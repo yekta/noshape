@@ -9,6 +9,14 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
+- **12:31 update (greens 8bb8a6d1 → 9da19774):** fuzz 69 (8bb8) × 600 alive. Live answered 1547–1553: filed P3
+  BODY-NAME-BY-TYPE (core), P3 GROUP-ROW-ERROR (skasm); SKETCH-START-INFERENCE confirmed; sketch 2.8 and assembly-sweep 5
+  = live; SKETCH-HINT-OVERLAP → live has no sketch tool hints at all. Verified: drawing S19 / A7 (format layers, lock),
+  K22; core-workflow 2.17 / 2.18 / 3.12 / 3.14 (core-workflow now 65/65 + 1 known ❌); analysis MP1–MP10 (measure
+  readouts vs live, new rows); derived CRASH1; advanced 3.8. SHELL-SLOW A/B: no change vs v0.4.12 (4–6.5 s at load 40–54).
+  103cd81d re-check: rectangle glyph owners = live, but vertical-edge glyph side and corner Coincident glyphs still differ
+  (SKETCH-RECT-DIM-GLYPHS note); new P3 SKETCH-VDIM-SIDE-ARROWS. Asked live: drawing line "Move to", status area unit.
+  Next: c9ed5cdb (MATE-CONNECTOR-PANEL-HIGHLIGHT) and 1649c27d (folder Roll to here) when green; fuzz 70; drawing.md rows.
 - **12:02 update (greens ea572159 → 8cd3c4da):** fuzz 68 (8cd3) × 600 alive. Filed **P1 SKETCH-MODEL-EDGE-SELECT** (skasm: in
   a sketch a click on a model edge selects nothing and clears the selection; also in v0.4.12), P1 (raised) SKETCH-START-INFERENCE,
   P2 RIB-CHAIN-NORMAL (core: L profile Normal rib fails; live +160), P3 SELECT-OTHER-POS (psui: popup 77 px low), P3
