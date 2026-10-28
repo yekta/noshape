@@ -3020,7 +3020,10 @@ impl PartStudioView {
         let raw = self.ui.hover_pick.as_ref().map(|t| t.reference.clone());
         let raw_edge = self.ui.hover_pick.as_ref().filter(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve)).map(|t| t.reference.clone());
         let points_ok = self.sketch.is_none() && self.active_field_filter(cx).is_none_or(field_takes_points);
+        // Out of the graphics nothing snaps (HOVER-VERTEX-STAYS: the pointer's
+        // last place inside kept an armed edge's midpoint lit after it left).
         let in_window = points_ok
+            && self.viewport.read(cx).pointer_inside()
             && match (&self.ui.midpoint_armed, self.ui.pointer) {
                 (Some(e), Some(p)) => self.edge_midpoint(e).and_then(|m| self.viewport.read(cx).project(m)).is_some_and(|s| in_midpoint_window(s, p)),
                 _ => false,
