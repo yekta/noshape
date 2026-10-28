@@ -2701,6 +2701,10 @@ impl PartStudioView {
                 .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| this.toggle_panel(panel, w, cx)))
         };
         v_flex()
+            // Chrome over the graphics (with a panel open the strip sits over
+            // them): its clicks and hover never reach the model (live,
+            // STRIP-CLICK-THROUGH).
+            .occlude()
             .pt(px(1.))
             .mr(px(-1.))
             // Live order (part-studio/77): Appearance, Configuration, Custom
