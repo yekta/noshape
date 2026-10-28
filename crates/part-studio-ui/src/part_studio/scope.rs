@@ -24,6 +24,14 @@ impl PartStudioView {
             for name in noshape_model::variables::variables_defined_later(studio, i) {
                 own.remove(&name);
             }
+            // A name defined again later: the value it has at `at`
+            // (DIALOG-EXPR-SCOPE: `#w = 5 mm` before Extrude 1, `#w = 8 mm`
+            // after it, Extrude 1's Depth reads 5 mm as live).
+            for f in studio.features.iter().take(i) {
+                if let Some((name, q)) = self.display.features.iter().find(|s| s.id == f.id).and_then(|s| s.variable.clone()) {
+                    own.insert(name, q);
+                }
+            }
         }
         vars.extend(own);
         vars

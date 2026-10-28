@@ -61,3 +61,20 @@ fn a_configured_variable_names_itself_with_the_active_value() {
     assert_eq!(crate::interaction::display_name(&cfg.for_editing(&var, &large)), "#w = 80 mm");
     assert_eq!(crate::interaction::display_name(&cfg.for_editing(&var, &cfg.defaults())), "#w = 40 mm");
 }
+
+/// A Variable feature's state holds the value it assigned, so a feature
+/// between two definitions of a name reads the first (DIALOG-EXPR-SCOPE).
+#[test]
+fn a_variable_feature_records_the_value_it_assigned() {
+    let units = noshape_units::UnitPrefs::default();
+    let mut ps = crate::partstudio::PartStudio::new();
+    for value in ["5 mm", "8 mm"] {
+        let mut f = ps.new_feature("assignVariable", &units).unwrap();
+        f.params.set("name", ParamValue::Text("w".into()));
+        f.params.set("lengthValue", ParamValue::Expr(ExprValue::new(value)));
+        ps.features.push(f);
+    }
+    let r = crate::regen::Regenerator::new().regenerate(&ps, &Default::default(), &units, &crate::regen::RegenOptions::default());
+    let values: Vec<(String, f64)> = r.display.features.iter().filter_map(|s| s.variable.clone()).map(|(n, q)| (n, (q.value * 1e6).round() / 1e3)).collect();
+    assert_eq!(values, [("w".to_string(), 5.0), ("w".to_string(), 8.0)]);
+}

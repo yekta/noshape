@@ -341,6 +341,10 @@ pub struct FeatureState {
     /// Values the feature computed for its read-only parameters (Onshape's
     /// `setFeatureComputedParameter`, e.g. a Hole's Up to next depth).
     pub computed: Vec<(String, ComputedValue)>,
+    /// A Variable feature's name and the value it assigned: a later
+    /// feature's dialog shows the value in scope at that feature
+    /// (DIALOG-EXPR-SCOPE), not the end of the list's.
+    pub variable: Option<(String, noshape_units::Quantity)>,
     /// Parts an Add / Remove / Intersect tool touched while its merge scope
     /// was empty: the dialog's default scope (live part-studio/234, qa5 BOOL4).
     pub touched: Vec<BodyId>,

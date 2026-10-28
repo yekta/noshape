@@ -281,7 +281,7 @@ impl Regenerator {
             }
             live.push(f.id);
             if i >= upto {
-                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new() });
+                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new() });
                 continue;
             }
             if let Some(versions) = self.entries.get_mut(&f.id)
@@ -297,7 +297,7 @@ impl Regenerator {
             }
             evaluated.push(f.id);
             let ft = Instant::now();
-            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new() };
+            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new() };
             if let Some(msg) = expr_error.take() {
                 state.status = FeatureStatus::Error;
                 state.message = Some(msg);
@@ -398,6 +398,10 @@ impl Regenerator {
                                 }
                                 ev.ctx.renumber_default_names();
                                 ctx = Arc::new(ev.ctx);
+                                if f.type_id == "assignVariable" {
+                                    let name = params.text("name").trim().trim_start_matches('#').to_string();
+                                    state.variable = ctx.variables.get(&name).map(|q| (name, *q));
+                                }
                             }
                             Ok(Err(e)) => {
                                 state.status = if e.warning { FeatureStatus::Warning } else { FeatureStatus::Error };
