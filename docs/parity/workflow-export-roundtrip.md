@@ -54,7 +54,15 @@ EXP1 Rhino: "Rhino export needs openNURBS" → ✗ still, routed kern (packaging
 ## Re-run pass 24 (qa5, 2026-10-24 ~00:20, CLI target-engine 13:51; source = tonight's bracket without step 8 (ADV9), 65431.327533 mm³ / 18 faces)
 | Format | Re-import | Status | Verified |
 |---|---|---|---|
-| Parasolid, ACIS, STEP, IGES, JT | 65431.327533 mm³, 18 faces (exact) | ✅ |  |
-| Rhino (3dm) | 65431.327331, 18 faces (this CLI build has openNURBS) | ✅ (RHINO1: works where openNURBS is built in) |  |
-| PVZ, glTF, GLB, OBJ, 3MF | 65434.9 – 65436.5 mm³ (mesh), 1 face | ✅ (mesh tolerance) |  |
+| Parasolid, ACIS, STEP, IGES, JT | 65431.327533 mm³, 18 faces (exact) | ✅ | v0.4.12 CLI 10-28 (bracket24 67643.716875 / 18): x_t / sat / step / igs / jt all 67643.716875, 18 faces |
+| Rhino (3dm) | 65431.327331, 18 faces (this CLI build has openNURBS) | ✅ (RHINO1: works where openNURBS is built in) | v0.4.12 CLI 10-28 (bracket24 67643.716875 / 18): 3dm 67643.716875, 18 faces (release build has openNURBS) |
+| PVZ, glTF, GLB, OBJ, 3MF | 65434.9 – 65436.5 mm³ (mesh), 1 face | ✅ (mesh tolerance) | v0.4.12 CLI 10-28 (bracket24 67643.716875 / 18): pvz 67646.192871, gltf / glb 67646.763954, 3mf 67646.765079, obj (from its zip) 67646.764949, 1 face |
 | STL, CLI defaults | 6.5e-05 mm³: exported in metres, imported in mm | ✅ as live (row 19: same in Onshape) | 77870dd4 10-28 (UI STL dialog: Units Meter by default, as live's sticky Meter) |
+
+## Re-run 2026-10-28 (qa, v0.4.12 CLI, bin/roundtrip_qa.py on tickets/bracket24.noshape = 67643.716875 mm³ / 18 faces)
+| Row | Ours | Status | Verified |
+|---|---|---|---|
+| Exact formats (Parasolid, ACIS, STEP, IGES, JT, Rhino) | 67643.716875, 18 faces each | ✅ | v0.4.12 CLI 10-28 |
+| Mesh formats (PVZ, glTF, GLB, 3MF) | 67646.19 – 67646.77, 1 face | ✅ (mesh) | v0.4.12 CLI 10-28 |
+| OBJ | export writes <name>.zip (obj + mtl) as live's OBJ download; import_files of that zip fails "Root assembly file not found. Ensure zip file name matches root assembly name and the archive does not have folders" (b2.zip holds b2.obj); the bare .obj re-imports 67646.764949 / 1 face | ? (live asked: REQUESTS qa 10-28 06:31) |  |
+| STL (CLI defaults) | 6.8e-05 mm³ (metres out, mm in) | ✅ as live | v0.4.12 CLI 10-28 |
