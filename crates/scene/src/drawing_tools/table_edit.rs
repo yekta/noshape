@@ -159,6 +159,8 @@ pub fn split_label(k: &TableKind) -> &'static str {
         TableKind::Bom { .. } => "Split BOM table below",
         // Help (cut_list_table): "Split cut list table below".
         TableKind::CutList { .. } => "Split cut list table below",
+        // Help (drawing_hole_table): "Split hole table above/below".
+        TableKind::Hole { .. } => "Split hole table below",
         _ => "Split table below",
     }
 }
@@ -167,6 +169,7 @@ pub fn split_label(k: &TableKind) -> &'static str {
 pub fn unsplit_label(k: &TableKind) -> &'static str {
     match k {
         TableKind::CutList { .. } => "Unsplit cut list table",
+        TableKind::Hole { .. } => "Unsplit hole table",
         _ => "Unsplit table",
     }
 }
@@ -181,7 +184,7 @@ fn shown_rows(t: &Table, l: &TableLayout) -> [usize; 2] {
 /// second part starts at), if it can.
 pub fn split_at(t: &Table, l: &TableLayout, r: usize) -> Option<usize> {
     let shown = l.ys.len().saturating_sub(1 + l.title as usize + 1);
-    let header_bottom = matches!(t.kind, TableKind::Bom { bottom_to_top: true, .. } | TableKind::CutList { bottom_to_top: true, .. } | TableKind::Custom { bottom_to_top: true, .. });
+    let header_bottom = matches!(t.kind, TableKind::Bom { bottom_to_top: true, .. } | TableKind::CutList { bottom_to_top: true, .. } | TableKind::Custom { bottom_to_top: true, .. } | TableKind::Hole { bottom_to_top: true, .. });
     let data_r = if header_bottom { r } else { r.wrapping_sub(1) };
     (data_r < shown && data_r + 1 < shown).then(|| shown_rows(t, l)[0] + data_r + 1)
 }

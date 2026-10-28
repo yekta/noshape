@@ -1610,9 +1610,10 @@ impl DrawingEditor {
         if matches!(t.kind, TableKind::General { .. }) && self.cell_sel.is_none_or(|c| c.table != id) {
             return self.data_table_entries(id, cx);
         }
-        // BOM, cut list and custom tables: Onshape's menus — the cells' (Size,
-        // Resize) with cells selected, else the whole table's.
-        if matches!(t.kind, TableKind::Bom { .. } | TableKind::CutList { .. } | TableKind::Custom { .. }) {
+        // BOM, cut list, hole and custom tables: Onshape's menus — the
+        // cells' (Size, Resize) with cells selected, else the whole table's
+        // (qa HOLE-TABLE-MENU: hole tables had the general table's).
+        if matches!(t.kind, TableKind::Bom { .. } | TableKind::CutList { .. } | TableKind::Hole { .. } | TableKind::Custom { .. }) {
             return match self.cell_sel.filter(|c| c.table == id) {
                 Some(cs) => self.cell_size_entries(&t, cs),
                 None => self.data_table_entries(id, cx),
@@ -1625,10 +1626,6 @@ impl DrawingEditor {
         }
         if let TableKind::Revision { .. } = t.kind {
             out.extend(self.revision_table_entries(id, cell));
-        }
-
-        if let TableKind::Hole { .. } = t.kind {
-            out.push(MenuEntry::item("Hole table properties...", move |t, _, cx| t.open_hole_table_props(id, cx)));
         }
         out.extend(self.table_more_entries(&t, cell));
         if let TableKind::CutList { bottom_to_top, .. } = t.kind {

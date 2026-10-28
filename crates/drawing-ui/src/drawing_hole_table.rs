@@ -61,6 +61,9 @@ impl DrawingEditor {
 
     fn close_hole_table_props(&mut self, accept: bool, cx: &mut Context<Self>) {
         let Some(d) = self.hole_dlg.take() else { return };
+        // The table's columns may change: no stale cell outline (qa
+        // HOLE-TABLE-MENU (2)).
+        self.cell_sel = None;
         if let (true, Some(id)) = (accept, d.table) {
             let (sl, pr, bt, corner) = (d.show_location, d.precision, d.bottom_to_top, d.corner);
             self.edit_table(id, "Hole table properties", cx, move |t| {
@@ -112,7 +115,8 @@ impl DrawingEditor {
                 m
             })
         };
-        let row = |label: &'static str, body: AnyElement| h_flex().h(px(28.)).px(px(8.)).child(div().w(px(70.)).text_size(px(11.)).child(label)).child(body).into_any_element();
+        // "Location precision" on one line (it wrapped at 70 px, walk 10-28).
+        let row = |label: &'static str, body: AnyElement| h_flex().h(px(28.)).px(px(8.)).child(div().w(px(98.)).flex_none().text_size(px(11.)).child(label)).child(body).into_any_element();
         let precisions: Vec<(String, bool, Set)> = PRECISIONS.iter().map(|&(l, p)| (l.to_string(), d.precision == p, std::rc::Rc::new(move |d: &mut HoleTableDlg| d.precision = p) as Set)).collect();
         let precision_label = PRECISIONS.iter().find(|(_, p)| *p == d.precision).map(|(l, _)| l.to_string()).unwrap_or_default();
         let orders: Vec<(String, bool, Set)> = vec![
@@ -197,11 +201,11 @@ impl DrawingEditor {
                         cx.notify();
                     }))),
                 )
-                .when(show, |v| v.child(row("Location precision", select("hole-table-precision", precision_label, 120., precisions).into_any_element())))
+                .when(show, |v| v.child(row("Location precision", select("hole-table-precision", precision_label, 112., precisions).into_any_element())))
                 .child(field(view_name.clone().unwrap_or_else(|| "Views".into()), view.is_none()))
                 .when(view.is_some(), |v| v.child(field(if origin { "Origin ✓".into() } else { "Origin: a vertex or circle center".into() }, !origin)))
                 .child(row("Sheet", div().text_size(px(12.)).child(self.current_sheet().name.clone()).into_any_element()))
-                .child(row("Order", select("hole-table-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, 120., orders).into_any_element()))
+                .child(row("Order", select("hole-table-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, 112., orders).into_any_element()))
                 .child(div().px(px(8.)).pt(px(4.)).text_size(px(11.)).child("Select fixed corner"))
                 .child(h_flex().px(px(8.)).pt(px(4.)).gap(px(26.)).children(corners))
                 .into_any_element(),

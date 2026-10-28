@@ -510,7 +510,31 @@ fn finish(drawing: &Drawing, table: &Table, mut data: TableData) -> TableData {
     // A split table shows its part of the rows.
     if let Some([a, b]) = table.rows {
         let n = data.rows.len();
-        data.rows = data.rows[a.min(n)..b.min(n)].to_vec();
+        let (a, b) = (a.min(n), b.min(n));
+        // Computed merges (hole tables' SIZE / QTY) clipped to the part; a
+        // group the split cuts shows its text in both parts.
+        let off = usize::from(data.header.is_some() && !data.header_bottom);
+        let mut merges = Vec::new();
+        for m in &data.merges {
+            let (s, e) = (m.row.saturating_sub(off), m.row.saturating_sub(off) + m.rows);
+            let (s2, e2) = (s.max(a), e.min(b));
+            if s2 >= e2 {
+                continue;
+            }
+            if s2 > s {
+                for c in m.col..m.col + m.cols {
+                    let v = data.rows[s].get(c).cloned().unwrap_or_default();
+                    if let Some(x) = data.rows[s2].get_mut(c) {
+                        *x = v;
+                    }
+                }
+            }
+            if e2 - s2 > 1 || m.cols > 1 {
+                merges.push(super::CellMerge { row: s2 - a + off, col: m.col, rows: e2 - s2, cols: m.cols });
+            }
+        }
+        data.merges = merges;
+        data.rows = data.rows[a..b].to_vec();
         data.overridden = data.overridden.iter().filter(|(r, _)| *r >= a && *r < b).map(|(r, c)| (r - a, *c)).collect();
     }
     data.padding = padding(drawing);

@@ -152,6 +152,13 @@ fn timed_nist_import() {
             // As live: an Assembly and a Part Studio of the 8 distinct parts.
             assert!(r["tabs"].as_array().unwrap().iter().any(|t| t["kind"] == "Assembly"), "{r}");
             parts = r["parts"].as_array().map(|p| p.len()).unwrap_or(0);
+            // At live's size: the box is 152.4 × 101.6 × 73 mm, the largest
+            // part (qa XT-ASM-SCALE: x_t parts came in 1000× too small).
+            let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").expect("the parts' Part Studio")["id"].clone();
+            let q = call(&mut ctx, "query_parts", json!({ "tab": studio }));
+            let extent = |p: &Value| (0..3).map(|k| p["bounding_box"]["max"][k].as_f64().unwrap() - p["bounding_box"]["min"][k].as_f64().unwrap()).fold(0.0, f64::max);
+            let biggest = q["parts"].as_array().unwrap().iter().map(extent).fold(0.0, f64::max);
+            assert!((biggest - 152.4).abs() < 0.5, "{ext}: the largest part is {biggest} mm long, not 152.4");
             let _ = std::fs::remove_dir_all(&dir);
         }
         assert_eq!(parts, 8);

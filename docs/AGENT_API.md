@@ -4686,7 +4686,7 @@ The table context menus, one edit each. Cells are (`row`, `column`) counted from
 - General tables, a block selected: `merge` (`mode` all | horizontal | vertical), `insert` (`at` column_left | column_right | row_above | row_below), `remove` / `duplicate` (`what` columns | rows); edit texts the menu's ("All", "Column Left", "Rows"…).
 - `columns_equally` / `rows_equally`: Size ▸ — of the block's columns / rows when a block is given (two or more), else the whole table.
 - `resize`: Resize… column `column`'s `width` and the row `height` (mm) ("Resize cell").
-- BOM, cut list and custom tables: `split` below displayed row `row` ("Split table"; the reply's `table` is the new part), `unsplit` ("Unsplit table").
+- BOM, cut list, hole and custom tables: `split` below displayed row `row` ("Split table"; the reply's `table` is the new part), `unsplit` ("Unsplit table").
 - Hole tables: `flip_x`, `flip_y`, `precision` (`decimals` 0–4 or null for the drawing's).
 - `order` (`to` top_to_bottom | bottom_to_top; BOM, cut list and hole tables), `show_location` (`on`: a hole table's X LOC / Y LOC columns, Show location data), `bom_type` (`to` flattened | structured).
 - `fixed_corner` (`to` top_right | top_left | bottom_right | bottom_left; the table stays put), `text_height` (`to` 2.5 | 3 | 3.5 | 5 mm), `fit` (Fit to content).

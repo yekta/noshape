@@ -41,6 +41,22 @@ impl DrawingEditor {
             self.cell_sel = None;
             return false;
         };
+        // Help (bom_table, cut_list_table, drawing_hole_table): "Click the
+        // edge of the table to select the entire table".
+        let lists = matches!(self.current_sheet().table(id).map(|t| &t.kind), Some(TableKind::Bom { .. } | TableKind::CutList { .. } | TableKind::Hole { .. }));
+        let tol = self.tol_mm(4.0);
+        let on_edge = self.built.as_ref().and_then(|b| b.table_layout(id)).is_some_and(|l| {
+            let (lo, hi, c) = (l.min(), l.max(), self.cursor);
+            [c[0] - lo[0], c[0] - hi[0], c[1] - lo[1], c[1] - hi[1]].iter().any(|d| d.abs() < tol)
+        });
+        if lists && on_edge {
+            self.selection = vec![Sel::Table(id)];
+            self.cell_sel = None;
+            self.status = None;
+            self.update_preview(cx);
+            self.redraw(cx);
+            return true;
+        }
         let Some(cell) = self.built.as_ref().and_then(|b| b.table_layout(id)).and_then(|l| l.cell_at(self.cursor)) else {
             self.cell_sel = None;
             return false;

@@ -255,6 +255,7 @@ impl DrawingEditor {
             TableKind::Custom { .. } => MenuEntry::item("Custom table properties...", move |t, _, cx| t.open_custom_props(id, cx)),
             TableKind::Bom { .. } => MenuEntry::item("BOM table properties...", move |t, _, cx| t.open_table_props(id, cx)),
             TableKind::CutList { .. } => MenuEntry::item("Cut list table properties...", move |t, _, cx| t.open_table_props(id, cx)),
+            TableKind::Hole { .. } => MenuEntry::item("Hole table properties...", move |t, _, cx| t.open_hole_table_props(id, cx)),
             // General tables (live drawing/549): only the fixed corner.
             _ => MenuEntry::item("Table properties...", move |t, _, cx| t.open_table_props_corner(id, cx)),
         });

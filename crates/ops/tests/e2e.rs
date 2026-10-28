@@ -4938,6 +4938,12 @@ fn hole_table_sizes_are_the_hole_callouts() {
     let pts: Vec<Value> = p["created"].as_array().unwrap().iter().map(|x| x["id"].clone()).collect();
     let hole = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": pts, "holeDiameterV3": "6.6 mm", "endStyleV2": "THROUGH" } }));
     assert_eq!(hole["regeneration"]["failed"], json!([]), "{hole}");
+    // R2 rounds on the block's vertical edges: convex, not holes (qa HOLE-TABLE-FILLETS).
+    let edges = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "line" }));
+    let vertical: Vec<Value> = edges["edges"].as_array().unwrap().iter().filter(|e| num(&e["direction"][2]).abs() > 0.99 && (num(&e["start"][0]) < 1.0 || num(&e["start"][0]) > 79.0)).map(|e| e["id"].clone()).collect();
+    assert_eq!(vertical.len(), 4, "{edges}");
+    let fi = call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": vertical, "radius": "2 mm" } }));
+    assert_eq!(fi["feature_status"]["status"], "Ok", "{fi}");
     let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
@@ -4950,4 +4956,12 @@ fn hole_table_sizes_are_the_hole_callouts() {
     assert!(rows[0][3].as_str().is_some_and(|s| s.starts_with('⌀') && s.contains("6.6") && s.contains("THRU")), "{t}");
     assert_eq!(rows[0][4], "3", "{t}");
     assert_eq!((rows[1][3].as_str(), rows[2][4].as_str()), (Some(""), Some("")), "merged: {t}");
+    // Split hole table below A1 (help drawing_hole_table): the second part
+    // shows the group's SIZE / QTY too.
+    let sp = call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": ht["table"], "action": "split", "row": 1 }));
+    let tables = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["tables"].clone();
+    let part = tables.as_array().unwrap().iter().find(|t| t["id"] == sp["table"]).cloned().unwrap();
+    let rows = part["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 2, "{part}");
+    assert!(rows[0][3].as_str().is_some_and(|s| s.contains("6.6")) && rows[0][4] == "3", "{part}");
 }

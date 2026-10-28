@@ -78,13 +78,13 @@ fn face_colors_of(r: &ffi::StepImport, i: usize) -> Vec<(usize, [f32; 3])> {
 /// available (STEPCAFControl / XCAF). Shapes are converted to `unit`.
 pub fn read_step(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
     let r = ck(ffi::read_step(path_str(path)?))?;
-    step_shapes(&r, unit)
+    step_shapes(&r, 1.0 / unit.mm_per_unit())
 }
 
 /// A STEP reader's shapes (OCCT millimetres) in `unit`, with names and colours.
-fn step_shapes(r: &ffi::StepImport, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
+/// The imported shapes scaled by `f` (to the caller's unit).
+fn step_shapes(r: &ffi::StepImport, f: f64) -> Result<Vec<ImportedShape>> {
     let shapes = list_to_vec(&r.shapes);
-    let f = 1.0 / unit.mm_per_unit();
     shapes
         .into_iter()
         .enumerate()
@@ -110,7 +110,8 @@ pub fn read_step_assembly(path: &Path, unit: LengthUnit) -> Result<Option<StepAs
     if t.instances.is_empty() {
         return Ok(None);
     }
-    Ok(Some((t.root.clone(), step_shapes(&t.parts, unit)?, pvz_instances_of(&t.instances))))
+    // OCCT reads STEP in millimetres.
+    Ok(Some((t.root.clone(), step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?, pvz_instances_of(&t.instances))))
 }
 
 /// A Parasolid transmit file (.x_t / .x_b) holding an assembly: the top
@@ -122,7 +123,9 @@ pub fn read_parasolid_assembly(path: &Path, unit: LengthUnit) -> Result<Option<S
     if t.instances.is_empty() {
         return Ok(None);
     }
-    Ok(Some((t.root.clone(), step_shapes(&t.parts, unit)?, pvz_instances_of(&t.instances))))
+    // Parasolid is in metres (as `read_parasolid`; qa XT-ASM-SCALE: the
+    // parts came in 1000× too small).
+    Ok(Some((t.root.clone(), step_shapes(&t.parts, 1e3 / unit.mm_per_unit())?, pvz_instances_of(&t.instances))))
 }
 
 /// A shape to export with optional name and color.

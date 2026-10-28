@@ -860,9 +860,9 @@ pub enum EdgeGeom {
     Line { a: [f64; 2], b: [f64; 2] },
     /// Circle or arc. `face_on` when the circle's axis is parallel to the
     /// viewing direction (it projects to a true circle); `bore` when it
-    /// bounds a cylindrical face of the same radius and axis (a hole or
-    /// boss rather than e.g. a fillet rim); `mid` is the projected middle
-    /// point of the edge (on the arc).
+    /// bounds a concave cylindrical face of the same radius and axis (a
+    /// hole: not a boss, nor a convex round's rim, qa HOLE-TABLE-FILLETS);
+    /// `mid` is the projected middle point of the edge (on the arc).
     Circle { center: [f64; 2], radius: f64, face_on: bool, bore: bool, mid: [f64; 2] },
     Other,
 }
@@ -1994,13 +1994,21 @@ fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &Bod
         Curve::Line { .. } => EdgeGeom::Line { a: frame.project(info.start), b: frame.project(info.end) },
         Curve::Circle { center, axis, radius, .. } => {
             let axis = axis.normalize();
+            let mid3 = e.point_at((info.first_param + info.last_param) / 2.0).unwrap_or(info.start);
+            // Material outside the cylinder: its outward normal at the rim
+            // points to the axis.
+            let to_axis = {
+                let d = center - mid3;
+                d - axis * d.dot(axis)
+            };
             let bore = topo.ef.get(edge_index).is_some_and(|faces| {
                 faces.iter().any(|&f| {
-                    matches!(body.shape.sub_shape(ShapeType::Face, f as usize).and_then(|f| f.face_surface()),
-                        Ok(Surface::Cylinder { axis: a, radius: rc, .. }) if (rc - radius).abs() <= radius * 1e-6 + 1e-12 && a.normalize().dot(axis).abs() > 1.0 - 1e-6)
+                    let Ok(face) = body.shape.sub_shape(ShapeType::Face, f as usize) else { return false };
+                    matches!(face.face_surface(), Ok(Surface::Cylinder { axis: a, radius: rc, .. }) if (rc - radius).abs() <= radius * 1e-6 + 1e-12 && a.normalize().dot(axis).abs() > 1.0 - 1e-6)
+                        && face.normal_at_point(mid3).is_ok_and(|n| n.dot(to_axis) > 0.0)
                 })
             });
-            let mid = e.point_at((info.first_param + info.last_param) / 2.0).map(|p| frame.project(p)).unwrap_or(frame.project(info.start));
+            let mid = frame.project(mid3);
             EdgeGeom::Circle { center: frame.project(center), radius, face_on: axis.dot(frame.dir).abs() > 1.0 - 1e-6, bore, mid }
         }
         _ => EdgeGeom::Other,
