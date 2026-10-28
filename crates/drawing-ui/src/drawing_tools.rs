@@ -19,6 +19,7 @@ impl DrawingEditor {
         self.woken_centers.clear();
         self.woken_points.clear();
         self.datum_on = None;
+        self.datum_at = None;
         self.sketch_dim_pick = None;
         // Choosing a tool keeps the palette's changes (like a click away).
         if self.palette.is_some() {
@@ -348,6 +349,7 @@ impl DrawingEditor {
             datum_label: Some(self.datum_dialog_label()),
             datum_rows: self.datum_dlg.as_ref().map(|d| d.rows.iter().map(|r| r.ann.clone()).collect()).unwrap_or_default(),
             datum_on: self.datum_on,
+            datum_at: self.datum_at,
             datum_target_letter: self.datum_target_letter,
             sketch_dim_pick: self.sketch_dim_pick,
         }

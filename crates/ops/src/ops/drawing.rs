@@ -484,6 +484,14 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                 if !texts.is_empty() {
                     j["text"] = json!(texts.join(" "));
                 }
+                // Where it is drawn (lines and text anchors, sheet mm).
+                let mine = |p: u32| matches!(b.picks.get(p as usize), Some(noshape_model::drawing::build::PickTarget::Annotation(x)) if *x == a.id);
+                let pts: Vec<[f64; 2]> = b.geometry.lines.iter().filter(|l| mine(l.pick)).flat_map(|l| l.points.iter().copied()).chain(b.geometry.texts.iter().filter(|t| mine(t.pick)).map(|t| t.pos)).collect();
+                if !pts.is_empty() {
+                    let lo = pts.iter().fold([f64::INFINITY; 2], |m, p| [m[0].min(p[0]), m[1].min(p[1])]);
+                    let hi = pts.iter().fold([f64::NEG_INFINITY; 2], |m, p| [m[0].max(p[0]), m[1].max(p[1])]);
+                    j["bounds"] = json!({ "min": pt(lo), "max": pt(hi) });
+                }
             }
             if let Some(v) = a.kind.view() {
                 j["view"] = json!(v.0);

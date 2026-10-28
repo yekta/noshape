@@ -893,6 +893,12 @@ pub enum AnnotationKind {
         label: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         on: Option<DatumOn>,
+        /// On a view's geometry: that point (view coordinates). The
+        /// triangle follows the view when it moves or rescales and the box
+        /// moves with it (qa DATUM-SCALE-DETACHED); `anchor` is where it was
+        /// when placed.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        at: Option<(ViewId, [f64; 2])>,
     },
     /// Ordinate dimension group: one datum (`origin`) and the values of
     /// every point measured from it along x (`horizontal`) or y. The texts

@@ -20,6 +20,8 @@ pub struct ToolValues {
     pub datum_rows: Vec<Annotation>,
     /// Datum tool: the annotation line the triangle was put on.
     pub datum_on: Option<DatumOn>,
+    /// Datum tool: the view point the triangle was put on.
+    pub datum_at: Option<(ViewId, [f64; 2])>,
     /// Datum target tool: the letter of the set being placed.
     pub datum_target_letter: Option<char>,
     /// Dimension tool: the drawing-sketch entity picked (SK7).
@@ -203,7 +205,7 @@ impl SheetPick<'_> {
                 if len(sub(c, *a)) < 3.0 {
                     return None;
                 }
-                Some(Annotation { id, kind: AnnotationKind::Datum { anchor: *a, label: v.datum_label.clone().filter(|s| !s.is_empty()).unwrap_or_else(|| self.next_datum_label()), on: v.datum_on }, position: c, ..Default::default() })
+                Some(Annotation { id, kind: AnnotationKind::Datum { anchor: *a, label: v.datum_label.clone().filter(|s| !s.is_empty()).unwrap_or_else(|| self.next_datum_label()), on: v.datum_on, at: v.datum_at }, position: c, ..Default::default() })
             }
             _ => None,
         }

@@ -1017,7 +1017,10 @@ impl DrawingEditor {
                 // crosshair), else on the geometry.
                 let on = self.datum_attach_at(c);
                 self.datum_on = on.map(|o| o.1);
-                let p = on.map(|o| o.0).or_else(|| self.snap_at(c).and_then(|s| self.pick_sheet(&s))).unwrap_or(c);
+                // On a view's geometry: kept as that view point (it follows the view).
+                let pp = if on.is_none() { self.any_point(c) } else { None };
+                self.datum_at = pp.as_ref().map(|s| (s.view, s.p));
+                let p = on.map(|o| o.0).or_else(|| pp.as_ref().and_then(|s| self.pick_sheet(s))).unwrap_or(c);
                 self.tool = Tool::Datum { anchor: Some(p) };
             }
             Tool::Datum { anchor: Some(_) } => {
@@ -1026,6 +1029,7 @@ impl DrawingEditor {
                     // Help datum: the tool stays active for more datums.
                     self.tool = Tool::Datum { anchor: None };
                     self.datum_on = None;
+                    self.datum_at = None;
                     self.datum_placed(window, cx);
                 }
             }

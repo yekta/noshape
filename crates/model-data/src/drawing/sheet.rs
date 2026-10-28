@@ -1569,7 +1569,7 @@ impl SheetGeometry {
                         }
                     }
                 }
-                AnnotationKind::Datum { anchor, label, on } => {
+                AnnotationKind::Datum { anchor, label, on, at } => {
                     let (bw, bh) = ((font::text_width(label, ah) + 3.0).max(7.0), 7.0);
                     // On another annotation: the box follows it and the
                     // triangle sits on the line square below the box; past
@@ -1594,7 +1594,14 @@ impl SheetGeometry {
                             }
                             (q, c, Some([n[0] * side, n[1] * side]))
                         }
-                        None => (*anchor, a.position, None),
+                        None => match at {
+                            Some((v, p)) => {
+                                let s = env.to_sheet(*v, *p);
+                                let d = [s[0] - anchor[0], s[1] - anchor[1]];
+                                (s, [a.position[0] + d[0], a.position[1] + d[1]], None)
+                            }
+                            None => (*anchor, a.position, None),
+                        },
                     };
                     self.lines.push(Polyline2 { points: vec![[c[0] - bw / 2.0, c[1] - bh / 2.0], [c[0] + bw / 2.0, c[1] - bh / 2.0], [c[0] + bw / 2.0, c[1] + bh / 2.0], [c[0] - bw / 2.0, c[1] + bh / 2.0]], style: LineStyle::Thin, closed: true, pick });
                     self.texts.push(Text2 { pos: c, height: ah, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });

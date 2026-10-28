@@ -1781,8 +1781,15 @@ fn drawing_callouts_ordinates_and_datums() {
     assert_eq!(e.param.as_deref(), Some("table"), "{e:?}");
 
     let dt = call(&mut ctx, "drawing_datum", json!({ "drawing": tab, "anchor": quarter(&lines[1]), "position": [quarter(&lines[1])[0], quarter(&lines[1])[1] + 15.0] }));
-    assert_eq!(kind_of(&mut ctx, dt["annotation"].as_u64().unwrap()), "Datum");
+    let did = dt["annotation"].as_u64().unwrap();
+    assert_eq!(kind_of(&mut ctx, did), "Datum");
     assert!(last(&mut ctx).ends_with(":: Datum"));
+    // On the view's edge it follows the view's scale (qa DATUM-SCALE-DETACHED).
+    let bounds = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["annotations"].as_array().unwrap().iter().find(|a| a["id"] == did).unwrap()["bounds"].clone();
+    let before = bounds(&mut ctx);
+    call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "action": "properties", "set": { "scale": "1:2" } }));
+    let after = bounds(&mut ctx);
+    assert!((num(&after["min"][0]) - num(&before["min"][0])).abs() + (num(&after["min"][1]) - num(&before["min"][1])).abs() > 1.0, "the datum moved with its edge: {before} → {after}");
 }
 
 #[test]

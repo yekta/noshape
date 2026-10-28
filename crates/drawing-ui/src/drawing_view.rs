@@ -325,6 +325,8 @@ pub struct DrawingEditor {
     pub woken_points: Vec<[f64; 2]>,
     /// Datum tool: the annotation line the datum's triangle was put on.
     pub datum_on: Option<noshape_model::drawing::DatumOn>,
+    /// Datum tool: the view point the triangle was put on.
+    pub datum_at: Option<(ViewId, [f64; 2])>,
     /// Datum target tool: the letter of the set being placed (A1, A2…; a
     /// new run of the tool starts the next letter's set).
     pub datum_target_letter: Option<char>,
@@ -550,6 +552,7 @@ impl DrawingEditor {
             woken_centers: Vec::new(),
             woken_points: Vec::new(),
             datum_on: None,
+            datum_at: None,
             datum_target_letter: None,
             menu_at: [0.0; 2],
             move_sheet: None,

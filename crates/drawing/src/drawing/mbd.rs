@@ -46,7 +46,7 @@ pub fn place_model_datums(drawing: &mut Drawing, doc: &Document) {
                     let ModelKind::Datum { letter } = &m.kind;
                     placed.push((key.tab, m.id));
                     add.push(Annotation {
-                        kind: AnnotationKind::Datum { anchor: v.position, label: letter.clone(), on: None },
+                        kind: AnnotationKind::Datum { anchor: v.position, label: letter.clone(), on: None, at: None },
                         position: v.position,
                         model: Some(ModelRef { tab: key.tab, id: m.id, view: v.id, offset: DEFAULT_OFFSET, hidden: false }),
                         ..Default::default()
@@ -105,7 +105,7 @@ pub fn resolve_model_annotations(sheet: &mut Sheet, geoms: &HashMap<ViewId, Arc<
         let view = m.view;
         let Some((anchor, pos)) = model_datum_points(ma, &frame, &|p| to_sheet(view, p), m.offset) else { return false };
         let ModelKind::Datum { letter } = &ma.kind;
-        a.kind = AnnotationKind::Datum { anchor, label: letter.clone(), on: None };
+        a.kind = AnnotationKind::Datum { anchor, label: letter.clone(), on: None, at: None };
         a.position = pos;
         true
     });

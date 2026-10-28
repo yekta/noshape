@@ -1307,13 +1307,15 @@ fn datum(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let pk = t.m.pick(&Tool::Datum { anchor: None }, &[], c);
     // On a GD&T frame edge or a dimension's lines, else on the geometry.
     let on = pk.datum_attach_at(c);
-    let anchor = on.map(|o| o.0).or_else(|| pk.snap_at(c).and_then(|s| pk.pick_sheet(&s))).unwrap_or(c);
+    // On a view's geometry: kept as that view point (it follows the view).
+    let pp = if on.is_none() { pk.any_point(c) } else { None };
+    let anchor = on.map(|o| o.0).or_else(|| pp.as_ref().and_then(|s| pk.pick_sheet(s))).unwrap_or(c);
     let label = match a.opt_str("label")?.map(str::trim).filter(|l| !l.is_empty()) {
         Some(l) => l.to_string(),
         None => pk.next_datum_label(),
     };
     let tool = Tool::Datum { anchor: Some(anchor) };
-    let ann = t.m.pick(&tool, &[], pt_arg(a, "position")?).pending_annotation(&ToolValues { datum_label: Some(label), datum_on: on.map(|o| o.1), ..Default::default() }).ok_or_else(|| OpError::param("position", "at least 3 mm from the anchor"))?;
+    let ann = t.m.pick(&tool, &[], pt_arg(a, "position")?).pending_annotation(&ToolValues { datum_label: Some(label), datum_on: on.map(|o| o.1), datum_at: pp.map(|s| (s.view, s.p)), ..Default::default() }).ok_or_else(|| OpError::param("position", "at least 3 mm from the anchor"))?;
     let (id, sheet) = (ann.id, t.sheet);
     t.d.sheets[sheet].annotations.push(ann);
     done(od, t, "Datum", "annotation", id)

@@ -639,7 +639,7 @@ fn dimension_formats_and_new_dimension_types() {
     add(sheet, AnnotationKind::ChamferDimension { view: ViewId(1), a: [0.0, 0.0], b: [0.002, 0.002], c: [0.002, 0.002], d: [0.01, 0.002] }, [150.0, 180.0]);
     add(sheet, AnnotationKind::ArcLengthDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.01, a: [0.01, 0.0], b: [0.0, 0.01], mid: [0.00707, 0.00707], offset: 5.0 }, [0.0; 2]);
     add(sheet, AnnotationKind::Gdt { anchor: [40.0, 40.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![], extra: Default::default() }, [40.0, 40.0]);
-    add(sheet, AnnotationKind::Datum { anchor: [60.0, 100.0], label: "A".into(), on: None }, [60.0, 112.0]);
+    add(sheet, AnnotationKind::Datum { anchor: [60.0, 100.0], label: "A".into(), on: None, at: None }, [60.0, 112.0]);
     add(sheet, AnnotationKind::SurfaceFinish { anchor: [80.0, 100.0], value: "Ra 1.6".into(), leaders: Vec::new() }, [80.0, 100.0]);
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let t = texts(&built);
@@ -2075,7 +2075,7 @@ fn datum_on_gdt_frame_follows_it() {
     let (line, seg, y, a, b) = bottom.unwrap();
     let mid = [(a[0] + b[0]) / 2.0, y];
     let on = DatumOn { ann: gid, line: line as u32, seg: seg as u32, t: 0.5 };
-    drawing.sheets[0].annotations.push(Annotation { id: gid + 1, kind: AnnotationKind::Datum { anchor: mid, label: "Q".into(), on: Some(on) }, position: [mid[0] + 3.0, y - 15.0], ..Default::default() });
+    drawing.sheets[0].annotations.push(Annotation { id: gid + 1, kind: AnnotationKind::Datum { anchor: mid, label: "Q".into(), on: Some(on), at: None }, position: [mid[0] + 3.0, y - 15.0], ..Default::default() });
     let at = |drawing: &Drawing| {
         let built = render_sheet(drawing, 0, &sources, &cache, false).unwrap();
         let t = built.geometry.texts.iter().find(|t| t.text == "Q").unwrap().pos;
@@ -2129,7 +2129,7 @@ fn datum_on_dimension_arrow_hides_it() {
     let (ann, line, seg, t, tip, arrow) = found.expect("a dimension with an arrowhead");
     let id = drawing.sheets[0].next_annotation_id();
     let on = DatumOn { ann, line, seg, t };
-    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::Datum { anchor: tip, label: "Q".into(), on: Some(on) }, position: [tip[0], tip[1] - 15.0], ..Default::default() });
+    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::Datum { anchor: tip, label: "Q".into(), on: Some(on), at: None }, position: [tip[0], tip[1] - 15.0], ..Default::default() });
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     assert!(!built.geometry.fills.iter().any(|f| f.points == arrow), "the covered arrowhead is still drawn");
 }
