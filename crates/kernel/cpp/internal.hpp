@@ -5,6 +5,11 @@
 #include "noshape-kernel/src/ffi.rs.h"
 
 #include <BRepTools_History.hxx>
+#include <Bnd_Box.hxx>
+#include <IntCurvesFace_Intersector.hxx>
+#include <TopAbs_State.hxx>
+#include <memory>
+#include <vector>
 #include <GProp_GProps.hxx>
 #include <Geom_Surface.hxx>
 #include <TopExp.hxx>
@@ -86,6 +91,29 @@ bool bop_parallel();
 bool valid_changed(const TopoDS_Shape& input, const TopoDS_Shape& r);
 // Every edge used twice, once each way (features.cpp).
 bool closed_and_oriented(const TopoDS_Shape& r);
+
+// A point against a solid by the parity of a ray's crossings, each ray
+// intersected only with the faces whose box it passes (OCCT's solid
+// classifier traces every face of a 1600-face part for each point, ~60 ms)
+// (geom.cpp). IN / OUT from a ray that crosses face interiors only; ON when
+// a crossing is within `tol` of the point; UNKNOWN when no ray was clean (a
+// crossing within `band` of the point, through an edge, or tangent): the
+// caller asks OCCT's classifier.
+class RayClassifier
+{
+public:
+  RayClassifier(const TopoDS_Shape& solid, double tol, double band);
+  // With the solid's faces and their boxes already at hand.
+  RayClassifier(const ShapeIMap& faces, std::vector<Bnd_Box> boxes, double tol, double band);
+  ~RayClassifier();
+  TopAbs_State Perform(const gp_Pnt& p);
+
+private:
+  ShapeIMap                                               myFaces;
+  std::vector<Bnd_Box>                                    myBoxes;
+  std::vector<std::unique_ptr<IntCurvesFace_Intersector>> myRays;
+  double                                                  myTol, myBand;
+};
 
 class HistoryBuilder
 {

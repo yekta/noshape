@@ -120,3 +120,45 @@ fn a_small_fuse_on_a_big_part_is_done_locally() {
     assert_eq!(last_boolean_path(), "occt");
     assert_eq!(noshape_kernel::bool_corpus::Summary::of(&local).differences(&noshape_kernel::bool_corpus::Summary::of(&whole)), Vec::<String>::new());
 }
+
+/// classify_point on a part of 200+ faces goes by rays (geom.cpp
+/// RayClassifier): points inside, outside, on faces and on edges of a plate
+/// with 100 fins, against the union of its boxes.
+#[test]
+fn points_against_a_big_part_classified_by_rays() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let n = 100;
+    let len = (2 * n + 10) as f64;
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(len, 20.0, 10.0) * mm).unwrap();
+    let fins: Vec<Shape> = (0..n).map(|i| make_box_corners(DVec3::new(2.0 + 2.0 * i as f64, 0.0, 10.0) * mm, DVec3::new(3.0 + 2.0 * i as f64, 20.0, 15.0) * mm).unwrap()).collect();
+    let part = boolean(BooleanOp::Fuse, &[plate], &fins, &BooleanOptions { unify: true, ..Default::default() }).unwrap().shape;
+    assert!(part.count(ShapeType::Face) >= 200);
+    // In the closed union of the boxes (mm).
+    let closed = |p: DVec3| {
+        let inb = |a: DVec3, b: DVec3| p.cmpge(a).all() && p.cmple(b).all();
+        inb(DVec3::ZERO, DVec3::new(len, 20.0, 10.0)) || (0..n).any(|i| inb(DVec3::new(2.0 + 2.0 * i as f64, 0.0, 10.0), DVec3::new(3.0 + 2.0 * i as f64, 20.0, 15.0)))
+    };
+    let truth = |p: DVec3| {
+        if !closed(p) {
+            return PointClass::Outside;
+        }
+        let e = 1e-3;
+        let all_in = (0..27).all(|k| closed(p + DVec3::new((k % 3) as f64 - 1.0, ((k / 3) % 3) as f64 - 1.0, (k / 9) as f64 - 1.0) * e));
+        if all_in { PointClass::Inside } else { PointClass::OnBoundary }
+    };
+    let xs: Vec<f64> = (-2..=60).map(|k| k as f64 * 0.5).chain([len - 0.5, len, len + 0.5]).collect();
+    let mut wrong = Vec::new();
+    for &x in &xs {
+        for y in [-1.0, 0.0, 7.3, 20.0, 21.0] {
+            for z in [-1.0, 0.0, 4.1, 10.0, 12.5, 15.0, 16.0] {
+                let p = DVec3::new(x, y, z);
+                let got = part.classify_point(p * mm, 1e-7).unwrap();
+                if got != truth(p) {
+                    wrong.push(format!("{p}: {got:?}, want {:?}", truth(p)));
+                }
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{} wrong:\n{}", wrong.len(), wrong.join("\n"));
+}

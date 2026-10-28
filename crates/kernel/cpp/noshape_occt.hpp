@@ -20,6 +20,9 @@
 
 class IntCurvesFace_ShapeIntersector; // geom.cpp line_crossings
 class BRepClass3d_SolidClassifier;    // geom.cpp classify_point
+namespace noshape {
+class RayClassifier; // internal.hpp, classify_point
+}
 
 #include <chrono>
 #include <typeinfo>
@@ -355,6 +358,8 @@ public:
   // Extrude's auto scope classifies a tool's vertices against one part.
   mutable std::mutex                                    myClassifyLock;
   mutable std::shared_ptr<BRepClass3d_SolidClassifier> myClassifier;
+  // Its rays for a big solid (by the tolerance they were made with).
+  mutable std::pair<double, std::shared_ptr<RayClassifier>> myRays{-1.0, nullptr};
 
   // Ancestor maps (CSR offsets, values) by kind * 16 + ancestor kind,
   // computed once: regeneration asks for the same ones of a body many times.
@@ -577,6 +582,7 @@ OpOut op_rib(const OcShape& base, const OcShape& wire, const PlaneF& plane,
 void                     set_memory_budget_mb(uint64_t mb);
 void                     set_bop_parallel(bool on);
 rust::String             last_boolean_path();
+void                     kernel_profile_mark(rust::Str label);
 void                     set_occt_threads(int32_t n);
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts);

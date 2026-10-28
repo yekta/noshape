@@ -520,6 +520,8 @@ pub(crate) mod ffi {
         fn set_bop_parallel(on: bool);
         /// Which way this thread's last op_boolean went (BOOLEAN-SPEEDUP corpus).
         fn last_boolean_path() -> String;
+        /// NOSHAPE_KERNEL_PROFILE: prints the calls since the last mark under `label` and starts again.
+        fn kernel_profile_mark(label: &str);
         /// OCCT's thread pool size (once, before any parallel work).
         fn set_occt_threads(n: i32);
         fn op_boolean(

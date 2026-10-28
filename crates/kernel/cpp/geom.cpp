@@ -46,6 +46,7 @@
 #include <gp_Lin.hxx>
 #include <IntCurvesFace_ShapeIntersector.hxx>
 #include <IntCurveSurface_TransitionOnCurve.hxx>
+#include <TopoDS_Iterator.hxx>
 #include <gp_Sphere.hxx>
 #include <gp_Torus.hxx>
 
@@ -903,10 +904,118 @@ rust::Vec<double> line_crossings(const OcShape& s, P3 p, P3 dir, double len)
   return out;
 }
 
+RayClassifier::RayClassifier(const ShapeIMap& faces, std::vector<Bnd_Box> boxes, double tol, double band)
+    : myFaces(faces),
+      myBoxes(std::move(boxes)),
+      myRays((size_t)faces.Extent()),
+      myTol(tol),
+      myBand(band)
+{
+}
+
+static ShapeIMap faces_of(const TopoDS_Shape& s)
+{
+  ShapeIMap f;
+  TopExp::MapShapes(s, TopAbs_FACE, f);
+  return f;
+}
+
+static std::vector<Bnd_Box> boxes_of(const ShapeIMap& faces, double tol)
+{
+  std::vector<Bnd_Box> b((size_t)faces.Extent());
+  for (int i = 1; i <= faces.Extent(); ++i)
+  {
+    BRepBndLib::Add(faces(i), b[(size_t)i - 1], false);
+    b[(size_t)i - 1].Enlarge(tol);
+  }
+  return b;
+}
+
+RayClassifier::RayClassifier(const TopoDS_Shape& solid, double tol, double band)
+    : RayClassifier(faces_of(solid), {}, tol, band)
+{
+  myBoxes = boxes_of(myFaces, tol);
+}
+
+RayClassifier::~RayClassifier() = default;
+
+TopAbs_State RayClassifier::Perform(const gp_Pnt& p)
+{
+  const gp_Dir dirs[] = {gp_Dir(0.5773, 0.5774, 0.5775), gp_Dir(-0.31, 0.83, 0.46), gp_Dir(0.71, -0.24, -0.66), gp_Dir(-0.12, -0.55, 0.83)};
+  for (const gp_Dir& d : dirs)
+  {
+    const gp_Lin ray(p, d);
+    int          n     = 0;
+    bool         clean = true;
+    for (int i = 1; i <= myFaces.Extent() && clean; ++i)
+    {
+      if (myBoxes[(size_t)i - 1].IsOut(ray))
+        continue;
+      std::unique_ptr<IntCurvesFace_Intersector>& fi = myRays[(size_t)i - 1];
+      if (!fi)
+        fi = std::make_unique<IntCurvesFace_Intersector>(TopoDS::Face(myFaces(i)), myTol);
+      fi->Perform(ray, -myBand, RealLast());
+      if (!fi->IsDone())
+        return TopAbs_UNKNOWN;
+      for (int k = 1; k <= fi->NbPnt(); ++k)
+      {
+        const double w = std::abs(fi->WParameter(k));
+        if (w <= myTol)
+          return TopAbs_ON;
+        if (w <= myBand || fi->State(k) == TopAbs_ON || fi->Transition(k) == IntCurveSurface_Tangent)
+        {
+          clean = false;
+          break;
+        }
+        ++n;
+      }
+    }
+    if (clean)
+      return n % 2 == 1 ? TopAbs_IN : TopAbs_OUT;
+  }
+  return TopAbs_UNKNOWN;
+}
+
+// Rays for big solids only (NOSHAPE_CLASSIFY_RAYS=0: never): OCCT's
+// classifier is quick on small ones.
+static bool rays_for(const TopoDS_Shape& s)
+{
+  static const bool off = [] {
+    const char* v = std::getenv("NOSHAPE_CLASSIFY_RAYS");
+    return v != nullptr && std::string(v) == "0";
+  }();
+  if (off)
+    return false;
+  TopoDS_Shape one = s;
+  if (one.ShapeType() == TopAbs_COMPOUND && one.NbChildren() == 1)
+    one = TopoDS_Iterator(one).Value();
+  if (one.ShapeType() != TopAbs_SOLID)
+    return false;
+  int n = 0;
+  for (TopExp_Explorer f(one, TopAbs_FACE); f.More() && n < 200; f.Next())
+    ++n;
+  return n >= 200;
+}
+
 int8_t classify_point(const OcShape& solid, P3 p, double tol)
 {
   require_non_null(solid.shape, "solid");
   std::lock_guard<std::mutex> g(solid.myClassifyLock);
+  const double t = tol > 0 ? tol : 1e-7;
+  if (solid.myRays.first != t && rays_for(solid.shape))
+    solid.myRays = {t, std::make_shared<RayClassifier>(solid.shape, t, 100 * t)};
+  if (solid.myRays.second)
+    switch (solid.myRays.second->Perform(to_pnt(p)))
+    {
+      case TopAbs_IN:
+        return 1;
+      case TopAbs_OUT:
+        return -1;
+      case TopAbs_ON:
+        return 0;
+      default:
+        break;
+    }
   if (!solid.myClassifier)
   {
     auto loaded = std::make_shared<BRepClass3d_SolidClassifier>();
@@ -914,7 +1023,7 @@ int8_t classify_point(const OcShape& solid, P3 p, double tol)
     solid.myClassifier = loaded;
   }
   BRepClass3d_SolidClassifier& c = *solid.myClassifier;
-  c.Perform(to_pnt(p), tol > 0 ? tol : 1e-7);
+  c.Perform(to_pnt(p), t);
   switch (c.State())
   {
     case TopAbs_IN:

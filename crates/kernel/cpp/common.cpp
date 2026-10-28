@@ -1313,14 +1313,15 @@ struct KernelProfile
 {
   std::mutex                                                  lock;
   std::map<std::string, std::pair<long, double>>              calls; // name -> (count, ms)
-  ~KernelProfile()
+  void print(const std::string& label)
   {
     std::vector<std::pair<std::string, std::pair<long, double>>> rows(calls.begin(), calls.end());
     std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) { return a.second.second > b.second.second; });
-    std::fprintf(stderr, "kernel profile (NOSHAPE_KERNEL_PROFILE):\n");
+    std::fprintf(stderr, "kernel profile (NOSHAPE_KERNEL_PROFILE)%s:\n", label.c_str());
     for (const auto& [name, v] : rows)
       std::fprintf(stderr, "  %9.1f ms %7ld  %s\n", v.second, v.first, name.c_str());
   }
+  ~KernelProfile() { print(""); }
 };
 KernelProfile& kernel_profile()
 {
@@ -1379,6 +1380,16 @@ void kernel_profile_add_named(const char* name, std::chrono::steady_clock::durat
   auto&                       v = p.calls[std::string("  ") + name];
   v.first += 1;
   v.second += std::chrono::duration<double, std::milli>(took).count();
+}
+
+void kernel_profile_mark(rust::Str label)
+{
+  if (!kernel_profile_on())
+    return;
+  KernelProfile&              p = kernel_profile();
+  std::lock_guard<std::mutex> g(p.lock);
+  p.print(" " + std::string(label));
+  p.calls.clear();
 }
 
 void kernel_profile_add(const char* what, std::chrono::steady_clock::duration took)

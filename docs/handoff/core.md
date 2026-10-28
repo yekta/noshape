@@ -166,6 +166,17 @@ Phase 2 (local Booleans), first step landed:
   Breakdown (pattern_second ×400, NOSHAPE_PERF): kernel ~580 ms (local Boolean, mostly OCCT's general fuse of the
   two 800-edge faces the fins merge into), naming + unify ~230 ms, split ~50 ms; then the display re-meshes the whole
   part (~1 s, every regeneration).
+- Step 3 (10-28): big planar faces the tool only touches (≥ 64 edges, the tool's box on their inner side, no tool
+  face on their plane over an area) stay out of the general fuse and out of the ring: the fin fused under the
+  400-fin plate went through the plate's two 800-edge front / back faces and, through them, every fin's sides
+  (1604 of 1612 faces); their edges the fuse splits are put back in place (`patched`, IsSplitToReverse +
+  pcurves on the plane). Tool pieces against the target and kernel `classify_point` on solids of ≥ 200 faces go
+  by `RayClassifier` (geom.cpp, NOSHAPE_CLASSIFY_RAYS=0: OCCT's classifier): ray parity over the faces whose
+  box the ray passes, OCCT's classifier when no ray is clean. Corpus case a2121c5b (1612 faces): 417 → 163 ms
+  (general fuse 180 → 5 ms; OCCT 1108 ms recorded). Extrude 3's kernel CPU (NOSHAPE_KERNEL_PROFILE=cpu, now
+  printed per feature): 535 → 395 ms; classify_point (the auto scope, 2 calls) 133 → 22 ms. Left: op_unify 106
+  (merge_planar 42, candidates 33), the local Boolean 65 (maps 26, history 19), ancestor maps 85 (8 calls),
+  bounding boxes 20 (6 calls), on_face's decline 14. T1: kernel `boolean_groups::points_against_a_big_part_classified_by_rays`.
 - The regen's unify (boolean.cpp `merge_planar`): the merged face goes on the surface of the group's face with the
   most edges and only edges without a pcurve there get one; a one-shell solid is rebuilt shell-only instead of
   BRepTools_ReShape copying the part: fins-400's 4 unifies 849 → 382 ms. A unify of only the new faces' region

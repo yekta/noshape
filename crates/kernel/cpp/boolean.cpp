@@ -55,6 +55,7 @@
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepLib.hxx>
+#include <BOPTools_AlgoTools.hxx>
 #include <IntCurvesFace_ShapeIntersector.hxx>
 #include <IntTools_Context.hxx>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
@@ -2108,24 +2109,89 @@ static bool local_boolean(const TopoDS_Shape& target, const TopoDS_Shape& tool, 
   // The faces the tool reaches, and their neighbours.
   ShapeAncMap ef;
   TopExp::MapShapesAndUniqueAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
-  ShapeIMap reached, region;
+  ShapeIMap            reached, region;
+  std::vector<Bnd_Box> boxes((size_t)faces.Extent());
   for (int i = 1; i <= faces.Extent(); ++i)
   {
-    Bnd_Box fb;
+    Bnd_Box& fb = boxes[(size_t)i - 1];
     BRepBndLib::Add(faces(i), fb, false);
     if (!fb.IsOut(tb))
       reached.Add(faces(i));
+    fb.Enlarge(tol); // for the rays below
   }
   if (reached.Extent() == 0 || reached.Extent() * 4 > faces.Extent())
     return no(5);
+  // Big planar faces the tool only touches stay out of the general fuse
+  // (rebuilding the 400-fin plate's 800-edge front and back faces was most
+  // of the time, and their ring of neighbours is the whole part): the tool
+  // whole box on their inner side, no face of it lying on them over an area. Their
+  // edges the fuse splits are put back below.
+  // The corners of the tool's box (a curved tool bulges past its vertices).
+  std::vector<gp_Pnt> tv;
+  {
+    double x0, y0, z0, x1, y1, z1;
+    tb.Get(x0, y0, z0, x1, y1, z1);
+    for (int c = 0; c < 8; ++c)
+      tv.emplace_back(c & 1 ? x1 : x0, c & 2 ? y1 : y0, c & 4 ? z1 : z0);
+  }
+  auto out_of_fuse = [&](const TopoDS_Face& f) {
+    int n = 0;
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More() && n < 64; e.Next())
+      ++n;
+    gp_Pln pl;
+    if (n < 64 || !outer_plane(f, pl))
+      return false;
+    for (const gp_Pnt& p : tv)
+      if (gp_Vec(pl.Location(), p).Dot(gp_Vec(pl.Axis().Direction())) > 20 * tol)
+        return false;
+    Bnd_Box fb;
+    BRepBndLib::Add(f, fb, false);
+    for (TopExp_Explorer x(tsolid, TopAbs_FACE); x.More(); x.Next())
+    {
+      gp_Pln tp;
+      if (!outer_plane(TopoDS::Face(x.Current()), tp) || !tp.Axis().Direction().IsParallel(pl.Axis().Direction(), 1e-9) || pl.Distance(tp.Location()) > 10 * tol)
+        continue;
+      // On the plane: overlapping in a line at most.
+      Bnd_Box xb;
+      BRepBndLib::Add(x.Current(), xb, false);
+      double a0, b0, c0, a1, b1, c1, d0, e0, g0, d1, e1, g1;
+      fb.Get(a0, b0, c0, a1, b1, c1);
+      xb.Get(d0, e0, g0, d1, e1, g1);
+      const double ox = std::min(a1, d1) - std::max(a0, d0), oy = std::min(b1, e1) - std::max(b0, e0), oz = std::min(c1, g1) - std::max(c0, g0);
+      int thick = 0;
+      for (double o : {ox, oy, oz})
+        thick += o > 100 * tol ? 1 : 0;
+      if (thick >= 2)
+        return false;
+    }
+    return true;
+  };
+  ShapeIMap left_out;
+  auto      in_fuse = [&](const TopoDS_Shape& f) {
+    if (left_out.Contains(f))
+      return false;
+    if (region.Contains(f))
+      return true;
+    if (out_of_fuse(TopoDS::Face(f)))
+    {
+      left_out.Add(f);
+      return false;
+    }
+    return true;
+  };
   for (int i = 1; i <= reached.Extent(); ++i)
   {
+    if (!in_fuse(reached(i)))
+      continue;
     region.Add(reached(i));
     for (TopExp_Explorer e(reached(i), TopAbs_EDGE); e.More(); e.Next())
       if (const ShapeList* fl = ef.Seek(e.Current()))
         for (ShapeList::Iterator it(*fl); it.More(); it.Next())
-          region.Add(it.Value());
+          if (in_fuse(it.Value()))
+            region.Add(it.Value());
   }
+  if (region.Extent() == 0)
+    return no(5);
   // The region's boundary: edges it shares with the faces left alone.
   ShapeIMap boundary;
   for (int i = 1; i <= region.Extent(); ++i)
@@ -2154,9 +2220,57 @@ static bool local_boolean(const TopoDS_Shape& target, const TopoDS_Shape& tool, 
   gf.Perform();
   if (gf.HasErrors())
     return no(6);
-  for (int i = 1; i <= boundary.Extent(); ++i)
-    if (!gf.Modified(boundary(i)).IsEmpty())
-      return no(7);
+  // Outside faces whose boundary edges the fuse split: the pieces in place
+  // of the edge (only planar faces kept out above can have them).
+  NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> patched;
+  {
+    occ::handle<IntTools_Context> ctx = new IntTools_Context();
+    ShapeIMap                     touched;
+    for (int i = 1; i <= boundary.Extent(); ++i)
+      if (!gf.Modified(boundary(i)).IsEmpty())
+        if (const ShapeList* fl = ef.Seek(boundary(i)))
+          for (ShapeList::Iterator it(*fl); it.More(); it.Next())
+            if (!region.Contains(it.Value()))
+              touched.Add(it.Value());
+    for (int i = 1; i <= touched.Extent(); ++i)
+    {
+      const TopoDS_Face& f   = TopoDS::Face(touched(i));
+      gp_Pln             pl;
+      if (!outer_plane(f, pl))
+        return no(7);
+      const TopoDS_Face fwd = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
+      TopoDS_Face       nf  = TopoDS::Face(fwd.EmptyCopied());
+      for (TopoDS_Iterator w(fwd); w.More(); w.Next())
+      {
+        TopoDS_Wire nw;
+        B.MakeWire(nw);
+        for (TopoDS_Iterator x(w.Value()); x.More(); x.Next())
+        {
+          const ShapeList& im = gf.Modified(x.Value());
+          if (im.IsEmpty())
+          {
+            B.Add(nw, x.Value());
+            continue;
+          }
+          for (ShapeList::Iterator it(im); it.More(); it.Next())
+          {
+            TopoDS_Edge piece = TopoDS::Edge(it.Value());
+            piece.Orientation(TopAbs_FORWARD);
+            if (BOPTools_AlgoTools::IsSplitToReverse(piece, TopoDS::Edge(x.Value().Oriented(TopAbs_FORWARD)), ctx))
+              piece.Reverse();
+            if (x.Value().Orientation() == TopAbs_REVERSED)
+              piece.Reverse();
+            BRepLib::BuildPCurveForEdgeOnPlane(piece, nf);
+            B.Add(nw, piece);
+          }
+        }
+        nw.Closed(true);
+        B.Add(nf, nw);
+      }
+      nf.Orientation(f.Orientation());
+      patched.Bind(f, nf);
+    }
+  }
   auto images = [&](const TopoDS_Shape& f) {
     ShapeList l = gf.Modified(f);
     if (l.IsEmpty() && !gf.IsDeleted(f))
@@ -2201,32 +2315,10 @@ static bool local_boolean(const TopoDS_Shape& target, const TopoDS_Shape& tool, 
     return BOPTools_AlgoTools3D::PointInFace(f, p, uv, context) == 0;
   };
   BRepClass3d_SolidClassifier in_tool(tsolid);
-  // Inside the target: the parity of a ray's crossings (OCCT's solid
-  // classifier traced every face of the 1600-face part for each point,
-  // 1.6 s); a ray that touches anything is tried in another direction.
-  IntCurvesFace_ShapeIntersector rays;
-  rays.Load(solid, tol);
-  auto target_state = [&](const gp_Pnt& p) {
-    const gp_Dir dirs[] = {gp_Dir(0.5773, 0.5774, 0.5775), gp_Dir(-0.31, 0.83, 0.46), gp_Dir(0.71, -0.24, -0.66), gp_Dir(-0.12, -0.55, 0.83)};
-    for (const gp_Dir& d : dirs)
-    {
-      rays.Perform(gp_Lin(p, d), -tol, RealLast());
-      int  n     = 0;
-      bool clean = true;
-      for (int k = 1; k <= rays.NbPnt(); ++k)
-      {
-        if (std::abs(rays.WParameter(k)) <= 10 * tol || rays.State(k) == TopAbs_ON || rays.Transition(k) == IntCurveSurface_Tangent)
-        {
-          clean = false;
-          break;
-        }
-        ++n;
-      }
-      if (clean)
-        return n % 2 == 1 ? TopAbs_IN : TopAbs_OUT;
-    }
-    return TopAbs_ON;
-  };
+  // Inside the target: rays (OCCT's solid classifier traced every face of
+  // the 1600-face part for each point, 1.6 s; loading all 1600 into its shape
+  // intersector, 40 ms).
+  RayClassifier target_rays(faces, std::move(boxes), tol, 10 * tol);
   // The target's faces' pieces.
   NCollection_DataMap<TopoDS_Shape, ShapeList, TopTools_ShapeMapHasher> kept;
   ShapeIMap                                                             keep;
@@ -2301,8 +2393,8 @@ static bool local_boolean(const TopoDS_Shape& target, const TopoDS_Shape& tool, 
       gp_Pnt            p;
       if (!inner_point(piece, p))
         return no(10);
-      const TopAbs_State st = target_state(p);
-      if (st == TopAbs_ON)
+      const TopAbs_State st = target_rays.Perform(p);
+      if (st != TopAbs_IN && st != TopAbs_OUT)
         return no(11);
       const bool take = op == 0 ? st == TopAbs_OUT : st == TopAbs_IN;
       if (take)
@@ -2320,7 +2412,10 @@ static bool local_boolean(const TopoDS_Shape& target, const TopoDS_Shape& tool, 
   B.MakeShell(ns);
   for (TopoDS_Iterator it(shell); it.More(); it.Next())
     if (!region.Contains(it.Value()))
-      B.Add(ns, it.Value());
+    {
+      const TopoDS_Shape* p = patched.Seek(it.Value());
+      B.Add(ns, p != nullptr ? p->Oriented(it.Value().Orientation()) : it.Value());
+    }
   for (int i = 1; i <= keep.Extent(); ++i)
     B.Add(ns, keep(i));
   ns.Closed(true);
@@ -2364,6 +2459,8 @@ static bool local_boolean(const TopoDS_Shape& target, const TopoDS_Shape& tool, 
         if (!any)
           h->Remove(s);
       }
+  for (NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher>::Iterator it(patched); it.More(); it.Next())
+    h->AddModified(it.Key(), it.Value());
   // As OCCT records it: both input solids replaced by the new one.
   h->Remove(solid);
   h->Remove(tsolid);

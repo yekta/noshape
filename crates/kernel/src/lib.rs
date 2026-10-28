@@ -50,7 +50,7 @@ pub mod transform;
 
 pub use boolean::{
     BooleanOp, BooleanOptions, Glue, boolean, common, cut, fuse, fuse_all, imprint, project_curves, section,
-    last_boolean_path, section_caps, set_parallel_booleans, section_plane, section_wires, split, split_by_plane, unify_same_domain, with_cancel,
+    kernel_profile_mark, last_boolean_path, section_caps, set_parallel_booleans, section_plane, section_wires, split, split_by_plane, unify_same_domain, with_cancel,
 };
 pub use construct::*;
 pub use error::{KernelError, Result};

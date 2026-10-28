@@ -181,6 +181,12 @@ pub struct Regenerator {
     evaluations: u64,
 }
 
+/// NOSHAPE_KERNEL_PROFILE: the kernel's profile is printed for each feature.
+fn kernel_profiling() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("NOSHAPE_KERNEL_PROFILE").is_some())
+}
+
 fn hash_bytes(prev: u64, data: &[u8]) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     prev.hash(&mut h);
@@ -415,6 +421,9 @@ impl Regenerator {
                 }
             }
             state.time_ms = ft.elapsed().as_secs_f32() * 1000.0;
+            if kernel_profiling() {
+                noshape_kernel::kernel_profile_mark(&format!("{} {:.1} ms", f.name, state.time_ms));
+            }
             let versions = self.entries.entry(f.id).or_default();
             versions.insert(0, CacheEntry { key, ctx: ctx.clone(), state: state.clone(), last_run: run });
             versions.truncate(VERSIONS);

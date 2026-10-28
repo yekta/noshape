@@ -132,6 +132,12 @@ pub fn last_boolean_path() -> String {
     ffi::last_boolean_path()
 }
 
+/// With NOSHAPE_KERNEL_PROFILE set: prints the kernel calls made since the
+/// last mark under `label` (one feature's) and starts counting again.
+pub fn kernel_profile_mark(label: &str) {
+    ffi::kernel_profile_mark(label)
+}
+
 /// Run `f` with `flag` as this thread's boolean cancel flag: once it is set,
 /// a running [`boolean`] stops inside OCCT and fails with "cancelled" (a
 /// stale regeneration releases its thread quickly).
