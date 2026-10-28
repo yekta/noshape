@@ -12,6 +12,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - qa 21:58: still endless on green 58d89104 (tickets/draft-pool-hang-2133.noshape: not done after 246 s, RSS 3.1 GB, load 33).
 - qa 22:05: still endless on green 61143838 (not done after 229 s, RSS 3.5 GB; no core change since 58d8). Core's worktree has an uncommitted 0005 rework (a budget still stops a pool job of its own thread, test a_budget_still_stops_a_pool_job_of_its_own_thread): re-test as soon as it is green.
 - **qa 23:10: DRAFT-BUDGET-POOL fixed on green 5eb5259b** (core 34cbea98, OCCT patch 0005 v2): the document opens in 21–26 s, Draft 7 stops at its budget. No longer a blocker. BOP-PAIRS-GPF stays closed while the pairs are serial (core's 924f1387 parallel pairs not on main yet: re-test seed 152 / GUI fuzz when it lands).
+- **qa 23:16: new since this evening, P1 RUST-MIRROR-EXTRA-FACE (bool, likely da75e17b)**: on a fuzz body the Rust Boolean leaves one more face after a part mirror than OCCT and a later Chamfer cuts 0.039 mm³ more (1275.839 vs 1275.800); not known yet which is right. bool to judge before the cut (or revert da75e17b / fall back to OCCT on mirrored faces).
 
 ## Release blockers for the 2026-10-28 05:00 release (qa, checked 04:17 UTC on green 1b81b7ca)
 - Re-confirmed 04:30 on green 3f4e10d9 (= 1b81b7ca + 4658e826 Feature Studio snippets / Ctrl+C part and 3062ec50 view
