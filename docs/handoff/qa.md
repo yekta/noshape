@@ -3,7 +3,7 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-**Morning smoke 2026-10-28 (pre-cut, greens 3f4e10d9 / b504234e = last-green at 04:30 / 04:44): all rows OK** (open / edit / undo times, STEP
+**v0.4.12 cut 05:00 (tag e936fe98 = ec96b151 + version bump; code = green 1b81b7ca).** **Morning smoke 2026-10-28 (pre-cut, greens 1b81b7ca / 3f4e10d9 / b504234e; same kernel as v0.4.12): all rows OK** (open / edit / undo times, STEP
 round trip 60779.484, kill -9 after Suppress, drawing PDF, assembly drag, dialog hover + pick, fuzz); details under
 "Daily release smoke". Redo on the release artifact when it is published; blocker list at the top of TICKETS.
 

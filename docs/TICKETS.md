@@ -10,6 +10,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   label prefix / suffix; no kernel or regen change): the list below stands.
 - Re-confirmed 04:48 on green b504234e (last-green; adds 4fa9cdf1 row-tooltip fix, c1f5d69c / 0ea2b791 assembly tool search and
   filter, all UI; verified): the list below stands.
+- **Cut 05:00: tag v0.4.12 = e936fe98 = ec96b151 + "Release v0.4.12"; its code is identical to green 1b81b7ca** (no diff under
+  crates / vendor / scripts / Cargo), where this list was checked (fuzz 51 / 52, FILLET-OVERSIZE re-check). Not in it: 4658e826
+  (Ctrl+C part, FS snippets), 3062ec50, 4fa9cdf1, c1f5d69c, 0ea2b791 (all verified on later greens). Artifact smoke when published.
 - **No new P0 since v0.4.11; nothing found today blocks the 05:00 release.** Fuzz seeds 45–52 × 600 actions on greens 41f60e47, 7929b13a, da18f886, 1b81b7ca: no crash, no hang. The open
   P0s below are all in v0.4.11 already (none is a regression of today's mains):
   - FILLET-OVERSIZE-OK (core): an edge fillet too big for its faces reports Ok with a wrong solid (wf-block R25 on three
