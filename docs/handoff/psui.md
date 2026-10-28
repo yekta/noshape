@@ -179,6 +179,12 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N0. 10-28 04:20–06:00 landed: 54324599 Create selection's see-through result faces (3.19), 6f4dc5c3 arrow halo as live
+    (6.2), 2960a143 Measure asterisk (4.9), aaaa5b4c STRIP-CLICK-THROUGH (P1), 298fbda5 MASS-MC-FIELD (P2, ops names the
+    reference without a material), 57ab9256 VAR-NAME-PINK. Waiting for live: 7.7 parts list properties, FOLDER-MENU
+    (last folder). P0 COMMIT-LATENCY / undo 392 ms (qa, this machine at load ~30; CI 26–71 ms): profile on the runners
+    with core before changing anything; the regen cache already keeps several versions per feature.
+
 N1. Open live answers still pending: interaction 4.9 (Measure asterisk), 6.2 (Section arrow vs Extrude arrow crops).
 N2. part-studio 🔧 rows to compare with live captures: 3.19 (Create selection, part-studio/380–398), 7.7 (parts list
     properties: ask live), 10.1, 11.5–11.7.
