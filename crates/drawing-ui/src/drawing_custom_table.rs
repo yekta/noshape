@@ -229,12 +229,9 @@ impl DrawingEditor {
         }
     }
 
-    /// Whether the cursor is on a corner of custom table `id` (a double-click
-    /// there opens its properties).
-    pub fn custom_corner_at(&self, id: u64) -> bool {
-        if !self.current_sheet().table(id).is_some_and(|t| matches!(t.kind, TableKind::Custom { .. })) {
-            return false;
-        }
+    /// Whether the cursor is on a corner of table `id` (a double-click there
+    /// opens its properties; help H:table).
+    pub fn table_corner_at(&self, id: u64) -> bool {
         let Some(l) = self.built.as_ref().and_then(|b| b.table_layout(id)) else { return false };
         let (lo, hi) = (l.min(), l.max());
         let tol = self.tol_mm(6.0);

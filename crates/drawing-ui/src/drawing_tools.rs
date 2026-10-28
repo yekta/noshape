@@ -1555,9 +1555,17 @@ impl DrawingEditor {
             }
             Some(PickTarget::Table(id)) => {
                 // On a divider: fit it to the text; in a cell: edit the cell;
-                // a custom table's fixed corner: its properties (help).
-                if self.custom_corner_at(id) {
-                    self.open_custom_props(id, cx);
+                // on a corner: the table's properties (help H:table: "or by
+                // double-clicking a corner"), the dialog its menu opens.
+                let kind = self.current_sheet().table(id).map(|t| t.kind.clone());
+                if self.table_corner_at(id) && !matches!(kind, Some(noshape_model::drawing::TableKind::Revision { .. }) | None) {
+                    use noshape_model::drawing::TableKind as K;
+                    match kind {
+                        Some(K::Custom { .. }) => self.open_custom_props(id, cx),
+                        Some(K::Bom { .. } | K::CutList { .. }) => self.open_table_props(id, cx),
+                        Some(K::Hole { .. }) => self.open_hole_table_props(id, cx),
+                        _ => self.open_table_props_corner(id, cx),
+                    }
                 } else if !self.fit_table_divider(id, cx) {
                     self.open_cell_panel(id, window, cx)
                 }
