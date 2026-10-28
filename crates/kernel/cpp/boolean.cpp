@@ -2053,7 +2053,7 @@ static bool fuse_on_face(const TopoDS_Shape& target, const OcShape* src, const T
   {
     boxes.resize((size_t)faces.Extent());
     for (int i = 1; i <= faces.Extent(); ++i)
-      BRepBndLib::Add(faces(i), boxes[(size_t)i - 1], false);
+      face_box(faces(i), boxes[(size_t)i - 1]);
   }
   Bnd_Box all;
   for (const Bnd_Box& b : boxes)
@@ -2249,7 +2249,7 @@ static bool local_boolean(const TopoDS_Shape& target, const OcShape* src, const 
   {
     boxes.resize((size_t)faces.Extent());
     for (int i = 1; i <= faces.Extent(); ++i)
-      BRepBndLib::Add(faces(i), boxes[(size_t)i - 1], false);
+      face_box(faces(i), boxes[(size_t)i - 1]);
   }
   Bnd_Box all;
   for (const Bnd_Box& b : boxes)
@@ -2926,6 +2926,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
       bool clean = false;
       if (opts.unify)
         out = unify_in(out, h, scope.get(), &clean);
+      std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("boolean.local_result");
       OpOut r = make_result(concat(args.items, tools.items), out, h.get(), &srcs, opts.unify ? nullptr : &maps);
       if (opts.unify)
         r.shape->myUnifyClean = clean;
@@ -3109,8 +3110,10 @@ OpOut op_unify(const OcShape& s)
   HHist        hist;
   bool         clean = false;
   TopoDS_Shape res   = unify_in(s.shape, hist, sc, &clean);
+  std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("unify.result");
   OpOut        r     = make_result({s.shape}, res, hist.get(), &srcs);
   r.shape->myUnifyClean = clean;
+  lap = std::make_unique<KernelTimer>("unify.boxes");
   inherit_face_boxes(s, *r.shape);
   // The caller keeps the input when nothing merged: it knows too.
   if (clean && res.IsSame(s.shape))

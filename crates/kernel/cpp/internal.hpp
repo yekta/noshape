@@ -95,6 +95,10 @@ bool valid_changed(const TopoDS_Shape& input, const TopoDS_Shape& r);
 void map_fev(const TopoDS_Shape& s, ShapeIMap& f, ShapeIMap& e, ShapeIMap& v);
 // TopExp::MapShapesAndUniqueAncestors, quicker (common.cpp).
 void unique_ancestors(const TopoDS_Shape& s, TopAbs_ShapeEnum kind, TopAbs_ShapeEnum ancestor_kind, ShapeAncMap& m);
+// A face's box: a planar face bounded by straight edges only, its corners'
+// (with their tolerances; the face lies in their hull), any other face
+// BRepBndLib's without triangulation (common.cpp). OcShape::face_boxes's.
+void face_box(const TopoDS_Shape& f, Bnd_Box& b);
 // `out`'s face boxes from `from`'s for the faces they share (common.cpp).
 void inherit_face_boxes(const OcShape& from, OcShape& out);
 // The OcShape's ancestor map (CSR offsets, values; ancestor_map's), made
@@ -137,6 +141,8 @@ private:
   ShapeIMap                                               myFaces;
   std::vector<Bnd_Box>                                    myBoxes;
   std::vector<std::unique_ptr<IntCurvesFace_Intersector>> myRays;
+  std::vector<int8_t>                                     myKinds; // -1 not looked at, 1 planar, 0 not
+  std::vector<gp_Pln>                                     myPlanes;
   double                                                  myTol, myBand;
 };
 

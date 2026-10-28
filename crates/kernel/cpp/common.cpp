@@ -42,6 +42,8 @@ extern "C" char etext;
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Iterator.hxx>
+#include <Geom_Line.hxx>
+#include <Geom_Plane.hxx>
 #include <NCollection_IncAllocator.hxx>
 
 #include <algorithm>
@@ -147,13 +149,48 @@ const ShapeIMap& OcShape::map(TopAbs_ShapeEnum kind) const
   return myMaps[k];
 }
 
+void face_box(const TopoDS_Shape& f, Bnd_Box& b)
+{
+  TopLoc_Location loc;
+  if (!occ::down_cast<Geom_Plane>(BRep_Tool::Surface(TopoDS::Face(f), loc)).IsNull())
+  {
+    bool lines = true;
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More() && lines; e.Next())
+    {
+      const TopoDS_Edge&            ed = TopoDS::Edge(e.Current());
+      double                        a, c;
+      TopLoc_Location               l;
+      const occ::handle<Geom_Curve> cu = BRep_Tool::Curve(ed, l, a, c);
+      lines = !cu.IsNull() && cu->IsKind(STANDARD_TYPE(Geom_Line)) && !BRep_Tool::Degenerated(ed);
+    }
+    if (lines)
+    {
+      Bnd_Box vb;
+      for (TopExp_Explorer v(f, TopAbs_VERTEX); v.More(); v.Next())
+      {
+        const TopoDS_Vertex& vx = TopoDS::Vertex(v.Current());
+        Bnd_Box              one;
+        one.Add(BRep_Tool::Pnt(vx));
+        one.Enlarge(BRep_Tool::Tolerance(vx));
+        vb.Add(one);
+      }
+      if (!vb.IsVoid())
+      {
+        b.Add(vb);
+        return;
+      }
+    }
+  }
+  BRepBndLib::Add(f, b, false);
+}
+
 const std::vector<Bnd_Box>& OcShape::face_boxes() const
 {
   std::call_once(myBoxesFlag, [&]() {
     const ShapeIMap& f = map(TopAbs_FACE);
     myBoxes.resize((size_t)f.Extent());
     for (int i = 1; i <= f.Extent(); ++i)
-      BRepBndLib::Add(f(i), myBoxes[(size_t)i - 1], false);
+      face_box(f(i), myBoxes[(size_t)i - 1]);
     myBoxesReady.store(true);
   });
   return myBoxes;
@@ -192,7 +229,7 @@ void inherit_face_boxes(const OcShape& from, OcShape& out)
     if (k > 0)
       b[(size_t)i - 1] = wb[(size_t)k - 1];
     else
-      BRepBndLib::Add(now(i), b[(size_t)i - 1], false);
+      face_box(now(i), b[(size_t)i - 1]);
   }
   out.adopt_face_boxes(std::move(b));
 }

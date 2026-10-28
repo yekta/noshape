@@ -997,9 +997,11 @@ impl<'a> EvalCtx<'a> {
             args.extend(near.iter().map(|&i| tools[i].names.clone()));
             let arg_refs: Vec<&ShapeNames> = args.iter().collect();
             let face_names = self.name_result(&arg_refs, &res.history, &res.shape, &BTreeMap::new(), None);
+            let t_named0 = t0.elapsed();
             // Like Parasolid, merge faces left coplanar (or on one cylinder...) by
             // the boolean: a block added flush with a face leaves one face.
             let unified = k::unify_same_domain(&res.shape)?;
+            let t_unified = t0.elapsed();
             let (res, face_names) = if unified.shape.count(ShapeType::Face) < res.shape.count(ShapeType::Face) {
                 let before = unify_input_names(face_names);
                 let names = self.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
@@ -1007,6 +1009,9 @@ impl<'a> EvalCtx<'a> {
             } else {
                 (res, face_names)
             };
+            if perf {
+                log::info!(target: "perf", "boolean_into: naming {:.1} ms, unify {:.1} ms, naming the unified {:.1} ms", (t_named0 - t_bool).as_secs_f64() * 1e3, (t_unified - t_named0).as_secs_f64() * 1e3, (t0.elapsed() - t_unified).as_secs_f64() * 1e3);
+            }
             // Parasolid refuses a cut leaving faces that meet along an edge
             // from both sides (live Bo3: a cylinder tangent to the block's
             // face, by Boolean or Extrude Remove); the parts stay as they were.

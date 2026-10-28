@@ -333,7 +333,7 @@ public:
   OcShape& operator=(const OcShape&) = delete;
 
   const ShapeIMap& map(TopAbs_ShapeEnum kind) const;
-  // Its faces' boxes (BRepBndLib, no triangulation) by map(TopAbs_FACE)
+  // Its faces' boxes (face_box) by map(TopAbs_FACE)
   // index - 1, computed once: the auto scope's classification, fuse_on_face
   // and the local Boolean all box the target's 1600 faces.
   const std::vector<Bnd_Box>& face_boxes() const;

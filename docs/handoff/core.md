@@ -224,6 +224,16 @@ Phase 2 (local Booleans), first step landed:
   the fin fuse, the scoped unify and the naming's maps, 20 rounds): median 142 → 105 ms. Per round (CPU): the
   local Boolean 30 (history 8, closed_and_oriented 6.5, general fuse 6), merge_planar 25 (the two 800-edge
   groups 13, the edge phase's maps 5.6), candidates_again 8; the whole-shape unify would add ~50.
+- Step 9 (10-28): planar faces bounded by straight edges get their box from their corners (`face_box`; any other
+  face BRepBndLib's), and the rays meet a planar face's plane directly and classify the hit with
+  BRepClass_FaceClassifier (OCCT's IntCurvesFace_Intersector approximated the 800-edge front face's whole boundary
+  first, ~10 ms): classify_point's rays 16.8 → 6.5 ms. boolean_into logs (NOSHAPE_PERF) naming / unify / naming
+  the unified separately: on Extrude 3 the naming is 6 + 5 ms; the unify call 70 ms wall (merge_planar's two
+  800-edge groups ~20, candidates_again ~10, its make_result ~12: the merged part mapped again and ~10k kept
+  records), the split 32 (edge / vertex names of 5000 edges, 3300 vertices). Corpus a2121c5b 49 ms; 0 mismatches.
+  Timed test (dev, loaded machine) 236–303 ms. Left for < 150: the two big groups' rebuild, the history records of
+  every kept sub-shape (op_boolean and op_unify each), the naming of every edge and vertex, the auto scope's first
+  classification (the target's face boxes and rays, ~20 ms; the dialog's `touched`, ops).
 - The regen's unify (boolean.cpp `merge_planar`): the merged face goes on the surface of the group's face with the
   most edges and only edges without a pcurve there get one; a one-shell solid is rebuilt shell-only instead of
   BRepTools_ReShape copying the part: fins-400's 4 unifies 849 → 382 ms. A unify of only the new faces' region

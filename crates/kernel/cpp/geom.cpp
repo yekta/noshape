@@ -47,6 +47,7 @@
 #include <IntCurvesFace_ShapeIntersector.hxx>
 #include <IntCurveSurface_TransitionOnCurve.hxx>
 #include <TopoDS_Iterator.hxx>
+#include <BRepClass_FaceClassifier.hxx>
 #include <gp_Sphere.hxx>
 #include <gp_Torus.hxx>
 
@@ -924,6 +925,8 @@ RayClassifier::RayClassifier(const ShapeIMap& faces, std::vector<Bnd_Box> boxes,
     : myFaces(faces),
       myBoxes(std::move(boxes)),
       myRays((size_t)faces.Extent()),
+      myKinds((size_t)faces.Extent(), -1),
+      myPlanes((size_t)faces.Extent()),
       myTol(tol),
       myBand(band)
 {
@@ -942,7 +945,7 @@ static std::vector<Bnd_Box> boxes_of(const ShapeIMap& faces)
 {
   std::vector<Bnd_Box> b((size_t)faces.Extent());
   for (int i = 1; i <= faces.Extent(); ++i)
-    BRepBndLib::Add(faces(i), b[(size_t)i - 1], false);
+    face_box(faces(i), b[(size_t)i - 1]);
   return b;
 }
 
@@ -1013,6 +1016,46 @@ TopAbs_State RayClassifier::Perform(const gp_Pnt& p)
     {
       if (ray_misses(myBoxes[(size_t)i - 1], p, d, -myBand))
         continue;
+      // A planar face: its plane met directly, the point classified in the
+      // face (OCCT's intersector approximated the whole boundary first: ~10
+      // ms for the 400-fin plate's 800-edge front face).
+      const TopoDS_Face& face = TopoDS::Face(myFaces(i));
+      int8_t&            kind = myKinds[(size_t)i - 1];
+      if (kind < 0)
+      {
+        TopLoc_Location                l;
+        const occ::handle<Geom_Plane> pl = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(face, l));
+        kind                             = pl.IsNull() ? 0 : 1;
+        if (kind == 1)
+          myPlanes[(size_t)i - 1] = pl->Pln().Transformed(l.Transformation());
+      }
+      if (kind == 1)
+      {
+        const gp_Pln& pl = myPlanes[(size_t)i - 1];
+        const gp_Vec  nv(pl.Axis().Direction());
+        const double  dn = gp_Vec(d).Dot(nv), h = gp_Vec(p, pl.Location()).Dot(nv);
+        if (std::abs(dn) < 1e-9)
+        {
+          // Along the plane: in it, nothing to count on.
+          if (std::abs(h) <= myTol)
+            clean = false;
+          continue;
+        }
+        const double w = h / dn;
+        if (w < -myBand)
+          continue;
+        BRepClass_FaceClassifier fc(face, p.Translated(gp_Vec(d) * w), myTol);
+        const TopAbs_State       st = fc.State();
+        if (st != TopAbs_IN && st != TopAbs_ON)
+          continue;
+        if (std::abs(w) <= myTol)
+          return TopAbs_ON;
+        if (std::abs(w) <= myBand || st == TopAbs_ON)
+          clean = false;
+        else
+          ++n;
+        continue;
+      }
       std::unique_ptr<IntCurvesFace_Intersector>& fi = myRays[(size_t)i - 1];
       if (!fi)
         fi = std::make_unique<IntCurvesFace_Intersector>(TopoDS::Face(myFaces(i)), myTol);
@@ -1065,7 +1108,11 @@ int8_t classify_point(const OcShape& solid, P3 p, double tol)
   std::lock_guard<std::mutex> g(solid.myClassifyLock);
   const double t = tol > 0 ? tol : 1e-7;
   if (solid.myRays.first != t && rays_for(solid.shape))
+  {
+    const KernelTimer timer("classify.setup");
     solid.myRays = {t, std::make_shared<RayClassifier>(solid.map(TopAbs_FACE), solid.face_boxes(), t, 100 * t)};
+  }
+  std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("classify.rays");
   if (solid.myRays.second)
     switch (solid.myRays.second->Perform(to_pnt(p)))
     {
