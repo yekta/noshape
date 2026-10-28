@@ -759,7 +759,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     parameter `groupedSketches`); reopened, only those show as "Vertices of Sketch N", points clicked one by one stay
     one chip each. wf-block on :102: a new Hole from Sketch 2's row reopens grouped; the older Hole reopens with two
     "Vertex of Sketch 2" chips.
-- [x] P2 P1-10 works on main (psui 10-27: Extrude 2 as Remove flipped away from the block: the tool translucent dark
+- [x] verified 41f60e47 (qa 10-28 02:55: wf-block, Extrude › Sketch 1 region › Remove: the tool goes −Z away from the block, translucent dark red, part uncut; tickets/p1-10-remove-away-41f6.png) P2 P1-10 works on main (psui 10-27: Extrude 2 as Remove flipped away from the block: the tool translucent dark
   red, the part uncut) (qa5, carried over) Extrude › Remove tool preview pointing away from the part is grey; live translucent dark
   red (live part-studio/234–235) (qa5 2026-10-26)
 - [x] verified 19555ca3 (qa) 6db9bb8d P2 DELETE-TAB-DIALOG fixed (psui 10-27): live's 598 px "Delete tabs" with the outlined warning triangle, "Deleting
