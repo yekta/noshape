@@ -69,30 +69,30 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 
 | # | Behaviour | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
-| I1 | Source tabs Current document / Other documents | E§4.1 | ✅ | |  |
-| I2 | Element tabs Part Studios / Assemblies | E§4.1 | ✅ | |  |
-| I3 | Search by partial name | E§4.1 | ✅ | |  |
+| I1 | Source tabs Current document / Other documents | E§4.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| I2 | Element tabs Part Studios / Assemblies | E§4.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| I3 | Search by partial name | E§4.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | I4 | Insert entire Part Studio as rigid | E§4.1 | ✅ | |  |
-| I5 | Click a part inserts it; click a Part Studio inserts all its parts | E§4.2 | ✅ | |  |
-| I6 | Click an assembly inserts it as a subassembly (cycles prevented) | E§4.2 | ✅ | |  |
+| I5 | Click a part inserts it; click a Part Studio inserts all its parts | E§4.2 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| I6 | Click an assembly inserts it as a subassembly (cycles prevented) | E§4.2 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | I7 | Cursor in the dialog: instance at the Part Studio origin; later copies offset | E§4.2 | ✅ | |  |
-| I8 | Cursor in the graphics area: instance follows the cursor; click places | E§4.2 | ✅ | |  |
-| I9 | Esc / close: insertion ends, placed instances stay (Undo removes) | E§4.2, B | ✅ | |  |
-| I10 | Placed instances are free (not fixed, not mated) | E§4.2 | ✅ | |  |
+| I8 | Cursor in the graphics area: instance follows the cursor; click places | E§4.2 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| I9 | Esc / close: insertion ends, placed instances stay (Undo removes) | E§4.2, B | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| I10 | Placed instances are free (not fixed, not mated) | E§4.2 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | I11 | Other documents at a version, newer-version notice | E§4.1 | ✅ | pre-existing |  |
 | I12 | Filters (sketches, surfaces, parts, composite) | E§4.1 | ✅ | Parts / Composite parts (off) / Sketches (off) / Surfaces filter toggles (live 320); composite parts first under their Part Studio with the composite icon, one instance row with the composite icon (live 326); sketches inserted as Sketch 1 <1> with the sketch icon. Note: the Part Studio model always consumes a composite's members (Onshape keeps them unless Closed): Part Studio area GUI :103 i1–i7: three toggles (Parts on, Composite parts off, Sketches off) + rigid at the right as live 320; sketches listed under the parts with thumbnails; a composite hidden until its toggle is on, then inserted as one "Composite part 1 <1>" row (composite icon, DOF glyph, no chevron). |  |
 | I13 | Configuration inputs before inserting | E§4.1 | ✅ | live 592–595: a configured row gets the 57x30 split button "Set to last viewed configuration" (configuration icon) with ▾ Set to last viewed / Reset to default ("Could not find last viewed configuration." toast when the Part Studio was never shown in a configuration); the inputs ("Size [Default ▾]", checkboxes) show when the row is expanded, above the parts; no Generate (live: none) GUI :103 (▾ menu right-aligned under the caret, OsSelect inputs). |  |
 | I14 | Snap-insert with explicit MCs (Fastened) | E§4.3 | ✅ | snap mode on: the inserted instance's Part Studio mate connector lands on the connector under the cursor, Ctrl cycles it, the click adds a Fastened mate. GUI :103 k6–k9: a Mate connector on the Pin's bottom circle, snap mode on, Insert › Pin › Part 1: the instance's connector lands on the hole's centre connector under the cursor; the click adds "Fastened 2" |  |
 | I15 | Standard content tab: Standard › Category › Class › Component, Size (+ auto-size), Head slot, Length, Thread length, Material, Finish, Part number, Description, preview, Insert / closest / furthest | E§4.7, H:standard_content, live assembly/70, 900–902, dom/ui2-standard-content-panel.* | 🔧 | `model/assembly/standard.rs` (live's names and alphabetical pickers, default ANSI inch Countersunk bolt #10-24 x 0.25, thread-named ANSI sizes, live's inch lengths, Head slot, Material / Finish lists, `description()`; legacy specs load through `SpecFile`); `app/assembly_standard.rs` (two scroll groups with live's scrollbars, 181/146 px selects, read-only Part number + pencil and Description, line-drawing preview, Insert + closest / furthest, face / edge pre-selection); model tests `standard_content_*`. The pencil's in-place edit mode ("Property changes apply company/user wide."), the inserted instance's name and "Edit standard content" are done as live (behaviours "Standard content: edit properties …"). Open: the components beyond ours (PEM® and 11 others, /root/skasm-scratch/sc/compare.py; asked live 10-27) |  |
-| I16 | Inserted count, thumbnails | E§4.1 | ✅ | "Inserted: N" counts the instance following the cursor, as live 122 ("Inserted: 1" while the sketch follows the cursor); part / Part Studio / sketch thumbnails rendered offscreen (assembly_thumbs.rs). GUI :103 k5, i2. Visual for ui2: live has a `?` at the right of the "Undo to remove instances" footer |  |
+| I16 | Inserted count, thumbnails | E§4.1 | ✅ | "Inserted: N" counts the instance following the cursor, as live 122 ("Inserted: 1" while the sketch follows the cursor); part / Part Studio / sketch thumbnails rendered offscreen (assembly_thumbs.rs). GUI :103 k5, i2. Visual for ui2: live has a `?` at the right of the "Undo to remove instances" footer | 0.4.10+ / 77870dd4 10-28 |
 
 ## 4. Instance list (H:instances_list, E§5, UI:context-menus/assembly__context-*.png)
 
 | # | Behaviour | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
-| L1 | Top-level assembly row; click selects the whole assembly | E§5.1 | ✅ | |  |
-| L2 | Origin row (pickable as a mate target) | E§5.1 | ✅ | |  |
-| L3 | "Instances (n)" header, DOF count | B | ✅ | |  |
+| L1 | Top-level assembly row; click selects the whole assembly | E§5.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| L2 | Origin row (pickable as a mate target) | E§5.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| L3 | "Instances (n)" header, DOF count | B | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | L4 | Filter box: name substring | E§5.2 | ✅ | |  |
 | L5 | Filter colon commands `:part :assembly :mate :matelimits :connector :errors :suppressed :hidden :shown` (combinable) | E§5.2 | ✅ | model test `list_filter_colon_commands`; dropdown lists them |  |
 | L6 | Filter `:item :folder :warnings` | E§5.2 | ✅ | `:warnings` matches instances with an instance warning (More than one part is fixed, …); `:folder` lists the folders (flat, like every filtered row; a folder also matches by name); `:item` lists non-geometric items, which this account cannot create (live 105: no "Add items" flow), so it is always empty. GUI :103 w1 (two fixed parts → both listed with ⚠), w4 (Folder 1) |  |
@@ -100,7 +100,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | L8 | Hovering a row highlights the instance in the graphics | E§24.4 | ✅ | |  |
 | L9 | Selecting in the graphics scrolls the list to the row | E§5.1 | ✅ | |  |
 | L10 | Shift/Ctrl click adds to the selection | — | ✅ | |  |
-| L11 | Fixed pin icon ("Part is fixed"), DOF indicator ("Has degrees of freedom") | E§5.3, B | ✅ | |  |
+| L11 | Fixed pin icon ("Part is fixed"), DOF indicator ("Has degrees of freedom") | E§5.3, B | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | L12 | Suppressed rows struck through, hidden rows dimmed | E§5.3 | ✅ | |  |
 | L13 | Error indicator with message tooltip | E§5.3 | ✅ | |  |
 | L14 | Subassemblies expand to their instances | E§5.1 | ✅ | |  |
