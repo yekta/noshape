@@ -155,9 +155,9 @@ u is measured from. Our moments integration now closes them (kernel common.cpp `
 field on the shape's box, so the volume with gaps doesn't depend on where the part sits.
 | Sample | Now | Status | Verified |
 |---|---|---|---|
-| g50 F18 cylinder | 82.8478429 (was 82.786126) | ✅ |  |
-| g50 F11 plane | 46.000000 (was 45.999575) | ✅ |  |
-| g50 F19 offset | 4.189139 (live 4.1893432, −0.0002) | ✗ small |  |
+| g50 F18 cylinder | 82.8478429 (was 82.786126) | ✅ | v0.4.12 CLI 10-28 (bin/g50faces.py: F18 82.847884) |
+| g50 F11 plane | 46.000000 (was 45.999575) | ✅ | v0.4.12 CLI 10-28 (F11 46.000000) |
+| g50 F19 offset | 4.189139 (live 4.1893432, −0.0002) | ✗ small | v0.4.12 CLI 10-28: now **4.189385** (live 4.1893432, +0.00004; was −0.0002) — within 1e-5 relative |
 | g50 F8 | 8.321612 (live 8.3308904, −0.0093) | ✗ live reports EXTRUDED: Onshape replaced the file's B_SURFACE (which collapses to the apex; its area over its whole parameter range is ours) with another surface on import. Live request filed ("api (10-24) IM2b follow-up") |  |
 | g50 volume | 6052.680 (live 6052.761; was 6053.320) | ✅ band | v0.4.12 CLI 10-28 (qa, /tmp/qa-imp/impmatrix.json: 6052.678152) |
 | McMaster F0 cylinder | 13.938182 (live 13.9122437, +0.026; was +0.034) | ✗ its helix edges: ours 159.394088 / 159.325155, live 159.392935 / 159.3450619; live request filed |  |
