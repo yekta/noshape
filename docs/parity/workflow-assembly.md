@@ -106,8 +106,8 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | 3.2 | Replicate Part 3 <1> (Cylindrical 1) in Part 1 | one copy in hole 1 → "Replicate 1 ▸ Part 3 <7>" ✅; the new mate "Cylindrical 2" goes to the top-level Mate features (live nests "Mate features (1)" under the Replicate row) | ✅ (T: assembly `replicate_on_matching_holes`, qa5 A12 assert); was ✅ A7 fixed / ✗ **A12** |  |
 | 3.4 | Linear pattern preview | grey preview copy | ✅ A8 fixed | 6acf6b94 (qa 10:32: Assembly linear pattern of Part 4 <1> → grey preview copy while editing; tickets/asm-linear-pattern-6acf.png) |
 | 3.5 | Direction = plate front edge | copy along the edge, 25 mm | ✅ A9 fixed | 6acf6b94 (qa 10:32: Direction = plate top front edge → chip "Edge of Part 1 <1>", the copy 25 mm along the edge) |
-| 3.7 | Toolbar button tooltip after click | hides | ✅ A10 fixed |  |
-| 4.7 | Type into a selected BOM cell | editing starts but the **first character is lost** ("PN-002" → "N-002") and is committed on its own: Esc leaves "P" in the cell; Delete doesn't clear a cell | ✅ (GUI :103 skasm 10-27: "PN-002" whole; Enter commits and moves down); was ✗ A11 (changed) |  |
+| 3.7 | Toolbar button tooltip after click | hides | ✅ A10 fixed | 6acf6b94 (qa 10:33: hover Fastened → tooltip "Fastened mate (m)"; click → Fastened 1 dialog, tooltip gone with the pointer still on the button) |
+| 4.7 | Type into a selected BOM cell | editing starts but the **first character is lost** ("PN-002" → "N-002") and is committed on its own: Esc leaves "P" in the cell; Delete doesn't clear a cell | ✅ (GUI :103 skasm 10-27: "PN-002" whole; Enter commits and moves down); was ✗ A11 (changed) | 6acf6b94 (qa 10:33: BOM (Flattened), click row 1 Part number, type QA1, Enter → stored, row 2's cell selected) |
 | – | Relation toolbar button | live: Gear / Rack and pinion / Screw / Linear relation tools (feature dialogs) | **custom "Relation" panel**: tabs Gear / Rack & pinion / Screw / Linear, "Select mate" dropdowns, Lead per radian, blue **OK** | ✗ **A13** |  |
 | – | Tab position of a new Assembly made with + while Part Studio 1 was active | after Part Studio 1 (stays there) | was placed after Part Studio 1, **later shown at the end of the tab bar** (after a BOM edit / undo / tab switches) | ✗ **DOC5** |  |
 
@@ -135,7 +135,7 @@ Pass 6 (17:11) had found A12 fixed (mate nests under "Replicate 1 ▸ Mate featu
 | A15 (new) pending first instance look | face (229,163,54) with **black edges** vs live (242,182,72) with amber edges (255,192,76); **a transform triad at the instance** (live none); root row "Assembly 5" highlighted with the instance row (live only the instance row) | ✗ **A15** (skb / ui2) |  |
 | A3 hidden mate rows | light grey | ✅ **fixed** | 77870dd4 10-28 |
 | A13 relations | four toolbar buttons; Gear → "Gear 1" dialog: type select, Mate(s), Relation ratio 1, ☐ Reverse direction | ✅ **fixed** | 77870dd4 10-28 |
-| A11 typing into a BOM cell | "QA1" kept | ✅ **fixed** (Ctrl+Z doesn't revert the BOM edit; live ?) |  |
+| A11 typing into a BOM cell | "QA1" kept | ✅ **fixed** (Ctrl+Z doesn't revert the BOM edit; live ?) | 6acf6b94 (qa 10:33: "QA1" kept) |
 | A14 Replicate red hints | none | ✅ **fixed** |  |
 | A16 (new) | "solving…" label at the top right for as long as the Replicate dialog is open (nothing selected); gone on cancel | ? A16 (live request filed) |  |
 | A4 Slider flip | block still inside the plate (Front view) | ✗ still |  |
@@ -148,7 +148,7 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 | A15 selected instance | (242,182,73) top, amber edges, only the instance row highlighted | ❌ (ASM-SELECTED-EDGES-DARK) **fixed** | 77870dd4 10-28 (faces amber ✅, interior edges near-black) |
 | A16 "solving…" label | gone | ✅ **fixed** |  |
 | A19 (new) empty Replicate | title red ✅; **no pending red "Replicate N" row with error badge in the list, no badge on the root row, no red border on "Parts to find match in"** (live has all three) | ✗ **A19** (skb) |  |
-| A11 BOM edit + Ctrl+Z | not undone | ✅ (= live) |  |
+| A11 BOM edit + Ctrl+Z | not undone | ✅ (= live) | 6acf6b94 (qa 10:33: Esc, Ctrl+Z over the view → undoes the last assembly edit (a drag), QA1 stays) |
 | A4 Slider flip | block still inside the plate | ✗ still |  |
 | A18 repeat insert, ✓ without entering graphics | (5.000025, 2.500025, 1.250025) | ✅ **fixed** (live exact 5 / 2.5 / 1.25) |  |
 
@@ -167,8 +167,8 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | A1 fit | F fits all three instances; the far block runs under the right strip as in live ins-902 | ✅ | 6acf6b94 (qa 10:30, qa5's mkasm.py doc: F fits all five instances) |
-| A10 toolbar tooltip after click | gone once the dialog opens (b01) | ✅ **fixed** |  |
-| A11 BOM typing into a selected cell | "QA1" stored, Enter moves down (b05) | ✅ **fixed** |  |
+| A10 toolbar tooltip after click | gone once the dialog opens (b01) | ✅ **fixed** | 6acf6b94 (qa 10:33: as 3.7) |
+| A11 BOM typing into a selected cell | "QA1" stored, Enter moves down (b05) | ✅ **fixed** | 6acf6b94 (qa 10:33: "QA1" stored, Enter moves down) |
 | A13 relations | tool search "relation": Gear relation, Screw relation, Linear relation, Rack and pinion relation (b10) | ✅ **fixed** | 77870dd4 10-28 |
 | A6 pattern dialogs | "Linear pattern 1" feature dialog (✓ ✕, red title, pending red row with badge): Instances, Direction (+ clock), Distance 25 mm, Instance count 2 (+ flip), ☐ Equal spacing, ☐ Centered, ☐ Second direction (b11) | ✅ **fixed** | 77870dd4 10-28 |
 | A8 pattern preview | grey preview copy while editing (b14) | ✅ **fixed** | 6acf6b94 (qa 10:32: grey preview copy while editing) |
