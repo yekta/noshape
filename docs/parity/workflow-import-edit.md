@@ -66,8 +66,8 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | # | Row | Ours | Status | Verified |
 |---|---|---|---|---|
 | 1.2–1.4 | Fresh `import_files` of g25-b | SAT 7585.978524, X_T 7583.000869, STEP 7582.713024 (live 7582.912205) | ✗ I1 |  |
-| 2.1 | Move face, click 2 px inside the x=40 face border | "Face of Import 1" (face picked) | ✅ I2 fixed |  |
-| 2.9 | Row tooltip after clicking Top for a sketch | hides | ✅ I4 fixed |  |
+| 2.1 | Move face, click 2 px inside the x=40 face border | "Face of Import 1" (face picked) | ✅ I2 fixed | 6acf6b94 (qa 10:28, our holeblock.step imported: Move face, click 2 px inside the x=40 face's left border → "Face of Import 1", translucent offset preview) |
+| 2.9 | Row tooltip after clicking Top for a sketch | hides | ✅ I4 fixed | 6acf6b94 (qa 10:28, our holeblock.step imported: Sketch, hover Top (tooltip "Top"), click, move into the dialog → no tooltip, Sketch plane "Top plane") |
 | 3.4 | Agent API import | `import_files` exists (one tab per file, "g25-b", "g25-b 1", …) | ✅ I6 fixed | v0.4.12 CLI (qa 10:23: import_files holeblock.step → File tab "holeblock.step" + Part Studio "holeblock", 7214.601837) |
 | – | Switch to the holeblock tab | "Parts (0)" until a click (TAB1) | ✗ TAB1 |  |
 | – | `noshape-cli … | head` | CLI **panics** "failed printing to stdout: Broken pipe" | ✗ **API1** (minor) |  |
@@ -85,9 +85,9 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app /root/target-lead/debug/noshape)
 | Row | Ours now | Status | Verified |
 |---|---|---|---|
-| TAB1 | copy of the qa5 import doc: switching to the g48-two tab shows Parts (2) at once | ✅ fixed |  |
-| I2 | Delete face field, click right on a block's top edge: "Face of Extrude 3" (face picked) | ✅ |  |
-| I4 | Plane dialog, click Top in the list, move into the dialog: no row tooltip left | ✅ |  |
+| TAB1 | copy of the qa5 import doc: switching to the g48-two tab shows Parts (2) at once | ✅ fixed | 6acf6b94 (qa 10:28, our holeblock.step imported + g48-two.step: first visit of g48-two shows Parts (0) while it regenerates, Parts (2) after ~2 s with no input) |
+| I2 | Delete face field, click right on a block's top edge: "Face of Extrude 3" (face picked) | ✅ | 6acf6b94 (qa 10:28, our holeblock.step imported: Delete face, click exactly on the top front edge pixel → "Face of Import 1") |
+| I4 | Plane dialog, click Top in the list, move into the dialog: no row tooltip left | ✅ | 6acf6b94 (qa 10:28, our holeblock.step imported: same as 2.9, no row tooltip left after the click) |
 | API1 / API2 | fixed on agent/qa5 (CLI exits quietly on a closed pipe; tab_create takes "Part Studio" and lists the kinds in its error) | 🔧 |  |
 
 ## Re-run pass 22 (qa5, 2026-10-24, CLI built from main c59c5af9 after the api import/export batch; /root/qa5-scratch/pass21/impmatrix21.*)
