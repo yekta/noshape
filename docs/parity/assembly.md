@@ -28,7 +28,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | K9 | `q` reorients the secondary axis during a snap drag | E§20 | ✅ | snap drag (verified); mate / MC dialog |  |
 | K10 | `Shift` (hold) locks mate inference to the hovered face/edge | H:mates, E§6.3 | ✅ | nearest point of the locked entity; click anywhere picks it |  |
 | K11 | `Ctrl` (tap) cycles the dragged connector in snap mode | E§20 | ✅ | Ctrl tap cycles the dragged connector only when the instance has more than the picked one (its explicit connectors); live 570 (a block with no explicit connectors): Ctrl taps don't change the face-centre connector, and ours doesn't either. No message while snap-dragging (live 569) |  |
-| K12 | `Enter` commits the dialog | H:shortcuts | ✅ | mate dialog |  |
+| K12 | `Enter` commits the dialog | H:shortcuts | ✅ | mate dialog | 0.4.10+ / 77870dd4 10-28 |
 | K13 | `Shift+Enter` commits and starts another of the same command | H:shortcuts | ✅ | mate dialog: commits and reopens the same mate type |  |
 | K14 | `Esc` cancels the command / closes menus, exits isolate | H:shortcuts | ✅ | Insert: Esc closes and keeps placed instances | 0.4.10+ / 77870dd4 10-28 |
 | K15 | `Space` clears the selection | H:shortcuts | ✅ | | 0.4.10+ / c9c66d1c 10-27 |
@@ -269,8 +269,8 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 
 | # | Behaviour | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
-| S1 | Drag an instance: it goes transparent, MCs of others wake near the cursor | E§20 | ✅ | pre-existing |  |
-| S2 | Release opens the mate dialog (Fastened) with both MCs filled | E§20 | ✅ | pre-existing |  |
+| S1 | Drag an instance: it goes transparent, MCs of others wake near the cursor | E§20 | ✅ | pre-existing | 0.4.10+ / 77870dd4 10-28 |
+| S2 | Release opens the mate dialog (Fastened) with both MCs filled | E§20 | ✅ | pre-existing | 0.4.10+ / 77870dd4 10-28 |
 | S3 | Ctrl cycles the dragged instance's MCs | E§20 | ✅ | see K11 |  |
 | S4 | `a` / `q` change alignment during the drag | E§20 | ✅ | |  |
 | S5 | Fixed instances cannot be dragged | E§20 | ✅ | |  |
