@@ -9,7 +9,7 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
-- **13:45 update (green f8014efa, copied 13:27):** **SKETCH-START-INFERENCE verified** (GUI, qa-scratch/inf.noshape:
+- **13:35 update (green f8014efa, copied 13:27):** **SKETCH-START-INFERENCE verified** (GUI, qa-scratch/inf.noshape:
   arc end → Tangent stored, slanted line end → Perpendicular stored, its start → Parallel, H / V still win). **REGEN-SPEED
   re-timed with the mesh cache: no clear gain** (edits 725 / 691 / 606 ms at load 35, 426 / 165 / 198 at load 30, 3rd undo
   131 ms; the fine refine still meshes the whole part, 82–166 ms). drawing D39 linear override = live (prefix / suffix /
@@ -225,7 +225,7 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Shared prefs touched by testing: ~/.config/noshape/preferences.json got `featureDialogWidths.extrude 278` from a resize
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
-## Requests to the lead (qa, updated 2026-10-28 13:45)
+## Requests to the lead (qa, updated 2026-10-28 13:35)
 - **REGEN-SPEED (P0):** green f8014efa with the mesh cache still commits Extrude 1 edits on live-30-features in 165–725 ms
   (load 30–35) and the 3rd undo re-evaluates 29 features (131 ms). Booleans dominate under load (25–97 ms each).
 - **P1 SKETCH-MODEL-EDGE-SELECT (skasm, new 10-28, also in v0.4.12):** in a sketch a click on a model edge selects nothing
