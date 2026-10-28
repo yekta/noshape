@@ -57,7 +57,7 @@ Fresh doc /tmp/qa5/d23b/derive.noshape (pass9/mkderive.py), configured /tmp/qa5/
 | DER6 second derive of the same source | ✓ enabled, accepted, red row "Derived 2 did not regenerate properly: Creating multiple Derived features from the same source and configuration is not allowed. …" | ✅ **fixed** (e10, e11) | a6c56638 10-28 |
 | DER7 ghosting | none | ✅ **fixed** (e10) | a6c56638 10-28 |
 | DER8 insert derived part into an assembly | "qa5 dst" lists "Block"; inserts "Block <1>" with its fillet | ✅ **fixed** (e18, e19) | a6c56638 10-28 |
-| DER9 renamed source part | panel and dst Parts show "Block" | ✅ **fixed** (e17) |  |
+| DER9 renamed source part | panel and dst Parts show "Block" | ✅ **fixed** (e17) | c725f68f 10-28 (Part 1 renamed "Block" in Part Studio 1 → Part Studio 2 Parts (1) "Block", the Derived panel lists Part Studio 1 › Block) |
 | DER10 configuration change in the panel | contents empty + Generate enabled; Generate re-lists, disables | ✅ **fixed** (e33–e35) | a6c56638 10-28 |
 | DER11 context icon | one icon (short ⇦ + dot), "Update available for Context 1" on the arrow | ✅ **fixed** (e42) | a6c56638 10-28 |
 | TAB1 derived studio after reopen | Parts (1) + Appearance strip button at once | ✅ **fixed** (e31) | a6c56638 10-28 |
