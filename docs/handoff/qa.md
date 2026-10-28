@@ -9,6 +9,10 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6)
 
+- **20:40 update:** fuzz 83 (b8f4) alive. OK-ENABLED-AFTER-CLEAR withdrawn (live 1575: = ours). Rust Boolean watch, bool CLI 20:16
+  (has e66f8a83 glue-pattern path) vs v0.4.12: patmatrix and bin/touchpat.py (touching part patterns ADD / NEW) identical; a
+  feature pattern of a boss at the plate edge fails "Could not create all instances as entered…" in both (my setup, not a
+  regression; not ticketed).
 - **20:25 update (green b8f46ab6, copied 20:19):** **P1 GREEN-ICONS-PATH**: greens since 4b9d7eaf are built in /home/ngyekta/… and
   show no icons here (rust-embed debug reads assets from the build tree); workaround in place: a copy of main's crates/app/assets
   at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ empty crates/app-core) — refresh it if icons change. UI-look
