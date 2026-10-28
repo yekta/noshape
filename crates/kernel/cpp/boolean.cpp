@@ -271,7 +271,7 @@ bool same_domain_candidates(const TopoDS_Shape& s, const UnifyScope* sc = nullpt
 {
   const TopoDS_Shape& where = sc != nullptr ? TopoDS_Shape(sc->faces) : s;
   ShapeAncMap         ef;
-  TopExp::MapShapesAndUniqueAncestors(where, TopAbs_EDGE, TopAbs_FACE, ef);
+  unique_ancestors(where, TopAbs_EDGE, TopAbs_FACE, ef);
   auto plane_of = [](const TopoDS_Face& f, gp_Pln& pl) {
     TopLoc_Location                 loc;
     const occ::handle<Geom_Surface> g = BRep_Tool::Surface(f, loc);
@@ -308,7 +308,7 @@ bool same_domain_candidates(const TopoDS_Shape& s, const UnifyScope* sc = nullpt
   // Collinear edges that could merge: a vertex shared by exactly two
   // straight edges on one line.
   ShapeAncMap ve;
-  TopExp::MapShapesAndUniqueAncestors(where, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  unique_ancestors(where, TopAbs_VERTEX, TopAbs_EDGE, ve);
   for (int i = 1; i <= ve.Extent(); ++i)
   {
     const ShapeList& es = ve(i);
@@ -387,7 +387,7 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
   for (int i = 1; i <= nf; ++i)
     planar[(size_t)i] = outer_plane(TopoDS::Face(faces(i)), pl[(size_t)i]);
   ShapeAncMap ef;
-  TopExp::MapShapesAndUniqueAncestors(where, TopAbs_EDGE, TopAbs_FACE, ef);
+  unique_ancestors(where, TopAbs_EDGE, TopAbs_FACE, ef);
   std::vector<int> up((size_t)nf + 1);
   for (int i = 0; i <= nf; ++i)
     up[(size_t)i] = i;
@@ -667,8 +667,8 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
     std::fprintf(stderr, "unify scope: %d faces, %d seeds\n", n, seeds2.Extent());
   }
   ShapeAncMap ve, ef2;
-  TopExp::MapShapesAndUniqueAncestors(sc != nullptr ? TopoDS_Shape(where2) : r, TopAbs_VERTEX, TopAbs_EDGE, ve);
-  TopExp::MapShapesAndUniqueAncestors(sc != nullptr ? TopoDS_Shape(where2) : r, TopAbs_EDGE, TopAbs_FACE, ef2);
+  unique_ancestors(sc != nullptr ? TopoDS_Shape(where2) : r, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  unique_ancestors(sc != nullptr ? TopoDS_Shape(where2) : r, TopAbs_EDGE, TopAbs_FACE, ef2);
   auto line_of = [](const TopoDS_Edge& e, gp_Lin& lin) {
     TopLoc_Location loc;
     double          f, l;
@@ -2268,7 +2268,7 @@ static bool local_boolean(const TopoDS_Shape& target, const OcShape* src, const 
     csr   = &ancestors_cached(*src, TopAbs_EDGE, TopAbs_FACE);
   }
   else
-    TopExp::MapShapesAndUniqueAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
+    unique_ancestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
   auto faces_of = [&](const TopoDS_Shape& e, auto&& f) {
     if (csr == nullptr)
     {
@@ -2599,9 +2599,7 @@ static bool local_boolean(const TopoDS_Shape& target, const OcShape* src, const 
   // History: OCCT's general fuse's, kept to what the result holds.
   // The result's maps (make_result's history keeps them for the result).
   std::array<ShapeIMap, 3> rm;
-  TopExp::MapShapes(so, TopAbs_FACE, rm[0]);
-  TopExp::MapShapes(so, TopAbs_EDGE, rm[1]);
-  TopExp::MapShapes(so, TopAbs_VERTEX, rm[2]);
+  map_fev(so, rm[0], rm[1], rm[2]);
   struct InResult
   {
     const std::array<ShapeIMap, 3>& m;

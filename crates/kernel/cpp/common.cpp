@@ -42,6 +42,7 @@ extern "C" char etext;
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Iterator.hxx>
+#include <NCollection_IncAllocator.hxx>
 
 #include <algorithm>
 #include <sstream>
@@ -76,9 +77,69 @@ std::mutex& mesh_mutex()
 
 // ---------------------------------------------------------------- OcShape
 
+static void walk_fev(const TopoDS_Shape& x, ShapeIMap& f, ShapeIMap& e, ShapeIMap& v)
+{
+  switch (x.ShapeType())
+  {
+    case TopAbs_FACE: {
+      const int n = f.Extent();
+      if (f.Add(x) <= n)
+        return; // met before, with its sub-shapes
+      break;
+    }
+    case TopAbs_EDGE: {
+      const int n = e.Extent();
+      if (e.Add(x) <= n)
+        return;
+      break;
+    }
+    case TopAbs_VERTEX:
+      v.Add(x);
+      return;
+    default:
+      break;
+  }
+  for (TopoDS_Iterator it(x); it.More(); it.Next())
+    walk_fev(it.Value(), f, e, v);
+}
+
+void unique_ancestors(const TopoDS_Shape& s, TopAbs_ShapeEnum kind, TopAbs_ShapeEnum ancestor_kind, ShapeAncMap& m)
+{
+  // As TopExp::MapShapesAndUniqueAncestors (the same keys, order and lists),
+  // the lists' nodes from one bump allocator: half its time was malloc.
+  const occ::handle<NCollection_IncAllocator> alloc = new NCollection_IncAllocator();
+  const ShapeList                             empty(alloc);
+  for (TopExp_Explorer a(s, ancestor_kind); a.More(); a.Next())
+  {
+    const TopoDS_Shape& anc = a.Current();
+    for (TopExp_Explorer x(anc, kind); x.More(); x.Next())
+    {
+      ShapeList& l    = m(m.Add(x.Current(), empty));
+      bool       seen = false;
+      for (ShapeList::Iterator it(l); it.More() && !seen; it.Next())
+        seen = anc.IsSame(it.Value());
+      if (!seen)
+        l.Append(anc);
+    }
+  }
+  for (TopExp_Explorer x(s, kind, ancestor_kind); x.More(); x.Next())
+    m.Add(x.Current(), empty);
+}
+
+void map_fev(const TopoDS_Shape& s, ShapeIMap& f, ShapeIMap& e, ShapeIMap& v)
+{
+  if (!s.IsNull())
+    walk_fev(s, f, e, v);
+}
+
 const ShapeIMap& OcShape::map(TopAbs_ShapeEnum kind) const
 {
   const int k = static_cast<int>(kind);
+  if (kind == TopAbs_FACE || kind == TopAbs_EDGE || kind == TopAbs_VERTEX)
+  {
+    std::call_once(myFevFlag, [&]() { map_fev(shape, myMaps[TopAbs_FACE], myMaps[TopAbs_EDGE], myMaps[TopAbs_VERTEX]); });
+    return myMaps[k];
+  }
   std::call_once(myFlags[k], [&]() {
     if (!shape.IsNull())
       TopExp::MapShapes(shape, kind, myMaps[k]);
@@ -98,10 +159,13 @@ const std::vector<Bnd_Box>& OcShape::face_boxes() const
   return myBoxes;
 }
 
-void OcShape::adopt_map(TopAbs_ShapeEnum kind, ShapeIMap&& m)
+void OcShape::adopt_fev(std::array<ShapeIMap, 3>&& m)
 {
-  const int k = static_cast<int>(kind);
-  std::call_once(myFlags[k], [&]() { myMaps[k] = std::move(m); });
+  std::call_once(myFevFlag, [&]() {
+    myMaps[TopAbs_FACE]   = std::move(m[0]);
+    myMaps[TopAbs_EDGE]   = std::move(m[1]);
+    myMaps[TopAbs_VERTEX] = std::move(m[2]);
+  });
 }
 
 void OcShape::adopt_face_boxes(std::vector<Bnd_Box>&& b)
@@ -281,9 +345,7 @@ HistoryBuilder::HistoryBuilder(const std::vector<TopoDS_Shape>& args, const Topo
 {
   if (out_maps != nullptr)
   {
-    myOut->adopt_map(TopAbs_FACE, std::move((*out_maps)[0]));
-    myOut->adopt_map(TopAbs_EDGE, std::move((*out_maps)[1]));
-    myOut->adopt_map(TopAbs_VERTEX, std::move((*out_maps)[2]));
+    myOut->adopt_fev(std::move(*out_maps));
   }
   for (size_t i = 0; i < myArgs.size(); ++i)
   {
@@ -600,6 +662,62 @@ static std::pair<std::vector<uint32_t>, std::vector<uint32_t>> ancestor_map_unca
   return out;
 }
 
+using Csr32 = std::pair<std::vector<uint32_t>, std::vector<uint32_t>>;
+
+static Csr32 csr_of(std::vector<std::pair<uint32_t, uint32_t>>& pairs, int rows)
+{
+  std::sort(pairs.begin(), pairs.end());
+  pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
+  Csr32 out;
+  out.first.assign((size_t)rows + 1, 0);
+  out.second.reserve(pairs.size());
+  for (const auto& [i, a] : pairs)
+  {
+    ++out.first[(size_t)i + 1];
+    out.second.push_back(a);
+  }
+  for (size_t i = 1; i < out.first.size(); ++i)
+    out.first[i] += out.first[i - 1];
+  return out;
+}
+
+// Edge -> faces and vertex -> faces together (the naming asks for both): one
+// walk of each face's edges and their vertices, the rows as
+// ancestor_map_uncached makes them.
+static std::pair<Csr32, Csr32> edge_and_vertex_faces(const OcShape& s)
+{
+  const KernelTimer                          timer("ancestors.edge_vertex_face");
+  const ShapeIMap&                           fm = s.map(TopAbs_FACE);
+  const ShapeIMap&                           em = s.map(TopAbs_EDGE);
+  const ShapeIMap&                           vm = s.map(TopAbs_VERTEX);
+  std::vector<std::pair<uint32_t, uint32_t>> pe, pv;
+  uint32_t                                   a = 0;
+  std::function<void(const TopoDS_Shape&)>   visit = [&](const TopoDS_Shape& x) {
+    if (x.ShapeType() == TopAbs_VERTEX)
+    {
+      const int i = vm.FindIndex(x);
+      if (i > 0)
+        pv.emplace_back((uint32_t)i - 1, a);
+      return;
+    }
+    if (x.ShapeType() == TopAbs_EDGE)
+    {
+      const int i = em.FindIndex(x);
+      if (i > 0)
+        pe.emplace_back((uint32_t)i - 1, a);
+    }
+    for (TopoDS_Iterator it(x); it.More(); it.Next())
+      visit(it.Value());
+  };
+  for (int f = 1; f <= fm.Extent(); ++f)
+  {
+    a = (uint32_t)f - 1;
+    for (TopoDS_Iterator it(fm(f)); it.More(); it.Next())
+      visit(it.Value());
+  }
+  return {csr_of(pe, em.Extent()), csr_of(pv, vm.Extent())};
+}
+
 const std::pair<std::vector<uint32_t>, std::vector<uint32_t>>& ancestors_cached(const OcShape& s, TopAbs_ShapeEnum kind, TopAbs_ShapeEnum ancestor_kind)
 {
   const int key = (int)kind * 16 + (int)ancestor_kind;
@@ -608,6 +726,14 @@ const std::pair<std::vector<uint32_t>, std::vector<uint32_t>>& ancestors_cached(
     auto                        it = s.myAncestors.find(key);
     if (it != s.myAncestors.end())
       return it->second;
+  }
+  if (ancestor_kind == TopAbs_FACE && (kind == TopAbs_EDGE || kind == TopAbs_VERTEX))
+  {
+    auto                        both = edge_and_vertex_faces(s);
+    std::lock_guard<std::mutex> g(s.myAncestorsLock);
+    s.myAncestors.emplace((int)TopAbs_EDGE * 16 + (int)TopAbs_FACE, std::move(both.first));
+    s.myAncestors.emplace((int)TopAbs_VERTEX * 16 + (int)TopAbs_FACE, std::move(both.second));
+    return s.myAncestors.find(key)->second;
   }
   auto                        m = ancestor_map_uncached(s, kind, ancestor_kind);
   std::lock_guard<std::mutex> g(s.myAncestorsLock);

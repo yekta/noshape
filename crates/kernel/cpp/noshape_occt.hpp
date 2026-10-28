@@ -339,9 +339,11 @@ public:
   const std::vector<Bnd_Box>& face_boxes() const;
   // Whether face_boxes() has been made.
   bool has_face_boxes() const { return myBoxesReady.load(); }
-  // A map / the face boxes someone made already (the history of the op that
-  // made the shape; boxes of the faces it kept): taken unless made here first.
-  void adopt_map(TopAbs_ShapeEnum kind, ShapeIMap&& m);
+  // The face, edge and vertex maps / the face boxes someone made already (the
+  // history of the op that made the shape; boxes of the faces it kept): taken
+  // unless made here first. map() makes the face, edge and vertex maps in one
+  // walk (map_fev).
+  void adopt_fev(std::array<ShapeIMap, 3>&& m);
   void adopt_face_boxes(std::vector<Bnd_Box>&& b);
   // Volume properties, computed once (`compute` runs the first time):
   // regeneration asks for a body's volume before and after each boolean.
@@ -395,6 +397,7 @@ public:
 
 private:
   mutable std::once_flag myFlags[TopAbs_SHAPE + 1];
+  mutable std::once_flag myFevFlag;
   mutable ShapeIMap      myMaps[TopAbs_SHAPE + 1];
   mutable std::once_flag myVolumeFlag;
   mutable GProp_GProps   myVolume;

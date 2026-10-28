@@ -203,3 +203,36 @@ fn the_unify_after_a_local_boolean_matches_the_whole_one() {
         assert_eq!(last_unify_path(), "known", "{what}");
     }
 }
+
+/// The fin fused under the 400-fin plate (corpus case a2121c5b, Extrude 3 of
+/// fins-400), as the regeneration runs it: the Boolean, the unify, the
+/// naming's maps, `NOSHAPE_BENCH_N` times (default 20) for `perf record`.
+/// NOSHAPE_BENCH_CASE=<dir>/<name>.
+#[test]
+#[ignore = "bench: NOSHAPE_BENCH_CASE=/root/core-scratch/bool-one/a2121c5b456e7188"]
+fn local_fuse_bench() {
+    let Ok(case) = std::env::var("NOSHAPE_BENCH_CASE") else { return };
+    let path = std::path::Path::new(&case);
+    let c = noshape_kernel::bool_corpus::load(path.parent().unwrap(), path.file_name().unwrap().to_str().unwrap()).expect("the case");
+    let _ = set_working_scale(1000.0);
+    let n: usize = std::env::var("NOSHAPE_BENCH_N").ok().and_then(|v| v.parse().ok()).unwrap_or(20);
+    let mut ms = Vec::new();
+    for _ in 0..n {
+        // A fresh target each round, known to have nothing to merge (as a
+        // regenerated part is).
+        let target = Shape::from_brep_bytes(&c.objects[0].to_brep_bytes().unwrap()).unwrap();
+        let target = unify_same_domain(&target).unwrap().shape;
+        let _ = target.ancestor_map(ShapeType::Edge, ShapeType::Face).unwrap();
+        let _ = target.ancestor_map(ShapeType::Vertex, ShapeType::Face).unwrap();
+        // The auto scope's classification made the face boxes.
+        let _ = target.classify_point(DVec3::ZERO, 1e-9);
+        let t = std::time::Instant::now();
+        let r = boolean(c.op, std::slice::from_ref(&target), &c.tools, &c.opts).unwrap();
+        let u = unify_same_domain(&r.shape).unwrap();
+        let _ = u.shape.ancestor_map(ShapeType::Edge, ShapeType::Face).unwrap();
+        let _ = u.shape.ancestor_map(ShapeType::Vertex, ShapeType::Face).unwrap();
+        ms.push(t.elapsed().as_secs_f64() * 1e3);
+    }
+    ms.sort_by(f64::total_cmp);
+    eprintln!("local fuse + unify + maps: median {:.1} ms, best {:.1} ms ({} runs, path {}, unify {})", ms[ms.len() / 2], ms[0], n, last_boolean_path(), last_unify_path());
+}

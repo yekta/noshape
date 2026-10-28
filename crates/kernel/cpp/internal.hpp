@@ -89,6 +89,12 @@ bool bop_parallel();
 // `r` valid where it differs from `input`: its faces not the input's in full,
 // the whole shape for closure and orientation (features.cpp).
 bool valid_changed(const TopoDS_Shape& input, const TopoDS_Shape& r);
+// The face, edge and vertex maps of `s` in one walk, as three
+// TopExp::MapShapes make them (each first occurrence, depth first; a
+// sub-shape met again isn't walked again) (common.cpp).
+void map_fev(const TopoDS_Shape& s, ShapeIMap& f, ShapeIMap& e, ShapeIMap& v);
+// TopExp::MapShapesAndUniqueAncestors, quicker (common.cpp).
+void unique_ancestors(const TopoDS_Shape& s, TopAbs_ShapeEnum kind, TopAbs_ShapeEnum ancestor_kind, ShapeAncMap& m);
 // `out`'s face boxes from `from`'s for the faces they share (common.cpp).
 void inherit_face_boxes(const OcShape& from, OcShape& out);
 // The OcShape's ancestor map (CSR offsets, values; ancestor_map's), made

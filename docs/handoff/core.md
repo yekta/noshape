@@ -215,6 +215,15 @@ Phase 2 (local Booleans), first step landed:
   800-edge group rebuilt; merge.edges 12-15; make_result's history ~20), classify_point 33 (the target's face
   boxes, made the first time), ancestor maps 16, bounding boxes 12-15. Corpus a2121c5b 74 ms; 0 mismatches.
   T2 timed (perf.yml model job's pattern_second step): `timed_the_fin_under_the_fin_plate_regenerates_locally`.
+- Step 8 (10-28): whole-part walks merged. `OcShape::map` makes the face, edge and vertex maps in one walk
+  (`map_fev`: MapShapes' order, a sub-shape met again not walked again); edge → face and vertex → face are made
+  together (the naming asks for both); `unique_ancestors` replaces TopExp::MapShapesAndUniqueAncestors in
+  boolean.cpp (same entries, lists from a bump allocator; small gain: the walk is the cost). perf on the bench
+  below: TopoDS_Iterator::updateCurrentShape was 14 % of the time (OCCT has no frame pointers: no callers).
+  Bench `boolean_groups::local_fuse_bench` (ignored; NOSHAPE_BENCH_CASE=/root/core-scratch/bool-one/a2121c5b456e7188:
+  the fin fuse, the scoped unify and the naming's maps, 20 rounds): median 142 → 105 ms. Per round (CPU): the
+  local Boolean 30 (history 8, closed_and_oriented 6.5, general fuse 6), merge_planar 25 (the two 800-edge
+  groups 13, the edge phase's maps 5.6), candidates_again 8; the whole-shape unify would add ~50.
 - The regen's unify (boolean.cpp `merge_planar`): the merged face goes on the surface of the group's face with the
   most edges and only edges without a pcurve there get one; a one-shell solid is rebuilt shell-only instead of
   BRepTools_ReShape copying the part: fins-400's 4 unifies 849 → 382 ms. A unify of only the new faces' region
