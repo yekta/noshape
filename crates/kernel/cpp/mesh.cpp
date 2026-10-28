@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <BRepAdaptor_Surface.hxx>
 #include <functional>
+#include <atomic>
 #include <NCollection_DataMap.hxx>
 #include <TopoDS_Compound.hxx>
 #include <BRep_Builder.hxx>
@@ -192,6 +193,10 @@ bool cdt_face(const IMeshData::IFaceHandle& f, size_t min_nodes, bool curved)
 // plate's faces 1.4 s → 0.1 s). Any face it can't take
 // (self-intersecting or seam wires, a ring it refuses) goes to `fallback`
 // (BRepMesh's own planar algorithm).
+// Planar faces PlanarCdtAlgo gave to BRepMesh's algorithm (mesh_prepare
+// reports its meshing's; tests).
+std::atomic<size_t> g_planar_fallbacks{0};
+
 class PlanarCdtAlgo : public IMeshTools_MeshAlgo
 {
 public:
@@ -208,7 +213,10 @@ public:
     {
     }
     if (!done)
+    {
+      ++g_planar_fallbacks;
       myFallback->Perform(f, prm, range);
+    }
   }
 
 private:
@@ -783,7 +791,11 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
       mesher.SetShape(meshed);
       mesher.ChangeParameters() = prm;
       const KernelTimer timer("mesh.brepmesh");
+      const size_t      fallbacks = g_planar_fallbacks.load();
       mesher.Perform(ctx);
+      m->planar_fallbacks = g_planar_fallbacks.load() - fallbacks;
+      if (std::getenv("NOSHAPE_MESH_DEBUG"))
+        std::fprintf(stderr, "mesh: %zu planar faces to BRepMesh's algorithm\n", m->planar_fallbacks);
     }
     for (int i = 1; i <= m->faces.Extent(); ++i)
     {
@@ -973,6 +985,7 @@ MeshCounts mesh_counts(const OcMesh& m)
   c.edge_points = m.edge_points;
   c.edges       = (size_t)m.edges.Extent();
   c.vertices    = (size_t)m.vertices.Extent();
+  c.planar_fallbacks = m.planar_fallbacks;
   return c;
 }
 

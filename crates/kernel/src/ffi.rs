@@ -175,6 +175,8 @@ pub(crate) mod ffi {
         edge_points: usize,
         edges: usize,
         vertices: usize,
+        /// Planar faces the kernel's triangulation gave to BRepMesh's.
+        planar_fallbacks: usize,
     }
 
     #[derive(Debug, Clone, Copy)]

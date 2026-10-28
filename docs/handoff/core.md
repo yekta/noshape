@@ -248,8 +248,17 @@ Phase 2 (local Booleans), first step landed:
   them the patched 800-edge front / back faces), the display 586 → 261 ms, the whole edit 802 → 479 ms.
   T1: kernel `boolean_groups::display_meshes_of_kept_faces_are_reused` (a fuse and a hole: the same triangles,
   normals and edge polylines as meshing a fresh copy whole; 97 → 43 and 91 → 15 ms). T2 timed:
-  `pattern_second::timed_editing_the_fin_under_the_fin_plate`. Next there: meshing the 800-edge faces (~65 ms
-  each), mesh_prepare's maps (28 ms; the shape's own would do).
+  `pattern_second::timed_editing_the_fin_under_the_fin_plate`.
+- Step 11 (10-28): psui's planar CDT fix (their 10-28 note below, /root/psui-scratch/planar-cdt-collinear-fix.patch):
+  planar_cdt.hpp `recover()` refused a boundary segment when a vertex lay in line *behind* its start; the fin under
+  the plate puts edges in line across the 1608-edge front / back faces, so both went to BRepMesh's algorithm every
+  time. T1 kernel `planar_mesh::a_vertex_in_line_behind_a_boundary_segment_keeps_the_planar_triangulation` (theirs),
+  on `Tessellation::planar_fallbacks` (new: planar faces given to BRepMesh's algorithm; NOSHAPE_MESH_DEBUG prints
+  it). The edit (dev, loaded): display 230–265 ms, whole 447–640 ms. Left in the display: BRepMesh's model build of
+  the two 1608-edge faces (~150 ms for the 7 new faces; ShapeAnalysis_WireOrder, CurveOnPlane per call: psui), the
+  maps (31 ms), the clean (19). psui's larger patch (mesh-reuse-for-core.patch: an edge discretizer reusing the
+  kept faces' polygons, display deflection quantised) is not taken: the cache here keeps the same output with the
+  1 % rule; the quantising would change every display mesh.
 - The regen's unify (boolean.cpp `merge_planar`): the merged face goes on the surface of the group's face with the
   most edges and only edges without a pcurve there get one; a one-shell solid is rebuilt shell-only instead of
   BRepTools_ReShape copying the part: fins-400's 4 unifies 849 → 382 ms. A unify of only the new faces' region

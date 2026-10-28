@@ -257,14 +257,18 @@ struct Mesh
     for (int k = 0; k < 4096; ++k)
     {
       // Triangle of e: (a, x, y); does a-b leave a through x-y?
-      const int x = v[next(e)], y = v[prev(e)];
-      if (orient(p[a], p[x], p[b]) > 0 && orient(p[a], p[y], p[b]) < 0)
+      const int    x = v[next(e)], y = v[prev(e)];
+      const double ox = orient(p[a], p[x], p[b]), oy = orient(p[a], p[y], p[b]);
+      if (ox > 0 && oy < 0)
       {
         start = next(e);
         break;
       }
-      if (orient(p[a], p[x], p[b]) == 0 || orient(p[a], p[y], p[b]) == 0)
-        return false; // passes through a vertex: not a clean segment
+      // A vertex on a-b: not a clean segment. One on its line behind a (a
+      // fin's edge in line with another's across the plate) is no matter.
+      auto ahead = [&](int z) { return (p[z].x - p[a].x) * (p[b].x - p[a].x) + (p[z].y - p[a].y) * (p[b].y - p[a].y) > 0; };
+      if ((ox == 0 && ahead(x)) || (oy == 0 && ahead(y)))
+        return false;
       const int r = tw[prev(e)];
       if (r < 0)
         return false;

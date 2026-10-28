@@ -53,6 +53,10 @@ pub struct Tessellation {
     pub edges: Vec<EdgeRange>,
     /// Vertex positions (one per topological vertex).
     pub vertices: Vec<[f32; 3]>,
+    /// Planar faces the kernel's triangulation couldn't take (meshed by
+    /// BRepMesh's algorithm instead, much slower on big faces).
+    #[serde(default)]
+    pub planar_fallbacks: usize,
 }
 
 impl Tessellation {
@@ -152,6 +156,7 @@ pub fn tessellate_with(shape: &Shape, o: &MeshOptions) -> Result<Tessellation> {
         edge_points: vec![[0.0; 3]; c.edge_points],
         edges: Vec::new(),
         vertices: vec![[0.0; 3]; c.vertices],
+        planar_fallbacks: c.planar_fallbacks,
     };
     let mut face_ranges = vec![0u32; c.faces * 4];
     let mut edge_ranges = vec![0u32; c.edges * 2];

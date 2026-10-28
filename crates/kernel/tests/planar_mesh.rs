@@ -122,3 +122,25 @@ fn planar_faces_with_many_holes_mesh_watertight_and_delaunay() {
         assert_planar_faces(&s, &m);
     }
 }
+
+/// A boundary segment a-b with a vertex in line behind a (as the 400-fin
+/// plate's front face once a fin is fused under one: the fin's sides in line
+/// with the fin's above). The kernel's triangulation took that vertex for one
+/// on the segment and refused the face, and BRepMesh took 0.3 s over the
+/// plate's. Here a = (0, 0) and b = (0, -5) have nodes in line behind them as
+/// their nearest (so Delaunay edges), and two spikes beside a-b's middle
+/// keep a-b from being one.
+#[test]
+fn a_vertex_in_line_behind_a_boundary_segment_keeps_the_planar_triangulation() {
+    for flip in [1.0, -1.0] {
+        let p = |x: f64, y: f64| DVec3::new(flip * x, y, 0.0) * 1e-3;
+        let mut pts = vec![p(0.0, 0.0), p(0.0, -5.0), p(10.0, -5.0), p(10.0, -2.6), p(0.3, -2.5), p(10.0, -2.4), p(10.0, 10.0), p(1.0, 10.0), p(0.0, 1.0), p(-1.0, 10.0), p(-10.0, 10.0), p(-10.0, -10.0), p(0.0, -6.0), p(-0.3, -2.5)];
+        if flip < 0.0 {
+            pts.reverse();
+        }
+        let face = make_face_from_wire(&make_polyline(&pts, true).unwrap(), true).unwrap();
+        let m = tessellate(&face, face.bounding_box(false).unwrap().diagonal(), 0.0898, true).unwrap();
+        assert_eq!(m.planar_fallbacks, 0, "flip {flip}: the face went to BRepMesh");
+        assert_eq!(m.triangle_count(), pts.len() - 2);
+    }
+}
