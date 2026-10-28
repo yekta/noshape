@@ -1674,6 +1674,38 @@ fn flat_pattern_view_shows_bend_lines_and_notes() {
     assert!(!g2.texts.iter().any(|t| t.text.starts_with("UP ") || t.text.starts_with("DOWN ")));
 }
 
+/// An ordinate group whose point loses its feature stays on the sheet and
+/// turns red as a whole (help drawing_-_ordinate_dimension; D10): it is one
+/// annotation, dangling with one lost reference, every element one pick.
+#[test]
+fn ordinate_group_with_a_lost_point_is_red_as_a_whole() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let sheet = &drawing.sheets[0];
+    let view = sheet.views[0].id;
+    let g = compute_view(&drawing, sheet, view, &sources, &cache, false);
+    let snaps: Vec<_> = g.snaps.iter().filter(|s| s.point.is_some()).take(3).cloned().collect();
+    assert_eq!(snaps.len(), 3);
+    // The last point's body is gone (its feature deleted).
+    let lost = match snaps[2].point.clone().unwrap() {
+        PointRef::Vertex { name, .. } | PointRef::Center { name, .. } | PointRef::Midpoint { name, .. } | PointRef::Quadrant { name, .. } | PointRef::Intersection { name, .. } => PointRef::Vertex { body: crate::BodyId { feature: crate::reference::FeatureId(u64::MAX - 7), index: 0 }, name },
+    };
+    let id = drawing.sheets[0].next_annotation_id();
+    drawing.sheets[0].annotations.push(Annotation {
+        id,
+        kind: AnnotationKind::OrdinateGroup { view, origin: snaps[0].p, points: vec![snaps[0].p, snaps[1].p, snaps[2].p], horizontal: true },
+        position: [100.0, 100.0],
+        refs: vec![AnnotationRef { slot: 0, point: snaps[0].point.clone().unwrap() }, AnnotationRef { slot: 1, point: snaps[0].point.clone().unwrap() }, AnnotationRef { slot: 2, point: snaps[1].point.clone().unwrap() }, AnnotationRef { slot: 3, point: lost }],
+        ..Default::default()
+    });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(built.dangling.contains(&id), "{:?}", built.dangling);
+    let p = pick_of(&built, PickTarget::Annotation(id));
+    let g = &built.geometry;
+    assert!(g.texts.iter().filter(|t| t.pick == p).count() >= 3, "every value is still drawn, under the group's pick");
+}
+
 #[test]
 fn annotations_moved_to_format_layers() {
     let (doc, mut drawing) = demo();
