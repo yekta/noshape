@@ -346,6 +346,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 08:02 (v0.4.12 release CLI = green 1b81b7ca, bin/shelltime.py, load ~30): h10 R2 t1.5 0.51 s (9369.159),
   h30 R2 t1.5 0.49 s (19015.487), h10 R4 t2.5 1.05 s (14277.776), no hole 0.70 s (9031.64): the hole cases 3–4× faster than
   10-27; the no-hole case slower than 10-27's 0.16 s (one run, load-bound?).
+  qa 12:11 (A/B back to back, NOSHAPE_PERF, bin/shellab.sh: wf-block top face, default 2.5 mm): v0.4.12 4842 / 6471 ms, green 8cd3c4da 6484 / 4154 ms at load 39–54: no change against the release; the box was very loaded (03:30's 2.6 s was at load ~30).
 - [ ] P0 REGEN-SPEED (core 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
