@@ -18,8 +18,8 @@ Status: ✅ matches expected/live, ✗ differs (finding #), ? live data pending.
 | 6 | Delete face › Type list | Heal / Cap / Leave open | same | ✅ | 0.4.10+ / dd1b5037 10-27 (Heal / Cap / Leave open) |
 | 7 | Delete faces field, click near an edge | face-only | **"Edge of Extrude 2" accepted** (I2 again) | ✗ I2 |  |
 | 8 | Leave open on the box top | open surface body | "Part 2" under Surfaces (5 faces, 3800 mm²) | ✅ (name ?) | 0.4.10+ / dd1b5037 10-27 (40×30×20 block's top: "Part 2" under Surfaces) |
-| 9 | Tool search "fill" | Fillet, Fill, Finish flex PCB model, Finish sheet metal model, … | no Finish flex PCB model (SM12) | ✗ SM12 |  |
-| 10 | Fill: 4 top edges | live dialog ? | chips "[Position] Edge of Extrude 2" + per-edge continuity rows; **no preview while editing**; result Surface 2, 800 mm² | ✗ SF1 (preview) |  |
+| 9 | Tool search "fill" | Fillet, Fill, Finish flex PCB model, Finish sheet metal model, … | no Finish flex PCB model (SM12) | ✅ (SM12 fixed) | 64997436 10-28 (GUI: "Fill" → Fillet, Fill, Finish flex PCB model, Finish sheet metal model, Modify fillet) |
+| 10 | Fill: 4 top edges | live dialog ? | chips "[Position] Edge of Extrude 2" + per-edge continuity rows; **no preview while editing**; result Surface 2, 800 mm² | ✅ preview (SF1 fixed); ✗ FILL-MERGE-WITH-ALL | 64997436 10-28 (GUI: preview shows; closed loop on New gives no "Merge with all", separate Surface 2 → FILL-MERGE-WITH-ALL) |
 | 11 | Boundary surface: arcs as U profiles | surface between the arcs | "Add Profile" UI, preview, OK; 1200 mm² (planar region between two coplanar arcs = 40×30) | ✅ | 0.4.10+ / da18f886 10-28 (U profiles rows "[None] Edge of Arcs sketch" ×2, preview, Surface 1 = 1200.000 mm²) |
 | 12 | Click in the viewport before activating a field | (Boundary) | notice "Click a selection field in the dialog first." | ? |  |
 | 13 | Extrude two adjacent regions (solid) 10 mm | one block, **6 faces** (live merges coplanar faces, G45) | 8000 mm³ but **10 faces** (region seams kept on top/bottom/sides) | ✅ (SF2 fixed) | v0.4.12 CLI 10-28 (bin/sfcheck.py: two adjacent 20×20 regions, 10 mm → 8000, 6 faces) |
@@ -49,9 +49,9 @@ Status: ✅ matches expected/live, ✗ differs (finding #), ? live data pending.
 
 | # | Row | Live | Verdict |
 |---|---|---|---|
-| 1–4 | Thicken of the extruded line surface | default direction **−Y** (bbox y −2…0), Surface 1 consumed, Part 1 New | ours: **y 0…2** (opposite side), opened on Add → **SF8** |
+| 1–4 | Thicken of the extruded line surface | default direction **−Y** (bbox y −2…0), Surface 1 consumed, Part 1 New | ours: **y 0…2** (opposite side), opened on Add → **SF8** — **64997436 10-28: SF8 fixed** (GUI opens on New, 5 / 0 mm; CLI 2 mm → Part 1 1600, y −2…0, Surface 1 consumed) |
 | 6 | Delete face top of box | default Heal fails "Could not delete selected faces."; enum HEAL / CAP / VOID | ✅ (ours Heal / Cap / Leave open) |
-| 10 | Fill on the open box | rows "[Position] Edge …"; when the loop closes **☑ Merge with all** appears → **knits into one solid, 8000 mm³, 6 faces** | ours: no Merge with all; separate "Surface 2" → **SF7** |
+| 10 | Fill on the open box | rows "[Position] Edge …"; when the loop closes **☑ Merge with all** appears → **knits into one solid, 8000 mm³, 6 faces** | ours: no Merge with all; separate "Surface 2" → **SF7** — **64997436 10-28: still** → TICKETS FILL-MERGE-WITH-ALL (core) |
 | 11 | Boundary surface | V profiles shown pink/required; U profiles rows "[None] Edge of Sketch 1" | ? look |
 | 18 | Split by a plane | Part 1 = +X side, new Part 2 = −X side; **Keep tools switches on by itself** after the plane pick | naming ✅ (original keeps +X); Keep tools auto-on ? |
 | 21–23 | Move boundary single edge 10 mm | surface extended in place: 1200 → 1200+…, still 1 face | SF5, SF6 confirmed |
