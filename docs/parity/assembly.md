@@ -120,7 +120,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 
 | # | Entry | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
-| C1 | Exit isolate (top, while isolating) | H:mates | ✅ | |  |
+| C1 | Exit isolate (top, while isolating) | H:mates | ✅ | | 0.4.10+ / 1b81b7ca 10-28 (Isolate… on an instance: Isolate panel; empty-space menu starts with Exit isolate (live 19363), which ends it) |
 | C2 | Hide / Show | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C3 | Hide other instances | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C4 | Hide all instances | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
