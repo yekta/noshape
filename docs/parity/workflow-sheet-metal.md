@@ -14,7 +14,7 @@ window 1440×900.
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1.1 | Sketch on Top, G, rectangle from the origin; D 60, D 40 | fully defined (black) | same; bare "60" stored as "60" (see core F3) | ✅ | 41f60e47 10-28 (60 Tab 40 now kept: 1eefebb9) |
+| 1.1 | Sketch on Top, G, rectangle from the origin; D 60, D 40 | fully defined (black) | same; bare "60" stored as "60" (see core F3) | ✅ | 41f60e47 10-28 (rectangle from the origin; the 60 typed then dimensioned) |
 | 1.2 | Sheet metal ▾ list | 15 items: … Corner break, Finish sheet metal model, **Flex PCB model, Finish flex PCB model**; 199 px wide | 13 items (no Flex PCB pair), 213 px | ✗ SM12 |  |
 | 1.3 | Sheet metal model dialog on open | Convert tab, Selections (3 query fields, Clearance 0, ☐ Include bends, ☐ Keep input parts), General, › Material, › Relief; title red + ✓ disabled until a selection | same layout and states | ✅ | 77870dd4 10-28 |
 | 1.4 | Thicken tab, click the region | chip "Face of Sketch 1" | same | ✅ | 77870dd4 10-28 |
