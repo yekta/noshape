@@ -285,7 +285,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 14.1 | Circular pattern instances follow seed edits and a shared draggable center | H:sketch_circular_pattern | ✅ (T:ux: seed drag, center drag, circle/ellipse dimension edits, deletion cleanup; GUI recheck pending) |  |
+| 14.1 | Circular pattern instances follow seed edits and a shared draggable center | H:sketch_circular_pattern | ✅ (T:ux: seed drag, center drag, circle/ellipse dimension edits, deletion cleanup; GUI recheck pending) | 8cd3c4da 10-28 (GUI: circle › Circular pattern ('3x' on canvas) › Enter; dragging the seed's rim grows all three instances together, '=' glyphs) |
 | 14.2 | Bezier creation rejects a seventeenth control point with the degree-15 message and still allows completion | H:bezier, i18n | ✅ (T:sm `bezier_creation_stops_at_degree_fifteen_and_can_still_finish`; live: 14 points → Deg 13, no message) |  |
 | 14.3 | Holding/releasing Shift updates inference at a stationary cursor; Shift before release suppresses a pending drag snap | H:automatic_inferencing | ✅ (T:sm; GUI :103 m12.png: Shift down at a stationary cursor drops the horizontal inference, release restores it) |  |
 | 14.4 | Reopening an ellipse dimension shows its diameter; reopening conic rho stays unitless; accepting unchanged preserves geometry | H:dimension, H:conic | ✅ (T:sm `reopening_ellipse_and_rho_dimensions_preserves_the_displayed_value`, now also with a stored diameter expression) |  |
