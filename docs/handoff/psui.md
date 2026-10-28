@@ -142,7 +142,7 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 | target | goal | current (where measured) |
 |---|---|---|
 | orbit / pan / zoom, NIST assembly at Retina | 120 fps | v0.4.11 (perf.yml 40528877198, macOS 14, 2388×1588 device px, frame-driven): presented 76.7 / 73.6 / 64.9 fps, UI CPU p95 0.35 / 0.33 / 0.37 ms; GPU time not reported on Metal (r.done_ms lands with ab488e30, after v0.4.11). At 1× the runner presents ~30 fps (its timer) |
-| cold start to first frame | ≤ 1 s | v0.4.11: the job's first launch 1356 ms (OS first run: gpui_kit::init 285 ms vs 20 warm; the held shader compile 421 ms starts at the first window draw, 784 ms); warm launches 276–385 ms ✓. COLD=1 run 40526882894 (Metal shader cache cleared each launch) pending |
+| cold start to first frame | ≤ 1 s | 10-28 (perf 40755981437, Metal cache cleared each launch, precompiled metallibs): median 1364 ms (macOS 14) / 1560 ms (macOS 15), shader compile 65–141 ms (was 540–900); the window itself is the rest. Earlier: | v0.4.11: the job's first launch 1356 ms (OS first run: gpui_kit::init 285 ms vs 20 warm; the held shader compile 421 ms starts at the first window draw, 784 ms); warm launches 276–385 ms ✓. COLD=1 run 40526882894 (Metal shader cache cleared each launch) pending |
 | open a document | ≤ 0.5 s | v0.4.11 warm: opening → first viewport frame 130–200 ms ✓; first launch 800 ms |
 
 ## In progress
@@ -187,6 +187,13 @@ that touches the model: ~12 min.
    mesh_prepare (400-fin plate, live-30-features open / edit); numbers before/after here. Land planes, then
    cylinders / cones, then spheres / tori.
 
+N05. 10-28 21:00 cold start with the metallibs loading (perf 40755981437 on c2428d9e, COLD=1: Metal cache cleared
+     before every launch): "shader compile" (r.prewarm_pipelines) 65–141 ms on macOS 14 and 15, against 540–900 ms
+     before (40686409197). First viewport frame, median of 9: macOS 15 1560 ms (1766 before), macOS 14 1364 ms; the
+     first launch of a job 2.5–3.3 s, of which the window takes 2.0–2.8 s (OS first-run, gpui_kit::init), not the
+     shaders. The build runner (macOS 26): pipelines from source 1039–1228 ms, precompiled 68–93 ms. Left for the
+     2 s budget: the first window itself. macOS 14's red is the 1× texture pan (31 → 18.7 fps, the timer-paced
+     bimodal path of N00), not this.
 N04. 10-28 15:30 cold start, measured: perf 40709590907's build job (macOS 26 runner, Metal cache cleared before each
      run) creates the first-frame pipelines in 868–1033 ms from source and 79–130 ms from the metallibs (34 of 34
      loads hit). The bench of 40686409197 still read 540–900 ms "shader compile" on macOS 15: the libraries were built
