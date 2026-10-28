@@ -35,19 +35,22 @@ print(' '.join(sorted(out)))
 P
 )
 [ -n "$pkgs" ] || pkgs="noshape-ops"
-args=$(for p in $pkgs; do printf -- '-p %s ' "$p"; done)
 echo "== crates: $pkgs"
-# Decide on cargo's exit code (with pipefail a grep can't decide it), then show the relevant lines.
-echo "== clippy"; out=$(cargo clippy $args --all-targets -- -D warnings 2>&1); rc=$?
-[ $rc -eq 0 ] || { echo "$out" | grep -vE '^warning: [a-z0-9_-]+@' | grep -E '^(error|warning)' -A6 | head -60; fail "clippy"; }
-echo "== tests"; out=$(cargo test $args --no-fail-fast 2>&1); rc=$?
-[ $rc -eq 0 ] || { echo "$out" | grep -vE '^warning: [a-z0-9_-]+@' | grep -E 'FAILED|panicked|^error|SIGSEGV|signal:|Caused by' -A2 | head -60; fail "tests"; }
-if echo "$pkgs" | grep -qwE 'noshape|noshape-ops|noshape-cli'; then echo "== T0"; tools/tiers/t0.sh > /tmp/land-t0-$$.log 2>&1 || { tail -20 /tmp/land-t0-$$.log; fail "T0"; }; fi
-# Menu labels live in the UI crates, but the test that every one has an agent API op (ops coverage) doesn't depend
-# on them, so the crate list above misses it (10-28: 19f2d38a's "Move to origin" turned main red).
-if ! echo "$pkgs" | grep -qw 'noshape-ops' && echo "$changed" | grep -qE '^crates/(app|[a-z-]+-ui)/.*\.rs$'; then
-  echo "== menu coverage"; out=$(cargo test -p noshape-ops --test all coverage:: 2>&1) || { echo "$out" | grep -E 'FAILED|panicked' -A8 | head -30; fail "menu coverage (add the label to crates/ops/src/coverage.rs MENUS)"; }
+# The checks (tools/tiers/land-checks.sh) run on the land server, vibe3, so agents' full test runs don't load this
+# machine (10-28): the commit goes to a temporary land/ branch, vibe3 checks it in this worktree's own worktree and
+# target dir there. NOSHAPE_LAND_LOCAL=1, or vibe3 unreachable: here, as before.
+name=$(basename "$PWD"); cf=$(mktemp); echo "$changed" > "$cf"
+if [ "${NOSHAPE_LAND_LOCAL:-0}" != 1 ] && ssh -o BatchMode=yes -o ConnectTimeout=5 vibe3 true 2>/dev/null; then
+  branch="land/$name-$(git rev-parse --short HEAD)"
+  git push -q -f origin "HEAD:refs/heads/$branch" || fail "push to $branch"
+  ssh -o BatchMode=yes vibe3 "mkdir -p ~/land && cd ~/projects/noshape && git fetch -q origin $branch && git show FETCH_HEAD:tools/tiers/land-remote.sh > ~/land/remote-$name.sh && bash ~/land/remote-$name.sh '$name' '$branch' '$pkgs'" < "$cf"
+  rc=$?; git push -q origin --delete "$branch" 2>/dev/null
+else
+  echo "== here (NOSHAPE_LAND_LOCAL=1 or vibe3 unreachable)"
+  tools/tiers/land-checks.sh "$pkgs" "$cf"; rc=$?
 fi
+rm -f "$cf"
+[ $rc -eq 0 ] || exit 1
 # Main may have moved while we tested: rebase again; re-test only if the new commits touch the crates we edit.
 tested=$(git rev-parse origin/main)
 git fetch -q origin
