@@ -158,5 +158,5 @@ below 20 fps (`DETAIL_REDUCTION_THRESHOLD_FPS`), perf implementing.
 ## Main 358fcd83 (qa5, 2026-10-25 13:45, queue build target-lead 12:55)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| KS1 Keyboard shortcuts ↗ pop-out | page window 1440 × 900 = the app window (was a fixed 1280 × 900) | ✅ **fixed** |  |
+| KS1 Keyboard shortcuts ↗ pop-out | page window 1440 × 900 = the app window (was a fixed 1280 × 900) | ✅ **fixed** | 1b81b7ca 10-28 (page window 1600 × 1000 = the app window here) |
 | Shift+R in an Assembly | toggles high quality: the 3D view menu then reads "Disable high quality" | ✅ **fixed** | 77870dd4 10-28 |

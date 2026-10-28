@@ -41,7 +41,7 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 
 | # | What | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| KS1 | ↗ pop-out next to × | `a.osx-popout-link` (14 px arrow-up-right, no tooltip) opens a full-size "Keyboard shortcuts" page: no tabs or search, every category at once in two columns, the legend bar, a footer; the modal stays open | missing | ✅ `shortcuts_page.rs` (97c4895c): its own window with the two-column page, legend and footer, the modal staying open; now opened at the opener's bounds (live: a new tab, 1919×1079), and the lock right after the name as live (4 px blank, was 8; also in the modal: 616 / 2460-1) |  |
+| KS1 | ↗ pop-out next to × | `a.osx-popout-link` (14 px arrow-up-right, no tooltip) opens a full-size "Keyboard shortcuts" page: no tabs or search, every category at once in two columns, the legend bar, a footer; the modal stays open | missing | ✅ `shortcuts_page.rs` (97c4895c): its own window with the two-column page, legend and footer, the modal staying open; now opened at the opener's bounds (live: a new tab, 1919×1079), and the lock right after the name as live (4 px blank, was 8; also in the modal: 616 / 2460-1) | 1b81b7ca 10-28 (↗ next to ×: "Keyboard shortcuts — noshape" window, two columns (General, 3D view …), legend bar, footer; the modal stays open) |
 
 ## 4. Opening documents (qa4, lead 10-23)
 
