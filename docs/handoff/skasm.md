@@ -108,7 +108,8 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
 (standard content) → mates/assembly workflow gaps (all ✅, UNCONFIRMED all answered 10-27) → standard content.
-1. Open tickets: none in my section (10-27 late). Fixed this round: dc9db0a4 CONFLICT-COLLAPSE-ON-DRAG (a drag
+1. Open tickets: none in my section (10-28 04:30; also fixed 10-28: SKETCH-FILLET-STUCK-RADIUS twice more, ASM-TOOLSEARCH,
+   ASM-CHANGE-CONFIG-ICON, ASM-FILTER-PATTERN-INSTANCES; left: the filter's :part / :mate help popover). 10-27 late: Fixed this round: dc9db0a4 CONFLICT-COLLAPSE-ON-DRAG (a drag
    solves only the dragged components; the others stay as they are, also faster), 1ca0cf14 ASM-RENAME-ESC +
    J-KEY-NO-EFFECT, 07ead631 MATE-ANGLE-360, 5bc2e08e ORIGIN-COINCIDENT-GLYPH (a point on the Origin is coincident
    with it, no longer merged into it: circles centred on the Origin now carry a Coincident too, as live),
@@ -131,7 +132,10 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    (line, rectangle, circle, center rectangle, tangent arc), polygon, mate dialog, Revolute + drag, linear pattern
    direction pick.
 
-Walks: 10-27 02:40 on green 19555ca3: line chain + dimension, polygon, V on H toast, mate dialog (types, limits,
+Walks: 10-28 04:10 on green 1b81b7ca: line chain 40 / 25 typed, rectangle 30 Tab 20, asm5 Revolute pin dragged
+(stays), j shows the hidden Revolute: no regressions. Seen: a line's dimension text ("40") and a rectangle's height
+("20") sit under the constraint glyph rows (glyphs 20.5 px off the line, the dimension ~28 px); live's spacing there not
+recorded. 10-27 02:40 on green 19555ca3: line chain + dimension, polygon, V on H toast, mate dialog (types, limits,
 errors), Revolute + drag (only the dragged instance moves): no regressions. 04:00 on green 8165fca6: paste (copy at the
 pointer, selected, Transform triad on it). Sketch options (Show constraints / expressions / errors) persist in
 ~/.config/noshape/sketch-options.json, so "Show expressions" can start ticked on this box; not a bug.
