@@ -242,9 +242,9 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | # | Behaviour | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
 | X1 | Origin entity pick with inference | E§8.1 | ✅ | |  |
-| X2 | Flip primary, reorient secondary | E§8.1 | ✅ | |  |
-| X3 | Move: X/Y/Z translation, rotation axis + angle | E§8.1 | ✅ | |  |
-| X4 | Origin type Between entities, Realign (primary / secondary axis entity) | E§8.1, H:assembly_mate_connector | ✅ | Between verified in the app, Realign model-tested; entities of the same instance; model test `mate_connector_between_entities_and_realign` |  |
+| X2 | Flip primary, reorient secondary | E§8.1 | ✅ | | 8627322e 10-28 (asm5 Ctrl+M: flip-primary arrow and reorient-secondary buttons at the dialog's foot; their effect not re-run here (mate dialog's a = K8)) |
+| X3 | Move: X/Y/Z translation, rotation axis + angle | E§8.1 | ✅ | | 8627322e 10-28 (☑ Move → X / Y / Z 0 mm with the axis arrows, "Rotate about Z" ▾, Rotation angle 0 deg) |
+| X4 | Origin type Between entities, Realign (primary / secondary axis entity) | E§8.1, H:assembly_mate_connector | ✅ | Between verified in the app, Realign model-tested; entities of the same instance; model test `mate_connector_between_entities_and_realign` | 8627322e 10-28 (Origin type ▾ On entity / Between entities; ☑ Realign → Primary axis entity, Secondary axis entity) |
 | X5 | Add mate connector to instance origin (prefilled) | E§5.4 | ✅ | | 2292bf8c 10-28 (mate doc: Part 1 <1> › Add mate connector to instance origin… → "Mate connector 1" dialog, On entity, Origin entity "Origin of Part 1 <1>" prefilled, ☐ Realign ☐ Move; ✓ adds the row) |
 
 ## 9. Dragging, solving, triad (H:Home__triad_manipulator, E§24)
