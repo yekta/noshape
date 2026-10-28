@@ -10,6 +10,7 @@ target structure and the rules that keep it.
 | Layer | Crate | What |
 |---|---|---|
 | 0 | `noshape-units`, `noshape-sketch`, `noshape-kernel`, `noshape-featurescript` | quantities, the sketch solver, the OCCT kernel bridge, the FeatureScript language |
+| 0 | `noshape-brep` (below `noshape-kernel`) | noshape's own B-rep, pure Rust: index-based topology and a Boolean for solids bounded by planes (docs/BOOLEAN-SPEEDUP.md phase 3); the kernel converts OCCT shapes to it and back (`brep_bridge.rs`, `cpp/rust_boolean.cpp`) |
 | 1 | **`noshape-model-data`** | the document data model: documents, tabs, Part Studio feature lists, feature schemas, params, references, configurations, variables, and the data types of Assemblies, Drawings (sheets, views, annotations, templates, fonts) and Feature Studios. Serde types and plain methods on them; **no evaluation** |
 | 2 | **`noshape-model-core`** | regeneration, features, sheet metal, in-context (context bodies in regeneration), analysis; what regeneration needs of the FeatureScript host (`regen::custom_features`: compiled studio types, `CustomFeatureProvider`, the `CustomHost` hook; `regen::std_route`: which built-in features std runs) |
 | 3 | **`noshape-custom`** | the FeatureScript host: compiling Feature Studios, custom features and custom tables, the modeling natives, the built-in features std runs, the demo Feature Studio |

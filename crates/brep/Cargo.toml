@@ -1,0 +1,10 @@
+[package]
+name = "noshape-brep"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "noshape's own B-rep: index-based topology and a Boolean for solids bounded by planes"
+
+[dependencies]
+glam.workspace = true
+noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }

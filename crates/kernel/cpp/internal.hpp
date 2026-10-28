@@ -146,6 +146,15 @@ private:
   double                                                  myTol, myBand;
 };
 
+// noshape's own Boolean (crates/brep; rust_boolean.cpp), on with NOSHAPE_BOOL_RUST=1: the Boolean `op` of
+// `args` (the object first) when it takes them. `srcs` gets an OcShape for each argument (made in `own`
+// where it has none), `out` the result, `hist` its history.
+bool rust_boolean_on();
+// Notes why it wasn't tried (false; the replay's strict mode fails).
+bool rust_decline(const char* why);
+bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
+                  std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist);
+
 class HistoryBuilder
 {
 public:

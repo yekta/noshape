@@ -295,6 +295,53 @@ pub(crate) mod ffi {
         ref_angle: f64,
     }
 
+    /// A body for noshape's own Boolean (crates/brep; `brep_bridge`): flat arrays.
+    #[derive(Default)]
+    struct BrepBody {
+        /// x, y, z per vertex.
+        vertices: Vec<f64>,
+        /// Start and end vertex per edge.
+        edges: Vec<u32>,
+        /// The plane of each face: origin x, y, z, normal x, y, z.
+        planes: Vec<f64>,
+        /// Per face: the outward normal is minus the plane's.
+        reversed: Vec<bool>,
+        /// Per face, its first loop (faces + 1 entries); per loop, its first use (loops + 1).
+        face_loops: Vec<u32>,
+        loop_uses: Vec<u32>,
+        /// Edge × 2 + reversed.
+        uses: Vec<u32>,
+        /// Per solid, its first face (solids + 1); the faces of its one shell.
+        solid_faces: Vec<u32>,
+        faces_of_solids: Vec<u32>,
+    }
+
+    /// noshape's own Boolean's result: the body, its entities' origins (kind 0 the input itself, 1 a piece
+    /// of it, 2 new; arg; index: three per entity), the history (kind, arg, index, relation, output kind,
+    /// output: six per record; kinds 0 solid, 1 face, 2 edge, 3 vertex; relations 0 modified, 1 generated,
+    /// 2 deleted).
+    #[derive(Default)]
+    struct BrepResult {
+        body: BrepBody,
+        vertex_origin: Vec<u32>,
+        edge_origin: Vec<u32>,
+        face_origin: Vec<u32>,
+        solid_origin: Vec<u32>,
+        history: Vec<u32>,
+    }
+
+    extern "Rust" {
+        /// noshape's own Boolean (op 0 fuse, 1 cut, 2 common) of `args` (the object first): false when it
+        /// declines (`last_rust_decline` says why).
+        fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, out: &mut BrepResult) -> bool;
+        /// Notes why the C++ side declined (for `last_rust_decline`).
+        fn brep_decline(reason: &str);
+        /// Whether op_boolean tries it ([`crate::set_rust_boolean`], else NOSHAPE_BOOL_RUST=1).
+        fn brep_enabled() -> bool;
+        /// Whether a decline fails the Boolean ([`crate::set_rust_boolean_only`]).
+        fn brep_strict() -> bool;
+    }
+
     unsafe extern "C++" {
         include!("noshape-kernel/cpp/noshape_occt.hpp");
 
@@ -648,6 +695,8 @@ pub(crate) mod ffi {
         -> Result<HlrOut>;
     }
 }
+
+use crate::brep_bridge::{brep_boolean, brep_decline, brep_enabled, brep_strict};
 
 // SAFETY: OcShape wraps an immutable TopoDS_Shape (handles with atomic
 // reference counts); its lazily-built maps are guarded by std::call_once.

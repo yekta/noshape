@@ -14,6 +14,7 @@ rust-version = "1.90"
 
 [workspace.dependencies]
 noshape-units = { path = "crates/units" }
+noshape-brep = { path = "crates/brep" }
 noshape-sketch = { path = "crates/sketch" }
 noshape-kernel = { path = "crates/kernel" }
 noshape-model = { path = "crates/model" }

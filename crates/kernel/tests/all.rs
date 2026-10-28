@@ -5,6 +5,7 @@ mod bbox;
 mod blend;
 mod bool_replay;
 mod boolean_groups;
+mod brep_replay;
 #[path = "core.rs"]
 mod kernel_core;
 mod crash_inputs;

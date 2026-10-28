@@ -1,0 +1,192 @@
+//! noshape's own Boolean (crates/brep) against OCCT over the Boolean corpus: each case it accepts must give
+//! OCCT's recorded result (validity, counts, volume to 1e-9, the history), and it is timed against OCCT run
+//! here. Prints the cases it takes, why it declines the others, and the times by size.
+//!
+//! `NOSHAPE_BOOL_CORPUS=/root/core-scratch/bool-corpus cargo test -p noshape-kernel --test all
+//! brep_replay::brep_corpus_replay -- --ignored --nocapture` (NOSHAPE_BREP_DIFF=1 prints each mismatch's
+//! history records that differ; NOSHAPE_BREP_ONLY=<name> runs one case).
+
+use noshape_kernel::bool_corpus::{cases, load, Summary};
+use noshape_kernel::*;
+use std::collections::BTreeMap;
+use std::path::Path;
+use std::time::Instant;
+
+/// Each history record as text, with its output's place (micrometres; sorted).
+fn records(r: &OpResult) -> Vec<(String, [i64; 3])> {
+    let q = |x: f64| (x * 1e6).round() as i64;
+    let mut v: Vec<(String, [i64; 3])> = r
+        .history
+        .records
+        .iter()
+        .map(|h| {
+            let p = r
+                .shape
+                .sub_shape(h.output_kind, h.output_index as usize)
+                .ok()
+                .map(|x| match h.output_kind {
+                    ShapeType::Face => x.centroid().unwrap_or_default(),
+                    ShapeType::Edge => x.edge_info().ok().and_then(|i| x.point_at(0.5 * (i.first_param + i.last_param)).ok()).unwrap_or_default(),
+                    ShapeType::Vertex => x.vertex_point().unwrap_or_default(),
+                    _ => DVec3::ZERO,
+                })
+                .unwrap_or_default();
+            (format!("arg{} {:?}{} {:?} {:?}", h.arg, h.input_kind, h.input_index, h.relation, h.output_kind), [q(p.x), q(p.y), q(p.z)])
+        })
+        .collect();
+    v.sort();
+    v
+}
+
+/// The same records, places within 2 µm (a centroid rounded the other way).
+fn same_records(a: &[(String, [i64; 3])], b: &[(String, [i64; 3])]) -> bool {
+    let mut used = vec![false; b.len()];
+    a.len() == b.len()
+        && a.iter().all(|(k, p)| {
+            let hit = b.iter().enumerate().position(|(j, (l, o))| !used[j] && k == l && (0..3).all(|i| (p[i] - o[i]).abs() <= 2));
+            hit.map(|j| used[j] = true).is_some()
+        })
+}
+
+fn median(v: &mut [f64]) -> f64 {
+    if v.is_empty() {
+        return 0.0;
+    }
+    v.sort_by(f64::total_cmp);
+    v[v.len() / 2]
+}
+
+/// (cases, accepted, mismatches, report).
+fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
+    let _ = set_working_scale(1000.0);
+    let only = std::env::var("NOSHAPE_BREP_ONLY").ok();
+    let diff = std::env::var_os("NOSHAPE_BREP_DIFF").is_some();
+    let unstable: Vec<String> = std::fs::read_to_string(dir.join("unstable")).map(|t| t.lines().map(|l| l.trim().to_string()).collect()).unwrap_or_default();
+    let mut bad = Vec::new();
+    let mut report = String::new();
+    let mut declines: BTreeMap<String, usize> = BTreeMap::new();
+    // By size bucket: (rust ms, occt ms) of each accepted case.
+    let mut times: [Vec<(f64, f64)>; 3] = Default::default();
+    let (mut n, mut accepted) = (0, 0);
+    for name in cases(dir) {
+        if only.as_ref().is_some_and(|o| *o != name) || unstable.contains(&name) {
+            continue;
+        }
+        let Some(c) = load(dir, &name) else { continue };
+        n += 1;
+        // Declines fail at once (no OCCT run).
+        set_rust_boolean_only(true);
+        let t = Instant::now();
+        let r = boolean(c.op, &c.objects, &c.tools, &c.opts);
+        let mut ms = t.elapsed().as_secs_f64() * 1e3;
+        let path = last_boolean_path();
+        let why = last_rust_decline();
+        set_rust_boolean_only(false);
+        if path != "rust" {
+            *declines.entry(why).or_default() += 1;
+            continue;
+        }
+        accepted += 1;
+        let r = match r {
+            Ok(r) => r,
+            Err(e) => {
+                bad.push(format!("{name}: failed: {e}"));
+                continue;
+            }
+        };
+        // Again, warm (the first call loads the inputs' maps).
+        set_rust_boolean(Some(true));
+        let t = Instant::now();
+        let _ = boolean(c.op, &c.objects, &c.tools, &c.opts);
+        ms = ms.min(t.elapsed().as_secs_f64() * 1e3);
+        set_rust_boolean(Some(false));
+        let t = Instant::now();
+        let o = boolean(c.op, &c.objects, &c.tools, &c.opts);
+        let occt_ms = t.elapsed().as_secs_f64() * 1e3;
+        set_rust_boolean(None);
+        let mut d = Summary::of(&r).differences(&c.summary);
+        // The history's hash rounds centroids: compare with OCCT's records within 2 µm.
+        if d == ["history differs"] && o.as_ref().is_ok_and(|o| same_records(&records(&r), &records(o))) {
+            d.clear();
+        }
+        if !d.is_empty() {
+            let mut line = format!("{name} ({:?}, {} tools, recorded path {}): {}", c.op, c.tools.len(), c.path, d.join(", "));
+            if diff && let Ok(o) = &o {
+                let (mine, theirs) = (records(&r), records(o));
+                for x in mine.iter().filter(|x| !theirs.contains(x)) {
+                    line += &format!("\n    rust only: {} {:?}", x.0, x.1);
+                }
+                for x in theirs.iter().filter(|x| !mine.contains(x)) {
+                    line += &format!("\n    occt only: {} {:?}", x.0, x.1);
+                }
+            }
+            bad.push(line);
+            continue;
+        }
+        let faces: usize = c.objects.iter().chain(&c.tools).map(|x| x.count(ShapeType::Face)).sum();
+        let b = if faces < 50 { 0 } else if faces <= 1000 { 1 } else { 2 };
+        times[b].push((ms, occt_ms));
+        report += &format!("{name} {:?} faces {faces} tools {}: {ms:.2} ms, OCCT {occt_ms:.2} ms ({:.1}x)\n", c.op, c.tools.len(), occt_ms / ms.max(1e-6));
+    }
+    report += &format!("{accepted} of {n} cases taken, {} differ from OCCT\n", bad.len());
+    for (why, k) in &declines {
+        report += &format!("  declined {k}: {why}\n");
+    }
+    for (what, t) in ["<50 input faces", "50-1000", ">1000"].iter().zip(&times) {
+        let mut r: Vec<f64> = t.iter().map(|x| x.0).collect();
+        let mut o: Vec<f64> = t.iter().map(|x| x.1).collect();
+        let (sr, so): (f64, f64) = (r.iter().sum(), o.iter().sum());
+        report += &format!(
+            "{what}: {} cases, median {:.2} ms (OCCT {:.2} ms), total {sr:.0} ms (OCCT {so:.0} ms, {:.1}x)\n",
+            t.len(),
+            median(&mut r),
+            median(&mut o),
+            so / sr.max(1e-6)
+        );
+    }
+    (n, accepted, bad, report)
+}
+
+/// The whole corpus (outside the repo).
+#[test]
+#[ignore = "T2: the Boolean corpus (/root/core-scratch/bool-corpus, NOSHAPE_BOOL_CORPUS)"]
+fn brep_corpus_replay() {
+    let dir = std::env::var("NOSHAPE_BOOL_CORPUS").unwrap_or_else(|_| "/root/core-scratch/bool-corpus".into());
+    let (n, _, bad, report) = replay(Path::new(&dir));
+    eprintln!("{report}");
+    assert!(bad.is_empty(), "{} of {n} cases differ:\n{}", bad.len(), bad.join("\n"));
+}
+
+/// Small planar cases from the corpus (tests/data/brep): noshape's own Boolean takes every one, as OCCT.
+#[test]
+fn brep_small_cases_match_occt() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/brep");
+    let (n, accepted, bad, report) = replay(&dir);
+    eprintln!("{report}");
+    assert!(n >= 20, "{n} cases in {}", dir.display());
+    assert!(bad.is_empty(), "{} of {n} cases differ:\n{}", bad.len(), bad.join("\n"));
+    assert_eq!(accepted, n, "cases declined:\n{report}");
+}
+
+/// The same result, faces in the same order with the same history, run alone and on 16 threads at once.
+#[test]
+fn brep_results_are_the_same_on_any_thread() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/brep");
+    let names = cases(&dir);
+    let c = names.iter().filter_map(|n| load(&dir, n)).max_by_key(|c| c.target_faces).expect("cases");
+    let run = || {
+        set_rust_boolean_only(true);
+        let r = boolean(c.op, &c.objects, &c.tools, &c.opts).expect("noshape's Boolean takes it");
+        set_rust_boolean_only(false);
+        let faces: Vec<DVec3> = r.shape.sub_shapes(ShapeType::Face).iter().map(|f| f.centroid().unwrap_or_default()).collect();
+        (faces, r.history.records)
+    };
+    let alone = run();
+    let all: Vec<_> = std::thread::scope(|s| {
+        let hs: Vec<_> = (0..16).map(|_| s.spawn(run)).collect();
+        hs.into_iter().map(|h| h.join().expect("a thread")).collect()
+    });
+    for r in all {
+        assert_eq!(r, alone);
+    }
+}
