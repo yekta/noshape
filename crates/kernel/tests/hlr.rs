@@ -86,6 +86,28 @@ fn cylinder_side_view_has_two_outlines() {
     }
 }
 
+/// A tube revolved 360° about Z draws its outlines only: the revolve's seam
+/// (in the sketch plane) is no line in a side view, and where it lies on the
+/// outline the outline stays (qa DWG-REVOLVE-SEAM).
+#[test]
+fn revolved_tube_side_views_have_no_seam_line() {
+    let front = Plane::new(DVec3::ZERO, -DVec3::Y, DVec3::X);
+    let seg = |a: (f64, f64), b: (f64, f64)| Segment2d::Line { a: DVec2::new(a.0, a.1), b: DVec2::new(b.0, b.1) };
+    let rect = make_face_2d(&front, &[seg((10.0, 0.0), (20.0, 0.0)), seg((20.0, 0.0), (20.0, 30.0)), seg((20.0, 30.0), (10.0, 30.0)), seg((10.0, 30.0), (10.0, 0.0))], &[]).unwrap();
+    let tube = revolve(&rect, DVec3::ZERO, DVec3::Z, 2.0 * PI).unwrap().shape;
+    for exact in [true, false] {
+        // Across the seam's plane: the outlines at ±20 only (no line at the axis).
+        let e = project_hlr(&tube, DVec3::X, DVec3::Z, exact).unwrap();
+        let xs = vertical_lines(&e, Visibility::Visible, 0.0, 30.0);
+        assert_eq!(xs.len(), 2, "exact={exact}: {xs:?}\n{}", dump(&e));
+        assert!((xs[0] + 20.0).abs() < 1e-3 && (xs[1] - 20.0).abs() < 1e-3, "exact={exact}: {xs:?}");
+        // Along it: both outlines, the seam's side too.
+        let e = project_hlr(&tube, DVec3::Y, DVec3::Z, exact).unwrap();
+        let xs = vertical_lines(&e, Visibility::Visible, 0.0, 30.0);
+        assert_eq!(xs.len(), 2, "exact={exact}: {xs:?}\n{}", dump(&e));
+    }
+}
+
 #[test]
 fn fragments_are_merged_into_polylines() {
     // A face-on circle must come out as a single closed polyline per edge,

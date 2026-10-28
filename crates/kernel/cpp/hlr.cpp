@@ -17,6 +17,7 @@
 #include <HLRBRep_FaceData.hxx>
 #include <HLRBRep_FaceIterator.hxx>
 #include <HLRBRep_PolyAlgo.hxx>
+#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 
 #include <unordered_map>
 
@@ -44,6 +45,10 @@ struct Emitter
   const ShapeIMap&  srcEdges;
   const CurveIndex& curves;
   double            defl;
+  // Source edges that are a face's seam (by source index).
+  const std::vector<char>* seams = nullptr;
+
+  bool seam(int src) const { return seams && src >= 0 && (size_t)src < seams->size() && (*seams)[src]; }
 
   void emit_points(const std::vector<gp_Pnt2d>& pts, bool visible, uint8_t cls, int source)
   {
@@ -112,6 +117,27 @@ CurveIndex curve_index(const ShapeIMap& src)
 // The source edge of `s`: itself, else (a piece of a split edge) the source
 // edge with the same curve and location. Copies sharing a curve (patterned
 // instances) are told apart by location; still ambiguous gives none.
+// The source edges that are the seam of a periodic face (used twice by it):
+// not edges in Onshape's topology, so drawn only where they are the outline.
+// A revolve's seam has no continuity flag, so HLR takes it as a sharp edge
+// (qa DWG-REVOLVE-SEAM: a line at a revolved tube's axis in side views).
+std::vector<char> seam_edges(const TopoDS_Shape& shape, const ShapeIMap& src)
+{
+  TopTools_IndexedDataMapOfShapeListOfShape ef;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, ef);
+  std::vector<char> out((size_t)src.Extent(), 0);
+  for (int i = 1; i <= src.Extent(); ++i)
+  {
+    const int k = ef.FindIndex(src(i));
+    if (k == 0)
+      continue;
+    for (const TopoDS_Shape& f : ef(k))
+      if (BRep_Tool::IsClosed(TopoDS::Edge(src(i)), TopoDS::Face(f)))
+        out[(size_t)i - 1] = 1;
+  }
+  return out;
+}
+
 int source_index(const ShapeIMap& src, const CurveIndex& curves, const TopoDS_Shape& s)
 {
   if (s.IsNull() || s.ShapeType() != TopAbs_EDGE)
@@ -194,7 +220,10 @@ void exact_pass(Emitter& em, const occ::handle<HLRBRep_Data>& DS, int typ, bool 
       HLRBRep_EdgeData& edf = DS->EDataArray().ChangeValue(ie);
       if (edf.Used())
         continue;
-      bool todraw;
+      // A face's seam counts as smooth even without its continuity flag.
+      const int  src    = src_of(ie);
+      const bool smooth = edf.Rg1Line() || em.seam(src);
+      bool       todraw;
       if (typ == 2)
         todraw = itf.Internal(); // silhouettes computed by the outliner
       else if (typ == 3)
@@ -202,20 +231,20 @@ void exact_pass(Emitter& em, const occ::handle<HLRBRep_Data>& DS, int typ, bool 
       else if (typ == 4)
         todraw = edf.RgNLine() && !itf.OutLine();
       else
-        todraw = !itf.IsoLine() && !itf.Internal() && (!edf.Rg1Line() || itf.OutLine());
+        todraw = !itf.IsoLine() && !itf.Internal() && (!smooth || itf.OutLine());
       if (todraw)
       {
         uint8_t cls = typ == 2 ? CLS_OUTLINE : typ == 3 ? CLS_SMOOTH : (typ == 4 ? CLS_SEAM : CLS_SHARP);
         // Real edges lying on the silhouette (e.g. a cylinder seam seen
         // from the side) are outlines too but keep their source edge.
-        if (typ == 5 && itf.OutLine() && edf.Rg1Line())
+        if (typ == 5 && itf.OutLine() && smooth)
           cls = CLS_OUTLINE;
-        draw_edge_data(em, edf, visible, cls, src_of(ie));
+        draw_edge_data(em, edf, visible, cls, src);
         edf.Used(true);
       }
       else
       {
-        if ((typ > 4 || typ == 2) && (edf.Rg1Line() && !itf.OutLine()))
+        if ((typ > 4 || typ == 2) && (smooth && !itf.OutLine()))
         {
           int hc = edf.HideCount();
           if (hc > 0)
@@ -272,8 +301,9 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
   HlrOut    out;
   ShapeIMap srcEdges;
   TopExp::MapShapes(s.shape, TopAbs_EDGE, srcEdges);
-  const CurveIndex curves = curve_index(srcEdges);
-  Emitter          em{out, srcEdges, curves, defl};
+  const CurveIndex        curves = curve_index(srcEdges);
+  const std::vector<char> seams  = seam_edges(s.shape, srcEdges);
+  Emitter                 em{out, srcEdges, curves, defl, &seams};
 
   if (exact)
   {
@@ -337,9 +367,9 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
     }
     else if (src < 0)
       cls = outl ? CLS_OUTLINE : CLS_SHARP;
-    else if (reg1 && outl)
+    else if ((reg1 || em.seam(src)) && outl)
       cls = CLS_OUTLINE;
-    else if (regn)
+    else if (regn || em.seam(src))
       cls = CLS_SEAM;
     else if (reg1)
       cls = CLS_SMOOTH;
