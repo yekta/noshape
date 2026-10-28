@@ -1256,14 +1256,9 @@ impl FeatureDialog {
         if self.baselines.get(path).is_none_or(|b| *b == text) {
             return false;
         }
-        // Live ("Input behaviour", qa4 F30): Enter in a count (Instance
-        // count) accepts the whole dialog at once; only quantities (Depth,
-        // a Variable's value: "8" → "8 mm") apply first.
-        if matches!(self.spec_for_path(path).map(|s| &s.kind), Some(ParamKind::Num(n)) if n.kind == noshape_model::params::NumKind::Integer) {
-            self.commit_number(path, state, window, cx);
-            return false;
-        }
-        // Live: "30" → "30 mm", "10+5" → "(10+5) mm", the text re-selected.
+        // Live: "30" → "30 mm", "10+5" → "(10+5) mm", the text re-selected; a count the same
+        // (behaviours "qa (2026-10-28) Linear pattern: Enter in Instance count / Distance is two-step, as Depth":
+        // "3" + Enter keeps the dialog with "3" selected, the next Enter accepts).
         self.commit_number(path, state, window, cx);
         let text = state.read(cx).value().to_string();
         self.baselines.insert(path.to_string(), text);
