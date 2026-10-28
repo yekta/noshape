@@ -125,6 +125,7 @@ perf.yml model job (release) on main 10-27 ~18:05 (run 40556712238; before ab192
 | live-30-features full regen (`regen_profile::regen_profile`) | **50 ms** | 65 ms | ≤ 80 (live 171) |
 | edit commit on it (`regen_profile::edit_commit_profile`, total) | **72 ms** | 90 ms | ≤ 100 |
 | big-plate regen | 276 ms | 314 ms | ≤ 250 (live 617) |
+| big-plate's Extrude 2 (400 holes; dev here, load ~50, 10-28 after the parallel profiles / prisms) | | 215 ms (was 457; profiles 136-205 → 42, prisms 120-172 → 18-39, the Boolean step ~120) | |
 | Shell on qa's filleted plate with a hole | (not on perf.yml yet; dev here 177–229 ms a feature) | | ≤ 200 |
 | fin under the 400-fin plate (Extrude 3; `pattern_second::timed_the_fin_under_the_fin_plate_regenerates_locally`) | | (here, release, best of 3: 324 ms 10-28 05:37) | < 150 (was 2.7 s) |
 | editing that fin (`pattern_second::timed_editing_the_fin_under_the_fin_plate`, edit commit, dev here, loaded) | | feature 217 ms, display 261 ms (was 586), whole edit 479 ms (was 802) | |
@@ -313,6 +314,12 @@ the serial result loop only 22 s. So the big structural win is the pairs, not th
   TreatVerticesEE 25, PerformFF 17, RepeatIntersection 13, PerformVF 12.5, PerformVE 6. Next if worth it:
   PostTreatFF's sub-filler, the pair collections (the keys could be made in parallel), the EF result loop's
   projections (decide in parallel, commit in order).
+
+Big plate (10-28): Extrude 2's 400 sketch regions become faces in parallel (`EvalCtx::profiles`, ≥ 16 regions,
+each region's face gets its own edges) and its 400 prisms too (extrude, ≥ 16 profiles all from sketch regions),
+kept in order (the first error in order still wins). NOSHAPE_PERF logs extrude's profiles / tools / operation.
+Phase 1 stopped at patch 0004 (the remaining steps are 10-40 s each, listed above); CI run 40718671419 built OCCT
+with 0003b and 0004 on Linux, macOS and Windows.
 
 ## Next, in order
 0. **Now: phase 1 (knurl 210 s → < 90 s), EF result loop first (patch 0004); take the big structural win, stop

@@ -708,6 +708,22 @@ impl<'a> EvalCtx<'a> {
     /// profiles follow the pattern transform (sketch regions are already
     /// transformed through their sketch's frame).
     pub fn profiles(&self, refs: &[Reference]) -> FResult<Vec<Profile>> {
+        // Many sketch regions (a plate's 400 holes): their faces made in
+        // parallel. Each region's face gets its own edges (region_profile
+        // makes them from the segments), so they share nothing.
+        if refs.len() >= 16 && refs.iter().all(|r| matches!(r, Reference::SketchRegion { .. })) {
+            let mut regions = Vec::with_capacity(refs.len());
+            for r in refs {
+                let Reference::SketchRegion { sketch, key } = r else { unreachable!() };
+                let Some((s, region)) = self.resolve_region(*sketch, key) else {
+                    return err("A selected sketch region no longer exists");
+                };
+                regions.push((s, region, Source::Region { sketch: *sketch, key: key.clone() }));
+            }
+            use rayon::prelude::*;
+            let made: Vec<FResult<Profile>> = regions.into_par_iter().map(|(s, region, key)| region_profile(&s, &region, key)).collect();
+            return made.into_iter().collect();
+        }
         let mut out = Vec::new();
         for r in refs {
             match r {

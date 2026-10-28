@@ -40,18 +40,35 @@ fn eval_inner(ev: &mut EvalCtx) -> FResult<()> {
         // std extrude.fs: OFFSET_WIRE_SELECT_WALL_PATH / EXTRUDE_NO_SELECTED_REGION.
         return crate::regen::eval::err_at(if thin { &["wallShape"] } else { &["entities"] }, if thin { "Select edges or faces to define the path of the thin wall." } else { "Select face or sketch region to extrude." });
     }
+    let t0 = std::time::Instant::now();
     let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&|f, _| f.normal), false)? } else { ev.profiles(refs)? };
     if profiles.is_empty() {
         return err("No valid regions to extrude");
     }
+    let t_profiles = t0.elapsed();
     let mut tools = Vec::new();
-    for p in &profiles {
-        let dir = direction(ev, p, thin)?;
-        tools.push(extrude_profile(ev, p, dir)?);
+    if profiles.len() >= 16 && profiles.iter().all(|p| !p.from_face) {
+        // Many sketch regions: each prism on its own profile (they share no
+        // edges), in parallel, kept in order.
+        let dirs = profiles.iter().map(|p| direction(ev, p, thin)).collect::<FResult<Vec<_>>>()?;
+        let ev_ro: &EvalCtx = ev;
+        use rayon::prelude::*;
+        let made: Vec<FResult<NamedShape>> = profiles.par_iter().zip(dirs.par_iter()).map(|(p, d)| extrude_profile(ev_ro, p, *d)).collect();
+        tools = made.into_iter().collect::<FResult<Vec<_>>>()?;
+    } else {
+        for p in &profiles {
+            let dir = direction(ev, p, thin)?;
+            tools.push(extrude_profile(ev, p, dir)?);
+        }
     }
+    let t_tools = t0.elapsed();
     let op = ev.enum_("operationType").to_string();
     let scope = scope(ev);
-    ev.apply_operation(tools, &op, scope, BodyKind::Solid)
+    let r = ev.apply_operation(tools, &op, scope, BodyKind::Solid);
+    if crate::regen::display::perf_enabled() {
+        log::info!(target: "perf", "extrude: {} profiles {:.1} ms, tools {:.1} ms, operation {:.1} ms", profiles.len(), t_profiles.as_secs_f64() * 1e3, (t_tools - t_profiles).as_secs_f64() * 1e3, (t0.elapsed() - t_tools).as_secs_f64() * 1e3);
+    }
+    r
 }
 
 pub fn scope(ev: &EvalCtx) -> Option<Vec<usize>> {
