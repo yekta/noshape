@@ -959,6 +959,7 @@ impl DrawLists {
                     }
                 }
                 Drawable::Mesh(_) if pick && inst.pick_only => self.pick_priority.push(i),
+                Drawable::Mesh(_) if pick && inst.pick_solid => self.opaque.push(i),
                 Drawable::Mesh(_) if !pick && inst.reflection.is_some() && inst.color[3] >= 0.999 => self.reflective.push(i),
                 Drawable::Mesh(_) if !pick && inst.over_transparent && inst.color[3] >= 0.999 => self.over_transparent.push(i),
                 Drawable::Mesh(_) if inst.on_top => {

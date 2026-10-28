@@ -299,6 +299,11 @@ pub struct Instance {
     /// border, as its fill: seen edge-on its near side would hide the
     /// sketch curves lying in the plane).
     pub pick_behind: bool,
+    /// Picked like an opaque mesh even when translucent (depth written, the
+    /// nearest wins): a part made see-through by its appearance or the
+    /// Translucent mode (live: such a part is picked normally; Alt picks
+    /// through it).
+    pub pick_solid: bool,
     /// Added to the geometry's local (1-based) pick ids; 0 keeps them as-is.
     pub pick_base: u32,
     /// The section cap hatch's part id (Onshape: occurrence id + mesh group
@@ -406,6 +411,7 @@ impl Instance {
             on_top: false,
             pick_only: false,
             pick_behind: false,
+            pick_solid: false,
             pick_base: 0,
             hatch_id: 0,
             zebra: None,
@@ -466,6 +472,11 @@ impl Instance {
     /// See [`Instance::pick_behind`].
     pub fn pick_behind(mut self) -> Self {
         self.pick_behind = true;
+        self
+    }
+    /// See [`Instance::pick_solid`].
+    pub fn pick_solid(mut self, on: bool) -> Self {
+        self.pick_solid = on;
         self
     }
     pub fn with_color(mut self, c: [f32; 4]) -> Self {

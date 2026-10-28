@@ -863,6 +863,9 @@ impl PartStudioView {
         // Show dimensions: the parts' shadowed faces come up a little (live).
         o.dims_shown = self.ui.shown_dims.is_some();
         if let Some(iso) = &self.ui.isolate {
+            if !iso.select_transparent {
+                o.pick_through_bodies = self.isolation_transparent().into_iter().collect();
+            }
             o.faint_planes = iso.mode == behaviors::IsolateMode::Isolate;
             if matches!(behaviors::iso_look(iso.opacity), behaviors::IsoLook::Ghost) {
                 o.ghost_bodies = self.isolation_transparent().into_iter().collect();
@@ -1661,8 +1664,8 @@ impl PartStudioView {
                 // Live: with a dialog field active, what it doesn't take isn't
                 // highlighted; on a plane's resize ring nothing is.
                 let id = id.filter(|_| self.ui.plane_ring_hover.is_none());
-                self.ui.hover_pick = id.and_then(|id| self.built.as_ref()?.picks.get(id).filter(|t| self.field_takes(t, cx) != Some(false)).cloned());
-                if self.update_hover(cx) {
+                self.ui.hover_raw = id.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
+                if self.rehover(cx) {
                     self.refresh_scene(false, cx);
                 }
             }

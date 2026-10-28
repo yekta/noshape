@@ -4157,7 +4157,18 @@ impl PartStudioView {
     /// Sketch keyboard actions on the view root.
     pub(super) fn with_sketch_actions(&mut self, root: Div, cx: &mut Context<Self>) -> AnyElement {
         if self.sketch.is_none() {
-            return root.into_any_element();
+            // Alt down / up re-hovers at once (live: the pre-highlight goes
+            // through a see-through part as soon as Alt goes down).
+            return root
+                .on_modifiers_changed(cx.listener(|this, ev: &ModifiersChangedEvent, _, cx| {
+                    if ev.modifiers.alt != this.ui.alt_held {
+                        this.ui.alt_held = ev.modifiers.alt;
+                        if this.rehover(cx) {
+                            this.refresh_scene(false, cx);
+                        }
+                    }
+                }))
+                .into_any_element();
         }
         root.on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| this.sketch_key_down(ev, window, cx)))
             .on_modifiers_changed(cx.listener(|this, ev: &ModifiersChangedEvent, _, cx| {

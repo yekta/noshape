@@ -222,6 +222,10 @@ pub struct SceneOptions {
     /// solid but washed out, faces and edges mixed toward white by
     /// [`ISOLATE_GHOST`] in sRGB.
     pub ghost_bodies: Vec<noshape_model::BodyId>,
+    /// Parts picks go through (Isolate's see-through parts without "Select
+    /// transparent geometry"); every other part is picked nearest-first even
+    /// when translucent.
+    pub pick_through_bodies: Vec<noshape_model::BodyId>,
     /// How far the ghosts go toward white ([`ISOLATE_GHOST`] if unset;
     /// [`MAKE_TRANSPARENT_GHOST`] for Make transparent).
     pub ghost_mix: Option<f32>,
@@ -393,7 +397,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 };
                 // (The renderer draws a preview's back faces under the datum
                 // planes and picked regions and its front faces over them.)
-                let mesh = if opts.preview_bodies.contains(&b.id) { mesh.preview() } else { mesh };
+                let mesh = if opts.preview_bodies.contains(&b.id) { mesh.preview() } else { mesh.pick_solid(!opts.pick_through_bodies.contains(&b.id)) };
                 let mesh = if opts.ghost_bodies.contains(&b.id) { mesh.ghost(opts.ghost_mix.unwrap_or(ISOLATE_GHOST)) } else { mesh };
                 // The cap hatch's id: live's Part Studio parts read 230, 234,
                 // 238, … (occurrence id + mesh group hash; live ui (10-26),

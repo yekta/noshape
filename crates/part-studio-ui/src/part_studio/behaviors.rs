@@ -138,6 +138,11 @@ pub struct UiState {
     pub cam_history: Vec<Camera>,
     /// Last pointer position over the viewport (viewport-local).
     pub pointer: Option<DVec2>,
+    /// The pick under the pointer as the pick buffer has it (before Alt and
+    /// the active field's filter), so Alt going down or up re-hovers.
+    pub hover_raw: Option<PickTarget>,
+    /// Alt is down: hover and clicks go through see-through parts.
+    pub alt_held: bool,
     /// The pick under the pointer before midpoint snapping
     /// ([`PartStudioView::update_hover`]).
     pub hover_pick: Option<PickTarget>,
@@ -515,6 +520,8 @@ impl UiState {
             dialog_info: None,
             cam_history: Vec::new(),
             pointer: None,
+            hover_raw: None,
+            alt_held: false,
             hover_pick: None,
             midpoint_armed: None,
             select_other: None,
@@ -2318,15 +2325,31 @@ impl PartStudioView {
         Arc::new(d)
     }
 
-    /// A click on a transparent part goes through it (Alt+click, or always
-    /// while isolating without "Select transparent geometry"): the first
-    /// entity of an opaque part along the ray, if any.
+    /// What the hover shows for [`UiState::hover_raw`]: through see-through parts
+    /// while Alt is down, then only what the active field takes. True when
+    /// the highlight changed.
+    pub(super) fn rehover(&mut self, cx: &App) -> bool {
+        let raw = self.ui.hover_raw.clone();
+        let t = match (raw, self.ui.pointer) {
+            (Some(t), Some(p)) if self.ui.alt_held && matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex) => self.pick_through_transparent(t, p, true, cx),
+            (t, _) => t,
+        };
+        self.ui.hover_pick = t.filter(|t| self.field_takes(t, cx) != Some(false));
+        self.update_hover(cx)
+    }
+
+    /// A pick on a see-through part goes through it: on a part made
+    /// transparent by its appearance only with Alt (live "psui (2026-10-28,
+    /// P1) part-studio 2.23": hover and click pick it normally, Alt the next
+    /// entity behind), on Isolate's see-through parts always unless "Select
+    /// transparent geometry" is ticked (then not even with Alt). The first
+    /// entity of another part along the ray, if any.
     pub(super) fn pick_through_transparent(&self, t: PickTarget, position: DVec2, alt: bool, cx: &App) -> Option<PickTarget> {
         let Some(body) = self.body_of(&t.reference) else { return Some(t) };
         let iso_t = self.isolation_transparent();
         let appearance_t = |b: &BodyId| self.display.body(b).is_some_and(|d| d.color[3] < 0.99);
         let select_t = self.ui.isolate.as_ref().is_some_and(|i| i.select_transparent);
-        let through = |b: &BodyId| (iso_t.contains(b) && (alt || !select_t)) || (alt && appearance_t(b));
+        let through = |b: &BodyId| if iso_t.contains(b) { !select_t } else { alt && appearance_t(b) };
         if !through(&body) {
             return Some(t);
         }

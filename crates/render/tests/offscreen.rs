@@ -2061,3 +2061,34 @@ fn a_hovered_part_is_outlined_on_its_silhouette() {
         assert_eq!(px(&hovered, inner, y), px(&rest, inner, y), "{dpr}x: the face inside the band changed");
     }
 }
+
+
+/// Live ("psui (2026-10-28, P1) part-studio 2.23"): a part made see-through by its appearance is picked like any part,
+/// nearest first (`Instance::pick_solid`); other see-through meshes (datum planes, Isolate's parts) let what is behind
+/// them win.
+#[test]
+fn a_see_through_part_in_front_wins_the_pick_when_solid() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let front = r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, 0.0], [0.01, 0.01, 0.01], 1));
+    let back = r.upload_mesh(&primitives::box_mesh([-0.1, -0.1, -0.04], [0.1, 0.1, -0.03], 1));
+    let cam = iso_camera();
+    let (w, h) = (400u32, 300u32);
+    let picked = |r: &mut Renderer, solid: bool| {
+        let mut scene = Scene::default();
+        scene.instances.push(Instance::new(Drawable::Mesh(back.clone())).pick_base(1000));
+        scene.instances.push(Instance::new(Drawable::Mesh(front.clone())).with_color([0.6, 0.8, 0.9, 0.5]).pick_solid(solid));
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: true }).unwrap();
+        let s = cam.project(glam::DVec3::new(0.0, 0.0, 0.01), glam::DVec2::new(w as f64, h as f64), 0.02).unwrap();
+        f.pick.unwrap().id_at(s.x as i32, s.y as i32).unwrap()
+    };
+    let behind = picked(&mut r, false);
+    assert!(behind > 1000, "a see-through mesh lets the part behind it win: {behind}");
+    assert_eq!(picked(&mut r, true), 2, "the see-through part's own top face (+Z, id 2) wins");
+}
