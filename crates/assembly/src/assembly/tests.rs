@@ -4551,3 +4551,24 @@ fn ansi_taper_and_spring_pin_sizes_match_live() {
         }
     }
 }
+
+/// INSTANCE-NAME-STALE (live behaviours "Replace instance": the instance
+/// name follows the part name + <n>): a renamed part renames its instances.
+#[test]
+fn instances_follow_their_part_name() {
+    let mut f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let asm = Assembly {
+        instances: vec![part_instance(1, "Part 1 <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Part 1 <2>", f.studios[0], body.clone(), DVec3::X, false)],
+        ..Default::default()
+    };
+    let tab = f.doc.add_tab("Assembly 1", TabContent::Assembly(Box::new(asm)));
+    assert!(crate::assembly::follow_part_names(&mut f.doc, f.studios[0]).is_empty(), "no own names yet");
+    if let Some(TabContent::PartStudio(ps)) = f.doc.tab_mut(f.studios[0]).map(|t| &mut t.content) {
+        ps.part_properties.entry(body).or_default().name = Some("Pin".into());
+    }
+    assert_eq!(crate::assembly::follow_part_names(&mut f.doc, f.studios[0]), vec![tab]);
+    let Some(TabContent::Assembly(a)) = f.doc.tab(tab).map(|t| &t.content) else { panic!() };
+    assert_eq!(a.instances.iter().map(|i| i.name.as_str()).collect::<Vec<_>>(), ["Pin <1>", "Pin <2>"]);
+}

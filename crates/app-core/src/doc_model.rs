@@ -107,11 +107,16 @@ impl DocModel {
             TabContent::PartStudio(ps) => f(ps),
             _ => return None,
         };
+        // A renamed part renames its instances, in the same change.
+        let mut tabs = vec![tab];
+        tabs.extend(noshape_model::assembly::follow_part_names(&mut self.session.doc, tab));
         let desc = format!("{tab_name} :: {description}");
-        if let Err(e) = self.session.commit(&[tab], false, &desc) {
+        if let Err(e) = self.session.commit(&tabs, false, &desc) {
             cx.emit(DocEvent::Error(format!("Could not save change: {e:#}")));
         }
-        cx.emit(DocEvent::TabChanged(tab));
+        for t in tabs {
+            cx.emit(DocEvent::TabChanged(t));
+        }
         cx.notify();
         Some(r)
     }

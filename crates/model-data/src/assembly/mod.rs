@@ -1298,3 +1298,39 @@ pub mod config;
 pub mod standard;
 pub mod bom;
 pub mod ops;
+
+/// Instances follow their part's name (live behaviours "Replace instance":
+/// "The instance name always follows the part name + `<n>`";
+/// INSTANCE-NAME-STALE): after `studio` changed, every instance of one of its
+/// parts that has a name of its own reads "<name> <n>" (its number kept).
+/// The assembly tabs changed.
+pub fn follow_part_names(doc: &mut crate::document::Document, studio: TabId) -> Vec<TabId> {
+    let Some(crate::document::TabContent::PartStudio(ps)) = doc.tab(studio).map(|t| &t.content) else { return Vec::new() };
+    let names: std::collections::BTreeMap<BodyId, String> = ps.part_properties.iter().filter_map(|(b, p)| Some((b.clone(), p.name.clone().filter(|n| !n.trim().is_empty())?))).collect();
+    if names.is_empty() {
+        return Vec::new();
+    }
+    let mut changed = Vec::new();
+    for tab in doc.tabs.iter_mut() {
+        let crate::document::TabContent::Assembly(asm) = &mut tab.content else { continue };
+        let mut any = false;
+        for i in 0..asm.instances.len() {
+            let InstanceSource::Part { studio: s, body, .. } = &asm.instances[i].source else { continue };
+            let Some(name) = names.get(body).filter(|_| *s == studio) else { continue };
+            if Assembly::base_name(&asm.instances[i].name) == name {
+                continue;
+            }
+            let n = asm.instances[i].name.rsplit_once(" <").and_then(|(_, r)| r.strip_suffix('>')).filter(|r| r.parse::<u32>().is_ok()).map(str::to_string);
+            let new = match n {
+                Some(n) if !asm.instances.iter().any(|x| x.name == format!("{name} <{n}>")) => format!("{name} <{n}>"),
+                _ => asm.next_instance_name(name),
+            };
+            asm.instances[i].name = new;
+            any = true;
+        }
+        if any {
+            changed.push(tab.id);
+        }
+    }
+    changed
+}
