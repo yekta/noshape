@@ -43,7 +43,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 2.5 | The active tool's button is highlighted | UI | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 2.6 | Tools stay active until Esc or another tool is chosen | H:sketch_tools | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 2.7 | Pressing a tool's shortcut (or button) again exits it | B§2.1 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 2.8 | Constraint buttons not applicable to the current selection are disabled | B§3.1 | ✅ (T:sm) |  |
+| 2.8 | Constraint buttons not applicable to the current selection are disabled | B§3.1 | ✅ (T:sm) | 8cd3c4da 10-28 (GUI 1600 px: collapsed list at full strength with a line selected = live request 1549: live never dims constraints, and collapses this group below 1650 px too) |
 | 2.9 | Tooltips name the tool and its shortcut | UI | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 2.10 | Search tools (Alt+C) finds sketch tools | H:sketch_tools | ✅ (sketch tools listed first in a sketch) | 0.4.10+ / 2d9a275c 10-27 |
 | 2.11 | S opens the sketch shortcut toolbar at the cursor | H:sketch_basics | ✅ (sketch tools in the S toolbar) | 0.4.10+ / 2d9a275c 10-27 |
