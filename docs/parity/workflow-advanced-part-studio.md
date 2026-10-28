@@ -15,9 +15,9 @@ Status: ✅ matches live/exact, ✗ differs (finding #), ? live data pending.
 | 1.2 | Plane (Top + 20) | Plane 1 | Plane 1 | ✅ | 7929b13a 10-28 |
 | 1.3 | Sketch, Sketch plane field active, click the **Plane 1 row** in the feature list | fills "Plane 1" (default planes work the same way) | **nothing**; clicking Plane 1 in the viewport doesn't fill it either; the Top row works | ✗ ADV1 | 7929b13a 10-28 (Sketch with nothing selected, click the Plane 1 row → "Plane 1"; ADV1 fixed) |
 | 1.4 | Select Plane 1 first, then Sketch | sketch on Plane 1 | works | ✅ | 7929b13a 10-28 (Plane 1 selected, Sketch → "Plane 1", field inactive) |
-| 1.5 | Circle Ø16 at (10,10) | – | ✅ | ✅ |  |
+| 1.5 | Circle Ø16 at (10,10) | – | ✅ | ✅ | 64997436 10-28 (GUI: Sketch 2 on Plane 1, Ø16 at (10,10)) |
 | 1.6 | Loft dialog | Solid/Surface/Thin, New/Add/Remove/Intersect, Profiles, End conditions, Guides and continuity, Path, Connections, Show isocurves | same | ✅ | f9185639 10-28 (dialog fields) |
-| 1.7 | Click the circle region | "Face of Sketch 2" | first click took the circle's **centre point** ("Sketch 2 point" → pyramid to a point); the region took a second click | ? (point vs region priority) |  |
+| 1.7 | Click the circle region | "Face of Sketch 2" | first click took the circle's **centre point** ("Sketch 2 point" → pyramid to a point); the region took a second click | ? (point vs region priority) | 64997436 10-28 (GUI: a click on the centre picks 'Vertex of Sketch 2' (point first, as any point pick); a click inside the circle off the centre picks 'Face of Sketch 2') |
 | 1.8 | Result (square 20 → Ø16, 20 high) | **5927.728022 mm³**, side faces 324.6214685 mm² each | **5927.755 mm³** (+0.027), area 1899.548 (live 4×324.6215+400+201.0619 = 1899.548) | ✗ ADV2 (volume 0.027 off; area exact) |  |
 
 ## 2. Sweep (Part Studio 2; live SW rows)
@@ -37,14 +37,14 @@ Status: ✅ matches live/exact, ✗ differs (finding #), ? live data pending.
 |---|---|---|---|---|---|
 | 3.1 | Block 40×20×10; Fillet 4 vertical edges R3 | 7922.743339 | ✅ (G7 value) | ✅ | main CLI 12:08 (bin/advmatrix.py): 7922.743339 |
 | 3.2 | Draft: neutral Top, 4 side faces (tangent propagation), 5° | **7428.357160** (D1) | **7428.357** | ✅ | main CLI 12:08 (bin/advmatrix.py): 7428.357160 |
-| 3.3 | Edit Extrude 1 depth after the draft | regenerates | regenerates | ✅ |  |
+| 3.3 | Edit Extrude 1 depth after the draft | regenerates | regenerates | ✅ | 64997436 10-28 (GUI: Extrude 1 10 → 15 mm with Fillet 1 + Draft 1 after it: all regenerate, no error) |
 | 3.4 | Shift+S twice in the Part Studio (sketch, then Point) | ? | worked as Sketch then Point | ? |  |
 | 3.5 | Hole dialog | Inch/Metric, Simple/Counterbore/Countersink, Sketch points, Merge scope, Hole type Drilled, Drill size 1/4 (0.25), Ø, Start plane, Termination Blind, depth, 118 deg | same (Simple matches hole-01 screenshot) | ✅ | f9185639 10-28 (dialog fields) |
 | 3.6 | Counterbore defaults | Ø10 × 5 mm, 12 mm deep (psb f) | same; 6877.312 mm³ = exact | ✅ | 41f60e47 10-28 (Ø10 × 5, 12 deep) |
 | 3.7 | Counterbore / countersink rows | (live look pending) | text labels **truncate the values** ("Counterbore diamet… 1(", "Countersink angle 82 de") and with Tapped the **"Countersink diameter" label overlaps "12.878 mm"** | ✗ ADV4 |  |
 | 3.8 | Hole type list | Drilled, Clearance, Tapped | same; Tapped adds Tap type, Size, Threads/inch, Fastener fit, ☐ Thread class, Tapped depth | ? |  |
-| 3.9 | Mirror › Part mirror about Right | Part 2 | Part 2 | ✅ |  |
-| 3.10 | Mirror › Feature mirror of the hole about Plane 1 (Right + 20) | dialog: Features to mirror, Mirror plane, ☐ Reapply features | same; **Plane 1 row doesn't fill Mirror plane** (ADV1); viewport pick works; 6326.267 mm³ = exact | ✅ / ✗ ADV1 |  |
+| 3.9 | Mirror › Part mirror about Right | Part 2 | Part 2 | ✅ | 64997436 10-28 (GUI: Part 1 + Right row → Part 2) |
+| 3.10 | Mirror › Feature mirror of the hole about Plane 1 (Right + 20) | dialog: Features to mirror, Mirror plane, ☐ Reapply features | same; **Plane 1 row doesn't fill Mirror plane** (ADV1); viewport pick works; 6326.267 mm³ = exact | ✅ / ✗ ADV1 | 64997436 10-28 (GUI: the Plane 1 row fills Mirror plane: ADV1 fixed for mirror; tickets/adv1-mirror-plane-row-6499.png) |
 | 3.11 | Edit the hole to Countersink + Tapped | mirror follows | Mirror 2 error "Could not create all instances as entered. Try selecting "Reapply features" option." (the two countersinks overlap at the plane); ☑ Reapply features fixes it | ? (plausible per G45) |  |
 
 ## 4. Helix, thread, rib, wrap
@@ -52,7 +52,7 @@ Status: ✅ matches live/exact, ✗ differs (finding #), ? live data pending.
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 4.1 | Helix dialog | Cylinder/Cone \| Axis \| Circle; Conical or cylindrical face; Input type Turns; Start condition Start angle 0; End condition Height; Target revolutions 4; Handedness Clockwise; ☐ Show start and end profiles | same (no "Handedness" label: the select stands alone) | ✗ ADV5 (label) |  |
-| 4.2 | Helix on the Ø6 × 30 face | curve 4 turns | Curve 1, length **81.147 mm** = exact | ✅ |  |
+| 4.2 | Helix on the Ø6 × 30 face | curve 4 turns | Curve 1, length **81.147 mm** = exact | ✅ | 64997436 10-28 (GUI: Helix on the Ø6×30 side face → Curve 1, a click on it reads Length 81.147 mm) |
 | 4.3 | Space | clears the selection | clears | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | 4.4 | Tool search "thread" | External thread (Did you mean: Helix, Hole) | same | ✅ | 41f60e47 10-28 |
 | 4.5 | External thread: click the Ø6 cylinder's end edge | chip / size mismatch handling (pending) | **no hover, no pick**; a pre-selected edge is dropped on open; outside the dialog the same edge picks fine ("Diameter: 6.000 mm") | ✗ ADV6 |  |
@@ -86,11 +86,11 @@ rebuilt exactly to live's spec in /tmp/qa5/home/Documents/noshape/qa5-livecheck.
 | 2.5 | Sweep error tooltip | "Sweep 1 did not regenerate properly: …" | still "Could not create valid swept body, check input."; Helix error tooltip also bare ("Select a cone or cylinder.") | ✗ ADV3 |  |
 | 3.7 | Hole countersink rows | – | "Countersink diameter" label still overlaps "12.878 mm", "82 de" cut | ✗ ADV4 |  |
 | 4.1 | Helix handedness label | live DOM (qa5-adv-helix): the Clockwise select has **no label** | no label | ✅ **ADV5 withdrawn** |  |
-| 4.5 | External thread edge pick | picks the edge | **hovers + picks "Edge of Sweep 1"** | ✅ ADV6 fixed |  |
-| 4.5b | Thread dialog "Threads/inch" value | "20 tpi" (dom qa5-adv-thread) | "20 tpi (UNC)" | ✗ **ADV8** |  |
-| 4.5c | Thread result | cosmetic, **cylindrical face split at 10 mm (3 → 4 faces)**, area unchanged | area unchanged 2513.2741, **still 3 faces** (Split face ☑ default) | ✗ **ADV7** |  |
+| 4.5 | External thread edge pick | picks the edge | **hovers + picks "Edge of Sweep 1"** | ✅ ADV6 fixed | 64997436 10-28 (GUI: hover outlines the Ø6 top edge, click → 'Edge of Extrude 3') |
+| 4.5b | Thread dialog "Threads/inch" value | "20 tpi" (dom qa5-adv-thread) | "20 tpi (UNC)" | ✅ (ADV8 fixed) | 64997436 10-28 (GUI: '20 tpi'; ADV8 fixed) |
+| 4.5c | Thread result | cosmetic, **cylindrical face split at 10 mm (3 → 4 faces)**, area unchanged | area unchanged 2513.2741, **still 3 faces** (Split face ☑ default) | ✅ (ADV7 fixed) | 64997436 10-28 (GUI: committed, the side face is split 10 mm down: hover lights the lower band only; ADV7 fixed; tickets/thread-split-6499.png) |
 | 4.6 | Rib defaults | 2.5 mm, Parallel to sketch plane, Merge ribs ☑; Parts auto-fills "Part 1" | same (UI pass 2) | ✅ | f9185639 10-28 (dialog fields) |
-| 4.8 | Rib 4 mm, line (5,25)–(25,5) | **10550.0000, 11 planar faces** | **10550.0, 11 faces** (CLI) | ✅ |  |
+| 4.8 | Rib 4 mm, line (5,25)–(25,5) | **10550.0000, 11 planar faces** | **10550.0, 11 faces** (CLI) | ✅ | 64997436 10-28 (GUI: Sketch 3 row, Part 1, 4 mm → Mass props 10550 mm³) |
 | 4.2b | Helix Ø20×30 default | 253.1115 mm | 253.1116 (analytic 253.11157) | ✅ | b504234e 10-28 (GUI: Helix on Ø20×30 side face, edge Length 253.112 mm) |
 | 4.9 | Wrap 10×5 rectangle onto Ø20 | Surface tab default; sheet, 1 cylinder face 50.0000 mm² | Surface default; Surface 1, 1 cylinder face 50.0 | ✅ | b504234e 10-28 (GUI: Surface tab default, 10×5 on Front+10 onto Ø20 side face → Surfaces (1) Surface 1, Face Mass props 50 mm², perimeter 30 mm) |
 | 3.6b | Hole types, block 40×20×10, point (20,10), Inch | Cbore 7448.9548 (9 f) / Simple 7683.3078 (7) / Csink 7643.7210 (8) | **7448.9548 (9) / 7683.3078 (7) / 7643.7210 (8)** | ✅ | b504234e 10-28 (GUI, Inch tabs on the (20,10) vertex, Mass props: Simple 7683.308 / Cbore 7448.955 / Csink 7643.721) |
@@ -171,7 +171,7 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 ## Re-run pass 22 (qa5, 2026-10-24, agent/qa5 on main 037298c3)
 | Row | Ours now | Status | Verified |
 |---|---|---|---|
-| 2.3 / 4.7 Sketch row into a curve field | Rib: clicking the "Line sketch" row fills Sketch profiles with **"Edges of Line sketch"** (live "Edges of Rib sketch", behaviours ~983); Sweep path the same | 🔧 fixed (qa5) |  |
+| 2.3 / 4.7 Sketch row into a curve field | Rib: clicking the "Line sketch" row fills Sketch profiles with **"Edges of Line sketch"** (live "Edges of Rib sketch", behaviours ~983); Sweep path the same | 🔧 fixed (qa5) | 64997436 10-28 (GUI: the Sketch 3 row fills 'Edges of Sketch 3') |
 | 3.6c Hole row named by the callout | hole.fs "Feature Name Template": "#featureName" → live names it by the callout too | ✅ | f9185639 10-28 (wf-block row "Ø 6.35 mm ↧ 12 mm") |
 | 4.9 Wrap default tab | wrap.fs Creation type Default SURFACE | ✅ | f9185639 10-28 (dialog fields) |
 | 1.7 point vs region priority | no live evidence yet | ? |  |
