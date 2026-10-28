@@ -9,6 +9,7 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97 → … → b504234e → 2960a143)
 
+- **09:50 update (green 97c7aae3 → c82818b7 at 09:32):** Preferences D11 (Sketch list offsets 17/6/205/10 px, icon→label 13 px = prefs/04) and D12 (Save stays enabled after re-unticking) verified on 97c7aae3; P9 re-checked: Extrude ticked → first S button, but Section view / Measure ticked + saved never reach the sketch S toolbar → filed P3 SKETCH-S-INSPECT-TOOLS. Filed P2 PREFS-WHEEL-DOUBLE-SCROLL: one wheel notch over the Keyboard shortcuts or Sketch list scrolls the list and the page (69 px) together (gpui div scroll listener never stops propagation; likely every nested scroller). Fuzz seed 61 on c82818b7 running; next: verify XT-ASM-VERSIONS, DATUM-SCALE-DETACHED, DARK-DRAWING-TOOLBAR on c82818b7.
 - **09:28 update (greens 7e88e3ab → 97c7aae3):** verified ASM-K-IMPLICIT-MCS (7e88e3ab; residual: bare triad, live disc + triad),
   ASM-MC-LIST-ORDER, ASM-XT-ROUNDTRIP-NAMES and the folder guide's end tick (97c7aae3). Filed P3 API-CONFIG-NAME-KEY (the API
   takes {'Size': 'Large'} by display name, stores and ignores it). Rows: exploded 2 14 15 EXV1; configured-assembly 3 5 8
