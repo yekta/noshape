@@ -94,6 +94,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   3.10b had 9000 (CLI) on 10-21 (qa 2026-10-28 05:11, build b504234e)
   qa (code read): Reapply off goes through pattern.rs geometric_feature_pattern → pattern_faces (the boss's faces on Part 1),
   Reapply on through reapply_features, which is right; the copy looks as if its y walls were dropped (not traced).
+  qa 16:32: still open on the v0.4.12 CLI (qa-scratch/bin/fmir.py: block 40×20×10, boss (5,5)–(15,15) ×5 Add, Plane 1 = Right + 20, Feature mirror of Extrude 2 → Part 1 9500 mm³, 15 faces; live 9000 / 16); no fix on main since.
 - [ ] P3 ENCLOSE-NO-REGION-MSG Enclose of the three default planes only (Top, Front, Right; any doc): ours ERROR "Failed to
   create a part from enclosed region."; live L30 (behaviours ~8393): "Selections do not enclose a region.", no field flagged.
   solid_a.rs only gives the live text when k::enclose returns no solid, but k::enclose itself errors here, so the
