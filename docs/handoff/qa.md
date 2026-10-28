@@ -7,8 +7,13 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 noshape-0.4.12-linux-x86_64.tar.gz: all rows OK** (details under "Daily release smoke" › v0.4.12). Blocker list at the top
 of TICKETS (open P0s all carried from v0.4.11).
 
-## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6)
+## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b)
 
+- **20:42 update (green 989f756b, copied 20:36):** Rust Boolean regression net: bin/volsweep.sh (19 model documents: perf parts,
+  crash fixtures, fuzz bodies) gives identical volume / area / parts with the v0.4.12 CLI and bool's 20:16 CLI (Rust on); fuzz 84
+  (e66f) alive; CLI fuzz 160 / 161 on the Rust CLI running (bx9n1netq). e73b8ce2 datum targets checked → P3 DWG-DATUM-TARGET-MENU
+  (menu order, Paste, extra Move to, first label B1). Note: appstart overwrites app.pid, so stop the previous app before the next
+  appstart (fz83's app was left running for 15 min).
 - **20:40 update:** fuzz 83 (b8f4) alive. OK-ENABLED-AFTER-CLEAR withdrawn (live 1575: = ours). Rust Boolean watch, bool CLI 20:16
   (has e66f8a83 glue-pattern path) vs v0.4.12: patmatrix and bin/touchpat.py (touching part patterns ADD / NEW) identical; a
   feature pattern of a boss at the plate edge fails "Could not create all instances as entered…" in both (my setup, not a
