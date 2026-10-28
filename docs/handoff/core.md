@@ -104,6 +104,9 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   and the CLI died in ForceInterfEF / an IntTools_Context map on a pool worker, intermittently, as BOOL-THREAD-CRASH
   did with whole booleans parallel); ReduceIntersectionRange's E/E interferences indexed by new vertex (serial,
   stays on). So the knurl is back near its serial time unless the variable is set.
+- Parallel pairs: ready on branch agent/core-pairs-on (99185686, not landed, for after the 10-29 release): serial
+  inside CPU budgets, off in OCCT until the kernel turns it on; land it with /root/core-scratch/libTKBO.a.0004-on3
+  in /root/occt.
 - 0005 (10-28; v2 22:30: only jobs with worker threads, a job of the calling thread alone is a serial loop the
   budget must still stop: qa DRAFT-BUDGET-POOL, T1 `kernel_core::a_budget_still_stops_a_pool_job_of_its_own_thread`,
   T2 ops `regen_profile::the_draft_pool_hang_document_opens`) TKernel OSD_ThreadPool::Launcher::perform counts, per thread, the pool jobs it runs
