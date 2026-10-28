@@ -20,7 +20,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | K1 | `i` opens / closes Insert parts and assemblies | H:shortcuts, E§3 | ✅ | toggles; closing commits a pending placement | 0.4.10+ / c9c66d1c 10-27 (opens / closes Insert) |
 | K2 | `m` opens the Fastened mate dialog | H:shortcuts | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Fastened 1 dialog) |
 | K3 | `j` shows / hides all mates | H:shortcuts | ✅ | per-mate eye overrides (Mate.hidden) | 0.4.10+ / c5e53806 10-28 (j shows / hides new mates) |
-| K4 | `k` shows / hides mate connectors | H:shortcuts | ❌ (ASM-K-IMPLICIT-MCS) | | 2292bf8c 10-28: ✗ k draws only part-studio connectors, not the mates' implicit ones (live ks-k-1) |
+| K4 | `k` shows / hides mate connectors | H:shortcuts | ✅ (ASM-K-IMPLICIT-MCS fixed 81519593) | | 7e88e3ab 10-28 (first k shows the mates' connectors as triads, second hides them; live glyph is disc + triad) |
 | K5 | `h` toggles Show mates mode | H:shortcuts | ✅ | also toolbar button | 0.4.10+ / c9c66d1c 10-27 (Show mates mode banner) |
 | K6 | `Shift+S` toggles Snap mode | H:shortcuts | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | K7 | `Ctrl+M` opens the Mate connector dialog | H:shortcuts | ✅ | bound in Workspace; Assembly handles MateConnectorTool | 0.4.10+ / 77870dd4 10-28 |
