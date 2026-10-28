@@ -259,7 +259,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 9.11 | Display: Shaded with edges / Shaded without edges / Unshaded / Translucent; Hidden edges visible/removed; Tangent edges visible / phantom (dash-dot) / removed | live | ✅ (tangency found from the mesh: `MeshBuffers::smooth_edges`) | 0.4.10+ / 2d9a275c 10-27 |
 | 9.12 | Orient normal to sketch on edit (camera menu toggle); the previous view returns when the sketch closes | View__orient_normal_to_sketch_on_edit | ✅ (10-27: Sketch 1 opens normal to Top, ✓ brings back the frame pixel for pixel; the toggle isn't persisted across sessions) | 0.4.10+ / 2d9a275c 10-27 |
 | 9.13 | Named views store orientation/zoom/projection; save, restore, delete | View__named_views | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 9.14 | Named views store the section state | View__named_views | 🔧 |  |
+| 9.14 | Named views store the section state | View__named_views | 🔧 | 0.4.10+ / 7929b13a 10-28 (blk40: Front section offset 11.8, Named views › secv saved; Turn off section view; selecting secv brings the section back; tickets/named-view-section-7929.png) |
 | 9.15 | Rotation inertia; rotate about the point under the cursor | A §6.1 | ✅ U (`inertia_decays_like_onshape`, `rotation_keeps_the_pivot_fixed_on_screen`, app-core navigation, from the bundle) | 0.4.10+ / 2d9a275c 10-27 |
 
 ## 10. Visibility, isolate, transparency, section (View__hide_show, View__isolate, View__make_transparent, View__section_view)

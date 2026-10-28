@@ -17,6 +17,8 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   empty-selection texts (Sweep, Loft, Thicken, Rib, Face mirror / pattern), Fill fields, Hole / Curve pattern errors;
   chrome-sweep FD3 FD5–FD8, FL1 FL2 FL8 FL9, RT1 RT2.
   Docs built this session: qa-scratch/blk40.noshape (plain 40×20×10), cpat.noshape (block + 100 mm sketch circle).
+  7929b13a (psui): a sketch above the extrude of its face fails "Sketch 2 did not regenerate properly: Select a sketch plane.\n1
+  missing selection" with the warning triangle (tickets/sketch-plane-gone-7929.png) ✓; named view restores its section ✓.
   Next: 04:30 blocker list; ~05:00 release smoke; then the remaining chrome-sweep / feature-sweep / assembly.md / drawing.md rows.
 
 ## Session 3 (qa on a fresh account, 10-27 19:05 → 10-28; greens fa61ba6f → … → d2826142 → c5e53806)
