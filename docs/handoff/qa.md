@@ -7,8 +7,13 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 noshape-0.4.12-linux-x86_64.tar.gz: all rows OK** (details under "Daily release smoke" › v0.4.12). Blocker list at the top
 of TICKETS (open P0s all carried from v0.4.11).
 
-## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401)
+## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03)
 
+- **20:00 update (green 4994be03, copied 19:40):** verified MATE-EXACT-FLIP-MOVER (GUI + CLI), drawing S8 sheet drag (= live but for a
+  drag ghost → P3 DWG-SHEET-DRAG-GHOST), core ae7ce4a5 (64-region extrude: 64 parts, exact volumes, 1.6 s). **ASM-TRIAD-MENU reopened**:
+  Move to origin only when the instance was picked in the graphics, not from the list. Live 1574: Revolve ✓ state = live; new P3
+  MIRROR-DIALOG-STATE. Parity rows refreshed (sketch 14.34, six stale ❌ rows → ✅). Fuzz 81 (4994) running.
+  Still open for 05:00: BOP-PAIRS-GPF, DRAFT-BUDGET-POOL (no core response on main yet).
 - **19:32 update (green b184b401):** fuzz 79 (live-30) and 80 (drawing doc) alive. New: P3 DWG-CIRCLE-FACETS (drawing-sketch circles
   are 16–24-gons), P3 HOLE-TABLE-BUTTON (live 1573: no button without an unsuppressed Hole; suppressed Hole row reads "Hole").
   P1 walk on b184: revolve 28274.334 mm³ / 7539.822 mm² and mirror+merge 56548.668 / 13194.689 = analytic; Mirror New → Add
