@@ -7,8 +7,12 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 noshape-0.4.12-linux-x86_64.tar.gz: all rows OK** (details under "Daily release smoke" › v0.4.12). Blocker list at the top
 of TICKETS (open P0s all carried from v0.4.11).
 
-## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793)
+## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401)
 
+- **18:58 update (green b184b401, copied 18:12):** **P0 DRAFT-BUDGET-POOL** (A/B with NOSHAPE_BOP_PAIRS_SERIAL=1, repro doc in
+  tickets/), early 10-29 blocker notes at the top of TICKETS. Verified SKETCH-S-INSPECT-TOOLS (root profile restored), drawing S6
+  Change configuration. SHELL-SLOW note: failing shells take up to a minute on the fuzz body. Fuzz 78 (87dd) alive. Asked live:
+  Hole table panel with no holes (P3). Scripts: bin/editloop2.sh (regen-aware edit loop), bin/openwatch.sh (open + RSS watchdog).
 - **18:25 update (green 87ddb793, copied 18:08):** verified DIALOG-EXPR-SCOPE, DIALOG-AC-ENTER, SKETCH-HINT-OVERLAP,
   SKETCH-RECT-DROPDOWN-NAME. **BOP-PAIRS-GPF: a second crash**, the watcher's debug CLI (main 17:09) segfaulted in
   BOPAlgo_PaveFiller::ForceInterfEF (CLI fuzz seed 152, a Shell); replays of that Shell (5×) and 80 GUI Extrude edits on
@@ -292,6 +296,10 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
 ## Requests to the lead (qa, updated 2026-10-28 17:45)
+- **P0 DRAFT-BUDGET-POOL (core, regression of f024fd0d, 18:55):** with the pave-filler pairs on the pool, a Draft's defeaturing
+  runs past its 30 s budget forever (memory > 4 GB): tickets/draft-pool-hang-2133.noshape never finishes opening; with
+  NOSHAPE_BOP_PAIRS_SERIAL=1 it stops at 30 s and opens in 57 s. Together with BOP-PAIRS-GPF: please make the pairs serial
+  by default before the 05:00 cut unless core fixes both.
 - **P0 BOP-PAIRS-GPF (core, new in green 5267fdaf):** a GPF inside OCCT's IntTools_Context on a thread-pool worker
   killed the app during a Mirror preview; it arrived with f024fd0d (patch 0004, threaded pave-filler pairs). Unless core
   fixes it, please consider NOSHAPE_BOP_PAIRS_SERIAL=1 behaviour as the default before the 05:00 cut.
