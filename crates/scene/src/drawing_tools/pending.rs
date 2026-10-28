@@ -162,12 +162,14 @@ impl SheetPick<'_> {
                 })
             }
             Tool::Dimension { kind: DimTool::ArcLength, picks } => {
-                let [Pick::Arc { view, center, radius, a, b, mid, r }] = picks.as_slice() else { return None };
+                let [Pick::Arc { view, center, radius, a, b, r, .. }] = picks.as_slice() else { return None };
                 let pl = self.placement(*view)?;
-                let offset = (len(sub(c, pl.to_sheet(*center))) - pl.len_to_sheet(*radius)).max(2.0);
+                // The side of the arc the pointer is on: the picked arc, or
+                // across its ends the conjugate.
+                let (mid, offset) = super::jog::arc_length_place(&pl, *center, *radius, c);
                 Some(Annotation {
                     id,
-                    kind: AnnotationKind::ArcLengthDimension { view: *view, center: *center, radius: *radius, a: a.p, b: b.p, mid: *mid, offset },
+                    kind: AnnotationKind::ArcLengthDimension { view: *view, center: *center, radius: *radius, a: a.p, b: b.p, mid, offset },
                     position: c,
                     refs: refs(vec![(0, r.clone()), (1, a.r.clone()), (2, b.r.clone())]),
                     ..Default::default()

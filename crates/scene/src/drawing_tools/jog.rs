@@ -8,6 +8,19 @@ use noshape_model::drawing::sheet::{LinearFrame, linear_frame};
 use noshape_model::drawing::{Annotation, AnnotationKind};
 
 /// Distance from `c` to segment `a`-`b`.
+/// An arc length dimension placed (or dragged) at sheet point `at`: its
+/// `mid` (view coordinates, the point on the circle toward `at`, so the
+/// side of the arc the pointer is on is measured: across the arc's ends,
+/// the conjugate; help drawing_-_arc_length_dimension) and its offset from
+/// the arc (sheet mm).
+pub fn arc_length_place(pl: &noshape_model::drawing::build::ViewPlacement, center: [f64; 2], radius: f64, at: [f64; 2]) -> ([f64; 2], f64) {
+    let c = pl.to_sheet(center);
+    let v = sub(at, c);
+    let offset = (len(v) - pl.len_to_sheet(radius)).max(2.0);
+    let mid_sheet = if len(v) > 1e-9 { [c[0] + v[0] / len(v) * pl.len_to_sheet(radius), c[1] + v[1] / len(v) * pl.len_to_sheet(radius)] } else { c };
+    (pl.to_view(mid_sheet), offset)
+}
+
 pub fn seg_dist(c: [f64; 2], a: [f64; 2], b: [f64; 2]) -> f64 {
     let d = [b[0] - a[0], b[1] - a[1]];
     let l2 = d[0] * d[0] + d[1] * d[1];
@@ -220,6 +233,11 @@ impl SheetPick<'_> {
                     *offset = dim_offset(pl.to_sheet(*pa), pl.to_sheet(*pb), *orientation, c);
                 }
             }
+            AnnotationKind::ArcLengthDimension { center, radius, mid, offset, .. } => {
+                if let Some(pl) = pl {
+                    (*mid, *offset) = arc_length_place(&pl, *center, *radius, c);
+                }
+            }
             AnnotationKind::ForeshortenedRadial { jog, .. } => {
                 // Dragging moves the false center.
                 if let Some(pl) = pl {
@@ -261,11 +279,38 @@ impl SheetPick<'_> {
                 (AnnotationKind::Gdt { anchor, .. }, AnnotationKind::Gdt { anchor: n, .. }) => *anchor = *n,
                 (AnnotationKind::RevisionCallout { anchor, .. }, AnnotationKind::RevisionCallout { anchor: n, .. }) => *anchor = *n,
                 (AnnotationKind::MaxMinDimension { offset, .. }, AnnotationKind::MaxMinDimension { offset: o, .. }) => *offset = *o,
+                (AnnotationKind::ArcLengthDimension { mid, offset, .. }, AnnotationKind::ArcLengthDimension { mid: m, offset: o, .. }) => {
+                    *mid = *m;
+                    *offset = *o;
+                }
                 (AnnotationKind::ForeshortenedRadial { jog, .. }, AnnotationKind::ForeshortenedRadial { jog: j, .. }) => *jog = *j,
                 _ => {}
             }
             return out;
         }
         a
+    }
+}
+
+#[cfg(test)]
+mod arc_length_tests {
+    use noshape_model::drawing::ViewId;
+    use noshape_model::drawing::build::ViewPlacement;
+
+    /// The quarter arc from 0° to 90° (radius 10 mm in a 1:1 view): placed
+    /// beside it, `mid` is on it; placed across its ends, on the conjugate.
+    #[test]
+    fn arc_length_follows_the_side_the_pointer_is_on() {
+        let pl = ViewPlacement::new(ViewId(1), [0.0, 0.0], [100.0, 100.0], 1.0);
+        let c = pl.to_sheet([0.0, 0.0]);
+        let r = pl.len_to_sheet(0.01);
+        let angle = |at: [f64; 2]| {
+            let (m, off) = super::arc_length_place(&pl, [0.0, 0.0], 0.01, at);
+            assert!(off >= 2.0);
+            m[1].atan2(m[0]).to_degrees().rem_euclid(360.0)
+        };
+        let k = (r + 8.0) / 2f64.sqrt();
+        assert!((angle([c[0] + k, c[1] + k]) - 45.0).abs() < 1.0);
+        assert!((angle([c[0] - k, c[1] - k]) - 225.0).abs() < 1.0);
     }
 }
