@@ -5,6 +5,14 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 ## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97)
 
+- **04:00 update (greens da18f886 → 1b81b7ca):** fuzz 49 / 50 on da18f886 alive (51 on 1b81b7ca running). Verified: da18f886
+  SKETCH-FILLET-STUCK-RADIUS (c) (a whole-leg fillet types smaller; (b) max-fit preview + Enter commit still unlike live),
+  0637de45 dual row (D34), e3fd499b see-through picks (part-studio 2.23) on 1b81b7ca. SKETCH-FILLET-EQUAL still open for
+  equal radii. Filed: P2 DIM-PALETTE-DROPDOWN-COLLAPSE (dx), P2 MASS-MC-FIELD (psui, regression of interaction 5.4),
+  P3 ASM-MENU-WRAP, P3 ASM-MATE-MENU-SEPARATORS (skasm); ASM-FOLDER-UNPACK withdrawn (my crop cut the menu: crop menus whole!).
+  Rows: assembly.md C24 F2 F3 F5 F12 K26 K29 L4 L10 L12 L16–L19 M4 M8 M10 M11; part-studio 5.4b 6.24 7.6 10.8 2.23; sketch
+  11.3; surfaces 11 (1200 mm²); chrome-sweep TS1 TS2; keyboard-mouse arrows. interaction 3.6 can't be judged here (frames
+  ~0.5 s under lavapipe at load 30).
 - **03:30 update:** fuzz 47 / 48 × 600 on 7929b13a: alive. REGEN-SPEED on 7929b13a (load ~30): median 378 ms, 3rd undo
   392 ms; SHELL-SLOW: wf-block top-face shell 2.6 s / 1.7 s in the app. Filed P3 TABLE-SHIFT-TAB-BLANK, P3
   NOTE-PANEL-UNDER-PROPS (dx). Live asked: auxiliary view label checkbox. Rows: drawing.md T5 T7 T10 T11 V10–V13 V16 V36
