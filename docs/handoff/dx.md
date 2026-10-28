@@ -118,6 +118,17 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   live's layouts (from tests/perf's NIST x_t); older versions stay flat until live sends an assembly in each
   (REQUESTS dx 10-28). Then BALLOON-WRONG-ITEM, DRAWING-SHIFT-SLASH, the drawing.md rows in P2 order.
 
+## Afternoon 10-28 (landed through 3476703d)
+- Parasolid: 30.1–31.1 ASSEMBLY layouts from live's samples (all 13 versions read); exports carry part names / colours
+  and the assembly's name as Onshape's TYSA_NAME / TYSA_COLOUR_2 attributes in every version (5bb31dca).
+- drawing.md: S25 dimension Text justification, S19 format-layer thickness for moved entities, D10 (ordinate group red
+  as a whole; test only), D39 overridden dimensions keep prefix / suffix / above / below, A44 Surface finish keeps
+  placing until ✓ (checked in the app on :131).
+- Asked live (REQUESTS dx 10-28): EX11 finish notification, V53 paste across workspaces, S6 Change configuration.
+- Next, in order: D39's override on non-linear dimensions (needs an override field beyond LinearDimension);
+  S8 sheet row drag (live answer pending); A35 datum-target dimension / label menus (needs their own picks + live's
+  menus); TABLE-SHIFT-TAB-BLANK; V59 / V26 once live data exists; drawing.md ⏳ rows to verify on green.
+
 ## Midday 10-28 (landed through ec54591b; checks on green 6570fa0d, :131, /root/dx-scratch/w3/b*.png)
 - Green: the dimension palette's dual row as live asbdd-9 ([ 3.15 ▾ (in) ▾ 👁 ], the eye shows "[3.15 in]"); in Dark mode
   the drawing toolbar is white over its whole width (DARK-DRAWING-TOOLBAR).
