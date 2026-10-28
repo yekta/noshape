@@ -5365,6 +5365,19 @@ impl Render for PartStudioView {
                 }
             }))
             .on_action(cx.listener(Self::on_delete))
+            // Live (behaviours "qa (2026-10-28) SKETCH-ENTER-NO-PLANE"): while a
+            // new sketch's plane is empty, Enter and Esc do nothing; only the
+            // dialog's ✕ (or a plane, then ✓) leaves it.
+            .capture_action(cx.listener(|this, _: &crate::actions::Accept, _, cx| {
+                if this.sketch_without_plane(cx) {
+                    cx.stop_propagation();
+                }
+            }))
+            .capture_action(cx.listener(|this, _: &Cancel, _, cx| {
+                if this.sketch_without_plane(cx) {
+                    cx.stop_propagation();
+                }
+            }))
             // Shift+Tab on <body> stays there (live psb 10-19 h); elsewhere in
             // the Part Studio it moves back as usual.
             .on_action(cx.listener(|this, _: &crate::actions::StudioTabPrev, window, cx| {

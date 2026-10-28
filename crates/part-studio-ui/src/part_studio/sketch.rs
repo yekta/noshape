@@ -191,6 +191,14 @@ fn icon_px(name: &str, size: f32, color: Rgba) -> Icon {
 
 impl PartStudioView {
     /// Id of the sketch feature being edited (if the dialog is a sketch).
+    /// A Sketch dialog is open with its plane field still empty.
+    pub(super) fn sketch_without_plane(&self, cx: &App) -> bool {
+        self.edit.as_ref().is_some_and(|e| {
+            let d = e.dialog.read(cx);
+            d.feature.type_id == "sketch" && d.feature.params.query("sketchPlane").is_empty()
+        })
+    }
+
     pub(super) fn editing_sketch_id(&self, cx: &App) -> Option<FeatureId> {
         let e = self.edit.as_ref()?;
         let d = e.dialog.read(cx);

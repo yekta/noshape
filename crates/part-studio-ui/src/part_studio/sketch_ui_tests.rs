@@ -211,6 +211,36 @@ fn rectangle_value_boxes_tab_as_live(cx: &mut TestAppContext) {
     assert_eq!(dimension_kinds(cx, &view), vec![(false, 0.02)], "the height 20");
 }
 
+/// SKETCH-ENTER-NO-PLANE (live request 1532): a new sketch with no plane
+/// yet ignores Enter and Esc (it was committed red / cancelled); only ✕ or a
+/// plane and ✓ leave it.
+#[gpui::test]
+fn enter_and_esc_leave_a_planeless_sketch_open(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "noplane");
+    let features = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).map(|s| s.features.len()));
+    let before = features(cx);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection.clear();
+            v.start_feature("sketch", w, cx);
+        });
+    })
+    .unwrap();
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        let focus = view.read(cx).focus.clone();
+        w.focus(&focus, cx);
+    })
+    .unwrap();
+    draw(cx, window);
+    keys(cx, window, &["enter"]);
+    assert!(cx.update(|cx| view.read(cx).edit.is_some()), "Enter keeps the dialog open");
+    assert_eq!(features(cx), before, "nothing committed");
+    keys(cx, window, &["escape"]);
+    assert!(cx.update(|cx| view.read(cx).edit.is_some()), "Esc too");
+}
+
 /// The driving dimensions as (a width: a horizontal line's length or the
 /// distance between vertical lines; value).
 fn dimension_kinds(cx: &mut TestAppContext, view: &Entity<PartStudioView>) -> Vec<(bool, f64)> {
