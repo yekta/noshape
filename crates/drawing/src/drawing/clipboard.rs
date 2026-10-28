@@ -20,6 +20,10 @@ pub struct ViewClipboard {
     /// The point pasted at the cursor (None: the middle of the positions).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub anchor: Option<[f64; 2]>,
+    /// Where the views were copied: (document, workspace). Live pastes views
+    /// only between drawings of one workspace ([`ViewClipboard::refusal`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<(String, String)>,
 }
 
 impl ViewClipboard {
@@ -31,6 +35,20 @@ impl ViewClipboard {
         let c: ViewClipboard = serde_json::from_str(text).ok()?;
         let s = &c.sheet;
         (c.noshape_drawing_views == 1 && !(s.views.is_empty() && s.annotations.is_empty() && s.tables.is_empty())).then_some(c)
+    }
+
+    /// Live's message when these views can't be pasted into `document` /
+    /// `workspace` (live behaviours V53: nothing is pasted, a blue bubble
+    /// that stays until closed). Entities alone and unstamped copies paste.
+    pub fn refusal(&self, document: &str, workspace: &str) -> Option<&'static str> {
+        let (d, w) = self.origin.as_ref().filter(|_| !self.sheet.views.is_empty())?;
+        if d != document {
+            Some("Views could not be copied between documents.")
+        } else if w != workspace {
+            Some("Views could not be copied between workspaces.")
+        } else {
+            None
+        }
     }
 
     /// Center of the copied views' (else entities') positions (sheet mm).
@@ -97,14 +115,14 @@ impl DrawingClipboard for Drawing {
         if annotations.is_empty() && tables.is_empty() {
             return Err("Nothing to copy".into());
         }
-        Ok(ViewClipboard { noshape_drawing_views: 1, sheet: Sheet { views: vec![], annotations, tables, ..src.clone() }, anchor: None })
+        Ok(ViewClipboard { noshape_drawing_views: 1, sheet: Sheet { views: vec![], annotations, tables, ..src.clone() }, anchor: None, origin: None })
     }
 
     fn copy_views(&self, sheet: usize, ids: &[ViewId], sources: Option<&Sources>) -> Result<ViewClipboard, String> {
         let src = self.sheets.get(sheet).ok_or("No sheet")?;
         let mut tmp = Drawing { sheets: vec![src.clone(), Sheet { views: vec![], annotations: vec![], tables: vec![], ..src.clone() }], projection: self.projection, units_mm: self.units_mm, props: self.props.clone(), active_sheet: 0, continuation: None, drawn_by: self.drawn_by.clone(), sources_at: None, meta: self.meta.clone() };
         tmp.move_views_to_sheet(0, ids, 1, sources)?;
-        Ok(ViewClipboard { noshape_drawing_views: 1, sheet: tmp.sheets.swap_remove(1), anchor: None })
+        Ok(ViewClipboard { noshape_drawing_views: 1, sheet: tmp.sheets.swap_remove(1), anchor: None, origin: None })
     }
 }
 

@@ -4256,6 +4256,15 @@ fn drawing_replicate_copy_paste_replace_and_navigation() {
     assert_eq!(p["pasted"]["views"].as_array().unwrap().len(), 1, "{p}");
     assert!(!p["pasted"]["annotations"].as_array().unwrap().is_empty(), "{p}");
     assert!(last(&mut ctx).ends_with(":: Paste views"));
+    // Views copied in another document or workspace are refused (live V53).
+    let mut other: Value = serde_json::from_str(c["clipboard"].as_str().unwrap()).unwrap();
+    let origin = other["origin"].clone();
+    assert!(origin[0].as_str().unwrap().ends_with("drawing_more.noshape"), "{origin}");
+    for (o, m) in [(json!(["/elsewhere.noshape", origin[1]]), "Views could not be copied between documents."), (json!([origin[0], "another"]), "Views could not be copied between workspaces.")] {
+        other["origin"] = o;
+        let e = try_call(&mut ctx, "drawing_paste", json!({ "drawing": tab, "position": [100, 70], "clipboard": other.to_string() })).unwrap_err();
+        assert!(format!("{e:?}").contains(m), "{e:?}");
+    }
 
     // Paste as table, then Table properties… (fixed corner, kept in place).
     let pt = call(&mut ctx, "drawing_paste_table", json!({ "drawing": tab, "text": "Item\tQty\nBolt\t4", "position": [20, 280] }));

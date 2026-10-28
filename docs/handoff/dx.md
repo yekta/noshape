@@ -118,6 +118,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   live's layouts (from tests/perf's NIST x_t); older versions stay flat until live sends an assembly in each
   (REQUESTS dx 10-28). Then BALLOON-WRONG-ITEM, DRAWING-SHIFT-SLASH, the drawing.md rows in P2 order.
 
+## Late afternoon 10-28
+- D39 on every dimension kind: a typed value replaces the measured one after its symbol (`DimFormat.value`,
+  `overridden_text`; drawing_edit_dimension `value`), landed 2e44d382.
+- V53: views copied in another document / workspace are refused with live's bubble (stays until ×); EX11's start
+  banner closes after 2.5 s; the bell for the finish notification is asked of the lead.
+- Next, in order: S6 (Sheets panel reference / view menus, Change configuration panel on the reference row, every
+  view of that reference changes); S8 sheet row drag; A35; TABLE-SHIFT-TAB-BLANK; V59 / V26; ⏳ rows on green.
+
 ## Afternoon 10-28 (landed through 3476703d)
 - Parasolid: 30.1–31.1 ASSEMBLY layouts from live's samples (all 13 versions read); exports carry part names / colours
   and the assembly's name as Onshape's TYSA_NAME / TYSA_COLOUR_2 attributes in every version (5bb31dca).
@@ -203,6 +211,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
+- **Notifications bell (drawing.md EX11, P3)**: live reports a finished export only in the Notifications bell
+  (bold "Export completed"; expanded "Part 1 Drawing (3).pdf was exported successfully."; no toast; behaviours EX11).
+  The app has no bell or notification list. It belongs to the window chrome (crates/app), so yours: a bell with a list
+  that editors push to (title, body, time). dx then pushes export results from the drawing editor.
 - **Version in non-release builds (qa VERSION-FOOTER-STALE, P3)**: crates/app/build.rs shows CARGO_PKG_VERSION
   (0.4.6) + the commit, so green / CI builds read three releases old. Bump the workspace version with each release
   tag, or let build.rs take the last tag (`git describe --tags --abbrev=0`) when it is newer. Release process, so yours.

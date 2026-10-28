@@ -393,7 +393,8 @@ impl DrawingEditor {
             return;
         }
         match self.drawing.copy_views(self.sheet, &ids, Some(&self.sources)) {
-            Ok(c) => {
+            Ok(mut c) => {
+                c.origin = Some(noshape_ops::drawing::clip_origin(&self.doc.read(cx).session));
                 let n = c.sheet.views.len();
                 cx.write_to_clipboard(ClipboardItem::new_string(c.to_json()));
                 self.status = Some(if n == 1 { "Copied 1 view".into() } else { format!("Copied {n} views").into() });
@@ -416,6 +417,11 @@ impl DrawingEditor {
     /// Paste (view menu, Ctrl+V): copied views centered on the cursor.
     pub fn paste_views(&mut self, cx: &mut Context<Self>) {
         let Some(clip) = view_clipboard(cx) else { return };
+        let (document, workspace) = noshape_ops::drawing::clip_origin(&self.doc.read(cx).session);
+        if let Some(m) = clip.refusal(&document, &workspace) {
+            self.show_message(m, crate::os_ui::BubbleKind::Info, None, cx);
+            return;
+        }
         let at = self.cursor;
         let mut ids = Vec::new();
         let first = self.current_sheet().next_annotation_id();

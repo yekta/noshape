@@ -4840,7 +4840,7 @@ Examples:
 
 Paste copied views, annotations and tables centered at a point (edits the document (one undoable history entry)).
 
-Paste (Ctrl+V, the drawing menus): what drawing_copy copied (or `clipboard` text), centered on `position` (sheet mm), one edit "Paste views". Returns the new view ids and annotation ids.
+Paste (Ctrl+V, the drawing menus): what drawing_copy copied (or `clipboard` text), centered on `position` (sheet mm), one edit "Paste views". Returns the new view ids and annotation ids. Views paste only between drawings of one workspace, as in Onshape: views copied in another document or workspace are refused ("Views could not be copied between documents." / "… between workspaces.").
 
 Examples:
 

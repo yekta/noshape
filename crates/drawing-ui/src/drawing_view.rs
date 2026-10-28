@@ -412,26 +412,28 @@ impl DrawingEditor {
     /// A green success bubble at the top centre of the sheet (live: "✓
     /// Successfully replicated 7/7 annotations ×"), gone after 5 s or on ×.
     pub fn show_toast(&mut self, text: impl Into<SharedString>, cx: &mut Context<Self>) {
-        self.show_toast_kind(text, crate::os_ui::BubbleKind::Success, cx);
+        self.show_message(text, crate::os_ui::BubbleKind::Success, Some(std::time::Duration::from_secs(5)), cx);
     }
 
-    /// [`Self::show_toast`] as a blue (Info) banner, e.g. live's "… is being
-    /// prepared for export" (EX11).
-    pub fn show_toast_kind(&mut self, text: impl Into<SharedString>, kind: crate::os_ui::BubbleKind, cx: &mut Context<Self>) {
+    /// The bubble at the top centre of the sheet, closed after `close_after`
+    /// (None: only by ×).
+    pub fn show_message(&mut self, text: impl Into<SharedString>, kind: crate::os_ui::BubbleKind, close_after: Option<std::time::Duration>, cx: &mut Context<Self>) {
         self.toast_kind = kind;
         self.toast_gen += 1;
         let generation = self.toast_gen;
         self.toast = Some(text.into());
-        cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(std::time::Duration::from_secs(5)).await;
-            let _ = this.update(cx, |this, cx| {
-                if this.toast_gen == generation {
-                    this.toast = None;
-                    cx.notify();
-                }
-            });
-        })
-        .detach();
+        if let Some(after) = close_after {
+            cx.spawn(async move |this, cx| {
+                cx.background_executor().timer(after).await;
+                let _ = this.update(cx, |this, cx| {
+                    if this.toast_gen == generation {
+                        this.toast = None;
+                        cx.notify();
+                    }
+                });
+            })
+            .detach();
+        }
         cx.notify();
     }
 

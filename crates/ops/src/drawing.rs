@@ -59,6 +59,13 @@ pub struct SheetModel {
     pub out_of_date: bool,
 }
 
+/// Where copied views come from: (document, workspace), for
+/// [`noshape_model::drawing::clipboard::ViewClipboard::refusal`].
+pub fn clip_origin(session: &crate::session::Session) -> (String, String) {
+    let path = std::fs::canonicalize(&session.path).unwrap_or_else(|_| session.path.clone());
+    (path.display().to_string(), session.branch.to_string())
+}
+
 /// The document state the drawing's views were last made from, when a
 /// source changed since (the views keep their geometry until Update): that
 /// document and the changed sources. Pinned sources never go out of date.

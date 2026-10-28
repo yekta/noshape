@@ -67,7 +67,7 @@ impl DrawingEditor {
         sheet.views.clear();
         sheet.tables.clear();
         sheet.annotations = notes;
-        let clip = ViewClipboard { noshape_drawing_views: 1, sheet, anchor: Some([0.0, 0.0]) };
+        let clip = ViewClipboard { noshape_drawing_views: 1, sheet, anchor: Some([0.0, 0.0]), origin: None };
         cx.write_to_clipboard(ClipboardItem::new_string(clip.to_json()));
         true
     }

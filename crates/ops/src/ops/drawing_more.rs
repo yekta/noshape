@@ -80,7 +80,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "paste",
             summary: "Paste copied views, annotations and tables centered at a point",
-            description: "Paste (Ctrl+V, the drawing menus): what drawing_copy copied (or `clipboard` text), centered on `position` (sheet mm), one edit \"Paste views\". Returns the new view ids and annotation ids.",
+            description: "Paste (Ctrl+V, the drawing menus): what drawing_copy copied (or `clipboard` text), centered on `position` (sheet mm), one edit \"Paste views\". Returns the new view ids and annotation ids. Views paste only between drawings of one workspace, as in Onshape: views copied in another document or workspace are refused (\"Views could not be copied between documents.\" / \"… between workspaces.\").",
             fields: with(common(), vec![req("position", point(), "Where the copy's center goes (sheet mm)."), opt("clipboard", s(), "Clipboard text from drawing_copy (default: this session's copy).")]),
             mutates: true,
             destructive: false,
@@ -239,6 +239,7 @@ fn copy(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Err(OpError::invalid("nothing to copy: give `views`, or `annotations` / `tables`"));
     }
     let od = ctx.doc(a.opt_str("doc")?)?;
+    let origin = crate::drawing::clip_origin(&od.session);
     let t = target(od, a)?;
     let sheet = &t.d.sheets[t.sheet];
     for (i, v) in views.iter().enumerate() {
@@ -250,7 +251,10 @@ fn copy(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         t.d.copy_entities(t.sheet, &anns, &tables)
     } else {
         let ids: Vec<ViewId> = views.iter().map(|v| ViewId(*v)).collect();
-        t.d.copy_views(t.sheet, &ids, Some(&t.m.sources))
+        t.d.copy_views(t.sheet, &ids, Some(&t.m.sources)).map(|mut c| {
+            c.origin = Some(origin);
+            c
+        })
     }
     .map_err(OpError::invalid)?;
     let c = &clip.sheet;
@@ -273,6 +277,10 @@ fn paste(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let clip = ViewClipboard::from_json(&text).ok_or_else(|| OpError::param("clipboard", "not drawing content copied with drawing_copy"))?;
     let at = point_value(a.get("position").ok_or_else(|| OpError::param("position", "required"))?, "position")?;
     let od = ctx.doc(a.opt_str("doc")?)?;
+    let (document, workspace) = crate::drawing::clip_origin(&od.session);
+    if let Some(m) = clip.refusal(&document, &workspace) {
+        return Err(OpError::invalid(m));
+    }
     let mut t = target(od, a)?;
     let sheet = t.sheet;
     let first = t.d.sheets[sheet].next_annotation_id();
