@@ -15,13 +15,13 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1.1 | + › Import… → STEP | file prompt, then the Import dialog | path prompt (no-native-dialog mode), "Import to Onshape" dialog: Import to this document / Combine to a single Part Studio, ☑ Import appearances, ☐ Y axis up, ☐ composite, ☐ join surfaces | ✅ (see kern G38h for live's dialog) |  |
-| 1.2 | Import | Part Studio tab named after the file; the new tabs go right after the open tab (SPECS 10-27, behaviours Import "inserted right after the active tab") | tab "bracket" (Import 1 → Part 1) + folder tab "CAD Imports"; the new tab is placed after Part Studio 1, not at the end | ✅ (= live with Part Studio 1 open) |  |
+| 1.1 | + › Import… → STEP | file prompt, then the Import dialog | path prompt (no-native-dialog mode), "Import to Onshape" dialog: Import to this document / Combine to a single Part Studio, ☑ Import appearances, ☐ Y axis up, ☐ composite, ☐ join surfaces | ✅ (see kern G38h for live's dialog) | 6acf6b94 (qa 10:30, qa5's mkasm.py doc: + › Import… → path prompt → Import to Onshape dialog (this document / Combine, ☑ appearances, ☐ Y up, ☐ composite, ☐ join)) |
+| 1.2 | Import | Part Studio tab named after the file; the new tabs go right after the open tab (SPECS 10-27, behaviours Import "inserted right after the active tab") | tab "bracket" (Import 1 → Part 1) + folder tab "CAD Imports"; the new tab is placed after Part Studio 1, not at the end | ✅ (= live with Part Studio 1 open) | 6acf6b94 (qa 10:30, qa5's mkasm.py doc: bracket.step (g25-b) → tab "bracket" right after Part Studio 1 + CAD Imports folder) |
 | 1.3 | Assembly, i | "Insert parts and assemblies", Current document › Part Studios, filters, tree with thumbnails, "Inserted: 0", "Undo to remove instances" | same | ✅ | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) |
 | 1.4 | Click Part 1 (empty assembly) | instance at identity, **amber (selected)**, row selected, view zooms to fit it | at identity, but **not amber, row not selected**; the zoom-to-fit crops the plate at the right edge | ✅ (skasm 10-27: amber + row selected; fitted beside the Insert dialog, GUI :103); was ✗ A1 | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) (amber + row selected; zoom-to-fit still crops the plate's right end) |
 | 1.5 | Click Part 2, move to graphics, click | follows the cursor amber; drops at the click | same | ✅ | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) |
-| 1.6 | Bracket (Part 1 of "bracket") | "Part 1 <2>": live numbers by name across parts, lowest free number (behaviours "skasm (2026-10-27) instance numbering") | instance named "Part 1 <2>" (`next_instance_name`: by name, lowest free) | ✅ |  |
-| 1.7 | ✓, F | – | 5 instances | ✅ |  |
+| 1.6 | Bracket (Part 1 of "bracket") | "Part 1 <2>": live numbers by name across parts, lowest free number (behaviours "skasm (2026-10-27) instance numbering") | instance named "Part 1 <2>" (`next_instance_name`: by name, lowest free) | ✅ | 6acf6b94 (qa 10:30, qa5's mkasm.py doc: Insert › bracket › Part 1 → "Part 1 <2>") |
+| 1.7 | ✓, F | – | 5 instances | ✅ | 6acf6b94 (qa 10:30, qa5's mkasm.py doc: ✓, F → Instances (5), all in view) |
 | 1.8 | Part 1 <1> › right-click | menu (skb list) | same items (Add comment omitted, cloud) | ✅ | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) |
 | 1.9 | Fix | ground glyph on the row and on Assembly 1 | same | ✅ | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) |
 
@@ -131,7 +131,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 Pass 6 (17:11) had found A12 fixed (mate nests under "Replicate 1 ▸ Mate features (1)").
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| A1 first insert fit | as tight as live (ins-902: live's block also runs under the right strip) | ✅ fit |  |
+| A1 first insert fit | as tight as live (ins-902: live's block also runs under the right strip) | ✅ fit | 6acf6b94 (qa 10:30, qa5's mkasm.py doc: first Part 1 inserted at identity, fitted beside the Insert dialog, its right end under the right strip as in ins-902) |
 | A15 (new) pending first instance look | face (229,163,54) with **black edges** vs live (242,182,72) with amber edges (255,192,76); **a transform triad at the instance** (live none); root row "Assembly 5" highlighted with the instance row (live only the instance row) | ✗ **A15** (skb / ui2) |  |
 | A3 hidden mate rows | light grey | ✅ **fixed** | 77870dd4 10-28 |
 | A13 relations | four toolbar buttons; Gear → "Gear 1" dialog: type select, Mate(s), Relation ratio 1, ☐ Reverse direction | ✅ **fixed** | 77870dd4 10-28 |
@@ -166,7 +166,7 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 ## Re-run pass 21 (2026-10-23 ~17:30–18:30, app = /root/target-lead/debug/noshape 10-23 17:10 (main 88fbf8f), CLI = target-lead noshape-cli 10-23 13:45)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| A1 fit | F fits all three instances; the far block runs under the right strip as in live ins-902 | ✅ |  |
+| A1 fit | F fits all three instances; the far block runs under the right strip as in live ins-902 | ✅ | 6acf6b94 (qa 10:30, qa5's mkasm.py doc: F fits all five instances) |
 | A10 toolbar tooltip after click | gone once the dialog opens (b01) | ✅ **fixed** |  |
 | A11 BOM typing into a selected cell | "QA1" stored, Enter moves down (b05) | ✅ **fixed** |  |
 | A13 relations | tool search "relation": Gear relation, Screw relation, Linear relation, Rack and pinion relation (b10) | ✅ **fixed** | 77870dd4 10-28 |
