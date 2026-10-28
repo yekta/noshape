@@ -144,3 +144,30 @@ fn a_vertex_in_line_behind_a_boundary_segment_keeps_the_planar_triangulation() {
         assert_eq!(m.triangle_count(), pts.len() - 2);
     }
 }
+
+/// Meshing the biggest face of a part, `NOSHAPE_BENCH_N` times (perf; run
+/// with NOSHAPE_MESH_CACHE=0). NOSHAPE_BENCH_CASE=<dir>/<name> (a corpus case:
+/// its first object).
+#[test]
+#[ignore = "bench: NOSHAPE_BENCH_CASE=/root/core-scratch/bool-one/a2121c5b456e7188 NOSHAPE_MESH_CACHE=0"]
+fn mesh_big_face_bench() {
+    let Ok(case) = std::env::var("NOSHAPE_BENCH_CASE") else { return };
+    let path = std::path::Path::new(&case);
+    let c = noshape_kernel::bool_corpus::load(path.parent().unwrap(), path.file_name().unwrap().to_str().unwrap()).expect("the case");
+    let _ = set_working_scale(1000.0);
+    let face = c.objects[0].faces().into_iter().max_by_key(|f| f.count(ShapeType::Edge)).unwrap();
+    let n: usize = std::env::var("NOSHAPE_BENCH_N").ok().and_then(|v| v.parse().ok()).unwrap_or(20);
+    let diag = c.objects[0].bounding_box(false).unwrap().diagonal();
+    let mut ms = Vec::new();
+    let mut sum = 0u64;
+    for _ in 0..n {
+        let t = std::time::Instant::now();
+        let m = tessellate(&face, diag * 1e-3, 0.09, false).unwrap();
+        ms.push(t.elapsed().as_secs_f64() * 1e3);
+        assert_eq!(m.planar_fallbacks, 0);
+        // What came out, to compare builds.
+        sum = m.indices.iter().map(|&i| i as u64).chain(m.positions.iter().flatten().map(|p| p.to_bits() as u64)).fold(0xcbf2_9ce4_8422_2325, |h, x| (h ^ x).wrapping_mul(0x100_0000_01b3));
+    }
+    ms.sort_by(f64::total_cmp);
+    eprintln!("the {}-edge face: median {:.1} ms, best {:.1} ms, triangles' hash {sum:016x}", face.count(ShapeType::Edge), ms[ms.len() / 2], ms[0]);
+}

@@ -1,0 +1,80 @@
+--- a/src/ModelingAlgorithms/TKMesh/BRepMesh/BRepMesh_ShapeVisitor.cxx
++++ b/src/ModelingAlgorithms/TKMesh/BRepMesh/BRepMesh_ShapeVisitor.cxx
+@@ -27,6 +27,11 @@
+ #include <IMeshData_Status.hxx>
+ #include <IMeshTools_Context.hxx>
+ #include <BRepTools.hxx>
++#include <BRep_Tool.hxx>
++#include <Geom_Plane.hxx>
++#include <NCollection_Map.hxx>
++#include <TopTools_ShapeMapHasher.hxx>
++#include <TopoDS.hxx>
+ 
+ IMPLEMENT_STANDARD_RTTIEXT(BRepMesh_ShapeVisitor, IMeshTools_ShapeVisitor)
+ 
+@@ -97,21 +102,47 @@
+   }
+ 
+   occ::handle<ShapeExtend_WireData> aWireData = new ShapeExtend_WireData(theWire, true, false);
+-  ShapeAnalysis_Wire aWireTool(aWireData, theDFace->GetFace(), Precision::Confusion());
+ 
++  // noshape: a wire on a plane that is already a simple loop in order (each
++  // edge ends at the vertex the next one starts at, no vertex twice) keeps its
++  // order. ShapeAnalysis_WireOrder compares every edge's ends with every
++  // other's: 30 % of meshing a 1600-edge face (the 400-fin plate's front).
++  bool isOrderedLoop = false;
++  {
++    TopLoc_Location aLoc;
++    const int       aNb = aWireData->NbEdges();
++    if (aNb > 0 && !occ::down_cast<Geom_Plane>(BRep_Tool::Surface(theDFace->GetFace(), aLoc)).IsNull())
++    {
++      NCollection_Map<TopoDS_Shape, TopTools_ShapeMapHasher> aStarts;
++      isOrderedLoop = true;
++      for (int i = 1; i <= aNb && isOrderedLoop; ++i)
++      {
++        const TopoDS_Edge&  aEdge  = aWireData->Edge(i);
++        const TopoDS_Edge&  aNext  = aWireData->Edge(i == aNb ? 1 : i + 1);
++        const TopoDS_Vertex aFirst = TopExp::FirstVertex(aEdge, true);
++        isOrderedLoop = aEdge.Orientation() != TopAbs_EXTERNAL && aEdge.Orientation() != TopAbs_INTERNAL
++                        && !aFirst.IsNull() && aStarts.Add(aFirst)
++                        && TopExp::LastVertex(aEdge, true).IsSame(TopExp::FirstVertex(aNext, true));
++      }
++    }
++  }
+   ShapeAnalysis_WireOrder aOrderTool;
+-  aWireTool.CheckOrder(aOrderTool, true, false);
+-  if (aWireTool.LastCheckStatus(ShapeExtend_FAIL))
++  if (!isOrderedLoop)
+   {
+-    return false;
+-  }
++    ShapeAnalysis_Wire aWireTool(aWireData, theDFace->GetFace(), Precision::Confusion());
++    aWireTool.CheckOrder(aOrderTool, true, false);
++    if (aWireTool.LastCheckStatus(ShapeExtend_FAIL))
++    {
++      return false;
++    }
+ 
+-  if (aWireTool.LastCheckStatus(ShapeExtend_DONE3))
+-  {
+-    theDFace->SetStatus(IMeshData_UnorientedWire);
++    if (aWireTool.LastCheckStatus(ShapeExtend_DONE3))
++    {
++      theDFace->SetStatus(IMeshData_UnorientedWire);
++    }
+   }
+ 
+-  const int aEdgesNb = aOrderTool.NbEdges();
++  const int aEdgesNb = isOrderedLoop ? aWireData->NbEdges() : aOrderTool.NbEdges();
+   if (aEdgesNb != aWireData->NbEdges())
+   {
+     return false;
+@@ -120,7 +151,7 @@
+   const IMeshData::IWireHandle& aDWire = theDFace->AddWire(theWire, aEdgesNb);
+   for (int i = 1; i <= aEdgesNb; ++i)
+   {
+-    const int          aEdgeIndex = aOrderTool.Ordered(i);
++    const int          aEdgeIndex = isOrderedLoop ? i : aOrderTool.Ordered(i);
+     const TopoDS_Edge& aEdge      = aWireData->Edge(aEdgeIndex);
+     if (aEdge.Orientation() != TopAbs_EXTERNAL)
+     {

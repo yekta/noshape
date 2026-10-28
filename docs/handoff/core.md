@@ -93,6 +93,12 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   Extrema_ExtCS, TKShHealing ShapeUpgrade_UnifySameDomain). Local: patched sources in /root/core-scratch/occt-patch/b,
   built in /root/kern-scratch/occt-build (`cmake --build build --target <TK>`), the .a swapped into /root/occt/lib with
   cp + mv; backups of the replaced libs in /root/core-scratch/occt-lib-backup.
+- 0003 TKMesh BRepMesh_FaceChecker: wires whose boxes miss each other skip the tree walk. 0003b (10-28) TKMesh
+  BRepMesh_ShapeVisitor::addWire: a wire on a plane that is already a simple loop in order keeps its order
+  (ShapeAnalysis_WireOrder compares every edge's ends with every other's: 30 % of meshing the 400-fin plate's
+  1604-edge front face; best 67.7 → 51.9 ms, the same triangles: kernel `planar_mesh::mesh_big_face_bench` prints a
+  hash). 0003b sorts after 0003 in C order and before it in some locales: they touch different files. 0004 is kept
+  for phase 1 (the plan's name).
 - OCCT 8's gp_Dir / gp_Ax1 constructors are noexcept: a zero vector anywhere is std::terminate (caught by the guard as
   SIGABRT inside bridge calls). Never build a gp_Dir from a vector that can be zero in our C++.
 - Signal-handler state (crash guard, budget) needs `std::atomic_signal_fence` after it is set, or the compiler may drop
@@ -269,8 +275,26 @@ Phase 2 (local Booleans), first step landed:
   shown_topology (223 ms), and inside the local Boolean the general fuse of the two 800-edge front / back faces
   (the fins merge into them; ~220–350 ms). Next: unify only the region, no reload of classifiers, then the target.
 
+Phase 2 stopped here (user, 10-28 12:55: big gains, not the last milliseconds). Where it stands, fin under the
+400-fin plate (Extrude 3):
+- Full regeneration, the feature: 2.7 s (OCCT whole) → ~240 ms dev / 324 ms release under load (best of 3).
+  Kernel CPU ~200: the local Boolean ~45 (history 15, closed_and_oriented 10, general fuse 6), its make_result ~6;
+  op_unify ~70 (merge_planar's two 1604-edge front / back groups ~20, candidates_again ~10, make_result ~12);
+  the auto scope's first classify_point ~20 (the target's face boxes and rays; the dialog's `touched`); ancestor maps
+  ~15; bounding boxes ~15. Rust: naming 6 + 5, the split's edge / vertex names ~30.
+- Edit commit (depth 5 → 6, 7, 8 mm; dev, loaded): the feature ~217 ms, the display 586 → ~230-260 ms, the whole
+  edit 802 → ~450-480 ms. Display left: BRepMesh on the 7 new faces ~150 ms (the two 1604-edge faces' model build;
+  0003b took 30 % of it), mesh maps 31, clean 19, shown_topology 15.
+- Long tail left (each 5-20 ms): rebuilding the 800-edge groups in merge_planar, the history records of every kept
+  sub-shape (op_boolean and op_unify), naming every edge and vertex, the auto scope's first classification, the
+  BRepMesh model build of big faces. The bool agent's Rust Boolean (phase 3, NOSHAPE_BOOL_RUST, its hook early in
+  op_boolean) may replace the local Boolean for planar parts.
+
 ## Next, in order
-0. **P0 Boolean speed-up, docs/BOOLEAN-SPEEDUP.md (lead, 10-27 19:40; the user's plan, binding).** Phase 0 first
+0. **Now: phase 1 (knurl 210 s → < 90 s), EF result loop first (patch 0004); take the big structural win, stop
+   when returns flatten (user 10-28).** Phase 2 stopped (above). Phase 3 is the bool agent's (crates/brep, the
+   NOSHAPE_BOOL_RUST hook in op_boolean: keep it working when changing op_boolean). Earlier wording:
+   **P0 Boolean speed-up, docs/BOOLEAN-SPEEDUP.md (lead, 10-27 19:40; the user's plan, binding).** Phase 0 first
    (recorder, corpus, replay, the small-part flame graph and the knurl thread-scaling run): its small-part answer
    also decides how REGEN-SPEED's per-boolean ~15 ms gets cut, so item 1 continues through it. Then, one agent
    doing both: Phase 2 (local Booleans: Extrude 3 under the 400-fin plate 2.7 s → < 150 ms, the everyday case)
