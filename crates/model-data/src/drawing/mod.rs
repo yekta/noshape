@@ -1196,6 +1196,10 @@ pub struct DimFormat {
     /// The palette's dual row (live asbdd-9: "[ 0.39 ▾ (in) ▾ 👁 ]").
     #[serde(default, skip_serializing_if = "DualFormat::is_default")]
     pub dual_fmt: DualFormat,
+    /// A typed value overriding the measured one, for dimensions other than
+    /// linear (those keep `LinearDimension::override_text`; D39).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
     /// The Fit tolerance types' options.
     #[serde(default, skip_serializing_if = "FitOpts::is_default")]
     pub fit: FitOpts,

@@ -1267,12 +1267,7 @@ impl SheetGeometry {
                         // fields stay editable"): the typed value with the
                         // prefix, suffix, parentheses, text above / below and
                         // the inspection oval (D39).
-                        Some(o) => {
-                            let f = &a.format;
-                            let main = format!("{}{o}{}", env.expand(&f.prefix), env.expand(&f.suffix));
-                            let line = |s: &String| (!s.is_empty()).then(|| env.expand(s));
-                            DimText { main: if f.reference { format!("({main})") } else { main }, above: line(&f.above), below: line(&f.below), oval: f.inspection_frame, ..Default::default() }
-                        }
+                        Some(o) => super::format::overridden_text(&a.format, "", o, &|s| env.expand(s)),
                         None => env.text(a, model_len, false, ""),
                     };
                     let first = self.texts.len();
@@ -1982,6 +1977,13 @@ impl SheetGeometry {
                         }
                     }
                 }
+            }
+        }
+        // Other overridden dimensions' values are underlined too (D39).
+        for (k, &(a, t0, _, _)) in starts.iter().enumerate() {
+            let t1 = starts.get(k + 1).map(|s| s.1).unwrap_or(self.texts.len());
+            if a.kind.is_dimension() && a.format.value.is_some() && t0 < t1 && !self.overridden.contains(&t0) {
+                self.overridden.push(t0);
             }
         }
         self.in_dim = false;
@@ -2765,7 +2767,10 @@ impl AnnotationEnv for PlainEnv<'_> {
         0.0
     }
     fn text(&self, a: &Annotation, value: f64, angular: bool, symbol: &str) -> DimText {
-        super::format::dim_text(self.drawing, &a.format, value, angular, symbol)
+        match a.format.value.as_deref() {
+            Some(v) => super::format::overridden_text(&a.format, symbol, v, &super::format::text_codes),
+            None => super::format::dim_text(self.drawing, &a.format, value, angular, symbol),
+        }
     }
     fn expand(&self, s: &str) -> String {
         super::format::text_codes(s)

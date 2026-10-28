@@ -4056,7 +4056,7 @@ Examples:
 | `below` | string |  | Text below. |
 | `prefix` | string |  | Prefix. |
 | `suffix` | string |  | Suffix. |
-| `value` | string |  | Linear dimensions: the value text (an override; empty: the measured value). |
+| `value` | string |  | Dimensions: the value text (an override, drawn underlined; empty: the measured value). |
 | `precision` | integer or string |  | Decimals 0–8, or "drawing" (the drawing's). |
 | `units` | string |  | Millimeters, Centimeters, Meters, Inches, Inches fractional, Feet and inches, Feet, Yards, or "drawing". |
 | `tolerance` | string |  | None, Symmetrical, Deviation, Limits, Basic (not hole callouts), MIN, MAX, Fit, Fit with tolerance, Fit (Tolerance only). |

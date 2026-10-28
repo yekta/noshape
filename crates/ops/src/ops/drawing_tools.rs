@@ -429,7 +429,7 @@ pub fn ops() -> Vec<Op> {
                     opt("below", s(), "Text below."),
                     opt("prefix", s(), "Prefix."),
                     opt("suffix", s(), "Suffix."),
-                    opt("value", s(), "Linear dimensions: the value text (an override; empty: the measured value)."),
+                    opt("value", s(), "Dimensions: the value text (an override, drawn underlined; empty: the measured value)."),
                     opt("precision", json!({ "type": ["integer", "string"] }), "Decimals 0–8, or \"drawing\" (the drawing's)."),
                     opt("units", s(), "Millimeters, Centimeters, Meters, Inches, Inches fractional, Feet and inches, Feet, Yards, or \"drawing\"."),
                     opt("tolerance", s(), "None, Symmetrical, Deviation, Limits, Basic (not hole callouts), MIN, MAX, Fit, Fit with tolerance, Fit (Tolerance only)."),
@@ -2295,9 +2295,14 @@ fn edit_dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     } else if a.get("hole_class").is_some() || a.get("shaft_class").is_some() {
         return Err(OpError::param("hole_class", "fit classes need a Fit tolerance"));
     }
+    // A typed value overrides any dimension's (D39).
     if let Some(v) = a.opt_str("value")? {
-        let AnnotationKind::LinearDimension { override_text, .. } = &mut ann.kind else { return Err(OpError::param("value", "only linear dimensions take a typed value")) };
-        *override_text = Some(v.to_string()).filter(|s| !s.trim().is_empty());
+        let typed = Some(v.to_string()).filter(|s| !s.trim().is_empty());
+        match &mut ann.kind {
+            AnnotationKind::LinearDimension { override_text, .. } => *override_text = typed,
+            AnnotationKind::HoleCallout { .. } => return Err(OpError::param("value", "hole callouts show their hole feature (dimensions take a typed value)")),
+            _ => ann.format.value = typed,
+        }
     }
     if let Some(d) = a.get("diameter").and_then(Value::as_bool) {
         let AnnotationKind::RadialDimension { diameter, .. } = &mut ann.kind else { return Err(OpError::param("diameter", "only radial dimensions")) };

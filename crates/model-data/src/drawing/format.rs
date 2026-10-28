@@ -197,6 +197,16 @@ pub fn flatten_stacked(s: &str) -> String {
 
 /// Full text of a dimension measuring `value` (meters, or radians when
 /// `angular`); `symbol` precedes the value (e.g. "Ø", "R").
+/// An overridden dimension's text (help drawing_dimensions: typing a value
+/// overrides it, "its other fields stay editable"): the typed `value` after
+/// the prefix and `symbol`, then the suffix; parentheses, text above / below
+/// and the inspection oval kept (`expand` fills the fields; D39).
+pub fn overridden_text(f: &DimFormat, symbol: &str, value: &str, expand: &dyn Fn(&str) -> String) -> DimText {
+    let main = format!("{}{symbol}{value}{}", expand(&f.prefix), expand(&f.suffix));
+    let line = |s: &String| (!s.is_empty()).then(|| expand(s));
+    DimText { main: if f.reference { format!("({main})") } else { main }, above: line(&f.above), below: line(&f.below), oval: f.inspection_frame, ..Default::default() }
+}
+
 pub fn dim_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool, symbol: &str) -> DimText {
     let p = &drawing.props;
     let num_with = |v: f64, tol: bool| -> String {

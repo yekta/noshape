@@ -930,8 +930,11 @@ fn drawing_views_and_dimensions() {
     assert!(text.contains("REF") && !text.contains("±"), "{text}");
     // The override keeps its prefix (D39: the other fields stay).
     assert!(text.contains("2X REF"), "{text}");
-    let e = try_call(&mut ctx, "drawing_edit_dimension", json!({ "drawing": tab, "annotation": dia["annotation"], "value": "X" })).unwrap_err();
-    assert_eq!(e.param.as_deref(), Some("value"));
+    // Other dimensions take a typed value too, after their symbol (D39).
+    let ed = call(&mut ctx, "drawing_edit_dimension", json!({ "drawing": tab, "annotation": dia["annotation"], "value": "X" }));
+    let text = ed["annotations"].as_array().unwrap().iter().find(|x| x["id"] == dia["annotation"]).unwrap()["text"].as_str().unwrap().to_string();
+    assert!(text.contains("ØX"), "{text}");
+    call(&mut ctx, "drawing_edit_dimension", json!({ "drawing": tab, "annotation": dia["annotation"], "value": "" }));
     // A callout on the linear dimension's text (qa CALLOUT-ON-DIMENSION):
     // its leader ends on the dimension; deleting the dimension deletes it.
     let ann = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["annotations"].as_array().unwrap().clone();

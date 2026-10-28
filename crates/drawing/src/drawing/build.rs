@@ -1046,6 +1046,10 @@ impl AnnotationEnv for Env<'_> {
         Some(super::cad_objects::CadDual { factor: primary.meters() / du.meters(), precision: format::dual_precision(self.drawing, &a.format), post, below: p.dual.dim_location == super::DualLocation::Bottom })
     }
     fn text(&self, a: &Annotation, value: f64, angular: bool, symbol: &str) -> DimText {
+        // A typed value (D39).
+        if let Some(v) = a.format.value.as_deref() {
+            return format::overridden_text(&a.format, symbol, v, &|s| self.expand(s));
+        }
         let mut f = a.format.clone();
         f.prefix = self.expand(&f.prefix);
         f.suffix = self.expand(&f.suffix);

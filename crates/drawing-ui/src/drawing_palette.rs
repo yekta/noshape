@@ -63,8 +63,6 @@ pub struct PaletteDlg {
     pub target: u8,
     /// The tolerance list entry.
     pub tol: &'static str,
-    /// The value shown when the palette opened (unchanged: no override).
-    value_text: String,
     /// Where it opened (editor px); it stays there while the text changes.
     at: Option<[f32; 2]>,
     pub orig: Annotation,
@@ -95,9 +93,10 @@ impl DrawingEditor {
             _ => (String::new(), String::new()),
         };
         let rotation = a.kind.view().and_then(|v| self.placement(v)).map(|p| p.rotation).unwrap_or(0.0);
-        let value_text = match &a.kind {
-            AnnotationKind::LinearDimension { override_text: Some(t), .. } => t.clone(),
-            k => k.measured(rotation).map(|m| noshape_model::drawing::format::format_len(&self.drawing, &noshape_model::drawing::DimFormat { show_units: false, ..a.format.clone() }, m)).unwrap_or_default(),
+        let value_text = match (&a.kind, &a.format.value) {
+            (AnnotationKind::LinearDimension { override_text: Some(t), .. }, _) => t.clone(),
+            (_, Some(t)) => t.clone(),
+            (k, None) => k.measured(rotation).map(|m| noshape_model::drawing::format::format_len(&self.drawing, &noshape_model::drawing::DimFormat { show_units: false, ..a.format.clone() }, m)).unwrap_or_default(),
         };
         let above = self.input(&a.format.above, window, cx);
         let prefix = self.input(&a.format.prefix, window, cx);
@@ -127,7 +126,7 @@ impl DrawingEditor {
             }));
         }
         let tol = tol_name(&a);
-        self.palette = Some(PaletteDlg { id, hole, above, prefix, value, suffix, below, tol_a, tol_b, target: 1, tol, value_text, at: None, orig: a.clone(), cur: a, _subs: subs });
+        self.palette = Some(PaletteDlg { id, hole, above, prefix, value, suffix, below, tol_a, tol_b, target: 1, tol, at: None, orig: a.clone(), cur: a, _subs: subs });
         self.tool = Tool::Select;
         cx.notify();
     }
@@ -135,6 +134,12 @@ impl DrawingEditor {
     /// Read the text fields into the edited annotation and preview it.
     fn palette_from_inputs(&mut self, cx: &mut Context<Self>) {
         let u = self.palette.as_ref().map(|d| noshape_model::drawing::format::length_units(&self.drawing, &d.cur.format));
+        // The measured value: a typed one different from it overrides (an
+        // existing override stays while other fields change).
+        let measured = self.palette.as_ref().map(|d| {
+            let rotation = d.orig.kind.view().and_then(|v| self.placement(v)).map(|p| p.rotation).unwrap_or(0.0);
+            d.orig.kind.measured(rotation).map(|m| noshape_model::drawing::format::format_len(&self.drawing, &noshape_model::drawing::DimFormat { show_units: false, value: None, ..d.orig.format.clone() }, m)).unwrap_or_default()
+        });
         let Some(d) = &mut self.palette else { return };
         let Some(u) = u else { return };
         let val = |st: &Entity<InputState>| st.read(cx).value().to_string();
@@ -145,10 +150,13 @@ impl DrawingEditor {
         f.prefix = val(&d.prefix);
         f.suffix = val(&d.suffix);
         noshape_ops::drawing::set_tolerance(f, d.tol, m(&d.tol_a).unwrap_or(0.0), m(&d.tol_b).unwrap_or(0.0));
-        // A typed value overrides a linear dimension's text.
+        // A typed value overrides the dimension's text (D39).
         let typed = val(&d.value);
-        if let AnnotationKind::LinearDimension { override_text, .. } = &mut d.cur.kind {
-            *override_text = (typed.trim() != d.value_text.trim() && !typed.trim().is_empty()).then(|| typed.clone());
+        let over = (typed.trim() != measured.unwrap_or_default().trim() && !typed.trim().is_empty()).then(|| typed.clone());
+        match &mut d.cur.kind {
+            AnnotationKind::LinearDimension { override_text, .. } => *override_text = over,
+            AnnotationKind::HoleCallout { .. } => {}
+            _ => d.cur.format.value = over,
         }
         if d.cur.hole.as_deref().is_some_and(|o| *o == Default::default()) {
             d.cur.hole = None;
