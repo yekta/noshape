@@ -9,6 +9,16 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
+- **15:07 update (greens f8014efa → 5f6a908b → 8627322e):** verified **P1 SKETCH-MODEL-EDGE-SELECT** (line + model
+  edge both select, B → Parallel), CURVE-ROW-NO-HIGHLIGHT, PREFS-WHEEL-DOUBLE-SCROLL, 21eec57b (parts list properties
+  saved with the studio, not undoable; folder menu state 4), drawing D39 (linear and diameter overrides), A44 (surface
+  finish keeps placing until OK). New: P2 ROW-TOOLTIP-WIDE-PANEL (no feature-row tooltips once the list is widened, since
+  v0.4.12), P3 AGENT-ELLIPSE-DIM-VALUE (agent API reads an ellipse axis dim at 2×), P3 TOAST-AUTOHIDE (held: live asked).
+  Parity: part-studio 6.16 / 7.7 / 10.1, sketch 8.7a / 11.12a / 14.3 / 14.4 / 14.36, advanced 4.1 / ADV12 / SK1 / hole
+  defaults, assembly R12 / D13, assembly-sweep 8 / 23, derived 9, surfaces 17 / 19, feature-sweep L45, sketch-tools SK5.
+  Fuzz 72 (f801), 73 (5f6a) alive; 74 (8627) running. Live asked: offset toast lifetime, Show all scope.
+  Note for GUI tests: HOME=/tmp/qa-home has the left panel at 710 px (row tooltips hidden there); use /tmp/qa-home2
+  (default width) for tooltip checks.
 - **13:35 update (green f8014efa, copied 13:27):** **SKETCH-START-INFERENCE verified** (GUI, qa-scratch/inf.noshape:
   arc end → Tangent stored, slanted line end → Perpendicular stored, its start → Parallel, H / V still win). **REGEN-SPEED
   re-timed with the mesh cache: no clear gain** (edits 725 / 691 / 606 ms at load 35, 426 / 165 / 198 at load 30, 3rd undo
