@@ -1418,18 +1418,6 @@ impl DrawingEditor {
         let mut out = Vec::new();
         let sheet = &self.drawing.sheets[self.sheet];
         let Some(v) = sheet.view(id).cloned() else { return out };
-        let deg = std::f64::consts::PI / 180.0;
-        let rot = v.rotation;
-        let mut rotate = vec![
-            MenuEntry::item("Rotate 90° counter-clockwise", move |t, _, cx| t.edit_view("Rotate view", id, cx, |v| v.rotation += 90.0 * deg)),
-            MenuEntry::item("Rotate 90° clockwise", move |t, _, cx| t.edit_view("Rotate view", id, cx, |v| v.rotation -= 90.0 * deg)),
-            MenuEntry::item("Rotate 180°", move |t, _, cx| t.edit_view("Rotate view", id, cx, |v| v.rotation += 180.0 * deg)),
-            MenuEntry::item("Custom angle...", move |t, w, cx| t.open_rotation_panel(id, w, cx)),
-        ];
-        if rot != 0.0 {
-            rotate.push(MenuEntry::item("Reset rotation", move |t, _, cx| t.edit_view("Rotate view", id, cx, |v| v.rotation = 0.0)));
-        }
-        out.push(MenuEntry::Submenu("Rotate".into(), rotate));
         let mut crop = vec![
             MenuEntry::item("Rectangle", move |t, _, cx| t.set_tool(Tool::Crop { parent: Some(id), first: None, circle: false }, cx)),
             MenuEntry::item("Circle", move |t, _, cx| t.set_tool(Tool::Crop { parent: Some(id), first: None, circle: true }, cx)),
