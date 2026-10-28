@@ -78,7 +78,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 1.4 | Insert picker | filter icons Part Studios / Parts / Sketches / Flat patterns + thumbnails | ✅ D2 fixed |  |
 | 1.6 | Place a view, Ctrl+Z | view removed, no "Out of date" notice ✅; **title-block SCALE changes from "1:1" (before the view) to "----" after the undo** | ✅ D3 fixed / ✗ **D14** (minor) | c38eb9cf (qa 10:52, wf-block Part 1 › Create Drawing, No views: place a Front view (SCALE 1:1), Ctrl+Z → view gone, SCALE "----", no Out of date notice; Ctrl+Y brings it back at 1:1) |
 | 1.7 | DWG NO. of an assembly drawing | "----" (both drawings) | ✅ D4 fixed | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) ("----") |
-| 2.6 | GTol: type right after opening | "0.1" lands in Tolerance, ✓ enabled | ✅ D7 fixed |  |
+| 2.6 | GTol: type right after opening | "0.1" lands in Tolerance, ✓ enabled | ✅ D7 fixed | c38eb9cf (qa 10:54: GTol tool, type 0.1 at once → "0.1" in Tolerance, ✓ green) |
 | 3.2 | Callout balloons in the existing drawing | still "----" with a BOM table present | ✗ D8 |  |
 | 4.1 | Export dialog | "View export rules" link present | ✅ D9 fixed | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) |
 | 4.3 | DXF options | Release 14 + "Model space only", Sheets ▾ "All sheets" ✅; **Units "Drawing units"** (live "Use drawing units"), **☐ Set z-height to zero…** (live ☑ by default, behaviours.md D12 answer) | ✅ D11 fixed / ✗ **D15** | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) (Release 14, Model space only, All sheets, Use drawing units) |
