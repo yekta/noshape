@@ -43,7 +43,7 @@ selection and hover per step, rows in brackets).
 | 2.3 | Assembly: plain clicks add across instances; a plain click on a selected face toggles it off (not on the triad's centre); empty click clears | L4599–4644; live "nav2 selection" 7 | 🔧 (assembly_view.rs `click_select` toggles, as live) |  |
 | 2.4 | Assembly box (only with nothing selected) selects **whole part occurrences**: a crossing box those it touches, a window only those wholly inside it | live "nav2 selection" 7, ui (10-26) ui-asmbox/03–05 (supersedes L4599–4644's faces-in-window) | ✅ in the app 10-26: crossing over part of <2> → the whole occurrence; window over part of <2> → nothing, around all of <2> → <2> only (assembly_view.rs BoxSelect: every mesh point of the occurrence inside the box) | 0.4.10+ / f16b31c6 10-27 |
 | 2.5 | Assembly: with something selected, a left drag from empty space **moves the selected instance(s)** with the pointer (no box) | live "nav2 selection" 7 | ✅ in the app 10-26 (<2> selected, a drag from empty space moved it and it stayed; assembly_view.rs `start_selection_drag`: the selection's movable instances follow the pointer in the view plane through their bounds' centre, solved as drags; a click there still clears) | 0.4.10+ / f16b31c6 10-27 |
-| 2.6 | Assembly drag starting on a part moves the instance | L4599–4644 | 🔧 (P) |  |
+| 2.6 | Assembly drag starting on a part moves the instance | L4599–4644 | ✅ (P) | 989f756b 10-28 (qa GUI: free Part 1 <2> dragged by its top face follows the pointer in the view plane; Undo enabled) |
 
 ## 3. Hover pre-highlight
 
