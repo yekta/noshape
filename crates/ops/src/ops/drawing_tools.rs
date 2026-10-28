@@ -543,7 +543,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "callout",
             summary: "Callout (balloon) with or without a leader",
-            description: "The Callout tool and its dialog: with `anchor` (a click on an edge or point, sheet mm) the leader starts there (in an assembly view an empty `text` shows the part's BOM item number); without it the callout sits alone at `position`. One edit (\"Callout\").",
+            description: "The Callout tool and its dialog: with `anchor` (a click on an edge or point, or on a dimension's lines or text: the callout is attached to it, follows it and goes when it is deleted; sheet mm) the leader starts there (in an assembly view an empty `text` shows the part's BOM item number); without it the callout sits alone at `position`. One edit (\"Callout\").",
             fields: with(
                 common(),
                 vec![
@@ -1232,10 +1232,16 @@ fn callout(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => dt::free_callout(t.d.sheets[t.sheet].next_annotation_id(), position, centre, style),
         Some(p) => {
             let c = point_value(p, "anchor")?;
-            let anchor = t.m.pick(&Tool::Balloon { anchor: None }, &[], c).any_point(c).ok_or_else(|| OpError::param("anchor", "not on a view's geometry"))?;
+            // On a dimension's lines or text, else on a view's geometry.
+            let first = t.m.pick(&Tool::Balloon { anchor: None }, &[], c);
+            let on = first.dimension_anchor(c);
+            let anchor = match &on {
+                Some(o) => o.0.clone(),
+                None => first.any_point(c).ok_or_else(|| OpError::param("anchor", "not on a view's geometry or a dimension"))?,
+            };
             let tool = Tool::Balloon { anchor: Some(anchor.clone()) };
             let pk = t.m.pick(&tool, &[], position);
-            let mut ann = pk.pending_annotation(&ToolValues { callout: Some((centre, style)), ..Default::default() }).ok_or_else(|| OpError::param("position", "the callout can't be placed there"))?;
+            let mut ann = pk.pending_annotation(&ToolValues { callout: Some((centre, style)), datum_on: on.map(|o| o.1), ..Default::default() }).ok_or_else(|| OpError::param("position", "the callout can't be placed there"))?;
             pk.finish_callout(&mut ann, &anchor);
             ann
         }

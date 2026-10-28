@@ -614,9 +614,10 @@ impl DrawingEditor {
                         cx.stop_propagation();
                     }
                 }))
-                // Opened from the launcher: leaving it closes it (live).
+                // Opened from the launcher: leaving it closes it (live), but
+                // not into its own open list (qa DIM-PALETTE-DROPDOWN-COLLAPSE).
                 .on_hover(cx.listener(|this, hovered: &bool, _, cx| {
-                    if !*hovered {
+                    if !*hovered && !crate::os_menu::is_open(cx) {
                         this.launcher_palette_left(cx);
                     }
                 }))

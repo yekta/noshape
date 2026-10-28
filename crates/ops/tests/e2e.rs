@@ -930,6 +930,19 @@ fn drawing_views_and_dimensions() {
     assert!(text.contains("REF") && !text.contains("±"), "{text}");
     let e = try_call(&mut ctx, "drawing_edit_dimension", json!({ "drawing": tab, "annotation": dia["annotation"], "value": "X" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("value"));
+    // A callout on the linear dimension's text (qa CALLOUT-ON-DIMENSION):
+    // its leader ends on the dimension; deleting the dimension deletes it.
+    let ann = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["annotations"].as_array().unwrap().clone();
+    // 10 mm along its dimension line from its text (the 40 mm dimension's
+    // extension line runs through the text's x).
+    let pos = ann(&mut ctx).iter().find(|a| a["id"] == lin_id).unwrap()["position"].clone();
+    let at = json!([num(&pos[0]) + 10.0, num(&pos[1])]);
+    let co = call(&mut ctx, "drawing_callout", json!({ "drawing": tab, "anchor": at, "position": [num(&at[0]) + 25.0, num(&at[1]) + 25.0], "text": "7" }));
+    let cid = co["annotation"].as_u64().unwrap();
+    let leader_end = ann(&mut ctx).iter().find(|a| a["id"] == cid).unwrap()["leaders"][0]["path"].as_array().unwrap().last().unwrap().clone();
+    assert!((num(&leader_end[1]) - num(&at[1])).abs() < 5.0, "the leader ends on the dimension near its text: {leader_end} vs {at}");
+    call(&mut ctx, "drawing_delete", json!({ "drawing": tab, "annotations": [lin_id] }));
+    assert!(!ann(&mut ctx).iter().any(|a| a["id"] == cid), "the callout went with its dimension");
     // The dual row: this dimension's dual precision, units and Show/hide
     // units (live asbdd-9: Ø10 "[0.39 in]").
     let dia_id = dia["annotation"].as_u64().unwrap();

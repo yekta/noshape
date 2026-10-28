@@ -3447,6 +3447,11 @@ pub struct CalloutStyle {
     /// away from its snap points): its BOM item and properties (qa5 D8).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub part: Option<BodyId>,
+    /// On a dimension (the Callout tool clicked on its lines or text; help
+    /// callout_balloon): the leader ends there and follows it, and deleting
+    /// the dimension deletes the callout.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on: Option<DatumOn>,
 }
 
 /// One stacked callout: its instance (part) and text (empty = that part's
@@ -3461,7 +3466,7 @@ pub struct StackedCallout {
 
 impl Default for CalloutStyle {
     fn default() -> Self {
-        Self { above: String::new(), below: String::new(), left: String::new(), right: String::new(), border: CalloutBorder::Circle, chars: 2, on_face: false, free: false, height: None, stacked: Vec::new(), nodes: Vec::new(), leaders: Vec::new(), part: None }
+        Self { above: String::new(), below: String::new(), left: String::new(), right: String::new(), border: CalloutBorder::Circle, chars: 2, on_face: false, free: false, height: None, stacked: Vec::new(), nodes: Vec::new(), leaders: Vec::new(), part: None, on: None }
     }
 }
 

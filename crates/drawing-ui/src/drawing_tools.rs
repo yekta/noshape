@@ -846,7 +846,11 @@ impl DrawingEditor {
                 }
             }
             Tool::Balloon { anchor: None } => {
-                if let Some(p) = self.any_point(c) {
+                // On a dimension (help callout_balloon; qa
+                // CALLOUT-ON-DIMENSION), else on the geometry.
+                let on = self.pk().dimension_anchor(c);
+                self.datum_on = on.as_ref().map(|o| o.1);
+                if let Some(p) = on.map(|o| o.0).or_else(|| self.any_point(c)) {
                     self.tool = Tool::Balloon { anchor: Some(p) };
                 } else {
                     // Empty space: a callout without a leader, right there.
@@ -863,6 +867,7 @@ impl DrawingEditor {
                     self.pk().finish_callout(&mut a, &anchor);
                     self.edit_sheet("Callout", cx, |s| s.annotations.push(a));
                     self.tool = Tool::Balloon { anchor: None };
+                    self.datum_on = None;
                 }
             }
             _ => {}
@@ -1631,7 +1636,15 @@ impl DrawingEditor {
         let mut out = Vec::new();
         // Several entities selected (live drawing/291).
         if self.selection.len() > 1 && sel.is_some_and(|s| self.selection.contains(&s)) {
-            return self.multi_selection_entries(cx);
+            // Several callouts: Align horizontally / vertically first (qa
+            // CALLOUT-ALIGN-MISSING).
+            let clicked = match sel {
+                Some(Sel::Annotation(id)) => self.current_sheet().annotations.iter().find(|a| a.id == id).cloned(),
+                _ => None,
+            };
+            let mut out = clicked.map(|a| self.callout_align_entries(&a)).unwrap_or_default();
+            out.extend(self.multi_selection_entries(cx));
+            return out;
         }
         match sel {
             Some(Sel::View(id)) => out = self.onshape_view_entries(id, cx),

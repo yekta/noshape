@@ -4206,7 +4206,7 @@ Examples:
 
 Callout (balloon) with or without a leader (edits the document (one undoable history entry)).
 
-The Callout tool and its dialog: with `anchor` (a click on an edge or point, sheet mm) the leader starts there (in an assembly view an empty `text` shows the part's BOM item number); without it the callout sits alone at `position`. One edit ("Callout").
+The Callout tool and its dialog: with `anchor` (a click on an edge or point, or on a dimension's lines or text: the callout is attached to it, follows it and goes when it is deleted; sheet mm) the leader starts there (in an assembly view an empty `text` shows the part's BOM item number); without it the callout sits alone at `position`. One edit ("Callout").
 
 Examples:
 

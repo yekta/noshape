@@ -1558,8 +1558,25 @@ impl DrawingEditor {
     }
 
     pub fn annotation_extra_entries(&self, a: &Annotation) -> Vec<MenuEntry> {
+        let mut out = self.callout_align_entries(a);
+        let a2 = a.clone();
+        if a.kind.is_dimension() {
+            out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
+        } else if matches!(a.kind, AnnotationKind::Gdt { .. } | AnnotationKind::Datum { .. } | AnnotationKind::SurfaceFinish { .. } | AnnotationKind::Balloon { .. }) {
+            out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
+        }
+        // With a BOM table in the drawing: Add stacked callouts….
+        if matches!(a.kind, AnnotationKind::Balloon { .. }) && self.drawing.sheets.iter().flat_map(|s| &s.tables).any(|t| matches!(t.kind, TableKind::Bom { .. })) {
+            let id = a.id;
+            out.push(MenuEntry::item("Add stacked callouts...", move |t, _, cx| t.open_stack_dlg(id, cx)));
+        }
+        out
+    }
+
+    /// Several callouts selected (help callout_balloon): Align horizontally /
+    /// Align vertically to the clicked one `a`, then a separator.
+    pub fn callout_align_entries(&self, a: &Annotation) -> Vec<MenuEntry> {
         let mut out = Vec::new();
-        // Several callouts selected: align them to the clicked one.
         let sheet = &self.drawing.sheets[self.sheet];
         let callouts: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(id) = s { Some(*id) } else { None }).filter(|id| sheet.annotations.iter().any(|x| x.id == *id && matches!(x.kind, AnnotationKind::Balloon { .. }))).collect();
         if callouts.len() >= 2 && matches!(a.kind, AnnotationKind::Balloon { .. }) {
@@ -1575,17 +1592,6 @@ impl DrawingEditor {
                 }));
             }
             out.push(MenuEntry::Separator);
-        }
-        let a2 = a.clone();
-        if a.kind.is_dimension() {
-            out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
-        } else if matches!(a.kind, AnnotationKind::Gdt { .. } | AnnotationKind::Datum { .. } | AnnotationKind::SurfaceFinish { .. } | AnnotationKind::Balloon { .. }) {
-            out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
-        }
-        // With a BOM table in the drawing: Add stacked callouts….
-        if matches!(a.kind, AnnotationKind::Balloon { .. }) && self.drawing.sheets.iter().flat_map(|s| &s.tables).any(|t| matches!(t.kind, TableKind::Bom { .. })) {
-            let id = a.id;
-            out.push(MenuEntry::item("Add stacked callouts...", move |t, _, cx| t.open_stack_dlg(id, cx)));
         }
         out
     }

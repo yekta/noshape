@@ -1461,7 +1461,10 @@ impl SheetGeometry {
                 }
                 // Grouped callouts are drawn after the loop, at their dimension.
                 AnnotationKind::Balloon { .. } if a.group.is_some() => {}
-                AnnotationKind::Balloon { .. } => self.balloon(a, a.position, env, ah, pick),
+                AnnotationKind::Balloon { callout, .. } => {
+                    let on = callout.on.as_ref().and_then(|o| self.attached_point(&starts, o)).map(|x| x.0);
+                    self.balloon(a, a.position, env, ah, pick, on)
+                }
                 AnnotationKind::RevisionCallout { anchor, revision, group: None } => {
                     if let Some(label) = env.revision_label(revision) {
                         self.revision_callout(*anchor, label, ah, pick);
@@ -2015,7 +2018,7 @@ impl SheetGeometry {
         let revisions_end = self.mark();
         for (a, c) in grouped_balloons {
             let ah = self.style.type_style(&a.kind).height.unwrap_or(ah0);
-            self.balloon(a, c, env, ah, (a.id & 0xFFFF_FFFF) as u32);
+            self.balloon(a, c, env, ah, (a.id & 0xFFFF_FFFF) as u32, None);
         }
         if let Some(c) = self.style.ann_color {
             self.color_since(m, c);
@@ -2098,12 +2101,13 @@ impl SheetGeometry {
     }
 
     /// A callout (balloon) centered at `c`: the circle, its leader to the
-    /// anchor with a dot on the part, and its text.
-    fn balloon(&mut self, a: &Annotation, c: [f64; 2], env: &dyn AnnotationEnv, ah: f64, pick: u32) {
+    /// anchor (`on`: the point on the dimension it is attached to) with a
+    /// dot on the part, and its text.
+    fn balloon(&mut self, a: &Annotation, c: [f64; 2], env: &dyn AnnotationEnv, ah: f64, pick: u32, on: Option<[f64; 2]>) {
         use super::CalloutBorder as B;
         let AnnotationKind::Balloon { view, anchor, text, callout: cs } = &a.kind else { return };
         let h = cs.height.unwrap_or(ah);
-        let p = env.to_sheet(*view, *anchor);
+        let p = on.unwrap_or_else(|| env.to_sheet(*view, *anchor));
         // The callout and its stacked callouts: the same size, one gap apart.
         let mut items = vec![env.balloon_text(a, text)];
         items.extend(cs.stacked.iter().map(|st| env.stacked_text(a, st)));

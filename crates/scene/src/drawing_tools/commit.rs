@@ -175,6 +175,7 @@ impl SheetPick<'_> {
     pub fn finish_callout(&self, a: &mut Annotation, anchor: &PickedPoint) {
         if let AnnotationKind::Balloon { callout, .. } = &mut a.kind
             && callout.part.is_none()
+            && callout.on.is_none()
             && anchor.r.is_none()
         {
             callout.part = self.part_under(anchor.view, anchor.p);
@@ -987,16 +988,44 @@ impl SheetPick<'_> {
     /// Datum tool's first click on a GD&T frame edge or a dimension's lines
     /// (the red crosshair): the point on the line and where it is.
     pub fn datum_attach_at(&self, c: [f64; 2]) -> Option<([f64; 2], DatumOn)> {
+        self.attach_at(c, self.tol_mm(5.0), &|a: &Annotation| matches!(a.kind, AnnotationKind::Gdt { .. }) || a.kind.is_dimension())
+    }
+
+    /// The Callout tool's first click on a dimension (help callout_balloon:
+    /// linear and angular dimensions): the dimension under the pointer (its
+    /// lines or text; the nearest point of its lines), else the nearest
+    /// dimension line.
+    pub fn dimension_attach_at(&self, c: [f64; 2]) -> Option<([f64; 2], DatumOn)> {
+        let tol = self.tol_mm(5.0);
+        let b = self.built?;
+        if let Some(noshape_model::drawing::build::PickTarget::Annotation(id)) = b.hit(c, tol).and_then(|h| b.picks.get(h as usize)) {
+            let id = *id;
+            if let Some(x) = self.attach_at(c, f64::INFINITY, &|a: &Annotation| a.id == id && a.kind.is_dimension()) {
+                return Some(x);
+            }
+        }
+        self.attach_at(c, tol, &|a: &Annotation| a.kind.is_dimension())
+    }
+
+    /// [`Self::dimension_attach_at`] as the callout's anchor (in the
+    /// dimension's view) and where it sits.
+    pub fn dimension_anchor(&self, c: [f64; 2]) -> Option<(PickedPoint, DatumOn)> {
+        let (q, on) = self.dimension_attach_at(c)?;
+        let view = self.drawing.sheets.get(self.sheet)?.annotations.iter().find(|a| a.id == on.ann)?.kind.view()?;
+        Some((PickedPoint { view, p: self.placement(view)?.to_view(q), r: None }, on))
+    }
+
+    /// The point of an annotation's drawn lines nearest `c` (within `tol`),
+    /// on annotations `ok` accepts.
+    fn attach_at(&self, c: [f64; 2], tol: f64, ok: &dyn Fn(&Annotation) -> bool) -> Option<([f64; 2], DatumOn)> {
         let b = self.built?;
         let sheet = self.drawing.sheets.get(self.sheet)?;
-        let tol = self.tol_mm(5.0);
         let mut best: Option<(f64, [f64; 2], DatumOn)> = None;
         let mut count: std::collections::HashMap<u64, u32> = Default::default();
         for l in &b.geometry.lines {
             let Some(noshape_model::drawing::build::PickTarget::Annotation(id)) = b.picks.get(l.pick as usize) else { continue };
             let line = *count.entry(*id).and_modify(|n| *n += 1).or_insert(0);
-            let ok = sheet.annotations.iter().find(|a| a.id == *id).is_some_and(|a| matches!(a.kind, AnnotationKind::Gdt { .. }) || a.kind.is_dimension());
-            if !ok {
+            if !sheet.annotations.iter().find(|a| a.id == *id).is_some_and(ok) {
                 continue;
             }
             let n = l.points.len();
@@ -1043,7 +1072,10 @@ pub fn delete_selection(s: &mut Sheet, sel: &[super::Sel]) {
                     m.hidden = true;
                 }
             }
-            Sel::Annotation(a) => s.annotations.retain(|n| n.id != *a && n.group != Some(*a) && !matches!(n.kind, AnnotationKind::RevisionCallout { group: Some(g), .. } if g == *a)),
+            // So do callouts on it (help callout_balloon).
+            Sel::Annotation(a) => s.annotations.retain(|n| {
+                n.id != *a && n.group != Some(*a) && !matches!(n.kind, AnnotationKind::RevisionCallout { group: Some(g), .. } if g == *a) && !matches!(&n.kind, AnnotationKind::Balloon { callout, .. } if callout.on.is_some_and(|o| o.ann == *a))
+            }),
             Sel::Table(t) => s.tables.retain(|n| n.id != *t),
             // A hole table's tag axis isn't deleted on its own (live: no Delete in its menu).
             Sel::HoleAxis(_) => {}
