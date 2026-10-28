@@ -6,6 +6,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## Release blockers for the 2026-10-28 05:00 release (qa, checked 04:17 UTC on green 1b81b7ca)
+- Re-confirmed 04:30 on green 3f4e10d9 (= 1b81b7ca + 4658e826 Feature Studio snippets / Ctrl+C part and 3062ec50 view
+  label prefix / suffix; no kernel or regen change): the list below stands.
 - **No new P0 since v0.4.11; nothing found today blocks the 05:00 release.** Fuzz seeds 45–52 × 600 actions on greens 41f60e47, 7929b13a, da18f886, 1b81b7ca: no crash, no hang. The open
   P0s below are all in v0.4.11 already (none is a regression of today's mains):
   - FILLET-OVERSIZE-OK (core): an edge fillet too big for its faces reports Ok with a wrong solid (wf-block R25 on three
