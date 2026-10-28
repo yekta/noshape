@@ -37,9 +37,9 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 ## Re-run pass 21 (2026-10-23 ~17:30–18:30, app = /root/target-lead/debug/noshape 10-23 17:10 (main 88fbf8f), CLI = target-lead noshape-cli 10-23 13:45)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| SML1 loft Add | OK, one body **9805.524423, 14 faces** (= live 9805.524422649518) | ✅ **fixed** |  |
-| BEND1 | 4812.566371, 14 faces, bbox x 0..31.72 (x<30 flat, wall x≈29.7..31.7) | ✅ **fixed** |  |
-| JOG1 | 4825.132741, 22 faces, bbox max x 55.889, z 9 | ✅ **fixed** |  |
+| SML1 loft Add | OK, one body **9805.524423, 14 faces** (= live 9805.524422649518) | ✅ **fixed** | v0.4.12 CLI 10-28 (mksmloft.py ADD: 9805.524423, 14 faces) |
+| BEND1 | 4812.566371, 14 faces, bbox x 0..31.72 (x<30 flat, wall x≈29.7..31.7) | ✅ **fixed** | v0.4.12 CLI 10-28 (smtools.py bend: 4812.566371, 14 faces, bbox max 31.722 / 40 / 31.722) |
+| JOG1 | 4825.132741, 22 faces, bbox max x 55.889, z 9 | ✅ **fixed** | v0.4.12 CLI 10-28 (smtools.py jog: 4825.132741, 22 faces, bbox max x 55.889, z 9) |
 | RIP1 | (fixed in cc84d44: tool search lists only tools) | ✅ | 77870dd4 10-28 |
 
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app /root/target-lead/debug/noshape)
