@@ -51,7 +51,7 @@ Fresh doc /tmp/qa5/d23b/derive.noshape (pass9/mkderive.py), configured /tmp/qa5/
 |---|---|---|---|
 | DER1 empty dialog | pink "Select Part Studio…" box, "Placement" label, no clock icon | ✅ **fixed** (e02) | a6c56638 10-28 |
 | DER2 panel icons | branch icon | ✅ **fixed** (e03) | a6c56638 10-28 |
-| DER3 pick the studio | expands inline (Part 1, Sketch 1), ‹ back arrow; reopening shows it expanded | ❌ (DERIVED-PICK-CHIP) **fixed** (e04, e32) | a6c56638 10-28 (expands, ‹; but no part chip next to Generate / no row highlight: DERIVED-PICK-CHIP) |
+| DER3 pick the studio | expands inline (Part 1, Sketch 1), ‹ back arrow; reopening shows it expanded | ✅ (DERIVED-PICK-CHIP fixed) | a6c56638 10-28 (expands, ‹; but no part chip next to Generate / no row highlight: DERIVED-PICK-CHIP) · verified c8239e05 10-28 (TICKETS DERIVED-PICK-CHIP) |
 | DER4 fillet chip on a derived edge | not red any more, but still **"Edge of deleted feature"** (live "Edge of Derived 1") | ✗ still (partly) (e09) |  |
 | DER5 ▸ expander | present; expands to "Sketch 1" (= live 1582) | ✅ **fixed** (e06) | a6c56638 10-28 |
 | DER6 second derive of the same source | ✓ enabled, accepted, red row "Derived 2 did not regenerate properly: Creating multiple Derived features from the same source and configuration is not allowed. …" | ✅ **fixed** (e10, e11) | a6c56638 10-28 |

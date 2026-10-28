@@ -145,7 +145,7 @@ Pass 6 (17:11) had found A12 fixed (mate nests under "Replicate 1 ▸ Mate featu
 Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an empty Replicate; BOM edits are not on the undo stack.
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| A15 selected instance | (242,182,73) top, amber edges, only the instance row highlighted | ❌ (ASM-SELECTED-EDGES-DARK) **fixed** | 77870dd4 10-28 (faces amber ✅, interior edges near-black) |
+| A15 selected instance | (242,182,73) top, amber edges, only the instance row highlighted | ✅ (ASM-SELECTED-EDGES-DARK fixed) | 77870dd4 10-28 (faces amber ✅, interior edges near-black) · verified c725f68f 10-28 (TICKETS ASM-SELECTED-EDGES-DARK) |
 | A16 "solving…" label | gone | ✅ **fixed** | 6acf6b94 (qa 10:40, Assembly 2: plate + shaft, Revolute 1 on hole 2's top rim: no "solving…" label during the Replicate / mates) |
 | A19 (new) empty Replicate | title red ✅; **no pending red "Replicate N" row with error badge in the list, no badge on the root row, no red border on "Parts to find match in"** (live has all three) | ✗ **A19** (skb) |  |
 | A11 BOM edit + Ctrl+Z | not undone | ✅ (= live) | 6acf6b94 (qa 10:33: Esc, Ctrl+Z over the view → undoes the last assembly edit (a drag), QA1 stays) |

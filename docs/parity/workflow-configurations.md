@@ -14,7 +14,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1.1 | Strip (x) › Variable table | section "▾ Part Studio 1 ⋯", Name / Variable type / Value / Description, italic Name add row, footer Create Variable Studio ▴ | same, plus an empty-state illustration | ✅ | a6c56638 10-28 |
-| 1.2 | Name "2x" | pink cell, red border, tooltip "Variable name must be a letter followed by a string of letters or numbers."; Enter does nothing | same | ❌ (VAR-NAME-PINK) | a6c56638 10-28 (fill white, live pink: VAR-NAME-PINK) |
+| 1.2 | Name "2x" | pink cell, red border, tooltip "Variable name must be a letter followed by a string of letters or numbers."; Enter does nothing | same | ✅ (VAR-NAME-PINK fixed) | a6c56638 10-28 (fill white, live pink: VAR-NAME-PINK) · verified 98667558 10-28 (TICKETS VAR-NAME-PINK) |
 | 1.3 | "w" Enter | Variable feature at the rollback bar, "(x) #w = 0 mm", row w / Length / 0 mm | same | ✅ | a6c56638 10-28 |
 | 1.4 | "w" again | created as w_0 + info bubble "Renamed some new variables to avoid name conflicts." | same text; **the bubble never goes away** (still there 5 min later) and later **covers the feature dialog header (title, ✓ ✕)** | ✅ (bubble at the window top centre, gone within 7 s) | a6c56638 10-28 |
 | 1.5 | Value "30" Enter | "30 mm" | "30 mm" | ✅ | a6c56638 10-28 |

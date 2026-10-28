@@ -15,7 +15,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | Enter / Shift+Enter / Esc | accept / accept & repeat / cancel | Plane: Shift+Enter commits Plane 2 and opens Plane 3 | ✅ | 0.4.10+ / dd1b5037 10-27 (Plane: Shift+Enter commits Plane 1, opens Plane 2) |
 | Space | clear selection | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Delete / Backspace | delete selection | deletes a feature row (core F15 fixed) | ✅ | 0.4.10+ / dd1b5037 10-27 (Plane 1 row + Delete: gone at once; Ctrl+Z back) |
-| Ctrl+C / Ctrl+V | copy / paste | part copy → paste opens Derived (DOC3) | ❌ (CTRL-C-PART) / ✗ DOC3 | 77870dd4 10-28 (menu Copy Part + Ctrl+V ✅; Ctrl+C on a selected part copies nothing) |
+| Ctrl+C / Ctrl+V | copy / paste | part copy → paste opens Derived (DOC3) | ✅ (CTRL-C-PART fixed) | 77870dd4 10-28 (menu Copy Part + Ctrl+V ✅; Ctrl+C on a selected part copies nothing) · verified 3f4e10d9 10-28 (TICKETS CTRL-C-PART) |
 | Shift+C | Curve/surface analysis | opens (re-uses the last entity "Face of Fillet 1") | ✅ / ? | 0.4.10+ / dd1b5037 10-27 |
 | Shift+D | Dihedral analysis | opens | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Ctrl+Shift+F, Ctrl+U | FeatureScript search, Report a bug | not tested (cloud/FS) | – |  |
