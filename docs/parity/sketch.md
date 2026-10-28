@@ -255,7 +255,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 11.19 | Use: click model edges / faces / other sketches to project; linked to the source | H:use | ✅ (planar curves project exactly; non-planar edges project to a fitted spline like Onshape; other sketches; linked); a used circle / arc has a construction centre point, its line ends are not (live "skb (10-25) sketch Use on a face sketch", 4b5ac4fe) | 0.4.10+ / 965d3f56 10-27 (U, block edge → black line + use glyphs) |
 | 11.20 | Use: hover preview of the projection | H:use | ✅ (GUI :103 m8.png: hovering the cylinder top edge highlights it and previews the projected circle on the sketch plane; click creates it) | 0.4.10+ / 965d3f56 10-27 (hover preview orange) |
 | 11.21 | Use silhouette edges | H:use | ✅ (cylinders, cones, spheres, tori; verified on the demo plate) | 0.4.10+ / dd1b5037 10-27 (Front sketch, U on the pin's cylinder face: two silhouette lines + end edges) |
-| 11.22 | Intersection: face crossing the sketch plane | H:intersection | ✅ |  |
+| 11.22 | Intersection: face crossing the sketch plane | H:intersection | ✅ | 8cd3c4da 10-28 (GUI: sketch on Front through a centred block, Intersection › top face → a black fixed line x −20…20 at z 10) |
 | 11.23 | Text cannot be patterned / mirrored in a sketch | H:text | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 
 ## 12. Context menus
