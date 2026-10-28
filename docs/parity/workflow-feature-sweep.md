@@ -46,7 +46,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | 4 | Translate direction auto-fill | Direction = the first planar face picked (moveFaceEditingLogic) | stays empty | 🔧 a new Move face (Translate) takes the first planar moved face, until the user sets Direction |  |
 | 5 | Rotate, no axis | text from evAxis | "Select a rotation axis" | 🔧 L5 "Cannot determine rotation axis." on Axis |  |
 | 6 | Up to entity, nothing / unresolvable | "Cannot resolve entities." on limitEntity | "Select the entity to move up to" | 🔧 |  |
-| 7 | Translate up to a plane | first face must be planar ("When moving up to a plane, first selected face must be planar.") and parallel ("Limit face must be parallel to face being moved.") | any plane, distance computed | 🔧 ✅ L6 (no field) |  |
+| 7 | Translate up to a plane | first face must be planar ("When moving up to a plane, first selected face must be planar.") and parallel ("Limit face must be parallel to face being moved.") | any plane, distance computed | 🔧 ✅ L6 (no field) | 1b81b7ca 10-28 (blk40: top face, Translate, Up to entity = Right plane → "Limit face must be parallel to face being moved."; planar-first-face case not run) |
 | 8 | Offset up to a non-parallel plane | the extended face meets the plane: distance 0 | distance along the normal | 🔧 |  |
 | 9 | 0 offset / translation | succeeds, part unchanged | went to the kernel | 🔧 |  |
 | 10 | Kernel failure | "Could not offset selected faces as requested." / "Could not transform selected faces as requested." | "Move face failed: …" | 🔧 |  |
