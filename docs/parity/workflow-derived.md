@@ -70,8 +70,8 @@ Fresh doc /tmp/qa5/d23b/derive.noshape (pass9/mkderive.py), configured /tmp/qa5/
 |---|---|---|---|
 | CRASH1 Parts list › right-click › Rename | inline editor, no crash (z01) | ✅ **fixed** |  |
 | DER4 fillet chip on a derived edge | "Edge of Derived 1" (z03) | ✅ **fixed** | a6c56638 10-28 |
-| DER13 fillet error after suppressing the source | "Fillet 1 did not regenerate properly: Select edges or faces to fillet." (z04) | ✅ **fixed** |  |
-| DER14 Derived row menu | has "Add appearance to feature…" (z02) | ✅ **fixed** |  |
+| DER13 fillet error after suppressing the source | "Fillet 1 did not regenerate properly: Select edges or faces to fillet." (z04) | ✅ **fixed** | c725f68f 10-28 (wf-block Part Studio 2: Derived 1 of Part Studio 1, Fillet 1 R1 on its edge, Suppress Derived 1 → "Fillet 1 did not regenerate properly: Select edges or faces to fillet.") |
+| DER14 Derived row menu | has "Add appearance to feature…" (z02) | ✅ **fixed** | c725f68f 10-28 (Derived 1 row menu: Rename, Edit… · Add selection to folder… · Suppress, Dynamic suppression · Switch to Part Studio 1 · Zoom to selection · Show dependencies… · Add appearance to feature… · Delete) |
 
 ## Re-check on main a0e360a3 (qa4, 2026-10-23 19:30–20:40, FRESH=1, /root/qa4-scratch/bin/noshape-main)
 | Finding | Result |
