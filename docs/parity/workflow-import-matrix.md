@@ -17,23 +17,23 @@ known band keep the ≤1e-5 rule until live supplies one.
 | g25-b.sat / .step / .x_t | 7585.978524 / 7582.713024 / 7583.000869 | 7582.912205 | ✗ I1 |  |
 | g47-1part.step (UI export, = g25-b.step) | 7582.713024 | 7582.912205 | ✗ I1 |  |
 | g29-{none,auto,basic,advanced,bsurf}.step | 7582.713024 ×4, bsurf 7582.995371 | 7582.912205 | ✗ I1 |  |
-| g29-tiny-none / auto | 8000.001, 11 faces | 11 faces (boss kept) | ✅ |  |
-| g29-tiny-basic / advanced / bsurf | 8000.000335, 7 faces | 7 faces | ✅ |  |
-| g36-pvzfillet v25 … v38.1, jt-fillet.jt | 7495.362697, 26 faces | 7495.362697409259, 26 | ✅ |  |
-| g37-block.x_t / g37-hole.x_t | 8000 (6) / 7214.601837 (7) | 8000 / 7214.601836602553 | ✅ |  |
+| g29-tiny-none / auto | 8000.001, 11 faces | 11 faces (boss kept) | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 8000.001 / 11 |
+| g29-tiny-basic / advanced / bsurf | 8000.000335, 7 faces | 7 faces | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 8000.000335 / 7 (bsurf 8000.000336) |
+| g36-pvzfillet v25 … v38.1, jt-fillet.jt | 7495.362697, 26 faces | 7495.362697409259, 26 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 7495.362697 / 26 on all 27 versions and the JT |
+| g37-block.x_t / g37-hole.x_t | 8000 (6) / 7214.601837 (7) | 8000 / 7214.601836602553 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 8000 (6) / 7214.601837 (7) |
 | onshape-cone .sat / .x_t / -v25.x_t | 376.991118, 2 faces (all three) | ? | ? |  |
 | g26-revolved-spline .sat / .x_t | 1726.080718 / 1726.080764 (3 faces) | ? | ? (Δ 4.6e-5 between formats) |  |
-| g35-kern-g24b-mm.stl | mesh, 7581.846183, 1 face | 7581.846183257335 | ✅ |  |
+| g35-kern-g24b-mm.stl | mesh, 7581.846183, 1 face | 7581.846183257335 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 7581.846183 / 1 |
 | g35-…-rest-meters.stl (default mesh unit) | 8e-06 mm³ (read as mm) | live dialog has a Units ▾ (default = document units) | ? (CLI has `mesh_unit`) |  |
-| pvz-block / -assembly / -subasm / -rot-asm / -longname / rest-* | mesh solids 7999.999464, 1 face | 7999.999463558208 | ✅ |  |
-| pvz-fillet / rest-pvz-fillet | 7484.089597 | 7484.089596687392 | ✅ |  |
+| pvz-block / -assembly / -subasm / -rot-asm / -longname / rest-* | mesh solids 7999.999464, 1 face | 7999.999463558208 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 7999.999464 / 1 each |
+| pvz-fillet / rest-pvz-fillet | 7484.089597 | 7484.089596687392 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 7484.089597 |
 | pvz-shapes.pvz | Part 1 1569.1766, Part 2 1770.2392, Part 3 9407.7781 (sum 12747.193949) + "Composite part 1" (Surface, 2 faces) | **parts named Cylinder, Torus, Cone**; sum 12747.193946661087; Composite part 1 (closed, 2 surfaces), no Surfaces section | ✗ **IM1** (part names from the file lost) |  |
-| jt-block.jt / jt-2parts.jt | 8000 / 8000 + 1000 | 8000 / 8000 + 1000 | ✅ |  |
+| jt-block.jt / jt-2parts.jt | 8000 / 8000 + 1000 | 8000 / 8000 + 1000 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 8000 / 8000 + 1000 |
 | g38b-psas_Bell_Crank.x_t | 2050.807089, 27 faces | 2050.83652761612, 27 | ✗ **IM2** (−0.029) |  |
 | g38b-fluxpad_102_STEM.x_t | 255.767857, 167 faces | 255.7688571778665, 167 | ✗ IM2 (−0.001) |  |
 | g38b-ktane_Bracket.x_t | 19377.868698, 12 faces | 19378.847109377377, 12 | ✗ **IM2 (−0.978, worst)** |  |
 | g38b-mcmaster-91274A118.x_t | 254.521984, 25 faces | 254.4037797834923, 25 | ✗ IM2 (+0.118) |  |
-| g38d-mcmaster-curve1 / polycarb-curves | Curve 1 / Curves 1–8 (wires) | 1 / 8 wires | ✅ |  |
+| g38d-mcmaster-curve1 / polycarb-curves | Curve 1 / Curves 1–8 (wires) | 1 / 8 wires | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 1 / 8 wires (no volume) |
 | g39-rule-unique-parts.zip, g47-3parts-unique.zip (zips of 3 STEP parts) | **ERROR "Root assembly file not found. Ensure zip f…"** | ? (requested "qa5 zip import") | ? |  |
 | g47-3parts.step | Part 1–3, 1000 each (listed Part 3, 2, 1) | 3 cubes | ✅ (order ?) |  |
 
@@ -65,7 +65,7 @@ All 106 earlier samples re-imported (/root/qa5-scratch/pass3/impmatrix12.py → 
 | New g48-ap203 / ap214 / inch .step (g47 3 cubes) | 3 × 1000, 6 faces each, listed Part 3, 2, 1 | ✅ volumes (order as g47, ?) |  |
 | New g48-types.step (live 22595.3688587902, 15 faces) | 22595.371166, 15 | ✗ IM2-type (+0.0023) |  |
 | New g48-two.step (live Part 1 22595.3688587902 + Part 2 1000) | 22595.371166 + 1000 | ✗ IM2-type (+0.0023) |  |
-| New g48-surface.step | "Surface 1", 1 face | ✅ |  |
+| New g48-surface.step | "Surface 1", 1 face | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 1 face, no volume |
 | New g49-chamfer2.x_t (live 44789.85021254086) | 44789.972897, 10 faces | ✗ IM2 (+0.123) |  |
 | New g49-chamfer1.x_t (live 44833.437797237995) | 44833.53007, 10 faces | ✗ IM2 (+0.092) |  |
 | New g50-reorder-shell1.x_t (live 5990.51958739, 20 faces) | 5990.523086, 20 | ✗ IM2-type (+0.0035) |  |
@@ -122,16 +122,16 @@ native Part Studios the .x_t files were exported from, not re-uploaded). Ours: C
 `import_files` with defaults, `query_mass_properties` + `query_entities` (/root/api-scratch/im2).
 | Sample | Ours volume / area / faces | Live band volume / area / faces | Status | Verified |
 |---|---|---|---|---|
-| g26-revolved-spline.x_t | 1726.080764 / 764.757501 / 3 | 1723.48714–1728.70956 / 763.82643–765.64946 / 3 | ✅ |  |
-| g48-types.step | 22595.371166 / 5859.027270 / 15 | 22593.47604–22597.26157 / 5858.64505–5859.41140 / 15 | ✅ |  |
-| g49-chamfer1.x_t | 44833.530070 / 7674.032869 / 10 | 44830.51265–44836.20455 / 7673.93667–7674.10522 / 10 | ✅ |  |
-| g49-chamfer2.x_t | 44789.972897 / 7654.531075 / 10 | 44786.54841–44793.28002 / 7654.41848–7654.65347 / 10 | ✅ |  |
-| g50-reorder-shell1.x_t | 5990.523086 / 12131.769122 / 20 | 5986.86289–5994.17629 / 12131.64289–12131.90190 / 20 | ✅ |  |
-| g50-g46-shell1.x_t (IM4) | 6053.320139 / 12258.695405 / 21 | 6048.91104–6056.61040 / 12258.60418–12258.89664 / 21 | ✅ |  |
-| g38b-ktane_Bracket.x_t | 19377.868698 / 9223.353906 / 12 | 19370.14999–19387.54423 / 9222.82507–9224.00498 / 12 | ✅ |  |
-| g38b-psas_Bell_Crank.x_t | 2050.807089 / 1921.487523 / 27 | 2050.43259–2051.24046 / 1921.37196–1921.61854 / 27 | ✅ |  |
-| g38b-mcmaster-91274A118.x_t | 254.521984 / 407.613254 / 25 | 248.20340–260.60416 / 397.20399–417.95194 / 25 | ✅ |  |
-| g38b-fluxpad_102_STEM.x_t | 255.767857 / 636.018340 / 167 | 255.68612–255.85159 / 635.94739–636.09426 / 167 | ✅ |  |
+| g26-revolved-spline.x_t | 1726.080764 / 764.757501 / 3 | 1723.48714–1728.70956 / 763.82643–765.64946 / 3 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 1726.080764 / 3 (volume, faces) |
+| g48-types.step | 22595.371166 / 5859.027270 / 15 | 22593.47604–22597.26157 / 5858.64505–5859.41140 / 15 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 22595.371170 / 15 |
+| g49-chamfer1.x_t | 44833.530070 / 7674.032869 / 10 | 44830.51265–44836.20455 / 7673.93667–7674.10522 / 10 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 44833.514326 / 10, in band (was 44833.530070) |
+| g49-chamfer2.x_t | 44789.972897 / 7654.531075 / 10 | 44786.54841–44793.28002 / 7654.41848–7654.65347 / 10 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 44789.962583 / 10, in band |
+| g50-reorder-shell1.x_t | 5990.523086 / 12131.769122 / 20 | 5986.86289–5994.17629 / 12131.64289–12131.90190 / 20 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 5990.523086 / 20 |
+| g50-g46-shell1.x_t (IM4) | 6053.320139 / 12258.695405 / 21 | 6048.91104–6056.61040 / 12258.60418–12258.89664 / 21 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 6052.678152 / 21, in band (was 6053.320139) |
+| g38b-ktane_Bracket.x_t | 19377.868698 / 9223.353906 / 12 | 19370.14999–19387.54423 / 9222.82507–9224.00498 / 12 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 19377.868698 / 12 |
+| g38b-psas_Bell_Crank.x_t | 2050.807089 / 1921.487523 / 27 | 2050.43259–2051.24046 / 1921.37196–1921.61854 / 27 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 2050.807126 / 27, in band |
+| g38b-mcmaster-91274A118.x_t | 254.521984 / 407.613254 / 25 | 248.20340–260.60416 / 397.20399–417.95194 / 25 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 254.419624 / 25, in band |
+| g38b-fluxpad_102_STEM.x_t | 255.767857 / 636.018340 / 167 | 255.68612–255.85159 / 635.94739–636.09426 / 167 | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 255.768144 / 167, in band |
 
 IM2 is closed on volumes and areas: every value lies inside live's band, with the same face counts.
 
@@ -167,3 +167,13 @@ field on the shape's box, so the volume with gaps doesn't depend on where the pa
 Surface types: a B-surface that is an exact linear extrusion (degree 1 across, rows translates) reports as an extrusion
 (FeatureScript EXTRUDED, query_entities "extruded"), as Parasolid reports such surfaces; query_entities also names
 REVOLVED faces "revolved". F8 isn't one in the file (see above).
+
+## Re-run 2026-10-28 (qa, v0.4.12 CLI = green 1b81b7ca code, bin/impmatrix_qa.py over every sample, /tmp/qa-imp/impmatrix.json)
+| Row | Ours | Status | Verified |
+|---|---|---|---|
+| I1 g36-g24b v25.0 … v38.1 / g25-b X_T | 7583.000866, 18 faces (all versions) | inside live's band 7576.2420 – 7589.5825 (grading rule 10-24); analytic-face areas not re-measured in this run | v0.4.12 CLI 10-28 (volumes, faces) |
+| I1 g25-b SAT / STEP, g29-*.step, g47-1part.step | SAT 7582.996453 (was 7585.978524), STEP 7582.693101 (×5), bsurf 7582.995361, 18 faces | inside the band; areas to check | v0.4.12 CLI 10-28 (volumes, faces) |
+| g50-g46-shell1 / g49-chamfer1 / g49-chamfer2 | 6052.678152 / 44833.514326 / 44789.962583 (were 6053.320139 / 44833.530070 / 44789.972897) | ✅ still in band; values moved since 10-24 | v0.4.12 CLI 10-28 |
+| g35-…-rest-meters.stl | 8e-06 mm³ (read as mm) | ? unchanged (mesh unit) |  |
+| dx-asm-xt-<v>.x_t (live's assembly exports, request 1536) | v0.4.12: 12.0 / 28.1 / 33.0 / 33.1 / 37.1 / 38.1 import nothing, 25.0 / 28.0 / latest ~1e-6 mm³ (XT-ASM-SCALE). Green 98667558: 25.0 / 28.0 / 38.1 / latest OK (pin 848.23), the other five fail | ✗ XT-ASM-VERSIONS | 98667558 10-28 (GUI) |
+| Errors over all samples | 0 tool errors (dx-asm-xt failures come back as empty imports through the CLI) | ✅ |  |
