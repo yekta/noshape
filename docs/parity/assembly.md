@@ -45,7 +45,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | K26 | `[` Measure, `Shift+X` section view | E§3 | ✅ | Measure: click faces/edges/vertices of any instances (length, area, radius, position, distance ΔXYZ, angle; model test `measure_between_instances`); Section view through the hovered planar face, the selected mate connector or Front, offset and flip | 0.4.10+ / 52ca0b97 10-28 ([ opens the Measure panel at the bottom right; Shift+X the Section view dialog) |
 | K27 | `` ` `` select other | E§3 | ✅ | cycles the instances under the cursor (Shift+` backwards), list at the cursor |  |
 | K28 | `Alt+click` select through transparent | H:shortcuts | ✅ | Alt held (or Isolate › Select transparent geometry): transparent / isolated-away instances become pickable (`AsmSceneOptions.pick_dimmed`); the isolate enter / exit / expand and pickability toggles now redraw the pick buffer (rebuild_scene(true)); GUI k28e (checkbox path; Alt held via xdotool is unreliable) |  |
-| K29 | View keys (`f`, `Shift+1..7`, `z`, arrows) | H:shortcuts | ✅ | shared viewport bindings |  |
+| K29 | View keys (`f`, `Shift+1..7`, `z`, arrows) | H:shortcuts | ✅ | shared viewport bindings | 0.4.10+ / 52ca0b97 10-28 (Shift+5 Top, Shift+7 Isometric, ← turns the view, f fits) |
 | K30 | Alt-drag ignoring mates | task brief | n/a | not an Onshape behaviour (not documented) |  |
 
 ## 2. Toolbar (E§2.1, UI:toolbars/docs-assembly-toolbar.png)
