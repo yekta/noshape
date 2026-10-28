@@ -1282,6 +1282,38 @@ pub fn query_region(display: &StudioDisplay, r: &Reference, up: &Uploader) -> Op
     Some(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([k[0], k[1], k[2], 0.7]).unpickable().ignore_clip().layer(8).unlit().over_transparent())
 }
 
+/// Create selection's result faces (live part-studio/387): see-through
+/// yellow-green over the part, which leaves them out (`state::HIDDEN`), so
+/// what lies behind them shows (a hole's walls). Not pickable (the hidden
+/// faces' pick ids would hide it too): a click there reaches what is behind.
+pub fn query_faces(display: &StudioDisplay, faces: &[Reference], up: &Uploader) -> Option<Instance> {
+    let mut m = MeshData { positions: Vec::new(), normals: Vec::new(), pick_ids: Vec::new(), indices: Vec::new() };
+    for b in display.bodies.iter().filter(|b| !b.hidden) {
+        for (fi, r) in b.face_refs.iter().enumerate() {
+            if !faces.contains(r) {
+                continue;
+            }
+            let Some(&(first, count)) = b.mesh.face_ranges.get(fi) else { continue };
+            for &ix in b.mesh.indices.get(first as usize..(first + count) as usize).unwrap_or(&[]) {
+                let i = ix as usize;
+                let (Some(p), Some(n)) = (b.mesh.positions.get(i), b.mesh.normals.get(i)) else { continue };
+                m.indices.push(m.positions.len() as u32);
+                m.positions.push(*p);
+                m.normals.push(*n);
+                m.pick_ids.push(0);
+            }
+        }
+    }
+    if m.indices.is_empty() {
+        return None;
+    }
+    let k = theme::lin(theme::viewport::QUERY_HOVER);
+    Some(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([k[0], k[1], k[2], QUERY_FACE_ALPHA]).unpickable())
+}
+
+/// How opaque Create selection's see-through result faces are.
+pub const QUERY_FACE_ALPHA: f32 = 0.5;
+
 /// The boundary edges of `faces` where other geometry hides them, dashed in
 /// the selection color (live "lp wall over" 2258: the seed of a failed
 /// Feature pattern behind the block).

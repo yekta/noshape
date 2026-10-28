@@ -1158,10 +1158,22 @@ impl PartStudioView {
                 }
             }
         }
-        for r in cs.iter().flat_map(|(_, found)| found) {
+        // Create selection's result: faces see-through yellow-green (drawn
+        // apart, live part-studio/387), edges in the query highlight.
+        let found: Vec<Reference> = cs.iter().flat_map(|(_, found)| found.iter().cloned()).collect();
+        let (found_faces, found_other): (Vec<Reference>, Vec<Reference>) = found.into_iter().partition(|r| matches!(r, Reference::Face(_)));
+        for r in &found_other {
             for &id in built.picks.ids_for(r) {
                 scene.add_flag(id, noshape_render::state::QUERY);
             }
+        }
+        if !found_faces.is_empty() {
+            for r in &found_faces {
+                for &id in built.picks.ids_for(r) {
+                    scene.add_flag(id, noshape_render::state::HIDDEN);
+                }
+            }
+            scene.instances.extend(scene_builder::query_faces(&self.display, &found_faces, self.gpu.uploader()));
         }
         if let Some(q) = &self.ui.query_hover {
             // A region is drawn from the sketch, not by its pick state.
