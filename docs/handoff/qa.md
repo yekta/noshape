@@ -14,6 +14,7 @@ of TICKETS (open P0s all carried from v0.4.11).
   ASM-K-IMPLICIT-MCS (`k` shows no mate-implicit connectors). Verified on the qa5 mate doc (bin: /root/qa5-scratch/pass10/
   mkmate.py via the v0.4.12 CLI): workflow-mates 5 / 15; assembly.md D5 D19 D20 F4 M14 R1 X5 (K4 and R11 ❌); assembly-sweep
   14 15 18 24 28. CLI rows on v0.4.12: sheet-metal loft / bend / jog, 400-hole plate (same geometry, 5–9 s per step).
+  Open question to live (REQUESTS 07:10): assembly.md F1, ours lists a later Mate connector above an earlier mate.
 - **06:48 update (greens e8ca768f → d2357ee5 → 2292bf8c):** verified NUMBER-FIELD-ERROR-MARK, SKETCH-FILLET-EQUAL,
   SKETCH-FILLET-STUCK-RADIUS (b) (d2357ee5); SKETCH-ENTER-NO-PLANE (toast residual: ours hides in ~11 s), LEFT-RAIL-WHERE-USED
   (2292bf8c); ASM-CHANGE-CONFIG-ICON, VAR-NAME-PINK (98667558); part-studio 7.7 (e8ca768f). Filed P2 XT-ASM-VERSIONS (live's
