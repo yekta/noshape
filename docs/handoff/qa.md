@@ -9,6 +9,10 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97 → … → b504234e → 2960a143)
 
+- **08:18 update (greens c725f68f → 867a7720):** verified VIEW-LABEL-TOGGLE (residual: no preview before ✓, Prefix / Letter /
+  Suffix rows hide when unticked) and DRAWING-BOX-SELECT (867a7720). On c725f68f: FILLET-OVERSIZE-OK unchanged; REGEN-SPEED
+  A/B at load ~45 = 6444d892 (3rd undo 1.4–1.6 s); SHELL-SLOW on the v0.4.12 CLI 0.5–1.05 s (3–4× faster than 10-27).
+  workflow-derived DER9 DER13 DER14. Fuzz 58 on c725f68f alive; 59 on 867a7720 running.
 - **08:02 update (greens 6444d892 → c725f68f):** verified ASM-MENU-WRAP, ASM-MATE-MENU-SEPARATORS, CALLOUT-ON-DIMENSION,
   CALLOUT-ALIGN-MISSING, DIM-PALETTE-DROPDOWN-COLLAPSE, BALLOON-WRONG-ITEM (6444d892); MATE-LIMITS-OPPOSITE-SIGN,
   ASM-SELECTED-EDGES-DARK, DWG-REVOLVE-SEAM (c725f68f). NOTE-PANEL-UNDER-PROPS still clipped for a table near the
