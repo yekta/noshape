@@ -90,20 +90,30 @@ extern thread_local double                  budget_limit;
 extern thread_local int                     budget_reason;
 extern thread_local const std::atomic<bool>* budget_cancel;
 extern thread_local int                     budget_hold;
+// OCCT patch 0004: this thread's override of the pairs' mode (-1 none, 0 serial); returns the one before.
+extern "C" int noshape_bop_set_pairs_parallel_here(int on);
 // The running budget's timer (run_budgeted's), for the crash guard to stop
 // when it recovers past that budget's frame.
 extern thread_local void*                   budget_timer_live;
 // The budget as a crash guard found it; restored when the guard recovers
 // from a fault past run_budgeted's frame (qa CLI-SUPPRESS-SEGV: its jump
 // buffer and timer outlived it, and the next tick or budgeted op jumped into
-// the dead frame).
+// the dead frame), with the thread's pairs mode run_budgeted set.
 void budget_timer_stop(void* timer);
 struct BudgetSnapshot
 {
   sigjmp_buf* jmp   = budget_jmp;
   void*       timer = budget_timer_live;
-  void        restore() const
+  int         pairs = pairs_here();
+  static int  pairs_here()
   {
+    const int was = noshape_bop_set_pairs_parallel_here(-1);
+    noshape_bop_set_pairs_parallel_here(was);
+    return was;
+  }
+  void restore() const
+  {
+    noshape_bop_set_pairs_parallel_here(pairs);
     if (budget_timer_live != timer && budget_timer_live != nullptr)
       budget_timer_stop(budget_timer_live);
     budget_timer_live = timer;
@@ -149,11 +159,16 @@ int run_budgeted(double cpu_seconds, F&& f)
   sigjmp_buf        env;
   sigjmp_buf* const crash_outer = crash_guard;
   budget_timer_live             = timer;
+  // OCCT's pair intersections serial for the budgeted op (patch 0004): work
+  // on pool workers is out of the budget's reach (qa DRAFT-BUDGET-POOL: a
+  // worker's endless intersection line went on past the budget).
+  const int pairs_outer = noshape_bop_set_pairs_parallel_here(0);
   if (sigsetjmp(env, 1) != 0)
   {
     budget_timer_stop(timer);
     budget_timer_live = nullptr;
     crash_guard       = crash_outer;
+    noshape_bop_set_pairs_parallel_here(pairs_outer);
     return budget_reason;
   }
   budget_limit  = thread_cpu_seconds() + cpu_seconds;
@@ -171,11 +186,13 @@ int run_budgeted(double cpu_seconds, F&& f)
     budget_jmp = nullptr;
     budget_timer_stop(timer);
     budget_timer_live = nullptr;
+    noshape_bop_set_pairs_parallel_here(pairs_outer);
     throw;
   }
   budget_jmp = nullptr;
   budget_timer_stop(timer);
   budget_timer_live = nullptr;
+  noshape_bop_set_pairs_parallel_here(pairs_outer);
 #else
   (void)cpu_seconds;
   f();
@@ -667,6 +684,7 @@ OpOut op_rib(const OcShape& base, const OcShape& wire, const PlaneF& plane,
 // ---- booleans, split, transform, section (boolean.cpp)
 void                     set_memory_budget_mb(uint64_t mb);
 void                     set_bop_parallel(bool on);
+void                     set_bop_pairs_parallel(bool on);
 rust::String             last_unify_path();
 OpOut                    op_unify_whole(const OcShape& s);
 rust::String             last_boolean_path();

@@ -9,30 +9,27 @@ diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_2.cxx b/src/Mo
  #include <BOPAlgo_PaveFiller.hxx>
  #include <BOPAlgo_Alerts.hxx>
  #include <BOPAlgo_Tools.hxx>
-@@ -209,6 +210,22 @@
+@@ -209,6 +210,19 @@
  
  //=================================================================================================
  
 +// noshape: the pairs' intersections on the thread pool even when the Boolean
-+// runs serially, with NOSHAPE_BOP_PAIRS_PARALLEL=1 only. Each pair is
-+// computed alone into its own record (with its own context) and the records
-+// are used afterwards in the pairs' order, so the result is the same; the
-+// diamond knurl's 815 000 edge / face pairs took 130 s on one thread. Off by
-+// default: with it on, the app and the CLI died in ForceInterfEF (qa
-+// BOP-PAIRS-GPF, as BOOL-THREAD-CRASH with whole booleans parallel).
++// runs serially (noshape_bop_set_pairs_parallel: on unless noshape turns it
++// off, NOSHAPE_BOP_PAIRS_PARALLEL=0). Each pair is computed alone into its own
++// record (with its own context) and the records are used afterwards in the
++// pairs' order, so the result is the same; the diamond knurl's 815 000 edge /
++// face pairs took 130 s on one thread. (qa BOP-PAIRS-GPF was noshape's CPU
++// budget jumping out of the pool job: patch 0005.)
++extern "C" int noshape_bop_pairs_parallel();
 +static bool noshapePairsInParallel(const bool theRunParallel, const int theNbPairs)
 +{
-+  static const bool aOn = [] {
-+    const char* v = std::getenv("NOSHAPE_BOP_PAIRS_PARALLEL");
-+    return v != nullptr && v[0] != '\0' && v[0] != '0';
-+  }();
-+  return theRunParallel || (aOn && theNbPairs >= 64);
++  return theRunParallel || (noshape_bop_pairs_parallel() != 0 && theNbPairs >= 64);
 +}
 +
  void BOPAlgo_PaveFiller::IntersectVE(
    const NCollection_IndexedDataMap<occ::handle<BOPDS_PaveBlock>, NCollection_List<int>>& theVEPairs,
    const Message_ProgressRange&                                                           theRange,
-@@ -301,7 +318,7 @@
+@@ -301,7 +315,7 @@
    }
    // Perform intersection
    //=============================================================
@@ -52,30 +49,27 @@ diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_3.cxx b/src/Mo
  #include <Bnd_Box.hxx>
  #include <BOPAlgo_PaveFiller.hxx>
  #include <BOPAlgo_Tools.hxx>
-@@ -197,6 +198,22 @@
+@@ -197,6 +198,19 @@
  
  //=================================================================================================
  
 +// noshape: the pairs' intersections on the thread pool even when the Boolean
-+// runs serially, with NOSHAPE_BOP_PAIRS_PARALLEL=1 only. Each pair is
-+// computed alone into its own record (with its own context) and the records
-+// are used afterwards in the pairs' order, so the result is the same; the
-+// diamond knurl's 815 000 edge / face pairs took 130 s on one thread. Off by
-+// default: with it on, the app and the CLI died in ForceInterfEF (qa
-+// BOP-PAIRS-GPF, as BOOL-THREAD-CRASH with whole booleans parallel).
++// runs serially (noshape_bop_set_pairs_parallel: on unless noshape turns it
++// off, NOSHAPE_BOP_PAIRS_PARALLEL=0). Each pair is computed alone into its own
++// record (with its own context) and the records are used afterwards in the
++// pairs' order, so the result is the same; the diamond knurl's 815 000 edge /
++// face pairs took 130 s on one thread. (qa BOP-PAIRS-GPF was noshape's CPU
++// budget jumping out of the pool job: patch 0005.)
++extern "C" int noshape_bop_pairs_parallel();
 +static bool noshapePairsInParallel(const bool theRunParallel, const int theNbPairs)
 +{
-+  static const bool aOn = [] {
-+    const char* v = std::getenv("NOSHAPE_BOP_PAIRS_PARALLEL");
-+    return v != nullptr && v[0] != '\0' && v[0] != '0';
-+  }();
-+  return theRunParallel || (aOn && theNbPairs >= 64);
++  return theRunParallel || (noshape_bop_pairs_parallel() != 0 && theNbPairs >= 64);
 +}
 +
  void BOPAlgo_PaveFiller::PerformEE(const Message_ProgressRange& theRange)
  {
    FillShrunkData(TopAbs_EDGE, TopAbs_EDGE);
-@@ -341,7 +358,7 @@
+@@ -341,7 +355,7 @@
      anEdgeEdge.SetProgressRange(aPS.Next());
    }
    //======================================================
@@ -95,30 +89,27 @@ diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_4.cxx b/src/Mo
  #include <BOPAlgo_PaveFiller.hxx>
  #include <BOPAlgo_Alerts.hxx>
  #include <BOPDS_DS.hxx>
-@@ -172,6 +173,22 @@
+@@ -172,6 +173,19 @@
  
  //=================================================================================================
  
 +// noshape: the pairs' intersections on the thread pool even when the Boolean
-+// runs serially, with NOSHAPE_BOP_PAIRS_PARALLEL=1 only. Each pair is
-+// computed alone into its own record (with its own context) and the records
-+// are used afterwards in the pairs' order, so the result is the same; the
-+// diamond knurl's 815 000 edge / face pairs took 130 s on one thread. Off by
-+// default: with it on, the app and the CLI died in ForceInterfEF (qa
-+// BOP-PAIRS-GPF, as BOOL-THREAD-CRASH with whole booleans parallel).
++// runs serially (noshape_bop_set_pairs_parallel: on unless noshape turns it
++// off, NOSHAPE_BOP_PAIRS_PARALLEL=0). Each pair is computed alone into its own
++// record (with its own context) and the records are used afterwards in the
++// pairs' order, so the result is the same; the diamond knurl's 815 000 edge /
++// face pairs took 130 s on one thread. (qa BOP-PAIRS-GPF was noshape's CPU
++// budget jumping out of the pool job: patch 0005.)
++extern "C" int noshape_bop_pairs_parallel();
 +static bool noshapePairsInParallel(const bool theRunParallel, const int theNbPairs)
 +{
-+  static const bool aOn = [] {
-+    const char* v = std::getenv("NOSHAPE_BOP_PAIRS_PARALLEL");
-+    return v != nullptr && v[0] != '\0' && v[0] != '0';
-+  }();
-+  return theRunParallel || (aOn && theNbPairs >= 64);
++  return theRunParallel || (noshape_bop_pairs_parallel() != 0 && theNbPairs >= 64);
 +}
 +
  void BOPAlgo_PaveFiller::PerformVF(const Message_ProgressRange& theRange)
  {
    myIterator->Initialize(TopAbs_VERTEX, TopAbs_FACE);
-@@ -286,7 +303,7 @@
+@@ -286,7 +300,7 @@
      aVertexFace.SetProgressRange(aPS.Next());
    }
    //================================================================
@@ -127,7 +118,7 @@ diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_4.cxx b/src/Mo
    //================================================================
    if (UserBreak(aPSOuter))
    {
-@@ -438,7 +455,7 @@
+@@ -438,7 +452,7 @@
      aPairs.emplace_back(nV, nF);
      aRepOfPair.push_back(aIns.first->second);
    }
@@ -139,10 +130,11 @@ diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_4.cxx b/src/Mo
 diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx
 --- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx
 +++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx
-@@ -15,9 +15,11 @@
+@@ -15,9 +15,12 @@
  // Alternatively, this file may be used under the terms of Open CASCADE
  // commercial license or contractual agreement.
  
++#include <atomic>
 +#include <cstdlib>
  #include <Bnd_Box.hxx>
  #include <Bnd_Tools.hxx>
@@ -151,7 +143,7 @@ diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx b/src/Mo
  #include <BOPAlgo_Alerts.hxx>
  #include <BOPAlgo_Tools.hxx>
  #include <BOPDS_CoupleOfPaveBlocks.hxx>
-@@ -229,8 +231,46 @@
+@@ -229,8 +232,68 @@
  
  //=================================================================================================
  
@@ -170,19 +162,41 @@ diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx b/src/Mo
 +} // namespace
 +
 +// noshape: the pairs' intersections on the thread pool even when the Boolean
-+// runs serially, with NOSHAPE_BOP_PAIRS_PARALLEL=1 only. Each pair is
-+// computed alone into its own record (with its own context) and the records
-+// are used afterwards in the pairs' order, so the result is the same; the
-+// diamond knurl's 815 000 edge / face pairs took 130 s on one thread. Off by
-+// default: with it on, the app and the CLI died in ForceInterfEF (qa
-+// BOP-PAIRS-GPF, as BOOL-THREAD-CRASH with whole booleans parallel).
++// runs serially (noshape_bop_set_pairs_parallel: on unless noshape turns it
++// off, NOSHAPE_BOP_PAIRS_PARALLEL=0). Each pair is computed alone into its own
++// record (with its own context) and the records are used afterwards in the
++// pairs' order, so the result is the same; the diamond knurl's 815 000 edge /
++// face pairs took 130 s on one thread. (qa BOP-PAIRS-GPF was noshape's CPU
++// budget jumping out of the pool job: patch 0005.)
++extern "C" int noshape_bop_pairs_parallel();
 +static bool noshapePairsInParallel(const bool theRunParallel, const int theNbPairs)
 +{
-+  static const bool aOn = [] {
-+    const char* v = std::getenv("NOSHAPE_BOP_PAIRS_PARALLEL");
-+    return v != nullptr && v[0] != '\0' && v[0] != '0';
-+  }();
-+  return theRunParallel || (aOn && theNbPairs >= 64);
++  return theRunParallel || (noshape_bop_pairs_parallel() != 0 && theNbPairs >= 64);
++}
++
++// Off until noshape turns it on (kernel boolean(): its CPU budgets keep the pairs
++// serial; a kernel without that must not get them).
++static std::atomic<int> THE_NOSHAPE_PAIRS_PARALLEL{0};
++// This thread's override (-1: none): noshape's CPU budgets turn the pairs serial
++// for their ops (work on pool workers is out of a budget's reach).
++thread_local int THE_NOSHAPE_PAIRS_HERE = -1;
++
++extern "C" Standard_EXPORT int noshape_bop_pairs_parallel()
++{
++  return THE_NOSHAPE_PAIRS_HERE >= 0 ? THE_NOSHAPE_PAIRS_HERE : THE_NOSHAPE_PAIRS_PARALLEL.load(std::memory_order_relaxed);
++}
++
++// Sets this thread's override, returns the one before.
++extern "C" Standard_EXPORT int noshape_bop_set_pairs_parallel_here(const int theOn)
++{
++  const int aWas         = THE_NOSHAPE_PAIRS_HERE;
++  THE_NOSHAPE_PAIRS_HERE = theOn;
++  return aWas;
++}
++
++extern "C" Standard_EXPORT void noshape_bop_set_pairs_parallel(const int theOn)
++{
++  THE_NOSHAPE_PAIRS_PARALLEL.store(theOn != 0 ? 1 : 0);
 +}
 +
  void BOPAlgo_PaveFiller::PerformEF(const Message_ProgressRange& theRange)
@@ -198,7 +212,7 @@ diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx b/src/Mo
    FillShrunkData(TopAbs_EDGE, TopAbs_FACE);
    //
    myIterator->Initialize(TopAbs_EDGE, TopAbs_FACE);
-@@ -392,7 +432,7 @@
+@@ -392,7 +455,7 @@
      aEdgeFace.SetProgressRange(aPS.Next());
    }
    //=================================================================
@@ -207,7 +221,7 @@ diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx b/src/Mo
    //=================================================================
    if (UserBreak(aPSOuter))
    {
-@@ -805,8 +845,30 @@
+@@ -805,8 +868,30 @@
      }
    }
    //
@@ -250,30 +264,27 @@ diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_6.cxx b/src/Mo
  #include <BOPAlgo_PaveFiller.hxx>
  #include <Bnd_Box.hxx>
  #include <BOPAlgo_Alerts.hxx>
-@@ -355,6 +356,22 @@
+@@ -355,6 +356,19 @@
  
  //=================================================================================================
  
 +// noshape: the pairs' intersections on the thread pool even when the Boolean
-+// runs serially, with NOSHAPE_BOP_PAIRS_PARALLEL=1 only. Each pair is
-+// computed alone into its own record (with its own context) and the records
-+// are used afterwards in the pairs' order, so the result is the same; the
-+// diamond knurl's 815 000 edge / face pairs took 130 s on one thread. Off by
-+// default: with it on, the app and the CLI died in ForceInterfEF (qa
-+// BOP-PAIRS-GPF, as BOOL-THREAD-CRASH with whole booleans parallel).
++// runs serially (noshape_bop_set_pairs_parallel: on unless noshape turns it
++// off, NOSHAPE_BOP_PAIRS_PARALLEL=0). Each pair is computed alone into its own
++// record (with its own context) and the records are used afterwards in the
++// pairs' order, so the result is the same; the diamond knurl's 815 000 edge /
++// face pairs took 130 s on one thread. (qa BOP-PAIRS-GPF was noshape's CPU
++// budget jumping out of the pool job: patch 0005.)
++extern "C" int noshape_bop_pairs_parallel();
 +static bool noshapePairsInParallel(const bool theRunParallel, const int theNbPairs)
 +{
-+  static const bool aOn = [] {
-+    const char* v = std::getenv("NOSHAPE_BOP_PAIRS_PARALLEL");
-+    return v != nullptr && v[0] != '\0' && v[0] != '0';
-+  }();
-+  return theRunParallel || (aOn && theNbPairs >= 64);
++  return theRunParallel || (noshape_bop_pairs_parallel() != 0 && theNbPairs >= 64);
 +}
 +
  void BOPAlgo_PaveFiller::PerformFF(const Message_ProgressRange& theRange)
  {
    // Update face info for all Face/Face intersection pairs
-@@ -615,7 +632,7 @@
+@@ -615,7 +629,7 @@
    }
    //======================================================
    // Perform intersection

@@ -95,6 +95,9 @@ pub fn boolean(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &Boolean
     ffi::set_memory_budget_mb(std::env::var("NOSHAPE_BOOLEAN_MEMORY_MB").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(0));
     // OCCT's booleans in parallel (NOSHAPE_BOP_PARALLEL; serial by default):
     // likewise.
+    // OCCT patch 0004's pair intersections on the thread pool (on;
+    // NOSHAPE_BOP_PAIRS_PARALLEL=0: off; always serial inside a CPU budget).
+    ffi::set_bop_pairs_parallel(std::env::var("NOSHAPE_BOP_PAIRS_PARALLEL").map_or(true, |v| v.trim() != "0"));
     ffi::set_bop_parallel(match PARALLEL_OVERRIDE.load(std::sync::atomic::Ordering::Relaxed) {
         1 => false,
         2 => true,
