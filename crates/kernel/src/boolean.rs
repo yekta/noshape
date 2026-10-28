@@ -212,6 +212,21 @@ pub fn unify_same_domain(shape: &Shape) -> Result<OpResult> {
     Ok(OpResult::from_ffi(ck(ffi::op_unify(shape.raw()))?))
 }
 
+/// [`unify_same_domain`] over the whole shape, whatever is known of it (a
+/// shape an earlier unify found nothing in, a local Boolean's result:
+/// boolean.cpp `UnifyScope`): the reference the fast ways are checked
+/// against.
+pub fn unify_same_domain_whole(shape: &Shape) -> Result<OpResult> {
+    Ok(OpResult::from_ffi(ck(ffi::op_unify_whole(shape.raw()))?))
+}
+
+/// Which way this thread's last [`unify_same_domain`] went: "known" (an
+/// earlier unify found nothing to merge in the shape), "scoped" (a local
+/// Boolean's result: only where it changed the part), "whole".
+pub fn last_unify_path() -> String {
+    ffi::last_unify_path()
+}
+
 /// Intersection curves of two shapes (BRepAlgoAPI_Section). History args:
 /// 0 = a, 1 = b; faces `Generate` the section edges lying on them.
 pub fn section(a: &Shape, b: &Shape) -> Result<OpResult> {

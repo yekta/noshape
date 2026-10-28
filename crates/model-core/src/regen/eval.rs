@@ -897,7 +897,7 @@ impl<'a> EvalCtx<'a> {
         // faces, no seam).
         let unified = k::unify_same_domain(&res.shape)?;
         if unified.shape.count(ShapeType::Face) < res.shape.count(ShapeType::Face) {
-            let before = names_for(&res.shape, face_names);
+            let before = unify_input_names(face_names);
             let names = self.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
             return Ok(split_solids(&unified.shape, &names));
         }
@@ -910,7 +910,7 @@ impl<'a> EvalCtx<'a> {
             let name = self.ctx.alloc_part_name(kind);
             let color = self.ctx.alloc_color();
             let id = BodyId { feature: self.feature, index: base_index * 64 + j as u32 };
-            let body = Body::new(id, name, kind, p.shape, p.names.faces, color, self.feature);
+            let body = Body::named(id, name, kind, p.shape, p.names, color, self.feature);
             self.ctx.bodies.push(Arc::new(body));
         }
         Ok(())
@@ -1001,7 +1001,7 @@ impl<'a> EvalCtx<'a> {
             // the boolean: a block added flush with a face leaves one face.
             let unified = k::unify_same_domain(&res.shape)?;
             let (res, face_names) = if unified.shape.count(ShapeType::Face) < res.shape.count(ShapeType::Face) {
-                let before = names_for(&res.shape, face_names);
+                let before = unify_input_names(face_names);
                 let names = self.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
                 (unified, names)
             } else {
@@ -1030,7 +1030,7 @@ impl<'a> EvalCtx<'a> {
                     let name = self.ctx.alloc_part_name(target.kind);
                     (BodyId { feature: self.feature, index: 10_000 + (ti as u32) * 64 + j as u32 }, name, target.color)
                 };
-                bodies.push(Body::new(id, name, target.kind, p.shape, p.names.faces, color, self.feature));
+                bodies.push(Body::named(id, name, target.kind, p.shape, p.names, color, self.feature));
             }
             if perf {
                 log::info!(target: "perf", "boolean_into: bodies (edge / vertex names) {:.1} ms", (t0.elapsed() - t_split).as_secs_f64() * 1e3);
@@ -1074,7 +1074,7 @@ impl<'a> EvalCtx<'a> {
         let face_names = self.name_result(&arg_refs, &res.history, &res.shape, &BTreeMap::new(), None);
         let unified = k::unify_same_domain(&res.shape)?;
         let (shape, face_names) = if unified.shape.count(ShapeType::Face) < res.shape.count(ShapeType::Face) {
-            let before = names_for(&res.shape, face_names);
+            let before = unify_input_names(face_names);
             let names = self.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
             (unified.shape, names)
         } else {
@@ -1097,13 +1097,13 @@ impl<'a> EvalCtx<'a> {
         let mut replaced: BTreeMap<usize, Arc<Body>> = BTreeMap::new();
         for (t, p) in owned {
             let b = &bodies[t];
-            replaced.insert(targets[t], Arc::new(Body::new(b.id.clone(), b.name.clone(), b.kind, p.shape, p.names.faces, b.color, self.feature)));
+            replaced.insert(targets[t], Arc::new(Body::named(b.id.clone(), b.name.clone(), b.kind, p.shape, p.names, b.color, self.feature)));
         }
         let (kind, color) = (bodies[0].kind, bodies[0].color);
         let mut extra: Vec<Arc<Body>> = Vec::new();
         for (j, p) in free.into_iter().enumerate() {
             let name = self.ctx.alloc_part_name(kind);
-            extra.push(Arc::new(Body::new(BodyId { feature: self.feature, index: 30_000 + j as u32 }, name, kind, p.shape, p.names.faces, color, self.feature)));
+            extra.push(Arc::new(Body::named(BodyId { feature: self.feature, index: 30_000 + j as u32 }, name, kind, p.shape, p.names, color, self.feature)));
         }
         let first_kept = replaced.keys().next().copied();
         let old = std::mem::take(&mut self.ctx.bodies);
@@ -1127,12 +1127,12 @@ impl<'a> EvalCtx<'a> {
         let pieces = split_solids(&shape, &faces);
         let mut iter = pieces.into_iter();
         if let Some(first) = iter.next() {
-            self.ctx.bodies[bi] = Arc::new(Body::new(old.id.clone(), old.name.clone(), old.kind, first.shape, first.names.faces, old.color, self.feature));
+            self.ctx.bodies[bi] = Arc::new(Body::named(old.id.clone(), old.name.clone(), old.kind, first.shape, first.names, old.color, self.feature));
         }
         for (j, p) in iter.enumerate() {
             let name = self.ctx.alloc_part_name(old.kind);
             let id = BodyId { feature: self.feature, index: 20_000 + j as u32 };
-            self.ctx.bodies.insert(bi + 1 + j, Arc::new(Body::new(id, name, old.kind, p.shape, p.names.faces, old.color, self.feature)));
+            self.ctx.bodies.insert(bi + 1 + j, Arc::new(Body::named(id, name, old.kind, p.shape, p.names, old.color, self.feature)));
         }
     }
 }
@@ -1154,6 +1154,14 @@ impl NamedShape {
         let names = names_for(&shape, faces);
         Self { shape, names }
     }
+}
+
+/// A unify's input names for naming its result: the faces' only. The
+/// unify's history takes faces to faces (merge_planar, UnifySameDomain), so
+/// the edge and vertex names, which cost two ancestor maps of the whole part
+/// (the 1600-face fin plate: ~30 ms), would go unread.
+fn unify_input_names(faces: Vec<Name>) -> ShapeNames {
+    ShapeNames { faces, edges: Vec::new(), vertices: Vec::new() }
 }
 
 /// Full names (faces + derived edges/vertices) for a shape.

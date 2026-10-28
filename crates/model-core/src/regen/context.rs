@@ -88,6 +88,29 @@ impl Body {
         }
     }
 
+    /// [`Body::new`] with the edge and vertex names already derived from the
+    /// faces' ([`super::eval::names_for`], as `new` derives them): a part's
+    /// 5000 edges and 3300 vertices named once, not twice.
+    pub fn named(id: BodyId, name: String, kind: BodyKind, shape: Shape, names: crate::naming::ShapeNames, color: usize, wire_feature: FeatureId) -> Self {
+        if names.faces.is_empty() || names.edges.len() != shape.count(ShapeType::Edge) || names.vertices.len() != shape.count(ShapeType::Vertex) {
+            return Body::new(id, name, kind, shape, names.faces, color, wire_feature);
+        }
+        Self {
+            id,
+            name,
+            kind,
+            shape,
+            faces: names.faces,
+            edges: names.edges,
+            vertices: names.vertices,
+            color,
+            composite: None,
+            face_lookup: OnceLock::new(),
+            edge_lookup: OnceLock::new(),
+            vertex_lookup: OnceLock::new(),
+        }
+    }
+
     pub fn renamed(&self, name: String) -> Body {
         Body { name, ..self.clone_shallow() }
     }

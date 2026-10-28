@@ -23,6 +23,7 @@ class IntCurvesFace_ShapeIntersector; // geom.cpp line_crossings
 class BRepClass3d_SolidClassifier;    // geom.cpp classify_point
 namespace noshape {
 class RayClassifier; // internal.hpp, classify_point
+struct UnifyScope;   // internal.hpp, the unify
 }
 
 #include <chrono>
@@ -366,6 +367,12 @@ public:
   // Its rays for a big solid (by the tolerance they were made with).
   mutable std::pair<double, std::shared_ptr<RayClassifier>> myRays{-1.0, nullptr};
 
+  // What the unify knows of it (boolean.cpp): nothing to merge in it (a
+  // unify found nothing); for a local Boolean's result on such a shape,
+  // where to look.
+  mutable std::atomic<bool>         myUnifyClean{false};
+  std::shared_ptr<const UnifyScope> myUnifyScope;
+
   // Ancestor maps (CSR offsets, values) by kind * 16 + ancestor kind,
   // computed once: regeneration asks for the same ones of a body many times.
   mutable std::mutex                                                                 myAncestorsLock;
@@ -591,6 +598,8 @@ OpOut op_rib(const OcShape& base, const OcShape& wire, const PlaneF& plane,
 // ---- booleans, split, transform, section (boolean.cpp)
 void                     set_memory_budget_mb(uint64_t mb);
 void                     set_bop_parallel(bool on);
+rust::String             last_unify_path();
+OpOut                    op_unify_whole(const OcShape& s);
 rust::String             last_boolean_path();
 void                     kernel_profile_mark(rust::Str label);
 void                     set_occt_threads(int32_t n);

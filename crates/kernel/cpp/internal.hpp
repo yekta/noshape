@@ -95,6 +95,20 @@ const std::pair<std::vector<uint32_t>, std::vector<uint32_t>>& ancestors_cached(
 // Every edge used twice, once each way (features.cpp).
 bool closed_and_oriented(const TopoDS_Shape& r);
 
+// Where in a shape the unify can find something to merge, when the shape
+// is a local Boolean's result on a target that had nothing (a candidate
+// pair of faces has a face the Boolean made, a candidate vertex is one whose
+// edges or their faces it changed): `faces`, the new faces, the faces across
+// the edges of the pieces kept, and every face at a `seeds` vertex, in the
+// shape's own order and orientations; `seeds`, the vertices of the edges made
+// or removed and of the pieces' edges (boolean.cpp). The unify of the
+// 1600-face fin plate after each fin walked the whole part three times.
+struct UnifyScope
+{
+  TopoDS_Compound faces;
+  ShapeIMap       seeds;
+};
+
 // A point against a solid by the parity of a ray's crossings, each ray
 // intersected only with the faces whose box it passes (OCCT's solid
 // classifier traces every face of a 1600-face part for each point, ~60 ms)

@@ -79,6 +79,7 @@
 #include <TColStd_PackedMapOfInteger.hxx>
 #include <NCollection_DataMap.hxx>
 #include <TopTools_ShapeMapHasher.hxx>
+#include <deque>
 #include <mutex>
 #include <memory>
 #include <algorithm>
@@ -250,15 +251,27 @@ std::vector<TopoDS_Shape> concat(const std::vector<TopoDS_Shape>& a,
   return r;
 }
 
+
+// NOSHAPE_UNIFY_LOCAL=0: the whole shape always.
+bool unify_local_on()
+{
+  static const bool on = [] {
+    const char* v = std::getenv("NOSHAPE_UNIFY_LOCAL");
+    return v == nullptr || std::string(v) != "0";
+  }();
+  return on;
+}
+
 // Whether two adjacent faces lie on one surface, or two edges meeting at a
 // vertex of only those two lie on one line, i.e. whether
 // ShapeUpgrade_UnifySameDomain could change anything. Linear in the shape;
 // unifying a shape it would leave unchanged costs seconds on large results
-// (a part with 1000 patterned ribs: 14 s).
-bool same_domain_candidates(const TopoDS_Shape& s)
+// (a part with 1000 patterned ribs: 14 s). With a scope: only there.
+bool same_domain_candidates(const TopoDS_Shape& s, const UnifyScope* sc = nullptr)
 {
-  ShapeAncMap ef;
-  TopExp::MapShapesAndUniqueAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  const TopoDS_Shape& where = sc != nullptr ? TopoDS_Shape(sc->faces) : s;
+  ShapeAncMap         ef;
+  TopExp::MapShapesAndUniqueAncestors(where, TopAbs_EDGE, TopAbs_FACE, ef);
   auto plane_of = [](const TopoDS_Face& f, gp_Pln& pl) {
     TopLoc_Location                 loc;
     const occ::handle<Geom_Surface> g = BRep_Tool::Surface(f, loc);
@@ -295,11 +308,11 @@ bool same_domain_candidates(const TopoDS_Shape& s)
   // Collinear edges that could merge: a vertex shared by exactly two
   // straight edges on one line.
   ShapeAncMap ve;
-  TopExp::MapShapesAndUniqueAncestors(s, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  TopExp::MapShapesAndUniqueAncestors(where, TopAbs_VERTEX, TopAbs_EDGE, ve);
   for (int i = 1; i <= ve.Extent(); ++i)
   {
     const ShapeList& es = ve(i);
-    if (es.Extent() != 2)
+    if (es.Extent() != 2 || (sc != nullptr && !sc->seeds.Contains(ve.FindKey(i))))
       continue;
     double                        f1, l1, f2, l2;
     const occ::handle<Geom_Curve> c1 = BRep_Tool::Curve(TopoDS::Edge(es.First()), f1, l1);
@@ -361,17 +374,19 @@ void edge_samples(const TopoDS_Edge& e, int n, std::vector<gp_Pnt>& out)
 // curved faces are left to UnifySameDomain. UnifySameDomain re-fixes every
 // merged face, O(edges²) per face: 3.6 s for 1000 full-width fins, whose
 // side faces merge into two combs of 6000 edges.
-TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist)
+TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* sc = nullptr, UnifyScope* next = nullptr)
 {
-  ShapeIMap faces;
-  TopExp::MapShapes(s, TopAbs_FACE, faces);
+  // With a scope: its faces only (the groups are there), its seeds' edges.
+  const TopoDS_Shape& where = sc != nullptr ? TopoDS_Shape(sc->faces) : s;
+  ShapeIMap           faces;
+  TopExp::MapShapes(where, TopAbs_FACE, faces);
   const int           nf = faces.Extent();
   std::vector<char>   planar((size_t)nf + 1, 0);
   std::vector<gp_Pln> pl((size_t)nf + 1);
   for (int i = 1; i <= nf; ++i)
     planar[(size_t)i] = outer_plane(TopoDS::Face(faces(i)), pl[(size_t)i]);
   ShapeAncMap ef;
-  TopExp::MapShapesAndUniqueAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  TopExp::MapShapesAndUniqueAncestors(where, TopAbs_EDGE, TopAbs_FACE, ef);
   std::vector<int> up((size_t)nf + 1);
   for (int i = 0; i <= nf; ++i)
     up[(size_t)i] = i;
@@ -613,10 +628,36 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist)
       hist = new BRepTools_History();
     hist->Merge(h);
   }
+  // The scope's faces as they are now, and its seeds with the vertices of
+  // the inner edges gone.
+  TopoDS_Compound where2;
+  ShapeIMap       seeds2;
+  if (sc != nullptr)
+  {
+    B.MakeCompound(where2);
+    for (TopoDS_Iterator it(sc->faces); it.More(); it.Next())
+    {
+      const TopoDS_Shape* m = merged_into.Seek(it.Value());
+      if (m == nullptr)
+        B.Add(where2, it.Value());
+      else if (!m->IsNull())
+        B.Add(where2, m->Oriented(it.Value().Orientation()));
+    }
+    seeds2 = sc->seeds;
+    for (const TopoDS_Shape& x : gone)
+      if (x.ShapeType() == TopAbs_EDGE)
+        for (TopExp_Explorer v(x, TopAbs_VERTEX); v.More(); v.Next())
+          seeds2.Add(v.Current());
+    if (next != nullptr)
+    {
+      next->faces = where2;
+      next->seeds = seeds2;
+    }
+  }
   // Collinear straight edges through vertices of only those two.
   ShapeAncMap ve, ef2;
-  TopExp::MapShapesAndUniqueAncestors(r, TopAbs_VERTEX, TopAbs_EDGE, ve);
-  TopExp::MapShapesAndUniqueAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef2);
+  TopExp::MapShapesAndUniqueAncestors(sc != nullptr ? TopoDS_Shape(where2) : r, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  TopExp::MapShapesAndUniqueAncestors(sc != nullptr ? TopoDS_Shape(where2) : r, TopAbs_EDGE, TopAbs_FACE, ef2);
   auto line_of = [](const TopoDS_Edge& e, gp_Lin& lin) {
     TopLoc_Location loc;
     double          f, l;
@@ -640,7 +681,7 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist)
   for (int i = 1; i <= ve.Extent(); ++i)
   {
     const ShapeList& es = ve(i);
-    if (es.Extent() != 2)
+    if (es.Extent() != 2 || (sc != nullptr && !seeds2.Contains(ve.FindKey(i))))
       continue;
     const TopoDS_Edge e1 = TopoDS::Edge(es.First()), e2 = TopoDS::Edge(es.Last());
     gp_Lin l1, l2;
@@ -731,22 +772,92 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist)
   if (hist.IsNull())
     hist = new BRepTools_History();
   hist->Merge(h2);
+  if (sc != nullptr && next != nullptr)
+  {
+    // The scope's faces rebuilt around the new edges; the new edges' ends.
+    const occ::handle<BRepTools_History> rebuilt = rs2->History();
+    ShapeIMap                            now;
+    for (TopoDS_Iterator it(where2); it.More(); it.Next())
+    {
+      const ShapeList& m = rebuilt->Modified(it.Value());
+      now.Add(m.IsEmpty() ? it.Value() : m.First().Oriented(it.Value().Orientation()));
+    }
+    BRep_Builder B2;
+    B2.MakeCompound(next->faces);
+    for (int i = 1; i <= now.Extent(); ++i)
+      B2.Add(next->faces, now(i));
+    for (const auto& [c, members] : chains)
+      for (int m : members)
+        for (TopExp_Explorer v(edges(m + 1), TopAbs_VERTEX); v.More(); v.Next())
+          next->seeds.Add(v.Current());
+  }
   return r2;
 }
 
 // Optional ShapeUpgrade_UnifySameDomain post-processing, composing history
 // (skipped when it could change nothing; planar faces and straight edges
 // merged first by merge_planar).
+TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean);
+
+// NOSHAPE_UNIFY_CHECK=1: a scoped unify is checked against the whole one
+// (counts and volume; tests).
+void check_scoped_unify(const TopoDS_Shape& s0, const TopoDS_Shape& got)
+{
+  static const bool on = std::getenv("NOSHAPE_UNIFY_CHECK") != nullptr;
+  if (!on)
+    return;
+  HHist              h;
+  const TopoDS_Shape want = unify_in(s0, h, nullptr, nullptr);
+  int                n[2][3] = {};
+  for (int k = 0; k < 2; ++k)
+    for (int j = 0; j < 3; ++j)
+    {
+      ShapeIMap m;
+      TopExp::MapShapes(k == 0 ? got : want, j == 0 ? TopAbs_FACE : j == 1 ? TopAbs_EDGE : TopAbs_VERTEX, m);
+      n[k][j] = m.Extent();
+    }
+  GProp_GProps a, b;
+  BRepGProp::VolumeProperties(got, a);
+  BRepGProp::VolumeProperties(want, b);
+  if (n[0][0] != n[1][0] || n[0][1] != n[1][1] || n[0][2] != n[1][2] || std::abs(a.Mass() - b.Mass()) > 1e-9 * std::abs(b.Mass()))
+  {
+    std::fprintf(stderr, "UNIFY SCOPED MISMATCH: faces %d/%d edges %d/%d vertices %d/%d volume %.12g/%.12g\n", n[0][0], n[1][0], n[0][1], n[1][1], n[0][2], n[1][2], a.Mass(), b.Mass());
+    std::abort();
+  }
+}
+
 TopoDS_Shape unify(const TopoDS_Shape& s0, HHist& hist)
 {
+  return unify_in(s0, hist, nullptr, nullptr);
+}
+
+// The unify, looking only in `sc` when given (UnifyScope); `clean` (when
+// given) says whether the result has nothing more to merge.
+TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean)
+{
+  if (clean != nullptr)
+    *clean = false;
   std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("unify.candidates");
-  if (!same_domain_candidates(s0))
+  if (!same_domain_candidates(s0, sc))
+  {
+    if (sc != nullptr)
+      check_scoped_unify(s0, s0);
+    if (clean != nullptr)
+      *clean = true;
     return s0;
-  lap                  = std::make_unique<KernelTimer>("unify.merge_planar");
-  const TopoDS_Shape s = merge_planar(s0, hist);
+  }
+  lap = std::make_unique<KernelTimer>("unify.merge_planar");
+  UnifyScope         next;
+  const TopoDS_Shape s = merge_planar(s0, hist, sc, &next);
   lap                  = std::make_unique<KernelTimer>("unify.candidates_again");
-  if (!same_domain_candidates(s))
+  if (!same_domain_candidates(s, sc != nullptr ? &next : nullptr))
+  {
+    if (sc != nullptr)
+      check_scoped_unify(s0, s);
+    if (clean != nullptr)
+      *clean = true;
     return s;
+  }
   lap = std::make_unique<KernelTimer>("unify.usd");
   ShapeUpgrade_UnifySameDomain u(s, true, true, false);
   u.Build();
@@ -2082,7 +2193,7 @@ static bool fuse_on_face(const TopoDS_Shape& target, const OcShape* src, const T
 // face: a fin fused to the 400-fin plate's 1600 faces took 1.8 s). False
 // when it doesn't apply (NOSHAPE_BOOL_LOCAL=0: never); the caller runs the
 // whole Boolean.
-static bool local_boolean(const TopoDS_Shape& target, const OcShape* src, const TopoDS_Shape& tool, int op, TopoDS_Shape& out, HHist& hist)
+static bool local_boolean(const TopoDS_Shape& target, const OcShape* src, const TopoDS_Shape& tool, int op, TopoDS_Shape& out, HHist& hist, std::shared_ptr<const UnifyScope>& scope)
 {
   auto no = [](int why) {
     if (std::getenv("NOSHAPE_BOOL_DEBUG"))
@@ -2510,6 +2621,80 @@ static bool local_boolean(const TopoDS_Shape& target, const OcShape* src, const 
   // As OCCT records it: both input solids replaced by the new one.
   h->Remove(solid);
   h->Remove(tsolid);
+  // A target the unify found nothing to merge in: where in the result it
+  // can (UnifyScope): the new faces (pieces kept, faces patched), the
+  // vertices of the edges made or removed, and the faces at those.
+  if (src != nullptr && src->myUnifyClean && unify_local_on())
+  {
+    lap                            = std::make_unique<KernelTimer>("local.unify_scope");
+    auto             sc            = std::make_shared<UnifyScope>();
+    const ShapeIMap& old_edges     = src->map(TopAbs_EDGE);
+    ShapeIMap        local;
+    for (int i = 1; i <= keep.Extent(); ++i)
+      local.Add(keep(i));
+    for (NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher>::Iterator it(patched); it.More(); it.Next())
+      local.Add(it.Value());
+    const int new_faces = local.Extent();
+    for (int i = 1; i <= new_faces; ++i)
+      for (TopExp_Explorer e(local(i), TopAbs_EDGE); e.More(); e.Next())
+        if (!old_edges.Contains(e.Current()))
+          for (TopExp_Explorer v(e.Current(), TopAbs_VERTEX); v.More(); v.Next())
+            sc->seeds.Add(v.Current());
+    auto removed = [&](const TopoDS_Shape& f) {
+      for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+        if (!in_result.Contains(e.Current()))
+          for (TopExp_Explorer v(e.Current(), TopAbs_VERTEX); v.More(); v.Next())
+            sc->seeds.Add(v.Current());
+    };
+    for (int i = 1; i <= region.Extent(); ++i)
+      removed(region(i));
+    for (NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher>::Iterator it(patched); it.More(); it.Next())
+      removed(it.Key());
+    // A kept piece's old edges now join it to another face than before (a
+    // box fused flush to the plate's end: the front face meets the box's
+    // across the edge it shared with the end face): the faces across them,
+    // and their vertices (two collinear edges may now share both faces).
+    const auto& ef_old = ancestors_cached(*src, TopAbs_EDGE, TopAbs_FACE);
+    for (int i = 1; i <= keep.Extent(); ++i)
+      for (TopExp_Explorer e(keep(i), TopAbs_EDGE); e.More(); e.Next())
+      {
+        for (TopExp_Explorer v(e.Current(), TopAbs_VERTEX); v.More(); v.Next())
+          sc->seeds.Add(v.Current());
+        const int k = old_edges.FindIndex(e.Current());
+        if (k > 0)
+          for (uint32_t j = ef_old.first[(size_t)k - 1]; j < ef_old.first[(size_t)k]; ++j)
+          {
+            const TopoDS_Shape& f = faces((int)ef_old.second[j] + 1);
+            if (!region.Contains(f) && !patched.IsBound(f))
+              local.Add(f);
+          }
+      }
+    // The target's faces at the seeds that the result keeps as they were.
+    const auto&      vf = ancestors_cached(*src, TopAbs_VERTEX, TopAbs_FACE);
+    const ShapeIMap& tv = src->map(TopAbs_VERTEX);
+    for (int i = 1; i <= sc->seeds.Extent(); ++i)
+    {
+      const int k = tv.FindIndex(sc->seeds(i));
+      if (k > 0)
+        for (uint32_t j = vf.first[(size_t)k - 1]; j < vf.first[(size_t)k]; ++j)
+        {
+          const TopoDS_Shape& f = faces((int)vf.second[j] + 1);
+          if (!region.Contains(f) && !patched.IsBound(f))
+            local.Add(f);
+        }
+    }
+    // In the result's order and orientations (as the whole unify would see them).
+    BRep_Builder B2;
+    B2.MakeCompound(sc->faces);
+    ShapeIMap added;
+    for (TopExp_Explorer x(so, TopAbs_FACE); x.More(); x.Next())
+      if (local.Contains(x.Current()) && !added.Contains(x.Current()))
+      {
+        added.Add(x.Current());
+        B2.Add(sc->faces, x.Current());
+      }
+    scope = sc;
+  }
   out  = so;
   hist = h;
   return true;
@@ -2700,17 +2885,28 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   // One tool where it meets a large target: the faces it reaches only.
   if ((op == 0 || op == 1) && a.size() == 1 && t.size() == 1 && facets.source.empty() && opts.fuzzy <= 0 && opts.glue == 0)
   {
-    TopoDS_Shape out;
-    HHist        h;
-    bool         done = false;
+    TopoDS_Shape                      out;
+    HHist                             h;
+    std::shared_ptr<const UnifyScope> scope;
+    bool                              done = false;
     {
       const KernelTimer timer("boolean.local");
-      done = local_boolean(a[0], args.sources.empty() ? nullptr : args.sources[0], t[0], op, out, h);
+      done = local_boolean(a[0], args.sources.empty() ? nullptr : args.sources[0], t[0], op, out, h, scope);
     }
     if (done)
+    {
       t_bool_path = "local";
-    if (done)
-      return make_result(concat(args.items, tools.items), opts.unify ? unify(out, h) : out, h.get());
+      // Where the unify (here or op_unify's) has to look (UnifyScope).
+      bool clean = false;
+      if (opts.unify)
+        out = unify_in(out, h, scope.get(), &clean);
+      OpOut r = make_result(concat(args.items, tools.items), out, h.get());
+      if (opts.unify)
+        r.shape->myUnifyClean = clean;
+      else
+        r.shape->myUnifyScope = scope;
+      return r;
+    }
   }
   // Holes straight through a plate: built directly.
   if (op == 1 && a.size() == 1 && facets.source.empty())
@@ -2851,12 +3047,44 @@ OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts
   return make_result(concat(args.items, tools.items), res, hist.get());
 }
 
-OpOut op_unify(const OcShape& s)
+namespace
+{
+thread_local const char* t_unify_path = "";
+} // namespace
+
+rust::String last_unify_path() { return rust::String(t_unify_path); }
+
+OpOut op_unify_whole(const OcShape& s)
 {
   require_non_null(s.shape, "shape");
   HHist        hist;
   TopoDS_Shape res = unify(s.shape, hist);
   return make_result({s.shape}, res, hist.get());
+}
+
+OpOut op_unify(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  // Known to have nothing to merge (an earlier unify found nothing), or
+  // where to look (a local Boolean's result: UnifyScope).
+  if (s.myUnifyClean && unify_local_on())
+  {
+    t_unify_path          = "known";
+    OpOut r              = make_result({s.shape}, s.shape, nullptr);
+    r.shape->myUnifyClean = true;
+    return r;
+  }
+  const UnifyScope* sc = unify_local_on() ? s.myUnifyScope.get() : nullptr;
+  t_unify_path         = sc != nullptr ? "scoped" : "whole";
+  HHist        hist;
+  bool         clean = false;
+  TopoDS_Shape res   = unify_in(s.shape, hist, sc, &clean);
+  OpOut        r     = make_result({s.shape}, res, hist.get());
+  r.shape->myUnifyClean = clean;
+  // The caller keeps the input when nothing merged: it knows too.
+  if (clean && res.IsSame(s.shape))
+    s.myUnifyClean = true;
+  return r;
 }
 
 OpOut op_enclose(const OcShapeList& shapes)

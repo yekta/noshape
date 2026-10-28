@@ -162,3 +162,44 @@ fn points_against_a_big_part_classified_by_rays() {
     }
     assert!(wrong.is_empty(), "{} wrong:\n{}", wrong.len(), wrong.join("\n"));
 }
+
+/// The unify after a local Boolean on a part the unify found nothing in
+/// looks only where the Boolean changed the part (boolean.cpp `UnifyScope`):
+/// the same result as the whole unify, in fuses whose faces merge into the
+/// part's big faces and whose edges merge into chains, and in cuts.
+#[test]
+fn the_unify_after_a_local_boolean_matches_the_whole_one() {
+    use noshape_kernel::bool_corpus::Summary;
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let n = 100;
+    let len = (2 * n + 10) as f64;
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(len, 20.0, 10.0) * mm).unwrap();
+    let fins: Vec<Shape> = (0..n).map(|i| make_box_corners(DVec3::new(2.0 + 2.0 * i as f64, 0.0, 10.0) * mm, DVec3::new(3.0 + 2.0 * i as f64, 20.0, 15.0) * mm).unwrap()).collect();
+    let part = boolean(BooleanOp::Fuse, &[plate], &fins, &BooleanOptions { unify: true, ..Default::default() }).unwrap().shape;
+    // As the regeneration does after every Boolean: a unify, which finds
+    // nothing more; the next one knows.
+    let part = unify_same_domain(&part).unwrap().shape;
+    let _ = unify_same_domain(&part).unwrap();
+    assert_eq!(last_unify_path(), "known");
+    let cases = [
+        ("a fin under the plate", BooleanOp::Fuse, DVec3::new(2.0, 0.0, -5.0), DVec3::new(3.0, 20.0, 0.0)),
+        ("the gap between two fins filled", BooleanOp::Fuse, DVec3::new(3.0, 0.0, 10.0), DVec3::new(4.0, 20.0, 15.0)),
+        ("the plate made longer, flush", BooleanOp::Fuse, DVec3::new(len, 0.0, 0.0), DVec3::new(len + 5.0, 20.0, 10.0)),
+        ("a fin on the end, flush", BooleanOp::Fuse, DVec3::new(len - 1.0, 0.0, 10.0), DVec3::new(len, 20.0, 15.0)),
+        ("a notch in a fin", BooleanOp::Cut, DVec3::new(1.5, 5.0, 12.0), DVec3::new(3.5, 8.0, 16.0)),
+        ("a pocket in the bottom", BooleanOp::Cut, DVec3::new(20.0, 5.0, -1.0), DVec3::new(30.0, 15.0, 4.0)),
+    ];
+    for (what, op, a, b) in cases {
+        let tool = make_box_corners(a * mm, b * mm).unwrap();
+        let r = boolean(op, std::slice::from_ref(&part), &[tool], &BooleanOptions::default()).unwrap();
+        assert_eq!(last_boolean_path(), "local", "{what}");
+        let scoped = unify_same_domain(&r.shape).unwrap();
+        assert_eq!(last_unify_path(), "scoped", "{what}");
+        let whole = unify_same_domain_whole(&r.shape).unwrap();
+        assert_eq!(Summary::of(&scoped).differences(&Summary::of(&whole)), Vec::<String>::new(), "{what}");
+        assert!(scoped.shape.count(ShapeType::Face) <= r.shape.count(ShapeType::Face), "{what}");
+        let _ = unify_same_domain(&scoped.shape).unwrap();
+        assert_eq!(last_unify_path(), "known", "{what}");
+    }
+}

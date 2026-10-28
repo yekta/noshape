@@ -184,6 +184,23 @@ Phase 2 (local Booleans), first step landed:
   rows). local.maps 26 → 5 ms, on_face's decline 14 → 2 ms; corpus a2121c5b 161 → 110 ms; 0 mismatches.
   `NOSHAPE_KERNEL_PROFILE` shows ancestors.<kind> per map: naming's vertex → face maps are the dear ones (3 a
   feature, ~16 ms each on the 1612-face part).
+- Step 5 (10-28): the regen's unify after a local Boolean looks only where the Boolean changed the part.
+  `OcShape::myUnifyClean`: a unify found nothing to merge in the shape (op_unify then returns at once, path
+  "known"); a local Boolean on such a target attaches a `UnifyScope` to its result (internal.hpp: the new faces,
+  the faces across the kept pieces' edges, the faces at the vertices whose edges changed) and op_unify's
+  candidate scans and merge_planar run over that compound only (path "scoped"; `last_unify_path()`).
+  NOSHAPE_UNIFY_LOCAL=0: the whole shape; NOSHAPE_UNIFY_CHECK=1: every scoped unify is redone whole and compared
+  (aborts on a difference); `unify_same_domain_whole` for tests. Extrude 3 of fins-400 (CPU, loaded machine):
+  op_unify 187 → 77 ms (merge_planar 76 → 27, candidates_again 56 → 10; the rest is make_result's history over
+  the whole part); the feature 670 → 408 ms wall. T1: kernel
+  `boolean_groups::the_unify_after_a_local_boolean_matches_the_whole_one` (six fuses and cuts, four of which merge).
+  With it, naming: a unify's input gets face names only (its history takes faces to faces; the edge / vertex
+  names cost two ancestor maps of the part) and `Body::named` takes the edge / vertex names `names_for` already
+  made (the part's edges and vertices were named twice). Extrude 3: ancestor maps 8 → 4 a feature; the feature
+  306 ms wall (dev; 1681 at the start of phase 2). Checked: kernel, model-core, model and ops tests and the corpus
+  with NOSHAPE_UNIFY_CHECK=1, no difference. Left in Extrude 3 (CPU): op_boolean 100 (local 59), op_unify 72
+  (merge_planar 30, make_result's history ~30), classify_point 32 (first: the face boxes), bounding boxes 27
+  (6 calls), ancestor maps 28.
 - The regen's unify (boolean.cpp `merge_planar`): the merged face goes on the surface of the group's face with the
   most edges and only edges without a pcurve there get one; a one-shell solid is rebuilt shell-only instead of
   BRepTools_ReShape copying the part: fins-400's 4 unifies 849 → 382 ms. A unify of only the new faces' region
