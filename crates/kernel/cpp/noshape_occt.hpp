@@ -658,6 +658,8 @@ std::unique_ptr<OcShape> read_iges(rust::Str path);
 std::unique_ptr<OcShape> read_mesh(rust::Str path, uint32_t merge_limit);
 void                     write_iges(const OcShapeList& shapes, rust::Str path, rust::Str system, rust::Str version);
 void                     write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary, rust::Str version, rust::Str application);
+void write_parasolid_assembly(const OcShapeList& parts, rust::Slice<const uint32_t> inst_part, rust::Slice<const double> transforms, rust::Str path,
+                              rust::Str version, rust::Str application);
 std::unique_ptr<OcShape> read_parasolid(rust::Str path);
 StepImport               read_parasolid_parts(rust::Str path);
 StepTree                 read_parasolid_tree(rust::Str path);

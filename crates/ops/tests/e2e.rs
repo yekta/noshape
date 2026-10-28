@@ -3936,6 +3936,30 @@ fn step_assembly_export_and_import_round_trip() {
     assert!(block_after["translation"].as_array().unwrap().iter().all(|v| num(v).abs() < 1e-6), "{block_after}");
 }
 
+/// An Assembly exported as Parasolid keeps its structure (qa
+/// ASM-PARASOLID-FLAT; live's x_t of an assembly re-imports as an Assembly
+/// and a "<file> parts" Part Studio): each part once, placed by its instances.
+#[test]
+fn parasolid_assembly_export_and_import_round_trip() {
+    let mut ctx = Ctx::new();
+    let (_, pin) = two_part_assembly(&mut ctx, "xt_asm.noshape");
+    call(&mut ctx, "assembly_transform", json!({ "instance": pin, "translation": [0, 0, 30], "axis": [0, 0, 1], "angle": "90 deg" }));
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    let before = list["instances"].as_array().unwrap().iter().find(|i| i["id"] == pin).unwrap().clone();
+    let file = scratch("xt_asm_out.x_t");
+    let e = call(&mut ctx, "export_parts", json!({ "tab": "Assembly 1", "format": "PARASOLID", "file": file.to_str().unwrap() }));
+    assert_eq!(e["parts"], 2, "{e}");
+    let r = call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+    let tabs: Vec<(String, String)> = r["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| (t["name"].as_str().unwrap().to_string(), t["kind"].as_str().unwrap().to_string())).collect();
+    let asm = tabs.iter().find(|t| t.1 == "Assembly").unwrap_or_else(|| panic!("an Assembly: {r}")).0.clone();
+    assert!(tabs.contains(&("xt_asm_out parts".to_string(), "Part Studio".to_string())), "{r}");
+    assert_eq!(call(&mut ctx, "query_parts", json!({ "tab": "xt_asm_out parts" }))["parts"].as_array().unwrap().len(), 2);
+    let inst = call(&mut ctx, "assembly_list", json!({ "tab": asm }))["instances"].as_array().unwrap().clone();
+    assert_eq!(inst.len(), 2, "{inst:?}");
+    let moved = |i: &Value| (0..3).all(|k| (num(&i["translation"][k]) - num(&before["translation"][k])).abs() < 1e-6);
+    assert!(inst.iter().any(moved), "the pin where the assembly had it: {inst:?} vs {before}");
+}
+
 /// Live's own STEP assembly (qa4 r4 s5): the tabs, parts and placements live makes.
 #[test]
 fn step_assembly_import_matches_live() {

@@ -102,6 +102,33 @@ fn parasolid_round_trip() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// An assembly as Parasolid (qa ASM-PARASOLID-FLAT): in 38.1 each part once
+/// with its instances, read back as the same assembly; older versions'
+/// assembly layouts are unknown, so nothing is written there.
+#[test]
+fn parasolid_assembly_round_trip() {
+    let dir = std::env::temp_dir().join(format!("noshape-xt-asm-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let parts: Vec<Shape> = xt_parts().into_iter().map(|p| p.1).take(2).collect();
+    let turned = glam::DMat4::from_translation(DVec3::new(0.05, 0.0, 0.01)) * glam::DMat4::from_rotation_z(std::f64::consts::FRAC_PI_2);
+    let placed = [glam::DMat4::IDENTITY, glam::DMat4::from_translation(DVec3::new(0.1, 0.0, 0.0)), turned];
+    let instances: Vec<StepInstance> = [0, 1, 1].into_iter().zip(placed).map(|(part, transform)| StepInstance { part, transform }).collect();
+    let path = dir.join("asm.x_t");
+    assert!(write_parasolid_assembly(&path, &parts, &instances, LengthUnit::Meter, "38.1").unwrap());
+    let (_, back, inst) = read_parasolid_assembly(&path, LengthUnit::Meter).unwrap().expect("an assembly");
+    assert_eq!((back.len(), inst.len()), (2, 3));
+    for (b, p) in back.iter().zip(&parts) {
+        let (v, want) = (volume_properties(&b.shape).unwrap().mass, volume_properties(p).unwrap().mass);
+        assert!((v - want).abs() < 5e-6 * want, "{v} vs {want}");
+    }
+    for (i, want) in inst.iter().zip(&instances) {
+        assert_eq!(i.part, want.part);
+        assert!(i.transform.abs_diff_eq(want.transform, 1e-12), "{:?} vs {:?}", i.transform, want.transform);
+    }
+    assert!(!write_parasolid_assembly(&dir.join("old.x_t"), &parts, &instances, LengthUnit::Meter, "37.1").unwrap());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// Parasolid versions (the Export dialog's list): each writes the body in
 /// that version's layouts with Onshape's header (live G36: one key per line,
 /// part 2 the writer's schema, the first body line naming the version's

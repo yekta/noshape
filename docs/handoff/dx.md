@@ -105,6 +105,19 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Live answered the derived colour question: the target's next default colour unless the source part's appearance is
   explicit (then carried); ours now does both.
 
+## Night 10-28 (landed through acc43c43; walk on green 52ca0b97, :131, /root/dx-scratch/w3/a*.png)
+- Walk 03:15: hole table on a 3-hole part (Ø6.6 THRU ×3): TAG / X LOC / Y LOC / SIZE "⌀6.6 THRU" / QTY 3 merged;
+  the tag axis' menu (Hole table properties..., Flip X / Y | Clear selection, Zoom to fit), Flip X negates X LOC;
+  table menu › Hole table properties... opens the dialog with the table's values, untick Show location data › ✓
+  drops X / Y LOC in one edit (one undo restores). Fixed from it: "Location precision" wrapped (label 98 px).
+- Landed: EX16 Insert DXF / DWG text as editable notes (da079ca2); D34 the palette's dual row (per-dimension dual
+  precision / units / Show-hide units, DXF too) and D17's wording (0637de45); V48 section / detail labels' own
+  Prefix / Letter / Suffix (3062ec50, drawing_get views' `label_text`); qa XT-ASM-SCALE (P1), HOLE-TABLE-FILLETS,
+  HOLE-TABLE-MENU (acc43c43; TB21 ✅).
+- With this: qa ASM-PARASOLID-FLAT: assemblies exported as Parasolid 38.1 keep ASSEMBLY / INSTANCE / TRANSFORM nodes in
+  live's layouts (from tests/perf's NIST x_t); older versions stay flat until live sends an assembly in each
+  (REQUESTS dx 10-28). Then BALLOON-WRONG-ITEM, DRAWING-SHIFT-SLASH, the drawing.md rows in P2 order.
+
 ## Evening 10-27 (landed through 24a0e15f)
 - Speed: Parasolid read 35 → 3 s; x_t assemblies import as live (Assembly + "<file> parts"); live's NIST exports in
   tests/perf; dx_perf::timed_nist_import (STEP 41.8 s / x_t 48.0 s dev, loaded; live 38.7 / 24.5 s) is held back by
@@ -136,8 +149,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - NIST assembly import, live's own exports (tests/perf/nist-mtc-crada-assembly.step / .x_t): **live STEP 38.7 s,
   x_t 24.5 s** to done (32.5 / 21.3 s to the Assembly tab). Ours, CLI import_files (dev, machine at load ~45):
   STEP 37–44 s, x_t 59–74 s, ~50 s of it display meshing serialized on the kernel's global mesh_mutex (request
-  below); target ≤ 19 / 12 s. dx_perf::timed_nist_import (dev, load ~45, Assembly + 8 parts as live): STEP 41.8 s,
-  x_t 48.0 s. x_t of an assembly now imports as live (Assembly + "<file> parts"). Earlier, on our own export of tests/perf/nist-mtc-crada-assembly.noshape (36 parts, STEP 11.9 MB), kernel only
+  below); target ≤ 19 / 12 s. dx_perf::timed_nist_import (dev, load ~45, Assembly + 8 parts as live, and since
+  10-28 the box's 152.4 mm): **10-28 03:50: STEP 46.9 s, x_t 20.9 s** (x_t was 48.0 s: its parts came in 1000× too
+  small, qa XT-ASM-SCALE, and meshing them was the slow part; fixed acc43c43). x_t of an assembly now imports as live (Assembly + "<file> parts"). Earlier, on our own export of tests/perf/nist-mtc-crada-assembly.noshape (36 parts, STEP 11.9 MB), kernel only
   (C++ -O2): read STEP 9.3 s, write x_t 8.1 s, read x_t 35 s → **3.0 s** (10-27: attributes indexed once, bodies
   healed in parallel, second fins' SP-curves matched in parallel; same volumes / faces bit for bit). STEP next. Parasolid export of that
   Part Studio crashed the kernel on 3 parts (OCCT 8.0.1 SweptToElementary null face): fixed f2279b3c.

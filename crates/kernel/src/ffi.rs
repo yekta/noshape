@@ -590,6 +590,7 @@ pub(crate) mod ffi {
         fn read_mesh(path: &str, merge_limit: u32) -> Result<UniquePtr<OcShape>>;
         fn write_iges(shapes: &OcShapeList, path: &str, system: &str, version: &str) -> Result<()>;
         fn write_parasolid(shapes: &OcShapeList, path: &str, binary: bool, version: &str, application: &str) -> Result<()>;
+        fn write_parasolid_assembly(parts: &OcShapeList, inst_part: &[u32], transforms: &[f64], path: &str, version: &str, application: &str) -> Result<()>;
         fn read_parasolid(path: &str) -> Result<UniquePtr<OcShape>>;
         fn read_parasolid_parts(path: &str) -> Result<StepImport>;
         fn read_rhino_parts_ffi(path: &str) -> Result<StepImport>;

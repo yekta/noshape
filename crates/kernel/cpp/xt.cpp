@@ -1759,6 +1759,43 @@ std::string parasolid_binary_body(const TopoDS_Shape& prepared, std::vector<Topo
   return binary_body(w.nodes, xt_version("12.0"));
 }
 
+// A base-schema field's position in a node (the fields before it fixed-size).
+size_t base_field(int type, const std::string& name)
+{
+  const std::vector<FieldSpec>& f = base_schema().at(type).fields;
+  for (size_t i = 0; i < f.size(); ++i)
+    if (f[i].name == name)
+      return i;
+  fail_invalid("no field " + name);
+  return 0;
+}
+
+// One part's BODY, as write_parasolid writes it.
+int write_body(Writer& w, const TopoDS_Shape& s)
+{
+  require_non_null(s, "shape");
+  const TopoDS_Shape p = prepared(s, true);
+  bool               solid = false;
+  for (TopExp_Explorer ex(p, TopAbs_SOLID); ex.More(); ex.Next())
+    solid = true;
+  const int body = w.alloc();
+  w.next_id      = 1;
+  BodyWriter bw(w, body, solid);
+  bw.write(p);
+  return body;
+}
+
+void write_file(const std::vector<Node>& nodes, const XtVersion& ver, bool binary, const std::string& path, const std::string& application)
+{
+  const std::string data = header(binary, path, application) + (binary ? binary_body(nodes, ver) : text_body(nodes, ver));
+  std::ofstream     out(path, std::ios::binary);
+  if (!out)
+    fail_invalid("cannot write " + path);
+  out.write(data.data(), (std::streamsize)data.size());
+  if (!out)
+    fail_op("writing " + path + " failed");
+}
+
 void write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary, rust::Str version, rust::Str application)
 {
   const XtVersion ver = xt_version(std::string(version));
@@ -1767,18 +1804,7 @@ void write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary, rus
   const bool       list = shapes.items.size() != 1;
   const int        root = list ? w.alloc() : 0;
   for (const auto& s : shapes.items)
-  {
-    require_non_null(s, "shape");
-    const TopoDS_Shape p = prepared(s, true);
-    bool               solid = false;
-    for (TopExp_Explorer ex(p, TopAbs_SOLID); ex.More(); ex.Next())
-      solid = true;
-    const int body = w.alloc();
-    bodies.push_back(body);
-    w.next_id = 1;
-    BodyWriter bw(w, body, solid);
-    bw.write(p);
-  }
+    bodies.push_back(write_body(w, s));
   if (list)
   {
     Node& n     = w.add(74, root);
@@ -1788,14 +1814,77 @@ void write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary, rus
     for (int b : bodies)
       n.fields.push_back(fp(b));
   }
-  const std::vector<Node> nodes = to_version(std::move(w.nodes), ver);
-  const std::string       data  = header(binary, std::string(path), std::string(application)) + (binary ? binary_body(nodes, ver) : text_body(nodes, ver));
-  std::ofstream       out(std::string(path), std::ios::binary);
-  if (!out)
-    fail_invalid("cannot write " + std::string(path));
-  out.write(data.data(), (std::streamsize)data.size());
-  if (!out)
-    fail_op("writing " + std::string(path) + " failed");
+  write_file(to_version(std::move(w.nodes), ver), ver, binary, std::string(path), std::string(application));
+}
+
+// An assembly as Onshape exports one (38.1, live samples/dx-nist-assembly.x_t;
+// qa ASM-PARASOLID-FLAT): the ASSEMBLY first (node 1), each part's BODY once
+// (bodies chained next / previous, ref_instance the first of its instances),
+// and per placement an INSTANCE (chained in the assembly and per part) with
+// its TRANSFORM (`tf`: 12 per instance, the rotation's rows each followed by
+// the translation in metres; flag 1 moved, 2 turned).
+void write_parasolid_assembly(const OcShapeList& parts, rust::Slice<const uint32_t> inst_part, rust::Slice<const double> tf, rust::Str path, rust::Str version,
+                              rust::Str application)
+{
+  const XtVersion ver = xt_version(std::string(version));
+  if (schema_code(ver) < 38100)
+    fail_invalid("Parasolid assemblies are written in 38.1");
+  if (tf.size() != inst_part.size() * 12)
+    fail_invalid("one transform per instance");
+  Writer           w;
+  const int        root = w.alloc();
+  std::vector<int> bodies;
+  for (const auto& s : parts.items)
+    bodies.push_back(write_body(w, s));
+  const size_t                     ni = inst_part.size();
+  std::vector<int>                 inst(ni), trs(ni);
+  std::vector<std::vector<size_t>> of_part(bodies.size());
+  for (size_t k = 0; k < ni; ++k)
+  {
+    if (inst_part[k] >= bodies.size())
+      fail_invalid("an instance of no part");
+    inst[k] = w.alloc();
+    trs[k]  = w.alloc();
+    of_part[inst_part[k]].push_back(k);
+  }
+  long long id = 1;
+  for (size_t k = 0; k < ni; ++k)
+  {
+    const std::vector<size_t>& same = of_part[inst_part[k]];
+    const size_t               j    = (size_t)(std::find(same.begin(), same.end(), k) - same.begin());
+    const double*              m    = &tf[k * 12];
+    Node&                      I    = w.add(11, inst[k]);
+    I.fields = {fd(id++), fp(0), fu(1), fp(bodies[inst_part[k]]), fp(trs[k]), fp(root), fp(k + 1 < ni ? inst[k + 1] : 0), fp(k > 0 ? inst[k - 1] : 0),
+                fp(j + 1 < same.size() ? inst[same[j + 1]] : 0), fp(j > 0 ? inst[same[j - 1]] : 0)};
+    bool turned = false;
+    for (int r = 0; r < 3; ++r)
+      for (int c = 0; c < 3; ++c)
+        turned |= std::abs(m[r * 4 + c] - (r == c ? 1.0 : 0.0)) > 1e-15;
+    const bool moved = m[3] != 0 || m[7] != 0 || m[11] != 0;
+    Node&      T     = w.add(100, trs[k]);
+    T.fields         = {fd(id++), fp(inst[k]), fp(0), fp(0)};
+    for (int r = 0; r < 3; ++r)
+      for (int c = 0; c < 3; ++c)
+        T.fields.push_back(ff(m[r * 4 + c]));
+    T.fields.push_back(fv(gp_XYZ(m[3], m[7], m[11])));
+    T.fields.push_back(ff(1));
+    T.fields.push_back(fd((moved ? 1 : 0) | (turned ? 2 : 0)));
+    T.fields.push_back(fv_null());
+  }
+  Node& A  = w.add(10, root);
+  A.fields = {fd(id), fp(0), fp(0), fp(0), fp(0), fp(0), fp(0), fp(0), ff(1e3), ff(1e-8), fp(0), fp(0), fp(0), fu(1), fp(0), fu(1), fp(ni ? inst[0] : 0)};
+  const size_t ref = base_field(12, "ref_instance"), next = base_field(12, "next"), prev = base_field(12, "previous");
+  for (size_t b = 0; b < bodies.size(); ++b)
+  {
+    Node& B = w.node(bodies[b]);
+    if (!of_part[b].empty())
+      B.fields.at(ref) = fp(inst[of_part[b].front()]);
+    B.fields.at(next) = fp(b + 1 < bodies.size() ? bodies[b + 1] : 0);
+    B.fields.at(prev) = fp(b > 0 ? bodies[b - 1] : 0);
+  }
+  std::vector<Node> nodes = std::move(w.nodes);
+  std::stable_sort(nodes.begin(), nodes.end(), [](const Node& a, const Node& b) { return a.index < b.index; });
+  write_file(to_version(std::move(nodes), ver), ver, false, std::string(path), std::string(application));
 }
 
 // ---------------------------------------------------------------- reader

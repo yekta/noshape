@@ -336,15 +336,25 @@ impl AssemblyExport {
 /// and individual files get the placed parts.
 pub fn write_assembly_export(s: &ExportSettings, path: &std::path::Path, a: &AssemblyExport) -> anyhow::Result<std::path::PathBuf> {
     anyhow::ensure!(!a.instances.is_empty(), "There are no parts to export");
+    // Y axis up: the model's +Z becomes +Y.
+    let up = if s.y_up { glam::DMat4::from_rotation_x(-std::f64::consts::FRAC_PI_2) } else { glam::DMat4::IDENTITY };
+    let instances: Vec<k::StepInstance> = a.instances.iter().map(|(p, _, t)| k::StepInstance { part: *p, transform: up * *t }).collect();
+    // Parasolid keeps the assembly too (live: its x_t re-imports as an
+    // Assembly; qa ASM-PARASOLID-FLAT), in the versions whose layouts we have.
+    if s.format == PartFormat::Parasolid && !s.individual && k::write_parasolid_assembly(path, &a.parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), &instances, k::LengthUnit::Meter, parasolid_version(s))? {
+        return Ok(path.to_path_buf());
+    }
     if s.format != PartFormat::Step || s.individual {
         return write_export(s, path, a.placed()?);
     }
-    // Y axis up: the model's +Z becomes +Y.
-    let up = if s.y_up { glam::DMat4::from_rotation_x(-std::f64::consts::FRAC_PI_2) } else { glam::DMat4::IDENTITY };
     let shapes: Vec<k::ExportShape> = a.parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect();
-    let instances: Vec<k::StepInstance> = a.instances.iter().map(|(p, _, t)| k::StepInstance { part: *p, transform: up * *t }).collect();
     k::write_step_assembly(path, &a.root, &shapes, &instances, k::LengthUnit::Meter, &step_options(s))?;
     Ok(path.to_path_buf())
+}
+
+/// The dialog's Parasolid version (live G36: "Use latest version" = 38.1).
+fn parasolid_version(s: &ExportSettings) -> &'static str {
+    if s.latest { PARASOLID_VERSIONS[0] } else { PARASOLID_VERSIONS.get(s.version).copied().unwrap_or(PARASOLID_VERSIONS[0]) }
 }
 
 /// A part as the STEP writer takes it: Onshape writes the colour's 8-bit sRGB values.
@@ -417,10 +427,7 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
         PartFormat::Iges => k::write_iges(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
         // Text transmit file in the chosen version (live G36: the body in that
         // version's layouts; "Use latest version" = 38.1).
-        PartFormat::Parasolid => {
-            let version = if s.latest { PARASOLID_VERSIONS[0] } else { PARASOLID_VERSIONS.get(s.version).copied().unwrap_or(PARASOLID_VERSIONS[0]) };
-            k::write_parasolid_version(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter, false, version)?
-        }
+        PartFormat::Parasolid => k::write_parasolid_version(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter, false, parasolid_version(s))?,
         PartFormat::Acis => k::write_acis(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
         PartFormat::Pvz => {
             let shapes: Vec<k::ExportShape> = parts.iter().map(|(n, sh, _)| k::ExportShape { shape: sh.clone(), name: Some(n.clone()), color: None }).collect();
