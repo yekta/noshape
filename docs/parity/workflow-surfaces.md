@@ -20,7 +20,7 @@ Status: ✅ matches expected/live, ✗ differs (finding #), ? live data pending.
 | 8 | Leave open on the box top | open surface body | "Part 2" under Surfaces (5 faces, 3800 mm²) | ✅ (name ?) | 0.4.10+ / dd1b5037 10-27 (40×30×20 block's top: "Part 2" under Surfaces) |
 | 9 | Tool search "fill" | Fillet, Fill, Finish flex PCB model, Finish sheet metal model, … | no Finish flex PCB model (SM12) | ✗ SM12 |  |
 | 10 | Fill: 4 top edges | live dialog ? | chips "[Position] Edge of Extrude 2" + per-edge continuity rows; **no preview while editing**; result Surface 2, 800 mm² | ✗ SF1 (preview) |  |
-| 11 | Boundary surface: arcs as U profiles | surface between the arcs | "Add Profile" UI, preview, OK; 1200 mm² (planar region between two coplanar arcs = 40×30) | ✅ |  |
+| 11 | Boundary surface: arcs as U profiles | surface between the arcs | "Add Profile" UI, preview, OK; 1200 mm² (planar region between two coplanar arcs = 40×30) | ✅ | 0.4.10+ / da18f886 10-28 (U profiles rows "[None] Edge of Arcs sketch" ×2, preview, Surface 1 = 1200.000 mm²) |
 | 12 | Click in the viewport before activating a field | (Boundary) | notice "Click a selection field in the dialog first." | ? |  |
 | 13 | Extrude two adjacent regions (solid) 10 mm | one block, **6 faces** (live merges coplanar faces, G45) | 8000 mm³ but **10 faces** (region seams kept on top/bottom/sides) | ✗ SF2 |  |
 | 14 | Extrude with both regions, misclick near the New/Add/Remove row | – | Error "Select parts in the merge scope" (most likely my click landed on Remove; not a finding) | – |  |
