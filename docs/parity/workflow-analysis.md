@@ -81,3 +81,4 @@ Block 40×20×10 at the origin (qa-scratch/blk40 copy), clicks additive (rows fo
 | MP7 | One circular edge (hole rim) | status "Diameter: 8.000 mm" (dom/measure-readouts-final.txt (10)) | "Diameter: 6.350 mm" | ✅ | 8bb8a6d1 10-28 |
 | MP8 | Two circular edges (rims 25 mm apart) | "Center dist: 30.000 mm  Max dist: 38.000 mm  Min dist: 22.000 mm" ((7): Center, Max, Min) | "Center dist: 25.000 mm  Max dist: 31.350 mm  Min dist: 18.650 mm" | ✅ | 8bb8a6d1 10-28 |
 | MP9 | Hole wall + planar face parallel to its axis (front face) | "Min dist: …  Center axes dist: …  Max dist: …" ((6) run 6b) | "Min dist: 2.825 mm  Center axes dist: 6.000 mm  Max dist: 35.219 mm" | ✅ | 8bb8a6d1 10-28 |
+| MP10 | Chamfer face (45°) + top face | status "Angle: 135.000 deg"; panel Angle | Area | Max dist | Min dist ((2)) | same: Angle 135.000 deg · Area 609.712 mm² · Max dist 43.060 (X/Y/Z) · Min dist 0.000 | ✅ | 8bb8a6d1 10-28 |
