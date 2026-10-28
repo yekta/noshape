@@ -166,7 +166,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | F3 | Hover tooltip: "<name> has error: <message>", type, offset and limit definitions | UI:mate-hover | ✅ | | 0.4.10+ / 52ca0b97 10-28 ("Revolute 1 (Hidden) / Revolute mate / Offset: off / Limits: Z angle – to 30 deg") |
 | F4 | Mate limit indicator icon ("<name> has limits") | H:mates, B | ✅ | | 2292bf8c 10-28 (Revolute 1, ☑ Limits 0 / 90 deg → row icon, tooltip "Revolute 1 has limits") |
 | F5 | Eye icon on hover toggles the mate indicator | E§6.4 | ✅ | | 0.4.10+ / 52ca0b97 10-28 (row eye shows the hidden mate's glyph) |
-| F6 | Mates expand to the implicit mate connectors they use | E§5.1, UI:mate-hover | ✅ | |  |
+| F6 | Mates expand to the implicit mate connectors they use | E§5.1, UI:mate-hover | ✅ | | 4c97692e 10-28 (GUI: Revolute 1 › chevron → 'Mate connector of Part 2 <1>', 'Mate connector of Part 1 <1>' rows with the connector icon) |
 | F7 | Double-click edits | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | F8 | Error rows red with indicator | E§6.4 | ✅ | | ea572159 10-28 (GUI: the erroring mate and the gears on it red, red dot indicators at the row end and on 'Mate features') |
 | F9 | Suppressed / inactive rows grey, struck through | E§6.4 | ✅ | | 0.4.10+ / acd6acce 10-27 (wa2: Assembly 2) |
