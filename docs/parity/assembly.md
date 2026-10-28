@@ -140,7 +140,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | C18 | Zoom to selection | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C19 | Add selection to folder… | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C20 | Expand ▸ Expand selected / Expand all; Collapse ▸ … | UI:context-part | ✅ | subassemblies; GUI g2–g4 |  |
-| C21 | Create empty subassembly | UI:context-part | ✅ | new "Assembly N" tab + instance |  |
+| C21 | Create empty subassembly | UI:context-part | ✅ | new "Assembly N" tab + instance | 0.4.10+ / 1b81b7ca 10-28 (instance menu › Create empty subassembly → "Assembly 2 <1>" row (selected, triad) and an "Assembly 2" tab) |
 | C22 | Delete (mates, MCs, relations go; groups keep other members) | UI:context-part, E§1 | ✅ | model test `rename_hide_others_and_unfix_all` |  |
 | C23 | Show mates, Go to item in list (graphics menu) | E§5.4 | ✅ | |  |
 | C24 | Graphics menu on empty space: Show all, Zoom to fit, Isometric, Clear selection | E§5.4 | ✅ | | 0.4.10+ / 52ca0b97 10-28 (asm5 empty space: Show all, Create Drawing of Assembly 1…, Zoom to fit, Isometric = live 1336) |
