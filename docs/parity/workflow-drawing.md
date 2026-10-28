@@ -21,7 +21,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 1.7 | Title block DWG NO. of the assembly drawing | the assembly's part number ("----" when empty) | **"PN-001" = Part 1's part number** (CLI: only Part 1 has PN-001) | ✗ D4 |  |
 | 1.8 | Section view (Horizontal), click a hole centre, drag down, place, ✓ | "SECTION A-A", arrows, hatching | same | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) ("SECTION A - A", arrows, hatch; Vertical tab) |
 | 1.9 | Detail view: circle centre + radius, place | "DETAIL B / SCALE 1:1" (2× parent), circle + label on the parent | same | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) ("DETAIL A / SCALE 2:1", circle + label on the parent) |
-| 1.10 | Auxiliary view on a straight edge, place | "Auxiliary C - C", indicator arrows at the parent | same | ✅ |  |
+| 1.10 | Auxiliary view on a straight edge, place | "Auxiliary C - C", indicator arrows at the parent | same | ✅ | c38eb9cf (qa 10:55: Auxiliary view on the front view's top edge, placed above → "Auxiliary A - A" (first aux view), A–A indicator arrows at the parent) |
 
 ## 2. Annotations
 
