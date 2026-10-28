@@ -36,7 +36,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | 2.5 | Slider: block top face → plate top face; HUD flip primary axis | flip turns the block over | block stays inside the plate; CLI: **rotation identity after the flip** (flip had no effect) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 |  |
 | 2.6 | Fastened: bracket → plate; flip, flip back | flips | flips correctly | ✅ |  |
 | 2.7 | Mate connector tool hover on a face | **orange outline on the hovered face, white dots only at that face's inference points, small triad + ring** (assembly/31-*) | no face outline, **dark dots on many edges of other faces**, large triad without ring | ✅ (GUI :103 skasm 10-27: orange outline on the hovered face, small triad + ring at the nearest inference point, no dots on other parts); was ✗ A5 | 77870dd4 10-28 |
-| 2.8 | Place, ✓ | "Mate connector 1" under Mate features | same | ✅ |  |
+| 2.8 | Place, ✓ | "Mate connector 1" under Mate features | same | ✅ | 6acf6b94 (qa 10:36: Mate connector (Ctrl+M), hover the pattern copy's front face (orange outline, white dots, small triad + ring), click, ✓ → "Mate connector 1" under Mate features (3)) |
 
 ## 3. Replicate, patterns
 
