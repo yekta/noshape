@@ -85,6 +85,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Same in green b504234e (GUI, Mass properties 9500 mm³; tickets/feature-mirror-full-depth-b504.png) and v0.4.11 CLI;
   script qa-scratch/bin/fmirvar.py (face / offset-plane sketch × Reapply off / on). Parity workflow-advanced-part-studio
   3.10b had 9000 (CLI) on 10-21 (qa 2026-10-28 05:11, build b504234e)
+- [ ] P3 ENCLOSE-NO-REGION-MSG Enclose of the three default planes only (Top, Front, Right; any doc): ours ERROR "Failed to
+  create a part from enclosed region."; live L30 (behaviours ~8393): "Selections do not enclose a region.", no field flagged.
+  solid_a.rs only gives the live text when k::enclose returns no solid, but k::enclose itself errors here, so the
+  "Failed…" text wins. Same for a lone wrapped surface (live text for that not recorded). Same in v0.4.11 CLI; parity
+  feature-sweep Enclose row 3 had it 🔧 ✅ (tickets/enclose-3planes-b504.png) (qa 2026-10-28 05:19, build b504234e)
 - [ ] P3 SM-FACES Sheet metal model › Extrude of an open L ((0,0)–(50,0)–(50,30), Blind 20, thickness 2, R3; live "fs (10-23
   05:00)"): volumes exact (3211.3274 / flipped 3051.3274) and the folded boxes = live, but ours has **10 faces**, live **14**
   (12 PLANE + 2 CYLINDER): live keeps each end face (z 0 and z 20) split into wall / bend / wall pieces, ours merges each end

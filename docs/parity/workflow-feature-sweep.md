@@ -160,8 +160,8 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1 | Fields | Result body operation, Entities, Merge with all ☐, merge scope, Keep tools ☐ | same | ✅ | f9185639 10-28 (dialog fields) |
-| 2 | Empty | "Select faces, parts, or planes to form a solid." | own text | 🔧 L29 Entities marked |  |
-| 3 | No region | "Selections do not enclose a region." | own text | 🔧 ✅ L30 |  |
+| 2 | Empty | "Select faces, parts, or planes to form a solid." | own text | 🔧 L29 Entities marked | b504234e 10-28 (GUI: empty → title tooltip "Enclose 1 did not regenerate properly: Select faces, parts, or planes to form a solid.", ✓ disabled) |
+| 3 | No region | "Selections do not enclose a region." | own text | 🔧 ❌ (ENCLOSE-NO-REGION-MSG) L30 | b504234e 10-28: ✗ Top+Front+Right → "Failed to create a part from enclosed region." |
 | 4 | Failure | "Failed to create a part from enclosed region." | "Enclose failed: …" | 🔧 |  |
 | 5 | Sketch regions | allowed | filtered out | 🔧 L31 accepted; enclosed regions make one part |  |
 
@@ -199,7 +199,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Mirror / patterns: Face and Feature modes, Curve pattern
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | Face / Feature labels, no operation tabs, Reapply only for Feature (☐), defaults | same | ✅ |  |
+| 1 | Fields | Face / Feature labels, no operation tabs, Reapply only for Feature (☐), defaults | same | ✅ | b504234e 10-28 (GUI: Feature mirror = Features to mirror, Mirror plane, ☐ Reapply features, no tabs; Face mirror = Faces to mirror (+tangent), Mirror plane, no tabs/Reapply; Part mirror New/Add/Remove/Intersect) |
 | 2 | Empty Face mode | "Select faces to pattern." / "…mirror." on faces, before the direction | same | ✅ | 67f88fd1 10-28 (Face mirror "Select faces to mirror.", Face pattern "Select faces to pattern.") |
 | 3 | Empty Feature mode | "Select features to pattern." / "…mirror." on Features, before the direction / plane | direction first, then "Select features to pattern" | 🔧 |  |
 | 4 | Unresolvable plane / direction / axis | "Select a mirror plane." / "Select a pattern direction." / "Select a pattern axis." on the field | "…could not be resolved" | 🔧 |  |
