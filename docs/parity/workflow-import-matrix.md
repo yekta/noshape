@@ -35,7 +35,7 @@ known band keep the ≤1e-5 rule until live supplies one.
 | g38b-mcmaster-91274A118.x_t | 254.521984, 25 faces | 254.4037797834923, 25 | ✗ IM2 (+0.118) |  |
 | g38d-mcmaster-curve1 / polycarb-curves | Curve 1 / Curves 1–8 (wires) | 1 / 8 wires | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 1 / 8 wires (no volume) |
 | g39-rule-unique-parts.zip, g47-3parts-unique.zip (zips of 3 STEP parts) | **ERROR "Root assembly file not found. Ensure zip f…"** | ? (requested "qa5 zip import") | ? |  |
-| g47-3parts.step | Part 1–3, 1000 each (listed Part 3, 2, 1) | 3 cubes | ✅ (order ?) |  |
+| g47-3parts.step | Part 1–3, 1000 each (listed Part 3, 2, 1) | 3 cubes | ✅ (order ?) | v0.4.12 CLI 10-28 (qa, /tmp/qa-imp/impmatrix.json: Part 3, Part 2, Part 1, 1000.0 / 6 faces each) |
 
 Findings: **IM1** (kern/fs) PVZ part names; **IM2** (kern) Parasolid imports of the native-CAD samples differ in volume (ktane −0.978 mm³, Bell Crank −0.029, McMaster +0.118, fluxpad −0.001) while face counts match, i.e. a tolerance/evaluation issue in the volume of imported B-splines or fillets; I1 unchanged.
 
@@ -58,11 +58,11 @@ All 106 imports (impmatrix7.log) are identical to the 14:36 CLI run: I1 (g25-b S
 All 106 earlier samples re-imported (/root/qa5-scratch/pass3/impmatrix12.py → impmatrix12.log/json); 104 rows identical to pass 7.
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| IM3 zips (g39-rule-unique-parts.zip, g47-3parts-unique.zip) | import returns errors ["g39-rule-unique-parts.zip was not translated. Translation is not supported for STEP (.stp) files."] (= live's notification text) and creates a **File tab** named after the zip, no parts | ✅ **fixed** (UI toast "…uploaded but failed to translate. Open document ×" not checked) |  |
+| IM3 zips (g39-rule-unique-parts.zip, g47-3parts-unique.zip) | import returns errors ["g39-rule-unique-parts.zip was not translated. Translation is not supported for STEP (.stp) files."] (= live's notification text) and creates a **File tab** named after the zip, no parts | ✅ **fixed** (UI toast "…uploaded but failed to translate. Open document ×" not checked) | v0.4.12 CLI (qa 10:24: import_files of both zips → File tab named after the zip, no parts, errors ["<zip> was not translated. Translation is not supported for STEP (.stp) files."]) |
 | IM1 PVZ (part names, RootAssembly + BOM tabs) | unchanged | ✗ still |  |
 | IM2 Parasolid volumes (ktane, Bell Crank, McMaster, fluxpad, g26) | unchanged | ✗ still |  |
 | I1 g25-b SAT/STEP/X_T | unchanged | ✗ still |  |
-| New g48-ap203 / ap214 / inch .step (g47 3 cubes) | 3 × 1000, 6 faces each, listed Part 3, 2, 1 | ✅ volumes (order as g47, ?) |  |
+| New g48-ap203 / ap214 / inch .step (g47 3 cubes) | 3 × 1000, 6 faces each, listed Part 3, 2, 1 | ✅ volumes (order as g47, ?) | v0.4.12 CLI 10-28 (qa, /tmp/qa-imp/impmatrix.json: ap203 / ap214 / inch each Part 3, 2, 1 at 1000.0, 6 faces) |
 | New g48-types.step (live 22595.3688587902, 15 faces) | 22595.371166, 15 | ✗ IM2-type (+0.0023) |  |
 | New g48-two.step (live Part 1 22595.3688587902 + Part 2 1000) | 22595.371166 + 1000 | ✗ IM2-type (+0.0023) |  |
 | New g48-surface.step | "Surface 1", 1 face | ✅ | v0.4.12 CLI 10-28 (= 1b81b7ca code): 1 face, no volume |
@@ -84,7 +84,7 @@ impmatrix13 (116 samples) vs impmatrix12: 108 identical.
 impmatrix14 vs impmatrix13: 115 of 116 identical.
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| IM5 g38d-polycarb-curves.x_t | Curve 1…Curve 8 (8 wires) again | ✅ **fixed** |  |
+| IM5 g38d-polycarb-curves.x_t | Curve 1…Curve 8 (8 wires) again | ✅ **fixed** | v0.4.12 CLI 10-28 (qa, /tmp/qa-imp/impmatrix.json: Curve 1 … Curve 8, Wire) |
 | IM4 g50-g46-shell1.x_t | still refused ("a curve of the file could not be rebuilt") | ✗ still |  |
 | NAME3 multi-part import names | unchanged (positional: g48-two Part 1 = cube) | ✗ still |  |
 | IM1, IM2, I1 | unchanged | ✗ still |  |
@@ -93,16 +93,16 @@ impmatrix14 vs impmatrix13: 115 of 116 identical.
 impmatrix15 vs impmatrix14: 109 identical.
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| NAME3 multi-part import names | file names kept again: g48-two Part 1 = 22595.371166 (G48), Part 2 = 1000 cube; g47-3parts / g48-ap203/ap214/inch listed Part 3, 2, 1; jt-2parts Part 1 = 8000, Part 2 = 1000 | ✅ **fixed** |  |
+| NAME3 multi-part import names | file names kept again: g48-two Part 1 = 22595.371166 (G48), Part 2 = 1000 cube; g47-3parts / g48-ap203/ap214/inch listed Part 3, 2, 1; jt-2parts Part 1 = 8000, Part 2 = 1000 | ✅ **fixed** | v0.4.12 CLI 10-28 (qa, /tmp/qa-imp/impmatrix.json: g48-two Part 1 22595.37117 / 15 faces, Part 2 1000 cube) |
 | IM4 g50-g46-shell1.x_t | imports again (no refusal) but still **corrupt**: 21 faces, volume 4550.392098, area 11830.50, bbox 0..38955.54 × 0..16845.92 × 0..320.42 mm (live 6052.69679568, a ~50×30×30 part) | ✗ still |  |
-| IM5 g38d curves | 8 wires | ✅ (stays fixed) |  |
+| IM5 g38d curves | 8 wires | ✅ (stays fixed) | v0.4.12 CLI 10-28 (qa, /tmp/qa-imp/impmatrix.json: 8 Wire bodies) |
 | IM1, IM2, I1 | unchanged | ✗ still |  |
 
 ## Re-run pass 21 (2026-10-23 ~17:30–18:30, app = /root/target-lead/debug/noshape 10-23 17:10 (main 88fbf8f), CLI = target-lead noshape-cli 10-23 13:45)
 impmatrix16 (117 samples incl. the new psb-L11-boss-fillet.step: Part 1 8179.76547, 10 faces) vs impmatrix15: 115 identical.
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| IM4 g50-g46-shell1.x_t | 21 faces, bbox 0..50 × 0..30 × 0..30, area 12258.695 (live 12258.75), volume **6053.320139** (live 6052.69679568, +0.62) | ✅ geometry **fixed**; volume offset joins IM2 |  |
+| IM4 g50-g46-shell1.x_t | 21 faces, bbox 0..50 × 0..30 × 0..30, area 12258.695 (live 12258.75), volume **6053.320139** (live 6052.69679568, +0.62) | ✅ geometry **fixed**; volume offset joins IM2 | v0.4.12 CLI 10-28 (qa, /tmp/qa-imp/impmatrix.json: 21 faces, volume now 6052.678152 (row 162)) |
 | IM1 PVZ names / tabs | unchanged | ✗ still → routed kern/fs |  |
 | IM2 Parasolid volumes (ktane, Bell Crank, McMaster, fluxpad, g26, g48, g49, g50) | unchanged | ✗ still → routed kern |  |
 | I1 g25-b SAT/STEP/X_T | unchanged | ✗ still → routed kern |  |
@@ -110,7 +110,7 @@ impmatrix16 (117 samples incl. the new psb-L11-boss-fillet.step: Part 1 8179.765
 ## Re-run pass 22 (qa5, 2026-10-24, CLI built from main c59c5af9 after the api import/export batch; /root/qa5-scratch/pass21/impmatrix21.*)
 | Row | Ours now | Status | Verified |
 |---|---|---|---|
-| IM1 PVZ | pvz-shapes.pvz → File tab + Assembly "RootAssembly" + Part Studio "pvz-shapes parts" with **Cylinder 9407.778113, Torus 1770.239209, Cone 1569.176627** + "Composite part 1" (live names and volumes); pvz-colors keeps "Face colored / Red / Transparent", pvz-longname its long name; multi-instance PVZ files give one part + the assembly | ✅ mostly fixed; live also makes a **"BOM : RootAssembly"** tab (behaviours ~6720), ours none → ✗ IM1b (api) |  |
+| IM1 PVZ | pvz-shapes.pvz → File tab + Assembly "RootAssembly" + Part Studio "pvz-shapes parts" with **Cylinder 9407.778113, Torus 1770.239209, Cone 1569.176627** + "Composite part 1" (live names and volumes); pvz-colors keeps "Face colored / Red / Transparent", pvz-longname its long name; multi-instance PVZ files give one part + the assembly | ✅ mostly fixed; live also makes a **"BOM : RootAssembly"** tab (behaviours ~6720), ours none → ✗ IM1b (api) | v0.4.12 CLI 10-28 (qa, /tmp/qa-imp/impmatrix.json: Part Studio "pvz-shapes parts": Cylinder 9407.778113, Torus 1770.239209, Cone 1569.176627, Composite part 1; IM1b BOM tab not re-checked) |
 | Re-import names | second import of g25-b → "g25-b (1)", "g25-b (2)" | ✅ (live "(1)") | 77870dd4 10-28 (UI: g25-b, g25-b (1), g25-b (2)) |
 | IM2 B-spline volumes | unchanged (ktane, McMaster, g26, g48, g49, g50 same digits as pass 16) | ✗ kern |  |
 | I1 g25-b SAT / STEP / X_T | 7585.978524 / 7582.713024 / 7583.000869, unchanged | ✗ kern |  |
@@ -159,10 +159,10 @@ field on the shape's box, so the volume with gaps doesn't depend on where the pa
 | g50 F11 plane | 46.000000 (was 45.999575) | ✅ |  |
 | g50 F19 offset | 4.189139 (live 4.1893432, −0.0002) | ✗ small |  |
 | g50 F8 | 8.321612 (live 8.3308904, −0.0093) | ✗ live reports EXTRUDED: Onshape replaced the file's B_SURFACE (which collapses to the apex; its area over its whole parameter range is ours) with another surface on import. Live request filed ("api (10-24) IM2b follow-up") |  |
-| g50 volume | 6052.680 (live 6052.761; was 6053.320) | ✅ band |  |
+| g50 volume | 6052.680 (live 6052.761; was 6053.320) | ✅ band | v0.4.12 CLI 10-28 (qa, /tmp/qa-imp/impmatrix.json: 6052.678152) |
 | McMaster F0 cylinder | 13.938182 (live 13.9122437, +0.026; was +0.034) | ✗ its helix edges: ours 159.394088 / 159.325155, live 159.392935 / 159.3450619; live request filed |  |
 | McMaster thread flanks F1 / F2 | −0.0008 / −0.0012 | ✗ small |  |
-| McMaster volume | 254.418923 (live 254.403780; was 254.521984) | ✅ band |  |
+| McMaster volume | 254.418923 (live 254.403780; was 254.521984) | ✅ band | v0.4.12 CLI 10-28 (qa, /tmp/qa-imp/impmatrix.json: 254.419624 (+0.0007 vs the row's 254.418923), in band) |
 
 Surface types: a B-surface that is an exact linear extrusion (degree 1 across, rows translates) reports as an extrusion
 (FeatureScript EXTRUDED, query_entities "extruded"), as Parasolid reports such surfaces; query_entities also names
