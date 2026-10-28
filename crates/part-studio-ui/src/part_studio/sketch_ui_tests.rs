@@ -192,6 +192,19 @@ fn rectangle_value_boxes_take_width_then_height(cx: &mut TestAppContext) {
     assert!(near(&dimensions(cx, &view), &[0.02, 0.03]), "{:?}", dimensions(cx, &view));
 }
 
+/// SKETCH-F-FIT: F in a sketch fits the sketch's own geometry, not the
+/// default planes around the origin (live workflow-advanced SK2).
+#[gpui::test]
+fn zoom_fit_in_a_sketch_fits_its_geometry(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "fit", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    keys(cx, window, &["3", "0", "enter", "2", "0", "enter"]);
+    let (lo, hi) = cx.update(|cx| view.read(cx).zoom_fit_bounds()).unwrap();
+    let size = hi - lo;
+    assert!((size.x - 0.03).abs() < 1e-6 && (size.y - 0.02).abs() < 1e-6 && size.z.abs() < 1e-9, "{lo} {hi}");
+}
+
 /// Tab in a rectangle's value box (live, behaviours "skasm (2026-10-28)
 /// sketch value boxes: Tab"): inside the typed width it applies nothing and
 /// stays, the value selected with its unit, so 30 Tab 20 Enter makes the

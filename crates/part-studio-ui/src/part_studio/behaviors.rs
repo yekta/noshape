@@ -2497,6 +2497,18 @@ impl PartStudioView {
     /// point when it is shown, and the visible planes (the default ones
     /// span ±75 mm).
     pub(super) fn zoom_fit_bounds(&self) -> Option<(glam::DVec3, glam::DVec3)> {
+        // In a sketch, F fits the sketch's own geometry (live, workflow-advanced
+        // SK2: "F in a sketch fits the far rectangle (tight margin)";
+        // SKETCH-F-FIT: the planes and parts kept it half out of view).
+        if let Some(f) = self.opts.editing_sketch
+            && let Some(sk) = self.display.sketches.iter().find(|s| s.feature == f)
+        {
+            let p3 = |a: [f32; 3]| glam::DVec3::new(a[0] as f64, a[1] as f64, a[2] as f64);
+            let pts = sk.curves.iter().flat_map(|c| c.points.iter().copied()).chain(sk.points.iter().map(|q| q.position)).map(p3);
+            if let Some(b) = pts.fold(None, |acc: Option<(glam::DVec3, glam::DVec3)>, q| Some(acc.map_or((q, q), |(lo, hi)| (lo.min(q), hi.max(q))))) {
+                return Some(b);
+            }
+        }
         let origin = self.opts.show_origin && self.display.show_origin;
         self.fit_box(origin, |pl| self.opts.show_planes && !pl.hidden)
     }
