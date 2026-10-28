@@ -1627,6 +1627,9 @@ impl DrawingEditor {
             out.extend(self.revision_table_entries(id, cell));
         }
 
+        if let TableKind::Hole { .. } = t.kind {
+            out.push(MenuEntry::item("Hole table properties...", move |t, _, cx| t.open_hole_table_props(id, cx)));
+        }
         out.extend(self.table_more_entries(&t, cell));
         if let TableKind::Hole { precision, .. } = t.kind {
             let mut prec = vec![MenuEntry::check("Drawing default", precision.is_none(), move |t, _, cx| t.edit_table(id, "Hole table precision", cx, |t| if let TableKind::Hole { precision, .. } = &mut t.kind { *precision = None }))];

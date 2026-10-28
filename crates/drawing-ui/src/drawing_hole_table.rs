@@ -25,23 +25,52 @@ pub struct HoleTableDlg {
     pub bottom_to_top: bool,
     /// Live: the 2nd corner icon is pressed at first.
     pub corner: TableCorner,
+    /// Hole table properties… of this table (None: inserting one).
+    pub table: Option<u64>,
 }
 
 impl Default for HoleTableDlg {
     fn default() -> Self {
-        Self { show_location: true, precision: None, bottom_to_top: false, corner: TableCorner::TopRight }
+        Self { show_location: true, precision: None, bottom_to_top: false, corner: TableCorner::TopRight, table: None }
     }
 }
 
 impl DrawingEditor {
     /// Open / drop the dialog with the Hole table tool.
     pub fn sync_hole_table_dlg(&mut self) {
+        // Hole table properties… stays open whatever the tool.
+        if self.hole_dlg.as_ref().is_some_and(|d| d.table.is_some()) {
+            return;
+        }
         let on = matches!(self.tool, Tool::Table { kind: TableTool::Hole, .. });
         match (on, self.hole_dlg.is_some()) {
             (true, false) => self.hole_dlg = Some(HoleTableDlg::default()),
             (false, true) => self.hole_dlg = None,
             _ => {}
         }
+    }
+
+    /// Table menu › Hole table properties…: the dialog with the table's
+    /// choices; ✓ applies them (one edit), ✕ leaves the table as it was.
+    pub fn open_hole_table_props(&mut self, id: u64, cx: &mut Context<Self>) {
+        let Some(t) = self.current_sheet().table(id) else { return };
+        let TableKind::Hole { show_location, precision, bottom_to_top, .. } = t.kind else { return };
+        self.hole_dlg = Some(HoleTableDlg { show_location, precision, bottom_to_top, corner: t.corner, table: Some(id) });
+        cx.notify();
+    }
+
+    fn close_hole_table_props(&mut self, accept: bool, cx: &mut Context<Self>) {
+        let Some(d) = self.hole_dlg.take() else { return };
+        if let (true, Some(id)) = (accept, d.table) {
+            let (sl, pr, bt, corner) = (d.show_location, d.precision, d.bottom_to_top, d.corner);
+            self.edit_table(id, "Hole table properties", cx, move |t| {
+                if let TableKind::Hole { show_location, precision, bottom_to_top, .. } = &mut t.kind {
+                    (*show_location, *precision, *bottom_to_top) = (sl, pr, bt);
+                }
+                t.corner = corner;
+            });
+        }
+        cx.notify();
     }
 
     /// A hole table just made by the tool takes the dialog's choices.
@@ -58,8 +87,10 @@ impl DrawingEditor {
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
         let ed = cx.entity();
-        let (view, origin) = match &self.tool {
-            Tool::Table { view, origin, .. } => (*view, origin.is_some()),
+        let editing = d.table;
+        let (view, origin) = match (&self.tool, editing.and_then(|id| self.current_sheet().table(id))) {
+            (_, Some(t)) => (t.view(), true),
+            (Tool::Table { view, origin, .. }, None) => (*view, origin.is_some()),
             _ => (None, false),
         };
         let view_name = view.and_then(|v| self.current_sheet().view(v)).map(|v| v.name.clone().unwrap_or_else(|| crate::drawing_props::default_view_name(&self.drawing, self.current_sheet(), v)));
@@ -133,13 +164,29 @@ impl DrawingEditor {
                     h_flex()
                         .h(px(28.))
                         .pl(px(11.))
-                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Hole table"))
+                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(if editing.is_some() { "Hole table properties" } else { "Hole table" }))
                         // Live: ✓ stays disabled until an origin is picked (a click places the table).
-                        .child(div().w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).when(!origin, |d| d.opacity(0.3)).child(crate::ui::glyph("check", 16., gpui_kit::white())))
-                        .child(div().id("hole-table-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.tool = Tool::Select;
-                            this.hole_dlg = None;
-                            cx.notify();
+                        .child(
+                            div()
+                                .id("hole-table-ok")
+                                .w(px(28.))
+                                .h(px(27.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .bg(pal.accept)
+                                .when(!origin, |d| d.opacity(0.3))
+                                .child(crate::ui::glyph("check", 16., gpui_kit::white()))
+                                .when(editing.is_some(), |d| d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_hole_table_props(true, cx)))),
+                        )
+                        .child(div().id("hole-table-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            if editing.is_some() {
+                                this.close_hole_table_props(false, cx);
+                            } else {
+                                this.tool = Tool::Select;
+                                this.hole_dlg = None;
+                                cx.notify();
+                            }
                         }))),
                 )
                 .child(
