@@ -263,6 +263,9 @@ pub struct AsmUi {
     /// The face a graphics context menu was opened on (its Section view…
     /// cuts parallel to it).
     pub menu_face: Option<AsmPickTarget>,
+    /// The graphics menu opened on the selected instance's triad or face:
+    /// it starts with Move to origin (live ~14029; ASM-TRIAD-MENU).
+    pub menu_move_origin: bool,
     /// Make transparent (Shift+T): instances drawn transparent.
     pub transparent: Option<HashSet<InstanceId>>,
     /// S shortcut toolbar position (viewport-local).
@@ -1986,6 +1989,11 @@ impl AssemblyView {
     /// general menu on empty space).
     pub(super) fn open_graphics_menu(&mut self, top: Option<InstanceId>, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         let entries = match top {
+            Some(t) if std::mem::take(&mut self.ui.menu_move_origin) => {
+                let mut m = vec![item("Move to origin", |t, _, cx| t.triad_action(TriadAction::MoveToOrigin, cx))];
+                m.extend(self.instance_menu(t, true, cx));
+                m
+            }
             Some(t) => self.instance_menu(t, true, cx),
             None => {
                 // Onshape: Show all | Create Drawing of <assembly>… | Zoom to fit, Isometric.

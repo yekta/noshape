@@ -2780,12 +2780,13 @@ impl AssemblyView {
                 // Live (skb-move-origin-menu-graphics.png, behaviours "skb
                 // (10-24) section base snap + move to origin" (2)): an instance,
                 // selected or not, gets the instance menu; empty space the
-                // general menu.
+                // general menu. The selected instance's triad or face: its menu
+                // with Move to origin first (live ~14029, ~4632; ASM-TRIAD-MENU).
                 self.ui.menu_face = self.pick(*pick).filter(|t| t.kind == PickKind::Face);
-                match self.pick(*pick).map(|t| t.path[0]) {
-                    Some(top) => self.open_graphics_menu(Some(top), *position, window, cx),
-                    None => self.open_graphics_menu(None, *position, window, cx),
-                }
+                let on_triad = matches!(self.overlay(*pick), Some(OverlayPick::Manip(_)));
+                let top = if on_triad { self.selected.first().copied() } else { self.pick(*pick).map(|t| t.path[0]) };
+                self.ui.menu_move_origin = self.triad.is_some() && top.is_some_and(|t| self.selected.contains(&t));
+                self.open_graphics_menu(top, *position, window, cx);
                 cx.notify();
             }
             _ => {}
@@ -4011,11 +4012,18 @@ impl AssemblyView {
             let icon = icon_path(relation_icon(r.relation_type));
             items.push((r.id, self.feature_row(FeatureRow { id: r.id, icon, name: r.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx)));
         }
+        // Live (behaviours "qa (2026-10-28, P3) assembly E2 follow-up"; GROUP-ROW-ERROR):
+        // a group over mated members is red with the mates' error.
+        const SAME_GROUP: &str = "Mate cannot be added between member of same group.";
         for g in &asm.groups {
-            if !self.feature_passes(noshape_model::assembly::ops::RowKind::Group, &g.name, false, g.suppressed, false, false) {
+            let err = asm.mates.iter().any(|m| {
+                let i = m.instances();
+                i.len() >= 2 && i.iter().all(|x| g.instances.contains(x)) && result.mates.iter().any(|s| s.id == m.id && s.message.as_deref() == Some(SAME_GROUP))
+            });
+            if !self.feature_passes(noshape_model::assembly::ops::RowKind::Group, &g.name, err, g.suppressed, false, false) {
                 continue;
             }
-            items.push((g.id, self.feature_row(FeatureRow { id: g.id, icon: icon_path("group"), name: g.name.clone(), ok: true, inactive: g.suppressed, message: None, has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx)));
+            items.push((g.id, self.feature_row(FeatureRow { id: g.id, icon: icon_path("group"), name: g.name.clone(), ok: !err, inactive: g.suppressed, message: err.then(|| SAME_GROUP.to_string()), has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx)));
         }
         items.sort_by_key(|(id, _)| id.0);
         let (mut mate_ids, mut mate_rows): (Vec<MateId>, Vec<AnyElement>) = items.into_iter().unzip();
