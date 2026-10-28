@@ -94,17 +94,17 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | L2 | Origin row (pickable as a mate target) | E§5.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | L3 | "Instances (n)" header, DOF count | B | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | L4 | Filter box: name substring | E§5.2 | ✅ | |  |
-| L5 | Filter colon commands `:part :assembly :mate :matelimits :connector :errors :suppressed :hidden :shown` (combinable) | E§5.2 | ✅ | model test `list_filter_colon_commands`; dropdown lists them |  |
+| L5 | Filter colon commands `:part :assembly :mate :matelimits :connector :errors :suppressed :hidden :shown` (combinable) | E§5.2 | ✅ | model test `list_filter_colon_commands`; dropdown lists them | 0.4.10+ / 77870dd4 10-28 |
 | L6 | Filter `:item :folder :warnings` | E§5.2 | ✅ | `:warnings` matches instances with an instance warning (More than one part is fixed, …); `:folder` lists the folders (flat, like every filtered row; a folder also matches by name); `:item` lists non-geometric items, which this account cannot create (live 105: no "Add items" flow), so it is always empty. GUI :103 w1 (two fixed parts → both listed with ⚠), w4 (Folder 1) |  |
-| L7 | Eye icon on row hover toggles visibility; stays shown while hidden | E§5.1 | ✅ | |  |
-| L8 | Hovering a row highlights the instance in the graphics | E§24.4 | ✅ | |  |
+| L7 | Eye icon on row hover toggles visibility; stays shown while hidden | E§5.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| L8 | Hovering a row highlights the instance in the graphics | E§24.4 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | L9 | Selecting in the graphics scrolls the list to the row | E§5.1 | ✅ | |  |
 | L10 | Shift/Ctrl click adds to the selection | — | ✅ | |  |
 | L11 | Fixed pin icon ("Part is fixed"), DOF indicator ("Has degrees of freedom") | E§5.3, B | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | L12 | Suppressed rows struck through, hidden rows dimmed | E§5.3 | ✅ | |  |
 | L13 | Error indicator with message tooltip | E§5.3 | ✅ | |  |
 | L14 | Subassemblies expand to their instances | E§5.1 | ✅ | |  |
-| L15 | Inline rename (Shift+N, Rename) | E§5.4 | ✅ | |  |
+| L15 | Inline rename (Shift+N, Rename) | E§5.4 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | L16 | Folders: Add selection to folder (named inline), count `(n)` | E§5.6 | ✅ | model test `folders_and_display_states` |  |
 | L17 | Folder menu: Rename, Hide/Show, Hide other, Hide all, Isolate, Make transparent, Suppress, Add selection to folder, Expand, Collapse, Delete (with contents), Unpack folder | E§5.6, UI:concepts__featurelist-contextmenu | ✅ | live 537: Rename | Hide, Hide other instances, Hide all instances, Isolate…, Make transparent…, Suppress, Dynamic suppression ▸ (folder expression: `ListFolder.unsuppressed_if`, model test `dynamic_suppression_of_a_folder_suppresses_its_instances`), Unfix all (when it holds fixed instances) | Add selection to folder…, Expand ▸, Collapse ▸ | Delete, Unpack folder GUI :103 = live 537 (items, separators, 22 px rows; Unfix all only with fixed instances). |  |
 | L18 | Folder eye hides / shows all members | E§5.6 | ✅ | GUI f3–f4 |  |
