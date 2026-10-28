@@ -355,8 +355,8 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 
 ## Requests to the lead (qa, updated 2026-10-28 21:55)
 - **21:55, for core:** core's worktree has 924f1387 (not on main yet) turning patch 0004's parallel pairs back on "now that the
-  budget can't jump out of a pool job (0005)". 0005 is what brought DRAFT-BUDGET-POOL back (below; still open on 58d89104?
-  re-checking now). Please have core run tickets/draft-pool-hang-2133.noshape (/root/qa-scratch/tickets/) before landing; qa
+  budget can't jump out of a pool job (0005)". 0005 is what brought DRAFT-BUDGET-POOL back (below; still open on 58d89104:
+  not done after 246 s, 3.1 GB). Please have core run tickets/draft-pool-hang-2133.noshape (/root/qa-scratch/tickets/) before landing; qa
   will re-run CLI seed 152 and GUI fuzz for BOP-PAIRS-GPF once it is green.
 - **P0 DRAFT-BUDGET-POOL is back (21:05):** green e4cccdff (core c1f98ed6, OCCT patch 0005) never finishes opening
   tickets/draft-pool-hang-2133.noshape (memory climbing); 989f756b opens it in 26 s. The defeaturing's face/face stage runs on the OCCT

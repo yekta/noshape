@@ -9,6 +9,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - **New since v0.4.12, both from f024fd0d (OCCT patch 0004, threaded pave-filler pairs), in every green since 5267fdaf:** P0 BOP-PAIRS-GPF (GPF / segfault in OCCT pave-filler code on pool workers: app on a Mirror preview, debug CLI in a Shell) and P0 DRAFT-BUDGET-POOL (a Draft's defeaturing ignores its budget: endless regen + memory growth; NOSHAPE_BOP_PAIRS_SERIAL=1 makes it stop at 30 s). Either fixed, or the pairs serial by default, before the cut.
 - qa 20:00: resolved for the cut: 58fb2592 / bce87760 make the pairs serial by default and green 4994be03 already runs serial (draft-pool-hang doc opens, Draft 7 stops at its budget). Re-check at 04:30 on the then-green.
 - **qa 21:05: DRAFT-BUDGET-POOL is back on green e4cccdff** (c1f98ed6, OCCT patch 0005: the budget no longer leaves pool jobs, and defeaturing's face/face stage is a pool job even with serial pairs): the draft-pool-hang document never finishes opening (989f756b: 26 s). P0 for the cut unless reverted or fixed.
+- qa 21:58: still endless on green 58d89104 (tickets/draft-pool-hang-2133.noshape: not done after 246 s, RSS 3.1 GB, load 33).
 
 ## Release blockers for the 2026-10-28 05:00 release (qa, checked 04:17 UTC on green 1b81b7ca)
 - Re-confirmed 04:30 on green 3f4e10d9 (= 1b81b7ca + 4658e826 Feature Studio snippets / Ctrl+C part and 3062ec50 view
