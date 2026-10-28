@@ -203,12 +203,17 @@ impl C2 {
         }
     }
 
-    /// Parameters (on `self`, on `o`) where the two meet, ends included.
-    pub fn intersections(&self, o: &C2) -> Vec<(f64, f64)> {
+    /// Parameters (on `self`, on `o`) where the two cross, ends included; none where they run together
+    /// (within `tol`: collinear segments, arcs of one circle), which their ends lying on each other show.
+    pub fn intersections(&self, o: &C2, tol: f64) -> Vec<(f64, f64)> {
         let mut out = Vec::new();
         match (*self, *o) {
             (C2::Seg { a, b }, C2::Seg { a: c, b: d }) => {
                 let (e, f) = (b - a, d - c);
+                let off = |p: DVec2, q: DVec2, x: DVec2| (x - p).perp_dot((q - p).normalize()).abs();
+                if (off(a, b, c) <= tol && off(a, b, d) <= tol) || (off(c, d, a) <= tol && off(c, d, b) <= tol) {
+                    return out;
+                }
                 let den = e.perp_dot(f);
                 if den.abs() > 1e-300 {
                     let w = c - a;
@@ -234,10 +239,13 @@ impl C2 {
                     }
                 }
             }
-            (C2::Arc { .. }, C2::Seg { .. }) => out = o.intersections(self).into_iter().map(|(u, t)| (t, u)).collect(),
+            (C2::Arc { .. }, C2::Seg { .. }) => out = o.intersections(self, tol).into_iter().map(|(u, t)| (t, u)).collect(),
             (C2::Arc { c: c1, r: r1, a0: s1, sweep: w1 }, C2::Arc { c: c2, r: r2, a0: s2, sweep: w2 }) => {
                 let d = c2 - c1;
                 let dl = d.length();
+                if dl <= tol && (r1 - r2).abs() <= tol {
+                    return out;
+                }
                 if dl > 1e-300 && dl <= r1 + r2 && dl >= (r1 - r2).abs() {
                     let x = (dl * dl + r1 * r1 - r2 * r2) / (2.0 * dl);
                     let h = (r1 * r1 - x * x).max(0.0).sqrt();
@@ -288,7 +296,7 @@ mod tests {
         let half = C2::Arc { c: DVec2::ZERO, r: 1.0, a0: 0.0, sweep: -PI };
         assert!(inside(DVec2::new(0.0, -0.5), &[half, C2::Seg { a: DVec2::new(-1.0, 0.0), b: DVec2::new(1.0, 0.0) }]));
         let line = C2::Seg { a: DVec2::new(-3.0, 1.0), b: DVec2::new(3.0, 1.0) };
-        assert_eq!(line.intersections(&disk).len(), 2);
+        assert_eq!(line.intersections(&disk, 1e-9).len(), 2);
         let mut hits = Vec::new();
         disk.ray_hits(DVec2::ZERO, DVec2::X, &mut hits);
         assert_eq!(hits.len(), 1);

@@ -28,6 +28,8 @@ scratch /root/bool-scratch.
   solid and a common's solids are Modified to their images, a fuse's solids are Deleted, a solid left alone is Kept.
 
 ## Tests
+- T1 kernel `brep_replay::brep_kept_bodies_give_the_same_result` (each small case's result cut and fused again, from
+  its kept body and from a new wrapper: the same).
 - T1 kernel `brep_replay::brep_small_cases_match_occt` (37 corpus cases in tests/data/brep, 12 with cylinders: every
   one taken, each as OCCT; NOSHAPE_BREP_FACES=1 lists both results' faces, NOSHAPE_BREP_DUMP=<dir> writes both), `brep_replay::brep_results_are_the_same_on_any_thread` (alone vs 16 threads at once).
 - T1 brep unit tests (boxes, boss, pocket, through hole, step, side by side, two holes, near coincidence).
@@ -37,12 +39,18 @@ scratch /root/bool-scratch.
 
 ## Numbers (10-28, dev build, loaded machine)
 Planes only (landed fcf860a3): 147 of 973 taken, 0 differ; median 0.61 ms vs 8.7 ms.
-With cylinders: **250 of 973 taken, 0 differ from OCCT**.
+With cylinders (landed e0197071): 250 of 973 taken, 0 differ. Then (16:30): seams anywhere, faces nothing reaches
+not split, 2D crossings of collinear / concentric curves ignored (a BREP round trip changed results before), bodies
+kept on the OcShape: **268 of 973 taken, 0 differ from OCCT**.
 
 | bucket | cases taken | median rust | median OCCT | total rust / OCCT |
 |---|---|---|---|---|
-| < 50 input faces | 249 | 0.76 ms | 21.0 ms | 245 / 6604 ms (26.9×) |
-| 50–1000 | 1 | 20.6 ms | 124 ms | 6.1× |
+| < 50 input faces | 267 | 0.72 ms | 18.0 ms | 257 / 6036 ms (23.5×) |
+| 50–1000 | 1 | 4.4 ms | 42.5 ms | 9.7× |
+
+Where the time goes (NOSHAPE_KERNEL_PROFILE=cpu, a 92-face fuse, warm): the Rust Boolean 2.5 ms, building the
+shapes 0.3, make_result 0.3, keeping the body 0.2, conversion 0.1 (0.6 cold). Switches: NOSHAPE_BREP_NOCACHE=1
+converts every time; NOSHAPE_BREP_BIG=1 lets targets of 200+ faces through (for the locality work).
 
 Declined: 261 no solid (faces / shells as arguments: face–face fuse and common, solid–face common), 98 a curved
 edge (ellipses, B-splines), 76 a degenerate edge (cones, spheres), 60 fuzzy / mesh / pattern glue, 50 an arc across

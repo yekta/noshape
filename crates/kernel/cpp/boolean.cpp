@@ -2971,7 +2971,12 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
       t_bool_path = "rust";
       if (opts.unify)
         out = unify(out, h);
-      return make_result(concat(args.items, tools.items), out, h.get(), &rs);
+      std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("boolean.rust.result");
+      OpOut r = make_result(concat(args.items, tools.items), out, h.get(), &rs);
+      lap.reset();
+      if (!opts.unify)
+        rust_boolean_keep(*r.shape);
+      return r;
     }
   }
   // Many tools apart from each other cut out of one solid (holes): in slabs.

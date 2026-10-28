@@ -401,7 +401,7 @@ impl Ctx {
         let open = |v: Option<u32>| v.map_or(End::Open, End::Vertex);
         let mut cuts: Vec<(f64, End)> = vec![(t0, open(ends[0])), (t1, open(ends[1]))];
         for b in &self.faces[f].bound {
-            for (u, _) in c2.intersections(b) {
+            for (u, _) in c2.intersections(b, tol) {
                 let t = t0 + (t1 - t0) * u;
                 cuts.push((t, End::Point(path.at(t))));
             }
@@ -663,7 +663,9 @@ impl Ctx {
             return Ok(());
         }
         if (dd.abs() - r).abs() <= GREY * tol {
-            return Err(Decline("a plane touching a cylinder"));
+            // Touching along a line: fine where the faces don't both reach it.
+            let th = circle_line(r, x, y, n, -dd.signum() * r).first().copied().unwrap_or(0.0);
+            return self.touch(fp, fc, th);
         }
         let ths = circle_line(r, x, y, n, -dd);
         for th in ths {
@@ -687,6 +689,26 @@ impl Ctx {
         self.section(f, fc, Path::Line { p, d: a }, t0, t1)
     }
 
+    /// Face `f` touches cylinder face `fc`'s surface along its generator at `th`: declines where both faces
+    /// reach the line.
+    fn touch(&mut self, f: usize, fc: usize, th: f64) -> R<()> {
+        let Surf::Cyl { o, a, x, y, r, .. } = self.faces[fc].s else { unreachable!() };
+        let p = o + (x * th.cos() + y * th.sin()) * r;
+        let (lo, hi) = (self.faces[f].lo.max(self.faces[fc].lo), self.faces[f].hi.min(self.faces[fc].hi));
+        let (t0, t1) = box_range(p, a, lo, hi, self.tol);
+        if t0 >= t1 {
+            return Ok(());
+        }
+        let path = Path::Line { p, d: a };
+        let ia = self.intervals(f, &path, t0, t1, [None, None], true)?;
+        if ia.is_empty() {
+            return Ok(());
+        }
+        let ib = self.intervals(fc, &path, t0, t1, [None, None], true)?;
+        let meet = ia.iter().any(|x| ib.iter().any(|y| x[1].0.min(y[1].0) - x[0].0.max(y[0].0) > self.tol));
+        if meet { Err(Decline("faces touching along a line")) } else { Ok(()) }
+    }
+
     fn cyl_cyl(&mut self, f1: usize, f2: usize) -> R<()> {
         let Surf::Cyl { o: o1, a: a1, x, y, r: r1, .. } = self.faces[f1].s else { unreachable!() };
         let Surf::Cyl { o: o2, a: a2, r: r2, .. } = self.faces[f2].s else { unreachable!() };
@@ -707,7 +729,10 @@ impl Ctx {
             return Ok(());
         }
         if (dl - r1 - r2).abs() <= GREY * tol || (dl - (r1 - r2).abs()).abs() <= GREY * tol {
-            return Err(Decline("cylinders touching"));
+            let ex = w / dl;
+            let base = ex.dot(y).atan2(ex.dot(x));
+            let th = if (dl - r1 - r2).abs() <= GREY * tol || r1 > r2 { base } else { base + PI };
+            return self.touch(f2, f1, th);
         }
         // Where the two circles meet, as angles about the first axis.
         let ex = w / dl;
@@ -836,6 +861,10 @@ impl Ctx {
                     }
                 }
                 for t in hits {
+                    let q3 = p + r * t;
+                    if t.abs() > GREY * tol && !boxes_meet(q3, q3, g.lo, g.hi, GREY * tol) {
+                        continue;
+                    }
                     if t.abs() <= GREY * tol {
                         if distance2(g.to2(p), &g.bound) > tol && inside2(g.to2(p), &g.bound) {
                             return Err(Decline("a piece's point on another solid's face"));
@@ -1001,9 +1030,15 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
                     Surf::Plane { n, d: n.dot(origin), origin, u, v }
                 }
                 Surface::Cylinder { origin, axis, xdir, radius } => {
+                    // A face that goes round starts at its seam (an edge it uses twice).
                     let mut seen = std::collections::HashSet::new();
-                    let full = edges.iter().any(|&(e, _)| !seen.insert(e));
-                    Surf::Cyl { o: origin, a: axis, x: xdir, y: axis.cross(xdir), r: radius, flip: f.reversed, th0: 0.0, full }
+                    let seam = edges.iter().find(|&&(e, _)| !seen.insert(e)).map(|&(e, _)| e);
+                    let y = axis.cross(xdir);
+                    let th0 = seam.map_or(0.0, |e| {
+                        let w = cx.pool.p[cx.edges[e].v[0] as usize] - origin;
+                        w.dot(y).atan2(w.dot(xdir))
+                    });
+                    Surf::Cyl { o: origin, a: axis, x: xdir, y, r: radius, flip: f.reversed, th0, full: seam.is_some() }
                 }
             };
             cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Vec::new(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY });
@@ -1208,10 +1243,14 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
         segs.sort_unstable();
         segs.dedup();
         face_split[f] = boundary_split || segs.len() != n_boundary;
-        if !involved[cx.faces[f].solid] {
+        // A face nothing reaches is one piece as it was (out of every other solid).
+        let fs = cx.faces[f].solid;
+        let near = involved[fs]
+            && (0..ns).any(|t| meets[fs * ns + t] && boxes_meet(cx.faces[f].lo, cx.faces[f].hi, cx.solids[t].lo, cx.solids[t].hi, GREY * tol));
+        if !near && !face_split[f] {
             let loops = vec![cx.faces[f].edges.iter().map(|&(e, r)| (edge_pieces[e][0].0, r ^ edge_pieces[e][0].1)).collect()];
             face_pieces[f].push(pieces.len());
-            pieces.push(Piece { face: f, loops, inside: DVec3::ZERO });
+            pieces.push(Piece { face: f, loops, inside: DVec3::NAN });
             continue;
         }
         // The curves in the face's parameter plane (a seam's pieces on both sides).
@@ -1290,7 +1329,7 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
             if cx.solids[t].arg == arg {
                 continue;
             }
-            if !meets[s * ns + t] {
+            if !meets[s * ns + t] || pieces[pi].inside.is_nan() {
                 states.push((t, State::Out));
                 continue;
             }

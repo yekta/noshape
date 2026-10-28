@@ -3,6 +3,8 @@
 // anything but solids bounded by planes and cylinders, and OCCT runs as before.
 #include "internal.hpp"
 
+#include <cstdlib>
+
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepTools_History.hxx>
@@ -198,6 +200,47 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     return "faces outside the solids";
   return nullptr;
 }
+
+// `s` as a flat body, from its cache (made here the first time).
+const char* cached_body(const OcShape& s, BrepBody& b, double& max_tol)
+{
+  if (std::getenv("NOSHAPE_BREP_NOCACHE") != nullptr)
+    return to_body(s, b, max_tol);
+  {
+    const std::lock_guard<std::mutex> lock(s.myBrepLock);
+    if (s.myBrepWhy != nullptr)
+      return s.myBrepWhy;
+    if (s.myBrep)
+    {
+      b       = *s.myBrep;
+      max_tol = std::max(max_tol, s.myBrepTol);
+      return nullptr;
+    }
+  }
+  double      tol = 0;
+  const char* why = to_body(s, b, tol);
+  const std::lock_guard<std::mutex> lock(s.myBrepLock);
+  if (why != nullptr)
+    s.myBrepWhy = why;
+  else if (!s.myBrep)
+  {
+    s.myBrep    = std::make_shared<BrepBody>(b);
+    s.myBrepTol = tol;
+  }
+  max_tol = std::max(max_tol, tol);
+  return why;
+}
+
+// This thread's last result (its flat body, the shapes built for its entities, the tolerance), for
+// rust_boolean_keep.
+struct Built
+{
+  BrepBody                  body;
+  std::vector<TopoDS_Shape> v, e, f, s;
+  double                    tol = 0;
+  bool                      set = false;
+};
+thread_local Built t_built;
 
 gp_Pnt point_of(const BrepBody& b, uint32_t v)
 {
@@ -411,6 +454,10 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
     bb.Add(sol[s], sh);
     bb.Add(out, sol[s]);
   }
+  t_built.v.assign(vs.begin(), vs.end());
+  t_built.e.assign(es.begin(), es.end());
+  t_built.f.assign(fs.begin(), fs.end());
+  t_built.s.assign(sol.begin(), sol.end());
   static const TopAbs_ShapeEnum kinds[] = {TopAbs_SOLID, TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX};
   auto output = [&](uint32_t kind, uint32_t i) -> TopoDS_Shape {
     switch (kind)
@@ -455,13 +502,16 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
       srcs[i] = own.back().get();
     }
   // Big targets are the local Boolean's (op_boolean), until this one is local too.
-  if (srcs[0]->map(TopAbs_FACE).Extent() >= 200)
+  if (srcs[0]->map(TopAbs_FACE).Extent() >= 200 && std::getenv("NOSHAPE_BREP_BIG") == nullptr)
     return decline("a big target (the local Boolean's)");
   std::vector<BrepBody> bodies(args.size());
   double                max_tol = 0;
-  for (size_t i = 0; i < args.size(); ++i)
-    if (const char* why = to_body(*srcs[i], bodies[i], max_tol))
-      return decline(why);
+  {
+    const KernelTimer timer("boolean.rust.convert");
+    for (size_t i = 0; i < args.size(); ++i)
+      if (const char* why = cached_body(*srcs[i], bodies[i], max_tol))
+        return decline(why);
+  }
   if (max_tol > kMaxTol)
     return decline("a tolerant input");
   // Arguments sharing sub-shapes: OCCT keeps the shared ones as they are.
@@ -477,10 +527,108 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   // Two points are one within both their tolerances (OCCT's rule).
   const double tol = 2 * std::max(max_tol, 1e-7);
   BrepResult   r;
-  if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, r))
-    return decline(nullptr);
+  t_built.set = false;
+  {
+    const KernelTimer timer("boolean.rust.brep");
+    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, r))
+      return decline(nullptr);
+  }
+  const KernelTimer timer("boolean.rust.build");
   out = build(r, srcs, max_tol > 0 ? max_tol : 1e-7, hist);
+  t_built.body = std::move(r.body);
+  t_built.tol  = max_tol;
+  t_built.set  = true;
   return true;
+}
+
+void rust_boolean_keep(const OcShape& out)
+{
+  if (!t_built.set)
+    return;
+  t_built.set = false;
+  const KernelTimer timer("boolean.rust.keep");
+  Built             done;
+  std::swap(done, t_built);
+  const BrepBody& b = done.body;
+  // The body in `out`'s own order (its maps').
+  const ShapeIMap& vm = out.map(TopAbs_VERTEX);
+  const ShapeIMap& em = out.map(TopAbs_EDGE);
+  const ShapeIMap& fm = out.map(TopAbs_FACE);
+  const ShapeIMap& sm = out.map(TopAbs_SOLID);
+  const size_t nv = b.vertices.size() / 3, ne = b.edges.size() / 2, nf = b.reversed.size(), ns = b.solid_faces.size() - 1;
+  if (static_cast<size_t>(vm.Extent()) != nv || static_cast<size_t>(em.Extent()) != ne || static_cast<size_t>(fm.Extent()) != nf
+      || static_cast<size_t>(sm.Extent()) != ns)
+    return;
+  auto order = [](const ShapeIMap& m, const std::vector<TopoDS_Shape>& built, std::vector<uint32_t>& at) {
+    at.resize(built.size());
+    for (size_t i = 0; i < built.size(); ++i)
+    {
+      const int k = m.FindIndex(built[i]);
+      if (k <= 0)
+        return false;
+      at[i] = static_cast<uint32_t>(k - 1);
+    }
+    return true;
+  };
+  std::vector<uint32_t> av, ae, af, as;
+  if (!order(vm, done.v, av) || !order(em, done.e, ae) || !order(fm, done.f, af) || !order(sm, done.s, as))
+    return;
+  auto c = std::make_shared<BrepBody>();
+  std::vector<double> vx(3 * nv), cu(11 * ne), su(11 * nf);
+  std::vector<uint32_t> ed(2 * ne);
+  for (size_t i = 0; i < nv; ++i)
+    for (int k = 0; k < 3; ++k)
+      vx[3 * av[i] + k] = b.vertices[3 * i + k];
+  for (size_t i = 0; i < ne; ++i)
+  {
+    ed[2 * ae[i]]     = av[b.edges[2 * i]];
+    ed[2 * ae[i] + 1] = av[b.edges[2 * i + 1]];
+    for (int k = 0; k < 11; ++k)
+      cu[11 * ae[i] + k] = b.curves[11 * i + k];
+  }
+  std::vector<size_t> face_of(nf);
+  for (size_t i = 0; i < nf; ++i)
+  {
+    face_of[af[i]] = i;
+    for (int k = 0; k < 11; ++k)
+      su[11 * af[i] + k] = b.surfaces[11 * i + k];
+  }
+  for (double x : vx)
+    c->vertices.push_back(x);
+  for (uint32_t x : ed)
+    c->edges.push_back(x);
+  for (double x : cu)
+    c->curves.push_back(x);
+  for (double x : su)
+    c->surfaces.push_back(x);
+  c->face_loops.push_back(0);
+  c->loop_uses.push_back(0);
+  for (size_t j = 0; j < nf; ++j)
+  {
+    const size_t i = face_of[j];
+    c->reversed.push_back(b.reversed[i]);
+    for (uint32_t l = b.face_loops[i]; l < b.face_loops[i + 1]; ++l)
+    {
+      for (uint32_t k = b.loop_uses[l]; k < b.loop_uses[l + 1]; ++k)
+        c->uses.push_back(2 * ae[b.uses[k] / 2] + b.uses[k] % 2);
+      c->loop_uses.push_back(static_cast<uint32_t>(c->uses.size()));
+    }
+    c->face_loops.push_back(static_cast<uint32_t>(c->loop_uses.size() - 1));
+  }
+  std::vector<size_t> solid_of(ns);
+  for (size_t i = 0; i < ns; ++i)
+    solid_of[as[i]] = i;
+  c->solid_faces.push_back(0);
+  for (size_t j = 0; j < ns; ++j)
+  {
+    const size_t i = solid_of[j];
+    for (uint32_t k = b.solid_faces[i]; k < b.solid_faces[i + 1]; ++k)
+      c->faces_of_solids.push_back(af[b.faces_of_solids[k]]);
+    c->solid_faces.push_back(static_cast<uint32_t>(c->faces_of_solids.size()));
+  }
+  const std::lock_guard<std::mutex> lock(out.myBrepLock);
+  out.myBrep    = c;
+  out.myBrepTol = done.tol;
 }
 
 } // namespace noshape

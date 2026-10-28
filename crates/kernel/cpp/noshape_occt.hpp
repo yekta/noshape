@@ -319,6 +319,8 @@ using ShapeAncMap =
 [[noreturn]] void fail_unsupported(const std::string& msg);
 [[noreturn]] void fail_io(const std::string& msg);
 
+struct BrepBody; // a body for noshape's own Boolean (ffi.rs)
+
 // Immutable wrapper around a TopoDS_Shape. Lazily caches the
 // TopExp::MapShapes indexed maps per shape type (thread-safe via call_once).
 class OcShape
@@ -391,6 +393,13 @@ public:
   // where to look.
   mutable std::atomic<bool>         myUnifyClean{false};
   std::shared_ptr<const UnifyScope> myUnifyScope;
+
+  // noshape's own Boolean's flat form of it (rust_boolean.cpp), or why it has none, made once: a chain of
+  // Booleans converts each body once.
+  mutable std::mutex                      myBrepLock;
+  mutable std::shared_ptr<const BrepBody> myBrep;
+  mutable double                          myBrepTol = 0;
+  mutable const char*                     myBrepWhy = nullptr;
 
   // Ancestor maps (CSR offsets, values) by kind * 16 + ancestor kind,
   // computed once: regeneration asks for the same ones of a body many times.

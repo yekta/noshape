@@ -154,6 +154,8 @@ bool rust_boolean_on();
 bool rust_decline(const char* why);
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist);
+// Keeps this thread's last result's flat body on `out` (its OcShape), for the next Boolean on it.
+void rust_boolean_keep(const OcShape& out);
 
 class HistoryBuilder
 {

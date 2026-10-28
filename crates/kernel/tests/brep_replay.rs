@@ -73,6 +73,9 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
             continue;
         }
         let Some(c) = load(dir, &name) else { continue };
+        if std::env::var("NOSHAPE_BREP_MIN_FACES").ok().and_then(|v| v.parse::<usize>().ok()).is_some_and(|m| c.target_faces < m) {
+            continue;
+        }
         n += 1;
         // Declines fail at once (no OCCT run).
         set_rust_boolean_only(true);
@@ -83,6 +86,9 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         let why = last_rust_decline();
         set_rust_boolean_only(false);
         if path != "rust" {
+            if std::env::var("NOSHAPE_BREP_WHY").is_ok_and(|w| why.contains(&w)) {
+                report += &format!("{name} declined: {why}\n");
+            }
             *declines.entry(why).or_default() += 1;
             continue;
         }
@@ -96,8 +102,10 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         };
         // Again, warm (the first call loads the inputs' maps).
         set_rust_boolean(Some(true));
+        kernel_profile_mark("before");
         let t = Instant::now();
         let _ = boolean(c.op, &c.objects, &c.tools, &c.opts);
+        kernel_profile_mark(&name);
         ms = ms.min(t.elapsed().as_secs_f64() * 1e3);
         set_rust_boolean(Some(false));
         let t = Instant::now();
@@ -205,4 +213,35 @@ fn brep_results_are_the_same_on_any_thread() {
     for r in all {
         assert_eq!(r, alone);
     }
+}
+
+/// A result's body kept for the next Boolean (no conversion) gives what converting it again gives: each
+/// small case's result cut and fused with its tools moved aside, from the kept body and from the same shape
+/// wrapped anew (nothing kept).
+#[test]
+fn brep_kept_bodies_give_the_same_result() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/brep");
+    let mut n = 0;
+    for name in cases(&dir) {
+        let Some(c) = load(&dir, &name) else { continue };
+        set_rust_boolean_only(true);
+        let Ok(r) = boolean(c.op, &c.objects, &c.tools, &c.opts) else {
+            set_rust_boolean_only(false);
+            continue;
+        };
+        let fresh_shape = r.shape.oriented(r.shape.orientation()).expect("a new wrapper");
+        // Tools apart from the ones the result shares vertices with.
+        let tools: Vec<Shape> = c.tools.iter().map(|t| t.transformed(&Transform::Translate(DVec3::new(3e-4, 2e-4, 0.0))).expect("moved")).collect();
+        for op in [BooleanOp::Cut, BooleanOp::Fuse] {
+            let kept = boolean(op, std::slice::from_ref(&r.shape), &tools, &c.opts).map(|x| Summary::of(&x));
+            let fresh = boolean(op, std::slice::from_ref(&fresh_shape), &tools, &c.opts).map(|x| Summary::of(&x));
+            assert_eq!(kept.is_ok(), fresh.is_ok(), "{name} {op:?}");
+            if let (Ok(a), Ok(b)) = (kept, fresh) {
+                assert!(a.differences(&b).is_empty(), "{name} {op:?}: {:?}", a.differences(&b));
+                n += 1;
+            }
+        }
+        set_rust_boolean_only(false);
+    }
+    assert!(n >= 20, "{n} second Booleans");
 }

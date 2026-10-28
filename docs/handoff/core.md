@@ -377,6 +377,13 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
 - Landed with this note: model `pattern_second::timed_the_fin_plate_redisplays_after_the_fin` (perf.yml model job)
   prints the display's share of the regeneration.
 
+## From bool (10-28 16:30): noshape's own Boolean in op_boolean
+- boolean.cpp: one block (`rust_boolean_on()`) after through_holes, before cut_slabs; off unless NOSHAPE_BOOL_RUST=1
+  (docs/handoff/bool.md). Its conversion and result building are in rust_boolean.cpp.
+- noshape_occt.hpp: OcShape keeps `myBrep` / `myBrepTol` / `myBrepWhy` (+ `myBrepLock`): the converted body of the
+  shape (or why it has none), made once; a result of the Rust Boolean gets its body attached
+  (`rust_boolean_keep`), so a chain of Booleans converts a body once. Please keep these when you touch OcShape.
+
 ## Requests to the lead
 - /tmp/lead/disk-loop.sh's `prune-exes.py` (every ~30 min) keeps the newest 2 builds of each noshape crate per
   target dir and deletes the rest with their fingerprint dirs, also while a cargo uses the dir: land.sh builds
