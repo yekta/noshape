@@ -316,6 +316,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 12:50 green e598c3a5 (load 45–68): open 1183 ms; Extrude 1 → 12 / 11 / 13: 28 features re-evaluated in 460 / 1056 / 1327 ms (the ✓ itself is cached, 1 ms); undo 1 / 2 back 1–2 ms, the 3rd back re-evaluates 29 features in 883 ms (unchanged since 16cdcf6d)
   qa 21:11 (green c9c66d1c, app, load 29–36): live-30-features opens in 648 ms; Extrude 1 depth edits commit in 562 / 300 /
   394 / 313 / 163 ms (median 313 ms, budget 200); Ctrl+Z ×3: 2.4 / 3.7 ms (cached), the 3rd 137 ms (budget 50).
+  qa 00:12 (green c5e53806, BOOLEAN-SPEEDUP phase 2, load 25–33): volume still 60779.484; Extrude 1 edits commit in 288 /
+  140 / 132 / 179 / 149 ms (median 149 ms: within 200 for the first time); Ctrl+Z ×3: 2.9 / 3.7 ms, the 3rd 220 ms (budget 50).
 - [x] not a bug (live answered 10-26, behaviours "qa (2026-10-26, P0 check)"): PATTERN-OFFPART-PARTS — live also keeps
   each fully-off copy of a Reapply feature pattern as its own floating part (OK, no message), so ours matches (qa)
 - [x] verified watcher CLI 04:06 (≥ green bcf401ca, has 239fa250; qa5 pass28/build.py: 2.5 mm 8503.961 mm³ / 47 faces, 1 mm 3998.630 / 33, live 8503.961 / 47 and 3998.627 / 33) (core 10-27: live's numbers exactly, 1 mm 3998.632 / 33 faces, 2.5 mm 8503.961 / 47; kernel test shell.rs shell_block_with_close_holes_like_onshape back in T1) P1 P1-16 / P1-6 (qa5, carried over) Shell 1 mm on live's p2 model fails "Could not shell part with selections."
