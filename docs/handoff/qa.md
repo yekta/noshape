@@ -9,6 +9,11 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
+- **15:40 update (green ff379982, copied 15:40):** INSTANCE-NAME-STALE verified (Pin <1>). Live answered 1561
+  (offset toast is sticky → TOAST-AUTOHIDE withdrawn) and 1562 (Show all = ours; live adds "Show all parts" → new P3
+  SHOW-ALL-PARTS-MENU). Asked live: does Surface extrude take part edges (ours doesn't highlight them). Verified more
+  rows: navigation 1.2 / 1.4 / 1.19 / 3.4, interaction 1.14, assembly A6 / K8 / L21 / X1–X4, feature-sweep MC 4 / face
+  pattern 9, surfaces 2 (cancel half). Fuzz 75 (ff37) running.
 - **15:30 update (green 8627322e):** fuzz 74 (8627) alive. New: P3 HOVER-VERTEX-STAYS (a rim vertex's hover dot stays
   after a jump out of the graphics; not a regression), P3 CURSOR-COUNT-UNDER-MENU (count cursor stays under an open
   context menu). Verified: navigation 1.8 / 1.12 / 1.17 (pixel-measured), interaction 3.8, sketch 1.7a / 4.29 / 14.2 /
