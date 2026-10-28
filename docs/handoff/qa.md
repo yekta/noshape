@@ -9,6 +9,14 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **23:58 update (greens 10ea49ed / 43a3696e, no code change since):** **new P0 CLI-SUPPRESS-SEGV** (core): CLI fuzz seed 171 segfaults at
+  op 119 (unsuppress Fillet 6 in a 63-feature body) 4 / 4 with bool's CLI (Rust on and off) and the v0.4.12 release CLI, so it is
+  in the release already; standalone repro (tickets/cli-suppress-segv.noshape + tickets/supsegv.py) crashes 1 of 4, the GUI
+  survived once. gdb attached to a seed-171 replay (/tmp/qa-gdbfuzz.sh → cli/gdb-171g.txt) for the stack. DRAFT-BUDGET-POOL edit
+  loop 16/16 on 10ea; live-30 30 edits: RSS flat (no leak). SKETCH-MODEL-EDGE-SELECT residual confirmed fixed (10/10). D18 checked
+  (+ P3 DWG-ARC-REF-FULL-CIRCLE). Face sweep Rust on / off: 18 of 19 documents identical (only cli-fillet-segv, RUST-MIRROR-EXTRA-FACE);
+  seed 170's document identical. Note: copying a fuzz .noshape without its -wal gives "database disk image is malformed" (CLI exits
+  without closing; bin/partq.py now copies the WAL).
 - **23:22 update (green 10ea49ed = + dx angular as live 1576):** verified DWG-ANGULAR-SECTOR (+ P3 DWG-ANGULAR-LABEL-ANGLE: the
   label only slides along the bisector); SKETCH-F-FIT reopened (fit off-centre, far corner under the right strip). New **P1
   RUST-MIRROR-EXTRA-FACE** (bool; TICKETS › Rust Boolean; in the 10-29 blocker notes and Requests to the lead). Running: face-count
