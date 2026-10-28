@@ -220,6 +220,8 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
 ## Requests to the lead (qa, updated 2026-10-28 12:16)
+- **No new green since 4c97692e (12:50) as of 13:23**; main carries b7cd7b8c (P1 SKETCH-START-INFERENCE fix), aeb6e097 /
+  fd6da984 (mesh cache, REGEN-SPEED), 368d5137, 21eec57b. If main is red, those wait.
 - **P1 SKETCH-MODEL-EDGE-SELECT (skasm, new 10-28, also in v0.4.12):** in a sketch a click on a model edge selects nothing
   and clears the selection, so "line + model edge → constraint key" (an everyday flow) can't be done; tool-first works.
 - **P1 SKETCH-START-INFERENCE (skasm, live-confirmed 1550):** a line's first click on an existing endpoint gives no
