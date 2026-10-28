@@ -9,6 +9,10 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **22:08 update (qa resumed on another account; green 61143838 = 58d8 + psui d33a327c + dx 61143838, copied 21:58):**
+  DRAFT-BUDGET-POOL still endless on 61143838 (229 s, 3.5 GB); core has an uncommitted 0005 rework in its worktree (budget stops
+  a pool job of its own thread) → re-test when green. Verified EXTRUDE-SKETCH-ROW-CHIP. Fuzz 87 (58d8) alive; fuzz 88 (6114,
+  live-30, 600) running via new bin/fzrun.sh <seed> [n] [doc]. Next: drawing ⏳ A51–A53 / V23 / V44, release blockers 04:30.
 - **21:52 update (green 58d89104 = bool 0b0f4fd8, copied 21:50):** on 1735d968 (= 59c8 code): interaction 3.4 ✅ (mate connector rest
   white 0.8, hover amber 0.4, selected amber 0.5 over the owner tint; = live decodes) + new P3 MC-SELECT-NO-READOUT; drawing V17, V47,
   D12 ✅. Fuzz 87 (58d8, live-30 copy, 600) running. Next: DRAFT-BUDGET-POOL re-check + rustbool on 58d8, then the remaining ⏳ rows.
