@@ -181,10 +181,9 @@ fn is_sketch_ref(r: &Reference) -> bool {
 /// Copy of `params` without the sketch regions that don't resolve in `ctx`
 /// (their sketch is gone or comes later, or it no longer has the region)
 /// and the parts of this studio's features (`own`) that don't exist there,
-/// and, with `topo`, the faces, edges and vertices of this studio's features
-/// that no body has there, and how many were left out; `None` when everything
-/// resolves.
-pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(FeatureId) -> bool, topo: bool) -> (Option<ParamValues>, usize) {
+/// and the faces, edges and vertices of this studio's features that no body
+/// has there, and how many were left out; `None` when everything resolves.
+pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(FeatureId) -> bool) -> (Option<ParamValues>, usize) {
     /// Whether every face `n` is named after comes from this studio's features
     /// (sketch and wire-body curves are left alone).
     fn own_topo(n: &TopoName, own: &dyn Fn(FeatureId) -> bool) -> bool {
@@ -201,11 +200,12 @@ pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(Fe
         match r {
             // A face, edge or vertex of a feature that comes later in the list, or that a feature before this one
             // consumed (live "(7) Dragging feature rows": a Chamfer dragged above the Extrude its edge comes from
-            // fails with "Select edges or faces to chamfer." and "1 missing selection"; L20 Fillet R7 likewise).
+            // fails with "Select edges or faces to chamfer." and "1 missing selection"; L20 Fillet R7 likewise; a
+            // sketch on a face that is gone: "Select a sketch plane." and "1 missing selection").
             // Exact names first: the fuzzy lookups scan a body's entities.
-            Reference::Face(n) if topo && own_topo(n, own) => ctx.bodies.iter().any(|b| b.has_exact(n)) || ctx.bodies.iter().any(|b| !b.find_faces(n).is_empty()),
-            Reference::Edge(n) if topo && own_topo(n, own) => ctx.bodies.iter().any(|b| b.has_exact(n)) || ctx.bodies.iter().any(|b| !b.find_edges(n).is_empty()),
-            Reference::Vertex(n) if topo && own_topo(n, own) => ctx.bodies.iter().any(|b| b.has_exact(n)) || ctx.bodies.iter().any(|b| !b.find_vertices(n).is_empty()),
+            Reference::Face(n) if own_topo(n, own) => ctx.bodies.iter().any(|b| b.has_exact(n)) || ctx.bodies.iter().any(|b| !b.find_faces(n).is_empty()),
+            Reference::Edge(n) if own_topo(n, own) => ctx.bodies.iter().any(|b| b.has_exact(n)) || ctx.bodies.iter().any(|b| !b.find_edges(n).is_empty()),
+            Reference::Vertex(n) if own_topo(n, own) => ctx.bodies.iter().any(|b| b.has_exact(n)) || ctx.bodies.iter().any(|b| !b.find_vertices(n).is_empty()),
             _ => region_or_part_resolves(r, ctx, own),
         }
     };

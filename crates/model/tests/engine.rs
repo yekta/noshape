@@ -1362,3 +1362,33 @@ fn a_feature_above_the_one_that_made_its_edge_misses_its_edge() {
     // The second one now finds its edge.
     assert_eq!(r.display.features.iter().find(|st| st.id == again).unwrap().status, FeatureStatus::Ok);
 }
+
+
+/// Live ("psui (2026-10-28, P1) feature list: a sketch whose plane face is gone"): a sketch on the block's top face
+/// dragged above the Extrude that makes the face fails with "Select a sketch plane." and one missing selection.
+#[test]
+fn a_sketch_above_the_extrude_of_its_face_misses_its_plane() {
+    let mut t = T::new();
+    let (_, x) = t.block(0.0, 0.0, 0.04, 0.04, "10 mm");
+    let r = t.ok();
+    let part = r.context.bodies[0].clone();
+    let top = part
+        .shape
+        .faces()
+        .iter()
+        .enumerate()
+        .find(|(_, f)| (f.centroid().unwrap().z - 0.01).abs() < 1e-6)
+        .map(|(i, _)| Reference::Face((*part.faces[i]).clone()))
+        .expect("top face");
+    let s2 = t.sketch(top, rect(0.01, 0.01, 0.02, 0.02));
+    let st = |r: &RegenResult| r.display.features.iter().find(|st| st.id == s2).unwrap().clone();
+    assert_eq!(st(&t.regen()).status, FeatureStatus::Ok);
+    let i = t.ps.features.iter().position(|f| f.id == s2).unwrap();
+    let f = t.ps.features.remove(i);
+    let j = t.ps.features.iter().position(|g| g.id == x).unwrap();
+    t.ps.features.insert(j, f);
+    let s = st(&t.regen());
+    assert_eq!(s.status, FeatureStatus::Error);
+    assert_eq!(s.message.as_deref(), Some("Select a sketch plane."));
+    assert_eq!(s.missing, 1);
+}

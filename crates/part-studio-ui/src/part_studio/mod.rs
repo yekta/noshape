@@ -789,7 +789,7 @@ impl PartStudioView {
             // Live (sketch/00-sketch-dialog-empty.png): a sketch without a
             // plane asks for one in a blue bubble over the graphics.
             const NO_PLANE: &str = "Select a sketch plane";
-            let no_plane = e.dialog.read(cx).feature.type_id == "sketch" && st.as_ref().is_some_and(|(k, m)| *k == FeatureStatus::Error && m == NO_PLANE);
+            let no_plane = e.dialog.read(cx).feature.type_id == "sketch" && st.as_ref().is_some_and(|(k, m)| *k == FeatureStatus::Error && m == noshape_model::regen::features::sketch::NO_SKETCH_PLANE);
             // Live (qa5 BOOL1): a feature's info ("Boolean resulted in no
             // geometry change…") is a blue bubble at the top centre of the
             // graphics while the dialog is open; the dialog shows nothing.

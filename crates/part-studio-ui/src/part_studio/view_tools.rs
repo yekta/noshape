@@ -691,7 +691,9 @@ impl PartStudioView {
     pub(super) fn render_named_views(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let (st, _) = self.named_views.as_ref()?;
         let st = st.clone();
-        let views: Vec<String> = self.studio(cx).map(|s| s.named_views.iter().map(|v| v.name.clone()).collect()).unwrap_or_default();
+        let mut views: Vec<String> = self.studio(cx).map(|s| s.named_views.iter().map(|v| v.name.clone()).collect()).unwrap_or_default();
+        // Live ("psui (2026-10-28, P1) part-studio 9.14"): the list is sorted by name, whatever the save order.
+        views.sort_by_key(|v| v.to_lowercase());
         if self.named_view_picked.as_ref().is_some_and(|n| !views.contains(n)) {
             self.named_view_picked = None;
         }

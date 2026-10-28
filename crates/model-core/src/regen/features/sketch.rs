@@ -10,9 +10,13 @@ use std::sync::Arc;
 
 pub use noshape_model_data::sketch_feature::CONFIGURED_DIMENSION_PREFIX;
 
+/// A sketch without a plane, or whose plane is gone (live: the row tooltip "Sketch 2 did not regenerate properly:
+/// Select a sketch plane." with "1 missing selection"; a new sketch's blue bubble reads it without the period).
+pub const NO_SKETCH_PLANE: &str = "Select a sketch plane.";
+
 pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     let Some(plane_ref) = ev.query("sketchPlane").first() else {
-        return crate::regen::eval::err_at(&["sketchPlane"], "Select a sketch plane");
+        return crate::regen::eval::err_at(&["sketchPlane"], NO_SKETCH_PLANE);
     };
     let Some(frame) = ev.resolve_plane(plane_ref) else {
         return err("The sketch plane could not be found");
