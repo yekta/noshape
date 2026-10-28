@@ -396,7 +396,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (the contact curves, 6.65917 mm each) and a quarter circle R2 (3.14159 mm), a triangle tapering to a point where
   the cylinders turn tangent; all exact too. Live's per-face areas are asked (REQUESTS dx 10-27 I1) to tell whether
   the excess is ours or the STEP approximation's.
-  qa 06:33 (v0.4.12 CLI import matrix): unchanged, x_t 7583.000866 / SAT 7582.996453 / STEP 7582.693101, 18 faces each; all
+  qa 06:30 (v0.4.12 CLI import matrix): unchanged, x_t 7583.000866 / SAT 7582.996453 / STEP 7582.693101, 18 faces each; all
   inside live's band 7576.24–7589.58 (grading rule 10-24).
 - [ ] P2 BOOL-TOUCH-INFO Boolean Intersect of two blocks that only touch face to face: both parts deleted (= live), but
   live reports INFO "The parts either do not intersect or are totally contained." (dialog bubble); ours OK with no message.
