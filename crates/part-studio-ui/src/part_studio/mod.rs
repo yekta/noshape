@@ -3157,14 +3157,30 @@ impl PartStudioView {
         // Live (qa4 r5 s8 (6), ui 10-25 c): rows in a folder are indented
         // 19 px per level, with a 1 px #d7d7d7 guide under each enclosing
         // folder's chevron (9 px in from its row).
-        let indent = |indent: f32, row: AnyElement| {
+        // The last row of a folder ends its innermost guide in a 9 px tick (live ROLLBACK-BAR-IN-FOLDER: x 45–53).
+        let indent = |indent: f32, last: bool, row: AnyElement| {
             if indent <= 0. {
                 return row;
             }
             let levels = (indent / FOLDER_INDENT).round() as usize;
             let guides = (0..levels).map(|k| div().absolute().top_0().bottom_0().left(px(9. + FOLDER_INDENT * k as f32)).w(px(1.)).bg(gpui_kit::rgb(0xd7d7d7)));
-            div().relative().pl(px(indent)).child(row).children(guides).into_any_element()
+            let tick = last.then(|| div().absolute().bottom_0().left(px(5. + FOLDER_INDENT * (levels - 1) as f32)).w(px(9.)).h(px(1.)).bg(gpui_kit::rgb(0xd7d7d7)));
+            div().relative().pl(px(indent)).child(row).children(guides).children(tick).into_any_element()
         };
+        // Whether each item is the last of its folder: the next row (feature, folder, bar or "...") sits less deep.
+        let depth_of = |item: &ListItem| match item {
+            ListItem::Feature(x, _) | ListItem::Folder(x, _) | ListItem::DerivedSketch(x, ..) | ListItem::Rollback(_, x) => Some(*x),
+            ListItem::Ellipsis => Some(0.),
+            ListItem::Placeholder | ListItem::Prompt => None,
+        };
+        let lasts: Vec<bool> = (0..items.len())
+            .map(|i| {
+                let Some(d) = depth_of(&items[i]).filter(|d| *d > 0.) else { return false };
+                // A folder row's own children (deeper) don't end it.
+                let next = items[i + 1..].iter().find_map(depth_of);
+                next.is_none_or(|n| n < d)
+            })
+            .collect();
         // Rows out of the list's view (with 2 rows to spare) are left out,
         // each run of them replaced by one empty block of their height: a
         // filter key that brings back every feature builds and lays out only
@@ -3181,7 +3197,7 @@ impl PartStudioView {
         // The "Default geometry" row and its open rows come first.
         let mut y = if dg_count == 0 { 0. } else { row_h * (1 + if self.ui.default_geometry_collapsed { 0 } else { dg_count }) as f32 };
         let mut skipped = 0usize;
-        for item in items {
+        for (item, last) in items.into_iter().zip(lasts) {
             let h = match &item {
                 ListItem::Rollback(..) => 13.,
                 ListItem::Prompt => 60.,
@@ -3202,11 +3218,11 @@ impl PartStudioView {
             rows.push(match item {
                 ListItem::Placeholder => self.render_editing_placeholder(cx),
                 // Inside a folder: indented under its guide like the children (live ROLLBACK-BAR-IN-FOLDER).
-                ListItem::Rollback(i, x) => indent(x, self.render_rollback_bar(i, window, cx)),
+                ListItem::Rollback(i, x) => indent(x, last, self.render_rollback_bar(i, window, cx)),
                 ListItem::Ellipsis => ellipsis(),
-                ListItem::Folder(x, fd) => indent(x, self.render_folder_row(&fd, slot, cx)),
-                ListItem::Feature(x, id) => indent(x, self.render_feature_row_view(id, slot, cx)),
-                ListItem::DerivedSketch(x, id, k) => indent(x, self.render_derived_sketch_row(id, k, cx)),
+                ListItem::Folder(x, fd) => indent(x, last, self.render_folder_row(&fd, slot, cx)),
+                ListItem::Feature(x, id) => indent(x, last, self.render_feature_row_view(id, slot, cx)),
+                ListItem::DerivedSketch(x, id, k) => indent(x, last, self.render_derived_sketch_row(id, k, cx)),
                 ListItem::Prompt => self.render_folder_prompt(cx),
             });
         }
