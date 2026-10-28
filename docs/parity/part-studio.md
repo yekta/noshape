@@ -266,7 +266,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 10.1 | Hide/Show parts, sketches, planes, mate connectors, default geometry | View__hide_show | ✅ (parts only before; psui 10-28 on :102: Top hidden from its row's eye, Mate connector 1 from its row menu (Hide; the glyph goes, the row shows the struck eye), the empty-space menu's Show all brings them back) | 5f6a908b 10-28 (GUI, wf-block copy: Top row eye → plane gone, row greyed with struck eye; empty-space menu Show all · Select ▸ · Zoom to fit · Isometric (= live) › Show all → Top back; it also showed the hidden Sketch 1 / Sketch 2 (live scope asked, REQUESTS qa 10-28 15:00)) |
+| 10.1 | Hide/Show parts, sketches, planes, mate connectors, default geometry | View__hide_show | ✅ (parts only before; psui 10-28 on :102: Top hidden from its row's eye, Mate connector 1 from its row menu (Hide; the glyph goes, the row shows the struck eye), the empty-space menu's Show all brings them back) | 5f6a908b / 8627322e 10-28 (Top row eye hides the plane; empty-space Show all brings back Top and the hidden sketches = live request 1562; the "Show all parts" item live adds while something is hidden is missing → SHOW-ALL-PARTS-MENU) |
 | 10.2 | Hide other parts / Hide all parts / Show all / Show all parts | View__hide_show | ✅ (10-27: the face menu and the parts list row menu as live; Show all in the empty-space menu) | 0.4.10+ / 2d9a275c 10-27 |
 | 10.3 | Isolate keeps chosen parts opaque, others transparent | View__isolate | ✅ (see 2.18) | 0.4.10+ / 2d9a275c 10-27 |
 | 10.4 | Make transparent makes chosen parts transparent | View__make_transparent | ✅ (see 2.19) | 0.4.10+ / 2d9a275c 10-27 |
