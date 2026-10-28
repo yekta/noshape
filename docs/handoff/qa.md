@@ -3,7 +3,7 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-**Morning smoke 2026-10-28 (pre-cut, green 3f4e10d9 = last-green at 04:30): all rows OK** (open / edit / undo times, STEP
+**Morning smoke 2026-10-28 (pre-cut, greens 3f4e10d9 / b504234e = last-green at 04:30 / 04:44): all rows OK** (open / edit / undo times, STEP
 round trip 60779.484, kill -9 after Suppress, drawing PDF, assembly drag, dialog hover + pick, fuzz); details under
 "Daily release smoke". Redo on the release artifact when it is published; blocker list at the top of TICKETS.
 
@@ -169,6 +169,9 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Hover + pick in feature dialogs: Linear pattern Feature / Part / Face mode Direction takes the edge at its middle and
   the top face (not the plane); cfs.noshape "Edge pick" (EDGE && ALLOWS_AXIS) and "Plain edge pick" take two edges each.
 - Fuzz seeds 45–52 × 600 on today's greens: no crash.
+- Re-smoke on b504234e (last-green from 04:44, adds only UI fixes, all verified: REORDER stale tooltip, ASM-TOOLSEARCH,
+  ASM-FILTER-PATTERN-INSTANCES): live-30 open regen 431 ms, edits 184 / 169 / 239 ms at load ~32 (median 184), Ctrl+Z
+  6 / 2 / 208 ms; fuzz seed 53 × 600 alive.
 
 ## Daily release smoke
 ### Checklist rows run on every release (in addition to the open / regen / export / drawing / assembly / kill -9 rows below)
