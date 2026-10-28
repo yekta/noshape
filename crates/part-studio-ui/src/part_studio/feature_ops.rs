@@ -111,6 +111,7 @@ impl PartStudioView {
     pub(super) fn roll_to_folder(&mut self, folder: u32, cx: &mut Context<Self>) {
         let Some(first) = self.studio(cx).and_then(|s| s.folder_features(folder).iter().filter_map(|id| s.index_of(*id)).min()) else { return };
         self.set_rollback(Some(first), cx);
+        self.ui.rollback_folder_top = Some((folder, first));
     }
 
     /// Expand ▸ / Collapse ▸ "… selected": the selected folder.

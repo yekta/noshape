@@ -2244,6 +2244,7 @@ impl PartStudioView {
     }
 
     fn set_rollback(&mut self, index: Option<usize>, cx: &mut Context<Self>) {
+        self.ui.rollback_folder_top = None;
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, noshape_ops::studio::ROLLBACK_DESCRIPTION, cx, |ps| noshape_ops::studio::set_rollback(ps, index));
         });
@@ -2849,11 +2850,24 @@ impl PartStudioView {
         // Filtered (live part-studio/564): each run of hidden features is
         // one "..." row and the rollback bar keeps its place.
         let mut in_hidden_run = false;
+        // The bar at a folder's top (its Roll to here): drawn under the
+        // folder's row when that folder opens at the rollback feature.
+        let mut bar_in_folder = self.ui.rollback_folder_top.filter(|&(_, at)| at == rollback && filtered.is_none()).map(|(fid, _)| fid);
         for (i, f) in studio.features.iter().enumerate() {
             if editing_new_at == Some(i) {
                 items.push(ListItem::Placeholder);
             }
-            if i == rollback {
+            // Not at the folder's first row, or under a closed folder: the bar
+            // stays where it was.
+            if i == rollback
+                && bar_in_folder.is_some_and(|fid| {
+                    let chain = studio.folder_chain(f.folder);
+                    !chain.contains(&fid) || open_folder.contains(&fid) || chain.iter().take_while(|c| **c != fid).chain(std::iter::once(&fid)).any(|c| studio.folder(*c).is_none_or(|fd| self.folder_collapsed(fd)))
+                })
+            {
+                bar_in_folder = None;
+            }
+            if i == rollback && bar_in_folder.is_none() {
                 in_hidden_run = false;
                 // Between two children of an open folder the bar is one of its rows,
                 // indented like them (live ROLLBACK-BAR-IN-FOLDER: x 64–235).
@@ -2879,6 +2893,10 @@ impl PartStudioView {
                     items.push(ListItem::Folder(FOLDER_INDENT * depth as f32, fd.clone()));
                     if prompt_folder == Some(fd.id) {
                         items.push(ListItem::Prompt);
+                    }
+                    if i == rollback && bar_in_folder == Some(fd.id) {
+                        items.push(ListItem::Rollback(i, FOLDER_INDENT * (depth + 1) as f32));
+                        bar_in_folder = None;
                     }
                 }
             }

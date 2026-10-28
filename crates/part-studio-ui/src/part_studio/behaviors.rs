@@ -434,6 +434,10 @@ pub struct UiState {
     /// the document's state (a new folder starts closed). View state, not
     /// an undo step (live qa4 r5 s8 (7)).
     pub folder_open: std::collections::HashMap<u32, bool>,
+    /// A folder's Roll to here put the bar at its top: (folder, rollback
+    /// index). The same index as a bar above the folder; the list draws it
+    /// inside the open folder while the index stays (live FOLDER-MENU-ROLL-TO-HERE).
+    pub rollback_folder_top: Option<(u32, usize)>,
     /// The folder row selected in the feature list (a click on it).
     pub selected_folder: Option<u32>,
     /// A folder just made: its row related-highlighted until the next click.
@@ -678,6 +682,7 @@ impl UiState {
             selected_folder: None,
             fresh_folder: None,
             folder_open: Default::default(),
+            rollback_folder_top: None,
             menu_target: None,
             list_menu: None,
             consumed_lines: None,
