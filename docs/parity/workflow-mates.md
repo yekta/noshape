@@ -35,13 +35,13 @@ Status: ✅ matches live, ✗ differs, ? live pending.
 Docs /tmp/qa5/d24b/m.noshape (mate-base copy), /tmp/qa5/d24b/full.noshape (pass 10 doc). Shots m50–m76.
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| MT1 flip icon (empty dialog) | up-right, same as live 30 (cmp-flip2) | ✅ **fixed** |  |
+| MT1 flip icon (empty dialog) | up-right, same as live 30 (cmp-flip2) | ✅ **fixed** | 77870dd4 10-28 |
 | MT2 mate-type list | plain rows, current type highlighted, overlays the field (cmp-m52) | ✅ **fixed** | 0.4.10+ / daf1f50c 10-27 (qa-scratch/mate.noshape) |
 | MT3 chip clock tooltip | "Mate connector of Part 1 <2> (Click to edit)" | ✅ **fixed** (m56) | 0.4.10+ / daf1f50c 10-27 (qa-scratch/mate.noshape) |
 | MT4 connector panel | chip bold, instance row highlighted | ✅ **fixed** (m57) |  |
 | MT5 / MT6 Offset values / default axis | regular black "0 mm"; Rotate about X | ✅ **fixed** (m53) | 0.4.10+ / daf1f50c 10-27 (qa-scratch/mate.noshape) |
 | MT7 selected Revolute at 0° | mated face amber, instance rows highlighted, triad letters, no circle ✅; label **"0.000°" italic, past the X axis** (live "0°" upright on the X-axis end, trailing zeros dropped) | ✗ still (label only) (m60) |  |
-| MT8 Mate connector tool | no preview slider; Move rows X↘ Y↗ Z↑ icons, Rotate about Z | ✅ **fixed** (m61, m62) |  |
+| MT8 Mate connector tool | no preview slider; Move rows X↘ Y↗ Z↑ icons, Rotate about Z | ✅ **fixed** (m61, m62) | 77870dd4 10-28 |
 | MT9 Replace instance → unresolvable mate | stays red, tooltip "Revolute 1 has error: Mate cannot resolve mate connectors. (Hidden)" | ✅ **fixed** (m75, m76) |  |
 
 ## Re-run pass 19 (2026-10-22 ~11:00–11:40, app /tmp/qa5/noshape-1013 = /root/target-lead/debug/noshape 10:13: the queue's 09:58 batch build = main 3ce6952 + the ready branches of that batch; CLI 08:11)
@@ -57,7 +57,7 @@ Docs /tmp/qa5/d24b/m.noshape (mate-base copy), /tmp/qa5/d24b/full.noshape (pass 
 | MT10 HUD position | centred on the 2nd pick, bottom edge on it, kept inside the graphics area (assembly/35, 93; mate-hud.txt) | was +14/+14 below-right, unclamped (✓/✕ cut off at the right edge, mates/s06) | ✅ **fixed** | 0.4.10+ / daf1f50c 10-27 (2nd pick (1185,432): HUD 1031–1339 × 381–429) |
 | MT11 DOF and drag per type | Fastened 0, Revolute ⟳z, Slider ↹z, Cylindrical ⟳z ↹z, Planar ⟳z ↹x ↹y, Ball 3 rotations (behaviours DOF table) | same (solver test + drags in the app, mates/t-*.png) | ✅ |  |
 | MT12 retype via Edit… | the row is renamed, the solve follows the new type | same (Revolute → Slider → Cylindrical → Planar → Ball) | ✅ | 0.4.10+ / daf1f50c 10-27 (qa-scratch/mate.noshape) (Fastened → Revolute) |
-| MT13 cylinder-face inference | connector on the axis at mid-length, dots at the end centres (assembly/31) | same (mates/s10) | ✅ |  |
+| MT13 cylinder-face inference | connector on the axis at mid-length, dots at the end centres (assembly/31) | same (mates/s10) | ✅ | 77870dd4 10-28 |
 | MT14 MATE-FLIP-AXIAL (qa4 round 5; live "qa4 round 5 s3 mate flip") | Revolute / Cylindrical / Planar: default aligns the connectors' Z (pin hangs through, t (0,0,−30)); Flip primary axis turns it over (t (0,0,50), Z (0,0,−1)); a pin on its side gets the default too | flip did nothing (the residual took Z's x, y only); now a mate whose Z points the wrong way turns its moving part over before solving (`solver::orient_axial_mates`), the tie (perpendicular axes) aligns (`ops::assembly::flip_for_axes`), and the CLI's new mates bring the connectors together like the dialog. Tests: `flip_primary_turns_axial_mates_over`, ops `mate_flip`, `default_flip_ties_align`; app: flip in the floating toolbar stands the pin on the plate (mates/fl02, fl03) | ✅ **fixed** |  |
 | MT15 axial default with the part starting anti-aligned | (live "skb (10-25) axial mate default flip") Revolute / Planar keep an upside-down pin's pose (flip set automatically, t (0,0,50)); parallel or perpendicular starts align, as Fastened | same: least rotation, ties aligned (`flip_for_axes`); ops `mate_flip` covers upside down (Revolute, Planar) and on its side (Revolute, Fastened) | ✅ |  |
 
