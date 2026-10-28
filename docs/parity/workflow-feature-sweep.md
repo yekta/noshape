@@ -75,7 +75,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1 | Fields | order, labels, defaults, Twist / Scale / Thin / Trim ends groups (dialog-sweep.txt) | same | ✅ | f9185639 10-28 (dialog fields) |
-| 2 | Empty path | "Select entities for sweep path." on path | same | ✅ |  |
+| 2 | Empty path | "Select entities for sweep path." on path | same | ✅ | 67f88fd1 10-28 ("Select entities for sweep path.", Sweep path pink) |
 | 3 | Thin, check order | wall checked before path: "Select faces or sketch regions to sweep." on wallShape | path first; own text, no field | 🔧 |  |
 | 4 | Path not one chain | "Sweep path curves are not all connected." on path | own text, no field | 🔧 |  |
 | 5 | Lock direction empty | "Select direction to lock." on lockDirectionQuery | own text, no field | 🔧 |  |
@@ -89,7 +89,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1 | Fields | order, labels, defaults, End conditions, Path section count 5, Connections, isocurves 10 | same | ✅ | f9185639 10-28 (dialog fields) |
-| 2 | Empty profiles | "Select profiles in order from start to finish." on profiles | same | ✅ |  |
+| 2 | Empty profiles | "Select profiles in order from start to finish." on profiles | same | ✅ | 67f88fd1 10-28 ("Select profiles in order from start to finish.") |
 | 3 | Guides, Path | supported | "…not supported yet" | 🔧 live "psb (10-24 f)". **Path**: the profiles carried along the path, Section count sections cut at even steps, live then runs a natural cubic through them (quarter arc □20: 25100.80 / 25128.64 for 5 / 10 sections); ours still comes out at the exact sweep (25132.6, within 0.13 %; the natural rebuild is rejected for path lofts, P3, test tolerance temporary); the path needn't touch the profiles (live: no error); two profiles only so far. **Guides** through polygon corners: each side face ruled between its corner columns (the guide or a straight line), sewn with the profiles; the guided edge is the guide; live's guided faces bulge a little more (one guide 5634.73 vs ours ~5628.8, four 9511.27 vs ~9511.44); "All guides should intersect each profile boundary." (no field); curved profiles, several guide curves, more than two profiles, guide continuity still "not supported yet" |  |
 | 4 | End conditions | applied, with their errors (planar profile, adjacent faces, tangency direction) | warning only | 🔧 Normal / Tangent to profile and Normal / Tangent to direction clamp the end derivative (kernel `LoftEnd`, natural_loft): live "psb (10-24) loft end derivative" (+ b): 3·ΔCP1 = m·(0.9 h + 0.1 c) at each corner column, a smoothstep between the corners, natural free end (Parasolid's interior columns carry a small extra bump: volumes within ~1.5e-5); two-profile lofts get a halfway section so OCCT smooths them; the nine live lofts (□→□ shifted / h 40 / Tangent, □→Ø16 m 0.5 / 3 / both ends / end only / Tangent 2) in test `loft_end_conditions_as_live`; texts "Only planar profiles are valid for Normal/Tangent to profile start/end condition.", "Select direction for start/end profile tangency."; Match tangent / curvature still a warning. **Tangent to profile is 🔧**: corners match live, the interior columns don't (3900 vs live 3926.46, 4943.72 vs 4925.19); the test's 30 mm³ tolerance is temporary until live's columns ("psb (10-24 h)") land |  |
 | 5 | Connections | every connection; "Select a point on each profile to define a connection." | first only | 🔧 the text (on the array); two or more connections split the profiles at their points and loft connection to connection (kernel `connect_sections`); test `loft_between_squares` |  |
@@ -102,7 +102,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1 | Fields | order, labels, 5 mm, Thickness 2 = 0, Keep tools ☐, merge scope, Mid plane swap | same | ✅ | f9185639 10-28 (dialog fields) |
-| 2 | Empty | "Select surfaces or faces to thicken." on entities | same | ✅ |  |
+| 2 | Empty | "Select surfaces or faces to thicken." on entities | same | ✅ | 67f88fd1 10-28 ("Select surfaces or faces to thicken.") |
 | 3 | Keep tools off, some faces of a surface | the surface is kept unless all its faces are picked | deleted when any face is picked | 🔧 L16 |  |
 | 4 | Adjacent faces | one operation: one body | each face separately | ✗ L17: one L-shaped part of 2560 mm³ (square corner); ours 2 slabs — needs the kernel's intersection join (kern); overlapping slabs of one body are fused |  |
 | 5 | Auto Add from a surface face | only faces of solids count (thicken.fs) | surface faces count (opens on Add) | 🔧 L18 (surface face stays New); a user-picked Add / Remove sets the flip (canSetBooleanFlip) |  |
@@ -112,7 +112,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1 | Fields | Creation type Solid / Surface / Split (Surface), operations for Solid, flip, Trim to target, anchors, Thickness 2.5 | same | ✅ | f9185639 10-28 (dialog fields) |
-| 2 | Position group | Angle / U shift / V shift in a collapsed "Position" group | always shown, no group | ✅ (fs: the std group, collapsed) |  |
+| 2 | Position group | Angle / U shift / V shift in a collapsed "Position" group | always shown, no group | ✅ (fs: the std group, collapsed) | 67f88fd1 10-28 (Position group collapsed) |
 | 3 | Filters | Tools planar only; Target cylindrical or conical only; no unwrap | wider, plus unwrap | 🔧 L20 (no unwrap; forced picks fail with live's texts) |  |
 | 4 | Errors | "Select planar faces or sketch regions to wrap." (source), "Select a cylindrical or conical face to wrap around." (destination), "Source entities must all lie on the same plane.", "Select anchor points.", auto-anchor text, "Failed to imprint edges onto destination face.", ambiguous anchor | own texts, no fields | 🔧 (unwrap keeps its own texts) |  |
 | 5 | Dialog dump | — | — | 🔧 L21 Position group collapsed (FS compiler lacks the group, dialog comparison excludes wrap) |  |
@@ -121,7 +121,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1 | Fields | order, labels, Thickness 2.5 mm, Parallel, Opposite direction ☑, Draft ☐ 3°, Extend ☐, Merge ribs ☑ | same | ✅ | f9185639 10-28 (dialog fields) |
-| 2 | Empty profiles | "Select sketch profiles to create the ribs." on profiles | same | ✅ |  |
+| 2 | Empty profiles | "Select sketch profiles to create the ribs." on profiles | same | ✅ | 67f88fd1 10-28 ("Select sketch profiles to create the ribs.") |
 | 3 | Empty Parts | "Select parts where the rib will be fitted into." | all solids used | 🔧 L22 (no field); older ribs keep using every part |  |
 | 4 | Parts / direction auto-fill | edit logic fills Parts and picks the side | none | 🔧 L22 Parts filled with the studio's parts on open |  |
 | 5 | Closed profile, Parallel | "Only open sketch profiles can be used when rib direction is parallel to sketch plane." | no check | 🔧 ? L23 |  |
@@ -139,7 +139,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 ## Fill
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Fields | order, Guides group, Sample size 5, isocurves 10, Merge with all ☑ | same | ✅ |  |
+| 1 | Fields | order, Guides group, Sample size 5, isocurves 10, Merge with all ☑ | same | ✅ | 67f88fd1 10-28 (New / Add, Guides group (Vertices or curves, Precise), Show isocurves Count 10, Add: Merge with all ☑) |
 | 2 | Empty edges | "Select laminar edges or curves as fill surface boundary." on edges | own text, no field | 🔧 |  |
 | 3 | Continuity label | "Continuity [Position]" label shown (SHOW_LABEL) | no label | 🔧 SHOW_LABEL |  |
 | 4 | Loop errors | "A boundary edge can have only one type of continuity constraint.", "Cannot create fill surface between multiple loops.", "Boundary edges selected do not form a closed loop.", "Cannot create tangency or curvature constraint for a curve selection." | own texts | 🔧 ? L27 (internal-edge variant) |  |
@@ -200,7 +200,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1 | Fields | Face / Feature labels, no operation tabs, Reapply only for Feature (☐), defaults | same | ✅ |  |
-| 2 | Empty Face mode | "Select faces to pattern." / "…mirror." on faces, before the direction | same | ✅ |  |
+| 2 | Empty Face mode | "Select faces to pattern." / "…mirror." on faces, before the direction | same | ✅ | 67f88fd1 10-28 (Face mirror "Select faces to mirror.", Face pattern "Select faces to pattern.") |
 | 3 | Empty Feature mode | "Select features to pattern." / "…mirror." on Features, before the direction / plane | direction first, then "Select features to pattern" | 🔧 |  |
 | 4 | Unresolvable plane / direction / axis | "Select a mirror plane." / "Select a pattern direction." / "Select a pattern axis." on the field | "…could not be resolved" | 🔧 |  |
 | 5 | Linear second direction empty | error only when its count > 1: "Select a pattern direction." on directionTwo | always, own text | 🔧 |  |
