@@ -63,9 +63,9 @@ it, so re-take positions after every selection.
 | 3.9 | Hole defaults and callout | Drilled 1/4 (6.35 mm), 12 mm blind, 118 deg; "Ø6.35 ↧ 12" callout; row "Ø 6.35 mm ↧ 12 mm" | ✅ | 0.4.10+ / f16b31c6 10-27 (wf-block hole) |
 | 3.10 | Linear pattern, Part type: Part 1, edge, 40 mm × 3 | Part 2/3, default colour rotation #a5a5a5, #3b61b4 | ✅ | outdated: live keeps the seed colour on part-pattern copies (workflow-p1-pass P1-13, verified 203c4d6f); this row's colour rotation is the old expectation |
 | 3.11 | Direction field, click near the edge's midpoint | Filtered to the edge ("Edge of Part 1") | ✅ re-checked 10-23: an edge/line, not a midpoint (was ✗ F11) | 0.4.10+ / 203c4d6f 10-27 |
-| 3.12 | Linear pattern, Feature type: Hole, edge, 10 mm × 2 | Holes copied on Part 1 | ✅ re-checked 10-23: holes copied 10 mm along the edge, Part 1 intact (was ✗ F12 (Part 1 destroyed)) |  |
+| 3.12 | Linear pattern, Feature type: Hole, edge, 10 mm × 2 | Holes copied on Part 1 | ✅ re-checked 10-23: holes copied 10 mm along the edge, Part 1 intact (was ✗ F12 (Part 1 destroyed)) | 8bb8a6d1 10-28 (wf-block opened for SHELL-SLOW: Hole + Linear pattern 1 (feature, 25 mm × 2) shows 4 holes, Part 1 intact) |
 | 3.13 | Esc while a select's search box is open | Closes the list only | ✅ re-checked 10-23: list closes, dialog stays (was ✗ F13) | 0.4.10+ / 1c853f78 10-27 |
-| 3.14 | Mirror, Part type: Part 3 about Right | Part 4 | ✅ |  |
+| 3.14 | Mirror, Part type: Part 3 about Right | Part 4 | ✅ | 64997436 10-28 (Mirror › Part mirror of Part 1 about the Right row → Part 2; advanced 3.9) |
 | 3.15 | Shift+X while a feature dialog is open | ? | ✅ re-checked 10-23: Shift+X does nothing while the dialog is open (was ✗ F14 (Section view opens on top of the open Mirror dialog)) | 0.4.10+ / 1c853f78 10-27 |
 | 3.16 | Boolean union Part 3 + Part 4 | Touching parts: one part. Parts that don't touch (live 10-22): **two unchanged parts, the row stays black with no error**, and while editing a blue info bubble **"Boolean resulted in no geometry change…"** (psb BOOL1) | ✅ touching; disjoint: re-run | 0.4.10+ / 2a6d0167 10-27 (workflow-booleans BOOL1) |
 
