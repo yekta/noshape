@@ -225,11 +225,11 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 |---|---|---|---|---|---|
 | N1 | Hovering shows inference dots; the nearest shows a full triad | E§6.3 | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | N2 | Planar face: centroid, every vertex, edge midpoints, arc/circle centers, inner loop (hole, slot) centers; Z normal to the face | E§8.2 | ✅ | model test `inference_points_match_onshape` | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
-| N3 | Cylindrical face: axis points at both ends and the middle, Z along the axis | E§8.2 | ✅ | model test |  |
+| N3 | Cylindrical face: axis points at both ends and the middle, Z along the axis | E§8.2 | ✅ | model test | 0.4.10+ / 77870dd4 10-28 |
 | N4 | Conical face: top, middle, bottom and virtual sharp | E§8.2 | ✅ | T:`inference_points_on_cones_spheres_arcs_and_vertices` |  |
 | N5 | Spherical face: center | E§8.2 | ✅ | T:`inference_points_on_cones_spheres_arcs_and_vertices` |  |
 | N6 | Circular edge: center only | H:mates | ✅ | model test | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
-| N7 | Linear edge: midpoint and both ends, Z along the edge | E§8.2 | ✅ | model test |  |
+| N7 | Linear edge: midpoint and both ends, Z along the edge | E§8.2 | ✅ | model test | 0.4.10+ / 77870dd4 10-28 |
 | N8 | Arc / curve edge: center, midpoint and ends | E§8.2 | ✅ | T:`inference_points_on_cones_spheres_arcs_and_vertices` (fixed: an arc edge's Midpoint resolved to the center, regen/implicit.rs) |  |
 | N9 | Vertex: the point, Z normal to a face | E§8.2 | ✅ | hovering a part vertex: Z normal to the first planar face around it T:`inference_points_on_cones_spheres_arcs_and_vertices` |  |
 | N10 | No seam vertices of circles offered | — | ✅ | model test |  |
