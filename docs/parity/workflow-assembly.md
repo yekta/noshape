@@ -98,9 +98,9 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | # | Row | Ours | Status | Verified |
 |---|---|---|---|---|
 | 1.4 | First insert into an empty assembly | **amber + row selected now** (the "Assembly 2" root row is highlighted too); zoom-to-fit still crops the plate (right and bottom off-screen, dialog over it) | ✅ (skasm 10-27: amber + row selected; fitted beside the Insert dialog, GUI :103); was ✗ A1 (partly fixed) | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) |
-| 2.1 | Revolute 2nd pick | moved part previews **amber** | ✅ A2 fixed |  |
+| 2.1 | Revolute 2nd pick | moved part previews **amber** | ✅ A2 fixed | 6acf6b94 (qa 10:31: Revolute, shaft face near its bottom, then a hole rim → the shaft jumps into the hole, amber while the dialog is open) |
 | 2.2 | New mate row | tooltip "Revolute 1 (Hidden)" + eye-off icon ✅, but the row text is still #333333 (live light grey) | ✅ (GUI green 8165fca6, skasm 10-27: the row light grey); was ✗ A3 (partly fixed) | 77870dd4 10-28 |
-| 2.5 | Slider flip primary axis | block still inside the plate (only its top face z-fights at the plate top) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 |  |
+| 2.5 | Slider flip primary axis | block still inside the plate (only its top face z-fights at the plate top) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 | 6acf6b94 (qa 10:31: Slider block top → plate top puts the block inside the plate; HUD flip → it stands on the plate; tickets/slider-flip-6acf.png) |
 | 2.7 | Mate connector hover on the plate top | orange outline + white inference dots on that face ✅; **extra white dots on other parts** (bracket edges, shaft bottom) | ✅ (GUI :103 skasm 10-27: orange outline on the hovered face, small triad + ring at the nearest inference point, no dots on other parts); was ✗ A5 (partly fixed) | 77870dd4 10-28 |
 | 3.1 / 3.4 / 3.6 | Replicate / Linear / Circular pattern dialogs | standard feature dialogs with live's fields (dom/ui2-asm-*) ✅; Replicate adds red hints "Select the instances to pattern (seed)" / "Select the geometry to find match in" that live doesn't show | ✅ A6 fixed / ✗ **A14** (hint text) | 77870dd4 10-28 |
 | 3.2 | Replicate Part 3 <1> (Cylindrical 1) in Part 1 | one copy in hole 1 → "Replicate 1 ▸ Part 3 <7>" ✅; the new mate "Cylindrical 2" goes to the top-level Mate features (live nests "Mate features (1)" under the Replicate row) | ✅ (T: assembly `replicate_on_matching_holes`, qa5 A12 assert); was ✅ A7 fixed / ✗ **A12** |  |
@@ -161,7 +161,7 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 ## Re-run pass 14 (2026-10-22, main aa75fdf, app /tmp/qa5/noshape-0503; doc rebuilt: /tmp/qa5/d14/asm.noshape via /root/qa5-scratch/pass14/mkasm2.py = mkasm + plate fixed, block, shaft)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| A4 Slider (block top → plate top) + HUD flip primary axis | flip turns the block over: it sits on the plate (p02, p03) | ✅ **fixed** |  |
+| A4 Slider (block top → plate top) + HUD flip primary axis | flip turns the block over: it sits on the plate (p02, p03) | ✅ **fixed** | 6acf6b94 (qa 10:31: as 2.5: flip turns the block over onto the plate) |
 
 ## Re-run pass 21 (2026-10-23 ~17:30–18:30, app = /root/target-lead/debug/noshape 10-23 17:10 (main 88fbf8f), CLI = target-lead noshape-cli 10-23 13:45)
 | Row | Ours | Status | Verified |
