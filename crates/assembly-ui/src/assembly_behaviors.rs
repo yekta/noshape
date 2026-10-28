@@ -32,7 +32,10 @@ fn icon_item(label: impl Into<String>, icon: &'static str, act: impl Fn(&mut Ass
 
 /// Fill a popup menu with entries; separators at the ends or doubled are dropped.
 /// Onshape's right-click menu ([`OsMenu`]: 12 px, 22 px rows).
-pub fn fill_menu(mut m: OsMenu, entries: Vec<MenuEntry>, view: Entity<AssemblyView>, window: &mut Window, cx: &mut Context<OsMenu>) -> OsMenu {
+pub fn fill_menu(m: OsMenu, entries: Vec<MenuEntry>, view: Entity<AssemblyView>, window: &mut Window, cx: &mut Context<OsMenu>) -> OsMenu {
+    // Live (behaviours "psui (2026-10-27, P3) MENU-TRUNCATE"; ASM-MENU-WRAP):
+    // at most 250 px, a long item ends in "…" rather than wrapping.
+    let mut m = m.truncate_labels();
     let mut cleaned: Vec<MenuEntry> = Vec::new();
     for e in entries {
         if matches!(e, MenuEntry::Sep) && cleaned.last().is_none_or(|l| matches!(l, MenuEntry::Sep)) {
@@ -1887,11 +1890,10 @@ impl AssemblyView {
         m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, ids2.clone(), cx)));
         // Named-position editing mode: no driver, suppression or Animate
         // items (live 152).
-        // Live (qa5 MNU2): separators on both sides of the driver item.
+        // Live (dom/context-menus-assembly-revolute.txt; ASM-MATE-MENU-SEPARATORS):
+        // in the Hide … Dynamic suppression group, no separators around it.
         if movable && !np_editing {
-            m.push(MenuEntry::Sep);
             m.push(item("Edit named position driver mate…", move |t, _, cx| t.open_np_driver(id, cx)));
-            m.push(MenuEntry::Sep);
         }
         match &mate {
             _ if np_editing => {}
