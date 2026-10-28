@@ -3,6 +3,22 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1)
+
+- **03:00 update:** fuzz seeds 45 / 46 × 600 on 41f60e47: alive, no panic. No new P0.
+  Verified: P1-8 (hole chips), PS-SECTION overlap (flat 198,0,0 = live's recapture), RHINO-GREEN (green lists no RHINO),
+  VERSION-0.4.6 (v0.4.11 STEP header 'NOSHAPE 0.4.11'), P1-10 (Remove tool away = dark red), FS-EDITOR-COMPLETE (67f88fd1,
+  live's (A)–(D)); REORDER-MISSING-MSG message half verified (stale tooltip after the drop still open). v0.4.9-era P0 notes
+  closed as superseded (v0.4.11 CLI opens cli-draft-hang in 171 s).
+  Filed: P2 HOLE-TABLE-MENU (dx: an edge click selects a cell, not the table; the hole table's menu lacks Copy / Move to /
+  Bring to front / Move to sheet / Clear selection / Zoom to fit; stale cell outline after properties shrink the table).
+  Live asked: Curve pattern Distance field flagged?, rollback bar inside a folder.
+  Rows: drawing.md TB20 / TB21 ✓, TB22 ❌; feature-sweep Body draft (8535.138 / 8530.035 / 8265.017 / 8174.977 = live),
+  empty-selection texts (Sweep, Loft, Thicken, Rib, Face mirror / pattern), Fill fields, Hole / Curve pattern errors;
+  chrome-sweep FD3 FD5–FD8, FL1 FL2 FL8 FL9, RT1 RT2.
+  Docs built this session: qa-scratch/blk40.noshape (plain 40×20×10), cpat.noshape (block + 100 mm sketch circle).
+  Next: 04:30 blocker list; ~05:00 release smoke; then the remaining chrome-sweep / feature-sweep / assembly.md / drawing.md rows.
+
 ## Session 3 (qa on a fresh account, 10-27 19:05 → 10-28; greens fa61ba6f → … → d2826142 → c5e53806)
 
 - **02:00 update (green 77870dd4; main has 1eefebb9 Tab fix, hole-table dialog, not yet green):** no new P0.
