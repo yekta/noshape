@@ -195,7 +195,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 8.8 | Pierce: point + off-plane edge | H:pierce | ✅ (GUI :103 m14.png: sketch on Front, point + Pierce (Shift+G) with the cylinder top edge → point moves to the pierce point, fully defined) |  |
 | 8.9 | Symmetric: axis line first, then two entities | H:symmetric | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.10 | Curvature: spline/conic + adjacent curve | H:curvature | ✅ |  |
-| 8.11 | Constraints to planes / model edges | H:working_with_constraints | ✅ (same reference mechanism as dimensions) |  |
+| 8.11 | Constraints to planes / model edges | H:working_with_constraints | ❌ (SKETCH-MODEL-EDGE-SELECT) (same reference mechanism as dimensions) | 8cd3c4da 10-28 (GUI: tool first works (B, line, model edge → parallel); selection first fails: a model edge click selects nothing and clears the selection) |
 | 8.12 | Glyphs show for the hovered entity (show after hover, hide after 750 ms); all with Show constraints | H:working_with_constraints, B§3.5 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 8.13 | Hover a glyph highlights its entities (yellow); click selects it; Delete removes it | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.14 | Drag glyphs to move them | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
