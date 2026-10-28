@@ -9,6 +9,11 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
+- **12:53 update (greens 9da19774 → 4c97692e):** verified FOLDER-MENU-ROLL-TO-HERE residual (1649c27d) and
+  MATE-CONNECTOR-PANEL-HIGHLIGHT (c9ed5cdb) on 4c97692e. Drawing: A6, A13 (diagonal fraction tofu → DWG-NOTE-DIAG-FRACTION),
+  A42 (→ DWG-GDT-MENU-ORDER), K25; live 1555/1556 answered → P3 DWG-LINE-MENU, P3 READOUT-VALUE-TOOLTIP. Fuzz 71 (4c97)
+  running. Waiting for a green with b7cd7b8c (skasm's SKETCH-START-INFERENCE fix) and core aeb6e097 / fd6da984 (display mesh
+  cache): verify the inference cases (arc end tangent, line end perpendicular) and re-time REGEN-SPEED.
 - **12:43 update (green 9da19774):** fuzz 70 (9da1) alive. Drawing pass on qa-scratch/cbd.noshape (counterbore plate +
   ISO A3 drawing, bin/cbdwg.py): D3 wall thickness, D5, D7 ordinates, D10 (ordinate group red after Suppress + Update) = live;
   filed P2 DWG-DANGLING-WALL (the wall-thickness dim stays black when its circles go), P3 DWG-MAXMIN-LINE (Ctrl+M won't take
