@@ -159,7 +159,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 7.7 | Two lines at an angle: angle; the quadrant follows the cursor | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 7.8 | Circle: diameter; arc: radius | H:dimension | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 7.9 | Arc length: both end points then the arc | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
-| 7.10 | Point / line / circle to a construction line, cursor across it: centerline dimension (twice the distance) | H:dimension | ✅ (T:sm, T:ux) |  |
+| 7.10 | Point / line / circle to a construction line, cursor across it: centerline dimension (twice the distance) | H:dimension | ✅ (T:sm, T:ux) | 8cd3c4da 10-28 (GUI: point + construction line, d: 27.977 on the point's side, Ø55.955 with the cursor across the line) |
 | 7.11 | Ellipse: major / minor diameter | B§4.2 | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 7.12 | Dimension to the sketch origin | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 7.13 | Dimension to planes / model edges | H:dimension | ✅ (planes as trace lines, model edges / vertices as linked reference geometry) | 0.4.10+ / 965d3f56 10-27 (point to model edge 24.797 → 20) |
@@ -227,7 +227,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 10.4 | Dropping a point on the origin constrains it to the origin | B§7.1 | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 10.5 | Shift while dragging suppresses the snap | B§7.1 | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 10.6 | Colors: blue under-defined, black fully defined, red over-defined, per entity | Home__colors | ✅ (theme palette: #0000d0 / black / #cd0000) | 0.4.10+ / 2d9a275c 10-27 |
-| 10.7 | Text boxes drag as a whole | H:text | ✅ |  |
+| 10.7 | Text boxes drag as a whole | H:text | ✅ | 8cd3c4da 10-28 (GUI: text 'AB' dragged by its glyphs: box, corners and text move together) |
 
 ## 11. Edit tools
 
