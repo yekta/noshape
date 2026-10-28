@@ -252,7 +252,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | # | Behaviour | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
 | R1 | Free drag moves an instance within its remaining DOF; limits stop it | E§24.1 | ✅ | model test `slider_respects_limits` |  |
-| R2 | Unmated, unfixed instances move exactly | H:triad | ✅ | |  |
+| R2 | Unmated, unfixed instances move exactly | H:triad | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | R3 | Fixed instances cannot be dragged (cue, no manipulator) | H:triad | ✅ | no manipulator for a selected fixed instance (live 565); press-dragging it: `no-drop` cursor + the fix glyph at the cursor, nothing moves, no message (live 562–563; `AsmUi.fixed_drag`); no pre-highlight while dragging (live 562: hover cleared when the fixed drag starts). GUI :103 r5 (glyph, nothing moves), r7 (selected, no triad) | 0.4.10+ / dd1b5037 10-27 (asm5: dragging the fixed plate: no-drop cursor, plate doesn't move) |
 | R4 | Click an instance shows the triad: axis arrows, plane squares, rotation arcs | H:triad | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | R5 | Drag the triad center to reposition it (snaps to MCs / inference points) | H:triad | ✅ | |  |
@@ -260,7 +260,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | R7 | Right-click center: Move to origin | H:triad | ✅ | | 0.4.10+ / acd6acce 10-27 (handle clicked first, then right-click; tickets/asm-triad-menus-acd6.png) |
 | R8 | Right-click axis arrow: Align with Z, Anti-align with Z | H:triad | ✅ | | 0.4.10+ / acd6acce 10-27 (handle clicked first, then right-click; tickets/asm-triad-menus-acd6.png) |
 | R9 | Right-click arc: Rotate 90 degrees, Rotate 180 degrees | H:triad | ✅ | | 0.4.10+ / acd6acce 10-27 (handle clicked first, then right-click; tickets/asm-triad-menus-acd6.png) |
-| R10 | Box selection selects instances (Shift/Ctrl adds) | — | ✅ | |  |
+| R10 | Box selection selects instances (Shift/Ctrl adds) | — | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | R11 | Mate values on the selected mate; double-click a value to type one | H:mates | ✅ | live 300–318, 305z; bundle `calculateMateValues` / `calculateDimensionDisplayData`: the first connector measured in the second's frame (`onshape_mate_values`; typed values converted back to the solver's convention by `solver_values_for`, unit test `typed_mate_values_round_trip_through_the_solver_convention`). Rotation: angular dimension around the moving connector, radius 80 px fixed when first shown (`PREVIEW_ANGULAR_DIMENSION_RADIUS_PIXEL_SIZE`), arc from +X through the value, arrowheads out, text at half the sweep in the plane along X, arc broken around it. Translations: in-plane linear dimensions X: origin → x, Y: (x,0) → (x,y), Z: (x,y,0) → (x,y,z), arrowheads out, text centred, line broken (`value_dims`, `ValueLine`). GUI :103 r1–r5: Revolute 1 selected shows 0.000°, double-click (`xdotool click --repeat 2 --delay 1`; a longer delay splits the clicks under Xvfb) opens the box, 30 ↵ turns the pin, the arc reads 30.000° |  |
 | R12 | Mates solved simultaneously; red when unsolvable | E§24.2 | ✅ | |  |
 | R13 | Rigid detection icon (0 DOF + fixed) | E§24.2 | ✅ | see L24 |  |
