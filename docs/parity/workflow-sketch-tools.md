@@ -93,7 +93,7 @@ Doc /tmp/qa5/d29/sk.noshape (same steps as pass 14). Shots z20–z29.
 ## Release re-check v0.4.8 (qa5, 2026-10-25 02:20, release asset noshape-cli 0.4.8 linux-x86_64)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| SK5 fillet radius edit (pass20/sk5.py + sk5b.py) | R3: top 25.089, bottom 28.089, left 22.065, right 19.065; R8: 25.089 / 33.089 / 22.065 / 14.065 = live | ✅ |  |
+| SK5 fillet radius edit (pass20/sk5.py + sk5b.py) | R3: top 25.089, bottom 28.089, left 22.065, right 19.065; R8: 25.089 / 33.089 / 22.065 / 14.065 = live | ✅ | v0.4.12 CLI 10-28 (bin/sk5.py: R3 top 25.089 / bottom 28.089 / left 22.065 / right 19.065; R8 25.089 / 33.089 / 22.065 / 14.065 = live) |
 | POLY1 dash-dot along the whole polygon preview | not in v0.4.8 (fix eb764d1b is in ready/qa5) | — |  |
 | POLY1 on main 358fcd83 (queue build 12:55) | inscribed polygon pending: the construction circle is dash-dot along its whole length | ✅ **fixed** | 0.4.10+ / 2d9a275c 10-27 |
 | Tool search in a sketch (green 461aefb0) | "chamfer" → only the sketch **Chamfer** (sketch icon, live description); "fillet" → **Fillet** with "shift f" | ✅ **fixed** | 0.4.10+ / 2d9a275c 10-27 |
