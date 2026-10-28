@@ -102,7 +102,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | L10 | Shift/Ctrl click adds to the selection | — | ✅ | | 0.4.10+ / 52ca0b97 10-28 (Shift+click adds Part 2 <1>; Ctrl+click opens the row menu with the selection kept, deliberately per live "skb (10-24) … (3)") |
 | L11 | Fixed pin icon ("Part is fixed"), DOF indicator ("Has degrees of freedom") | E§5.3, B | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | L12 | Suppressed rows struck through, hidden rows dimmed | E§5.3 | ✅ | | 0.4.10+ / 52ca0b97 10-28 (Suppress Part 2 <1>: grey italic struck through, its Revolute too; Hide Part 1 <1>: dimmed with the crossed eye) |
-| L13 | Error indicator with message tooltip | E§5.3 | ✅ | |  |
+| L13 | Error indicator with message tooltip | E§5.3 | ✅ | | ea572159 10-28 (GUI: Part 2 <1> fixed → Revolute 1 red with a red dot at the right; hover 'Revolute 1 has error: Mate is between fixed instances. (Hidden)'; fixed instances' fix icon + yellow ⚠ with a tooltip; tickets/asm-error-row-ea57.png) |
 | L14 | Subassemblies expand to their instances | E§5.1 | ✅ | |  |
 | L15 | Inline rename (Shift+N, Rename) | E§5.4 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | L16 | Folders: Add selection to folder (named inline), count `(n)` | E§5.6 | ✅ | model test `folders_and_display_states` | 0.4.10+ / 52ca0b97 10-28 (Part 1 + Part 2 › Add selection to folder… › "Folder name" popup › "New folder (2)" = live 1224) |
@@ -168,7 +168,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | F5 | Eye icon on hover toggles the mate indicator | E§6.4 | ✅ | | 0.4.10+ / 52ca0b97 10-28 (row eye shows the hidden mate's glyph) |
 | F6 | Mates expand to the implicit mate connectors they use | E§5.1, UI:mate-hover | ✅ | |  |
 | F7 | Double-click edits | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
-| F8 | Error rows red with indicator | E§6.4 | ✅ | |  |
+| F8 | Error rows red with indicator | E§6.4 | ✅ | | ea572159 10-28 (GUI: the erroring mate and the gears on it red, red dot indicators at the row end and on 'Mate features') |
 | F9 | Suppressed / inactive rows grey, struck through | E§6.4 | ✅ | | 0.4.10+ / acd6acce 10-27 (wa2: Assembly 2) |
 | F10 | Mate folders (Add selection to folder, folder menu) | E§5.6 | ✅ | | 0.4.10+ / 1b81b7ca 10-28 (Revolute 1 › Add selection to folder… › Enter → "New folder (1)" under Mate features) |
 | F11 | Drag to reorder | H:mates | ✅ | drop a mate (connector, relation, group) row on another of the same kind; model test `reorder_mate_features` |  |
