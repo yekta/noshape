@@ -115,7 +115,10 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    labels vs glyphs f3c804b9 + 103cd81d, MATE-CONNECTOR-PANEL-HIGHLIGHT c9ed5cdb, SKETCH-START-INFERENCE b7cd7b8c,
    SKETCH-MODEL-EDGE-SELECT 52ff661c, INSTANCE-NAME-STALE ff379982, SKETCH-HINT-OVERLAP + SKETCH-RECT-DROPDOWN-NAME
    df97926c, ASM-TRIAD-MENU + GROUP-ROW-ERROR 19f2d38a, MATE-EXACT-FLIP-MOVER 556b8fcf (UI rule: the first pick moves);
-   SKETCH-MENU-ESC not a bug (live behaves as ours, behaviours ~197). Fixed 10-28 later: SKETCH-FILLET-EQUAL + the fillet tool reworked to
+   SKETCH-MENU-ESC not a bug (live behaves as ours, behaviours ~197). Fixed 10-28 evening: SKETCH-USE-PRESELECT 000dfaf4,
+   SKETCH-F-FIT f2b44e7a (F in a sketch fits its own curves); SKETCH-MODEL-EDGE-SELECT residual answered: every click
+   is right (logged), the :103 frame takes 0.6–1.1 s GPU + 0.3 s present under load, so screenshots lag (see the ticket).
+   Next: ASM-PATTERN-SUBASSEMBLY (P2), then the P3s. Fixed 10-28 later: SKETCH-FILLET-EQUAL + the fillet tool reworked to
    live's request-1530 answer (4ca44aa8), RECT-TAB-LIVE (c1b58ff7), SKETCH-ENTER-NO-PLANE (b08165c0, qa verified),
    ASM-MENU-WRAP + ASM-MATE-MENU-SEPARATORS (6444d892), ASM-SELECTED-EDGES-DARK (0d05bd3b). Earlier 10-28:
    SKETCH-FILLET-STUCK-RADIUS twice more, ASM-TOOLSEARCH,
