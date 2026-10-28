@@ -270,6 +270,6 @@ Reference / Coordinate system, ruledSurface type / vertex override / corner type
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | L56 Hole, Merge scope cleared | Error "No target parts selected for hole." | ✅ | v0.4.12 CLI 10-28 (bin/l56.py: scope [] → Error 'No target parts selected for hole.', faulty scope; default scope Ok) |
-| L45 Curve pattern d 25 × 4 on a 100 mm circle | Error "Cannot create a curve pattern when the entered distance is larger than the path length." | ✅ |  |
-| L45b × 3 | Ok, copies at 120° / 240° (centres (−7.958, ±13.783) on R 15.915) = live | ✅ **fixed** |  |
+| L45 Curve pattern d 25 × 4 on a 100 mm circle | Error "Cannot create a curve pattern when the entered distance is larger than the path length." | ✅ | v0.4.12 CLI 10-28 (bin/l45.py: Error with that text, faulty distance) |
+| L45b × 3 | Ok, copies at 120° / 240° (centres (−7.958, ±13.783) on R 15.915) = live | ✅ **fixed** | v0.4.12 CLI 10-28 (bin/l45.py: Ok, centres (15.915,0), (−7.958, ±13.783)) |
 
