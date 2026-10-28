@@ -477,6 +477,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     the list is a missing selection like a missing sketch region: left out, so the feature fails with its own
     empty-selection message and "1 missing selection" (test engine::transform_above_its_part_misses_its_part).
     Derived parts (another studio's) are left alone. Still open: the stale row tooltip right after the drop.
+  - qa 10-28 02:45, green 41f60e47: message half verified: tubes6 + Split 1 + Transform 1 (Part 7, XYZ 30), drag Transform 1
+    above Split 1 → hover reads "Transform 1 did not regenerate properly: Cannot resolve entities.\n1 missing selection" (std
+    transformCopy.fs throws CANNOT_RESOLVE_ENTITIES for empty entities, so that is its own message). Still open: right after
+    the drop the tooltip shows "Split 1" over the Transform 1 row (tickets/drag-stale-tooltip-41f6.png, reorder-missing-msg-41f6.png).
 - [x] P1 EDGE-ON-PLANE-PICK a sketch line lying in an edge-on default plane can't be hovered or picked: tickets/axp/axis-line.noshape (Sketch 1 on Front: a rectangle and a vertical line on the vertical axis, i.e. in the Right plane), view cube › Front, Revolve, region picked, Revolve axis active, pointer on the line: no pre-highlight and the click adds nothing (tickets/axp/front-hover-eb43.png, zoom front-hover-zoom-eb43.png), while the rectangle's edges hover and pick normally (rect-edge-hover-eb43.png); orbit a few degrees and the line picks. (At rest the line is now drawn grey over the plane's blue edge line, as live; on e598c3a5 it was hidden under it.) Live (behaviours "qa (2026-10-27) Revolve axis on a sketch line lying on the Right plane, Front view (request 1489)"): the line pre-highlights at once (5 px #FFC685 band only along the line) and the click gives "Edge of Sketch 1"; the plane's edge line never takes the hover. Likely the edge-on plane quad wins the pick (or a depth tie) over the coincident edge; edges must win (qa 2026-10-27 13:40, green eb4338a8) — **verified 2a6d0167 (qa 15:35: axis-line.noshape, Front, Revolve › Revolve axis: the line hovers orange, picks "Edge of Sketch 1", the revolve builds; tickets/axp/fixed-2a6d.png)**
   - psui (landed with this note): the Right plane edge-on in Front view has a border segment along its near side,
     nearer the camera than the line in it, and the pick pass drew lines with depth writes, so that segment hid the
@@ -748,7 +752,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   InputEvent::Blur → commit_number + flush_typed looks right, so the Changed event seems lost on the way (qa 2026-10-26,
   build 4d2f6b0c)
 - [x] 4e55b01f P1 PREVIEW-NO-PICK (psui found 10-27, regression of 8bf820e0 in v0.4.8 / green ≥ 136c6738): with a feature dialog previewing (new Extrude, any edit), nothing in the graphics hovered or picked: the pick pass drew only the unpickable copy of the model before the feature. Fixed: the preview's pick pass picks the model with the feature (offscreen::a_preview_picks_the_model_with_the_feature). Check: Shift+E on a block, hover its top face (orange boundary), click it (chip "Face of Extrude 1"). — **verified a6c56638** (qa 00:30 10-28: wf-block, Shift+E, the top face hovers with its orange boundary while the preview is on, a click gives chip "Face of Extrude 1"; tickets/preview-pick-a6c5.png)
-- [x] P2 P1-8 caveat (qa5, carried over) a reopened Hole whose points were clicked one by one shows one grouped chip
+- [x] verified 41f60e47 (qa 10-28 02:35: wf-block's Hole reopens with two "Vertex of Sketch 2" chips; Sketch 2 picked from its row stays one "Vertices of Sketch 2" chip after ✓ and reopen; tickets/p1-8-perclick-41f6.png, p1-8-grouped-41f6.png) P2 P1-8 caveat (qa5, carried over) a reopened Hole whose points were clicked one by one shows one grouped chip
   "Vertices of Sketch N"; live keeps one "Vertex of Sketch N" chip per click (the grouping isn't stored; details in
   docs/handoff/qa5-routing.md "qa5 open items at the 2026-10-26 stop") (qa5 2026-10-26)
   - psui (landed with this note): a Hole records the sketches whose points were picked from their row (hidden
@@ -821,7 +825,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (tickets/curve-analysis-over-extrude.png). Either the panel must be opaque or the analysis tool must replace the feature dialog as live
   does for tool switches (live: Shift+E with a dialog open replaces it, behaviours 7371) (qa 2026-10-26, build 4d2f6b0c)
 
-- [x] reopened (qa 11:58, green e8858e61 and watcher build 0a25dd1a): the red is gone, but the overlap now renders as a
+- [x] verified 41f60e47 (qa 10-28 02:40: ps2.noshape › Front selected › Section view… › ✓: the pin / block overlap is flat (198,0,0), the rest hatched in the parts' colour, as live's recapture; tickets/ps-section-overlap-41f6.png) reopened (qa 11:58, green e8858e61 and watcher build 0a25dd1a): the red is gone, but the overlap now renders as a
   **hole**: ps2.noshape › Section view › Front › ✓: where the pin passes through the block, the cap is blank white with
   the Top plane's line showing through it (parity of 2 parts reads as "outside"); live hatches the overlap grey
   (behaviours "skb (10-24) assembly section" (5)). tickets/ps-section-overlap-white-green.png, ps-section-green.png
@@ -1106,14 +1110,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   booleanScope → "Error: No merge scope selected." (faulty booleanScope); the dialog auto-fills Merge scope = Part 1
   when Remove is picked (live behaviours "Remove … Merge scope = Part 1 (auto-filled)"). AGENT_API.md on main describes
   the auto choices for Add and the Remove direction but not the Remove scope (qa 2026-10-26, v0.4.8 release CLI)
-- [x] (dx 10-27: a build without openNURBS no longer lists RHINO, in the Export dialog or export_parts (kernel::RHINO_EXPORT from the build script; test export::tests::rhino_is_listed_only_when_built_in); building the watcher with OPENNURBS_ROOT so QA tests what ships stays the lead's) P2 RHINO-GREEN the green build (/root/green/noshape, the lead's watcher build) has no openNURBS: Part › Export… ›
+- [x] verified 41f60e47 (qa 10-28 02:30: the green build has no openNURBS and its Export › Format list ends … 3MF, STL with no RHINO; the v0.4.11 release binary has openNURBS) (dx 10-27: a build without openNURBS no longer lists RHINO, in the Export dialog or export_parts (kernel::RHINO_EXPORT from the build script; test export::tests::rhino_is_listed_only_when_built_in); building the watcher with OPENNURBS_ROOT so QA tests what ships stays the lead's) P2 RHINO-GREEN the green build (/root/green/noshape, the lead's watcher build) has no openNURBS: Part › Export… ›
   RHINO → toast "Export failed: unsupported: Rhino export needs openNURBS: build with OPENNURBS_ROOT
   (scripts/build-opennurbs.sh)", while RHINO stays offered in the format list. Releases build it (release.yml); the
   watcher's build should match the release configuration so QA tests what ships (lead: watcher build env); and a build
   without openNURBS shouldn't list RHINO (qa 2026-10-26, build 4d2f6b0c)
 - [x] verified (qa 10-27: USER_GUIDE.md:13 "Undo/redo … cover the edits of the current session") (dx 10-26) P3 docs/USER_GUIDE.md says "Undo/redo … work across sessions"; they don't (the undo history starts empty after a
   reopen, which is also live's behaviour): fix the sentence (qa 2026-10-26, build 4d2f6b0c)
-- [x] (dx 10-27: exports and the MCP server report `noshape_kernel::VERSION`, the release tag release.yml stamps (NOSHAPE_VERSION), else the crate's, as the app already did; releases built before cut-release.sh bumped Cargo.toml reported 0.4.6 in files) P2 VERSION-0.4.6 exported files and the app report version 0.4.6 (STEP header `originating_system 'NOSHAPE 0.4.6'`)
+- [x] verified v0.4.11 (qa 10-28 02:28: the release's noshape-cli export_parts STEP header reads originating_system 'NOSHAPE 0.4.11'; unstamped green builds still say 0.4.6, the crate version, by design) (dx 10-27: exports and the MCP server report `noshape_kernel::VERSION`, the release tag release.yml stamps (NOSHAPE_VERSION), else the crate's, as the app already did; releases built before cut-release.sh bumped Cargo.toml reported 0.4.6 in files) P2 VERSION-0.4.6 exported files and the app report version 0.4.6 (STEP header `originating_system 'NOSHAPE 0.4.6'`)
   while the releases are v0.4.7 / v0.4.8: the workspace `version` in Cargo.toml was never bumped; the daily release cut
   should bump it (lead's release script) (qa 2026-10-26, build 4d2f6b0c)
 - [x] (dx c63d2bf5: bound 1e-4, live's spline bands are ±0.1 %) P2 `kernel/tests/export::rhino_breps_are_valid` red on Windows 10-26 (sphere volume 4e-5 off).
