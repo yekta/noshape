@@ -2455,7 +2455,7 @@ impl SketchEditor {
                     self.chain_end = Some(b);
                     self.left_chain_end = false;
                 }
-                self.set_otf(data, vec![length_field(&data.sketch, line, self.world_per_px)]);
+                self.set_otf(data, vec![line_length_field(&data.sketch, line, self.world_per_px)]);
                 EditOutcome::changed()
             }
             Tool::MidpointLine => {
@@ -2476,7 +2476,7 @@ impl SketchEditor {
                 attach(sk, mid, None, &m);
                 attach(sk, pb, Some(line), &click);
                 self.finish_create(data, &[line]);
-                self.set_otf(data, vec![length_field(&data.sketch, line, self.world_per_px)]);
+                self.set_otf(data, vec![line_length_field(&data.sketch, line, self.world_per_px)]);
                 EditOutcome::changed()
             }
             Tool::CornerRect | Tool::CenterRect => {
@@ -2558,9 +2558,19 @@ impl SketchEditor {
                     let width = BoxPlace::Edge { line: horizontal, u: out_h, gap: 14.0 };
                     fields[0].place = Some(width);
                     fields[0].place_active = Some(width);
+                    // Live (behaviours "skasm (2026-10-28) dimension labels vs
+                    // glyph rows"): the width's dimension outside its edge,
+                    // past the edge's glyph box (42 px) when that is on the same
+                    // side (below), else 26 px; the height's on the other
+                    // vertical edge, 41 px inside, where its box was.
+                    fields[0].label = mid(horizontal) + out_h * w * if out_h.y < 0.0 { 42.0 } else { 26.0 };
                     if let Some(f) = fields.get_mut(1) {
                         f.place = Some(BoxPlace::Edge { line: vertical, u: out_v, gap: 16.0 });
                         f.place_active = other.map(|o| BoxPlace::Edge { line: o, u: out_v, gap: 14.0 });
+                        if let Some(o) = other {
+                            f.kind = ConstraintKind::Length { curve: o, value: 0.0 };
+                            f.label = mid(o) + out_v * w * 41.0;
+                        }
                     }
                 }
                 self.set_otf(data, fields);
@@ -5488,6 +5498,20 @@ fn rim_autos(sk: &mut Sketch, circle: EntityId, click: &Click) {
         }
         _ => {}
     }
+}
+
+/// A lone line's length box and dimension (live, behaviours "skasm
+/// (2026-10-28) dimension labels vs glyph rows"): 26 px off the line's middle
+/// on the side away from its constraint glyphs (which go below a horizontal
+/// line, left of a vertical one): above, or right.
+fn line_length_field(sk: &Sketch, line: EntityId, wpp: f64) -> OtfField {
+    let mut f = length_field(sk, line, wpp);
+    if let Some(Curve2::Line { a, b }) = sk.curve(line) {
+        let n = (b - a).try_normalize().unwrap_or(DVec2::X).perp();
+        let n = if n.y < -1e-9 || (n.y.abs() <= 1e-9 && n.x < 0.0) { -n } else { n };
+        f.label = (a + b) * 0.5 + n * wpp * 26.0;
+    }
+    f
 }
 
 fn length_field(sk: &Sketch, line: EntityId, wpp: f64) -> OtfField {
@@ -8453,6 +8477,29 @@ mod tests {
         let g: Vec<_> = ed.constraint_glyphs(&d).into_iter().filter(|g| g.icon == "coincident").collect();
         assert_eq!(g.len(), 1, "one coincident glyph: {:?}", g.iter().map(|g| (g.entity, g.anchor)).collect::<Vec<_>>());
         assert!(!g[0].external, "the Origin's glyph isn't tinted as an external reference");
+    }
+
+    /// Live (behaviours "skasm (2026-10-28) dimension labels vs glyph rows"):
+    /// a line's length 26 px above it (its glyph goes below); a corner
+    /// rectangle's width 42 px below the bottom edge (past the edge's glyph)
+    /// and its height on the right edge, 41 px inside.
+    #[test]
+    fn value_box_dimensions_keep_clear_of_the_glyphs() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.04));
+        click(&mut ed, &mut d, v(0.04, 0.04));
+        let f = &ed.otf.as_ref().unwrap().fields[0];
+        assert!((f.label - v(0.02, 0.04 + 26.0 * PX)).length() < 1e-9, "above the line: {:?}", f.label);
+        ed.cancel();
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        click(&mut ed, &mut d, v(0.03, 0.02));
+        let o = ed.otf.as_ref().unwrap();
+        assert!((o.fields[0].label - v(0.015, -42.0 * PX)).length() < 1e-9, "width: {:?}", o.fields[0].label);
+        let ConstraintKind::Length { curve, .. } = o.fields[1].kind else { panic!() };
+        let Some(Curve2::Line { a, b }) = d.sketch.curve(curve) else { panic!() };
+        assert!((a.x - 0.03).abs() < 1e-9 && (b.x - 0.03).abs() < 1e-9, "the right edge: {a:?} {b:?}");
+        assert!((o.fields[1].label - v(0.03 - 41.0 * PX, 0.01)).length() < 1e-9, "height inside: {:?}", o.fields[1].label);
     }
 
     /// Live (behaviours "skasm (2026-10-27, P1) sketch value boxes: center
