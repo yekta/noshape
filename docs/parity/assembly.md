@@ -75,7 +75,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | I4 | Insert entire Part Studio as rigid | E§4.1 | ✅ | | 0.4.10+ / 1b81b7ca 10-28 ("Insert entire Part Studio as rigid" toggle, then Part Studio 1 → one instance "Part Studio 1 <1>", Inserted: 1) |
 | I5 | Click a part inserts it; click a Part Studio inserts all its parts | E§4.2 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | I6 | Click an assembly inserts it as a subassembly (cycles prevented) | E§4.2 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
-| I7 | Cursor in the dialog: instance at the Part Studio origin; later copies offset | E§4.2 | ✅ | |  |
+| I7 | Cursor in the dialog: instance at the Part Studio origin; later copies offset | E§4.2 | ✅ | | 78958d0f 10-28 (Insert › Part 2 clicked twice, ✓ without entering the graphics → copies at (1.25, 1.25, 3.75) and (2.5, 2.5, 7.5) mm (CLI read-back): steps of 1/8 of the part's 10×10×30 box, as live's A18 (5, 2.5, 1.25) for a 40×20×10 plate; Part 2 already had copies in the assembly, so the origin-first case not seen) |
 | I8 | Cursor in the graphics area: instance follows the cursor; click places | E§4.2 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | I9 | Esc / close: insertion ends, placed instances stay (Undo removes) | E§4.2, B | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | I10 | Placed instances are free (not fixed, not mated) | E§4.2 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
