@@ -345,4 +345,4 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | Hovered / selected sketch line | `#fec788` / `#feab10` ~80 % over the black line (darker core `#ca9e6b` / `#ca870b`) | the line recoloured, solid | → render owner (the line stays under a translucent highlight) |  |
 | Dimension value box (hover / selected) | 27 px high, centred on the value (sketch/24) | 22 px | ✅ | 0.4.10+ / d2826142 10-28 |
 | Inference glyph box | 20 px of 40 % white behind the icon, seen over a face (part-studio/1032) | none | ✅ | 0.4.10+ / d2826142 10-28 |
-| Alignment guide | 1 px yellow, 4 px on / 4 off, no dot at the pointer (part-studio/1032) | 7 px `#ffc20e` dash + 8 px yellow dot | ✅ |  |
+| Alignment guide | 1 px yellow, 4 px on / 4 off, no dot at the pointer (part-studio/1032) | 7 px `#ffc20e` dash + 8 px yellow dot | ✅ | 8627322e 10-28 (Line rubber band under a hovered endpoint: guide at x 959 only (1 px), 4 px on / 4 off, (231,203,96), no dot at the pointer = live) |
