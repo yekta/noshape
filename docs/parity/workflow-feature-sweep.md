@@ -127,7 +127,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | 5 | Closed profile, Parallel | "Only open sketch profiles can be used when rib direction is parallel to sketch plane." | no check | 🔧 ? L23 |  |
 | 6 | Draft, Extend profiles to part | supported | "not supported yet" / ignored | Extend 🔧 L22: parallel ribs are built as rib.fs does (swept past the part, split by it, excess removed; ends extended with the checkbox or when they sit on a face they point into), all five live rows match (3692, 3932, 4112, 4562, error). Draft 🔧 rib.fs applyDraft: the sides drafted about the rib's top (wider into the part, narrower with Opposite), split by the part again; live G33c 27048.155585660817 matched (test `rib_draft_as_live`), Normal to sketch plane drafted the same way (no live number). Extend with Normal to sketch plane (L24: error) stays ✗ |  |
 | 7 | Errors | "Failed to create a rib from a selected profile.", "None of the ribs intersected a part.", "Failed to merge ribs into parts." | own texts | 🔧 |  |
-| 8 | One rib per edge | yes (Merge ribs off: one body per edge) | one per chain | ✅ L24: one body per profile chain (live: the L rib is one body); parallel needs one straight edge 🔧; Extend profiles see row 6 |  |
+| 8 | One rib per edge | yes (Merge ribs off: one body per edge) | one per chain | ✅ L24: one body per profile chain (live: the L rib is one body); parallel needs one straight edge 🔧; Extend profiles see row 6 | v0.4.12 CLI 10-28 (bin/ribchain.py: two separate profiles, Merge off → Part 2 600 + Part 3 260, on → one part 10610; the L profile Normal fails → RIB-CHAIN-NORMAL, so live's L24 one-body case can't be checked) |
 
 ## Offset surface
 | # | Area | Onshape | Ours | Status | Verified |
