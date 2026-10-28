@@ -1174,7 +1174,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Change configuration… dialog (green 7e88e3ab) shows Size "Default", and assembly_bom merges it with a Default instance
   (cfg.noshape Assembly 8: <1> default + <2> {'Size': 'Large'} → one row Qty 2; <3> {'Configuration': 'Large'} its own
   row). Setting Large in the dialog stores {'Configuration': 'Large', 'Size': 'Large', 'h': '8 mm'}. The API should resolve
-  a display name to its id, or reject unknown keys (qa 2026-10-28 08:31, v0.4.12 CLI + green 7e88e3ab)
+  a display name to its id, or reject unknown keys (qa 2026-10-28 08:28, v0.4.12 CLI + green 7e88e3ab)
 - [ ] P3 OBJ-ZIP-MSG importing an OBJ export zip (.obj + .mtl) gives the zipped-assembly message: + › Import… (or CLI
   import_files) of samples/l30-export/v2s2-30features-live-obj.zip, or of our own OBJ export (b2.zip = b2.obj + b2.mtl) →
   "Import failed: …: Root assembly file not found. Ensure zip file name matches root assembly name and the archive does
