@@ -2014,6 +2014,14 @@ impl PartStudioView {
         cx.notify();
     }
 
+    /// The empty-space menu's Show all parts: the hidden parts shown, sketches and planes left hidden.
+    pub(super) fn show_all_parts(&mut self, cx: &mut Context<Self>) {
+        let hidden: Vec<Reference> = self.display.bodies.iter().filter(|b| b.hidden).map(|b| Reference::Body(b.id.clone())).collect();
+        if !hidden.is_empty() {
+            self.set_visibility(&hidden, false, cx);
+        }
+    }
+
     /// Shift+P: hide all construction geometry (planes, sketches).
     pub(super) fn hide_construction(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let any_shown = self.opts.show_planes || self.opts.show_sketches;

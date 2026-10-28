@@ -64,6 +64,7 @@ impl PartStudioView {
         let source_sketch = creator.and_then(|id| studio.and_then(|s| s.feature(id).and_then(|f| noshape_model::interaction::source_sketch(&s.features, f)).and_then(|sid| s.feature(sid).map(|g| (sid, g.name.clone())))));
         let has_selection = !self.selection.is_empty() || !self.selected_features.is_empty();
         let isolate = self.ui.isolate.as_ref().map(|i| i.mode);
+        let parts_hidden = self.display.bodies.iter().any(|b| b.hidden);
         let section = !self.ui.section.is_empty();
         let editing = self.edit.is_some();
         let editing_tool = self.edit.as_ref().and_then(|e| e.dialog.read(cx).feature.feature_type()).map(|t| t.name);
@@ -553,7 +554,13 @@ impl PartStudioView {
                             this.exit_isolate(w, cx);
                         }))).separator();
                     }
-                    m = m.item(item("Show all", Box::new(|this, _, cx| this.show_everything(cx)))).separator();
+                    m = m.item(item("Show all", Box::new(|this, _, cx| this.show_everything(cx))));
+                    // Live (behaviours "qa (2026-10-28) Part Studio empty-space right-click › Show all / Show all
+                    // parts"): with a part hidden, a second item that shows only the parts.
+                    if parts_hidden {
+                        m = m.item(item("Show all parts", Box::new(|this, _, cx| this.show_all_parts(cx))));
+                    }
+                    m = m.separator();
                     if section || section_dialog {
                         m = m.item(icon_item("Turn off section view", "menu-section-view", Box::new(|this, w, cx| this.turn_off_section(w, cx))));
                     } else {

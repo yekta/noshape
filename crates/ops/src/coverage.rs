@@ -556,6 +556,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Select", Op("ui_select")),
     ("partStudio:Show all planes", Op("feature_set_visibility")),
     ("partStudio:Show all", Op("feature_set_visibility")),
+    ("partStudio:Show all parts", Op("feature_set_visibility")),
     ("partStudio:Show dependencies…", Op("feature_dependencies")),
     ("partStudio:Show dimensions", Op("sketch_get")),
     ("partStudio:Size to Part Studio", Op("feature_size_plane")),
