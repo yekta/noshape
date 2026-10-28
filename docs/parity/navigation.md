@@ -89,7 +89,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 1.10 | Ctrl+middle-drag pans (closest binding) | `getClosestMode` | ✅ | 0.4.10+ / fa61ba6f 10-27 |
 | 1.11 | Pressing/releasing Ctrl or Alt mid-drag switches mode (rotate ↔ pan ↔ constrained) without lifting the button | `updateManipulationMode` per drag event | ✅ R: right-drag −100 px, Ctrl held +100 px, released −100 px → the view turns 200 px worth (the Ctrl part pans) |  |
 | 1.12 | A second button pressed mid-drag re-resolves the mode | `updateInputState` | ✅ R: right-drag, middle pressed (closest binding other than Rotate = Pan, as `getClosestMode`), middle released (Rotate) → turns 200 px worth. Fixed 10-25: on Wayland gpui forgot the right button when the middle one was released, ending the drag |  |
-| 1.13 | Releasing outside the graphics area ends the drag | — | ✅ fixed 10-25: the drag also follows the pointer over the panels (Onshape's dragHelper is jQuery UI `mouse`, bound to the document; ours stopped at the viewport edge) and ends on release there; R: 220 px from the viewport into the feature list → 146.442° = 3 turns/diagonal, no change after the release |  |
+| 1.13 | Releasing outside the graphics area ends the drag | — | ✅ fixed 10-25: the drag also follows the pointer over the panels (Onshape's dragHelper is jQuery UI `mouse`, bound to the document; ours stopped at the viewport edge) and ends on release there; R: 220 px from the viewport into the feature list → 146.442° = 3 turns/diagonal, no change after the release | 0.4.10+ / 41f60e47 10-28 |
 | 1.14 | Right-click (no drag): context menu; a right-drag opens none | Home__context_menus | ✅ | 0.4.10+ / 2a6d0167 10-27 |
 | 1.15 | Double-click middle button: zoom to fit (animated) | `onMiddleMouseButtonDoubleClick` | ✅ | 0.4.10+ / 2a6d0167 10-27 |
 | 1.16 | Scroll wheel up zooms in, down zooms out, about the cursor (also when zooming out) | help; `zoomOnCanvasPoint`, `USE_CENTRAL_ZOOM_OUT` 0; live navigation/11–14 (fixed point = pointer both ways) | ✅ L, R (Wayland value120, X11 valuators, both directions, fixed point < 0.5 px) | 0.4.10+ / 2a6d0167 10-27 |
@@ -98,7 +98,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 1.19 | Zoom limits: no zoom out once the model is under 100 px across, no zoom in past 2^24 px/m | `canZoom` | ✅ U `zoom_limits_like_can_zoom` (app-core navigation, from the bundle) |  |
 | 1.20 | Horizontal scroll (tilt wheel, sideways swipe) does nothing | `zoomOnMouseWheelScroll` (`wheelDeltaX > wheelDeltaY` → ignored); live navigation/17 | ✅ R: horizontal wheel → no zoom (X11 and Wayland) | 0.4.10+ / 2a6d0167 10-27 |
 | 1.20b | Shift+wheel and Ctrl+wheel zoom exactly like the wheel (Linux; macOS and Chrome on Windows turn Shift+wheel horizontal before Onshape sees it, so it does nothing there) | live navigation/15–16 | ✅ R: Shift / Ctrl+wheel zoom like the wheel; Windows Shift+wheel now zooms too (Chromium keeps it vertical) | 0.4.10+ / fa61ba6f 10-27 |
-| 1.21 | Scrolling during a box selection does nothing | `onMouseWheelScroll` | ✅ R: three wheel notches during a left-drag box → no camera change |  |
+| 1.21 | Scrolling during a box selection does nothing | `onMouseWheelScroll` | ✅ R: three wheel notches during a left-drag box → no camera change | 0.4.10+ / 41f60e47 10-28 |
 | 1.22 | Left-drag: box select (left→right window, right→left crossing); never navigates | Home__selection; no flag for the left button | ✅ | 0.4.10+ / 2a6d0167 10-27 |
 
 ## 2. Touchpad / trackpad
