@@ -40,7 +40,7 @@ Status: ✅ matches live/exact, ✗ differs (finding #), ? live data pending.
 | 3.3 | Edit Extrude 1 depth after the draft | regenerates | regenerates | ✅ |  |
 | 3.4 | Shift+S twice in the Part Studio (sketch, then Point) | ? | worked as Sketch then Point | ? |  |
 | 3.5 | Hole dialog | Inch/Metric, Simple/Counterbore/Countersink, Sketch points, Merge scope, Hole type Drilled, Drill size 1/4 (0.25), Ø, Start plane, Termination Blind, depth, 118 deg | same (Simple matches hole-01 screenshot) | ✅ | f9185639 10-28 (dialog fields) |
-| 3.6 | Counterbore defaults | Ø10 × 5 mm, 12 mm deep (psb f) | same; 6877.312 mm³ = exact | ✅ |  |
+| 3.6 | Counterbore defaults | Ø10 × 5 mm, 12 mm deep (psb f) | same; 6877.312 mm³ = exact | ✅ | 41f60e47 10-28 (Ø10 × 5, 12 deep) |
 | 3.7 | Counterbore / countersink rows | (live look pending) | text labels **truncate the values** ("Counterbore diamet… 1(", "Countersink angle 82 de") and with Tapped the **"Countersink diameter" label overlaps "12.878 mm"** | ✗ ADV4 |  |
 | 3.8 | Hole type list | Drilled, Clearance, Tapped | same; Tapped adds Tap type, Size, Threads/inch, Fastener fit, ☐ Thread class, Tapped depth | ? |  |
 | 3.9 | Mirror › Part mirror about Right | Part 2 | Part 2 | ✅ |  |
