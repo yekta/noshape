@@ -136,7 +136,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | C14 | Select instances with same part and same configuration | UI:context-part | ✅ | | 0.4.10+ / a6c56638 10-28 |
 | C15 | Copy <name> / Copy n items | UI:context-part, B | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C16 | Move to new subassembly | UI:context-part | ✅ | model test `move_to_new_subassembly_and_dissolve_keep_positions` | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
-| C17 | Dissolve subassembly | UI:context-subassembly | ✅ | tab left empty when unused elsewhere | ff379982 10-28 (that row › Dissolve subassembly → Part 1 <1>, Part 2 <1> and Revolute 1 back at the top level; Linear pattern 1, red since its seed moved in, stays red after the dissolve (live asked)) |
+| C17 | Dissolve subassembly | UI:context-subassembly | ✅ | tab left empty when unused elsewhere | ff379982 10-28: ✗ dissolve itself works (instances + Revolute 1 back), but Move to new subassembly leaves Linear pattern 1 behind red → ASM-PATTERN-SUBASSEMBLY (live 1564) |
 | C18 | Zoom to selection | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C19 | Add selection to folder… | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C20 | Expand ▸ Expand selected / Expand all; Collapse ▸ … | UI:context-part | ✅ | subassemblies; GUI g2–g4 | ff379982 10-28 (subassembly row menu: Expand ▸ Expand selected / Expand all, Collapse ▸ Collapse selected / Collapse all) |
