@@ -9,6 +9,12 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
+- **16:16 update (green 78958d0f, copied 16:10):** 307b619b verified (view paste into another document → "Views
+  could not be copied between documents."). Fuzz 76 (7895) alive. New from live 1564 / 1565: P2 ASM-PATTERN-SUBASSEMBLY
+  (Move to new subassembly must carry a dependent pattern, with live's confirm modal), P2 DWG-CONSTRAINT-PRESELECT
+  (drawing constraint keys must apply to a preselection). Also new: P2 SKETCH-F-FIT (F in a sketch doesn't fit a far
+  rectangle; same on 8627322e). Verified workflow-assembly 2.4, sketch 7.22 / 8.10 / 4.38 (DXF) / 14.8, drawing TB11.
+  Open live asks: table Shift+click, View properties Esc, curve-to-curve dimension.
 - **16:00 update (green ff379982):** fuzz 75 (ff37) alive. New: P3 ASM-INTERFERENCE-NONE (assembly check with no
   clash stays blank; live says "No interferences"), P3 DWG-CELL-MERGE-GREY. Live answered 1563 (Surface extrude takes
   no part edges = ours). Asked live: C17 pattern after subassembly dissolve, drawing select-first constraint keys, View
