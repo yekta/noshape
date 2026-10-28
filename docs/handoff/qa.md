@@ -9,6 +9,14 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401)
 
+- **19:32 update (green b184b401):** fuzz 79 (live-30) and 80 (drawing doc) alive. New: P3 DWG-CIRCLE-FACETS (drawing-sketch circles
+  are 16–24-gons), P3 HOLE-TABLE-BUTTON (live 1573: no button without an unsuppressed Hole; suppressed Hole row reads "Hole").
+  P1 walk on b184: revolve 28274.334 mm³ / 7539.822 mm² and mirror+merge 56548.668 / 13194.689 = analytic; Mirror New → Add
+  once the plane touches (std edit logic, = live). FEATURE-MIRROR-COPY-FULL-DEPTH still 9500 on main 17:09. Asked live: Revolve /
+  Mirror ✓ state with a required field empty (ours: ✓ green). GUI loops on the 54-feature fuzz body are impractical (7.5 s GPU
+  frames). Removed my dead-pid crash markers in /tmp/noshape-regen (left other agents' 1598756 / 1598789).
+  Next: verify 19f2d38a ASM-TRIAD-MENU, 556b8fcf MATE-EXACT-FLIP-MOVER, ae7ce4a5 (parallel extrude regions: watch for crashes),
+  5b55c884 (sheet drag) when green; 04:30 blocker list; ~05:00 release smoke.
 - **18:58 update (green b184b401, copied 18:12):** **P0 DRAFT-BUDGET-POOL** (A/B with NOSHAPE_BOP_PAIRS_SERIAL=1, repro doc in
   tickets/), early 10-29 blocker notes at the top of TICKETS. Verified SKETCH-S-INSPECT-TOOLS (root profile restored), drawing S6
   Change configuration. SHELL-SLOW note: failing shells take up to a minute on the fuzz body. Fuzz 78 (87dd) alive. Asked live:
