@@ -99,8 +99,12 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   1604-edge front face; best 67.7 → 51.9 ms, the same triangles: kernel `planar_mesh::mesh_big_face_bench` prints a
   hash). 0003b sorts after 0003 in C order and before it in some locales: they touch different files.
 - 0004 (10-28, phase 1) TKBO, on 0001: the pair intersections of PerformEE / PerformEF / PerformFF / PerformVF /
-  IntersectVE / TreatVerticesEE on the thread pool with booleans serial (`noshapePairsInParallel`, ≥ 64 pairs;
-  NOSHAPE_BOP_PAIRS_SERIAL=1 never); ReduceIntersectionRange's E/E interferences indexed by new vertex. Built lib
+  IntersectVE / TreatVerticesEE on the thread pool with booleans serial (`noshapePairsInParallel`, ≥ 64 pairs),
+  **only with NOSHAPE_BOP_PAIRS_PARALLEL=1 since 10-28 18:24** (qa BOP-PAIRS-GPF: with it on by default the app
+  and the CLI died in ForceInterfEF / an IntTools_Context map on a pool worker, intermittently, as BOOL-THREAD-CRASH
+  did with whole booleans parallel); ReduceIntersectionRange's E/E interferences indexed by new vertex (serial,
+  stays on). So the knurl is back near its serial time unless the variable is set; the race is the next thing to
+  find (ASan / TSan on qa's seed 152 Shell replay, tickets/bop-pairs-cli-segv-r152.py, or bisect the six sites). Built lib
   kept at /root/core-scratch/libTKBO.a.0004; the TKBO before it in /root/core-scratch/occt-lib-backup.
 - OCCT 8's gp_Dir / gp_Ax1 constructors are noexcept: a zero vector anywhere is std::terminate (caught by the guard as
   SIGABRT inside bridge calls). Never build a gp_Dir from a vector that can be zero in our C++.
