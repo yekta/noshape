@@ -1124,6 +1124,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
+- [ ] P2 XT-ASM-VERSIONS live's own Parasolid assembly exports fail to import in half the versions: + › Import… (Import
+  to this document) of /root/onshape-research/live/samples/dx-asm-xt-<v>.x_t (request 1536: Part 1 block + Part 2 pin,
+  3 instances, one file per Parasolid version) on green 98667558:
+  12.0 → "Import failed: … geometry kernel exception: stoll"; 28.1 and 33.0 → "invalid input: parasolid: no parts in the
+  file"; 33.1 and 37.1 → "invalid input: parasolid: bad node type" (tickets/xt-asm-versions-9866.png); 25.0, 28.0, 38.1
+  and latest import as an Assembly "live xt asm" + "dx-asm-xt-<v> parts" (38.1: Part 2 848.23 mm³ = the Ø6×30 pin).
+  Live reads all of them (they are its own exports). v0.4.12's CLI fails the same six and imports the other three at
+  ~1e-6 mm³ (XT-ASM-SCALE, fixed since) (qa 2026-10-28 06:24, build 98667558)
 - [ ] P2 VIEW-LABEL-TOGGLE View properties' "View label" / "Scale label" boxes don't drive the drawn label of a detail (or auxiliary) view: wf-block drawing › Detail view B (2:1) under "DETAIL B / SCALE 2:1" › double-click → ☑ View label with the new Prefix DETAIL / Letter B / Suffix rows (3062ec50 ✅) but ☐ Scale label while the scale line is drawn; untick View label, ✓ → the label still reads "DETAIL B / SCALE 2:1" (tickets/view-label-toggle-3f4e.png). The auxiliary view does the same (View label ☐ while "Auxiliary A - A" shows; live asked, REQUESTS qa 10-28 03:30). The boxes should show / hide what is drawn (qa 2026-10-28 04:32, green 3f4e10d9)
   qa 05:46: live answered request 1535 (behaviours ~22615): ISO A3 aux view → ☑ View label (ticked, as drawn), Prefix /
   Letter "A" / Suffix fields (no single Label field), ☐ Scale label; unticking View label hides the "A" at once, ticking
