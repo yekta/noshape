@@ -105,10 +105,10 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | L13 | Error indicator with message tooltip | E§5.3 | ✅ | |  |
 | L14 | Subassemblies expand to their instances | E§5.1 | ✅ | |  |
 | L15 | Inline rename (Shift+N, Rename) | E§5.4 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
-| L16 | Folders: Add selection to folder (named inline), count `(n)` | E§5.6 | ✅ | model test `folders_and_display_states` |  |
+| L16 | Folders: Add selection to folder (named inline), count `(n)` | E§5.6 | ✅ | model test `folders_and_display_states` | 0.4.10+ / 52ca0b97 10-28 (Part 1 + Part 2 › Add selection to folder… › "Folder name" popup › "New folder (2)" = live 1224) |
 | L17 | Folder menu: Rename, Hide/Show, Hide other, Hide all, Isolate, Make transparent, Suppress, Add selection to folder, Expand, Collapse, Delete (with contents), Unpack folder | E§5.6, UI:concepts__featurelist-contextmenu | ✅ | live 537: Rename | Hide, Hide other instances, Hide all instances, Isolate…, Make transparent…, Suppress, Dynamic suppression ▸ (folder expression: `ListFolder.unsuppressed_if`, model test `dynamic_suppression_of_a_folder_suppresses_its_instances`), Unfix all (when it holds fixed instances) | Add selection to folder…, Expand ▸, Collapse ▸ | Delete, Unpack folder GUI :103 = live 537 (items, separators, 22 px rows; Unfix all only with fixed instances). |  |
-| L18 | Folder eye hides / shows all members | E§5.6 | ✅ | GUI f3–f4 |  |
-| L19 | New folder icon in the header | E§5.6 | ✅ | header folder button (around the selection) |  |
+| L18 | Folder eye hides / shows all members | E§5.6 | ✅ | GUI f3–f4 | 0.4.10+ / 52ca0b97 10-28 (folder eye hides both members, crossed eyes on the rows) |
+| L19 | New folder icon in the header | E§5.6 | ✅ | header folder button (around the selection) | 0.4.10+ / 52ca0b97 10-28 (folder icon right of "Instances (3)") |
 | L20 | Drag and drop to reorder / into folders / into subassemblies | E§5.5 | ✅ | dropping onto a subassembly row moves the dragged (or selected) instances into it at the same place; model test `drop_instances_into_a_subassembly` |  |
 | L21 | Instance list properties columns | E§5.1 | ✅ | Top row › Show / Hide instance list properties: gray release-state pill ("In progress") after each instance name (live 103: no columns) (skb) GUI l21c |  |
 | L22 | Items list (non-geometric BOM items) | E§5.1 | n/a | not on the captured plan: live 105 / 678 found no non-geometric item flow (no "Add items" control in the BOM header, ⋯ or rows); a subscription-gated feature (TEAM-RULES exclusion) |  |
