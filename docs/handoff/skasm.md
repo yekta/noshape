@@ -155,7 +155,10 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
 - disk-loop (/tmp/lead/disk-loop.sh, every 30 min): its prune steps (prune-deps / prune-exes / incremental) run on
   target dirs mid-build; three of my lands failed 10-28 00:40–01:50 on .rmeta / fingerprint files deleted under a
   running build ("extern location for noshape_units does not exist: …/libnoshape_units-d2f9….rmeta", "failed to write
-  …/invoked.timestamp"). Could they skip a dir whose cargo is running, as `floor` does with `busy`?
+  …/invoked.timestamp"). Could they skip a dir whose cargo is running, as `floor` does with `busy`? 02:34 again,
+  right after the 02:32 run ("prune-exes: removed 42 old builds"): prune-exes.py deletes an old build's fingerprint
+  dir while cargo is rebuilding that very hash (release-ui, part-studio-ui).
+  Fuzz 10-28 02:00–02:40: assembly 120 seeds × 120 steps clean; sketch wide 149 seeds × 150 steps clean.
 - "Show calculation variance" in Mass properties (live: behaviours "skasm (2026-10-27) calculation variance": every
   value gets " ± 4.000e-1 mm³"-style text, 3-decimal scientific, not persisted). The assembly panel
   (assembly-ui/assembly_mass.rs) is mine, the Part Studio one psui's (part-studio-ui menus.rs ~1329), and the numbers
