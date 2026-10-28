@@ -175,7 +175,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 7.22 | Errors: "A dimension cannot be created between these items." / "Could not create the dimension." | i18n | ✅ |  |
 | 7.23 | Driving dimensions black, driven gray, hover/selected gold, conflicting red | Home__colors, B§4.5 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 7.24 | Tolerances, precision, configure dimension | B§4.3 | ✅ (tolerance types, deviations, precision; configure dimension) | 0.4.10+ / dd1b5037 10-27 (± → Tolerance: No tolerance / Symmetrical / Deviation / Limits / Min / Max / Basic; Precision: Workspace precision) |
-| 7.25 | Min / max distance to circles | SK-D07 | ✅ (T:sm; rim picks measure min / max) |  |
+| 7.25 | Min / max distance to circles | SK-D07 | ✅ (T:sm; rim picks measure min / max) | 4c97692e 10-28 (GUI: d on the facing rims of two circles → horizontal 34.743 between the rims (minimum), extension lines on the rims) |
 
 ## 8. Constraints
 
