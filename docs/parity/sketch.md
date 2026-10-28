@@ -212,7 +212,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 9.2 | Box select left→right: window (entirely inside) | B§5.4 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 9.3 | Box select right→left: crossing (anything the box touches) | B§5.4 | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 9.4 | Hover highlights orange, selection amber, related entities yellow | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 9.5 | Not fully constrained points win over fully constrained ones under the cursor | H:sketch_tools | ✅ (T:ux; fresh GUI :103 free point overlapping fixed origin drags away while origin stays fixed; current-point-priority.png) |  |
+| 9.5 | Not fully constrained points win over fully constrained ones under the cursor | H:sketch_tools | ✅ (T:ux; fresh GUI :103 free point overlapping fixed origin drags away while origin stays fixed; current-point-priority.png) | 4c97692e 10-28 (GUI: Point with Shift held on the origin (no snap), then a drag from that spot moves the free point (−48, +64 px); the origin stays) |
 | 9.6 | Clicking a closed region selects it | B§1.6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 9.7 | Select other (`) | B§5.4 | ✅ (GUI :103 backtick opens candidate popup; select-other-focus.png) | 0.4.10+ / 203c4d6f 10-27 |
 | 9.8 | Click in empty space clears the selection | Onshape | ✅ | 0.4.10+ / 2d9a275c 10-27 |
