@@ -2749,7 +2749,7 @@ impl Renderer {
             self.ao = Some(crate::ao::AoPass::new(&self.device, msaa, COLOR_FORMAT));
         }
         // A hovered whole part: its outline band after the color pass (hover_outline.rs).
-        let hover_band = req.scene.states.iter().any(|&s| s & (crate::scene::state::HOVER | crate::scene::state::OUTLINE) == crate::scene::state::HOVER | crate::scene::state::OUTLINE && s & crate::scene::state::SELECTED == 0);
+        let hover_band = req.scene.hover_outline;
         if hover_band && self.hover_outline.is_none() {
             self.hover_outline = Some(crate::hover_outline::HoverOutline::new(&self.device, COLOR_FORMAT));
         }

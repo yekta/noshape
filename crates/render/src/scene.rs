@@ -869,6 +869,10 @@ pub struct Scene {
     pub instances: Vec<Instance>,
     /// Indexed by pick id; see [`state`].
     pub states: Vec<u32>,
+    /// A whole part is hovered: its faces carry `HOVER | OUTLINE` and the
+    /// renderer draws its outline band (hover_outline.rs). A hovered face's
+    /// boundary edges carry the same flags but need no band.
+    pub hover_outline: bool,
     pub clip: Option<ClipPlane>,
     /// Up to two more section planes (with `clip`): geometry is removed
     /// where all planes clip it.

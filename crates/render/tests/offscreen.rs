@@ -2009,6 +2009,7 @@ fn a_hovered_part_is_outlined_on_its_silhouette() {
                 for id in 1..=6 {
                     scene.set_state(id, state::HOVER | state::OUTLINE);
                 }
+                scene.hover_outline = true;
             }
             r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: dpr, style: &Style::default(), pick: false }).unwrap().bgra
         };
