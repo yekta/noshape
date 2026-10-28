@@ -64,7 +64,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 3.10 | Space clears the sketch selection | B§8.2 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 3.11 | Ctrl+C / Ctrl+V copy / paste sketch entities | H:sketch_basics | ✅ (T:ux) | 0.4.10+ / 203c4d6f 10-27 |
 | 3.12 | `#` typed without `=` in a sketch value box is the view shortcut; `=#var` enters a variable | H:sketch_basics | ✅ | 0.4.10+ / 41f60e47 10-28 |
-| 3.13 | Shortcuts are user-customizable | B§2.1 | ✅ (Shift+/ › Customize keyboard shortcuts opens the Preferences window scrolled to Keyboard shortcuts, like live's /user/settings?focusView=customize-keyboard-shortcuts tab (shortcuts/30–47): tabs, Edit / Reset per row, legend, Reset all, Shortcut toolbars; GUI :103 k1–k2) |  |
+| 3.13 | Shortcuts are user-customizable | B§2.1 | ✅ (Shift+/ › Customize keyboard shortcuts opens the Preferences window scrolled to Keyboard shortcuts, like live's /user/settings?focusView=customize-keyboard-shortcuts tab (shortcuts/30–47): tabs, Edit / Reset per row, legend, Reset all, Shortcut toolbars; GUI :103 k1–k2) | 78958d0f 10-28 (Preferences › Keyboard shortcuts › Sketch: Bezier (Unassigned) › pencil → "Edit shortcut: Bezier", j captured, ✓ → chip "j" with the customized border; in a sketch j starts Bezier ("Click to add control points; double-click to end"); note the Preferences page is its own window) |
 
 ## 4. Geometry tools: clicks, drags and results
 
