@@ -272,6 +272,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("assembly:Isometric", Op("view_camera")),
     ("assembly:Make transparent…", Op("view_display")),
     ("assembly:Move down", Op("assembly_named_position")),
+    ("assembly:Move to origin", Op("assembly_transform")),
     ("assembly:Move to new subassembly", Op("assembly_move_to_subassembly")),
     ("assembly:Move to origin", Op("assembly_transform")),
     ("assembly:Move up", Op("assembly_named_position")),
