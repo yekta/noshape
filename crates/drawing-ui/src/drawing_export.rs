@@ -220,7 +220,8 @@ impl DrawingEditor {
         let sources = self.sources.clone();
         let cache = self.cache.clone();
         let info = self.info.clone();
-        self.status = Some(format!("{name} is being prepared for export").into());
+        // Live (qa4 r5 s11): a blue banner while the file is made.
+        self.show_toast_kind(format!("{name} is being prepared for export. You will receive a notification with its status."), crate::os_ui::BubbleKind::Info, cx);
         cx.notify();
         let settings = s.clone();
         cx.spawn(async move |this, cx| {

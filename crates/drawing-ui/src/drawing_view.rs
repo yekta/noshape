@@ -395,6 +395,8 @@ pub struct DrawingEditor {
     /// and its generation (a newer one replaces it).
     pub toast: Option<SharedString>,
     pub toast_gen: u64,
+    /// Its colour (green success, blue info).
+    pub toast_kind: crate::os_ui::BubbleKind,
     pub _subs: Vec<Subscription>,
 }
 
@@ -408,6 +410,13 @@ impl DrawingEditor {
     /// A green success bubble at the top centre of the sheet (live: "✓
     /// Successfully replicated 7/7 annotations ×"), gone after 5 s or on ×.
     pub fn show_toast(&mut self, text: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.show_toast_kind(text, crate::os_ui::BubbleKind::Success, cx);
+    }
+
+    /// [`Self::show_toast`] as a blue (Info) banner, e.g. live's "… is being
+    /// prepared for export" (EX11).
+    pub fn show_toast_kind(&mut self, text: impl Into<SharedString>, kind: crate::os_ui::BubbleKind, cx: &mut Context<Self>) {
+        self.toast_kind = kind;
         self.toast_gen += 1;
         let generation = self.toast_gen;
         self.toast = Some(text.into());
@@ -433,7 +442,7 @@ impl DrawingEditor {
                 cx.notify();
             });
         };
-        Some(div().absolute().top(px(8.)).left_0().right_0().flex().justify_center().child(crate::os_ui::message_bubble("dr-toast", crate::os_ui::BubbleKind::Success, text, close, cx)).into_any_element())
+        Some(div().absolute().top(px(8.)).left_0().right_0().flex().justify_center().child(crate::os_ui::message_bubble("dr-toast", self.toast_kind, text, close, cx)).into_any_element())
     }
 
     pub fn new(doc: Entity<DocModel>, tab: TabId, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -604,6 +613,7 @@ impl DrawingEditor {
             status: None,
             toast: None,
             toast_gen: 0,
+            toast_kind: crate::os_ui::BubbleKind::Success,
             _subs: subs,
         };
         this.old_state = this.load_old_state(cx);
