@@ -1441,7 +1441,7 @@ impl DrawingEditor {
                     });
                 }
             }
-            Sel::Break(..) | Sel::Sketch(_) | Sel::Hatch(_) | Sel::Image(_) | Sel::AutoCentermark(..) | Sel::ViewLabel(_) | Sel::AuxIndicator(_) => {}
+            Sel::Break(..) | Sel::Sketch(_) | Sel::Hatch(_) | Sel::Image(_) | Sel::AutoCentermark(..) | Sel::ViewLabel(_) | Sel::AuxIndicator(_) | Sel::HoleAxis(_) => {}
         }
     }
 
@@ -1505,7 +1505,7 @@ impl DrawingEditor {
             },
             Sel::ViewLabel(v) => self.label_drag(v, start),
             // Dragging the indicator's line (off its dots) does nothing (live u-914).
-            Sel::Table(_) | Sel::Break(..) | Sel::Hatch(_) | Sel::AutoCentermark(..) | Sel::AuxIndicator(_) => Drag::None,
+            Sel::Table(_) | Sel::Break(..) | Sel::Hatch(_) | Sel::AutoCentermark(..) | Sel::AuxIndicator(_) | Sel::HoleAxis(_) => Drag::None,
         }
     }
 
@@ -1636,6 +1636,23 @@ impl DrawingEditor {
         match sel {
             Some(Sel::View(id)) => out = self.onshape_view_entries(id, cx),
             Some(Sel::AuxIndicator(id)) => return Self::aux_indicator_entries(id, crate::drawing_props::paste_entry(cx)),
+            // A hole table's tag axis (help drawing_hole_table): Hole table
+            // properties, Flip X direction, Flip Y direction | Clear
+            // selection, Zoom to fit.
+            Some(Sel::HoleAxis(id)) => {
+                use noshape_model::drawing::TableKind;
+                return vec![
+                    MenuEntry::item("Hole table properties...", move |t, _, cx| t.open_hole_table_props(id, cx)),
+                    MenuEntry::item("Flip X direction", move |t, _, cx| t.edit_table(id, "Flip X direction", cx, |t| if let TableKind::Hole { flip_x, .. } = &mut t.kind { *flip_x = !*flip_x })),
+                    MenuEntry::item("Flip Y direction", move |t, _, cx| t.edit_table(id, "Flip Y direction", cx, |t| if let TableKind::Hole { flip_y, .. } = &mut t.kind { *flip_y = !*flip_y })),
+                    MenuEntry::Separator,
+                    MenuEntry::item("Clear selection", |t, _, cx| {
+                        t.selection.clear();
+                        t.redraw(cx);
+                    }),
+                    MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
+                ];
+            }
             Some(Sel::ViewLabel(id)) => out = self.label_entries(id, cx),
             Some(Sel::Annotation(id)) => {
                 // Linear dimensions: Onshape's own menu.

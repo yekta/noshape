@@ -1022,6 +1022,8 @@ pub fn delete_selection(s: &mut Sheet, sel: &[super::Sel]) {
             }
             Sel::Annotation(a) => s.annotations.retain(|n| n.id != *a && n.group != Some(*a) && !matches!(n.kind, AnnotationKind::RevisionCallout { group: Some(g), .. } if g == *a)),
             Sel::Table(t) => s.tables.retain(|n| n.id != *t),
+            // A hole table's tag axis isn't deleted on its own (live: no Delete in its menu).
+            Sel::HoleAxis(_) => {}
             Sel::Sketch(e) => {
                 s.sketch.sketch.remove_entity(noshape_sketch::EntityId(*e));
             }

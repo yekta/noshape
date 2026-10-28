@@ -673,7 +673,7 @@ impl DrawingEditor {
         self.selection.retain(|s| match s {
             Sel::View(v) => sheet.view(*v).is_some(),
             Sel::Annotation(a) => sheet.annotations.iter().any(|x| x.id == *a),
-            Sel::Table(t) => sheet.table(*t).is_some(),
+            Sel::Table(t) | Sel::HoleAxis(t) => sheet.table(*t).is_some(),
             Sel::Break(v, i) => sheet.view(*v).is_some_and(|v| *i < v.breaks.len()),
             Sel::Sketch(e) => sheet.sketch.sketch.entity(noshape_sketch::EntityId(*e)).is_some(),
             Sel::Hatch(h) => sheet.sketch.hatches.iter().any(|x| x.id == *h),

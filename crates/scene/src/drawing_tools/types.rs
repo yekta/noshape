@@ -223,6 +223,8 @@ pub enum Sel {
     /// An auxiliary view's reference indicator, selected on its own (live
     /// u-906: orange, its parent edge orange, the view framed light blue).
     AuxIndicator(ViewId),
+    /// A hole table's tag axis (its own menu: Hole table properties, flips).
+    HoleAxis(u64),
 }
 
 #[derive(Clone, Debug)]

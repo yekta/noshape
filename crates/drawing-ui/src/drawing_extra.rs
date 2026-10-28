@@ -1631,16 +1631,6 @@ impl DrawingEditor {
             out.push(MenuEntry::item("Hole table properties...", move |t, _, cx| t.open_hole_table_props(id, cx)));
         }
         out.extend(self.table_more_entries(&t, cell));
-        if let TableKind::Hole { precision, .. } = t.kind {
-            let mut prec = vec![MenuEntry::check("Drawing default", precision.is_none(), move |t, _, cx| t.edit_table(id, "Hole table precision", cx, |t| if let TableKind::Hole { precision, .. } = &mut t.kind { *precision = None }))];
-            for p in 0..=4u8 {
-                prec.push(MenuEntry::check(format!("{p} decimals"), precision == Some(p), move |t, _, cx| t.edit_table(id, "Hole table precision", cx, |t| if let TableKind::Hole { precision, .. } = &mut t.kind { *precision = Some(p) })));
-            }
-            out.push(MenuEntry::Submenu("Precision".into(), prec));
-            // Tag axis directions.
-            out.push(MenuEntry::item("Flip X direction", move |t, _, cx| t.edit_table(id, "Flip X direction", cx, |t| if let TableKind::Hole { flip_x, .. } = &mut t.kind { *flip_x = !*flip_x })));
-            out.push(MenuEntry::item("Flip Y direction", move |t, _, cx| t.edit_table(id, "Flip Y direction", cx, |t| if let TableKind::Hole { flip_y, .. } = &mut t.kind { *flip_y = !*flip_y })));
-        }
         if let TableKind::CutList { bottom_to_top, .. } = t.kind {
             out.push(MenuEntry::Submenu(
                 "Order".into(),

@@ -147,7 +147,7 @@ impl<'a> SheetPick<'a> {
             .filter(|(_, t)| match (sel, t) {
                 (Sel::View(v), t) => t.view() == Some(v),
                 (Sel::Annotation(a), PickTarget::Annotation(b) | PickTarget::Inspection(b)) => a == *b,
-                (Sel::Table(a), PickTarget::Table(b)) => a == *b,
+                (Sel::Table(a), PickTarget::Table(b)) | (Sel::HoleAxis(a), PickTarget::HoleAxis(b)) => a == *b,
                 (Sel::Break(v, i), PickTarget::BreakLine { view, index }) => v == *view && i == *index,
                 (Sel::Sketch(a), PickTarget::SketchEntity(b)) => a == *b,
                 (Sel::Hatch(a), PickTarget::Hatch(b)) => a == *b,
@@ -166,6 +166,7 @@ impl<'a> SheetPick<'a> {
             PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::SectionLine(v) | PickTarget::DetailCircle(v) | PickTarget::BrokenOut { view: v, .. } => Some(Sel::View(*v)),
             PickTarget::Annotation(a) | PickTarget::Inspection(a) => Some(Sel::Annotation(*a)),
             PickTarget::Table(t) => Some(Sel::Table(*t)),
+            PickTarget::HoleAxis(t) => Some(Sel::HoleAxis(*t)),
             PickTarget::BreakLine { view, index } => Some(Sel::Break(*view, *index)),
             PickTarget::SketchEntity(id) => Some(Sel::Sketch(*id)),
             PickTarget::Hatch(id) => Some(Sel::Hatch(*id)),

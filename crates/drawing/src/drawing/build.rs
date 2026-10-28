@@ -39,6 +39,8 @@ pub enum PickTarget {
     /// formats are locked (live qa4 round 5 s11 (4)).
     TitleField(String),
     Table(u64),
+    /// A hole table's tag axis (live: its own menu, TB21).
+    HoleAxis(u64),
     /// Break lines of break `index` of a view.
     BreakLine { view: ViewId, index: usize },
     /// A drawing sketch entity (sheet sketch id).
@@ -2164,7 +2166,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         if let (TableKind::Hole { flip_x, flip_y, .. }, Some(geo), Some(pl), Some(o)) = (&t.kind, geo, view.and_then(place), origin) {
             let os = pl.to_sheet(o);
             let origin_mark = g.mark();
-            // The tag axis: X and Y arrows in the table's directions.
+            // The tag axis: X and Y arrows in the table's directions, picked
+            // on its own (live: its menu has the flips).
+            let pick = picks.id(PickTarget::HoleAxis(t.id));
             let (sx, sy) = (if *flip_x { -1.0 } else { 1.0 }, if *flip_y { -1.0 } else { 1.0 });
             let (xt, yt) = ([os[0] + 8.0 * sx, os[1]], [os[0], os[1] + 8.0 * sy]);
             // Drawing properties › Tables › Hole tables: Indicator lines'
