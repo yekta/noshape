@@ -897,15 +897,20 @@ impl AssemblyView {
         self.result.bounds().map(|(a, b)| (b - a).length() * 0.06).unwrap_or(0.01).clamp(0.002, 1.0)
     }
 
-    /// Instance rows drawn "related-highlight" (live 305 / 578): the
-    /// selected mate's instances, the instance of a connector being edited
-    /// from a mate dialog (qa5 MT7, MT4).
+    /// Instance rows drawn "related-highlight" (live 305): the selected
+    /// mate's instances; none while a mate's connector is open from its chip
+    /// (live 578: then only its owner's row, selected; see `chip_mc_owner`).
     fn related_instances(&self, cx: &App) -> Vec<InstanceId> {
-        let mut out = self.selected_mate.map(|id| self.mate_instances(id, cx)).unwrap_or_default();
-        if let Some(c) = self.mc.as_ref().filter(|m| m.for_mate.is_some()).and_then(|m| m.on.as_ref()) {
-            out.push(c.instance);
+        if self.chip_mc_owner().is_some() {
+            return Vec::new();
         }
-        out
+        self.selected_mate.map(|id| self.mate_instances(id, cx)).unwrap_or_default()
+    }
+
+    /// The top instance owning the connector open from a mate's chip.
+    fn chip_mc_owner(&self) -> Option<InstanceId> {
+        let c = self.mc.as_ref().filter(|m| m.for_mate.is_some())?.on.as_ref()?;
+        Some(c.path.first().copied().unwrap_or(c.instance))
     }
 
     fn mate_instances(&self, id: MateId, cx: &App) -> Vec<InstanceId> {
@@ -937,8 +942,17 @@ impl AssemblyView {
         let tops: Vec<InstanceId> = self.selected.iter().copied().filter(|t| !self.ui.entity_sel.iter().any(|(p, _)| p[0] == *t)).collect();
         let Some(built) = &self.built else { return };
         let mut h = Highlights { selected_tops: tops, selected_entities: self.ui.entity_sel.clone(), ..Default::default() };
+        // A mate's connector open from its chip (live assembly/578,
+        // MATE-CONNECTOR-PANEL-HIGHLIGHT): only its origin entity is shown,
+        // selected; no whole-part amber.
+        let chip_mc = self.mc.as_ref().filter(|m| m.for_mate.is_some()).and_then(|m| m.on.clone());
+        if let Some(c) = &chip_mc {
+            let mut path = c.path.clone();
+            path.push(c.instance);
+            h.selected_entities.push((path, c.reference.clone()));
+        }
         // Mate preview: the instance that moves is drawn amber (live qa5 2.1).
-        if let Some(s) = &self.mate {
+        if let Some(s) = self.mate.as_ref().filter(|_| chip_mc.is_none()) {
             let d = s.dialog.read(cx);
             if let (Some(a), Some(b), Some(asm)) = (&d.a, &d.b, self.assembly(cx)) {
                 let m = Mate::new(MateId(0), String::new(), d.mate_type(), a.clone(), b.clone());
@@ -3282,7 +3296,7 @@ impl AssemblyView {
         let versioned = ext_key.as_ref().and_then(|k| crate::derived::ExternalRef::parse(k)).map(|r| r.path == own_path);
         let newer_badge = update.is_some() && versioned == Some(false);
         let dof = if is_top { node.and_then(|n| n.dof) } else { None };
-        let selected = is_top && self.selected.contains(&top);
+        let selected = is_top && (self.selected.contains(&top) || self.chip_mc_owner() == Some(top));
         let has_children = node.is_some_and(|n| !n.children.is_empty());
         let expanded = self.expanded.contains(&path);
         let icon = match kind {
