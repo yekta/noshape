@@ -70,7 +70,9 @@ pub enum Panel {
     Note { input: Entity<TextareaState>, edit: Option<u64>, pos: [f64; 2], height: Entity<InputState>, style: noshape_model::drawing::note::NoteStyle, field: Option<String> },
     /// Dimension properties (precision, units, tolerance, texts).
     Datum { edit: Option<u64>, anchor: [f64; 2], input: Entity<InputState> },
-    SurfaceFinish { edit: Option<u64>, pos: [f64; 2], input: Entity<InputState> },
+    /// `placed`: the symbols placed since it opened (help surface_finish:
+    /// keep placing until ✓; ✕ takes them back).
+    SurfaceFinish { edit: Option<u64>, pos: [f64; 2], input: Entity<InputState>, placed: Vec<u64> },
     /// A table cell's text; `note`: the Note panel's style of a general
     /// table cell (live 743: the cell is a note).
     Cell { table: u64, row: usize, col: usize, input: Entity<TextareaState>, note: Option<Box<CellNote>> },

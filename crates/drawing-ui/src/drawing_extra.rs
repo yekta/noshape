@@ -1033,7 +1033,17 @@ impl DrawingEditor {
                     self.datum_placed(window, cx);
                 }
             }
-            Tool::SurfaceFinish => self.open_surface_finish_panel(None, c, noshape_scene::drawing_tools::SURFACE_FINISH_DEFAULT, window, cx),
+            // Keep placing until ✓ (help surface_finish).
+            Tool::SurfaceFinish => match &self.panel {
+                Some(Panel::SurfaceFinish { edit: None, input, .. }) => {
+                    let value = input.read(cx).value().to_string();
+                    self.place_surface_finish(c, value, cx);
+                }
+                _ => {
+                    self.open_surface_finish_panel(None, c, noshape_scene::drawing_tools::SURFACE_FINISH_DEFAULT, window, cx);
+                    self.place_surface_finish(c, noshape_scene::drawing_tools::SURFACE_FINISH_DEFAULT.to_string(), cx);
+                }
+            },
             _ => return false,
         }
         true
@@ -1863,7 +1873,30 @@ impl DrawingEditor {
     fn open_surface_finish_panel(&mut self, edit: Option<u64>, pos: [f64; 2], value: &str, window: &mut Window, cx: &mut Context<Self>) {
         let input = self.input(value, window, cx);
         Self::focus_input(&input, window, cx);
-        self.panel = Some(Panel::SurfaceFinish { edit, pos, input });
+        self.panel = Some(Panel::SurfaceFinish { edit, pos, input, placed: Vec::new() });
+        cx.notify();
+    }
+
+    /// The Surface finish tool's click: a symbol there with the panel's value
+    /// (the panel stays for more, help surface_finish).
+    fn place_surface_finish(&mut self, at: [f64; 2], value: String, cx: &mut Context<Self>) {
+        let id = self.current_sheet().next_annotation_id();
+        self.edit_sheet("Surface finish", cx, |s| s.annotations.push(noshape_scene::drawing_tools::surface_finish(id, at, value)));
+        if let Some(Panel::SurfaceFinish { placed, .. }) = &mut self.panel {
+            placed.push(id);
+        }
+    }
+
+    /// A panel's Cancel / Esc: closed, nothing applied; the Surface finish
+    /// tool's symbols placed meanwhile go too (help surface_finish: ✕
+    /// cancels).
+    pub fn cancel_panel(&mut self, cx: &mut Context<Self>) {
+        if let Some(Panel::SurfaceFinish { edit: None, placed, .. }) = self.panel.take() {
+            if !placed.is_empty() {
+                self.edit_sheet("Surface finish", cx, |s| s.annotations.retain(|a| !placed.contains(&a.id)));
+            }
+            self.tool = Tool::Select;
+        }
         cx.notify();
     }
 
@@ -1981,9 +2014,20 @@ impl DrawingEditor {
                     }
                 });
             }
-            Panel::SurfaceFinish { edit, pos, input } => {
+            Panel::SurfaceFinish { edit, pos, input, placed } => {
                 let value = val(&input, cx);
                 match edit {
+                    // ✓: the symbols placed take the panel's value.
+                    None if !placed.is_empty() => {
+                        self.edit_sheet("Surface finish", cx, |s| {
+                            for a in s.annotations.iter_mut().filter(|a| placed.contains(&a.id)) {
+                                if let AnnotationKind::SurfaceFinish { value: v, .. } = &mut a.kind {
+                                    *v = value.clone();
+                                }
+                            }
+                        });
+                        self.tool = Tool::Select;
+                    }
                     Some(id) => self.edit_sheet("Edit surface finish", cx, |s| {
                         if let Some(AnnotationKind::SurfaceFinish { value: v, .. }) = s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
                             *v = value;

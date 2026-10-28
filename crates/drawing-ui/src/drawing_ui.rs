@@ -91,14 +91,14 @@ impl DrawingEditor {
                 // before key listeners, and it reverts an edit), so catch the
                 // action too.
                 .capture_action(cx.listener(|this, _: &Escape, window, cx| {
-                    this.panel = None;
+                    this.cancel_panel(cx);
                     window.focus(&this.focus, cx);
                     cx.stop_propagation();
                     cx.notify();
                 }))
                 .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
                     if e.keystroke.key == "escape" {
-                        this.panel = None;
+                        this.cancel_panel(cx);
                         window.focus(&this.focus, cx);
                         cx.stop_propagation();
                         cx.notify();
@@ -124,10 +124,7 @@ impl DrawingEditor {
                     h_flex()
                         .gap_2()
                         .justify_end()
-                        .child(Button::new("dr-panel-cancel").label("Cancel").ghost().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.panel = None;
-                            cx.notify();
-                        })))
+                        .child(Button::new("dr-panel-cancel").label("Cancel").ghost().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel_panel(cx))))
                         .child(Button::new("dr-panel-ok").label("OK").primary().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_panel(cx)))),
                 )
                 .into_any_element(),
