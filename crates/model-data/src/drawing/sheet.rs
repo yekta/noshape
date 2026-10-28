@@ -402,6 +402,9 @@ pub struct SheetStyle {
     /// Per annotation type overrides, and the datum triangle size (mm).
     pub ann_types: Vec<(AnnType, AnnTypeStyle)>,
     pub datum_size: f64,
+    /// Dimensions: Text justification of the lines above / below the value
+    /// and the dual line (Drawing properties › Dimensions).
+    pub dim_justify: super::TextJustify,
     /// Callouts: text justification, stack direction and gap (mm).
     pub callout_justify: super::TextJustify,
     pub callout_stack: super::StackDirection,
@@ -500,7 +503,7 @@ impl SheetStyle {
 
 impl Default for SheetStyle {
     fn default() -> Self {
-        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false, iso: true, virtual_sharp_extension: false, virtual_sharp_pen: 0.4, virtual_sharp_color: None, revision_callout: RevisionCalloutStyle::default() }
+        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, dim_justify: super::TextJustify::Center, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false, iso: true, virtual_sharp_extension: false, virtual_sharp_pen: 0.4, virtual_sharp_color: None, revision_callout: RevisionCalloutStyle::default() }
     }
 }
 
@@ -2290,6 +2293,14 @@ impl SheetGeometry {
         let v = [-sn, cs];
         let total = self.dim_label_width(t, h);
         let x0 = -halign * total;
+        // Lines of width `w` beside the value: Text justification (S25;
+        // Auto as Center for dimensions).
+        let just = self.style.dim_justify;
+        let line_x = |w: f64| match just {
+            super::TextJustify::Left => x0,
+            super::TextJustify::Right => x0 + total - w,
+            _ => x0 + (total - w) / 2.0,
+        };
         let stacked = t.upper.is_some() && t.lower.is_some();
         let base = if vcenter { if stacked && t.main.is_empty() { -h * 0.15 } else { -h / 2.0 } } else if stacked && t.main.is_empty() { h * 0.95 } else { 0.0 };
         let loc = |x: f64, y: f64| [at[0] + u[0] * x + v[0] * y, at[1] + u[1] * x + v[1] * y];
@@ -2314,18 +2325,18 @@ impl SheetGeometry {
             let (xa, xb, ya, yb) = (x0 - 0.8, x0 + total + 0.8, base - 0.8, base + h + 0.8);
             self.lines.push(Polyline2 { points: vec![loc(xa, ya), loc(xb, ya), loc(xb, yb), loc(xa, yb)], style: LineStyle::Thin, closed: true, pick });
         }
-        // The dual value: a second line, the same height, centred on the
-        // value, above (Top) or below (Bottom) it (live asb 10-24).
+        // The dual value: a second line, the same height, on the value
+        // (centred by default), above (Top) or below (Bottom) it (live asb 10-24).
         if let Some(d) = &t.dual {
             let w = font::text_width(d, h);
             let y = if t.dual_below { base - h * 1.6 } else { base + h * 1.6 };
-            self.texts.push(Text2 { pos: loc(x0 + (total - w) / 2.0, y), height: h, text: d.clone(), angle, anchor: Anchor::BottomLeft, pick });
+            self.texts.push(Text2 { pos: loc(line_x(w), y), height: h, text: d.clone(), angle, anchor: Anchor::BottomLeft, pick });
         }
-        // Above / below text, centred on the value.
+        // Above / below text, on the value as justified.
         for (txt, y) in [(&t.above, base + h * 1.5), (&t.below, base - h * 1.5)] {
             if let Some(txt) = txt {
                 let w = font::text_width(txt, h);
-                self.texts.push(Text2 { pos: loc(x0 + (total - w) / 2.0, y), height: h, text: txt.clone(), angle, anchor: Anchor::BottomLeft, pick });
+                self.texts.push(Text2 { pos: loc(line_x(w), y), height: h, text: txt.clone(), angle, anchor: Anchor::BottomLeft, pick });
             }
         }
         // Inspection dimension: an oval (half circles at the ends).
@@ -2891,6 +2902,22 @@ pub fn note_leader_paths(bbox: [f64; 4], leaders: &[super::Leader], targets: &[[
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Dimensions › Text justification places the lines above / below the
+    /// value: Left on its left edge, Right on its right edge, Center centred.
+    #[test]
+    fn dimension_text_justification() {
+        let t = DimText { main: "10".into(), above: Some("ABOVE THE VALUE".into()), ..Default::default() };
+        for (just, want) in [(super::super::TextJustify::Left, 0.0), (super::super::TextJustify::Center, 0.5), (super::super::TextJustify::Right, 1.0)] {
+            let mut g = SheetGeometry::new(200.0, 200.0);
+            g.style.dim_justify = just;
+            g.dim_label([100.0, 100.0], 0.0, 0.0, false, &t, 3.5, 1);
+            let (main, above) = (&g.texts[0], &g.texts[1]);
+            let (wm, wa) = (font::text_width("10", 3.5), font::text_width("ABOVE THE VALUE", 3.5));
+            let x = main.pos[0] + (wm - wa) * want;
+            assert!((above.pos[0] - x).abs() < 1e-9, "{just:?}: {} vs {x}", above.pos[0]);
+        }
+    }
 
     /// Drawing properties › Inspection: Solid fill in its own colour (live's
     /// orange by default) under the border and number, which keep theirs.
