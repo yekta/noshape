@@ -29,12 +29,12 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Parts to draft | the faces turn about their edge away from the parting entity: the top stays 40×20, the bottom grows by 10·tan 5° (8535.1377); Keep material makes no difference here | "not supported yet" | ✅ test `body_draft_as_live` |  |
-| 2 | Corner type Plane | corners bevelled from the top corner to the drafted faces' feet (8530.0348, 10 faces) | — | ✅ |  |
-| 3 | Symmetric | both sides narrow toward the parting plane (8265.0174, 10 faces) | — | ✅ (split at the parting plane, each side drafted, fused) |  |
-| 4 | Faces to draft / Edges to hold | only the picked faces (8174.9773); held top edges = Parts | — | ✅ |  |
+| 1 | Parts to draft | the faces turn about their edge away from the parting entity: the top stays 40×20, the bottom grows by 10·tan 5° (8535.1377); Keep material makes no difference here | "not supported yet" | ✅ test `body_draft_as_live` | 67f88fd1 10-28 (blk40: Top plane parting 8535.138, top face parting the same) |
+| 2 | Corner type Plane | corners bevelled from the top corner to the drafted faces' feet (8530.0348, 10 faces) | — | ✅ | 67f88fd1 10-28 (8530.035) |
+| 3 | Symmetric | both sides narrow toward the parting plane (8265.0174, 10 faces) | — | ✅ (split at the parting plane, each side drafted, fused) | 67f88fd1 10-28 (Plane 1 at z 5, Symmetric 8265.017) |
+| 4 | Faces to draft / Edges to hold | only the picked faces (8174.9773); held top edges = Parts | — | ✅ | 67f88fd1 10-28 (Faces to draft = front face, parting Top 8174.977; Edges to hold not run) |
 | 5 | Cylinder | a cone r 10.8749 → 10 (3424.4619) | — | ✅ |  |
-| 6 | Errors | "Select parts to draft." / "Select faces to draft." / "Select edges to draft." on their field; "Body draft pull direction is invalid." on Pull direction; "Parting entity is invalid." on Parting entity; Draft on self of a block "Selected parts could not be drafted." on Parts | — | ✅ |  |
+| 6 | Errors | "Select parts to draft." / "Select faces to draft." / "Select edges to draft." on their field; "Body draft pull direction is invalid." on Pull direction; "Parting entity is invalid." on Parting entity; Draft on self of a block "Selected parts could not be drafted." on Parts | — | ✅ | 67f88fd1 10-28 (empty Parts / Faces / Edges: "Select parts to draft." / "Select faces to draft." / "Select edges to draft."; pull / parting / on-self texts not run) |
 | 7 | Match faces at parting, concave repair, Draft on self that works, Keep material where drafting removes material | — | — | ✗ (no live case yet) |  |
 
 ## Move face
