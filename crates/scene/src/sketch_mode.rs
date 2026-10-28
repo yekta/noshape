@@ -1308,6 +1308,21 @@ impl SketchEditor {
         self.frame.intersect_ray(origin, dir).map(|p| self.frame.to_local(p))
     }
 
+    /// The existing point a Line's first click snapped to: the first segment
+    /// infers tangent / perpendicular / parallel from the curves there (live,
+    /// behaviours "qa (2026-10-28, P2) SKETCH-START-INFERENCE"; it had no
+    /// anchor point until a segment existed).
+    fn line_start_point(&self) -> Option<EntityId> {
+        if self.tool != Tool::Line {
+            return None;
+        }
+        let inf = self.clicks.first()?.inference.as_ref().filter(|i| i.kind == InferenceKind::Endpoint)?;
+        match inf.constraints.first() {
+            Some(AutoConstraint::CoincidentPoint(p)) => Some(*p),
+            _ => None,
+        }
+    }
+
     fn infer(&self, sk: &Sketch, p: DVec2, suppress: bool) -> Option<Inference> {
         if suppress {
             return None;
@@ -1318,7 +1333,7 @@ impl SketchEditor {
         let ctx = InferenceContext {
             tool: if self.tangent_mode { SketchTool::TangentArc } else { self.tool.inference_tool() },
             anchor,
-            anchor_point: self.chain_end,
+            anchor_point: self.chain_end.or_else(|| self.line_start_point()),
             snap_radius: self.world_per_px * 9.0,
             angle_tolerance: 3f64.to_radians(),
             exclude: Vec::new(),
@@ -8453,6 +8468,29 @@ mod tests {
             ed.tool_up(&mut d, v(0.01, 0.0));
             assert_eq!(count(&d), n, "no second coincident");
         }
+    }
+
+    /// SKETCH-START-INFERENCE (live request 1550): a line started on a
+    /// line's end and moved along its perpendicular gets Perpendicular; one
+    /// started on an arc's end along its tangent gets Tangent.
+    #[test]
+    fn a_line_started_on_an_end_infers_from_that_curve() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        // Slanted: an axis-aligned direction would infer Horizontal / Vertical first (live).
+        let l0 = d.sketch.add_line(v(0.0, 0.0), v(0.02, 0.01));
+        click(&mut ed, &mut d, v(0.02, 0.01));
+        click(&mut ed, &mut d, v(0.02, 0.01) + v(-0.01, 0.02).normalize() * 0.015);
+        let l1 = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).map(|e| e.id).find(|e| *e != l0).unwrap();
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Perpendicular { a, b } if (a == l1 && b == l0) || (a == l0 && b == l1))), "{:?}", d.sketch.constraints().map(|c| c.kind.clone()).collect::<Vec<_>>());
+        ed.cancel();
+        let (mut ed, mut d) = editor(Tool::Line);
+        // A 60° arc centred on the origin; at its end the tangent runs (-sin 60°, cos 60°).
+        let (s60, c60) = 60f64.to_radians().sin_cos();
+        let end = v(0.02 * c60, 0.02 * s60);
+        let arc = d.sketch.add_arc(v(0.0, 0.0), v(0.02, 0.0), end);
+        click(&mut ed, &mut d, end);
+        click(&mut ed, &mut d, end + v(-s60, c60) * 0.015);
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Tangent { a, b } if a == arc || b == arc)), "{:?}", d.sketch.constraints().map(|c| c.kind.clone()).collect::<Vec<_>>());
     }
 
     /// ORIGIN-COINCIDENT-GLYPH (live "qa4 r5 s6" (4)): a line drawn from the
