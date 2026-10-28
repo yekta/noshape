@@ -267,9 +267,9 @@ Reference / Coordinate system, ruledSurface type / vertex override / corner type
 | L45b Distance 10 × 3 | copies at 120° / 240°; curvePattern.fs: 40° / 80° | ✅ **fixed** (was ✗ L45b; std spacing d·L / (L − d) on closed paths) | b504234e 10-28 (GUI edit to Distance 10 × 3 → copies at 40.0° / 80.0°, centres (12.186, 10.225) / (2.762, 15.666) = curvePattern.fs) |
 
 ## Re-check on the main CLI 12:08 (qa, 2026-10-27 20:30, v048/tools/fsw.py)
-| Row | Ours | Status |
-|---|---|---|
-| L56 Hole, Merge scope cleared | Error "No target parts selected for hole." | ✅ |
-| L45 Curve pattern d 25 × 4 on a 100 mm circle | Error "Cannot create a curve pattern when the entered distance is larger than the path length." | ✅ |
-| L45b × 3 | Ok, copies at 120° / 240° (centres (−7.958, ±13.783) on R 15.915) = live | ✅ **fixed** |
+| Row | Ours | Status | Verified |
+|---|---|---|---|
+| L56 Hole, Merge scope cleared | Error "No target parts selected for hole." | ✅ |  |
+| L45 Curve pattern d 25 × 4 on a 100 mm circle | Error "Cannot create a curve pattern when the entered distance is larger than the path length." | ✅ |  |
+| L45b × 3 | Ok, copies at 120° / 240° (centres (−7.958, ±13.783) on R 15.915) = live | ✅ **fixed** |  |
 
