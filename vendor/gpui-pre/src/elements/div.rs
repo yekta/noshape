@@ -2146,6 +2146,9 @@ pub struct Interactivity {
     pub(crate) tracked_scroll_handle: Option<ScrollHandle>,
     pub(crate) scroll_anchor: Option<ScrollAnchor>,
     pub(crate) scroll_offset: Option<Rc<RefCell<Point<Pixels>>>>,
+    /// NOSHAPE PATCH (agent psui): the scroll range of the last prepaint, for
+    /// the wheel's scroll chaining (`paint_scroll_listener`).
+    pub(crate) scroll_max: std::cell::Cell<Point<Pixels>>,
     pub(crate) ongoing_scroll: Option<Rc<RefCell<OngoingScroll>>>,
     pub(crate) group: Option<SharedString>,
     /// The base style of the element, before any modifications are applied
@@ -2489,6 +2492,7 @@ impl Interactivity {
                 scroll_offset.y = scroll_offset.y.clamp(-scroll_max.y, px(0.));
             }
 
+            self.scroll_max.set(scroll_max);
             if let Some(mut scroll_handle_state) = tracked_scroll_handle {
                 scroll_handle_state.max_offset = scroll_max;
                 scroll_handle_state.bounds = bounds;
@@ -3350,7 +3354,20 @@ impl Interactivity {
             let line_height = window.line_height();
             let hitbox = hitbox.clone();
             let current_view = window.current_view();
+            let scroll_max = self.scroll_max.get();
             window.on_mouse_event(move |event: &ScrollWheelEvent, phase, window, cx| {
+                // NOSHAPE PATCH (agent psui, PREFS-WHEEL-DOUBLE-SCROLL): scroll
+                // chaining as in a browser. The innermost scroller under the
+                // pointer that can still move takes the wheel; the ones around
+                // it leave that event alone (other wheel listeners still get
+                // it). A scroller at its end passes it on outwards.
+                if phase == DispatchPhase::Capture {
+                    WHEEL_SCROLLED.set(false);
+                    return;
+                }
+                if WHEEL_SCROLLED.get() {
+                    return;
+                }
                 if phase == DispatchPhase::Bubble && hitbox.should_handle_scroll(window) {
                     let mut scroll_offset = scroll_offset.borrow_mut();
                     let old_scroll_offset = *scroll_offset;
@@ -3390,9 +3407,10 @@ impl Interactivity {
                             delta_x = Pixels::ZERO;
                         }
                     }
-                    scroll_offset.y += delta_y;
-                    scroll_offset.x += delta_x;
+                    scroll_offset.y = (scroll_offset.y + delta_y).clamp(-scroll_max.y, px(0.));
+                    scroll_offset.x = (scroll_offset.x + delta_x).clamp(-scroll_max.x, px(0.));
                     if *scroll_offset != old_scroll_offset {
+                        WHEEL_SCROLLED.set(true);
                         cx.notify(current_view);
                     }
                 }
@@ -5696,4 +5714,10 @@ mod tests {
         assert_eq!(bounds("cell-1").origin.x, px(100.));
         assert_eq!(bounds("cell-2").origin.x, px(300.));
     }
+}
+
+// NOSHAPE PATCH (agent psui): a scroller moved for the wheel event being
+// dispatched (reset in its capture phase); see `paint_scroll_listener`.
+thread_local! {
+    static WHEEL_SCROLLED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
