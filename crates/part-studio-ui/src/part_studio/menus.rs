@@ -916,6 +916,22 @@ impl PartStudioView {
                     };
                     item.child(axis(0, pt.x)).child(axis(1, pt.y)).child(axis(2, pt.z))
                 }
+                // Live (behaviours "interaction 4.9"): a distance computed as tiny but not zero reads
+                // "0.000* in", the value titled "<6 decimals> (within coincident tolerance)".
+                Measurement::Distance { distance, .. } if within_coincident(distance) => {
+                    let units = self.doc.read(cx).session.doc.settings.units;
+                    let tip = format!("{} (within coincident tolerance)", noshape_units::to_fixed(distance / units.si_factor(Dim::LENGTH), 6));
+                    let text = l(distance);
+                    let (num, unit) = text.split_once(' ').map(|(n, u)| (n.to_string(), u.to_string())).unwrap_or((text, String::new()));
+                    item.child(
+                        h_flex()
+                            .id(SharedString::from(format!("coincident-{label}")))
+                            .gap(px(2.))
+                            .child(h_flex().child(crate::ui::measure_value(num).text_color(pal.text)).child(div().child("*")))
+                            .child(div().child(unit))
+                            .tooltip(crate::ui::tooltip(tip)),
+                    )
+                }
                 m => {
                     let text = match m {
                         Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) => l(x),
@@ -1786,6 +1802,29 @@ fn measure_filter_type(label: &str) -> Option<&'static str> {
 /// A measured value as Onshape's measure readout and panel write it (bundle
 /// `formatValue`, live part-studio/81: "90.000 deg", "11.902 in²"): the
 /// display precision with trailing zeros kept, "deg" for degrees.
+/// Onshape's coincident tolerance for a measured distance (FeatureScript `TOLERANCE.zeroLength`, metres).
+const COINCIDENT_TOLERANCE: f64 = 1e-8;
+
+/// A distance computed as tiny but not zero (live "interaction 4.9": the readout's asterisk). Below 1e-12 m the
+/// kernel's touching shapes read as exactly zero, as live's B-rep cases do (no asterisk).
+fn within_coincident(d: f64) -> bool {
+    d.abs() > 1e-12 && d.abs() <= COINCIDENT_TOLERANCE
+}
+
+#[cfg(test)]
+mod coincident_tests {
+    use super::within_coincident;
+    use std::prelude::v1::test;
+
+    #[test]
+    fn asterisk_only_for_tiny_nonzero_distances() {
+        assert!(!within_coincident(0.0));
+        assert!(!within_coincident(1e-15));
+        assert!(within_coincident(3e-9));
+        assert!(!within_coincident(1e-6));
+    }
+}
+
 fn measure_fmt_in(q: Quantity, units: &noshape_units::UnitPrefs) -> String {
     let angle = q.dim == Dim::ANGLE;
     let decimals = usize::from(if angle { units.angle_precision } else { units.length_precision });

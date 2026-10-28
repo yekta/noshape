@@ -70,7 +70,7 @@ selection and hover per step, rows in brackets).
 | 4.6 | Status-bar Point readout with red / green / blue axis arrows ("Point:  X↘ 40.000 mm  Y↗ 0.000 mm  Z↑ 10.000 mm") | L14555–14574; live part-studio/qa4-r5-s9-4, ui-mass/07 | ✅ (psui 10-27, app vs live part-studio/qa4-r5-s9-4: "Point: X↘ … mm Y↗ … Z↑ …", the same arrows, colours, underlined values) | 0.4.10+ / f16b31c6 10-27 |
 | 4.7 | Hovering a distance row draws a black dashed line | L8957 | ✅ (10-27 on :102: Min dist row → the dashed line between the closest points) | 0.4.10+ / 2a6d0167 10-27 |
 | 4.8 | Live update when the selection changes; value display restored after 3 s (`MEASUREMENT_VALUE_DISPLAY_RESTORE_TIME_MS`) | B | 🔧 (readout and panel follow the selection: menus.rs `measure_cache` keyed on it). The 3 s constant (3e3) is only defined in the loaded bundles; nothing reads it there, so no behaviour to copy yet |  |
-| 4.9 | Mesh parts: an asterisk marks approximate values | L947, L953 | 🔧 |  |
+| 4.9 | An asterisk marks a distance within the coincident tolerance ("0.000* in", the value titled "0.000000 (within coincident tolerance)"; live saw it for two points on a mesh) | L947, L953, behaviours "psui (2026-10-27, P2) interaction 4.9" | 🔧 (psui 10-28: Min / Max dist and other distance rows between 1e-12 m and 1e-8 m (`within_coincident`); exact zeros plain as live's B-rep cases) |  |
 
 ## 5. Mass properties
 
