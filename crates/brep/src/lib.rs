@@ -29,6 +29,8 @@ pub const GREY: f64 = 50.0;
 pub enum Curve {
     Line,
     Circle { center: DVec3, normal: DVec3, xdir: DVec3, radius: f64 },
+    /// No curve: an edge at a point (a cone's apex), its start and end one vertex.
+    Degenerate,
 }
 
 /// A face's surface.
@@ -39,6 +41,8 @@ pub enum Surface {
     /// The points at `radius` from the line through `origin` along `axis`; its normal points away from the
     /// axis, its angles run from `xdir` counter-clockwise about `axis` (OCCT's seam is at angle 0).
     Cylinder { origin: DVec3, axis: DVec3, xdir: DVec3, radius: f64 },
+    /// Like a cylinder whose radius at height `z` along the axis (from `origin`) is `radius + z tan(angle)`.
+    Cone { origin: DVec3, axis: DVec3, xdir: DVec3, radius: f64, angle: f64 },
 }
 
 /// An edge between two vertices (`v[0]` its start, `v[1]` its end: one forward direction).

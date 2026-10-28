@@ -302,9 +302,11 @@ pub(crate) mod ffi {
         vertices: Vec<f64>,
         /// Start and end vertex per edge.
         edges: Vec<u32>,
-        /// Per edge: kind (0 line, 1 circle), centre, normal, x direction, radius (11 numbers).
+        /// Per edge: kind (0 line, 1 circle, 2 none: a cone's apex), centre, normal, x direction, radius (11
+        /// numbers).
         curves: Vec<f64>,
-        /// Per face: kind (0 plane, 1 cylinder), origin, normal or axis, x direction, radius (11 numbers).
+        /// Per face: kind (0 plane, 1 cylinder, 2 cone), origin, normal or axis, x direction, radius, a cone's
+        /// half-angle (12 numbers).
         surfaces: Vec<f64>,
         /// Per face: the outward normal is minus the plane's.
         reversed: Vec<bool>,

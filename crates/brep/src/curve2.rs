@@ -1,7 +1,7 @@
 //! Curves in a face's parameter plane: straight segments and circular arcs.
 
 use glam::DVec2;
-use std::f64::consts::{FRAC_PI_2, PI, TAU};
+use std::f64::consts::TAU;
 
 /// A segment from `a` to `b`, or an arc of the circle (`c`, `r`) from angle `a0` through `sweep` (positive:
 /// counter-clockwise).
@@ -112,60 +112,6 @@ impl C2 {
         }
     }
 
-    /// Crossings of the ray from `p` towards +x (half-open in y, so a loop's crossings add up right).
-    pub fn crossings(&self, p: DVec2) -> usize {
-        match *self {
-            C2::Seg { a, b } => {
-                if (a.y > p.y) != (b.y > p.y) {
-                    let x = a.x + (p.y - a.y) / (b.y - a.y) * (b.x - a.x);
-                    usize::from(x > p.x)
-                } else {
-                    0
-                }
-            }
-            C2::Arc { c, r, a0, sweep } => {
-                // Pieces monotone in y, split where the tangent is horizontal (angles π/2 + kπ).
-                let a1 = a0 + sweep;
-                let (lo, hi) = (a0.min(a1), a0.max(a1));
-                let mut cuts = vec![lo];
-                let mut k = ((lo - FRAC_PI_2) / PI).floor() + 1.0;
-                while FRAC_PI_2 + k * PI < hi {
-                    cuts.push(FRAC_PI_2 + k * PI);
-                    k += 1.0;
-                }
-                cuts.push(hi);
-                let mut n = 0;
-                for w in cuts.windows(2) {
-                    let (ya, yb) = (c.y + r * w[0].sin(), c.y + r * w[1].sin());
-                    if (ya > p.y) != (yb > p.y) {
-                        // On this monotone piece, the angle where y = p.y.
-                        let s = ((p.y - c.y) / r).clamp(-1.0, 1.0).asin();
-                        let mut found = None;
-                        for cand in [s, PI - s] {
-                            let mut a = cand;
-                            while a < w[0] - 1e-12 {
-                                a += TAU;
-                            }
-                            while a > w[1] + 1e-12 {
-                                a -= TAU;
-                            }
-                            if a >= w[0] - 1e-12 && a <= w[1] + 1e-12 {
-                                found = Some(a);
-                                break;
-                            }
-                        }
-                        if let Some(a) = found
-                            && c.x + r * a.cos() > p.x
-                        {
-                            n += 1;
-                        }
-                    }
-                }
-                n
-            }
-        }
-    }
-
     /// The parameter of the point nearest `p`, and its distance.
     pub fn param_of(&self, p: DVec2) -> (f64, f64) {
         match *self {
@@ -263,9 +209,32 @@ impl C2 {
     }
 }
 
-/// Whether `p` is inside the loops of `edges` (even-odd).
+/// Whether `p` is inside the loops of `edges` (even-odd), by a ray in a direction no input favours; another
+/// one when it passes through an end of a curve.
 pub(crate) fn inside(p: DVec2, edges: &[C2]) -> bool {
-    edges.iter().map(|e| e.crossings(p)).sum::<usize>() % 2 == 1
+    const ANGLES: [f64; 4] = [0.371_1, 1.913_7, 4.170_9, 2.653_1];
+    let scale = edges.iter().map(|e| e.start().abs().max_element()).fold(p.abs().max_element(), f64::max).max(1e-3);
+    let mut odd = false;
+    for a in ANGLES {
+        let d = DVec2::new(a.cos(), a.sin());
+        let mut hits = Vec::new();
+        let mut clean = true;
+        for e in edges {
+            let n = hits.len();
+            e.ray_hits(p, d, &mut hits);
+            for &s in &hits[n..] {
+                let q = p + d * s;
+                if (q - e.start()).length() <= 1e-9 * scale || (q - e.end()).length() <= 1e-9 * scale {
+                    clean = false;
+                }
+            }
+        }
+        odd = hits.len() % 2 == 1;
+        if clean {
+            break;
+        }
+    }
+    odd
 }
 
 /// The distance from `p` to the nearest of `edges`.
@@ -276,6 +245,7 @@ pub(crate) fn distance(p: DVec2, edges: &[C2]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::f64::consts::PI;
 
     #[test]
     fn a_disk_with_a_square_hole() {
@@ -293,6 +263,10 @@ mod tests {
         assert!(!inside(DVec2::new(0.1, 0.1), &edges));
         assert!(!inside(DVec2::new(2.1, 0.0), &edges));
         assert!((distance(DVec2::new(3.0, 0.0), &edges) - 1.0).abs() < 1e-12);
+        // The case that found the half-open rule's fault: a full circle's start level with the point.
+        let full = C2::Arc { c: DVec2::ZERO, r: 0.0025, a0: 0.0, sweep: -TAU };
+        assert!(!inside(DVec2::new(-0.02, 0.0), &[full]));
+        assert!(inside(DVec2::new(-0.001, 0.0), &[full]));
         let half = C2::Arc { c: DVec2::ZERO, r: 1.0, a0: 0.0, sweep: -PI };
         assert!(inside(DVec2::new(0.0, -0.5), &[half, C2::Seg { a: DVec2::new(-1.0, 0.0), b: DVec2::new(1.0, 0.0) }]));
         let line = C2::Seg { a: DVec2::new(-3.0, 1.0), b: DVec2::new(3.0, 1.0) };

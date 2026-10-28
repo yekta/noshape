@@ -6,8 +6,9 @@ scratch /root/bool-scratch.
 ## What it is
 - `crates/brep` (`noshape-brep`, pure Rust, below the kernel): `Body` (vertices, edges, faces, solids in index
   arenas; one forward direction per edge) and `boolean(op, args, tol)`: fuse / cut / common of solids bounded by
-  planes and cylinders (every cylinder parallel to one axis, every plane square or parallel to it: holes, bosses,
-  slots, notches), OCCT's result without unify (every face split by the other solids' faces and by their edges on it, pieces
+  planes, cylinders and cones (every cylinder and cone parallel to one axis, cones on a shared axis, every plane
+  square or parallel to it: holes and drilled holes with their 118° tips, countersinks, bosses, slots, notches;
+  a cone's apex is a degenerate edge), OCCT's result without unify (every face split by the other solids' faces and by their edges on it, pieces
   kept by where they lie, coincident faces kept once) and OCCT's history.
 - Tolerances: two points within `tol` are one, a point within `tol` of a plane is on it; `tol` = 2 × the inputs'
   largest tolerance (at least 1e-7; inputs over 1e-5 decline). A distance in (tol, 50 tol] is ambiguous: decline.
@@ -64,9 +65,21 @@ boundary because that face's wire started at another edge). Loops now start wher
 Shell's own Booleans (recorded from the kernel shell tests, /root/bool-scratch/direct-corpus): 13 of 85 taken, 0
 differ (most decline: offset surfaces, cones, tolerant inputs).
 
+Cones and the rest (10-28 18:45): coaxial cones (apex edges), fuzzy ≤ 1e-6 (added to the tolerance), a 2D
+point-in-region fault fixed (a full circle's start level with the point counted once: `sin(-2π) != 0`; now a ray
+in a direction no input favours, another one when it passes a curve's end), big targets cheaper (loop starts,
+face pairs). Corpus: **349 of 973 taken, 0 differ from OCCT**; < 50 input faces: 348 cases, median 0.67 ms vs
+17.1 ms (OCCT, same build), total 298 vs 7046 ms (23.6×).
+
+Locality (lead 15:05): the 1612-face fin fuse (a2121c5b) through the Rust path (NOSHAPE_BREP_BIG=1,
+NOSHAPE_BOOL_LOCAL=0) is right (0 differ) and ~55–65 ms (Rust ~30, building the shapes and make_result ~25), about
+the local Boolean's ~50 ms; plain OCCT 1.1 s. So the local Boolean stays first for targets of 200+ faces and the
+Rust path declines them. Next for it: don't touch untouched faces at all (C++ build and make_result over 1600
+faces are most of what's left).
+
 ## Next
-1. Locality (lead 15:05): convert and arrange only the target faces the tool's box reaches plus a ring, keep the
-   rest as is (Kept), the converted body cached on the OcShape; then drop the ≥ 200-face decline.
+1. Locality: done in the Rust part (faces nothing reaches aren't split or classified, bodies cached on the
+   OcShape); left: the C++ side's whole-shape build and history (above).
 2. Faces and shells as arguments (261 cases); arcs across a seam (50); tangent planes (37).
 3. Route shell.cpp / features.cpp's direct BRepAlgoAPI calls and the slab paths through one shared entry point
    (lead 10-28), and record them in the corpus.

@@ -131,7 +131,15 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
                 for (who, x) in [("rust", &r), ("occt", o)] {
                     for f in x.shape.sub_shapes(ShapeType::Face) {
                         let c = f.centroid().unwrap_or_default();
-                        line += &format!("\n    {who} face area {:.6e} at ({:.5} {:.5} {:.5}) valid {}", f.area().unwrap_or(0.0), c.x, c.y, c.z, f.is_valid());
+                        line += &format!("\n    {who} face area {:.6e} at ({:.5} {:.5} {:.5}) valid {} {:?}", f.area().unwrap_or(0.0), c.x, c.y, c.z, f.is_valid(), f.orientation());
+                        if !f.is_valid() || who == "occt" {
+                            for w in f.children() {
+                                for e in w.children() {
+                                    let i = e.edge_info();
+                                    line += &format!("\n        {:?} {:?}", e.orientation(), i.map(|i| (i.start, i.end, i.first_param, i.last_param)));
+                                }
+                            }
+                        }
                     }
                 }
             }

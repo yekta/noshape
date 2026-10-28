@@ -62,7 +62,11 @@ fn body_of(b: &BrepBody) -> Body {
         .chunks(2)
         .zip(b.curves.chunks(11))
         .map(|(e, c)| {
-            let curve = if c[0] == 0.0 { Curve::Line } else { Curve::Circle { center: v3(c, 1), normal: v3(c, 4), xdir: v3(c, 7), radius: c[10] } };
+            let curve = match c[0] as u8 {
+                0 => Curve::Line,
+                1 => Curve::Circle { center: v3(c, 1), normal: v3(c, 4), xdir: v3(c, 7), radius: c[10] },
+                _ => Curve::Degenerate,
+            };
             Edge { v: [e[0], e[1]], curve }
         })
         .collect();
@@ -70,8 +74,12 @@ fn body_of(b: &BrepBody) -> Body {
         let loops = (b.face_loops[f]..b.face_loops[f + 1])
             .map(|l| b.uses[b.loop_uses[l as usize] as usize..b.loop_uses[l as usize + 1] as usize].iter().map(|&u| Use { edge: u / 2, reversed: u % 2 == 1 }).collect())
             .collect();
-        let s = &b.surfaces[11 * f..11 * f + 11];
-        let surface = if s[0] == 0.0 { Surface::Plane { origin: v3(s, 1), normal: v3(s, 4) } } else { Surface::Cylinder { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10] } };
+        let s = &b.surfaces[12 * f..12 * f + 12];
+        let surface = match s[0] as u8 {
+            0 => Surface::Plane { origin: v3(s, 1), normal: v3(s, 4) },
+            1 => Surface::Cylinder { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10] },
+            _ => Surface::Cone { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], angle: s[11] },
+        };
         out.faces.push(Face { surface, reversed: b.reversed[f], loops });
     }
     out.solids = (0..b.solid_faces.len().saturating_sub(1)).map(|s| Solid { shells: vec![b.faces_of_solids[b.solid_faces[s] as usize..b.solid_faces[s + 1] as usize].to_vec()] }).collect();
@@ -85,6 +93,10 @@ fn flat(b: &Body, out: &mut BrepBody) {
     for e in &b.edges {
         match e.curve {
             Curve::Line => out.curves.extend([0.0; 11]),
+            Curve::Degenerate => {
+                out.curves.push(2.0);
+                out.curves.extend([0.0; 10]);
+            }
             Curve::Circle { center, normal, xdir, radius } => {
                 out.curves.push(1.0);
                 out.curves.extend(xyz(center).into_iter().chain(xyz(normal)).chain(xyz(xdir)));
@@ -98,12 +110,17 @@ fn flat(b: &Body, out: &mut BrepBody) {
         match f.surface {
             Surface::Plane { origin, normal } => {
                 out.surfaces.push(0.0);
-                out.surfaces.extend(xyz(origin).into_iter().chain(xyz(normal)).chain([0.0; 4]));
+                out.surfaces.extend(xyz(origin).into_iter().chain(xyz(normal)).chain([0.0; 5]));
             }
             Surface::Cylinder { origin, axis, xdir, radius } => {
                 out.surfaces.push(1.0);
                 out.surfaces.extend(xyz(origin).into_iter().chain(xyz(axis)).chain(xyz(xdir)));
-                out.surfaces.push(radius);
+                out.surfaces.extend([radius, 0.0]);
+            }
+            Surface::Cone { origin, axis, xdir, radius, angle } => {
+                out.surfaces.push(2.0);
+                out.surfaces.extend(xyz(origin).into_iter().chain(xyz(axis)).chain(xyz(xdir)));
+                out.surfaces.extend([radius, angle]);
             }
         }
         out.reversed.push(f.reversed);

@@ -246,3 +246,70 @@ fn a_round_boss_on_a_plate() {
     check_used_both_ways(&cut.body);
     assert_eq!(cut.body.faces.len(), 8);
 }
+
+/// A drill: a cylinder along z from z0 to z1 with a cone's tip below z0 (half-angle 59°, as a 118° drill point).
+fn drill(cx: f64, cy: f64, r: f64, z0: f64, z1: f64) -> Body {
+    let ang = 59f64.to_radians();
+    let (c0, c1) = (DVec3::new(cx, cy, z0), DVec3::new(cx, cy, z1));
+    let apex = DVec3::new(cx, cy, z0 - r / ang.tan());
+    let circ = |c: DVec3| Curve::Circle { center: c, normal: DVec3::Z, xdir: DVec3::X, radius: r };
+    let edges = vec![
+        Edge { v: [0, 0], curve: circ(c0) },
+        Edge { v: [1, 1], curve: circ(c1) },
+        Edge { v: [0, 1], curve: Curve::Line },
+        Edge { v: [2, 0], curve: Curve::Line },
+        Edge { v: [2, 2], curve: Curve::Degenerate },
+    ];
+    let u = |e: u32, reversed: bool| Use { edge: e, reversed };
+    let faces = vec![
+        Face { surface: Surface::Plane { origin: c1, normal: DVec3::Z }, reversed: false, loops: vec![vec![u(1, false)]] },
+        Face {
+            surface: Surface::Cylinder { origin: c0, axis: DVec3::Z, xdir: DVec3::X, radius: r },
+            reversed: false,
+            loops: vec![vec![u(0, false), u(2, false), u(1, true), u(2, true)]],
+        },
+        Face {
+            surface: Surface::Cone { origin: c0, axis: DVec3::Z, xdir: DVec3::X, radius: r, angle: ang },
+            reversed: false,
+            loops: vec![vec![u(4, false), u(3, false), u(0, true), u(3, true)]],
+        },
+    ];
+    Body { vertices: vec![c0 + DVec3::X * r, c1 + DVec3::X * r, apex], edges, faces, solids: vec![Solid { shells: vec![vec![0, 1, 2]] }] }
+}
+
+#[test]
+fn a_drilled_hole() {
+    let plate = cuboid((0.0, 0.0, 0.0), (4.0, 4.0, 1.0));
+    // Blind: the tip inside the plate.
+    let tool = drill(2.0, 2.0, 0.5, 0.5, 2.0);
+    let cut = boolean(Op::Cut, &[&plate, &tool], TOL).unwrap();
+    check_used_both_ways_but_apex(&cut.body);
+    assert_eq!(counts(&cut), (1, 8, 17, 11));
+    // Through, the tip below the plate.
+    let tool = drill(2.0, 2.0, 0.5, -0.5, 2.0);
+    let cut = boolean(Op::Cut, &[&plate, &tool], TOL).unwrap();
+    check_used_both_ways_but_apex(&cut.body);
+    assert_eq!(counts(&cut), (1, 7, 15, 10));
+    // A cone cut by the plate's top: a section circle on the cone.
+    let tool = drill(2.0, 2.0, 0.5, 1.2, 2.0);
+    let cut = boolean(Op::Cut, &[&plate, &tool], TOL).unwrap();
+    check_used_both_ways_but_apex(&cut.body);
+    assert_eq!(cut.body.faces.len(), 7);
+}
+
+/// Every edge used once each way, a cone's apex (one face, twice) aside.
+fn check_used_both_ways_but_apex(b: &Body) {
+    let mut uses = vec![[0, 0]; b.edges.len()];
+    for f in &b.faces {
+        for l in &f.loops {
+            for u in l {
+                uses[u.edge as usize][u.reversed as usize] += 1;
+            }
+        }
+    }
+    for (e, u) in uses.iter().enumerate() {
+        if b.edges[e].curve != Curve::Degenerate {
+            assert_eq!(*u, [1, 1], "edge {e}");
+        }
+    }
+}

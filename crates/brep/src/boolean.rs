@@ -58,6 +58,8 @@ impl Circ {
 enum Geo {
     Line,
     Arc { k: Circ, a0: f64, sweep: f64 },
+    /// No curve: an edge at a cone's apex.
+    Apex,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -69,9 +71,11 @@ struct Seg {
 enum Surf {
     /// Outward normal, offset (`n · x == d`), and the 2D frame (`u × v == n`).
     Plane { n: DVec3, d: f64, origin: DVec3, u: DVec3, v: DVec3 },
-    /// Axis origin and direction, angle frame, radius; `flip`: the outward normal points to the axis.
-    /// Parameters (r θ, ±h) with θ in [th0, th0 + 2π); `full`: the face goes round (a seam at th0).
-    Cyl { o: DVec3, a: DVec3, x: DVec3, y: DVec3, r: f64, flip: bool, th0: f64, full: bool },
+    /// A cylinder or cone: axis origin and direction, angle frame, radius `r0 + k h` at height h along the
+    /// axis; `flip`: the outward normal points to the axis. Parameters (r θ, ±h) with θ in [th0, th0 + 2π)
+    /// and `r` a scale (a cylinder's radius, a cone's largest on the face); `full`: the face goes round (a
+    /// seam at th0).
+    Cyl { o: DVec3, a: DVec3, x: DVec3, y: DVec3, r: f64, r0: f64, k: f64, flip: bool, th0: f64, full: bool },
 }
 
 struct GFace {
@@ -106,9 +110,10 @@ impl GFace {
     fn to3(&self, q: DVec2) -> DVec3 {
         match self.s {
             Surf::Plane { origin, u, v, .. } => origin + u * q.x + v * q.y,
-            Surf::Cyl { o, a, x, y, r, flip, .. } => {
+            Surf::Cyl { o, a, x, y, r, r0, k, flip, .. } => {
                 let th = q.x / r;
-                o + a * (if flip { -q.y } else { q.y }) + (x * th.cos() + y * th.sin()) * r
+                let h = if flip { -q.y } else { q.y };
+                o + a * h + (x * th.cos() + y * th.sin()) * (r0 + k * h)
             }
         }
     }
@@ -117,19 +122,34 @@ impl GFace {
     fn curve2(&self, p0: DVec3, p1: DVec3, g: &Geo, copy: usize) -> R<C2> {
         match (&self.s, g) {
             (Surf::Plane { .. }, Geo::Line) => Ok(C2::Seg { a: self.to2(p0), b: self.to2(p1) }),
+            (Surf::Plane { .. }, Geo::Apex) => Err(Decline("an apex on a plane")),
             (Surf::Plane { n, .. }, Geo::Arc { k, sweep, .. }) => {
                 let c = self.to2(k.c);
                 let d = self.to2(p0) - c;
                 let s = if k.n.dot(*n) > 0.0 { *sweep } else { -*sweep };
                 Ok(C2::Arc { c, r: k.r, a0: d.y.atan2(d.x), sweep: s })
             }
-            (Surf::Cyl { r, th0, a, full, .. }, g) => {
-                let mut q0 = self.to2(p0);
+            (Surf::Cyl { r, th0, a, o, full, .. }, g) => {
+                if *g == Geo::Apex {
+                    if !*full {
+                        return Err(Decline("an apex on a part of a cone"));
+                    }
+                    let y = self.to2(p0).y;
+                    return Ok(C2::Seg { a: DVec2::new(r * th0, y), b: DVec2::new(r * (th0 + TAU), y) });
+                }
+                // A line's angle from its end off the axis (a cone's generator may start at the apex).
+                let off = |p: DVec3| (p - *o - *a * (p - *o).dot(*a)).length();
+                let mut q0 = if *g == Geo::Line && off(p1) > off(p0) {
+                    DVec2::new(self.to2(p1).x, self.to2(p0).y)
+                } else {
+                    self.to2(p0)
+                };
                 let seam = *full && (q0.x - r * th0).abs() <= 1e-9 * r.max(1.0);
                 if seam && copy == 1 {
                     q0.x = r * (th0 + TAU);
                 }
                 match g {
+                    Geo::Apex => unreachable!(),
                     Geo::Line => {
                         let q1 = DVec2::new(q0.x, self.to2(p1).y);
                         Ok(C2::Seg { a: q0, b: q1 })
@@ -354,10 +374,10 @@ impl Ctx {
     fn normal_at(&self, f: usize, p: DVec3) -> DVec3 {
         match self.faces[f].s {
             Surf::Plane { n, .. } => n,
-            Surf::Cyl { o, a, flip, .. } => {
+            Surf::Cyl { o, a, k, flip, .. } => {
                 let w = p - o;
-                let radial = (w - a * w.dot(a)).normalize();
-                if flip { -radial } else { radial }
+                let n = ((w - a * w.dot(a)).normalize() - a * k).normalize();
+                if flip { -n } else { n }
             }
         }
     }
@@ -382,6 +402,7 @@ impl Ctx {
         match s.g {
             Geo::Line => self.p(s.v[0]).lerp(self.p(s.v[1]), t),
             Geo::Arc { k, a0, sweep } => k.at(a0 + sweep * t),
+            Geo::Apex => self.p(s.v[0]),
         }
     }
 
@@ -401,6 +422,7 @@ impl Ctx {
                 let t = (k.angle(p) - a0).rem_euclid(TAU) / sweep;
                 (t, (off * off + rad * rad).sqrt())
             }
+            Geo::Apex => (0.0, (p - self.p(s.v[0])).length()),
         }
     }
 
@@ -408,6 +430,7 @@ impl Ctx {
         match s.g {
             Geo::Line => (self.p(s.v[1]) - self.p(s.v[0])).length(),
             Geo::Arc { k, sweep, .. } => k.r * sweep,
+            Geo::Apex => 0.0,
         }
     }
 
@@ -496,12 +519,35 @@ impl Ctx {
 
     /// Adds where `path` lies inside both faces to both, as sections.
     fn section(&mut self, fs: usize, ft: usize, path: Path, t0: f64, t1: f64) -> R<()> {
-        let ia = self.intervals(fs, &path, t0, t1, [End::Open; 2], false)?;
+        let tol = self.tol;
+        // A circle in parts between the faces' seams (a vertex where it crosses one).
+        let mut cuts: Vec<(f64, End)> = vec![(t0, End::Open)];
+        if let Path::Circle(k) = path {
+            for f in [fs, ft] {
+                let Some(p) = self.seam_at(f, path) else { continue };
+                let t = t0 + (k.angle(p) - t0).rem_euclid(TAU);
+                if (t - t0) * k.r <= tol || (t1 - t) * k.r <= tol {
+                    cuts[0].1 = End::Point(p);
+                } else {
+                    cuts.push((t, End::Point(p)));
+                }
+            }
+            cuts.sort_by(|a, b| a.0.total_cmp(&b.0));
+        }
+        for i in 0..cuts.len() {
+            let (a, ea) = cuts[i];
+            let (b, eb) = if i + 1 < cuts.len() { cuts[i + 1] } else { (t1, cuts[0].1) };
+            self.section_part(fs, ft, path, a, b, [ea, eb])?;
+        }
+        Ok(())
+    }
+
+    fn section_part(&mut self, fs: usize, ft: usize, path: Path, t0: f64, t1: f64, ends: [End; 2]) -> R<()> {
+        let ia = self.intervals(fs, &path, t0, t1, ends, false)?;
         if ia.is_empty() {
             return Ok(());
         }
-        let ib = self.intervals(ft, &path, t0, t1, [End::Open; 2], false)?;
-        let (ia, ib) = (wrap(ia, &path, t0, t1), wrap(ib, &path, t0, t1));
+        let ib = self.intervals(ft, &path, t0, t1, ends, false)?;
         let tol = self.tol;
         let scale = match path {
             Path::Line { .. } => 1.0,
@@ -537,11 +583,8 @@ impl Ctx {
             }
             Ok(Some(v))
         };
-        let shifts: &[f64] = if matches!(path, Path::Circle(_)) { &[-TAU, 0.0, TAU] } else { &[0.0] };
         for x in &ia {
-            for y0 in &ib {
-              for &sh in shifts {
-                let y = &[(y0[0].0 + sh, y0[0].1), (y0[1].0 + sh, y0[1].1)];
+            for y in &ib {
                 let lo = x[0].0.max(y[0].0);
                 let hi = x[1].0.min(y[1].0);
                 if (hi - lo) * scale <= tol {
@@ -557,7 +600,6 @@ impl Ctx {
                 self.face_segs[fs].push(seg);
                 self.face_segs[ft].push(seg);
                 self.sections.push((seg, fs, ft));
-              }
             }
         }
         Ok(())
@@ -576,11 +618,11 @@ impl Ctx {
                 (Path::Line { p: a, d: (b - a) / l }, 0.0, l)
             }
             Geo::Arc { k, a0, sweep } => (Path::Circle(k), a0, a0 + sweep),
+            Geo::Apex => return Ok(()),
         };
         // An arc across a round face's seam: in two parts, a vertex where it crosses.
         let mut parts = vec![(t0, End::Vertex(s.v[0]), t1, End::Vertex(s.v[1]))];
-        if let (Path::Circle(k), Surf::Cyl { o, a, x, y, r, th0, full: true, .. }) = (path, &self.faces[f].s) {
-            let seam = o + a * (k.c - o).dot(*a) + (x * th0.cos() + y * th0.sin()) * *r;
+        if let (Path::Circle(k), Some(seam)) = (path, self.seam_at(f, path)) {
             let ts = t0 + (k.angle(seam) - t0).rem_euclid(TAU);
             if (ts - t0) * k.r > self.tol && (t1 - ts) * k.r > self.tol {
                 parts = vec![(t0, End::Vertex(s.v[0]), ts, End::Point(seam)), (ts, End::Point(seam), t1, End::Vertex(s.v[1]))];
@@ -609,6 +651,13 @@ impl Ctx {
         Ok(())
     }
 
+    /// Where `path` (a circle about face `f`'s axis) crosses `f`'s seam, if `f` goes round.
+    fn seam_at(&self, f: usize, path: Path) -> Option<DVec3> {
+        let (Path::Circle(k), Surf::Cyl { o, a, x, y, r0, k: slope, th0, full: true, .. }) = (path, &self.faces[f].s) else { return None };
+        let h = (k.c - *o).dot(*a);
+        Some(*o + *a * h + (*x * th0.cos() + *y * th0.sin()) * (r0 + slope * h))
+    }
+
     /// Whether edge `e` lies on face `f`'s surface.
     fn edge_on_surface(&mut self, e: usize, f: usize) -> R<bool> {
         let [a, b] = self.edges[e].v;
@@ -619,25 +668,37 @@ impl Ctx {
                 let off = n.dot(k.c) - d;
                 Ok(k.n.cross(*n).length() <= 1e-9 && off.abs() <= tol)
             }
-            (Surf::Cyl { o, a: ax, r, .. }, Geo::Line) => {
-                let rad = |p: DVec3| {
+            (Surf::Cyl { o, a: ax, r0, k, .. }, Geo::Line) => {
+                // Both ends and the middle on it: a line meets a cylinder or cone in two points at most.
+                let off = |p: DVec3| {
                     let w = p - *o;
-                    (w - *ax * w.dot(*ax)).length() - r
+                    let h = w.dot(*ax);
+                    ((w - *ax * h).length() - (r0 + k * h)).abs()
                 };
                 let (pa, pb) = (self.p(a), self.p(b));
-                let along = (pb - pa).normalize().cross(*ax).length() <= 1e-9;
-                Ok(along && rad(pa).abs() <= tol && rad(pb).abs() <= tol)
+                Ok(off(pa) <= tol && off(pb) <= tol && off((pa + pb) * 0.5) <= tol)
             }
-            (Surf::Cyl { o, a: ax, r, .. }, Geo::Arc { k, .. }) => {
+            (Surf::Cyl { o, a: ax, r0, k: slope, .. }, Geo::Arc { k, .. }) => {
                 let w = k.c - *o;
-                Ok(k.n.cross(*ax).length() <= 1e-9 && (w - *ax * w.dot(*ax)).length() <= tol && (k.r - r).abs() <= tol)
+                let h = w.dot(*ax);
+                Ok(k.n.cross(*ax).length() <= 1e-9 && (w - *ax * h).length() <= tol && (k.r - (r0 + slope * h)).abs() <= tol)
             }
+            (_, Geo::Apex) => Ok(false),
         }
     }
 
     fn face_pair(&mut self, fs: usize, ft: usize) -> R<()> {
         for (f, g) in [(fs, ft), (ft, fs)] {
-            for (e, _) in self.faces[f].edges.clone() {
+            let (lo, hi) = (self.faces[g].lo, self.faces[g].hi);
+            for k in 0..self.faces[f].edges.len() {
+                let e = self.faces[f].edges[k].0;
+                // (Only edges that reach the other face's box can lie on it.)
+                let [a, b] = self.edges[e].v;
+                if let Geo::Line = self.edges[e].g
+                    && !boxes_meet(self.p(a).min(self.p(b)), self.p(a).max(self.p(b)), lo, hi, GREY * self.tol)
+                {
+                    continue;
+                }
                 if self.edge_on_surface(e, g)? {
                     self.edge_in_face(e, g)?;
                 }
@@ -684,22 +745,29 @@ impl Ctx {
 
     fn plane_cyl(&mut self, fp: usize, fc: usize) -> R<()> {
         let Surf::Plane { n, d, .. } = self.faces[fp].s else { unreachable!() };
-        let Surf::Cyl { o, a, x, y, r, th0, .. } = self.faces[fc].s else { unreachable!() };
+        let Surf::Cyl { o, a, x, y, r, r0, k: slope, th0, .. } = self.faces[fc].s else { unreachable!() };
         let tol = self.tol;
         let na = n.dot(a);
         if na.abs() >= 1.0 - 1e-12 {
             // A plane across the axis: a circle.
             let h = (d - n.dot(o)) / na;
             let c = o + a * h;
+            let rc = r0 + slope * h;
             let (lo, hi) = (self.faces[fc].lo, self.faces[fc].hi);
-            if !boxes_meet(c, c, lo, hi, GREY * tol + r) {
+            if !boxes_meet(c, c, lo, hi, GREY * tol + rc.abs()) {
                 return Ok(());
             }
-            let k = Circ { c, n: a, x, y, r };
+            if rc <= GREY * tol {
+                return Err(Decline("a plane through a cone's apex"));
+            }
+            let k = Circ { c, n: a, x, y, r: rc };
             return self.section(fp, fc, Path::Circle(k), th0, th0 + TAU);
         }
         if na.abs() > 1e-12 {
             return Err(Decline("a plane at an angle to a cylinder"));
+        }
+        if slope != 0.0 {
+            return Err(Decline("a plane along a cone"));
         }
         // A plane along the axis: lines along it where the plane meets the circle.
         let dd = n.dot(o) - d;
@@ -754,8 +822,8 @@ impl Ctx {
     }
 
     fn cyl_cyl(&mut self, f1: usize, f2: usize) -> R<()> {
-        let Surf::Cyl { o: o1, a: a1, x, y, r: r1, .. } = self.faces[f1].s else { unreachable!() };
-        let Surf::Cyl { o: o2, a: a2, r: r2, .. } = self.faces[f2].s else { unreachable!() };
+        let Surf::Cyl { o: o1, a: a1, x, y, r: r1, r0: r01, k: k1, th0, .. } = self.faces[f1].s else { unreachable!() };
+        let Surf::Cyl { o: o2, a: a2, r: r2, r0: r02, k: k2, .. } = self.faces[f2].s else { unreachable!() };
         let tol = self.tol;
         if a1.cross(a2).length() > 1e-12 {
             return Err(Decline("cylinders at an angle"));
@@ -763,6 +831,32 @@ impl Ctx {
         let w = o2 - o1;
         let w = w - a1 * w.dot(a1);
         let dl = w.length();
+        if (k1 != 0.0 || k2 != 0.0) && dl > GREY * tol {
+            return Err(Decline("a cone off another's axis"));
+        }
+        if k1 != 0.0 || k2 != 0.0 {
+            // On one axis: where the radii agree (along the first's axis from its origin, s).
+            let sg = a1.dot(a2);
+            let c2 = (o1 - o2).dot(a2);
+            let (c0, c1) = (r01 - r02 - k2 * c2, k1 - k2 * sg);
+            if c1.abs() < 1e-12 {
+                if c0.abs() <= tol {
+                    self.coplanar.push((f1, f2));
+                    return Ok(());
+                }
+                if c0.abs() <= GREY * tol {
+                    return Err(Decline("cones nearly coincident"));
+                }
+                return Ok(());
+            }
+            let s = -c0 / c1;
+            let rc = r01 + k1 * s;
+            if rc <= GREY * tol {
+                return Err(Decline("cones meeting at an apex"));
+            }
+            let k = Circ { c: o1 + a1 * s, n: a1, x, y, r: rc };
+            return self.section(f1, f2, Path::Circle(k), th0, th0 + TAU);
+        }
         if dl <= GREY * tol {
             if (r1 - r2).abs() <= tol {
                 // One surface: their pieces on each other are coincident, like coplanar faces'.
@@ -797,6 +891,9 @@ impl Ctx {
     /// The pool vertices strictly inside `s`, in order from its start: of `lists` (each sorted by x), the
     /// ones not `own`'s (an argument's vertices never lie inside its own edges).
     fn split_among(&self, s: &Seg, lists: &ByOwner, own: Option<u32>) -> R<Vec<u32>> {
+        if s.g == Geo::Apex {
+            return Ok(vec![s.v[0], s.v[1]]);
+        }
         let mut chain: Vec<(f64, u32)> = Vec::new();
         for (who, list) in lists {
             if own.is_some() && *who == own {
@@ -822,6 +919,7 @@ impl Ctx {
                 (a.min(b), a.max(b))
             }
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
+            Geo::Apex => return Ok(vec![s.v[0], s.v[1]]),
         };
         let (lo, hi) = (lo - DVec3::splat(tol), hi + DVec3::splat(tol));
         let start = sorted_x.partition_point(|x| x.0 < lo.x);
@@ -862,6 +960,7 @@ impl Ctx {
             .map(|w| {
                 let g = match s.g {
                     Geo::Line => Geo::Line,
+                    Geo::Apex => Geo::Apex,
                     Geo::Arc { k, a0, sweep } => {
                         let t = |v: u32, end: bool| {
                             if v == s.v[0] && !end {
@@ -911,22 +1010,30 @@ impl Ctx {
                         }
                         hits.push(dist / den);
                     }
-                    Surf::Cyl { o, a, r: rad, .. } => {
+                    Surf::Cyl { o, a, r0, k, .. } => {
+                        // |w⊥ + t r⊥| = r0 + k (h + t r·a), on the cone's own side of its apex.
                         let w = p - o;
-                        let (wp, rp) = (w - a * w.dot(a), r - a * r.dot(a));
-                        let (qa, qb, qc) = (rp.length_squared(), wp.dot(rp), wp.length_squared() - rad * rad);
-                        if qa < 1e-12 {
-                            continue;
+                        let (h, dz) = (w.dot(a), r.dot(a));
+                        let (wp, rp) = (w - a * h, r - a * dz);
+                        let rad = r0 + k * h;
+                        let (qa, qb, qc) = (rp.length_squared() - k * k * dz * dz, wp.dot(rp) - k * dz * rad, wp.length_squared() - rad * rad);
+                        let mut roots = Vec::new();
+                        if qa.abs() < 1e-12 {
+                            if qb.abs() > 1e-300 {
+                                roots.push(-qc / (2.0 * qb));
+                            }
+                        } else {
+                            let disc = qb * qb - qa * qc;
+                            if disc < 0.0 {
+                                continue;
+                            }
+                            if disc.sqrt() / qa.abs() <= GREY * tol {
+                                continue 'dirs;
+                            }
+                            roots.push((-qb - disc.sqrt()) / qa);
+                            roots.push((-qb + disc.sqrt()) / qa);
                         }
-                        let disc = qb * qb - qa * qc;
-                        if disc < 0.0 {
-                            continue;
-                        }
-                        if disc.sqrt() / qa <= GREY * tol {
-                            continue 'dirs;
-                        }
-                        hits.push((-qb - disc.sqrt()) / qa);
-                        hits.push((-qb + disc.sqrt()) / qa);
+                        hits.extend(roots.into_iter().filter(|t| r0 + k * (h + t * dz) > -tol));
                     }
                 }
                 let gb = if hits.is_empty() { &[][..] } else { self.bound(f)? };
@@ -959,18 +1066,24 @@ impl Ctx {
     }
 }
 
-/// A circle's intervals as one when they meet across the start of its parameter range (no vertex there).
-fn wrap(mut v: Vec<Ival>, path: &Path, t0: f64, t1: f64) -> Vec<Ival> {
-    if !matches!(path, Path::Circle(_)) || v.len() < 2 {
-        return v;
-    }
-    let (first, last) = (v[0], v[v.len() - 1]);
-    if first[0].1 == End::Open && first[0].0 == t0 && last[1].1 == End::Open && last[1].0 == t1 {
-        let n = v.len();
-        v[n - 1] = [last[0], (first[1].0 + (t1 - t0), first[1].1)];
-        v.remove(0);
-    }
-    v
+/// A cylinder's or cone's face (radius `r0 + k h`): one that goes round starts at its seam (an edge it uses
+/// twice); its parameter scale is its largest radius.
+fn round(cx: &Ctx, edges: &[(usize, bool)], [o, a, x]: [DVec3; 3], r0: f64, k: f64, flip: bool) -> Surf {
+    let mut seen = HashSet::default();
+    let seam = edges.iter().find(|&&(e, _)| !seen.insert(e)).map(|&(e, _)| e);
+    let y = a.cross(x);
+    let th0 = seam.map_or(0.0, |e| {
+        let v = cx.edges[e].v;
+        let p = if (cx.pool.p[v[0] as usize] - o).cross(a).length() > (cx.pool.p[v[1] as usize] - o).cross(a).length() { cx.pool.p[v[0] as usize] } else { cx.pool.p[v[1] as usize] };
+        let w = p - o;
+        w.dot(y).atan2(w.dot(x))
+    });
+    let r = if k == 0.0 {
+        r0
+    } else {
+        edges.iter().filter_map(|&(e, _)| if let Geo::Arc { k, .. } = cx.edges[e].g { Some(k.r) } else { None }).fold(r0.abs(), f64::max)
+    };
+    Surf::Cyl { o, a, x, y, r, r0, k, flip, th0, full: seam.is_some() }
 }
 
 /// The parameters of the line `p + t d` inside the box (`lo`, `hi`), grown well beyond the grey zone (the
@@ -1076,6 +1189,12 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
         for (i, e) in body.edges.iter().enumerate() {
             let v = [vmap[e.v[0] as usize], vmap[e.v[1] as usize]];
             let g = match e.curve {
+                Curve::Degenerate => {
+                    if v[0] != v[1] {
+                        return Err(Decline("a degenerate edge between two vertices"));
+                    }
+                    Geo::Apex
+                }
                 Curve::Line => {
                     if v[0] == v[1] {
                         return Err(Decline("a closed or tiny edge"));
@@ -1103,17 +1222,8 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
                     let (u, v) = frame(n);
                     Surf::Plane { n, d: n.dot(origin), origin, u, v }
                 }
-                Surface::Cylinder { origin, axis, xdir, radius } => {
-                    // A face that goes round starts at its seam (an edge it uses twice).
-                    let mut seen = HashSet::default();
-                    let seam = edges.iter().find(|&&(e, _)| !seen.insert(e)).map(|&(e, _)| e);
-                    let y = axis.cross(xdir);
-                    let th0 = seam.map_or(0.0, |e| {
-                        let w = cx.pool.p[cx.edges[e].v[0] as usize] - origin;
-                        w.dot(y).atan2(w.dot(xdir))
-                    });
-                    Surf::Cyl { o: origin, a: axis, x: xdir, y, r: radius, flip: f.reversed, th0, full: seam.is_some() }
-                }
+                Surface::Cylinder { origin, axis, xdir, radius } => round(&cx, &edges, [origin, axis, xdir], radius, 0.0, f.reversed),
+                Surface::Cone { origin, axis, xdir, radius, angle } => round(&cx, &edges, [origin, axis, xdir], radius, angle.tan(), f.reversed),
             };
             cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY });
         }
@@ -1145,7 +1255,7 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
         for &(e, _) in &cx.faces[f].edges {
             let s = cx.edge_seg(e);
             let n = match s.g {
-                Geo::Line => 1,
+                Geo::Line | Geo::Apex => 1,
                 Geo::Arc { sweep, .. } => (sweep / (PI / 8.0)).ceil() as usize + 1,
             };
             for k in 0..=n {
@@ -1249,7 +1359,7 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
         let list = sedge_of.entry(key).or_default();
         for &i in list.iter() {
             let o = &sedges[i].seg;
-            if matches!(o.g, Geo::Line) == matches!(s.g, Geo::Line) && (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * cx.tol {
+            if std::mem::discriminant(&o.g) == std::mem::discriminant(&s.g) && (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * cx.tol {
                 let rev = match (o.g, s.g) {
                     (Geo::Arc { k: k1, .. }, Geo::Arc { k: k2, .. }) => k1.n.dot(k2.n) < 0.0,
                     _ => o.v[0] != s.v[0],
@@ -1275,7 +1385,7 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
     for (e, &es) in edge_solid.iter().enumerate() {
         let s = cx.edge_seg(e);
         let (lo, hi) = match s.g {
-            Geo::Line => (cx.p(s.v[0]).min(cx.p(s.v[1])), cx.p(s.v[0]).max(cx.p(s.v[1]))),
+            Geo::Line | Geo::Apex => (cx.p(s.v[0]).min(cx.p(s.v[1])), cx.p(s.v[0]).max(cx.p(s.v[1]))),
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
         };
         let near = es != usize::MAX && (0..ns).any(|t| meets[es * ns + t] && boxes_meet(lo, hi, cx.solids[t].lo, cx.solids[t].hi, GREY * tol));
@@ -1357,8 +1467,11 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
                 let c = cx.faces[f].curve2(cx.p(s.v[0]), cx.p(s.v[1]), &s.g, copy)?;
                 let mut ends = [0u32; 2];
                 for (k, (w, q)) in [(s.v[0], c.start()), (s.v[1], c.end())].into_iter().enumerate() {
-                    // A vertex on a seam is at two places in the parameter plane.
-                    let right = (q.x - cx.faces[f].to2(cx.p(w)).x).abs() > 1e-6 * q.x.abs().max(1e-3);
+                    // A vertex on a seam (or a cone's apex) is at two places in the parameter plane.
+                    let right = match cx.faces[f].s {
+                        Surf::Cyl { r, th0, .. } => q.x > r * (th0 + PI),
+                        Surf::Plane { .. } => false,
+                    };
                     ends[k] = *local.entry((w, right)).or_insert_with(|| {
                         pts.push(q);
                         (pts.len() - 1) as u32
@@ -1517,12 +1630,13 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
             }
         }
     }
-    if uses.values().any(|u| u[0] != u[1] || u[0] == 0) {
+    // (A cone's apex is used once.)
+    if uses.iter().any(|(&s, u)| sedges[s].seg.g != Geo::Apex && (u[0] != u[1] || u[0] == 0)) {
         return Err(Decline("a non-manifold result"));
     }
     // Seams: an edge one face uses both ways; any other edge two faces once each.
     for (&s, u) in &uses {
-        if u[0] > 1 {
+        if u[0] > 1 && sedges[s].seg.g != Geo::Apex {
             let users = kept.iter().filter(|&&p| pieces[p].loops.iter().flatten().any(|x| x.0 == s)).count();
             if users != 1 || u[0] != 1 {
                 return Err(Decline("a non-manifold result"));
@@ -1586,6 +1700,8 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
         sedge_flip.insert(s, flip);
         let seg = x.seg;
         let (v, curve) = match seg.g {
+            Geo::Apex if !edge_same[s] => return Err(Decline("a cone's apex changed")),
+            Geo::Apex => (seg.v, Curve::Degenerate),
             Geo::Line => (if flip { [seg.v[1], seg.v[0]] } else { seg.v }, Curve::Line),
             Geo::Arc { k, .. } => {
                 let (v, n) = if flip { ([seg.v[1], seg.v[0]], -k.n) } else { (seg.v, k.n) };
@@ -1612,12 +1728,13 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
         face_same[f] = same;
         let src = &args[g.arg as usize].faces[g.index as usize];
         // Each loop from where the input face's starts (its first edge's first piece), as OCCT's pieces.
+        let at: HashMap<usize, usize> = if pieces[p].loops.iter().all(|l| l.len() <= 1) { HashMap::default() } else { g.edges.iter().enumerate().rev().map(|(i, x)| (x.0, i)).collect() };
         let rank = |s: usize| -> (usize, usize) {
             sedges[s]
                 .origins
                 .iter()
                 .filter_map(|&e| {
-                    let at = g.edges.iter().position(|x| x.0 == e)?;
+                    let at = *at.get(&e)?;
                     let k = edge_pieces[e].iter().position(|x| x.0 == s)?;
                     Some((at, if g.edges[at].1 { edge_pieces[e].len() - 1 - k } else { k }))
                 })
@@ -1811,6 +1928,7 @@ fn shell_volume(b: &Body, faces: &[u32]) -> f64 {
                 let e = b.edges[u.edge as usize];
                 let (p, q) = (b.vertices[e.v[0] as usize], b.vertices[e.v[1] as usize]);
                 let mut poly = match e.curve {
+                    Curve::Degenerate => continue,
                     Curve::Line => vec![p, q],
                     Curve::Circle { center, normal, xdir, radius } => {
                         let y = normal.cross(xdir);

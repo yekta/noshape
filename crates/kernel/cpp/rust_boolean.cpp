@@ -11,13 +11,13 @@
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
-#include <BRepLib.hxx>
 #include <TopExp_Explorer.hxx>
 #include <BRepTools_History.hxx>
 #include <ElCLib.hxx>
 #include <ElSLib.hxx>
 #include <Geom2d_Line.hxx>
 #include <Geom_Circle.hxx>
+#include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Line.hxx>
 #include <Geom_Plane.hxx>
@@ -93,7 +93,19 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
   {
     const TopoDS_Edge e = TopoDS::Edge(em(i).Oriented(TopAbs_FORWARD));
     if (BRep_Tool::Degenerated(e))
-      return "a degenerate edge";
+    {
+      // A cone's apex.
+      TopoDS_Vertex v1, v2;
+      TopExp::Vertices(e, v1, v2);
+      if (v1.IsNull() || !v1.IsSame(v2))
+        return "a degenerate edge";
+      b.curves.push_back(2);
+      for (int k = 0; k < 10; ++k)
+        b.curves.push_back(0);
+      b.edges.push_back(static_cast<uint32_t>(vm.FindIndex(v1) - 1));
+      b.edges.push_back(static_cast<uint32_t>(vm.FindIndex(v1) - 1));
+      continue;
+    }
     TopLoc_Location               loc;
     double                        f = 0, l = 0;
     const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, loc, f, l);
@@ -135,7 +147,8 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     const occ::handle<Geom_Surface>       surf = BRep_Tool::Surface(f, loc);
     const occ::handle<Geom_Plane>         pl   = occ::down_cast<Geom_Plane>(surf);
     const occ::handle<Geom_CylindricalSurface> cyl = occ::down_cast<Geom_CylindricalSurface>(surf);
-    if (pl.IsNull() && cyl.IsNull())
+    const occ::handle<Geom_ConicalSurface>     con = occ::down_cast<Geom_ConicalSurface>(surf);
+    if (pl.IsNull() && cyl.IsNull() && con.IsNull())
       return "a curved face";
     if (f.Orientation() != TopAbs_FORWARD && f.Orientation() != TopAbs_REVERSED)
       return "an internal face";
@@ -147,8 +160,21 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       b.surfaces.push_back(0);
       push3(b.surfaces, p.Location().XYZ());
       push3(b.surfaces, p.Axis().Direction().XYZ());
-      for (int k = 0; k < 4; ++k)
+      for (int k = 0; k < 5; ++k)
         b.surfaces.push_back(0);
+    }
+    else if (!con.IsNull())
+    {
+      // As a cylinder's below; its half-angle the other way about a left-handed frame's axis.
+      const gp_Cone c = con->Cone().Transformed(loc.Transformation());
+      const gp_Ax3& a = c.Position();
+      b.surfaces.push_back(2);
+      push3(b.surfaces, c.Location().XYZ());
+      push3(b.surfaces, a.XDirection().Crossed(a.YDirection()).XYZ());
+      push3(b.surfaces, a.XDirection().XYZ());
+      b.surfaces.push_back(c.RefRadius());
+      b.surfaces.push_back(a.Direct() ? c.SemiAngle() : -c.SemiAngle());
+      flip = !a.Direct();
     }
     else
     {
@@ -161,6 +187,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       push3(b.surfaces, a.XDirection().Crossed(a.YDirection()).XYZ());
       push3(b.surfaces, a.XDirection().XYZ());
       b.surfaces.push_back(c.Radius());
+      b.surfaces.push_back(0);
       flip = !a.Direct();
     }
     b.reversed.push_back((f.Orientation() == TopAbs_REVERSED) != flip);
@@ -174,8 +201,8 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
         const int           k = em.FindIndex(e);
         if (k <= 0 || (e.Orientation() != TopAbs_FORWARD && e.Orientation() != TopAbs_REVERSED))
           return "an internal edge";
-        // A seam (twice in a cylinder's face) once each way.
-        if (seen[k] == i && (cyl.IsNull() || BRep_Tool::IsClosed(TopoDS::Edge(e), f) == false))
+        // A seam (twice in a cylinder's or cone's face) once each way.
+        if (seen[k] == i && ((cyl.IsNull() && con.IsNull()) || BRep_Tool::IsClosed(TopoDS::Edge(e), f) == false))
           return "an edge twice in a face";
         seen[k] = i;
         b.uses.push_back(static_cast<uint32_t>(2 * (k - 1) + (e.Orientation() == TopAbs_REVERSED ? 1 : 0)));
@@ -338,11 +365,16 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
     const TopoDS_Face& src = TopoDS::Face(input(srcs, r.face_origin[3 * i + 1], TopAbs_FACE, r.face_origin[3 * i + 2]));
     TopLoc_Location                 loc;
     const occ::handle<Geom_Surface> s0  = BRep_Tool::Surface(src, loc);
-    // A new face gets its own surface (OCCT's pieces do).
-    const occ::handle<Geom_Surface> s = kind == 0 ? s0 : occ::handle<Geom_Surface>(occ::down_cast<Geom_Surface>(s0->Copy()));
+    // A new face on a cylinder or cone gets its own surface (OCCT's pieces do; a plane's is shared).
+    const bool                      curved = occ::down_cast<Geom_Plane>(s0).IsNull();
+    const occ::handle<Geom_Surface> s = kind == 0 || !curved ? s0 : occ::handle<Geom_Surface>(occ::down_cast<Geom_Surface>(s0->Copy()));
     const occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(s);
-    // The face's way round against its surface's normal (to_body: a left-handed cylinder's is inward).
-    const bool rev = b.reversed[i] != (!cs.IsNull() && !cs->Position().Direct());
+    const occ::handle<Geom_ConicalSurface>     cn = occ::down_cast<Geom_ConicalSurface>(s);
+    const bool                                 round = !cs.IsNull() || !cn.IsNull();
+    const gp_Ax3 frame = !cs.IsNull() ? cs->Position().Transformed(loc.Transformation()) : !cn.IsNull() ? cn->Position().Transformed(loc.Transformation()) : gp_Ax3();
+    // The face's way round against its surface's normal (to_body: a left-handed cylinder's or cone's is
+    // inward).
+    const bool rev = b.reversed[i] != (round && !frame.Direct());
     if (kind == 0)
     {
       // A cut's tool face is the result's the other way round.
@@ -351,39 +383,58 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
     }
     TopoDS_Face                     f;
     bb.MakeFace(f, s, loc, BRep_Tool::Tolerance(src));
-    // Its edges' curves on a cylinder (a plane's are implicit).
-    if (!cs.IsNull())
+    // Its edges' curves on a cylinder or cone (a plane's are made below).
+    if (round)
     {
-      const gp_Cylinder cyl = cs->Cylinder().Transformed(loc.Transformation());
-      const gp_Dir up = cyl.Position().XDirection().Crossed(cyl.Position().YDirection());
+      const gp_Cylinder cyl = cs.IsNull() ? gp_Cylinder() : cs->Cylinder().Transformed(loc.Transformation());
+      const gp_Cone     con = cn.IsNull() ? gp_Cone() : cn->Cone().Transformed(loc.Transformation());
+      auto params = [&](const gp_Pnt& p, double& u, double& v) {
+        if (!cs.IsNull())
+          ElSLib::Parameters(cyl, p, u, v);
+        else
+          ElSLib::Parameters(con, p, u, v);
+      };
+      const gp_Dir      up  = frame.XDirection().Crossed(frame.YDirection());
       const double      eps = 1e-7;
       std::vector<int>  uses(ne, 0);
       for (uint32_t k = b.loop_uses[b.face_loops[i]]; k < b.loop_uses[b.face_loops[i + 1]]; ++k)
         ++uses[b.uses[k] / 2];
-      // Its angles: from where the Boolean's start, by whole turns to where its kept edges' curves are.
+      // The input's own edges: their curves on the input face's surface, onto this one's.
       double umin = r.face_u0[i];
+      bool   placed = false;
       for (size_t k = 0; k < ne; ++k)
       {
         double f0 = 0, f1 = 0;
         occ::handle<Geom2d_Curve> pc;
-        // (Not a seam: it lies at either end.)
-        if (uses[k] == 1 && r.edge_origin[3 * k] == 0 && !BRep_Tool::IsClosed(es[k], s, loc)
-            && !(pc = BRep_Tool::CurveOnSurface(es[k], s, loc, f0, f1)).IsNull())
+        if (uses[k] == 0 || r.edge_origin[3 * k] != 0 || (pc = BRep_Tool::CurveOnSurface(es[k], s0, loc, f0, f1)).IsNull())
+          continue;
+        if (BRep_Tool::IsClosed(es[k], s0, loc))
+        {
+          double g0 = 0, g1 = 0;
+          const occ::handle<Geom2d_Curve> pr = BRep_Tool::CurveOnSurface(TopoDS::Edge(es[k].Reversed()), s0, loc, g0, g1);
+          bb.UpdateEdge(es[k], pc, pr, s, loc, BRep_Tool::Tolerance(es[k]));
+          bb.Range(es[k], s, loc, f0, f1);
+          continue;
+        }
+        bb.UpdateEdge(es[k], pc, s, loc, BRep_Tool::Tolerance(es[k]));
+        // (An apex has no curve to take its range from.)
+        bb.Range(es[k], s, loc, f0, f1);
+        // Its angles: from where the Boolean's start, by whole turns to where the input's edges' curves are
+        // (not a seam's: it lies at either end; not an apex's: it spans them).
+        if (!placed && !BRep_Tool::Degenerated(es[k]))
         {
           const double um = pc->Value(0.5 * (f0 + f1)).X();
           umin += 2 * M_PI * std::floor((um - umin) / (2 * M_PI));
-          break;
+          placed = true;
         }
       }
       const double umax = umin + 2 * M_PI;
       for (size_t k = 0; k < ne; ++k)
       {
-        if (uses[k] == 0)
+        if (uses[k] == 0 || r.edge_origin[3 * k] == 0)
           continue;
         const TopoDS_Edge& e = es[k];
         double             f0 = 0, f1 = 0;
-        if (r.edge_origin[3 * k] == 0 && !BRep_Tool::CurveOnSurface(e, s, loc, f0, f1).IsNull())
-          continue;
         TopLoc_Location               el;
         const occ::handle<Geom_Curve> c  = BRep_Tool::Curve(e, el, f0, f1);
         const occ::handle<Geom_Curve> bc = basis_of(c);
@@ -399,15 +450,21 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
         {
           const gp_Circ g  = circ->Circ().Transformed(el.Transformation());
           const double  sg = g.Axis().Direction().Dot(up) > 0 ? 1.0 : -1.0;
-          ElSLib::Parameters(cyl, ElCLib::Value(0, g), u, v);
+          params(ElCLib::Value(0, g), u, v);
           const double a = u + sg * f0, z = u + sg * f1;
           u += shift(std::min(a, z), std::max(a, z));
           bb.UpdateEdge(e, new Geom2d_Line(gp_Pnt2d(u, v), gp_Dir2d(sg, 0)), s, loc, BRep_Tool::Tolerance(e));
           continue;
         }
-        const gp_Lin g  = occ::down_cast<Geom_Line>(bc)->Lin().Transformed(el.Transformation());
-        const double dv = g.Direction().Dot(cyl.Axis().Direction()) > 0 ? 1.0 : -1.0;
-        ElSLib::Parameters(cyl, g.Location(), u, v);
+        const gp_Lin g = occ::down_cast<Geom_Line>(bc)->Lin().Transformed(el.Transformation());
+        // Along the generator: v changes as the line's parameter does, one way or the other.
+        // (Its angle from its middle: a cone's generator may start at the apex.)
+        double u1 = 0, v1 = 0, um = 0, vm = 0;
+        params(g.Location(), u, v);
+        params(g.Location().Translated(gp_Vec(g.Direction())), u1, v1);
+        params(ElCLib::Value(0.5 * (f0 + f1), g), um, vm);
+        u = um;
+        const double dv = v1 > v ? 1.0 : -1.0;
         u += shift(u, u);
         // On the seam's line the edge has both of the seam's curves (the faces either side of it each take one).
         const bool on_seam = std::abs(u - umin) < eps || std::abs(u - umax) < eps;
@@ -420,9 +477,9 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
         }
         // A seam: the way up on the face's right, the way down on its left.
         const double left = u, right = u + 2 * M_PI;
-        const occ::handle<Geom2d_Curve> up   = new Geom2d_Line(gp_Pnt2d(dv > 0 ? right : left, v), gp_Dir2d(0, dv));
-        const occ::handle<Geom2d_Curve> down = new Geom2d_Line(gp_Pnt2d(dv > 0 ? left : right, v), gp_Dir2d(0, dv));
-        bb.UpdateEdge(e, up, down, s, loc, BRep_Tool::Tolerance(e));
+        const occ::handle<Geom2d_Curve> c_up   = new Geom2d_Line(gp_Pnt2d(dv > 0 ? right : left, v), gp_Dir2d(0, dv));
+        const occ::handle<Geom2d_Curve> c_down = new Geom2d_Line(gp_Pnt2d(dv > 0 ? left : right, v), gp_Dir2d(0, dv));
+        bb.UpdateEdge(e, c_up, c_down, s, loc, BRep_Tool::Tolerance(e));
       }
     }
     for (uint32_t l = b.face_loops[i]; l < b.face_loops[i + 1]; ++l)
@@ -440,10 +497,6 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
       w.Closed(true);
       bb.Add(f, w);
     }
-    // Its edges' curves on a plane too, as OCCT's pieces have them.
-    if (cs.IsNull())
-      for (TopExp_Explorer ex(f, TopAbs_EDGE); ex.More(); ex.Next())
-        BRepLib::BuildPCurveForEdgeOnPlane(TopoDS::Edge(ex.Current()), f);
     fs[i] = rev ? TopoDS::Face(f.Reversed()) : f;
   }
   TopoDS_Compound out;
@@ -504,7 +557,8 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
 bool rust_decline(const char* why) { return decline(why); }
 
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
-                  std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist)
+                  std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
+                  double fuzzy)
 {
   srcs.resize(args.size(), nullptr);
   for (size_t i = 0; i < args.size(); ++i)
@@ -536,8 +590,8 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
         if (vj.Contains(vi(k)))
           return decline("arguments share vertices");
     }
-  // Two points are one within both their tolerances (OCCT's rule).
-  const double tol = 2 * std::max(max_tol, 1e-7);
+  // Two points are one within both their tolerances (OCCT's rule; a fuzzy Boolean adds its value to each).
+  const double tol = 2 * (std::max(max_tol, 1e-7) + fuzzy);
   BrepResult   r;
   t_built.set = false;
   {
@@ -586,7 +640,7 @@ void rust_boolean_keep(const OcShape& out)
   if (!order(vm, done.v, av) || !order(em, done.e, ae) || !order(fm, done.f, af) || !order(sm, done.s, as))
     return;
   auto c = std::make_shared<BrepBody>();
-  std::vector<double> vx(3 * nv), cu(11 * ne), su(11 * nf);
+  std::vector<double> vx(3 * nv), cu(11 * ne), su(12 * nf);
   std::vector<uint32_t> ed(2 * ne);
   for (size_t i = 0; i < nv; ++i)
     for (int k = 0; k < 3; ++k)
@@ -602,8 +656,8 @@ void rust_boolean_keep(const OcShape& out)
   for (size_t i = 0; i < nf; ++i)
   {
     face_of[af[i]] = i;
-    for (int k = 0; k < 11; ++k)
-      su[11 * af[i] + k] = b.surfaces[11 * i + k];
+    for (int k = 0; k < 12; ++k)
+      su[12 * af[i] + k] = b.surfaces[12 * i + k];
   }
   for (double x : vx)
     c->vertices.push_back(x);
