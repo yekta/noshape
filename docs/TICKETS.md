@@ -734,7 +734,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   show the same (tickets/perf-total-mismatch.png) (qa 2026-10-27, green dacce5e7)
   psui: the Performance panel's total is the feature times' sum, as the Regeneration times dialog's footer (live:
   one number, the sum, behaviours "spec: core SHELL-SLOW").
-- [ ] P3 LEFT-RAIL-WHERE-USED the Part Studio's left rail is Versions and history, Create version…, Document notes, Performance
+- [x] (psui 10-28, this commit: a "Where used" rail button after Document notes (our own icon) opens a panel listing the tabs of this document that use the active one (`Document::tab_users`: assemblies, drawings, derived parts), a click opening the tab; on :102 asm5 Part Studio 1 → Assembly 1 → Assembly 1 Drawing 1. Release drafts stays (local release management, part-studio 13.14)) P3 LEFT-RAIL-WHERE-USED the Part Studio's left rail is Versions and history, Create version…, Document notes, Performance
   errors detected, Release drafts; live's is Versions and history, Create version…, Comments, Document notes, **Where used**,
   Performance errors detected, AI Advisor (behaviours 1559 / 1563). Comments and AI Advisor are cloud; "Where used" (which
   tabs use this element) isn't there; "Release drafts" isn't on live's rail (a Free account has no release management)

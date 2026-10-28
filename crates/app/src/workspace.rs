@@ -273,6 +273,9 @@ impl Workspace {
         if let Some((tm, _)) = &self.tab_manager {
             tm.update(cx, |t, cx| t.set_active(Some(tab), cx));
         }
+        if let Some((DocPanel::WhereUsed(w), _)) = &self.doc_panel {
+            w.update(cx, |w, cx| w.set_tab(Some(tab), cx));
+        }
         // Versions and history's Repair wrench is there for Part Studios only
         // (live ui2/950 vs document/22).
         if let Some(h) = &self.history {
@@ -804,7 +807,7 @@ impl Workspace {
         let same = match &self.doc_panel {
             Some((DocPanel::Notes(_), _)) => notes,
             Some((DocPanel::Performance(_), _)) => !notes,
-            None => false,
+            Some((DocPanel::WhereUsed(_), _)) | None => false,
         };
         self.doc_panel = None;
         if !same {
@@ -833,6 +836,28 @@ impl Workspace {
                 ];
                 (DocPanel::Performance(panel), subs)
             });
+        }
+        cx.notify();
+    }
+
+    /// The rail's Where used (`doc_panels::WhereUsedPanel`): opens or closes it like the other document panels.
+    fn toggle_where_used(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let open = matches!(self.doc_panel, Some((DocPanel::WhereUsed(_), _)));
+        self.doc_panel = None;
+        if !open {
+            self.history = None;
+            self.release_drafts = None;
+            self.tab_manager = None;
+            let (doc, tab) = (self.doc.clone(), self.active);
+            let panel = cx.new(|_| crate::doc_panels::WhereUsedPanel::new(doc, tab));
+            let subs = vec![
+                cx.subscribe(&panel, |this, _, _: &crate::doc_panels::ClosePanel, cx| {
+                    this.doc_panel = None;
+                    cx.notify();
+                }),
+                cx.subscribe_in(&panel, window, |this, _, ev: &crate::doc_panels::OpenTab, window, cx| this.activate(ev.0, window, cx)),
+            ];
+            self.doc_panel = Some((DocPanel::WhereUsed(panel), subs));
         }
         cx.notify();
     }
@@ -1360,6 +1385,7 @@ impl Workspace {
         let history_open = self.history.is_some();
         let notes_open = matches!(self.doc_panel, Some((DocPanel::Notes(_), _)));
         let perf_open = matches!(self.doc_panel, Some((DocPanel::Performance(_), _)));
+        let where_open = matches!(self.doc_panel, Some((DocPanel::WhereUsed(_), _)));
         let paused = self.active_part_studio().is_some_and(|v| v.read(cx).regen_paused());
         let perf_error = crate::doc_panels::PerfSnapshot { adapter: self.gpu.adapter_name(), ..Default::default() }.software_renderer();
         // Live (part-studio/181): the icons' ink starts at x 10, y 49 (20 px
@@ -1396,6 +1422,11 @@ impl Workspace {
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_doc_panel(true, cx))),
             )
             .child(
+                crate::ui::rail_button("rail-where-used", "where-used", where_open, true, cx).pl(px(1.))
+                    .tip("Where used", TipSide::Right)
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_where_used(window, cx))),
+            )
+            .child(
                 crate::ui::rail_button("rail-performance", "performance", perf_open, true, cx).pl(px(1.))
                     // A software renderer is a performance error (live: a red badge).
                     .when(perf_error, |d| d.child(div().absolute().left(px(22.)).top(px(16.)).size(px(11.)).rounded_full().bg(gpui_kit::rgb_static(0xffffff)).child(crate::assets::icon("error", 11., cx))))
@@ -1417,6 +1448,7 @@ impl Workspace {
 enum DocPanel {
     Notes(Entity<crate::doc_panels::NotesPanel>),
     Performance(Entity<crate::doc_panels::PerformancePanel>),
+    WhereUsed(Entity<crate::doc_panels::WhereUsedPanel>),
 }
 
 /// A file tab's right-click menu (live menus/rmb-tab-file-*, behaviours
@@ -1663,6 +1695,7 @@ impl Render for Workspace {
                             self.doc_panel.as_ref().map(|(p, _)| match p {
                                 DocPanel::Notes(n) => n.clone().into_any_element(),
                                 DocPanel::Performance(v) => v.clone().into_any_element(),
+                                DocPanel::WhereUsed(w) => w.clone().into_any_element(),
                             })
                         }),
                     }.map(|panel| div().w(px(crate::history_panel::PANEL_W)).h_full().flex_none().border_r_1().border_color(pal.border).child(panel)))

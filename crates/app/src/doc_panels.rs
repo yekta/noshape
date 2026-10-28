@@ -503,3 +503,80 @@ impl Render for PerformancePanel {
             .child(panel_footer("https://cad.onshape.com/help/Content/performance_panel.htm", cx))
     }
 }
+
+/// Where used: opens a tab of the document from the list.
+pub struct OpenTab(pub noshape_model::document::TabId);
+
+/// **Where used** (live's rail: Versions and history, Create version…, Comments, Document notes, Where used, …; on a Free
+/// account it only advertises the paid plans): here the other tabs of this document that use the active one
+/// (assembly instances, drawings, derived parts; `Document::tab_users`), a click opening the tab.
+pub struct WhereUsedPanel {
+    doc: Entity<DocModel>,
+    tab: Option<noshape_model::document::TabId>,
+}
+
+impl EventEmitter<ClosePanel> for WhereUsedPanel {}
+impl EventEmitter<OpenTab> for WhereUsedPanel {}
+
+impl WhereUsedPanel {
+    pub fn new(doc: Entity<DocModel>, tab: Option<noshape_model::document::TabId>) -> Self {
+        Self { doc, tab }
+    }
+
+    /// The tab whose users it lists (the workspace's active tab).
+    pub fn set_tab(&mut self, tab: Option<noshape_model::document::TabId>, cx: &mut Context<Self>) {
+        if self.tab != tab {
+            self.tab = tab;
+            cx.notify();
+        }
+    }
+}
+
+impl Render for WhereUsedPanel {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        use noshape_model::TabContent;
+        let pal = p();
+        let doc = &self.doc.read(cx).session.doc;
+        let name = self.tab.and_then(|t| doc.tab(t)).map(|t| t.name.clone()).unwrap_or_default();
+        let users: Vec<(noshape_model::document::TabId, String, &'static str)> = self
+            .tab
+            .map(|t| doc.tab_users(t))
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|u| doc.tab(u))
+            .map(|t| {
+                let icon = match t.content {
+                    TabContent::PartStudio(_) => "part-studio",
+                    TabContent::Assembly(_) => "assembly",
+                    TabContent::Drawing(_) => "drawing",
+                    _ => "file",
+                };
+                (t.id, t.name.clone(), icon)
+            })
+            .collect();
+        let close = header_icon("whereused-close", "close", "Close").on_click(cx.listener(|_, _, _, cx| cx.emit(ClosePanel)));
+        let mut body = v_flex().px(px(10.)).py(px(8.)).gap(px(2.)).child(
+            div().pb(px(6.)).text_size(px(13.)).text_color(pal.text_muted).child(if users.is_empty() {
+                format!("No other tab of this document uses {name}.")
+            } else {
+                format!("Tabs that use {name}:")
+            }),
+        );
+        for (id, tab_name, icon) in users {
+            body = body.child(
+                h_flex()
+                    .id(SharedString::from(format!("whereused-{id}")))
+                    .h(px(26.))
+                    .px(px(4.))
+                    .gap(px(6.))
+                    .rounded(px(2.))
+                    .cursor_pointer()
+                    .hover(|d| d.bg(pal.panel_hover))
+                    .child(crate::assets::icon(icon, 16., cx))
+                    .child(div().text_size(px(13.33)).text_color(pal.text).truncate().child(crate::ui::user_text(tab_name)))
+                    .on_click(cx.listener(move |_, _, _, cx| cx.emit(OpenTab(id)))),
+            );
+        }
+        v_flex().size_full().bg(pal.panel).child(panel_header("Where used").child(close)).child(body)
+    }
+}
