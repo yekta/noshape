@@ -113,6 +113,13 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   `NOSHAPE_PERF_LINES=pulled`, pixel-identical offscreen) measured by perf.yml 40599691793 (variants r1/p1/r2/p2 at
   2x): land it opt-in or as default only if p1/p2 beat r1/r2. Perf 40590825262 (main 27e0f950, Retina orbit):
   macOS 14 base 64.6 / 73.1 fps, no lines 84.4; macOS 15 base 52.0 / 61.3, no lines 96.4.
+- 10-27 23:40– (psui session on another account): MISSING-TOPO (P1 feature list errors, found walking live's "(7)
+  Dragging feature rows"): a face / edge / vertex of a feature later in the list or consumed before is a missing
+  selection (model-core `drop_missing_regions` with `topo`, sketches excluded; `Body::has_exact` first), so a Fillet
+  dragged above its Extrude shows the ⚠ triangle and "1 missing selection"; feature_list gives `missing_selections`.
+  part-studio.md 5.4b verified (✅), 6.16 note updated. perf.yml 40599691793 (psui-perf-pulled, 2x orbit): macOS 14
+  p1 72.8 / p2 67.6 against r1 69.0 / r2 69.8 fps, macOS 15 p 50.3 / 60.6 against r 57.7 / 44.8 (noise ±15): pulled
+  lines gain nothing measurable, the branch stays unlanded. Live asked: 2.23 Alt+click, a sketch on a face that is gone.
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
@@ -184,7 +191,7 @@ that touches the model: ~12 min.
    | bg → hover face | FFC685 FFC685 | bg, the bottom the same, as live's crops. Residual: on shallow slants a few
    pixels of the line's antialiasing lie diagonally past the band's 1 px reach and stay dark (a 1.5 px reach
    overshoots onto the background on steep edges instead).
-0f. Retina orbit, next experiment for 0c: line segments are instances of 6 vertices (`draw(slots*6, 0..count)`),
+0f. (done 10-28: no gain, see above) Retina orbit, experiment for 0c: line segments are instances of 6 vertices (`draw(slots*6, 0..count)`),
    which packs Apple GPUs' vertex SIMD groups badly; pull segments from a storage buffer by vertex_index / 6 with
    the slot as the instance (one instance per copy) and measure with perf.yml.
 0e. P3 LEFT-RAIL-WHERE-USED: live's Free account only shows an upgrade notice for "Where used"; a panel listing
