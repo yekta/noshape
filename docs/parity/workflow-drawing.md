@@ -33,7 +33,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 2.4 | Circle in the top view, place | Ø10 with leader | same | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) (Ø10 with leader) |
 | 2.5 | Datum on an edge | filled triangle + leader + framed "A" | same; next label "B" | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) (A then B) |
 | 2.6 | GTol dialog | Upper text, Prefix, Type ⌖▾, Tolerance, 3 Datums, Suffix, + / Ø, Lower text; **✓ enabled once something is entered** | same fields; **typing right after opening is lost** although Tolerance shows focus (needs a click); ✓ stays dimmed with content | ✗ D7 |  |
-| 2.7 | Each click places another frame, Esc ends | yes | yes | ✅ |  |
+| 2.7 | Each click places another frame, Esc ends | yes | yes | ✅ | c38eb9cf (qa 10:55: Callout, three clicks → three "----" frames, Esc ends the tool) |
 | 2.8 | Note (n), click, type, ✓ | in-place editor with ruler, formatting toolbar | same | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) (editor with ruler + formatting toolbar) |
 
 ## 3. BOM table, balloons, sheet properties
@@ -75,7 +75,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | # | Row | Ours | Status | Verified |
 |---|---|---|---|---|
 | 1.1 | Create Drawing dialog | ANSI_A_INCH.dwt selected by default; "No views" option pre-selected (live default ?) | ✅ D1 fixed | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) (ANSI_A_INCH selected, No views preselected) |
-| 1.4 | Insert picker | filter icons Part Studios / Parts / Sketches / Flat patterns + thumbnails | ✅ D2 fixed |  |
+| 1.4 | Insert picker | filter icons Part Studios / Parts / Sketches / Flat patterns + thumbnails | ✅ D2 fixed | c38eb9cf (qa 10:54: Insert view › Insert → "Select a part or assembly": filter toggles for the kinds present (Part Studios, Parts on, Sketches; seven defined in live order), Part 1 row with its thumbnail, Import… row) |
 | 1.6 | Place a view, Ctrl+Z | view removed, no "Out of date" notice ✅; **title-block SCALE changes from "1:1" (before the view) to "----" after the undo** | ✅ D3 fixed / ✗ **D14** (minor) | c38eb9cf (qa 10:52, wf-block Part 1 › Create Drawing, No views: place a Front view (SCALE 1:1), Ctrl+Z → view gone, SCALE "----", no Out of date notice; Ctrl+Y brings it back at 1:1) |
 | 1.7 | DWG NO. of an assembly drawing | "----" (both drawings) | ✅ D4 fixed | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) ("----") |
 | 2.6 | GTol: type right after opening | "0.1" lands in Tolerance, ✓ enabled | ✅ D7 fixed | c38eb9cf (qa 10:54: GTol tool, type 0.1 at once → "0.1" in Tolerance, ✓ green) |
