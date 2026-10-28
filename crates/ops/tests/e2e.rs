@@ -3367,6 +3367,47 @@ fn two_part_assembly(ctx: &mut Ctx, file: &str) -> (String, String) {
     (b, p)
 }
 
+/// A callout on a part's silhouette is that part's, not the part of an edge
+/// a little way off (qa BALLOON-WRONG-ITEM: a click on a pin's silhouette
+/// near the plate's edge showed the plate's item).
+#[test]
+fn callout_on_a_silhouette_takes_its_part() {
+    let mut ctx = Ctx::new();
+    let (_, pin) = two_part_assembly(&mut ctx, "callout_silhouette.noshape");
+    // The pin stands on the plate.
+    call(&mut ctx, "assembly_transform", json!({ "instance": pin, "translation": [-50, 10, 20] }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Assembly 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let iso = g["views"].as_array().unwrap().iter().find(|v| v["edges"].as_array().is_some_and(|es| es.iter().any(|e| e["type"] == "silhouette"))).cloned().expect("a view with silhouettes");
+    let segs = |e: &Value| -> Vec<([f64; 2], [f64; 2])> {
+        let p = |v: &Value| [num(&v[0]), num(&v[1])];
+        match e["type"].as_str() {
+            Some("line" | "silhouette") => vec![(p(&e["a"]), p(&e["b"]))],
+            _ => e["points"].as_array().map(|ps| ps.windows(2).map(|w| (p(&w[0]), p(&w[1]))).collect()).unwrap_or_default(),
+        }
+    };
+    let dist = |q: [f64; 2], (a, b): ([f64; 2], [f64; 2])| {
+        let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+        let t = (((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / (dx * dx + dy * dy).max(1e-12)).clamp(0.0, 1.0);
+        ((a[0] + t * dx - q[0]).powi(2) + (a[1] + t * dy - q[1]).powi(2)).sqrt()
+    };
+    let edges = iso["edges"].as_array().unwrap();
+    let near = |q: [f64; 2], kind: &str| edges.iter().filter(|e| e["type"] == kind).flat_map(&segs).map(|s| dist(q, s)).fold(f64::INFINITY, f64::min);
+    // A point of a silhouette 0.12–0.28 mm from a (plate) line: within the
+    // pick tolerance of both, on the pin.
+    let at = edges
+        .iter()
+        .filter(|e| e["type"] == "silhouette")
+        .flat_map(&segs)
+        .flat_map(|(a, b)| (0..=400).map(move |k| [a[0] + (b[0] - a[0]) * k as f64 / 400.0, a[1] + (b[1] - a[1]) * k as f64 / 400.0]))
+        .find(|&q| (0.12..0.28).contains(&near(q, "line")) && near(q, "curve") > 0.3)
+        .expect("a silhouette point near a plate edge");
+    let c = call(&mut ctx, "drawing_callout", json!({ "drawing": tab, "anchor": at, "position": [at[0] + 30.0, at[1] + 30.0], "text": "{part.name}" }));
+    let text = c["annotations"].as_array().unwrap().iter().find(|a| a["id"] == c["annotation"]).unwrap()["text"].clone();
+    assert_eq!(text, "Part 2", "the pin, at {at:?}");
+}
+
 /// Split BOM table below / Unsplit table on a two-item BOM.
 #[test]
 fn drawing_bom_split_and_unsplit() {

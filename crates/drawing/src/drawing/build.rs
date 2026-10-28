@@ -1092,6 +1092,7 @@ impl Env<'_> {
         let s = pl.to_sheet(p);
         g.edges
             .iter()
+            .filter(|e| e.visible)
             .filter_map(|e| {
                 let me = g.model_edges.get(e.model? as usize)?;
                 let d = e.points.windows(2).map(|w| views::dist_to_segment(s, pl.to_sheet(w[0]), pl.to_sheet(w[1]))).fold(f64::INFINITY, f64::min);

@@ -2651,16 +2651,21 @@ pub fn body_under(src: &SourceModel, frame: &ViewFrame, p: [f64; 2], tol: f64) -
     let plane = Plane { origin: at, x_dir: frame.dir, normal: frame.right };
     let ray = noshape_kernel::make_edge_2d(&plane, &Segment2d::Line { a: DVec2::new(-reach, 0.0), b: DVec2::new(reach, 0.0) }).ok()?;
     let tol = tol.max(reach * 1e-7);
-    src.context
+    let near: Vec<(f64, f64, BodyId)> = src
+        .context
         .bodies
         .iter()
         .filter(|b| b.kind == BodyKind::Solid)
         .filter_map(|b| {
             let d = noshape_kernel::distance(&ray, &b.shape).ok()?;
-            (d.distance <= tol).then(|| (d.point_a.dot(frame.dir), b.id.clone()))
+            (d.distance <= tol).then(|| (d.distance, d.point_a.dot(frame.dir), b.id.clone()))
         })
-        .min_by(|a, b| a.0.total_cmp(&b.0))
-        .map(|(_, id)| id)
+        .collect();
+    // The bodies the line of sight passes closest to (those it goes through,
+    // else a silhouette's), the front-most of them: a click on a pin's
+    // outline just above the plate's edge is the pin's (qa BALLOON-WRONG-ITEM).
+    let best = near.iter().map(|n| n.0).fold(f64::INFINITY, f64::min);
+    near.into_iter().filter(|n| n.0 <= best + tol * 0.1).min_by(|a, b| a.1.total_cmp(&b.1)).map(|n| n.2)
 }
 
 /// The angle (radians, 0..2π) an arc of `center` sweeps from `a` through

@@ -268,15 +268,22 @@ impl<'a> SheetPick<'a> {
         let g = self.geoms.get(&view)?;
         let s = pl.to_sheet(p);
         let tol = self.tol_mm(6.0);
-        g.edges
+        // The nearest drawn (visible) edge decides: a model edge gives its
+        // part, a silhouette (no model edge) the body it outlines (qa
+        // BALLOON-WRONG-ITEM: a pin's silhouette took the plate edge behind).
+        let (_, model) = g
+            .edges
             .iter()
+            .filter(|e| e.visible)
             .filter_map(|e| {
-                let me = g.model_edges.get(e.model? as usize)?;
                 let d = e.points.windows(2).map(|w| views::dist_to_segment(s, pl.to_sheet(w[0]), pl.to_sheet(w[1]))).fold(f64::INFINITY, f64::min);
-                (d < tol).then(|| (d, me.body.clone()))
+                (d < tol).then_some((d, e.model))
             })
-            .min_by(|a, b| a.0.total_cmp(&b.0))
-            .map(|(_, b)| b)
+            .min_by(|a, b| a.0.total_cmp(&b.0))?;
+        match model.and_then(|m| g.model_edges.get(m as usize)) {
+            Some(me) => Some(me.body.clone()),
+            None => self.part_under(view, p),
+        }
     }
 
     /// The part under `p` (view coordinates): the front-most body on the
