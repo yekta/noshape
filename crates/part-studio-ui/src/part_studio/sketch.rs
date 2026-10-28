@@ -708,7 +708,9 @@ impl PartStudioView {
                 // model edge or vertex joins the selection (a constraint key then
                 // links it); an empty click clears it with the rest.
                 if tool_now == Some(Tool::Select) && hovered.is_none() {
-                    let model = self.hover.clone().filter(|r| matches!(r, Reference::Edge(_) | Reference::Vertex(_)));
+                    // Picked at the click itself: the hover pick can lag a quick
+                    // move (qa: 4 of 10 clicks missed the edge).
+                    let model = self.model_edge_at(*position, cx).or_else(|| self.hover.clone().filter(|r| matches!(r, Reference::Edge(_) | Reference::Vertex(_))));
                     if let Some(ed) = &mut self.sketch {
                         match model {
                             Some(r) => {
@@ -721,7 +723,11 @@ impl PartStudioView {
                                 cx.notify();
                                 return true;
                             }
-                            None => ed.model_selection.clear(),
+                            None if !ed.model_selection.is_empty() => {
+                                ed.model_selection.clear();
+                                self.refresh_scene(false, cx);
+                            }
+                            None => {}
                         }
                     }
                 }
@@ -1325,6 +1331,17 @@ impl PartStudioView {
         let first = if c == '=' { String::new() } else { c.to_string() };
         self.open_otf_input(Some(first), window, cx);
         cx.stop_propagation();
+    }
+
+    /// The model edge under a viewport point, picked geometrically (6 px):
+    /// an edge at the nearest hit's depth.
+    fn model_edge_at(&self, position: DVec2, cx: &App) -> Option<Reference> {
+        let vp = self.viewport.read(cx);
+        let (o, d) = vp.ray(position);
+        let tol = vp.camera.world_per_pixel(vp.size().y) * 6.0;
+        let hits = noshape_model::interaction::entities_along_ray(&self.display, o, d, tol, &|_| false, 8);
+        let first = hits.first()?.depth;
+        hits.into_iter().filter(|h| h.depth <= first + tol * 2.0).find(|h| matches!(h.reference, Reference::Edge(_))).map(|h| h.reference)
     }
 
     /// Show an input for the active on-the-fly box: `first` replaces the
