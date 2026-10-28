@@ -101,7 +101,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | L9 | Selecting in the graphics scrolls the list to the row | E§5.1 | ✅ | |  |
 | L10 | Shift/Ctrl click adds to the selection | — | ✅ | | 0.4.10+ / 52ca0b97 10-28 (Shift+click adds Part 2 <1>; Ctrl+click opens the row menu with the selection kept, deliberately per live "skb (10-24) … (3)") |
 | L11 | Fixed pin icon ("Part is fixed"), DOF indicator ("Has degrees of freedom") | E§5.3, B | ✅ | | 0.4.10+ / 77870dd4 10-28 |
-| L12 | Suppressed rows struck through, hidden rows dimmed | E§5.3 | ✅ | |  |
+| L12 | Suppressed rows struck through, hidden rows dimmed | E§5.3 | ✅ | | 0.4.10+ / 52ca0b97 10-28 (Suppress Part 2 <1>: grey italic struck through, its Revolute too; Hide Part 1 <1>: dimmed with the crossed eye) |
 | L13 | Error indicator with message tooltip | E§5.3 | ✅ | |  |
 | L14 | Subassemblies expand to their instances | E§5.1 | ✅ | |  |
 | L15 | Inline rename (Shift+N, Rename) | E§5.4 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
