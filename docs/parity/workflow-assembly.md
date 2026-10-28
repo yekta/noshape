@@ -35,19 +35,19 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | 2.4 | Cylindrical: pin bottom edge, hole 2 top edge; drag up | slides + rotates | aligned (2nd connector landed at the hole's bottom edge); drag slides along the axis | ✅ / ? |  |
 | 2.5 | Slider: block top face → plate top face; HUD flip primary axis | flip turns the block over | block stays inside the plate; CLI: **rotation identity after the flip** (flip had no effect) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 |  |
 | 2.6 | Fastened: bracket → plate; flip, flip back | flips | flips correctly | ✅ |  |
-| 2.7 | Mate connector tool hover on a face | **orange outline on the hovered face, white dots only at that face's inference points, small triad + ring** (assembly/31-*) | no face outline, **dark dots on many edges of other faces**, large triad without ring | ✅ (GUI :103 skasm 10-27: orange outline on the hovered face, small triad + ring at the nearest inference point, no dots on other parts); was ✗ A5 |  |
+| 2.7 | Mate connector tool hover on a face | **orange outline on the hovered face, white dots only at that face's inference points, small triad + ring** (assembly/31-*) | no face outline, **dark dots on many edges of other faces**, large triad without ring | ✅ (GUI :103 skasm 10-27: orange outline on the hovered face, small triad + ring at the nearest inference point, no dots on other parts); was ✗ A5 | 77870dd4 10-28 |
 | 2.8 | Place, ✓ | "Mate connector 1" under Mate features | same | ✅ |  |
 
 ## 3. Replicate, patterns
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 3.1 | Replicate dialog | standard feature dialog (✓ ✕) (pending capture) | custom panel: ALL-CAPS headers "SEED INSTANCE", "MATE TO BE MATCHED", a "Use selection" button, yellow hint text, a blue **OK** button, no ✓ | ✅ (GUI green 8165fca6, skasm 10-27: Replicate is a standard feature dialog ✓ ✕); was ✗ A6 |  |
+| 3.1 | Replicate dialog | standard feature dialog (✓ ✕) (pending capture) | custom panel: ALL-CAPS headers "SEED INSTANCE", "MATE TO BE MATCHED", a "Use selection" button, yellow hint text, a blue **OK** button, no ✓ | ✅ (GUI green 8165fca6, skasm 10-27: Replicate is a standard feature dialog ✓ ✕); was ✗ A6 | 77870dd4 10-28 |
 | 3.2 | Seed Part 3 <1> (Cylindrical 1), OK | one copy per free matching hole | "3 match(es) found": **two pins stacked inside hole 1 (where the shaft is) and one on top of the seed in hole 2** (z-fighting stripes) | ✗ A7 |  |
 | 3.3 | Ctrl+Z | removes it | removed | ✅ |  |
-| 3.4 | Assembly linear pattern dialog | standard feature dialog with preview | same custom panel style (INSTANCES / DIRECTION, boxed inputs, OK); **no preview** | ✅ (GUI green 8165fca6, skasm 10-27: Linear pattern a standard feature dialog); was ✗ A6, A8 |  |
+| 3.4 | Assembly linear pattern dialog | standard feature dialog with preview | same custom panel style (INSTANCES / DIRECTION, boxed inputs, OK); **no preview** | ✅ (GUI green 8165fca6, skasm 10-27: Linear pattern a standard feature dialog); was ✗ A6, A8 | 77870dd4 10-28 |
 | 3.5 | Direction = plate front edge, 25 mm × 3 | copies along the edge | the edge pick becomes "Mate connector of Part 1 <1>" and copies go **along its Z (the face normal, −Y)**, off the plate | ✅ (T: assembly `linear_pattern_along_an_edge`); was ✗ A9 | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) (Direction "Edge of Part 1 <1>", copy along +X) |
-| 3.6 | Assembly circular pattern, axis = shaft face, 4 × 360 | 3 copies around the axis | 3 copies around the shaft axis; tree "Circular pattern 1 (3)" | ✅ / ? |  |
+| 3.6 | Assembly circular pattern, axis = shaft face, 4 × 360 | 3 copies around the axis | 3 copies around the shaft axis; tree "Circular pattern 1 (3)" | ✅ / ? | 77870dd4 10-28 |
 | 3.7 | Button tooltip after clicking it | hides | "Assembly circular pattern" tooltip stays over the graphics | ✗ A10 |  |
 
 ## 4. Explode, BOM
@@ -99,10 +99,10 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 |---|---|---|---|---|
 | 1.4 | First insert into an empty assembly | **amber + row selected now** (the "Assembly 2" root row is highlighted too); zoom-to-fit still crops the plate (right and bottom off-screen, dialog over it) | ✅ (skasm 10-27: amber + row selected; fitted beside the Insert dialog, GUI :103); was ✗ A1 (partly fixed) | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) |
 | 2.1 | Revolute 2nd pick | moved part previews **amber** | ✅ A2 fixed |  |
-| 2.2 | New mate row | tooltip "Revolute 1 (Hidden)" + eye-off icon ✅, but the row text is still #333333 (live light grey) | ✅ (GUI green 8165fca6, skasm 10-27: the row light grey); was ✗ A3 (partly fixed) |  |
+| 2.2 | New mate row | tooltip "Revolute 1 (Hidden)" + eye-off icon ✅, but the row text is still #333333 (live light grey) | ✅ (GUI green 8165fca6, skasm 10-27: the row light grey); was ✗ A3 (partly fixed) | 77870dd4 10-28 |
 | 2.5 | Slider flip primary axis | block still inside the plate (only its top face z-fights at the plate top) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 |  |
-| 2.7 | Mate connector hover on the plate top | orange outline + white inference dots on that face ✅; **extra white dots on other parts** (bracket edges, shaft bottom) | ✅ (GUI :103 skasm 10-27: orange outline on the hovered face, small triad + ring at the nearest inference point, no dots on other parts); was ✗ A5 (partly fixed) |  |
-| 3.1 / 3.4 / 3.6 | Replicate / Linear / Circular pattern dialogs | standard feature dialogs with live's fields (dom/ui2-asm-*) ✅; Replicate adds red hints "Select the instances to pattern (seed)" / "Select the geometry to find match in" that live doesn't show | ✅ A6 fixed / ✗ **A14** (hint text) |  |
+| 2.7 | Mate connector hover on the plate top | orange outline + white inference dots on that face ✅; **extra white dots on other parts** (bracket edges, shaft bottom) | ✅ (GUI :103 skasm 10-27: orange outline on the hovered face, small triad + ring at the nearest inference point, no dots on other parts); was ✗ A5 (partly fixed) | 77870dd4 10-28 |
+| 3.1 / 3.4 / 3.6 | Replicate / Linear / Circular pattern dialogs | standard feature dialogs with live's fields (dom/ui2-asm-*) ✅; Replicate adds red hints "Select the instances to pattern (seed)" / "Select the geometry to find match in" that live doesn't show | ✅ A6 fixed / ✗ **A14** (hint text) | 77870dd4 10-28 |
 | 3.2 | Replicate Part 3 <1> (Cylindrical 1) in Part 1 | one copy in hole 1 → "Replicate 1 ▸ Part 3 <7>" ✅; the new mate "Cylindrical 2" goes to the top-level Mate features (live nests "Mate features (1)" under the Replicate row) | ✅ (T: assembly `replicate_on_matching_holes`, qa5 A12 assert); was ✅ A7 fixed / ✗ **A12** |  |
 | 3.4 | Linear pattern preview | grey preview copy | ✅ A8 fixed |  |
 | 3.5 | Direction = plate front edge | copy along the edge, 25 mm | ✅ A9 fixed |  |
@@ -133,19 +133,19 @@ Pass 6 (17:11) had found A12 fixed (mate nests under "Replicate 1 ▸ Mate featu
 |---|---|---|---|
 | A1 first insert fit | as tight as live (ins-902: live's block also runs under the right strip) | ✅ fit |  |
 | A15 (new) pending first instance look | face (229,163,54) with **black edges** vs live (242,182,72) with amber edges (255,192,76); **a transform triad at the instance** (live none); root row "Assembly 5" highlighted with the instance row (live only the instance row) | ✗ **A15** (skb / ui2) |  |
-| A3 hidden mate rows | light grey | ✅ **fixed** |  |
-| A13 relations | four toolbar buttons; Gear → "Gear 1" dialog: type select, Mate(s), Relation ratio 1, ☐ Reverse direction | ✅ **fixed** |  |
+| A3 hidden mate rows | light grey | ✅ **fixed** | 77870dd4 10-28 |
+| A13 relations | four toolbar buttons; Gear → "Gear 1" dialog: type select, Mate(s), Relation ratio 1, ☐ Reverse direction | ✅ **fixed** | 77870dd4 10-28 |
 | A11 typing into a BOM cell | "QA1" kept | ✅ **fixed** (Ctrl+Z doesn't revert the BOM edit; live ?) |  |
 | A14 Replicate red hints | none | ✅ **fixed** |  |
 | A16 (new) | "solving…" label at the top right for as long as the Replicate dialog is open (nothing selected); gone on cancel | ? A16 (live request filed) |  |
 | A4 Slider flip | block still inside the plate (Front view) | ✗ still |  |
-| A5 mate connector hover | dots only on the hovered face, small triad + ring | ✅ **fixed** |  |
+| A5 mate connector hover | dots only on the hovered face, small triad + ring | ✅ **fixed** | 77870dd4 10-28 |
 
 ## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
 Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an empty Replicate; BOM edits are not on the undo stack.
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| A15 selected instance | (242,182,73) top, amber edges, only the instance row highlighted | ✅ **fixed** |  |
+| A15 selected instance | (242,182,73) top, amber edges, only the instance row highlighted | ❌ (ASM-SELECTED-EDGES-DARK) **fixed** | 77870dd4 10-28 (faces amber ✅, interior edges near-black) |
 | A16 "solving…" label | gone | ✅ **fixed** |  |
 | A19 (new) empty Replicate | title red ✅; **no pending red "Replicate N" row with error badge in the list, no badge on the root row, no red border on "Parts to find match in"** (live has all three) | ✗ **A19** (skb) |  |
 | A11 BOM edit + Ctrl+Z | not undone | ✅ (= live) |  |
@@ -169,11 +169,11 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 | A1 fit | F fits all three instances; the far block runs under the right strip as in live ins-902 | ✅ |  |
 | A10 toolbar tooltip after click | gone once the dialog opens (b01) | ✅ **fixed** |  |
 | A11 BOM typing into a selected cell | "QA1" stored, Enter moves down (b05) | ✅ **fixed** |  |
-| A13 relations | tool search "relation": Gear relation, Screw relation, Linear relation, Rack and pinion relation (b10) | ✅ **fixed** |  |
-| A6 pattern dialogs | "Linear pattern 1" feature dialog (✓ ✕, red title, pending red row with badge): Instances, Direction (+ clock), Distance 25 mm, Instance count 2 (+ flip), ☐ Equal spacing, ☐ Centered, ☐ Second direction (b11) | ✅ **fixed** |  |
+| A13 relations | tool search "relation": Gear relation, Screw relation, Linear relation, Rack and pinion relation (b10) | ✅ **fixed** | 77870dd4 10-28 |
+| A6 pattern dialogs | "Linear pattern 1" feature dialog (✓ ✕, red title, pending red row with badge): Instances, Direction (+ clock), Distance 25 mm, Instance count 2 (+ flip), ☐ Equal spacing, ☐ Centered, ☐ Second direction (b11) | ✅ **fixed** | 77870dd4 10-28 |
 | A8 pattern preview | grey preview copy while editing (b14) | ✅ **fixed** |  |
 | A9 direction from an edge | the copy moves along the picked edge (implicit "Mate connector of Part 1 <1>" on the edge), not the face normal; it goes toward −X (b14) | ✅ direction / ? sign |  |
-| A5 MC inference | hovering the hole rim: rim highlighted, connector at the hole centre, no dots on other parts (b16) | ✅ **fixed** |  |
+| A5 MC inference | hovering the hole rim: rim highlighted, connector at the hole centre, no dots on other parts (b16) | ✅ **fixed** | 77870dd4 10-28 |
 | DOC5 new Assembly tab position | + › Create Assembly with Part Studio 1 active → "Assembly 2" right after Part Studio 1, stays there after tab switches (t01) | ✅ **fixed** |  |
 | A15 / A18 | fixed in pass 8 (rows in workflow-configured-assembly.md are stale) | ✅ |  |
 
@@ -190,8 +190,8 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 | SV1 Section view… from a face's menu | "Section plane 1 (Top)" parallel to the face, manipulator at its centroid | was an empty "Section planes" (the hover is gone by the menu click); now the selected face seeds it (mates/sv06) | ✅ **fixed** |  |
 | SV2 section base drag snapping (behaviours "skb (10-24) section base snap + move to origin" (1)) | vertex ≤ 22 px; a face bounded by one circle → its centre; an edge of the face under the pointer ≤ 35 px → nearest point (edge orange, connector triad + pale disc); on the face → the face point; off the parts → free; on release the plane moves through the snapped point | same (`section_base_snap`, CPU ray pick + B-rep edge→face adjacency): back edge in-plane keeps z 5 (sv07/08); bottom front edge (z 0) moves the cut to z 0 on release (sv12/13) | ✅ |  |
 | SV3 cut exactly on a part's face | the cap is drawn hatched at the base (skb-sv/bottom-edge-released) | nothing drawn for the coplanar cut (renderer capping, not skb) | ✗ (renderer) |  |
-| HV1 face hover (no tool) | the face's boundary edges orange, no fill (behaviours "Assembly selection model" (1)) | was nothing (edges did highlight; same on main 538981d5); now the boundary is outlined (mates/hv-fix) | ✅ **fixed** |  |
-| RM1 right-click an unselected instance | the instance menu (no Clear selection when nothing is selected), e.g. Section view… cutting parallel to the right-clicked face (live skb-move-origin-menu-graphics.png) | was the general (empty-space) menu; now the instance menu, Section view… from it uses that face (mates/rm01, rm02) | ✅ **fixed** |  |
+| HV1 face hover (no tool) | the face's boundary edges orange, no fill (behaviours "Assembly selection model" (1)) | was nothing (edges did highlight; same on main 538981d5); now the boundary is outlined (mates/hv-fix) | ✅ **fixed** | 77870dd4 10-28 |
+| RM1 right-click an unselected instance | the instance menu (no Clear selection when nothing is selected), e.g. Section view… cutting parallel to the right-clicked face (live skb-move-origin-menu-graphics.png) | was the general (empty-space) menu; now the instance menu, Section view… from it uses that face (mates/rm01, rm02) | ✅ **fixed** | 77870dd4 10-28 |
 | DR1 DRAG-RUNAWAY (qa4 round 5 v3 s10; live: only the dragged cube moves, ≈21 ms a step) | dragging the top cube of a 10/19-cube Planar stack moves only that cube | was: the column leant, and at 19 cubes the others flew ±2.5 million mm. Now least change: the dragged instance alone is solved unless moving the rest of its group gets the drag closer (a one-step check with the mates rigid), and undragged free bodies get a stay term when the whole group must move. qa4's v3s10n.py NCUBES=19 in the app: a 150 px drag moves only Part 2 <19> (70 mm), the 18 others unchanged; solve 3 ms/step (p50, app log). Tests: `planar_stack_drag_moves_only_the_dragged_cube`, `coupled_drag_leaves_free_bodies_put`; perf `drag_speed` (`--ignored`): 19 cubes 2.2 ms, 20-link chain 18 ms | ✅ **fixed** |  |
 | CX1 CHIP-X-SELECTED (qa4) | a pattern dialog chip's × removes the instance while it's selected | the field re-took it from the selection; now × also deselects it (perf/cx02, cx03) | ✅ **fixed** |  |
 
