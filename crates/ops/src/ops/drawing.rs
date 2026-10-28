@@ -322,8 +322,11 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             // What the view shows: a base view's orientation, a projected
             // view's side of its parent.
             match &v.kind {
-                ViewKind::Base { orientation, .. } => {
+                ViewKind::Base { orientation, config, .. } => {
                     j["orientation"] = json!(ORIENTATIONS.iter().find(|o| o.1 == *orientation).map(|o| o.0));
+                    if !config.is_empty() {
+                        j["configuration"] = json!(config.0);
+                    }
                     // The Insert view panel's choices, when not the defaults.
                     if let Some(n) = &v.named_view {
                         j["named_view"] = json!(n);

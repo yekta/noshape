@@ -441,6 +441,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Reorder inspection items", Op("drawing_inspection")),
     ("drawing:Replace", Op("drawing_replace")),
     ("drawing:Replace...", Op("drawing_replace")),
+    ("drawing:Change configuration...", Op("drawing_change_configuration")),
     ("drawing:Replicate annotations\\tbeta", Op("drawing_replicate")),
     ("drawing:Reset ordinate", Op("drawing_annotation_edit")),
     ("drawing:Resize...", Op("drawing_table_edit")),

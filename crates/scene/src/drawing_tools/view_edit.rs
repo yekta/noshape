@@ -141,6 +141,25 @@ pub fn replace_reference(d: &mut Drawing, old: noshape_model::document::TabId, o
     }
 }
 
+/// Reference › Change configuration… (sheets panel): on every sheet, the
+/// base views of `tab` showing `part` show configuration `config`, with
+/// the views derived from them (one drawing edit "Change configuration";
+/// live behaviours S6: every view of the reference changes, from either
+/// tab of the panel). Returns how many base views changed.
+pub fn change_configuration(d: &mut Drawing, tab: noshape_model::document::TabId, part: &Option<noshape_model::BodyId>, config: &noshape_model::configuration::ConfigValues) -> usize {
+    let mut n = 0;
+    for v in d.sheets.iter_mut().flat_map(|s| s.views.iter_mut()) {
+        if let ViewKind::Base { source, part: p, config: c, .. } = &mut v.kind
+            && *source == tab
+            && p == part
+        {
+            *c = config.clone();
+            n += 1;
+        }
+    }
+    n
+}
+
 /// BOM table › Replace: every base view of `old` on the sheet shows `new`
 /// (one sheet edit "Replace").
 pub fn replace_sheet_source(s: &mut Sheet, old: noshape_model::document::TabId, new: noshape_model::document::TabId) {

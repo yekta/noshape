@@ -4266,6 +4266,18 @@ fn drawing_replicate_copy_paste_replace_and_navigation() {
         assert!(format!("{e:?}").contains(m), "{e:?}");
     }
 
+    // Change configuration… on the reference: every base view of it (live S6).
+    call(&mut ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "list", "name": "Size" }));
+    let large = call(&mut ctx, "config_add_option", json!({ "tab": "Part Studio 1", "input": "Size", "name": "Large" }))["option"].clone();
+    call(&mut ctx, "drawing_change_configuration", json!({ "drawing": tab, "view": second, "configuration": { "Size": "Large" } }));
+    assert!(last(&mut ctx).ends_with(":: Change configuration"));
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let bases: Vec<&Value> = g["views"].as_array().unwrap().iter().filter(|v| v["kind"] == "base").collect();
+    assert!(bases.len() >= 3, "{g}");
+    for v in bases {
+        assert_eq!(v["configuration"].as_object().map(|o| o.values().cloned().collect::<Vec<_>>()), Some(vec![large.clone()]), "{v}");
+    }
+
     // Paste as table, then Table properties… (fixed corner, kept in place).
     let pt = call(&mut ctx, "drawing_paste_table", json!({ "drawing": tab, "text": "Item\tQty\nBolt\t4", "position": [20, 280] }));
     assert!(last(&mut ctx).ends_with(":: Paste as table"));

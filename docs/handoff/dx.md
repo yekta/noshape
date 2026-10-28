@@ -123,8 +123,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   `overridden_text`; drawing_edit_dimension `value`), landed 2e44d382.
 - V53: views copied in another document / workspace are refused with live's bubble (stays until ×); EX11's start
   banner closes after 2.5 s; the bell for the finish notification is asked of the lead.
-- Next, in order: S6 (Sheets panel reference / view menus, Change configuration panel on the reference row, every
-  view of that reference changes); S8 sheet row drag; A35; TABLE-SHIFT-TAB-BLANK; V59 / V26; ⏳ rows on green.
+- S6: Sheets panel › reference › Change configuration... (live's panel; every view of the reference; the API's
+  drawing_change_configuration), checked on :131.
+- Next, in order: S8 sheet row drag; A35; TABLE-SHIFT-TAB-BLANK; V59 / V26; ⏳ rows on green.
 
 ## Afternoon 10-28 (landed through 3476703d)
 - Parasolid: 30.1–31.1 ASSEMBLY layouts from live's samples (all 13 versions read); exports carry part names / colours

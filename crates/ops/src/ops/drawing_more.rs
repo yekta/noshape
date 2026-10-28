@@ -88,6 +88,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "change_configuration",
+            summary: "Show another configuration in every view of a view's reference",
+            description: "Sheets panel › reference › Change configuration... (Onshape): every base view of `view`'s reference (its Part Studio and part), on every sheet, shows `configuration`, with the views derived from them. Inputs not given keep the reference's current values. One edit \"Change configuration\".",
+            fields: with(common(), vec![req("view", json!({ "type": "integer" }), "A view of the reference."), req("configuration", json!({ "type": "object" }), "{input id or name: value} (list option id or name, true/false, an expression).")]),
+            mutates: true,
+            destructive: false,
+            run: change_configuration,
+        },
+        Op {
+            group: "drawing",
             verb: "paste_table",
             summary: "Paste spreadsheet cells as a new table",
             description: "Paste as table: spreadsheet text (rows of tab-separated cells, as a spreadsheet copies them) becomes a general table with its top-left corner at `position` (sheet mm); one edit \"Paste as table\". Returns the table id.",
@@ -296,6 +306,23 @@ fn paste(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 // ------------------------------------------------------------ replace / replicate
+
+fn change_configuration(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let sheet = t.sheet;
+    let v = view_arg(&t, a, "view")?;
+    let (key, part) = noshape_model::drawing::views::view_source(&t.d.sheets[sheet], v).ok_or_else(|| OpError::param("view", "the view shows no model"))?;
+    if !matches!(od.doc().tab(key.tab).map(|x| &x.content), Some(noshape_model::document::TabContent::PartStudio(ps)) if !ps.configuration.inputs.is_empty()) {
+        return Err(OpError::param("view", "its reference has no configuration inputs"));
+    }
+    let mut config = key.config.clone();
+    config.0.extend(super::source_config_arg(od, key.tab, a)?.0);
+    ve::change_configuration(&mut t.d, key.tab, &part, &config);
+    let tab = t.tab;
+    commit(od, tab, sheet, t.d, "Change configuration")?;
+    Ok(reply(od, tab, sheet, false)?.into())
+}
 
 fn replace(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;

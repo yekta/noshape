@@ -287,6 +287,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("drawing_table_properties", &[r##"{"drawing": "Assembly 1 Drawing 1", "table": 1, "structured": true, "corner": "top_left"}"##, r##"{"drawing": "Part 1 Drawing 1", "table": 2, "visible_rows": 8, "newest_top": true}"##]),
     ("drawing_copy", &[r##"{"drawing": "Part 1 Drawing 1", "views": [2]}"##, r##"{"drawing": "Part 1 Drawing 1", "annotations": [3, 4]}"##]),
     ("drawing_paste", &[r##"{"drawing": "Part 1 Drawing 1", "position": [300, 150]}"##, r##"{"drawing": "Part 1 Drawing 1", "sheet": 2, "position": [200, 150]}"##]),
+    ("drawing_change_configuration", &[r##"{"drawing": "Part 1 Drawing 1", "view": 1, "configuration": {"Size": "Large"}}"##]),
     ("drawing_paste_table", &[r##"{"drawing": "Part 1 Drawing 1", "text": "Item\tQty\nBolt\t4", "position": [20, 280]}"##]),
     ("drawing_replace", &[r##"{"drawing": "Part 1 Drawing 1", "view": 1, "source": "Part Studio 2"}"##, r##"{"drawing": "Assembly 1 Drawing 1", "table": 1, "source": "Assembly 2"}"##]),
     ("drawing_replicate", &[r##"{"drawing": "Part 1 Drawing 1", "from": 1, "to": 5}"##, r##"{"drawing": "Part 1 Drawing 1", "from": 1, "region": [[180, 150], [230, 190]], "to": 5, "at": [320, 170]}"##]),

@@ -283,8 +283,9 @@ impl DrawingEditor {
     }
 
     /// The reference row's menu (live dom/context-menus-drawing-sheets.txt):
-    /// Switch to reference | Replace... (on every sheet; the chooser), then
-    /// Pin view reference ▸ versions, or Unpin.
+    /// Switch to reference | Replace... (on every sheet; the chooser) |
+    /// Change configuration... (configured sources), then Pin view
+    /// reference ▸ versions, or Unpin.
     fn reference_menu(&self, tab: TabId, part: Option<noshape_model::BodyId>, pinned: bool, cx: &App) -> Vec<MenuEntry> {
         let replaced = part.clone();
         let assembly = matches!(self.doc.read(cx).session.doc.tab(tab).map(|t| &t.content), Some(noshape_model::document::TabContent::Assembly(_)));
@@ -299,6 +300,11 @@ impl DrawingEditor {
                 cx.notify();
             }),
         ];
+        // Live S6: on a configured source's reference row (not on view rows).
+        if self.reference_configurable(tab, cx) {
+            let part = part.clone();
+            out.push(MenuEntry::item("Change configuration...", move |t, w, cx| t.open_change_config(tab, part.clone(), w, cx)));
+        }
         if pinned {
             out.push(MenuEntry::item("Unpin view reference", move |t, _, cx| t.pin_reference(tab, part.clone(), None, cx)));
         } else {

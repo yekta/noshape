@@ -11,6 +11,7 @@ pub mod drawing_break;
 pub mod drawing_callout;
 pub mod drawing_cell_panel;
 pub mod drawing_cells;
+pub mod drawing_config;
 pub mod drawing_hole_table;
 pub mod drawing_centermark;
 pub mod drawing_chooser;

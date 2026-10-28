@@ -315,6 +315,8 @@ pub struct DrawingEditor {
     pub table_dlg: Option<crate::drawing_table_dlg::TableDlg>,
     /// The Hole table dialog (with the Hole table tool).
     pub hole_dlg: Option<crate::drawing_hole_table::HoleTableDlg>,
+    /// Sheets panel › reference › Change configuration... (S6).
+    pub change_config: Option<crate::drawing_config::ChangeConfigDlg>,
     /// Geometric tolerance dialog (drawing_gdt.rs).
     pub gdt_dlg: Option<crate::drawing_gdt::GdtDlg>,
     /// Custom tables: the dialog and the evaluated tables.
@@ -560,6 +562,7 @@ impl DrawingEditor {
             stack_dlg: None,
             table_dlg: None,
             hole_dlg: None,
+            change_config: None,
             gdt_dlg: None,
             custom_tables: Default::default(),
             woken_centers: Vec::new(),
@@ -1567,6 +1570,7 @@ impl DrawingEditor {
             .children(self.render_stack_dlg(cx))
             .children(self.render_table_dlg(cx))
             .children(self.render_hole_table_dlg(cx))
+            .children(self.render_change_config(cx))
             .children(self.render_custom_dlg(cx))
             .children(self.render_move_sheet(cx))
             .children(self.render_table_props(cx))
