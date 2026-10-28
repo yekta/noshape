@@ -150,7 +150,7 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 | A19 (new) empty Replicate | title red ✅; **no pending red "Replicate N" row with error badge in the list, no badge on the root row, no red border on "Parts to find match in"** (live has all three) | ✗ **A19** (skb) |  |
 | A11 BOM edit + Ctrl+Z | not undone | ✅ (= live) | 6acf6b94 (qa 10:33: Esc, Ctrl+Z over the view → undoes the last assembly edit (a drag), QA1 stays) |
 | A4 Slider flip | block still inside the plate | ✗ still |  |
-| A18 repeat insert, ✓ without entering graphics | (5.000025, 2.500025, 1.250025) | ✅ **fixed** (live exact 5 / 2.5 / 1.25) |  |
+| A18 repeat insert, ✓ without entering graphics | (5.000025, 2.500025, 1.250025) | ✅ **fixed** (live exact 5 / 2.5 / 1.25) | 78958d0f 10-28 (GUI Insert, Part 2 (10×10×30) twice, ✓ without entering the graphics → (1.25, 1.25, 3.75), (2.5, 2.5, 7.5) exactly: 1/8 steps with no 0.000025 drift) |
 
 ## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
 | Row | Ours | Status | Verified |
