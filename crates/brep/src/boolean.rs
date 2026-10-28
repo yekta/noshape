@@ -1334,6 +1334,30 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             }
         }
     }
+    // Curves added to one face that cross each other (edges of two arguments lying on a third's face): a
+    // vertex where they cross.
+    for f in 0..cx.faces.len() {
+        let segs = cx.face_segs[f].clone();
+        if segs.len() < 2 {
+            continue;
+        }
+        let c2: Vec<C2> = segs.iter().map(|s| cx.faces[f].curve2(cx.p(s.v[0]), cx.p(s.v[1]), &s.g, 0)).collect::<R<_>>()?;
+        for i in 0..segs.len() {
+            for j in i + 1..segs.len() {
+                for (t, u) in c2[i].intersections(&c2[j], tol) {
+                    let (li, lj) = (cx.seg_length(&segs[i]), cx.seg_length(&segs[j]));
+                    if t * li > tol && (1.0 - t) * li > tol && u * lj > tol && (1.0 - u) * lj > tol {
+                        let n = cx.pool.p.len();
+                        cx.pool.add(cx.seg_at(&segs[i], t))?;
+                        // (With a vertex of three arguments or more about, OCCT's choices differ: not done.)
+                        if cx.pool.p.len() > n && cx.pool.inputs.iter().any(|ins| ins.len() >= 3) {
+                            return Err(Decline("edges of two arguments crossing on a third's face"));
+                        }
+                    }
+                }
+            }
+        }
+    }
     // Split edges.
     let mut by_x: Vec<(f64, u32)> = cx.pool.p.iter().enumerate().map(|(i, p)| (p.x, i as u32)).collect();
     by_x.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -1862,8 +1886,19 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             }
         }
     }
+    // (A face made only a vertex where one input edge pierces it: where two edges cross, the edges made it;
+    // where faces alone meet, no one.)
+    let mut in_edges = vec![0u8; cx.pool.p.len()];
+    for inner in &edge_inner {
+        for &w in inner {
+            in_edges[w as usize] = in_edges[w as usize].saturating_add(1);
+        }
+    }
     for (f, inner) in face_inner.iter().enumerate() {
         for &w in inner {
+            if in_edges[w as usize] != 1 {
+                continue;
+            }
             if let (true, Some(&o)) = (cx.pool.inputs[w as usize].is_empty(), vmap.get(&w)) {
                 h.push(rec(Kind::Face, cx.faces[f].arg, cx.faces[f].index, Relation::Generated, Kind::Vertex, o));
             }

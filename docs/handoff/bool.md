@@ -38,6 +38,15 @@ have; a kept edge without one there declines), only edges the Boolean made get c
 small case at 8 and 16 threads on the same input shapes: 0 failures in 200 runs (100 pinned to 8 cores); back in
 T1. Corpus unchanged: 378 of 973 taken, 0 differ.
 
+## A fresh corpus (10-28 22:30)
+/root/bool-scratch/corpus2: 692 Booleans recorded under OCCT from today's model and kernel tests (incl. Shell's).
+It found curves added to one face crossing without a vertex (two slabs' edges on a third's face: "no point inside
+a face piece"); now a vertex goes where two such curves cross, and a face is said to generate a vertex only where
+one input edge pierces it (two crossing edges made it; faces alone meeting: no one, as OCCT). Where that crossing
+meets a vertex of three arguments OCCT's choices differ: declined. Now: main corpus 377 of 972, fresh corpus 369
+of 692, Shell's direct ones (/root/bool-scratch/direct-corpus) 28 of 85 (was 13): all 0 differ. 5c40b573 (a
+centroid on a .5 µm rounding boundary) is in the main corpus's `unstable` list.
+
 ## T2 with it on vs off (10-28 20:20, kernel + model T2)
 Three differed: core's `bool_replay::bool_corpus_replay` (7 cases whose 1 µm-rounded centroid / edge midpoint sat
 on a .5 boundary: a piece now keeps its edge's own parameters at the edge's ends, which fixes 6; one face centroid

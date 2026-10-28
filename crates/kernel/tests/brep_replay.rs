@@ -143,6 +143,13 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
                     }
                 }
             }
+            if let (Ok(at), Ok(o)) = (std::env::var("NOSHAPE_BREP_AT"), &o) {
+                for (who, x) in [("rust", records(&r)), ("occt", records(o))] {
+                    for rec in x.iter().filter(|x| format!("{:?}", x.1) == at) {
+                        line += &format!("\n    {who} at: {} {:?}", rec.0, rec.1);
+                    }
+                }
+            }
             if diff && let Ok(o) = &o {
                 let (mine, theirs) = (records(&r), records(o));
                 for x in mine.iter().filter(|x| !theirs.contains(x)) {

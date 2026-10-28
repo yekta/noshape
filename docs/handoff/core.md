@@ -407,6 +407,8 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   call; recorded with NOSHAPE_RECORD_BOOLEANS (path `direct` / `direct_rust`). features.cpp: Thicken's cut and
   Shell's offset cut too (10-28 20:00). The fillet / chamfer fallbacks' cuts (balls, wedges, chamfer planes) are
   left as they are: their tools are cylinders at angles the Rust Boolean declines anyway.
+- Corpus: I added 5c40b5731295e50a to /root/core-scratch/bool-corpus/unstable (with the Rust Boolean one face's
+  centroid lands on the other side of a 0.5 Âµm rounding boundary; all else equal).
 - Found while testing (OCCT, not ours, affects `RayClassifier`): BRepClass_FaceClassifier's answer for a point
   0.04 mm from an 800-edge comb face's boundary depended on which edge the face's wire starts with (the fin plate's
   y=20 face after a unify; `classify_point` gave Outside for a point inside). Results of the Rust Boolean now start
