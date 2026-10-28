@@ -170,7 +170,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | F7 | Double-click edits | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | F8 | Error rows red with indicator | E§6.4 | ✅ | |  |
 | F9 | Suppressed / inactive rows grey, struck through | E§6.4 | ✅ | | 0.4.10+ / acd6acce 10-27 (wa2: Assembly 2) |
-| F10 | Mate folders (Add selection to folder, folder menu) | E§5.6 | ✅ | |  |
+| F10 | Mate folders (Add selection to folder, folder menu) | E§5.6 | ✅ | | 0.4.10+ / 1b81b7ca 10-28 (Revolute 1 › Add selection to folder… › Enter → "New folder (1)" under Mate features) |
 | F11 | Drag to reorder | H:mates | ✅ | drop a mate (connector, relation, group) row on another of the same kind; model test `reorder_mate_features` |  |
 | F12 | Selecting a glyph in the graphics selects the mate | E§6.4 | ✅ | mate indicators are pickable: click selects the mate, right-click opens its menu; blue OK / red error / grey inactive | 0.4.10+ / 52ca0b97 10-28 (click on the glyph selects the Revolute 1 row) |
 
