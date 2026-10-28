@@ -179,12 +179,12 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-N00. **Check perf bisect first** (10-28 06:12): v0.4.12's perf run 40640263048 has the NIST 1× texture orbit / pan / zoom
-     at 18–19 fps on both macOS runners (31 before; the first orbit, the reliable one, too; 2× frame-driven unchanged at
-     67–75). Dispatched bench-only runs: 40642410950 = bf131a31~1 (3523b8f2) and 40643178645 = bf131a31 (re-dispatched with the full SHA; the part hover
-     outline). If bf131a31 is the step: its `hover_band` also fires for any hovered face's outlined boundary (OUTLINE on
-     edges), not only a whole hovered part, and stores the MSAA depth; narrow it. If both are slow, bisect further between
-     27e0f950 (31 fps, run 40590825262) and bf131a31~1.
+N00. **Perf bisect of v0.4.12's 1× texture orbit / zoom drop (31 → 18 fps, run 40640263048)**: bf131a31~1 (40642410950)
+     and bf131a31 (40643178645) both read orbit 30–32 / zoom 31–32 on both macOS runners, so bf131a31 is not it. Pan is
+     ~18 in both: an older, separate drop (27e0f950 had 31). Running (07:08): 40648174571 = 1b81b7ca (v0.4.12's code
+     from source: does the drop reproduce outside the release binary?) and 40648183752 = e3fd499b~1. Then bisect the
+     commits between; render-side candidates: e3fd499b (pick_solid, Part Studio only), 52ca0b97 (hover shader). Also
+     landed cef2a10a: the hover band only for a whole hovered part (it ran on every face hover).
 N01. 10-28 06:00–06:30 landed: a237ae16 count fields two-step Enter (live), c8239e05 folder Roll to here / Roll to end
      and the nested rollback bar, 469aa3c6 parts list properties (7.7), blamed number fields (live "failing parameter
      marked red"). Residuals: a folder rolled to its top draws the bar above it; the guide's end tick; the parts-list
