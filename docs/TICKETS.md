@@ -24,7 +24,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - SHELL-SLOW (core): wf-block top-face Shell 2.6 s (2.5 mm) / 1.7 s (1.5 mm) in the app on 7929b13a; live well under 1 s.
   - BOOL-THREAD-CRASH (core): the OCCT race stays; booleans run serial since v0.4.10, no crash in today's fuzz.
 - P1/P2 found today (not blockers): HOLE-TABLE-MENU, DIM-PALETTE-DROPDOWN-COLLAPSE, CALLOUT-ON-DIMENSION, ASM-MENU-WRAP, TABLE-SHIFT-TAB-BLANK,
-  NOTE-PANEL-UNDER-PROPS, ASM-MATE-MENU-SEPARATORS, MASS-MC-FIELD (regression; fixed d2357ee5 era); SKETCH-FILLET-STUCK-RADIUS (b) and SKETCH-FILLET-EQUAL fixed and verified on d2357ee5 (06:44).
+  NOTE-PANEL-UNDER-PROPS, ASM-MATE-MENU-SEPARATORS, MASS-MC-FIELD (regression; verified fixed on c56b5367); SKETCH-FILLET-STUCK-RADIUS (b) and SKETCH-FILLET-EQUAL fixed and verified on d2357ee5 (06:44).
 
 ## Earlier: release blockers for the 2026-10-28 05:00 release (qa, 2026-10-27 20:43)
 - [x] verified c5e53806 (qa 00:12: Shift+F, box over the part → app alive, 6 edges in the field; tickets/box-dialog-fixed-c5e5.png) (psui 10-27 22:40: fixed, the dialog read before its update; T1 test box_select_with_a_dialog_open) P0 BOX-DIALOG-PANIC (psui, regression of df28c320, in greens dd1b5037, daf1f50c, c9c66d1c, acd6acce and d2826142 (re-checked 21:55)): any box selection with a feature dialog open crashes the app. See the psui ticket below. Not in v0.4.11.
