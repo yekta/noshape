@@ -92,8 +92,8 @@ rebuilt exactly to live's spec in /tmp/qa5/home/Documents/noshape/qa5-livecheck.
 | 4.6 | Rib defaults | 2.5 mm, Parallel to sketch plane, Merge ribs ☑; Parts auto-fills "Part 1" | same (UI pass 2) | ✅ | f9185639 10-28 (dialog fields) |
 | 4.8 | Rib 4 mm, line (5,25)–(25,5) | **10550.0000, 11 planar faces** | **10550.0, 11 faces** (CLI) | ✅ |  |
 | 4.2b | Helix Ø20×30 default | 253.1115 mm | 253.1116 (analytic 253.11157) | ✅ | b504234e 10-28 (GUI: Helix on Ø20×30 side face, edge Length 253.112 mm) |
-| 4.9 | Wrap 10×5 rectangle onto Ø20 | Surface tab default; sheet, 1 cylinder face 50.0000 mm² | Surface default; Surface 1, 1 cylinder face 50.0 | ✅ |  |
-| 3.6b | Hole types, block 40×20×10, point (20,10), Inch | Cbore 7448.9548 (9 f) / Simple 7683.3078 (7) / Csink 7643.7210 (8) | **7448.9548 (9) / 7683.3078 (7) / 7643.7210 (8)** | ✅ |  |
+| 4.9 | Wrap 10×5 rectangle onto Ø20 | Surface tab default; sheet, 1 cylinder face 50.0000 mm² | Surface default; Surface 1, 1 cylinder face 50.0 | ✅ | b504234e 10-28 (GUI: Surface tab default, 10×5 on Front+10 onto Ø20 side face → Surfaces (1) Surface 1, Face Mass props 50 mm², perimeter 30 mm) |
+| 3.6b | Hole types, block 40×20×10, point (20,10), Inch | Cbore 7448.9548 (9 f) / Simple 7683.3078 (7) / Csink 7643.7210 (8) | **7448.9548 (9) / 7683.3078 (7) / 7643.7210 (8)** | ✅ | b504234e 10-28 (GUI, Inch tabs on the (20,10) vertex, Mass props: Simple 7683.308 / Cbore 7448.955 / Csink 7643.721) |
 | 3.6c | Hole dialog title | the live callout ("Ø 6.35 mm ↧ 12 mm \| ⌴Ø 10 mm ↧ 5 mm") | callout title + the feature row also named by callout ("1/4-20 ↧ 12 mm \| ⌵Ø 12…") | ? (row name: verify live) |  |
 | 6 | Boolean intersect two blocks | Part 1, 4000.0000 | Part 1, 4000.0 | ✅ | b504234e 10-28 (GUI: Intersect tab, 40×20×10 ∩ offset 40×20×10 → Parts (1) Part 1, Mass props 4000 mm³) |
 | 3.10b | Feature mirror of a 10×10×5 boss about Right+20 | no New/Add tabs; 9000.0000, 16 planar faces | 9000.0, 16 faces (CLI) | ❌ (FEATURE-MIRROR-COPY-FULL-DEPTH) | b504234e 10-28: ✗ GUI Feature mirror (Reapply off) 9500 / 15 faces, copy spans the part's full y |
