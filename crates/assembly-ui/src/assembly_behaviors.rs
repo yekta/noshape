@@ -2575,14 +2575,15 @@ pub(super) fn onshape_mate_values(a: &noshape_model::assembly::solver::Frame, b:
 
 /// Our solver values (`solver::mate_values`: the second connector in the
 /// first's frame) that put Onshape's value `ix` at `v`, the other shown
-/// values unchanged. Rotation: ours turns the other way; translations: the
-/// first connector's offset in the second's frame, expressed back in the
-/// first's (negated).
+/// values unchanged. Rotation: the solver's value is the one shown;
+/// translations: the first connector's offset in the second's frame,
+/// expressed back in the first's (negated).
 pub(super) fn solver_values_for(a: &noshape_model::assembly::solver::Frame, b: &noshape_model::assembly::solver::Frame, ours: [f64; 4], ix: usize, v: f64) -> [f64; 4] {
     let mut on = onshape_mate_values(a, b);
     let mut out = ours;
+    // The rotation shown is the solver's own value (live's rotationZ).
     if ix == 0 {
-        out[0] = ours[0] - (v - on[0]);
+        out[0] = v;
         return out;
     }
     on[ix] = v;
@@ -3628,15 +3629,26 @@ impl AssemblyView {
                         r
                     }
                 };
-                let sweep = mate_angle_sweep(on[0]);
+                // The value is live's rotationZ, our solver's (oracle_asm R2:
+                // +45 with the pin turned -45° about the plate's Z; the limits
+                // bound it); `on[0]`, the angle from the second connector's X
+                // to the first's, reads the other way for connectors aligned
+                // as usual (MATE-LIMITS-OPPOSITE-SIGN: the label read 270° at
+                // a 0–90 limit's 90).
+                let sweep = mate_angle_sweep(ms.values[0]);
                 let text = if preview { format!("{}°", noshape_units::to_fixed(sweep.to_degrees(), 0)) } else { format!("{}°", mate_angle_label(sweep.to_degrees())) };
-                let frame = noshape_model::assembly::solver::Frame { origin: a.origin, rotation: b.rotation };
+                // The arc still runs from the one X axis to the other: drawn
+                // clockwise (its frame mirrored) when the value turns that way.
+                let close = |x: f64, y: f64| (x - y).rem_euclid(std::f64::consts::TAU).min((y - x).rem_euclid(std::f64::consts::TAU)) < 1e-6;
+                let cw = close(on[0], -ms.values[0]) && !close(on[0], ms.values[0]);
+                let rot = if cw { b.rotation * glam::DQuat::from_rotation_x(std::f64::consts::PI) } else { b.rotation };
+                let frame = noshape_model::assembly::solver::Frame { origin: a.origin, rotation: rot };
                 let mid = sweep * 0.5;
                 // Live (qa5 MT7): at 0° the label sits at the X axis's end.
                 let center = if sweep < 1e-9 {
                     a.origin + bx * (self.triad_size() + width(&text) * 0.5 + pad)
                 } else {
-                    a.origin + b.rotation * DVec3::new(mid.cos() * radius, mid.sin() * radius, 0.0)
+                    a.origin + rot * DVec3::new(mid.cos() * radius, mid.sin() * radius, 0.0)
                 };
                 let (x, y) = readable(center, bx, by);
                 let (hw, hh) = (width(&text) * 0.5 + pad, asc * 0.65 + pad);
@@ -3792,8 +3804,8 @@ impl AssemblyView {
 
     fn start_value_edit(&mut self, id: MateId, ix: usize, window: &mut Window, cx: &mut Context<Self>) {
         let units = self.units(cx);
-        let v = self.result.mates.iter().find(|m| m.id == id).and_then(|m| Some(onshape_mate_values(&m.frame_a?, &m.frame_b?)[ix])).unwrap_or(0.0);
-        let v = if ix == 0 { v.rem_euclid(std::f64::consts::TAU) } else { v };
+        // The rotation as shown: our solver's value (live's rotationZ), 0 not 360.
+        let v = self.result.mates.iter().find(|m| m.id == id).and_then(|m| Some(if ix == 0 { mate_angle_sweep(m.values[0]) } else { onshape_mate_values(&m.frame_a?, &m.frame_b?)[ix] })).unwrap_or(0.0);
         let q = if ix == 0 { noshape_units::Quantity::radians(v) } else { noshape_units::Quantity::meters(v) };
         let st = cx.new(|cx| InputState::new(window, cx).default_value(noshape_units::format_quantity(q, &units)));
         // Focus once the double-click is over (the viewport's mouse-up
@@ -3836,8 +3848,9 @@ impl AssemblyView {
                 return;
             }
         };
-        // The typed value is Onshape's (see `onshape_mate_values`); hold the
-        // matching solver values (all translations, so the others stay).
+        // The typed value is Onshape's: the rotation our solver's own, the
+        // translations `onshape_mate_values`'; hold the matching solver
+        // values (all translations, so the others stay).
         let Some(ms) = self.result.mates.iter().find(|m| m.id == id) else { return };
         let (Some(fa), Some(fb)) = (ms.frame_a, ms.frame_b) else { return };
         let target = solver_values_for(&fa, &fb, ms.values, ix, v);
@@ -4723,8 +4736,12 @@ mod value_tests {
         assert!((on[0] + ours[0]).abs() < 1e-12, "rotation reads the other way");
         for (ix, v) in [(0, 2.0_f64), (1, 0.02), (2, -0.015), (3, 0.05)] {
             let target = solver_values_for(&a, &b, ours, ix, v);
+            if ix == 0 {
+                assert_eq!(target[0], v, "the rotation shown is the solver's");
+                continue;
+            }
             let got = onshape_mate_values(&a, &second_from(&a, target));
-            let want_rot = if ix == 0 { v } else { on[0] };
+            let want_rot = on[0];
             assert!((got[0] - want_rot).rem_euclid(std::f64::consts::TAU).min((want_rot - got[0]).rem_euclid(std::f64::consts::TAU)) < 1e-9, "ix {ix}: rotation {} vs {}", got[0], want_rot);
             if ix != 0 {
                 for k in 1..4 {
