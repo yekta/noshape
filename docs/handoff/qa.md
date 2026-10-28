@@ -9,6 +9,11 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
+- **15:30 update (green 8627322e):** fuzz 74 (8627) alive. New: P3 HOVER-VERTEX-STAYS (a rim vertex's hover dot stays
+  after a jump out of the graphics; not a regression), P3 CURSOR-COUNT-UNDER-MENU (count cursor stays under an open
+  context menu). Verified: navigation 1.8 / 1.12 / 1.17 (pixel-measured), interaction 3.8, sketch 1.7a / 4.29 / 14.2 /
+  14.7 / 14.33 / alignment guide, part-studio 5.16 / 10.7a / 11.5, chrome-sweep SM4a–h, l (sheet metal table), p2-look
+  DL12, mates MT14 / MT15 (CLI), import matrix 0 errors over 143 samples (v0.4.12 CLI).
 - **15:07 update (greens f8014efa → 5f6a908b → 8627322e):** verified **P1 SKETCH-MODEL-EDGE-SELECT** (line + model
   edge both select, B → Parallel), CURVE-ROW-NO-HIGHLIGHT, PREFS-WHEEL-DOUBLE-SCROLL, 21eec57b (parts list properties
   saved with the studio, not undoable; folder menu state 4), drawing D39 (linear and diameter overrides), A44 (surface
