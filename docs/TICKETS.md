@@ -5,7 +5,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
-## Release blockers for the 2026-10-28 05:00 release (qa, 2026-10-27 20:43)
+## Release blockers for the 2026-10-28 05:00 release (qa, checked 04:17 UTC on green 1b81b7ca)
+- **No new P0 since v0.4.11; nothing found today blocks the 05:00 release.** Fuzz seeds 45–52 × 600 actions on greens 41f60e47, 7929b13a, da18f886, 1b81b7ca: no crash, no hang. The open
+  P0s below are all in v0.4.11 already (none is a regression of today's mains):
+  - FILLET-OVERSIZE-OK (core): an edge fillet too big for its faces reports Ok with a wrong solid (wf-block R25 on three
+    vertical edges, R50 on two; live fails "End boundary intersects unfilleted edge."). Re-checked on 1b81b7ca at 04:05.
+  - REGEN-SPEED / COMMIT-LATENCY (core / psui): live-30-features Extrude 1 edits commit in 301–785 ms (median 378 ms, load
+    ~30, 7929b13a; budget 200 ms), the 3rd Ctrl+Z 392 ms (budget 50 ms).
+  - SHELL-SLOW (core): wf-block top-face Shell 2.6 s (2.5 mm) / 1.7 s (1.5 mm) in the app on 7929b13a; live well under 1 s.
+  - BOOL-THREAD-CRASH (core): the OCCT race stays; booleans run serial since v0.4.10, no crash in today's fuzz.
+- P1/P2 found today (not blockers): HOLE-TABLE-MENU, DIM-PALETTE-DROPDOWN-COLLAPSE, ASM-MENU-WRAP, TABLE-SHIFT-TAB-BLANK,
+  NOTE-PANEL-UNDER-PROPS, ASM-MATE-MENU-SEPARATORS, MASS-MC-FIELD (regression); still open: SKETCH-FILLET-STUCK-RADIUS (b), SKETCH-FILLET-EQUAL.
+
+## Earlier: release blockers for the 2026-10-28 05:00 release (qa, 2026-10-27 20:43)
 - [x] verified c5e53806 (qa 00:12: Shift+F, box over the part → app alive, 6 edges in the field; tickets/box-dialog-fixed-c5e5.png) (psui 10-27 22:40: fixed, the dialog read before its update; T1 test box_select_with_a_dialog_open) P0 BOX-DIALOG-PANIC (psui, regression of df28c320, in greens dd1b5037, daf1f50c, c9c66d1c, acd6acce and d2826142 (re-checked 21:55)): any box selection with a feature dialog open crashes the app. See the psui ticket below. Not in v0.4.11.
 
 ## Release v0.4.9 (qa, 2026-10-27 02:55)
