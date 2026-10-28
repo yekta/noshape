@@ -80,6 +80,31 @@ mod expand_by_distance_tests {
     }
 }
 
+/// The part Ctrl+C copies when no feature is selected: the selected part,
+/// else the part of the first selected face, edge or vertex.
+pub(crate) fn part_to_copy(selection: &[Reference], body_of: impl Fn(&Reference) -> Option<BodyId>) -> Option<BodyId> {
+    selection.iter().find_map(|r| if let Reference::Body(b) = r { Some(b.clone()) } else { None }).or_else(|| selection.iter().find_map(body_of))
+}
+
+#[cfg(test)]
+mod part_to_copy_tests {
+    use super::*;
+    use noshape_model::reference::FeatureId;
+    use std::prelude::v1::test;
+
+    /// CTRL-C-PART: a part row's selection copies that part; a face copies its part; nothing else, nothing.
+    #[test]
+    fn ctrl_c_copies_the_selected_part() {
+        let part = BodyId { feature: FeatureId(7), index: 0 };
+        let p = part.clone();
+        let body_of = move |r: &Reference| matches!(r, Reference::Face(_)).then(|| p.clone());
+        assert_eq!(part_to_copy(&[Reference::Body(part.clone())], &body_of), Some(part.clone()));
+        let face = Reference::Face(noshape_model::reference::TopoName::face(FeatureId(7), noshape_model::reference::Role::New(0)));
+        assert_eq!(part_to_copy(&[Reference::Origin, face], &body_of), Some(part));
+        assert_eq!(part_to_copy(&[Reference::Origin], &body_of), None);
+    }
+}
+
 /// What the Dynamic suppression dialog sets: a feature's "Unsuppressed if"
 /// expression, or that of every feature in a folder.
 #[derive(Clone, Copy)]

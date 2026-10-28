@@ -5325,7 +5325,13 @@ impl Render for PartStudioView {
             }))
             .on_action(cx.listener(|this, _: &Copy, _, cx| {
                 if this.sketch.is_none() {
-                    this.copy_selected_features(cx);
+                    // Selected features, else the selected part (live: Ctrl+C
+                    // copies a part like its menu's "Copy Part 1", CTRL-C-PART).
+                    if !this.selected_features.is_empty() {
+                        this.copy_selected_features(cx);
+                    } else if let Some(b) = behaviors::part_to_copy(&this.selection, |r| this.body_of(r)) {
+                        this.copy_part(b, cx);
+                    }
                 }
             }))
             .on_action(cx.listener(|this, _: &Paste, window, cx| {

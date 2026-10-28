@@ -42,6 +42,67 @@ impl Default for CompletionMenuOptions {
     }
 }
 
+/// An inserted snippet's placeholders (byte ranges, in Tab order) and its end
+/// (`$0`, else the snippet's end), while Tab walks them (Ace's tabstops).
+#[derive(Debug, Clone)]
+pub(crate) struct SnippetSession {
+    pub(crate) stops: Vec<Range<usize>>,
+    pub(crate) end: usize,
+    pub(crate) current: usize,
+    /// The text's length when the current placeholder was selected: what
+    /// was typed since then went into it.
+    pub(crate) len: usize,
+}
+
+/// A snippet's text (`${1:default}`, `$1`, `$0`; `\\$`, `\\}`, `\\\\` escapes) as
+/// the plain text, the placeholders in their numbers' order and the end.
+pub(crate) fn parse_snippet(snippet: &str) -> (String, Vec<Range<usize>>, usize) {
+    let mut out = String::new();
+    let mut stops: Vec<(u32, Range<usize>)> = Vec::new();
+    let mut end = None;
+    let mut open: Vec<(u32, usize)> = Vec::new();
+    let mut chars = snippet.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' if matches!(chars.peek(), Some('$' | '}' | '\\')) => out.push(chars.next().unwrap_or(c)),
+            '$' if chars.peek() == Some(&'{') => {
+                chars.next();
+                let mut n = String::new();
+                while let Some(d) = chars.peek().filter(|d| d.is_ascii_digit()) {
+                    n.push(*d);
+                    chars.next();
+                }
+                if chars.peek() == Some(&':') {
+                    chars.next();
+                }
+                open.push((n.parse().unwrap_or(0), out.len()));
+            }
+            '$' if chars.peek().is_some_and(|d| d.is_ascii_digit()) => {
+                let mut n = String::new();
+                while let Some(d) = chars.peek().filter(|d| d.is_ascii_digit()) {
+                    n.push(*d);
+                    chars.next();
+                }
+                match n.parse::<u32>().unwrap_or(0) {
+                    0 => end = Some(out.len()),
+                    k => stops.push((k, out.len()..out.len())),
+                }
+            }
+            '}' if !open.is_empty() => {
+                let (k, at) = open.pop().unwrap_or_default();
+                match k {
+                    0 => end = Some(at),
+                    k => stops.push((k, at..out.len())),
+                }
+            }
+            c => out.push(c),
+        }
+    }
+    stops.sort_by_key(|(k, _)| *k);
+    let end = end.unwrap_or(out.len());
+    (out, stops.into_iter().map(|(_, r)| r).collect(), end)
+}
+
 /// A trait for providing code completions based on the current input state and context.
 pub trait CompletionProvider {
     /// Fetches completions based on the given byte offset.
@@ -125,6 +186,41 @@ impl Default for InlineCompletion {
 }
 
 impl InputBaseState<EditorMode> {
+    /// Tab in an inserted snippet: what was typed since the last stop went
+    /// into its placeholder (the later ones move by as much); select the next
+    /// placeholder, or put the caret at the snippet's end and finish. A caret
+    /// moved out of the placeholder finishes the snippet without moving.
+    pub(crate) fn next_snippet_stop(&mut self, cx: &mut Context<Self>) -> bool {
+        let Some(mut s) = self.extras.snippet.take() else {
+            return false;
+        };
+        let delta = self.text.len() as isize - s.len as isize;
+        let shift = |x: usize| (x as isize + delta).max(0) as usize;
+        let cur = s.stops[s.current].clone();
+        let cur = cur.start..shift(cur.end);
+        let caret = self.cursor();
+        if caret < cur.start || caret > cur.end {
+            return false;
+        }
+        for r in s.stops.iter_mut().skip(s.current + 1) {
+            *r = shift(r.start)..shift(r.end);
+        }
+        s.stops[s.current] = cur;
+        if s.end >= s.stops[s.current].start {
+            s.end = shift(s.end);
+        }
+        s.current += 1;
+        s.len = self.text.len();
+        match s.stops.get(s.current).cloned() {
+            Some(next) => {
+                self.set_selected_range(next, cx);
+                self.extras.snippet = Some(s);
+            }
+            None => self.set_selected_range(s.end..s.end, cx),
+        }
+        true
+    }
+
     pub(crate) fn handle_completion_trigger(
         &mut self,
         _range: &Range<usize>,

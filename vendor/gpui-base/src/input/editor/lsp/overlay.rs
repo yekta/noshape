@@ -189,11 +189,36 @@ impl InputBaseState<EditorMode> {
             new_text.clone_from(insert_text);
             range = range.end..range.end;
         }
+        let snippet = item.insert_text_format == Some(lsp_types::InsertTextFormat::SNIPPET);
+        let (new_text, stops, end) = if snippet {
+            super::completions::parse_snippet(&new_text)
+        } else {
+            let n = new_text.len();
+            (new_text, Vec::new(), n)
+        };
+        let start = range.start;
         self.completion_inserting = true;
         let range = self.range_to_utf16(&range);
         self.replace_text_in_range_silent(Some(range), &new_text, window, cx);
         self.completion_inserting = false;
         self.focus(window, cx);
+        self.extras.snippet = None;
+        if snippet {
+            let at = |r: &std::ops::Range<usize>| start + r.start..start + r.end;
+            let stops: Vec<_> = stops.iter().map(at).collect();
+            match stops.first() {
+                Some(first) => {
+                    self.set_selected_range(first.clone(), cx);
+                    self.extras.snippet = Some(super::completions::SnippetSession {
+                        stops,
+                        end: start + end,
+                        current: 0,
+                        len: self.text.len(),
+                    });
+                }
+                None => self.set_selected_range(start + end..start + end, cx),
+            }
+        }
     }
 
     #[doc(hidden)]

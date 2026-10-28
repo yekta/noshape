@@ -15,6 +15,8 @@ pub struct Entry {
     pub kind: String,
     /// What Enter inserts: a function's call, else the name.
     pub snippet: String,
+    /// The same as an Ace snippet: a function's values as placeholders.
+    pub template: String,
     /// The doc tooltip (Markdown): the call, the description, the parameters.
     pub doc: String,
     /// Ace's completer score: functions over predicates over enums (live "opE": the functions' fuzzy matches
@@ -213,20 +215,34 @@ fn params_of(list: &str) -> Vec<(String, String)> {
     out
 }
 
-/// A function's call (live: `opExtractWires(context, id + "opExtractWires1", {` / `        "edges" : edges` / `});`).
-fn call_snippet(name: &str, params: &[(String, String)], doc: &Doc) -> String {
-    let args: Vec<String> = params
-        .iter()
-        .map(|(p, ty)| {
-            let d = doc.params.iter().find(|d| &d.name == p);
-            if ty == "map" && let Some(d) = d.filter(|d| !d.fields.is_empty()) {
-                let fields: Vec<String> = d.fields.iter().filter(|f| !f.optional()).map(|f| format!("        \"{}\" : {}", f.name, f.value())).collect();
-                return if fields.is_empty() { "{}".to_string() } else { format!("{{\n{}\n}}", fields.join(",\n")) };
+/// A function's call (live "FS-EDITOR-COMPLETE follow-up": `opExtractWires(context, id + "opExtractWires1", {` /
+/// `        "edges" : edges` / `});`, every call ending in `;`); with `stops`, each value an Ace placeholder
+/// (`${1:context}`), in order (Enter selects the first, Tab the next).
+fn call_snippet(name: &str, params: &[(String, String)], doc: &Doc, stops: bool) -> String {
+    let mut n = 0;
+    let mut stop = |v: String| {
+        if !stops {
+            return v;
+        }
+        n += 1;
+        format!("${{{n}:{}}}", v.replace('\\', "\\\\").replace('$', "\\$").replace('}', "\\}"))
+    };
+    let mut args = Vec::new();
+    for (p, ty) in params {
+        let d = doc.params.iter().find(|d| &d.name == p);
+        if ty == "map"
+            && let Some(d) = d.filter(|d| !d.fields.is_empty())
+        {
+            let mut fields = Vec::new();
+            for f in d.fields.iter().filter(|f| !f.optional()) {
+                fields.push(format!("        \"{}\" : {}", f.name, stop(f.value())));
             }
-            d.map_or_else(|| p.clone(), DocParam::value)
-        })
-        .collect();
-    format!("{name}({})", args.join(", ")) + if params.iter().any(|(_, t)| t == "map") && doc.params.iter().any(|d| !d.fields.is_empty()) { ";" } else { "" }
+            args.push(if fields.is_empty() { "{}".to_string() } else { format!("{{\n{}\n}}", fields.join(",\n")) });
+            continue;
+        }
+        args.push(stop(d.map_or_else(|| p.clone(), DocParam::value)));
+    }
+    format!("{name}({});", args.join(", "))
 }
 
 fn function_doc(snippet: &str, params: &[(String, String)], doc: &Doc) -> String {
@@ -319,9 +335,12 @@ fn parse_module(src: &str) -> Vec<Entry> {
         };
         let function = |name: String, list: Option<String>, rank: i32, out: &mut Vec<Entry>| {
             let params = params_of(&list.unwrap_or_default());
-            let snippet = call_snippet(&name, &params, &doc);
+            let snippet = call_snippet(&name, &params, &doc, false);
+            let template = call_snippet(&name, &params, &doc, true);
             let doc = function_doc(&snippet, &params, &doc);
-            out.push(Entry { name, kind: "function".into(), snippet, doc, rank });
+            // Live: a predicate's column reads "predicate".
+            let kind = if rank == 2 { "predicate" } else { "function" };
+            out.push(Entry { name, kind: kind.into(), snippet, template, doc, rank });
         };
         if let Some(r) = rest.strip_prefix("function ") {
             function(ident(r), list_from(r), 3, &mut out);
@@ -335,7 +354,7 @@ fn parse_module(src: &str) -> Vec<Entry> {
             }
         } else if let Some(r) = rest.strip_prefix("enum ") {
             let name = ident(r);
-            out.push(Entry { name: name.clone(), kind: "enum".into(), snippet: name.clone(), doc: doc.description.clone(), rank: 1 });
+            out.push(Entry { name: name.clone(), kind: "enum".into(), snippet: name.clone(), template: name.clone(), doc: doc.description.clone(), rank: 1 });
             // The values, in declaration order, up to the closing brace.
             let mut j = i + 1;
             while j < lines.len() && !lines[j].trim().starts_with('}') {
@@ -345,7 +364,7 @@ fn parse_module(src: &str) -> Vec<Entry> {
                         let value = ident(part.trim());
                         if !value.is_empty() {
                             let text = doc.values.iter().find(|(n, _)| n == &value).map(|(_, t)| t.clone()).unwrap_or_default();
-                            out.push(Entry { name: value.clone(), kind: name.clone(), snippet: value.clone(), doc: if text.is_empty() { value.clone() } else { format!("{value}\n\n{text}") }, rank: 0 });
+                            out.push(Entry { name: value.clone(), kind: name.clone(), snippet: value.clone(), template: value.clone(), doc: if text.is_empty() { value.clone() } else { format!("{value}\n\n{text}") }, rank: 0 });
                         }
                     }
                 }
@@ -509,7 +528,7 @@ impl gpui_kit::component::input::CompletionProvider for Completions {
         _cx: &mut gpui_kit::App,
     ) -> gpui_kit::Task<anyhow::Result<gpui_kit::component::input::lsp_types::CompletionResponse>> {
         use gpui_kit::component::input::RopeExt as _;
-        use gpui_kit::component::input::lsp_types::{CompletionItem, CompletionResponse, CompletionTextEdit, Documentation, LSPAny, MarkupContent, MarkupKind, Range, TextEdit};
+        use gpui_kit::component::input::lsp_types::{CompletionItem, CompletionResponse, CompletionTextEdit, Documentation, InsertTextFormat, LSPAny, MarkupContent, MarkupKind, Range, TextEdit};
         let row = text.offset_to_position(offset).line as usize;
         let line_start = text.line_start_offset(row);
         let line = text.slice(line_start..offset).to_string();
@@ -521,7 +540,9 @@ impl gpui_kit::component::input::CompletionProvider for Completions {
                     .map(|m| CompletionItem {
                         label: m.entry.name.clone(),
                         detail: Some(m.entry.kind.clone()),
-                        text_edit: Some(CompletionTextEdit::Edit(TextEdit { range, new_text: indented(&m.entry.snippet, &indent) })),
+                        // A function's call as an Ace snippet (its values selected in turn by Tab).
+                        text_edit: Some(CompletionTextEdit::Edit(TextEdit { range, new_text: indented(&m.entry.template, &indent) })),
+                        insert_text_format: (m.entry.template != m.entry.snippet).then_some(InsertTextFormat::SNIPPET),
                         documentation: (!m.entry.doc.is_empty()).then(|| Documentation::MarkupContent(MarkupContent { kind: MarkupKind::Markdown, value: m.entry.doc.clone() })),
                         // The letters the list highlights (the menu's `ace` look reads them).
                         data: Some(LSPAny::from(m.hits.iter().map(|r| LSPAny::from(vec![r.start as u64, r.end as u64])).collect::<Vec<_>>())),
@@ -579,6 +600,13 @@ mod tests {
         let d = &find("opExtractWires").doc;
         assert!(d.contains("Generates wire bodies from the supplied edges.") && d.contains("PARAMETER INFO") && d.contains("**edges** is Query"), "{d}");
         assert_eq!(find("opExtractWires").kind, "function");
+        // Live follow-up (a), (c), (e): the placeholders and the `;`.
+        let rows: Vec<&Entry> = index().iter().filter(|e| e.name == "qCreatedBy").collect();
+        assert_eq!(rows[0].template, "qCreatedBy(${1:id + \"extrude1\"}, ${2:EntityType.BODY});");
+        assert_eq!(rows[1].template, "qCreatedBy(${1:featureId});");
+        assert_eq!(find("isQueryEmpty").snippet, "isQueryEmpty(context, query);");
+        let p = find("surfaceOperationTypePredicate");
+        assert_eq!((p.kind.as_str(), p.snippet.as_str()), ("predicate", "surfaceOperationTypePredicate(definition);"));
     }
 
     /// Live (C): `EntityType.` lists its values in declaration order with the enum as their kind; `definition.`

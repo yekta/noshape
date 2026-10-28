@@ -201,7 +201,10 @@ impl<M: InputModeKind> InputBaseState<M> {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        // First, try to accept inline completion if present
+        // An inserted snippet's next placeholder, then an inline completion.
+        if M::next_snippet_stop(self, cx) {
+            return;
+        }
         if M::accept_inline_completion(self, window, cx) {
             return;
         }

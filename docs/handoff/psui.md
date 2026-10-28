@@ -125,6 +125,10 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   fs_complete.rs (std index from the doc comments, hump matching, Ace ranking, call snippets) + the vendored completion
   menu's `ace` look (gpui-component completion_menu.rs, caret_anchored.rs `shift_x`; gpui-base: a non-trigger
   keystroke closes the list). Unknowns asked in REQUESTS (psui 10-28): snippets of non-op functions, `;`, placeholders.
+- 10-28 01:40–03:20: 7929b13a sketch on a lost face ("Select a sketch plane." + missing, live), named views sorted;
+  e3fd499b see-through parts pick nearest-first, Alt through (2.23 ✅); then completion placeholders (vendored
+  gpui-base snippet session: `${n:…}` selected in turn by Tab, caret after `;`; every call ends in `;`, predicates
+  "predicate") and CTRL-C-PART.
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 

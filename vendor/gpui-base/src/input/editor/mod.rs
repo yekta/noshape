@@ -66,6 +66,13 @@ impl InputModeKind for EditorMode {
         state.extras.lsp.update(&text, window, cx);
     }
 
+    fn next_snippet_stop(
+        state: &mut InputBaseState<Self>,
+        cx: &mut gpui::Context<InputBaseState<Self>>,
+    ) -> bool {
+        state.next_snippet_stop(cx)
+    }
+
     fn accept_inline_completion(
         state: &mut InputBaseState<Self>,
         window: &mut Window,
