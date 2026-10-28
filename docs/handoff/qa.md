@@ -4,6 +4,18 @@ qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA)
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 ## Session 3 (qa on a fresh account, 10-27 19:05 → 10-28; greens fa61ba6f → … → d2826142 → c5e53806)
+
+- **01:10 update (greens a6c56638 → f9185639):** no new P0. Fuzz on c5e53806 (seeds 41/43/44 × 600 actions): no crash.
+  Merge audit finished: none of 11e83152, 98ae008e, 6c040449, 4a0e07c2, 4083c486 was lost (all refactored into the crate split).
+- Verified on a6c56638: PREVIEW-NO-PICK, DIALOG-OK-STATE ((a) = live; (b) "Syntax error in expression.", ✓ disabled).
+- Filed: P1 STRIP-CLICK-THROUGH (psui: clicks / hover on the right panel strip reach the viewport; = qa5's old C6),
+  P2 HOLE-TABLE-FILLETS (dx: convex R2 corner rounds listed as Ø4 holes), P2 DARK-DRAWING-TOOLBAR (dx regression: dark
+  toolbar up to x≈1384 in a drawing), P2 ASM-TOOLSEARCH (skasm: Tangent mate / Width mate not found, "Insert" title),
+  P2 ASM-FILTER-PATTERN-INSTANCES (live 1519), P3 VAR-NAME-PINK, P3 DERIVED-PICK-CHIP, P3 ASM-CHANGE-CONFIG-ICON;
+  DATUM-SCALE-DETACHED got live's answer (1520).
+- Checklists newly done: workflow-tabs 15/16, workflow-document 18/18 (DOC1–4 fixed), workflow-configurations 27/28
+  (C1–C8 fixed), workflow-derived 34/41 (DER1–14, TAB1, in-context), chrome-sweep 24/74, preferences 16/30,
+  feature-sweep 16/45 (dialog fields), assembly-sweep 9/45.
 - **00:30 state: no open P0 release blocker of mine.** BOX-DIALOG-PANIC fixed (ecc38c5a) and verified on c5e53806.
   Still open P0 (core): FILLET-OVERSIZE-OK (live answered: R50 two-edge / R25 three-edge fillets must fail "End boundary
   intersects unfilleted edge."; ours Ok with wrong solids). Check the 04:30 blocker list against TICKETS.
