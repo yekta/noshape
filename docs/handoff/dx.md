@@ -183,6 +183,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
+- **Version in non-release builds (qa VERSION-FOOTER-STALE, P3)**: crates/app/build.rs shows CARGO_PKG_VERSION
+  (0.4.6) + the commit, so green / CI builds read three releases old. Bump the workspace version with each release
+  tag, or let build.rs take the last tag (`git describe --tags --abbrev=0`) when it is newer. Release process, so yours.
 - **Shift+/ in a drawing (qa DRAWING-SHIFT-SLASH, P3)**: the Keyboard shortcuts modal (tabs General … Drawing) is
   rendered by the Part Studio view (part-studio-ui view_tools.rs `render_shortcut_sheet` / `toggle_shortcut_sheet`,
   psui's crate) and the Assembly has its own list; the drawing editor has nothing for `ToggleShortcutHelp`. Live

@@ -1395,8 +1395,9 @@ impl DrawingEditor {
         }
         use crate::cached_slice::Slice;
         let me = cx.entity();
-        let toolbar = Slice::new(&me, |this, window, cx| this.render_toolbar(window, cx), cx);
-        let panel = Slice::new(&me, |this, _, cx| div().size_full().relative().children(this.render_panel(cx)).into_any_element(), cx);
+        // The slices render on their own: light too (qa DARK-DRAWING-TOOLBAR).
+        let toolbar = Slice::new(&me, |this, window, cx| gpui_kit::with_light_colors(|| this.render_toolbar(window, cx)), cx);
+        let panel = Slice::new(&me, |this, _, cx| gpui_kit::with_light_colors(|| div().size_full().relative().children(this.render_panel(cx)).into_any_element()), cx);
         // Undo state comes from the document.
         for s in [&toolbar, &panel] {
             Slice::observing(s, &self.doc, cx);
