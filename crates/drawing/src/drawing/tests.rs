@@ -3240,3 +3240,23 @@ fn template_sizes_follow_the_standard() {
     assert!(i.props.table_styles.hole_indicator_iso && (i.props.table_styles.hole_indicator_arrow.unwrap() - 2.5).abs() < 1e-9);
     assert!((i.props.ann_text_height - 3.5).abs() < 1e-9);
 }
+
+/// Line to line angular beside the edges (live D11): 180° minus the angle,
+/// with an extension line along the turned edge's continuation past the
+/// vertex out to the arc.
+#[test]
+fn supplementary_angular_draws_the_continuation() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let sheet = &mut drawing.sheets[0];
+    let (c60, s60) = (60f64.to_radians().cos(), 60f64.to_radians().sin());
+    let kind = AnnotationKind::AngularDimension { view: ViewId(2), vertex: [0.0, 0.0], a: [0.01 * c60, 0.01 * s60], b: [0.01, 0.0], radius: 20.0, three_point: false, flip_a: false, flip_b: true };
+    sheet.annotations.push(Annotation { id: 950, kind: kind.clone(), position: [0.0; 2], ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+    assert!(texts(&built).iter().any(|t| t == "120.0°"), "{:?}", texts(&built));
+    let pl = built.placement(ViewId(2)).unwrap();
+    let (v, back) = (pl.to_sheet([0.0, 0.0]), pl.to_sheet([-0.01, 0.0]));
+    // A line from near the vertex along −x (edge b's continuation).
+    let along = |l: &&sheet::Polyline2| l.points.len() == 2 && l.points.iter().all(|p| (p[1] - v[1]).abs() < 1e-6) && l.points.iter().any(|p| p[0] < back[0] - 1.0);
+    assert!(built.geometry.lines.iter().any(|l| along(&l)), "no continuation line");
+}

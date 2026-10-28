@@ -1339,11 +1339,27 @@ impl SheetGeometry {
                     let at = [out[0] + if left { -1.0 } else { 1.0 }, out[1] + 0.8];
                     self.dim_label(at, 0.0, if left { 1.0 } else { 0.0 }, false, &t, dh, pick);
                 }
-                AnnotationKind::AngularDimension { view, radius, .. } => {
+                AnnotationKind::AngularDimension { view, radius, flip_a, flip_b, .. } => {
                     let (vertex, pa, pb) = a.kind.angular_legs().expect("angular");
                     let v = env.to_sheet(*view, vertex);
                     let pa = env.to_sheet(*view, pa);
                     let pb = env.to_sheet(*view, pb);
+                    // Extension lines along the edges (or their continuation
+                    // through the vertex) out to the arc where it passes
+                    // them (live D11).
+                    for (p, flipped) in [(pa, *flip_a), (pb, *flip_b)] {
+                        let d = [p[0] - v[0], p[1] - v[1]];
+                        let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
+                        if l < 1e-9 {
+                            continue;
+                        }
+                        let u = [d[0] / l, d[1] / l];
+                        let from = if flipped { self.style.geometry_gap } else { l + self.style.geometry_gap };
+                        let to = radius + self.style.extension;
+                        if to > from {
+                            self.lines.push(Polyline2 { points: vec![[v[0] + u[0] * from, v[1] + u[1] * from], [v[0] + u[0] * to, v[1] + u[1] * to]], style: LineStyle::Thin, closed: false, pick });
+                        }
+                    }
                     let a0 = (pa[1] - v[1]).atan2(pa[0] - v[0]);
                     let mut a1 = (pb[1] - v[1]).atan2(pb[0] - v[0]);
                     if a1 < a0 {

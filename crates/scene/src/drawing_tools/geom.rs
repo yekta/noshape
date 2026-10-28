@@ -34,9 +34,10 @@ pub fn in_sweep(v: [f64; 2], a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> bool {
 }
 
 /// Line to line angular: make the dimension measure the sector of the two
-/// extended lines that sheet point `at` is in (the inner angle, either
-/// supplementary one or the vertical one), turning its legs through the
-/// vertex. True when legs `a` and `b` swapped (their references must too).
+/// extended lines that sheet point `at` is in, as live (behaviours D11):
+/// between the edges the inner angle, beside them 180° minus it (a leg
+/// turned through the vertex), opposite them the reflex 360° minus it.
+/// True when legs `a` and `b` swapped (their references must too).
 pub fn angular_to_sector(kind: &mut AnnotationKind, pl: &noshape_model::drawing::build::ViewPlacement, at: [f64; 2]) -> bool {
     let AnnotationKind::AngularDimension { vertex, a, b, flip_a, flip_b, three_point: false, .. } = kind else { return false };
     let v = pl.to_sheet(*vertex);
@@ -58,6 +59,9 @@ pub fn angular_to_sector(kind: &mut AnnotationKind, pl: &noshape_model::drawing:
     if first.0 == second.0 {
         return false;
     }
+    // Opposite the edges: the reflex angle, from the second edge round to
+    // the first (never the vertically opposite angle).
+    let (first, second) = if first.1 && second.1 { ((second.0, false, 0.0), (first.0, false, 0.0)) } else { (first, second) };
     let swap = first.0;
     if swap {
         std::mem::swap(a, b);
@@ -117,7 +121,7 @@ mod angular_tests {
     use noshape_model::drawing::{AnnotationKind, ViewId};
 
     /// Edges at 0° and 60° meeting at the origin: the pointer's sector
-    /// gives 60° (between them), 120° (beside), 60° (opposite) or 120°.
+    /// gives 60° (between them), 120° (beside) or 300° (opposite: reflex).
     #[test]
     fn line_to_line_angular_measures_the_pointer_sector() {
         let pl = ViewPlacement::new(ViewId(1), [0.0, 0.0], [100.0, 100.0], 1.0);
@@ -125,7 +129,7 @@ mod angular_tests {
         let (c60, s60) = (60f64.to_radians().cos(), 60f64.to_radians().sin());
         let v = pl.to_sheet([0.0, 0.0]);
         let at = |deg: f64| [v[0] + 20.0 * deg.to_radians().cos(), v[1] + 20.0 * deg.to_radians().sin()];
-        for (deg, want) in [(30.0, 60.0), (120.0, 120.0), (210.0, 60.0), (300.0, 120.0), (30.0, 60.0)] {
+        for (deg, want) in [(30.0, 60.0), (120.0, 120.0), (210.0, 300.0), (300.0, 120.0), (30.0, 60.0)] {
             let mut k = AnnotationKind::AngularDimension { view: ViewId(1), vertex: [0.0, 0.0], a: [r, 0.0], b: [r * c60, r * s60], radius: 20.0, three_point: false, flip_a: false, flip_b: false };
             super::angular_to_sector(&mut k, &pl, at(deg));
             let (o, p, q) = k.angular_legs().unwrap();

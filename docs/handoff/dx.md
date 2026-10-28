@@ -128,6 +128,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - S8: sheet rows drag to reorder (one or several; blue drop line; one undo), checked on :131.
 - qa TABLE-SHIFT-TAB-BLANK (caret after a cell's text), NOTE-PANEL-UNDER-PROPS (below the table when no room above);
   A35 datum targets: no dimensions until Show dimensions (label menu), boxed, Hide dimension on the dimension's menu.
+- D18 arc length conjugate (the side the pointer is on); D11 line to line angular by the placing sector (θ, 180° − θ
+  with the continuation line, reflex opposite), from live's answer 1576.
 - Next, in order: V59 / V26 once live data exists; drawing.md ⏳ rows on green; the remaining 🔧 rows in P2 order.
 
 ## Afternoon 10-28 (landed through 3476703d)
