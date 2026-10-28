@@ -796,47 +796,55 @@ bool is_seam(const TopoDS_Edge& e, const NCollection_List<TopoDS_Shape>* faces)
 // cone's apex (live: a drill tip is a vertex; a cylinder's circles, a ring's
 // and a sphere have none). Flags in MapShapes order, the edges' then the
 // vertices'.
+// Made once per shape from its cached ancestor maps (the naming made the
+// edge / vertex -> face ones): the display asked twice a regeneration, each
+// time mapping the 1600-face fin plate's ancestors three times (~70 ms).
 rust::Vec<uint8_t> shown_topology(const OcShape& s)
 {
-  const ShapeIMap& em = s.map(TopAbs_EDGE);
-  const ShapeIMap& vm = s.map(TopAbs_VERTEX);
-  ShapeAncMap      ef, ve, vf;
-  if (!s.shape.IsNull())
-  {
-    TopExp::MapShapesAndAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, ef);
-    TopExp::MapShapesAndAncestors(s.shape, TopAbs_VERTEX, TopAbs_EDGE, ve);
-    TopExp::MapShapesAndAncestors(s.shape, TopAbs_VERTEX, TopAbs_FACE, vf);
-  }
-  rust::Vec<uint8_t> out;
-  out.reserve((size_t)(em.Extent() + vm.Extent()));
-  std::vector<bool> open(em.Extent() + 1, false);
-  for (int i = 1; i <= em.Extent(); ++i)
-  {
-    const TopoDS_Edge& e     = TopoDS::Edge(em(i));
-    const bool         shown = !BRep_Tool::Degenerated(e) && !is_seam(e, ef.Seek(e));
-    TopoDS_Vertex      a, b;
-    TopExp::Vertices(e, a, b);
-    open[i] = shown && !a.IsSame(b);
-    out.push_back(shown ? 1 : 0);
-  }
-  for (int i = 1; i <= vm.Extent(); ++i)
-  {
-    const NCollection_List<TopoDS_Shape>* es      = ve.Seek(vm(i));
-    bool                                  shown   = es == nullptr || es->IsEmpty();
-    bool                                  anyEdge = false;
-    if (es != nullptr)
-      for (NCollection_List<TopoDS_Shape>::Iterator it(*es); it.More() && !shown; it.Next())
+  std::call_once(s.myShownFlag, [&]() {
+    const KernelTimer timer("shown_topology.make");
+    const ShapeIMap&  em = s.map(TopAbs_EDGE);
+    const ShapeIMap&  vm = s.map(TopAbs_VERTEX);
+    const ShapeIMap&  fm = s.map(TopAbs_FACE);
+    const auto&       ef = ancestors_cached(s, TopAbs_EDGE, TopAbs_FACE);
+    const auto&       ve = ancestors_cached(s, TopAbs_VERTEX, TopAbs_EDGE);
+    const auto&       vf = ancestors_cached(s, TopAbs_VERTEX, TopAbs_FACE);
+    std::vector<uint8_t>& out = s.myShown;
+    out.reserve((size_t)(em.Extent() + vm.Extent()));
+    std::vector<bool> open(em.Extent() + 1, false);
+    for (int i = 1; i <= em.Extent(); ++i)
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(em(i));
+      // A seam closes every face it bounds on itself.
+      bool seam = ef.first[(size_t)i] > ef.first[(size_t)i - 1];
+      for (uint32_t k = ef.first[(size_t)i - 1]; k < ef.first[(size_t)i] && seam; ++k)
+        seam = BRep_Tool::IsClosed(e, TopoDS::Face(fm((int)ef.second[k] + 1)));
+      const bool    shown = !BRep_Tool::Degenerated(e) && !seam;
+      TopoDS_Vertex a, b;
+      TopExp::Vertices(e, a, b);
+      open[i] = shown && !a.IsSame(b);
+      out.push_back(shown ? 1 : 0);
+    }
+    for (int i = 1; i <= vm.Extent(); ++i)
+    {
+      const uint32_t e0 = ve.first[(size_t)i - 1], e1 = ve.first[(size_t)i];
+      bool           shown = e0 == e1, anyEdge = false;
+      for (uint32_t k = e0; k < e1 && !shown; ++k)
       {
-        const int j = em.FindIndex(it.Value());
-        shown       = j > 0 && open[j];
-        anyEdge     = anyEdge || (j > 0 && out[(size_t)j - 1] != 0);
+        const int j = (int)ve.second[k] + 1;
+        shown       = open[j];
+        anyEdge     = anyEdge || out[(size_t)j - 1] != 0;
       }
-    if (!shown && !anyEdge)
-      if (const NCollection_List<TopoDS_Shape>* fs = vf.Seek(vm(i)))
-        for (NCollection_List<TopoDS_Shape>::Iterator it(*fs); it.More() && !shown; it.Next())
-          shown = BRepAdaptor_Surface(TopoDS::Face(it.Value()), false).GetType() == GeomAbs_Cone;
-    out.push_back(shown ? 1 : 0);
-  }
+      if (!shown && !anyEdge)
+        for (uint32_t k = vf.first[(size_t)i - 1]; k < vf.first[(size_t)i] && !shown; ++k)
+          shown = BRepAdaptor_Surface(TopoDS::Face(fm((int)vf.second[k] + 1)), false).GetType() == GeomAbs_Cone;
+      out.push_back(shown ? 1 : 0);
+    }
+  });
+  rust::Vec<uint8_t> out;
+  out.reserve(s.myShown.size());
+  for (uint8_t v : s.myShown)
+    out.push_back(v);
   return out;
 }
 

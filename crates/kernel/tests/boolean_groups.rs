@@ -236,3 +236,43 @@ fn local_fuse_bench() {
     ms.sort_by(f64::total_cmp);
     eprintln!("local fuse + unify + maps: median {:.1} ms, best {:.1} ms ({} runs, path {}, unify {})", ms[ms.len() / 2], ms[0], n, last_boolean_path(), last_unify_path());
 }
+
+
+/// Display meshes of faces a Boolean left alone come from the kernel's mesh
+/// cache (mesh.cpp `MeshSet`); only the new faces are meshed: the same
+/// triangles, normals and edge polylines as meshing a fresh copy whole, for a
+/// fuse (straight shared edges: partial) and a round hole (circular edges
+/// shared with kept faces: meshed whole).
+#[test]
+fn display_meshes_of_kept_faces_are_reused() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let n = 100;
+    let len = (2 * n + 10) as f64;
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(len, 20.0, 10.0) * mm).unwrap();
+    let fins: Vec<Shape> = (0..n).map(|i| make_box_corners(DVec3::new(2.0 + 2.0 * i as f64, 0.0, 10.0) * mm, DVec3::new(3.0 + 2.0 * i as f64, 20.0, 15.0) * mm).unwrap()).collect();
+    let part = boolean(BooleanOp::Fuse, &[plate], &fins, &BooleanOptions { unify: true, ..Default::default() }).unwrap().shape;
+    let part = unify_same_domain(&part).unwrap().shape;
+    let (lin, ang) = (0.2 * mm, 0.3);
+    let _ = tessellate(&part, lin, ang, false).unwrap();
+    let fin = make_box_corners(DVec3::new(2.0, 0.0, -5.0) * mm, DVec3::new(3.0, 20.0, 0.0) * mm).unwrap();
+    let hole = make_cylinder(&Plane::new(DVec3::new(50.5, 10.0, -1.0) * mm, DVec3::Z, DVec3::X), 3.0 * mm, 12.0 * mm, 2.0 * PI).unwrap();
+    for (what, op, tool) in [("a fin fused under the plate", BooleanOp::Fuse, fin), ("a round hole", BooleanOp::Cut, hole)] {
+        let r = boolean(op, std::slice::from_ref(&part), &[tool], &BooleanOptions::default()).unwrap().shape;
+        let t = std::time::Instant::now();
+        let cached = tessellate(&r, lin, ang, false).unwrap();
+        let ms = t.elapsed().as_secs_f64() * 1e3;
+        let fresh = Shape::from_brep_bytes(&r.to_brep_bytes().unwrap()).unwrap();
+        let t = std::time::Instant::now();
+        let whole = tessellate(&fresh, lin, ang, false).unwrap();
+        eprintln!("{what}: {ms:.1} ms with the cache, {:.1} ms whole", t.elapsed().as_secs_f64() * 1e3);
+        assert_eq!(cached.triangle_count(), whole.triangle_count(), "{what}");
+        assert_eq!(cached.indices, whole.indices, "{what}");
+        assert_eq!(cached.faces.len(), whole.faces.len(), "{what}");
+        assert_eq!(cached.edge_points.len(), whole.edge_points.len(), "{what}");
+        let near = |a: &[[f32; 3]], b: &[[f32; 3]]| a.len() == b.len() && a.iter().zip(b).all(|(p, q)| (0..3).all(|k| (p[k] - q[k]).abs() < 1e-6));
+        assert!(near(&cached.positions, &whole.positions), "{what}: positions");
+        assert!(near(&cached.normals, &whole.normals), "{what}: normals");
+        assert!(near(&cached.edge_points, &whole.edge_points), "{what}: edge points");
+    }
+}

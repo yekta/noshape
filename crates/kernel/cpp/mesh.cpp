@@ -35,6 +35,12 @@
 #include <algorithm>
 #include <BRepAdaptor_Surface.hxx>
 #include <functional>
+#include <NCollection_DataMap.hxx>
+#include <TopoDS_Compound.hxx>
+#include <BRep_Builder.hxx>
+#include <Geom_Line.hxx>
+#include <array>
+#include <deque>
 #include <cstdlib>
 
 namespace noshape {
@@ -638,6 +644,45 @@ struct FaceTri
   bool                            identity = true;
   bool                            reversed = false;
 };
+
+// Display meshes made before, by face and edge (TShape and location) and the
+// deflections: the faces a regeneration left alone take theirs from here, and
+// BRepMesh meshes only the others. It re-meshed every face of a part after
+// each feature (~340 ms on the 400-fin plate, as long again when every face
+// already had a mesh); the shapes' own triangulations are dropped after each
+// mesh (BRepTools::Clean below), so the meshes are kept here. A set serves
+// absolute deflections within 1 % of its own (the display's scale with the
+// part's diagonal, which a small feature barely changes); the latest three
+// sets, each up to 20 M nodes. Under mesh_mutex. NOSHAPE_MESH_CACHE=0: off.
+struct MeshSet
+{
+  double lin = 0, ang = 0;
+  NCollection_DataMap<TopoDS_Shape, occ::handle<Poly_Triangulation>, TopTools_ShapeMapHasher> faces;
+  NCollection_DataMap<TopoDS_Shape, std::vector<std::array<float, 3>>, TopTools_ShapeMapHasher> edges;
+  size_t                                                                                        nodes = 0;
+};
+
+MeshSet* mesh_set(double lin, double ang)
+{
+  static const bool off = [] {
+    const char* v = std::getenv("NOSHAPE_MESH_CACHE");
+    return v != nullptr && std::string(v) == "0";
+  }();
+  if (off)
+    return nullptr;
+  static std::deque<MeshSet> sets;
+  for (MeshSet& m : sets)
+    if (m.ang == ang && std::abs(m.lin - lin) <= 0.01 * lin)
+    {
+      if (m.nodes > 20000000)
+        m = MeshSet{lin, ang, {}, {}, 0};
+      return &m;
+    }
+  sets.push_front(MeshSet{lin, ang, {}, {}, 0});
+  while (sets.size() > 3)
+    sets.pop_back();
+  return &sets.front();
+}
 } // namespace
 
 struct OcMeshFaces
@@ -655,6 +700,7 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     fail_invalid("angular deflection must be positive");
   auto m   = std::make_unique<OcMesh>();
   m->shape = s.shape;
+  std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("mesh.maps");
   TopExp::MapShapes(s.shape, TopAbs_FACE, m->faces);
   TopExp::MapShapes(s.shape, TopAbs_EDGE, m->edges);
   TopExp::MapShapes(s.shape, TopAbs_VERTEX, m->vertices);
@@ -680,10 +726,62 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     ctx->SetFaceDiscret(new BRepMesh_FaceDiscret(new PlanarCdtAlgoFactory()));
     if (std::getenv("NOSHAPE_MESH_BREPMESH_POST") == nullptr)
       ctx->SetPostProcessor(new DisplayPostProcessor());
-    BRepMesh_IncrementalMesh mesher;
-    mesher.SetShape(s.shape);
-    mesher.ChangeParameters() = prm;
+    lap = std::make_unique<KernelTimer>("mesh.cache");
+    // The faces the cache has (absolute deflections; no mesh faces, whose
+    // triangulation is their geometry): only the others are meshed, alone,
+    // when every edge they share with a cached face is straight (a curved
+    // one is discretised for both its faces: it is meshed whole then).
+    bool mesh_faces = false;
+    for (int i = 1; i <= m->faces.Extent() && !mesh_faces; ++i)
+      mesh_faces = is_mesh_face(TopoDS::Face(m->faces(i)));
+    MeshSet*          set = relative || mesh_faces ? nullptr : mesh_set(lin, ang);
+    std::vector<char> fresh((size_t)m->faces.Extent() + 1, 1);
+    int               nfresh = m->faces.Extent();
+    if (set != nullptr)
+      for (int i = 1; i <= m->faces.Extent(); ++i)
+        if (set->faces.IsBound(m->faces(i)))
+          fresh[(size_t)i] = 0, --nfresh;
+    bool partial = set != nullptr && nfresh < m->faces.Extent();
+    for (int i = 1; i <= m->edges.Extent() && partial; ++i)
     {
+      const TopoDS_Edge&                    e  = TopoDS::Edge(m->edges(i));
+      const NCollection_List<TopoDS_Shape>* fl = edgeFaces.Seek(e);
+      int                                   nf = 0, nc = 0;
+      if (fl != nullptr)
+        for (NCollection_List<TopoDS_Shape>::Iterator it(*fl); it.More(); it.Next(), ++nf)
+          nc += fresh[(size_t)m->faces.FindIndex(it.Value())] ? 0 : 1;
+      if (nc == 0)
+        continue;
+      if (nc == nf)
+      {
+        partial = set->edges.IsBound(e); // its polyline, made with its faces
+        continue;
+      }
+      double                        a, b;
+      TopLoc_Location               l;
+      const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, l, a, b);
+      partial                         = !c.IsNull() && c->IsKind(STANDARD_TYPE(Geom_Line));
+    }
+    if (std::getenv("NOSHAPE_MESH_DEBUG"))
+      std::fprintf(stderr, "mesh: %d faces, %d not cached, %s\n", m->faces.Extent(), nfresh, partial ? "partial" : set == nullptr ? "no cache" : "whole");
+    TopoDS_Shape meshed = s.shape;
+    if (partial)
+    {
+      BRep_Builder    B;
+      TopoDS_Compound c;
+      B.MakeCompound(c);
+      for (int i = 1; i <= m->faces.Extent(); ++i)
+        if (fresh[(size_t)i])
+          B.Add(c, m->faces(i));
+      meshed = c;
+    }
+    else
+      std::fill(fresh.begin(), fresh.end(), 1);
+    if (!partial || nfresh > 0)
+    {
+      BRepMesh_IncrementalMesh mesher;
+      mesher.SetShape(meshed);
+      mesher.ChangeParameters() = prm;
       const KernelTimer timer("mesh.brepmesh");
       mesher.Perform(ctx);
     }
@@ -691,6 +789,20 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     {
       const TopoDS_Face& f = TopoDS::Face(m->faces(i));
       TopLoc_Location    loc;
+      if (!fresh[(size_t)i])
+      {
+        // From the cache, in the face's frame.
+        const occ::handle<Poly_Triangulation>& tri = set->faces.Find(f);
+        FaceTri&                               ft  = side->faces[i - 1];
+        ft.reversed                                = f.Orientation() == TopAbs_REVERSED;
+        ft.tri                                     = tri;
+        ft.identity                                = f.Location().IsIdentity();
+        if (!ft.identity)
+          ft.trsf = f.Location().Transformation();
+        m->nodes += tri->NbNodes();
+        m->indices += 3 * (size_t)tri->NbTriangles();
+        continue;
+      }
       const occ::handle<Poly_Triangulation>& tri = BRep_Tool::Triangulation(f, loc);
       FaceTri&                               ft  = side->faces[i - 1];
       ft.reversed                                = f.Orientation() == TopAbs_REVERSED;
@@ -732,8 +844,17 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
         ft.trsf = loc.Transformation();
       m->nodes += tri->NbNodes();
       m->indices += 3 * (size_t)tri->NbTriangles();
+      // Kept for the next mesh when the face's own frame is the one the
+      // triangulation came in.
+      if (set != nullptr && loc.IsEqual(f.Location()))
+      {
+        if (!set->faces.IsBound(f))
+          set->nodes += (size_t)tri->NbNodes();
+        set->faces.Bind(f, tri);
+      }
     }
 
+    lap = std::make_unique<KernelTimer>("mesh.edges");
     // Edge polylines (inside the lock: reads polygons stored on edges).
     m->edge_polys.resize(m->edges.Extent());
     for (int i = 1; i <= m->edges.Extent(); ++i)
@@ -744,6 +865,20 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
       // Not edges in Onshape: not drawn, so not pickable (shown_topology).
       if (BRep_Tool::Degenerated(e) || is_seam(e, fl))
         continue;
+      // None of its faces meshed now: its polyline from the cache.
+      bool cached = set != nullptr && fl != nullptr;
+      if (cached)
+        for (NCollection_List<TopoDS_Shape>::Iterator it(*fl); it.More() && cached; it.Next())
+          cached = !fresh[(size_t)m->faces.FindIndex(it.Value())];
+      if (cached)
+        if (const std::vector<std::array<float, 3>>* c = set->edges.Seek(e))
+        {
+          poly = *c;
+          if (e.Orientation() == TopAbs_REVERSED)
+            std::reverse(poly.begin(), poly.end());
+          m->edge_points += poly.size();
+          continue;
+        }
       bool done = false;
       if (fl != nullptr)
       {
@@ -809,6 +944,8 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
           poly.clear();
         }
       }
+      if (set != nullptr)
+        set->edges.Bind(e, poly);
       if (e.Orientation() == TopAbs_REVERSED)
         std::reverse(poly.begin(), poly.end());
       m->edge_points += poly.size();
@@ -819,8 +956,10 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     // mesh made a later boolean on the shown body 5x slower and deaf to an
     // abort for seconds (400 fins: 2.4 s -> 14 s; v0.4.8 delete-while-
     // regenerating gate). Mesh faces (no surface) keep theirs.
-    BRepTools::Clean(s.shape);
+    lap = std::make_unique<KernelTimer>("mesh.clean");
+    BRepTools::Clean(meshed);
   }
+  m->cleaned  = true;
   m->faceData = side;
   return m;
 }
@@ -948,6 +1087,8 @@ void mesh_fill(const OcMesh& m, rust::Slice<float> positions, rust::Slice<float>
   // the shown body against 2.5 s; docs/handoff/viewport-performance.md).
   // Faces whose triangulation is their only geometry (mesh bodies) keep it
   // (BRepTools::Clean).
+  if (m.cleaned)
+    return; // mesh_prepare did
   std::lock_guard<std::mutex> lock(mesh_mutex());
   BRepTools::Clean(m.shape);
 }

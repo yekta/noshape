@@ -382,6 +382,10 @@ public:
   mutable std::array<double, 6>        myBox[2]{};
   mutable bool                         myBoxMade[2]{false, false};
 
+  // shown_topology's flags (common.cpp), made once.
+  mutable std::once_flag       myShownFlag;
+  mutable std::vector<uint8_t> myShown;
+
   // What the unify knows of it (boolean.cpp): nothing to merge in it (a
   // unify found nothing); for a local Boolean's result on such a shape,
   // where to look.
@@ -433,6 +437,7 @@ public:
   size_t       indices     = 0;
   size_t       edge_points = 0;
   std::vector<std::vector<std::array<float, 3>>> edge_polys; // per edge
+  bool                                           cleaned = false; // the shape's triangulations dropped
 };
 
 std::unique_ptr<OcShape> wrap(const TopoDS_Shape& s);

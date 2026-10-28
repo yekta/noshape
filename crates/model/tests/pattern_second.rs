@@ -373,3 +373,35 @@ fn timed_the_fin_plate_redisplays_after_the_fin() {
     assert!(matches!(st.status, FeatureStatus::Ok), "{:?} {:?}", st.status, st.message);
     eprintln!("fin under the {n}-fin plate: {} ms the fin, {:.0} ms the rest (display; total {total:.0} ms)", st.time_ms, total - st.time_ms as f64);
 }
+
+/// Editing the fin under the 400-fin plate (its depth 5 → 6, 7, 8 mm, the plate
+/// and its fins cached), as an edit commit: the feature, then the display
+/// (the faces the edit left alone keep their meshes, kernel mesh.cpp
+/// `MeshSet`; NOSHAPE_MESH_CACHE=0 re-meshes all). Printed, the best of three.
+#[test]
+#[ignore = "timed: perf.yml model job (wall clock; ci.yml tests are deterministic)"]
+fn timed_editing_the_fin_under_the_fin_plate() {
+    log();
+    let n = 400;
+    let (mut s, _, lp2) = model(n, true);
+    s.ps.features.retain(|f| f.id != lp2);
+    let w2 = s.ps.features.last().unwrap().id;
+    let mut regen = Regenerator::new();
+    let opts = RegenOptions::default();
+    let _ = regen.regenerate(&s.ps, &ConfigValues::default(), &s.units, &opts);
+    let (mut feature, mut whole, mut display) = (f64::MAX, f64::MAX, f64::MAX);
+    for depth in ["6 mm", "7 mm", "8 mm"] {
+        s.ps.features.last_mut().unwrap().params.set("depth", e(depth));
+        let t = Instant::now();
+        let r = regen.regenerate(&s.ps, &ConfigValues::default(), &s.units, &opts);
+        let ms = t.elapsed().as_secs_f64() * 1e3;
+        let st = r.display.features.iter().find(|x| x.id == w2).unwrap();
+        assert!(matches!(st.status, FeatureStatus::Ok), "{:?} {:?}", st.status, st.message);
+        feature = feature.min(st.time_ms as f64);
+        whole = whole.min(ms);
+        // The other features come from the cache: the rest is the display.
+        display = display.min(ms - st.time_ms as f64);
+    }
+    eprintln!("editing the fin under the {n}-fin plate: the feature {feature:.0} ms, the display {display:.0} ms, the whole edit {whole:.0} ms");
+    assert!(whole < 3000.0, "the edit took {whole:.0} ms");
+}

@@ -118,6 +118,7 @@ perf.yml model job (release) on main 10-27 ~18:05 (run 40556712238; before ab192
 | big-plate regen | 276 ms | 314 ms | ≤ 250 (live 617) |
 | Shell on qa's filleted plate with a hole | (not on perf.yml yet; dev here 177–229 ms a feature) | | ≤ 200 |
 | fin under the 400-fin plate (Extrude 3; `pattern_second::timed_the_fin_under_the_fin_plate_regenerates_locally`) | | (here, release, best of 3: 324 ms 10-28 05:37) | < 150 (was 2.7 s) |
+| editing that fin (`pattern_second::timed_editing_the_fin_under_the_fin_plate`, edit commit, dev here, loaded) | | feature 217 ms, display 261 ms (was 586), whole edit 479 ms (was 802) | |
 This machine (load 20–40) runs ~3× slower than the macOS runner; compare there. Landed for these today: patch 0003,
 `cut_through_holes`, `fuse_on_face`, on-demand hole tables (the first hole parsed 2.1 MB of FS: 154 → 17 ms),
 `fillet_square_corner`, the blend check on changed faces, shells by regions. Measuring: NOSHAPE_KERNEL_PROFILE=1
@@ -234,6 +235,21 @@ Phase 2 (local Booleans), first step landed:
   Timed test (dev, loaded machine) 236–303 ms. Left for < 150: the two big groups' rebuild, the history records of
   every kept sub-shape (op_boolean and op_unify each), the naming of every edge and vertex, the auto scope's first
   classification (the target's face boxes and rays, ~20 ms; the dialog's `touched`, ops).
+- Step 10 (10-28): display meshes of the faces an edit left alone are reused. mesh.cpp `MeshSet`: the display's
+  triangulations (with normals) and edge polylines by face / edge (TShape + location) and deflections (a set serves
+  absolute deflections within 1 %: the display's scale with the part's diagonal). mesh_prepare meshes only the
+  faces it doesn't have, alone, when every edge they share with a cached face is straight (else the whole shape),
+  and drops the triangulations of only those. BRepMesh re-meshed all 1612 faces after each edit, and took as long
+  again when they all already had a mesh (~340 ms either way), so the cache keeps them out of BRepMesh entirely.
+  NOSHAPE_MESH_CACHE=0: off; NOSHAPE_MESH_DEBUG=1 prints how many faces were meshed. `shown_topology` is made
+  once per shape from its cached ancestor maps (2 calls a regeneration, each mapping the part's ancestors 3 times:
+  137 → 15 ms). Editing the fin (depth 5 → 6, 7, 8 mm; dev, loaded machine, best of 3), before → after: the
+  feature 216 → 217 ms (kernel ~200 CPU), mesh_prepare 406 → 193 ms (134 of it meshing the 7 new faces, two of
+  them the patched 800-edge front / back faces), the display 586 → 261 ms, the whole edit 802 → 479 ms.
+  T1: kernel `boolean_groups::display_meshes_of_kept_faces_are_reused` (a fuse and a hole: the same triangles,
+  normals and edge polylines as meshing a fresh copy whole; 97 → 43 and 91 → 15 ms). T2 timed:
+  `pattern_second::timed_editing_the_fin_under_the_fin_plate`. Next there: meshing the 800-edge faces (~65 ms
+  each), mesh_prepare's maps (28 ms; the shape's own would do).
 - The regen's unify (boolean.cpp `merge_planar`): the merged face goes on the surface of the group's face with the
   most edges and only edges without a pcurve there get one; a one-shell solid is rebuilt shell-only instead of
   BRepTools_ReShape copying the part: fins-400's 4 unifies 849 → 382 ms. A unify of only the new faces' region
