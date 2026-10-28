@@ -7,8 +7,11 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 noshape-0.4.12-linux-x86_64.tar.gz: all rows OK** (details under "Daily release smoke" › v0.4.12). Blocker list at the top
 of TICKETS (open P0s all carried from v0.4.11).
 
-## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e)
+## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **21:52 update (green 58d89104 = bool 0b0f4fd8, copied 21:50):** on 1735d968 (= 59c8 code): interaction 3.4 ✅ (mate connector rest
+  white 0.8, hover amber 0.4, selected amber 0.5 over the owner tint; = live decodes) + new P3 MC-SELECT-NO-READOUT; drawing V17, V47,
+  D12 ✅. Fuzz 87 (58d8, live-30 copy, 600) running. Next: DRAFT-BUDGET-POOL re-check + rustbool on 58d8, then the remaining ⏳ rows.
 - **21:40 update (green 59c8c51e):** drawing V22 ✅ (section line Flip / Edit section), T16 ✅; new P3 DWG-CENTERMARK-ALIGN (auto
   centermark menu lacks Align centermark). GUI Part › Export… › Parasolid 38.1 → in-app save path dialog → re-import with the v0.4.12 CLI:
   39430.0888 mm³ both ways. asm5 BOM panel columns = live. Still waiting on core for DRAFT-BUDGET-POOL.
