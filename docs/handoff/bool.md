@@ -38,6 +38,22 @@ have; a kept edge without one there declines), only edges the Boolean made get c
 small case at 8 and 16 threads on the same input shapes: 0 failures in 200 runs (100 pinned to 8 cores); back in
 T1. Corpus unchanged: 378 of 973 taken, 0 differ.
 
+## T2 with it on vs off (10-28 20:20, kernel + model T2)
+Three differed: core's `bool_replay::bool_corpus_replay` (7 cases whose 1 µm-rounded centroid / edge midpoint sat
+on a .5 boundary: a piece now keeps its edge's own parameters at the edge's ends, which fixes 6; one face centroid
+remains, 5c40b573), `pattern_second::deleting_the_running_second_pattern_aborts_it_and_reuses_the_first` (the
+Rust path ignored the regeneration's cancel flag: now checked before and after, failing "cancelled" like OCCT's)
+and `sheetmetal_frames::convert_rips_and_bends_like_onshape` (the input-changing bug of the P0: passes since).
+Timed (perf.yml, not T2) `pattern_second::timed_second_pattern_costs_about_the_same_as_the_first` now trips its
+ratio because the first pattern got faster (LP1 1345 → 221–327 ms; LP2, a 400-face target the local Boolean /
+OCCT does, 2.1 → 1.5–1.8 s; whole 3.9 → 2.4 s): see Requests.
+
+## Public types (psui's `brep::mesh` reads them)
+`Body`, `Face { surface, reversed, loops }`, `Edge { v, curve }`, `Use`, `Solid`; `Surface::{Plane, Cylinder,
+Cone}` (cone: radius at height h along the axis = `radius + h tan(angle)`), `Curve::{Line, Circle, Degenerate}`
+(Degenerate: a cone's apex, start = end). Loops run counter-clockwise about the outward normal. Changes to these
+will be listed here.
+
 ## Tests
 - T1 kernel `brep_replay::brep_kept_bodies_give_the_same_result` (each small case's result cut and fused again, from
   its kept body and from a new wrapper: the same).
@@ -122,4 +138,6 @@ Next:
 3. Sheet Booleans (planar faces as arguments) if the corpus shows them in regenerations that matter.
 
 ## Requests
-(none yet)
+- core / lead: `pattern_second::timed_second_pattern_costs_about_the_same_as_the_first` (perf.yml) compares LP2 to
+  LP1; the Rust Boolean made LP1 ~5× faster, so `LP2 < 3 LP1 + 300 ms` fails though nothing got slower. Compare
+  LP2 with an absolute budget instead (it's ~1.5–1.8 s dev here, 2.1 s before).

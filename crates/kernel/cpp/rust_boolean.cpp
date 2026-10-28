@@ -576,6 +576,13 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
                   double fuzzy, bool touching_only)
 {
+  // A stale regeneration's Boolean stops (as OCCT's does through its progress indicator).
+  const std::atomic<bool>* cancel = thread_cancel_flag();
+  auto stop = [&] {
+    if (cancel != nullptr && cancel->load(std::memory_order_relaxed))
+      fail_op("cancelled");
+  };
+  stop();
   srcs.resize(args.size(), nullptr);
   for (size_t i = 0; i < args.size(); ++i)
     if (srcs[i] == nullptr || !srcs[i]->shape.IsEqual(args[i]))
@@ -616,6 +623,7 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
       return decline(nullptr);
   }
   const KernelTimer timer("boolean.rust.build");
+  stop();
   if (const char* why = build(r, srcs, max_tol > 0 ? max_tol : 1e-7, out, hist))
     return decline(why);
   t_built.body = std::move(r.body);
