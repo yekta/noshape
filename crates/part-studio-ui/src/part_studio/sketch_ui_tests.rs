@@ -56,6 +56,11 @@ fn part_studio(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<
 /// A fresh document's Part Studio in a test window, sketching on Top with `tool`.
 fn sketch_with(cx: &mut TestAppContext, name: &str, tool: Tool) -> (AnyWindowHandle, Entity<PartStudioView>) {
     let (window, view) = part_studio(cx, name);
+    sketch_in(cx, window, view, tool)
+}
+
+/// A new sketch on Top in the test window's Part Studio, with `tool`.
+fn sketch_in(cx: &mut TestAppContext, window: AnyWindowHandle, view: Entity<PartStudioView>, tool: Tool) -> (AnyWindowHandle, Entity<PartStudioView>) {
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
             v.selection = vec![Reference::Plane(DatumPlane::Top)];
@@ -148,6 +153,32 @@ fn line_value_box_takes_the_first_key(cx: &mut TestAppContext) {
     click(cx, window, &view, (640., 360.));
     keys(cx, window, &["5", "0", "enter"]);
     assert!(near(&dimensions(cx, &view), &[0.05]), "{:?}", dimensions(cx, &view));
+}
+
+/// `=#len` in a Line's value box (a Variable `len` = 42 mm before the
+/// sketch): Enter makes a 42 mm dimension driven by the variable.
+#[gpui::test]
+fn line_value_box_takes_a_variable(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "line-var");
+    cx.update(|cx| {
+        let (doc, tab) = { let v = view.read(cx); (v.doc.clone(), v.tab) };
+        doc.update(cx, |d, cx| {
+            let units = d.session.doc.settings.units;
+            d.edit_studio(tab, "Variable", cx, |ps| {
+                let mut f = ps.new_feature("assignVariable", &units).unwrap();
+                f.params.set("name", noshape_model::ParamValue::Text("len".into()));
+                f.params.set("variableType", noshape_model::ParamValue::Enum("LENGTH".into()));
+                f.params.set("lengthValue", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("42 mm")));
+                ps.features.push(f);
+            });
+        });
+    });
+    draw(cx, window);
+    let (window, view) = sketch_in(cx, window, view, Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["=", "#", "l", "e", "n", "enter"]);
+    assert!(near(&dimensions(cx, &view), &[0.042]), "{:?}", dimensions(cx, &view));
 }
 
 /// OTF-FIRST-KEY: corner rectangle, `30` Enter `20` Enter: 30 × 20 (the

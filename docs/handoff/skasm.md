@@ -114,9 +114,9 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    with it, no longer merged into it: circles centred on the Origin now carry a Coincident too, as live),
    bf1edd44 SKETCH-PATTERN-GLYPH-HOVER. e52e8015 point menus as live; UI keystroke tests 9.
 2. (Tried: writing back solved components between conflict-exclusion retries: no gain measured, dropped.)
-3. UI keystroke tests (docs/TESTS.md, part-studio-ui sketch_ui_tests.rs, 12 tests with psui's): extend to other P1
-   sketch key flows (`=#var` in a value box). Tab between rectangle boxes added 10-28 (it dropped the typed width;
-   fixed); the value box's keys are bound per test App (entry_key_bindings). The harness
+3. UI keystroke tests (docs/TESTS.md, part-studio-ui sketch_ui_tests.rs, 13 tests with psui's). Added 10-28: Tab
+   between rectangle boxes (it dropped the typed width; fixed), `=#len` in a Line box (sketch_in builds on a studio
+   prepared first). The value box's keys are bound per test App (entry_key_bindings). The harness
    is part-studio-ui only; assembly-ui could opt in the same way (dev-dependency on noshape-ui-test-support + gpui).
 4. Standard content (P3): ANSI taper pin crowned ends done 10-27 (live's rule from its B-rep alone: the seams l
    apart, the large one at d/2, crown spheres symmetric; = live's volume / areas / bbox); DIN 7050 / 7051 /
@@ -152,6 +152,10 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   model after an edit 53 s. T0 after a sketch/scene edit 830 s total chain (incl. the tests above).
 
 ## Requests to the lead
+- disk-loop (/tmp/lead/disk-loop.sh, every 30 min): its prune steps (prune-deps / prune-exes / incremental) run on
+  target dirs mid-build; three of my lands failed 10-28 00:40–01:50 on .rmeta / fingerprint files deleted under a
+  running build ("extern location for noshape_units does not exist: …/libnoshape_units-d2f9….rmeta", "failed to write
+  …/invoked.timestamp"). Could they skip a dir whose cargo is running, as `floor` does with `busy`?
 - "Show calculation variance" in Mass properties (live: behaviours "skasm (2026-10-27) calculation variance": every
   value gets " ± 4.000e-1 mm³"-style text, 3-decimal scientific, not persisted). The assembly panel
   (assembly-ui/assembly_mass.rs) is mine, the Part Studio one psui's (part-studio-ui menus.rs ~1329), and the numbers
