@@ -4,33 +4,33 @@ qa5, 2026-10-21 pass 4, CLI /tmp/qa5/noshape-cli-1436; source "qa5 bracket" (671
 script /root/qa5-scratch/pass3/roundtrip.py (export_parts defaults → import_files defaults into qa5-roundtrip.noshape).
 Status: ✅ exact / expected, ✗ broken, ? live comparison pending.
 
-| Format | File size | Re-imported | Status |
-|---|---|---|---|
-| Parasolid (.x_t) | 14739 B | 67191.327533, 20 faces | ✅ (header still v12, I5) |
-| ACIS (.sat) | 21947 B | 67191.327533, 20 | ✅ |
-| STEP | 72081 B | 67191.327533, 20 | ✅ |
-| IGES | 58968 B | 67191.327532, 20 | ✅ (header DOC1) |
-| JT | 34689 B | 67191.327533, 20 | ✅ |
-| PVZ | 70509 B | mesh 67194.905652 (+0.005 %), 1 face | ✅ (mesh, as Onshape) |
-| glTF / GLB | 46988 / 35484 B | mesh 67196.545601, 1 face | ✅ (mesh) |
-| 3MF | 78273 B | mesh 67196.546674, 1 face | ✅ (mesh) |
-| **Rhino (.3dm)** | – | **export_failed "unsupported: Rhino export needs openNURBS: build with OPENNURBS_ROOT"** (Onshape exports Rhino; live G-series has .3dm imports) | ✗ **EXP1** (kern / packaging: the shipped build must include it) |
-| **OBJ** | 45214 B | **import fails: "i/o error: could not read mesh file …bracket.obj"** (our own OBJ export can't be read back) | ✗ **EXP2** (kern) |
-| STL (CLI defaults) | 47284 B | 6.7e-05 mm³: the export defaults to **metres**, the import to **mm** | ? (live: UI export dialog Units sticky "Meter", REST always metres; UI import Units defaults to the document units, so Onshape behaves the same way. Check that our UI export dialog defaults/stickiness match) |
+| Format | File size | Re-imported | Status | Verified |
+|---|---|---|---|---|
+| Parasolid (.x_t) | 14739 B | 67191.327533, 20 faces | ✅ (header still v12, I5) | 77870dd4 10-28 (UI export header SCH_3801231_38101) |
+| ACIS (.sat) | 21947 B | 67191.327533, 20 | ✅ |  |
+| STEP | 72081 B | 67191.327533, 20 | ✅ | 77870dd4 10-28 (UI: wf-block 6649.885 → STEP → re-import 6649.885) |
+| IGES | 58968 B | 67191.327532, 20 | ✅ (header DOC1) |  |
+| JT | 34689 B | 67191.327533, 20 | ✅ |  |
+| PVZ | 70509 B | mesh 67194.905652 (+0.005 %), 1 face | ✅ (mesh, as Onshape) |  |
+| glTF / GLB | 46988 / 35484 B | mesh 67196.545601, 1 face | ✅ (mesh) |  |
+| 3MF | 78273 B | mesh 67196.546674, 1 face | ✅ (mesh) |  |
+| **Rhino (.3dm)** | – | **export_failed "unsupported: Rhino export needs openNURBS: build with OPENNURBS_ROOT"** (Onshape exports Rhino; live G-series has .3dm imports) | ✗ **EXP1** (kern / packaging: the shipped build must include it) |  |
+| **OBJ** | 45214 B | **import fails: "i/o error: could not read mesh file …bracket.obj"** (our own OBJ export can't be read back) | ✗ **EXP2** (kern) |  |
+| STL (CLI defaults) | 47284 B | 6.7e-05 mm³: the export defaults to **metres**, the import to **mm** | ? (live: UI export dialog Units sticky "Meter", REST always metres; UI import Units defaults to the document units, so Onshape behaves the same way. Check that our UI export dialog defaults/stickiness match) |  |
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
 
 ## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
-| Row | Ours | Status |
-|---|---|---|
-| EXP2 OBJ round trip | 72076 B, re-imports as mesh 67196.546728, 1 face | ✅ **fixed** |
-| EXP1 Rhino | export_failed "unsupported: Rhino export needs openNURBS" | ✗ still |
-| other nine formats | unchanged (exact or mesh) | ✅ |
+| Row | Ours | Status | Verified |
+|---|---|---|---|
+| EXP2 OBJ round trip | 72076 B, re-imports as mesh 67196.546728, 1 face | ✅ **fixed** |  |
+| EXP1 Rhino | export_failed "unsupported: Rhino export needs openNURBS" | ✗ still |  |
+| other nine formats | unchanged (exact or mesh) | ✅ |  |
 
 ## Re-run pass 12 (2026-10-22 ~01:35, CLI /tmp/qa5/noshape-cli-0107 = target-engine 01:07; main still 5bd50b2)
-| Row | Ours | Status |
-|---|---|---|
-| EXP1 Rhino | export_failed "unsupported: Rhino export needs openNURBS: build with OPENNURBS_ROOT (scripts/build-opennurbs.sh)" | ✗ still (the engine build has no openNURBS) |
+| Row | Ours | Status | Verified |
+|---|---|---|---|
+| EXP1 Rhino | export_failed "unsupported: Rhino export needs openNURBS: build with OPENNURBS_ROOT (scripts/build-opennurbs.sh)" | ✗ still (the engine build has no openNURBS) |  |
 
 ## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
 | EXP1 Rhino | "Rhino export needs openNURBS" | ✗ still |
@@ -45,16 +45,16 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 EXP1 Rhino: "Rhino export needs openNURBS" → ✗ still, routed kern (packaging).
 
 ## Re-run pass 22 (qa5, 2026-10-24, CLI built from main c59c5af9 after the api import/export batch; /root/qa5-scratch/pass21/impmatrix21.*)
-| Row | Ours now | Status |
-|---|---|---|
-| DOC1 IGES header | Start "File generated by NOSHAPE Version 0.4.6"; Global 1Hb (part), 6Hb.IGES, 7HNOSHAPE, 5H0.4.6, 32,24,8,56,15, 1., 2, 2HMM, 1000, 1., 13H261024.063348 (UTC), 1D-05, 1000000., empty author/org, 9, 0; space-padded sequence numbers | ✅ live's layout; product strings are noshape's own by decision |
-| I5 Parasolid header | PART1 fields as live (MC…unknown, FORMAT=text, GUISE=transmit, KEY/FILE = file name, DATE … (UTC)); FRU/APPL = "noshape 0.4.6"; SCH_3801231_38101 and modeller 3801231 in every version, as live | ✅ |
-| RHINO1 (EXP1) | "unsupported: Rhino export needs openNURBS: build with OPENNURBS_ROOT" | ✗ packaging (kern) |
+| Row | Ours now | Status | Verified |
+|---|---|---|---|
+| DOC1 IGES header | Start "File generated by NOSHAPE Version 0.4.6"; Global 1Hb (part), 6Hb.IGES, 7HNOSHAPE, 5H0.4.6, 32,24,8,56,15, 1., 2, 2HMM, 1000, 1., 13H261024.063348 (UTC), 1D-05, 1000000., empty author/org, 9, 0; space-padded sequence numbers | ✅ live's layout; product strings are noshape's own by decision | a6c56638 10-28 (UI IGES: "File generated by NOSHAPE Version 0.4.6") |
+| I5 Parasolid header | PART1 fields as live (MC…unknown, FORMAT=text, GUISE=transmit, KEY/FILE = file name, DATE … (UTC)); FRU/APPL = "noshape 0.4.6"; SCH_3801231_38101 and modeller 3801231 in every version, as live | ✅ | 77870dd4 10-28 |
+| RHINO1 (EXP1) | "unsupported: Rhino export needs openNURBS: build with OPENNURBS_ROOT" | ✗ packaging (kern) |  |
 
 ## Re-run pass 24 (qa5, 2026-10-24 ~00:20, CLI target-engine 13:51; source = tonight's bracket without step 8 (ADV9), 65431.327533 mm³ / 18 faces)
-| Format | Re-import | Status |
-|---|---|---|
-| Parasolid, ACIS, STEP, IGES, JT | 65431.327533 mm³, 18 faces (exact) | ✅ |
-| Rhino (3dm) | 65431.327331, 18 faces (this CLI build has openNURBS) | ✅ (RHINO1: works where openNURBS is built in) |
-| PVZ, glTF, GLB, OBJ, 3MF | 65434.9 – 65436.5 mm³ (mesh), 1 face | ✅ (mesh tolerance) |
-| STL, CLI defaults | 6.5e-05 mm³: exported in metres, imported in mm | ✅ as live (row 19: same in Onshape) |
+| Format | Re-import | Status | Verified |
+|---|---|---|---|
+| Parasolid, ACIS, STEP, IGES, JT | 65431.327533 mm³, 18 faces (exact) | ✅ |  |
+| Rhino (3dm) | 65431.327331, 18 faces (this CLI build has openNURBS) | ✅ (RHINO1: works where openNURBS is built in) |  |
+| PVZ, glTF, GLB, OBJ, 3MF | 65434.9 – 65436.5 mm³ (mesh), 1 face | ✅ (mesh tolerance) |  |
+| STL, CLI defaults | 6.5e-05 mm³: exported in metres, imported in mm | ✅ as live (row 19: same in Onshape) | 77870dd4 10-28 (UI STL dialog: Units Meter by default, as live's sticky Meter) |
