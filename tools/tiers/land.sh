@@ -43,6 +43,11 @@ echo "== clippy"; out=$(cargo clippy $args --all-targets -- -D warnings 2>&1); r
 echo "== tests"; out=$(cargo test $args --no-fail-fast 2>&1); rc=$?
 [ $rc -eq 0 ] || { echo "$out" | grep -vE '^warning: [a-z0-9_-]+@' | grep -E 'FAILED|panicked|^error|SIGSEGV|signal:|Caused by' -A2 | head -60; fail "tests"; }
 if echo "$pkgs" | grep -qwE 'noshape|noshape-ops|noshape-cli'; then echo "== T0"; tools/tiers/t0.sh > /tmp/land-t0-$$.log 2>&1 || { tail -20 /tmp/land-t0-$$.log; fail "T0"; }; fi
+# Menu labels live in the UI crates, but the test that every one has an agent API op (ops coverage) doesn't depend
+# on them, so the crate list above misses it (10-28: 19f2d38a's "Move to origin" turned main red).
+if ! echo "$pkgs" | grep -qw 'noshape-ops' && echo "$changed" | grep -qE '^crates/(app|[a-z-]+-ui)/.*\.rs$'; then
+  echo "== menu coverage"; out=$(cargo test -p noshape-ops --test all coverage:: 2>&1) || { echo "$out" | grep -E 'FAILED|panicked' -A8 | head -30; fail "menu coverage (add the label to crates/ops/src/coverage.rs MENUS)"; }
+fi
 # Main may have moved while we tested: rebase again; re-test only if the new commits touch the crates we edit.
 tested=$(git rev-parse origin/main)
 git fetch -q origin
