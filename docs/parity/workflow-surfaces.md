@@ -26,9 +26,9 @@ Status: ✅ matches expected/live, ✗ differs (finding #), ? live data pending.
 | 14 | Extrude with both regions, misclick near the New/Add/Remove row | – | Error "Select parts in the merge scope" (most likely my click landed on Remove; not a finding) | – |  |
 | 15 | Transform: type list | Translate by line, by distance, by XYZ, Transform by mate connectors, Rotate, Copy in place, Scale | same | ✅ | 0.4.10+ / dd1b5037 10-27 (Translate by line / by distance / by XYZ / Transform by mate connector / Rotate / Copy in place / Scale) |
 | 16 | Transform XYZ x 20, ☑ Copy part | copy | Part 4 at x 80..120 | ✅ | 0.4.10+ / dd1b5037 10-27 (bracket: XYZ x 10 + Copy part → Part 2 overlapping) |
-| 17 | Boolean Subtract: tools Part 4, targets Part 3 | 4000 mm³, 6 faces | 4000.0, 6 faces | ✅ |  |
+| 17 | Boolean Subtract: tools Part 4, targets Part 3 | 4000 mm³, 6 faces | 4000.0, 6 faces | ✅ | v0.4.12 CLI 10-28 (bin/boolmir.py: blocks 60..100 / 80..120, Subtract tools Part 2 targets Part 1 → 4000.000 mm³, 6 faces, x 60..80) |
 | 18 | Split Part 3 by Plane 1 (Right + 70) | two parts | Part 3 (x 70..80) + **Part 5** (x 60..70), 2000 each | ? (names) |  |
-| 19 | Mirror Part 5 about Right | Part 6 | Part 6 at x −70..−60 | ✅ |  |
+| 19 | Mirror Part 5 about Right | Part 6 | Part 6 at x −70..−60 | ✅ | v0.4.12 CLI 10-28 (bin/boolmir.py: Mirror of that part about Right → new part 4000.000, 6 faces, x −80..−60) |
 | 20 | Part colours after Split/Mirror | rotation #9dcfed, #a5a5a5, #3b61b4, #eaeaea, #c4e2f3, #f88701, #7f7f7f, #fab601 | Part 3 and Part 5 orange, Part 6 gold (persist after tab switch) | ? SF4 |  |
 | 21 | Move boundary on one straight edge of the planar boundary surface, 25 mm | surface extended | **Error with raw kernel text** "Geometry operation failed: operation failed: wire offset failed (offset too large or non-planar wire?)" | ✅ (SF5 fixed) | v0.4.12 CLI 10-28 (bin/sfcheck25.py: straight side of the arcs boundary surface, 25 mm → 1950 mm² = 1200 + 30×25, 1 face) |
 | 22 | (CLI) Move boundary on one edge of the planar Fill surface, 10 mm | 800 + 200 mm² | Error "Move boundary currently supports single planar surfaces only (all boundary edges moved)" | ✅ (SF5 fixed) | v0.4.12 CLI 10-28 (bin/sfcheck.py on a 40×20 extruded-line surface: one edge 10 mm → 1000 mm², x 0..50, 1 face) |
