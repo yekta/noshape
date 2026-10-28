@@ -129,6 +129,11 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
   e3fd499b see-through parts pick nearest-first, Alt through (2.23 ✅); then completion placeholders (vendored
   gpui-base snippet session: `${n:…}` selected in turn by Tab, caret after `;`; every call ends in `;`, predicates
   "predicate") and CTRL-C-PART.
+- 10-28 03:20–04:10: 4658e826 completion placeholders + CTRL-C-PART; 4fa9cdf1 no row tooltips while dragging
+  (REORDER-MISSING-MSG closed). End-of-day walk 03:35 on green da18f886 (live-30: edit Extrude 1 rolls back with the
+  preview and arrow, Esc; Front › Shift+X opens Section view with "Section plane 1 (Front)" and cuts; Shift+1/7 views;
+  Alt-pick, completion, lost sketch plane checked on my builds): no regressions in my area. One unreproduced oddity: a
+  drag of Boss 2 once moved Boss sketch 2 with it (three retries moved Boss 2 alone).
 - perf.yml on main dispatched 10-26 23:45: 40421862773 (live-30 edit/undo/redo), 40421870988 (fins-400 orbit 2x frames),
   40421880164 (live-30 cold start). Read the summaries into viewport-performance.md.
 
@@ -173,6 +178,12 @@ App edit → `cargo build -p noshape`: 60–78 s. A vendor gpui-base / gpui-pre-
 that touches the model: ~12 min.
 
 ## Next, in order
+
+N1. Open live answers still pending: interaction 4.9 (Measure asterisk), 6.2 (Section arrow vs Extrude arrow crops).
+N2. part-studio 🔧 rows to compare with live captures: 3.19 (Create selection, part-studio/380–398), 7.7 (parts list
+    properties: ask live), 10.1, 11.5–11.7.
+N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOperationType sits before
+    NewBodyOperationType in ours); Shift+Tab in a snippet (untested live).
 
 0. Live answer pending (REQUESTS psui 10-27, P2 interaction 4.9): when the Measure readout puts an asterisk after
    a value (live saw "Min dist: 0.000* in" with two picks on a mesh, none for mesh + Origin). Apply when answered.
