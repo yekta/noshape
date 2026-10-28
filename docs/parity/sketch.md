@@ -336,13 +336,13 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 ## Constraint glyph layout (ui2, 2026-10-25; live sketch/27, 28 vs ours at 1× / 2×)
 | Item | Live | Ours before | Status | Verified |
 |---|---|---|---|---|
-| Line glyphs | a row centred on the line's midpoint, 20.5 px out (below a horizontal line, left of a vertical one), 20 px white boxes 22 px apart | started at the midpoint and ran right, 6 px off the line | ❌ (SKETCH-GLYPH-LAYOUT-LOST) (box 11 px under a horizontal line, as live) | 0.4.10+ / 8602df0d 10-27 |
-| Point glyphs | up-left of the point (box top-left −27, −26) with a 1 px `#a8b2bb` leader | up-right, no leader | ❌ (SKETCH-GLYPH-LAYOUT-LOST) | 0.4.10+ / 8602df0d 10-27 |
-| Box | plain white square, no border, radius or shadow | radius 2 + shadow | ❌ (SKETCH-GLYPH-LAYOUT-LOST) | 0.4.10+ / 8602df0d 10-27 |
-| Icon | spans 14 px of the box | 11 px | ❌ (SKETCH-GLYPH-LAYOUT-LOST) (18 px icon) | 0.4.10+ / 8602df0d 10-27 |
+| Line glyphs | a row centred on the line's midpoint, 20.5 px out (below a horizontal line, left of a vertical one), 20 px white boxes 22 px apart | started at the midpoint and ran right, 6 px off the line | ✅ (box 11 px under a horizontal line, as live) | 0.4.10+ / d2826142 10-27 |
+| Point glyphs | up-left of the point (box top-left −27, −26) with a 1 px `#a8b2bb` leader | up-right, no leader | ✅ | 0.4.10+ / d2826142 10-27 |
+| Box | plain white square, no border, radius or shadow | radius 2 + shadow | ✅ | 0.4.10+ / d2826142 10-27 |
+| Icon | spans 14 px of the box | 11 px | ✅ (18 px icon) | 0.4.10+ / d2826142 10-27 |
 | Hovered glyph `#fcda7f`, toolbar, inference glyph | | | ✅ | 0.4.10+ / 965d3f56 10-27 (Equal glyph bg #fcda7f, both ellipses #ffc685; pattern glyph see SKETCH-PATTERN-GLYPH-HOVER) |
 | Rectangle corner coincident glyphs | four, at the corners | none: our corners share points, no coincident constraints | → skb (model) |  |
 | Hovered / selected sketch line | `#fec788` / `#feab10` ~80 % over the black line (darker core `#ca9e6b` / `#ca870b`) | the line recoloured, solid | → render owner (the line stays under a translucent highlight) |  |
-| Dimension value box (hover / selected) | 27 px high, centred on the value (sketch/24) | 22 px | ❌ (SKETCH-GLYPH-LAYOUT-LOST) | 0.4.10+ / 8602df0d 10-27 |
-| Inference glyph box | 20 px of 40 % white behind the icon, seen over a face (part-studio/1032) | none | ❌ (SKETCH-GLYPH-LAYOUT-LOST) | 0.4.10+ / 8602df0d 10-27 |
+| Dimension value box (hover / selected) | 27 px high, centred on the value (sketch/24) | 22 px | ✅ | 0.4.10+ / d2826142 10-28 |
+| Inference glyph box | 20 px of 40 % white behind the icon, seen over a face (part-studio/1032) | none | ✅ | 0.4.10+ / d2826142 10-28 |
 | Alignment guide | 1 px yellow, 4 px on / 4 off, no dot at the pointer (part-studio/1032) | 7 px `#ffc20e` dash + 8 px yellow dot | ✅ |  |
