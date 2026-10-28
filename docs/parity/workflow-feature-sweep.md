@@ -191,7 +191,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | 1 | Fields, empty origin | order, labels; "Cannot resolve entities." on Origin entity | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Empty owner | "Cannot determine owner of mate connector." on Select owner entity | no error | 🔧 L37 (owner inferred from the origin's part or the only part, as the dialog does) |  |
 | 3 | Owner / attachment auto-fill | from the origin entity or the only part (connectorEditLogic) | none | 🔧 L37 |  |
-| 4 | To selection, empty | "Select an entity for the mate connector attachment." on Attach to | no check | ✅ (already in refgeom.rs; the doc was stale) |  |
+| 4 | To selection, empty | "Select an entity for the mate connector attachment." on Attach to | no check | ✅ (already in refgeom.rs; the doc was stale) | v0.4.12 CLI 10-28 (cent copy: Mate connector on the top face, attachmentOption TO_SELECTION, attachTo [] → Error "Select an entity for the mate connector attachment.", faulty attachTo) |
 | 5 | Owner / attachment at regen | the connector follows them | not stored | 🔧 the owner part is kept with the connector and a Transform that moves the part moves it (attachment to a selection still follows the owner, not the selected face) |  |
 | 6 | Move vs Reorient secondary axis | translation in the reoriented frame (likely) | translated first | 🔧 L38 order: flip/reorient, move, rotate; "+Y" = X to −Y |  |
 | 7 | Between entities / Realign errors | built-in texts | own texts | 🔧 L39 "Failed to resolve mate connector coordinate system."; empty Realign axis = OK |  |
