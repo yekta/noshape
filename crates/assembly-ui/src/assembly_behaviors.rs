@@ -248,6 +248,8 @@ pub struct AsmUi {
     pub filter_sub: Option<Subscription>,
     /// The ≡ "Show search results as list" toggle (off: matches in their tree).
     pub filter_flat: bool,
+    /// The filter box has focus (its help popover shows while it is empty).
+    pub filter_focused: bool,
     /// Instance row under the cursor in the list (highlighted in the viewport).
     pub list_hover: Option<InstanceId>,
     /// Last clicked instance row: the anchor of Shift+click ranges.
@@ -2121,14 +2123,19 @@ impl AssemblyView {
             return;
         }
         let st = cx.new(|cx| InputState::new(window, cx));
-        let sub = cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| {
-            if matches!(ev, InputEvent::Change) {
+        let sub = cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| match ev {
+            InputEvent::Change => {
                 // No `cx.notify()`: the field's own notification re-renders
                 // the view (its ancestor) and the list head; of the cached
                 // slices only the rows show the filter.
                 this.ui.filter = ListFilter::parse(&st.read(cx).value());
                 this.filter_rows_changed(cx);
             }
+            InputEvent::Focus | InputEvent::Blur => {
+                this.ui.filter_focused = matches!(ev, InputEvent::Focus);
+                cx.notify();
+            }
+            _ => {}
         });
         self.ui.filter_input = Some(st);
         self.ui.filter_sub = Some(sub);
@@ -2233,7 +2240,8 @@ impl AssemblyView {
         cx.notify();
     }
 
-    /// Filter box with its colon-command dropdown (top of the instance list).
+    /// Filter box with its colon-command dropdown (top of the instance list);
+    /// focused and empty, live's help popover under it.
     pub(super) fn render_list_filter(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let Some(st) = self.ui.filter_input.clone() else { return div().into_any_element() };
         let view = cx.entity();
@@ -2281,7 +2289,8 @@ impl AssemblyView {
                     .border_1()
                     .border_color(gpui_kit::rgb(0xaaaaaa))
                     .rounded(px(3.))
-                    .child(crate::ui::input_with_placeholder(&st, "Filter by name", cx).appearance(false).text_size(px(13.33)).pl(px(5.))),
+                    .child(crate::ui::input_with_placeholder(&st, "Filter by name", cx).appearance(false).text_size(px(13.33)).pl(px(5.)))
+                    .when(self.ui.filter_focused && self.ui.filter.is_empty(), |d| d.child(div().absolute().top(px(31.)).left_0().child(deferred(anchored().child(filter_help())).with_priority(2)))),
             )
             .child(div().flex_1())
             .child({
@@ -4757,4 +4766,39 @@ mod ps_origin_tests {
         assert_eq!(PsOrigin::Origin.chip(|_| None).as_deref(), Some("Origin"));
         assert_eq!(PsOrigin::Connector(MateId(3)).chip(|_| Some("Mate connector 1".into())).as_deref(), Some("Mate connector 1"));
     }
+}
+
+/// The filter box's help (live, behaviours "qa (2026-10-27, P2) assembly
+/// instance list: Filter by name finds pattern instances", request 1519).
+fn filter_help() -> AnyElement {
+    const ROWS: [(&str, &str); 10] = [
+        (":part", "Filter by part contents"),
+        (":assembly", "Filter by subassemblies"),
+        (":mate", "Filter by mates and relations"),
+        (":matelimits", "Filter by mates with limits"),
+        (":folder", "Filter by assembly folders"),
+        (":errors", "Filter by contents with errors"),
+        (":warnings", "Filter by contents with warnings"),
+        (":suppressed", "Filter by suppressed contents"),
+        (":hidden", "Filter by hidden contents"),
+        (":shown", "Filter by shown contents"),
+    ];
+    let pal = p();
+    v_flex()
+        .w(px(330.))
+        .p(px(10.))
+        .gap(px(4.))
+        .bg(gpui_kit::rgb(0xffffff))
+        .border_1()
+        .border_color(gpui_kit::rgb(0xd7d7d7))
+        .rounded(px(3.))
+        .shadow_md()
+        .text_size(px(12.))
+        .text_color(pal.text)
+        .child("Search with filters or a partial name.")
+        .children(ROWS.iter().map(|(token, what)| {
+            h_flex().child(div().font_weight(FontWeight::BOLD).child(*token)).child(div().pl(px(4.)).italic().child("name")).child(div().child(format!(":\u{a0}{what}")))
+        }))
+        .child(div().pt(px(4.)).child("To perform an exact search, use quotation marks, such as :part \"Part 1 <1>\". Filters may be combined. For example, :part :hidden will search for only parts which are hidden."))
+        .into_any_element()
 }
