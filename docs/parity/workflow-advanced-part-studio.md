@@ -162,7 +162,7 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 |---|---|---|---|
 | ADV2 loft | 5927.754632 | ✗ still → routed kern |  |
 | ADV4 Hole countersink rows | icon rows, values readable ("12.878 mm", "82 deg") (a12) | ✅ **fixed** | 64997436 10-28 (GUI: Inch › Countersink › Tapped: icon rows, 13.487 mm / 82 deg / 12 mm / 12 mm / 3 all fit, no overlap; 20 tpi (UNC), ☐ Thread class = live dom qa5-adv-hole-tapped) |
-| Hole Tapped defaults | Straight tap, 1/4, **20 tpi (UNC)**, Fastener fit None, ☐ Thread class (live ~8515 ☐) (a15); an old doc's stored Threads/inch shows blank (legacy value) | ✅ |  |
+| Hole Tapped defaults | Straight tap, 1/4, **20 tpi (UNC)**, Fastener fit None, ☐ Thread class (live ~8515 ☐) (a15); an old doc's stored Threads/inch shows blank (legacy value) | ✅ | f8014efa 10-28 (GUI, new Hole on cbd.noshape › Hole type Tapped: Straight tap, 1/4, 20 tpi (UNC), Fastener fit None, ☐ Thread class, title "1/4-20 ↧ 12 mm") |
 | ADV1, ADV3, ADV6, ADV7, ADV8, TAB1 | fixed in earlier passes; ADV5, ADV12 withdrawn | ✅ |  |
 
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app /root/target-lead/debug/noshape)
