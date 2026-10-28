@@ -337,7 +337,11 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Shared prefs touched by testing: ~/.config/noshape/preferences.json got `featureDialogWidths.extrude 278` from a resize
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
-## Requests to the lead (qa, updated 2026-10-28 20:25)
+## Requests to the lead (qa, updated 2026-10-28 21:05)
+- **P0 DRAFT-BUDGET-POOL is back (21:05):** green e4cccdff (core c1f98ed6, OCCT patch 0005) never finishes opening
+  tickets/draft-pool-hang-2133.noshape (memory climbing); 989f756b opens it in 26 s. The defeaturing's face/face stage runs on the OCCT
+  pool even with serial pairs, and 0005 stops the budget from interrupting it. Revert 0005 or give pool work a real cancellation
+  before the 05:00 cut.
 - **P1 GREEN-ICONS-PATH (20:25):** greens since 4b9d7eaf are built in /home/ngyekta/projects/noshape-wt/watch; their rust-embed (no
   debug-embed) reads icons from that path at run time, so on this box the app has no icons. qa copied main's crates/app/assets there
   as a stopgap (see TICKETS › Lead / build). Please build the green where it runs or turn on rust-embed's debug-embed.
