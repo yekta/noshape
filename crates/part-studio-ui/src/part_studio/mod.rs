@@ -3319,15 +3319,19 @@ impl PartStudioView {
                         .os_context_menu(move |m, _, _| {
                             let (v1, v2) = (view.clone(), view.clone());
                             let ids = ids2.clone();
-                            m.item(crate::os_menu::OsMenuItem::new(if show_props { "Hide parts list properties" } else { "Show parts list properties" }).on_click(move |_, _, cx| {
+                            // Live ("psui (2026-10-28, P1) part-studio 7.7"): the Parts header's menu is this one item,
+                            // an override for this Part Studio; Preferences › Display parts list properties stays the
+                            // default (not changed here).
+                            let m = m.item(crate::os_menu::OsMenuItem::new(if show_props { "Hide parts list properties" } else { "Show parts list properties" }).on_click(move |_, _, cx| {
                                 v1.update(cx, |this, cx| {
                                     this.ui.show_part_props = !this.ui.show_part_props;
-                                    // The same setting as Preferences › Display parts list properties.
-                                    crate::part_studio_hooks::set_parts_list_properties(this.ui.show_part_props);
                                     cx.notify();
                                 })
-                            }))
-                            .item(crate::os_menu::OsMenuItem::new(format!("Hide all {}", title.to_lowercase())).on_click(move |_, _, cx| {
+                            }));
+                            if key == "parts" {
+                                return m;
+                            }
+                            m.item(crate::os_menu::OsMenuItem::new(format!("Hide all {}", title.to_lowercase())).on_click(move |_, _, cx| {
                                 let t: Vec<Reference> = ids.iter().cloned().map(Reference::Body).collect();
                                 v2.update(cx, |this, cx| this.set_visibility(&t, true, cx))
                             }))
@@ -3607,7 +3611,10 @@ impl PartStudioView {
                 // a composite adds "(open|closed) (N parts)".
                 None => div()
                     .id(SharedString::from(format!("part-name-{}", b.id)))
-                    .flex_1()
+                    // With the properties shown the name is as wide as its text and the pills follow it (live
+                    // "psui (2026-10-28, P1) part-studio 7.7").
+                    .when(!self.ui.show_part_props, |d| d.flex_1())
+                    .when(self.ui.show_part_props, |d| d.min_w_0().flex_shrink(1.))
                     .truncate()
                     .child(crate::ui::user_text(b.name.clone()))
                     .tooltip(crate::ui::user_tooltip(match &b.composite {
@@ -3616,8 +3623,19 @@ impl PartStudioView {
                     }))
                     .into_any_element(),
             })
-            // Parts list properties (part number, revision).
-            .when_some(self.ui.show_part_props.then(|| self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).map(|p| [p.part_number.clone().unwrap_or_default(), p.revision.clone().unwrap_or_default()].iter().filter(|x| !x.is_empty()).cloned().collect::<Vec<_>>().join(" · "))).flatten().filter(|t| !t.is_empty()), |d, t| d.child(div().text_xs().text_color(pal.text_faint).child(crate::ui::user_text(t))))
+            // Parts list properties (live "psui (2026-10-28, P1) part-studio 7.7"): after the name, the part
+            // number in a #d7d7d7 pill (if set), the state in a #eeeeee pill (always, "In progress" by default) and
+            // the revision in parentheses (if set), each ellipsised on its own; the eye stays at the right end.
+            .when(self.ui.show_part_props, |d| {
+                let props = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).cloned().unwrap_or_default();
+                let pill = |text: String, bg: u32, h: f32| {
+                    div().ml(px(4.)).h(px(h)).pl(px(4.)).pr(px(if bg == 0xeeeeee { 3. } else { 4. })).min_w_0().flex_shrink(1.).flex().items_center().rounded(px(3.)).bg(gpui_kit::rgb(bg)).text_color(gpui_kit::rgb(0x333333)).child(div().truncate().child(crate::ui::user_text(text)))
+                };
+                d.when_some(props.part_number.filter(|t| !t.is_empty()), |d, t| d.child(pill(t, 0xd7d7d7, 22.)))
+                    .child(pill(props.meta.state.clone().filter(|t| !t.is_empty()).unwrap_or_else(|| "In progress".into()), 0xeeeeee, 20.))
+                    .when_some(props.revision.filter(|t| !t.is_empty()), |d, t| d.child(div().ml(px(4.)).min_w_0().flex_shrink(1.).truncate().text_color(gpui_kit::rgb(0x333333)).child(crate::ui::user_text(format!("({t})")))))
+                    .child(div().flex_1())
+            })
             .child(
                 div()
                     .id(SharedString::from(format!("part-eye-{}", b.id)))
