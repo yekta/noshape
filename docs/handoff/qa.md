@@ -9,6 +9,11 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
+- **16:29 update (green 78958d0f):** live 1566 / 1567 → P2 DWG-PANEL-ESC-STACK (Esc doesn't close View properties /
+  Table; panels stack), P3 DWG-TABLE-SHIFT-EXTEND. Verified: drawing V51 / V52 / TB19, workflow-drawing D8 (callout "2") /
+  D12 (R14 DXF entities), assembly L24 / R13 (rigid icon) / I7, workflow-assembly A18, sketch 3.13 (custom shortcut) /
+  8.18. Open live asks: drawing info toast lifetimes, curve-to-curve dimension. Tip: Preferences and the documents page
+  are separate X windows (send keys with xdotool --window; move them off-screen when done).
 - **16:16 update (green 78958d0f, copied 16:10):** 307b619b verified (view paste into another document → "Views
   could not be copied between documents."). Fuzz 76 (7895) alive. New from live 1564 / 1565: P2 ASM-PATTERN-SUBASSEMBLY
   (Move to new subassembly must carry a dependent pattern, with live's confirm modal), P2 DWG-CONSTRAINT-PRESELECT
