@@ -192,15 +192,44 @@ fn rectangle_value_boxes_take_width_then_height(cx: &mut TestAppContext) {
     assert!(near(&dimensions(cx, &view), &[0.02, 0.03]), "{:?}", dimensions(cx, &view));
 }
 
-/// Tab moves from the rectangle's width box to its height box, taking the
-/// typed width: Rectangle, click, click, 30 Tab 20 Enter → 30 × 20.
+/// Tab in a rectangle's value box (live, behaviours "skasm (2026-10-28)
+/// sketch value boxes: Tab"): inside the typed width it applies nothing and
+/// stays, the value selected with its unit, so 30 Tab 20 Enter makes the
+/// width 20 and no height; with nothing typed it makes the height box the
+/// active one.
 #[gpui::test]
-fn rectangle_value_boxes_tab_between_them(cx: &mut TestAppContext) {
+fn rectangle_value_boxes_tab_as_live(cx: &mut TestAppContext) {
     let (window, view) = sketch_with(cx, "rect-tab", Tool::CornerRect);
     click(cx, window, &view, (500., 300.));
     click(cx, window, &view, (650., 400.));
     keys(cx, window, &["3", "0", "tab", "2", "0", "enter"]);
-    assert!(near(&dimensions(cx, &view), &[0.02, 0.03]), "{:?}", dimensions(cx, &view));
+    assert_eq!(dimension_kinds(cx, &view), vec![(true, 0.02)], "the width 20, no height");
+    let (window, view) = sketch_with(cx, "rect-tab2", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    keys(cx, window, &["tab", "2", "0", "enter"]);
+    assert_eq!(dimension_kinds(cx, &view), vec![(false, 0.02)], "the height 20");
+}
+
+/// The driving dimensions as (a width: a horizontal line's length or the
+/// distance between vertical lines; value).
+fn dimension_kinds(cx: &mut TestAppContext, view: &Entity<PartStudioView>) -> Vec<(bool, f64)> {
+    cx.update(|cx| {
+        let data = view.read(cx).sketch_data(cx).expect("sketching");
+        let sk = &data.sketch;
+        let dir = |e: noshape_sketch::EntityId| match sk.curve(e) {
+            Some(noshape_sketch::Curve2::Line { a, b }) => Some(b - a),
+            _ => None,
+        };
+        let width = |es: &[noshape_sketch::EntityId]| match es {
+            [e] => dir(*e).is_some_and(|d| d.y.abs() < 1e-9),
+            _ => es.iter().all(|e| dir(*e).is_some_and(|d| d.x.abs() < 1e-9)),
+        };
+        sk.constraints()
+            .filter(|c| c.driving)
+            .filter_map(|c| Some((width(&c.kind.entities()), (c.value()? * 1e6).round() / 1e6)))
+            .collect()
+    })
 }
 
 /// A press, a drag in `steps` and a release of the tool, viewport pixels.

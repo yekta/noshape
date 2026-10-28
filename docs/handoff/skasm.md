@@ -116,7 +116,8 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    bf1edd44 SKETCH-PATTERN-GLYPH-HOVER. e52e8015 point menus as live; UI keystroke tests 9.
 2. (Tried: writing back solved components between conflict-exclusion retries: no gain measured, dropped.)
 3. UI keystroke tests (docs/TESTS.md, part-studio-ui sketch_ui_tests.rs, 13 tests with psui's). Added 10-28: Tab
-   between rectangle boxes (it dropped the typed width; fixed), `=#len` in a Line box (sketch_in builds on a studio
+   in a rectangle's boxes as live (behaviours "skasm (2026-10-28) sketch value boxes: Tab": on a typed value it applies
+   nothing and stays, "30" → "30 mm" selected; with nothing typed the other hint is active), `=#len` in a Line box (sketch_in builds on a studio
    prepared first). The value box's keys are bound per test App (entry_key_bindings). The harness
    is part-studio-ui only; assembly-ui could opt in the same way (dev-dependency on noshape-ui-test-support + gpui).
 4. Standard content (P3): ANSI taper pin crowned ends done 10-27 (live's rule from its B-rep alone: the seams l

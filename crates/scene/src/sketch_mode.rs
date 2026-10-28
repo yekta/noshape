@@ -3184,6 +3184,12 @@ impl SketchEditor {
     }
 
     /// Switch the active on-the-fly box (Alt+arrows / Tab).
+    /// The unit kind of the active on-the-fly box's value.
+    pub fn otf_active_dim(&self) -> Option<Dim> {
+        let o = self.otf.as_ref()?;
+        o.fields.get(o.active).map(|f| dim_unit(&f.kind))
+    }
+
     pub fn otf_step(&mut self, delta: isize) {
         if let Some(o) = &mut self.otf {
             let n = o.fields.len() as isize;

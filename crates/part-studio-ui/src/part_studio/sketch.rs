@@ -27,16 +27,20 @@ use noshape_units::{Dim, Quantity};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-actions!(sketch_entry, [SketchEntryNext, SketchEntryPrev, SketchEntryCancel]);
+actions!(sketch_entry, [SketchEntryNext, SketchEntryPrev, SketchEntryTab, SketchEntryBackTab, SketchEntryCancel, SketchHintTab, SketchHintBackTab]);
 
-/// Keys of the on-the-fly value box: Tab / Alt+arrows to the other box, Esc.
+/// Keys of the on-the-fly value box: Tab (the value with its unit,
+/// selected), Alt+arrows to the other box, Esc.
 pub(super) fn entry_key_bindings() -> Vec<KeyBinding> {
     vec![
-        KeyBinding::new("tab", SketchEntryNext, Some("SketchEntry")),
-        KeyBinding::new("shift-tab", SketchEntryPrev, Some("SketchEntry")),
+        KeyBinding::new("tab", SketchEntryTab, Some("SketchEntry")),
+        KeyBinding::new("shift-tab", SketchEntryBackTab, Some("SketchEntry")),
         KeyBinding::new("alt-right", SketchEntryNext, Some("SketchEntry")),
         KeyBinding::new("alt-left", SketchEntryPrev, Some("SketchEntry")),
         KeyBinding::new("escape", SketchEntryCancel, Some("SketchEntry")),
+        // With no input open (the hints showing): the other hint (live).
+        KeyBinding::new("tab", SketchHintTab, Some("Sketch")),
+        KeyBinding::new("shift-tab", SketchHintBackTab, Some("Sketch")),
     ]
 }
 
@@ -1403,21 +1407,50 @@ impl PartStudioView {
 
     /// Tab / Alt+arrows in the box: switch to the other box.
     fn otf_switch(&mut self, delta: isize, window: &mut Window, cx: &mut Context<Self>) {
-        // A value typed in the box is taken before moving on (rectangle: 30
-        // Tab 20 Enter makes 30 x 20; it was dropped).
-        let typed = self.ui_ref().and_then(|u| u.otf_input.as_ref()).map(|(st, _)| st.read(cx).value().to_string());
-        let units = self.doc.read(cx).session.doc.settings.units;
-        let suggested = self.sketch_data(cx).and_then(|data| self.sketch.as_ref()?.otf_boxes(&data, &units).into_iter().find(|b| b.2).map(|b| b.1));
-        if let Some(text) = typed.filter(|t| !t.trim().is_empty() && Some(t.trim()) != suggested.as_deref().map(str::trim)) {
-            self.commit_otf_input(&text, window, cx);
-            return;
-        }
         if let Some(ed) = &mut self.sketch {
             ed.otf_step(delta);
         }
         self.close_otf_input();
         self.open_otf_input(None, window, cx);
         self.refresh_scene(false, cx);
+    }
+
+    /// Tab / Shift+Tab in the box (live, behaviours "skasm (2026-10-28)
+    /// sketch value boxes: Tab"): on a typed value nothing is applied and the
+    /// box stays, the value gets its unit ("30" → "30 mm"), all selected, so
+    /// the next keys replace it; on the untouched suggestion the other box
+    /// becomes the active one.
+    fn otf_tab(&mut self, delta: isize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(st) = self.ui_ref().and_then(|u| u.otf_input.as_ref()).map(|(st, _)| st.clone()) else { return };
+        let Some(dim) = self.sketch.as_ref().and_then(|ed| ed.otf_active_dim()) else { return };
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let text = st.read(cx).value().to_string();
+        let suggested = self.sketch_data(cx).and_then(|data| self.sketch.as_ref()?.otf_boxes(&data, &units).into_iter().find(|b| b.2).map(|b| b.1));
+        if suggested.as_deref().map(str::trim) == Some(text.trim()) {
+            self.otf_switch(delta, window, cx);
+            return;
+        }
+        let vars = self.sketch_variables(cx);
+        let shown = noshape_model::quantity_text::commit_text(text.trim().trim_start_matches('=').trim(), dim, &units, &vars);
+        st.update(cx, |s, cx| {
+            if !shown.is_empty() {
+                s.set_value(shown, window, cx);
+            }
+            s.select_all(window, cx);
+        });
+        cx.notify();
+    }
+
+    /// Tab with the hints showing and no input open: switch the active one.
+    /// Tab elsewhere goes on to its other bindings.
+    fn otf_hint_tab(&mut self, delta: isize, cx: &mut Context<Self>) {
+        let Some(ed) = self.sketch.as_mut().filter(|ed| ed.otf.is_some()) else {
+            cx.propagate();
+            return;
+        };
+        ed.otf_step(delta);
+        self.refresh_scene(false, cx);
+        cx.notify();
     }
 
     /// Esc in the box: drop the boxes (the geometry stays undimensioned).
@@ -3389,6 +3422,8 @@ impl PartStudioView {
                         .key_context("SketchEntry")
                         .on_action(cx.listener(|this, _: &SketchEntryNext, window, cx| this.otf_switch(1, window, cx)))
                         .on_action(cx.listener(|this, _: &SketchEntryPrev, window, cx| this.otf_switch(-1, window, cx)))
+                        .on_action(cx.listener(|this, _: &SketchEntryTab, window, cx| this.otf_tab(1, window, cx)))
+                        .on_action(cx.listener(|this, _: &SketchEntryBackTab, window, cx| this.otf_tab(-1, window, cx)))
                         .on_action(cx.listener(|this, _: &SketchEntryCancel, window, cx| this.cancel_otf(window, cx)))
                         // Live (inputs/6_on-the-fly_dimension_box): 13.33 px right-aligned, pl/pr 3,
                         // a blue bottom border on a transparent box.
@@ -4188,6 +4223,11 @@ impl PartStudioView {
 
             // Sketch versions of the document-level commands (capture phase,
             // before the Part Studio handles them).
+            // Tab / Shift+Tab with no value box input open: the other hint is
+            // the active box, nothing applied (live).
+            .on_action(cx.listener(|this, _: &SketchHintTab, _, cx| this.otf_hint_tab(1, cx)))
+            .on_action(cx.listener(|this, _: &SketchHintBackTab, _, cx| this.otf_hint_tab(-1, cx)))
+            .capture_action(cx.listener(|this, _: &crate::actions::DialogTabPrev, _, cx| this.otf_hint_tab(-1, cx)))
             .capture_action(cx.listener(|this, _: &ClearSelection, _, cx| {
                 if let Some(ed) = &mut this.sketch {
                     ed.selection.clear();
