@@ -266,7 +266,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 10.1 | Hide/Show parts, sketches, planes, mate connectors, default geometry | View__hide_show | 🔧 (parts only before) |  |
+| 10.1 | Hide/Show parts, sketches, planes, mate connectors, default geometry | View__hide_show | ✅ (parts only before; psui 10-28 on :102: Top hidden from its row's eye, Mate connector 1 from its row menu (Hide; the glyph goes, the row shows the struck eye), the empty-space menu's Show all brings them back) |  |
 | 10.2 | Hide other parts / Hide all parts / Show all / Show all parts | View__hide_show | ✅ (10-27: the face menu and the parts list row menu as live; Show all in the empty-space menu) | 0.4.10+ / 2d9a275c 10-27 |
 | 10.3 | Isolate keeps chosen parts opaque, others transparent | View__isolate | ✅ (see 2.18) | 0.4.10+ / 2d9a275c 10-27 |
 | 10.4 | Make transparent makes chosen parts transparent | View__make_transparent | ✅ (see 2.19) | 0.4.10+ / 2d9a275c 10-27 |
