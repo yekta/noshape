@@ -4441,7 +4441,10 @@ impl PartStudioView {
                 let after = this.ui.feature_drop.take().is_some_and(|(r, a)| r == i && a);
                 this.drop_features(d.id, i, after, cx);
             }));
-        let row = crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), tip);
+        // No row tooltips while a row is dragged: one scheduled over a row the
+        // drag passed showed after the drop over the moved row, naming the
+        // other (REORDER-MISSING-MSG's stale tooltip).
+        let row = if cx.has_active_drag() { row } else { crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), tip) };
         let view = cx.entity();
         // Roll to here unless the bar already sits right after this
         // feature, Roll to end while it isn't at the end (live qa4 r5 s2,
