@@ -348,3 +348,28 @@ fn timed_the_fin_under_the_fin_plate_regenerates_locally() {
     eprintln!("fin under the {n}-fin plate: {best:.0} ms (target 150)");
     assert!(best < 600.0, "the fin under the {n}-fin plate took {best:.0} ms (target 150)");
 }
+
+/// BOOLEAN-SPEEDUP phase 2's display half: after the fin under the 400-fin
+/// plate, what the regeneration costs besides the fin itself (the display:
+/// meshing the part, its edges and vertices). Printed only.
+#[test]
+#[ignore = "timed: perf.yml model job (wall clock; ci.yml tests are deterministic)"]
+fn timed_the_fin_plate_redisplays_after_the_fin() {
+    log();
+    let n = 400;
+    let (mut s, _, lp2) = model(n, true);
+    s.ps.features.retain(|f| f.id != lp2);
+    let w2 = s.ps.features.pop().unwrap();
+    let id = w2.id;
+    let mut g = Regenerator::new();
+    let opts = RegenOptions::default();
+    // The plate and its fins, shown.
+    assert!(!g.regenerate(&s.ps, &ConfigValues::default(), &s.units, &opts).cancelled);
+    s.ps.features.push(w2);
+    let t = Instant::now();
+    let r = g.regenerate(&s.ps, &ConfigValues::default(), &s.units, &opts);
+    let total = t.elapsed().as_secs_f64() * 1000.0;
+    let st = r.display.features.iter().find(|x| x.id == id).unwrap();
+    assert!(matches!(st.status, FeatureStatus::Ok), "{:?} {:?}", st.status, st.message);
+    eprintln!("fin under the {n}-fin plate: {} ms the fin, {:.0} ms the rest (display; total {total:.0} ms)", st.time_ms, total - st.time_ms as f64);
+}

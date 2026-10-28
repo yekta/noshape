@@ -275,6 +275,35 @@ Phase 2 (local Booleans), first step landed:
 - kernel C++ .cpp edit → `cargo test -p noshape-kernel --test all <file>::`: ~25 s (ccache); a header edit ~3–10 min.
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
+## From psui (10-28 10:45): display re-mesh findings for your mesh cache
+
+Before the lead's 10:35 correction I built a kernel-side face cache too. It is **not landed**; take it or drop it:
+/root/psui-scratch/mesh-reuse-for-core.patch (`git apply` on e60fdf6f; mesh.cpp, ffi, mesh.rs, display.rs, tests).
+What it found on pattern_second's fin under the 400-fin plate (release, load 20–40):
+- **A planar CDT bug, independent of any cache (small):** planar_cdt.hpp `recover()` refuses a constraint when a
+  vertex in a's fan is collinear with a-b even when it lies *behind* a. The fin under fin 19 puts edges in line
+  across the plate's front / back faces (1608 edges), so PlanarCdtAlgo refuses both on every regeneration and
+  BRepMesh's own algorithm takes 200–400 ms (BRepMesh's face phase 32 → 414 ms). Fix: refuse only a collinear
+  vertex ahead of a (dot > 0): /root/psui-scratch/planar-cdt-collinear-fix.patch, with a T1 that fails without it
+  (planar_mesh `a_vertex_in_line_behind_a_boundary_segment_keeps_the_planar_triangulation`; it reads a
+  `planar_fallbacks` count that the big patch adds to MeshCounts).
+- Keys miss without this: the display's linear deflection is diag × quality and the fin grows the bounding box, so
+  every key changes. The patch quantizes diag in display.rs `display_deflection` (eighths of an octave, up).
+- Kept faces must stay *out* of BRepMesh: with every face restored it still took 86 of ~100 ms (model build, edges,
+  healer). The patch meshes a compound of the new faces only and gives each edge they share with a kept face that
+  face's polygon (a custom edge discretizer doing what BRepMesh's extractor does); an edge that isn't
+  same-parameter / same-range, or is a seam, brings its kept face along instead. A face is reused when its edges,
+  and per edge the faces' surface / location / orientation / stored pcurves in BRepMesh's order
+  (ReverseSortFaces), are unchanged; the faces themselves may be new (the rebuilt front face).
+- Exactness: kernel test mesh_reuse (120 and 400 fins, a fin fused under with unify) compares the result with a
+  full re-mesh bit for bit: identical, 1867 of 1878 faces kept.
+- Numbers (tessellating the part after the fin): main 430–600 ms; CDT fix alone 330–630 (load); fix + cache
+  326–357 ms, 1202 of 1610 faces kept (the 400 located fin faces are never cached). Left: BRepMesh's model build
+  of the two 1608-edge faces (~200 ms: ShapeAnalysis_WireOrder, BRep_Tool::CurveOnPlane per call), and ~150–190 ms
+  of display work outside meshing (mine to measure once your cache lands).
+- Landed with this note: model `pattern_second::timed_the_fin_plate_redisplays_after_the_fin` (perf.yml model job)
+  prints the display's share of the regeneration.
+
 ## Requests to the lead
 - /tmp/lead/disk-loop.sh's `prune-exes.py` (every ~30 min) keeps the newest 2 builds of each noshape crate per
   target dir and deletes the rest with their fingerprint dirs, also while a cargo uses the dir: land.sh builds

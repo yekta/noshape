@@ -179,6 +179,14 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N02. 10-28 08:55–10:45, item 1 (display re-mesh): built a kernel face cache, then the lead (10:35) gave the kernel
+     side to core; not landed. Findings, the patch and numbers are in core.md "From psui (10-28 10:45)": the
+     planar CDT collinear bug (200–400 ms on the fin plate's rebuilt front faces, independent of caching) is the
+     big one. My part, only after core's cache lands: measure the display work outside meshing on Extrude 3
+     (~150–190 ms here: "display: bodies" minus "tessellate"; with_mesh_lines, shown_vertices, …) with
+     `pattern_second::timed_the_fin_plate_redisplays_after_the_fin` and NOSHAPE_PERF=1, act if significant.
+     Next: item 2, cold start (precompiled Metal shader libraries in the release job).
+
 N00. Perf 10-28: v0.4.12's 1× texture orbit / zoom at 18 fps (run 40640263048) is **runner noise, not code**:
      v0.4.12's own commit built from source (40648174571) reads 31.1 / 30.5 / 30.7 fps on macOS 14 and 18.7 / 19.1 /
      18.6 on macOS 15 in the same run; bf131a31~1 and bf131a31 read ~31 on both. The 1× path is timer-paced and
