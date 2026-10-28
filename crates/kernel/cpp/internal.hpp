@@ -89,6 +89,8 @@ bool bop_parallel();
 // `r` valid where it differs from `input`: its faces not the input's in full,
 // the whole shape for closure and orientation (features.cpp).
 bool valid_changed(const TopoDS_Shape& input, const TopoDS_Shape& r);
+// `out`'s face boxes from `from`'s for the faces they share (common.cpp).
+void inherit_face_boxes(const OcShape& from, OcShape& out);
 // The OcShape's ancestor map (CSR offsets, values; ancestor_map's), made
 // once and kept (common.cpp).
 const std::pair<std::vector<uint32_t>, std::vector<uint32_t>>& ancestors_cached(const OcShape& s, TopAbs_ShapeEnum kind, TopAbs_ShapeEnum ancestor_kind);
@@ -135,7 +137,9 @@ private:
 class HistoryBuilder
 {
 public:
-  HistoryBuilder(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& output);
+  // `sources[i]`, when given and holding args[i], lends its maps (the
+  // caller's OcShapes: their maps are made already).
+  HistoryBuilder(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& output, const std::vector<const OcShape*>* sources = nullptr);
 
   // Add Modified/Generated/Deleted records from a (composed) history plus
   // Kept records for input sub-shapes present unchanged in the output.
@@ -152,15 +156,18 @@ public:
 
   OpOut finish();
 
-  const TopoDS_Shape& output() const { return myOut.shape; }
+  const TopoDS_Shape& output() const { return myOut->shape; }
+  // The result's OcShape (finish() hands it on, with the maps made here).
+  OcShape& out() { return *myOut; }
 
 private:
   void push(uint32_t arg, uint8_t in_kind, uint32_t in_index, uint8_t rel,
             const TopoDS_Shape& out);
 
   std::vector<TopoDS_Shape>             myArgs;
-  std::vector<std::unique_ptr<OcShape>> myArgMaps;
-  OcShape                               myOut;
+  std::vector<std::unique_ptr<OcShape>> myOwnArgMaps;
+  std::vector<const OcShape*>           myArgMaps;
+  std::unique_ptr<OcShape>              myOut;
   rust::Vec<HistRec>                    myRecs;
 };
 
@@ -333,6 +340,6 @@ bool is_seam(const TopoDS_Edge& e, const NCollection_List<TopoDS_Shape>* faces);
 
 // Convenience: build OpOut from args + output + optional history.
 OpOut make_result(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& out,
-                  const BRepTools_History* h);
+                  const BRepTools_History* h, const std::vector<const OcShape*>* sources = nullptr);
 
 } // namespace noshape

@@ -93,8 +93,44 @@ const std::vector<Bnd_Box>& OcShape::face_boxes() const
     myBoxes.resize((size_t)f.Extent());
     for (int i = 1; i <= f.Extent(); ++i)
       BRepBndLib::Add(f(i), myBoxes[(size_t)i - 1], false);
+    myBoxesReady.store(true);
   });
   return myBoxes;
+}
+
+void OcShape::adopt_map(TopAbs_ShapeEnum kind, ShapeIMap&& m)
+{
+  const int k = static_cast<int>(kind);
+  std::call_once(myFlags[k], [&]() { myMaps[k] = std::move(m); });
+}
+
+void OcShape::adopt_face_boxes(std::vector<Bnd_Box>&& b)
+{
+  std::call_once(myBoxesFlag, [&]() {
+    myBoxes = std::move(b);
+    myBoxesReady.store(true);
+  });
+}
+
+// The faces' boxes of `out` from `from`'s where they are the same faces
+// (made once when `from` has them), the others made here.
+void inherit_face_boxes(const OcShape& from, OcShape& out)
+{
+  if (!from.has_face_boxes())
+    return;
+  const ShapeIMap&            was = from.map(TopAbs_FACE);
+  const std::vector<Bnd_Box>& wb  = from.face_boxes();
+  const ShapeIMap&            now = out.map(TopAbs_FACE);
+  std::vector<Bnd_Box>        b((size_t)now.Extent());
+  for (int i = 1; i <= now.Extent(); ++i)
+  {
+    const int k = was.FindIndex(now(i));
+    if (k > 0)
+      b[(size_t)i - 1] = wb[(size_t)k - 1];
+    else
+      BRepBndLib::Add(now(i), b[(size_t)i - 1], false);
+  }
+  out.adopt_face_boxes(std::move(b));
 }
 
 std::unique_ptr<OcShape> wrap(const TopoDS_Shape& s) { return std::make_unique<OcShape>(s); }
@@ -239,12 +275,22 @@ TopoDS_Shape simplify_compound(const TopoDS_Shape& s)
 static const TopAbs_ShapeEnum kHistKinds[] = {TopAbs_SOLID, TopAbs_FACE, TopAbs_EDGE,
                                               TopAbs_VERTEX};
 
-HistoryBuilder::HistoryBuilder(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& output)
+HistoryBuilder::HistoryBuilder(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& output, const std::vector<const OcShape*>* sources)
     : myArgs(args),
-      myOut(output)
+      myOut(std::make_unique<OcShape>(output))
 {
-  for (const auto& a : myArgs)
-    myArgMaps.push_back(std::make_unique<OcShape>(a));
+  for (size_t i = 0; i < myArgs.size(); ++i)
+  {
+    const OcShape* src = sources != nullptr && i < sources->size() ? (*sources)[i] : nullptr;
+    // The same shape, orientation too (MapShapes keeps the first occurrence's).
+    if (src != nullptr && src->shape.IsEqual(myArgs[i]))
+      myArgMaps.push_back(src);
+    else
+    {
+      myOwnArgMaps.push_back(std::make_unique<OcShape>(myArgs[i]));
+      myArgMaps.push_back(myOwnArgMaps.back().get());
+    }
+  }
 }
 
 void HistoryBuilder::push(uint32_t arg, uint8_t in_kind, uint32_t in_index, uint8_t rel,
@@ -274,7 +320,7 @@ void HistoryBuilder::push(uint32_t arg, uint8_t in_kind, uint32_t in_index, uint
         push(arg, in_kind, in_index, rel, e.Current());
     return;
   }
-  const int idx = myOut.map(ok).FindIndex(out);
+  const int idx = myOut->map(ok).FindIndex(out);
   if (idx <= 0)
     return; // not part of the final result
   r.out_kind  = static_cast<uint8_t>(ok);
@@ -312,7 +358,7 @@ void HistoryBuilder::add_history(const BRepTools_History* h)
         }
         if (!found)
         {
-          const int oi = myOut.map(k).FindIndex(s);
+          const int oi = myOut->map(k).FindIndex(s);
           if (oi > 0)
           {
             HistRec r{ai, (uint8_t)k, (uint32_t)(i - 1), REL_KEPT, (uint8_t)k, (uint32_t)(oi - 1)};
@@ -390,16 +436,18 @@ void HistoryBuilder::add_cap(uint32_t arg, uint8_t relation, const TopoDS_Shape&
 
 OpOut HistoryBuilder::finish()
 {
+  // The result's OcShape with the maps the records needed (its first
+  // queries would make them again).
   OpOut o;
-  o.shape   = wrap(myOut.shape);
+  o.shape   = std::move(myOut);
   o.history = std::move(myRecs);
   return o;
 }
 
 OpOut make_result(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& out,
-                  const BRepTools_History* h)
+                  const BRepTools_History* h, const std::vector<const OcShape*>* sources)
 {
-  HistoryBuilder hb(args, out);
+  HistoryBuilder hb(args, out, sources);
   hb.add_history(h);
   return hb.finish();
 }

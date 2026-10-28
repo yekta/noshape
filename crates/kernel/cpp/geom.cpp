@@ -680,6 +680,16 @@ void tighten_box(const TopoDS_Shape& s, double box[6])
 rust::Vec<double> bounding_box(const OcShape& s, bool optimal)
 {
   require_non_null(s.shape, "shape");
+  {
+    std::lock_guard<std::mutex> g(s.myBoxLock);
+    if (s.myBoxMade[optimal ? 1 : 0])
+    {
+      rust::Vec<double> r;
+      for (double v : s.myBox[optimal ? 1 : 0])
+        r.push_back(v);
+      return r;
+    }
+  }
   Bnd_Box b;
   if (optimal)
     BRepBndLib::AddOptimal(s.shape, b, false, false);
@@ -700,6 +710,12 @@ rust::Vec<double> bounding_box(const OcShape& s, bool optimal)
   b.Get(box[0], box[1], box[2], box[3], box[4], box[5]);
   if (optimal && !has_mesh_faces(s.shape) && has_free_form_face(s.shape))
     tighten_box(s.shape, box);
+  {
+    std::lock_guard<std::mutex> g(s.myBoxLock);
+    for (int i = 0; i < 6; ++i)
+      s.myBox[optimal ? 1 : 0][(size_t)i] = box[i];
+    s.myBoxMade[optimal ? 1 : 0] = true;
+  }
   rust::Vec<double> r;
   for (double v : box)
     r.push_back(v);

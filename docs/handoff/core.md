@@ -201,6 +201,11 @@ Phase 2 (local Booleans), first step landed:
   with NOSHAPE_UNIFY_CHECK=1, no difference. Left in Extrude 3 (CPU): op_boolean 100 (local 59), op_unify 72
   (merge_planar 30, make_result's history ~30), classify_point 32 (first: the face boxes), bounding boxes 27
   (6 calls), ancestor maps 28.
+- Step 6 (10-28): an op's result keeps the maps its history needed (HistoryBuilder hands its OcShape on instead of
+  wrapping the shape again), the history reads the inputs' maps from their OcShapes (op_boolean, op_unify), results
+  of the local Boolean and the unify take the face boxes of the faces they kept from their input, and
+  `bounding_box` is made once per OcShape. Extrude 3 (CPU): bounding boxes 27 → 14 ms, ancestor maps 28 → 21 ms;
+  corpus a2121c5b 110 → 93 ms; 0 mismatches.
 - The regen's unify (boolean.cpp `merge_planar`): the merged face goes on the surface of the group's face with the
   most edges and only edges without a pcurve there get one; a one-shell solid is rebuilt shell-only instead of
   BRepTools_ReShape copying the part: fins-400's 4 unifies 849 → 382 ms. A unify of only the new faces' region
@@ -243,10 +248,12 @@ Phase 2 (local Booleans), first step landed:
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
 ## Requests to the lead
-- The hourly `cargo-cache-trim.timer` (system, at :26) runs `cargo sweep --recursive --maxsize 8GB /root`: target
-  dirs over 8 GB (target-core is 29 GB) lose their oldest artifacts while builds run. land.sh failed twice on 10-28
-  (00:27 a deleted fingerprint dir, 00:59 a deleted rlib at link time). Please exclude /root/target-* or raise the
-  cap for them; until then I start long jobs right after :26.
+- /tmp/lead/disk-loop.sh's `prune-exes.py` (every ~30 min) keeps the newest 2 builds of each noshape crate per
+  target dir and deletes the rest with their fingerprint dirs, also while a cargo uses the dir: land.sh builds
+  each crate in more than two ways (clippy, tests, T0), so the build a running land.sh still needs goes. My lands
+  failed at 00:27, 00:59, 03:36 and 04:06 on 10-28, each a minute after a prune ("removed 47 old builds" at 03:35,
+  45 at 04:06) on a missing fingerprint / rlib. Please skip target dirs a cargo is running in (the loop's `busy()`)
+  or keep 4 builds; until then I start lands right after a prune.
 - Corpus case 24e39113fe46e702: OCCT's own result differs from run to run (listed `unstable` in the corpus).
 - Main RED 484a185c (09:31) and cb5e9cec (07:55), "ops --test all SIGSEGV": not the kernel. The kernel log has
   `hidden_edges::e[1635930] general protection fault … in libvulkan.so.1.4.341` at the watcher's T1 (09:26), and a

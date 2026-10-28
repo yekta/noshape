@@ -337,6 +337,12 @@ public:
   // index - 1, computed once: the auto scope's classification, fuse_on_face
   // and the local Boolean all box the target's 1600 faces.
   const std::vector<Bnd_Box>& face_boxes() const;
+  // Whether face_boxes() has been made.
+  bool has_face_boxes() const { return myBoxesReady.load(); }
+  // A map / the face boxes someone made already (the history of the op that
+  // made the shape; boxes of the faces it kept): taken unless made here first.
+  void adopt_map(TopAbs_ShapeEnum kind, ShapeIMap&& m);
+  void adopt_face_boxes(std::vector<Bnd_Box>&& b);
   // Volume properties, computed once (`compute` runs the first time):
   // regeneration asks for a body's volume before and after each boolean.
   template <class F>
@@ -367,6 +373,13 @@ public:
   // Its rays for a big solid (by the tolerance they were made with).
   mutable std::pair<double, std::shared_ptr<RayClassifier>> myRays{-1.0, nullptr};
 
+  // bounding_box's (geom.cpp) by `optimal`, made once: the regeneration
+  // boxes the same part several times a feature (the auto scope, the
+  // Boolean's tools, the extent).
+  mutable std::mutex                   myBoxLock;
+  mutable std::array<double, 6>        myBox[2]{};
+  mutable bool                         myBoxMade[2]{false, false};
+
   // What the unify knows of it (boolean.cpp): nothing to merge in it (a
   // unify found nothing); for a local Boolean's result on such a shape,
   // where to look.
@@ -389,6 +402,7 @@ private:
   mutable GProp_GProps   mySurface;
   mutable std::once_flag       myBoxesFlag;
   mutable std::vector<Bnd_Box> myBoxes;
+  mutable std::atomic<bool>    myBoxesReady{false};
 };
 
 // Growable list of shapes used to pass shape arrays across the bridge.

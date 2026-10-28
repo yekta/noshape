@@ -2824,6 +2824,10 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts)
 {
   t_bool_path = "occt";
+  // The inputs' OcShapes for the history (their maps are made already).
+  std::vector<const OcShape*> srcs = args.sources;
+  srcs.resize(args.items.size(), nullptr);
+  srcs.insert(srcs.end(), tools.sources.begin(), tools.sources.end());
   if (args.items.empty())
     fail_invalid("boolean needs at least one argument");
   if (tools.items.empty())
@@ -2865,7 +2869,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     if (done)
       t_bool_path = "fuse_slabs";
     if (done)
-      return make_result(concat(args.items, tools.items), out, h.get());
+      return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
   }
   // A tool standing on a face of the target (a boss): built directly.
   if (op == 0 && a.size() == 1 && t.size() == 1 && facets.source.empty())
@@ -2880,7 +2884,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     if (done)
       t_bool_path = "on_face";
     if (done)
-      return make_result(concat(args.items, tools.items), out, h.get());
+      return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
   }
   // One tool where it meets a large target: the faces it reaches only.
   if ((op == 0 || op == 1) && a.size() == 1 && t.size() == 1 && facets.source.empty() && opts.fuzzy <= 0 && opts.glue == 0)
@@ -2900,11 +2904,13 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
       bool clean = false;
       if (opts.unify)
         out = unify_in(out, h, scope.get(), &clean);
-      OpOut r = make_result(concat(args.items, tools.items), out, h.get());
+      OpOut r = make_result(concat(args.items, tools.items), out, h.get(), &srcs);
       if (opts.unify)
         r.shape->myUnifyClean = clean;
       else
         r.shape->myUnifyScope = scope;
+      if (!args.sources.empty() && args.sources[0] != nullptr)
+        inherit_face_boxes(*args.sources[0], *r.shape);
       return r;
     }
   }
@@ -2921,7 +2927,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     if (done)
       t_bool_path = "through_holes";
     if (done)
-      return make_result(concat(args.items, tools.items), out, h.get());
+      return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
   }
   // Many tools apart from each other cut out of one solid (holes): in slabs.
   if (op == 1 && opts.unify && a.size() == 1 && facets.source.empty())
@@ -2933,7 +2939,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     if (done)
       t_bool_path = "cut_slabs";
     if (done)
-      return make_result(concat(args.items, tools.items), out, h.get());
+      return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
   }
   // Many tools (not a pattern's checked glue, which handles its own): the
   // ones apart from each other as one argument each group.
@@ -2985,7 +2991,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     {
       t_bool_path = "trimmed";
       res  = remesh_facets(opts.unify ? unify(res, hist) : res, facets, hist);
-      return make_result(concat(args.items, tools.items), res, hist.get());
+      return make_result(concat(args.items, tools.items), res, hist.get(), &srcs);
     }
     else
     {
@@ -3015,7 +3021,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   }
   res = remesh_facets(res, facets, hist);
   const KernelTimer timer("boolean.result");
-  return make_result(concat(args.items, tools.items), res, hist.get());
+  return make_result(concat(args.items, tools.items), res, hist.get(), &srcs);
 }
 
 OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts)
@@ -3067,10 +3073,12 @@ OpOut op_unify(const OcShape& s)
   require_non_null(s.shape, "shape");
   // Known to have nothing to merge (an earlier unify found nothing), or
   // where to look (a local Boolean's result: UnifyScope).
+  const std::vector<const OcShape*> srcs{&s};
   if (s.myUnifyClean && unify_local_on())
   {
     t_unify_path          = "known";
-    OpOut r              = make_result({s.shape}, s.shape, nullptr);
+    OpOut r              = make_result({s.shape}, s.shape, nullptr, &srcs);
+    inherit_face_boxes(s, *r.shape);
     r.shape->myUnifyClean = true;
     return r;
   }
@@ -3079,8 +3087,9 @@ OpOut op_unify(const OcShape& s)
   HHist        hist;
   bool         clean = false;
   TopoDS_Shape res   = unify_in(s.shape, hist, sc, &clean);
-  OpOut        r     = make_result({s.shape}, res, hist.get());
+  OpOut        r     = make_result({s.shape}, res, hist.get(), &srcs);
   r.shape->myUnifyClean = clean;
+  inherit_face_boxes(s, *r.shape);
   // The caller keeps the input when nothing merged: it knows too.
   if (clean && res.IsSame(s.shape))
     s.myUnifyClean = true;
