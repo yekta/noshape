@@ -279,14 +279,14 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 
 | # | Behaviour | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
-| AN1 | Animate from the mate context menu; all other mates enforced | E§6.6 | ✅ | |  |
-| AN2 | DOF selector for mates with several DOF | E§6.6, B | ✅ | model test `hold_one_degree_of_freedom` |  |
-| AN3 | Start / End default to the limits, else 0 → 360° | E§6.6 | ✅ | |  |
-| AN4 | Steps (more steps = slower, about 60 per second) | E§6.6 | ✅ | |  |
-| AN5 | Playback Single / Reciprocate / Loop | E§6.6 | ✅ | |  |
-| AN6 | Reverse | E§6.6 | ✅ | |  |
-| AN7 | Current value (read-only, live) | E§6.6 | ✅ | |  |
-| AN8 | Play / Stop (stays at the stop point) | E§6.6 | ✅ | closing restores the document positions |  |
+| AN1 | Animate from the mate context menu; all other mates enforced | E§6.6 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| AN2 | DOF selector for mates with several DOF | E§6.6, B | ✅ | model test `hold_one_degree_of_freedom` | 0.4.10+ / 77870dd4 10-28 |
+| AN3 | Start / End default to the limits, else 0 → 360° | E§6.6 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| AN4 | Steps (more steps = slower, about 60 per second) | E§6.6 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| AN5 | Playback Single / Reciprocate / Loop | E§6.6 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| AN6 | Reverse | E§6.6 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| AN7 | Current value (read-only, live) | E§6.6 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| AN8 | Play / Stop (stays at the stop point) | E§6.6 | ✅ | closing restores the document positions | 0.4.10+ / 77870dd4 10-28 |
 
 ## 12. Other assembly features
 
