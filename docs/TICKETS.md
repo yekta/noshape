@@ -431,14 +431,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
-- [ ] P3 ROLLBACK-BAR-IN-FOLDER rolled back to a feature inside a folder, the bar is drawn at the root, not nested: cpat.noshape,
+- [x] (psui 10-28, this commit: between two children of an open folder the bar is indented with them, the guide running past it (on :102, x 64 as live); residual: the 9 px tick at the guide's end) P3 ROLLBACK-BAR-IN-FOLDER rolled back to a feature inside a folder, the bar is drawn at the root, not nested: cpat.noshape,
   select Extrude 1 … Curve pattern 1, Add selection to folder… › Enter, expand "New folder (3)", right-click Sketch 2 (middle
   child) › Roll to here → bar #B8B8B8 at x 45–234 (root width, over the folder's guide line); Curve pattern 1 below it stays
   nested and grey italic (= live). Live (behaviours ~22597, request 1534): the bar is an indented child row at x 64–235
   (starts at the children's icon column), the 1 px #D7D7D7 guide at x 49 runs past it. Also: live's guide ends in a 9 px
   horizontal tick (x 45–53) under the last child; ours ends without one (any expanded folder)
   (tickets/rollback-in-folder-2960.png) (qa 2026-10-28 05:46, build 2960a143)
-- [ ] P3 FOLDER-MENU-ROLL-TO-HERE a feature-list folder's context menu has no "Roll to here": cpat.noshape, select Extrude 1 +
+- [x] (psui 10-28, this commit, live "psui (2026-10-28, P3) FOLDER-MENU-ROLL-TO-HERE": Roll to here unless the bar is right after the folder (live hides it too), Roll to end unless the bar is at the end, and Roll to here goes to the folder's top (before its first child); residual: ours then draws the bar just above the folder, not nested at its top, and still offers Roll to here there) P3 FOLDER-MENU-ROLL-TO-HERE a feature-list folder's context menu has no "Roll to here": cpat.noshape, select Extrude 1 +
   Sketch 2, right-click › Add selection to folder… › Enter, right-click "New folder (2)" (also with the rollback bar moved
   above it): ours Rename | Add selection to folder… | Suppress, Dynamic suppression ▸ | Expand ▸, Collapse ▸ | Delete,
   Unpack folder. live (behaviours ~14488, ~14660, ~15385; suppressed folder too): … Suppress | Dynamic suppression ▸ | —

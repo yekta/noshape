@@ -106,9 +106,11 @@ impl PartStudioView {
     }
 
     /// The folder row's Roll to here: the bar after its last feature.
+    /// A folder's Roll to here: to just before its first child (live "psui (2026-10-28, P3) FOLDER-MENU-ROLL-TO-HERE":
+    /// the bar goes to the folder's top, its children rolled back).
     pub(super) fn roll_to_folder(&mut self, folder: u32, cx: &mut Context<Self>) {
-        let Some(last) = self.studio(cx).and_then(|s| s.folder_features(folder).last().and_then(|id| s.index_of(*id))) else { return };
-        self.set_rollback(Some(last + 1), cx);
+        let Some(first) = self.studio(cx).and_then(|s| s.folder_features(folder).iter().filter_map(|id| s.index_of(*id)).min()) else { return };
+        self.set_rollback(Some(first), cx);
     }
 
     /// Expand ▸ / Collapse ▸ "… selected": the selected folder.

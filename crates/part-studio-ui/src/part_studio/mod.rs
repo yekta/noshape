@@ -2855,7 +2855,12 @@ impl PartStudioView {
             }
             if i == rollback {
                 in_hidden_run = false;
-                items.push(ListItem::Rollback(i));
+                // Between two children of an open folder the bar is one of its rows,
+                // indented like them (live ROLLBACK-BAR-IN-FOLDER: x 64–235).
+                let chain = studio.folder_chain(f.folder);
+                let depth = open_folder.iter().zip(&chain).take_while(|(a, b)| a == b).count();
+                let open = chain[..depth].iter().all(|c| studio.folder(*c).is_some_and(|fd| !self.folder_collapsed(fd)));
+                items.push(ListItem::Rollback(i, if open && filtered.is_none() { FOLDER_INDENT * depth as f32 } else { 0. }));
             }
             if filtered.as_ref().is_some_and(|set| !set.contains(&f.id)) {
                 if !std::mem::replace(&mut in_hidden_run, true) {
@@ -2902,7 +2907,7 @@ impl PartStudioView {
             items.push(ListItem::Placeholder);
         }
         if rollback >= n_features {
-            items.push(ListItem::Rollback(n_features));
+            items.push(ListItem::Rollback(n_features, 0.));
         }
         if prompt_anchor == Some(None) {
             items.push(ListItem::Prompt);
@@ -3178,7 +3183,7 @@ impl PartStudioView {
         let mut skipped = 0usize;
         for item in items {
             let h = match &item {
-                ListItem::Rollback(_) => 13.,
+                ListItem::Rollback(..) => 13.,
                 ListItem::Prompt => 60.,
                 _ => row_h,
             };
@@ -3196,7 +3201,8 @@ impl PartStudioView {
             let slot = (rows.len(), item_indent(&item));
             rows.push(match item {
                 ListItem::Placeholder => self.render_editing_placeholder(cx),
-                ListItem::Rollback(i) => self.render_rollback_bar(i, window, cx),
+                // Inside a folder: indented under its guide like the children (live ROLLBACK-BAR-IN-FOLDER).
+                ListItem::Rollback(i, x) => indent(x, self.render_rollback_bar(i, window, cx)),
                 ListItem::Ellipsis => ellipsis(),
                 ListItem::Folder(x, fd) => indent(x, self.render_folder_row(&fd, slot, cx)),
                 ListItem::Feature(x, id) => indent(x, self.render_feature_row_view(id, slot, cx)),
@@ -3891,7 +3897,8 @@ impl PartStudioView {
         // Roll to here is offered unless the bar already sits right after
         // the folder's last feature (live qa4 r5 s2: Roll to here on the
         // rolled-back last feature brings the bar back to the end).
-        let is_last = self.studio(cx).is_some_and(|s| s.folder_features(id).last().and_then(|l| s.index_of(*l)).is_some_and(|i| i + 1 == s.rollback_index()));
+        let is_last = self.studio(cx).is_some_and(|s| s.folder_features(id).iter().filter_map(|l| s.index_of(*l)).max().is_some_and(|i| i + 1 == s.rollback_index()));
+        let at_end = self.studio(cx).is_some_and(|s| s.rollback_index() >= s.features.len());
         let row = crate::ui::tree_row(SharedString::from(format!("folder-{id}")), selected)
             .mr(px(5.))
             // Live `related-highlight`: #ECF0F4 with a 1 px #90CEF1 line under it.
@@ -3954,8 +3961,16 @@ impl PartStudioView {
                     sm.item(crate::os_menu::OsMenuItem::new("Add expression…").on_click(move |_, w, cx| v.update(cx, |this, cx| this.edit_folder_dynamic_suppression(id, w, cx))))
                 })
             };
+            // Live ("psui (2026-10-28, P3) FOLDER-MENU-ROLL-TO-HERE"): Roll to here unless the bar is right after
+            // the folder; Roll to end unless it is at the end.
+            if !is_last || !at_end {
+                m = m.separator();
+            }
             if !is_last {
-                m = m.separator().item(item("Roll to here", Box::new(move |this, _, cx| this.roll_to_folder(id, cx))));
+                m = m.item(item("Roll to here", Box::new(move |this, _, cx| this.roll_to_folder(id, cx))));
+            }
+            if !at_end {
+                m = m.item(item("Roll to end", Box::new(move |this, _, cx| this.set_rollback(None, cx))));
             }
             m = m.separator();
             m = m.submenu("Expand", window, cx, move |sm, _, _| {
@@ -5081,7 +5096,8 @@ fn item_indent(item: &ListItem) -> f32 {
 /// What the features list shows, in order (`render_feature_list`).
 enum ListItem {
     Placeholder,
-    Rollback(usize),
+    /// Before which feature, indent (inside an open folder).
+    Rollback(usize, f32),
     Ellipsis,
     /// Indent, folder.
     Folder(f32, noshape_model::partstudio::Folder),
