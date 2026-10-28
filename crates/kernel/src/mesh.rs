@@ -57,6 +57,9 @@ pub struct Tessellation {
     /// BRepMesh's algorithm instead, much slower on big faces).
     #[serde(default)]
     pub planar_fallbacks: usize,
+    /// Faces noshape's own mesher meshed (crates/brep `mesh`), not BRepMesh.
+    #[serde(default)]
+    pub rust_faces: usize,
 }
 
 impl Tessellation {
@@ -157,6 +160,7 @@ pub fn tessellate_with(shape: &Shape, o: &MeshOptions) -> Result<Tessellation> {
         edges: Vec::new(),
         vertices: vec![[0.0; 3]; c.vertices],
         planar_fallbacks: c.planar_fallbacks,
+        rust_faces: c.rust_faces,
     };
     let mut face_ranges = vec![0u32; c.faces * 4];
     let mut edge_ranges = vec![0u32; c.edges * 2];

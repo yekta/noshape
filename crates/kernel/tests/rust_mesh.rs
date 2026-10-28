@@ -1,0 +1,119 @@
+//! noshape's own display mesher (crates/brep `mesh`, cpp/mesh_rust.cpp) against BRepMesh: the same shapes
+//! meshed with it (faces it takes) and without it (a copy: new faces, so the mesh cache has none) give the same
+//! faces (area, bounds, turned like the normals), the same edge polylines and a watertight mesh.
+use noshape_kernel::*;
+use std::collections::HashMap;
+use std::f64::consts::TAU;
+
+const MM: f64 = 1e-3;
+
+fn mesh(s: &Shape, rust: bool) -> Tessellation {
+    set_rust_mesh(rust);
+    // The display's angle-based deflections (display.rs display_deflection).
+    let t = tessellate(s, s.bounding_box(false).unwrap().diagonal(), 2.0 * TAU / 144.0, true).unwrap();
+    set_rust_mesh(true);
+    t
+}
+
+fn p(q: [f32; 3]) -> DVec3 {
+    DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64)
+}
+
+/// Per face: area (along the vertex normals), bounds.
+fn faces(t: &Tessellation) -> Vec<(f64, DVec3, DVec3)> {
+    t.faces
+        .iter()
+        .map(|r| {
+            let tris = &t.indices[r.first_index as usize..(r.first_index + r.index_count) as usize];
+            let mut area = 0.0;
+            for c in tris.chunks(3) {
+                let (a, b, cc) = (p(t.positions[c[0] as usize]), p(t.positions[c[1] as usize]), p(t.positions[c[2] as usize]));
+                let n = (b - a).cross(cc - a);
+                let normal = p(t.normals[c[0] as usize]);
+                // Turned like the normals.
+                assert!(n.dot(normal) >= 0.0, "a triangle against its normal");
+                area += n.length() / 2.0;
+            }
+            let pts = &t.positions[r.first_vertex as usize..(r.first_vertex + r.vertex_count) as usize];
+            let lo = pts.iter().fold(DVec3::splat(f64::MAX), |m, &q| m.min(p(q)));
+            let hi = pts.iter().fold(DVec3::splat(f64::MIN), |m, &q| m.max(p(q)));
+            (area, lo, hi)
+        })
+        .collect()
+}
+
+fn assert_watertight(m: &Tessellation) {
+    let mut id: HashMap<[u32; 3], u32> = HashMap::new();
+    let weld: Vec<u32> = m
+        .positions
+        .iter()
+        .map(|q| {
+            let n = id.len() as u32;
+            *id.entry(q.map(f32::to_bits)).or_insert(n)
+        })
+        .collect();
+    let mut edges: HashMap<(u32, u32), i32> = HashMap::new();
+    for t in m.indices.chunks(3) {
+        for k in 0..3 {
+            let (a, b) = (weld[t[k] as usize], weld[t[(k + 1) % 3] as usize]);
+            *edges.entry((a.min(b), a.max(b))).or_insert(0) += 1;
+        }
+    }
+    let open = edges.values().filter(|&&n| n != 2).count();
+    assert_eq!(open, 0, "{open} of {} edges not shared by two triangles", edges.len());
+}
+
+/// `s` meshed both ways: the same faces and edges, watertight; returns how many faces the Rust mesher took.
+fn same_as_brepmesh(s: &Shape) -> usize {
+    let rust = mesh(s, true);
+    let copy = transform(s, &Transform::Translate(DVec3::ZERO), true).unwrap().shape;
+    let occt = mesh(&copy, false);
+    assert_eq!(occt.rust_faces, 0);
+    assert_eq!(rust.faces.len(), occt.faces.len());
+    let tol = s.bounding_box(false).unwrap().diagonal() * 1e-6;
+    for (i, (a, b)) in faces(&rust).into_iter().zip(faces(&occt)).enumerate() {
+        assert!((a.0 - b.0).abs() <= 1e-6 * b.0.max(MM * MM), "face {i}: area {} against BRepMesh's {}", a.0, b.0);
+        assert!((a.1 - b.1).abs().max_element() <= tol && (a.2 - b.2).abs().max_element() <= tol, "face {i}: bounds");
+    }
+    assert_eq!(rust.edges.len(), occt.edges.len());
+    for i in 0..rust.edges.len() {
+        let (a, b) = (rust.edge_polyline(i), occt.edge_polyline(i));
+        assert_eq!(a.len(), b.len(), "edge {i}: points");
+        assert!(a.iter().zip(b).all(|(x, y)| (p(*x) - p(*y)).length() <= tol), "edge {i}: points differ");
+    }
+    assert_watertight(&rust);
+    rust.rust_faces
+}
+
+/// A plate with 1 mm fins across it, fused and unified (the fin plate in small): planes and lines only.
+fn fins(n: usize) -> Shape {
+    let len = (2 * n + 4) as f64;
+    let base = make_box_corners(DVec3::ZERO, DVec3::new(len, 20.0, 5.0) * MM).unwrap();
+    let tools: Vec<Shape> = (0..n).map(|i| make_box_corners(DVec3::new(2.0 + 2.0 * i as f64, 0.0, 5.0) * MM, DVec3::new(3.0 + 2.0 * i as f64, 20.0, 9.0) * MM).unwrap()).collect();
+    boolean(BooleanOp::Fuse, &[base], &tools, &BooleanOptions { unify: true, ..Default::default() }).unwrap().shape
+}
+
+#[test]
+fn planes_bounded_by_lines_mesh_as_brepmesh_meshes_them() {
+    let s = fins(30);
+    let n = s.faces().len();
+    assert_eq!(same_as_brepmesh(&s), n, "every face of the fin plate");
+}
+
+#[test]
+fn faces_with_curved_edges_stay_brepmesh_and_the_mesh_stays_watertight() {
+    // A plate with four holes: its top and bottom have circles (BRepMesh's), its sides only lines (ours).
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(40.0, 20.0, 5.0) * MM).unwrap();
+    let holes: Vec<Shape> = (0..4).map(|i| make_cylinder(&Plane::new(DVec3::new(5.0 + 10.0 * i as f64, 10.0, -1.0) * MM, DVec3::Z, DVec3::X), 2.0 * MM, 7.0 * MM, TAU).unwrap()).collect();
+    let s = boolean(BooleanOp::Cut, &[plate], &holes, &BooleanOptions::default()).unwrap().shape;
+    assert_eq!(same_as_brepmesh(&s), 4, "the four sides");
+}
+
+#[test]
+fn a_patterns_instances_share_one_mesh() {
+    // A body and a moved instance of it (the same faces at another place).
+    let s = fins(5);
+    let moved = transform(&s, &Transform::Translate(DVec3::new(0.0, 30.0, 0.0) * MM), false).unwrap().shape;
+    let both = Shape::compound(&[s.clone(), moved]);
+    assert_eq!(same_as_brepmesh(&both), 2 * s.faces().len());
+}

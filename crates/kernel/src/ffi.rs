@@ -177,6 +177,8 @@ pub(crate) mod ffi {
         vertices: usize,
         /// Planar faces the kernel's triangulation gave to BRepMesh's.
         planar_fallbacks: usize,
+        /// Faces noshape's own mesher meshed (crates/brep `mesh`).
+        rust_faces: usize,
     }
 
     #[derive(Debug, Clone, Copy)]
@@ -336,7 +338,48 @@ pub(crate) mod ffi {
         history: Vec<u32>,
     }
 
+    /// A body's faces for noshape's own display mesher (crates/brep `mesh`; `mesh_bridge`): flat arrays.
+    #[derive(Default)]
+    struct MeshIn {
+        /// x, y, z per vertex.
+        vertices: Vec<f64>,
+        /// Start and end vertex per edge.
+        edges: Vec<u32>,
+        /// Per edge: kind (0 line, 1 circle, else not meshed here), centre, normal, x direction, radius, the
+        /// parameters at its start and end (13 numbers).
+        curves: Vec<f64>,
+        /// Per face: kind (0 plane, else not meshed here), origin, normal (the surface's own), x direction, 3
+        /// spare (13 numbers).
+        surfaces: Vec<f64>,
+        /// Per face, its first loop (faces + 1 entries); per loop, its first use (loops + 1); edge × 2 + reversed.
+        face_loops: Vec<u32>,
+        loop_uses: Vec<u32>,
+        uses: Vec<u32>,
+        /// The display's deflections (BRepMesh's linear and angular).
+        linear: f64,
+        angular: f64,
+    }
+
+    /// noshape's display mesher's result: per face meshed (`face_ok`) its nodes, normals and triangles (from
+    /// `face_nodes` / `face_tris`, faces + 1 entries; nodes face-local in `tris`); per use of a meshed face (in
+    /// order) its node count and nodes from the edge's start; per edge (edges + 1) its first node parameter.
+    #[derive(Default)]
+    struct MeshOut {
+        face_ok: Vec<u8>,
+        face_nodes: Vec<u32>,
+        face_tris: Vec<u32>,
+        nodes: Vec<f64>,
+        normals: Vec<f64>,
+        tris: Vec<u32>,
+        use_nodes: Vec<u32>,
+        edge_params: Vec<u32>,
+        params: Vec<f64>,
+    }
+
     extern "Rust" {
+        /// noshape's own display mesher (crates/brep `mesh`) on the faces of `input` it takes: false when the
+        /// input is malformed.
+        fn brep_mesh(input: &MeshIn, out: &mut MeshOut) -> bool;
         /// noshape's own Boolean (op 0 fuse, 1 cut, 2 common) of `args` (the object first): false when it
         /// declines (`last_rust_decline` says why).
         /// `touching_only`: declines unless the arguments only touch (a pattern's checked glue).
@@ -707,6 +750,7 @@ pub(crate) mod ffi {
     }
 }
 
+use crate::mesh_bridge::brep_mesh;
 use crate::brep_bridge::{brep_boolean, brep_decline, brep_enabled, brep_record_direct, brep_recording, brep_strict};
 
 // SAFETY: OcShape wraps an immutable TopoDS_Shape (handles with atomic

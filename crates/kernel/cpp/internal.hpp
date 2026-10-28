@@ -151,6 +151,12 @@ private:
 // fuzzy value `fuzzy` added to every tolerance. `srcs`
 // gets an OcShape for each argument (made in `own` where it has none), `out` the result, `hist` its history.
 bool rust_boolean_on();
+// noshape's own display mesher (mesh_rust.cpp): on unless NOSHAPE_MESH_RUST=0.
+bool rust_mesh_on();
+// Meshes the `fresh` faces it takes (planes so far): each gets its triangulation and its edges' polygons, as
+// BRepMesh leaves them, and is marked in `taken`. Returns how many.
+int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeIMap& vertices, const std::vector<char>& fresh, double lin, double ang,
+                    std::vector<char>& taken);
 // Notes why it wasn't tried (false; the replay's strict mode fails).
 bool rust_decline(const char* why);
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,

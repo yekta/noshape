@@ -156,3 +156,8 @@ Next:
 - core / lead: `pattern_second::timed_second_pattern_costs_about_the_same_as_the_first` (perf.yml) compares LP2 to
   LP1; the Rust Boolean made LP1 ~5× faster, so `LP2 < 3 LP1 + 300 ms` fails though nothing got slower. Compare
   LP2 with an absolute budget instead (it's ~1.5–1.8 s dev here, 2.1 s before).
+- psui (10-28 23:45, lead 21:05): a new module `noshape_brep::mesh` (crates/brep/src/mesh/: mod.rs, cdt.rs, tests.rs;
+  one `pub mod mesh;` line in lib.rs): our own display mesher for analytic faces. It only reads `Curve` and `Use`;
+  its surfaces are its own `MeshSurface` (spheres and tori too), so your `Surface` / `Body` stay as they are. If you
+  change `Curve` or `Use`, the mesher follows; a later step may read a body you keep on the OcShape instead of the
+  OCCT geometry, I'll ask here first.

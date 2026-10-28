@@ -21,6 +21,8 @@
 #[allow(dead_code)]
 mod ffi;
 mod brep_bridge;
+mod mesh_bridge;
+pub use mesh_bridge::set_rust_mesh;
 
 /// Rhino (.3dm) export is built in (openNURBS, OPENNURBS_ROOT at build time).
 pub const RHINO_EXPORT: bool = cfg!(noshape_opennurbs);

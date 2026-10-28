@@ -773,19 +773,23 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     if (std::getenv("NOSHAPE_MESH_DEBUG"))
       std::fprintf(stderr, "mesh: %d faces, %d not cached, %s\n", m->faces.Extent(), nfresh, partial ? "partial" : set == nullptr ? "no cache" : "whole");
     TopoDS_Shape meshed = s.shape;
-    if (partial)
+    if (!partial)
+      std::fill(fresh.begin(), fresh.end(), 1);
+    // Faces noshape's own mesher takes (psui, mesh_rust.cpp) aren't BRepMesh's.
+    std::vector<char> taken((size_t)m->faces.Extent() + 1, 0);
+    const int         ntaken = !relative && !mesh_faces && rust_mesh_on() ? rust_mesh_faces(m->faces, m->edges, m->vertices, fresh, lin, ang, taken) : 0;
+    m->rust_faces            = (size_t)ntaken;
+    if (partial || ntaken > 0)
     {
       BRep_Builder    B;
       TopoDS_Compound c;
       B.MakeCompound(c);
       for (int i = 1; i <= m->faces.Extent(); ++i)
-        if (fresh[(size_t)i])
+        if (fresh[(size_t)i] && !taken[(size_t)i])
           B.Add(c, m->faces(i));
       meshed = c;
     }
-    else
-      std::fill(fresh.begin(), fresh.end(), 1);
-    if (!partial || nfresh > 0)
+    if (meshed.ShapeType() != TopAbs_COMPOUND || meshed.NbChildren() > 0)
     {
       BRepMesh_IncrementalMesh mesher;
       mesher.SetShape(meshed);
@@ -970,6 +974,10 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     // regenerating gate). Mesh faces (no surface) keep theirs.
     lap = std::make_unique<KernelTimer>("mesh.clean");
     BRepTools::Clean(meshed);
+    // The faces noshape's mesher took (and their edges' polygons) too.
+    for (int i = 1; i <= m->faces.Extent() && ntaken > 0; ++i)
+      if (taken[(size_t)i])
+        BRepTools::Clean(m->faces(i));
   }
   m->cleaned  = true;
   m->faceData = side;
@@ -986,6 +994,7 @@ MeshCounts mesh_counts(const OcMesh& m)
   c.edges       = (size_t)m.edges.Extent();
   c.vertices    = (size_t)m.vertices.Extent();
   c.planar_fallbacks = m.planar_fallbacks;
+  c.rust_faces       = m.rust_faces;
   return c;
 }
 

@@ -20,6 +20,7 @@ mod instances;
 mod mesh_import;
 mod perf;
 mod planar_mesh;
+mod rust_mesh;
 mod projection;
 mod seam;
 mod shell;

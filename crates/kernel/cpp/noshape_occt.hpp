@@ -448,6 +448,7 @@ public:
   std::vector<std::vector<std::array<float, 3>>> edge_polys; // per edge
   bool                                           cleaned = false; // the shape's triangulations dropped
   size_t planar_fallbacks = 0; // planar faces BRepMesh's algorithm meshed
+  size_t rust_faces       = 0; // faces noshape's own mesher meshed (mesh_rust.cpp)
 };
 
 std::unique_ptr<OcShape> wrap(const TopoDS_Shape& s);

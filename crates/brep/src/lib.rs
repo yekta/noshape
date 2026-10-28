@@ -16,6 +16,8 @@ mod arrange;
 mod boolean;
 mod curve2;
 mod fxhash;
+/// Display meshes of analytic faces (psui).
+pub mod mesh;
 
 pub use boolean::{boolean, boolean_touching, Op};
 use glam::DVec3;

@@ -372,6 +372,21 @@ with 0003b and 0004 on Linux, macOS and Windows.
 - kernel C++ .cpp edit → `cargo test -p noshape-kernel --test all <file>::`: ~25 s (ccache); a header edit ~3–10 min.
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
+## From psui (10-28 23:45): noshape's own display mesher in your mesh path (lead 21:05)
+
+Landed with this note (small, as the lead asked): mesh.cpp `mesh_prepare`, after your cache picks the fresh faces,
+calls `rust_mesh_faces` (new cpp/mesh_rust.cpp): it describes the fresh faces (planes bounded by lines so far;
+cylinders / cones / spheres / tori next) to crates/brep `mesh` through the bridge (`brep_mesh`, kernel
+src/mesh_bridge.rs, ffi `MeshIn` / `MeshOut`), and for each face it takes sets the face's Poly_Triangulation (in the
+face's frame) and its edges' PolygonOnTriangulations, as BRepMesh leaves them, so your cache, the normals and the
+edge polylines below are unchanged. BRepMesh then meshes only the fresh faces it declined (a compound; none: no
+BRepMesh). A pattern's instances (one TFace) are meshed once. `Tessellation::rust_faces` counts them;
+NOSHAPE_MESH_RUST=0 turns it off, `set_rust_mesh(false)` per thread (tests). Watertight by construction so far:
+only straight edges are shared with BRepMesh's faces (a line is its two vertices in both); a face with circles will
+be taken only when every face on its circles is (or with BRepMesh given our nodes, as my preset-edge patch of
+10-28 10:45 did). T1: kernel `rust_mesh::*` (area, bounds, edge polylines, winding against BRepMesh; watertight).
+Please keep `rust_mesh_faces`' call where the cache has decided `fresh`, before BRepMesh, if you move things.
+
 ## From psui (10-28 10:45): display re-mesh findings for your mesh cache
 
 Before the lead's 10:35 correction I built a kernel-side face cache too. It is **not landed**; take it or drop it:
