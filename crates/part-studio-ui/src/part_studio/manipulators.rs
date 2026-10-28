@@ -539,12 +539,14 @@ fn arrow_glyph(a: &Arrow, hover: bool, dragging: bool, view: &noshape_render::ca
     let base = tip + dir * ARROW_SHAFT_PX * wpp;
     let apex = base + dir * ARROW_HEAD_PX * wpp;
     let (l, r) = (base + side * ARROW_HEAD_W_PX * 0.5 * wpp, base - side * ARROW_HEAD_W_PX * 0.5 * wpp);
-    // Idle and hovered as icons2 matched them; while dragged, one solid blue
-    // stroke (≈ #2c61a3, dialogs/extrude-06).
+    // Idle: live "psui (2026-10-27, P2) interaction 6.2" measured the halo
+    // at #6A767D 0.75 (145–158 over white, darker than a face over one); hovered
+    // as icons2; while dragged, one solid blue stroke (≈ #2c61a3,
+    // dialogs/extrude-06).
     let (outline, core, outline_px, core_px) = if dragging {
         (crate::theme::rgb8(0x2c61a3), crate::theme::rgb8(0x2c61a3), 2.0, 2.0)
     } else {
-        (if hover { crate::theme::rgb8(0x3e6eb0) } else { crate::theme::rgb8(0xa8adb2) }, crate::theme::rgb8(0xffffff), if hover { 4.0 } else { 3.0 }, 1.5)
+        (if hover { crate::theme::rgb8(0x3e6eb0) } else { [0x6a, 0x76, 0x7d, 191] }, crate::theme::rgb8(0xffffff), if hover { 4.0 } else { 3.0 }, 1.5)
     };
     let mut back = LineData::default();
     let mut front = LineData::default();
