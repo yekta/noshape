@@ -56,7 +56,7 @@ selection and hover per step, rows in brackets).
 | 3.5 | Timing ("reduce mouse hover highlight" on): below 0.15 px/ms the pick runs on every move; faster, the old highlight clears (unless still under the pointer) and the pick waits min(5 × average pick ms, 250 ms) after the pointer pauses (average = EMA 0.8/0.2 of pick times) | live "nav2 pre-highlight" 1–2 | 🔧 (viewport.rs `prehighlight_delay`, GPU hover-pick time as the average; plain selection only; test `prehighlight_waits_for_a_pause_as_live`) |  |
 | 3.6 | Leaving the graphics area clears the pre-highlight at once (next frame) | live "nav2 pre-highlight" 4; B `onMouseLeave` | ✅ R (hover-leave) | 8627322e 10-28: ✗ partly (edges clear at once on a jump out; a rim vertex's dot stays → HOVER-VERTEX-STAYS) |
 | 3.7 | Hovering a feature row outlines its geometry | L260 | ✅ (psui 10-27, app vs live selection/10: the part outlined #FFC685, the row highlighted, tooltip "Extrude 1 <- Sketch 1" right of the row) | 0.4.10+ / f16b31c6 10-27 |
-| 3.8 | Sketch hover #ffc685 / mirrored pair secondary #f2ff80 | L8776–8813 | ✅ P sketch |  |
+| 3.8 | Sketch hover #ffc685 / mirrored pair secondary #f2ff80 | L8776–8813 | ✅ P sketch | 8627322e 10-28 (hovered sketch line on Front: most common hover pixel (255,198,133) = #ffc685; mirrored-pair #f2ff80 not run) |
 
 ## 4. Measure (status bar readout and panel)
 
