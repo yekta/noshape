@@ -9,7 +9,7 @@ round trip 60779.484, kill -9 after Suppress, drawing PDF, assembly drag, dialog
 
 ## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97 → … → b504234e → 2960a143)
 
-- **05:55 update (greens b504234e → 2960a143; v0.4.12 not published yet at 05:55, still v0.4.11 Latest):** Filed P1
+- **05:50 update (greens b504234e → 2960a143; v0.4.12 not published yet at 05:50, still v0.4.11 Latest):** Filed P1
   FEATURE-MIRROR-COPY-FULL-DEPTH (core: Feature mirror with Reapply off copies a boss as deep as the whole part, 9500 vs
   live 9000; also in v0.4.11), P3 ENCLOSE-NO-REGION-MSG, P3 FOLDER-MENU-ROLL-TO-HERE, P3 ROLLBACK-BAR-IN-FOLDER (live 1534).
   Verified on 2960a143: HOLE-TABLE-MENU, HOLE-TABLE-FILLETS, XT-ASM-SCALE (x_t import real size, ~10 s), assembly filter
