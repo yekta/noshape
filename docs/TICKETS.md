@@ -948,7 +948,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   is not captured. Not tied to the connector flip: a Revolute between the two top-face hole centres (Zs agree, plates
   overlapping), limits 0 / 90 → the value box also opens with "360°" at 0° and a typed 45 stays at 0°.
   is not captured (qa 2026-10-28 07:01, build 2292bf8c)
-- [x] verified 7e88e3ab (qa 08:24: mate doc, Revolute between the two top-face hole centres: first `k` draws the connectors' triad at the hole, second `k` hides it again (no pixel left); tickets/asm-k-mcs-7e88.png. Residual: live draws the disc + triad connector glyph (ks-k-1), ours a bare triad) 81519593 P3 ASM-K-IMPLICIT-MCS `k` shows nothing for the mates' implicit connectors: two plates (qa5 mkmate.py doc), Revolute 1
+- [x] verified 7e88e3ab (qa 08:23: mate doc, Revolute between the two top-face hole centres: first `k` draws the connectors' triad at the hole, second `k` hides it again (no pixel left); tickets/asm-k-mcs-7e88.png. Residual: live draws the disc + triad connector glyph (ks-k-1), ours a bare triad) 81519593 P3 ASM-K-IMPLICIT-MCS `k` shows nothing for the mates' implicit connectors: two plates (qa5 mkmate.py doc), Revolute 1
   between their hole centres (implicit connectors), click empty canvas, `k` → no pixel changes, again `k` → none
   (tickets/asm-k-implicit-mcs-2292.png). Live (behaviours ~20842, assembly/ks-k-1.png): the first `k` draws the instances'
   implicit / explicit mate connector glyphs (disc + triad at both ends of Revolute 1), the second hides them. Ours
