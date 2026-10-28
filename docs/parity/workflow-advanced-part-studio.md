@@ -118,7 +118,7 @@ rebuilt exactly to live's spec in /tmp/qa5/home/Documents/noshape/qa5-livecheck.
 | ADV8 "20 tpi (UNC)" | unchanged | ✗ still |  |
 | ADV12 hole row name | both callout lines | ✗ still |  |
 | TAB1 tab switch Parts (0) | PS2 still "Parts (0)" on open (holeblock in qa5 import OK) | ✗ still (partly) |  |
-| SK2 F in a sketch | fits the far rectangle (tight margin) | ✅ **fixed** (no "Sketch N" outline yet) |  |
+| SK2 F in a sketch | fits the far rectangle (tight margin) | ✅ **fixed** (no "Sketch N" outline yet) | ff379982 10-28: ✗ regressed: F in the sketch leaves the far rectangle half off-screen → SKETCH-F-FIT |
 
 ## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
 Pass 6 (17:11 build, d5745c9) had already found ADV8 fixed ("20 tpi"); not re-checked here.
@@ -128,7 +128,7 @@ Pass 6 (17:11 build, d5745c9) had already found ADV8 fixed ("20 tpi"); not re-ch
 | ADV2 loft | 5927.754632 (CLI) | ✗ still (live 5927.728) |  |
 | ADV3 error tooltip prefix | "Helix 1 did not regenerate properly: Select a cone or cylinder." | ✅ **fixed** | 64997436 10-28 (GUI: empty Hole committed → row tooltip '1/4-20 ↧ 12 mm | ⌵Ø 13.487 mm X 82° [Hole] did not regenerate properly: No hole points selected.') |
 | SK1 dim set to an unsolvable value | Enter closes the box, value R2 kept, geometry red, **yellow "⚠ Sketch could not be solved."** toast, gone when the sketch closes ✅; **dialog title "Sketch 2" and the feature row text stay black** (live red) | ✗ still (mostly fixed) | f8014efa 10-28 (title / row now red: see SK1 row below) |
-| SK2 | the "Sketch 2" plane outline now shows while editing | ✅ |  |
+| SK2 | the "Sketch 2" plane outline now shows while editing | ✅ | ff379982 10-28 (editing a sketch shows its plane frame with the plane's name, e.g. "Front" / "Top") |
 | ADV7 thread splits face | still one cylindrical face, 565.487 mm² (whole 30 mm) (CLI) | ✗ still |  |
 | ADV12 hole row name | both callout lines; tooltip "Hole 1 <- Sketch 2" | ✗ still |  |
 | TAB1 tab switch | Part Studio 2 and 3 open with "Parts (0)" and 4 right-strip icons until a body is clicked | ✗ still |  |
