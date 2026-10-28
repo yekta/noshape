@@ -493,6 +493,12 @@ impl PartStudioView {
         self.rebuild_scene(cx);
     }
 
+    /// Whether the Parts list shows part properties: this studio's own
+    /// setting (its Parts header menu) or else Preferences'.
+    fn show_part_props(&self, cx: &App) -> bool {
+        self.studio(cx).and_then(|s| s.parts_list_properties).unwrap_or(self.ui.show_part_props)
+    }
+
     fn studio<'a>(&self, cx: &'a App) -> Option<&'a PartStudio> {
         self.doc.read(cx).studio(self.tab)
     }
@@ -3316,7 +3322,7 @@ impl PartStudioView {
             .filter(|(key, _, rows, _)| *key == "Parts" || !rows.is_empty())
             .collect();
         let mut col = v_flex().size_full().id("parts-area").overflow_y_scroll();
-        let show_props = self.ui.show_part_props;
+        let show_props = self.show_part_props(cx);
         for (title, key, rows, ids) in sections {
             let collapsed = self.ui.collapsed_sections.contains(key);
             let n = ids.len();
@@ -3358,7 +3364,15 @@ impl PartStudioView {
                             // default (not changed here).
                             let m = m.item(crate::os_menu::OsMenuItem::new(if show_props { "Hide parts list properties" } else { "Show parts list properties" }).on_click(move |_, _, cx| {
                                 v1.update(cx, |this, cx| {
-                                    this.ui.show_part_props = !this.ui.show_part_props;
+                                    // Saved with the document, not an undo step.
+                                    let (on, tab) = (!show_props, this.tab);
+                                    this.doc.update(cx, |d, cx| {
+                                        d.edit_document_not_undoable(if on { "Show parts list properties" } else { "Hide parts list properties" }, cx, |doc| {
+                                            if let Some(noshape_model::TabContent::PartStudio(ps)) = doc.tab_mut(tab).map(|t| &mut t.content) {
+                                                ps.parts_list_properties = Some(on);
+                                            }
+                                        })
+                                    });
                                     cx.notify();
                                 })
                             }));
@@ -3576,6 +3590,7 @@ impl PartStudioView {
     /// field), hover highlights the part, the eye hides or shows it, and the
     /// context menu has Onshape's part commands.
     fn render_part_row(&self, b: &noshape_model::display::BodyDisplay, cx: &mut Context<Self>) -> AnyElement {
+        let show_props = self.show_part_props(cx);
         let pal = p();
         let r = Reference::Body(b.id.clone());
         // A part picked in the open dialog's active field is selected in the
@@ -3647,8 +3662,8 @@ impl PartStudioView {
                     .id(SharedString::from(format!("part-name-{}", b.id)))
                     // With the properties shown the name is as wide as its text and the pills follow it (live
                     // "psui (2026-10-28, P1) part-studio 7.7").
-                    .when(!self.ui.show_part_props, |d| d.flex_1())
-                    .when(self.ui.show_part_props, |d| d.min_w_0().flex_shrink(1.))
+                    .when(!show_props, |d| d.flex_1())
+                    .when(show_props, |d| d.min_w_0().flex_shrink(1.))
                     .truncate()
                     .child(crate::ui::user_text(b.name.clone()))
                     .tooltip(crate::ui::user_tooltip(match &b.composite {
@@ -3660,7 +3675,7 @@ impl PartStudioView {
             // Parts list properties (live "psui (2026-10-28, P1) part-studio 7.7"): after the name, the part
             // number in a #d7d7d7 pill (if set), the state in a #eeeeee pill (always, "In progress" by default) and
             // the revision in parentheses (if set), each ellipsised on its own; the eye stays at the right end.
-            .when(self.ui.show_part_props, |d| {
+            .when(show_props, |d| {
                 let props = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).cloned().unwrap_or_default();
                 let pill = |text: String, bg: u32, h: f32| {
                     div().ml(px(4.)).h(px(h)).pl(px(4.)).pr(px(if bg == 0xeeeeee { 3. } else { 4. })).min_w_0().flex_shrink(1.).flex().items_center().rounded(px(3.)).bg(gpui_kit::rgb(bg)).text_color(gpui_kit::rgb(0x333333)).child(div().truncate().child(crate::ui::user_text(text)))
@@ -3951,6 +3966,9 @@ impl PartStudioView {
         // rolled-back last feature brings the bar back to the end).
         let is_last = self.studio(cx).is_some_and(|s| s.folder_features(id).iter().filter_map(|l| s.index_of(*l)).max().is_some_and(|i| i + 1 == s.rollback_index()));
         let at_end = self.studio(cx).is_some_and(|s| s.rollback_index() >= s.features.len());
+        // The bar at this folder's top after its own Roll to here (the same
+        // index as a bar right above the folder, which keeps Roll to here).
+        let at_top = self.ui.rollback_folder_top.is_some_and(|(f, at)| f == id && self.studio(cx).is_some_and(|s| s.rollback_index() == at));
         let row = crate::ui::tree_row(SharedString::from(format!("folder-{id}")), selected)
             .mr(px(5.))
             // Live `related-highlight`: #ECF0F4 with a 1 px #90CEF1 line under it.
@@ -4014,11 +4032,11 @@ impl PartStudioView {
                 })
             };
             // Live ("psui (2026-10-28, P3) FOLDER-MENU-ROLL-TO-HERE"): Roll to here unless the bar is right after
-            // the folder; Roll to end unless it is at the end.
-            if !is_last || !at_end {
+            // the folder or at its top; Roll to end unless it is at the end.
+            if !(is_last || at_top) || !at_end {
                 m = m.separator();
             }
-            if !is_last {
+            if !(is_last || at_top) {
                 m = m.item(item("Roll to here", Box::new(move |this, _, cx| this.roll_to_folder(id, cx))));
             }
             if !at_end {

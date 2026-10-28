@@ -260,6 +260,11 @@ pub struct PartStudio {
     /// Hidden default geometry (Origin, Top, Front, Right planes).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden_defaults: Vec<Reference>,
+    /// The Parts header menu's Show / Hide parts list properties for this
+    /// studio, kept with the document (live keeps it after a reload); None:
+    /// Preferences › Display parts list properties.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parts_list_properties: Option<bool>,
     /// Sketches whose visibility follows their consumers (live "psb (10-25
     /// l)"): hidden while an unsuppressed feature uses them, until the user
     /// shows or hides them by hand.

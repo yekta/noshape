@@ -179,6 +179,18 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N03. 10-28 11:00–12:30: item 2 cold start landed as code, to be measured: vendor/wgpu-hal (29.0.4 + src/metal/
+     precompiled.rs) loads `<hash of the MSL>.metallib` from noshape.app/Contents/Resources/metallib (or
+     NOSHAPE_METALLIB_DIR) before compiling a pipeline's MSL; packaging/macos/metallibs.sh (release.yml and
+     .github/actions/noshape-binary) dumps the first-frame MSL with crates/render/examples/prewarm_shaders
+     (NOSHAPE_MSL_DUMP), compiles each with `xcrun metal -std=<its // language:> -fpreserve-invariance`, then reruns
+     the example and fails if any pipeline still compiles (NOSHAPE_METALLIB_LOG=1 prints hit / miss per source).
+     Type-checked locally with `cargo check -p noshape-render --example prewarm_shaders --target aarch64-apple-darwin`.
+     Next: perf.yml `-f ref=<full sha> -f cold=1` and compare first launches with 40526882894 (1.28–1.96 s); the
+     AIR still goes through the driver's backend compile, so expect part of the 480–670 ms back, not all.
+     Also landed: a folder's Roll to here nests the bar at its top (open folder), and live's state 4 (behaviours
+     FOLDER-MENU-ROLL-TO-HERE): no Roll to here there; the Parts header's properties toggle is saved per studio
+     (PartStudio::parts_list_properties, not an undo step).
 N02. 10-28 08:55–10:45, item 1 (display re-mesh): built a kernel face cache, then the lead (10:35) gave the kernel
      side to core; not landed. Findings, the patch and numbers are in core.md "From psui (10-28 10:45)": the
      planar CDT collinear bug (200–400 ms on the fin plate's rebuilt front faces, independent of caching) is the
