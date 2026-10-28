@@ -213,7 +213,7 @@ impl SheetPick<'_> {
                 }
             }
             AnnotationKind::AngularDimension { vertex, radius, a: pa, b: pb, three_point, .. } => {
-                if let Some(pl) = pl {
+                if let Some(pl) = &pl {
                     *radius = len(sub(c, pl.to_sheet(*vertex))).max(3.0);
                     // 3 point angular: across a leg, the arc measures 360° minus the angle.
                     if *three_point && !in_sweep(pl.to_sheet(*vertex), pl.to_sheet(*pa), pl.to_sheet(*pb), c) {
@@ -249,6 +249,18 @@ impl SheetPick<'_> {
             }
             _ => a.position = [orig.position[0] + d[0], orig.position[1] + d[1]],
         }
+        // Line to line angular: the sector the arc is dragged into.
+        if let Some(pl) = a.kind.view().and_then(|v| self.placement(v))
+            && super::geom::angular_to_sector(&mut a.kind, &pl, c)
+        {
+            for r in &mut a.refs {
+                r.slot = match r.slot {
+                    1 => 2,
+                    2 => 1,
+                    s => s,
+                };
+            }
+        }
         // Keep the stored (unresolved) inputs of the committed annotation;
         // only the placement changes.
         if let Some(committed) = self.drawing.sheets.get(self.sheet).and_then(|s| s.annotations.iter().find(|x| x.id == a.id)) {
@@ -260,8 +272,9 @@ impl SheetPick<'_> {
                     *angle = *g;
                     *knee = *k;
                 }
-                (AnnotationKind::AngularDimension { radius, a: pa, b: pb, .. }, AnnotationKind::AngularDimension { radius: r, a: na, .. }) => {
+                (AnnotationKind::AngularDimension { radius, a: pa, b: pb, flip_a, flip_b, .. }, AnnotationKind::AngularDimension { radius: r, a: na, flip_a: fa, flip_b: fb, .. }) => {
                     *radius = *r;
+                    (*flip_a, *flip_b) = (*fa, *fb);
                     // Legs swapped by the drag: swap the stored legs and their references too.
                     let swapped = matches!(&orig.kind, AnnotationKind::AngularDimension { a: oa, b: ob, .. } if na == ob && oa != ob);
                     if swapped {

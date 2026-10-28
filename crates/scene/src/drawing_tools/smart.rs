@@ -140,7 +140,20 @@ impl SheetPick<'_> {
             _ => None,
         };
         let refs = if vref.is_some() { vec![(0, vref), (1, pa.r.clone()), (2, pb.r.clone())] } else { vec![] };
-        Some((AnnotationKind::AngularDimension { view: a1.view, vertex: v, a: pa.p, b: pb.p, radius, three_point: false }, refs))
+        let mut kind = AnnotationKind::AngularDimension { view: a1.view, vertex: v, a: pa.p, b: pb.p, radius, three_point: false, flip_a: false, flip_b: false };
+        // The angle of the sector the pointer is in (inner, supplementary
+        // or vertical).
+        let mut refs = refs;
+        if super::geom::angular_to_sector(&mut kind, &pl, c) {
+            for r in &mut refs {
+                r.0 = match r.0 {
+                    1 => 2,
+                    2 => 1,
+                    s => s,
+                };
+            }
+        }
+        Some((kind, refs))
     }
 
     /// A linear dimension from `a` to `b`, oriented by the cursor (or

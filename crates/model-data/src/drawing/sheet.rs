@@ -1339,10 +1339,11 @@ impl SheetGeometry {
                     let at = [out[0] + if left { -1.0 } else { 1.0 }, out[1] + 0.8];
                     self.dim_label(at, 0.0, if left { 1.0 } else { 0.0 }, false, &t, dh, pick);
                 }
-                AnnotationKind::AngularDimension { view, vertex, a: pa, b: pb, radius, .. } => {
-                    let v = env.to_sheet(*view, *vertex);
-                    let pa = env.to_sheet(*view, *pa);
-                    let pb = env.to_sheet(*view, *pb);
+                AnnotationKind::AngularDimension { view, radius, .. } => {
+                    let (vertex, pa, pb) = a.kind.angular_legs().expect("angular");
+                    let v = env.to_sheet(*view, vertex);
+                    let pa = env.to_sheet(*view, pa);
+                    let pb = env.to_sheet(*view, pb);
                     let a0 = (pa[1] - v[1]).atan2(pa[0] - v[0]);
                     let mut a1 = (pb[1] - v[1]).atan2(pb[0] - v[0]);
                     if a1 < a0 {

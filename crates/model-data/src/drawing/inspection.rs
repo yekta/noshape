@@ -212,9 +212,10 @@ fn nominal_of(d: &Drawing, a: &Annotation) -> (Option<f64>, Option<&'static str>
             (Some(v), Some(len_unit))
         }
         AnnotationKind::RadialDimension { radius, diameter, .. } => (Some(if *diameter { radius * 2.0 } else { *radius }), Some(len_unit)),
-        AnnotationKind::AngularDimension { vertex, a: p, b: q, .. } => {
+        k @ AnnotationKind::AngularDimension { .. } => {
+            let (vertex, p, q) = k.angular_legs().expect("angular");
             let ang = |x: [f64; 2]| (x[1] - vertex[1]).atan2(x[0] - vertex[0]);
-            let mut s = (ang(*q) - ang(*p)).abs();
+            let mut s = (ang(q) - ang(p)).abs();
             if s > std::f64::consts::PI {
                 s = std::f64::consts::TAU - s;
             }

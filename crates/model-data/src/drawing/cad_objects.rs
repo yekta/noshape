@@ -196,10 +196,11 @@ impl SheetGeometry {
                         (CadDimKind::Radial { center: c, point: tip }, *radius, *view)
                     }
                 }
-                AnnotationKind::AngularDimension { view, vertex, a: pa, b: pb, radius, .. } => {
-                    let v = env.to_sheet(*view, *vertex);
-                    let pa = env.to_sheet(*view, *pa);
-                    let pb = env.to_sheet(*view, *pb);
+                AnnotationKind::AngularDimension { view, radius, .. } => {
+                    let (vertex, pa, pb) = a.kind.angular_legs().expect("angular");
+                    let v = env.to_sheet(*view, vertex);
+                    let pa = env.to_sheet(*view, pa);
+                    let pb = env.to_sheet(*view, pb);
                     let a0 = (pa[1] - v[1]).atan2(pa[0] - v[0]);
                     let mut a1 = (pb[1] - v[1]).atan2(pb[0] - v[0]);
                     if a1 < a0 {

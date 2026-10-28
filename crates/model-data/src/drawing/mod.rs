@@ -801,6 +801,15 @@ pub enum AnnotationKind {
         radius: f64,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         three_point: bool,
+        /// Line to line angular: leg `a` / `b` runs along its edge's
+        /// extension through the vertex (the supplementary or vertical
+        /// angle, picked by where the dimension is dragged; help
+        /// drawing_-_line_to_line_angular_dimension). The references stay
+        /// on the edge.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        flip_a: bool,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        flip_b: bool,
     },
     /// `angle`: the mark's rotation in the view (radians; Align centermark,
     /// pattern centermarks).
@@ -2191,6 +2200,14 @@ impl AnnotationKind {
             | AnnotationKind::DatumTarget { view, .. } => Some(view),
             _ => None,
         }
+    }
+
+    /// An angular dimension's vertex and legs as drawn (view coordinates):
+    /// a flipped leg is its point mirrored through the vertex.
+    pub fn angular_legs(&self) -> Option<([f64; 2], [f64; 2], [f64; 2])> {
+        let AnnotationKind::AngularDimension { vertex: v, a, b, flip_a, flip_b, .. } = self else { return None };
+        let leg = |p: [f64; 2], flip: bool| if flip { [2.0 * v[0] - p[0], 2.0 * v[1] - p[1]] } else { p };
+        Some((*v, leg(*a, *flip_a), leg(*b, *flip_b)))
     }
 
     /// The view an annotation is attached to, if any.
