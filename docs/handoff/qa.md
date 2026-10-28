@@ -9,6 +9,13 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **22:49 update (greens 81506e89 = + bool Shell slab vertices, f11f45f3 = + dx 6f684708 angular sectors):** 81506e89: live-30
+  60779.484 / 15848.357 and a GUI top-face Shell on wf-block 5045.965 / 3956.429 (= v0.4.12 CLI); bool CLI 22:19 matrices (shell,
+  hole, feature, fillet, boolean) identical to their bool1934 baselines. Verified REVOLVE-AXIS-VERTEX, READOUT-VALUE-TOOLTIP.
+  Drawing: ✅ T1 / V2 / A8 / SK7 / SK9 / SK10 / SK18 / SK19; 🔧 A4 (P3 DWG-NOTE-LEADER-ARROW, leaders have no arrowheads), A17 (P3
+  DWG-RULER-SELECTOR-CLOSES); live answers → P2 DWG-ROTATE-VIEW-DIMS-ZERO (V44), DWG-HOLE-CALLOUT-ADD-LEADER raised to P2; D11 on
+  f11f → P2 DWG-ANGULAR-SECTOR. Live asked: datum copy / paste (C9, REQUESTS 22:42). Fuzz 90 (e336, boltdwg) alive; 91 (f11f) running.
+  DRAFT-BUDGET-POOL: core's land of 3a6e8122 still running (since 22:10); background wait active.
 - **22:27 update (green c34f4406; e3368b77 = + skasm 000dfaf4):** verified SKETCH-USE-PRESELECT. Fuzz 88 (6114) and 89 (e336)
   alive (600 actions each, ~3 min). bin/volsweep.sh with bool's CLI 22:19 (rel/k/bool/2219, Rust on): all 19 documents identical to
   v0.4.12. Drawing ⏳ walk on boltdwg / hcd docs (bin/boltdwg.py, bin/hcdwg.py; display :131 is free and used for GUI checks while
