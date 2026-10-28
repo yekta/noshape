@@ -532,6 +532,9 @@ pub struct SketchEditor {
     fillet_session: Option<EntityId>,
     /// Fillet/chamfer preview is isolated from the document until Enter.
     pending_corner: Option<(SketchData, noshape_sketch::EditResult)>,
+    /// The pending fillet stands in for a default radius too large for its
+    /// corner: the largest that fits, previewed red.
+    corner_too_large: bool,
     /// Slot preview (live Onshape: light blue until the next click, Enter or
     /// leaving the tool commits it): the previewed data and the new curves.
     pending_slot: Option<(SketchData, Vec<EntityId>)>,
@@ -1111,6 +1114,7 @@ impl SketchEditor {
             xf_scale: 1.0,
             fillet_session: None,
             pending_corner: None,
+            corner_too_large: false,
             pending_slot: None,
             chamfer_distance: 0.005,
             slot_width: 0.005,
@@ -1166,6 +1170,7 @@ impl SketchEditor {
         self.external_snap = None;
         self.fillet_session = None;
         self.pending_corner = None;
+        self.corner_too_large = false;
         self.pending_slot = None;
         self.editing_text = None;
         self.text_expression = false;
@@ -1892,15 +1897,14 @@ impl SketchEditor {
         }
         let chamfer = self.tool == Tool::Chamfer;
         let corner = hovered.filter(|e| is_point(&data.sketch, *e)).or_else(|| if hovered.is_none() { nearest_point(&data.sketch, p, self.world_per_px * 10.0) } else { None });
-        let mut preview = data.clone();
-        let sk = &mut preview.sketch;
-        let r = if let Some(pid) = corner {
+        // The corner point, or the two curves.
+        let target = if let Some(pid) = corner {
             self.picks.clear();
-            if chamfer { sk.chamfer_corner(pid, self.chamfer_distance, self.chamfer_distance) } else { sk.fillet_corner(pid, self.fillet_radius) }
+            (pid, None)
         } else if let Some(c) = hovered {
             if let Some(&(first, _)) = self.picks.first().filter(|(f, _)| *f != c) {
                 self.picks.clear();
-                if chamfer { sk.chamfer(first, c, self.chamfer_distance, self.chamfer_distance) } else { sk.fillet(first, c, self.fillet_radius) }
+                (first, Some(c))
             } else {
                 self.picks = vec![(c, p)];
                 return EditOutcome::redraw();
@@ -1908,9 +1912,37 @@ impl SketchEditor {
         } else {
             return EditOutcome::none();
         };
-        match r {
-            Ok(r) => {
+        let dist = self.chamfer_distance;
+        let make = |r: f64| {
+            let mut preview = data.clone();
+            let sk = &mut preview.sketch;
+            let res = match (target, chamfer) {
+                ((pid, None), true) => sk.chamfer_corner(pid, dist, dist),
+                ((pid, None), false) => sk.fillet_corner(pid, r),
+                ((a, Some(b)), true) => sk.chamfer(a, b, dist, dist),
+                ((a, Some(b)), false) => sk.fillet(a, b, r),
+            };
+            res.map(|res| (preview, res))
+        };
+        let mut made = make(self.fillet_radius);
+        let mut too_large = false;
+        // Live (sketch.md 11.4; SKETCH-FILLET-STUCK-RADIUS reopened): a
+        // default radius too large for the corner previews red, to be dragged
+        // or typed smaller; the tool is never locked out by it. The preview is
+        // the largest radius that fits.
+        if made.is_err() && !chamfer && make(self.fillet_radius * 1e-3).is_ok() {
+            let (mut lo, mut hi) = (self.fillet_radius * 1e-3, self.fillet_radius);
+            for _ in 0..30 {
+                let mid = 0.5 * (lo + hi);
+                if make(mid).is_ok() { lo = mid } else { hi = mid }
+            }
+            made = make(lo);
+            too_large = made.is_ok();
+        }
+        match made {
+            Ok((preview, r)) => {
                 self.pending_corner = Some((preview, r));
+                self.corner_too_large = too_large;
                 self.message = Some("Adjust the preview, then press Enter to confirm".into());
                 EditOutcome::redraw()
             }
@@ -1929,6 +1961,7 @@ impl SketchEditor {
 
     pub fn commit_corner(&mut self, data: &mut SketchData) -> EditOutcome {
         let Some((preview, result)) = self.pending_corner.take() else { return EditOutcome::none() };
+        self.corner_too_large = false;
         *data = preview;
         self.finish_create(data, &result.created);
         if self.tool == Tool::Chamfer {
@@ -2169,14 +2202,20 @@ impl SketchEditor {
         }
         let pa = self.fillet_label_foot(sk)?;
         let px = self.world_per_px;
-        Some((pa + DVec2::new(-7.5 * px, 13.0 * px), self.fillet_radius))
+        // The preview's own radius (it follows the arrow's drag).
+        let (arc, _) = self.fillet_handle(sk)?;
+        let r = match self.pending_corner.as_ref().and_then(|(d, _)| d.sketch.curve(arc)) {
+            Some(Curve2::Arc { radius, .. }) => radius,
+            _ => self.fillet_radius,
+        };
+        Some((pa + DVec2::new(-7.5 * px, 13.0 * px), r))
     }
 
     /// Preview of a fillet at the hovered corner: the arc, and whether it fits.
     fn fillet_preview(&self, sk: &Sketch) -> Option<(Vec<DVec2>, bool)> {
         if let Some((data, result)) = &self.pending_corner {
             let arc = result.created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Arc))?;
-            return Some((data.sketch.tessellate(arc, self.world_per_px), true));
+            return Some((data.sketch.tessellate(arc, self.world_per_px), !self.corner_too_large));
         }
         let pid = self.hover.filter(|e| is_point(sk, *e))?;
         let users: Vec<EntityId> = sk.entities().filter(|e| e.endpoints().is_some_and(|(s, en)| s == pid || en == pid)).map(|e| e.id).collect();
@@ -3309,6 +3348,8 @@ impl SketchEditor {
                     let kept = legs.iter().all(|(e, d0)| matches!(data.sketch.curve(*e), Some(Curve2::Line { a, b }) if (b - a).dot(*d0) > 1e-12 * d0.length_squared().max(1e-30)));
                     if !solved || !kept {
                         data.sketch = before;
+                    } else if pending {
+                        self.corner_too_large = false;
                     }
                 }
                 if pending { EditOutcome::redraw() } else { EditOutcome::changed() }
@@ -8323,6 +8364,27 @@ mod tests {
         assert!(ed.commit_corner(&mut d).changed);
         click(&mut ed, &mut d, p1);
         assert!(ed.pending_corner.is_some(), "the next corner still fillets: {:?}", ed.message);
+    }
+
+    /// SKETCH-FILLET-STUCK-RADIUS (reopened, qa green d2826142): a large
+    /// committed radius as the default doesn't lock a smaller corner out: it
+    /// previews the largest radius that fits, red, to drag or type smaller.
+    #[test]
+    fn a_default_radius_too_large_for_the_corner_previews_red() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        let r = d.sketch.corner_rectangle(v(0.1, 0.0), v(0.115, 0.011));
+        let corner = d.sketch.point(r.points[0]).unwrap();
+        ed.fillet_radius = 0.03727;
+        click(&mut ed, &mut d, corner);
+        assert!(ed.pending_corner.is_some(), "a preview, not a refusal: {:?}", ed.message);
+        let (arc, _) = ed.fillet_handle(&d.sketch).unwrap();
+        let radius = match ed.pending_corner.as_ref().and_then(|(pv, _)| pv.sketch.curve(arc)) {
+            Some(Curve2::Arc { radius, .. }) => radius,
+            c => panic!("{c:?}"),
+        };
+        assert!(radius > 0.005 && radius < 0.011, "the largest radius that fits: {radius}");
+        assert!(ed.fillet_preview(&d.sketch).is_some_and(|(_, fits)| !fits), "drawn red");
+        assert_eq!(ed.fillet_value_label(&d.sketch).map(|(_, r)| r), Some(radius), "the label reads the preview");
     }
 
     #[test]

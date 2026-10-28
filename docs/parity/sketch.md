@@ -277,7 +277,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
 | 13.1 | Tool prompts at the bottom of the view ("Select a mirror line.", …) | i18n | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 13.2 | "Cannot fillet selected point." | i18n | ❌ (FILLET-POINT-MSG) | 0.4.10+ / 203c4d6f 10-27 |
+| 13.2 | "Cannot fillet selected point." | i18n | ✅ (FILLET-POINT-MSG, qa verified dd1b5037) | 0.4.10+ / 203c4d6f 10-27 |
 | 13.3 | "The maximum bezier degree (15) has been reached." | i18n | ✅ (GUI :103 entering degree 16 reports exact message; bezier-max-degree-error.png; T:sm creation limit also added) | 0.4.10+ / 965d3f56 10-27 (degree 16 → exact message) |
 | 13.4 | Conflicting constraints reported as a sketch warning | B§7.2 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 
