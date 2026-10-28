@@ -435,7 +435,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
-- [ ] P3 NUMBER-FIELD-ERROR-MARK a number field blamed by the feature's error isn't marked: cpat.noshape › Curve pattern ›
+- [x] verified d2357ee5 (qa 06:36: cpat Curve pattern Distance 25 × 4 → Distance #f9ebec with a #bd3039 rule (2 px here, live 1 px), Instance count normal; tickets/number-field-error-mark-d235.png; residual: the assembly Linear pattern's Distance at 0 is still white, live's colours there not captured) a801dcd6 P3 NUMBER-FIELD-ERROR-MARK a number field blamed by the feature's error isn't marked: cpat.noshape › Curve pattern ›
   Part pattern of Part 1 along the circle, Distance mode, 25 mm × 4 → title red, tooltip "…did not regenerate properly:
   Cannot create a curve pattern when the entered distance is larger than the path length.", but the Distance field stays
   white with its grey #d7d7d7 rule (tickets/number-field-error-mark-9866.png). Live (behaviours ~22572, request 1533): the
