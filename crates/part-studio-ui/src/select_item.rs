@@ -441,9 +441,17 @@ impl SelectItemPanel {
                 let cfg = this.cfg_edit.get(&key).cloned().unwrap_or_default();
                 this.pick(join_value(&key, &cfg), cx);
             })).into_any_element());
+            // What the Derived takes from this studio (live 407: a grey chip per part beside Generate): its parts
+            // when the studio itself is picked, else the picked part.
+            let taken: Vec<String> = parts
+                .iter()
+                .flatten()
+                .filter(|(b, _)| b.index != u32::MAX && (current == s.tab || current == crate::fs_reference::part_value(&s.tab, b)))
+                .map(|(_, n)| n.clone())
+                .collect();
             if open && let Some(cfg) = s.configuration.clone() {
                 let tab = s.tab.clone();
-                out.push(self.config_editor(&tab, &cfg, window, cx));
+                out.push(self.config_editor(&tab, &cfg, taken, window, cx));
             }
             // Live 409 (qa5 DER10): a changed configuration empties the
             // contents until Generate lists them again.
@@ -454,7 +462,9 @@ impl SelectItemPanel {
                     let on = current == value;
                     let studio = s.tab.clone();
                     let icon = if body.index == u32::MAX { "sketch" } else { "part" };
-                    out.push(row(SharedString::from(format!("sel-part-{value}")), 36., None, &value, icon, name, on, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    // The studio picked whole: its parts are what the Derived takes, pale blue (live 407).
+                    let implied = current == s.tab && body.index != u32::MAX;
+                    out.push(row(SharedString::from(format!("sel-part-{value}")), 36., None, &value, icon, name, on, cx).when(implied, |d| d.bg(gpui_kit::rgb(0xdef1fb))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         let cfg = this.cfg_edit.get(&studio).cloned().unwrap_or_default();
                         this.pick(join_value(&value, &cfg), cx);
                     })).into_any_element());
@@ -478,7 +488,7 @@ impl SelectItemPanel {
         (editing != effective, editing)
     }
 
-    fn config_editor(&mut self, key: &str, cfg: &Configuration, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn config_editor(&mut self, key: &str, cfg: &Configuration, taken: Vec<String>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let (changed, editing) = self.config_changed(key, cfg);
         // Live 741: labels only as wide as their text, the editor fills the rest.
@@ -548,8 +558,12 @@ impl SelectItemPanel {
             col = col.child(control);
         }
         let key2 = key.to_string();
+        // Live 407: the chips of what the Derived takes sit right of Generate (#d0dbe5, #333, a soft shadow).
+        let chips = taken.into_iter().map(|n| {
+            div().h(px(29.)).px(px(6.)).flex().items_center().rounded(px(3.)).bg(gpui_kit::rgb(0xd0dbe5)).shadow_sm().text_size(px(12.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child(crate::ui::user_text(n))
+        });
         col.child(
-            div().pt(px(2.)).pb(px(2.)).child(
+            h_flex().gap(px(8.)).pt(px(2.)).pb(px(2.)).child(
                 div()
                     .id(SharedString::from(format!("sel-cfg-generate-{key}")))
                     .ml(px(3.))
@@ -572,7 +586,8 @@ impl SelectItemPanel {
                         let base = if source_of(base) == key2 { base.to_string() } else { key2.clone() };
                         this.pick(join_value(&base, &cfg), cx);
                     })),
-            ),
+            )
+            .children(chips),
         )
         .into_any_element()
     }
