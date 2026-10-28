@@ -7,8 +7,16 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 round trip 60779.484, kill -9 after Suppress, drawing PDF, assembly drag, dialog hover + pick, fuzz); details under
 "Daily release smoke". Redo on the release artifact when it is published; blocker list at the top of TICKETS.
 
-## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97)
+## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97 → … → b504234e → 2960a143)
 
+- **05:55 update (greens b504234e → 2960a143; v0.4.12 not published yet at 05:55, still v0.4.11 Latest):** Filed P1
+  FEATURE-MIRROR-COPY-FULL-DEPTH (core: Feature mirror with Reapply off copies a boss as deep as the whole part, 9500 vs
+  live 9000; also in v0.4.11), P3 ENCLOSE-NO-REGION-MSG, P3 FOLDER-MENU-ROLL-TO-HERE, P3 ROLLBACK-BAR-IN-FOLDER (live 1534).
+  Verified on 2960a143: HOLE-TABLE-MENU, HOLE-TABLE-FILLETS, XT-ASM-SCALE (x_t import real size, ~10 s), assembly filter
+  popover (1519), part-studio 3.19 see-through result faces. REGEN-SPEED A/B: 2960a143 median 167 ms vs b504234e 212 ms
+  back to back (load 22–28). ADV2 loft still 5927.755. Rows: advanced 4.2b 4.9 3.6b 6 (3.10b ❌); feature-sweep Mirror
+  fields, Enclose empty (row 3 ❌), L45b ×2 fixed; chrome-sweep RP0–RP6, FD2 FD4 FD9, FL7 FL10 (FL5 ❌). Asked live: Enter
+  in a pattern's Instance count (ours commits on one Enter, Depth needs two). Fuzz 54 × 600 on 2960a143 running.
 - **04:20 update:** 05:00 blocker list pushed at the top of TICKETS (no new P0; open P0s FILLET-OVERSIZE-OK, REGEN-SPEED /
   COMMIT-LATENCY, SHELL-SLOW, BOOL-THREAD-CRASH are all in v0.4.11). Fuzz 51 / 52 on 1b81b7ca alive. FILLET-OVERSIZE-OK
   re-checked on 1b81b7ca (R25 D-shape, no error). Filed P2 CALLOUT-ON-DIMENSION, P3 CALLOUT-ALIGN-MISSING (dx). Rows:
