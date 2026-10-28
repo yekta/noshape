@@ -144,7 +144,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 6.13 | Shift suppresses inferences | H:automatic_inferencing | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 6.14 | Snap to model vertices and edges when sketching on a face; vertices stay linked | H:sketch_basics | ✅ (GUI :103 m10.png: sketch on a part face, the line start snaps to the model vertex with a coincident inference and stays linked (fixed point)) | 0.4.10+ / 965d3f56 10-27 (sketch on wf-block's top face: line from the top face's corner vertex, start black + use glyph) |
 | 6.15 | Woken entity / parallel partner highlighted orange, new line drawn dotted when parallel | H:automatic_inferencing | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 6.16 | Ellipse quadrant (Quadrant constraint) inference | H:working_with_constraints | ✅ (T:ux, Quadrant constraint) |  |
+| 6.16 | Ellipse quadrant (Quadrant constraint) inference | H:working_with_constraints | ✅ (T:ux, Quadrant constraint) | 4c97692e 10-28 (GUI: ellipse, then a line ending near its top: snaps to the quadrant point with a dashed guide to the centre; stored Quadrant (read back with the CLI)) |
 
 ## 7. Dimension tool
 
