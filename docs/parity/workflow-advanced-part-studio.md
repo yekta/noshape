@@ -85,7 +85,7 @@ rebuilt exactly to live's spec in /tmp/qa5/home/Documents/noshape/qa5-livecheck.
 | 1.8 | Loft volume | 5927.728022 | 5927.755 | ✗ ADV2 |  |
 | 2.5 | Sweep error tooltip | "Sweep 1 did not regenerate properly: …" | still "Could not create valid swept body, check input."; Helix error tooltip also bare ("Select a cone or cylinder.") | ✗ ADV3 |  |
 | 3.7 | Hole countersink rows | – | "Countersink diameter" label still overlaps "12.878 mm", "82 de" cut | ✗ ADV4 |  |
-| 4.1 | Helix handedness label | live DOM (qa5-adv-helix): the Clockwise select has **no label** | no label | ✅ **ADV5 withdrawn** |  |
+| 4.1 | Helix handedness label | live DOM (qa5-adv-helix): the Clockwise select has **no label** | no label | ✅ **ADV5 withdrawn** | f8014efa 10-28 (GUI: new Helix: "Clockwise" select spans the row with no label) |
 | 4.5 | External thread edge pick | picks the edge | **hovers + picks "Edge of Sweep 1"** | ✅ ADV6 fixed | 64997436 10-28 (GUI: hover outlines the Ø6 top edge, click → 'Edge of Extrude 3') |
 | 4.5b | Thread dialog "Threads/inch" value | "20 tpi" (dom qa5-adv-thread) | "20 tpi (UNC)" | ✅ (ADV8 fixed) | 64997436 10-28 (GUI: '20 tpi'; ADV8 fixed) |
 | 4.5c | Thread result | cosmetic, **cylindrical face split at 10 mm (3 → 4 faces)**, area unchanged | area unchanged 2513.2741, **still 3 faces** (Split face ☑ default) | ✅ (ADV7 fixed) | 64997436 10-28 (GUI: committed, the side face is split 10 mm down: hover lights the lower band only; ADV7 fixed; tickets/thread-split-6499.png) |
