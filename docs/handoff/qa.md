@@ -3,7 +3,7 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-**v0.4.12 published 05:49 (tag e936fe98 = ec96b151 + version bump; code = green 1b81b7ca). Artifact smoke 06:05 on
+**v0.4.12 published 05:49 (tag e936fe98 = ec96b151 + version bump; code = green 1b81b7ca). Artifact smoke 06:03 on
 noshape-0.4.12-linux-x86_64.tar.gz: all rows OK** (details under "Daily release smoke" › v0.4.12). Blocker list at the top
 of TICKETS (open P0s all carried from v0.4.11).
 
@@ -187,7 +187,7 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   Linear pattern in Feature, Part and Face mode: Direction pre-highlights and picks an edge at its middle and a face (not
   the plane behind it); Fillet › Edges and Shell › Faces hover + pick; cfs.noshape custom feature "Edge pick"
   (`EDGE && ALLOWS_AXIS`, 2 picks) and "Plain edge pick" both take two edges.
-### v0.4.12 (tag e936fe98, published 05:49; Linux tarball smoked 05:53–06:05 on the box at load 20–27)
+### v0.4.12 (tag e936fe98, published 05:49; Linux tarball smoked 05:53–06:03 on the box at load 20–27)
 - Start page "(0.4.12.e936fe98a8b4)"; CLI STEP header 'NOSHAPE 0.4.12'; STEP export → import_files round trip of the
   l30 copy 83341.148087 = 83341.148087 (this l30 file is the 34-feature variant; v0.4.11 gives the same).
 - live-30 (l30 copy) open regen 982 ms; Extrude 1 → 15 / 16 / 17: 140 / 107 / 120 ms (median 120); Ctrl+Z ×3: 1 / 1 /

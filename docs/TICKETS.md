@@ -13,6 +13,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - **Cut 05:00: tag v0.4.12 = e936fe98 = ec96b151 + "Release v0.4.12"; its code is identical to green 1b81b7ca** (no diff under
   crates / vendor / scripts / Cargo), where this list was checked (fuzz 51 / 52, FILLET-OVERSIZE re-check). Not in it: 4658e826
   (Ctrl+C part, FS snippets), 3062ec50, 4fa9cdf1, c1f5d69c, 0ea2b791 (all verified on later greens). Artifact smoke when published.
+- **Published 05:49; artifact smoke 06:03 (Linux tarball): all rows OK** (version strings, STEP round trip, edit / undo
+  times, kill -9 after Suppress, hover + pick, drawing PDF, assembly drag; docs/handoff/qa.md › v0.4.12).
 - **No new P0 since v0.4.11; nothing found today blocks the 05:00 release.** Fuzz seeds 45–52 × 600 actions on greens 41f60e47, 7929b13a, da18f886, 1b81b7ca: no crash, no hang. The open
   P0s below are all in v0.4.11 already (none is a regression of today's mains):
   - FILLET-OVERSIZE-OK (core): an edge fillet too big for its faces reports Ok with a wrong solid (wf-block R25 on three
