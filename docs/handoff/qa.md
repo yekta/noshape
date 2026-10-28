@@ -9,7 +9,7 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
-- **11:30 update (green 64997436):** fuzz 66 (left running by session 4, 64997436) finished alive. workflow-advanced-part-studio:
+- **11:17 update (green 64997436):** fuzz 66 (left running by session 4, 64997436) finished alive. workflow-advanced-part-studio:
   1.5, 1.7 (a click on the circle's centre takes its point, off-centre the region), 3.3, 3.9, 3.10 (Plane 1 row fills Mirror
   plane: ADV1 fixed there too), 4.2 (81.147), 4.5/4.5b/4.5c (thread edge pick, "20 tpi", face split: ADV7/ADV8 fixed), 4.8
   (rib 10550), ADV3 (error prefix), ADV4 (countersink rows) verified; ADV2 loft still 5927.755. workflow-surfaces: SF2, SF5,
