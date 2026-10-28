@@ -9,7 +9,7 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
-- **11:50 update (greens 64997436 → ea572159):** fuzz 66 (6499) and 67 (ea57) × 600 alive. REGEN-SPEED on 64997436: 3rd
+- **11:40 update (greens 64997436 → ea572159):** fuzz 66 (6499) and 67 (ea57) × 600 alive. REGEN-SPEED on 64997436: 3rd
   undo 131–251 ms (was ~1300 at 09:27), edits 201–606 ms at load 24–30 (ticket note). Verified: ASM-XT-ROUNDTRIP-NAMES dx
   half (ea572159: x_t carries "Pin" etc., re-import "Pin <1>"), sheet-metal SM8–SM12, feature-sweep L56 + row 12 (all 21
   flush-wall cases = live, bin/flushwall.py / flushwall2.py), sm-joints 1, import-matrix g50 F18/F11 (F19 now +0.00004),
