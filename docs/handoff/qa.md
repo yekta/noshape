@@ -155,6 +155,17 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   leave a document that crashes on every open; v0.4.8 opens the same documents. DRAFT-SEGV-DOC also hits v0.4.8.
 - SHELL-WALLS: wrong solid with status OK (also in v0.4.8).
 
+## 2026-10-28 release smoke (pre-cut, 04:35–04:42 on green 3f4e10d9 = `last-green` at 04:30; redo on the artifact once published)
+- **Results at the top of the qa doc for the morning: all smoke rows OK on 3f4e10d9.**
+- live-30-features: open regen 176 ms; Extrude 1 edits 256 / 167 / 135 ms (median 167, load ~20); Ctrl+Z 1 / 3 / 134 ms.
+- Part › Export STEP (AP242) → + › Import → "smoke-3f4e" Part Studio (+ CAD Imports folder): 60779.484 mm³ = live.
+- kill -9 0.3 s after Suppress Boss 1 → reopened with Boss 1 suppressed.
+- Drawing (wf-block, two sheets) › Export PDF → 2 pages, letter landscape, sheet content right.
+- asm5: dragging the Revolute pin rotates it in place (stays on its hole).
+- Hover + pick in feature dialogs: Linear pattern Feature / Part / Face mode Direction takes the edge at its middle and
+  the top face (not the plane); cfs.noshape "Edge pick" (EDGE && ALLOWS_AXIS) and "Plain edge pick" take two edges each.
+- Fuzz seeds 45–52 × 600 on today's greens: no crash.
+
 ## Daily release smoke
 ### Checklist rows run on every release (in addition to the open / regen / export / drawing / assembly / kill -9 rows below)
 - **hover + pick in a feature dialog** (LP-DIRECTION-PICK regression, from 2026-10-27): lpd.noshape (bin/lpdoc.py) →
