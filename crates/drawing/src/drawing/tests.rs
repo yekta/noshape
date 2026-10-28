@@ -153,6 +153,31 @@ fn sheet_operations() {
     assert_eq!(d.unique_sheet_name(), "Sheet1");
 }
 
+/// Sheets panel drags (live "dx sheet row drag"): Sheet3 above Sheet1 gives
+/// 3, 1, 2; Sheet1 below the last gives 2, 3, 1; several keep their order.
+#[test]
+fn dragged_sheets_move_together() {
+    let names = |d: &Drawing| d.sheets.iter().map(|s| s.name.clone()).collect::<Vec<_>>().join(" ");
+    let three = || {
+        let mut d = Drawing::default();
+        d.add_sheet(0);
+        d.add_sheet(1);
+        d
+    };
+    let mut d = three();
+    assert_eq!(d.move_sheets(&[2], 0), Some(vec![2, 0, 1]));
+    assert_eq!(names(&d), "Sheet3 Sheet1 Sheet2");
+    let mut d = three();
+    assert_eq!(d.move_sheets(&[0], 3), Some(vec![1, 2, 0]));
+    assert_eq!(names(&d), "Sheet2 Sheet3 Sheet1");
+    let mut d = three();
+    assert_eq!(d.move_sheets(&[2, 0], 2), Some(vec![1, 0, 2]));
+    assert_eq!(names(&d), "Sheet2 Sheet1 Sheet3");
+    // Dropped where they are: nothing to do.
+    assert_eq!(d.move_sheets(&[1], 1), None);
+    assert_eq!(d.move_sheets(&[1], 2), None);
+}
+
 #[test]
 fn rotated_and_broken_views() {
     let (doc, mut drawing) = demo();

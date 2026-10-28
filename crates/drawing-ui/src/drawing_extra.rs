@@ -39,6 +39,20 @@ fn norm(a: [f64; 2]) -> [f64; 2] {
     [a[0] / l, a[1] / l]
 }
 
+/// Sheet rows dragged in the Sheets panel; the ghost is the row's name, or
+/// "N Items" for several (live).
+#[derive(Clone)]
+pub struct SheetDrag {
+    rows: Vec<usize>,
+    label: String,
+}
+
+impl Render for SheetDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().px(px(8.)).py(px(2.)).rounded(px(10.)).bg(rgb(0x1651b0)).text_color(gpui_kit::white()).text_size(px(12.)).child(self.label.clone())
+    }
+}
+
 /// Width of the open Sheets panel (live drawing/30).
 pub const SHEETS_W: f32 = 258.;
 
@@ -214,6 +228,22 @@ impl DrawingEditor {
             crate::os_menu::open(position, menu, window, cx);
         }
         cx.notify();
+    }
+
+    /// Sheets dragged in the panel and dropped before sheet `to` (live "dx
+    /// sheet row drag"): one edit; the active sheet and the selected rows
+    /// stay with their sheets.
+    pub fn drop_sheets(&mut self, rows: &[usize], to: usize, cx: &mut Context<Self>) {
+        self.sheet_drop = None;
+        let mut d = self.drawing.clone();
+        let Some(order) = d.move_sheets(rows, to) else {
+            cx.notify();
+            return;
+        };
+        let new_index = |old: usize| order.iter().position(|i| *i == old).unwrap_or(old);
+        self.sheet = new_index(self.sheet);
+        self.sheet_rows = self.sheet_rows.iter().map(|r| new_index(*r)).collect();
+        self.edit("Move sheet", cx, |dr| *dr = d);
     }
 
     /// Name of the reference (part or source tab) a view's base view shows.
@@ -543,9 +573,37 @@ impl DrawingEditor {
         // Sheets before `i` that are an imported model space (not numbered).
         let models: Vec<bool> = self.drawing.sheets.iter().map(|s| s.imported.as_ref().is_some_and(|m| m.model)).collect();
         let model_before = move |i: usize| models[..i.min(models.len())].iter().filter(|m| **m).count();
+        let n_sheets = self.drawing.sheets.len();
+        let drop_at = self.sheet_drop.filter(|_| cx.has_active_drag());
+        let sel_rows = self.sheet_rows.clone();
         let sheet_row = |i: usize, s: &Sheet, active: bool, selected: bool, cx: &mut Context<Self>| {
+            // Dragged: the selected rows when this one is among them.
+            let rows: Vec<usize> = if selected && sel_rows.len() > 1 { sel_rows.clone() } else { vec![i] };
+            let drag = SheetDrag { label: if rows.len() > 1 { format!("{} Items", rows.len()) } else { s.name.clone() }, rows };
             crate::ui::tree_row(("dr-sheet-tab", i), selected && !active)
                 .relative()
+                .on_drag(drag, |d, _, _, cx| cx.new(|_| d.clone()))
+                // The drop goes before this row (upper half) or after it.
+                .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<SheetDrag>, _, cx| {
+                    let b = e.bounds;
+                    let y = e.event.position.y;
+                    if y < b.top() || y >= b.bottom() || e.event.position.x < b.left() || e.event.position.x >= b.right() {
+                        return;
+                    }
+                    let at = if y < b.top() + b.size.height / 2. { i } else { i + 1 };
+                    if this.sheet_drop != Some(at) {
+                        this.sheet_drop = Some(at);
+                        cx.notify();
+                    }
+                }))
+                .on_drop(cx.listener(|this, d: &SheetDrag, _, cx| {
+                    if let Some(to) = this.sheet_drop {
+                        this.drop_sheets(&d.rows, to, cx);
+                    }
+                }))
+                // Live: a blue line across the panel where the rows go.
+                .when(drop_at == Some(i), |r| r.child(div().absolute().left_0().right_0().top(px(-1.)).h(px(2.)).bg(blue)))
+                .when(drop_at == Some(n_sheets) && i + 1 == n_sheets, |r| r.child(div().absolute().left_0().right_0().bottom(px(-1.)).h(px(2.)).bg(blue)))
                 // Live drawing/281: chevron at x 18, page icon at 37, name at 60.
                 .pl(px(13.))
                 .cursor_pointer()

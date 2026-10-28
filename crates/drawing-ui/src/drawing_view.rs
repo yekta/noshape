@@ -377,6 +377,9 @@ pub struct DrawingEditor {
     pub mbd_model: usize,
     /// Selected rows of the Sheets panel (sheet indices).
     pub sheet_rows: Vec<usize>,
+    /// While sheet rows are dragged: the row the drop goes before (the
+    /// number of sheets: after the last), shown as a blue line (S8).
+    pub sheet_drop: Option<usize>,
     /// The note edited in place (its sheet text is hidden under the editor).
     pub inplace_hidden: Option<u64>,
     /// The general table cell edited in place (table, row, column).
@@ -612,6 +615,7 @@ impl DrawingEditor {
             right_panel: None,
             mbd_model: 0,
             sheet_rows: Vec::new(),
+            sheet_drop: None,
             inplace_hidden: None,
             inplace_cell: None,
             panel_highlight: None,

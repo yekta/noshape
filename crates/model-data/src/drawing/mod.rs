@@ -3971,6 +3971,30 @@ impl Drawing {
         true
     }
 
+    /// Move sheets `rows` (kept in their order) to stand before sheet `to`
+    /// (`len`: at the end), as a drag in the Sheets panel does. Returns the
+    /// new order as old indices, or None when nothing moves.
+    pub fn move_sheets(&mut self, rows: &[usize], to: usize) -> Option<Vec<usize>> {
+        let n = self.sheets.len();
+        let mut moved: Vec<usize> = rows.iter().copied().filter(|r| *r < n).collect();
+        moved.sort_unstable();
+        moved.dedup();
+        if moved.is_empty() {
+            return None;
+        }
+        let rest: Vec<usize> = (0..n).filter(|i| !moved.contains(i)).collect();
+        let at = rest.iter().take_while(|i| **i < to.min(n)).count();
+        let mut order = rest[..at].to_vec();
+        order.extend(&moved);
+        order.extend(&rest[at..]);
+        if order.iter().copied().eq(0..n) {
+            return None;
+        }
+        let mut old: Vec<Option<Sheet>> = std::mem::take(&mut self.sheets).into_iter().map(Some).collect();
+        self.sheets = order.iter().map(|i| old[*i].take().expect("each sheet once")).collect();
+        Some(order)
+    }
+
     /// Rename sheet `i`; empty names are rejected.
     pub fn rename_sheet(&mut self, i: usize, name: &str) -> bool {
         let name = name.trim();

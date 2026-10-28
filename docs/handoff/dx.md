@@ -125,7 +125,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   banner closes after 2.5 s; the bell for the finish notification is asked of the lead.
 - S6: Sheets panel › reference › Change configuration... (live's panel; every view of the reference; the API's
   drawing_change_configuration), checked on :131.
-- Next, in order: S8 sheet row drag; A35; TABLE-SHIFT-TAB-BLANK; V59 / V26; ⏳ rows on green.
+- S8: sheet rows drag to reorder (one or several; blue drop line; one undo), checked on :131.
+- Next, in order: A35; TABLE-SHIFT-TAB-BLANK; V59 / V26; ⏳ rows on green.
 
 ## Afternoon 10-28 (landed through 3476703d)
 - Parasolid: 30.1–31.1 ASSEMBLY layouts from live's samples (all 13 versions read); exports carry part names / colours
