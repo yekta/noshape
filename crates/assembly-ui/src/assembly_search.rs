@@ -38,6 +38,8 @@ const RUNS: &[Run] = &[
     |t, w, cx| t.open_relation(RelationType::Linear, None, w, cx),
     |t, w, cx| t.toggle_display_states(w, cx),
     |t, _, cx| t.open_ps_in_context(false, cx),
+    |t, w, cx| t.start_mate(MateType::Tangent, w, cx),
+    |t, w, cx| t.start_mate(MateType::Width, w, cx),
 ];
 
 /// (icon, name, shortcut); the description is live's, by name
@@ -55,11 +57,7 @@ fn tool(i: usize) -> AsmTool {
 /// toolbar order; at most 10 results.
 /// A toolbar tool's description (its tooltip's second line), by icon.
 pub(super) fn tool_description(icon: &str) -> &'static str {
-    let title = ASSEMBLY_TOOLS.iter().find(|t| t.0 == icon).map(|t| t.1).unwrap_or(match icon {
-        "tangent-mate" => "Tangent mate",
-        "width-mate" => "Width mate",
-        _ => "",
-    });
+    let title = ASSEMBLY_TOOLS.iter().find(|t| t.0 == icon).map_or("", |t| t.1);
     crate::tool_text::assembly_description(title).unwrap_or_default()
 }
 
@@ -297,6 +295,10 @@ mod tests {
         assert_eq!(names("group"), vec!["Group"]);
         assert_eq!(names("context"), vec!["Create Part Studio in context"]);
         assert_eq!(names("display"), vec!["Display states"]);
+        // ASM-TOOLSEARCH (live dom/ui-e-search-live-assembly.json).
+        assert_eq!(names("Tangent mate"), vec!["Tangent mate"]);
+        assert_eq!(names("tangent"), vec!["Tangent mate"]);
+        assert_eq!(names("Width mate"), vec!["Width mate"]);
     }
 }
 

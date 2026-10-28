@@ -1292,7 +1292,8 @@ impl AssemblyView {
             // Change configuration: only for configured Part Studios.
             let configured = inst.source.studio().and_then(|s| self.doc.read(cx).session.doc.tab(s)).is_some_and(|t| matches!(&t.content, TabContent::PartStudio(ps) if !ps.configuration.inputs.is_empty()));
             if configured && !matches!(inst.source, InstanceSource::Standard { .. }) {
-                m.push(item("Change configuration…", move |t, w, cx| t.open_config(top, w, cx)));
+                // Live (assembly/1381): the blue configuration-table icon.
+                m.push(icon_item("Change configuration…", "configuration-table", move |t, w, cx| t.open_config(top, w, cx)));
                 // Live qa5 CA2: both selections follow Change configuration….
                 m.push(item("Select instances with same configuration", move |t, _, cx| t.select_same_configuration(top, false, cx)));
                 m.push(item("Select instances with same part and same configuration", move |t, _, cx| t.select_same_configuration(top, true, cx)));

@@ -49,8 +49,9 @@ pub fn studio_rank(names: &[&str], query: &str) -> Vec<usize> {
 
 /// The Assembly's ranking (live dom/assembly-tool-search.txt): names
 /// starting with the text, then names containing it, then names holding
-/// its letters in order; shorter names first within each tier, then the
-/// given order; at most 10 results. Indices into `names`.
+/// its letters in order; shorter names first within each tier (Tangent and
+/// Width mate after the rest of theirs), then the given order; at most 10
+/// results. Indices into `names`.
 pub fn assembly_rank(names: &[&str], query: &str) -> Vec<usize> {
     let q = query.trim().to_lowercase();
     if q.is_empty() {
@@ -60,7 +61,7 @@ pub fn assembly_rank(names: &[&str], query: &str) -> Vec<usize> {
         let mut it = n.chars();
         q.chars().filter(|c| !c.is_whitespace()).all(|c| it.any(|x| x == c))
     };
-    let mut hits: Vec<(u8, usize, usize)> = names
+    let mut hits: Vec<(u8, bool, usize, usize)> = names
         .iter()
         .enumerate()
         .filter_map(|(i, name)| {
@@ -74,11 +75,11 @@ pub fn assembly_rank(names: &[&str], query: &str) -> Vec<usize> {
             } else {
                 return None;
             };
-            Some((tier, n.chars().count(), i))
+            Some((tier, LATE_TOOLS.contains(name), n.chars().count(), i))
         })
         .collect();
     hits.sort();
-    hits.into_iter().take(10).map(|(_, _, i)| i).collect()
+    hits.into_iter().take(10).map(|(.., i)| i).collect()
 }
 
 /// The Assembly toolbar's tools in toolbar order: (icon, name, shortcut).
@@ -108,7 +109,14 @@ pub const ASSEMBLY_TOOLS: &[(&str, &str, Option<&str>)] = &[
     ("linear-relation", "Linear relation", None),
     ("display-states", "Display states", None),
     ("create-partstudio-incontext", "Create Part Studio in context", None),
+    // Last: they rank after the other tools of their tier (live's "mate"
+    // list leaves them out; "Tangent" / "Width mate" find them).
+    ("tangent-mate", "Tangent mate", None),
+    ("width-mate", "Width mate", None),
 ];
+
+/// Tools ranked after the others of their tier ([`assembly_rank`]).
+const LATE_TOOLS: &[&str] = &["Tangent mate", "Width mate"];
 
 /// A sketch tool's name in the tool search: live's title, the label without
 /// its shortcut ("Line (L)" -> "Line") and plain where the toolbar label
