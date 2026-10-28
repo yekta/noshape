@@ -195,7 +195,13 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Shared prefs touched by testing: ~/.config/noshape/preferences.json got `featureDialogWidths.extrude 278` from a resize
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
-## Requests to the lead (qa, updated 2026-10-27 20:44)
+## Requests to the lead (qa, updated 2026-10-28 12:16)
+- **P1 SKETCH-MODEL-EDGE-SELECT (skasm, new 10-28, also in v0.4.12):** in a sketch a click on a model edge selects nothing
+  and clears the selection, so "line + model edge → constraint key" (an everyday flow) can't be done; tool-first works.
+- **P1 SKETCH-START-INFERENCE (skasm, live-confirmed 1550):** a line's first click on an existing endpoint gives no
+  tangent / perpendicular / parallel inference (sketch_mode keeps chain_end None until the first segment exists).
+
+## Earlier requests (qa, 2026-10-27 20:44)
 - **P0 BOX-DIALOG-PANIC (psui, new 20:42)**: since df28c320 (greens dd1b5037, daf1f50c) any box selection with a feature dialog open
   panics the app (FeatureDialog read inside its own update, behaviors.rs:1052). One-line fix; it must not ship at 05:00.
 - P0 FILLET-OVERSIZE-OK (core): overlapping two-edge fillets / chamfers report Ok with impossible solids (live asked).
