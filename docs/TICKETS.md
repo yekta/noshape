@@ -339,6 +339,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   sections with an arc, cuts the rim torus first (cut last it took 270–360 ms against the hole's tube), and checks only
   the faces the cut made: qa's shelltime plates (h10/h30 R2 t1.5, h10 R4 t2.5) 420–870 → 177–229 ms a Shell feature at
   load ~35 (dev build), same volumes; probe `kernel_robustness::shell_feature_time_probe` (ignored).
+  qa 08:02 (v0.4.12 release CLI = green 1b81b7ca, bin/shelltime.py, load ~30): h10 R2 t1.5 0.51 s (9369.159),
+  h30 R2 t1.5 0.49 s (19015.487), h10 R4 t2.5 1.05 s (14277.776), no hole 0.70 s (9031.64): the hole cases 3–4× faster than
+  10-27; the no-hole case slower than 10-27's 0.16 s (one run, load-bound?).
 - [ ] P0 REGEN-SPEED (core 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
