@@ -911,6 +911,8 @@ RayClassifier::RayClassifier(const ShapeIMap& faces, std::vector<Bnd_Box> boxes,
       myTol(tol),
       myBand(band)
 {
+  for (Bnd_Box& b : myBoxes)
+    b.Enlarge(tol);
 }
 
 static ShapeIMap faces_of(const TopoDS_Shape& s)
@@ -920,21 +922,20 @@ static ShapeIMap faces_of(const TopoDS_Shape& s)
   return f;
 }
 
-static std::vector<Bnd_Box> boxes_of(const ShapeIMap& faces, double tol)
+static std::vector<Bnd_Box> boxes_of(const ShapeIMap& faces)
 {
   std::vector<Bnd_Box> b((size_t)faces.Extent());
   for (int i = 1; i <= faces.Extent(); ++i)
-  {
     BRepBndLib::Add(faces(i), b[(size_t)i - 1], false);
-    b[(size_t)i - 1].Enlarge(tol);
-  }
   return b;
 }
 
 RayClassifier::RayClassifier(const TopoDS_Shape& solid, double tol, double band)
     : RayClassifier(faces_of(solid), {}, tol, band)
 {
-  myBoxes = boxes_of(myFaces, tol);
+  myBoxes = boxes_of(myFaces);
+  for (Bnd_Box& b : myBoxes)
+    b.Enlarge(tol);
 }
 
 RayClassifier::~RayClassifier() = default;
@@ -1003,7 +1004,7 @@ int8_t classify_point(const OcShape& solid, P3 p, double tol)
   std::lock_guard<std::mutex> g(solid.myClassifyLock);
   const double t = tol > 0 ? tol : 1e-7;
   if (solid.myRays.first != t && rays_for(solid.shape))
-    solid.myRays = {t, std::make_shared<RayClassifier>(solid.shape, t, 100 * t)};
+    solid.myRays = {t, std::make_shared<RayClassifier>(solid.map(TopAbs_FACE), solid.face_boxes(), t, 100 * t)};
   if (solid.myRays.second)
     switch (solid.myRays.second->Perform(to_pnt(p)))
     {

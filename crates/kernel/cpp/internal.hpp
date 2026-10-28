@@ -89,6 +89,9 @@ bool bop_parallel();
 // `r` valid where it differs from `input`: its faces not the input's in full,
 // the whole shape for closure and orientation (features.cpp).
 bool valid_changed(const TopoDS_Shape& input, const TopoDS_Shape& r);
+// The OcShape's ancestor map (CSR offsets, values; ancestor_map's), made
+// once and kept (common.cpp).
+const std::pair<std::vector<uint32_t>, std::vector<uint32_t>>& ancestors_cached(const OcShape& s, TopAbs_ShapeEnum kind, TopAbs_ShapeEnum ancestor_kind);
 // Every edge used twice, once each way (features.cpp).
 bool closed_and_oriented(const TopoDS_Shape& r);
 
@@ -103,7 +106,7 @@ class RayClassifier
 {
 public:
   RayClassifier(const TopoDS_Shape& solid, double tol, double band);
-  // With the solid's faces and their boxes already at hand.
+  // With the solid's faces and their boxes (as BRepBndLib makes them) at hand.
   RayClassifier(const ShapeIMap& faces, std::vector<Bnd_Box> boxes, double tol, double band);
   ~RayClassifier();
   TopAbs_State Perform(const gp_Pnt& p);

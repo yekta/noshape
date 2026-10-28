@@ -86,6 +86,17 @@ const ShapeIMap& OcShape::map(TopAbs_ShapeEnum kind) const
   return myMaps[k];
 }
 
+const std::vector<Bnd_Box>& OcShape::face_boxes() const
+{
+  std::call_once(myBoxesFlag, [&]() {
+    const ShapeIMap& f = map(TopAbs_FACE);
+    myBoxes.resize((size_t)f.Extent());
+    for (int i = 1; i <= f.Extent(); ++i)
+      BRepBndLib::Add(f(i), myBoxes[(size_t)i - 1], false);
+  });
+  return myBoxes;
+}
+
 std::unique_ptr<OcShape> wrap(const TopoDS_Shape& s) { return std::make_unique<OcShape>(s); }
 
 // ---------------------------------------------------------------- conversions
@@ -486,65 +497,67 @@ int64_t index_of(const OcShape& s, const OcShape& sub, uint8_t kind)
   return i > 0 ? i - 1 : -1;
 }
 
-static Csr ancestor_map_uncached(const OcShape& s, uint8_t kind, uint8_t ancestor_kind);
 
 Csr ancestor_map(const OcShape& s, uint8_t kind, uint8_t ancestor_kind)
 {
-  const int key = kind * 16 + ancestor_kind;
+  const std::pair<std::vector<uint32_t>, std::vector<uint32_t>>& m = ancestors_cached(s, to_kind(kind), to_kind(ancestor_kind));
+  Csr out;
+  out.offsets.reserve(m.first.size());
+  for (uint32_t v : m.first)
+    out.offsets.push_back(v);
+  out.values.reserve(m.second.size());
+  for (uint32_t v : m.second)
+    out.values.push_back(v);
+  return out;
+}
+
+// For every ancestor, the sub-shapes of `kind` in it (as
+// TopExp::MapShapesAndAncestors finds them), as (sub-shape, ancestor) index
+// pairs sorted: the rows of the map, each ancestor once, in order.
+static std::pair<std::vector<uint32_t>, std::vector<uint32_t>> ancestor_map_uncached(const OcShape& s, TopAbs_ShapeEnum k, TopAbs_ShapeEnum ak)
+{
+  const KernelTimer timer(k == TopAbs_EDGE && ak == TopAbs_FACE     ? "ancestors.edge_face"
+                          : k == TopAbs_VERTEX && ak == TopAbs_FACE ? "ancestors.vertex_face"
+                          : k == TopAbs_VERTEX && ak == TopAbs_EDGE ? "ancestors.vertex_edge"
+                                                                    : "ancestors.other");
+  const ShapeIMap&                           km = s.map(k);
+  const ShapeIMap&                           am = s.map(ak);
+  std::vector<std::pair<uint32_t, uint32_t>> pairs;
+  for (int a = 1; a <= am.Extent(); ++a)
+    for (TopExp_Explorer x(am(a), k); x.More(); x.Next())
+    {
+      const int i = km.FindIndex(x.Current());
+      if (i > 0)
+        pairs.emplace_back((uint32_t)i - 1, (uint32_t)a - 1);
+    }
+  std::sort(pairs.begin(), pairs.end());
+  pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
+  std::pair<std::vector<uint32_t>, std::vector<uint32_t>> out;
+  out.first.assign((size_t)km.Extent() + 1, 0);
+  out.second.reserve(pairs.size());
+  for (const auto& [i, a] : pairs)
+  {
+    ++out.first[(size_t)i + 1];
+    out.second.push_back(a);
+  }
+  for (size_t i = 1; i < out.first.size(); ++i)
+    out.first[i] += out.first[i - 1];
+  return out;
+}
+
+const std::pair<std::vector<uint32_t>, std::vector<uint32_t>>& ancestors_cached(const OcShape& s, TopAbs_ShapeEnum kind, TopAbs_ShapeEnum ancestor_kind)
+{
+  const int key = (int)kind * 16 + (int)ancestor_kind;
   {
     std::lock_guard<std::mutex> g(s.myAncestorsLock);
     auto                        it = s.myAncestors.find(key);
     if (it != s.myAncestors.end())
-    {
-      Csr out;
-      out.offsets.reserve(it->second.first.size());
-      for (uint32_t v : it->second.first)
-        out.offsets.push_back(v);
-      out.values.reserve(it->second.second.size());
-      for (uint32_t v : it->second.second)
-        out.values.push_back(v);
-      return out;
-    }
+      return it->second;
   }
-  Csr out = ancestor_map_uncached(s, kind, ancestor_kind);
+  auto                        m = ancestor_map_uncached(s, kind, ancestor_kind);
   std::lock_guard<std::mutex> g(s.myAncestorsLock);
-  s.myAncestors[key] = {std::vector<uint32_t>(out.offsets.begin(), out.offsets.end()), std::vector<uint32_t>(out.values.begin(), out.values.end())};
-  return out;
-}
-
-static Csr ancestor_map_uncached(const OcShape& s, uint8_t kind, uint8_t ancestor_kind)
-{
-  const TopAbs_ShapeEnum k  = to_kind(kind);
-  const TopAbs_ShapeEnum ak = to_kind(ancestor_kind);
-  const ShapeIMap&       km = s.map(k);
-  const ShapeIMap&       am = s.map(ak);
-  ShapeAncMap            anc;
-  if (!s.shape.IsNull())
-    TopExp::MapShapesAndAncestors(s.shape, k, ak, anc);
-  Csr out;
-  out.offsets.reserve(km.Extent() + 1);
-  out.offsets.push_back(0);
-  std::vector<uint32_t> row;
-  for (int i = 1; i <= km.Extent(); ++i)
-  {
-    row.clear();
-    const NCollection_List<TopoDS_Shape>* l = anc.Seek(km(i));
-    if (l != nullptr)
-    {
-      for (NCollection_List<TopoDS_Shape>::Iterator it(*l); it.More(); it.Next())
-      {
-        const int ai = am.FindIndex(it.Value());
-        if (ai > 0)
-          row.push_back(static_cast<uint32_t>(ai - 1));
-      }
-    }
-    std::sort(row.begin(), row.end());
-    row.erase(std::unique(row.begin(), row.end()), row.end());
-    for (uint32_t v : row)
-      out.values.push_back(v);
-    out.offsets.push_back(static_cast<uint32_t>(out.values.size()));
-  }
-  return out;
+  // std::map's entries stay where they are: the reference outlives the lock.
+  return s.myAncestors.emplace(key, std::move(m)).first->second;
 }
 
 // Whether an edge is an OCCT seam: it closes every face it bounds on itself
@@ -653,7 +666,12 @@ std::unique_ptr<OcShapeList> children(const OcShape& s)
 std::unique_ptr<OcShape> make_compound(const OcShapeList& l) { return wrap(compound_of(l.items)); }
 
 std::unique_ptr<OcShapeList> list_new() { return std::make_unique<OcShapeList>(); }
-void   list_push(OcShapeList& l, const OcShape& s) { l.items.push_back(s.shape); }
+void list_push(OcShapeList& l, const OcShape& s)
+{
+  l.items.push_back(s.shape);
+  l.sources.resize(l.items.size() - 1, nullptr);
+  l.sources.push_back(&s);
+}
 size_t list_len(const OcShapeList& l) { return l.items.size(); }
 
 std::unique_ptr<OcShape> list_get(const OcShapeList& l, size_t i)

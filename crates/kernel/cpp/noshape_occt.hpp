@@ -9,6 +9,7 @@
 
 #include "rust/cxx.h"
 
+#include <Bnd_Box.hxx>
 #include <GProp_GProps.hxx>
 #include <Standard_Failure.hxx>
 #include <TopAbs_ShapeEnum.hxx>
@@ -331,6 +332,10 @@ public:
   OcShape& operator=(const OcShape&) = delete;
 
   const ShapeIMap& map(TopAbs_ShapeEnum kind) const;
+  // Its faces' boxes (BRepBndLib, no triangulation) by map(TopAbs_FACE)
+  // index - 1, computed once: the auto scope's classification, fuse_on_face
+  // and the local Boolean all box the target's 1600 faces.
+  const std::vector<Bnd_Box>& face_boxes() const;
   // Volume properties, computed once (`compute` runs the first time):
   // regeneration asks for a body's volume before and after each boolean.
   template <class F>
@@ -375,6 +380,8 @@ private:
   mutable GProp_GProps   myVolume;
   mutable std::once_flag mySurfaceFlag;
   mutable GProp_GProps   mySurface;
+  mutable std::once_flag       myBoxesFlag;
+  mutable std::vector<Bnd_Box> myBoxes;
 };
 
 // Growable list of shapes used to pass shape arrays across the bridge.
@@ -382,6 +389,9 @@ class OcShapeList
 {
 public:
   std::vector<TopoDS_Shape> items;
+  // The OcShapes pushed (list_push; null for items added otherwise), for
+  // their caches: valid only during the call the list is passed to.
+  std::vector<const OcShape*> sources;
 };
 
 struct OcMeshFaces; // per-face triangulation handles (mesh.cpp)

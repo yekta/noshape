@@ -177,6 +177,13 @@ Phase 2 (local Booleans), first step landed:
   printed per feature): 535 → 395 ms; classify_point (the auto scope, 2 calls) 133 → 22 ms. Left: op_unify 106
   (merge_planar 42, candidates 33), the local Boolean 65 (maps 26, history 19), ancestor maps 85 (8 calls),
   bounding boxes 20 (6 calls), on_face's decline 14. T1: kernel `boolean_groups::points_against_a_big_part_classified_by_rays`.
+- Step 4 (10-28): op_boolean sees its inputs' OcShapes (`OcShapeList::sources`, valid during the call): the local
+  Boolean and fuse_on_face take the target's cached face map, edge → face map and face boxes (`OcShape::face_boxes`,
+  shared with classify_point's rays) instead of rebuilding them; fuse_on_face finds each face's plane once.
+  Ancestor maps are built by sorting (sub-shape, ancestor) pairs instead of TopExp::MapShapesAndAncestors (same
+  rows). local.maps 26 → 5 ms, on_face's decline 14 → 2 ms; corpus a2121c5b 161 → 110 ms; 0 mismatches.
+  `NOSHAPE_KERNEL_PROFILE` shows ancestors.<kind> per map: naming's vertex → face maps are the dear ones (3 a
+  feature, ~16 ms each on the 1612-face part).
 - The regen's unify (boolean.cpp `merge_planar`): the merged face goes on the surface of the group's face with the
   most edges and only edges without a pcurve there get one; a one-shell solid is rebuilt shell-only instead of
   BRepTools_ReShape copying the part: fins-400's 4 unifies 849 → 382 ms. A unify of only the new faces' region
@@ -219,6 +226,11 @@ Phase 2 (local Booleans), first step landed:
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
 ## Requests to the lead
+- The hourly `cargo-cache-trim.timer` (system, at :26) runs `cargo sweep --recursive --maxsize 8GB /root`: target
+  dirs over 8 GB (target-core is 29 GB) lose their oldest artifacts while builds run. land.sh failed twice on 10-28
+  (00:27 a deleted fingerprint dir, 00:59 a deleted rlib at link time). Please exclude /root/target-* or raise the
+  cap for them; until then I start long jobs right after :26.
+- Corpus case 24e39113fe46e702: OCCT's own result differs from run to run (listed `unstable` in the corpus).
 - Main RED 484a185c (09:31) and cb5e9cec (07:55), "ops --test all SIGSEGV": not the kernel. The kernel log has
   `hidden_edges::e[1635930] general protection fault … in libvulkan.so.1.4.341` at the watcher's T1 (09:26), and a
   "pipeline compil" thread faulting in libvulkan 10 min earlier: ops' GPU test `hidden_edges::edges_behind_fins_stay_hidden`

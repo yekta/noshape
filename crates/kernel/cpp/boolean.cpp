@@ -1901,7 +1901,7 @@ static bool cut_through_holes(const TopoDS_Shape& target, const std::vector<Topo
 // with the cap's outline as a new inner loop of the face and the tool's
 // other faces added (no boolean: live's 30-feature part spent ~6 ms of CPU
 // in each boss's). False when it doesn't apply; the caller fuses as usual.
-static bool fuse_on_face(const TopoDS_Shape& target, const TopoDS_Shape& tool, TopoDS_Shape& out, HHist& hist)
+static bool fuse_on_face(const TopoDS_Shape& target, const OcShape* src, const TopoDS_Shape& tool, TopoDS_Shape& out, HHist& hist)
 {
   auto no = [](int why) {
     if (std::getenv("NOSHAPE_BOOL_DEBUG"))
@@ -1917,8 +1917,25 @@ static bool fuse_on_face(const TopoDS_Shape& target, const TopoDS_Shape& tool, T
   TopoDS_Shape solid, shell, tsolid, tshell;
   if (!only(target, TopAbs_SOLID, solid) || !only(solid, TopAbs_SHELL, shell) || !only(tool, TopAbs_SOLID, tsolid) || !only(tsolid, TopAbs_SHELL, tshell))
     return no(1);
+  // The target's faces and their boxes: its OcShape's when it has one.
+  if (src != nullptr && !src->shape.IsSame(target))
+    src = nullptr;
+  ShapeIMap own_faces;
+  if (src == nullptr)
+    TopExp::MapShapes(solid, TopAbs_FACE, own_faces);
+  const ShapeIMap&     faces = src != nullptr ? src->map(TopAbs_FACE) : own_faces;
+  std::vector<Bnd_Box> boxes;
+  if (src != nullptr)
+    boxes = src->face_boxes();
+  else
+  {
+    boxes.resize((size_t)faces.Extent());
+    for (int i = 1; i <= faces.Extent(); ++i)
+      BRepBndLib::Add(faces(i), boxes[(size_t)i - 1], false);
+  }
   Bnd_Box all;
-  BRepBndLib::Add(solid, all, false);
+  for (const Bnd_Box& b : boxes)
+    all.Add(b);
   BRepBndLib::Add(tsolid, all, false);
   if (all.IsVoid())
     return no(2);
@@ -1934,11 +1951,12 @@ static bool fuse_on_face(const TopoDS_Shape& target, const TopoDS_Shape& tool, T
     pl = gp_Pln(pl.Location(), n);
     return true;
   };
-  // The tool's cap on a face of the target.
-  ShapeIMap faces;
-  TopExp::MapShapes(solid, TopAbs_FACE, faces);
-  TopoDS_Face cap, face;
-  gp_Pln      fpl;
+  // The tool's cap on a face of the target (each target face's plane found
+  // once).
+  std::vector<int8_t> planar((size_t)faces.Extent(), -1);
+  std::vector<gp_Pln> planes((size_t)faces.Extent());
+  TopoDS_Face         cap, face;
+  gp_Pln              fpl;
   for (TopExp_Explorer e(tsolid, TopAbs_FACE); e.More() && face.IsNull(); e.Next())
   {
     const TopoDS_Face& c = TopoDS::Face(e.Current());
@@ -1950,16 +1968,18 @@ static bool fuse_on_face(const TopoDS_Shape& target, const TopoDS_Shape& tool, T
       ++nw;
     if (nw != 1)
       continue;
+    Bnd_Box cb;
+    BRepBndLib::Add(c, cb, false);
     for (int i = 1; i <= faces.Extent(); ++i)
     {
       const TopoDS_Face& f = TopoDS::Face(faces(i));
-      gp_Pln             pl;
-      if (outward(f, pl) && pl.Axis().Direction().Dot(cpl.Axis().Direction()) < -1 + 1e-12 && pl.Distance(cpl.Location()) <= tol)
+      int8_t&            known = planar[(size_t)i - 1];
+      if (known < 0)
+        known = outward(f, planes[(size_t)i - 1]) ? 1 : 0;
+      const gp_Pln& pl = planes[(size_t)i - 1];
+      if (known == 1 && pl.Axis().Direction().Dot(cpl.Axis().Direction()) < -1 + 1e-12 && pl.Distance(cpl.Location()) <= tol)
       {
-        Bnd_Box fb, cb;
-        BRepBndLib::Add(f, fb, false);
-        BRepBndLib::Add(c, cb, false);
-        if (fb.IsOut(cb))
+        if (boxes[(size_t)i - 1].IsOut(cb))
           continue;
         cap  = c;
         face = f;
@@ -1981,14 +2001,8 @@ static bool fuse_on_face(const TopoDS_Shape& target, const TopoDS_Shape& tool, T
   BRepBndLib::Add(tsolid, tb, false);
   tb.Enlarge(tol);
   for (int i = 1; i <= faces.Extent(); ++i)
-  {
-    if (faces(i).IsSame(face))
-      continue;
-    Bnd_Box fb;
-    BRepBndLib::Add(faces(i), fb, false);
-    if (!fb.IsOut(tb))
+    if (!faces(i).IsSame(face) && !boxes[(size_t)i - 1].IsOut(tb))
       return no(5);
-  }
   {
     TopExp_Explorer v(cap, TopAbs_VERTEX);
     gp_Pnt          p;
@@ -2068,7 +2082,7 @@ static bool fuse_on_face(const TopoDS_Shape& target, const TopoDS_Shape& tool, T
 // face: a fin fused to the 400-fin plate's 1600 faces took 1.8 s). False
 // when it doesn't apply (NOSHAPE_BOOL_LOCAL=0: never); the caller runs the
 // whole Boolean.
-static bool local_boolean(const TopoDS_Shape& target, const TopoDS_Shape& tool, int op, TopoDS_Shape& out, HHist& hist)
+static bool local_boolean(const TopoDS_Shape& target, const OcShape* src, const TopoDS_Shape& tool, int op, TopoDS_Shape& out, HHist& hist)
 {
   auto no = [](int why) {
     if (std::getenv("NOSHAPE_BOOL_DEBUG"))
@@ -2092,33 +2106,65 @@ static bool local_boolean(const TopoDS_Shape& target, const TopoDS_Shape& tool, 
   if (!only(target, TopAbs_SOLID, solid) || !only(solid, TopAbs_SHELL, shell) || !only(tool, TopAbs_SOLID, tsolid))
     return no(3);
   std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("local.maps");
-  ShapeIMap faces;
-  TopExp::MapShapes(solid, TopAbs_FACE, faces);
+  // The target's maps and face boxes: its OcShape's (the regeneration's
+  // naming and auto scope made them), else built here.
+  if (src != nullptr && !src->shape.IsSame(target))
+    src = nullptr;
+  ShapeIMap own_faces;
+  if (src == nullptr)
+    TopExp::MapShapes(solid, TopAbs_FACE, own_faces);
+  const ShapeIMap& faces = src != nullptr ? src->map(TopAbs_FACE) : own_faces;
   int tool_faces = 0;
   for (TopExp_Explorer it(tsolid, TopAbs_FACE); it.More(); it.Next())
     ++tool_faces;
   // Worth it only on a part much bigger than the tool.
   if (faces.Extent() < 200 || faces.Extent() < 8 * tool_faces)
     return no(4);
+  std::vector<Bnd_Box> boxes;
+  if (src != nullptr)
+    boxes = src->face_boxes();
+  else
+  {
+    boxes.resize((size_t)faces.Extent());
+    for (int i = 1; i <= faces.Extent(); ++i)
+      BRepBndLib::Add(faces(i), boxes[(size_t)i - 1], false);
+  }
   Bnd_Box all;
-  BRepBndLib::Add(solid, all, false);
+  for (const Bnd_Box& b : boxes)
+    all.Add(b);
   const double tol = 1e-7 * std::max(1.0, std::sqrt(all.SquareExtent()));
   Bnd_Box tb;
   BRepBndLib::Add(tsolid, tb, false);
   tb.Enlarge(10 * tol);
-  // The faces the tool reaches, and their neighbours.
+  // Edge -> faces of the target.
   ShapeAncMap ef;
-  TopExp::MapShapesAndUniqueAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
-  ShapeIMap            reached, region;
-  std::vector<Bnd_Box> boxes((size_t)faces.Extent());
-  for (int i = 1; i <= faces.Extent(); ++i)
+  const ShapeIMap* edges = nullptr;
+  const std::pair<std::vector<uint32_t>, std::vector<uint32_t>>* csr = nullptr;
+  if (src != nullptr)
   {
-    Bnd_Box& fb = boxes[(size_t)i - 1];
-    BRepBndLib::Add(faces(i), fb, false);
-    if (!fb.IsOut(tb))
-      reached.Add(faces(i));
-    fb.Enlarge(tol); // for the rays below
+    edges = &src->map(TopAbs_EDGE);
+    csr   = &ancestors_cached(*src, TopAbs_EDGE, TopAbs_FACE);
   }
+  else
+    TopExp::MapShapesAndUniqueAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
+  auto faces_of = [&](const TopoDS_Shape& e, auto&& f) {
+    if (csr == nullptr)
+    {
+      if (const ShapeList* fl = ef.Seek(e))
+        for (ShapeList::Iterator it(*fl); it.More(); it.Next())
+          f(it.Value());
+      return;
+    }
+    const int k = edges->FindIndex(e);
+    if (k > 0)
+      for (uint32_t j = csr->first[(size_t)k - 1]; j < csr->first[(size_t)k]; ++j)
+        f(faces((int)csr->second[j] + 1));
+  };
+  // The faces the tool reaches, and their neighbours.
+  ShapeIMap reached, region;
+  for (int i = 1; i <= faces.Extent(); ++i)
+    if (!boxes[(size_t)i - 1].IsOut(tb))
+      reached.Add(faces(i));
   if (reached.Extent() == 0 || reached.Extent() * 4 > faces.Extent())
     return no(5);
   // Big planar faces the tool only touches stay out of the general fuse
@@ -2185,10 +2231,10 @@ static bool local_boolean(const TopoDS_Shape& target, const TopoDS_Shape& tool, 
       continue;
     region.Add(reached(i));
     for (TopExp_Explorer e(reached(i), TopAbs_EDGE); e.More(); e.Next())
-      if (const ShapeList* fl = ef.Seek(e.Current()))
-        for (ShapeList::Iterator it(*fl); it.More(); it.Next())
-          if (in_fuse(it.Value()))
-            region.Add(it.Value());
+      faces_of(e.Current(), [&](const TopoDS_Shape& x) {
+        if (in_fuse(x))
+          region.Add(x);
+      });
   }
   if (region.Extent() == 0)
     return no(5);
@@ -2196,10 +2242,10 @@ static bool local_boolean(const TopoDS_Shape& target, const TopoDS_Shape& tool, 
   ShapeIMap boundary;
   for (int i = 1; i <= region.Extent(); ++i)
     for (TopExp_Explorer e(region(i), TopAbs_EDGE); e.More(); e.Next())
-      if (const ShapeList* fl = ef.Seek(e.Current()))
-        for (ShapeList::Iterator it(*fl); it.More(); it.Next())
-          if (!region.Contains(it.Value()))
-            boundary.Add(e.Current());
+      faces_of(e.Current(), [&](const TopoDS_Shape& x) {
+        if (!region.Contains(x))
+          boundary.Add(e.Current());
+      });
   lap = std::make_unique<KernelTimer>("local.gf");
   // OCCT's general fuse of the region's faces and the tool.
   BRep_Builder    B;
@@ -2228,10 +2274,10 @@ static bool local_boolean(const TopoDS_Shape& target, const TopoDS_Shape& tool, 
     ShapeIMap                     touched;
     for (int i = 1; i <= boundary.Extent(); ++i)
       if (!gf.Modified(boundary(i)).IsEmpty())
-        if (const ShapeList* fl = ef.Seek(boundary(i)))
-          for (ShapeList::Iterator it(*fl); it.More(); it.Next())
-            if (!region.Contains(it.Value()))
-              touched.Add(it.Value());
+        faces_of(boundary(i), [&](const TopoDS_Shape& x) {
+          if (!region.Contains(x))
+            touched.Add(x);
+        });
     for (int i = 1; i <= touched.Extent(); ++i)
     {
       const TopoDS_Face& f   = TopoDS::Face(touched(i));
@@ -2644,7 +2690,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     bool         done = false;
     {
       const KernelTimer timer("boolean.on_face");
-      done = fuse_on_face(a[0], t[0], out, h);
+      done = fuse_on_face(a[0], args.sources.empty() ? nullptr : args.sources[0], t[0], out, h);
     }
     if (done)
       t_bool_path = "on_face";
@@ -2659,7 +2705,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     bool         done = false;
     {
       const KernelTimer timer("boolean.local");
-      done = local_boolean(a[0], t[0], op, out, h);
+      done = local_boolean(a[0], args.sources.empty() ? nullptr : args.sources[0], t[0], op, out, h);
     }
     if (done)
       t_bool_path = "local";
