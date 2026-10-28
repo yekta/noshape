@@ -10,9 +10,11 @@ NOSHAPE_MSL_DUMP="$msl" cargo run --release --locked -p noshape-render --example
 mkdir -p "$out"
 for f in "$msl"/*.metal; do
   k=$(basename "$f" .metal)
-  # naga's first line: "// language: metal3.1"
-  std=$(head -1 "$f" | sed -n 's|^// language: metal\([0-9.]*\).*|\1|p')
-  xcrun -sdk macosx metal -std="metal${std:-3.0}" -fpreserve-invariance -c "$f" -o "$msl/$k.air"
+  # For every macOS the app runs on with MSL 2.4 (12+), not the build runner's
+  # (macOS 26: MSL 3.2, a library macOS 14 can't load): naga writes the same
+  # source for any version from 2.4 on but its "// language:" line, which the
+  # key leaves out.
+  xcrun -sdk macosx metal -std=metal2.4 -mmacosx-version-min=12.0 -fpreserve-invariance -c "$f" -o "$msl/$k.air"
   xcrun -sdk macosx metallib "$msl/$k.air" -o "$out/$k.metallib"
 done
 # Every pipeline must now load its library (the key is stable).

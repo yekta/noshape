@@ -179,6 +179,13 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N04. 10-28 15:30 cold start, measured: perf 40709590907's build job (macOS 26 runner, Metal cache cleared before each
+     run) creates the first-frame pipelines in 868–1033 ms from source and 79–130 ms from the metallibs (34 of 34
+     loads hit). The bench of 40686409197 still read 540–900 ms "shader compile" on macOS 15: the libraries were built
+     for the build runner's macOS 26 / MSL 3.2 and don't load on 15 (the app compiles from source then); macOS 14 had
+     "Parent device is lost" on every launch (new in that run; one sample). Now built with -std=metal2.4
+     -mmacosx-version-min=12.0 (naga writes the same source from 2.4 on). Next: perf -f cold=1 on that commit; the
+     bench's first-launch "shader compile" should drop by ~0.8 s if they load on 14 / 15.
 N03. 10-28 11:00–12:30: item 2 cold start landed as code, to be measured: vendor/wgpu-hal (29.0.4 + src/metal/
      precompiled.rs) loads `<hash of the MSL>.metallib` from noshape.app/Contents/Resources/metallib (or
      NOSHAPE_METALLIB_DIR) before compiling a pipeline's MSL; packaging/macos/metallibs.sh (release.yml and
