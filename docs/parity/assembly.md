@@ -42,7 +42,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | K23 | `s` opens the shortcut toolbar at the cursor | E§2, B `OPEN_MINI_TOOLBAR` | ✅ | assembly tool set, kept inside the graphics area | 0.4.10+ / c9c66d1c 10-27 (assembly tool set at the cursor) |
 | K24 | `Shift+/` keyboard shortcut list | H:shortcuts | ✅ | assembly list overlay | 0.4.10+ / c9c66d1c 10-27 (Assembly keyboard shortcuts list) |
 | K25 | `Alt+C` search tools | E§2 | ✅ | Alt+C / "Search tools…" in the assembly toolbar: the tool search popover with the assembly tools, live ranking (starts, contains, letters in order; shorter names first; max 10), live descriptions, Highlight tool in toolbar (`assembly_search.rs`, unit test) | 0.4.10+ / c9c66d1c 10-27 |
-| K26 | `[` Measure, `Shift+X` section view | E§3 | ✅ | Measure: click faces/edges/vertices of any instances (length, area, radius, position, distance ΔXYZ, angle; model test `measure_between_instances`); Section view through the hovered planar face, the selected mate connector or Front, offset and flip |  |
+| K26 | `[` Measure, `Shift+X` section view | E§3 | ✅ | Measure: click faces/edges/vertices of any instances (length, area, radius, position, distance ΔXYZ, angle; model test `measure_between_instances`); Section view through the hovered planar face, the selected mate connector or Front, offset and flip | 0.4.10+ / 52ca0b97 10-28 ([ opens the Measure panel at the bottom right; Shift+X the Section view dialog) |
 | K27 | `` ` `` select other | E§3 | ✅ | cycles the instances under the cursor (Shift+` backwards), list at the cursor |  |
 | K28 | `Alt+click` select through transparent | H:shortcuts | ✅ | Alt held (or Isolate › Select transparent geometry): transparent / isolated-away instances become pickable (`AsmSceneOptions.pick_dimmed`); the isolate enter / exit / expand and pickability toggles now redraw the pick buffer (rebuild_scene(true)); GUI k28e (checkbox path; Alt held via xdotool is unreliable) |  |
 | K29 | View keys (`f`, `Shift+1..7`, `z`, arrows) | H:shortcuts | ✅ | shared viewport bindings |  |
@@ -93,13 +93,13 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | L1 | Top-level assembly row; click selects the whole assembly | E§5.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | L2 | Origin row (pickable as a mate target) | E§5.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | L3 | "Instances (n)" header, DOF count | B | ✅ | | 0.4.10+ / 77870dd4 10-28 |
-| L4 | Filter box: name substring | E§5.2 | ✅ | |  |
+| L4 | Filter box: name substring | E§5.2 | ✅ | | 0.4.10+ / 52ca0b97 10-28 ("Part 2" → Assembly 1 › Part 2 <1>; pattern instances: ASM-FILTER-PATTERN-INSTANCES) |
 | L5 | Filter colon commands `:part :assembly :mate :matelimits :connector :errors :suppressed :hidden :shown` (combinable) | E§5.2 | ✅ | model test `list_filter_colon_commands`; dropdown lists them | 0.4.10+ / 77870dd4 10-28 |
 | L6 | Filter `:item :folder :warnings` | E§5.2 | ✅ | `:warnings` matches instances with an instance warning (More than one part is fixed, …); `:folder` lists the folders (flat, like every filtered row; a folder also matches by name); `:item` lists non-geometric items, which this account cannot create (live 105: no "Add items" flow), so it is always empty. GUI :103 w1 (two fixed parts → both listed with ⚠), w4 (Folder 1) |  |
 | L7 | Eye icon on row hover toggles visibility; stays shown while hidden | E§5.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | L8 | Hovering a row highlights the instance in the graphics | E§24.4 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | L9 | Selecting in the graphics scrolls the list to the row | E§5.1 | ✅ | |  |
-| L10 | Shift/Ctrl click adds to the selection | — | ✅ | |  |
+| L10 | Shift/Ctrl click adds to the selection | — | ✅ | | 0.4.10+ / 52ca0b97 10-28 (Shift+click adds Part 2 <1>; Ctrl+click opens the row menu with the selection kept, deliberately per live "skb (10-24) … (3)") |
 | L11 | Fixed pin icon ("Part is fixed"), DOF indicator ("Has degrees of freedom") | E§5.3, B | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | L12 | Suppressed rows struck through, hidden rows dimmed | E§5.3 | ✅ | |  |
 | L13 | Error indicator with message tooltip | E§5.3 | ✅ | |  |
