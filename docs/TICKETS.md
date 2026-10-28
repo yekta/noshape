@@ -178,6 +178,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   285 ms for Extrude 1's edit (Boss 1–6 8–25 ms each, Linear pattern 1 45 ms, Fillet 3 19 ms, Hole 1 18 ms, Fillet 2
   15 ms), then refine 35 ms. Undo / redo are fine (26–71 ms). Logs: the run's perf-macos-14/15 artifacts (psui
   2026-10-27)
+  - psui 10-28 05:48 (NOSHAPE_PERF_SCRIPT=edit-undo-redo on this machine, load ~29, build 57ab9256): commit shown in
+    835 ms (regen[preview] 232 ms: 29 features evaluated; refine 74 ms); **undo shown in 624 ms with regen 30/30 cached
+    in 2.8 ms and display 0.8 ms**, redo 480 ms (regen 3.5 ms). So undo / redo spend nothing in the model here: the
+    rest is the app waiting on this loaded host (CI's 26–71 ms is the real figure). The commit's cost is the model
+    (Boss 1–6 and Hole 1 re-evaluated after Extrude 1), core's side.
 - [x] 3f5f69ed (core: extruded cylinders framed as live, z toward the sketch; CP1 matches, out of KNOWN; R3/C1 now flip the pin as live, the solver's −157.5° turn is skasm's) P0 `model/tests/oracle_asm::assemblies_match_live` CP1 regressed by 339de774 (cylinder frame); fs suspects the
   cylinder axis should point toward the sketch (also CP1, R3, C1). Red at the halt.
 - [x] cc6c4b54 (core: live's rule, a blind hole's bottom within 2t of the floor fails the shell before OCCT runs; back in T1) P0 `model/tests/qa_regressions::shell_that_breaks_the_part_fails` red on macOS arm64 in every CI run of 10-26 (T2
