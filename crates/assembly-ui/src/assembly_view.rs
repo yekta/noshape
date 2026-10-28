@@ -3750,13 +3750,43 @@ impl AssemblyView {
 
     /// A pattern's row with, when expanded, its instances and its mates.
     #[allow(clippy::too_many_arguments)]
-    fn push_pattern_rows(&self, p: &InstancePattern, asm: &Assembly, result: &AssemblyResult, filtering: bool, rows: &mut Vec<AnyElement>, selected_row: &mut Option<usize>, cx: &mut Context<Self>) {
-        if !self.feature_passes(noshape_model::assembly::ops::RowKind::Pattern, &p.name, false, p.suppressed, false, false) {
-            return;
-        }
+    /// A pattern's rows; false when the filter hides some of them.
+    fn push_pattern_rows(&self, p: &InstancePattern, asm: &Assembly, result: &AssemblyResult, filtering: bool, rows: &mut Vec<AnyElement>, selected_row: &mut Option<usize>, cx: &mut Context<Self>) -> bool {
         let err = result.pattern_errors.iter().find(|(id, _)| *id == p.id).map(|(_, m)| m.clone());
-        rows.push(self.pattern_row(p, err, cx));
-        if self.expanded.contains(&vec![InstanceId(p.id.0)]) {
+        let named = self.feature_passes(noshape_model::assembly::ops::RowKind::Pattern, &p.name, false, p.suppressed, false, false);
+        // Filtering (live, behaviours "qa (2026-10-27, P2) assembly instance
+        // list: Filter by name finds pattern instances"): the pattern's
+        // matching instances, under its row opened for them, and a "…" row
+        // for its others (ASM-FILTER-PATTERN-INSTANCES: they were never found).
+        if filtering {
+            let hits: Vec<&Instance> = p.generated.iter().filter_map(|g| asm.instance(g.instance)).filter(|i| self.instance_passes(i, result.node(&[i.id]), cx)).collect();
+            if hits.is_empty() {
+                if named {
+                    rows.push(self.pattern_row(p, err, false, cx));
+                }
+                return named && p.generated.is_empty();
+            }
+            let tree = !self.ui.filter_flat;
+            if tree {
+                rows.push(self.pattern_row(p, err, true, cx));
+            }
+            for inst in &hits {
+                if selected_row.is_none() && self.selected.first() == Some(&inst.id) {
+                    *selected_row = Some(rows.len());
+                }
+                rows.push(self.instance_row(result.node(&[inst.id]), Some(inst), vec![inst.id], usize::from(tree), cx));
+            }
+            if tree && hits.len() < p.generated.len() {
+                rows.push(h_flex().h(px(crate::ui::ROW_H)).flex_none().pl(px(28. + 22.)).text_size(px(crate::ui::ROW_TEXT)).text_color(crate::theme::p().text).child("…").into_any_element());
+            }
+            return true;
+        }
+        if !named {
+            return false;
+        }
+        let open = self.expanded.contains(&vec![InstanceId(p.id.0)]);
+        rows.push(self.pattern_row(p, err, open, cx));
+        if open {
             for g in &p.generated {
                 if let Some(inst) = asm.instance(g.instance) {
                     if selected_row.is_none() && self.selected.first() == Some(&inst.id) {
@@ -3797,6 +3827,7 @@ impl AssemblyView {
                 }
             }
         }
+        true
     }
 
     /// The instance and pattern rows in the order they show in the list (as
@@ -3860,10 +3891,13 @@ impl AssemblyView {
         // (3)): a pattern's row sits in the instance order, where its first
         // instance is ("<3>, Linear pattern 1, <5>").
         let mut shown_patterns: HashSet<MateId> = HashSet::new();
+        // Instances or patterns the filter hides: the "…" row stands for them
+        // (live: none when only the Origin and the mates folder go).
+        let mut hidden = false;
         for inst in &asm.instances {
             if let Some(p) = asm.generated_by(inst.id) {
                 if shown_patterns.insert(p.id) {
-                    self.push_pattern_rows(p, &asm, &result, filtering, &mut rows, &mut selected_row, cx);
+                    hidden |= !self.push_pattern_rows(p, &asm, &result, filtering, &mut rows, &mut selected_row, cx);
                 }
                 continue;
             }
@@ -3889,6 +3923,7 @@ impl AssemblyView {
             }
             let node = result.node(&[inst.id]);
             if !self.instance_passes(inst, node, cx) {
+                hidden = true;
                 continue;
             }
             if selected_row.is_none() && self.selected.first() == Some(&inst.id) {
@@ -3914,7 +3949,7 @@ impl AssemblyView {
         }
         // Patterns not placed with their instances (none generated) go last.
         for p in asm.patterns.iter().filter(|p| !shown_patterns.contains(&p.id)) {
-            self.push_pattern_rows(p, &asm, &result, filtering, &mut rows, &mut selected_row, cx);
+            hidden |= !self.push_pattern_rows(p, &asm, &result, filtering, &mut rows, &mut selected_row, cx);
         }
         rows.extend(self.pending_pattern_row(cx));
         // Selecting in the graphics area scrolls the list to the row.
@@ -3985,6 +4020,7 @@ impl AssemblyView {
             mate_rows.push(self.feature_row(FeatureRow { id: g.id, icon: icon_path("group"), name: g.name.clone(), ok: true, inactive: g.suppressed, message: None, has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx));
             mate_ids.push(g.id);
         }
+        let mate_hidden = filtering && mate_ids.iter().filter(|id| id.0 != u64::MAX).count() < asm.connectors.len() + asm.mates.len() + asm.relations.len() + asm.groups.len();
         let mate_rows = if filtering { mate_rows } else { self.fold_mate_rows(&asm, mate_ids, mate_rows, cx) };
         // Onshape's instance list: the filter row, the "Instances (N)" header
         // with its new-folder button, then one tree that ends with the
@@ -4025,7 +4061,7 @@ impl AssemblyView {
                     .into_any_element(),
             );
         }
-        if tree {
+        if tree && (hidden || mate_hidden) {
             // The "…" (live: text at x 28 of the list), past the rows shown.
             rows.push(h_flex().h(px(crate::ui::ROW_H)).flex_none().pl(px(28.)).text_size(px(crate::ui::ROW_TEXT)).text_color(pal.text).child("…").into_any_element());
         }

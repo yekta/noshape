@@ -854,11 +854,10 @@ impl AssemblyView {
         )
     }
 
-    pub(super) fn pattern_row(&self, pat: &InstancePattern, error: Option<String>, cx: &mut Context<Self>) -> AnyElement {
+    /// A pattern's row; `expanded`: its caret open (its instances listed).
+    pub(super) fn pattern_row(&self, pat: &InstancePattern, error: Option<String>, expanded: bool, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let id = pat.id;
-        let key = vec![InstanceId(id.0)];
-        let expanded = self.expanded.contains(&key);
         let icon = match pat.kind {
             PatternKind::Linear { .. } | PatternKind::PartPattern { .. } => "linear-pattern",
             PatternKind::Circular { .. } => "circular-pattern",
