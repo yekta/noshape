@@ -934,7 +934,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (or 30), Enter → <2> stays at 0° (clamped), although 45 is inside 0–90. Untick Limits → the 30 typed earlier applies:
   world +30°, label "30°". So the label / typed value is the world angle, but the limits are checked against its negative.
   Expected: the limits bound the same value the mate shows and takes (0–90 → 0°…90°); live's limit sign convention itself
-  is not captured. Here <2>'s connector (bottom face) points its Z down; not tried with two connectors whose Zs agree
+  is not captured. Not tied to the connector flip: a Revolute between the two top-face hole centres (Zs agree, plates
+  overlapping), limits 0 / 90 → the value box also opens with "360°" at 0° and a typed 45 stays at 0°.
   is not captured (qa 2026-10-28 07:01, build 2292bf8c)
 - [ ] P3 ASM-K-IMPLICIT-MCS `k` shows nothing for the mates' implicit connectors: two plates (qa5 mkmate.py doc), Revolute 1
   between their hole centres (implicit connectors), click empty canvas, `k` → no pixel changes, again `k` → none
