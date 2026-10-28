@@ -51,7 +51,7 @@ Status: ✅ done, 🟡 partly, ❌ not yet. "Hot" = hot spot in CSS pixels.
 | Rotate / pan / zoom drags (right / middle / Ctrl+right, Shift+middle, wheel) and left-drag box select | `default` (live: Onshape never changes the cursor for navigation) | — | ✅ (no hiding during drags) | 0.4.10+ / 41f60e47 10-28 (xcur: arrow hot 3,1) |
 | Manipulator arrows, triad, rotate rings, extrude depth arrow (hover and drag) | unchanged: the dialog's current canvas cursor (live) | — | ✅ | 0.4.10+ / 1b81b7ca 10-28 (section arrow hover: cursor unchanged; triad / rings not run) |
 | Feature dialog open (e.g. new Extrude, Mate connector after its first pick) | the selection-count cursor: Onshape counts the whole selection minus rollback-bar items (`min(6, n)`), so the edited feature row makes it "1" | 3,3 | 🟡 (ours shows the arrow while a dialog is open; exact counting asked live, REQUESTS.md 20 Oct follow-up) |  |
-| Selection-count cursor outside the canvas | the same cursor on `.navbar`; while a context menu is open the layer and the canvas are `default` (live dom/cursors-count.json) | — | ✅ (navbar via `CursorSync`) |  |
+| Selection-count cursor outside the canvas | the same cursor on `.navbar`; while a context menu is open the layer and the canvas are `default` (live dom/cursors-count.json) | — | ✅ (navbar via `CursorSync`) | 8627322e 10-28: navbar count cursor ✓ (32 px hot 3,3 over the title bar with 1 selected); ✗ with a context menu open the canvas keeps it → CURSOR-COUNT-UNDER-MENU |
 | Follow mode (another user's pointer) | cloud-only (excluded) | — | — |  |
 | Comment tag placement (`comment-tag.svg`) | cloud-only (excluded) | — | — |  |
 
