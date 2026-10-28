@@ -624,6 +624,9 @@ impl PartStudioView {
         let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| this.close_context_menu(cx));
         menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
         self.context_menu = Some((position, menu, sub));
+        // The canvas shows the arrow while the menu is open (live cursors.md row 54, CURSOR-COUNT-UNDER-MENU).
+        self.viewport.update(cx, |vp, _| vp.menu_open = true);
+        crate::cursor::reset(window, cx);
         // Onshape keeps the right-clicked entity highlighted while its menu is open.
         self.ui.menu_target = target_ref_for_highlight;
         self.refresh_scene(false, cx);
@@ -632,6 +635,10 @@ impl PartStudioView {
 
     pub(super) fn close_context_menu(&mut self, cx: &mut Context<Self>) {
         if let Some((pos, _, _)) = self.context_menu.take() {
+            self.viewport.update(cx, |vp, cx| {
+                vp.menu_open = false;
+                cx.notify();
+            });
             self.ui.menu_pos = pos;
             if self.ui.menu_target.take().is_some() {
                 self.refresh_scene(false, cx);

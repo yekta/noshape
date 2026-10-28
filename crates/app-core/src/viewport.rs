@@ -306,6 +306,8 @@ pub struct Viewport {
     /// Selected entities, shown in the cursor image (Onshape's
     /// selection-count cursor: 1-5, "5+" for more). Set by the owner.
     pub selection_count: usize,
+    /// A context menu of the view's own is open over the canvas: no cursor of ours (the arrow).
+    pub menu_open: bool,
     /// The top of Onshape's cursor stack (sketch tool crosshair, `move` over
     /// a dimension value, `no-drop`…), set by the owner; it wins over the
     /// selection cursor (docs/parity/cursors.md).
@@ -318,6 +320,8 @@ pub struct Viewport {
     /// The cursor last set through the platform (`None` = the arrow), and
     /// whether the platform could.
     cursor_applied: Option<Option<crate::cursor::AppCursor>>,
+    /// The [`crate::cursor::RESET_EPOCH`] `cursor_applied` belongs to.
+    cursor_epoch: u64,
     cursor_platform: bool,
     hover: Option<u32>,
     /// When true, left-drag goes to the active tool instead of box select.
@@ -572,10 +576,12 @@ impl Viewport {
             press_pos: DVec2::ZERO,
             last_pos: DVec2::ZERO,
             selection_count: 0,
+            menu_open: false,
             tool_cursor: None,
             overlay_cursor: None,
             ctrl_in_box: false,
             cursor_applied: None,
+            cursor_epoch: 0,
             cursor_platform: true,
             hover: None,
             tool_captures_left: false,
@@ -2614,6 +2620,14 @@ impl Viewport {
             self.tool_cursor
         };
         let want = self.overlay_cursor.or_else(|| self.pointer_inside.then(|| stack.or_else(|| (self.selection_count > 0).then(|| AppCursor::count(self.selection_count)))).flatten());
+        // Live (cursors.md row 54, CURSOR-COUNT-UNDER-MENU): with a context menu open the canvas is the arrow.
+        let want = want.filter(|_| !self.menu_open && !crate::os_menu::is_open(cx));
+        let epoch = crate::cursor::RESET_EPOCH.load(std::sync::atomic::Ordering::Relaxed);
+        if epoch != self.cursor_epoch {
+            // Someone put the arrow back meanwhile: what we applied is gone.
+            self.cursor_epoch = epoch;
+            self.cursor_applied = None;
+        }
         if self.cursor_applied == Some(want) || (want.is_none() && self.cursor_applied.is_none_or(|a| a.is_none())) {
             return;
         }

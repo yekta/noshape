@@ -275,6 +275,17 @@ pub fn dump(dir: &std::path::Path, cursors: &[AppCursor], cx: &App) -> std::io::
     Ok(n)
 }
 
+/// Bumped when the window's cursor is reset behind the views' backs (a
+/// context menu opening, [`reset`]): the viewport sets its own again.
+pub static RESET_EPOCH: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// The arrow over `window` now, whatever a view set (live cursors.md row 54:
+/// with a context menu open the canvas is `default`).
+pub fn reset(window: &Window, cx: &App) {
+    set(window, None, cx);
+    RESET_EPOCH.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// Show `cursor` over `window` (`None`: GPUI's own cursor). Returns false
 /// where the platform can't.
 pub fn set(window: &Window, cursor: Option<AppCursor>, cx: &App) -> bool {

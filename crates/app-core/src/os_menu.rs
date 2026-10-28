@@ -664,6 +664,8 @@ pub fn open_anchored(position: Point<Pixels>, anchor: Anchor, menu: Entity<OsMen
         cx.default_global::<OsMenuHost>().0 = None;
         cx.refresh_windows();
     });
+    // The canvas's own cursor (the selection count) gives way to the arrow (CURSOR-COUNT-UNDER-MENU).
+    crate::cursor::reset(window, cx);
     let prev = window.focused(cx);
     menu.update(cx, |m, _| m.return_focus = prev);
     window.focus(&menu.focus_handle(cx), cx);
