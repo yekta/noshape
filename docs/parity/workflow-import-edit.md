@@ -25,13 +25,13 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 2.1 | Move face: click near the edge of the x=40 face | field "Faces to move" only accepts faces (picks the face) | **chip "Edge of Import 1"** (feature red); 3 times in this run, also inside the hole | ✅ hover near the x=40 edge outlines the face; chip "Face of Import 1" (I2 fixed) | 77870dd4 10-28 |
-| 2.2 | Move face, x=40 face, Offset 20 mm, flipped (O1) | **3607.3009183012764**, 1 part | **3607.300918**, 8 faces | ✅ |  |
-| 2.3 | Move face, hole face 5 mm default direction (O4) | **8000** | 8000.0 (CLI; the hole wall could not be picked in the UI, see I2) | ✅ |  |
-| 2.4 | … opposite direction | **2429.203673**, 1 part | 2429.203532, 1 part | ✅ |  |
+| 2.2 | Move face, x=40 face, Offset 20 mm, flipped (O1) | **3607.3009183012764**, 1 part | **3607.300918**, 8 faces | ✅ | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported: 3607.300918, 8 faces) |
+| 2.3 | Move face, hole face 5 mm default direction (O4) | **8000** | 8000.0 (CLI; the hole wall could not be picked in the UI, see I2) | ✅ | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported: 8000.0, 6 faces) |
+| 2.4 | … opposite direction | **2429.203673**, 1 part | 2429.203532, 1 part | ✅ | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported: 2429.20361, 1 part (live 2429.203673)) |
 | 2.5 | Feature row menu (last feature) | Rename, Edit…, Add selection to folder…, Suppress, Add comment, Zoom to selection, Show dependencies…, Add appearance…, Delete | same + Dynamic suppression | ✅ |  |
-| 2.6 | Delete face (hole), Heal | 8000, 6 faces | 8000.0, 6 faces | ✅ |  |
+| 2.6 | Delete face (hole), Heal | 8000, 6 faces | 8000.0, 6 faces | ✅ | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported: 8000.0, 6 faces) |
 | 2.7 | Replace face: top face, replace with Plane 1 (Top + 15) | ? (request) | plane refused, notice "Select faces." | ? I3 |  |
-| 2.8 | Fillet (Shift+F) top front edge R3 | 8000 − (1−π/4)·9·40 = 7922.743339 | 7922.743339 | ✅ |  |
+| 2.8 | Fillet (Shift+F) top front edge R3 | 8000 − (1−π/4)·9·40 = 7922.743339 | 7922.743339 | ✅ | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported, hole healed, top front edge R3: 7922.743339, 7 faces) |
 | 2.9 | Feature-list row tooltip after clicking a row (Plane: Top) | hides | "Top" tooltip stays over the open dialog's first label | ✗ I4 |  |
 
 ## 3. Export
@@ -40,7 +40,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 |---|---|---|---|---|---|
 | 3.1 | Part › Export… | File name + View export rules, Format (last used), ☐ Y axis up, Version (Parasolid list), ☐ Use latest version, Options | Parasolid, 38.1, ☑ Use latest version, Options Download | ✅ (format stickiness ?) | 77870dd4 10-28 |
 | 3.2 | Parasolid file | header `SCH_3801231_38101` for 38.1 | `APPL=noshape … SCH=SCH_1200000_12006` (v12) although 38.1 was chosen | ✅ (header SCH_3801231_38101 for 38.1: I5 fixed) | 77870dd4 10-28 |
-| 3.3 | STEP export → re-import | same volume | 7922.743339 both ways | ✅ |  |
+| 3.3 | STEP export → re-import | same volume | 7922.743339 both ways | ✅ | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported: fillet result exported to STEP and imported again → 7922.743339, 7 faces) |
 | 3.4 | Agent API import | (CLI/MCP must cover every UI feature) | **no import operation** in `noshape-cli tools` | ✗ I6 |  |
 
 ## Findings (2026-10-21 run)
@@ -68,7 +68,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 1.2–1.4 | Fresh `import_files` of g25-b | SAT 7585.978524, X_T 7583.000869, STEP 7582.713024 (live 7582.912205) | ✗ I1 |  |
 | 2.1 | Move face, click 2 px inside the x=40 face border | "Face of Import 1" (face picked) | ✅ I2 fixed |  |
 | 2.9 | Row tooltip after clicking Top for a sketch | hides | ✅ I4 fixed |  |
-| 3.4 | Agent API import | `import_files` exists (one tab per file, "g25-b", "g25-b 1", …) | ✅ I6 fixed |  |
+| 3.4 | Agent API import | `import_files` exists (one tab per file, "g25-b", "g25-b 1", …) | ✅ I6 fixed | v0.4.12 CLI (qa 10:23: import_files holeblock.step → File tab "holeblock.step" + Part Studio "holeblock", 7214.601837) |
 | – | Switch to the holeblock tab | "Parts (0)" until a click (TAB1) | ✗ TAB1 |  |
 | – | `noshape-cli … | head` | CLI **panics** "failed printing to stdout: Broken pipe" | ✗ **API1** (minor) |  |
 | – | `tab_create kind="Part Studio"` (the kind document_info prints) | "unknown tab kind" (needs "partstudio"; the message doesn't list the valid kinds) | ✗ **API2** (minor) |  |
