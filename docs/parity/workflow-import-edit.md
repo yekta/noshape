@@ -11,37 +11,37 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 
 ## 1. Import
 
-| # | Step | Live | Ours | Status |
-|---|---|---|---|---|
-| 1.1 | + › Import… holeblock.step, Import to this document | Part Studio named after the file | tab "holeblock" (Import 1 → Part 1) + file tab in folder "CAD Imports"; 7214.601837 mm³ | ✅ |
-| 1.2 | g25-b.step (live's AP242 export) | 7582.912205 | 7582.713024 (−0.199) | ? I1 |
-| 1.3 | g25-b.x_t | 7582.912205 | 7583.000869 (+0.089) | ? I1 |
-| 1.4 | g25-b.sat | 7582.912205 | **7585.978524 (+3.066)** | ✗ I1 |
-| 1.5 | Second import of a same-named file | ? | tab "g25-b 1" | ? |
-| 1.6 | Tool search "move face", Enter | dialog opens | same (search panel like live) | ✅ |
+| # | Step | Live | Ours | Status | Verified |
+|---|---|---|---|---|---|
+| 1.1 | + › Import… holeblock.step, Import to this document | Part Studio named after the file | tab "holeblock" (Import 1 → Part 1) + file tab in folder "CAD Imports"; 7214.601837 mm³ | ✅ (tab "g25-b" + "CAD Imports" folder) | 77870dd4 10-28 |
+| 1.2 | g25-b.step (live's AP242 export) | 7582.912205 | 7582.713024 (−0.199) | ✅ 7582.693 (live 7582.912 ± 4.82, live's own STEP band) | 77870dd4 10-28 |
+| 1.3 | g25-b.x_t | 7582.912205 | 7583.000869 (+0.089) | ✅ 7583.001 (live ± 6.67) | 77870dd4 10-28 |
+| 1.4 | g25-b.sat | 7582.912205 | **7585.978524 (+3.066)** | ✅ 7582.996 (was 7585.978; live ± 4.22): I1 fixed | 77870dd4 10-28 |
+| 1.5 | Second import of a same-named file | ? | tab "g25-b 1" | ? tabs "g25-b (1)", "g25-b (2)" (live naming not captured) | 77870dd4 10-28 |
+| 1.6 | Tool search "move face", Enter | dialog opens | same (search panel like live) | ✅ | 77870dd4 10-28 |
 
 ## 2. Direct edits on the imported body
 
-| # | Step | Live | Ours | Status |
-|---|---|---|---|---|
-| 2.1 | Move face: click near the edge of the x=40 face | field "Faces to move" only accepts faces (picks the face) | **chip "Edge of Import 1"** (feature red); 3 times in this run, also inside the hole | ✗ I2 |
-| 2.2 | Move face, x=40 face, Offset 20 mm, flipped (O1) | **3607.3009183012764**, 1 part | **3607.300918**, 8 faces | ✅ |
-| 2.3 | Move face, hole face 5 mm default direction (O4) | **8000** | 8000.0 (CLI; the hole wall could not be picked in the UI, see I2) | ✅ |
-| 2.4 | … opposite direction | **2429.203673**, 1 part | 2429.203532, 1 part | ✅ |
-| 2.5 | Feature row menu (last feature) | Rename, Edit…, Add selection to folder…, Suppress, Add comment, Zoom to selection, Show dependencies…, Add appearance…, Delete | same + Dynamic suppression | ✅ |
-| 2.6 | Delete face (hole), Heal | 8000, 6 faces | 8000.0, 6 faces | ✅ |
-| 2.7 | Replace face: top face, replace with Plane 1 (Top + 15) | ? (request) | plane refused, notice "Select faces." | ? I3 |
-| 2.8 | Fillet (Shift+F) top front edge R3 | 8000 − (1−π/4)·9·40 = 7922.743339 | 7922.743339 | ✅ |
-| 2.9 | Feature-list row tooltip after clicking a row (Plane: Top) | hides | "Top" tooltip stays over the open dialog's first label | ✗ I4 |
+| # | Step | Live | Ours | Status | Verified |
+|---|---|---|---|---|---|
+| 2.1 | Move face: click near the edge of the x=40 face | field "Faces to move" only accepts faces (picks the face) | **chip "Edge of Import 1"** (feature red); 3 times in this run, also inside the hole | ✅ hover near the x=40 edge outlines the face; chip "Face of Import 1" (I2 fixed) | 77870dd4 10-28 |
+| 2.2 | Move face, x=40 face, Offset 20 mm, flipped (O1) | **3607.3009183012764**, 1 part | **3607.300918**, 8 faces | ✅ |  |
+| 2.3 | Move face, hole face 5 mm default direction (O4) | **8000** | 8000.0 (CLI; the hole wall could not be picked in the UI, see I2) | ✅ |  |
+| 2.4 | … opposite direction | **2429.203673**, 1 part | 2429.203532, 1 part | ✅ |  |
+| 2.5 | Feature row menu (last feature) | Rename, Edit…, Add selection to folder…, Suppress, Add comment, Zoom to selection, Show dependencies…, Add appearance…, Delete | same + Dynamic suppression | ✅ |  |
+| 2.6 | Delete face (hole), Heal | 8000, 6 faces | 8000.0, 6 faces | ✅ |  |
+| 2.7 | Replace face: top face, replace with Plane 1 (Top + 15) | ? (request) | plane refused, notice "Select faces." | ? I3 |  |
+| 2.8 | Fillet (Shift+F) top front edge R3 | 8000 − (1−π/4)·9·40 = 7922.743339 | 7922.743339 | ✅ |  |
+| 2.9 | Feature-list row tooltip after clicking a row (Plane: Top) | hides | "Top" tooltip stays over the open dialog's first label | ✗ I4 |  |
 
 ## 3. Export
 
-| # | Step | Live | Ours | Status |
-|---|---|---|---|---|
-| 3.1 | Part › Export… | File name + View export rules, Format (last used), ☐ Y axis up, Version (Parasolid list), ☐ Use latest version, Options | Parasolid, 38.1, ☑ Use latest version, Options Download | ✅ (format stickiness ?) |
-| 3.2 | Parasolid file | header `SCH_3801231_38101` for 38.1 | `APPL=noshape … SCH=SCH_1200000_12006` (v12) although 38.1 was chosen | ✗ I5 |
-| 3.3 | STEP export → re-import | same volume | 7922.743339 both ways | ✅ |
-| 3.4 | Agent API import | (CLI/MCP must cover every UI feature) | **no import operation** in `noshape-cli tools` | ✗ I6 |
+| # | Step | Live | Ours | Status | Verified |
+|---|---|---|---|---|---|
+| 3.1 | Part › Export… | File name + View export rules, Format (last used), ☐ Y axis up, Version (Parasolid list), ☐ Use latest version, Options | Parasolid, 38.1, ☑ Use latest version, Options Download | ✅ (format stickiness ?) |  |
+| 3.2 | Parasolid file | header `SCH_3801231_38101` for 38.1 | `APPL=noshape … SCH=SCH_1200000_12006` (v12) although 38.1 was chosen | ✗ I5 |  |
+| 3.3 | STEP export → re-import | same volume | 7922.743339 both ways | ✅ |  |
+| 3.4 | Agent API import | (CLI/MCP must cover every UI feature) | **no import operation** in `noshape-cli tools` | ✗ I6 |  |
 
 ## Findings (2026-10-21 run)
 
@@ -63,15 +63,15 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 
 ## Re-run pass 3 (2026-10-21 15:05–15:15; UI /tmp/qa5/noshape-1448 = target-shared 14:48, CLI /tmp/qa5/noshape-cli-1436)
 
-| # | Row | Ours | Status |
-|---|---|---|---|
-| 1.2–1.4 | Fresh `import_files` of g25-b | SAT 7585.978524, X_T 7583.000869, STEP 7582.713024 (live 7582.912205) | ✗ I1 |
-| 2.1 | Move face, click 2 px inside the x=40 face border | "Face of Import 1" (face picked) | ✅ I2 fixed |
-| 2.9 | Row tooltip after clicking Top for a sketch | hides | ✅ I4 fixed |
-| 3.4 | Agent API import | `import_files` exists (one tab per file, "g25-b", "g25-b 1", …) | ✅ I6 fixed |
-| – | Switch to the holeblock tab | "Parts (0)" until a click (TAB1) | ✗ TAB1 |
-| – | `noshape-cli … | head` | CLI **panics** "failed printing to stdout: Broken pipe" | ✗ **API1** (minor) |
-| – | `tab_create kind="Part Studio"` (the kind document_info prints) | "unknown tab kind" (needs "partstudio"; the message doesn't list the valid kinds) | ✗ **API2** (minor) |
+| # | Row | Ours | Status | Verified |
+|---|---|---|---|---|
+| 1.2–1.4 | Fresh `import_files` of g25-b | SAT 7585.978524, X_T 7583.000869, STEP 7582.713024 (live 7582.912205) | ✗ I1 |  |
+| 2.1 | Move face, click 2 px inside the x=40 face border | "Face of Import 1" (face picked) | ✅ I2 fixed |  |
+| 2.9 | Row tooltip after clicking Top for a sketch | hides | ✅ I4 fixed |  |
+| 3.4 | Agent API import | `import_files` exists (one tab per file, "g25-b", "g25-b 1", …) | ✅ I6 fixed |  |
+| – | Switch to the holeblock tab | "Parts (0)" until a click (TAB1) | ✗ TAB1 |  |
+| – | `noshape-cli … | head` | CLI **panics** "failed printing to stdout: Broken pipe" | ✗ **API1** (minor) |  |
+| – | `tab_create kind="Part Studio"` (the kind document_info prints) | "unknown tab kind" (needs "partstudio"; the message doesn't list the valid kinds) | ✗ **API2** (minor) |  |
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
 | I1 / IM2 | not re-run (no new CLI); UI import not repeated | – |
@@ -83,12 +83,12 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | I1 g25-b.sat via the app's + › Import… | 7585.979 mm³ | ✗ still (live 7582.912) |
 
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app /root/target-lead/debug/noshape)
-| Row | Ours now | Status |
-|---|---|---|
-| TAB1 | copy of the qa5 import doc: switching to the g48-two tab shows Parts (2) at once | ✅ fixed |
-| I2 | Delete face field, click right on a block's top edge: "Face of Extrude 3" (face picked) | ✅ |
-| I4 | Plane dialog, click Top in the list, move into the dialog: no row tooltip left | ✅ |
-| API1 / API2 | fixed on agent/qa5 (CLI exits quietly on a closed pipe; tab_create takes "Part Studio" and lists the kinds in its error) | 🔧 |
+| Row | Ours now | Status | Verified |
+|---|---|---|---|
+| TAB1 | copy of the qa5 import doc: switching to the g48-two tab shows Parts (2) at once | ✅ fixed |  |
+| I2 | Delete face field, click right on a block's top edge: "Face of Extrude 3" (face picked) | ✅ |  |
+| I4 | Plane dialog, click Top in the list, move into the dialog: no row tooltip left | ✅ |  |
+| API1 / API2 | fixed on agent/qa5 (CLI exits quietly on a closed pipe; tab_create takes "Part Studio" and lists the kinds in its error) | 🔧 |  |
 
 ## Re-run pass 22 (qa5, 2026-10-24, CLI built from main c59c5af9 after the api import/export batch; /root/qa5-scratch/pass21/impmatrix21.*)
 | I1 | unchanged (three volumes) | ✗ kern |
