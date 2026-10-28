@@ -380,12 +380,12 @@ impl DrawingEditor {
                     out.push(MenuEntry::Submenu(format!("Arc condition (end {})", end + 1).into(), entries));
                 }
             }
-            AnnotationKind::DatumTarget { .. } => {
+            AnnotationKind::DatumTarget { view, anchor, .. } => {
                 let a2 = a.clone();
                 out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_more_panel(&a2, w, cx)));
-                // Help datum: a target's position dimensions › Hide dimension;
-                // a target with hidden ones › Show dimensions ▸ This target /
-                // All targets.
+                // Live (behaviours "A35 datum target"): the target's
+                // dimension › Hide dimension; its label (or anywhere else on
+                // it) › Show dimensions ▸ This target / All targets.
                 let id = a.id;
                 let opts = a.target.as_deref().cloned().unwrap_or_default();
                 let set = |hide: bool, all: bool| {
@@ -393,12 +393,11 @@ impl DrawingEditor {
                         t.edit_sheet(if hide { "Hide dimension" } else { "Show dimensions" }, cx, |s| noshape_scene::drawing_tools::annotation_edit::set_target_dims_hidden(s, id, hide, all))
                     }
                 };
-                if opts.origin.is_some() && !opts.hide_dims {
+                let on_dimension = opts.origin.is_some() && !opts.hide_dims && self.placement(*view).is_some_and(|pl| target_dimension_hit(a.position, pl.to_sheet(*anchor), self.cursor));
+                if on_dimension {
                     out.push(MenuEntry::item("Hide dimension", set(true, false)));
-                }
-                let any_hidden = self.current_sheet().annotations.iter().any(|x| x.target.as_ref().is_some_and(|o| o.hide_dims && o.origin.is_some()));
-                if opts.hide_dims || any_hidden {
-                    out.push(MenuEntry::Submenu("Show dimensions".into(), vec![MenuEntry::item("This target", set(false, false)).disabled(!opts.hide_dims), MenuEntry::item("All targets", set(false, true))]));
+                } else {
+                    out.push(MenuEntry::Submenu("Show dimensions".into(), vec![MenuEntry::item("This target", set(false, false)), MenuEntry::item("All targets", set(false, true))]));
                 }
             }
             _ => {}
@@ -661,5 +660,29 @@ impl DrawingEditor {
             _ => {}
         }
         cx.notify();
+    }
+}
+
+/// A right-click at sheet point `at` on a datum target with its dimensions
+/// shown: on a dimension, not on the label bubble (center `label`, the
+/// drawn 5.5 mm radius) or its leader to the target point `point`.
+fn target_dimension_hit(label: [f64; 2], point: [f64; 2], at: [f64; 2]) -> bool {
+    let dist = |a: [f64; 2], b: [f64; 2]| ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)).sqrt();
+    let (d, l) = ([point[0] - label[0], point[1] - label[1]], dist(label, point));
+    let t = if l > 1e-9 { (((at[0] - label[0]) * d[0] + (at[1] - label[1]) * d[1]) / (l * l)).clamp(0.0, 1.0) } else { 0.0 };
+    let on_leader = dist(at, [label[0] + d[0] * t, label[1] + d[1] * t]) < 1.5;
+    dist(at, label) > 6.5 && !on_leader
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_target_right_click_is_on_its_dimension_away_from_label_and_leader() {
+        let (label, point) = ([100.0, 100.0], [80.0, 80.0]);
+        let hit = |at| super::target_dimension_hit(label, point, at);
+        assert!(!hit([101.0, 99.0]), "the label bubble");
+        assert!(!hit([90.0, 90.5]), "on the leader");
+        assert!(hit([70.0, 88.0]), "a dimension beside the point");
+        assert!(hit([90.0, 72.0]));
     }
 }

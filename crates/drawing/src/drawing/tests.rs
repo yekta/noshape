@@ -2081,9 +2081,25 @@ fn datum_target_origin_dimensions_show_and_hide() {
     drawing.sheets[0].annotations.push(Annotation { id: 902, kind: AnnotationKind::DatumTarget { view: vid, anchor: [0.01, 0.005], label: "A1".into(), area: DatumTargetArea::Dot }, position: [300.0, 200.0], target: Some(Box::new(target)), ..Default::default() });
     let sources = regenerate_sources(&doc, &drawing);
     let texts = |d: &Drawing| render_sheet(d, 0, &sources, &ViewCache::new(), false).unwrap().geometry.texts.iter().map(|t| t.text.clone()).collect::<Vec<_>>();
-    // 30 mm and 15 mm from the origin.
+    // Live: none until Show dimensions.
+    let new = texts(&drawing);
+    assert!(!new.iter().any(|t| t == "30" || t == "15"), "{new:?}");
+    // Then 30 mm and 15 mm from the origin, as basic (boxed) dimensions.
+    drawing.sheets[0].annotations.last_mut().unwrap().target.as_mut().unwrap().hide_dims = false;
     let shown = texts(&drawing);
     assert!(shown.iter().any(|t| t == "30") && shown.iter().any(|t| t == "15"), "{shown:?}");
+    let b = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+    // Basic dimensions: a closed box round each value.
+    let g = &b.geometry;
+    for t in g.texts.iter().filter(|t| t.text == "30" || t.text == "15") {
+        let inside = |l: &&sheet::Polyline2| {
+            let (xs, ys): (Vec<f64>, Vec<f64>) = l.points.iter().map(|p| (p[0], p[1])).unzip();
+            let (x0, x1) = (xs.iter().copied().fold(f64::MAX, f64::min), xs.iter().copied().fold(f64::MIN, f64::max));
+            let (y0, y1) = (ys.iter().copied().fold(f64::MAX, f64::min), ys.iter().copied().fold(f64::MIN, f64::max));
+            (x0 - 0.1..=x1 + 0.1).contains(&t.pos[0]) && (y0 - 0.1..=y1 + 0.1).contains(&t.pos[1])
+        };
+        assert!(g.lines.iter().filter(|l| l.closed && l.points.len() == 4).any(|l| inside(&l)), "{} is boxed", t.text);
+    }
     drawing.sheets[0].annotations.last_mut().unwrap().target.as_mut().unwrap().hide_dims = true;
     let hidden = texts(&drawing);
     assert!(!hidden.iter().any(|t| t == "30"), "{hidden:?}");

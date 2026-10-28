@@ -4731,7 +4731,7 @@ The annotation context menus, one edit each with the menu's edit text:
 - `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend; a note's or callout's at `from_node` [leader, node]); `remove_leaders` (a callout's added ones).
 - Note and callout leaders (a callout's leader 0 is the one to its anchor, then the added ones; drawing_get `leaders`): `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`; its branches then start at the bend), `delete_leader` (`leader`; a callout's leader 0 leaves it in space), `move_leader` (Move by grip: leader `leader`'s end to `point`; onto a vertex, circle center or edge it attaches there, elsewhere it stays on the sheet; a callout's leader 0 only onto a model point).
 - Radial dimensions: `foreshorten`; `remove_foreshorten`.
-- Datum targets: `hide_dimension` (its position dimensions), `show_dimensions` (`all`: All targets, else This target).
+- Datum targets: a new one draws no position dimensions (as live); `show_dimensions` (`all`: All targets, else This target; basic, boxed dimensions from its origin), `hide_dimension`.
 - Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.
 - `detach` (Detach from geometry: stays put, no longer follows the model).
 - Centermarks: `align_centermark` to the straight edge at `point`.

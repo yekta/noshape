@@ -126,7 +126,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - S6: Sheets panel › reference › Change configuration... (live's panel; every view of the reference; the API's
   drawing_change_configuration), checked on :131.
 - S8: sheet rows drag to reorder (one or several; blue drop line; one undo), checked on :131.
-- Next, in order: A35; TABLE-SHIFT-TAB-BLANK; V59 / V26; ⏳ rows on green.
+- qa TABLE-SHIFT-TAB-BLANK (caret after a cell's text), NOTE-PANEL-UNDER-PROPS (below the table when no room above);
+  A35 datum targets: no dimensions until Show dimensions (label menu), boxed, Hide dimension on the dimension's menu.
+- Next, in order: V59 / V26 once live data exists; drawing.md ⏳ rows on green; the remaining 🔧 rows in P2 order.
 
 ## Afternoon 10-28 (landed through 3476703d)
 - Parasolid: 30.1–31.1 ASSEMBLY layouts from live's samples (all 13 versions read); exports carry part names / colours

@@ -1967,12 +1967,14 @@ impl SheetGeometry {
                     if let (Some(o), false) = (opts.origin, opts.hide_dims) {
                         let os = env.to_sheet(*view, o);
                         let (dx, dy) = ((anchor[0] - o[0]).abs(), (anchor[1] - o[1]).abs());
+                        // Basic (boxed) dimensions, as live draws them.
+                        let basic = |v: f64| DimText { boxed: true, ..env.text(a, v, false, "") };
                         if dx > 1e-9 {
-                            let t = env.text(a, dx, false, "");
+                            let t = basic(dx);
                             self.linear_dimension_text(os, [p[0], os[1]], -8.0, DimOrientation::Horizontal, &t, pick);
                         }
                         if dy > 1e-9 {
-                            let t = env.text(a, dy, false, "");
+                            let t = basic(dy);
                             self.linear_dimension_text([p[0], os[1]], p, 8.0, DimOrientation::Vertical, &t, pick);
                         }
                     }

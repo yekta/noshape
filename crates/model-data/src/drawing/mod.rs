@@ -1886,7 +1886,7 @@ impl TargetStyle {
 /// style, the origin (view coordinates; the target's X / Y position
 /// dimensions measure from it), Length or Angle positioning, the flipped
 /// directions and "Hide dimension".
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DatumTargetOpts {
     pub style: TargetStyle,
@@ -1896,7 +1896,15 @@ pub struct DatumTargetOpts {
     pub angular: bool,
     pub flip_x: bool,
     pub flip_y: bool,
+    /// Live (behaviours "A35 datum target"): a new target draws no
+    /// dimensions until Show dimensions.
     pub hide_dims: bool,
+}
+
+impl Default for DatumTargetOpts {
+    fn default() -> Self {
+        Self { style: TargetStyle::default(), origin: None, origin_ref: None, angular: false, flip_x: false, flip_y: false, hide_dims: true }
+    }
 }
 
 /// Where dual values sit relative to the primary ones.
