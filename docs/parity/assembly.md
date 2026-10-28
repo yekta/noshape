@@ -232,7 +232,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | N7 | Linear edge: midpoint and both ends, Z along the edge | E§8.2 | ✅ | model test | 0.4.10+ / 77870dd4 10-28 |
 | N8 | Arc / curve edge: center, midpoint and ends | E§8.2 | ✅ | T:`inference_points_on_cones_spheres_arcs_and_vertices` (fixed: an arc edge's Midpoint resolved to the center, regen/implicit.rs) |  |
 | N9 | Vertex: the point, Z normal to a face | E§8.2 | ✅ | hovering a part vertex: Z normal to the first planar face around it T:`inference_points_on_cones_spheres_arcs_and_vertices` |  |
-| N10 | No seam vertices of circles offered | — | ✅ | model test |  |
+| N10 | No seam vertices of circles offered | — | ✅ | model test | 4c97692e 10-28 (GUI: m, hover the plate's Ø10 hole rim → one connector at the centre (triad + disc), no dot at the circle's seam) |
 | N11 | Shift locks the entity; the connector snaps to its nearest point | E§6.3 | ✅ | |  |
 | N12 | Hovered entity highlighted | E§6.3 | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | N13 | Sketch entities / regions as targets | E§8.2 | ✅ | sketch instance curves: a line offers its midpoint (Z along the line) and its ends, a circle its center (GUI n2–n3). Regions are pickable faces (`face_refs` = SketchRegion); hovering inside a loop offers the region centroid plus the loop's corners and edge midpoints, Z along the sketch normal (live 601; `regen::implicit` SketchRegion branch, `inference_candidates`); model test `sketch_instances_are_wire_occurrences_with_edges` GUI :103: Insert › Sketches, hovering a region snaps to its centroid (Z on the sketch normal); Fastened onto a hole. |  |
