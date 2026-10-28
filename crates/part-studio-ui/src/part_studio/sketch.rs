@@ -29,6 +29,17 @@ use std::sync::Arc;
 
 actions!(sketch_entry, [SketchEntryNext, SketchEntryPrev, SketchEntryCancel]);
 
+/// Keys of the on-the-fly value box: Tab / Alt+arrows to the other box, Esc.
+pub(super) fn entry_key_bindings() -> Vec<KeyBinding> {
+    vec![
+        KeyBinding::new("tab", SketchEntryNext, Some("SketchEntry")),
+        KeyBinding::new("shift-tab", SketchEntryPrev, Some("SketchEntry")),
+        KeyBinding::new("alt-right", SketchEntryNext, Some("SketchEntry")),
+        KeyBinding::new("alt-left", SketchEntryPrev, Some("SketchEntry")),
+        KeyBinding::new("escape", SketchEntryCancel, Some("SketchEntry")),
+    ]
+}
+
 static BIND_ENTRY_KEYS: std::sync::Once = std::sync::Once::new();
 
 // The sketch toolbar's groups and their order (shared with the agent API's
@@ -192,15 +203,7 @@ impl PartStudioView {
             }
             return;
         };
-        BIND_ENTRY_KEYS.call_once(|| {
-            cx.bind_keys([
-                KeyBinding::new("tab", SketchEntryNext, Some("SketchEntry")),
-                KeyBinding::new("shift-tab", SketchEntryPrev, Some("SketchEntry")),
-                KeyBinding::new("alt-right", SketchEntryNext, Some("SketchEntry")),
-                KeyBinding::new("alt-left", SketchEntryPrev, Some("SketchEntry")),
-                KeyBinding::new("escape", SketchEntryCancel, Some("SketchEntry")),
-            ]);
-        });
+        BIND_ENTRY_KEYS.call_once(|| cx.bind_keys(entry_key_bindings()));
         let plane = self.edit.as_ref().and_then(|e| e.dialog.read(cx).feature.params.query("sketchPlane").first().cloned());
         let frame = self.display.sketches.iter().find(|s| s.feature == id).map(|s| s.frame).or(match plane {
             Some(Reference::Plane(DatumPlane::Top)) => Some(PlaneFrame::TOP),
@@ -1400,6 +1403,15 @@ impl PartStudioView {
 
     /// Tab / Alt+arrows in the box: switch to the other box.
     fn otf_switch(&mut self, delta: isize, window: &mut Window, cx: &mut Context<Self>) {
+        // A value typed in the box is taken before moving on (rectangle: 30
+        // Tab 20 Enter makes 30 x 20; it was dropped).
+        let typed = self.ui_ref().and_then(|u| u.otf_input.as_ref()).map(|(st, _)| st.read(cx).value().to_string());
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let suggested = self.sketch_data(cx).and_then(|data| self.sketch.as_ref()?.otf_boxes(&data, &units).into_iter().find(|b| b.2).map(|b| b.1));
+        if let Some(text) = typed.filter(|t| !t.trim().is_empty() && Some(t.trim()) != suggested.as_deref().map(str::trim)) {
+            self.commit_otf_input(&text, window, cx);
+            return;
+        }
         if let Some(ed) = &mut self.sketch {
             ed.otf_step(delta);
         }

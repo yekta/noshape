@@ -27,6 +27,8 @@ fn part_studio(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<
     // The app's default key bindings (Esc → Cancel, tool keys), without the
     // user's customizations.
     cx.update(|cx| cx.bind_keys(crate::actions::default_key_bindings()));
+    // The value box's own keys (the app binds them once per process).
+    cx.update(|cx| cx.bind_keys(super::entry_key_bindings()));
     crate::part_studio_hooks::register_for_tests();
     let dir = std::env::temp_dir().join(format!("noshape-ui-{name}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -156,6 +158,17 @@ fn rectangle_value_boxes_take_width_then_height(cx: &mut TestAppContext) {
     click(cx, window, &view, (500., 300.));
     click(cx, window, &view, (650., 400.));
     keys(cx, window, &["3", "0", "enter", "2", "0", "enter"]);
+    assert!(near(&dimensions(cx, &view), &[0.02, 0.03]), "{:?}", dimensions(cx, &view));
+}
+
+/// Tab moves from the rectangle's width box to its height box, taking the
+/// typed width: Rectangle, click, click, 30 Tab 20 Enter → 30 × 20.
+#[gpui::test]
+fn rectangle_value_boxes_tab_between_them(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "rect-tab", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    keys(cx, window, &["3", "0", "tab", "2", "0", "enter"]);
     assert!(near(&dimensions(cx, &view), &[0.02, 0.03]), "{:?}", dimensions(cx, &view));
 }
 

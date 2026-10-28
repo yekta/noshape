@@ -114,8 +114,9 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    with it, no longer merged into it: circles centred on the Origin now carry a Coincident too, as live),
    bf1edd44 SKETCH-PATTERN-GLYPH-HOVER. e52e8015 point menus as live; UI keystroke tests 9.
 2. (Tried: writing back solved components between conflict-exclusion retries: no gain measured, dropped.)
-3. UI keystroke tests (docs/TESTS.md, part-studio-ui sketch_ui_tests.rs, 7 tests): extend to other P1 sketch key
-   flows (`=#var` in a value box, polygon sides typed, Tab between rectangle boxes, Enter in a Line chain). The harness
+3. UI keystroke tests (docs/TESTS.md, part-studio-ui sketch_ui_tests.rs, 12 tests with psui's): extend to other P1
+   sketch key flows (`=#var` in a value box). Tab between rectangle boxes added 10-28 (it dropped the typed width;
+   fixed); the value box's keys are bound per test App (entry_key_bindings). The harness
    is part-studio-ui only; assembly-ui could opt in the same way (dev-dependency on noshape-ui-test-support + gpui).
 4. Standard content (P3): ANSI taper pin crowned ends done 10-27 (live's rule from its B-rep alone: the seams l
    apart, the large one at d/2, crown spheres symmetric; = live's volume / areas / bbox); DIN 7050 / 7051 /
