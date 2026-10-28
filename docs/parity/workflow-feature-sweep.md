@@ -261,7 +261,7 @@ Reference / Coordinate system, ruledSurface type / vertex override / corner type
 ## Release re-check v0.4.8 (qa5, 2026-10-25 02:45, release asset noshape-cli 0.4.8 and target-engine 00:45; v048/tools/fsw.py)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| L56 Hole, Merge scope cleared (point on the block's top) | Error "No target parts selected for hole.", Merge scope flagged | ✅ | 67f88fd1 10-28 (app) same text in the Hole's title tooltip |
+| L56 Hole, Merge scope cleared (point on the block's top) | Error "No target parts selected for hole.", Merge scope flagged | ✅ | 98667558 10-28 (wf-block hole, Merge scope cleared: title red, with Sketch points active the empty Merge scope is #f9ebec with a red border, ✓ green = live 1533) |
 | L45 Curve pattern, closed 100 mm path, Distance 25 × 4 | Error "Cannot create a curve pattern when the entered distance is larger than the path length.", Distance flagged | ❌ (NUMBER-FIELD-ERROR-MARK) | 98667558 10-28: ✗ Distance field not marked (live 1533: #F9EBEC + #BD3039 rule) |
 | L45 Distance 25 × 3 | **Error** (same text); live OK with copies at 120° / 240° | ✅ **fixed** (was ✗ L45b, limit check on the sampled path length) | b504234e 10-28 (GUI: cpat, Part pattern › Distance 25 mm × 3 → OK, Parts (3) at 120° / 240°; fixed since 10-27 20:30) |
 | L45b Distance 10 × 3 | copies at 120° / 240°; curvePattern.fs: 40° / 80° | ✅ **fixed** (was ✗ L45b; std spacing d·L / (L − d) on closed paths) | b504234e 10-28 (GUI edit to Distance 10 × 3 → copies at 40.0° / 80.0°, centres (12.186, 10.225) / (2.762, 15.666) = curvePattern.fs) |
