@@ -442,6 +442,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   blamed number field gets `os-invalid-textbox`, fill #F9EBEC and a 1 px #BD3039 bottom rule (Instance count stays normal),
   focused or not; selection fields get the same fill with a full red border (field_error already names "distance" via
   err_at, so only the number-field drawing is missing) (qa 2026-10-28 06:14, build 98667558)
+  qa 06:34 (e8ca768f): the assembly's Linear pattern does mark its Instance count at 0 (#f9ebec + red rule), but at
+  Distance 0 ("Linear pattern distance must be positive…") its Distance stays white too.
 - [x] verified c8239e05 (qa 06:11: wf-block, folder of Fillet 1 / Chamfer 1 / Sketch 2, Chamfer 1 › Roll to here → bar #B8B8B8 at x 64–234 nested under the guide, Sketch 2 nested grey italic, guide x 49 runs on to the last child; the end tick still missing as psui notes; tickets/rollback-in-folder-c823.png) (psui 10-28, this commit: between two children of an open folder the bar is indented with them, the guide running past it (on :102, x 64 as live); residual: the 9 px tick at the guide's end) P3 ROLLBACK-BAR-IN-FOLDER rolled back to a feature inside a folder, the bar is drawn at the root, not nested: cpat.noshape,
   select Extrude 1 … Curve pattern 1, Add selection to folder… › Enter, expand "New folder (3)", right-click Sketch 2 (middle
   child) › Roll to here → bar #B8B8B8 at x 45–234 (root width, over the folder's guide line); Curve pattern 1 below it stays
