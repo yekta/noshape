@@ -261,8 +261,8 @@ Reference / Coordinate system, ruledSurface type / vertex override / corner type
 ## Release re-check v0.4.8 (qa5, 2026-10-25 02:45, release asset noshape-cli 0.4.8 and target-engine 00:45; v048/tools/fsw.py)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| L56 Hole, Merge scope cleared (point on the block's top) | Error "No target parts selected for hole.", Merge scope flagged | ✅ |  |
-| L45 Curve pattern, closed 100 mm path, Distance 25 × 4 | Error "Cannot create a curve pattern when the entered distance is larger than the path length.", Distance flagged | ✅ |  |
+| L56 Hole, Merge scope cleared (point on the block's top) | Error "No target parts selected for hole.", Merge scope flagged | ✅ | 67f88fd1 10-28 (app) same text in the Hole's title tooltip |
+| L45 Curve pattern, closed 100 mm path, Distance 25 × 4 | Error "Cannot create a curve pattern when the entered distance is larger than the path length.", Distance flagged | ✅ | 67f88fd1 10-28 (app) same text; the Distance field is not drawn red in the dialog (live asked, REQUESTS qa 10-28) |
 | L45 Distance 25 × 3 | **Error** (same text); live OK with copies at 120° / 240° | ✗ **L45b** (psb; limit check on the sampled path length) |  |
 | L45b Distance 10 × 3 | copies at 120° / 240°; curvePattern.fs: 40° / 80° | ✗ **L45b** (psb; std spacing d·L / (L − d) on closed paths) |  |
 
