@@ -9,6 +9,14 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
+- **12:02 update (greens ea572159 → 8cd3c4da):** fuzz 68 (8cd3) × 600 alive. Filed **P1 SKETCH-MODEL-EDGE-SELECT** (skasm: in
+  a sketch a click on a model edge selects nothing and clears the selection; also in v0.4.12), P1 (raised) SKETCH-START-INFERENCE,
+  P2 RIB-CHAIN-NORMAL (core: L profile Normal rib fails; live +160), P3 SELECT-OTHER-POS (psui: popup 77 px low), P3
+  API-ASM-RELATIONS (dx: assembly_list has no relations). Verified: feature-sweep 6 (loft texts), 7 (sweep + live's whole thin
+  sweep matrix, bin/thinsweep.py), 8 (rib bodies per profile); assembly-sweep 6 7 12 13 16 17 25 30 32 35 M4 M5 (E1/E2/E3/E5/E8
+  texts = live); sketch 7.10 10.7 11.22; chrome-sweep FL4 (look = live, position off). Live asked: assembly E2 Group row state.
+  Next: verify 103cd81d (skasm rectangle glyphs) and dx 1c716428 / bd60d26d on the next green; sketch.md 8.8 / 9.5 / 14.x;
+  assembly-sweep 8–11 / 19 / 29 / 33.
 - **11:40 update (greens 64997436 → ea572159):** fuzz 66 (6499) and 67 (ea57) × 600 alive. REGEN-SPEED on 64997436: 3rd
   undo 131–251 ms (was ~1300 at 09:27), edits 201–606 ms at load 24–30 (ticket note). Verified: ASM-XT-ROUNDTRIP-NAMES dx
   half (ea572159: x_t carries "Pin" etc., re-import "Pin <1>"), sheet-metal SM8–SM12, feature-sweep L56 + row 12 (all 21
