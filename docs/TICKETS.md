@@ -931,7 +931,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (top-face hole centres), then right-click Part 1 <1> › Add mate connector to instance origin… › ✓ → Mate features (2):
   **Mate connector 1, Fastened 1**. Live (behaviours ~22743, request 1541): creation order, "Fastened 1 · Mate connector 1"
   (REST /features the same); parity assembly.md F1 (qa 2026-10-28 07:55, build 2292bf8c)
-- [ ] P2 MATE-LIMITS-OPPOSITE-SIGN a Revolute's limits act on the negated value: two plates (qa5 mkmate.py doc), Fastened
+- [x] verified c725f68f (qa 07:57: aligned Revolute with limits 0 / 90: the value box opens at "0°"; typed 45 → <2> at +45° (label "45°", box "45°"); typed 120 → held at 90°; tickets/mate-limits-fixed-c725.png) c725f68f P2 MATE-LIMITS-OPPOSITE-SIGN a Revolute's limits act on the negated value: two plates (qa5 mkmate.py doc), Fastened
   <2> bottom-face hole centre → <1> top-face hole centre, change to Revolute, ☑ Limits min 0 deg / max 90 deg, ✓. Dragging
   <2> both ways stops at world 0° and at world −90° about Z (CLI assembly_list); selected, the mate's arc label there reads
   **"270°"** (tickets/mate-limit-sign-270-2292.png), and at 0° its value box opens with "360°". Double-click the value, type 45
