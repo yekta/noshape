@@ -379,15 +379,12 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Shared prefs touched by testing: ~/.config/noshape/preferences.json got `featureDialogWidths.extrude 278` from a resize
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
-## Requests to the lead (qa, updated 2026-10-28 21:55)
-- **21:55, for core:** core's worktree has 924f1387 (not on main yet) turning patch 0004's parallel pairs back on "now that the
-  budget can't jump out of a pool job (0005)". 0005 is what brought DRAFT-BUDGET-POOL back (below; still open on 58d89104:
-  not done after 246 s, 3.1 GB). Please have core run tickets/draft-pool-hang-2133.noshape (/root/qa-scratch/tickets/) before landing; qa
-  will re-run CLI seed 152 and GUI fuzz for BOP-PAIRS-GPF once it is green.
-- **P0 DRAFT-BUDGET-POOL is back (21:05):** green e4cccdff (core c1f98ed6, OCCT patch 0005) never finishes opening
-  tickets/draft-pool-hang-2133.noshape (memory climbing); 989f756b opens it in 26 s. The defeaturing's face/face stage runs on the OCCT
-  pool even with serial pairs, and 0005 stops the budget from interrupting it. Revert 0005 or give pool work a real cancellation
-  before the 05:00 cut.
+## Requests to the lead (qa, updated 2026-10-28 23:18)
+- **23:18, for bool / the cut:** P1 RUST-MIRROR-EXTRA-FACE (TICKETS › Rust Boolean): since da75e17b (likely) the Rust Boolean keeps one
+  more face after a part mirror than OCCT on tickets/cli-fillet-segv.noshape, and a later Chamfer cuts 0.039 mm³ more. Needs bool's
+  judgement (which result matches live) before 05:00, or OCCT for mirrored faces.
+- (done) DRAFT-BUDGET-POOL: verified on 5eb5259b (core 34cbea98). core's 924f1387 parallel pairs still not on main: qa re-runs CLI seed
+  152 and GUI fuzz for BOP-PAIRS-GPF when it lands.
 - **P1 GREEN-ICONS-PATH (20:25):** greens since 4b9d7eaf are built in /home/ngyekta/projects/noshape-wt/watch; their rust-embed (no
   debug-embed) reads icons from that path at run time, so on this box the app has no icons. qa copied main's crates/app/assets there
   as a stopgap (see TICKETS › Lead / build). Please build the green where it runs or turn on rust-embed's debug-embed.
