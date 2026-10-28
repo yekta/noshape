@@ -9,6 +9,11 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **23:22 update (green 10ea49ed = + dx angular as live 1576):** verified DWG-ANGULAR-SECTOR (+ P3 DWG-ANGULAR-LABEL-ANGLE: the
+  label only slides along the bisector); SKETCH-F-FIT reopened (fit off-centre, far corner under the right strip). New **P1
+  RUST-MIRROR-EXTRA-FACE** (bool; TICKETS › Rust Boolean; in the 10-29 blocker notes and Requests to the lead). Running: face-count
+  sweep Rust on / off (bin/facesweep.sh → cli/facesweep-bool2253.out; 10 of 19 same so far), CLI fuzz seeds 170 / 171 with bool's
+  22:53 CLI (cli/clifuzz-17{0,1}r.log). Fuzz 95 (5eb5, boltdwg) alive.
 - **23:13 update (green 5eb5259b = + core 34cbea98 OCCT 0005 v2, skasm SKETCH-F-FIT, bool da75e17b):** **DRAFT-BUDGET-POOL verified**
   (draft-pool-hang doc opens in 21–26 s, cli-draft-hang2 61 s): no open P0 blocker from today's mains so far (blocker notes at the
   top of TICKETS updated). REGEN-SPEED on f11f: commits 104–206 ms (median 129, load ~20), 3rd undo 184 ms. P1 walk on 896123ac
