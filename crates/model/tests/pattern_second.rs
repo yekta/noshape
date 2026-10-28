@@ -324,3 +324,27 @@ fn deleting_the_running_second_pattern_aborts_it_and_reuses_the_first() {
     let fused = cancel.scope(|| noshape_kernel::boolean(noshape_kernel::BooleanOp::Fuse, &[a], &[b], &Default::default()));
     assert!(fused.is_err(), "a boolean ran to the end under an aborted run");
 }
+
+/// BOOLEAN-SPEEDUP phase 2's target: the fin under the 400-fin plate (the
+/// user's Extrude 3, before Linear pattern 2) regenerates locally, < 150 ms
+/// (it took 2.7 s through OCCT's whole Boolean). Asserted: no slower than
+/// 4× the target (runner noise); printed: the feature's time.
+#[test]
+#[ignore = "timed: perf.yml model job (wall clock; ci.yml tests are deterministic)"]
+fn timed_the_fin_under_the_fin_plate_regenerates_locally() {
+    log();
+    let n = 400;
+    let (mut s, _, lp2) = model(n, true);
+    s.ps.features.retain(|f| f.id != lp2);
+    let w2 = s.ps.features.last().unwrap().id;
+    // The best of three regenerations (the first warms OCCT's caches).
+    let mut best = f64::MAX;
+    for _ in 0..3 {
+        let r = s.regen(None);
+        let st = r.display.features.iter().find(|x| x.id == w2).unwrap();
+        assert!(matches!(st.status, FeatureStatus::Ok), "{:?} {:?}", st.status, st.message);
+        best = best.min(st.time_ms as f64);
+    }
+    eprintln!("fin under the {n}-fin plate: {best:.0} ms (target 150)");
+    assert!(best < 600.0, "the fin under the {n}-fin plate took {best:.0} ms (target 150)");
+}

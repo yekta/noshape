@@ -378,6 +378,7 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
 {
   // With a scope: its faces only (the groups are there), its seeds' edges.
   const TopoDS_Shape& where = sc != nullptr ? TopoDS_Shape(sc->faces) : s;
+  std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("merge.maps");
   ShapeIMap           faces;
   TopExp::MapShapes(where, TopAbs_FACE, faces);
   const int           nf = faces.Extent();
@@ -406,6 +407,7 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
   std::map<int, std::vector<int>> groups;
   for (int i = 1; i <= nf; ++i)
     groups[root(i)].push_back(i);
+  lap = std::make_unique<KernelTimer>("merge.groups");
   occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape();
   // As UnifySameDomain records it: every merged face modified into the new
   // one, inner edges and vertices removed.
@@ -583,6 +585,7 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
       }
     any = true;
   }
+  lap            = std::make_unique<KernelTimer>("merge.rebuild");
   TopoDS_Shape r = s;
   // One solid of one shell: the shell rebuilt with the merged faces (ReShape
   // copied the whole part: most of the time on the 400-fin plate).
@@ -655,6 +658,14 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
     }
   }
   // Collinear straight edges through vertices of only those two.
+  lap = std::make_unique<KernelTimer>("merge.edges");
+  if (sc != nullptr && std::getenv("NOSHAPE_BOOL_DEBUG"))
+  {
+    int n = 0;
+    for (TopoDS_Iterator it(where2); it.More(); it.Next())
+      ++n;
+    std::fprintf(stderr, "unify scope: %d faces, %d seeds\n", n, seeds2.Extent());
+  }
   ShapeAncMap ve, ef2;
   TopExp::MapShapesAndUniqueAncestors(sc != nullptr ? TopoDS_Shape(where2) : r, TopAbs_VERTEX, TopAbs_EDGE, ve);
   TopExp::MapShapesAndUniqueAncestors(sc != nullptr ? TopoDS_Shape(where2) : r, TopAbs_EDGE, TopAbs_FACE, ef2);
@@ -2193,7 +2204,7 @@ static bool fuse_on_face(const TopoDS_Shape& target, const OcShape* src, const T
 // face: a fin fused to the 400-fin plate's 1600 faces took 1.8 s). False
 // when it doesn't apply (NOSHAPE_BOOL_LOCAL=0: never); the caller runs the
 // whole Boolean.
-static bool local_boolean(const TopoDS_Shape& target, const OcShape* src, const TopoDS_Shape& tool, int op, TopoDS_Shape& out, HHist& hist, std::shared_ptr<const UnifyScope>& scope)
+static bool local_boolean(const TopoDS_Shape& target, const OcShape* src, const TopoDS_Shape& tool, int op, TopoDS_Shape& out, HHist& hist, std::shared_ptr<const UnifyScope>& scope, std::array<ShapeIMap, 3>& out_maps)
 {
   auto no = [](int why) {
     if (std::getenv("NOSHAPE_BOOL_DEBUG"))
@@ -2586,9 +2597,20 @@ static bool local_boolean(const TopoDS_Shape& target, const OcShape* src, const 
   // front face, 800 edges, took ~1 s).
   lap = std::make_unique<KernelTimer>("local.history");
   // History: OCCT's general fuse's, kept to what the result holds.
-  ShapeIMap in_result;
-  for (TopAbs_ShapeEnum k : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
-    TopExp::MapShapes(so, k, in_result);
+  // The result's maps (make_result's history keeps them for the result).
+  std::array<ShapeIMap, 3> rm;
+  TopExp::MapShapes(so, TopAbs_FACE, rm[0]);
+  TopExp::MapShapes(so, TopAbs_EDGE, rm[1]);
+  TopExp::MapShapes(so, TopAbs_VERTEX, rm[2]);
+  struct InResult
+  {
+    const std::array<ShapeIMap, 3>& m;
+    bool Contains(const TopoDS_Shape& x) const
+    {
+      const TopAbs_ShapeEnum t = x.ShapeType();
+      return t == TopAbs_FACE ? m[0].Contains(x) : t == TopAbs_EDGE ? m[1].Contains(x) : t == TopAbs_VERTEX && m[2].Contains(x);
+    }
+  } in_result{rm};
   HHist                     h = new BRepTools_History();
   std::vector<TopoDS_Shape> inputs;
   for (int i = 1; i <= region.Extent(); ++i)
@@ -2695,8 +2717,9 @@ static bool local_boolean(const TopoDS_Shape& target, const OcShape* src, const 
       }
     scope = sc;
   }
-  out  = so;
-  hist = h;
+  out_maps = std::move(rm);
+  out      = so;
+  hist     = h;
   return true;
 }
 
@@ -2892,10 +2915,11 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     TopoDS_Shape                      out;
     HHist                             h;
     std::shared_ptr<const UnifyScope> scope;
+    std::array<ShapeIMap, 3>          maps;
     bool                              done = false;
     {
       const KernelTimer timer("boolean.local");
-      done = local_boolean(a[0], args.sources.empty() ? nullptr : args.sources[0], t[0], op, out, h, scope);
+      done = local_boolean(a[0], args.sources.empty() ? nullptr : args.sources[0], t[0], op, out, h, scope, maps);
     }
     if (done)
     {
@@ -2904,7 +2928,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
       bool clean = false;
       if (opts.unify)
         out = unify_in(out, h, scope.get(), &clean);
-      OpOut r = make_result(concat(args.items, tools.items), out, h.get(), &srcs);
+      OpOut r = make_result(concat(args.items, tools.items), out, h.get(), &srcs, opts.unify ? nullptr : &maps);
       if (opts.unify)
         r.shape->myUnifyClean = clean;
       else

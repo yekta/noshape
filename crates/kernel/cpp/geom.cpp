@@ -956,17 +956,62 @@ RayClassifier::RayClassifier(const TopoDS_Shape& solid, double tol, double band)
 
 RayClassifier::~RayClassifier() = default;
 
+// Whether the half-line p + t d, t >= t0, misses the box (slabs).
+static bool ray_misses(const Bnd_Box& b, const gp_Pnt& p, const gp_Dir& d, double t0)
+{
+  if (b.IsVoid())
+    return true;
+  if (b.IsOpen())
+    return false;
+  double lo[3], hi[3];
+  b.Get(lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]);
+  const double o[3] = {p.X(), p.Y(), p.Z()}, v[3] = {d.X(), d.Y(), d.Z()};
+  double       tmin = t0, tmax = RealLast();
+  for (int k = 0; k < 3; ++k)
+  {
+    if (std::abs(v[k]) < 1e-300)
+    {
+      if (o[k] < lo[k] || o[k] > hi[k])
+        return true;
+      continue;
+    }
+    double a = (lo[k] - o[k]) / v[k], c = (hi[k] - o[k]) / v[k];
+    if (a > c)
+      std::swap(a, c);
+    tmin = std::max(tmin, a);
+    tmax = std::min(tmax, c);
+    if (tmin > tmax)
+      return true;
+  }
+  return false;
+}
+
 TopAbs_State RayClassifier::Perform(const gp_Pnt& p)
 {
-  const gp_Dir dirs[] = {gp_Dir(0.5773, 0.5774, 0.5775), gp_Dir(-0.31, 0.83, 0.46), gp_Dir(0.71, -0.24, -0.66), gp_Dir(-0.12, -0.55, 0.83)};
-  for (const gp_Dir& d : dirs)
+  // Slanted, and near the axes (a point under a plate leaves it downwards
+  // past nothing, sideways past every fin): the rays that pass the fewest
+  // faces' boxes first. Any clean ray gives the same parity.
+  static const gp_Dir all[] = {gp_Dir(0.5773, 0.5774, 0.5775), gp_Dir(-0.31, 0.83, 0.46), gp_Dir(0.71, -0.24, -0.66), gp_Dir(-0.12, -0.55, 0.83),
+                               gp_Dir(0.0123, 0.0071, 0.9999), gp_Dir(-0.0071, 0.0123, -0.9999), gp_Dir(0.9999, 0.0123, 0.0071),
+                               gp_Dir(-0.9999, -0.0071, 0.0123), gp_Dir(0.0071, 0.9999, -0.0123), gp_Dir(0.0123, -0.9999, -0.0071)};
+  const int        nd = (int)(sizeof(all) / sizeof(all[0]));
+  std::vector<int> passed((size_t)nd, 0), order((size_t)nd);
+  for (int k = 0; k < nd; ++k)
   {
-    const gp_Lin ray(p, d);
-    int          n     = 0;
-    bool         clean = true;
+    order[(size_t)k] = k;
+    for (const Bnd_Box& b : myBoxes)
+      passed[(size_t)k] += ray_misses(b, p, all[k], -myBand) ? 0 : 1;
+  }
+  std::stable_sort(order.begin(), order.end(), [&](int a, int b) { return passed[(size_t)a] < passed[(size_t)b]; });
+  for (int k : order)
+  {
+    const gp_Dir& d = all[k];
+    const gp_Lin  ray(p, d);
+    int           n     = 0;
+    bool          clean = true;
     for (int i = 1; i <= myFaces.Extent() && clean; ++i)
     {
-      if (myBoxes[(size_t)i - 1].IsOut(ray))
+      if (ray_misses(myBoxes[(size_t)i - 1], p, d, -myBand))
         continue;
       std::unique_ptr<IntCurvesFace_Intersector>& fi = myRays[(size_t)i - 1];
       if (!fi)

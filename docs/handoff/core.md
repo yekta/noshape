@@ -117,6 +117,7 @@ perf.yml model job (release) on main 10-27 ~18:05 (run 40556712238; before ab192
 | edit commit on it (`regen_profile::edit_commit_profile`, total) | **72 ms** | 90 ms | ≤ 100 |
 | big-plate regen | 276 ms | 314 ms | ≤ 250 (live 617) |
 | Shell on qa's filleted plate with a hole | (not on perf.yml yet; dev here 177–229 ms a feature) | | ≤ 200 |
+| fin under the 400-fin plate (Extrude 3; `pattern_second::timed_the_fin_under_the_fin_plate_regenerates_locally`) | | (here, release, best of 3: 324 ms 10-28 05:37) | < 150 (was 2.7 s) |
 This machine (load 20–40) runs ~3× slower than the macOS runner; compare there. Landed for these today: patch 0003,
 `cut_through_holes`, `fuse_on_face`, on-demand hole tables (the first hole parsed 2.1 MB of FS: 154 → 17 ms),
 `fillet_square_corner`, the blend check on changed faces, shells by regions. Measuring: NOSHAPE_KERNEL_PROFILE=1
@@ -206,6 +207,14 @@ Phase 2 (local Booleans), first step landed:
   of the local Boolean and the unify take the face boxes of the faces they kept from their input, and
   `bounding_box` is made once per OcShape. Extrude 3 (CPU): bounding boxes 27 → 14 ms, ancestor maps 28 → 21 ms;
   corpus a2121c5b 110 → 93 ms; 0 mismatches.
+- Step 7 (10-28): RayClassifier tries the ray that passes the fewest faces' boxes first (slanted and near-axis
+  directions; boxes tested against the half-line): the fin's pieces against the plate 16 → 3 ms. The local
+  Boolean hands the result's face / edge / vertex maps to make_result (they were made twice). Timers inside
+  merge_planar (merge.maps / groups / rebuild / edges); NOSHAPE_BOOL_DEBUG prints the unify scope's size (Extrude 3:
+  11 faces, 16 seeds). Extrude 3 (dev, CPU): op_boolean ~58, op_unify ~65-76 (merge.groups 15-19: the front face's
+  800-edge group rebuilt; merge.edges 12-15; make_result's history ~20), classify_point 33 (the target's face
+  boxes, made the first time), ancestor maps 16, bounding boxes 12-15. Corpus a2121c5b 74 ms; 0 mismatches.
+  T2 timed (perf.yml model job's pattern_second step): `timed_the_fin_under_the_fin_plate_regenerates_locally`.
 - The regen's unify (boolean.cpp `merge_planar`): the merged face goes on the surface of the group's face with the
   most edges and only edges without a pcurve there get one; a one-shell solid is rebuilt shell-only instead of
   BRepTools_ReShape copying the part: fins-400's 4 unifies 849 → 382 ms. A unify of only the new faces' region

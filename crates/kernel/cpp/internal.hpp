@@ -139,7 +139,8 @@ class HistoryBuilder
 public:
   // `sources[i]`, when given and holding args[i], lends its maps (the
   // caller's OcShapes: their maps are made already).
-  HistoryBuilder(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& output, const std::vector<const OcShape*>* sources = nullptr);
+  // `out_maps`: the output's face, edge and vertex maps, made already (taken).
+  HistoryBuilder(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& output, const std::vector<const OcShape*>* sources = nullptr, std::array<ShapeIMap, 3>* out_maps = nullptr);
 
   // Add Modified/Generated/Deleted records from a (composed) history plus
   // Kept records for input sub-shapes present unchanged in the output.
@@ -340,6 +341,7 @@ bool is_seam(const TopoDS_Edge& e, const NCollection_List<TopoDS_Shape>* faces);
 
 // Convenience: build OpOut from args + output + optional history.
 OpOut make_result(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& out,
-                  const BRepTools_History* h, const std::vector<const OcShape*>* sources = nullptr);
+                  const BRepTools_History* h, const std::vector<const OcShape*>* sources = nullptr,
+                  std::array<ShapeIMap, 3>* out_maps = nullptr);
 
 } // namespace noshape

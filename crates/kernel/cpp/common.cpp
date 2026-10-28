@@ -275,10 +275,16 @@ TopoDS_Shape simplify_compound(const TopoDS_Shape& s)
 static const TopAbs_ShapeEnum kHistKinds[] = {TopAbs_SOLID, TopAbs_FACE, TopAbs_EDGE,
                                               TopAbs_VERTEX};
 
-HistoryBuilder::HistoryBuilder(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& output, const std::vector<const OcShape*>* sources)
+HistoryBuilder::HistoryBuilder(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& output, const std::vector<const OcShape*>* sources, std::array<ShapeIMap, 3>* out_maps)
     : myArgs(args),
       myOut(std::make_unique<OcShape>(output))
 {
+  if (out_maps != nullptr)
+  {
+    myOut->adopt_map(TopAbs_FACE, std::move((*out_maps)[0]));
+    myOut->adopt_map(TopAbs_EDGE, std::move((*out_maps)[1]));
+    myOut->adopt_map(TopAbs_VERTEX, std::move((*out_maps)[2]));
+  }
   for (size_t i = 0; i < myArgs.size(); ++i)
   {
     const OcShape* src = sources != nullptr && i < sources->size() ? (*sources)[i] : nullptr;
@@ -445,9 +451,10 @@ OpOut HistoryBuilder::finish()
 }
 
 OpOut make_result(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& out,
-                  const BRepTools_History* h, const std::vector<const OcShape*>* sources)
+                  const BRepTools_History* h, const std::vector<const OcShape*>* sources,
+                  std::array<ShapeIMap, 3>* out_maps)
 {
-  HistoryBuilder hb(args, out, sources);
+  HistoryBuilder hb(args, out, sources, out_maps);
   hb.add_history(h);
   return hb.finish();
 }
