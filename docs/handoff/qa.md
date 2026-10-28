@@ -9,6 +9,14 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **23:13 update (green 5eb5259b = + core 34cbea98 OCCT 0005 v2, skasm SKETCH-F-FIT, bool da75e17b):** **DRAFT-BUDGET-POOL verified**
+  (draft-pool-hang doc opens in 21–26 s, cli-draft-hang2 61 s): no open P0 blocker from today's mains so far (blocker notes at the
+  top of TICKETS updated). REGEN-SPEED on f11f: commits 104–206 ms (median 129, load ~20), 3rd undo 184 ms. P1 walk on 896123ac
+  (new doc, 60×40 sketch + dims, Extrude 10, Fillet R5 → 23946.35 mm³ / 6767.81 mm² = analytic). Fuzz 93 (8961) alive, 94 (5eb5)
+  running. bool CLI 22:53 (rel/k/bool/2253, has da75e17b + unlanded 66211f3c): matrices identical; volsweep identical except
+  tickets/cli-fillet-segv.noshape: Part 1 1198.5436 → 1198.5819 mm³ and every one of its 15 parts has 1–3 more faces with the Rust
+  Boolean (off = v0.4.12 exactly); per-feature bisect running (bin/rbbisect.py, cli/rbb-cfs-{0,1}.out). Drawing: V63 / D42 / CR17 /
+  EX14 ✅, S20 / C9 🔧, TB25 noted; new P3 DWG-DATUM-PASTE-ATTACHED (live 1581).
 - **22:49 update (greens 81506e89 = + bool Shell slab vertices, f11f45f3 = + dx 6f684708 angular sectors):** 81506e89: live-30
   60779.484 / 15848.357 and a GUI top-face Shell on wf-block 5045.965 / 3956.429 (= v0.4.12 CLI); bool CLI 22:19 matrices (shell,
   hole, feature, fillet, boolean) identical to their bool1934 baselines. Verified REVOLVE-AXIS-VERTEX, READOUT-VALUE-TOOLTIP.
