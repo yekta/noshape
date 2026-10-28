@@ -1693,6 +1693,15 @@ fn annotations_moved_to_format_layers() {
     assert!(dxf.contains("TITLE_BLOCK") && dxf.contains("BORDER_ZONES"));
     let exploded = export::prepare(&g, &export::ExportOptions { explode_all: true, ..Default::default() });
     assert!(exploded.layers.iter().any(|s| s.layer == SheetLayer::TitleBlock && (!s.lines.is_empty() || !s.fills.is_empty())));
+    // Its lines (an underline) take the layer's thickness too (S19).
+    drawing.props.title_block_thickness = 0.7;
+    if let Some(AnnotationKind::Note { style, .. }) = drawing.sheets[0].annotations.iter_mut().find(|a| a.id == 902).map(|a| &mut a.kind) {
+        style.underline = true;
+    }
+    let g = built(&drawing);
+    let i = g.texts.iter().position(|t| t.text == "LAYERED NOTE").unwrap();
+    let li = g.lines.iter().position(|l| l.pick == g.texts[i].pick).expect("the underline");
+    assert_eq!(g.line_pen(li).0, 0.7);
     // Locked formats: not pickable.
     drawing.props.formats_locked = true;
     let g = built(&drawing);

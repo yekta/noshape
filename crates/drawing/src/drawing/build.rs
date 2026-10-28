@@ -751,6 +751,16 @@ fn part_mass(drawing: &Drawing, sheet: &Sheet, sources: &Sources) -> Option<f64>
     crate::regen::measure::mass_properties(&src.context, std::slice::from_ref(&id), &|_| rho).and_then(|m| m.mass)
 }
 
+/// Lines moved to a format layer take its thickness too (Drawing properties ›
+/// Formats; their dashes kept; S19).
+fn format_layer_pens(g: &mut SheetGeometry, lines: std::ops::Range<usize>, layer: SheetLayer, p: &super::DrawingProps) {
+    let Some(width_mm) = layer.thickness(p) else { return };
+    for i in lines {
+        let dashes = g.lines[i].style.dashes().to_vec();
+        g.pens.push(super::sheet::PenSpan { centered: false, lines: i..i + 1, width_mm, dashes });
+    }
+}
+
 /// Export layers (lines, texts) of an annotation's elements.
 fn annotation_cad_layers(k: &AnnotationKind) -> (CadLayer, CadLayer) {
     use AnnotationKind as A;
@@ -2092,6 +2102,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         if let Some(rgb) = s.layer.color(&drawing.props) {
             g.colors.push(super::sheet::ColorSpan { lines: s.lines.clone(), texts: s.texts.clone(), fills: s.fills.clone(), rgb });
         }
+        format_layer_pens(&mut g, s.lines.clone(), s.layer, &drawing.props);
         if drawing.props.formats_locked {
             g.lines[s.lines.clone()].iter_mut().for_each(|l| l.pick = 0);
             g.texts[s.texts.clone()].iter_mut().for_each(|t| t.pick = 0);
@@ -2170,6 +2181,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             if let Some(rgb) = t.layer.color(&drawing.props) {
                 g.colors.push(super::sheet::ColorSpan { lines: span.lines.clone(), texts: span.texts.clone(), fills: span.fills.clone(), rgb });
             }
+            format_layer_pens(&mut g, span.lines.clone(), t.layer, &drawing.props);
             if drawing.props.formats_locked {
                 g.lines[span.lines.clone()].iter_mut().for_each(|l| l.pick = 0);
                 g.texts[span.texts.clone()].iter_mut().for_each(|x| x.pick = 0);
