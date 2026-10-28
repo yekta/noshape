@@ -927,6 +927,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
+- [ ] P2 MATE-LIMITS-OPPOSITE-SIGN a Revolute's limits act on the negated value: two plates (qa5 mkmate.py doc), Fastened
+  <2> bottom-face hole centre → <1> top-face hole centre, change to Revolute, ☑ Limits min 0 deg / max 90 deg, ✓. Dragging
+  <2> both ways stops at world 0° and at world −90° about Z (CLI assembly_list); selected, the mate's arc label there reads
+  **"270°"** (tickets/mate-limit-sign-270-2292.png), and at 0° its value box opens with "360°". Double-click the value, type 45
+  (or 30), Enter → <2> stays at 0° (clamped), although 45 is inside 0–90. Untick Limits → the 30 typed earlier applies:
+  world +30°, label "30°". So the label / typed value is the world angle, but the limits are checked against its negative.
+  Expected: the limits bound the same value the mate shows and takes (0–90 → 0°…90°); live's limit sign convention itself
+  is not captured (qa 2026-10-28 07:01, build 2292bf8c)
 - [ ] P3 ASM-K-IMPLICIT-MCS `k` shows nothing for the mates' implicit connectors: two plates (qa5 mkmate.py doc), Revolute 1
   between their hole centres (implicit connectors), click empty canvas, `k` → no pixel changes, again `k` → none
   (tickets/asm-k-implicit-mcs-2292.png). Live (behaviours ~20842, assembly/ks-k-1.png): the first `k` draws the instances'
