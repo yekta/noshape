@@ -115,6 +115,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   lines Phantom; palette select lists widen to their rows; walks of views / dimensions / Drawing properties
   (drawing.md: V36 V37 V39 V51 V66 V67 V72 D28 D32 D35 D38 verified, S29–S33 notes refreshed).
 - Live asked (REQUESTS dx 10-27): none open.
+- Late 10-27 / early 10-28: Drawing properties defaults vs live's new dumps (template sizes by standard, unlocked
+  formats); cut list "Split cut list table below" / "Unsplit cut list table" and Cut list table properties › Sheet;
+  hole tables as live (QTY, SIZE / QTY merged per size, SIZE = the Hole feature's callout, Show location data,
+  Order), the Hole table dialog and Hole table properties… (drawing.md TB20, TB22, TB28, TB29). Next on tables:
+  hole table X / Y direction edges, Holes to exclude, the pointer preview; the tag axis' own menu (TB21).
 
 ## Drawing walk 10-27 afternoon (green 0537ac91, :131, /root/dx-scratch/w2/s*.png)
 - Verified ✅: V36, V37, V39, V51, V66, V67, V72 (drawing.md). Fixed from it: Rotate view ▸ on views whose alignment
