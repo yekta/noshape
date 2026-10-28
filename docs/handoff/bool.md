@@ -6,15 +6,20 @@ scratch /root/bool-scratch.
 ## What it is
 - `crates/brep` (`noshape-brep`, pure Rust, below the kernel): `Body` (vertices, edges, faces, solids in index
   arenas; one forward direction per edge) and `boolean(op, args, tol)`: fuse / cut / common of solids bounded by
-  planes, OCCT's result without unify (every face split by the other solids' faces and by their edges on it, pieces
+  planes and cylinders (every cylinder parallel to one axis, every plane square or parallel to it: holes, bosses,
+  slots, notches), OCCT's result without unify (every face split by the other solids' faces and by their edges on it, pieces
   kept by where they lie, coincident faces kept once) and OCCT's history.
 - Tolerances: two points within `tol` are one, a point within `tol` of a plane is on it; `tol` = 2 × the inputs'
   largest tolerance (at least 1e-7; inputs over 1e-5 decline). A distance in (tol, 50 tol] is ambiguous: decline.
-- Kernel: `op_boolean` tries it after fuse_slabs / on_face (their results are what the corpus records), before the
-  local Boolean, when `NOSHAPE_BOOL_RUST=1` (default **off** for now). `cpp/rust_boolean.cpp` converts the
+- How: where two faces' surfaces meet (a line, a circle) is clipped to both faces in their parameter planes
+  (`curve2.rs`: segments and arcs; a cylinder's plane is (r θ, h), a seam's vertices sit at both ends); each face is
+  split into regions there (`arrange.rs`), each region is in / out / on the other solids (ray parity, coincident
+  planes), the op keeps some. Seams stay edges: a piece crossing one is two faces, as in OCCT.
+- Kernel: `op_boolean` tries it after fuse_slabs / on_face / the local Boolean / through_holes (their results are
+  what the corpus records; targets of ≥ 200 faces decline, the local Boolean's, until this one is local too), when `NOSHAPE_BOOL_RUST=1` (default **off** for now). `cpp/rust_boolean.cpp` converts the
   arguments (their OcShape maps' indices are the body's), builds the result (unchanged inputs reused, pieces on the
   input's curve / surface, new lines for sections) and a `BRepTools_History`; `src/brep_bridge.rs` is the Rust
-  side. Declines: anything not a solid of planes and straight edges, voids, seams, shared sub-shapes between
+  side. Declines: anything not a solid of planes, cylinders, lines and circles, voids, seams, shared sub-shapes between
   arguments, fuzzy, mesh bodies, a pattern's checked glue with several tools, common with several tools, and
   whatever the algorithm finds ambiguous. `last_rust_decline()` says why.
 - OCCT's history, as learnt from the corpus: an input vertex on another argument's edge or face (or another's
@@ -23,33 +28,34 @@ scratch /root/bool-scratch.
   solid and a common's solids are Modified to their images, a fuse's solids are Deleted, a solid left alone is Kept.
 
 ## Tests
-- T1 kernel `brep_replay::brep_small_cases_match_occt` (25 planar corpus cases in tests/data/brep: every one taken,
-  each as OCCT), `brep_replay::brep_results_are_the_same_on_any_thread` (alone vs 16 threads at once).
+- T1 kernel `brep_replay::brep_small_cases_match_occt` (37 corpus cases in tests/data/brep, 12 with cylinders: every
+  one taken, each as OCCT; NOSHAPE_BREP_FACES=1 lists both results' faces, NOSHAPE_BREP_DUMP=<dir> writes both), `brep_replay::brep_results_are_the_same_on_any_thread` (alone vs 16 threads at once).
 - T1 brep unit tests (boxes, boss, pocket, through hole, step, side by side, two holes, near coincidence).
 - T2 `NOSHAPE_BOOL_CORPUS=/root/core-scratch/bool-corpus cargo test -p noshape-kernel --test all
   brep_replay::brep_corpus_replay -- --ignored --nocapture` (NOSHAPE_BREP_DIFF=1: the differing history records;
   NOSHAPE_BREP_ONLY=<case>). Declined cases fail at once (`set_rust_boolean_only`), so it takes ~30 s.
 
 ## Numbers (10-28, dev build, loaded machine)
-Corpus (973 cases): 147 taken, **0 differ from OCCT**.
+Planes only (landed fcf860a3): 147 of 973 taken, 0 differ; median 0.61 ms vs 8.7 ms.
+With cylinders: **250 of 973 taken, 0 differ from OCCT**.
 
 | bucket | cases taken | median rust | median OCCT | total rust / OCCT |
 |---|---|---|---|---|
-| < 50 input faces | 142 | 0.61 ms | 8.70 ms | 93 / 1541 ms (16.6×) |
-| 50–1000 | 2 | 13.8 ms | 34.0 ms | 2.5× |
-| > 1000 | 1 | 80 ms | 52 ms | 0.6× (O(faces²) pairs: next) |
+| < 50 input faces | 249 | 0.76 ms | 21.0 ms | 245 / 6604 ms (26.9×) |
+| 50–1000 | 1 | 20.6 ms | 124 ms | 6.1× |
 
-Declined: 439 a curved edge (cylinders next), 261 no solid (faces / shells as arguments: face–face fuse and
-common, solid–face common), 64 fuzzy / mesh / pattern glue, 30 taken by an earlier path, 12 shared sub-shapes,
-7 coincident tools, ~13 ambiguous geometry.
+Declined: 261 no solid (faces / shells as arguments: face–face fuse and common, solid–face common), 98 a curved
+edge (ellipses, B-splines), 76 a degenerate edge (cones, spheres), 60 fuzzy / mesh / pattern glue, 50 an arc across
+a cylinder's seam, 40 taken by an earlier path, 37 a plane tangent to a cylinder, 23 cylinders at an angle, 15 other
+surfaces, 13 shared sub-shapes, ~30 ambiguous geometry and rarer cases.
 
 ## Next
-1. Cylinders (holes, bosses): faces split in (angle, height); plane ⟂ / ∥ axis, coaxial and parallel cylinders.
-2. Faces and shells as arguments (261 cases).
-3. Big parts: box tree for the face pairs and the vertex-on-edge search.
-4. Route shell.cpp / features.cpp's direct BRepAlgoAPI calls and the slab paths through one shared entry point
+1. Locality (lead 15:05): convert and arrange only the target faces the tool's box reaches plus a ring, keep the
+   rest as is (Kept), the converted body cached on the OcShape; then drop the ≥ 200-face decline.
+2. Faces and shells as arguments (261 cases); arcs across a seam (50); tangent planes (37).
+3. Route shell.cpp / features.cpp's direct BRepAlgoAPI calls and the slab paths through one shared entry point
    (lead 10-28), and record them in the corpus.
-5. Default on once the corpus stays clean and the kernel / model / ops tests are green with it on.
+4. Default on once the corpus stays clean and the kernel / model / ops tests are green with it on.
 
 ## Requests
 (none yet)

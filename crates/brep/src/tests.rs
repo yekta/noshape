@@ -52,7 +52,7 @@ fn cuboid(lo: (f64, f64, f64), hi: (f64, f64, f64)) -> Body {
 fn volume(b: &Body) -> f64 {
     let mut v = 0.0;
     for f in &b.faces {
-        let Surface::Plane { origin, .. } = f.surface;
+        let Surface::Plane { origin, .. } = f.surface else { panic!("planes only") };
         for l in &f.loops {
             for u in l {
                 let e = b.edges[u.edge as usize];
@@ -185,4 +185,64 @@ fn the_result_is_the_same_every_time() {
     check_closed(&r1.body);
     assert_eq!(r1.body, r2.body);
     assert_eq!(r1.history, r2.history);
+}
+
+/// A cylinder along z: centre (cx, cy), radius r, from z0 to z1, its seam at +x.
+fn cylinder(cx: f64, cy: f64, r: f64, z0: f64, z1: f64) -> Body {
+    let c0 = DVec3::new(cx, cy, z0);
+    let c1 = DVec3::new(cx, cy, z1);
+    let circ = |c: DVec3| Curve::Circle { center: c, normal: DVec3::Z, xdir: DVec3::X, radius: r };
+    let edges = vec![Edge { v: [0, 0], curve: circ(c0) }, Edge { v: [1, 1], curve: circ(c1) }, Edge { v: [0, 1], curve: Curve::Line }];
+    let u = |e: u32, reversed: bool| Use { edge: e, reversed };
+    let faces = vec![
+        Face { surface: Surface::Plane { origin: c0, normal: DVec3::Z }, reversed: true, loops: vec![vec![u(0, true)]] },
+        Face { surface: Surface::Plane { origin: c1, normal: DVec3::Z }, reversed: false, loops: vec![vec![u(1, false)]] },
+        Face {
+            surface: Surface::Cylinder { origin: c0, axis: DVec3::Z, xdir: DVec3::X, radius: r },
+            reversed: false,
+            loops: vec![vec![u(0, false), u(2, false), u(1, true), u(2, true)]],
+        },
+    ];
+    Body { vertices: vec![c0 + DVec3::X * r, c1 + DVec3::X * r], edges, faces, solids: vec![Solid { shells: vec![vec![0, 1, 2]] }] }
+}
+
+/// Every edge used once each way (a seam both ways by one face).
+fn check_used_both_ways(b: &Body) {
+    let mut uses = vec![[0, 0]; b.edges.len()];
+    for f in &b.faces {
+        for l in &f.loops {
+            for u in l {
+                uses[u.edge as usize][u.reversed as usize] += 1;
+            }
+        }
+    }
+    assert!(uses.iter().all(|u| *u == [1, 1]), "edges not used once each way: {uses:?}");
+}
+
+#[test]
+fn a_hole_through_a_plate_and_a_blind_one() {
+    let plate = cuboid((0.0, 0.0, 0.0), (4.0, 4.0, 1.0));
+    let tool = cylinder(2.0, 2.0, 0.5, -1.0, 2.0);
+    let cut = boolean(Op::Cut, &[&plate, &tool], TOL).unwrap();
+    check_used_both_ways(&cut.body);
+    // The plate's six faces (top and bottom with a hole) and the hole's wall; its circles and seam.
+    assert_eq!(counts(&cut), (1, 7, 15, 10));
+    let blind = cylinder(2.0, 2.0, 0.5, 0.5, 1.0);
+    let cut = boolean(Op::Cut, &[&plate, &blind], TOL).unwrap();
+    check_used_both_ways(&cut.body);
+    assert_eq!(counts(&cut), (1, 8, 15, 10));
+}
+
+#[test]
+fn a_round_boss_on_a_plate() {
+    let plate = cuboid((0.0, 0.0, 0.0), (4.0, 4.0, 1.0));
+    let boss = cylinder(2.0, 2.0, 0.5, 1.0, 2.0);
+    let fuse = boolean(Op::Fuse, &[&plate, &boss], TOL).unwrap();
+    check_used_both_ways(&fuse.body);
+    assert_eq!(counts(&fuse), (1, 8, 15, 10));
+    // Through the plate's side: the cylinder's wall meets the plate's side in lines.
+    let side = cylinder(4.0, 2.0, 0.5, -1.0, 2.0);
+    let cut = boolean(Op::Cut, &[&plate, &side], TOL).unwrap();
+    check_used_both_ways(&cut.body);
+    assert_eq!(cut.body.faces.len(), 8);
 }

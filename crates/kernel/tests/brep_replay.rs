@@ -111,6 +111,22 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         }
         if !d.is_empty() {
             let mut line = format!("{name} ({:?}, {} tools, recorded path {}): {}", c.op, c.tools.len(), c.path, d.join(", "));
+            if let Some(dump) = std::env::var_os("NOSHAPE_BREP_DUMP") {
+                let _ = std::fs::write(Path::new(&dump).join(format!("{name}-rust.brep")), r.shape.to_brep_bytes().unwrap_or_default());
+                if let Ok(o) = &o {
+                    let _ = std::fs::write(Path::new(&dump).join(format!("{name}-occt.brep")), o.shape.to_brep_bytes().unwrap_or_default());
+                }
+            }
+            if std::env::var_os("NOSHAPE_BREP_FACES").is_some()
+                && let Ok(o) = &o
+            {
+                for (who, x) in [("rust", &r), ("occt", o)] {
+                    for f in x.shape.sub_shapes(ShapeType::Face) {
+                        let c = f.centroid().unwrap_or_default();
+                        line += &format!("\n    {who} face area {:.6e} at ({:.5} {:.5} {:.5}) valid {}", f.area().unwrap_or(0.0), c.x, c.y, c.z, f.is_valid());
+                    }
+                }
+            }
             if diff && let Ok(o) = &o {
                 let (mine, theirs) = (records(&r), records(o));
                 for x in mine.iter().filter(|x| !theirs.contains(x)) {

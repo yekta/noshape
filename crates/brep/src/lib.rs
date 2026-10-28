@@ -14,6 +14,7 @@
 
 mod arrange;
 mod boolean;
+mod curve2;
 
 pub use boolean::{boolean, Op};
 use glam::DVec3;
@@ -21,10 +22,12 @@ use glam::DVec3;
 /// Distances in (tol, GREY × tol] are ambiguous: the Boolean declines.
 pub const GREY: f64 = 50.0;
 
-/// An edge's curve. Straight edges run between their vertices.
+/// An edge's curve. Straight edges run between their vertices; an arc runs counter-clockwise about its
+/// circle's `normal` from the edge's start to its end (a whole circle when they are one vertex).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Curve {
     Line,
+    Circle { center: DVec3, normal: DVec3, xdir: DVec3, radius: f64 },
 }
 
 /// A face's surface.
@@ -32,6 +35,9 @@ pub enum Curve {
 pub enum Surface {
     /// The points `x` with `normal · x == normal · origin` (`normal` unit).
     Plane { origin: DVec3, normal: DVec3 },
+    /// The points at `radius` from the line through `origin` along `axis`; its normal points away from the
+    /// axis, its angles run from `xdir` counter-clockwise about `axis` (OCCT's seam is at angle 0).
+    Cylinder { origin: DVec3, axis: DVec3, xdir: DVec3, radius: f64 },
 }
 
 /// An edge between two vertices (`v[0]` its start, `v[1]` its end: one forward direction).
@@ -59,10 +65,10 @@ pub struct Face {
 }
 
 impl Face {
-    /// The outward normal.
-    pub fn normal(&self) -> DVec3 {
-        let Surface::Plane { normal, .. } = self.surface;
-        if self.reversed { -normal } else { normal }
+    /// The outward normal of a planar face.
+    pub fn normal(&self) -> Option<DVec3> {
+        let Surface::Plane { normal, .. } = self.surface else { return None };
+        Some(if self.reversed { -normal } else { normal })
     }
 }
 
@@ -134,6 +140,8 @@ pub struct Output {
     pub edge_origin: Vec<Origin>,
     pub face_origin: Vec<Origin>,
     pub solid_origin: Vec<Origin>,
+    /// Per face on a cylinder, where its angles start (it lies within this and 2π more); 0 on a plane.
+    pub face_u0: Vec<f64>,
     pub history: Vec<Record>,
 }
 

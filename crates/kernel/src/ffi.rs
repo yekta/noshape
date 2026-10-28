@@ -302,8 +302,10 @@ pub(crate) mod ffi {
         vertices: Vec<f64>,
         /// Start and end vertex per edge.
         edges: Vec<u32>,
-        /// The plane of each face: origin x, y, z, normal x, y, z.
-        planes: Vec<f64>,
+        /// Per edge: kind (0 line, 1 circle), centre, normal, x direction, radius (11 numbers).
+        curves: Vec<f64>,
+        /// Per face: kind (0 plane, 1 cylinder), origin, normal or axis, x direction, radius (11 numbers).
+        surfaces: Vec<f64>,
         /// Per face: the outward normal is minus the plane's.
         reversed: Vec<bool>,
         /// Per face, its first loop (faces + 1 entries); per loop, its first use (loops + 1).
@@ -327,6 +329,8 @@ pub(crate) mod ffi {
         edge_origin: Vec<u32>,
         face_origin: Vec<u32>,
         solid_origin: Vec<u32>,
+        /// Per face on a cylinder, where its angles start (it lies within this and 2π more).
+        face_u0: Vec<f64>,
         history: Vec<u32>,
     }
 

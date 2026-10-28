@@ -50,28 +50,61 @@ pub(crate) fn brep_decline(reason: &str) {
     LAST_DECLINE.with(|c| *c.borrow_mut() = reason.to_string());
 }
 
+fn v3(s: &[f64], i: usize) -> glam::DVec3 {
+    glam::DVec3::new(s[i], s[i + 1], s[i + 2])
+}
+
 fn body_of(b: &BrepBody) -> Body {
-    let v3 = |s: &[f64], i: usize| glam::DVec3::new(s[3 * i], s[3 * i + 1], s[3 * i + 2]);
-    let mut out = Body { vertices: (0..b.vertices.len() / 3).map(|i| v3(&b.vertices, i)).collect(), ..Default::default() };
-    out.edges = b.edges.chunks(2).map(|e| Edge { v: [e[0], e[1]], curve: Curve::Line }).collect();
+    let mut out = Body { vertices: (0..b.vertices.len() / 3).map(|i| v3(&b.vertices, 3 * i)).collect(), ..Default::default() };
+    out.edges = b
+        .edges
+        .chunks(2)
+        .zip(b.curves.chunks(11))
+        .map(|(e, c)| {
+            let curve = if c[0] == 0.0 { Curve::Line } else { Curve::Circle { center: v3(c, 1), normal: v3(c, 4), xdir: v3(c, 7), radius: c[10] } };
+            Edge { v: [e[0], e[1]], curve }
+        })
+        .collect();
     for f in 0..b.reversed.len() {
         let loops = (b.face_loops[f]..b.face_loops[f + 1])
             .map(|l| b.uses[b.loop_uses[l as usize] as usize..b.loop_uses[l as usize + 1] as usize].iter().map(|&u| Use { edge: u / 2, reversed: u % 2 == 1 }).collect())
             .collect();
-        out.faces.push(Face { surface: Surface::Plane { origin: v3(&b.planes, 2 * f), normal: v3(&b.planes, 2 * f + 1) }, reversed: b.reversed[f], loops });
+        let s = &b.surfaces[11 * f..11 * f + 11];
+        let surface = if s[0] == 0.0 { Surface::Plane { origin: v3(s, 1), normal: v3(s, 4) } } else { Surface::Cylinder { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10] } };
+        out.faces.push(Face { surface, reversed: b.reversed[f], loops });
     }
     out.solids = (0..b.solid_faces.len().saturating_sub(1)).map(|s| Solid { shells: vec![b.faces_of_solids[b.solid_faces[s] as usize..b.solid_faces[s + 1] as usize].to_vec()] }).collect();
     out
 }
 
 fn flat(b: &Body, out: &mut BrepBody) {
-    out.vertices = b.vertices.iter().flat_map(|p| [p.x, p.y, p.z]).collect();
+    let xyz = |p: glam::DVec3| [p.x, p.y, p.z];
+    out.vertices = b.vertices.iter().flat_map(|&p| xyz(p)).collect();
     out.edges = b.edges.iter().flat_map(|e| e.v).collect();
+    for e in &b.edges {
+        match e.curve {
+            Curve::Line => out.curves.extend([0.0; 11]),
+            Curve::Circle { center, normal, xdir, radius } => {
+                out.curves.push(1.0);
+                out.curves.extend(xyz(center).into_iter().chain(xyz(normal)).chain(xyz(xdir)));
+                out.curves.push(radius);
+            }
+        }
+    }
     out.face_loops = vec![0];
     out.loop_uses = vec![0];
     for f in &b.faces {
-        let Surface::Plane { origin, normal } = f.surface;
-        out.planes.extend([origin.x, origin.y, origin.z, normal.x, normal.y, normal.z]);
+        match f.surface {
+            Surface::Plane { origin, normal } => {
+                out.surfaces.push(0.0);
+                out.surfaces.extend(xyz(origin).into_iter().chain(xyz(normal)).chain([0.0; 4]));
+            }
+            Surface::Cylinder { origin, axis, xdir, radius } => {
+                out.surfaces.push(1.0);
+                out.surfaces.extend(xyz(origin).into_iter().chain(xyz(axis)).chain(xyz(xdir)));
+                out.surfaces.push(radius);
+            }
+        }
         out.reversed.push(f.reversed);
         for l in &f.loops {
             out.uses.extend(l.iter().map(|u| u.edge * 2 + u.reversed as u32));
@@ -117,6 +150,7 @@ pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, out: &mut BrepRe
     out.edge_origin = origins(&r.edge_origin);
     out.face_origin = origins(&r.face_origin);
     out.solid_origin = origins(&r.solid_origin);
+    out.face_u0 = r.face_u0;
     let kind = |k: Kind| match k {
         Kind::Solid => 0,
         Kind::Face => 1,

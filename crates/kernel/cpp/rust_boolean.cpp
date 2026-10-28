@@ -1,12 +1,16 @@
 // noshape's own Boolean (crates/brep, docs/BOOLEAN-SPEEDUP.md phase 3): the arguments as flat bodies, the
 // result and its history back as shapes. op_boolean runs it first with NOSHAPE_BOOL_RUST=1; it declines
-// anything but solids bounded by planes and straight edges, and OCCT runs as before.
+// anything but solids bounded by planes and cylinders, and OCCT runs as before.
 #include "internal.hpp"
 
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepTools_History.hxx>
 #include <ElCLib.hxx>
+#include <ElSLib.hxx>
+#include <Geom2d_Line.hxx>
+#include <Geom_Circle.hxx>
+#include <Geom_CylindricalSurface.hxx>
 #include <Geom_Line.hxx>
 #include <Geom_Plane.hxx>
 #include <Geom_TrimmedCurve.hxx>
@@ -38,17 +42,23 @@ bool decline(const char* why)
 // Inputs with a larger tolerance are tolerant shapes: OCCT's.
 constexpr double kMaxTol = 1e-5;
 
-occ::handle<Geom_Line> line_of(const occ::handle<Geom_Curve>& c)
+occ::handle<Geom_Curve> basis_of(const occ::handle<Geom_Curve>& c)
 {
   occ::handle<Geom_Curve> b = c;
   while (true)
   {
     occ::handle<Geom_TrimmedCurve> t = occ::down_cast<Geom_TrimmedCurve>(b);
     if (t.IsNull())
-      break;
+      return b;
     b = t->BasisCurve();
   }
-  return occ::down_cast<Geom_Line>(b);
+}
+
+void push3(rust::Vec<double>& v, const gp_XYZ& p)
+{
+  v.push_back(p.X());
+  v.push_back(p.Y());
+  v.push_back(p.Z());
 }
 
 // `s` as a flat body (its maps' indices are the body's), or why not.
@@ -79,12 +89,30 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     TopLoc_Location               loc;
     double                        f = 0, l = 0;
     const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, loc, f, l);
-    if (c.IsNull() || line_of(c).IsNull())
+    if (c.IsNull())
+      return "an edge without a curve";
+    const occ::handle<Geom_Curve>  bc   = basis_of(c);
+    const occ::handle<Geom_Circle> circ = occ::down_cast<Geom_Circle>(bc);
+    if (occ::down_cast<Geom_Line>(bc).IsNull() && circ.IsNull())
       return "a curved edge";
     TopoDS_Vertex v1, v2;
     TopExp::Vertices(e, v1, v2);
-    if (v1.IsNull() || v2.IsNull() || v1.IsSame(v2))
+    if (v1.IsNull() || v2.IsNull())
+      return "an edge without vertices";
+    if (v1.IsSame(v2) && (circ.IsNull() || std::abs(l - f - 2 * M_PI) > 1e-9))
       return "a closed edge";
+    if (circ.IsNull())
+      for (int k = 0; k < 11; ++k)
+        b.curves.push_back(0);
+    else
+    {
+      const gp_Circ g = circ->Circ().Transformed(loc.Transformation());
+      b.curves.push_back(1);
+      push3(b.curves, g.Location().XYZ());
+      push3(b.curves, g.Axis().Direction().XYZ());
+      push3(b.curves, g.XAxis().Direction().XYZ());
+      b.curves.push_back(g.Radius());
+    }
     max_tol = std::max(max_tol, BRep_Tool::Tolerance(e));
     b.edges.push_back(static_cast<uint32_t>(vm.FindIndex(v1) - 1));
     b.edges.push_back(static_cast<uint32_t>(vm.FindIndex(v2) - 1));
@@ -94,20 +122,40 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
   std::vector<int> seen(em.Extent() + 1, 0);
   for (int i = 1; i <= fm.Extent(); ++i)
   {
-    const TopoDS_Face&      f = TopoDS::Face(fm(i));
-    TopLoc_Location         loc;
-    occ::handle<Geom_Plane> pl = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(f, loc));
-    if (pl.IsNull())
+    const TopoDS_Face&                    f = TopoDS::Face(fm(i));
+    TopLoc_Location                       loc;
+    const occ::handle<Geom_Surface>       surf = BRep_Tool::Surface(f, loc);
+    const occ::handle<Geom_Plane>         pl   = occ::down_cast<Geom_Plane>(surf);
+    const occ::handle<Geom_CylindricalSurface> cyl = occ::down_cast<Geom_CylindricalSurface>(surf);
+    if (pl.IsNull() && cyl.IsNull())
       return "a curved face";
     if (f.Orientation() != TopAbs_FORWARD && f.Orientation() != TopAbs_REVERSED)
       return "an internal face";
-    max_tol            = std::max(max_tol, BRep_Tool::Tolerance(f));
-    const gp_Pln   p   = pl->Pln().Transformed(loc.Transformation());
-    const gp_Pnt   o   = p.Location();
-    const gp_Dir   n   = p.Axis().Direction();
-    for (double x : {o.X(), o.Y(), o.Z(), n.X(), n.Y(), n.Z()})
-      b.planes.push_back(x);
-    b.reversed.push_back(f.Orientation() == TopAbs_REVERSED);
+    max_tol   = std::max(max_tol, BRep_Tool::Tolerance(f));
+    bool flip = false;
+    if (!pl.IsNull())
+    {
+      const gp_Pln p = pl->Pln().Transformed(loc.Transformation());
+      b.surfaces.push_back(0);
+      push3(b.surfaces, p.Location().XYZ());
+      push3(b.surfaces, p.Axis().Direction().XYZ());
+      for (int k = 0; k < 4; ++k)
+        b.surfaces.push_back(0);
+    }
+    else
+    {
+      // A left-handed frame is the right-handed one about the other way of its axis, with the normal
+      // inward (the face the other way round).
+      const gp_Cylinder c = cyl->Cylinder().Transformed(loc.Transformation());
+      const gp_Ax3&     a = c.Position();
+      b.surfaces.push_back(1);
+      push3(b.surfaces, c.Location().XYZ());
+      push3(b.surfaces, a.XDirection().Crossed(a.YDirection()).XYZ());
+      push3(b.surfaces, a.XDirection().XYZ());
+      b.surfaces.push_back(c.Radius());
+      flip = !a.Direct();
+    }
+    b.reversed.push_back((f.Orientation() == TopAbs_REVERSED) != flip);
     for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
     {
       if (wi.Value().ShapeType() != TopAbs_WIRE)
@@ -116,8 +164,11 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       {
         const TopoDS_Shape& e = ei.Value();
         const int           k = em.FindIndex(e);
-        if (k <= 0 || (e.Orientation() != TopAbs_FORWARD && e.Orientation() != TopAbs_REVERSED) || seen[k] == i)
-          return "a seam or an internal edge";
+        if (k <= 0 || (e.Orientation() != TopAbs_FORWARD && e.Orientation() != TopAbs_REVERSED))
+          return "an internal edge";
+        // A seam (twice in a cylinder's face) once each way.
+        if (seen[k] == i && (cyl.IsNull() || BRep_Tool::IsClosed(TopoDS::Edge(e), f) == false))
+          return "an edge twice in a face";
         seen[k] = i;
         b.uses.push_back(static_cast<uint32_t>(2 * (k - 1) + (e.Orientation() == TopAbs_REVERSED ? 1 : 0)));
       }
@@ -171,6 +222,7 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
     else
       bb.MakeVertex(vs[i], point_of(b, static_cast<uint32_t>(i)), tol);
   }
+  // Edges: the input's own, a piece on its curve, or new on a line or circle.
   std::vector<TopoDS_Edge> es(ne);
   for (size_t i = 0; i < ne; ++i)
   {
@@ -180,28 +232,51 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
       es[i] = TopoDS::Edge(input(srcs, r.edge_origin[3 * i + 1], TopAbs_EDGE, r.edge_origin[3 * i + 2]).Oriented(TopAbs_FORWARD));
       continue;
     }
-    const uint32_t v0 = b.edges[2 * i], v1 = b.edges[2 * i + 1];
-    const gp_Pnt   p0 = point_of(b, v0), p1 = point_of(b, v1);
-    TopoDS_Edge    e;
-    double         t0 = 0, t1 = p0.Distance(p1);
+    const uint32_t          v0 = b.edges[2 * i], v1 = b.edges[2 * i + 1];
+    const gp_Pnt            p0 = point_of(b, v0), p1 = point_of(b, v1);
+    const double*           cv = &b.curves[11 * i];
+    occ::handle<Geom_Curve> c;
+    TopLoc_Location         loc;
+    double                  f = 0, l = 0, tol_e = tol;
     if (kind == 1)
     {
       const TopoDS_Edge src = TopoDS::Edge(input(srcs, r.edge_origin[3 * i + 1], TopAbs_EDGE, r.edge_origin[3 * i + 2]));
-      TopLoc_Location               loc;
-      double                        f = 0, l = 0;
-      const occ::handle<Geom_Curve> c   = BRep_Tool::Curve(src, loc, f, l);
-      const gp_Lin                  lin = line_of(c)->Lin().Transformed(loc.Transformation());
-      t0                                = ElCLib::Parameter(lin, p0);
-      t1                                = ElCLib::Parameter(lin, p1);
-      bb.MakeEdge(e, c, loc, BRep_Tool::Tolerance(src));
+      c                     = BRep_Tool::Curve(src, loc, f, l);
+      tol_e                 = BRep_Tool::Tolerance(src);
+    }
+    else if (cv[0] == 0)
+      c = new Geom_Line(p0, gp_Dir(gp_Vec(p0, p1)));
+    else
+    {
+      const gp_Pnt ctr(cv[1], cv[2], cv[3]);
+      const gp_Dir n(cv[4], cv[5], cv[6]);
+      // Its parameter 0 at the start.
+      gp_Vec x(ctr, p0);
+      x -= gp_Vec(n) * x.Dot(gp_Vec(n));
+      c = new Geom_Circle(gp_Ax2(ctr, n, gp_Dir(x)), cv[10]);
+      f = 0;
+    }
+    const occ::handle<Geom_Curve> bc = basis_of(c);
+    double                        t0 = 0, t1 = 0;
+    if (const occ::handle<Geom_Circle> circ = occ::down_cast<Geom_Circle>(bc); !circ.IsNull())
+    {
+      const gp_Circ g = circ->Circ().Transformed(loc.Transformation());
+      t0              = f + std::fmod(std::fmod(ElCLib::Parameter(g, p0) - f, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
+      double d        = std::fmod(std::fmod(ElCLib::Parameter(g, p1) - t0, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
+      if (v0 == v1 || d < 1e-12)
+        d = 2 * M_PI;
+      t1 = t0 + d;
     }
     else
     {
-      const occ::handle<Geom_Line> c = new Geom_Line(p0, gp_Dir(gp_Vec(p0, p1)));
-      bb.MakeEdge(e, c, tol);
+      const gp_Lin g = occ::down_cast<Geom_Line>(bc)->Lin().Transformed(loc.Transformation());
+      t0             = ElCLib::Parameter(g, p0);
+      t1             = ElCLib::Parameter(g, p1);
     }
     if (!(t0 < t1))
       fail_op("brep: an edge against its curve");
+    TopoDS_Edge e;
+    bb.MakeEdge(e, c, loc, tol_e);
     bb.Add(e, vs[v0].Oriented(TopAbs_FORWARD));
     bb.Add(e, vs[v1].Oriented(TopAbs_REVERSED));
     bb.Range(e, t0, t1);
@@ -212,17 +287,93 @@ TopoDS_Shape build(const BrepResult& r, const std::vector<const OcShape*>& srcs,
   {
     const uint32_t kind = r.face_origin[3 * i];
     const TopoDS_Face& src = TopoDS::Face(input(srcs, r.face_origin[3 * i + 1], TopAbs_FACE, r.face_origin[3 * i + 2]));
-    const bool rev = b.reversed[i];
+    TopLoc_Location                 loc;
+    const occ::handle<Geom_Surface> s   = BRep_Tool::Surface(src, loc);
+    const occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(s);
+    // The face's way round against its surface's normal (to_body: a left-handed cylinder's is inward).
+    const bool rev = b.reversed[i] != (!cs.IsNull() && !cs->Position().Direct());
     if (kind == 0)
     {
       // A cut's tool face is the result's the other way round.
       fs[i] = (src.Orientation() == TopAbs_REVERSED) == rev ? src : TopoDS::Face(src.Reversed());
       continue;
     }
-    TopLoc_Location                 loc;
-    const occ::handle<Geom_Surface> s = BRep_Tool::Surface(src, loc);
     TopoDS_Face                     f;
     bb.MakeFace(f, s, loc, BRep_Tool::Tolerance(src));
+    // Its edges' curves on a cylinder (a plane's are implicit).
+    if (!cs.IsNull())
+    {
+      const gp_Cylinder cyl = cs->Cylinder().Transformed(loc.Transformation());
+      const gp_Dir up = cyl.Position().XDirection().Crossed(cyl.Position().YDirection());
+      const double      eps = 1e-7;
+      std::vector<int>  uses(ne, 0);
+      for (uint32_t k = b.loop_uses[b.face_loops[i]]; k < b.loop_uses[b.face_loops[i + 1]]; ++k)
+        ++uses[b.uses[k] / 2];
+      // Its angles: from where the Boolean's start, by whole turns to where its kept edges' curves are.
+      double umin = r.face_u0[i];
+      for (size_t k = 0; k < ne; ++k)
+      {
+        double f0 = 0, f1 = 0;
+        occ::handle<Geom2d_Curve> pc;
+        // (Not a seam: it lies at either end.)
+        if (uses[k] == 1 && r.edge_origin[3 * k] == 0 && !BRep_Tool::IsClosed(es[k], s, loc)
+            && !(pc = BRep_Tool::CurveOnSurface(es[k], s, loc, f0, f1)).IsNull())
+        {
+          const double um = pc->Value(0.5 * (f0 + f1)).X();
+          umin += 2 * M_PI * std::floor((um - umin) / (2 * M_PI));
+          break;
+        }
+      }
+      const double umax = umin + 2 * M_PI;
+      for (size_t k = 0; k < ne; ++k)
+      {
+        if (uses[k] == 0)
+          continue;
+        const TopoDS_Edge& e = es[k];
+        double             f0 = 0, f1 = 0;
+        if (r.edge_origin[3 * k] == 0 && !BRep_Tool::CurveOnSurface(e, s, loc, f0, f1).IsNull())
+          continue;
+        TopLoc_Location               el;
+        const occ::handle<Geom_Curve> c  = BRep_Tool::Curve(e, el, f0, f1);
+        const occ::handle<Geom_Curve> bc = basis_of(c);
+        // u in the face's range.
+        auto shift = [&](double lo, double hi) {
+          const double n = std::ceil((umin - eps - lo) / (2 * M_PI));
+          if (hi + n * 2 * M_PI > umax + eps)
+            fail_op("brep: an edge outside its face's range");
+          return n * 2 * M_PI;
+        };
+        double u = 0, v = 0;
+        if (const occ::handle<Geom_Circle> circ = occ::down_cast<Geom_Circle>(bc); !circ.IsNull())
+        {
+          const gp_Circ g  = circ->Circ().Transformed(el.Transformation());
+          const double  sg = g.Axis().Direction().Dot(up) > 0 ? 1.0 : -1.0;
+          ElSLib::Parameters(cyl, ElCLib::Value(0, g), u, v);
+          const double a = u + sg * f0, z = u + sg * f1;
+          u += shift(std::min(a, z), std::max(a, z));
+          bb.UpdateEdge(e, new Geom2d_Line(gp_Pnt2d(u, v), gp_Dir2d(sg, 0)), s, loc, BRep_Tool::Tolerance(e));
+          continue;
+        }
+        const gp_Lin g  = occ::down_cast<Geom_Line>(bc)->Lin().Transformed(el.Transformation());
+        const double dv = g.Direction().Dot(cyl.Axis().Direction()) > 0 ? 1.0 : -1.0;
+        ElSLib::Parameters(cyl, g.Location(), u, v);
+        u += shift(u, u);
+        // On the seam's line the edge has both of the seam's curves (the faces either side of it each take one).
+        const bool on_seam = std::abs(u - umin) < eps || std::abs(u - umax) < eps;
+        if (on_seam)
+          u = umin;
+        if (!on_seam)
+        {
+          bb.UpdateEdge(e, new Geom2d_Line(gp_Pnt2d(u, v), gp_Dir2d(0, dv)), s, loc, BRep_Tool::Tolerance(e));
+          continue;
+        }
+        // A seam: the way up on the face's right, the way down on its left.
+        const double left = u, right = u + 2 * M_PI;
+        const occ::handle<Geom2d_Curve> up   = new Geom2d_Line(gp_Pnt2d(dv > 0 ? right : left, v), gp_Dir2d(0, dv));
+        const occ::handle<Geom2d_Curve> down = new Geom2d_Line(gp_Pnt2d(dv > 0 ? left : right, v), gp_Dir2d(0, dv));
+        bb.UpdateEdge(e, up, down, s, loc, BRep_Tool::Tolerance(e));
+      }
+    }
     for (uint32_t l = b.face_loops[i]; l < b.face_loops[i + 1]; ++l)
     {
       TopoDS_Wire w;
@@ -303,6 +454,9 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
       own.push_back(std::make_unique<OcShape>(args[i]));
       srcs[i] = own.back().get();
     }
+  // Big targets are the local Boolean's (op_boolean), until this one is local too.
+  if (srcs[0]->map(TopAbs_FACE).Extent() >= 200)
+    return decline("a big target (the local Boolean's)");
   std::vector<BrepBody> bodies(args.size());
   double                max_tol = 0;
   for (size_t i = 0; i < args.size(); ++i)
