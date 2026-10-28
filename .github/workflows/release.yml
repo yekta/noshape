@@ -93,6 +93,7 @@ jobs:
           cp target/release/noshape "$app/Contents/MacOS/noshape"
           cp target/release/noshape-cli "$app/Contents/MacOS/noshape-cli"
           cp packaging/icons/noshape.icns "$app/Contents/Resources/noshape.icns"
+          packaging/macos/metallibs.sh "$app"
           sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
           plutil -lint "$app/Contents/Info.plist"
           strip -x "$app/Contents/MacOS/noshape"

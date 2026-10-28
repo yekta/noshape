@@ -119,6 +119,8 @@ runs:
           mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
           cp target/release/noshape "$app/Contents/MacOS/noshape"
           cp packaging/icons/noshape.icns "$app/Contents/Resources/noshape.icns"
+          # (a ref from before the precompiled shaders has no script)
+          if [[ -x packaging/macos/metallibs.sh ]]; then packaging/macos/metallibs.sh "$app"; fi
           sed "s/@VERSION@/0.0.0/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
           codesign --force --deep --sign - "$app"
           echo "BIN=$app/Contents/MacOS/noshape" >> "$GITHUB_ENV"

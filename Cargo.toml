@@ -117,6 +117,13 @@ debug = "line-tables-only"
 # src/linux/wayland/tablet.rs, zwp_tablet_v2) become touches unless
 # `gpui::set_pen_as_mouse`; Wayland keeps every held mouse button.
 gpui-pre-linux = { path = "vendor/gpui-pre-linux" }
+# NOSHAPE PATCH (agent psui): Metal libraries compiled ahead of time. Before
+# compiling the MSL naga writes, the Metal backend loads the metallib built
+# for that exact source when the app ships one (src/metal/precompiled.rs;
+# packaging/macos/metallibs.sh builds them in the release job), and
+# NOSHAPE_MSL_DUMP writes the sources. Only the lines marked "NOSHAPE PATCH"
+# in src/metal/{mod,device}.rs and src/metal/precompiled.rs differ from 29.0.4.
+wgpu-hal = { path = "vendor/wgpu-hal" }
 # NOSHAPE PATCH (agent nav): gpui's macOS platform exposes whether a right
 # press was a converted Ctrl+left click (`last_right_press_was_ctrl_click`),
 # so the viewport can treat it as Chrome on macOS does. Only the lines marked
