@@ -5,6 +5,17 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 ## Session 3 (qa on a fresh account, 10-27 19:05 → 10-28; greens fa61ba6f → … → d2826142 → c5e53806)
 
+- **02:00 update (green 77870dd4; main has 1eefebb9 Tab fix, hole-table dialog, not yet green):** no new P0.
+  Filed: P2 SM-FLANGE-CORNER (core: qa5's SM1 never ticketed, 8383.122 vs live 8511.4987), P2 CTRL-C-PART (psui: Ctrl+C on a
+  selected part copies nothing; menu Copy Part works), P3 ASM-SELECTED-EDGES-DARK (skasm). Reopened SKETCH-FILLET-STUCK-RADIUS
+  (3351f945 previews the max fit; a fillet that uses a whole leg then can't be made smaller: "Sketch could not be solved.");
+  live asked about the second fillet's "=" in one Shift+F session (REQUESTS qa 10-28).
+  Verified fixed today on the way: I1 (SAT 7582.996), I2, I5 (Parasolid 38.1 header), RIP1/BEND2/JOG1, SM5/DSM2/DSM3,
+  DL7 (title block → Note editor), DOC1–4, C1–C8, DER1–14, TAB1, Variable Studio / configured insert rows.
+  Checklists: featurescript 10/10, drawing-sheet-metal 9/9, undo 7/7, configurations 27/28, document 18/18, derived 34/41,
+  assembly.md 124/261, drawing.md 55/186, workflow-assembly 32/75, keyboard-mouse 36/40, import-edit 8/21. Total 1300+/2068.
+  Next on the next green: 1eefebb9 (Rectangle 30 Tab 20 → 30 × 20: reproduced as broken on 77870dd4, fix not in it yet),
+  HOLE-TABLE-FILLETS / hole table dialog (dx), then the remaining assembly.md / drawing.md rows.
 - **01:10 update (greens a6c56638 → f9185639):** no new P0. Fuzz on c5e53806 (seeds 41/43/44 × 600 actions): no crash.
   Merge audit finished: none of 11e83152, 98ae008e, 6c040449, 4a0e07c2, 4083c486 was lost (all refactored into the crate split).
 - Verified on a6c56638: PREVIEW-NO-PICK, DIALOG-OK-STATE ((a) = live; (b) "Syntax error in expression.", ✓ disabled).
