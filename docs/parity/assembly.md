@@ -230,7 +230,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | N5 | Spherical face: center | E§8.2 | ✅ | T:`inference_points_on_cones_spheres_arcs_and_vertices` |  |
 | N6 | Circular edge: center only | H:mates | ✅ | model test | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | N7 | Linear edge: midpoint and both ends, Z along the edge | E§8.2 | ✅ | model test | 0.4.10+ / 77870dd4 10-28 |
-| N8 | Arc / curve edge: center, midpoint and ends | E§8.2 | ✅ | T:`inference_points_on_cones_spheres_arcs_and_vertices` (fixed: an arc edge's Midpoint resolved to the center, regen/implicit.rs) |  |
+| N8 | Arc / curve edge: center, midpoint and ends | E§8.2 | ✅ | T:`inference_points_on_cones_spheres_arcs_and_vertices` (fixed: an arc edge's Midpoint resolved to the center, regen/implicit.rs) | 78958d0f 10-28 (wf-block Part 1 inserted, Ctrl+M, hover the bottom edge of a vertical-edge fillet → arc outlined, hollow dots at both ends, connector preview at the arc's midpoint; the centre point is inside the part, not seen) |
 | N9 | Vertex: the point, Z normal to a face | E§8.2 | ✅ | hovering a part vertex: Z normal to the first planar face around it T:`inference_points_on_cones_spheres_arcs_and_vertices` | 4c97692e 10-28 (GUI: m, hover the plate's top-front corner → a connector at the vertex, disc + triad, Z (blue) along the front face's normal) |
 | N10 | No seam vertices of circles offered | — | ✅ | model test | 4c97692e 10-28 (GUI: m, hover the plate's Ø10 hole rim → one connector at the centre (triad + disc), no dot at the circle's seam) |
 | N11 | Shift locks the entity; the connector snaps to its nearest point | E§6.3 | ✅ | |  |
