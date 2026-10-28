@@ -1000,6 +1000,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (the failing 5 came from that Equal: a max-fit fillet with its leg at ~0 typed 5 fine in tests). Each trimmed leg now
   keeps at least 2 px (max-fit fallback and the arrow's drag). Tests a_smaller_second_fillet_in_a_session_keeps_its_own_radius,
   a_max_fit_fillet_on_free_lines_types_smaller. To revisit with live's answer to qa's Equal question.
+  skasm 10-28 (next commit), reworked to live's answer (behaviours "qa (2026-10-28) SKETCH-FILLET-STUCK-RADIUS: two
+  corners in one fillet session", request 1530): every fillet has its own radius dimension and value box (no Equal);
+  the default is the last radius shown (drag previews too); a default too large for the corner previews red at that
+  radius (the arc past the legs, the hollow arrow, an R label, no value box) and Enter does nothing; its arrow drags it
+  to a radius that fits; an over-drag turns the preview red and a release there toasts "The current fillet radius
+  produces invalid geometry." with nothing made; a fillet using a whole leg types smaller. The max-fit preview and the
+  2 px leg rule are gone. Agent API sketch_fillet: each fillet gets the radius, a too-small corner is that error.
+  Checked on :103 (R25 default, small corner red, Enter nothing, arrow dragged in → R8.386).
   qa 02:20, live answered (behaviours "qa (2026-10-28) SKETCH-FILLET-STUCK-RADIUS: two corners in one fillet session"):
   (b) a default too large for the clicked corner previews **at the sticky radius, red, with no value box; Enter is a no-op**; the
   user drags the hollow arrow down to a fitting radius. An invalid press-drag release shows the toast "The current fillet radius

@@ -362,13 +362,15 @@ fn sketch_fillet_chamfer_offset() {
     let (c1, c2, c3) = (corner(40.0, 0.0), corner(40.0, 20.0), corner(0.0, 20.0));
     let f = call(&mut ctx, "sketch_fillet", json!({ "sketch": sk, "entities": [c1, c2], "radius": "4 mm" }));
     assert_eq!(created(&f, "arc").len(), 2, "{f}");
-    // The first fillet is dimensioned, the second equal to it (one session).
+    // Each fillet has its own radius dimension, no Equal (live, behaviours
+    // "qa (2026-10-28) SKETCH-FILLET-STUCK-RADIUS: two corners in one fillet session").
     let st = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
     let cons = st["constraints"].as_array().unwrap();
     let radius: Vec<&Value> = cons.iter().filter(|c| c["type"] == "Radius").collect();
-    assert_eq!(radius.len(), 1, "{cons:?}");
+    assert_eq!(radius.len(), 2, "{cons:?}");
+    assert!(radius.iter().all(|r| r["value"] == "R4"), "{radius:?}");
     assert_eq!(radius[0]["expression"], "4 mm");
-    assert!(cons.iter().any(|c| c["type"] == "Equal"));
+    assert!(!cons.iter().any(|c| c["type"] == "Equal"));
     let ch = call(&mut ctx, "sketch_chamfer", json!({ "sketch": sk, "entities": [c3], "distance": 3 }));
     assert_eq!(created(&ch, "line").len(), 1, "{ch}");
     let st = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));

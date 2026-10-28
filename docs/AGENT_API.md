@@ -187,7 +187,7 @@ import, history.
 Each runs the sketch editor's tool on the clicks and values you give, as one "Edit : Sketch N":
 
 ```text
-sketch_fillet     {"sketch": "Sketch 1", "entities": ["entity:F…:3", "entity:F…:5"], "radius": "4 mm"}   corner points; the first gets R4, the rest are equal to it
+sketch_fillet     {"sketch": "Sketch 1", "entities": ["entity:F…:3", "entity:F…:5"], "radius": "4 mm"}   corner points; each gets its own R4
 sketch_offset     {"sketch": "Sketch 1", "entities": ["entity:F…:9"], "distance": "2 mm", "toward": [60, 30]}
 sketch_trim       {"sketch": "Sketch 1", "points": [[5, 0]]}                       the piece under the click goes
 sketch_linear_pattern {"sketch": "Sketch 1", "entities": ["entity:F…:9"], "count": 3, "distance": "10 mm", "angle": "90 deg"}   -> pattern id (edit with `pattern`)
@@ -1458,7 +1458,7 @@ Examples:
 
 Fillet sketch corners (the Sketch fillet tool) (edits the document (one undoable history entry)).
 
-Each corner point in `entities` is filleted; two curves given one after the other are filleted where they meet (the tool's two-curve mode). All fillets of one call are one tool session: the first gets a radius dimension set to `radius` (a value or expression), later ones are constrained equal to it, as in Onshape.
+Each corner point in `entities` is filleted; two curves given one after the other are filleted where they meet (the tool's two-curve mode). All fillets of one call are one tool session; each gets its own radius dimension set to `radius` (a value or expression), as in Onshape (no Equal between them). A corner too small for the radius is an error ("The current fillet radius produces invalid geometry.").
 
 Examples:
 

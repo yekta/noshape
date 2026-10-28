@@ -281,6 +281,8 @@ enum DragState {
     OffsetArrow { start: DVec2, moved: bool },
     /// Dragging the fillet radius manipulator (the session's first fillet).
     FilletRadius { arc: EntityId },
+    /// The arrow of an invalid (red) fillet preview ([`SketchEditor::invalid_corner`]).
+    FilletInvalid,
     /// Dragging the pending chamfer's distance arrow.
     ChamferDistance,
     /// Trim tool drag: every curve the path crosses is trimmed.
@@ -532,9 +534,11 @@ pub struct SketchEditor {
     fillet_session: Option<EntityId>,
     /// Fillet/chamfer preview is isolated from the document until Enter.
     pending_corner: Option<(SketchData, noshape_sketch::EditResult)>,
-    /// The pending fillet stands in for a default radius too large for its
-    /// corner: the largest that fits, previewed red.
-    corner_too_large: bool,
+    /// The corner point of the pending fillet (clicked on its vertex).
+    pending_corner_pid: Option<EntityId>,
+    /// A corner whose fillet at the current radius is invalid: previewed red
+    /// (live), its arrow drags the radius to one that fits.
+    invalid_corner: Option<EntityId>,
     /// Slot preview (live Onshape: light blue until the next click, Enter or
     /// leaving the tool commits it): the previewed data and the new curves.
     pending_slot: Option<(SketchData, Vec<EntityId>)>,
@@ -1114,7 +1118,8 @@ impl SketchEditor {
             xf_scale: 1.0,
             fillet_session: None,
             pending_corner: None,
-            corner_too_large: false,
+            pending_corner_pid: None,
+            invalid_corner: None,
             pending_slot: None,
             chamfer_distance: 0.005,
             slot_width: 0.005,
@@ -1170,7 +1175,8 @@ impl SketchEditor {
         self.external_snap = None;
         self.fillet_session = None;
         self.pending_corner = None;
-        self.corner_too_large = false;
+        self.pending_corner_pid = None;
+        self.invalid_corner = None;
         self.pending_slot = None;
         self.editing_text = None;
         self.text_expression = false;
@@ -1707,7 +1713,9 @@ impl SketchEditor {
                 out
             }
             Tool::Fillet if self.fillet_arrow(&data.sketch).is_some_and(|(a, b)| dist_to_segment(p, a, b) <= self.world_per_px * 10.0) => {
-                if let Some((arc, _)) = self.fillet_handle(&data.sketch) {
+                if self.invalid_corner.is_some() {
+                    self.drag = Some(DragState::FilletInvalid);
+                } else if let Some((arc, _)) = self.fillet_handle(&data.sketch) {
                     self.drag = Some(DragState::FilletRadius { arc });
                 }
                 EditOutcome::redraw()
@@ -1895,6 +1903,8 @@ impl SketchEditor {
         if self.pending_corner.is_some() {
             return self.commit_corner(data);
         }
+        // Another corner replaces a red preview.
+        self.invalid_corner = None;
         let chamfer = self.tool == Tool::Chamfer;
         let corner = hovered.filter(|e| is_point(&data.sketch, *e)).or_else(|| if hovered.is_none() { nearest_point(&data.sketch, p, self.world_per_px * 10.0) } else { None });
         // The corner point, or the two curves.
@@ -1912,48 +1922,29 @@ impl SketchEditor {
         } else {
             return EditOutcome::none();
         };
-        let dist = self.chamfer_distance;
-        let min_leg = self.world_per_px * 2.0;
-        let make = |r: f64| {
-            let mut preview = data.clone();
-            let sk = &mut preview.sketch;
-            let res = match (target, chamfer) {
-                ((pid, None), true) => sk.chamfer_corner(pid, dist, dist),
-                ((pid, None), false) => sk.fillet_corner(pid, r),
-                ((a, Some(b)), true) => sk.chamfer(a, b, dist, dist),
-                ((a, Some(b)), false) => sk.fillet(a, b, r),
-            };
-            res.map(|res| (preview, res))
+        let mut preview = data.clone();
+        let sk = &mut preview.sketch;
+        let (dist, r) = (self.chamfer_distance, self.fillet_radius);
+        let made = match (target, chamfer) {
+            ((pid, None), true) => sk.chamfer_corner(pid, dist, dist),
+            ((pid, None), false) => sk.fillet_corner(pid, r),
+            ((a, Some(b)), true) => sk.chamfer(a, b, dist, dist),
+            ((a, Some(b)), false) => sk.fillet(a, b, r),
         };
-        // A fillet that leaves a leg (next to) nothing can't be made smaller
-        // again (qa: R21.832 on a 21.86 mm leg, then 5 "could not be solved").
-        let legs_left = |(preview, res): &(SketchData, noshape_sketch::EditResult)| {
-            res.created.iter().copied().filter(|e| preview.sketch.kind(*e) == Some(EntityKind::Arc)).all(|arc| fillet_legs(&preview.sketch, arc).iter().all(|(_, d)| d.length() >= min_leg))
-        };
-        let mut made = make(self.fillet_radius);
-        let mut too_large = false;
-        // Live (sketch.md 11.4; SKETCH-FILLET-STUCK-RADIUS reopened): a
-        // default radius too large for the corner previews red, to be dragged
-        // or typed smaller; the tool is never locked out by it. The preview is
-        // the largest radius that fits.
-        let fits = |r: f64| make(r).ok().filter(&legs_left);
-        if !chamfer && made.as_ref().is_ok_and(|m| !legs_left(m)) {
-            made = Err(noshape_sketch::SketchError::OperationFailed("no leg left".into()));
-        }
-        if made.is_err() && !chamfer && fits(self.fillet_radius * 1e-3).is_some() {
-            let (mut lo, mut hi) = (self.fillet_radius * 1e-3, self.fillet_radius);
-            for _ in 0..30 {
-                let mid = 0.5 * (lo + hi);
-                if fits(mid).is_some() { lo = mid } else { hi = mid }
-            }
-            made = make(lo);
-            too_large = made.is_ok();
-        }
         match made {
-            Ok((preview, r)) => {
-                self.pending_corner = Some((preview, r));
-                self.corner_too_large = too_large;
+            Ok(res) => {
+                self.pending_corner = Some((preview, res));
+                self.pending_corner_pid = target.1.is_none().then_some(target.0);
                 self.message = Some("Adjust the preview, then press Enter to confirm".into());
+                EditOutcome::redraw()
+            }
+            // Live (behaviours "qa (2026-10-28) SKETCH-FILLET-STUCK-RADIUS: two
+            // corners in one fillet session"): a radius the corner can't take
+            // previews red at that radius, with no value box; Enter does
+            // nothing; its arrow drags it to one that fits.
+            Err(_) if !chamfer && target.1.is_none() && corner_arc(&data.sketch, target.0, r).is_some() => {
+                self.invalid_corner = Some(target.0);
+                self.message = None;
                 EditOutcome::redraw()
             }
             // Live's text alone (i18n; FILLET-POINT-MSG: the solver's reason
@@ -1965,13 +1956,21 @@ impl SketchEditor {
         }
     }
 
+    /// The fillet of the corner `pid` at `r` on a copy of `data`, if valid.
+    fn try_fillet_corner(data: &SketchData, pid: EntityId, r: f64) -> Option<(SketchData, noshape_sketch::EditResult)> {
+        let mut preview = data.clone();
+        let res = preview.sketch.fillet_corner(pid, r).ok()?;
+        Some((preview, res))
+    }
+
     pub fn corner_pending(&self) -> bool {
-        self.pending_corner.is_some()
+        self.pending_corner.is_some() || self.invalid_corner.is_some()
     }
 
     pub fn commit_corner(&mut self, data: &mut SketchData) -> EditOutcome {
+        // Enter on a red preview does nothing (live).
         let Some((preview, result)) = self.pending_corner.take() else { return EditOutcome::none() };
-        self.corner_too_large = false;
+        self.pending_corner_pid = None;
         *data = preview;
         self.finish_create(data, &result.created);
         if self.tool == Tool::Chamfer {
@@ -1988,39 +1987,22 @@ impl SketchEditor {
         EditOutcome::changed()
     }
 
-    /// First fillet of a session gets a radius value box; later ones are equal
-    /// to it, so editing the first dimension changes them all (Onshape).
+    /// Every fillet keeps its own radius dimension, its value box open
+    /// (live, behaviours "qa (2026-10-28) SKETCH-FILLET-STUCK-RADIUS": no
+    /// Equal between the fillets of a session).
     fn after_fillet(&mut self, data: &mut SketchData, r: &noshape_sketch::EditResult) {
         let Some(arc) = r.created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Arc)) else { return };
         let rad_dim = r.constraints_added.iter().copied().find(|c| data.sketch.constraint(*c).is_some_and(|c| matches!(c.kind, ConstraintKind::Radius { .. })));
-        // Equal to the session's first only at its radius: a smaller one (the
-        // largest a short corner takes) gets its own dimension (qa: an Equal
-        // to R124.98 made a R21.8 fillet red at once and untypeable).
-        let radius = |e: EntityId| match data.sketch.curve(e) {
-            Some(Curve2::Arc { radius, .. }) => Some(radius),
-            _ => None,
-        };
-        let same = |first: EntityId| matches!((radius(first), radius(arc)), (Some(a), Some(b)) if (a - b).abs() <= 1e-9 * a.max(1e-3));
-        match self.fillet_session {
-            Some(first) if data.sketch.entity(first).is_some() && same(first) => {
-                if let Some(d) = rad_dim {
-                    let _ = data.sketch.remove_constraint(d);
-                }
-                let _ = data.sketch.add_constraint(ConstraintKind::Equal { a: first, b: arc });
-            }
-            _ => {
-                if let (Some(d), Some(m)) = (rad_dim, curve_mid(&data.sketch, arc)) {
-                    let c = match data.sketch.curve(arc) {
-                        Some(Curve2::Arc { center, .. }) => center,
-                        _ => m,
-                    };
-                    let l = m + (m - c).try_normalize().unwrap_or(DVec2::X) * self.world_per_px * 30.0;
-                    data.dimension_labels.insert(d.0, [l.x, l.y]);
-                    self.open_value_box(data, d);
-                }
-                self.fillet_session = Some(arc);
-            }
+        if let (Some(d), Some(m)) = (rad_dim, curve_mid(&data.sketch, arc)) {
+            let c = match data.sketch.curve(arc) {
+                Some(Curve2::Arc { center, .. }) => center,
+                _ => m,
+            };
+            let l = m + (m - c).try_normalize().unwrap_or(DVec2::X) * self.world_per_px * 30.0;
+            data.dimension_labels.insert(d.0, [l.x, l.y]);
+            self.open_value_box(data, d);
         }
+        self.fillet_session = Some(arc);
     }
 
     fn after_chamfer(&mut self, data: &mut SketchData, r: &noshape_sketch::EditResult) {
@@ -2195,6 +2177,12 @@ impl SketchEditor {
     /// The radius manipulator (live sketch/1934): from the fillet arc's
     /// midpoint toward its centre; (start, apex of the head).
     pub fn fillet_arrow(&self, sk: &Sketch) -> Option<(DVec2, DVec2)> {
+        if let Some(pid) = self.invalid_corner {
+            let a = corner_arc(sk, pid, self.fillet_radius)?;
+            let m = a.mid();
+            let d = (a.center - m).try_normalize()?;
+            return Some((m, m + d * self.world_per_px * (FILLET_ARROW_STEM_PX + OFFSET_ARROW_HEAD_PX)));
+        }
         let (arc, m) = self.fillet_handle(sk)?;
         let sk = self.pending_corner.as_ref().map(|(d, _)| &d.sketch).unwrap_or(sk);
         let Some(Curve2::Arc { center, .. }) = sk.curve(arc) else { return None };
@@ -2215,11 +2203,18 @@ impl SketchEditor {
     /// The pending fillet's radius label ("R5", live sketch/1934): its
     /// right-centre anchor, up-left of the leader, and the radius.
     pub fn fillet_value_label(&self, sk: &Sketch) -> Option<(DVec2, f64)> {
-        if self.tool != Tool::Fillet || self.pending_corner.is_none() {
+        if self.tool != Tool::Fillet {
             return None;
         }
-        let pa = self.fillet_label_foot(sk)?;
         let px = self.world_per_px;
+        if let Some(pid) = self.invalid_corner {
+            let a = corner_arc(sk, pid, self.fillet_radius)?;
+            let (pa, pb) = (a.ends[0], a.ends[1]);
+            let foot = if (pa.y - pb.y).abs() > 1e-12 { if pa.y > pb.y { pa } else { pb } } else if pa.x < pb.x { pa } else { pb };
+            return Some((foot + DVec2::new(-7.5 * px, 13.0 * px), self.fillet_radius));
+        }
+        self.pending_corner.as_ref()?;
+        let pa = self.fillet_label_foot(sk)?;
         // The preview's own radius (it follows the arrow's drag).
         let (arc, _) = self.fillet_handle(sk)?;
         let r = match self.pending_corner.as_ref().and_then(|(d, _)| d.sketch.curve(arc)) {
@@ -2233,34 +2228,11 @@ impl SketchEditor {
     fn fillet_preview(&self, sk: &Sketch) -> Option<(Vec<DVec2>, bool)> {
         if let Some((data, result)) = &self.pending_corner {
             let arc = result.created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Arc))?;
-            return Some((data.sketch.tessellate(arc, self.world_per_px), !self.corner_too_large));
+            return Some((data.sketch.tessellate(arc, self.world_per_px), true));
         }
-        let pid = self.hover.filter(|e| is_point(sk, *e))?;
-        let users: Vec<EntityId> = sk.entities().filter(|e| e.endpoints().is_some_and(|(s, en)| s == pid || en == pid)).map(|e| e.id).collect();
-        if users.len() != 2 {
-            return None;
-        }
-        let v = sk.point(pid)?;
-        let far = |l: EntityId| -> Option<DVec2> {
-            let (s, e) = sk.endpoints(l)?;
-            sk.point(if s == pid { e } else { s })
-        };
-        let (Some(a), Some(b)) = (far(users[0]), far(users[1])) else { return None };
-        let (Some(_), Some(_)) = (line_of(sk, users[0]), line_of(sk, users[1])) else { return None };
-        let (ua, ub) = ((a - v).try_normalize()?, (b - v).try_normalize()?);
-        let theta = ua.angle_to(ub).abs();
-        if theta < 1e-6 || (PI - theta).abs() < 1e-6 {
-            return None;
-        }
-        let r = self.fillet_radius;
-        let t = r / (theta * 0.5).tan();
-        let c = v + (ua + ub).normalize() * (r / (theta * 0.5).sin());
-        let (pa, pb) = (v + ua * t, v + ub * t);
-        let fits = t <= (a - v).length() && t <= (b - v).length();
-        let a0 = (pa - c).to_angle();
-        let sweep = noshape_sketch::geom::ccw_sweep(a0, (pb - c).to_angle());
-        let sweep = if sweep > PI { sweep - TAU } else { sweep };
-        Some((arc_points(c, r, a0, sweep), fits))
+        let pid = self.invalid_corner.or(self.hover.filter(|e| is_point(sk, *e)))?;
+        let a = corner_arc(sk, pid, self.fillet_radius)?;
+        Some((arc_points(a.center, self.fillet_radius, a.a0, a.sweep), a.fits && self.invalid_corner.is_none()))
     }
 
     /// Open the value box of a dimension (the Onshape dimension context dialog).
@@ -3358,15 +3330,45 @@ impl SketchEditor {
                     let _ = data.sketch.set_dimension_value(dim, r);
                     data.dimension_exprs.remove(&dim.0);
                     let solved = data.sketch.solve().is_solved();
-                    let min_leg = self.world_per_px * 2.0;
-                    let kept = legs.iter().all(|(e, d0)| matches!(data.sketch.curve(*e), Some(Curve2::Line { a, b }) if (b - a).dot(*d0) > 0.0 && (b - a).length() >= min_leg));
+                    // A leg used up to its end is fine (live types a fillet
+                    // of a whole leg smaller again).
+                    let kept = legs.iter().all(|(e, d0)| matches!(data.sketch.curve(*e), Some(Curve2::Line { a, b }) if (b - a).dot(*d0) >= -1e-12 * d0.length_squared()));
                     if !solved || !kept {
                         data.sketch = before;
+                        // Live: the preview turns red at that radius (only a
+                        // corner clicked on its vertex; a committed fillet or
+                        // two picked curves keep the last good one).
+                        if let Some(pid) = self.pending_corner_pid.filter(|_| pending) {
+                            self.pending_corner = None;
+                            self.pending_corner_pid = None;
+                            self.invalid_corner = Some(pid);
+                            self.fillet_radius = r;
+                            self.drag = Some(DragState::FilletInvalid);
+                        }
                     } else if pending {
-                        self.corner_too_large = false;
+                        // The default is the last radius shown (live).
+                        self.fillet_radius = r;
                     }
                 }
                 if pending { EditOutcome::redraw() } else { EditOutcome::changed() }
+            }
+            Some(DragState::FilletInvalid) => {
+                let Some(pid) = self.invalid_corner else { return EditOutcome::none() };
+                let Some(a) = corner_arc(&data.sketch, pid, self.fillet_radius) else { return EditOutcome::none() };
+                // The arc's middle follows the pointer along the bisector:
+                // at radius r it is r (1 / sin(θ/2) − 1) from the vertex.
+                let k = 1.0 / (a.theta * 0.5).sin() - 1.0;
+                let r = ((p - a.vertex).dot(a.bisector) / k.max(1e-9)).max(self.world_per_px);
+                self.fillet_radius = r;
+                if let Some(made) = Self::try_fillet_corner(data, pid, r)
+                    && let Some(arc) = made.1.created.iter().copied().find(|e| made.0.sketch.kind(*e) == Some(EntityKind::Arc))
+                {
+                    self.pending_corner = Some(made);
+                    self.pending_corner_pid = Some(pid);
+                    self.invalid_corner = None;
+                    self.drag = Some(DragState::FilletRadius { arc });
+                }
+                EditOutcome::redraw()
             }
             Some(DragState::TrimPath { mut points }) => {
                 let last = points.last().copied().unwrap_or(p);
@@ -3600,6 +3602,12 @@ impl SketchEditor {
                 }
             }
             Some(DragState::ChamferDistance) => EditOutcome::redraw(),
+            // Released on a radius the corner can't take: nothing is made
+            // (live's toast); the red preview stays to drag back.
+            Some(DragState::FilletInvalid) => {
+                self.toast = Some("The current fillet radius produces invalid geometry.".into());
+                EditOutcome::redraw()
+            }
             Some(DragState::OffsetArrow { moved, .. }) => {
                 if !moved {
                     self.offset_flip = !self.offset_flip;
@@ -5564,6 +5572,58 @@ fn crosses_box(sk: &Sketch, id: EntityId, lo: DVec2, hi: DVec2, tol: f64) -> boo
 }
 
 /// The fixed point on the sketch origin (created on first use).
+/// A fillet arc of radius `r` at the corner point `pid` of two lines (drawn
+/// whether or not the legs are long enough).
+struct CornerArc {
+    vertex: DVec2,
+    /// From the vertex toward the arc's centre.
+    bisector: DVec2,
+    /// The angle between the legs.
+    theta: f64,
+    center: DVec2,
+    radius: f64,
+    a0: f64,
+    sweep: f64,
+    /// The tangent points on the two legs.
+    ends: [DVec2; 2],
+    /// Both tangent points on their legs.
+    fits: bool,
+}
+
+impl CornerArc {
+    fn mid(&self) -> DVec2 {
+        self.center + DVec2::from_angle(self.a0 + self.sweep * 0.5) * self.radius
+    }
+}
+
+fn corner_arc(sk: &Sketch, pid: EntityId, r: f64) -> Option<CornerArc> {
+    let users: Vec<EntityId> = sk.entities().filter(|e| e.endpoints().is_some_and(|(s, en)| s == pid || en == pid)).map(|e| e.id).collect();
+    if users.len() != 2 {
+        return None;
+    }
+    let v = sk.point(pid)?;
+    let far = |l: EntityId| -> Option<DVec2> {
+        let (s, e) = sk.endpoints(l)?;
+        sk.point(if s == pid { e } else { s })
+    };
+    let (Some(a), Some(b)) = (far(users[0]), far(users[1])) else { return None };
+    let (Some(_), Some(_)) = (line_of(sk, users[0]), line_of(sk, users[1])) else { return None };
+    let (ua, ub) = ((a - v).try_normalize()?, (b - v).try_normalize()?);
+    let theta = ua.angle_to(ub).abs();
+    if theta < 1e-6 || (PI - theta).abs() < 1e-6 {
+        return None;
+    }
+    let t = r / (theta * 0.5).tan();
+    let bisector = (ua + ub).normalize();
+    let c = v + bisector * (r / (theta * 0.5).sin());
+    let (pa, pb) = (v + ua * t, v + ub * t);
+    let fits = t <= (a - v).length() && t <= (b - v).length();
+    let a0 = (pa - c).to_angle();
+    let sweep = noshape_sketch::geom::ccw_sweep(a0, (pb - c).to_angle());
+    let sweep = if sweep > PI { sweep - TAU } else { sweep };
+    Some(CornerArc { vertex: v, bisector, theta, center: c, radius: r, a0, sweep, ends: [pa, pb], fits })
+}
+
 /// The lines a fillet arc trims (at its ends) and their vectors.
 fn fillet_legs(sk: &Sketch, arc: EntityId) -> Vec<(EntityId, DVec2)> {
     sk.endpoints(arc)
@@ -7657,6 +7717,106 @@ mod tests {
         assert!(dim_value_text(&k, 0.01, &u).contains("20"), "ellipse axes show diameters");
     }
 
+    /// Live (behaviours "qa (2026-10-28) SKETCH-FILLET-STUCK-RADIUS: two
+    /// corners in one fillet session"): every fillet keeps its own radius
+    /// dimension (no Equal), its value box open.
+    #[test]
+    fn fillet_vertex_then_own_radius() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        let r = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.04, 0.02));
+        let (p0, p1) = (d.sketch.point(r.points[0]).unwrap(), d.sketch.point(r.points[1]).unwrap());
+        click(&mut ed, &mut d, p0);
+        assert!(ed.commit_corner(&mut d).changed);
+        assert!(ed.dim_edit.is_some(), "radius box after the first fillet");
+        ed.dim_edit = None;
+        click(&mut ed, &mut d, p1);
+        assert!(ed.commit_corner(&mut d).changed);
+        assert!(ed.dim_edit.is_some(), "and after the second");
+        assert_eq!(count(&d, EntityKind::Arc), 2);
+        assert!(!d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Equal { .. })));
+        assert_eq!(d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::Radius { .. })).count(), 2);
+    }
+
+    /// The arc's middle at `r` for the corner `pid` (where the arrow drags it).
+    fn fillet_mid(d: &SketchData, pid: EntityId, r: f64) -> DVec2 {
+        corner_arc(&d.sketch, pid, r).unwrap().mid()
+    }
+
+    /// Live (same behaviours; SKETCH-FILLET-STUCK-RADIUS): a default too large
+    /// for the corner previews red at that radius, with no value box, and
+    /// Enter does nothing; dragging its arrow to a radius that fits makes the
+    /// preview, which commits with its own radius and types smaller.
+    #[test]
+    fn a_default_radius_too_large_for_the_corner_previews_red() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        let r = d.sketch.corner_rectangle(v(0.1, 0.0), v(0.115, 0.011));
+        let pid = r.points[0];
+        let corner = d.sketch.point(pid).unwrap();
+        ed.fillet_radius = 0.12;
+        click(&mut ed, &mut d, corner);
+        assert!(ed.pending_corner.is_none() && ed.invalid_corner == Some(pid), "a red preview: {:?}", ed.message);
+        assert!(ed.fillet_preview(&d.sketch).is_some_and(|(_, fits)| !fits), "drawn red");
+        assert_eq!(ed.fillet_value_label(&d.sketch).map(|(_, r)| r), Some(0.12), "its label reads the default");
+        assert!(!ed.commit_corner(&mut d).changed, "Enter does nothing");
+        assert!(ed.dim_edit.is_none() && count(&d, EntityKind::Arc) == 0);
+        // The arrow dragged in to R5: a valid preview.
+        assert!(ed.fillet_arrow(&d.sketch).is_some());
+        ed.drag = Some(DragState::FilletInvalid);
+        let m5 = fillet_mid(&d, pid, 0.005);
+        ed.tool_drag(&mut d, m5);
+        assert!(ed.invalid_corner.is_none() && ed.pending_corner.is_some());
+        assert!((ed.fillet_radius - 0.005).abs() < 1e-9, "the default follows the radius shown: {}", ed.fillet_radius);
+        ed.tool_up(&mut d, m5);
+        assert!(ed.commit_corner(&mut d).changed);
+        assert!(ed.dim_edit.is_some(), "its value box");
+        assert!(!d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Equal { .. })));
+    }
+
+    /// Live: an over-drag turns the preview red (the default follows the
+    /// radius shown); released there, a toast and nothing made; dragged back,
+    /// the preview is valid again.
+    #[test]
+    fn fillet_overdrag_turns_red_and_drags_back() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        let r = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.023, 0.015));
+        let pid = r.points[0];
+        let corner = d.sketch.point(pid).unwrap();
+        click(&mut ed, &mut d, corner);
+        let arc = ed.pending_corner.as_ref().and_then(|(pv, res)| res.created.iter().copied().find(|e| pv.sketch.kind(*e) == Some(EntityKind::Arc))).expect("a preview");
+        ed.drag = Some(DragState::FilletRadius { arc });
+        let far = fillet_mid(&d, pid, 0.05);
+        ed.tool_drag(&mut d, far);
+        assert!(ed.pending_corner.is_none() && ed.invalid_corner == Some(pid), "red past the corner");
+        assert!((ed.fillet_radius - 0.05).abs() < 1e-6, "{}", ed.fillet_radius);
+        ed.tool_up(&mut d, far);
+        assert_eq!(ed.toast.as_deref(), Some("The current fillet radius produces invalid geometry."));
+        assert!(!ed.commit_corner(&mut d).changed && count(&d, EntityKind::Arc) == 0);
+        ed.drag = Some(DragState::FilletInvalid);
+        let m4 = fillet_mid(&d, pid, 0.004);
+        ed.tool_drag(&mut d, m4);
+        assert!(ed.pending_corner.is_some(), "valid again");
+    }
+
+    /// Live (c): a fillet using a whole leg types smaller; the leg grows back.
+    #[test]
+    fn a_fillet_using_a_whole_leg_types_smaller() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        let c = d.sketch.add_point(v(0.0, 0.0));
+        let a = d.sketch.add_point(v(0.02186, 0.0));
+        let b = d.sketch.add_point(v(0.0, 0.03));
+        d.sketch.add_line_between(c, a).unwrap();
+        d.sketch.add_line_between(c, b).unwrap();
+        ed.fillet_radius = 0.021859;
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        assert!(ed.pending_corner.is_some(), "{:?}", ed.message);
+        let (arc, _) = ed.fillet_handle(&d.sketch).unwrap();
+        assert!(ed.commit_corner(&mut d).changed);
+        let dim = d.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Radius { curve, .. } if curve == arc)).map(|c| c.id).expect("its radius");
+        let r = ed.apply_dimension(&mut d, dim, "5", &UnitPrefs::default(), &std::collections::BTreeMap::<String, noshape_units::Quantity>::new());
+        assert!(r.is_ok(), "{r:?}");
+        assert!(matches!(d.sketch.curve(arc), Some(Curve2::Arc { radius, .. }) if (radius - 0.005).abs() < 1e-9), "{:?}", d.sketch.curve(arc));
+    }
+
     #[test]
     fn fillet_two_curves() {
         let (mut ed, mut d) = editor(Tool::Fillet);
@@ -8368,119 +8528,6 @@ mod tests {
         }
         assert_eq!(count(&d, EntityKind::EllipticalArc), 1);
         assert_eq!(ed.otf.as_ref().map(|o| o.fields.len()), Some(2));
-    }
-
-    /// SKETCH-FILLET-STUCK-RADIUS: dragging the preview's arrow far past
-    /// what the corner allows keeps the last radius that solved (the preview
-    /// stays) and leaves the default alone until the fillet is committed;
-    /// the next corner still fillets.
-    #[test]
-    fn fillet_overdrag_keeps_the_preview_and_the_default() {
-        let (mut ed, mut d) = editor(Tool::Fillet);
-        let r = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.023, 0.015));
-        let (p0, p1) = (d.sketch.point(r.points[0]).unwrap(), d.sketch.point(r.points[1]).unwrap());
-        let default = ed.fillet_radius;
-        click(&mut ed, &mut d, p0);
-        let arc = ed.pending_corner.as_ref().and_then(|(pv, res)| res.created.iter().copied().find(|e| pv.sketch.kind(*e) == Some(EntityKind::Arc))).expect("a preview");
-        ed.drag = Some(DragState::FilletRadius { arc });
-        for k in 1..=10 {
-            ed.tool_drag(&mut d, v(0.01 * k as f64, 0.01 * k as f64));
-        }
-        ed.tool_up(&mut d, v(0.1, 0.1));
-        assert_eq!(ed.fillet_radius, default, "the drag doesn't set the default");
-        let preview_arc = ed.pending_corner.as_ref().and_then(|(pv, _)| pv.sketch.curve(arc));
-        assert!(matches!(preview_arc, Some(Curve2::Arc { radius, .. }) if radius < 0.015), "the preview stays: {preview_arc:?}");
-        assert!(ed.commit_corner(&mut d).changed);
-        click(&mut ed, &mut d, p1);
-        assert!(ed.pending_corner.is_some(), "the next corner still fillets: {:?}", ed.message);
-    }
-
-    /// SKETCH-FILLET-STUCK-RADIUS (reopened, qa green d2826142): a large
-    /// committed radius as the default doesn't lock a smaller corner out: it
-    /// previews the largest radius that fits, red, to drag or type smaller.
-    #[test]
-    fn a_default_radius_too_large_for_the_corner_previews_red() {
-        let (mut ed, mut d) = editor(Tool::Fillet);
-        let r = d.sketch.corner_rectangle(v(0.1, 0.0), v(0.115, 0.011));
-        let corner = d.sketch.point(r.points[0]).unwrap();
-        ed.fillet_radius = 0.03727;
-        click(&mut ed, &mut d, corner);
-        assert!(ed.pending_corner.is_some(), "a preview, not a refusal: {:?}", ed.message);
-        let (arc, _) = ed.fillet_handle(&d.sketch).unwrap();
-        let radius = match ed.pending_corner.as_ref().and_then(|(pv, _)| pv.sketch.curve(arc)) {
-            Some(Curve2::Arc { radius, .. }) => radius,
-            c => panic!("{c:?}"),
-        };
-        assert!(radius > 0.005 && radius < 0.011, "the largest radius that fits: {radius}");
-        assert!(ed.fillet_preview(&d.sketch).is_some_and(|(_, fits)| !fits), "drawn red");
-        assert_eq!(ed.fillet_value_label(&d.sketch).map(|(_, r)| r), Some(radius), "the label reads the preview");
-        // Committed, it shrinks again (qa: a leg left at zero length made 5 mm "could not be solved").
-        assert!(ed.commit_corner(&mut d).changed);
-        let dim = d.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Radius { curve, .. } if curve == arc)).map(|c| c.id).expect("its radius");
-        let units = UnitPrefs::default();
-        let r = ed.apply_dimension(&mut d, dim, "5", &units, &std::collections::BTreeMap::<String, noshape_units::Quantity>::new());
-        assert!(r.is_ok(), "{r:?}");
-        assert!(matches!(d.sketch.curve(arc), Some(Curve2::Arc { radius, .. }) if (radius - 0.005).abs() < 1e-9), "{:?}", d.sketch.curve(arc));
-    }
-
-    /// qa 01:15: two free lines at a corner (a 21.86 mm leg), a default too
-    /// large: the max-fit fillet, committed, types smaller.
-    #[test]
-    fn a_max_fit_fillet_on_free_lines_types_smaller() {
-        let (mut ed, mut d) = editor(Tool::Fillet);
-        let c = d.sketch.add_point(v(0.0, 0.0));
-        let a = d.sketch.add_point(v(0.02186, 0.0));
-        let b = d.sketch.add_point(v(0.0, 0.03));
-        d.sketch.add_line_between(c, a).unwrap();
-        d.sketch.add_line_between(c, b).unwrap();
-        ed.fillet_radius = 0.12498;
-        click(&mut ed, &mut d, v(0.0, 0.0));
-        assert!(ed.pending_corner.is_some(), "{:?}", ed.message);
-        let (arc, _) = ed.fillet_handle(&d.sketch).unwrap();
-        assert!(ed.commit_corner(&mut d).changed);
-        eprintln!("committed {:?}", d.sketch.curve(arc));
-        let dim = d.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Radius { curve, .. } if curve == arc)).map(|c| c.id).expect("its radius");
-        let r = ed.apply_dimension(&mut d, dim, "5", &UnitPrefs::default(), &std::collections::BTreeMap::<String, noshape_units::Quantity>::new());
-        assert!(r.is_ok(), "{r:?}");
-        assert!(matches!(d.sketch.curve(arc), Some(Curve2::Arc { radius, .. }) if (radius - 0.005).abs() < 1e-9), "{:?}", d.sketch.curve(arc));
-    }
-
-    /// qa 01:15: in one Fillet session a large first fillet, then a short
-    /// corner: the second (the largest it takes) has its own radius, not an
-    /// Equal to the first, and types smaller.
-    #[test]
-    fn a_smaller_second_fillet_in_a_session_keeps_its_own_radius() {
-        let (mut ed, mut d) = editor(Tool::Fillet);
-        let big = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.3, 0.3));
-        let small = d.sketch.corner_rectangle(v(0.4, 0.0), v(0.415, 0.011));
-        let (p_big, p_small) = (d.sketch.point(big.points[0]).unwrap(), d.sketch.point(small.points[0]).unwrap());
-        ed.fillet_radius = 0.12;
-        click(&mut ed, &mut d, p_big);
-        assert!(ed.commit_corner(&mut d).changed);
-        click(&mut ed, &mut d, p_small);
-        assert!(ed.pending_corner.is_some(), "{:?}", ed.message);
-        let (arc, _) = ed.fillet_handle(&d.sketch).unwrap();
-        assert!(ed.commit_corner(&mut d).changed);
-        assert!(!d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Equal { b, .. } if b == arc)), "no Equal to the first");
-        assert!(d.sketch.solve().is_solved());
-        let dim = d.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Radius { curve, .. } if curve == arc)).map(|c| c.id).expect("its own radius");
-        let r = ed.apply_dimension(&mut d, dim, "5", &UnitPrefs::default(), &std::collections::BTreeMap::<String, noshape_units::Quantity>::new());
-        assert!(r.is_ok(), "{r:?}");
-        assert!(matches!(d.sketch.curve(arc), Some(Curve2::Arc { radius, .. }) if (radius - 0.005).abs() < 1e-9));
-    }
-
-    #[test]
-    fn fillet_vertex_then_equal_fillets() {
-        let (mut ed, mut d) = editor(Tool::Fillet);
-        let r = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.04, 0.02));
-        let (p0, p1) = (d.sketch.point(r.points[0]).unwrap(), d.sketch.point(r.points[1]).unwrap());
-        click(&mut ed, &mut d, p0);
-        assert!(ed.commit_corner(&mut d).changed);
-        assert!(ed.dim_edit.is_some(), "radius box after the first fillet");
-        click(&mut ed, &mut d, p1);
-        assert!(ed.commit_corner(&mut d).changed);
-        assert_eq!(count(&d, EntityKind::Arc), 2);
-        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Equal { .. })));
     }
 
     #[test]

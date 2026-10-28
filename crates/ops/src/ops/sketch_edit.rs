@@ -82,7 +82,7 @@ pub fn ops() -> Vec<Op> {
         op(
             "fillet",
             "Fillet sketch corners (the Sketch fillet tool)",
-            "Each corner point in `entities` is filleted; two curves given one after the other are filleted where they meet (the tool's two-curve mode). All fillets of one call are one tool session: the first gets a radius dimension set to `radius` (a value or expression), later ones are constrained equal to it, as in Onshape.",
+            "Each corner point in `entities` is filleted; two curves given one after the other are filleted where they meet (the tool's two-curve mode). All fillets of one call are one tool session; each gets its own radius dimension set to `radius` (a value or expression), as in Onshape (no Equal between them). A corner too small for the radius is an error (\"The current fillet radius produces invalid geometry.\").",
             vec![req("entities", ids(), "Corner points (entity ids), or pairs of curves."), opt("radius", value(), "Radius (default: the tool's, as in Onshape: 5 mm (0.5 in in inch documents) at first, then the last radius used in this Part Studio).")],
             fillet,
         ),
@@ -306,8 +306,9 @@ fn spline_point(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 /// Fillet / chamfer: corner clicks (points) or curve pairs, each previewed
-/// and confirmed, in one tool session; the first one's value box takes the
-/// size (`dim_edit`), as typing it does.
+/// and confirmed, in one tool session; the value box takes the size
+/// (`dim_edit`), as typing it does: every fillet's (each has its own radius,
+/// live), the first chamfer's.
 fn corners(ctx: &mut Ctx, a: &Args, tool: Tool, size: &str) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let units = od.doc().settings.units;
@@ -341,7 +342,7 @@ fn corners(ctx: &mut Ctx, a: &Args, tool: Tool, size: &str) -> Result<OpOutput, 
         }
     }
     let mut changed = false;
-    let mut first_dim = None;
+    let mut dims = Vec::new();
     let mut pending_curve = false;
     for (i, e) in picks.iter().enumerate() {
         let p = t.data.sketch.point(*e).or_else(|| t.data.sketch.curve(*e).map(|c| c.point({
@@ -358,9 +359,13 @@ fn corners(ctx: &mut Ctx, a: &Args, tool: Tool, size: &str) -> Result<OpOutput, 
         ed.tool_down(&mut t.data, p, Some(*e), false, false);
         if ed.corner_pending() {
             let out = ed.commit_corner(&mut t.data);
-            changed |= out.changed;
-            if first_dim.is_none() {
-                first_dim = ed.dim_edit.as_ref().map(|d| d.constraint);
+            // A radius the corner can't take: live's red preview, nothing made.
+            if !out.changed {
+                return Err(OpError::param(&format!("entities[{i}]"), "The current fillet radius produces invalid geometry."));
+            }
+            changed = true;
+            if tool == Tool::Fillet || dims.is_empty() {
+                dims.extend(ed.dim_edit.take().map(|d| d.constraint));
             }
         } else if is_point || !pending_curve {
             let why = ed.message.clone().unwrap_or_else(|| "this corner can't be filleted".into());
@@ -370,9 +375,11 @@ fn corners(ctx: &mut Ctx, a: &Args, tool: Tool, size: &str) -> Result<OpOutput, 
     if pending_curve {
         return Err(OpError::param("entities", "curves are filleted in pairs; the last curve has no partner"));
     }
-    // The value box of the first fillet / chamfer takes what was typed.
-    if let (Some(cid), Some((text, _))) = (first_dim, &size_text) {
-        ed.apply_dimension(&mut t.data, cid, text, &units, &vars).map_err(|m| OpError::param(size, &m))?;
+    // The value boxes take what was typed.
+    if let Some((text, _)) = &size_text {
+        for cid in dims {
+            ed.apply_dimension(&mut t.data, cid, text, &units, &vars).map_err(|m| OpError::param(size, &m))?;
+        }
     }
     ed.dim_edit = None;
     ed.message = None;
