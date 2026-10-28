@@ -18,7 +18,7 @@ Status: ✅ matches live, ✗ differs, ? live pending.
 | 6 | Source Extrude 1 depth 10 → 15 | derived part follows (same workspace) | follows at once (d08) | ✅ (? live confirm asked) | a6c56638 10-28 |
 | 7 | Rename the source part "Block" | ? | derived part keeps "Part 1" (d10) | ? (asked) |  |
 | 8 | Fillet 2 mm on a derived edge, then reopen Fillet 1 | chip "Edge of Derived 1" (normal entity naming) | fillet regenerates fine, but the chip reads **"Edge of deleted feature" in red** (d13) | ✅ (DER4: "Edge of Derived 1") | a6c56638 10-28 |
-| 9 | Source gets Part 2 (cylinder) | whole-studio derive picks it up | Parts (2), fillet survives (d18) | ✅ (? asked) |  |
+| 9 | Source gets Part 2 (cylinder) | whole-studio derive picks it up | Parts (2), fillet survives (d18) | ✅ (? asked) | v0.4.12 CLI 10-28 (bin/der9.py: Part Studio 2 Derived of the whole Part Studio 1 → Part 1 8000; PS1 gets a Ø12 × 15 cylinder → PS2 Parts (2) Part 1 8000, Part 2 1696.46; the fillet part not re-run) |
 | 10 | Suppress source Extrude 1 | ? | Derived 1 stays OK (only the cylinder, renamed "Part 1" as in the source); Fillet 1 red "Fillet 1 did not regenerate properly: Selected edges no longer exist" (d20, d21); undo restores | ? (asked) |  |
 | 11 | Derived 1 row right-click | ? | Rename, Edit…, Add selection to folder…, Suppress, Dynamic suppression ▸, Zoom to selection, Show dependencies…, Roll to here, Delete (d23) | ? (asked) |  |
 | 12 | Feature-list Derived row | rows carry a **▸ expander** (421) | no expander | ✅ (DER5: ▸ lists Sketch 1, Sketch 2) | a6c56638 10-28 |
