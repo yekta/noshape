@@ -9,6 +9,12 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97 → … → b504234e → 2960a143)
 
+- **06:48 update (greens e8ca768f → d2357ee5 → 2292bf8c):** verified NUMBER-FIELD-ERROR-MARK, SKETCH-FILLET-EQUAL,
+  SKETCH-FILLET-STUCK-RADIUS (b) (d2357ee5); SKETCH-ENTER-NO-PLANE (toast residual: ours hides in ~11 s), LEFT-RAIL-WHERE-USED
+  (2292bf8c); ASM-CHANGE-CONFIG-ICON, VAR-NAME-PINK (98667558); part-studio 7.7 (e8ca768f). Filed P2 XT-ASM-VERSIONS (live's
+  Parasolid assembly exports 12.0 / 28.1 / 33.0 / 33.1 / 37.1 fail to import). Import matrix + export round trip re-run on the
+  v0.4.12 CLI (rows verified; I1 now inside live's band; OBJ zip re-import asked of live). Assembly-sweep rows 20 21 22 26 27.
+  Fuzz 55 on 98667558 alive; 56 on 2292bf8c running.
 - **06:15 update (greens c56b5367 → c8239e05 → 98667558; v0.4.12 published 05:49, artifact smoke all OK):** verified
   MASS-MC-FIELD, ASM-PARASOLID-FLAT, STRIP-CLICK-THROUGH (c56b5367); FOLDER-MENU-ROLL-TO-HERE, ROLLBACK-BAR-IN-FOLDER (end tick
   still missing), DERIVED-PICK-CHIP (c8239e05); count-field Enter two-step (98667558). Filed P3 ASM-XT-ROUNDTRIP-NAMES
