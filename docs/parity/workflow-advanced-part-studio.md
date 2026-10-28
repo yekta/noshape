@@ -11,7 +11,7 @@ Status: ✅ matches live/exact, ✗ differs (finding #), ? live data pending.
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1.1 | Sketch 1: 20×20 square on Top, from the origin | – | fully defined with D | ✅ | 7929b13a 10-28 (corner rectangle from the origin, 20 Tab 20 Enter: both dimensions) |
+| 1.1 | Sketch 1: 20×20 square on Top, from the origin | – | fully defined with D | ✅ | 7929b13a 10-28 (corner rectangle from the origin, both dimensions typed; note: since c1b58ff7 Tab no longer applies (live), so the flow is 20 Enter 20 Enter) |
 | 1.2 | Plane (Top + 20) | Plane 1 | Plane 1 | ✅ | 7929b13a 10-28 |
 | 1.3 | Sketch, Sketch plane field active, click the **Plane 1 row** in the feature list | fills "Plane 1" (default planes work the same way) | **nothing**; clicking Plane 1 in the viewport doesn't fill it either; the Top row works | ✗ ADV1 | 7929b13a 10-28 (Sketch with nothing selected, click the Plane 1 row → "Plane 1"; ADV1 fixed) |
 | 1.4 | Select Plane 1 first, then Sketch | sketch on Plane 1 | works | ✅ | 7929b13a 10-28 (Plane 1 selected, Sketch → "Plane 1", field inactive) |
