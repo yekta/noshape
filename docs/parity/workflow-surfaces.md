@@ -11,7 +11,7 @@ Status: ✅ matches expected/live, ✗ differs (finding #), ? live data pending.
 | # | Step | Expected / live | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1 | Shift+E, Surface tab, click the line, 20 mm | surface 40×20 | "Line sketch line" chip, preview, Surface 1 in "Surfaces (1)" | ✅ | 0.4.10+ / dd1b5037 10-27 (40 mm line on Top, Surface 1 under Surfaces (1)) |
-| 2 | Next Extrude opens on … | (live: last used tab?) | Surface tab again (sticky) | ✅ live behaviours 1497: "the Solid / Surface / Thin choice is sticky per user" (qa 10-27, dd1b5037) |  |
+| 2 | Next Extrude opens on … | (live: last used tab?) | Surface tab again (sticky) | ✅ live behaviours 1497: "the Solid / Surface / Thin choice is sticky per user" (qa 10-27, dd1b5037) | 8627322e 10-28 (cancel half: Shift+E › Surface › Esc → the next Extrude opens on Solid = live "sticky after a commit only" (behaviours 20884); the commit half not re-run) |
 | 3 | Thicken (extrude ▾), click the surface | live dialog: [New\|Add\|Remove\|Intersect] · Faces and surfaces to thicken · ☐ Mid plane · Thickness 1 · Thickness 2 · ☐ Keep tools · ☐ Merge with all · Merge scope | same fields; opens on **Add** with Merge scope prefilled "Surface 1" | ? |  |
 | 4 | Thickness 2, ✓ | 40×20×2 = 1600 mm³ solid | Part 1, 1600.0, 6 faces | ✅ | 0.4.10+ / dd1b5037 10-27 (1600 mm³ / 1840 mm², the surface consumed; = live behaviours 6047) |
 | 5 | Solid extrude of a region after a picking miss | – | Extrude 2 red "Select sketch curves to extrude" (was still on the Surface tab) | ✅ (my miss) |  |
