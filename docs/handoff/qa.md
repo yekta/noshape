@@ -9,6 +9,12 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97 → … → b504234e → 2960a143)
 
+- **06:15 update (greens c56b5367 → c8239e05 → 98667558; v0.4.12 published 05:49, artifact smoke all OK):** verified
+  MASS-MC-FIELD, ASM-PARASOLID-FLAT, STRIP-CLICK-THROUGH (c56b5367); FOLDER-MENU-ROLL-TO-HERE, ROLLBACK-BAR-IN-FOLDER (end tick
+  still missing), DERIVED-PICK-CHIP (c8239e05); count-field Enter two-step (98667558). Filed P3 ASM-XT-ROUNDTRIP-NAMES
+  (re-imported own x_t assembly lists instances "<1>"…), P3 NUMBER-FIELD-ERROR-MARK (live 1533; selection-field marking
+  is already = live). Fuzz 54 on 2960a143 alive; 55 on 98667558 running. Live answers 1532 (SKETCH-ENTER-NO-PLANE) and
+  1535 (VIEW-LABEL-TOGGLE) added to their tickets.
 - **05:50 update (greens b504234e → 2960a143; v0.4.12 not published yet at 05:50, still v0.4.11 Latest):** Filed P1
   FEATURE-MIRROR-COPY-FULL-DEPTH (core: Feature mirror with Reapply off copies a boss as deep as the whole part, 9500 vs
   live 9000; also in v0.4.11), P3 ENCLOSE-NO-REGION-MSG, P3 FOLDER-MENU-ROLL-TO-HERE, P3 ROLLBACK-BAR-IN-FOLDER (live 1534).
