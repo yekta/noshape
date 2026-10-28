@@ -44,7 +44,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 |---|---|---|---|---|---|
 | 3.1 | Replicate dialog | standard feature dialog (✓ ✕) (pending capture) | custom panel: ALL-CAPS headers "SEED INSTANCE", "MATE TO BE MATCHED", a "Use selection" button, yellow hint text, a blue **OK** button, no ✓ | ✅ (GUI green 8165fca6, skasm 10-27: Replicate is a standard feature dialog ✓ ✕); was ✗ A6 | 77870dd4 10-28 |
 | 3.2 | Seed Part 3 <1> (Cylindrical 1), OK | one copy per free matching hole | "3 match(es) found": **two pins stacked inside hole 1 (where the shaft is) and one on top of the seed in hole 2** (z-fighting stripes) | ✗ A7 |  |
-| 3.3 | Ctrl+Z | removes it | removed | ✅ |  |
+| 3.3 | Ctrl+Z | removes it | removed | ✅ | 6acf6b94 (qa 10:40, Assembly 2: plate + shaft, Revolute 1 on hole 2's top rim: Ctrl+Z after ✓ removes Replicate 1 and Part 2 <2>) |
 | 3.4 | Assembly linear pattern dialog | standard feature dialog with preview | same custom panel style (INSTANCES / DIRECTION, boxed inputs, OK); **no preview** | ✅ (GUI green 8165fca6, skasm 10-27: Linear pattern a standard feature dialog); was ✗ A6, A8 | 77870dd4 10-28 |
 | 3.5 | Direction = plate front edge, 25 mm × 3 | copies along the edge | the edge pick becomes "Mate connector of Part 1 <1>" and copies go **along its Z (the face normal, −Y)**, off the plate | ✅ (T: assembly `linear_pattern_along_an_edge`); was ✗ A9 | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) (Direction "Edge of Part 1 <1>", copy along +X) |
 | 3.6 | Assembly circular pattern, axis = shaft face, 4 × 360 | 3 copies around the axis | 3 copies around the shaft axis; tree "Circular pattern 1 (3)" | ✅ / ? | 77870dd4 10-28 |
@@ -103,7 +103,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | 2.5 | Slider flip primary axis | block still inside the plate (only its top face z-fights at the plate top) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 | 6acf6b94 (qa 10:31: Slider block top → plate top puts the block inside the plate; HUD flip → it stands on the plate; tickets/slider-flip-6acf.png) |
 | 2.7 | Mate connector hover on the plate top | orange outline + white inference dots on that face ✅; **extra white dots on other parts** (bracket edges, shaft bottom) | ✅ (GUI :103 skasm 10-27: orange outline on the hovered face, small triad + ring at the nearest inference point, no dots on other parts); was ✗ A5 (partly fixed) | 77870dd4 10-28 |
 | 3.1 / 3.4 / 3.6 | Replicate / Linear / Circular pattern dialogs | standard feature dialogs with live's fields (dom/ui2-asm-*) ✅; Replicate adds red hints "Select the instances to pattern (seed)" / "Select the geometry to find match in" that live doesn't show | ✅ A6 fixed / ✗ **A14** (hint text) | 77870dd4 10-28 |
-| 3.2 | Replicate Part 3 <1> (Cylindrical 1) in Part 1 | one copy in hole 1 → "Replicate 1 ▸ Part 3 <7>" ✅; the new mate "Cylindrical 2" goes to the top-level Mate features (live nests "Mate features (1)" under the Replicate row) | ✅ (T: assembly `replicate_on_matching_holes`, qa5 A12 assert); was ✅ A7 fixed / ✗ **A12** |  |
+| 3.2 | Replicate Part 3 <1> (Cylindrical 1) in Part 1 | one copy in hole 1 → "Replicate 1 ▸ Part 3 <7>" ✅; the new mate "Cylindrical 2" goes to the top-level Mate features (live nests "Mate features (1)" under the Replicate row) | ✅ (T: assembly `replicate_on_matching_holes`, qa5 A12 assert); was ✅ A7 fixed / ✗ **A12** | 6acf6b94 (qa 10:40, Assembly 2: plate + shaft, Revolute 1 on hole 2's top rim: Replicate Part 2 <1>, Match edges on face, plate top face → one copy in the free hole 1, none stacked; tickets/asm-replicate-6acf.png) |
 | 3.4 | Linear pattern preview | grey preview copy | ✅ A8 fixed | 6acf6b94 (qa 10:32: Assembly linear pattern of Part 4 <1> → grey preview copy while editing; tickets/asm-linear-pattern-6acf.png) |
 | 3.5 | Direction = plate front edge | copy along the edge, 25 mm | ✅ A9 fixed | 6acf6b94 (qa 10:32: Direction = plate top front edge → chip "Edge of Part 1 <1>", the copy 25 mm along the edge) |
 | 3.7 | Toolbar button tooltip after click | hides | ✅ A10 fixed | 6acf6b94 (qa 10:33: hover Fastened → tooltip "Fastened mate (m)"; click → Fastened 1 dialog, tooltip gone with the pointer still on the button) |
@@ -136,7 +136,7 @@ Pass 6 (17:11) had found A12 fixed (mate nests under "Replicate 1 ▸ Mate featu
 | A3 hidden mate rows | light grey | ✅ **fixed** | 77870dd4 10-28 |
 | A13 relations | four toolbar buttons; Gear → "Gear 1" dialog: type select, Mate(s), Relation ratio 1, ☐ Reverse direction | ✅ **fixed** | 77870dd4 10-28 |
 | A11 typing into a BOM cell | "QA1" kept | ✅ **fixed** (Ctrl+Z doesn't revert the BOM edit; live ?) | 6acf6b94 (qa 10:33: "QA1" kept) |
-| A14 Replicate red hints | none | ✅ **fixed** |  |
+| A14 Replicate red hints | none | ✅ **fixed** | 6acf6b94 (qa 10:40, Assembly 2: plate + shaft, Revolute 1 on hole 2's top rim: the dialog shows no hint text, only the empty field's red border) |
 | A16 (new) | "solving…" label at the top right for as long as the Replicate dialog is open (nothing selected); gone on cancel | ? A16 (live request filed) |  |
 | A4 Slider flip | block still inside the plate (Front view) | ✗ still |  |
 | A5 mate connector hover | dots only on the hovered face, small triad + ring | ✅ **fixed** | 77870dd4 10-28 |
@@ -146,7 +146,7 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | A15 selected instance | (242,182,73) top, amber edges, only the instance row highlighted | ❌ (ASM-SELECTED-EDGES-DARK) **fixed** | 77870dd4 10-28 (faces amber ✅, interior edges near-black) |
-| A16 "solving…" label | gone | ✅ **fixed** |  |
+| A16 "solving…" label | gone | ✅ **fixed** | 6acf6b94 (qa 10:40, Assembly 2: plate + shaft, Revolute 1 on hole 2's top rim: no "solving…" label during the Replicate / mates) |
 | A19 (new) empty Replicate | title red ✅; **no pending red "Replicate N" row with error badge in the list, no badge on the root row, no red border on "Parts to find match in"** (live has all three) | ✗ **A19** (skb) |  |
 | A11 BOM edit + Ctrl+Z | not undone | ✅ (= live) | 6acf6b94 (qa 10:33: Esc, Ctrl+Z over the view → undoes the last assembly edit (a drag), QA1 stays) |
 | A4 Slider flip | block still inside the plate | ✗ still |  |
@@ -155,7 +155,7 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 ## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| A19 empty Replicate | pending red "Replicate 1" row + badge, root badge, red border on "Parts to find match in" | ✅ **fixed** (m80) |  |
+| A19 empty Replicate | pending red "Replicate 1" row + badge, root badge, red border on "Parts to find match in" | ✅ **fixed** (m80) | 6acf6b94 (qa 10:40: Replicate with nothing picked → red "Replicate 1" row + dot, dot on Assembly 1, red border on "Parts to find match in") |
 | A4 Slider flip | not re-run: the "qa5 assembly" doc was lost with /tmp/qa5/home | – |  |
 
 ## Re-run pass 14 (2026-10-22, main aa75fdf, app /tmp/qa5/noshape-0503; doc rebuilt: /tmp/qa5/d14/asm.noshape via /root/qa5-scratch/pass14/mkasm2.py = mkasm + plate fixed, block, shaft)
@@ -198,4 +198,4 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 ## Release re-check v0.4.8 (qa5, 2026-10-25 04:00, release asset noshape 0.4.8; doc built with v048/tools/a12.py + a12b.py: plate with three Ø10 holes, Ø10 × 30 pin, Cylindrical 1 in hole 1, Replicate over the plate)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| A12 Replicate mate placement | two copies (Part 2 <2>, <3>); tree: "Replicate 1 ▸ Part 2 <2>, Part 2 <3>, Mate features (2)"; top-level "Mate features (1)" keeps only Cylindrical 1 (light grey, hidden as A3) | ✅ |  |
+| A12 Replicate mate placement | two copies (Part 2 <2>, <3>); tree: "Replicate 1 ▸ Part 2 <2>, Part 2 <3>, Mate features (2)"; top-level "Mate features (1)" keeps only Cylindrical 1 (light grey, hidden as A3) | ✅ | 6acf6b94 (qa 10:40, Assembly 2: plate + shaft, Revolute 1 on hole 2's top rim: tree "Replicate 1 ▸ Part 2 <2>, Mate features (1)"; top-level Mate features (1) keeps only Revolute 1 (grey, hidden); one copy as the plate has two holes) |
