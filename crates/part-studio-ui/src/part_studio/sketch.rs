@@ -993,7 +993,7 @@ impl PartStudioView {
         cx.notify();
     }
 
-    fn toggle_construction(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn toggle_construction(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.with_sketch(cx, |ed, data| ed.toggle_construction(data)) == Some(true) {
             self.regen_sync(window, cx);
         }

@@ -149,6 +149,11 @@ pub(super) fn sketch_shortcut_toolbar(prefs: &super::toolbar_prefs::ToolbarPrefs
             // Live (behaviours 3242–3250): the Sketch list starts with these two feature tools (SKETCH-S-EXTRUDE).
             "Extrude" => Some(SketchShortcut::Feature("extrude")),
             "Revolve" => Some(SketchShortcut::Feature("revolve")),
+            // Live (SKETCH-S-INSPECT-TOOLS): the inspection rows and Construction too, in list order.
+            "Section view" => Some(SketchShortcut::Command("Section view", "section-view")),
+            "Measure" => Some(SketchShortcut::Command("Measure", "measure")),
+            "Mass and section properties" => Some(SketchShortcut::Command("Mass and section properties", "mass-properties")),
+            "Construction" => Some(SketchShortcut::Command("Construction", "construction")),
             n => super::sketch::all_sketch_tools().find(|t| tool_name(*t) == n).map(SketchShortcut::Tool),
         })
         .collect()
@@ -160,6 +165,8 @@ pub(super) fn sketch_shortcut_toolbar(prefs: &super::toolbar_prefs::ToolbarPrefs
 pub(super) enum SketchShortcut {
     Tool(Tool),
     Feature(&'static str),
+    /// A Preferences row that isn't a tool (name, icon): it does what its own button does.
+    Command(&'static str, &'static str),
 }
 
 /// Feature types of the Part Studio toolbar, in toolbar order (the tools

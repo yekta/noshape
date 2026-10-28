@@ -3071,6 +3071,36 @@ impl PartStudioView {
             for item in super::shortcut_cmds::sketch_shortcut_toolbar(&self.ui.toolbar) {
                 let tool = match item {
                     super::shortcut_cmds::SketchShortcut::Tool(t) => t,
+                    super::shortcut_cmds::SketchShortcut::Command(name, icon) => {
+                        buttons.push(
+                            btn(SharedString::from(format!("mini-{icon}")), crate::assets::icon_path(icon), cx)
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                                        cx.stop_propagation();
+                                        this.ui.mini_toolbar = None;
+                                        match name {
+                                            "Section view" => this.toggle_section(window, cx),
+                                            "Measure" => {
+                                                this.ui.measure_pinned = !this.ui.measure_pinned;
+                                                this.set_show_mass(false, cx);
+                                            }
+                                            "Mass and section properties" => {
+                                                this.ui.measure_pinned = false;
+                                                this.set_show_mass(!this.show_mass, cx);
+                                            }
+                                            _ => {
+                                                window.focus(&this.focus, cx);
+                                                this.toggle_construction(window, cx);
+                                            }
+                                        }
+                                        cx.notify();
+                                    }),
+                                )
+                                .into_any_element(),
+                        );
+                        continue;
+                    }
                     super::shortcut_cmds::SketchShortcut::Feature(id) => {
                         buttons.push(
                             btn(SharedString::from(format!("mini-{id}")), feature_icon(id), cx)
