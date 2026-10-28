@@ -866,7 +866,12 @@ fn hole_callout_marked(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &
     // Without "Override precision/tolerance" the hole feature's precision
     // applies (the callout's units always do).
     let format = if opts.override_tol { a.format.clone() } else { super::DimFormat { precision: None, tolerance: super::Tolerance::None, ..a.format.clone() } };
-    let a = &Annotation { format, ..a.clone() };
+    Some(hole_callout_text(drawing, hole, n, &Annotation { format, ..a.clone() }))
+}
+
+/// A hole's callout lines ("⌀6.6 ↧ 12", "⌴ ⌀11 ↧ 4" …) for `n` holes
+/// with annotation `a`'s format (hole callouts; hole tables' SIZE).
+pub fn hole_callout_text(drawing: &Drawing, hole: &crate::regen::context::HoleRecord, n: usize, a: &Annotation) -> Vec<String> {
     // The callout's lines with lengths written by `len`; `dual`: the dual
     // block (fit classes and deviations stay on the primary, as live's
     // dimensions).
@@ -954,7 +959,7 @@ fn hole_callout_marked(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &
     if !f.below.is_empty() {
         out.push(f.below.clone());
     }
-    Some(out)
+    out
 }
 
 /// A hole callout with its dual block (live asb 10-24 (3)): the dual lines

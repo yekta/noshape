@@ -1672,6 +1672,15 @@ fn drawing_callouts_ordinates_and_datums() {
     assert_eq!(kind_of(&mut ctx, h["annotation"].as_u64().unwrap()), "HoleCallout");
     let e = try_call(&mut ctx, "drawing_hole_callout", json!({ "drawing": tab, "hole": [5, 5], "position": [20, 20] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("hole"), "{e:?}");
+    // A hole table of that view (live 1983): TAG, X / Y LOC, SIZE (the
+    // diameter: an extrude cut has no hole feature), QTY.
+    let ht = call(&mut ctx, "drawing_view_table", json!({ "drawing": tab, "kind": "hole", "view": top["id"], "origin": p(&lines[0], "a"), "position": [20, 120] }));
+    let hid = ht["table"].clone();
+    let tables = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["tables"].clone();
+    let t = tables.as_array().unwrap().iter().find(|t| t["id"] == hid).cloned().unwrap();
+    assert_eq!(t["header"], json!(["TAG", "X LOC", "Y LOC", "SIZE", "QTY"]), "{t}");
+    assert_eq!(t["rows"][0][3], "Ø10", "{t}");
+    assert_eq!(t["rows"][0][4], "1", "{t}");
 
     let c = call(&mut ctx, "drawing_callout", json!({ "drawing": tab, "anchor": quarter(&lines[0]), "position": [40, 250], "text": "7", "border": "hexagon" }));
     assert_eq!(kind_of(&mut ctx, c["annotation"].as_u64().unwrap()), "Balloon");
@@ -4889,4 +4898,32 @@ fn a_fillet_moved_above_its_extrude_reports_its_missing_selection() {
     assert_eq!(fillet["message"], "Select edges or faces to fillet.");
     assert_eq!(fillet["missing_selections"], 1);
     assert_eq!(list["failed"][0]["missing_selections"], 1, "{list}");
+
+/// A hole table's SIZE is the Hole feature's callout, written once for a
+/// size with its QTY (live behaviours 1983: "Ø.250 ↧.472", QTY 3, merged).
+#[test]
+fn hole_table_sizes_are_the_hole_callouts() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "hole_table.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [80, 50]] }));
+    let r = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [r], "depth": "10 mm" } }));
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "at": [[40, 25, 10]] }))["faces"][0]["id"].clone();
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": top }))["sketch"].clone();
+    let p = call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "point", "points": [[15, 15, 10], [65, 15, 10], [40, 35, 10]] }));
+    let pts: Vec<Value> = p["created"].as_array().unwrap().iter().map(|x| x["id"].clone()).collect();
+    let hole = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": pts, "holeDiameterV3": "6.6 mm", "endStyleV2": "THROUGH" } }));
+    assert_eq!(hole["regeneration"]["failed"], json!([]), "{hole}");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let view = g["views"].as_array().unwrap().iter().find(|v| v["edges"].as_array().is_some_and(|es| es.iter().filter(|e| e["type"] == "circle").count() >= 3)).cloned().expect("the view showing the holes");
+    let corner = view["edges"].as_array().unwrap().iter().find(|e| e["type"] == "line").map(|e| [num(&e["a"][0]), num(&e["a"][1])]).unwrap();
+    let ht = call(&mut ctx, "drawing_view_table", json!({ "drawing": tab, "kind": "hole", "view": view["id"], "origin": corner, "position": [20, 120] }));
+    let t = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["tables"].as_array().unwrap().iter().find(|t| t["id"] == ht["table"]).cloned().unwrap();
+    let rows = t["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 3, "{t}");
+    assert!(rows[0][3].as_str().is_some_and(|s| s.starts_with('⌀') && s.contains("6.6") && s.contains("THRU")), "{t}");
+    assert_eq!(rows[0][4], "3", "{t}");
+    assert_eq!((rows[1][3].as_str(), rows[2][4].as_str()), (Some(""), Some("")), "merged: {t}");
 }

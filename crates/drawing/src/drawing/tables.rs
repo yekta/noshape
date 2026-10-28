@@ -290,6 +290,8 @@ pub struct HoleRow {
     pub x: f64,
     pub y: f64,
     pub diameter: f64,
+    /// The bore's model circle (its hole feature's record).
+    pub point: Option<super::PointRef>,
 }
 
 /// Holes of a view grouped by size: tags A1, A2... for the largest size,
@@ -299,14 +301,14 @@ pub fn hole_rows(g: &ViewGeometry, origin: [f64; 2]) -> Vec<HoleRow> {
     // Concentric bores of different size (e.g. counterbores): keep the
     // smallest per center as the hole size.
     bores.sort_by(|a, b| a.1.total_cmp(&b.1));
-    let mut holes: Vec<([f64; 2], f64)> = Vec::new();
-    for (c, r, _) in bores {
-        if !holes.iter().any(|(h, _)| (h[0] - c[0]).abs() < 1e-9 && (h[1] - c[1]).abs() < 1e-9) {
-            holes.push((c, r));
+    let mut holes: Vec<([f64; 2], f64, Option<super::PointRef>)> = Vec::new();
+    for (c, r, p) in bores {
+        if !holes.iter().any(|(h, _, _)| (h[0] - c[0]).abs() < 1e-9 && (h[1] - c[1]).abs() < 1e-9) {
+            holes.push((c, r, p));
         }
     }
     let mut sizes: Vec<f64> = Vec::new();
-    for (_, r) in &holes {
+    for (_, r, _) in &holes {
         if !sizes.iter().any(|s| (s - r).abs() < 1e-9) {
             sizes.push(*r);
         }
@@ -314,11 +316,11 @@ pub fn hole_rows(g: &ViewGeometry, origin: [f64; 2]) -> Vec<HoleRow> {
     sizes.sort_by(|a, b| b.total_cmp(a));
     let mut out = Vec::new();
     for (si, size) in sizes.iter().enumerate() {
-        let mut group: Vec<&([f64; 2], f64)> = holes.iter().filter(|(_, r)| (r - size).abs() < 1e-9).collect();
+        let mut group: Vec<&([f64; 2], f64, Option<super::PointRef>)> = holes.iter().filter(|(_, r, _)| (r - size).abs() < 1e-9).collect();
         group.sort_by(|a, b| b.0[1].total_cmp(&a.0[1]).then(a.0[0].total_cmp(&b.0[0])));
         let letter = tag_letters(si);
-        for (k, (c, r)) in group.into_iter().enumerate() {
-            out.push(HoleRow { tag: format!("{letter}{}", k + 1), center: *c, x: c[0] - origin[0], y: c[1] - origin[1], diameter: r * 2.0 });
+        for (k, (c, r, p)) in group.into_iter().enumerate() {
+            out.push(HoleRow { tag: format!("{letter}{}", k + 1), center: *c, x: c[0] - origin[0], y: c[1] - origin[1], diameter: r * 2.0, point: p.clone() });
         }
     }
     out
@@ -421,8 +423,18 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
                     if *show_location {
                         r.extend([num(h.x * sx), num(h.y * sy)]);
                     }
-                    // The merged cells carry the text in their first row.
-                    r.push(if k == 0 { format!("Ø{}", num(h.diameter)) } else { String::new() });
+                    // The merged cells carry the text in their first row: the
+                    // hole feature's callout (live: "Ø.250 ↧.472", a
+                    // counterbore's second line), else the diameter.
+                    let size = || {
+                        let ctx = &source?.context;
+                        let (c, r) = super::views::resolve_point3(ctx, h.point.as_ref()?)?;
+                        let r = r?;
+                        let hole = ctx.holes.iter().find(|x| x.matches_circle(c, r, r * 1e-3 + 1e-7))?;
+                        let a = super::Annotation { format: DimFormat { precision: *precision, ..Default::default() }, ..Default::default() };
+                        Some(super::build::hole_callout_text(drawing, hole, 1, &a).join("\n"))
+                    };
+                    r.push(if k == 0 { size().unwrap_or_else(|| format!("Ø{}", num(h.diameter))) } else { String::new() });
                     r.push(if k == 0 { n.to_string() } else { String::new() });
                     rows.push(r);
                 }
