@@ -113,7 +113,7 @@ rebuilt exactly to live's spec in /tmp/qa5/home/Documents/noshape/qa5-livecheck.
 | ADV1 Plane 1 row → Sketch plane | nothing | ✗ still |  |
 | ADV2 loft | 5927.755 | ✗ still |  |
 | ADV3 / SK1 dim conflict | box stays open, red "The sketch could not be solved with that value" | ✗ still |  |
-| ADV4 countersink rows | icon rows, values fit, no overlap | ✅ **fixed** |  |
+| ADV4 countersink rows | icon rows, values fit, no overlap | ✅ **fixed** | 64997436 10-28 (GUI: Inch › Countersink › Tapped: icon rows, 13.487 mm / 82 deg / 12 mm / 12 mm / 3 all fit, no overlap; 20 tpi (UNC), ☐ Thread class = live dom qa5-adv-hole-tapped) |
 | ADV7 thread split face | whole cylinder highlights as one face | ✗ still |  |
 | ADV8 "20 tpi (UNC)" | unchanged | ✗ still |  |
 | ADV12 hole row name | both callout lines | ✗ still |  |
@@ -126,7 +126,7 @@ Pass 6 (17:11 build, d5745c9) had already found ADV8 fixed ("20 tpi"); not re-ch
 |---|---|---|---|
 | ADV1 Plane 1 row → Sketch plane | field stays empty | ✗ still |  |
 | ADV2 loft | 5927.754632 (CLI) | ✗ still (live 5927.728) |  |
-| ADV3 error tooltip prefix | "Helix 1 did not regenerate properly: Select a cone or cylinder." | ✅ **fixed** |  |
+| ADV3 error tooltip prefix | "Helix 1 did not regenerate properly: Select a cone or cylinder." | ✅ **fixed** | 64997436 10-28 (GUI: empty Hole committed → row tooltip '1/4-20 ↧ 12 mm | ⌵Ø 13.487 mm X 82° [Hole] did not regenerate properly: No hole points selected.') |
 | SK1 dim set to an unsolvable value | Enter closes the box, value R2 kept, geometry red, **yellow "⚠ Sketch could not be solved."** toast, gone when the sketch closes ✅; **dialog title "Sketch 2" and the feature row text stay black** (live red) | ✗ still (mostly fixed) |  |
 | SK2 | the "Sketch 2" plane outline now shows while editing | ✅ |  |
 | ADV7 thread splits face | still one cylindrical face, 565.487 mm² (whole 30 mm) (CLI) | ✗ still |  |
@@ -161,7 +161,7 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | ADV2 loft | 5927.754632 | ✗ still → routed kern |  |
-| ADV4 Hole countersink rows | icon rows, values readable ("12.878 mm", "82 deg") (a12) | ✅ **fixed** |  |
+| ADV4 Hole countersink rows | icon rows, values readable ("12.878 mm", "82 deg") (a12) | ✅ **fixed** | 64997436 10-28 (GUI: Inch › Countersink › Tapped: icon rows, 13.487 mm / 82 deg / 12 mm / 12 mm / 3 all fit, no overlap; 20 tpi (UNC), ☐ Thread class = live dom qa5-adv-hole-tapped) |
 | Hole Tapped defaults | Straight tap, 1/4, **20 tpi (UNC)**, Fastener fit None, ☐ Thread class (live ~8515 ☐) (a15); an old doc's stored Threads/inch shows blank (legacy value) | ✅ |  |
 | ADV1, ADV3, ADV6, ADV7, ADV8, TAB1 | fixed in earlier passes; ADV5, ADV12 withdrawn | ✅ |  |
 

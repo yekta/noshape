@@ -22,7 +22,7 @@ Status: ✅ matches expected/live, ✗ differs (finding #), ? live data pending.
 | 10 | Fill: 4 top edges | live dialog ? | chips "[Position] Edge of Extrude 2" + per-edge continuity rows; **no preview while editing**; result Surface 2, 800 mm² | ✗ SF1 (preview) |  |
 | 11 | Boundary surface: arcs as U profiles | surface between the arcs | "Add Profile" UI, preview, OK; 1200 mm² (planar region between two coplanar arcs = 40×30) | ✅ | 0.4.10+ / da18f886 10-28 (U profiles rows "[None] Edge of Arcs sketch" ×2, preview, Surface 1 = 1200.000 mm²) |
 | 12 | Click in the viewport before activating a field | (Boundary) | notice "Click a selection field in the dialog first." | ? |  |
-| 13 | Extrude two adjacent regions (solid) 10 mm | one block, **6 faces** (live merges coplanar faces, G45) | 8000 mm³ but **10 faces** (region seams kept on top/bottom/sides) | ✗ SF2 |  |
+| 13 | Extrude two adjacent regions (solid) 10 mm | one block, **6 faces** (live merges coplanar faces, G45) | 8000 mm³ but **10 faces** (region seams kept on top/bottom/sides) | ✅ (SF2 fixed) | v0.4.12 CLI 10-28 (bin/sfcheck.py: two adjacent 20×20 regions, 10 mm → 8000, 6 faces) |
 | 14 | Extrude with both regions, misclick near the New/Add/Remove row | – | Error "Select parts in the merge scope" (most likely my click landed on Remove; not a finding) | – |  |
 | 15 | Transform: type list | Translate by line, by distance, by XYZ, Transform by mate connectors, Rotate, Copy in place, Scale | same | ✅ | 0.4.10+ / dd1b5037 10-27 (Translate by line / by distance / by XYZ / Transform by mate connector / Rotate / Copy in place / Scale) |
 | 16 | Transform XYZ x 20, ☑ Copy part | copy | Part 4 at x 80..120 | ✅ | 0.4.10+ / dd1b5037 10-27 (bracket: XYZ x 10 + Copy part → Part 2 overlapping) |
@@ -31,8 +31,8 @@ Status: ✅ matches expected/live, ✗ differs (finding #), ? live data pending.
 | 19 | Mirror Part 5 about Right | Part 6 | Part 6 at x −70..−60 | ✅ |  |
 | 20 | Part colours after Split/Mirror | rotation #9dcfed, #a5a5a5, #3b61b4, #eaeaea, #c4e2f3, #f88701, #7f7f7f, #fab601 | Part 3 and Part 5 orange, Part 6 gold (persist after tab switch) | ? SF4 |  |
 | 21 | Move boundary on one straight edge of the planar boundary surface, 25 mm | surface extended | **Error with raw kernel text** "Geometry operation failed: operation failed: wire offset failed (offset too large or non-planar wire?)" | ✗ SF5 |  |
-| 22 | (CLI) Move boundary on one edge of the planar Fill surface, 10 mm | 800 + 200 mm² | Error "Move boundary currently supports single planar surfaces only (all boundary edges moved)" | ✗ SF5 |  |
-| 23 | (CLI) Move boundary on the boundary surface's bspline edge, 10 mm | 1200 + 300 mm² | **Status OK, surface area −514.305 mm²** (corrupt body) | ✗ SF6 |  |
+| 22 | (CLI) Move boundary on one edge of the planar Fill surface, 10 mm | 800 + 200 mm² | Error "Move boundary currently supports single planar surfaces only (all boundary edges moved)" | ✅ (SF5 fixed) | v0.4.12 CLI 10-28 (bin/sfcheck.py on a 40×20 extruded-line surface: one edge 10 mm → 1000 mm², x 0..50, 1 face) |
+| 23 | (CLI) Move boundary on the boundary surface's bspline edge, 10 mm | 1200 + 300 mm² | **Status OK, surface area −514.305 mm²** (corrupt body) | ✅ (SF6 fixed) | v0.4.12 CLI 10-28 (bin/sfcheck.py: boundary surface between two 3-point arcs 30 apart = 1200 mm²; its straight side 10 mm → 1500 mm², 1 face) |
 | 24 | Feature-list row tooltip after picking a plane from the list | hides | lingers over the dialog (I4) | ✗ I4 |  |
 
 ## Findings (2026-10-21 run)
@@ -61,7 +61,7 @@ Status: ✅ matches expected/live, ✗ differs (finding #), ? live data pending.
 
 | # | Row | Ours | Status | Verified |
 |---|---|---|---|---|
-| 13 | Extrude two adjacent regions 10 mm | 8000, **10 faces** (live 6) | ✗ SF2 |  |
+| 13 | Extrude two adjacent regions 10 mm | 8000, **10 faces** (live 6) | ✅ (SF2 fixed) | v0.4.12 CLI 10-28 (8000, 6 faces) |
 | 21 | Move boundary on the planar boundary surface (qa5 surfaces doc) | still Error | ✗ SF5 |  |
 | 9 | Tool search "fill" / Sheet metal ▾ | still no Finish flex PCB model | ✗ SM12 |  |
 
