@@ -3,32 +3,28 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-## Session 3 (qa on a fresh account, from 19:05; greens fa61ba6f → 965d3f56 → 8602df0d → dd1b5037 → daf1f50c → c9c66d1c → acd6acce / 73708f00)
-- **P0 BOX-DIALOG-PANIC (psui, release blocker, at the top of TICKETS)**: any box selection with a feature dialog open panics the
-  app since df28c320 (greens dd1b5037 → c9c66d1c). Found by bin/fuzz.py (seeds 41, 43 both die on it); UI fuzzing is pointless
-  until it's fixed. Re-test: wf-block, Shift+F, drag a box over the part.
-- Verified: EXPORT-OBJ-ZIP-NAME, SURF-EXTRUDE-SKETCH-EDGES, BOX-FILLET-FACES (fa61ba6f); PREVIEW-SELF-PICK, DUP-COINCIDENT,
-  FILLET-POINT-MSG (dd1b5037). Closed as = live: PATTERN-EDGE-DIR-FLIPPED, SKETCH-LINE-MENU (on a line).
-- Checklists done: workflow-p1-pass, workflow-bracket 12/12, workflow-analysis 12/12, workflow-units 8/8; partial:
-  workflow-keyboard-mouse 33/40, cursors 20/34 (bin/xcur.py reads the X cursor: wait ~2 s after a move), workflow-mates 16/33,
-  workflow-drawing 17/28, workflow-assembly 17/75, workflow-surfaces 6/13, workflow-advanced-part-studio 9/46
-  (bin/advmatrix.py), interaction 36/44, sketch.md 210/261.
-- New tickets this session: P0 BOX-DIALOG-PANIC, P0 FILLET-OVERSIZE-OK (live answered: R50 two-edge and R25 three-edge must
-  fail "End boundary intersects unfilleted edge."; smaller overlapping rounds = live exactly), P1 SKETCH-GLYPH-LAYOUT-LOST,
-  P1 CONFLICT-COLLAPSE-ON-DRAG, P2 ASM-PATTERN-EDIT-TAKES-SELECTION, P2 SKETCH-FILLET-STUCK-RADIUS, P2 SECTION-DIALOG-STACK,
-  P2 DATUM-SCALE-DETACHED, P2 BALLOON-WRONG-ITEM, P3 SKETCH-PATTERN-GLYPH-HOVER, P3 ORIGIN-COINCIDENT-GLYPH,
-  P3 TABS-PANEL-FOCUS, P3 MATE-ANGLE-360.
-- 21:26: parity rows verified 961 of 2031 (675 at the session start). assembly.md 57/261 (keys, menus, mate dialog, triad
-  menus R7–R9: click the handle first, then right-click), drawing.md 32/186 (keys, toolbar, views). New since 21:12: P2
-  J-KEY-NO-EFFECT, P2 ASM-RENAME-ESC, P3 DRAWING-SHIFT-SLASH; sketch point menus verified (e52e8015).
-- REGEN-SPEED on c9c66d1c (load ~33): commits median 313 ms, 3rd undo 137 ms (numbers in the ticket).
-- CLI fuzz seed 150 (main CLI 12:08): 150 steps clean.
+## Session 3 (qa on a fresh account, 10-27 19:05 → 10-28; greens fa61ba6f → … → d2826142 → c5e53806)
+- **00:30 state: no open P0 release blocker of mine.** BOX-DIALOG-PANIC fixed (ecc38c5a) and verified on c5e53806.
+  Still open P0 (core): FILLET-OVERSIZE-OK (live answered: R50 two-edge / R25 three-edge fillets must fail "End boundary
+  intersects unfilleted edge."; ours Ok with wrong solids). Check the 04:30 blocker list against TICKETS.
+- Verified on c5e53806 (00:12–00:25): BOX-DIALOG-PANIC, CONFLICT-COLLAPSE-ON-DRAG, SECTION-DIALOG-STACK, TABS-PANEL-FOCUS,
+  ORIGIN-COINCIDENT-GLYPH, SKETCH-PATTERN-GLYPH-HOVER, J-KEY-NO-EFFECT, ASM-RENAME-ESC, MATE-ANGLE-360; on d2826142:
+  SKETCH-GLYPH-LAYOUT-LOST, ASM-PATTERN-EDIT-TAKES-SELECTION (leftover: selection kept after ✕). Reopened:
+  SKETCH-FILLET-STUCK-RADIUS (over-drag commits the max radius now, but that sticky radius then refuses smaller corners).
+  Earlier: EXPORT-OBJ-ZIP-NAME, PREVIEW-SELF-PICK, DUP-COINCIDENT, FILLET-POINT-MSG, SKETCH-LINE-MENU (= live on a line,
+  point menus e52e8015).
+- REGEN-SPEED on c5e53806 (BOOLEAN-SPEEDUP phase 2): commit median 149 ms (budget 200, first time within), 3rd undo 220 ms;
+  live-30-features 60779.484 and the bracket 67191.328 unchanged.
+- Open findings of mine: core FILLET-OVERSIZE-OK (P0), ADV2 (P2); skasm SKETCH-FILLET-STUCK-RADIUS (P2); dx XT-ASM-SCALE
+  (P1: Parasolid assemblies import ~1000× small, nothing drawn), BALLOON-WRONG-ITEM, DATUM-SCALE-DETACHED,
+  ASM-PARASOLID-FLAT (P2), DRAWING-SHIFT-SLASH (P3), VERSION-FOOTER-STALE (P3).
+- Checklists: workflow-p1-pass, -bracket, -analysis, -units complete; keyboard-mouse 33/40, cursors 20/34 (bin/xcur.py),
+  mates 17/33, drawing 17/28, assembly-wf 17/75, surfaces 6/13, advanced-ps 9/46, interaction 36/44, sketch.md 216/261,
+  assembly.md 57/261, drawing.md 37/186. Tools: bin/xcur.py (X cursor read-back), bin/oversize.py, bin/advmatrix.py.
 - Live requests open: FILLET-OVERSIZE chamfer cases, assembly instance filter vs pattern instances, datums vs sheet scale.
-- Merge-loss audit (tickets/merge-audit-1027.txt): checked, not lost: e4799ab4, 703545e4, 38a14f20, 8284b6b4, 5b048262,
-  259270b6. Not checked: 11e83152, 98ae008e, 6c040449, 4a0e07c2, 4083c486.
-- v0.4.11 was published 15:13 (not smoked by qa); the v0.4.10 binary in rel/k/v0410 is gone (disk loop).
-- Next: re-test BOX-DIALOG-PANIC on each green; rest of workflow-assembly / workflow-drawing / workflow-mates; drawing.md and
-  assembly.md (P2, 0 verified so far). 04:30: P0 blockers at the top of TICKETS for the 05:00 release.
+- Note: start the app with a long timeout (q.sh appstart … 7200): the 3000 s default ended a session mid-test.
+- Next: drawing.md / assembly.md rows; re-test FILLET-OVERSIZE-OK / XT-ASM-SCALE when fixed; 04:30 blockers; ~05:00
+  release smoke (checklist below) on the release commit.
 
 ## Parity re-verification (lead 10-27 13:50; standing, high priority)
 **Verified rows: see session 3 (pv.py count docs/parity/*.md)** (❌ open: SKETCH-LINE-MENU, FILLET-POINT-MSG (sketch.md); DIALOG-OK-STATE resolved f16b31c6; HOLE-SIZE-NO-DIAMETER, DIM-AC-ENTER, TAB-EXPORT-MISSING fixed and verified f16b31c6; OTF-FIRST-KEY, BOX-FILLET-FACES, SURF-EXTRUDE-SKETCH-EDGES fixed and verified (6cbb24e0 / 203c4d6f); SPACE-CHECKBOX and SHORTCUT-MAP-FOCUS fixed and verified). Column "Verified" = `0.4.10+ / <green> <date>`
