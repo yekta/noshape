@@ -12,7 +12,7 @@ pub fn ops() -> Vec<Op> {
         group: "export",
         verb: "parts",
         summary: "Export a Part Studio's parts or an Assembly to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino)",
-        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP and Parasolid (latest version, 38.1) keep the assembly (the root product / ASSEMBLY, each part once, placed by its instances), the other formats and older Parasolid versions get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.",
+        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP and Parasolid keep the assembly (the root product / ASSEMBLY, each part once, placed by its instances), the other formats get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.",
         fields: vec![
             doc_field(),
             tab_field(),
@@ -123,7 +123,7 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 /// Export of an Assembly tab: its instances (or `parts`: instance ids or
-/// names); STEP and Parasolid 38.1 keep the assembly, as Onshape's.
+/// names); STEP and Parasolid keep the assembly, as Onshape's.
 fn assembly(ctx: &mut Ctx, a: &Args, format: PartFormat, s: ExportSettings) -> Result<OpOutput, OpError> {
     use noshape_model::document::TabContent;
     let od = ctx.doc(a.opt_str("doc")?)?;

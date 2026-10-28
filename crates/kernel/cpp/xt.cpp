@@ -1817,8 +1817,8 @@ void write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary, rus
   write_file(to_version(std::move(w.nodes), ver), ver, binary, std::string(path), std::string(application));
 }
 
-// An assembly as Onshape exports one (38.1, live samples/dx-nist-assembly.x_t;
-// qa ASM-PARASOLID-FLAT): the ASSEMBLY first (node 1), each part's BODY once
+// An assembly as Onshape exports one (live samples/dx-nist-assembly.x_t and
+// dx-asm-xt-<v>.x_t; qa ASM-PARASOLID-FLAT, XT-ASM-VERSIONS): the ASSEMBLY first (node 1), each part's BODY once
 // (bodies chained next / previous, ref_instance the first of its instances),
 // and per placement an INSTANCE (chained in the assembly and per part) with
 // its TRANSFORM (`tf`: 12 per instance, the rotation's rows each followed by
@@ -1827,8 +1827,6 @@ void write_parasolid_assembly(const OcShapeList& parts, rust::Slice<const uint32
                               rust::Str application)
 {
   const XtVersion ver = xt_version(std::string(version));
-  if (schema_code(ver) < 38100)
-    fail_invalid("Parasolid assemblies are written in 38.1");
   if (tf.size() != inst_part.size() * 12)
     fail_invalid("one transform per instance");
   Writer           w;

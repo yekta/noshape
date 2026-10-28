@@ -340,8 +340,9 @@ pub fn write_assembly_export(s: &ExportSettings, path: &std::path::Path, a: &Ass
     let up = if s.y_up { glam::DMat4::from_rotation_x(-std::f64::consts::FRAC_PI_2) } else { glam::DMat4::IDENTITY };
     let instances: Vec<k::StepInstance> = a.instances.iter().map(|(p, _, t)| k::StepInstance { part: *p, transform: up * *t }).collect();
     // Parasolid keeps the assembly too (live: its x_t re-imports as an
-    // Assembly; qa ASM-PARASOLID-FLAT), in the versions whose layouts we have.
-    if s.format == PartFormat::Parasolid && !s.individual && k::write_parasolid_assembly(path, &a.parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), &instances, k::LengthUnit::Meter, parasolid_version(s))? {
+    // Assembly; qa ASM-PARASOLID-FLAT), in every version.
+    if s.format == PartFormat::Parasolid && !s.individual {
+        k::write_parasolid_assembly(path, &a.parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), &instances, k::LengthUnit::Meter, parasolid_version(s))?;
         return Ok(path.to_path_buf());
     }
     if s.format != PartFormat::Step || s.individual {

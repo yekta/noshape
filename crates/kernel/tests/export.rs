@@ -102,9 +102,8 @@ fn parasolid_round_trip() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// An assembly as Parasolid (qa ASM-PARASOLID-FLAT): in 38.1 each part once
-/// with its instances, read back as the same assembly; older versions'
-/// assembly layouts are unknown, so nothing is written there.
+/// An assembly as Parasolid (qa ASM-PARASOLID-FLAT): in every version each
+/// part once with its instances, read back as the same assembly.
 #[test]
 fn parasolid_assembly_round_trip() {
     let dir = std::env::temp_dir().join(format!("noshape-xt-asm-{}", std::process::id()));
@@ -114,19 +113,34 @@ fn parasolid_assembly_round_trip() {
     let placed = [glam::DMat4::IDENTITY, glam::DMat4::from_translation(DVec3::new(0.1, 0.0, 0.0)), turned];
     let instances: Vec<StepInstance> = [0, 1, 1].into_iter().zip(placed).map(|(part, transform)| StepInstance { part, transform }).collect();
     let path = dir.join("asm.x_t");
-    assert!(write_parasolid_assembly(&path, &parts, &instances, LengthUnit::Meter, "38.1").unwrap());
-    let (_, back, inst) = read_parasolid_assembly(&path, LengthUnit::Meter).unwrap().expect("an assembly");
-    assert_eq!((back.len(), inst.len()), (2, 3));
-    for (b, p) in back.iter().zip(&parts) {
-        let (v, want) = (volume_properties(&b.shape).unwrap().mass, volume_properties(p).unwrap().mass);
-        assert!((v - want).abs() < 5e-6 * want, "{v} vs {want}");
+    for version in PARASOLID_VERSIONS {
+        write_parasolid_assembly(&path, &parts, &instances, LengthUnit::Meter, version).unwrap();
+        let (_, back, inst) = read_parasolid_assembly(&path, LengthUnit::Meter).unwrap().unwrap_or_else(|| panic!("{version}: an assembly"));
+        assert_eq!((back.len(), inst.len()), (2, 3), "{version}");
+        for (b, p) in back.iter().zip(&parts) {
+            let (v, want) = (volume_properties(&b.shape).unwrap().mass, volume_properties(p).unwrap().mass);
+            assert!((v - want).abs() < 5e-6 * want, "{version}: {v} vs {want}");
+        }
+        for (i, want) in inst.iter().zip(&instances) {
+            assert_eq!(i.part, want.part);
+            assert!(i.transform.abs_diff_eq(want.transform, 1e-12), "{version}: {:?} vs {:?}", i.transform, want.transform);
+        }
     }
-    for (i, want) in inst.iter().zip(&instances) {
-        assert_eq!(i.part, want.part);
-        assert!(i.transform.abs_diff_eq(want.transform, 1e-12), "{:?} vs {:?}", i.transform, want.transform);
-    }
-    assert!(!write_parasolid_assembly(&dir.join("old.x_t"), &parts, &instances, LengthUnit::Meter, "37.1").unwrap());
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Live's own assembly (a block and a Ø6 × 30 pin, three instances) in each
+/// Parasolid version reads as the assembly it is (qa XT-ASM-VERSIONS).
+#[test]
+fn parasolid_assemblies_from_onshape_in_every_version() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-asm");
+    for v in ["12.0", "25.0", "28.0", "28.1", "33.0", "33.1", "37.1", "38.1", "latest"] {
+        let (_, parts, inst) = read_parasolid_assembly(&dir.join(format!("{v}.x_t")), LengthUnit::Millimeter).unwrap_or_else(|e| panic!("{v}: {e}")).unwrap_or_else(|| panic!("{v}: an assembly"));
+        assert_eq!((parts.len(), inst.len()), (2, 3), "{v}");
+        let mut vols: Vec<f64> = parts.iter().map(|p| volume_properties(&p.shape).unwrap().mass).collect();
+        vols.sort_by(f64::total_cmp);
+        assert!((vols[0] - 848.23).abs() < 0.01, "{v}: the pin {vols:?}");
+    }
 }
 
 /// Parasolid versions (the Export dialog's list): each writes the body in

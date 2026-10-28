@@ -296,14 +296,10 @@ pub fn write_parasolid(path: &Path, shapes: &[Shape], unit: LengthUnit, binary: 
 }
 
 /// Write an assembly as a Parasolid text file the way Onshape exports an
-/// Assembly (live samples/dx-nist-assembly.x_t): each part once in its own
-/// coordinates (`unit`), placed by its instances. Only 38.1's assembly
-/// layouts are known: other versions write nothing and return false (the
-/// caller writes the placed parts).
-pub fn write_parasolid_assembly(path: &Path, parts: &[Shape], instances: &[StepInstance], unit: LengthUnit, version: &str) -> Result<bool> {
-    if version != PARASOLID_VERSIONS[0] {
-        return Ok(false);
-    }
+/// Assembly (live samples/dx-nist-assembly.x_t, dx-asm-xt-<v>.x_t): each
+/// part once in its own coordinates (`unit`), placed by its instances, in
+/// Parasolid version `version` (one of [`PARASOLID_VERSIONS`]).
+pub fn write_parasolid_assembly(path: &Path, parts: &[Shape], instances: &[StepInstance], unit: LengthUnit, version: &str) -> Result<()> {
     let f = unit.mm_per_unit() * 1e-3;
     let v = parts.iter().map(|s| scaled(s, f)).collect::<Result<Vec<_>>>()?;
     let l = vec_to_list(&v);
@@ -315,8 +311,7 @@ pub fn write_parasolid_assembly(path: &Path, parts: &[Shape], instances: &[StepI
             (0..3).flat_map(move |r| [m.x_axis[r], m.y_axis[r], m.z_axis[r], m.w_axis[r] * f])
         })
         .collect();
-    ck(ffi::write_parasolid_assembly(&l, &part, &tf, path_str(path)?, version, &format!("noshape {}", crate::VERSION)))?;
-    Ok(true)
+    ck(ffi::write_parasolid_assembly(&l, &part, &tf, path_str(path)?, version, &format!("noshape {}", crate::VERSION)))
 }
 
 /// [`write_parasolid`] in Parasolid version `version` (one of
