@@ -6,8 +6,9 @@
 //! Rows: text above; [prefix] [value + precision ▾ (dimension) | count ▾ +
 //! the callout, read only (hole)] [tolerance ▾ (dimension)] [units ▾]
 //! [suffix]; text below; [Ø ▾ symbols] and the toggles (dimension:
-//! inspection oval, dual ▾, reset text position, parentheses, show units,
-//! radius / diameter; hole: (XX), dual ▾, ☐ Override precision/tolerance);
+//! inspection oval, dual ▾, reset text position, parentheses, radius /
+//! diameter; above them, with a dual shown, the dual row: its precision ▾,
+//! units ▾ and Show/hide units; hole: (XX), dual ▾, ☐ Override precision/tolerance);
 //! then the tolerance's values (Symmetrical / Deviation / Limits with ±
 //! buttons) or Fit options (fit type, hole class, shaft class, standard,
 //! fit precision, stacking).
@@ -436,6 +437,62 @@ impl DrawingEditor {
                 .child(pbutton("dp-units", div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(ink).child(unit_label).into_any_element(), 60., unit_items, false))
                 .child(field(&d.suffix, Some(80.), 30.))
         };
+        // The dual row (live asbdd-9, a dimension showing its dual): "[ 0.39 ▾
+        // (in) ▾ 👁 ]" on grey, the value read only; precision, units and
+        // Show/hide units are this dimension's ("(Drawing)": Drawing
+        // properties › Dual).
+        let dual_row = if !hole && fmt.dual.unwrap_or(self.drawing.props.dual.show) && !matches!(d.cur.kind, AnnotationKind::AngularDimension { .. }) {
+            use noshape_model::drawing::format as nf;
+            let rotation = d.cur.kind.view().and_then(|v| self.placement(v)).map(|p| p.rotation).unwrap_or(0.0);
+            let value = d.cur.kind.measured(rotation).map(|m| nf::dual_value(&self.drawing, &fmt, m)).unwrap_or_default();
+            let du = nf::dual_units(&self.drawing, &fmt);
+            let drawing_du = self.drawing.props.dual.units_for(!nf::length_units(&self.drawing, &fmt).imperial());
+            let dprec = fmt.dual_fmt.precision;
+            let prec_items: Vec<(String, bool, Act)> = PRECISIONS.iter().map(|&(l, v)| (l.to_string(), dprec == v, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.dual_fmt.precision = v) as Act)).collect();
+            let own = fmt.dual_fmt.units;
+            let mut unit_items: Vec<(String, bool, Act)> = DimUnits::CALLOUT.iter().map(|&u| (u.name().to_string(), own == Some(u), std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.dual_fmt.units = Some(u)) as Act)).collect();
+            let at = DimUnits::CALLOUT.iter().position(|&u| u == drawing_du).map_or(0, |i| i + 1);
+            unit_items.insert(at, (format!("{} (Drawing)", drawing_du.name()), own.is_none(), std::rc::Rc::new(|d: &mut PaletteDlg| d.cur.format.dual_fmt.units = None) as Act));
+            let unit_label = if du.symbol().is_empty() { "(ft-in)".to_string() } else { format!("({})", du.symbol()) };
+            let shown = nf::dual_shows_unit(&self.drawing, &fmt);
+            let bracket = |s: &'static str| div().w(px(14.)).flex().justify_center().text_size(px(28.)).font_weight(FontWeight::LIGHT).text_color(gpui_kit::rgb(0x777777)).child(s);
+            let eye = div()
+                .id("dp-dual-units")
+                .size(px(30.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(4.))
+                .border_1()
+                .border_color(gpui_kit::rgb(0xcccccc))
+                .when(shown, |e| e.bg(gpui_kit::rgb(0xdfe7ee)))
+                .cursor_pointer()
+                .child(crate::ui::glyph("eye", 16., ink))
+                .tooltip(|w, cx| gpui_kit::component::tooltip::Tooltip::new("Show/hide units").build(w, cx))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.edit_palette(move |d| d.cur.format.dual_fmt.show_unit = Some(!shown), cx)));
+            Some(
+                h_flex()
+                    .h(px(34.))
+                    .pl(px(70.))
+                    .gap(px(2.))
+                    .bg(gpui_kit::rgb(0xf0f0f0))
+                    .child(bracket("["))
+                    .child(
+                        h_flex()
+                            .h(px(30.))
+                            .ml(px(4.))
+                            .child(div().w(px(85.)).h(px(30.)).border_1().border_color(gpui_kit::rgb(0xdddddd)).rounded_l(px(4.)).bg(gpui_kit::rgb(0xeeeeee)).flex().items_center().justify_center().text_size(px(14.)).text_color(gpui_kit::rgb(0x999999)).child(value))
+                            .child(pbutton("dp-dual-prec", div().into_any_element(), 20., prec_items, true)),
+                    )
+                    .child(div().w(px(50.)))
+                    .child(pbutton("dp-dual-unit", div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(ink).child(unit_label).into_any_element(), 60., unit_items, false))
+                    .child(eye)
+                    .child(bracket("]"))
+                    .into_any_element(),
+            )
+        } else {
+            None
+        };
         // The toggles row.
         let radial = matches!(d.cur.kind, AnnotationKind::RadialDimension { .. });
         let mut toggles = h_flex().gap(px(if hole { 4. } else { 2. })).child(symbols);
@@ -582,6 +639,7 @@ impl DrawingEditor {
                 // The drag handle.
                 .child(h_flex().h(px(13.)).justify_center().border_b_1().border_color(gpui_kit::rgb(0xeeeeee)).child(div().text_size(px(8.)).text_color(gpui_kit::rgb(0x9a9a9a)).child("▫▫▫")))
                 .child(field(&d.above, None, 22.))
+                .children(dual_row)
                 .child(middle)
                 .child(field(&d.below, None, 22.))
                 .child(toggles)

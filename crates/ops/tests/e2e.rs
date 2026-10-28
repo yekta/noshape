@@ -928,6 +928,15 @@ fn drawing_views_and_dimensions() {
     assert!(text.contains("REF") && !text.contains("±"), "{text}");
     let e = try_call(&mut ctx, "drawing_edit_dimension", json!({ "drawing": tab, "annotation": dia["annotation"], "value": "X" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("value"));
+    // The dual row: this dimension's dual precision, units and Show/hide
+    // units (live asbdd-9: Ø10 "[0.39 in]").
+    let dia_id = dia["annotation"].as_u64().unwrap();
+    let ed = call(&mut ctx, "drawing_edit_dimension", json!({ "drawing": tab, "annotation": dia_id, "dual": "dual", "dual_precision": 2, "dual_units": "Inches", "dual_show_units": true }));
+    let text = ed["annotations"].as_array().unwrap().iter().find(|x| x["id"] == dia_id).unwrap()["text"].as_str().unwrap().to_string();
+    assert!(text.contains("[0.39 in]"), "{text}");
+    let ed = call(&mut ctx, "drawing_edit_dimension", json!({ "drawing": tab, "annotation": dia_id, "dual_show_units": false }));
+    let text = ed["annotations"].as_array().unwrap().iter().find(|x| x["id"] == dia_id).unwrap()["text"].as_str().unwrap().to_string();
+    assert!(text.contains("[0.39]"), "{text}");
     // An isometric base view, and a view projected from it.
     let iv = call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "source": "Part Studio 1", "orientation": "isometric", "position": [330, 230], "scale": 1.0 }));
     let base = iv["view"].as_u64().unwrap();

@@ -4068,6 +4068,9 @@ Examples:
 | `parentheses` | boolean |  | Parentheses (a reference value). |
 | `inspection` | boolean |  | Inspection dimension (oval frame). |
 | `dual` | one of `single`, `drawing`, `dual` |  | Single unit, Single unit (Drawing) or Dual unit. |
+| `dual_precision` | integer or string |  | The dual row: decimals 0–8, or "drawing". |
+| `dual_units` | string |  | The dual row: units as `units`, or "drawing". |
+| `dual_show_units` | boolean or string |  | The dual row's Show/hide units: true / false, or "drawing". |
 | `diameter` | boolean |  | Radial dimensions: diameter (true) or radius (false). |
 | `override_tolerance` | boolean |  | Hole callouts: Override precision/tolerance. |
 

@@ -1031,9 +1031,9 @@ impl AnnotationEnv for Env<'_> {
             return None;
         }
         let primary = format::length_units(self.drawing, &a.format);
-        let du = p.dual.units_for(!primary.imperial());
-        let post = if p.dual.show_unit && !du.symbol().is_empty() { format!("[] {}", du.symbol()) } else { "[]".to_string() };
-        Some(super::cad_objects::CadDual { factor: primary.meters() / du.meters(), precision: p.dual.precision.unwrap_or(3), post, below: p.dual.dim_location == super::DualLocation::Bottom })
+        let du = format::dual_units(self.drawing, &a.format);
+        let post = if format::dual_shows_unit(self.drawing, &a.format) && !du.symbol().is_empty() { format!("[] {}", du.symbol()) } else { "[]".to_string() };
+        Some(super::cad_objects::CadDual { factor: primary.meters() / du.meters(), precision: format::dual_precision(self.drawing, &a.format), post, below: p.dual.dim_location == super::DualLocation::Bottom })
     }
     fn text(&self, a: &Annotation, value: f64, angular: bool, symbol: &str) -> DimText {
         let mut f = a.format.clone();

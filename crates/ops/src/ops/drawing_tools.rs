@@ -441,6 +441,9 @@ pub fn ops() -> Vec<Op> {
                     opt("parentheses", json!({ "type": "boolean" }), "Parentheses (a reference value)."),
                     opt("inspection", json!({ "type": "boolean" }), "Inspection dimension (oval frame)."),
                     opt("dual", json!({ "type": "string", "enum": ["single", "drawing", "dual"] }), "Single unit, Single unit (Drawing) or Dual unit."),
+                    opt("dual_precision", json!({ "type": ["integer", "string"] }), "The dual row: decimals 0–8, or \"drawing\"."),
+                    opt("dual_units", s(), "The dual row: units as `units`, or \"drawing\"."),
+                    opt("dual_show_units", json!({ "type": ["boolean", "string"] }), "The dual row's Show/hide units: true / false, or \"drawing\"."),
                     opt("diameter", json!({ "type": "boolean" }), "Radial dimensions: diameter (true) or radius (false)."),
                     opt("override_tolerance", json!({ "type": "boolean" }), "Hole callouts: Override precision/tolerance."),
                 ],
@@ -2210,16 +2213,26 @@ fn edit_dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             *slot = v.to_string();
         }
     }
-    match a.get("precision") {
-        None => {}
-        Some(Value::String(s)) if s == "drawing" => f.precision = None,
-        Some(v) => f.precision = Some(v.as_u64().filter(|n| *n <= 8).ok_or_else(|| OpError::param("precision", "0–8 or \"drawing\""))? as u8),
+    for (k, slot) in [("precision", &mut f.precision), ("dual_precision", &mut f.dual_fmt.precision)] {
+        match a.get(k) {
+            None => {}
+            Some(Value::String(s)) if s == "drawing" => *slot = None,
+            Some(v) => *slot = Some(v.as_u64().filter(|n| *n <= 8).ok_or_else(|| OpError::param(k, "0–8 or \"drawing\""))? as u8),
+        }
     }
-    if let Some(u) = a.opt_str("units")? {
-        f.units = match u {
-            "drawing" => None,
-            _ => Some(DimUnits::CALLOUT.iter().copied().find(|x| x.name().eq_ignore_ascii_case(u)).ok_or_else(|| OpError::param("units", &format!("one of {} or \"drawing\"", DimUnits::CALLOUT.iter().map(|x| x.name()).collect::<Vec<_>>().join(", "))))?),
-        };
+    for (k, slot) in [("units", &mut f.units), ("dual_units", &mut f.dual_fmt.units)] {
+        if let Some(u) = a.opt_str(k)? {
+            *slot = match u {
+                "drawing" => None,
+                _ => Some(DimUnits::CALLOUT.iter().copied().find(|x| x.name().eq_ignore_ascii_case(u)).ok_or_else(|| OpError::param(k, &format!("one of {} or \"drawing\"", DimUnits::CALLOUT.iter().map(|x| x.name()).collect::<Vec<_>>().join(", "))))?),
+            };
+        }
+    }
+    match a.get("dual_show_units") {
+        None => {}
+        Some(Value::Bool(b)) => f.dual_fmt.show_unit = Some(*b),
+        Some(Value::String(s)) if s == "drawing" => f.dual_fmt.show_unit = None,
+        Some(_) => return Err(OpError::param("dual_show_units", "true, false or \"drawing\"")),
     }
     for (k, slot) in [("parentheses", &mut f.reference), ("inspection", &mut f.inspection_frame)] {
         if let Some(b) = a.get(k).and_then(Value::as_bool) {

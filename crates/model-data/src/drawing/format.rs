@@ -303,22 +303,34 @@ fn dual_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool) -> Opt
         Tolerance::Symmetric { value: t } => format!("±{:.*}", p.dual.tolerance_precision.unwrap_or(3) as usize, t.abs() / du.meters()),
         _ => String::new(),
     };
-    Some(format!("[{}{tol}{}]", dual_number(drawing, du, value), dual_unit(drawing, du)))
+    Some(format!("[{}{tol}{}]", dual_value(drawing, f, value), dual_unit(drawing, f, du)))
 }
 
-/// The dual units of a length shown with `f` (the other system).
-fn dual_units(drawing: &Drawing, f: &DimFormat) -> super::DimUnits {
-    drawing.props.dual.units_for(!length_units(drawing, f).imperial())
+/// The dual units of a length shown with `f`: the dimension's own (palette
+/// dual row), else the drawing's (the other system unless set).
+pub fn dual_units(drawing: &Drawing, f: &DimFormat) -> super::DimUnits {
+    f.dual_fmt.units.unwrap_or_else(|| drawing.props.dual.units_for(!length_units(drawing, f).imperial()))
 }
 
-/// A length in the dual units at the dual precision (unset: live's 0.123).
-fn dual_number(drawing: &Drawing, du: super::DimUnits, meters: f64) -> String {
-    unit_number(drawing, meters, du, Some(drawing.props.dual.precision.unwrap_or(3)), None, false)
+/// The dual precision of `f` (unset everywhere: live's 0.123).
+pub fn dual_precision(drawing: &Drawing, f: &DimFormat) -> u8 {
+    f.dual_fmt.precision.or(drawing.props.dual.precision).unwrap_or(3)
 }
 
-/// " in" / " mm" with Show dual unit, else nothing.
-fn dual_unit(drawing: &Drawing, du: super::DimUnits) -> String {
-    if drawing.props.dual.show_unit && !du.symbol().is_empty() { format!(" {}", du.symbol()) } else { String::new() }
+/// Whether `f`'s dual shows its unit (the palette's eye, else Show dual unit).
+pub fn dual_shows_unit(drawing: &Drawing, f: &DimFormat) -> bool {
+    f.dual_fmt.show_unit.unwrap_or(drawing.props.dual.show_unit)
+}
+
+/// A length in `f`'s dual units at its dual precision, no unit (the
+/// palette's read-only dual value).
+pub fn dual_value(drawing: &Drawing, f: &DimFormat, meters: f64) -> String {
+    unit_number(drawing, meters, dual_units(drawing, f), Some(dual_precision(drawing, f)), None, false)
+}
+
+/// " in" / " mm" when the dual shows its unit, else nothing.
+fn dual_unit(drawing: &Drawing, f: &DimFormat, du: super::DimUnits) -> String {
+    if dual_shows_unit(drawing, f) && !du.symbol().is_empty() { format!(" {}", du.symbol()) } else { String::new() }
 }
 
 /// A hole callout length's dual, with its unit ("6.35 mm"), when the
@@ -329,7 +341,7 @@ pub fn dual_len(drawing: &Drawing, f: &DimFormat, meters: f64) -> Option<String>
         return None;
     }
     let du = dual_units(drawing, f);
-    Some(format!("{}{}", dual_number(drawing, du, meters), dual_unit(drawing, du)))
+    Some(format!("{}{}", dual_value(drawing, f, meters), dual_unit(drawing, f, du)))
 }
 
 // ------------------------------------------------------------ property fields
@@ -747,6 +759,9 @@ mod tests {
         let t = dim_text(&d, &DimFormat::default(), 0.060, false, "");
         assert_eq!((t.dual.as_deref(), t.dual_below), (Some("[2.36]"), true));
         assert_eq!(dim_text(&d, &DimFormat { dual: Some(false), ..Default::default() }, 0.060, false, "").dual, None);
+        // The palette's dual row: this dimension's precision, units, unit shown.
+        let own = DimFormat { dual_fmt: super::super::DualFormat { precision: Some(1), units: Some(DimUnits::Centimeter), show_unit: Some(true) }, ..Default::default() };
+        assert_eq!(dim_text(&d, &own, 0.060, false, "").dual.as_deref(), Some("[6.0 cm]"));
         d.props.dual.show = false;
         assert_eq!(dim_text(&d, &DimFormat { dual: Some(true), ..Default::default() }, 0.060, false, "").dual.as_deref(), Some("[2.36]"));
     }

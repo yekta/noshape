@@ -1155,6 +1155,9 @@ pub struct DimFormat {
     /// Palette "Count type" (None: no count).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub count: Option<HoleCount>,
+    /// The palette's dual row (live asbdd-9: "[ 0.39 ▾ (in) ▾ 👁 ]").
+    #[serde(default, skip_serializing_if = "DualFormat::is_default")]
+    pub dual_fmt: DualFormat,
     /// The Fit tolerance types' options.
     #[serde(default, skip_serializing_if = "FitOpts::is_default")]
     pub fit: FitOpts,
@@ -1163,6 +1166,24 @@ pub struct DimFormat {
 impl DimFormat {
     pub fn is_default(&self) -> bool {
         *self == DimFormat::default()
+    }
+}
+
+/// One dimension's dual precision, units and Show/hide units (the
+/// palette's dual row); None each: Drawing properties › Dual.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct DualFormat {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub precision: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub units: Option<DimUnits>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show_unit: Option<bool>,
+}
+
+impl DualFormat {
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
     }
 }
 

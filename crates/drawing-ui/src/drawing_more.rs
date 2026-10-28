@@ -348,7 +348,7 @@ impl DrawingEditor {
                 }
             }
             &AnnotationKind::ForeshortenedDiameter { view, axis, edge, direct } => {
-                let label = if direct { "Display as foreshortened diameter" } else { "Display as direct diameter" };
+                let label = if direct { "Display as foreshorten diameter" } else { "Display as direct diameter" };
                 out.push(MenuEntry::item(label, move |t, _, cx| set_kind(t, "Foreshortened diameter", AnnotationKind::ForeshortenedDiameter { view, axis, edge, direct: !direct }, cx)));
             }
             &AnnotationKind::OrdinateGroup { view, origin, horizontal, .. } => {
