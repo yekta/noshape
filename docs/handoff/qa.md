@@ -9,7 +9,7 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
-- **12:31 update (greens 8bb8a6d1 → 9da19774):** fuzz 69 (8bb8) × 600 alive. Live answered 1547–1553: filed P3
+- **12:28 update (greens 8bb8a6d1 → 9da19774):** fuzz 69 (8bb8) × 600 alive. Live answered 1547–1553: filed P3
   BODY-NAME-BY-TYPE (core), P3 GROUP-ROW-ERROR (skasm); SKETCH-START-INFERENCE confirmed; sketch 2.8 and assembly-sweep 5
   = live; SKETCH-HINT-OVERLAP → live has no sketch tool hints at all. Verified: drawing S19 / A7 (format layers, lock),
   K22; core-workflow 2.17 / 2.18 / 3.12 / 3.14 (core-workflow now 65/65 + 1 known ❌); analysis MP1–MP10 (measure
