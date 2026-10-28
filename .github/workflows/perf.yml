@@ -445,11 +445,11 @@ jobs:
         shell: bash
         run: |
           status=0
-          cargo test --release --locked -p noshape-model --test all -- --ignored --nocapture --test-threads=1 pattern_perf::timed_ pattern_fins::timed_ pattern_second::timed_the_fin engine::timed_ qa_regressions::timed_ 2>&1 | tee timed.log || status=$?
+          cargo test --release --locked -p noshape-model --test all -- --ignored --nocapture --test-threads=1 pattern_perf::timed_ pattern_fins::timed_ pattern_second::timed_the_fin pattern_second::timed_editing engine::timed_ qa_regressions::timed_ kernel_robustness::timed_ 2>&1 | tee timed.log || status=$?
           cargo test --release --locked -p noshape-store --lib -- --ignored --nocapture timed_ 2>&1 | tee -a timed.log || status=$?
           # PLAN 2.7 dx: the bracket drawing's 4 standard views, the NIST STEP / Parasolid import.
           cargo test --release --locked -p noshape-ops --test all -- --ignored --nocapture --test-threads=1 dx_perf::timed_ 2>&1 | tee -a timed.log || status=$?
-          { echo "### ${{ matrix.name }}: timed checks"; echo '```'; grep -E "^test timed_|^timed |×[0-9]+|1 MB commit|after the abort|fin under the|panicked" timed.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo "### ${{ matrix.name }}: timed checks"; echo '```'; grep -E "^test timed_|^timed |×[0-9]+|1 MB commit|after the abort|fin under the|editing the fin|shell on the|panicked" timed.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit $status
 
       - name: Timed checks (release, Windows)
@@ -457,7 +457,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
-          cargo test --release --locked -p noshape-model --test all -- --ignored --nocapture --test-threads=1 pattern_perf::timed_ pattern_fins::timed_ pattern_second::timed_the_fin engine::timed_ qa_regressions::timed_ 2>&1 | Tee-Object -FilePath timed.log
+          cargo test --release --locked -p noshape-model --test all -- --ignored --nocapture --test-threads=1 pattern_perf::timed_ pattern_fins::timed_ pattern_second::timed_the_fin pattern_second::timed_editing engine::timed_ qa_regressions::timed_ kernel_robustness::timed_ 2>&1 | Tee-Object -FilePath timed.log
           $status = $LASTEXITCODE
           cargo test --release --locked -p noshape-store --lib -- --ignored --nocapture timed_ 2>&1 | Tee-Object -FilePath timed_store.log
           if ($LASTEXITCODE -ne 0) { $status = $LASTEXITCODE }
@@ -465,7 +465,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { $status = $LASTEXITCODE }
           "### ${{ matrix.name }}: timed checks" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          Select-String -Path timed.log, timed_store.log, timed_dx.log -Pattern '^test timed_|^timed |×[0-9]+|1 MB commit|after the abort|fin under the|panicked' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          Select-String -Path timed.log, timed_store.log, timed_dx.log -Pattern '^test timed_|^timed |×[0-9]+|1 MB commit|after the abort|fin under the|editing the fin|shell on the|panicked' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           exit $status
 

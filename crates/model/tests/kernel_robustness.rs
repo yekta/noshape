@@ -2712,3 +2712,32 @@ fn shell_feature_time_probe() {
         eprintln!("h{h} R{r} t{th}: {st:?} {msg:?} {v:.3} mm³ in {:.0} ms", t0.elapsed().as_secs_f64() * 1e3);
     }
 }
+
+/// PLAN 2.7's Shell target (≤ 200 ms, live ~400): qa's 80 × 50 × 10 plate
+/// with a Ø20 hole, the top filleted R2, shelled 1.5 / 1.6 / 1.7 mm with the
+/// bottom removed (the plate and fillet cached). Printed: the Shell's best
+/// time; asserted: under 4× the target (runner noise).
+#[test]
+#[ignore = "timed: perf.yml model job (wall clock; ci.yml tests are deterministic)"]
+fn timed_shell_on_a_filleted_plate_with_a_hole() {
+    let mut t = T::new();
+    let (sk, _) = t.sketch(&[&[(-40.0, -25.0), (40.0, -25.0), (40.0, 25.0), (-40.0, 25.0)]], &[((0.0, 0.0), 10.0)]);
+    let r0 = t.regen();
+    let plate = r0.display.sketches.iter().find(|x| x.feature == sk).unwrap().regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).map(|g| Reference::SketchRegion { sketch: sk, key: g.key.clone() }).unwrap();
+    t.add("extrude", &[("entities", q(vec![plate])), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    let top = t.faces_where(|c| c.z > 10.0 - 1e-6);
+    t.add("fillet", &[("entities", q(top)), ("radius", e("2 mm"))]);
+    let bottom = t.faces_where(|c| c.z.abs() < 1e-6);
+    t.regen();
+    let s = t.shell(bottom, "1.5 mm");
+    let mut best = f64::MAX;
+    for th in ["1.5 mm", "1.6 mm", "1.7 mm"] {
+        t.ps.feature_mut(s).unwrap().params.set("thickness", e(th));
+        let r = t.regen();
+        let st = r.display.features.iter().find(|x| x.id == s).unwrap();
+        assert!(matches!(st.status, FeatureStatus::Ok), "{th}: {:?} {:?}", st.status, st.message);
+        best = best.min(st.time_ms as f64);
+    }
+    eprintln!("shell on the filleted plate with a hole: {best:.0} ms (target 200)");
+    assert!(best < 800.0, "the shell took {best:.0} ms (target 200)");
+}
