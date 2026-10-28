@@ -163,7 +163,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 6.5 | Z zooms out ×½, Shift+Z in ×2, about the view centre | live navigation/50–51 | 🔧 (was ×0.8/×1.25) |  |
 | 6.6 | Ctrl+Shift+arrows move the sheet 10 % of the canvas width toward the arrow | live navigation/54–55 | 🔧 (missing) |  |
 | 6.7 | Double middle click and F zoom to fit the sheet | live navigation/45–46, 56 | 🔧 (double middle missing) |  |
-| 6.8 | Left-drag on empty sheet: box select | live navigation/44 | 🔧 dx 10-28 (after qa DRAWING-BOX-SELECT): the window box (#1651B0 20 % / 60 %) and what it wholly encloses selected, Shift adds (`Drag::SelectBox`, `select_in_box`); to verify on green | 0.4.10+ / fa61ba6f 10-27 |
+| 6.8 | Left-drag on empty sheet: box select | live navigation/44 | 🔧 dx 10-28 (after qa DRAWING-BOX-SELECT): the window box (#1651B0 20 % / 60 %) and what it wholly encloses selected, Shift adds (`Drag::SelectBox`, `select_in_box`); to verify on green | 867a7720 10-28 (wf-block drawing: drag from empty sheet → window box #1651B0 20 % fill, the enclosed view selected) |
 
 ## 7. Touchscreen (iOS, Android and browser table)
 
