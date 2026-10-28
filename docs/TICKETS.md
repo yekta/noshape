@@ -927,6 +927,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
+- [ ] P3 ASM-MC-LIST-ORDER an assembly mate connector added after a mate is listed above it: qa5 mkmate.py doc, Fastened 1
+  (top-face hole centres), then right-click Part 1 <1> › Add mate connector to instance origin… › ✓ → Mate features (2):
+  **Mate connector 1, Fastened 1**. Live (behaviours ~22743, request 1541): creation order, "Fastened 1 · Mate connector 1"
+  (REST /features the same); parity assembly.md F1 (qa 2026-10-28 07:55, build 2292bf8c)
 - [ ] P2 MATE-LIMITS-OPPOSITE-SIGN a Revolute's limits act on the negated value: two plates (qa5 mkmate.py doc), Fastened
   <2> bottom-face hole centre → <1> top-face hole centre, change to Revolute, ☑ Limits min 0 deg / max 90 deg, ✓. Dragging
   <2> both ways stops at world 0° and at world −90° about Z (CLI assembly_list); selected, the mate's arc label there reads
@@ -1157,6 +1161,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
+- [ ] P3 OBJ-ZIP-MSG importing an OBJ export zip (.obj + .mtl) gives the zipped-assembly message: + › Import… (or CLI
+  import_files) of samples/l30-export/v2s2-30features-live-obj.zip, or of our own OBJ export (b2.zip = b2.obj + b2.mtl) →
+  "Import failed: …: Root assembly file not found. Ensure zip file name matches root assembly name and the archive does
+  not have folders". Live (behaviours ~22718, request 1540): nothing is translated, the notification reads "<zip> was not
+  translated. Translation is not supported for MTL (.mtl) files." (title "Translation not supported"); the zip stays as
+  a file tab. The bare .obj imports in both: ours 72215.0759 mm³ = live 72215.0759 (live's "6.3 % less" note compared a
+  different model) (qa 2026-10-28 07:55, v0.4.12 CLI)
 - [ ] P2 XT-ASM-VERSIONS live's own Parasolid assembly exports fail to import in half the versions: + › Import… (Import
   to this document) of /root/onshape-research/live/samples/dx-asm-xt-<v>.x_t (request 1536: Part 1 block + Part 2 pin,
   3 instances, one file per Parasolid version) on green 98667558:

@@ -64,5 +64,5 @@ EXP1 Rhino: "Rhino export needs openNURBS" → ✗ still, routed kern (packaging
 |---|---|---|---|
 | Exact formats (Parasolid, ACIS, STEP, IGES, JT, Rhino) | 67643.716875, 18 faces each | ✅ | v0.4.12 CLI 10-28 |
 | Mesh formats (PVZ, glTF, GLB, 3MF) | 67646.19 – 67646.77, 1 face | ✅ (mesh) | v0.4.12 CLI 10-28 |
-| OBJ | export writes <name>.zip (obj + mtl) as live's OBJ download; import_files of that zip fails "Root assembly file not found. Ensure zip file name matches root assembly name and the archive does not have folders" (b2.zip holds b2.obj); the bare .obj re-imports 67646.764949 / 1 face | ? (live asked: REQUESTS qa 10-28 06:31) |  |
+| OBJ | export writes <name>.zip (obj + mtl) as live's OBJ download; import_files of that zip fails "Root assembly file not found. Ensure zip file name matches root assembly name and the archive does not have folders" (b2.zip holds b2.obj); the bare .obj re-imports 67646.764949 / 1 face | ✗ OBJ-ZIP-MSG (live 1540: such a zip isn't translated, "…Translation is not supported for MTL (.mtl) files."); live's own .obj imports 72215.0759 in ours = live | v0.4.12 CLI 10-28 |
 | STL (CLI defaults) | 6.8e-05 mm³ (metres out, mm in) | ✅ as live | v0.4.12 CLI 10-28 |
