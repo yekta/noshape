@@ -256,7 +256,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | R3 | Fixed instances cannot be dragged (cue, no manipulator) | H:triad | ✅ | no manipulator for a selected fixed instance (live 565); press-dragging it: `no-drop` cursor + the fix glyph at the cursor, nothing moves, no message (live 562–563; `AsmUi.fixed_drag`); no pre-highlight while dragging (live 562: hover cleared when the fixed drag starts). GUI :103 r5 (glyph, nothing moves), r7 (selected, no triad) | 0.4.10+ / dd1b5037 10-27 (asm5: dragging the fixed plate: no-drop cursor, plate doesn't move) |
 | R4 | Click an instance shows the triad: axis arrows, plane squares, rotation arcs | H:triad | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | R5 | Drag the triad center to reposition it (snaps to MCs / inference points) | H:triad | ✅ | |  |
-| R6 | Typed value field after a triad drag | H:triad | ✅ | |  |
+| R6 | Typed value field after a triad drag | H:triad | ✅ | | 78958d0f 10-28 (asm5: click the pin → triad at the picked point; drag its Z arrow up 60 px → "12.799 mm" beside the arrow; on release it becomes an editable box with the value selected; the pin itself stays (Revolute 1 holds z); typing a value not run) |
 | R7 | Right-click center: Move to origin | H:triad | ✅ | | 0.4.10+ / acd6acce 10-27 (handle clicked first, then right-click; tickets/asm-triad-menus-acd6.png) |
 | R8 | Right-click axis arrow: Align with Z, Anti-align with Z | H:triad | ✅ | | 0.4.10+ / acd6acce 10-27 (handle clicked first, then right-click; tickets/asm-triad-menus-acd6.png) |
 | R9 | Right-click arc: Rotate 90 degrees, Rotate 180 degrees | H:triad | ✅ | | 0.4.10+ / acd6acce 10-27 (handle clicked first, then right-click; tickets/asm-triad-menus-acd6.png) |
