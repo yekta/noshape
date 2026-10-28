@@ -14,7 +14,7 @@ for f in "$msl"/*.metal; do
   # (macOS 26: MSL 3.2, a library macOS 14 can't load): naga writes the same
   # source for any version from 2.4 on but its "// language:" line, which the
   # key leaves out.
-  xcrun -sdk macosx metal -std=metal2.4 -mmacosx-version-min=12.0 -fpreserve-invariance -c "$f" -o "$msl/$k.air"
+  xcrun -sdk macosx metal -std=macos-metal2.4 -mmacosx-version-min=12.0 -fpreserve-invariance -c "$f" -o "$msl/$k.air"
   xcrun -sdk macosx metallib "$msl/$k.air" -o "$out/$k.metallib"
 done
 # Every pipeline must now load its library (the key is stable).
