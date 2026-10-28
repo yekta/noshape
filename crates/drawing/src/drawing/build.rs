@@ -518,6 +518,14 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
             match (&mut a.kind, r.slot) {
                 (AnnotationKind::LinearDimension { a: pa, .. }, 0) => *pa = p,
                 (AnnotationKind::LinearDimension { b: pb, .. }, 1) => *pb = p,
+                // A wall thickness: the end on its circle (center `p`), in
+                // the direction it had.
+                (AnnotationKind::LinearDimension { a: x, .. }, 10) | (AnnotationKind::LinearDimension { b: x, .. }, 11) => {
+                    let rad = radius.unwrap_or(0.0);
+                    let d = [x[0] - p[0], x[1] - p[1]];
+                    let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
+                    *x = if l > 1e-12 { [p[0] + d[0] / l * rad, p[1] + d[1] / l * rad] } else { [p[0] + rad, p[1]] };
+                }
                 (AnnotationKind::RadialDimension { center, radius: rr, .. }, 0) => {
                     *center = p;
                     if let Some(r) = radius {

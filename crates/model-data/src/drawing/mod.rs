@@ -349,7 +349,8 @@ impl PointRef {
 }
 
 /// Binding of one annotation input to model geometry. `slot` meaning per
-/// annotation kind: linear dimension 0 = `a`, 1 = `b`; radial dimension and
+/// annotation kind: linear dimension 0 = `a`, 1 = `b` (10 / 11: `a` / `b`
+/// on a circle, from its center ref: a wall thickness); radial dimension and
 /// centermark 0 = center/radius; angular dimension 0 = vertex, 1 = `a`,
 /// 2 = `b`; centerline 0 = `a`, 1 = `b`; balloon 0 = anchor.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

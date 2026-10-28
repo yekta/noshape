@@ -337,11 +337,9 @@ impl DrawingEditor {
                     out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, id))));
                 }
             }
-            AnnotationKind::RadialDimension { .. } => {
-                if let Some(k) = noshape_scene::drawing_tools::annotation_edit::foreshortened(&a.kind) {
-                    out.push(MenuEntry::item("Foreshorten", move |t, _, cx| set_kind(t, "Foreshorten", k.clone(), cx)));
-                }
-            }
+            // Live's radial menu has no Foreshorten (qa DWG-FORESHORTEN-JUMP,
+            // behaviours D14: only the toolbar tool); one made before keeps
+            // Remove foreshorten.
             AnnotationKind::ForeshortenedRadial { .. } => {
                 if let Some(k) = noshape_scene::drawing_tools::annotation_edit::unforeshortened(&a.kind) {
                     out.push(MenuEntry::item("Remove foreshorten", move |t, _, cx| set_kind(t, "Remove foreshorten", k.clone(), cx)));

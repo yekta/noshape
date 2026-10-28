@@ -3260,3 +3260,41 @@ fn supplementary_angular_draws_the_continuation() {
     let along = |l: &&sheet::Polyline2| l.points.len() == 2 && l.points.iter().all(|p| (p[1] - v[1]).abs() < 1e-6) && l.points.iter().any(|p| p[0] < back[0] - 1.0);
     assert!(built.geometry.lines.iter().any(|l| along(&l)), "no continuation line");
 }
+
+/// A wall thickness (two concentric circles) follows its circles and turns
+/// red when one goes (qa DWG-DANGLING-WALL): its ends are slots 10 / 11 on
+/// the circles' center references.
+#[test]
+fn wall_thickness_follows_its_circles_and_dangles_without_them() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let sheet = &drawing.sheets[0];
+    let view = sheet.views[0].id;
+    let g = compute_view(&drawing, sheet, view, &sources, &cache, false);
+    let s = g.snaps.iter().find(|s| matches!(s.point, Some(PointRef::Center { .. }))).expect("a circle center snap").clone();
+    let ctx = views::view_source(sheet, view).and_then(|(k, _)| sources.get(&k)).unwrap().context.clone();
+    let (c, radius) = views::resolve_in_view(&ctx, &g, s.point.as_ref().unwrap()).unwrap();
+    let r = radius.expect("a radius");
+    let center = s.point.clone().unwrap();
+    let wall = |id: u64, r2: PointRef| Annotation {
+        id,
+        // Stored off the circle: resolving puts the ends back on it.
+        kind: AnnotationKind::LinearDimension { view, a: [c[0] + 3.0 * r, c[1]], b: [c[0] + 3.0 * r, c[1]], offset: 0.0, orientation: DimOrientation::Aligned, override_text: None },
+        position: [0.0; 2],
+        refs: vec![AnnotationRef { slot: 10, point: center.clone() }, AnnotationRef { slot: 11, point: r2 }],
+        ..Default::default()
+    };
+    let lost = match center.clone() {
+        PointRef::Center { name, .. } => PointRef::Center { body: crate::BodyId { feature: crate::reference::FeatureId(u64::MAX - 7), index: 0 }, name },
+        _ => unreachable!(),
+    };
+    let id = drawing.sheets[0].next_annotation_id();
+    drawing.sheets[0].annotations.push(wall(id, center.clone()));
+    drawing.sheets[0].annotations.push(wall(id + 1, lost));
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let AnnotationKind::LinearDimension { a, .. } = &built.resolved.annotations.iter().find(|x| x.id == id).unwrap().kind else { panic!() };
+    assert!((a[0] - (c[0] + r)).abs() < 1e-9 && (a[1] - c[1]).abs() < 1e-9, "on the circle: {a:?} (center {c:?}, r {r})");
+    assert!(!built.dangling.contains(&id), "{:?}", built.dangling);
+    assert!(built.dangling.contains(&(id + 1)), "a lost circle: red, {:?}", built.dangling);
+}

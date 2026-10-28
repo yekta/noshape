@@ -213,12 +213,19 @@ impl SheetPick<'_> {
                 }
             }
             [Pick::Line { a, b }, x] | [x, Pick::Line { a, b }] => self.point_to_line(&center(x)?, a, b),
-            // Two concentric circles / arcs: the wall thickness, toward the cursor.
-            [Pick::Circle { view, center: c1, radius: r1, .. } | Pick::Arc { view, center: c1, radius: r1, .. }, Pick::Circle { center: c2, radius: r2, .. } | Pick::Arc { center: c2, radius: r2, .. }] if len(sub(*c1, *c2)) < 1e-9 => {
+            // Two concentric circles / arcs: the wall thickness, toward the
+            // cursor. Each end follows its circle (slots 10 / 11), so the
+            // dimension turns red when a circle goes (qa DWG-DANGLING-WALL).
+            [Pick::Circle { view, center: c1, radius: r1, r: q1 } | Pick::Arc { view, center: c1, radius: r1, r: q1, .. }, Pick::Circle { center: c2, radius: r2, r: q2, .. } | Pick::Arc { center: c2, radius: r2, r: q2, .. }] if len(sub(*c1, *c2)) < 1e-9 => {
                 let pl = self.placement(*view)?;
                 let u = norm(sub(pl.to_view(c), *c1));
                 let at = |r: f64| PickedPoint { view: *view, p: [c1[0] + u[0] * r, c1[1] + u[1] * r], r: None };
-                self.linear(&at(*r1), &at(*r2), Some(DimOrientation::Aligned))
+                let (kind, _) = self.linear(&at(*r1), &at(*r2), Some(DimOrientation::Aligned))?;
+                let refs = match (q1, q2) {
+                    (Some(x), Some(y)) => vec![(10, Some(x.clone())), (11, Some(y.clone()))],
+                    _ => Vec::new(),
+                };
+                Some((kind, refs))
             }
             [x, y] => self.linear(&center(x)?, &center(y)?, None),
             _ => None,
