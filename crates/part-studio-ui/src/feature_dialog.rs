@@ -1370,6 +1370,13 @@ impl FeatureDialog {
             if open(this, &p3) {
                 cx.stop_propagation();
                 this.accept_completion(None, window, cx);
+                // Live (behaviours 7040, DIALOG-AC-ENTER): the same Enter commits the field, its text selected;
+                // the next Enter accepts the dialog. Not when it opened the Create variable popup.
+                if this.create_var.is_none()
+                    && let Some(state) = this.inputs.get(&p3).cloned()
+                {
+                    this.apply_on_enter(&p3, &state, window, cx);
+                }
             }
         }))
         .capture_action(cx.listener(move |this, _: &Escape, _, cx| {
