@@ -64,3 +64,11 @@ frame-driven delivered rate.
 | Big plate: open in the app | ~10 min | first frame 1.9 / 3.4 s (preview 1.1 / 2.4 s, fine mesh 0.24 / 0.36 s after) | ✅ | 77870dd4 10-28 Linux xvfb: preview 0.87 s (Extrude 2 517 ms), refine 1.19 s |
 | Big plate: orbit / pan / zoom | frame 0.75-3.6 s behind | frame-driven at 2x Retina: orbit 93 / 102 fps, zoom 110 / 102, pan 86 / 75; 2-14% of frames over 16.7 ms | ✅ 60 fps |  |
 | Click on the plate top selects a Point | — | not re-checked (pick priority, ADV 1.7) | ✅ (a click between holes selects the top face, "Area: 139893.807 mm²") | 77870dd4 10-28 |
+
+## Re-run 2026-10-28 06:50 (qa, v0.4.12 CLI = release build of green 1b81b7ca, load ~34; bin/mkbig2_qa.py, Remove with `oppositeDirection: false` per API-REMOVE-DIR)
+| Step | Ours | Status | Verified |
+|---|---|---|---|
+| 400 circles in one sketch (batch) | 5.2 s (was 54.7 s, debug build) | ✅ | v0.4.12 CLI 10-28 |
+| Extrude Remove Through all, 400 regions | OK, 8.6 s (was 132 s) | ✅ PERF1 much better (release vs debug build, not like for like) | v0.4.12 CLI 10-28 |
+| Chamfer 0.5 on 400 top edges | OK, 5.5 s; 1397629.073 mm³, 806 faces (same numbers as 10-21) | ✅ | v0.4.12 CLI 10-28 |
+| Edit Extrude 1 10 → 12 | OK, 4.7 s; 1677416.687 (same) | ✅ | v0.4.12 CLI 10-28 |
