@@ -365,7 +365,6 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Columns Equally", Op("drawing_table_edit")),
     ("drawing:Columns equally", Op("drawing_table_edit")),
     ("drawing:Copy", Op("drawing_copy")),
-    ("drawing:Custom angle...", Op("drawing_view_edit")),
     ("drawing:Custom table properties...", Op("drawing_custom_table")),
     ("drawing:Cut list table properties...", Op("drawing_table_properties")),
     ("drawing:Delete break", Op("drawing_delete")),
