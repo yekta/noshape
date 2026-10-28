@@ -3,3 +3,4 @@
 
 mod instancing_bench;
 mod offscreen;
+mod wgsl_portable;

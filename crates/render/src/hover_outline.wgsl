@@ -26,13 +26,17 @@ fn fs_hover_outline(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32>
     let r = u.p.z;
     let n = i32(ceil(r));
     // In the band when a pixel on the other side of the boundary lies within reach (the window's edge doesn't count).
-    for (var dy = -n; dy <= n; dy++) {
+    // Ends in a return: D3D's DXC rejects a function whose last statement is `discard` ("control may reach end of
+    // non-void function"), which Vulkan and Metal accept.
+    var band = false;
+    for (var dy = -n; dy <= n && !band; dy++) {
         for (var dx = -n; dx <= n; dx++) {
             if (f32(dx * dx + dy * dy) > r * r) { continue; }
             let q = p + vec2(dx, dy);
             if (any(q < vec2(0)) || any(q >= size)) { continue; }
-            if ((textureLoad(mask, q, 0).r > 0.0) != inside) { return u.color; }
+            if ((textureLoad(mask, q, 0).r > 0.0) != inside) { band = true; break; }
         }
     }
-    discard;
+    if (!band) { discard; }
+    return u.color;
 }
