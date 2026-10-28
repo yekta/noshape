@@ -43,6 +43,7 @@ extern "C" char etext;
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Iterator.hxx>
 #include <OSD_Parallel.hxx>
+#include <OSD_ThreadPool.hxx>
 #include <Geom_Line.hxx>
 #include <Geom_Plane.hxx>
 #include <NCollection_IncAllocator.hxx>
@@ -1535,6 +1536,22 @@ void crash_inside_kernel(uint8_t kind)
         y = y * 1.0000001 + 1e-9;
     });
     fail_op("budget " + std::to_string(reason) + " after " + std::to_string(done.load()) + " of " + std::to_string(n));
+  }
+  else if (kind == 7)
+  {
+    // A pool job of this thread alone (as OCCT's serial BOPTools_Parallel
+    // loops are): the budget still stops it inside.
+    std::atomic<int>         done{0};
+    OSD_ThreadPool::Launcher alone(*OSD_ThreadPool::DefaultPool(), 1);
+    const int                reason = run_budgeted(0.05, [&] {
+      alone.Perform(0, 4, [&](int, int i) {
+        volatile double x = i;
+        for (long k = 0; k < 2000000000L; ++k)
+          x = x * 1.0000001 + 1e-9;
+        ++done;
+      });
+    });
+    fail_op("budget " + std::to_string(reason) + " after " + std::to_string(done.load()) + " of 4");
   }
 #endif
   else

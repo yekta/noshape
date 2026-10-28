@@ -1,15 +1,25 @@
 --- a/src/FoundationClasses/TKernel/OSD/OSD_ThreadPool.cxx
 +++ b/src/FoundationClasses/TKernel/OSD/OSD_ThreadPool.cxx
-@@ -188,8 +188,29 @@
+@@ -13,6 +13,7 @@
+ // commercial license or contractual agreement.
+ 
+ #include <OSD_ThreadPool.hxx>
++#include <optional>
+ 
+ #include <OSD.hxx>
+ #include <OSD_Parallel.hxx>
+@@ -188,8 +189,35 @@
  
  //=================================================================================================
  
 +namespace
 +{
-+// noshape: how many pool jobs this thread is running (it takes part in them
-+// and waits for the workers). A CPU budget's siglongjmp out of one would
-+// leave the workers on the abandoned stack frames (qa BOP-PAIRS-GPF,
-+// BOOL-THREAD-CRASH): noshape's budget doesn't jump while it isn't 0.
++// noshape: how many pool jobs with worker threads this thread is running (it
++// takes part in them and waits for the workers). A CPU budget's siglongjmp
++// out of one would leave the workers on the abandoned stack frames (qa
++// BOP-PAIRS-GPF, BOOL-THREAD-CRASH): noshape's budget doesn't jump while it
++// isn't 0. A job of this thread alone (a serial BOPTools_Parallel loop) isn't
++// counted: jumping out of it is safe, and the budget must stop those.
 +thread_local int THE_NOSHAPE_POOL_DEPTH = 0;
 +
 +struct NoshapePoolDepth
@@ -26,7 +36,11 @@
 +
  void OSD_ThreadPool::Launcher::perform(JobInterface& theJob)
  {
-+  const NoshapePoolDepth aDepth;
++  std::optional<NoshapePoolDepth> aDepth;
++  if (myNbThreads > 1)
++  {
++    aDepth.emplace();
++  }
    run(theJob);
    wait();
  }

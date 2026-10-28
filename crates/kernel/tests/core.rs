@@ -370,6 +370,19 @@ fn a_budget_never_stops_a_call_inside_an_occt_thread_pool_loop() {
     }
 }
 
+/// ... but a pool job of the evaluating thread alone (OCCT's serial loops go
+/// through the pool launcher too) is still stopped inside: the first patch
+/// 0005 counted those as well, and budgeted drafts / shells ran on for minutes
+/// (qa DRAFT-BUDGET-POOL).
+#[cfg(target_os = "linux")]
+#[test]
+fn a_budget_still_stops_a_pool_job_of_its_own_thread() {
+    let t = std::time::Instant::now();
+    let e = crash_inside_kernel(7).unwrap_err().to_string();
+    assert!(e.contains("budget 1 after 0 of 4"), "{e}");
+    assert!(t.elapsed().as_secs_f64() < 5.0, "{:?}", t.elapsed());
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn a_budget_never_stops_a_call_inside_the_allocator() {

@@ -176,3 +176,35 @@ fn edit_commit_profile() {
     }
     let _ = std::fs::remove_file(&tmp);
 }
+
+/// qa DRAFT-BUDGET-POOL: the CLI-fuzz body whose Draft 7 ran away (its face
+/// deletion's defeaturing never ended, memory climbing) when the CPU budget
+/// couldn't stop OCCT pool work (patch 0004's parallel pairs; the first patch
+/// 0005, which also held the budget in serial pool loops). Its Drafts must stop
+/// at their budget (30 s of CPU each): the document opens in well under the
+/// 4 minutes it ran before qa stopped it (green 989f756b: 26 s).
+#[test]
+#[ignore = "T2: a CLI-fuzz document with budgeted drafts (~30-70 s)"]
+fn the_draft_pool_hang_document_opens() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/budget/draft-pool-hang.noshape");
+    let tmp = std::env::temp_dir().join(format!("noshape-draft-pool-{}.noshape", std::process::id()));
+    std::fs::copy(&path, &tmp).unwrap();
+    let t = Instant::now();
+    let s = noshape_ops::session::Session::open(&tmp).unwrap();
+    let units = s.doc.settings.units;
+    let mut slow = Vec::new();
+    for tab in &s.doc.tabs {
+        if let TabContent::PartStudio(ps) = &tab.content {
+            let r = Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+            for (f, st) in ps.features.iter().zip(&r.display.features) {
+                if st.time_ms > 5000.0 {
+                    slow.push(format!("{} {:.0} ms {:?} {:?}", f.name, st.time_ms, st.status, st.message));
+                }
+            }
+        }
+    }
+    let _ = std::fs::remove_file(&tmp);
+    let secs = t.elapsed().as_secs_f64();
+    eprintln!("draft pool hang document: opened and regenerated in {secs:.0} s; slow: {slow:?}");
+    assert!(secs < 180.0, "{secs:.0} s; slow: {slow:?}");
+}

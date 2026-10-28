@@ -104,7 +104,9 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   and the CLI died in ForceInterfEF / an IntTools_Context map on a pool worker, intermittently, as BOOL-THREAD-CRASH
   did with whole booleans parallel); ReduceIntersectionRange's E/E interferences indexed by new vertex (serial,
   stays on). So the knurl is back near its serial time unless the variable is set.
-- 0005 (10-28) TKernel OSD_ThreadPool::Launcher::perform counts, per thread, the pool jobs it runs
+- 0005 (10-28; v2 22:30: only jobs with worker threads, a job of the calling thread alone is a serial loop the
+  budget must still stop: qa DRAFT-BUDGET-POOL, T1 `kernel_core::a_budget_still_stops_a_pool_job_of_its_own_thread`,
+  T2 ops `regen_profile::the_draft_pool_hang_document_opens`) TKernel OSD_ThreadPool::Launcher::perform counts, per thread, the pool jobs it runs
   (`noshape_osd_pool_depth()`); the CPU budget's handler (common.cpp on_budget_tick) doesn't jump while it isn't 0
   (the next tick after). That was BOP-PAIRS-GPF's cause: the budgeted ops (Shell, draft, blends) jumped out of a
   pool job the evaluating thread takes part in (it runs a share of the items), the workers went on with its
@@ -416,6 +418,8 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- Never swap an OCCT lib into the shared /root/occt before its patch lands (I did 10-28 20:50-22:05 with a "pairs
+  on" TKBO, and qa's 21:05 build picked it up): /root/occt-core + /root/target-core-bop is the place to try them.
 - /tmp/lead/disk-loop.sh's `prune-exes.py` (every ~30 min) keeps the newest 2 builds of each noshape crate per
   target dir and deletes the rest with their fingerprint dirs, also while a cargo uses the dir: land.sh builds
   each crate in more than two ways (clippy, tests, T0), so the build a running land.sh still needs goes. My lands
