@@ -179,12 +179,11 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-N00. **Perf bisect of v0.4.12's 1× texture orbit / zoom drop (31 → 18 fps, run 40640263048)**: bf131a31~1 (40642410950)
-     and bf131a31 (40643178645) both read orbit 30–32 / zoom 31–32 on both macOS runners, so bf131a31 is not it. Pan is
-     ~18 in both: an older, separate drop (27e0f950 had 31). Running (07:08): 40648174571 = 1b81b7ca (v0.4.12's code
-     from source: does the drop reproduce outside the release binary?) and 40648183752 = e3fd499b~1. Then bisect the
-     commits between; render-side candidates: e3fd499b (pick_solid, Part Studio only), 52ca0b97 (hover shader). Also
-     landed cef2a10a: the hover band only for a whole hovered part (it ran on every face hover).
+N00. Perf 10-28: v0.4.12's 1× texture orbit / zoom at 18 fps (run 40640263048) is **runner noise, not code**:
+     v0.4.12's own commit built from source (40648174571) reads 31.1 / 30.5 / 30.7 fps on macOS 14 and 18.7 / 19.1 /
+     18.6 on macOS 15 in the same run; bf131a31~1 and bf131a31 read ~31 on both. The 1× path is timer-paced and
+     bimodal (one or two 33 ms ticks per frame); compare it only within one run, or use the 2× frame-driven rows
+     (unchanged at 67–75 fps). Landed with it: cef2a10a, the hover band only for a whole hovered part.
 N01. 10-28 06:00–06:30 landed: a237ae16 count fields two-step Enter (live), c8239e05 folder Roll to here / Roll to end
      and the nested rollback bar, 469aa3c6 parts list properties (7.7), blamed number fields (live "failing parameter
      marked red"). Residuals: a folder rolled to its top draws the bar above it; the guide's end tick; the parts-list
