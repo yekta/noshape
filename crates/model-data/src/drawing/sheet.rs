@@ -1263,7 +1263,16 @@ impl SheetGeometry {
                         }
                     };
                     let t = match override_text {
-                        Some(o) => DimText::plain(o.clone()),
+                        // Overridden (help drawing_dimensions: "its other
+                        // fields stay editable"): the typed value with the
+                        // prefix, suffix, parentheses, text above / below and
+                        // the inspection oval (D39).
+                        Some(o) => {
+                            let f = &a.format;
+                            let main = format!("{}{o}{}", env.expand(&f.prefix), env.expand(&f.suffix));
+                            let line = |s: &String| (!s.is_empty()).then(|| env.expand(s));
+                            DimText { main: if f.reference { format!("({main})") } else { main }, above: line(&f.above), below: line(&f.below), oval: f.inspection_frame, ..Default::default() }
+                        }
                         None => env.text(a, model_len, false, ""),
                     };
                     let first = self.texts.len();
