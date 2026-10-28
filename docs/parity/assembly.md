@@ -161,7 +161,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 
 | # | Behaviour | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
-| F1 | Mate connectors, mates, relations, groups listed in creation order | E§5.1 | ✅ | |  |
+| F1 | Mate connectors, mates, relations, groups listed in creation order | E§5.1 | ✅ | | 2292bf8c 10-28: ? Fastened 1 created first, then Mate connector 1 → ours lists the connector above the mate; live order asked (REQUESTS qa 07:10) |
 | F2 | Hover a mate: its instances highlight, glyph shows | E§5.1 | ✅ | | 0.4.10+ / 52ca0b97 10-28 (hover Revolute 1: both instances tinted, the glyph shows) |
 | F3 | Hover tooltip: "<name> has error: <message>", type, offset and limit definitions | UI:mate-hover | ✅ | | 0.4.10+ / 52ca0b97 10-28 ("Revolute 1 (Hidden) / Revolute mate / Offset: off / Limits: Z angle – to 30 deg") |
 | F4 | Mate limit indicator icon ("<name> has limits") | H:mates, B | ✅ | | 2292bf8c 10-28 (Revolute 1, ☑ Limits 0 / 90 deg → row icon, tooltip "Revolute 1 has limits") |
