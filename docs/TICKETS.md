@@ -382,6 +382,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 08:10 (A/B at load 39–49, the box was very busy): c725f68f open 907 ms, edits 295 / 299 / 255 ms, Ctrl+Z ×3 1 / 2 /
   1437 ms; 6444d892 right after: open 1725 ms, edits 178 / 315 / 397 ms, Ctrl+Z 1 / 2 / 1620 ms. Same within load noise; the
   third undo (29 features re-evaluated) stays far over 50 ms.
+  qa 09:27 (green 97c7aae3 with core 89531150, load 28–34): open 913 ms, edits 406 / 323 / 196 ms (median 323), Ctrl+Z 2 / 1 /
+  1277 ms: no visible change at this load.
 - [x] not a bug (live answered 10-26, behaviours "qa (2026-10-26, P0 check)"): PATTERN-OFFPART-PARTS — live also keeps
   each fully-off copy of a Reapply feature pattern as its own floating part (OK, no message), so ours matches (qa)
 - [x] verified watcher CLI 04:06 (≥ green bcf401ca, has 239fa250; qa5 pass28/build.py: 2.5 mm 8503.961 mm³ / 47 faces, 1 mm 3998.630 / 33, live 8503.961 / 47 and 3998.627 / 33) (core 10-27: live's numbers exactly, 1 mm 3998.632 / 33 faces, 2.5 mm 8503.961 / 47; kernel test shell.rs shell_block_with_close_holes_like_onshape back in T1) P1 P1-16 / P1-6 (qa5, carried over) Shell 1 mm on live's p2 model fails "Could not shell part with selections."
