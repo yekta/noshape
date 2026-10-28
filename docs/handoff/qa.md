@@ -9,6 +9,9 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e)
 
+- **21:40 update (green 59c8c51e):** drawing V22 ✅ (section line Flip / Edit section), T16 ✅; new P3 DWG-CENTERMARK-ALIGN (auto
+  centermark menu lacks Align centermark). GUI Part › Export… › Parasolid 38.1 → in-app save path dialog → re-import with the v0.4.12 CLI:
+  39430.0888 mm³ both ways. asm5 BOM panel columns = live. Still waiting on core for DRAFT-BUDGET-POOL.
 - **21:31 update (green 59c8c51e, copied 21:28):** verified CURSOR-COUNT-UNDER-MENU (XFixes 32→24→32). Live answered 1577 / 1578 →
   P2 DWG-PROPERTY-FIELD (editor token, inserted properties default All uppercase), P3 DWG-SURFACE-FINISH-MENU (no Add leader, Flip /
   Paste, empty-sheet Paste); D19 → P3 DWG-CHAMFER-NOTE-LANDING. Fuzz 86 (59c8) alive. DRAFT-BUDGET-POOL: no core reply yet.
