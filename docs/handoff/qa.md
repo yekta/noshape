@@ -3,7 +3,15 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1)
+## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97)
+
+- **03:30 update:** fuzz 47 / 48 × 600 on 7929b13a: alive. REGEN-SPEED on 7929b13a (load ~30): median 378 ms, 3rd undo
+  392 ms; SHELL-SLOW: wf-block top-face shell 2.6 s / 1.7 s in the app. Filed P3 TABLE-SHIFT-TAB-BLANK, P3
+  NOTE-PANEL-UNDER-PROPS (dx). Live asked: auxiliary view label checkbox. Rows: drawing.md T5 T7 T10 T11 V10–V13 V16 V36
+  V37 V41 V50 D27 A2 A3 A10–A12 A37 A40 A47 A48 EX7–EX9 S2 S7 S10–S12 S23 S26 S34 S35 TB1 TB8 (K24 ❌);
+  part-studio 1.24 3.18 5.6 5.8 5.8b 9.14; sketch 14.45; chrome-sweep CM1 CM3 CM5; advanced 1.1–1.4 (ADV1 fixed).
+  Not yet green at 03:30: e3fd499b (psui see-through picks), da18f886 (skasm SKETCH-FILLET-STUCK-RADIUS again),
+  0637de45 (dx dual dimensions) — verify on the next green.
 
 - **03:00 update:** fuzz seeds 45 / 46 × 600 on 41f60e47: alive, no panic. No new P0.
   Verified: P1-8 (hole chips), PS-SECTION overlap (flat 198,0,0 = live's recapture), RHINO-GREEN (green lists no RHINO),
