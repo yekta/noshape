@@ -178,6 +178,14 @@ App edit → `cargo build -p noshape`: 60–78 s. A vendor gpui-base / gpui-pre-
 that touches the model: ~12 min.
 
 ## Next, in order
+0. **After the cold-start work: our own display mesher (lead 10-28 21:05, user-approved).** `brep::mesh` in crates/brep
+   (bool's crate, its Body / Surface / Curve types): planes (polygons with holes), cylinders, cones, spheres, tori from
+   their exact parameterisation, shared edge samples (watertight), the display's deflection rules; anything else
+   declines to BRepMesh per face. Hook in crates/kernel/cpp/mesh.cpp behind core's mesh cache, NOSHAPE_MESH_RUST
+   (0 = off), on by default once correct; cached brep bodies where the Rust Boolean made them, else read the OCCT face
+   geometry directly. T1: area / bounds / max deviation against BRepMesh, offscreen pixel checks. Target ≥ 10× on
+   mesh_prepare (400-fin plate, live-30-features open / edit); numbers before/after here. Land planes, then
+   cylinders / cones, then spheres / tori.
 
 N04. 10-28 15:30 cold start, measured: perf 40709590907's build job (macOS 26 runner, Metal cache cleared before each
      run) creates the first-frame pipelines in 868–1033 ms from source and 79–130 ms from the metallibs (34 of 34
