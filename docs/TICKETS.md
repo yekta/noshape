@@ -75,6 +75,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (right), Part pattern 3 × 2 → 6 (right). Same on CLI 09:50 and v0.4.10. Live patterns an added boss in any in-plane
   direction without Reapply (confirming in REQUESTS "qa (2026-10-27, FEATURE-PATTERN-ADD-Y)") (qa 2026-10-27 11:13,
   v0.4.10 artifact / CLI 09:50)
+- [ ] P1 FEATURE-MIRROR-COPY-FULL-DEPTH Mirror › **Feature mirror** (Reapply features off, the default) of an added boss
+  builds a copy as deep as the whole part: block 40×20×10 on Top (0..40, 0..20), sketch on its top face (or on Top+10)
+  a rectangle (5,5)–(15,15), Extrude Add 5 mm; Plane = Right offset 20; Feature mirror, Features to mirror = Extrude 2,
+  Mirror plane = Plane 2, ✓. live (behaviours ~6240, "qa5 feature mirror"): boss copy at x 25…35, **9000.0000 mm³,
+  16 planar faces**; ours: **9500 mm³, 15 faces**, the copy is x 25…35 × **y 0…20** × z 10…15 (its top face 200 mm²,
+  the original's 100). An off-centre boss (5,2)–(15,8) gives a copy that again spans y 0…20 (9300, should be 8800):
+  the copy takes the part's full depth, not the boss's. With ☑ Reapply features: 9000 / 16 = live. No error, status OK.
+  Same in green b504234e (GUI, Mass properties 9500 mm³; tickets/feature-mirror-full-depth-b504.png) and v0.4.11 CLI;
+  script qa-scratch/bin/fmirvar.py (face / offset-plane sketch × Reapply off / on). Parity workflow-advanced-part-studio
+  3.10b had 9000 (CLI) on 10-21 (qa 2026-10-28 05:11, build b504234e)
 - [ ] P3 SM-FACES Sheet metal model › Extrude of an open L ((0,0)–(50,0)–(50,30), Blind 20, thickness 2, R3; live "fs (10-23
   05:00)"): volumes exact (3211.3274 / flipped 3051.3274) and the folded boxes = live, but ours has **10 faces**, live **14**
   (12 PLANE + 2 CYLINDER): live keeps each end face (z 0 and z 20) split into wall / bend / wall pieces, ours merges each end
@@ -379,6 +389,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   in the green app; live 5927.728022 (docs/handoff/qa5-routing.md "kern" table) (qa 2026-10-26, build 4d2f6b0c)
   qa 20:30 (main CLI 12:08): live's other loft (behaviours pvz-shapes "Loft": 20×20 square (110..130, −10..10) to a circle r8 at
   (120, 0, 25)) gives 7409.693222 / 6 faces, live 7409.706328752699 (−0.013 mm³, −1.8e-6): same direction as ADV2.
+  qa 2026-10-28 05:06, green b504234e: still open. GUI Mass properties 5927.755 mm³ (doc qa-scratch/adv2.noshape); v0.4.11 CLI 5927.754578.
 - [ ] P2 HOLE-MISS-MSG a Hole whose points are on the part's Top-plane face but drilled away from the part (sketch on
   Top at z 0 under a 40×30×20 block, default direction): ours "No target parts selected for hole."; live "None of the holes
   intersected a part." with Merge scope flagged (behaviours L56/L57 and "H1 flipped"); live keeps "No target parts…" for
