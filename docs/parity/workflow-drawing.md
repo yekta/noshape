@@ -76,7 +76,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 |---|---|---|---|---|
 | 1.1 | Create Drawing dialog | ANSI_A_INCH.dwt selected by default; "No views" option pre-selected (live default ?) | ✅ D1 fixed | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) (ANSI_A_INCH selected, No views preselected) |
 | 1.4 | Insert picker | filter icons Part Studios / Parts / Sketches / Flat patterns + thumbnails | ✅ D2 fixed |  |
-| 1.6 | Place a view, Ctrl+Z | view removed, no "Out of date" notice ✅; **title-block SCALE changes from "1:1" (before the view) to "----" after the undo** | ✅ D3 fixed / ✗ **D14** (minor) |  |
+| 1.6 | Place a view, Ctrl+Z | view removed, no "Out of date" notice ✅; **title-block SCALE changes from "1:1" (before the view) to "----" after the undo** | ✅ D3 fixed / ✗ **D14** (minor) | c38eb9cf (qa 10:52, wf-block Part 1 › Create Drawing, No views: place a Front view (SCALE 1:1), Ctrl+Z → view gone, SCALE "----", no Out of date notice; Ctrl+Y brings it back at 1:1) |
 | 1.7 | DWG NO. of an assembly drawing | "----" (both drawings) | ✅ D4 fixed | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) ("----") |
 | 2.6 | GTol: type right after opening | "0.1" lands in Tolerance, ✓ enabled | ✅ D7 fixed |  |
 | 3.2 | Callout balloons in the existing drawing | still "----" with a BOM table present | ✗ D8 |  |
@@ -96,7 +96,7 @@ Pass 6 (17:11) had found D5 fixed (d starts Dimension after Esc).
 |---|---|---|---|
 | D8 balloons | the old front-view balloon now shows **3**; a new balloon on a cylinder in the isometric view still shows "----" | ✗ still (partly) |  |
 | D15 DXF defaults | ☑ Set z-height to zero…, Units "Use drawing units" | ✅ **fixed** | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) (☑ z-height to zero) |
-| D14 SCALE after undo | "----" on the empty sheet, "1:1" with a view, "----" after Ctrl+Z (consistent) | ✅ **fixed** (live value on an empty sheet ?) |  |
+| D14 SCALE after undo | "----" on the empty sheet, "1:1" with a view, "----" after Ctrl+Z (consistent) | ✅ **fixed** (live value on an empty sheet ?) | c38eb9cf (qa 10:52, wf-block Part 1 › Create Drawing, No views: "----" after the undo, "1:1" with the view (and while the Insert-view preview follows the cursor)) |
 | D16 (new) | the "Sheet1" chip draws over the Insert view dialog's title ("Sheet1 ew") | ✗ **D16** (asb / ui) |  |
 
 ## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
@@ -123,6 +123,6 @@ Live answered "qa5 pass 7" (3): SCALE "----" before any view, 1:1 after → D14 
 | D10 PDF | tab › Export… › PDF 1.5 Color: the isometric view is **lines** (not shaded); Detail A keeps its circle and the clipped content, "DETAIL A / SCALE 2:1" (pass23/d10pdf-1.png) | ✅ fixed (api) | 0.4.10+ / daf1f50c 10-27 (PDF 1.5, 1 page 792×612, lines, Detail A clipped + SCALE 2:1) |
 | D12 DXF | Release 14: CIRCLE ×5, ELLIPSE ×2, MTEXT ×43, LINE, POLYLINE; layers VISIBLE, TITLE_BLOCK, BORDER_ZONES / BORDER_FRAME, DETAIL_VIEW_BORDER / DETAIL_VIEW_PARENT_BORDER, ANNOTATION_TEXT (R14 writes upper-case layer names, behaviours ~6165) | ✅ fixed (api) for this drawing; hatches, dimensions and tables not in it (not checked) | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) (R14 AC1014, INSUNITS 4: DIMENSION 2, LINE 95, CIRCLE 7, ELLIPSE 4, MTEXT 46, POLYLINE 9, SOLID 4) |
 | D13 DRAWN name after reopening (pass 24, 2026-10-24) | d10 drawing: "ROOT" in DRAWN before and after closing and reopening the document | ✅ fixed |  |
-| D6 / 2.2 Dimension near an edge's midpoint (pass 24) | d, hover 7 px off the left view edge's midpoint: the whole edge highlights; click, move, click: length dimension "20" of the edge (live "asb (b)": the edge is picked, never its midpoint) | ✅ |  |
+| D6 / 2.2 Dimension near an edge's midpoint (pass 24) | d, hover 7 px off the left view edge's midpoint: the whole edge highlights; click, move, click: length dimension "20" of the edge (live "asb (b)": the edge is picked, never its midpoint) | ✅ | c38eb9cf (qa 10:52, wf-block Part 1 › Create Drawing, No views: d, hover 7 px along the left edge from its midpoint → whole edge orange; click, move, click → the edge's length dimension (at 7 px perpendicular nothing highlights; live measured along the edge too)) |
 | D8 (dx 10-27, main 9932ff31, CLI) | Callout on the pin's silhouette in an assembly drawing's isometric view (plate + Ø10 pin) | the pin's BOM item number "2" (drawing_get now lists silhouettes; /root/dx-scratch/d8/d8.py) | ✅ D8 |  |
 | D12 entities (dx 10-27, main dbc12611, CLI, demo drawing 4 sheets) | DXF 2018: DIMENSION 6, HATCH 6, ACAD_TABLE 4, MTEXT, LWPOLYLINE; Release 14: DIMENSION 6, HATCH 6, INSERT 4, POLYLINE/VERTEX, MTEXT (live drw2-k-dxfR14: DIMENSION, HATCH, INSERT, POLYLINE/VERTEX, MTEXT) | dimensions, hatches and tables are entities, not exploded | ✅ D12 |  |
