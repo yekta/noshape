@@ -43,7 +43,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | K24 | `Shift+/` keyboard shortcut list | H:shortcuts | ✅ | assembly list overlay | 0.4.10+ / c9c66d1c 10-27 (Assembly keyboard shortcuts list) |
 | K25 | `Alt+C` search tools | E§2 | ✅ | Alt+C / "Search tools…" in the assembly toolbar: the tool search popover with the assembly tools, live ranking (starts, contains, letters in order; shorter names first; max 10), live descriptions, Highlight tool in toolbar (`assembly_search.rs`, unit test) | 0.4.10+ / c9c66d1c 10-27 |
 | K26 | `[` Measure, `Shift+X` section view | E§3 | ✅ | Measure: click faces/edges/vertices of any instances (length, area, radius, position, distance ΔXYZ, angle; model test `measure_between_instances`); Section view through the hovered planar face, the selected mate connector or Front, offset and flip | 0.4.10+ / 52ca0b97 10-28 ([ opens the Measure panel at the bottom right; Shift+X the Section view dialog) |
-| K27 | `` ` `` select other | E§3 | ✅ | cycles the instances under the cursor (Shift+` backwards), list at the cursor |  |
+| K27 | `` ` `` select other | E§3 | ❌ (ASM-SELECT-OTHER) | cycles the instances under the cursor (Shift+` backwards), list at the cursor | 4c97692e 10-28 (GUI: bare one-row popup → ASM-SELECT-OTHER) |
 | K28 | `Alt+click` select through transparent | H:shortcuts | ✅ | Alt held (or Isolate › Select transparent geometry): transparent / isolated-away instances become pickable (`AsmSceneOptions.pick_dimmed`); the isolate enter / exit / expand and pickability toggles now redraw the pick buffer (rebuild_scene(true)); GUI k28e (checkbox path; Alt held via xdotool is unreliable) |  |
 | K29 | View keys (`f`, `Shift+1..7`, `z`, arrows) | H:shortcuts | ✅ | shared viewport bindings | 0.4.10+ / 52ca0b97 10-28 (Shift+5 Top, Shift+7 Isometric, ← turns the view, f fits) |
 | K30 | Alt-drag ignoring mates | task brief | n/a | not an Onshape behaviour (not documented) |  |
@@ -217,7 +217,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | D18 | Only the current mate's instances move until Solve | H:mates | ✅ | help (Mates): "Onshape does not continually calculate all mates and their positions until the Mate feature is accepted. Use Solve". `SolveOptions::only_mate`: before Solve only the mate being defined is solved (the second connector's instance held, live 33–35: the first-picked part moves); other mates and relations are not enforced and report ok; Solve / ✓ solve everything. T:`a_mate_being_defined_is_solved_alone_until_solve`; GUI :103 d1 (Part 1 <2> mated onto <1>: the revolute-mated Pin stays put), d2 (Solve: the Pin follows, and Fastened 1 conflicts as expected) |  |
 | D19 | Tangent mate: entities, Tangent propagation, flip | E§7.10 | ✅ | pre-existing | e8ca768f 10-28 (asm5 Tangent dialog: two "Face, edge or vertex" fields, ☑ Tangent propagation, flip button; empty → "Nothing selected.") |
 | D20 | Width mate: tab and width connector fields | E§7.11 | ✅ | pre-existing | e8ca768f 10-28 (asm5 Width dialog: "Tab mate connector(s)", "Width mate connectors") |
-| D21 | Over-constrained message in the dialog, red mate | E§24.2 | ✅ | |  |
+| D21 | Over-constrained message in the dialog, red mate | E§24.2 | ❌ (ASM-OVERDEFINED-TEXT) | | 4c97692e 10-28 (GUI: dialog open → no error, pin moves = live; after ✓ both red, but our text differs → ASM-OVERDEFINED-TEXT) |
 
 ## 7. Mate connector inference (H:mates, H:assembly_mate_connector, E§6.3, E§8.2)
 
