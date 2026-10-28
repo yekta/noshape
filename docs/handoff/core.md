@@ -142,9 +142,12 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   and the CLI died in ForceInterfEF / an IntTools_Context map on a pool worker, intermittently, as BOOL-THREAD-CRASH
   did with whole booleans parallel); ReduceIntersectionRange's E/E interferences indexed by new vertex (serial,
   stays on). So the knurl is back near its serial time unless the variable is set.
-- Parallel pairs: ready on branch agent/core-pairs-on (99185686, not landed, for after the 10-29 release): serial
-  inside CPU budgets, off in OCCT until the kernel turns it on; land it with /root/core-scratch/libTKBO.a.0004-on3
-  in /root/occt.
+- Parallel pairs back (10-29, after the release): 0004's flag off by default in
+  OCCT, the kernel's boolean() turns it on (NOSHAPE_BOP_PAIRS_PARALLEL=0 off), and run_budgeted turns it off for
+  its thread while a budget runs (`noshape_bop_set_pairs_parallel_here`): a worker's work is out of a CPU
+  budget's reach (DRAFT-BUDGET-POOL), and no budget jumps race the pool. Checked in /root/occt-core +
+  target-core-bop: kernel tests, corpus 974 / 0 (NOSHAPE_BOOL_RUST=0), qa's draft document 21 s (Draft 7 stops
+  after 11 s). Landed with that TKBO (/root/core-scratch/libTKBO.a.0004-on3) swapped into /root/occt. A crash guard that recovers past a budget restores the thread's pairs mode too (BudgetSnapshot).
 - CLI-SUPPRESS-SEGV (10-29, 5ac53b95; qa fuzz seeds 171 4/4 and 174 1/1 run to the end on the fixed CLI): a fault inside a budgeted op (OCCT's chamfer under run_budgeted) was caught
   by a crash guard (the bridge's trycatch_timed, or run_guarded) past run_budgeted's frame, and the budget's jump
   buffer and CPU timer outlived it: the next budgeted op ran as if nested (no budget of its own) and the stale

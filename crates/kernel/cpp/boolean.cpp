@@ -2825,6 +2825,10 @@ static std::vector<TopoDS_Shape> group_disjoint(const std::vector<TopoDS_Shape>&
   return out;
 }
 
+extern "C" void noshape_bop_set_pairs_parallel(int on); // OCCT patch 0004
+
+void set_bop_pairs_parallel(bool on) { noshape_bop_set_pairs_parallel(on ? 1 : 0); }
+
 void set_memory_budget_mb(uint64_t mb)
 {
   g_memory_budget_mb.store(mb > 0 ? mb : 4096);

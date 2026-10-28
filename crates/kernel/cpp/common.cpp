@@ -1526,10 +1526,15 @@ void crash_inside_kernel(uint8_t kind)
   {
     // A budget running out inside an OCCT thread pool loop (qa
     // BOP-PAIRS-GPF): it stops the work after the loop, never inside it.
-    std::atomic<int> done{0};
-    const int        n      = 4096;
-    const int        reason = run_budgeted(0.05, [&] {
-      OSD_Parallel::For(0, n, [&](int i) {
+    // A pool of its own: the default one may have no thread free (other
+    // tests' parallel Booleans), and a job of this thread alone is a serial
+    // loop the budget does stop (kind 7).
+    static const occ::handle<OSD_ThreadPool> pool = new OSD_ThreadPool(4);
+    std::atomic<int>                         done{0};
+    const int                                n = 4096;
+    OSD_ThreadPool::Launcher                 launcher(*pool, 4);
+    const int                                reason = run_budgeted(0.05, [&] {
+      launcher.Perform(0, n, [&](int, int i) {
         // Arithmetic only (a clock read would put the pc in the vDSO, where
         // the budget never jumps): a few ms each.
         volatile double x = i;
