@@ -7,8 +7,11 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 noshape-0.4.12-linux-x86_64.tar.gz: all rows OK** (details under "Daily release smoke" › v0.4.12). Blocker list at the top
 of TICKETS (open P0s all carried from v0.4.11).
 
-## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff)
+## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c)
 
+- **21:24 update (green 70eb094c, copied 21:18):** SKETCH-MODEL-EDGE-SELECT (skasm 1932d832 ray pick): selection never dropped any more
+  (40/40), edge taken 7/10 at 0.15 s rest, 9/10 at 0.4 s → P2 residual. Release dry run on e4cc/70eb: kill -9 after Suppress →
+  reopens suppressed ✓; Linear pattern hover + pick (Part 1, Direction face) ✓. DRAFT-BUDGET-POOL still open (no core reply yet).
 - **21:14 update (green e4cccdff, copied 21:00; has core c1f98ed6 OCCT patch 0005):** **P0 DRAFT-BUDGET-POOL reopened**: the
   draft-pool-hang document never finishes opening (989f756b: 26 s); A/B and stack in TICKETS; lead asked. cli-draft-hang2 still
   opens. Fuzz 85 (e4cc) alive. Drawing V18, SK8 ✅. Live asked: note field / ANSI case (20:55), surface finish menu (20:58).
