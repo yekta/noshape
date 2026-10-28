@@ -3271,11 +3271,15 @@ impl FeatureDialog {
         // shows it in the still focused field; typing hides it again.
         let applied = self.baselines.get(path).cloned().unwrap_or_else(|| text.clone());
         let eval_err = num.filter(|_| !applied.trim().is_empty()).and_then(|n| noshape_units::evaluate_as(&applied, n.kind.dim(), &self.units, &self.variables).err());
-        let invalid = err.is_some() || eval_err.is_some() || (num.is_some() && self.out_of_range(path, &applied));
+        // Live (behaviours "qa (2026-10-28) feature dialogs: the failing parameter is marked red"): a parameter the
+        // feature's error blames takes the same pink fill and red rule, focused or not; ✓ stays enabled.
+        let blamed = if path == s.id { self.field_error(s.id) } else { None };
+        let invalid = err.is_some() || eval_err.is_some() || (num.is_some() && self.out_of_range(path, &applied)) || blamed.is_some();
         // Live (ui (10-26 c)): the hover says why ("Cannot use angle as length.").
         let invalid_tip = match &eval_err {
             Some(e) => crate::quantity_field::eval_message(e),
             None if num.is_some() && self.out_of_range(path, &applied) => self.range_message(path, &applied),
+            None if err.is_none() && blamed.is_some() => blamed.clone().unwrap_or_default(),
             None => crate::quantity_field::INVALID_TIP.to_string(),
         };
         let field = v_flex().id(SharedString::from(format!("num-{path}")));
