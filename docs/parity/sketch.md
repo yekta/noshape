@@ -138,7 +138,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 6.7 | New line horizontal / vertical inference | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 6.8 | Parallel / perpendicular to the previous segment | B§6 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 6.9 | Wake-up: lines the cursor passed over give parallel / perpendicular inferences | H:automatic_inferencing | ✅ (T:inf) | ea572159 10-28 (GUI: hover a free line, start a new line elsewhere, move along its direction → Parallel glyph, the woken line lit orange) |
-| 6.10 | Tangent inference from an arc / spline end | B§6 | ❌ (SKETCH-START-INFERENCE) (T:inf) | ea572159 10-28 (GUI: a line started on a 3 point arc's end shows no tangent inference along the exact tangent) |
+| 6.10 | Tangent inference from an arc / spline end | B§6 | ✅ (SKETCH-START-INFERENCE fixed) (T:inf) | 78958d0f 10-28 (GUI: 3 point arc, Line started on its end and moved along the tangent → the arc lights as the inference, a Tangent glyph is stored; qa-scratch/tickets/sketch-arc-tangent-7895.png; first verified f8014efa) |
 | 6.11 | Inference glyph next to the cursor | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 6.12 | Inference line yellow dashed (`INFERENCE_SNAP_LINE_COLOR`) | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 6.13 | Shift suppresses inferences | H:automatic_inferencing | ✅ | 0.4.10+ / 2d9a275c 10-27 |
@@ -195,7 +195,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 8.8 | Pierce: point + off-plane edge | H:pierce | ✅ (GUI :103 m14.png: sketch on Front, point + Pierce (Shift+G) with the cylinder top edge → point moves to the pierce point, fully defined) | 8cd3c4da 10-28 (GUI tool-first: Shift+G, a free point, the block's top-left edge crossing the Front sketch plane → the point jumps to the crossing, Pierce glyph) |
 | 8.9 | Symmetric: axis line first, then two entities | H:symmetric | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.10 | Curvature: spline/conic + adjacent curve | H:curvature | ✅ | ff379982 10-28 (spline started on a line's end; select spline + line, shift+u → Curvature glyphs on both, the joint re-solves; conic case not run) |
-| 8.11 | Constraints to planes / model edges | H:working_with_constraints | ❌ (SKETCH-MODEL-EDGE-SELECT) (same reference mechanism as dimensions) | 8cd3c4da 10-28 (GUI: tool first works (B, line, model edge → parallel); selection first fails: a model edge click selects nothing and clears the selection) |
+| 8.11 | Constraints to planes / model edges | H:working_with_constraints | ❌ (SKETCH-MODEL-EDGE-SELECT reopened) (same reference mechanism as dimensions) | 78958d0f 10-28 (GUI: tool first works; selection first now works only part of the time: line + model edge click → 6 of 10 runs both selected, 4 of 10 the click misses and clears the line; fixed at 8627322e for the plain case) |
 | 8.12 | Glyphs show for the hovered entity (show after hover, hide after 750 ms); all with Show constraints | H:working_with_constraints, B§3.5 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 8.13 | Hover a glyph highlights its entities (yellow); click selects it; Delete removes it | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.14 | Drag glyphs to move them | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
@@ -236,7 +236,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 11.1 | Fillet: click a vertex, radius box; later vertices make equal fillets | H:sketch_fillet | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 11.2 | Fillet: click two curves | H:sketch_fillet | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 11.3 | Fillet keeps a virtual sharp with the coincident constraints | H:sketch_fillet | ✅ | 0.4.10+ / da18f886 10-28 (fixed L outline, Shift+F R30: the corner keeps its virtual sharp point; tickets/fillet-typed-smaller-da18.png) |
-| 11.4 | Fillet drag manipulator; too-large preview in red | H:sketch_fillet | ❌ (SKETCH-FILLET-STUCK-RADIUS) (T:sm; red preview, radius manipulator)  ❌ (SKETCH-FILLET-STUCK-RADIUS) ❌ (SKETCH-FILLET-STUCK-RADIUS)| 0.4.10+ / 77870dd4 10-28 |
+| 11.4 | Fillet drag manipulator; too-large preview in red | H:sketch_fillet | ✅ (SKETCH-FILLET-STUCK-RADIUS fixed) (T:sm; red preview, radius manipulator) | d2357ee5 10-28 (qa 06:44: a too-large sticky radius previews red with the hollow arrow and no value box, Enter does nothing, dragging the arrow in turns it blue and Enter commits; an over-drag release toasts "The current fillet radius produces invalid geometry.") |
 | 11.5 | Chamfer: vertex or two lines, two distance dimensions (45° default) | H:sketch_chamfer | ✅ (T:ux) | 0.4.10+ / 203c4d6f 10-27 |
 | 11.6 | Trim: click removes up to the nearest intersections, whole curve when unbounded | H:trim | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 11.7 | Trim: drag across curves trims everything crossed | H:trim | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
