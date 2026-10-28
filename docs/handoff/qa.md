@@ -7,8 +7,12 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 noshape-0.4.12-linux-x86_64.tar.gz: all rows OK** (details under "Daily release smoke" › v0.4.12). Blocker list at the top
 of TICKETS (open P0s all carried from v0.4.11).
 
-## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03)
+## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf)
 
+- **20:15 update (green 4b9d7eaf, copied 20:08; Rust Boolean on by default, pairs serial):** live-30-features 60779.484 mm³ /
+  15848.357 mm² (= v0.4.12); Extrude 1 edits 168–673 ms at load 44–55 (REGEN-SPEED unchanged); wf-block Shell A/B vs 4994be03
+  noisy (3.8–9.3 s both); fuzz body opens in 134 s (Shell 4/5 48/55 s); fuzz 82 (600) alive. Rust vs OCCT: bin/rustbool.py (8 plane /
+  cylinder edge cases) and the volume matrices identical (bool CLI 19:34). 64-region extrude loop: 60 edits alive (4994be03).
 - **19:58 update (green 4994be03):** core made patch 0004's pairs opt-in (58fb2592 / bce87760) and the green's OCCT is already serial:
   DRAFT-BUDGET-POOL's document opens (Draft 7 stops at 40 s) and BOP-PAIRS-GPF closed for the default build; re-test both when
   NOSHAPE_BOP_PAIRS_PARALLEL comes back. **bool 57f44b1d turns the Rust Boolean on by default (main, not green yet)**: early check
