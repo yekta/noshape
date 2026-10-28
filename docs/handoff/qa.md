@@ -9,6 +9,12 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03)
 
+- **19:58 update (green 4994be03):** core made patch 0004's pairs opt-in (58fb2592 / bce87760) and the green's OCCT is already serial:
+  DRAFT-BUDGET-POOL's document opens (Draft 7 stops at 40 s) and BOP-PAIRS-GPF closed for the default build; re-test both when
+  NOSHAPE_BOP_PAIRS_PARALLEL comes back. **bool 57f44b1d turns the Rust Boolean on by default (main, not green yet)**: early check
+  with bool's CLI 19:34 (+ NOSHAPE_BOOL_RUST=1): bool / shell / hole / feature / fillet matrices identical to their baselines,
+  live-30-features 60779.4843 mm³ / 15848.3569 mm² = v0.4.12. On the next green: GUI regen of the test parts, fuzz, matrices.
+  New P3 OK-ENABLED-AFTER-CLEAR (live asked). Scripts: bin/matrun.sh (matrices with one CLI), bin/volq.py (volume of a doc).
 - **20:00 update (green 4994be03, copied 19:40):** verified MATE-EXACT-FLIP-MOVER (GUI + CLI), drawing S8 sheet drag (= live but for a
   drag ghost → P3 DWG-SHEET-DRAG-GHOST), core ae7ce4a5 (64-region extrude: 64 parts, exact volumes, 1.6 s). **ASM-TRIAD-MENU reopened**:
   Move to origin only when the instance was picked in the graphics, not from the list. Live 1574: Revolve ✓ state = live; new P3
