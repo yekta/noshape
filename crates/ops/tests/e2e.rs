@@ -2803,6 +2803,16 @@ fn drawing_insert_view_options() {
     let ed = call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": did, "scale": 3, "label": "Z" }));
     let dv = ed["views"].as_array().unwrap().iter().find(|v| v["id"] == did).unwrap().clone();
     assert!((num(&dv["scale"]) - 3.0).abs() < 1e-9, "{dv}");
+    // View properties › Prefix / Letter / Suffix (live asbv-97: the
+    // drawing's "DETAIL" until changed); "\n" starts a label line.
+    let p = call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": did }));
+    assert_eq!((&p["properties"]["prefix"], &p["properties"]["label"], &p["properties"]["suffix"]), (&json!("DETAIL"), &json!("Z"), &json!("")), "{p}");
+    let label = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["views"].as_array().unwrap().iter().find(|v| v["id"] == did).unwrap()["label_text"].clone();
+    assert_eq!(label(&mut ctx), json!(["DETAIL Z", "SCALE 3:1"]));
+    call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": did, "set": { "prefix": "VIEW", "suffix": "(ROTATED)\nSEE NOTE 2" } }));
+    assert_eq!(label(&mut ctx), json!(["VIEW Z (ROTATED)", "SEE NOTE 2", "SCALE 3:1"]));
+    let e = try_call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": base["id"], "set": { "prefix": "X" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("set.prefix"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": base["id"], "radius": 5 })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_detail_view", json!({ "drawing": tab, "parent": base["id"], "profile": "polygon", "points": [[90, 140], [110, 160]], "position": [200, 260] })).unwrap_err();

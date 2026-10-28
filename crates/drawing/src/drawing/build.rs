@@ -1808,10 +1808,16 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // 4:1" alike, 0.12 in).
             let lh = vt.view_label_height.unwrap_or(drawing.props.ann_text_height);
             let mut label_lines: Vec<(String, f64)> = Vec::new();
+            // The view's own Prefix / Suffix (View properties), else the
+            // drawing's prefix; one label line per text line.
+            let affixed = |prefix: &str, letter: String| -> Vec<(String, f64)> {
+                let text = format!("{} {letter} {}", v.label_prefix.as_deref().unwrap_or(prefix), v.label_suffix.as_deref().unwrap_or(""));
+                text.lines().map(str::trim).filter(|l| !l.is_empty()).map(|l| (l.to_string(), lh)).collect()
+            };
             match &v.kind {
-                ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } => label_lines.push((format!("{} {label} - {label}", vt.section_prefix).trim().to_string(), lh)),
+                ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } => label_lines.extend(affixed(&vt.section_prefix, format!("{label} - {label}"))),
                 ViewKind::Detail { label, .. } => {
-                    label_lines.push((format!("{} {label}", vt.detail_prefix).trim().to_string(), lh));
+                    label_lines.extend(affixed(&vt.detail_prefix, label.clone()));
                     label_lines.push((format!("SCALE {}", format_scale(pl.scale)), lh));
                 }
                 ViewKind::Auxiliary { .. } => {

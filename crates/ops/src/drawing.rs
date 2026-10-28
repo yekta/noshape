@@ -510,8 +510,23 @@ pub struct ViewPropValues {
     pub simplification: Option<Simplification>,
     pub name: String,
     pub view_label: bool,
+    /// Section / detail views: the label's letter, Prefix and Suffix (live
+    /// asbv-97; the prefix shows the drawing's until changed). Other views:
+    /// the label text, no prefix / suffix.
     pub label: String,
+    pub prefix: String,
+    pub suffix: String,
     pub scale_label: bool,
+}
+
+/// Drawing properties' label prefix of a section / detail view.
+pub fn default_label_prefix(d: &Drawing, kind: &noshape_model::drawing::ViewKind) -> Option<String> {
+    use noshape_model::drawing::ViewKind;
+    match kind {
+        ViewKind::Section { .. } | ViewKind::AlignedSection { .. } => Some(d.props.view_tab.section_prefix.clone()),
+        ViewKind::Detail { .. } => Some(d.props.view_tab.detail_prefix.clone()),
+        _ => None,
+    }
 }
 
 impl ViewPropValues {
@@ -546,6 +561,8 @@ impl ViewPropValues {
                 ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } | ViewKind::Detail { label, .. } => label.clone(),
                 _ => v.label.clone().unwrap_or_default(),
             },
+            prefix: v.label_prefix.clone().or_else(|| default_label_prefix(d, &v.kind)).unwrap_or_default(),
+            suffix: v.label_suffix.clone().unwrap_or_default(),
             scale_label: v.scale_label.unwrap_or(v.label.is_some() && v.scale.is_some()),
         })
     }
@@ -557,6 +574,7 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
     use noshape_scene::drawing_tools::view_edit::{default_view_name, set_standard_orientation};
     let Some(old) = d.sheets.get(sheet).and_then(|s| s.view(id)).cloned() else { return };
     let default_name = default_view_name(d, &d.sheets[sheet], &old);
+    let default_prefix = default_label_prefix(d, &old.kind);
     let Some(v) = d.sheets[sheet].view_mut(id) else { return };
     v.scale = p.scale;
     v.sheet_scale = p.sheet_scale && p.scale.is_none();
@@ -584,6 +602,12 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
     v.name = (!name.is_empty() && name != default_name).then(|| name.to_string());
     v.scale_label = Some(p.scale_label);
     let label = p.label.trim().to_string();
+    // Prefix / Suffix: the drawing's prefix is kept as "not set".
+    if let Some(def) = default_prefix {
+        let (prefix, suffix) = (p.prefix.trim(), p.suffix.trim());
+        v.label_prefix = (prefix != def).then(|| prefix.to_string());
+        v.label_suffix = (!suffix.is_empty()).then(|| suffix.to_string());
+    }
     match &mut v.kind {
         ViewKind::Section { label: l, .. } | ViewKind::AlignedSection { label: l, .. } | ViewKind::Detail { label: l, .. } => {
             if !label.is_empty() {

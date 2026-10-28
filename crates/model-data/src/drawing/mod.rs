@@ -386,6 +386,13 @@ pub struct DrawingView {
     pub auto_centerlines: Option<bool>,
     #[serde(default)]
     pub label: Option<String>,
+    /// Section / detail views: View properties › Prefix and Suffix of the
+    /// label (live asbv-97; None: Drawing properties' prefix, no suffix;
+    /// lines split at "\n").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label_prefix: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label_suffix: Option<String>,
     /// Rotation of the view on the sheet (radians, counter-clockwise).
     #[serde(default)]
     pub rotation: f64,
@@ -678,6 +685,8 @@ impl Default for DrawingView {
             show_centerlines: false,
             auto_centerlines: None,
             label: None,
+            label_prefix: None,
+            label_suffix: None,
             rotation: 0.0,
             crop: None,
             breaks: Vec::new(),

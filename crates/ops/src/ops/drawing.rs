@@ -368,6 +368,13 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if let Some(l) = &v.label {
                 j["label"] = json!(l);
             }
+            // The label lines as drawn under the view ("DETAIL A", "SCALE 2:1").
+            if let Some(b) = &m.built {
+                let lines: Vec<&str> = b.geometry.texts.iter().filter(|t| matches!(b.picks.get(t.pick as usize), Some(noshape_model::drawing::build::PickTarget::ViewLabel(x)) if *x == v.id)).map(|t| t.text.as_str()).collect();
+                if !lines.is_empty() {
+                    j["label_text"] = json!(lines);
+                }
+            }
             // The view menu's state, when not the defaults.
             if let Some(n) = &v.name {
                 j["name"] = json!(n);

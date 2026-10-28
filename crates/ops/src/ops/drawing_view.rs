@@ -88,7 +88,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "view_properties",
             summary: "Read or change a view's View properties",
-            description: "The View properties dialog of one view (live drawing/177). Without `set`, replies with its fields as the dialog opens (`properties`). `set` changes the fields it names (same names), then ✓: scale (\"1:2\", or null to inherit), sheet_scale (inherit from the sheet rather than the parent), rotation (degrees; views without a parent or children), tangent_edges, best_quality, orientation / named_view (base views), explode_position and display_state (assemblies; child views: null = Follow parent), suppress_alignment, cut_from_section, sketch_appearances, model_annotations, simplification + simplification_value, name, view_label, label, scale_label, sheet (moves the view, linked to its parent). One edit (\"View properties\").",
+            description: "The View properties dialog of one view (live drawing/177). Without `set`, replies with its fields as the dialog opens (`properties`). `set` changes the fields it names (same names), then ✓: scale (\"1:2\", or null to inherit), sheet_scale (inherit from the sheet rather than the parent), rotation (degrees; views without a parent or children), tangent_edges, best_quality, orientation / named_view (base views), explode_position and display_state (assemblies; child views: null = Follow parent), suppress_alignment, cut_from_section, sketch_appearances, model_annotations, simplification + simplification_value, name, view_label, label (section / detail views: the letter), prefix / suffix (section / detail views; \"\\n\" starts a line), scale_label, sheet (moves the view, linked to its parent). One edit (\"View properties\").",
             fields: with(common(), vec![opt("set", json!({ "type": "object" }), "Fields to change (see the reply without `set`).")]),
             mutates: true,
             destructive: false,
@@ -453,6 +453,8 @@ fn props_json(od: &OpenDoc, t: &Target, id: ViewId, p: &dr::ViewPropValues) -> V
         "name": p.name,
         "view_label": p.view_label,
         "label": p.label,
+        "prefix": p.prefix,
+        "suffix": p.suffix,
         "scale_label": p.scale_label,
         "sheet": t.sheet + 1,
     });
@@ -522,6 +524,9 @@ fn view_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             "name" => p.name = string(k, x)?,
             "view_label" => p.view_label = boolean(k, x)?,
             "label" => p.label = string(k, x)?,
+            "prefix" | "suffix" if dr::default_label_prefix(&t.d, &t.d.sheets[t.sheet].view(id).expect("view").kind).is_none() => return Err(err(k, "section and detail views only")),
+            "prefix" => p.prefix = string(k, x)?,
+            "suffix" => p.suffix = string(k, x)?,
             "scale_label" => p.scale_label = boolean(k, x)?,
             "orientation" | "named_view" if !base => return Err(err(k, "base views only")),
             "orientation" => {

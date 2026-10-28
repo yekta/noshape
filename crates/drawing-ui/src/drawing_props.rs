@@ -98,6 +98,8 @@ pub struct ViewProps {
     name: Entity<InputState>,
     view_label: bool,
     label: Entity<InputState>,
+    /// Section / detail views: the label's Prefix and Suffix (live asbv-97).
+    affixes: Option<(Entity<InputState>, Entity<InputState>)>,
     scale_label: bool,
     /// View simplification (None: the parent's) and its value field.
     simplification: Option<Simplification>,
@@ -538,6 +540,10 @@ impl DrawingEditor {
             name: input(name, window, cx),
             view_label: auto_label || v.label.as_ref().is_some_and(|l| !l.is_empty()),
             label: input(label, window, cx),
+            affixes: auto_label.then(|| {
+                let prefix = v.label_prefix.clone().or_else(|| noshape_ops::drawing::default_label_prefix(&self.drawing, &v.kind)).unwrap_or_default();
+                (input(prefix, window, cx), input(v.label_suffix.clone().unwrap_or_default(), window, cx))
+            }),
             scale_label: v.scale_label.unwrap_or(v.label.is_some() && v.scale.is_some()),
             simplification: v.simplification,
             simp_value: input(crate::drawing_insert::simplification_text(views::view_simplification(self.current_sheet(), id), self.drawing.units_mm), window, cx),
@@ -670,6 +676,8 @@ impl DrawingEditor {
             name: p.name.read(cx).value().trim().to_string(),
             view_label: p.view_label,
             label: p.label.read(cx).value().trim().to_string(),
+            prefix: p.affixes.as_ref().map(|a| a.0.read(cx).value().trim().to_string()).unwrap_or_default(),
+            suffix: p.affixes.as_ref().map(|a| a.1.read(cx).value().trim().to_string()).unwrap_or_default(),
             scale_label: p.scale_label,
         };
         let mut d = self.drawing.clone();
@@ -1039,7 +1047,15 @@ impl DrawingEditor {
         let (vl, sl) = (props.view_label, props.scale_label);
         rows.push(check("vp-view-label", "View label", vl, |p, on| p.view_label = on, cx));
         if vl && multi.is_none() {
-            rows.push(row("Label", field(&props.label)));
+            // Section / detail views: Prefix, Letter, Suffix (live asbv-97).
+            match &props.affixes {
+                Some((prefix, suffix)) => {
+                    rows.push(row("Prefix", field(prefix)));
+                    rows.push(row("Letter", field(&props.label)));
+                    rows.push(row("Suffix", field(suffix)));
+                }
+                None => rows.push(row("Label", field(&props.label))),
+            }
         }
         rows.push(check("vp-scale-label", "Scale label", sl, |p, on| p.scale_label = on, cx));
         // BOM / cut list table references: the table listing this view's parts.
