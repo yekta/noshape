@@ -42,8 +42,8 @@ it, so re-take positions after every selection.
 | 2.14 | Type, Esc | Reverts and blurs; box stays | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 2.15 | Unknown "#w" + Enter | "Create variable" popup next to the field (Name "w") | ✅ re-checked 10-23: Create variable popup, Name "w" (was ✗ F6) | 0.4.10+ / 1c853f78 10-27 |
 | 2.16 | "abc" + Enter | Pink field, red underline, ✓ disabled, box stays open, hover "Enter a valid expression." | ✅ re-checked 10-23: pink, red underline, ✓ disabled (was ✗ F7) | 0.4.10+ / 1c853f78 10-27 |
-| 2.17 | Arc radius, point-point, line-point dimensions | Created, typed values applied | ✅ |  |
-| 2.18 | Type the value immediately after the placing click | Applied (keys not lost) | ✅ (checked with 20 ms steps) |  |
+| 2.17 | Arc radius, point-point, line-point dimensions | Created, typed values applied | ✅ | 8bb8a6d1 10-28 (GUI: arc R25, point–point 30 (horizontal), line–point 15: all applied; tickets/core-dims-8bb8.png) |
+| 2.18 | Type the value immediately after the placing click | Applied (keys not lost) | ✅ (checked with 20 ms steps) | 8bb8a6d1 10-28 (GUI: xdotool types the value 20 ms after the placing click, 20 ms per key, then Enter: all three values applied) |
 | 2.19 | Enter with no tool active | Does **not** accept the sketch (live sketch/311) | ✅ (see F2) | 0.4.10+ / 1c853f78 10-27 |
 | 2.20 | ✓ | Sketch 1 in the list, under-defined badge | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 2.21 | Dimension crash (user report, macOS) | – | not reproduced on Linux (all dimension kinds above) |  |
