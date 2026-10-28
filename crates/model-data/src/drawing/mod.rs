@@ -921,6 +921,8 @@ pub enum AnnotationKind {
     /// circle center; its condition picks the center, the near side (Min)
     /// or the far side (Max) of the circle. Slots: 0 = `a`, 1 = `b` (circle
     /// center references also update the radius).
+    /// Slots: 0 = `a`, 1 = `b`; to a straight edge (live: any non-curve
+    /// geometry), 2 and 3 = its ends and `b` is the perpendicular's foot.
     MaxMinDimension { view: ViewId, a: [f64; 2], ra: f64, ca: ArcCondition, b: [f64; 2], rb: f64, cb: ArcCondition, offset: f64, orientation: DimOrientation },
     /// Foreshortened radius: like a radial dimension, but the leader starts
     /// at a false center `jog` (view coordinates) and reaches the arc through

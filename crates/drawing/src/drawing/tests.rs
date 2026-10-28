@@ -3298,3 +3298,33 @@ fn wall_thickness_follows_its_circles_and_dangles_without_them() {
     assert!(!built.dangling.contains(&id), "{:?}", built.dangling);
     assert!(built.dangling.contains(&(id + 1)), "a lost circle: red, {:?}", built.dangling);
 }
+
+/// A max / min dimension to a straight edge (qa DWG-MAXMIN-LINE): its far
+/// end is the perpendicular's foot on the edge (slots 2, 3), resolved again
+/// when the model changes.
+#[test]
+fn maxmin_to_an_edge_measures_square_to_it() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let sheet = &drawing.sheets[0];
+    let view = sheet.views[0].id;
+    let g = compute_view(&drawing, sheet, view, &sources, &cache, false);
+    let center = g.snaps.iter().find(|s| matches!(s.point, Some(PointRef::Center { .. }))).expect("a circle").clone();
+    let mut vs = g.snaps.iter().filter(|s| matches!(s.point, Some(PointRef::Vertex { .. })));
+    let e0 = vs.next().expect("a vertex").clone();
+    let e1 = vs.find(|s| (s.p[0] - e0.p[0]).abs() + (s.p[1] - e0.p[1]).abs() > 1e-4).expect("another vertex").clone();
+    let id = drawing.sheets[0].next_annotation_id();
+    drawing.sheets[0].annotations.push(Annotation {
+        id,
+        kind: AnnotationKind::MaxMinDimension { view, a: center.p, ra: 0.001, ca: ArcCondition::Max, b: [9.0, 9.0], rb: 0.0, cb: ArcCondition::Center, offset: 0.0, orientation: DimOrientation::Aligned },
+        position: [0.0; 2],
+        refs: vec![AnnotationRef { slot: 0, point: center.point.clone().unwrap() }, AnnotationRef { slot: 2, point: e0.point.clone().unwrap() }, AnnotationRef { slot: 3, point: e1.point.clone().unwrap() }],
+        ..Default::default()
+    });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(!built.dangling.contains(&id), "{:?}", built.dangling);
+    let AnnotationKind::MaxMinDimension { a, b, .. } = &built.resolved.annotations.iter().find(|x| x.id == id).unwrap().kind else { panic!() };
+    let want = super::build::foot_on_line(*a, e0.p, e1.p);
+    assert!((b[0] - want[0]).abs() < 1e-9 && (b[1] - want[1]).abs() < 1e-9, "{b:?} vs {want:?}");
+}

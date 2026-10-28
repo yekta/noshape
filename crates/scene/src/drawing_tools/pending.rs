@@ -245,24 +245,31 @@ impl SheetPick<'_> {
         match self.tool {
             Tool::Dimension { kind: DimTool::MaxMin, picks } if picks.len() == 2 => {
                 let Pick::CircleAt { view, center, radius, r, at } = &picks[0] else { return None };
+                let mut edge = Vec::new();
                 let (b, rb, cb, rref) = match &picks[1] {
                     Pick::Point(p) => (p.p, 0.0, ArcCondition::Center, p.r.clone()),
                     Pick::CircleAt { center: c2, radius: r2, r, at: at2, .. } => {
                         let near = dot(sub(*at2, *c2), sub(*center, *c2)) > 0.0;
                         (*c2, *r2, if near { ArcCondition::Min } else { ArcCondition::Max }, r.clone())
                     }
+                    // A straight edge: measured square to it, from the
+                    // perpendicular's foot.
+                    Pick::Line { a: e0, b: e1 } => {
+                        edge = vec![(2, e0.r.clone()), (3, e1.r.clone())];
+                        (noshape_model::drawing::build::foot_on_line(*center, e0.p, e1.p), 0.0, ArcCondition::Center, None)
+                    }
                     _ => return None,
                 };
                 let ca = if dot(sub(*at, *center), sub(b, *center)) > 0.0 { ArcCondition::Min } else { ArcCondition::Max };
                 let pl = self.placement(*view)?;
                 let (ps, qs) = (pl.to_sheet(*center), pl.to_sheet(b));
-                let o = auto_orientation(ps, qs, c);
+                let o = if edge.is_empty() { auto_orientation(ps, qs, c) } else { DimOrientation::Aligned };
                 let offset = dim_offset(ps, qs, o, c);
                 Some(Annotation {
                     id,
                     kind: AnnotationKind::MaxMinDimension { view: *view, a: *center, ra: *radius, ca, b, rb, cb, offset, orientation: o },
                     position: c,
-                    refs: refs(vec![(0, r.clone()), (1, rref)]),
+                    refs: refs([vec![(0, r.clone()), (1, rref)], edge].concat()),
                     ..Default::default()
                 })
             }

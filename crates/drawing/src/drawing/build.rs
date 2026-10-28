@@ -510,6 +510,8 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
             continue;
         };
         let mut ok = true;
+        // A max / min dimension's straight edge (slots 2, 3).
+        let mut edge: [Option<[f64; 2]>; 2] = [None, None];
         for r in &a.refs {
             let Some((p, radius)) = resolve_in_view(&ctx, geo, &r.point) else {
                 ok = false;
@@ -591,6 +593,7 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
                         *rb = r;
                     }
                 }
+                (AnnotationKind::MaxMinDimension { .. }, k @ (2 | 3)) => edge[k as usize - 2] = Some(p),
                 (AnnotationKind::ForeshortenedRadial { center, radius: rr, .. }, 0) => {
                     *center = p;
                     if let Some(r) = radius {
@@ -608,6 +611,9 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
                 }
                 _ => {}
             }
+        }
+        if let ([Some(e0), Some(e1)], AnnotationKind::MaxMinDimension { a: pa, b: pb, .. }) = (edge, &mut a.kind) {
+            *pb = foot_on_line(*pa, e0, e1);
         }
         if !ok {
             dangling.push(a.id);
@@ -2282,6 +2288,17 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     // Mirrors aren't views of this sheet (not picked, not listed).
     placements.retain(|p| !p.id.is_ghost());
     BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, tables: table_layouts, title_rect, title_cells }
+}
+
+/// The foot of the perpendicular from `p` to the line through `a` and `b`.
+pub fn foot_on_line(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
+    let d = [b[0] - a[0], b[1] - a[1]];
+    let l2 = d[0] * d[0] + d[1] * d[1];
+    if l2 < 1e-24 {
+        return a;
+    }
+    let t = ((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / l2;
+    [a[0] + d[0] * t, a[1] + d[1] * t]
 }
 
 #[cfg(test)]

@@ -192,10 +192,12 @@ impl SheetPick<'_> {
             (DimTool::MaxMin, 0) => picks.extend(self.circle_at()),
             (DimTool::MaxMin, 1) => {
                 let Some(Pick::CircleAt { view, center, .. }) = picks.first().cloned() else { return };
+                // Another circle, a point, else a straight edge (qa
+                // DWG-MAXMIN-LINE; help: any other non-curve geometry).
                 let second = match self.circle_at() {
                     Some(Pick::CircleAt { view: v, center: c2, .. }) if v == view && len(sub(c2, center)) < 1e-9 => None,
                     Some(p @ Pick::CircleAt { view: v, .. }) if v == view => Some(p),
-                    _ => self.snap_at(self.cursor).filter(|p| p.view == view).map(Pick::Point),
+                    _ => self.snap_at(self.cursor).filter(|p| p.view == view).map(Pick::Point).or_else(|| self.line_pick().filter(|l| matches!(l, Pick::Line { a, .. } if a.view == view))),
                 };
                 picks.extend(second);
             }
