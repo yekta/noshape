@@ -1825,6 +1825,9 @@ impl DrawingEditor {
         let (r, c) = (at as usize / ncols, at as usize % ncols);
         let text = cells.get(r).and_then(|x| x.get(c)).cloned().unwrap_or_default();
         let input = self.textarea(&text, 3, window, cx);
+        // Typing adds to a filled cell's text (qa TABLE-SHIFT-TAB-BLANK: the
+        // caret sat before it, "QQA2").
+        input.update(cx, |s, cx| s.set_selected_range(text.len()..text.len(), cx));
         let note = self.cell_note(table, r, c, window, cx);
         self.panel = Some(Panel::Cell { table, row: r, col: c, input, note });
         cx.notify();

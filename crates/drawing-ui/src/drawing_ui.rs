@@ -6,6 +6,7 @@ use crate::theme::{p, with_alpha as theme_with_alpha};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Escape, Input, InputEvent, InputState, TextareaState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::drawing::*;
 
@@ -141,8 +142,12 @@ impl DrawingEditor {
         };
         let rows = self.note_panel_rows(cx);
         let color_dlg = self.render_note_color(cx);
-        // Above the text (and the note's ruler).
-        let bottom = (self.size_px()[1] - (b.text_top.min(b.top) - above) + 6.0) as f32;
+        // Above the text (and the note's ruler); below it (a table: below the
+        // whole table) when there is no room under the toolbar (qa
+        // NOTE-PANEL-UNDER-PROPS: ✓ ✕ hidden).
+        const PANEL_H: f64 = 128.0;
+        let over = b.text_top.min(b.top) - above - 6.0;
+        let (top, bottom) = if over - PANEL_H < 4.0 { (Some((self.cell_table_bottom().unwrap_or(0.0).max(b.top + b.height) + 6.0) as f32), None) } else { (None, Some((self.size_px()[1] - over) as f32)) };
         // Inside the graphics area: clear of Drawing properties / the right
         // panels and their icon strip (qa NOTE-PANEL-UNDER-PROPS).
         let right = self.size_px()[0] - if self.drawing_props.open || self.right_panel.is_some() { 370.0 + 35.0 } else { 0.0 };
@@ -152,7 +157,8 @@ impl DrawingEditor {
                 .id("dr-note-panel")
                 .absolute()
                 .left(px(left))
-                .bottom(px(bottom))
+                .when_some(top, |d, t| d.top(px(t)))
+                .when_some(bottom, |d, y| d.bottom(px(y)))
                 // Live: 394 px (dom/drawing-note-edit-dialog.txt).
                 .w(px(394.))
                 .bg(pal.dialog_bg)

@@ -267,6 +267,15 @@ impl DrawingEditor {
         Some(InplaceBox { left: tl[0], top: tl[1], width: br[0] - tl[0], height: br[1] - tl[1], font_px, pitch_px, family, bold, italic, text_top })
     }
 
+    /// Bottom of the table whose cell is edited (local px): the Note panel
+    /// goes under it when it doesn't fit above.
+    pub fn cell_table_bottom(&self) -> Option<f64> {
+        let Some(Panel::Cell { table, .. }) = &self.panel else { return None };
+        let l = self.built.as_ref()?.table_layout(*table)?;
+        let x = *l.xs.first()?;
+        l.ys.iter().map(|y| self.sheet_to_local([x, *y])[1]).reduce(f64::max)
+    }
+
     /// The cell's text editor: the caret in the cell, a blue cell outline
     /// with a dashed text box (live 740–757).
     pub fn render_cell_inplace(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
