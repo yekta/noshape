@@ -128,7 +128,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | C6 | Make transparent… | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C7 | Suppress / Unsuppress | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C8 | Fix / Unfix | UI:context-part | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
-| C9 | Check interference… (subassemblies, multi-selection) | UI:context-subassembly | ✅ | |  |
+| C9 | Check interference… (subassemblies, multi-selection) | UI:context-subassembly | ✅ | | ff379982 10-28 (two instances selected › Check interference… → 220 px dialog at the lower right, both chips, Include standard content / Show top level only; ✗ no "No interferences" when clear → ASM-INTERFERENCE-NONE) |
 | C10 | Add mate connector to instance origin… | UI:context-part | ✅ | single selection | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C11 | Replace instances… / Replace n instances… | UI:context-part, B | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C12 | Switch to Part Studio / Switch to Assembly | UI:context-part | ✅ | opens the tab | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
