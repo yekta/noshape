@@ -9,6 +9,11 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97 → … → b504234e → 2960a143)
 
+- **09:28 update (greens 7e88e3ab → 97c7aae3):** verified ASM-K-IMPLICIT-MCS (7e88e3ab; residual: bare triad, live disc + triad),
+  ASM-MC-LIST-ORDER, ASM-XT-ROUNDTRIP-NAMES and the folder guide's end tick (97c7aae3). Filed P3 API-CONFIG-NAME-KEY (the API
+  takes {'Size': 'Large'} by display name, stores and ignores it). Rows: exploded 2 14 15 EXV1; configured-assembly 3 5 8
+  CA5 CA6; p2-look AL2 AL3 DL1 DL2 DL6 DL14; workflow-derived DER9 DER13 DER14. REGEN-SPEED on 97c7aae3 unchanged at load
+  ~30. Fuzz 59 on 867a7720 alive; 60 on 97c7aae3 running. (A 08:59 app exit was my own `timeout 1800`, not a crash.)
 - **08:18 update (greens c725f68f → 867a7720):** verified VIEW-LABEL-TOGGLE (residual: no preview before ✓, Prefix / Letter /
   Suffix rows hide when unticked) and DRAWING-BOX-SELECT (867a7720). On c725f68f: FILLET-OVERSIZE-OK unchanged; REGEN-SPEED
   A/B at load ~45 = 6444d892 (3rd undo 1.4–1.6 s); SHELL-SLOW on the v0.4.12 CLI 0.5–1.05 s (3–4× faster than 10-27).
