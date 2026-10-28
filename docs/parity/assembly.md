@@ -215,8 +215,8 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | D16 | Animate (preview) button in the dialog | H:mates | ✅ | ▶ (`play-dialog`, "Animate mate degree of freedom", live 575): the mate's first DOF runs once from its current value through 2 full turns (a span for sliders) with the value arc and whole-degree label ("208°"), then back to the start pose (~12 s: 720 steps at 60/s; live ≈45 s in a slow browser, "probably a fixed frame count"); ▶ never becomes a stop button. GUI :103 d4–d7, v6–v7 | 0.4.10+ / 77870dd4 10-28 |
 | D17 | Edit implicit / assembly MCs from the dialog (MC icon) | H:mates | ✅ | the chip's `mate-connector-qlv-item` icon opens the Mate connector dialog docked right of the mate dialog (live 578, dom/assembly-mate-chip-connector-dialog.txt): close button only for an implicit connector, Origin type ▾ On entity, active "Origin entity" field naming the entity ("Face of Part 1 <1>"), ☐ Realign, ☐ Move (X/Y/Z translation, Rotate about X/Y/Z ▾, Rotation angle), flip / reorient icons, `?`; edits go into the mate's own reference, which stays implicit (`MateConnectorRef.moved`, `ConnectorMove.off`; model test `implicit_connector_move_offsets_the_mate`). GUI :103 m4–m5; standalone dialog: Onshape's preview slider (112 px, rests at 0.7, fades the connector glyph to the left) with `?` on its row |  |
 | D18 | Only the current mate's instances move until Solve | H:mates | ✅ | help (Mates): "Onshape does not continually calculate all mates and their positions until the Mate feature is accepted. Use Solve". `SolveOptions::only_mate`: before Solve only the mate being defined is solved (the second connector's instance held, live 33–35: the first-picked part moves); other mates and relations are not enforced and report ok; Solve / ✓ solve everything. T:`a_mate_being_defined_is_solved_alone_until_solve`; GUI :103 d1 (Part 1 <2> mated onto <1>: the revolute-mated Pin stays put), d2 (Solve: the Pin follows, and Fastened 1 conflicts as expected) |  |
-| D19 | Tangent mate: entities, Tangent propagation, flip | E§7.10 | ✅ | pre-existing |  |
-| D20 | Width mate: tab and width connector fields | E§7.11 | ✅ | pre-existing |  |
+| D19 | Tangent mate: entities, Tangent propagation, flip | E§7.10 | ✅ | pre-existing | e8ca768f 10-28 (asm5 Tangent dialog: two "Face, edge or vertex" fields, ☑ Tangent propagation, flip button; empty → "Nothing selected.") |
+| D20 | Width mate: tab and width connector fields | E§7.11 | ✅ | pre-existing | e8ca768f 10-28 (asm5 Width dialog: "Tab mate connector(s)", "Width mate connectors") |
 | D21 | Over-constrained message in the dialog, red mate | E§24.2 | ✅ | |  |
 
 ## 7. Mate connector inference (H:mates, H:assembly_mate_connector, E§6.3, E§8.2)
@@ -245,7 +245,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | X2 | Flip primary, reorient secondary | E§8.1 | ✅ | |  |
 | X3 | Move: X/Y/Z translation, rotation axis + angle | E§8.1 | ✅ | |  |
 | X4 | Origin type Between entities, Realign (primary / secondary axis entity) | E§8.1, H:assembly_mate_connector | ✅ | Between verified in the app, Realign model-tested; entities of the same instance; model test `mate_connector_between_entities_and_realign` |  |
-| X5 | Add mate connector to instance origin (prefilled) | E§5.4 | ✅ | |  |
+| X5 | Add mate connector to instance origin (prefilled) | E§5.4 | ✅ | | 2292bf8c 10-28 (mate doc: Part 1 <1> › Add mate connector to instance origin… → "Mate connector 1" dialog, On entity, Origin entity "Origin of Part 1 <1>" prefilled, ☐ Realign ☐ Move; ✓ adds the row) |
 
 ## 9. Dragging, solving, triad (H:Home__triad_manipulator, E§24)
 
