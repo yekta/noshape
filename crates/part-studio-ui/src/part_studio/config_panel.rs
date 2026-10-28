@@ -401,7 +401,8 @@ impl PartStudioView {
         // Only the variables before the rollback bar (live 10-20 o).
         let var_rows = self.studio(cx).map(noshape_model::variable_table::active_rows).unwrap_or_default();
         let count = var_rows.len();
-        let input_cell_sized = move |st: &Entity<InputState>, size: f32| gpui_kit::base::input::input_frame(div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().px(px(2.)).bg(crate::theme::p().bg_senary).border_r_1().border_b_1().border_color(grid).child(Input::new(st).appearance(false).text_size(px(size)).pl(px(4.))));
+        let input_cell_filled = move |st: &Entity<InputState>, size: f32, fill: Rgba| gpui_kit::base::input::input_frame(div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().px(px(2.)).bg(fill).border_r_1().border_b_1().border_color(grid).child(Input::new(st).appearance(false).text_size(px(size)).pl(px(4.))));
+        let input_cell_sized = move |st: &Entity<InputState>, size: f32| input_cell_filled(st, size, crate::theme::p().bg_senary);
         let input_cell = move |st: &Entity<InputState>| input_cell_sized(st, 13.33);
         // A Name cell holding an invalid name: pink with a red border and the
         // reason as tooltip (live part-studio/554–555).
@@ -410,8 +411,9 @@ impl PartStudioView {
             let bad = !v.trim().is_empty() && !noshape_model::variable_table::is_identifier(v.trim().trim_start_matches('#'));
             div()
                 .id(SharedString::from(format!("pvar-cell-{}", st.entity_id())))
-                .when(bad, |d| d.bg(gpui_kit::rgb(0xf9ebec)).border_1().border_color(gpui_kit::rgb(0xbd3039)).tooltip(crate::ui::tooltip("Variable name must be a letter followed by a string of letters or numbers.")))
-                .child(input_cell(st))
+                .when(bad, |d| d.border_1().border_color(gpui_kit::rgb(0xbd3039)).tooltip(crate::ui::tooltip("Variable name must be a letter followed by a string of letters or numbers.")))
+                // The cell itself fills pink (its white covered the pink under it, VAR-NAME-PINK).
+                .child(if bad { input_cell_filled(st, 13.33, gpui_kit::rgb(0xf9ebec)) } else { input_cell(st) })
         };
         let mut rows: Vec<AnyElement> = Vec::new();
         for (k, r) in var_rows.into_iter().enumerate() {
