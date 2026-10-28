@@ -9,6 +9,16 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
+- **11:50 update (greens 64997436 → ea572159):** fuzz 66 (6499) and 67 (ea57) × 600 alive. REGEN-SPEED on 64997436: 3rd
+  undo 131–251 ms (was ~1300 at 09:27), edits 201–606 ms at load 24–30 (ticket note). Verified: ASM-XT-ROUNDTRIP-NAMES dx
+  half (ea572159: x_t carries "Pin" etc., re-import "Pin <1>"), sheet-metal SM8–SM12, feature-sweep L56 + row 12 (all 21
+  flush-wall cases = live, bin/flushwall.py / flushwall2.py), sm-joints 1, import-matrix g50 F18/F11 (F19 now +0.00004),
+  sketch 6.9 / 8.7 / 14.25, assembly-sweep 1–4 (relation texts, bin/relerr.py). Filed P2 INSTANCE-NAME-STALE (skasm: part
+  rename doesn't rename its instances), P2 SKETCH-MENU-ESC (skasm, regression of 14.9), P2 SKETCH-START-INFERENCE (skasm:
+  a line's first click on an existing endpoint gives no tangent / perpendicular inference; cause in sketch_mode chain_end).
+  Live asked: sketch 2.8 (constraint list dimming), SKETCH-START-INFERENCE confirm, relation after its mate is deleted
+  (ours deletes Gear 1 with it). NIST open on ea572159 at load 44: preview 5.2 s, background refine 36 s (llvmpipe).
+  Next: assembly-sweep rows 5–13 / 16–19 / 23 / 25, sketch.md 7.x / 9.5 / 10.7 / 14.x, fuzz 68.
 - **11:17 update (green 64997436):** fuzz 66 (left running by session 4, 64997436) finished alive. workflow-advanced-part-studio:
   1.5, 1.7 (a click on the circle's centre takes its point, off-centre the region), 3.3, 3.9, 3.10 (Plane 1 row fills Mirror
   plane: ADV1 fixed there too), 4.2 (81.147), 4.5/4.5b/4.5c (thread edge pick, "20 tpi", face split: ADV7/ADV8 fixed), 4.8
