@@ -1177,6 +1177,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (cfg.noshape Assembly 8: <1> default + <2> {'Size': 'Large'} → one row Qty 2; <3> {'Configuration': 'Large'} its own
   row). Setting Large in the dialog stores {'Configuration': 'Large', 'Size': 'Large', 'h': '8 mm'}. The API should resolve
   a display name to its id, or reject unknown keys (qa 2026-10-28 08:28, v0.4.12 CLI + green 7e88e3ab)
+  dx 10-28: not reproduced on main (target-dx CLI at bfe9101d, qa's bin/cfgasm.py on a copy of cfg.noshape): {'Size': 'Large', 'NoBoss': True} is stored as {'Configuration': 'Large', 'Checkbox_2': 'true'} and assembly_set_configuration resolves names too (fixed by 0d75aa8e, API-ASM-CONFIG-NAMES, which v0.4.12 contains). qa: which call / source gave {'Size': 'Large'}?
 - [ ] P3 OBJ-ZIP-MSG importing an OBJ export zip (.obj + .mtl) gives the zipped-assembly message: + › Import… (or CLI
   import_files) of samples/l30-export/v2s2-30features-live-obj.zip, or of our own OBJ export (b2.zip = b2.obj + b2.mtl) →
   "Import failed: …: Root assembly file not found. Ensure zip file name matches root assembly name and the archive does
@@ -1184,6 +1185,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   translated. Translation is not supported for MTL (.mtl) files." (title "Translation not supported"); the zip stays as
   a file tab. The bare .obj imports in both: ours 72215.0759 mm³ = live 72215.0759 (live's "6.3 % less" note compared a
   different model) (qa 2026-10-28 07:55, v0.4.12 CLI)
+  dx 10-28 (the commit after c82818b7): a zip holding an .mtl is uploaded untranslated with live's "<zip> was not translated. Translation is not supported for MTL (.mtl) files." (native_assembly MTL_IN_ZIP; e2e import_options_and_errors re-imports our OBJ export zip).
 - [x] bfe9101d P2 XT-ASM-VERSIONS live's own Parasolid assembly exports fail to import in half the versions: + › Import… (Import
   to this document) of /root/onshape-research/live/samples/dx-asm-xt-<v>.x_t (request 1536: Part 1 block + Part 2 pin,
   3 instances, one file per Parasolid version) on green 98667558:
@@ -1217,7 +1219,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 05:31 verified on green 2960a143: edge click selects the whole table (amber, no cell), menu = the list above; a row
   right-click with the table selected adds "Split hole table below"; a cell gives Size ▸ / Resize (help also lists Copy);
   ☐ Show location data ✓ shrinks it with no stale outline (tickets/hole-table-menu-2960.png).
-- [ ] P2 DARK-DRAWING-TOOLBAR in Dark mode a drawing's toolbar turns dark up to x≈1384 and stays white beyond it: Preferences › Theming › Dark mode › Save theme, open Part 1 Drawing 1 (1600 px window) → toolbar row y 40–75 is the dark chrome colour behind the tools from the rail to the last tool (Zoom), white from there to the right edge. Live (behaviours "ui2 drawing dark chrome", dark-mode.md dk-950 ☑): the drawing editor ignores Dark mode, its toolbar stays rgb(255,255,255) across the full width; only the header, left rail and tab bar go dark. Shot tickets/dark-drawing-toolbar-f918.png (qa 2026-10-28 01:00, green f9185639)
+- [x] c82818b7 P2 DARK-DRAWING-TOOLBAR in Dark mode a drawing's toolbar turns dark up to x≈1384 and stays white beyond it: Preferences › Theming › Dark mode › Save theme, open Part 1 Drawing 1 (1600 px window) → toolbar row y 40–75 is the dark chrome colour behind the tools from the rail to the last tool (Zoom), white from there to the right edge. Live (behaviours "ui2 drawing dark chrome", dark-mode.md dk-950 ☑): the drawing editor ignores Dark mode, its toolbar stays rgb(255,255,255) across the full width; only the header, left rail and tab bar go dark. Shot tickets/dark-drawing-toolbar-f918.png (qa 2026-10-28 01:00, green f9185639)
+  dx 10-28 (c82818b7): the toolbar and panel are separate render slices, outside the editor's light-theme wrapper; they render light too now (whole toolbar white in Dark mode, as live).
 - [x] verified 2960a143 (qa 05:31, notes below) acc43c43 P2 HOLE-TABLE-FILLETS the hole table counts convex corner rounds as holes: wf-block (40×20 block, R2 rounds on the vertical edges, four Ø6.35 holes), Create Drawing › Suggested views, Hole table › top view › origin = its bottom-left corner › place → rows A1–A4 Ø6.35 QTY 4 ✅ plus **B1 (2,18), B2 (38,18), B3 (38,2) Ø4 QTY 3** with tags B1–B3 drawn at three corners of the view. Those are the quarter-cylinder R2 rounds (outside material, 90° arcs), not holes. Live (help "Hole table", 1983): only holes (full cylindrical bores) get tags and rows. Shot tickets/hole-table-fillets-f918.png (qa 2026-10-28 01:05, green f9185639)
   qa 02:05 (green 41f60e47, with dx's Hole table dialog and callout SIZE): still B1–B3 Ø4 QTY 3 for the R2 corner rounds; SIZE of the
   real holes now reads the callout "Ø6.35 ↧ 12" ✅ (tickets/hole-table-fillets-41f6.png).

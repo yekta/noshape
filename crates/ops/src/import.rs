@@ -279,7 +279,7 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
             match noshape_model::native_assembly::read_assembly_zip(path) {
                 Ok(a) => assemblies.push(a),
                 // Onshape keeps the zip as a file tab and reports it.
-                Err(e) if e == noshape_model::native_assembly::STEP_IN_ZIP => errors.push(format!("{} was not translated. {e}", import_names(path).1)),
+                Err(e) if e == noshape_model::native_assembly::STEP_IN_ZIP || e == noshape_model::native_assembly::MTL_IN_ZIP => errors.push(format!("{} was not translated. {e}", import_names(path).1)),
                 Err(e) => errors.push(format!("Import failed: {}: {e:#}", path.display())),
             }
             continue;

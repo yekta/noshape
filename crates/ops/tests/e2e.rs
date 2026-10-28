@@ -1319,6 +1319,10 @@ fn import_options_and_errors() {
     // Onshape keeps such a zip as a file tab and reports it as not translated.
     let r = call(&mut ctx, "import_files", json!({ "files": [zip.to_str().unwrap()] }));
     assert!(r["errors"][0].as_str().unwrap().contains("was not translated"), "{r}");
+    // So is an OBJ export's zip (.obj + .mtl): live's MTL message (qa OBJ-ZIP-MSG).
+    let z = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "OBJ", "file": scratch("obj_zip").to_str().unwrap() }));
+    let r = call(&mut ctx, "import_files", json!({ "files": [z["file"].as_str().unwrap()] }));
+    assert!(r["errors"][0].as_str().unwrap().ends_with("was not translated. Translation is not supported for MTL (.mtl) files."), "{z} {r}");
     let e = try_call(&mut ctx, "import_files", json!({ "files": ["/tmp/nope.xyz"] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("files[0]"));
     let e = try_call(&mut ctx, "import_files", json!({ "files": ["/tmp/definitely-missing.step"] })).unwrap_err();

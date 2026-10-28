@@ -45,6 +45,9 @@ pub const NO_ROOT: &str = "Root assembly file not found. Ensure zip file name ma
 /// A zip of STEP files: Onshape uploads it but doesn't translate it (live
 /// qa5 pass 7: a BLOB tab, notification "<zip> was not translated. …").
 pub const STEP_IN_ZIP: &str = "Translation is not supported for STEP (.stp) files.";
+/// An OBJ export's zip (.obj + .mtl): the same, for the .mtl (live request
+/// 1540; qa OBJ-ZIP-MSG).
+pub const MTL_IN_ZIP: &str = "Translation is not supported for MTL (.mtl) files.";
 
 /// A native assembly as Onshape imports it (live G38): a flat zip named like
 /// its root assembly, with the part files the assembly references by name.
@@ -110,8 +113,15 @@ pub fn read_assembly_zip(path: &std::path::Path) -> Result<AssemblyZip, String> 
         let iams: Vec<&&String> = assemblies.iter().filter(|n| NativeSystem::of(n) == Some(NativeSystem::Inventor)).collect();
         let found = assemblies.iter().find(|n| split(n).0.eq_ignore_ascii_case(&stem)).or(if iams.len() == 1 { iams.first().copied() } else { None });
         let Some(root) = found.copied() else {
-            let step = |n: &String| matches!(split(n).1.as_str(), "step" | "stp");
-            return Err(if names.iter().any(step) { STEP_IN_ZIP } else { NO_ROOT }.to_string());
+            let has = |exts: &[&str]| names.iter().any(|n| exts.contains(&split(n).1.as_str()));
+            return Err(if has(&["mtl"]) {
+                MTL_IN_ZIP
+            } else if has(&["step", "stp"]) {
+                STEP_IN_ZIP
+            } else {
+                NO_ROOT
+            }
+            .to_string());
         };
         let system = NativeSystem::of(root).ok_or(NO_ROOT)?;
         let components = k::read_native_assembly(&dir.join(root)).map_err(|e| e.to_string())?;
