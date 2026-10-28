@@ -15,10 +15,10 @@ the error-string table's.
 
 | # | Situation | Onshape | Ours (before) | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | Gear on wrong mate types | "Gear relations require two rotational degrees of freedom." | same without the period | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |  |
-| 2 | Rack and pinion on wrong types | "Rack and pinion relations require one translational degree of freedom and one rotational degree of freedom." | "…require one rotational and one translational degree of freedom" | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |  |
-| 3 | Screw on wrong types | "Screw relations require one cylindrical mate." | no period | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |  |
-| 4 | Linear on wrong types | "Linear relations require two translational degrees of freedom." | no period | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |  |
+| 1 | Gear on wrong mate types | "Gear relations require two rotational degrees of freedom." | same without the period | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) | v0.4.12 CLI 10-28 (bin/relerr.py on asm5 + Fastened 1: assembly_relation refuses with the live text, period included) |
+| 2 | Rack and pinion on wrong types | "Rack and pinion relations require one translational degree of freedom and one rotational degree of freedom." | "…require one rotational and one translational degree of freedom" | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) | v0.4.12 CLI 10-28 (bin/relerr.py on asm5 + Fastened 1: assembly_relation refuses with the live text, period included) |
+| 3 | Screw on wrong types | "Screw relations require one cylindrical mate." | no period | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) | v0.4.12 CLI 10-28 (bin/relerr.py on asm5 + Fastened 1: assembly_relation refuses with the live text, period included) |
+| 4 | Linear on wrong types | "Linear relations require two translational degrees of freedom." | no period | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) | v0.4.12 CLI 10-28 (bin/relerr.py on asm5 + Fastened 1: assembly_relation refuses with the live text, period included) |
 | 5 | Relation's mate deleted | "One or more mates in this relation do not exist." | "Relation mate does not exist" | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |  |
 | 6 | Relation's mate suppressed | (error string exists, but live shows Inactive: row 17) | "Relation mate is suppressed" | ✅ (T: assembly `relation_measured_from_stored_reference` E5: inactive, skasm 10-27) |  |
 | 7 | Relation's mate failed | "One or more mates in this relation are invalid." | "Relation mate could not be resolved" | ✅ (T: assembly `relation_and_mate_errors_use_live_texts`, skasm 10-27) |  |
