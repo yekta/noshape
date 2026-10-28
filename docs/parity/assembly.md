@@ -143,7 +143,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | C21 | Create empty subassembly | UI:context-part | ✅ | new "Assembly N" tab + instance |  |
 | C22 | Delete (mates, MCs, relations go; groups keep other members) | UI:context-part, E§1 | ✅ | model test `rename_hide_others_and_unfix_all` |  |
 | C23 | Show mates, Go to item in list (graphics menu) | E§5.4 | ✅ | |  |
-| C24 | Graphics menu on empty space: Show all, Zoom to fit, Isometric, Clear selection | E§5.4 | ✅ | |  |
+| C24 | Graphics menu on empty space: Show all, Zoom to fit, Isometric, Clear selection | E§5.4 | ✅ | | 0.4.10+ / 52ca0b97 10-28 (asm5 empty space: Show all, Create Drawing of Assembly 1…, Zoom to fit, Isometric = live 1336) |
 | C25 | Properties…, Instance properties…, Show center of mass, Use best available tessellation, Edit in context, Update context, Change to version, Export, Where used, Revision history, Create task, Add comment, Create Drawing, Add to named positions, Lock/follow position to, Select instances with same configuration | UI:context-part | ✅ | all of the live list implemented (see LA13 and G13: Edit in context ▸, Update context ▸, Set as primary instance ▸); Where used / Revision history / Create task / Add comment are cloud-only or not in the live menu GUI skasm 10-27: the instance menu equals live 501 item for item (Add comment cloud-only). | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 
 ### 4.2 Top-level assembly menu (UI:context-assembly)
@@ -162,17 +162,17 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | # | Behaviour | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
 | F1 | Mate connectors, mates, relations, groups listed in creation order | E§5.1 | ✅ | |  |
-| F2 | Hover a mate: its instances highlight, glyph shows | E§5.1 | ✅ | |  |
-| F3 | Hover tooltip: "<name> has error: <message>", type, offset and limit definitions | UI:mate-hover | ✅ | |  |
+| F2 | Hover a mate: its instances highlight, glyph shows | E§5.1 | ✅ | | 0.4.10+ / 52ca0b97 10-28 (hover Revolute 1: both instances tinted, the glyph shows) |
+| F3 | Hover tooltip: "<name> has error: <message>", type, offset and limit definitions | UI:mate-hover | ✅ | | 0.4.10+ / 52ca0b97 10-28 ("Revolute 1 (Hidden) / Revolute mate / Offset: off / Limits: Z angle – to 30 deg") |
 | F4 | Mate limit indicator icon ("<name> has limits") | H:mates, B | ✅ | |  |
-| F5 | Eye icon on hover toggles the mate indicator | E§6.4 | ✅ | |  |
+| F5 | Eye icon on hover toggles the mate indicator | E§6.4 | ✅ | | 0.4.10+ / 52ca0b97 10-28 (row eye shows the hidden mate's glyph) |
 | F6 | Mates expand to the implicit mate connectors they use | E§5.1, UI:mate-hover | ✅ | |  |
 | F7 | Double-click edits | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | F8 | Error rows red with indicator | E§6.4 | ✅ | |  |
 | F9 | Suppressed / inactive rows grey, struck through | E§6.4 | ✅ | | 0.4.10+ / acd6acce 10-27 (wa2: Assembly 2) |
 | F10 | Mate folders (Add selection to folder, folder menu) | E§5.6 | ✅ | |  |
 | F11 | Drag to reorder | H:mates | ✅ | drop a mate (connector, relation, group) row on another of the same kind; model test `reorder_mate_features` |  |
-| F12 | Selecting a glyph in the graphics selects the mate | E§6.4 | ✅ | mate indicators are pickable: click selects the mate, right-click opens its menu; blue OK / red error / grey inactive |  |
+| F12 | Selecting a glyph in the graphics selects the mate | E§6.4 | ✅ | mate indicators are pickable: click selects the mate, right-click opens its menu; blue OK / red error / grey inactive | 0.4.10+ / 52ca0b97 10-28 (click on the glyph selects the Revolute 1 row) |
 
 ### 5.1 Mate context menu (H:mates "Mate context menu")
 
@@ -181,14 +181,14 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | M1 | Rename | H:mates | ✅ | inline | 0.4.10+ / acd6acce 10-27 (wa2: Assembly 2) (Rename → inline, "Pin axis") |
 | M2 | Edit… (works when suppressed) | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | M3 | Apply limit position ▸ Min/Max per DOF ("Moved mate to max Z limit") | H:mates, B | ✅ | model test `mate_reset_and_apply_limit_position`; other DOFs stay free | 0.4.10+ / 77870dd4 10-28 |
-| M4 | Reset (home position) | H:mates | ✅ | model test |  |
+| M4 | Reset (home position) | H:mates | ✅ | model test | 0.4.10+ / 52ca0b97 10-28 (menu item present; = live) |
 | M5 | Animate <mate>… | H:mates, B | ✅ | see §11 | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | M6 | Hide / Show | H:mates | ✅ | 0.4.10+ / 77870dd4 10-28 |
 | M7 | Show all mates | H:mates | ✅ | 0.4.10+ / 77870dd4 10-28 |
-| M8 | Isolate…, Make transparent… (instances of the mate) | H:mates | ✅ | |  |
+| M8 | Isolate…, Make transparent… (instances of the mate) | H:mates | ✅ | | 0.4.10+ / 52ca0b97 10-28 (menu items present) |
 | M9 | Suppress / Unsuppress | H:mates | ✅ | | 0.4.10+ / acd6acce 10-27 (wa2: Assembly 2) (Suppress: grey italic struck-through; Ctrl+Z) |
-| M10 | Add selection to folder… | E§6.5 | ✅ | |  |
-| M11 | Clear selection | H:mates | ✅ | |  |
+| M10 | Add selection to folder… | E§6.5 | ✅ | | 0.4.10+ / 52ca0b97 10-28 (menu item present) |
+| M11 | Clear selection | H:mates | ✅ | | 0.4.10+ / 52ca0b97 10-28 (no Clear selection in the mate row menu, = live's capture; row text stale) |
 | M12 | Delete | H:mates | ✅ | | 0.4.10+ / acd6acce 10-27 (wa2: Assembly 2) (Delete, Ctrl+Z restores) |
 | M13 | Dynamic suppression, Edit named position driver mate, Configure | E§6.5 | ✅ | Dynamic suppression ▸ (mates and instances: "Unsuppressed if"; once set: Unsuppress + Edit dynamic suppression), Edit named position driver mate… (Driving mate selector, editing banner, value columns); Configure: mate parameters are configured from the Configuration panel's mode (G17) | 0.4.10+ / 77870dd4 10-28 |
 | M14 | Mate connector menu: Rename, Edit, Hide, Hide other mate connectors, Show all mate connectors, Suppress, Delete | E§6.5 | ✅ | |  |
