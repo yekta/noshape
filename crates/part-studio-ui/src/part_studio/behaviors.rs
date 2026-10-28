@@ -2530,6 +2530,13 @@ impl PartStudioView {
         if self.edit.is_some() { 220.0 + 2.0 * 12.0 } else { 0.0 }
     }
 
+    /// While a sketch is edited, F (fitted to the sketch alone) keeps clear
+    /// of the right panel strip too (SKETCH-F-FIT reopened: the corner of a
+    /// far rectangle ended under it).
+    pub(super) fn fit_inset_right(&self) -> f64 {
+        if self.opts.editing_sketch.is_some() { 40.0 } else { 0.0 }
+    }
+
     /// W: the next box drag zooms to the box (press W again to cancel).
     pub(super) fn toggle_zoom_window(&mut self, cx: &mut Context<Self>) {
         self.push_camera_history(cx);

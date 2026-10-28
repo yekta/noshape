@@ -57,13 +57,20 @@ pub fn zoom_step(camera: &Camera, zoom_in: bool, bounds: Option<(DVec3, DVec3)>,
 /// Zoom to fit: the box fills the view of `size` pixels, an overlay `inset`
 /// pixels wide at the left kept clear when the rest is wide enough.
 pub fn fit_camera_to_box(camera: &mut Camera, lo: DVec3, hi: DVec3, size: DVec2, inset: f64) {
-    let inset = if size.x - inset >= size.x * 0.45 { inset.max(0.0) } else { 0.0 };
-    let width = (size.x - inset).max(1.0);
+    fit_camera_to_box_insets(camera, lo, hi, size, inset, 0.0);
+}
+
+/// [`fit_camera_to_box`] keeping `left` and `right` pixels at the sides
+/// clear (both dropped when less than 45 % of the width would be left).
+pub fn fit_camera_to_box_insets(camera: &mut Camera, lo: DVec3, hi: DVec3, size: DVec2, left: f64, right: f64) {
+    let (left, right) = if size.x - left - right >= size.x * 0.45 { (left.max(0.0), right.max(0.0)) } else { (0.0, 0.0) };
+    let width = (size.x - left - right).max(1.0);
     let aspect = if size.y > 0.0 { width / size.y } else { 1.0 };
     camera.fit_box(lo, hi, aspect);
-    if inset > 0.0 && size.y > 0.0 {
-        // Move the model right, into the middle of the uncovered part.
-        camera.pan(DVec2::new(inset * 0.5, 0.0), size.y);
+    let shift = (left - right) * 0.5;
+    if shift != 0.0 && size.y > 0.0 {
+        // Move the model into the middle of the uncovered part.
+        camera.pan(DVec2::new(shift, 0.0), size.y);
     }
 }
 

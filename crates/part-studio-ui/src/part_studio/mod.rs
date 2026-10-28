@@ -1195,7 +1195,7 @@ impl PartStudioView {
                 }
             }
         }
-        let (fit_bounds, fit_inset) = (self.zoom_fit_bounds(), self.fit_inset_left());
+        let (fit_bounds, fit_inset, fit_right) = (self.zoom_fit_bounds(), self.fit_inset_left(), self.fit_inset_right());
         // The selection-count cursor: sketch entities while sketching,
         // otherwise the Part Studio selection (not a dialog's picks).
         // With a feature dialog open, the dialog's picks (live dom/cursors-count:
@@ -1251,7 +1251,7 @@ impl PartStudioView {
         }
         let (tool_cursor, overlay_cursor) = (self.viewport_tool_cursor(), self.viewport_overlay_cursor());
         self.viewport.update(cx, |vp, cx| {
-            (vp.fit_bounds, vp.fit_inset_left) = (fit_bounds, fit_inset);
+            (vp.fit_bounds, vp.fit_inset_left, vp.fit_inset_right) = (fit_bounds, fit_inset, fit_right);
             vp.selection_count = count;
             (vp.tool_cursor, vp.overlay_cursor) = (tool_cursor, overlay_cursor);
             vp.set_scene(Arc::new(scene), geometry_changed, cx)

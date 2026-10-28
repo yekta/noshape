@@ -2,6 +2,7 @@
 //! instead of one per file. Run one file's tests with `cargo test -p <crate> --test all <file>::`.
 
 mod edge_looks;
+mod fit_insets;
 mod pattern_bench;
 mod silhouettes;
 mod sketch_perf;
