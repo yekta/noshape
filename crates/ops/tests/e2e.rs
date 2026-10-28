@@ -4898,6 +4898,7 @@ fn a_fillet_moved_above_its_extrude_reports_its_missing_selection() {
     assert_eq!(fillet["message"], "Select edges or faces to fillet.");
     assert_eq!(fillet["missing_selections"], 1);
     assert_eq!(list["failed"][0]["missing_selections"], 1, "{list}");
+}
 
 /// A hole table's SIZE is the Hole feature's callout, written once for a
 /// size with its QTY (live behaviours 1983: "Ø.250 ↧.472", QTY 3, merged).
