@@ -7,6 +7,21 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 noshape-0.4.12-linux-x86_64.tar.gz: all rows OK** (details under "Daily release smoke" › v0.4.12). Blocker list at the top
 of TICKETS (open P0s all carried from v0.4.11).
 
+## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf)
+
+- **17:15 update (green 5267fdaf, copied 17:01; has core f024fd0d OCCT patch 0004 threaded pave filler, bool e0197071
+  Rust Boolean off by default):** REGEN-SPEED A/B vs 78958d0f: no clear gain, still over 200 ms (ticket note). Fuzz 77
+  (5267, live-30-features copy) running. Not yet green: df97926c (SKETCH-HINT-OVERLAP, SKETCH-RECT-DROPDOWN-NAME),
+  f94b3275 (SKETCH-S-INSPECT-TOOLS), a2dea2fd (DIALOG-AC-ENTER), 9d0a3bf6 (DIALOG-EXPR-SCOPE): verify those next.
+- **17:00 (green 78958d0f):** feature-list pass on live-30-features: suppress 206 ms, reorder 137, rollback drag 44,
+  edit while rolled back 99, delete a used sketch 201 (Hole red, tooltip text), roll to end 457, cached undo / redo 2–3 ms;
+  Extrude 1 edit 508 ms. **SKETCH-MODEL-EDGE-SELECT reopened**: in a sketch a model-edge click still misses ~4 in 10
+  (clears the selection); hit rate rises with hover time (1 s: 5/5); Part Studio 15/15. New: P2 SKETCH-USE-PRESELECT
+  (U ignores a preselected edge; live asked), P3 CURV-GAUSS-NOISE (Gaussian curvature map stripes on cylinders; live
+  asked). sketch.md 6.10 (arc-end tangent inference) ✅ on 78958d0f, 11.4 ✅ (d2357ee5), 8.11 ❌ (reopen).
+  Not bugs: Esc keeps the selection (= live); "Restore" in the sketch-cancel toast works while the toast is up.
+  Open live asks: Gaussian curvature look (16:45), Use with preselection (17:05), plus session 5's drawing toast lifetimes.
+
 ## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
 
 - **16:29 update (green 78958d0f):** live 1566 / 1567 → P2 DWG-PANEL-ESC-STACK (Esc doesn't close View properties /
