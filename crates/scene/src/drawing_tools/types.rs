@@ -248,6 +248,9 @@ pub enum Drag {
     /// Drag-select table cells: a rubber band from `start` (help H:table:
     /// the cells it touches are selected on release).
     SelectCells { id: u64, start: [f64; 2] },
+    /// Box select: a left-drag from empty sheet (live navigation/44: a blue
+    /// window box; what it wholly encloses is selected on release).
+    SelectBox { start: [f64; 2] },
     /// Resize a table from its free corner (scales column widths and rows).
     ResizeTable { id: u64, start: [f64; 2], orig: Table, size: [f64; 2], widths: Vec<f64> },
     /// A table divider: column boundary `col` or row boundary `row` (index

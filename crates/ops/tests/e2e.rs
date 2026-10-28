@@ -2826,6 +2826,15 @@ fn drawing_insert_view_options() {
     assert_eq!(label(&mut ctx), json!(["DETAIL Z", "SCALE 3:1"]));
     call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": did, "set": { "prefix": "VIEW", "suffix": "(ROTATED)\nSEE NOTE 2" } }));
     assert_eq!(label(&mut ctx), json!(["VIEW Z (ROTATED)", "SEE NOTE 2", "SCALE 3:1"]));
+    // ☐ View label / ☐ Scale label hide what they name (qa VIEW-LABEL-TOGGLE).
+    let p = call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": did }));
+    assert_eq!((&p["properties"]["view_label"], &p["properties"]["scale_label"]), (&json!(true), &json!(true)), "{p}");
+    call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": did, "set": { "view_label": false } }));
+    assert_eq!(label(&mut ctx), json!(["SCALE 3:1"]));
+    call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": did, "set": { "scale_label": false } }));
+    assert!(label(&mut ctx).is_null());
+    call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": did, "set": { "view_label": true, "scale_label": true } }));
+    assert_eq!(label(&mut ctx), json!(["VIEW Z (ROTATED)", "SEE NOTE 2", "SCALE 3:1"]));
     let e = try_call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": base["id"], "set": { "prefix": "X" } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("set.prefix"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": base["id"], "radius": 5 })).unwrap_err();

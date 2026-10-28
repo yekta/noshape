@@ -1526,6 +1526,7 @@ impl DrawingEditor {
             .children(self.render_sketch_dim_box(cx))
             .children(self.render_cell_inplace(cx))
             .children(self.render_rotate_label())
+            .children(self.render_select_box())
             .children(self.render_rotate_guide())
             .children(self.render_cell_panel(cx))
             .child(panel)

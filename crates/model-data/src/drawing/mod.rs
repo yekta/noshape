@@ -393,6 +393,10 @@ pub struct DrawingView {
     pub label_prefix: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_suffix: Option<String>,
+    /// View properties › ☐ View label on a view labelled by its kind
+    /// (section, detail, auxiliary): the label isn't drawn.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hide_label: bool,
     /// Rotation of the view on the sheet (radians, counter-clockwise).
     #[serde(default)]
     pub rotation: f64,
@@ -603,6 +607,24 @@ pub enum DisplayChoice {
 }
 
 impl DrawingView {
+    /// Labelled by its kind (section, aligned section, detail; auxiliary
+    /// with a reference letter) rather than by `label`.
+    pub fn auto_label(&self) -> bool {
+        matches!(self.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. } | ViewKind::Detail { .. })
+            || (matches!(self.kind, ViewKind::Auxiliary { .. }) && self.aux_ref.as_ref().is_some_and(|a| !a.letter.is_empty()))
+    }
+
+    /// View properties › View label: the label is drawn.
+    pub fn view_label_shown(&self) -> bool {
+        if self.auto_label() { !self.hide_label } else { self.label.as_ref().is_some_and(|l| !l.is_empty()) }
+    }
+
+    /// View properties › Scale label: the scale is drawn under the label
+    /// (detail views by default; others with their own label and scale).
+    pub fn scale_label_shown(&self) -> bool {
+        self.scale_label.unwrap_or(if matches!(self.kind, ViewKind::Detail { .. }) { true } else { self.label.is_some() && self.scale.is_some() })
+    }
+
     /// The base view's Explode/Position.
     pub fn asm_position(&self) -> AsmPosition {
         match (self.explode, self.named_position) {
@@ -687,6 +709,7 @@ impl Default for DrawingView {
             label: None,
             label_prefix: None,
             label_suffix: None,
+            hide_label: false,
             rotation: 0.0,
             crop: None,
             breaks: Vec::new(),

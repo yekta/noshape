@@ -538,13 +538,13 @@ impl DrawingEditor {
             display: if matches!(v.kind, ViewKind::Base { .. }) { Some(v.display_state.clone().map_or(DisplayChoice::ShowAll, DisplayChoice::State)) } else { v.own_display.clone() },
             sheet: self.sheet,
             name: input(name, window, cx),
-            view_label: auto_label || v.label.as_ref().is_some_and(|l| !l.is_empty()),
+            view_label: v.view_label_shown(),
             label: input(label, window, cx),
             affixes: auto_label.then(|| {
                 let prefix = v.label_prefix.clone().or_else(|| noshape_ops::drawing::default_label_prefix(&self.drawing, &v.kind)).unwrap_or_default();
                 (input(prefix, window, cx), input(v.label_suffix.clone().unwrap_or_default(), window, cx))
             }),
-            scale_label: v.scale_label.unwrap_or(v.label.is_some() && v.scale.is_some()),
+            scale_label: v.scale_label_shown(),
             simplification: v.simplification,
             simp_value: input(crate::drawing_insert::simplification_text(views::view_simplification(self.current_sheet(), id), self.drawing.units_mm), window, cx),
             others: Vec::new(),
@@ -624,9 +624,13 @@ impl DrawingEditor {
             if p.scale_label != m.scale_label {
                 v.scale_label = Some(p.scale_label);
             }
-            // Section / detail views always keep their labels.
-            if p.view_label != m.view_label && !matches!(v.kind, ViewKind::Section { .. } | ViewKind::Detail { .. } | ViewKind::AlignedSection { .. }) {
-                v.label = p.view_label.then(|| v.name.clone().unwrap_or(default_name).to_uppercase());
+            // Views labelled by their kind show / hide that label.
+            if p.view_label != m.view_label {
+                if v.auto_label() {
+                    v.hide_label = !p.view_label;
+                } else {
+                    v.label = p.view_label.then(|| v.name.clone().unwrap_or(default_name).to_uppercase());
+                }
             }
         }
         if p.sheet != m.sheet {

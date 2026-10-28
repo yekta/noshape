@@ -73,6 +73,67 @@ impl DrawingEditor {
         true
     }
 
+    /// End of a box select (left-drag from empty sheet, live navigation/44):
+    /// the views, annotations, tables, images and sketch entities wholly
+    /// inside the box `a`–`b` are selected; Shift adds to the selection.
+    pub fn select_in_box(&mut self, a: [f64; 2], b: [f64; 2], add: bool, cx: &mut Context<Self>) {
+        let (lo, hi) = ([a[0].min(b[0]), a[1].min(b[1])], [a[0].max(b[0]), a[1].max(b[1])]);
+        let inside = |p: [f64; 2]| p[0] >= lo[0] && p[0] <= hi[0] && p[1] >= lo[1] && p[1] <= hi[1];
+        let picked: Vec<Sel> = {
+            let Some(built) = &self.built else { return };
+            // Each item's drawn points: all inside, it is taken.
+            let mut all_in: Vec<(Sel, bool)> = Vec::new();
+            let mut note = |sel: Sel, ok: bool| match all_in.iter_mut().find(|x| x.0 == sel) {
+                Some(x) => x.1 &= ok,
+                None => all_in.push((sel, ok)),
+            };
+            for l in built.geometry.lines.iter().filter(|l| l.pick != 0) {
+                if let Some(sel) = self.sel_of_pick(l.pick).filter(|s| !matches!(s, Sel::View(_))) {
+                    note(sel, l.points.iter().all(|p| inside(*p)));
+                }
+            }
+            for t in built.geometry.texts.iter().filter(|t| t.pick != 0) {
+                if let Some(sel) = self.sel_of_pick(t.pick).filter(|s| !matches!(s, Sel::View(_))) {
+                    note(sel, inside(t.pos));
+                }
+            }
+            for pl in &built.placements {
+                note(Sel::View(pl.id), inside(pl.min) && inside(pl.max));
+            }
+            all_in.into_iter().filter(|x| x.1).map(|x| x.0).collect()
+        };
+        if !add {
+            self.selection.clear();
+        }
+        for s in picked {
+            if !self.selection.contains(&s) {
+                self.selection.push(s);
+            }
+        }
+        self.cell_sel = None;
+        self.redraw(cx);
+    }
+
+    /// The box of a box select being dragged: live's window box (#1651B0 at
+    /// 20 %, its border at 60 %).
+    pub fn render_select_box(&self) -> Option<AnyElement> {
+        let Drag::SelectBox { start } = self.drag else { return None };
+        let (a, b) = (self.sheet_to_local(start), self.sheet_to_local(self.cursor));
+        let (x0, y0, x1, y1) = (a[0].min(b[0]), a[1].min(b[1]), a[0].max(b[0]), a[1].max(b[1]));
+        Some(
+            div()
+                .absolute()
+                .left(px(x0 as f32))
+                .top(px(y0 as f32))
+                .w(px((x1 - x0) as f32))
+                .h(px((y1 - y0) as f32))
+                .bg(gpui_kit::rgba(0x1651b033))
+                .border_1()
+                .border_color(gpui_kit::rgba(0x1651b099))
+                .into_any_element(),
+        )
+    }
+
     /// End of a cell drag-selection: the cells the rubber band `a`–`b`
     /// touches (below the title row) become the selected block.
     pub fn select_cells_in(&mut self, id: u64, a: [f64; 2], b: [f64; 2], cx: &mut Context<Self>) {

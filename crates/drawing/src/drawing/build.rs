@@ -1815,13 +1815,19 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 let text = format!("{} {letter} {}", v.label_prefix.as_deref().unwrap_or(prefix), v.label_suffix.as_deref().unwrap_or(""));
                 text.lines().map(str::trim).filter(|l| !l.is_empty()).map(|l| (l.to_string(), lh)).collect()
             };
+            // View properties › View label / Scale label (qa VIEW-LABEL-TOGGLE).
+            let shown = !v.hide_label;
             match &v.kind {
-                ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } => label_lines.extend(affixed(&vt.section_prefix, format!("{label} - {label}"))),
+                ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } if shown => label_lines.extend(affixed(&vt.section_prefix, format!("{label} - {label}"))),
                 ViewKind::Detail { label, .. } => {
-                    label_lines.extend(affixed(&vt.detail_prefix, label.clone()));
-                    label_lines.push((format!("SCALE {}", format_scale(pl.scale)), lh));
+                    if shown {
+                        label_lines.extend(affixed(&vt.detail_prefix, label.clone()));
+                    }
+                    if v.scale_label_shown() {
+                        label_lines.push((format!("SCALE {}", format_scale(pl.scale)), lh));
+                    }
                 }
-                ViewKind::Auxiliary { .. } => {
+                ViewKind::Auxiliary { .. } if shown => {
                     if let Some(a) = v.aux_ref.as_ref().filter(|a| !a.letter.is_empty()) {
                         let l = if vt.aux_double_label { format!("{0} - {0}", a.letter) } else { a.letter.clone() };
                         label_lines.push((format!("{} {l} {}", vt.aux_prefix, vt.aux_suffix).trim().to_string(), lh));

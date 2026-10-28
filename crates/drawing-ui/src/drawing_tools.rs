@@ -1029,6 +1029,7 @@ impl DrawingEditor {
                 self.set_preview(Some(dr), cx);
             }
             Drag::SelectCells { .. } => self.update_preview(cx),
+            Drag::SelectBox { .. } => cx.notify(),
             Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } => {
                 let drag = self.drag.clone();
                 self.extra_drag_move(&drag, cx);
@@ -1261,6 +1262,7 @@ impl DrawingEditor {
                 }
             }
             Drag::SelectCells { id, start } => self.select_cells_in(id, start, self.cursor, cx),
+            Drag::SelectBox { start } => self.select_in_box(start, self.cursor, e.modifiers.shift, cx),
             Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } | Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } => {
                 let name = match drag {
                     Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } => "Move by grip",
@@ -1472,7 +1474,8 @@ impl DrawingEditor {
         if let Some((orig, k)) = self.centermark_grip_at(start) {
             return Drag::CentermarkArm { orig, k };
         }
-        let Some(sel) = self.sel_at(pick, start) else { return Drag::None };
+        // Nothing there: a box select (qa DRAWING-BOX-SELECT).
+        let Some(sel) = self.sel_at(pick, start) else { return Drag::SelectBox { start } };
         if !self.selection.contains(&sel) {
             self.selection = vec![sel];
         }

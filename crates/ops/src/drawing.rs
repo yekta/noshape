@@ -536,7 +536,6 @@ impl ViewPropValues {
         let s = d.sheets.get(sheet)?;
         let v = s.view(id)?;
         let base = matches!(v.kind, ViewKind::Base { .. });
-        let auto_label = matches!(v.kind, ViewKind::Section { .. } | ViewKind::Detail { .. } | ViewKind::AlignedSection { .. });
         Some(ViewPropValues {
             orientation: match &v.kind {
                 ViewKind::Base { orientation, .. } => Some(*orientation),
@@ -556,14 +555,14 @@ impl ViewPropValues {
             model_annotations: v.model_annotations,
             simplification: v.simplification,
             name: v.name.clone().unwrap_or_else(|| noshape_scene::drawing_tools::view_edit::default_view_name(d, s, v)),
-            view_label: auto_label || v.label.as_ref().is_some_and(|l| !l.is_empty()),
+            view_label: v.view_label_shown(),
             label: match &v.kind {
                 ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } | ViewKind::Detail { label, .. } => label.clone(),
                 _ => v.label.clone().unwrap_or_default(),
             },
             prefix: v.label_prefix.clone().or_else(|| default_label_prefix(d, &v.kind)).unwrap_or_default(),
             suffix: v.label_suffix.clone().unwrap_or_default(),
-            scale_label: v.scale_label.unwrap_or(v.label.is_some() && v.scale.is_some()),
+            scale_label: v.scale_label_shown(),
         })
     }
 }
@@ -602,6 +601,11 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
     v.name = (!name.is_empty() && name != default_name).then(|| name.to_string());
     v.scale_label = Some(p.scale_label);
     let label = p.label.trim().to_string();
+    // ☐ View label hides a section / detail / auxiliary label.
+    let auto = old.auto_label();
+    if auto {
+        v.hide_label = !p.view_label;
+    }
     // Prefix / Suffix: the drawing's prefix is kept as "not set".
     if let Some(def) = default_prefix {
         let (prefix, suffix) = (p.prefix.trim(), p.suffix.trim());
@@ -614,6 +618,7 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
                 *l = label;
             }
         }
+        _ if auto => {}
         _ => v.label = (p.view_label && !label.is_empty()).then_some(label).or_else(|| p.view_label.then(|| v.name.clone().unwrap_or(default_name.clone()).to_uppercase())),
     }
     if let (ViewKind::Base { orientation: o, source, .. }, Some(n)) = (&mut v.kind, p.orientation) {
