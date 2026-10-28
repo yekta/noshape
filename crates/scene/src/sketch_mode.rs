@@ -76,7 +76,7 @@ impl ConstraintTool {
         }
     }
     /// Entities needed before the constraint can be created.
-    fn arity(self) -> usize {
+    pub fn arity(self) -> usize {
         match self {
             ConstraintTool::Horizontal | ConstraintTool::Vertical | ConstraintTool::Fix => 1,
             ConstraintTool::Symmetric => 3,
@@ -1199,31 +1199,11 @@ impl SketchEditor {
         self.woken.clear();
         self.press = None;
         self.tangent_mode = false;
+        // Live shows no hint for a sketch tool (behaviours "qa (2026-10-28,
+        // P3) sketch tool hints: none in live"; SKETCH-HINT-OVERLAP: ours drew
+        // over the measure readout); Mirror's prompt is live's i18n text.
         self.message = match self.tool {
-            Tool::Fillet => Some("Select a point or two sketch curves to fillet".into()),
-            Tool::Chamfer => Some("Select a vertex or two edges to chamfer".into()),
-            Tool::Trim => Some("Click entities to trim away, or drag across them".into()),
-            Tool::Extend => Some("Click the line or arc to extend".into()),
-            Tool::Split => Some("Click the sketch curve to split".into()),
-            Tool::SplinePoint => Some("Click a spline or bezier control polygon to add a control point".into()),
-            Tool::Offset => Some("Select one or more curves to offset".into()),
             Tool::Mirror => Some("Select a mirror line.".into()),
-            Tool::Dimension => Some("Select the entities to dimension, then click to place the dimension".into()),
-            Tool::Use => Some("Click edges, faces or sketch entities to use (project) them".into()),
-            Tool::Intersection => Some("Select a surface or face crossing the sketch plane".into()),
-            Tool::InsertDxf => Some("Choose the units, then a DXF file".into()),
-            Tool::InsertImage => Some("Choose an image file, then draw the image rectangle".into()),
-            Tool::Text => Some("Drag a box: its lower-left corner and height set the first line of text".into()),
-            Tool::Conic => Some("Click the start point, the end point, then the control point".into()),
-            Tool::Spline => Some("Click to add points; double-click to end".into()),
-            Tool::Bezier => Some("Click to add control points; double-click to end".into()),
-            Tool::MidpointLine => Some("Click the midpoint, then an end point".into()),
-            Tool::EllipticalArc => Some("Click the center, the primary axis, the start point, then the end point".into()),
-            Tool::Polygon | Tool::CircumPolygon => Some("Click the center, then the circumference (type a number first to set the sides)".into()),
-            Tool::LinearPattern => Some("Select entities and set the pattern; click in empty space or press Enter to accept".into()),
-            Tool::CircularPattern => Some("Select entities and set the center; click in empty space or press Enter to accept".into()),
-            Tool::Transform => Some("Select entities and set the transform; click in empty space or press Enter to accept".into()),
-            Tool::Constraint(c) => Some(format!("Select {} entit{} for {}", c.arity(), if c.arity() == 1 { "y" } else { "ies" }, c.label())),
             _ => None,
         };
     }

@@ -692,9 +692,17 @@ fn constrain(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     let before: Vec<ConstraintId> = t.data.sketch.constraints().map(|c| c.id).collect();
     let mut ed = editor(&t);
+    let picked = ids.len();
     ed.selection = ids;
     if !ed.constraint_command(&mut t.data, c) {
-        let why = ed.message.clone().unwrap_or_else(|| format!("{name} doesn't apply to these entities"));
+        // (The tool shows no hint, as live; the reply says what's missing.)
+        let why = ed.message.clone().unwrap_or_else(|| {
+            if picked < c.arity() {
+                format!("Select {} entit{} for {}", c.arity(), if c.arity() == 1 { "y" } else { "ies" }, c.label())
+            } else {
+                format!("{name} doesn't apply to these entities")
+            }
+        });
         return Err(OpError::invalid(why).with_param("entities"));
     }
     let added: Vec<String> = t.data.sketch.constraints().filter(|c| !before.contains(&c.id)).map(|c| constraint_id(c.id, false)).collect();

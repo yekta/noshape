@@ -3746,7 +3746,14 @@ impl PartStudioView {
                     let (v, t) = (view.clone(), *t);
                     let label: &'static str = t.label();
                     let shortcut = label.rsplit_once(" (").map(|(_, k)| k.trim_end_matches(')')).filter(|k| k.len() <= 7);
-                    let name = label.split(" (").next().unwrap_or_default();
+                    // Live's row names (dom/dropdowns-sketch.json; SKETCH-RECT-DROPDOWN-NAME).
+                    let name = match label.split(" (").next().unwrap_or_default() {
+                        "Center rectangle" => "Center point rectangle",
+                        "Use / project edges" => "Use",
+                        "Sketch fillet" => "Fillet",
+                        "Sketch chamfer" => "Chamfer",
+                        n => n,
+                    };
                     menu = menu.item(crate::ui::menu_tool_item(name, t.icon(), shortcut).on_click(move |_, window, cx| v.update(cx, |this, cx| this.activate_tool(t, window, cx))));
                 }
                 menu
