@@ -42,7 +42,7 @@ echo "== crates: $pkgs"
 name=$(basename "$PWD"); cf=$(mktemp); echo "$changed" > "$cf"
 if [ "${NOSHAPE_LAND_LOCAL:-0}" != 1 ] && ssh -o BatchMode=yes -o ConnectTimeout=5 vibe3 true 2>/dev/null; then
   branch="land/$name-$(git rev-parse --short HEAD)"
-  git push -q -f origin "HEAD:refs/heads/$branch" || fail "push to $branch"
+  git push -q -f origin "HEAD:refs/heads/$branch" 2>/dev/null || fail "push to $branch"
   ssh -o BatchMode=yes vibe3 "mkdir -p ~/land && cd ~/projects/noshape && git fetch -q origin $branch && git show FETCH_HEAD:tools/tiers/land-remote.sh > ~/land/remote-$name.sh && bash ~/land/remote-$name.sh '$name' '$branch' '$pkgs'" < "$cf"
   rc=$?; git push -q origin --delete "$branch" 2>/dev/null
 else
