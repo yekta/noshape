@@ -45,7 +45,7 @@ Docs /tmp/qa5/d24b/m.noshape (mate-base copy), /tmp/qa5/d24b/full.noshape (pass 
 | MT9 Replace instance → unresolvable mate | stays red, tooltip "Revolute 1 has error: Mate cannot resolve mate connectors. (Hidden)" | ✅ **fixed** (m75, m76) |  |
 
 ## Re-run pass 19 (2026-10-22 ~11:00–11:40, app /tmp/qa5/noshape-1013 = /root/target-lead/debug/noshape 10:13: the queue's 09:58 batch build = main 3ce6952 + the ready branches of that batch; CLI 08:11)
-| MT7 label at 0° | small blue "0°" on the X-axis end over the red X (z11) | ❌ regressed (MATE-ANGLE-360; qa 10-27 daf1f50c: full dashed circle + "360°") |
+| MT7 label at 0° | small blue "0°" on the X-axis end over the red X (z11) | ✅ (MATE-ANGLE-360 fixed 07ead631, qa verified c5e53806 10-28) |
 
 ## Re-check on main 88fbf8f5 (qa4, 2026-10-23 18:00–19:00, FRESH=1, /root/qa4-scratch/bin/noshape-m88)
 - MT3 tooltip "… (Click to edit)" ✅ in code; MT5 offset values now regular text (QuantityInput, qa4 10-22) ✅; MT5 limit fields,

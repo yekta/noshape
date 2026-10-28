@@ -19,7 +19,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 |---|---|---|---|---|---|
 | K1 | `i` opens / closes Insert parts and assemblies | H:shortcuts, E§3 | ✅ | toggles; closing commits a pending placement | 0.4.10+ / c9c66d1c 10-27 (opens / closes Insert) |
 | K2 | `m` opens the Fastened mate dialog | H:shortcuts | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Fastened 1 dialog) |
-| K3 | `j` shows / hides all mates | H:shortcuts | ❌ (J-KEY-NO-EFFECT) | per-mate eye overrides (Mate.hidden) | 0.4.10+ / c9c66d1c 10-27 |
+| K3 | `j` shows / hides all mates | H:shortcuts | ✅ | per-mate eye overrides (Mate.hidden) | 0.4.10+ / c5e53806 10-28 (j shows / hides new mates) |
 | K4 | `k` shows / hides mate connectors | H:shortcuts | ✅ | |  |
 | K5 | `h` toggles Show mates mode | H:shortcuts | ✅ | also toolbar button | 0.4.10+ / c9c66d1c 10-27 (Show mates mode banner) |
 | K6 | `Shift+S` toggles Snap mode | H:shortcuts | ✅ | |  |
@@ -33,7 +33,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | K14 | `Esc` cancels the command / closes menus, exits isolate | H:shortcuts | ✅ | Insert: Esc closes and keeps placed instances |  |
 | K15 | `Space` clears the selection | H:shortcuts | ✅ | | 0.4.10+ / c9c66d1c 10-27 |
 | K16 | `Delete` / `Backspace` deletes the selection (instances or mate feature) | H:shortcuts | ✅ | |  |
-| K17 | `Shift+N` renames the selected instance or feature inline | H:shortcuts | ✅ | | 0.4.10+ / c9c66d1c 10-27 (opens; Esc doesn't cancel: ASM-RENAME-ESC) |
+| K17 | `Shift+N` renames the selected instance or feature inline | H:shortcuts | ✅ | | 0.4.10+ / c5e53806 10-28 (Esc keeps the old name) |
 | K18 | `y` hides the hovered or selected instances | H:shortcuts | ✅ | hover in graphics or list | 0.4.10+ / c9c66d1c 10-27 (hovered pin) |
 | K19 | `Shift+Y` shows hidden instances | H:shortcuts | ✅ | | 0.4.10+ / c9c66d1c 10-27 (pointer over the hidden pin) |
 | K20 | `Shift+I` isolates hovered/selected (repeated presses add) | H:shortcuts, H:View__isolate | ✅ | | 0.4.10+ / c9c66d1c 10-27 (hovered pattern copy isolated, others translucent) |
