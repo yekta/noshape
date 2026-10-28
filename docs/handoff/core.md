@@ -97,8 +97,11 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   BRepMesh_ShapeVisitor::addWire: a wire on a plane that is already a simple loop in order keeps its order
   (ShapeAnalysis_WireOrder compares every edge's ends with every other's: 30 % of meshing the 400-fin plate's
   1604-edge front face; best 67.7 → 51.9 ms, the same triangles: kernel `planar_mesh::mesh_big_face_bench` prints a
-  hash). 0003b sorts after 0003 in C order and before it in some locales: they touch different files. 0004 is kept
-  for phase 1 (the plan's name).
+  hash). 0003b sorts after 0003 in C order and before it in some locales: they touch different files.
+- 0004 (10-28, phase 1) TKBO, on 0001: the pair intersections of PerformEE / PerformEF / PerformFF / PerformVF /
+  IntersectVE / TreatVerticesEE on the thread pool with booleans serial (`noshapePairsInParallel`, ≥ 64 pairs;
+  NOSHAPE_BOP_PAIRS_SERIAL=1 never); ReduceIntersectionRange's E/E interferences indexed by new vertex. Built lib
+  kept at /root/core-scratch/libTKBO.a.0004; the TKBO before it in /root/core-scratch/occt-lib-backup.
 - OCCT 8's gp_Dir / gp_Ax1 constructors are noexcept: a zero vector anywhere is std::terminate (caught by the guard as
   SIGABRT inside bridge calls). Never build a gp_Dir from a vector that can be zero in our C++.
 - Signal-handler state (crash guard, budget) needs `std::atomic_signal_fence` after it is set, or the compiler may drop
@@ -289,6 +292,27 @@ Phase 2 stopped here (user, 10-28 12:55: big gains, not the last milliseconds). 
   sub-shape (op_boolean and op_unify), naming every edge and vertex, the auto scope's first classification, the
   BRepMesh model build of big faces. The bool agent's Rust Boolean (phase 3, NOSHAPE_BOOL_RUST, its hook early in
   op_boolean) may replace the local Boolean for planar parts.
+
+Phase 1 (10-28, in progress; patch 0004 drafted in /root/core-scratch/0004-bop-parallel-pairs.patch, applied on
+0001): the diamond knurl (kernel `perf::knurl_like_onshape`, KNURL=diamond, release, production settings: OCCT
+booleans serial, BOOL-THREAD-CRASH) runs against /root/occt-core (a copy of /root/occt with the TKBO under test;
+/root/target-core-bop; NOSHAPE_EF_STATS=1 prints [ef] / [bop] step times from temporary timers that are not in the
+patch). Before: 564 s (load ~30), PerformEF 181 s, of it the "parallel" pair intersections 130 s on one thread and
+the serial result loop only 22 s. So the big structural win is the pairs, not the result loop:
+- The pair intersections of PerformEE / PerformEF / PerformFF / PerformVF / IntersectVE run on the thread pool even
+  with booleans serial (`noshapePairsInParallel`, ≥ 64 pairs; NOSHAPE_BOP_PAIRS_SERIAL=1: never). Each pair into its
+  own record with its own context, applied afterwards in order: the same result. ForceInterfEF's / ForceInterfEE's
+  and the builder's loops stay serial (the race's sites).
+- ReduceIntersectionRange looks up the E/E interferences by new vertex (it scanned all ~10^5 for each vertex
+  common part): 6.3 → 0.4 s.
+- TreatVerticesEE (patch 0001 had made it one representative per congruent class, still serial) on the pool too:
+  75 → 25 s; PerformVF 42 → 12.5, RepeatIntersection 34 → 13.
+- Knurl 564 → 264-329 s (instrumented 264-281, the clean lib 329; load 26-36; same 8142 faces, volume 75409.760). Steps left (s, summed over the run's Booleans):
+  MakeBlocks 75 (PostTreatFF's sub-filler 37, UpdateFaceInfo 20, the loop 12, PutSEInOtherFaces 5), PerformEF 44
+  (pair collection 15 with 0001's congruence keys, pairs 14, result loop 13 of which projections 10), PerformEE 30,
+  TreatVerticesEE 25, PerformFF 17, RepeatIntersection 13, PerformVF 12.5, PerformVE 6. Next if worth it:
+  PostTreatFF's sub-filler, the pair collections (the keys could be made in parallel), the EF result loop's
+  projections (decide in parallel, commit in order).
 
 ## Next, in order
 0. **Now: phase 1 (knurl 210 s → < 90 s), EF result loop first (patch 0004); take the big structural win, stop

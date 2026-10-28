@@ -1,0 +1,264 @@
+diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_2.cxx b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_2.cxx
+--- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_2.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_2.cxx
+@@ -15,6 +15,7 @@
+ // Alternatively, this file may be used under the terms of Open CASCADE
+ // commercial license or contractual agreement.
+ 
++#include <cstdlib>
+ #include <BOPAlgo_PaveFiller.hxx>
+ #include <BOPAlgo_Alerts.hxx>
+ #include <BOPAlgo_Tools.hxx>
+@@ -209,6 +210,18 @@
+ 
+ //=================================================================================================
+ 
++// noshape: the pairs' intersections on the thread pool even when the Boolean
++// runs serially (NOSHAPE_BOP_PAIRS_SERIAL=1: never). Each pair is computed
++// alone into its own record (with its own context) and the records are used
++// afterwards in the pairs' order, so the result is the same. Everything else
++// stays serial (BOOL-THREAD-CRASH: a race outside these loops; the diamond
++// knurl's 815 000 edge / face pairs took 130 s on one thread).
++static bool noshapePairsInParallel(const bool theRunParallel, const int theNbPairs)
++{
++  static const bool aSerial = std::getenv("NOSHAPE_BOP_PAIRS_SERIAL") != nullptr;
++  return theRunParallel || (!aSerial && theNbPairs >= 64);
++}
++
+ void BOPAlgo_PaveFiller::IntersectVE(
+   const NCollection_IndexedDataMap<occ::handle<BOPDS_PaveBlock>, NCollection_List<int>>& theVEPairs,
+   const Message_ProgressRange&                                                           theRange,
+@@ -301,7 +314,7 @@
+   }
+   // Perform intersection
+   //=============================================================
+-  BOPTools_Parallel::Perform(myRunParallel, aVVE, myContext);
++  BOPTools_Parallel::Perform(noshapePairsInParallel(myRunParallel, aVVE.Length()), aVVE, myContext);
+   //=============================================================
+   if (UserBreak(aPSOuter))
+   {
+diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_3.cxx b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_3.cxx
+--- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_3.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_3.cxx
+@@ -15,6 +15,7 @@
+ // Alternatively, this file may be used under the terms of Open CASCADE
+ // commercial license or contractual agreement.
+ 
++#include <cstdlib>
+ #include <Bnd_Box.hxx>
+ #include <BOPAlgo_PaveFiller.hxx>
+ #include <BOPAlgo_Tools.hxx>
+@@ -197,6 +198,18 @@
+ 
+ //=================================================================================================
+ 
++// noshape: the pairs' intersections on the thread pool even when the Boolean
++// runs serially (NOSHAPE_BOP_PAIRS_SERIAL=1: never). Each pair is computed
++// alone into its own record (with its own context) and the records are used
++// afterwards in the pairs' order, so the result is the same. Everything else
++// stays serial (BOOL-THREAD-CRASH: a race outside these loops; the diamond
++// knurl's 815 000 edge / face pairs took 130 s on one thread).
++static bool noshapePairsInParallel(const bool theRunParallel, const int theNbPairs)
++{
++  static const bool aSerial = std::getenv("NOSHAPE_BOP_PAIRS_SERIAL") != nullptr;
++  return theRunParallel || (!aSerial && theNbPairs >= 64);
++}
++
+ void BOPAlgo_PaveFiller::PerformEE(const Message_ProgressRange& theRange)
+ {
+   FillShrunkData(TopAbs_EDGE, TopAbs_EDGE);
+@@ -341,7 +354,7 @@
+     anEdgeEdge.SetProgressRange(aPS.Next());
+   }
+   //======================================================
+-  BOPTools_Parallel::Perform(myRunParallel, aVEdgeEdge);
++  BOPTools_Parallel::Perform(noshapePairsInParallel(myRunParallel, aVEdgeEdge.Length()), aVEdgeEdge);
+   //======================================================
+   if (UserBreak(aPSOuter))
+   {
+diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_4.cxx b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_4.cxx
+--- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_4.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_4.cxx
+@@ -15,6 +15,7 @@
+ // Alternatively, this file may be used under the terms of Open CASCADE
+ // commercial license or contractual agreement.
+ 
++#include <cstdlib>
+ #include <BOPAlgo_PaveFiller.hxx>
+ #include <BOPAlgo_Alerts.hxx>
+ #include <BOPDS_DS.hxx>
+@@ -172,6 +173,18 @@
+ 
+ //=================================================================================================
+ 
++// noshape: the pairs' intersections on the thread pool even when the Boolean
++// runs serially (NOSHAPE_BOP_PAIRS_SERIAL=1: never). Each pair is computed
++// alone into its own record (with its own context) and the records are used
++// afterwards in the pairs' order, so the result is the same. Everything else
++// stays serial (BOOL-THREAD-CRASH: a race outside these loops; the diamond
++// knurl's 815 000 edge / face pairs took 130 s on one thread).
++static bool noshapePairsInParallel(const bool theRunParallel, const int theNbPairs)
++{
++  static const bool aSerial = std::getenv("NOSHAPE_BOP_PAIRS_SERIAL") != nullptr;
++  return theRunParallel || (!aSerial && theNbPairs >= 64);
++}
++
+ void BOPAlgo_PaveFiller::PerformVF(const Message_ProgressRange& theRange)
+ {
+   myIterator->Initialize(TopAbs_VERTEX, TopAbs_FACE);
+@@ -286,7 +299,7 @@
+     aVertexFace.SetProgressRange(aPS.Next());
+   }
+   //================================================================
+-  BOPTools_Parallel::Perform(myRunParallel, aVVF, myContext);
++  BOPTools_Parallel::Perform(noshapePairsInParallel(myRunParallel, aVVF.Length()), aVVF, myContext);
+   //================================================================
+   if (UserBreak(aPSOuter))
+   {
+@@ -438,7 +451,7 @@
+     aPairs.emplace_back(nV, nF);
+     aRepOfPair.push_back(aIns.first->second);
+   }
+-  BOPTools_Parallel::Perform(myRunParallel, aVVF, myContext);
++  BOPTools_Parallel::Perform(noshapePairsInParallel(myRunParallel, aVVF.Length()), aVVF, myContext);
+   (void)dummy;
+   for (size_t k = 0; k < aPairs.size(); ++k)
+   {
+diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx
+--- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx
+@@ -15,9 +15,11 @@
+ // Alternatively, this file may be used under the terms of Open CASCADE
+ // commercial license or contractual agreement.
+ 
++#include <cstdlib>
+ #include <Bnd_Box.hxx>
+ #include <Bnd_Tools.hxx>
+ #include <BOPAlgo_PaveFiller.hxx>
++#include <algorithm>
+ #include <BOPAlgo_Alerts.hxx>
+ #include <BOPAlgo_Tools.hxx>
+ #include <BOPDS_CoupleOfPaveBlocks.hxx>
+@@ -229,8 +231,42 @@
+ 
+ //=================================================================================================
+ 
++namespace
++{
++// noshape: PerformEF's index of the E/E interferences by their new vertex
++// (ReduceIntersectionRange scanned all of them for each vertex common part:
++// the diamond knurl's ~10^5 E/E for each of ~10^5 E/F parts). Made at the
++// first use in a PerformEF; E/E interferences are not added during it.
++struct EEByVertex
++{
++  bool                                      made = false;
++  std::unordered_map<int, std::vector<int>> of;
++};
++thread_local EEByVertex* t_eeByVertex = nullptr;
++} // namespace
++
++// noshape: the pairs' intersections on the thread pool even when the Boolean
++// runs serially (NOSHAPE_BOP_PAIRS_SERIAL=1: never). Each pair is computed
++// alone into its own record (with its own context) and the records are used
++// afterwards in the pairs' order, so the result is the same. Everything else
++// stays serial (BOOL-THREAD-CRASH: a race outside these loops; the diamond
++// knurl's 815 000 edge / face pairs took 130 s on one thread).
++static bool noshapePairsInParallel(const bool theRunParallel, const int theNbPairs)
++{
++  static const bool aSerial = std::getenv("NOSHAPE_BOP_PAIRS_SERIAL") != nullptr;
++  return theRunParallel || (!aSerial && theNbPairs >= 64);
++}
++
+ void BOPAlgo_PaveFiller::PerformEF(const Message_ProgressRange& theRange)
+ {
++  // noshape: ReduceIntersectionRange's index (see EEByVertex).
++  EEByVertex aEEByVertex;
++  struct EEByVertexScope
++  {
++    EEByVertex* prev;
++    explicit EEByVertexScope(EEByVertex* now) : prev(t_eeByVertex) { t_eeByVertex = now; }
++    ~EEByVertexScope() { t_eeByVertex = prev; }
++  } aEEByVertexScope(&aEEByVertex);
+   FillShrunkData(TopAbs_EDGE, TopAbs_FACE);
+   //
+   myIterator->Initialize(TopAbs_EDGE, TopAbs_FACE);
+@@ -392,7 +428,7 @@
+     aEdgeFace.SetProgressRange(aPS.Next());
+   }
+   //=================================================================
+-  BOPTools_Parallel::Perform(myRunParallel, aVEdgeFace, myContext);
++  BOPTools_Parallel::Perform(noshapePairsInParallel(myRunParallel, aNbEdgeFace), aVEdgeFace, myContext);
+   //=================================================================
+   if (UserBreak(aPSOuter))
+   {
+@@ -805,8 +841,30 @@
+     }
+   }
+   //
+-  for (i = 0; i < aNbEEs; ++i)
++  // noshape: only the E/E interferences whose new vertex is theV1 or theV2,
++  // in their order (the ranges only shrink: the order doesn't matter).
++  std::vector<int> aCand;
++  if (t_eeByVertex != nullptr)
++  {
++    if (!t_eeByVertex->made)
++    {
++      for (int j = 0; j < aNbEEs; ++j)
++        if (aEEs(j).HasIndexNew())
++          t_eeByVertex->of[aEEs(j).IndexNew()].push_back(j);
++      t_eeByVertex->made = true;
++    }
++    for (const int aV : {theV1, theV2})
++    {
++      const auto it = t_eeByVertex->of.find(aV);
++      if (it != t_eeByVertex->of.end() && (aV != theV2 || theV1 != theV2))
++        aCand.insert(aCand.end(), it->second.begin(), it->second.end());
++    }
++    std::sort(aCand.begin(), aCand.end());
++  }
++  const int aNbCand = t_eeByVertex != nullptr ? (int)aCand.size() : aNbEEs;
++  for (int c = 0; c < aNbCand; ++c)
+   {
++    i                   = t_eeByVertex != nullptr ? aCand[(size_t)c] : c;
+     BOPDS_InterfEE& aEE = aEEs(i);
+     if (!aEE.HasIndexNew())
+     {
+diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_6.cxx b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_6.cxx
+--- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_6.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_6.cxx
+@@ -15,6 +15,7 @@
+ // Alternatively, this file may be used under the terms of Open CASCADE
+ // commercial license or contractual agreement.
+ 
++#include <cstdlib>
+ #include <BOPAlgo_PaveFiller.hxx>
+ #include <Bnd_Box.hxx>
+ #include <BOPAlgo_Alerts.hxx>
+@@ -355,6 +356,18 @@
+ 
+ //=================================================================================================
+ 
++// noshape: the pairs' intersections on the thread pool even when the Boolean
++// runs serially (NOSHAPE_BOP_PAIRS_SERIAL=1: never). Each pair is computed
++// alone into its own record (with its own context) and the records are used
++// afterwards in the pairs' order, so the result is the same. Everything else
++// stays serial (BOOL-THREAD-CRASH: a race outside these loops; the diamond
++// knurl's 815 000 edge / face pairs took 130 s on one thread).
++static bool noshapePairsInParallel(const bool theRunParallel, const int theNbPairs)
++{
++  static const bool aSerial = std::getenv("NOSHAPE_BOP_PAIRS_SERIAL") != nullptr;
++  return theRunParallel || (!aSerial && theNbPairs >= 64);
++}
++
+ void BOPAlgo_PaveFiller::PerformFF(const Message_ProgressRange& theRange)
+ {
+   // Update face info for all Face/Face intersection pairs
+@@ -615,7 +628,7 @@
+   }
+   //======================================================
+   // Perform intersection
+-  BOPTools_Parallel::Perform(myRunParallel, aVFaceFace);
++  BOPTools_Parallel::Perform(noshapePairsInParallel(myRunParallel, aVFaceFace.Length()), aVFaceFace);
+   if (UserBreak(aPSOuter))
+   {
+     return;
