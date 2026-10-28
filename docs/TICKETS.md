@@ -956,7 +956,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   implicit / explicit mate connector glyphs (disc + triad at both ends of Revolute 1), the second hides them. Ours
   (assembly_view.rs show_connectors) only draws connectors defined in the part studios (o.context.connectors), not the
   ones the mates create (qa 2026-10-28 06:58, build 2292bf8c)
-- [x] b09814de P3 ASM-XT-ROUNDTRIP-NAMES our own Parasolid assembly re-imports with unnamed instances: asm5 › Assembly 1 › Export… ›
+- [x] verified 97c7aae3 (qa 09:25: asm5 › Export PARASOLID › re-import → "Assembly" lists Part 1 <1>, Part 1 <2>, Part 2 <1> (names of the new studio's parts, numbered in file order: the two pins are "Part 1" there); tickets/asm-xt-names-97c7.png) b09814de P3 ASM-XT-ROUNDTRIP-NAMES our own Parasolid assembly re-imports with unnamed instances: asm5 › Assembly 1 › Export… ›
   PARASOLID, then + › Import… of that file → the new "Assembly" lists its instances as **"<1>", "<2>", "<3>"** (no part
   name), while the parts studio names the parts "Part 1", "Part 2" (tickets/asm-xt-roundtrip-names-c56b.png). An instance
   row is always "<part name> <n>" in live (and in ours elsewhere: Part 1 <1>, Part 2 <1>). Either the export writes no
