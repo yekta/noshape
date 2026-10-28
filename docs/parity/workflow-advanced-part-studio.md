@@ -127,7 +127,7 @@ Pass 6 (17:11 build, d5745c9) had already found ADV8 fixed ("20 tpi"); not re-ch
 | ADV1 Plane 1 row → Sketch plane | field stays empty | ✗ still |  |
 | ADV2 loft | 5927.754632 (CLI) | ✗ still (live 5927.728) |  |
 | ADV3 error tooltip prefix | "Helix 1 did not regenerate properly: Select a cone or cylinder." | ✅ **fixed** | 64997436 10-28 (GUI: empty Hole committed → row tooltip '1/4-20 ↧ 12 mm | ⌵Ø 13.487 mm X 82° [Hole] did not regenerate properly: No hole points selected.') |
-| SK1 dim set to an unsolvable value | Enter closes the box, value R2 kept, geometry red, **yellow "⚠ Sketch could not be solved."** toast, gone when the sketch closes ✅; **dialog title "Sketch 2" and the feature row text stay black** (live red) | ✗ still (mostly fixed) |  |
+| SK1 dim set to an unsolvable value | Enter closes the box, value R2 kept, geometry red, **yellow "⚠ Sketch could not be solved."** toast, gone when the sketch closes ✅; **dialog title "Sketch 2" and the feature row text stay black** (live red) | ✗ still (mostly fixed) | f8014efa 10-28 (title / row now red: see SK1 row below) |
 | SK2 | the "Sketch 2" plane outline now shows while editing | ✅ |  |
 | ADV7 thread splits face | still one cylindrical face, 565.487 mm² (whole 30 mm) (CLI) | ✗ still |  |
 | ADV12 hole row name | both callout lines; tooltip "Hole 1 <- Sketch 2" | ✗ still |  |
@@ -140,7 +140,7 @@ Pass 6 (17:11 build, d5745c9) had already found ADV8 fixed ("20 tpi"); not re-ch
 | ADV1 Plane 1 row → Sketch plane | fills "Plane 1" | ✅ **fixed** | 0.4.10+ / dd1b5037 10-27 (Plane rows fill Sketch plane / Entities) |
 | ADV2 loft (Mass properties) | 5927.755 mm³ | ✗ still (live 5927.728) |  |
 | ADV7 thread splits face | hover shows two cylinder faces, split ~10 mm up | ✅ **fixed** |  |
-| SK1 unsolvable dimension | dialog title and row now red, ✓ disabled | ✅ **fixed** |  |
+| SK1 unsolvable dimension | dialog title and row now red, ✓ disabled | ✅ **fixed** | f8014efa 10-28 (GUI, qa-scratch/tri.noshape (bin/tri.py): base 10 → 30 → box closes, 30 kept, geometry stays, all red, title / row red, header badge, ⚠ "Sketch could not be solved."; ✓ stays enabled = live (behaviours 14346: after ✓ WARNING)) |
 | ADV12 hole row | tooltip "1/4-20 ↧ 12 mm \| ⌵Ø 12.878 mm X 82° [Hole]" ✅; row still shows both callout lines | ✗ still (partly) |  |
 | TAB1 | Part Studio 2 still opens with "Parts (0)" (Part Studio 3 listed its parts) | ✗ still |  |
 
