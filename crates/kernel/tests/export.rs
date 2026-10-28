@@ -134,7 +134,7 @@ fn parasolid_assembly_round_trip() {
 #[test]
 fn parasolid_assemblies_from_onshape_in_every_version() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-asm");
-    for v in ["12.0", "25.0", "28.0", "28.1", "33.0", "33.1", "37.1", "38.1", "latest"] {
+    for v in ["12.0", "25.0", "28.0", "28.1", "30.0", "30.1", "31.0", "31.1", "33.0", "33.1", "37.1", "38.1", "latest"] {
         let (_, parts, inst) = read_parasolid_assembly(&dir.join(format!("{v}.x_t")), LengthUnit::Millimeter).unwrap_or_else(|e| panic!("{v}: {e}")).unwrap_or_else(|| panic!("{v}: an assembly"));
         assert_eq!((parts.len(), inst.len()), (2, 3), "{v}");
         let mut vols: Vec<f64> = parts.iter().map(|p| volume_properties(&p.shape).unwrap().mass).collect();

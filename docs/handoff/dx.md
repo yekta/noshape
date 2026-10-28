@@ -118,6 +118,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   live's layouts (from tests/perf's NIST x_t); older versions stay flat until live sends an assembly in each
   (REQUESTS dx 10-28). Then BALLOON-WRONG-ITEM, DRAWING-SHIFT-SLASH, the drawing.md rows in P2 order.
 
+## Midday 10-28 (landed through ec54591b; checks on green 6570fa0d, :131, /root/dx-scratch/w3/b*.png)
+- Green: the dimension palette's dual row as live asbdd-9 ([ 3.15 ▾ (in) ▾ 👁 ], the eye shows "[3.15 in]"); in Dark mode
+  the drawing toolbar is white over its whole width (DARK-DRAWING-TOOLBAR).
+- Landed: DWG-REVOLVE-SEAM (P1), VIEW-LABEL-TOGGLE, DRAWING-BOX-SELECT (qa verified all three), XT-ASM-VERSIONS (all 13
+  of live's per-version assemblies read; ours write in every version), DATUM-SCALE-DETACHED, DARK-DRAWING-TOOLBAR,
+  OBJ-ZIP-MSG, drawing.md EX10 (strikethrough by DXF version), EX11 (export banner), TB9 (corner double-click).
+- Asked live: EX11's finish notification, V53 paste across workspaces. Next: ASM-XT-ROUNDTRIP-NAMES (names as
+  Parasolid attributes: ATTRIB_DEF / ATTRIBUTE / CHAR_VALUES per version), drawing.md rows in P2 order.
+
 ## Morning 10-28 (landed through 91dec38b)
 - qa tickets fixed: BALLOON-WRONG-ITEM (a callout on a silhouette is that part's: the nearest visible edge decides,
   the line of sight's closest body for silhouettes), ASM-PARASOLID-FLAT (verified by qa 06:08), CALLOUT-ON-DIMENSION
