@@ -164,7 +164,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | F1 | Mate connectors, mates, relations, groups listed in creation order | E§5.1 | ✅ | |  |
 | F2 | Hover a mate: its instances highlight, glyph shows | E§5.1 | ✅ | | 0.4.10+ / 52ca0b97 10-28 (hover Revolute 1: both instances tinted, the glyph shows) |
 | F3 | Hover tooltip: "<name> has error: <message>", type, offset and limit definitions | UI:mate-hover | ✅ | | 0.4.10+ / 52ca0b97 10-28 ("Revolute 1 (Hidden) / Revolute mate / Offset: off / Limits: Z angle – to 30 deg") |
-| F4 | Mate limit indicator icon ("<name> has limits") | H:mates, B | ✅ | |  |
+| F4 | Mate limit indicator icon ("<name> has limits") | H:mates, B | ✅ | | 2292bf8c 10-28 (Revolute 1, ☑ Limits 0 / 90 deg → row icon, tooltip "Revolute 1 has limits") |
 | F5 | Eye icon on hover toggles the mate indicator | E§6.4 | ✅ | | 0.4.10+ / 52ca0b97 10-28 (row eye shows the hidden mate's glyph) |
 | F6 | Mates expand to the implicit mate connectors they use | E§5.1, UI:mate-hover | ✅ | |  |
 | F7 | Double-click edits | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
