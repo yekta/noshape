@@ -59,7 +59,7 @@ pub use history::{History, HistoryRecord, OpResult, Relation};
 pub use hlr::{EdgeClass, ProjectedEdge, Visibility, project_hlr, project_hlr_with};
 pub use io::{
     ExportShape, ImportedShape, LengthUnit, StepOptions, StepSchema, StlFormat, read_brep, read_iges, read_mesh, read_step, write_brep,
-    rhino_brep_count, write_acis, write_iges, write_jt, write_obj, write_obj_mesh, write_parasolid, write_parasolid_assembly, write_parasolid_version, PARASOLID_VERSIONS, write_pvz, read_parasolid, read_parasolid_parts, read_native_parts, read_native_parts_configuration, read_native_assembly, read_native_assembly_in, extract_zip, NativeComponent, read_acis_parts, read_jt_parts, read_rhino_parts, read_pvz, read_pvz_parts, read_pvz_instances, read_step_assembly, read_parasolid_assembly, write_step_assembly, StepAssembly, StepInstance, PvzInstance, read_mesh_bodies, write_rhino, write_step, write_step_shapes, write_step_with, write_stl, write_stl_mesh,
+    rhino_brep_count, write_acis, write_iges, write_jt, write_obj, write_obj_mesh, write_parasolid, write_parasolid_assembly, write_parasolid_parts, write_parasolid_version, PARASOLID_VERSIONS, write_pvz, read_parasolid, read_parasolid_parts, read_native_parts, read_native_parts_configuration, read_native_assembly, read_native_assembly_in, extract_zip, NativeComponent, read_acis_parts, read_jt_parts, read_rhino_parts, read_pvz, read_pvz_parts, read_pvz_instances, read_step_assembly, read_parasolid_assembly, write_step_assembly, StepAssembly, StepInstance, PvzInstance, read_mesh_bodies, write_rhino, write_step, write_step_shapes, write_step_with, write_stl, write_stl_mesh,
 };
 pub use mesh::{EdgeRange, FaceRange, MeshOptions, Tessellation, tessellate, tessellate_with};
 pub use ops::*;

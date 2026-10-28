@@ -4029,7 +4029,11 @@ fn parasolid_assembly_export_and_import_round_trip() {
     let tabs: Vec<(String, String)> = r["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| (t["name"].as_str().unwrap().to_string(), t["kind"].as_str().unwrap().to_string())).collect();
     let asm = tabs.iter().find(|t| t.1 == "Assembly").unwrap_or_else(|| panic!("an Assembly: {r}")).0.clone();
     assert!(tabs.contains(&("xt_asm_out parts".to_string(), "Part Studio".to_string())), "{r}");
-    assert_eq!(call(&mut ctx, "query_parts", json!({ "tab": "xt_asm_out parts" }))["parts"].as_array().unwrap().len(), 2);
+    // Named as in the assembly (qa ASM-XT-ROUNDTRIP-NAMES).
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "xt_asm_out parts" }));
+    let mut names: Vec<&str> = parts["parts"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap()).collect();
+    names.sort();
+    assert_eq!(names, ["Part 1", "Part 2"], "{parts}");
     let inst = call(&mut ctx, "assembly_list", json!({ "tab": asm }))["instances"].as_array().unwrap().clone();
     assert_eq!(inst.len(), 2, "{inst:?}");
     let moved = |i: &Value| (0..3).all(|k| (num(&i["translation"][k]) - num(&before["translation"][k])).abs() < 1e-6);

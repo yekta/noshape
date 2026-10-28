@@ -243,14 +243,14 @@ int schema_code(const XtVersion& v)
 // have them, live G36), the ones it drops left out.
 std::vector<Node> to_version(std::vector<Node> nodes, const XtVersion& v)
 {
-  const int code = schema_code(v);
-  if (code <= 13006)
-    return nodes;
+  const int                                    code = schema_code(v);
   std::map<int, const std::vector<FieldSpec>*> layouts;
   for (const auto& [c, types] : version_schemas())
     if (c <= code)
       for (const auto& [t, f] : types)
         layouts[t] = &f;
+  if (layouts.empty())
+    return nodes;
   const auto& base = base_schema();
   for (Node& n : nodes)
   {
@@ -273,13 +273,18 @@ std::vector<Node> to_version(std::vector<Node> nodes, const XtVersion& v)
     for (const FieldSpec& f : *lt->second)
     {
       auto it = by_name.find(f.name);
+      int  have = 0;
       if (it != by_name.end())
       {
         out.insert(out.end(), it->second.begin(), it->second.end());
-        continue;
+        // A fixed array this version makes longer (37.0's 17 legal
+        // owners): the rest as zero / false.
+        if (f.n <= 1 || (int)it->second.size() >= f.n)
+          continue;
+        have = (int)it->second.size();
       }
       const int k = std::max(1, f.n == 1 ? 0 : f.n);
-      for (int i = 0; i < k && f.n != 1; ++i)
+      for (int i = have; i < k && f.n != 1; ++i)
         switch (f.type)
         {
           case 'f':
@@ -1770,6 +1775,138 @@ size_t base_field(int type, const std::string& name)
   return 0;
 }
 
+// Names and colours as Parasolid attributes, as Onshape writes them (live
+// samples/dx-asm-xt-<v>.x_t; qa ASM-XT-ROUNDTRIP-NAMES): the definitions
+// SDL/TYSA_NAME (8017) and SDL/TYSA_COLOUR_2 (8040) once, chained; per owner
+// its ATTRIBUTEs (chained from its attributes_groups, and per definition) on
+// a CHAR_VALUES / REAL_VALUES node, listed in its attribute_chains LIST.
+struct AttrWriter
+{
+  Writer&            w;
+  int                name_def = 0, colour_def = 0, last_def = 0;
+  std::map<int, int> last_of_type; // definition -> its latest attribute
+
+  int definition(const std::string& id, int type_id, const std::vector<int>& actions, const std::vector<bool>& owners, int field)
+  {
+    const int ident = w.alloc();
+    {
+      Node& s    = w.add(79, ident);
+      s.variable = true;
+      s.var_count = (int)id.size();
+      for (char c : id)
+        s.fields.push_back(fc(c));
+    }
+    const int d = w.alloc();
+    {
+      Node& n     = w.add(80, d);
+      n.variable  = true;
+      n.var_count = 1;
+      n.fields    = {fp(0), fp(ident), fd(type_id)};
+      for (int a : actions)
+        n.fields.push_back(fu(a));
+      n.fields.push_back(fp(0)); // field_names
+      for (bool o : owners)
+        n.fields.push_back(fl(o));
+      n.fields.push_back(fu(field));
+    }
+    if (last_def)
+      w.node(last_def).fields[0] = fp(d);
+    last_def = d;
+    return d;
+  }
+
+  // Live's flags: a name on any of the first 13 owner types, a colour on
+  // the first three (assembly, instance, body).
+  int names()
+  {
+    if (!name_def)
+      name_def = definition("SDL/TYSA_NAME", 8017, {0, 0, 0, 0, 0, 0, 0, 0}, {true, true, true, true, true, true, true, true, true, true, true, true, true, false}, 3);
+    return name_def;
+  }
+  int colours()
+  {
+    if (!colour_def)
+      colour_def = definition("SDL/TYSA_COLOUR_2", 8040, {0, 0, 0, 0, 3, 5, 0, 0}, {true, true, true, false, false, false, false, false, false, false, false, false, false, false}, 2);
+    return colour_def;
+  }
+
+  // `owner`'s name (ASCII; others as '?') and colour (sRGB 0–1, or none),
+  // node ids from `id` on.
+  void attach(int owner, const std::string& name, const double* rgb, int& id)
+  {
+    std::vector<int> attrs;
+    auto             attr = [&](int def, int value) {
+      const int a         = w.alloc();
+      const int prev_type = last_of_type.count(def) ? last_of_type[def] : 0;
+      {
+        Node& n     = w.add(81, a);
+        n.variable  = true;
+        n.var_count = 1;
+        n.fields    = {fd(id++), fp(def), fp(owner), fp(0), fp(attrs.empty() ? 0 : attrs.back()), fp(0), fp(prev_type), fp(value)};
+      }
+      if (!attrs.empty())
+        w.node(attrs.back()).fields[3] = fp(a);
+      if (prev_type)
+        w.node(prev_type).fields[5] = fp(a);
+      last_of_type[def] = a;
+      attrs.push_back(a);
+    };
+    std::string text;
+    for (unsigned char c : name)
+      text += c >= 32 && c < 127 ? (char)c : '?';
+    if (!text.empty())
+    {
+      const int def = names();
+      const int v   = w.alloc();
+      {
+        Node& n     = w.add(84, v);
+        n.variable  = true;
+        n.var_count = (int)text.size();
+        for (char c : text)
+          n.fields.push_back(fc(c));
+      }
+      attr(def, v);
+    }
+    if (rgb)
+    {
+      const int def = colours();
+      const int v   = w.alloc();
+      {
+        Node& n     = w.add(83, v);
+        n.variable  = true;
+        n.var_count = 3;
+        for (int k = 0; k < 3; ++k)
+          n.fields.push_back(ff(rgb[k]));
+      }
+      attr(def, v);
+    }
+    if (attrs.empty())
+      return;
+    const int list = w.alloc(), block = w.alloc();
+    w.add(70, list).fields = {fd(0), fp(owner), fp(0), fp(0), fd(4), fd((long long)attrs.size()), fd(20), fd(8), fp(block), fp(block), fd(1), fl(true)};
+    {
+      Node& b     = w.add(74, block);
+      b.variable  = true;
+      b.var_count = 20;
+      b.fields    = {fd((long long)attrs.size()), fp(0)};
+      for (size_t k = 0; k < 20; ++k)
+        b.fields.push_back(fp(k < attrs.size() ? attrs[k] : 0));
+    }
+    // attributes_groups, attribute_chains (BODY and ASSEMBLY alike).
+    Node& o     = w.node(owner);
+    o.fields[1] = fp(attrs[0]);
+    o.fields[2] = fp(list);
+  }
+};
+
+// Shape `i`'s name and colour from the FFI lists (NaN: no colour).
+std::pair<std::string, const double*> name_colour(rust::Slice<const rust::String> names, rust::Slice<const double> colours, size_t i)
+{
+  const std::string name = i < names.size() ? std::string(names[i]) : std::string();
+  const double*     rgb  = 3 * i + 2 < colours.size() && !std::isnan(colours[3 * i]) ? &colours[3 * i] : nullptr;
+  return {name, rgb};
+}
+
 // One part's BODY, as write_parasolid writes it.
 int write_body(Writer& w, const TopoDS_Shape& s)
 {
@@ -1785,6 +1922,18 @@ int write_body(Writer& w, const TopoDS_Shape& s)
   return body;
 }
 
+// write_body with the part's name / colour attributes (its node ids after the
+// body's).
+int write_named_body(Writer& w, AttrWriter& aw, const TopoDS_Shape& s, const std::string& name, const double* rgb)
+{
+  const int body = write_body(w, s);
+  int       id   = w.next_id;
+  aw.attach(body, name, rgb, id);
+  w.node(body).fields[0] = fd(id - 1);
+  w.next_id              = id;
+  return body;
+}
+
 void write_file(const std::vector<Node>& nodes, const XtVersion& ver, bool binary, const std::string& path, const std::string& application)
 {
   const std::string data = header(binary, path, application) + (binary ? binary_body(nodes, ver) : text_body(nodes, ver));
@@ -1796,15 +1945,20 @@ void write_file(const std::vector<Node>& nodes, const XtVersion& ver, bool binar
     fail_op("writing " + path + " failed");
 }
 
-void write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary, rust::Str version, rust::Str application)
+void write_parasolid(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str path, bool binary, rust::Str version,
+                     rust::Str application)
 {
   const XtVersion ver = xt_version(std::string(version));
   Writer           w;
+  AttrWriter       aw{w};
   std::vector<int> bodies;
   const bool       list = shapes.items.size() != 1;
   const int        root = list ? w.alloc() : 0;
-  for (const auto& s : shapes.items)
-    bodies.push_back(write_body(w, s));
+  for (size_t i = 0; i < shapes.items.size(); ++i)
+  {
+    const auto [name, rgb] = name_colour(names, colours, i);
+    bodies.push_back(write_named_body(w, aw, shapes.items[i], name, rgb));
+  }
   if (list)
   {
     Node& n     = w.add(74, root);
@@ -1823,17 +1977,21 @@ void write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary, rus
 // and per placement an INSTANCE (chained in the assembly and per part) with
 // its TRANSFORM (`tf`: 12 per instance, the rotation's rows each followed by
 // the translation in metres; flag 1 moved, 2 turned).
-void write_parasolid_assembly(const OcShapeList& parts, rust::Slice<const uint32_t> inst_part, rust::Slice<const double> tf, rust::Str path, rust::Str version,
-                              rust::Str application)
+void write_parasolid_assembly(const OcShapeList& parts, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str root_name,
+                              rust::Slice<const uint32_t> inst_part, rust::Slice<const double> tf, rust::Str path, rust::Str version, rust::Str application)
 {
   const XtVersion ver = xt_version(std::string(version));
   if (tf.size() != inst_part.size() * 12)
     fail_invalid("one transform per instance");
   Writer           w;
+  AttrWriter       aw{w};
   const int        root = w.alloc();
   std::vector<int> bodies;
-  for (const auto& s : parts.items)
-    bodies.push_back(write_body(w, s));
+  for (size_t i = 0; i < parts.items.size(); ++i)
+  {
+    const auto [name, rgb] = name_colour(names, colours, i);
+    bodies.push_back(write_named_body(w, aw, parts.items[i], name, rgb));
+  }
   const size_t                     ni = inst_part.size();
   std::vector<int>                 inst(ni), trs(ni);
   std::vector<std::vector<size_t>> of_part(bodies.size());
@@ -1869,8 +2027,11 @@ void write_parasolid_assembly(const OcShapeList& parts, rust::Slice<const uint32
     T.fields.push_back(fd((moved ? 1 : 0) | (turned ? 2 : 0)));
     T.fields.push_back(fv_null());
   }
-  Node& A  = w.add(10, root);
-  A.fields = {fd(id), fp(0), fp(0), fp(0), fp(0), fp(0), fp(0), fp(0), ff(1e3), ff(1e-8), fp(0), fp(0), fp(0), fu(1), fp(0), fu(1), fp(ni ? inst[0] : 0)};
+  w.add(10, root).fields = {fd(id), fp(0), fp(0), fp(0), fp(0), fp(0), fp(0), fp(0), ff(1e3), ff(1e-8), fp(0), fp(0), fp(0), fu(1), fp(0), fu(1), fp(ni ? inst[0] : 0)};
+  // The assembly's name (live: its own TYSA_NAME).
+  int aid = (int)id + 1;
+  aw.attach(root, std::string(root_name), nullptr, aid);
+  w.node(root).fields[0] = fd(aid - 1);
   const size_t ref = base_field(12, "ref_instance"), next = base_field(12, "next"), prev = base_field(12, "previous");
   for (size_t b = 0; b < bodies.size(); ++b)
   {

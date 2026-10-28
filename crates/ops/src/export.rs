@@ -342,7 +342,7 @@ pub fn write_assembly_export(s: &ExportSettings, path: &std::path::Path, a: &Ass
     // Parasolid keeps the assembly too (live: its x_t re-imports as an
     // Assembly; qa ASM-PARASOLID-FLAT), in every version.
     if s.format == PartFormat::Parasolid && !s.individual {
-        k::write_parasolid_assembly(path, &a.parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), &instances, k::LengthUnit::Meter, parasolid_version(s))?;
+        k::write_parasolid_assembly(path, &a.root, &a.parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), &instances, k::LengthUnit::Meter, parasolid_version(s))?;
         return Ok(path.to_path_buf());
     }
     if s.format != PartFormat::Step || s.individual {
@@ -428,7 +428,8 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
         PartFormat::Iges => k::write_iges(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
         // Text transmit file in the chosen version (live G36: the body in that
         // version's layouts; "Use latest version" = 38.1).
-        PartFormat::Parasolid => k::write_parasolid_version(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter, false, parasolid_version(s))?,
+        // Named and coloured as Onshape's (TYSA_NAME / TYSA_COLOUR_2).
+        PartFormat::Parasolid => k::write_parasolid_parts(path, &parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), k::LengthUnit::Meter, false, parasolid_version(s))?,
         PartFormat::Acis => k::write_acis(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
         PartFormat::Pvz => {
             let shapes: Vec<k::ExportShape> = parts.iter().map(|(n, sh, _)| k::ExportShape { shape: sh.clone(), name: Some(n.clone()), color: None }).collect();

@@ -109,14 +109,22 @@ fn parasolid_assembly_round_trip() {
     let dir = std::env::temp_dir().join(format!("noshape-xt-asm-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let parts: Vec<Shape> = xt_parts().into_iter().map(|p| p.1).take(2).collect();
+    // Named and coloured: read back as such (qa ASM-XT-ROUNDTRIP-NAMES).
+    let named: Vec<ExportShape> = parts.iter().enumerate().map(|(i, s)| ExportShape { shape: s.clone(), name: Some(format!("Part {}", i + 1)), color: Some([0.25 * (i + 1) as f32, 0.5, 0.75]) }).collect();
     let turned = glam::DMat4::from_translation(DVec3::new(0.05, 0.0, 0.01)) * glam::DMat4::from_rotation_z(std::f64::consts::FRAC_PI_2);
     let placed = [glam::DMat4::IDENTITY, glam::DMat4::from_translation(DVec3::new(0.1, 0.0, 0.0)), turned];
     let instances: Vec<StepInstance> = [0, 1, 1].into_iter().zip(placed).map(|(part, transform)| StepInstance { part, transform }).collect();
     let path = dir.join("asm.x_t");
     for version in PARASOLID_VERSIONS {
-        write_parasolid_assembly(&path, &parts, &instances, LengthUnit::Meter, version).unwrap();
-        let (_, back, inst) = read_parasolid_assembly(&path, LengthUnit::Meter).unwrap().unwrap_or_else(|| panic!("{version}: an assembly"));
+        write_parasolid_assembly(&path, "Gearbox", &named, &instances, LengthUnit::Meter, version).unwrap();
+        let (root, back, inst) = read_parasolid_assembly(&path, LengthUnit::Meter).unwrap().unwrap_or_else(|| panic!("{version}: an assembly"));
         assert_eq!((back.len(), inst.len()), (2, 3), "{version}");
+        assert_eq!(root, "Gearbox", "{version}");
+        for (i, b) in back.iter().enumerate() {
+            assert_eq!(b.name.as_deref(), Some(format!("Part {}", i + 1).as_str()), "{version}");
+            let c = b.color.unwrap_or_else(|| panic!("{version}: a colour"));
+            assert!((c[0] - 0.25 * (i + 1) as f32).abs() < 1e-6 && (c[2] - 0.75).abs() < 1e-6, "{version}: {c:?}");
+        }
         for (b, p) in back.iter().zip(&parts) {
             let (v, want) = (volume_properties(&b.shape).unwrap().mass, volume_properties(p).unwrap().mass);
             assert!((v - want).abs() < 5e-6 * want, "{version}: {v} vs {want}");
@@ -125,6 +133,24 @@ fn parasolid_assembly_round_trip() {
             assert_eq!(i.part, want.part);
             assert!(i.transform.abs_diff_eq(want.transform, 1e-12), "{version}: {:?} vs {:?}", i.transform, want.transform);
         }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Parts' names and colours as Parasolid attributes in every version (as
+/// Onshape's: SDL/TYSA_NAME, SDL/TYSA_COLOUR_2), read back.
+#[test]
+fn parasolid_part_names_and_colours() {
+    let dir = std::env::temp_dir().join(format!("noshape-xt-names-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let parts: Vec<ExportShape> = xt_parts().into_iter().take(3).enumerate().map(|(i, p)| ExportShape { shape: p.1, name: Some(format!("Bracket {}", i + 1)), color: (i != 1).then_some([0.2, 0.4, 0.6]) }).collect();
+    let path = dir.join("named.x_t");
+    for version in PARASOLID_VERSIONS {
+        write_parasolid_parts(&path, &parts, LengthUnit::Meter, false, version).unwrap();
+        let back = read_parasolid_parts(&path, LengthUnit::Meter).unwrap_or_else(|e| panic!("{version}: {e}"));
+        let names: Vec<Option<&str>> = back.iter().map(|p| p.name.as_deref()).collect();
+        assert_eq!(names, [Some("Bracket 1"), Some("Bracket 2"), Some("Bracket 3")], "{version}");
+        assert!(back[0].color.is_some_and(|c| (c[1] - 0.4).abs() < 1e-6) && back[1].color.is_none(), "{version}");
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
