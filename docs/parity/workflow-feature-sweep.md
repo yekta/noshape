@@ -150,7 +150,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1 | Fields | order, items, seven conditions (None), magnitude 1 | same | ✅ | f9185639 10-28 (dialog fields) |
-| 2 | Profile arrays | driven-query rows "[None] Edges of Curve U1" (live L28: no limit, a third row is taken) | "Add Profile" UI | ✅ driven query with the "[#uCondition] #uProfileEntities" item label |  |
+| 2 | Profile arrays | driven-query rows "[None] Edges of Curve U1" (live L28: no limit, a third row is taken) | "Add Profile" UI | ✅ driven query with the "[#uCondition] #uProfileEntities" item label | da18f886 10-28 (Boundary surface U profiles: rows "[None] Edge of Arcs sketch" ×2, a driven-query row per pick; see workflow-surfaces 11) |
 | 3 | Boundary condition label | SHOW_LABEL | no label | 🔧 SHOW_LABEL |  |
 | 4 | Too few profiles | "Select edges to specify at least two profiles." on both arrays | own text, no field | 🔧 L28; a third profile / mid-span crossing fail with live's texts 🔧; 1U+1V 🔧 builds the sheet the U sweeps along the V (the other two sides are the profiles moved to each other's far end; live 2099) |  |
 | 5 | Boundary conditions | applied, with their errors | warning only | 🔧 rows in one direction: the first / last row's condition is the loft end condition (same rule as Loft 4); live L28's "Only planar profiles are valid for Normal/Tangent to profile start condition." on a part edge (test `boundary_condition_needs_a_planar_profile`); U+V networks still warn |  |
