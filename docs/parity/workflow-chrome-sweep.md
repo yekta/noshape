@@ -48,7 +48,7 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | # | What | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | OD1 | A document next to the -wal/-shm of an earlier file of the same name | (Onshape has no local files; the rule is: never crash, show an error) | panic in main.rs ("could not open document: unknown branch …") | ✅ the store probes the document read-only with and without the log; a log it can't be read with but can be read without is foreign and moved aside (kept as `*-wal.stale`). `create` moves leftovers aside too. Tests: `foreign_side_files_are_moved_aside_on_open`, `a_log_that_belongs_to_the_document_is_kept`, `creating_over_leftover_side_files_moves_them_aside` |  |
-| OD2 | Any document named on the command line that can't be opened | — | `expect()` panic | ✅ the Documents page opens with the error bubble "Could not open document: …" (as for a failed open from the page) |  |
+| OD2 | Any document named on the command line that can't be opened | — | `expect()` panic | ✅ the Documents page opens with the error bubble "Could not open document: …" (as for a failed open from the page) | da18f886+ / 1b81b7ca 10-28 (a text file named vq34.noshape on the command line: the Documents page opens with "Could not open document: opening vq34.noshape: not a noshape document") |
 
 ## 5. Assembly dialogs (qa4)
 
