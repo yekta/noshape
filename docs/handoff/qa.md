@@ -3,6 +3,10 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+**Morning smoke 2026-10-28 (pre-cut, green 3f4e10d9 = last-green at 04:30): all rows OK** (open / edit / undo times, STEP
+round trip 60779.484, kill -9 after Suppress, drawing PDF, assembly drag, dialog hover + pick, fuzz); details under
+"Daily release smoke". Redo on the release artifact when it is published; blocker list at the top of TICKETS.
+
 ## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97)
 
 - **04:20 update:** 05:00 blocker list pushed at the top of TICKETS (no new P0; open P0s FILLET-OVERSIZE-OK, REGEN-SPEED /
