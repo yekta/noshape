@@ -370,7 +370,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "insert_cad",
             summary: "Insert a DXF or DWG as drawing sketch geometry",
-            description: "Toolbar › Insert DXF or DWG: the model-space wireframe of DXF / DWG file tab `file` (or local file `path`, imported first as a file tab: its own edit \"Import <name>\") becomes sheet sketch geometry at the file's own coordinates (its unit, else the drawing's; blocks and polylines exploded, colors dropped). One edit (\"Insert DXF or DWG\"); replies with the number of entities.",
+            description: "Toolbar › Insert DXF or DWG: the model-space wireframe of DXF / DWG file tab `file` (or local file `path`, imported first as a file tab: its own edit \"Import <name>\") becomes sheet sketch geometry and its TEXT / MTEXT editable notes, at the file's own coordinates (its unit, else the drawing's; blocks and polylines exploded, colors dropped). One edit (\"Insert DXF or DWG\"); replies with the number of entities and of notes.",
             fields: with(
                 common(),
                 vec![opt("file", json!({ "type": "string" }), "DXF / DWG file tab (name or id)."), opt("path", json!({ "type": "string" }), "Local DXF / DWG file to import and insert.")],
@@ -1905,15 +1905,16 @@ fn insert_image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn insert_cad(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let file = insert_file(od, a, noshape_model::file_tab::FileKind::Drawing2d, "a DXF or DWG file")?;
-    let d = file.bytes().ok_or_else(|| OpError::param("file", "the file data is damaged")).and_then(|b| noshape_sketch::cad::parse_cad(&b).map_err(|e| OpError::param("file", &format!("Insert DXF or DWG failed: {e}"))))?;
+    let bytes = file.bytes().ok_or_else(|| OpError::param("file", "the file data is damaged"))?;
     let mut t = target(od, a)?;
     let units_mm = t.d.units_mm;
-    let sk = &mut t.d.sheets[t.sheet].sketch;
-    let n = dt::insert_cad(sk, &d, units_mm);
-    let _ = sk.sketch.solve();
+    let sheet = &mut t.d.sheets[t.sheet];
+    let (n, notes) = dt::insert_cad(sheet, &bytes, units_mm).map_err(|e| OpError::param("file", &format!("Insert DXF or DWG failed: {e}")))?;
+    let _ = sheet.sketch.sketch.solve();
     commit(od, t.tab, t.sheet, t.d, "Insert DXF or DWG")?;
     let mut out = reply(od, t.tab, t.sheet, false)?;
     out["entities"] = json!(n);
+    out["notes"] = json!(notes);
     Ok(out.into())
 }
 

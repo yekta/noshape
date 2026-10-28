@@ -386,14 +386,17 @@ impl DrawingEditor {
         let doc = self.doc.clone();
         use noshape_model::file_tab::FileKind;
         crate::drawing_hooks::pick_file(doc, "Insert DXF or DWG", &[FileKind::Drawing2d], &["dxf", "dwg"], window, cx, move |file, _, cx| {
-            let parsed = file.bytes().ok_or_else(|| "the file data is damaged".to_string()).and_then(|b| noshape_sketch::cad::parse_cad(&b).map_err(|e| e.to_string()));
+            let parsed = file.bytes().ok_or_else(|| "the file data is damaged".to_string()).and_then(|b| noshape_sketch::cad::parse_cad(&b).map(|_| b).map_err(|e| e.to_string()));
             this.update(cx, |this, cx| match parsed {
-                Ok(d) => {
+                Ok(b) => {
                     // To sheet mm: the file's unit, else the drawing's.
                     let units_mm = this.drawing.units_mm;
-                    let mut n = 0;
-                    this.edit_sketch("Insert DXF or DWG", cx, |s| n = noshape_scene::drawing_tools::insert_cad(s, &d, units_mm));
-                    this.status = Some(format!("Inserted {n} entities from {}", file.file_name).into());
+                    let mut n = (0, 0);
+                    this.edit_sheet("Insert DXF or DWG", cx, |s| {
+                        n = noshape_scene::drawing_tools::insert_cad(s, &b, units_mm).unwrap_or_default();
+                        let _ = s.sketch.sketch.solve();
+                    });
+                    this.status = Some(format!("Inserted {} entities and {} notes from {}", n.0, n.1, file.file_name).into());
                     cx.notify();
                 }
                 Err(e) => {

@@ -3972,7 +3972,7 @@ Examples:
 
 Insert a DXF or DWG as drawing sketch geometry (edits the document (one undoable history entry)).
 
-Toolbar › Insert DXF or DWG: the model-space wireframe of DXF / DWG file tab `file` (or local file `path`, imported first as a file tab: its own edit "Import <name>") becomes sheet sketch geometry at the file's own coordinates (its unit, else the drawing's; blocks and polylines exploded, colors dropped). One edit ("Insert DXF or DWG"); replies with the number of entities.
+Toolbar › Insert DXF or DWG: the model-space wireframe of DXF / DWG file tab `file` (or local file `path`, imported first as a file tab: its own edit "Import <name>") becomes sheet sketch geometry and its TEXT / MTEXT editable notes, at the file's own coordinates (its unit, else the drawing's; blocks and polylines exploded, colors dropped). One edit ("Insert DXF or DWG"); replies with the number of entities and of notes.
 
 Examples:
 

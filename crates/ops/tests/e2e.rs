@@ -2043,6 +2043,10 @@ fn drawing_insert_image_and_cad() {
     let n = r["entities"].as_u64().unwrap();
     assert!(n > 0, "{r}");
     assert!(r["sketch_entities"].as_u64().unwrap() >= n, "{r}");
+    // Its TEXT "FOO" (at 1, 4; 0.75 high) as an editable note.
+    assert_eq!(r["notes"], 1, "{r}");
+    let notes = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    assert!(notes.to_string().contains("FOO"), "{notes}");
     let e = try_call(&mut ctx, "drawing_insert_cad", json!({ "drawing": tab, "path": png.to_str().unwrap() })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("path"), "{e:?}");
 }

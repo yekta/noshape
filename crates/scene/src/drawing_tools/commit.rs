@@ -742,9 +742,32 @@ pub fn add_sheet_image(s: &mut Sheet, name: String, data_base64: std::sync::Arc<
 /// Insert DXF or DWG: the file's model-space wireframe as sheet sketch
 /// geometry at its own coordinates, in the file's unit (else the
 /// drawing's); the entities created (the caller solves the sketch).
-pub fn insert_cad(sketch: &mut noshape_model::drawing::sheet_sketch::SheetSketch, d: &noshape_sketch::dxf::DxfDrawing, units_mm: bool) -> usize {
+/// Insert DXF or DWG: the file's model-space wireframe becomes sheet
+/// sketch geometry and its TEXT / MTEXT editable notes (live: "simple
+/// notes become editable Notes", colors dropped), at the file's own
+/// coordinates in its unit (else the drawing's). The sheet sketch is left
+/// unsolved. Returns the entity and note counts.
+pub fn insert_cad(sheet: &mut Sheet, bytes: &[u8], units_mm: bool) -> Result<(usize, usize), String> {
+    let d = noshape_sketch::cad::parse_cad(bytes).map_err(|e| e.to_string())?;
+    let (spaces, _) = noshape_sketch::cad::parse_cad_spaces(bytes).map_err(|e| e.to_string())?;
     let scale = d.unit_scale.map(|m| m * 1000.0).unwrap_or(if units_mm { 1.0 } else { 25.4 });
-    sketch.sketch.insert_drawing(d, scale, noshape_sketch::DVec2::ZERO).len()
+    let n = sheet.sketch.sketch.insert_drawing(&d, scale, noshape_sketch::DVec2::ZERO).len();
+    let mut notes = 0;
+    for t in spaces.iter().filter(|s| s.model).flat_map(|s| &s.texts) {
+        // TEXT's %% control codes (MTEXT comes plain).
+        let text = t.text.replace("%%c", "Ø").replace("%%C", "Ø").replace("%%d", "°").replace("%%D", "°").replace("%%p", "±").replace("%%P", "±");
+        if text.trim().is_empty() {
+            continue;
+        }
+        // The file's anchor is the baseline start; a note's is its top left.
+        let (h, p) = (t.height * scale, t.position * scale);
+        let (s, c) = t.rotation.sin_cos();
+        let style = note::NoteStyle { angle: t.rotation, ..Default::default() };
+        let id = sheet.next_annotation_id();
+        sheet.annotations.push(Annotation { id, kind: AnnotationKind::Note { text, height_mm: h, style }, position: [p.x - s * h, p.y + c * h], ..Default::default() });
+        notes += 1;
+    }
+    Ok((n, notes))
 }
 
 // ------------------------------------------------------------ drawing sketch
