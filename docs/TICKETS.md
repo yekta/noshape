@@ -923,6 +923,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   skasm 10-28 (0ea2b791): the filter searches pattern instances: the pattern listed opened with its matching instances and a "…" for
   its others; the top-level "…" only when instances, patterns or mates are hidden. Checked on :103 with asm5 ("<2>",
   "Part", "Linear"). The :part / :mate … help popover: the next commit (focused and empty; typing hides it).
+  qa 05:52 green 2960a143 (e0d7df4b): focusing the empty Filter box shows live's help popover word for word ("Search with
+  filters or a partial name.", :part … :shown, the exact-search paragraph; tickets/asm-filter-popover-2960.png); typing "P"
+  hides it.
 - [x] verified c5e53806 (qa 00:23: Shift+N on Part 2 <1>, Esc → closes with the old name, then y hides the instance; tickets/asm-rename-esc-c5e5.png) 1ca0cf14 P2 ASM-RENAME-ESC Esc doesn't cancel an assembly instance's inline rename: Assembly, select Part 2 <1>, Shift+N (or Rename) → the row's name box opens selected; Esc (pointer over the graphics or the list) → the box stays open, and the next keys (y, Shift+Y…) type into it instead of running their shortcuts (tickets/asm-rename-esc-c9c6.png: three Shift+N / Esc rounds, box open after each Esc); only a click elsewhere closes it. The Part Studio's part / feature inline rename closes on Esc and keeps the old name. Live: Esc in an inline rename reverts and closes it (behaviours "Rename": an empty name resets, Esc cancels) (qa 2026-10-27 21:16, green c9c66d1c)
   skasm 10-27 (1ca0cf14): Esc in an assembly row's inline rename (instance, mate, folder, tab) closes it with the old name;
   the next keys run their shortcuts. Checked on :103 (pointer over the graphics and over the list).
