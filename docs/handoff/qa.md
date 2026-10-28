@@ -9,6 +9,11 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97 → … → b504234e → 2960a143)
 
+- **08:02 update (greens 6444d892 → c725f68f):** verified ASM-MENU-WRAP, ASM-MATE-MENU-SEPARATORS, CALLOUT-ON-DIMENSION,
+  CALLOUT-ALIGN-MISSING, DIM-PALETTE-DROPDOWN-COLLAPSE, BALLOON-WRONG-ITEM (6444d892); MATE-LIMITS-OPPOSITE-SIGN,
+  ASM-SELECTED-EDGES-DARK, DWG-REVOLVE-SEAM (c725f68f). NOTE-PANEL-UNDER-PROPS still clipped for a table near the
+  sheet's top-right (noted on the ticket). Live answers: 1540 → P3 OBJ-ZIP-MSG (our OBJ reader is exact: live's own .obj
+  72215.0759 = live); 1541 → P3 ASM-MC-LIST-ORDER. Fuzz 57 on 6444d892 alive; 58 on c725f68f running.
 - **07:08 update (green 2292bf8c):** fuzz 56 × 600 alive. Filed P2 MATE-LIMITS-OPPOSITE-SIGN (Revolute limits act on the
   negated value: at the max the label reads 270°, typed in-range values clamp to 0; also with aligned connectors) and P3
   ASM-K-IMPLICIT-MCS (`k` shows no mate-implicit connectors). Verified on the qa5 mate doc (bin: /root/qa5-scratch/pass10/
