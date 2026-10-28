@@ -98,7 +98,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 4.26 | Bezier: click control points, double-click to end; control polygon shown | H:bezier | ✅ (control polygon shown while drawing and when selected) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.27 | Bezier: context menu **Escape bezier** removes the curve in progress | H:bezier | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.28 | Bezier degree label (double-click to edit, max 15) | H:bezier | ✅ (T:ux; GUI :103 double-click opens degree input; 4→6 succeeds, 16 rejected; bezier-degree-six-verified.png) | 0.4.10+ / 965d3f56 10-27 (double-click Deg 3 → 6; curve kept) |
-| 4.29 | Spline control point: click a spline / bezier control polygon to add a point | H:spline_control_point | ✅ (T:ux) |  |
+| 4.29 | Spline control point: click a spline / bezier control polygon to add a point | H:spline_control_point | ✅ (T:ux) | 8627322e 10-28 (GUI: 4-point Bezier "Deg 3"; Spline control point (hint "Click a spline or bezier control polygon to add a control point"), hover near it shows the dashed polygon, click its first segment → "Deg 4", 3 interior points) |
 | 4.30 | Point: click to place | H:point | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 4.31 | Text: drag a box, lower-left corner and height set the first line; horizontal constraint on the bottom edge | H:text | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 4.32 | Text: font, bold, italic, flip; edit later; drag by its box | H:text | ✅ | 0.4.10+ / 2d9a275c 10-27 |
