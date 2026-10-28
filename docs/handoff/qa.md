@@ -7,8 +7,13 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 noshape-0.4.12-linux-x86_64.tar.gz: all rows OK** (details under "Daily release smoke" › v0.4.12). Blocker list at the top
 of TICKETS (open P0s all carried from v0.4.11).
 
-## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf)
+## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6)
 
+- **20:25 update (green b8f46ab6, copied 20:19):** **P1 GREEN-ICONS-PATH**: greens since 4b9d7eaf are built in /home/ngyekta/… and
+  show no icons here (rust-embed debug reads assets from the build tree); workaround in place: a copy of main's crates/app/assets
+  at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ empty crates/app-core) — refresh it if icons change. UI-look
+  results on 4b9d7eaf before the workaround are not valid (model results are). Verified on b8f46ab6: SHOW-ALL-PARTS-MENU,
+  HOVER-VERTEX-STAYS, TABLE-SHIFT-TAB-BLANK, NOTE-PANEL-UNDER-PROPS. Fuzz 83 (b8f4) running.
 - **20:15 update (green 4b9d7eaf, copied 20:08; Rust Boolean on by default, pairs serial):** live-30-features 60779.484 mm³ /
   15848.357 mm² (= v0.4.12); Extrude 1 edits 168–673 ms at load 44–55 (REGEN-SPEED unchanged); wf-block Shell A/B vs 4994be03
   noisy (3.8–9.3 s both); fuzz body opens in 134 s (Shell 4/5 48/55 s); fuzz 82 (600) alive. Rust vs OCCT: bin/rustbool.py (8 plane /
