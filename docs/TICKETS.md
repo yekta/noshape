@@ -86,7 +86,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   script qa-scratch/bin/fmirvar.py (face / offset-plane sketch × Reapply off / on). Parity workflow-advanced-part-studio
   3.10b had 9000 (CLI) on 10-21 (qa 2026-10-28 05:11, build b504234e)
   qa (code read): Reapply off goes through pattern.rs geometric_feature_pattern → pattern_faces (the boss's faces on Part 1),
-  Reapply on through reapply_features, which is right; the face-pattern tool loses the boss's y walls.
+  Reapply on through reapply_features, which is right; the copy looks as if its y walls were dropped (not traced).
 - [ ] P3 ENCLOSE-NO-REGION-MSG Enclose of the three default planes only (Top, Front, Right; any doc): ours ERROR "Failed to
   create a part from enclosed region."; live L30 (behaviours ~8393): "Selections do not enclose a region.", no field flagged.
   solid_a.rs only gives the live text when k::enclose returns no solid, but k::enclose itself errors here, so the
