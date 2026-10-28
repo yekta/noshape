@@ -251,7 +251,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 
 | # | Behaviour | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
-| R1 | Free drag moves an instance within its remaining DOF; limits stop it | E§24.1 | ✅ | model test `slider_respects_limits` |  |
+| R1 | Free drag moves an instance within its remaining DOF; limits stop it | E§24.1 | ✅ | model test `slider_respects_limits` | 2292bf8c 10-28 (Revolute 1 limits 0 / 90 deg: <2> drags about Z only and stops at exactly 0° and 90° (world −90°, its connector Z points down) when dragged past; CLI assembly_list) |
 | R2 | Unmated, unfixed instances move exactly | H:triad | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | R3 | Fixed instances cannot be dragged (cue, no manipulator) | H:triad | ✅ | no manipulator for a selected fixed instance (live 565); press-dragging it: `no-drop` cursor + the fix glyph at the cursor, nothing moves, no message (live 562–563; `AsmUi.fixed_drag`); no pre-highlight while dragging (live 562: hover cleared when the fixed drag starts). GUI :103 r5 (glyph, nothing moves), r7 (selected, no triad) | 0.4.10+ / dd1b5037 10-27 (asm5: dragging the fixed plate: no-drop cursor, plate doesn't move) |
 | R4 | Click an instance shows the triad: axis arrows, plane squares, rotation arcs | H:triad | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
