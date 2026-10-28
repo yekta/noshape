@@ -456,6 +456,9 @@ pub struct SketchEditor {
     pub hover_region: Option<Vec<u32>>,
     /// Selected sketch regions (clicking inside a closed profile).
     pub selected_regions: Vec<Vec<u32>>,
+    /// Model edges / vertices selected in the sketch (live sketch.md 8.11):
+    /// they join the selection for a constraint, as linked external entities.
+    pub model_selection: Vec<noshape_model::reference::Reference>,
     /// Hovered dimension label or constraint glyph.
     pub hover_constraint: Option<ConstraintId>,
     /// Hovered sketch pattern glyph (pattern id).
@@ -1069,6 +1072,7 @@ impl SketchEditor {
             use_preview: Vec::new(),
             hover_region: None,
             selected_regions: Vec::new(),
+            model_selection: Vec::new(),
             hover_constraint: None,
             hover_pattern: None,
             glyph_entity: None,

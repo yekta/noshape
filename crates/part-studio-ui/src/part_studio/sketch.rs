@@ -704,6 +704,27 @@ impl PartStudioView {
                     }
                     (h, _, _) => h,
                 };
+                // Live (sketch.md 8.11; SKETCH-MODEL-EDGE-SELECT): with Select, a
+                // model edge or vertex joins the selection (a constraint key then
+                // links it); an empty click clears it with the rest.
+                if tool_now == Some(Tool::Select) && hovered.is_none() {
+                    let model = self.hover.clone().filter(|r| matches!(r, Reference::Edge(_) | Reference::Vertex(_)));
+                    if let Some(ed) = &mut self.sketch {
+                        match model {
+                            Some(r) => {
+                                if let Some(i) = ed.model_selection.iter().position(|x| *x == r) {
+                                    ed.model_selection.remove(i);
+                                } else {
+                                    ed.model_selection.push(r);
+                                }
+                                self.refresh_scene(false, cx);
+                                cx.notify();
+                                return true;
+                            }
+                            None => ed.model_selection.clear(),
+                        }
+                    }
+                }
                 // A snap onto a model edge links the new point to it.
                 if let Some(ExternalSnap::Edge { reference, .. }) = self.sketch.as_ref().filter(|s| s.tool.draws()).and_then(|s| s.external_snap.clone())
                     && let Some(id) = self.external_entity(&reference, false, true, cx)
@@ -764,6 +785,7 @@ impl PartStudioView {
         selection.clear();
         selection.extend(ed.selection.iter().map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
         selection.extend(ed.selected_regions.iter().map(|k| Reference::SketchRegion { sketch: f, key: k.clone() }));
+        selection.extend(ed.model_selection.iter().cloned());
         accent.clear();
         // Live (sketch/12): what the Dimension tool measures shows selected
         // (amber) while the dimension is placed.
@@ -950,6 +972,16 @@ impl PartStudioView {
     }
 
     fn constraint(&mut self, c: ConstraintTool, window: &mut Window, cx: &mut Context<Self>) {
+        // Selected model edges / vertices take part as linked external entities.
+        let model = self.sketch.as_mut().map(|ed| std::mem::take(&mut ed.model_selection)).unwrap_or_default();
+        for r in &model {
+            if let Some(id) = self.external_entity(r, false, true, cx)
+                && let Some(ed) = &mut self.sketch
+                && !ed.selection.contains(&id)
+            {
+                ed.selection.push(id);
+            }
+        }
         if self.with_sketch(cx, |ed, data| ed.constraint_command(data, c)) == Some(true) {
             self.regen_sync(window, cx);
         }
