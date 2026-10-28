@@ -5,5 +5,7 @@
 //! loads them instead of compiling the shaders (~0.5 s).
 fn main() {
     let mut renderer = noshape_render::Renderer::new().expect("no GPU adapter");
+    let t = std::time::Instant::now();
     renderer.prewarm(noshape_render::Style::default().msaa);
+    println!("prewarm: {:.0} ms", t.elapsed().as_secs_f64() * 1000.0);
 }

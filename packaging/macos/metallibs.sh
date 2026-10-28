@@ -19,6 +19,15 @@ done
 log=$(NOSHAPE_METALLIB_DIR="$out" NOSHAPE_METALLIB_LOG=1 cargo run --release --locked -p noshape-render --example prewarm_shaders 2>&1 | grep '^metallib ' || true)
 echo "$log"
 echo "metallibs: $(ls "$out" | wc -l) built, $(grep -c precompiled <<<"$log" || true) loaded, $(grep -c 'compiled now' <<<"$log" || true) compiled"
+# What they save on a first launch: the pipelines from source and from the
+# libraries, each with the Metal shader cache cleared.
+cold() {
+  find "$(getconf DARWIN_USER_CACHE_DIR)" -maxdepth 3 -type d -name com.apple.metal -prune -exec rm -rf {} +
+  NOSHAPE_METALLIB_DIR="$1" target/release/examples/prewarm_shaders | grep '^prewarm'
+}
+for i in 1 2 3; do
+  echo "cold, from source: $(cold /nonexistent); cold, precompiled: $(cold "$out")"
+done
 if grep -q 'compiled now' <<<"$log"; then
   echo "a pipeline compiled its shader although its metallib was built" >&2
   exit 1
