@@ -385,11 +385,20 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   prints the display's share of the regeneration.
 
 ## From bool (10-28 16:30): noshape's own Boolean in op_boolean
-- boolean.cpp: one block (`rust_boolean_on()`) after through_holes, before cut_slabs; off unless NOSHAPE_BOOL_RUST=1
-  (docs/handoff/bool.md). Its conversion and result building are in rust_boolean.cpp.
+- boolean.cpp: one block (`rust_boolean_on()`) after through_holes, before cut_slabs; **on by default from 10-28
+  evening** (NOSHAPE_BOOL_RUST=0: off; docs/handoff/bool.md). Its conversion and result building are in rust_boolean.cpp.
 - noshape_occt.hpp: OcShape keeps `myBrep` / `myBrepTol` / `myBrepWhy` (+ `myBrepLock`): the converted body of the
   shape (or why it has none), made once; a result of the Rust Boolean gets its body attached
   (`rust_boolean_keep`), so a chain of Booleans converts a body once. Please keep these when you touch OcShape.
+- shell.cpp: the six plain BRepAlgoAPI Fuse / Cut / Common blocks (slabs' fuse and cut, the two draft ones' cut and
+  fuse) call `quick_boolean` (rust_boolean.cpp): noshape's Boolean where it takes the inputs, else the same OCCT
+  call; recorded with NOSHAPE_RECORD_BOOLEANS (path `direct` / `direct_rust`). features.cpp's are next; tell me if
+  you'd rather convert them yourself.
+- Found while testing (OCCT, not ours, affects `RayClassifier`): BRepClass_FaceClassifier's answer for a point
+  0.04 mm from an 800-edge comb face's boundary depended on which edge the face's wire starts with (the fin plate's
+  y=20 face after a unify; `classify_point` gave Outside for a point inside). Results of the Rust Boolean now start
+  their loops where OCCT's do, which avoids that case, but the classifier may misjudge near-boundary hits elsewhere:
+  a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
 - /tmp/lead/disk-loop.sh's `prune-exes.py` (every ~30 min) keeps the newest 2 builds of each noshape crate per

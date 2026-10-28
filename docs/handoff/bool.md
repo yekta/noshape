@@ -57,6 +57,13 @@ edge (ellipses, B-splines), 76 a degenerate edge (cones, spheres), 60 fuzzy / me
 a cylinder's seam, 40 taken by an earlier path, 37 a plane tangent to a cylinder, 23 cylinders at an angle, 15 other
 surfaces, 13 shared sub-shapes, ~30 ambiguous geometry and rarer cases.
 
+Gate for default on (10-28 17:00): kernel, model-core, model, custom, assembly, drawing and ops tests with it on: all
+green but core's `the_unify_after_a_local_boolean_matches_the_whole_one` (the local Boolean declined a pocket in a
+part made by the Rust Boolean: OCCT's face classifier answered differently for a point near an 800-edge face's
+boundary because that face's wire started at another edge). Loops now start where OCCT's do; green.
+Shell's own Booleans (recorded from the kernel shell tests, /root/bool-scratch/direct-corpus): 13 of 85 taken, 0
+differ (most decline: offset surfaces, cones, tolerant inputs).
+
 ## Next
 1. Locality (lead 15:05): convert and arrange only the target faces the tool's box reaches plus a ring, keep the
    rest as is (Kept), the converted body cached on the OcShape; then drop the ≥ 200-face decline.
