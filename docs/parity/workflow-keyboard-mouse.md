@@ -40,7 +40,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | ↑ ↓ on the rollback bar | move it | ✅ (core 4.5) | ✅ | 77870dd4 10-28 |
 | Shift+1…7 | Front, Back, Left, Right, Top, Bottom, Isometric | all correct | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | ← → ↑ ↓ | rotate 15°: from Front, Left brings Right in, Up brings Bottom in | same direction and step | ✅ | 0.4.10+ / dd1b5037 10-27 |
-| Shift+arrows / Ctrl+arrows / Ctrl+Shift+arrows | coarse / precision rotate / pan | Shift+← from Front → Right (90°), Ctrl+← a small step | ✅ / ? (angles) |  |
+| Shift+arrows / Ctrl+arrows / Ctrl+Shift+arrows | coarse / precision rotate / pan | Shift+← from Front → Right (90°), Ctrl+← a small step | ✅ / ? (angles) | da18f886 10-28 (from Isometric: ← a small turn, Shift+← a large one (Right / Back faces), Ctrl+← barely moves; Ctrl+Shift+arrows pan (wf-block)) |
 | Shift+P | hide all construction | planes hidden / back | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | y / Shift+Y | hide / show selected parts | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 (y hides; Shift+Y shows only with the pointer over the hidden part = live behaviours psui 2.16/2.17) |
 | p | hide/show planes | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
