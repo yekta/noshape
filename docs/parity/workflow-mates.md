@@ -28,7 +28,7 @@ Status: ✅ matches live, ✗ differs, ? live pending.
 | 17 | Animate… | "Animate mate": ⟳ - z - Revolute 1, Start 0 deg, End 360 deg, Steps 300, Playback Reciprocate ▾ + ↻, Current value, ▶ ■; instance rows related-highlighted | same dialog; ▶ animates with Current value updating, ■ stops (m28–m33); rows not highlighted (MT7) | ✅ | 0.4.10+ / daf1f50c 10-27 (mate.noshape) |
 | 18 | Ctrl+M Mate connector, pick, ☑ Realign, ☑ Move | On entity ▾, Origin entity, Realign → Primary / Secondary axis entity; Move → **X↘ Y↗ Z↑ icon rows** "0 mm", Rotate about Z, Rotation angle 0 deg; **no preview slider**; rows ~29 px (qa5/asm-043) | same fields, but Move rows are labelled **"X translation" / "Y translation" / "Z translation"** (grey italic values) and the dialog has a **preview slider** row (cmp-m37) | ✗ **MT8** (skb) |  |
 | 19 | Hidden mate row tooltip | "<name> (Hidden)" + parameter summary | "Revolute 1 (Hidden) / Revolute mate / Offset: off" (m38) | ✅ (summary lines ?) | 0.4.10+ / daf1f50c 10-27 (mate.noshape) |
-| 20 | Replace instances… › pick an unrelated part | panel closes, plain chip "Part 1", title black, orange preview at the instance's position, mates that can't resolve turn red + red badge on the root | same (m44–m46) | ✅ |  |
+| 20 | Replace instances… › pick an unrelated part | panel closes, plain chip "Part 1", title black, orange preview at the instance's position, mates that can't resolve turn red + red badge on the root | same (m44–m46) | ✅ | 6570fa0d (qa 10:07: two plates + Revolute 1, Part 1 <2> › Replace instances… › Part 2 (pin) → picker closes, plain chip "Part 2", title black, orange pin at the instance's place, Revolute 1 red + red dots on the root and Mate features; tickets/replace-unrelated-6570.png) |
 | 21 | ✓ | mate kept but **fails**: red row, tooltip "<mate> has error: Mate cannot resolve mate connectors. (Hidden)" | the mate turns back to normal (not red) and **re-attaches to the new part, moving it onto <1>** (the box now sits on the plate) (m47, m48) | ✗ **MT9** (skb) |  |
 
 ## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
@@ -38,11 +38,11 @@ Docs /tmp/qa5/d24b/m.noshape (mate-base copy), /tmp/qa5/d24b/full.noshape (pass 
 | MT1 flip icon (empty dialog) | up-right, same as live 30 (cmp-flip2) | ✅ **fixed** | 77870dd4 10-28 |
 | MT2 mate-type list | plain rows, current type highlighted, overlays the field (cmp-m52) | ✅ **fixed** | 0.4.10+ / daf1f50c 10-27 (qa-scratch/mate.noshape) |
 | MT3 chip clock tooltip | "Mate connector of Part 1 <2> (Click to edit)" | ✅ **fixed** (m56) | 0.4.10+ / daf1f50c 10-27 (qa-scratch/mate.noshape) |
-| MT4 connector panel | chip bold, instance row highlighted | ✅ **fixed** (m57) |  |
+| MT4 connector panel | chip bold, instance row highlighted | ❌ (MATE-CONNECTOR-PANEL-HIGHLIGHT) **fixed** (m57) | 6570fa0d (qa 10:08: chip bold ✓; owning instance row not highlighted (both rows #ecf0f4), whole instance orange) |
 | MT5 / MT6 Offset values / default axis | regular black "0 mm"; Rotate about X | ✅ **fixed** (m53) | 0.4.10+ / daf1f50c 10-27 (qa-scratch/mate.noshape) |
 | MT7 selected Revolute at 0° | mated face amber, instance rows highlighted, triad letters, no circle ✅; label **"0.000°" italic, past the X axis** (live "0°" upright on the X-axis end, trailing zeros dropped) | ✗ still (label only) (m60) |  |
 | MT8 Mate connector tool | no preview slider; Move rows X↘ Y↗ Z↑ icons, Rotate about Z | ✅ **fixed** (m61, m62) | 77870dd4 10-28 |
-| MT9 Replace instance → unresolvable mate | stays red, tooltip "Revolute 1 has error: Mate cannot resolve mate connectors. (Hidden)" | ✅ **fixed** (m75, m76) |  |
+| MT9 Replace instance → unresolvable mate | stays red, tooltip "Revolute 1 has error: Mate cannot resolve mate connectors. (Hidden)" | ✅ **fixed** (m75, m76) | 6570fa0d (qa 10:07: after ✓ Revolute 1 stays red; tooltip "Revolute 1 has error: Mate cannot resolve mate connectors. (Hidden)" / Revolute mate / Offset: off) |
 
 ## Re-run pass 19 (2026-10-22 ~11:00–11:40, app /tmp/qa5/noshape-1013 = /root/target-lead/debug/noshape 10:13: the queue's 09:58 batch build = main 3ce6952 + the ready branches of that batch; CLI 08:11)
 | MT7 label at 0° | small blue "0°" on the X-axis end over the red X (z11) | ✅ (MATE-ANGLE-360 fixed 07ead631, qa verified c5e53806 10-28) |
