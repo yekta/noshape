@@ -60,7 +60,7 @@ frame-driven delivered rate.
 | NIST orbit | ≈2 renders/s | 32.5 / 29.6 fps presented (timer-bound), GPU ~5 ms per frame, UI CPU 0.4 ms | ✅ |  |
 | Big plate: 400 holes (Extrude Remove) | 132 s | 1.15 s (macOS-latest; Windows 1.31 s); live 617 ms | ✅ PERF1 under 2 s; 2x live | 77870dd4 10-28 Linux: Extrude 2 (400-hole Remove) 517 ms on open (live 491 ms) |
 | Big plate: Chamfer 0.5 × 400 | 133 s | 1.08 s (Windows 1.69 s); live 1.02 s | ✅ |  |
-| Big plate: Extrude 1 10 → 12 | 150 s | 1.62 s (Windows **2.88 s**, over big_plate.rs's 2 s); live 1.03 s | ✅ macOS / ✗ Windows (kern: these doubled since 10-25's 0.49 / 0.71 / 1.04 s on macOS) |  |
+| Big plate: Extrude 1 10 → 12 | 150 s | 1.62 s (Windows **2.88 s**, over big_plate.rs's 2 s); live 1.03 s | ✅ macOS / ✗ Windows (kern: these doubled since 10-25's 0.49 / 0.71 / 1.04 s on macOS) | 77870dd4 10-28 Linux: commit regen 447 ms preview / 685 ms refine (live 1.03 s) |
 | Big plate: open in the app | ~10 min | first frame 1.9 / 3.4 s (preview 1.1 / 2.4 s, fine mesh 0.24 / 0.36 s after) | ✅ | 77870dd4 10-28 Linux xvfb: preview 0.87 s (Extrude 2 517 ms), refine 1.19 s |
 | Big plate: orbit / pan / zoom | frame 0.75-3.6 s behind | frame-driven at 2x Retina: orbit 93 / 102 fps, zoom 110 / 102, pan 86 / 75; 2-14% of frames over 16.7 ms | ✅ 60 fps |  |
 | Click on the plate top selects a Point | — | not re-checked (pick priority, ADV 1.7) | ✅ (a click between holes selects the top face, "Area: 139893.807 mm²") | 77870dd4 10-28 |
