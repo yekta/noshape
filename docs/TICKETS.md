@@ -927,6 +927,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
+- [ ] P3 ASM-K-IMPLICIT-MCS `k` shows nothing for the mates' implicit connectors: two plates (qa5 mkmate.py doc), Revolute 1
+  between their hole centres (implicit connectors), click empty canvas, `k` → no pixel changes, again `k` → none
+  (tickets/asm-k-implicit-mcs-2292.png). Live (behaviours ~20842, assembly/ks-k-1.png): the first `k` draws the instances'
+  implicit / explicit mate connector glyphs (disc + triad at both ends of Revolute 1), the second hides them. Ours
+  (assembly_view.rs show_connectors) only draws connectors defined in the part studios (o.context.connectors), not the
+  ones the mates create (qa 2026-10-28 06:58, build 2292bf8c)
 - [ ] P3 ASM-XT-ROUNDTRIP-NAMES our own Parasolid assembly re-imports with unnamed instances: asm5 › Assembly 1 › Export… ›
   PARASOLID, then + › Import… of that file → the new "Assembly" lists its instances as **"<1>", "<2>", "<3>"** (no part
   name), while the parts studio names the parts "Part 1", "Part 2" (tickets/asm-xt-roundtrip-names-c56b.png). An instance

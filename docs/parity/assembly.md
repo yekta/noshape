@@ -20,7 +20,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | K1 | `i` opens / closes Insert parts and assemblies | H:shortcuts, E§3 | ✅ | toggles; closing commits a pending placement | 0.4.10+ / c9c66d1c 10-27 (opens / closes Insert) |
 | K2 | `m` opens the Fastened mate dialog | H:shortcuts | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Fastened 1 dialog) |
 | K3 | `j` shows / hides all mates | H:shortcuts | ✅ | per-mate eye overrides (Mate.hidden) | 0.4.10+ / c5e53806 10-28 (j shows / hides new mates) |
-| K4 | `k` shows / hides mate connectors | H:shortcuts | ✅ | |  |
+| K4 | `k` shows / hides mate connectors | H:shortcuts | ❌ (ASM-K-IMPLICIT-MCS) | | 2292bf8c 10-28: ✗ k draws only part-studio connectors, not the mates' implicit ones (live ks-k-1) |
 | K5 | `h` toggles Show mates mode | H:shortcuts | ✅ | also toolbar button | 0.4.10+ / c9c66d1c 10-27 (Show mates mode banner) |
 | K6 | `Shift+S` toggles Snap mode | H:shortcuts | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | K7 | `Ctrl+M` opens the Mate connector dialog | H:shortcuts | ✅ | bound in Workspace; Assembly handles MateConnectorTool | 0.4.10+ / 77870dd4 10-28 |
@@ -191,7 +191,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | M11 | Clear selection | H:mates | ✅ | | 0.4.10+ / 52ca0b97 10-28 (no Clear selection in the mate row menu, = live's capture; row text stale) |
 | M12 | Delete | H:mates | ✅ | | 0.4.10+ / acd6acce 10-27 (wa2: Assembly 2) (Delete, Ctrl+Z restores) |
 | M13 | Dynamic suppression, Edit named position driver mate, Configure | E§6.5 | ✅ | Dynamic suppression ▸ (mates and instances: "Unsuppressed if"; once set: Unsuppress + Edit dynamic suppression), Edit named position driver mate… (Driving mate selector, editing banner, value columns); Configure: mate parameters are configured from the Configuration panel's mode (G17) | 0.4.10+ / 77870dd4 10-28 |
-| M14 | Mate connector menu: Rename, Edit, Hide, Hide other mate connectors, Show all mate connectors, Suppress, Delete | E§6.5 | ✅ | |  |
+| M14 | Mate connector menu: Rename, Edit, Hide, Hide other mate connectors, Show all mate connectors, Suppress, Delete | E§6.5 | ✅ | | 2292bf8c 10-28 (Mate connector 1 row: Rename · Edit… · Hide, Hide other mate connectors, Show all mate connectors, Suppress · Delete) |
 
 ## 6. Mate dialog (H:mates "Mate dialog", E§6.2)
 
