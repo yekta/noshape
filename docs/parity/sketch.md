@@ -63,7 +63,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 3.9 | Delete / Backspace deletes selected entities, constraints and dimensions | H:dimension, H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 3.10 | Space clears the sketch selection | B§8.2 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 3.11 | Ctrl+C / Ctrl+V copy / paste sketch entities | H:sketch_basics | ✅ (T:ux) | 0.4.10+ / 203c4d6f 10-27 |
-| 3.12 | `#` typed without `=` in a sketch value box is the view shortcut; `=#var` enters a variable | H:sketch_basics | ✅ |  |
+| 3.12 | `#` typed without `=` in a sketch value box is the view shortcut; `=#var` enters a variable | H:sketch_basics | ✅ | 0.4.10+ / 41f60e47 10-28 |
 | 3.13 | Shortcuts are user-customizable | B§2.1 | ✅ (Shift+/ › Customize keyboard shortcuts opens the Preferences window scrolled to Keyboard shortcuts, like live's /user/settings?focusView=customize-keyboard-shortcuts tab (shortcuts/30–47): tabs, Edit / Reset per row, legend, Reset all, Shortcut toolbars; GUI :103 k1–k2) |  |
 
 ## 4. Geometry tools: clicks, drags and results
@@ -121,7 +121,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 5.5 | Ellipse / elliptical arc: primary then secondary diameter | H:ellipse | ✅ (T:sm) | 0.4.10+ / 965d3f56 10-27 (readout Ø primary, then Ø secondary) |
 | 5.6 | Polygon: no value box and no Ø dimension (live spec 10-26 "Sketch polygon commits": seed + circular pattern, no DIAMETER; the Help's "diameter of the construction circle" is only the readout) | H:inscribed_polygon | ✅ (scene test `polygon_sides_typed_and_midpoint_line`: no box) | 0.4.10+ / 2d9a275c 10-27 |
 | 5.7 | Fillet: radius box right after the first fillet | H:sketch_fillet | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 5.8 | `=#var` uses a variable; expressions with units and functions | H:sketch_basics | ✅ |  |
+| 5.8 | `=#var` uses a variable; expressions with units and functions | H:sketch_basics | ✅ | 0.4.10+ / 41f60e47 10-28 |
 | 5.9 | Esc closes the box without dimensioning | — | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 5.10 | Chained lines: the chain continues from the dimensioned end | H:line | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 
@@ -298,7 +298,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 14.11 | Esc preserves the sketch selection; Space or an empty-space click clears it | Live sketch/31,36 | ✅ (GUI :103 k1-esc.png: line stays selected after Esc) | 0.4.10+ / 965d3f56 10-27 (Esc keeps a selected line, Space clears) |
 | 14.12 | S toolbar has the live ten-tool order, includes Spline, and pressing S again repositions it at the cursor | Live sketch/38–39 | ✅ (GUI :103 current-s-toolbar-focused/current-s-repositioned: ten tools, 2×5, second S moves it) | 0.4.10+ / 203c4d6f 10-27 |
 | 14.13 | Sketch context menu offers Select other, Zoom to fit, Zoom to selection, with Confirm sketch first | Live sketch/31,37 | ✅ (GUI :103 k2-menu-line.png) | 0.4.10+ / 203c4d6f 10-27 |
-| 14.14 | Polygon side-count spinner adjusts the pending polygon; a click commits it (live 10-27: it does not start the next polygon); Esc discards only the pending preview | Live sketch/87–98 | ✅ (GUI :103 k6-poly1-c.png: `◀ N ▶` spinner after the 2nd click; count follows the pointer distance as in live 97–98) |  |
+| 14.14 | Polygon side-count spinner adjusts the pending polygon; a click commits it (live 10-27: it does not start the next polygon); Esc discards only the pending preview | Live sketch/87–98 | ✅ (GUI :103 k6-poly1-c.png: `◀ N ▶` spinner after the 2nd click; count follows the pointer distance as in live 97–98) | 0.4.10+ / 41f60e47 10-28 |
 | 14.15 | Text box creation opens the Text dialog; editing supports confirmation/cancel, live preview and the 250-character limit | Live sketch/132–134 | ✅ (GUI :103 k6-text.png / k6-text-ok-c.png: dialog with preview, selected "Default text", 12/250; ✓ creates. Existing texts: double-click reopens the dialog, ✓ applies, ×/Esc keeps the text; T:sm `text_dialog_is_provisional_and_validates_character_limit`; no side panel for selected text; Convert to expression is in the dialog) |  |
 | 14.16 | Fillet first click previews/manipulator; Enter commits and opens the radius value box | Live sketch/110–115 | ✅ (T:sm `fillet_two_curves`: staged until Enter, Enter opens the radius box; GUI :103 k3-fillet.png + k3-enter-c.png; Enter path now syncs the value box) | 0.4.10+ / 203c4d6f 10-27 |
 | 14.17 | Linear sketch pattern offers independent X/Y counts and spacing, defaults 3×1 | Live sketch/136–137 | ✅ (two directions with linked grid, T:sm `linear_pattern_second_direction_links_grid_and_round_trips_edit`; GUI :103 k4: `3x`/`1x` + spacing `25` on canvas, typed 40 mm applied as a driving dimension) | 0.4.10+ / 965d3f56 10-27 (3x / 1x, 25 mm) |
