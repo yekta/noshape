@@ -7,6 +7,19 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 noshape-0.4.12-linux-x86_64.tar.gz: all rows OK** (details under "Daily release smoke" › v0.4.12). Blocker list at the top
 of TICKETS (open P0s all carried from v0.4.11).
 
+## Session 5 (qa, another account, from 10-28 11:00; green 64997436)
+
+- **11:30 update (green 64997436):** fuzz 66 (left running by session 4, 64997436) finished alive. workflow-advanced-part-studio:
+  1.5, 1.7 (a click on the circle's centre takes its point, off-centre the region), 3.3, 3.9, 3.10 (Plane 1 row fills Mirror
+  plane: ADV1 fixed there too), 4.2 (81.147), 4.5/4.5b/4.5c (thread edge pick, "20 tpi", face split: ADV7/ADV8 fixed), 4.8
+  (rib 10550), ADV3 (error prefix), ADV4 (countersink rows) verified; ADV2 loft still 5927.755. workflow-surfaces: SF2, SF5,
+  SF6 (never ticketed; now fixed on the v0.4.12 CLI, bin/sfcheck.py / sfcheck25.py), SM12, SF1, SF8 fixed. Filed P2
+  CURVE-ROW-NO-HIGHLIGHT (psui), P2 FILL-MERGE-WITH-ALL (core, = qa5's SF7). Live asked: the open sheet's name after Delete
+  face › Leave open (ours: two bodies both "Part 1"). Not bugs: feature dialogs are rgba(255,255,255,.95) as live; enum
+  selects open a search input as live. Docs: qa-scratch/adv18 (loft), adv3 (fillet+draft), adv4 (rib/helix/thread), sf7
+  (open box) via bin/adv18.py, adv3.py, adv4.py, sf7doc.py on the v0.4.12 CLI.
+  Next: REGEN-SPEED on 64997436 (f8a21d5f core timings), workflow-sheet-metal (10/15), sketch.md T-rows, assembly-sweep.
+
 ## Session 4 (qa, another account, from 10-28 02:13; greens 41f60e47 → 67f88fd1 → 7929b13a → 52ca0b97 → … → b504234e → 2960a143)
 
 - **10:56 update (green c38eb9cf):** Parasolid 30.0–31.1 assemblies import (XT-ASM-VERSIONS note); f3c804b9's line case = live, rectangle case filed P3 SKETCH-RECT-DIM-GLYPHS (+ live glyph rules); P3 SKETCH-RECT-DROPDOWN-NAME; P2 ANSI-TEXT-ALIGN-DEFAULT (ANSI drawings use ISO's "Align with dimension line"). Verified: workflow-assembly Replicate rows, 2.6, 2.8, LI3, SV1; workflow-drawing 1.4, 1.6, 1.10, 2.6, 2.7, D6, D13, D14; export-roundtrip re-run (Rhino export now works: EXP1 gone). Not bugs after checking: Replicate 'no identical geometry' (I'd picked the hole's bottom edge), STL round trip ×1e-9 (live's defaults: export m, import doc unit). Fuzz 65 (c38eb9cf) alive.
