@@ -7,8 +7,12 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 noshape-0.4.12-linux-x86_64.tar.gz: all rows OK** (details under "Daily release smoke" › v0.4.12). Blocker list at the top
 of TICKETS (open P0s all carried from v0.4.11).
 
-## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b)
+## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff)
 
+- **21:14 update (green e4cccdff, copied 21:00; has core c1f98ed6 OCCT patch 0005):** **P0 DRAFT-BUDGET-POOL reopened**: the
+  draft-pool-hang document never finishes opening (989f756b: 26 s); A/B and stack in TICKETS; lead asked. cli-draft-hang2 still
+  opens. Fuzz 85 (e4cc) alive. Drawing V18, SK8 ✅. Live asked: note field / ANSI case (20:55), surface finish menu (20:58).
+  bin/openwatch.sh takes BIN=noshape-green-old for A/B.
 - **20:53 update (green 989f756b; 69ab5f37 has no app change):** drawing.md ⏳ pass: ✅ C1, EX5, T14, T21, T24, CR12, A14, A16;
   new P2 DWG-SHEETS-ROW-RENAME (K20: view rows not selectable, Shift+N rename look), P3 DWG-CHAMFER-ANGLE-PRECISION (S27),
   A45 surface-finish menu and the note-field / ANSI upper-case look asked from live (REQUESTS 20:55, 20:58); interaction 2.6 ✅.
