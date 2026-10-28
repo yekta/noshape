@@ -37,7 +37,7 @@ window 1440×900.
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 3.1 | Dialog defaults | hemType STRAIGHT, useMinimalGap true, length 12.5 mm, OUTER, SIMPLE | Straight, ☑ Flattened, Total length 12.5 mm, Outer, Simple | ✅ spec / ? labels |  |
+| 3.1 | Dialog defaults | hemType STRAIGHT, useMinimalGap true, length 12.5 mm, OUTER, SIMPLE | Straight, ☑ Flattened, Total length 12.5 mm, Outer, Simple | ✅ spec / ? labels | 77870dd4 10-28 |
 | 3.2 | Pick edge, ✓ | ? | OK; 30 faces, 9254.2367 mm³; closed hem r 0.01, obround relief r 1.0625 where it meets the flange | ? |  |
 
 ## 4. Tab (Sketch 2 on Top: x 20..40, y 40..50; merge = plate top face)
