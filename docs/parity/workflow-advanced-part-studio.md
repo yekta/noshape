@@ -148,7 +148,7 @@ Pass 6 (17:11 build, d5745c9) had already found ADV8 fixed ("20 tpi"); not re-ch
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | ADV2 loft (CLI) | 5927.754632 | ✗ still (live 5927.728022) |  |
-| ADV12 hole row name | "1/4-20 ↧ 12 mm \| ⌵Ø 12…" (both parts, ellipsis); tooltip "… [Hole] <- Sketch 2" | ✅ — **withdrawn**: live psb 10-21 p (behaviours ~7448) shows both callout parts; "first only" was a Simple hole (a04, a05) |  |
+| ADV12 hole row name | "1/4-20 ↧ 12 mm \| ⌵Ø 12…" (both parts, ellipsis); tooltip "… [Hole] <- Sketch 2" | ✅ — **withdrawn**: live psb 10-21 p (behaviours ~7448) shows both callout parts; "first only" was a Simple hole (a04, a05) | f8014efa 10-28 (GUI, counterbore on cbd.noshape, default panel: row "Ø 6.35 mm ↧ 12 mm | ⌴…", tooltip "Ø 6.35 mm ↧ 12 mm | ⌴Ø 10 mm ↧ 5 mm [Hole] <- Sketch 2") |
 | TAB1 Part Studio 2 on first open | Parts (1), 5 strip buttons | ✅ **fixed** (a01) |  |
 
 ## Re-run pass 15 (2026-10-22, CLI /tmp/qa5/noshape-cli-0521 = target-engine 05:21; main still aa75fdf)
