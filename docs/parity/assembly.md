@@ -180,7 +180,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 |---|---|---|---|---|---|
 | M1 | Rename | H:mates | ✅ | inline | 0.4.10+ / acd6acce 10-27 (wa2: Assembly 2) (Rename → inline, "Pin axis") |
 | M2 | Edit… (works when suppressed) | H:mates | ✅ | | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
-| M3 | Apply limit position ▸ Min/Max per DOF ("Moved mate to max Z limit") | H:mates, B | ✅ | model test `mate_reset_and_apply_limit_position`; other DOFs stay free |  |
+| M3 | Apply limit position ▸ Min/Max per DOF ("Moved mate to max Z limit") | H:mates, B | ✅ | model test `mate_reset_and_apply_limit_position`; other DOFs stay free | 0.4.10+ / 77870dd4 10-28 |
 | M4 | Reset (home position) | H:mates | ✅ | model test |  |
 | M5 | Animate <mate>… | H:mates, B | ✅ | see §11 | 0.4.10+ / daf1f50c 10-27 (mate.noshape / workflow-mates session) |
 | M6 | Hide / Show | H:mates | ✅ | 0.4.10+ / 77870dd4 10-28 |
