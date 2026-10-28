@@ -124,6 +124,11 @@ pub struct SheetGeometry {
     pub images: Vec<GeomImage>,
     /// Texts in a font other than the default (last span wins).
     pub fonts: Vec<FontSpan>,
+    /// Struck-through note texts and the lines drawn through them: DWG /
+    /// DXF 2013+ keep the strike as MTEXT formatting, older versions drop it
+    /// (help exporting_a_drawing: "Strikethrough text needs Version 2013").
+    pub struck_texts: Vec<std::ops::Range<usize>>,
+    pub strike_lines: Vec<usize>,
     /// Colored areas drawn under all the ink (pending revision rows).
     pub backdrops: Vec<(Vec<[f64; 2]>, [u8; 3])>,
     /// Translucent areas drawn over all the ink (a release watermark):
@@ -663,6 +668,11 @@ impl SheetGeometry {
         }
     }
 
+    /// Text `i` is struck through (a note's Strikethrough).
+    pub fn text_struck(&self, i: usize) -> bool {
+        self.struck_texts.iter().any(|r| r.contains(&i))
+    }
+
     pub fn text_font(&self, i: usize) -> Option<&TextFont> {
         self.fonts.iter().rev().find(|s| s.texts.contains(&i)).map(|s| &s.font)
     }
@@ -1198,6 +1208,7 @@ impl SheetGeometry {
                     let text = super::note::fractions(&env.expand(text));
                     let l = super::note::layout(&text, h, style, a.position);
                     let mark = self.mark();
+                    let t0 = self.texts.len();
                     for p in &l.pieces {
                         self.note_text(p.pos, h, &p.text, pick);
                         if let Some(i) = p.item.filter(|i| p.designator && style.flags.contains(i)) {
@@ -1209,8 +1220,12 @@ impl SheetGeometry {
                             self.lines.push(Polyline2 { points: vec![[at[0], at[1] - h * 0.2], [at[0] + w, at[1] - h * 0.2]], style: LineStyle::Thin, closed: false, pick });
                         }
                         if style.strikethrough {
+                            self.strike_lines.push(self.lines.len());
                             self.lines.push(Polyline2 { points: vec![[at[0], at[1] + h * 0.5], [at[0] + w, at[1] + h * 0.5]], style: LineStyle::Thin, closed: false, pick });
                         }
+                    }
+                    if style.strikethrough {
+                        self.struck_texts.push(t0..self.texts.len());
                     }
                     // Leaders leave a side of the box through a landing, or
                     // branch off another leader (`note_leader_paths`).

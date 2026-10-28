@@ -748,7 +748,12 @@ impl Sheet<'_> {
             // font's code unless it is the style's.
             TextIn::Space if self.g.cad_text_style(ti) == Some(CadTextStyle::Note) => {
                 let font = self.g.text_font(ti).and_then(mtext_font_code).unwrap_or_default();
-                format!("{{\\pxq{};{font}{}}}", paragraph_align(t.anchor), mtext_value(&t.text))
+                // Strikethrough needs Version 2013 (help exporting_a_drawing).
+                let text = match self.g.text_struck(ti) && self.version >= DxfVersion::AC1027 {
+                    true => format!("\\K{}\\k", mtext_value(&t.text)),
+                    false => mtext_value(&t.text),
+                };
+                format!("{{\\pxq{};{font}{text}}}", paragraph_align(t.anchor))
             }
             TextIn::Space => mtext_value(&t.text),
             TextIn::Cell { aligned: true, .. } => format!("{{\\pxq{};{}}}", paragraph_align(t.anchor), mtext_value(&t.text)),
@@ -1087,7 +1092,8 @@ fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&s
         sh.image(doc, im, owner)?;
     }
     for li in 0..g.lines.len() {
-        if !hatch_line[li] && lo[li].is_none() {
+        // A strike is the text's own formatting in CAD files (EX10).
+        if !hatch_line[li] && lo[li].is_none() && !g.strike_lines.contains(&li) {
             sh.line(doc, li, owner, false)?;
         }
     }
@@ -1472,6 +1478,32 @@ mod tests {
     /// Live asb 10-24 "drawing font files": a note's font is an MTEXT code
     /// after the paragraph's (`\FARSimp.shx|c0;`, `\fArimo|b0|i0|c0|p0;`,
     /// the CJK ones by font name); the style's Noto Sans has none.
+    /// Struck-through notes: the strike is MTEXT's \K…\k from 2013 on, and
+    /// is lost before (help exporting_a_drawing: "Strikethrough text needs
+    /// Version 2013"); never a separate LINE.
+    #[test]
+    fn strikethrough_needs_version_2013() {
+        use crate::drawing::sheet::{Anchor, LineStyle, Polyline2, Text2};
+        let mut g = sample();
+        let (t0, l0) = (g.texts.len(), g.lines.len());
+        g.texts.push(Text2 { pos: [20.0, 150.0], height: 3.5, text: "STRUCK".into(), angle: 0.0, anchor: Anchor::BottomLeft, pick: 0 });
+        g.lines.push(Polyline2 { points: vec![[20.0, 151.75], [40.0, 151.75]], style: LineStyle::Thin, closed: false, pick: 0 });
+        g.struck_texts.push(t0..t0 + 1);
+        g.strike_lines.push(l0);
+        g.cad_text_style_since(t0, CadTextStyle::Note);
+        for (version, want) in [(DxfVersion::AC1032, "{\\pxql;\\KSTRUCK\\k}"), (DxfVersion::AC1027, "{\\pxql;\\KSTRUCK\\k}"), (DxfVersion::AC1024, "{\\pxql;STRUCK}")] {
+            let dxf = String::from_utf8(to_dxf_version(&g, 4, version).unwrap()).unwrap();
+            let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf.as_bytes().to_vec())).unwrap().read().unwrap();
+            let value = doc.entities().find_map(|e| match e {
+                EntityType::MText(m) if m.value.contains("STRUCK") => Some(m.value.clone()),
+                _ => None,
+            });
+            assert_eq!(value.as_deref(), Some(want), "{version:?}");
+            let strike = doc.entities().any(|e| matches!(e, EntityType::Line(l) if (l.start.y - l.end.y).abs() < 1e-9 && (l.start.y * 4.0 / 4.0 - 151.75).abs() < 1.0 && (l.end.x - l.start.x - 20.0).abs() < 1.0));
+            assert!(!strike, "{version:?}: no strike LINE");
+        }
+    }
+
     #[test]
     fn note_fonts_are_mtext_codes_like_live() {
         use crate::drawing::sheet::{Anchor, FontSpan, Text2, TextFont};
