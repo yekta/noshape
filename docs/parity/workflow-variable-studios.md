@@ -19,14 +19,14 @@ Status: ✅ matches live, ✗ differs, ? live pending.
 | 10 | Own Variable `#w = 5 mm` before Extrude 1 | wins (5); all inserted w rows ⓘ; Extrude 1 stays black | 5 mm, ⓘ on all three, Extrude black | ✅ | v0.4.12 CLI (qa 10:14: variable_create #w = 5 mm, feature_reorder before Extrude 1 → 500 mm³) |
 | 11 | Variable dialog: type the value, Enter | (Enter accepts the feature) | **Enter does nothing**; ✓ needed | ✗ **VS1** (psb; live check requested) |  |
 | 12 | Drag the Variable row below Extrude 1 (or Extrude 1 above it) | ? (live: a Variable *after* the Extrude has no effect) | drop line shown, then **refused** with a red toast "Cannot reorder: Extrude 1 depends on Variable 1." (CLI feature_reorder: same error) | ? **VS2** (live check requested) |  |
-| 13 | New Variable `#w = 30 mm` created after Extrude 1 | no effect | still 5 mm | ✅ |  |
+| 13 | New Variable `#w = 30 mm` created after Extrude 1 | no effect | still 5 mm | ✅ | 32d67025 (qa 10:18: own #w = 5 before Extrude 1, then a Variable #w = 30 (later 8) after it → still 500 mm³; the API refuses the same (API-VAR-REDEFINE); the dialog shows Depth 8 mm (DIALOG-EXPR-SCOPE)) |
 | 14 | Reopen the document | order kept | vs all, vs1, vs2, vs t kept | ✅ |  |
 | 15 | Own-table rows vs inserted rows | same table style | own rows: smaller value font, type ▾ shifted (p9-vs23) | ? VS3 (ui2, minor) |  |
 
 ## Update from live's answer "qa5 pass 8" (behaviours.md, 10-21) + re-check 10-22 00:15 on /tmp/qa5/noshape-2330 (target-shared 23:30)
 | Row | Live | Ours | Status | Verified |
 |---|---|---|---|---|
-| 11 VS1 | Enter #1 in Value commits and normalises ("8" → "8 mm", fully selected), dialog stays open; Enter #2 accepts and closes (same two-step Enter as every feature dialog) | identical: Enter #1 → "8 mm" selected, title "#w = 8 mm", dialog open; Enter #2 closes, row "#w = 8 mm" (shots v03, v04) | ✅ **VS1 withdrawn** (pass 8 expected one-step Enter) |  |
+| 11 VS1 | Enter #1 in Value commits and normalises ("8" → "8 mm", fully selected), dialog stays open; Enter #2 accepts and closes (same two-step Enter as every feature dialog) | identical: Enter #1 → "8 mm" selected, title "#w = 8 mm", dialog open; Enter #2 closes, row "#w = 8 mm" (shots v03, v04) | ✅ **VS1 withdrawn** (pass 8 expected one-step Enter) | 32d67025 (qa 10:18: "8" + Enter → "8 mm" selected, title "#w = 8 mm", open; Enter #2 closes; with the unit list open ("30 mm") Enter #1 only closes the list: DIALOG-AC-ENTER) |
 | 12 VS2 | the reorder is **allowed, with no message** in both directions; Extrude 1 then fails red "Extrude 1 did not regenerate properly: Variable not found, is suppressed, or has not been set." (Parts (0)), or resolves silently to a Variable Studio's w when one is in scope; Ctrl+Z undoes it in one step | refused with the red toast "Cannot reorder: Extrude 1 depends on Variable 1." (UI and CLI) | ✗ **VS2** (psb) |  |
 | 2 (default tick) | "Insert into all Part Studios and Assemblies" is ☑ only for the **first** Variable Studio in the workspace; every later one comes up ☐ | 4th studio (+ › Create Variable Studio in qa5-vs, which has vs all/vs1/vs2) comes up **☑** (shot v06) | ✗ **VS4** (psb), new |  |
 
