@@ -77,3 +77,4 @@ Block 40×20×10 at the origin (qa-scratch/blk40 copy), clicks additive (rows fo
 | MP3 | Top + vertical edge (10 mm) | "Perp line and plane angle: 90.000 deg" | same | ✅ | 8bb8a6d1 10-28 |
 | MP4 | Top + the part's top face | status "Parallel dist: 10.000 mm"; panel Parallel dist 10 (X 0, Y 0, Z 10) · Area 800 mm² · Min dist 10 (X 0, Y 0, Z 10), no Max dist | same rows and values (tickets/measure-top-face-8bb8.png) | ✅ | 8bb8a6d1 10-28 |
 | MP5 | Top alone | nothing in the status bar; panel "No measurements available for current selection." | same (blue info box) | ✅ | 8bb8a6d1 10-28 |
+| MP6 | Two parallel through-hole walls (wf-block holes 25 mm apart, Ø6.35) | live label rule (behaviours ~401): "Parallel axes dist: … Min dist: … Max dist: …" in one line | "Parallel axes dist: 25.000 mm  Min dist: 18.650 mm  Max dist: 32.906 mm" (max = √(31.35² + 10²)) | ✅ | 8bb8a6d1 10-28 |
