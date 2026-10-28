@@ -940,16 +940,23 @@ impl PartStudioView {
                     )
                 }
                 m => {
-                    let text = match m {
-                        Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) => l(x),
-                        Measurement::Area(x) => self.measure_fmt(Quantity::new(x, Dim { length: 2, angle: 0 }), cx),
-                        Measurement::Volume(x) => self.measure_fmt(Quantity::new(x, Dim { length: 3, angle: 0 }), cx),
-                        Measurement::Angle(x) => self.measure_fmt(Quantity::new(x, Dim::ANGLE), cx),
-                        Measurement::Percent(x) => format!("{} %", noshape_units::to_fixed(x, 2)),
-                        Measurement::Distance { distance, .. } => l(distance),
-                        Measurement::Point(_) => String::new(),
+                    let (area, volume) = (Dim { length: 2, angle: 0 }, Dim { length: 3, angle: 0 });
+                    let (text, full) = match m {
+                        Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) => (l(x), Some((x, Dim::LENGTH))),
+                        Measurement::Area(x) => (self.measure_fmt(Quantity::new(x, area), cx), Some((x, area))),
+                        Measurement::Volume(x) => (self.measure_fmt(Quantity::new(x, volume), cx), Some((x, volume))),
+                        Measurement::Angle(x) => (self.measure_fmt(Quantity::new(x, Dim::ANGLE), cx), Some((x, Dim::ANGLE))),
+                        Measurement::Percent(x) => (format!("{} %", noshape_units::to_fixed(x, 2)), None),
+                        Measurement::Distance { distance, .. } => (l(distance), Some((distance, Dim::LENGTH))),
+                        Measurement::Point(_) => (String::new(), None),
                     };
-                    item.child(value(text))
+                    // Live (behaviours "qa (2026-10-28, P3) measure status readout", READOUT-VALUE-TOOLTIP): the
+                    // value's tooltip is the number with 5 decimals ("600.00000").
+                    let units = self.doc.read(cx).session.doc.settings.units;
+                    match full {
+                        Some((x, d)) => item.child(div().id(SharedString::from(format!("readout-{label}"))).child(value(text)).tooltip(crate::ui::tooltip(noshape_units::to_fixed(x / units.si_factor(d), 5)))),
+                        None => item.child(value(text)),
+                    }
                 }
             });
         }
