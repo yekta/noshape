@@ -340,7 +340,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | Point glyphs | up-left of the point (box top-left −27, −26) with a 1 px `#a8b2bb` leader | up-right, no leader | ✅ | 0.4.10+ / d2826142 10-27 |
 | Box | plain white square, no border, radius or shadow | radius 2 + shadow | ✅ | 0.4.10+ / d2826142 10-27 |
 | Icon | spans 14 px of the box | 11 px | ✅ (18 px icon) | 0.4.10+ / d2826142 10-27 |
-| Hovered glyph `#fcda7f`, toolbar, inference glyph | | | ✅ | 0.4.10+ / 965d3f56 10-27 (Equal glyph bg #fcda7f, both ellipses #ffc685; pattern glyph see SKETCH-PATTERN-GLYPH-HOVER) |
+| Hovered glyph `#fcda7f`, toolbar, inference glyph | | | ✅ | 0.4.10+ / c5e53806 10-28 (Equal glyph; pattern glyph hover = live) |
 | Rectangle corner coincident glyphs | four, at the corners | none: our corners share points, no coincident constraints | → skb (model) |  |
 | Hovered / selected sketch line | `#fec788` / `#feab10` ~80 % over the black line (darker core `#ca9e6b` / `#ca870b`) | the line recoloured, solid | → render owner (the line stays under a translucent highlight) |  |
 | Dimension value box (hover / selected) | 27 px high, centred on the value (sketch/24) | 22 px | ✅ | 0.4.10+ / d2826142 10-28 |
