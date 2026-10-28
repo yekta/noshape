@@ -38,8 +38,8 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 3.1 | Part › Export… | File name + View export rules, Format (last used), ☐ Y axis up, Version (Parasolid list), ☐ Use latest version, Options | Parasolid, 38.1, ☑ Use latest version, Options Download | ✅ (format stickiness ?) |  |
-| 3.2 | Parasolid file | header `SCH_3801231_38101` for 38.1 | `APPL=noshape … SCH=SCH_1200000_12006` (v12) although 38.1 was chosen | ✗ I5 |  |
+| 3.1 | Part › Export… | File name + View export rules, Format (last used), ☐ Y axis up, Version (Parasolid list), ☐ Use latest version, Options | Parasolid, 38.1, ☑ Use latest version, Options Download | ✅ (format stickiness ?) | 77870dd4 10-28 |
+| 3.2 | Parasolid file | header `SCH_3801231_38101` for 38.1 | `APPL=noshape … SCH=SCH_1200000_12006` (v12) although 38.1 was chosen | ✅ (header SCH_3801231_38101 for 38.1: I5 fixed) | 77870dd4 10-28 |
 | 3.3 | STEP export → re-import | same volume | 7922.743339 both ways | ✅ |  |
 | 3.4 | Agent API import | (CLI/MCP must cover every UI feature) | **no import operation** in `noshape-cli tools` | ✗ I6 |  |
 
