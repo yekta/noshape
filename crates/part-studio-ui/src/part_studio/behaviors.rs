@@ -438,6 +438,8 @@ pub struct UiState {
     /// index). The same index as a bar above the folder; the list draws it
     /// inside the open folder while the index stays (live FOLDER-MENU-ROLL-TO-HERE).
     pub rollback_folder_top: Option<(u32, usize)>,
+    /// The sketches selected as list rows when a feature was started (its dialog's whole-sketch rows).
+    pub row_sketches: std::collections::HashSet<FeatureId>,
     /// The folder row selected in the feature list (a click on it).
     pub selected_folder: Option<u32>,
     /// A folder just made: its row related-highlighted until the next click.
@@ -683,6 +685,7 @@ impl UiState {
             fresh_folder: None,
             folder_open: Default::default(),
             rollback_folder_top: None,
+            row_sketches: Default::default(),
             menu_target: None,
             list_menu: None,
             consumed_lines: None,

@@ -225,6 +225,10 @@ pub struct FeatureDialog {
     /// "Vertices of Sketch N" row. Points clicked one by one keep a
     /// "Vertex of Sketch N" chip each (live qa5 P1-8).
     pub grouped_sketches: std::collections::HashSet<FeatureId>,
+    /// Sketches whose list rows filled a new feature's field: their regions
+    /// show as one "Faces of Sketch 1" row even when there is one region
+    /// (live EXTRUDE-SKETCH-ROW-CHIP: the row stands for the whole sketch).
+    pub whole_sketches: std::collections::HashSet<FeatureId>,
     /// Open `#` variable autofill list of a numeric field.
     completion: Option<crate::var_complete::VarCompletion>,
     /// Open "Create variable" popup.
@@ -375,6 +379,7 @@ impl FeatureDialog {
             sketch_region_count: Arc::new(|_| 0),
             sketch_vertices: Arc::new(|_| Vec::new()),
             grouped_sketches: Default::default(),
+            whole_sketches: Default::default(),
             completion: None,
             create_var: None,
             external_field: None,
@@ -2485,7 +2490,7 @@ impl FeatureDialog {
                     if let Reference::SketchRegion { sketch, .. } = r {
                         let all: Vec<usize> = refs.iter().enumerate().filter(|(_, x)| matches!(x, Reference::SketchRegion { sketch: s2, .. } if s2 == sketch)).map(|(i, _)| i).collect();
                         let count = (self.sketch_region_count)(*sketch);
-                        if count >= 2 && all.len() == count {
+                        if (count >= 2 || self.whole_sketches.contains(sketch)) && all.len() == count {
                             if all[0] == k {
                                 rows.push((format!("Faces of {}", (self.labeler)(&Reference::Sketch(*sketch))), all, Reference::Sketch(*sketch)));
                             }

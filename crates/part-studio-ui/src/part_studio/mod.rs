@@ -1853,6 +1853,8 @@ impl PartStudioView {
                 }
             }
         }
+        // Sketches picked as list rows stand for the whole sketch in the new dialog (EXTRUDE-SKETCH-ROW-CHIP).
+        self.ui.row_sketches = self.selected_features.iter().copied().filter(|id| self.display.sketches.iter().any(|s| s.feature == *id)).collect();
         self.selection.clear();
         self.selected_features.clear();
         self.ui.select_other = None;
@@ -2036,6 +2038,8 @@ impl PartStudioView {
         let region_counts: std::collections::HashMap<FeatureId, usize> = self.display.sketches.iter().map(|s| (s.feature, s.regions.len())).collect();
         let vertex_sets: std::collections::HashMap<FeatureId, Vec<Reference>> = self.display.sketches.iter().map(|s| (s.feature, sketch_points(s))).collect();
         let studio_view = cx.entity().downgrade();
+        let whole_sketches = std::mem::take(&mut self.ui.row_sketches);
+        let whole_sketches = if is_new { whole_sketches } else { Default::default() };
         // Options ticked in an earlier, cancelled sketch dialog don't carry over.
         self.sketch_pending_options = None;
         dialog.update(cx, |d, cx| {
@@ -2057,6 +2061,7 @@ impl PartStudioView {
                 vertex_sets.iter().filter(|(_, v)| v.len() >= 2 && v.iter().all(|r| picked.contains(r))).map(|(id, _)| *id).collect()
             };
             d.sketch_vertices = Arc::new(move |id| vertex_sets.get(&id).cloned().unwrap_or_default());
+            d.whole_sketches = whole_sketches;
             d.width = crate::part_studio_hooks::feature_dialog_width(&d.feature.type_id).map(|w| px(w as f32));
             d.variables = vars;
             d.final_available = later;
