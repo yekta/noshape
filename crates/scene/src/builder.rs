@@ -1111,6 +1111,15 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             state::SELECTED
         };
         mark(r, flag, &mut scene);
+        // A curve (its Curves row): drawn as its edges selected, as when
+        // picked in the graphics (CURVE-ROW-NO-HIGHLIGHT).
+        if let Reference::Body(b) = r
+            && let Some(body) = display.body(b).filter(|b| b.face_refs.is_empty())
+        {
+            for e in &body.edge_refs {
+                mark(e, if error { state::ERROR } else { state::SELECTED }, &mut scene);
+            }
+        }
         // A part given by reference (its faces listed beside it): its faces
         // take the whole-part amber.
         if !error
@@ -1140,6 +1149,12 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
         match h {
             // A hovered part (live "psui (2026-10-27, P2) PART-HOVER-RED look"): its outline in hover orange, no
             // tint, its own edges as at rest.
+            // A hovered curve's row: its edges pre-highlighted, as the curve hovered in the graphics.
+            Reference::Body(b) if display.body(b).is_some_and(|b| b.face_refs.is_empty()) => {
+                for e in display.body(b).filter(|b| !b.hidden).map(|b| b.edge_refs.as_slice()).unwrap_or_default() {
+                    mark(e, state::HOVER, &mut scene);
+                }
+            }
             Reference::Body(b) => {
                 for f in display.body(b).filter(|b| !b.hidden).map(|b| b.face_refs.as_slice()).unwrap_or_default() {
                     for &id in built.picks.ids_for(f) {

@@ -67,7 +67,14 @@ pub fn resolve_shapes(ctx: &Context, r: &Reference) -> Vec<Shape> {
         }
         Reference::Body(id) => {
             if let Some(b) = ctx.body(id) {
-                out.push(b.shape.clone());
+                // A curve of one edge (its Parts list row) measures as that edge
+                // (CURVE-ROW-NO-HIGHLIGHT: "Length", as the curve picked in the graphics).
+                let edges = if b.kind == crate::display::BodyKind::Wire { b.shape.edges() } else { Vec::new() };
+                if edges.len() == 1 {
+                    out.extend(edges);
+                } else {
+                    out.push(b.shape.clone());
+                }
             }
         }
         Reference::Origin => out.push(k::make_vertex(DVec3::ZERO).ok().into_iter().next().unwrap_or_else(Shape::null)),
