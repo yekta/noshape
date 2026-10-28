@@ -54,7 +54,7 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 
 | # | What | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| AD1 | Assembly linear/circular pattern: Esc on a focused, unedited field | cancels the dialog (feature-dialog keys) | nothing (the dialog had no "FeatureDialog" key context) | ✅ key context + Esc ✕, Enter ✓, Tab / Shift+Tab through the fields |  |
+| AD1 | Assembly linear/circular pattern: Esc on a focused, unedited field | cancels the dialog (feature-dialog keys) | nothing (the dialog had no "FeatureDialog" key context) | ✅ key context + Esc ✕, Enter ✓, Tab / Shift+Tab through the fields | 1b81b7ca 10-28 (asm5 Linear pattern 1 › Edit: Distance focused, Esc closes the dialog) |
 
 ## 6. Measure with planes (qa4 R1)
 
