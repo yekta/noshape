@@ -1168,6 +1168,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
+- [ ] P3 API-CONFIG-NAME-KEY the agent API takes a configuration keyed by the input's display name and silently ignores
+  it: qa-scratch/bin/cfgasm.py (assembly_insert … configuration {'Size': 'Large'} on Part Studio 1, whose list input is
+  id "Configuration", named "Size") → OK, assembly_list stores {'Size': 'Large'}, but the instance stays Default: its
+  Change configuration… dialog (green 7e88e3ab) shows Size "Default", and assembly_bom merges it with a Default instance
+  (cfg.noshape Assembly 8: <1> default + <2> {'Size': 'Large'} → one row Qty 2; <3> {'Configuration': 'Large'} its own
+  row). Setting Large in the dialog stores {'Configuration': 'Large', 'Size': 'Large', 'h': '8 mm'}. The API should resolve
+  a display name to its id, or reject unknown keys (qa 2026-10-28 08:31, v0.4.12 CLI + green 7e88e3ab)
 - [ ] P3 OBJ-ZIP-MSG importing an OBJ export zip (.obj + .mtl) gives the zipped-assembly message: + › Import… (or CLI
   import_files) of samples/l30-export/v2s2-30features-live-obj.zip, or of our own OBJ export (b2.zip = b2.obj + b2.mtl) →
   "Import failed: …: Root assembly file not found. Ensure zip file name matches root assembly name and the archive does

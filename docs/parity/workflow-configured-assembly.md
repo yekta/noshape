@@ -27,7 +27,7 @@ Live answered "qa5 pass 7" (5): BOM 1 row Qty 2 → 2 rows after d = 25 → merg
 | CA2 instance menu | Select instances with same configuration, … same part and same configuration, Release… present | ✅ **fixed** | a6c56638 10-28 |
 | CA3 translucent dialog | Change configuration body still shows the model and origin triad through it | ✗ still |  |
 | CA4 unit / Tab | "25" + Tab → "25 mm" ✅; Tab still leaves the dialog (focus to the noshape logo) | ✗ still (partly) |  |
-| CA5 Reset to default | d back to 10 mm | ✅ **fixed** |  |
+| CA5 Reset to default | d back to 10 mm | ✅ **fixed** | 7e88e3ab 10-28 (Change configuration… on Part 1 <1>: Size Large › Generate › ✓, reopened shows Large) |
 | CA6 BOM merge | 1 row Qty 2 (later Qty 3 with a third instance) | ✅ **fixed** | v0.4.12 CLI 10-28 (cfg.noshape Assembly 9: three default Part 1 + one Large → BOM rows Part 1 Qty 3, Part 1 Qty 1) |
 
 **CA3 status (lead, 10-21 after pass 8):** ui found live's dialog background is rgba(255,255,255,.95) in Onshape's CSS, and live cf-052 shows the model through it too. CA3 is **? pending ui's side-by-side crop**, not ✗.
