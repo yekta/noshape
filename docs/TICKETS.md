@@ -424,6 +424,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P3 ROLLBACK-BAR-IN-FOLDER rolled back to a feature inside a folder, the bar is drawn at the root, not nested: cpat.noshape,
+  select Extrude 1 … Curve pattern 1, Add selection to folder… › Enter, expand "New folder (3)", right-click Sketch 2 (middle
+  child) › Roll to here → bar #B8B8B8 at x 45–234 (root width, over the folder's guide line); Curve pattern 1 below it stays
+  nested and grey italic (= live). Live (behaviours ~22597, request 1534): the bar is an indented child row at x 64–235
+  (starts at the children's icon column), the 1 px #D7D7D7 guide at x 49 runs past it. Also: live's guide ends in a 9 px
+  horizontal tick (x 45–53) under the last child; ours ends without one (any expanded folder)
+  (tickets/rollback-in-folder-2960.png) (qa 2026-10-28 05:46, build 2960a143)
 - [ ] P3 FOLDER-MENU-ROLL-TO-HERE a feature-list folder's context menu has no "Roll to here": cpat.noshape, select Extrude 1 +
   Sketch 2, right-click › Add selection to folder… › Enter, right-click "New folder (2)" (also with the rollback bar moved
   above it): ours Rename | Add selection to folder… | Suppress, Dynamic suppression ▸ | Expand ▸, Collapse ▸ | Delete,
@@ -1075,6 +1082,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 ## Drawings / API / data exchange (dx)
 - [ ] P2 VIEW-LABEL-TOGGLE View properties' "View label" / "Scale label" boxes don't drive the drawn label of a detail (or auxiliary) view: wf-block drawing › Detail view B (2:1) under "DETAIL B / SCALE 2:1" › double-click → ☑ View label with the new Prefix DETAIL / Letter B / Suffix rows (3062ec50 ✅) but ☐ Scale label while the scale line is drawn; untick View label, ✓ → the label still reads "DETAIL B / SCALE 2:1" (tickets/view-label-toggle-3f4e.png). The auxiliary view does the same (View label ☐ while "Auxiliary A - A" shows; live asked, REQUESTS qa 10-28 03:30). The boxes should show / hide what is drawn (qa 2026-10-28 04:32, green 3f4e10d9)
+  qa 05:46: live answered request 1535 (behaviours ~22615): ISO A3 aux view → ☑ View label (ticked, as drawn), Prefix /
+  Letter "A" / Suffix fields (no single Label field), ☐ Scale label; unticking View label hides the "A" at once, ticking
+  Scale label adds a "2:1" line under it; ✕ reverts both.
 - [ ] P3 CALLOUT-ALIGN-MISSING two selected callouts get the generic multi-selection menu, without Align horizontally / Align vertically: wf-block drawing, two leaderless callouts ("----"), click one, Shift+click the other, right-click → Copy, Paste as table | Clear selection, Zoom to fit, Delete (tickets/callout-align-missing-1b81.png). annotation_extra_entries has the items (drawing_extra.rs) but this menu path doesn't reach them. Help (callout_balloon): select multiple callouts, right-click › Align horizontally / Align vertically (parity drawing.md A26, verified earlier) (qa 2026-10-28 04:18, green 1b81b7ca)
 - [ ] P2 CALLOUT-ON-DIMENSION the Callout tool doesn't attach to a dimension: wf-block drawing with a linear dimension 18 › Callout › click the dimension's text → a leaderless "----" balloon is dropped on top of the dimension text (the 18 shows through it); the next click in white space places a second leaderless balloon. Deleting the dimension leaves both balloons (tickets/callout-on-dimension-1b81.png: before / after Delete). Help "Callout" (callout_balloon): callouts can be placed on linear and angular dimensions (click the dimension, then place the balloon; the leader runs to the dimension), and "Deleting a dimension with an attached callout also deletes the callout" (parity drawing.md D41) (qa 2026-10-28 04:16, green 1b81b7ca)
 - [ ] P2 DIM-PALETTE-DROPDOWN-COLLAPSE a dimension palette dropdown whose list hangs below the palette can't be used: wf-block drawing, a linear dimension (18) › select › click the ±0.1 icon (palette opens) › [XX] ▾ (Single unit / Dual unit / Dual unit (Drawing)) › move the pointer down onto "Single unit" → the palette collapses as soon as the pointer leaves its box, the list stays orphaned, the sheet behind takes the hover (title block and border light up orange through the list, tickets/palette-hover-through-da18.png) and the click changes nothing (tickets/palette-dropdown-collapse-da18.png). Down + Enter on the open list did not apply "Dual unit" either. So a dimension's own dual mode can't be set in the app (the drawing-wide Show dual dimensions works, and the new dual row [ 0.709 ▾ (in) ▾ 👁 ] shows as live). An open dropdown should keep its palette open and take the clicks, as live's palette does (qa 2026-10-28 03:40, green da18f886)
