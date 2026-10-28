@@ -202,7 +202,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 8.15 | Conflicting constraints: white glyph on red | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.16 | External (Use) constraints have a blue glyph background | H:working_with_constraints | ✅ (GUI :103 Equal to projected model circle gives blue glyph backgrounds; external-equal.png) | 0.4.10+ / 965d3f56 10-27 (Use glyphs on #def1fb) |
 | 8.17 | Equal: if one curve is dimensioned, its size wins | H:equal | ✅ (solver) | 0.4.10+ / 203c4d6f 10-27 |
-| 8.18 | Constraint manager / Profile inspector | H:working_with_constraints | ✅ (both panels from the Sketch diagnostics tools) |  |
+| 8.18 | Constraint manager / Profile inspector | H:working_with_constraints | ✅ (both panels from the Sketch diagnostics tools) | 78958d0f 10-28 (sketch dialog's diagnostics icon → Profile inspector… / Constraint manager…; CM: Filters (Automatically select constraints; Type / Mode / Status chips; Sort by constraint / entity), "Entities and constraints (4)" with eye / delete per row, Clear all · Delete all; Profile inspector: "No issues: every profile is closed.", Previous / Next) |
 
 ## 9. Selection
 
