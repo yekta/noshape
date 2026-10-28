@@ -934,7 +934,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
-- [x] 97c7aae3 P3 ASM-MC-LIST-ORDER an assembly mate connector added after a mate is listed above it: qa5 mkmate.py doc, Fastened 1
+- [x] verified 97c7aae3 (qa 09:24: mate doc, Fastened 1 then Add mate connector to instance origin → Mate features (2): Fastened 1, Mate connector 1; tickets/asm-mc-order-97c7.png) 97c7aae3 P3 ASM-MC-LIST-ORDER an assembly mate connector added after a mate is listed above it: qa5 mkmate.py doc, Fastened 1
   (top-face hole centres), then right-click Part 1 <1> › Add mate connector to instance origin… › ✓ → Mate features (2):
   **Mate connector 1, Fastened 1**. Live (behaviours ~22743, request 1541): creation order, "Fastened 1 · Mate connector 1"
   (REST /features the same); parity assembly.md F1 (qa 2026-10-28 07:55, build 2292bf8c)
