@@ -114,7 +114,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | L22 | Items list (non-geometric BOM items) | E§5.1 | n/a | not on the captured plan: live 105 / 678 found no non-geometric item flow (no "Add items" control in the BOM header, ⋯ or rows); a subscription-gated feature (TEAM-RULES exclusion) |  |
 | L23 | Dynamic suppression | E§5.7 | ✅ | Instance row › Dynamic suppression ▸ Add expression…: 220 px "Dynamic suppression" dialog, "Unsuppressed if" expression; evaluated with the assembly variables, false → suppressed (`eval::dynamically_suppressed`, model test); menu with an expression set: capture requested |  |
 | L24 | Rigid / lock icons on subassemblies | E§5.3 | ✅ | lock icon; rigid icon when the subassembly has 0 DOF and exactly one fixed instance (`InstanceNode.rigid`); GUI g1 (Move to new subassembly of a fixed + fastened pair) |  |
-| L25 | Warnings (more than one part fixed …) | E§5.3, B | ✅ | warning icon + "<name> has warning: …": More than one part is fixed / More than one part inside is fixed / Fastened to origin even though Assembly has fixed part(s) |  |
+| L25 | Warnings (more than one part fixed …) | E§5.3, B | ✅ | warning icon + "<name> has warning: …": More than one part is fixed / More than one part inside is fixed / Fastened to origin even though Assembly has fixed part(s) | 0.4.10+ / 3f4e10d9 10-28 (Fix on Part 2 <1> too: ⚠ on both fixed rows, the Revolute red; hovering the row / its icons showed only "Part 2 <1>", the "has warning: More than one part is fixed" tooltip not reached) |
 
 ### 4.1 Instance context menu (part / subassembly), Onshape order
 
