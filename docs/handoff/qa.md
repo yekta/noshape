@@ -9,6 +9,13 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **22:27 update (green c34f4406; e3368b77 = + skasm 000dfaf4):** verified SKETCH-USE-PRESELECT. Fuzz 88 (6114) and 89 (e336)
+  alive (600 actions each, ~3 min). bin/volsweep.sh with bool's CLI 22:19 (rel/k/bool/2219, Rust on): all 19 documents identical to
+  v0.4.12. Drawing ⏳ walk on boltdwg / hcd docs (bin/boltdwg.py, bin/hcdwg.py; display :131 is free and used for GUI checks while
+  fuzz runs on :110, bin/q131.sh): ✅ A29 / A52 / A53; 🔧 A51 → P2 DWG-E2E-SILHOUETTE, V23 → P3 DWG-EDIT-SECTION-DIALOG, A56 → P3
+  DWG-HOLE-CALLOUT-ADD-LEADER; ❌ A21 → P2 DWG-GROUP-ANNOTATION-MENU; P3 DWG-DIM-HOVER-STAYS (in v0.4.12 too). V44: after Rotate view
+  the H / V dims read 0 (asked live, REQUESTS 22:18). Core committed 3a6e8122 (OCCT 0005 v2) for DRAFT-BUDGET-POOL, not landed:
+  a background wait (until green contains it) is running; re-test tickets/draft-pool-hang-2133.noshape with bin/openwatch.sh then.
 - **22:08 update (qa resumed on another account; green 61143838 = 58d8 + psui d33a327c + dx 61143838, copied 21:58):**
   DRAFT-BUDGET-POOL still endless on 61143838 (229 s, 3.5 GB); core has an uncommitted 0005 rework in its worktree (budget stops
   a pool job of its own thread) → re-test when green. Verified EXTRUDE-SKETCH-ROW-CHIP. Fuzz 87 (58d8) alive; fuzz 88 (6114,
