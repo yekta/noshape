@@ -351,6 +351,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   h30 R2 t1.5 0.49 s (19015.487), h10 R4 t2.5 1.05 s (14277.776), no hole 0.70 s (9031.64): the hole cases 3–4× faster than
   10-27; the no-hole case slower than 10-27's 0.16 s (one run, load-bound?).
   qa 12:11 (A/B back to back, NOSHAPE_PERF, bin/shellab.sh: wf-block top face, default 2.5 mm): v0.4.12 4842 / 6471 ms, green 8cd3c4da 6484 / 4154 ms at load 39–54: no change against the release; the box was very loaded (03:30's 2.6 s was at load ~30).
+  qa 18:35 (greens 5267fdaf / 78958d0f / b184b401, release builds, load ~45–60): **failing shells take up to a minute**: the CLI-fuzz document qa-scratch/tickets/bop-pairs-gpf-5267.noshape (54 features) opens in 117–126 s, of which Shell 5 55–58 s and Shell 4 27–34 s, and **both end red (failed)**; Shell 3 6–9 s, Shell 2 3–4 s. Suppressing Shell 4 (already failed, no geometry) re-ran Shell 5 for another 55 s. Same times on 78958d0f, so not from patch 0004. Live fails such shells fast (not timed here; no live copy of this body).
 - [ ] P0 REGEN-SPEED (core 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
