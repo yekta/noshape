@@ -7,13 +7,13 @@ Status: ✅ exact / expected, ✗ broken, ? live comparison pending.
 | Format | File size | Re-imported | Status | Verified |
 |---|---|---|---|---|
 | Parasolid (.x_t) | 14739 B | 67191.327533, 20 faces | ✅ (header still v12, I5) | 77870dd4 10-28 (UI export header SCH_3801231_38101) |
-| ACIS (.sat) | 21947 B | 67191.327533, 20 | ✅ |  |
+| ACIS (.sat) | 21947 B | 67191.327533, 20 | ✅ | v0.4.12 CLI 10-28 (qa 10:48, bin/roundtrip_qa.py, source bracket 67643.716875 / 18 faces: .sat 20139 B → 67643.716875, 18) |
 | STEP | 72081 B | 67191.327533, 20 | ✅ | 77870dd4 10-28 (UI: wf-block 6649.885 → STEP → re-import 6649.885) |
-| IGES | 58968 B | 67191.327532, 20 | ✅ (header DOC1) |  |
-| JT | 34689 B | 67191.327533, 20 | ✅ |  |
-| PVZ | 70509 B | mesh 67194.905652 (+0.005 %), 1 face | ✅ (mesh, as Onshape) |  |
-| glTF / GLB | 46988 / 35484 B | mesh 67196.545601, 1 face | ✅ (mesh) |  |
-| 3MF | 78273 B | mesh 67196.546674, 1 face | ✅ (mesh) |  |
+| IGES | 58968 B | 67191.327532, 20 | ✅ (header DOC1) | v0.4.12 CLI 10-28 (qa 10:48, bin/roundtrip_qa.py, source bracket 67643.716875 / 18 faces: .igs 50463 B → 67643.716875, 18) |
+| JT | 34689 B | 67191.327533, 20 | ✅ | v0.4.12 CLI 10-28 (qa 10:48, bin/roundtrip_qa.py, source bracket 67643.716875 / 18 faces: .jt 26862 B → 67643.716875, 18) |
+| PVZ | 70509 B | mesh 67194.905652 (+0.005 %), 1 face | ✅ (mesh, as Onshape) | v0.4.12 CLI 10-28 (qa 10:48, bin/roundtrip_qa.py, source bracket 67643.716875 / 18 faces: .pvz 51496 B → mesh 67646.192871 (+0.004 %), 1 face) |
+| glTF / GLB | 46988 / 35484 B | mesh 67196.545601, 1 face | ✅ (mesh) | v0.4.12 CLI 10-28 (qa 10:48, bin/roundtrip_qa.py, source bracket 67643.716875 / 18 faces: .gltf 32519 / .glb 24632 B → mesh 67646.763954, 1 face) |
+| 3MF | 78273 B | mesh 67196.546674, 1 face | ✅ (mesh) | v0.4.12 CLI 10-28 (qa 10:48, bin/roundtrip_qa.py, source bracket 67643.716875 / 18 faces: .3mf 42970 B → mesh 67646.765079, 1 face) |
 | **Rhino (.3dm)** | – | **export_failed "unsupported: Rhino export needs openNURBS: build with OPENNURBS_ROOT"** (Onshape exports Rhino; live G-series has .3dm imports) | ✗ **EXP1** (kern / packaging: the shipped build must include it) |  |
 | **OBJ** | 45214 B | **import fails: "i/o error: could not read mesh file …bracket.obj"** (our own OBJ export can't be read back) | ✗ **EXP2** (kern) |  |
 | STL (CLI defaults) | 47284 B | 6.7e-05 mm³: the export defaults to **metres**, the import to **mm** | ? (live: UI export dialog Units sticky "Meter", REST always metres; UI import Units defaults to the document units, so Onshape behaves the same way. Check that our UI export dialog defaults/stickiness match) |  |
@@ -23,9 +23,9 @@ Status: ✅ exact / expected, ✗ broken, ? live comparison pending.
 ## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| EXP2 OBJ round trip | 72076 B, re-imports as mesh 67196.546728, 1 face | ✅ **fixed** |  |
-| EXP1 Rhino | export_failed "unsupported: Rhino export needs openNURBS" | ✗ still |  |
-| other nine formats | unchanged (exact or mesh) | ✅ |  |
+| EXP2 OBJ round trip | 72076 B, re-imports as mesh 67196.546728, 1 face | ✅ **fixed** | v0.4.12 CLI 10-28 (qa 10:48, bin/roundtrip_qa.py, source bracket 67643.716875 / 18 faces: OBJ exports b2.zip (.obj + .mtl; the zip itself is now refused with live's MTL message, OBJ-ZIP-MSG); the bare .obj → mesh 67646.764949, 1 face) |
+| EXP1 Rhino | export_failed "unsupported: Rhino export needs openNURBS" | ✗ still | v0.4.12 CLI 10-28 (qa 10:48, bin/roundtrip_qa.py, source bracket 67643.716875 / 18 faces: Rhino now exports (.3dm 68317 B) and re-imports exactly 67643.716875, 18 faces: EXP1 no longer reproduces) |
+| other nine formats | unchanged (exact or mesh) | ✅ | v0.4.12 CLI 10-28 (qa 10:48, bin/roundtrip_qa.py, source bracket 67643.716875 / 18 faces: x_t 13630 / STEP 23041 B exact; STL comes back 6.8e-05 mm³ (unitless file read in another unit, like the g35 STL row)) |
 
 ## Re-run pass 12 (2026-10-22 ~01:35, CLI /tmp/qa5/noshape-cli-0107 = target-engine 01:07; main still 5bd50b2)
 | Row | Ours | Status | Verified |
