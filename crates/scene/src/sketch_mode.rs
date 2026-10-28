@@ -1913,6 +1913,7 @@ impl SketchEditor {
             return EditOutcome::none();
         };
         let dist = self.chamfer_distance;
+        let min_leg = self.world_per_px * 2.0;
         let make = |r: f64| {
             let mut preview = data.clone();
             let sk = &mut preview.sketch;
@@ -1924,17 +1925,26 @@ impl SketchEditor {
             };
             res.map(|res| (preview, res))
         };
+        // A fillet that leaves a leg (next to) nothing can't be made smaller
+        // again (qa: R21.832 on a 21.86 mm leg, then 5 "could not be solved").
+        let legs_left = |(preview, res): &(SketchData, noshape_sketch::EditResult)| {
+            res.created.iter().copied().filter(|e| preview.sketch.kind(*e) == Some(EntityKind::Arc)).all(|arc| fillet_legs(&preview.sketch, arc).iter().all(|(_, d)| d.length() >= min_leg))
+        };
         let mut made = make(self.fillet_radius);
         let mut too_large = false;
         // Live (sketch.md 11.4; SKETCH-FILLET-STUCK-RADIUS reopened): a
         // default radius too large for the corner previews red, to be dragged
         // or typed smaller; the tool is never locked out by it. The preview is
         // the largest radius that fits.
-        if made.is_err() && !chamfer && make(self.fillet_radius * 1e-3).is_ok() {
+        let fits = |r: f64| make(r).ok().filter(&legs_left);
+        if !chamfer && made.as_ref().is_ok_and(|m| !legs_left(m)) {
+            made = Err(noshape_sketch::SketchError::OperationFailed("no leg left".into()));
+        }
+        if made.is_err() && !chamfer && fits(self.fillet_radius * 1e-3).is_some() {
             let (mut lo, mut hi) = (self.fillet_radius * 1e-3, self.fillet_radius);
             for _ in 0..30 {
                 let mid = 0.5 * (lo + hi);
-                if make(mid).is_ok() { lo = mid } else { hi = mid }
+                if fits(mid).is_some() { lo = mid } else { hi = mid }
             }
             made = make(lo);
             too_large = made.is_ok();
@@ -1983,8 +1993,16 @@ impl SketchEditor {
     fn after_fillet(&mut self, data: &mut SketchData, r: &noshape_sketch::EditResult) {
         let Some(arc) = r.created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Arc)) else { return };
         let rad_dim = r.constraints_added.iter().copied().find(|c| data.sketch.constraint(*c).is_some_and(|c| matches!(c.kind, ConstraintKind::Radius { .. })));
+        // Equal to the session's first only at its radius: a smaller one (the
+        // largest a short corner takes) gets its own dimension (qa: an Equal
+        // to R124.98 made a R21.8 fillet red at once and untypeable).
+        let radius = |e: EntityId| match data.sketch.curve(e) {
+            Some(Curve2::Arc { radius, .. }) => Some(radius),
+            _ => None,
+        };
+        let same = |first: EntityId| matches!((radius(first), radius(arc)), (Some(a), Some(b)) if (a - b).abs() <= 1e-9 * a.max(1e-3));
         match self.fillet_session {
-            Some(first) if data.sketch.entity(first).is_some() => {
+            Some(first) if data.sketch.entity(first).is_some() && same(first) => {
                 if let Some(d) = rad_dim {
                     let _ = data.sketch.remove_constraint(d);
                 }
@@ -3328,24 +3346,14 @@ impl SketchEditor {
                     // later fillet "radius too large").
                     let before = data.sketch.clone();
                     // The legs the arc trims: a radius the corner can't take
-                    // flips them (it still "solves").
-                    let legs: Vec<(EntityId, DVec2)> = data
-                        .sketch
-                        .endpoints(arc)
-                        .map(|(a, b)| [a, b])
-                        .into_iter()
-                        .flatten()
-                        .flat_map(|pt| data.sketch.users_of_point(pt))
-                        .filter(|e| *e != arc)
-                        .filter_map(|e| match data.sketch.curve(e) {
-                            Some(Curve2::Line { a, b }) => Some((e, b - a)),
-                            _ => None,
-                        })
-                        .collect();
+                    // flips them (it still "solves"); each keeps 2 px, from
+                    // which the fillet can shrink again.
+                    let legs = fillet_legs(&data.sketch, arc);
                     let _ = data.sketch.set_dimension_value(dim, r);
                     data.dimension_exprs.remove(&dim.0);
                     let solved = data.sketch.solve().is_solved();
-                    let kept = legs.iter().all(|(e, d0)| matches!(data.sketch.curve(*e), Some(Curve2::Line { a, b }) if (b - a).dot(*d0) > 1e-12 * d0.length_squared().max(1e-30)));
+                    let min_leg = self.world_per_px * 2.0;
+                    let kept = legs.iter().all(|(e, d0)| matches!(data.sketch.curve(*e), Some(Curve2::Line { a, b }) if (b - a).dot(*d0) > 0.0 && (b - a).length() >= min_leg));
                     if !solved || !kept {
                         data.sketch = before;
                     } else if pending {
@@ -5550,6 +5558,21 @@ fn crosses_box(sk: &Sketch, id: EntityId, lo: DVec2, hi: DVec2, tol: f64) -> boo
 }
 
 /// The fixed point on the sketch origin (created on first use).
+/// The lines a fillet arc trims (at its ends) and their vectors.
+fn fillet_legs(sk: &Sketch, arc: EntityId) -> Vec<(EntityId, DVec2)> {
+    sk.endpoints(arc)
+        .map(|(a, b)| [a, b])
+        .into_iter()
+        .flatten()
+        .flat_map(|pt| sk.users_of_point(pt))
+        .filter(|e| *e != arc)
+        .filter_map(|e| match sk.curve(e) {
+            Some(Curve2::Line { a, b }) => Some((e, b - a)),
+            _ => None,
+        })
+        .collect()
+}
+
 /// The sketch's Origin point ([`origin_point`]).
 fn is_origin(sk: &Sketch, e: EntityId) -> bool {
     sk.entity(e).is_some_and(|e| e.external && e.reference_only && matches!(e.geometry, noshape_sketch::Geometry::Point { pos } if pos.length() < 1e-12))
@@ -8385,6 +8408,59 @@ mod tests {
         assert!(radius > 0.005 && radius < 0.011, "the largest radius that fits: {radius}");
         assert!(ed.fillet_preview(&d.sketch).is_some_and(|(_, fits)| !fits), "drawn red");
         assert_eq!(ed.fillet_value_label(&d.sketch).map(|(_, r)| r), Some(radius), "the label reads the preview");
+        // Committed, it shrinks again (qa: a leg left at zero length made 5 mm "could not be solved").
+        assert!(ed.commit_corner(&mut d).changed);
+        let dim = d.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Radius { curve, .. } if curve == arc)).map(|c| c.id).expect("its radius");
+        let units = UnitPrefs::default();
+        let r = ed.apply_dimension(&mut d, dim, "5", &units, &std::collections::BTreeMap::<String, noshape_units::Quantity>::new());
+        assert!(r.is_ok(), "{r:?}");
+        assert!(matches!(d.sketch.curve(arc), Some(Curve2::Arc { radius, .. }) if (radius - 0.005).abs() < 1e-9), "{:?}", d.sketch.curve(arc));
+    }
+
+    /// qa 01:15: two free lines at a corner (a 21.86 mm leg), a default too
+    /// large: the max-fit fillet, committed, types smaller.
+    #[test]
+    fn a_max_fit_fillet_on_free_lines_types_smaller() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        let c = d.sketch.add_point(v(0.0, 0.0));
+        let a = d.sketch.add_point(v(0.02186, 0.0));
+        let b = d.sketch.add_point(v(0.0, 0.03));
+        d.sketch.add_line_between(c, a).unwrap();
+        d.sketch.add_line_between(c, b).unwrap();
+        ed.fillet_radius = 0.12498;
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        assert!(ed.pending_corner.is_some(), "{:?}", ed.message);
+        let (arc, _) = ed.fillet_handle(&d.sketch).unwrap();
+        assert!(ed.commit_corner(&mut d).changed);
+        eprintln!("committed {:?}", d.sketch.curve(arc));
+        let dim = d.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Radius { curve, .. } if curve == arc)).map(|c| c.id).expect("its radius");
+        let r = ed.apply_dimension(&mut d, dim, "5", &UnitPrefs::default(), &std::collections::BTreeMap::<String, noshape_units::Quantity>::new());
+        assert!(r.is_ok(), "{r:?}");
+        assert!(matches!(d.sketch.curve(arc), Some(Curve2::Arc { radius, .. }) if (radius - 0.005).abs() < 1e-9), "{:?}", d.sketch.curve(arc));
+    }
+
+    /// qa 01:15: in one Fillet session a large first fillet, then a short
+    /// corner: the second (the largest it takes) has its own radius, not an
+    /// Equal to the first, and types smaller.
+    #[test]
+    fn a_smaller_second_fillet_in_a_session_keeps_its_own_radius() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        let big = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.3, 0.3));
+        let small = d.sketch.corner_rectangle(v(0.4, 0.0), v(0.415, 0.011));
+        let (p_big, p_small) = (d.sketch.point(big.points[0]).unwrap(), d.sketch.point(small.points[0]).unwrap());
+        ed.fillet_radius = 0.12;
+        click(&mut ed, &mut d, p_big);
+        assert!(ed.commit_corner(&mut d).changed);
+        click(&mut ed, &mut d, p_small);
+        assert!(ed.pending_corner.is_some(), "{:?}", ed.message);
+        let (arc, _) = ed.fillet_handle(&d.sketch).unwrap();
+        assert!(ed.commit_corner(&mut d).changed);
+        assert!(!d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Equal { b, .. } if b == arc)), "no Equal to the first");
+        assert!(d.sketch.solve().is_solved());
+        let dim = d.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Radius { curve, .. } if curve == arc)).map(|c| c.id).expect("its own radius");
+        let r = ed.apply_dimension(&mut d, dim, "5", &UnitPrefs::default(), &std::collections::BTreeMap::<String, noshape_units::Quantity>::new());
+        assert!(r.is_ok(), "{r:?}");
+        assert!(matches!(d.sketch.curve(arc), Some(Curve2::Arc { radius, .. }) if (radius - 0.005).abs() < 1e-9));
     }
 
     #[test]
