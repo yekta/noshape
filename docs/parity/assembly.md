@@ -22,17 +22,17 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | K3 | `j` shows / hides all mates | H:shortcuts | ✅ | per-mate eye overrides (Mate.hidden) | 0.4.10+ / c5e53806 10-28 (j shows / hides new mates) |
 | K4 | `k` shows / hides mate connectors | H:shortcuts | ✅ | |  |
 | K5 | `h` toggles Show mates mode | H:shortcuts | ✅ | also toolbar button | 0.4.10+ / c9c66d1c 10-27 (Show mates mode banner) |
-| K6 | `Shift+S` toggles Snap mode | H:shortcuts | ✅ | |  |
-| K7 | `Ctrl+M` opens the Mate connector dialog | H:shortcuts | ✅ | bound in Workspace; Assembly handles MateConnectorTool |  |
+| K6 | `Shift+S` toggles Snap mode | H:shortcuts | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| K7 | `Ctrl+M` opens the Mate connector dialog | H:shortcuts | ✅ | bound in Workspace; Assembly handles MateConnectorTool | 0.4.10+ / 77870dd4 10-28 |
 | K8 | `a` flips the primary axis (mate / mate connector dialog, snap drag) | H:shortcuts, E§20 | ✅ | dialog and snap drag |  |
 | K9 | `q` reorients the secondary axis during a snap drag | E§20 | ✅ | snap drag (verified); mate / MC dialog |  |
 | K10 | `Shift` (hold) locks mate inference to the hovered face/edge | H:mates, E§6.3 | ✅ | nearest point of the locked entity; click anywhere picks it |  |
 | K11 | `Ctrl` (tap) cycles the dragged connector in snap mode | E§20 | ✅ | Ctrl tap cycles the dragged connector only when the instance has more than the picked one (its explicit connectors); live 570 (a block with no explicit connectors): Ctrl taps don't change the face-centre connector, and ours doesn't either. No message while snap-dragging (live 569) |  |
 | K12 | `Enter` commits the dialog | H:shortcuts | ✅ | mate dialog |  |
 | K13 | `Shift+Enter` commits and starts another of the same command | H:shortcuts | ✅ | mate dialog: commits and reopens the same mate type |  |
-| K14 | `Esc` cancels the command / closes menus, exits isolate | H:shortcuts | ✅ | Insert: Esc closes and keeps placed instances |  |
+| K14 | `Esc` cancels the command / closes menus, exits isolate | H:shortcuts | ✅ | Insert: Esc closes and keeps placed instances | 0.4.10+ / 77870dd4 10-28 |
 | K15 | `Space` clears the selection | H:shortcuts | ✅ | | 0.4.10+ / c9c66d1c 10-27 |
-| K16 | `Delete` / `Backspace` deletes the selection (instances or mate feature) | H:shortcuts | ✅ | |  |
+| K16 | `Delete` / `Backspace` deletes the selection (instances or mate feature) | H:shortcuts | ✅ | | 0.4.10+ / 77870dd4 10-28 |
 | K17 | `Shift+N` renames the selected instance or feature inline | H:shortcuts | ✅ | | 0.4.10+ / c5e53806 10-28 (Esc keeps the old name) |
 | K18 | `y` hides the hovered or selected instances | H:shortcuts | ✅ | hover in graphics or list | 0.4.10+ / c9c66d1c 10-27 (hovered pin) |
 | K19 | `Shift+Y` shows hidden instances | H:shortcuts | ✅ | | 0.4.10+ / c9c66d1c 10-27 (pointer over the hidden pin) |
@@ -52,16 +52,16 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 
 | # | Behaviour | Source | Status | Notes | Verified |
 |---|---|---|---|---|---|
-| T1 | Insert, Replicate, Linear/Circular pattern, Mirror tools | E§2.1 | ✅ | |  |
-| T2 | Mate connector tool | E§2.1 | ✅ | |  |
-| T3 | Mate tools Fastened … Parallel, Tangent, Width | E§2.1 | ✅ | |  |
-| T4 | Group, Relations dropdown | E§2.1 | ✅ | Group is immediate (no dialog), see G1 |  |
-| T5 | Replace instance tool | E§2.1, live 833–836 | ✅ | the 220 px "Replace instance" ✓ ✕ dialog even with nothing selected (no notice): Instances to replace (active, clicks add/remove), part-icon "Select replacement component" field (red with the title once an instance is picked), ☐ Replace all instances; Esc cancels. The field opens the "Select replacement component" panel beside the dialog (live 840–841: the Insert panel's tabs and list, ✕ only, "Search entities or features", 559 px; `picking_replacement` / `pick_replacement` intercept the insert handlers); the pick fills the field and closes the panel; ✓ replaces and re-points the mates (GUI-verified 20 Oct); the Standard content tab's Insert picks the component. Preview (live 842): the picked replacement is evaluated in place before ✓ (`effective` applies it; drawn selected, failing mates red), the pre-preview result kept in `ReplaceSession::before` for ✓'s geometric matching. The picker's filters are live's four: Parts, Sketches, Surfaces, Flat patterns (`insert_flat`; none are listed, so it narrows to nothing). Name (live 843): an instance already named after the replacement keeps its name (`Assembly::replace_instance`). Naming as live (behaviours "Replace instance: naming", 843): the replaced instance takes the new part's name with the lowest free number ("Part 1 <2>" → "Flange <1>"), a same-named replacement keeps it; instances can't be renamed in live (`Assembly::replace_instance`) |  |
-| T6 | Display states tool | E§2.1 | ✅ | |  |
-| T7 | Snap mode toggle (highlighted when on) | E§2.1 | ✅ | |  |
-| T8 | Show mates mode toggle | E§2.1 | ✅ | |  |
-| T9 | Create Part Studio in context | E§2.1 | ✅ | toolbar button and Origin row › Create Part Studio in context… ("Origin of new Part Studio"), new Part Studio opened in context with a persisted Assembly context snapshot (see G13) GUI p1–p3 |  |
-| T10 | Update all references | E§2.1 | ✅ | toolbar "Update all references to latest versions" is enabled (blue) only while another document referenced here has a newer version (live 607, 621), else disabled; rows: ⋮ "Versioned part from current document" / "…from other document", blue badge "Versioned part from other document with newer version" (live 617, 620); the non-Onshape "update" pill and "Update to Vx" menu item are gone. Fixture: test `t10_fixture_reports_the_newer_version_of_a_referenced_document` (`NOSHAPE_T10_DIR`); GUI :103 t1–t9: enabled button, blue badge, Reference manager row with thumbnail "T10 source / V1 ⇨ V2", Update all → "Versioned part from other document" icon + tooltip, "Newer versions available for 0 documents", button faded to 0.4 when disabled (live 607 vs 621) |  |
+| T1 | Insert, Replicate, Linear/Circular pattern, Mirror tools | E§2.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| T2 | Mate connector tool | E§2.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| T3 | Mate tools Fastened … Parallel, Tangent, Width | E§2.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| T4 | Group, Relations dropdown | E§2.1 | ✅ | Group is immediate (no dialog), see G1 | 0.4.10+ / 77870dd4 10-28 |
+| T5 | Replace instance tool | E§2.1, live 833–836 | ✅ | the 220 px "Replace instance" ✓ ✕ dialog even with nothing selected (no notice): Instances to replace (active, clicks add/remove), part-icon "Select replacement component" field (red with the title once an instance is picked), ☐ Replace all instances; Esc cancels. The field opens the "Select replacement component" panel beside the dialog (live 840–841: the Insert panel's tabs and list, ✕ only, "Search entities or features", 559 px; `picking_replacement` / `pick_replacement` intercept the insert handlers); the pick fills the field and closes the panel; ✓ replaces and re-points the mates (GUI-verified 20 Oct); the Standard content tab's Insert picks the component. Preview (live 842): the picked replacement is evaluated in place before ✓ (`effective` applies it; drawn selected, failing mates red), the pre-preview result kept in `ReplaceSession::before` for ✓'s geometric matching. The picker's filters are live's four: Parts, Sketches, Surfaces, Flat patterns (`insert_flat`; none are listed, so it narrows to nothing). Name (live 843): an instance already named after the replacement keeps its name (`Assembly::replace_instance`). Naming as live (behaviours "Replace instance: naming", 843): the replaced instance takes the new part's name with the lowest free number ("Part 1 <2>" → "Flange <1>"), a same-named replacement keeps it; instances can't be renamed in live (`Assembly::replace_instance`) | 0.4.10+ / 77870dd4 10-28 |
+| T6 | Display states tool | E§2.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| T7 | Snap mode toggle (highlighted when on) | E§2.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| T8 | Show mates mode toggle | E§2.1 | ✅ | | 0.4.10+ / 77870dd4 10-28 |
+| T9 | Create Part Studio in context | E§2.1 | ✅ | toolbar button and Origin row › Create Part Studio in context… ("Origin of new Part Studio"), new Part Studio opened in context with a persisted Assembly context snapshot (see G13) GUI p1–p3 | 0.4.10+ / 77870dd4 10-28 |
+| T10 | Update all references | E§2.1 | ✅ | toolbar "Update all references to latest versions" is enabled (blue) only while another document referenced here has a newer version (live 607, 621), else disabled; rows: ⋮ "Versioned part from current document" / "…from other document", blue badge "Versioned part from other document with newer version" (live 617, 620); the non-Onshape "update" pill and "Update to Vx" menu item are gone. Fixture: test `t10_fixture_reports_the_newer_version_of_a_referenced_document` (`NOSHAPE_T10_DIR`); GUI :103 t1–t9: enabled button, blue badge, Reference manager row with thumbnail "T10 source / V1 ⇨ V2", Update all → "Versioned part from other document" icon + tooltip, "Newer versions available for 0 documents", button faded to 0.4 when disabled (live 607 vs 621) | 0.4.10+ / 77870dd4 10-28 |
 | T11 | Toolbar order exactly as Onshape | UI:toolbars | 🔧 | owned by the theme agent |  |
 | T12 | Customize toolbar | E§2 | ✅ | toolbar right-click: Customize toolbar… / Hide (Show) "Search tools"; customize mode: #f5f5f5 tool sets with ••• sleds (drag to move a set), drag a tool onto the 640 px Tools panel (red dashed drop zone) to remove it and back to re-add, Show items already in toolbar (3 columns, present tools greyed), Save / Reset to default (disabled until changed) / Cancel; saved in assembly_toolbar.json (`assembly_toolbar.rs`). GUI :103 h1–h5 vs live 340–346 |  |
 
@@ -132,8 +132,8 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | C10 | Add mate connector to instance origin… | UI:context-part | ✅ | single selection | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C11 | Replace instances… / Replace n instances… | UI:context-part, B | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C12 | Switch to Part Studio / Switch to Assembly | UI:context-part | ✅ | opens the tab | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
-| C13 | Change configuration… | UI:context-part | ✅ | |  |
-| C14 | Select instances with same part and same configuration | UI:context-part | ✅ | |  |
+| C13 | Change configuration… | UI:context-part | ✅ | | 0.4.10+ / a6c56638 10-28 |
+| C14 | Select instances with same part and same configuration | UI:context-part | ✅ | | 0.4.10+ / a6c56638 10-28 |
 | C15 | Copy <name> / Copy n items | UI:context-part, B | ✅ | | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C16 | Move to new subassembly | UI:context-part | ✅ | model test `move_to_new_subassembly_and_dissolve_keep_positions` | 0.4.10+ / c9c66d1c 10-27 (Part 1 <1> menu, tickets/asm-instance-menu-c9c6.png) |
 | C17 | Dissolve subassembly | UI:context-subassembly | ✅ | tab left empty when unused elsewhere |  |
