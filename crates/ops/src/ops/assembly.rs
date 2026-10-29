@@ -49,7 +49,7 @@ pub fn ops() -> Vec<Op> {
             group: "assembly",
             verb: "list",
             summary: "An assembly's instances, mates and degrees of freedom",
-            description: "Solves the assembly and lists the instances (id, name, source, placement: translation in workspace units and rotation quaternion xyzw, fixed/hidden/suppressed, remaining DOF) and the mates (id, name, type, ok, error message).",
+            description: "Solves the assembly and lists the instances (id, name, source, placement: translation in workspace units and rotation quaternion xyzw, fixed/hidden/suppressed, remaining DOF) the mates (id, name, type, ok, error message) and the mate relations (id, name, type, mates, ratio, reverse, suppressed, ok / inactive / message).",
             fields: vec![doc_field(), asm_field()],
             mutates: false,
             destructive: false,
@@ -335,7 +335,7 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
         })
         .collect();
     let (named_positions, exploded_views) = positions::json(a);
-    Ok(json!({ "units": units_json(&units), "instances": instances, "mates": mates, "folders": structure::folders_json(a), "patterns": more::patterns_json(a), "named_positions": named_positions, "exploded_views": exploded_views, "dof": r.solved.dof, "converged": r.solved.converged }))
+    Ok(json!({ "units": units_json(&units), "instances": instances, "mates": mates, "relations": features::relations_json(a, &r), "folders": structure::folders_json(a), "patterns": more::patterns_json(a), "named_positions": named_positions, "exploded_views": exploded_views, "dof": r.solved.dof, "converged": r.solved.converged }))
 }
 
 /// An instance's menu settings, when not the defaults.

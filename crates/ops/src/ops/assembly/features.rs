@@ -135,6 +135,30 @@ fn group(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     Ok(v.into())
 }
 
+/// assembly_list's `relations` (qa API-ASM-RELATIONS): each relation's
+/// name, type, mates, ratio, reverse and suppressed, with the solve's state
+/// (ok, inactive, message: "One or more mates in this relation are invalid.").
+pub(super) fn relations_json(a: &noshape_model::assembly::Assembly, r: &noshape_model::assembly::eval::AssemblyResult) -> Vec<Value> {
+    a.relations
+        .iter()
+        .map(|x| {
+            let st = r.relations.iter().find(|s| s.id == x.id);
+            json!({
+                "id": format!("mate:{}", x.id.0),
+                "name": x.name,
+                "type": RELATIONS.iter().find(|k| k.1 == x.relation_type).map(|k| k.0),
+                "mates": x.mates.iter().map(|m| format!("mate:{}", m.0)).collect::<Vec<_>>(),
+                "ratio": x.ratio.text,
+                "reverse": x.reverse,
+                "suppressed": x.suppressed,
+                "ok": st.map(|s| s.ok),
+                "inactive": st.map(|s| s.inactive),
+                "message": st.and_then(|s| s.message.clone()),
+            })
+        })
+        .collect()
+}
+
 fn relation(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = target(ctx, a)?;
     let asm = assembly(od, tab)?.clone();

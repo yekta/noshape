@@ -1221,6 +1221,10 @@ fn assembly_groups_relations_connectors() {
     let r = call(&mut ctx, "assembly_relation", json!({ "type": "gear", "mates": ["Revolute 1", "Revolute 2"], "ratio": 2 }));
     assert_eq!(r["name"], "Gear 1", "{r}");
     assert_eq!(last(&mut ctx), "Assembly 1 :: Insert : Gear relation");
+    // Listed with its mates and state (qa API-ASM-RELATIONS).
+    let g = &call(&mut ctx, "assembly_list", json!({}))["relations"][0];
+    assert_eq!((g["name"].clone(), g["type"].clone(), g["ratio"].clone(), g["ok"].clone()), (json!("Gear 1"), json!("gear"), json!("2"), json!(true)), "{g}");
+    assert_eq!(g["mates"], json!([m1["mate"], m2["mate"]]), "{g} {m1}");
     let e = try_call(&mut ctx, "assembly_relation", json!({ "type": "gear", "mates": ["Revolute 1", "Revolute 1"] })).unwrap_err();
     assert!(e.message.contains("two different mates"), "{e:?}");
 
