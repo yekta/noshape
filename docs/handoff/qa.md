@@ -9,7 +9,7 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
-- **10:36 update:** boolmir seeds 1–90 done (4500 Part mirror / pattern Add cases): 18 Rust/OCCT differences, all in the filed families.
+- **10:35 update:** boolmir seeds 1–90 done (4500 Part mirror / pattern Add cases): 18 Rust/OCCT differences, all in the filed families.
   CLI seed 197 (v0.4.14): **P1 RUST-MIRROR-ZERO-SOLID** (a Part mirror leaves a zero-thickness Solid; document attached), and its step
   69 ran > 37 min until killed. bin/clifuzz_time.py now logs "(start)" before each op so a stuck step names itself.
 - **10:26 update:** RUST-HALF-POCKET-3 is **every blind half pocket opening on the bottom (Top-plane) face** (bin/pocksweep.py: 24 / 24
