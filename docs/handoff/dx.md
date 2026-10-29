@@ -118,6 +118,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   live's layouts (from tests/perf's NIST x_t); older versions stay flat until live sends an assembly in each
   (REQUESTS dx 10-28). Then BALLOON-WRONG-ITEM, DRAWING-SHIFT-SLASH, the drawing.md rows in P2 order.
 
+## Night 10-28 / 10-29 (landed through the D13 centermark commit)
+- qa tickets fixed: DWG-ANGULAR-SECTOR (reflex opposite, continuation line, sector fixed at placing),
+  DWG-DANGLING-WALL (wall thickness references its circles: slots 10 / 11), DWG-FORESHORTEN-JUMP (no Foreshorten in
+  the radial menu, as live), DWG-MAXMIN-LINE (max / min to a straight edge, square to it: slots 2 / 3).
+- drawing.md D2 (Ø between a cylinder's silhouettes: silhouette lines are pickable), D15 (Diameter on one silhouette),
+  D13 (radial / diameter take a centermark).
+- Asked live: D33 the dimension palette's Count type (REQUESTS dx 10-29).
+- Next, in order: D26 re-attach by grip for radial / angular / ordinate (needs live's grips, 1475-1477); D33 once live
+  answers; D22 mid / quad snaps on a placed dimension's grips; V59 / V26; drawing.md ⏳ rows on green.
+
 ## Late afternoon 10-28
 - D39 on every dimension kind: a typed value replaces the measured one after its symbol (`DimFormat.value`,
   `overridden_text`; drawing_edit_dimension `value`), landed 2e44d382.
@@ -130,7 +140,6 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   A35 datum targets: no dimensions until Show dimensions (label menu), boxed, Hide dimension on the dimension's menu.
 - D18 arc length conjugate (the side the pointer is on); D11 line to line angular by the placing sector (θ, 180° − θ
   with the continuation line, reflex opposite), from live's answer 1576.
-- Next, in order: V59 / V26 once live data exists; drawing.md ⏳ rows on green; the remaining 🔧 rows in P2 order.
 
 ## Afternoon 10-28 (landed through 3476703d)
 - Parasolid: 30.1–31.1 ASSEMBLY layouts from live's samples (all 13 versions read); exports carry part names / colours
