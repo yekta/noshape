@@ -119,22 +119,10 @@ pub fn edge_nodes(vertices: &[DVec3], edge: &MeshEdge, defl: Deflection) -> Opti
 
 /// Meshes the faces of a body (`vertices`, `edges`, `faces`) that are meshed here.
 pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], defl: Deflection) -> BodyMesh {
-    // Each edge's nodes once, shared by the faces on it.
-    let mut out = BodyMesh { edges: vec![None; edges.len()], faces: Vec::with_capacity(faces.len()) };
-    for f in faces.iter().filter(|f| !matches!(f.surface, MeshSurface::Other)) {
-        for u in f.loops.iter().flatten() {
-            let e = u.edge as usize;
-            if let (Some(slot @ None), Some(edge)) = (out.edges.get_mut(e), edges.get(e)) {
-                *slot = edge_nodes(vertices, edge, defl);
-            }
-        }
-    }
-    for f in faces {
-        out.faces.push(mesh_face(vertices, edges, f, &out.edges));
-    }
     // A circle on a face declined here is split by BRepMesh for that face: the faces meshed here on it would
-    // not share its nodes. Declined in turn, until none is left.
-    // Lines are split the same either way: only the other edges' faces count.
+    // not share its nodes. Declined in turn, until none is left (before meshing, so none is meshed for
+    // nothing; again after, for the faces that failed). Lines are split the same either way: only the other
+    // edges' faces count.
     let mut on_edge: Vec<(u32, usize)> = Vec::new();
     for (i, f) in faces.iter().enumerate() {
         on_edge.extend(f.loops.iter().flatten().filter(|u| !matches!(edges.get(u.edge as usize).map(|e| e.curve), Some(Some(Curve::Line)))).map(|u| (u.edge, i)));
@@ -142,18 +130,42 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
     on_edge.sort_unstable();
     on_edge.dedup();
     let on_edge: Vec<Vec<usize>> = on_edge.chunk_by(|a, b| a.0 == b.0).map(|c| c.iter().map(|&(_, i)| i).collect()).collect();
-    loop {
+    let settle = |ok: &mut [bool]| loop {
         let mut changed = false;
         for l in &on_edge {
-            if l.iter().all(|&i| out.faces[i].is_some()) || l.iter().all(|&i| out.faces[i].is_none()) {
+            if l.iter().all(|&i| ok[i]) || l.iter().all(|&i| !ok[i]) {
                 continue;
             }
             for &i in l {
-                changed |= out.faces[i].take().is_some();
+                changed |= std::mem::replace(&mut ok[i], false);
             }
         }
         if !changed {
             break;
+        }
+    };
+    let mut ok: Vec<bool> = faces.iter().map(|f| !matches!(f.surface, MeshSurface::Other)).collect();
+    settle(&mut ok);
+    // Each edge's nodes once, shared by the faces on it.
+    let mut out = BodyMesh { edges: vec![None; edges.len()], faces: vec![None; faces.len()] };
+    for (f, _) in faces.iter().zip(&ok).filter(|(_, ok)| **ok) {
+        for u in f.loops.iter().flatten() {
+            let e = u.edge as usize;
+            if let (Some(slot @ None), Some(edge)) = (out.edges.get_mut(e), edges.get(e)) {
+                *slot = edge_nodes(vertices, edge, defl);
+            }
+        }
+    }
+    for (i, f) in faces.iter().enumerate() {
+        if ok[i] {
+            out.faces[i] = mesh_face(vertices, edges, f, &out.edges);
+            ok[i] = out.faces[i].is_some();
+        }
+    }
+    settle(&mut ok);
+    for (m, ok) in out.faces.iter_mut().zip(&ok) {
+        if !ok {
+            *m = None;
         }
     }
     out

@@ -199,6 +199,12 @@ N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes
      loops, strips) ~13 ms of it; the rest is the C++ around it, ~10 ms each: reading OCCT geometry, building
      Poly_Triangulations, core's edge loop, mesh_fill, the bounding box. Next for ≥10×: our faces written straight
      into the Tessellation (no Poly_Triangulation / mesh_fill round trip), geometry from the Rust Boolean's bodies.
+     Step 2d (10-29): the circle fixpoint runs before meshing too (a face declined there isn't meshed for
+     nothing). Fixtures on open (ops `regen_profile::regen_profile`, NOSHAPE_KERNEL_PROFILE=cpu, mesh_prepare +
+     mesh_fill, release, load 16–25, NOSHAPE_MESH_RUST=0 → on): fins-400 438–529 → 109–150 ms (3.5–4×; ours
+     85–124 of it, no BRepMesh); live-30-features 13–19 → 12–14.5 ms (ours 0.5 ms; BRepMesh 5–8 ms still meshes
+     the fillets (tori) and the faces sharing their circles; before 2d ours meshed those too and threw them away:
+     19–24 ms). Next: tori and spheres (grids), so live-30's fillets are ours.
 0. **After the cold-start work: our own display mesher (lead 10-28 21:05, user-approved).** `brep::mesh` in crates/brep
    (bool's crate, its Body / Surface / Curve types): planes (polygons with holes), cylinders, cones, spheres, tori from
    their exact parameterisation, shared edge samples (watertight), the display's deflection rules; anything else
