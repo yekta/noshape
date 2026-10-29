@@ -118,6 +118,17 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   live's layouts (from tests/perf's NIST x_t); older versions stay flat until live sends an assembly in each
   (REQUESTS dx 10-28). Then BALLOON-WRONG-ITEM, DRAWING-SHIFT-SLASH, the drawing.md rows in P2 order.
 
+## Morning 10-29 (landed through 8eabd3f5)
+- qa tickets fixed: DWG-ROTATE-VIEW-DIMS-ZERO (edge dimensions turn with the view: `set_view_rotation`),
+  DWG-DATUM-PASTE-ATTACHED (pasted datum stands free; not red, as ours can't re-attach a datum by drag yet),
+  DWG-ANGULAR-LABEL-ANGLE (`text_angle`, arc carried round), DWG-ARC-REF-FULL-CIRCLE, DWG-RULER-SELECTOR-CLOSES,
+  DWG-GROUP-ANNOTATION-MENU (multi-selection Group annotation / Group with a view), DWG-HOLE-CALLOUT-ADD-LEADER (extra
+  leaders, live's menu), DWG-PROPERTY-FIELD half (inserted properties All uppercase; the editor still shows the token),
+  DWG-NOTE-LEADER-ARROW (= live: arrowheads at sheet size, live's answer 1588).
+- drawing.md D23 (placement inference to view vertices / centers; it no longer aligned with itself), D22, D26, D31, D33.
+- Next: DWG-PROPERTY-FIELD's editor (fields shown as values), DWG-SURFACE-FINISH-MENU, DWG-CHAMFER-NOTE-LANDING,
+  DWG-EDIT-SECTION-DIALOG, DWG-DIM-HOVER-STAYS, DWG-CENTERMARK-ALIGN, the E2E-SILHOUETTE hover residual.
+
 ## Night 10-28 / 10-29 (landed through the D13 centermark commit)
 - qa tickets fixed: DWG-ANGULAR-SECTOR (reflex opposite, continuation line, sector fixed at placing),
   DWG-DANGLING-WALL (wall thickness references its circles: slots 10 / 11), DWG-FORESHORTEN-JUMP (no Foreshorten in
@@ -229,6 +240,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
+- **land.sh and the 3964a7cf revert (10-29 06:44)**: land.sh did not miss it. The change touched model-data, so its
+  crate list (reverse dependencies) included noshape-ops, and vibe3 ran noshape-ops' full tests (e2e included) green. All
+  116 ops e2e also pass here at fd102784 (main with the change). Related risk, not today's cause: the ops e2e tests
+  (`--test all`) write the real ~/.config/noshape (graphics.json, *_toolbar.json, release settings, keyboard shortcuts,
+  sketch-options.json, recent.json): only tests/prefs.rs sets NOSHAPE_CONFIG_DIR. Two e2e runs on one machine (the
+  watcher and an agent) share those files. Setting NOSHAPE_CONFIG_DIR to a per-process temp dir for the `all` binary
+  (or in t0.sh / t1.sh / land-checks.sh) would isolate them.
 - **v0.4.13 (relayed from bool, 10-29)**: tag v0.4.13 = 5e56477b has the Rust Boolean regression bool 2520afc4 that
   c79eed1d fixes (halfmir2.py variant B: 7869.1 mm³ with a −78.54 mm² face, live 7607.301). bool's options: cut from a
   green with c79eed1d, or ship with NOSHAPE_BOOL_RUST off by default. Details: TICKETS RUST-MIRROR-EXTRA-FACE, handoff
