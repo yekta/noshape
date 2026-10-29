@@ -1237,7 +1237,7 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         match crate::regen::features::split::split_part(ev) {
             // Owning existing imprints (std Jog splits up front): nothing new
             // to split is fine; the edges already there are this split's.
-            Err(e) if own_existing && e.message == "The tools don't split the selected faces" => {}
+            Err(e) if own_existing && e.message == crate::regen::features::split::NO_SPLIT => {}
             r => r?,
         }
         // The pieces of the target faces (their snapshot points: uv middle, on the face).

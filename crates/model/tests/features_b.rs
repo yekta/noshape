@@ -24,6 +24,8 @@ fn expr(s: &str) -> ParamValue {
 
 impl Studio {
     fn new() -> Self {
+        // Sheet metal runs by std, as in the app (the host's natives).
+        noshape_model::custom::register();
         Self { ps: PartStudio::new(), units: UnitPrefs::default(), reg: Regenerator::new() }
     }
 
@@ -1134,3 +1136,4 @@ fn fill_on_an_open_box_knits_a_solid() {
     assert_eq!(b.shape.faces().len(), 6);
     assert!((b.shape.volume().unwrap() * 1e9 - 8000.0).abs() < 1e-6);
 }
+

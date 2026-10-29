@@ -30,6 +30,8 @@ fn en(s: &str) -> ParamValue {
 
 impl Studio {
     fn new() -> Self {
+        // Sheet metal runs by std, as in the app (the host's natives).
+        noshape_model::custom::register();
         Self { ps: PartStudio::new(), units: UnitPrefs::default(), reg: Regenerator::new() }
     }
 
@@ -577,12 +579,20 @@ fn corner_break_and_relief_and_tab() {
         p.set("secondBoundOffset", expr("10 mm"));
     });
     let r = s.ok();
-    let (rad, w) = (mm(3.0), mm(40.0));
-    let base = mm(60.0) * w * t - mm(40.0) * (rad + t) * t;
-    let bend = PI / 4.0 * ((rad + t).powi(2) - rad.powi(2)) * w;
-    let wall = (mm(20.0) - (rad + t)) * t * w;
+    // The automatic bend reliefs (Obround, width scale 1.0625: 2.125 mm) cut
+    // the plate beside both flange ends, x 7.875 and 52.125.
+    let relief_sides: Vec<f64> = r.context.bodies[0]
+        .shape
+        .faces()
+        .iter()
+        .filter_map(|f| {
+            let bb = f.bounding_box(true).ok()?;
+            let n = f.face_plane().ok()??.unit_normal();
+            (n.x.abs() > 1.0 - 1e-9 && bb.max.z < mm(2.0) + 1e-6 && bb.min.y > mm(30.0)).then_some((bb.min.x + bb.max.x) * 0.5 * 1e3)
+        })
+        .collect();
+    assert!(relief_sides.iter().any(|x| (x - 7.875).abs() < 1e-6) && relief_sides.iter().any(|x| (x - 52.125).abs() < 1e-6), "relief sides at {relief_sides:?}");
     let v = volume(&r, 0);
-    assert!(v < base + bend + wall - 1e-12, "reliefs remove material: {v} vs {}", base + bend + wall);
     assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Solid), 1);
     let fp = flat(&r, 0);
     assert_eq!(fp.bend_lines.len(), 1);
@@ -618,8 +628,13 @@ fn corner_break_and_relief_and_tab() {
     let r = s.ok();
     let sk = r.display.sketches.iter().find(|x| x.feature == tid).unwrap();
     let key = sk.regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).unwrap().key.clone();
+    // "Flange to merge": the plate face the dialog's editing logic fills in
+    // (std sheetMetalTabEditingLogic; live qa5 4.2), here its bottom face, in
+    // the sketch plane.
+    let merge = face_at(&r, 0, DVec3::new(mm(30.0), mm(20.0), 0.0));
     s.add("sheetMetalTab", move |p| {
         p.set("tabFaces", ParamValue::Query(vec![Reference::SketchRegion { sketch: tid, key }]));
+        p.set("booleanUnionScope", ParamValue::Query(vec![merge]));
     });
     let r = s.ok();
     let expected = mm(60.0) * mm(40.0) * t + mm(20.0) * mm(15.0) * t;
@@ -633,7 +648,6 @@ fn corner_break_and_relief_and_tab() {
 fn finish_sheet_metal_deactivates() {
     let mut s = plate();
     let r = s.ok();
-    let edge = edge_at(&r, 0, DVec3::new(mm(30.0), mm(40.0), mm(2.0)));
     // Finish needs its parts (live: "Select one or more sheet metal parts.").
     let part = Reference::Body(r.context.bodies[0].id.clone());
     s.add("sheetMetalEnd", move |p| p.set("sheetMetalParts", ParamValue::Query(vec![part])));
@@ -641,10 +655,14 @@ fn finish_sheet_metal_deactivates() {
     assert!(!r.context.sheet_metal.values().next().unwrap().active);
     // The flat pattern stays available.
     flat(&r, 0);
+    // A flange on the finished part's edge (picked after Finish, as in the
+    // dialog): std getSMDefinitionEdgesForFlangeTypeFeature's
+    // SHEET_METAL_ACTIVE_EDGE_NEEDED.
+    let edge = edge_at(&r, 0, DVec3::new(mm(30.0), mm(40.0), mm(2.0)));
     s.add("sheetMetalFlange", move |p| p.set("edges", ParamValue::Query(vec![edge])));
     let (st, msg) = s.last_status();
     assert_eq!(st, FeatureStatus::Error);
-    assert!(msg.contains("no longer an active sheet metal"), "{msg}");
+    assert_eq!(msg, "Selected edges should be from active sheet metal models.");
 }
 
 #[test]
@@ -992,3 +1010,4 @@ fn convert_rips_and_bends_like_onshape() {
         assert!(near(bbox(&r, top).max.x, mm(top_x), 1e-6) && near(bbox(&r, side).max.z, mm(side_z), 1e-6), "{style}: {:?} {:?}", bbox(&r, top), bbox(&r, side));
     }
 }
+

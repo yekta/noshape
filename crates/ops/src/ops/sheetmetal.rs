@@ -86,7 +86,8 @@ fn models(od: &mut OpenDoc, tab: TabId) -> Result<(Vec<Model>, noshape_model::re
     let ps = doc::studio(od.doc(), tab)?;
     let mut out: Vec<Model> = Vec::new();
     for (b, d) in &r.context.sheet_metal {
-        if out.iter().any(|m| m.0 == d.model) {
+        // (Only parts that exist: a std rebuild can leave an earlier part's entry.)
+        if out.iter().any(|m| m.0 == d.model) || r.context.body(b).is_none() {
             continue;
         }
         let name = ps.feature(d.model).map(|f| f.name.clone()).unwrap_or_else(|| "Sheet metal model".into());

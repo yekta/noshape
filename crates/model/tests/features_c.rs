@@ -34,6 +34,8 @@ fn q(r: Reference) -> ParamValue {
 
 impl Studio {
     fn new() -> Self {
+        // Sheet metal runs by std, as in the app (the host's natives).
+        noshape_model::custom::register();
         Self { ps: PartStudio::new(), units: UnitPrefs::default(), reg: Regenerator::new(), opts: RegenOptions::default() }
     }
 

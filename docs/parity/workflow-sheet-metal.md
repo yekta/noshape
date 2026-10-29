@@ -183,3 +183,18 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 | SM10 "Exported …" notice | auto-dismisses; next dialog unobstructed | ✅ **fixed** | 64997436 10-28 (GUI: Part 1 › Export… › Parasolid › Save: 'Exported …x_t' gone within ~5 s) |
 | SM11 select tooltip over its list | no tooltip while the list is open | ✅ **fixed** | 64997436 10-28 (GUI: hover the select 2.5 s with its list open: no tooltip) |
 | SM12 / SM13 | (fixed earlier) | ✅ |  |
+
+## skasm 2026-10-29: sheet metal runs by std (Onshape's own sheet metal FeatureScript) by default
+The built-in sheet metal features now run std's own features through the FS host (`regen/std_route.rs`,
+`NOSHAPE_STD_SHEET_METAL=0` for the old native code). Rows checked by tests on the std route (values from live):
+| Row | Ours (std route) | Status | Verified |
+|---|---|---|---|
+| 2.6 SM1 flange corner | 8511.4987 mm³, 24 faces (T2 sheetmetal_std flanges_on_adjacent_edges_match_live) | ✅ (test) | |
+| 3.2 hem on G34 | 9378.1835 mm³, 33 faces (T2 hem_on_g34_matches_live) | ✅ (test) | |
+| 4.2 SM2 tab on the top face | OK, +400 mm³ (T2 tab_merges_into_the_top_face) | ✅ (test) | |
+| 4.2 SM16 tab auto-fill | std editing logic fills Flange to merge + 0.02 mm (T2 tab_editing_logic_fills_merge_face_and_offset) | ✅ (test) | |
+| 6.5 SM17 flat placement | live's (T2 flat_pattern_keeps_the_model_placement) | ✅ (test) | |
+| 6.6 SM14 DXF | AC1014, live's layers (T2 flat_dxf_is_written_as_live) | ✅ (test) | |
+| 5.6 SM3 Closed corner | 8541.2502 mm³ / 35 faces (live 8535.0418 / 23) | ✗ (T2 closed_corner_matches_live) | |
+| Modify joint radius (table cell) | OK (e2e sheet_metal_table_ops) | ✅ (test) | |
+A GUI pass of the whole list on a green build is next.

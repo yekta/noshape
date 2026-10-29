@@ -8,10 +8,12 @@ use crate::regen::eval::{EvalCtx, FResult};
 use crate::regen::features::EvalFn;
 use std::sync::LazyLock;
 
-/// Built-in sheet metal features run by std (switched on by
-/// [`set_std_sheet_metal`] or `NOSHAPE_STD_SHEET_METAL=1` until the std
-/// route passes every native sheet metal test; Flex PCB always runs by std).
-static STD_SHEET_METAL: LazyLock<std::sync::atomic::AtomicBool> = LazyLock::new(|| std::sync::atomic::AtomicBool::new(std::env::var("NOSHAPE_STD_SHEET_METAL").is_ok_and(|v| v == "1")));
+/// Built-in sheet metal features run by std, Onshape's own sheet metal
+/// FeatureScript (default; `NOSHAPE_STD_SHEET_METAL=0` or
+/// [`set_std_sheet_metal`]`(false)` runs the native evaluators; Flex PCB always
+/// runs by std). Without the FeatureScript host registered (a bare
+/// model-core regeneration) the native evaluators run.
+static STD_SHEET_METAL: LazyLock<std::sync::atomic::AtomicBool> = LazyLock::new(|| std::sync::atomic::AtomicBool::new(std::env::var("NOSHAPE_STD_SHEET_METAL").map_or(true, |v| v != "0")));
 
 pub fn set_std_sheet_metal(on: bool) {
     STD_SHEET_METAL.store(on, std::sync::atomic::Ordering::Relaxed);
@@ -91,7 +93,9 @@ macro_rules! std_features {
             {
                 return Some(f);
             }
-            if !STD_SHEET_METAL.load(std::sync::atomic::Ordering::Relaxed) && !matches!(type_id, "pcbStart" | "pcbEnd") {
+            if !matches!(type_id, "pcbStart" | "pcbEnd")
+                && (!STD_SHEET_METAL.load(std::sync::atomic::Ordering::Relaxed) || crate::regen::custom_features::host().is_none())
+            {
                 return None;
             }
             Some(match type_id {

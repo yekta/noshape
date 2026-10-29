@@ -779,6 +779,9 @@ fn sheet_metal_table_ops() {
     let mj = list["features"].as_array().unwrap().iter().find(|f| f["type"] == "sheetMetalJoint").expect("a Modify joint").clone();
     let g = call(&mut ctx, "feature_get", json!({ "feature": mj["id"] }));
     assert_eq!((g["params"]["jointType"].as_str(), g["params"]["radius"].as_str(), g["params"]["useDefaultRadius"].as_bool()), (Some("BEND"), Some("3 mm"), Some(false)), "{g}");
+    eprintln!("PROBE g {g}");
+    eprintln!("PROBE t2 {}", call(&mut ctx, "sheetmetal_table", json!({})));
+    eprintln!("PROBE parts {}", call(&mut ctx, "query_parts", json!({})));
     // Move up: Bend B first.
     let m = call(&mut ctx, "sheetmetal_move_bend", json!({ "bend": "Bend B", "by": -1 }));
     assert_eq!(m["bends"][0]["name"], "Bend B", "{m}");

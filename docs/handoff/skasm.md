@@ -104,6 +104,23 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
 - Next for speed: the sketch step's regeneration (3.7 of 5.2 ms in the dev build; JSON serialization in the regen
   path is the largest single item: core's code).
 
+## Sheet metal (since 10-29 19:40)
+- **Std route is the default** (10-29): the built-in sheet metal features run std's own FeatureScript through the host
+  (`model-core/src/regen/std_route.rs`; `NOSHAPE_STD_SHEET_METAL=0` = native; without the FS host registered, a bare
+  model-core regen, native too). Tests that use sheet metal call `noshape_model::custom::register()` in their helpers.
+- Fixed to get there: std Jog's `ownExistingImprints` split (split.rs `NO_SPLIT`); FIX on an arc = centre + radius
+  and DISTANCE `direction` HORIZONTAL / VERTICAL / MINIMUM in the host's skConstraint (std's tear drop hem); form
+  up/down by the side the tools reach past the sheet; the std flat holds only while the part is as the sheet metal
+  feature built it (`FlatPattern::built_for`, `body_key`), else the native flattener on std's data (a later Hole's
+  hole and counterbore heads); per-vertex Bend relief settings (`Definition::reliefs`); pulled wall sides that come
+  out reversed are dropped (Modify joint radius on a corner a later flange shortened); ops' table skips stale parts.
+- Open: Closed corner (sheetmetal_std closed_corner_matches_live, 8541.25 / 35 vs live 8535.0418 / 23); Butt joint
+  direction (sheetmetal_frames convert_rips_and_bends: Direction 1 should be the wall first in Onshape's entity
+  order; ours follows the definition face index, from the native offset op's face order); rect→triangle loft (51 vs
+  49 faces); partial Outer flange wall side (asked live: REQUESTS skasm 2026-10-29 21:30); holes through std's own
+  sheet metal hole path (std hole.fs handleSheetMetalCutAndAttribution: HOLE_NO_HITS on our host; holes still run
+  natively and the flat follows the part). Next: the GUI pass of docs/parity/workflow-sheet-metal.md on a green build.
+
 ## WIP on agent/skasm
 (none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
 "tools/tiers/land.sh".)

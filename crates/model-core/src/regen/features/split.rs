@@ -137,6 +137,10 @@ fn project_onto(curve: &Shape, face: &Shape, dir: Option<DVec3>) -> FResult<Vec<
     Ok(proj.edges())
 }
 
+/// Split Face's error when the tools change nothing (std's
+/// SPLIT_FACE_NO_CHANGE; std Jog's `ownExistingImprints` split expects it).
+pub const NO_SPLIT: &str = "Selected entities do not split selected faces.";
+
 pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("splitType", "FACE") {
         return split_faces(ev);
@@ -303,7 +307,7 @@ fn split_faces(ev: &mut EvalCtx) -> FResult<()> {
         changed = true;
     }
     if !changed {
-        return err("Selected entities do not split selected faces.");
+        return err(NO_SPLIT);
     }
     if !ev.bool("keepToolSurfaces") {
         remove_bodies(ev, &tool_bodies);

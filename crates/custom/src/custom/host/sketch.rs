@@ -454,6 +454,19 @@ fn sk_constraint(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             }
         };
         let len = magnitude_of(def.get("length"));
+        // FIX on an arc fixes its circle, not its ends (std's tear drop hem:
+        // "Fix the center and radius of the arc ... This does not fix the end
+        // position of the arc").
+        if &*ty == "FIX"
+            && let Some(arc) = first.filter(|e| b.sketch.kind(*e) == Some(EntityKind::Arc))
+            && let Some(center) = b.sketch.entity(arc).and_then(|e| e.center())
+            && let (Some(c), Some((s, _))) = (b.sketch.point(center), b.sketch.endpoints(arc))
+            && let Some(p) = b.sketch.point(s)
+        {
+            b.sketch.add_constraint(ConstraintKind::Fix { entity: center }).map_err(|_| raise_error(i, "SKETCH_ADD_CONSTRAINT_FAILED", None))?;
+            b.sketch.add_constraint(ConstraintKind::Radius { curve: arc, value: (p - c).length() }).map_err(|_| raise_error(i, "SKETCH_ADD_CONSTRAINT_FAILED", None))?;
+            return Ok(Value::Undefined);
+        }
         let kind = match &*ty {
             "COINCIDENT" => ConstraintKind::Coincident { a: need(i, first)?, b: need(i, second)? },
             "PARALLEL" => ConstraintKind::Parallel { a: need(i, first)?, b: need(i, second)? },
@@ -471,9 +484,16 @@ fn sk_constraint(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             "NORMAL" => ConstraintKind::Normal { line: need(i, first)?, curve: need(i, second)? },
             "MIRROR" => ConstraintKind::Symmetric { a: need(i, first)?, b: need(i, second)?, axis: need(i, ent("localMirror"))? },
             "LENGTH" => ConstraintKind::Length { curve: need(i, first)?, value: len.unwrap_or(0.0) },
-            "DISTANCE" => match second {
-                Some(s) => ConstraintKind::Distance { a: need(i, first)?, b: s, value: len.unwrap_or(0.0), mode: Default::default() },
-                None => ConstraintKind::Length { curve: need(i, first)?, value: len.unwrap_or(0.0) },
+            // `direction` (DimensionDirection): along the sketch's x / y or
+            // the shortest; the axis ones keep the points' current sides
+            // (`alignment` says the same for std's sketches, e.g. the
+            // tear drop hem's).
+            "DISTANCE" => match (second, def.get("direction").as_str().as_deref()) {
+                (Some(s), Some("HORIZONTAL")) => ConstraintKind::HorizontalDistance { a: need(i, first)?, b: s, value: len.unwrap_or(0.0) },
+                (Some(s), Some("VERTICAL")) => ConstraintKind::VerticalDistance { a: need(i, first)?, b: s, value: len.unwrap_or(0.0) },
+                (Some(s), Some("MINIMUM")) => ConstraintKind::Distance { a: need(i, first)?, b: s, value: len.unwrap_or(0.0), mode: noshape_sketch::DistanceMode::Minimum },
+                (Some(s), _) => ConstraintKind::Distance { a: need(i, first)?, b: s, value: len.unwrap_or(0.0), mode: Default::default() },
+                (None, _) => ConstraintKind::Length { curve: need(i, first)?, value: len.unwrap_or(0.0) },
             },
             "RADIUS" => ConstraintKind::Radius { curve: need(i, first)?, value: len.unwrap_or(0.0) },
             "DIAMETER" => ConstraintKind::Diameter { curve: need(i, first)?, value: len.unwrap_or(0.0) },

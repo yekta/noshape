@@ -37,6 +37,8 @@ fn b(v: bool) -> ParamValue {
 
 impl T {
     fn new() -> Self {
+        // Sheet metal runs by std, as in the app (the host's natives).
+        noshape_model::custom::register();
         T { ps: PartStudio::new(), units: UnitPrefs::default(), reg: Regenerator::new() }
     }
     fn regen(&mut self) -> RegenResult {

@@ -384,3 +384,64 @@ fn tab_editing_logic_fills_merge_face_and_offset() {
         v => panic!("booleanOffset {v:?} in {changed:?}"),
     }
 }
+
+/// SM-MODIFY-JOINT (live behaviours "ui (10-24 b)"): the table's Radius
+/// cell on G34's first bend adds a Modify joint (Joint = the bend's face,
+/// Bend, Use model bend radius off, 3 mm) that regenerates OK: the bend's
+/// faces are then r 3 / r 5.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn modify_joint_changes_a_bend_radius() {
+    let mut s = g34();
+    let r = s.ok();
+    let bend = face_at(&r, DVec3::new(30.0, 2.0 - 2.0f64.sqrt(), 4.0 - 2.0f64.sqrt()));
+    s.add("sheetMetalJoint", |p| {
+        p.set("entity", ParamValue::Query(vec![bend]));
+        p.set("jointType", en("BEND"));
+        p.set("useDefaultRadius", ParamValue::Bool(false));
+        p.set("radius", expr("3 mm"));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[part(&r)];
+    let mut radii: Vec<f64> = b.shape.faces().iter().filter_map(|f| match f.face_surface().ok()? {
+        noshape_kernel::Surface::Cylinder { radius, .. } => Some((radius * 1e3 * 1e6).round() / 1e6),
+        _ => None,
+    }).collect();
+    radii.sort_by(f64::total_cmp);
+    assert!(volume_mm3(&r) > 8000.0 && radii.contains(&3.0) && radii.contains(&5.0), "{} mm³, radii {radii:?}: {:#?}", volume_mm3(&r), face_report(&r));
+}
+
+/// The same with G34's flanges as two Flange features (the sheet metal
+/// table's e2e test builds it that way).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn modify_joint_after_two_flange_features() {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    for at in [DVec3::new(30.0, 0.0, 2.0), DVec3::new(0.0, 20.0, 2.0)] {
+        let r = s.ok();
+        let e = edge_at(&r, at);
+        s.add("sheetMetalFlange", |p| {
+            p.set("edges", ParamValue::Query(vec![e]));
+            p.set("distance", expr("20 mm"));
+        });
+    }
+    let r = s.ok();
+    eprintln!("two flanges: {} mm³", volume_mm3(&r));
+    let bend = face_at(&r, DVec3::new(30.0, 2.0 - 2.0f64.sqrt(), 4.0 - 2.0f64.sqrt()));
+    s.add("sheetMetalJoint", |p| {
+        p.set("entity", ParamValue::Query(vec![bend]));
+        p.set("jointType", en("BEND"));
+        p.set("useDefaultRadius", ParamValue::Bool(false));
+        p.set("radius", expr("3 mm"));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[part(&r)];
+    assert!(volume_mm3(&r) > 8000.0 && b.shape.faces().len() > 20, "{} mm³: {:#?}", volume_mm3(&r), face_report(&r));
+}

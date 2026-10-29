@@ -66,6 +66,9 @@ pub struct FlatPattern {
     pub thickness: f64,
     /// Non-fatal problems (closed loops, unresolved walls ...).
     pub warnings: Vec<String>,
+    /// The part it was built for ([`body_key`]): a std-built flat (made when
+    /// its sheet metal feature rebuilt the part) holds only for that shape.
+    pub built_for: Option<[f64; 8]>,
 }
 
 impl FlatPattern {
@@ -180,12 +183,24 @@ fn polygon_area(p: &[DVec2]) -> f64 {
     (0..n).map(|i| p[i].perp_dot(p[(i + 1) % n])).sum::<f64>() * 0.5
 }
 
-/// Flat pattern of the sheet metal body with id `id` in a context.
+/// A part's shape fingerprint: face and edge counts and its box (a later
+/// feature that cut a hole or moved it changes it).
+pub fn body_key(shape: &Shape) -> [f64; 8] {
+    let b = shape.bounding_box(false).map(|b| [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z]).unwrap_or([0.0; 6]);
+    [shape.count(ShapeType::Face) as f64, shape.count(ShapeType::Edge) as f64, b[0], b[1], b[2], b[3], b[4], b[5]]
+}
+
+/// Flat pattern of the sheet metal body with id `id` in a context: the std
+/// sheet metal feature's own flat while the part is as that feature built it,
+/// else unfolded from the part (a later Hole's through hole and counterbore
+/// heads, as live's flat shows them).
 pub fn flat_pattern_for(ctx: &Context, id: &BodyId) -> Result<FlatPattern, String> {
-    if let Some(f) = ctx.sheet_metal_flats.get(id) {
+    let body = ctx.body(id).ok_or_else(|| "The part no longer exists".to_string())?;
+    if let Some(f) = ctx.sheet_metal_flats.get(id)
+        && f.built_for.is_none_or(|k| k == body_key(&body.shape))
+    {
         return Ok((**f).clone());
     }
-    let body = ctx.body(id).ok_or_else(|| "The part no longer exists".to_string())?;
     let data = ctx.sheet_metal.get(id).ok_or_else(|| format!("{} is not a sheet metal part", body.name))?;
     flat_pattern(body, data)
 }
@@ -447,7 +462,7 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
         }
     }
     loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
-    Ok(FlatPattern { frame, loops, bend_lines: lines, forms, heads, shape, thickness: t, warnings })
+    Ok(FlatPattern { frame, loops, bend_lines: lines, forms, heads, shape, thickness: t, warnings, built_for: None })
 }
 
 /// A flat pattern from planar pieces already laid flat in `frame` (walls and
@@ -480,7 +495,7 @@ pub fn flat_from_pieces(frame: k::Plane, pieces: &[Shape], bend_lines: Vec<FlatB
         }
     }
     loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
-    Ok(FlatPattern { frame, loops, bend_lines, forms: Vec::new(), heads: Vec::new(), shape, thickness, warnings })
+    Ok(FlatPattern { frame, loops, bend_lines, forms: Vec::new(), heads: Vec::new(), shape, thickness, warnings, built_for: None })
 }
 
 fn extent(l: &[DVec2]) -> f64 {
