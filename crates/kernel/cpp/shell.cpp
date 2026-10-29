@@ -2632,9 +2632,13 @@ void bind_wedge(const TopoDS_Shape& w, const TopoDS_Face& f, const gp_Pnt& o, co
 // faces that vanish disappear and their neighbours meet. Per face, the wedge
 // between it and its drafted surface is cut away (or added below the neutral
 // plane). Planar faces and cylinder bands (fillets) parallel to the pull.
-OpOut op_draft_wedges(const OcShape& solid, const OcShapeList& faces, P3 pull, const PlaneF& neutral,
+OpOut op_draft_wedges(const OcShape& solid_in, const OcShapeList& faces_in, P3 pull, const PlaneF& neutral,
                       double angle)
 {
+  // On its own copy: its Booleans change their input (GUARD-SEGV-MALLOC-DEADLOCK).
+  const OwnCopy     own(solid_in);
+  const OcShape&    solid = own.shape();
+  const OcShapeList faces = own.subs(faces_in);
   require_non_null(solid.shape, "solid");
   if (!(std::abs(angle) < M_PI / 2.0))
     fail_invalid("draft angle must be less than 90 degrees");
@@ -2798,9 +2802,14 @@ OpOut op_draft_wedges(const OcShape& solid, const OcShapeList& faces, P3 pull, c
 // normal; positive angles lean into the material. The material between the
 // face and the ruled surface is cut away (or added): a slab of the face is
 // split by the ruled sheet and the pieces touching the face are the change.
-OpOut op_draft_parting_curve(const OcShape& solid, const OcShapeList& faces, const OcShapeList& edges, P3 pull,
+OpOut op_draft_parting_curve(const OcShape& solid_in, const OcShapeList& faces_in, const OcShapeList& edges_in, P3 pull,
                              rust::Slice<const double> angles)
 {
+  // On its own copy: its Booleans change their input (GUARD-SEGV-MALLOC-DEADLOCK).
+  const OwnCopy     own(solid_in);
+  const OcShape&    solid = own.shape();
+  const OcShapeList faces = own.subs(faces_in);
+  const OcShapeList edges = own.subs(edges_in);
   require_non_null(solid.shape, "solid");
   if (angles.size() != faces.items.size())
     fail_invalid("one draft angle per face");

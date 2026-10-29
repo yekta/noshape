@@ -443,3 +443,58 @@ fn shell_and_draft_leave_their_input_as_it_was() {
     let _ = draft(&s, &sides, DVec3::Z, &Plane::xy(), 3f64.to_radians());
     assert!(s.to_brep_bytes().unwrap() == before, "draft changed its input");
 }
+
+/// The same for every op that takes a body the model keeps: none may change
+/// it (a jump halfway through such an edit corrupts the body for good). Each
+/// op on a fresh part.
+#[test]
+fn ops_leave_their_input_as_it_was() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let part = || {
+        let s = cut(&bx([0.0; 3], [80.0 * mm, 50.0 * mm, 10.0 * mm]), &cyl_z(40.0 * mm, 25.0 * mm, -mm, 10.0 * mm, 12.0 * mm)).unwrap().shape;
+        let t = edges_where(&s, |i| (i.start.z - 10.0 * mm).abs() < 1e-9 && (i.end.z - 10.0 * mm).abs() < 1e-9);
+        fillet_checked(&s, &t, &[2.0 * mm]).unwrap().shape
+    };
+    let tool = bx([60.0 * mm, 10.0 * mm, 5.0 * mm], [100.0 * mm, 40.0 * mm, 20.0 * mm]);
+    let circle = |z: f64| make_circle(DVec3::new(20.0 * mm, 25.0 * mm, z), DVec3::Z, 3.0 * mm).unwrap();
+    let profile = make_face_from_wire(&make_wire(&[circle(30.0 * mm)]).unwrap(), true).unwrap();
+    let plane = Plane::from_normal(DVec3::new(0.0, 0.0, 5.0 * mm), DVec3::Z);
+    type Op<'a> = (&'a str, Box<dyn Fn(&Shape) + 'a>);
+    let ops: Vec<Op> = vec![
+        ("fuse", Box::new(|s| drop(fuse(s, &tool)))),
+        ("cut", Box::new(|s| drop(cut(s, &tool)))),
+        ("common", Box::new(|s| drop(common(s, &tool)))),
+        ("boolean", Box::new(|s| drop(boolean(BooleanOp::Fuse, std::slice::from_ref(s), std::slice::from_ref(&tool), &BooleanOptions::default())))),
+        ("split_by_plane", Box::new(|s| drop(split_by_plane(s, &plane)))),
+        ("section_plane", Box::new(|s| drop(section_plane(s, &plane)))),
+        ("unify_same_domain", Box::new(|s| drop(unify_same_domain(s)))),
+        ("fillet_checked", Box::new(|s| drop(fillet_checked(s, &edges_where(s, |i| i.start.z.abs() < 1e-9 && i.end.z.abs() < 1e-9), &[1.0 * mm])))),
+        ("chamfer_checked", Box::new(|s| drop(chamfer_checked(s, &edges_where(s, |i| i.start.z.abs() < 1e-9 && i.end.z.abs() < 1e-9), ChamferSpec::Equal(1.0 * mm), &[])))),
+        ("draft", Box::new(|s| drop(draft(s, &faces_where(s, |c| (c.x.abs() < 1e-9 || (c.x - 80.0 * mm).abs() < 1e-9) && c.z < 9.0 * mm), DVec3::Z, &Plane::xy(), 3f64.to_radians())))),
+        ("draft_parting_curve", Box::new(|s| {
+            let sides = faces_where(s, |c| (c.x.abs() < 1e-9 || (c.x - 80.0 * mm).abs() < 1e-9) && c.z < 9.0 * mm);
+            let parting = edges_where(s, |i| (i.start.z - 5.0 * mm).abs() < 1e-9 && (i.end.z - 5.0 * mm).abs() < 1e-9);
+            drop(draft_parting_curve(s, &sides, &parting, DVec3::Z, &vec![3f64.to_radians(); sides.len()]))
+        })),
+        ("draft_wedges", Box::new(|s| drop(draft_wedges(s, &faces_where(s, |c| (c.x.abs() < 1e-9 || (c.x - 80.0 * mm).abs() < 1e-9) && c.z < 9.0 * mm), DVec3::Z, &Plane::xy(), 3f64.to_radians())))),
+        ("delete_faces", Box::new(|s| drop(delete_faces(s, &faces_where(s, |c| c.z > 8.0 * mm && c.z < 10.0 * mm - 1e-9))))),
+        ("offset_faces", Box::new(|s| drop(offset_faces(s, &faces_where(s, |c| c.z > 10.0 * mm - 1e-9), 1.0 * mm)))),
+        ("offset_shape", Box::new(|s| drop(offset_shape(s, 0.5 * mm, JoinType::Arc)))),
+        ("shell", Box::new(|s| drop(shell(s, &faces_where(s, |c| c.z > 10.0 * mm - 1e-9), 1.0 * mm, ShellSide::Inside, JoinType::Arc)))),
+        ("shell_solid", Box::new(|s| drop(shell_solid(s, &faces_where(s, |c| c.z > 10.0 * mm - 1e-9), 1.0 * mm, ShellSide::Inside, ShellMethod::Auto)))),
+        ("extrude_up_to", Box::new(|s| drop(extrude_up_to(&profile, -DVec3::Z, s, 0.0)))),
+        ("project_curves", Box::new(|s| drop(project_curves(&circle(30.0 * mm), s, Some(-DVec3::Z))))),
+        ("imprint", Box::new(|s| drop(imprint(s, &[circle(10.0 * mm)])))),
+    ];
+    let mut changed = Vec::new();
+    for (what, op) in &ops {
+        let s = part();
+        let before = s.to_brep_bytes().unwrap();
+        op(&s);
+        if s.to_brep_bytes().unwrap() != before {
+            changed.push(*what);
+        }
+    }
+    assert!(changed.is_empty(), "changed their input: {changed:?}");
+}

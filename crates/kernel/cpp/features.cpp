@@ -2351,8 +2351,12 @@ OpOut op_thicken(const OcShape& s, double t1, double t2)
   return make_result(args, orient_solids_outward(mk.Shape()), hist.get());
 }
 
-OpOut op_shell(const OcShape& solid, const OcShapeList& faces, double thickness, uint8_t join)
+OpOut op_shell(const OcShape& solid_in, const OcShapeList& faces_in, double thickness, uint8_t join)
 {
+  // On its own copy: OCCT's offset changes its input (GUARD-SEGV-MALLOC-DEADLOCK).
+  const OwnCopy     own(solid_in);
+  const OcShape&    solid = own.shape();
+  const OcShapeList faces = own.subs(faces_in);
   require_non_null(solid.shape, "solid");
   if (!(std::abs(thickness) > 1e-9))
     fail_invalid("shell thickness must be non-zero");
