@@ -9,6 +9,12 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **09:43 update (greens 0e1689b3 → 96a9a9eb = + core 45791441, GUARD-SEGV-MALLOC-DEADLOCK marked fixed by core):** seed-189
+  re-runs wait for a CLI with 24daf867 / 45791441 (none on the box). P1 checklists: workflow-feature-sweep 🔧 error texts, 19
+  checked on the v0.4.14 CLI (bin/errsweep.py, /tmp/qa-err2/3.py): all = Onshape's std texts except **P3 RIB-CLOSED-PROFILE-MSG**;
+  large models: big plate opens in 1.6 s and edits in 0.6 s (PERF1 was 10 min / 150 s); export round trip Rhino / OBJ rows
+  closed; core-workflow 5.5 (F18) = live. Live 1592 answered: disjoint Subtract = live; **P3 REMOVE-NO-HIT-INFO**, **P3
+  BOOL4B-BUBBLE**. GUI fuzz 262–285 alive; CLI seeds 195–196 (bool 07:17) clean, 197 / 198 (v0.4.14) running.
 - **09:25 update (greens 349290dc → 0e1689b3 = + core 24daf867 guard ends the process past a held lock, bool 4138d9f7):**
   P1 checklists: workflow-booleans re-run on the v0.4.14 CLI with bin/boolmatrix.py (14 cases, Rust = OCCT, INT2 fixed; two cases
   asked live: disjoint Subtract consumes its tool, Remove extrude with the default direction touches nothing and says Ok);
