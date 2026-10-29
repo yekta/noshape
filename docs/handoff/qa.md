@@ -9,6 +9,9 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **04:52 update (green e8f10ecd = + psui 8ca1dac1 mesher, bool 1cb16071, skasm subassembly rows):** live-30 / halfmir / wf-block right
+  in the app; GUI fuzz 167–178 alive; CLI seeds 187 / 188 (core CLI) done. bin/guimass.sh now runs with HOME=/tmp/qa-home3 (the fuzzers
+  drag root's persisted left panel wide enough to push the Mass properties panel off the window). Waiting for the 10-29 cut.
 - **04:24 update (green c32e66f4):** blocker list re-confirmed at the top of TICKETS: only open regression P1 RUST-MIRROR-EXTRA-FACE,
   no open P0. In the app on c32e: live-30, halfmir, wf-block right; GUI fuzz 160–166 (2363 / 4b53) alive. Next: watch the cut
   (`gh release list -R yekta/noshape`), 30-minute smoke of the published release (rows as v0.4.12's, + halfmir 7214.602, the crash
