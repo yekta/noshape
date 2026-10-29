@@ -9,7 +9,7 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
-- **09:55 update:** Rust Boolean fuzz: **bin/boolrand.py** (random overlapping boxes / cylinders + a random Union / Subtract /
+- **09:53 update:** Rust Boolean fuzz: **bin/boolrand.py** (random overlapping boxes / cylinders + a random Union / Subtract /
   Intersect, run with NOSHAPE_BOOL_RUST=1 and =0 on the v0.4.14 CLI, outputs diffed; /tmp/qa-br.sh): 23 seeds × 40–60 cases,
   one difference, where **Rust is right and OCCT wrong** (P2 OCCT-UNION-OFFSET-CYL, also in v0.4.12). Running: seeds 40–59 with real
   start offsets (the earlier `hasOffset` was the up-to offset and was ignored silently), and **bin/boolgrid.py** (the same on a 5 mm
