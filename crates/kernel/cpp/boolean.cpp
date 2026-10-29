@@ -3187,6 +3187,59 @@ rust::String last_boolean_path()
   return rust::String(t_bool_path);
 }
 
+namespace
+{
+
+// `s` with its location put into its geometry: a fresh copy, its sub-shapes
+// in the same map order (a history by index holds for both).
+TopoDS_Shape bake_location(const TopoDS_Shape& s)
+{
+  if (s.Location().IsIdentity())
+    return s;
+  BRepBuilderAPI_Transform tr(s.Located(TopLoc_Location()), s.Location().Transformation(), true);
+  return tr.IsDone() ? tr.Shape() : TopoDS_Shape();
+}
+
+// Whether a Boolean of solids can have come out with `r`'s volume: a union
+// no bigger than its inputs together nor smaller than the biggest, a cut no
+// bigger than its target, a common no bigger than either side.
+bool volume_possible(uint8_t op, const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_Shape>& t, const TopoDS_Shape& r)
+{
+  double va = 0, vt = 0, big = 0;
+  for (const TopoDS_Shape& x : a)
+  {
+    const double v = volume_of(x);
+    va += v;
+    big = std::max(big, v);
+  }
+  for (const TopoDS_Shape& x : t)
+  {
+    const double v = volume_of(x);
+    vt += v;
+    big = std::max(big, v);
+  }
+  const double v = volume_of(r), tol = 1e-7 * std::max(va + vt, 1e-12);
+  switch (op)
+  {
+    case 0:
+      return v <= va + vt + tol && v >= big - tol;
+    case 1:
+      return v <= va + tol;
+    default:
+      return v <= std::min(va, vt) + tol;
+  }
+}
+
+bool all_solids(const std::vector<TopoDS_Shape>& l)
+{
+  for (const TopoDS_Shape& x : l)
+    if (!TopExp_Explorer(x, TopAbs_SOLID).More())
+      return false;
+  return true;
+}
+
+} // namespace
+
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts)
 {
@@ -3421,6 +3474,43 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   }
   res = b->Shape();
   fail_if_cancelled();
+  // A located input (a pattern's instance: moved, not copied) that OCCT got
+  // wrong: a circular Part pattern x2 of a half plate whose blind hole's drill
+  // tip sits on the axis came out 94 mm³ bigger than both halves and invalid;
+  // with the rotation put into the copy's geometry it is right. Checked by
+  // volume where that is cheap (a few tools); a result that can't be right
+  // is built again on copies with their locations baked in.
+  std::vector<TopoDS_Shape> inputs = concat(args.items, tools.items);
+  auto located = [](const std::vector<TopoDS_Shape>& l) {
+    return std::any_of(l.begin(), l.end(), [](const TopoDS_Shape& x) { return !x.Location().IsIdentity(); });
+  };
+  if (n_tools <= 8 && first.glue == 0 && facets.source.empty() && (located(args.items) || located(tools.items)) && all_solids(inputs)
+      && !volume_possible(op, args.items, tools.items, res))
+  {
+    std::vector<TopoDS_Shape> a2, t2;
+    for (const TopoDS_Shape& x : args.items)
+      a2.push_back(bake_location(x));
+    for (const TopoDS_Shape& x : tools.items)
+      t2.push_back(bake_location(x));
+    const bool baked = std::none_of(a2.begin(), a2.end(), [](const TopoDS_Shape& x) { return x.IsNull(); })
+                       && std::none_of(t2.begin(), t2.end(), [](const TopoDS_Shape& x) { return x.IsNull(); });
+    if (baked)
+    {
+      std::unique_ptr<BRepAlgoAPI_BooleanOperation> b2 = make();
+      b2->SetArguments(to_list(a2));
+      b2->SetTools(to_list(t2));
+      apply_opts(*b2, first);
+      build_cancellable(*b2);
+      fail_if_cancelled();
+      if (!b2->HasErrors() && b2->IsDone() && volume_possible(op, a2, t2, b2->Shape()))
+      {
+        t_bool_path = "occt_baked";
+        inputs      = concat(a2, t2);
+        hist        = new BRepTools_History(to_list(inputs), *b2);
+        res         = b2->Shape();
+      }
+    }
+  }
   if (opts.unify)
   {
     const KernelTimer timer("boolean.unify");
@@ -3428,7 +3518,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   }
   res = remesh_facets(res, facets, hist);
   const KernelTimer timer("boolean.result");
-  return make_result(concat(args.items, tools.items), res, hist.get(), &srcs);
+  return make_result(inputs, res, hist.get(), &srcs);
 }
 
 OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts)

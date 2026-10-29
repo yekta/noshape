@@ -2893,3 +2893,33 @@ fn part_mirror_of_a_half_blind_hole_merges_across_the_plane() {
         assert!(b.is_valid());
     }
 }
+
+/// A circular Part pattern x2 (Add) of a half plate about the axis of its
+/// blind hole: the instance (moved, not copied) lands on the seed's half
+/// hole. OCCT's fuse with the located instance came out 94 mm³ bigger than
+/// the two halves and invalid; the kernel builds such a result again on
+/// copies with the rotation in their geometry.
+#[test]
+fn circular_part_pattern_onto_itself_keeps_its_volume() {
+    for style in ["NONE", "SIMPLE"] {
+        let mut t = T::new();
+        let (_, regions) = t.sketch(&[&[(0.0, -10.0), (15.0, -10.0), (15.0, 10.0), (0.0, 10.0)]], &[]);
+        t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+        let body = t.regen().context.bodies[0].id.clone();
+        if style != "NONE" {
+            let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+            let mut sk = noshape_sketch::Sketch::new();
+            let p = sk.add_point(DVec2::new(0.0, 0.0));
+            let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::FeaturePlane(pl)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+            let h = t.add("hole", &[("scope", q(vec![Reference::Body(body.clone())])), ("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p.0 }])), ("unitsSystem", en("METRIC")), ("styleV2", en(style)), ("startStyle", en("SKETCH")), ("holeDiameterV3", e("6 mm")), ("endStyleV2", en("BLIND")), ("holeDepthV3", e("5 mm"))]);
+            t.ok(h);
+        }
+        let half = volume(&t.regen());
+        let m = t.add("circularPattern", &[("patternType", en("PART")), ("operationType", en("ADD")), ("entities", q(vec![Reference::Body(body)])), ("axis", q(vec![Reference::Plane(DatumPlane::Top)])), ("instanceCount", e("2")), ("defaultScope", ParamValue::Bool(true))]);
+        let r = t.ok(m);
+        assert_eq!(r.context.bodies.len(), 1, "{style}");
+        assert!((volume(&r) - 2.0 * half).abs() < 1e-6, "{style}: {} mm³, want {}", volume(&r), 2.0 * half);
+        assert!(r.context.bodies[0].shape.is_valid(), "{style}");
+        assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), if style == "NONE" { 6 } else { 9 }, "{style}");
+    }
+}

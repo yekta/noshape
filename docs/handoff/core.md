@@ -126,6 +126,14 @@ skasm's now; see docs/handoff/skasm.md.
   (USD KeepShape), else with every pair on one kind of periodic surface kept apart: 9 faces (countersink 11). Left:
   the two half cones as one face (a merge like merge_cylinder_bands for cones with an apex). T1
   `kernel_robustness::part_mirror_of_a_half_blind_hole_merges_across_the_plane`.
+- Found on the way (no ticket): a circular Part pattern x2 (Add) of a half plate about its blind hole's axis gave
+  5935.887 mm³ for 2 x 2920.820 and an invalid part: OCCT's fuse with the located instance (copy_bodies moves, not
+  copies) is wrong there (also at pi - 1e-9, and with the seed deep-copied: not patch 0001's pair reuse as far as
+  that shows); the same rotation in a copy's geometry is right. op_boolean's OCCT path now checks the volume
+  (a union within max..sum, a cut no bigger than its target, a common no bigger than either side) when an input is
+  located and there are <= 8 tools without glue; an impossible one is built again on copies with the locations
+  baked in (path "occt_baked"; the history by index holds for the copies). T1
+  `kernel_robustness::circular_part_pattern_onto_itself_keeps_its_volume`.
 - For skasm: T2 `sheetmetal_frames::convert_rips_and_bends_like_onshape` now fails alone too (BUTT: top wall max x
   39.98 mm), on main since 969c5069 (std sheet metal by default); the 21:34 T2 before it passed.
 
