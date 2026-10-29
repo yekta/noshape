@@ -176,7 +176,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   −1.0e-6, cone ±3e-6 (invisible), tube Ixx +1.0e-5 and Ixy −0.0068 (exactly 0), torus R30 r5 Ixx 54.11200 vs 54.11261
   (−1.1e-5: reads 54.112 vs 54.113). OCCT's BRepGProp default precision; ask it for a tighter epsilon (or Gauss order)
   for the inertia tensor.
-- [ ] P0 BOOL-THREAD-CRASH the process dies inside OCCT booleans on a worker thread, nondeterministically: CLI fuzz seed 72 on
+- [x] 34cbea98 5ac53b95 (core 10-29 04:00: the two causes found since: a CPU budget that jumped out of an OCCT pool job left the workers on its abandoned frames (the pool-thread segfaults in ForceInterfEF / FillInternalShapes; OCCT patch 0005 v2, T1 kernel_core::a_budget_never_stops_a_call_inside_an_occt_thread_pool_loop), and a crash guard that recovered past a budgeted op left that budget's timer and jump buffer behind (the later silent deaths with no kernel trap; T1 kernel_core::a_fault_inside_a_budget_leaves_no_budget_behind). Core debug CLI with both (main 5ac53b95 + Shell cones): seed 72 × 106 and seed 93 × 120, 3 runs each, all to the end, no crash or hang (cli/clifuzz-{72,93}core{1,2,3}.log). qa: please re-run the fuzz batch on a green) P0 BOOL-THREAD-CRASH the process dies inside OCCT booleans on a worker thread, nondeterministically: CLI fuzz seed 72 on
   the watcher CLI 04:06 (≥ bcf401ca, crash guard and blend budget in): run 1 died at step 105 (delete Extrude 8; marker:
   Extrude 10 evaluating), kernel log "general protection fault … in noshape-cli[b13430a]" =
   `BOPAlgo_PaveFiller::ForceInterfEF` on thread 768668 (main pid 768652); the replay of the same seed died earlier, at
