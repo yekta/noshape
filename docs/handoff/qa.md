@@ -9,6 +9,10 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **11:43 update (green 79c9bf7a = + bool 79c9bf7a angled cylinders, core f11da72f):** mirror set unchanged; Preferences › Mouse
+  controls 5.1 / 5.4 / 5.5 / 5.8 verified (saving not exercised); filed P2 AGENT-HIDDEN-PARAMS-SILENT (feature_add drops parameters
+  hidden by others without saying so). CLI fuzz 208–211 clean; 212–217 running. Open P0s unchanged: RUST-HALF-POCKET-3,
+  RUST-MIRROR-NOTCH (bool).
 - **11:28 update (green f42c3330, skasm only since 2bd06bb3):** navigation 3.7 (arrow-key views in Assemblies), 6.1 (drawing right-drag
   pan 1:1, no menu), 6.3 (drawing wheel ×1.06 / notch) verified. CLI fuzz 206–207 clean, 208–211 running. Left in navigation.md:
   3.2 axes, 3.3 / 3.9 animation timing / easing, 5.x Preferences › Mouse controls, 6.2 other presets.
