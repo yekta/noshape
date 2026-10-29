@@ -2005,6 +2005,187 @@
     "source": "Onshape standard content tables DATA_SELFCLINCHING_THRU_HOLE_STANDOFF_MAIN, DATA_SELFCLINCHING_THRU_HOLE_STANDOFF_LENGTH (component document 6250d8dfca29f8601be77631; live/dom/skb-sc-fsrules), lists from live (dom/skb-sc-full-NAS.json)",
     "nearOnly": false,
     "nameWithoutLength": true
+   },
+   {
+    "category": "Sheet metal fasteners",
+    "class": "Flush nuts",
+    "name": "Self-clinching flush nut NASM 45938/4",
+    "shape": "flushNut",
+    "form": {},
+    "params": [
+     {
+      "label": "Sheet thickness",
+      "options": [
+       "0.060-0.090",
+       "0.091-UP",
+       "0.125-0.155",
+       "0.156-0.186",
+       "0.187-UP"
+      ],
+      "default": "0.060-0.090",
+      "names": {
+       "0.060-0.090": "0.06",
+       "0.091-UP": "0.09",
+       "0.125-0.155": "0.12",
+       "0.156-0.186": "0.151",
+       "0.187-UP": "0.182"
+      }
+     }
+    ],
+    "sizes": [
+     {
+      "name": "#2-56",
+      "label": "Self-clinching flush nut #2-56 x {Sheet thickness}",
+      "d": 0.086,
+      "dims": {
+       "dm": 0.0667,
+       "dmaj": 0.086,
+       "s": 0.188,
+       "dc": 0.171,
+       "a@Sheet thickness=0.060-0.090": 0.06,
+       "ax@Sheet thickness=0.060-0.090": 0.0,
+       "a@Sheet thickness=0.091-UP": 0.09,
+       "ax@Sheet thickness=0.091-UP": 0.028125
+      },
+      "values": {
+       "Sheet thickness": [
+        "0.060-0.090",
+        "0.091-UP"
+       ]
+      }
+     },
+     {
+      "name": "#4-40",
+      "label": "Self-clinching flush nut #4-40 x {Sheet thickness}",
+      "d": 0.112,
+      "dims": {
+       "dm": 0.0849,
+       "dmaj": 0.112,
+       "s": 0.188,
+       "dc": 0.171,
+       "a@Sheet thickness=0.060-0.090": 0.06,
+       "ax@Sheet thickness=0.060-0.090": 0.0,
+       "a@Sheet thickness=0.091-UP": 0.09,
+       "ax@Sheet thickness=0.091-UP": 0.028125
+      },
+      "values": {
+       "Sheet thickness": [
+        "0.060-0.090",
+        "0.091-UP"
+       ]
+      }
+     },
+     {
+      "name": "#6-32",
+      "label": "Self-clinching flush nut #6-32 x {Sheet thickness}",
+      "d": 0.138,
+      "dims": {
+       "dm": 0.104,
+       "dmaj": 0.138,
+       "s": 0.25,
+       "dc": 0.212,
+       "a@Sheet thickness=0.060-0.090": 0.06,
+       "ax@Sheet thickness=0.060-0.090": 0.0,
+       "a@Sheet thickness=0.091-UP": 0.09,
+       "ax@Sheet thickness=0.091-UP": 0.028125
+      },
+      "values": {
+       "Sheet thickness": [
+        "0.060-0.090",
+        "0.091-UP"
+       ]
+      }
+     },
+     {
+      "name": "#8-32",
+      "label": "Self-clinching flush nut #8-32 x {Sheet thickness}",
+      "d": 0.164,
+      "dims": {
+       "dm": 0.13,
+       "dmaj": 0.164,
+       "s": 0.313,
+       "dc": 0.289,
+       "a@Sheet thickness=0.060-0.090": 0.06,
+       "ax@Sheet thickness=0.060-0.090": 0.0,
+       "a@Sheet thickness=0.091-UP": 0.09,
+       "ax@Sheet thickness=0.091-UP": 0.028125
+      },
+      "values": {
+       "Sheet thickness": [
+        "0.060-0.090",
+        "0.091-UP"
+       ]
+      }
+     },
+     {
+      "name": "#10-24",
+      "label": "Self-clinching flush nut #10-24 x {Sheet thickness}",
+      "d": 0.19,
+      "dims": {
+       "dm": 0.145,
+       "dmaj": 0.19,
+       "s": 0.344,
+       "dc": 0.311,
+       "a@Sheet thickness=0.060-0.090": 0.06,
+       "ax@Sheet thickness=0.060-0.090": 0.0,
+       "a@Sheet thickness=0.091-UP": 0.09,
+       "ax@Sheet thickness=0.091-UP": 0.028125
+      },
+      "values": {
+       "Sheet thickness": [
+        "0.060-0.090",
+        "0.091-UP"
+       ]
+      }
+     },
+     {
+      "name": "#10-32",
+      "label": "Self-clinching flush nut #10-32 x {Sheet thickness}",
+      "d": 0.19,
+      "dims": {
+       "dm": 0.156,
+       "dmaj": 0.19,
+       "s": 0.344,
+       "dc": 0.311,
+       "a@Sheet thickness=0.060-0.090": 0.06,
+       "ax@Sheet thickness=0.060-0.090": 0.0,
+       "a@Sheet thickness=0.091-UP": 0.09,
+       "ax@Sheet thickness=0.091-UP": 0.028125
+      },
+      "values": {
+       "Sheet thickness": [
+        "0.060-0.090",
+        "0.091-UP"
+       ]
+      }
+     },
+     {
+      "name": "1/4-28",
+      "label": "Self-clinching flush nut 1/4-28 x {Sheet thickness}",
+      "d": 0.25,
+      "dims": {
+       "dm": 0.211,
+       "dmaj": 0.25,
+       "s": 0.375,
+       "dc": 0.343,
+       "a@Sheet thickness=0.125-0.155": 0.12,
+       "ax@Sheet thickness=0.125-0.155": 0.0375,
+       "a@Sheet thickness=0.156-0.186": 0.151,
+       "ax@Sheet thickness=0.156-0.186": 0.0472,
+       "a@Sheet thickness=0.187-UP": 0.182,
+       "ax@Sheet thickness=0.187-UP": 0.0569
+      },
+      "values": {
+       "Sheet thickness": [
+        "0.125-0.155",
+        "0.156-0.186",
+        "0.187-UP"
+       ]
+      }
+     }
+    ],
+    "nearOnly": true,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_FLUSH_NUT_MAIN / _SHEET_THICKNESS (component document a36b8b3d2a690bfe0b1d89d3; live/dom/skb-sc-fsrules), lists from live (dom/skb-sc-full-NAS.json)"
    }
   ]
  }

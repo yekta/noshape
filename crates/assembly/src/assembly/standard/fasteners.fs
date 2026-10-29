@@ -2587,3 +2587,43 @@ export const standoff = defineFeature(function(context is Context, id is Id, def
         subtract(context, id + "trim", ring, cylinderZ(context, id + "recess", -g - step, step, rc));
         uniteAll(context, id);
     });
+
+/**
+ * Live's NASM 45938/4 self-clinching flush nut (raw /features): a hex plate
+ * s across flats, a / 6.4 high, above z = 0 (live's "Near" on its underside)
+ * with the minor-diameter hole; under it a revolved clinch shank tapering
+ * from 0.823 dc to dc and then straight for ax, a - a 5/32 deep in all; both
+ * hole entrances chamfered (dmaj - dm) / 2.
+ */
+annotation { "Feature Type Name" : "Flush nut" }
+export const flushNut = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "dm" }
+        isLength(definition.dm, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dmaj" }
+        isLength(definition.dmaj, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "s" }
+        isLength(definition.s, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dc" }
+        isLength(definition.dc, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "a" }
+        isLength(definition.a, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "ax" }
+        isLength(definition.ax, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+    }
+    {
+        const rm = definition.dm / 2;
+        const ch = (definition.dmaj - definition.dm) / 2;
+        const hh = definition.a * 5 / 32;
+        const depth = definition.a - hh;
+        const r1 = 0.823 * definition.dc / 2;
+        const rc = definition.dc / 2;
+        prismZ(context, id + "hex", Z, hh, polygonPoints(6, definition.s, 1));
+        revolveProfile(context, id + "shank", [{ "p" : rz(Z, Z) }, { "p" : rz(r1, Z) }, { "p" : rz(rc, -(depth - definition.ax)) }, { "p" : rz(rc, -depth) }, { "p" : rz(Z, -depth) }]);
+        uniteAll(context, id);
+        const part = solidsOf(context, id);
+        // The hole, chamfered at both ends.
+        const hole = revolveProfile(context, id + "hole", [{ "p" : rz(Z, hh + EPS) }, { "p" : rz(rm + ch + EPS, hh + EPS) }, { "p" : rz(rm, hh - ch) }, { "p" : rz(rm, -depth + ch) }, { "p" : rz(rm + ch + EPS, -depth - EPS) }, { "p" : rz(Z, -depth - EPS) }]);
+        subtract(context, id + "cut", part, hole);
+    });

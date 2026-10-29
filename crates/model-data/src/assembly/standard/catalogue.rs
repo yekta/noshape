@@ -29,6 +29,8 @@ pub enum Shape {
     SocketShoulderScrew,
     /// NAS 1129 self-clinching standoffs (blind / thru).
     Standoff,
+    /// NASM 45938/4 self-clinching flush nut.
+    FlushNut,
 }
 
 impl Shape {
@@ -45,6 +47,7 @@ impl Shape {
             Shape::ShoulderScrew => "shoulderScrew",
             Shape::SocketShoulderScrew => "socketShoulderScrew",
             Shape::Standoff => "standoff",
+            Shape::FlushNut => "flushNut",
         }
     }
     /// Whether the component has a length (bolts, screws, pins, keys).
@@ -53,7 +56,7 @@ impl Shape {
     }
     /// Nuts, washers, rings fit over a shaft: auto-size rounds up.
     pub fn fits_over(self) -> bool {
-        matches!(self, Shape::Nut | Shape::Washer | Shape::RetainingRing | Shape::ORing)
+        matches!(self, Shape::Nut | Shape::Washer | Shape::RetainingRing | Shape::ORing | Shape::FlushNut)
     }
     /// The script's dimension giving the part's height (its top face, where
     /// the second mate connector sits), for parts with no length.
@@ -84,6 +87,10 @@ pub struct Param {
     /// slot drive), over the component's `form`.
     #[serde(default)]
     pub forms: BTreeMap<String, BTreeMap<String, f64>>,
+    /// What the part name writes for an option at a size label's
+    /// "{<label>}" (live: Sheet thickness "0.091-UP" -> "0.09").
+    #[serde(default)]
+    pub names: BTreeMap<String, String>,
 }
 
 /// A size of live's Size list whose configuration the server can't build

@@ -303,6 +303,12 @@ impl StandardSpec {
         if let Some(c) = component(self) {
             for p in &c.params {
                 let chosen = self.param(&p.label);
+                // "{Sheet thickness}": the chosen option's own text.
+                let token = format!("{{{}}}", p.label);
+                if label.contains(&token) {
+                    label = label.replace(&token, p.names.get(chosen).map(String::as_str).unwrap_or(chosen));
+                    continue;
+                }
                 let token = format!(" {} x ", p.default);
                 if chosen != p.default && !p.default.is_empty() && label.contains(&token) {
                     label = label.replacen(&token, &format!(" {chosen} x "), 1);

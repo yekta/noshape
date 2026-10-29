@@ -4750,6 +4750,47 @@ fn nas_1129_standoffs_match_live() {
     }
 }
 
+/// NASM 45938/4 self-clinching flush nut as live's component (behaviours
+/// "skasm (2026-10-27) standard content gaps": live's studio default, a 0.09 /
+/// ax 0.0225, is 14 faces, PLANE 9, CONE 3, CYLINDER 2, 26.7785949 mm³ — the
+/// same construction gives 27.1312 mm³ at the table's 0.091-UP row, ax
+/// 0.028125); named with the chosen Sheet thickness's length ("… x 0.06",
+/// "… x 0.09"); every size and Sheet thickness builds.
+#[test]
+fn nasm_45938_4_flush_nut_matches_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let c = CATALOGUE.iter().find(|c| c.name == "Self-clinching flush nut NASM 45938/4").unwrap();
+    let mut spec = StandardSpec::new(c);
+    assert_eq!(spec.part_name(), "Self-clinching flush nut #2-56 x 0.06");
+    spec.params.insert("Sheet thickness".into(), "0.091-UP".into());
+    assert_eq!(spec.part_name(), "Self-clinching flush nut #2-56 x 0.09");
+    let r = standard::regenerate(&spec).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let v = b.shape.volume().unwrap() * 1e9;
+    let mut kinds = std::collections::BTreeMap::new();
+    for i in 0..b.faces.len() {
+        let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+            Surface::Plane(_) => "plane",
+            Surface::Cone { .. } => "cone",
+            Surface::Cylinder { .. } => "cylinder",
+            _ => "other",
+        };
+        *kinds.entry(k).or_insert(0) += 1;
+    }
+    assert_eq!(kinds, [("cone", 3), ("cylinder", 2), ("plane", 9)].into_iter().collect(), "{v} mm³");
+    assert!((v - 27.131184).abs() < 1e-3, "{v} mm³");
+    for s in &c.sizes {
+        for t in s.values.get("Sheet thickness").into_iter().flatten() {
+            let mut spec = StandardSpec::new(c);
+            spec.set_size(&s.name);
+            spec.params.insert("Sheet thickness".into(), t.clone());
+            let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{} {t}: {e}", s.name));
+            assert!(standard::part_body(&r).is_some(), "{} {t}", s.name);
+        }
+    }
+}
+
 /// ANSI commercial taper pins and slotted spring pins with live's whole size
 /// lists (its FSRules tables, behaviours "skasm (2026-10-27) standard content
 /// gaps": taper pins from #7/0, spring pins with 9/64, 5/8, 3/4); every size

@@ -842,7 +842,7 @@ fn paint_fastener(b: Bounds<Pixels>, pv: Preview, window: &mut Window) {
             stroke(&circle(ex, ey, r), false);
             stroke(&circle(ex, ey, r * 0.78), false);
         }
-        Shape::Standoff => {
+        Shape::Standoff | Shape::FlushNut => {
             stroke(&polygon(ex, ey, r, 6, 0.0), true);
             stroke(&circle(ex, ey, r * 0.45), false);
         }
@@ -937,7 +937,7 @@ fn paint_fastener(b: Bounds<Pixels>, pv: Preview, window: &mut Window) {
             stroke(&[(sx + 8.0, ey - r), (sx + 8.0, ey - r + 16.0)], false);
         }
         // The hex collar, then the body.
-        Shape::Standoff => {
+        Shape::Standoff | Shape::FlushNut => {
             let (hr, x1) = (r * 0.85, sx + 8.0);
             stroke(&[(sx, ey - r), (x1, ey - r), (x1, ey + r), (sx, ey + r)], true);
             stroke(&[(x1, ey - hr), (end, ey - hr), (end, ey + hr), (x1, ey + hr)], false);
