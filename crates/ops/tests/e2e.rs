@@ -857,6 +857,11 @@ fn drawing_lists_silhouettes() {
     let mid = [(num(&a[0]) + num(&b[0])) / 2.0, (num(&a[1]) + num(&b[1])) / 2.0];
     let c = call(&mut ctx, "drawing_callout", json!({ "drawing": tab, "anchor": mid, "position": [mid[0] + 20.0, mid[1] + 20.0] }));
     assert!(c["annotation"].is_u64(), "{c}");
+    // Both silhouettes of one side view: a Ø dimension (help D2).
+    let mids: Vec<[f64; 2]> = g["views"].as_array().unwrap().iter().map(|v| v["edges"].as_array().cloned().unwrap_or_default().into_iter().filter(|e| e["type"] == "silhouette" && e["a"].is_array()).map(|e| [(num(&e["a"][0]) + num(&e["b"][0])) / 2.0, (num(&e["a"][1]) + num(&e["b"][1])) / 2.0]).collect::<Vec<_>>()).find(|m| m.len() == 2).expect("a side view with two silhouettes");
+    let place = [(mids[0][0] + mids[1][0]) / 2.0 + 3.0, (mids[0][1] + mids[1][1]) / 2.0 + 25.0];
+    let dia = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": mids, "place": place }));
+    assert_eq!(dia["text"], "Ø20", "{dia}");
 }
 
 /// A new drawing knows the document state its views come from, so a model

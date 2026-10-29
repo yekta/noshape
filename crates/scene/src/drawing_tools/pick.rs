@@ -307,7 +307,7 @@ impl<'a> SheetPick<'a> {
     }
 
     pub fn line_pick(&self) -> Option<Pick> {
-        let (view, me) = self.hovered_edge()?;
+        let Some((view, me)) = self.hovered_edge() else { return self.silhouette_line_pick() };
         let EdgeGeom::Line { a, b } = me.geom else { return None };
         let pa = me.ends[0].clone().map(|(r, p)| PickedPoint { view, p, r: Some(r) }).unwrap_or(PickedPoint { view, p: a, r: None });
         let pb = me.ends[1].clone().map(|(r, p)| PickedPoint { view, p, r: Some(r) }).unwrap_or(PickedPoint { view, p: b, r: None });
@@ -315,6 +315,29 @@ impl<'a> SheetPick<'a> {
             return None;
         }
         Some(Pick::Line { a: pa, b: pb })
+    }
+
+    /// A hovered straight drawn line with no model edge (an HLR silhouette
+    /// of a cylinder or cone): its ends, unreferenced. Two of them on one
+    /// cylinder give a Ø dimension (help drawing_-_dimension, D2).
+    fn silhouette_line_pick(&self) -> Option<Pick> {
+        let h = self.hover?;
+        let PickTarget::Edge { view, edge } = self.built?.picks.get(h as usize)?.clone() else { return None };
+        let e = self.geoms.get(&view)?.edges.get(edge as usize)?;
+        if e.model.is_some() {
+            return None;
+        }
+        let (a, b) = (*e.points.first()?, *e.points.last()?);
+        let l = len(sub(b, a));
+        if l < 1e-9 {
+            return None;
+        }
+        // Straight: every point on the chord.
+        let u = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+        if e.points.iter().any(|p| ((p[0] - a[0]) * u[1] - (p[1] - a[1]) * u[0]).abs() > l * 1e-4) {
+            return None;
+        }
+        Some(Pick::Line { a: PickedPoint { view, p: a, r: None }, b: PickedPoint { view, p: b, r: None } })
     }
 
     /// The hovered arc (open circular edge).
