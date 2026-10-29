@@ -72,3 +72,9 @@ frame-driven delivered rate.
 | Extrude Remove Through all, 400 regions | OK, 8.6 s (was 132 s) | ✅ PERF1 much better (release vs debug build, not like for like) | v0.4.12 CLI 10-28 |
 | Chamfer 0.5 on 400 top edges | OK, 5.5 s; 1397629.073 mm³, 806 faces (same numbers as 10-21) | ✅ | v0.4.12 CLI 10-28 |
 | Edit Extrude 1 10 → 12 | OK, 4.7 s; 1677416.687 (same) | ✅ | v0.4.12 CLI 10-28 |
+
+## Re-check 2026-10-29 09:31 (qa, green 0e1689b3 app, Linux, load ~15; tests/perf/big-plate.noshape = plate + 400 holes, 4 features)
+| Row | Ours | Status | Verified |
+|---|---|---|---|
+| Open in the app (PERF1, was ~10 min) | model shown after **1.6 s** (regen preview 329 ms / refine 397 ms) | ✅ | 0e1689b3 10-29 |
+| Edit Extrude 1 10 → 12 (PERF1, was 150 s; live 1.03 s) | commit regen **261 ms preview / 573 ms refine**; 1678725.684 mm³, 406 faces (= 1398938.070 × 1.2, the 10 mm value) | ✅ | 0e1689b3 10-29 |
