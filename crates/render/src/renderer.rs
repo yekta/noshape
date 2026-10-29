@@ -1090,6 +1090,12 @@ fn same_buffers(a: &Instance, b: &Instance, pick: bool) -> bool {
 /// Draw slots the line quad index buffer covers ([`Pipelines::quad_index`]).
 const QUAD_INDEX_SLOTS: u32 = 1 << 16;
 
+/// The edge lines' vertex shader: `vs_line`, or under `NOSHAPE_PERF_LINES=minimal` the bare projection
+/// `vs_line_min` (benchmarks: how much of the lines' Retina cost is the vertex work).
+fn line_vs() -> &'static str {
+    if std::env::var("NOSHAPE_PERF_LINES").is_ok_and(|v| v == "minimal") { "vs_line_min" } else { "vs_line" }
+}
+
 /// `NOSHAPE_PERF_LINES=indexed`: line quads drawn indexed, four vertex shaders each (for the benchmarks).
 fn indexed_lines() -> bool {
     static INDEXED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
@@ -2332,7 +2338,7 @@ impl Renderer {
             // Lines test depth but don't write it: the ambient occlusion pass reads the depth buffer, and a highlight
             // band brought toward the eye left a step there that it shaded as a crease, a noisy shadow along a
             // hovered edge (EDGE-HIGHLIGHT-LOOK; live has none).
-            let line = s.spawn(|| first.make(LayoutKind::Main, P { label: "line", vs: "vs_line", fs: "fs_line", buffers: LINE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
+            let line = s.spawn(|| first.make(LayoutKind::Main, P { label: "line", vs: line_vs(), fs: "fs_line", buffers: LINE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
             // Front faces culled, like Onshape's pass (`setOverrideFaceCullingMode(FRONT)`).
             let mesh_backsil = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh-backsil", vs: "vs_backsil", fs: "fs_backsil", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Front) }));
             let silhouette = s.spawn(|| first.make(LayoutKind::Main, P { label: "silhouette", vs: "vs_silhouette", fs: "fs_line", buffers: SILHOUETTE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));

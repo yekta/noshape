@@ -719,6 +719,35 @@ fn vs_line(@builtin(vertex_index) index: u32, l: LineIn) -> LineOut {
     return line_vertex(index, l, 0xffffffffu);
 }
 
+// NOSHAPE_PERF_LINES=minimal (benchmarks only): the segment projected and widened, nothing else (no state, lift,
+// depth offset or colour): what's left of the lines' cost is the raster's, the rest was `line_vertex`'s.
+@vertex
+fn vs_line_min(@builtin(vertex_index) index: u32, l: LineIn) -> LineOut {
+    let slot = index / 6u;
+    let vi = index % 6u;
+    var ts = array<f32, 6>(0.0, 0.0, 1.0, 0.0, 1.0, 1.0);
+    var ss = array<f32, 6>(-1.0, 1.0, 1.0, -1.0, 1.0, -1.0);
+    let model = insts[slots[slot]].model;
+    let ca = g.view_proj * (model * vec4(l.a, 1.0));
+    let cb = g.view_proj * (model * vec4(l.b, 1.0));
+    let half_vp = g.viewport.xy * 0.5;
+    let d = normalize(cb.xy / cb.w * half_vp - ca.xy / ca.w * half_vp + vec2(1e-6, 0.0));
+    let half = max(l.width * g.viewport.z * 0.5, 0.5);
+    var c = select(ca, cb, ts[vi] > 0.5);
+    c = vec4(c.xy + vec2(-d.y, d.x) * ss[vi] * half / half_vp * c.w, c.z, c.w);
+    var o: LineOut;
+    o.pos = c;
+    o.color = vec4(0.0, 0.0, 0.0, 1.0);
+    o.pick = 0u;
+    o.along = 0.0;
+    o.world = vec3(0.0);
+    o.style = 0u;
+    o.slot = slot;
+    o.across = 0.0;
+    o.core = 0.0;
+    return o;
+}
+
 // A tessellation edge inside a curved face with the normals of its two
 // facets (Onshape's edge-based silhouettes, `vs-draw-silhouettes`): drawn
 // like an edge where one facet faces the viewer and the other doesn't.
