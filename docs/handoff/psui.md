@@ -391,6 +391,13 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
    | bg → hover face | FFC685 FFC685 | bg, the bottom the same, as live's crops. Residual: on shallow slants a few
    pixels of the line's antialiasing lie diagonally past the band's 1 px reach and stay dark (a 1.5 px reach
    overshoots onto the background on steep edges instead).
+0c2. (10-29) Retina lines, what's ruled out and what's left: lines share the one "color" pass with the faces (no
+   extra MSAA load / store); the pick pass runs only on demand (`pick_valid`); segment count (LOD), MSAA level and
+   quad shape (indexed 4-vertex) didn't move it. Left: the per-vertex work of `line_vertex` (shaders.wgsl), run 6×
+   per segment: `load_inst` copies the 176-byte instance, a `states` lookup, two model and two view_proj
+   products, `clip_near`, `in_front_of_faces`, sRGB conversion. Next experiment: WGSL `override` switches set
+   from env at pipeline creation (skip states / lift / per-vertex instance load by passing what's needed per
+   segment) as perf.yml variants on macOS at 2×, one run.
 0f. (done 10-28: no gain, see above) Retina orbit, experiment for 0c: line segments are instances of 6 vertices (`draw(slots*6, 0..count)`),
    which packs Apple GPUs' vertex SIMD groups badly; pull segments from a storage buffer by vertex_index / 6 with
    the slot as the instance (one instance per copy) and measure with perf.yml.

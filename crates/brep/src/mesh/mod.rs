@@ -168,7 +168,9 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
         }
     }
     let used: Vec<usize> = (0..edges.len()).filter(|&e| used[e]).collect();
-    for (e, n) in in_parallel(used.len(), 64, |k| edge_nodes(vertices, &edges[used[k]], defl)) {
+    // In parallel only for many (a small part's edges sample in microseconds, less than starting threads).
+    let run = if used.len() < 512 { used.len().max(1) } else { 64 };
+    for (e, n) in in_parallel(used.len(), run, |k| edge_nodes(vertices, &edges[used[k]], defl)) {
         out.edges[used[e]] = n;
     }
     // The faces on their own, in parallel (as BRepMesh meshes them), the costliest first, one at a time: a
