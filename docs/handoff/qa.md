@@ -9,6 +9,16 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **18:27 update (green c3c8371b = + bool 82d02000 free-form faces in the Rust Boolean, dx 4f549431):** mirror set + P0 repros unchanged
+  (0 px); verified DWG-TOOL-HINTS-PREVIEW (Datum / GD&T previews) and the DWG-E2E-SILHOUETTE hover residual. 82d02000 has no CLI yet, so
+  it goes through the app: bin/revgen.py (box + revolved sphere / torus / cone / tube, Boolean) and bin/splgen.py (box + an extruded
+  profile with spline sides) make documents with the v0.4.14 CLI (its result is the OCCT reference), then the app's Mass properties
+  under NOSHAPE_BOOL_RUST=1 / 0 (bin/guimass.sh, now also done on regen[full]); cli/revab.summary, so far all 0 px. bool notes
+  spheres / tori / revolutions still mostly decline to OCCT, so the spline extrusions are the real test. The OCCT path's three
+  "non-manifold" errors in revgen are true tangent contacts (a torus tube exactly as tall as the box, a tube bore tangent to a box
+  side). Rust-vs-OCCT CLI series on the 12:13 CLI: boolmir 121–135, boolrand 76–90, boolgrid 56–70 all equal except boolgrid 68 #25
+  (point-touching regions: Rust 8 faces, OCCT 9, added to RUST-UNION-MERGES-DISJOINT-FACES); next round (136–150 / 91–105 / 71–85)
+  running. fzloop gets two revolve documents (fzdoc-revtube / -revtorus) as the loops restart.
 - **18:13 update (green 0cffc7ad = + psui d5ae3ded own mesher step 5d, dx 0cffc7ad / ed5a2a24):** verified DWG-GROUP-ANNOTATION-RULE,
   DWG-LINE-COPY, DWG-CIRCLE-FACETS, DWG-CONSTRAINT-PRESELECT and DWG-INFO-TOASTS (c) (the cross-document paste bubble stays until ×,
   one bubble on a repeat). DWG-TOOL-HINTS-PREVIEW: Note half fixed (NOTE placeholder, no hint text); Datum / GD&T previews still open.
