@@ -32,6 +32,14 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   slanted offset plane is inexact (cavity ∩ solid 11405.6614 vs exact 11405.67292 mm³, the same by the adaptive and
   the segmented Gauss integrals; the tube's seam turned 180° changes nothing). Try the wall as (solid − cavity) ∪ (solid ∩ tube), or the tube's frame turned;
   then let cones and holes meet in regions (wf-block's shell → ~0.4 s).
+- P2 CYL-UNIFY-OPPOSITE (qa, open): reproduced in the kernel (a Ø12 circle on y = 0 extruded 10 mm both ways, fuse,
+  unify_same_domain and _whole: 4 faces, two 376.99 mm² cylinders; live one 753.98). same_domain_candidates says yes
+  (two cylinders), OCCT's UnifySameDomain then leaves them: their axes point opposite ways (prisms along −n and +n).
+  Fix: before the USD, give one of two adjacent coaxial same-radius cylinder faces the other's surface (frame with the
+  axis turned: (u, v) → (−u, −v) on its pcurves, the outward normal kept), or merge such a pair directly; the T1
+  test to add is that case (3 faces, one cylinder of 753.98 mm²). Careful: rebuilding the face on the other's surface
+  and letting ShapeFix add pcurves writes them into edges shared with the input shape (the data race b0e757f3
+  removed); work on a copy (BRepBuilderAPI_Copy, its history composed) or give the new face fresh edges sewn in.
 - Speed table refreshed from perf.yml run 40796942944 (release): the fin under the 400-fin plate 40–64 ms (< 150 met).
 - Parallel pairs: branch agent/core-pairs-on rebased on 16139489 (f83bf5f4; the crash guard's BudgetSnapshot
   restores the thread's pairs mode too); kernel tests green against /root/occt-core with libTKBO.a.0004-on3. Land
