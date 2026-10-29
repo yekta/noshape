@@ -267,7 +267,9 @@ impl DrawingEditor {
             }
         };
         let symbols: Vec<(String, String)> = SYMBOLS.iter().map(|s| (s.to_string(), s.to_string())).collect();
-        let token = |key: &str| format!("{{{key}}}");
+        // Live (behaviours request 1577): an inserted property's Text format
+        // is All uppercase at first; a date keeps its date format.
+        let token = |key: &str| if is_date_field(key) { format!("{{{key}}}") } else { format!("{{{key}|upper}}") };
         let drawing_props: Vec<(String, String)> = DRAWING_FIELDS.iter().map(|(k, n)| (n.to_string(), token(k))).collect();
         let sheet_props: Vec<(String, String)> = SHEET_REF_FIELDS.iter().map(|(k, n)| (n.to_string(), token(k))).collect();
         let symbol_btn = div()
