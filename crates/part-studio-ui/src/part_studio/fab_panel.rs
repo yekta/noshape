@@ -26,6 +26,12 @@ impl PartStudioView {
         self.context.as_ref().is_some_and(|c| !c.sheet_metal.is_empty())
     }
 
+    /// Whether the studio has a hole (an unsuppressed Hole made one): live shows the Hole table button only then
+    /// (HOLE-TABLE-BUTTON).
+    pub(super) fn has_holes(&self) -> bool {
+        self.context.as_ref().is_some_and(|c| !c.holes.is_empty())
+    }
+
     pub(super) fn has_frames(&self) -> bool {
         self.context.as_ref().is_some_and(|c| !c.frame_members.is_empty())
     }

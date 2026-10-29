@@ -670,6 +670,10 @@ impl PartStudioView {
     /// The name a feature shows in the list, and in the chips that name it:
     /// a Hole's callout, a Variable's "#name = value" (see [`listed_name`]).
     fn shown_feature_name(&self, f: &Feature, cx: &App) -> String {
+        // Live (HOLE-TABLE-BUTTON): a suppressed Hole's row reads "Hole"; its callout name returns with it.
+        if f.type_id == "hole" && !f.custom_name && (f.suppressed || self.display.feature_state(f.id).is_some_and(|s| s.status == FeatureStatus::Suppressed)) {
+            return "Hole".into();
+        }
         listed_name(f, &self.computed_values(f.id, cx), &self.doc.read(cx).session.doc.settings.units, &self.display.variables)
     }
 

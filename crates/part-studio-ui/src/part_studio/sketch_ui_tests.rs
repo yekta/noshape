@@ -535,3 +535,30 @@ fn a_selected_mate_connector_reads_its_origin(cx: &mut TestAppContext) {
     })
     .unwrap();
 }
+
+/// HOLE-TABLE-BUTTON (live "qa (2026-10-28, P3) Part Studio Hole table panel with no holes"): with no hole the
+/// Hole table panel doesn't exist (an open one closes), and a suppressed Hole lists as "Hole".
+#[gpui::test]
+fn no_hole_table_without_a_hole(cx: &mut TestAppContext) {
+    use super::super::config_panel::RightPanel;
+    let (window, view) = part_studio(cx, "hole-table");
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, _| {
+            assert!(!v.has_holes());
+            v.right_panel = Some(RightPanel::HoleTable);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            assert_eq!(v.right_panel, None, "the Hole table closed: no hole");
+            let units = noshape_units::UnitPrefs::default();
+            let mut f = v.studio(cx).unwrap().new_feature("hole", &units).unwrap();
+            assert_ne!(v.shown_feature_name(&f, cx), "Hole", "an unsuppressed Hole is named by its callout");
+            f.suppressed = true;
+            assert_eq!(v.shown_feature_name(&f, cx), "Hole");
+        })
+    })
+    .unwrap();
+}

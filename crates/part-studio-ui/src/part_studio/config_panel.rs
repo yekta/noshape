@@ -167,6 +167,11 @@ impl PartStudioView {
 
     pub(super) fn render_right_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let panel = self.right_panel?;
+        // Live: suppressing the only Hole with its table open closes the panel at once (no button left).
+        if panel == RightPanel::HoleTable && !self.has_holes() {
+            self.right_panel = None;
+            return None;
+        }
         self.commit_unfocused_cell(window, cx);
         let pal = p();
         let configured = panel == RightPanel::Configurations && self.studio(cx).is_some_and(|s| !s.configuration.inputs.is_empty());
@@ -2716,8 +2721,9 @@ impl PartStudioView {
             .when(!self.display.bodies.is_empty() || !self.display.sketches.is_empty(), |d| d.child(btn("panel-appearance", "appearance", "Appearance panel", RightPanel::Appearance, cx)))
             .child(btn("panel-config", "configuration", "Configuration panel", RightPanel::Configurations, cx))
             .child(btn("panel-custom", "featurescript-table", "Custom tables", RightPanel::CustomTables, cx))
-            // Live L59 (part-studio/2181): the Hole table panel follows.
-            .child(btn("panel-holes", "hole-table", "Hole table", RightPanel::HoleTable, cx))
+            // Live L59 (part-studio/2181): the Hole table panel follows, while the studio has a hole
+            // (behaviours "qa (2026-10-28, P3) Part Studio Hole table panel with no holes").
+            .when(self.has_holes(), |d| d.child(btn("panel-holes", "hole-table", "Hole table", RightPanel::HoleTable, cx)))
             .child(btn("panel-inspection", "mbd-status", "Inspection table", RightPanel::Inspection, cx))
             // Live "qa5 sm" (8): "Sheet metal table and flat view" sits right
             // above the Variable table.
