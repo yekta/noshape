@@ -56,7 +56,8 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   /root/occt-asan (scripts/build-occt.sh with CFLAGS/CXXFLAGS -fsanitize=address, ~1 h), the CLI against it
   (/root/core-scratch/asanbuild/cli.sh: target /root/target-asan, libasan linked explicitly because of the mold
   wrapper; run.sh: allow_user_poisoning=0 for OCCT's pools, verify_asan_link_order=0): seed 189 clean 2 / 3, one
-  fatal "holding a lock" at step 72 without a stack; 5bdada9c NOSHAPE_GUARD_TRACE=1 prints it next time.
+  fatal "holding a lock" at step 72 without a stack; 5bdada9c NOSHAPE_GUARD_TRACE=1 prints it next time. Then 6
+  more instrumented sessions (asanbuild/rounds.sh): all clean. Not reproducible under ASan so far.
 - T2 (kernel, model, ops) on main 10-29 07:20: reds were export::pvz_structure / pvz_import (the Rust Boolean, ticket
   PVZ-RUST-BOOL for bool), bool_replay::bool_corpus_replay (bool), the elliptic boss curvature blend (open, mine),
   blends_match_onshape (my FILLET-OVERSIZE rule pre-empted live F2's "Failed to fillet selections." for four meeting
