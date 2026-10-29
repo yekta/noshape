@@ -428,7 +428,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Region...", Op("drawing_hatch_region")),
     ("drawing:Remove all breaks", Op("drawing_view_edit")),
     ("drawing:Remove all inspection items", Op("drawing_inspection")),
-    ("drawing:Remove annotation from group", Op("drawing_annotation_edit")),
+    ("drawing:Remove from grouped annotation", Op("drawing_annotation_edit")),
     ("drawing:Remove crop", Op("drawing_view_edit")),
     ("drawing:Remove foreshorten", Op("drawing_annotation_edit")),
     ("drawing:Remove from group", Op("drawing_annotation_edit")),

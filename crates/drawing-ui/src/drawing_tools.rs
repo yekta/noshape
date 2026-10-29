@@ -378,6 +378,7 @@ impl DrawingEditor {
             datum_at: self.datum_at,
             datum_target_letter: self.datum_target_letter,
             sketch_dim_pick: self.sketch_dim_pick,
+            note_preview: matches!(self.tool, Tool::Note) && !matches!(self.panel, Some(Panel::Note { .. })),
         }
     }
 
@@ -1738,7 +1739,7 @@ impl DrawingEditor {
         out
     }
 
-    fn move_to_entry(a: &Annotation) -> MenuEntry {
+    pub(crate) fn move_to_entry(a: &Annotation) -> MenuEntry {
         let (id, cur) = (a.id, a.layer);
         let layers = SheetLayer::FORMAT.iter().copied().chain((!cur.is_drawing()).then_some(SheetLayer::Drawing));
         let items = layers
@@ -1947,10 +1948,11 @@ impl DrawingEditor {
                             let ids = anns.clone();
                             out.push(MenuEntry::item("Group", move |t, _, cx| t.edit_sheet("Group", cx, |s| noshape_scene::drawing_tools::annotation_edit::group_with_view(s, &ids, Some(v)))));
                         }
+                        // Live (request 1590): one grouped member alone leaves the
+                        // group; grouping needs a callout among the annotations.
                         if a.ann_group.is_some() {
-                            let ids = anns.clone();
-                            out.push(MenuEntry::item("Remove annotation from group", move |t, _, cx| t.edit_sheet("Remove annotation from group", cx, |s| noshape_scene::drawing_tools::annotation_edit::group_annotations(s, &ids, false))));
-                        } else if anns.iter().collect::<std::collections::HashSet<_>>().len() >= 2 {
+                            out.push(MenuEntry::item("Remove from grouped annotation", move |t, _, cx| t.edit_sheet("Remove from grouped annotation", cx, |s| noshape_scene::drawing_tools::annotation_edit::group_annotations(s, &[id], false))));
+                        } else if anns.iter().collect::<std::collections::HashSet<_>>().len() >= 2 && matches!(a.kind, AnnotationKind::Balloon { .. }) {
                             let ids = anns.clone();
                             out.push(MenuEntry::item("Group annotation", move |t, _, cx| t.edit_sheet("Group annotation", cx, |s| noshape_scene::drawing_tools::annotation_edit::group_annotations(s, &ids, true))));
                         }

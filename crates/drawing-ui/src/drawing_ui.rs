@@ -16,10 +16,10 @@ pub use noshape_ops::drawing::parse_scale;
 impl DrawingEditor {
     pub fn render_status(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
+        // Live has no tool hints (behaviours "qa (2026-10-28, P3) drawing tool
+        // hints: none in live", qa DWG-TOOL-HINTS-PREVIEW): the tools show a
+        // preview at the cursor instead.
         let mut parts: Vec<String> = Vec::new();
-        if let Some(pr) = self.prompt() {
-            parts.push(format!("{}: {pr}", self.tool.name()));
-        }
         if self.computing {
             parts.push("computing views…".into());
         }

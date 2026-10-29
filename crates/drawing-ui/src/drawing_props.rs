@@ -414,7 +414,8 @@ impl DrawingEditor {
     pub fn copy_entities(&mut self, cx: &mut Context<Self>) {
         let anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(a) = s { Some(*a) } else { None }).collect();
         let tables: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Table(t) = s { Some(*t) } else { None }).collect();
-        if let Ok(c) = self.drawing.copy_entities(self.sheet, &anns, &tables) {
+        let sketch: Vec<u32> = self.selection.iter().filter_map(|s| if let Sel::Sketch(e) = s { Some(*e) } else { None }).collect();
+        if let Ok(c) = self.drawing.copy_selection(self.sheet, &anns, &tables, &sketch) {
             cx.write_to_clipboard(ClipboardItem::new_string(c.to_json()));
             cx.notify();
         }

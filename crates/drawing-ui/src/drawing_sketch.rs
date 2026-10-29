@@ -397,8 +397,13 @@ impl DrawingEditor {
             .collect();
         vec![
             crate::drawing_props::paste_always(),
-            // Drawing sketch geometry doesn't copy yet.
-            MenuEntry::item("Copy", |_, _, _| {}).disabled(true),
+            // Live (request 1598, qa DWG-LINE-COPY): Copy, then Paste or Ctrl+V.
+            MenuEntry::item("Copy", move |t, _, cx| {
+                if !t.selection.contains(&Sel::Sketch(id)) {
+                    t.selection = vec![Sel::Sketch(id)];
+                }
+                t.copy_entities(cx);
+            }),
             MenuEntry::item("Paste as table", |t, _, cx| {
                 t.start_paste_table(cx);
             }),

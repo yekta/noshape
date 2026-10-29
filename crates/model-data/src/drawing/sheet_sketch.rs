@@ -152,7 +152,9 @@ impl SheetSketch {
                         continue;
                     }
                     let Some(c) = self.sketch.curve(e.id) else { continue };
-                    let pts: Vec<[f64; 2]> = c.tessellate(0.02).into_iter().map(|p| [p.x, p.y]).collect();
+                    // Fine enough to read as a true curve zoomed in (live draws
+                    // vectors; qa DWG-CIRCLE-FACETS: 0.02 mm showed 24-gons).
+                    let pts: Vec<[f64; 2]> = c.tessellate(0.002).into_iter().map(|p| [p.x, p.y]).collect();
                     if pts.len() >= 2 {
                         let closed = matches!(c, noshape_sketch::Curve2::Circle { .. } | noshape_sketch::Curve2::Ellipse { .. });
                         g.lines.push(Polyline2 { points: pts, style: st.line.line_style(), closed, pick: pk });

@@ -61,6 +61,11 @@ impl DrawingEditor {
         if views.len() == self.selection.len() {
             return self.multi_view_entries(views, cx);
         }
+        let sheet = self.current_sheet();
+        let anns: Vec<&noshape_model::drawing::Annotation> = self.selection.iter().filter_map(|s| if let Sel::Annotation(x) = s { sheet.annotations.iter().find(|a| a.id == *x) } else { None }).collect();
+        if anns.len() >= 2 && anns.len() == self.selection.len() && anns.iter().all(|a| matches!(a.kind, AnnotationKind::Note { .. } | AnnotationKind::Balloon { .. })) {
+            return self.multi_note_entries(&anns, cx);
+        }
         let mut out = self.group_entries(&views);
         out.extend([
             MenuEntry::item("Copy", |t, _, cx| t.copy_views(None, cx)),
@@ -78,12 +83,52 @@ impl DrawingEditor {
         out
     }
 
-    /// Notes and callouts selected together (help H:note, drawing.md A21;
-    /// qa DWG-GROUP-ANNOTATION-MENU): Group annotation (or Remove annotation
-    /// from group); with one view too, Group with the view (or Remove from
-    /// group).
+    /// Notes and callouts selected together (live A21, request 1590, qa
+    /// DWG-GROUP-ANNOTATION-RULE): Paste · Copy · Paste as table · Add leader
+    /// · Group annotation (only with a callout among them) · Move to ▸;
+    /// grouped ones Remove from grouped annotation and no Move to | Clear
+    /// selection · Zoom to fit · Delete.
+    fn multi_note_entries(&self, anns: &[&noshape_model::drawing::Annotation], _cx: &App) -> Vec<MenuEntry> {
+        use noshape_scene::drawing_tools::annotation_edit::group_annotations;
+        let ids: Vec<u64> = anns.iter().map(|a| a.id).collect();
+        let first = anns[0];
+        let fid = first.id;
+        let mut out = vec![
+            crate::drawing_props::paste_always(),
+            MenuEntry::item("Copy", |t, _, cx| t.copy_entities(cx)),
+            MenuEntry::item("Paste as table", |t, _, cx| {
+                t.start_paste_table(cx);
+            }),
+            if matches!(first.kind, AnnotationKind::Note { .. }) {
+                MenuEntry::item("Add leader", move |t, _, cx| t.note_add_leader(fid, cx))
+            } else {
+                MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id: fid }, cx))
+            },
+        ];
+        if anns.iter().any(|a| a.ann_group.is_some()) {
+            out.push(MenuEntry::item("Remove from grouped annotation", move |t, _, cx| t.edit_sheet("Remove from grouped annotation", cx, |s| group_annotations(s, &ids, false))));
+        } else {
+            if anns.iter().any(|a| matches!(a.kind, AnnotationKind::Balloon { .. })) {
+                out.push(MenuEntry::item("Group annotation", move |t, _, cx| t.edit_sheet("Group annotation", cx, |s| group_annotations(s, &ids, true))));
+            }
+            out.push(Self::move_to_entry(first));
+        }
+        out.extend([
+            MenuEntry::Separator,
+            MenuEntry::item("Clear selection", |t, _, cx| {
+                t.selection.clear();
+                t.redraw(cx);
+            }),
+            MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
+            MenuEntry::item("Delete", |t, _, cx| t.delete_selection(cx)),
+        ]);
+        out
+    }
+
+    /// Notes and callouts selected with one view (help H:note, drawing.md
+    /// A21): Group with the view (or Remove from group).
     fn group_entries(&self, views: &[ViewId]) -> Vec<MenuEntry> {
-        use noshape_scene::drawing_tools::annotation_edit::{group_annotations, group_with_view};
+        use noshape_scene::drawing_tools::annotation_edit::group_with_view;
         let sheet = self.current_sheet();
         let anns: Vec<&noshape_model::drawing::Annotation> = self.selection.iter().filter_map(|s| if let Sel::Annotation(x) = s { sheet.annotations.iter().find(|a| a.id == *x) } else { None }).collect();
         let groupable = |a: &&noshape_model::drawing::Annotation| matches!(a.kind, AnnotationKind::Note { .. } | AnnotationKind::Balloon { .. });
@@ -92,23 +137,13 @@ impl DrawingEditor {
         }
         let ids: Vec<u64> = anns.iter().map(|a| a.id).collect();
         let mut out = Vec::new();
-        match views {
-            [] if anns.len() >= 2 => {
-                if anns.iter().any(|a| a.ann_group.is_some()) {
-                    out.push(MenuEntry::item("Remove annotation from group", move |t, _, cx| t.edit_sheet("Remove annotation from group", cx, |s| group_annotations(s, &ids, false))));
-                } else {
-                    out.push(MenuEntry::item("Group annotation", move |t, _, cx| t.edit_sheet("Group annotation", cx, |s| group_annotations(s, &ids, true))));
-                }
+        if let [v] = views {
+            let v = *v;
+            if anns.iter().any(|a| a.view_group.is_some()) {
+                out.push(MenuEntry::item("Remove from group", move |t, _, cx| t.edit_sheet("Remove from group", cx, |s| group_with_view(s, &ids, None))));
+            } else {
+                out.push(MenuEntry::item("Group", move |t, _, cx| t.edit_sheet("Group", cx, |s| group_with_view(s, &ids, Some(v)))));
             }
-            [v] => {
-                let v = *v;
-                if anns.iter().any(|a| a.view_group.is_some()) {
-                    out.push(MenuEntry::item("Remove from group", move |t, _, cx| t.edit_sheet("Remove from group", cx, |s| group_with_view(s, &ids, None))));
-                } else {
-                    out.push(MenuEntry::item("Group", move |t, _, cx| t.edit_sheet("Group", cx, |s| group_with_view(s, &ids, Some(v)))));
-                }
-            }
-            _ => {}
         }
         out
     }

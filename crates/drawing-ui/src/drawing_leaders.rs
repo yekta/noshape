@@ -193,6 +193,10 @@ impl DrawingEditor {
         if !style.leaders.is_empty() {
             out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| ae::remove_leaders(s, id))));
         }
+        // A grouped note alone leaves its group (live A21, request 1590).
+        if a.ann_group.is_some() {
+            out.push(MenuEntry::item("Remove from grouped annotation", move |t, _, cx| t.edit_sheet("Remove from grouped annotation", cx, |s| ae::group_annotations(s, &[id], false))));
+        }
         // Move to ▸ a format layer (or back to the drawing).
         let cur = a.layer;
         let layers = noshape_model::drawing::SheetLayer::FORMAT.iter().copied().chain((!cur.is_drawing()).then_some(noshape_model::drawing::SheetLayer::Drawing));
