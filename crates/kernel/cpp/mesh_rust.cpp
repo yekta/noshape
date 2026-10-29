@@ -7,6 +7,8 @@
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <Geom_Circle.hxx>
+#include <Geom_ConicalSurface.hxx>
+#include <Geom_CylindricalSurface.hxx>
 #include <Geom_Line.hxx>
 #include <Geom_Plane.hxx>
 #include <Geom_TrimmedCurve.hxx>
@@ -16,6 +18,8 @@
 
 #include <cstdlib>
 #include <string>
+#include <algorithm>
+#include <tuple>
 #include <unordered_map>
 
 namespace noshape {
@@ -126,26 +130,34 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     first[(size_t)i] = i;
     TopLoc_Location                 loc;
     const occ::handle<Geom_Surface> s  = BRep_Tool::Surface(f, loc);
-    const occ::handle<Geom_Plane>   pl = s.IsNull() || is_mesh_face(f) ? occ::handle<Geom_Plane>() : occ::down_cast<Geom_Plane>(s);
-    bool                            ok = !pl.IsNull() && (f.Orientation() == TopAbs_FORWARD || f.Orientation() == TopAbs_REVERSED);
-    std::vector<uint32_t>           uses, ends;
-    std::vector<int>&               ue = use_edges[(size_t)i];
-    for (TopoDS_Iterator wi(f); wi.More() && ok; wi.Next())
+    const bool                      mf = s.IsNull() || is_mesh_face(f);
+    const occ::handle<Geom_Plane>   pl = mf ? occ::handle<Geom_Plane>() : occ::down_cast<Geom_Plane>(s);
+    const occ::handle<Geom_CylindricalSurface> cyl = mf ? occ::handle<Geom_CylindricalSurface>() : occ::down_cast<Geom_CylindricalSurface>(s);
+    const occ::handle<Geom_ConicalSurface>     con = mf ? occ::handle<Geom_ConicalSurface>() : occ::down_cast<Geom_ConicalSurface>(s);
+    bool ok = (!pl.IsNull() || !cyl.IsNull() || !con.IsNull()) && (f.Orientation() == TopAbs_FORWARD || f.Orientation() == TopAbs_REVERSED);
+    // Its loops, meshed here or not (a face BRepMesh meshes tells which edges it splits its own way).
+    std::vector<int>& ue   = use_edges[(size_t)i];
+    for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
     {
-      ok = wi.Value().ShapeType() == TopAbs_WIRE;
-      for (TopoDS_Iterator ei(wi.Value()); ei.More() && ok; ei.Next())
+      if (wi.Value().ShapeType() != TopAbs_WIRE)
+      {
+        ok = false;
+        continue;
+      }
+      for (TopoDS_Iterator ei(wi.Value()); ei.More(); ei.Next())
       {
         const int k = edges.FindIndex(ei.Value());
-        ok          = k > 0 && (ei.Value().Orientation() == TopAbs_FORWARD || ei.Value().Orientation() == TopAbs_REVERSED);
-        if (ok)
+        if (k <= 0 || (ei.Value().Orientation() != TopAbs_FORWARD && ei.Value().Orientation() != TopAbs_REVERSED))
         {
-          uses.push_back(static_cast<uint32_t>(2 * (k - 1) + (ei.Value().Orientation() == TopAbs_REVERSED ? 1 : 0)));
-          ue.push_back(k);
+          ok = false;
+          continue;
         }
+        in.uses.push_back(static_cast<uint32_t>(2 * (k - 1) + (ei.Value().Orientation() == TopAbs_REVERSED ? 1 : 0)));
+        ue.push_back(k);
       }
-      ends.push_back(static_cast<uint32_t>(uses.size()));
+      in.loop_uses.push_back(static_cast<uint32_t>(in.uses.size()));
     }
-    if (ok)
+    if (ok && !pl.IsNull())
     {
       const gp_Ax3 a = pl->Position().Transformed(loc.Transformation());
       in.surfaces.push_back(0);
@@ -153,15 +165,22 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
       push3(in.surfaces, a.XDirection().Crossed(a.YDirection()).XYZ());
       push3(in.surfaces, a.XDirection().XYZ());
       push0(in.surfaces, 3);
-      const uint32_t base = static_cast<uint32_t>(in.uses.size());
-      for (uint32_t u : uses)
-        in.uses.push_back(u);
-      for (uint32_t e : ends)
-        in.loop_uses.push_back(base + e);
+    }
+    else if (ok)
+    {
+      // Kind, origin, axis, x direction, radius, half-angle, whether the frame is right-handed.
+      const gp_Ax3 a = (cyl.IsNull() ? con->Position() : cyl->Position()).Transformed(loc.Transformation());
+      in.surfaces.push_back(cyl.IsNull() ? 2 : 1);
+      push3(in.surfaces, a.Location().XYZ());
+      push3(in.surfaces, a.Direction().XYZ());
+      push3(in.surfaces, a.XDirection().XYZ());
+      in.surfaces.push_back(cyl.IsNull() ? con->RefRadius() : cyl->Radius());
+      in.surfaces.push_back(cyl.IsNull() ? con->SemiAngle() : 0.0);
+      in.surfaces.push_back(a.Direct() ? 1.0 : 0.0);
     }
     else
     {
-      // Not meshed here: no loops.
+      // Meshed by BRepMesh.
       in.surfaces.push_back(255);
       push0(in.surfaces, 12);
     }
@@ -230,6 +249,8 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
       taken[(size_t)i] = 1;
       ++n;
     }
+    // Per edge its polygons on this face: a seam (twice in the face) one per way, forward first.
+    std::vector<std::tuple<TopoDS_Shape, occ::handle<Poly_PolygonOnTriangulation>, occ::handle<Poly_PolygonOnTriangulation>>> polys;
     for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
       for (TopoDS_Iterator ei(wi.Value()); ei.More(); ei.Next())
       {
@@ -251,9 +272,24 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
         }
         occ::handle<Poly_PolygonOnTriangulation> poly = new Poly_PolygonOnTriangulation(nodes, params);
         poly->Deflection(lin);
-        BRepMesh_ShapeTool::UpdateEdge(TopoDS::Edge(ei.Value()), poly, tris[(size_t)i0], f.Location());
+        const bool forward = ei.Value().Orientation() == TopAbs_FORWARD;
+        auto       it      = std::find_if(polys.begin(), polys.end(), [&](const auto& p) { return std::get<0>(p).IsSame(ei.Value()); });
+        if (it == polys.end())
+          polys.emplace_back(ei.Value(), forward ? poly : nullptr, forward ? nullptr : poly);
+        else if (forward)
+          std::get<1>(*it) = poly;
+        else
+          std::get<2>(*it) = poly;
         at += 1 + count;
       }
+    for (const auto& [e, fwd, rev] : polys)
+    {
+      const TopoDS_Edge edge = TopoDS::Edge(e.Oriented(TopAbs_FORWARD));
+      if (!fwd.IsNull() && !rev.IsNull())
+        BRepMesh_ShapeTool::UpdateEdge(edge, fwd, rev, tris[(size_t)i0], f.Location());
+      else
+        BRepMesh_ShapeTool::UpdateEdge(edge, fwd.IsNull() ? rev : fwd, tris[(size_t)i0], f.Location());
+    }
   }
   return n;
 }

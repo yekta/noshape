@@ -6,8 +6,10 @@
 //! the surface's own orientation (its normal; the kernel turns them for reversed faces), every boundary node a
 //! mesh node.
 //!
-//! Faces taken so far: planes bounded by straight edges (constrained Delaunay of their boundary nodes, as the
-//! kernel's planar triangulation).
+//! Faces taken so far: planes (constrained Delaunay of their boundary nodes, as the kernel's planar
+//! triangulation), cylinders and cones between two rims at constant height (the rims' nodes zipped, as the
+//! kernel's strips). Edges: lines and circles (arcs split as BRepMesh splits them, so a face it meshes next to
+//! one meshed here shares the nodes). A face with a circle another face on it declines is declined too.
 
 pub mod cdt;
 
@@ -19,6 +21,13 @@ use glam::{DVec2, DVec3};
 pub enum MeshSurface {
     /// The plane through `origin` with unit `normal` (the surface's own, `xdir` × `ydir`) and unit `xdir` in it.
     Plane { origin: DVec3, normal: DVec3, xdir: DVec3 },
+    /// OCCT's cylinder `origin + radius (cos u x + sin u y) + v axis` (`y` = `axis` × `xdir`, or minus that
+    /// when the frame isn't `direct`): its normal is ∂u × ∂v.
+    Cylinder { origin: DVec3, axis: DVec3, xdir: DVec3, direct: bool, radius: f64 },
+    /// OCCT's cone `origin + (radius + v sin a) (cos u x + sin u y) + v cos a axis` (`a` the half-angle).
+    Cone { origin: DVec3, axis: DVec3, xdir: DVec3, direct: bool, radius: f64, angle: f64 },
+    /// Any other surface: the face is declined (BRepMesh meshes it), its loops tell which edges it is on.
+    Other,
 }
 
 /// An edge: its curve (`None`: one not meshed here) between vertices `v[0]` (at parameter `t0`) and `v[1]`
@@ -74,17 +83,42 @@ pub struct BodyMesh {
 }
 
 /// The nodes of `edge` under `defl`, if it is a curve meshed here.
-pub fn edge_nodes(vertices: &[DVec3], edge: &MeshEdge, _defl: Deflection) -> Option<EdgeNodes> {
+pub fn edge_nodes(vertices: &[DVec3], edge: &MeshEdge, defl: Deflection) -> Option<EdgeNodes> {
     let (a, b) = (*vertices.get(edge.v[0] as usize)?, *vertices.get(edge.v[1] as usize)?);
     match edge.curve {
         Some(Curve::Line) => Some(EdgeNodes { points: vec![a, b], params: vec![edge.t0, edge.t1] }),
+        Some(Curve::Circle { center, normal, xdir, radius }) => {
+            // BRepMesh's split (BRepMesh_CurveTessellator, GCPnts_TangentialDeflection's circle): half the
+            // deflections, at least 3 segments, equal steps; the ends are the vertices.
+            let arc = edge.t1 - edge.t0;
+            if !(arc > 0.0 && arc <= std::f64::consts::TAU + 1e-9 && radius > 1e-7) {
+                return None;
+            }
+            let (lin, ang) = (0.5 * defl.linear, 0.5 * defl.angular);
+            let chord = 2.0 * (1.0 - lin / radius).max(0.0).acos();
+            let step = chord.min(ang).max((1e-7 / radius).min(std::f64::consts::FRAC_PI_2));
+            let n = ((arc / step).ceil().min(1e6) as usize).max(3);
+            let du = arc / n as f64;
+            let ydir = normal.cross(xdir);
+            let mut points = Vec::with_capacity(n + 1);
+            let mut params = Vec::with_capacity(n + 1);
+            for k in 0..=n {
+                let t = if k == n { edge.t1 } else { edge.t0 + k as f64 * du };
+                params.push(t);
+                points.push(match k {
+                    0 => a,
+                    _ if k == n => b,
+                    _ => center + radius * (t.cos() * xdir + t.sin() * ydir),
+                });
+            }
+            Some(EdgeNodes { points, params })
+        }
         _ => None,
     }
 }
 
-/// Meshes the faces of a body (`vertices`, `edges`, `faces`; `None`: a face not meshed here) that are meshed
-/// here.
-pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[Option<MeshFace>], defl: Deflection) -> BodyMesh {
+/// Meshes the faces of a body (`vertices`, `edges`, `faces`) that are meshed here.
+pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], defl: Deflection) -> BodyMesh {
     let mut out = BodyMesh { edges: vec![None; edges.len()], faces: Vec::with_capacity(faces.len()) };
     let mut done = vec![false; edges.len()];
     for f in faces {
@@ -96,7 +130,31 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[Option<MeshFac
             }
             out.edges[e].clone()
         };
-        out.faces.push(f.as_ref().and_then(|f| mesh_face(vertices, edges, f, &mut nodes)));
+        out.faces.push(mesh_face(vertices, edges, f, &mut nodes));
+    }
+    // A circle on a face declined here is split by BRepMesh for that face: the faces meshed here on it would
+    // not share its nodes. Declined in turn, until none is left.
+    let mut on_edge: Vec<Vec<usize>> = vec![Vec::new(); edges.len()];
+    for (i, f) in faces.iter().enumerate() {
+        for u in f.loops.iter().flatten() {
+            if let Some(l) = on_edge.get_mut(u.edge as usize).filter(|l| !l.contains(&i)) {
+                l.push(i);
+            }
+        }
+    }
+    loop {
+        let mut changed = false;
+        for (e, l) in on_edge.iter().enumerate() {
+            if matches!(edges[e].curve, Some(Curve::Line)) || l.iter().all(|&i| out.faces[i].is_some()) || l.iter().all(|&i| out.faces[i].is_none()) {
+                continue;
+            }
+            for &i in l {
+                changed |= out.faces[i].take().is_some();
+            }
+        }
+        if !changed {
+            break;
+        }
     }
     out
 }
@@ -105,7 +163,172 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[Option<MeshFac
 fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &mut dyn FnMut(u32) -> Option<EdgeNodes>) -> Option<FaceMesh> {
     match face.surface {
         MeshSurface::Plane { origin, normal, xdir } => mesh_plane(vertices, edges, face, origin, normal, xdir, nodes),
+        MeshSurface::Cylinder { origin, axis, xdir, direct, radius } => mesh_strip(edges, face, &Revolved { origin, axis, xdir, direct, radius, angle: 0.0 }, nodes),
+        MeshSurface::Cone { origin, axis, xdir, direct, radius, angle } => mesh_strip(edges, face, &Revolved { origin, axis, xdir, direct, radius, angle }, nodes),
+        MeshSurface::Other => None,
     }
+}
+
+/// A cylinder (`angle` 0) or cone in OCCT's parameters.
+struct Revolved {
+    origin: DVec3,
+    axis: DVec3,
+    xdir: DVec3,
+    direct: bool,
+    radius: f64,
+    angle: f64,
+}
+
+impl Revolved {
+    fn ydir(&self) -> DVec3 {
+        let y = self.axis.cross(self.xdir);
+        if self.direct { y } else { -y }
+    }
+    /// (u in (−π, π], v) of a point on the surface.
+    fn uv(&self, p: DVec3) -> DVec2 {
+        let d = p - self.origin;
+        let u = d.dot(self.ydir()).atan2(d.dot(self.xdir));
+        DVec2::new(u, d.dot(self.axis) / self.angle.cos())
+    }
+    /// The surface's own normal (∂u × ∂v, unit) at (u, v), if not at an apex.
+    fn normal(&self, q: DVec2) -> Option<DVec3> {
+        let (s, c) = self.angle.sin_cos();
+        let radial = q.x.cos() * self.xdir + q.x.sin() * self.ydir();
+        let du = (self.radius + q.y * s) * (-q.x.sin() * self.xdir + q.x.cos() * self.ydir());
+        let dv = s * radial + c * self.axis;
+        let n = du.cross(dv);
+        (n.length() > 1e-12 * self.radius.max(1e-9)).then(|| n.normalize())
+    }
+}
+
+/// A cylinder or cone between two rims at constant v (circles round the axis) and at most two sides at
+/// constant u (straight edges along it, seams): the rims' nodes zipped by u, as the kernel's strips.
+fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &mut dyn FnMut(u32) -> Option<EdgeNodes>) -> Option<FaceMesh> {
+    if face.loops.len() > 2 {
+        return None;
+    }
+    // Every use's nodes in (u, v), u unwrapped along each loop (a seam's two uses at u and u + 2π).
+    struct Side {
+        uv: Vec<DVec2>,
+        points: Vec<DVec3>,
+    }
+    let mut sides: Vec<(usize, usize, Side)> = Vec::new();
+    for (l, uses) in face.loops.iter().enumerate() {
+        let (pts, per_use) = loop_nodes(edges, uses, nodes)?;
+        let mut uv: Vec<DVec2> = pts.iter().map(|&p| s.uv(p)).collect();
+        for k in 1..uv.len() {
+            let mut du = uv[k].x - uv[k - 1].x;
+            du -= (du / std::f64::consts::TAU).round() * std::f64::consts::TAU;
+            uv[k].x = uv[k - 1].x + du;
+        }
+        // The closing node (the loop's first again) at its unwrapped place after the last.
+        let close = {
+            let mut du = uv[0].x - uv[uv.len() - 1].x;
+            du -= (du / std::f64::consts::TAU).round() * std::f64::consts::TAU;
+            DVec2::new(uv[uv.len() - 1].x + du, uv[0].y)
+        };
+        for (k, idx) in per_use.iter().enumerate() {
+            // Along the use: from v[0] to v[1] reversed when the use runs backwards.
+            let along: Vec<usize> = if uses[k].reversed { idx.iter().rev().copied().collect() } else { idx.clone() };
+            let n = along.len();
+            let side_uv: Vec<DVec2> = along
+                .iter()
+                .enumerate()
+                .map(|(j, &i)| {
+                    // The last node of the loop's last use is the loop's first, one turn on.
+                    if j + 1 == n && i == 0 { close } else { uv[i] }
+                })
+                .collect();
+            sides.push((l, k, Side { uv: side_uv, points: along.iter().map(|&i| pts[i]).collect() }));
+        }
+    }
+    let (umin, umax) = sides.iter().flat_map(|(_, _, sd)| sd.uv.iter()).fold((f64::MAX, f64::MIN), |(a, b), q| (a.min(q.x), b.max(q.x)));
+    let span = sides.iter().flat_map(|(_, _, sd)| sd.uv.iter()).fold(0.0f64, |m, q| m.max(q.y.abs())).max(umax - umin).max(1.0);
+    let tol = 1e-9 * span.max(s.radius);
+    // Rims (v constant) and sides (u constant).
+    let mut rims: Vec<(f64, Vec<(f64, DVec3)>)> = Vec::new();
+    let mut cols: Vec<(f64, Vec<(f64, DVec3)>)> = Vec::new();
+    for (_, _, sd) in &sides {
+        let (v0, v1) = sd.uv.iter().fold((f64::MAX, f64::MIN), |(a, b), q| (a.min(q.y), b.max(q.y)));
+        let (u0, u1) = sd.uv.iter().fold((f64::MAX, f64::MIN), |(a, b), q| (a.min(q.x), b.max(q.x)));
+        if v1 - v0 <= tol {
+            let at = match rims.iter().position(|r| (r.0 - v0).abs() <= tol) {
+                Some(i) => i,
+                None => {
+                    rims.push((v0, Vec::new()));
+                    rims.len() - 1
+                }
+            };
+            rims[at].1.extend(sd.uv.iter().zip(&sd.points).map(|(q, p)| (q.x, *p)));
+        } else if u1 - u0 <= tol {
+            let at = match cols.iter().position(|c| (c.0 - u0).abs() <= tol) {
+                Some(i) => i,
+                None => {
+                    cols.push((u0, Vec::new()));
+                    cols.len() - 1
+                }
+            };
+            cols[at].1.extend(sd.uv.iter().zip(&sd.points).map(|(q, p)| (q.y, *p)));
+        } else {
+            return None;
+        }
+    }
+    if rims.len() != 2 || cols.len() > 2 || cols.iter().any(|c| (c.0 - umin).abs() > tol && (c.0 - umax).abs() > tol) {
+        return None;
+    }
+    rims.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let (vlo, vhi) = (rims[0].0, rims[1].0);
+    // Each rim by u, shared ends once, from umin to umax; each side only its two rim ends (straight along v).
+    for r in rims.iter_mut() {
+        r.1.sort_by(|a, b| a.0.total_cmp(&b.0));
+        r.1.dedup_by(|b, a| b.0 - a.0 <= tol);
+        if r.1.len() < 2 || (r.1[0].0 - umin).abs() > tol || (r.1[r.1.len() - 1].0 - umax).abs() > tol {
+            return None;
+        }
+    }
+    for c in &cols {
+        if c.1.iter().any(|(v, _)| (v - vlo).abs() > tol && (v - vhi).abs() > tol) {
+            return None;
+        }
+    }
+    let (lo, hi) = (&rims[0].1, &rims[1].1);
+    let (nlo, nhi) = (lo.len(), hi.len());
+    let mut points = Vec::with_capacity(nlo + nhi);
+    let mut normals = Vec::with_capacity(nlo + nhi);
+    for (r, v) in [(lo, vlo), (hi, vhi)] {
+        for &(u, p) in r.iter() {
+            points.push(p);
+            normals.push(s.normal(DVec2::new(u, v))?);
+        }
+    }
+    // Zip the rims (counter-clockwise in (u, v)), advancing on the rim whose next node comes first.
+    let mut triangles = Vec::with_capacity(nlo + nhi - 2);
+    let (mut i, mut j) = (0, 0);
+    while i + 1 < nlo || j + 1 < nhi {
+        let on_lo = j + 1 == nhi || (i + 1 < nlo && lo[i + 1].0 <= hi[j + 1].0);
+        if on_lo {
+            triangles.push([i as u32, (i + 1) as u32, (nlo + j) as u32]);
+            i += 1;
+        } else {
+            triangles.push([i as u32, (nlo + j + 1) as u32, (nlo + j) as u32]);
+            j += 1;
+        }
+    }
+    // Each use's nodes: found by (u, v), listed from the edge's start.
+    let node_of = |q: DVec2| -> Option<u32> {
+        let (r, base) = if (q.y - vlo).abs() <= tol { (lo, 0) } else if (q.y - vhi).abs() <= tol { (hi, nlo) } else { return None };
+        let k = r.partition_point(|x| x.0 < q.x - tol);
+        (k < r.len() && (r[k].0 - q.x).abs() <= tol).then_some((base + k) as u32)
+    };
+    let mut edge_nodes: Vec<Vec<Vec<u32>>> = face.loops.iter().map(|l| vec![Vec::new(); l.len()]).collect();
+    for (l, k, sd) in &sides {
+        let mut ids: Vec<u32> = sd.uv.iter().map(|&q| node_of(q)).collect::<Option<_>>()?;
+        if face.loops[*l][*k].reversed {
+            ids.reverse();
+        }
+        edge_nodes[*l][*k] = ids;
+    }
+    Some(FaceMesh { points, normals, triangles, edge_nodes })
 }
 
 /// A loop's nodes in order round it (each shared vertex once), and per use the indices of its edge's nodes
@@ -115,8 +338,7 @@ fn loop_nodes(edges: &[MeshEdge], uses: &[Use], nodes: &mut dyn FnMut(u32) -> Op
         let e = edges.get(u.edge as usize)?;
         Some(if u.reversed { (e.v[1], e.v[0]) } else { (e.v[0], e.v[1]) })
     };
-    // In order round the loop (wires needn't list their edges so): each use's end the next one's start; a
-    // vertex two uses start from (a loop touching itself) is ambiguous.
+    // In order round the loop (wires needn't list their edges so): each use's end the next one's start.
     let mut order = Vec::with_capacity(uses.len());
     let mut left: Vec<usize> = (0..uses.len()).collect();
     let mut at = 0;
@@ -124,11 +346,15 @@ fn loop_nodes(edges: &[MeshEdge], uses: &[Use], nodes: &mut dyn FnMut(u32) -> Op
         let i = left.remove(at);
         order.push(i);
         let end = ends(&uses[i])?.1;
-        let next: Vec<usize> = (0..left.len()).filter(|&k| ends(&uses[left[k]]).is_some_and(|e| e.0 == end)).collect();
-        match (next.as_slice(), left.is_empty()) {
-            ([k], _) => at = *k,
-            ([], true) => {}
-            _ => return None,
+        // Several (a seam's vertex: the rim on and the seam back both start there): not back along the edge
+        // just walked, then the next one in the given order.
+        let next = (0..left.len())
+            .filter(|&k| ends(&uses[left[k]]).is_some_and(|e| e.0 == end))
+            .min_by_key(|&k| (uses[left[k]].edge == uses[i].edge, (left[k] + uses.len() - i) % uses.len()));
+        match (next, left.is_empty()) {
+            (Some(k), _) => at = k,
+            (None, true) => {}
+            (None, false) => return None,
         }
     }
     if ends(&uses[*order.last()?])?.1 != ends(&uses[order[0]])?.0 {

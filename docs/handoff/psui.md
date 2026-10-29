@@ -178,6 +178,14 @@ App edit → `cargo build -p noshape`: 60–78 s. A vendor gpui-base / gpui-pre-
 that touches the model: ~12 min.
 
 ## Next, in order
+
+N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes bounded by lines; crates/brep
+     `mesh`, cpp/mesh_rust.cpp after core's cache, NOSHAPE_MESH_RUST=0 off); step 2 (this commit): circles split as
+     BRepMesh splits them, planes with holes, cylinders and cones between two rims (zipped as the kernel's strips),
+     a face on a circle a BRepMesh face shares declined to a fixpoint (watertight), seams' two polygons. T1 kernel
+     rust_mesh::* (fins, holes, countersink, an angled hole left to BRepMesh, pattern instances). Next: measure
+     (pattern_second fin plate, live-30-features open / edit, release, NOSHAPE_MESH_RUST=0 vs on), then spheres and
+     tori (grids), cone apexes, and the bodies the Rust Boolean keeps (no OCCT reads).
 0. **After the cold-start work: our own display mesher (lead 10-28 21:05, user-approved).** `brep::mesh` in crates/brep
    (bool's crate, its Body / Surface / Curve types): planes (polygons with holes), cylinders, cones, spheres, tori from
    their exact parameterisation, shared edge samples (watertight), the display's deflection rules; anything else

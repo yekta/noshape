@@ -44,15 +44,14 @@ pub(crate) fn brep_mesh(input: &MeshIn, out: &mut MeshOut) -> bool {
             MeshEdge { curve, v: [input.edges[2 * i], input.edges[2 * i + 1]], t0: c[11], t1: c[12] }
         })
         .collect();
-    let mut faces: Vec<Option<MeshFace>> = Vec::with_capacity(nf);
+    let mut faces: Vec<MeshFace> = Vec::with_capacity(nf);
     for f in 0..nf {
         let s = &input.surfaces[13 * f..13 * f + 13];
         let surface = match s[0] as u8 {
             0 => MeshSurface::Plane { origin: v3(s, 1), normal: v3(s, 4), xdir: v3(s, 7) },
-            _ => {
-                faces.push(None);
-                continue;
-            }
+            1 => MeshSurface::Cylinder { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], direct: s[12] > 0.5 },
+            2 => MeshSurface::Cone { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], angle: s[11], direct: s[12] > 0.5 },
+            _ => MeshSurface::Other,
         };
         let (l0, l1) = (input.face_loops[f] as usize, input.face_loops[f + 1] as usize);
         if l1 < l0 || l1 + 1 > input.loop_uses.len() {
@@ -70,7 +69,7 @@ pub(crate) fn brep_mesh(input: &MeshIn, out: &mut MeshOut) -> bool {
             }
             loops.push(uses);
         }
-        faces.push(Some(MeshFace { surface, loops }));
+        faces.push(MeshFace { surface, loops });
     }
     let m = mesh_body(&vertices, &edges, &faces, Deflection { linear: input.linear, angular: input.angular });
     out.face_nodes.push(0);

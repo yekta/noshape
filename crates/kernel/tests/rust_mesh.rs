@@ -72,7 +72,9 @@ fn same_as_brepmesh(s: &Shape) -> usize {
     assert_eq!(rust.faces.len(), occt.faces.len());
     let tol = s.bounding_box(false).unwrap().diagonal() * 1e-6;
     for (i, (a, b)) in faces(&rust).into_iter().zip(faces(&occt)).enumerate() {
-        assert!((a.0 - b.0).abs() <= 1e-6 * b.0.max(MM * MM), "face {i}: area {} against BRepMesh's {}", a.0, b.0);
+        // Within the polygons' own error: a 144-gon's area is 1 − 8e-5 of its circle's (BRepMesh triangulates a
+        // cone between the same rims a little differently).
+        assert!((a.0 - b.0).abs() <= 2e-4 * b.0.max(MM * MM), "face {i}: area {} against BRepMesh's {}", a.0, b.0);
         assert!((a.1 - b.1).abs().max_element() <= tol && (a.2 - b.2).abs().max_element() <= tol, "face {i}: bounds");
     }
     assert_eq!(rust.edges.len(), occt.edges.len());
@@ -101,11 +103,32 @@ fn planes_bounded_by_lines_mesh_as_brepmesh_meshes_them() {
 }
 
 #[test]
-fn faces_with_curved_edges_stay_brepmesh_and_the_mesh_stays_watertight() {
-    // A plate with four holes: its top and bottom have circles (BRepMesh's), its sides only lines (ours).
+fn holes_mesh_as_brepmesh_meshes_them() {
+    // A plate with four through holes: planes with circles, cylinders with seams.
     let plate = make_box_corners(DVec3::ZERO, DVec3::new(40.0, 20.0, 5.0) * MM).unwrap();
     let holes: Vec<Shape> = (0..4).map(|i| make_cylinder(&Plane::new(DVec3::new(5.0 + 10.0 * i as f64, 10.0, -1.0) * MM, DVec3::Z, DVec3::X), 2.0 * MM, 7.0 * MM, TAU).unwrap()).collect();
     let s = boolean(BooleanOp::Cut, &[plate], &holes, &BooleanOptions::default()).unwrap().shape;
+    assert_eq!(same_as_brepmesh(&s), s.faces().len(), "every face");
+}
+
+#[test]
+fn a_countersink_meshes_as_brepmesh_meshes_it() {
+    // A hole with a 90° countersink: a cone between two circles.
+    let plate = make_box_corners(DVec3::new(-10.0, -10.0, 0.0) * MM, DVec3::new(10.0, 10.0, 5.0) * MM).unwrap();
+    let hole = make_cylinder(&Plane::new(DVec3::new(0.0, 0.0, -1.0) * MM, DVec3::Z, DVec3::X), 2.0 * MM, 7.0 * MM, TAU).unwrap();
+    let sink = make_cone(&Plane::new(DVec3::new(0.0, 0.0, 3.0) * MM, DVec3::Z, DVec3::X), 1.0 * MM, 4.0 * MM, 3.0 * MM, TAU).unwrap();
+    let s = boolean(BooleanOp::Cut, &[plate], &[hole, sink], &BooleanOptions::default()).unwrap().shape;
+    assert_eq!(same_as_brepmesh(&s), s.faces().len(), "every face");
+}
+
+#[test]
+fn faces_on_curves_brepmesh_splits_stay_brepmesh_and_the_mesh_stays_watertight() {
+    // A hole drilled at an angle: its rims are ellipses (BRepMesh's), so the hole and the faces it cuts are
+    // BRepMesh's; the plate's sides are ours.
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(40.0, 20.0, 5.0) * MM).unwrap();
+    let axis = DVec3::new(0.3, 0.0, 1.0).normalize();
+    let hole = make_cylinder(&Plane::new(DVec3::new(20.0, 10.0, -5.0) * MM, axis, DVec3::Y), 2.0 * MM, 15.0 * MM, TAU).unwrap();
+    let s = boolean(BooleanOp::Cut, &[plate], &[hole], &BooleanOptions::default()).unwrap().shape;
     assert_eq!(same_as_brepmesh(&s), 4, "the four sides");
 }
 
