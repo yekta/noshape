@@ -341,6 +341,20 @@ impl DrawingEditor {
     }
 
     /// A point in a view: snap, else the point on a hovered edge, else free.
+    /// The centermark (placed or automatic) under `s`: its center.
+    fn centermark_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
+        let b = self.built.as_ref()?;
+        let h = b.hit(s, self.pk().tol_mm(5.0))?;
+        match b.picks.get(h as usize)? {
+            PickTarget::AutoCentermark { view, center } => Some(PickedPoint { view: *view, p: [center[0] as f64 / 1e9, center[1] as f64 / 1e9], r: None }),
+            PickTarget::Annotation(id) => match self.current_sheet().annotations.iter().find(|a| a.id == *id) {
+                Some(Annotation { kind: AnnotationKind::Centermark { view, center, .. }, refs, .. }) => Some(PickedPoint { view: *view, p: *center, r: refs.first().map(|r| r.point.clone()) }),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
     pub fn any_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
         self.pk().any_point(s)
     }
@@ -919,7 +933,9 @@ impl DrawingEditor {
                 // CALLOUT-ON-DIMENSION), else on the geometry.
                 let on = self.pk().dimension_anchor(c);
                 self.datum_on = on.as_ref().map(|o| o.1);
-                if let Some(p) = on.map(|o| o.0).or_else(|| self.any_point(c)) {
+                // On a centermark: its center (help callout_balloon, drawing.md A22).
+                let mark = if on.is_none() { self.centermark_point(c) } else { None };
+                if let Some(p) = on.map(|o| o.0).or(mark).or_else(|| self.any_point(c)) {
                     self.tool = Tool::Balloon { anchor: Some(p) };
                 } else {
                     // Empty space: a callout without a leader, right there.
