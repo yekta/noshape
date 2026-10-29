@@ -2353,3 +2353,85 @@ export const oRing = defineFeature(function(context is Context, id is Id, defini
         opRevolve(context, id + "ring", { "entities" : qSketchRegion(id + "sketch"), "axis" : line(vector(Z, Z, Z), vector(0, 0, 1)), "angleForward" : 2 * PI * radian });
         opDeleteBodies(context, id + "deleteSketch", { "entities" : qCreatedBy(id + "sketch", EntityType.BODY) });
     });
+
+/**
+ * Live's DIN 923 slotted pan head screw with shoulder (raw /features,
+ * behaviours "skasm (2026-10-27) standard content gaps"): one revolved
+ * sketch, the shoulder end at z = 0 (live's "Near" connector) with the head
+ * above: the pan head (dk, k) with its top edge chamfered c, a fillet rf into
+ * the shoulder (ds, l long), the shoulder end, the thread neck (dn) with
+ * fillets rn into the shoulder end and into a 30 degree taper out to d, which
+ * it reaches ln below the shoulder end, the thread down to b below it, its
+ * end chamfered 0.625 of the thread's triangle height; then the slot (n wide,
+ * t deep) across the head.
+ */
+annotation { "Feature Type Name" : "Shoulder screw" }
+export const shoulderScrew = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "d" }
+        isLength(definition.d, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "l" }
+        isLength(definition.l, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dk" }
+        isLength(definition.dk, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "k" }
+        isLength(definition.k, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "ds" }
+        isLength(definition.ds, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "rf" }
+        isLength(definition.rf, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "c" }
+        isLength(definition.c, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dn" }
+        isLength(definition.dn, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "ln" }
+        isLength(definition.ln, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "rn" }
+        isLength(definition.rn, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "b" }
+        isLength(definition.b, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "p" }
+        isLength(definition.p, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "n" }
+        isLength(definition.n, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "t" }
+        isLength(definition.t, NONNEGATIVE_LENGTH_BOUNDS);
+    }
+    {
+        const R = definition.dk / 2;
+        const rs = definition.ds / 2;
+        const rh = definition.rf;
+        const rnk = definition.dn / 2;
+        const f = definition.rn;
+        const rm = definition.d / 2;
+        const ls = definition.l;
+        const top = ls + definition.k;
+        const c = definition.c;
+        const ch = 0.625 * 0.8660254 * definition.p;
+        const s45 = sqrt(0.5);
+        // The taper: from the neck fillet's end (30 degrees round from the
+        // neck) at 30 degrees from the axis out to d, reached ln down.
+        const p9x = rnk + f * (1 - cos(30 * degree));
+        const run = (rm - p9x) / sin(30 * degree);
+        const zc = -definition.ln + run * cos(30 * degree) + f / 2;
+        const body = revolveProfile(context, id + "body", [
+                    { "p" : rz(Z, top) },
+                    { "p" : rz(R - c, top) },
+                    { "p" : rz(R, top - c) },
+                    { "p" : rz(R, ls) },
+                    { "p" : rz(rs + rh, ls) },
+                    { "p" : rz(rs, ls - rh), "mid" : rz(rs + rh - rh * s45, ls - rh + rh * s45) },
+                    { "p" : rz(rs, Z) },
+                    { "p" : rz(rnk + f, Z) },
+                    { "p" : rz(rnk, -f), "mid" : rz(rnk + f - f * s45, -f + f * s45) },
+                    { "p" : rz(rnk, zc) },
+                    { "p" : rz(p9x, zc - f / 2), "mid" : rz(rnk + f - f * cos(15 * degree), zc - f * sin(15 * degree)) },
+                    { "p" : rz(rm, -definition.ln) },
+                    { "p" : rz(rm, -definition.b + ch) },
+                    { "p" : rz(rm - ch, -definition.b) },
+                    { "p" : rz(Z, -definition.b) }
+                ]);
+        const slot = cuboid(context, id + "slot", vector(-definition.n / 2, -R - definition.k, top - definition.t), vector(definition.n / 2, R + definition.k, top + definition.k));
+        subtract(context, id + "cut", body, slot);
+    });

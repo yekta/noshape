@@ -23,6 +23,8 @@ pub enum Shape {
     Key,
     RetainingRing,
     ORing,
+    /// A revolved shoulder screw as live's DIN 923 (shoulder end at z = 0).
+    ShoulderScrew,
 }
 
 impl Shape {
@@ -36,11 +38,12 @@ impl Shape {
             Shape::Key => "key",
             Shape::RetainingRing => "retainingRing",
             Shape::ORing => "oRing",
+            Shape::ShoulderScrew => "shoulderScrew",
         }
     }
     /// Whether the component has a length (bolts, screws, pins, keys).
     pub fn has_length(self) -> bool {
-        matches!(self, Shape::Screw | Shape::Pin | Shape::Key)
+        matches!(self, Shape::Screw | Shape::Pin | Shape::Key | Shape::ShoulderScrew)
     }
     /// Nuts, washers, rings fit over a shaft: auto-size rounds up.
     pub fn fits_over(self) -> bool {

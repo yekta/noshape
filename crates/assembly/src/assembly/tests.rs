@@ -4599,6 +4599,47 @@ fn ansi_taper_pin_has_live_crowned_ends() {
     }
 }
 
+/// DIN 923 slotted pan head screw with shoulder as live's component (behaviours
+/// "skasm (2026-10-27) standard content gaps": M1.4 x 0.5 has 19 faces,
+/// PLANE 8, CONE 4, CYLINDER 4, TORUS 3, 11.8897749 mm³ in 11.885 – 11.895);
+/// the shoulder end at z = 0, the head above, the thread below; every size
+/// regenerates.
+#[test]
+fn din_923_shoulder_screw_matches_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let c = CATALOGUE.iter().find(|c| c.name == "Slotted pan head screw with shoulder DIN 923").unwrap();
+    assert_eq!(c.length_label(), "Shoulder length");
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("M1.4");
+    spec.length = Some("0.5".into());
+    assert_eq!(spec.part_name(), "Slotted pan head screw with shoulder M1.4x0.30 x 0.5");
+    let r = standard::regenerate(&spec).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let v = b.shape.volume().unwrap() * 1e9;
+    let mut kinds = std::collections::BTreeMap::new();
+    for i in 0..b.faces.len() {
+        let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+            Surface::Plane(_) => "plane",
+            Surface::Cone { .. } => "cone",
+            Surface::Cylinder { .. } => "cylinder",
+            Surface::Torus { .. } => "torus",
+            _ => "other",
+        };
+        *kinds.entry(k).or_insert(0) += 1;
+    }
+    let bb = b.shape.bounding_box(true).unwrap();
+    assert_eq!(kinds, [("cone", 4), ("cylinder", 4), ("plane", 8), ("torus", 3)].into_iter().collect(), "{v} mm³");
+    assert!((11.885..=11.895).contains(&v), "{v} mm³, live 11.8897749");
+    assert!((bb.max.z * 1e3 - 1.4).abs() < 1e-6 && (bb.min.z * 1e3 + 2.2).abs() < 1e-6, "z {} .. {}", bb.min.z * 1e3, bb.max.z * 1e3);
+    for s in &c.sizes {
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(&s.name);
+        let r = standard::regenerate(&spec).unwrap();
+        assert!(standard::part_body(&r).is_some(), "{}", s.name);
+    }
+}
+
 /// ANSI commercial taper pins and slotted spring pins with live's whole size
 /// lists (its FSRules tables, behaviours "skasm (2026-10-27) standard content
 /// gaps": taper pins from #7/0, spring pins with 9/64, 5/8, 3/4); every size

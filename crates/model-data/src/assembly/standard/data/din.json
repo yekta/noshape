@@ -11932,6 +11932,332 @@
    {
     "category": "Bolts & screws",
     "class": "Slotted head screws",
+    "name": "Slotted pan head screw with shoulder DIN 923",
+    "shape": "shoulderScrew",
+    "form": {},
+    "sizes": [
+     {
+      "name": "M1.4",
+      "label": "Slotted pan head screw with shoulder M1.4x0.30",
+      "d": 1.4,
+      "dims": {
+       "d": 1.4,
+       "dk": 3.5,
+       "k": 0.9,
+       "ds": 2.0,
+       "rf": 0.1,
+       "c": 0.25,
+       "dn": 0.9,
+       "ln": 1.05,
+       "rn": 0.16,
+       "b": 2.2,
+       "p": 0.3,
+       "n": 0.3,
+       "t": 0.6
+      },
+      "lengths": [
+       "0.5",
+       "0.6",
+       "0.8",
+       "1",
+       "1.2",
+       "1.4",
+       "1.5",
+       "1.6",
+       "1.8",
+       "2",
+       "2.5",
+       "3",
+       "4"
+      ]
+     },
+     {
+      "name": "M1.6",
+      "label": "Slotted pan head screw with shoulder M1.6x0.35",
+      "d": 1.6,
+      "dims": {
+       "d": 1.6,
+       "dk": 4.0,
+       "k": 1.0,
+       "ds": 2.5,
+       "rf": 0.1,
+       "c": 0.25,
+       "dn": 1.0,
+       "ln": 1.2,
+       "rn": 0.16,
+       "b": 2.5,
+       "p": 0.35,
+       "n": 0.4,
+       "t": 0.7
+      },
+      "lengths": [
+       "0.8",
+       "1",
+       "1.2",
+       "1.4",
+       "1.5",
+       "1.6",
+       "1.8",
+       "2",
+       "2.5",
+       "3",
+       "4",
+       "5"
+      ]
+     },
+     {
+      "name": "M2",
+      "label": "Slotted pan head screw with shoulder M2x0.40",
+      "d": 2.0,
+      "dims": {
+       "d": 2.0,
+       "dk": 4.5,
+       "k": 1.2,
+       "ds": 2.8,
+       "rf": 0.1,
+       "c": 0.3,
+       "dn": 1.2,
+       "ln": 1.4,
+       "rn": 0.2,
+       "b": 3.0,
+       "p": 0.4,
+       "n": 0.5,
+       "t": 0.8
+      },
+      "lengths": [
+       "1",
+       "1.2",
+       "1.4",
+       "1.5",
+       "1.6",
+       "1.8",
+       "2",
+       "2.5",
+       "3",
+       "4",
+       "5",
+       "6"
+      ]
+     },
+     {
+      "name": "M2.5",
+      "label": "Slotted pan head screw with shoulder M2.5x0.45",
+      "d": 2.5,
+      "dims": {
+       "d": 2.5,
+       "dk": 6.0,
+       "k": 1.5,
+       "ds": 3.5,
+       "rf": 0.1,
+       "c": 0.4,
+       "dn": 1.8,
+       "ln": 1.6,
+       "rn": 0.2,
+       "b": 3.5,
+       "p": 0.45,
+       "n": 0.6,
+       "t": 0.95
+      },
+      "lengths": [
+       "1.2",
+       "1.4",
+       "1.5",
+       "1.6",
+       "1.8",
+       "2",
+       "2.5",
+       "3",
+       "4",
+       "5",
+       "6"
+      ]
+     },
+     {
+      "name": "M3",
+      "label": "Slotted pan head screw with shoulder M3x0.50",
+      "d": 3.0,
+      "dims": {
+       "d": 3.0,
+       "dk": 7.0,
+       "k": 1.8,
+       "ds": 4.0,
+       "rf": 0.1,
+       "c": 0.45,
+       "dn": 2.2,
+       "ln": 1.75,
+       "rn": 0.2,
+       "b": 4.5,
+       "p": 0.5,
+       "n": 0.8,
+       "t": 1.15
+      },
+      "lengths": [
+       "1.4",
+       "1.5",
+       "1.6",
+       "1.8",
+       "2",
+       "2.5",
+       "3",
+       "4",
+       "5",
+       "6",
+       "10"
+      ]
+     },
+     {
+      "name": "M4",
+      "label": "Slotted pan head screw with shoulder M4x0.70",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "dk": 8.5,
+       "k": 2.4,
+       "ds": 5.5,
+       "rf": 0.2,
+       "c": 0.6,
+       "dn": 2.9,
+       "ln": 2.45,
+       "rn": 0.4,
+       "b": 6.0,
+       "p": 0.7,
+       "n": 1.0,
+       "t": 1.5
+      },
+      "lengths": [
+       "2",
+       "2.5",
+       "3",
+       "4",
+       "5",
+       "6",
+       "10"
+      ]
+     },
+     {
+      "name": "M5",
+      "label": "Slotted pan head screw with shoulder M5x0.80",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "dk": 11.0,
+       "k": 2.7,
+       "ds": 7.0,
+       "rf": 0.2,
+       "c": 0.7,
+       "dn": 3.7,
+       "ln": 2.8,
+       "rn": 0.4,
+       "b": 7.0,
+       "p": 0.8,
+       "n": 1.2,
+       "t": 1.6
+      },
+      "lengths": [
+       "2.5",
+       "3",
+       "4",
+       "5",
+       "6",
+       "10",
+       "16",
+       "20"
+      ]
+     },
+     {
+      "name": "M6",
+      "label": "Slotted pan head screw with shoulder M6x1.00",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "dk": 13.0,
+       "k": 3.1,
+       "ds": 8.0,
+       "rf": 0.25,
+       "c": 0.8,
+       "dn": 4.4,
+       "ln": 3.5,
+       "rn": 0.6,
+       "b": 9.0,
+       "p": 1.0,
+       "n": 1.6,
+       "t": 1.9
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "10",
+       "16",
+       "20",
+       "25"
+      ]
+     },
+     {
+      "name": "M8",
+      "label": "Slotted pan head screw with shoulder M8x1.25",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dk": 16.0,
+       "k": 3.8,
+       "ds": 10.0,
+       "rf": 0.4,
+       "c": 0.9,
+       "dn": 6.0,
+       "ln": 4.4,
+       "rn": 0.6,
+       "b": 11.0,
+       "p": 1.25,
+       "n": 2.0,
+       "t": 2.4
+      },
+      "lengths": [
+       "4",
+       "5",
+       "6",
+       "10",
+       "16",
+       "20",
+       "25"
+      ]
+     },
+     {
+      "name": "M10",
+      "label": "Slotted pan head screw with shoulder M10x1.50",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "dk": 20.0,
+       "k": 4.6,
+       "ds": 13.0,
+       "rf": 0.4,
+       "c": 1.1,
+       "dn": 7.7,
+       "ln": 5.2,
+       "rn": 0.8,
+       "b": 13.5,
+       "p": 1.5,
+       "n": 2.5,
+       "t": 2.8
+      },
+      "lengths": [
+       "5",
+       "6",
+       "10",
+       "16",
+       "20",
+       "25"
+      ]
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_923_SLOTTED_PAN_HEAD_SHOULDER_SCREW_MAIN / _LENGTHS (DIN 923: 2012-06; component document 77a22c026cb137cd6cf0911e; live/dom/skb-sc-fsrules)",
+    "lengthLabel": "Shoulder length"
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Slotted head screws",
     "name": "Slotted raised countersunk head screw DIN EN ISO 2010",
     "shape": "screw",
     "form": {
