@@ -347,3 +347,44 @@ fn brep_tilted_holes_match_occt() {
     }
     assert!(taken >= 30, "{taken} taken");
 }
+
+/// Cylinders of one radius whose axes meet (cross-drilled holes, a boss across a bar): OCCT's two ellipses, its
+/// curves on both cylinders; noshape's own Boolean takes them as OCCT, at right angles and slanted.
+#[test]
+fn brep_cross_drilled_holes_match_occt() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let mut taken = 0;
+    let mut why_not = Vec::new();
+    for deg in [90.0f64, 60.0] {
+        for (len, r2) in [(40.0, 4.0), (14.0, 4.0), (40.0, 3.0)] {
+            for op in [BooleanOp::Fuse, BooleanOp::Cut, BooleanOp::Common] {
+                let b = make_box_corners(DVec3::ZERO, DVec3::new(40.0, 20.0, 10.0) * mm).unwrap();
+                let down = make_cylinder(&Plane::from_normal(DVec3::new(20.0, 10.0, -5.0) * mm, DVec3::Z), 4.0 * mm, 20.0 * mm, std::f64::consts::TAU).unwrap();
+                let a = deg.to_radians();
+                let d = DVec3::new(a.sin(), 0.0, a.cos());
+                let base = DVec3::new(20.0, 10.0, 5.0) * mm - d * (len / 2.0) * mm;
+                let across = make_cylinder(&Plane::from_normal(base, d), r2 * mm, len * mm, std::f64::consts::TAU).unwrap();
+                let name = format!("{deg}° length {len} r {r2} {op:?}");
+                let tools = [down, across];
+                set_rust_boolean_only(true);
+                let r = boolean(op, std::slice::from_ref(&b), &tools, &BooleanOptions::default());
+                let (path, why) = (last_boolean_path(), last_rust_decline());
+                set_rust_boolean_only(false);
+                set_rust_boolean(Some(false));
+                let o = boolean(op, &[b], &tools, &BooleanOptions::default());
+                set_rust_boolean(None);
+                if path != "rust" {
+                    why_not.push(format!("{name}: {why}"));
+                    continue;
+                }
+                taken += 1;
+                let d = Summary::of(&r.unwrap()).differences(&Summary::of(&o.unwrap()));
+                assert!(d.is_empty(), "{name}: {d:?}");
+            }
+        }
+    }
+    // (Of other radii a curve of the fourth order, a common with several tools, the slanted long one's ends
+    // inside a face: declined.)
+    assert!(taken >= 6, "{taken} taken; declined: {why_not:#?}");
+}

@@ -361,6 +361,22 @@ bool_corpus_replay and export:: (24) pass.
   exact box doesn't), so such vertices are taken only where nothing can be rounded (straight edges along an axis,
   exactly through the vertex), else declined. Crossing edges (a line and a circle): Modified, as before.
 
+## Cylinders at an angle of one radius, axes meeting (10-29 12:10)
+- OCCT cuts them in two ellipses (IntAna_QuadQuadGeo: centred where the axes meet, normals a1 + a2 and a1 - a2,
+  major axes the other, radii r / cos(A/2), r / sin(A/2) and r, a1 the earlier argument's face's axis); the
+  Rust Boolean now does too (`cyl_cyl_angled`), its edges OCCT's own as for planes' ellipses. IntPatch also
+  starts each closed ellipse at its parameter 0 (a vertex there; `section_cut`). Other radii or axes that miss
+  (a curve of the fourth order) still decline, unless the axes are farther apart than the radii's sum.
+- Cross-drilled holes (kernel T1 `brep_replay::brep_cross_drilled_holes_match_occt`, brep
+  `cross_drilled_holes_of_one_radius`): 6 of 6 fuses / cuts taken, as OCCT. The filleted-box Shells' sector slabs
+  (corpus5 d12ad61b, 49de15f4, 616ac3a3, 3–4 s each) now get past this and decline on the vertex rule above.
+- rust_boolean.cpp: NOSHAPE_BOOL_DEBUG prints OCCT's ellipses when none matches ours.
+- Corpus6 (/root/bool-scratch/corpus6, 828 Booleans of today's kernel + model T1 tests, exact slabs): Rust takes
+  564, 0 differ. What's left, by recorded OCCT time (105 s, loaded machine): curved edges 32.8 s (73; helical
+  sweeps against rods 15 s in 3 cases, fillet slabs), a plane along a cone off its axis (hyperbolas, in slab fuses)
+  14.4 s (13), an internal face 13.8 s (1 slab fuse of 72), the vertex rule 10.6 s (5), tolerant inputs 6.9 s,
+  edges crossing on a third's face 5.2 s, an edge ending inside a face 5.1 s.
+
 ## Next
 Measured 10-29 07:37 on corpus5 (929 Booleans recorded from today's model and kernel tests, 105 s of OCCT time
 recorded): the Rust path takes 600, and what it leaves costs mostly:

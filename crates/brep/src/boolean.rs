@@ -648,9 +648,22 @@ impl Ctx {
 
     /// Adds where `path` lies inside both faces to both, as sections.
     fn section(&mut self, fs: usize, ft: usize, path: Path, t0: f64, t1: f64) -> R<()> {
+        self.section_cut(fs, ft, path, t0, t1, None)
+    }
+
+    /// The same, a closed path also cut at parameter `at` (where OCCT's curve starts).
+    fn section_cut(&mut self, fs: usize, ft: usize, path: Path, t0: f64, t1: f64, at: Option<f64>) -> R<()> {
         let tol = self.tol;
         // A circle or ellipse in parts between the faces' seams (a vertex where it crosses one).
         let mut cuts: Vec<(f64, End)> = vec![(t0, End::Open)];
+        if let (Some(t), Path::Ellipse(e)) = (at, path) {
+            let t = t0 + (t - t0).rem_euclid(TAU);
+            if e.length(t0, t) <= tol || e.length(t, t1) <= tol {
+                cuts[0].1 = End::Point(path.at(t));
+            } else {
+                cuts.push((t, End::Point(path.at(t))));
+            }
+        }
         if let Path::Circle(k) = path {
             for f in [fs, ft] {
                 let Some(p) = self.seam_at(f, path) else { continue };
@@ -1038,7 +1051,10 @@ impl Ctx {
         let Surf::Cyl { o: o2, a: a2, r: r2, r0: r02, k: k2, .. } = self.faces[f2].s else { unreachable!() };
         let tol = self.tol;
         if a1.cross(a2).length() > 1e-12 {
-            return Err(Decline("cylinders at an angle"));
+            if k1 != 0.0 || k2 != 0.0 {
+                return Err(Decline("a cone at an angle"));
+            }
+            return self.cyl_cyl_angled(f1, f2);
         }
         let w = o2 - o1;
         let w = w - a1 * w.dot(a1);
@@ -1095,6 +1111,40 @@ impl Ctx {
         let base = ex.dot(y).atan2(ex.dot(x));
         for th in [base + ca.acos(), base - ca.acos()] {
             self.generator(f2, f1, th)?;
+        }
+        Ok(())
+    }
+
+    /// Cylinders at an angle. Apart, nothing; of one radius with their axes meeting, OCCT's two ellipses
+    /// (IntAna_QuadQuadGeo: centred where the axes meet, normals a1 + a2 and a1 - a2 and major axes the other,
+    /// radii r / cos(A / 2), r / sin(A / 2) and r, A the axes' angle; a1 the earlier argument's face's axis); else
+    /// (a curve of the fourth order) declined.
+    fn cyl_cyl_angled(&mut self, f1: usize, f2: usize) -> R<()> {
+        let (f1, f2) = if (self.faces[f2].arg, self.faces[f2].index) < (self.faces[f1].arg, self.faces[f1].index) { (f2, f1) } else { (f1, f2) };
+        let Surf::Cyl { o: o1, a: a1, r: r1, th0, .. } = self.faces[f1].s else { unreachable!() };
+        let Surf::Cyl { o: o2, a: a2, r: r2, .. } = self.faces[f2].s else { unreachable!() };
+        let tol = self.tol;
+        let w = o2 - o1;
+        let dist = a1.cross(a2).normalize().dot(w).abs();
+        if dist > r1 + r2 + GREY * tol {
+            return Ok(());
+        }
+        let rel = (r1 - r2).abs() / r1.max(r2);
+        if dist > 1e-9 || rel > 1e-14 {
+            return Err(Decline("cylinders at an angle"));
+        }
+        let (b, d, e) = (a1.dot(a2), a1.dot(w), a2.dot(w));
+        let c = o1 + a1 * ((d - b * e) / (1.0 - b * b));
+        let (ch, sh) = (((1.0 + b) * 0.5).sqrt(), ((1.0 - b) * 0.5).sqrt());
+        let (sum, diff) = ((a1 + a2).normalize(), (a1 - a2).normalize());
+        for (n, x, major) in [(sum, diff, r1 / ch), (diff, sum, r1 / sh)] {
+            let el = Ell { c, n, x, y: n.cross(x), a: major, b: r1 };
+            let (lo, hi) = (self.faces[f1].lo.max(self.faces[f2].lo), self.faces[f1].hi.min(self.faces[f2].hi));
+            if !boxes_meet(c - DVec3::splat(major), c + DVec3::splat(major), lo, hi, GREY * tol) {
+                continue;
+            }
+            let ts = self.ell_at_angle(f1, &el, th0);
+            self.section_cut(f1, f2, Path::Ellipse(el), ts, ts + TAU, Some(0.0))?;
         }
         Ok(())
     }

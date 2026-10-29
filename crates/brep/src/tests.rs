@@ -493,3 +493,23 @@ fn a_cone_halved_through_its_axis() {
     let clear = boolean(Op::Cut, &[&cone, &cuboid((3.2, 0.0, -1.0), (4.0, 4.0, 2.0))], TOL).unwrap();
     assert_eq!(counts(&clear), (1, 3, 3, 2));
 }
+
+#[test]
+fn cross_drilled_holes_of_one_radius() {
+    // Cylinders of one radius whose axes meet: two ellipses in the planes between them (OCCT's).
+    let block = cuboid((-2.0, -2.0, -2.0), (2.0, 2.0, 2.0));
+    let down = cylinder(0.0, 0.0, 0.5, -3.0, 3.0);
+    let across = turned_about_x(&cylinder(0.0, 0.0, 0.5, -3.0, 3.0), 90f64.to_radians());
+    let cut = boolean(Op::Cut, &[&block, &down, &across], TOL).unwrap();
+    check_used_both_ways(&cut.body);
+    let ellipses: Vec<(f64, f64)> = cut.body.edges.iter().filter_map(|e| if let Curve::Ellipse { major, minor, .. } = e.curve { Some((major, minor)) } else { None }).collect();
+    // (Each also cut where OCCT's curve starts.)
+    assert_eq!(counts(&cut), (1, 10, 26, 16));
+    assert_eq!(ellipses.len(), 6);
+    for (major, minor) in ellipses {
+        assert!((major - 0.5 * 2f64.sqrt()).abs() < 1e-12 && (minor - 0.5).abs() < 1e-12, "{major} {minor}");
+    }
+    // Of other radii: declined.
+    let thinner = turned_about_x(&cylinder(0.0, 0.0, 0.4, -3.0, 3.0), 90f64.to_radians());
+    assert!(boolean(Op::Cut, &[&block, &down, &thinner], TOL).is_err());
+}

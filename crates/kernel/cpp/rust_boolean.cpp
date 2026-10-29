@@ -398,6 +398,22 @@ const char* ellipse_edge(const BrepResult& r, const std::vector<const OcShape*>&
     out.tol = std::max({ic.Tolerance(), BRep_Tool::Tolerance(fa), BRep_Tool::Tolerance(fb)});
     return nullptr;
   }
+  if (std::getenv("NOSHAPE_BOOL_DEBUG"))
+  {
+    std::fprintf(stderr, "ellipse: ours c (%g %g %g) n (%g %g %g)\n", ctr.X(), ctr.Y(), ctr.Z(), n.X(), n.Y(), n.Z());
+    for (const IntTools_Curve& ic : it->second)
+    {
+      const occ::handle<Geom_Ellipse> el = occ::down_cast<Geom_Ellipse>(basis_of(ic.Curve()));
+      if (el.IsNull())
+        continue;
+      const gp_Elips g = el->Elips();
+      std::fprintf(stderr, "  occt c (%g %g %g) n (%g %g %g) x (%g %g %g) [%g, %g]\n", g.Location().X(), g.Location().Y(), g.Location().Z(), g.Axis().Direction().X(), g.Axis().Direction().Y(), g.Axis().Direction().Z(), g.XAxis().Direction().X(), g.XAxis().Direction().Y(), g.XAxis().Direction().Z(), ic.Curve()->FirstParameter(), ic.Curve()->LastParameter());
+      const double t = ic.Curve()->FirstParameter();
+      const gp_Pnt q = ic.Curve()->Value(t);
+      const gp_Pnt2d u1 = ic.FirstCurve2d().IsNull() ? gp_Pnt2d() : ic.FirstCurve2d()->Value(t), u2 = ic.SecondCurve2d().IsNull() ? gp_Pnt2d() : ic.SecondCurve2d()->Value(t);
+      std::fprintf(stderr, "    start (%g %g %g) uv1 (%g %g) uv2 (%g %g)\n", q.X(), q.Y(), q.Z(), u1.X(), u1.Y(), u2.X(), u2.Y());
+    }
+  }
   return "an ellipse unlike OCCT's sections";
 }
 
