@@ -209,6 +209,11 @@ Method: xdotool input on X11, model extents measured from pixels (front face col
 **Covered by unit tests, not separately in the app:** 1.1, 1.2 (`drag_rotate_rate_matches_live`), 1.4 (`inertia_decays_like_onshape`),
 1.16–1.18 (zoom tests), 3.3 / 3.9 (animation timing), 2.7 pinch ratio (`ortho_zoom_amounts_and_pinch_follow_fingers`).
 
+**3.3 / 3.9 in the app (qa 10-29 18:25, green 0cffc7ad):** an x11grab recording at 100 fps (qa-scratch/bin/animrec.sh,
+animfit.py) shows only 3–5 rendered frames per animation on Xvfb + llvmpipe (viewport readback ≈ 100 ms a frame), too few to tell
+linear from smootherstep; an arrow step ends 267 ms after the first change (= 250 ms + a frame), Shift+7 from Front ≈ 530 ms. Easing
+stays covered by the unit tests; a measurement needs a GPU runner.
+
 **Not conclusive here:** 1.11 (Ctrl pressed mid-drag): the screenshot after rotate → Ctrl-pan is plausible but I couldn't separate the two
 parts from one frame; 1.3 rotate centre, 1.12, 1.13, 1.21, 3.4 (key repeat), 3.7 (Assembly), 5.x (Mouse controls page), 6.x (drawing) not
 re-run this pass.
