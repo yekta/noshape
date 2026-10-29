@@ -567,6 +567,19 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - Replays, all 0 differ: corpus5 682 (+16), corpus6 636 (+16); main 680, corpus2 528, corpus3 533, corpus4 573,
   Shell's 71, direct 52 as before. T1: a case (14e82fef) in tests/data/brep.
 
+## Planes at an angle to cones (10-29 22:00 UTC)
+- A plane at an angle to a cone's axis that cuts every ruling of the face's nappe: an ellipse (`plane_cone`), its
+  axes from the two rulings in the plane through the axis and the plane's normal, its centre off the axis; on the
+  cone's face it is mapped point by point (`C2::Conic`, a 3D ellipse through the face's map), its parameter at the
+  seam's angle solved exactly. OCCT's ellipse is matched within the model tolerance as before. T1
+  `brep_replay::brep_cones_cut_at_an_angle_match_occt` (a countersink's frustum and a tilted box: 9 taken, as OCCT).
+- Parabolas (a 45° countersink and a 45° chamfer: corpus6's five slab fuses / cuts, 9.8 s recorded) and hyperbolas
+  at an angle still decline "a plane at an angle to a cone": next.
+- A piece of any curve within the grey band of a face's boundary is judged where it is farthest from the boundary,
+  if clearly off it (was B-splines only): those five cases got past it to the parabola.
+- Replays unchanged, all 0 differ (main 680, corpus2 528, corpus3 533, corpus4 573, corpus5 682, corpus6 636, Shell's
+  71, direct 52).
+
 ## Next
 Free-form, the lead's four steps (13:35) where they stand (10-29 20:45 UTC): (1) profiled (above); (2) the hybrid
 (OCCT's IntTools_FaceFace curves, everything else ours) takes B-spline, torus, sphere, extruded and revolved faces;

@@ -20,6 +20,8 @@ pub(crate) enum C2 {
     Nurbs { c: Arc<NurbsCurve>, t0: f64, t1: f64 },
     /// A 3D NURBS curve's part from `t0` to `t1` seen in a plane's or cylinder's / cone's parameter plane.
     Mapped { c: Arc<NurbsCurve>, t0: f64, t1: f64, m: Map },
+    /// A 3D ellipse `c + u cos a + v sin a`, a from `t0` through `sweep`, seen so (a plane's section of a cone).
+    Conic { c: DVec3, u: DVec3, v: DVec3, t0: f64, sweep: f64, m: Map },
 }
 
 /// A face's map from 3D to its parameter plane (the Boolean's own): a plane's frame, or a cylinder's or cone's
@@ -126,6 +128,15 @@ impl C2 {
                     m.map(p, DVec3::ZERO).0
                 }
             }
+            C2::Conic { c, u, v, t0, sweep, m } => {
+                let a = t0 + sweep * t;
+                let p = c + u * a.cos() + v * a.sin();
+                if m.at_seam(p) {
+                    m.map_on(p, (v * a.cos() - u * a.sin()) * sweep, Some(t > 0.5)).0
+                } else {
+                    m.map(p, DVec3::ZERO).0
+                }
+            }
         }
     }
 
@@ -163,6 +174,15 @@ impl C2 {
                 let (a, b) = ((t - h).max(0.0), (t + h).min(1.0));
                 (d(t), (d(b) - d(a)) / (b - a))
             }
+            C2::Conic { c, u, v, t0, sweep, m } => {
+                let d = |s: f64| {
+                    let a = t0 + sweep * s;
+                    m.map(c + u * a.cos() + v * a.sin(), (v * a.cos() - u * a.sin()) * sweep).1
+                };
+                let h = 1e-5;
+                let (a, b) = ((t - h).max(0.0), (t + h).min(1.0));
+                (d(t), (d(b) - d(a)) / (b - a))
+            }
         }
     }
 
@@ -182,6 +202,7 @@ impl C2 {
             C2::Hyp { c, u, v, w, k, t0, sweep } => C2::Hyp { c, u, v, w, k, t0: t0 + sweep, sweep: -sweep },
             C2::Nurbs { ref c, t0, t1 } => C2::Nurbs { c: c.clone(), t0: t1, t1: t0 },
             C2::Mapped { ref c, t0, t1, m } => C2::Mapped { c: c.clone(), t0: t1, t1: t0, m },
+            C2::Conic { c, u, v, t0, sweep, m } => C2::Conic { c, u, v, t0: t0 + sweep, sweep: -sweep, m },
         }
     }
 
@@ -189,7 +210,7 @@ impl C2 {
         match *self {
             C2::Seg { a, b } => (b - a).length(),
             C2::Arc { r, sweep, .. } => r * sweep.abs(),
-            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } => self.gauss(|t| self.derivs(t).0.length()),
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => self.gauss(|t| self.derivs(t).0.length()),
         }
     }
 
@@ -209,7 +230,7 @@ impl C2 {
         match *self {
             C2::Seg { a, b } => (b - a).normalize(),
             C2::Arc { a0, sweep, .. } => dir(a0 + sweep * t).perp() * sweep.signum(),
-            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } => self.derivs(t).0.normalize(),
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => self.derivs(t).0.normalize(),
         }
     }
 
@@ -218,7 +239,7 @@ impl C2 {
         match *self {
             C2::Seg { .. } => 0.0,
             C2::Arc { r, sweep, .. } => sweep.signum() / r,
-            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } => {
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => {
                 let (d, dd) = self.derivs(0.0);
                 d.perp_dot(dd) / d.length().powi(3)
             }
@@ -233,7 +254,7 @@ impl C2 {
                 let a1 = a0 + sweep;
                 0.5 * (r * r * sweep + r * c.x * (a1.sin() - a0.sin()) - r * c.y * (a1.cos() - a0.cos()))
             }
-            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } => self.gauss(|t| 0.5 * self.at(t).perp_dot(self.derivs(t).0)),
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => self.gauss(|t| 0.5 * self.at(t).perp_dot(self.derivs(t).0)),
         }
     }
 
@@ -320,7 +341,7 @@ impl C2 {
                     }
                 }
             }
-            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } => {
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => {
                 for t in self.roots(|t| (self.at(t) - m).perp_dot(d)) {
                     let s = (self.at(t) - m).dot(d);
                     if s > 0.0 {
@@ -346,7 +367,7 @@ impl C2 {
                 let rel = if sweep >= 0.0 { (a - a0).rem_euclid(TAU) } else { (a0 - a).rem_euclid(TAU) };
                 (rel / sweep.abs(), d)
             }
-            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } => {
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => {
                 // The nearest sample, then Newton on (q - p)·q' (within 0..1).
                 let mut best = (0.0, f64::INFINITY);
                 let n = self.samples();
@@ -394,7 +415,7 @@ impl C2 {
                     (self.start() - p).length().min((self.end() - p).length())
                 }
             }
-            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } => self.param_of(p).1,
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => self.param_of(p).1,
         }
     }
 
@@ -415,7 +436,7 @@ impl C2 {
                 let (lo, hi) = hull(&mut c.poles_of(t0, t1).iter().map(|p| DVec2::splat(s * (*p - o).dot(a))));
                 Some((DVec2::new(r * th0, lo.y), DVec2::new(r * (th0 + TAU), hi.y)))
             }
-            C2::Trig { .. } | C2::Hyp { .. } => None,
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Conic { .. } => None,
         }
     }
 
@@ -512,7 +533,7 @@ impl C2 {
     /// Parameters (on `self`, on `o`) where the two cross, ends included; none where they run together
     /// (within `tol`: collinear segments, arcs of one circle), which their ends lying on each other show.
     pub fn intersections(&self, o: &C2, tol: f64) -> Vec<(f64, f64)> {
-        if matches!(self, C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. }) || matches!(o, C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. }) {
+        if matches!(self, C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. }) || matches!(o, C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. }) {
             return self.numeric_intersections(o, tol);
         }
         let mut out = Vec::new();
@@ -549,7 +570,7 @@ impl C2 {
                 }
             }
             (C2::Arc { .. }, C2::Seg { .. }) => out = o.intersections(self, tol).into_iter().map(|(u, t)| (t, u)).collect(),
-            (C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. }, _) | (_, C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. }) => unreachable!(),
+            (C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. }, _) | (_, C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. }) => unreachable!(),
             (C2::Arc { c: c1, r: r1, a0: s1, sweep: w1 }, C2::Arc { c: c2, r: r2, a0: s2, sweep: w2 }) => {
                 let d = c2 - c1;
                 let dl = d.length();

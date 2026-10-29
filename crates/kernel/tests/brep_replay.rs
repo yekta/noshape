@@ -497,6 +497,44 @@ fn brep_free_form_cases_match_occt() {
     assert!(accepted >= 1, "{accepted} of {n} taken:\n{report}");
 }
 
+/// A cone (a countersink's frustum) cut by a plane at an angle to its axis, through it off the axis: an ellipse
+/// whose centre is off the axis; noshape's own Boolean takes them as OCCT.
+#[test]
+fn brep_cones_cut_at_an_angle_match_occt() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let mut taken = 0;
+    let mut why_not = Vec::new();
+    for (deg, off) in [(20.0f64, 0.0), (20.0, 1.0), (40.0, 0.5)] {
+        let cone = make_cone(&Plane::from_normal(DVec3::ZERO, DVec3::Z), 5.0 * mm, 2.0 * mm, 10.0 * mm, std::f64::consts::TAU).unwrap();
+        let a = deg.to_radians();
+        let d = DVec3::new(a.sin(), 0.0, a.cos());
+        // A big box whose top, tilted, crosses the cone at 5 mm.
+        let top = DVec3::new(off, 0.0, 5.0) * mm;
+        let block = make_box_corners(DVec3::new(-20.0, -20.0, -40.0) * mm, DVec3::ZERO).unwrap();
+        let tool = block.transformed(&Transform::frame_to_frame(&Plane::from_normal(DVec3::ZERO, DVec3::Z), &Plane::from_normal(top, d))).unwrap();
+        for op in [BooleanOp::Fuse, BooleanOp::Cut, BooleanOp::Common] {
+            let name = format!("{deg}° {off} mm {op:?}");
+            set_rust_boolean_only(true);
+            let r = boolean(op, std::slice::from_ref(&cone), std::slice::from_ref(&tool), &BooleanOptions::default());
+            let (path, why) = (last_boolean_path(), last_rust_decline());
+            set_rust_boolean_only(false);
+            set_rust_boolean(Some(false));
+            let o = boolean(op, std::slice::from_ref(&cone), std::slice::from_ref(&tool), &BooleanOptions::default());
+            set_rust_boolean(None);
+            if path != "rust" {
+                why_not.push(format!("{name}: {why}"));
+                continue;
+            }
+            taken += 1;
+            let d = Summary::of(&r.unwrap()).differences(&Summary::of(&o.unwrap()));
+            assert!(d.is_empty(), "{name}: {d:?}");
+        }
+    }
+    eprintln!("{taken} taken; declined: {why_not:#?}");
+    assert!(taken >= 9, "{taken} taken; declined: {why_not:#?}");
+}
+
 /// Booleans on a part that already has a tilted hole (its rims ellipses, the argument's own): a pocket next to
 /// it, a slot across it, a second tilted hole; noshape's own Boolean takes them as OCCT.
 #[test]

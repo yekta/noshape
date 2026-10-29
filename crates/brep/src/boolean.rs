@@ -15,7 +15,7 @@
 //! or parallel to it: then surfaces meet in lines along the axis or circles around it.
 
 use crate::arrange::{deeper, regions};
-use crate::curve2::{distance as distance2, inside as inside2, C2};
+use crate::curve2::{distance as distance2, inside as inside2, Map, C2};
 use crate::freeform::FreeSurface;
 use crate::nurbs::NurbsCurve;
 use crate::{Body, Curve, Decline, Edge, Face, Kind, Origin, Output, Record, Relation, SectionSource, Solid, Surface, Use, GREY};
@@ -267,7 +267,12 @@ impl GFace {
                 }
                 Ok(C2::Trig { c: self.to2(e.c), u: lin(e.x) * e.a, v: lin(e.y) * e.b, w: DVec2::ZERO, t0: *t0, sweep: *sweep })
             }
-            (Surf::Cyl { k: slope, .. }, Geo::Ell { e, .. }) if *slope != 0.0 && !e.hyp => Err(Decline("an ellipse on a cone")),
+            (&Surf::Cyl { o, a, x, y, r, flip, th0, k: slope, .. }, &Geo::Ell { e, t0, sweep, .. }) if slope != 0.0 && !e.hyp => {
+                // (Seen along the axis its centre is off it: mapped point by point, on the side of its middle at
+                // the face's seam.)
+                let mid = self.to2(e.at(t0 + 0.5 * sweep)).x;
+                Ok(C2::Conic { c: e.c, u: e.x * e.a, v: e.y * e.b, t0, sweep, m: Map::Cyl { o, a, x, y, r, flip, th0, mid } })
+            }
             (Surf::Cyl { k: slope, .. }, Geo::Ell { e, .. }) if *slope == 0.0 && e.hyp => Err(Decline("a hyperbola on a cylinder")),
             (Surf::Cyl { r, th0, a, o, full, .. }, g) => {
                 if *g == Geo::Apex {
@@ -809,13 +814,9 @@ impl Ctx<'_> {
             let inside = if dist <= tol {
                 closed
             } else if dist <= GREY * tol {
-                // A B-spline (a shallow helix rising from a rod's end): judged where it is farthest from the
-                // boundary, if that is clearly off it; else ambiguous.
-                let far = if let Path::Nurbs { .. } = path {
-                    (1..8).map(|k| c2.at(((a.0 + (b.0 - a.0) * k as f64 / 8.0) - t0) / (t1 - t0))).map(|q| (distance2(q, &bound), q)).max_by(|x, y| x.0.total_cmp(&y.0))
-                } else {
-                    None
-                };
+                // Judged where it is farthest from the boundary (a shallow helix rising from a rod's end, an arc
+                // nearly tangent to a face's edge), if that is clearly off it; else ambiguous.
+                let far = (1..8).map(|k| c2.at(((a.0 + (b.0 - a.0) * k as f64 / 8.0) - t0) / (t1 - t0))).map(|q| (distance2(q, &bound), q)).max_by(|x, y| x.0.total_cmp(&y.0));
                 match far {
                     Some((d, q)) if d > 3.0 * tol => inside2(q, &bound),
                     _ => return Err(Decline("a curve nearly along a face's boundary")),
@@ -1043,7 +1044,18 @@ impl Ctx<'_> {
 
     /// The parameter of ellipse `e` (on face `f`'s cylinder) where the cylinder's angle is `th`.
     fn ell_at_angle(&self, f: usize, e: &Ell, th: f64) -> f64 {
-        let Surf::Cyl { a, x, y, .. } = self.faces[f].s else { unreachable!() };
+        let Surf::Cyl { o, a, x, y, k, .. } = self.faces[f].s else { unreachable!() };
+        if k != 0.0 {
+            // A cone's (its centre off the axis): where it crosses the half-plane of the axis at angle th,
+            // (P - o) · (a × d) = 0 with (P - o) · d > 0.
+            let d = x * th.cos() + y * th.sin();
+            let m = a.cross(d);
+            let (p, q, g) = ((e.x * e.a).dot(m), (e.y * e.b).dot(m), (e.c - o).dot(m));
+            let rr = (p * p + q * q).sqrt();
+            let base = q.atan2(p);
+            let dev = (-g / rr).clamp(-1.0, 1.0).acos();
+            return [base + dev, base - dev].into_iter().max_by(|&s, &t| (e.at(s) - o).dot(d).total_cmp(&(e.at(t) - o).dot(d))).unwrap_or(base);
+        }
         // Seen along the axis it is the cylinder's circle: its major axis' direction at t = 0, its minor's at π/2.
         let d = x * th.cos() + y * th.sin();
         let xp = (e.x - a * e.x.dot(a)).normalize();
@@ -1243,7 +1255,7 @@ impl Ctx<'_> {
         }
         if na.abs() > 1e-12 {
             if slope != 0.0 {
-                return Err(Decline("a plane at an angle to a cone"));
+                return self.plane_cone(fp, fc);
             }
             if na.abs() < 0.25 {
                 return Err(Decline("a plane nearly along a cylinder"));
@@ -1321,6 +1333,54 @@ impl Ctx<'_> {
             self.generator(fp, fc, th)?;
         }
         Ok(())
+    }
+
+    /// A plane at an angle to a cone's axis, cutting each of the face's nappe's rulings (else declined): an
+    /// ellipse, its axes from the two rulings in the plane through the axis and the plane's normal.
+    fn plane_cone(&mut self, fp: usize, fc: usize) -> R<()> {
+        let Surf::Plane { n, d, flip, .. } = self.faces[fp].s else { unreachable!() };
+        let Surf::Cyl { o, a, r0, k: slope, th0, .. } = self.faces[fc].s else { unreachable!() };
+        let tol = self.tol;
+        let na = n.dot(a);
+        // (A parabola or hyperbola: not yet.)
+        if na.abs() <= slope.abs() * (1.0 - na * na).sqrt() * (1.0 + 1e-6) {
+            return Err(Decline("a plane at an angle to a cone"));
+        }
+        // The apex, the nappe's direction (radii growing), the rulings in the plane of the axis and the normal.
+        let apex = o - a * (r0 / slope);
+        let up = if slope > 0.0 { a } else { -a };
+        let side = (n - a * na).normalize();
+        let (ca, sa) = (1.0 / (1.0 + slope * slope).sqrt(), slope.abs() / (1.0 + slope * slope).sqrt());
+        let hit = |g: DVec3| {
+            let den = n.dot(g);
+            (den.abs() > 1e-300).then(|| (d - n.dot(apex)) / den).filter(|&s| s > 0.0).map(|s| apex + g * s)
+        };
+        let (Some(v1), Some(v2)) = (hit(up * ca + side * sa), hit(up * ca - side * sa)) else {
+            // The other nappe: not this face's.
+            return Ok(());
+        };
+        let c = (v1 + v2) * 0.5;
+        // As OCCT's: its normal the plane surface's, its major axis along the axis' direction in the plane.
+        let sn = if flip { -n } else { n };
+        let mut xe = (v1 - v2).normalize();
+        if xe.dot(a) < 0.0 {
+            xe = -xe;
+        }
+        let ae = (v1 - v2).length() * 0.5;
+        let h = (c - o).dot(a);
+        let rc = r0 + slope * h;
+        let off = (c - o - a * h).length();
+        let be = (rc * rc - off * off).max(0.0).sqrt();
+        if be <= GREY * tol {
+            return Err(Decline("a plane through a cone's apex"));
+        }
+        let e = Ell { c, n: sn, x: xe, y: sn.cross(xe), a: ae, b: be, hyp: false };
+        let (lo, hi) = (self.faces[fc].lo, self.faces[fc].hi);
+        if !boxes_meet(c - DVec3::splat(ae), c + DVec3::splat(ae), lo, hi, GREY * tol) {
+            return Ok(());
+        }
+        let ts = self.ell_at_angle(fc, &e, th0);
+        self.section(fp, fc, Path::Ellipse(e), ts, ts + TAU)
     }
 
     /// The section along cylinder or cone face `fc`'s generator at angle `th` (in its frame), with face `f`.
