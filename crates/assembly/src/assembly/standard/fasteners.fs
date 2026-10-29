@@ -2634,7 +2634,9 @@ export const flushNut = defineFeature(function(context is Context, id is Id, def
  * the hex s, dc / 10 high, over an undercut 0.9333 dc for 0.13333 dc, then
  * the body dc with two serration grooves (0.98 dc, dc / 30 wide, dc / 25
  * apart) down to l. Form 0 (SO™ through-hole unthreaded): a bore db
- * through, both entrances chamfered 45° out to 1.11 db.
+ * through, both entrances chamfered 45° out to 1.11 db. Form 1 (SO™
+ * through-hole threaded): the thread's minor diameter dm from the top, its
+ * ends chamfered 45° out to dmaj, then from the bottom a bore db lb long.
  */
 annotation { "Feature Type Name" : "PEM standoff" }
 export const pemStandoff = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2650,6 +2652,12 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
         isLength(definition.dc, NONNEGATIVE_LENGTH_BOUNDS);
         annotation { "Name" : "db" }
         isLength(definition.db, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dm" }
+        isLength(definition.dm, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dmaj" }
+        isLength(definition.dmaj, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "lb" }
+        isLength(definition.lb, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
     }
     {
         const dc = definition.dc;
@@ -2663,13 +2671,28 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
         const gap = dc / 25;
         const l = definition.l;
         const rb = definition.db / 2;
-        const rt = 1.11 * definition.db / 2;
-        revolveProfile(context, id + "body", [
+        // The top of the hole (its chamfer's outer radius) and the inside.
+        var rt;
+        var inside;
+        if (definition.form == 1)
+        {
+            const rmaj = definition.dmaj / 2;
+            const rmin = definition.dm / 2;
+            const lb = definition.lb;
+            rt = rmaj;
+            inside = [{ "p" : rz(rb, -l) }, { "p" : rz(rb, -l + lb) }, { "p" : rz(rmaj, -l + lb) }, { "p" : rz(rmin, -l + lb + (rmaj - rmin)) }, { "p" : rz(rmin, -(rmaj - rmin)) }];
+        }
+        else
+        {
+            rt = 1.11 * definition.db / 2;
+            inside = [{ "p" : rz(rt, -l) }, { "p" : rz(rb, -l + (rt - rb)) }, { "p" : rz(rb, -(rt - rb)) }];
+        }
+        revolveProfile(context, id + "body", join([
                     { "p" : rz(rt, Z) }, { "p" : rz(rh, Z) }, { "p" : rz(rh, -g) }, { "p" : rz(ru, -g) }, { "p" : rz(ru, z1) },
                     { "p" : rz(rc, z1) }, { "p" : rz(rc, z1 - gap) }, { "p" : rz(rs, z1 - gap) }, { "p" : rz(rs, z1 - gap - w) },
                     { "p" : rz(rc, z1 - gap - w) }, { "p" : rz(rc, z1 - 2 * gap - w) }, { "p" : rz(rs, z1 - 2 * gap - w) }, { "p" : rz(rs, z1 - 2 * gap - 2 * w) },
-                    { "p" : rz(rc, z1 - 2 * gap - 2 * w) }, { "p" : rz(rc, -l) }, { "p" : rz(rt, -l) }, { "p" : rz(rb, -l + (rt - rb)) }, { "p" : rz(rb, -(rt - rb)) }
-                ]);
+                    { "p" : rz(rc, z1 - 2 * gap - 2 * w) }, { "p" : rz(rc, -l) }
+                ], inside));
         // The hex corners: a hex ring round the top of the bore, united.
         const ring = prismZ(context, id + "hex", -g, g, polygonPoints(6, definition.s, 1));
         subtract(context, id + "trim", ring, cylinderZ(context, id + "bore", -g - g, g, rt));
