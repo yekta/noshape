@@ -3,9 +3,10 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-**v0.4.12 published 05:49 (tag e936fe98 = ec96b151 + version bump; code = green 1b81b7ca). Artifact smoke 06:03 on
-noshape-0.4.12-linux-x86_64.tar.gz: all rows OK** (details under "Daily release smoke" › v0.4.12). Blocker list at the top
-of TICKETS (open P0s all carried from v0.4.11).
+**v0.4.13 published 06:34 (tag 110539f2 = 5e56477b + version bump). Smoke 06:30–06:45 on noshape-0.4.13-linux-x86_64.tar.gz
+(byte-identical to the CI artifact): all GUI / CLI rows OK, but it ships bool's P0 halfmir2 B (7869.1 mm³ instead of 7607.301 with
+the default Rust Boolean; NOSHAPE_BOOL_RUST=0 fixes B and breaks A). Green 5166e6dd has the fix (c79eed1d), right in the app:
+recommend the next release from it.** Details under "Daily release smoke" › v0.4.13; note at the top of TICKETS.
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
@@ -561,6 +562,22 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   Linear pattern in Feature, Part and Face mode: Direction pre-highlights and picks an edge at its middle and a face (not
   the plane behind it); Fillet › Edges and Shell › Faces hover + pick; cfs.noshape custom feature "Edge pick"
   (`EDGE && ALLOWS_AXIS`, 2 picks) and "Plain edge pick" both take two edges.
+### v0.4.13 (tag 110539f2 = 5e56477b + version bump; published 06:34, all three bundles; Linux tarball smoked 06:30–06:45)
+- Linux tarball sha256 ac6429e6932a906a… = the CI run 40825343362 artifact smoked first. Start page "(0.4.13.110539f2eda8)";
+  CLI MCP `"version":"0.4.13"`.
+- live-30 (l30 copy): Extrude 1 → 15 / 16 / 17 commits 67 / 74 / 82 ms; Ctrl+Z ×3, the 3rd 92 ms (REGEN-SPEED budget 50, carried).
+  kill -9 0.3 s after Suppress Boss 1 → reopens with Boss 1 suppressed.
+- Hover + pick (bin/picksweep3.sh, lpd, 28 tools): every dialog takes the edge / face as before, all 28 crops pixel-identical
+  to the previous sweep.
+- boltdwg › drawing tab › Export… › PDF → `Part Studio 1 Drawing 1.pdf`, 98.8 KB, 1 page.
+- asm5 › Assembly 1: dragging the revolute pin leaves it in place.
+- Round trip (bin/roundtrip_qa.py) Parasolid / ACIS / STEP / IGES / JT / Rhino 67643.716875 mm³ 18 faces; PVZ / glTF / GLB / 3MF
+  meshes; same as the v0.4.12 CLI (OBJ goes to a .zip, STL comes back in m³: script artefacts, both releases alike).
+- volsweep (19 documents) = v0.4.12 except fillet-oversize-min (now fails like live, FILLET-OVERSIZE-OK).
+- Mirror cases on the release CLI: halfmir 7214.602 / 7 faces, mirhole 14429.204 with one 628.319 mm² wall (RUST-MIRROR-EXTRA-FACE
+  fixed). **halfmir2 B 7869.1 mm³ with a −78.54 mm² face (expected 7607.301): P0 shipped** (bool 06:08 note; fixed in c79eed1d,
+  green 5166e6dd: B 7607.301, A 9130.973 in the app). With NOSHAPE_BOOL_RUST=0: B 7607.301 but A 8376.991 (−188.5 mm² face).
+
 ### v0.4.12 (tag e936fe98, published 05:49; Linux tarball smoked 05:53–06:03 on the box at load 20–27)
 - Start page "(0.4.12.e936fe98a8b4)"; CLI STEP header 'NOSHAPE 0.4.12'; STEP export → import_files round trip of the
   l30 copy 83341.148087 = 83341.148087 (this l30 file is the 34-feature variant; v0.4.11 gives the same).
