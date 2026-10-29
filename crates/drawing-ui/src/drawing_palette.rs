@@ -592,6 +592,33 @@ impl DrawingEditor {
             let fprec_items: Vec<(String, bool, Act)> = PRECISIONS.iter().map(|&(l, v)| (l.to_string(), fo.precision == v, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.fit.precision = v) as Act)).collect();
             let stack_items: Vec<(String, bool, Act)> = FitStacking::ALL.iter().map(|&s| (s.name().to_string(), fo.stacking == s, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.fit.stacking = s) as Act)).collect();
             let or_none = |s: &str| if s.is_empty() { "None".to_string() } else { s.to_string() };
+            // Live (help drawing_dimensions / hole_thread_callout, drawing.md
+            // D36 / A58): a toggle beside the stacking list shows or hides the
+            // hole class (dimensions) or the shaft class (hole callouts).
+            let (tip, shown, flip): (&'static str, bool, fn(&mut PaletteDlg)) = if hole {
+                ("Toggle shaft class visibility", !fo.hide_shaft, |d| d.cur.format.fit.hide_shaft = !d.cur.format.fit.hide_shaft)
+            } else {
+                ("Toggle hole class visibility", !fo.hide_hole, |d| d.cur.format.fit.hide_hole = !d.cur.format.fit.hide_hole)
+            };
+            let vis = {
+                let ed = ed.clone();
+                div()
+                    .id("dp-fit-vis")
+                    .h(px(28.))
+                    .px(px(6.))
+                    .flex()
+                    .items_center()
+                    .rounded(px(4.))
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0xcccccc))
+                    .when(shown, |e| e.bg(gpui_kit::rgb(0xdfe7ee)))
+                    .cursor_pointer()
+                    .text_size(px(12.))
+                    .text_color(ink)
+                    .child(if hole { "g6" } else { "H7" })
+                    .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(tip).build(w, cx))
+                    .on_click(move |_, _, cx| ed.update(cx, |t, cx| t.edit_palette(flip, cx)))
+            };
             h_flex()
                 .gap(px(3.))
                 .pt(px(3.))
@@ -603,6 +630,7 @@ impl DrawingEditor {
                     Some(_) => standard.to_string(),
                 }), 110., std_items))
                 .when(fo.mode != FitMode::Fit, |e| e.child(menu("dp-fit-prec", small(PRECISIONS.iter().find(|x| x.1 == fo.precision).map(|x| x.0).unwrap_or("(Drawing)").to_string()), 80., fprec_items)))
+                .child(vis)
                 .child(menu("dp-fit-stack", small("H7/g6".into()), 58., stack_items))
                 .into_any_element()
         };
