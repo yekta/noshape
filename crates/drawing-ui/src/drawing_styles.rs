@@ -425,6 +425,30 @@ impl DrawingEditor {
                     this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| if let AnnotationKind::RadialDimension { dim_line, .. } = &mut a.kind { *dim_line = v }), cx);
                 }))));
         }
+        // Callouts (help styles, drawing.md A64): Stack direction, Stack gap size.
+        if sel.iter().all(|a| matches!(a.kind, AnnotationKind::Balloon { .. })) {
+            let dirs: Vec<(String, bool, Edit)> = noshape_model::drawing::StackDirection::ALL
+                .iter()
+                .map(|&d| {
+                    let inherited = d == props.callout_stack;
+                    let f: Edit = if inherited { st(|s| s.stack = None) } else { std::rc::Rc::new(move |a: &mut Annotation| a.style.get_or_insert_with(Default::default).stack = Some(d)) };
+                    (drawing(d.name().to_string(), inherited), own.stack.map_or(inherited, |c| c == d), f)
+                })
+                .collect();
+            let cur = own.stack.unwrap_or(props.callout_stack);
+            let set_gap: fn(&mut AnnStyle, f64) = |s, h| s.stack_gap = (!h.is_nan()).then_some(h);
+            let gaps: Vec<(String, bool, Edit)> = [0.5, 1.0, 1.27, 2.0, 3.0]
+                .into_iter()
+                .map(|g| {
+                    let inherited = (g - props.callout_stack_gap).abs() < 1e-6;
+                    let f: Edit = if inherited { std::rc::Rc::new(move |a: &mut Annotation| if let Some(s) = a.style.as_mut() { set_gap(s, f64::NAN) }) } else { std::rc::Rc::new(move |a: &mut Annotation| set_gap(a.style.get_or_insert_with(Default::default), g)) };
+                    (num(g), own.stack_gap.map_or(inherited, |c| (c - g).abs() < 1e-6), f)
+                })
+                .collect();
+            body = body
+                .child(row("Stack direction", select("st-stack", drawing(cur.name().to_string(), own.stack.is_none()), 220., dirs)))
+                .child(row("Stack gap size", unit(select("st-stack-gap", num(own.stack_gap.unwrap_or(props.callout_stack_gap)), 80., gaps))));
+        }
         // Datums (help styles, drawing.md A64): Datum size.
         if sel.iter().all(|a| matches!(a.kind, AnnotationKind::Datum { .. })) {
             let set_datum: fn(&mut AnnStyle, f64) = |s, h| s.datum_size = (!h.is_nan()).then_some(h);

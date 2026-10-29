@@ -2061,6 +2061,9 @@ pub struct AnnStyle {
     pub text_gap: Option<f64>,
     /// Datums: the triangle's size (Styles panel › Datum size, drawing.md A64).
     pub datum_size: Option<f64>,
+    /// Callouts: Stack direction and Stack gap size (Styles panel, A64).
+    pub stack: Option<StackDirection>,
+    pub stack_gap: Option<f64>,
 }
 
 impl AnnStyle {
@@ -2101,6 +2104,12 @@ impl AnnStyle {
             }
             if let Some(d) = self.datum_size {
                 s.datum_size = d;
+            }
+            if let Some(d) = self.stack {
+                s.callout_stack = d;
+            }
+            if let Some(g) = self.stack_gap {
+                s.callout_stack_gap = g;
             }
         }
     }
