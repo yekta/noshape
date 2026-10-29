@@ -5003,6 +5003,11 @@ fn pem_tps_pins_match_live() {
         *kinds.entry(k).or_insert(0) += 1;
     }
     assert_eq!(kinds, [("cone", 5), ("cylinder", 5), ("plane", 4), ("torus", 3)].into_iter().collect());
+    // TPXS™: the same head, a 15° end taper (live 17 faces too).
+    let tpxs = CATALOGUE.iter().find(|c| c.name == "TPXS™ Self-clinching pilot pins").unwrap();
+    assert_eq!(StandardSpec::new(tpxs).part_name(), "PEM TPXS-3MM-16");
+    let r = standard::regenerate(&StandardSpec::new(tpxs)).unwrap();
+    assert_eq!(r.context.body(&standard::part_body(&r).unwrap()).unwrap().faces.len(), 17);
     for c in [metric, unified] {
         for s in &c.sizes {
             for l in &s.lengths {

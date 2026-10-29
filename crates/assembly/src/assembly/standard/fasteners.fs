@@ -2752,12 +2752,15 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
  * 0.09 sd high; the hole-size band hs with a V groove (0.075 p wide, sides
  * 2:1, its bottom rounded 0.025 p) centred on it; a 45° step to the pin p at
  * 0.7 sd; the pin to l, its end tapered 26° to dd with a 120 degree dimple
- * 0.3 p across.
+ * 0.3 p across (form 0, TPS™); form 1 (TPXS™): tapered 15° to dd, the
+ * dimple p / 6 across.
  */
 annotation { "Feature Type Name" : "PEM pin" }
 export const pemPin = defineFeature(function(context is Context, id is Id, definition is map)
     precondition
     {
+        annotation { "Name" : "Form" }
+        isInteger(definition.form, { (unitless) : [0, 0, 100] } as IntegerBoundSpec);
         annotation { "Name" : "l" }
         isLength(definition.l, NONNEGATIVE_LENGTH_BOUNDS);
         annotation { "Name" : "hd" }
@@ -2791,8 +2794,9 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
         const rg = 0.025 * p;
         const cx = rh - dep + sqrt(rg * rg - ig * ig);
         const re = definition.dd / 2;
-        const zt = -l + (rp - re) / tan(26 * degree);
-        const rd = 0.15 * p;
+        const tpxs = definition.form == 1;
+        const zt = -l + (rp - re) / tan((tpxs ? 15 : 26) * degree);
+        const rd = tpxs ? p / 12 : 0.15 * p;
         const s45 = sqrt(0.5);
         revolveProfile(context, id + "body", [
                     { "p" : rz(Z, Z) }, { "p" : rz(R - rf, Z) }, { "p" : rz(R, -rf), "mid" : rz(R - rf + rf * s45, -rf + rf * s45) },

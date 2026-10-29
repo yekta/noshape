@@ -1070,7 +1070,9 @@
     "class": "Self-clinching pins",
     "name": "TPS™/TP4™ Flush-head pilot pins",
     "shape": "pemPin",
-    "form": {},
+    "form": {
+     "form": 0
+    },
     "params": [
      {
       "label": "Type",
@@ -1170,6 +1172,44 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_FLUSH_HEAD_PILOT_PINS_MAIN, DATA_PEM_SELFCLINCHING_FLUSH_HEAD_PILOT_PINS_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 594b20ce14a98ac84af48ff6; live/dom/skb-sc-fsrules); dialog as live"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching pins",
+    "name": "TPXS™ Self-clinching pilot pins",
+    "shape": "pemPin",
+    "form": {
+     "form": 1
+    },
+    "materials": [
+     "Stainless Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "",
+      "finish": "Passivated",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "3",
+      "label": "PEM TPXS-3MM-{l}",
+      "d": 3.0,
+      "dims": {
+       "hd": 5.2,
+       "p": 3.0,
+       "dd": 2.11,
+       "sd": 2.29,
+       "hs": 3.5
+      },
+      "lengths": [
+       "16"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_PILOT_PINS_MAIN, DATA_PEM_SELFCLINCHING_PILOT_PINS_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document ca6935b48f3012c7e72964d4; live/dom/skb-sc-fsrules); dialog as live"
    }
   ]
  },
@@ -2721,7 +2761,9 @@
     "class": "Self-clinching pins",
     "name": "TPS™/TP4™ Flush-head pilot pins",
     "shape": "pemPin",
-    "form": {},
+    "form": {
+     "form": 0
+    },
     "params": [
      {
       "label": "Type",
