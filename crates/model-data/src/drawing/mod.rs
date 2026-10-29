@@ -2059,6 +2059,8 @@ pub struct AnnStyle {
     /// Text alignment: Some(true) horizontal, Some(false) with the line.
     pub horizontal: Option<bool>,
     pub text_gap: Option<f64>,
+    /// Datums: the triangle's size (Styles panel › Datum size, drawing.md A64).
+    pub datum_size: Option<f64>,
 }
 
 impl AnnStyle {
@@ -2096,6 +2098,9 @@ impl AnnStyle {
             }
             if let Some(j) = self.justify {
                 s.callout_justify = j;
+            }
+            if let Some(d) = self.datum_size {
+                s.datum_size = d;
             }
         }
     }

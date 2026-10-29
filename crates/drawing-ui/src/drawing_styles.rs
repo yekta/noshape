@@ -425,6 +425,12 @@ impl DrawingEditor {
                     this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| if let AnnotationKind::RadialDimension { dim_line, .. } = &mut a.kind { *dim_line = v }), cx);
                 }))));
         }
+        // Datums (help styles, drawing.md A64): Datum size.
+        if sel.iter().all(|a| matches!(a.kind, AnnotationKind::Datum { .. })) {
+            let set_datum: fn(&mut AnnStyle, f64) = |s, h| s.datum_size = (!h.is_nan()).then_some(h);
+            let d_label = num(own.datum_size.unwrap_or(props.datum_size));
+            body = body.child(row("Datum size", unit(select("st-datum", d_label, 80., presets(own.datum_size, props.datum_size, set_datum)))));
+        }
         let revert = cx.listener(|this, _: &ClickEvent, _, cx| this.edit_styles(std::rc::Rc::new(|a: &mut Annotation| a.style = None), cx));
         Self::styles_with_footer(body.into_any_element(), "st-revert", revert, cx)
     }
