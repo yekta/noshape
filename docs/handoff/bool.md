@@ -131,6 +131,8 @@ apart: 38b2cd00 and fd7ef128, a hole through a boss, were invalid after unify, s
 unify check compares validity and volume now too. halfmir2 A/B/C, mirhole, halfmir, rust-mirror-min, the rod: all
 right. Main corpus 610 of 972, fresh 482 of 692, corpus3 489 of 698, Shell's 52 of 85: 0 differ.
 
+Checked with a CLI of c79eed1d, Rust on vs off (10-29 06:15): qa's bin/facesweep.sh (19 documents, every part's volume / area / faces) identical; holematrix, shellmatrix, xformmatrix, patmatrix, featmatrix, massmatrix, topomatrix identical but for timings; halfmir2 A/B/C, mirhole, halfmir, rust-mirror-min right. Tag v0.4.13 (5e56477b) has 2520afc4 without c79eed1d: halfmir2 B wrong there; flagged P0 at the top of TICKETS.
+
 RUST-MIRROR-EXTRA-FACE (qa P1, 10-29 04:30): a part mirrored onto itself (Add) kept its hole wall in two after
 the model's unify_same_domain (8 faces, OCCT and live 7). The wall's halves are a cylinder and its mirror image
 (left-handed); OCCT's unify goes by the order of a seam's uses in the loop, and on a left-handed surface ours ran
