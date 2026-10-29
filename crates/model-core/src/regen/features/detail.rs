@@ -141,6 +141,83 @@ fn overflows(shape: &Shape, edges: &[usize], r: f64) -> bool {
     })
 }
 
+/// Whether a round of the selection both rolls past an unfilleted edge and
+/// overlaps another round of it (live FILLET-OVERSIZE-OK: "End boundary
+/// intersects unfilleted edge."; one round rolling over alone, or rounds
+/// overlapping into a ridge, are fine). Straight edges between planar faces,
+/// against the faces' edges parallel to them: a round's setback on a face
+/// past an unfilleted edge rolls over it, two setbacks wider than the face
+/// between their edges overlap.
+/// A selected edge's setback on each of its two planar faces: (face, the
+/// direction into it across the edge, the setback).
+type Setbacks = [(u32, DVec3, f64); 2];
+
+fn end_boundary_hits_unfilleted(shape: &Shape, edges: &[usize], radii: &[f64]) -> bool {
+    let (Ok(ef), faces, all) = (shape.edge_faces(), shape.faces(), shape.edges()) else { return false };
+    let mut face_edges = vec![Vec::new(); faces.len()];
+    for (e, fs) in ef.iter().enumerate() {
+        for &f in fs {
+            if let Some(l) = face_edges.get_mut(f as usize) {
+                l.push(e);
+            }
+        }
+    }
+    let line = |e: usize| match all.get(e).map(|s| s.edge_info()) {
+        Some(Ok(i)) if matches!(i.curve, k::Curve::Line { .. }) => Some((i.start, i.end)),
+        _ => None,
+    };
+    let plane = |f: u32| matches!(faces.get(f as usize).map(|f| f.face_surface()), Some(Ok(k::Surface::Plane(_))));
+    // Convex edges only.
+    let setbacks = |e: usize, r: f64| -> Option<Setbacks> {
+        let (a, b) = line(e)?;
+        let fs = ef.get(e)?;
+        if fs.len() != 2 || !plane(fs[0]) || !plane(fs[1]) {
+            return None;
+        }
+        let d = (b - a).normalize_or_zero();
+        let mid = (a + b) * 0.5;
+        let n = [faces[fs[0] as usize].normal_at_point(mid).ok()?.normalize(), faces[fs[1] as usize].normal_at_point(mid).ok()?.normalize()];
+        let setback = r * (n[0].dot(n[1]).clamp(-1.0, 1.0).acos() / 2.0).tan();
+        let mut out = [(0, DVec3::ZERO, 0.0); 2];
+        for k in 0..2 {
+            // Into the face: the side its vertices are on.
+            let w = n[k].cross(d).normalize_or_zero();
+            let reach = |w: DVec3| faces[fs[k] as usize].vertices().iter().filter_map(|v| v.vertex_point().ok()).map(|p| (p - a).dot(w)).fold(0.0, f64::max);
+            let w = if reach(w) >= reach(-w) { w } else { -w };
+            // Convex: the face runs away from the other face's outside.
+            if w.dot(n[1 - k]) > -1e-9 {
+                return None;
+            }
+            out[k] = (fs[k], w, setback);
+        }
+        Some(out)
+    };
+    let radius = |i: usize| radii.get(i).or(radii.first()).copied().unwrap_or(0.0);
+    let selected: Vec<(usize, Setbacks)> = edges.iter().enumerate().filter_map(|(i, &e)| Some((e, setbacks(e, radius(i))?))).collect();
+    let tol = 1e-9 * (1.0 + radii.iter().fold(0.0, |m: f64, r| m.max(*r)));
+    selected.iter().any(|(e, sides)| {
+        let (a, b) = line(*e).unwrap_or_default();
+        let d = (b - a).normalize_or_zero();
+        let (mut rolls, mut overlaps) = (false, false);
+        for &(f, w, setback) in sides {
+            for &o in face_edges.get(f as usize).into_iter().flatten() {
+                let Some((p, q)) = line(o) else { continue };
+                // Parallel, across the face, beside this edge for some length.
+                let width = (p - a).dot(w);
+                let (s0, s1) = ((p - a).dot(d), (q - a).dot(d));
+                if o == *e || (q - p).normalize_or_zero().dot(d).abs() < 1.0 - 1e-9 || width <= tol || s0.max(s1) <= tol || s0.min(s1) >= (b - a).length() - tol {
+                    continue;
+                }
+                match selected.iter().find(|(x, _)| *x == o) {
+                    None => rolls |= setback > width + tol,
+                    Some((_, other)) => overlaps |= other.iter().any(|&(g, _, s)| g == f && setback + s > width + tol),
+                }
+            }
+        }
+        rolls && overlaps
+    })
+}
+
 pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("filletType", "FULL_ROUND") {
         return full_round(ev);
@@ -267,6 +344,9 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         } else {
             vec![radius]
         };
+        if end_boundary_hits_unfilleted(&body.shape, &edges, &radii) {
+            return err("End boundary intersects unfilleted edge.");
+        }
         let res = match k::fillet_checked(&body.shape, &shapes, &radii) {
             Ok(r) => r,
             // Without propagation a single straight edge whose ball fits its faces

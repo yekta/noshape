@@ -2741,3 +2741,43 @@ fn timed_shell_on_a_filleted_plate_with_a_hole() {
     eprintln!("shell on the filleted plate with a hole: {best:.0} ms (target 200)");
     assert!(best < 800.0, "the shell took {best:.0} ms (target 200)");
 }
+
+/// qa FILLET-OVERSIZE-OK, live's answers (behaviours "qa (2026-10-27, P0)
+/// FILLET-OVERSIZE-OK"): on a 40 x 20 x 10 block, overlapping rounds of
+/// vertical edges meet in a ridge and one round may roll over an edge, but a
+/// round that does both fails "End boundary intersects unfilleted edge.".
+#[test]
+fn oversize_fillets_like_onshape() {
+    let mut base = T::new();
+    base.block(40.0, 20.0, 10.0);
+    let at = |t: &mut T, xy: &[(f64, f64)]| t.edges_where(|i| vertical(i) && xy.iter().any(|&(x, y)| (i.start.x - x * 1e-3).abs() < 1e-9 && (i.start.y - y * 1e-3).abs() < 1e-9));
+    let two = at(&mut base, &[(40.0, 0.0), (40.0, 20.0)]);
+    let three = at(&mut base, &[(40.0, 0.0), (40.0, 20.0), (0.0, 20.0)]);
+    let top = base.edges_where(|i| !vertical(i) && (i.start.z - 0.01).abs() < 1e-9);
+    assert_eq!((two.len(), three.len(), top.len()), (2, 3, 4));
+    let cases: [(&str, &Vec<Reference>, &str, Option<f64>); 11] = [
+        ("2 edges R10", &two, "10 mm", Some(7570.796327)),
+        ("2 edges R10.5", &two, "10.5 mm", Some(7526.842646)),
+        ("2 edges R12", &two, "12 mm", Some(7384.178285)),
+        ("2 edges R20", &two, "20 mm", Some(6456.739397)),
+        ("2 edges R50", &two, "50 mm", None),
+        ("3 edges R10", &three, "10 mm", Some(7356.194490)),
+        ("3 edges R12", &three, "12 mm", Some(7075.151640)),
+        ("3 edges R20", &three, "20 mm", Some(5598.332051)),
+        ("3 edges R25", &three, "25 mm", None),
+        ("3 edges R50", &three, "50 mm", None),
+        ("4 top edges R12", &top, "12 mm", None),
+    ];
+    for (what, edges, r, want) in cases {
+        let mut t = base.fork();
+        let f = t.fillet(edges.clone(), r);
+        let (st, msg, v) = status(&mut t, f);
+        match want {
+            Some(want) => {
+                assert_eq!(st, FeatureStatus::Ok, "{what}: {msg:?}");
+                assert!((v - want).abs() < 1e-3, "{what}: {v} vs live {want}");
+            }
+            None => assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some("End boundary intersects unfilleted edge.")), "{what}: {v} mm³"),
+        }
+    }
+}
