@@ -292,10 +292,11 @@ pub fn fractions(text: &str) -> String {
             if k > j + 1 && k < chars.len() && chars[k] == ' ' && (start == 0 || !chars[start - 1].is_ascii_alphanumeric()) {
                 let num: String = chars[start..j].iter().collect();
                 let den: String = chars[j + 1..k].iter().collect();
-                // ⁄ (fraction slash) for diagonal; the stacked forms keep a
-                // marker the renderer turns into two small rows.
+                // Markers the renderer turns into small numerals: stacked
+                // (with or without a bar), or diagonal around a slash line
+                // (the drawing fonts have no ⁄; qa DWG-NOTE-DIAG-FRACTION).
                 match mark {
-                    '#' => out.push_str(&format!("{num}\u{2044}{den}")),
+                    '#' => out.push_str(&format!("\u{E004}{num}\u{E001}{den}\u{E002}")),
                     '/' => out.push_str(&format!("\u{E000}{num}\u{E001}{den}\u{E002}")),
                     _ => out.push_str(&format!("\u{E003}{num}\u{E001}{den}\u{E002}")),
                 }
@@ -310,28 +311,32 @@ pub fn fractions(text: &str) -> String {
     out
 }
 
-/// A run of note text: plain, or a stacked fraction (with or without a bar).
+/// A run of note text: plain, a stacked fraction (with or without a bar), or
+/// a diagonal one (help A13: `n#n`).
 #[derive(Clone, Debug, PartialEq)]
 pub enum Seg {
     Text(String),
     Fraction { num: String, den: String, bar: bool },
+    Diagonal { num: String, den: String },
 }
 
 /// Split text into plain runs and stacked fractions (see [`fractions`]).
 pub fn segments(s: &str) -> Vec<Seg> {
     let mut out = Vec::new();
     let mut rest = s;
-    while let Some(i) = rest.find(['\u{E000}', '\u{E003}']) {
+    while let Some(i) = rest.find(['\u{E000}', '\u{E003}', '\u{E004}']) {
         if i > 0 {
             out.push(Seg::Text(rest[..i].to_string()));
         }
         let bar = rest[i..].starts_with('\u{E000}');
+        let diagonal = rest[i..].starts_with('\u{E004}');
         let body = &rest[i + '\u{E000}'.len_utf8()..];
         let (Some(m), Some(e)) = (body.find('\u{E001}'), body.find('\u{E002}')) else {
             out.push(Seg::Text(body.to_string()));
             return out;
         };
-        out.push(Seg::Fraction { num: body[..m].to_string(), den: body[m + '\u{E001}'.len_utf8()..e].to_string(), bar });
+        let (num, den) = (body[..m].to_string(), body[m + '\u{E001}'.len_utf8()..e].to_string());
+        out.push(if diagonal { Seg::Diagonal { num, den } } else { Seg::Fraction { num, den, bar } });
         rest = &body[e + '\u{E002}'.len_utf8()..];
     }
     if !rest.is_empty() {
@@ -343,6 +348,11 @@ pub fn segments(s: &str) -> Vec<Seg> {
 /// Size of a stacked fraction's digits (of the text height).
 pub const FRACTION_SCALE: f64 = 0.6;
 
+/// Width of a diagonal fraction: the numerator, the slash, the denominator.
+pub fn diagonal_width(num: &str, den: &str, h: f64) -> f64 {
+    font::text_width(num, h * FRACTION_SCALE) + h * 0.3 + font::text_width(den, h * FRACTION_SCALE) + h * 0.1
+}
+
 /// Width of note text, stacked fractions included.
 pub fn text_width(s: &str, h: f64) -> f64 {
     segments(s)
@@ -350,6 +360,7 @@ pub fn text_width(s: &str, h: f64) -> f64 {
         .map(|g| match g {
             Seg::Text(t) => font::text_width(t, h),
             Seg::Fraction { num, den, .. } => font::text_width(num, h * FRACTION_SCALE).max(font::text_width(den, h * FRACTION_SCALE)) + h * 0.2,
+            Seg::Diagonal { num, den } => diagonal_width(num, den, h),
         })
         .sum()
 }
@@ -533,7 +544,8 @@ mod tests {
         let l = layout("WORD WORD WORD WORD", 3.5, &s, [0.0, 0.0]);
         assert!(l.pieces.len() >= 2 && (l.pieces[0].pos[1] - l.pieces[1].pos[1] - 3.5 * 3.0).abs() < 1e-9);
         assert_eq!(fractions("1/2 IN"), "\u{E000}1\u{E001}2\u{E002} IN");
-        assert_eq!(fractions("3#4 X"), "3\u{2044}4 X");
+        assert_eq!(fractions("3#4 X"), "\u{E004}3\u{E001}4\u{E002} X");
+        assert_eq!(segments(&fractions("3#4 X")), [Seg::Diagonal { num: "3".into(), den: "4".into() }, Seg::Text(" X".into())]);
         assert_eq!(fractions("A1/2 "), "A1/2 ", "not after a letter");
     }
 

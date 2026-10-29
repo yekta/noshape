@@ -255,6 +255,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
+- (10-29 16:40) DRAWING-SHIFT-SLASH: Shift+/ in a drawing should open the Keyboard shortcuts modal on its Drawing tab, but the modal (state, tabs, rows) lives in part-studio-ui (`render_shortcut_sheet`, psui's). Could it move to app-core (or a hook) so the drawing editor can open it? I haven't touched psui's code.
 - **land.sh and the 3964a7cf revert (10-29 06:44)**: land.sh did not miss it. The change touched model-data, so its
   crate list (reverse dependencies) included noshape-ops, and vibe3 ran noshape-ops' full tests (e2e included) green. All
   116 ops e2e also pass here at fd102784 (main with the change). Related risk, not today's cause: the ops e2e tests

@@ -2176,6 +2176,17 @@ impl SheetGeometry {
                     }
                     x += w + h * 0.2;
                 }
+                // Diagonal: the numerator raised, a slash, the denominator
+                // on the baseline, all small (help A13).
+                Seg::Diagonal { num, den } => {
+                    let fh = h * FRACTION_SCALE;
+                    let (wn, base) = (font::text_width(&num, fh), pos[1] - h);
+                    let x0 = x + h * 0.05;
+                    self.texts.push(Text2 { pos: [x0, base + h * 0.45], height: fh, text: num.clone(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+                    self.lines.push(Polyline2 { points: vec![[x0 + wn - h * 0.05, base], [x0 + wn + h * 0.25, base + h]], style: LineStyle::Thin, closed: false, pick });
+                    self.texts.push(Text2 { pos: [x0 + wn + h * 0.25, base], height: fh, text: den.clone(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+                    x += super::note::diagonal_width(&num, &den, h);
+                }
             }
         }
     }
