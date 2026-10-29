@@ -3278,6 +3278,115 @@
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_FASTENER_MATERIAL_TYPE (component document 2038559c3f6970de294798a8; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)",
     "plainDescription": true
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching nuts",
+    "name": "SH™ Hard panel nuts",
+    "shape": "pemNut",
+    "form": {
+     "form": 2
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Hardened Alloy Steel"
+    ],
+    "materialCodes": {
+     "Hardened Alloy Steel": {
+      "code": "SH",
+      "finish": "No finish",
+      "finishCode": "X"
+     }
+    },
+    "sizes": [
+     {
+      "name": "M6x1",
+      "label": "PEM {type}-M6-{l}",
+      "d": 6.0,
+      "dims": {
+       "dm": 4.917,
+       "dmaj": 6.0,
+       "dc": 8.73,
+       "de": 11.18,
+       "tl": 4.08,
+       "mh": 0.9571,
+       "md": 0.0408
+      },
+      "lengths": [
+       "1.4",
+       "2.3"
+      ],
+      "lengthDims": {
+       "1.4": {
+        "al": 1.38
+       },
+       "2.3": {
+        "al": 2.21
+       }
+      },
+      "lengthNames": {
+       "1.4": "1",
+       "2.3": "2"
+      }
+     },
+     {
+      "name": "M8x1.25",
+      "label": "PEM {type}-M8-{l}",
+      "d": 8.0,
+      "dims": {
+       "dm": 6.647,
+       "dmaj": 8.0,
+       "dc": 10.47,
+       "de": 12.7,
+       "tl": 5.47,
+       "mh": 0.9571,
+       "md": 0.0547
+      },
+      "lengths": [
+       "1.4",
+       "2.3"
+      ],
+      "lengthDims": {
+       "1.4": {
+        "al": 1.38
+       },
+       "2.3": {
+        "al": 2.21
+       }
+      },
+      "lengthNames": {
+       "1.4": "1",
+       "2.3": "2"
+      }
+     },
+     {
+      "name": "M10x1.5",
+      "label": "PEM {type}-M10-{l}",
+      "d": 10.0,
+      "dims": {
+       "dm": 8.376,
+       "dmaj": 10.0,
+       "dc": 13.97,
+       "de": 17.35,
+       "tl": 7.48,
+       "mh": 0.9571,
+       "md": 0.0748
+      },
+      "lengths": [
+       "2.29"
+      ],
+      "lengthDims": {
+       "2.29": {
+        "al": 2.21
+       }
+      },
+      "lengthNames": {
+       "2.29": "1"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_SELF_CLINCHING_LENGTH (component document a37d53b86a2bdf62ea34b3ae; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  },
@@ -8355,6 +8464,115 @@
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_FASTENER_MATERIAL_TYPE (component document 1f5657fdc63930950ea70caa; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)",
     "plainDescription": true
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching nuts",
+    "name": "SH™ Hard panel nuts",
+    "shape": "pemNut",
+    "form": {
+     "form": 2
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Hardened Alloy Steel"
+    ],
+    "materialCodes": {
+     "Hardened Alloy Steel": {
+      "code": "SH",
+      "finish": "No finish",
+      "finishCode": "X"
+     }
+    },
+    "sizes": [
+     {
+      "name": "1/4-20",
+      "label": "PEM {type}-0420-{l}",
+      "d": 0.25,
+      "dims": {
+       "dm": 0.196,
+       "dmaj": 0.25,
+       "dc": 0.343,
+       "de": 0.44,
+       "tl": 0.17,
+       "mh": 0.037665,
+       "md": 0.0017
+      },
+      "lengths": [
+       "0.056",
+       "0.090"
+      ],
+      "lengthDims": {
+       "0.056": {
+        "al": 0.054
+       },
+       "0.090": {
+        "al": 0.087
+       }
+      },
+      "lengthNames": {
+       "0.056": "1",
+       "0.090": "2"
+      }
+     },
+     {
+      "name": "5/16-18",
+      "label": "PEM {type}-0518-{l}",
+      "d": 0.313,
+      "dims": {
+       "dm": 0.252,
+       "dmaj": 0.313,
+       "dc": 0.412,
+       "de": 0.5,
+       "tl": 0.23,
+       "mh": 0.037665,
+       "md": 0.0023
+      },
+      "lengths": [
+       "0.056",
+       "0.090"
+      ],
+      "lengthDims": {
+       "0.056": {
+        "al": 0.054
+       },
+       "0.090": {
+        "al": 0.087
+       }
+      },
+      "lengthNames": {
+       "0.056": "1",
+       "0.090": "2"
+      }
+     },
+     {
+      "name": "3/8-16",
+      "label": "PEM {type}-0616-{l}",
+      "d": 0.375,
+      "dims": {
+       "dm": 0.307,
+       "dmaj": 0.375,
+       "dc": 0.499,
+       "de": 0.623,
+       "tl": 0.27,
+       "mh": 0.037665,
+       "md": 0.0027
+      },
+      "lengths": [
+       "0.090"
+      ],
+      "lengthDims": {
+       "0.090": {
+        "al": 0.087
+       }
+      },
+      "lengthNames": {
+       "0.090": "1"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_SELF_CLINCHING_LENGTH (component document 7a1df4f6cee5999410c34c63; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  }

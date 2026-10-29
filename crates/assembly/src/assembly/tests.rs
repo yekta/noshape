@@ -5059,7 +5059,7 @@ fn pem_fh_pins_match_live() {
 #[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn pem_fh_pin_sizes_build() {
     use super::standard::{self, CATALOGUE, StandardSpec};
-    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™") || c.name.starts_with("FHL™") || c.name.starts_with("TFH™") || c.name.starts_with("HFLH™") || c.name.starts_with("HF") || c.name.starts_with("FHX™") || c.name.starts_with("SGPC™") || c.name.starts_with("S™/SS™") || c.name.starts_with("CLA™") || c.name.starts_with("SMPS™")) {
+    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™") || c.name.starts_with("FHL™") || c.name.starts_with("TFH™") || c.name.starts_with("HFLH™") || c.name.starts_with("HF") || c.name.starts_with("FHX™") || c.name.starts_with("SGPC™") || c.name.starts_with("S™/SS™") || c.name.starts_with("CLA™") || c.name.starts_with("SMPS™") || c.name.starts_with("SH™")) {
         for s in &c.sizes {
             // (Nuts for thin sheets have no length.)
             let ls = if s.lengths.is_empty() { vec![None] } else { vec![s.lengths.first(), s.lengths.last()] };
@@ -5514,6 +5514,37 @@ fn pem_cla_smps_nuts_match_live() {
             want.insert("torus", torus);
         }
         assert_eq!(kinds, want, "{} {size}", c.name);
+    }
+}
+
+/// PEM® SH™ hard panel nuts (live's raw /features and body details): "PEM
+/// SH-M6-1 X", description "PEM SH-M6-1  X Hardened Alloy Steel No finish",
+/// "PEM SH-0420-1 X"; M6 / 1/4-20 = live's studio defaults: 148 faces (PLANE
+/// 108, CYLINDER 3, CONE 5 and "PEM SH"'s 32 curved walls: P 7, M 2, S 23).
+#[test]
+fn pem_sh_nuts_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let metric = CATALOGUE.iter().find(|c| c.name.starts_with("SH™") && !c.inch).unwrap();
+    let unified = CATALOGUE.iter().find(|c| c.name.starts_with("SH™") && c.inch).unwrap();
+    let spec = StandardSpec::new(metric);
+    assert_eq!((spec.part_name(), spec.description()), ("PEM SH-M6-1 X".to_string(), "PEM SH-M6-1  X Hardened Alloy Steel No finish".to_string()));
+    assert_eq!(StandardSpec::new(unified).part_name(), "PEM SH-0420-1 X");
+    for c in [metric, unified] {
+        let r = standard::regenerate(&StandardSpec::new(c)).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let mut kinds = std::collections::BTreeMap::new();
+        for i in 0..b.faces.len() {
+            let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+                Surface::Plane(_) => "plane",
+                Surface::Cone { .. } => "cone",
+                Surface::Cylinder { .. } => "cylinder",
+                Surface::Torus { .. } => "torus",
+                _ => "curved",
+            };
+            *kinds.entry(k).or_insert(0) += 1;
+        }
+        assert_eq!(kinds, [("cone", 5), ("curved", 32), ("cylinder", 3), ("plane", 108)].into_iter().collect(), "{}", c.inch);
     }
 }
 

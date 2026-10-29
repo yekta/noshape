@@ -3171,7 +3171,9 @@ function swagingCollarStud(context is Context, id is Id, definition is map)
  * 120° apart, read from below, between 0.381 mm off the chamfer and 0.381 mm
  * inside the rounding). Form 1 (SMPS™ / SMPP™ for thin sheets): the shank
  * down to al / 4.5, coning in at 10°; the body's top edge chamfered de / 60,
- * its bottom edge de / 40.
+ * its bottom edge de / 40. Form 2 (SH™ hard panel nuts): as form 1, the
+ * chamfers de / 80 and de / 60; "PEM" over the top and "SH" under (letters
+ * mh high, 45° and 60° apart), their tops 0.635 mm inside the chamfer.
  */
 annotation { "Feature Type Name" : "PEM nut" }
 export const pemNut = defineFeature(function(context is Context, id is Id, definition is map)
@@ -3195,6 +3197,8 @@ export const pemNut = defineFeature(function(context is Context, id is Id, defin
         isLength(definition.al, NONNEGATIVE_LENGTH_BOUNDS);
         annotation { "Name" : "md" }
         isLength(definition.md, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "mh" }
+        isLength(definition.mh, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
     }
     {
         const rmaj = definition.dmaj / 2;
@@ -3206,12 +3210,13 @@ export const pemNut = defineFeature(function(context is Context, id is Id, defin
         const tl = definition.tl;
         const f = definition.de / 40;
         const zb = -al - tl;
-        const thin = definition.form == 1;
+        const thin = definition.form == 1 || definition.form == 2;
         const z1 = thin ? -al / 4.5 : -tl / 13;
         const r2 = rc - (al / 2 + z1) * tan((thin ? 10 : 9) * degree);
         const s45 = sqrt(0.5);
-        const c2 = definition.de / 60;
-        const edges = thin ? [{ "p" : rz(re - c2, -al) }, { "p" : rz(re, -al - c2) }, { "p" : rz(re, zb + f) }, { "p" : rz(re - f, zb) }] :
+        const c2 = definition.de / (definition.form == 2 ? 80 : 60);
+        const cb = definition.form == 2 ? definition.de / 60 : f;
+        const edges = thin ? [{ "p" : rz(re - c2, -al) }, { "p" : rz(re, -al - c2) }, { "p" : rz(re, zb + cb) }, { "p" : rz(re - cb, zb) }] :
             [{ "p" : rz(re - f, -al) }, { "p" : rz(re, -al - f), "mid" : rz(re - f + f * s45, -al - f + f * s45) },
                     { "p" : rz(re, zb + f) }, { "p" : rz(re - f, zb), "mid" : rz(re - f + f * s45, zb + f - f * s45) }];
         revolveProfile(context, id + "body", concatenateArrays([[
@@ -3225,17 +3230,20 @@ export const pemNut = defineFeature(function(context is Context, id is Id, defin
         // on a plane facing down turned 0°, -120°, 120°. Open Sans' box
         // height is its ascender: 2189 / 1462 of the cap height.
         const gap = 0.381 * millimeter;
-        const h = re - f - rmaj - 2 * gap;
+        const five = definition.form == 2;
+        const h = five ? definition.mh : re - f - rmaj - 2 * gap;
+        const rb = five ? re - cb - 0.635 * millimeter - h : rmaj + gap;
         if (definition.md > EPS && h > EPS)
         {
-            const letters = [["P", 0, 0.85502], ["E", -120, 0.77907], ["M", 120, 1.20842]];
-            for (var k = 0; k < 3; k += 1)
+            const letters = five ? [["P", 45, 0.85509], ["E", 0, 0.77913], ["M", -45, 1.2084], ["S", -150, 0.78578], ["H", 150, 0.97917]] :
+                [["P", 0, 0.85502], ["E", -120, 0.77907], ["M", 120, 1.20842]];
+            for (var k = 0; k < size(letters); k += 1)
             {
                 const a = letters[k][1] * degree;
                 const w = letters[k][2] * h;
                 const sk = newSketchOnPlane(context, id + ("mark" ~ k), { "sketchPlane" : plane(vector(Z, Z, zb), vector(0, 0, -1), vector(cos(a), -sin(a), 0)) });
                 skText(sk, "text", { "text" : letters[k][0], "fontName" : "OpenSans-Regular.ttf",
-                            "firstCorner" : vector(-w / 2, rmaj + gap), "secondCorner" : vector(w / 2, rmaj + gap + h * 2189 / 1462) });
+                            "firstCorner" : vector(-w / 2, rb), "secondCorner" : vector(w / 2, rb + h * 2189 / 1462) });
                 skSolve(sk);
                 opExtrude(context, id + ("engrave" ~ k), { "entities" : qSketchRegion(id + ("mark" ~ k), true), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : definition.md });
                 opDeleteBodies(context, id + ("deleteMark" ~ k), { "entities" : qCreatedBy(id + ("mark" ~ k), EntityType.BODY) });
