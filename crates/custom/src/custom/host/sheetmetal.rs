@@ -1144,6 +1144,10 @@ fn inner_point(f: &Shape) -> Option<DVec3> {
 
 /// What each face, edge and vertex of the part comes from.
 fn part_sources(part: &Shape, pieces: &[Piece], topo: &Topo) -> (Vec<Def>, Vec<Def>, Vec<Def>) {
+    // Each piece's box (a point outside it is not on it: most pieces are
+    // skipped without projecting onto them).
+    let boxes: Vec<Option<k::BoundingBox>> = pieces.iter().map(|x| x.face.bounding_box(false).ok()).collect();
+    let in_box = |i: usize, p: DVec3| boxes[i].is_none_or(|b| (b.min - DVec3::splat(1e-6)).cmple(p).all() && p.cmple(b.max + DVec3::splat(1e-6)).all());
     let faces: Vec<Def> = part
         .faces()
         .iter()
@@ -1156,7 +1160,7 @@ fn part_sources(part: &Shape, pieces: &[Piece], topo: &Topo) -> (Vec<Def>, Vec<D
                 (Some(a), Ok(b)) => a.cross(b).length() < 1e-6,
                 _ => true,
             };
-            pieces.iter().find(|x| x.face.project_point(p).is_ok_and(|pr| pr.point.distance(p) < 1e-7) && along(x)).map_or(Def::Face(0), |x| x.from)
+            pieces.iter().enumerate().find(|(i, x)| in_box(*i, p) && x.face.project_point(p).is_ok_and(|pr| pr.point.distance(p) < 1e-7) && along(x)).map_or(Def::Face(0), |(_, x)| x.from)
         })
         .collect();
     let ef = part.edge_faces().unwrap_or_default();

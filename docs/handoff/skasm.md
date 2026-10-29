@@ -124,6 +124,9 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   49 faces); partial Outer flange wall side (asked live: REQUESTS skasm 2026-10-29 21:30); holes through std's own
   sheet metal hole path (std hole.fs handleSheetMetalCutAndAttribution: HOLE_NO_HITS on our host; holes still run
   natively and the flat follows the part). Next: the GUI pass of docs/parity/workflow-sheet-metal.md on a green build.
+- Speed (ops regen_profile "sheet metal (std)": 200 × 150 plate, 4 flanges, hem): 2.9 s → 0.66 s (dev build) by a
+  box test before projecting part faces onto construction pieces (host part_sources: O(faces × pieces) face
+  classifications were ~35 %). Profile now flat (std's one-time load, allocation, OCCT adaptors).
 
 ## WIP on agent/skasm
 (none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
