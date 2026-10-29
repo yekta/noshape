@@ -120,6 +120,10 @@ Big targets (10-29 04:00): the Rust path runs after the local Boolean, so a targ
 is one the local Boolean declined: no longer declined here (db5f2f3d 1004 faces, 99 tools: 178 ms vs OCCT 865;
 11b69a56 412 faces: 9 vs 88 ms; both as OCCT).
 
+A line along a drill's axis touches its tip's cone only at the apex, a vertex: that vertex is the cut there
+(10-29 06:00; it was declined as touching). Main corpus **613 of 972**, fresh 490 of 692, corpus3 497 of 698: 0
+differ.
+
 Where OCCT's time still goes (corpus3, recorded with this Boolean on from the model and kernel tests, 10-29
 05:40): of ~118 s still in OCCT, 90 s are inputs with curved edges (B-spline, ellipse): Shell's slab Booleans on
 filleted parts 1.7–7.8 s each (24 cases, 48 s), op_boolean's 42 s (60, most with free-form faces too). In all the

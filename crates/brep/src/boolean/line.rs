@@ -168,6 +168,11 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
                         continue;
                     }
                     if disc.sqrt() / qa.abs() <= GREY * tol {
+                        // Touching it: at a vertex (a cone's apex), that vertex is the cut; else declined.
+                        let t = -qb / qa;
+                        if near_vertex(&vertex_cuts, t) {
+                            continue;
+                        }
                         return Err(Decline("a line touching a face"));
                     }
                     ts.push((-qb - disc.sqrt()) / qa);
