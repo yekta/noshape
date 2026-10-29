@@ -133,9 +133,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Evening: DWG-NOTE-DIAG-FRACTION, AGENT-ELLIPSE-DIM-VALUE, DWG-LINE-COPY, DWG-GROUP-ANNOTATION-RULE,
   DWG-TOOL-HINTS-PREVIEW (Datum / GD&T previews), DWG-CIRCLE-FACETS, DWG-E2E-SILHOUETTE residual (edge tools hover one
   edge), DWG-SHEET-PROPS-ESC, DWG-TABLE-ESC-GHOST, API-ASM-RELATIONS; D24's dragged value (`Annotation.text_along`).
-- Left in dx's TICKETS: DWG-DATUM-PASTE-RED (red needs re-attach by drag first), DWG-EDIT-SECTION-DIALOG's tool button,
-  DRAWING-SHIFT-SLASH (asked the lead), VERSION-FOOTER-STALE (release process).
-- Next: D24's ISO placement (live request asb 10-25 a), D21 for the other kinds, V59 / V26.
+- Later: DWG-DATUM-PASTE-RED (`Annotation.loose`; a datum's triangle re-attaches by drag), DWG-EDIT-SECTION-DIALOG's
+  tool button; drawing.md D17 (foreshortened diameter flip node), D21 (checked), D36 / A58 (fit class visibility
+  toggle), V26 / V59 (live needs nothing more), A22 (callout on a centermark), A24 / A23 (cut list item default,
+  `{cut.*}`; not checked on a frame part yet), A25 (callout menu order).
+- Left in dx's TICKETS: DRAWING-SHIFT-SLASH (asked the lead), VERSION-FOOTER-STALE (release process).
+- Local `cargo test` runs get a fresh NOSHAPE_CONFIG_DIR (/root/dx-scratch/env.sh, lead 10-29).
+- Next: D24's ISO placement (live request asb 10-25 a), A24's frame-part check, the other 🔧 rows (A33 "click in
+  space to add a target", A32 area size precision, V60 Show/Hide constraints).
 
 ## Morning 10-29 (landed through 8eabd3f5)
 - qa tickets fixed: DWG-ROTATE-VIEW-DIMS-ZERO (edge dimensions turn with the view: `set_view_rotation`),
