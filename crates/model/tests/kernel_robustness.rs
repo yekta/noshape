@@ -2825,3 +2825,29 @@ fn part_pattern_add_touching_along_a_line_changes_nothing() {
         assert!((v - 1570.796327).abs() < 1e-5, "{v}");
     }
 }
+
+/// qa FEATURE-MIRROR-COPY-FULL-DEPTH (live behaviours ~6240, "qa5 feature
+/// mirror"): block 40 × 20 × 10, a boss (5, 5)–(15, 15) × 5 added on top,
+/// Feature mirror across Right + 20 (Reapply features off): the copy at x
+/// 25…35 as deep as the boss, 9000 mm³, 16 planar faces.
+#[test]
+fn feature_mirror_of_a_boss_copies_the_boss() {
+    let mut t = T::new();
+    t.block(40.0, 20.0, 10.0);
+    let top = t.faces_where(|c| c.z > 9.999);
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts: Vec<_> = [(5.0, 5.0), (15.0, 5.0), (15.0, 15.0), (5.0, 15.0)].iter().map(|(x, y)| sk.add_point(DVec2::new(x * 1e-3, y * 1e-3))).collect();
+    for i in 0..4 {
+        sk.add_line_between(pts[i], pts[(i + 1) % 4]).unwrap();
+    }
+    let s = t.add("sketch", &[("sketchPlane", q(top)), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+    let boss = t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Right)])), ("offset", e("20 mm"))]);
+    let m = t.add("mirror", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(boss)])), ("mirrorPlane", q(vec![Reference::FeaturePlane(pl)]))]);
+    let r = t.ok(m);
+    let b = &r.context.bodies[0].shape;
+    assert!((volume(&r) - 9000.0).abs() < 1e-6, "{} mm³, {} faces", volume(&r), b.count(noshape_kernel::ShapeType::Face));
+    assert_eq!(b.count(noshape_kernel::ShapeType::Face), 16);
+}

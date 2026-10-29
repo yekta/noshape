@@ -762,13 +762,21 @@ fn overhang_growth(body: &Shape, tool: &NamedShape) -> Option<NamedShape> {
     let reach = (bb.max - bb.min).length() * 2.0;
     let tol = reach * 1e-9;
     let contains = |a: &k::BoundingBox, b: &k::BoundingBox| a.min.x <= b.min.x + tol && a.min.y <= b.min.y + tol && a.min.z <= b.min.z + tol && b.max.x <= a.max.x + tol && b.max.y <= a.max.y + tol && b.max.z <= a.max.z + tol;
-    let supports: Vec<(Shape, k::Plane)> = body.faces().into_iter().filter_map(|f| f.face_plane().ok().flatten().map(|p| (f, p))).collect();
+    // Planar faces with their outward normals: the face's orientation, not
+    // the plane's frame (a mirrored copy's frames are left-handed: its top
+    // face read as facing down onto the original boss's top, and grew a
+    // column the part's depth, qa FEATURE-MIRROR-COPY-FULL-DEPTH).
+    let outward = |f: &Shape| -> Option<(k::Plane, DVec3)> {
+        let p = f.face_plane().ok().flatten()?;
+        let n = f.normal_at_point(f.centroid().ok()?).ok()?.normalize();
+        Some((p, n))
+    };
+    let supports: Vec<(Shape, k::Plane, DVec3)> = body.faces().into_iter().filter_map(|f| outward(&f).map(|(p, n)| (f, p, n))).collect();
     let mut grown: Vec<Shape> = Vec::new();
     for f in tool.shape.faces() {
-        let Ok(Some(tp)) = f.face_plane() else { continue };
-        let d = tp.normal.normalize();
+        let Some((tp, d)) = outward(&f) else { continue };
         // A footprint: lying on a planar face of the part, facing it.
-        let on: Vec<&Shape> = supports.iter().filter(|(_, bp)| bp.normal.normalize().dot(d) < -1.0 + 1e-9 && (tp.origin - bp.origin).dot(d).abs() <= tol).map(|(s, _)| s).collect();
+        let on: Vec<&Shape> = supports.iter().filter(|(_, bp, bn)| bn.dot(d) < -1.0 + 1e-9 && (tp.origin - bp.origin).dot(d).abs() <= tol).map(|(s, _, _)| s).collect();
         if on.is_empty() {
             continue;
         }
