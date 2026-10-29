@@ -438,8 +438,6 @@ pub fn triangulate(pts: &[Pt], rings: &[Vec<usize>]) -> Option<Vec<[u32; 3]>> {
     p.push(Pt { x: cx - 2.0 * big, y: cy - big });
     p.push(Pt { x: cx + 2.0 * big, y: cy - big });
     p.push(Pt { x: cx, y: cy + 2.0 * big });
-    let mut m = Mesh { p, v: Vec::with_capacity(6 * nv + 12), tw: Vec::with_capacity(6 * nv + 12), vedge: vec![NONE; np + 3], fixed: Vec::with_capacity(6 * nv + 12), recovered: Vec::new(), st: Vec::new() };
-    m.add_tri(np, np + 1, np + 2);
     // Insertion order: BRIO (a fixed pseudo-random shuffle cut into rounds of doubling size, each round in
     // z-order): few flips per point and short walks.
     let s = 65535.0 / size;
@@ -462,6 +460,16 @@ pub fn triangulate(pts: &[Pt], rings: &[Vec<usize>]) -> Option<Vec<[u32; 3]>> {
         lo += len;
         len *= 2;
     }
+    // The result depends on nothing else than the rings, the grid points and this order: a face met again with
+    // the same ones (live-30's plate top after an edit moved it) takes the last triangulation.
+    let key = (nv >= CACHE_MIN).then(|| CacheKey { rr: rr.clone(), p: p.iter().map(|q| (q.x, q.y)).collect(), order: order.clone() });
+    if let Some(k) = &key
+        && let Some(tris) = cached(k)
+    {
+        return checked(pts, tris, nv, rr.len(), want, size);
+    }
+    let mut m = Mesh { p, v: Vec::with_capacity(6 * nv + 12), tw: Vec::with_capacity(6 * nv + 12), vedge: vec![NONE; np + 3], fixed: Vec::with_capacity(6 * nv + 12), recovered: Vec::new(), st: Vec::new() };
+    m.add_tri(np, np + 1, np + 2);
     let mut start = 0;
     for &(_, i) in &order {
         if !m.insert(i, &mut start) {
@@ -517,22 +525,74 @@ pub fn triangulate(pts: &[Pt], rings: &[Vec<usize>]) -> Option<Vec<[u32; 3]>> {
     let mut st: Vec<usize> = m.recovered.clone().into_iter().filter_map(|(x, y)| m.find_edge(x, y)).filter(|&e| !m.fixed[e] && m.tw[e] != NONE).collect();
     m.legalize(&mut st);
     let mut tris = Vec::with_capacity(nv + 2 * rr.len());
-    let mut sum = 0.0;
     for (t, _) in inside.iter().enumerate().filter(|(_, i)| **i) {
         let (a, b, c) = (m.v[3 * t], m.v[3 * t + 1], m.v[3 * t + 2]);
         if a >= np || b >= np || c >= np {
             return None;
         }
-        let ar = orient(pts[a], pts[b], pts[c]);
+        tris.push([a as u32, b as u32, c as u32]);
+    }
+    let tris = checked(pts, tris, nv, rr.len(), want, size)?;
+    if let Some(k) = key {
+        keep(k, &tris);
+    }
+    Some(tris)
+}
+
+/// `tris` if they are counter-clockwise and every point is used: V + 2 H − 2 triangles covering the polygon.
+fn checked(pts: &[Pt], tris: Vec<[u32; 3]>, nv: usize, rings: usize, want: f64, size: f64) -> Option<Vec<[u32; 3]>> {
+    let mut sum = 0.0;
+    for t in &tris {
+        let ar = orient(pts[t[0] as usize], pts[t[1] as usize], pts[t[2] as usize]);
         if ar.is_nan() || ar <= 0.0 {
             return None;
         }
         sum += ar / 2.0;
-        tris.push([a as u32, b as u32, c as u32]);
     }
-    // Every point used: V + 2 H - 2 triangles, covering the polygon.
-    if tris.len() != nv + 2 * (rr.len() - 1) - 2 || (sum - want).abs() > 1e-9 * size * size {
-        return None;
-    }
+    (tris.len() == nv + 2 * (rings - 1) - 2 && (sum - want).abs() <= 1e-9 * size * size).then_some(tris)
+}
+
+/// Faces of this many boundary nodes or more are cached (a few dozen take microseconds).
+const CACHE_MIN: usize = 256;
+/// The last triangulations kept.
+const CACHE_LEN: usize = 16;
+
+#[derive(PartialEq)]
+struct CacheKey {
+    rr: Vec<Vec<usize>>,
+    p: Vec<(f64, f64)>,
+    order: Vec<(u32, usize)>,
+}
+
+type Cache = std::collections::VecDeque<(CacheKey, Vec<[u32; 3]>)>;
+
+fn cache() -> &'static std::sync::Mutex<Cache> {
+    static CACHE: std::sync::OnceLock<std::sync::Mutex<Cache>> = std::sync::OnceLock::new();
+    CACHE.get_or_init(Default::default)
+}
+
+/// Cache hits so far (tests).
+static HITS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+pub fn cache_hits() -> usize {
+    HITS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+fn cached(k: &CacheKey) -> Option<Vec<[u32; 3]>> {
+    let c = cache().lock().ok()?;
+    let tris = c.iter().find(|(ck, _)| ck == k).map(|(_, t)| t.clone())?;
+    HITS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     Some(tris)
+}
+
+fn keep(k: CacheKey, tris: &[[u32; 3]]) {
+    if let Ok(mut c) = cache().lock() {
+        if c.iter().any(|(ck, _)| *ck == k) {
+            return;
+        }
+        if c.len() >= CACHE_LEN {
+            c.pop_back();
+        }
+        c.push_front((k, tris.to_vec()));
+    }
 }

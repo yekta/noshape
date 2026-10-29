@@ -225,3 +225,31 @@ fn bench_cdt_plate_with_holes() {
     }
     eprintln!("cdt: {} points, {:.3} ms each", pts.len(), t.elapsed().as_secs_f64() * 1e3 / 200.0);
 }
+
+#[test]
+fn a_big_face_met_again_takes_its_last_triangulation() {
+    use std::f64::consts::TAU;
+    // A plate round ten holes of 40 nodes (≥ 256 nodes: cached), then the same plate moved (an edit moved the face
+    // along its normal: the same outline, its coordinates a little off in the last bits).
+    let plate = |dx: f64, dy: f64| {
+        let mut pts = vec![cdt::Pt { x: dx, y: dy }, cdt::Pt { x: 100.0 + dx, y: dy }, cdt::Pt { x: 100.0 + dx, y: 40.0 + dy }, cdt::Pt { x: dx, y: 40.0 + dy }];
+        let mut rings = vec![vec![0, 1, 2, 3]];
+        for h in 0..10 {
+            let (cx, cy) = (10.0 + 20.0 * (h % 5) as f64 + dx, if h < 5 { 10.0 } else { 30.0 } + dy);
+            let base = pts.len();
+            pts.extend((0..40).map(|k| {
+                let a = TAU * k as f64 / 40.0;
+                cdt::Pt { x: cx + 6.0 * a.cos(), y: cy + 6.0 * a.sin() }
+            }));
+            rings.push((base..base + 40).rev().collect());
+        }
+        (pts, rings)
+    };
+    let (pts, rings) = plate(0.0, 0.0);
+    let first = cdt::triangulate(&pts, &rings).expect("clean");
+    let hits = cdt::cache_hits();
+    let (moved, rings) = plate(1e-9, 0.0);
+    let again = cdt::triangulate(&moved, &rings).expect("clean");
+    assert!(cdt::cache_hits() > hits, "the second one came from the cache");
+    assert_eq!(first, again);
+}
