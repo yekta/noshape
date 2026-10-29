@@ -152,8 +152,7 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 32d87597 / 5a695829 / 3cb447c2 perf.yml "Display mesher (release)" step (model job; per run mesher-N.log in the
 model-perf artifact; macOS prints its mesh steps summed); 8b2c53ae HOLE-TABLE-BUTTON (verified by qa 16:04);
 bc1ce2e2 PREFS-SELECT-LIST-DETACH (os_menu: a native `<select>` list closes on a wheel outside it).
-Open in psui's TICKETS: MIRROR-DIALOG-STATE (P3: (a) contradicted by live's own capture ok-4, ours = it; (b) asked
-live, REQUESTS psui 10-29 16:40, apply when answered); ROW-TOOLTIP-WIDE-PANEL (P2, waiting for qa's pointer
+MIRROR-DIALOG-STATE closed (live's answer 1597 = ours). Open in psui's TICKETS: ROW-TOOLTIP-WIDE-PANEL (P2, waiting for qa's pointer
 path); API-VAR-REDEFINE (P3, the agent API's variable_create + model-data's variable_table::create: dx / core's
 code, not a UI change: left for them).
 18:20: d5ae3ded mesher 5d (CDT cache), cc73aaea display off the critical path (N06).
@@ -288,7 +287,11 @@ N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes
      live-30's edit commits ("live-30 edit" rows).
      **Runner numbers on 5d (perf 40924170859, Linux):** fins-400 open 246–251 → 21–22 ms (11.5–11.8×);
      live-30 open 12.2–12.4 → 3.6–4.4 ms (~3×); live-30 edit_commit_profile's meshes 114.8 → 25–26 ms in all
-     (4.5×; that run's "over 1 meshes" was a miscount, fixed next).
+     (4.5×; that run's "over 1 meshes" was a miscount, fixed next). macOS (Apple silicon) same run: fins-400
+     364–451 → 18–23 ms (16–25×), live-30 open 11.5–22 → 4–6 ms, live-30 edits 117–129 → 32–37 ms (3.5×).
+     cb540420: a small part's OCCT reads / edge polylines stay on the calling thread (the pool from 1024 items:
+     waking it cost up to 6 ms on live-30's 150 edges under load). perf dispatched after it (read its
+     model-perf artifacts' display_mesher.log).
      cc73aaea: the display's first touches of a new part off its critical path: shown vertices classified
      beside the tessellation (rayon::join in display.rs tessellate_body; ~12 ms on the fin plate), a big
      shape's bounding box per face on OCCT's pool (kernel geom.cpp, the same box; 14.6 → ~3 ms). fins-400
