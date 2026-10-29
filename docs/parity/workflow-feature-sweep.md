@@ -290,3 +290,5 @@ Reference / Coordinate system, ruledSurface type / vertex override / corner type
 | Offset surface 2 nothing | Error "Select faces, surfaces, or sketch regions to offset from." | ✅ | v0.4.14 10-29 |
 | Fill 2 nothing | Error "Select laminar edges or curves as fill surface boundary." | ✅ | v0.4.14 10-29 |
 | Wrap 4 nothing | Error "Select planar faces or sketch regions to wrap." | ✅ | v0.4.14 10-29 |
+| Draft 7 parting edge parallel to pull (vertical edge, pull = top face) | Error "Parting edge cannot be parallel to pull direction." | ✅ | v0.4.14 10-29 |
+| Rib 5 closed circle, Parallel to sketch plane | Error "Failed to create a rib from a selected profile." | ✗ RIB-CLOSED-PROFILE-MSG (rib.fs: "Only open sketch profiles can be used when rib direction is parallel to sketch plane.") | v0.4.14 10-29 |
