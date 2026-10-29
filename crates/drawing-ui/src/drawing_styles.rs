@@ -145,6 +145,60 @@ impl DrawingEditor {
         Self::styles_with_footer(rows.into_any_element(), "st-h-revert", revert, cx)
     }
 
+    /// Sketch geometry selected (help styles, SK16): Linestyle and Color;
+    /// Revert puts the drawing's back (the sheet layer stays).
+    fn render_sketch_styles(&mut self, first: u32, cx: &mut Context<Self>) -> AnyElement {
+        use noshape_model::drawing::sheet_sketch::{SketchLine, SketchStyle};
+        type SkEdit = std::rc::Rc<dyn Fn(&mut SketchStyle)>;
+        let pal = p();
+        let ed = cx.entity();
+        let cur = self.current_sheet().sketch.style(noshape_sketch::EntityId(first));
+        let select = |id: &'static str, label: String, items: Vec<(String, bool, SkEdit)>| -> AnyElement {
+            let ed = ed.clone();
+            Button::new(id).label(label).ghost().small().w(px(160.)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+                for (l, on, f) in &items {
+                    let (e, f) = (ed.clone(), f.clone());
+                    m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit_sketch_styles(f.clone(), cx))));
+                }
+                m
+            })
+            .into_any_element()
+        };
+        let row = |label: &'static str, body: AnyElement| h_flex().h(px(33.)).px(px(12.)).child(div().flex_1().text_size(px(13.33)).text_color(pal.text_muted).child(label)).child(body).into_any_element();
+        let lines: Vec<(String, bool, SkEdit)> = SketchLine::ALL.iter().map(|&l| (l.name().to_string(), cur.line == l, std::rc::Rc::new(move |x: &mut SketchStyle| x.line = l) as SkEdit)).collect();
+        let colors: Vec<(String, bool, SkEdit)> = crate::drawing_drawprops::COLORS
+            .iter()
+            .map(|(n, c)| {
+                let c = *c;
+                (n.to_string(), cur.color == c, std::rc::Rc::new(move |x: &mut SketchStyle| x.color = c) as SkEdit)
+            })
+            .collect();
+        let color_label = crate::drawing_drawprops::COLORS.iter().find(|x| x.1 == cur.color).map(|x| x.0.to_string()).unwrap_or_else(|| "Custom".into());
+        let revert = cx.listener(|this, _: &ClickEvent, _, cx| {
+            this.edit_sketch_styles(
+                std::rc::Rc::new(|x: &mut SketchStyle| {
+                    x.line = SketchLine::default();
+                    x.color = None;
+                }),
+                cx,
+            )
+        });
+        let rows = v_flex().child(row("Linestyle", select("st-sk-line", cur.line.name().to_string(), lines))).child(row("Color", select("st-sk-color", color_label, colors)));
+        Self::styles_with_footer(rows.into_any_element(), "st-sk-revert", revert, cx)
+    }
+
+    /// Apply `f` to every selected sketch entity's style (one undo step).
+    fn edit_sketch_styles(&mut self, f: std::rc::Rc<dyn Fn(&mut noshape_model::drawing::sheet_sketch::SketchStyle)>, cx: &mut Context<Self>) {
+        let ids: Vec<u32> = self.selection.iter().filter_map(|s| if let Sel::Sketch(id) = s { Some(*id) } else { None }).collect();
+        self.edit_sheet("Style", cx, |s| {
+            for id in &ids {
+                let mut st = s.sketch.style(noshape_sketch::EntityId(*id));
+                f(&mut st);
+                s.sketch.styles.insert(*id, st);
+            }
+        });
+    }
+
     pub fn render_styles_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let sel = self.styled_selection();
         let hatch = self.selection.iter().find_map(|s| if let Sel::Hatch(id) = s { self.current_sheet().sketch.hatches.iter().find(|h| h.id == *id).cloned() } else { None });
@@ -152,6 +206,12 @@ impl DrawingEditor {
             && let Some(h) = hatch
         {
             return self.render_hatch_styles(h, cx);
+        }
+        let sketch = self.selection.iter().find_map(|s| if let Sel::Sketch(id) = s { Some(*id) } else { None });
+        if sel.is_empty()
+            && let Some(id) = sketch
+        {
+            return self.render_sketch_styles(id, cx);
         }
         if sel.is_empty() {
             // Live drawing/95-panel-styles (IntimationMessageheadingStyle /

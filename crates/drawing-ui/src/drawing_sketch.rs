@@ -370,25 +370,45 @@ impl DrawingEditor {
 }
 
 impl DrawingEditor {
-    /// Context menu of a sketch entity: Linestyle ▸, Delete.
+    /// Context menu of a sketch entity (live S19, qa DWG-LINE-MENU): Paste ·
+    /// Copy · Paste as table · Move to ▸ (the format layers and Drawing, the
+    /// current one greyed) | Clear selection · Zoom to fit · Delete. Its line
+    /// style and color are in the Styles panel.
     pub fn sketch_entries(&self, id: u32) -> Vec<MenuEntry> {
-        use noshape_model::drawing::sheet_sketch::SketchLine;
-        let cur = self.sketch().style(EntityId(id));
-        let styles = SketchLine::ALL
+        use noshape_model::drawing::SheetLayer;
+        let cur = self.sketch().style(EntityId(id)).layer;
+        let layers = SheetLayer::FORMAT
             .iter()
-            .map(|&l| {
-                MenuEntry::check(l.name(), cur.line == l, move |t, _, cx| {
-                    t.edit_sheet("Linestyle", cx, |s| {
-                        let mut st = s.sketch.style(EntityId(id));
-                        st.line = l;
-                        s.sketch.styles.insert(id, st);
+            .copied()
+            .chain([SheetLayer::Drawing])
+            .map(|l| {
+                MenuEntry::item(l.name(), move |t, _, cx| {
+                    let ids: Vec<u32> = t.selection.iter().filter_map(|s| if let Sel::Sketch(x) = s { Some(*x) } else { None }).chain([id]).collect();
+                    t.edit_sheet("Move to", cx, |s| {
+                        for i in &ids {
+                            let mut st = s.sketch.style(EntityId(*i));
+                            st.layer = l;
+                            s.sketch.styles.insert(*i, st);
+                        }
                     })
                 })
+                .disabled(l == cur)
             })
             .collect();
         vec![
-            MenuEntry::Submenu("Linestyle".into(), styles),
+            crate::drawing_props::paste_always(),
+            // Drawing sketch geometry doesn't copy yet.
+            MenuEntry::item("Copy", |_, _, _| {}).disabled(true),
+            MenuEntry::item("Paste as table", |t, _, cx| {
+                t.start_paste_table(cx);
+            }),
+            MenuEntry::Submenu("Move to".into(), layers),
             MenuEntry::Separator,
+            MenuEntry::item("Clear selection", |t, _, cx| {
+                t.selection.clear();
+                t.redraw(cx);
+            }),
+            MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
             MenuEntry::item("Delete", move |t, _, cx| {
                 t.selection.clear();
                 t.edit_sketch("Delete", cx, |s| {

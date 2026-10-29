@@ -1766,6 +1766,32 @@ fn annotations_moved_to_format_layers() {
     assert_eq!(g.texts[i].pick, 0);
 }
 
+/// A sheet line moved to Title block (live S19, qa DWG-LINE-MENU): the
+/// layer's Formats colour and thickness, its export layer, locked with it.
+#[test]
+fn sketch_lines_moved_to_format_layers() {
+    let (doc, mut drawing) = demo();
+    let l = drawing.sheets[0].sketch.sketch.add_line(noshape_sketch::DVec2::new(20.0, 20.0), noshape_sketch::DVec2::new(80.0, 20.0));
+    let line_of = |g: &sheet::SheetGeometry| g.lines.iter().position(|x| x.points.first().is_some_and(|p| (p[0] - 20.0).abs() < 1e-6 && (p[1] - 20.0).abs() < 1e-6)).expect("the line");
+    let sources = regenerate_sources(&doc, &drawing);
+    let built = |d: &Drawing| render_sheet(d, 0, &sources, &ViewCache::new(), false).unwrap().geometry;
+    drawing.props.title_block_color = Some([200, 0, 0]);
+    drawing.props.title_block_thickness = 1.0;
+    drawing.props.formats_locked = false;
+    let g = built(&drawing);
+    let i = line_of(&g);
+    assert_ne!(g.line_color(i), Some([200, 0, 0]));
+    assert_ne!(g.line_pen(i).0, 1.0);
+    drawing.sheets[0].sketch.styles.insert(l.0, sheet_sketch::SketchStyle { layer: SheetLayer::TitleBlock, ..Default::default() });
+    let g = built(&drawing);
+    let i = line_of(&g);
+    assert_eq!((g.line_color(i), g.line_pen(i).0, g.line_layer(i)), (Some([200, 0, 0]), 1.0, "TITLE_BLOCK"));
+    assert_ne!(g.lines[i].pick, 0);
+    drawing.props.formats_locked = true;
+    let g = built(&drawing);
+    assert_eq!(g.lines[line_of(&g)].pick, 0);
+}
+
 #[test]
 fn rotated_notes_turn_about_their_position() {
     let drawing = Drawing::default();

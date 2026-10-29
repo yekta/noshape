@@ -40,11 +40,14 @@ impl SketchLine {
     }
 }
 
-/// Per-entity sketch style: line style, color (None = black).
+/// Per-entity sketch style: line style, color (None = black), and the sheet
+/// layer (Move to ▸: a format layer's lines take its Formats pen, S19).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct SketchStyle {
     pub line: SketchLine,
     pub color: Option<[u8; 3]>,
+    #[serde(default, skip_serializing_if = "super::SheetLayer::is_drawing")]
+    pub layer: super::SheetLayer,
 }
 
 /// A hatch region: a closed boundary (sheet mm) filled with a pattern.
@@ -185,7 +188,7 @@ mod tests {
         let mut sk = SheetSketch::default();
         let l = sk.sketch.add_line(DVec2::new(10.0, 10.0), DVec2::new(50.0, 10.0));
         sk.sketch.add_circle(DVec2::new(30.0, 30.0), 5.0);
-        sk.styles.insert(l.0, SketchStyle { line: SketchLine::Center, color: Some([255, 0, 0]) });
+        sk.styles.insert(l.0, SketchStyle { line: SketchLine::Center, color: Some([255, 0, 0]), ..Default::default() });
         let sq = vec![[0.0, 0.0], [20.0, 0.0], [20.0, 20.0], [0.0, 20.0]];
         sk.hatches.push(HatchRegion { id: 1, boundary: sq.clone(), holes: vec![], view: None, standard: 0, pattern: 0, scale: 1.0, angle: 0.0, color: None });
         let mut g = SheetGeometry::new(297.0, 210.0);

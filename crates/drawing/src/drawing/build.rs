@@ -2165,6 +2165,22 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }
         }
         g.cad_since(sketch_mark, CadLayer::SketchedGeometry);
+        // Lines moved to a format layer (live S19, qa DWG-LINE-MENU): its
+        // Formats colour and thickness, its export layer, locked with it.
+        let moved: Vec<(u32, SheetLayer)> = sheet.sketch.styles.iter().filter(|(_, s)| !s.layer.is_drawing()).map(|(id, s)| (cell.borrow_mut().id(PickTarget::SketchEntity(*id)), s.layer)).collect();
+        if !moved.is_empty() {
+            for i in sketch_mark.0..g.lines.len() {
+                let Some(&(_, layer)) = moved.iter().find(|(p, _)| *p == g.lines[i].pick) else { continue };
+                if let Some(rgb) = layer.color(&drawing.props) {
+                    g.colors.push(super::sheet::ColorSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, rgb });
+                }
+                format_layer_pens(&mut g, i..i + 1, layer, &drawing.props);
+                g.layers.push(LayerSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, layer });
+                if drawing.props.formats_locked {
+                    g.lines[i].pick = 0;
+                }
+            }
+        }
     }
 
     // Tables (and hole tags in their views).
