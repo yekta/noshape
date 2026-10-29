@@ -147,8 +147,12 @@ impl DrawingEditor {
         }) else {
             return;
         };
-        // The dimension whose text box (2 mm margin) contains the drop point.
-        let hit = sheet.annotations.iter().filter(|a| a.kind.is_dimension()).find_map(|d| {
+        // The dimension whose text box (2 mm margin) contains the drop point;
+        // a callout also groups with another callout, a weld or surface
+        // finish symbol or a datum (help callout_balloon, drawing.md A27).
+        // Not one already grouped (its own grouped callouts sit on it: no cycle).
+        let target = |d: &Annotation| d.id != orig.id && d.group.is_none() && (d.kind.is_dimension() || (balloon && matches!(d.kind, AnnotationKind::Balloon { .. } | AnnotationKind::Weld { .. } | AnnotationKind::SurfaceFinish { .. } | AnnotationKind::Datum { .. })));
+        let hit = sheet.annotations.iter().filter(|d| target(d)).find_map(|d| {
             let picks: Vec<u32> = b.picks.iter().enumerate().filter(|(_, t)| matches!(t, PickTarget::Annotation(x) if *x == d.id)).map(|(i, _)| i as u32).collect();
             let pts: Vec<[f64; 2]> = b.geometry.texts.iter().filter(|t| picks.contains(&t.pick)).flat_map(noshape_model::drawing::font::text_box).collect();
             if pts.is_empty() {
