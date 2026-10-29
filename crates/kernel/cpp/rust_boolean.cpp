@@ -50,8 +50,10 @@ bool decline(const char* why)
   return false;
 }
 
-// Inputs with a larger tolerance are tolerant shapes: OCCT's.
-constexpr double kMaxTol = 1e-3;
+// Inputs with a larger tolerance are tolerant shapes: OCCT's. (Points are one within the largest tolerance of
+// all the inputs, where OCCT goes by each point's own: kept small, as 1e-3 merged points 0.2 mm apart that OCCT
+// keeps apart.)
+constexpr double kMaxTol = 1e-5;
 
 occ::handle<Geom_Curve> basis_of(const occ::handle<Geom_Curve>& c)
 {

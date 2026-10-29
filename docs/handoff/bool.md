@@ -71,8 +71,9 @@ faces median 0.58 ms vs 7.9 ms.
     13 such cases merge alike and stay.
 Main corpus **419 of 972** (was 411), fresh 385 of 692, Shell's 26 of 85: all 0 differ, incl. the merge check.
 
-Then (10-29 00:50): inputs with tolerances up to 1e-3 (was 1e-5; the ones taken match, the rest meet the
-"nearly coincide" guards), and a cut's tools whose faces meet facing each other (slots of side-by-side tools,
+Then (10-29 00:50): inputs with tolerances up to 1e-3 (back to 1e-5 at 03:00: points are one within the largest
+tolerance of all the inputs, where OCCT goes by each point's own, so 1e-3 could merge points 0.2 mm apart that
+OCCT keeps; it took only 2 cases), and a cut's tools whose faces meet facing each other (slots of side-by-side tools,
 Shell's slabs): those pieces are inside the tools, kept by neither. Facing one way still declines (OCCT then
 says the object's solid was deleted, not modified). Fresh corpus 393 of 692, Shell's 34 of 85, main 419: 0 differ.
 
