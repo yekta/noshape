@@ -15,3 +15,4 @@ mod many_parts;
 mod mate_flip;
 mod regen_profile;
 mod smoke;
+mod symmetric_mirror;
