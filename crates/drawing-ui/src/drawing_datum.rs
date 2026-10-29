@@ -145,6 +145,8 @@ impl DrawingEditor {
         if let Some(d) = &mut self.datum_dlg {
             d.rows.push(TargetRow { ann: a, label: lab, x, y });
             d.open = Some(k);
+            // Live: the new target's Origin field is active (blue) at once.
+            d.picking_origin = Some(k);
             d._subs.extend(subs);
         }
         self.datum_preview(cx);

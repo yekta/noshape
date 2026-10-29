@@ -283,13 +283,12 @@ impl DrawingEditor {
         let to = to.unwrap_or_else(|| d.add_sheet(self.sheet));
         // Live (behaviours "Views linked across sheets"): the views move alone, linked to their parents.
         match d.move_views_to_sheet_linked(self.sheet, &ids, to) {
+            // Live: the destination sheet shows, no bubble (qa DWG-INFO-TOASTS).
             Ok(moved) => {
-                let name = d.sheets[to].name.clone();
                 self.commit("Move to sheet", d, cx);
                 self.switch_sheet(to, cx);
                 // Live drawing/286: the moved object stays selected.
                 self.selection = moved.iter().map(|(_, n)| Sel::View(*n)).collect();
-                self.status = Some(format!("Moved to {name}").into());
             }
             Err(e) => self.status = Some(e.into()),
         }

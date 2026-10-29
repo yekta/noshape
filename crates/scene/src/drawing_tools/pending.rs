@@ -316,10 +316,11 @@ impl SheetPick<'_> {
     }
 
     /// The letter of a new datum target set: after the last set's letter
-    /// (datum letters, skipping I, O, Q, S, X, Z).
+    /// (datum letters, skipping I, O, Q, S, X, Z). The drawing's, not the
+    /// preview's, which holds the target being placed (qa DWG-DATUM-TARGET-MENU: B1).
     pub fn next_target_set(&self) -> char {
         const LETTERS: &str = "ABCDEFGHJKLMNPRTUVWY";
-        let last = self.current_sheet().annotations.iter().filter_map(|a| if let AnnotationKind::DatumTarget { label, .. } = &a.kind { label.chars().next() } else { None }).filter_map(|c| LETTERS.find(c)).max();
+        let last = self.drawing.sheets[self.sheet].annotations.iter().filter_map(|a| if let AnnotationKind::DatumTarget { label, .. } = &a.kind { label.chars().next() } else { None }).filter_map(|c| LETTERS.find(c)).max();
         match last {
             Some(i) => LETTERS.chars().nth(i + 1).unwrap_or('A'),
             None => 'A',

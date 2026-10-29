@@ -1706,6 +1706,38 @@ impl DrawingEditor {
 
     /// Move to ▸ a format layer (or back to the drawing), for annotation `a`
     /// with the rest of the selection.
+    /// Live's order for an annotation with entries of its own (`own`):
+    /// `edit` · Paste · Copy · Paste as table · `own` (· Move to ▸) | Clear
+    /// selection · Zoom to fit · Delete.
+    fn live_order_entries(&self, a: &Annotation, edit: MenuEntry, own: Vec<MenuEntry>, move_to: bool, cx: &App) -> Vec<MenuEntry> {
+        let id = a.id;
+        let mut out = vec![edit];
+        out.extend(crate::drawing_props::paste_entry(cx));
+        out.push(MenuEntry::item("Copy", move |t, _, cx| {
+            if !t.selection.contains(&Sel::Annotation(id)) {
+                t.selection = vec![Sel::Annotation(id)];
+            }
+            t.copy_entities(cx);
+        }));
+        out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+            t.start_paste_table(cx);
+        }));
+        out.extend(own);
+        if move_to {
+            out.push(Self::move_to_entry(a));
+        }
+        out.extend([
+            MenuEntry::Separator,
+            MenuEntry::item("Clear selection", |t, _, cx| {
+                t.selection.clear();
+                t.redraw(cx);
+            }),
+            MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
+            MenuEntry::item("Delete", |t, _, cx| t.delete_selection(cx)),
+        ]);
+        out
+    }
+
     fn move_to_entry(a: &Annotation) -> MenuEntry {
         let (id, cur) = (a.id, a.layer);
         let layers = SheetLayer::FORMAT.iter().copied().chain((!cur.is_drawing()).then_some(SheetLayer::Drawing));
@@ -1854,6 +1886,23 @@ impl DrawingEditor {
                         MenuEntry::item("Delete", |t, _, cx| t.delete_selection(cx)),
                     ]);
                     return out;
+                }
+                // GD&T frames (help drawing.md A42, qa DWG-GDT-MENU-ORDER):
+                // Edit... · Paste · Copy · Paste as table · Add leader (·
+                // Remove leaders) · Move to ▸ | Clear selection · Zoom to fit · Delete.
+                if let Some(a) = a.as_ref().filter(|a| matches!(a.kind, AnnotationKind::Gdt { .. })) {
+                    let a2 = a.clone();
+                    let edit = MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx));
+                    let own = self.annotation_more_entries(a);
+                    return self.live_order_entries(a, edit, own, true, cx);
+                }
+                // Datum targets (live A35, qa DWG-DATUM-TARGET-MENU): Edit... ·
+                // Paste · Copy · Paste as table · Show dimensions ▸ (on its
+                // dimension: Hide dimension) | Clear selection · Zoom to fit · Delete.
+                if let Some(a) = a.as_ref().filter(|a| matches!(a.kind, AnnotationKind::DatumTarget { .. })) {
+                    let mut own = self.annotation_more_entries(a);
+                    let edit = own.remove(0);
+                    return self.live_order_entries(a, edit, own, false, cx);
                 }
                 // Notes: their own menu in live's order (drawing_leaders).
                 if let Some(a) = a.as_ref().filter(|a| matches!(a.kind, AnnotationKind::Note { .. })) {

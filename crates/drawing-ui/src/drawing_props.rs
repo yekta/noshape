@@ -400,11 +400,10 @@ impl DrawingEditor {
             return;
         }
         match self.drawing.copy_views(self.sheet, &ids, Some(&self.sources)) {
+            // Live (qa DWG-INFO-TOASTS, request 1569): no bubble.
             Ok(mut c) => {
                 c.origin = Some(noshape_ops::drawing::clip_origin(&self.doc.read(cx).session));
-                let n = c.sheet.views.len();
                 cx.write_to_clipboard(ClipboardItem::new_string(c.to_json()));
-                self.status = Some(if n == 1 { "Copied 1 view".into() } else { format!("Copied {n} views").into() });
             }
             Err(e) => self.status = Some(e.into()),
         }

@@ -39,17 +39,17 @@ fn norm(a: [f64; 2]) -> [f64; 2] {
     [a[0] / l, a[1] / l]
 }
 
-/// Sheet rows dragged in the Sheets panel; the ghost is the row's name, or
-/// "N Items" for several (live).
+/// Sheet rows dragged in the Sheets panel. Live draws no ghost at the
+/// pointer: only the insertion bar moves (behaviours "spec: dx drawing.md
+/// S8", qa DWG-SHEET-DRAG-GHOST).
 #[derive(Clone)]
 pub struct SheetDrag {
     rows: Vec<usize>,
-    label: String,
 }
 
 impl Render for SheetDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().px(px(8.)).py(px(2.)).rounded(px(10.)).bg(rgb(0x1651b0)).text_color(gpui_kit::white()).text_size(px(12.)).child(self.label.clone())
+        div()
     }
 }
 
@@ -614,7 +614,7 @@ impl DrawingEditor {
         let sheet_row = |i: usize, s: &Sheet, active: bool, selected: bool, cx: &mut Context<Self>| {
             // Dragged: the selected rows when this one is among them.
             let rows: Vec<usize> = if selected && sel_rows.len() > 1 { sel_rows.clone() } else { vec![i] };
-            let drag = SheetDrag { label: if rows.len() > 1 { format!("{} Items", rows.len()) } else { s.name.clone() }, rows };
+            let drag = SheetDrag { rows };
             crate::ui::tree_row(("dr-sheet-tab", i), selected && !active)
                 .relative()
                 .on_drag(drag, |d, _, _, cx| cx.new(|_| d.clone()))

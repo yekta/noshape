@@ -61,12 +61,12 @@ impl DrawingEditor {
             self.cell_sel = None;
             return false;
         };
-        // Live (behaviours.md "General table"): Shift+click moves the
-        // single-cell selection rather than extending it; blocks are
-        // drag-selected.
-        let _ = shift;
+        // Live (behaviours "qa (2026-10-28) drawing.md TB7", request 1567):
+        // Shift+click extends the cell selection to the block from its
+        // first cell (qa DWG-TABLE-SHIFT-EXTEND).
+        let anchor = self.cell_sel.as_ref().filter(|s| shift && s.table == id).map(|s| s.a);
         self.selection = vec![Sel::Table(id)];
-        self.cell_sel = Some(CellSel { table: id, a: cell, b: cell });
+        self.cell_sel = Some(CellSel { table: id, a: anchor.unwrap_or(cell), b: cell });
         self.status = None;
         self.update_preview(cx);
         self.redraw(cx);
