@@ -19,7 +19,7 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 - de4d9d6b SHELL-SLOW: Shell's regions path takes convex cones (a chamfer round the top over filleted corners: 2.3 s in slabs
   → 0.2 s, same volumes, one offset face per face where slabs split the inner cones; T1
   `shell::shell_over_chamfered_fillet_corners_by_regions`).
-- SHELL-SLOW (10-29 06:45): parts with holes and chamfers / cones by regions too. Cutting a hole's tube from the planes'
+- 63393512 SHELL-SLOW (10-29 06:45): parts with holes and chamfers / cones by regions too. Cutting a hole's tube from the planes'
   polytope came out off where it crosses a sloped offset plane (OCCT's intersection with the big polytope face: a Ø6.35
   hole by a 1 mm top chamfer, t 1, 3479.08807 vs exact 3479.07658 mm³ by sections; a BOPAlgo_CellsBuilder of solid,
   cavity and tubes the same); there the tubes are now added to the wall instead: (solid − cavity) ∪ (solid ∩ tubes),
@@ -42,6 +42,11 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   frame the opposite prism's cylinder with the same seam. Don't write pcurves into the input's shared edges (the
   data race b0e757f3 removed).
 - Speed table refreshed from perf.yml run 40796942944 (release): the fin under the 400-fin plate 40–64 ms (< 150 met).
+- Knurl on main with the pairs back (release, 10-29 06:52, load 25–29): diamond **246.5 s** (was 564 before patch
+  0004, 264–329 with the pairs before they went serial), 8142 faces, 75409.760 mm³ as before. Live 32 s.
+- Failing shells on fuzz bodies (qa's bop-pairs-gpf-5267, dev CLI): Shell 4 regions no (a non-elementary face),
+  offset 0.6 s, slabs fuse 6.7 s + common 14.3 s → invalid → fails at 21 s; Shell 5 (a non-planar removed face)
+  ~26 s in the slabs' fuse, fails. No live rule to fail them early yet.
 - f93ac93c parallel pairs back on (after the release), with libTKBO.a.0004-on3 in /root/occt since 05:28. The land
   first failed on vibe3: `a_budget_never_stops_a_call_inside_an_occt_thread_pool_loop` used OCCT's default pool,
   which other tests' parallel Booleans had busy, so its loop ran on the caller alone (a serial job the budget may
@@ -391,28 +396,20 @@ Phase 1 stopped at patch 0004 (the remaining steps are 10-40 s each, listed abov
 with 0003b and 0004 on Linux, macOS and Windows.
 
 ## Next, in order
-0. **Now: phase 1 (knurl 210 s → < 90 s), EF result loop first (patch 0004); take the big structural win, stop
-   when returns flatten (user 10-28).** Phase 2 stopped (above). Phase 3 is the bool agent's (crates/brep, the
-   NOSHAPE_BOOL_RUST hook in op_boolean: keep it working when changing op_boolean). Earlier wording:
-   **P0 Boolean speed-up, docs/BOOLEAN-SPEEDUP.md (lead, 10-27 19:40; the user's plan, binding).** Phase 0 first
-   (recorder, corpus, replay, the small-part flame graph and the knurl thread-scaling run): its small-part answer
-   also decides how REGEN-SPEED's per-boolean ~15 ms gets cut, so item 1 continues through it. Then, one agent
-   doing both: Phase 2 (local Booleans: Extrude 3 under the 400-fin plate 2.7 s → < 150 ms, the everyday case)
-   before Phase 1 (OCCT patch 0004, parallel serial phases: knurl 210 s → < 90 s); Phase 3 only if Phase 0
-   supports it. Each phase: same results and history, deterministic at 1/4/16 threads, OCCT fallback with a
-   NOSHAPE_BOOL_<NAME>=0 switch, numbers before/after in this file.
-1. P0 REGEN-SPEED (open): per regeneration ~15 ms per boolean (OCCT build), fillet/chamfer ~10 ms + ~6 ms check, the
-   display meshing ~45 ms. Ideas: check only the blend's new/modified faces instead of the whole part; fewer
-   unify passes; profile with NOSHAPE_KERNEL_PROFILE=1 on the probe. Live: 2–9 ms per feature.
-2. P0 SHELL-SLOW (open): parts with concave edges still go to slabs (fuse of 20–45 overlapping tools 0.4–5 s; qa's
-   shell_that_breaks part now fails at once by live's rule); NOSHAPE_SHELL_DEBUG=1 times each stage. The delete-crash shell input (now fails on the
-   budget) is in /root/core-scratch/slow-shells. Next: regions for concave edges between planes (pockets, steps).
-3. P1 std_oracle hole scope,
-   Extrude add (Hole add: std holeEditLogic is OCCT-bound in its probe), the elliptic boss curvature blend,
-   FILLET-HANG's fillet itself. T2 reds of the 10-27 nightly in my area to check: kernel_robustness
-   shell_draft_sweep_matches_onshape, sheetmetal_frames (3).
-4. kern's open items: forward-oriented edges (proposal: hand out edges FORWARD so start/end, parameters and tangents
-   agree; touches every caller of edge_info). Cylinder frames: done (64f6f79a).
+(lead 10-29 06:10: big structural wins, land small and often, stop when returns flatten.)
+0. Knurl (Phase 1): the pairs are parallel again (f93ac93c); 246.5 s on main (release, load ~28). The steps
+   left after patch 0004 are 10–40 s each (MakeBlocks' PostTreatFF sub-filler ~37, PerformEF's pair collection 15
+   and result-loop projections 10, PerformEE 30, TreatVerticesEE 25): only the sub-filler is one big piece.
+1. P0 SHELL-SLOW tail: parts with concave edges (pockets, steps) still go to slabs, and failing shells take up to the
+   30 s budget (qa 18:35: Shell 5 of bop-pairs-gpf-5267.noshape 55 s wall under load). Next: regions for concave edges
+   between planes; fail fast where the regions path can tell live fails.
+2. P2 CYL-UNIFY-OPPOSITE (see Tonight): rebuild the two halves as one face (one seam), or frame the opposite prism's
+   cylinder with the same seam.
+3. P1 std_oracle hole scope, Extrude add, the elliptic boss curvature blend, FILLET-HANG's fillet; T2 reds in my area.
+4. FILLET-OVERSIZE chamfer half once live answers; RIB-CHAIN-NORMAL once live's L24 semantics are pinned (ours: the
+   L thickened and extruded both ways would be ~272 mm³; live +160).
+5. kern's open item: forward-oriented edges.
+REGEN-SPEED is met in release (perf.yml 40796942944); waiting on qa's release-build GUI measurement.
 
 ## End-of-day walk (10-27 03:45, green 8165fca6)
 - Opened qa's qa-1026-ps2-shell.noshape in the green app on :101: Part Studio 1 (live's 30 features) regenerates, Part
