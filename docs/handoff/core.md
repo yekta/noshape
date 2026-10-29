@@ -6,6 +6,9 @@ behaviour, crates/featurescript, the FeatureScript host (crates/custom), the Ons
 /root/projects/noshape-wt/core (branch agent/core), target dir /root/target-core, scratch /root/core-scratch.
 Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache gcc-13" CXX="ccache g++-13"`
 (/root/core-scratch/env.sh; long jobs via /root/core-scratch/job.sh <log> "<cmd>").
+**Sheet metal moved to skasm (lead 10-29 19:40):** model-core's sheet metal (crates/model-core/src/sheetmetal,
+regen/features/sheetmetal*.rs, the FS host's custom/host/sheetmetal.rs) and its Part Studio dialogs / table are
+skasm's now; see docs/handoff/skasm.md.
 
 ## Tonight (10-29, before the 05:00 release)
 - 5ac53b95 P0 CLI-SUPPRESS-SEGV: a crash guard that recovers past a budgeted op ends that budget (details under OCCT

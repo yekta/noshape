@@ -1,7 +1,10 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
 Area (PLAN 2.3): crates/sketch, crates/scene/src/sketch_mode.rs, sketch behaviour in the app (part_studio/sketch.rs),
-crates/app/src/assembly_*.rs + assembly_view.rs, crates/model/src/assembly, standard content. Older notes:
+crates/app/src/assembly_*.rs + assembly_view.rs, crates/model/src/assembly, standard content, and since 10-29 19:40
+(lead) **sheet metal end to end**: model-core's crates/model-core/src/sheetmetal + regen/features/sheetmetal*.rs, the
+FS host's custom/host/sheetmetal.rs (moved from core), the dialogs and the table / flat view in the Part Studio UI
+(psui's crate: name psui in such commits). Checklist docs/parity/workflow-sheet-metal.md. Older notes:
 docs/handoff/sketch-behaviour.md, docs/handoff/assembly-behaviour.md (skb), checklists docs/parity/sketch.md,
 docs/parity/assembly.md.
 
