@@ -528,7 +528,7 @@ double turns(double x)
 }
 
 const char* ellipse_edge(const BrepResult& r, const std::vector<const OcShape*>& srcs, size_t i, const gp_Pnt& p0,
-                         const gp_Pnt& p1, bool closed, Sections& sections, EllEdge& out)
+                         const gp_Pnt& p1, bool closed, double tol, Sections& sections, EllEdge& out)
 {
   const uint32_t*         ef = &r.ellipse_faces[4 * i];
   std::array<uint32_t, 4> key{ef[0], ef[1], ef[2], ef[3]};
@@ -553,6 +553,11 @@ const char* ellipse_edge(const BrepResult& r, const std::vector<const OcShape*>&
   const double* cv = &r.body.curves[11 * i];
   const gp_Pnt  ctr(cv[1], cv[2], cv[3]);
   const gp_Dir  n(cv[4], cv[5], cv[6]);
+  // OCCT's conic is ours within the model's tolerance (centre, and the axis over the conic's size; compilers round
+  // OCCT's and ours differently by some ulps, MSVC's more than GCC's), the parameters within that tolerance along it.
+  auto same = [&](const gp_Pnt& c, const gp_Dir& a, double size) {
+    return c.Distance(ctr) <= tol && a.Dot(n) > 0 && a.XYZ().Subtracted(n.XYZ()).Modulus() * size <= tol;
+  };
   if (cv[0] == 4)
   {
     // A hyperbola's branch (not closed): the piece of OCCT's that holds it.
@@ -563,11 +568,13 @@ const char* ellipse_edge(const BrepResult& r, const std::vector<const OcShape*>&
       if (hy.IsNull())
         continue;
       const gp_Hypr g = hy->Hypr();
-      if (g.Location().Distance(ctr) > 1e-9 * g.MajorRadius() || g.Axis().Direction().Dot(n) < 1 - 1e-12)
+      if (!same(g.Location(), g.Axis().Direction(), g.MajorRadius()))
         continue;
       const double first = c->FirstParameter(), last = c->LastParameter();
       const double t0 = ElCLib::Parameter(g, p0), t1 = ElCLib::Parameter(g, p1);
-      if (!(t1 > t0) || t0 < first - 1e-9 || t1 > last + 1e-9)
+      // (Its speed is at least its minor radius.)
+      const double eps = std::max(1e-9, tol / g.MinorRadius());
+      if (!(t1 > t0) || t0 < first - eps || t1 > last + eps)
         continue;
       out.curve     = hy;
       out.face[0]   = fa;
@@ -588,23 +595,31 @@ const char* ellipse_edge(const BrepResult& r, const std::vector<const OcShape*>&
     if (el.IsNull())
       continue;
     const gp_Elips g = el->Elips();
-    if (g.Location().Distance(ctr) > 1e-9 * g.MajorRadius() || g.Axis().Direction().Dot(n) < 1 - 1e-12)
+    if (!same(g.Location(), g.Axis().Direction(), g.MajorRadius()))
       continue;
     const double first = c->FirstParameter(), last = c->LastParameter();
-    double       t0    = first + turns(ElCLib::Parameter(g, p0) - first);
-    if (t0 > last + 1e-9 && t0 - 2 * M_PI >= first - 1e-9)
+    // Parameters within the tolerance along it (its speed is at least its minor radius): a start just short of a
+    // turn past OCCT's first is at its first (a closed one starting where OCCT's does), ends just outside OCCT's
+    // range at its ends.
+    const double eps = std::max(1e-9, tol / g.MinorRadius());
+    double       t0  = first + turns(ElCLib::Parameter(g, p0) - first);
+    if (t0 > 2 * M_PI + first - eps || (t0 > last + eps && t0 - 2 * M_PI >= first - eps))
       t0 -= 2 * M_PI;
     double d = turns(ElCLib::Parameter(g, p1) - t0);
     if (closed || d < 1e-12)
       d = 2 * M_PI;
-    if (t0 < first - 1e-9 || t0 + d > last + 1e-9)
+    if (t0 < first - eps || t0 + d > last + eps)
       continue;
+    if (t0 < first)
+      t0 = first;
+    if (t0 + d > last)
+      d = last - t0;
     // An end just short of an axis' end (an edge tangent to the ellipse there, its crossing found to 1e-6 by the
     // Boolean where OCCT's is exact): declined.
     for (const double t : {t0, t0 + d})
     {
       const double off = std::abs(t - M_PI_2 * std::round(t / M_PI_2));
-      if (off > 1e-12 && off < 1e-5)
+      if (off > 1e-9 && off < 1e-5)
         return "an ellipse ending nearly at an axis";
     }
     out.curve     = el;
@@ -759,7 +774,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     {
       // OCCT's own section of the two faces: its ellipse and the part of it this piece is in (OCCT's curves on
       // the faces are made over the part), the curves on the faces.
-      const char* why = ellipse_edge(r, srcs, i, p0, p1, v0 == v1, sections, ells[i]);
+      const char* why = ellipse_edge(r, srcs, i, p0, p1, v0 == v1, tol, sections, ells[i]);
       if (why != nullptr)
         return why;
       c     = ells[i].curve;
@@ -813,7 +828,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       for (const double t : {at0 ? -1.0 : t0, at1 ? -1.0 : t1})
       {
         const double off = std::abs(t - M_PI_2 * std::round(t / M_PI_2));
-        if (t >= 0 && off > 1e-12 && off < 1e-5)
+        if (t >= 0 && off > 1e-9 && off < 1e-5)
           return "a piece of an ellipse ending nearly at an axis";
       }
     }

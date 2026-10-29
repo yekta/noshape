@@ -480,6 +480,17 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   takes its curve on a free-form face from whichever of its origins is that face's own edge.
 - The thread fused with its rod stays parked: past the grey band it stops at a sliver near the rod's end.
 
+## Windows CI: ellipse sections to the model tolerance (lead 16:25, fixed 10-29 16:30 UTC)
+- `brep_parts_with_tilted_holes_match_occt` took 16 (needs 19) on MSVC: the 45° hole's Booleans declined "an
+  ellipse unlike OCCT's sections". `ellipse_edge` compared OCCT's section with ours to a few ulps: a closed ellipse
+  starting where OCCT's does got its start a turn past OCCT's first when the rounding went the other way (a -3e-15
+  shift of the parameter reproduces it on Linux: 13 taken, the same three declines). Now: centre within the model
+  tolerance, axis within it over the conic's size, parameters within it along the conic (tol / minor radius), a start
+  just short of a turn past OCCT's first is its first, ends just outside OCCT's range clamp to it; "an ellipse ending
+  nearly at an axis" from 1e-9 rad off (was 1e-12). Checked with the parameters shifted ±3e-15 … ±1e-10: 19 taken.
+  Windows: dispatched CI on branch bool-ellipse-tol (run 40912100596). Replays all 0 differ, a few more taken: main
+  638, corpus2 508, corpus3 513, corpus4 552 (+1), corpus5 643 (+1), corpus6 599 (+4), Shell's 70, direct 52.
+
 ## Next
 Corpus6 (10-29 13:30, recorded OCCT time of what the Rust path still declines, loaded machine): curved edges
 32.8 s (73: helical B-spline sweeps against rods ~15 s in 3, fillet slabs), one slab fuse with an internal face
