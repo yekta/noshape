@@ -2789,7 +2789,9 @@ impl AssemblyView {
                 self.ui.menu_face = self.pick(*pick).filter(|t| t.kind == PickKind::Face);
                 let on_triad = matches!(self.overlay(*pick), Some(OverlayPick::Manip(_)));
                 let top = if on_triad { self.selected.first().copied() } else { self.pick(*pick).map(|t| t.path[0]) };
-                self.ui.menu_move_origin = self.triad.is_some() && top.is_some_and(|t| self.selected.contains(&t));
+                // The triad shows for a list selection too (at its bounds
+                // centre, ASM-TRIAD-MENU reopened), not only a placed one.
+                self.ui.menu_move_origin = self.manipulator(cx).is_some() && top.is_some_and(|t| self.selected.contains(&t));
                 self.open_graphics_menu(top, *position, window, cx);
                 cx.notify();
             }
