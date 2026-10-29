@@ -304,8 +304,8 @@ pub(crate) mod ffi {
         vertices: Vec<f64>,
         /// Start and end vertex per edge.
         edges: Vec<u32>,
-        /// Per edge: kind (0 line, 1 circle, 2 none: a cone's apex), centre, normal, x direction, radius (11
-        /// numbers).
+        /// Per edge: kind (0 line, 1 circle, 2 none: a cone's apex, 3 an ellipse: only in a Boolean's result),
+        /// centre, normal, x direction, radius (an ellipse's major radius) (11 numbers).
         curves: Vec<f64>,
         /// Per face: kind (0 plane, 1 cylinder, 2 cone), origin, normal or axis, x direction, radius, a cone's
         /// half-angle (12 numbers).
@@ -337,6 +337,10 @@ pub(crate) mod ffi {
         solid_origin: Vec<u32>,
         /// Per face on a cylinder, where its angles start (it lies within this and 2π more).
         face_u0: Vec<f64>,
+        /// Per edge, an ellipse's minor radius and the arguments' faces it is the section of (arg, face, arg,
+        /// face); zeros for other edges.
+        ellipse_minor: Vec<f64>,
+        ellipse_faces: Vec<u32>,
         history: Vec<u32>,
     }
 

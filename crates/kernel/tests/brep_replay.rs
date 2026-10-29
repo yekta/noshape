@@ -309,3 +309,41 @@ fn brep_kept_bodies_give_the_same_result() {
     }
     assert!(n >= 20, "{n} second Booleans");
 }
+
+/// A cylinder through a box at an angle to its faces (sections on planes at an angle to its axis: ellipses, their
+/// curves on the cylinder OCCT's own), through the middle, near a side and short of the faces: noshape's own
+/// Boolean takes each, as OCCT (a plane nearly along the axis declines).
+#[test]
+fn brep_tilted_holes_match_occt() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let mut taken = 0;
+    for deg in [10.0f64, 30.0, 60.0] {
+        for (dx, dy, len) in [(0.0, 0.0, 40.0), (3.0, 2.0, 40.0), (0.0, 7.0, 40.0), (0.0, 0.0, 12.0)] {
+            for op in [BooleanOp::Fuse, BooleanOp::Cut, BooleanOp::Common] {
+                let b = make_box_corners(DVec3::ZERO, DVec3::new(40.0, 20.0, 10.0) * mm).unwrap();
+                let a = deg.to_radians();
+                let d = DVec3::new(0.0, -a.sin(), a.cos());
+                let base = DVec3::new(20.0 + dx, 10.0 + dy, 5.0) * mm - d * (len / 2.0) * mm;
+                let c = make_cylinder(&Plane::from_normal(base, d), 5.0 * mm, len * mm, std::f64::consts::TAU).unwrap();
+                let name = format!("{deg}° ({dx}, {dy}) length {len} {op:?}");
+                set_rust_boolean_only(true);
+                let r = boolean(op, std::slice::from_ref(&b), std::slice::from_ref(&c), &BooleanOptions::default());
+                let (path, why) = (last_boolean_path(), last_rust_decline());
+                set_rust_boolean_only(false);
+                set_rust_boolean(Some(false));
+                let o = boolean(op, &[b], &[c], &BooleanOptions::default()).unwrap();
+                set_rust_boolean(None);
+                if path != "rust" {
+                    // (Only the plane nearly along the axis: 10° with the cylinder near a side.)
+                    assert_eq!(why, "a plane nearly along a cylinder", "{name}");
+                    continue;
+                }
+                taken += 1;
+                let d = Summary::of(&r.unwrap()).differences(&Summary::of(&o));
+                assert!(d.is_empty(), "{name}: {d:?}");
+            }
+        }
+    }
+    assert!(taken >= 30, "{taken} taken");
+}

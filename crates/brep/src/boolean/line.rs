@@ -63,6 +63,7 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
         let mut at: Vec<DVec3> = Vec::new();
         match g.g {
             Geo::Apex => continue,
+            Geo::Ell { .. } => return Err(Decline("an argument's ellipse")),
             Geo::Line => {
                 let (p0, p1) = (cx.p(g.v[0]), cx.p(g.v[1]));
                 let el = (p1 - p0).length();

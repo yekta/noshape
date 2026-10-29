@@ -21,6 +21,13 @@
 #include <ElSLib.hxx>
 #include <Geom2d_Line.hxx>
 #include <Geom_Circle.hxx>
+#include <Geom_Ellipse.hxx>
+#include <IntTools_Curve.hxx>
+#include <IntTools_FaceFace.hxx>
+#include <array>
+#include <map>
+#include <BOPTools_AlgoTools2D.hxx>
+#include <gp_Elips.hxx>
 #include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Line.hxx>
@@ -317,6 +324,101 @@ const TopoDS_Shape& input(const std::vector<const OcShape*>& srcs, uint32_t arg,
   return srcs[arg]->map(kind)(static_cast<int>(index) + 1);
 }
 
+// An ellipse's edge as OCCT makes it (BOPAlgo_PaveFiller::MakeBlocks): on its section's curve, its parameters
+// within the part of it the edge is in, its curves on the two faces (made over that part).
+struct EllEdge
+{
+  occ::handle<Geom_Curve>   curve;
+  TopoDS_Face               face[2];
+  occ::handle<Geom2d_Curve> pcurve[2];
+  double                    t0 = 0, t1 = 0, tol = 0;
+};
+
+// OCCT's sections of pairs of the arguments' faces (arg, face, arg, face; the earlier argument's first).
+using Sections = std::map<std::array<uint32_t, 4>, std::vector<IntTools_Curve>>;
+
+double turns(double x)
+{
+  return std::fmod(std::fmod(x, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
+}
+
+const char* ellipse_edge(const BrepResult& r, const std::vector<const OcShape*>& srcs, size_t i, const gp_Pnt& p0,
+                         const gp_Pnt& p1, bool closed, Sections& sections, EllEdge& out)
+{
+  const uint32_t*         ef = &r.ellipse_faces[4 * i];
+  std::array<uint32_t, 4> key{ef[0], ef[1], ef[2], ef[3]};
+  if (std::make_pair(key[2], key[3]) < std::make_pair(key[0], key[1]))
+    key = {ef[2], ef[3], ef[0], ef[1]};
+  const TopoDS_Face fa = TopoDS::Face(input(srcs, key[0], TopAbs_FACE, key[1]));
+  const TopoDS_Face fb = TopoDS::Face(input(srcs, key[2], TopAbs_FACE, key[3]));
+  auto              it = sections.find(key);
+  if (it == sections.end())
+  {
+    // As the pave filler asks (approximated curves on both faces, its approximation tolerance).
+    IntTools_FaceFace ff;
+    ff.SetParameters(true, true, true, 1e-7);
+    ff.Perform(fa, fb);
+    if (!ff.IsDone())
+      return "an ellipse OCCT doesn't make";
+    std::vector<IntTools_Curve> lines;
+    for (const IntTools_Curve& c : ff.Lines())
+      lines.push_back(c);
+    it = sections.emplace(key, std::move(lines)).first;
+  }
+  const double* cv = &r.body.curves[11 * i];
+  const gp_Pnt  ctr(cv[1], cv[2], cv[3]);
+  const gp_Dir  n(cv[4], cv[5], cv[6]);
+  for (const IntTools_Curve& ic : it->second)
+  {
+    const occ::handle<Geom_Curve>   c  = ic.Curve();
+    const occ::handle<Geom_Ellipse> el = occ::down_cast<Geom_Ellipse>(basis_of(c));
+    if (el.IsNull())
+      continue;
+    const gp_Elips g = el->Elips();
+    if (g.Location().Distance(ctr) > 1e-9 * g.MajorRadius() || g.Axis().Direction().Dot(n) < 1 - 1e-12)
+      continue;
+    const double first = c->FirstParameter(), last = c->LastParameter();
+    double       t0    = first + turns(ElCLib::Parameter(g, p0) - first);
+    if (t0 > last + 1e-9 && t0 - 2 * M_PI >= first - 1e-9)
+      t0 -= 2 * M_PI;
+    double d = turns(ElCLib::Parameter(g, p1) - t0);
+    if (closed || d < 1e-12)
+      d = 2 * M_PI;
+    if (t0 < first - 1e-9 || t0 + d > last + 1e-9)
+      continue;
+    out.curve     = el;
+    out.face[0]   = fa;
+    out.face[1]   = fb;
+    out.pcurve[0] = ic.FirstCurve2d();
+    out.pcurve[1] = ic.SecondCurve2d();
+    out.t0        = t0;
+    out.t1        = t0 + d;
+    // The pave filler's section tolerance: the curve's and the faces' (PerformFF; MakeBlocks adds the tangential
+    // one, which CorrectToleranceOfSE takes off again).
+    out.tol = std::max({ic.Tolerance(), BRep_Tool::Tolerance(fa), BRep_Tool::Tolerance(fb)});
+    return nullptr;
+  }
+  return "an ellipse unlike OCCT's sections";
+}
+
+// An ellipse's curve on its face `src` (one of the two it is the section of), set on `e` on surface `s`, as
+// BOPTools_AlgoTools::MakePCurve: moved by turns to the face.
+const char* ellipse_pcurve(const EllEdge& x, const TopoDS_Face& src, const TopoDS_Edge& e, const occ::handle<Geom_Surface>& s,
+                           const TopLoc_Location& loc, BRep_Builder& bb)
+{
+  for (int j = 0; j < 2; ++j)
+    if (!x.curve.IsNull() && x.face[j].IsSame(src))
+    {
+      if (x.pcurve[j].IsNull())
+        return "an ellipse without its curve on a face";
+      occ::handle<Geom2d_Curve> adjusted;
+      BOPTools_AlgoTools2D::AdjustPCurveOnFace(TopoDS::Face(x.face[j].Oriented(TopAbs_FORWARD)), x.t0, x.t1, x.pcurve[j], adjusted);
+      bb.UpdateEdge(e, adjusted, s, loc, BRep_Tool::Tolerance(e));
+      return nullptr;
+    }
+  return "an ellipse on another face";
+}
+
 // The result's shapes and history: `out`, `hist`; or why not.
 const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, double tol, TopoDS_Shape& result, occ::handle<BRepTools_History>& hist)
 {
@@ -331,8 +433,10 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     else
       bb.MakeVertex(vs[i], point_of(b, static_cast<uint32_t>(i)), tol);
   }
-  // Edges: the input's own, a piece on its curve, or new on a line or circle.
+  // Edges: the input's own, a piece on its curve, or new on a line, circle or ellipse.
   std::vector<TopoDS_Edge> es(ne);
+  std::vector<EllEdge>     ells(ne);
+  Sections                 sections;
   for (size_t i = 0; i < ne; ++i)
   {
     const uint32_t kind = r.edge_origin[3 * i];
@@ -364,6 +468,26 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     }
     else if (cv[0] == 0)
       c = new Geom_Line(p0, gp_Dir(gp_Vec(p0, p1)));
+    else if (cv[0] == 3)
+    {
+      // OCCT's own section of the two faces: its ellipse and the part of it this piece is in (OCCT's curves on
+      // the faces are made over the part), the curves on the faces.
+      const char* why = ellipse_edge(r, srcs, i, p0, p1, v0 == v1, sections, ells[i]);
+      if (why != nullptr)
+        return why;
+      c     = ells[i].curve;
+      tol_e = ells[i].tol;
+      // Its vertices' tolerances to the section's (BOPTools_AlgoTools::MakeEdge; CorrectToleranceOfSE may take
+      // 1e-12 off again; an argument's vertex OCCT would replace by a new one).
+      const double need = tol_e + 1e-12;
+      for (const uint32_t v : {v0, v1})
+        if (BRep_Tool::Tolerance(vs[v]) < need)
+        {
+          if (r.vertex_origin[3 * v] == 0)
+            return "an argument's vertex on an ellipse";
+          bb.UpdateVertex(vs[v], need);
+        }
+    }
     else
     {
       const gp_Pnt ctr(cv[1], cv[2], cv[3]);
@@ -380,7 +504,14 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     }
     const occ::handle<Geom_Curve> bc = basis_of(c);
     double                        t0 = 0, t1 = 0;
-    if (const occ::handle<Geom_Circle> circ = occ::down_cast<Geom_Circle>(bc); !circ.IsNull())
+    if (!occ::down_cast<Geom_Ellipse>(bc).IsNull())
+    {
+      if (kind != 2)
+        return "a piece of an ellipse";
+      t0 = ells[i].t0;
+      t1 = ells[i].t1;
+    }
+    else if (const occ::handle<Geom_Circle> circ = occ::down_cast<Geom_Circle>(bc); !circ.IsNull())
     {
       const gp_Circ g = circ->Circ().Transformed(loc.Transformation());
       t0              = f + std::fmod(std::fmod(ElCLib::Parameter(g, p0) - f, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
@@ -528,6 +659,12 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           return n * 2 * M_PI;
         };
         double u = 0, v = 0;
+        if (!occ::down_cast<Geom_Ellipse>(bc).IsNull())
+        {
+          if (const char* why = ellipse_pcurve(ells[k], src, e, s, loc, bb))
+            return why;
+          continue;
+        }
         if (const occ::handle<Geom_Circle> circ = occ::down_cast<Geom_Circle>(bc); !circ.IsNull())
         {
           const gp_Circ g  = circ->Circ().Transformed(el.Transformation());
@@ -596,10 +733,22 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     }
     // On a plane, the curves of the edges it made stored, as OCCT's pieces have them (mass properties
     // integrate along them; a big face's would cost more than they're worth).
-    if (!round && b.loop_uses[b.face_loops[i + 1]] - b.loop_uses[b.face_loops[i]] <= 64)
+    // (An ellipse's always: its tolerance goes by them, below.)
+    if (!round)
+    {
+      const bool small = b.loop_uses[b.face_loops[i + 1]] - b.loop_uses[b.face_loops[i]] <= 64;
       for (uint32_t k = b.loop_uses[b.face_loops[i]]; k < b.loop_uses[b.face_loops[i + 1]]; ++k)
-        if (r.edge_origin[3 * (b.uses[k] / 2)] != 0)
-          BRepLib::BuildPCurveForEdgeOnPlane(es[b.uses[k] / 2], f);
+      {
+        const uint32_t ek = b.uses[k] / 2;
+        if (r.edge_origin[3 * ek] != 0 && b.curves[11 * ek] == 3)
+        {
+          if (const char* why = ellipse_pcurve(ells[ek], src, es[ek], s, loc, bb))
+            return why;
+        }
+        else if (r.edge_origin[3 * ek] != 0 && small)
+          BRepLib::BuildPCurveForEdgeOnPlane(es[ek], f);
+      }
+    }
     fs[i] = rev ? TopoDS::Face(f.Reversed()) : f;
   }
   // Made faces of cylinders and cones, all their curves set (a later face on the same surface may have set one

@@ -54,12 +54,69 @@ impl Circ {
     }
 }
 
-/// A curve between two pool vertices: a segment, or an arc from angle `a0` through `sweep` (> 0) of its
-/// circle.
+/// An ellipse: centre, unit normal, and its axes: `x` the major one (radius `a`), `y = n × x` the minor one
+/// (radius `b`); parameter t at `c + a cos t x + b sin t y` (OCCT's).
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Ell {
+    c: DVec3,
+    n: DVec3,
+    x: DVec3,
+    y: DVec3,
+    a: f64,
+    b: f64,
+}
+
+impl Ell {
+    fn at(&self, t: f64) -> DVec3 {
+        self.c + self.x * (self.a * t.cos()) + self.y * (self.b * t.sin())
+    }
+
+    fn deriv(&self, t: f64) -> DVec3 {
+        self.y * (self.b * t.cos()) - self.x * (self.a * t.sin())
+    }
+
+    /// The parameter of the point of it nearest `p` (from its angle, then Newton's method).
+    fn param(&self, p: DVec3) -> f64 {
+        let w = p - self.c;
+        let mut t = (w.dot(self.y) / self.b).atan2(w.dot(self.x) / self.a);
+        for _ in 0..8 {
+            let (d1, q) = (self.deriv(t), self.at(t) - p);
+            let d2 = self.c - self.at(t);
+            let g = q.dot(d1);
+            let gp = d1.length_squared() + q.dot(d2);
+            if gp.abs() < 1e-300 {
+                break;
+            }
+            let step = g / gp;
+            t -= step;
+            if step.abs() < 1e-15 {
+                break;
+            }
+        }
+        t
+    }
+
+    /// Its length from `t0` to `t1` (Gauss–Legendre on 16 pieces).
+    fn length(&self, t0: f64, t1: f64) -> f64 {
+        const N: usize = 16;
+        const G: [(f64, f64); 4] = [
+            (0.069_431_844_202_973_71, 0.173_927_422_568_726_9),
+            (0.330_009_478_207_571_9, 0.326_072_577_431_273_1),
+            (0.669_990_521_792_428_1, 0.326_072_577_431_273_1),
+            (0.930_568_155_797_026_3, 0.173_927_422_568_726_9),
+        ];
+        let h = (t1 - t0) / N as f64;
+        (0..N).map(|k| G.iter().map(|&(x, w)| w * self.deriv(t0 + h * (k as f64 + x)).length()).sum::<f64>() * h).sum()
+    }
+}
+
+/// A curve between two pool vertices: a segment, an arc from angle `a0` through `sweep` (> 0) of its
+/// circle, or a piece of an ellipse from parameter `t0` through `sweep` (> 0), the section of `faces`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Geo {
     Line,
     Arc { k: Circ, a0: f64, sweep: f64 },
+    Ell { e: Ell, t0: f64, sweep: f64, faces: [usize; 2] },
     /// No curve: an edge at a cone's apex.
     Apex,
 }
@@ -71,8 +128,9 @@ struct Seg {
 }
 
 enum Surf {
-    /// Outward normal, offset (`n · x == d`), and the 2D frame (`u × v == n`).
-    Plane { n: DVec3, d: f64, origin: DVec3, u: DVec3, v: DVec3 },
+    /// Outward normal, offset (`n · x == d`), and the 2D frame (`u × v == n`); `flip`: its surface's normal
+    /// is -n.
+    Plane { n: DVec3, d: f64, origin: DVec3, u: DVec3, v: DVec3, flip: bool },
     /// A cylinder or cone: axis origin and direction, angle frame, radius `r0 + k h` at height h along the
     /// axis; `flip`: the outward normal points to the axis. Parameters (r θ, ±h) with θ in [th0, th0 + 2π)
     /// and `r` a scale (a cylinder's radius, a cone's largest on the face); `full`: the face goes round (a
@@ -131,6 +189,11 @@ impl GFace {
                 let s = if k.n.dot(*n) > 0.0 { *sweep } else { -*sweep };
                 Ok(C2::Arc { c, r: k.r, a0: d.y.atan2(d.x), sweep: s })
             }
+            (Surf::Plane { u, v, .. }, Geo::Ell { e, t0, sweep, .. }) => {
+                let lin = |w: DVec3| DVec2::new(w.dot(*u), w.dot(*v));
+                Ok(C2::Trig { c: self.to2(e.c), u: lin(e.x) * e.a, v: lin(e.y) * e.b, w: DVec2::ZERO, t0: *t0, sweep: *sweep })
+            }
+            (Surf::Cyl { k: slope, .. }, Geo::Ell { .. }) if *slope != 0.0 => Err(Decline("an ellipse on a cone")),
             (Surf::Cyl { r, th0, a, o, full, .. }, g) => {
                 if *g == Geo::Apex {
                     if !*full {
@@ -172,6 +235,25 @@ impl GFace {
                             return Err(Decline("an arc across a cylinder's seam"));
                         }
                         Ok(C2::Seg { a: q0, b: DVec2::new(x1, q0.y) })
+                    }
+                    Geo::Ell { e, t0, sweep, .. } => {
+                        // Seen along the axis the ellipse is the cylinder's circle: its angle φ0 + s t, its height
+                        // hc + A cos t.
+                        let Surf::Cyl { flip, .. } = self.s else { unreachable!() };
+                        let xp = (e.x - *a * e.x.dot(*a)).normalize();
+                        let s = if xp.cross(e.y).dot(*a) > 0.0 { 1.0 } else { -1.0 };
+                        let ds = s * sweep * r;
+                        if ds < 0.0 && (at0 || at1) {
+                            q0.x = r * (th0 + TAU);
+                        }
+                        let x1 = q0.x + ds;
+                        if x1 < r * th0 - 1e-9 * r || x1 > r * (th0 + TAU) + 1e-9 * r {
+                            return Err(Decline("an ellipse across a cylinder's seam"));
+                        }
+                        let (hc, amp) = ((e.c - *o).dot(*a), e.a * e.x.dot(*a));
+                        let sh = if flip { -1.0 } else { 1.0 };
+                        let phi0 = q0.x / r - s * t0;
+                        Ok(C2::Trig { c: DVec2::new(r * phi0, sh * hc), u: DVec2::new(0.0, sh * amp), v: DVec2::ZERO, w: DVec2::new(r * s, 0.0), t0: *t0, sweep: *sweep })
                     }
                 }
             }
@@ -273,11 +355,13 @@ enum State {
     OnOpposite,
 }
 
-/// A curve on two faces' surfaces, as parameters: a line `p + t d`, or a circle by angle.
+/// A curve on two faces' surfaces, as parameters: a line `p + t d` (`d` unit), a circle by angle, or an
+/// ellipse by its parameter.
 #[derive(Clone, Copy)]
 enum Path {
     Line { p: DVec3, d: DVec3 },
     Circle(Circ),
+    Ellipse(Ell),
 }
 
 impl Path {
@@ -285,6 +369,7 @@ impl Path {
         match self {
             Path::Line { p, d } => *p + *d * t,
             Path::Circle(k) => k.at(t),
+            Path::Ellipse(e) => e.at(t),
         }
     }
 
@@ -292,6 +377,8 @@ impl Path {
         match self {
             Path::Line { .. } => Geo::Line,
             Path::Circle(k) => Geo::Arc { k: *k, a0: t0, sweep: t1 - t0 },
+            // (Its faces set by the section.)
+            Path::Ellipse(e) => Geo::Ell { e: *e, t0, sweep: t1 - t0, faces: [usize::MAX; 2] },
         }
     }
 }
@@ -409,6 +496,7 @@ impl Ctx {
         match s.g {
             Geo::Line => self.p(s.v[0]).lerp(self.p(s.v[1]), t),
             Geo::Arc { k, a0, sweep } => k.at(a0 + sweep * t),
+            Geo::Ell { e, t0, sweep, .. } => e.at(t0 + sweep * t),
             Geo::Apex => self.p(s.v[0]),
         }
     }
@@ -429,6 +517,10 @@ impl Ctx {
                 let t = (k.angle(p) - a0).rem_euclid(TAU) / sweep;
                 (t, (off * off + rad * rad).sqrt())
             }
+            Geo::Ell { e, t0, sweep, .. } => {
+                let tp = e.param(p);
+                ((tp - t0).rem_euclid(TAU) / sweep, (e.at(tp) - p).length())
+            }
             Geo::Apex => (0.0, (p - self.p(s.v[0])).length()),
         }
     }
@@ -437,6 +529,7 @@ impl Ctx {
         match s.g {
             Geo::Line => (self.p(s.v[1]) - self.p(s.v[0])).length(),
             Geo::Arc { k, sweep, .. } => k.r * sweep,
+            Geo::Ell { e, t0, sweep, .. } => e.length(t0, t0 + sweep),
             Geo::Apex => 0.0,
         }
     }
@@ -452,24 +545,33 @@ impl Ctx {
         let len = match path {
             Path::Line { .. } => t1 - t0,
             Path::Circle(k) => (t1 - t0) * k.r,
+            Path::Ellipse(e) => e.length(t0, t1),
         };
         if len <= tol {
             return Ok(Vec::new());
         }
-        // A circle about a face that doesn't go round: in parts either side of the face's gap.
-        if let (&Path::Circle(k), &Surf::Cyl { o, a, x, y, r0, k: slope, th0, full: false, .. }) = (path, &self.faces[f].s) {
-            let h = (k.c - o).dot(a);
-            let t = t0 + (k.angle(o + a * h + (x * th0.cos() + y * th0.sin()) * (r0 + slope * h)) - t0).rem_euclid(TAU);
-            if (t - t0) * k.r > tol && (t1 - t) * k.r > tol {
-                let mut out = self.intervals(f, path, t0, t, [ends[0], End::Open], closed)?;
-                for iv in self.intervals(f, path, t, t1, [End::Open, ends[1]], closed)? {
-                    match out.last_mut() {
-                        Some(last) if last[1].0 == iv[0].0 && last[1].1 == End::Open => last[1] = iv[1],
-                        _ => out.push(iv),
-                    }
-                }
-                return Ok(out);
+        // A circle or ellipse about a face that doesn't go round: in parts either side of the face's gap.
+        let gap = match (path, &self.faces[f].s) {
+            (&Path::Circle(k), &Surf::Cyl { o, a, x, y, r0, k: slope, th0, full: false, .. }) => {
+                let h = (k.c - o).dot(a);
+                let t = t0 + (k.angle(o + a * h + (x * th0.cos() + y * th0.sin()) * (r0 + slope * h)) - t0).rem_euclid(TAU);
+                Some((t, (t - t0) * k.r > tol && (t1 - t) * k.r > tol))
             }
+            (&Path::Ellipse(e), &Surf::Cyl { th0, full: false, .. }) => {
+                let t = t0 + (self.ell_at_angle(f, &e, th0) - t0).rem_euclid(TAU);
+                Some((t, e.length(t0, t) > tol && e.length(t, t1) > tol))
+            }
+            _ => None,
+        };
+        if let Some((t, true)) = gap {
+            let mut out = self.intervals(f, path, t0, t, [ends[0], End::Open], closed)?;
+            for iv in self.intervals(f, path, t, t1, [End::Open, ends[1]], closed)? {
+                match out.last_mut() {
+                    Some(last) if last[1].0 == iv[0].0 && last[1].1 == End::Open => last[1] = iv[1],
+                    _ => out.push(iv),
+                }
+            }
+            return Ok(out);
         }
         let geo = path.geo(t0, t1);
         let c2 = self.faces[f].curve2(path.at(t0), path.at(t1), &geo, 0)?;
@@ -495,11 +597,16 @@ impl Ctx {
         }
         cuts.sort_by(|a, b| a.0.total_cmp(&b.0));
         let scale = len / (t1 - t0);
+        // The length along it between two parameters.
+        let apart = |x: f64, y: f64| match path {
+            Path::Ellipse(e) => e.length(x, y),
+            _ => (y - x) * scale,
+        };
         // Cuts at one place are one, a vertex if any of them is.
         let mut merged: Vec<(f64, End)> = Vec::with_capacity(cuts.len());
         for c in cuts {
             match merged.last_mut() {
-                Some(last) if (c.0 - last.0) * scale <= tol => {
+                Some(last) if apart(last.0, c.0) <= tol => {
                     if c.1.rank() > last.1.rank() {
                         *last = c;
                     }
@@ -511,7 +618,7 @@ impl Ctx {
         let mut out: Vec<Ival> = Vec::new();
         for k in 0..cuts.len() - 1 {
             let (a, b) = (cuts[k], cuts[k + 1]);
-            if (b.0 - a.0) * scale <= tol {
+            if apart(a.0, b.0) <= tol {
                 continue;
             }
             let mid = c2.at(((a.0 + b.0) * 0.5 - t0) / (t1 - t0));
@@ -542,13 +649,25 @@ impl Ctx {
     /// Adds where `path` lies inside both faces to both, as sections.
     fn section(&mut self, fs: usize, ft: usize, path: Path, t0: f64, t1: f64) -> R<()> {
         let tol = self.tol;
-        // A circle in parts between the faces' seams (a vertex where it crosses one).
+        // A circle or ellipse in parts between the faces' seams (a vertex where it crosses one).
         let mut cuts: Vec<(f64, End)> = vec![(t0, End::Open)];
         if let Path::Circle(k) = path {
             for f in [fs, ft] {
                 let Some(p) = self.seam_at(f, path) else { continue };
                 let t = t0 + (k.angle(p) - t0).rem_euclid(TAU);
                 if (t - t0) * k.r <= tol || (t1 - t) * k.r <= tol {
+                    cuts[0].1 = End::Point(p);
+                } else {
+                    cuts.push((t, End::Point(p)));
+                }
+            }
+            cuts.sort_by(|a, b| a.0.total_cmp(&b.0));
+        }
+        if let Path::Ellipse(e) = path {
+            for f in [fs, ft] {
+                let Some(p) = self.seam_at(f, path) else { continue };
+                let t = t0 + (e.param(p) - t0).rem_euclid(TAU);
+                if e.length(t0, t) <= tol || e.length(t, t1) <= tol {
                     cuts[0].1 = End::Point(p);
                 } else {
                     cuts.push((t, End::Point(p)));
@@ -571,14 +690,16 @@ impl Ctx {
         }
         let ib = self.intervals(ft, &path, t0, t1, ends, false)?;
         let tol = self.tol;
-        let scale = match path {
-            Path::Line { .. } => 1.0,
-            Path::Circle(k) => k.r,
+        // The length along it between two parameters.
+        let apart = |x: f64, y: f64| match path {
+            Path::Line { .. } => y - x,
+            Path::Circle(k) => (y - x) * k.r,
+            Path::Ellipse(e) => e.length(x, y),
         };
         // The end of a section: the tighter of the two faces' ends, made a vertex.
         let pick = |cx: &mut Ctx, x: (f64, End), y: (f64, End), lo: bool| -> R<Option<u32>> {
             let (later, earlier) = if x.0 > y.0 { (x, y) } else { (y, x) };
-            let end = if (later.0 - earlier.0) * scale > tol {
+            let end = if apart(earlier.0, later.0) > tol {
                 if lo { later.1 } else { earlier.1 }
             } else if x.1.rank() >= y.1.rank() {
                 x.1
@@ -591,7 +712,7 @@ impl Ctx {
                 End::Point(p) => cx.pool.add(p)?,
             };
             // Both faces end there: the same vertex.
-            if (later.0 - earlier.0) * scale <= tol {
+            if apart(earlier.0, later.0) <= tol {
                 for o in [x.1, y.1] {
                     let w = match o {
                         End::Vertex(w) => w,
@@ -609,13 +730,16 @@ impl Ctx {
             for y in &ib {
                 let lo = x[0].0.max(y[0].0);
                 let hi = x[1].0.min(y[1].0);
-                if (hi - lo) * scale <= tol {
+                if apart(lo, hi) <= tol {
                     continue;
                 }
                 let vlo = pick(self, x[0], y[0], true)?;
                 let vhi = pick(self, x[1], y[1], false)?;
                 let (Some(vlo), Some(vhi)) = (vlo, vhi) else { return Err(Decline("a section without ends")) };
-                let seg = Seg { v: [vlo, vhi], g: path.geo(lo, hi) };
+                let mut seg = Seg { v: [vlo, vhi], g: path.geo(lo, hi) };
+                if let Geo::Ell { faces, .. } = &mut seg.g {
+                    *faces = [fs, ft];
+                }
                 if vlo == vhi && seg.g == Geo::Line {
                     continue;
                 }
@@ -640,6 +764,7 @@ impl Ctx {
                 (Path::Line { p: a, d: (b - a) / l }, 0.0, l)
             }
             Geo::Arc { k, a0, sweep } => (Path::Circle(k), a0, a0 + sweep),
+            Geo::Ell { .. } => return Err(Decline("an argument's ellipse")),
             Geo::Apex => return Ok(()),
         };
         // An arc across a round face's seam: in two parts, a vertex where it crosses.
@@ -675,9 +800,23 @@ impl Ctx {
 
     /// Where `path` (a circle about face `f`'s axis) crosses `f`'s seam, if `f` goes round.
     fn seam_at(&self, f: usize, path: Path) -> Option<DVec3> {
-        let (Path::Circle(k), Surf::Cyl { o, a, x, y, r0, k: slope, th0, full: true, .. }) = (path, &self.faces[f].s) else { return None };
-        let h = (k.c - *o).dot(*a);
-        Some(*o + *a * h + (*x * th0.cos() + *y * th0.sin()) * (r0 + slope * h))
+        match (path, &self.faces[f].s) {
+            (Path::Circle(k), Surf::Cyl { o, a, x, y, r0, k: slope, th0, full: true, .. }) => {
+                let h = (k.c - *o).dot(*a);
+                Some(*o + *a * h + (*x * th0.cos() + *y * th0.sin()) * (r0 + slope * h))
+            }
+            (Path::Ellipse(e), Surf::Cyl { th0, full: true, .. }) => Some(e.at(self.ell_at_angle(f, &e, *th0))),
+            _ => None,
+        }
+    }
+
+    /// The parameter of ellipse `e` (on face `f`'s cylinder) where the cylinder's angle is `th`.
+    fn ell_at_angle(&self, f: usize, e: &Ell, th: f64) -> f64 {
+        let Surf::Cyl { a, x, y, .. } = self.faces[f].s else { unreachable!() };
+        // Seen along the axis it is the cylinder's circle: its major axis' direction at t = 0, its minor's at π/2.
+        let d = x * th.cos() + y * th.sin();
+        let xp = (e.x - a * e.x.dot(a)).normalize();
+        d.dot(e.y).atan2(d.dot(xp))
     }
 
     /// Whether edge `e` lies on face `f`'s surface.
@@ -706,6 +845,7 @@ impl Ctx {
                 Ok(k.n.cross(*ax).length() <= 1e-9 && (w - *ax * h).length() <= tol && (k.r - (r0 + slope * h)).abs() <= tol)
             }
             (_, Geo::Apex) => Ok(false),
+            (_, Geo::Ell { .. }) => Err(Decline("an argument's ellipse")),
         }
     }
 
@@ -786,7 +926,25 @@ impl Ctx {
             return self.section(fp, fc, Path::Circle(k), th0, th0 + TAU);
         }
         if na.abs() > 1e-12 {
-            return Err(Decline("a plane at an angle to a cylinder"));
+            if slope != 0.0 {
+                return Err(Decline("a plane at an angle to a cone"));
+            }
+            if na.abs() < 0.25 {
+                return Err(Decline("a plane nearly along a cylinder"));
+            }
+            // OCCT's ellipse (IntAna_QuadQuadGeo): its centre where the plane meets the axis, its normal the
+            // plane surface's, its major axis (n × a) × n, its radii r / |n · a| and r.
+            let Surf::Plane { flip, .. } = self.faces[fp].s else { unreachable!() };
+            let sn = if flip { -n } else { n };
+            let c = o + a * ((d - n.dot(o)) / na);
+            let xe = sn.cross(a).cross(sn).normalize();
+            let e = Ell { c, n: sn, x: xe, y: sn.cross(xe), a: r / na.abs(), b: r };
+            let (lo, hi) = (self.faces[fc].lo, self.faces[fc].hi);
+            if !boxes_meet(c - DVec3::splat(e.a), c + DVec3::splat(e.a), lo, hi, GREY * tol) {
+                return Ok(());
+            }
+            let ts = self.ell_at_angle(fc, &e, th0);
+            return self.section(fp, fc, Path::Ellipse(e), ts, ts + TAU);
         }
         if slope != 0.0 {
             return Err(Decline("a plane along a cone"));
@@ -947,6 +1105,7 @@ impl Ctx {
                 (a.min(b), a.max(b))
             }
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
+            Geo::Ell { e, .. } => (e.c - DVec3::splat(e.a), e.c + DVec3::splat(e.a)),
             Geo::Apex => return Ok(vec![s.v[0], s.v[1]]),
         };
         let (lo, hi) = (lo - DVec3::splat(tol), hi + DVec3::splat(tol));
@@ -1001,6 +1160,19 @@ impl Ctx {
                         };
                         let (ta, tb) = (t(w[0], false), t(w[1], true));
                         Geo::Arc { k, a0: a0 + sweep * ta, sweep: sweep * (tb - ta) }
+                    }
+                    Geo::Ell { e, t0, sweep, faces } => {
+                        let t = |v: u32, end: bool| {
+                            if v == s.v[0] && !end {
+                                0.0
+                            } else if v == s.v[1] && end {
+                                1.0
+                            } else {
+                                self.seg_param(s, self.p(v)).0
+                            }
+                        };
+                        let (ta, tb) = (t(w[0], false), t(w[1], true));
+                        Geo::Ell { e, t0: t0 + sweep * ta, sweep: sweep * (tb - ta), faces }
                     }
                 };
                 Seg { v: [w[0], w[1]], g }
@@ -1239,6 +1411,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         for (i, e) in body.edges.iter().enumerate() {
             let v = [vmap[e.v[0] as usize], vmap[e.v[1] as usize]];
             let g = match e.curve {
+                Curve::Ellipse { .. } => return Err(Decline("an argument's ellipse")),
                 Curve::Degenerate => {
                     if v[0] != v[1] {
                         return Err(Decline("a degenerate edge between two vertices"));
@@ -1270,7 +1443,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
                 Surface::Plane { origin, normal } => {
                     let n = if f.reversed { -normal } else { normal };
                     let (u, v) = frame(n);
-                    Surf::Plane { n, d: n.dot(origin), origin, u, v }
+                    Surf::Plane { n, d: n.dot(origin), origin, u, v, flip: f.reversed }
                 }
                 Surface::Cylinder { origin, axis, xdir, radius } => round(&cx, &edges, [origin, axis, xdir], radius, 0.0, f.reversed),
                 Surface::Cone { origin, axis, xdir, radius, angle } => round(&cx, &edges, [origin, axis, xdir], radius, angle.tan(), f.reversed),
@@ -1304,7 +1477,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             let s = cx.edge_seg(e);
             let n = match s.g {
                 Geo::Line | Geo::Apex => 1,
-                Geo::Arc { sweep, .. } => (sweep / (PI / 8.0)).ceil() as usize + 1,
+                Geo::Arc { sweep, .. } | Geo::Ell { sweep, .. } => (sweep / (PI / 8.0)).ceil() as usize + 1,
             };
             for k in 0..=n {
                 let p = cx.seg_at(&s, k as f64 / n as f64);
@@ -1314,6 +1487,12 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             if let Geo::Arc { k, .. } = s.g {
                 // Arcs bulge between the samples by at most r (1 - cos(π/16)).
                 let bulge = DVec3::splat(k.r * (1.0 - (PI / 16.0).cos()));
+                lo -= bulge;
+                hi += bulge;
+            }
+            if let Geo::Ell { e, .. } = s.g {
+                // An ellipse by at most h² / 8 times its largest second derivative (a) for steps h ≤ π/8.
+                let bulge = DVec3::splat(e.a * (PI / 8.0).powi(2) / 8.0);
                 lo -= bulge;
                 hi += bulge;
             }
@@ -1443,6 +1622,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             if std::mem::discriminant(&o.g) == std::mem::discriminant(&s.g) && (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * cx.tol {
                 let rev = match (o.g, s.g) {
                     (Geo::Arc { k: k1, .. }, Geo::Arc { k: k2, .. }) => k1.n.dot(k2.n) < 0.0,
+                    (Geo::Ell { e: e1, t0: a1, sweep: s1, .. }, Geo::Ell { e: e2, t0: a2, sweep: s2, .. }) => e1.deriv(a1 + 0.5 * s1).dot(e2.deriv(a2 + 0.5 * s2)) < 0.0,
                     _ => o.v[0] != s.v[0],
                 };
                 return (i, rev);
@@ -1468,6 +1648,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         let (lo, hi) = match s.g {
             Geo::Line | Geo::Apex => (cx.p(s.v[0]).min(cx.p(s.v[1])), cx.p(s.v[0]).max(cx.p(s.v[1]))),
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
+            Geo::Ell { e, .. } => (e.c - DVec3::splat(e.a), e.c + DVec3::splat(e.a)),
         };
         let near = es != usize::MAX && (0..ns).any(|t| meets[es * ns + t] && boxes_meet(lo, hi, cx.solids[t].lo, cx.solids[t].hi, GREY * tol));
         let chain = if near { cx.split_among(&s, &lists, Some(cx.edges[e].arg))? } else { vec![s.v[0], s.v[1]] };
@@ -1803,6 +1984,12 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
                 let (v, n) = if flip { ([seg.v[1], seg.v[0]], -k.n) } else { (seg.v, k.n) };
                 (v, Curve::Circle { center: k.c, normal: n, xdir: k.x, radius: k.r })
             }
+            // (Only new: OCCT's frame as the section made it.)
+            Geo::Ell { .. } if flip => return Err(Decline("a piece of an argument's ellipse")),
+            Geo::Ell { e, faces, .. } => {
+                let of = |f: usize| (cx.faces[f].arg, cx.faces[f].index);
+                (seg.v, Curve::Ellipse { center: e.c, normal: e.n, xdir: e.x, major: e.a, minor: e.b, faces: [of(faces[0]), of(faces[1])] })
+            }
         };
         emap.insert(s, out.body.edges.len() as u32);
         out.body.edges.push(Edge { v: [vmap[v[0] as usize], vmap[v[1] as usize]], curve });
@@ -2125,6 +2312,18 @@ fn shell_volume(b: &Body, faces: &[u32]) -> f64 {
                             .map(|k| {
                                 let a = a0 + sweep * k as f64 / 16.0;
                                 center + (xdir * a.cos() + y * a.sin()) * radius
+                            })
+                            .collect()
+                    }
+                    Curve::Ellipse { center, normal, xdir, major, minor, .. } => {
+                        let y = normal.cross(xdir);
+                        let par = |x: DVec3| ((x - center).dot(y) / minor).atan2((x - center).dot(xdir) / major);
+                        let t0 = par(p);
+                        let sweep = if e.v[0] == e.v[1] { TAU } else { (par(q) - t0).rem_euclid(TAU) };
+                        (0..=16)
+                            .map(|k| {
+                                let t = t0 + sweep * k as f64 / 16.0;
+                                center + xdir * (major * t.cos()) + y * (minor * t.sin())
                             })
                             .collect()
                     }

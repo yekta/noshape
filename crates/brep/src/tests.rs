@@ -417,3 +417,45 @@ fn faces_on_crossing_planes_have_nothing_in_common() {
     // The same square twice: declined (their overlap isn't worked out).
     assert!(boolean(Op::Common, &[&sq(true), &sq(true)], TOL).is_err());
 }
+
+/// `b` turned by `angle` about the x axis.
+fn turned_about_x(b: &Body, angle: f64) -> Body {
+    let q = glam::DQuat::from_rotation_x(angle);
+    let mut out = b.clone();
+    for p in &mut out.vertices {
+        *p = q * *p;
+    }
+    for e in &mut out.edges {
+        if let Curve::Circle { center, normal, xdir, .. } = &mut e.curve {
+            (*center, *normal, *xdir) = (q * *center, q * *normal, q * *xdir);
+        }
+    }
+    for f in &mut out.faces {
+        match &mut f.surface {
+            Surface::Plane { origin, normal } => (*origin, *normal) = (q * *origin, q * *normal),
+            Surface::Cylinder { origin, axis, xdir, .. } | Surface::Cone { origin, axis, xdir, .. } => {
+                (*origin, *axis, *xdir) = (q * *origin, q * *axis, q * *xdir)
+            }
+        }
+    }
+    out
+}
+
+#[test]
+fn a_hole_through_a_tilted_plate() {
+    // A plane at an angle to a cylinder: ellipses (OCCT's: radii r / cos and r, normal the plane's).
+    let a = 30f64.to_radians();
+    let plate = turned_about_x(&cuboid((-2.0, -2.0, -0.5), (2.0, 2.0, 0.5)), a);
+    let hole = cylinder(0.0, 0.0, 0.5, -3.0, 3.0);
+    let cut = boolean(Op::Cut, &[&plate, &hole], TOL).unwrap();
+    check_used_both_ways(&cut.body);
+    assert_eq!(counts(&cut), (1, 7, 15, 10));
+    let ellipses: Vec<(f64, f64)> = cut.body.edges.iter().filter_map(|e| if let Curve::Ellipse { major, minor, .. } = e.curve { Some((major, minor)) } else { None }).collect();
+    assert_eq!(ellipses.len(), 2);
+    for (major, minor) in ellipses {
+        assert!((major - 0.5 / a.cos()).abs() < 1e-12 && (minor - 0.5).abs() < 1e-12, "{major} {minor}");
+    }
+    // Nearly along the axis: declined.
+    let steep = turned_about_x(&cuboid((-2.0, -2.0, -0.5), (2.0, 2.0, 0.5)), 80f64.to_radians());
+    assert!(boolean(Op::Cut, &[&steep, &hole], TOL).is_err());
+}
