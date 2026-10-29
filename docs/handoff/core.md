@@ -26,8 +26,11 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   regions 3998.677). Same topology both ways, only the tube face's area differs: one Ø6.35 hole at (15, 6) in a
   75.554 × 20.245 × 10 block with a 1 mm top chamfer, t 1: regions 234.33971, slabs 234.33552, **exact 234.33553
   mm²** (2πR·9 minus ∫ 2R·acos((6 − y_c(z))/R) dz over the chamfer offset y_c = z − 8.586, z 9.414 → 10), so the
-  regions path is the one off (its tube cut from the planes' polytope, then the final cut). Fix that, then let cones
-  and holes meet in regions (wf-block's shell → ~0.4 s).
+  regions path is the one off; exact wall 3479.07658 mm³ by sections, slabs 3479.07652, regions 3479.08807. Edge
+  tolerances there are 3e-6 mm and both integrate adaptively, but regions' answer moves with the tube's length
+  (caps past the cavity box: 3479.09615), outside the part: OCCT's cavity − tube cut where the tube crosses the
+  slanted offset plane is inexact. Try the wall as (solid − cavity) ∪ (solid ∩ tube), or the tube's frame turned;
+  then let cones and holes meet in regions (wf-block's shell → ~0.4 s).
 - Speed table refreshed from perf.yml run 40796942944 (release): the fin under the 400-fin plate 40–64 ms (< 150 met).
 - Parallel pairs: branch agent/core-pairs-on rebased on 16139489 (f83bf5f4; the crash guard's BudgetSnapshot
   restores the thread's pairs mode too); kernel tests green against /root/occt-core with libTKBO.a.0004-on3. Land
