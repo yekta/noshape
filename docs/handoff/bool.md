@@ -550,6 +550,15 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   more each (reversed free-form faces declined before, mostly "a non-manifold result"): main 675, corpus2 524,
   corpus3 529, corpus4 569, corpus5 661, corpus6 615, Shell's 70, direct 52.
 
+## Tolerant inputs, where it doesn't matter (10-29 21:00 UTC)
+- An argument's sub-shapes with a tolerance over 1e-5 no longer decline the Boolean when their boxes, grown by their
+  tolerances, reach no other argument's box: nothing of theirs meets another argument, so the Boolean goes by the
+  rest's tolerance (`rust_boolean`, before "a tolerant input"). The tolerant ones where the arguments meet still
+  decline (OCCT merges by each point's own tolerance, ours by the largest: per-point tolerances would take them; the
+  three biggest such cases in corpus6, 10.2 s recorded, are fuses of boxes with 1e-4 edges where they touch).
+- Replays, all 0 differ: main 680 (+5), corpus2 528 (+4), corpus3 533 (+4), corpus4 573 (+4), corpus5 666 (+5),
+  corpus6 620 (+5), Shell's 71 (+1), direct 52. T1: a case (5f078363) in tests/data/brep.
+
 ## Next
 Free-form, the lead's four steps (13:35) where they stand (10-29 20:45 UTC): (1) profiled (above); (2) the hybrid
 (OCCT's IntTools_FaceFace curves, everything else ours) takes B-spline, torus, sphere, extruded and revolved faces;

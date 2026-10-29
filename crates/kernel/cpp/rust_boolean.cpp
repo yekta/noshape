@@ -14,6 +14,7 @@
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepLib.hxx>
+#include <BRepBndLib.hxx>
 #include <BRepTools.hxx>
 #include <TopExp_Explorer.hxx>
 #include <BRepTools_History.hxx>
@@ -1466,6 +1467,40 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
       }
       max_tol = ef;
     }
+  }
+  // Tolerant sub-shapes away from every other argument (their boxes, grown by their tolerances, apart from the
+  // others'): nothing of theirs meets another argument, so their tolerances don't matter; the Boolean goes by the
+  // rest's.
+  if (max_tol > kMaxTol && args.size() >= 2)
+  {
+    std::vector<Bnd_Box> whole(args.size());
+    for (size_t i = 0; i < args.size(); ++i)
+      BRepBndLib::Add(srcs[i]->shape, whole[i]);
+    double rest = 0;
+    bool   reaches = false;
+    for (size_t i = 0; i < args.size() && !reaches; ++i)
+      for (const TopAbs_ShapeEnum t : {TopAbs_VERTEX, TopAbs_EDGE, TopAbs_FACE})
+      {
+        const ShapeIMap& m = srcs[i]->map(t);
+        for (int k = 1; k <= m.Extent() && !reaches; ++k)
+        {
+          const TopoDS_Shape& x  = m(k);
+          const double        tx = t == TopAbs_VERTEX ? BRep_Tool::Tolerance(TopoDS::Vertex(x)) : t == TopAbs_EDGE ? BRep_Tool::Tolerance(TopoDS::Edge(x)) : BRep_Tool::Tolerance(TopoDS::Face(x));
+          if (tx <= kMaxTol)
+          {
+            rest = std::max(rest, tx);
+            continue;
+          }
+          Bnd_Box b;
+          BRepBndLib::Add(x, b);
+          b.Enlarge(tx + kMaxTol);
+          for (size_t j = 0; j < args.size(); ++j)
+            if (j != i && !b.IsOut(whole[j]))
+              reaches = true;
+        }
+      }
+    if (!reaches)
+      max_tol = rest;
   }
   if (max_tol > kMaxTol)
     return decline("a tolerant input");
