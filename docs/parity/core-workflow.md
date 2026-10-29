@@ -90,7 +90,7 @@ it, so re-take positions after every selection.
 | 5.2 | Plane ▾ dropdown contents | … Variable, Query variable, **Composite part, Tag** | ✅ (v0.4.6 gate): list scrolls to Composite part / Tag (was ✗ F17 (last items cut off at the window bottom)) | 0.4.10+ / 1c853f78 10-27 |
 | 5.3 | Drag the variable to the top; Extrude 1 depth "#w" | Parts 20 mm | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 5.4 | Select a face / two faces | "Area: 856.366 mm²" / a distance | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| 5.5 | Mass properties, no material | ? centre of mass shown | ? F18 (centre of mass and inertia blank) |  |
+| 5.5 | Mass properties, no material | ? centre of mass shown | ✅ = live (behaviours ~948: with no material the centre of mass and inertia are blank and the yellow toast "One or more parts do not have a material defined." shows; ours the same on 0e1689b3, qa 10-29) |  |
 | 5.6 | Material warning | Goes with the Mass properties dialog | ✅ (v0.4.6 gate): page toast ≈3.4 s, gone ≈8 s (= live) (was ✗ F19 (stays; later covers the sketch dialog's ✓)) | 0.4.10+ / f16b31c6 10-27 (toast on Mass properties with no material) |
 | 5.7 | Configurations panel › Configure Part Studio; add row "Long" | List input, Default / Long, info box | ✅ | 0.4.10+ / fa61ba6f 10-27 |
 | 5.8 | Right-click a feature parameter (Variable Value) | "Configure …" | ✅ re-checked 10-23: Depth › right-click › "Configure" (was ✗ F20 (only Cut/Copy/Paste/Select All)) | 0.4.10+ / fa61ba6f 10-27 |
