@@ -294,21 +294,23 @@ Rust path declines them. Next for it: don't touch untouched faces at all (C++ bu
 faces are most of what's left).
 
 ## Next
-What still declines (10-29 02:05, main corpus 451 of 972 taken; fresh 434 of 692; Shell's 48 of 85):
-- free-form surfaces and curves (B-spline edges and faces, ellipses: sweeps, lofts, fillets of angled edges):
-  ~100 main / 84 fresh, the most OCCT time (~105 s main); OCCT's (core's phase 1).
-- faces or shells as arguments (face–face commons, sheet fuses): ~250 main / 51 fresh, 1–8 ms each.
-- cylinders at an angle (27 main), planes at an angle to a cylinder (8 main / 6 fresh, ~1.4 s each in the fresh
-  corpus: multi-tool cuts round a shaft): ellipses and 4th-order curves; not worth it yet.
-- arguments sharing faces (13 main / 17 fresh, ~90 ms each): OCCT rebuilds some shared corners (see above).
-- edges of two arguments crossing on a third's face near a vertex of three (12 fresh): OCCT's attribution of the
-  crossing vertices goes by more than the face (tried 10-29: crediting the face made 10 others differ).
-- big targets (local Boolean first), pattern fuses with overlapping instances (core's trimmed path), ambiguous
-  geometry within 50 × the tolerance (~25), a line along a face or edge (~6).
-Next:
-1. Big targets: the Rust side (~21 ms of ~54 on 1612 faces) and the build/history over untouched faces, to get
-   under the local Boolean's ~43 ms.
-2. Shared faces, if a rule for OCCT's rebuilt corners turns up.
+Measured 10-29 07:37 on corpus5 (929 Booleans recorded from today's model and kernel tests, 105 s of OCCT time
+recorded): the Rust path takes 600, and what it leaves costs mostly:
+- curved edges / faces (B-spline, ellipse; fillets, sweeps, Shell's slabs on filleted parts): 74 s (141 cases).
+  OCCT's (core's phase 1); the slow Shell ones have their curves inside the slabs' reach.
+- a plane at an angle to a cylinder (ellipses): 11 s in 20 cases, but 3 of them (multi-tool cuts round a shaft,
+  0.5–2.3 s each) are most of it; the single-tool ones are 10–80 ms. Needs elliptic sections, sinusoids in a
+  cylinder's parameter plane and OCCT's own pcurve approximation (BOPTools_AlgoTools2D) to match its volumes.
+- cylinders at an angle (4th-order curves): 7.7 s in 6.
+- a plane along a cone: 2.8 s in 8 (one 2.4 s case; the rest drill tips cut through their axis: the apex).
+- sheets (faces / shells as arguments): none in corpus5. In the main corpus: 56 fuses of faces (sheet metal),
+  55 of them pure glue (faces meeting along whole edges, OCCT keeps each argument's shell in its result), ~1 s
+  in all; 33 coplanar Commons with a face in common, 1–8 ms each.
+- big targets: the local Boolean takes them first (~43 ms on 1612 faces; the Rust path ~54 ms there): 7 cases,
+  0.5 s in corpus5.
+So the lead's remaining list (sheets, direct sites, big targets in place) is worth about 1–2 s of corpus5's
+105 s; the direct sites are done but for Shell's two (above). Proposal: elliptic sections next (with the unify
+check), or hand curved surfaces to core's phase 1; sheets and big targets after.
 
 ## Requests
 - core / lead: `pattern_second::timed_second_pattern_costs_about_the_same_as_the_first` (perf.yml) compares LP2 to
