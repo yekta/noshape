@@ -9,6 +9,8 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **13:10 update (green 80ab80e9):** verified DWG-CENTERMARK-ALIGN, DWG-DIM-HOVER-STAYS. boolrand 61–75 / boolgrid 41–55 on the fixed CLI:
+  no Rust/OCCT difference at all. CLI fuzz on v0.4.14 through seed 224 clean.
 - **13:01 update:** with bool's dev CLI of 12:13 (has e5da453f; qa-scratch/rel/k/bool/1213): bin/pocksweep.py 32 / 32 right; the 19 boolmir
   seeds that differed and 30 fresh ones (91–120): no volume differences left, only face counts (RUST-MIRROR-SPLIT-FACES open; through
   half holes Rust-right). RUST-UNION-MERGES-DISJOINT-FACES unchanged (bin/union14.py). Running: boolrand 61–75 / boolgrid 41–55 on that
