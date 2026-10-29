@@ -233,7 +233,7 @@ impl DrawingEditor {
             })
             .collect();
         let ed2 = ed.clone();
-        let scale_menu = Button::new("sp-scale-list").ghost().small().w(px(20.)).p_0().dropdown_caret(true).os_dropdown_menu("sp-scale-list-dd", true, move |mut menu, _, _| {
+        let scale_menu = Button::new("sp-scale-list").ghost().small().w(px(20.)).p_0().dropdown_caret(true).os_dropdown_menu("sp-scale-list-dd", false, move |mut menu, _, _| {
             for (label, checked, f) in &scale_items {
                 let (e, f) = (ed2.clone(), f.clone());
                 menu = menu.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(*checked).on_click(move |_, w, cx| e.update(cx, |this, cx| f(this, w, cx))));

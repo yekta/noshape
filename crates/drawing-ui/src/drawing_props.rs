@@ -920,7 +920,7 @@ impl DrawingEditor {
         }
         let scale_menu = {
             let view = view.clone();
-            Button::new("vp-scale-dd").ghost().xsmall().w(px(20.)).h(px(24.)).dropdown_caret(true).os_dropdown_menu("vp-scale-menu", true, move |mut menu, _, _| {
+            Button::new("vp-scale-dd").ghost().xsmall().w(px(20.)).h(px(24.)).dropdown_caret(true).os_dropdown_menu("vp-scale-menu", false, move |mut menu, _, _| {
                 for (label, checked, f) in &scale_items {
                     let (v, f) = (view.clone(), f.clone());
                     menu = menu.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(*checked).on_click(move |_, w, cx| {

@@ -118,6 +118,21 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   live's layouts (from tests/perf's NIST x_t); older versions stay flat until live sends an assembly in each
   (REQUESTS dx 10-28). Then BALLOON-WRONG-ITEM, DRAWING-SHIFT-SLASH, the drawing.md rows in P2 order.
 
+## Afternoon 10-29 (landed through 8d3bc80b; 16:14 UTC)
+- qa tickets fixed: DWG-CONSTRAINT-PRESELECT, DWG-SHEETS-ROW-RENAME (view rows select; Shift+N "Rename" popup beside
+  one row), DARK-DRAWING-PANEL-CONTROLS, DWG-PROPERTY-FIELD (editor shows values, tokens kept: `NoteFields`),
+  DWG-GDT-MENU-ORDER, DWG-DATUM-TARGET-MENU (A1, Origin active), DWG-TABLE-SHIFT-EXTEND, DWG-SHEET-DRAG-GHOST,
+  DWG-INFO-TOASTS, DWG-LINE-MENU (sketch `SketchStyle.layer`, Formats pen; Linestyle / Color in the Styles panel),
+  DWG-PALETTE-VALUE-EMPTY (already fixed by D39), then DWG-CHAMFER-ANGLE-PRECISION, DWG-CELL-MERGE-GREY,
+  DRAWING-SCALE-LIST-NARROW.
+- Outside dx's crates, small and needed by those: vendor/gpui-component `Theme::global` gives a light copy inside
+  `with_light_colors` (`LightTheme`, set by crates/app main.rs `apply_kit_theme`); app-core os_menu greys an empty
+  submenu.
+- The drawing editor filled its SheetInfo (document / tab names) only on the first edit: properties read "----"
+  right after opening; now at once.
+- Next: DWG-NOTE-DIAG-FRACTION, AGENT-ELLIPSE-DIM-VALUE, DRAWING-SHIFT-SLASH, DWG-TOOL-HINTS-PREVIEW, the other P3s;
+  then D24, D21 for the other kinds, V59 / V26.
+
 ## Morning 10-29 (landed through 8eabd3f5)
 - qa tickets fixed: DWG-ROTATE-VIEW-DIMS-ZERO (edge dimensions turn with the view: `set_view_rotation`),
   DWG-DATUM-PASTE-ATTACHED (pasted datum stands free; not red, as ours can't re-attach a datum by drag yet),

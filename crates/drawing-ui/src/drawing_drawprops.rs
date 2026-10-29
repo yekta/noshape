@@ -1052,7 +1052,7 @@ impl DrawingEditor {
                 .child(trow("Non 45 degree style", 165., 33., 2., sel("dp-chs", style_name(props.chamfer_dimension), style_items(props.chamfer_dimension, |p, v| p.chamfer_dimension = v), 186.)))
                 .child(trow("Non 45 degree content", 165., 33., 2., sel("dp-chc", props.chamfer_content.name().into(), content_items(props.chamfer_content, |p, v| p.chamfer_content = v, false), 186.)))
                 .child(trow("Length precision", 165., 33., 2., sel("dp-chlp", shown(props.chamfer_length_precision, default_digits(units)), precision_items(props.chamfer_length_precision, 6, |p, v| p.chamfer_length_precision = v), 186.)))
-                .child(trow("Angle precision", 165., 33., 2., sel("dp-chap", shown(props.chamfer_angle_precision, 0), precision_items(props.chamfer_angle_precision, 4, |p, v| p.chamfer_angle_precision = v), 186.)))
+                .child(trow("Angle precision", 165., 33., 2., sel("dp-chap", shown(props.chamfer_angle_precision, 1), precision_items(props.chamfer_angle_precision, 4, |p, v| p.chamfer_angle_precision = v), 186.)))
                 .child(section("Ordinate dimensions"))
                 // Live drawing/ui2-ah-tab-Dimensions-end: column 146, 205 px.
                 .child(trow("Dimension style", 146., 33., 2., sel("dp-ordstd", std_name(ord_ansi), std_items(ord_ansi, |p, v| p.ordinate_ansi = Some(v)), 205.)))

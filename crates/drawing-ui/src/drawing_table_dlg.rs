@@ -187,9 +187,10 @@ impl DrawingEditor {
             })),
         ]
         .into_iter()
-        .map(|e| e.disabled(!multi))
         .collect();
-        out.push(MenuEntry::Submenu("Merge".into(), merge));
+        // Live (behaviours 1498, qa DWG-CELL-MERGE-GREY): for one cell
+        // "Merge ▸" itself is greyed (an empty submenu).
+        out.push(MenuEntry::Submenu("Merge".into(), if multi { merge } else { Vec::new() }));
         out.push(edit("Unmerge", Box::new(move |t| {
             t.unmerge(r0, c0);
         })).disabled(t.merge_at(r0, c0).is_none()));

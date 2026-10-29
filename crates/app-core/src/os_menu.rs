@@ -64,7 +64,9 @@ pub enum MenuIcon {
 pub enum OsMenuItem {
     Item { label: SharedString, icon: Option<MenuIcon>, checked: bool, disabled: bool, handler: Option<Handler>, keys: Vec<SharedString>, user: bool },
     Separator,
-    Submenu { label: SharedString, icon: Option<MenuIcon>, menu: Entity<OsMenu> },
+    /// `disabled`: an empty submenu, greyed and never opened (live's greyed
+    /// "Merge ▸" for one table cell).
+    Submenu { label: SharedString, icon: Option<MenuIcon>, menu: Entity<OsMenu>, disabled: bool },
 }
 
 impl OsMenuItem {
@@ -138,7 +140,7 @@ impl OsMenuItem {
     }
 
     fn clickable(&self) -> bool {
-        matches!(self, Self::Item { disabled: false, .. } | Self::Submenu { .. })
+        matches!(self, Self::Item { disabled: false, .. } | Self::Submenu { disabled: false, .. })
     }
 }
 
@@ -328,7 +330,8 @@ impl OsMenu {
         });
         // A click in the submenu closes the whole menu.
         self._subs.push(cx.subscribe(&menu, |_, _, _: &DismissEvent, cx| cx.emit(DismissEvent)));
-        self.items.push(OsMenuItem::Submenu { label: label.into(), icon: icon.map(|n| MenuIcon::Named(SharedString::from(n.to_string()))), menu });
+        let disabled = menu.read(cx).is_empty();
+        self.items.push(OsMenuItem::Submenu { label: label.into(), icon: icon.map(|n| MenuIcon::Named(SharedString::from(n.to_string()))), menu, disabled });
         self
     }
 
@@ -338,7 +341,7 @@ impl OsMenu {
 
     fn open_submenu(&self) -> Option<&Entity<OsMenu>> {
         match self.hovered.and_then(|i| self.items.get(i)) {
-            Some(OsMenuItem::Submenu { menu, .. }) => Some(menu),
+            Some(OsMenuItem::Submenu { menu, disabled: false, .. }) => Some(menu),
             _ => None,
         }
     }
@@ -554,9 +557,9 @@ impl Render for OsMenu {
                             d.cursor_pointer().on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation()).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate(ix, window, cx)))
                         })
                         .into_any_element(),
-                    OsMenuItem::Submenu { label, icon, menu } => row(ix)
-                        .text_color(pal.text)
-                        .when(hovered, |d| d.bg(hover_bg))
+                    OsMenuItem::Submenu { label, icon, menu, disabled } => row(ix)
+                        .text_color(if *disabled { pal.text_faint } else { pal.text })
+                        .when(hovered && !*disabled, |d| d.bg(hover_bg))
                         .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
                         .child(div().flex_1().when(wraps || truncate, |d| d.min_w_0()).child(label_el(label, false)))
                         .child({
@@ -567,7 +570,7 @@ impl Render for OsMenu {
                         // from the border).
                         .pr(px(6.))
                         .child(div().ml(px(16.)).child(crate::ui::glyph("ui-caret-right", 10., gpui_kit::rgb(0x666666))))
-                        .when(hovered, |d| {
+                        .when(hovered && !*disabled, |d| {
                             // Opens beside the row: its top-left at the menu's right edge,
                             // level with the row (window coordinates from the last paint).
                             // Near the window's right edge it opens to the left (live camera menu).
