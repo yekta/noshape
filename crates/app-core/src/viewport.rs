@@ -395,8 +395,6 @@ pub struct Viewport {
     /// Logical pixels at the left of the viewport covered by an overlay (the
     /// feature dialog): zoom to fit centers the model in the rest.
     pub fit_inset_left: f64,
-    /// The same at the right (the panel strip, while a sketch is edited).
-    pub fit_inset_right: f64,
     /// The box being dragged: press point, pointer, crossing.
     box_rect: Option<(DVec2, DVec2, bool)>,
     anim: Option<CameraAnimation>,
@@ -617,7 +615,6 @@ impl Viewport {
             pick_priority: Arc::new(|_| 0),
             fit_bounds: None,
             fit_inset_left: 0.0,
-            fit_inset_right: 0.0,
             box_rect: None,
             anim: None,
             axis_tag: AxisTag::None,
@@ -795,7 +792,7 @@ impl Viewport {
         let mut to = self.camera;
         to.rotation = rotation;
         if let Some((lo, hi)) = self.fit_bounds.or_else(|| self.scene_bounds.map(|(lo, hi)| (lo.as_dvec3(), hi.as_dvec3()))) {
-            noshape_scene::camera_ops::fit_camera_to_box_insets(&mut to, lo, hi, self.size(), self.fit_inset_left, self.fit_inset_right);
+            fit_camera_to_box(&mut to, lo, hi, self.size(), self.fit_inset_left);
         }
         self.animate_to(to, cx);
     }
@@ -834,7 +831,7 @@ impl Viewport {
         let Some((lo, hi)) = self.fit_bounds.or_else(|| self.scene_bounds.map(|(lo, hi)| (lo.as_dvec3(), hi.as_dvec3()))) else { return };
         let size = self.size();
         let mut to = self.camera;
-        noshape_scene::camera_ops::fit_camera_to_box_insets(&mut to, lo, hi, size, self.fit_inset_left, self.fit_inset_right);
+        fit_camera_to_box(&mut to, lo, hi, size, self.fit_inset_left);
         if animate {
             self.animate_to(to, cx);
         } else {

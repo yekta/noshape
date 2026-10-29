@@ -2497,18 +2497,6 @@ impl PartStudioView {
     /// point when it is shown, and the visible planes (the default ones
     /// span ±75 mm).
     pub(super) fn zoom_fit_bounds(&self) -> Option<(glam::DVec3, glam::DVec3)> {
-        // In a sketch, F fits the sketch's own geometry (live, workflow-advanced
-        // SK2: "F in a sketch fits the far rectangle (tight margin)";
-        // SKETCH-F-FIT: the planes and parts kept it half out of view).
-        if let Some(f) = self.opts.editing_sketch
-            && let Some(sk) = self.display.sketches.iter().find(|s| s.feature == f)
-        {
-            let p3 = |a: [f32; 3]| glam::DVec3::new(a[0] as f64, a[1] as f64, a[2] as f64);
-            let pts = sk.curves.iter().flat_map(|c| c.points.iter().copied()).chain(sk.points.iter().map(|q| q.position)).map(p3);
-            if let Some(b) = pts.fold(None, |acc: Option<(glam::DVec3, glam::DVec3)>, q| Some(acc.map_or((q, q), |(lo, hi)| (lo.min(q), hi.max(q))))) {
-                return Some(b);
-            }
-        }
         let origin = self.opts.show_origin && self.display.show_origin;
         self.fit_box(origin, |pl| self.opts.show_planes && !pl.hidden)
     }
@@ -2527,14 +2515,9 @@ impl PartStudioView {
 
     /// Logical pixels of the viewport covered by the feature dialog (top left).
     pub(super) fn fit_inset_left(&self) -> f64 {
-        if self.edit.is_some() { 220.0 + 2.0 * 12.0 } else { 0.0 }
-    }
-
-    /// While a sketch is edited, F (fitted to the sketch alone) keeps clear
-    /// of the right panel strip too (SKETCH-F-FIT reopened: the corner of a
-    /// far rectangle ended under it).
-    pub(super) fn fit_inset_right(&self) -> f64 {
-        if self.opts.editing_sketch.is_some() { 40.0 } else { 0.0 }
+        // Live (request 1583): F in a sketch ignores the Sketch dialog and
+        // frames the whole canvas, as after ✓.
+        if self.edit.is_some() && self.opts.editing_sketch.is_none() { 220.0 + 2.0 * 12.0 } else { 0.0 }
     }
 
     /// W: the next box drag zooms to the box (press W again to cancel).
