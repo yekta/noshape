@@ -5058,7 +5058,7 @@ fn pem_fh_pins_match_live() {
 #[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn pem_fh_pin_sizes_build() {
     use super::standard::{self, CATALOGUE, StandardSpec};
-    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs") {
+    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™")) {
         for s in &c.sizes {
             for l in [s.lengths.first().unwrap(), s.lengths.last().unwrap()] {
                 let mut spec = StandardSpec::new(c);
@@ -5103,6 +5103,27 @@ fn pem_fh_studs_match_live() {
         *kinds.entry(k).or_insert(0) += 1;
     }
     assert_eq!(kinds, [("cone", 14), ("cylinder", 27), ("plane", 39), ("torus", 2)].into_iter().collect());
+}
+
+/// PEM® FH4™ / FHP™ flush-head studs for stainless sheets (live's raw
+/// /features: FH studs' construction): "PEM FH4-M3-6", description "PEM
+/// FH4-M3-6 Stainless Steel Passivated" (single spaces, live's crawl), FHP
+/// for Hardened Stainless Steel, M6 stainless only; M3 x 6 = 82 faces.
+#[test]
+fn pem_fh4_studs_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let name = "FH4™/FHP™ Flush-head studs for stainless steel sheets";
+    let metric = CATALOGUE.iter().find(|c| c.name == name && !c.inch).unwrap();
+    let unified = CATALOGUE.iter().find(|c| c.name == name && c.inch).unwrap();
+    let mut spec = StandardSpec::new(metric);
+    assert_eq!((spec.part_name(), spec.description()), ("PEM FH4-M3-6".to_string(), "PEM FH4-M3-6 Stainless Steel Passivated".to_string()));
+    spec.material = Some("Hardened Stainless Steel".into());
+    assert_eq!(spec.part_name(), "PEM FHP-M3-6");
+    spec.set_size("M6x1.00");
+    assert_eq!(metric.materials_for(spec.size_row()), ["Stainless Steel"]);
+    assert_eq!(StandardSpec::new(unified).part_name(), "PEM FH4-440-4");
+    let r = standard::regenerate(&StandardSpec::new(metric)).unwrap();
+    assert_eq!(r.context.body(&standard::part_body(&r).unwrap()).unwrap().faces.len(), 82);
 }
 
 /// ANSI commercial taper pins and slotted spring pins with live's whole size

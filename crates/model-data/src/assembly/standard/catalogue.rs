@@ -215,6 +215,10 @@ pub struct Component {
     /// after it.
     #[serde(default)]
     pub material_codes: BTreeMap<String, MaterialCode>,
+    /// PEM®: the description is "<name> <material> <finish>" (live's FH4™
+    /// studs), not the part number's spaced layout.
+    #[serde(default)]
+    pub plain_description: bool,
     #[serde(default)]
     pub params: Vec<Param>,
     pub sizes: Vec<Size>,

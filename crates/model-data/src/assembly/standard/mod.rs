@@ -371,6 +371,9 @@ impl StandardSpec {
     pub fn description(&self) -> String {
         // PEM® (live request 1591): "PEM SOS-43.1-3   Stainless Steel No
         // finish", "PEM SO-43.1-3  ZI Steel Zinc plated".
+        if component(self).is_some_and(|c| c.plain_description && c.material_codes.contains_key(self.material())) {
+            return format!("{} {} {}", self.part_name(), self.material(), self.finish());
+        }
         if let Some(m) = component(self).and_then(|c| c.material_codes.get(self.material())) {
             let name = self.part_name();
             let base = name.strip_suffix(&format!(" {}", m.finish_code)).filter(|_| !m.finish_code.is_empty()).unwrap_or(&name);
