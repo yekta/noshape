@@ -776,8 +776,10 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     if (!partial)
       std::fill(fresh.begin(), fresh.end(), 1);
     // Faces noshape's own mesher takes (psui, mesh_rust.cpp) aren't BRepMesh's.
-    std::vector<char> taken((size_t)m->faces.Extent() + 1, 0);
-    const int         ntaken = !relative && !mesh_faces && rust_mesh_on() ? rust_mesh_faces(m->faces, m->edges, m->vertices, fresh, lin, ang, taken) : 0;
+    std::vector<char>                              taken((size_t)m->faces.Extent() + 1, 0);
+    std::vector<occ::handle<Poly_Triangulation>>   rust_tris((size_t)m->faces.Extent() + 1);
+    std::vector<std::vector<std::array<float, 3>>> rust_polys((size_t)m->edges.Extent());
+    const int ntaken = !relative && !mesh_faces && rust_mesh_on() ? rust_mesh_faces(m->faces, m->edges, m->vertices, fresh, lin, ang, taken, rust_tris, rust_polys) : 0;
     m->rust_faces            = (size_t)ntaken;
     if (partial || ntaken > 0)
     {
@@ -819,9 +821,12 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
         m->indices += 3 * (size_t)tri->NbTriangles();
         continue;
       }
-      const occ::handle<Poly_Triangulation>& tri = BRep_Tool::Triangulation(f, loc);
-      FaceTri&                               ft  = side->faces[i - 1];
-      ft.reversed                                = f.Orientation() == TopAbs_REVERSED;
+      // noshape's mesher's (in the face's frame), else BRepMesh's.
+      const occ::handle<Poly_Triangulation> tri = taken[(size_t)i] ? rust_tris[(size_t)i] : BRep_Tool::Triangulation(f, loc);
+      if (taken[(size_t)i])
+        loc = f.Location();
+      FaceTri& ft = side->faces[i - 1];
+      ft.reversed = f.Orientation() == TopAbs_REVERSED;
       if (tri.IsNull())
         continue;
       if (is_mesh_face(f))
@@ -896,6 +901,12 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
           continue;
         }
       bool done = false;
+      // noshape's mesher's nodes.
+      if (!rust_polys[(size_t)i - 1].empty())
+      {
+        poly = rust_polys[(size_t)i - 1];
+        done = true;
+      }
       if (fl != nullptr)
       {
         for (NCollection_List<TopoDS_Shape>::Iterator it(*fl); it.More() && !done; it.Next())
@@ -974,10 +985,6 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     // regenerating gate). Mesh faces (no surface) keep theirs.
     lap = std::make_unique<KernelTimer>("mesh.clean");
     BRepTools::Clean(meshed);
-    // The faces noshape's mesher took (and their edges' polygons) too.
-    for (int i = 1; i <= m->faces.Extent() && ntaken > 0; ++i)
-      if (taken[(size_t)i])
-        BRepTools::Clean(m->faces(i));
   }
   m->cleaned  = true;
   m->faceData = side;

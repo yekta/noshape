@@ -186,6 +186,12 @@ N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes
      rust_mesh::* (fins, holes, countersink, an angled hole left to BRepMesh, pattern instances). Next: measure
      (pattern_second fin plate, live-30-features open / edit, release, NOSHAPE_MESH_RUST=0 vs on), then spheres and
      tori (grids), cone apexes, and the bodies the Rust Boolean keeps (no OCCT reads).
+     Measured (release, this machine, load ~14, pattern_second fin plate, 1606 faces): the first (cold) display mesh
+     BRepMesh 291–361 ms → ours 181–196 ms (step 2) → 73–96 ms (this commit: our meshes and polylines handed to
+     mesh.cpp directly instead of set on the shape (no polygons, no clean), loops chained through a vertex index).
+     Left (kernel profile): core's shape maps 21–24, reading OCCT's geometry 16–18, our mesher 14–25, building the
+     triangulations 7–9, edge polylines 5–8. After the fin (core's cache serves most): 134–153 → ~133 ms (the cache's
+     own cost, not meshing). live-30-features edit commit: 99–115 ms either way (no display re-mesh in it).
 0. **After the cold-start work: our own display mesher (lead 10-28 21:05, user-approved).** `brep::mesh` in crates/brep
    (bool's crate, its Body / Surface / Curve types): planes (polygons with holes), cylinders, cones, spheres, tori from
    their exact parameterisation, shared edge samples (watertight), the display's deflection rules; anything else

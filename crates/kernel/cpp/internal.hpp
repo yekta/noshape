@@ -32,6 +32,7 @@
 #include <gp_GTrsf.hxx>
 
 #include <array>
+#include <Poly_Triangulation.hxx>
 #include <map>
 #include <functional>
 #include <string>
@@ -154,10 +155,11 @@ private:
 bool rust_boolean_on();
 // noshape's own display mesher (mesh_rust.cpp): on unless NOSHAPE_MESH_RUST=0.
 bool rust_mesh_on();
-// Meshes the `fresh` faces it takes (planes so far): each gets its triangulation and its edges' polygons, as
-// BRepMesh leaves them, and is marked in `taken`. Returns how many.
+// Meshes the `fresh` faces it takes (analytic ones): each is marked in `taken` with its triangulation in `tris`
+// (in the face's own frame; per face index), and their edges' polylines go to `polys` (per edge index, the
+// FORWARD edge's way). Returns how many.
 int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeIMap& vertices, const std::vector<char>& fresh, double lin, double ang,
-                    std::vector<char>& taken);
+                    std::vector<char>& taken, std::vector<occ::handle<Poly_Triangulation>>& tris, std::vector<std::vector<std::array<float, 3>>>& polys);
 // Notes why it wasn't tried (false; the replay's strict mode fails).
 bool rust_decline(const char* why);
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,

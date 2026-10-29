@@ -62,9 +62,10 @@ bool rust_mesh_on()
 }
 
 int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeIMap& vertices, const std::vector<char>& fresh, double lin, double ang,
-                    std::vector<char>& taken)
+                    std::vector<char>& taken, std::vector<occ::handle<Poly_Triangulation>>& tris, std::vector<std::vector<std::array<float, 3>>>& polys)
 {
   const KernelTimer timer("mesh.rust");
+  auto              lap = std::make_unique<KernelTimer>("mesh.rust.in");
   MeshIn            in;
   in.linear  = lin;
   in.angular = ang;
@@ -190,14 +191,15 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
   if (face_of.empty())
     return 0;
   MeshOut out;
+  lap = std::make_unique<KernelTimer>("mesh.rust.mesh");
   if (!brep_mesh(in, out))
     return 0;
-  // Per meshed face: its triangulation (in the face's own frame), its edges' polygons.
-  std::vector<occ::handle<Poly_Triangulation>> tris(faces.Extent() + 1);
-  std::vector<size_t>                          use_at(faces.Extent() + 1, 0); // its first entry in out.use_nodes
-  BRep_Builder                                 B;
-  int                                          n = 0;
-  size_t                                       un = 0;
+  lap = std::make_unique<KernelTimer>("mesh.rust.out");
+  // Per meshed face: its triangulation (in the face's own frame); per edge of one: its polyline (in the
+  // map's FORWARD direction, as mesh.cpp's edges loop wants it).
+  std::vector<size_t> use_at(faces.Extent() + 1, 0); // its first entry in out.use_nodes
+  int                 n  = 0;
+  size_t              un = 0;
   for (size_t j = 0; j < face_of.size(); ++j)
   {
     const int i = face_of[j];
@@ -223,73 +225,50 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     for (uint32_t t = t0; t < t1; ++t)
       tri->SetTriangle((int)(t - t0 + 1), Poly_Triangle((int)out.tris[3 * t] + 1, (int)out.tris[3 * t + 1] + 1, (int)out.tris[3 * t + 2] + 1));
     tri->Deflection(lin);
-    B.UpdateFace(f, tri);
     tris[(size_t)i]   = tri;
     use_at[(size_t)i] = un;
-    // Skip to the next face's uses: per use a count and that many node indices.
     for (uint32_t l = in.face_loops[j]; l < in.face_loops[j + 1]; ++l)
       for (uint32_t u = in.loop_uses[l]; u < in.loop_uses[l + 1]; ++u)
         un += 1 + out.use_nodes[un];
-    taken[(size_t)i] = 1;
-    ++n;
   }
-  // Polygons of every taken face's edges (a pattern's instances with the first's nodes), as BRepMesh's
-  // post-processing leaves them: the edge's nodes from its start to its end, their parameters.
+  // Edge polylines of the meshed faces' edges (a pattern's instances: the first's, moved), and the instances'
+  // triangulations (the first's).
   for (int i = 1; i <= faces.Extent(); ++i)
   {
     if (!fresh[(size_t)i] || first[(size_t)i] == 0 || tris[(size_t)first[(size_t)i]].IsNull())
       continue;
-    const int          i0  = first[(size_t)i];
-    const TopoDS_Face& f   = TopoDS::Face(faces(i));
-    size_t             at  = use_at[(size_t)i0];
-    size_t             nuse = 0;
-    if (i != i0)
-    {
-      // Same TFace: the triangulation is on it already.
-      taken[(size_t)i] = 1;
-      ++n;
-    }
-    // Per edge its polygons on this face: a seam (twice in the face) one per way, forward first.
-    std::vector<std::tuple<TopoDS_Shape, occ::handle<Poly_PolygonOnTriangulation>, occ::handle<Poly_PolygonOnTriangulation>>> polys;
+    const int          i0 = first[(size_t)i];
+    const TopoDS_Face& f  = TopoDS::Face(faces(i));
+    tris[(size_t)i]       = tris[(size_t)i0];
+    taken[(size_t)i]      = 1;
+    ++n;
+    // From the first face's nodes (global) to this face's place.
+    const bool    moved = i != i0 && !f.Location().IsEqual(faces(i0).Location());
+    const gp_Trsf to    = moved ? f.Location().Transformation() * faces(i0).Location().Transformation().Inverted() : gp_Trsf();
+    // The first face's j: its nodes start at out.face_nodes[j].
+    const size_t   j0    = (size_t)(std::find(face_of.begin(), face_of.end(), i0) - face_of.begin());
+    const uint32_t nbase = out.face_nodes[j0];
+    size_t         at    = use_at[(size_t)i0];
     for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
       for (TopoDS_Iterator ei(wi.Value()); ei.More(); ei.Next())
       {
         const uint32_t count = out.use_nodes[at];
-        // A pattern's instance: its edge's parameters are the first face's edge's at the same use.
-        const int      ke    = use_edges[(size_t)i0][(size_t)(nuse++)];
-        NCollection_Array1<int>    nodes(1, (int)count);
-        NCollection_Array1<double> params(1, (int)count);
-        const uint32_t             p0 = out.edge_params[(size_t)(ke - 1)];
-        if (out.edge_params[(size_t)ke] - p0 != count)
+        const int      k     = edges.FindIndex(ei.Value());
+        if (k > 0 && polys[(size_t)k - 1].empty())
         {
-          at += 1 + count;
-          continue;
+          auto& poly = polys[(size_t)k - 1];
+          poly.reserve(count);
+          for (uint32_t c = 0; c < count; ++c)
+          {
+            const uint32_t node = nbase + out.use_nodes[at + 1 + c];
+            gp_Pnt         p(out.nodes[3 * node], out.nodes[3 * node + 1], out.nodes[3 * node + 2]);
+            if (moved)
+              p.Transform(to);
+            poly.push_back({(float)p.X(), (float)p.Y(), (float)p.Z()});
+          }
         }
-        for (uint32_t c = 0; c < count; ++c)
-        {
-          nodes((int)c + 1)  = (int)out.use_nodes[at + 1 + c] + 1;
-          params((int)c + 1) = out.params[p0 + c];
-        }
-        occ::handle<Poly_PolygonOnTriangulation> poly = new Poly_PolygonOnTriangulation(nodes, params);
-        poly->Deflection(lin);
-        const bool forward = ei.Value().Orientation() == TopAbs_FORWARD;
-        auto       it      = std::find_if(polys.begin(), polys.end(), [&](const auto& p) { return std::get<0>(p).IsSame(ei.Value()); });
-        if (it == polys.end())
-          polys.emplace_back(ei.Value(), forward ? poly : nullptr, forward ? nullptr : poly);
-        else if (forward)
-          std::get<1>(*it) = poly;
-        else
-          std::get<2>(*it) = poly;
         at += 1 + count;
       }
-    for (const auto& [e, fwd, rev] : polys)
-    {
-      const TopoDS_Edge edge = TopoDS::Edge(e.Oriented(TopAbs_FORWARD));
-      if (!fwd.IsNull() && !rev.IsNull())
-        BRepMesh_ShapeTool::UpdateEdge(edge, fwd, rev, tris[(size_t)i0], f.Location());
-      else
-        BRepMesh_ShapeTool::UpdateEdge(edge, fwd.IsNull() ? rev : fwd, tris[(size_t)i0], f.Location());
-    }
   }
   return n;
 }

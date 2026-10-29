@@ -338,24 +338,29 @@ fn loop_nodes(edges: &[MeshEdge], uses: &[Use], nodes: &mut dyn FnMut(u32) -> Op
         let e = edges.get(u.edge as usize)?;
         Some(if u.reversed { (e.v[1], e.v[0]) } else { (e.v[0], e.v[1]) })
     };
-    // In order round the loop (wires needn't list their edges so): each use's end the next one's start.
+    // In order round the loop (wires needn't list their edges so): each use's end the next one's start. At a
+    // vertex several uses start from (a seam's: the rim on and the seam back), not back along the edge just
+    // walked, then the next one in the given order.
+    let mut from: std::collections::HashMap<u32, Vec<usize>> = std::collections::HashMap::with_capacity(uses.len());
+    for (k, u) in uses.iter().enumerate() {
+        from.entry(ends(u)?.0).or_default().push(k);
+    }
     let mut order = Vec::with_capacity(uses.len());
-    let mut left: Vec<usize> = (0..uses.len()).collect();
-    let mut at = 0;
-    while !left.is_empty() {
-        let i = left.remove(at);
+    let mut i = 0;
+    loop {
         order.push(i);
-        let end = ends(&uses[i])?.1;
-        // Several (a seam's vertex: the rim on and the seam back both start there): not back along the edge
-        // just walked, then the next one in the given order.
-        let next = (0..left.len())
-            .filter(|&k| ends(&uses[left[k]]).is_some_and(|e| e.0 == end))
-            .min_by_key(|&k| (uses[left[k]].edge == uses[i].edge, (left[k] + uses.len() - i) % uses.len()));
-        match (next, left.is_empty()) {
-            (Some(k), _) => at = k,
-            (None, true) => {}
-            (None, false) => return None,
+        let starts = from.get_mut(&ends(&uses[i])?.0)?;
+        starts.retain(|&k| k != i);
+        if order.len() == uses.len() {
+            break;
         }
+        let end = ends(&uses[i])?.1;
+        let next = from
+            .get(&end)?
+            .iter()
+            .copied()
+            .min_by_key(|&k| (uses[k].edge == uses[i].edge, (k + uses.len() - i) % uses.len()))?;
+        i = next;
     }
     if ends(&uses[*order.last()?])?.1 != ends(&uses[order[0]])?.0 {
         return None;
