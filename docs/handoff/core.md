@@ -143,16 +143,18 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   different construction for prismatic parts (by_regions extended to holes / collapsing fillets), not tuning.
 
 ## Speed targets (PLAN 2.7), current numbers
-perf.yml model job (release) on main 10-27 ~18:05 (run 40556712238; before ab192d94's square-corner fillets):
-| target | macOS (Apple silicon) | Linux x86_64 | goal |
-|---|---|---|---|
-| live-30-features full regen (`regen_profile::regen_profile`) | **50 ms** | 65 ms | ≤ 80 (live 171) |
-| edit commit on it (`regen_profile::edit_commit_profile`, total) | **72 ms** | 90 ms | ≤ 100 |
-| big-plate regen | 276 ms | 314 ms | ≤ 250 (live 617) |
-| big-plate's Extrude 2 (400 holes; dev here, load ~50, 10-28 after the parallel profiles / prisms) | | 215 ms (was 457; profiles 136-205 → 42, prisms 120-172 → 18-39, the Boolean step ~120) | |
-| Shell on qa's filleted plate with a hole (`kernel_robustness::timed_shell_on_a_filleted_plate_with_a_hole`, perf.yml timed checks from 10-28) | | dev here 140 ms (10-28, load ~50; was 177–229) | ≤ 200 |
-| fin under the 400-fin plate (Extrude 3; `pattern_second::timed_the_fin_under_the_fin_plate_regenerates_locally`) | | (here, release, best of 3: 324 ms 10-28 05:37) | < 150 (was 2.7 s) |
-| editing that fin (`pattern_second::timed_editing_the_fin_under_the_fin_plate`, edit commit, dev here, loaded) | | feature 217 ms, display 261 ms (was 586), whole edit 479 ms (was 802) | |
+perf.yml model job (release) on main 10-29 00:53 (run 40796942944, 34cbea98; the previous table was 10-27's run 40556712238):
+| target | macOS (Apple silicon) | Linux x86_64 | Windows x86_64 | goal |
+|---|---|---|---|---|
+| live-30-features full regen (`regen_profile::regen_profile`) | **35 ms** | 41 ms | 53 ms | ≤ 80 (live 171; 10-27: 50 / 65) |
+| edit commit on it (`regen_profile::edit_commit_profile`, total) | **34 ms** | 38 ms | 60 ms | ≤ 100 (10-27: 72 / 90) |
+| big-plate regen | **159 ms** | 230 ms | 306 ms | ≤ 250 (live 617; 10-27: 276 / 314) |
+| big-plate depth edit (`big_plate`: extrude + 400-edge chamfer) | 1.30 s (chamfer 625 ms) | 0.94 s (chamfer 424 ms) | 1.30 s (chamfer 540 ms) | the chamfer is what's left |
+| fins-400 full regen (8 features) | 1748 ms | 1945 ms | 2353 ms | |
+| Shell on qa's filleted plate with a hole (`kernel_robustness::timed_shell_on_a_filleted_plate_with_a_hole`) | 85 ms | 62 ms | 61 ms | ≤ 200 (dev here 140) |
+| fin under the 400-fin plate (Extrude 3; `pattern_second::timed_the_fin_under_the_fin_plate_regenerates_locally`, 2 runs) | 40 / 64 ms | 60 / 64 ms | 46 / 50 ms | **< 150 met** (was 2.7 s; here release under load 324) |
+| that fin plus the redisplay (`timed_the_fin_plate_redisplays_after_the_fin`, total) | 61 / 102 ms | 96 / 99 ms | 88 / 88 ms | |
+| editing that fin (`timed_editing_the_fin_under_the_fin_plate`: feature, display, whole edit) | 30 + 24 = 56 ms / 96 | 49 + 40 = 91 ms / 93 | 42 + 34 = 76 ms / 93 | (was 802 ms dev) |
 This machine (load 20–40) runs ~3× slower than the macOS runner; compare there. Landed for these today: patch 0003,
 `cut_through_holes`, `fuse_on_face`, on-demand hole tables (the first hole parsed 2.1 MB of FS: 154 → 17 ms),
 `fillet_square_corner`, the blend check on changed faces, shells by regions. Measuring: NOSHAPE_KERNEL_PROFILE=1
