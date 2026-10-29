@@ -109,6 +109,58 @@
    {
     "category": "Sheet metal fasteners",
     "class": "Clinch nuts",
+    "name": "Self-locking clinch nut with self-locking threads NASM 45938",
+    "shape": "nut",
+    "form": {
+     "form": 11
+    },
+    "sizes": [
+     {
+      "name": "1/4-20",
+      "label": "Self-locking clinch nut with self-locking threads 1/4-20",
+      "d": 0.25,
+      "dims": {
+       "d": 0.25,
+       "dh": 0.196,
+       "dc": 0.343,
+       "de": 0.5,
+       "alen": 0.058,
+       "tlen": 0.189
+      }
+     },
+     {
+      "name": "5/16-18",
+      "label": "Self-locking clinch nut with self-locking threads 5/16-18",
+      "d": 0.3125,
+      "dims": {
+       "d": 0.3125,
+       "dh": 0.252,
+       "dc": 0.412,
+       "de": 0.575,
+       "alen": 0.058,
+       "tlen": 0.24
+      }
+     },
+     {
+      "name": "3/8-16",
+      "label": "Self-locking clinch nut with self-locking threads 3/8-16",
+      "d": 0.375,
+      "dims": {
+       "d": 0.375,
+       "dh": 0.307,
+       "dc": 0.499,
+       "de": 0.65,
+       "alen": 0.058,
+       "tlen": 0.3
+      }
+     }
+    ],
+    "source": "Onshape standard content table DATA_SELF_LOCKING_CLINCH_NUT_MAIN (document e6984c2765239d5c4971e398; raw /features live/dom/skb-sc-comp, B-reps live/dom/skb-sc-geom)",
+    "nearOnly": false
+   },
+   {
+    "category": "Sheet metal fasteners",
+    "class": "Clinch nuts",
     "name": "Self-locking clinch nut without self-locking threads NASM 45938",
     "shape": "nut",
     "form": {

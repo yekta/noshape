@@ -1305,6 +1305,7 @@ const NUT_T_SLOT = 7;
 const NUT_CLINCH_HEX = 8;
 const NUT_CLINCH_FLUSH = 9;
 const NUT_CLINCH = 10;
+const NUT_CLINCH_LOCKING = 11;
 
 /**
  * Live's NASM 45938 self-locking clinch nut (raw /features + B-rep): a
@@ -1313,7 +1314,11 @@ const NUT_CLINCH = 10;
  * tlen long with its edges rounded de / 40, the bore at the minor diameter
  * dh opening to the major d over the top 0.012 in then out at 25° to the top,
  * countersunk at the bottom over 1.5 (d - dh); the step's ring cut by 24
- * scallops of radius 0.06 de meeting on its edge.
+ * scallops of radius 0.06 de meeting on its edge. NUT_CLINCH_LOCKING (with
+ * self-locking threads): only the shank's top edge rounded; under it a skirt
+ * coning from 0.3 de out to de / 2 0.046 in down, cut to two tabs de / 6 wide
+ * along X by flats 0.955 de apart (running 0.35 tlen up the shank), the
+ * tabs' cone-to-flat edges rounded de / 60.
  */
 function selfLockingClinchNut(context is Context, id is Id, def is map)
 {
@@ -1327,11 +1332,12 @@ function selfLockingClinchNut(context is Context, id is Id, def is map)
     const rmin = def.dh / 2;
     const rtop = rmaj + (a - k) * tan(25 * degree);
     const s45 = sin(45 * degree);
-    revolveProfile(context, id + "body", [{ "p" : rz(rtop, Z) }, { "p" : rz(def.dc / 2, Z) }, { "p" : rz(def.dc / 2 - (a - k) * tan(15 * degree), -(a - k)) },
-                { "p" : rz(rs, -(a - k)) }, { "p" : rz(rs, -a) }, { "p" : rz(R - f, -a) }, { "p" : rz(R, -a - f), "mid" : rz(R - f + f * s45, -a - f + f * s45) },
-                { "p" : rz(R, -a - t + f) }, { "p" : rz(R - f, -a - t), "mid" : rz(R - f + f * s45, -a - t + f - f * s45) },
-                { "p" : rz(rmaj, -a - t) }, { "p" : rz(rmin, -a - t + 1.5 * (def.d - def.dh)) }, { "p" : rz(rmin, -a) }, { "p" : rz(rmaj, -a) },
-                { "p" : rz(rmaj, -(a - k)) }]);
+    const locking = def.form == NUT_CLINCH_LOCKING;
+    const foot = locking ? [{ "p" : rz(R, -a - t) }] : [{ "p" : rz(R, -a - t + f) }, { "p" : rz(R - f, -a - t), "mid" : rz(R - f + f * s45, -a - t + f - f * s45) }];
+    revolveProfile(context, id + "body", concatenateArrays([[{ "p" : rz(rtop, Z) }, { "p" : rz(def.dc / 2, Z) }, { "p" : rz(def.dc / 2 - (a - k) * tan(15 * degree), -(a - k)) },
+                { "p" : rz(rs, -(a - k)) }, { "p" : rz(rs, -a) }, { "p" : rz(R - f, -a) }, { "p" : rz(R, -a - f), "mid" : rz(R - f + f * s45, -a - f + f * s45) }],
+                foot, [{ "p" : rz(rmaj, -a - t) }, { "p" : rz(rmin, -a - t + 1.5 * (def.d - def.dh)) }, { "p" : rz(rmin, -a) }, { "p" : rz(rmaj, -a) },
+                { "p" : rz(rmaj, -(a - k)) }]]));
     // The scallops: 24 circles whose neighbours meet on the ring's edge.
     const rho = 0.06 * def.de;
     const half = 7.5 * degree;
@@ -1346,6 +1352,35 @@ function selfLockingClinchNut(context is Context, id is Id, def is map)
         tools = append(tools, c);
     }
     subtract(context, id + "scallops", qCreatedBy(id + "body", EntityType.BODY), qUnion(tools));
+    if (!locking)
+        return;
+    // The skirt, cut to the two tabs, their outer ends rounded.
+    const zb = -a - t;
+    const sk = 0.046 * inch;
+    const xf = 0.955 * R;
+    const w = def.de / 12;
+    revolveProfile(context, id + "skirt", [{ "p" : rz(0.3 * def.de, zb) }, { "p" : rz(R, zb) }, { "p" : rz(R, zb - sk) }]);
+    opBoolean(context, id + "addSkirt", { "tools" : qUnion([qCreatedBy(id + "body", EntityType.BODY), qCreatedBy(id + "skirt", EntityType.BODY)]), "operationType" : BooleanOperationType.UNION });
+    const cuts = qUnion([cuboid(context, id + "flatPlus", vector(xf, -2 * R, zb - 2 * sk), vector(2 * R, 2 * R, zb + 0.35 * t)),
+                cuboid(context, id + "flatMinus", vector(-2 * R, -2 * R, zb - 2 * sk), vector(-xf, 2 * R, zb + 0.35 * t)),
+                cuboid(context, id + "bandPlus", vector(-2 * R, w, zb - 2 * sk), vector(2 * R, 2 * R, zb)),
+                cuboid(context, id + "bandMinus", vector(-2 * R, -2 * R, zb - 2 * sk), vector(2 * R, -w, zb))]);
+    subtract(context, id + "tabs", qCreatedBy(id + "body", EntityType.BODY), cuts);
+    var ends = [];
+    for (var e in evaluateQuery(context, qOwnedByBody(qCreatedBy(id + "body", EntityType.BODY), EntityType.EDGE)))
+    {
+        const bb = evBox3d(context, { "topology" : e });
+        // (The skirt's seam at +X splits that tab's edge in two.)
+        if (abs(bb.maxCorner[0] - bb.minCorner[0]) < EPS && abs(abs(bb.minCorner[0]) - xf) < EPS && bb.maxCorner[1] - bb.minCorner[1] > EPS && bb.maxCorner[2] < zb - EPS)
+            ends = append(ends, e);
+    }
+    if (size(ends) > 0)
+    {
+        try silent
+        {
+            opFillet(context, id + "tabEnds", { "entities" : qUnion(ends), "radius" : def.de / 60 });
+        }
+    }
 }
 
 /**
@@ -1359,7 +1394,7 @@ function selfLockingClinchNut(context is Context, id is Id, def is map)
  */
 function clinchNut(context is Context, id is Id, def is map)
 {
-    if (def.form == NUT_CLINCH)
+    if (def.form == NUT_CLINCH || def.form == NUT_CLINCH_LOCKING)
     {
         selfLockingClinchNut(context, id, def);
         return;
@@ -1467,7 +1502,7 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
     }
     {
         const form = definition.form;
-        if (form == NUT_CLINCH_HEX || form == NUT_CLINCH_FLUSH || form == NUT_CLINCH)
+        if (form == NUT_CLINCH_HEX || form == NUT_CLINCH_FLUSH || form == NUT_CLINCH || form == NUT_CLINCH_LOCKING)
         {
             clinchNut(context, id, definition);
             return;

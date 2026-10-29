@@ -3768,14 +3768,17 @@ fn failing_standard_sizes_are_listed_with_live_errors() {
     assert_eq!(k.failure("440mm - 550mm"), Some("com.belmonttech.service.exception.BTBadRequestException: Feature script error: @stringToNumber: String is not a number"));
 }
 
-/// NAS clinch nuts (live's raw /features): NASM 45938/2 (hex on a pilot hex,
+/// NAS clinch nuts (live's raw /features): NASM 45938 with self-locking
+/// threads (the tabs under the shank), NASM 45938/2 (hex on a pilot hex,
 /// the bore's pilot end coned to the flats) and NASM 3214 (hex on a stepped
 /// shank, Nut thickness rows); faces and total area (m²) of live's B-rep.
 #[test]
 #[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn nas_clinch_nuts_match_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
-    let cases: [(&str, &str, usize, f64); 5] = [
+    let cases: [(&str, &str, usize, f64); 7] = [
+        ("Self-locking clinch nut with self-locking threads NASM 45938", "1/4-20", 48, 5.543943691241644e-4),
+        ("Self-locking clinch nut with self-locking threads NASM 45938", "3/8-16", 48, 1.0147442316561532e-3),
         ("Self-locking clinch nut without self-locking threads NASM 45938", "1/4-20", 37, 5.396039629105201e-4),
         ("Self-locking clinch nut without self-locking threads NASM 45938", "3/8-16", 37, 9.938981948384477e-4),
         ("Hex head self-locking clinch nut NASM 45938/2", "#6-32", 29, 2.3303731762714102e-4),
