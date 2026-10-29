@@ -1004,7 +1004,7 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
             m->edge_polys[(size_t)i - 1] = std::make_shared<const std::vector<std::array<float, 3>>>(std::move(polys[(size_t)i - 1]));
         }
       },
-      !parallel || ne <= run);
+      !parallel || ne < 1024); // a small part's edges stay here (mesh_rust.cpp in_chunks)
     lap = std::make_unique<KernelTimer>("mesh.edges.cache");
     m->edge_reversed.resize((size_t)ne);
     for (int i = 1; i <= ne; ++i)

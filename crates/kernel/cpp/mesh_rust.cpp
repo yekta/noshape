@@ -62,7 +62,8 @@ void put3(double* v, const gp_XYZ& p)
   v[2] = p.Z();
 }
 
-// f(i) for i in 1..=n, in runs of 64 on OCCT's pool when `parallel` and there are several.
+// f(i) for i in 1..=n, in runs of 64 on OCCT's pool when `parallel` and there are many (a small part's few
+// hundred stay here: waking the pool cost more, up to 6 ms on a loaded machine for live-30's 150 edges).
 template <class F>
 void in_chunks(int n, bool parallel, const F& f)
 {
@@ -73,7 +74,7 @@ void in_chunks(int n, bool parallel, const F& f)
       for (int i = c * run + 1; i <= std::min(n, (c + 1) * run); ++i)
         f(i);
     },
-    !parallel || n <= run);
+    !parallel || n < 1024);
 }
 
 } // namespace
