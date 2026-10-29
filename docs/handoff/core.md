@@ -37,9 +37,14 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   (two cylinders), OCCT's UnifySameDomain then leaves them: their axes point opposite ways (prisms along −n and +n).
   Fix: before the USD, give one of two adjacent coaxial same-radius cylinder faces the other's surface (frame with the
   axis turned: (u, v) → (−u, −v) on its pcurves, the outward normal kept), or merge such a pair directly; the T1
-  test to add is that case (3 faces, one cylinder of 753.98 mm²). Careful: rebuilding the face on the other's surface
-  and letting ShapeFix add pcurves writes them into edges shared with the input shape (the data race b0e757f3
-  removed); work on a copy (BRepBuilderAPI_Copy, its history composed) or give the new face fresh edges sewn in.
+  test to add is that case (3 faces, one cylinder of 753.98 mm²). Tried 10-29 06:30 (not landed): a
+  BRepTools_Modification moving the second face onto the first's surface (pcurves (u, v) → (±u + φ, ±v + c), wires
+  and face reversed when the map turns the plane over) gives a valid shape with both faces on one surface handle,
+  but OCCT's unify still keeps two: their seams are on opposite sides (u 0 and π; the model's two Extrudes the
+  same, likely the live framing of extruded cylinders, 3f5f69ed), and one face can't carry both seams. So the fix is
+  to rebuild the band as one face (one seam; the caps' circle edges reused as copies, history from both halves), or
+  frame the opposite prism's cylinder with the same seam. Don't write pcurves into the input's shared edges (the
+  data race b0e757f3 removed).
 - Speed table refreshed from perf.yml run 40796942944 (release): the fin under the 400-fin plate 40–64 ms (< 150 met).
 - f93ac93c parallel pairs back on (after the release), with libTKBO.a.0004-on3 in /root/occt since 05:28. The land
   first failed on vibe3: `a_budget_never_stops_a_call_inside_an_occt_thread_pool_loop` used OCCT's default pool,
