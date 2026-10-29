@@ -769,6 +769,26 @@ fn vs_silhouette(@builtin(vertex_index) index: u32, s: SilhouetteIn) -> LineOut 
     // Toward the viewer: the eye ray (perspective) or the view direction.
     let at = (inst.model * vec4(s.a, 1.0)).xyz;
     let view = select(-g.camera_fwd.xyz, g.camera_pos.xyz - at, g.camera_pos.w > 0.5);
+    // A silhouette unless both facets clearly face the same way. A facet seen exactly edge-on (an exact standard
+    // view of a cylinder) faces neither: both edges round it are the outline (SIL-AXIS-VIEW-GONE: with `>= 0` both
+    // were dropped and the cylinder's sides lost their line in Front view). Decided first: most candidates aren't
+    // silhouettes, and the line's own vertex work was spent on each of them for nothing (the Retina orbit's cost).
+    let d1 = dot(normalize(n1), normalize(view));
+    let d2 = dot(normalize(n2), normalize(view));
+    let eps = 1e-4;
+    if ((d1 > eps && d2 > eps) || (d1 < -eps && d2 < -eps)) {
+        var none: LineOut;
+        none.pos = vec4(0.0, 0.0, -2.0, 1.0);
+        none.color = vec4(0.0);
+        none.pick = 0u;
+        none.along = 0.0;
+        none.world = vec3(0.0);
+        none.style = 0u;
+        none.slot = slot;
+        none.across = 0.0;
+        none.core = 0.0;
+        return none;
+    }
     var l: LineIn;
     l.a = s.a;
     l.b = s.b;
@@ -778,15 +798,7 @@ fn vs_silhouette(@builtin(vertex_index) index: u32, s: SilhouetteIn) -> LineOut 
     // Lifted: a hovered part's silhouette over the part edges it runs on.
     l.style = 32u;
     // A face's hover and selection show on its boundary edges, not here.
-    var o = line_vertex(index, l, ~(HOVER | SELECTED));
-    // A silhouette unless both facets clearly face the same way. A facet seen exactly edge-on (an exact standard
-    // view of a cylinder) faces neither: both edges round it are the outline (SIL-AXIS-VIEW-GONE: with `>= 0` both
-    // were dropped and the cylinder's sides lost their line in Front view).
-    let d1 = dot(normalize(n1), normalize(view));
-    let d2 = dot(normalize(n2), normalize(view));
-    let eps = 1e-4;
-    if ((d1 > eps && d2 > eps) || (d1 < -eps && d2 < -eps)) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
-    return o;
+    return line_vertex(index, l, ~(HOVER | SELECTED));
 }
 
 // `w` moved toward the eye by `px` physical pixels' worth of world length

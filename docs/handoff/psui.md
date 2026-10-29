@@ -410,6 +410,11 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
    depth testing, so every hidden line fragment is shaded and blended. Diagnostic `NOSHAPE_PERF_LINES=plain`
    (fs_line_plain, no discard) landed next; bench with variants r / plain / nol. If plain ≈ nol: draw solid
    lines with a discard-free pipeline (dashed / clipped ones keep fs_line).
+   **Result (perf 40956037306):** plain ≈ base (macOS 14 done_ms p95 45–49 against 42–48; nol 20–22): not the
+   discards. Note `NOSHAPE_PERF_SKIP=lines` also drops silhouettes and back silhouettes, which none of the edge
+   variants touched; the older "no silhouettes" run cut p95 46 → 26. Next (landed with this note): vs_silhouette
+   decides a candidate isn't a silhouette before line_vertex (same output); bench variants r / nosil
+   (NOSHAPE_PERF_SKIP=silhouettes) / nobsil (backsil) / nol on it.
 0f. (done 10-28: no gain, see above) Retina orbit, experiment for 0c: line segments are instances of 6 vertices (`draw(slots*6, 0..count)`),
    which packs Apple GPUs' vertex SIMD groups badly; pull segments from a storage buffer by vertex_index / 6 with
    the slot as the instance (one instance per copy) and measure with perf.yml.
