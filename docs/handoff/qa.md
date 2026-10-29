@@ -9,6 +9,9 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **12:11 update (green a6ad41bb = + dx a6ad41bb surface finish):** verified DWG-SURFACE-FINISH-MENU and psui's CURV-GAUSS-NOISE. CLI fuzz
+  215 (3 slow regens 82–124 s on suppress / delete of a big fuzz body) / 216 / 217 clean; 218–229 queued. bin/ watch: /tmp/qa-watch.sh
+  (wakes on a non-qa / non-skasm green or a CLI-fuzz death / step stuck > 300 s).
 - **11:56 update:** navigation.md: 6.2 (SOLIDWORKS preset in drawings, with a throwaway profile) verified; left 3.2 / 3.3 / 3.9 (view
   animation axes / timing / easing: needs frame timing, not screenshots). RUST-MIRROR-NOTCH: same pattern as the pocket (Front OK,
   Mirror New + Union wrong). CLI fuzz 212–214 clean. GUI fuzz 338–353 alive.
