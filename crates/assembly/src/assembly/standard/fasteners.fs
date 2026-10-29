@@ -2637,6 +2637,9 @@ export const flushNut = defineFeature(function(context is Context, id is Id, def
  * through, both entrances chamfered 45° out to 1.11 db. Form 1 (SO™
  * through-hole threaded): the thread's minor diameter dm from the top, its
  * ends chamfered 45° out to dmaj, then from the bottom a bore db lb long.
+ * Form 2 (BSO™ blind threaded): the top closed; from the bottom the minor
+ * diameter, its entrance chamfered 45° out to dmaj, ending in a 120 degree
+ * drill point 0.9 l up.
  */
 annotation { "Feature Type Name" : "PEM standoff" }
 export const pemStandoff = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2674,7 +2677,15 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
         // The top of the hole (its chamfer's outer radius) and the inside.
         var rt;
         var inside;
-        if (definition.form == 1)
+        if (definition.form == 2)
+        {
+            const rmaj = definition.dmaj / 2;
+            const rmin = definition.dm / 2;
+            const tip = -l + 0.9 * l;
+            rt = Z;
+            inside = [{ "p" : rz(rmaj, -l) }, { "p" : rz(rmin, -l + (rmaj - rmin)) }, { "p" : rz(rmin, tip - rmin / tan(60 * degree)) }, { "p" : rz(Z, tip) }];
+        }
+        else if (definition.form == 1)
         {
             const rmaj = definition.dmaj / 2;
             const rmin = definition.dm / 2;
@@ -2695,6 +2706,7 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
                 ], inside));
         // The hex corners: a hex ring round the top of the bore, united.
         const ring = prismZ(context, id + "hex", -g, g, polygonPoints(6, definition.s, 1));
-        subtract(context, id + "trim", ring, cylinderZ(context, id + "bore", -g - g, g, rt));
+        // (A closed top: cut the ring inside the body instead.)
+        subtract(context, id + "trim", ring, cylinderZ(context, id + "bore", -g - g, g, rt > EPS ? rt : rc));
         uniteAll(context, id);
     });
