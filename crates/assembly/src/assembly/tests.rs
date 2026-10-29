@@ -5053,12 +5053,12 @@ fn pem_fh_pins_match_live() {
     assert_eq!(kinds, [("cone", 14), ("cylinder", 27), ("plane", 39), ("torus", 2)].into_iter().collect());
 }
 
-/// The FH™ pins' every size (T2: a slotted pin takes ~2 s to build).
+/// The FH™ pins' and studs' every size (T2: a slotted part takes ~2 s to build).
 #[test]
 #[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn pem_fh_pin_sizes_build() {
     use super::standard::{self, CATALOGUE, StandardSpec};
-    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins") {
+    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs") {
         for s in &c.sizes {
             for l in [s.lengths.first().unwrap(), s.lengths.last().unwrap()] {
                 let mut spec = StandardSpec::new(c);
@@ -5069,6 +5069,40 @@ fn pem_fh_pin_sizes_build() {
             }
         }
     }
+}
+
+/// PEM® FH™ / FHS™ / FHA™ flush-head studs (live's raw /features and body
+/// details): "PEM FHS-M2.5-6", "PEM FHS-256-4"; M8 offers no aluminum (live's
+/// table); M2.5 x 6 = live's studio default, 82 faces (PLANE 39, CYLINDER 27,
+/// CONE 14, TORUS 2).
+#[test]
+fn pem_fh_studs_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let name = "FH™/FHS™/FHA™ Flush-head studs";
+    let metric = CATALOGUE.iter().find(|c| c.name == name && !c.inch).unwrap();
+    let unified = CATALOGUE.iter().find(|c| c.name == name && c.inch).unwrap();
+    assert_eq!(StandardSpec::new(metric).part_name(), "PEM FHS-M2.5-6");
+    assert_eq!(StandardSpec::new(unified).part_name(), "PEM FHS-256-4");
+    let mut spec = StandardSpec::new(metric);
+    spec.set_size("M8x1.25");
+    assert_eq!(metric.materials_for(spec.size_row()), ["Stainless Steel", "Steel"]);
+    spec.material = Some("Aluminum".into());
+    assert_eq!(spec.material(), "Stainless Steel", "a material the size lacks falls back");
+    let r = standard::regenerate(&StandardSpec::new(metric)).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let mut kinds = std::collections::BTreeMap::new();
+    for i in 0..b.faces.len() {
+        let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+            Surface::Plane(_) => "plane",
+            Surface::Cone { .. } => "cone",
+            Surface::Cylinder { .. } => "cylinder",
+            Surface::Torus { .. } => "torus",
+            _ => "other",
+        };
+        *kinds.entry(k).or_insert(0) += 1;
+    }
+    assert_eq!(kinds, [("cone", 14), ("cylinder", 27), ("plane", 39), ("torus", 2)].into_iter().collect());
 }
 
 /// ANSI commercial taper pins and slotted spring pins with live's whole size

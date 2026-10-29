@@ -477,7 +477,7 @@ impl AssemblyView {
                 }), cx)));
             }
         }
-        let materials: Vec<String> = c.materials().iter().map(|s| s.to_string()).collect();
+        let materials: Vec<String> = c.materials_for(spec.size_row()).iter().map(|s| s.to_string()).collect();
         params = params.child(row("Material", 27., Self::std_select("std-material", 146., spec.material().to_string(), materials, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.material = Some(v.to_string())), cx)));
         let finishes: Vec<String> = c.finishes_for(spec.material()).iter().map(|s| s.to_string()).collect();
         params = params.child(row("Finish", 27., Self::std_select("std-finish", 146., spec.finish().to_string(), finishes, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.finish = Some(v.to_string())), cx)));

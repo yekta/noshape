@@ -2759,6 +2759,10 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
  * groove p / 20 centred on r1's band, a 45° step to the pin at sd, the
  * dimple as form 0; 12 serration slots (±7.5° on r1, walls at ±15°) cut
  * under the head, then a disc (r1 + r2) / 2 across, hd / 20 deep, added back.
+ * Form 3 (FH™ flush-head studs, sd = the thread start ts): r1 the major
+ * radius (no step), the disc 0.075 ts deep, a half-round groove p / 20
+ * midway from it to ts, the face split at ts, the end chamfered 0.625 of the
+ * thread's triangle height (pitch pt) with the dimple 0.3 p across.
  */
 annotation { "Feature Type Name" : "PEM pin" }
 export const pemPin = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2778,6 +2782,8 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
         isLength(definition.sd, NONNEGATIVE_LENGTH_BOUNDS);
         annotation { "Name" : "hs" }
         isLength(definition.hs, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "pt" }
+        isLength(definition.pt, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
     }
     {
         const p = definition.p;
@@ -2799,7 +2805,7 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
         const rg = 0.025 * p;
         const cx = rh - dep + sqrt(rg * rg - ig * ig);
         const re = definition.dd / 2;
-        if (definition.form == 2)
+        if (definition.form == 2 || definition.form == 3)
         {
             flushHeadPin(context, id, definition);
             return;
@@ -2818,9 +2824,10 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
                 ]);
     });
 
-/** pemPin form 2 (FH™ flush-head pins). */
+/** pemPin forms 2 (FH™ flush-head pins) and 3 (FH™ flush-head studs). */
 function flushHeadPin(context is Context, id is Id, definition is map)
 {
+    const stud = definition.form == 3;
     const p = definition.p;
     const sd = definition.sd;
     const l = definition.l;
@@ -2828,19 +2835,29 @@ function flushHeadPin(context is Context, id is Id, definition is map)
     const rr = definition.hd / 20;
     const hk = definition.hd / 10;
     const rp = p / 2;
-    const r1 = (2 * rp + R - rr) / 3;
+    const r1 = stud ? rp : (2 * rp + R - rr) / 3;
     const r2 = (r1 + R - rr) / 2;
     const zcone = -definition.hd / 5;
-    const z45 = -sd + (r1 - rp);
-    const zg = (zcone + z45) / 2;
+    const discDepth = stud ? 0.075 * sd : rr;
     const rg = p / 20;
     const rd = 0.15 * p;
-    revolveProfile(context, id + "body", [
+    var tail;
+    if (stud)
+    {
+        const zg = (-hk - discDepth - sd) / 2;
+        const ch = 0.625 * 0.8660254 * definition.pt;
+        tail = [{ "p" : rz(r1, zg + rg) }, { "p" : rz(r1, zg - rg), "mid" : rz(r1 - rg, zg) }, { "p" : rz(r1, -l + ch) }, { "p" : rz(r1 - ch, -l) }];
+    }
+    else
+    {
+        const z45 = -sd + (r1 - rp);
+        const zg = (zcone + z45) / 2;
+        tail = [{ "p" : rz(r1, zg + rg) }, { "p" : rz(r1, zg - rg), "mid" : rz(r1 - rg, zg) }, { "p" : rz(r1, z45) }, { "p" : rz(rp, -sd) }, { "p" : rz(rp, -l) }];
+    }
+    revolveProfile(context, id + "body", join(join([
                 { "p" : rz(Z, Z) }, { "p" : rz(R - rr, Z) }, { "p" : rz(R - rr, -hk), "mid" : rz(R, -rr) },
-                { "p" : rz(r2, -hk) }, { "p" : rz(r2, -0.3 * sd) }, { "p" : rz(r1, zcone) }, { "p" : rz(r1, zg + rg) },
-                { "p" : rz(r1, zg - rg), "mid" : rz(r1 - rg, zg) }, { "p" : rz(r1, z45) }, { "p" : rz(rp, -sd) }, { "p" : rz(rp, -l) },
-                { "p" : rz(rd, -l) }, { "p" : rz(Z, -l + rd / tan(60 * degree)) }
-            ]);
+                { "p" : rz(r2, -hk) }, { "p" : rz(r2, -0.3 * sd) }, { "p" : rz(r1, zcone) }], tail),
+                [{ "p" : rz(rd, -l) }, { "p" : rz(Z, -l + rd / tan(60 * degree)) }]));
     // The serration slots: 12 wedges outside r1 under the head (one sketch,
     // one extrude), then live's Sketch 3 disc added back: (r1 + r2) / 2
     // across (its r2 circle is construction), hd / 20 deep. (~2 s a part:
@@ -2865,6 +2882,17 @@ function flushHeadPin(context is Context, id is Id, definition is map)
     opExtrude(context, id + "slots", { "entities" : qSketchRegion(id + "slotSketch"), "direction" : vector(0, 0, -1), "endBound" : BoundingType.BLIND, "endDepth" : sd });
     opDeleteBodies(context, id + "deleteSlotSketch", { "entities" : qCreatedBy(id + "slotSketch", EntityType.BODY) });
     subtract(context, id + "cut", qCreatedBy(id + "body", EntityType.BODY), qCreatedBy(id + "slots", EntityType.BODY));
-    revolveProfile(context, id + "ring", [{ "p" : rz(Z, -hk) }, { "p" : rz((r1 + r2) / 2, -hk) }, { "p" : rz((r1 + r2) / 2, -hk - rr) }, { "p" : rz(Z, -hk - rr) }]);
+    revolveProfile(context, id + "ring", [{ "p" : rz(Z, -hk) }, { "p" : rz((r1 + r2) / 2, -hk) }, { "p" : rz((r1 + r2) / 2, -hk - discDepth) }, { "p" : rz(Z, -hk - discDepth) }]);
     uniteAll(context, id);
+    // A stud's shank face split at the thread start (live's Split 1).
+    if (stud)
+    {
+        opPlane(context, id + "threadPlane", { "plane" : plane(vector(Z, Z, -sd), vector(0, 0, 1)), "width" : 4 * R, "height" : 4 * R });
+        try silent
+        {
+            opSplitFace(context, id + "threadSplit", { "faceTargets" : qGeometry(qOwnedByBody(solidsOf(context, id), EntityType.FACE), GeometryType.CYLINDER),
+                        "faceTools" : qCreatedBy(id + "threadPlane", EntityType.FACE), "keepToolSurfaces" : false });
+        }
+        opDeleteBodies(context, id + "deleteThreadPlane", { "entities" : qCreatedBy(id + "threadPlane", EntityType.BODY) });
+    }
 }

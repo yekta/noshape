@@ -121,7 +121,7 @@ fn apply_spec(mut spec: StandardSpec, c: &Component, a: &Args) -> Result<Standar
         spec.length = Some(hit.clone());
     }
     if let Some(v) = a.opt_str("material")? {
-        let list = c.materials();
+        let list = c.materials_for(spec.size_row());
         let hit = list.iter().find(|x| ci_eq(x, v)).ok_or_else(|| OpError::param("material", &format!("one of {}", list.join(", "))))?;
         spec.material = Some(hit.to_string());
     }
@@ -168,7 +168,7 @@ fn catalogue(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         out.insert("lengths".into(), json!(size.map(|s| c.lengths(s)).unwrap_or_default()));
     }
     out.insert("params".into(), json!(params));
-    out.insert("materials".into(), json!(c.materials()));
+    out.insert("materials".into(), json!(c.materials_for(size)));
     out.insert("finishes".into(), json!(c.finishes()));
     out.insert("default".into(), spec_json(&spec));
     Ok(Value::Object(out).into())

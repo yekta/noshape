@@ -349,7 +349,12 @@ impl StandardSpec {
     }
 
     pub fn material(&self) -> &str {
-        self.material.as_deref().unwrap_or_else(|| component(self).and_then(|c| c.materials().first().copied()).unwrap_or(MATERIALS[0]))
+        // A material the size doesn't offer falls back to its first (PEM®).
+        let offered = component(self).map(|c| c.materials_for(self.size_row())).unwrap_or_default();
+        match self.material.as_deref() {
+            Some(m) if offered.is_empty() || offered.contains(&m) => m,
+            _ => offered.first().copied().unwrap_or(MATERIALS[0]),
+        }
     }
 
     pub fn finish(&self) -> &str {

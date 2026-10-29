@@ -1314,6 +1314,207 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_FLUSH_HEAD_PINS_MAIN, DATA_PEM_SELFCLINCHING_FLUSH_HEAD_PINS_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document c861b46541e424d54fdcf051; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching studs",
+    "name": "FH™/FHS™/FHA™ Flush-head studs",
+    "shape": "pemPin",
+    "form": {
+     "form": 3
+    },
+    "materials": [
+     "Stainless Steel",
+     "Steel",
+     "Aluminum"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "FHS",
+      "finish": "Passivated",
+      "finishCode": ""
+     },
+     "Steel": {
+      "code": "FH",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     },
+     "Aluminum": {
+      "code": "FHA",
+      "finish": "No finish",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "M2.5x0.45",
+      "label": "PEM {type}-M2.5-{l}",
+      "d": 2.5,
+      "dims": {
+       "hd": 4.1,
+       "p": 2.5,
+       "sd": 1.95,
+       "pt": 0.45,
+       "dd": 2.5,
+       "hs": 2.5
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "15",
+       "18"
+      ]
+     },
+     {
+      "name": "M3x0.50",
+      "label": "PEM {type}-M3-{l}",
+      "d": 3.0,
+      "dims": {
+       "hd": 4.6,
+       "p": 3.0,
+       "sd": 2.1,
+       "pt": 0.5,
+       "dd": 3.0,
+       "hs": 3.0
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "15",
+       "18",
+       "20",
+       "25"
+      ]
+     },
+     {
+      "name": "M3.5x0.60",
+      "label": "PEM {type}-M3.5-{l}",
+      "d": 3.5,
+      "dims": {
+       "hd": 5.3,
+       "p": 3.5,
+       "sd": 2.25,
+       "pt": 0.6,
+       "dd": 3.5,
+       "hs": 3.5
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "15",
+       "18",
+       "20",
+       "25",
+       "30"
+      ]
+     },
+     {
+      "name": "M4x0.70",
+      "label": "PEM {type}-M4-{l}",
+      "d": 4.0,
+      "dims": {
+       "hd": 5.9,
+       "p": 4.0,
+       "sd": 2.4,
+       "pt": 0.7,
+       "dd": 4.0,
+       "hs": 4.0
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "15",
+       "18",
+       "20",
+       "25",
+       "30",
+       "35"
+      ]
+     },
+     {
+      "name": "M5x0.80",
+      "label": "PEM {type}-M5-{l}",
+      "d": 5.0,
+      "dims": {
+       "hd": 6.5,
+       "p": 5.0,
+       "sd": 2.7,
+       "pt": 0.8,
+       "dd": 5.0,
+       "hs": 5.0
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "15",
+       "18",
+       "20",
+       "25",
+       "30",
+       "35"
+      ]
+     },
+     {
+      "name": "M6x1.00",
+      "label": "PEM {type}-M6-{l}",
+      "d": 6.0,
+      "dims": {
+       "hd": 8.2,
+       "p": 6.0,
+       "sd": 3.0,
+       "pt": 1.0,
+       "dd": 6.0,
+       "hs": 6.0
+      },
+      "lengths": [
+       "10",
+       "12",
+       "15",
+       "18",
+       "20",
+       "25",
+       "30",
+       "35"
+      ]
+     },
+     {
+      "name": "M8x1.25",
+      "label": "PEM {type}-M8-{l}",
+      "d": 8.0,
+      "dims": {
+       "hd": 9.6,
+       "p": 8.0,
+       "sd": 3.7,
+       "pt": 1.25,
+       "dd": 8.0,
+       "hs": 8.0
+      },
+      "lengths": [
+       "12",
+       "15",
+       "18",
+       "20",
+       "25",
+       "30",
+       "35"
+      ],
+      "materials": [
+       "Stainless Steel",
+       "Steel"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_FLUSH_HEAD_STUD_MAIN, DATA_PEM_SELFCLINCHING_FLUSH_HEAD_STUD_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 4e9757d3b8f5c8dba42ee090; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  },
@@ -3551,6 +3752,321 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_FLUSH_HEAD_PINS_MAIN, DATA_PEM_SELFCLINCHING_FLUSH_HEAD_PINS_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document ab7974163377246833163e63; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching studs",
+    "name": "FH™/FHS™/FHA™ Flush-head studs",
+    "shape": "pemPin",
+    "form": {
+     "form": 3
+    },
+    "materials": [
+     "Stainless Steel",
+     "Steel",
+     "Aluminum"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "FHS",
+      "finish": "Passivated",
+      "finishCode": ""
+     },
+     "Steel": {
+      "code": "FH",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     },
+     "Aluminum": {
+      "code": "FHA",
+      "finish": "No finish",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "#2-56",
+      "label": "PEM {type}-256-{l}",
+      "d": 0.086,
+      "dims": {
+       "hd": 0.144,
+       "p": 0.086,
+       "sd": 0.075,
+       "pt": 0.01785,
+       "dd": 0.086,
+       "hs": 0.086
+      },
+      "lengths": [
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75"
+      ],
+      "lengthNames": {
+       "0.25": "4",
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12"
+      },
+      "materials": [
+       "Stainless Steel",
+       "Steel"
+      ]
+     },
+     {
+      "name": "#4-40",
+      "label": "PEM {type}-440-{l}",
+      "d": 0.112,
+      "dims": {
+       "hd": 0.176,
+       "p": 0.112,
+       "sd": 0.085,
+       "pt": 0.025,
+       "dd": 0.112,
+       "hs": 0.112
+      },
+      "lengths": [
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25"
+      ],
+      "lengthNames": {
+       "0.25": "4",
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20"
+      }
+     },
+     {
+      "name": "#6-32",
+      "label": "PEM {type}-632-{l}",
+      "d": 0.138,
+      "dims": {
+       "hd": 0.206,
+       "p": 0.138,
+       "sd": 0.09,
+       "pt": 0.03125,
+       "dd": 0.138,
+       "hs": 0.138
+      },
+      "lengths": [
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ],
+      "lengthNames": {
+       "0.25": "4",
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24"
+      }
+     },
+     {
+      "name": "#8-32",
+      "label": "PEM {type}-832-{l}",
+      "d": 0.164,
+      "dims": {
+       "hd": 0.237,
+       "p": 0.164,
+       "sd": 0.09,
+       "pt": 0.03125,
+       "dd": 0.164,
+       "hs": 0.164
+      },
+      "lengths": [
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ],
+      "lengthNames": {
+       "0.25": "4",
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24"
+      }
+     },
+     {
+      "name": "#10-24",
+      "label": "PEM {type}-024-{l}",
+      "d": 0.19,
+      "dims": {
+       "hd": 0.256,
+       "p": 0.19,
+       "sd": 0.1,
+       "pt": 0.04167,
+       "dd": 0.19,
+       "hs": 0.19
+      },
+      "lengths": [
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ],
+      "lengthNames": {
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24"
+      }
+     },
+     {
+      "name": "#10-32",
+      "label": "PEM {type}-032-{l}",
+      "d": 0.19,
+      "dims": {
+       "hd": 0.256,
+       "p": 0.19,
+       "sd": 0.1,
+       "pt": 0.03125,
+       "dd": 0.19,
+       "hs": 0.19
+      },
+      "lengths": [
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ],
+      "lengthNames": {
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24"
+      }
+     },
+     {
+      "name": "1/4-20",
+      "label": "PEM {type}-0420-{l}",
+      "d": 0.25,
+      "dims": {
+       "hd": 0.337,
+       "p": 0.25,
+       "sd": 0.135,
+       "pt": 0.05,
+       "dd": 0.25,
+       "hs": 0.25
+      },
+      "lengths": [
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ],
+      "lengthNames": {
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24"
+      }
+     },
+     {
+      "name": "5/16-18",
+      "label": "PEM {type}-0518-{l}",
+      "d": 0.313,
+      "dims": {
+       "hd": 0.376,
+       "p": 0.313,
+       "sd": 0.16,
+       "pt": 0.05555,
+       "dd": 0.313,
+       "hs": 0.313
+      },
+      "lengths": [
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ],
+      "lengthNames": {
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24"
+      },
+      "materials": [
+       "Stainless Steel",
+       "Steel"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_FLUSH_HEAD_STUD_MAIN, DATA_PEM_SELFCLINCHING_FLUSH_HEAD_STUD_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document cf43cb87ec4685d2ccc0321b; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  }

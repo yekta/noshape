@@ -161,6 +161,10 @@ pub struct Size {
     /// 0.156", the hole depth after it), by length.
     #[serde(default)]
     pub length_names: BTreeMap<String, String>,
+    /// The Material options at this size when not all the component's (live:
+    /// PEM® FH™ studs M8 have no aluminum).
+    #[serde(default)]
+    pub materials: Vec<String>,
 }
 
 /// How the Thread length list follows from the length.
@@ -375,6 +379,14 @@ impl Component {
         match &self.finishes {
             Some(f) => f.iter().map(String::as_str).collect(),
             None => super::FINISHES.to_vec(),
+        }
+    }
+
+    /// Material options at a size (its own list when it has one).
+    pub fn materials_for<'a>(&'a self, size: Option<&'a Size>) -> Vec<&'a str> {
+        match size.filter(|s| !s.materials.is_empty()) {
+            Some(s) => s.materials.iter().map(String::as_str).collect(),
+            None => self.materials(),
         }
     }
 
