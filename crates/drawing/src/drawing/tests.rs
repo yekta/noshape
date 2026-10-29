@@ -3328,3 +3328,22 @@ fn maxmin_to_an_edge_measures_square_to_it() {
     let want = super::build::foot_on_line(*a, e0.p, e1.p);
     assert!((b[0] - want[0]).abs() < 1e-9 && (b[1] - want[1]).abs() < 1e-9, "{b:?} vs {want:?}");
 }
+
+/// A note's leader ends in an arrowhead on what it points at (qa
+/// DWG-NOTE-LEADER-ARROW; live: "the arrowhead touching the edge").
+#[test]
+fn note_leader_ends_in_an_arrowhead() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    // On a view's edge point, as Add leader makes it.
+    let view = drawing.sheets[0].views[0].id;
+    let mut kind = AnnotationKind::note("NOTE ONE", 3.5);
+    if let AnnotationKind::Note { style, .. } = &mut kind {
+        style.leaders = vec![Leader { view: Some(view), point: [0.01, 0.0], ..Default::default() }];
+    }
+    drawing.sheets[0].annotations.push(Annotation { id: 960, kind, position: [250.0, 90.0], ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+    let target = built.placement(view).unwrap().to_sheet([0.01, 0.0]);
+    let tip = |f: &&sheet::Fill2| f.points.iter().any(|p| (p[0] - target[0]).abs() < 1e-6 && (p[1] - target[1]).abs() < 1e-6);
+    assert!(built.geometry.fills.iter().any(|f| tip(&f)), "no arrowhead at the leader's end");
+}
