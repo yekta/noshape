@@ -147,13 +147,15 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 
 ## In progress
 
-10-29 10:35: 60ca6465 MC-SELECT-NO-READOUT landed (a mate connector selected alone reads "Point:" at its origin;
-T1 a_selected_mate_connector_reads_its_origin; checked on :102: wf-block + Mate connector 1, ring clicked →
-"Point: X 19.500 Y 1.000 Z 10.000 mm"). PSUI-CONE-SHADING already on main (9b9caa54). No open P0 / P1 in psui's
-TICKETS. 13:10: mesher step 5 landed (6f411558, N06 below); on GitHub's Linux runner fins-400's display mesh
-is 11–12.5× BRepMesh's, live-30's 2.8×. 14:25: step 5b landed (edf5dda5); 15:40 step 5c (5f3d7b20, N06);
-15:55 HOLE-TABLE-BUTTON (8b2c53ae). Here: /root/psui-scratch/prof3.sh
-(RUNS, ONLY=live-30) for the documents, rust_mesh::bench_* for the kernel.
+(nothing unlanded) Landed 10-29: 60ca6465 MC-SELECT-NO-READOUT; 6f411558 / edf5dda5 / 5f3d7b20 mesher steps 5–5c
+(N06: fins-400's display mesh ≥ 10× BRepMesh's on GitHub's Linux and macOS runners, live-30's 3.3–6×);
+32d87597 / 5a695829 / 3cb447c2 perf.yml "Display mesher (release)" step (model job; per run mesher-N.log in the
+model-perf artifact; macOS prints its mesh steps summed); 8b2c53ae HOLE-TABLE-BUTTON (verified by qa 16:04);
+bc1ce2e2 PREFS-SELECT-LIST-DETACH (os_menu: a native `<select>` list closes on a wheel outside it).
+Open in psui's TICKETS: MIRROR-DIALOG-STATE (P3: (a) contradicted by live's own capture ok-4, ours = it; (b) asked
+live, REQUESTS psui 10-29 16:40, apply when answered); ROW-TOOLTIP-WIDE-PANEL (P2, waiting for qa's pointer
+path); API-VAR-REDEFINE (P3, the agent API's variable_create + model-data's variable_table::create: dx / core's
+code, not a UI change: left for them).
 
 Residuals found today: a paused dialog's Depth field
 shows a corner mark in live; Shift+wheel under xdotool loses events after the first (GPUI X11 resets the scroll
