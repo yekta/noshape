@@ -9,6 +9,9 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **06:20 update:** tag v0.4.13 = 5e56477b + version bump; its release isn't published yet (CI). Soak on 5e56 continued: GUI fuzz 196–221
+  all alive. Release smoke ready: `bin/relsmoke_cli.sh 0.4.13` (download, CLI version, STEP round trip, volsweep vs v0.4.12: expect only
+  fillet-oversize-min to differ, now failing like live), then the GUI rows of v0.4.12's smoke + halfmir 7214.602 + mirhole wall 628.319.
 - **05:20 update:** lead holds v0.4.13 for a cut from green 5e56477b (~06:00). **RUST-MIRROR-EXTRA-FACE verified there** (bool 6c16a4ce:
   mirhole wall one 628.319 mm² face, cli-fillet-segv Part 1 1198.544 again); blocker list at the top of TICKETS: none open. Soak on 5e56:
   17 / 17 crash documents open, GUI fuzz 191–195 alive. Next: release smoke once v0.4.13 is published (watcher bqgay5amw running).
