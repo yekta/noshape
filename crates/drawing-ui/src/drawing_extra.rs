@@ -9,7 +9,7 @@ use noshape_model::document::TabId;
 use crate::drawing_scene::Overlay;
 use crate::drawing_view::*;
 use crate::theme::p;
-use gpui_kit::component::input::{Input, Textarea};
+use gpui_kit::component::input::{Input, InputEvent, InputState, Textarea};
 use gpui_kit::component::{Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -55,6 +55,13 @@ impl Render for SheetDrag {
 
 /// Width of the open Sheets panel (live drawing/30).
 pub const SHEETS_W: f32 = 258.;
+
+/// The row a Sheets panel "Rename" popup (Shift+N, live K20) renames.
+#[derive(Clone, Copy, PartialEq)]
+pub enum RowRename {
+    Sheet(usize),
+    View(ViewId),
+}
 
 impl DrawingEditor {
     // ------------------------------------------------------------ sheets
@@ -404,16 +411,8 @@ impl DrawingEditor {
             .into_any_element()
     }
 
-    fn sheet_view_row(&self, sheet: &Sheet, v: &DrawingView, indent: f32, cx: &mut Context<Self>) -> AnyElement {
-        // Derived views nest under their parent (20 px per level).
-        // A view linked to a parent on another sheet sits at the top level
-        // with an ↗ badge on its icon (live drawing/1040).
-        let mut depth = 0;
-        let mut cur = v.id;
-        while let Some(p) = sheet.parent_of(cur).filter(|p| !p.is_ghost()) {
-            depth += 1;
-            cur = p;
-        }
+    /// A view's Sheets panel row: its name and icon.
+    fn view_row_label(&self, sheet: &Sheet, v: &DrawingView) -> (String, &'static str) {
         let linked = sheet.linked_parent(v.id).is_some();
         let named = |fallback: String| v.name.clone().unwrap_or(fallback);
         let (label, icon) = match &v.kind {
@@ -424,18 +423,54 @@ impl DrawingEditor {
             // "-Linked" variant with a dark ↗ (live drawing/760, 1040).
             ViewKind::Base { .. } => (named(crate::drawing_props::default_view_name(&self.drawing, sheet, v)), "drawing-standard-views"),
             ViewKind::Projected { .. } => (named(crate::drawing_props::default_view_name(&self.drawing, sheet, v)), if linked { "projected-view-linked" } else { "projected-view" }),
-            ViewKind::Auxiliary { .. } => ("Auxiliary view".to_string(), if linked { "auxiliary-view-linked" } else { "auxiliary-view" }),
-            ViewKind::Section { label, .. } => (format!("Section {label}"), if linked { "section-view-linked" } else { "section-view" }),
-            ViewKind::Detail { label, .. } => (format!("Detail {label}"), if linked { "detail-view-linked" } else { "detail-view" }),
-            _ => ("Section view".to_string(), if linked { "section-view-linked" } else { "section-view" }),
+            ViewKind::Auxiliary { .. } => (named("Auxiliary view".to_string()), if linked { "auxiliary-view-linked" } else { "auxiliary-view" }),
+            ViewKind::Section { label, .. } => (named(format!("Section {label}")), if linked { "section-view-linked" } else { "section-view" }),
+            ViewKind::Detail { label, .. } => (named(format!("Detail {label}")), if linked { "detail-view-linked" } else { "detail-view" }),
+            _ => (named("Section view".to_string()), if linked { "section-view-linked" } else { "section-view" }),
         };
-        let label = v.label.clone().filter(|l| !l.is_empty()).unwrap_or(label);
+        (v.label.clone().filter(|l| !l.is_empty()).unwrap_or(label), icon)
+    }
+
+    fn sheet_view_row(&self, sheet: &Sheet, v: &DrawingView, indent: f32, cx: &mut Context<Self>) -> AnyElement {
+        // Derived views nest under their parent (20 px per level).
+        // A view linked to a parent on another sheet sits at the top level
+        // with an ↗ badge on its icon (live drawing/1040).
+        let mut depth = 0;
+        let mut cur = v.id;
+        while let Some(p) = sheet.parent_of(cur).filter(|p| !p.is_ghost()) {
+            depth += 1;
+            cur = p;
+        }
+        let (label, icon) = self.view_row_label(sheet, v);
         let id = v.id;
-        crate::ui::tree_row(SharedString::from(format!("dr-view-{}", v.id.0)), false)
+        // Live (K20): a click selects the view (Ctrl+click adds); the current
+        // sheet's only, the selection being the current sheet's.
+        let current = std::ptr::eq(sheet, self.current_sheet());
+        let selected = current && self.selection.contains(&Sel::View(id));
+        let popup = (self.row_rename.as_ref().map(|r| r.0) == Some(RowRename::View(id))).then(|| self.row_rename_popup(cx));
+        crate::ui::tree_row(SharedString::from(format!("dr-view-{}", v.id.0)), selected)
+            .relative()
             .pl(px(indent + 20. * depth as f32))
             .text_color(rgb(0x666666))
             .child(sheets_icon(icon, cx))
             .child(div().flex_1().truncate().child(label))
+            .when(current, |row| {
+                row.on_click(cx.listener(move |this, e: &ClickEvent, _, cx| {
+                    let m = e.modifiers();
+                    if m.control || m.platform {
+                        match this.selection.iter().position(|s| *s == Sel::View(id)) {
+                            Some(k) => {
+                                this.selection.remove(k);
+                            }
+                            None => this.selection.push(Sel::View(id)),
+                        }
+                    } else {
+                        this.selection = vec![Sel::View(id)];
+                    }
+                    this.redraw(cx);
+                }))
+            })
+            .when_some(popup, |row, p| row.child(p))
             // Onshape's view row menu (live dom/context-menus-drawing-sheets.txt):
             // Properties... | Replace... (the view's reference) | Delete.
             .on_mouse_down(
@@ -735,7 +770,8 @@ impl DrawingEditor {
         } else {
             for (i, s) in self.drawing.sheets.iter().enumerate() {
                 let active = i == self.sheet;
-                list = list.child(sheet_row(i, s, active, self.sheet_rows.contains(&i), cx));
+                let popup = (self.row_rename.as_ref().map(|r| r.0) == Some(RowRename::Sheet(i))).then(|| self.row_rename_popup(cx));
+                list = list.child(sheet_row(i, s, active, self.sheet_rows.contains(&i), cx).when_some(popup, |row, p| row.child(p)));
                 if active {
                     for (k, (r, vs)) in groups(self, s, cx).iter().enumerate() {
                         let src = vs.first().and_then(|v| self.reference_source(s, v.id));
@@ -1788,6 +1824,92 @@ impl DrawingEditor {
     }
 
     // ------------------------------------------------------------ panels
+
+    /// Shift+N with the Sheets panel open (live K20): a small "Rename" popup
+    /// beside the row, the name fully selected.
+    pub fn open_row_rename(&mut self, row: RowRename, window: &mut Window, cx: &mut Context<Self>) {
+        let name = match row {
+            RowRename::Sheet(i) => self.drawing.sheets.get(i).map(|s| s.name.clone()).unwrap_or_default(),
+            RowRename::View(id) => self.current_sheet().view(id).map(|v| self.view_row_label(self.current_sheet(), v).0).unwrap_or_default(),
+        };
+        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(name));
+        let sub = cx.subscribe(&st, |this: &mut Self, _, ev: &InputEvent, cx| {
+            if let InputEvent::PressEnter { .. } = ev {
+                this.apply_row_rename(true, cx);
+            }
+        });
+        self._subs.push(sub);
+        Self::focus_input(&st, window, cx);
+        self.row_rename = Some((row, st));
+        cx.notify();
+    }
+
+    /// ✓ (`apply`) or ✕ / Esc of the "Rename" popup.
+    pub fn apply_row_rename(&mut self, apply: bool, cx: &mut Context<Self>) {
+        let Some((row, st)) = self.row_rename.take() else { return };
+        let name = st.read(cx).value().trim().to_string();
+        if apply && !name.is_empty() {
+            match row {
+                RowRename::Sheet(i) => {
+                    if self.drawing.sheets.get(i).is_some_and(|s| s.name != name) {
+                        self.edit("Rename sheet", cx, |d| {
+                            d.rename_sheet(i, &name);
+                        });
+                    }
+                }
+                RowRename::View(id) => {
+                    let sheet = self.current_sheet();
+                    if let Some(v) = sheet.view(id).filter(|v| self.view_row_label(sheet, v).0 != name) {
+                        let mut unnamed = v.clone();
+                        unnamed.name = None;
+                        let default = self.view_row_label(sheet, &unnamed).0;
+                        let si = self.sheet;
+                        self.edit("Rename view", cx, |d| {
+                            if let Some(v) = d.sheets[si].view_mut(id) {
+                                v.name = (name != default).then_some(name);
+                            }
+                        });
+                    }
+                }
+            }
+        }
+        cx.notify();
+    }
+
+    /// The "Rename" popup (live drawing/drw-shiftN-*.png: x ≈ 260..465 at
+    /// the row's height, green ✓ and red ✕, one field).
+    fn row_rename_popup(&self, cx: &mut Context<Self>) -> AnyElement {
+        let Some((_, st)) = &self.row_rename else { return div().into_any_element() };
+        let pal = p();
+        let body = gpui_kit::component::v_flex()
+            .id("dr-row-rename")
+            .w(px(205.))
+            .bg(pal.dialog_bg)
+            .shadow(crate::drawing_chrome::dialog_shadow())
+            .text_color(rgb(0x333333))
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_click(|_, _, cx| cx.stop_propagation())
+            .capture_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
+                if e.keystroke.key == "escape" {
+                    cx.stop_propagation();
+                    this.apply_row_rename(false, cx);
+                }
+            }))
+            .child(
+                h_flex()
+                    .h(px(28.))
+                    .pl(px(11.))
+                    .border_b_1()
+                    .border_color(rgb(0xd3d7d9))
+                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Rename"))
+                    .child(div().id("row-rename-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(rgb(0x009500)).cursor_pointer().child(crate::ui::glyph("check", 18., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_row_rename(true, cx))))
+                    .child(div().id("row-rename-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_row_rename(false, cx)))),
+            )
+            .child(div().p(px(4.)).child(Input::new(st).small()));
+        // Live: the panel spans x 40..300 and the popup starts at 260.
+        div().absolute().left(px(220.)).top_0().child(deferred(anchored().child(body)).with_priority(1)).into_any_element()
+    }
 
     pub fn open_sheet_name_panel(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         let name = self.drawing.sheets.get(index).map(|s| s.name.clone()).unwrap_or_default();

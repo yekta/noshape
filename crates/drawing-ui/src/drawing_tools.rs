@@ -89,6 +89,10 @@ impl DrawingEditor {
             return;
         }
         // Rename sheet / Rotation angle: Esc closes them unapplied (live).
+        if self.row_rename.take().is_some() {
+            cx.notify();
+            return;
+        }
         if matches!(self.panel, Some(Panel::SheetName { .. } | Panel::Rotation { .. })) {
             self.panel = None;
             cx.notify();

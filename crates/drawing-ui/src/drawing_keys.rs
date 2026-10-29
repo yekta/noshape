@@ -72,8 +72,18 @@ impl DrawingEditor {
     }
 
     /// Shift+N: rename the selected view (View properties › Name), else the current sheet.
+    /// With the Sheets panel open (live K20): one selected view or sheet row
+    /// gets a "Rename" popup beside its row; any other selection, nothing.
     pub fn rename_selected(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let view = self.selection.iter().find_map(|s| if let Sel::View(v) = s { Some(*v) } else { None });
+        if self.sheets_open {
+            let row = match (view, self.selection.len(), self.sheet_rows.as_slice()) {
+                (Some(v), 1, []) => crate::drawing_extra::RowRename::View(v),
+                (None, 0, [i]) => crate::drawing_extra::RowRename::Sheet(*i),
+                _ => return,
+            };
+            return self.open_row_rename(row, window, cx);
+        }
         match view {
             Some(v) => self.open_view_props(v, window, cx),
             None => self.open_sheet_name_panel(self.sheet, window, cx),

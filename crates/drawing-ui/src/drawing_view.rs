@@ -379,6 +379,8 @@ pub struct DrawingEditor {
     pub mbd_model: usize,
     /// Selected rows of the Sheets panel (sheet indices).
     pub sheet_rows: Vec<usize>,
+    /// The Sheets panel's Shift+N "Rename" popup: its row and field.
+    pub row_rename: Option<(crate::drawing_extra::RowRename, Entity<InputState>)>,
     /// While sheet rows are dragged: the row the drop goes before (the
     /// number of sheets: after the last), shown as a blue line (S8).
     pub sheet_drop: Option<usize>,
@@ -618,6 +620,7 @@ impl DrawingEditor {
             right_panel: None,
             mbd_model: 0,
             sheet_rows: Vec::new(),
+            row_rename: None,
             sheet_drop: None,
             inplace_hidden: None,
             inplace_cell: None,
