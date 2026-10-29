@@ -365,3 +365,27 @@ fn an_arc_leaving_along_a_side_splits_the_face() {
     let segs = [seg(0, 1), seg(2, 3), seg(0, 4), seg(4, 2), seg(1, 3), ([1, 4], arc)];
     assert_eq!(crate::arrange::regions(&pts, &segs).unwrap().len(), 2);
 }
+
+fn segment(a: DVec3, b: DVec3) -> Body {
+    Body { vertices: vec![a, b], edges: vec![Edge { v: [0, 1], curve: Curve::Line }], faces: Vec::new(), solids: Vec::new() }
+}
+
+#[test]
+fn a_line_through_a_box() {
+    let bx = cuboid((0.0, 0.0, 0.0), (4.0, 4.0, 4.0));
+    // In through the bottom, out through the top: one piece, its ends made by the line and each face.
+    let r = boolean(Op::Common, &[&segment(DVec3::new(1.0, 2.0, -1.0), DVec3::new(1.0, 2.0, 5.0)), &bx], TOL).unwrap();
+    assert_eq!((r.body.edges.len(), r.body.vertices.len(), r.body.faces.len()), (1, 2, 0));
+    let generated = r.history.iter().filter(|h| h.relation == Relation::Generated).count();
+    assert_eq!(generated, 4);
+    assert!(r.history.iter().any(|h| h.kind == Kind::Edge && h.arg == 0 && h.relation == Relation::Modified));
+    // Corner to corner through two vertices: they're modified, nothing generated.
+    let r = boolean(Op::Common, &[&segment(DVec3::splat(-1.0), DVec3::splat(5.0)), &bx], TOL).unwrap();
+    assert_eq!(r.body.edges.len(), 1);
+    assert_eq!(r.history.iter().filter(|h| h.kind == Kind::Vertex && h.arg == 1 && h.relation == Relation::Modified).count(), 2);
+    assert!(r.history.iter().all(|h| h.relation != Relation::Generated));
+    // Along a face: declined; in its plane but beside it: taken (it misses).
+    assert_eq!(boolean(Op::Common, &[&segment(DVec3::new(1.0, 0.0, -1.0), DVec3::new(1.0, 0.0, 5.0)), &bx], TOL).err(), Some(Decline("a line along a face")));
+    assert!(boolean(Op::Common, &[&segment(DVec3::new(6.0, 0.0, -1.0), DVec3::new(6.0, 0.0, 5.0)), &bx], TOL).is_err_and(|d| d == Decline("a line apart from the solid")));
+}
+

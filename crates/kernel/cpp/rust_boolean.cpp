@@ -78,7 +78,8 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
   const ShapeIMap& em = s.map(TopAbs_EDGE);
   const ShapeIMap& vm = s.map(TopAbs_VERTEX);
   const ShapeIMap& sm = s.map(TopAbs_SOLID);
-  if (sm.Extent() == 0 || fm.Extent() == 0)
+  // (Or an edge alone: a line's common with a solid.)
+  if ((sm.Extent() == 0 || fm.Extent() == 0) && !(sm.Extent() == 0 && fm.Extent() == 0 && em.Extent() == 1))
     return "no solid";
   b.vertices.reserve(3 * vm.Extent());
   for (int i = 1; i <= vm.Extent(); ++i)
@@ -540,6 +541,10 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     }
     bb.Add(out, sol[s]);
   }
+  // A result of edges alone (a line's common with a solid).
+  if (nf == 0)
+    for (const TopoDS_Edge& e : es)
+      bb.Add(out, e);
   t_built.v.assign(vs.begin(), vs.end());
   t_built.e.assign(es.begin(), es.end());
   t_built.f.assign(fs.begin(), fs.end());

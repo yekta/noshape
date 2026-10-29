@@ -4,7 +4,8 @@
 //!
 //! `NOSHAPE_BOOL_CORPUS=/root/core-scratch/bool-corpus cargo test -p noshape-kernel --test all
 //! brep_replay::brep_corpus_replay -- --ignored --nocapture` (NOSHAPE_BREP_DIFF=1 prints each mismatch's
-//! history records that differ; NOSHAPE_BREP_ONLY=<name> runs one case).
+//! history records that differ; NOSHAPE_BREP_ONLY=<name> runs one case; NOSHAPE_BREP_SHOW_OCCT=<name>,... prints
+//! OCCT's result and history records for those cases, taken or not).
 
 use noshape_kernel::bool_corpus::{cases, load, Summary};
 use noshape_kernel::*;
@@ -86,6 +87,18 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         let path = last_boolean_path();
         let why = last_rust_decline();
         set_rust_boolean_only(false);
+        if let Ok(names) = std::env::var("NOSHAPE_BREP_SHOW_OCCT")
+            && names.split(',').any(|x| x == name)
+        {
+            set_rust_boolean(Some(false));
+            if let Ok(o) = boolean(c.op, &c.objects, &c.tools, &c.opts) {
+                eprintln!("OCCT {name}: {} solids {} faces {} edges {} vertices", o.shape.count(ShapeType::Solid), o.shape.count(ShapeType::Face), o.shape.count(ShapeType::Edge), o.shape.count(ShapeType::Vertex));
+                for x in records(&o) {
+                    eprintln!("  {} {:?}", x.0, x.1);
+                }
+            }
+            set_rust_boolean(None);
+        }
         if path != "rust" {
             if std::env::var("NOSHAPE_BREP_WHY").is_ok_and(|w| why.contains(&w)) {
                 report += &format!("{name} declined: {why}\n");

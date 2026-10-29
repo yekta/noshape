@@ -21,6 +21,8 @@ use glam::{DVec2, DVec3};
 use crate::fxhash::{HashMap, HashSet};
 use std::f64::consts::{PI, TAU};
 
+mod line;
+
 /// The Boolean operation: `args[0]` is the object, the other arguments the tools.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Op {
@@ -1147,6 +1149,8 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
     };
     // Vertices, edges, faces and solids of every argument (a vertex outside every other argument's box can't
     // be one of theirs).
+    // A line alone (an edge, no faces) and a solid: their common (line.rs).
+    let line = op == Op::Common && args.len() == 2 && args[0].faces.is_empty() && args[0].edges.len() == 1 && matches!(args[0].edges[0].curve, Curve::Line);
     let arg_box: Vec<(DVec3, DVec3)> = args.iter().map(|b| b.vertices.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), &p| (lo.min(p), hi.max(p)))).collect();
     let mut first_edge = Vec::new();
     for (ai, body) in args.iter().enumerate() {
@@ -1224,7 +1228,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         if cx.faces[face0..].iter().any(|f| f.solid == usize::MAX) {
             return Err(Decline("a face outside a solid"));
         }
-        if body.solids.is_empty() {
+        if body.solids.is_empty() && !(line && ai == 0) {
             return Err(Decline("an argument without solids"));
         }
     }
@@ -1282,6 +1286,9 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
                 }
             }
         }
+    }
+    if line {
+        return line::line_common(&cx, tol);
     }
     cx.face_segs = vec![Vec::new(); cx.faces.len()];
     // Pairs of solids that may meet, and their faces.
