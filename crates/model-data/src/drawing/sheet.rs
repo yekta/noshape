@@ -1341,7 +1341,7 @@ impl SheetGeometry {
                     let at = [out[0] + if left { -1.0 } else { 1.0 }, out[1] + 0.8];
                     self.dim_label(at, 0.0, if left { 1.0 } else { 0.0 }, false, &t, dh, pick);
                 }
-                AnnotationKind::AngularDimension { view, radius, flip_a, flip_b, three_point, .. } => {
+                AnnotationKind::AngularDimension { view, radius, flip_a, flip_b, three_point, text_angle, .. } => {
                     let (vertex, pa, pb) = a.kind.angular_legs().expect("angular");
                     // A 3 point angular's picked points re-attach (live D26).
                     if *three_point {
@@ -1404,7 +1404,19 @@ impl SheetGeometry {
                     for t in [a0 + k, a1 - k] {
                         self.grips.push(Grip { pick, pos: [v[0] + radius * t.cos(), v[1] + radius * t.sin()], kind: GripKind::Handle });
                     }
-                    let mid = (a0 + a1) / 2.0;
+                    let tau = std::f64::consts::TAU;
+                    let mid = (a0 + a1) / 2.0 + text_angle.unwrap_or(0.0);
+                    // A label dragged past an end: the arc carried round to
+                    // it from the nearer end.
+                    let rel = (mid - a0).rem_euclid(tau);
+                    if rel > a1 - a0 {
+                        let (from, to) = if rel - (a1 - a0) <= tau - rel { (a1, a0 + rel) } else { (a0, a0 + rel - tau) };
+                        let seg: Vec<[f64; 2]> = (0..=12).map(|i| {
+                            let t = from + (to - from) * i as f64 / 12.0;
+                            [v[0] + radius * t.cos(), v[1] + radius * t.sin()]
+                        }).collect();
+                        self.lines.push(Polyline2 { points: seg, style: LineStyle::Thin, closed: false, pick });
+                    }
                     let t = env.text(a, a1 - a0, true, "");
                     self.dim_label([v[0] + (radius + 3.0) * mid.cos(), v[1] + (radius + 3.0) * mid.sin()], 0.0, 0.5, true, &t, dh, pick);
                 }

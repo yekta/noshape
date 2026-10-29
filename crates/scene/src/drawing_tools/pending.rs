@@ -110,7 +110,7 @@ impl SheetPick<'_> {
                     std::mem::swap(&mut a, &mut b);
                 }
                 let radius = len(sub(c, pl.to_sheet(v.p))).max(3.0);
-                Some(ann(AnnotationKind::AngularDimension { view: v.view, vertex: v.p, a: a.p, b: b.p, radius, three_point: true, flip_a: false, flip_b: false }, vec![(0, v.r.clone()), (1, a.r.clone()), (2, b.r.clone())]))
+                Some(ann(AnnotationKind::AngularDimension { view: v.view, vertex: v.p, a: a.p, b: b.p, radius, three_point: true, flip_a: false, flip_b: false, text_angle: None }, vec![(0, v.r.clone()), (1, a.r.clone()), (2, b.r.clone())]))
             }
             Tool::Dimension { kind: DimTool::Angle, picks } => {
                 let [Pick::Line { a: a1, b: b1 }, Pick::Line { a: a2, b: b2 }] = picks.as_slice() else { return None };

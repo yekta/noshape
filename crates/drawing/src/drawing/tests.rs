@@ -3250,7 +3250,7 @@ fn supplementary_angular_draws_the_continuation() {
     let sources = regenerate_sources(&doc, &drawing);
     let sheet = &mut drawing.sheets[0];
     let (c60, s60) = (60f64.to_radians().cos(), 60f64.to_radians().sin());
-    let kind = AnnotationKind::AngularDimension { view: ViewId(2), vertex: [0.0, 0.0], a: [0.01 * c60, 0.01 * s60], b: [0.01, 0.0], radius: 20.0, three_point: false, flip_a: false, flip_b: true };
+    let kind = AnnotationKind::AngularDimension { view: ViewId(2), vertex: [0.0, 0.0], a: [0.01 * c60, 0.01 * s60], b: [0.01, 0.0], radius: 20.0, three_point: false, flip_a: false, flip_b: true, text_angle: None };
     sheet.annotations.push(Annotation { id: 950, kind: kind.clone(), position: [0.0; 2], ..Default::default() });
     let built = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
     assert!(texts(&built).iter().any(|t| t == "120.0°"), "{:?}", texts(&built));
@@ -3367,4 +3367,30 @@ fn a_pasted_datum_stands_free() {
     // Same shape: the triangle keeps its offset from the box.
     let (dx, dy) = (anchor[0] - pasted.position[0], anchor[1] - pasted.position[1]);
     assert!((dx - 0.0).abs() < 1e-9 && (dy - 10.0).abs() < 1e-9, "{anchor:?} {:?}", pasted.position);
+}
+
+/// An angular dimension's label dragged past an edge (live D11, qa
+/// DWG-ANGULAR-LABEL-ANGLE): it sits there, the value unchanged, and the
+/// arc is carried round to it.
+#[test]
+fn an_angular_label_dragged_past_an_edge_stays_there() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let quarter = AnnotationKind::AngularDimension { view: ViewId(2), vertex: [0.0, 0.0], a: [0.01, 0.0], b: [0.0, 0.01], radius: 20.0, three_point: false, flip_a: false, flip_b: false, text_angle: None };
+    let label_at = |drawing: &Drawing| {
+        let built = render_sheet(drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+        let v = built.placement(ViewId(2)).unwrap().to_sheet([0.0, 0.0]);
+        let t = built.geometry.texts.iter().find(|t| t.text == "90.0°").expect("the value").clone();
+        ((t.pos[1] - v[1]).atan2(t.pos[0] - v[0]).to_degrees(), built.geometry.lines.len())
+    };
+    drawing.sheets[0].annotations.push(Annotation { id: 970, kind: quarter.clone(), position: [0.0; 2], ..Default::default() });
+    let (at_mid, lines) = label_at(&drawing);
+    // Dragged to 180° (past the 90° edge, 135° from the middle).
+    if let AnnotationKind::AngularDimension { text_angle, .. } = &mut drawing.sheets[0].annotations.last_mut().unwrap().kind {
+        *text_angle = Some(135f64.to_radians());
+    }
+    let (at_drag, lines2) = label_at(&drawing);
+    let off = |a: f64, b: f64| ((a - b + 180.0).rem_euclid(360.0) - 180.0).abs();
+    assert!(off(at_mid, 45.0) < 15.0 && off(at_drag, 180.0) < 15.0, "{at_mid} → {at_drag}");
+    assert_eq!(lines2, lines + 1, "the arc carried round to the label");
 }

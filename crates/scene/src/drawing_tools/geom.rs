@@ -130,7 +130,7 @@ mod angular_tests {
         let v = pl.to_sheet([0.0, 0.0]);
         let at = |deg: f64| [v[0] + 20.0 * deg.to_radians().cos(), v[1] + 20.0 * deg.to_radians().sin()];
         for (deg, want) in [(30.0, 60.0), (120.0, 120.0), (210.0, 300.0), (300.0, 120.0), (30.0, 60.0)] {
-            let mut k = AnnotationKind::AngularDimension { view: ViewId(1), vertex: [0.0, 0.0], a: [r, 0.0], b: [r * c60, r * s60], radius: 20.0, three_point: false, flip_a: false, flip_b: false };
+            let mut k = AnnotationKind::AngularDimension { view: ViewId(1), vertex: [0.0, 0.0], a: [r, 0.0], b: [r * c60, r * s60], radius: 20.0, three_point: false, flip_a: false, flip_b: false, text_angle: None };
             super::angular_to_sector(&mut k, &pl, at(deg));
             let (o, p, q) = k.angular_legs().unwrap();
             let (o, p, q) = (pl.to_sheet(o), pl.to_sheet(p), pl.to_sheet(q));

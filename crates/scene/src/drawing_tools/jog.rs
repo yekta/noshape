@@ -296,6 +296,20 @@ impl SheetPick<'_> {
             }
             _ => a.position = [orig.position[0] + d[0], orig.position[1] + d[1]],
         }
+        // An angular dimension's label goes where it is dragged (the arc
+        // follows round to it; live D11).
+        if let Some(pl) = a.kind.view().and_then(|v| self.placement(v))
+            && let Some((v, pa, pb)) = a.kind.angular_legs()
+        {
+            let (v, pa, pb) = (pl.to_sheet(v), pl.to_sheet(pa), pl.to_sheet(pb));
+            let ang = |p: [f64; 2]| (p[1] - v[1]).atan2(p[0] - v[0]);
+            let a0 = ang(pa);
+            let a1 = a0 + (ang(pb) - a0).rem_euclid(std::f64::consts::TAU);
+            let rel = (ang(c) - (a0 + a1) / 2.0 + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI;
+            if let AnnotationKind::AngularDimension { text_angle, .. } = &mut a.kind {
+                *text_angle = (rel.abs() > 1e-9).then_some(rel);
+            }
+        }
         // Keep the stored (unresolved) inputs of the committed annotation;
         // only the placement changes.
         if let Some(committed) = self.drawing.sheets.get(self.sheet).and_then(|s| s.annotations.iter().find(|x| x.id == a.id)) {
@@ -307,8 +321,9 @@ impl SheetPick<'_> {
                     *angle = *g;
                     *knee = *k;
                 }
-                (AnnotationKind::AngularDimension { radius, a: pa, b: pb, .. }, AnnotationKind::AngularDimension { radius: r, a: na, .. }) => {
+                (AnnotationKind::AngularDimension { radius, a: pa, b: pb, text_angle, .. }, AnnotationKind::AngularDimension { radius: r, a: na, text_angle: ta, .. }) => {
                     *radius = *r;
+                    *text_angle = *ta;
                     // Legs swapped by the drag: swap the stored legs and their references too.
                     let swapped = matches!(&orig.kind, AnnotationKind::AngularDimension { a: oa, b: ob, .. } if na == ob && oa != ob);
                     if swapped {

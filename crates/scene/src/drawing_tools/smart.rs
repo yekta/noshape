@@ -163,7 +163,7 @@ impl SheetPick<'_> {
             _ => None,
         };
         let refs = if vref.is_some() { vec![(0, vref), (1, pa.r.clone()), (2, pb.r.clone())] } else { vec![] };
-        let mut kind = AnnotationKind::AngularDimension { view: a1.view, vertex: v, a: pa.p, b: pb.p, radius, three_point: false, flip_a: false, flip_b: false };
+        let mut kind = AnnotationKind::AngularDimension { view: a1.view, vertex: v, a: pa.p, b: pb.p, radius, three_point: false, flip_a: false, flip_b: false, text_angle: None };
         // The angle of the sector the pointer is in (inner, supplementary
         // or vertical).
         let mut refs = refs;

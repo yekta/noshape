@@ -811,6 +811,12 @@ pub enum AnnotationKind {
         flip_a: bool,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         flip_b: bool,
+        /// Where the label was dragged: its angle from the arc's middle
+        /// (radians; None: on the middle). Past an end the arc is carried
+        /// round to it, the value unchanged (live D11, qa
+        /// DWG-ANGULAR-LABEL-ANGLE).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        text_angle: Option<f64>,
     },
     /// `angle`: the mark's rotation in the view (radians; Align centermark,
     /// pattern centermarks).
