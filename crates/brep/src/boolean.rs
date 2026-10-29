@@ -178,6 +178,8 @@ enum Surf {
 struct NCurve {
     c: Arc<NurbsCurve>,
     sec: Option<([usize; 2], [Arc<NurbsCurve>; 2], u32)>,
+    /// OCCT's tolerance for a section (0 for an input's curve).
+    tol: f64,
 }
 
 struct GFace {
@@ -694,7 +696,11 @@ impl Ctx<'_> {
     /// The intervals of `path` (parameters `t0..t1`) inside face `f` (with its boundary when `closed`).
     /// `ends`: the path's own end vertices, if it has them.
     fn intervals(&mut self, f: usize, path: &Path, t0: f64, t1: f64, ends: [End; 2], closed: bool) -> R<Vec<Ival>> {
-        let tol = self.tol;
+        // (OCCT's section of a free-form face: within its own tolerance of where the faces meet.)
+        let tol = match path {
+            Path::Nurbs { id, .. } => self.tol.max(self.ncurves[*id as usize].tol),
+            _ => self.tol,
+        };
         let len = path.length(t0, t1);
         if len <= tol {
             return Ok(Vec::new());
@@ -783,7 +789,17 @@ impl Ctx<'_> {
             let inside = if dist <= tol {
                 closed
             } else if dist <= GREY * tol {
-                return Err(Decline("a curve nearly along a face's boundary"));
+                // A B-spline (a shallow helix rising from a rod's end): judged where it is farthest from the
+                // boundary, if that is clearly off it; else ambiguous.
+                let far = if let Path::Nurbs { .. } = path {
+                    (1..8).map(|k| c2.at(((a.0 + (b.0 - a.0) * k as f64 / 8.0) - t0) / (t1 - t0))).map(|q| (distance2(q, &bound), q)).max_by(|x, y| x.0.total_cmp(&y.0))
+                } else {
+                    None
+                };
+                match far {
+                    Some((d, q)) if d > 3.0 * tol => inside2(q, &bound),
+                    _ => return Err(Decline("a curve nearly along a face's boundary")),
+                }
             } else {
                 inside2(mid, &bound)
             };
@@ -943,12 +959,26 @@ impl Ctx<'_> {
                 (Path::Line { p: a, d: (b - a) / l }, 0.0, l)
             }
             Geo::Arc { k, a0, sweep } => (Path::Circle(k), a0, a0 + sweep),
+            Geo::Ell { e, t0, sweep, .. } if !e.hyp && matches!(self.faces[f].s, Surf::Plane { .. }) => (Path::Ellipse(e), t0, t0 + sweep),
             Geo::Ell { .. } => return Err(Decline("an argument's ellipse")),
-            Geo::Nurbs { .. } => return Err(Decline("a curved edge on another argument's face")),
+            Geo::Nurbs { .. } if matches!(self.faces[f].s, Surf::Nurbs { .. }) => return Err(Decline("a curved edge on another argument's free-form face")),
+            Geo::Nurbs { id, t0, t1 } => (Path::Nurbs { id, c: self.ncurves[id as usize].c.clone() }, t0, t1),
             Geo::Apex => return Ok(()),
         };
         // An arc across a round face's seam: in two parts, a vertex where it crosses.
         let mut parts = vec![(t0, End::Vertex(s.v[0]), t1, End::Vertex(s.v[1]))];
+        if let Path::Nurbs { c, .. } = &path {
+            // A B-spline across a round face's seam (a helix round a rod): in parts, a vertex at each crossing.
+            let mut at = vec![(t0, End::Vertex(s.v[0]))];
+            for t in free::seam_cuts(self, [f, usize::MAX], c, t0.min(t1), t0.max(t1)) {
+                if path.length(t0.min(t), t0.max(t)) > self.tol && path.length(t1.min(t), t1.max(t)) > self.tol {
+                    at.push((t, End::Point(c.at(t))));
+                }
+            }
+            at.sort_by(|a, b| if t0 <= t1 { a.0.total_cmp(&b.0) } else { b.0.total_cmp(&a.0) });
+            at.push((t1, End::Vertex(s.v[1])));
+            parts = at.windows(2).map(|w| (w[0].0, w[0].1, w[1].0, w[1].1)).collect();
+        }
         if let (Path::Circle(k), Some(seam)) = (path.clone(), self.seam_at(f, &path)) {
             let ts = t0 + (k.angle(seam) - t0).rem_euclid(TAU);
             if (ts - t0) * k.r > self.tol && (t1 - ts) * k.r > self.tol {
@@ -1040,8 +1070,7 @@ impl Ctx<'_> {
                 Ok(k.n.cross(*ax).length() <= 1e-9 && (w - *ax * h).length() <= tol && (k.r - (r0 + slope * h)).abs() <= tol)
             }
             (_, Geo::Apex) => Ok(false),
-            (_, Geo::Ell { .. }) => Err(Decline("an argument's ellipse")),
-            (Surf::Nurbs { .. }, _) | (_, Geo::Nurbs { .. }) => {
+            (Surf::Nurbs { .. }, _) | (_, Geo::Nurbs { .. } | Geo::Ell { .. }) => {
                 // Points along it: all on the surface, it lies on it (not yet taken); within the grey band
                 // without being clearly off, ambiguous.
                 let s = self.edge_seg(e);
@@ -1055,6 +1084,19 @@ impl Ctx<'_> {
                     }
                 }
                 if on == 7 {
+                    // (On a plane, cylinder or cone: its pieces there go into the face, as a straight or round
+                    // edge's.)
+                    if let (Geo::Nurbs { .. }, Surf::Plane { .. } | Surf::Cyl { .. }) = (self.edges[e].g, &self.faces[f].s) {
+                        return Ok(true);
+                    }
+                    if let (Geo::Ell { e: el, .. }, Surf::Plane { .. }) = (self.edges[e].g, &self.faces[f].s)
+                        && !el.hyp
+                    {
+                        return Ok(true);
+                    }
+                    if let Geo::Ell { .. } = self.edges[e].g {
+                        return Err(Decline("an argument's ellipse on another's face"));
+                    }
                     return Err(Decline("an edge on another argument's free-form face"));
                 }
                 if near > 0 && on + near == 7 {
@@ -1076,7 +1118,7 @@ impl Ctx<'_> {
             let id = self.ncurves.len() as u32;
             let cc = Arc::new(c.curve);
             let [on0, on1] = c.on;
-            self.ncurves.push(NCurve { c: cc.clone(), sec: Some(([fs, ft], [Arc::new(on0), Arc::new(on1)], c.id)) });
+            self.ncurves.push(NCurve { c: cc.clone(), sec: Some(([fs, ft], [Arc::new(on0), Arc::new(on1)], c.id)), tol: c.tol });
             let cuts = free::seam_cuts(self, [fs, ft], &cc, c.t0, c.t1);
             self.section_nurbs(fs, ft, Path::Nurbs { id, c: cc }, c.t0, c.t1, &cuts)?;
         }
@@ -1779,10 +1821,18 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         for (i, e) in body.edges.iter().enumerate() {
             let v = [vmap[e.v[0] as usize], vmap[e.v[1] as usize]];
             let g = match e.curve {
-                Curve::Ellipse { .. } | Curve::Hyperbola { .. } => return Err(Decline("an argument's ellipse")),
+                Curve::Ellipse { center, normal, xdir, major, minor, .. } => {
+                    // An argument's ellipse (a tilted hole's rim): OCCT's frame, so its parameter OCCT's.
+                    let e = Ell { c: center, n: normal, x: xdir, y: normal.cross(xdir), a: major, b: minor, hyp: false };
+                    let (p0, p1) = (body.vertices[body.edges[i].v[0] as usize], body.vertices[body.edges[i].v[1] as usize]);
+                    let t0 = e.param(p0);
+                    let sweep = if v[0] == v[1] { TAU } else { (e.param(p1) - t0).rem_euclid(TAU) };
+                    Geo::Ell { e, t0, sweep, faces: [usize::MAX; 2] }
+                }
+                Curve::Hyperbola { .. } => return Err(Decline("an argument's hyperbola")),
                 Curve::Nurbs { .. } if cx.src.is_none() => return Err(Decline("a curved edge")),
                 Curve::Nurbs { index, t0, t1 } => {
-                    cx.ncurves.push(NCurve { c: Arc::new(body.nurbs_curves[index as usize].clone()), sec: None });
+                    cx.ncurves.push(NCurve { c: Arc::new(body.nurbs_curves[index as usize].clone()), sec: None, tol: 0.0 });
                     Geo::Nurbs { id: cx.ncurves.len() as u32 - 1, t0, t1 }
                 }
                 Curve::Degenerate => {
@@ -2424,6 +2474,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
             // (Only new: OCCT's frame as the section made it.)
             Geo::Ell { .. } if flip => return Err(Decline("a piece of an argument's ellipse")),
+            Geo::Ell { e, .. } if !x.origins.is_empty() => {
+                // A piece of an argument's ellipse (its curve the argument's).
+                (seg.v, Curve::Ellipse { center: e.c, normal: e.n, xdir: e.x, major: e.a, minor: e.b, faces: [(u32::MAX, u32::MAX); 2] })
+            }
             Geo::Ell { e, faces, .. } if e.hyp => {
                 let of = |f: usize| (cx.faces[f].arg, cx.faces[f].index);
                 (seg.v, Curve::Hyperbola { center: e.c, normal: e.n, xdir: e.x, major: e.a, minor: e.b, faces: [of(faces[0]), of(faces[1])] })

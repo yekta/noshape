@@ -433,6 +433,45 @@ bool_corpus_replay and export:: (24) pass.
 - psui: `noshape_brep::Surface` has `Nurbs { index }`, `Curve` has `Nurbs { index, t0, t1 }`, `Body` three more
   fields (`..Default::default()` in literals).
 
+## Free-form: where OCCT's time goes (lead's step 1, 10-29 15:30)
+The 57 free-form cases corpus6 still sends to OCCT, each run alone, serial, non-destructive, with core's
+instrumented TKBO (/root/occt-kern, NOSHAPE_BOP_STATS; tools/bopstats + tools/split.py in /root/bool-scratch):
+intersection steps (VE, EE, VF, EF, forced, FF of the first pave filler) 40.8 s, everything else (bookkeeping,
+MakeBlocks, building, classification) 4.5 s. Most of the intersection time is edge/face, not face/face:
+- the thread fused with its rod (8dc3e8d4, 45b63a7e): 16.2 / 16.7 s, of which EF 14.9 s, VF 0.9 s, FF 0.5 s
+  (B-spline helices against the rod's cylinder and the B-spline faces). The hybrid needs no OCCT EF (an edge's
+  crossings come from clipping the face/face curves), so the gain there is taking the case (its helical edges lie
+  on the rod: declined so far), not an intersector of our own.
+- the rest 0.01–2.8 s each, mostly 50–95 % intersections too (fillet / shell slabs with tori, B-spline walls).
+- recorded (parallel, loaded) times overstate some: addb9a14 13.8 s recorded, 2.8 s alone.
+The case already taken (74acee2f, thread ∩ cylinder): OCCT 1.98 s alone, 1.17 s of it intersections (EF 0.38,
+VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
+
+## Arguments with ellipse edges (10-29 16:10): parts with tilted holes
+- The kernel passes an argument's ellipse edges (kind 3, OCCT's frame and major radius, `BrepBody::ellipse_minor`;
+  closed ones too, as circles) and the Rust Boolean takes them as `Geo::Ell` (OCCT's parameter): clipped, split,
+  in a plane's face when they lie on it (a boss over a tilted hole's rim). Their pieces keep the argument's curve
+  and curves on its faces (rust_boolean.cpp `piece_pcurve`); a piece the other way round still declines.
+- Also: a B-spline edge lying on another argument's plane / cylinder / cone goes into that face (in parts at the
+  seams it crosses); OCCT's sections of free-form faces carry OCCT's own tolerance, used for "along a boundary";
+  a NURBS curve's piece whose middle is in the grey band is judged where it is farthest from the boundary, when
+  that is clearly off it. The thread fused with its rod still declines (its 5 µm tolerant inputs put a helix's
+  seam crossing 0.1 mm from the rod's vertex, in the grey band; then a vertex nearly on an edge): parked.
+- Decline reasons from the converter are specific now: an ellipse edge, a conic edge, a torus / sphere / offset /
+  revolution / extruded face, a curve on a free-form face other than a line or B-spline.
+- Corpus6 after free-form faces (585 / 828 taken): what's left by recorded time: an internal face 13.8 s (1),
+  two vertices nearly coincide 12.1 s (7, the thread fuses among them), ellipse edges 11.9 s (15), the vertex
+  rule 10.6 s (5), curves nearly along a boundary 10.2 s (9), tolerant inputs 6.9 s; tori 1.2 s, spheres 2.1 s,
+  extrusions 1.3 s (so the lead's step 3 is small here).
+- A section or piece of an ellipse ending within 1e-5 of an axis' end but not on it declines (an edge tangent to
+  the ellipse there: our crossing 1.5e-6 rad short of OCCT's exact 2π, a 3e-9 gap, 1e-9 of a volume); results
+  with ellipses or hyperbolas aren't kept as bodies (converted, they are OCCT's curves); the builder's curves of
+  other kinds decline instead of being taken for lines (two crashes in corpus5 / corpus4 before the fix).
+- Replays all 0 differ: main 634, corpus2 504, corpus3 511, corpus4 549 (+2), corpus5 632 (+4), corpus6 585,
+  Shell's 70. (Corpus6's ellipse cases mostly decline for other reasons still.)
+- Tests: kernel T1 `brep_replay::brep_parts_with_tilted_holes_match_occt` (24 Booleans on plates with a tilted
+  hole, 19 taken, as OCCT).
+
 ## Next
 Corpus6 (10-29 13:30, recorded OCCT time of what the Rust path still declines, loaded machine): curved edges
 32.8 s (73: helical B-spline sweeps against rods ~15 s in 3, fillet slabs), one slab fuse with an internal face

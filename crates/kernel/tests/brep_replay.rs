@@ -496,3 +496,49 @@ fn brep_free_form_cases_match_occt() {
     assert!(bad.is_empty(), "{} of {n} cases differ:\n{}", bad.len(), bad.join("\n"));
     assert!(accepted >= 1, "{accepted} of {n} taken:\n{report}");
 }
+
+/// Booleans on a part that already has a tilted hole (its rims ellipses, the argument's own): a pocket next to
+/// it, a slot across it, a second tilted hole; noshape's own Boolean takes them as OCCT.
+#[test]
+fn brep_parts_with_tilted_holes_match_occt() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let mut taken = 0;
+    let mut why_not = Vec::new();
+    for deg in [20.0f64, 45.0] {
+        let plate = make_box_corners(DVec3::ZERO, DVec3::new(40.0, 20.0, 10.0) * mm).unwrap();
+        let a = deg.to_radians();
+        let d = DVec3::new(0.0, -a.sin(), a.cos());
+        let hole = make_cylinder(&Plane::from_normal(DVec3::new(15.0, 10.0, 5.0) * mm - d * 20.0 * mm, d), 4.0 * mm, 40.0 * mm, std::f64::consts::TAU).unwrap();
+        set_rust_boolean(Some(false));
+        let part = boolean(BooleanOp::Cut, &[plate], &[hole], &BooleanOptions::default()).unwrap().shape;
+        set_rust_boolean(None);
+        let tools = [
+            ("pocket", make_box_corners(DVec3::new(25.0, 5.0, 6.0) * mm, DVec3::new(35.0, 15.0, 11.0) * mm).unwrap()),
+            ("slot", make_box_corners(DVec3::new(5.0, 8.0, 7.0) * mm, DVec3::new(30.0, 12.0, 11.0) * mm).unwrap()),
+            ("boss", make_box_corners(DVec3::new(5.0, 2.0, 10.0) * mm, DVec3::new(12.0, 18.0, 14.0) * mm).unwrap()),
+            ("hole", make_cylinder(&Plane::from_normal(DVec3::new(30.0, 10.0, 5.0) * mm - d * 20.0 * mm, d), 3.0 * mm, 40.0 * mm, std::f64::consts::TAU).unwrap()),
+        ];
+        for (what, tool) in tools {
+            for op in [BooleanOp::Fuse, BooleanOp::Cut, BooleanOp::Common] {
+                let name = format!("{deg}° {what} {op:?}");
+                set_rust_boolean_only(true);
+                let r = boolean(op, std::slice::from_ref(&part), std::slice::from_ref(&tool), &BooleanOptions::default());
+                let (path, why) = (last_boolean_path(), last_rust_decline());
+                set_rust_boolean_only(false);
+                set_rust_boolean(Some(false));
+                let o = boolean(op, std::slice::from_ref(&part), std::slice::from_ref(&tool), &BooleanOptions::default());
+                set_rust_boolean(None);
+                if path != "rust" {
+                    why_not.push(format!("{name}: {why}"));
+                    continue;
+                }
+                taken += 1;
+                let d = Summary::of(&r.unwrap()).differences(&Summary::of(&o.unwrap()));
+                assert!(d.is_empty(), "{name}: {d:?}");
+            }
+        }
+    }
+    // (Not yet: the 45° slot, whose section ends inside a face; commons that come out empty.)
+    assert!(taken >= 19, "{taken} taken; declined: {why_not:#?}");
+}

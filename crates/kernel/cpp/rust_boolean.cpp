@@ -22,6 +22,8 @@
 #include <Geom2d_Line.hxx>
 #include <Geom_Circle.hxx>
 #include <Geom_Ellipse.hxx>
+#include <Geom_Conic.hxx>
+#include <GeomAdaptor_Surface.hxx>
 #include <Geom_Hyperbola.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
@@ -229,14 +231,16 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     const occ::handle<Geom_Curve>        bc   = basis_of(c);
     const occ::handle<Geom_Circle>       circ = occ::down_cast<Geom_Circle>(bc);
     const occ::handle<Geom_BSplineCurve> bsc  = occ::down_cast<Geom_BSplineCurve>(bc);
-    if (occ::down_cast<Geom_Line>(bc).IsNull() && circ.IsNull() && bsc.IsNull())
-      return "a curved edge";
+    const occ::handle<Geom_Ellipse>      ell  = occ::down_cast<Geom_Ellipse>(bc);
+    if (occ::down_cast<Geom_Line>(bc).IsNull() && circ.IsNull() && bsc.IsNull() && ell.IsNull())
+      return !occ::down_cast<Geom_Ellipse>(bc).IsNull() ? "an ellipse edge" : !occ::down_cast<Geom_Conic>(bc).IsNull() ? "a conic edge" : "a curved edge";
     TopoDS_Vertex v1, v2;
     TopExp::Vertices(e, v1, v2);
     if (v1.IsNull() || v2.IsNull())
       return "an edge without vertices";
-    if (v1.IsSame(v2) && (circ.IsNull() || std::abs(l - f - 2 * M_PI) > 1e-9))
+    if (v1.IsSame(v2) && ((circ.IsNull() && ell.IsNull()) || std::abs(l - f - 2 * M_PI) > 1e-9))
       return "a closed edge";
+    b.ellipse_minor.push_back(ell.IsNull() ? 0 : ell->MinorRadius());
     if (!bsc.IsNull())
     {
       // A B-spline: kind 5, where its NURBS starts, its parameters from the edge's start to its end.
@@ -246,6 +250,16 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       b.curves.push_back(l);
       for (int k = 0; k < 7; ++k)
         b.curves.push_back(0);
+    }
+    else if (!ell.IsNull())
+    {
+      // An ellipse: kind 3, its frame (its parameter OCCT's), major radius (the minor in `ellipse_minor`).
+      const gp_Elips g = ell->Elips().Transformed(loc.Transformation());
+      b.curves.push_back(3);
+      push3(b.curves, g.Location().XYZ());
+      push3(b.curves, g.Axis().Direction().XYZ());
+      push3(b.curves, g.XAxis().Direction().XYZ());
+      b.curves.push_back(g.MajorRadius());
     }
     else if (circ.IsNull())
       for (int k = 0; k < 11; ++k)
@@ -276,7 +290,10 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     const occ::handle<Geom_ConicalSurface>     con = occ::down_cast<Geom_ConicalSurface>(surf);
     const occ::handle<Geom_BSplineSurface>     bss = occ::down_cast<Geom_BSplineSurface>(surf);
     if (pl.IsNull() && cyl.IsNull() && con.IsNull() && bss.IsNull())
-      return "a curved face";
+    {
+      const GeomAbs_SurfaceType t = GeomAdaptor_Surface(surf).GetType();
+      return t == GeomAbs_Torus ? "a torus face" : t == GeomAbs_Sphere ? "a sphere face" : t == GeomAbs_OffsetSurface ? "an offset face" : t == GeomAbs_SurfaceOfRevolution ? "a face of revolution" : t == GeomAbs_SurfaceOfExtrusion ? "an extruded face" : "a curved face";
+    }
     if (f.Orientation() != TopAbs_FORWARD && f.Orientation() != TopAbs_REVERSED)
       return "an internal face";
     max_tol   = std::max(max_tol, BRep_Tool::Tolerance(f));
@@ -367,7 +384,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
             return "an edge without its curve on a face";
           const double at = push_nurbs2(b.nurbs, pc, a, z);
           if (at < 0)
-            return "a curved edge";
+            return "a curve on a free-form face other than a line or B-spline";
           for (const double v : {(double)(i - 1), (double)(em.FindIndex(e) - 1), (double)second, at, a, z})
             b.pcurves.push_back(v);
         }
@@ -582,6 +599,14 @@ const char* ellipse_edge(const BrepResult& r, const std::vector<const OcShape*>&
       d = 2 * M_PI;
     if (t0 < first - 1e-9 || t0 + d > last + 1e-9)
       continue;
+    // An end just short of an axis' end (an edge tangent to the ellipse there, its crossing found to 1e-6 by the
+    // Boolean where OCCT's is exact): declined.
+    for (const double t : {t0, t0 + d})
+    {
+      const double off = std::abs(t - M_PI_2 * std::round(t / M_PI_2));
+      if (off > 1e-12 && off < 1e-5)
+        return "an ellipse ending nearly at an axis";
+    }
     out.curve     = el;
     out.face[0]   = fa;
     out.face[1]   = fb;
@@ -611,6 +636,26 @@ const char* ellipse_edge(const BrepResult& r, const std::vector<const OcShape*>&
     }
   }
   return "an ellipse unlike OCCT's sections";
+}
+
+// A piece `e` of the argument's edge (r.edge_origin[k]) on the input's face `src`: the input edge's curves on that
+// face (one, or a seam's two), set on `e` (the same parameters).
+const char* piece_pcurve(const BrepResult& r, const std::vector<const OcShape*>& srcs, size_t k, const TopoDS_Face& src, const TopoDS_Edge& e,
+                         const occ::handle<Geom_Surface>& s, const TopLoc_Location& loc, BRep_Builder& bb)
+{
+  if (r.edge_origin[3 * k] != 1)
+    return "a new edge without its curve on a face";
+  const TopoDS_Edge se = TopoDS::Edge(input(srcs, r.edge_origin[3 * k + 1], TopAbs_EDGE, r.edge_origin[3 * k + 2]).Oriented(TopAbs_FORWARD));
+  const TopoDS_Face sf = TopoDS::Face(src.Oriented(TopAbs_FORWARD));
+  double            a = 0, z = 0;
+  const occ::handle<Geom2d_Curve> pf = BRep_Tool::CurveOnSurface(se, sf, a, z);
+  if (pf.IsNull())
+    return "an input edge without its curve on a face";
+  if (BRep_Tool::IsClosed(se, sf))
+    bb.UpdateEdge(e, pf, BRep_Tool::CurveOnSurface(TopoDS::Edge(se.Reversed()), sf, a, z), s, loc, BRep_Tool::Tolerance(e));
+  else
+    bb.UpdateEdge(e, pf, s, loc, BRep_Tool::Tolerance(e));
+  return nullptr;
 }
 
 // An ellipse's curve on its face `src` (one of the two it is the section of), set on `e` on surface `s`, as
@@ -673,9 +718,12 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       TopoDS_Vertex a, z;
       TopExp::Vertices(src, a, z);
       const bool closed = a.IsSame(z);
-      if (!a.IsNull() && BRep_Tool::Pnt(a).Distance(p0) < 1e-12)
+      // (Within its tolerance: a vertex merged with another argument's keeps the edge's parameter, as OCCT's
+      // pave does; an ellipse's piece got 2π - 3e-9 by projection.)
+      const double merged = std::max(1e-12, std::min(BRep_Tool::Tolerance(a.IsNull() ? z : a), 1e-6));
+      if (!a.IsNull() && BRep_Tool::Pnt(a).Distance(p0) < merged)
         at0 = f;
-      if (!z.IsNull() && BRep_Tool::Pnt(z).Distance(p1) < 1e-12 && !(closed && v0 != v1))
+      if (!z.IsNull() && BRep_Tool::Pnt(z).Distance(p1) < merged && !(closed && v0 != v1))
         at1 = l;
     }
     else if (cv[0] == 0)
@@ -751,6 +799,24 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       t0 = cv[2];
       t1 = cv[3];
     }
+    else if (const occ::handle<Geom_Ellipse> el = occ::down_cast<Geom_Ellipse>(bc); !el.IsNull() && kind == 1)
+    {
+      // A piece of an argument's ellipse: as a circle's, from its start through the turn to its end.
+      const gp_Elips g = el->Elips().Transformed(loc.Transformation());
+      t0               = f + std::fmod(std::fmod(ElCLib::Parameter(g, p0) - f, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
+      double d         = std::fmod(std::fmod(ElCLib::Parameter(g, p1) - t0, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
+      if (v0 == v1 || d < 1e-12)
+        d = 2 * M_PI;
+      t1 = t0 + d;
+      // An end just short of an axis' end (an edge tangent to the ellipse there, its crossing found to 1e-6 by
+      // the Boolean where OCCT's is exact): declined.
+      for (const double t : {at0 ? -1.0 : t0, at1 ? -1.0 : t1})
+      {
+        const double off = std::abs(t - M_PI_2 * std::round(t / M_PI_2));
+        if (t >= 0 && off > 1e-12 && off < 1e-5)
+          return "a piece of an ellipse ending nearly at an axis";
+      }
+    }
     else if (!occ::down_cast<Geom_Ellipse>(bc).IsNull() || !occ::down_cast<Geom_Hyperbola>(bc).IsNull())
     {
       if (kind != 2)
@@ -767,11 +833,17 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         d = 2 * M_PI;
       t1 = t0 + d;
     }
-    else
+    else if (const occ::handle<Geom_Line> ln = occ::down_cast<Geom_Line>(bc); !ln.IsNull())
     {
-      const gp_Lin g = occ::down_cast<Geom_Line>(bc)->Lin().Transformed(loc.Transformation());
+      const gp_Lin g = ln->Lin().Transformed(loc.Transformation());
       t0             = ElCLib::Parameter(g, p0);
       t1             = ElCLib::Parameter(g, p1);
+    }
+    else
+    {
+      if (std::getenv("NOSHAPE_BOOL_DEBUG"))
+        std::fprintf(stderr, "build: edge %zu kind %u curve kind %g on a %s\n", i, kind, cv[0], bc.IsNull() ? "null" : bc->DynamicType()->Name());
+      return "an edge on a curve of another kind";
     }
     if (at0)
       t0 = *at0;
@@ -938,6 +1010,18 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           return n * 2 * M_PI;
         };
         double u = 0, v = 0;
+        if (b.curves[11 * k] == 5 && r.edge_section[k] != UINT32_MAX)
+        {
+          if (const char* why = ellipse_pcurve(ells[k], src, e, s, loc, bb))
+            return why;
+          continue;
+        }
+        if ((!occ::down_cast<Geom_Ellipse>(bc).IsNull() || !occ::down_cast<Geom_Hyperbola>(bc).IsNull() || b.curves[11 * k] == 5) && r.edge_origin[3 * k] == 1)
+        {
+          if (const char* why = piece_pcurve(r, srcs, k, src, e, s, loc, bb))
+            return why;
+          continue;
+        }
         if (!occ::down_cast<Geom_Ellipse>(bc).IsNull() || !occ::down_cast<Geom_Hyperbola>(bc).IsNull())
         {
           if (const char* why = ellipse_pcurve(ells[k], src, e, s, loc, bb))
@@ -957,7 +1041,10 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           bb.UpdateEdge(e, new Geom2d_Line(gp_Pnt2d(u, v), gp_Dir2d(sg, 0)), s, loc, BRep_Tool::Tolerance(e));
           continue;
         }
-        const gp_Lin g = occ::down_cast<Geom_Line>(bc)->Lin().Transformed(el.Transformation());
+        const occ::handle<Geom_Line> gl = occ::down_cast<Geom_Line>(bc);
+        if (gl.IsNull())
+          return "an edge of another kind on a cylinder or cone";
+        const gp_Lin g = gl->Lin().Transformed(el.Transformation());
         // Along the generator: v changes as the line's parameter does, one way or the other.
         // (Its angle from its middle: a cone's generator may start at the apex.)
         double u1 = 0, v1 = 0, um = 0, vm = 0;
@@ -1019,7 +1106,12 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       for (uint32_t k = b.loop_uses[b.face_loops[i]]; k < b.loop_uses[b.face_loops[i + 1]]; ++k)
       {
         const uint32_t ek = b.uses[k] / 2;
-        if (r.edge_origin[3 * ek] != 0 && (b.curves[11 * ek] == 3 || b.curves[11 * ek] == 4 || (b.curves[11 * ek] == 5 && r.edge_section[ek] != UINT32_MAX)))
+        if (r.edge_origin[3 * ek] == 1 && (b.curves[11 * ek] == 3 || b.curves[11 * ek] == 5))
+        {
+          if (const char* why = piece_pcurve(r, srcs, ek, src, es[ek], s, loc, bb))
+            return why;
+        }
+        else if (r.edge_origin[3 * ek] != 0 && (b.curves[11 * ek] == 3 || b.curves[11 * ek] == 4 || (b.curves[11 * ek] == 5 && r.edge_section[ek] != UINT32_MAX)))
         {
           if (const char* why = ellipse_pcurve(ells[ek], src, es[ek], s, loc, bb))
             return why;
@@ -1162,7 +1254,7 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
       return rust::String("a section without its curves on the faces");
     const double id = static_cast<double>(t_free->curves.size());
     t_free->curves.push_back({{fa, fb}, ic});
-    for (const double v : {id, first, last, at3, at0, at1})
+    for (const double v : {id, first, last, at3, at0, at1, ic.Tolerance()})
       out.curves.push_back(v);
   }
   return rust::String("");
@@ -1268,9 +1360,13 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   stop();
   if (const char* why = build(r, srcs, max_tol > 0 ? max_tol : 1e-7, out, hist))
     return decline(why);
-  // (A result with free-form faces isn't kept as a body: the next Boolean converts it, curves on faces and all.)
+  // (A result with free-form faces isn't kept as a body: the next Boolean converts it, curves on faces and all;
+  // nor one with ellipses or hyperbolas: converted, they are OCCT's curves, frame and parameters.)
   for (size_t i = 0; i < r.body.surfaces.size(); i += 12)
     if (r.body.surfaces[i] == 3)
+      return true;
+  for (size_t i = 0; i < r.body.curves.size(); i += 11)
+    if (r.body.curves[i] == 3 || r.body.curves[i] == 4)
       return true;
   t_built.target_face.assign(r.face_origin.size() / 3, 0);
   for (size_t i = 0; i < t_built.target_face.size(); ++i)

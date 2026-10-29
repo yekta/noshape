@@ -225,7 +225,7 @@ pub(super) fn face_box(g: &GFace) -> Option<(DVec3, DVec3)> {
 pub(super) fn seam_cuts(cx: &Ctx, faces: [usize; 2], c: &NurbsCurve, t0: f64, t1: f64) -> Vec<f64> {
     let mut out = Vec::new();
     for f in faces {
-        let Surf::Cyl { o, x, y, th0, .. } = cx.faces[f].s else { continue };
+        let Some(&Surf::Cyl { o, x, y, th0, .. }) = cx.faces.get(f).map(|g| &g.s) else { continue };
         // The angle from th0 in (-π, π]: a crossing where it changes sign without passing π.
         let ang = |t: f64| {
             let w = c.at(t) - o;

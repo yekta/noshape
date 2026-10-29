@@ -108,10 +108,13 @@ fn body_of(b: &BrepBody) -> Body {
             out.nurbs_curves.len() as u32 - 1
         })
     };
-    for (e, c) in b.edges.chunks(2).zip(b.curves.chunks(11)) {
+    for (i, (e, c)) in b.edges.chunks(2).zip(b.curves.chunks(11)).enumerate() {
         let curve = match c[0] as u8 {
             0 => Curve::Line,
             1 => Curve::Circle { center: v3(c, 1), normal: v3(c, 4), xdir: v3(c, 7), radius: c[10] },
+            3 if b.ellipse_minor.get(i).is_some_and(|&m| m > 0.0) => {
+                Curve::Ellipse { center: v3(c, 1), normal: v3(c, 4), xdir: v3(c, 7), major: c[10], minor: b.ellipse_minor[i], faces: [(u32::MAX, u32::MAX); 2] }
+            }
             5 => Curve::Nurbs { index: curve_at(&mut out, c[1] as usize), t0: c[2], t1: c[3] },
             _ => Curve::Degenerate,
         };
@@ -157,6 +160,7 @@ fn flat(b: &Body, out: &mut BrepBody) {
     let xyz = |p: glam::DVec3| [p.x, p.y, p.z];
     out.vertices = b.vertices.iter().flat_map(|&p| xyz(p)).collect();
     out.edges = b.edges.iter().flat_map(|e| e.v).collect();
+    out.ellipse_minor = b.edges.iter().map(|e| if let Curve::Ellipse { minor, .. } = e.curve { minor } else { 0.0 }).collect();
     for e in &b.edges {
         match e.curve {
             Curve::Line => out.curves.extend([0.0; 11]),
@@ -262,7 +266,7 @@ impl SectionSource for Occt {
             Nurbs::Curve(c) => c,
             Nurbs::Surface(_) => unreachable!(),
         };
-        Ok(out.curves.chunks(6).map(|c| SectionCurve { curve: curve(c[3]), t0: c[1], t1: c[2], on: [curve(c[4]), curve(c[5])], id: c[0] as u32 }).collect())
+        Ok(out.curves.chunks(7).map(|c| SectionCurve { curve: curve(c[3]), t0: c[1], t1: c[2], on: [curve(c[4]), curve(c[5])], id: c[0] as u32, tol: c[6] }).collect())
     }
 }
 

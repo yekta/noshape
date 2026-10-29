@@ -331,6 +331,8 @@ pub(crate) mod ffi {
         /// Per curve of an edge on a NURBS face: face, edge, a seam's other curve (0 / 1), where its NURBS starts,
         /// the edge's start and end parameters on it (6 numbers).
         pcurves: Vec<f64>,
+        /// Per edge, an ellipse's minor radius (an argument's ellipse, kind 3; 0 for others; may be empty).
+        ellipse_minor: Vec<f64>,
     }
 
     /// noshape's own Boolean's result: the body, its entities' origins (kind 0 the input itself, 1 a piece
@@ -356,8 +358,8 @@ pub(crate) mod ffi {
     }
 
     /// OCCT's sections of two faces for noshape's own Boolean (a free-form face's): per curve its id, its
-    /// parameter range, where its NURBS and its curves on the two faces (in the order asked) start in `nurbs`
-    /// (6 numbers; NURBS as in `BrepBody::nurbs`).
+    /// parameter range, where its NURBS and its curves on the two faces (in the order asked) start in `nurbs`, its
+    /// tolerance (7 numbers; NURBS as in `BrepBody::nurbs`).
     #[derive(Default)]
     struct BrepSections {
         curves: Vec<f64>,
