@@ -181,7 +181,8 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    as "td@Type=THFE" dims). FS `?:` is left-associative as live's: parenthesise nested ternaries. Heavy-duty 6c106f19.
    FHX 06c8d526 (flushHeadPin form 9: FH studs' serrations and disc, X-Press neck and 25° taper). SGPC (form 10:
    the collar knurled by cutting outside a 28-point star whose tips sit on it; ~350 s for the T2 sweep now). All
-   PEM studs done. Next: DSO 97,
+   PEM studs done. SGPC 563fc67c. DSO (pemStandoff form 4: SO's profile, round head knurled by knurlCut, the
+   helper SGPC uses too). Next:
    SOSG 115, nuts 109–148. Not shown yet: the read-only Hole size / Recommended sheet material rows.
    Live's studio defaults sometimes differ from the table (NAS 1129 thru minor 0.067 vs 0.0667, NASM 45938/4 ax 0.0225
    vs 0.028125): check the construction at the studio values, then test ours at the table's.

@@ -2530,6 +2530,51 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_SWAGING_COLLAR_STUD_MAIN, DATA_PEM_SELFCLINCHING_SWAGING_COLLAR_STUD_LENGTH (component document 384e30213ed1f04c3d451665; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching standoffs",
+    "name": "DSOS™/DSO™ Threaded standoffs (For close-to-edge applications)",
+    "shape": "pemStandoff",
+    "form": {
+     "form": 4
+    },
+    "materials": [
+     "Stainless Steel",
+     "Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "DSOS",
+      "finish": "No finish",
+      "finishCode": ""
+     },
+     "Steel": {
+      "code": "DSO",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "M3X0.50",
+      "label": "PEM {type}-M3-{l}",
+      "d": 3.0,
+      "dims": {
+       "s": 4.92,
+       "dc": 4.2,
+       "db": 2.459,
+       "dm": 2.459,
+       "dmaj": 3.0
+      },
+      "lengths": [
+       "6.35",
+       "7"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_THREADED_STANDOFF_MAIN, DATA_PEM_SELFCLINCHING_THREADED_STANDOFF_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 1b297ea1ec3b72544db6acee; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  },
@@ -6497,6 +6542,55 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_SWAGING_COLLAR_STUD_MAIN, DATA_PEM_SELFCLINCHING_SWAGING_COLLAR_STUD_LENGTH (component document 2f3748f159171d01e4ebdd8e; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching standoffs",
+    "name": "DSOS™/DSO™ Threaded standoffs (for close-to-edge applications)",
+    "shape": "pemStandoff",
+    "form": {
+     "form": 4
+    },
+    "materials": [
+     "Stainless Steel",
+     "Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "DSOS",
+      "finish": "No finish",
+      "finishCode": ""
+     },
+     "Steel": {
+      "code": "DSO",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "#4-40",
+      "label": "PEM {type}-440-{l}",
+      "d": 0.112,
+      "dims": {
+       "s": 0.187,
+       "dc": 0.165,
+       "db": 0.0849,
+       "dm": 0.0849,
+       "dmaj": 0.112
+      },
+      "lengths": [
+       "0.250",
+       "0.275"
+      ],
+      "lengthNames": {
+       "0.250": "250",
+       "0.275": "275"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_THREADED_STANDOFF_MAIN, DATA_PEM_SELFCLINCHING_THREADED_STANDOFF_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 638f81a1f0c5dd57c6a9d880; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  }

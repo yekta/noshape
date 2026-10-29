@@ -2644,7 +2644,10 @@ export const flushNut = defineFeature(function(context is Context, id is Id, def
  * drill point 0.9 l up. Form 3 (TSO™ for thin sheets): the undercut's top
  * corner filled by a dc / 50 chamfer; the minor diameter through, both ends
  * chamfered out to dmaj (live's STYLE A), or with bd > 0 (STYLE B) blind
- * from the bottom up to a 118 degree point bd below the top.
+ * from the bottom up to a 118 degree point bd below the top. Form 4 (DSO™
+ * for close-to-edge applications): the head round (s across), knurled by 40
+ * V teeth down to ((s - dc) / 2 + dc) / 2, their tips on its rim; the hole
+ * as TSO's STYLE A.
  */
 annotation { "Feature Type Name" : "PEM standoff" }
 export const pemStandoff = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2684,7 +2687,7 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
         // The top of the hole (its chamfer's outer radius) and the inside.
         var rt;
         var inside;
-        if (definition.form == 3)
+        if (definition.form == 3 || definition.form == 4)
         {
             const rmaj = definition.dmaj / 2;
             const rmin = definition.dm / 2;
@@ -2738,6 +2741,11 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
         }
         kept = append(kept, { "p" : rz(kept[size(kept) - 1].p[0], -l) });
         revolveProfile(context, id + "body", join(kept, inside));
+        if (definition.form == 4)
+        {
+            knurlCut(context, id, qCreatedBy(id + "body", EntityType.BODY), -g, g, 40, ((definition.s - dc) / 2 + dc) / 2, rh, (90 + 180 / 40) * degree);
+            return;
+        }
         // The hex corners: a hex ring round the top of the bore, united.
         const ring = prismZ(context, id + "hex", -g, g, polygonPoints(6, definition.s, 1));
         // (A closed top: cut the ring inside the body instead.)
@@ -3083,6 +3091,31 @@ function nonFlushStud(context is Context, id is Id, definition is map)
     opDeleteBodies(context, id + "deleteThreadPlane", { "entities" : qCreatedBy(id + "threadPlane", EntityType.BODY) });
 }
 
+/**
+ * Cut a knurl of `n` V teeth into `target` from z0 up h: everything outside
+ * the star whose valleys are at rIn (the first at angle a0) and its tips at
+ * rOut, halfway between.
+ */
+function knurlCut(context is Context, id is Id, target is Query, z0 is ValueWithUnits, h is ValueWithUnits, n is number, rIn is ValueWithUnits, rOut is ValueWithUnits, a0 is ValueWithUnits)
+{
+    var base = XY_PLANE;
+    base.origin[2] = z0;
+    const sk = newSketchOnPlane(context, id + "knurlSketch", { "sketchPlane" : base });
+    var star = [];
+    for (var k = 0; k < n; k += 1)
+    {
+        const a = a0 + 360 / n * k * degree;
+        star = append(star, vector(cos(a), sin(a)) * rIn);
+        star = append(star, vector(cos(a + 180 / n * degree), sin(a + 180 / n * degree)) * rOut);
+    }
+    skPolyline(sk, "star", { "points" : append(star, star[0]) });
+    skCircle(sk, "out", { "center" : vector(Z, Z), "radius" : 2 * rOut });
+    skSolve(sk);
+    opExtrude(context, id + "knurl", { "entities" : qSketchRegion(id + "knurlSketch", true), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : h });
+    opDeleteBodies(context, id + "deleteKnurlSketch", { "entities" : qCreatedBy(id + "knurlSketch", EntityType.BODY) });
+    subtract(context, id + "knurlCut", target, qCreatedBy(id + "knurl", EntityType.BODY));
+}
+
 /** pemPin form 10 (SGPC™ swaging collar studs). */
 function swagingCollarStud(context is Context, id is Id, definition is map)
 {
@@ -3107,24 +3140,8 @@ function swagingCollarStud(context is Context, id is Id, definition is map)
                 { "p" : rz(rc - f, zb) }, { "p" : rz(r1, zb) }, { "p" : rz(r1, zl + ch) }, { "p" : rz(r1 - ch, zl) }, { "p" : rz(rd, zl) },
                 { "p" : rz(Z, zl + rd / tan(60 * degree)) }
             ]);
-    // The knurl: outside a 28-point star (valleys 0.3 td in, tips on the
-    // collar), through the collar.
-    var under = XY_PLANE;
-    under.origin[2] = zb;
-    const sk = newSketchOnPlane(context, id + "knurlSketch", { "sketchPlane" : under });
-    var star = [];
-    for (var k = 0; k < 28; k += 1)
-    {
-        const a = (90 + 360 / 28 * k) * degree;
-        star = append(star, vector(cos(a), sin(a)) * (rc - f));
-        star = append(star, vector(cos(a + 180 / 28 * degree), sin(a + 180 / 28 * degree)) * rc);
-    }
-    skPolyline(sk, "star", { "points" : append(star, star[0]) });
-    skCircle(sk, "out", { "center" : vector(Z, Z), "radius" : R });
-    skSolve(sk);
-    opExtrude(context, id + "knurl", { "entities" : qSketchRegion(id + "knurlSketch", true), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : zu - zb });
-    opDeleteBodies(context, id + "deleteKnurlSketch", { "entities" : qCreatedBy(id + "knurlSketch", EntityType.BODY) });
-    subtract(context, id + "cut", qCreatedBy(id + "body", EntityType.BODY), qCreatedBy(id + "knurl", EntityType.BODY));
+    // The knurl: 28 V teeth 0.3 td deep, their tips on the collar.
+    knurlCut(context, id, qCreatedBy(id + "body", EntityType.BODY), zb, zu - zb, 28, rc - f, rc, 90 * degree);
     opPlane(context, id + "threadPlane", { "plane" : plane(vector(Z, Z, -ts), vector(0, 0, 1)), "width" : 4 * R, "height" : 4 * R });
     try silent
     {

@@ -5345,6 +5345,39 @@ fn pem_sgpc_studs_match_live() {
     assert!(tops.iter().any(|z| (z + 2.9).abs() < 1e-3), "cylinder tops {tops:?}");
 }
 
+/// PEM® DSOS™ / DSO™ threaded standoffs for close-to-edge applications
+/// (live's raw /features and body details): "PEM DSOS-M3-6.35", "PEM
+/// DSO-M3-6.35 ZI" for steel, "PEM DSOS-440-250"; M3 x 6.35 = live's studio
+/// default, 97 faces (PLANE 88, CYLINDER 7, CONE 2).
+#[test]
+fn pem_dso_standoffs_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let metric = CATALOGUE.iter().find(|c| c.name.starts_with("DSOS™") && !c.inch).unwrap();
+    let unified = CATALOGUE.iter().find(|c| c.name.starts_with("DSOS™") && c.inch).unwrap();
+    let mut spec = StandardSpec::new(metric);
+    assert_eq!(spec.part_name(), "PEM DSOS-M3-6.35");
+    spec.material = Some("Steel".into());
+    assert_eq!(spec.part_name(), "PEM DSO-M3-6.35 ZI");
+    assert_eq!(StandardSpec::new(unified).part_name(), "PEM DSOS-440-250");
+    for c in [metric, unified] {
+        let r = standard::regenerate(&StandardSpec::new(c)).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let mut kinds = std::collections::BTreeMap::new();
+        for i in 0..b.faces.len() {
+            let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+                Surface::Plane(_) => "plane",
+                Surface::Cone { .. } => "cone",
+                Surface::Cylinder { .. } => "cylinder",
+                Surface::Torus { .. } => "torus",
+                _ => "other",
+            };
+            *kinds.entry(k).or_insert(0) += 1;
+        }
+        assert_eq!(kinds, [("cone", 2), ("cylinder", 7), ("plane", 88)].into_iter().collect(), "{}", c.name);
+    }
+}
+
 /// ANSI commercial taper pins and slotted spring pins with live's whole size
 /// lists (its FSRules tables, behaviours "skasm (2026-10-27) standard content
 /// gaps": taper pins from #7/0, spring pins with 9/64, 5/8, 3/4); every size
