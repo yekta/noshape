@@ -296,6 +296,8 @@ pub struct DrawingEditor {
     pub paste_table: Option<Vec<Vec<String>>>,
     /// Note tool: the leader anchored by the first click (on a snap point).
     pub note_leader: Option<Leader>,
+    /// The open note editor's property fields (shown as their values).
+    pub note_fields: crate::drawing_note::NoteFields,
     /// Add leader on a note: where the new leader starts (`drawing_leaders`).
     pub leader_from: Option<noshape_model::drawing::LeaderStart>,
     /// The selected note leader (note, leader): drawn amber with its nodes
@@ -591,6 +593,7 @@ impl DrawingEditor {
             styles_gap: None,
             table_tool: None,
             note_leader: None,
+            note_fields: Default::default(),
             leader_from: None,
             leader_sel: None,
             menu_broken_out: None,
@@ -634,6 +637,9 @@ impl DrawingEditor {
             _subs: subs,
         };
         this.old_state = this.load_old_state(cx);
+        // The document's and the tab's names, the user: properties read them
+        // from the start, not after the first edit.
+        this.update_info(cx);
         this.ensure_sources(false, cx);
         this.refresh(cx);
         this

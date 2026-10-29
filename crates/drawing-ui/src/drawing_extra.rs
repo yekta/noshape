@@ -2184,11 +2184,11 @@ impl DrawingEditor {
                 Err(_) => self.status = Some("Invalid angle".into()),
             },
             Panel::Cell { table, row, col, input, .. } if self.current_sheet().table(table).is_some_and(|t| matches!(t.kind, TableKind::Revision { .. })) => {
-                let text = input.read(cx).value().to_string();
+                let text = self.note_text(&input, cx);
                 self.apply_revision_cell(table, row, col, text, cx);
             }
             Panel::Cell { table, row, col, input, note } => {
-                let text = input.read(cx).value().to_string();
+                let text = self.note_text(&input, cx);
                 let format = note.as_ref().and_then(|n| self.current_sheet().table(table).map(|t| Self::cell_note_format(t, row, col, n, self.drawing.units_mm, cx)));
                 self.edit_table(table, "Edit cell", cx, |t| {
                     if let Some(f) = format.clone() {

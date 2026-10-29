@@ -11,7 +11,7 @@
 use crate::drawing_view::*;
 use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
-use gpui_kit::component::input::Input;
+use gpui_kit::component::input::{Input, InputEvent, TextareaState};
 use gpui_kit::component::{Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -59,6 +59,57 @@ pub fn parse_note_height(s: &str, units_mm: bool) -> Option<f64> {
     num.trim().parse::<f64>().ok().map(|v| v * mm_per).filter(|v| *v > 0.1)
 }
 
+/// Property fields an open note editor shows as their values (live, qa
+/// DWG-PROPERTY-FIELD: the value, as one field): each value's byte range in
+/// the editor's text and the `{key|format}` token it stands for.
+#[derive(Default)]
+pub struct NoteFields {
+    editor: Option<EntityId>,
+    spans: Vec<(std::ops::Range<usize>, String)>,
+    last: String,
+}
+
+impl NoteFields {
+    /// After an edit (`cursor`: the caret after it): the fields after the
+    /// edited text move with it; one the edit touched is plain text now.
+    fn follow(&mut self, new: &str, cursor: usize) {
+        if new == self.last {
+            return;
+        }
+        let old = std::mem::replace(&mut self.last, new.to_string());
+        let (o, n) = (old.as_bytes(), new.as_bytes());
+        // Typing, deleting, pasting: the text after the caret is unchanged.
+        let after = &n[cursor.min(n.len())..];
+        let tail = if o.ends_with(after) { after.len() } else { o.iter().rev().zip(n.iter().rev()).take_while(|(a, b)| a == b).count().min(o.len()).min(n.len()) };
+        let (o_end, n_end) = (o.len() - tail, n.len() - tail);
+        let head = o[..o_end].iter().zip(&n[..n_end]).take_while(|(a, b)| a == b).count();
+        let delta = n.len() as isize - o.len() as isize;
+        self.spans.retain_mut(|(r, _)| {
+            if r.end <= head {
+                true
+            } else if r.start >= o_end {
+                *r = (r.start as isize + delta) as usize..(r.end as isize + delta) as usize;
+                true
+            } else {
+                false
+            }
+        });
+    }
+
+    /// The editor's `text` with each field back as its token.
+    fn tokens(&self, text: &str) -> String {
+        let mut out = text.to_string();
+        let mut spans: Vec<_> = self.spans.iter().collect();
+        spans.sort_by_key(|(r, _)| std::cmp::Reverse(r.start));
+        for (r, token) in spans {
+            if r.end <= out.len() && out.is_char_boundary(r.start) && out.is_char_boundary(r.end) {
+                out.replace_range(r.clone(), token);
+            }
+        }
+        out
+    }
+}
+
 /// Index of the list item (non-empty paragraph) holding byte offset `at`.
 fn item_at(text: &str, at: usize) -> Option<usize> {
     let para = text[..at.min(text.len())].matches('\n').count();
@@ -68,6 +119,102 @@ fn item_at(text: &str, at: usize) -> Option<usize> {
 }
 
 impl DrawingEditor {
+    /// A property token's value as the sheet shows it (its text format applied).
+    fn field_shown(&self, token: &str) -> String {
+        let lookup = |k: &str| noshape_model::drawing::build::field_value(&self.drawing, self.sheet, &self.info, &self.sources, k);
+        noshape_model::drawing::format::expand_fields(token, &lookup)
+    }
+
+    /// A note's text for its editor: each property token as its value.
+    pub fn note_shown(&self, text: &str) -> (String, Vec<(std::ops::Range<usize>, String)>) {
+        let (mut out, mut spans, mut rest) = (String::with_capacity(text.len()), Vec::new(), text);
+        while let Some(i) = rest.find('{') {
+            out.push_str(&rest[..i]);
+            let after = &rest[i..];
+            let token = after.find('}').map(|j| &after[..=j]).filter(|t| is_field(t[1..t.len() - 1].split('|').next().unwrap_or("").trim()));
+            match token {
+                Some(t) => {
+                    let v = self.field_shown(t);
+                    spans.push((out.len()..out.len() + v.len(), t.to_string()));
+                    out.push_str(&v);
+                    rest = &after[t.len()..];
+                }
+                None => {
+                    out.push('{');
+                    rest = &after[1..];
+                }
+            }
+        }
+        out.push_str(rest);
+        (out, spans)
+    }
+
+    /// Track the fields of note editor `input` (its text as shown).
+    pub fn attach_note_fields(&mut self, input: &Entity<TextareaState>, spans: Vec<(std::ops::Range<usize>, String)>, cx: &mut Context<Self>) {
+        self.note_fields = NoteFields { editor: Some(input.entity_id()), spans, last: input.read(cx).value().to_string() };
+        let sub = cx.subscribe(input, |this: &mut Self, st, ev: &InputEvent, cx| {
+            if matches!(ev, InputEvent::Change) && this.note_fields.editor == Some(st.entity_id()) {
+                let (v, c) = (st.read(cx).value().to_string(), st.read(cx).cursor());
+                this.note_fields.follow(&v, c);
+            }
+        });
+        self._subs.push(sub);
+    }
+
+    /// Note editor `input`'s text with its fields back as tokens.
+    pub fn note_text(&self, input: &Entity<TextareaState>, cx: &App) -> String {
+        let text = input.read(cx).value().to_string();
+        if self.note_fields.editor == Some(input.entity_id()) { self.note_fields.tokens(&text) } else { text }
+    }
+
+    /// Insert drawing / sheet reference property: its value, as one field.
+    fn insert_note_field(&mut self, input: &Entity<TextareaState>, token: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if self.note_fields.editor != Some(input.entity_id()) {
+            self.attach_note_fields(input, Vec::new(), cx);
+        }
+        let v = self.field_shown(token);
+        input.update(cx, |s, cx| s.insert(v.clone(), window, cx));
+        let (text, at) = (input.read(cx).value().to_string(), input.read(cx).cursor());
+        self.note_fields.follow(&text, at);
+        if at >= v.len() {
+            self.note_fields.spans.push((at - v.len()..at, token.to_string()));
+        }
+        cx.notify();
+    }
+
+    /// The field at the caret of note editor `input` (just after it or in it): its index and key.
+    fn note_field_at(&self, input: &Entity<TextareaState>, at: usize) -> Option<(usize, String)> {
+        if self.note_fields.editor != Some(input.entity_id()) {
+            return None;
+        }
+        let i = self.note_fields.spans.iter().position(|(r, _)| r.start < at && at <= r.end)?;
+        let t = &self.note_fields.spans[i].1;
+        Some((i, t[1..t.len() - 1].split('|').next().unwrap_or("").trim().to_string()))
+    }
+
+    /// Text format / Date time format of field `i`: its token and value.
+    fn reformat_note_field(&mut self, input: &Entity<TextareaState>, i: usize, token: String, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((r, _)) = self.note_fields.spans.get(i).cloned() else { return };
+        let mut text = input.read(cx).value().to_string();
+        if r.end > text.len() {
+            return;
+        }
+        let v = self.field_shown(&token);
+        text.replace_range(r.clone(), &v);
+        let delta = v.len() as isize - r.len() as isize;
+        for (s, _) in self.note_fields.spans.iter_mut().filter(|(s, _)| s.start >= r.end) {
+            *s = (s.start as isize + delta) as usize..(s.end as isize + delta) as usize;
+        }
+        let end = r.start + v.len();
+        self.note_fields.spans[i] = (r.start..end, token);
+        self.note_fields.last = text.clone();
+        input.update(cx, |s, cx| {
+            s.set_value(text, window, cx);
+            s.set_selected_range(end..end, cx);
+        });
+        cx.notify();
+    }
+
     /// Change the open note editor's style.
     fn note_style(&mut self, f: &dyn Fn(&mut NoteStyle), cx: &mut Context<Self>) {
         match &mut self.panel {
@@ -256,12 +403,18 @@ impl DrawingEditor {
 
         // Row 3: Insert symbol, Insert drawing property, Insert sheet
         // reference property, Text format, Date time format.
-        let insert_menu = |items: Vec<(String, String)>| {
-            let inp = input.clone();
+        let insert_menu = |items: Vec<(String, String)>, fields: bool| {
+            let (inp, ed) = (input.clone(), ed.clone());
             move |mut m: crate::os_menu::OsMenu, _: &mut Window, _: &mut Context<crate::os_menu::OsMenu>| {
                 for (label, token) in &items {
-                    let (inp, token) = (inp.clone(), token.clone());
-                    m = m.item(crate::os_menu::OsMenuItem::new(label.clone()).on_click(move |_, w, cx| inp.update(cx, |s, cx| s.insert(token.clone(), w, cx))));
+                    let (inp, ed, token) = (inp.clone(), ed.clone(), token.clone());
+                    m = m.item(crate::os_menu::OsMenuItem::new(label.clone()).on_click(move |_, w, cx| {
+                        if fields {
+                            ed.update(cx, |this, cx| this.insert_note_field(&inp, &token, w, cx));
+                        } else {
+                            inp.update(cx, |s, cx| s.insert(token.clone(), w, cx));
+                        }
+                    }));
                 }
                 m
             }
@@ -286,15 +439,22 @@ impl DrawingEditor {
             .tooltip(crate::ui::tooltip("Insert symbol"))
             .child(div().size(px(28.)).flex().items_center().justify_center().text_size(px(17.)).text_color(gpui_kit::rgb(0x333333)).child("Ø"))
             .child(crate::ui::glyph("drawing-tool-caret", 12., gpui_kit::rgb(0x000000)));
-        // Text format / Date time format: for the property at the caret.
-        let at = field_at(&text, cursor);
-        let is_date = at.as_ref().is_some_and(|(_, k)| is_date_field(k));
+        // Text format / Date time format: for the property at the caret (a
+        // field shown as its value, or a typed token).
+        let shown_at = self.note_field_at(&input, cursor);
+        let at = if shown_at.is_some() { None } else { field_at(&text, cursor) };
+        let key_at = shown_at.as_ref().map(|f| f.1.clone()).or_else(|| at.as_ref().map(|a| a.1.clone()));
+        let is_date = key_at.as_ref().is_some_and(|k| is_date_field(k));
         let reformat = |fmts: Vec<(String, String)>| {
-            let (inp, range, key) = (input.clone(), at.as_ref().map(|a| a.0.clone()), at.as_ref().map(|a| a.1.clone()).unwrap_or_default());
+            let (inp, range, key, ed, field) = (input.clone(), at.as_ref().map(|a| a.0.clone()), key_at.clone().unwrap_or_default(), ed.clone(), shown_at.as_ref().map(|f| f.0));
             move |mut m: crate::os_menu::OsMenu, _: &mut Window, _: &mut Context<crate::os_menu::OsMenu>| {
                 for (label, fmt) in &fmts {
-                    let (inp, range, tok) = (inp.clone(), range.clone(), if fmt.is_empty() { format!("{{{key}}}") } else { format!("{{{key}|{fmt}}}") });
+                    let (inp, range, tok, ed) = (inp.clone(), range.clone(), if fmt.is_empty() { format!("{{{key}}}") } else { format!("{{{key}|{fmt}}}") }, ed.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(label.clone()).on_click(move |_, w, cx| {
+                        if let Some(i) = field {
+                            ed.update(cx, |this, cx| this.reformat_note_field(&inp, i, tok.clone(), w, cx));
+                            return;
+                        }
                         let Some(r) = range.clone() else { return };
                         inp.update(cx, |s, cx| {
                             let mut v = s.value().to_string();
@@ -310,16 +470,16 @@ impl DrawingEditor {
         };
         let text_formats: Vec<(String, String)> = TEXT_FORMATS.iter().map(|(f, n)| (n.to_string(), f.to_string())).collect();
         let date_formats: Vec<(String, String)> = DATE_FORMATS.iter().map(|f| (f.to_string(), f.to_string())).collect();
-        let tf_on = at.is_some() && !is_date;
+        let tf_on = key_at.is_some() && !is_date;
         let tf_btn = popup("note-tf", "note-text-format", "Text format", tf_on, cx);
         let df_btn = popup("note-df", "note-date", "Date time format", is_date, cx);
         let row3 = h_flex()
             .h(px(30.))
             .pl(px(1.))
             .gap(px(2.))
-            .child(symbol_btn.os_dropdown_menu("note-symbol-dd", false, insert_menu(symbols)))
-            .child(popup("note-dprop", "note-drawing-prop", "Insert drawing property", true, cx).os_dropdown_menu("note-dprop-dd", false, insert_menu(drawing_props)))
-            .child(popup("note-sprop", "note-sheet-prop", "Insert sheet reference property", true, cx).os_dropdown_menu("note-sprop-dd", false, insert_menu(sheet_props)))
+            .child(symbol_btn.os_dropdown_menu("note-symbol-dd", false, insert_menu(symbols, false)))
+            .child(popup("note-dprop", "note-drawing-prop", "Insert drawing property", true, cx).os_dropdown_menu("note-dprop-dd", false, insert_menu(drawing_props, true)))
+            .child(popup("note-sprop", "note-sheet-prop", "Insert sheet reference property", true, cx).os_dropdown_menu("note-sprop-dd", false, insert_menu(sheet_props, true)))
             .child(if tf_on { tf_btn.os_dropdown_menu("note-tf-dd", false, reformat(text_formats)).into_any_element() } else { tf_btn.into_any_element() })
             .child(if is_date { df_btn.os_dropdown_menu("note-df-dd", false, reformat(date_formats)).into_any_element() } else { df_btn.into_any_element() });
 
@@ -381,5 +541,33 @@ impl DrawingEditor {
             rows.push(row4.into_any_element());
         }
         rows
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NoteFields;
+
+    /// "x" + the field "AB" ({k}) + "y": typing around the field moves it,
+    /// typing in it makes it plain text.
+    #[test]
+    fn note_fields_follow_edits() {
+        let at = |last: &str| NoteFields { editor: None, spans: vec![(1..3, "{k}".into())], last: last.into() };
+        // Typed before the field (caret after the new "A"): it moves.
+        let mut f = at("xABy");
+        f.follow("xAABy", 2);
+        assert_eq!(f.tokens("xAABy"), "xA{k}y");
+        // Typed right after it: it stays.
+        let mut f = at("xABy");
+        f.follow("xABBy", 4);
+        assert_eq!(f.tokens("xABBy"), "x{k}By");
+        // Backspace into it: plain text.
+        let mut f = at("xABy");
+        f.follow("xAy", 2);
+        assert_eq!(f.tokens("xAy"), "xAy");
+        // A multi-byte character before it.
+        let mut f = at("xABy");
+        f.follow("Øx ABy", 3);
+        assert_eq!(f.tokens("Øx ABy"), "Øx {k}y");
     }
 }

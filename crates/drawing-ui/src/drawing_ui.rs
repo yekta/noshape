@@ -242,7 +242,10 @@ impl DrawingEditor {
         {
             style.leaders.push(l);
         }
+        // Properties show as their values (live, qa DWG-PROPERTY-FIELD).
+        let (text, fields) = self.note_shown(&text);
         let input = self.textarea(&text, 5, window, cx);
+        self.attach_note_fields(&input, fields, cx);
         // Tab moves the text to the next tab stop of the ruler.
         input.update(cx, |s, cx| s.set_tab_size(gpui_kit::component::input::TabSize { tab_size: 4, hard_tabs: true }, cx));
         let height = self.input(&crate::drawing_note::note_height_text(h, self.drawing.units_mm), window, cx);
@@ -281,7 +284,7 @@ impl DrawingEditor {
         let Some(panel) = self.panel.take() else { return };
         match panel {
             Panel::Note { input, edit, pos, height, style, field } => {
-                let text = input.read(cx).value().to_string();
+                let text = self.note_text(&input, cx);
                 let h = crate::drawing_note::parse_note_height(&height.read(cx).value(), self.drawing.units_mm);
                 if let Some(key) = field {
                     self.edit_sheet("Edit title block", cx, |s| noshape_scene::drawing_tools::set_title_field(s, &key, text.trim_end()));
