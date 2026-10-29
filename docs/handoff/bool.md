@@ -472,6 +472,14 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - Tests: kernel T1 `brep_replay::brep_parts_with_tilted_holes_match_occt` (24 Booleans on plates with a tilted
   hole, 19 taken, as OCCT).
 
+## Narrower grey band (10-29 17:30)
+- `GREY` 10 → 4 (distances in (tol, 4 tol] ambiguous). OCCT merges within the tolerances' sum, which `tol` already
+  is; the band only guards our rounding. Replays, all 0 differ: main 638 (+4), corpus2 508 (+4), corpus3 513 (+2),
+  corpus4 551 (+2), corpus5 642 (+10), corpus6 595 (+10), Shell's 70, direct 52.
+- Also: degenerate edges of a free-form face (the surface closing at a point) bring their curves on it; a piece
+  takes its curve on a free-form face from whichever of its origins is that face's own edge.
+- The thread fused with its rod stays parked: past the grey band it stops at a sliver near the rod's end.
+
 ## Next
 Corpus6 (10-29 13:30, recorded OCCT time of what the Rust path still declines, loaded machine): curved edges
 32.8 s (73: helical B-spline sweeps against rods ~15 s in 3, fillet slabs), one slab fuse with an internal face

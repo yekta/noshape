@@ -372,7 +372,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       for (TopExp_Explorer x(ff, TopAbs_EDGE); x.More(); x.Next())
       {
         const TopoDS_Edge e = TopoDS::Edge(x.Current().Oriented(TopAbs_FORWARD));
-        if (done.Contains(e) || BRep_Tool::Degenerated(e))
+        if (done.Contains(e))
           continue;
         done.Add(e);
         const bool closed = BRep_Tool::IsClosed(e, ff);

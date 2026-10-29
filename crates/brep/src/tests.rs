@@ -172,8 +172,11 @@ fn apart_tools_cut_two_holes() {
 #[test]
 fn near_coincidences_decline() {
     let a = cuboid((0.0, 0.0, 0.0), (1.0, 1.0, 1.0));
-    let b = cuboid((0.5, 0.5, 1.0 + 1e-6), (1.5, 1.5, 2.0));
+    let b = cuboid((0.5, 0.5, 1.0 + 3e-7), (1.5, 1.5, 2.0));
     assert!(boolean(Op::Fuse, &[&a, &b], TOL).is_err());
+    // Ten times the tolerance apart: clearly apart (two solids).
+    let b = cuboid((0.5, 0.5, 1.0 + 1e-6), (1.5, 1.5, 2.0));
+    assert_eq!(boolean(Op::Fuse, &[&a, &b], TOL).unwrap().body.solids.len(), 2);
 }
 
 #[test]

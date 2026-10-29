@@ -606,6 +606,8 @@ impl Ctx<'_> {
             let c = free::scaled(pc, su, sv);
             let (a, b) = match s.g {
                 Geo::Nurbs { t0, t1, .. } => (t0, t1),
+                // (A degenerate edge (the surface closing at a point): its whole curve on the face.)
+                Geo::Apex => (*pt0, *pt1),
                 _ => {
                     // A piece of a straight or round edge: its ends' parameters on the edge's curve on the face.
                     let whole = C2::Nurbs { c: c.clone(), t0: *pt0, t1: *pt1 };
@@ -2214,7 +2216,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         for &si in &segs {
             let s = sedges[si].seg;
             for copy in 0..if seams.contains(&si) { 2 } else { 1 } {
-                let c = cx.c2_of(f, &s, copy, sedges[si].origins.first().copied())?;
+                // (The origin that is this face's own edge: its curve on a free-form face is that edge's.)
+                let own = sedges[si].origins.iter().copied().find(|&e| cx.faces[f].edges.iter().any(|x| x.0 == e)).or(sedges[si].origins.first().copied());
+                let c = cx.c2_of(f, &s, copy, own)?;
                 let mut ends = [0u32; 2];
                 for (k, (w, q)) in [(s.v[0], c.start()), (s.v[1], c.end())].into_iter().enumerate() {
                     // A vertex on a seam (or a cone's apex) is at two places in the parameter plane.
