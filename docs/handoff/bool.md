@@ -108,6 +108,12 @@ in the face's parameter plane, and unify_same_domain then doesn't merge it with 
 the order. With that, merge_check (and `set_rust_boolean_merged_after`) is gone: main corpus 451, fresh **434 of
 692**, Shell's **48 of 85**, corpus3 439 of 698 (vs OCCT): all 0 differ incl. unify.
 
+Numbers at 10-29 03:20 (tolerant inputs back to 1e-5; a face piece's inside point tried elsewhere when a ray
+passes exactly between two curves; the shared-vertex check one map): main corpus **453 of 972**, fresh 432 of
+692, Shell's 44 of 85, corpus3 (recorded with it on, vs OCCT) 437 of 698: all 0 differ incl. unify. No case is
+slower than OCCT (the least gain 3.8×). Declining costs most on the 999-instance pattern fuses: ~2.4 s of Rust
+before OCCT's ~120 s.
+
 The 30-feature part's edit commit (`regen_profile::edit_commit_profile`, dev build, load 15–19, 10-29 01:44,
 with everything above): Rust Boolean on 102, 124 ms (features 81, 90); off 158, 166 ms (features 130, 134). Hole
 1 15 → 8.5 ms, Linear pattern 1 12 → 4 ms, Boss 6 9 → under 3.5 ms; the chamfers and fillets are now most of it.
