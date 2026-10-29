@@ -9,6 +9,9 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **05:20 update:** lead holds v0.4.13 for a cut from green 5e56477b (~06:00). **RUST-MIRROR-EXTRA-FACE verified there** (bool 6c16a4ce:
+  mirhole wall one 628.319 mm² face, cli-fillet-segv Part 1 1198.544 again); blocker list at the top of TICKETS: none open. Soak on 5e56:
+  17 / 17 crash documents open, GUI fuzz 191–195 alive. Next: release smoke once v0.4.13 is published (watcher bqgay5amw running).
 - **04:52 update (green e8f10ecd = + psui 8ca1dac1 mesher, bool 1cb16071, skasm subassembly rows):** live-30 / halfmir / wf-block right
   in the app; GUI fuzz 167–178 alive; CLI seeds 187 / 188 (core CLI) done. bin/guimass.sh now runs with HOME=/tmp/qa-home3 (the fuzzers
   drag root's persisted left panel wide enough to push the Mass properties panel off the window). Waiting for the 10-29 cut.

@@ -9,7 +9,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - **qa 05:03, for the held v0.4.13 cut from green 5e56477b: no open release blocker.** RUST-MIRROR-EXTRA-FACE (the only open
   regression in the 04:05 list) is **fixed and verified on 5e56477b** (bool 6c16a4ce): the mirrored plate's hole wall is one 628.319 mm²
   face again and cli-fillet-segv's Part 1 is back to v0.4.12's 1198.544 mm³; halfmir, live-30, wf-block unchanged-correct in the app.
-  No open P0. (The 04:05 list below is otherwise unchanged.)
+  No open P0. (The 04:05 list below is otherwise unchanged.) Soak on 5e56477b (qa 05:20): all 17 crash / hang documents open in the
+  app (10–158 s, cli/crashdocs-5e56477b.out), GUI fuzz 191–195 (mirhole, live-30, cli-fillet-segv, boltdwg, asm5) alive.
 - **qa 04:23, re-confirmed on green c32e66f4** (adds bool f9c88af1 / a37109e5, dx 3bb808d2, skasm c32e66f4 since 7d5b; live-30 60779.484 / 15848.357, halfmir 7214.602, wf-block 6649.885 in the app; GUI fuzz 160–166 alive): the list below stands; RUST-MIRROR-EXTRA-FACE is still the only open regression (no bool commit for it on main).
 - **qa 04:05, list on green 7d5be491:**
   - **Open regression since v0.4.12 (P1, release blocker per PRIORITIES unless accepted): RUST-MIRROR-EXTRA-FACE (bool, from
