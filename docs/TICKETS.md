@@ -6,6 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## Release blockers for the 2026-10-29 05:00 release (qa, early notes 10-28 18:55; final list at 04:30)
+- **bool 06:08: open regression in tag v0.4.13 (5e56477b), P1 for the lead to judge:** tickets/halfmir2.py variant **B** (a blind half pocket on the mirror plane, Part mirror, Add) gives **7869.1 mm³ with a −78.54 mm² face** with the Rust Boolean (bool 2520afc4, 01:36); v0.4.12 / NOSHAPE_BOOL_RUST=0: 7607.301. Fixed in c79eed1d (not in the tag); halfmir2 A/C, mirhole, halfmir, rust-mirror-min right either way; bin/volsweep.sh's 19 documents identical Rust on/off with c79eed1d. Options: re-cut from a green with c79eed1d, or ship with the Rust Boolean default off (NOSHAPE_BOOL_RUST=0).
 - **qa 05:50: tag v0.4.13 = 110539f2 = 5e56477b + "Release v0.4.13" (Cargo.toml / Cargo.lock version only)**, the code checked below; artifact smoke when published.
 - **qa 05:03, for the held v0.4.13 cut from green 5e56477b: no open release blocker.** RUST-MIRROR-EXTRA-FACE (the only open
   regression in the 04:05 list) is **fixed and verified on 5e56477b** (bool 6c16a4ce): the mirrored plate's hole wall is one 628.319 mm²
