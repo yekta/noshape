@@ -9,6 +9,14 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **18:13 update (green 0cffc7ad = + psui d5ae3ded own mesher step 5d, dx 0cffc7ad / ed5a2a24):** verified DWG-GROUP-ANNOTATION-RULE,
+  DWG-LINE-COPY, DWG-CIRCLE-FACETS, DWG-CONSTRAINT-PRESELECT and DWG-INFO-TOASTS (c) (the cross-document paste bubble stays until ×,
+  one bubble on a repeat). DWG-TOOL-HINTS-PREVIEW: Note half fixed (NOTE placeholder, no hint text); Datum / GD&T previews still open.
+  Mesher 5d A/B (bin/meshab.sh): bolt / wf / tr / torus / big-plate 0 px, live-30 6 px, cone 285 px (= since 0f5f); against 5f3d only the
+  Hole table button gone on documents without a Hole (2332 px, the HOLE-TABLE-BUTTON fix). live-30 after 6 seeded Extrude 1 depth edits
+  (bin/editloop3.sh, ELSEED=7, ELSHOT): own vs OCCT 4 px, preview totals on par. GUI fzloop seeds through 593 alive; CLI fuzz 346–365
+  on main's Rust (bool 12:13 CLI) running, 346 clean; Rust-vs-OCCT boolmir 121–135, boolrand 76–90, boolgrid 56–70 running
+  (cli/rg1213b.summary). AGENT-ELLIPSE-DIM-VALUE still waits for a CLI of main.
 - **17:46 update:** **GUARD-SEGV-MALLOC-DEADLOCK verified** on core's 2ac952ce + 8311f20f: seeds 189 ×2 / 151 / 152 / 174 all 106 steps, no guard
   trace (no fault at all). Still in v0.4.13 / v0.4.14 (the next release has the fix through main: 24daf867, 45791441, 8311f20f).
 - **17:22 update (green 1888c5a1 = + core 8311f20f Shell / Draft on their own copy, dx ac9caf31):** Draft / Shell / mirror documents unchanged
