@@ -120,6 +120,16 @@ Big targets (10-29 04:00): the Rust path runs after the local Boolean, so a targ
 is one the local Boolean declined: no longer declined here (db5f2f3d 1004 faces, 99 tools: 178 ms vs OCCT 865;
 11b69a56 412 faces: 9 vs 88 ms; both as OCCT).
 
+RUST-MIRROR-EXTRA-FACE (qa P1, 10-29 06:30): a part mirrored onto itself (Add) kept its hole wall in two after
+the model's unify_same_domain (8 faces, OCCT and live 7). The wall's halves are a cylinder and its mirror image
+(left-handed); OCCT's unify goes by the order of a seam's uses in the loop, and on a left-handed surface ours ran
+the other way round from OCCT's. A face going round a left-handed cylinder or cone now lists its loops' edges in
+the opposite order: mirhole 7 faces (one 628.319 mm² wall), rust-mirror-min 19 faces, as OCCT. Not for a part of
+one (no seam): then halfmir's half walls merged into a reversed face (7738.201 mm³, as OCCT's wrong result,
+HALF-MIRROR-HOLE-INVERTED); with ours it stays right (7214.602, 7 faces). The rod mirrored across its end
+(CYL-UNIFY-OPPOSITE) stays one face (= live). The replay's unify check would flag a halfmir-like case (OCCT's
+unify is wrong there); none in the corpora. T1 case adf98991 (mirhole's fuse). All corpora 0 differ.
+
 A line along a drill's axis touches its tip's cone only at the apex, a vertex: that vertex is the cut there
 (10-29 06:00; it was declined as touching). Main corpus **613 of 972**, fresh 490 of 692, corpus3 497 of 698: 0
 differ.

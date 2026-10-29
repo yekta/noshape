@@ -525,16 +525,24 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         bb.UpdateEdge(e, c_up, c_down, s, loc, BRep_Tool::Tolerance(e));
       }
     }
+    // Built on the surface's side: a reversed face's edges the other way round, in the same order; a face
+    // going round (using its seam twice) a left-handed cylinder or cone (a mirrored one: its angles run the
+    // other way from ours) in the opposite order. As OCCT's: unify_same_domain goes by the order of a seam's
+    // uses (Shell's slab fuses; a part mirrored onto itself kept its hole wall in two, RUST-MIRROR-EXTRA-FACE).
+    // A part of a mirrored one keeps ours (the other way, halfmir's half walls merged into a reversed face).
+    std::vector<uint32_t> used;
+    for (uint32_t q = b.loop_uses[b.face_loops[i]]; q < b.loop_uses[b.face_loops[i + 1]]; ++q)
+      used.push_back(b.uses[q] / 2);
+    std::sort(used.begin(), used.end());
+    const bool mirrored = round && !frame.Direct() && std::adjacent_find(used.begin(), used.end()) != used.end();
     for (uint32_t l = b.face_loops[i]; l < b.face_loops[i + 1]; ++l)
     {
       TopoDS_Wire w;
       bb.MakeWire(w);
       const uint32_t u0 = b.loop_uses[l], u1 = b.loop_uses[l + 1];
-      // Built on the surface's side: a reversed face's edges the other way round, in the same order (as
-      // OCCT's: unify_same_domain goes by the order of a seam's uses).
       for (uint32_t k = 0; k < u1 - u0; ++k)
       {
-        const uint32_t u    = b.uses[u0 + k];
+        const uint32_t u    = b.uses[mirrored ? u1 - 1 - k : u0 + k];
         const bool     back = (u % 2 == 1) != rev;
         bb.Add(w, es[u / 2].Oriented(back ? TopAbs_REVERSED : TopAbs_FORWARD));
       }
