@@ -842,6 +842,10 @@ fn paint_fastener(b: Bounds<Pixels>, pv: Preview, window: &mut Window) {
             stroke(&circle(ex, ey, r), false);
             stroke(&circle(ex, ey, r * 0.78), false);
         }
+        Shape::Standoff => {
+            stroke(&polygon(ex, ey, r, 6, 0.0), true);
+            stroke(&circle(ex, ey, r * 0.45), false);
+        }
     }
     // Side view: the head at the left (x 110), the shank to the right.
     let (sx, end) = (110.0f32, 216.0f32);
@@ -931,6 +935,12 @@ fn paint_fastener(b: Bounds<Pixels>, pv: Preview, window: &mut Window) {
             stroke(&circle(sx + 8.0, ey - r + 8.0, 8.0), false);
             stroke(&circle(sx + 8.0, ey + r - 8.0, 8.0), false);
             stroke(&[(sx + 8.0, ey - r), (sx + 8.0, ey - r + 16.0)], false);
+        }
+        // The hex collar, then the body.
+        Shape::Standoff => {
+            let (hr, x1) = (r * 0.85, sx + 8.0);
+            stroke(&[(sx, ey - r), (x1, ey - r), (x1, ey + r), (sx, ey + r)], true);
+            stroke(&[(x1, ey - hr), (end, ey - hr), (end, ey + hr), (x1, ey + hr)], false);
         }
     }
 }

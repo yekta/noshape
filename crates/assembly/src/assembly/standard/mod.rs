@@ -227,6 +227,13 @@ pub fn part_studio(spec: &StandardSpec) -> Option<PartStudio> {
     for (k, v) in &s.counts {
         f.params.set(k, ParamValue::Expr(ExprValue::new(format!("{v}"))));
     }
+    // Dimensions of the chosen length (a blind standoff's hole depth).
+    if let Some(over) = spec.length.as_ref().and_then(|l| s.length_dims.get(l)) {
+        for (k, v) in over {
+            f.params.set(k, mm(v * u));
+            chosen.insert(k.clone(), *v);
+        }
+    }
     // Hex sockets' drill point (live: ISO 140, inch 120 degrees; a form's
     // own angle wins: ASME socket countersunk 140).
     if c.shape == Shape::Screw && !form.contains_key("drill") {

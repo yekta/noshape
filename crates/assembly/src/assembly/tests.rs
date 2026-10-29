@@ -4701,6 +4701,55 @@ fn din_tapping_screws_have_live_lists_and_build() {
     }
 }
 
+/// NAS 1129 self-clinching standoffs as live's components (behaviours
+/// "skasm (2026-10-27) standard content gaps"): blind #2-56 x 0.312 = 17
+/// faces (PLANE 11, CYLINDER 4, CONE 2), 101.0945282 mm³ in 101.073 –
+/// 101.116, named with the hole depth; thru #2-56 = 18 faces (PLANE 11,
+/// CYLINDER 5, CONE 2), named without the length; live's studio default
+/// 96.4902037 mm³ has the minor diameter rounded to 0.067 in, the table's
+/// 0.0667 gives 96.5725. Every size and length regenerates.
+#[test]
+fn nas_1129_standoffs_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let faces = |b: &crate::regen::context::Body| {
+        let mut kinds = std::collections::BTreeMap::new();
+        for i in 0..b.faces.len() {
+            let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+                Surface::Plane(_) => "plane",
+                Surface::Cone { .. } => "cone",
+                Surface::Cylinder { .. } => "cylinder",
+                _ => "other",
+            };
+            *kinds.entry(k).or_insert(0) += 1;
+        }
+        kinds
+    };
+    for (name, length, part, kinds, vol) in [
+        ("Self-clinching blind standoff NAS 1129", "0.312", "Self-clinching blind standoff #2-56 x 0.312 x 0.156", [("cone", 2), ("cylinder", 4), ("plane", 11)], 101.073..=101.116),
+        ("Self-clinching thru standoff NAS 1129", "0.375", "Self-clinching thru standoff #2-56", [("cone", 2), ("cylinder", 5), ("plane", 11)], 96.55..=96.59),
+    ] {
+        let c = CATALOGUE.iter().find(|c| c.name == name).unwrap();
+        let mut spec = StandardSpec::new(c);
+        spec.length = Some(length.into());
+        assert_eq!(spec.part_name(), part);
+        let r = standard::regenerate(&spec).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let v = b.shape.volume().unwrap() * 1e9;
+        assert_eq!(faces(b), kinds.into_iter().collect(), "{name}: {v} mm³");
+        assert!(vol.contains(&v), "{name}: {v} mm³");
+        for s in &c.sizes {
+            for l in &s.lengths {
+                let mut spec = StandardSpec::new(c);
+                spec.set_size(&s.name);
+                spec.length = Some(l.clone());
+                let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{name} {} x {l}: {e}", s.name));
+                assert!(standard::part_body(&r).is_some(), "{name} {} x {l}", s.name);
+            }
+        }
+    }
+}
+
 /// ANSI commercial taper pins and slotted spring pins with live's whole size
 /// lists (its FSRules tables, behaviours "skasm (2026-10-27) standard content
 /// gaps": taper pins from #7/0, spring pins with 9/64, 5/8, 3/4); every size

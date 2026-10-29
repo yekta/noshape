@@ -2521,3 +2521,69 @@ export const socketShoulderScrew = defineFeature(function(context is Context, id
         const tip = revolveProfile(context, id + "drill", [{ "p" : rz(Z, top - definition.t) }, { "p" : rz(rc, top - definition.t) }, { "p" : rz(Z, top - definition.t - rc / tan(70 * degree)) }]);
         subtract(context, id + "cut", body, qUnion([sock, tip]));
     });
+
+/**
+ * Live's NAS 1129 self-clinching standoffs (raw /features): one revolved
+ * sketch hanging below z = 0 (live's "Near" on the top): the top recessed
+ * 0.002 in inside the clinch diameter dc, the hex s (its corners extruded,
+ * dc / 10 high), a clinch groove (0.95 dc, dc / 10 high) under it, the body dc
+ * down to l. Blind (thru 0): a minor-diameter hole hd deep from the bottom
+ * with a 135 degree drill point, its entrance chamfered (dmaj - dm) / 2.
+ * Thru (thru 1): the minor-diameter hole from the top, its entrance
+ * chamfered the same, and from the bottom a bore db lb long ending in a 45
+ * degree step.
+ */
+annotation { "Feature Type Name" : "Standoff" }
+export const standoff = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Thru" }
+        isInteger(definition.thru, { (unitless) : [0, 0, 100] } as IntegerBoundSpec);
+        annotation { "Name" : "l" }
+        isLength(definition.l, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dm" }
+        isLength(definition.dm, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dmaj" }
+        isLength(definition.dmaj, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "s" }
+        isLength(definition.s, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dc" }
+        isLength(definition.dc, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "hd" }
+        isLength(definition.hd, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "db" }
+        isLength(definition.db, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "lb" }
+        isLength(definition.lb, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+    }
+    {
+        const step = 0.002 * inch;
+        const g = definition.dc / 10;
+        const rh = definition.s / 2;
+        const rc = definition.dc / 2;
+        const rg = 0.95 * definition.dc / 2;
+        const rm = definition.dm / 2;
+        const ch = (definition.dmaj - definition.dm) / 2;
+        const l = definition.l;
+        const outer = [{ "p" : rz(rc, -step) }, { "p" : rz(rc, Z) }, { "p" : rz(rh, Z) }, { "p" : rz(rh, -g) }, { "p" : rz(rg, -g) }, { "p" : rz(rg, -2 * g) }, { "p" : rz(rc, -2 * g) }, { "p" : rz(rc, -l) }];
+        var segments;
+        if (definition.thru == 1)
+        {
+            const rb = definition.db / 2;
+            const lb = definition.lb;
+            segments = join(join([{ "p" : rz(rm + ch, -step) }], outer),
+                    [{ "p" : rz(rb, -l) }, { "p" : rz(rb, -l + lb) }, { "p" : rz(rm, -l + lb + (rb - rm)) }, { "p" : rz(rm, -step - ch) }]);
+        }
+        else
+        {
+            const apex = rm / tan(67.5 * degree);
+            segments = join(join([{ "p" : rz(Z, -step) }], outer),
+                    [{ "p" : rz(rm + ch, -l) }, { "p" : rz(rm, -l + ch) }, { "p" : rz(rm, -l + definition.hd) }, { "p" : rz(Z, -l + definition.hd + apex) }]);
+        }
+        revolveProfile(context, id + "body", segments);
+        // The hex (its corners outside the s / 2 collar): a hex ring round
+        // the top recess, united with the body.
+        const ring = prismZ(context, id + "hex", -g, g, polygonPoints(6, definition.s, 1));
+        subtract(context, id + "trim", ring, cylinderZ(context, id + "recess", -g - step, step, rc));
+        uniteAll(context, id);
+    });

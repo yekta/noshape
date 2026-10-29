@@ -310,9 +310,15 @@ impl StandardSpec {
             }
         }
         // "{l}" marks where live puts the length ("Socket head shoulder
-        // screw 6.5 x 10 x M5x0.8"); else it ends the name.
-        match &self.length {
-            Some(l) if label.contains("{l}") => label.replace("{l}", l),
+        // screw 6.5 x 10 x M5x0.8"); else it ends the name. A size may write
+        // a length its own way ("0.312 x 0.156"); some names have none.
+        let length = match &self.length {
+            Some(_) if component(self).is_some_and(|c| c.name_without_length) => None,
+            Some(l) => Some(self.size_row().and_then(|s| s.length_names.get(l).cloned()).unwrap_or_else(|| l.clone())),
+            None => None,
+        };
+        match length {
+            Some(l) if label.contains("{l}") => label.replace("{l}", &l),
             Some(l) => format!("{label} x {l}"),
             None => label.replace(" x {l}", ""),
         }

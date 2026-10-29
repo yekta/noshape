@@ -27,6 +27,8 @@ pub enum Shape {
     ShoulderScrew,
     /// A revolved hex socket shoulder screw as live's ISO 7379.
     SocketShoulderScrew,
+    /// NAS 1129 self-clinching standoffs (blind / thru).
+    Standoff,
 }
 
 impl Shape {
@@ -42,11 +44,12 @@ impl Shape {
             Shape::ORing => "oRing",
             Shape::ShoulderScrew => "shoulderScrew",
             Shape::SocketShoulderScrew => "socketShoulderScrew",
+            Shape::Standoff => "standoff",
         }
     }
     /// Whether the component has a length (bolts, screws, pins, keys).
     pub fn has_length(self) -> bool {
-        matches!(self, Shape::Screw | Shape::Pin | Shape::Key | Shape::ShoulderScrew | Shape::SocketShoulderScrew)
+        matches!(self, Shape::Screw | Shape::Pin | Shape::Key | Shape::ShoulderScrew | Shape::SocketShoulderScrew | Shape::Standoff)
     }
     /// Nuts, washers, rings fit over a shaft: auto-size rounds up.
     pub fn fits_over(self) -> bool {
@@ -127,6 +130,14 @@ pub struct Size {
     /// the first the default), by label.
     #[serde(default)]
     pub values: BTreeMap<String, Vec<String>>,
+    /// Dimensions that depend on the length too (live's length table: a
+    /// blind standoff's hole depth), by length.
+    #[serde(default)]
+    pub length_dims: BTreeMap<String, BTreeMap<String, f64>>,
+    /// How the part name writes a length when not as itself (live: "0.312 x
+    /// 0.156", the hole depth after it), by length.
+    #[serde(default)]
+    pub length_names: BTreeMap<String, String>,
 }
 
 /// How the Thread length list follows from the length.
@@ -161,6 +172,10 @@ pub struct Component {
     /// The length select's label when not "Length" (live: "Shoulder length").
     #[serde(default)]
     pub length_label: Option<String>,
+    /// Live's part name leaves the length out ("Self-clinching thru standoff
+    /// #2-56").
+    #[serde(default)]
+    pub name_without_length: bool,
     /// Material and Finish options when not the usual (live), the first
     /// the default.
     #[serde(default)]
