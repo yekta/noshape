@@ -9,6 +9,11 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **21:56 update (greens e7ae194e → 031394bc → 62befcf0):** **new P2 RUST-UNION-POINT-TOUCH**: the Rust Boolean unions a sphere
+  touching a box at one point into one 1413.097 mm³ part, OCCT keeps two (Info "no geometry change"); came with bool
+  863967f8…503730d7 (same on 9e3ff3d9, e7ae194e, 62befcf0); live asked (REQUESTS qa 21:5x). The other 38 no-op / touching /
+  tangent documents (cli/abe7.summary) equal. Verified FEATURE-MIRROR-COPY-FULL-DEPTH (core 419e41d0: 9000 mm³ in the app, v0.4.14
+  9500; bin/fmirkeep.py). CLI fuzz v0.4.14 through 398 clean.
 - **21:23 update (greens 9e22cea5 → 88f494a4 → 915a165b → 0307a4c7 → 503730d7 → 83fe08d2 → 6f227e4f → 9e3ff3d9):** bool's free-form
   steps (88f494a4 reversed faces, 503730d7 tolerant sub-shapes) and core f10201e7 (glue retry): app Rust-vs-OCCT over 67 documents
   (5 threads, 37 spheres / tori, 25 spline extrusions; cli/ab88.summary) all 0 px; mirror set and P0 repros 0 px on the newer green
