@@ -9,7 +9,7 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
-- **10:09 update (green 0f5f4f49):** **two new P0 Rust Boolean regressions (since v0.4.13, also in v0.4.14 and the green; right in v0.4.12
+- **10:08 update (green 0f5f4f49):** **two new P0 Rust Boolean regressions (since v0.4.13, also in v0.4.14 and the green; right in v0.4.12
   and with NOSHAPE_BOOL_RUST=0): RUST-MIRROR-NOTCH** (notched cylinder mirrored onto itself with Add: 523.599 instead of 785.398 mm³)
   and **RUST-HALF-POCKET-3** (blind half pocket on the mirror plane lost: 2976.438 instead of 2929.314); repros bin/cylnotch.py,
   bin/halfpock3.py. Found by **bin/boolmir.py** (random part + optional pocket / hole, then Part mirror Add or linear pattern Add,
