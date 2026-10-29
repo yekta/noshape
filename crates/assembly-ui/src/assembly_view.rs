@@ -3558,7 +3558,16 @@ impl AssemblyView {
                     cx.notify();
                 }))
             }))
-            .child(div().flex_none().when(dim, |d| d.opacity(0.5)).child(crate::assets::icon(&icon, 14., cx)))
+            // Live (request 1559, cf-6): a failing feature's icon carries the
+            // red "!" disc at its lower right.
+            .child(
+                div()
+                    .flex_none()
+                    .relative()
+                    .when(dim, |d| d.opacity(0.5))
+                    .child(crate::assets::icon(&icon, 14., cx))
+                    .when(!ok && !inactive, |d| d.child(div().absolute().right(px(-4.)).bottom(px(-4.)).child(crate::assets::icon(&icon_path("error"), 10., cx)))),
+            )
             .child(match self.rename_field(behaviors::RenameRow::Feature(id), cx) {
                 Some(field) => field,
                 None => suppressed_text(div().flex_1().truncate(), inactive).child(crate::ui::user_text(name.clone())).into_any_element(),
@@ -3567,7 +3576,6 @@ impl AssemblyView {
                 let n = name.clone();
                 d.child(div().id(SharedString::from(format!("mlim-{}", id.0))).child(crate::assets::icon(&icon_path("mate-limits"), 12., cx)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(format!("{n} has limits")).build(w, cx)))
             })
-            .when(!ok && !inactive, |d| d.child(div().size(px(6.)).rounded_full().bg(pal.error)))
             .when_some(hidden, |d, hidden| {
                 // Eye icon (shown on hover, or always while hidden) toggles the mate indicator.
                 d.child(
@@ -3688,13 +3696,22 @@ impl AssemblyView {
             .text_color(pal.text)
             .when(all_selected, |d| d.bg(pal.accent_soft))
             .hover(|d| d.bg(pal.panel_hover))
-            .child(div().w(px(16.)).flex_none().flex().justify_center().child(crate::assets::icon(&icon_path("assembly"), 16., cx)))
+            // Live (request 1559, cf-6): the error badge (the red ⬇ disc) sits
+            // on the icon's lower right; its tooltip (E15) "Assembly contains error".
+            .child(
+                div()
+                    .w(px(16.))
+                    .flex_none()
+                    .flex()
+                    .justify_center()
+                    .relative()
+                    .child(crate::assets::icon(&icon_path("assembly"), 16., cx))
+                    .when(has_error, |d| d.child(div().id("asm-error").absolute().right(px(-4.)).bottom(px(-4.)).child(crate::assets::icon(&icon_path("regen-error"), 11., cx)).tooltip(crate::ui::tooltip("Assembly contains error")))),
+            )
             .child(match self.rename_field(behaviors::RenameRow::Instance(InstanceId::ORIGIN), cx) {
                 Some(field) => field,
                 None => div().min_w_0().truncate().child(crate::ui::user_text(name)).into_any_element(),
             })
-            // Live E15: the badge's tooltip.
-            .when(has_error, |d| d.child(div().id("asm-error").flex_none().size(px(6.)).rounded_full().bg(pal.error).tooltip(crate::ui::tooltip("Assembly contains error"))))
             // Grounded: something in the assembly is fixed (Onshape's arrow onto ground).
             .when(grounded, |d| d.child(div().id("asm-grounded").flex_none().child(crate::assets::icon(&icon_path("list-grounded"), 20., cx)).tooltip(|w, cx| gpui_kit::component::tooltip::Tooltip::new("Assembly is grounded").build(w, cx))))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -4063,9 +4080,10 @@ impl AssemblyView {
                     .when(self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)), related_row)
                     .cursor_pointer()
                     .child(crate::ui::caret(mates_open))
+                    // Live (request 1559, cf-6): a red ⬇ disc before the name
+                    // while a mate is in error; its tooltip (E15) "Mate error".
+                    .when(mate_error, |d| d.child(div().id("mates-error").flex_none().child(crate::assets::icon(&icon_path("regen-error"), 16., cx)).tooltip(crate::ui::tooltip("Mate error"))))
                     .child(div().flex_1().child(format!("Mate features ({mate_count})")))
-                    // Live E15: the folder's badge reads "Mate error".
-                    .when(mate_error, |d| d.child(div().id("mates-error").flex_none().mr(px(4.)).size(px(6.)).rounded_full().bg(pal.error).tooltip(crate::ui::tooltip("Mate error"))))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         let key = vec![MATE_FEATURES_COLLAPSED];
                         if !this.expanded.remove(&key) {

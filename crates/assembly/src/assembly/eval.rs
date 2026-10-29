@@ -2004,7 +2004,8 @@ impl AssemblyEvaluator {
             } else if let Some(f) = failed {
                 Some(f)
             } else if !ok {
-                Some("Mate could not be solved (over-constrained or conflicting)".into())
+                // Live (request 1559): "Revolute 1 has error: Mate overdefines the assembly.".
+                Some("Mate overdefines the assembly.".into())
             } else {
                 None
             };
