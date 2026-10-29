@@ -9,6 +9,9 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **11:14 update (green 2bd06bb3 = + bool bc4f62f0 Shell slabs):** wf-block Shell 1 / 2.5 mm unchanged (2566.862 / 5045.965 in the app); the
+  two mirror P0s unchanged. Navigation 6.5–6.7 (drawing Z / Shift+Z, Ctrl+Shift+arrows, double middle click) verified. CLI fuzz 202–205
+  (v0.4.14) clean; 206–211 running.
 - **10:59 update (green fe405cb0 = + bool 491acf9a ellipse sections):** RUST-MIRROR-RIM-ERR **verified fixed on main** (mirror and
   pattern cases right in the app of 60ca6465 / fe405cb0; not in v0.4.14). RUST-HALF-POCKET-3 / RUST-MIRROR-NOTCH unchanged on fe405cb0;
   clue added: only Top-plane sketches mirrored across Right (circle seam inside the kept half). Interaction 2.3 (assembly click
