@@ -86,7 +86,12 @@ Looked at and left (10-29 01:40):
   the merge problem above: with the seam change, 02fb69425a58e283's result has the tool's cylinder face (z
   0.02–0.03) and the target's two partial faces on one cylinder meeting at a circle; OCCT's unify_same_domain
   merges all three on OCCT's result, two on ours. Same as Shell's bd16a559 (op_boolean's 13 such cases merge
-  alike). Representation (curves on the faces at that circle), not geometry: the next thing to find.
+  alike). Representation (curves on the faces at that circle), not geometry: the next thing to find. Found so
+  far: our pieces' curves on a partial cylinder can sit a turn or two up (u 4π–6π: Rust's gap angle isn't
+  reduced to [0, 2π) and nothing anchors a face with no input edge); reducing it got 02fb to OCCT's face count
+  after unify (10) but not its edges (21 vs 23), and didn't change bd16. Taking the window from the input
+  face's UV bounds instead made 02fb invalid (face 12, all its edges new). /root/bool-scratch/tools/brep_edges.py
+  lists a circle's edges' curves in a .brep (rough: trimmed 2D curves span lines).
 - Edges of two arguments crossing on a third's face (12, 3 s): only declining near a vertex of three arguments on
   that face takes 9 more but 2 Shell slab fuses differ (OCCT says a face generated vertices our crossing
   doesn't make and deletes an input vertex we modify, at x = 20 near a four-argument corner): the global rule
