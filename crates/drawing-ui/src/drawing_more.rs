@@ -184,9 +184,10 @@ impl DrawingEditor {
                 if self.datum_origin_click(window, cx) {
                     return true;
                 }
-                if let Some(p) = self.any_point(c) {
-                    self.tool = Tool::DatumTarget { anchor: Some(p) };
-                }
+                // On geometry, or in space (help datum: "Click in space to add
+                // a target"; drawing.md A33): a sheet point.
+                let p = self.any_point(c).unwrap_or(noshape_scene::drawing_tools::PickedPoint { view: noshape_model::drawing::SHEET_VIEW, p: [c[0] / 1000.0, c[1] / 1000.0], r: None });
+                self.tool = Tool::DatumTarget { anchor: Some(p) };
             }
             Tool::DatumTarget { anchor: Some(_) } => {
                 if let Some(a) = self.pending_annotation() {
