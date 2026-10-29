@@ -3394,3 +3394,19 @@ fn an_angular_label_dragged_past_an_edge_stays_there() {
     assert!(off(at_mid, 45.0) < 15.0 && off(at_drag, 180.0) < 15.0, "{at_mid} → {at_drag}");
     assert_eq!(lines2, lines + 1, "the arc carried round to the label");
 }
+
+/// A hole callout takes more leaders (live A56, qa
+/// DWG-HOLE-CALLOUT-ADD-LEADER): each runs from the same shoulder and ends
+/// in an arrowhead on its hole.
+#[test]
+fn a_hole_callout_takes_another_leader() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let view = drawing.sheets[0].views[0].id;
+    let second = [0.02, 0.0];
+    drawing.sheets[0].annotations.push(Annotation { id: 980, kind: AnnotationKind::HoleCallout { view, center: [0.0, 0.0], radius: 0.003, leaders: vec![Leader { view: Some(view), point: second, ..Default::default() }] }, position: [330.0, 240.0], ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+    let target = built.placement(view).unwrap().to_sheet(second);
+    let tip = |f: &&sheet::Fill2| f.points.iter().any(|p| (p[0] - target[0]).abs() < 1e-6 && (p[1] - target[1]).abs() < 1e-6);
+    assert!(built.geometry.fills.iter().any(|f| tip(&f)), "an arrowhead on the second hole");
+}
