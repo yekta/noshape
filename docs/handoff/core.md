@@ -41,9 +41,10 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   and letting ShapeFix add pcurves writes them into edges shared with the input shape (the data race b0e757f3
   removed); work on a copy (BRepBuilderAPI_Copy, its history composed) or give the new face fresh edges sewn in.
 - Speed table refreshed from perf.yml run 40796942944 (release): the fin under the 400-fin plate 40–64 ms (< 150 met).
-- Parallel pairs: branch agent/core-pairs-on rebased on 16139489 (f83bf5f4; the crash guard's BudgetSnapshot
-  restores the thread's pairs mode too); kernel tests green against /root/occt-core with libTKBO.a.0004-on3. Land
-  after the release with that TKBO swapped into /root/occt in the same step.
+- f93ac93c parallel pairs back on (after the release), with libTKBO.a.0004-on3 in /root/occt since 05:28. The land
+  first failed on vibe3: `a_budget_never_stops_a_call_inside_an_occt_thread_pool_loop` used OCCT's default pool,
+  which other tests' parallel Booleans had busy, so its loop ran on the caller alone (a serial job the budget may
+  stop); the test now has a pool of its own.
 
 ## Landed on main (10-26 / 10-27)
 - 81c8d9cd psb's face blend WIP (curved sides, live's message rule). a2b34ade: the elliptic boss as live (a sketch
@@ -142,7 +143,7 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   and the CLI died in ForceInterfEF / an IntTools_Context map on a pool worker, intermittently, as BOOL-THREAD-CRASH
   did with whole booleans parallel); ReduceIntersectionRange's E/E interferences indexed by new vertex (serial,
   stays on). So the knurl is back near its serial time unless the variable is set.
-- Parallel pairs back (10-29, after the release): 0004's flag off by default in
+- f93ac93c Parallel pairs back (10-29, after the release): 0004's flag off by default in
   OCCT, the kernel's boolean() turns it on (NOSHAPE_BOP_PAIRS_PARALLEL=0 off), and run_budgeted turns it off for
   its thread while a budget runs (`noshape_bop_set_pairs_parallel_here`): a worker's work is out of a CPU
   budget's reach (DRAFT-BUDGET-POOL), and no budget jumps race the pool. Checked in /root/occt-core +
