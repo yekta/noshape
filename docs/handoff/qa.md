@@ -9,6 +9,10 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **01:43 update (green 0a2a8c87 = + bool 438ec212 / 838d3835):** **new P0 HALF-MIRROR-HOLE-INVERTED** (core; in v0.4.12 too): a half
+  plate with a half Ø10 hole on the mirror plane, Part mirror Add → 7738.201 mm³ / 2642.92 mm² instead of 7214.602 / 2957.08 (one hole
+  face reversed), in the app too (tickets/halfmir.py / .noshape); variants in tickets/halfmir2.py (half boss wrong with OCCT, right with
+  Rust). RUST-MIRROR-EXTRA-FACE unchanged on 0a2a. GUI fuzz 101 / 102 (c87f) alive; crash-doc sweep 12 of 17 open fine so far.
 - **01:35 update (green c87fd518 = + skasm 8ed2eeb4 / 24aaab66, psui mesher step 2 2ac8d541; not yet bool 438ec212 / 838d3835):**
   verified ASM-INTERFERENCE-NONE, ASM-OVERDEFINED-TEXT. Mesher step 2 A/B (wf-block, boltdwg): identical renders and triangle counts
   (could not confirm the toggle engages: no mesh.rust timer in the log). CLI seeds 176 / 177 fine, 178 / 179 running. Crash-doc
