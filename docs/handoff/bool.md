@@ -390,6 +390,25 @@ bool_corpus_replay and export:: (24) pass.
   `a_cone_halved_through_its_axis` (now with the off-axis cut).
 - Replays all 0 differ: main 615, corpus2 485, corpus3 492, corpus4 528, corpus5 609, corpus6 566, Shell's 70.
 
+## P0 RUST-MIRROR-NOTCH / RUST-HALF-POCKET-3 (qa 10-29 10:03, fixed 13:20)
+- Not the Booleans (every one matched OCCT): the unify after them. ShapeUpgrade_UnifySameDomain's result, where
+  faces on one cylinder (cone, ...) merge, depends on where those faces' wires start: the notched cylinder fused
+  with its mirror gave the solid of 2/3 its volume (a merged face more than a turn round) for 3 of 8 starts of one
+  seamed wire, OCCT's own start among the good ones only by luck; the half pocket lost 2/3 of the pocket for 2 of 4
+  starts of a half cylinder's wire (OCCT's too). The Rust Boolean's wires start elsewhere than OCCT's, so it hit the
+  bad ones. USD also changed its input's shared edges in place (the Boolean result's OcShape then read the wrong
+  volume too).
+- Fix (core's unify, boolean.cpp `usd_kept_volume`): where two adjacent faces on one kind of periodic surface could
+  merge (`round_candidates`), USD runs on a copy and must keep the volume (1e-9); else again with those faces' wires
+  started 1..7 edges further on (`rotate_round_wires`); none keeping it: not unified. Costs a copy and two volumes
+  there. core: please review.
+- Also: new section circles take the frame of the surface they lie on (their parameter its angle, every piece of a
+  circle on one frame, as OCCT's; each piece's parameter started at 0 before).
+- Checked: qa's cylnotch / cylnotch-union / halfpock3 / halfpockunion / pocksweep (32 / 32) / halfmir2 A-C /
+  halfmir / mirhole right on the dev CLI; boolmir seeds 4 8 16 22 39 45 69 75 80 84 × 50 identical Rust on / off;
+  kernel and model T1. Test: kernel T1 `brep_replay::a_notched_cylinder_fused_with_its_mirror_unifies_whole`
+  (the app's notch cut, recorded: tests/data/brep/ad14557ce79005e1).
+
 ## Next
 Measured 10-29 07:37 on corpus5 (929 Booleans recorded from today's model and kernel tests, 105 s of OCCT time
 recorded): the Rust path takes 600, and what it leaves costs mostly:

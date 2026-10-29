@@ -810,6 +810,110 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
 // merged first by merge_planar).
 TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean);
 
+// Whether two adjacent faces on one kind of periodic surface (cylinders,
+// cones, ...) could be merged: there USD's result can depend on where their
+// wires start (below).
+bool round_candidates(const TopoDS_Shape& s, const UnifyScope* sc)
+{
+  const TopoDS_Shape& where = sc != nullptr ? TopoDS_Shape(sc->faces) : s;
+  ShapeAncMap         ef;
+  unique_ancestors(where, TopAbs_EDGE, TopAbs_FACE, ef);
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const ShapeList& fs = ef(i);
+    if (fs.Extent() != 2)
+      continue;
+    const TopoDS_Face a = TopoDS::Face(fs.First()), b = TopoDS::Face(fs.Last());
+    TopLoc_Location   la, lb;
+    const occ::handle<Geom_Surface> ga = BRep_Tool::Surface(a, la), gb = BRep_Tool::Surface(b, lb);
+    if (!ga.IsNull() && !gb.IsNull() && ga->DynamicType() == gb->DynamicType() && (ga->IsUPeriodic() || ga->IsVPeriodic()))
+      return true;
+  }
+  return false;
+}
+
+// `s` with each wire of its faces on a periodic surface listed from its k-th
+// edge on (the history of the change in `h`); null when no wire is that long.
+TopoDS_Shape rotate_round_wires(const TopoDS_Shape& s, int k, HHist& h)
+{
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape();
+  BRep_Builder                   bb;
+  bool                           any = false;
+  for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
+  {
+    const TopoDS_Face&              f = TopoDS::Face(fx.Current());
+    TopLoc_Location                 l;
+    const occ::handle<Geom_Surface> g = BRep_Tool::Surface(f, l);
+    if (g.IsNull() || !(g->IsUPeriodic() || g->IsVPeriodic()))
+      continue;
+    for (TopoDS_Iterator w(f); w.More(); w.Next())
+    {
+      std::vector<TopoDS_Shape> es;
+      for (TopoDS_Iterator e(w.Value(), false, false); e.More(); e.Next())
+        es.push_back(e.Value());
+      if ((int)es.size() <= k)
+        continue;
+      std::rotate(es.begin(), es.begin() + k, es.end());
+      TopoDS_Wire nw;
+      bb.MakeWire(nw);
+      for (const TopoDS_Shape& e : es)
+        bb.Add(nw, e);
+      nw.Closed(w.Value().Closed());
+      rs->Replace(w.Value().Oriented(TopAbs_FORWARD), nw);
+      any = true;
+    }
+  }
+  if (!any)
+    return TopoDS_Shape();
+  const TopoDS_Shape r = rs->Apply(s);
+  h                    = rs->History();
+  return r;
+}
+
+// ShapeUpgrade_UnifySameDomain where faces on one periodic surface would
+// merge. Its result there depends on where their wires start (a notched
+// cylinder fused with its mirror: 3 of 8 starts of one seamed wire, OCCT's own
+// among them, gave a solid of 2/3 its volume, a merged face more than a turn
+// round; a half pocket mirrored onto itself: 2 of 4 starts of a half cylinder's
+// wire lost 2/3 of the pocket), and it changes its input's shared edges in
+// place: qa's RUST-MIRROR-NOTCH and RUST-HALF-POCKET-3 (the Rust Boolean's wires
+// start elsewhere than OCCT's). So: on a copy, the volume kept, else again with
+// those wires started further on; none keeping it: not unified.
+TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
+{
+  GProp_GProps g0;
+  BRepGProp::VolumeProperties(s, g0);
+  const double v0 = g0.Mass();
+  for (int k = 0; k < 8; ++k)
+  {
+    BRepBuilderAPI_Copy cp(s, false, false);
+    TopoDS_Shape        in = cp.Shape();
+    HHist               hc = new BRepTools_History(to_list(std::vector<TopoDS_Shape>{s}), cp);
+    HHist               hr;
+    if (k > 0)
+    {
+      in = rotate_round_wires(in, k, hr);
+      if (in.IsNull())
+        break;
+    }
+    ShapeUpgrade_UnifySameDomain u(in, true, true, false);
+    u.Build();
+    GProp_GProps g1;
+    BRepGProp::VolumeProperties(u.Shape(), g1);
+    if (std::abs(g1.Mass() - v0) > 1e-9 * std::abs(v0))
+      continue;
+    if (hist.IsNull())
+      hist = new BRepTools_History();
+    hist->Merge(hc);
+    if (!hr.IsNull())
+      hist->Merge(hr);
+    if (!u.History().IsNull())
+      hist->Merge(u.History());
+    return u.Shape();
+  }
+  return s;
+}
+
 // NOSHAPE_UNIFY_CHECK=1: a scoped unify is checked against the whole one
 // (counts and volume; tests).
 void check_scoped_unify(const TopoDS_Shape& s0, const TopoDS_Shape& got)
@@ -870,6 +974,8 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
     return s;
   }
   lap = std::make_unique<KernelTimer>("unify.usd");
+  if (TopExp_Explorer(s, TopAbs_SOLID).More() && round_candidates(s, sc != nullptr ? &next : nullptr))
+    return usd_kept_volume(s, hist);
   ShapeUpgrade_UnifySameDomain u(s, true, true, false);
   u.Build();
   if (!u.History().IsNull())

@@ -421,3 +421,28 @@ fn brep_hyperbolas_match_occt() {
     // (The common of the narrow box and the widening cone: two solids with a void, declined.)
     assert!(taken >= 14, "{taken} taken; declined: {why_not:#?}");
 }
+
+/// qa's RUST-MIRROR-NOTCH (P0): a notched cylinder, its notch (r2, 5 deep up from its bottom) cut by noshape's own
+/// Boolean (the app's, recorded), fused with its mirror across x = 0, which fills the notch, then unified: the full
+/// cylinder in 3 faces. (ShapeUpgrade_UnifySameDomain's result depended on where the cut's seamed wire starts, OCCT's
+/// own order there only by luck, and it changed its input in place; the unify now checks the volume it keeps.)
+#[test]
+fn a_notched_cylinder_fused_with_its_mirror_unifies_whole() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/brep");
+    let c = load(&dir, "ad14557ce79005e1").unwrap();
+    set_rust_boolean_only(true);
+    let r = boolean(c.op, &c.objects, &c.tools, &c.opts).unwrap();
+    let path = last_boolean_path();
+    set_rust_boolean_only(false);
+    assert_eq!(path, "rust");
+    let m = r.shape.transformed(&Transform::Mirror(Plane::from_normal(DVec3::ZERO, DVec3::X))).unwrap();
+    let f = boolean(BooleanOp::Fuse, std::slice::from_ref(&r.shape), std::slice::from_ref(&m), &BooleanOptions::default()).unwrap();
+    let u = unify_same_domain(&f.shape).unwrap();
+    set_rust_boolean(None);
+    let full = std::f64::consts::PI * 25.0 * 10.0 * 1e-9;
+    for (what, s) in [("unified", &u.shape), ("fused, after the unify", &f.shape)] {
+        let v = volume_properties(s).unwrap().mass;
+        assert!((v - full).abs() < 1e-9 * full, "{what}: {v}");
+    }
+    assert_eq!(u.shape.count(ShapeType::Face), 3);
+}

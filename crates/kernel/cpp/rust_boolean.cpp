@@ -537,12 +537,14 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     {
       const gp_Pnt ctr(cv[1], cv[2], cv[3]);
       const gp_Dir n(cv[4], cv[5], cv[6]);
-      // Its parameter 0 at the start; on the surface's own x axis (a cylinder's seam) that axis exactly, as
-      // OCCT's section circles (a start a rounding off it tilts the circle and its pcurve's u goes below 0).
+      // In the frame of the surface it is a section of (its parameter the cylinder's or cone's angle), as
+      // OCCT's section circles: every piece of a circle on one frame. (Each from 0 at its start made
+      // unify_same_domain merge a cylinder's arcs into a face more than a turn round: qa's RUST-MIRROR-NOTCH,
+      // RUST-HALF-POCKET-3.) Else its parameter 0 at the start.
       gp_Vec x(ctr, p0);
       x -= gp_Vec(n) * x.Dot(gp_Vec(n));
       const gp_Vec own(cv[7], cv[8], cv[9]);
-      if (own.Magnitude() > 0.5 && x.Magnitude() > 0 && x.Angle(own) < 1e-12)
+      if (own.Magnitude() > 0.5 && std::abs(own.Dot(gp_Vec(n))) < 1e-9)
         x = own;
       c = new Geom_Circle(gp_Ax2(ctr, n, gp_Dir(x)), cv[10]);
       f = 0;
