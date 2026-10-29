@@ -9,6 +9,8 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **15:02 update (green fd0cc4e2 = + bool tilted-hole ellipse edges):** bin/mirsetgui.sh (now also the loft / spline mirrors) identical to
+  the previous green on every case. CLI fuzz 310–312 on main's Rust clean.
 - **14:41 update (greens 5df4b64e → 5a695829):** verified DWG-SHEETS-ROW-RENAME; psui mesher 5b A/B (torus.noshape new, live-30,
   wf-block, bracket24, cone): 0 / 6 / 0 / 0 / 285 px, unchanged. CLI fuzz 306–309 on main's Rust clean.
 - **14:15 update (green 6c106f19 = + bool 5acac8d2 B-spline faces in the Rust Boolean):** mirror set, P0 repros, rim cases, 7 Draft /
