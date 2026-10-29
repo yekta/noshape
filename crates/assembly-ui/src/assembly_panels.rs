@@ -1778,6 +1778,11 @@ impl AssemblyView {
                     .into_any_element(),
             );
         }
+        // The box belongs to the triad (live assembly.md R6): it goes with it
+        // (ASM-TRIAD-VALUE-STAYS: Esc / an empty click left it drawn).
+        if self.manip_value.as_ref().is_some_and(|mv| !mv.explode) && self.triad.is_none() {
+            self.manip_value = None;
+        }
         let mv = self.manip_value.as_ref()?;
         let pos = self.manip_box_pos(mv.handle, mv.center, cx)?;
         let input = mv.input.clone();
