@@ -171,6 +171,9 @@ pub fn template_sizes(p: &mut DrawingProps, ansi: bool) {
     (p.table_h_padding, p.table_v_padding) = if ansi { (inch(0.06), inch(0.06)) } else { (1.5, 1.5) };
     p.table_styles.hole_indicator_iso = !ansi;
     p.table_styles.hole_indicator_arrow = Some(if ansi { inch(0.18) } else { 2.5 });
+    // Dimensions › Gaps and extensions › Text alignment (live ~1377):
+    // ANSI Horizontal, ISO Align with dimension line (qa ANSI-TEXT-ALIGN-DEFAULT).
+    p.dim_text_horizontal = ansi;
     if ansi {
         (p.dim_text_height, p.dim_arrow, p.ann_text_height, p.ann_arrow) = (inch(0.12), inch(0.18), inch(0.12), inch(0.18));
         (p.dim_text_gap, p.dim_geometry_gap, p.dim_extension) = (inch(0.09), inch(0.0625), inch(0.08));
@@ -210,5 +213,18 @@ pub fn apply_template(drawing: &mut Drawing, sheet: usize, t: &DrawingTemplate) 
     // The units note follows the template.
     if let Some((_, v)) = drawing.sheets[sheet].title_block.fields.iter_mut().find(|(k, _)| k == "Units") {
         *v = units_note_of(units).to_string();
+    }
+}
+
+#[cfg(test)]
+mod text_alignment_tests {
+    /// ANSI templates read dimension text horizontally, ISO along the line.
+    #[test]
+    fn ansi_dimension_text_is_horizontal() {
+        let mut p = super::DrawingProps::default();
+        super::template_sizes(&mut p, true);
+        assert!(p.dim_text_horizontal);
+        super::template_sizes(&mut p, false);
+        assert!(!p.dim_text_horizontal);
     }
 }

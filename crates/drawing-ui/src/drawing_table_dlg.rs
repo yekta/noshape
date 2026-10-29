@@ -332,6 +332,12 @@ impl DrawingEditor {
         Some(
             v_flex()
                 .id("dr-table-dlg")
+                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
+                    if e.keystroke.key == "escape" {
+                        cx.stop_propagation();
+                        this.close_table_dlg(false, cx);
+                    }
+                }))
                 .absolute()
                 .top(px(DIALOG_TOP))
                 .left(px(self.dialog_left()))

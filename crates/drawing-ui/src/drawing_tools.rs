@@ -16,6 +16,11 @@ impl DrawingEditor {
     // ------------------------------------------------------------ tools
 
     pub fn set_tool(&mut self, tool: Tool, cx: &mut Context<Self>) {
+        // Live (request 1566, qa DWG-PANEL-ESC-STACK): starting a tool closes
+        // View properties first, its pending edits discarded.
+        if !matches!(tool, Tool::Select) {
+            self.view_props = None;
+        }
         self.woken_centers.clear();
         self.woken_points.clear();
         self.datum_on = None;
@@ -82,9 +87,19 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
-        if self.zoom_window.take().is_some() || self.rotate_to_edge.take().is_some() || self.align_views.take().is_some() || self.sheet_props.take().is_some() || self.shortcut_toolbar.take().is_some() || self.measure.take().is_some() || self.align_centermark.take().is_some() || self.painter.take().is_some() || self.cancel_inspection(cx) || self.cancel_hatch(cx) {
+        if self.zoom_window.take().is_some() || self.rotate_to_edge.take().is_some() || self.align_views.take().is_some() || self.sheet_props.take().is_some() || self.shortcut_toolbar.take().is_some() || self.measure.take().is_some() || self.align_centermark.take().is_some() || self.align_auto_centermark.take().is_some() || self.painter.take().is_some() || self.cancel_inspection(cx) || self.cancel_hatch(cx) {
             self.status = None;
             cx.notify();
+            return;
+        }
+        // View properties: one Esc closes it as a cancel (live request 1566).
+        if self.view_props.take().is_some() {
+            cx.notify();
+            return;
+        }
+        // The Table dialog: closed without placing.
+        if self.table_dlg.is_some() {
+            self.close_table_dlg(false, cx);
             return;
         }
         if self.insert.chooser.take().is_some() | std::mem::take(&mut self.insert.panel) {

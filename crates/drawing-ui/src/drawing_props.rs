@@ -1095,6 +1095,14 @@ impl DrawingEditor {
         Some(
             v_flex()
                 .id("dr-view-props")
+                // Esc with a field focused closes it too (live).
+                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
+                    if e.keystroke.key == "escape" {
+                        cx.stop_propagation();
+                        this.view_props = None;
+                        cx.notify();
+                    }
+                }))
                 .absolute()
                 .top(px(DIALOG_TOP))
                 // Beside the Sheets panel when it is open (it opened under it).

@@ -139,6 +139,14 @@ impl DrawingEditor {
         Some(
             v_flex()
                 .id("dr-table-tool")
+                // Esc (Rows has the focus): closed without placing (live
+                // request 1566, qa DWG-PANEL-ESC-STACK).
+                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                    if e.keystroke.key == "escape" {
+                        cx.stop_propagation();
+                        this.close_table_tool(false, window, cx);
+                    }
+                }))
                 .absolute()
                 .top(px(DIALOG_TOP))
                 .left(px(self.dialog_left()))
