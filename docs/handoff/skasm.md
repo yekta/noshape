@@ -142,11 +142,15 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    nothing and stays, "30" → "30 mm" selected; with nothing typed the other hint is active), `=#len` in a Line box (sketch_in builds on a studio
    prepared first). The value box's keys are bound per test App (entry_key_bindings). The harness
    is part-studio-ui only; assembly-ui could opt in the same way (dev-dependency on noshape-ui-test-support + gpui).
-4. Standard content (P3): ANSI taper pin crowned ends done 10-27 (live's rule from its B-rep alone: the seams l
-   apart, the large one at d/2, crown spheres symmetric; = live's volume / areas / bbox); DIN 7050 / 7051 /
-   967 / 923, ISO 7379, NASM 45938 + /4, NAS 1129 ×2, PEM ×52 need live's /features (~10-28 03:00); live's studio
-   default geometry for each is in behaviours "skasm (2026-10-27) standard content gaps" (faces, volumes) to test
-   against.
+4. Standard content (P3), 10-29: DIN 923 6e3b291b and ISO 7379 7cc04a30 as live's components (raw /features: revolved
+   profile = live's face types and volume; shoulderScrew / socketShoulderScrew script features, shoulder end at z = 0 =
+   live's "Near"); DIN 7050 / 7051 / 967 tapping screws 345bf2c5 with live's lists, names and table values on the
+   generic screw (generic cross recess and cone tip: live's drafted Type H / Z recess sketches and C / F / R tips are in
+   dom/skasm-sc-gaps/*_features.json to match next). A size label's "{l}" places the length ("… 6.5 x 10 x M5x0.8",
+   "…ST2.2x4.5"; 7049 repeated it before). Already there: DIN 6908 (flat, = live's volume), ISO 10512. Still missing:
+   NASM 45938 with self-locking threads, NASM 45938/4, NAS 1129 blind / thru, PEM ×52: FSRules + body details only (no
+   /features), so their geometry has to come from the B-rep (dom/skasm-sc-gaps, dom/skb-sc-fsrules PEM_*).
+   Earlier: ANSI taper pin crowned ends 10-27.
 5. Broken-sketch solve time: a constraint on qa's 438-entity fuzz sketch ~85–125 ms in the sketch crate (9
    exclusion attempts of ~15 ms, the failing component's LM each time). Candidate: retry only the failing component.
 6. Assembly fuzz (T2) `random_assembly_edits_never_panic`: `ASM_FUZZ_SEEDS=1..200 ASM_FUZZ_STEPS=120 cargo test -p
