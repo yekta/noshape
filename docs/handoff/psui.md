@@ -156,6 +156,7 @@ Open in psui's TICKETS: MIRROR-DIALOG-STATE (P3: (a) contradicted by live's own 
 live, REQUESTS psui 10-29 16:40, apply when answered); ROW-TOOLTIP-WIDE-PANEL (P2, waiting for qa's pointer
 path); API-VAR-REDEFINE (P3, the agent API's variable_create + model-data's variable_table::create: dx / core's
 code, not a UI change: left for them).
+18:20: d5ae3ded mesher 5d (CDT cache), cc73aaea display off the critical path (N06).
 
 Residuals found today: a paused dialog's Depth field
 shows a corner mark in live; Shift+wheel under xdotool loses events after the first (GPUI X11 resets the scroll
@@ -285,6 +286,13 @@ N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes
      pattern_second::timed_the_fin_plate_redisplays_after_the_fin): the display 52–60 ms (was 133–153), its mesh
      ~20 ms; the rest is display work outside meshing (N02's open item). perf.yml's mesher step now also times
      live-30's edit commits ("live-30 edit" rows).
+     **Runner numbers on 5d (perf 40924170859, Linux):** fins-400 open 246–251 → 21–22 ms (11.5–11.8×);
+     live-30 open 12.2–12.4 → 3.6–4.4 ms (~3×); live-30 edit_commit_profile's meshes 114.8 → 25–26 ms in all
+     (4.5×; that run's "over 1 meshes" was a miscount, fixed next).
+     cc73aaea: the display's first touches of a new part off its critical path: shown vertices classified
+     beside the tessellation (rayon::join in display.rs tessellate_body; ~12 ms on the fin plate), a big
+     shape's bounding box per face on OCCT's pool (kernel geom.cpp, the same box; 14.6 → ~3 ms). fins-400
+     after the fin: the display 52–60 → 25–34 ms; editing the fin: the whole edit 154–215 ms (load 10–30).
 0. **After the cold-start work: our own display mesher (lead 10-28 21:05, user-approved).** `brep::mesh` in crates/brep
    (bool's crate, its Body / Surface / Curve types): planes (polygons with holes), cylinders, cones, spheres, tori from
    their exact parameterisation, shared edge samples (watertight), the display's deflection rules; anything else
