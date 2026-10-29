@@ -479,7 +479,7 @@ impl AssemblyView {
         }
         let materials: Vec<String> = c.materials().iter().map(|s| s.to_string()).collect();
         params = params.child(row("Material", 27., Self::std_select("std-material", 146., spec.material().to_string(), materials, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.material = Some(v.to_string())), cx)));
-        let finishes: Vec<String> = c.finishes().iter().map(|s| s.to_string()).collect();
+        let finishes: Vec<String> = c.finishes_for(spec.material()).iter().map(|s| s.to_string()).collect();
         params = params.child(row("Finish", 27., Self::std_select("std-finish", 146., spec.finish().to_string(), finishes, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.finish = Some(v.to_string())), cx)));
         body = body.child(div().relative().child(params).child(Self::std_scrollbar("std-param-sb", &self.ui.std.param_scroll, 114., cx))).child(div().mt(px(5.)).child(rule()));
         // Part number / Description: read-only, 161 px, #eee on a #ccc underline.
@@ -842,7 +842,7 @@ fn paint_fastener(b: Bounds<Pixels>, pv: Preview, window: &mut Window) {
             stroke(&circle(ex, ey, r), false);
             stroke(&circle(ex, ey, r * 0.78), false);
         }
-        Shape::Standoff | Shape::FlushNut => {
+        Shape::Standoff | Shape::FlushNut | Shape::PemStandoff => {
             stroke(&polygon(ex, ey, r, 6, 0.0), true);
             stroke(&circle(ex, ey, r * 0.45), false);
         }
@@ -937,7 +937,7 @@ fn paint_fastener(b: Bounds<Pixels>, pv: Preview, window: &mut Window) {
             stroke(&[(sx + 8.0, ey - r), (sx + 8.0, ey - r + 16.0)], false);
         }
         // The hex collar, then the body.
-        Shape::Standoff | Shape::FlushNut => {
+        Shape::Standoff | Shape::FlushNut | Shape::PemStandoff => {
             let (hr, x1) = (r * 0.85, sx + 8.0);
             stroke(&[(sx, ey - r), (x1, ey - r), (x1, ey + r), (sx, ey + r)], true);
             stroke(&[(x1, ey - hr), (end, ey - hr), (end, ey + hr), (x1, ey + hr)], false);

@@ -31,6 +31,8 @@ pub enum Shape {
     Standoff,
     /// NASM 45938/4 self-clinching flush nut.
     FlushNut,
+    /// PEM® self-clinching standoffs.
+    PemStandoff,
 }
 
 impl Shape {
@@ -48,11 +50,12 @@ impl Shape {
             Shape::SocketShoulderScrew => "socketShoulderScrew",
             Shape::Standoff => "standoff",
             Shape::FlushNut => "flushNut",
+            Shape::PemStandoff => "pemStandoff",
         }
     }
     /// Whether the component has a length (bolts, screws, pins, keys).
     pub fn has_length(self) -> bool {
-        matches!(self, Shape::Screw | Shape::Pin | Shape::Key | Shape::ShoulderScrew | Shape::SocketShoulderScrew | Shape::Standoff)
+        matches!(self, Shape::Screw | Shape::Pin | Shape::Key | Shape::ShoulderScrew | Shape::SocketShoulderScrew | Shape::Standoff | Shape::PemStandoff)
     }
     /// Nuts, washers, rings fit over a shaft: auto-size rounds up.
     pub fn fits_over(self) -> bool {
@@ -91,6 +94,16 @@ pub struct Param {
     /// "{<label>}" (live: Sheet thickness "0.091-UP" -> "0.09").
     #[serde(default)]
     pub names: BTreeMap<String, String>,
+}
+
+/// A material's part-number type code and finish (PEM®).
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaterialCode {
+    pub code: String,
+    pub finish: String,
+    #[serde(default)]
+    pub finish_code: String,
 }
 
 /// A size of live's Size list whose configuration the server can't build
@@ -189,6 +202,12 @@ pub struct Component {
     pub materials: Option<Vec<String>>,
     #[serde(default)]
     pub finishes: Option<Vec<String>>,
+    /// PEM®: each material's type code and its one finish (live: Steel ->
+    /// "SO", Zinc plated, "ZI"; Stainless Steel -> "SOS", No finish). The
+    /// part name is the label with "{type}" filled in and the finish code
+    /// after it.
+    #[serde(default)]
+    pub material_codes: BTreeMap<String, MaterialCode>,
     #[serde(default)]
     pub params: Vec<Param>,
     pub sizes: Vec<Size>,
@@ -353,6 +372,15 @@ impl Component {
         match &self.finishes {
             Some(f) => f.iter().map(String::as_str).collect(),
             None => super::FINISHES.to_vec(),
+        }
+    }
+
+    /// Finish options with this material chosen (PEM®: the material's one
+    /// finish).
+    pub fn finishes_for(&self, material: &str) -> Vec<&str> {
+        match self.material_codes.get(material) {
+            Some(m) => vec![m.finish.as_str()],
+            None => self.finishes(),
         }
     }
 

@@ -120,15 +120,16 @@ fn apply_spec(mut spec: StandardSpec, c: &Component, a: &Args) -> Result<Standar
         let hit = lengths.iter().find(|x| ci_eq(x, l)).ok_or_else(|| OpError::param("length", &format!("one of {}", lengths.join(", "))))?;
         spec.length = Some(hit.clone());
     }
-    for (field, list) in [("material", c.materials()), ("finish", c.finishes())] {
-        if let Some(v) = a.opt_str(field)? {
-            let hit = list.iter().find(|x| ci_eq(x, v)).ok_or_else(|| OpError::param(field, &format!("one of {}", list.join(", "))))?;
-            if field == "material" {
-                spec.material = Some(hit.to_string());
-            } else {
-                spec.finish = Some(hit.to_string());
-            }
-        }
+    if let Some(v) = a.opt_str("material")? {
+        let list = c.materials();
+        let hit = list.iter().find(|x| ci_eq(x, v)).ok_or_else(|| OpError::param("material", &format!("one of {}", list.join(", "))))?;
+        spec.material = Some(hit.to_string());
+    }
+    // The finishes the chosen material offers (PEM®: one).
+    if let Some(v) = a.opt_str("finish")? {
+        let list = c.finishes_for(spec.material());
+        let hit = list.iter().find(|x| ci_eq(x, v)).ok_or_else(|| OpError::param("finish", &format!("one of {}", list.join(", "))))?;
+        spec.finish = Some(hit.to_string());
     }
     Ok(spec)
 }

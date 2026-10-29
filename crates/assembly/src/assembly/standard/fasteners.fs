@@ -2627,3 +2627,51 @@ export const flushNut = defineFeature(function(context is Context, id is Id, def
         const hole = revolveProfile(context, id + "hole", [{ "p" : rz(Z, hh + EPS) }, { "p" : rz(rm + ch + EPS, hh + EPS) }, { "p" : rz(rm, hh - ch) }, { "p" : rz(rm, -depth + ch) }, { "p" : rz(rm + ch + EPS, -depth - EPS) }, { "p" : rz(Z, -depth - EPS) }]);
         subtract(context, id + "cut", part, hole);
     });
+
+/**
+ * Live's PEM® self-clinching standoffs (raw /features), one revolved sketch
+ * hanging below z = 0 (live's "Near" on the top) plus the hex corners:
+ * the hex s, dc / 10 high, over an undercut 0.9333 dc for 0.13333 dc, then
+ * the body dc with two serration grooves (0.98 dc, dc / 30 wide, dc / 25
+ * apart) down to l. Form 0 (SO™ through-hole unthreaded): a bore db
+ * through, both entrances chamfered 45° out to 1.11 db.
+ */
+annotation { "Feature Type Name" : "PEM standoff" }
+export const pemStandoff = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Form" }
+        isInteger(definition.form, { (unitless) : [0, 0, 100] } as IntegerBoundSpec);
+        annotation { "Name" : "l" }
+        isLength(definition.l, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "s" }
+        isLength(definition.s, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dc" }
+        isLength(definition.dc, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "db" }
+        isLength(definition.db, NONNEGATIVE_LENGTH_BOUNDS);
+    }
+    {
+        const dc = definition.dc;
+        const g = dc / 10;
+        const rh = definition.s / 2;
+        const rc = dc / 2;
+        const ru = 0.9333 * dc / 2;
+        const rs = 0.98 * dc / 2;
+        const z1 = -g - 0.13333 * dc;
+        const w = dc / 30;
+        const gap = dc / 25;
+        const l = definition.l;
+        const rb = definition.db / 2;
+        const rt = 1.11 * definition.db / 2;
+        revolveProfile(context, id + "body", [
+                    { "p" : rz(rt, Z) }, { "p" : rz(rh, Z) }, { "p" : rz(rh, -g) }, { "p" : rz(ru, -g) }, { "p" : rz(ru, z1) },
+                    { "p" : rz(rc, z1) }, { "p" : rz(rc, z1 - gap) }, { "p" : rz(rs, z1 - gap) }, { "p" : rz(rs, z1 - gap - w) },
+                    { "p" : rz(rc, z1 - gap - w) }, { "p" : rz(rc, z1 - 2 * gap - w) }, { "p" : rz(rs, z1 - 2 * gap - w) }, { "p" : rz(rs, z1 - 2 * gap - 2 * w) },
+                    { "p" : rz(rc, z1 - 2 * gap - 2 * w) }, { "p" : rz(rc, -l) }, { "p" : rz(rt, -l) }, { "p" : rz(rb, -l + (rt - rb)) }, { "p" : rz(rb, -(rt - rb)) }
+                ]);
+        // The hex corners: a hex ring round the top of the bore, united.
+        const ring = prismZ(context, id + "hex", -g, g, polygonPoints(6, definition.s, 1));
+        subtract(context, id + "trim", ring, cylinderZ(context, id + "bore", -g - g, g, rt));
+        uniteAll(context, id);
+    });

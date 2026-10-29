@@ -323,11 +323,19 @@ impl StandardSpec {
             Some(l) => Some(self.size_row().and_then(|s| s.length_names.get(l).cloned()).unwrap_or_else(|| l.clone())),
             None => None,
         };
-        match length {
+        let mut name = match length {
             Some(l) if label.contains("{l}") => label.replace("{l}", &l),
             Some(l) => format!("{label} x {l}"),
             None => label.replace(" x {l}", ""),
+        };
+        // PEM®: the material's type code, then its finish code ("PEM SO-43.1-3 ZI").
+        if let Some(m) = component(self).and_then(|c| c.material_codes.get(self.material())) {
+            name = name.replace("{type}", &m.code);
+            if !m.finish_code.is_empty() {
+                name = format!("{name} {}", m.finish_code);
+            }
         }
+        name
     }
 
     /// Washer Series.
@@ -345,6 +353,10 @@ impl StandardSpec {
     }
 
     pub fn finish(&self) -> &str {
+        // PEM®: the material decides (live: Steel -> Zinc plated only).
+        if let Some(m) = component(self).and_then(|c| c.material_codes.get(self.material())) {
+            return &m.finish;
+        }
         self.finish.as_deref().unwrap_or_else(|| component(self).and_then(|c| c.finishes().first().copied()).unwrap_or(FINISHES[0]))
     }
 
@@ -352,6 +364,13 @@ impl StandardSpec {
     /// #10-24 x 0.25 Stainless Steel " (the part name, the material, the
     /// finish unless Plain).
     pub fn description(&self) -> String {
+        // PEM® (live request 1591): "PEM SOS-43.1-3   Stainless Steel No
+        // finish", "PEM SO-43.1-3  ZI Steel Zinc plated".
+        if let Some(m) = component(self).and_then(|c| c.material_codes.get(self.material())) {
+            let name = self.part_name();
+            let base = name.strip_suffix(&format!(" {}", m.finish_code)).filter(|_| !m.finish_code.is_empty()).unwrap_or(&name);
+            return format!("{base}  {} {} {}", m.finish_code, self.material(), m.finish);
+        }
         let plain = component(self).and_then(|c| c.finishes().first().copied()).unwrap_or(FINISHES[0]);
         let finish = if self.finish() == plain { "" } else { self.finish() };
         format!("{} {} {finish}", self.part_name(), self.material())

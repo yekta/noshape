@@ -1,1 +1,444 @@
-[]
+[
+ {
+  "standard": "PEM®",
+  "inch": false,
+  "components": [
+   {
+    "category": "Metric",
+    "class": "Self-clinching standoffs",
+    "name": "SO™/SOS™/SOA™/SO4™ Through-hole unthreaded standoffs",
+    "shape": "pemStandoff",
+    "form": {
+     "form": 0
+    },
+    "materials": [
+     "Stainless Steel",
+     "Steel",
+     "Aluminum",
+     "Hardened Stainless Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "SOS",
+      "finish": "No finish",
+      "finishCode": ""
+     },
+     "Steel": {
+      "code": "SO",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     },
+     "Aluminum": {
+      "code": "SOA",
+      "finish": "No finish",
+      "finishCode": ""
+     },
+     "Hardened Stainless Steel": {
+      "code": "SO4",
+      "finish": "No finish",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "3.1 ",
+      "label": "PEM {type}-43.1-{l}",
+      "d": 3.1,
+      "dims": {
+       "s": 4.8,
+       "dc": 4.2,
+       "db": 3.1
+      },
+      "lengths": [
+       "3",
+       "4",
+       "6",
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "18",
+       "20"
+      ]
+     },
+     {
+      "name": "3.1 (thick walled)",
+      "label": "PEM {type}-63.1-{l}",
+      "d": 3.1,
+      "dims": {
+       "s": 6.4,
+       "dc": 5.39,
+       "db": 3.1
+      },
+      "lengths": [
+       "3",
+       "4",
+       "6",
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "18",
+       "20"
+      ]
+     },
+     {
+      "name": "3.6 ",
+      "label": "PEM {type}-63.6-{l}",
+      "d": 3.6,
+      "dims": {
+       "s": 6.4,
+       "dc": 5.39,
+       "db": 3.6
+      },
+      "lengths": [
+       "3",
+       "4",
+       "6",
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "18",
+       "20"
+      ]
+     },
+     {
+      "name": "3.6 (thick walled)",
+      "label": "PEM {type}-83.6-{l}",
+      "d": 3.6,
+      "dims": {
+       "s": 7.9,
+       "dc": 7.12,
+       "db": 3.6
+      },
+      "lengths": [
+       "3",
+       "4",
+       "6",
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "18",
+       "20"
+      ]
+     },
+     {
+      "name": "4.1 ",
+      "label": "PEM {type}-84.1-{l}",
+      "d": 4.1,
+      "dims": {
+       "s": 7.9,
+       "dc": 7.12,
+       "db": 4.1
+      },
+      "lengths": [
+       "3",
+       "4",
+       "6",
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "18",
+       "20"
+      ]
+     },
+     {
+      "name": "5.1 ",
+      "label": "PEM {type}-85.1-{l}",
+      "d": 5.1,
+      "dims": {
+       "s": 7.9,
+       "dc": 7.12,
+       "db": 5.1
+      },
+      "lengths": [
+       "3",
+       "4",
+       "6",
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "18",
+       "20"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_THRU_HOLE_UNTHREADED_STANDOFF_MAIN, DATA_PEM_SELFCLINCHING_THRU_HOLE_UNTHREADED_STANDOFF_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 0478ad2a36ad7e4b7aa85da7; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   }
+  ]
+ },
+ {
+  "standard": "PEM®",
+  "inch": true,
+  "components": [
+   {
+    "category": "Unified",
+    "class": "Self-clinching standoffs",
+    "name": "SO™/SOS™/SOA™/SO4™ Through-hole unthreaded standoffs",
+    "shape": "pemStandoff",
+    "form": {
+     "form": 0
+    },
+    "materials": [
+     "Stainless Steel",
+     "Steel",
+     "Aluminum",
+     "Hardened Stainless Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "SOS",
+      "finish": "No finish",
+      "finishCode": ""
+     },
+     "Steel": {
+      "code": "SO",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     },
+     "Aluminum": {
+      "code": "SOA",
+      "finish": "No finish",
+      "finishCode": ""
+     },
+     "Hardened Stainless Steel": {
+      "code": "SO4",
+      "finish": "No finish",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "0.116 ",
+      "label": "PEM {type}-4116-{l}",
+      "d": 0.116,
+      "dims": {
+       "s": 0.187,
+       "dc": 0.165,
+       "db": 0.116
+      },
+      "lengths": [
+       "0.125",
+       "0.187",
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.437",
+       "0.5",
+       "0.562",
+       "0.625",
+       "0.687",
+       "0.75"
+      ],
+      "lengthNames": {
+       "0.125": "4",
+       "0.187": "6",
+       "0.25": "8",
+       "0.312": "10",
+       "0.375": "12",
+       "0.437": "14",
+       "0.5": "16",
+       "0.562": "18",
+       "0.625": "20",
+       "0.687": "22",
+       "0.75": "24"
+      }
+     },
+     {
+      "name": "0.116 (thick walled)",
+      "label": "PEM {type}-6116-{l}",
+      "d": 0.116,
+      "dims": {
+       "s": 0.25,
+       "dc": 0.212,
+       "db": 0.116
+      },
+      "lengths": [
+       "0.125",
+       "0.187",
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.437",
+       "0.5",
+       "0.562",
+       "0.625",
+       "0.687",
+       "0.75"
+      ],
+      "lengthNames": {
+       "0.125": "4",
+       "0.187": "6",
+       "0.25": "8",
+       "0.312": "10",
+       "0.375": "12",
+       "0.437": "14",
+       "0.5": "16",
+       "0.562": "18",
+       "0.625": "20",
+       "0.687": "22",
+       "0.75": "24"
+      }
+     },
+     {
+      "name": "0.143 ",
+      "label": "PEM {type}-6143-{l}",
+      "d": 0.143,
+      "dims": {
+       "s": 0.25,
+       "dc": 0.212,
+       "db": 0.143
+      },
+      "lengths": [
+       "0.125",
+       "0.187",
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.437",
+       "0.5",
+       "0.562",
+       "0.625",
+       "0.687",
+       "0.75"
+      ],
+      "lengthNames": {
+       "0.125": "4",
+       "0.187": "6",
+       "0.25": "8",
+       "0.312": "10",
+       "0.375": "12",
+       "0.437": "14",
+       "0.5": "16",
+       "0.562": "18",
+       "0.625": "20",
+       "0.687": "22",
+       "0.75": "24"
+      }
+     },
+     {
+      "name": "0.143 (thick walled)",
+      "label": "PEM {type}-8143-{l}",
+      "d": 0.143,
+      "dims": {
+       "s": 0.312,
+       "dc": 0.28,
+       "db": 0.143
+      },
+      "lengths": [
+       "0.125",
+       "0.187",
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.437",
+       "0.5",
+       "0.562",
+       "0.625",
+       "0.687",
+       "0.75"
+      ],
+      "lengthNames": {
+       "0.125": "4",
+       "0.187": "6",
+       "0.25": "8",
+       "0.312": "10",
+       "0.375": "12",
+       "0.437": "14",
+       "0.5": "16",
+       "0.562": "18",
+       "0.625": "20",
+       "0.687": "22",
+       "0.75": "24"
+      }
+     },
+     {
+      "name": "0.169 ",
+      "label": "PEM {type}-8169-{l}",
+      "d": 0.169,
+      "dims": {
+       "s": 0.312,
+       "dc": 0.28,
+       "db": 0.169
+      },
+      "lengths": [
+       "0.125",
+       "0.187",
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.437",
+       "0.5",
+       "0.562",
+       "0.625",
+       "0.687",
+       "0.75"
+      ],
+      "lengthNames": {
+       "0.125": "4",
+       "0.187": "6",
+       "0.25": "8",
+       "0.312": "10",
+       "0.375": "12",
+       "0.437": "14",
+       "0.5": "16",
+       "0.562": "18",
+       "0.625": "20",
+       "0.687": "22",
+       "0.75": "24"
+      }
+     },
+     {
+      "name": "0.194 ",
+      "label": "PEM {type}-8194-{l}",
+      "d": 0.194,
+      "dims": {
+       "s": 0.312,
+       "dc": 0.28,
+       "db": 0.194
+      },
+      "lengths": [
+       "0.125",
+       "0.187",
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.437",
+       "0.5",
+       "0.562",
+       "0.625",
+       "0.687",
+       "0.75"
+      ],
+      "lengthNames": {
+       "0.125": "4",
+       "0.187": "6",
+       "0.25": "8",
+       "0.312": "10",
+       "0.375": "12",
+       "0.437": "14",
+       "0.5": "16",
+       "0.562": "18",
+       "0.625": "20",
+       "0.687": "22",
+       "0.75": "24"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_THRU_HOLE_UNTHREADED_STANDOFF_MAIN, DATA_PEM_SELFCLINCHING_THRU_HOLE_UNTHREADED_STANDOFF_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 933a12930e3e4001dfaee0c1; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   }
+  ]
+ }
+]
