@@ -168,9 +168,11 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    body-details file's faces (type, radius / angle, z range, area): the fastest way to read live's profile. FH pins
    9660fad9 (pemPin form 2: 12 serration slots + Sketch 3's disc added back; undimensioned radii come from MIDPOINT
    constraints; ~2 s a part, the size sweep is T2). Keep that construction: one combined boolean split the r1 face
-   (63 cylinders instead of 27). Next: FH studs (same head, no groove; Split 1 at the thread start + Revolve 2 +
-   Chamfer 1: decode its body details), DSO, SOSG, other studs, nuts (109–148 faces). Not shown yet: the read-only
-   Hole size / Recommended sheet material rows.
+   (63 cylinders instead of 27). FH studs b13a2459 (pemPin form 3; the thread-start split by opSplitFace, as the
+   askew bolt; a size can offer fewer materials: Size.materials / materials_for, pemgen handles it). Done: SO
+   unthreaded / threaded, BSO, TSO, TPS, TPXS, FH pins, FH studs (Metric + Unified each). Next: the other studs
+   (FH4 82 faces likely FH-like, FHL 44, TFH 53, HFLH 53, HF109 / HFG8 / HFE / HFH 68, FHX 85, SGPC 125), DSO 97,
+   SOSG 115, nuts 109–148. Not shown yet: the read-only Hole size / Recommended sheet material rows.
    Live's studio defaults sometimes differ from the table (NAS 1129 thru minor 0.067 vs 0.0667, NASM 45938/4 ax 0.0225
    vs 0.028125): check the construction at the studio values, then test ours at the table's.
    Earlier: ANSI taper pin crowned ends 10-27.
