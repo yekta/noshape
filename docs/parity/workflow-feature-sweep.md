@@ -274,7 +274,7 @@ Reference / Coordinate system, ruledSurface type / vertex override / corner type
 | L45b × 3 | Ok, copies at 120° / 240° (centres (−7.958, ±13.783) on R 15.915) = live | ✅ **fixed** | v0.4.12 CLI 10-28 (bin/l45.py: Ok, centres (15.915,0), (−7.958, ±13.783)) |
 
 
-## qa re-check 2026-10-29 09:40 (published v0.4.14 CLI, bin/errsweep.py: block 40×20×10, messages of the 🔧 rows; the field each error marks isn't in the CLI reply, not checked here)
+## qa re-check 2026-10-29 09:36 (published v0.4.14 CLI, bin/errsweep.py: block 40×20×10, messages of the 🔧 rows; the field each error marks isn't in the CLI reply, not checked here)
 | Row | Ours (v0.4.14) | Status | Verified |
 |---|---|---|---|
 | Draft 2 empty neutral plane | Error "Select a neutral plane." | ✅ | v0.4.14 10-29 |
