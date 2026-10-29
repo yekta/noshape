@@ -1291,6 +1291,29 @@ impl SheetGeometry {
                     let out = [c[0] + dir[0] * k, c[1] + dir[1] * k];
                     let far = [c[0] - dir[0] * r, c[1] - dir[1] * r];
                     let t = if *diameter { env.text(a, radius * 2.0, false, "Ø") } else { env.text(a, *radius, false, "R") };
+                    // ANSI, the value dropped inside the circle (live asbdt-3r-1 /
+                    // 3d-1, drawing.md D13): a radius's value where dropped, its
+                    // arrow outside pointing in with a tail, no leader; a
+                    // diameter's value centred, one arrow inside to the edge it
+                    // faces, the line on 0.36 in past it.
+                    if let (false, Some(kn)) = (self.style.iso, knee.filter(|k| *k < 0.0)) {
+                        let a_len = self.style.dim_arrow;
+                        if *diameter {
+                            let w = self.dim_label_width(&t, dh);
+                            let g = w / 2.0 + 0.65 * dh;
+                            if g < r {
+                                self.lines.push(Polyline2 { points: vec![[c[0] + dir[0] * g, c[1] + dir[1] * g], [tip[0] + dir[0] * 9.144, tip[1] + dir[1] * 9.144]], style: LineStyle::Thin, closed: false, pick });
+                            }
+                            self.arrow(tip, dir, 3.0);
+                            self.dim_label(c, 0.0, 0.5, true, &t, dh, pick);
+                        } else {
+                            let at = [c[0] + dir[0] * (r + kn), c[1] + dir[1] * (r + kn)];
+                            self.arrow(tip, [-dir[0], -dir[1]], 3.0);
+                            self.lines.push(Polyline2 { points: vec![[tip[0] + dir[0] * a_len, tip[1] + dir[1] * a_len], [tip[0] + dir[0] * 2.0 * a_len, tip[1] + dir[1] * 2.0 * a_len]], style: LineStyle::Thin, closed: false, pick });
+                            self.dim_label(at, 0.0, 0.5, true, &t, dh, pick);
+                        }
+                        continue;
+                    }
                     if !self.style.iso {
                         // ANSI (live asbdt-3, drawing/368): the arrow outside
                         // the circle pointing in, the leader on to the knee
