@@ -1067,6 +1067,8 @@ void mesh_fill(const OcMesh& m, rust::Slice<float> positions, rust::Slice<float>
     if (const RustFace& r = ft.rust; r.out)
     {
       // noshape's mesher's: global already (a moved instance's moved here), the surface's orientation.
+      // In f64 still: a moved instance's nodes rounded once, as its neighbours' are (a prism's top welds to its
+      // sides bit for bit).
       const double*   nodes = r.out->nodes.data();
       const double*   norms = r.out->normals.data();
       const uint32_t* tris  = r.out->tris.data();

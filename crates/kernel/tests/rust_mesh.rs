@@ -248,3 +248,39 @@ fn bench_fin_plate_display_mesh() {
         occt.1 / ours.1
     );
 }
+
+/// This process's CPU time in ms, its threads' that ended included (Linux, 10 ms ticks; 0 elsewhere).
+fn process_cpu_ms() -> f64 {
+    std::fs::read_to_string("/proc/self/stat").ok().and_then(|s| {
+        let f: Vec<&str> = s.rsplit_once(')')?.1.split_whitespace().collect();
+        Some((f.get(11)?.parse::<f64>().ok()? + f.get(12)?.parse::<f64>().ok()?) * 10.0)
+    }).unwrap_or(0.0)
+}
+
+/// The filleted boss (live-30's bosses: two tori of ~5000 nodes and their neighbours) meshed 40 times each way,
+/// fresh copies: wall and process CPU per mesh, all threads counted. `cargo test --release -p noshape-kernel
+/// --test all rust_mesh::bench_filleted -- --ignored --nocapture`; NOSHAPE_BENCH_OURS=1: ours only, ten rounds
+/// (under `perf record`).
+#[test]
+#[ignore = "bench"]
+fn bench_filleted_boss_display_mesh() {
+    let plate = make_box_corners(DVec3::new(-10.0, -10.0, 0.0) * MM, DVec3::new(10.0, 10.0, 5.0) * MM).unwrap();
+    let boss = make_cylinder(&Plane::new(DVec3::new(0.0, 0.0, 5.0) * MM, DVec3::Z, DVec3::X), 4.0 * MM, 4.0 * MM, TAU).unwrap();
+    let s = boolean(BooleanOp::Fuse, &[plate], &[boss], &BooleanOptions { unify: true, ..Default::default() }).unwrap().shape;
+    let round: Vec<Shape> = s.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| i.closed && !i.degenerated && i.start.z > 4.9 * MM)).collect();
+    let s = fillet(&s, &round, 1.0 * MM).unwrap().shape;
+    let times = |rust: bool| {
+        let copies: Vec<Shape> = (0..40).map(|_| transform(&s, &Transform::Translate(DVec3::ZERO), true).unwrap().shape).collect();
+        let (t, c) = (std::time::Instant::now(), process_cpu_ms());
+        let nodes: usize = copies.iter().map(|copy| mesh(copy, rust).positions.len()).sum();
+        (t.elapsed().as_secs_f64() * 1e3 / 40.0, (process_cpu_ms() - c) / 40.0, nodes / 40)
+    };
+    if std::env::var_os("NOSHAPE_BENCH_OURS").is_some() {
+        for _ in 0..10 {
+            times(true);
+        }
+        return;
+    }
+    let (ours, occt) = (times(true), times(false));
+    eprintln!("filleted boss ({} nodes) display mesh: ours {:.2} ms (CPU {:.2}), BRepMesh {:.2} ms (CPU {:.2}): {:.1}× ({:.1}× CPU)", ours.2, ours.0, ours.1, occt.0, occt.1, occt.0 / ours.0, occt.1 / ours.1);
+}

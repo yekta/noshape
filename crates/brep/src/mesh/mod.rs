@@ -246,13 +246,15 @@ struct Revolved {
     /// A cone's half-angle: its sine and cosine.
     angle: (f64, f64),
     minor: f64,
+    /// 1 when (`xdir`, `ydir`, `axis`) is right-handed, else −1.
+    hand: f64,
 }
 
 impl Revolved {
     #[allow(clippy::too_many_arguments)]
     fn new(origin: DVec3, axis: DVec3, xdir: DVec3, direct: bool, radius: f64, angle: f64, minor: f64) -> Revolved {
         let y = axis.cross(xdir);
-        Revolved { origin, axis, xdir, ydir: if direct { y } else { -y }, radius, angle: angle.sin_cos(), minor }
+        Revolved { origin, axis, xdir, ydir: if direct { y } else { -y }, radius, angle: angle.sin_cos(), minor, hand: if direct { 1.0 } else { -1.0 } }
     }
     fn torus(&self) -> bool {
         self.minor > 0.0
@@ -291,8 +293,14 @@ impl Revolved {
             let (s, c) = self.angle;
             (self.radius + v * s, s * radial + c * self.axis, v * c)
         };
+        let p = self.origin + ring * radial + z * self.axis;
+        if self.torus() {
+            // ∂u × ∂v is ring · minor · (cos v · radial + sin v · axis), handed as the frame: unit as it is.
+            let ok = ring.abs() * self.minor > 1e-12 * self.radius.max(1e-9) * self.minor.max(1.0);
+            return (p, ok.then(|| (self.hand * ring.signum()) * (cv * radial + sv * self.axis)));
+        }
         let n = (ring * tangent).cross(dv);
-        (self.origin + ring * radial + z * self.axis, (n.length() > 1e-12 * self.radius.max(1e-9) * self.minor.max(1.0)).then(|| n.normalize()))
+        (p, (n.length() > 1e-12 * self.radius.max(1e-9) * self.minor.max(1.0)).then(|| n.normalize()))
     }
 }
 
@@ -419,14 +427,23 @@ fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option
     rows.push(rim(&rims[0])?);
     if let Some(c0) = cols.first() {
         let ends = [cols.iter().find(|c| (c.0 - umin).abs() <= tol), cols.iter().find(|c| (c.0 - umax).abs() <= tol)];
+        let mut trig: Vec<(f64, (f64, f64))> = Vec::new();
         for k in 1..c0.1.len().saturating_sub(1) {
             let v = c0.1[k].0;
             let vt = s.v_trig(v);
             let n = arc_steps(umax - umin, s.ring(v), defl);
+            // The u's and their sines and cosines, the same for each row of as many nodes.
+            if trig.len() != n + 1 {
+                trig = (0..=n)
+                    .map(|j| {
+                        let u = if j == n { umax } else { umin + (umax - umin) * j as f64 / n as f64 };
+                        (u, u.sin_cos())
+                    })
+                    .collect();
+            }
             let mut row = Vec::with_capacity(n + 1);
-            for j in 0..=n {
-                let u = if j == n { umax } else { umin + (umax - umin) * j as f64 / n as f64 };
-                let (p, normal) = s.at(u.sin_cos(), v, vt);
+            for (j, &(u, su)) in trig.iter().enumerate() {
+                let (p, normal) = s.at(su, v, vt);
                 let end = if j == 0 { ends[0] } else if j == n { ends[1] } else { None };
                 row.push((u, end.map_or(p, |c| c.1[k].1), normal?));
             }
