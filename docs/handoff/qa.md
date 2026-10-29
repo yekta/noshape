@@ -9,6 +9,10 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **13:01 update:** with bool's dev CLI of 12:13 (has e5da453f; qa-scratch/rel/k/bool/1213): bin/pocksweep.py 32 / 32 right; the 19 boolmir
+  seeds that differed and 30 fresh ones (91–120): no volume differences left, only face counts (RUST-MIRROR-SPLIT-FACES open; through
+  half holes Rust-right). RUST-UNION-MERGES-DISJOINT-FACES unchanged (bin/union14.py). Running: boolrand 61–75 / boolgrid 41–55 on that
+  CLI (cli/rg1213.summary), CLI fuzz 225–229 (v0.4.14), GUI fzloop on both displays.
 - **12:51 update (greens 012653e7 → 82580226):** **RUST-HALF-POCKET-3 and RUST-MIRROR-NOTCH fixed on main (bool e5da453f), verified in the
   app** (both repros, two more pocket variants, the r7.5 notch = OCCT; the mirror set unchanged); still in v0.4.14, so the next release
   needs e5da453f. Re-running boolmir / pocksweep over all their cases needs a CLI of main (Requests to the lead). Verified
