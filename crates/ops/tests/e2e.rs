@@ -1757,6 +1757,10 @@ fn drawing_callouts_ordinates_and_datums() {
     let cm = call(&mut ctx, "drawing_centermark", json!({ "drawing": tab, "holes": [[cx - r, cy]] }));
     assert_eq!(kind_of(&mut ctx, cm["annotations"][0].as_u64().unwrap()), "Centermark");
     assert!(last(&mut ctx).ends_with(":: Centermark"));
+    // Radial on the centermark (its arm inside the hole, away from the rim):
+    // the circle it marks (help D13).
+    let rd = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "kind": "radius", "picks": [[cx - r + 0.6 * r, cy]], "place": [cx - r - 15.0, cy + 15.0] }));
+    assert_eq!(kind_of(&mut ctx, rd["annotation"].as_u64().unwrap()), "RadialDimension");
 
     let nt = call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "BREAK ALL EDGES", "position": [40, 40], "leader": a0 }));
     assert_eq!(kind_of(&mut ctx, nt["annotation"].as_u64().unwrap()), "Note");

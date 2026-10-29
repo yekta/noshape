@@ -77,6 +77,12 @@ impl<'a> SheetPick<'a> {
                 Some(PickTarget::Edge { .. } | PickTarget::SketchEntity(_)) => Some(h),
                 _ => None,
             },
+            // Radial and diameter also take a centermark (help D13).
+            (Tool::Dimension { kind: DimTool::Radius | DimTool::Diameter, .. }, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
+                Some(PickTarget::Edge { .. }) => Some(h),
+                Some(PickTarget::Annotation(id)) if self.current_sheet().annotations.iter().any(|a| a.id == *id && matches!(a.kind, AnnotationKind::Centermark { .. })) => Some(h),
+                _ => None,
+            },
             // Dimension-like tools only care about view edges.
             (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. }, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
                 Some(PickTarget::Edge { .. }) => Some(h),
@@ -317,6 +323,23 @@ impl<'a> SheetPick<'a> {
         Some(Pick::Line { a: pa, b: pb })
     }
 
+    /// A hovered centermark: the circle it marks (help D13: radial and
+    /// diameter dimensions pick an arc, circle or centermark): the view's
+    /// circle at its center whose radius × 1.25 is nearest its size.
+    fn centermark_circle(&self) -> Option<Pick> {
+        let h = self.hover?;
+        let built = self.built?;
+        let PickTarget::Annotation(id) = built.picks.get(h as usize)? else { return None };
+        let a = built.resolved.annotations.iter().find(|a| a.id == *id)?;
+        let AnnotationKind::Centermark { view, center, size, .. } = &a.kind else { return None };
+        let g = self.geoms.get(view)?;
+        g.circles()
+            .into_iter()
+            .filter(|(c, _, _)| len(sub(*c, *center)) < 1e-9)
+            .min_by(|x, y| (x.1 * 1.25 - size).abs().total_cmp(&(y.1 * 1.25 - size).abs()))
+            .map(|(center, radius, r)| Pick::Circle { view: *view, center, radius, r })
+    }
+
     /// A hovered straight drawn line with no model edge (an HLR silhouette
     /// of a cylinder or cone): its ends, unreferenced. Two of them on one
     /// cylinder give a Ø dimension (help drawing_-_dimension, D2).
@@ -356,6 +379,9 @@ impl<'a> SheetPick<'a> {
             && let EdgeGeom::Circle { center, radius, .. } = me.geom
         {
             return Some(Pick::Circle { view, center, radius, r: me.center_ref() });
+        }
+        if let Some(p) = self.centermark_circle() {
+            return Some(p);
         }
         let view = self.view_at(s)?;
         let pl = self.placement(view)?;
