@@ -169,6 +169,9 @@ focus / blur events; nothing blurs, so nothing commits. **Always `xdotool window
 on :102** (W=$(xdotool search --name noshape | head -1)). With focus, Tab commits and previews as live. Fixed alongside:
 a Tab commit scheduled two regenerations.
 
+## Local tests (lead 10-29): `export NOSHAPE_CONFIG_DIR=$(mktemp -d -t noshape-config-XXXXXX)` for `cargo test`
+(UI tests otherwise read / write the shared ~/.config/noshape); the app itself runs with the normal settings.
+
 ## Landing (10-27 13:45, lead): only with `tools/tiers/land.sh`
 
 It rebases, runs clippy + the full tests of every touched crate and its dependents (+ T0 for app / ops / cli) and
@@ -398,6 +401,10 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
    products, `clip_near`, `in_front_of_faces`, sRGB conversion. Next experiment: WGSL `override` switches set
    from env at pipeline creation (skip states / lift / per-vertex instance load by passing what's needed per
    segment) as perf.yml variants on macOS at 2×, one run.
+   Step one landed (7a8c12d2): `NOSHAPE_PERF_LINES=minimal` swaps the edge lines' vertex shader for the bare
+   projection `vs_line_min`. Bench perf 40944655118 (jobs=bench, ref 7a8c12d2, variants r1/min1/nol1/r2/min2/nol2
+   at 2×, frames-driven): compare the variants' GPU times (done_ms) within the job. min ≈ nol → the cost is
+   line_vertex's work (slim it); min ≈ r → it is the raster (look at blending / varyings / AA width).
 0f. (done 10-28: no gain, see above) Retina orbit, experiment for 0c: line segments are instances of 6 vertices (`draw(slots*6, 0..count)`),
    which packs Apple GPUs' vertex SIMD groups badly; pull segments from a storage buffer by vertex_index / 6 with
    the slot as the instance (one instance per copy) and measure with perf.yml.
