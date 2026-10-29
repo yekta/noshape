@@ -148,7 +148,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (right), Part pattern 3 × 2 → 6 (right). Same on CLI 09:50 and v0.4.10. Live patterns an added boss in any in-plane
   direction without Reapply (confirming in REQUESTS "qa (2026-10-27, FEATURE-PATTERN-ADD-Y)") (qa 2026-10-27 11:13,
   v0.4.10 artifact / CLI 09:50)
-- [x] 419e41d0 P1 FEATURE-MIRROR-COPY-FULL-DEPTH Mirror › **Feature mirror** (Reapply features off, the default) of an added boss
+- [x] verified 031394bc (qa 21:48: bin/fmirkeep.py documents made with the v0.4.14 CLI (Reapply off: 9500 / 15 faces there) open in the green app at **9000 mm³ / 3200 mm²** for both the face sketch and the offset-plane sketch = live; tickets/feature-mirror-full-depth-0313.png) 419e41d0 P1 FEATURE-MIRROR-COPY-FULL-DEPTH Mirror › **Feature mirror** (Reapply features off, the default) of an added boss
   builds a copy as deep as the whole part: block 40×20×10 on Top (0..40, 0..20), sketch on its top face (or on Top+10)
   a rectangle (5,5)–(15,15), Extrude Add 5 mm; Plane = Right offset 20; Feature mirror, Features to mirror = Extrude 2,
   Mirror plane = Plane 2, ✓. live (behaviours ~6240, "qa5 feature mirror"): boss copy at x 25…35, **9000.0000 mm³,
