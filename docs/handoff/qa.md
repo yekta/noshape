@@ -9,6 +9,8 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **13:54 update (green 37ed6e41):** verified ANSI-TEXT-ALIGN-DEFAULT, DWG-PANEL-ESC-STACK; new P3 DWG-TABLE-ESC-GHOST (the Table tool's
+  dashed preview stays on the sheet after Esc).
 - **13:49 update:** bin/holemir.py (Hole Simple / C-bore / C-sink, blind / through, centred on the mirror plane, Part mirror Add): all
   volumes right on both paths; C-bore through Rust 16 faces vs OCCT 9 (added to RUST-MIRROR-SPLIT-FACES); blind ones 14 / 16 faces on
   both, live asked. Note: bin/clifuzz_time.py never makes holes (its 'hole' branch is `continue`). CLI fuzz 228–229 (v0.4.14), 300
