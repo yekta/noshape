@@ -107,7 +107,7 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 - Parallel pairs: ready on branch agent/core-pairs-on (99185686, not landed, for after the 10-29 release): serial
   inside CPU budgets, off in OCCT until the kernel turns it on; land it with /root/core-scratch/libTKBO.a.0004-on3
   in /root/occt.
-- CLI-SUPPRESS-SEGV (10-29 01:20): a fault inside a budgeted op (OCCT's chamfer under run_budgeted) was caught
+- CLI-SUPPRESS-SEGV (10-29, 5ac53b95; qa fuzz seeds 171 4/4 and 174 1/1 run to the end on the fixed CLI): a fault inside a budgeted op (OCCT's chamfer under run_budgeted) was caught
   by a crash guard (the bridge's trycatch_timed, or run_guarded) past run_budgeted's frame, and the budget's jump
   buffer and CPU timer outlived it: the next budgeted op ran as if nested (no budget of its own) and the stale
   timer's tick jumped into the dead frame (the CLI's second fault, at a stack address). Both guards now take a
