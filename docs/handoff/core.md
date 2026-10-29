@@ -16,6 +16,15 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   between planar faces against the faces' parallel edges only. T1 `kernel_robustness::oversize_fillets_like_onshape`
   (live's 11 answers on the 40 x 20 x 10 block). Open: the chamfer half (live's answers not in yet: qa's 10.5 / 15 /
   30 mm chamfers on the two vertical edges are Ok here) and "all 12 edges R6 fails" in live (vertex blends).
+- SHELL-SLOW: Shell's regions path takes convex cones (a chamfer round the top over filleted corners: 2.3 s in slabs
+  → 0.2 s, same volumes, one offset face per face where slabs split the inner cones; T1
+  `shell::shell_over_chamfered_fillet_corners_by_regions`). Not yet for parts that also have holes, wf-block among
+  them (its top face 2.9–4.1 s here in slabs, 0.48 s by regions with 5045.963 vs 5045.965 mm³): **open finding**, on
+  main already, a hole's tube that crosses a chamfer's offset plane (but not the side wall's) comes out fuller by
+  regions than by slabs: 0.023 mm³ for two Ø6.35 holes 6 mm from a 1 mm top chamfer at t 1, 0.136 at t 2.5 with the
+  holes mid-part (kernel probe, removed; the live oracle qa5 P1-16 sides with slabs: 3998.627 live, slabs 3998.632,
+  regions 3998.677). Same topology both ways, only the tube face's area differs (234.3397 vs 234.3355 mm²). Find
+  which construction is off there, then let cones and holes meet in regions (wf-block's shell → ~0.4 s).
 - Speed table refreshed from perf.yml run 40796942944 (release): the fin under the 400-fin plate 40–64 ms (< 150 met).
 - Parallel pairs: branch agent/core-pairs-on rebased on 16139489 (f83bf5f4; the crash guard's BudgetSnapshot
   restores the thread's pairs mode too); kernel tests green against /root/occt-core with libTKBO.a.0004-on3. Land
