@@ -201,3 +201,27 @@ fn a_face_on_a_circle_a_declined_face_shares_is_declined() {
     let out = mesh_body(&v, &e, &[cyl, disc(MeshSurface::Other)], DEFL);
     assert!(out.faces.iter().all(|f| f.is_none()));
 }
+
+/// A plate face with ten round holes of 144 nodes each (live-30's top face has ~1450 boundary nodes): the
+/// triangulation alone, 200 times. `cargo test --release -p noshape-brep bench_cdt -- --ignored --nocapture`
+#[test]
+#[ignore = "bench"]
+fn bench_cdt_plate_with_holes() {
+    use std::f64::consts::TAU;
+    let mut pts = vec![cdt::Pt { x: 0.0, y: 0.0 }, cdt::Pt { x: 100.0, y: 0.0 }, cdt::Pt { x: 100.0, y: 40.0 }, cdt::Pt { x: 0.0, y: 40.0 }];
+    let mut rings = vec![vec![0, 1, 2, 3]];
+    for h in 0..10 {
+        let (cx, cy) = (10.0 + 20.0 * (h % 5) as f64, if h < 5 { 10.0 } else { 30.0 });
+        let base = pts.len();
+        pts.extend((0..144).map(|k| {
+            let a = TAU * k as f64 / 144.0;
+            cdt::Pt { x: cx + 6.0 * a.cos(), y: cy + 6.0 * a.sin() }
+        }));
+        rings.push((base..base + 144).collect());
+    }
+    let t = std::time::Instant::now();
+    for _ in 0..200 {
+        assert!(cdt::triangulate(&pts, &rings).is_some());
+    }
+    eprintln!("cdt: {} points, {:.3} ms each", pts.len(), t.elapsed().as_secs_f64() * 1e3 / 200.0);
+}

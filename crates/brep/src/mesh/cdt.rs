@@ -22,6 +22,9 @@ fn in_circle(a: Pt, b: Pt, c: Pt, d: Pt) -> bool {
     let (adx, ady, bdx, bdy, cdx, cdy) = (a.x - d.x, a.y - d.y, b.x - d.x, b.y - d.y, c.x - d.x, c.y - d.y);
     let (ad, bd, cd) = (adx * adx + ady * ady, bdx * bdx + bdy * bdy, cdx * cdx + cdy * cdy);
     let det = adx * (bdy * cd - bd * cdy) - ady * (bdx * cd - bd * cdx) + ad * (bdx * cdy - bdy * cdx);
+    if det <= 0.0 {
+        return false;
+    }
     let perm = ((bdx * cdy).abs() + (cdx * bdy).abs()) * ad + ((cdx * ady).abs() + (adx * cdy).abs()) * bd + ((adx * bdy).abs() + (bdx * ady).abs()) * cd;
     det > 1e-14 * perm
 }
@@ -55,6 +58,8 @@ struct Mesh {
     fixed: Vec<bool>,
     /// Diagonals made by segment recovery.
     recovered: Vec<(usize, usize)>,
+    /// The legalisation's stack, kept between insertions.
+    st: Vec<usize>,
 }
 
 impl Mesh {
@@ -170,7 +175,8 @@ impl Mesh {
         if (0..3).any(|k| self.p[self.v[t + k]] == q) {
             return false;
         }
-        let mut st = Vec::new();
+        let mut st = std::mem::take(&mut self.st);
+        st.clear();
         // On an edge: split the two triangles into four.
         let mut on = NONE;
         for k in 0..3 {
@@ -210,6 +216,7 @@ impl Mesh {
             self.vedge[d] = t1 + 2;
             st.extend([t0 + 2, t2 + 1, t1 + 2, t3 + 1]);
             self.legalize(&mut st);
+            self.st = st;
             *start = t0;
             return true;
         }
@@ -230,6 +237,7 @@ impl Mesh {
         self.vedge[i] = t + 2;
         st.extend([t, t1, t2]);
         self.legalize(&mut st);
+        self.st = st;
         *start = t;
         true
     }
@@ -430,7 +438,7 @@ pub fn triangulate(pts: &[Pt], rings: &[Vec<usize>]) -> Option<Vec<[u32; 3]>> {
     p.push(Pt { x: cx - 2.0 * big, y: cy - big });
     p.push(Pt { x: cx + 2.0 * big, y: cy - big });
     p.push(Pt { x: cx, y: cy + 2.0 * big });
-    let mut m = Mesh { p, v: Vec::with_capacity(6 * nv + 12), tw: Vec::with_capacity(6 * nv + 12), vedge: vec![NONE; np + 3], fixed: Vec::with_capacity(6 * nv + 12), recovered: Vec::new() };
+    let mut m = Mesh { p, v: Vec::with_capacity(6 * nv + 12), tw: Vec::with_capacity(6 * nv + 12), vedge: vec![NONE; np + 3], fixed: Vec::with_capacity(6 * nv + 12), recovered: Vec::new(), st: Vec::new() };
     m.add_tri(np, np + 1, np + 2);
     // Insertion order: BRIO (a fixed pseudo-random shuffle cut into rounds of doubling size, each round in
     // z-order): few flips per point and short walks.
@@ -475,17 +483,16 @@ pub fn triangulate(pts: &[Pt], rings: &[Vec<usize>]) -> Option<Vec<[u32; 3]>> {
             }
         }
     }
+    // Their half-edges, now that no flip moves them until the last Lawson pass.
+    let segments: Vec<usize> = rr.iter().flat_map(|r| (0..r.len()).map(|k| (r[k], r[(k + 1) % r.len()]))).map(|(a, b)| m.find_edge(a, b)).collect::<Option<_>>()?;
     // Inside: flood from the left of every boundary segment, never across one.
     let nt = m.v.len() / 3;
     let mut inside = vec![false; nt];
     let mut st = Vec::new();
-    for r in &rr {
-        for k in 0..r.len() {
-            let e = m.find_edge(r[k], r[(k + 1) % r.len()])?;
-            if !inside[e / 3] {
-                inside[e / 3] = true;
-                st.push(e / 3);
-            }
+    for &e in &segments {
+        if !inside[e / 3] {
+            inside[e / 3] = true;
+            st.push(e / 3);
         }
     }
     while let Some(t) = st.pop() {
@@ -499,13 +506,10 @@ pub fn triangulate(pts: &[Pt], rings: &[Vec<usize>]) -> Option<Vec<[u32; 3]>> {
         }
     }
     // The outside of every segment must have stayed out.
-    for r in &rr {
-        for k in 0..r.len() {
-            let e = m.find_edge(r[k], r[(k + 1) % r.len()])?;
-            let o = m.tw[e];
-            if o != NONE && inside[o / 3] {
-                return None;
-            }
+    for &e in &segments {
+        let o = m.tw[e];
+        if o != NONE && inside[o / 3] {
+            return None;
         }
     }
     // Lawson again after the recovery flips (segments fixed): only the recovery's diagonals (and what their

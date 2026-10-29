@@ -171,12 +171,27 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
     for (e, n) in in_parallel(used.len(), 64, |k| edge_nodes(vertices, &edges[used[k]], defl)) {
         out.edges[used[e]] = n;
     }
-    // The faces on their own, in parallel (as BRepMesh meshes them), in runs of a few faces: a part's few tori
-    // can be most of its nodes.
+    // The faces on their own, in parallel (as BRepMesh meshes them), the costliest first, one at a time: a
+    // part's few tori and its plate's face round many holes can be most of the time, and started last they
+    // kept the others' threads waiting. Cost by the boundary's nodes: a plane's triangulation ~1 µs a node,
+    // a strip's ~0.15 µs a node of its rims (its longest use) by its sides (its shortest).
     let edge_nodes = &out.edges;
-    let mesh = |i: usize| if ok[i] { mesh_face(vertices, edges, &faces[i], edge_nodes, defl) } else { None };
-    for (i, m) in in_parallel(faces.len(), 4, mesh) {
-        out.faces[i] = m;
+    let count = |u: &Use| edge_nodes.get(u.edge as usize).and_then(|n| n.as_ref()).map_or(0, |n| n.points.len());
+    let cost = |f: &MeshFace| -> f64 {
+        let n = f.loops.iter().flatten().map(count);
+        match f.surface {
+            MeshSurface::Plane { .. } => n.sum::<usize>() as f64,
+            _ => {
+                let (lo, hi) = n.fold((usize::MAX, 0), |(lo, hi), c| (lo.min(c), hi.max(c)));
+                0.15 * (lo.max(1) * hi) as f64
+            }
+        }
+    };
+    let mut order: Vec<(f64, usize)> = (0..faces.len()).filter(|&i| ok[i]).map(|i| (cost(&faces[i]), i)).collect();
+    order.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let mesh = |k: usize| mesh_face(vertices, edges, &faces[order[k].1], edge_nodes, defl);
+    for (k, m) in in_parallel(order.len(), 1, mesh) {
+        out.faces[order[k].1] = m;
     }
     for (ok, m) in ok.iter_mut().zip(&out.faces) {
         *ok = m.is_some();
