@@ -9,6 +9,11 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **15:51 update (green 3fb8a668):** verified DWG-PROPERTY-FIELD (editor shows the value). CLI fuzz 322–324 on main's Rust clean; GUI
+  fzloop seeds 400–503 alive. Open from today, owners' queue: P1 RUST-MIRROR-SPLIT-FACES, P2 RUST-UNION-MERGES-DISJOINT-FACES,
+  P2 MIRROR-BLIND-HOLE-FACES, P2 OCCT-UNION-OFFSET-CYL / OCCT-MIRROR-OVERCOUNT (OCCT path), P2 AGENT-HIDDEN-PARAMS-SILENT, P3
+  TOUCH-PATTERN-ADD, REMOVE-NO-HIT-INFO, BOOL4B-BUBBLE, DWG-TABLE-ESC-GHOST, DWG-SHEET-PROPS-ESC, DWG-GROUP-ANNOTATION-RULE,
+  DWG-DATUM-PASTE-RED, SKETCH-DIM-CURVE-PAIR-PREVIEW; core's GUARD-SEGV-MALLOC-DEADLOCK heap corruption (freeze half fixed).
 - **15:37 update (green 5f3d7b20 = + psui mesher 5c CDT):** A/B unchanged on boltdwg / wf-block / live-30 / tr / torus / cone; big-plate showed
   3590 px but the own mesher's render is identical to the previous green's (0 px) and the OCCT side varies run to run (20651 px between
   two OCCT runs: capture during refine under load), so no change. Filed P3 DWG-SHEET-PROPS-ESC from live 1596. CLI fuzz 316–321 clean.
