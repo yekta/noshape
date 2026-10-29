@@ -9,6 +9,11 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **03:00 update (green 6228323b = + bool reversed-face loops / seams / Shell slab Common / tolerance 1e-5, psui mesher hand-off, dx
+  D15):** in the app: live-30 60779.484 / 15848.357; **halfmir now 7214.602 / 2957.08 (right; HALF-MIRROR fixed by default via Rust,
+  OCCT path still wrong)**; mirhole wall still 314.159 (RUST-MIRROR open); wf-block top-face Shell 5045.965 / 3956.429 (= v0.4.12).
+  GUI fuzz 118–129 (0eb9) alive; CLI seeds 181 / 182 done (179 timed out on a 110-feature body, not a hang). Still no CLI with core's
+  crash-guard fix for the seed 171 / 174 replays.
 - **02:40 update:** big sweep done (cli/bigsweep.out): ~380 qa-scratch documents give identical per-part volume / area / face counts
   with the v0.4.12 CLI and bool's CLI 22:53 (Rust on), except the copies of cli-fillet-segv (RUST-MIRROR-EXTRA-FACE) and documents
   that don't open (bad-trunc, trunc, garbage, notdoc, vq34; same error both ways). GUI fuzz 116 / 117 (5f9c) alive; 118–123 running
