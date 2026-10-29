@@ -3,10 +3,9 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-**v0.4.13 published 06:34 (tag 110539f2 = 5e56477b + version bump). Smoke 06:30–06:45 on noshape-0.4.13-linux-x86_64.tar.gz
-(byte-identical to the CI artifact): all GUI / CLI rows OK, but it ships bool's P0 halfmir2 B (7869.1 mm³ instead of 7607.301 with
-the default Rust Boolean; NOSHAPE_BOOL_RUST=0 fixes B and breaks A). Green 5166e6dd has the fix (c79eed1d), right in the app:
-recommend the next release from it.** Details under "Daily release smoke" › v0.4.13; note at the top of TICKETS.
+**v0.4.14 (tag 6b2e0b13 = v0.4.13 + bool c79eed1d) smoke on the Release run's Linux artifact 08:31–08:42: all rows OK**, halfmir2 B
+right (7607.301), mirror set and cli-fillet-segv right; publication pending at 08:42 (then the tarball is compared with the artifact).
+Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfmir2 B P0.
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
@@ -589,6 +588,19 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   Linear pattern in Feature, Part and Face mode: Direction pre-highlights and picks an edge at its middle and a face (not
   the plane behind it); Fillet › Edges and Shell › Faces hover + pick; cfs.noshape custom feature "Edge pick"
   (`EDGE && ALLOWS_AXIS`, 2 picks) and "Plain edge pick" both take two edges.
+### v0.4.14 (tag 6b2e0b13 = v0.4.13 + bool c79eed1d; Release run 40839037570; Linux artifact smoked 08:31–08:42, before publication)
+- Artifact noshape-0.4.14-linux-x86_64.tar.gz sha256 71d827c489dccd03…; CLI MCP `"version":"0.4.14"`.
+- **The fix it ships:** halfmir2 A 9130.973 / B **7607.301** / C 7434.513 (8 faces each, no negative-area face); mirhole 14429.204,
+  7 faces, one 628.319 mm² wall; halfmir 7214.602, 7 faces; rust-mirror-min 1618.9016, 19 faces; cli-fillet-segv all 15 parts =
+  v0.4.12 (Part 1 1198.544).
+- volsweep (19 documents) = v0.4.12 except fillet-oversize-min (fails like live). Round trip as v0.4.13 (Parasolid / ACIS / STEP /
+  IGES / JT / Rhino 67643.716875 mm³ 18 faces; OBJ zip / STL m³ script artefacts).
+- live-30 (copy, one session): untouched 60779.484 / 15848.357; Extrude 1 depth 10 → 15 / 16 / 17 commits 75 / 70 / 178 ms (load
+  15), Ctrl+Z ×3 back, the 3rd 98 ms (REGEN-SPEED budget 50, carried). kill -9 0.3 s after Suppress Boss 1 → reopens suppressed.
+- Hover + pick (bin/picksweep3.sh, 28 tools): every dialog crop pixel-identical to v0.4.13's.
+- boltdwg drawing › Export › PDF → 1 page, 98.8 KB, content right. asm5 › Assembly 1: dragging the revolute pin leaves it in place.
+- Known, not new: P0 GUARD-SEGV-MALLOC-DEADLOCK (in v0.4.13 too).
+
 ### v0.4.13 (tag 110539f2 = 5e56477b + version bump; published 06:34, all three bundles; Linux tarball smoked 06:30–06:45)
 - Linux tarball sha256 ac6429e6932a906a… = the CI run 40825343362 artifact smoked first. Start page "(0.4.13.110539f2eda8)";
   CLI MCP `"version":"0.4.13"`.
