@@ -2212,9 +2212,14 @@ impl PartStudioView {
     }
 
     /// A Remove / Intersect whose tool reaches no part: every part comes out
-    /// of the feature exactly as it went in.
+    /// of the feature exactly as it went in, and the feature didn't fail (an
+    /// empty merge scope is "No merge scope selected.", no bubble: qa
+    /// BOOL4B-BUBBLE, live 1592).
     pub(super) fn tool_missed(&self) -> bool {
-        let (Some(_), Some(before)) = (&self.ui.preview_tool, &self.ui.preview_before) else { return false };
+        let (Some((preview, fid)), Some(before)) = (&self.ui.preview_tool, &self.ui.preview_before) else { return false };
+        if preview.features.iter().any(|f| f.id == *fid && f.status == noshape_model::display::FeatureStatus::Error) {
+            return false;
+        }
         !before.bodies.is_empty()
             && before.bodies.len() == self.display.bodies.len()
             && before.bodies.iter().zip(&self.display.bodies).all(|(a, b)| a.id == b.id && a.bounds == b.bounds && a.face_refs.len() == b.face_refs.len() && a.mesh.positions.len() == b.mesh.positions.len())
