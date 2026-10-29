@@ -645,16 +645,20 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   }
   if (max_tol > kMaxTol)
     return decline("a tolerant input");
-  // Arguments sharing sub-shapes: OCCT keeps the shared ones as they are.
-  for (size_t i = 1; i < args.size(); ++i)
-    for (size_t j = 0; j < i; ++j)
+  // Arguments sharing sub-shapes: OCCT keeps the shared ones as they are. (One map of every argument's vertices
+  // so far: a pattern's thousand instances against each other took seconds.)
+  {
+    ShapeIMap seen;
+    for (size_t i = 0; i < args.size(); ++i)
     {
       const ShapeIMap& vi = srcs[i]->map(TopAbs_VERTEX);
-      const ShapeIMap& vj = srcs[j]->map(TopAbs_VERTEX);
       for (int k = 1; k <= vi.Extent(); ++k)
-        if (vj.Contains(vi(k)))
+        if (seen.Contains(vi(k)))
           return decline("arguments share vertices");
+      for (int k = 1; k <= vi.Extent(); ++k)
+        seen.Add(vi(k));
     }
+  }
   // Two points are one within both their tolerances (OCCT's rule; a fuzzy Boolean adds its value to each).
   const double tol = 2 * (std::max(max_tol, 1e-7) + fuzzy);
   BrepResult   r;
