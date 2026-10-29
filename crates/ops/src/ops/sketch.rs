@@ -430,8 +430,9 @@ fn constraint_json(data: &SketchData, sketch: FeatureId, c: &noshape_sketch::Con
     });
     if dim {
         if let Some(val) = c.kind.value() {
-            let shown = val * sm::dim_display_scale(&c.kind);
-            v["value"] = json!(sm::dim_value_text(&c.kind, shown, units));
+            // dim_value_text scales it itself (an ellipse axis: Ø of twice its
+            // radius; qa AGENT-ELLIPSE-DIM-VALUE).
+            v["value"] = json!(sm::dim_value_text(&c.kind, val, units));
         }
         v["driving"] = json!(c.driving);
         if let Some(e) = data.dimension_exprs.get(&c.id.0) {
@@ -720,6 +721,10 @@ fn dimension_kind(kind: &str, ids: &[EntityId], mode: DistanceMode, data: &Sketc
         [a, b] => Ok((*a, *b)),
         _ => Err(OpError::param("entities", "two entities")),
     };
+    // An ellipse's radius / diameter is the axis the Dimension tool picks
+    // (Ø of the major or minor axis, as live's ellipse dimension).
+    let ellipse = matches!(ids, [e] if matches!(data.sketch.entity(*e).map(|x| &x.geometry), Some(noshape_sketch::Geometry::Ellipse { .. })));
+    let kind = if ellipse && matches!(kind, "radius" | "diameter") { "auto" } else { kind };
     Ok(match kind {
         "auto" => {
             let cursor = label.or_else(|| {
