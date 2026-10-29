@@ -90,6 +90,10 @@
 
 namespace noshape {
 
+// The way this thread's last shell was built ("regions", "offset", "slabs").
+thread_local const char* t_shell_path = "";
+rust::String             last_shell_path() { return rust::String(t_shell_path); }
+
 namespace {
 
 using HHist = occ::handle<BRepTools_History>;
@@ -770,6 +774,8 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
   std::vector<std::pair<TopoDS_Face, gp_Cylinder>> cylinders;
   std::vector<std::pair<TopoDS_Face, gp_Torus>>    tori;
   std::vector<std::pair<TopoDS_Face, gp_Cone>>     cones;
+  std::vector<TopoDS_Shape>                        tubes;
+  SourceMap                                        tube_sources;
   std::vector<std::pair<gp_Pnt, gp_Dir>>           halfspaces;
   std::vector<TopoDS_Shape>                        halfspace_faces;
   for (TopExp_Explorer e(solid, TopAbs_FACE); e.More(); e.Next())
@@ -920,15 +926,25 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
       // ~90 ms this way, same volumes).
       if (u1 - u0 < 2 * M_PI - 1e-6)
         return no("a concave cylinder isn't all round");
-      // Not next to cones yet: a hole's tube against a chamfer's offset plane
-      // comes out ~0.02 mm³ fuller than the slabs' and live's (qa5 P1-16:
-      // 3998.677 vs live 3998.627 mm³; also chamfered, unfilleted parts with
-      // holes, which take this path), so those keep the slabs' answer.
-      if (!cones.empty())
-        return no("a hole in a part with cones");
       gp_Ax2       tax(ElSLib::Value(0, v0 - margin, gp_Cylinder(ax, 0)), ax.Direction(), ax.XDirection());
       TopoDS_Shape tube = BRepPrimAPI_MakeCylinder(tax, r + t, v1 - v0 + 2 * margin).Shape();
-      SourceMap    src;
+      // Where it may cross a sloped offset (a chamfer's plane, a cone) the
+      // tube is added to the wall at the end (see there): cut from the
+      // cavity it came out off. Elsewhere the cut is exact and cheaper.
+      bool sloped = !cones.empty();
+      for (const auto& [o, n] : halfspaces)
+      {
+        const double c = std::abs(gp_Vec(n).Dot(gp_Vec(ax.Direction())));
+        sloped = sloped || (c > 1e-9 && c < 1 - 1e-9);
+      }
+      if (sloped)
+      {
+        for (TopExp_Explorer x(tube, TopAbs_FACE); x.More(); x.Next())
+          tube_sources.Bind(x.Current(), Source{f, (uint8_t)REL_GENERATED});
+        tubes.push_back(tube);
+        continue;
+      }
+      SourceMap src;
       for (TopExp_Explorer x(tube, TopAbs_FACE); x.More(); x.Next())
         src.Bind(x.Current(), Source{f, (uint8_t)REL_GENERATED});
       if (!cut_by(tube, src))
@@ -1026,10 +1042,76 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
   BRepAlgoAPI_Cut c(solid, cavity);
   if (c.HasErrors() || !c.IsDone())
     return no("a boolean failed");
+  TopoDS_Shape       walls = c.Shape();
+  std::vector<HHist> chain{c.History()};
+  if (!tubes.empty())
+  {
+    // The holes' walls: the part within their offset tubes, added to the
+    // cut. Cutting the tubes from the cavity first came out off where a tube
+    // crosses a sloped offset plane (OCCT's intersection with the big
+    // polytope: a Ø6.35 hole 6 mm from a 1 mm top chamfer, t 1: 3479.08807
+    // vs the exact 3479.07658 mm³; this way 3479.07652).
+    lap = std::make_unique<KernelTimer>("regions.tubes");
+    TopoDS_Compound tc;
+    BRep_Builder    bb;
+    bb.MakeCompound(tc);
+    for (const TopoDS_Shape& x : tubes)
+      bb.Add(tc, x);
+    // Each tube a tool of its own: they can overlap (close holes), which a
+    // compound argument mustn't.
+    BRepAlgoAPI_Common   m;
+    TopTools_ListOfShape objs, tools;
+    objs.Append(solid);
+    for (const TopoDS_Shape& x : tubes)
+      tools.Append(x);
+    m.SetArguments(objs);
+    m.SetTools(tools);
+    m.Build();
+    if (m.HasErrors() || !m.IsDone())
+      return no("a hole tube's common failed");
+    BRepAlgoAPI_Fuse fu(walls, m.Shape());
+    if (fu.HasErrors() || !fu.IsDone())
+      return no("a hole tube's fuse failed");
+    // One history for the cut and the common side by side: each input's
+    // images in either.
+    const HHist hc = c.History(), hm = m.History();
+    HHist       both = new BRepTools_History();
+    auto        add = [&](const TopoDS_Shape& x, const ShapeList& imgs) {
+      if (imgs.IsEmpty())
+        both->Remove(x);
+      else if (!(imgs.Extent() == 1 && imgs.First().IsSame(x)))
+        for (ShapeList::Iterator it(imgs); it.More(); it.Next())
+          both->AddModified(x, it.Value());
+    };
+    for (const TopAbs_ShapeEnum k : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+    {
+      ShapeIMap in, cv, tb;
+      TopExp::MapShapes(solid, k, in);
+      TopExp::MapShapes(cavity, k, cv);
+      TopExp::MapShapes(tc, k, tb);
+      for (int i = 1; i <= in.Extent(); ++i)
+      {
+        ShapeList       imgs = images_of(hc, in(i));
+        const ShapeList more = images_of(hm, in(i));
+        for (ShapeList::Iterator it(more); it.More(); it.Next())
+          if (!imgs.Contains(it.Value()))
+            imgs.Append(it.Value());
+        add(in(i), imgs);
+      }
+      for (int i = 1; i <= cv.Extent(); ++i)
+        add(cv(i), images_of(hc, cv(i)));
+      for (int i = 1; i <= tb.Extent(); ++i)
+        add(tb(i), images_of(hm, tb(i)));
+    }
+    chain = {both, fu.History()};
+    walls = fu.Shape();
+    for (SourceMap::Iterator it(tube_sources); it.More(); it.Next())
+      sources.Bind(it.Key(), it.Value());
+  }
   lap = std::make_unique<KernelTimer>("regions.unify");
   // Faces the cut split (a hole's wall tube at its seam, kern's bracket:
   // 21 faces, live 20) merged, as the slabs' are.
-  ShapeUpgrade_UnifySameDomain usd(c.Shape(), true, true, false);
+  ShapeUpgrade_UnifySameDomain usd(walls, true, true, false);
   usd.SetLinearTolerance(1e-7);
   usd.Build();
   TopoDS_Shape r = single_solid(usd.Shape());
@@ -1040,7 +1122,7 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
   auto ok = [&](const TopoDS_Shape& x) { return !x.IsNull() && solid_count(x) == 1 && valid_changed(solid, x); };
   if (!ok(r))
   {
-    r  = single_solid(c.Shape());
+    r  = single_solid(walls);
     hs = nullptr;
   }
   if (!ok(r))
@@ -1049,9 +1131,10 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
   if (!(vr > 0 && vr < vo))
     return no("volume out of range");
   lap = std::make_unique<KernelTimer>("regions.history");
-  const HHist hc = c.History();
-  out.result     = r;
-  out.history    = hs.IsNull() ? shell_history(solid, r, {hc}, {hc}, sources, {}) : shell_history(solid, r, {hc, hs}, {hc, hs}, sources, {});
+  if (!hs.IsNull())
+    chain.push_back(hs);
+  out.result  = r;
+  out.history = shell_history(solid, r, chain, chain, sources, {});
   return true;
 }
 
@@ -2307,11 +2390,14 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
   }
   const bool offset_ok = gap > 1e-5 && !collapses;
   Built      b;
+  t_shell_path = "";
   // method: 0 = automatic, 1 = offset only, 2 = slabs only (tests).
   const bool dbg = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
   auto       timed = [&](const char* what, auto&& run) {
     const auto t0 = std::chrono::steady_clock::now();
     const bool ok = run();
+    if (ok)
+      t_shell_path = what;
     if (dbg)
       std::fprintf(stderr, "shell: %s %s in %.0f ms\n", what, ok ? "done" : "failed",
                    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());

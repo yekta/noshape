@@ -614,6 +614,8 @@ pub(crate) mod ffi {
         fn last_boolean_path() -> String;
         /// Which way this thread's last op_unify went: "known", "scoped", "whole".
         fn last_unify_path() -> String;
+        /// Which way this thread's last op_shell_solid built its shell: "regions", "offset", "slabs".
+        fn last_shell_path() -> String;
         fn op_unify_whole(s: &OcShape) -> Result<OpOut>;
         /// NOSHAPE_KERNEL_PROFILE: prints the calls since the last mark under `label` and starts again.
         fn kernel_profile_mark(label: &str);

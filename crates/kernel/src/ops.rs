@@ -357,6 +357,12 @@ pub enum ShellMethod {
     Slabs,
 }
 
+/// Which way this thread's last [`shell_solid`] was built: "regions" (cuts
+/// of the offsets' cavity), "offset" (OCCT's offset), "slabs".
+pub fn last_shell_path() -> String {
+    ffi::last_shell_path()
+}
+
 /// Hollow a solid like Parasolid's shell: offsets of the kept faces are
 /// extended until they meet (faces whose offset vanishes disappear, walls that
 /// overlap merge), removed faces leave an opening. `faces` may be empty (closed

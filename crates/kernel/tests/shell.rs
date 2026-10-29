@@ -271,6 +271,8 @@ fn shell_block_with_close_holes_like_onshape() {
     }
     for (th, want, nf) in [(1.0, 3998.627, 33), (2.5, 8503.961, 47)] {
         let r = shell_solid(&s, &faces, th * mm, ShellSide::Inside, ShellMethod::Auto).unwrap_or_else(|e| panic!("{th} mm: {e}")).shape;
+        // Regions since the holes' tubes are added to the wall (1.2 / 2.3 s in slabs).
+        assert_eq!(last_shell_path(), "regions", "{th} mm");
         let v = vol(&r) * 1e9;
         assert!(r.is_valid());
         assert!((v - want).abs() < 0.01, "{th} mm: {v} vs {want}");
@@ -384,10 +386,34 @@ fn shell_over_chamfered_fillet_corners_by_regions() {
     // offset face per face here.
     for (th, nf) in [(1.0, 35), (2.5, 27)] {
         let auto = shell_solid(&s, &faces, th * mm, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+        assert_eq!(last_shell_path(), "regions", "{th} mm");
         let slabs = shell_solid(&s, &faces, th * mm, ShellSide::Inside, ShellMethod::Slabs).unwrap().shape;
         assert!(auto.is_valid());
         let (va, vs) = (vol(&auto) * 1e9, vol(&slabs) * 1e9);
         assert!((va - vs).abs() < 1e-6, "{th} mm: {va} vs slabs {vs}");
         assert_eq!(auto.count(ShapeType::Face), nf, "{th} mm");
     }
+}
+
+/// SHELL-SLOW: a hole whose offset tube crosses a top chamfer's offset plane
+/// (not the side wall's): the regions path's wall is exact, 3479.07658 mm³
+/// (by sections: the offset box less the tube, the chamfer's offset y = z −
+/// 8.586 above z 8.586). Cutting the tube from the planes' polytope came out
+/// 3479.08807, so slabs took such parts (wf-block: ~3 s).
+#[test]
+fn shell_of_a_hole_by_a_chamfer_is_exact() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let (a, b, h) = (75.554 * mm, 20.245 * mm, 10.0 * mm);
+    let mut s = bx([0.0; 3], [a, b, h]);
+    let t = edges_where(&s, |i| (i.start.z - h).abs() < 1e-9 && (i.end.z - h).abs() < 1e-9);
+    s = chamfer_checked(&s, &t, ChamferSpec::Equal(1.0 * mm), &[]).unwrap().shape;
+    let c = make_cylinder(&Plane::from_normal(DVec3::new(15.0 * mm, 6.0 * mm, -mm), DVec3::Z), 3.175 * mm, 12.0 * mm, std::f64::consts::TAU).unwrap();
+    s = cut(&s, &c).unwrap().shape;
+    let faces = faces_where(&s, |c| c.z > h - 1e-9);
+    let r = shell_solid(&s, &faces, mm, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    assert_eq!(last_shell_path(), "regions");
+    assert!(r.is_valid());
+    assert!((vol(&r) * 1e9 - 3479.07658).abs() < 1e-3, "{}", vol(&r) * 1e9);
+    assert_eq!(r.count(ShapeType::Face), 21);
 }
