@@ -9,6 +9,9 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **13:37 update (green 6d9a1bf5 = + psui 6f411558 own mesher step 5):** mesher A/B (bin/meshab.sh, now also waits for regen[full])
+  on cone / sphere / live-30 / boltdwg / wf-block / tr / fins-400: unchanged (285 / 170 / 6 / 0 / 0 / 0 / 0 px). CLI fuzz v0.4.14 to
+  seed 227 clean; 300–305 on bool's 12:13 CLI (main's Rust code) queued after 229.
 - **13:10 update (green 80ab80e9):** verified DWG-CENTERMARK-ALIGN, DWG-DIM-HOVER-STAYS. boolrand 61–75 / boolgrid 41–55 on the fixed CLI:
   no Rust/OCCT difference at all. CLI fuzz on v0.4.14 through seed 224 clean.
 - **13:01 update:** with bool's dev CLI of 12:13 (has e5da453f; qa-scratch/rel/k/bool/1213): bin/pocksweep.py 32 / 32 right; the 19 boolmir
