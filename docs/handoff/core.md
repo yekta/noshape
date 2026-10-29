@@ -29,7 +29,8 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   regions path is the one off; exact wall 3479.07658 mm³ by sections, slabs 3479.07652, regions 3479.08807. Edge
   tolerances there are 3e-6 mm and both integrate adaptively, but regions' answer moves with the tube's length
   (caps past the cavity box: 3479.09615), outside the part: OCCT's cavity − tube cut where the tube crosses the
-  slanted offset plane is inexact. Try the wall as (solid − cavity) ∪ (solid ∩ tube), or the tube's frame turned;
+  slanted offset plane is inexact (cavity ∩ solid 11405.6614 vs exact 11405.67292 mm³, the same by the adaptive and
+  the segmented Gauss integrals; the tube's seam turned 180° changes nothing). Try the wall as (solid − cavity) ∪ (solid ∩ tube), or the tube's frame turned;
   then let cones and holes meet in regions (wf-block's shell → ~0.4 s).
 - Speed table refreshed from perf.yml run 40796942944 (release): the fin under the 400-fin plate 40–64 ms (< 150 met).
 - Parallel pairs: branch agent/core-pairs-on rebased on 16139489 (f83bf5f4; the crash guard's BudgetSnapshot
