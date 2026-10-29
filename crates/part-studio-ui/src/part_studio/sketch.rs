@@ -3271,7 +3271,9 @@ impl PartStudioView {
             *counts.entry(g.entity.0).or_default() += 1;
         }
         // A line's side for its glyphs (screen unit normal): below a
-        // horizontal line, left of a vertical one (live sketch/28).
+        // horizontal line, right of a vertical one (live, behaviours "skasm
+        // (2026-10-28) rectangle glyphs and vertical dimension text"; the
+        // value-box dimension takes the left).
         let line_side = |e: noshape_sketch::EntityId| -> Option<(f32, f32)> {
             let noshape_sketch::Curve2::Line { a, b } = data.sketch.curve(e)? else { return None };
             let ((ax, ay), (bx, by)) = (project(a)?, project(b)?);
@@ -3281,7 +3283,7 @@ impl PartStudioView {
                 return None;
             }
             let (nx, ny) = (-dy / len, dx / len);
-            Some(if ny < -1e-3 || (ny.abs() <= 1e-3 && nx > 0.0) { (-nx, -ny) } else { (nx, ny) })
+            Some(if ny < -1e-3 || (ny.abs() <= 1e-3 && nx < 0.0) { (-nx, -ny) } else { (nx, ny) })
         };
         let mut per_entity: HashMap<u32, usize> = HashMap::new();
         for g in glyphs {

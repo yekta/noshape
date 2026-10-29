@@ -5496,7 +5496,9 @@ fn line_length_field(sk: &Sketch, line: EntityId, wpp: f64) -> OtfField {
     let mut f = length_field(sk, line, wpp);
     if let Some(Curve2::Line { a, b }) = sk.curve(line) {
         let n = (b - a).try_normalize().unwrap_or(DVec2::X).perp();
-        let n = if n.y < -1e-9 || (n.y.abs() <= 1e-9 && n.x < 0.0) { -n } else { n };
+        // Above a slanted or horizontal line, left of a vertical one (live,
+        // SKETCH-VDIM-SIDE-ARROWS).
+        let n = if n.y < -1e-9 || (n.y.abs() <= 1e-9 && n.x > 0.0) { -n } else { n };
         f.label = (a + b) * 0.5 + n * wpp * 26.0;
         f.label_at = Some((line, n, 26.0));
     }
@@ -6096,17 +6098,12 @@ fn linear_dim(out: &mut Vec<[DVec2; 2]>, p1: DVec2, p2: DVec2, u: Option<DVec2>,
     let span = (q2 - q1).dot(u);
     let (dir, len) = if span.abs() < 1e-15 { (u, 0.0) } else { (u * span.signum(), span.abs()) };
     let t = (pos - q1).dot(dir);
-    let alen = s * 9.0;
-    if len > 2.6 * alen {
-        out.push([q1 + dir * t.min(0.0), q1 + dir * t.max(len)]);
-        arrow(out, q1, -dir, s);
-        arrow(out, q2, dir, s);
-    } else {
-        // Short dimension: arrows outside pointing in.
-        out.push([q1 + dir * t.min(-2.0 * alen), q1 + dir * t.max(len + 2.0 * alen)]);
-        arrow(out, q1, dir, s);
-        arrow(out, q2, -dir, s);
-    }
+    // Live (behaviours "skasm (2026-10-28) rectangle glyphs and vertical
+    // dimension text"): the arrows stay inside however short the dimension;
+    // below ~50 px they overlap the text.
+    out.push([q1 + dir * t.min(0.0), q1 + dir * t.max(len)]);
+    arrow(out, q1, -dir, s);
+    arrow(out, q2, dir, s);
 }
 
 fn radial_dim(out: &mut Vec<[DVec2; 2]>, c: DVec2, r: f64, pos: DVec2, diameter: bool, span: Option<(f64, f64)>, s: f64) {
@@ -8525,6 +8522,33 @@ mod tests {
         let h = label_of(&d, |k| matches!(k, ConstraintKind::Length { value, .. } if (*value - 0.01).abs() < 1e-9));
         assert!((w - v(0.01, -42.0 * PX)).length() < 1e-9, "width label: {w:?}");
         assert!((h - v(0.02 - 41.0 * PX, 0.005)).length() < 1e-9, "height label: {h:?}");
+    }
+
+    /// SKETCH-VDIM-SIDE-ARROWS (live, behaviours "skasm (2026-10-28)
+    /// rectangle glyphs and vertical dimension text"): a vertical line's value
+    /// box lands left of it, and a short dimension keeps its arrows inside
+    /// (their tips at the extension lines, pointing out).
+    #[test]
+    fn a_vertical_lines_value_box_goes_left_and_short_arrows_stay_inside() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.04));
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        let f = &ed.otf.as_ref().unwrap().fields[0];
+        assert!((f.label - v(-26.0 * PX, 0.02)).length() < 1e-9, "left of the line: {:?}", f.label);
+        // A 6 px dimension: from each tip the arrow runs inward (overlapping
+        // the other), and no shaft sticks out past the extension lines.
+        let mut out = Vec::new();
+        linear_dim(&mut out, v(0.0, 0.0), v(6.0, 0.0), Some(DVec2::X), v(3.0, 5.0), 1.0);
+        for seg in out.iter().filter(|s| (s[0].y - 5.0).abs() < 1e-9 || (s[1].y - 5.0).abs() < 1e-9) {
+            for (tip, other) in [(seg[0], seg[1]), (seg[1], seg[0])] {
+                if tip.x.abs() < 1e-9 && (tip.y - 5.0).abs() < 1e-9 {
+                    assert!(other.x >= -1e-9, "left tip points out: {seg:?}");
+                }
+                if (tip.x - 6.0).abs() < 1e-9 && (tip.y - 5.0).abs() < 1e-9 {
+                    assert!(other.x <= 6.0 + 1e-9, "right tip points out: {seg:?}");
+                }
+            }
+        }
     }
 
     /// Live (behaviours "skasm (2026-10-27, P1) sketch value boxes: center
