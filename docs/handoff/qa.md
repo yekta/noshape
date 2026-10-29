@@ -9,6 +9,12 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **21:23 update (greens 9e22cea5 → 88f494a4 → 915a165b → 0307a4c7 → 503730d7 → 83fe08d2 → 6f227e4f → 9e3ff3d9):** bool's free-form
+  steps (88f494a4 reversed faces, 503730d7 tolerant sub-shapes) and core f10201e7 (glue retry): app Rust-vs-OCCT over 67 documents
+  (5 threads, 37 spheres / tori, 25 spline extrusions; cli/ab88.summary) all 0 px; mirror set and P0 repros 0 px on the newer green
+  (one hp3 crop was a failed X connection on :131, fine on re-run); threads add4 / rem7 unchanged. The dx greens (A25, D17, D36,
+  A22, A23 / A24) and psui 9e3ff3d9 (a benchmark switch) not checked one by one. CLI fuzz on v0.4.14: 377 re-run clean, 381–390
+  clean, 391 running (slow mirrors, 50 s).
 - **20:41 update (greens fb3fbeb9 → e7b26a16 → 6f5c1fae):** verified DWG-EDIT-SECTION-DIALOG (tool button, fb3fbeb9). bool e7b26a16
   (thread fused with its rod): new bin/thread.py (rod r5 × 20, helix on its face, a triangle swept along it, Add or Remove; made
   with the v0.4.14 CLI = OCCT reference) → threads/add2 / add4 / add7 / rem4 / rem7: Rust vs OCCT in the app all 0 px (add4 1631.344 /
