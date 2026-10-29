@@ -9,6 +9,12 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **01:25 update (green de7776da, no code change):** P0 CLI-SUPPRESS-SEGV second repro: seed 174 (gdb: 3 recovered fillet faults, then a
+  SIGSEGV inside ____longjmp_chk with a mangled address). New P2 CYL-UNIFY-OPPOSITE (live 1584: two opposite extrudes of one circle =
+  one cylinder face; ours two, both kernels; a mirrored rod merges with Rust, not with OCCT). Memory per regen on the 41-feature
+  cli-fillet-segv: +60–100 MB per Extrude edit up to ~2.2 GB, flat after ~19 edits, same with OCCT only; qa-1026-main +5 MB per
+  edit; live-30 flat → a bounded cache, no ticket. Seeds 172 / 173 / 175 fine and Rust on = off on their documents; 176 / 177 and
+  GUI fuzz 100 running.
 - **00:55 update (green fd036a5c):** RUST-MIRROR-EXTRA-FACE narrowed: a plate with a through hole mirrored onto itself (Add)
   keeps the hole wall split (2 × 314.159 mm²; OCCT / live one 628.319 mm²), seen in the app (tickets/mirhole.py, rust-mirror-min).
   bin/topomatrix.py (stacked cylinders, stacked plates with holes, side-by-side boxes, opposite extrudes) agrees Rust vs OCCT; the
