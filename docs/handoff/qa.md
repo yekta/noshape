@@ -9,6 +9,12 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **08:56 update (greens 2391af52 → 349290dc):** v0.4.14 published 08:43:30 = the smoked artifact (all rows OK; halfmir2 P0 marked
+  fixed at the top of TICKETS). On 2391 / 3492 the mirror set and 7 Draft / chamfer documents are identical to v0.4.14 / v0.4.13
+  in the app (bool a779433f, 024fc02d); verified 445c5ad6 (4 top edges R12 "Failed to fillet selections." = live F2). **New P2
+  PSUI-CONE-SHADING** (3081a122: a cone's apex fan shaded as a blob; sphere fine; live-30 / boltdwg / wf-block A/B identical).
+  GUARD-SEGV-MALLOC-DEADLOCK: v0.4.13 froze in 2 of 2 seed-189 runs (same malloc signature at step 95); a v0.4.14 run is going
+  (cli/clifuzz-189-rv0414.log). GUI fuzz 240–255 alive; CLI seeds 191–194 (bool CLI 07:17) clean.
 - **08:06 update:** tag v0.4.14 (6b2e0b13) pushed 08:00, Release run 40839037570 building (bdb6 waiter; smoke when it
   publishes: `bin/relsmoke_cli.sh 0.4.14`, `bin/mirset.sh <release cli>`, GUI rows). **P0 GUARD-SEGV-MALLOC-DEADLOCK** now
   has four sightings on CLI seed 189: core CLI frozen in malloc after a guarded SIGSEGV; v0.4.13 release CLI frozen on a
