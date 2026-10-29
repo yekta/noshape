@@ -9,6 +9,13 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **10:26 update:** RUST-HALF-POCKET-3 is **every blind half pocket opening on the bottom (Top-plane) face** (bin/pocksweep.py: 24 / 24
+  wrong on v0.4.14, OCCT 32 / 32 right; cut from the top face they're right), and it is the Rust **union** itself (Mirror New + Boolean
+  Union, bin/halfpockunion.py); RUST-MIRROR-NOTCH has the same bottom-face trigger. boolmir seeds 1–87 (cli/boolmir*.out): 17
+  differences, all in these families plus RUST-MIRROR-RIM-ERR (now also on Linear pattern Add), RUST-MIRROR-SPLIT-FACES and the
+  OCCT-path P2s. CLI seed 197 on v0.4.14: step 69 busy > 30 min at 40–55 % CPU (a worker thread, main in pthread_join; stripped binary,
+  op not logged before it runs) — not a deadlock; will note what the timeout leaves. /tmp is tmpfs (RAM): qa's scratch there cleaned
+  (374 MB).
 - **10:16 update:** boolmir seeds 16–45: more RUST-HALF-POCKET-3 / RUST-MIRROR-NOTCH cases, **P1 RUST-MIRROR-RIM-ERR** (Rust fails a
   mirror v0.4.12 did), **P1 RUST-MIRROR-SPLIT-FACES**, P2 OCCT-MIRROR-OVERCOUNT (OCCT path). Live 1593 / 1594 → **P2
   RUST-UNION-MERGES-DISJOINT-FACES**, P3 TOUCH-PATTERN-ADD. Caution: the box hit OOM at 10:00 (nginx in a docker container killed,
