@@ -9,6 +9,10 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **03:17 update (green a9339ee7 = + core ae44d8d9 fillet oversize, skasm b7e933c3 F fit / 9d70ff72 triad box):** verified
+  **CLI-SUPPRESS-SEGV** (seeds 171 / 174 replay clean with core's CLI 03:08, rel/k/core/0308), **FILLET-OVERSIZE-OK** (all live-answered
+  cases, tickets/oversize2.py; the single-edge R25 / R45 still Ok, asked live REQUESTS 03:10), SKETCH-F-FIT (per live 1583),
+  ASM-TRIAD-VALUE-STAYS. GUI fuzz 130–135 (6228) alive; 136–141 (a933) and CLI seeds 183 / 184 (core CLI, Rust on) running.
 - **03:00 update (green 6228323b = + bool reversed-face loops / seams / Shell slab Common / tolerance 1e-5, psui mesher hand-off, dx
   D15):** in the app: live-30 60779.484 / 15848.357; **halfmir now 7214.602 / 2957.08 (right; HALF-MIRROR fixed by default via Rust,
   OCCT path still wrong)**; mirhole wall still 314.159 (RUST-MIRROR open); wf-block top-face Shell 5045.965 / 3956.429 (= v0.4.12).
