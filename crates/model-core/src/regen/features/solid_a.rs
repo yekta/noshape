@@ -1170,9 +1170,13 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
         return err("The rib profiles no longer exist");
     }
     let normal = ev.is("ribExtrusionDirection", "NORMAL_TO_SKETCH_PLANE");
-    // Live L23/L24: parallel to the sketch plane a closed profile or a chain
-    // of several edges fails on the profiles.
-    if !normal && wires.iter().any(|w| w.is_closed().unwrap_or(false) || w.edges().len() > 1) {
+    // Parallel to the sketch plane: a closed profile fails first with
+    // rib.fs's RIB_ONLY_OPEN_PROFILES (qa RIB-CLOSED-PROFILE-MSG), a chain of
+    // several edges on the profiles (live L23/L24).
+    if !normal && wires.iter().any(|w| w.is_closed().unwrap_or(false)) {
+        return crate::regen::eval::err_at(&["profiles"], "Only open sketch profiles can be used when rib direction is parallel to sketch plane.");
+    }
+    if !normal && wires.iter().any(|w| w.edges().len() > 1) {
         return crate::regen::eval::err_at(&["profiles"], RIB_FAILED);
     }
     let dir = if ev.bool("oppositeDirection") { -frame.normal } else { frame.normal };

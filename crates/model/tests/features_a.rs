@@ -1154,6 +1154,22 @@ fn rib_extend_profiles_as_live() {
     assert_eq!(run((0.002, 0.015), (0.038, 0.015), true), Err("Failed to create a rib from a selected profile.".into()));
 }
 
+/// qa RIB-CLOSED-PROFILE-MSG: a closed profile parallel to the sketch plane
+/// fails with rib.fs's RIB_ONLY_OPEN_PROFILES, before anything else.
+#[test]
+fn rib_of_a_closed_profile_parallel_to_its_plane_says_why() {
+    let mut t = T::new();
+    let (_, x) = t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let c = sk.add_circle(DVec2::new(0.02, 0.005), 0.003);
+    let s = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+    t.add("rib", &[("profiles", q(vec![Reference::SketchEntity { sketch: s, entity: c.0 }])), ("parts", q(vec![Reference::Body(BodyId { feature: x, index: 0 })])), ("thickness", e("2 mm"))]);
+    let res = t.regen();
+    let st = res.display.features.last().unwrap();
+    assert_eq!(st.status, FeatureStatus::Error);
+    assert_eq!(st.message.as_deref(), Some("Only open sketch profiles can be used when rib direction is parallel to sketch plane."));
+}
+
 /// rib.fs applyDraft, live G33c (a U channel: plate 60×40×5, walls 5 thick
 /// and 30 high at both ends): the 4 mm rib from a line at z 25 across the
 /// channel, drafted 3°, widens toward the plate (27048.155585660817 mm³;
