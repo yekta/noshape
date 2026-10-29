@@ -424,6 +424,12 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
    frame culls the candidates (facing test with the instance's normal matrix) into a compacted index list +
    indirect draw (vs_silhouette pulling the candidate by index); behind a switch first, measured with the same
    variants, then default.
+   Landed with this note: `SilCull` (renderer.rs) + `cs_sil_cull` / `vs_silhouette_pulled` (shaders.wgsl), opt-in
+   `NOSHAPE_SIL_CULL=1` or `Renderer::set_silhouette_cull`; needs 6 storage buffers a stage (the renderer's own
+   device now asks up to 8 where the adapter has them; Linux's shared GPUI device keeps the old path); runs too
+   big for one storage binding draw the old way. T1 render offscreen culled_silhouettes_draw_as_the_plain_ones
+   (pixel-equal, two slots); every render test also passes with NOSHAPE_SIL_CULL=1. Bench dispatched with
+   variants r / cull / nosil: if cull ≈ nosil, make it the default.
 0f. (done 10-28: no gain, see above) Retina orbit, experiment for 0c: line segments are instances of 6 vertices (`draw(slots*6, 0..count)`),
    which packs Apple GPUs' vertex SIMD groups badly; pull segments from a storage buffer by vertex_index / 6 with
    the slot as the instance (one instance per copy) and measure with perf.yml.

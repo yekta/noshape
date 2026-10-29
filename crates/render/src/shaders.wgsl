@@ -762,21 +762,82 @@ struct SilhouetteIn {
 
 @vertex
 fn vs_silhouette(@builtin(vertex_index) index: u32, s: SilhouetteIn) -> LineOut {
-    let slot = index / 6u;
-    load_inst(slot);
-    let n1 = (inst.normal_m * vec4(s.n1, 0.0)).xyz;
-    let n2 = (inst.normal_m * vec4(s.n2, 0.0)).xyz;
+    return silhouette_vertex(index, s);
+}
+
+// A silhouette unless both facets clearly face the same way (the instance loaded). A facet seen exactly edge-on (an
+// exact standard view of a cylinder) faces neither: both edges round it are the outline (SIL-AXIS-VIEW-GONE: with
+// `>= 0` both were dropped and the cylinder's sides lost their line in Front view).
+fn is_silhouette(a: vec3<f32>, m1: vec3<f32>, m2: vec3<f32>) -> bool {
+    let n1 = (inst.normal_m * vec4(m1, 0.0)).xyz;
+    let n2 = (inst.normal_m * vec4(m2, 0.0)).xyz;
     // Toward the viewer: the eye ray (perspective) or the view direction.
-    let at = (inst.model * vec4(s.a, 1.0)).xyz;
+    let at = (inst.model * vec4(a, 1.0)).xyz;
     let view = select(-g.camera_fwd.xyz, g.camera_pos.xyz - at, g.camera_pos.w > 0.5);
-    // A silhouette unless both facets clearly face the same way. A facet seen exactly edge-on (an exact standard
-    // view of a cylinder) faces neither: both edges round it are the outline (SIL-AXIS-VIEW-GONE: with `>= 0` both
-    // were dropped and the cylinder's sides lost their line in Front view). Decided first: most candidates aren't
-    // silhouettes, and the line's own vertex work was spent on each of them for nothing (the Retina orbit's cost).
     let d1 = dot(normalize(n1), normalize(view));
     let d2 = dot(normalize(n2), normalize(view));
     let eps = 1e-4;
-    if ((d1 > eps && d2 > eps) || (d1 < -eps && d2 < -eps)) {
+    return !((d1 > eps && d2 > eps) || (d1 < -eps && d2 < -eps));
+}
+
+// NOSHAPE_SIL_CULL: the candidates of one silhouette draw (14 words each: a, b, n1, n2, pick, width) and the ones
+// cs_sil_cull found to be silhouettes this frame (candidate, slot), drawn indirectly by vs_silhouette_pulled.
+@group(2) @binding(0) var<storage, read> sil_cands: array<u32>;
+@group(2) @binding(1) var<storage, read_write> sil_found: array<u32>;
+// The same list as the vertex stage reads it (no writable storage there).
+@group(2) @binding(1) var<storage, read> sil_found_r: array<u32>;
+// The run of slots and the candidate count; the indirect draw's instance count, counted up here.
+struct SilJob {
+    first_slot: u32,
+    slots: u32,
+    count: u32,
+    _pad: u32,
+};
+@group(2) @binding(2) var<uniform> sil_job: SilJob;
+@group(2) @binding(3) var<storage, read_write> sil_args: array<atomic<u32>, 4>;
+
+fn sil_v3(i: u32, at: u32) -> vec3<f32> {
+    let b = 14u * i + at;
+    return vec3(bitcast<f32>(sil_cands[b]), bitcast<f32>(sil_cands[b + 1u]), bitcast<f32>(sil_cands[b + 2u]));
+}
+
+fn sil_in(i: u32) -> SilhouetteIn {
+    var s: SilhouetteIn;
+    s.a = sil_v3(i, 0u);
+    s.b = sil_v3(i, 3u);
+    s.n1 = sil_v3(i, 6u);
+    s.n2 = sil_v3(i, 9u);
+    s.pick = sil_cands[14u * i + 12u];
+    s.width = bitcast<f32>(sil_cands[14u * i + 13u]);
+    return s;
+}
+
+// One candidate of one slot per invocation (workgroups in two dimensions past 65535).
+@compute @workgroup_size(64)
+fn cs_sil_cull(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgroups) groups: vec3<u32>) {
+    let i = id.y * groups.x * 64u + id.x;
+    if (i >= sil_job.count * sil_job.slots) { return; }
+    let c = i % sil_job.count;
+    let slot = sil_job.first_slot + i / sil_job.count;
+    load_inst(slot);
+    if (!is_silhouette(sil_v3(c, 0u), sil_v3(c, 6u), sil_v3(c, 9u))) { return; }
+    let k = atomicAdd(&sil_args[1], 1u);
+    sil_found[2u * k] = c;
+    sil_found[2u * k + 1u] = slot;
+}
+
+@vertex
+fn vs_silhouette_pulled(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> LineOut {
+    let slot = sil_found_r[2u * ii + 1u];
+    return silhouette_vertex(slot * 6u + vi % 6u, sil_in(sil_found_r[2u * ii]));
+}
+
+fn silhouette_vertex(index: u32, s: SilhouetteIn) -> LineOut {
+    let slot = index / 6u;
+    load_inst(slot);
+    // Decided first: most candidates aren't silhouettes, and the line's own vertex work was spent on each of them
+    // for nothing.
+    if (!is_silhouette(s.a, s.n1, s.n2)) {
         var none: LineOut;
         none.pos = vec4(0.0, 0.0, -2.0, 1.0);
         none.color = vec4(0.0);

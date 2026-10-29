@@ -612,6 +612,9 @@ struct DrawLists {
     /// Color pass only: silhouette candidates (`GpuLines::silhouette`) and
     /// backface silhouette meshes (`Instance::back_silhouette`).
     silhouettes: Vec<usize>,
+    /// The frame's culled silhouette draws ([`SilCull`]), and the runs too big to cull (drawn as `silhouettes`).
+    sil_draws: Vec<SilDraw>,
+    sil_plain: Vec<usize>,
     back_silhouettes: Vec<usize>,
     points: Vec<usize>,
     /// Color pass only: `hidden_only` lines and points.
@@ -1260,7 +1263,18 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &lists.lines_hidden, &pipelines.line_hidden);
         draw(pass, &lists.points_hidden, &pipelines.point_hidden);
         draw(pass, &lists.lines, &pipelines.line);
-        draw(pass, &lists.silhouettes, &pipelines.silhouette);
+        match pipelines.silhouette_pulled.as_ref().filter(|_| !lists.sil_draws.is_empty() || !lists.sil_plain.is_empty()) {
+            Some(pulled) => {
+                pass.set_pipeline(pulled.get());
+                for d in &lists.sil_draws {
+                    pass.set_bind_group(2, &d.group, &[]);
+                    pass.draw_indirect(&d.args, 0);
+                    calls.0.set(calls.0.get() + 1);
+                }
+                draw(pass, &lists.sil_plain, &pipelines.silhouette);
+            }
+            None => draw(pass, &lists.silhouettes, &pipelines.silhouette),
+        }
         draw(pass, &lists.points, &pipelines.point);
         draw(pass, &lists.over_lines, &pipelines.mesh_transparent);
         // Outlined see-through parts, last (their depth would hide what
@@ -1559,9 +1573,160 @@ enum LayoutKind {
     Image,
     /// Section caps.
     Cap,
+    /// Silhouettes pulled from the cull's list (bind group 2, [`SilCull`]).
+    SilPulled,
 }
 
 /// What compiling a pipeline needs, owned (for compile threads).
+/// `NOSHAPE_SIL_CULL=1`: the edge silhouette candidates (every tessellation edge inside a curved face, 6 vertices
+/// each, the Retina orbit's line cost: perf 40964180293) culled on the GPU before the color pass: `cs_sil_cull` keeps
+/// the ones that are silhouettes in this view, counting them into an indirect draw of `vs_silhouette_pulled`.
+struct SilCull {
+    cs_layout: wgpu::BindGroupLayout,
+    vs_layout: wgpu::BindGroupLayout,
+    render_layout: wgpu::PipelineLayout,
+    pipeline: wgpu::ComputePipeline,
+    /// By (candidates, first slot, slots, count): the run's buffers, kept while drawn.
+    runs: HashMap<(usize, u32, u32, u32), SilRun>,
+}
+
+struct SilRun {
+    args: wgpu::Buffer,
+    cs_group: wgpu::BindGroup,
+    vs_group: wgpu::BindGroup,
+    used: bool,
+}
+
+/// One culled silhouette draw: its candidates and list (group 2) and its indirect arguments.
+struct SilDraw {
+    group: wgpu::BindGroup,
+    args: wgpu::Buffer,
+}
+
+impl SilCull {
+    fn new_if_on(device: &wgpu::Device, globals: &wgpu::BindGroupLayout, inst: &wgpu::BindGroupLayout, compare: &wgpu::BindGroupLayout, shader: &wgpu::ShaderModule) -> Option<Self> {
+        if std::env::var("NOSHAPE_SIL_CULL").ok().as_deref() != Some("1") {
+            return None;
+        }
+        Self::new(device, globals, inst, compare, shader)
+    }
+
+    fn new(device: &wgpu::Device, globals: &wgpu::BindGroupLayout, inst: &wgpu::BindGroupLayout, compare: &wgpu::BindGroupLayout, shader: &wgpu::ShaderModule) -> Option<Self> {
+        // Six storage buffers in the cull (the frame's states, instances and slots; candidates, list, arguments).
+        if device.limits().max_storage_buffers_per_shader_stage < 6 {
+            log::info!("silhouette cull off: {} storage buffers a stage", device.limits().max_storage_buffers_per_shader_stage);
+            return None;
+        }
+        let entry = |binding, visibility, ty| wgpu::BindGroupLayoutEntry { binding, visibility, ty: wgpu::BindingType::Buffer { ty, has_dynamic_offset: false, min_binding_size: None }, count: None };
+        let (c, v) = (wgpu::ShaderStages::COMPUTE, wgpu::ShaderStages::VERTEX);
+        let ro = wgpu::BufferBindingType::Storage { read_only: true };
+        let rw = wgpu::BufferBindingType::Storage { read_only: false };
+        let cs_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("sil-cull"),
+            entries: &[entry(0, c, ro), entry(1, c, rw), entry(2, c, wgpu::BufferBindingType::Uniform), entry(3, c, rw)],
+        });
+        let vs_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some("sil-pulled"), entries: &[entry(0, v, ro), entry(1, v, ro)] });
+        let cs_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some("sil-cull"), bind_group_layouts: &[Some(globals), Some(inst), Some(&cs_layout)], immediate_size: 0 });
+        let render_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some("sil-pulled"), bind_group_layouts: &[Some(globals), Some(inst), Some(&vs_layout), Some(compare)], immediate_size: 0 });
+        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("sil-cull"),
+            layout: Some(&cs_pipeline_layout),
+            module: shader,
+            entry_point: Some("cs_sil_cull"),
+            compilation_options: Default::default(),
+            cache: None,
+        });
+        Some(Self { cs_layout, vs_layout, render_layout, pipeline, runs: HashMap::new() })
+    }
+}
+
+impl Renderer {
+    /// Turns the silhouette cull ([`SilCull`]) on or off (`NOSHAPE_SIL_CULL=1` turns it on at start); whether it's
+    /// on (the device may not have the bindings).
+    pub fn set_silhouette_cull(&mut self, on: bool) -> bool {
+        if on != self.sil.is_some() {
+            self.sil = if on { SilCull::new(&self.device, &self.globals_layout, &self.inst_layout, &self.compare_layout, &self.shader) } else { None };
+            // The pulled silhouettes' pipeline joins (or leaves) the set.
+            self.pipelines = None;
+        }
+        self.sil.is_some()
+    }
+
+    /// [`SilCull`]: culls the frame's silhouette runs (own submission, before the frame's on the same queue); the
+    /// draws, and the runs too big for one storage binding (drawn as before).
+    fn sil_cull(&mut self, instances: &[Instance], lists: &DrawLists, bind_inst: &wgpu::BindGroup) -> (Vec<SilDraw>, Vec<usize>) {
+        let Self { sil, device, queue, bind_color, .. } = self;
+        let (Some(sc), Some(bind_color)) = (sil.as_mut(), bind_color.as_ref()) else { return (Vec::new(), Vec::new()) };
+        let (mut draws, mut plain) = (Vec::new(), Vec::new());
+        if lists.silhouettes.is_empty() {
+            sc.runs.clear();
+            return (draws, plain);
+        }
+        for r in sc.runs.values_mut() {
+            r.used = false;
+        }
+        let max_binding = device.limits().max_storage_buffer_binding_size;
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("sil-cull") });
+        {
+            let mut cp = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("sil-cull"), timestamp_writes: None });
+            cp.set_pipeline(&sc.pipeline);
+            cp.set_bind_group(0, bind_color, &[]);
+            cp.set_bind_group(1, bind_inst, &[]);
+            let list = &lists.silhouettes;
+            let mut k = 0;
+            while k < list.len() {
+                let inst = &instances[list[k]];
+                let first = lists.slot_of[list[k]];
+                let mut n = 1;
+                while k + n < list.len() && lists.slot_of[list[k + n]] == first + n as u32 && same_buffers(inst, &instances[list[k + n]], false) {
+                    n += 1;
+                }
+                let run_items = &list[k..k + n];
+                k += n;
+                let Drawable::Lines(l) = &inst.drawable else { continue };
+                let (count, slots) = (l.0.count, n as u32);
+                let found_size = 8 * u64::from(count) * u64::from(slots);
+                if count == 0 || found_size > max_binding || l.0.buffer.size() > max_binding {
+                    plain.extend_from_slice(run_items);
+                    continue;
+                }
+                let key = (Arc::as_ptr(&l.0) as usize, first, slots, count);
+                let run = sc.runs.entry(key).or_insert_with(|| {
+                    let found = device.create_buffer(&wgpu::BufferDescriptor { label: Some("sil-found"), size: found_size.max(8), usage: wgpu::BufferUsages::STORAGE, mapped_at_creation: false });
+                    let args = device.create_buffer(&wgpu::BufferDescriptor { label: Some("sil-args"), size: 16, usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+                    let job = device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: Some("sil-job"), contents: bytemuck::cast_slice(&[first, slots, count, 0u32]), usage: wgpu::BufferUsages::UNIFORM });
+                    let cs_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("sil-cull"),
+                        layout: &sc.cs_layout,
+                        entries: &[
+                            wgpu::BindGroupEntry { binding: 0, resource: l.0.buffer.as_entire_binding() },
+                            wgpu::BindGroupEntry { binding: 1, resource: found.as_entire_binding() },
+                            wgpu::BindGroupEntry { binding: 2, resource: job.as_entire_binding() },
+                            wgpu::BindGroupEntry { binding: 3, resource: args.as_entire_binding() },
+                        ],
+                    });
+                    let vs_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("sil-pulled"),
+                        layout: &sc.vs_layout,
+                        entries: &[wgpu::BindGroupEntry { binding: 0, resource: l.0.buffer.as_entire_binding() }, wgpu::BindGroupEntry { binding: 1, resource: found.as_entire_binding() }],
+                    });
+                    SilRun { args, cs_group, vs_group, used: false }
+                });
+                run.used = true;
+                // Six vertices per found candidate, counted up by the cull.
+                queue.write_buffer(&run.args, 0, bytemuck::cast_slice(&[6u32, 0, 0, 0]));
+                let groups = (u64::from(count) * u64::from(slots)).div_ceil(64);
+                cp.set_bind_group(2, &run.cs_group, &[]);
+                cp.dispatch_workgroups(groups.min(65535) as u32, groups.div_ceil(65535) as u32, 1);
+                draws.push(SilDraw { group: run.vs_group.clone(), args: run.args.clone() });
+            }
+        }
+        sc.runs.retain(|_, r| r.used);
+        queue.submit([encoder.finish()]);
+        (draws, plain)
+    }
+}
+
 #[derive(Clone)]
 struct PipelineMaker {
     device: wgpu::Device,
@@ -1569,6 +1734,7 @@ struct PipelineMaker {
     main: wgpu::PipelineLayout,
     image: wgpu::PipelineLayout,
     cap: wgpu::PipelineLayout,
+    sil: Option<wgpu::PipelineLayout>,
     /// Compile at utility priority (the first-frame pipelines under `NOSHAPE_PREWARM=early`; each runs on a
     /// thread of its own).
     early: bool,
@@ -1586,6 +1752,7 @@ impl PipelineMaker {
                 LayoutKind::Main => &self.main,
                 LayoutKind::Image => &self.image,
                 LayoutKind::Cap => &self.cap,
+                LayoutKind::SilPulled => self.sil.as_ref().expect("silhouette cull layout"),
             }),
             vertex: wgpu::VertexState {
                 module: sh,
@@ -1714,6 +1881,8 @@ struct Pipelines {
     /// Lines and points of `hidden_only` instances: drawn where something is
     /// in front of them (depth test Less, no depth write).
     line_hidden: Lazy,
+    /// The culled silhouettes (`NOSHAPE_SIL_CULL`, [`SilCull`]).
+    silhouette_pulled: Option<Lazy>,
     silhouette: wgpu::RenderPipeline,
     mesh_backsil: wgpu::RenderPipeline,
     /// `mesh_opaque` without `discard` ([`DrawLists::solid`] meshes).
@@ -1802,6 +1971,8 @@ impl SlotBuffer {
 }
 
 pub struct Renderer {
+    /// `NOSHAPE_SIL_CULL=1`: the edge silhouettes culled on the GPU each frame.
+    sil: Option<SilCull>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     adapter_info: wgpu::AdapterInfo,
@@ -2048,11 +2219,14 @@ impl Renderer {
 
     /// The device the renderer asks of an adapter.
     async fn request_device(adapter: &wgpu::Adapter) -> Result<(wgpu::Device, wgpu::Queue), String> {
+        // Up to 8 storage buffers a stage where the adapter has them (the silhouette cull binds 6, `SilCull`).
+        let mut required_limits = wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits());
+        required_limits.max_storage_buffers_per_shader_stage = adapter.limits().max_storage_buffers_per_shader_stage.clamp(required_limits.max_storage_buffers_per_shader_stage, 8);
         adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("noshape"),
                 required_features: adapter.features() & Self::WANTED_FEATURES,
-                required_limits: wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits()),
+                required_limits,
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
                 memory_hints: wgpu::MemoryHints::Performance,
                 trace: wgpu::Trace::Off,
@@ -2088,7 +2262,8 @@ impl Renderer {
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    // Compute too: the silhouette cull (`SilCull`).
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT | wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -2098,7 +2273,7 @@ impl Renderer {
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
-                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT | wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
@@ -2112,7 +2287,7 @@ impl Renderer {
             label: Some("instance"),
             entries: &[0, 1].map(|binding| wgpu::BindGroupLayoutEntry {
                 binding,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT | wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: true }, has_dynamic_offset: false, min_binding_size: None },
                 count: None,
             }),
@@ -2223,6 +2398,7 @@ impl Renderer {
 
         let timer = (perf::enabled() && device.features().contains(wgpu::Features::TIMESTAMP_QUERY)).then(|| GpuTimer::new(&device, &queue));
         let slot_buffers = std::array::from_fn(|_| SlotBuffer::new(&device));
+        let sil = SilCull::new_if_on(&device, &globals_layout, &inst_layout, &compare_layout, &shader);
         Self {
             device,
             queue,
@@ -2238,6 +2414,7 @@ impl Renderer {
             image_sampler,
             texel_sampler,
             section_caps,
+            sil,
             cap_pipeline_layout,
             pipelines: None,
             ao: None,
@@ -2319,6 +2496,7 @@ impl Renderer {
             main: self.pipeline_layout.clone(),
             image: self.image_pipeline_layout.clone(),
             cap: self.cap_pipeline_layout.clone(),
+            sil: self.sil.as_ref().map(|c| c.render_layout.clone()),
             early: false,
         };
         let mask_format = self.section_caps.mask_format;
@@ -2371,6 +2549,7 @@ impl Renderer {
         let mesh_transparent_back = lazy(LayoutKind::Main, P { label: "mesh-t-back", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Front) });
         let mesh_transparent_front = lazy(LayoutKind::Main, P { label: "mesh-t-front", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Back) });
         let mesh_on_top = lazy(LayoutKind::Main, P { label: "mesh-top", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }, PLAIN);
+        let silhouette_pulled = m.sil.is_some().then(|| lazy(LayoutKind::SilPulled, P { label: "silhouette-pulled", vs: "vs_silhouette_pulled", fs: "fs_line", buffers: &[], format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
         let line_hidden = lazy(LayoutKind::Main, P { label: "line-hidden", vs: "vs_line", fs: "fs_line", buffers: LINE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN);
         let point_hidden = lazy(LayoutKind::Main, P { label: "point-hidden", vs: "vs_point", fs: "fs_point", buffers: POINT_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: POINT_DEPTH_BIAS, samples: msaa }, PLAIN);
         let mesh_pick = lazy(LayoutKind::Main, P { label: "mesh-pick", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }, PLAIN);
@@ -2405,6 +2584,7 @@ impl Renderer {
             mesh_backsil,
             silhouette,
             line_hidden,
+            silhouette_pulled,
             point,
             point_hidden,
             mesh_pick,
@@ -2714,6 +2894,7 @@ impl Renderer {
         lists.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, dpr), false, &mut self.mesh_lod_memory);
         lists.apply_detail(&req.style.detail);
         let bind_inst = self.prepare_slots(SLOTS_COLOR, &lists.slots);
+        (lists.sil_draws, lists.sil_plain) = self.sil_cull(&req.scene.instances, &lists, &bind_inst);
         // ...then both versions together, and each version's opaque faces
         // for its depth and normal. A feature preview: the model with the
         // feature, mixed over the frame the same way.
@@ -3807,7 +3988,8 @@ impl Uploader {
         let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("silhouettes"),
             contents: if data.segments.is_empty() { &[0u8; std::mem::size_of::<SilhouetteSegment>()] } else { bytemuck::cast_slice(&data.segments) },
-            usage: wgpu::BufferUsages::VERTEX,
+            // Storage too: the silhouette cull reads the candidates (`SilCull`).
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::STORAGE,
         });
         LinesHandle(Arc::new(GpuLines { buffer, count: data.segments.len() as u32, bounds: data.bounds(), silhouette: true }))
     }

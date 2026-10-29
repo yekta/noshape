@@ -2093,3 +2093,46 @@ fn a_see_through_part_in_front_wins_the_pick_when_solid() {
     assert!(behind > 1000, "a see-through mesh lets the part behind it win: {behind}");
     assert_eq!(picked(&mut r, true), 2, "the see-through part's own top face (+Z, id 2) wins");
 }
+
+/// The silhouette cull (`Renderer::set_silhouette_cull`, NOSHAPE_SIL_CULL) draws what the plain silhouette pass draws:
+/// a ring of candidates round a cylinder, in two copies of one buffer (two slots), from an oblique view.
+#[test]
+fn culled_silhouettes_draw_as_the_plain_ones() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (240u32, 180u32);
+    let mut cam = Camera::default();
+    cam.set_view(StandardView::Isometric);
+    cam.fit_sphere(glam::DVec3::ZERO, 0.05, w as f64 / h as f64);
+    // 48 rulings of a cylinder of radius 1 cm, each between the facets either side of it.
+    let n = 48;
+    let at = |k: f32| {
+        let t = std::f32::consts::TAU * k / n as f32;
+        [t.cos(), t.sin()]
+    };
+    let segments: Vec<SilhouetteSegment> = (0..n)
+        .map(|k| {
+            let [x, y] = at(k as f32);
+            let ([a, b], [c, d]) = (at(k as f32 - 0.5), at(k as f32 + 0.5));
+            SilhouetteSegment { a: [0.01 * x, 0.01 * y, -0.02], b: [0.01 * x, 0.01 * y, 0.02], n1: [a, b, 0.0], n2: [c, d, 0.0], pick_id: 0, width: 1.25 }
+        })
+        .collect();
+    let lines = r.upload_silhouettes(&SilhouetteData { segments });
+    let copy = |dx: f32| Instance::new(Drawable::Lines(lines.clone())).with_color([0.0, 0.0, 0.0, 1.0]).with_transform(glam::Mat4::from_translation(glam::Vec3::new(dx, 0.0, 0.0)));
+    let scene = Scene { instances: vec![copy(-0.015), copy(0.015)], ..Default::default() };
+    let frame = |r: &mut Renderer| r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap().bgra;
+    let plain = frame(&mut r);
+    if !r.set_silhouette_cull(true) {
+        eprintln!("skipping: no silhouette cull on this device");
+        return;
+    }
+    let culled = frame(&mut r);
+    assert!(plain.iter().filter(|&&v| v < 100).count() > 50, "the silhouettes drawn");
+    assert_eq!(plain, culled);
+}
