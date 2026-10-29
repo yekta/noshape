@@ -3501,7 +3501,7 @@ Clicks the dimension tool on the view geometry at `picks` (sheet mm; click on an
 - point_to_line: a point and a line
 - line_to_line: two parallel lines
 - radius: one circle or arc
-- diameter: one circle or arc
+- diameter: one circle or arc, or a cylinder's silhouette (across to the other)
 - angle: two lines
 - angle_3_point: vertex, then a point on each leg
 - arc_length: one arc

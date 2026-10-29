@@ -60,6 +60,29 @@ impl SheetPick<'_> {
         })
     }
 
+    /// The hovered straight edge as one silhouette of a cylinder seen side
+    /// on (an edge-on circle of the view with its center at the radius from
+    /// the line), with the opposite silhouette: the line mirrored through the
+    /// cylinder's axis.
+    pub fn silhouette_pair(&self) -> Option<Vec<Pick>> {
+        let Some(Pick::Line { a, b }) = self.line_pick() else { return None };
+        let g = self.geoms.get(&a.view)?;
+        let u = norm(sub(b.p, a.p));
+        let off = |p: [f64; 2]| {
+            let t = dot(sub(p, a.p), u);
+            sub(p, [a.p[0] + u[0] * t, a.p[1] + u[1] * t])
+        };
+        let n = g.model_edges.iter().find_map(|me| match me.geom {
+            views::EdgeGeom::Circle { center, radius, face_on: false, .. } => {
+                let n = off(center);
+                ((len(n) - radius).abs() < radius * 1e-3).then_some(n)
+            }
+            _ => None,
+        })?;
+        let mirror = |p: &PickedPoint| PickedPoint { view: p.view, p: [p.p[0] + 2.0 * n[0], p.p[1] + 2.0 * n[1]], r: None };
+        Some(vec![Pick::Line { a: a.clone(), b: b.clone() }, Pick::Line { a: mirror(&a), b: mirror(&b) }])
+    }
+
     /// 2 point linear, Point to line and Line to line: the click adds only
     /// the entity type the tool takes (points; a point and a line; two
     /// parallel lines), in the first pick's view; a picked entity clicked
@@ -241,6 +264,11 @@ impl SheetPick<'_> {
             DimTool::Radius | DimTool::Diameter => {
                 if let Some(p) = self.circle_pick(c) {
                     *picks = vec![p];
+                } else if kind == DimTool::Diameter
+                    && let Some(pair) = self.silhouette_pair()
+                {
+                    // A cylinder's silhouette: its diameter (help D15).
+                    *picks = pair;
                 }
             }
             DimTool::Angle | DimTool::Chamfer => {

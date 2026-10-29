@@ -77,6 +77,15 @@ impl SheetPick<'_> {
                 let offset = dim_offset(ps, qs, o, c);
                 Some(ann(AnnotationKind::LinearDimension { view: a.view, a: a.p, b: b.p, offset, orientation: o, override_text: None }, vec![(0, a.r), (1, b.r)]))
             }
+            // Diameter on a cylinder's silhouette: across both silhouettes.
+            Tool::Dimension { kind: DimTool::Diameter, picks } if matches!(picks.as_slice(), [Pick::Line { .. }, Pick::Line { .. }]) => {
+                let (kind, refs) = self.smart_dimension(picks)?;
+                let mut a = ann(kind, refs);
+                if self.cylinder_silhouettes(picks) {
+                    a.format.prefix = "Ø".into();
+                }
+                Some(a)
+            }
             Tool::Dimension { kind: kind @ (DimTool::Radius | DimTool::Diameter), picks } => {
                 let [Pick::Circle { view, center, radius, r }] = picks.as_slice() else { return None };
                 let cs = self.placement(*view)?.to_sheet(*center);

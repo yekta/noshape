@@ -33,7 +33,7 @@ const DIMENSIONS: [(&str, DimTool, &str); 12] = [
     ("point_to_line", DimTool::PointLine, "a point and a line"),
     ("line_to_line", DimTool::LineLine, "two parallel lines"),
     ("radius", DimTool::Radius, "one circle or arc"),
-    ("diameter", DimTool::Diameter, "one circle or arc"),
+    ("diameter", DimTool::Diameter, "one circle or arc, or a cylinder's silhouette (across to the other)"),
     ("angle", DimTool::Angle, "two lines"),
     ("angle_3_point", DimTool::Angle3, "vertex, then a point on each leg"),
     ("arc_length", DimTool::ArcLength, "one arc"),

@@ -862,6 +862,9 @@ fn drawing_lists_silhouettes() {
     let place = [(mids[0][0] + mids[1][0]) / 2.0 + 3.0, (mids[0][1] + mids[1][1]) / 2.0 + 25.0];
     let dia = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": mids, "place": place }));
     assert_eq!(dia["text"], "Ø20", "{dia}");
+    // The Diameter tool on one silhouette: the same (help D15).
+    let one = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "kind": "diameter", "picks": [mids[0]], "place": [place[0], place[1] + 10.0] }));
+    assert_eq!(one["text"], "Ø20", "{one}");
 }
 
 /// A new drawing knows the document state its views come from, so a model
