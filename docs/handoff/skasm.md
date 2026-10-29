@@ -189,6 +189,11 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   model after an edit 53 s. T0 after a sketch/scene edit 830 s total chain (incl. the tests above).
 
 ## Requests to the lead
+- shared ~/.config/noshape (10-29 04:00): every agent's app runs and the GPUI UI tests read and write the same config
+  dir; left_panel_width.txt was 853 (some GUI session dragged the feature list wide), which shrinks the test
+  viewports and changed a measured value enough to fail part-studio-ui dimension_box_escape_as_live locally (it passed
+  on vibe3; I made the test independent of it). Could the UI test harness (ui-test-support) set NOSHAPE_CONFIG_DIR to
+  a temp dir, and the GUI start scripts use per-agent dirs? I now start mine with NOSHAPE_CONFIG_DIR=skasm-scratch/cfg.
 - disk-loop (/tmp/lead/disk-loop.sh, every 30 min): its prune steps (prune-deps / prune-exes / incremental) run on
   target dirs mid-build; three of my lands failed 10-28 00:40–01:50 on .rmeta / fingerprint files deleted under a
   running build ("extern location for noshape_units does not exist: …/libnoshape_units-d2f9….rmeta", "failed to write
