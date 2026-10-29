@@ -209,6 +209,12 @@ N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes
      each split round the axis as a circle there; a plane whose hole loop comes first (OCCT's wire order after a
      fillet) is triangulated with its largest ring as the outer one. T1 rust_mesh::fillets_round_a_boss (concave
      and convex tori, every face ours). Next: spheres, cone apexes (degenerate edges), measure live-30.
+     Step 3b (10-29): the trigonometry once per row / column (a torus's rows were 4 sin_cos per node), faces
+     meshed in parallel (rayon; BRepMesh runs InParallel too). Node and triangle counts equal BRepMesh's on every
+     T1 shape (the filleted boss: 11332 / 21324 both). Fixtures on open (as 2d, load ~24, NOSHAPE_MESH_RUST=0 →
+     on): live-30-features 11–13 → 8–9.5 ms (all 48 faces ours; with tori but before 3b: 20–23), fins-400
+     472–504 → 96–100 ms (~5×; ours 74). Bench: ours 53 ms (CPU 49) against BRepMesh 235 (218), 4.4×. What's
+     left on fins-400 is OCCT reads, Poly_Triangulation building, core's edge loop and mesh_fill (~10 ms each).
 0. **After the cold-start work: our own display mesher (lead 10-28 21:05, user-approved).** `brep::mesh` in crates/brep
    (bool's crate, its Body / Surface / Curve types): planes (polygons with holes), cylinders, cones, spheres, tori from
    their exact parameterisation, shared edge samples (watertight), the display's deflection rules; anything else

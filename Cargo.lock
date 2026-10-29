@@ -4514,6 +4514,7 @@ version = "0.4.6"
 dependencies = [
  "glam 0.34.1",
  "noshape-workspace-hack",
+ "rayon",
 ]
 
 [[package]]
@@ -4985,6 +4986,7 @@ dependencies = [
  "concurrent-queue",
  "crc32fast",
  "crossbeam-utils",
+ "either",
  "errno",
  "euclid",
  "event-listener",

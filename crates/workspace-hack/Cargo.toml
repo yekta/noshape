@@ -22,6 +22,7 @@ arrayvec = { version = "0.7", default-features = false, features = ["std"] }
 bytemuck = { version = "1", default-features = false, features = ["aarch64_simd", "derive", "extern_crate_alloc", "min_const_generics", "wasm_simd"] }
 crc32fast = { version = "1" }
 crossbeam-utils = { version = "0.8" }
+either = { version = "1", default-features = false, features = ["use_std"] }
 euclid = { version = "0.22" }
 foldhash = { version = "0.2" }
 getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3", default-features = false, features = ["std"] }
@@ -56,6 +57,7 @@ aho-corasick = { version = "1" }
 anstyle = { version = "1" }
 cc = { version = "1", default-features = false, features = ["parallel"] }
 crossbeam-utils = { version = "0.8" }
+either = { version = "1", default-features = false, features = ["use_std"] }
 foldhash = { version = "0.2" }
 hashbrown-9067fe90e8c1f593 = { package = "hashbrown", version = "0.17", default-features = false, features = ["default-hasher"] }
 indexmap = { version = "2", features = ["serde"] }

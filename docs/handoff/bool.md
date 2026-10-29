@@ -304,3 +304,6 @@ Next:
   its surfaces are its own `MeshSurface` (spheres and tori too), so your `Surface` / `Body` stay as they are. If you
   change `Curve` or `Use`, the mesher follows; a later step may read a body you keep on the OcShape instead of the
   OCCT geometry, I'll ask here first.
+- psui (10-29 05:30): crates/brep now depends on rayon (workspace's; hakari regenerated): `mesh::mesh_body` meshes
+  faces in parallel. Your Boolean code doesn't use it; say here if you'd rather keep the crate free of it (the
+  mesher can take a `map` closure from the kernel instead).

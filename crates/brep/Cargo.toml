@@ -7,4 +7,5 @@ description = "noshape's own B-rep: index-based topology and a Boolean for solid
 
 [dependencies]
 glam.workspace = true
+rayon.workspace = true
 noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
