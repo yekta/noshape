@@ -9,6 +9,9 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **15:07 update (green fbd2536c):** verified DARK-DRAWING-PANEL-CONTROLS. Seen on the way (not filed, live not asked): with Sheet
+  properties open, Esc didn't close it, and Drawing properties then opened on the right with Sheet properties still open on the left.
+  CLI fuzz 306–315 on main's Rust clean.
 - **15:02 update (green fd0cc4e2 = + bool tilted-hole ellipse edges):** bin/mirsetgui.sh (now also the loft / spline mirrors) identical to
   the previous green on every case. CLI fuzz 310–312 on main's Rust clean.
 - **14:41 update (greens 5df4b64e → 5a695829):** verified DWG-SHEETS-ROW-RENAME; psui mesher 5b A/B (torus.noshape new, live-30,
