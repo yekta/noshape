@@ -1134,15 +1134,24 @@ impl Env<'_> {
             .map(|(_, b)| b)
     }
 
-    /// A callout's text: its own (empty: the BOM item number), with the
-    /// properties of its part `body` (`{part.*}`) and that part's BOM row
-    /// (`{bom.*}`) filled in; "----" when there is none.
+    /// A callout's text: its own (empty: the BOM item number, or the cut
+    /// list's when the sheet has a cut list and the part no BOM row; help
+    /// callout_balloon, drawing.md A24), with the properties of its part
+    /// `body` (`{part.*}`), its BOM row (`{bom.*}`) and cut list row
+    /// (`{cut.*}`) filled in; "----" when there is none.
     fn callout_text(&self, a: &Annotation, body: Option<&crate::reference::BodyId>, text: &str) -> String {
-        let t = text.trim();
-        let text = if t.is_empty() || t == "#" { "{bom.item}" } else { text };
         let src = a.kind.view().and_then(|v| views::view_source(self.sheet, v)).and_then(|(key, _)| self.sources.get(&key));
         let part = src.zip(body).and_then(|(s, b)| s.part(Some(b)));
         let row = src.zip(body).and_then(|(s, b)| s.bom.iter().find(|r| r.bodies.contains(b)));
+        let cut_table = self.sheet.tables.iter().any(|t| matches!(t.kind, TableKind::CutList { .. }));
+        let t = text.trim();
+        let wants_cut = text.contains("{cut.") || ((t.is_empty() || t == "#") && row.is_none() && cut_table);
+        let cut = if wants_cut { src.zip(body).and_then(|(s, b)| crate::regen::features::frames::cut_list(&s.context, None).into_iter().find(|r| r.bodies.contains(b))) } else { None };
+        let text = if t.is_empty() || t == "#" {
+            if row.is_none() && cut_table { "{cut.item}" } else { "{bom.item}" }
+        } else {
+            text
+        };
         let lookup = |k: &str| -> Option<String> {
             Some(match k {
                 "part.name" => part.map(|p| p.name.clone()).unwrap_or_default(),
@@ -1155,6 +1164,9 @@ impl Env<'_> {
                 "bom.name" => row.map(|r| r.name.clone()).unwrap_or_default(),
                 "bom.material" => row.map(|r| r.material.clone()).unwrap_or_default(),
                 "instance.designator" => String::new(),
+                "cut.item" => cut.as_ref().map(|r| r.item.to_string()).unwrap_or_default(),
+                "cut.quantity" => cut.as_ref().map(|r| r.qty.to_string()).unwrap_or_default(),
+                "cut.description" => cut.as_ref().map(|r| if r.standard.is_empty() { r.description.clone() } else { format!("{} {}", r.standard, r.description) }).unwrap_or_default(),
                 _ => return (self.fields)(k),
             })
         };
