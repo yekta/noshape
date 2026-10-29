@@ -1914,6 +1914,26 @@ impl DrawingEditor {
                     ]);
                     return out;
                 }
+                // Callouts (help callout_balloon, drawing.md A25), as notes and
+                // GD&T frames: Edit... · Paste · Copy · Paste as table · Add
+                // leader (· Remove leaders) · grouping · Move to ▸ | Clear
+                // selection · Zoom to fit · Delete.
+                if let Some(a) = a.as_ref().filter(|a| matches!(a.kind, AnnotationKind::Balloon { .. })) {
+                    use noshape_scene::drawing_tools::annotation_edit::{group_annotations, group_with_view};
+                    let a2 = a.clone();
+                    let edit = MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx));
+                    let mut own = self.annotation_more_entries(a);
+                    let sel_view = self.selection.iter().find_map(|s| if let Sel::View(v) = s { Some(*v) } else { None });
+                    if a.view_group.is_some() {
+                        own.push(MenuEntry::item("Remove from group", move |t, _, cx| t.edit_sheet("Remove from group", cx, |s| group_with_view(s, &[id], None))));
+                    } else if let Some(v) = sel_view {
+                        own.push(MenuEntry::item("Group", move |t, _, cx| t.edit_sheet("Group", cx, |s| group_with_view(s, &[id], Some(v)))));
+                    }
+                    if a.ann_group.is_some() {
+                        own.push(MenuEntry::item("Remove from grouped annotation", move |t, _, cx| t.edit_sheet("Remove from grouped annotation", cx, |s| group_annotations(s, &[id], false))));
+                    }
+                    return self.live_order_entries(a, edit, own, true, cx);
+                }
                 // GD&T frames (help drawing.md A42, qa DWG-GDT-MENU-ORDER):
                 // Edit... · Paste · Copy · Paste as table · Add leader (·
                 // Remove leaders) · Move to ▸ | Clear selection · Zoom to fit · Delete.
