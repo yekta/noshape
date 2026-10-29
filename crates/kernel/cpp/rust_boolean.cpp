@@ -26,6 +26,7 @@
 #include <Geom_Conic.hxx>
 #include <GeomAdaptor_Surface.hxx>
 #include <Geom_Hyperbola.hxx>
+#include <Geom_Parabola.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <Geom_ToroidalSurface.hxx>
@@ -650,6 +651,38 @@ const char* ellipse_edge(const BrepResult& r, const std::vector<const OcShape*>&
     }
     return "a hyperbola unlike OCCT's sections";
   }
+  if (cv[0] == 6)
+  {
+    // A parabola (not closed): the piece of OCCT's that holds it.
+    for (const IntTools_Curve& ic : it->second)
+    {
+      const occ::handle<Geom_Curve>    c  = ic.Curve();
+      const occ::handle<Geom_Parabola> pa = occ::down_cast<Geom_Parabola>(basis_of(c));
+      if (pa.IsNull())
+        continue;
+      const gp_Parab g = pa->Parab();
+      if (!same(g.Location(), g.Axis().Direction(), std::max(p0.Distance(ctr), p1.Distance(ctr))))
+        continue;
+      const double first = c->FirstParameter(), last = c->LastParameter();
+      double       t0 = ElCLib::Parameter(g, p0), t1 = ElCLib::Parameter(g, p1);
+      // (Its speed is at least 1.)
+      const double eps = std::max(1e-9, tol);
+      if (!(t1 > t0) || t0 < first - eps || t1 > last + eps)
+        continue;
+      t0            = std::max(t0, first);
+      t1            = std::min(t1, last);
+      out.curve     = pa;
+      out.face[0]   = fa;
+      out.face[1]   = fb;
+      out.pcurve[0] = ic.FirstCurve2d();
+      out.pcurve[1] = ic.SecondCurve2d();
+      out.t0        = t0;
+      out.t1        = t1;
+      out.tol       = std::max({ic.Tolerance(), BRep_Tool::Tolerance(fa), BRep_Tool::Tolerance(fb)});
+      return nullptr;
+    }
+    return "a parabola unlike OCCT's sections";
+  }
   for (const IntTools_Curve& ic : it->second)
   {
     const occ::handle<Geom_Curve>   c  = ic.Curve();
@@ -849,7 +882,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           bb.UpdateVertex(vs[v], need);
         }
     }
-    else if (cv[0] == 3 || cv[0] == 4)
+    else if (cv[0] == 3 || cv[0] == 4 || cv[0] == 6)
     {
       // OCCT's own section of the two faces: its ellipse and the part of it this piece is in (OCCT's curves on
       // the faces are made over the part), the curves on the faces.
@@ -930,7 +963,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           return "a piece of an ellipse ending nearly at an axis";
       }
     }
-    else if (!occ::down_cast<Geom_Ellipse>(bc).IsNull() || !occ::down_cast<Geom_Hyperbola>(bc).IsNull())
+    else if (!occ::down_cast<Geom_Ellipse>(bc).IsNull() || !occ::down_cast<Geom_Hyperbola>(bc).IsNull() || !occ::down_cast<Geom_Parabola>(bc).IsNull())
     {
       if (kind != 2)
         return "a piece of an ellipse";
@@ -1129,13 +1162,13 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
             return why;
           continue;
         }
-        if ((!occ::down_cast<Geom_Ellipse>(bc).IsNull() || !occ::down_cast<Geom_Hyperbola>(bc).IsNull() || b.curves[11 * k] == 5) && r.edge_origin[3 * k] == 1)
+        if ((!occ::down_cast<Geom_Ellipse>(bc).IsNull() || !occ::down_cast<Geom_Hyperbola>(bc).IsNull() || !occ::down_cast<Geom_Parabola>(bc).IsNull() || b.curves[11 * k] == 5) && r.edge_origin[3 * k] == 1)
         {
           if (const char* why = piece_pcurve(r, srcs, k, src, e, s, loc, bb))
             return why;
           continue;
         }
-        if (!occ::down_cast<Geom_Ellipse>(bc).IsNull() || !occ::down_cast<Geom_Hyperbola>(bc).IsNull())
+        if (!occ::down_cast<Geom_Ellipse>(bc).IsNull() || !occ::down_cast<Geom_Hyperbola>(bc).IsNull() || !occ::down_cast<Geom_Parabola>(bc).IsNull())
         {
           if (const char* why = ellipse_pcurve(ells[k], src, e, s, loc, bb))
             return why;
@@ -1224,7 +1257,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           if (const char* why = piece_pcurve(r, srcs, ek, src, es[ek], s, loc, bb))
             return why;
         }
-        else if (r.edge_origin[3 * ek] != 0 && (b.curves[11 * ek] == 3 || b.curves[11 * ek] == 4 || (b.curves[11 * ek] == 5 && r.edge_section[ek] != UINT32_MAX)))
+        else if (r.edge_origin[3 * ek] != 0 && (b.curves[11 * ek] == 3 || b.curves[11 * ek] == 4 || b.curves[11 * ek] == 6 || (b.curves[11 * ek] == 5 && r.edge_section[ek] != UINT32_MAX)))
         {
           if (const char* why = ellipse_pcurve(ells[ek], src, es[ek], s, loc, bb))
             return why;
@@ -1544,7 +1577,7 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
     if (r.body.surfaces[i] == 3)
       return true;
   for (size_t i = 0; i < r.body.curves.size(); i += 11)
-    if (r.body.curves[i] == 3 || r.body.curves[i] == 4)
+    if (r.body.curves[i] == 3 || r.body.curves[i] == 4 || r.body.curves[i] == 6)
       return true;
   t_built.target_face.assign(r.face_origin.size() / 3, 0);
   for (size_t i = 0; i < t_built.target_face.size(); ++i)

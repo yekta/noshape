@@ -573,12 +573,27 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   cone's face it is mapped point by point (`C2::Conic`, a 3D ellipse through the face's map), its parameter at the
   seam's angle solved exactly. OCCT's ellipse is matched within the model tolerance as before. T1
   `brep_replay::brep_cones_cut_at_an_angle_match_occt` (a countersink's frustum and a tilted box: 9 taken, as OCCT).
-- Parabolas (a 45° countersink and a 45° chamfer: corpus6's five slab fuses / cuts, 9.8 s recorded) and hyperbolas
-  at an angle still decline "a plane at an angle to a cone": next.
+- Parabolas (10-29 22:40 UTC): a plane along one of a cone's rulings, OCCT's gp_Parab (`Curve::Parabola` in the
+  result, kind 6 in the bridge: vertex, normal, the way it opens, focal length; `Ell::par`, `C2::Conic` with `par`).
+  T1 `brep_replay::brep_cones_cut_along_a_ruling_match_occt` (a 45° cone and a 45° box: 6 taken, as OCCT). A plane
+  through the apex along a ruling declines ("a plane through a cone's apex": corpus6's 45° cases are those).
+- Open: on a cylinder or cone a vertex exactly half a turn from the seam is two points in the parameter plane (the
+  side of the seam is judged for every vertex, and rounding puts its two ends on either side; it should be only for
+  vertices on the seam). Fixing it lets the tilted-holes test's 45° slot common through, whose history then differs
+  from OCCT's: both together, next (the fix alone failed the land, 10-29 23:00).
+- Hyperbolas at an angle (not along the axis) still decline "a plane at an angle to a cone".
 - A piece of any curve within the grey band of a face's boundary is judged where it is farthest from the boundary,
   if clearly off it (was B-splines only): those five cases got past it to the parabola.
 - Replays unchanged, all 0 differ (main 680, corpus2 528, corpus3 533, corpus4 573, corpus5 682, corpus6 636, Shell's
   71, direct 52).
+
+## Planes through a cone's apex (10-29 23:00 UTC)
+- A plane through a cone's apex declined whenever the apex was in the face's box. Now only when the face reaches
+  its apex (the apex's height within its vertices'): a frustum's plane through the axis gets its two rulings, one
+  cutting every ruling has nothing in common with it, one along a ruling touches it there (`touch`, as a plane a
+  cylinder: a section where both faces reach the line, else nothing; now for cones too).
+- Replays with the parabolas, all 0 differ: main 680, corpus2 528, corpus3 533, corpus4 574 (+1), corpus5 685 (+3),
+  corpus6 640 (+4), Shell's 75 (+4), direct 52. T1: the ruling test's third configuration (through the apex; its fuse declines).
 
 ## Next
 Free-form, the lead's four steps (13:35) where they stand (10-29 20:45 UTC): (1) profiled (above); (2) the hybrid
