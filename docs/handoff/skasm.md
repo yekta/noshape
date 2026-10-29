@@ -114,7 +114,11 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   feature built it (`FlatPattern::built_for`, `body_key`), else the native flattener on std's data (a later Hole's
   hole and counterbore heads); per-vertex Bend relief settings (`Definition::reliefs`); pulled wall sides that come
   out reversed are dropped (Modify joint radius on a corner a later flange shortened); ops' table skips stale parts.
-- Open: Closed corner (sheetmetal_std closed_corner_matches_live, 8541.25 / 35 vs live 8535.0418 / 23); Butt joint
+- Open: Closed corner (sheetmetal_std closed_corner_matches_live, 8541.25 / 35 vs live 8535.0418 / 23: our bend
+  cylinders come out in pieces (outer 371.30 + 1.47 + 2.00 slivers vs live 372.31) where the wrapped cut meets the
+  bend's start plane at the wall side (x_cut(90°) = 0.02 = the bend's t0); starting the bend solid earlier
+  (margin) lets the two bends' extensions overlap in the corner square beyond each one's cut: build each bend's end
+  as one ruled face (x(θ) = x0 − (x0 − x1) sin θ, same for every radius) instead); Butt joint
   direction (sheetmetal_frames convert_rips_and_bends: Direction 1 should be the wall first in Onshape's entity
   order; ours follows the definition face index, from the native offset op's face order); rect→triangle loft (51 vs
   49 faces); partial Outer flange wall side (asked live: REQUESTS skasm 2026-10-29 21:30); holes through std's own
