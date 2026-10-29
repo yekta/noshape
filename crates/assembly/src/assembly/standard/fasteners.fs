@@ -2777,7 +2777,11 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
  * the groove as form 5 with its bottom rounded 0.025 p. Forms 7 (HFH™,
  * HF109™, HFG8™ heavy-duty studs) and 8 (HFE™ / THFE™): as form 6 with a
  * 45° collar, the head cut to 8 flats (chords hd / 4) facing the slots, the
- * slots td (form 8: hd / 8) wide.
+ * slots td (form 8: hd / 8) wide. Form 9 (FHX™ studs with the X-Press™
+ * profile, sd = S_DIM, pt = its taper's length): form 3's serrations and
+ * disc, the head's edges rounded 0.02 hd, a collar 1.15 p / 2 coning at 60°
+ * to p / 2 at hd / 5; a neck 0.9 p from 0.6 sd to sd between 45° flanks; the
+ * end tapered at 25° over pt; no split.
  */
 annotation { "Feature Type Name" : "PEM pin" }
 export const pemPin = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2824,7 +2828,7 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
         const rg = 0.025 * p;
         const cx = rh - dep + sqrt(rg * rg - ig * ig);
         const re = definition.dd / 2;
-        if (definition.form == 2 || definition.form == 3)
+        if (definition.form == 2 || definition.form == 3 || definition.form == 9)
         {
             flushHeadPin(context, id, definition);
             return;
@@ -2856,7 +2860,8 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
 /** pemPin forms 2 (FH™ flush-head pins) and 3 (FH™ flush-head studs). */
 function flushHeadPin(context is Context, id is Id, definition is map)
 {
-    const stud = definition.form == 3;
+    const xp = definition.form == 9;
+    const stud = definition.form == 3 || xp;
     const p = definition.p;
     const sd = definition.sd;
     const l = definition.l;
@@ -2865,13 +2870,20 @@ function flushHeadPin(context is Context, id is Id, definition is map)
     const hk = definition.hd / 10;
     const rp = p / 2;
     const r1 = stud ? rp : (2 * rp + R - rr) / 3;
-    const r2 = (r1 + R - rr) / 2;
+    const r2 = xp ? 1.15 * rp : (r1 + R - rr) / 2;
     const zcone = -definition.hd / 5;
     const discDepth = stud ? 0.075 * sd : rr;
     const rg = p / 20;
     const rd = 0.15 * p;
     var tail;
-    if (stud)
+    if (xp)
+    {
+        const rn = 0.9 * rp;
+        const t25 = definition.pt * tan(25 * degree);
+        tail = [{ "p" : rz(r1, -0.6 * sd + rp - rn) }, { "p" : rz(rn, -0.6 * sd) }, { "p" : rz(rn, -sd) }, { "p" : rz(r1, -sd - rp + rn) },
+                { "p" : rz(r1, -l + definition.pt) }, { "p" : rz(r1 - t25, -l) }];
+    }
+    else if (stud)
     {
         const zg = (-hk - discDepth - sd) / 2;
         const ch = 0.625 * 0.8660254 * definition.pt;
@@ -2883,9 +2895,14 @@ function flushHeadPin(context is Context, id is Id, definition is map)
         const zg = (zcone + z45) / 2;
         tail = [{ "p" : rz(r1, zg + rg) }, { "p" : rz(r1, zg - rg), "mid" : rz(r1 - rg, zg) }, { "p" : rz(r1, z45) }, { "p" : rz(rp, -sd) }, { "p" : rz(rp, -l) }];
     }
-    revolveProfile(context, id + "body", join(join([
-                { "p" : rz(Z, Z) }, { "p" : rz(R - rr, Z) }, { "p" : rz(R - rr, -hk), "mid" : rz(R, -rr) },
-                { "p" : rz(r2, -hk) }, { "p" : rz(r2, -0.3 * sd) }, { "p" : rz(r1, zcone) }], tail),
+    const f = 0.02 * definition.hd;
+    const s45 = sqrt(0.5);
+    const head = xp ? [{ "p" : rz(Z, Z) }, { "p" : rz(R - f, Z) }, { "p" : rz(R, -f), "mid" : rz(R - f + f * s45, -f + f * s45) },
+                { "p" : rz(R, -hk + f) }, { "p" : rz(R - f, -hk), "mid" : rz(R - f + f * s45, -hk + f - f * s45) },
+                { "p" : rz(r2, -hk) }, { "p" : rz(r2, zcone + (r2 - r1) / tan(60 * degree)) }, { "p" : rz(r1, zcone) }] :
+        [{ "p" : rz(Z, Z) }, { "p" : rz(R - rr, Z) }, { "p" : rz(R - rr, -hk), "mid" : rz(R, -rr) },
+                { "p" : rz(r2, -hk) }, { "p" : rz(r2, -0.3 * sd) }, { "p" : rz(r1, zcone) }];
+    revolveProfile(context, id + "body", join(join(head, tail),
                 [{ "p" : rz(rd, -l) }, { "p" : rz(Z, -l + rd / tan(60 * degree)) }]));
     // The serration slots: 12 wedges outside r1 under the head (one sketch,
     // one extrude), then live's Sketch 3 disc added back: (r1 + r2) / 2
@@ -2914,7 +2931,7 @@ function flushHeadPin(context is Context, id is Id, definition is map)
     revolveProfile(context, id + "ring", [{ "p" : rz(Z, -hk) }, { "p" : rz((r1 + r2) / 2, -hk) }, { "p" : rz((r1 + r2) / 2, -hk - discDepth) }, { "p" : rz(Z, -hk - discDepth) }]);
     uniteAll(context, id);
     // A stud's shank face split at the thread start (live's Split 1).
-    if (stud)
+    if (definition.form == 3)
     {
         opPlane(context, id + "threadPlane", { "plane" : plane(vector(Z, Z, -sd), vector(0, 0, 1)), "width" : 4 * R, "height" : 4 * R });
         try silent

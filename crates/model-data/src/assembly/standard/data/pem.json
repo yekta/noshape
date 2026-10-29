@@ -2329,6 +2329,67 @@
       "default": "HFE"
      }
     ]
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching studs",
+    "name": "FHX™ Flush-head studs with X-Press™ thread profile",
+    "shape": "pemPin",
+    "form": {
+     "form": 9
+    },
+    "materials": [
+     "Hardened Carbon Steel"
+    ],
+    "materialCodes": {
+     "Hardened Carbon Steel": {
+      "code": "FH",
+      "finish": "Zinc Plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "5 mm x 1.6",
+      "label": "PEM {type}-X5-{l}",
+      "d": 5.0,
+      "dims": {
+       "hd": 6.5,
+       "p": 5.0,
+       "sd": 4.0,
+       "pt": 1.6,
+       "dd": 5.0,
+       "hs": 5.0
+      },
+      "lengths": [
+       "10",
+       "15",
+       "20",
+       "25"
+      ]
+     },
+     {
+      "name": "6 mm x 1.6",
+      "label": "PEM {type}-X6-{l}",
+      "d": 6.0,
+      "dims": {
+       "hd": 8.2,
+       "p": 6.0,
+       "sd": 4.0,
+       "pt": 1.6,
+       "dd": 6.0,
+       "hs": 6.0
+      },
+      "lengths": [
+       "10",
+       "15",
+       "20",
+       "25"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_FLUSH_HEAD_STUD_XPRESS_THREAD_MAIN, DATA_PEM_SELFCLINCHING_FLUSH_HEAD_STUD_XPRESS_THREAD_LENGTH (component document 2ba86c85e5a2875d4b999be6; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  },
