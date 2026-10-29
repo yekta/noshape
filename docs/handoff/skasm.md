@@ -158,9 +158,14 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    only roughly compare; match them per feature (head sketch, recess H / Z, tips C / F / R) rather than by volume. PEM plan: /features for all 52 are in dom/skb-sc-fsrules/PEM_PEM_*__features.json (10-29).
    Geometry is NAS 1129's pattern (revolved profile + extruded hex corners; the standoff feature can grow a PEM
    form: serration grooves at CDia/25, CDia/30, 0.98 / 0.9333 CDia). The blocker is naming: pem.json is empty, and
-   live's names are part numbers from material + finish ("PEM SO-43.1-3  ZI": TYPE per PEM_MATERIAL in
-   DATA_FASTENER_MATERIAL_TYPE, FINISH_CODE), 4 PEM materials, Hole size / Recommended sheet material selects; asked
-   live for the dialog's behaviour (REQUESTS skasm 10-29 10:30) before building the catalogue support.
+   live's names are part numbers from material + finish. Done 10-29 (live request 1591 gave the dialog): a component's
+   materialCodes (material -> type code, its one finish, finish code), label "PEM {type}-<PEM_SIZE>-{l}", Unified
+   lengths via lengthNames (LENGTH_CODE); pemStandoff forms 0 SO unthreaded 3b350963, 1 SO threaded 94df73d6, 2 BSO
+   blind (all = live's face types). Generator: /root/skasm-scratch/pemgen.py (build(cat, class, name, form, row_of,
+   dims_of, lenrow_of) + add([...]); examples pem_so_threaded.py, pem_bso.py). Next: TSO (STYLE A / B per length:
+   A through-threaded?, B blind with a 118° point at 0.25 l; its CDia/50 chamfer edge is a compressed query: ask live
+   or compare face areas in its bodydetails), DSO, SOSG, then pins (TPS: 18-constraint profile), studs, nuts. Not
+   shown yet: the read-only Hole size / Recommended sheet material rows.
    Live's studio defaults sometimes differ from the table (NAS 1129 thru minor 0.067 vs 0.0667, NASM 45938/4 ax 0.0225
    vs 0.028125): check the construction at the studio values, then test ours at the table's.
    Earlier: ANSI taper pin crowned ends 10-27.
