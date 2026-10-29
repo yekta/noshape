@@ -146,7 +146,12 @@ impl GFace {
                 } else {
                     self.to2(p0)
                 };
-                let seam = *full && (q0.x - r * th0).abs() <= 1e-9 * r.max(1.0);
+                // At the start of its angles (rounding may give the end).
+                let (at0, at1) = ((q0.x - r * th0).abs() <= 1e-9 * r.max(1.0), (q0.x - r * (th0 + TAU)).abs() <= 1e-9 * r.max(1.0));
+                if at1 {
+                    q0.x = r * th0;
+                }
+                let seam = *full && (at0 || at1);
                 if seam && copy == 1 {
                     q0.x = r * (th0 + TAU);
                 }
@@ -159,7 +164,7 @@ impl GFace {
                     Geo::Arc { k, sweep, .. } => {
                         let along = if k.n.dot(*a) > 0.0 { 1.0 } else { -1.0 };
                         let ds = along * sweep * r;
-                        if seam && ds < 0.0 {
+                        if ds < 0.0 && (at0 || at1) {
                             q0.x = r * (th0 + TAU);
                         }
                         let x1 = q0.x + ds;
@@ -450,6 +455,21 @@ impl Ctx {
         };
         if len <= tol {
             return Ok(Vec::new());
+        }
+        // A circle about a face that doesn't go round: in parts either side of the face's gap.
+        if let (&Path::Circle(k), &Surf::Cyl { o, a, x, y, r0, k: slope, th0, full: false, .. }) = (path, &self.faces[f].s) {
+            let h = (k.c - o).dot(a);
+            let t = t0 + (k.angle(o + a * h + (x * th0.cos() + y * th0.sin()) * (r0 + slope * h)) - t0).rem_euclid(TAU);
+            if (t - t0) * k.r > tol && (t1 - t) * k.r > tol {
+                let mut out = self.intervals(f, path, t0, t, [ends[0], End::Open], closed)?;
+                for iv in self.intervals(f, path, t, t1, [End::Open, ends[1]], closed)? {
+                    match out.last_mut() {
+                        Some(last) if last[1].0 == iv[0].0 && last[1].1 == End::Open => last[1] = iv[1],
+                        _ => out.push(iv),
+                    }
+                }
+                return Ok(out);
+            }
         }
         let geo = path.geo(t0, t1);
         let c2 = self.faces[f].curve2(path.at(t0), path.at(t1), &geo, 0)?;
@@ -791,7 +811,12 @@ impl Ctx {
     /// The section along cylinder face `fc`'s generator at angle `th` (in its frame), with face `f`.
     fn generator(&mut self, f: usize, fc: usize, th: f64) -> R<()> {
         let Surf::Cyl { o, a, x, y, r, th0, full, .. } = self.faces[fc].s else { unreachable!() };
-        if full && ((th - th0).rem_euclid(TAU).min((th0 - th).rem_euclid(TAU))) * r <= GREY * self.tol {
+        let off = (th - th0).rem_euclid(TAU).min((th0 - th).rem_euclid(TAU)) * r;
+        if full && off <= self.tol {
+            // Its seam: an edge already, which lies on `f` (its edges on the other's faces add it there).
+            return Ok(());
+        }
+        if full && off <= GREY * self.tol {
             return Err(Decline("a section along a cylinder's seam"));
         }
         let p = o + (x * th.cos() + y * th.sin()) * r;
@@ -1533,6 +1558,8 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
     let mut on_pairs: Vec<(usize, usize)> = Vec::new();
     // Each piece's solids it is in or on (same side).
     let mut within: Vec<Vec<usize>> = vec![Vec::new(); pieces.len()];
+    // Solids another argument's piece is in or on (OCCT builds them anew).
+    let mut reached = vec![false; cx.solids.len()];
     for pi in 0..pieces.len() {
         let f = pieces[pi].face;
         let s = cx.faces[f].solid;
@@ -1573,6 +1600,11 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             states.push((t, st));
         }
         within[pi] = states.iter().filter(|x| matches!(x.1, State::In | State::OnSame)).map(|x| x.0).collect();
+        for &(t, st) in &states {
+            if st != State::Out {
+                reached[t] = true;
+            }
+        }
         let ons: Vec<(usize, State)> = states.iter().copied().filter(|x| matches!(x.1, State::OnSame | State::OnOpposite)).collect();
         if ons.len() > 1 && op != Op::Fuse {
             return Err(Decline("a piece on two solids"));
@@ -1798,7 +1830,8 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         let [solid] = &mut out.body.solids[..] else { return Err(Decline("a void in a result of several solids")) };
         solid.shells.extend(voids.into_iter().map(|v| v.shells.into_iter().next().unwrap_or_default()));
     }
-    // A result solid that is an input solid with all its faces as they were is that solid.
+    // A result solid that is an input solid with all its faces as they were, and nothing of another argument
+    // in or on it, is that solid.
     let face_index: HashMap<(u32, u32), usize> = cx.faces.iter().enumerate().map(|(g, f)| ((f.arg, f.index), g)).collect();
     let mut solid_of_face = vec![0u32; out.body.faces.len()];
     for (k, so) in out.body.solids.iter().enumerate() {
@@ -1811,7 +1844,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             _ => None,
         };
         let first = solid_of(out.face_origin[so.shells[0][0] as usize]);
-        let same = first.filter(|&si| cx.solids[si].faces.len() == so.shells.iter().map(Vec::len).sum::<usize>() && so.shells.iter().flatten().all(|&f| solid_of(out.face_origin[f as usize]) == Some(si)));
+        let same = first.filter(|&si| !reached[si] && cx.solids[si].faces.len() == so.shells.iter().map(Vec::len).sum::<usize>() && so.shells.iter().flatten().all(|&f| solid_of(out.face_origin[f as usize]) == Some(si)));
         let same = same.map(|si| Origin::Same { arg: cx.solids[si].arg, index: cx.solids[si].index });
         out.solid_origin.push(same.unwrap_or(Origin::New));
     }
@@ -2000,7 +2033,7 @@ fn gap(covered: &[(f64, f64)]) -> Option<f64> {
             best = Some((end, next));
         }
     }
-    best.map(|(end, w)| end + w * 0.5)
+    best.map(|(end, w)| (end + w * 0.5).rem_euclid(TAU))
 }
 
 /// The signed volume of a closed shell, its arcs as chords: positive for a solid, negative for a void.

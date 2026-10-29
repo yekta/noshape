@@ -13,6 +13,7 @@
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepLib.hxx>
+#include <BRepTools.hxx>
 #include <TopExp_Explorer.hxx>
 #include <BRepTools_History.hxx>
 #include <ElCLib.hxx>
@@ -441,12 +442,39 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           placed = true;
         }
       }
+      // A piece of an edge with two curves on this surface that this face uses once (between two faces on it,
+      // once a seam): both, as OCCT's piece keeps them (the model's merging of faces goes by them).
+      auto two_curves = [&](size_t k) -> std::optional<TopoDS_Edge> {
+        // (Not this face's own seam, which it uses both ways: below.)
+        if (r.edge_origin[3 * k] != 1 || uses[k] != 1)
+          return std::nullopt;
+        const TopoDS_Edge se = TopoDS::Edge(input(srcs, r.edge_origin[3 * k + 1], TopAbs_EDGE, r.edge_origin[3 * k + 2]).Oriented(TopAbs_FORWARD));
+        if (BRep_Tool::Degenerated(se) || !BRep_Tool::IsClosed(se, s0, loc))
+          return std::nullopt;
+        return se;
+      };
+      // With no input edge of its own to go by: by the angles of its input face, which holds it (and whose
+      // curves those pieces keep).
+      if (!placed)
+      {
+        double u1 = 0, u2 = 0, v1 = 0, v2 = 0;
+        BRepTools::UVBounds(src, u1, u2, v1, v2);
+        umin += 2 * M_PI * std::floor((0.5 * (u1 + u2) - umin) / (2 * M_PI));
+      }
       const double umax = umin + 2 * M_PI;
       for (size_t k = 0; k < ne; ++k)
       {
         if (uses[k] == 0 || r.edge_origin[3 * k] == 0)
           continue;
         const TopoDS_Edge& e = es[k];
+        if (const std::optional<TopoDS_Edge> se = two_curves(k))
+        {
+          double                          a0 = 0, a1 = 0;
+          const occ::handle<Geom2d_Curve> pf = BRep_Tool::CurveOnSurface(*se, s0, loc, a0, a1);
+          const occ::handle<Geom2d_Curve> pr = BRep_Tool::CurveOnSurface(TopoDS::Edge(se->Reversed()), s0, loc, a0, a1);
+          bb.UpdateEdge(e, pf, pr, s, loc, BRep_Tool::Tolerance(e));
+          continue;
+        }
         double             f0 = 0, f1 = 0;
         TopLoc_Location               el;
         const occ::handle<Geom_Curve> c  = BRep_Tool::Curve(e, el, f0, f1);

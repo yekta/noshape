@@ -88,6 +88,18 @@ face); the pieces inside are the result (edges alone: the C++ build puts them in
 the solid deleted. Declined: a line along a face or an edge, ending on the boundary, touching, near anything
 within the grey zone, missing the solid. Main corpus **432 of 972** (was 419), fresh 410 of 692: 0 differ.
 
+Seams (10-29 02:50): the seam changes of 10-28 are back (a circle on a part of a cylinder in parts either side
+of its gap, a curve starting on the start angle going either way, a section along a seam being the seam), with
+what made OCCT's unify_same_domain merge our results differently: (1) a piece of an edge that has two curves on
+a face's surface (between two faces on it, once a seam) keeps both, as OCCT's piece does (we gave it one, at a
+place good for one of the faces); (2) a face with no input edge of its own to place its angles goes by its input
+face's (they hold it), and Rust's gap angle is reduced to [0, 2π). Also: a solid with another argument's piece
+in or on it is built anew even when all its faces stay (OCCT deletes it: a cylinder inside a box fused).
+Main corpus **451 of 972** (was 432), fresh 426 of 692, Shell's 40 of 85, and a corpus recorded with this
+Boolean on (/root/bool-scratch/corpus3, 698 from the model and kernel tests, NOSHAPE_BREP_VS_OCCT=1) 431: all
+0 differ incl. the merge check; oracle_p1 (LP2, CP2) passes. Shell's bd16a559/f82019a4 still unify differently
+(merge_check stays). /root/bool-scratch/tools/usd_dump (a .brep's faces and edges, unified with `u`) showed it.
+
 Looked at and left (10-29 01:40):
 - The seam cases (19 "an arc across a cylinder's seam" + 5 "a section along ..." in the fresh corpus, 8 s) are
   the merge problem above: with the seam change, 02fb69425a58e283's result has the tool's cylinder face (z

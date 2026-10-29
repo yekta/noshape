@@ -276,12 +276,15 @@ fn a_round_boss_on_a_plate() {
 }
 
 #[test]
-fn a_cylinder_halved_along_its_seam_declines() {
-    // OCCT's result gives the cut line a seam's two curves on the cylinder, and the model's merging of faces
-    // after (unify_same_domain) went differently on ours (LP2, CP2 in oracle_p1): declined (10-28).
+fn a_cylinder_halved_along_its_seam() {
     let cyl = cylinder(0.0, 0.0, 1.0, 0.0, 2.0);
-    let half = boolean(Op::Cut, &[&cyl, &cuboid((-2.0, -2.0, -1.0), (2.0, 0.0, 3.0))], TOL);
-    assert_eq!(half.err(), Some(Decline("a section along a cylinder's seam")));
+    let half = boolean(Op::Cut, &[&cyl, &cuboid((-2.0, -2.0, -1.0), (2.0, 0.0, 3.0))], TOL).unwrap();
+    check_used_both_ways(&half.body);
+    // Two half disks, the half wall and the flat side; the seam is the flat side's edge at +x.
+    assert_eq!(counts(&half), (1, 4, 6, 4));
+    // A round boss on the half: its circle starts in the half wall's gap.
+    let boss = boolean(Op::Fuse, &[&half.body, &cylinder(0.0, 0.0, 1.0, 1.0, 3.0)], TOL).unwrap();
+    check_closed(&boss.body);
 }
 
 /// A drill: a cylinder along z from z0 to z1 with a cone's tip below z0 (half-angle 59°, as a 118° drill point).

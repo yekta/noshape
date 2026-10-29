@@ -5,7 +5,8 @@
 //! `NOSHAPE_BOOL_CORPUS=/root/core-scratch/bool-corpus cargo test -p noshape-kernel --test all
 //! brep_replay::brep_corpus_replay -- --ignored --nocapture` (NOSHAPE_BREP_DIFF=1 prints each mismatch's
 //! history records that differ; NOSHAPE_BREP_ONLY=<name> runs one case; NOSHAPE_BREP_SHOW_OCCT=<name>,... prints
-//! OCCT's result and history records for those cases, taken or not).
+//! OCCT's result and history records for those cases, taken or not; NOSHAPE_BREP_VS_OCCT=1 compares with OCCT run
+//! here instead of the recorded result: for a corpus recorded with this Boolean on).
 
 use noshape_kernel::bool_corpus::{cases, load, Summary};
 use noshape_kernel::*;
@@ -126,7 +127,11 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         let o = boolean(c.op, &c.objects, &c.tools, &c.opts);
         let occt_ms = t.elapsed().as_secs_f64() * 1e3;
         set_rust_boolean(None);
-        let mut d = Summary::of(&r).differences(&c.summary);
+        // (A corpus recorded with this Boolean on: against OCCT run here.)
+        let mut d = match (&o, std::env::var_os("NOSHAPE_BREP_VS_OCCT")) {
+            (Ok(o), Some(_)) => Summary::of(&r).differences(&Summary::of(o)),
+            _ => Summary::of(&r).differences(&c.summary),
+        };
         // The history's hash rounds centroids: compare with OCCT's records within 2 µm.
         if d == ["history differs"] && std::env::var_os("NOSHAPE_BREP_EXACT").is_none() && o.as_ref().is_ok_and(|o| same_records(&records(&r), &records(o))) {
             d.clear();
