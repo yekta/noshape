@@ -9,6 +9,13 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **10:09 update (green 0f5f4f49):** **two new P0 Rust Boolean regressions (since v0.4.13, also in v0.4.14 and the green; right in v0.4.12
+  and with NOSHAPE_BOOL_RUST=0): RUST-MIRROR-NOTCH** (notched cylinder mirrored onto itself with Add: 523.599 instead of 785.398 mm³)
+  and **RUST-HALF-POCKET-3** (blind half pocket on the mirror plane lost: 2976.438 instead of 2929.314); repros bin/cylnotch.py,
+  bin/halfpock3.py. Found by **bin/boolmir.py** (random part + optional pocket / hole, then Part mirror Add or linear pattern Add,
+  Rust vs OCCT; /tmp/qa-bm.sh, cli/boolmir.summary): 3 differences in 15 seeds × 50, the third Rust-right. Seeds 16–45 running.
+  boolrand (43 seeds) / boolgrid (40 seeds) on Union / Subtract / Intersect: only face-count differences and the OCCT-path P2.
+  Verified PSUI-CONE-SHADING on 0f5f4f49. Live asked: union face counts (09:56), tangent pattern Add (10:00).
 - **09:53 update:** Rust Boolean fuzz: **bin/boolrand.py** (random overlapping boxes / cylinders + a random Union / Subtract /
   Intersect, run with NOSHAPE_BOOL_RUST=1 and =0 on the v0.4.14 CLI, outputs diffed; /tmp/qa-br.sh): 23 seeds × 40–60 cases,
   one difference, where **Rust is right and OCCT wrong** (P2 OCCT-UNION-OFFSET-CYL, also in v0.4.12). Running: seeds 40–59 with real
