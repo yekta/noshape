@@ -106,6 +106,10 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   first failed on vibe3: `a_budget_never_stops_a_call_inside_an_occt_thread_pool_loop` used OCCT's default pool,
   which other tests' parallel Booleans had busy, so its loop ran on the caller alone (a serial job the budget may
   stop); the test now has a pool of its own.
+- 419e41d0 FEATURE-MIRROR-COPY-FULL-DEPTH: pattern.rs `overhang_growth` takes each face's outward normal from the
+  face (normal_at_point), not face_plane(): a mirrored copy's planar faces have left-handed frames, and
+  find_plane's normal pointed into the part there, so the mirrored boss's top looked like an overhang and grew a
+  column the part's depth. T1 `kernel_robustness::feature_mirror_of_a_boss_copies_the_boss`.
 
 ## Landed on main (10-26 / 10-27)
 - 81c8d9cd psb's face blend WIP (curved sides, live's message rule). a2b34ade: the elliptic boss as live (a sketch
@@ -456,8 +460,8 @@ with 0003b and 0004 on Linux, macOS and Windows.
    "not recoverable" exit now names its place; the in-place edits that corrupted bodies are gone from the budgeted ops.
 2. P0 SHELL-SLOW tail: concave parts with fillets (a pocket with floor fillets 2.3–2.9 s in slabs) need regions with
    concave edges; failing shells on fuzz bodies still spend 20–26 s in the slabs' Booleans (no early sign known).
-3. T2 red in my area: features_c::face_blend_curvature_on_an_elliptic_boss_as_live (OCCT's fuse with the lofted
-   tool comes back empty).
+3. find_plane / linear_direction (geom.cpp) on mirrored faces: left-handed plane frames give the inward normal
+   to every face_plane() user (sketch on face, holes, mates, up-to faces).
 4. Waiting on live: FILLET-OVERSIZE's chamfer half; RIB-CHAIN-NORMAL (live's +160 mm³ for the L normal rib).
 5. kern's open item: forward-oriented edges.
 Knurl Phase 1 stopped at 246 s (its steps left are 10–40 s each); REGEN-SPEED met in release (qa to re-measure).
