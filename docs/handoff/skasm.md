@@ -213,7 +213,12 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    vs 0.028125): check the construction at the studio values, then test ours at the table's.
    Earlier: ANSI taper pin crowned ends 10-27.
 5. Broken-sketch solve time: a constraint on qa's 438-entity fuzz sketch ~85–125 ms in the sketch crate (9
-   exclusion attempts of ~15 ms, the failing component's LM each time). Candidate: retry only the failing component.
+   exclusion attempts of ~15 ms, the failing component's LM each time). Measured 10-29 (fz211-final.json, a
+   Horizontal added): System::build ~0.3 ms, solve 12–19 ms per attempt at 4–9 LM iterations (~2 ms each, one big
+   failing component); the residual stays ~1.48e-3 attempt after attempt until the culprit is excluded, then drops
+   to 1e-12 (the plain re-solve converges only at attempt 8), so stopping when an exclusion doesn't lower the
+   residual breaks sk211 (it needs 3 such attempts). Left as is: what's left is the LM cost of the failing
+   component (live takes seconds on these anyway).
 6. Assembly fuzz (T2) `random_assembly_edits_never_panic`: `ASM_FUZZ_SEEDS=1..200 ASM_FUZZ_STEPS=120 cargo test -p
    noshape-assembly --lib assembly::tests::random_assembly_edits_never_panic -- --ignored --nocapture`.
 7. End-of-day walk (~04:00 UTC) on the newest /root/green/noshape against live: line chain + dimension, value boxes
@@ -228,8 +233,7 @@ changed), dimension text always centred on its line (the "beside" rule is gone),
 on the first entity. Open: live puts a vertical edge's glyph RIGHT of the rectangle's left edge but left of a lone
 vertical line (sketch/28): a rule by the line's direction (glyph right of start→end) fits both, but our rectangle's
 edges run CCW (top right→left, left downwards) unlike live's (both horizontals left→right, verticals upwards), so the
-rule would put our top glyph outside; and live draws a Coincident glyph up-left of each corner (−27..−8 px), ours none
-(corners are shared points).
+rule would put our top glyph outside. (Later: (a) 7d5be491; corner Coincident glyphs 297ea153.)
 Walks: 10-28 04:10 on green 1b81b7ca: line chain 40 / 25 typed, rectangle 30 Tab 20, asm5 Revolute pin dragged
 (stays), j shows the hidden Revolute: no regressions. Seen: a line's dimension text ("40") and a rectangle's height
 ("20") sit under the constraint glyph rows (glyphs 20.5 px off the line, the dimension ~28 px); live's spacing there not
