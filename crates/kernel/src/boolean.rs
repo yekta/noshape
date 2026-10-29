@@ -112,10 +112,25 @@ pub fn boolean(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &Boolean
         }
     });
     let run = || Ok(OpResult::from_ffi(ck(ffi::op_boolean(code, &a, &t, &opts.ffi()))?));
-    match crate::bool_corpus::recording() {
+    let res = match crate::bool_corpus::recording() {
         Some(dir) => crate::bool_corpus::record(&dir, op, objects, tools, opts, run),
         None => run(),
+    }?;
+    // A fuse of solids that comes back without a solid (OCCT on a tool that
+    // only touches the part: a face blend's curvature filler on the elliptic
+    // boss, live 11850.416 mm³): again with OCCT's glue, kept only when the
+    // inputs merely touched, i.e. the volumes add up.
+    let solids = |l: &[Shape]| l.iter().all(|x| x.count(crate::ShapeType::Solid) > 0);
+    if op == BooleanOp::Fuse && opts.glue == Glue::Off && res.shape.count(crate::ShapeType::Solid) == 0 && solids(objects) && solids(tools) {
+        let glued = BooleanOptions { glue: Glue::Shift, ..*opts };
+        if let Ok(g) = ck(ffi::op_boolean(code, &a, &t, &glued.ffi())).map(OpResult::from_ffi) {
+            let sum: f64 = objects.iter().chain(tools).filter_map(|x| x.volume().ok()).sum();
+            if g.shape.count(crate::ShapeType::Solid) > 0 && g.shape.volume().is_ok_and(|v| (v - sum).abs() <= 1e-6 * sum.abs()) {
+                return Ok(g);
+            }
+        }
     }
+    Ok(res)
 }
 
 /// 0: NOSHAPE_BOP_PARALLEL decides; 1: serial; 2: parallel.

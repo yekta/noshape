@@ -2519,11 +2519,11 @@ fn face_blend_on_an_elliptic_boss_as_live() {
     face_blend_on_curved_faces(true);
 }
 
-/// The elliptic boss's curvature section (live NE, 11850.666 mm³). Open
-/// (core): OCCT's fuse with the lofted tool comes back empty ("Failed to
-/// blend faces.").
+/// The elliptic boss's curvature section (live NE, 11850.666 mm³): OCCT's
+/// fuse with the lofted filler, which only touches the boss, came back empty
+/// ("Failed to blend faces."); the kernel's boolean now retries such a fuse
+/// with OCCT's glue.
 #[test]
-#[ignore = "T2: open difference from live (elliptic boss, curvature section)"]
 fn face_blend_curvature_on_an_elliptic_boss_as_live() {
     face_blend_on_curved_faces_curvature();
 }
