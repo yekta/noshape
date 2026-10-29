@@ -114,6 +114,10 @@ pub use panels::*;
 
 /// Key in `expanded` that marks the "Mate features" folder as collapsed.
 const MATE_FEATURES_COLLAPSED: InstanceId = InstanceId(u64::MAX);
+/// Expanded-set keys under a subassembly's path: its pattern rows (open)
+/// and its Mate features folder (collapsed).
+const NESTED_PATTERN_BIT: u64 = 1 << 62;
+const NESTED_MATES_COLLAPSED: InstanceId = InstanceId(u64::MAX - 1);
 /// The relation dialog's types, in the live select's order.
 const RELATION_KINDS: [RelationType; 4] = [RelationType::Gear, RelationType::RackAndPinion, RelationType::Screw, RelationType::Linear];
 
@@ -3513,10 +3517,108 @@ impl AssemblyView {
         if !self.expanded.contains(&node.path) {
             return;
         }
-        for c in &node.children {
+        // Live (behaviours "skasm (2026-10-28, P3) Move to new subassembly
+        // without dependents …", request 1582): an expanded subassembly lists
+        // its instances, its patterns (their copies under the pattern's caret)
+        // and its own Mate features folder.
+        let sub = if node.kind == NodeKind::Assembly { self.node_assembly(&node.path, cx) } else { None };
+        let generated = |c: &InstanceNode| sub.as_ref().is_some_and(|a| c.path.last().is_some_and(|id| a.generated_by(*id).is_some()));
+        for c in node.children.iter().filter(|c| !generated(c)) {
             rows.push(self.instance_row(Some(c), None, c.path.clone(), depth, cx));
             self.push_children(c, depth + 1, rows, cx);
         }
+        let Some(sub) = sub else { return };
+        let pal = p();
+        let nested_row = |key: Vec<InstanceId>, caret: Option<bool>, icon: String, name: String, depth: usize, cx: &mut Context<Self>| {
+            let k2 = key.clone();
+            h_flex()
+                .id(SharedString::from(format!("nest-{}", key.iter().map(|i| i.0.to_string()).collect::<Vec<_>>().join("-"))))
+                .h(px(crate::ui::ROW_H))
+                .pl(px(7. + depth as f32 * 22.))
+                .pr(px(3.))
+                .gap(px(3.))
+                .text_size(px(crate::ui::ROW_TEXT))
+                .text_color(pal.text)
+                .hover(|d| d.bg(pal.row_hover))
+                .child(div().w(px(12.)).when_some(caret, |d, open| {
+                    d.child(crate::ui::glyph(if open { "expander-down" } else { "expander-right" }, 14., pal.icon_tertiary))
+                }))
+                .when(!icon.is_empty(), |d| d.child(crate::ui::tree_icon(&icon, false, cx)))
+                .child(div().min_w_0().truncate().child(crate::ui::user_text(name)))
+                .when(caret.is_some(), |d| {
+                    d.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if !this.expanded.remove(&k2) {
+                            this.expanded.insert(k2.clone());
+                        }
+                        cx.notify();
+                    }))
+                })
+                .into_any_element()
+        };
+        for pat in &sub.patterns {
+            let mut key = node.path.clone();
+            key.push(InstanceId(NESTED_PATTERN_BIT | pat.id.0));
+            let open = self.expanded.contains(&key);
+            let icon = match pat.kind {
+                PatternKind::Linear { .. } | PatternKind::PartPattern { .. } => "linear-pattern",
+                PatternKind::Circular { .. } => "circular-pattern",
+                PatternKind::Mirror { .. } => "mirror",
+                PatternKind::Replicate { .. } => "replicate",
+            };
+            rows.push(nested_row(key, Some(open), icon_path(icon).to_string(), pat.name.clone(), depth, cx));
+            if open {
+                for c in node.children.iter().filter(|c| c.path.last().is_some_and(|id| pat.generated.iter().any(|g| g.instance == *id))) {
+                    rows.push(self.instance_row(Some(c), None, c.path.clone(), depth + 1, cx));
+                    self.push_children(c, depth + 2, rows, cx);
+                }
+            }
+        }
+        let mut key = node.path.clone();
+        key.push(NESTED_MATES_COLLAPSED);
+        let open = !self.expanded.contains(&key);
+        // The folder toggles the collapsed key (open by default, as the top level's).
+        let k2 = key.clone();
+        rows.push(
+            h_flex()
+                .id(SharedString::from(format!("nest-mates-{}", node.path.iter().map(|i| i.0.to_string()).collect::<Vec<_>>().join("-"))))
+                .h(px(crate::ui::ROW_H))
+                .pl(px(7. + depth as f32 * 22.))
+                .gap(px(3.))
+                .text_size(px(crate::ui::ROW_TEXT))
+                .text_color(pal.text)
+                .cursor_pointer()
+                .hover(|d| d.bg(pal.row_hover))
+                .child(div().w(px(12.)).child(crate::ui::glyph(if open { "expander-down" } else { "expander-right" }, 14., pal.icon_tertiary)))
+                .child(format!("Mate features ({})", sub.listed_mate_count()))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if !this.expanded.remove(&k2) {
+                        this.expanded.insert(k2.clone());
+                    }
+                    cx.notify();
+                }))
+                .into_any_element(),
+        );
+        if open {
+            for m in sub.mates.iter().filter(|m| sub.mate_generated_by(m.id).is_none()) {
+                let mut key = node.path.clone();
+                key.push(InstanceId(NESTED_PATTERN_BIT | (1 << 61) | m.id.0));
+                rows.push(nested_row(key, None, mate_icon(m.mate_type).to_string(), m.name.clone(), depth + 1, cx));
+            }
+        }
+    }
+
+    /// The content of the subassembly at `path` (top-level instance first).
+    fn node_assembly(&self, path: &[InstanceId], cx: &App) -> Option<Assembly> {
+        let doc = &self.doc.read(cx).session.doc;
+        let mut asm = self.assembly(cx)?.clone();
+        for id in path {
+            let InstanceSource::Assembly { assembly, .. } = &asm.instance(*id)?.source else { return None };
+            asm = match &doc.tab(*assembly)?.content {
+                TabContent::Assembly(a) => (**a).clone(),
+                _ => return None,
+            };
+        }
+        Some(asm)
     }
 
     fn feature_row(&self, f: FeatureRow, cx: &mut Context<Self>) -> AnyElement {
