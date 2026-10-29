@@ -9,6 +9,14 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **20:08 update (greens 863967f8 → 984c6fbb → 52ad95af → 5894c154):** verified DWG-SHEET-PROPS-ESC, DWG-TABLE-ESC-GHOST (863967f8),
+  CYL-UNIFY-OPPOSITE (52ad95af: the two-way Ø12 rod selects as one 20 mm cylinder face; v0.4.14 CLI still 4 faces); drawing D24
+  (dragged dimension value, ANSI) matches live's asbdt-1a…c on 5894c154. MESH-EMPTY-LOOP-PANIC again **from v0.4.14 alone**: CLI
+  fuzz seed 375 at a Part mirror, the CLI hung (all threads parked) instead of aborting; the green opens its document fine. App A/B
+  for bool 82d02000 / 863967f8: 37 sphere / torus documents on 863967f8 all equal (4-27 a black capture, 0 on re-run). Mirror set,
+  P0 repros and mesher A/B (bolt / l30 / torus / wf) unchanged on 5894c154. CLI fuzz 366–380 on v0.4.14: only 375 (377 was my own
+  pkill, re-run queued), 381–400 next; Rust-vs-OCCT round 151–165 / 106–120 / 86–100 all equal, 166–180 / 121–135 / 101–115
+  running. API-ASM-RELATIONS (dx 2978c674) and AGENT-ELLIPSE-DIM-VALUE wait for a CLI of main.
 - **19:00 update (greens f9d89b7d = + psui cc73aaea, 3a8c7a85 = + core 3a8c7a85 shell / draft wedges on their own copy):** new
   **P1 MESH-EMPTY-LOOP-PANIC**: CLI fuzz seed 355 (bool 12:13 CLI) died at a Part mirror; its document makes the **v0.4.14 app**
   hang on open (empty view, spinner for good) and the v0.4.14 CLI abort (exit 134): the own mesher panics in loop_nodes on a face
