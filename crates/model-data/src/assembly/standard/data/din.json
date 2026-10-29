@@ -7642,7 +7642,7 @@
     "sizes": [
      {
       "name": "ST2.2",
-      "label": "Cross recessed pan head tapping screw ST2.2x4.5",
+      "label": "Cross recessed pan head tapping screw ST2.2x{l}",
       "d": 2.2,
       "dims": {
        "d": 2.2,
@@ -7664,7 +7664,7 @@
      },
      {
       "name": "ST2.9",
-      "label": "Cross recessed pan head tapping screw ST2.9x6.5",
+      "label": "Cross recessed pan head tapping screw ST2.9x{l}",
       "d": 2.9,
       "dims": {
        "d": 2.9,
@@ -7686,7 +7686,7 @@
      },
      {
       "name": "ST3.5",
-      "label": "Cross recessed pan head tapping screw ST3.5x9.5",
+      "label": "Cross recessed pan head tapping screw ST3.5x{l}",
       "d": 3.5,
       "dims": {
        "d": 3.5,
@@ -7709,7 +7709,7 @@
      },
      {
       "name": "ST4.2",
-      "label": "Cross recessed pan head tapping screw ST4.2x9.5",
+      "label": "Cross recessed pan head tapping screw ST4.2x{l}",
       "d": 4.2,
       "dims": {
        "d": 4.2,
@@ -7733,7 +7733,7 @@
      },
      {
       "name": "ST4.8",
-      "label": "Cross recessed pan head tapping screw ST4.8x9.5",
+      "label": "Cross recessed pan head tapping screw ST4.8x{l}",
       "d": 4.8,
       "dims": {
        "d": 4.8,
@@ -7758,7 +7758,7 @@
      },
      {
       "name": "ST5.5",
-      "label": "Cross recessed pan head tapping screw ST5.5x13",
+      "label": "Cross recessed pan head tapping screw ST5.5x{l}",
       "d": 5.5,
       "dims": {
        "d": 5.5,
@@ -7782,7 +7782,7 @@
      },
      {
       "name": "ST6.3",
-      "label": "Cross recessed pan head tapping screw ST6.3x13",
+      "label": "Cross recessed pan head tapping screw ST6.3x{l}",
       "d": 6.3,
       "dims": {
        "d": 6.3,
@@ -7806,7 +7806,7 @@
      },
      {
       "name": "ST8",
-      "label": "Cross recessed pan head tapping screw ST8x16",
+      "label": "Cross recessed pan head tapping screw ST8x{l}",
       "d": 8.0,
       "dims": {
        "d": 8.0,
@@ -7831,7 +7831,7 @@
      },
      {
       "name": "ST9.5",
-      "label": "Cross recessed pan head tapping screw ST9.5x16",
+      "label": "Cross recessed pan head tapping screw ST9.5x{l}",
       "d": 9.5,
       "dims": {
        "d": 9.5,
@@ -7874,6 +7874,649 @@
       "default": "Type C"
      }
     ]
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Self-tapping screws",
+    "name": "Cross recessed pan head tapping screw with collar DIN 967",
+    "shape": "screw",
+    "form": {
+     "head": 3,
+     "drive": 3,
+     "point": 4,
+     "neck": 0
+    },
+    "params": [
+     {
+      "label": "Head type",
+      "options": [
+       "Type H",
+       "Type Z"
+      ],
+      "default": "Type H"
+     },
+     {
+      "label": "Tip type",
+      "options": [
+       "Type C",
+       "Type F"
+      ],
+      "default": "Type C"
+     }
+    ],
+    "sizes": [
+     {
+      "name": "ST2.9",
+      "label": "Cross recessed pan head tapping screw with collar ST2.9x{l}",
+      "d": 2.9,
+      "dims": {
+       "d": 2.9,
+       "dk": 7.5,
+       "k": 2.35,
+       "rf": 3.8,
+       "c": 0.8,
+       "dc": 7.5,
+       "sd": 3.0,
+       "t": 1.8,
+       "b": 0.97,
+       "z": 2.6
+      },
+      "lengths": [
+       "6.5",
+       "9.5",
+       "13",
+       "16",
+       "19"
+      ]
+     },
+     {
+      "name": "ST3.5",
+      "label": "Cross recessed pan head tapping screw with collar ST3.5x{l}",
+      "d": 3.5,
+      "dims": {
+       "d": 3.5,
+       "dk": 9.0,
+       "k": 2.6,
+       "rf": 4.6,
+       "c": 0.9,
+       "dc": 9.0,
+       "sd": 4.2,
+       "t": 2.03,
+       "b": 1.47,
+       "z": 3.2
+      },
+      "lengths": [
+       "9.5",
+       "13",
+       "16",
+       "19",
+       "22",
+       "25"
+      ]
+     },
+     {
+      "name": "ST4.2",
+      "label": "Cross recessed pan head tapping screw with collar ST4.2x{l}",
+      "d": 4.2,
+      "dims": {
+       "d": 4.2,
+       "dk": 10.0,
+       "k": 3.05,
+       "rf": 5.8,
+       "c": 1.1,
+       "dc": 10.0,
+       "sd": 4.6,
+       "t": 2.46,
+       "b": 1.47,
+       "z": 3.7
+      },
+      "lengths": [
+       "9.5",
+       "13",
+       "16",
+       "19",
+       "22",
+       "25",
+       "32"
+      ]
+     },
+     {
+      "name": "ST4.8",
+      "label": "Cross recessed pan head tapping screw with collar ST4.8x{l}",
+      "d": 4.8,
+      "dims": {
+       "d": 4.8,
+       "dk": 11.5,
+       "k": 3.55,
+       "rf": 6.6,
+       "c": 1.35,
+       "dc": 11.5,
+       "sd": 5.0,
+       "t": 2.87,
+       "b": 1.47,
+       "z": 4.3
+      },
+      "lengths": [
+       "9.5",
+       "13",
+       "16",
+       "19",
+       "22",
+       "25",
+       "32",
+       "38"
+      ]
+     },
+     {
+      "name": "ST6.3",
+      "label": "Cross recessed pan head tapping screw with collar ST6.3x{l}",
+      "d": 6.3,
+      "dims": {
+       "d": 6.3,
+       "dk": 14.5,
+       "k": 4.55,
+       "rf": 8.2,
+       "c": 1.8,
+       "dc": 14.5,
+       "sd": 7.1,
+       "t": 3.66,
+       "b": 2.41,
+       "z": 6.0
+      },
+      "lengths": [
+       "13",
+       "16",
+       "19",
+       "22",
+       "25",
+       "32",
+       "38"
+      ]
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_968_PAN_HEAD_TAPPING_SCREW_WITH_COLLAR_MAIN (component document 2cd4597db00bd3ff2962ac1d; live/dom/skb-sc-fsrules), Size and Length lists from live (dom/skb-sc-full-DIN.json); recess and tip as the generic cross recess / cone tip"
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Self-tapping screws",
+    "name": "Cross recessed flat head countersunk tapping screw DIN 7050",
+    "shape": "screw",
+    "form": {
+     "head": 4,
+     "drive": 3,
+     "point": 4,
+     "neck": 0
+    },
+    "params": [
+     {
+      "label": "Head type",
+      "options": [
+       "Type H",
+       "Type Z"
+      ],
+      "default": "Type H"
+     },
+     {
+      "label": "Tip type",
+      "options": [
+       "Type C",
+       "Type F"
+      ],
+      "default": "Type C"
+     }
+    ],
+    "sizes": [
+     {
+      "name": "ST2.2",
+      "label": "Cross recessed flat head countersunk tapping screw ST2.2x{l}",
+      "d": 2.2,
+      "dims": {
+       "d": 2.2,
+       "dk": 4.4,
+       "k": 1.1,
+       "sd": 1.9,
+       "t": 1.2,
+       "b": 0.61,
+       "z": 2.0
+      },
+      "lengths": [
+       "4.5",
+       "6.5",
+       "9.5",
+       "13",
+       "16"
+      ]
+     },
+     {
+      "name": "ST2.9",
+      "label": "Cross recessed flat head countersunk tapping screw ST2.9x{l}",
+      "d": 2.9,
+      "dims": {
+       "d": 2.9,
+       "dk": 6.3,
+       "k": 1.7,
+       "sd": 3.2,
+       "t": 2.1,
+       "b": 0.97,
+       "z": 2.6
+      },
+      "lengths": [
+       "6.5",
+       "9.5",
+       "13",
+       "16",
+       "19"
+      ]
+     },
+     {
+      "name": "ST3.5",
+      "label": "Cross recessed flat head countersunk tapping screw ST3.5x{l}",
+      "d": 3.5,
+      "dims": {
+       "d": 3.5,
+       "dk": 8.2,
+       "k": 2.35,
+       "sd": 4.4,
+       "t": 2.4,
+       "b": 1.47,
+       "z": 3.2
+      },
+      "lengths": [
+       "9.5",
+       "13",
+       "16",
+       "19",
+       "22",
+       "25"
+      ]
+     },
+     {
+      "name": "ST4.2",
+      "label": "Cross recessed flat head countersunk tapping screw ST4.2x{l}",
+      "d": 4.2,
+      "dims": {
+       "d": 4.2,
+       "dk": 9.4,
+       "k": 2.6,
+       "sd": 4.6,
+       "t": 2.6,
+       "b": 1.47,
+       "z": 3.7
+      },
+      "lengths": [
+       "9.5",
+       "13",
+       "16",
+       "19",
+       "22",
+       "25",
+       "32"
+      ]
+     },
+     {
+      "name": "ST4.8",
+      "label": "Cross recessed flat head countersunk tapping screw ST4.8x{l}",
+      "d": 4.8,
+      "dims": {
+       "d": 4.8,
+       "dk": 10.4,
+       "k": 2.8,
+       "sd": 5.2,
+       "t": 3.2,
+       "b": 1.47,
+       "z": 4.3
+      },
+      "lengths": [
+       "9.5",
+       "13",
+       "16",
+       "19",
+       "22",
+       "25",
+       "32"
+      ]
+     },
+     {
+      "name": "ST5.5",
+      "label": "Cross recessed flat head countersunk tapping screw ST5.5x{l}",
+      "d": 5.5,
+      "dims": {
+       "d": 5.5,
+       "dk": 11.5,
+       "k": 3.0,
+       "sd": 6.6,
+       "t": 3.3,
+       "b": 2.41,
+       "z": 5.0
+      },
+      "lengths": [
+       "13",
+       "16",
+       "19",
+       "22",
+       "25",
+       "32",
+       "38"
+      ]
+     },
+     {
+      "name": "ST6.3",
+      "label": "Cross recessed flat head countersunk tapping screw ST6.3x{l}",
+      "d": 6.3,
+      "dims": {
+       "d": 6.3,
+       "dk": 12.6,
+       "k": 3.15,
+       "sd": 6.8,
+       "t": 3.5,
+       "b": 2.41,
+       "z": 6.0
+      },
+      "lengths": [
+       "13",
+       "16",
+       "19",
+       "22",
+       "25",
+       "32",
+       "38"
+      ]
+     },
+     {
+      "name": "ST8",
+      "label": "Cross recessed flat head countersunk tapping screw ST8x{l}",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dk": 17.3,
+       "k": 4.65,
+       "sd": 8.9,
+       "t": 4.6,
+       "b": 3.48,
+       "z": 7.5
+      },
+      "lengths": [
+       "16",
+       "19",
+       "22",
+       "25",
+       "32",
+       "38",
+       "45",
+       "50"
+      ]
+     },
+     {
+      "name": "ST9.5",
+      "label": "Cross recessed flat head countersunk tapping screw ST9.5x{l}",
+      "d": 9.5,
+      "dims": {
+       "d": 9.5,
+       "dk": 20.0,
+       "k": 5.25,
+       "sd": 10.0,
+       "t": 5.7,
+       "b": 3.48,
+       "z": 8.0
+      },
+      "lengths": [
+       "19",
+       "22",
+       "25",
+       "32",
+       "38",
+       "45",
+       "50"
+      ]
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_7982 / DIN 7050 MAIN (component document 0315fe345dd0b3f8d6be552e; live/dom/skb-sc-fsrules), Size and Length lists from live (dom/skb-sc-full-DIN.json); recess and tip as the generic cross recess / cone tip"
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Self-tapping screws",
+    "name": "Cross recessed oval head raised countersunk tapping screw DIN 7051",
+    "shape": "screw",
+    "form": {
+     "head": 5,
+     "drive": 3,
+     "point": 4,
+     "neck": 0
+    },
+    "params": [
+     {
+      "label": "Head type",
+      "options": [
+       "Type H",
+       "Type Z"
+      ],
+      "default": "Type H"
+     },
+     {
+      "label": "Tip type",
+      "options": [
+       "Type C",
+       "Type F"
+      ],
+      "default": "Type C"
+     }
+    ],
+    "sizes": [
+     {
+      "name": "ST2.2",
+      "label": "Cross recessed oval head raised countersunk tapping screw ST2.2x{l}",
+      "d": 2.2,
+      "dims": {
+       "d": 2.2,
+       "dk": 4.4,
+       "k": 1.1,
+       "f": 0.5,
+       "sd": 2.2,
+       "t": 1.5,
+       "b": 0.61,
+       "z": 2.0
+      },
+      "lengths": [
+       "4.5",
+       "6.5",
+       "9.5",
+       "13",
+       "16"
+      ]
+     },
+     {
+      "name": "ST2.9",
+      "label": "Cross recessed oval head raised countersunk tapping screw ST2.9x{l}",
+      "d": 2.9,
+      "dims": {
+       "d": 2.9,
+       "dk": 6.3,
+       "k": 1.7,
+       "f": 0.7,
+       "sd": 3.4,
+       "t": 2.2,
+       "b": 0.97,
+       "z": 2.6
+      },
+      "lengths": [
+       "6.5",
+       "9.5",
+       "13",
+       "16",
+       "19"
+      ]
+     },
+     {
+      "name": "ST3.5",
+      "label": "Cross recessed oval head raised countersunk tapping screw ST3.5x{l}",
+      "d": 3.5,
+      "dims": {
+       "d": 3.5,
+       "dk": 8.2,
+       "k": 2.35,
+       "f": 0.8,
+       "sd": 4.8,
+       "t": 2.75,
+       "b": 1.47,
+       "z": 3.2
+      },
+      "lengths": [
+       "9.5",
+       "13",
+       "16",
+       "19",
+       "22",
+       "25"
+      ]
+     },
+     {
+      "name": "ST4.2",
+      "label": "Cross recessed oval head raised countersunk tapping screw ST4.2x{l}",
+      "d": 4.2,
+      "dims": {
+       "d": 4.2,
+       "dk": 9.4,
+       "k": 2.6,
+       "f": 1.0,
+       "sd": 5.2,
+       "t": 3.2,
+       "b": 1.47,
+       "z": 3.7
+      },
+      "lengths": [
+       "9.5",
+       "13",
+       "16",
+       "19",
+       "22",
+       "25",
+       "32"
+      ]
+     },
+     {
+      "name": "ST4.8",
+      "label": "Cross recessed oval head raised countersunk tapping screw ST4.8x{l}",
+      "d": 4.8,
+      "dims": {
+       "d": 4.8,
+       "dk": 10.399999999999999,
+       "k": 2.8,
+       "f": 1.2,
+       "sd": 5.4,
+       "t": 3.4,
+       "b": 1.47,
+       "z": 4.3
+      },
+      "lengths": [
+       "9.5",
+       "13",
+       "16",
+       "19",
+       "22",
+       "25",
+       "32"
+      ]
+     },
+     {
+      "name": "ST5.5",
+      "label": "Cross recessed oval head raised countersunk tapping screw ST5.5x{l}",
+      "d": 5.5,
+      "dims": {
+       "d": 5.5,
+       "dk": 11.5,
+       "k": 3.0,
+       "f": 1.3,
+       "sd": 6.7,
+       "t": 3.45,
+       "b": 2.41,
+       "z": 5.0
+      },
+      "lengths": [
+       "13",
+       "16",
+       "19",
+       "22",
+       "25",
+       "32",
+       "38"
+      ]
+     },
+     {
+      "name": "ST6.3",
+      "label": "Cross recessed oval head raised countersunk tapping screw ST6.3x{l}",
+      "d": 6.3,
+      "dims": {
+       "d": 6.3,
+       "dk": 12.6,
+       "k": 3.15,
+       "f": 1.4,
+       "sd": 7.3,
+       "t": 4.0,
+       "b": 2.41,
+       "z": 6.0
+      },
+      "lengths": [
+       "13",
+       "16",
+       "19",
+       "22",
+       "25",
+       "32",
+       "38"
+      ]
+     },
+     {
+      "name": "ST8",
+      "label": "Cross recessed oval head raised countersunk tapping screw ST8x{l}",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dk": 17.3,
+       "k": 4.65,
+       "f": 2.0,
+       "sd": 9.6,
+       "t": 5.25,
+       "b": 3.48,
+       "z": 7.5
+      },
+      "lengths": [
+       "16",
+       "19",
+       "22",
+       "25",
+       "32",
+       "38",
+       "45",
+       "50"
+      ]
+     },
+     {
+      "name": "ST9.5",
+      "label": "Cross recessed oval head raised countersunk tapping screw ST9.5x{l}",
+      "d": 9.5,
+      "dims": {
+       "d": 9.5,
+       "dk": 20.0,
+       "k": 5.25,
+       "f": 2.3,
+       "sd": 10.4,
+       "t": 6.0,
+       "b": 3.48,
+       "z": 8.0
+      },
+      "lengths": [
+       "16",
+       "19",
+       "22",
+       "25",
+       "32",
+       "38",
+       "45",
+       "50"
+      ]
+     }
+    ],
+    "source": "Onshape standard content table DIN 7051 MAIN (dk = d + 2k, the 90 degree countersink) (component document 088bf355873f9e0380e39309; live/dom/skb-sc-fsrules), Size and Length lists from live (dom/skb-sc-full-DIN.json); recess and tip as the generic cross recess / cone tip"
    },
    {
     "category": "Bolts & screws",

@@ -4677,6 +4677,30 @@ fn iso_7379_shoulder_screw_matches_live() {
     }
 }
 
+/// DIN 7050 / 7051 / 967 cross recessed tapping screws with live's lists and
+/// names ("Cross recessed flat head countersunk tapping screw ST2.2x4.5": the
+/// length right after the size, as DIN EN ISO 7049's); every size regenerates.
+#[test]
+fn din_tapping_screws_have_live_lists_and_build() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    for (name, first, part) in [
+        ("Cross recessed flat head countersunk tapping screw DIN 7050", "ST2.2", "Cross recessed flat head countersunk tapping screw ST2.2x4.5"),
+        ("Cross recessed oval head raised countersunk tapping screw DIN 7051", "ST2.2", "Cross recessed oval head raised countersunk tapping screw ST2.2x4.5"),
+        ("Cross recessed pan head tapping screw with collar DIN 967", "ST2.9", "Cross recessed pan head tapping screw with collar ST2.9x6.5"),
+        ("Cross recessed pan head tapping screw DIN EN ISO 7049", "ST2.2", "Cross recessed pan head tapping screw ST2.2x4.5"),
+    ] {
+        let c = CATALOGUE.iter().find(|c| c.name == name).expect(name);
+        let spec = StandardSpec::new(c);
+        assert_eq!((spec.size.as_str(), spec.part_name()), (first, part.to_string()));
+        for s in &c.sizes {
+            let mut spec = StandardSpec::new(c);
+            spec.set_size(&s.name);
+            let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{name} {}: {e}", s.name));
+            assert!(standard::part_body(&r).is_some(), "{name} {}", s.name);
+        }
+    }
+}
+
 /// ANSI commercial taper pins and slotted spring pins with live's whole size
 /// lists (its FSRules tables, behaviours "skasm (2026-10-27) standard content
 /// gaps": taper pins from #7/0, spring pins with 9/64, 5/8, 3/4); every size
