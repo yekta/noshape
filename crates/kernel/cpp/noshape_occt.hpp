@@ -150,6 +150,9 @@ struct BudgetHold
 // user, often this thread, would wait forever (qa GUARD-SEGV-MALLOC-DEADLOCK:
 // the v0.4.13 CLI blocked on a mutex it owned itself).
 extern thread_local int locked_sections;
+// Pthread mutexes (and pthread_once calls) this thread holds (common.cpp,
+// Linux): no budget jump and no guard recovery while any is held.
+extern thread_local int mutex_holds;
 struct LockedSection
 {
   BudgetHold hold;

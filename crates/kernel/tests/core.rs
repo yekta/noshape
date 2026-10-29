@@ -423,15 +423,33 @@ fn a_fault_inside_the_c_library_ends_the_process() {
         std::process::exit(0);
     }
     use std::os::unix::process::ExitStatusExt;
-    // 9: inside the C library; 10: holding a kernel lock (LockedSection).
-    for (kind, says) in [(9, "inside the C library"), (10, "holding a lock")] {
-        let out = std::process::Command::new(std::env::current_exe().unwrap())
+    // 9: inside the C library; 10: holding a kernel lock (LockedSection);
+    // 11: holding a plain std::mutex (as OCCT's own, counted by the
+    // pthread_mutex_lock wrapper).
+    // 12: glibc's abort from inside free() (a corrupt chunk).
+    for (kind, signal, says) in [(9, 11, "inside the C library"), (10, 11, "holding a lock"), (11, 11, "holding a lock"), (12, 6, "aborted")] {
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
             .args(["--exact", "kernel_core::a_fault_inside_the_c_library_ends_the_process", "--nocapture", "--test-threads", "1"])
             .env("NOSHAPE_TEST_LIBC_FAULT", kind.to_string())
-            .output()
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
             .unwrap();
-        let err = String::from_utf8_lossy(&out.stderr);
-        assert_eq!(out.status.signal(), Some(11), "{kind}: {:?}: {err}", out.status);
+        // Dies at once, never hangs (a recovery could wait forever on malloc's lock).
+        let t = std::time::Instant::now();
+        let status = loop {
+            if let Some(s) = child.try_wait().unwrap() {
+                break s;
+            }
+            if t.elapsed().as_secs() > 60 {
+                let _ = child.kill();
+                panic!("{kind}: the child hung");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        };
+        let mut err = String::new();
+        std::io::Read::read_to_string(&mut child.stderr.take().unwrap(), &mut err).unwrap();
+        assert_eq!(status.signal(), Some(signal), "{kind}: {status:?}: {err}");
         assert!(err.contains(says), "{kind}: {err}");
     }
     // Faults in our own code are still recovered.

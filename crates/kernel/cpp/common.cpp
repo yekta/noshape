@@ -1425,7 +1425,98 @@ rust::String dump_shape(const OcShape& s)
 
 namespace noshape {
 thread_local int locked_sections = 0;
+thread_local int mutex_holds     = 0;
 } // namespace noshape
+
+#ifdef __linux__
+// Every pthread mutex the program's own code (OCCT, the bridge, std::mutex)
+// takes is counted per thread, and every pthread_once it runs: while one is
+// held the CPU budget doesn't jump and the crash guard doesn't resume (qa
+// GUARD-SEGV-MALLOC-DEADLOCK: the v0.4.13 CLI waited on a mutex it owned
+// itself). These definitions take the executable's references; the C
+// library's are called through dlsym(RTLD_NEXT). Shared libraries keep
+// theirs.
+namespace {
+using MutexFn = int (*)(pthread_mutex_t*);
+using TimedFn = int (*)(pthread_mutex_t*, const struct timespec*);
+using ClockFn = int (*)(pthread_mutex_t*, clockid_t, const struct timespec*);
+using OnceFn  = int (*)(pthread_once_t*, void (*)());
+std::atomic<MutexFn> real_lock{nullptr}, real_trylock{nullptr}, real_unlock{nullptr};
+std::atomic<TimedFn> real_timedlock{nullptr};
+std::atomic<ClockFn> real_clocklock{nullptr};
+std::atomic<OnceFn>  real_once{nullptr};
+
+template <class F>
+F next_symbol(std::atomic<F>& slot, const char* name)
+{
+  F f = slot.load(std::memory_order_acquire);
+  if (f == nullptr)
+  {
+    f = reinterpret_cast<F>(dlsym(RTLD_NEXT, name));
+    slot.store(f, std::memory_order_release);
+  }
+  return f;
+}
+
+__attribute__((constructor(101))) void resolve_mutex_functions()
+{
+  next_symbol(real_lock, "pthread_mutex_lock");
+  next_symbol(real_trylock, "pthread_mutex_trylock");
+  next_symbol(real_unlock, "pthread_mutex_unlock");
+  next_symbol(real_timedlock, "pthread_mutex_timedlock");
+  next_symbol(real_clocklock, "pthread_mutex_clocklock");
+  next_symbol(real_once, "pthread_once");
+}
+} // namespace
+
+extern "C" int pthread_mutex_lock(pthread_mutex_t* m)
+{
+  const int r = next_symbol(real_lock, "pthread_mutex_lock")(m);
+  if (r == 0)
+    ++noshape::mutex_holds;
+  return r;
+}
+
+extern "C" int pthread_mutex_trylock(pthread_mutex_t* m)
+{
+  const int r = next_symbol(real_trylock, "pthread_mutex_trylock")(m);
+  if (r == 0)
+    ++noshape::mutex_holds;
+  return r;
+}
+
+extern "C" int pthread_mutex_timedlock(pthread_mutex_t* m, const struct timespec* t)
+{
+  const int r = next_symbol(real_timedlock, "pthread_mutex_timedlock")(m, t);
+  if (r == 0)
+    ++noshape::mutex_holds;
+  return r;
+}
+
+extern "C" int pthread_mutex_clocklock(pthread_mutex_t* m, clockid_t c, const struct timespec* t)
+{
+  const int r = next_symbol(real_clocklock, "pthread_mutex_clocklock")(m, c, t);
+  if (r == 0)
+    ++noshape::mutex_holds;
+  return r;
+}
+
+extern "C" int pthread_mutex_unlock(pthread_mutex_t* m)
+{
+  const int r = next_symbol(real_unlock, "pthread_mutex_unlock")(m);
+  if (r == 0 && noshape::mutex_holds > 0)
+    --noshape::mutex_holds;
+  return r;
+}
+
+extern "C" int pthread_once(pthread_once_t* o, void (*init)())
+{
+  ++noshape::mutex_holds;
+  const int r = next_symbol(real_once, "pthread_once")(o, init);
+  --noshape::mutex_holds;
+  return r;
+}
+#endif
 
 #ifndef _WIN32
 namespace noshape {
@@ -1435,6 +1526,10 @@ thread_local int         crash_signal = 0;
 
 namespace {
 struct sigaction g_previous[32];
+
+// Set by the terminate handler just before its abort().
+thread_local volatile bool terminating = false;
+std::terminate_handler     g_previous_terminate = nullptr;
 
 // The C library's code (where malloc / free run), found at install.
 uintptr_t g_libc_lo = 0, g_libc_hi = 0;
@@ -1466,11 +1561,20 @@ void on_crash(int sig, siginfo_t* info, void* ctx)
     // Nor one while this thread holds a kernel lock (LockedSection).
     const uintptr_t pc   = fault_pc(ctx);
     const bool      libc = info != nullptr && info->si_code > 0 && pc != 0 && pc >= g_libc_lo && pc < g_libc_hi;
-    if (libc || locked_sections > 0)
+    // An abort() neither: glibc's own heap checks ("free(): invalid
+    // pointer", ...) abort from inside malloc, possibly with its lock held.
+    // (std::terminate's abort, an OCCT exception through a noexcept frame,
+    // stays recovered: its handler marks it.)
+    const bool abort_raw = sig == SIGABRT && !terminating;
+    terminating          = false;
+    if (libc || abort_raw || locked_sections > 0 || mutex_holds > 0)
     {
-      static const char in_libc[] = "noshape: the kernel crashed inside the C library; not recoverable\n";
-      static const char in_lock[] = "noshape: the kernel crashed holding a lock; not recoverable\n";
-      [[maybe_unused]] const ssize_t w = libc ? write(2, in_libc, sizeof in_libc - 1) : write(2, in_lock, sizeof in_lock - 1);
+      static const char in_libc[]  = "noshape: the kernel crashed inside the C library; not recoverable\n";
+      static const char in_lock[]  = "noshape: the kernel crashed holding a lock; not recoverable\n";
+      static const char aborted[]  = "noshape: the kernel aborted; not recoverable\n";
+      [[maybe_unused]] const ssize_t w = libc               ? write(2, in_libc, sizeof in_libc - 1)
+                                         : abort_raw      ? write(2, aborted, sizeof aborted - 1)
+                                                          : write(2, in_lock, sizeof in_lock - 1);
       crash_guard = nullptr;
       signal(sig, SIG_DFL);
       raise(sig);
@@ -1539,6 +1643,12 @@ void install_crash_guard()
       g_libc_hi = find.hi;
     }
 #endif
+    g_previous_terminate = std::set_terminate([] {
+      terminating = true;
+      if (g_previous_terminate != nullptr)
+        g_previous_terminate();
+      std::abort();
+    });
     for (int sig : {SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT})
     {
       struct sigaction sa;
@@ -1641,6 +1751,30 @@ void crash_inside_kernel(uint8_t kind)
       std::raise(SIGSEGV);
     });
     fail_op("survived a fault holding a lock");
+  }
+  else if (kind == 12)
+  {
+    // The guard and malloc (qa GUARD-SEGV-MALLOC-DEADLOCK): a heap chunk's
+    // header overwritten, then freed inside a guarded call: glibc aborts from
+    // inside free(). Recovered, the next allocation could wait forever on the
+    // arena lock; not recovered, the process dies of SIGABRT.
+    run_guarded([&] {
+      void* const              p    = std::malloc(64);
+      volatile const uintptr_t head = reinterpret_cast<uintptr_t>(p) - sizeof(size_t);
+      *reinterpret_cast<volatile size_t*>(head) = 0x12345;
+      std::free(p);
+    });
+    fail_op("survived freeing a corrupt chunk");
+  }
+  else if (kind == 11)
+  {
+    // A fault holding a plain mutex (as OCCT's own): not recovered.
+    static std::mutex m;
+    run_guarded([&] {
+      std::lock_guard<std::mutex> g(m);
+      std::raise(SIGSEGV);
+    });
+    fail_op("survived a fault holding a mutex");
   }
   else if (kind == 9)
   {
@@ -1855,7 +1989,7 @@ void on_budget_tick(int, siginfo_t*, void* uctx)
   // Not while this thread runs an OCCT thread pool job (its workers would go
   // on using the abandoned frames: qa BOP-PAIRS-GPF, BOOL-THREAD-CRASH):
   // OCCT patch 0005 counts them. The next tick after.
-  if (env == nullptr || budget_hold > 0 || noshape_osd_pool_depth() > 0 || !in_own_code(uctx))
+  if (env == nullptr || budget_hold > 0 || mutex_holds > 0 || noshape_osd_pool_depth() > 0 || !in_own_code(uctx))
     return;
   const bool over   = thread_cpu_seconds() > budget_limit;
   const bool cancel = budget_cancel != nullptr && budget_cancel->load(std::memory_order_relaxed);
