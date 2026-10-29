@@ -478,6 +478,15 @@ impl AssemblyView {
                 }), cx)));
             }
         }
+        // PEM®: Hole size (follows Size) and, for nuts and standoffs,
+        // Recommended sheet material (follows Material): plain text (live).
+        let plain = |text: &str| div().text_size(px(12.)).text_color(gpui_kit::rgb(0x333333)).child(text.to_string()).into_any_element();
+        if let Some(hole) = spec.size_row().and_then(|s| s.hole_size.as_deref()) {
+            params = params.child(row("Hole size", 27., plain(hole)));
+        }
+        if let Some(rec) = c.recommended(spec.material()) {
+            params = params.child(row("Recommended sheet material", 34., plain(rec)));
+        }
         let materials: Vec<String> = c.materials_for(spec.size_row()).iter().map(|s| s.to_string()).collect();
         params = params.child(row("Material", 27., Self::std_select("std-material", 146., spec.material().to_string(), materials, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.material = Some(v.to_string())), cx)));
         let finishes: Vec<String> = c.finishes_for(spec.material()).iter().map(|s| s.to_string()).collect();

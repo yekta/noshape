@@ -21,22 +21,26 @@
      "Stainless Steel": {
       "code": "SOS",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Steel/Aluminum"
      },
      "Steel": {
       "code": "SO",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      },
      "Aluminum": {
       "code": "SOA",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Aluminum"
      },
      "Hardened Stainless Steel": {
       "code": "SO4",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Stainless Steel"
      }
     },
     "sizes": [
@@ -60,7 +64,8 @@
        "16",
        "18",
        "20"
-      ]
+      ],
+      "holeSize": "4.22 (+.08)"
      },
      {
       "name": "3.1 (thick walled)",
@@ -82,7 +87,8 @@
        "16",
        "18",
        "20"
-      ]
+      ],
+      "holeSize": "5.41 (+.08)"
      },
      {
       "name": "3.6 ",
@@ -104,7 +110,8 @@
        "16",
        "18",
        "20"
-      ]
+      ],
+      "holeSize": "5.41 (+.08)"
      },
      {
       "name": "3.6 (thick walled)",
@@ -126,7 +133,8 @@
        "16",
        "18",
        "20"
-      ]
+      ],
+      "holeSize": "7.12 (+.08)"
      },
      {
       "name": "4.1 ",
@@ -148,7 +156,8 @@
        "16",
        "18",
        "20"
-      ]
+      ],
+      "holeSize": "7.12 (+.08)"
      },
      {
       "name": "5.1 ",
@@ -170,7 +179,8 @@
        "16",
        "18",
        "20"
-      ]
+      ],
+      "holeSize": "7.12 (+.08)"
      }
     ],
     "nearOnly": false,
@@ -194,22 +204,26 @@
      "Stainless Steel": {
       "code": "SOS",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Steel/Aluminum"
      },
      "Steel": {
       "code": "SO",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      },
      "Aluminum": {
       "code": "SOA",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Aluminum"
      },
      "Hardened Stainless Steel": {
       "code": "SO4",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Stainless Steel"
      }
     },
     "sizes": [
@@ -263,7 +277,8 @@
        "18": {
         "lb": 8.0
        }
-      }
+      },
+      "holeSize": "4.22 (+.08)"
      },
      {
       "name": "M3x0.50 (thick walled)",
@@ -315,7 +330,8 @@
        "18": {
         "lb": 8.0
        }
-      }
+      },
+      "holeSize": "5.41 (+.08)"
      },
      {
       "name": "M3.5x0.60",
@@ -379,7 +395,8 @@
        "25": {
         "lb": 11.0
        }
-      }
+      },
+      "holeSize": "5.41 (+.08)"
      },
      {
       "name": "M4x0.70",
@@ -443,7 +460,8 @@
        "25": {
         "lb": 11.0
        }
-      }
+      },
+      "holeSize": "7.14 (+.08)"
      },
      {
       "name": "M5x0.80",
@@ -507,7 +525,8 @@
        "25": {
         "lb": 11.0
        }
-      }
+      },
+      "holeSize": "7.14 (+.08)"
      }
     ],
     "nearOnly": false,
@@ -531,22 +550,26 @@
      "Stainless Steel": {
       "code": "BSOS",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Steel/Aluminum"
      },
      "Steel": {
       "code": "BSO",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      },
      "Aluminum": {
       "code": "BSOA",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Aluminum"
      },
      "Hardened Stainless Steel": {
       "code": "BSO4",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Stainless Steel"
      }
     },
     "sizes": [
@@ -571,7 +594,8 @@
        "20",
        "22",
        "25"
-      ]
+      ],
+      "holeSize": "4.22 (+.08)"
      },
      {
       "name": "M3x0.50 (thick walled)",
@@ -594,7 +618,8 @@
        "20",
        "22",
        "25"
-      ]
+      ],
+      "holeSize": "5.41 (+.08)"
      },
      {
       "name": "M3.5x0.60",
@@ -617,7 +642,8 @@
        "20",
        "22",
        "25"
-      ]
+      ],
+      "holeSize": "5.41 (+.08)"
      },
      {
       "name": "M4x0.70",
@@ -640,7 +666,8 @@
        "20",
        "22",
        "25"
-      ]
+      ],
+      "holeSize": "7.14 (+.08)"
      },
      {
       "name": "M5x0.80",
@@ -663,7 +690,8 @@
        "20",
        "22",
        "25"
-      ]
+      ],
+      "holeSize": "7.14 (+.08)"
      }
     ],
     "nearOnly": false,
@@ -687,22 +715,26 @@
      "Stainless Steel": {
       "code": "TSOS",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Steel/Aluminum"
      },
      "Steel": {
       "code": "TSO",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      },
      "Aluminum": {
       "code": "TSOA",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Aluminum"
      },
      "Hardened Stainless Steel": {
       "code": "TSO4",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Stainless Steel"
      }
     },
     "sizes": [
@@ -776,7 +808,8 @@
        "16": "1600",
        "18": "1800",
        "19": "1900"
-      }
+      },
+      "holeSize": "4.22 (+.08)"
      },
      {
       "name": "M2.5x0.45 (thick walled)",
@@ -848,7 +881,8 @@
        "16": "1600",
        "18": "1800",
        "19": "1900"
-      }
+      },
+      "holeSize": "5.41 (+.08)"
      },
      {
       "name": "M3x0.50",
@@ -920,7 +954,8 @@
        "16": "1600",
        "18": "1800",
        "19": "1900"
-      }
+      },
+      "holeSize": "4.22 (+.08)"
      },
      {
       "name": "M3x0.50 (thick walled)",
@@ -992,7 +1027,8 @@
        "16": "1600",
        "18": "1800",
        "19": "1900"
-      }
+      },
+      "holeSize": "5.41 (+.08)"
      },
      {
       "name": "M3.5x0.60",
@@ -1059,7 +1095,8 @@
        "16": "1600",
        "18": "1800",
        "19": "1900"
-      }
+      },
+      "holeSize": "5.41 (+.08)"
      }
     ],
     "nearOnly": false,
@@ -1114,7 +1151,8 @@
        "10",
        "12",
        "16"
-      ]
+      ],
+      "holeSize": "3.5 (+.08)"
      },
      {
       "name": "4",
@@ -1132,7 +1170,8 @@
        "10",
        "12",
        "16"
-      ]
+      ],
+      "holeSize": "4.5 (+.08)"
      },
      {
       "name": "5",
@@ -1150,7 +1189,8 @@
        "12",
        "16",
        "20"
-      ]
+      ],
+      "holeSize": "5.5 (+.08)"
      },
      {
       "name": "6",
@@ -1167,7 +1207,8 @@
        "12",
        "16",
        "20"
-      ]
+      ],
+      "holeSize": "6.5 (+.08)"
      }
     ],
     "nearOnly": false,
@@ -1205,7 +1246,8 @@
       },
       "lengths": [
        "16"
-      ]
+      ],
+      "holeSize": "3.5 (+.08)"
      }
     ],
     "nearOnly": false,
@@ -1263,7 +1305,8 @@
        "20",
        "25",
        "30"
-      ]
+      ],
+      "holeSize": "3.5 (+.08)"
      },
      {
       "name": "4",
@@ -1286,7 +1329,8 @@
        "25",
        "30",
        "35"
-      ]
+      ],
+      "holeSize": "4.1 (+.08)"
      },
      {
       "name": "5",
@@ -1309,7 +1353,8 @@
        "25",
        "30",
        "35"
-      ]
+      ],
+      "holeSize": "5.5 (+.08)"
      }
     ],
     "nearOnly": false,
@@ -1365,7 +1410,8 @@
        "12",
        "15",
        "18"
-      ]
+      ],
+      "holeSize": "2.5 (+0.08)"
      },
      {
       "name": "M3x0.50",
@@ -1388,7 +1434,8 @@
        "18",
        "20",
        "25"
-      ]
+      ],
+      "holeSize": "3 (+0.08)"
      },
      {
       "name": "M3.5x0.60",
@@ -1412,7 +1459,8 @@
        "20",
        "25",
        "30"
-      ]
+      ],
+      "holeSize": "3.5 (+0.08)"
      },
      {
       "name": "M4x0.70",
@@ -1437,7 +1485,8 @@
        "25",
        "30",
        "35"
-      ]
+      ],
+      "holeSize": "4 (+0.08)"
      },
      {
       "name": "M5x0.80",
@@ -1461,7 +1510,8 @@
        "25",
        "30",
        "35"
-      ]
+      ],
+      "holeSize": "5 (+0.08)"
      },
      {
       "name": "M6x1.00",
@@ -1484,7 +1534,8 @@
        "25",
        "30",
        "35"
-      ]
+      ],
+      "holeSize": "6 (+0.08)"
      },
      {
       "name": "M8x1.25",
@@ -1510,7 +1561,8 @@
       "materials": [
        "Stainless Steel",
        "Steel"
-      ]
+      ],
+      "holeSize": "8 (+0.08)"
      }
     ],
     "nearOnly": false,
@@ -1562,7 +1614,8 @@
        "18",
        "20",
        "25"
-      ]
+      ],
+      "holeSize": "3 (+0.08)"
      },
      {
       "name": "M4x0.70",
@@ -1587,7 +1640,8 @@
        "25",
        "30",
        "35"
-      ]
+      ],
+      "holeSize": "4 (+0.08)"
      },
      {
       "name": "M5x0.80",
@@ -1611,7 +1665,8 @@
        "25",
        "30",
        "35"
-      ]
+      ],
+      "holeSize": "5 (+0.08)"
      },
      {
       "name": "M6x1.00",
@@ -1637,7 +1692,8 @@
       ],
       "materials": [
        "Stainless Steel"
-      ]
+      ],
+      "holeSize": "6 (+0.08)"
      }
     ],
     "nearOnly": false,
@@ -1688,7 +1744,8 @@
        "12",
        "15",
        "18"
-      ]
+      ],
+      "holeSize": "2.5 (+0.08)"
      },
      {
       "name": "M3x0.50",
@@ -1711,7 +1768,8 @@
        "18",
        "20",
        "25"
-      ]
+      ],
+      "holeSize": "3 (+0.08)"
      },
      {
       "name": "M3.5x0.60",
@@ -1735,7 +1793,8 @@
        "20",
        "25",
        "30"
-      ]
+      ],
+      "holeSize": "3.5 (+0.08)"
      },
      {
       "name": "M4x0.70",
@@ -1760,7 +1819,8 @@
        "25",
        "30",
        "35"
-      ]
+      ],
+      "holeSize": "4 (+0.08)"
      },
      {
       "name": "M5x0.80",
@@ -1784,7 +1844,8 @@
        "25",
        "30",
        "35"
-      ]
+      ],
+      "holeSize": "5 (+0.08)"
      }
     ],
     "nearOnly": false,
@@ -1837,7 +1898,8 @@
        "18",
        "20",
        "25"
-      ]
+      ],
+      "holeSize": "3 (+0.08)"
      },
      {
       "name": "M4x0.70",
@@ -1862,7 +1924,8 @@
        "25",
        "30",
        "35"
-      ]
+      ],
+      "holeSize": "4 (+0.08)"
      },
      {
       "name": "M5x0.80",
@@ -1887,7 +1950,8 @@
        "25",
        "30",
        "35"
-      ]
+      ],
+      "holeSize": "5 (+0.08)"
      }
     ],
     "nearOnly": false,
@@ -1934,7 +1998,8 @@
        "35",
        "40",
        "50"
-      ]
+      ],
+      "holeSize": "5 (+0.13)"
      },
      {
       "name": "M6x1.00",
@@ -1958,7 +2023,8 @@
        "35",
        "40",
        "50"
-      ]
+      ],
+      "holeSize": "6 (+0.13)"
      },
      {
       "name": "M8x1.25",
@@ -1981,7 +2047,8 @@
        "35",
        "40",
        "50"
-      ]
+      ],
+      "holeSize": "8 (+0.13)"
      }
     ],
     "nearOnly": false,
@@ -2024,7 +2091,8 @@
        "15",
        "20",
        "25"
-      ]
+      ],
+      "holeSize": "5 (+0.13)"
      },
      {
       "name": "M6x1.00",
@@ -2044,7 +2112,8 @@
        "15",
        "20",
        "25"
-      ]
+      ],
+      "holeSize": "6 (+0.13)"
      },
      {
       "name": "M8x1.25",
@@ -2063,7 +2132,8 @@
       "lengths": [
        "20",
        "25"
-      ]
+      ],
+      "holeSize": "8 (+0.13)"
      }
     ],
     "nearOnly": false,
@@ -2122,7 +2192,8 @@
        "35",
        "40",
        "50"
-      ]
+      ],
+      "holeSize": "5 (+0.08)"
      },
      {
       "name": "M6x1.00",
@@ -2146,7 +2217,8 @@
        "35",
        "40",
        "50"
-      ]
+      ],
+      "holeSize": "6 (+0.08)"
      },
      {
       "name": "M8x1.25",
@@ -2170,7 +2242,8 @@
        "35",
        "40",
        "50"
-      ]
+      ],
+      "holeSize": "8 (+0.08)"
      },
      {
       "name": "M10x1.5",
@@ -2193,7 +2266,8 @@
        "35",
        "40",
        "50"
-      ]
+      ],
+      "holeSize": "10 (+0.08)"
      }
     ],
     "nearOnly": false,
@@ -2248,7 +2322,8 @@
        "Type": [
         "HFE"
        ]
-      }
+      },
+      "holeSize": "5 (+0.13)"
      },
      {
       "name": "M6x1.00",
@@ -2281,7 +2356,8 @@
         "HFE",
         "THFE"
        ]
-      }
+      },
+      "holeSize": "6 (+0.13)"
      },
      {
       "name": "M8x1.25",
@@ -2314,7 +2390,8 @@
         "HFE",
         "THFE"
        ]
-      }
+      },
+      "holeSize": "8 (+0.13)"
      }
     ],
     "nearOnly": false,
@@ -2366,7 +2443,8 @@
        "15",
        "20",
        "25"
-      ]
+      ],
+      "holeSize": "5.2 (+0.08)"
      },
      {
       "name": "6 mm x 1.6",
@@ -2385,7 +2463,8 @@
        "15",
        "20",
        "25"
-      ]
+      ],
+      "holeSize": "6.2 (+0.08)"
      }
     ],
     "nearOnly": false,
@@ -2429,7 +2508,8 @@
        "12",
        "15",
        "18"
-      ]
+      ],
+      "holeSize": "2.5 (+0.08)"
      },
      {
       "name": "M3x0.50",
@@ -2452,7 +2532,8 @@
        "18",
        "20",
        "25"
-      ]
+      ],
+      "holeSize": "3 (+0.08)"
      },
      {
       "name": "M4x0.70",
@@ -2476,7 +2557,8 @@
        "20",
        "25",
        "30"
-      ]
+      ],
+      "holeSize": "4 (+0.08)"
      },
      {
       "name": "M5x0.80",
@@ -2501,7 +2583,8 @@
        "25",
        "30",
        "35"
-      ]
+      ],
+      "holeSize": "5 (+0.08)"
      },
      {
       "name": "M6x1.00",
@@ -2525,7 +2608,8 @@
        "25",
        "30",
        "35"
-      ]
+      ],
+      "holeSize": "6 (+0.08)"
      }
     ],
     "nearOnly": false,
@@ -2547,12 +2631,14 @@
      "Stainless Steel": {
       "code": "DSOS",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Steel/Aluminum"
      },
      "Steel": {
       "code": "DSO",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      }
     },
     "sizes": [
@@ -2570,7 +2656,8 @@
       "lengths": [
        "6.35",
        "7"
-      ]
+      ],
+      "holeSize": "4.22 (+.08)"
      }
     ],
     "nearOnly": false,
@@ -2592,12 +2679,14 @@
      "Stainless Steel": {
       "code": "SOSG",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Aluminum"
      },
      "Aluminum": {
       "code": "SOAG",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Aluminum"
      }
     },
     "sizes": [
@@ -2620,7 +2709,8 @@
        "8",
        "10",
        "12"
-      ]
+      ],
+      "holeSize": "5.4 (+.08)"
      }
     ],
     "nearOnly": false,
@@ -2644,17 +2734,20 @@
      "Stainless Steel": {
       "code": "CLS",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Steel/Aluminum"
      },
      "Hardened Stainless Steel": {
       "code": "SP",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Stainless steel"
      },
      "Carbon Steel": {
       "code": "S",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      }
     },
     "sizes": [
@@ -2690,7 +2783,8 @@
        "0.8": "0",
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "4.22 (+0.08)"
      },
      {
       "name": "M2.5x0.45",
@@ -2724,7 +2818,8 @@
        "0.8": "0",
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "4.22 (+0.08)"
      },
      {
       "name": "M3x0.50",
@@ -2758,7 +2853,8 @@
        "0.8": "0",
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "4.22 (+0.08)"
      },
      {
       "name": "M3.5x0.60",
@@ -2796,7 +2892,8 @@
       "materials": [
        "Stainless Steel",
        "Carbon Steel"
-      ]
+      ],
+      "holeSize": "4.75 (+0.08)"
      },
      {
       "name": "M4x0.70",
@@ -2830,7 +2927,8 @@
        "0.8": "0",
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "5.41 (+0.08)"
      },
      {
       "name": "M5x0.80",
@@ -2868,7 +2966,8 @@
       "typeCodes": {
        "Stainless Steel": "CLSS",
        "Carbon Steel": "SS"
-      }
+      },
+      "holeSize": "6.35 (+0.08)"
      },
      {
       "name": "M6x1.00",
@@ -2907,7 +3006,8 @@
        "1.2": "0",
        "1.4": "1",
        "2.29": "2"
-      }
+      },
+      "holeSize": "8.75 (+0.08)"
      },
      {
       "name": "M8x1.25",
@@ -2936,7 +3036,8 @@
       "lengthNames": {
        "1.4": "1",
        "2.29": "2"
-      }
+      },
+      "holeSize": "10.5 (+0.08)"
      },
      {
       "name": "M10x1.5",
@@ -2965,7 +3066,8 @@
       "lengthNames": {
        "2.29": "1",
        "3.18": "2"
-      }
+      },
+      "holeSize": "14 (+0.08)"
      },
      {
       "name": "M12x1.75",
@@ -2992,7 +3094,8 @@
       },
       "materials": [
        "Carbon Steel"
-      ]
+      ],
+      "holeSize": "17 (+0.08)"
      }
     ],
     "nearOnly": false,
@@ -3014,7 +3117,8 @@
      "Aluminum": {
       "code": "CLA",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Aluminum"
      }
     },
     "sizes": [
@@ -3045,7 +3149,8 @@
       "lengthNames": {
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "4.22 (+0.08)"
      },
      {
       "name": "M3x0.50",
@@ -3074,7 +3179,8 @@
       "lengthNames": {
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "4.75 (+0.08)"
      },
      {
       "name": "M3.5x0.60",
@@ -3103,7 +3209,8 @@
       "lengthNames": {
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "5.41 (+0.08)"
      },
      {
       "name": "M4x0.70",
@@ -3132,7 +3239,8 @@
       "lengthNames": {
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "5.94 (+0.08)"
      },
      {
       "name": "M5x0.80",
@@ -3161,7 +3269,8 @@
       "lengthNames": {
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "7.52 (+0.08)"
      },
      {
       "name": "M6x1.00",
@@ -3190,7 +3299,8 @@
       "lengthNames": {
        "1.4": "1",
        "2.3": "2"
-      }
+      },
+      "holeSize": "8.75 (+0.08)"
      }
     ],
     "nearOnly": false,
@@ -3214,12 +3324,14 @@
      "Stainless Steel": {
       "code": "SMPS",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Steel/Aluminum"
      },
      "Hardened Stainless Steel": {
       "code": "SMPP",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Stainless steel"
      }
     },
     "sizes": [
@@ -3238,7 +3350,8 @@
       },
       "lengths": [],
       "lengthDims": {},
-      "lengthNames": {}
+      "lengthNames": {},
+      "holeSize": "3.8 (+0.08)"
      },
      {
       "name": "M3x0.50",
@@ -3255,7 +3368,8 @@
       },
       "lengths": [],
       "lengthDims": {},
-      "lengthNames": {}
+      "lengthNames": {},
+      "holeSize": "4.24 (+0.08)"
      },
      {
       "name": "M3.5x0.60",
@@ -3272,7 +3386,8 @@
       },
       "lengths": [],
       "lengthDims": {},
-      "lengthNames": {}
+      "lengthNames": {},
+      "holeSize": "4.75 (+0.08)"
      }
     ],
     "nearOnly": false,
@@ -3295,7 +3410,8 @@
      "Hardened Alloy Steel": {
       "code": "SH",
       "finish": "No finish",
-      "finishCode": "X"
+      "finishCode": "X",
+      "recommended": "Hardened alloy steel"
      }
     },
     "sizes": [
@@ -3327,7 +3443,8 @@
       "lengthNames": {
        "1.4": "1",
        "2.3": "2"
-      }
+      },
+      "holeSize": "8.75 (+0.08)"
      },
      {
       "name": "M8x1.25",
@@ -3357,7 +3474,8 @@
       "lengthNames": {
        "1.4": "1",
        "2.3": "2"
-      }
+      },
+      "holeSize": "10.5 (+0.08)"
      },
      {
       "name": "M10x1.5",
@@ -3382,7 +3500,8 @@
       },
       "lengthNames": {
        "2.29": "1"
-      }
+      },
+      "holeSize": "14   (+0.08)"
      }
     ],
     "nearOnly": false,
@@ -3404,7 +3523,8 @@
      "Steel": {
       "code": "S",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      }
     },
     "sizes": [
@@ -3440,7 +3560,8 @@
        "0.8": "0",
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "4.22 (+0.08)"
      },
      {
       "name": "M4x0.7",
@@ -3474,7 +3595,8 @@
        "0.8": "0",
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "5.41 (+0.08)"
      },
      {
       "name": "M5x0.8",
@@ -3511,7 +3633,8 @@
       },
       "typeCodes": {
        "Steel": "SS"
-      }
+      },
+      "holeSize": "6.35 (+0.08)"
      },
      {
       "name": "M6x1",
@@ -3550,7 +3673,8 @@
        "1.2": "0",
        "1.4": "1",
        "2.29": "2"
-      }
+      },
+      "holeSize": "8.75 (+0.08)"
      },
      {
       "name": "M8x1.25",
@@ -3579,7 +3703,8 @@
       "lengthNames": {
        "1.4": "1",
        "2.29": "2"
-      }
+      },
+      "holeSize": "10.49 (+0.08)"
      }
     ],
     "nearOnly": false,
@@ -3601,7 +3726,8 @@
      "Steel": {
       "code": "SL",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      }
     },
     "sizes": [
@@ -3632,7 +3758,8 @@
       "lengthNames": {
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "4.22 (+0.08)"
      },
      {
       "name": "M3.5x0.6",
@@ -3661,7 +3788,8 @@
       "lengthNames": {
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "4.75 (+0.08)"
      },
      {
       "name": "M4x0.7",
@@ -3690,7 +3818,8 @@
       "lengthNames": {
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "5.41 (+0.08)"
      },
      {
       "name": "M5x0.8",
@@ -3719,7 +3848,8 @@
       "lengthNames": {
        "1": "1",
        "1.4": "2"
-      }
+      },
+      "holeSize": "6.35 (+0.08)"
      },
      {
       "name": "M6x1",
@@ -3748,7 +3878,8 @@
       "lengthNames": {
        "1.4": "1",
        "2.3": "2"
-      }
+      },
+      "holeSize": "8.75 (+0.08)"
      },
      {
       "name": "M8x1.25",
@@ -3777,7 +3908,8 @@
       "lengthNames": {
        "1.4": "1",
        "2.3": "2"
-      }
+      },
+      "holeSize": "10.5 (+0.08)"
      },
      {
       "name": "M10x1.5",
@@ -3806,7 +3938,8 @@
       "lengthNames": {
        "2.29": "1",
        "3.18": "2"
-      }
+      },
+      "holeSize": "14   (+0.08)"
      }
     ],
     "nearOnly": false,
@@ -3828,7 +3961,8 @@
      "Steel": {
       "code": "H",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      }
     },
     "sizes": [
@@ -3847,7 +3981,8 @@
       },
       "lengths": [],
       "lengthDims": {},
-      "lengthNames": {}
+      "lengthNames": {},
+      "holeSize": "12.7 (+0.13)"
      }
     ],
     "nearOnly": false,
@@ -3869,7 +4004,8 @@
      "Carbon Steel": {
       "code": "HNL",
       "finish": "Zinc plated",
-      "finishCode": "LZ"
+      "finishCode": "LZ",
+      "recommended": "Aluminum"
      }
     },
     "sizes": [
@@ -3888,7 +4024,8 @@
       },
       "lengths": [],
       "lengthDims": {},
-      "lengthNames": {}
+      "lengthNames": {},
+      "holeSize": "8.75 (+0.13)"
      },
      {
       "name": "M8x1.25",
@@ -3905,7 +4042,8 @@
       },
       "lengths": [],
       "lengthDims": {},
-      "lengthNames": {}
+      "lengthNames": {},
+      "holeSize": "10.5 (+0.13)"
      },
      {
       "name": "M10x1.50",
@@ -3922,7 +4060,8 @@
       },
       "lengths": [],
       "lengthDims": {},
-      "lengthNames": {}
+      "lengthNames": {},
+      "holeSize": "12.7 (+0.13)"
      }
     ],
     "nearOnly": false,
@@ -3952,22 +4091,26 @@
      "Stainless Steel": {
       "code": "SOS",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Steel/Aluminum"
      },
      "Steel": {
       "code": "SO",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      },
      "Aluminum": {
       "code": "SOA",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Aluminum"
      },
      "Hardened Stainless Steel": {
       "code": "SO4",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Stainless Steel"
      }
     },
     "sizes": [
@@ -4005,7 +4148,8 @@
        "0.625": "20",
        "0.687": "22",
        "0.75": "24"
-      }
+      },
+      "holeSize": ".166 (+.003 -.000)"
      },
      {
       "name": "0.116 (thick walled)",
@@ -4041,7 +4185,8 @@
        "0.625": "20",
        "0.687": "22",
        "0.75": "24"
-      }
+      },
+      "holeSize": ".213 (+.003 -.000)"
      },
      {
       "name": "0.143 ",
@@ -4077,7 +4222,8 @@
        "0.625": "20",
        "0.687": "22",
        "0.75": "24"
-      }
+      },
+      "holeSize": ".213 (+.003 -.000)"
      },
      {
       "name": "0.143 (thick walled)",
@@ -4113,7 +4259,8 @@
        "0.625": "20",
        "0.687": "22",
        "0.75": "24"
-      }
+      },
+      "holeSize": ".281 (+.003 -.000)"
      },
      {
       "name": "0.169 ",
@@ -4149,7 +4296,8 @@
        "0.625": "20",
        "0.687": "22",
        "0.75": "24"
-      }
+      },
+      "holeSize": ".281 (+.003 -.000)"
      },
      {
       "name": "0.194 ",
@@ -4185,7 +4333,8 @@
        "0.625": "20",
        "0.687": "22",
        "0.75": "24"
-      }
+      },
+      "holeSize": ".281 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -4209,22 +4358,26 @@
      "Stainless Steel": {
       "code": "SOS",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Steel/Aluminum"
      },
      "Steel": {
       "code": "SO",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      },
      "Aluminum": {
       "code": "SOA",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Aluminum"
      },
      "Hardened Stainless Steel": {
       "code": "SO4",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Stainless Steel"
      }
     },
     "sizes": [
@@ -4299,7 +4452,8 @@
        "0.625": "20",
        "0.687": "22",
        "0.75": "24"
-      }
+      },
+      "holeSize": ".166 (+.003 -.000)"
      },
      {
       "name": "#4-40 (thick walled)",
@@ -4372,7 +4526,8 @@
        "0.625": "20",
        "0.687": "22",
        "0.75": "24"
-      }
+      },
+      "holeSize": ".213 (+.003 -.000)"
      },
      {
       "name": "#6-32",
@@ -4470,7 +4625,8 @@
        "0.937": "30",
        "1": "32",
        "1.062": "34"
-      }
+      },
+      "holeSize": ".213 (+.003 -.000)"
      },
      {
       "name": "#6-32 (thick walled)",
@@ -4568,7 +4724,8 @@
        "0.937": "30",
        "1": "32",
        "1.062": "34"
-      }
+      },
+      "holeSize": ".281 (+.003 -.000)"
      },
      {
       "name": "#8-32",
@@ -4666,7 +4823,8 @@
        "0.937": "30",
        "1": "32",
        "1.062": "34"
-      }
+      },
+      "holeSize": ".281 (+.003 -.000)"
      },
      {
       "name": "#10-32",
@@ -4764,7 +4922,8 @@
        "0.937": "30",
        "1": "32",
        "1.062": "34"
-      }
+      },
+      "holeSize": ".281 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -4788,22 +4947,26 @@
      "Stainless Steel": {
       "code": "BSOS",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Steel/Aluminum"
      },
      "Steel": {
       "code": "BSO",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      },
      "Aluminum": {
       "code": "BSOA",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Aluminum"
      },
      "Hardened Stainless Steel": {
       "code": "BSO4",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Stainless Steel"
      }
     },
     "sizes": [
@@ -4846,7 +5009,8 @@
        "0.937": "30",
        "1": "32",
        "1.062": "34"
-      }
+      },
+      "holeSize": ".166 (+.003 -.000)"
      },
      {
       "name": "#4-40 (thick walled)",
@@ -4887,7 +5051,8 @@
        "0.937": "30",
        "1": "32",
        "1.062": "34"
-      }
+      },
+      "holeSize": ".213 (+.003 -.000)"
      },
      {
       "name": "#6-32",
@@ -4928,7 +5093,8 @@
        "0.937": "30",
        "1": "32",
        "1.062": "34"
-      }
+      },
+      "holeSize": ".213 (+.003 -.000)"
      },
      {
       "name": "#6-32 (thick walled)",
@@ -4969,7 +5135,8 @@
        "0.937": "30",
        "1": "32",
        "1.062": "34"
-      }
+      },
+      "holeSize": ".281 (+.003 -.000)"
      },
      {
       "name": "#8-32",
@@ -5010,7 +5177,8 @@
        "0.937": "30",
        "1": "32",
        "1.062": "34"
-      }
+      },
+      "holeSize": ".281 (+.003 -.000)"
      },
      {
       "name": "#10-32",
@@ -5051,7 +5219,8 @@
        "0.937": "30",
        "1": "32",
        "1.062": "34"
-      }
+      },
+      "holeSize": ".281 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -5075,22 +5244,26 @@
      "Stainless Steel": {
       "code": "TSOS",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Steel/Aluminum"
      },
      "Steel": {
       "code": "TSO",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      },
      "Aluminum": {
       "code": "TSOA",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Aluminum"
      },
      "Hardened Stainless Steel": {
       "code": "TSO4",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Stainless Steel"
      }
     },
     "sizes": [
@@ -5169,7 +5342,8 @@
        "0.625": "625",
        "0.687": "687",
        "0.75": "750"
-      }
+      },
+      "holeSize": ".166 (+.003 -.000)"
      },
      {
       "name": "#2-56 (thick walled)",
@@ -5246,7 +5420,8 @@
        "0.625": "625",
        "0.687": "687",
        "0.75": "750"
-      }
+      },
+      "holeSize": ".213 (+.003 -.000)"
      },
      {
       "name": "#4-40",
@@ -5323,7 +5498,8 @@
        "0.625": "625",
        "0.687": "687",
        "0.75": "0.750"
-      }
+      },
+      "holeSize": ".166 (+.003 -.000)"
      },
      {
       "name": "#4-40 (thick walled)",
@@ -5395,7 +5571,8 @@
        "0.625": "625",
        "0.687": "687",
        "0.75": "750"
-      }
+      },
+      "holeSize": ".213 (+.003 -.000)"
      },
      {
       "name": "#6-32",
@@ -5467,7 +5644,8 @@
        "0.625": "625",
        "0.687": "687",
        "0.75": "750"
-      }
+      },
+      "holeSize": ".213 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -5530,7 +5708,8 @@
        "0.625": "10",
        "0.75": "12",
        "1": "16"
-      }
+      },
+      "holeSize": ".144 (+.003 -.000)"
      },
      {
       "name": "0.187",
@@ -5556,7 +5735,8 @@
        "0.625": "10",
        "0.75": "12",
        "1": "16"
-      }
+      },
+      "holeSize": ".208 (+.003 -.000)"
      },
      {
       "name": "0.25",
@@ -5580,7 +5760,8 @@
        "0.625": "10",
        "0.75": "12",
        "1": "16"
-      }
+      },
+      "holeSize": ".272 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -5641,7 +5822,8 @@
        "0.375": "6",
        "0.5": "8",
        "0.625": "10"
-      }
+      },
+      "holeSize": ".085 (+.003 -.000)"
      },
      {
       "name": "0.084",
@@ -5669,7 +5851,8 @@
        "0.5": "8",
        "0.625": "10",
        "0.75": "12"
-      }
+      },
+      "holeSize": ".099 (+.003 -.000)"
      },
      {
       "name": "0.094",
@@ -5697,7 +5880,8 @@
        "0.5": "8",
        "0.625": "10",
        "0.75": "12"
-      }
+      },
+      "holeSize": ".111 (+.003 -.000)"
      },
      {
       "name": "0.103",
@@ -5725,7 +5909,8 @@
        "0.5": "8",
        "0.625": "10",
        "0.75": "12"
-      }
+      },
+      "holeSize": ".118 (+.003 -.000)"
      },
      {
       "name": "0.106",
@@ -5759,7 +5944,8 @@
        "0.875": "14",
        "1": "16",
        "1.25": "20"
-      }
+      },
+      "holeSize": ".125 (+.003 -.000)"
      },
      {
       "name": "0.116",
@@ -5793,7 +5979,8 @@
        "0.875": "14",
        "1": "16",
        "1.25": "20"
-      }
+      },
+      "holeSize": ".137 (+.003 -.000)"
      },
      {
       "name": "0.120",
@@ -5829,7 +6016,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".137 (+.003 -.000)"
      },
      {
       "name": "0.137",
@@ -5865,7 +6053,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".157 (+.003 -.000)"
      },
      {
       "name": "0.141",
@@ -5901,7 +6090,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".163 (+.003 -.000)"
      },
      {
       "name": "0.160",
@@ -5937,7 +6127,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".189 (+.003 -.000)"
      },
      {
       "name": "0.167",
@@ -5971,7 +6162,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".189 (+.003 -.000)"
      },
      {
       "name": "0.173",
@@ -6005,7 +6197,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".197 (+.003 -.000)"
      },
      {
       "name": "0.207",
@@ -6039,7 +6232,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".236 (+.003 -.000)"
      },
      {
       "name": "0.215",
@@ -6069,7 +6263,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".250 (+.003 -.000)"
      },
      {
       "name": "0.223",
@@ -6099,7 +6294,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".350 (+.003 -.000)"
      },
      {
       "name": "0.273",
@@ -6129,7 +6325,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".312 (+.003 -.000)"
      },
      {
       "name": "0.281",
@@ -6159,7 +6356,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".312 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -6227,7 +6425,8 @@
       "materials": [
        "Stainless Steel",
        "Steel"
-      ]
+      ],
+      "holeSize": ".085 (+.003 -.000)"
      },
      {
       "name": "#4-40",
@@ -6262,7 +6461,8 @@
        "0.875": "14",
        "1": "16",
        "1.25": "20"
-      }
+      },
+      "holeSize": ".111 (+.003 -.000)"
      },
      {
       "name": "#6-32",
@@ -6299,7 +6499,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".137 (+.003 -.000)"
      },
      {
       "name": "#8-32",
@@ -6336,7 +6537,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".163 (+.003 -.000)"
      },
      {
       "name": "#10-24",
@@ -6371,7 +6573,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".189 (+.003 -.000)"
      },
      {
       "name": "#10-32",
@@ -6406,7 +6609,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".189 (+.003 -.000)"
      },
      {
       "name": "1/4-20",
@@ -6439,7 +6643,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".249 (+.003 -.000)"
      },
      {
       "name": "5/16-18",
@@ -6474,7 +6679,8 @@
       "materials": [
        "Stainless Steel",
        "Steel"
-      ]
+      ],
+      "holeSize": ".311 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -6536,7 +6742,8 @@
        "0.75": "12",
        "0.875": "14",
        "1": "16"
-      }
+      },
+      "holeSize": ".111 (+.003 -.000)"
      },
      {
       "name": "#6-32",
@@ -6573,7 +6780,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".137 (+.003 -.000)"
      },
      {
       "name": "#8-32",
@@ -6610,7 +6818,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".163 (+.003 -.000)"
      },
      {
       "name": "#10-32",
@@ -6645,7 +6854,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".189 (+.003 -.000)"
      },
      {
       "name": "1/4-20",
@@ -6681,7 +6891,8 @@
       },
       "materials": [
        "Stainless Steel"
-      ]
+      ],
+      "holeSize": ".249 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -6740,7 +6951,8 @@
        "0.5": "8",
        "0.625": "10",
        "0.75": "12"
-      }
+      },
+      "holeSize": ".085 (+.003 -.000)"
      },
      {
       "name": "#4-40",
@@ -6773,7 +6985,8 @@
        "0.75": "12",
        "0.875": "14",
        "1": "16"
-      }
+      },
+      "holeSize": ".111 (+.003 -.000)"
      },
      {
       "name": "#6-32",
@@ -6810,7 +7023,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".137 (+.003 -.000)"
      },
      {
       "name": "#8-32",
@@ -6847,7 +7061,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".163 (+.003 -.000)"
      },
      {
       "name": "#10-32",
@@ -6882,7 +7097,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".189 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -6941,7 +7157,8 @@
        "0.5": "8",
        "0.625": "10",
        "0.75": "12"
-      }
+      },
+      "holeSize": ".085 (+.003 -.000)"
      },
      {
       "name": "#4-40",
@@ -6973,7 +7190,8 @@
        "0.625": "10",
        "0.75": "12",
        "0.875": "14"
-      }
+      },
+      "holeSize": ".111 (+.003 -.000)"
      },
      {
       "name": "#6-32",
@@ -7011,7 +7229,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".137 (+.003 -.000)"
      },
      {
       "name": "#8-32",
@@ -7049,7 +7268,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".163 (+.003 -.000)"
      },
      {
       "name": "#10-24",
@@ -7085,7 +7305,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".189 (+.003 -.000)"
      },
      {
       "name": "#10-32",
@@ -7121,7 +7342,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".189 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -7177,7 +7399,8 @@
        "1.5": "24",
        "1.75": "28",
        "2": "32"
-      }
+      },
+      "holeSize": ".190 (+.005 -.000)"
      },
      {
       "name": "1/4-20",
@@ -7210,7 +7433,8 @@
        "1.5": "24",
        "1.75": "28",
        "2": "32"
-      }
+      },
+      "holeSize": ".250 (+.005 -.000)"
      },
      {
       "name": "5/16-18",
@@ -7243,7 +7467,8 @@
        "1.5": "24",
        "1.75": "28",
        "2": "32"
-      }
+      },
+      "holeSize": ".312 (+.005 -.000)"
      }
     ],
     "nearOnly": false,
@@ -7291,7 +7516,8 @@
        "0.5": "8",
        "0.75": "12",
        "1": "16"
-      }
+      },
+      "holeSize": ".190 (+.005 -.000)"
      },
      {
       "name": "1/4-20",
@@ -7316,7 +7542,8 @@
        "0.5": "8",
        "0.75": "12",
        "1": "16"
-      }
+      },
+      "holeSize": ".250 (+.005 -.000)"
      },
      {
       "name": "5/16-18",
@@ -7339,7 +7566,8 @@
       "lengthNames": {
        "0.75": "12",
        "1": "16"
-      }
+      },
+      "holeSize": ".312 (+.005 -.000)"
      }
     ],
     "nearOnly": false,
@@ -7407,7 +7635,8 @@
        "1.5": "24",
        "1.75": "28",
        "2": "32"
-      }
+      },
+      "holeSize": ".190 (+.003 -.000)"
      },
      {
       "name": "1/4-20",
@@ -7440,7 +7669,8 @@
        "1.5": "24",
        "1.75": "28",
        "2": "32"
-      }
+      },
+      "holeSize": ".250 (+.003 -.000)"
      },
      {
       "name": "5/16-18",
@@ -7473,7 +7703,8 @@
        "1.5": "24",
        "1.75": "28",
        "2": "32"
-      }
+      },
+      "holeSize": ".312 (+.003 -.000)"
      },
      {
       "name": "3/8-16",
@@ -7504,7 +7735,8 @@
        "1.5": "24",
        "1.75": "28",
        "2": "32"
-      }
+      },
+      "holeSize": ".375 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -7568,7 +7800,8 @@
        "Type": [
         "HFE"
        ]
-      }
+      },
+      "holeSize": ".190 (+.005 -.000)"
      },
      {
       "name": "1/4-20",
@@ -7610,7 +7843,8 @@
         "HFE",
         "THFE"
        ]
-      }
+      },
+      "holeSize": ".250 (+.005 -.000)"
      },
      {
       "name": "5/16-18",
@@ -7652,7 +7886,8 @@
         "HFE",
         "THFE"
        ]
-      }
+      },
+      "holeSize": ".312 (+.005 -.000)"
      }
     ],
     "nearOnly": false,
@@ -7713,7 +7948,8 @@
        "0.5": "8",
        "0.625": "10",
        "0.75": "12"
-      }
+      },
+      "holeSize": ".145 (+.003 -.000)"
      },
      {
       "name": "#4-40",
@@ -7747,7 +7983,8 @@
        "0.875": "14",
        "1": "16",
        "1.25": "20"
-      }
+      },
+      "holeSize": ".171 (+.003 -.000)"
      },
      {
       "name": "#6-32",
@@ -7783,7 +8020,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".196 (+.003 -.000)"
      },
      {
       "name": "#8-32",
@@ -7819,7 +8057,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".223 (+.003 -.000)"
      },
      {
       "name": "#10-32",
@@ -7855,7 +8094,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".249 (+.003 -.000)"
      },
      {
       "name": "1/4-20",
@@ -7889,7 +8129,8 @@
        "1": "16",
        "1.25": "20",
        "1.5": "24"
-      }
+      },
+      "holeSize": ".309 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -7911,12 +8152,14 @@
      "Stainless Steel": {
       "code": "DSOS",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Steel/Aluminum"
      },
      "Steel": {
       "code": "DSO",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      }
     },
     "sizes": [
@@ -7938,7 +8181,8 @@
       "lengthNames": {
        "0.250": "250",
        "0.275": "275"
-      }
+      },
+      "holeSize": ".166 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -7960,12 +8204,14 @@
      "Stainless Steel": {
       "code": "SOSG",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Aluminum"
      },
      "Aluminum": {
       "code": "SOAG",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Aluminum"
      }
     },
     "sizes": [
@@ -7998,7 +8244,8 @@
        "0.375": "12",
        "0.437": "14",
        "0.5": "16"
-      }
+      },
+      "holeSize": ".166 (+.003 -.000)"
      },
      {
       "name": "#6-32",
@@ -8029,7 +8276,8 @@
        "0.375": "12",
        "0.437": "14",
        "0.5": "16"
-      }
+      },
+      "holeSize": ".166 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -8053,17 +8301,20 @@
      "Stainless Steel": {
       "code": "CLS",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Steel/Aluminum"
      },
      "Hardened Stainless Steel": {
       "code": "SP",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Stainless Steel"
      },
      "Carbon Steel": {
       "code": "S",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      }
     },
     "sizes": [
@@ -8099,7 +8350,8 @@
        "0.030": "0",
        "0.040": "1",
        "0.056": "2"
-      }
+      },
+      "holeSize": ".166 (+.003 -.000)"
      },
      {
       "name": "#3-48",
@@ -8137,7 +8389,8 @@
       "materials": [
        "Stainless Steel",
        "Carbon Steel"
-      ]
+      ],
+      "holeSize": ".166 (+.003 -.000)"
      },
      {
       "name": "#4-40",
@@ -8176,7 +8429,8 @@
        "0.040": "1",
        "0.056": "2",
        "0.090": "3"
-      }
+      },
+      "holeSize": ".166 (+.003 -.000)"
      },
      {
       "name": "#6-32",
@@ -8215,7 +8469,8 @@
        "0.040": "1",
        "0.056": "2",
        "0.090": "3"
-      }
+      },
+      "holeSize": ".1875 (+.003 -.000)"
      },
      {
       "name": "#8-32",
@@ -8254,7 +8509,8 @@
        "0.040": "1",
        "0.056": "2",
        "0.090": "3"
-      }
+      },
+      "holeSize": ".213 (+.003 -.000)"
      },
      {
       "name": "#10-24",
@@ -8297,7 +8553,8 @@
       "typeCodes": {
        "Stainless Steel": "CLSS",
        "Carbon Steel": "SS"
-      }
+      },
+      "holeSize": ".250 (+.003 -.000)"
      },
      {
       "name": "#10-32",
@@ -8340,7 +8597,8 @@
       "typeCodes": {
        "Stainless Steel": "CLSS",
        "Carbon Steel": "SS"
-      }
+      },
+      "holeSize": ".250 (+.003 -.000)"
      },
      {
       "name": "#12-24",
@@ -8378,7 +8636,8 @@
       "materials": [
        "Stainless Steel",
        "Carbon Steel"
-      ]
+      ],
+      "holeSize": ".277 (+.003 -.000)"
      },
      {
       "name": "1/4-20",
@@ -8417,7 +8676,8 @@
        "0.056": "1",
        "0.090": "2",
        "0.125": "3"
-      }
+      },
+      "holeSize": ".344 (+.003 -.000)"
      },
      {
       "name": "1/4-28",
@@ -8455,7 +8715,8 @@
       "materials": [
        "Stainless Steel",
        "Carbon Steel"
-      ]
+      ],
+      "holeSize": ".344 (+.003 -.000)"
      },
      {
       "name": "5/16-18",
@@ -8489,7 +8750,8 @@
        "0.056": "1",
        "0.090": "2",
        "0.125": "3"
-      }
+      },
+      "holeSize": ".413 (+.003 -.000)"
      },
      {
       "name": "5/16-24",
@@ -8523,7 +8785,8 @@
        "0.056": "1",
        "0.090": "2",
        "0.125": "3"
-      }
+      },
+      "holeSize": ".413 (+.003 -.000)"
      },
      {
       "name": "3/8-16",
@@ -8557,7 +8820,8 @@
        "0.090": "1",
        "0.125": "2",
        "0.250": "3"
-      }
+      },
+      "holeSize": ".500 (+.003 -.000)"
      },
      {
       "name": "3/8-24",
@@ -8591,7 +8855,8 @@
        "0.090": "1",
        "0.125": "2",
        "0.250": "3"
-      }
+      },
+      "holeSize": ".500 (+.003 -.000)"
      },
      {
       "name": "7/16-20",
@@ -8618,7 +8883,8 @@
       },
       "materials": [
        "Carbon Steel"
-      ]
+      ],
+      "holeSize": ".562 (+.003 -.000)"
      },
      {
       "name": "1/2-13",
@@ -8651,7 +8917,8 @@
       "materials": [
        "Stainless Steel",
        "Carbon Steel"
-      ]
+      ],
+      "holeSize": ".656 (+.003 -.000)"
      },
      {
       "name": "1/2-20",
@@ -8684,7 +8951,8 @@
       "materials": [
        "Stainless Steel",
        "Carbon Steel"
-      ]
+      ],
+      "holeSize": ".656 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -8706,7 +8974,8 @@
      "Aluminum": {
       "code": "CLA",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Aluminum"
      }
     },
     "sizes": [
@@ -8737,7 +9006,8 @@
       "lengthNames": {
        "0.040": "1",
        "0.056": "2"
-      }
+      },
+      "holeSize": ".166 (+.003 -.000)"
      },
      {
       "name": "#4-40",
@@ -8766,7 +9036,8 @@
       "lengthNames": {
        "0.040": "1",
        "0.056": "2"
-      }
+      },
+      "holeSize": ".166 (+.003 -.000)"
      },
      {
       "name": "#6-32",
@@ -8795,7 +9066,8 @@
       "lengthNames": {
        "0.040": "1",
        "0.056": "2"
-      }
+      },
+      "holeSize": ".1875 (+.003 -.000)"
      },
      {
       "name": "#8-32",
@@ -8824,7 +9096,8 @@
       "lengthNames": {
        "0.040": "1",
        "0.056": "2"
-      }
+      },
+      "holeSize": ".213 (+.003 -.000)"
      },
      {
       "name": "#10-24",
@@ -8853,7 +9126,8 @@
       "lengthNames": {
        "0.040": "1",
        "0.056": "2"
-      }
+      },
+      "holeSize": ".250 (+.003 -.000)"
      },
      {
       "name": "#10-32",
@@ -8882,7 +9156,8 @@
       "lengthNames": {
        "0.040": "1",
        "0.056": "2"
-      }
+      },
+      "holeSize": ".250 (+.003 -.000)"
      },
      {
       "name": "1/4-20",
@@ -8916,7 +9191,8 @@
        "0.056": "1",
        "0.091": "2",
        "0.125": "3"
-      }
+      },
+      "holeSize": ".344 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -8940,12 +9216,14 @@
      "Stainless Steel": {
       "code": "SMPS",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Steel/Aluminum"
      },
      "Hardened Stainless Steel": {
       "code": "SMPP",
       "finish": "No finish",
-      "finishCode": ""
+      "finishCode": "",
+      "recommended": "Stainless steel"
      }
     },
     "sizes": [
@@ -8964,7 +9242,8 @@
       },
       "lengths": [],
       "lengthDims": {},
-      "lengthNames": {}
+      "lengthNames": {},
+      "holeSize": ".136 (+.003 -.000)"
      },
      {
       "name": "#4-40",
@@ -8981,7 +9260,8 @@
       },
       "lengths": [],
       "lengthDims": {},
-      "lengthNames": {}
+      "lengthNames": {},
+      "holeSize": ".166 (+.003 -.000)"
      },
      {
       "name": "#6-32",
@@ -8998,7 +9278,8 @@
       },
       "lengths": [],
       "lengthDims": {},
-      "lengthNames": {}
+      "lengthNames": {},
+      "holeSize": ".187 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -9021,7 +9302,8 @@
      "Hardened Alloy Steel": {
       "code": "SH",
       "finish": "No finish",
-      "finishCode": "X"
+      "finishCode": "X",
+      "recommended": "Hardened alloy steel"
      }
     },
     "sizes": [
@@ -9053,7 +9335,8 @@
       "lengthNames": {
        "0.056": "1",
        "0.090": "2"
-      }
+      },
+      "holeSize": ".344 (+.003 -.000)"
      },
      {
       "name": "5/16-18",
@@ -9083,7 +9366,8 @@
       "lengthNames": {
        "0.056": "1",
        "0.090": "2"
-      }
+      },
+      "holeSize": ".413 (+.003 -.000)"
      },
      {
       "name": "3/8-16",
@@ -9108,7 +9392,8 @@
       },
       "lengthNames": {
        "0.090": "1"
-      }
+      },
+      "holeSize": ".500 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -9130,7 +9415,8 @@
      "Steel": {
       "code": "S",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      }
     },
     "sizes": [
@@ -9166,7 +9452,8 @@
        "0.030": "0",
        "0.040": "1",
        "0.056": "2"
-      }
+      },
+      "holeSize": ".166 (+.003 -.000)"
      },
      {
       "name": "#6-32",
@@ -9200,7 +9487,8 @@
        "0.030": "0",
        "0.040": "1",
        "0.056": "2"
-      }
+      },
+      "holeSize": ".1875 (+.003 -.000)"
      },
      {
       "name": "#8-32",
@@ -9234,7 +9522,8 @@
        "0.030": "0",
        "0.040": "1",
        "0.056": "2"
-      }
+      },
+      "holeSize": ".213 (+.003 -.000)"
      },
      {
       "name": "#10-32",
@@ -9271,7 +9560,8 @@
       },
       "typeCodes": {
        "Steel": "SS"
-      }
+      },
+      "holeSize": ".250 (+.003 -.000)"
      },
      {
       "name": "1/4-20",
@@ -9305,7 +9595,8 @@
        "0.047": "0",
        "0.056": "1",
        "0.090": "2"
-      }
+      },
+      "holeSize": ".344 (+.003 -.000)"
      },
      {
       "name": "5/16-18",
@@ -9334,7 +9625,8 @@
       "lengthNames": {
        "0.056": "1",
        "0.090": "2"
-      }
+      },
+      "holeSize": ".413 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -9356,7 +9648,8 @@
      "Steel": {
       "code": "SL",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      }
     },
     "sizes": [
@@ -9387,7 +9680,8 @@
       "lengthNames": {
        "0.040": "1",
        "0.056": "2"
-      }
+      },
+      "holeSize": ".166 (+.003 -.000)"
      },
      {
       "name": "#6-32",
@@ -9416,7 +9710,8 @@
       "lengthNames": {
        "0.040": "1",
        "0.056": "2"
-      }
+      },
+      "holeSize": ".1875 (+.003 -.000)"
      },
      {
       "name": "#8-32",
@@ -9445,7 +9740,8 @@
       "lengthNames": {
        "0.040": "1",
        "0.056": "2"
-      }
+      },
+      "holeSize": ".213 (+.003 -.000)"
      },
      {
       "name": "#10-32",
@@ -9474,7 +9770,8 @@
       "lengthNames": {
        "0.040": "1",
        "0.056": "2"
-      }
+      },
+      "holeSize": ".250 (+.003 -.000)"
      },
      {
       "name": "1/4-20",
@@ -9503,7 +9800,8 @@
       "lengthNames": {
        "0.056": "1",
        "0.091": "2"
-      }
+      },
+      "holeSize": ".344 (+.003 -.000)"
      },
      {
       "name": "5/16-18",
@@ -9532,7 +9830,8 @@
       "lengthNames": {
        "0.056": "1",
        "0.091": "2"
-      }
+      },
+      "holeSize": ".413 (+.003 -.000)"
      },
      {
       "name": "3/8-16",
@@ -9561,7 +9860,8 @@
       "lengthNames": {
        "0.090": "1",
        "0.125": "2"
-      }
+      },
+      "holeSize": ".500 (+.003 -.000)"
      }
     ],
     "nearOnly": false,
@@ -9583,7 +9883,8 @@
      "Steel": {
       "code": "H",
       "finish": "Zinc plated",
-      "finishCode": "ZI"
+      "finishCode": "ZI",
+      "recommended": "Steel/Aluminum"
      }
     },
     "sizes": [
@@ -9602,7 +9903,8 @@
       },
       "lengths": [],
       "lengthDims": {},
-      "lengthNames": {}
+      "lengthNames": {},
+      "holeSize": ".500 (+.005 -.000)"
      }
     ],
     "nearOnly": false,
@@ -9624,7 +9926,8 @@
      "Carbon Steel": {
       "code": "HNL",
       "finish": "Zinc plated",
-      "finishCode": "LZ"
+      "finishCode": "LZ",
+      "recommended": "Aluminum"
      }
     },
     "sizes": [
@@ -9643,7 +9946,8 @@
       },
       "lengths": [],
       "lengthDims": {},
-      "lengthNames": {}
+      "lengthNames": {},
+      "holeSize": ".344 (+.005 -.000)"
      },
      {
       "name": "5/16-18",
@@ -9660,7 +9964,8 @@
       },
       "lengths": [],
       "lengthDims": {},
-      "lengthNames": {}
+      "lengthNames": {},
+      "holeSize": ".413 (+.005 -.000)"
      },
      {
       "name": "3/8-16",
@@ -9677,7 +9982,8 @@
       },
       "lengths": [],
       "lengthDims": {},
-      "lengthNames": {}
+      "lengthNames": {},
+      "holeSize": ".500 (+.005 -.000)"
      }
     ],
     "nearOnly": false,

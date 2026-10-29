@@ -168,6 +168,12 @@ fn catalogue(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         out.insert("lengths".into(), json!(size.map(|s| c.lengths(s)).unwrap_or_default()));
     }
     out.insert("params".into(), json!(params));
+    if let Some(hole) = size.and_then(|s| s.hole_size.as_deref()) {
+        out.insert("hole_size".into(), json!(hole));
+    }
+    if let Some(rec) = c.recommended(spec.material()) {
+        out.insert("recommended_sheet_material".into(), json!(rec));
+    }
     out.insert("materials".into(), json!(c.materials_for(size)));
     out.insert("finishes".into(), json!(c.finishes()));
     out.insert("default".into(), spec_json(&spec));

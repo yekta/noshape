@@ -110,6 +110,9 @@ pub struct MaterialCode {
     pub finish: String,
     #[serde(default)]
     pub finish_code: String,
+    /// The read-only Recommended sheet material row (nuts and standoffs).
+    #[serde(default)]
+    pub recommended: Option<String>,
 }
 
 /// A size of live's Size list whose configuration the server can't build
@@ -172,6 +175,9 @@ pub struct Size {
     /// component's (live: PEM® M5 nuts "SS" / "CLSS").
     #[serde(default)]
     pub type_codes: BTreeMap<String, String>,
+    /// The read-only Hole size row (PEM®: "4.22 (+.08)").
+    #[serde(default)]
+    pub hole_size: Option<String>,
 }
 
 /// How the Thread length list follows from the length.
@@ -399,6 +405,12 @@ impl Component {
             Some(s) => s.materials.iter().map(String::as_str).collect(),
             None => self.materials(),
         }
+    }
+
+    /// The read-only Recommended sheet material with this material chosen
+    /// (PEM® nuts and standoffs).
+    pub fn recommended(&self, material: &str) -> Option<&str> {
+        self.material_codes.get(material).and_then(|m| m.recommended.as_deref())
     }
 
     /// Finish options with this material chosen (PEM®: the material's one

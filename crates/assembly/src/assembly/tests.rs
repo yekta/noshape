@@ -5675,6 +5675,27 @@ fn pem_hnl_nuts_match_live() {
     }
 }
 
+/// PEM®'s read-only rows (behaviours "skasm (2026-10-29) PEM® Insert
+/// dialog"): Hole size follows Size ("4.22 (+.08)", 3.6 thick walled "7.12
+/// (+.08)"), Recommended sheet material follows Material (Steel/Aluminum,
+/// Aluminum, SO4 Stainless Steel); studs have no Recommended row.
+#[test]
+fn pem_hole_size_and_recommended_rows_as_live() {
+    use super::standard::{CATALOGUE, StandardSpec};
+    let so = CATALOGUE.iter().find(|c| c.name == "SO™/SOS™/SOA™/SO4™ Through-hole unthreaded standoffs" && !c.inch).unwrap();
+    let mut spec = StandardSpec::new(so);
+    assert_eq!(spec.size_row().unwrap().hole_size.as_deref(), Some("4.22 (+.08)"));
+    spec.set_size("3.6 (thick walled)");
+    assert_eq!(spec.size_row().unwrap().hole_size.as_deref(), Some("7.12 (+.08)"));
+    let rec: Vec<_> = ["Stainless Steel", "Steel", "Aluminum", "Hardened Stainless Steel"].iter().map(|m| so.recommended(m)).collect();
+    assert_eq!(rec, [Some("Steel/Aluminum"), Some("Steel/Aluminum"), Some("Aluminum"), Some("Stainless Steel")]);
+    let cla = CATALOGUE.iter().find(|c| c.name.starts_with("CLA™") && !c.inch).unwrap();
+    assert_eq!(cla.recommended("Aluminum"), Some("Aluminum"));
+    let fh = CATALOGUE.iter().find(|c| c.name == "FH™/FHS™/FHA™ Flush-head studs" && !c.inch).unwrap();
+    assert!(fh.sizes.iter().all(|s| s.hole_size.is_some()));
+    assert_eq!(fh.recommended("Stainless Steel"), None);
+}
+
 /// ANSI commercial taper pins and slotted spring pins with live's whole size
 /// lists (its FSRules tables, behaviours "skasm (2026-10-27) standard content
 /// gaps": taper pins from #7/0, spring pins with 9/64, 5/8, 3/4); every size

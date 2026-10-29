@@ -198,8 +198,10 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    deep, outer corner on that third's inner circle, inner corners on the bore's), H (form 5: 24 round scallops in
    the ring, one size, no Sheet thickness) 13a6130e. HNL (form 6: H's scallops with the ring's foot at live's literal
    1.47214 mm, flats 0.94 de apart 0.15 tl high, tabs 1.6 al wide hanging 0.8 al, coned inside from 0.35 de to (de
-   - al) / 2, "PEM" between). All of live's PEM® catalogue is in. Left: the read-only Hole size / Recommended
-   sheet material rows; NASM 45938 self-locking; SKETCH-RECT-DIM-GLYPHS (b). Not shown yet: the read-only Hole size / Recommended sheet material rows.
+   - al) / 2, "PEM" between) 78557b36. All of live's PEM® catalogue is in. Read-only rows: Size.holeSize (every PEM
+   size, HOLE_IN_SHEET), MaterialCode.recommended (nuts and standoffs: RECOMMENDED_MATERIAL, else the crawl's
+   default), plain text under Length in the dialog, also in the ops info (hole_size, recommended_sheet_material);
+   /root/skasm-scratch/pem_rows.py fills them. Left: NASM 45938 self-locking; SKETCH-RECT-DIM-GLYPHS (b). Not shown yet: the read-only Hole size / Recommended sheet material rows.
    Live's studio defaults sometimes differ from the table (NAS 1129 thru minor 0.067 vs 0.0667, NASM 45938/4 ax 0.0225
    vs 0.028125): check the construction at the studio values, then test ours at the table's.
    Earlier: ANSI taper pin crowned ends 10-27.
