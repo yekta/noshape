@@ -9,6 +9,7 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **16:29 update (green 6d8d9fb8):** verified DWG-CHAMFER-ANGLE-PRECISION, DWG-CELL-MERGE-GREY, DRAWING-SCALE-LIST-NARROW.
 - **16:22 update (green 8d3bc80b):** verified DWG-DATUM-TARGET-MENU, DWG-LINE-MENU (Copy greyed; live asked), DWG-PALETTE-VALUE-EMPTY.
   Annotation menus show Paste only with something on the clipboard (GD&T, datum target): consistent, noted in the tickets. CLI fuzz
   331–333 on main's Rust clean.
