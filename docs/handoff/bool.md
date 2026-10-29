@@ -551,21 +551,20 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   corpus3 529, corpus4 569, corpus5 661, corpus6 615, Shell's 70, direct 52.
 
 ## Next
-Corpus6 (10-29 13:30, recorded OCCT time of what the Rust path still declines, loaded machine): curved edges
-32.8 s (73: helical B-spline sweeps against rods ~15 s in 3, fillet slabs), one slab fuse with an internal face
-(the shelled part's own internal edge) 13.8 s, vertices inside coincident edges of two other arguments 10.6 s (5:
-OCCT's PostTreatFF gives such a vertex a second same-domain hop when sections run along those edges, and its
-history then says Deleted; not predictable cheaply: declined), curves within 1 µm of a face's boundary 10.2 s (9,
-near-tangent hyperbolas in slab fuses), tolerant inputs 6.9 s, edges crossing on a third's face 5.2 s, an edge
-ending inside a face 5.1 s, an apex on a part of a cone 4.4 s, a plane through a cone's apex 2.9 s.
-- Freeform next (the biggest share, and the thread case shows how much: OCCT's Boolean of a rod and a helical
-  sweep (degree 10, 290 poles) takes 18.5 s serial, of which its face/face intersections are 0.5 s; the rest is
-  edge/face intersections and point projections on the B-splines). Plan, each step landed: (a) B-spline surfaces and
-  curves in `Body` (bridge conversion; still declined); (b) evaluation, point inversion, curves on faces from
-  OCCT's pcurves; (c) sections with a B-spline face from OCCT's own IntTools_FaceFace (as for ellipses: curves and
-  pcurves OCCT's, so results stay OCCT's and the corpus keeps comparing), clipped and arranged in the faces'
-  parameter planes by the Rust Boolean, pieces classified without OCCT; (d) tori / spheres / offset surfaces the
-  same way; (e) the Rust Boolean's own marching for the sections once (c) holds, against Onshape's numbers.
+Free-form, the lead's four steps (13:35) where they stand (10-29 20:45 UTC): (1) profiled (above); (2) the hybrid
+(OCCT's IntTools_FaceFace curves, everything else ours) takes B-spline, torus, sphere, extruded and revolved faces;
+(3) tori / spheres / sweeps through the same hybrid: returns flat (spheres and tori mostly decline at poles and
+seams: a few cases, ~4 s recorded in corpus6); (4) the helix cases: the hybrid plus faster curve evaluation and
+crossings take both thread fuses, 2.1–2.3 s against OCCT's 3–4 s (recorded 4.8 / 6.5 s). OCCT's face/face share
+there is 0.35 s: no own intersector needed for them now.
+Corpus6 still declined, by recorded OCCT time (615 / 828 taken): an internal face 13.8 s (1: addb9a14, a slab fuse
+with a B-spline face, the shelled part's own internal edge), tolerant inputs 13.2 s (15), vertices inside coincident
+edges of two other arguments 10.6 s (5: OCCT's PostTreatFF gives such a vertex a second same-domain hop and its
+history then says Deleted; not predictable cheaply), curves within the grey band of a face's boundary 10.1 s (7,
+near-tangent hyperbolas in slab fuses), edges of two arguments crossing on a third's face 5.2 s, an edge ending inside
+a face 5.1 s (21 small commons), an apex on a part of a cone 4.4 s, internal edges 3.6 s, a plane through a cone's
+apex 2.9 s, a cone's / sphere's / B-spline's apex changed 2.6 s (7: another argument through a pole; OCCT makes a new
+degenerate edge there, ours would need one too), the rest under 2 s each.
 - The unify guard (`usd_kept_volume`) costs a copy and two volumes where round faces merge; measure on the regen
   profiles and make it cheaper (only the merged faces' share of the volume) if it shows.
 
