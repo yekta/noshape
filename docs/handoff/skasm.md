@@ -153,8 +153,9 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    there: DIN 6908, ISO 10512. Still missing: NASM 45938 *with* self-locking threads (48 faces, 2 B-spline: our form 10
    body + Revolve 2's conical lip under EDia, two crimp cuts from Plane 1 (Sketch 3: EDia*0.955 flats, EDia/6), two
    fillets; dom/skasm-sc-gaps/NAS_*45938__features.json) and PEM ×52. DIN 967 tapping head as live's dome 895ac8b6
-   (87.36 vs live 87.06 mm³); DIN 7051's oval head is 4 % heavy (its rim rounding is set by tangency, see its features),
-   7050 within 0.02 %. PEM plan: /features for all 52 are in dom/skb-sc-fsrules/PEM_PEM_*__features.json (10-29).
+   (87.36 vs live 87.06 mm³); DIN 7051 4 % heavy, 7050 within 0.02 %. Caveat: these three studio defaults are not the
+   dialog's (7050 HeadDiameter 5.5 vs the table's 6.3 and tip R; 7051 / 967 Type Z recess), so their recorded volumes
+   only roughly compare; match them per feature (head sketch, recess H / Z, tips C / F / R) rather than by volume. PEM plan: /features for all 52 are in dom/skb-sc-fsrules/PEM_PEM_*__features.json (10-29).
    Geometry is NAS 1129's pattern (revolved profile + extruded hex corners; the standoff feature can grow a PEM
    form: serration grooves at CDia/25, CDia/30, 0.98 / 0.9333 CDia). The blocker is naming: pem.json is empty, and
    live's names are part numbers from material + finish ("PEM SO-43.1-3  ZI": TYPE per PEM_MATERIAL in
