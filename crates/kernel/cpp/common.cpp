@@ -9,6 +9,7 @@
 #include <OSD_ThreadPool.hxx>
 #ifdef __linux__
 #include <dlfcn.h>
+#include <execinfo.h>
 #include <link.h>
 #endif
 #ifndef _WIN32
@@ -1535,6 +1536,7 @@ std::terminate_handler     g_previous_terminate = nullptr;
 
 // The C library's code (where malloc / free run), found at install.
 uintptr_t g_libc_lo = 0, g_libc_hi = 0;
+bool      g_guard_trace = false;
 
 // The faulting instruction (Linux; 0 elsewhere: no C library check there).
 uintptr_t fault_pc([[maybe_unused]] const void* ctx)
@@ -1581,6 +1583,16 @@ void on_crash(int sig, siginfo_t* info, void* ctx)
                                          : abort_raw      ? write(2, aborted, sizeof aborted - 1)
                                                           : write(2, in_lock, sizeof in_lock - 1);
       crash_guard = nullptr;
+#ifdef __linux__
+      // NOSHAPE_GUARD_TRACE=1: where (diagnosis; not async-signal-safe, the
+      // process is ending anyway).
+      if (g_guard_trace)
+      {
+        void*     frames[64];
+        const int n = backtrace(frames, 64);
+        backtrace_symbols_fd(frames, n, 2);
+      }
+#endif
       signal(sig, SIG_DFL);
       raise(sig);
       return;
@@ -1618,6 +1630,7 @@ void install_crash_guard()
   std::call_once(once, [] {
     if (std::getenv("NOSHAPE_NO_CRASH_GUARD") != nullptr)
       return;
+    g_guard_trace = std::getenv("NOSHAPE_GUARD_TRACE") != nullptr;
 #ifdef __linux__
     Dl_info di{};
     if (dladdr(reinterpret_cast<void*>(&malloc), &di) != 0 && di.dli_fbase != nullptr)
