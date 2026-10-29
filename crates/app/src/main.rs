@@ -124,7 +124,18 @@ fn apply_theme(cx: &mut App) {
 
 /// GPUI Kit's theme from the palette in effect: at startup, and again when
 /// Preferences › Theming changes (live applies the theme without a reload).
+/// In dark mode the light one is kept too, for what stays light (a drawing's
+/// panels and their controls, qa DARK-DRAWING-PANEL-CONTROLS).
 pub(crate) fn apply_kit_theme(cx: &mut App) {
+    let light = gpui_kit::hex_theme_active().then(|| {
+        gpui_kit::with_light_colors(|| fill_kit_theme(cx));
+        cx.global::<Theme>().clone()
+    });
+    Theme::set_light_copy(cx, light);
+    fill_kit_theme(cx);
+}
+
+fn fill_kit_theme(cx: &mut App) {
     let pal = theme::p();
     let white: Hsla = gpui_kit::rgb_static(0xffffff).into();
     let dark = gpui_kit::hex_theme_active();

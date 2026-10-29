@@ -233,11 +233,36 @@ impl DerefMut for Theme {
 
 impl Global for Theme {}
 
+/// NOSHAPE PATCH: the light copy of the theme, while hex colours are themed
+/// (dark mode): what `Theme::global` gives inside `gpui::with_light_colors`
+/// (parts that stay light, as a drawing's panels).
+pub struct LightTheme(pub Theme);
+
+impl Global for LightTheme {}
+
+static LIGHT_THEME_SET: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 impl Theme {
     /// Returns the global theme reference
     #[inline(always)]
     pub fn global(cx: &App) -> &Theme {
+        // NOSHAPE PATCH: the light copy inside `with_light_colors`.
+        if LIGHT_THEME_SET.load(std::sync::atomic::Ordering::Relaxed) && !gpui::hex_theme_active() {
+            if let Some(l) = cx.try_global::<LightTheme>() {
+                return &l.0;
+            }
+        }
         cx.global::<Theme>()
+    }
+
+    /// NOSHAPE PATCH: set or clear the light copy (see [`LightTheme`]).
+    pub fn set_light_copy(cx: &mut App, light: Option<Theme>) {
+        LIGHT_THEME_SET.store(light.is_some(), std::sync::atomic::Ordering::Relaxed);
+        match light {
+            Some(t) => cx.set_global(LightTheme(t)),
+            None if cx.has_global::<LightTheme>() => drop(cx.remove_global::<LightTheme>()),
+            None => {}
+        }
     }
 
     /// Returns the global theme mutable reference.

@@ -1439,7 +1439,45 @@ impl Render for DrawingEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // Live (dk-950): in dark mode only the shell is dark; the drawing's
         // toolbar, canvas, sheet and panels stay in the light theme.
-        gpui_kit::with_light_colors(|| self.render_light(window, cx))
+        LightScope(gpui_kit::with_light_colors(|| self.render_light(window, cx)))
+    }
+}
+
+/// Lays out, prepaints and paints its child with hex colours unthemed: the
+/// components (checkboxes, select buttons) build their colours then, after
+/// `render` (qa DARK-DRAWING-PANEL-CONTROLS).
+struct LightScope(AnyElement);
+
+impl IntoElement for LightScope {
+    type Element = Self;
+
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+impl Element for LightScope {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+
+    fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
+        None
+    }
+
+    fn request_layout(&mut self, _: Option<&GlobalElementId>, _: Option<&InspectorElementId>, window: &mut Window, cx: &mut App) -> (LayoutId, ()) {
+        (gpui_kit::with_light_colors(|| self.0.request_layout(window, cx)), ())
+    }
+
+    fn prepaint(&mut self, _: Option<&GlobalElementId>, _: Option<&InspectorElementId>, _: Bounds<Pixels>, _: &mut (), window: &mut Window, cx: &mut App) {
+        gpui_kit::with_light_colors(|| self.0.prepaint(window, cx));
+    }
+
+    fn paint(&mut self, _: Option<&GlobalElementId>, _: Option<&InspectorElementId>, _: Bounds<Pixels>, _: &mut (), _: &mut (), window: &mut Window, cx: &mut App) {
+        gpui_kit::with_light_colors(|| self.0.paint(window, cx));
     }
 }
 
