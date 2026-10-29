@@ -9,6 +9,10 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **01:30 update:** drawing V71 ✅ (Explode/Position ▸ Default · Explode 1 applies). GUI fuzz 100 (fd03, qa-1026-main) alive. Running:
+  crash-document open sweep in the green app on :110 (/tmp/qa-crashdocs.sh → cli/crashdocs-<sha>.out), face sweep Rust on / off over
+  the crash fixtures + fuzz bodies (cli/facesweep2-bool2253.out), CLI seeds 176 / 177. Note: tonight's tickets/cli-suppress-segv.noshape
+  replaced an older fixture of the same name (only used by the crash-doc sweeps; no ticket referenced it).
 - **01:25 update (green de7776da, no code change):** P0 CLI-SUPPRESS-SEGV second repro: seed 174 (gdb: 3 recovered fillet faults, then a
   SIGSEGV inside ____longjmp_chk with a mangled address). New P2 CYL-UNIFY-OPPOSITE (live 1584: two opposite extrudes of one circle =
   one cylinder face; ours two, both kernels; a mirrored rod merges with Rust, not with OCCT). Memory per regen on the 41-feature
