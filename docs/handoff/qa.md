@@ -9,7 +9,7 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
-- **10:45 update (green 60ca6465):** verified MC-SELECT-NO-READOUT; P1-17 (Mass properties with nothing selected) = live. P1 pass list:
+- **10:43 update (green 60ca6465):** verified MC-SELECT-NO-READOUT; P1-17 (Mass properties with nothing selected) = live. P1 pass list:
   only P1-16 open (live's p2 model isn't recorded exactly enough to rebuild; core's 239fa250 reports 3998.630 vs live 3998.627).
   Running: CLI fuzz seeds 200–205 on v0.4.14 (/tmp/qa-cfloop.sh → cli/cfloop.summary), GUI fuzz on :110 / :131, a watch for the
   next green. Feature mirror of a bottom pocket is fine on both paths (only Part mirror / Union go wrong).
