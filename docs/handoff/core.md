@@ -53,7 +53,12 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 - CYL-UNIFY-OPPOSITE: the two halves' seams are opposite by construction (seat_circles starts a backward prism's
   circle at gp_Ax2's default x for its axis, which flips with the axis: (0,0,1) for +y, (0,0,-1) for −y; live's
   frames), so merging needs one face rebuilt with one seam (its circles split there, the caps' wires updated):
-  left for now (volumes are right; a face count difference).
+  left for now (volumes are right; a face count difference). Also tried 10-29 08:30 (not landed): split each band
+  along the other's seam line (BRepAlgoAPI_Splitter with edge tools: valid, 4 half-bands) and move the second
+  band's halves onto the first's surface: OCCT's unify then merges nothing, not even the first band's own two halves
+  back into one periodic face, and the moved halves came out invalid. So the fix is our own band merge: one face on
+  the first surface, u 0–2π, v over both, its two circles and one seam, the caps' circle edges replaced (ReShape),
+  history from both halves.
 - Knurl on main with the pairs back (release, 10-29 06:52, load 25–29): diamond **246.5 s** (was 564 before patch
   0004, 264–329 with the pairs before they went serial), 8142 faces, 75409.760 mm³ as before. Live 32 s.
 - Failing shells on fuzz bodies (qa's bop-pairs-gpf-5267, dev CLI): Shell 4 regions no (a non-elementary face),
