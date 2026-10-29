@@ -451,20 +451,16 @@ Phase 1 stopped at patch 0004 (the remaining steps are 10-40 s each, listed abov
 with 0003b and 0004 on Linux, macOS and Windows.
 
 ## Next, in order
-(lead 10-29 06:10: big structural wins, land small and often, stop when returns flatten.)
-0. Knurl (Phase 1): the pairs are parallel again (f93ac93c); 246.5 s on main (release, load ~28). The steps
-   left after patch 0004 are 10–40 s each (MakeBlocks' PostTreatFF sub-filler ~37, PerformEF's pair collection 15
-   and result-loop projections 10, PerformEE 30, TreatVerticesEE 25): only the sub-filler is one big piece.
-1. P0 SHELL-SLOW tail: parts with concave edges (pockets, steps) still go to slabs, and failing shells take up to the
-   30 s budget (qa 18:35: Shell 5 of bop-pairs-gpf-5267.noshape 55 s wall under load). Next: regions for concave edges
-   between planes; fail fast where the regions path can tell live fails.
-2. P2 CYL-UNIFY-OPPOSITE (see Tonight): rebuild the two halves as one face (one seam), or frame the opposite prism's
-   cylinder with the same seam.
-3. P1 std_oracle hole scope, Extrude add, the elliptic boss curvature blend, FILLET-HANG's fillet; T2 reds in my area.
-4. FILLET-OVERSIZE chamfer half once live answers; RIB-CHAIN-NORMAL once live's L24 semantics are pinned (ours: the
-   L thickened and extruded both ways would be ~272 mm³; live +160).
+(lead 10-29: big structural wins, land small and often, stop when returns flatten.)
+1. qa's re-run of fuzz seed 189 (151 / 152 / 174) on a green with 8311f20f + 3a8c7a85 (NOSHAPE_GUARD_TRACE=1): any
+   "not recoverable" exit now names its place; the in-place edits that corrupted bodies are gone from the budgeted ops.
+2. P0 SHELL-SLOW tail: concave parts with fillets (a pocket with floor fillets 2.3–2.9 s in slabs) need regions with
+   concave edges; failing shells on fuzz bodies still spend 20–26 s in the slabs' Booleans (no early sign known).
+3. T2 red in my area: features_c::face_blend_curvature_on_an_elliptic_boss_as_live (OCCT's fuse with the lofted
+   tool comes back empty).
+4. Waiting on live: FILLET-OVERSIZE's chamfer half; RIB-CHAIN-NORMAL (live's +160 mm³ for the L normal rib).
 5. kern's open item: forward-oriented edges.
-REGEN-SPEED is met in release (perf.yml 40796942944); waiting on qa's release-build GUI measurement.
+Knurl Phase 1 stopped at 246 s (its steps left are 10–40 s each); REGEN-SPEED met in release (qa to re-measure).
 
 ## End-of-day walk (10-27 03:45, green 8165fca6)
 - Opened qa's qa-1026-ps2-shell.noshape in the green app on :101: Part Studio 1 (live's 30 features) regenerates, Part
