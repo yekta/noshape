@@ -9,6 +9,10 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **00:08 update (green 76ef7009 = + dx 110dc605):** verified DWG-DANGLING-WALL, DWG-FORESHORTEN-JUMP. **P0 CLI-SUPPRESS-SEGV** stack
+  (tickets/cli-suppress-segv-bt.txt): a guarded OCCT chamfer fault (ChFi3d_EvalTolReached) is recovered once at op 116, the same fault
+  at op 119 jumps to a stale stack address → the crash guard does not survive a second fault in a session (in v0.4.12 too).
+  Reliable repro: `NSCLI=<cli> python3 tickets/clifuzz_t2.py 171 125` (~10 min; dies at op 119). Fuzz 97 (76ef, hcd) alive; 98 running.
 - **23:58 update (greens 10ea49ed / 43a3696e, no code change since):** **new P0 CLI-SUPPRESS-SEGV** (core): CLI fuzz seed 171 segfaults at
   op 119 (unsuppress Fillet 6 in a 63-feature body) 4 / 4 with bool's CLI (Rust on and off) and the v0.4.12 release CLI, so it is
   in the release already; standalone repro (tickets/cli-suppress-segv.noshape + tickets/supsegv.py) crashes 1 of 4, the GUI
