@@ -9,6 +9,13 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **09:27 update (greens 349290dc → 0e1689b3 = + core 24daf867 guard ends the process past a held lock, bool 4138d9f7):**
+  P1 checklists: workflow-booleans re-run on the v0.4.14 CLI with bin/boolmatrix.py (14 cases, Rust = OCCT, INT2 fixed; two cases
+  asked live: disjoint Subtract consumes its tool, Remove extrude with the default direction touches nothing and says Ok);
+  p1-dialogs: the last 4 🔧 rows verified (Curve pattern path order, Sweep lock direction, Loft focus, pattern Skip instances);
+  advanced Part Studio: ADV6 thread edge pick, Rib sketch row, ADV1 / ADV3 / ADV4 statuses; ADV2 loft still +0.027 mm³.
+  Mirror set identical on 0e1689b3. GUARD-SEGV-MALLOC-DEADLOCK's 24daf867 needs a CLI with it to re-run seed 189 (none on the
+  box; see Requests to the lead). Note: display :102 is not qa's (other geometry); qa uses :110 (fuzz) and :131 (checks).
 - **08:55 update (greens 2391af52 → 349290dc):** v0.4.14 published 08:43:30 = the smoked artifact (all rows OK; halfmir2 P0 marked
   fixed at the top of TICKETS). On 2391 / 3492 the mirror set and 7 Draft / chamfer documents are identical to v0.4.14 / v0.4.13
   in the app (bool a779433f, 024fc02d); verified 445c5ad6 (4 top edges R12 "Failed to fillet selections." = live F2). **New P2
