@@ -9,6 +9,10 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **14:15 update (green 6c106f19 = + bool 5acac8d2 B-spline faces in the Rust Boolean):** mirror set, P0 repros, rim cases, 7 Draft /
+  fillet documents unchanged; new bin/loftmir.py (loft / spline-sided extrude mirrored with Add) = OCCT (8471.586; 5927.755).
+  Live 1595 → P2 MIRROR-BLIND-HOLE-FACES (both paths 14 faces, live 8); the C-bore case is live 9 = OCCT, Rust 16 (SPLIT-FACES).
+  CLI fuzz 300–302 on main's Rust clean.
 - **13:54 update (green 37ed6e41):** verified ANSI-TEXT-ALIGN-DEFAULT, DWG-PANEL-ESC-STACK; new P3 DWG-TABLE-ESC-GHOST (the Table tool's
   dashed preview stays on the sheet after Esc).
 - **13:49 update:** bin/holemir.py (Hole Simple / C-bore / C-sink, blind / through, centred on the mirror plane, Part mirror Add): all
