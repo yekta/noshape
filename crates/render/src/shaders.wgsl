@@ -944,6 +944,20 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
     return enc(i.color);
 }
 
+// NOSHAPE_PERF_LINES=plain (benchmarks only): fs_line without its discards (dashes, the section clip), so the GPU
+// may depth-test before shading: whether hidden line fragments are the lines' Retina cost.
+@fragment
+fn fs_line_plain(i: LineOut) -> @location(0) vec4<f32> {
+    if (i.core > 0.0) {
+        let dpr = max(g.viewport.z, 1.0);
+        let a = abs(i.across);
+        let col = linear_to_srgb(i.color.rgb);
+        let alpha = select(0.78 + clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * 0.22, 1.0, a > 2.5 * dpr - max(1.0, 0.6 * dpr));
+        return vec4(col * select(0.78 / alpha, 1.0, alpha >= 1.0), alpha * i.color.a);
+    }
+    return enc(i.color);
+}
+
 @fragment
 fn fs_line_pick(i: LineOut) -> @location(0) u32 {
     load_inst(i.slot);
