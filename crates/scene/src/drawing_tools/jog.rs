@@ -158,7 +158,9 @@ impl SheetPick<'_> {
     /// its grip points to another edge, point or center re-attaches that end").
     pub fn reattached(&self, orig: &Annotation, k: usize) -> Annotation {
         let mut a = orig.clone();
-        let Some(sp) = self.snap_at(self.cursor) else { return a };
+        // Midpoints and quadrants too (help D22: available when editing a
+        // placed dimension).
+        let Some(sp) = self.snap_at_with(self.cursor, true) else { return a };
         if let AnnotationKind::LinearDimension { view, a: pa, b: pb, .. } = &mut a.kind {
             if sp.view != *view {
                 return a;

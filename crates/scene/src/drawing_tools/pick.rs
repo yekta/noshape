@@ -204,6 +204,13 @@ impl<'a> SheetPick<'a> {
 
     /// Snap point (vertex / circle center) of a view near a sheet point.
     pub fn snap_at(&self, s: [f64; 2]) -> Option<PickedPoint> {
+        self.snap_at_with(s, self.snap_mid_quad && matches!(self.tool, Tool::Dimension { .. }))
+    }
+
+    /// [`Self::snap_at`], with edge midpoints and circle quadrants when
+    /// `mid_quad` (Shift+Q while dimensioning; always for a placed
+    /// dimension's grips, help D22).
+    pub fn snap_at_with(&self, s: [f64; 2], mid_quad: bool) -> Option<PickedPoint> {
         let built = self.built?;
         let mut best: Option<(f64, PickedPoint)> = None;
         for pl in &built.placements {
@@ -237,7 +244,7 @@ impl<'a> SheetPick<'a> {
                 }
             }
             // Shift+Q: edge midpoints and circle quadrant points.
-            if self.snap_mid_quad && matches!(self.tool, Tool::Dimension { .. }) {
+            if mid_quad {
                 for me in &g.model_edges {
                     let mut cand: Vec<([f64; 2], PointRef)> = Vec::new();
                     match me.geom {

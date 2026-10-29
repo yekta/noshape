@@ -38,7 +38,7 @@ const DIMENSIONS: [(&str, DimTool, &str); 12] = [
     ("angle_3_point", DimTool::Angle3, "vertex, then a point on each leg"),
     ("arc_length", DimTool::ArcLength, "one arc"),
     ("chamfer", DimTool::Chamfer, "the chamfer edge, then the edge it meets (Drawing properties decide a callout or two linear dimensions)"),
-    ("max_min", DimTool::MaxMin, "a circle (where on it picks maximum or minimum), then a point or another circle"),
+    ("max_min", DimTool::MaxMin, "a circle (where on it picks maximum or minimum), then a point, another circle or a straight edge (square to it)"),
     ("foreshorten", DimTool::Foreshorten, "a hole or cylinder axis seen side-on, then the edge or point the diameter reaches"),
 ];
 

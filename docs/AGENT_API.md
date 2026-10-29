@@ -3506,7 +3506,7 @@ Clicks the dimension tool on the view geometry at `picks` (sheet mm; click on an
 - angle_3_point: vertex, then a point on each leg
 - arc_length: one arc
 - chamfer: the chamfer edge, then the edge it meets (Drawing properties decide a callout or two linear dimensions)
-- max_min: a circle (where on it picks maximum or minimum), then a point or another circle
+- max_min: a circle (where on it picks maximum or minimum), then a point, another circle or a straight edge (square to it)
 - foreshorten: a hole or cylinder axis seen side-on, then the edge or point the diameter reaches
 
 Examples:
