@@ -814,7 +814,7 @@ fn paint_fastener(b: Bounds<Pixels>, pv: Preview, window: &mut Window) {
             stroke(&circle(ex, ey, r * 0.6), false);
             drive(&mut stroke, r * 0.6);
         }
-        Shape::Screw => {
+        Shape::Screw | Shape::ShoulderScrew => {
             stroke(&circle(ex, ey, r), false);
             drive(&mut stroke, r);
         }
@@ -880,6 +880,12 @@ fn paint_fastener(b: Bounds<Pixels>, pv: Preview, window: &mut Window) {
                 stroke(&[(sx, ey - r * 0.5), (x1, ey - r * 0.5)], false);
                 stroke(&[(sx, ey + r * 0.5), (x1, ey + r * 0.5)], false);
             }
+            shank(&mut stroke, x1, hr);
+        }
+        // A shoulder screw: its round head (the shoulder isn't drawn).
+        Shape::ShoulderScrew => {
+            let (hr, x1) = (14.0f32, sx + 26.0);
+            stroke(&[(sx, ey - r), (x1, ey - r), (x1, ey + r), (sx, ey + r)], true);
             shank(&mut stroke, x1, hr);
         }
         Shape::Screw if round_head || pv.head > 5 => {
