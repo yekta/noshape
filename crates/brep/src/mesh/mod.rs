@@ -264,6 +264,14 @@ impl Revolved {
     fn v_trig(&self, v: f64) -> (f64, f64) {
         if self.torus() { v.sin_cos() } else { (0.0, 1.0) }
     }
+    /// The normal of the side line through u at v (u's sine and cosine, v's [`Revolved::v_trig`]) leaving the
+    /// apex or pole there: ∂u × ∂v without ∂u's length (none there), `sign` that length's sign beside it.
+    fn side_normal(&self, (su, cu): (f64, f64), (sv, cv): (f64, f64), sign: f64) -> Option<DVec3> {
+        let radial = cu * self.xdir + su * self.ydir;
+        let tangent = -su * self.xdir + cu * self.ydir;
+        let dv = if self.torus() { self.minor * (-sv * radial + cv * self.axis) } else { self.angle.0 * radial + self.angle.1 * self.axis };
+        (sign * tangent.cross(dv)).try_normalize()
+    }
     /// The point and the surface's own normal (∂u × ∂v, unit; none at an apex) at u (its sine and cosine) and
     /// v (and its, [`Revolved::v_trig`]): the trigonometry once per row and column, not per node.
     fn at(&self, (su, cu): (f64, f64), v: f64, (sv, cv): (f64, f64)) -> (DVec3, Option<DVec3>) {
@@ -394,8 +402,8 @@ fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option
     let apex = |v: f64| s.ring(v).abs() <= 1e-9 * (s.radius + s.minor);
     let rim = |r: &(f64, Vec<(f64, DVec3)>)| -> Option<Row> {
         if apex(r.0) {
-            // One node (its normal from the next row's, below).
-            return Some((r.0, vec![(0.5 * (umin + umax), r.1[0].1, DVec3::ZERO)]));
+            // Its point for now (its nodes once the next row's are known, below).
+            return Some((r.0, vec![(f64::NAN, r.1[0].1, DVec3::ZERO)]));
         }
         let vt = s.v_trig(r.0);
         Some((r.0, r.1.iter().map(|&(u, p)| Some((u, p, s.at(u.sin_cos(), r.0, vt).1?))).collect::<Option<_>>()?))
@@ -418,15 +426,25 @@ fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option
         }
     }
     rows.push(rim(&rims[1])?);
-    // An apex's or pole's normal: the axial part of the normals round it (the same at every u).
+    // An apex or pole: a node per triangle of the fan to it, at the middle u of the triangle's side, with the
+    // normal of the side line there (a cone's is the same all along it; a sphere's pole's the axis), not one node
+    // with one normal, which shaded a cone's tip as a round blob (PSUI-CONE-SHADING).
+    let is_apex: Vec<bool> = rows.iter().map(|r| r.1.len() == 1 && r.1[0].0.is_nan()).collect();
     let last = rows.len() - 1;
     for (w, next) in [(0, 1), (last, last - 1)] {
-        if rows[w].1.len() == 1 && rows[next].1.len() > 1 {
-            let n = s.axis * s.axis.dot(rows[next].1[0].2);
-            rows[w].1[0].2 = n.try_normalize()?;
-        } else if rows[w].1.len() == 1 {
+        if !is_apex[w] {
+            continue;
+        }
+        if is_apex[next] || rows[next].1.len() < 2 {
             return None;
         }
+        let (v, p) = (rows[w].0, rows[w].1[0].1);
+        let (vt, sign) = (s.v_trig(v), s.ring(rows[next].0).signum());
+        let fan = rows[next].1.windows(2).map(|q| {
+            let u = 0.5 * (q[0].0 + q[1].0);
+            Some((u, p, s.side_normal(u.sin_cos(), vt, sign)?))
+        });
+        rows[w].1 = fan.collect::<Option<_>>()?;
     }
     let mut points = Vec::new();
     let mut normals = Vec::new();
@@ -443,6 +461,15 @@ fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option
         let (lo, hi) = (&rows[w].1, &rows[w + 1].1);
         let (blo, bhi) = (base[w] as u32, base[w + 1] as u32);
         let (nlo, nhi) = (lo.len(), hi.len());
+        // A fan to an apex: its k-th node in the k-th triangle.
+        if is_apex[w + 1] {
+            triangles.extend((0..nlo - 1).map(|k| [blo + k as u32, blo + k as u32 + 1, bhi + k as u32]));
+            continue;
+        }
+        if is_apex[w] {
+            triangles.extend((0..nhi - 1).map(|k| [blo + k as u32, bhi + k as u32 + 1, bhi + k as u32]));
+            continue;
+        }
         let (mut i, mut j) = (0, 0);
         while i + 1 < nlo || j + 1 < nhi {
             let on_lo = j + 1 == nhi || (i + 1 < nlo && lo[i + 1].0 <= hi[j + 1].0);
@@ -459,8 +486,9 @@ fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option
     let node_of = |q: DVec2| -> Option<u32> {
         let w = rows.partition_point(|r| r.0 < q.y - tol);
         let r = &rows.get(w).filter(|r| (r.0 - q.y).abs() <= tol)?.1;
-        if r.len() == 1 {
-            return Some(base[w] as u32);
+        if is_apex[w] {
+            // Every node of an apex is its point: the nearest by u.
+            return Some((base[w] + r.partition_point(|x| x.0 < q.x).min(r.len() - 1)) as u32);
         }
         let k = r.partition_point(|x| x.0 < q.x - tol);
         (k < r.len() && (r[k].0 - q.x).abs() <= tol).then_some((base[w] + k) as u32)

@@ -226,6 +226,13 @@ N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes
      none, ours nearer the exact area). Every surface the lead listed is done; still declined: B-splines,
      offsets, revolutions / extrusions of free curves, a face with more than two loops on a revolved surface,
      a torus face bounded at constant u.
+     10-29 09:16 PSUI-CONE-SHADING (P2, qa against step 4): the apex was one node with an axial normal (a blob on
+     a cone's tip); now a node per fan triangle with its side line's normal. T1 checks normals on every mesher face
+     (exact surface normal, BRepMesh's, each triangle within 7° at its middle).
+     Note for whoever owns the UI test harness: part-studio-ui's sketch ui_tests read the shared
+     ~/.config/noshape/left_panel_width.txt (1240 here, written 05:30 by some session's app), so
+     section_rotate_handles_and_their_dead_centre and polygon_sides_typed_before_the_rim_click fail locally;
+     with XDG_CONFIG_HOME pointing at an empty dir both pass. Tests shouldn't read the user's config.
      Pixel check (10-29, lead's T1 ask): ops `mesh_pixels::live_30_features_look_the_same…` regenerates live-30
      with our mesher and with BRepMesh (kernel `set_rust_mesh_everywhere`, a process-wide switch for tests) and
      renders both shaded with edges from three views, 800×600: 5–14 pixels differ (by > 24 in a channel) of

@@ -63,6 +63,43 @@ fn assert_watertight(m: &Tessellation) {
     assert_eq!(open, 0, "{open} of {} edges not shared by two triangles", edges.len());
 }
 
+/// Normals (PSUI-CONE-SHADING, a cone's tip shaded as a blob): every node's normal is the face's own outward
+/// one there and BRepMesh's at the same point (an apex's nodes, the same point three times or more, aside:
+/// theirs differ by side line); every triangle's vertex normals are within 7° of the face's normal at its middle
+/// (an apex's too: one axial normal there was 59° off a 31° cone's).
+fn assert_normals(s: &Shape, rust: &Tessellation, occt: &Tessellation) {
+    let faces = s.faces();
+    let nodes = |t: &Tessellation, i: usize| -> Vec<([u32; 3], DVec3, DVec3)> {
+        let r = &t.faces[i];
+        (r.first_vertex..r.first_vertex + r.vertex_count).map(|k| (t.positions[k as usize].map(f32::to_bits), p(t.positions[k as usize]), p(t.normals[k as usize]).normalize())).collect()
+    };
+    for (i, f) in faces.iter().enumerate() {
+        let (ours, theirs) = (nodes(rust, i), nodes(occt, i));
+        let mut count: HashMap<[u32; 3], usize> = HashMap::new();
+        for (b, _, _) in &ours {
+            *count.entry(*b).or_insert(0) += 1;
+        }
+        let at: HashMap<[u32; 3], DVec3> = theirs.iter().map(|(b, _, n)| (*b, *n)).collect();
+        for (b, q, n) in ours.iter().filter(|(b, _, _)| count[b] < 3) {
+            // (None at an apex itself.)
+            let Ok(exact) = f.normal_at_point(*q) else { continue };
+            assert!(n.dot(exact) > 1.0 - 1e-5, "face {i}: the normal at {q} is {:.3}° off the surface's", n.angle_between(exact).to_degrees());
+            if let Some(m) = at.get(b) {
+                assert!(n.dot(*m) > 1.0 - 1e-5, "face {i}: the normal at {q} is {:.3}° off BRepMesh's", n.angle_between(*m).to_degrees());
+            }
+        }
+        let r = &rust.faces[i];
+        for c in rust.indices[r.first_index as usize..(r.first_index + r.index_count) as usize].chunks(3) {
+            let mid = c.iter().map(|&k| p(rust.positions[k as usize])).sum::<DVec3>() / 3.0;
+            let Ok(exact) = f.normal_at_point(mid) else { continue };
+            for &k in c {
+                let n = p(rust.normals[k as usize]).normalize();
+                assert!(n.angle_between(exact) < 7f64.to_radians(), "face {i}: a triangle's normal at {} is {:.1}° off the surface's at its middle", p(rust.positions[k as usize]), n.angle_between(exact).to_degrees());
+            }
+        }
+    }
+}
+
 /// `s` meshed both ways: the same faces and edges, watertight; returns how many faces the Rust mesher took.
 fn same_as_brepmesh(s: &Shape) -> usize {
     let rust = mesh(s, true);
@@ -88,6 +125,7 @@ fn same_as_brepmesh(s: &Shape) -> usize {
         assert!(a.iter().zip(b).all(|(x, y)| (p(*x) - p(*y)).length() <= tol), "edge {i}: points differ");
     }
     assert_watertight(&rust);
+    assert_normals(s, &rust, &occt);
     rust.rust_faces
 }
 
