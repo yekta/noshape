@@ -572,6 +572,22 @@ impl Sketch {
         Ok(())
     }
 
+    /// Gives `curve` its own copy of point `p` (same position), so `p` no
+    /// longer joins it to the other curves: deleting a shared point's
+    /// Coincident glyph (Onshape). Constraints on `p` stay on it.
+    pub fn split_point(&mut self, p: EntityId, curve: EntityId) -> Result<EntityId> {
+        let pos = self.point(p).ok_or(SketchError::UnknownEntity(p))?;
+        if !self.entity(curve).is_some_and(|e| e.point_refs().contains(&p)) {
+            return Err(SketchError::UnknownEntity(curve));
+        }
+        let q = self.add_point(pos);
+        if let Some(e) = self.entities.get_mut(&curve) {
+            e.replace_point(p, q);
+        }
+        self.touch();
+        Ok(q)
+    }
+
     /// Replaces the geometry of an entity in place (keeps id and flags).
     pub(crate) fn replace_geometry(&mut self, id: EntityId, g: Geometry) {
         if let Some(e) = self.entities.get_mut(&id) {

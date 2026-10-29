@@ -204,8 +204,11 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    /root/skasm-scratch/pem_rows.py fills them d6f85faf. NASM 45938 with self-locking threads (nut form
    NUT_CLINCH_LOCKING = 11: the "without" nut's body, only the top edge rounded, a coned skirt cut to two tabs by
    flats and a band, the tab ends rounded de / 60; matches live's B-rep faces and area at 1/4-20 and 3/8-16). Every
-   component of live's standard content (ANSI, DIN, ISO, NAS, PEM, SAE crawls) is now in the catalogue. Left:
-   SKETCH-RECT-DIM-GLYPHS (b). Not shown yet: the read-only Hole size / Recommended sheet material rows.
+   component of live's standard content (ANSI, DIN, ISO, NAS, PEM, SAE crawls) is now in the catalogue 96d4e856.
+   SKETCH-RECT-DIM-GLYPHS (b): shared-point Coincident glyphs (sketch_mode SHARED_GLYPH_BASE ids, like the Use
+   glyphs; Delete splits the point via Sketch::split_point). Locally, part-studio-ui's
+   polygon_sides_typed_before_the_rim_click and section_rotate_handles fail with the shared config dir and pass
+   with NOSHAPE_CONFIG_DIR empty (environment, not code). Not shown yet: the read-only Hole size / Recommended sheet material rows.
    Live's studio defaults sometimes differ from the table (NAS 1129 thru minor 0.067 vs 0.0667, NASM 45938/4 ax 0.0225
    vs 0.028125): check the construction at the studio values, then test ours at the table's.
    Earlier: ANSI taper pin crowned ends 10-27.

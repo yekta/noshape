@@ -403,6 +403,49 @@ pub fn use_glyph_entity(c: ConstraintId) -> Option<EntityId> {
     (c.0 & USE_GLYPH_BASE == USE_GLYPH_BASE).then_some(EntityId(c.0 & !USE_GLYPH_BASE))
 }
 
+/// Glyph ids of points shared by curves' ends (a rectangle's corners, a line
+/// chain's joints): ours shares the point where Onshape stores a Coincident,
+/// so the glyph stands for the sharing.
+const SHARED_GLYPH_BASE: u32 = 0xA000_0000;
+
+/// The glyph id of a shared point's Coincident.
+pub fn shared_glyph_id(p: EntityId) -> ConstraintId {
+    ConstraintId(SHARED_GLYPH_BASE | p.0)
+}
+
+/// The shared point of a shared-point glyph id.
+pub fn shared_glyph_point(c: ConstraintId) -> Option<EntityId> {
+    (c.0 & 0xE000_0000 == SHARED_GLYPH_BASE).then_some(EntityId(c.0 & !SHARED_GLYPH_BASE))
+}
+
+/// Line and arc ends meeting on one point entity, by point (2 or more).
+fn shared_ends(sk: &Sketch) -> Vec<(EntityId, Vec<EntityId>)> {
+    let mut by: std::collections::BTreeMap<EntityId, Vec<EntityId>> = std::collections::BTreeMap::new();
+    for e in sk.entities() {
+        if !matches!(e.kind(), EntityKind::Line | EntityKind::Arc) || e.reference_only || noshape_sketch::text::glyph_text_id(e.id).is_some() {
+            continue;
+        }
+        if let Some((a, b)) = sk.endpoints(e.id) {
+            by.entry(a).or_default().push(e.id);
+            if b != a {
+                by.entry(b).or_default().push(e.id);
+            }
+        }
+    }
+    by.into_iter().filter(|(p, c)| c.len() > 1 && p.0 < SHARED_GLYPH_BASE >> 2).collect()
+}
+
+/// Deleting a shared point's Coincident glyph splits the point: every curve
+/// but the first gets its own (Onshape: the ends are no longer joined).
+fn split_shared(data: &mut SketchData, p: EntityId) -> bool {
+    let Some((_, curves)) = shared_ends(&data.sketch).into_iter().find(|(q, _)| *q == p) else { return false };
+    let mut changed = false;
+    for c in curves.into_iter().skip(1) {
+        changed |= data.sketch.split_point(p, c).is_ok();
+    }
+    changed
+}
+
 /// Deleting a Use glyph unlinks the geometry: it stays as regular, free
 /// sketch geometry no longer following the model (Onshape).
 fn unlink_used(data: &mut SketchData, e: EntityId) -> bool {
@@ -4320,6 +4363,15 @@ impl SketchEditor {
                 out.push(GlyphInfo { constraint: cid, icon: "use", entity: g, anchor, on_point: is_point(sk, g), offset, external: true });
             }
         }
+        // Shared ends: a Coincident glyph at each (live: one per corner of a
+        // rectangle, up-left of the point).
+        for (p, curves) in shared_ends(sk) {
+            let Some(anchor) = glyph_anchor(sk, p) else { continue };
+            let cid = shared_glyph_id(p);
+            let offset = data.glyph_offsets.get(&glyph_key(cid, p)).map(|o| DVec2::new(o[0], o[1]));
+            let external = curves.iter().all(|c| sk.entity(*c).is_some_and(|x| x.external));
+            out.push(GlyphInfo { constraint: cid, icon: "coincident", entity: p, anchor, on_point: true, offset, external });
+        }
         out
     }
 
@@ -4382,6 +4434,10 @@ impl SketchEditor {
                 changed |= unlink_used(data, e);
                 continue;
             }
+            if let Some(p) = shared_glyph_point(c) {
+                changed |= split_shared(data, p);
+                continue;
+            }
             if data.sketch.remove_constraint(c).is_ok() {
                 data.dimension_exprs.remove(&c.0);
                 data.dimension_labels.remove(&c.0);
@@ -4419,6 +4475,13 @@ impl SketchEditor {
         }
         if let Some(e) = use_glyph_entity(cid) {
             if !unlink_used(data, e) {
+                return false;
+            }
+            data.sketch.solve();
+            return true;
+        }
+        if let Some(p) = shared_glyph_point(cid) {
+            if !split_shared(data, p) {
                 return false;
             }
             data.sketch.solve();
@@ -5193,6 +5256,11 @@ impl SketchEditor {
                 roles.extend(masters.into_iter().map(|e| (e, true)));
                 roles
             })
+            .or_else(|| {
+                // A shared point's glyph: the curves meeting there.
+                let p = self.hover_constraint.filter(|c| !self.selected_constraints.contains(c)).and_then(shared_glyph_point)?;
+                Some(shared_ends(&data.sketch).into_iter().filter(|(q, _)| *q == p).flat_map(|(_, c)| c).map(|e| (e, false)).collect())
+            })
             .unwrap_or_default();
         if !hover_roles.is_empty() {
             let selected_entities: Vec<EntityId> = self.selected_constraints.iter().filter_map(|c| data.sketch.constraint(*c)).flat_map(|c| c.kind.entities()).collect();
@@ -5390,6 +5458,8 @@ impl SketchEditor {
             for cid in self.selected_constraints.iter().chain(self.hover_constraint.iter()) {
                 if let Some(e) = use_glyph_entity(*cid) {
                     v.push(e);
+                } else if let Some(p) = shared_glyph_point(*cid) {
+                    v.extend(shared_ends(&data.sketch).into_iter().filter(|(q, _)| *q == p).flat_map(|(_, c)| c));
                 } else if let Some(c) = data.sketch.constraint(*cid) {
                     v.extend(c.kind.entities());
                 }
@@ -8526,6 +8596,31 @@ mod tests {
         let h = label_of(&d, |k| matches!(k, ConstraintKind::Length { value, .. } if (*value - 0.01).abs() < 1e-9));
         assert!((w - v(0.01, -42.0 * PX)).length() < 1e-9, "width label: {w:?}");
         assert!((h - v(0.02 - 41.0 * PX, 0.005)).length() < 1e-9, "height label: {h:?}");
+    }
+
+    /// SKETCH-RECT-DIM-GLYPHS (b) (live, behaviours "skasm (2026-10-28)
+    /// rectangle glyphs"): a Coincident glyph at each corner of a rectangle
+    /// (ours shares the corner point); deleting one splits that corner.
+    #[test]
+    fn a_rectangles_corners_show_coincident_glyphs_and_deleting_one_splits_it() {
+        // (Off the Origin, whose own Coincident would add a glyph.)
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        click(&mut ed, &mut d, v(0.01, 0.01));
+        click(&mut ed, &mut d, v(0.04, 0.03));
+        ed.cancel();
+        let corners: Vec<_> = ed.constraint_glyphs(&d).into_iter().filter(|g| g.icon == "coincident").collect();
+        assert_eq!(corners.len(), 4, "{:?}", corners.iter().map(|g| g.anchor).collect::<Vec<_>>());
+        assert!(corners.iter().all(|g| g.on_point && !g.external));
+        ed.selected_constraints.push(corners[0].constraint);
+        assert_eq!(ed.picked(Some(&d)).len(), 2, "the two edges meeting there");
+        ed.selected_constraints.clear();
+        let corner = corners[0].anchor;
+        assert!(ed.delete_constraint(&mut d, corners[0].constraint));
+        assert_eq!(ed.constraint_glyphs(&d).into_iter().filter(|g| g.icon == "coincident").count(), 3);
+        let lines: Vec<_> = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line && !e.construction).map(|e| e.id).collect();
+        let ends: Vec<EntityId> = lines.iter().flat_map(|l| { let (a, b) = d.sketch.endpoints(*l).unwrap(); [a, b] }).filter(|q| (d.sketch.point(*q).unwrap() - corner).length() < 1e-9).collect();
+        assert_eq!(ends.len(), 2, "both lines still end at the corner");
+        assert_ne!(ends[0], ends[1], "on their own points now");
     }
 
     /// SKETCH-VDIM-SIDE-ARROWS (live, behaviours "skasm (2026-10-28)
