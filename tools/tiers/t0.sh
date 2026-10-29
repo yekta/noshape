@@ -5,6 +5,9 @@
 set -eo pipefail
 cd "$(dirname "$0")/../.."
 export OCCT_ROOT=${OCCT_ROOT:-/root/occt}
+# The app reads and writes its settings (toolbars, graphics, shortcuts, recent files) in NOSHAPE_CONFIG_DIR, else
+# ~/.config/noshape: a fresh dir per run, so parallel runs (the watcher, two land checks on vibe3) never share them (10-29).
+[ -n "${NOSHAPE_CONFIG_DIR:-}" ] || { NOSHAPE_CONFIG_DIR=$(mktemp -d -t noshape-config-XXXXXX); export NOSHAPE_CONFIG_DIR; }
 E2E=(
   sketch_extrude_fillet_pattern_export_render assembly_with_mates configurations sketch_trim_extend_split
   sketch_fillet_chamfer_offset sketch_mirror_patterns_transform workspace_protection drawing_views_and_dimensions
