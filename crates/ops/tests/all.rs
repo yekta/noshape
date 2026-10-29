@@ -12,6 +12,7 @@ mod e2e;
 mod hidden_edges;
 mod live;
 mod many_parts;
+mod mesh_pixels;
 mod mate_flip;
 mod regen_profile;
 mod smoke;

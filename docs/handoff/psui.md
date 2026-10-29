@@ -226,6 +226,10 @@ N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes
      none, ours nearer the exact area). Every surface the lead listed is done; still declined: B-splines,
      offsets, revolutions / extrusions of free curves, a face with more than two loops on a revolved surface,
      a torus face bounded at constant u.
+     Pixel check (10-29, lead's T1 ask): ops `mesh_pixels::live_30_features_look_the_same…` regenerates live-30
+     with our mesher and with BRepMesh (kernel `set_rust_mesh_everywhere`, a process-wide switch for tests) and
+     renders both shaded with edges from three views, 800×600: 5–14 pixels differ (by > 24 in a channel) of
+     75k–318k part pixels; asserts ≤ 0.5 %. NOSHAPE_TEST_OUT writes the images.
 0. **After the cold-start work: our own display mesher (lead 10-28 21:05, user-approved).** `brep::mesh` in crates/brep
    (bool's crate, its Body / Surface / Curve types): planes (polygons with holes), cylinders, cones, spheres, tori from
    their exact parameterisation, shared edge samples (watertight), the display's deflection rules; anything else

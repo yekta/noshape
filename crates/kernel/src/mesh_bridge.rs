@@ -21,9 +21,17 @@ pub fn set_rust_mesh(on: bool) {
     OFF.with(|o| o.set(!on));
 }
 
+static OFF_EVERYWHERE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// [`set_rust_mesh`] for every thread (a regeneration meshes its bodies on a pool): tests comparing whole
+/// documents meshed both ways, in a test binary whose other tests don't count the faces it takes.
+pub fn set_rust_mesh_everywhere(on: bool) {
+    OFF_EVERYWHERE.store(!on, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// Whether this thread meshes with it.
 pub(crate) fn brep_mesh_on() -> bool {
-    !OFF.with(|o| o.get())
+    !OFF.with(|o| o.get()) && !OFF_EVERYWHERE.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 /// The body's faces (ffi `brep_mesh`'s flat arrays).
