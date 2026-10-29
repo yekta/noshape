@@ -5021,6 +5021,56 @@ fn pem_tps_pins_match_live() {
     }
 }
 
+/// PEM® FH™ / FHS™ / FHA™ flush-head pins (live's raw /features and body
+/// details): "PEM FHS-3MM-6" (stainless, Passivated), "PEM FH-3MM-6 ZI";
+/// 3 x 6 = live's studio default, 82 faces (PLANE 39, CYLINDER 27, CONE 14,
+/// TORUS 2: the 12 serration slots and the disc added back).
+#[test]
+fn pem_fh_pins_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let name = "FH™/FHS™/FHA™ Flush-head pins";
+    let metric = CATALOGUE.iter().find(|c| c.name == name && !c.inch).unwrap();
+    let unified = CATALOGUE.iter().find(|c| c.name == name && c.inch).unwrap();
+    let mut spec = StandardSpec::new(metric);
+    assert_eq!((spec.part_name(), spec.description()), ("PEM FHS-3MM-6".to_string(), "PEM FHS-3MM-6   Stainless Steel Passivated".to_string()));
+    spec.material = Some("Steel".into());
+    assert_eq!(spec.part_name(), "PEM FH-3MM-6 ZI");
+    assert_eq!(StandardSpec::new(unified).part_name(), "PEM FHS-073-4");
+    let r = standard::regenerate(&StandardSpec::new(metric)).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let mut kinds = std::collections::BTreeMap::new();
+    for i in 0..b.faces.len() {
+        let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+            Surface::Plane(_) => "plane",
+            Surface::Cone { .. } => "cone",
+            Surface::Cylinder { .. } => "cylinder",
+            Surface::Torus { .. } => "torus",
+            _ => "other",
+        };
+        *kinds.entry(k).or_insert(0) += 1;
+    }
+    assert_eq!(kinds, [("cone", 14), ("cylinder", 27), ("plane", 39), ("torus", 2)].into_iter().collect());
+}
+
+/// The FH™ pins' every size (T2: a slotted pin takes ~2 s to build).
+#[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
+fn pem_fh_pin_sizes_build() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins") {
+        for s in &c.sizes {
+            for l in [s.lengths.first().unwrap(), s.lengths.last().unwrap()] {
+                let mut spec = StandardSpec::new(c);
+                spec.set_size(&s.name);
+                spec.length = Some(l.clone());
+                let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{} x {l}: {e}", s.name));
+                assert!(standard::part_body(&r).is_some(), "{} x {l}", s.name);
+            }
+        }
+    }
+}
+
 /// ANSI commercial taper pins and slotted spring pins with live's whole size
 /// lists (its FSRules tables, behaviours "skasm (2026-10-27) standard content
 /// gaps": taper pins from #7/0, spring pins with 9/64, 5/8, 3/4); every size
@@ -5066,3 +5116,4 @@ fn instances_follow_their_part_name() {
     let Some(TabContent::Assembly(a)) = f.doc.tab(tab).map(|t| &t.content) else { panic!() };
     assert_eq!(a.instances.iter().map(|i| i.name.as_str()).collect::<Vec<_>>(), ["Pin <1>", "Pin <2>"]);
 }
+

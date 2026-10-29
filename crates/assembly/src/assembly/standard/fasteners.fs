@@ -2753,7 +2753,12 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
  * 2:1, its bottom rounded 0.025 p) centred on it; a 45° step to the pin p at
  * 0.7 sd; the pin to l, its end tapered 26° to dd with a 120 degree dimple
  * 0.3 p across (form 0, TPS™); form 1 (TPXS™): tapered 15° to dd, the
- * dimple p / 6 across.
+ * dimple p / 6 across. Form 2 (FH™ flush-head pins): the head hd / 10
+ * thick, its rim a half circle; the displacer r2 = (r1 + R - hd / 20) / 2
+ * down to 0.3 sd, a cone in to r1 = (p + r2) / 2 at hd / 5, a half-round
+ * groove p / 20 centred on r1's band, a 45° step to the pin at sd, the
+ * dimple as form 0; 12 serration slots (±7.5° on r1, walls at ±15°) cut
+ * under the head, then a disc (r1 + r2) / 2 across, hd / 20 deep, added back.
  */
 annotation { "Feature Type Name" : "PEM pin" }
 export const pemPin = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2794,6 +2799,11 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
         const rg = 0.025 * p;
         const cx = rh - dep + sqrt(rg * rg - ig * ig);
         const re = definition.dd / 2;
+        if (definition.form == 2)
+        {
+            flushHeadPin(context, id, definition);
+            return;
+        }
         const tpxs = definition.form == 1;
         const zt = -l + (rp - re) / tan((tpxs ? 15 : 26) * degree);
         const rd = tpxs ? p / 12 : 0.15 * p;
@@ -2807,3 +2817,54 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
                     { "p" : rz(Z, -l + rd / tan(60 * degree)) }
                 ]);
     });
+
+/** pemPin form 2 (FH™ flush-head pins). */
+function flushHeadPin(context is Context, id is Id, definition is map)
+{
+    const p = definition.p;
+    const sd = definition.sd;
+    const l = definition.l;
+    const R = definition.hd / 2;
+    const rr = definition.hd / 20;
+    const hk = definition.hd / 10;
+    const rp = p / 2;
+    const r1 = (2 * rp + R - rr) / 3;
+    const r2 = (r1 + R - rr) / 2;
+    const zcone = -definition.hd / 5;
+    const z45 = -sd + (r1 - rp);
+    const zg = (zcone + z45) / 2;
+    const rg = p / 20;
+    const rd = 0.15 * p;
+    revolveProfile(context, id + "body", [
+                { "p" : rz(Z, Z) }, { "p" : rz(R - rr, Z) }, { "p" : rz(R - rr, -hk), "mid" : rz(R, -rr) },
+                { "p" : rz(r2, -hk) }, { "p" : rz(r2, -0.3 * sd) }, { "p" : rz(r1, zcone) }, { "p" : rz(r1, zg + rg) },
+                { "p" : rz(r1, zg - rg), "mid" : rz(r1 - rg, zg) }, { "p" : rz(r1, z45) }, { "p" : rz(rp, -sd) }, { "p" : rz(rp, -l) },
+                { "p" : rz(rd, -l) }, { "p" : rz(Z, -l + rd / tan(60 * degree)) }
+            ]);
+    // The serration slots: 12 wedges outside r1 under the head (one sketch,
+    // one extrude), then live's Sketch 3 disc added back: (r1 + r2) / 2
+    // across (its r2 circle is construction), hd / 20 deep. (~2 s a part:
+    // the booleans on the slotted body.)
+    var under = XY_PLANE;
+    under.origin[2] = -hk;
+    const far = 2 * R;
+    const sk = newSketchOnPlane(context, id + "slotSketch", { "sketchPlane" : under });
+    for (var k = 0; k < 12; k += 1)
+    {
+        const c = (90 + 30 * k) * degree;
+        const a = vector(cos(c - 7.5 * degree), sin(c - 7.5 * degree)) * r1;
+        const b = vector(cos(c + 7.5 * degree), sin(c + 7.5 * degree)) * r1;
+        const a2 = a + vector(cos(c - 15 * degree), sin(c - 15 * degree)) * far;
+        const b2 = b + vector(cos(c + 15 * degree), sin(c + 15 * degree)) * far;
+        skArc(sk, "arc" ~ k, { "start" : a, "mid" : vector(cos(c), sin(c)) * r1, "end" : b });
+        skLineSegment(sk, "wb" ~ k, { "start" : b, "end" : b2 });
+        skLineSegment(sk, "out" ~ k, { "start" : b2, "end" : a2 });
+        skLineSegment(sk, "wa" ~ k, { "start" : a2, "end" : a });
+    }
+    skSolve(sk);
+    opExtrude(context, id + "slots", { "entities" : qSketchRegion(id + "slotSketch"), "direction" : vector(0, 0, -1), "endBound" : BoundingType.BLIND, "endDepth" : sd });
+    opDeleteBodies(context, id + "deleteSlotSketch", { "entities" : qCreatedBy(id + "slotSketch", EntityType.BODY) });
+    subtract(context, id + "cut", qCreatedBy(id + "body", EntityType.BODY), qCreatedBy(id + "slots", EntityType.BODY));
+    revolveProfile(context, id + "ring", [{ "p" : rz(Z, -hk) }, { "p" : rz((r1 + r2) / 2, -hk) }, { "p" : rz((r1 + r2) / 2, -hk - rr) }, { "p" : rz(Z, -hk - rr) }]);
+    uniteAll(context, id);
+}
