@@ -362,8 +362,8 @@ impl Mesh {
     }
 }
 
-/// Triangulates the polygon `rings[0]` (outer) with holes `rings[1..]` (indices into `pts`, each ring once
-/// round, either direction): triangles counter-clockwise, as point indices. Every point a vertex, no others.
+/// Triangulates the polygon of `rings` (indices into `pts`, each ring once round, either direction; the outer one
+/// the largest, the others its holes): triangles counter-clockwise, as point indices. Every point a vertex, no others.
 pub fn triangulate(pts: &[Pt], rings: &[Vec<usize>]) -> Option<Vec<[u32; 3]>> {
     if rings.is_empty() {
         return None;
@@ -392,7 +392,8 @@ pub fn triangulate(pts: &[Pt], rings: &[Vec<usize>]) -> Option<Vec<[u32; 3]>> {
     if size.is_nan() || size <= 0.0 || !size.is_finite() {
         return None;
     }
-    // Rings: the outer one counter-clockwise, holes clockwise (inside on the left).
+    // Rings: the outer one (the largest: a face's wires come in any order) first and counter-clockwise, holes
+    // clockwise (inside on the left).
     let signed_area = |r: &[usize]| {
         let mut s = 0.0;
         let mut j = r.len() - 1;
@@ -403,6 +404,8 @@ pub fn triangulate(pts: &[Pt], rings: &[Vec<usize>]) -> Option<Vec<[u32; 3]>> {
         s / 2.0
     };
     let mut rr: Vec<Vec<usize>> = rings.to_vec();
+    let outer = (0..rr.len()).max_by(|&a, &b| signed_area(&rr[a]).abs().total_cmp(&signed_area(&rr[b]).abs()))?;
+    rr.swap(0, outer);
     let mut want = 0.0;
     for (k, r) in rr.iter_mut().enumerate() {
         let a = signed_area(r);

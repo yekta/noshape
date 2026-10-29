@@ -11,6 +11,7 @@
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Line.hxx>
 #include <Geom_Plane.hxx>
+#include <Geom_ToroidalSurface.hxx>
 #include <Geom_TrimmedCurve.hxx>
 #include <Poly_PolygonOnTriangulation.hxx>
 #include <Poly_Triangulation.hxx>
@@ -116,9 +117,8 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     in.curves.push_back(f);
     in.curves.push_back(l);
   }
-  // Faces: kind (0 plane, 255 not meshed here), origin, normal (the surface's own: x × y), x direction (9
-  // numbers after the kind, 3 spare); their wires' edge uses. One face per TFace: the others (a pattern's
-  // instances) take its triangulation.
+  // Faces: kind (0 plane, 1 cylinder, 2 cone, 3 torus, 255 not meshed here) and 12 numbers of geometry (below);
+  // their wires' edge uses. One face per TFace: the others (a pattern's instances) take its triangulation.
   std::vector<int>                       first(faces.Extent() + 1, 0);
   std::vector<std::vector<int>>          use_edges(faces.Extent() + 1); // per first face: its uses' edges
   std::unordered_map<const void*, int>   by_tface;
@@ -144,7 +144,8 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     const occ::handle<Geom_Plane>   pl = mf ? occ::handle<Geom_Plane>() : occ::down_cast<Geom_Plane>(s);
     const occ::handle<Geom_CylindricalSurface> cyl = mf ? occ::handle<Geom_CylindricalSurface>() : occ::down_cast<Geom_CylindricalSurface>(s);
     const occ::handle<Geom_ConicalSurface>     con = mf ? occ::handle<Geom_ConicalSurface>() : occ::down_cast<Geom_ConicalSurface>(s);
-    bool ok = (!pl.IsNull() || !cyl.IsNull() || !con.IsNull()) && (f.Orientation() == TopAbs_FORWARD || f.Orientation() == TopAbs_REVERSED);
+    const occ::handle<Geom_ToroidalSurface>    tor = mf ? occ::handle<Geom_ToroidalSurface>() : occ::down_cast<Geom_ToroidalSurface>(s);
+    bool ok = (!pl.IsNull() || !cyl.IsNull() || !con.IsNull() || !tor.IsNull()) && (f.Orientation() == TopAbs_FORWARD || f.Orientation() == TopAbs_REVERSED);
     // Its loops, meshed here or not (a face BRepMesh meshes tells which edges it splits its own way).
     std::vector<int>& ue   = use_edges[(size_t)i];
     for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
@@ -175,6 +176,18 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
       push3(in.surfaces, a.XDirection().Crossed(a.YDirection()).XYZ());
       push3(in.surfaces, a.XDirection().XYZ());
       push0(in.surfaces, 3);
+    }
+    else if (ok && !tor.IsNull())
+    {
+      // Kind, origin, axis, x direction, major and minor radius, whether the frame is right-handed.
+      const gp_Ax3 a = tor->Position().Transformed(loc.Transformation());
+      in.surfaces.push_back(3);
+      push3(in.surfaces, a.Location().XYZ());
+      push3(in.surfaces, a.Direction().XYZ());
+      push3(in.surfaces, a.XDirection().XYZ());
+      in.surfaces.push_back(tor->MajorRadius());
+      in.surfaces.push_back(tor->MinorRadius());
+      in.surfaces.push_back(a.Direct() ? 1.0 : 0.0);
     }
     else if (ok)
     {

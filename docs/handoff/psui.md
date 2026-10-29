@@ -205,6 +205,10 @@ N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes
      85–124 of it, no BRepMesh); live-30-features 13–19 → 12–14.5 ms (ours 0.5 ms; BRepMesh 5–8 ms still meshes
      the fillets (tori) and the faces sharing their circles; before 2d ours meshed those too and threw them away:
      19–24 ms). Next: tori and spheres (grids), so live-30's fillets are ours.
+     Step 3 (10-29): tori between two rims at constant v (fillets round circular edges): rows at the seam's nodes,
+     each split round the axis as a circle there; a plane whose hole loop comes first (OCCT's wire order after a
+     fillet) is triangulated with its largest ring as the outer one. T1 rust_mesh::fillets_round_a_boss (concave
+     and convex tori, every face ours). Next: spheres, cone apexes (degenerate edges), measure live-30.
 0. **After the cold-start work: our own display mesher (lead 10-28 21:05, user-approved).** `brep::mesh` in crates/brep
    (bool's crate, its Body / Surface / Curve types): planes (polygons with holes), cylinders, cones, spheres, tori from
    their exact parameterisation, shared edge samples (watertight), the display's deflection rules; anything else

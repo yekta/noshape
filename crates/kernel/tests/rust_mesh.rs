@@ -122,6 +122,19 @@ fn a_countersink_meshes_as_brepmesh_meshes_it() {
 }
 
 #[test]
+fn fillets_round_a_boss_mesh_as_brepmesh_meshes_them() {
+    // A boss on a plate, its foot and its top edge filleted: a concave and a convex torus between the plate, the
+    // boss's side and its top.
+    let plate = make_box_corners(DVec3::new(-10.0, -10.0, 0.0) * MM, DVec3::new(10.0, 10.0, 5.0) * MM).unwrap();
+    let boss = make_cylinder(&Plane::new(DVec3::new(0.0, 0.0, 5.0) * MM, DVec3::Z, DVec3::X), 4.0 * MM, 4.0 * MM, TAU).unwrap();
+    let s = boolean(BooleanOp::Fuse, &[plate], &[boss], &BooleanOptions { unify: true, ..Default::default() }).unwrap().shape;
+    let round: Vec<Shape> = s.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| i.closed && !i.degenerated && i.start.z > 4.9 * MM)).collect();
+    assert_eq!(round.len(), 2);
+    let s = fillet(&s, &round, 1.0 * MM).unwrap().shape;
+    assert_eq!(same_as_brepmesh(&s), s.faces().len(), "every face");
+}
+
+#[test]
 fn faces_on_curves_brepmesh_splits_stay_brepmesh_and_the_mesh_stays_watertight() {
     // A hole drilled at an angle: its rims are ellipses (BRepMesh's), so the hole and the faces it cuts are
     // BRepMesh's; the plate's sides are ours.

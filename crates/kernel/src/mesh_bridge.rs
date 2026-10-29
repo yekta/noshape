@@ -67,6 +67,7 @@ pub(crate) fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surface
             0 => MeshSurface::Plane { origin: v3(s, 1), normal: v3(s, 4), xdir: v3(s, 7) },
             1 => MeshSurface::Cylinder { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], direct: s[12] > 0.5 },
             2 => MeshSurface::Cone { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], angle: s[11], direct: s[12] > 0.5 },
+            3 => MeshSurface::Torus { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], minor: s[11], direct: s[12] > 0.5 },
             _ => MeshSurface::Other,
         };
         let (l0, l1) = (input.face_loops[f] as usize, input.face_loops[f + 1] as usize);

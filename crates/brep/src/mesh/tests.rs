@@ -50,6 +50,16 @@ fn a_plane_with_a_hole_is_its_boundary_nodes_triangulated() {
 }
 
 #[test]
+fn a_hole_listed_before_the_outer_loop_is_still_a_hole() {
+    let (mut v, mut e) = (Vec::new(), Vec::new());
+    let outer = square(&mut v, &mut e, DVec3::ZERO, 4.0);
+    let inner: Vec<Use> = square(&mut v, &mut e, DVec3::new(0.5, 0.0, 0.0), 1.0).into_iter().rev().map(|u| Use { edge: u.edge, reversed: true }).collect();
+    let face = MeshFace { surface: MeshSurface::Plane { origin: DVec3::ZERO, normal: DVec3::Z, xdir: DVec3::X }, loops: vec![inner, outer] };
+    let m = mesh_body(&v, &e, &[face], DEFL).faces.remove(0).expect("meshed");
+    assert!((area(&m, DVec3::Z) - 15.0).abs() < 1e-12);
+}
+
+#[test]
 fn a_loop_whose_uses_dont_join_is_declined() {
     let (mut v, mut e) = (Vec::new(), Vec::new());
     let mut outer = square(&mut v, &mut e, DVec3::ZERO, 4.0);

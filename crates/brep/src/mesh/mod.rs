@@ -7,8 +7,8 @@
 //! mesh node.
 //!
 //! Faces taken so far: planes (constrained Delaunay of their boundary nodes, as the kernel's planar
-//! triangulation), cylinders and cones between two rims at constant height (the rims' nodes zipped, as the
-//! kernel's strips). Edges: lines and circles (arcs split as BRepMesh splits them, so a face it meshes next to
+//! triangulation), cylinders, cones and tori between two rims at constant v (rows of nodes zipped, as the
+//! kernel's strips: a torus's rows where its sides' nodes are). Edges: lines and circles (arcs split as BRepMesh splits them, so a face it meshes next to
 //! one meshed here shares the nodes). A face with a circle another face on it declines is declined too.
 
 pub mod cdt;
@@ -26,6 +26,8 @@ pub enum MeshSurface {
     Cylinder { origin: DVec3, axis: DVec3, xdir: DVec3, direct: bool, radius: f64 },
     /// OCCT's cone `origin + (radius + v sin a) (cos u x + sin u y) + v cos a axis` (`a` the half-angle).
     Cone { origin: DVec3, axis: DVec3, xdir: DVec3, direct: bool, radius: f64, angle: f64 },
+    /// OCCT's torus `origin + (radius + minor cos v) (cos u x + sin u y) + minor sin v axis`.
+    Torus { origin: DVec3, axis: DVec3, xdir: DVec3, direct: bool, radius: f64, minor: f64 },
     /// Any other surface: the face is declined (BRepMesh meshes it), its loops tell which edges it is on.
     Other,
 }
@@ -88,16 +90,12 @@ pub fn edge_nodes(vertices: &[DVec3], edge: &MeshEdge, defl: Deflection) -> Opti
     match edge.curve {
         Some(Curve::Line) => Some(EdgeNodes { points: vec![a, b], params: vec![edge.t0, edge.t1] }),
         Some(Curve::Circle { center, normal, xdir, radius }) => {
-            // BRepMesh's split (BRepMesh_CurveTessellator, GCPnts_TangentialDeflection's circle): half the
-            // deflections, at least 3 segments, equal steps; the ends are the vertices.
+            // BRepMesh's split, equal steps; the ends are the vertices.
             let arc = edge.t1 - edge.t0;
             if !(arc > 0.0 && arc <= std::f64::consts::TAU + 1e-9 && radius > 1e-7) {
                 return None;
             }
-            let (lin, ang) = (0.5 * defl.linear, 0.5 * defl.angular);
-            let chord = 2.0 * (1.0 - lin / radius).max(0.0).acos();
-            let step = chord.min(ang).max((1e-7 / radius).min(std::f64::consts::FRAC_PI_2));
-            let n = ((arc / step).ceil().min(1e6) as usize).max(3);
+            let n = arc_steps(arc, radius, defl);
             let du = arc / n as f64;
             let ydir = normal.cross(xdir);
             let mut points = Vec::with_capacity(n + 1);
@@ -115,6 +113,15 @@ pub fn edge_nodes(vertices: &[DVec3], edge: &MeshEdge, defl: Deflection) -> Opti
         }
         _ => None,
     }
+}
+
+/// How many equal steps an arc of `arc` radians on a circle of `radius` takes under `defl`: BRepMesh's split
+/// (BRepMesh_CurveTessellator, GCPnts_TangentialDeflection's circle): half the deflections, at least 3.
+fn arc_steps(arc: f64, radius: f64, defl: Deflection) -> usize {
+    let (lin, ang) = (0.5 * defl.linear, 0.5 * defl.angular);
+    let chord = 2.0 * (1.0 - lin / radius).max(0.0).acos();
+    let step = chord.min(ang).max((1e-7 / radius).min(std::f64::consts::FRAC_PI_2));
+    ((arc / step).ceil().min(1e6) as usize).max(3)
 }
 
 /// Meshes the faces of a body (`vertices`, `edges`, `faces`) that are meshed here.
@@ -158,7 +165,7 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
     }
     for (i, f) in faces.iter().enumerate() {
         if ok[i] {
-            out.faces[i] = mesh_face(vertices, edges, f, &out.edges);
+            out.faces[i] = mesh_face(vertices, edges, f, &out.edges, defl);
             ok[i] = out.faces[i].is_some();
         }
     }
@@ -172,16 +179,19 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
 }
 
 /// One face, its edges' nodes from `nodes`.
-fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &[Option<EdgeNodes>]) -> Option<FaceMesh> {
+fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &[Option<EdgeNodes>], defl: Deflection) -> Option<FaceMesh> {
     match face.surface {
         MeshSurface::Plane { origin, normal, xdir } => mesh_plane(vertices, edges, face, origin, normal, xdir, nodes),
-        MeshSurface::Cylinder { origin, axis, xdir, direct, radius } => mesh_strip(edges, face, &Revolved { origin, axis, xdir, direct, radius, angle: 0.0 }, nodes),
-        MeshSurface::Cone { origin, axis, xdir, direct, radius, angle } => mesh_strip(edges, face, &Revolved { origin, axis, xdir, direct, radius, angle }, nodes),
+        MeshSurface::Cylinder { origin, axis, xdir, direct, radius } => mesh_strip(edges, face, &Revolved { origin, axis, xdir, direct, radius, angle: 0.0, minor: 0.0 }, nodes, defl),
+        MeshSurface::Cone { origin, axis, xdir, direct, radius, angle } => mesh_strip(edges, face, &Revolved { origin, axis, xdir, direct, radius, angle, minor: 0.0 }, nodes, defl),
+        // A spindle or horn torus (the tube through its axis) isn't meshed here.
+        MeshSurface::Torus { origin, axis, xdir, direct, radius, minor } if minor > 0.0 && radius > minor => mesh_strip(edges, face, &Revolved { origin, axis, xdir, direct, radius, angle: 0.0, minor }, nodes, defl),
+        MeshSurface::Torus { .. } => None,
         MeshSurface::Other => None,
     }
 }
 
-/// A cylinder (`angle` 0) or cone in OCCT's parameters.
+/// A cylinder (`angle` 0), cone or torus (`minor` > 0, `radius` the major one) in OCCT's parameters.
 struct Revolved {
     origin: DVec3,
     axis: DVec3,
@@ -189,6 +199,7 @@ struct Revolved {
     direct: bool,
     radius: f64,
     angle: f64,
+    minor: f64,
 }
 
 impl Revolved {
@@ -196,30 +207,57 @@ impl Revolved {
         let y = self.axis.cross(self.xdir);
         if self.direct { y } else { -y }
     }
-    /// (u in (−π, π], v) of a point on the surface.
+    fn torus(&self) -> bool {
+        self.minor > 0.0
+    }
+    fn radial(&self, u: f64) -> DVec3 {
+        u.cos() * self.xdir + u.sin() * self.ydir()
+    }
+    /// (u in (−π, π], v) of a point on the surface (a torus's v in (−π, π] too).
     fn uv(&self, p: DVec3) -> DVec2 {
         let d = p - self.origin;
-        let u = d.dot(self.ydir()).atan2(d.dot(self.xdir));
-        DVec2::new(u, d.dot(self.axis) / self.angle.cos())
+        let (x, y, z) = (d.dot(self.xdir), d.dot(self.ydir()), d.dot(self.axis));
+        let v = if self.torus() { z.atan2(x.hypot(y) - self.radius) } else { z / self.angle.cos() };
+        DVec2::new(y.atan2(x), v)
+    }
+    /// The point at (u, v).
+    fn point(&self, q: DVec2) -> DVec3 {
+        if self.torus() {
+            self.origin + (self.radius + self.minor * q.y.cos()) * self.radial(q.x) + self.minor * q.y.sin() * self.axis
+        } else {
+            let (s, c) = self.angle.sin_cos();
+            self.origin + (self.radius + q.y * s) * self.radial(q.x) + q.y * c * self.axis
+        }
+    }
+    /// The radius of the circle at constant v.
+    fn ring(&self, v: f64) -> f64 {
+        if self.torus() { self.radius + self.minor * v.cos() } else { self.radius + v * self.angle.sin() }
     }
     /// The surface's own normal (∂u × ∂v, unit) at (u, v), if not at an apex.
     fn normal(&self, q: DVec2) -> Option<DVec3> {
-        let (s, c) = self.angle.sin_cos();
-        let radial = q.x.cos() * self.xdir + q.x.sin() * self.ydir();
-        let du = (self.radius + q.y * s) * (-q.x.sin() * self.xdir + q.x.cos() * self.ydir());
-        let dv = s * radial + c * self.axis;
+        let radial = self.radial(q.x);
+        let du = self.ring(q.y) * (-q.x.sin() * self.xdir + q.x.cos() * self.ydir());
+        let dv = if self.torus() {
+            self.minor * (-q.y.sin() * radial + q.y.cos() * self.axis)
+        } else {
+            let (s, c) = self.angle.sin_cos();
+            s * radial + c * self.axis
+        };
         let n = du.cross(dv);
-        (n.length() > 1e-12 * self.radius.max(1e-9)).then(|| n.normalize())
+        (n.length() > 1e-12 * self.radius.max(1e-9) * self.minor.max(1.0)).then(|| n.normalize())
     }
 }
 
-/// A cylinder or cone between two rims at constant v (circles round the axis) and at most two sides at
-/// constant u (straight edges along it, seams): the rims' nodes zipped by u, as the kernel's strips.
-fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option<EdgeNodes>]) -> Option<FaceMesh> {
+/// A cylinder, cone or torus between two rims at constant v (circles round the axis) and at most two sides at
+/// constant u (seams; a cylinder's or cone's straight, a torus's arcs round its tube): rows of nodes at the
+/// rims and at the sides' nodes in between, each zipped to the next by u, as the kernel's strips.
+fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option<EdgeNodes>], defl: Deflection) -> Option<FaceMesh> {
+    use std::f64::consts::TAU;
     if face.loops.len() > 2 {
         return None;
     }
-    // Every use's nodes in (u, v), u unwrapped along each loop (a seam's two uses at u and u + 2π).
+    let wrap = |d: f64| d - (d / TAU).round() * TAU;
+    // Every use's nodes in (u, v), unwrapped along each loop (a seam's two uses at u and u + 2π).
     struct Side {
         uv: Vec<DVec2>,
         points: Vec<DVec3>,
@@ -229,16 +267,14 @@ fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option
         let (pts, per_use) = loop_nodes(edges, uses, nodes)?;
         let mut uv: Vec<DVec2> = pts.iter().map(|&p| s.uv(p)).collect();
         for k in 1..uv.len() {
-            let mut du = uv[k].x - uv[k - 1].x;
-            du -= (du / std::f64::consts::TAU).round() * std::f64::consts::TAU;
-            uv[k].x = uv[k - 1].x + du;
+            uv[k].x = uv[k - 1].x + wrap(uv[k].x - uv[k - 1].x);
+            if s.torus() {
+                uv[k].y = uv[k - 1].y + wrap(uv[k].y - uv[k - 1].y);
+            }
         }
         // The closing node (the loop's first again) at its unwrapped place after the last.
-        let close = {
-            let mut du = uv[0].x - uv[uv.len() - 1].x;
-            du -= (du / std::f64::consts::TAU).round() * std::f64::consts::TAU;
-            DVec2::new(uv[uv.len() - 1].x + du, uv[0].y)
-        };
+        let last = uv[uv.len() - 1];
+        let close = DVec2::new(last.x + wrap(uv[0].x - last.x), if s.torus() { last.y + wrap(uv[0].y - last.y) } else { uv[0].y });
         for (k, idx) in per_use.iter().enumerate() {
             // Along the use: from v[0] to v[1] reversed when the use runs backwards.
             let along: Vec<usize> = if uses[k].reversed { idx.iter().rev().copied().collect() } else { idx.clone() };
@@ -263,74 +299,100 @@ fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option
     for (_, _, sd) in &sides {
         let (v0, v1) = sd.uv.iter().fold((f64::MAX, f64::MIN), |(a, b), q| (a.min(q.y), b.max(q.y)));
         let (u0, u1) = sd.uv.iter().fold((f64::MAX, f64::MIN), |(a, b), q| (a.min(q.x), b.max(q.x)));
-        if v1 - v0 <= tol {
-            let at = match rims.iter().position(|r| (r.0 - v0).abs() <= tol) {
-                Some(i) => i,
-                None => {
-                    rims.push((v0, Vec::new()));
-                    rims.len() - 1
-                }
-            };
-            rims[at].1.extend(sd.uv.iter().zip(&sd.points).map(|(q, p)| (q.x, *p)));
+        let (list, key, by_u) = if v1 - v0 <= tol {
+            (&mut rims, v0, true)
         } else if u1 - u0 <= tol {
-            let at = match cols.iter().position(|c| (c.0 - u0).abs() <= tol) {
-                Some(i) => i,
-                None => {
-                    cols.push((u0, Vec::new()));
-                    cols.len() - 1
-                }
-            };
-            cols[at].1.extend(sd.uv.iter().zip(&sd.points).map(|(q, p)| (q.y, *p)));
+            (&mut cols, u0, false)
         } else {
             return None;
-        }
+        };
+        let at = match list.iter().position(|r| (r.0 - key).abs() <= tol) {
+            Some(i) => i,
+            None => {
+                list.push((key, Vec::new()));
+                list.len() - 1
+            }
+        };
+        list[at].1.extend(sd.uv.iter().zip(&sd.points).map(|(q, p)| (if by_u { q.x } else { q.y }, *p)));
     }
-    if rims.len() != 2 || cols.len() > 2 || cols.iter().any(|c| (c.0 - umin).abs() > tol && (c.0 - umax).abs() > tol) {
+    if rims.len() != 2 || cols.len() > 2 || cols.iter().any(|c| (c.0 - umin).abs() > tol && (c.0 - umax).abs() > tol) || (s.torus() && cols.is_empty()) {
         return None;
     }
     rims.sort_by(|a, b| a.0.total_cmp(&b.0));
+    cols.sort_by(|a, b| a.0.total_cmp(&b.0));
     let (vlo, vhi) = (rims[0].0, rims[1].0);
-    // Each rim by u, shared ends once, from umin to umax; each side only its two rim ends (straight along v).
-    for r in rims.iter_mut() {
+    // Each rim and side by u or v, shared ends once.
+    for r in rims.iter_mut().chain(cols.iter_mut()) {
         r.1.sort_by(|a, b| a.0.total_cmp(&b.0));
         r.1.dedup_by(|b, a| b.0 - a.0 <= tol);
+    }
+    for r in &rims {
         if r.1.len() < 2 || (r.1[0].0 - umin).abs() > tol || (r.1[r.1.len() - 1].0 - umax).abs() > tol {
             return None;
         }
     }
+    // The sides run from rim to rim, through the same v's (a cylinder's or cone's none between).
     for c in &cols {
-        if c.1.iter().any(|(v, _)| (v - vlo).abs() > tol && (v - vhi).abs() > tol) {
+        if (c.1[0].0 - vlo).abs() > tol || (c.1[c.1.len() - 1].0 - vhi).abs() > tol || c.1.len() != cols[0].1.len() || c.1.iter().zip(&cols[0].1).any(|(a, b)| (a.0 - b.0).abs() > tol) {
             return None;
         }
     }
-    let (lo, hi) = (&rims[0].1, &rims[1].1);
-    let (nlo, nhi) = (lo.len(), hi.len());
-    let mut points = Vec::with_capacity(nlo + nhi);
-    let mut normals = Vec::with_capacity(nlo + nhi);
-    for (r, v) in [(lo, vlo), (hi, vhi)] {
-        for &(u, p) in r.iter() {
-            points.push(p);
-            normals.push(s.normal(DVec2::new(u, v))?);
+    if !s.torus() && cols.iter().any(|c| c.1.len() > 2) {
+        return None;
+    }
+    // Rows from vlo to vhi: the rims, and between them a row at each side node's v (its ends the sides' nodes,
+    // split round the axis as a circle there would be).
+    let mut rows: Vec<(f64, Vec<(f64, DVec3)>)> = vec![rims[0].clone()];
+    if let Some(c0) = cols.first() {
+        for k in 1..c0.1.len().saturating_sub(1) {
+            let v = c0.1[k].0;
+            let n = arc_steps(umax - umin, s.ring(v), defl);
+            let row = (0..=n)
+                .map(|j| {
+                    let u = if j == n { umax } else { umin + (umax - umin) * j as f64 / n as f64 };
+                    let end = if j == 0 { cols.iter().find(|c| (c.0 - umin).abs() <= tol) } else if j == n { cols.iter().find(|c| (c.0 - umax).abs() <= tol) } else { None };
+                    (u, end.map_or_else(|| s.point(DVec2::new(u, v)), |c| c.1[k].1))
+                })
+                .collect();
+            rows.push((v, row));
         }
     }
-    // Zip the rims (counter-clockwise in (u, v)), advancing on the rim whose next node comes first.
-    let mut triangles = Vec::with_capacity(nlo + nhi - 2);
-    let (mut i, mut j) = (0, 0);
-    while i + 1 < nlo || j + 1 < nhi {
-        let on_lo = j + 1 == nhi || (i + 1 < nlo && lo[i + 1].0 <= hi[j + 1].0);
-        if on_lo {
-            triangles.push([i as u32, (i + 1) as u32, (nlo + j) as u32]);
-            i += 1;
-        } else {
-            triangles.push([i as u32, (nlo + j + 1) as u32, (nlo + j) as u32]);
-            j += 1;
+    rows.push(rims[1].clone());
+    let mut points = Vec::new();
+    let mut normals = Vec::new();
+    let mut base = Vec::with_capacity(rows.len());
+    for (v, r) in &rows {
+        base.push(points.len());
+        for &(u, p) in r {
+            points.push(p);
+            normals.push(s.normal(DVec2::new(u, *v))?);
+        }
+    }
+    // Each row zipped to the next (counter-clockwise in (u, v)), advancing on the row whose next node comes
+    // first.
+    let mut triangles = Vec::with_capacity(2 * points.len());
+    for w in 0..rows.len() - 1 {
+        let (lo, hi) = (&rows[w].1, &rows[w + 1].1);
+        let (blo, bhi) = (base[w] as u32, base[w + 1] as u32);
+        let (nlo, nhi) = (lo.len(), hi.len());
+        let (mut i, mut j) = (0, 0);
+        while i + 1 < nlo || j + 1 < nhi {
+            let on_lo = j + 1 == nhi || (i + 1 < nlo && lo[i + 1].0 <= hi[j + 1].0);
+            if on_lo {
+                triangles.push([blo + i as u32, blo + (i + 1) as u32, bhi + j as u32]);
+                i += 1;
+            } else {
+                triangles.push([blo + i as u32, bhi + (j + 1) as u32, bhi + j as u32]);
+                j += 1;
+            }
         }
     }
     // Each use's nodes: found by (u, v), listed from the edge's start.
     let node_of = |q: DVec2| -> Option<u32> {
-        let (r, base) = if (q.y - vlo).abs() <= tol { (lo, 0) } else if (q.y - vhi).abs() <= tol { (hi, nlo) } else { return None };
+        let w = rows.partition_point(|r| r.0 < q.y - tol);
+        let r = &rows.get(w).filter(|r| (r.0 - q.y).abs() <= tol)?.1;
         let k = r.partition_point(|x| x.0 < q.x - tol);
-        (k < r.len() && (r[k].0 - q.x).abs() <= tol).then_some((base + k) as u32)
+        (k < r.len() && (r[k].0 - q.x).abs() <= tol).then_some((base[w] + k) as u32)
     };
     let mut edge_nodes: Vec<Vec<Vec<u32>>> = face.loops.iter().map(|l| vec![Vec::new(); l.len()]).collect();
     for (l, k, sd) in &sides {
