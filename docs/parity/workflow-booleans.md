@@ -134,3 +134,8 @@ tangent cylinders): 20 seeds × 60 cases. Differences: 2.
 | boolrand 17 #0: union of two r5 cylinders 1 mm apart (bottoms coplanar) | one part 1670.629 mm³ (exact), 5 faces | "Boolean resulted in no geometry change." | ✗ OCCT-UNION-OFFSET-CYL (OCCT path; Rust right) |
 | boolgrid 15 #42: union of a cylinder on a box and two boxes with coplanar neighbouring faces | 9623.8936 mm³, 12 faces | same volume / area, 14 faces | ? asked live (REQUESTS qa 10-29 09:56) |
 Tangent subtracts give "Boolean operation would result in non-manifold body." on both paths (= live Bo3).
+| boolgrid 38 #12: union of a box resting on a cylinder's top face, plus a separate pin | 3070.7963 mm³, 9 faces | same volume / area, 10 faces | ? (face counts; see the 09:56 live request) |
+| **boolmir** (bin/boolmir.py: random box / cylinder, optional pocket or hole, then Part mirror Add or Part linear pattern Add; seeds 1–15 × 50) seed 4 #25: blind half pocket on the mirror plane | 2976.4381, pocket gone | 2929.3142 (right) | ✗ **RUST-HALF-POCKET-3 (P0)** |
+| boolmir 8 #12: notched cylinder mirrored onto itself | 523.5988 | 785.3982 (right, full cylinder) | ✗ **RUST-MIRROR-NOTCH (P0)** |
+| boolmir 12 #18: through half hole on the mirror plane | 3874.3363, 7 faces (one hole wall) | same volume, 8 faces | Rust = live (RUST-MIRROR-EXTRA-FACE answer: one wall) |
+
