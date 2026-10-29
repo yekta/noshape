@@ -108,3 +108,18 @@ Docs /tmp/qa5/d25c/b2.noshape, /tmp/qa5/d25d/s.noshape, /tmp/qa5/d25b/merge.nosh
 | BOOL1 Union of the same disjoint parts | same Info, parts unchanged | ✅ | 0.4.10+ / 2a6d0167 10-27 |
 | BOOL4b Add extrude with an empty merge scope | Error "No merge scope selected.", parts unchanged | ✅ | 0.4.10+ / 2a6d0167 10-27 |
 | BOOL1b row tooltips (v0.4.8 app) | disjoint Intersect / Union rows: "Boolean 1", "Boolean 2" | ✅ | 0.4.10+ / 2a6d0167 10-27 |
+
+## Re-run 2026-10-29 09:08 (qa, published v0.4.14 CLI, Rust Boolean on by default; bin/boolmatrix.py, logs qa-scratch/cli/boolmatrix-v0414*.out)
+Same setup built by the CLI; every case gives identical parts with NOSHAPE_BOOL_RUST=0 (OCCT).
+| Row | Ours (v0.4.14) | Status | Verified |
+|---|---|---|---|
+| 2 Union 1+2 | Part 1 9178.097245 (9 faces), old Part 3 listed "Part 2" 4000 | ✅ | v0.4.14 10-29 |
+| 3 Subtract 2 from 1 (☐ / ☑ Keep tools) | 7607.300918 (8 faces); ☑ keeps Part 2 1570.796327 | ✅ | v0.4.14 10-29 |
+| 4 Intersect 1+2 (☐ / ☑ Keep tools) | new body 392.699082 listed second, old Part 3 → "Part 1"; ☑ → Parts (4) with Part 4 = 392.699082 | ✅ | v0.4.14 10-29 |
+| 6 BOOL1 disjoint Union 1+3 | parts unchanged, Info "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained." | ✅ (geometry; the bubble placement BOOL1b not re-checked) | v0.4.14 10-29 |
+| INT2 disjoint Intersect 1+3 ☑ Keep tools | parts unchanged, the same Info; no 8000 copy | ✅ **fixed** | v0.4.14 10-29 |
+| (new) disjoint Subtract tool Part 3 from Part 1 | Info "Selected tools and targets do not intersect."; **Part 3 is consumed** (Parts (2)) | ? asked live (REQUESTS qa 10-29 09:08) | |
+| 17 empty merge scope | Error "No merge scope selected.", parts unchanged | ✅ | v0.4.14 10-29 |
+| 18 Merge with all | ONE part 14785.398163, 17 faces | ✅ | v0.4.14 10-29 |
+| 19 scope Part 1 + Part 3 / Part 1 only | 14000 + 1570.796327 / 11000 + 1570.796327 + 4000 | ✅ | v0.4.14 10-29 |
+| (new) Extrude Remove, Merge with all | with the direction into the parts: 7000 / 785.398163 / 3000; **oppositeDirection left unset goes the other way, removes nothing and reports Ok** (CLI) | ? asked live (default direction, and the status of a Remove that touches nothing) | |
