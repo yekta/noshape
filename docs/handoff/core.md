@@ -58,6 +58,15 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   wrapper; run.sh: allow_user_poisoning=0 for OCCT's pools, verify_asan_link_order=0): seed 189 clean 2 / 3, one
   fatal "holding a lock" at step 72 without a stack; 5bdada9c NOSHAPE_GUARD_TRACE=1 prints it next time. Then 6
   more instrumented sessions (asanbuild/rounds.sh): all clean. Not reproducible under ASan so far.
+- 8311f20f the corruption's cause: Shell and Draft changed their input (the model's body) in place: OCCT's offset,
+  Booleans without SetNonDestructive and draft add curves on faces / raise tolerances; a budget or guard jump halfway
+  left the body corrupt. Found by fingerprinting each op's input (curve representations, tolerances, wires) before
+  and after (the shell paths 41 of the kernel tests, draft 2; fillet, chamfer, defeature none) and confirmed on qa's
+  2ac952ce CLI under gdb (/root/core-scratch/gdb189/run2.sh: catch every SIGSEGV with a backtrace and pass it on):
+  9 / 6 faults from step 60 then frozen, 2 / 2; with OwnCopy 0 faults, 106 steps, 2 / 2. `OwnCopy` (internal.hpp):
+  BRepBuilderAPI_Copy (geometry shared), same TopExp maps, `subs()` maps sub-shape arguments by index. Left to audit:
+  unbudgeted ops can still be interrupted by a guarded fault while OCCT edits their input (rust_boolean.cpp's
+  quick_boolean, offsets, thicken...): fingerprint them the same way (to_brep_bytes before / after in a test).
 - T2 (kernel, model, ops) on main 10-29 07:20: reds were export::pvz_structure / pvz_import (the Rust Boolean, ticket
   PVZ-RUST-BOOL for bool), bool_replay::bool_corpus_replay (bool), the elliptic boss curvature blend (open, mine),
   blends_match_onshape (my FILLET-OVERSIZE rule pre-empted live F2's "Failed to fillet selections." for four meeting
