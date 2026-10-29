@@ -273,3 +273,20 @@ Reference / Coordinate system, ruledSurface type / vertex override / corner type
 | L45 Curve pattern d 25 × 4 on a 100 mm circle | Error "Cannot create a curve pattern when the entered distance is larger than the path length." | ✅ | v0.4.12 CLI 10-28 (bin/l45.py: Error with that text, faulty distance) |
 | L45b × 3 | Ok, copies at 120° / 240° (centres (−7.958, ±13.783) on R 15.915) = live | ✅ **fixed** | v0.4.12 CLI 10-28 (bin/l45.py: Ok, centres (15.915,0), (−7.958, ±13.783)) |
 
+
+## qa re-check 2026-10-29 09:40 (published v0.4.14 CLI, bin/errsweep.py: block 40×20×10, messages of the 🔧 rows; the field each error marks isn't in the CLI reply, not checked here)
+| Row | Ours (v0.4.14) | Status | Verified |
+|---|---|---|---|
+| Draft 2 empty neutral plane | Error "Select a neutral plane." | ✅ | v0.4.14 10-29 |
+| Draft 3 no faces | Error "Select faces to draft." | ✅ | v0.4.14 10-29 |
+| Draft 4 parting line, nothing picked | Error "Select pull direction." (pull checked first) | ✅ | v0.4.14 10-29 |
+| Move face 2 nothing | Error "Select faces to move." | ✅ | v0.4.14 10-29 |
+| Move face 3 Translate, no direction (CLI, no editing logic) | Error "Cannot determine translation direction." | ✅ | v0.4.14 10-29 |
+| Move face 5 Rotate, no axis | Error "Cannot determine rotation axis." | ✅ | v0.4.14 10-29 |
+| Replace face 2 nothing | Error "Select faces to replace." | ✅ | v0.4.14 10-29 |
+| Sweep 3 Thin, nothing | Error "Select faces or sketch regions to sweep." (wall before path; Solid / Surface check the path first: "Select entities for sweep path.") | ✅ | v0.4.14 10-29 |
+| Sweep 5 Lock profile direction, no direction | Error "Select direction to lock." (also in the dialog on 349290dc: "Direction to lock" pink, path not) | ✅ | v0.4.14 10-29 |
+| Rib 3 nothing | Error "Select sketch profiles to create the ribs." (profiles before parts) | ✅ | v0.4.14 10-29 |
+| Offset surface 2 nothing | Error "Select faces, surfaces, or sketch regions to offset from." | ✅ | v0.4.14 10-29 |
+| Fill 2 nothing | Error "Select laminar edges or curves as fill surface boundary." | ✅ | v0.4.14 10-29 |
+| Wrap 4 nothing | Error "Select planar faces or sketch regions to wrap." | ✅ | v0.4.14 10-29 |
