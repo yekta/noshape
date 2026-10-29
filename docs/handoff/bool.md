@@ -316,14 +316,41 @@ near the tool converted and rebuilt).
 Replays: main 610 / 972, corpus2 482 / 692, corpus5 600 / 929 (vs OCCT run here), all 0 differ; T2
 bool_corpus_replay and export:: (24) pass.
 
+## Ellipses: planes at an angle to cylinders (10-29 09:40, d421f1e4)
+- A plane at an angle to a cylinder's axis (not a cone's; |n · a| ≥ 0.25, steeper declines as "a plane nearly
+  along a cylinder") is cut in an ellipse, OCCT's own (IntAna_QuadQuadGeo: centre on the axis, the plane surface's
+  normal, major axis (n × a) × n, radii r / |n · a| and r). In the faces' parameter planes it is a trigonometric
+  curve (curve2's `C2::Trig`: an ellipse on the plane, a sinusoid on the cylinder; crossings by sampling and
+  Newton's method); lengths along it are its arc length (never parameter × a radius).
+- Its edges are OCCT's to the last bit: rust_boolean.cpp runs OCCT's own `IntTools_FaceFace` on the section's two
+  argument faces (once per pair) and takes the curve, the part of it the edge is in and its curves on both faces
+  from there, moved by turns as `BOPTools_AlgoTools::MakePCurve` does. (OCCT's curve on the cylinder is a
+  30-pole B-spline 1e-8–6e-8 off the exact sinusoid, made over the part, and the parts come from the faces' UV
+  boxes, a plane's grown by 10% (CorrectPlaneBoundaries): computing either ourselves gave volumes 1e-6 off.)
+  The edge's tolerance is the section's (the curve's and the faces': MakeBlocks adds the tangential one and
+  CorrectToleranceOfSE takes it off again), its vertices' that + 1e-12 (OCCT's MakeEdge; its vertex reduction can
+  leave some 1e-12 lower: not matched). No SameParameter: OCCT's returns at once (the flag is set).
+- Not yet: arguments with ellipses (to_body: "a curved edge"; the next Boolean on a part with a tilted hole goes
+  to OCCT), planes at an angle to cones, a piece of an argument's ellipse.
+- Replays, all 0 differ with the unify check: main 614 / 972 (+4), corpus2 483 (+1), corpus3 490 (+1), corpus4
+  526 (+1), corpus5 607 / 929 (+7 of its 20 angled cases), Shell's direct 52 / 85. The taken ones are 2–7× OCCT
+  (its face/face and projections are most of their time). The angled cases left are near-tangencies (an ellipse's
+  top 2.7 µm over a counterbore's rim: OCCT keeps a 2.7 µm section across the cap, ours drops it, "an edge ends
+  inside a face"), cones, and crossings on a third face.
+- Tests: brep `a_hole_through_a_tilted_plate`, curve2 `an_ellipse_and_a_sinusoid`; kernel T1
+  `brep_replay::brep_tilted_holes_match_occt` (36 tilted holes against OCCT run there) and 5 corpus5 cases in
+  tests/data/brep (multi-tool d466cefc among them; the thread test runs them too).
+- psui: `noshape_brep::Curve` has a new variant `Ellipse` (only in a Boolean's result); `mesh::edge_nodes` returns
+  None for it (its `_` arm), so such faces mesh as before.
+
 ## Next
 Measured 10-29 07:37 on corpus5 (929 Booleans recorded from today's model and kernel tests, 105 s of OCCT time
 recorded): the Rust path takes 600, and what it leaves costs mostly:
 - curved edges / faces (B-spline, ellipse; fillets, sweeps, Shell's slabs on filleted parts): 74 s (141 cases).
   OCCT's (core's phase 1); the slow Shell ones have their curves inside the slabs' reach.
-- a plane at an angle to a cylinder (ellipses): 11 s in 20 cases, but 3 of them (multi-tool cuts round a shaft,
-  0.5–2.3 s each) are most of it; the single-tool ones are 10–80 ms. Needs elliptic sections, sinusoids in a
-  cylinder's parameter plane and OCCT's own pcurve approximation (BOPTools_AlgoTools2D) to match its volumes.
+- a plane at an angle to a cylinder (ellipses): 11 s in 20 cases; 7 taken since 10-29 (above), the rest
+  near-tangencies, cones and crossings on a third face. Next there: arguments with ellipse edges (a part with a
+  tilted hole sends every later Boolean to OCCT).
 - cylinders at an angle (4th-order curves): 7.7 s in 6.
 - a plane along a cone: 2.8 s in 8 (one 2.4 s case; the rest drill tips cut through their axis: the apex).
 - sheets (faces / shells as arguments): none in corpus5. In the main corpus: 56 fuses of faces (sheet metal),

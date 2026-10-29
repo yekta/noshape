@@ -517,6 +517,8 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   sets `myUnifyScope` (rust_unify_scope) like the local Boolean when its target is unify-clean.
 - 10-29 08:36 (PVZ-RUST-BOOL): tests/export.rs has one more T1 test at its end,
   `pvz_of_a_hole_cut_by_the_rust_boolean` (the test part's cut by the Rust Boolean written as PVZ).
+- 10-29 09:40: ffi.rs `BrepResult` has `ellipse_minor` / `ellipse_faces` (an ellipse edge's minor radius and the two
+  argument faces it is the section of); `BrepBody.curves` kind 3 is an ellipse (only in a Boolean's result).
 - noshape_occt.hpp: OcShape keeps `myBrep` / `myBrepTol` / `myBrepWhy` (+ `myBrepLock`): the converted body of the
   shape (or why it has none), made once; a result of the Rust Boolean gets its body attached
   (`rust_boolean_keep`), so a chain of Booleans converts a body once. Please keep these when you touch OcShape.
