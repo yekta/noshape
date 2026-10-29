@@ -52,7 +52,11 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   no guard recovery while any is held. A SIGABRT under the guard is fatal unless the terminate handler (installed
   with the guard, chaining the previous one) marked it: glibc's heap checks abort inside malloc. Shared libraries'
   own locks (libstdc++'s) aren't counted. The heap corruption itself: not found yet (seed 189 under
-  LD_PRELOAD=libasan, guard on, clean once; /root/core-scratch/asan189/run.sh, more runs going).
+  LD_PRELOAD=libasan, guard on, clean 3 / 3; /root/core-scratch/asan189/run.sh). Instrumented: OCCT with ASan in
+  /root/occt-asan (scripts/build-occt.sh with CFLAGS/CXXFLAGS -fsanitize=address, ~1 h), the CLI against it
+  (/root/core-scratch/asanbuild/cli.sh: target /root/target-asan, libasan linked explicitly because of the mold
+  wrapper; run.sh: allow_user_poisoning=0 for OCCT's pools, verify_asan_link_order=0): seed 189 clean 2 / 3, one
+  fatal "holding a lock" at step 72 without a stack; 5bdada9c NOSHAPE_GUARD_TRACE=1 prints it next time.
 - T2 (kernel, model, ops) on main 10-29 07:20: reds were export::pvz_structure / pvz_import (the Rust Boolean, ticket
   PVZ-RUST-BOOL for bool), bool_replay::bool_corpus_replay (bool), the elliptic boss curvature blend (open, mine),
   blends_match_onshape (my FILLET-OVERSIZE rule pre-empted live F2's "Failed to fillet selections." for four meeting
