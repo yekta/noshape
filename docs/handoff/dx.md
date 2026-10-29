@@ -124,9 +124,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   the radial menu, as live), DWG-MAXMIN-LINE (max / min to a straight edge, square to it: slots 2 / 3).
 - drawing.md D2 (Ø between a cylinder's silhouettes: silhouette lines are pickable), D15 (Diameter on one silhouette),
   D13 (radial / diameter take a centermark).
-- Asked live: D33 the dimension palette's Count type (REQUESTS dx 10-29).
-- Next, in order: D26 re-attach by grip for radial / angular / ordinate (needs live's grips, 1475-1477); D33 once live
-  answers; D22 mid / quad snaps on a placed dimension's grips; V59 / V26; drawing.md ⏳ rows on green.
+- D22 (grips snap to midpoints / quadrants), D26 (radial / 3 point angular / ordinate re-attach by their blue grips),
+  D33 (live has no Count type: matches), D31 (row was stale: the launcher exists).
+- App checks now run on dx's own Xvfb :147 (/root/dx-scratch/xvfb147.pid): another agent's app (noshape-green-new)
+  opens windows on :131.
+- Next, in order: D23 placement inference lines; D24 a value dragged past an extension line; D21 centre-to-quad for
+  the other kinds; V59 / V26; drawing.md ⏳ rows on green.
 
 ## Late afternoon 10-28
 - D39 on every dimension kind: a typed value replaces the measured one after its symbol (`DimFormat.value`,
