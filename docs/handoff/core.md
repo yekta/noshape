@@ -504,6 +504,8 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   evening** (NOSHAPE_BOOL_RUST=0: off; docs/handoff/bool.md). Its conversion and result building are in rust_boolean.cpp.
 - 10-29 08:00: OcShape has `myBrepLazy` too (a Rust result's body, remapped on first use), and op_boolean's Rust path
   sets `myUnifyScope` (rust_unify_scope) like the local Boolean when its target is unify-clean.
+- 10-29 08:36 (PVZ-RUST-BOOL): tests/export.rs has one more T1 test at its end,
+  `pvz_of_a_hole_cut_by_the_rust_boolean` (the test part's cut by the Rust Boolean written as PVZ).
 - noshape_occt.hpp: OcShape keeps `myBrep` / `myBrepTol` / `myBrepWhy` (+ `myBrepLock`): the converted body of the
   shape (or why it has none), made once; a result of the Rust Boolean gets its body attached
   (`rust_boolean_keep`), so a chain of Booleans converts a body once. Please keep these when you touch OcShape.

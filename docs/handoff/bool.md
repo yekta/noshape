@@ -303,6 +303,19 @@ local_fuse_bench (a2121c5b, 1612 faces, fresh target each round) the Rust path i
 23 ms in merge_planar): the local Boolean stays first. Doing better needs the Boolean itself local (only the faces
 near the tool converted and rebuilt).
 
+## PVZ-RUST-BOOL (10-29 08:36, f4ad907d)
+- core's T2 `export::pvz_structure` / `pvz_import` failed with the Rust Boolean on: the test part's through hole had
+  its seam's curves at u = -3.5e-16 (the face's start angle from its seam's point, which OCCT's own input puts a
+  rounding off the axis) and its circles' x axis tilted by as much; the PVZ writer's NURBS conversion then trimmed
+  out of range. A start angle within 1e-12 of a whole turn is the turn now, and a new circle starting on its
+  surface's x axis takes that axis: the seam at 0 / 2π and the circles on (1, 0, 0), as OCCT's. T1
+  `export::pvz_of_a_hole_cut_by_the_rust_boolean` (failed before).
+- The same T2 run's `bool_replay::bool_corpus_replay` failed on 2e30111c: "an edge outside its face's range" was
+  an exception, not a decline (brep_replay showed it as a decline with no reason, so I missed it). It and "an
+  edge against its curve" decline now; brep_replay counts a failure without a reason as a failure.
+Replays: main 610 / 972, corpus2 482 / 692, corpus5 600 / 929 (vs OCCT run here), all 0 differ; T2
+bool_corpus_replay and export:: (24) pass.
+
 ## Next
 Measured 10-29 07:37 on corpus5 (929 Booleans recorded from today's model and kernel tests, 105 s of OCCT time
 recorded): the Rust path takes 600, and what it leaves costs mostly:
