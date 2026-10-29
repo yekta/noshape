@@ -913,6 +913,49 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
       hist->Merge(u.History());
     return u.Shape();
   }
+  // No start keeps it (two half cones meeting at their apex: a blind hole's
+  // drill tip mirrored onto itself, qa's MIRROR-BLIND-HOLE-FACES; every start
+  // gave an invalid solid, and with it the box's planes stayed split too):
+  // the rest unified, the faces on cones kept apart, else every pair on one
+  // kind of periodic surface.
+  for (int pass = 0; pass < 2; ++pass)
+  {
+    BRepBuilderAPI_Copy cp(s, false, false);
+    const TopoDS_Shape  in = cp.Shape();
+    HHist               hc = new BRepTools_History(to_list(std::vector<TopoDS_Shape>{s}), cp);
+    ShapeUpgrade_UnifySameDomain u(in, true, true, false);
+    ShapeAncMap                  ef;
+    unique_ancestors(in, TopAbs_EDGE, TopAbs_FACE, ef);
+    bool kept = false;
+    for (int i = 1; i <= ef.Extent(); ++i)
+    {
+      const ShapeList& fs = ef(i);
+      if (fs.Extent() != 2)
+        continue;
+      const TopoDS_Face a = TopoDS::Face(fs.First()), b = TopoDS::Face(fs.Last());
+      TopLoc_Location   la, lb;
+      const occ::handle<Geom_Surface> ga = BRep_Tool::Surface(a, la), gb = BRep_Tool::Surface(b, lb);
+      if (ga.IsNull() || gb.IsNull() || ga->DynamicType() != gb->DynamicType() || !(ga->IsUPeriodic() || ga->IsVPeriodic()))
+        continue;
+      if (pass == 0 && BRepAdaptor_Surface(a, false).GetType() != GeomAbs_Cone)
+        continue;
+      u.KeepShape(ef.FindKey(i));
+      kept = true;
+    }
+    if (!kept)
+      continue;
+    u.Build();
+    GProp_GProps g1;
+    BRepGProp::VolumeProperties(u.Shape(), g1);
+    if (std::abs(g1.Mass() - v0) > 1e-9 * std::abs(v0))
+      continue;
+    if (hist.IsNull())
+      hist = new BRepTools_History();
+    hist->Merge(hc);
+    if (!u.History().IsNull())
+      hist->Merge(u.History());
+    return u.Shape();
+  }
   return s;
 }
 

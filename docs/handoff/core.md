@@ -119,6 +119,15 @@ skasm's now; see docs/handoff/skasm.md.
   inward normal to sketch-on-face, holes, up-to faces, mate connectors and Measure's angles. Both now flip Z for an
   indirect frame. T1 `kernel_core::topology_queries` checks a mirrored box. (The bool corpus case d0e4644e7ce32085,
   a fuse that was empty, is now a solid of 1.185e-5 by the Glue::Shift retry: rebased.)
+- MIRROR-BLIND-HOLE-FACES (part): a blind hole centred on the mirror plane, Part mirror Add, came out with no face
+  merged across the plane (14; live 8): the drill tip's two half cones meet at their apex (each half has its own
+  degenerate apex edge), where USD gives an invalid solid from every wire start, so usd_kept_volume dropped the
+  whole unify, planes included. Now (boolean.cpp) it unifies the rest with the edges between cone faces kept
+  (USD KeepShape), else with every pair on one kind of periodic surface kept apart: 9 faces (countersink 11). Left:
+  the two half cones as one face (a merge like merge_cylinder_bands for cones with an apex). T1
+  `kernel_robustness::part_mirror_of_a_half_blind_hole_merges_across_the_plane`.
+- For skasm: T2 `sheetmetal_frames::convert_rips_and_bends_like_onshape` now fails alone too (BUTT: top wall max x
+  39.98 mm), on main since 969c5069 (std sheet metal by default); the 21:34 T2 before it passed.
 
 ## Landed on main (10-26 / 10-27)
 - 81c8d9cd psb's face blend WIP (curved sides, live's message rule). a2b34ade: the elliptic boss as live (a sketch

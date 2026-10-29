@@ -2851,3 +2851,45 @@ fn feature_mirror_of_a_boss_copies_the_boss() {
     assert!((volume(&r) - 9000.0).abs() < 1e-6, "{} mm³, {} faces", volume(&r), b.count(noshape_kernel::ShapeType::Face));
     assert_eq!(b.count(noshape_kernel::ShapeType::Face), 16);
 }
+
+/// qa MIRROR-BLIND-HOLE-FACES: a half plate with a blind hole centred on
+/// Right, Part mirror Add across Right. The drill tip's two half cones meet
+/// at their apex, where OCCT's UnifySameDomain gives an invalid solid from
+/// every wire start; the rest still merges across the plane (live: 8 faces,
+/// one cone; here the cone stays two halves: 9; with a countersink 11).
+#[test]
+fn part_mirror_of_a_half_blind_hole_merges_across_the_plane() {
+    for (style, want_v, want_f) in [("SIMPLE", 5841.6394, 9), ("C_SINK", 5728.5421, 11)] {
+        let mut t = T::new();
+        let (_, regions) = t.sketch(&[&[(0.0, -10.0), (15.0, -10.0), (15.0, 10.0), (0.0, 10.0)]], &[]);
+        t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+        let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = sk.add_point(DVec2::new(0.0, 0.0));
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::FeaturePlane(pl)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let body = t.regen().context.bodies[0].id.clone();
+        let h = t.add(
+            "hole",
+            &[
+                ("scope", q(vec![Reference::Body(body.clone())])),
+                ("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p.0 }])),
+                ("unitsSystem", en("METRIC")),
+                ("styleV2", en(style)),
+                ("startStyle", en("SKETCH")),
+                ("holeDiameterV3", e("6 mm")),
+                ("endStyleV2", en("BLIND")),
+                ("holeDepthV3", e("5 mm")),
+                ("cSinkDiameterV3", e("12 mm")),
+                ("cSinkAngleV3", e("90 deg")),
+            ],
+        );
+        t.ok(h);
+        let m = t.add("mirror", &[("patternType", en("PART")), ("operationType", en("ADD")), ("entities", q(vec![Reference::Body(body)])), ("mirrorPlane", q(vec![Reference::Plane(DatumPlane::Right)])), ("defaultScope", ParamValue::Bool(true))]);
+        let r = t.ok(m);
+        let b = &r.context.bodies[0].shape;
+        assert_eq!(r.context.bodies.len(), 1);
+        assert!((volume(&r) - want_v).abs() < 1e-3, "{style}: {} mm³", volume(&r));
+        assert_eq!(b.count(noshape_kernel::ShapeType::Face), want_f, "{style}");
+        assert!(b.is_valid());
+    }
+}
