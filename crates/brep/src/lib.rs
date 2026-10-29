@@ -21,7 +21,7 @@ pub mod nurbs;
 /// Display meshes of analytic faces (psui).
 pub mod mesh;
 
-pub use boolean::{boolean, boolean_touching, Op};
+pub use boolean::{boolean, boolean_touching, boolean_with, Op};
 use glam::DVec3;
 
 /// Distances in (tol, GREY × tol] are ambiguous: the Boolean declines. (50 until 10-29; 10 takes 9 more of the
@@ -43,6 +43,8 @@ pub enum Curve {
     Hyperbola { center: DVec3, normal: DVec3, xdir: DVec3, major: f64, minor: f64, faces: [(u32, u32); 2] },
     /// No curve: an edge at a point (a cone's apex), its start and end one vertex.
     Degenerate,
+    /// `Body::nurbs_curves[index]` from parameter `t0` (the edge's start) to `t1` (its end).
+    Nurbs { index: u32, t0: f64, t1: f64 },
 }
 
 /// A face's surface.
@@ -55,6 +57,20 @@ pub enum Surface {
     Cylinder { origin: DVec3, axis: DVec3, xdir: DVec3, radius: f64 },
     /// Like a cylinder whose radius at height `z` along the axis (from `origin`) is `radius + z tan(angle)`.
     Cone { origin: DVec3, axis: DVec3, xdir: DVec3, radius: f64, angle: f64 },
+    /// `Body::nurbs_surfaces[index]`, its parameters OCCT's (its edges' curves on it are `Body::pcurves`).
+    Nurbs { index: u32 },
+}
+
+/// An edge's curve on a NURBS face, in the face's parameters: `Body::nurbs_curves[curve]` (x, y) from `t0` (the
+/// edge's start) to `t1`; `second`: a seam's other curve (the one its reversed use runs along).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PCurve {
+    pub face: u32,
+    pub edge: u32,
+    pub second: bool,
+    pub curve: u32,
+    pub t0: f64,
+    pub t1: f64,
 }
 
 /// An edge between two vertices (`v[0]` its start, `v[1]` its end: one forward direction).
@@ -102,6 +118,27 @@ pub struct Body {
     pub edges: Vec<Edge>,
     pub faces: Vec<Face>,
     pub solids: Vec<Solid>,
+    pub nurbs_curves: Vec<nurbs::NurbsCurve>,
+    pub nurbs_surfaces: Vec<nurbs::NurbsSurface>,
+    pub pcurves: Vec<PCurve>,
+}
+
+/// A curve where two faces meet, as the kernel's OCCT makes it (a free-form face's sections come from there, so
+/// their edges are OCCT's own): the curve from parameter `t0` to `t1`, its curves on the two faces in their own
+/// (OCCT's) parameters (x, y; the same parameter), and the source's name for it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SectionCurve {
+    pub curve: nurbs::NurbsCurve,
+    pub t0: f64,
+    pub t1: f64,
+    pub on: [nurbs::NurbsCurve; 2],
+    pub id: u32,
+}
+
+/// Where the Boolean gets the sections of free-form faces: the curves where face `a` (argument, face) and face `b`
+/// meet, curves on them in that order.
+pub trait SectionSource {
+    fn sections(&self, a: (u32, u32), b: (u32, u32)) -> Result<Vec<SectionCurve>, Decline>;
 }
 
 /// Why a Boolean declined.
@@ -159,6 +196,8 @@ pub struct Output {
     pub solid_origin: Vec<Origin>,
     /// Per face on a cylinder, where its angles start (it lies within this and 2π more); 0 on a plane.
     pub face_u0: Vec<f64>,
+    /// Per edge, the [`SectionCurve::id`] of the section it is a piece of (`u32::MAX`: none).
+    pub edge_section: Vec<u32>,
     pub history: Vec<Record>,
 }
 

@@ -446,3 +446,53 @@ fn a_notched_cylinder_fused_with_its_mirror_unifies_whole() {
     }
     assert_eq!(u.shape.count(ShapeType::Face), 3);
 }
+
+/// Free-form faces reach noshape's own Boolean as NURBS: the thread case's B-spline faces (degree 1 × 10, 290
+/// poles), their edges' B-spline curves and curves on the faces, decoded as OCCT has them (points on the
+/// surfaces at their (u, v), edge curves through their vertices, curves on faces onto the edges).
+#[test]
+fn brep_free_form_faces_arrive_as_occt_has_them() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/brep-freeform");
+    let c = load(&dir, "8dc3e8d4da1ab5af").unwrap();
+    let tool = &c.tools[0];
+    let body = brep_body(tool).unwrap();
+    assert!(!body.nurbs_surfaces.is_empty() && !body.pcurves.is_empty());
+    let faces = tool.sub_shapes(ShapeType::Face);
+    for (f, face) in body.faces.iter().enumerate() {
+        let noshape_brep::Surface::Nurbs { index } = face.surface else { continue };
+        let s = &body.nurbs_surfaces[index as usize];
+        let [u0, u1, v0, v1] = faces[f].uv_bounds().unwrap();
+        for k in 0..=8 {
+            let (u, v) = (u0 + (u1 - u0) * k as f64 / 8.0, v0 + (v1 - v0) * (8 - k) as f64 / 8.0);
+            let want = faces[f].point_at_uv(u, v).unwrap();
+            assert!((s.at(u, v) - want).length() < 1e-12, "face {f} at ({u}, {v}): {} vs {want}", s.at(u, v));
+        }
+    }
+    for e in &body.edges {
+        if let noshape_brep::Curve::Nurbs { index, t0, t1 } = e.curve {
+            let c = &body.nurbs_curves[index as usize];
+            assert!((c.at(t0) - body.vertices[e.v[0] as usize]).length() < 1e-7 && (c.at(t1) - body.vertices[e.v[1] as usize]).length() < 1e-7);
+        }
+    }
+    for p in &body.pcurves {
+        let noshape_brep::Surface::Nurbs { index } = body.faces[p.face as usize].surface else { panic!("a curve on a face not NURBS") };
+        let (s, c) = (&body.nurbs_surfaces[index as usize], &body.nurbs_curves[p.curve as usize]);
+        let e = body.edges[p.edge as usize];
+        for (t, v) in [(p.t0, e.v[0]), (p.t1, e.v[1])] {
+            let uv = c.at(t);
+            assert!((s.at(uv.x, uv.y) - body.vertices[v as usize]).length() < 1e-6, "edge {} on face {}", p.edge, p.face);
+        }
+    }
+}
+
+/// Free-form cases (tests/data/brep-freeform: a helical thread's B-spline faces against a cylinder): noshape's own
+/// Boolean takes them with OCCT's own sections of the free-form faces and everything else its own, as OCCT. (Not
+/// yet: the thread fused with a rod its helical edges lie on, a common it finds non-manifold.)
+#[test]
+fn brep_free_form_cases_match_occt() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/brep-freeform");
+    let (n, accepted, bad, report) = replay(&dir);
+    eprintln!("{report}");
+    assert!(bad.is_empty(), "{} of {n} cases differ:\n{}", bad.len(), bad.join("\n"));
+    assert!(accepted >= 1, "{accepted} of {n} taken:\n{report}");
+}

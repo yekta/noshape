@@ -64,6 +64,7 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
         match g.g {
             Geo::Apex => continue,
             Geo::Ell { .. } => return Err(Decline("an argument's ellipse")),
+            Geo::Nurbs { .. } => return Err(Decline("a line and a curved edge")),
             Geo::Line => {
                 let (p0, p1) = (cx.p(g.v[0]), cx.p(g.v[1]));
                 let el = (p1 - p0).length();
@@ -133,6 +134,7 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
         let g = &cx.faces[f];
         let mut ts: Vec<f64> = Vec::new();
         match g.s {
+            Surf::Nurbs { .. } => return Err(Decline("a line and a curved face")),
             Surf::Plane { n, d: dn, .. } => {
                 let den = n.dot(d);
                 let dist = dn - n.dot(a);

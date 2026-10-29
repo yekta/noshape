@@ -2,18 +2,57 @@
 //! arc on a plane, a plane's section on a cylinder: a sinusoid) and hyperbolic ones (a hyperbola's arc on a plane
 //! or on the cone it is a section of), the last two done numerically.
 
-use glam::DVec2;
+use crate::nurbs::NurbsCurve;
+use glam::{DVec2, DVec3};
 use std::f64::consts::TAU;
+use std::sync::Arc;
 
 /// A segment from `a` to `b`, an arc of the circle (`c`, `r`) from angle `a0` through `sweep` (positive:
 /// counter-clockwise), the curve c + u cos t + v sin t + w t, or the curve c + u cosh t + v sinh t + w atan(k sinh t),
-/// for t from `t0` through `sweep`.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// for t from `t0` through `sweep`, or a NURBS curve's part from its parameter `t0` to `t1` (its x and y; a curve
+/// on a free-form face, OCCT's, in the face's own parameters).
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum C2 {
     Seg { a: DVec2, b: DVec2 },
     Arc { c: DVec2, r: f64, a0: f64, sweep: f64 },
     Trig { c: DVec2, u: DVec2, v: DVec2, w: DVec2, t0: f64, sweep: f64 },
     Hyp { c: DVec2, u: DVec2, v: DVec2, w: DVec2, k: f64, t0: f64, sweep: f64 },
+    Nurbs { c: Arc<NurbsCurve>, t0: f64, t1: f64 },
+    /// A 3D NURBS curve's part from `t0` to `t1` seen in a plane's or cylinder's / cone's parameter plane.
+    Mapped { c: Arc<NurbsCurve>, t0: f64, t1: f64, m: Map },
+}
+
+/// A face's map from 3D to its parameter plane (the Boolean's own): a plane's frame, or a cylinder's or cone's
+/// (axis origin and direction, angle frame, scale `r`, `flip`: heights the other way, angles from `th0` through
+/// 2π; `mid`: the curve's x halfway, which says on which side of the angles' ends its ends are).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum Map {
+    Plane { origin: DVec3, u: DVec3, v: DVec3 },
+    Cyl { o: DVec3, a: DVec3, x: DVec3, y: DVec3, r: f64, flip: bool, th0: f64, mid: f64 },
+}
+
+impl Map {
+    /// Point `p` and its derivative `d` (along a curve) mapped.
+    pub fn map(&self, p: DVec3, d: DVec3) -> (DVec2, DVec2) {
+        match *self {
+            Map::Plane { origin, u, v } => (DVec2::new((p - origin).dot(u), (p - origin).dot(v)), DVec2::new(d.dot(u), d.dot(v))),
+            Map::Cyl { o, a, x, y, r, flip, th0, mid } => {
+                let w = p - o;
+                let (wx, wy) = (w.dot(x), w.dot(y));
+                let mut th = th0 + (wy.atan2(wx) - th0).rem_euclid(TAU);
+                // At the angles' ends: the side the curve is on.
+                let eps = 1e-9;
+                if (th - th0).abs() <= eps && mid > r * (th0 + std::f64::consts::PI) {
+                    th = th0 + TAU;
+                } else if (th - th0 - TAU).abs() <= eps && mid < r * (th0 + std::f64::consts::PI) {
+                    th = th0;
+                }
+                let s = if flip { -1.0 } else { 1.0 };
+                let dth = (wx * d.dot(y) - wy * d.dot(x)) / (wx * wx + wy * wy);
+                (DVec2::new(r * th, s * w.dot(a)), DVec2::new(r * dth, s * d.dot(a)))
+            }
+        }
+    }
 }
 
 /// Points along a curve to look for crossings between (a trigonometric curve's turns at most a quarter of a
@@ -49,6 +88,8 @@ impl C2 {
                 let a = t0 + sweep * t;
                 c + u * a.cosh() + v * a.sinh() + w * (k * a.sinh()).atan()
             }
+            C2::Nurbs { ref c, t0, t1 } => c.at(t0 + (t1 - t0) * t).truncate(),
+            C2::Mapped { ref c, t0, t1, m } => m.map(c.at(t0 + (t1 - t0) * t), DVec3::ZERO).0,
         }
     }
 
@@ -72,6 +113,20 @@ impl C2 {
                 let (d1, d2) = (g1 / q, (g * q - 2.0 * g * g1 * g1) / (q * q));
                 ((u * a.sinh() + v * a.cosh() + w * d1) * sweep, (u * a.cosh() + v * a.sinh() + w * d2) * (sweep * sweep))
             }
+            C2::Nurbs { ref c, t0, t1 } => {
+                let [_, d1, d2] = c.derivs(t0 + (t1 - t0) * t);
+                (d1.truncate() * (t1 - t0), d2.truncate() * ((t1 - t0) * (t1 - t0)))
+            }
+            C2::Mapped { ref c, t0, t1, m } => {
+                // The second derivative by differences of the first (Newton's steps only need it roughly).
+                let d = |s: f64| {
+                    let [p, d1, _] = c.derivs(t0 + (t1 - t0) * s);
+                    m.map(p, d1).1 * (t1 - t0)
+                };
+                let h = 1e-5;
+                let (a, b) = ((t - h).max(0.0), (t + h).min(1.0));
+                (d(t), (d(b) - d(a)) / (b - a))
+            }
         }
     }
 
@@ -89,6 +144,8 @@ impl C2 {
             C2::Arc { c, r, a0, sweep } => C2::Arc { c, r, a0: a0 + sweep, sweep: -sweep },
             C2::Trig { c, u, v, w, t0, sweep } => C2::Trig { c, u, v, w, t0: t0 + sweep, sweep: -sweep },
             C2::Hyp { c, u, v, w, k, t0, sweep } => C2::Hyp { c, u, v, w, k, t0: t0 + sweep, sweep: -sweep },
+            C2::Nurbs { ref c, t0, t1 } => C2::Nurbs { c: c.clone(), t0: t1, t1: t0 },
+            C2::Mapped { ref c, t0, t1, m } => C2::Mapped { c: c.clone(), t0: t1, t1: t0, m },
         }
     }
 
@@ -96,7 +153,7 @@ impl C2 {
         match *self {
             C2::Seg { a, b } => (b - a).length(),
             C2::Arc { r, sweep, .. } => r * sweep.abs(),
-            C2::Trig { .. } | C2::Hyp { .. } => self.gauss(|t| self.derivs(t).0.length()),
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } => self.gauss(|t| self.derivs(t).0.length()),
         }
     }
 
@@ -116,7 +173,7 @@ impl C2 {
         match *self {
             C2::Seg { a, b } => (b - a).normalize(),
             C2::Arc { a0, sweep, .. } => dir(a0 + sweep * t).perp() * sweep.signum(),
-            C2::Trig { .. } | C2::Hyp { .. } => self.derivs(t).0.normalize(),
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } => self.derivs(t).0.normalize(),
         }
     }
 
@@ -125,7 +182,7 @@ impl C2 {
         match *self {
             C2::Seg { .. } => 0.0,
             C2::Arc { r, sweep, .. } => sweep.signum() / r,
-            C2::Trig { .. } | C2::Hyp { .. } => {
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } => {
                 let (d, dd) = self.derivs(0.0);
                 d.perp_dot(dd) / d.length().powi(3)
             }
@@ -140,7 +197,7 @@ impl C2 {
                 let a1 = a0 + sweep;
                 0.5 * (r * r * sweep + r * c.x * (a1.sin() - a0.sin()) - r * c.y * (a1.cos() - a0.cos()))
             }
-            C2::Trig { .. } | C2::Hyp { .. } => self.gauss(|t| 0.5 * self.at(t).perp_dot(self.derivs(t).0)),
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } => self.gauss(|t| 0.5 * self.at(t).perp_dot(self.derivs(t).0)),
         }
     }
 
@@ -148,13 +205,14 @@ impl C2 {
     fn samples(&self) -> usize {
         match self {
             C2::Seg { .. } => 1,
+            C2::Nurbs { c, .. } | C2::Mapped { c, .. } => SAMPLES.max(8 * (c.poles.len() - c.degree)),
             _ => SAMPLES,
         }
     }
 
     /// The roots in 0..1 of `f` along it (sign changes between samples, then bisection; exact zeros too).
     fn roots(&self, f: impl Fn(f64) -> f64) -> Vec<f64> {
-        let n = SAMPLES;
+        let n = self.samples();
         let mut out: Vec<f64> = Vec::new();
         let mut prev = f(0.0);
         if prev == 0.0 {
@@ -221,7 +279,7 @@ impl C2 {
                     }
                 }
             }
-            C2::Trig { .. } | C2::Hyp { .. } => {
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } => {
                 for t in self.roots(|t| (self.at(t) - m).perp_dot(d)) {
                     let s = (self.at(t) - m).dot(d);
                     if s > 0.0 {
@@ -247,11 +305,12 @@ impl C2 {
                 let rel = if sweep >= 0.0 { (a - a0).rem_euclid(TAU) } else { (a0 - a).rem_euclid(TAU) };
                 (rel / sweep.abs(), d)
             }
-            C2::Trig { .. } | C2::Hyp { .. } => {
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } => {
                 // The nearest sample, then Newton on (q - p)·q' (within 0..1).
                 let mut best = (0.0, f64::INFINITY);
-                for k in 0..=SAMPLES {
-                    let t = k as f64 / SAMPLES as f64;
+                let n = self.samples();
+                for k in 0..=n {
+                    let t = k as f64 / n as f64;
                     let d = (self.at(t) - p).length();
                     if d < best.1 {
                         best = (t, d);
@@ -294,7 +353,7 @@ impl C2 {
                     (self.start() - p).length().min((self.end() - p).length())
                 }
             }
-            C2::Trig { .. } | C2::Hyp { .. } => self.param_of(p).1,
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } => self.param_of(p).1,
         }
     }
 
@@ -363,11 +422,11 @@ impl C2 {
     /// Parameters (on `self`, on `o`) where the two cross, ends included; none where they run together
     /// (within `tol`: collinear segments, arcs of one circle), which their ends lying on each other show.
     pub fn intersections(&self, o: &C2, tol: f64) -> Vec<(f64, f64)> {
-        if matches!(self, C2::Trig { .. } | C2::Hyp { .. }) || matches!(o, C2::Trig { .. } | C2::Hyp { .. }) {
+        if matches!(self, C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. }) || matches!(o, C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. }) {
             return self.numeric_intersections(o, tol);
         }
         let mut out = Vec::new();
-        match (*self, *o) {
+        match (self.clone(), o.clone()) {
             (C2::Seg { a, b }, C2::Seg { a: c, b: d }) => {
                 let (e, f) = (b - a, d - c);
                 let off = |p: DVec2, q: DVec2, x: DVec2| (x - p).perp_dot((q - p).normalize()).abs();
@@ -400,7 +459,7 @@ impl C2 {
                 }
             }
             (C2::Arc { .. }, C2::Seg { .. }) => out = o.intersections(self, tol).into_iter().map(|(u, t)| (t, u)).collect(),
-            (C2::Trig { .. } | C2::Hyp { .. }, _) | (_, C2::Trig { .. } | C2::Hyp { .. }) => unreachable!(),
+            (C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. }, _) | (_, C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. }) => unreachable!(),
             (C2::Arc { c: c1, r: r1, a0: s1, sweep: w1 }, C2::Arc { c: c2, r: r2, a0: s2, sweep: w2 }) => {
                 let d = c2 - c1;
                 let dl = d.length();
@@ -466,7 +525,7 @@ mod tests {
     fn a_disk_with_a_square_hole() {
         let disk = C2::Arc { c: DVec2::ZERO, r: 2.0, a0: 0.3, sweep: TAU };
         let sq = [(-0.5, -0.5), (-0.5, 0.5), (0.5, 0.5), (0.5, -0.5)];
-        let mut edges = vec![disk];
+        let mut edges = vec![disk.clone()];
         for k in 0..4 {
             let (a, b) = (sq[k], sq[(k + 1) % 4]);
             edges.push(C2::Seg { a: DVec2::new(a.0, a.1), b: DVec2::new(b.0, b.1) });
@@ -480,8 +539,8 @@ mod tests {
         assert!((distance(DVec2::new(3.0, 0.0), &edges) - 1.0).abs() < 1e-12);
         // The case that found the half-open rule's fault: a full circle's start level with the point.
         let full = C2::Arc { c: DVec2::ZERO, r: 0.0025, a0: 0.0, sweep: -TAU };
-        assert!(!inside(DVec2::new(-0.02, 0.0), &[full]));
-        assert!(inside(DVec2::new(-0.001, 0.0), &[full]));
+        assert!(!inside(DVec2::new(-0.02, 0.0), std::slice::from_ref(&full)));
+        assert!(inside(DVec2::new(-0.001, 0.0), std::slice::from_ref(&full)));
         let half = C2::Arc { c: DVec2::ZERO, r: 1.0, a0: 0.0, sweep: -PI };
         assert!(inside(DVec2::new(0.0, -0.5), &[half, C2::Seg { a: DVec2::new(-1.0, 0.0), b: DVec2::new(1.0, 0.0) }]));
         let line = C2::Seg { a: DVec2::new(-3.0, 1.0), b: DVec2::new(3.0, 1.0) };
@@ -501,10 +560,10 @@ mod tests {
         let h: f64 = 1.0 / 9.0;
         let ramanujan = PI * 3.0 * (1.0 + 3.0 * h / (10.0 + (4.0 - 3.0 * h).sqrt()));
         assert!((el.length() - ramanujan).abs() < 1e-8, "{} {ramanujan}", el.length());
-        assert!(inside(DVec2::new(1.5, 0.3), &[el]));
-        assert!(!inside(DVec2::new(1.5, 0.8), &[el]));
-        assert!((distance(DVec2::new(3.0, 0.0), &[el]) - 1.0).abs() < 1e-12);
-        assert!((distance(DVec2::new(0.0, -3.0), &[el]) - 2.0).abs() < 1e-12);
+        assert!(inside(DVec2::new(1.5, 0.3), std::slice::from_ref(&el)));
+        assert!(!inside(DVec2::new(1.5, 0.8), std::slice::from_ref(&el)));
+        assert!((distance(DVec2::new(3.0, 0.0), std::slice::from_ref(&el)) - 1.0).abs() < 1e-12);
+        assert!((distance(DVec2::new(0.0, -3.0), std::slice::from_ref(&el)) - 2.0).abs() < 1e-12);
         let (t, d) = el.param_of(DVec2::new(0.0, 1.0));
         assert!((t - 0.25).abs() < 1e-12 && d < 1e-12);
         // A segment across it: x = ±√3 at y = 1/2.

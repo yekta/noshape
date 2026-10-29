@@ -304,11 +304,12 @@ pub(crate) mod ffi {
         vertices: Vec<f64>,
         /// Start and end vertex per edge.
         edges: Vec<u32>,
-        /// Per edge: kind (0 line, 1 circle, 2 none: a cone's apex, 3 an ellipse: only in a Boolean's result),
-        /// centre, normal, x direction, radius (an ellipse's major radius) (11 numbers).
+        /// Per edge: kind (0 line, 1 circle, 2 none: a cone's apex, 3 an ellipse, 4 a hyperbola: only in a
+        /// Boolean's result), centre, normal, x direction, radius (an ellipse's major radius) (11 numbers); kind 5 a
+        /// NURBS curve: where it starts in `nurbs`, the edge's start and end parameters.
         curves: Vec<f64>,
         /// Per face: kind (0 plane, 1 cylinder, 2 cone), origin, normal or axis, x direction, radius, a cone's
-        /// half-angle (12 numbers).
+        /// half-angle (12 numbers); kind 3 a NURBS surface: where it starts in `nurbs`.
         surfaces: Vec<f64>,
         /// Per face: the outward normal is minus the plane's.
         reversed: Vec<bool>,
@@ -322,6 +323,14 @@ pub(crate) mod ffi {
         solid_shells: Vec<u32>,
         shell_faces: Vec<u32>,
         faces_of_shells: Vec<u32>,
+        /// The NURBS curves (edge kind 5: where it starts here, the edge's start and end parameters) and surfaces
+        /// (face kind 3: where it starts) refer to, back to back: a curve as 0, dimension, degree, knot count, pole
+        /// count, rational, knots, poles (x, y, z each), weights; a surface as 1, degrees, knot counts, pole counts,
+        /// rational, knots (u, v), poles (row by row, u first), weights.
+        nurbs: Vec<f64>,
+        /// Per curve of an edge on a NURBS face: face, edge, a seam's other curve (0 / 1), where its NURBS starts,
+        /// the edge's start and end parameters on it (6 numbers).
+        pcurves: Vec<f64>,
     }
 
     /// noshape's own Boolean's result: the body, its entities' origins (kind 0 the input itself, 1 a piece
@@ -341,7 +350,18 @@ pub(crate) mod ffi {
         /// face); zeros for other edges.
         ellipse_minor: Vec<f64>,
         ellipse_faces: Vec<u32>,
+        /// Per edge, the section (`brep_occt_sections`' id) it is a piece of; u32::MAX: none.
+        edge_section: Vec<u32>,
         history: Vec<u32>,
+    }
+
+    /// OCCT's sections of two faces for noshape's own Boolean (a free-form face's): per curve its id, its
+    /// parameter range, where its NURBS and its curves on the two faces (in the order asked) start in `nurbs`
+    /// (6 numbers; NURBS as in `BrepBody::nurbs`).
+    #[derive(Default)]
+    struct BrepSections {
+        curves: Vec<f64>,
+        nurbs: Vec<f64>,
     }
 
     /// noshape's display mesher's result: per face meshed (`face_ok`) its nodes, normals and triangles (from
@@ -635,6 +655,11 @@ pub(crate) mod ffi {
         /// Cancel flag of this thread's booleans (an `AtomicBool` address, 0 = none).
         fn set_thread_cancel(flag: usize);
         fn op_unify(s: &OcShape) -> Result<OpOut>;
+        /// The flat body noshape's own Boolean would get for `s` (tests): "" or why it can't.
+        fn brep_body_of(s: &OcShape, out: &mut BrepBody) -> String;
+        /// During noshape's own Boolean: OCCT's sections of face `a_face` of argument `a_arg` and face `b_face`
+        /// of `b_arg`: "" or why it can't give them.
+        fn brep_occt_sections(a_arg: u32, a_face: u32, b_arg: u32, b_face: u32, out: &mut BrepSections) -> String;
         fn op_enclose(shapes: &OcShapeList) -> Result<OpOut>;
         fn op_transform(s: &OcShape, m: &[f64], copy: bool) -> Result<OpOut>;
         fn op_gtransform(s: &OcShape, m: &[f64]) -> Result<OpOut>;

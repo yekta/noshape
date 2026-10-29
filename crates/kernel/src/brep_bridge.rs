@@ -2,9 +2,11 @@
 //! [`ffi::BrepBody`]s (cpp/rust_boolean.cpp), calls [`brep_boolean`], and builds the result's shapes and
 //! history from the [`ffi::BrepResult`].
 
-use crate::ffi::ffi::{self as raw, BrepBody, BrepResult, OcShapeList, OpOut};
+use crate::ffi::ffi::{self as raw, BrepBody, BrepResult, BrepSections, OcShapeList, OpOut};
 use crate::{bool_corpus, BooleanOp, BooleanOptions, OpResult, Shape};
-use noshape_brep::{Body, Curve, Edge, Face, Kind, Op, Origin, Relation, Solid, Surface, Use};
+use noshape_brep::nurbs::{NurbsCurve, NurbsSurface};
+use noshape_brep::{Body, Curve, Decline, Edge, Face, Kind, Op, Origin, PCurve, Relation, SectionCurve, SectionSource, Solid, Surface, Use};
+use std::collections::HashMap;
 use std::cell::{Cell, RefCell};
 use std::sync::OnceLock;
 
@@ -55,21 +57,66 @@ fn v3(s: &[f64], i: usize) -> glam::DVec3 {
     glam::DVec3::new(s[i], s[i + 1], s[i + 2])
 }
 
+/// The NURBS curve or surface at `at` in `nurbs` (ffi::BrepBody::nurbs).
+enum Nurbs {
+    Curve(NurbsCurve),
+    Surface(NurbsSurface),
+}
+
+fn nurbs_at(nurbs: &[f64], at: usize) -> Nurbs {
+    let n = |i: usize| nurbs[at + i] as usize;
+    let pts = |from: usize, count: usize| (0..count).map(|i| v3(nurbs, from + 3 * i)).collect::<Vec<_>>();
+    if nurbs[at] == 0.0 {
+        let (degree, nk, np, rational) = (n(2), n(3), n(4), n(5) == 1);
+        let k0 = at + 6;
+        let p0 = k0 + nk;
+        let w0 = p0 + 3 * np;
+        return Nurbs::Curve(NurbsCurve { degree, knots: nurbs[k0..p0].to_vec(), poles: pts(p0, np), weights: if rational { nurbs[w0..w0 + np].to_vec() } else { Vec::new() } });
+    }
+    let (udegree, vdegree, nku, nkv, nu, nv, rational) = (n(1), n(2), n(3), n(4), n(5), n(6), n(7) == 1);
+    let ku = at + 8;
+    let kv = ku + nku;
+    let p0 = kv + nkv;
+    let w0 = p0 + 3 * nu * nv;
+    Nurbs::Surface(NurbsSurface {
+        udegree,
+        vdegree,
+        uknots: nurbs[ku..kv].to_vec(),
+        vknots: nurbs[kv..p0].to_vec(),
+        nu,
+        nv,
+        poles: pts(p0, nu * nv),
+        weights: if rational { nurbs[w0..w0 + nu * nv].to_vec() } else { Vec::new() },
+    })
+}
+
+/// The body noshape's own Boolean gets for `shape` (tests), or why there is none.
+pub fn brep_body(shape: &Shape) -> Result<Body, String> {
+    let mut b = BrepBody::default();
+    let why = raw::brep_body_of(shape.raw(), &mut b);
+    if why.is_empty() { Ok(body_of(&b)) } else { Err(why) }
+}
+
 fn body_of(b: &BrepBody) -> Body {
     let mut out = Body { vertices: (0..b.vertices.len() / 3).map(|i| v3(&b.vertices, 3 * i)).collect(), ..Default::default() };
-    out.edges = b
-        .edges
-        .chunks(2)
-        .zip(b.curves.chunks(11))
-        .map(|(e, c)| {
-            let curve = match c[0] as u8 {
-                0 => Curve::Line,
-                1 => Curve::Circle { center: v3(c, 1), normal: v3(c, 4), xdir: v3(c, 7), radius: c[10] },
-                _ => Curve::Degenerate,
-            };
-            Edge { v: [e[0], e[1]], curve }
+    // NURBS curves by where they start in `b.nurbs`.
+    let mut curves: HashMap<usize, u32> = HashMap::new();
+    let mut curve_at = |out: &mut Body, at: usize| -> u32 {
+        *curves.entry(at).or_insert_with(|| {
+            let Nurbs::Curve(c) = nurbs_at(&b.nurbs, at) else { unreachable!() };
+            out.nurbs_curves.push(c);
+            out.nurbs_curves.len() as u32 - 1
         })
-        .collect();
+    };
+    for (e, c) in b.edges.chunks(2).zip(b.curves.chunks(11)) {
+        let curve = match c[0] as u8 {
+            0 => Curve::Line,
+            1 => Curve::Circle { center: v3(c, 1), normal: v3(c, 4), xdir: v3(c, 7), radius: c[10] },
+            5 => Curve::Nurbs { index: curve_at(&mut out, c[1] as usize), t0: c[2], t1: c[3] },
+            _ => Curve::Degenerate,
+        };
+        out.edges.push(Edge { v: [e[0], e[1]], curve });
+    }
     for f in 0..b.reversed.len() {
         let loops = (b.face_loops[f]..b.face_loops[f + 1])
             .map(|l| b.uses[b.loop_uses[l as usize] as usize..b.loop_uses[l as usize + 1] as usize].iter().map(|&u| Use { edge: u / 2, reversed: u % 2 == 1 }).collect())
@@ -78,13 +125,32 @@ fn body_of(b: &BrepBody) -> Body {
         let surface = match s[0] as u8 {
             0 => Surface::Plane { origin: v3(s, 1), normal: v3(s, 4) },
             1 => Surface::Cylinder { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10] },
+            3 => {
+                let Nurbs::Surface(n) = nurbs_at(&b.nurbs, s[1] as usize) else { unreachable!() };
+                out.nurbs_surfaces.push(n);
+                Surface::Nurbs { index: out.nurbs_surfaces.len() as u32 - 1 }
+            }
             _ => Surface::Cone { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], angle: s[11] },
         };
         out.faces.push(Face { surface, reversed: b.reversed[f], loops });
     }
+    for p in b.pcurves.chunks(6) {
+        let curve = curve_at(&mut out, p[3] as usize);
+        out.pcurves.push(PCurve { face: p[0] as u32, edge: p[1] as u32, second: p[2] != 0.0, curve, t0: p[4], t1: p[5] });
+    }
     let shell = |h: usize| b.faces_of_shells[b.shell_faces[h] as usize..b.shell_faces[h + 1] as usize].to_vec();
     out.solids = (0..b.solid_shells.len().saturating_sub(1)).map(|s| Solid { shells: (b.solid_shells[s] as usize..b.solid_shells[s + 1] as usize).map(shell).collect() }).collect();
     out
+}
+
+/// `c` at the end of `nurbs` (ffi::BrepBody::nurbs); where it starts.
+fn push_curve(nurbs: &mut Vec<f64>, c: &NurbsCurve) -> f64 {
+    let at = nurbs.len() as f64;
+    nurbs.extend([0.0, 3.0, c.degree as f64, c.knots.len() as f64, c.poles.len() as f64, if c.weights.is_empty() { 0.0 } else { 1.0 }]);
+    nurbs.extend(&c.knots);
+    nurbs.extend(c.poles.iter().flat_map(|p| [p.x, p.y, p.z]));
+    nurbs.extend(&c.weights);
+    at
 }
 
 fn flat(b: &Body, out: &mut BrepBody) {
@@ -113,6 +179,11 @@ fn flat(b: &Body, out: &mut BrepBody) {
                 out.curves.extend(xyz(center).into_iter().chain(xyz(normal)).chain(xyz(xdir)));
                 out.curves.push(major);
             }
+            Curve::Nurbs { index, t0, t1 } => {
+                let at = push_curve(&mut out.nurbs, &b.nurbs_curves[index as usize]);
+                out.curves.extend([5.0, at, t0, t1]);
+                out.curves.extend([0.0; 7]);
+            }
         }
     }
     out.face_loops = vec![0];
@@ -132,6 +203,16 @@ fn flat(b: &Body, out: &mut BrepBody) {
                 out.surfaces.push(2.0);
                 out.surfaces.extend(xyz(origin).into_iter().chain(xyz(axis)).chain(xyz(xdir)));
                 out.surfaces.extend([radius, angle]);
+            }
+            Surface::Nurbs { index } => {
+                let s = &b.nurbs_surfaces[index as usize];
+                let at = out.nurbs.len() as f64;
+                out.nurbs.extend([1.0, s.udegree as f64, s.vdegree as f64, s.uknots.len() as f64, s.vknots.len() as f64, s.nu as f64, s.nv as f64, if s.weights.is_empty() { 0.0 } else { 1.0 }]);
+                out.nurbs.extend(s.uknots.iter().chain(&s.vknots));
+                out.nurbs.extend(s.poles.iter().flat_map(|&p| xyz(p)));
+                out.nurbs.extend(&s.weights);
+                out.surfaces.extend([3.0, at]);
+                out.surfaces.extend([0.0; 10]);
             }
         }
         out.reversed.push(f.reversed);
@@ -162,6 +243,29 @@ fn origins(o: &[Origin]) -> Vec<u32> {
         .collect()
 }
 
+/// Free-form faces' sections from OCCT (rust_boolean.cpp keeps its curves for building the result's edges).
+struct Occt;
+
+impl SectionSource for Occt {
+    fn sections(&self, a: (u32, u32), b: (u32, u32)) -> Result<Vec<SectionCurve>, Decline> {
+        let mut out = BrepSections::default();
+        let why = raw::brep_occt_sections(a.0, a.1, b.0, b.1, &mut out);
+        if !why.is_empty() {
+            // (Reasons are static strings on the Rust side.)
+            return Err(Decline(match why.as_str() {
+                "a section OCCT makes as a conic" => "a section OCCT makes as a conic",
+                "a section without its curves on the faces" => "a section without its curves on the faces",
+                _ => "OCCT's section failed",
+            }));
+        }
+        let curve = |at: f64| match nurbs_at(&out.nurbs, at as usize) {
+            Nurbs::Curve(c) => c,
+            Nurbs::Surface(_) => unreachable!(),
+        };
+        Ok(out.curves.chunks(6).map(|c| SectionCurve { curve: curve(c[3]), t0: c[1], t1: c[2], on: [curve(c[4]), curve(c[5])], id: c[0] as u32 }).collect())
+    }
+}
+
 pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: bool, out: &mut BrepResult) -> bool {
     let op = match op {
         0 => Op::Fuse,
@@ -170,7 +274,7 @@ pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: b
     };
     let bodies: Vec<Body> = args.iter().map(body_of).collect();
     let refs: Vec<&Body> = bodies.iter().collect();
-    let r = match noshape_brep::boolean_touching(op, &refs, tol, touching_only) {
+    let r = match noshape_brep::boolean_with(op, &refs, tol, touching_only, Some(&Occt)) {
         Ok(r) => r,
         Err(d) => {
             brep_decline(d.0);
@@ -184,6 +288,7 @@ pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: b
     out.face_origin = origins(&r.face_origin);
     out.solid_origin = origins(&r.solid_origin);
     out.face_u0 = r.face_u0;
+    out.edge_section = r.edge_section;
     for e in &r.body.edges {
         let (minor, faces) = match e.curve {
             Curve::Ellipse { minor, faces, .. } | Curve::Hyperbola { minor, faces, .. } => (minor, [faces[0].0, faces[0].1, faces[1].0, faces[1].1]),

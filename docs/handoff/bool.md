@@ -409,6 +409,30 @@ bool_corpus_replay and export:: (24) pass.
   kernel and model T1. Test: kernel T1 `brep_replay::a_notched_cylinder_fused_with_its_mirror_unifies_whole`
   (the app's notch cut, recorded: tests/data/brep/ad14557ce79005e1).
 
+## Free-form faces (10-29 14:50): the Rust Boolean takes B-spline faces, with OCCT's own sections of them
+- `Body` carries NURBS: `Surface::Nurbs { index }`, `Curve::Nurbs { index, t0, t1 }`, `Body::nurbs_surfaces /
+  nurbs_curves`, and `Body::pcurves` (an edge's curve on a NURBS face, OCCT's, in its parameters). The kernel
+  converts Geom_BSplineSurface faces, B-spline edges and their curves on such faces (rust_boolean.cpp `to_body`,
+  flat in `BrepBody::nurbs / pcurves`; brep_bridge decodes); `brep::nurbs` evaluates them (stack-only basis
+  functions; points, first and second derivatives, a point's parameters).
+- The Boolean (`boolean_with(.., src)`, boolean/free.rs): a face pair with a NURBS face gets its sections from
+  `SectionSource` (the kernel's `Occt`: rust_boolean.cpp `brep_occt_sections` runs OCCT's own IntTools_FaceFace,
+  as the pave filler asks, and keeps the curves); each is a `Path::Nurbs` clipped in both faces' parameter planes
+  (on a NURBS face OCCT's curve on it, its parameters scaled by the surface's mean speeds so 2D lengths are about
+  3D ones; on a plane, cylinder or cone `C2::Mapped`: the 3D curve through the face's own map, cut where it crosses
+  a cylinder's seam / gap), then arranged and classified as any face (rays across NURBS faces: per patch box,
+  Newton on (u, v, t)). Result edges on those sections are OCCT's curves and curves on faces (the ellipse path:
+  `EllEdge`), pieces of input B-spline edges keep their curves and their curves on faces; faces stay on their
+  input surfaces. Declined: edges lying on another argument's NURBS face (the thread fused with a rod its helical
+  edges lie on), sections OCCT makes as conics, results with free-form faces aren't kept as bodies.
+- Replays, all 0 differ: main 634 / 972 (+19), corpus2 504 (+19), corpus3 511 (+19), corpus4 547 (+19), corpus5
+  628 / 929 (+19), corpus6 585 / 828 (+19), Shell's 70. The thread ∩ cylinder (74acee2f): OCCT 1.13 s, ours 0.67
+  s (5.7 s before evaluation went allocation-free and patch boxes cached; OCCT's face/face is 0.15 s of it).
+- Tests: kernel T1 `brep_replay::brep_free_form_faces_arrive_as_occt_has_them` (the decoded degree-10 surfaces
+  against OCCT's points to 1e-12), `brep_free_form_cases_match_occt` (tests/data/brep-freeform); brep `nurbs`.
+- psui: `noshape_brep::Surface` has `Nurbs { index }`, `Curve` has `Nurbs { index, t0, t1 }`, `Body` three more
+  fields (`..Default::default()` in literals).
+
 ## Next
 Corpus6 (10-29 13:30, recorded OCCT time of what the Rust path still declines, loaded machine): curved edges
 32.8 s (73: helical B-spline sweeps against rods ~15 s in 3, fillet slabs), one slab fuse with an internal face

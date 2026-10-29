@@ -203,7 +203,7 @@ fn cylinder(cx: f64, cy: f64, r: f64, z0: f64, z1: f64) -> Body {
             loops: vec![vec![u(0, false), u(2, false), u(1, true), u(2, true)]],
         },
     ];
-    Body { vertices: vec![c0 + DVec3::X * r, c1 + DVec3::X * r], edges, faces, solids: vec![Solid { shells: vec![vec![0, 1, 2]] }] }
+    Body { vertices: vec![c0 + DVec3::X * r, c1 + DVec3::X * r], edges, faces, solids: vec![Solid { shells: vec![vec![0, 1, 2]] }], ..Default::default() }
 }
 
 /// Every edge used once each way (a seam both ways by one face).
@@ -314,7 +314,7 @@ fn drill(cx: f64, cy: f64, r: f64, z0: f64, z1: f64) -> Body {
             loops: vec![vec![u(4, false), u(3, false), u(0, true), u(3, true)]],
         },
     ];
-    Body { vertices: vec![c0 + DVec3::X * r, c1 + DVec3::X * r, apex], edges, faces, solids: vec![Solid { shells: vec![vec![0, 1, 2]] }] }
+    Body { vertices: vec![c0 + DVec3::X * r, c1 + DVec3::X * r, apex], edges, faces, solids: vec![Solid { shells: vec![vec![0, 1, 2]] }], ..Default::default() }
 }
 
 #[test]
@@ -370,7 +370,7 @@ fn an_arc_leaving_along_a_side_splits_the_face() {
 }
 
 fn segment(a: DVec3, b: DVec3) -> Body {
-    Body { vertices: vec![a, b], edges: vec![Edge { v: [0, 1], curve: Curve::Line }], faces: Vec::new(), solids: Vec::new() }
+    Body { vertices: vec![a, b], edges: vec![Edge { v: [0, 1], curve: Curve::Line }], ..Default::default() }
 }
 
 #[test]
@@ -409,7 +409,7 @@ fn faces_on_crossing_planes_have_nothing_in_common() {
         let edges = (0..4).map(|k| Edge { v: [k, (k + 1) % 4], curve: Curve::Line }).collect();
         let normal = if z { DVec3::Z } else { -DVec3::Y };
         let loops = vec![(0..4).map(|k| Use { edge: k, reversed: false }).collect()];
-        Body { vertices, edges, faces: vec![Face { surface: Surface::Plane { origin: p(0.0, 0.0), normal }, reversed: false, loops }], solids: Vec::new() }
+        Body { vertices, edges, faces: vec![Face { surface: Surface::Plane { origin: p(0.0, 0.0), normal }, reversed: false, loops }], ..Default::default() }
     };
     let r = boolean(Op::Common, &[&sq(true), &sq(false)], TOL).unwrap();
     assert!(r.body.faces.is_empty() && r.body.edges.is_empty());
@@ -436,6 +436,7 @@ fn turned_about_x(b: &Body, angle: f64) -> Body {
             Surface::Cylinder { origin, axis, xdir, .. } | Surface::Cone { origin, axis, xdir, .. } => {
                 (*origin, *axis, *xdir) = (q * *origin, q * *axis, q * *xdir)
             }
+            Surface::Nurbs { .. } => {}
         }
     }
     out
@@ -476,7 +477,7 @@ fn frustum(cx: f64, cy: f64, r0: f64, r1: f64, z0: f64, z1: f64) -> Body {
             loops: vec![vec![u(0, false), u(2, false), u(1, true), u(2, true)]],
         },
     ];
-    Body { vertices: vec![c0 + DVec3::X * r0, c1 + DVec3::X * r1], edges, faces, solids: vec![Solid { shells: vec![vec![0, 1, 2]] }] }
+    Body { vertices: vec![c0 + DVec3::X * r0, c1 + DVec3::X * r1], edges, faces, solids: vec![Solid { shells: vec![vec![0, 1, 2]] }], ..Default::default() }
 }
 
 #[test]

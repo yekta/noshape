@@ -49,11 +49,15 @@ fn span(knots: &[f64], degree: usize, n: usize, t: f64) -> usize {
     lo
 }
 
-/// The non-zero basis functions at `t` and their derivatives up to `nd` (A2.3): `ders[k][j]` is the k-th
-/// derivative of N(s - p + j).
-fn basis_derivs(knots: &[f64], s: usize, t: f64, p: usize, nd: usize) -> Vec<Vec<f64>> {
-    let mut ndu = vec![vec![0.0; p + 1]; p + 1];
-    let (mut left, mut right) = (vec![0.0; p + 1], vec![0.0; p + 1]);
+/// Degrees up to this (OCCT's limit is 25).
+pub const MAX_DEGREE: usize = 25;
+const M: usize = MAX_DEGREE + 1;
+
+/// The non-zero basis functions at `t` and their derivatives up to `nd` (≤ 2) (A2.3): `ders[k][j]` is the k-th
+/// derivative of N(s - p + j). On the stack.
+fn basis_derivs(knots: &[f64], s: usize, t: f64, p: usize, nd: usize) -> [[f64; M]; 3] {
+    let mut ndu = [[0.0; M]; M];
+    let (mut left, mut right) = ([0.0; M], [0.0; M]);
     ndu[0][0] = 1.0;
     for j in 1..=p {
         left[j] = t - knots[s + 1 - j];
@@ -67,12 +71,12 @@ fn basis_derivs(knots: &[f64], s: usize, t: f64, p: usize, nd: usize) -> Vec<Vec
         }
         ndu[j][j] = saved;
     }
-    let nd = nd.min(p);
-    let mut ders = vec![vec![0.0; p + 1]; nd + 1];
+    let nd = nd.min(p).min(2);
+    let mut ders = [[0.0; M]; 3];
     for j in 0..=p {
         ders[0][j] = ndu[j][p];
     }
-    let mut a = vec![vec![0.0; p + 1]; 2];
+    let mut a = [[0.0; M]; 2];
     for r in 0..=p {
         let (mut s1, mut s2) = (0usize, 1usize);
         a[0][0] = 1.0;
@@ -100,13 +104,32 @@ fn basis_derivs(knots: &[f64], s: usize, t: f64, p: usize, nd: usize) -> Vec<Vec
     }
     // Row k times p! / (p - k)!.
     let mut f = p as f64;
-    for (k, row) in ders.iter_mut().enumerate().skip(1) {
-        for v in row.iter_mut() {
+    for (k, row) in ders.iter_mut().enumerate().skip(1).take(nd) {
+        for v in row.iter_mut().take(p + 1) {
             *v *= f;
         }
         f *= (p - k) as f64;
     }
     ders
+}
+
+/// The non-zero basis functions at `t` alone (A2.2), on the stack.
+fn basis(knots: &[f64], s: usize, t: f64, p: usize) -> [f64; M] {
+    let mut n = [0.0; M];
+    let (mut left, mut right) = ([0.0; M], [0.0; M]);
+    n[0] = 1.0;
+    for j in 1..=p {
+        left[j] = t - knots[s + 1 - j];
+        right[j] = knots[s + j] - t;
+        let mut saved = 0.0;
+        for r in 0..j {
+            let tmp = n[r] / (right[r + 1] + left[j - r]);
+            n[r] = saved + right[r + 1] * tmp;
+            saved = left[j - r] * tmp;
+        }
+        n[j] = saved;
+    }
+    n
 }
 
 /// Binomial coefficient.
@@ -129,7 +152,7 @@ impl NurbsCurve {
         let mut aw = [DVec3::ZERO; 3];
         let mut w = [0.0; 3];
         for (k, row) in b.iter().enumerate() {
-            for (j, &nj) in row.iter().enumerate() {
+            for (j, &nj) in row.iter().enumerate().take(p + 1) {
                 let i = s - p + j;
                 let wi = if self.weights.is_empty() { 1.0 } else { self.weights[i] };
                 aw[k] += self.poles[i] * (nj * wi);
@@ -148,7 +171,17 @@ impl NurbsCurve {
     }
 
     pub fn at(&self, t: f64) -> DVec3 {
-        self.derivs(t)[0]
+        let (p, n) = (self.degree, self.poles.len());
+        let s = span(&self.knots, p, n, t);
+        let b = basis(&self.knots, s, t, p);
+        let (mut aw, mut w) = (DVec3::ZERO, 0.0);
+        for (j, &nj) in b.iter().enumerate().take(p + 1) {
+            let i = s - p + j;
+            let wi = if self.weights.is_empty() { 1.0 } else { self.weights[i] };
+            aw += self.poles[i] * (nj * wi);
+            w += nj * wi;
+        }
+        aw / w
     }
 
     /// The parameter of the point of it nearest `p` (from 16 samples a span, then Newton's method), and the
@@ -204,9 +237,9 @@ impl NurbsSurface {
                 if k + l > 2 {
                     continue;
                 }
-                for (a, &na) in ru.iter().enumerate() {
+                for (a, &na) in ru.iter().enumerate().take(p + 1) {
                     let i = su - p + a;
-                    for (b, &nb) in rv.iter().enumerate() {
+                    for (b, &nb) in rv.iter().enumerate().take(q + 1) {
                         let j = sv - q + b;
                         let idx = i * self.nv + j;
                         let wi = if self.weights.is_empty() { 1.0 } else { self.weights[idx] };
@@ -239,7 +272,20 @@ impl NurbsSurface {
     }
 
     pub fn at(&self, u: f64, v: f64) -> DVec3 {
-        self.derivs(u, v)[0]
+        let (p, q) = (self.udegree, self.vdegree);
+        let (su, sv) = (span(&self.uknots, p, self.nu, u), span(&self.vknots, q, self.nv, v));
+        let (bu, bv) = (basis(&self.uknots, su, u, p), basis(&self.vknots, sv, v, q));
+        let (mut aw, mut w) = (DVec3::ZERO, 0.0);
+        for (a, &na) in bu.iter().enumerate().take(p + 1) {
+            let i = su - p + a;
+            for (b, &nb) in bv.iter().enumerate().take(q + 1) {
+                let idx = i * self.nv + sv - q + b;
+                let wi = if self.weights.is_empty() { 1.0 } else { self.weights[idx] };
+                aw += self.poles[idx] * (na * nb * wi);
+                w += na * nb * wi;
+            }
+        }
+        aw / w
     }
 
     /// The parameters of the point of it nearest `p` (from a grid of samples, 8 a span each way, or near

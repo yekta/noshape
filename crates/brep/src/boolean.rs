@@ -16,11 +16,14 @@
 
 use crate::arrange::regions;
 use crate::curve2::{distance as distance2, inside as inside2, C2};
-use crate::{Body, Curve, Decline, Edge, Face, Kind, Origin, Output, Record, Relation, Solid, Surface, Use, GREY};
+use crate::nurbs::{NurbsCurve, NurbsSurface};
+use crate::{Body, Curve, Decline, Edge, Face, Kind, Origin, Output, Record, Relation, SectionSource, Solid, Surface, Use, GREY};
+use std::sync::Arc;
 use glam::{DVec2, DVec3};
 use crate::fxhash::{HashMap, HashSet};
 use std::f64::consts::{PI, TAU};
 
+mod free;
 mod line;
 
 /// The Boolean operation: `args[0]` is the object, the other arguments the tools.
@@ -145,6 +148,9 @@ enum Geo {
     Ell { e: Ell, t0: f64, sweep: f64, faces: [usize; 2] },
     /// No curve: an edge at a cone's apex.
     Apex,
+    /// `Ctx::ncurves[id]` from parameter `t0` to `t1` (an input's B-spline edge, or a piece of OCCT's section of
+    /// two faces, one of them free-form).
+    Nurbs { id: u32, t0: f64, t1: f64 },
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -162,6 +168,16 @@ enum Surf {
     /// and `r` a scale (a cylinder's radius, a cone's largest on the face); `full`: the face goes round (a
     /// seam at th0).
     Cyl { o: DVec3, a: DVec3, x: DVec3, y: DVec3, r: f64, r0: f64, k: f64, flip: bool, th0: f64, full: bool },
+    /// A NURBS surface (`GFace::ns`): parameters (su u, sv v), (u, v) its own (OCCT's), scaled to lengths along it;
+    /// `flip`: the outward normal is minus Su × Sv.
+    Nurbs { su: f64, sv: f64, flip: bool },
+}
+
+/// A NURBS curve the Boolean works with: an input's B-spline edge, or OCCT's section of two faces (`sec`: the
+/// faces, its curves on them in their own parameters (OCCT's), the source's id for it).
+struct NCurve {
+    c: Arc<NurbsCurve>,
+    sec: Option<([usize; 2], [Arc<NurbsCurve>; 2], u32)>,
 }
 
 struct GFace {
@@ -175,6 +191,12 @@ struct GFace {
     bound: std::cell::OnceCell<R<Vec<C2>>>,
     lo: DVec3,
     hi: DVec3,
+    /// A NURBS face's surface, its edges' curves on it (by edge, a seam's second: OCCT's, in its own parameters,
+    /// from the edge's start to its end), and samples for finding a point's parameters.
+    ns: Option<Arc<NurbsSurface>>,
+    pcurves: HashMap<(usize, bool), (Arc<NurbsCurve>, f64, f64)>,
+    grid: std::cell::OnceCell<Vec<(DVec2, DVec3)>>,
+    patches: std::cell::OnceCell<Vec<free::Patch>>,
 }
 
 impl GFace {
@@ -190,7 +212,19 @@ impl GFace {
                 let h = w.dot(a);
                 DVec2::new(r * th, if flip { -h } else { h })
             }
+            Surf::Nurbs { su, sv, .. } => {
+                let uv = self.uv_of(p);
+                DVec2::new(uv.x * su, uv.y * sv)
+            }
         }
+    }
+
+    /// A point's parameters on a NURBS face's surface (from the nearest of its samples).
+    fn uv_of(&self, p: DVec3) -> DVec2 {
+        let Some(ns) = &self.ns else { return DVec2::ZERO };
+        let grid = self.grid.get_or_init(|| free::samples(ns));
+        let seed = grid.iter().min_by(|a, b| (a.1 - p).length_squared().total_cmp(&(b.1 - p).length_squared())).map(|x| x.0);
+        ns.param_of(p, seed).0
     }
 
     fn to3(&self, q: DVec2) -> DVec3 {
@@ -201,12 +235,14 @@ impl GFace {
                 let h = if flip { -q.y } else { q.y };
                 o + a * h + (x * th.cos() + y * th.sin()) * (r0 + k * h)
             }
+            Surf::Nurbs { su, sv, .. } => self.ns.as_ref().map_or(DVec3::ZERO, |ns| ns.at(q.x / su, q.y / sv)),
         }
     }
 
     /// The curve `g` from `p0` (in 3D) in this face's parameter plane, `copy` 1 for the right side of a seam.
     fn curve2(&self, p0: DVec3, p1: DVec3, g: &Geo, copy: usize) -> R<C2> {
         match (&self.s, g) {
+            (Surf::Nurbs { .. }, _) | (_, Geo::Nurbs { .. }) => Err(Decline("a curve on a free-form face")),
             (Surf::Plane { .. }, Geo::Line) => Ok(C2::Seg { a: self.to2(p0), b: self.to2(p1) }),
             (Surf::Plane { .. }, Geo::Apex) => Err(Decline("an apex on a plane")),
             (Surf::Plane { n, .. }, Geo::Arc { k, sweep, .. }) => {
@@ -249,7 +285,7 @@ impl GFace {
                     q0.x = r * (th0 + TAU);
                 }
                 match g {
-                    Geo::Apex => unreachable!(),
+                    Geo::Apex | Geo::Nurbs { .. } => unreachable!(),
                     Geo::Line => {
                         let q1 = DVec2::new(q0.x, self.to2(p1).y);
                         Ok(C2::Seg { a: q0, b: q1 })
@@ -409,11 +445,13 @@ enum State {
 
 /// A curve on two faces' surfaces, as parameters: a line `p + t d` (`d` unit), a circle by angle, or an
 /// ellipse by its parameter.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum Path {
     Line { p: DVec3, d: DVec3 },
     Circle(Circ),
     Ellipse(Ell),
+    /// `Ctx::ncurves[id]` (`c` its curve): OCCT's section of two faces, one of them free-form.
+    Nurbs { id: u32, c: Arc<NurbsCurve> },
 }
 
 impl Path {
@@ -422,6 +460,7 @@ impl Path {
             Path::Line { p, d } => *p + *d * t,
             Path::Circle(k) => k.at(t),
             Path::Ellipse(e) => e.at(t),
+            Path::Nurbs { c, .. } => c.at(t),
         }
     }
 
@@ -431,6 +470,17 @@ impl Path {
             Path::Circle(k) => Geo::Arc { k: *k, a0: t0, sweep: t1 - t0 },
             // (Its faces set by the section.)
             Path::Ellipse(e) => Geo::Ell { e: *e, t0, sweep: t1 - t0, faces: [usize::MAX; 2] },
+            Path::Nurbs { id, .. } => Geo::Nurbs { id: *id, t0, t1 },
+        }
+    }
+
+    /// Its length from `t0` to `t1`.
+    fn length(&self, t0: f64, t1: f64) -> f64 {
+        match self {
+            Path::Line { .. } => t1 - t0,
+            Path::Circle(k) => (t1 - t0) * k.r,
+            Path::Ellipse(e) => e.length(t0, t1),
+            Path::Nurbs { c, .. } => free::length(c, t0, t1),
         }
     }
 }
@@ -460,7 +510,7 @@ type ByOwner = Vec<(Option<u32>, Vec<(f64, u32)>)>;
 /// An interval of a path inside a face: its ends (parameter, end).
 type Ival = [(f64, End); 2];
 
-struct Ctx {
+struct Ctx<'a> {
     tol: f64,
     pool: Pool,
     faces: Vec<GFace>,
@@ -473,6 +523,9 @@ struct Ctx {
     coplanar: Vec<(usize, usize)>,
     /// Where two faces cross (the curve, the faces).
     sections: Vec<(Seg, usize, usize)>,
+    /// NURBS curves (`Geo::Nurbs`), and where OCCT's sections of free-form faces come from.
+    ncurves: Vec<NCurve>,
+    src: Option<&'a dyn SectionSource>,
 }
 
 fn frame(n: DVec3) -> (DVec3, DVec3) {
@@ -491,7 +544,7 @@ fn boxes_meet(alo: DVec3, ahi: DVec3, blo: DVec3, bhi: DVec3, tol: f64) -> bool 
     alo.x <= bhi.x + tol && blo.x <= ahi.x + tol && alo.y <= bhi.y + tol && blo.y <= ahi.y + tol && alo.z <= bhi.z + tol && blo.z <= ahi.z + tol
 }
 
-impl Ctx {
+impl Ctx<'_> {
     fn p(&self, v: u32) -> DVec3 {
         self.pool.p[v as usize]
     }
@@ -525,7 +578,48 @@ impl Ctx {
                 let n = ((w - a * w.dot(a)).normalize() - a * k).normalize();
                 if flip { -n } else { n }
             }
+            Surf::Nurbs { flip, .. } => {
+                let g = &self.faces[f];
+                let uv = g.uv_of(p);
+                let d = g.ns.as_ref().map_or([DVec3::Z; 6], |ns| ns.derivs(uv.x, uv.y));
+                let n = d[1].cross(d[2]).normalize_or_zero();
+                if flip { -n } else { n }
+            }
         }
+    }
+
+    /// Segment `s` in face `f`'s parameter plane (`copy` 1: a seam's right side; `edge`: the input edge it is
+    /// (a piece of), whose curve on a free-form face is OCCT's).
+    fn c2_of(&self, f: usize, s: &Seg, copy: usize, edge: Option<usize>) -> R<C2> {
+        let g = &self.faces[f];
+        if let Surf::Nurbs { su, sv, .. } = g.s {
+            if let Geo::Nurbs { id, t0, t1 } = s.g
+                && let Some((faces, on, _)) = &self.ncurves[id as usize].sec
+            {
+                let k = if faces[0] == f { 0 } else if faces[1] == f { 1 } else { return Err(Decline("a section on a third face")) };
+                return Ok(C2::Nurbs { c: free::scaled(&on[k], su, sv), t0, t1 });
+            }
+            let e = edge.ok_or(Decline("a curve on a free-form face not its own"))?;
+            let (pc, pt0, pt1) = g.pcurves.get(&(e, copy == 1)).ok_or(Decline("an edge without its curve on a free-form face"))?;
+            let c = free::scaled(pc, su, sv);
+            let (a, b) = match s.g {
+                Geo::Nurbs { t0, t1, .. } => (t0, t1),
+                _ => {
+                    // A piece of a straight or round edge: its ends' parameters on the edge's curve on the face.
+                    let whole = C2::Nurbs { c: c.clone(), t0: *pt0, t1: *pt1 };
+                    let at = |p: DVec3| {
+                        let (t, _) = whole.param_of(g.to2(p));
+                        pt0 + (pt1 - pt0) * t
+                    };
+                    (at(self.p(s.v[0])), at(self.p(s.v[1])))
+                }
+            };
+            return Ok(C2::Nurbs { c, t0: a, t1: b });
+        }
+        if let Geo::Nurbs { id, t0, t1 } = s.g {
+            return free::mapped(g, &self.ncurves[id as usize].c, t0, t1);
+        }
+        g.curve2(self.p(s.v[0]), self.p(s.v[1]), &s.g, copy)
     }
 
     /// Face `f`'s boundary in its parameter plane.
@@ -536,7 +630,7 @@ impl Ctx {
             for &(e, _) in &self.faces[f].edges {
                 let s = self.edge_seg(e);
                 let copy = seen.entry(e).or_insert(0);
-                bound.push(self.faces[f].curve2(self.p(s.v[0]), self.p(s.v[1]), &s.g, *copy)?);
+                bound.push(self.c2_of(f, &s, *copy, Some(e))?);
                 *copy += 1;
             }
             Ok(bound)
@@ -550,6 +644,7 @@ impl Ctx {
             Geo::Arc { k, a0, sweep } => k.at(a0 + sweep * t),
             Geo::Ell { e, t0, sweep, .. } => e.at(t0 + sweep * t),
             Geo::Apex => self.p(s.v[0]),
+            Geo::Nurbs { id, t0, t1 } => self.ncurves[id as usize].c.at(t0 + (t1 - t0) * t),
         }
     }
 
@@ -575,6 +670,10 @@ impl Ctx {
                 (d / sweep, (e.at(tp) - p).length())
             }
             Geo::Apex => (0.0, (p - self.p(s.v[0])).length()),
+            Geo::Nurbs { id, t0, t1 } => {
+                let (t, d) = self.ncurves[id as usize].c.param_of(p);
+                ((t - t0) / (t1 - t0), d)
+            }
         }
     }
 
@@ -584,6 +683,7 @@ impl Ctx {
             Geo::Arc { k, sweep, .. } => k.r * sweep,
             Geo::Ell { e, t0, sweep, .. } => e.length(t0, t0 + sweep),
             Geo::Apex => 0.0,
+            Geo::Nurbs { id, t0, t1 } => free::length(&self.ncurves[id as usize].c, t0, t1),
         }
     }
 
@@ -595,11 +695,7 @@ impl Ctx {
     /// `ends`: the path's own end vertices, if it has them.
     fn intervals(&mut self, f: usize, path: &Path, t0: f64, t1: f64, ends: [End; 2], closed: bool) -> R<Vec<Ival>> {
         let tol = self.tol;
-        let len = match path {
-            Path::Line { .. } => t1 - t0,
-            Path::Circle(k) => (t1 - t0) * k.r,
-            Path::Ellipse(e) => e.length(t0, t1),
-        };
+        let len = path.length(t0, t1);
         if len <= tol {
             return Ok(Vec::new());
         }
@@ -630,7 +726,12 @@ impl Ctx {
             return Ok(out);
         }
         let geo = path.geo(t0, t1);
-        let c2 = self.faces[f].curve2(path.at(t0), path.at(t1), &geo, 0)?;
+        let c2 = if let Path::Nurbs { .. } = path {
+            // (A NURBS curve's part needs no vertices.)
+            self.c2_of(f, &Seg { v: [u32::MAX; 2], g: geo }, 0, None)?
+        } else {
+            self.faces[f].curve2(path.at(t0), path.at(t1), &geo, 0)?
+        };
         // Where it meets the face's boundary.
         let mut cuts: Vec<(f64, End)> = vec![(t0, ends[0]), (t1, ends[1])];
         let bound = self.bound(f)?.to_vec();
@@ -712,7 +813,7 @@ impl Ctx {
         let tol = self.tol;
         // A circle or ellipse in parts between the faces' seams (a vertex where it crosses one).
         let mut cuts: Vec<(f64, End)> = vec![(t0, End::Open)];
-        if let (Some(t), Path::Ellipse(e)) = (at, path) {
+        if let (Some(t), Path::Ellipse(e)) = (at, &path) {
             let t = t0 + (t - t0).rem_euclid(TAU);
             if e.length(t0, t) <= tol || e.length(t, t1) <= tol {
                 cuts[0].1 = End::Point(path.at(t));
@@ -722,7 +823,7 @@ impl Ctx {
         }
         if let Path::Circle(k) = path {
             for f in [fs, ft] {
-                let Some(p) = self.seam_at(f, path) else { continue };
+                let Some(p) = self.seam_at(f, &path) else { continue };
                 let t = t0 + (k.angle(p) - t0).rem_euclid(TAU);
                 if (t - t0) * k.r <= tol || (t1 - t) * k.r <= tol {
                     cuts[0].1 = End::Point(p);
@@ -737,7 +838,7 @@ impl Ctx {
         {
             // (Not closed: its ends are where its range ends.)
             for f in [fs, ft] {
-                let Some(p) = self.seam_at(f, path) else { continue };
+                let Some(p) = self.seam_at(f, &path) else { continue };
                 let t = e.param(p);
                 if e.length(t0, t.max(t0)) > tol && e.length(t.min(t1), t1) > tol {
                     cuts.push((t, End::Point(p)));
@@ -746,7 +847,7 @@ impl Ctx {
             cuts.sort_by(|a, b| a.0.total_cmp(&b.0));
         } else if let Path::Ellipse(e) = path {
             for f in [fs, ft] {
-                let Some(p) = self.seam_at(f, path) else { continue };
+                let Some(p) = self.seam_at(f, &path) else { continue };
                 let t = t0 + (e.param(p) - t0).rem_euclid(TAU);
                 if e.length(t0, t) <= tol || e.length(t, t1) <= tol {
                     cuts[0].1 = End::Point(p);
@@ -760,7 +861,7 @@ impl Ctx {
         for i in 0..cuts.len() {
             let (a, ea) = cuts[i];
             let (b, eb) = if i + 1 < cuts.len() { cuts[i + 1] } else { (t1, if open { End::Open } else { cuts[0].1 }) };
-            self.section_part(fs, ft, path, a, b, [ea, eb])?;
+            self.section_part(fs, ft, path.clone(), a, b, [ea, eb])?;
         }
         Ok(())
     }
@@ -773,11 +874,7 @@ impl Ctx {
         let ib = self.intervals(ft, &path, t0, t1, ends, false)?;
         let tol = self.tol;
         // The length along it between two parameters.
-        let apart = |x: f64, y: f64| match path {
-            Path::Line { .. } => y - x,
-            Path::Circle(k) => (y - x) * k.r,
-            Path::Ellipse(e) => e.length(x, y),
-        };
+        let apart = |x: f64, y: f64| path.length(x, y);
         // The end of a section: the tighter of the two faces' ends, made a vertex.
         let pick = |cx: &mut Ctx, x: (f64, End), y: (f64, End), lo: bool| -> R<Option<u32>> {
             let (later, earlier) = if x.0 > y.0 { (x, y) } else { (y, x) };
@@ -847,11 +944,12 @@ impl Ctx {
             }
             Geo::Arc { k, a0, sweep } => (Path::Circle(k), a0, a0 + sweep),
             Geo::Ell { .. } => return Err(Decline("an argument's ellipse")),
+            Geo::Nurbs { .. } => return Err(Decline("a curved edge on another argument's face")),
             Geo::Apex => return Ok(()),
         };
         // An arc across a round face's seam: in two parts, a vertex where it crosses.
         let mut parts = vec![(t0, End::Vertex(s.v[0]), t1, End::Vertex(s.v[1]))];
-        if let (Path::Circle(k), Some(seam)) = (path, self.seam_at(f, path)) {
+        if let (Path::Circle(k), Some(seam)) = (path.clone(), self.seam_at(f, &path)) {
             let ts = t0 + (k.angle(seam) - t0).rem_euclid(TAU);
             if (ts - t0) * k.r > self.tol && (t1 - ts) * k.r > self.tol {
                 parts = vec![(t0, End::Vertex(s.v[0]), ts, End::Point(seam)), (ts, End::Point(seam), t1, End::Vertex(s.v[1]))];
@@ -881,8 +979,8 @@ impl Ctx {
     }
 
     /// Where `path` (a circle about face `f`'s axis) crosses `f`'s seam, if `f` goes round.
-    fn seam_at(&self, f: usize, path: Path) -> Option<DVec3> {
-        match (path, &self.faces[f].s) {
+    fn seam_at(&self, f: usize, path: &Path) -> Option<DVec3> {
+        match (path.clone(), &self.faces[f].s) {
             (Path::Circle(k), Surf::Cyl { o, a, x, y, r0, k: slope, th0, full: true, .. }) => {
                 let h = (k.c - *o).dot(*a);
                 Some(*o + *a * h + (*x * th0.cos() + *y * th0.sin()) * (r0 + slope * h))
@@ -943,7 +1041,65 @@ impl Ctx {
             }
             (_, Geo::Apex) => Ok(false),
             (_, Geo::Ell { .. }) => Err(Decline("an argument's ellipse")),
+            (Surf::Nurbs { .. }, _) | (_, Geo::Nurbs { .. }) => {
+                // Points along it: all on the surface, it lies on it (not yet taken); within the grey band
+                // without being clearly off, ambiguous.
+                let s = self.edge_seg(e);
+                let (mut on, mut near) = (0, 0);
+                for k in 0..=6 {
+                    let d = free::surface_distance(&self.faces[f], self.seg_at(&s, k as f64 / 6.0));
+                    if d <= tol {
+                        on += 1;
+                    } else if d <= GREY * tol {
+                        near += 1;
+                    }
+                }
+                if on == 7 {
+                    return Err(Decline("an edge on another argument's free-form face"));
+                }
+                if near > 0 && on + near == 7 {
+                    return Err(Decline("an edge nearly on another argument's face"));
+                }
+                Ok(false)
+            }
         }
+    }
+
+    /// Faces `fs` and `ft` (one free-form) meet where OCCT's section says (its curves, its curves on them).
+    fn nurbs_pair(&mut self, fs: usize, ft: usize) -> R<()> {
+        let Some(src) = self.src else { return Err(Decline("a curved face")) };
+        let (a, b) = ((self.faces[fs].arg, self.faces[fs].index), (self.faces[ft].arg, self.faces[ft].index));
+        for c in src.sections(a, b)? {
+            if c.t1 <= c.t0 || c.t1.is_nan() {
+                continue;
+            }
+            let id = self.ncurves.len() as u32;
+            let cc = Arc::new(c.curve);
+            let [on0, on1] = c.on;
+            self.ncurves.push(NCurve { c: cc.clone(), sec: Some(([fs, ft], [Arc::new(on0), Arc::new(on1)], c.id)) });
+            let cuts = free::seam_cuts(self, [fs, ft], &cc, c.t0, c.t1);
+            self.section_nurbs(fs, ft, Path::Nurbs { id, c: cc }, c.t0, c.t1, &cuts)?;
+        }
+        Ok(())
+    }
+
+    /// A section along OCCT's curve from `t0` to `t1`, cut at `cuts` (seams it crosses): a closed one has a
+    /// vertex where it starts (as OCCT's), an open one ends where it does.
+    fn section_nurbs(&mut self, fs: usize, ft: usize, path: Path, t0: f64, t1: f64, cuts: &[f64]) -> R<()> {
+        let closed = (path.at(t0) - path.at(t1)).length() <= self.tol;
+        let first = if closed { End::Point(path.at(t0)) } else { End::Open };
+        let mut at: Vec<(f64, End)> = vec![(t0, first)];
+        for &t in cuts {
+            if path.length(t0, t) > self.tol && path.length(t, t1) > self.tol {
+                at.push((t, End::Point(path.at(t))));
+            }
+        }
+        for i in 0..at.len() {
+            let (a, ea) = at[i];
+            let (b, eb) = if i + 1 < at.len() { at[i + 1] } else { (t1, if closed { first } else { End::Open }) };
+            self.section_part(fs, ft, path.clone(), a, b, [ea, eb])?;
+        }
+        Ok(())
     }
 
     fn face_pair(&mut self, fs: usize, ft: usize) -> R<()> {
@@ -964,6 +1120,7 @@ impl Ctx {
             }
         }
         match (&self.faces[fs].s, &self.faces[ft].s) {
+            (Surf::Nurbs { .. }, _) | (_, Surf::Nurbs { .. }) => self.nurbs_pair(fs, ft),
             (Surf::Plane { .. }, Surf::Plane { .. }) => self.plane_plane(fs, ft),
             (Surf::Plane { .. }, Surf::Cyl { .. }) => self.plane_cyl(fs, ft),
             (Surf::Cyl { .. }, Surf::Plane { .. }) => self.plane_cyl(ft, fs),
@@ -1282,6 +1439,7 @@ impl Ctx {
             }
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
             Geo::Ell { e, t0, sweep, .. } => e.piece_box(t0, sweep),
+            Geo::Nurbs { id, t0, t1 } => free::piece_box(&self.ncurves[id as usize].c, t0, t1),
             Geo::Apex => return Ok(vec![s.v[0], s.v[1]]),
         };
         let (lo, hi) = (lo - DVec3::splat(tol), hi + DVec3::splat(tol));
@@ -1324,6 +1482,19 @@ impl Ctx {
                 let g = match s.g {
                     Geo::Line => Geo::Line,
                     Geo::Apex => Geo::Apex,
+                    Geo::Nurbs { id, t0, t1 } => {
+                        let t = |v: u32, end: bool| {
+                            if v == s.v[0] && !end {
+                                0.0
+                            } else if v == s.v[1] && end {
+                                1.0
+                            } else {
+                                self.seg_param(s, self.p(v)).0
+                            }
+                        };
+                        let (ta, tb) = (t(w[0], false), t(w[1], true));
+                        Geo::Nurbs { id, t0: t0 + (t1 - t0) * ta, t1: t0 + (t1 - t0) * tb }
+                    }
                     Geo::Arc { k, a0, sweep } => {
                         let t = |v: u32, end: bool| {
                             if v == s.v[0] && !end {
@@ -1410,6 +1581,20 @@ impl Ctx {
                             roots.push((-qb + disc.sqrt()) / qa);
                         }
                         hits.extend(roots.into_iter().filter(|t| r0 + k * (h + t * dz) > -tol));
+                    }
+                    Surf::Nurbs { .. } => {
+                        let Some(ns) = &g.ns else { continue };
+                        if !free::ray_meets(p, r, g.lo, g.hi) {
+                            continue;
+                        }
+                        for (uv, t) in free::ray_hits(ns, g.patches.get_or_init(|| free::patches(ns)), p, r) {
+                            // Grazing it: another ray.
+                            let d = ns.derivs(uv.x, uv.y);
+                            if d[1].cross(d[2]).normalize_or_zero().dot(r).abs() < 1e-3 {
+                                continue 'dirs;
+                            }
+                            hits.push(t);
+                        }
                     }
                 }
                 let gb = if hits.is_empty() { &[][..] } else { self.bound(f)? };
@@ -1502,6 +1687,11 @@ pub fn boolean(op: Op, args: &[&Body], tol: f64) -> R<Output> {
 /// The same; with `touching_only`, declines unless the arguments only touch (no piece of one inside another:
 /// a pattern's fuse, which OCCT glues only then).
 pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -> R<Output> {
+    boolean_with(op, args, tol, touching_only, None)
+}
+
+/// The same; free-form (NURBS) faces taken where `src` gives their sections (else declined).
+pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option<&dyn SectionSource>) -> R<Output> {
     if args.len() < 2 {
         return Err(Decline("a Boolean needs an object and a tool"));
     }
@@ -1519,6 +1709,8 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         face_segs: Vec::new(),
         coplanar: Vec::new(),
         sections: Vec::new(),
+        ncurves: Vec::new(),
+        src,
     };
     // Vertices, edges, faces and solids of every argument (a vertex outside every other argument's box can't
     // be one of theirs).
@@ -1588,6 +1780,11 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             let v = [vmap[e.v[0] as usize], vmap[e.v[1] as usize]];
             let g = match e.curve {
                 Curve::Ellipse { .. } | Curve::Hyperbola { .. } => return Err(Decline("an argument's ellipse")),
+                Curve::Nurbs { .. } if cx.src.is_none() => return Err(Decline("a curved edge")),
+                Curve::Nurbs { index, t0, t1 } => {
+                    cx.ncurves.push(NCurve { c: Arc::new(body.nurbs_curves[index as usize].clone()), sec: None });
+                    Geo::Nurbs { id: cx.ncurves.len() as u32 - 1, t0, t1 }
+                }
                 Curve::Degenerate => {
                     if v[0] != v[1] {
                         return Err(Decline("a degenerate edge between two vertices"));
@@ -1616,6 +1813,8 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         for (i, f) in body.faces.iter().enumerate() {
             let edges: Vec<(usize, bool)> = f.loops.iter().flatten().map(|u| (first_edge[ai] + u.edge as usize, u.reversed)).collect();
             let s = match f.surface {
+                Surface::Nurbs { .. } if cx.src.is_none() => return Err(Decline("a curved face")),
+                Surface::Nurbs { index } => free::nurbs_surf(&body.nurbs_surfaces[index as usize], f.reversed),
                 Surface::Plane { origin, normal } => {
                     let n = if f.reversed { -normal } else { normal };
                     let (u, v) = frame(n);
@@ -1624,7 +1823,19 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
                 Surface::Cylinder { origin, axis, xdir, radius } => round(&cx, &edges, [origin, axis, xdir], radius, 0.0, f.reversed),
                 Surface::Cone { origin, axis, xdir, radius, angle } => round(&cx, &edges, [origin, axis, xdir], radius, angle.tan(), f.reversed),
             };
-            cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY });
+            let (ns, pcurves) = match f.surface {
+                Surface::Nurbs { index } => {
+                    let pcurves = body
+                        .pcurves
+                        .iter()
+                        .filter(|p| p.face == i as u32)
+                        .map(|p| ((first_edge[ai] + p.edge as usize, p.second), (Arc::new(body.nurbs_curves[p.curve as usize].clone()), p.t0, p.t1)))
+                        .collect();
+                    (Some(Arc::new(body.nurbs_surfaces[index as usize].clone())), pcurves)
+                }
+                _ => (None, HashMap::default()),
+            };
+            cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, pcurves, grid: Default::default(), patches: Default::default() });
         }
         for (i, s) in body.solids.iter().enumerate() {
             let si = cx.solids.len();
@@ -1654,6 +1865,12 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             let n = match s.g {
                 Geo::Line | Geo::Apex => 1,
                 Geo::Arc { sweep, .. } | Geo::Ell { sweep, .. } => (sweep / (PI / 8.0)).ceil() as usize + 1,
+                Geo::Nurbs { id, t0, t1 } => {
+                    let (blo, bhi) = free::piece_box(&cx.ncurves[id as usize].c, t0, t1);
+                    lo = lo.min(blo);
+                    hi = hi.max(bhi);
+                    1
+                }
             };
             for k in 0..=n {
                 let p = cx.seg_at(&s, k as f64 / n as f64);
@@ -1673,6 +1890,10 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
                 lo = lo.min(elo) - bulge;
                 hi = hi.max(ehi) + bulge;
             }
+        }
+        if let Some((blo, bhi)) = free::face_box(&cx.faces[f]) {
+            lo = lo.min(blo);
+            hi = hi.max(bhi);
         }
         cx.faces[f].lo = lo;
         cx.faces[f].hi = hi;
@@ -1741,7 +1962,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         if segs.len() < 2 {
             continue;
         }
-        let c2: Vec<C2> = segs.iter().map(|s| cx.faces[f].curve2(cx.p(s.v[0]), cx.p(s.v[1]), &s.g, 0)).collect::<R<_>>()?;
+        let c2: Vec<C2> = segs.iter().map(|s| cx.c2_of(f, s, 0, None)).collect::<R<_>>()?;
         for i in 0..segs.len() {
             for j in i + 1..segs.len() {
                 for (t, u) in c2[i].intersections(&c2[j], tol) {
@@ -1828,6 +2049,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             Geo::Line | Geo::Apex => (cx.p(s.v[0]).min(cx.p(s.v[1])), cx.p(s.v[0]).max(cx.p(s.v[1]))),
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
             Geo::Ell { e, t0, sweep, .. } => e.piece_box(t0, sweep),
+            Geo::Nurbs { id, t0, t1 } => free::piece_box(&cx.ncurves[id as usize].c, t0, t1),
         };
         let near = es != usize::MAX && (0..ns).any(|t| meets[es * ns + t] && boxes_meet(lo, hi, cx.solids[t].lo, cx.solids[t].hi, GREY * tol));
         let chain = if near { cx.split_among(&s, &lists, Some(cx.edges[e].arg))? } else { vec![s.v[0], s.v[1]] };
@@ -1942,13 +2164,13 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         for &si in &segs {
             let s = sedges[si].seg;
             for copy in 0..if seams.contains(&si) { 2 } else { 1 } {
-                let c = cx.faces[f].curve2(cx.p(s.v[0]), cx.p(s.v[1]), &s.g, copy)?;
+                let c = cx.c2_of(f, &s, copy, sedges[si].origins.first().copied())?;
                 let mut ends = [0u32; 2];
                 for (k, (w, q)) in [(s.v[0], c.start()), (s.v[1], c.end())].into_iter().enumerate() {
                     // A vertex on a seam (or a cone's apex) is at two places in the parameter plane.
                     let right = match cx.faces[f].s {
                         Surf::Cyl { r, th0, .. } => q.x > r * (th0 + PI),
-                        Surf::Plane { .. } => false,
+                        Surf::Plane { .. } | Surf::Nurbs { .. } => false,
                     };
                     ends[k] = *local.entry((w, right)).or_insert_with(|| {
                         pts.push(q);
@@ -2210,7 +2432,16 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
                 let of = |f: usize| (cx.faces[f].arg, cx.faces[f].index);
                 (seg.v, Curve::Ellipse { center: e.c, normal: e.n, xdir: e.x, major: e.a, minor: e.b, faces: [of(faces[0]), of(faces[1])] })
             }
+            Geo::Nurbs { id, t0, t1 } => {
+                out.body.nurbs_curves.push((*cx.ncurves[id as usize].c).clone());
+                let index = out.body.nurbs_curves.len() as u32 - 1;
+                if flip { ([seg.v[1], seg.v[0]], Curve::Nurbs { index, t0: t1, t1: t0 }) } else { (seg.v, Curve::Nurbs { index, t0, t1 }) }
+            }
         };
+        out.edge_section.push(match seg.g {
+            Geo::Nurbs { id, .. } => cx.ncurves[id as usize].sec.as_ref().map_or(u32::MAX, |s| s.2),
+            _ => u32::MAX,
+        });
         emap.insert(s, out.body.edges.len() as u32);
         out.body.edges.push(Edge { v: [vmap[v[0] as usize], vmap[v[1] as usize]], curve });
         out.edge_origin.push(match x.origins.first() {
@@ -2261,7 +2492,15 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             .collect();
         piece_out.insert(p, out.body.faces.len() as u32);
         out.face_u0.push(if let Surf::Cyl { th0, .. } = g.s { th0 } else { 0.0 });
-        out.body.faces.push(Face { surface: src.surface, reversed: src.reversed ^ flip, loops });
+        // (A NURBS surface into the result's own table.)
+        let surface = match (src.surface, &g.ns) {
+            (Surface::Nurbs { .. }, Some(ns)) => {
+                out.body.nurbs_surfaces.push((**ns).clone());
+                Surface::Nurbs { index: out.body.nurbs_surfaces.len() as u32 - 1 }
+            }
+            (s, _) => s,
+        };
+        out.body.faces.push(Face { surface, reversed: src.reversed ^ flip, loops });
         out.face_origin.push(if same { Origin::Same { arg: g.arg, index: g.index } } else { Origin::Piece { arg: g.arg, index: g.index } });
     }
     // Solids, one per shell, outward.
@@ -2523,6 +2762,7 @@ fn shell_volume(b: &Body, faces: &[u32]) -> f64 {
                 let mut poly = match e.curve {
                     Curve::Degenerate => continue,
                     Curve::Line => vec![p, q],
+                    Curve::Nurbs { index, t0, t1 } => (0..=32).map(|k| b.nurbs_curves[index as usize].at(t0 + (t1 - t0) * k as f64 / 32.0)).collect(),
                     Curve::Circle { center, normal, xdir, radius } => {
                         let y = normal.cross(xdir);
                         let ang = |x: DVec3| (x - center).dot(y).atan2((x - center).dot(xdir));

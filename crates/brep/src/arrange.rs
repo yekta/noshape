@@ -21,7 +21,7 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
     let n_h = segs.len() * 2;
     let from = |h: usize| segs[h / 2].0[h % 2] as usize;
     let to = |h: usize| segs[h / 2].0[1 - h % 2] as usize;
-    let curve = |h: usize| if h.is_multiple_of(2) { segs[h / 2].1 } else { segs[h / 2].1.reversed() };
+    let curve = |h: usize| if h.is_multiple_of(2) { segs[h / 2].1.clone() } else { segs[h / 2].1.reversed() };
     // Half-edges leaving each point, counter-clockwise by direction, then by how much they turn left.
     let mut out: Vec<Vec<(f64, f64, usize)>> = vec![Vec::new(); pts.len()];
     for h in 0..n_h {

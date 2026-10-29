@@ -732,6 +732,9 @@ OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts
 // Cancel flag of this thread's booleans (address of a Rust AtomicBool, 0 = none).
 void set_thread_cancel(size_t flag);
 OpOut op_unify(const OcShape& s);
+rust::String brep_body_of(const OcShape& s, BrepBody& out);
+struct BrepSections;
+rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, BrepSections& out);
 OpOut op_enclose(const OcShapeList& shapes);
 OpOut op_transform(const OcShape& s, rust::Slice<const double> m, bool copy);
 OpOut op_gtransform(const OcShape& s, rust::Slice<const double> m);
