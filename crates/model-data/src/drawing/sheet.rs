@@ -1773,14 +1773,15 @@ impl SheetGeometry {
                         super::ChamferContent::CLength if is45 => format!("C{}", len(dist)),
                         super::ChamferContent::CLength => format!("{} X {deg}", len(dist)),
                     };
+                    // Live (drawing/255z; qa DWG-CHAMFER-NOTE-LANDING): no
+                    // underline: the leader ends in a short horizontal landing
+                    // at the text's mid-height, the text beside it.
                     let e = a.position;
-                    let left = e[0] < m[0];
-                    let wtxt = self.dim_label_width(&t, dh);
-                    let sh = [e[0] + if left { -wtxt - 2.0 } else { wtxt + 2.0 }, e[1]];
-                    self.lines.push(Polyline2 { points: vec![m, e, sh], style: LineStyle::Thin, closed: false, pick });
-                    let d = [m[0] - e[0], m[1] - e[1]];
-                    self.arrow(m, d, 3.0);
-                    self.dim_label([e[0] + if left { -1.0 } else { 1.0 }, e[1] + 0.8], 0.0, if left { 1.0 } else { 0.0 }, false, &t, dh, pick);
+                    let side = if e[0] < m[0] { -1.0 } else { 1.0 };
+                    let k = [e[0] - side * self.style.dim_arrow.max(2.0), e[1]];
+                    self.lines.push(Polyline2 { points: vec![m, k, e], style: LineStyle::Thin, closed: false, pick });
+                    self.arrow(m, [m[0] - k[0], m[1] - k[1]], 3.0);
+                    self.dim_label([e[0] + side, e[1]], 0.0, if side < 0.0 { 1.0 } else { 0.0 }, true, &t, dh, pick);
                 }
                 AnnotationKind::ArcLengthDimension { view, center, radius, a: pa, b: pb, mid, offset } => {
                     let c = env.to_sheet(*view, *center);

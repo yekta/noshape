@@ -3435,3 +3435,20 @@ fn a_surface_finish_on_an_edge_turns_and_flips() {
     let (pos2, _, _) = text_of(&drawing);
     assert!((pos[0] - p[0]) * (pos2[0] - p[0]) < 0.0, "Flip: the other side of the edge ({pos:?} / {pos2:?} about {p:?})");
 }
+
+/// A chamfer note (live drawing/255z, qa DWG-CHAMFER-NOTE-LANDING): no
+/// underline; the leader ends in a landing shorter than the text, at its
+/// mid-height, the text beside it.
+#[test]
+fn chamfer_note_has_a_short_landing_and_no_underline() {
+    let drawing = Drawing::default();
+    let k = AnnotationKind::ChamferDimension { view: ViewId(1), a: [0.0, 0.0], b: [0.002, 0.002], c: [0.0, 0.0], d: [0.01, 0.0] };
+    let s = Sheet { annotations: vec![Annotation { id: 1, kind: k, position: [60.0, 60.0], ..Default::default() }], ..Default::default() };
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    g.add_annotations(&s, &sheet::PlainEnv { drawing: &drawing, scale: 1000.0 });
+    let t = g.texts.iter().find(|t| t.text.contains(" X 45.0°")).unwrap().clone();
+    let w = font::text_width(&t.text, t.height);
+    // Horizontal pieces of the leader: only the landing, shorter than the text.
+    let horiz: Vec<f64> = g.lines.iter().flat_map(|l| l.points.windows(2).filter(|p| (p[0][1] - p[1][1]).abs() < 1e-9).map(|p| (p[1][0] - p[0][0]).abs()).collect::<Vec<_>>()).collect();
+    assert!(!horiz.is_empty() && horiz.iter().all(|h| *h < w * 0.6), "landing {horiz:?} vs text {w}");
+}
