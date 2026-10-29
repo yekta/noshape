@@ -1579,8 +1579,11 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         let in_obj = states.iter().any(|x| x.1 == State::In && cx.solids[x.0].arg == 0);
         let in_tool = states.iter().any(|x| x.1 == State::In && cx.solids[x.0].arg != 0);
         let on = ons.first().copied();
-        if let Some((t, _)) = on {
-            if op != Op::Fuse && arg != 0 && cx.solids[t].arg != 0 {
+        // Two tools' pieces coinciding (a cut), facing each other: inside the tools.
+        let tools_on = op == Op::Cut && arg != 0 && on.is_some_and(|(t, _)| cx.solids[t].arg != 0);
+        if let Some((t, st)) = on {
+            // (Facing one way OCCT may build the object's solid anew: its history says it's deleted.)
+            if op != Op::Fuse && arg != 0 && cx.solids[t].arg != 0 && (op == Op::Common || st == State::OnSame) {
                 return Err(Decline("tools coincide"));
             }
             on_pairs.push((pi, t));
@@ -1595,6 +1598,8 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
                         Some((_, State::OnOpposite)) => (!in_tool).then_some(false),
                         _ => None,
                     }
+                } else if tools_on {
+                    None
                 } else {
                     (on.is_none() && in_obj && !in_tool).then_some(true)
                 }

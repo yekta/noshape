@@ -50,7 +50,7 @@ bool decline(const char* why)
 }
 
 // Inputs with a larger tolerance are tolerant shapes: OCCT's.
-constexpr double kMaxTol = 1e-5;
+constexpr double kMaxTol = 1e-3;
 
 occ::handle<Geom_Curve> basis_of(const occ::handle<Geom_Curve>& c)
 {

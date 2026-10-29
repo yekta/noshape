@@ -220,6 +220,18 @@ fn check_used_both_ways(b: &Body) {
 }
 
 #[test]
+fn a_slot_cut_by_two_boxes_side_by_side() {
+    // The tools' faces where they meet face each other inside the tools: in neither's piece of the result.
+    let plate = cuboid((0.0, 0.0, 0.0), (4.0, 4.0, 1.0));
+    let (a, b) = (cuboid((1.0, -1.0, 0.5), (2.0, 5.0, 2.0)), cuboid((2.0, -1.0, 0.5), (3.0, 5.0, 2.0)));
+    let cut = boolean(Op::Cut, &[&plate, &a, &b], TOL).unwrap();
+    check_closed(&cut.body);
+    // Bottom, four sides, the top either side of the slot, its walls and its floor (a piece of each tool's).
+    assert_eq!(cut.body.faces.len(), 11);
+    assert!((volume(&cut.body) - (16.0 - 4.0)).abs() < 1e-12);
+}
+
+#[test]
 fn a_hole_through_a_plate_and_a_blind_one() {
     let plate = cuboid((0.0, 0.0, 0.0), (4.0, 4.0, 1.0));
     let tool = cylinder(2.0, 2.0, 0.5, -1.0, 2.0);
