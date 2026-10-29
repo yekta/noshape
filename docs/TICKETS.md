@@ -503,7 +503,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 20:30 (main CLI 12:08): live's other loft (behaviours pvz-shapes "Loft": 20×20 square (110..130, −10..10) to a circle r8 at
   (120, 0, 25)) gives 7409.693222 / 6 faces, live 7409.706328752699 (−0.013 mm³, −1.8e-6): same direction as ADV2.
   qa 2026-10-28 05:06, green b504234e: still open. GUI Mass properties 5927.755 mm³ (doc qa-scratch/adv2.noshape); v0.4.11 CLI 5927.754578.
-  qa 2026-10-29 09:20: unchanged on the published v0.4.14 CLI (bin/adv2loft.py): 5927.754578 mm³, 6 faces (live 5927.728022).
+  qa 2026-10-29 09:16: unchanged on the published v0.4.14 CLI (bin/adv2loft.py): 5927.754578 mm³, 6 faces (live 5927.728022).
 - [ ] P2 HOLE-MISS-MSG a Hole whose points are on the part's Top-plane face but drilled away from the part (sketch on
   Top at z 0 under a 40×30×20 block, default direction): ours "No target parts selected for hole."; live "None of the holes
   intersected a part." with Merge scope flagged (behaviours L56/L57 and "H1 flipped"); live keeps "No target parts…" for
