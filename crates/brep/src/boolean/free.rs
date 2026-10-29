@@ -29,7 +29,8 @@ pub(super) fn uv_box(ns: Option<&FreeSurface>, pcurves: &PCurves) -> [f64; 4] {
 }
 
 /// A free-form face's `Surf`: its parameters scaled by the surface's mean speeds along u and v over its box (so
-/// lengths in its parameter plane are about lengths on it, as the tolerances want).
+/// lengths in its parameter plane are about lengths on it, as the tolerances want), v the other way on a reversed
+/// face.
 pub(super) fn nurbs_surf(ns: &FreeSurface, uv: [f64; 4], reversed: bool) -> Surf {
     let (mut su, mut sv) = (0.0, 0.0);
     for i in 0..=4 {
@@ -39,7 +40,8 @@ pub(super) fn nurbs_surf(ns: &FreeSurface, uv: [f64; 4], reversed: bool) -> Surf
             sv += d[2].length();
         }
     }
-    Surf::Nurbs { su: (su / 25.0).max(1e-12), sv: (sv / 25.0).max(1e-12), flip: reversed }
+    let sv = (sv / 25.0).max(1e-12);
+    Surf::Nurbs { su: (su / 25.0).max(1e-12), sv: if reversed { -sv } else { sv }, flip: reversed }
 }
 
 /// The values splitting `lo..hi` into pieces: the surface's own breaks there, each gap in `n` parts.

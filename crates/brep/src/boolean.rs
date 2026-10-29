@@ -170,7 +170,8 @@ enum Surf {
     /// seam at th0).
     Cyl { o: DVec3, a: DVec3, x: DVec3, y: DVec3, r: f64, r0: f64, k: f64, flip: bool, th0: f64, full: bool },
     /// A NURBS surface (`GFace::ns`): parameters (su u, sv v), (u, v) its own (OCCT's), scaled to lengths along it;
-    /// `flip`: the outward normal is minus Su × Sv.
+    /// `flip`: the outward normal is minus Su × Sv, and sv is negative (its plane mirrored, as a reversed cylinder's
+    /// heights are, so a piece's loops run counter-clockwise seen from outside).
     Nurbs { su: f64, sv: f64, flip: bool },
 }
 

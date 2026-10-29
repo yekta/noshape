@@ -544,7 +544,11 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - Replays, all 0 differ, one more each: main 660, corpus2 509, corpus3 514, corpus4 553, corpus5 647, corpus6 600
   (the thread fuse), Shell's 70, direct 52. The thread fuse: ours 2.3 s against OCCT's 3.1 s wall (replay, loaded
   machine); thread ∩ cylinder (74acee2f) 0.54 s against 0.99 s; extruded-fillet cuts 21 ms against 45 ms.
-- The other thread fuse (45b63a7e) declines "a non-manifold result": next.
+- The other thread fuse (45b63a7e) declined "a non-manifold result": its faces are reversed, and a reversed
+  free-form face's parameter plane wasn't mirrored (planes' and cylinders' are), so its pieces' loops ran the wrong
+  way round. Now its v scale is negative. Taken, as OCCT: 2.1 s against OCCT's 3.8 s. Replays, all 0 differ, ~15
+  more each (reversed free-form faces declined before, mostly "a non-manifold result"): main 675, corpus2 524,
+  corpus3 529, corpus4 569, corpus5 661, corpus6 615, Shell's 70, direct 52.
 
 ## Next
 Corpus6 (10-29 13:30, recorded OCCT time of what the Rust path still declines, loaded machine): curved edges
