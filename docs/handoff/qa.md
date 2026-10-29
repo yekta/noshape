@@ -9,6 +9,10 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **17:22 update (green 1888c5a1 = + core 8311f20f Shell / Draft on their own copy, dx ac9caf31):** Draft / Shell / mirror documents unchanged
+  in the app; verified DWG-NOTE-DIAG-FRACTION. core's re-run request for GUARD-SEGV-MALLOC-DEADLOCK running: seeds 189 ×2, 151, 152, 174
+  with NOSHAPE_GUARD_TRACE=1 on core's CLI 2ac952ce + 8311f20f (qa-scratch/rel/k/core/2acfix; summary cli/fixrun.summary, traces
+  cli/guardtrace-fix*.log).
 - **17:00 update (greens 1652461f → bc1ce2e2):** verified PREFS-SELECT-LIST-DETACH; live 1598 → P3 DWG-LINE-COPY. AGENT-ELLIPSE-DIM-VALUE
   (dx 1652461f, agent API) waits for a CLI of main. CLI fuzz 331–339 on main's Rust clean (two 128–130 s suppress regens on a big body).
 - **16:29 update (green 6d8d9fb8):** verified DWG-CHAMFER-ANGLE-PRECISION, DWG-CELL-MERGE-GREY, DRAWING-SCALE-LIST-NARROW.
