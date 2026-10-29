@@ -393,10 +393,15 @@ fn dimension_box_escape_as_live(cx: &mut TestAppContext) {
     let cid = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().find(|c| c.value().is_some()).unwrap().id);
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_dim_edit(cid, w, cx))).unwrap();
     draw(cx, window);
-    keys(cx, window, &["9"]);
+    let box_text = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).dim_input.as_ref().map(|d| d.1.read(cx).value().to_string()));
+    let before = box_text(cx);
+    keys(cx, window, &["7"]);
+    assert_eq!(box_text(cx).as_deref(), Some("7"), "typing replaces the value");
     keys(cx, window, &["escape"]);
-    let text = cx.update(|cx| view.read(cx).dim_input.as_ref().map(|d| d.1.read(cx).value().to_string()));
-    assert!(text.as_deref().is_some_and(|t| !t.starts_with('9')), "the first Esc reverts and keeps the box: {text:?}");
+    // (The measured text depends on the viewport's scale, so compare with it
+    // rather than with the typed key.)
+    let text = box_text(cx);
+    assert!(text.is_some() && text == before, "the first Esc reverts and keeps the box: {text:?} vs {before:?}");
     keys(cx, window, &["escape"]);
     assert!(cx.update(|cx| view.read(cx).dim_input.is_none()), "the second Esc closes it");
     assert!(near(&dimensions(cx, &view), &measured), "{:?}", dimensions(cx, &view));

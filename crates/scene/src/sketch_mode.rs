@@ -940,6 +940,8 @@ pub fn tolerance_allowed(k: &ConstraintKind) -> bool {
 /// [`SketchEditor::apply_dimension`]'s error for a value the sketch can't
 /// be solved with (Onshape's warning toast text).
 pub const SKETCH_NOT_SOLVED: &str = "Sketch could not be solved.";
+/// Live's warning when the picked items can't be dimensioned.
+pub const DIMENSION_FAILED: &str = "A dimension cannot be created between these items.";
 
 /// What Enter does in sketch mode ([`SketchEditor::enter_target`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -4136,12 +4138,14 @@ impl SketchEditor {
         let ids: Vec<EntityId> = self.picks.iter().map(|x| x.0).collect();
         self.picks_placed = std::mem::take(&mut self.picks);
         let picks = std::mem::take(&mut self.picks_placed);
+        // Live (behaviours "qa (2026-10-28) sketch.md 7.22", SKETCH-DIM-CURVE-PAIR):
+        // the yellow warning bubble; the picks clear, the tool stays on.
         let Some(kind) = smart_dimension(&data.sketch, &ids, p).map(|k| circle_mode(&data.sketch, k, &picks, self.world_per_px)) else {
-            self.message = Some("A dimension cannot be created between these items.".into());
+            self.toast = Some(DIMENSION_FAILED.into());
             return EditOutcome::redraw();
         };
         let Some(cid) = add_dimension(data, kind, Some(p), None) else {
-            self.message = Some("Could not create the dimension.".into());
+            self.toast = Some(DIMENSION_FAILED.into());
             return EditOutcome::redraw();
         };
         // Live ("qa4 round 5 s5 driven dims" (1)): a dimension that would

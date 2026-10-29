@@ -108,7 +108,16 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
 (standard content) → mates/assembly workflow gaps (all ✅, UNCONFIRMED all answered 10-27) → standard content.
-1. Open tickets (10-28 18:30): SKETCH-RECT-DIM-GLYPHS (a) vertical edge glyph side, (b) corner Coincident glyphs,
+1. 10-29 night: landed ASM-PATTERN-SUBASSEMBLY a277db14 (dependent patterns move with their seeds, live's confirm modal
+   only when there are dependents), SKETCH-F-FIT b7e933c3 (per live request 1583: F in a sketch = F outside, whole canvas,
+   no dialog inset; my sketch-only fit and insets were wrong and are gone), ASM-INTERFERENCE-NONE 24aaab66,
+   ASM-OVERDEFINED-TEXT 8ed2eeb4, ASM-TRIAD-VALUE-STAYS 9d70ff72, ASM-SELECT-OTHER 681183a9, SKETCH-VDIM-SIDE-ARROWS
+   (+ RECT-DIM-GLYPHS (a)), SKETCH-DIM-CURVE-PAIR's warning bubble. SKETCH-MODEL-EDGE-SELECT residual answered (display
+   latency: :103 frames cost 0.6–1.1 s GPU under load). Gaps found: an expanded subassembly row lists its instances flat
+   (live: its pattern rows with the copies under their caret, and its own Mate features folder; behaviours request 1582);
+   after Move to new subassembly live's Undo is disabled. :103 note: this session xdotool digits didn't reach the app
+   (letters did); windowfocus --sync before keys helps with letters.
+   Older: open tickets (10-28 18:30): SKETCH-RECT-DIM-GLYPHS (a) vertical edge glyph side, (b) corner Coincident glyphs,
    (c) the top-edge glyphs on the height dimension's arrow: see its note (needs our rectangle's edges to run as live's,
    or a direction rule, and per-corner coincident glyphs for shared points). Fixed 10-28 afternoon: MATE-LIMITS-OPPOSITE-
    SIGN c725f68f, ASM-K-IMPLICIT-MCS 81519593, ASM-XT-ROUNDTRIP-NAMES b09814de, ASM-MC-LIST-ORDER 97c7aae3, dimension
