@@ -10,6 +10,13 @@ recommend the next release from it.** Details under "Daily release smoke" › v0
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **08:06 update:** tag v0.4.14 (6b2e0b13) pushed 08:00, Release run 40839037570 building (bdb6 waiter; smoke when it
+  publishes: `bin/relsmoke_cli.sh 0.4.14`, `bin/mirset.sh <release cli>`, GUI rows). **P0 GUARD-SEGV-MALLOC-DEADLOCK** now
+  has four sightings on CLI seed 189: core CLI frozen in malloc after a guarded SIGSEGV; v0.4.13 release CLI frozen on a
+  pthread mutex it owns itself (step 89, an extrude); two core-CLI re-runs with GPFs on freed refcounts (OCCT shape map
+  teardown → death; `Arc<Body>` drop → recovered). Cores in cli/ (3 GB each; delete when core has them). Verified on 4c06:
+  ASM-TRIAD-MENU (list), DWG-ROTATE-VIEW-DIMS-ZERO, DWG-NOTE-LEADER-ARROW, SKETCH-DIM-CURVE-PAIR (+ P3 …-PREVIEW); live 1590
+  → P3 DWG-GROUP-ANNOTATION-RULE. Sketch value-box digits still don't arrive from xdotool (KP_ / keydown alike).
 - **07:45 update (green 4c06fe81 = + core 63393512 Shell regions with holes, psui 2af6a63e mesher, dx 8eabd3f5 / 92c85bbf):**
   **release/v0.4.14 (6b2e0b13) CI artifact checked**: halfmir2 A/B/C, rust-mirror-min, mirhole, halfmir and cli-fillet-segv all
   right (Mass properties in the CI app; it has no CLI). Waiting for the tag, then the smoke (bin/relsmoke_cli.sh 0.4.14 + GUI rows;
