@@ -2555,6 +2555,8 @@ export const standoff = defineFeature(function(context is Context, id is Id, def
         isLength(definition.db, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
         annotation { "Name" : "lb" }
         isLength(definition.lb, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "bd" }
+        isLength(definition.bd, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
     }
     {
         const step = 0.002 * inch;
@@ -2639,7 +2641,10 @@ export const flushNut = defineFeature(function(context is Context, id is Id, def
  * ends chamfered 45° out to dmaj, then from the bottom a bore db lb long.
  * Form 2 (BSO™ blind threaded): the top closed; from the bottom the minor
  * diameter, its entrance chamfered 45° out to dmaj, ending in a 120 degree
- * drill point 0.9 l up.
+ * drill point 0.9 l up. Form 3 (TSO™ for thin sheets): the undercut's top
+ * corner filled by a dc / 50 chamfer; the minor diameter through, both ends
+ * chamfered out to dmaj (live's STYLE A), or with bd > 0 (STYLE B) blind
+ * from the bottom up to a 118 degree point bd below the top.
  */
 annotation { "Feature Type Name" : "PEM standoff" }
 export const pemStandoff = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2661,6 +2666,8 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
         isLength(definition.dmaj, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
         annotation { "Name" : "lb" }
         isLength(definition.lb, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "bd" }
+        isLength(definition.bd, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
     }
     {
         const dc = definition.dc;
@@ -2677,7 +2684,23 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
         // The top of the hole (its chamfer's outer radius) and the inside.
         var rt;
         var inside;
-        if (definition.form == 2)
+        if (definition.form == 3)
+        {
+            const rmaj = definition.dmaj / 2;
+            const rmin = definition.dm / 2;
+            const bd = definition.bd;
+            if (bd > EPS)
+            {
+                rt = Z;
+                inside = [{ "p" : rz(rmaj, -l) }, { "p" : rz(rmin, -l + (rmaj - rmin)) }, { "p" : rz(rmin, -bd - rmin / tan(59 * degree)) }, { "p" : rz(Z, -bd) }];
+            }
+            else
+            {
+                rt = rmaj;
+                inside = [{ "p" : rz(rmaj, -l) }, { "p" : rz(rmin, -l + (rmaj - rmin)) }, { "p" : rz(rmin, -(rmaj - rmin)) }];
+            }
+        }
+        else if (definition.form == 2)
         {
             const rmaj = definition.dmaj / 2;
             const rmin = definition.dm / 2;
@@ -2698,12 +2721,23 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
             rt = 1.11 * definition.db / 2;
             inside = [{ "p" : rz(rt, -l) }, { "p" : rz(rb, -l + (rt - rb)) }, { "p" : rz(rb, -(rt - rb)) }];
         }
-        revolveProfile(context, id + "body", join([
-                    { "p" : rz(rt, Z) }, { "p" : rz(rh, Z) }, { "p" : rz(rh, -g) }, { "p" : rz(ru, -g) }, { "p" : rz(ru, z1) },
+        // TSO™: the undercut's top corner filled by a dc / 50 chamfer.
+        const c1 = definition.form == 3 ? dc / 50 : Z;
+        const under = c1 > EPS ? [{ "p" : rz(ru + c1, -g) }, { "p" : rz(ru, -g - c1) }] : [{ "p" : rz(ru, -g) }];
+        const outer = join(join([{ "p" : rz(rt, Z) }, { "p" : rz(rh, Z) }, { "p" : rz(rh, -g) }], under), [
+                    { "p" : rz(ru, z1) },
                     { "p" : rz(rc, z1) }, { "p" : rz(rc, z1 - gap) }, { "p" : rz(rs, z1 - gap) }, { "p" : rz(rs, z1 - gap - w) },
                     { "p" : rz(rc, z1 - gap - w) }, { "p" : rz(rc, z1 - 2 * gap - w) }, { "p" : rz(rs, z1 - 2 * gap - w) }, { "p" : rz(rs, z1 - 2 * gap - 2 * w) },
-                    { "p" : rz(rc, z1 - 2 * gap - 2 * w) }, { "p" : rz(rc, -l) }
-                ], inside));
+                    { "p" : rz(rc, z1 - 2 * gap - 2 * w) }]);
+        // Short lengths end inside the serrations: the outside stops at l.
+        var kept = [];
+        for (var q in outer)
+        {
+            if (q.p[1] > -l + EPS)
+                kept = append(kept, q);
+        }
+        kept = append(kept, { "p" : rz(kept[size(kept) - 1].p[0], -l) });
+        revolveProfile(context, id + "body", join(kept, inside));
         // The hex corners: a hex ring round the top of the bore, united.
         const ring = prismZ(context, id + "hex", -g, g, polygonPoints(6, definition.s, 1));
         // (A closed top: cut the ring inside the body instead.)
