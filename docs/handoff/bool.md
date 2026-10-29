@@ -580,7 +580,8 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - Open: on a cylinder or cone a vertex exactly half a turn from the seam is two points in the parameter plane (the
   side of the seam is judged for every vertex, and rounding puts its two ends on either side; it should be only for
   vertices on the seam). Fixing it lets the tilted-holes test's 45° slot common through, whose history then differs
-  from OCCT's (ours: the part's edge 20 Deleted, OCCT keeps it as it is): both together, next (the fix alone failed
+  from OCCT's: the part's edge 20 (a generator of the 45° hole) is in neither result, ours says Deleted, OCCT's
+  history has no record for it at all (an OCCT quirk to find and mimic before the fix can land; the fix alone failed
   the land, 10-29 23:00).
 - Hyperbolas at an angle (not along the axis) still decline "a plane at an angle to a cone".
 - A piece of any curve within the grey band of a face's boundary is judged where it is farthest from the boundary,
