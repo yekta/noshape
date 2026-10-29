@@ -142,7 +142,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Night: drawing.md A27 (callouts group onto callouts / symbols / datums, also by clicking while placing; only
   ungrouped targets, else a group cycle drew both at the origin), A28 (stacked instances reorder; not app-checked),
   A31 (datum on hole callouts), A32 (area size precision), A33 (datum target in empty space: a SHEET_VIEW point).
-  Live request filed for V60 (view Show/Hide constraints).
+  Live request filed for V60 (view Show/Hide constraints). Then A59 (no replicate onto the source view), A63 (painter
+  carries Styles-panel overrides), A64 (Styles panel: Datum size; callouts' Stack direction / gap), A57 (stale note:
+  side-by-side dual exists), D13 (ANSI radius / diameter values dropped inside the circle).
 - Next: D24's ISO placement (live request asb 10-25 a), A24's frame-part check, A28's app check, V60 when answered.
 
 ## Morning 10-29 (landed through 8eabd3f5)
