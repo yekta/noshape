@@ -9,6 +9,9 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **01:47 update:** crash-document sweep in the app (fd036a5c, cli/crashdocs-8ed2eeb4.out): all 16 open (10–142 s, 0.5–1.4 GB).
+  HALF-MIRROR: a linear pattern joining half holes is right (reflection-specific); Feature mirror fine. RUST-MIRROR: extra seam circle
+  edge in the hole. GUI fuzz series 106–109 on :110 (0a2a), CLI seeds 178 / 179 running.
 - **01:43 update (green 0a2a8c87 = + bool 438ec212 / 838d3835):** **new P0 HALF-MIRROR-HOLE-INVERTED** (core; in v0.4.12 too): a half
   plate with a half Ø10 hole on the mirror plane, Part mirror Add → 7738.201 mm³ / 2642.92 mm² instead of 7214.602 / 2957.08 (one hole
   face reversed), in the app too (tickets/halfmir.py / .noshape); variants in tickets/halfmir2.py (half boss wrong with OCCT, right with
