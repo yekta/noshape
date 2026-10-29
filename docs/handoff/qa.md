@@ -9,6 +9,11 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **01:58 update (green 80253527, same code as 0a2a8c87):** GUI fuzz 106–109 (0a2a: live-30, halfmir, boltdwg, asm5) alive; CLI seeds
+  176 / 177 / 178 done (documents Rust on = off). HALF-MIRROR also via Mirror New + Boolean union (union with a reflected body).
+  Transform / pattern / advanced matrices v0.4.12 vs bool CLI identical. Running: broad sweep of 387 qa-scratch documents v0.4.12 vs bool
+  CLI with Rust (/tmp/qa-bigsweep.sh → cli/bigsweep.out; 82 so far, diffs only cfsg = RUST-MIRROR and the deliberately broken
+  bad-trunc), GUI fuzz 110–113 on :131, CLI seeds 179 / 180.
 - **01:47 update:** crash-document sweep in the app (fd036a5c, cli/crashdocs-8ed2eeb4.out): all 16 open (10–142 s, 0.5–1.4 GB).
   HALF-MIRROR: a linear pattern joining half holes is right (reflection-specific); Feature mirror fine. RUST-MIRROR: extra seam circle
   edge in the hole. GUI fuzz series 106–109 on :110 (0a2a), CLI seeds 178 / 179 running.
