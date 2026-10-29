@@ -88,6 +88,8 @@ impl DrawingEditor {
         }
         self.table_tool = None;
         self.tool = Tool::Select;
+        // The ghost outline goes with it (qa DWG-TABLE-ESC-GHOST).
+        self.update_preview(cx);
         cx.notify();
     }
 

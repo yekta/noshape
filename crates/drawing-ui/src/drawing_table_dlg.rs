@@ -118,6 +118,8 @@ impl DrawingEditor {
             (None, _) => self.tool = Tool::Select,
             _ => {}
         }
+        // The placement preview goes with it (qa DWG-TABLE-ESC-GHOST).
+        self.update_preview(cx);
         cx.notify();
     }
 

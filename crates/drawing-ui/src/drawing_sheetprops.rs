@@ -393,6 +393,14 @@ impl DrawingEditor {
         Some(
             v_flex()
                 .id("dr-sheet-props")
+                // One Esc closes it, also from its focused Scale field (live, request 1596).
+                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
+                    if e.keystroke.key == "escape" {
+                        cx.stop_propagation();
+                        this.sheet_props = None;
+                        cx.notify();
+                    }
+                }))
                 .absolute()
                 .top(px(DIALOG_TOP))
                 .left(px(self.dialog_left()))
