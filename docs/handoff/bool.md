@@ -120,6 +120,12 @@ Big targets (10-29 04:00): the Rust path runs after the local Boolean, so a targ
 is one the local Boolean declined: no longer declined here (db5f2f3d 1004 faces, 99 tools: 178 ms vs OCCT 865;
 11b69a56 412 faces: 9 vs 88 ms; both as OCCT).
 
+Where OCCT's time still goes (corpus3, recorded with this Boolean on from the model and kernel tests, 10-29
+05:40): of ~118 s still in OCCT, 90 s are inputs with curved edges (B-spline, ellipse): Shell's slab Booleans on
+filleted parts 1.7–7.8 s each (24 cases, 48 s), op_boolean's 42 s (60, most with free-form faces too). In all the
+slow Shell ones the curved edges are within the slabs' reach (/root/bool-scratch/tools/bspl_far): carrying them
+untouched wouldn't help; they need intersections with curves this Boolean doesn't have (OCCT's, core's phase 1).
+
 Sheets (10-29 05:20): a Common of faces alone (model-core asking whether faces overlap) keeps only where they
 overlap; faces on planes that cross or lie apart (or boxes apart) have nothing in common: an empty result, all
 deleted, as OCCT's. Coplanar ones that meet still decline (33 of the main corpus, 1–8 ms each, most with a
