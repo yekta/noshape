@@ -7,6 +7,20 @@ behaviour, crates/featurescript, the FeatureScript host (crates/custom), the Ons
 Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache gcc-13" CXX="ccache g++-13"`
 (/root/core-scratch/env.sh; long jobs via /root/core-scratch/job.sh <log> "<cmd>").
 
+## Tonight (10-29, before the 05:00 release)
+- 5ac53b95 P0 CLI-SUPPRESS-SEGV: a crash guard that recovers past a budgeted op ends that budget (details under OCCT
+  patches). qa's fuzz seeds 171 (4 / 4) and 174 run to the end on the fixed CLI.
+- ae44d8d9 P0 FILLET-OVERSIZE-OK: detail.rs `end_boundary_hits_unfilleted` fails a fillet whose round both rolls
+  past an unfilleted edge and overlaps another round of the selection ("End boundary intersects unfilleted edge.",
+  live's rule from qa's matrix); overlapping rounds alone (a ridge) and a single roll-over stay Ok. Straight edges
+  between planar faces against the faces' parallel edges only. T1 `kernel_robustness::oversize_fillets_like_onshape`
+  (live's 11 answers on the 40 x 20 x 10 block). Open: the chamfer half (live's answers not in yet: qa's 10.5 / 15 /
+  30 mm chamfers on the two vertical edges are Ok here) and "all 12 edges R6 fails" in live (vertex blends).
+- Speed table refreshed from perf.yml run 40796942944 (release): the fin under the 400-fin plate 40–64 ms (< 150 met).
+- Parallel pairs: branch agent/core-pairs-on rebased on 16139489 (f83bf5f4; the crash guard's BudgetSnapshot
+  restores the thread's pairs mode too); kernel tests green against /root/occt-core with libTKBO.a.0004-on3. Land
+  after the release with that TKBO swapped into /root/occt in the same step.
+
 ## Landed on main (10-26 / 10-27)
 - 81c8d9cd psb's face blend WIP (curved sides, live's message rule). a2b34ade: the elliptic boss as live (a sketch
   ellipse's halves become one edge, so the extruded side is one face; closed lofts start a quarter turn past the seam);
