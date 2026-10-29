@@ -9,6 +9,8 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **17:46 update:** **GUARD-SEGV-MALLOC-DEADLOCK verified** on core's 2ac952ce + 8311f20f: seeds 189 ×2 / 151 / 152 / 174 all 106 steps, no guard
+  trace (no fault at all). Still in v0.4.13 / v0.4.14 (the next release has the fix through main: 24daf867, 45791441, 8311f20f).
 - **17:22 update (green 1888c5a1 = + core 8311f20f Shell / Draft on their own copy, dx ac9caf31):** Draft / Shell / mirror documents unchanged
   in the app; verified DWG-NOTE-DIAG-FRACTION. core's re-run request for GUARD-SEGV-MALLOC-DEADLOCK running: seeds 189 ×2, 151, 152, 174
   with NOSHAPE_GUARD_TRACE=1 on core's CLI 2ac952ce + 8311f20f (qa-scratch/rel/k/core/2acfix; summary cli/fixrun.summary, traces
