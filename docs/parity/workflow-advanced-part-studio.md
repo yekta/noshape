@@ -13,7 +13,7 @@ Status: ✅ matches live/exact, ✗ differs (finding #), ? live data pending.
 |---|---|---|---|---|---|
 | 1.1 | Sketch 1: 20×20 square on Top, from the origin | – | fully defined with D | ✅ | 7929b13a 10-28 (corner rectangle from the origin, both dimensions typed; note: since c1b58ff7 Tab no longer applies (live), so the flow is 20 Enter 20 Enter) |
 | 1.2 | Plane (Top + 20) | Plane 1 | Plane 1 | ✅ | 7929b13a 10-28 |
-| 1.3 | Sketch, Sketch plane field active, click the **Plane 1 row** in the feature list | fills "Plane 1" (default planes work the same way) | **nothing**; clicking Plane 1 in the viewport doesn't fill it either; the Top row works | ✗ ADV1 | 7929b13a 10-28 (Sketch with nothing selected, click the Plane 1 row → "Plane 1"; ADV1 fixed) |
+| 1.3 | Sketch, Sketch plane field active, click the **Plane 1 row** in the feature list | fills "Plane 1" (default planes work the same way) | **nothing**; clicking Plane 1 in the viewport doesn't fill it either; the Top row works | ✅ ADV1 fixed (7929b13a, see Verified) | 7929b13a 10-28 (Sketch with nothing selected, click the Plane 1 row → "Plane 1"; ADV1 fixed) |
 | 1.4 | Select Plane 1 first, then Sketch | sketch on Plane 1 | works | ✅ | 7929b13a 10-28 (Plane 1 selected, Sketch → "Plane 1", field inactive) |
 | 1.5 | Circle Ø16 at (10,10) | – | ✅ | ✅ | 64997436 10-28 (GUI: Sketch 2 on Plane 1, Ø16 at (10,10)) |
 | 1.6 | Loft dialog | Solid/Surface/Thin, New/Add/Remove/Intersect, Profiles, End conditions, Guides and continuity, Path, Connections, Show isocurves | same | ✅ | f9185639 10-28 (dialog fields) |
@@ -28,7 +28,7 @@ Status: ✅ matches live/exact, ✗ differs (finding #), ? live data pending.
 | 2.2 | Sweep dialog | Faces and sketch regions to sweep, Sweep path, ☐ Extend to full path, Profile control None, ☐ Twist, ☐ Scale | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2.3 | Path field: click the Sketch 2 row | ? | notice "Select edges, sketch curves or curves."; viewport picks work (two chips "Sketch 2 line", "Sketch 2 arc") | ? |  |
 | 2.4 | Arc R3 | **981.4696759** | **981.47** | ✅ | main CLI 12:08 (bin/advmatrix.py): 981.469676, 4 faces |
-| 2.5 | Arc R2 | ERROR "Sweep R2 did not regenerate properly: Could not create valid swept body, check input." | row tooltip "Could not create valid swept body, check input." (**no "Sweep 1 did not regenerate properly:" prefix**) | ✗ ADV3 |  |
+| 2.5 | Arc R2 | ERROR "Sweep R2 did not regenerate properly: Could not create valid swept body, check input." | row tooltip "Could not create valid swept body, check input." (**no "Sweep 1 did not regenerate properly:" prefix**) | ✅ ADV3 fixed: tooltips carry "<feature> did not regenerate properly:" (see the re-run tables; v0.4.14 10-29 "Fillet 1 did not regenerate properly: Failed to fillet selections.") |  |
 | 2.6 | Arc R6 | **1114.7093353** | **1114.709** | ✅ | main CLI 12:08 (bin/advmatrix.py): 1114.709335 |
 
 ## 3. Fillet, draft, holes, mirror (Part Studio 3)
@@ -41,10 +41,10 @@ Status: ✅ matches live/exact, ✗ differs (finding #), ? live data pending.
 | 3.4 | Shift+S twice in the Part Studio (sketch, then Point) | ? | worked as Sketch then Point | ? |  |
 | 3.5 | Hole dialog | Inch/Metric, Simple/Counterbore/Countersink, Sketch points, Merge scope, Hole type Drilled, Drill size 1/4 (0.25), Ø, Start plane, Termination Blind, depth, 118 deg | same (Simple matches hole-01 screenshot) | ✅ | f9185639 10-28 (dialog fields) |
 | 3.6 | Counterbore defaults | Ø10 × 5 mm, 12 mm deep (psb f) | same; 6877.312 mm³ = exact | ✅ | 41f60e47 10-28 (Ø10 × 5, 12 deep) |
-| 3.7 | Counterbore / countersink rows | (live look pending) | text labels **truncate the values** ("Counterbore diamet… 1(", "Countersink angle 82 de") and with Tapped the **"Countersink diameter" label overlaps "12.878 mm"** | ✗ ADV4 |  |
+| 3.7 | Counterbore / countersink rows | (live look pending) | text labels **truncate the values** ("Counterbore diamet… 1(", "Countersink angle 82 de") and with Tapped the **"Countersink diameter" label overlaps "12.878 mm"** | ✅ ADV4 fixed (64997436 10-28 rows fit, see below) |  |
 | 3.8 | Hole type list | Drilled, Clearance, Tapped | same; Tapped adds Tap type, Size, Threads/inch, Fastener fit, ☐ Thread class, Tapped depth | ✅ (live behaviours ~8515: Tapped → Tap type Straight tap, Size, Threads/inch, Fastener fit None, ☐ Thread class) | 64997436 10-28 (GUI: Drilled / Clearance / Tapped; Tapped shows Tap type, Size 1/4, Threads/inch 20 tpi (UNC), Fastener fit None, ☐ Thread class, tap drill 5.105 mm, tapped depth) |
 | 3.9 | Mirror › Part mirror about Right | Part 2 | Part 2 | ✅ | 64997436 10-28 (GUI: Part 1 + Right row → Part 2) |
-| 3.10 | Mirror › Feature mirror of the hole about Plane 1 (Right + 20) | dialog: Features to mirror, Mirror plane, ☐ Reapply features | same; **Plane 1 row doesn't fill Mirror plane** (ADV1); viewport pick works; 6326.267 mm³ = exact | ✅ / ✗ ADV1 | 64997436 10-28 (GUI: the Plane 1 row fills Mirror plane: ADV1 fixed for mirror; tickets/adv1-mirror-plane-row-6499.png) |
+| 3.10 | Mirror › Feature mirror of the hole about Plane 1 (Right + 20) | dialog: Features to mirror, Mirror plane, ☐ Reapply features | same; **Plane 1 row doesn't fill Mirror plane** (ADV1); viewport pick works; 6326.267 mm³ = exact | ✅ mirror plane row fills (64997436) | 64997436 10-28 (GUI: the Plane 1 row fills Mirror plane: ADV1 fixed for mirror; tickets/adv1-mirror-plane-row-6499.png) |
 | 3.11 | Edit the hole to Countersink + Tapped | mirror follows | Mirror 2 error "Could not create all instances as entered. Try selecting "Reapply features" option." (the two countersinks overlap at the plane); ☑ Reapply features fixes it | ? (plausible per G45) |  |
 
 ## 4. Helix, thread, rib, wrap
