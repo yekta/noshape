@@ -839,15 +839,7 @@ pub enum AnnotationKind {
     /// Hole / thread callout on a hole circle (`center`, `radius` in view
     /// coordinates; slot 0 = the circle's center reference). The text comes
     /// from the Hole feature; the leader runs from the circle to `position`.
-    /// `leaders`: the ones added with Add leader, from the same shoulder to
-    /// other holes (live behaviours A56, qa DWG-HOLE-CALLOUT-ADD-LEADER).
-    HoleCallout {
-        view: ViewId,
-        center: [f64; 2],
-        radius: f64,
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        leaders: Vec<Leader>,
-    },
+    HoleCallout { view: ViewId, center: [f64; 2], radius: f64 },
     /// Virtual sharp: where two straight edges (`a1`-`b1`, `a2`-`b2`) meet.
     VirtualSharp { view: ViewId, a1: [f64; 2], b1: [f64; 2], a2: [f64; 2], b2: [f64; 2] },
     /// Callout: `text` empty = the BOM / cut list item of the part at the

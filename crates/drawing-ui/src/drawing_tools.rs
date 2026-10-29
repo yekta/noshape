@@ -1728,37 +1728,6 @@ impl DrawingEditor {
                     ];
                 }
                 let a = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).cloned();
-                // Hole callouts (live behaviours A56): Edit... · Paste · Copy
-                // · Paste as table · Add leader (· Remove leaders) | Clear
-                // selection · Zoom to fit · Delete.
-                if let Some(a) = a.as_ref().filter(|a| matches!(a.kind, AnnotationKind::HoleCallout { .. })) {
-                    let a2 = a.clone();
-                    let mut out = vec![MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx))];
-                    out.extend(crate::drawing_props::paste_entry(cx));
-                    out.push(MenuEntry::item("Copy", move |t, _, cx| {
-                        if !t.selection.contains(&Sel::Annotation(id)) {
-                            t.selection = vec![Sel::Annotation(id)];
-                        }
-                        t.copy_entities(cx);
-                    }));
-                    out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-                        t.start_paste_table(cx);
-                    }));
-                    out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
-                    if matches!(&a.kind, AnnotationKind::HoleCallout { leaders, .. } if !leaders.is_empty()) {
-                        out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, id))));
-                    }
-                    out.extend([
-                        MenuEntry::Separator,
-                        MenuEntry::item("Clear selection", |t, _, cx| {
-                            t.selection.clear();
-                            t.redraw(cx);
-                        }),
-                        MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
-                        MenuEntry::item("Delete", |t, _, cx| t.delete_selection(cx)),
-                    ]);
-                    return out;
-                }
                 // Notes: their own menu in live's order (drawing_leaders).
                 if let Some(a) = a.as_ref().filter(|a| matches!(a.kind, AnnotationKind::Note { .. })) {
                     let mut out = self.inspection_entries(a);

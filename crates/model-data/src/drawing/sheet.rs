@@ -1455,7 +1455,7 @@ impl SheetGeometry {
                         self.lines.push(Polyline2 { points: pts, style: LineStyle::Centerline, closed: true, pick });
                     }
                 }
-                AnnotationKind::HoleCallout { view, center, radius, leaders } => {
+                AnnotationKind::HoleCallout { view, center, radius } => {
                     let c = env.to_sheet(*view, *center);
                     let r = radius * env.scale(*view);
                     let lines = env.hole_callout(a);
@@ -1470,15 +1470,6 @@ impl SheetGeometry {
                     let shoulder = [t[0] + if right { -4.0 } else { 4.0 }, t[1]];
                     self.lines.push(Polyline2 { points: vec![on, shoulder, t], style: LineStyle::Thin, closed: false, pick });
                     self.arrow(on, [-u[0], -u[1]], 3.0);
-                    // Added leaders: from the same shoulder, an arrow on each hole.
-                    for ld in leaders {
-                        let p = match ld.view {
-                            Some(v) => env.to_sheet(v, ld.point),
-                            None => ld.point,
-                        };
-                        self.lines.push(Polyline2 { points: vec![shoulder, p], style: LineStyle::Thin, closed: false, pick });
-                        self.arrow(p, [p[0] - shoulder[0], p[1] - shoulder[1]], 3.0);
-                    }
                     let w = lines.iter().map(|s| super::format::flatten_stacked(s).chars().count()).max().unwrap_or(0) as f64 * h * 0.62;
                     let x0 = if right { t[0] + 1.0 } else { t[0] - 1.0 - w };
                     let n = lines.len() as f64;

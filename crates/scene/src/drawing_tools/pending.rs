@@ -118,7 +118,7 @@ impl SheetPick<'_> {
                 Some(ann(kind, refs))
             }
 
-            Tool::HoleCallout { circle: Some((view, center, radius, r)) } => Some(ann(AnnotationKind::HoleCallout { view: *view, center: *center, radius: *radius, leaders: Vec::new() }, vec![(0, r.clone())])),
+            Tool::HoleCallout { circle: Some((view, center, radius, r)) } => Some(ann(AnnotationKind::HoleCallout { view: *view, center: *center, radius: *radius }, vec![(0, r.clone())])),
             Tool::Balloon { anchor: Some(a) } => {
                 // In assembly views a callout on a part shows its BOM item (empty text = linked).
                 // A click on an edge away from its snap points: that edge's part.

@@ -229,10 +229,6 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
-- **v0.4.13 (relayed from bool, 10-29)**: tag v0.4.13 = 5e56477b has the Rust Boolean regression bool 2520afc4 that
-  c79eed1d fixes (halfmir2.py variant B: 7869.1 mm³ with a −78.54 mm² face, live 7607.301). bool's options: cut from a
-  green with c79eed1d, or ship with NOSHAPE_BOOL_RUST off by default. Details: TICKETS RUST-MIRROR-EXTRA-FACE, handoff
-  bool.md. (The lead wasn't a live session; psui and dx couldn't reach it directly.)
 - **Notifications bell (drawing.md EX11, P3)**: live reports a finished export only in the Notifications bell
   (bold "Export completed"; expanded "Part 1 Drawing (3).pdf was exported successfully."; no toast; behaviours EX11).
   The app has no bell or notification list. It belongs to the window chrome (crates/app), so yours: a bell with a list

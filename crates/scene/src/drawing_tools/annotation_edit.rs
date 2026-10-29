@@ -96,7 +96,6 @@ pub fn leaders_mut(a: &mut Annotation) -> Option<&mut Vec<Leader>> {
         AnnotationKind::Note { style, .. } => Some(&mut style.leaders),
         AnnotationKind::Weld { spec, .. } => Some(&mut spec.leaders),
         AnnotationKind::Balloon { callout, .. } => Some(&mut callout.leaders),
-        AnnotationKind::HoleCallout { leaders, .. } => Some(leaders),
         _ => None,
     }
 }
@@ -108,7 +107,6 @@ pub fn leaders(a: &Annotation) -> Option<&Vec<Leader>> {
         AnnotationKind::Note { style, .. } => Some(&style.leaders),
         AnnotationKind::Weld { spec, .. } => Some(&spec.leaders),
         AnnotationKind::Balloon { callout, .. } => Some(&callout.leaders),
-        AnnotationKind::HoleCallout { leaders, .. } => Some(leaders),
         _ => None,
     }
 }
