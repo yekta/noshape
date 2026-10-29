@@ -2575,6 +2575,56 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_THREADED_STANDOFF_MAIN, DATA_PEM_SELFCLINCHING_THREADED_STANDOFF_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 1b297ea1ec3b72544db6acee; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching standoffs",
+    "name": "SOSG™/SOAG™ Grounding standoffs",
+    "shape": "pemStandoff",
+    "form": {
+     "form": 5
+    },
+    "materials": [
+     "Stainless Steel",
+     "Aluminum"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "SOSG",
+      "finish": "No finish",
+      "finishCode": ""
+     },
+     "Aluminum": {
+      "code": "SOAG",
+      "finish": "No finish",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "M3x0.50",
+      "label": "PEM {type}-3.5M3-{l}",
+      "d": 3.0,
+      "dims": {
+       "s": 6.4,
+       "dc": 5.39,
+       "db": 2.459,
+       "dm": 2.459,
+       "dmaj": 3.0,
+       "tt": 0.76
+      },
+      "lengths": [
+       "3",
+       "4",
+       "6",
+       "8",
+       "10",
+       "12"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_GROUNDING_STANDOFF_MAIN, DATA_PEM_SELFCLINCHING_GROUNDING_STANDOFF_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document ee6fb64b700c17e9bdadd080; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  },
@@ -6591,6 +6641,97 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_THREADED_STANDOFF_MAIN, DATA_PEM_SELFCLINCHING_THREADED_STANDOFF_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 638f81a1f0c5dd57c6a9d880; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching standoffs",
+    "name": "SOSG™/SOAG™ Grounding standoffs",
+    "shape": "pemStandoff",
+    "form": {
+     "form": 5
+    },
+    "materials": [
+     "Stainless Steel",
+     "Aluminum"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "SOSG",
+      "finish": "No finish",
+      "finishCode": ""
+     },
+     "Aluminum": {
+      "code": "SOAG",
+      "finish": "No finish",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "#4-40",
+      "label": "PEM {type}-6440-{l}",
+      "d": 0.112,
+      "dims": {
+       "s": 0.25,
+       "dc": 0.212,
+       "db": 0.0849,
+       "dm": 0.0849,
+       "dmaj": 0.112,
+       "tt": 0.03
+      },
+      "lengths": [
+       "0.125",
+       "0.187",
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.437",
+       "0.5"
+      ],
+      "lengthNames": {
+       "0.125": "4",
+       "0.187": "6",
+       "0.25": "8",
+       "0.312": "10",
+       "0.375": "12",
+       "0.437": "14",
+       "0.5": "16"
+      }
+     },
+     {
+      "name": "#6-32",
+      "label": "PEM {type}-8632-{l}",
+      "d": 0.138,
+      "dims": {
+       "s": 0.312,
+       "dc": 0.28,
+       "db": 0.104,
+       "dm": 0.104,
+       "dmaj": 0.138,
+       "tt": 0.03
+      },
+      "lengths": [
+       "0.125",
+       "0.187",
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.437",
+       "0.5"
+      ],
+      "lengthNames": {
+       "0.125": "4",
+       "0.187": "6",
+       "0.25": "8",
+       "0.312": "10",
+       "0.375": "12",
+       "0.437": "14",
+       "0.5": "16"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_GROUNDING_STANDOFF_MAIN, DATA_PEM_SELFCLINCHING_GROUNDING_STANDOFF_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document ac797db2bbadfa852fd38cd5; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  }

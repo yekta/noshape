@@ -2647,7 +2647,9 @@ export const flushNut = defineFeature(function(context is Context, id is Id, def
  * from the bottom up to a 118 degree point bd below the top. Form 4 (DSO™
  * for close-to-edge applications): the head round (s across), knurled by 40
  * V teeth down to ((s - dc) / 2 + dc) / 2, their tips on its rim; the hole
- * as TSO's STYLE A.
+ * as TSO's STYLE A. Form 5 (SOSG™ / SOAG™ grounding standoffs): one
+ * serration groove, the hex's flats facing ±X, the hole as STYLE A, and 32
+ * V notches tt up from the bottom (valleys 0.95 dc, tips on the body).
  */
 annotation { "Feature Type Name" : "PEM standoff" }
 export const pemStandoff = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2671,6 +2673,8 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
         isLength(definition.lb, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
         annotation { "Name" : "bd" }
         isLength(definition.bd, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "tt" }
+        isLength(definition.tt, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
     }
     {
         const dc = definition.dc;
@@ -2687,7 +2691,7 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
         // The top of the hole (its chamfer's outer radius) and the inside.
         var rt;
         var inside;
-        if (definition.form == 3 || definition.form == 4)
+        if (definition.form >= 3)
         {
             const rmaj = definition.dmaj / 2;
             const rmin = definition.dm / 2;
@@ -2727,11 +2731,13 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
         // TSO™: the undercut's top corner filled by a dc / 50 chamfer.
         const c1 = definition.form == 3 ? dc / 50 : Z;
         const under = c1 > EPS ? [{ "p" : rz(ru + c1, -g) }, { "p" : rz(ru, -g - c1) }] : [{ "p" : rz(ru, -g) }];
-        const outer = join(join([{ "p" : rz(rt, Z) }, { "p" : rz(rh, Z) }, { "p" : rz(rh, -g) }], under), [
-                    { "p" : rz(ru, z1) },
-                    { "p" : rz(rc, z1) }, { "p" : rz(rc, z1 - gap) }, { "p" : rz(rs, z1 - gap) }, { "p" : rz(rs, z1 - gap - w) },
-                    { "p" : rz(rc, z1 - gap - w) }, { "p" : rz(rc, z1 - 2 * gap - w) }, { "p" : rz(rs, z1 - 2 * gap - w) }, { "p" : rz(rs, z1 - 2 * gap - 2 * w) },
-                    { "p" : rz(rc, z1 - 2 * gap - 2 * w) }]);
+        const grooves = definition.form == 5 ? 1 : 2;
+        var outer = join(join([{ "p" : rz(rt, Z) }, { "p" : rz(rh, Z) }, { "p" : rz(rh, -g) }], under), [{ "p" : rz(ru, z1) }, { "p" : rz(rc, z1) }]);
+        for (var k = 0; k < grooves; k += 1)
+        {
+            const z = z1 - (k + 1) * gap - k * w;
+            outer = join(outer, [{ "p" : rz(rc, z) }, { "p" : rz(rs, z) }, { "p" : rz(rs, z - w) }, { "p" : rz(rc, z - w) }]);
+        }
         // Short lengths end inside the serrations: the outside stops at l.
         var kept = [];
         for (var q in outer)
@@ -2747,10 +2753,12 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
             return;
         }
         // The hex corners: a hex ring round the top of the bore, united.
-        const ring = prismZ(context, id + "hex", -g, g, polygonPoints(6, definition.s, 1));
+        const ring = prismZ(context, id + "hex", -g, g, polygonPoints(6, definition.s, definition.form == 5 ? 0 : 1));
         // (A closed top: cut the ring inside the body instead.)
         subtract(context, id + "trim", ring, cylinderZ(context, id + "bore", -g - g, g, rt > EPS ? rt : rc));
         uniteAll(context, id);
+        if (definition.form == 5)
+            knurlCut(context, id + "teeth", solidsOf(context, id), -l, definition.tt, 32, 0.95 * rc, rc, 90 * degree);
     });
 
 /**
