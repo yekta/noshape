@@ -62,6 +62,12 @@ impl DrawingEditor {
     /// region's box first.
     fn replicate_annotations(&mut self, view: ViewId, cx: &mut Context<Self>) {
         let Some(r) = &self.replication else { return };
+        // Help hole_thread_callout (drawing.md A59): never onto its own view.
+        if r.src.id == view {
+            self.status = Some("Annotations cannot be replicated to the source view".into());
+            cx.notify();
+            return;
+        }
         if r.region.is_some() {
             self.replicate_dlg = Some(ReplicateDlg::Place { view, at: None });
             self.tool = Tool::Select;
