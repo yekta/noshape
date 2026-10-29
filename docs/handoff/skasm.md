@@ -188,8 +188,10 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    Size.typeCodes for per-size codes (M5 SS / CLSS); /root/skasm-scratch/pemnut.py build_nut(). S / SS / CLS / CLSS /
    SP done (form 0). Live's nuts' SWEEP faces are the engraved "PEM" (Sketch 3 text, OpenSans-Regular.ttf, one face
    per quadratic segment of Open Sans 1.10): sketch text's Open Sans is now the 1.10 drawing files (was the
-   variable font: P 11 + M 6 curved walls instead of live's 7 + 2). Next nuts: CLA, HNL, H, S-RT, SH, SL, SMPS
-   (109–148 faces). Not shown yet: the read-only Hole size / Recommended sheet material rows.
+   variable font: P 11 + M 6 curved walls instead of live's 7 + 2) 765e618c. CLA (form 0, aluminum only) and SMPS
+   (form 1: al / 4.5 shank, 10° cone, chamfered body edges, engraved tl / 100; no Sheet thickness select: a size
+   without lengths hides the length row). The T2 sweep pem_fh_pin_sizes_build takes ~10 min now. Next nuts: HNL,
+   H, S-RT, SH, SL (109–148 faces). Not shown yet: the read-only Hole size / Recommended sheet material rows.
    Live's studio defaults sometimes differ from the table (NAS 1129 thru minor 0.067 vs 0.0667, NASM 45938/4 ax 0.0225
    vs 0.028125): check the construction at the studio values, then test ours at the table's.
    Earlier: ANSI taper pin crowned ends 10-27.

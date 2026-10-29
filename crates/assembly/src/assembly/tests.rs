@@ -5059,14 +5059,16 @@ fn pem_fh_pins_match_live() {
 #[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn pem_fh_pin_sizes_build() {
     use super::standard::{self, CATALOGUE, StandardSpec};
-    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™") || c.name.starts_with("FHL™") || c.name.starts_with("TFH™") || c.name.starts_with("HFLH™") || c.name.starts_with("HF") || c.name.starts_with("FHX™") || c.name.starts_with("SGPC™") || c.name.starts_with("S™/SS™")) {
+    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™") || c.name.starts_with("FHL™") || c.name.starts_with("TFH™") || c.name.starts_with("HFLH™") || c.name.starts_with("HF") || c.name.starts_with("FHX™") || c.name.starts_with("SGPC™") || c.name.starts_with("S™/SS™") || c.name.starts_with("CLA™") || c.name.starts_with("SMPS™")) {
         for s in &c.sizes {
-            for l in [s.lengths.first().unwrap(), s.lengths.last().unwrap()] {
+            // (Nuts for thin sheets have no length.)
+            let ls = if s.lengths.is_empty() { vec![None] } else { vec![s.lengths.first(), s.lengths.last()] };
+            for l in ls {
                 let mut spec = StandardSpec::new(c);
                 spec.set_size(&s.name);
-                spec.length = Some(l.clone());
-                let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{} x {l}: {e}", s.name));
-                assert!(standard::part_body(&r).is_some(), "{} x {l}", s.name);
+                spec.length = l.cloned();
+                let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{} x {l:?}: {e}", s.name));
+                assert!(standard::part_body(&r).is_some(), "{} x {l:?}", s.name);
             }
         }
     }
@@ -5468,6 +5470,50 @@ fn pem_s_nuts_match_live() {
             *kinds.entry(k).or_insert(0) += 1;
         }
         assert_eq!(kinds, [("cone", 3), ("curved", 9), ("cylinder", 3), ("plane", 92), ("torus", 2)].into_iter().collect(), "{size}");
+    }
+}
+
+/// PEM® CLA™ aluminum nuts and SMPS™ / SMPP™ nuts for thin sheets (live's
+/// raw /features and body details): "PEM CLA-M2-1 Aluminum No finish", "PEM
+/// SMPS-M2.5 Stainless Steel No finish" (no Sheet thickness select), "PEM
+/// SMPP-M2.5"; at live's studio sizes 109 faces (CLA as S™; SMPS: chamfered
+/// body edges, CONE 5, no TORUS).
+#[test]
+fn pem_cla_smps_nuts_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let find = |name: &str, inch: bool| CATALOGUE.iter().find(|c| c.name.starts_with(name) && c.inch == inch).unwrap();
+    let (cla, smps) = (find("CLA™", false), find("SMPS™", false));
+    let spec = StandardSpec::new(cla);
+    assert_eq!(spec.description(), "PEM CLA-M2-1 Aluminum No finish");
+    assert_eq!(StandardSpec::new(find("CLA™", true)).part_name(), "PEM CLA-256-1");
+    let mut spec = StandardSpec::new(smps);
+    assert!(smps.lengths(spec.size_row().unwrap()).is_empty());
+    assert_eq!(spec.description(), "PEM SMPS-M2.5 Stainless Steel No finish");
+    spec.material = Some("Hardened Stainless Steel".into());
+    assert_eq!(spec.part_name(), "PEM SMPP-M2.5");
+    assert_eq!(StandardSpec::new(find("SMPS™", true)).part_name(), "PEM SMPS-256");
+    for (c, size, cones, torus) in [(cla, "M6x1.00", 3, 2), (find("CLA™", true), "#2-56", 3, 2), (smps, "M2.5x0.45", 5, 0), (find("SMPS™", true), "#2-56", 5, 0)] {
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        let r = standard::regenerate(&spec).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let mut kinds = std::collections::BTreeMap::new();
+        for i in 0..b.faces.len() {
+            let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+                Surface::Plane(_) => "plane",
+                Surface::Cone { .. } => "cone",
+                Surface::Cylinder { .. } => "cylinder",
+                Surface::Torus { .. } => "torus",
+                _ => "curved",
+            };
+            *kinds.entry(k).or_insert(0) += 1;
+        }
+        let mut want: std::collections::BTreeMap<&str, i32> = [("cone", cones), ("curved", 9), ("cylinder", 3), ("plane", 92)].into_iter().collect();
+        if torus > 0 {
+            want.insert("torus", torus);
+        }
+        assert_eq!(kinds, want, "{} {size}", c.name);
     }
 }
 

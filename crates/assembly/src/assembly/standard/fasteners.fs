@@ -3169,7 +3169,9 @@ function swagingCollarStud(context is Context, id is Id, definition is map)
  * rounded de / 40; the thread's minor diameter through, chamfered 45° out to
  * the major at both ends; "PEM" engraved md deep in the bottom face (letters
  * 120° apart, read from below, between 0.381 mm off the chamfer and 0.381 mm
- * inside the rounding).
+ * inside the rounding). Form 1 (SMPS™ / SMPP™ for thin sheets): the shank
+ * down to al / 4.5, coning in at 10°; the body's top edge chamfered de / 60,
+ * its bottom edge de / 40.
  */
 annotation { "Feature Type Name" : "PEM nut" }
 export const pemNut = defineFeature(function(context is Context, id is Id, definition is map)
@@ -3204,15 +3206,19 @@ export const pemNut = defineFeature(function(context is Context, id is Id, defin
         const tl = definition.tl;
         const f = definition.de / 40;
         const zb = -al - tl;
-        const z1 = -tl / 13;
-        const r2 = rc - (al / 2 - tl / 13) * tan(9 * degree);
+        const thin = definition.form == 1;
+        const z1 = thin ? -al / 4.5 : -tl / 13;
+        const r2 = rc - (al / 2 + z1) * tan((thin ? 10 : 9) * degree);
         const s45 = sqrt(0.5);
-        revolveProfile(context, id + "body", [
+        const c2 = definition.de / 60;
+        const edges = thin ? [{ "p" : rz(re - c2, -al) }, { "p" : rz(re, -al - c2) }, { "p" : rz(re, zb + f) }, { "p" : rz(re - f, zb) }] :
+            [{ "p" : rz(re - f, -al) }, { "p" : rz(re, -al - f), "mid" : rz(re - f + f * s45, -al - f + f * s45) },
+                    { "p" : rz(re, zb + f) }, { "p" : rz(re - f, zb), "mid" : rz(re - f + f * s45, zb + f - f * s45) }];
+        revolveProfile(context, id + "body", concatenateArrays([[
                     { "p" : rz(rmaj, Z) }, { "p" : rz(rc, Z) }, { "p" : rz(rc, z1) }, { "p" : rz(r2, -al / 2) }, { "p" : rz(rk, -al / 2) },
-                    { "p" : rz(rk, -al) }, { "p" : rz(re - f, -al) }, { "p" : rz(re, -al - f), "mid" : rz(re - f + f * s45, -al - f + f * s45) },
-                    { "p" : rz(re, zb + f) }, { "p" : rz(re - f, zb), "mid" : rz(re - f + f * s45, zb + f - f * s45) },
+                    { "p" : rz(rk, -al) }], edges, [
                     { "p" : rz(rmaj, zb) }, { "p" : rz(rmin, zb + rmaj - rmin) }, { "p" : rz(rmin, -(rmaj - rmin)) }
-                ]);
+                ]]));
         knurlCut(context, id, qCreatedBy(id + "body", EntityType.BODY), -al, al / 2, 24, (r2 + rk) / 2, rk, 90 * degree);
         // The marking: each letter's box from 0.381 mm off the chamfer to
         // 0.381 mm inside the rounding, centred (live's widths per height),

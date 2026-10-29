@@ -461,6 +461,7 @@ impl AssemblyView {
         }
         if let Some(size) = spec.size_row()
             && c.shape.has_length()
+            && !c.lengths(size).is_empty()
         {
             let cur = spec.length.clone().unwrap_or_default();
             let length_el = if c.length_edit {

@@ -2997,6 +2997,287 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_SELF_CLINCHING_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 6486f47556e99e877dd14aa2; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching nuts",
+    "name": "CLA™ Self-clinching nuts",
+    "shape": "pemNut",
+    "form": {
+     "form": 0
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Aluminum"
+    ],
+    "materialCodes": {
+     "Aluminum": {
+      "code": "CLA",
+      "finish": "No finish",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "M2x0.40",
+      "label": "PEM {type}-M2-{l}",
+      "d": 2.0,
+      "dims": {
+       "dm": 1.567,
+       "dmaj": 2.0,
+       "dc": 4.2,
+       "de": 6.35,
+       "tl": 1.5,
+       "md": 0.25
+      },
+      "lengths": [
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "1": {
+        "al": 0.98
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M3x0.50",
+      "label": "PEM {type}-M3-{l}",
+      "d": 3.0,
+      "dims": {
+       "dm": 2.459,
+       "dmaj": 3.0,
+       "dc": 4.73,
+       "de": 6.35,
+       "tl": 2.0,
+       "md": 0.25
+      },
+      "lengths": [
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "1": {
+        "al": 0.98
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M3.5x0.60",
+      "label": "PEM {type}-M3.5-{l}",
+      "d": 3.5,
+      "dims": {
+       "dm": 2.85,
+       "dmaj": 3.5,
+       "dc": 5.38,
+       "de": 7.11,
+       "tl": 2.0,
+       "md": 0.25
+      },
+      "lengths": [
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "1": {
+        "al": 0.98
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M4x0.70",
+      "label": "PEM {type}-M4-{l}",
+      "d": 4.0,
+      "dims": {
+       "dm": 3.242,
+       "dmaj": 4.0,
+       "dc": 5.92,
+       "de": 7.8,
+       "tl": 3.0,
+       "md": 0.25
+      },
+      "lengths": [
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "1": {
+        "al": 0.98
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M5x0.80",
+      "label": "PEM {type}-M5-{l}",
+      "d": 5.0,
+      "dims": {
+       "dm": 4.134,
+       "dmaj": 5.0,
+       "dc": 7.49,
+       "de": 9.4,
+       "tl": 3.8,
+       "md": 0.25
+      },
+      "lengths": [
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "1": {
+        "al": 0.98
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M6x1.00",
+      "label": "PEM {type}-M6-{l}",
+      "d": 6.0,
+      "dims": {
+       "dm": 4.917,
+       "dmaj": 6.0,
+       "dc": 8.73,
+       "de": 11.18,
+       "tl": 4.08,
+       "md": 0.25
+      },
+      "lengths": [
+       "1.4",
+       "2.3"
+      ],
+      "lengthDims": {
+       "1.4": {
+        "al": 1.38
+       },
+       "2.3": {
+        "al": 2.21
+       }
+      },
+      "lengthNames": {
+       "1.4": "1",
+       "2.3": "2"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_SELF_CLINCHING_LENGTH (component document 71d1d03b53d271987ba06028; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)",
+    "plainDescription": true
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching nuts",
+    "name": "SMPS™/SMPP™ Nuts (For thin sheets)",
+    "shape": "pemNut",
+    "form": {
+     "form": 1
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Stainless Steel",
+     "Hardened Stainless Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "SMPS",
+      "finish": "No finish",
+      "finishCode": ""
+     },
+     "Hardened Stainless Steel": {
+      "code": "SMPP",
+      "finish": "No finish",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "M2.5x0.45",
+      "label": "PEM {type}-M2.5",
+      "d": 2.5,
+      "dims": {
+       "dm": 2.013,
+       "dmaj": 2.5,
+       "dc": 3.79,
+       "de": 5.6,
+       "tl": 1.4,
+       "al": 0.61,
+       "md": 0.014
+      },
+      "lengths": [],
+      "lengthDims": {},
+      "lengthNames": {}
+     },
+     {
+      "name": "M3x0.50",
+      "label": "PEM {type}-M3",
+      "d": 3.0,
+      "dims": {
+       "dm": 2.459,
+       "dmaj": 3.0,
+       "dc": 4.22,
+       "de": 5.6,
+       "tl": 1.4,
+       "al": 0.61,
+       "md": 0.014
+      },
+      "lengths": [],
+      "lengthDims": {},
+      "lengthNames": {}
+     },
+     {
+      "name": "M3.5x0.60",
+      "label": "PEM {type}-M3.5",
+      "d": 3.5,
+      "dims": {
+       "dm": 2.85,
+       "dmaj": 3.5,
+       "dc": 4.73,
+       "de": 6.4,
+       "tl": 1.4,
+       "al": 0.61,
+       "md": 0.014
+      },
+      "lengths": [],
+      "lengthDims": {},
+      "lengthNames": {}
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_FASTENER_MATERIAL_TYPE (component document 2038559c3f6970de294798a8; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)",
+    "plainDescription": true
    }
   ]
  },
@@ -7759,6 +8040,321 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_SELF_CLINCHING_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 6ef74964e6c32ca0d8d6d0ce; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching nuts",
+    "name": "CLA™ Self-clinching nuts",
+    "shape": "pemNut",
+    "form": {
+     "form": 0
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Aluminum"
+    ],
+    "materialCodes": {
+     "Aluminum": {
+      "code": "CLA",
+      "finish": "No finish",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "#2-56",
+      "label": "PEM {type}-256-{l}",
+      "d": 0.086,
+      "dims": {
+       "dm": 0.0667,
+       "dmaj": 0.086,
+       "dc": 0.165,
+       "de": 0.25,
+       "tl": 0.07,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.040": "1",
+       "0.056": "2"
+      }
+     },
+     {
+      "name": "#4-40",
+      "label": "PEM {type}-440-{l}",
+      "d": 0.112,
+      "dims": {
+       "dm": 0.0849,
+       "dmaj": 0.112,
+       "dc": 0.187,
+       "de": 0.25,
+       "tl": 0.07,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.040": "1",
+       "0.056": "2"
+      }
+     },
+     {
+      "name": "#6-32",
+      "label": "PEM {type}-632-{l}",
+      "d": 0.138,
+      "dims": {
+       "dm": 0.104,
+       "dmaj": 0.138,
+       "dc": 0.212,
+       "de": 0.28,
+       "tl": 0.07,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.040": "1",
+       "0.056": "2"
+      }
+     },
+     {
+      "name": "#8-32",
+      "label": "PEM {type}-832-{l}",
+      "d": 0.164,
+      "dims": {
+       "dm": 0.13,
+       "dmaj": 0.164,
+       "dc": 0.233,
+       "de": 0.31,
+       "tl": 0.09,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.040": "1",
+       "0.056": "2"
+      }
+     },
+     {
+      "name": "#10-24",
+      "label": "PEM {type}-024-{l}",
+      "d": 0.19,
+      "dims": {
+       "dm": 0.145,
+       "dmaj": 0.19,
+       "dc": 0.295,
+       "de": 0.37,
+       "tl": 0.09,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.040": "1",
+       "0.056": "2"
+      }
+     },
+     {
+      "name": "#10-32",
+      "label": "PEM {type}-032-{l}",
+      "d": 0.19,
+      "dims": {
+       "dm": 0.156,
+       "dmaj": 0.19,
+       "dc": 0.295,
+       "de": 0.37,
+       "tl": 0.09,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.040": "1",
+       "0.056": "2"
+      }
+     },
+     {
+      "name": "1/4-20",
+      "label": "PEM {type}-0420-{l}",
+      "d": 0.25,
+      "dims": {
+       "dm": 0.196,
+       "dmaj": 0.25,
+       "dc": 0.343,
+       "de": 0.44,
+       "tl": 0.17,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.056",
+       "0.091",
+       "0.125"
+      ],
+      "lengthDims": {
+       "0.056": {
+        "al": 0.054
+       },
+       "0.091": {
+        "al": 0.087
+       },
+       "0.125": {
+        "al": 0.12
+       }
+      },
+      "lengthNames": {
+       "0.056": "1",
+       "0.091": "2",
+       "0.125": "3"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_SELF_CLINCHING_LENGTH (component document 9d17ff500f202bbb48ee8235; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)",
+    "plainDescription": true
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching nuts",
+    "name": "SMPS™/SMPP™ Nuts (For thin sheets)",
+    "shape": "pemNut",
+    "form": {
+     "form": 1
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Stainless Steel",
+     "Hardened Stainless Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "SMPS",
+      "finish": "No finish",
+      "finishCode": ""
+     },
+     "Hardened Stainless Steel": {
+      "code": "SMPP",
+      "finish": "No finish",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "#2-56",
+      "label": "PEM {type}-256",
+      "d": 0.086,
+      "dims": {
+       "dm": 0.0667,
+       "dmaj": 0.086,
+       "dc": 0.135,
+       "de": 0.22,
+       "tl": 0.065,
+       "al": 0.024,
+       "md": 0.00065
+      },
+      "lengths": [],
+      "lengthDims": {},
+      "lengthNames": {}
+     },
+     {
+      "name": "#4-40",
+      "label": "PEM {type}-440",
+      "d": 0.112,
+      "dims": {
+       "dm": 0.0849,
+       "dmaj": 0.112,
+       "dc": 0.165,
+       "de": 0.22,
+       "tl": 0.065,
+       "al": 0.024,
+       "md": 0.00065
+      },
+      "lengths": [],
+      "lengthDims": {},
+      "lengthNames": {}
+     },
+     {
+      "name": "#6-32",
+      "label": "PEM {type}-632",
+      "d": 0.138,
+      "dims": {
+       "dm": 0.104,
+       "dmaj": 0.138,
+       "dc": 0.186,
+       "de": 0.252,
+       "tl": 0.065,
+       "al": 0.024,
+       "md": 0.00065
+      },
+      "lengths": [],
+      "lengthDims": {},
+      "lengthNames": {}
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_FASTENER_MATERIAL_TYPE (component document 1f5657fdc63930950ea70caa; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)",
+    "plainDescription": true
    }
   ]
  }
