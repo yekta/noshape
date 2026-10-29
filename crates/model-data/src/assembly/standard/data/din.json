@@ -7911,7 +7911,7 @@
       "d": 2.9,
       "dims": {
        "d": 2.9,
-       "dk": 7.5,
+       "dk": 6.124541,
        "k": 2.35,
        "rf": 3.8,
        "c": 0.8,
@@ -7919,7 +7919,8 @@
        "sd": 3.0,
        "t": 1.8,
        "b": 0.97,
-       "z": 2.6
+       "z": 2.6,
+       "ru": 0.1
       },
       "lengths": [
        "6.5",
@@ -7935,7 +7936,7 @@
       "d": 3.5,
       "dims": {
        "d": 3.5,
-       "dk": 9.0,
+       "dk": 7.141428,
        "k": 2.6,
        "rf": 4.6,
        "c": 0.9,
@@ -7943,7 +7944,8 @@
        "sd": 4.2,
        "t": 2.03,
        "b": 1.47,
-       "z": 3.2
+       "z": 3.2,
+       "ru": 0.1
       },
       "lengths": [
        "9.5",
@@ -7960,7 +7962,7 @@
       "d": 4.2,
       "dims": {
        "d": 4.2,
-       "dk": 10.0,
+       "dk": 8.675828,
        "k": 3.05,
        "rf": 5.8,
        "c": 1.1,
@@ -7968,7 +7970,8 @@
        "sd": 4.6,
        "t": 2.46,
        "b": 1.47,
-       "z": 3.7
+       "z": 3.7,
+       "ru": 0.2
       },
       "lengths": [
        "9.5",
@@ -7986,7 +7989,7 @@
       "d": 4.8,
       "dims": {
        "d": 4.8,
-       "dk": 11.5,
+       "dk": 9.838699,
        "k": 3.55,
        "rf": 6.6,
        "c": 1.35,
@@ -7994,7 +7997,8 @@
        "sd": 5.0,
        "t": 2.87,
        "b": 1.47,
-       "z": 4.3
+       "z": 4.3,
+       "ru": 0.2
       },
       "lengths": [
        "9.5",
@@ -8013,7 +8017,7 @@
       "d": 6.3,
       "dims": {
        "d": 6.3,
-       "dk": 14.5,
+       "dk": 12.253571,
        "k": 4.55,
        "rf": 8.2,
        "c": 1.8,
@@ -8021,7 +8025,8 @@
        "sd": 7.1,
        "t": 3.66,
        "b": 2.41,
-       "z": 6.0
+       "z": 6.0,
+       "ru": 0.25
       },
       "lengths": [
        "13",
@@ -8034,7 +8039,7 @@
       ]
      }
     ],
-    "source": "Onshape standard content table DATA_DIN_968_PAN_HEAD_TAPPING_SCREW_WITH_COLLAR_MAIN (component document 2cd4597db00bd3ff2962ac1d; live/dom/skb-sc-fsrules), Size and Length lists from live (dom/skb-sc-full-DIN.json); recess and tip as the generic cross recess / cone tip"
+    "source": "Onshape standard content table DATA_DIN_968_PAN_HEAD_TAPPING_SCREW_WITH_COLLAR_MAIN (component document 2cd4597db00bd3ff2962ac1d; live/dom/skb-sc-fsrules), Size and Length lists from live (dom/skb-sc-full-DIN.json); head as live (967: the dome of HEAD_RADIUS on the collar ledge, dk its base; ru = SHANK_FILLET), recess and tip as the generic cross recess / cone tip"
    },
    {
     "category": "Bolts & screws",
