@@ -125,7 +125,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 3.4 | Holding an arrow rotates continuously: every key repeat starts another step that runs alongside the earlier ones (they add up) | help; `setAllowRepeat` for ROTATE_*, `startAnimation`; live navigation/910–921: a 1 s hold (X repeat 660 ms / 25 Hz, 11 keydowns) turns 165° | ✅ nav 10-19: a 1 s held ← turns 165°, as live navigation/910–921 | 8627322e 10-28 (wf-block: one Left press turns the view one step (cube ~15°); Left held 1.5 s keeps turning (several steps, Right face now in front); step overlap not measured) |
 | 3.5 | Ctrl+Shift+arrows pan: the model moves 150 px toward the arrow (measured at the scene centre), 250 ms smootherstep; ignored while the camera animates | help; `animatePan`, `animateTo` | ✅ R: Ctrl+Shift+→ moves the model exactly 150 px, no rotation | 0.4.10+ / 2a6d0167 10-27 |
 | 3.6 | Z zooms out ×1.75, Shift+Z in ×1.75, about the view centre, 250 ms, clamped to the zoom limits | help; `animateZoom`, `adjustCameraToValidZoom` | ✅ R: Z ×1.75 out, Shift+Z ×1/1.75 in (world per pixel, exact) | 0.4.10+ / 2a6d0167 10-27 |
-| 3.7 | All of 3.1–3.6 work in Assemblies too | `getIsInPartStudio() \|\| getIsInAssembly()` | 🔧 (Assembly had none) |  |
+| 3.7 | All of 3.1–3.6 work in Assemblies too | `getIsInPartStudio() \| ✅ (was: Assembly had none) | f42c3330 10-29 (qa, asm5 Assembly 1: Shift+Right turns the view 90°, Ctrl+Right a small step; tickets/asm-nav-arrows-f42c.png) | 🔧 (Assembly had none) |  |
 | 3.8 | Up/Down with the rollback bar selected move the bar instead | `handleRotateUp` | ✅ (FeatureList context) | 0.4.10+ / fa61ba6f 10-27 |
 | 3.9 | View animations (standard views, fit, N) use Onshape's smootherstep easing | `animateTo` | 🔧 (was smoothstep) |  |
 
@@ -156,9 +156,9 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 6.1 | Pan: right-drag, Ctrl+right-drag, middle-drag, Ctrl+middle-drag (default preset); the sheet follows 1:1; no context menu after a right-drag | Mouse controls 2D column; live navigation/41–43 | 🔧 |  |
+| 6.1 | Pan: right-drag, Ctrl+right-drag, middle-drag, Ctrl+middle-drag (default preset); the sheet follows 1:1; no context menu after a right-drag | Mouse controls 2D column; live navigation/41–43 | ✅ | f42c3330 10-29 (qa, boltdwg drawing: a 100 px right-drag pans the sheet 100 px, no context menu after it; tickets/dwg-wheel-pan-f42c.png) |
 | 6.2 | Other presets' 2D bindings (e.g. SOLIDWORKS Shift+middle zoom, Creo Ctrl+middle zoom) | Mouse controls 2D column | 🔧 |  |
-| 6.3 | Wheel zoom about the pointer ×1.06 per notch (same as 3D); Shift/Ctrl+wheel the same; horizontal nothing; trackpad scroll and pinch as in 3D | live navigation/32–40 | 🔧 |  |
+| 6.3 | Wheel zoom about the pointer ×1.06 per notch (same as 3D); Shift/Ctrl+wheel the same; horizontal nothing; trackpad scroll and pinch as in 3D | live navigation/32–40 | ✅ | f42c3330 10-29 (qa, boltdwg drawing: 10 wheel notches about the pointer scale the Top view ≈1.83× (1.06¹⁰ = 1.79); tickets/dwg-wheel-pan-f42c.png) |
 | 6.4 | No rotation of any kind; plain arrow keys do nothing | Mouse controls; live navigation/52–53 | ✅ | 0.4.10+ / fa61ba6f 10-27 |
 | 6.5 | Z zooms out ×½, Shift+Z in ×2, about the view centre | live navigation/50–51 | ✅ (was ×0.8/×1.25) | 2bd06bb3 10-29 (qa, boltdwg drawing: Z ×½ and Shift+Z ×2 about the view centre; tickets/dwg-nav-2bd0.png) |
 | 6.6 | Ctrl+Shift+arrows move the sheet 10 % of the canvas width toward the arrow | live navigation/54–55 | ✅ (was missing) | 2bd06bb3 10-29 (qa, boltdwg drawing: Ctrl+Shift+Right moves the sheet ≈10 % of the canvas width to the right; tickets/dwg-nav-2bd0.png) |
