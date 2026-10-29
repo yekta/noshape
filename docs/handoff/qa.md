@@ -10,6 +10,15 @@ recommend the next release from it.** Details under "Daily release smoke" › v0
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **07:45 update (green 4c06fe81 = + core 63393512 Shell regions with holes, psui 2af6a63e mesher, dx 8eabd3f5 / 92c85bbf):**
+  **release/v0.4.14 (6b2e0b13) CI artifact checked**: halfmir2 A/B/C, rust-mirror-min, mirhole, halfmir and cli-fillet-segv all
+  right (Mass properties in the CI app; it has no CLI). Waiting for the tag, then the smoke (bin/relsmoke_cli.sh 0.4.14 + GUI rows;
+  bin/mirset.sh on the release CLI for face counts). **New P0 GUARD-SEGV-MALLOC-DEADLOCK (core)**: CLI seed 189 step 95 segfaults
+  in a Draft's defeaturing and the crash guard's recovery deadlocks in malloc (core dump in cli/); re-runs (parallel / serial
+  pairs, v0.4.13 CLI) running to see if it repeats. RUST-SHELL-C79E (P2): bool's debug CLI only, release builds right.
+  Verified DWG-HOLE-CALLOUT-ADD-LEADER (4c06), DWG-PROPERTY-FIELD upper-case half. Mesher A/B on 4c06 identical. GUI fuzz
+  222–238 alive. A cross sweep of the 19 volsweep documents, v0.4.13 vs core's CLI (parallel pairs), is identical except
+  cli-shell-gpf's Mirror 2 face count (69 vs 67) from core's unlanded worktree state at 06:35 (main gives 67).
 - **07:07 update (green 5166e6dd = + core f93ac93c parallel pairs, bool c79eed1d, dx 3b67d2f7 / f7c8f430 / 4df6ed3c / 36be21f2):**
   core's re-runs with the pairs parallel again: **draft-pool-hang** opens in 25 s (Draft 7 15.5 s, stops at its budget);
   **edit loop** (bin/editloop3.sh, 16 Extrude 1 depth edits on it) 16 / 16, 8–21 s each, RSS 0.9 → 1.2 GB; **CLI fuzz seeds
