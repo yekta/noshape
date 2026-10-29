@@ -292,3 +292,7 @@ Reference / Coordinate system, ruledSurface type / vertex override / corner type
 | Wrap 4 nothing | Error "Select planar faces or sketch regions to wrap." | ✅ | v0.4.14 10-29 |
 | Draft 7 parting edge parallel to pull (vertical edge, pull = top face) | Error "Parting edge cannot be parallel to pull direction." | ✅ | v0.4.14 10-29 |
 | Rib 5 closed circle, Parallel to sketch plane | Error "Failed to create a rib from a selected profile." | ✗ RIB-CLOSED-PROFILE-MSG (rib.fs: "Only open sketch profiles can be used when rib direction is parallel to sketch plane.") | v0.4.14 10-29 |
+| Move face 6 Up to entity with nothing | Error "Cannot resolve entities." | ✅ | v0.4.14 10-29 |
+| Sweep 4 path of two disconnected lines | Error "Sweep path curves are not all connected." | ✅ | v0.4.14 10-29 |
+| Loft 6 point profile in the middle | Error "Point profiles can only exist as first or last profiles." | ✅ | v0.4.14 10-29 |
+| Loft 6 two regions in one profile | Error "Select a single sketch region or face per profile." | ✅ | v0.4.14 10-29 |
