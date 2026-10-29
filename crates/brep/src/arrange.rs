@@ -130,22 +130,28 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         let hs: Vec<usize> = members[ri].iter().flat_map(|&ci| cycles[ci].iter().copied()).collect();
         r.dangling = hs.iter().any(|&h| members[ri].contains(&cycle_of[h ^ 1]));
         // A point inside: from the middle of the outer loop's longest curve, halfway to the nearest curve
-        // across.
-        let outer = &cycles[members[ri][0]];
-        let &h = outer.iter().max_by(|&&a, &&b| curve(a).length().total_cmp(&curve(b).length())).expect("a cycle has edges");
-        let c = curve(h);
-        let m = c.at(0.5);
-        let dir = c.tangent(0.5).perp();
-        let mut hits = Vec::new();
-        for &g in &hs {
-            curve(g).ray_hits(m, dir, &mut hits);
+        // across (elsewhere on it, then on the others, when that ray passes exactly between two curves).
+        let mut outer = cycles[members[ri][0]].clone();
+        outer.sort_by(|&a, &b| curve(b).length().total_cmp(&curve(a).length()));
+        let mut found = None;
+        'tries: for &h in &outer {
+            let c = curve(h);
+            for t in [0.5, 0.381_966, 0.618_034] {
+                let m = c.at(t);
+                let dir = c.tangent(t).perp();
+                let mut hits = Vec::new();
+                for &g in &hs {
+                    curve(g).ray_hits(m, dir, &mut hits);
+                }
+                let nearest = hits.into_iter().filter(|&s| s > 1e-9 * c.length()).fold(f64::INFINITY, f64::min);
+                if nearest.is_finite() {
+                    found = Some(m + dir * (nearest * 0.5));
+                    break 'tries;
+                }
+            }
         }
-        let scale = c.length();
-        let nearest = hits.into_iter().filter(|&s| s > 1e-9 * scale).fold(f64::INFINITY, f64::min);
-        if !nearest.is_finite() {
-            return Err(Decline("no point inside a face piece"));
-        }
-        r.inside = m + dir * (nearest * 0.5);
+        let Some(inside) = found else { return Err(Decline("no point inside a face piece")) };
+        r.inside = inside;
     }
     Ok(regions)
 }
