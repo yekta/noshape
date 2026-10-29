@@ -5126,6 +5126,42 @@ fn pem_fh4_studs_match_live() {
     assert_eq!(r.context.body(&standard::part_body(&r).unwrap()).unwrap().faces.len(), 82);
 }
 
+/// PEM® FHL™ / FHLS™ low-displacement head studs (live's body details): "PEM FHLS-M2.5-6", "PEM FHLS-256-4"; M2.5 x 6 = live's
+/// studio default, 44 faces (PLANE 34, CYLINDER 5, CONE 4, TORUS 1); every
+/// size builds.
+#[test]
+fn pem_fhl_studs_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let name = "FHL™/FHLS™ Flush, Low-displacement head studs";
+    let metric = CATALOGUE.iter().find(|c| c.name == name && !c.inch).unwrap();
+    let unified = CATALOGUE.iter().find(|c| c.name == name && c.inch).unwrap();
+    assert_eq!(StandardSpec::new(metric).part_name(), "PEM FHLS-M2.5-6");
+    assert_eq!(StandardSpec::new(unified).part_name(), "PEM FHLS-256-4");
+    let r = standard::regenerate(&StandardSpec::new(metric)).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let mut kinds = std::collections::BTreeMap::new();
+    for i in 0..b.faces.len() {
+        let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+            Surface::Plane(_) => "plane",
+            Surface::Cone { .. } => "cone",
+            Surface::Cylinder { .. } => "cylinder",
+            Surface::Torus { .. } => "torus",
+            _ => "other",
+        };
+        *kinds.entry(k).or_insert(0) += 1;
+    }
+    assert_eq!(kinds, [("cone", 4), ("cylinder", 5), ("plane", 34), ("torus", 1)].into_iter().collect());
+    for c in [metric, unified] {
+        for s in &c.sizes {
+            let mut spec = StandardSpec::new(c);
+            spec.set_size(&s.name);
+            let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{}: {e}", s.name));
+            assert!(standard::part_body(&r).is_some(), "{}", s.name);
+        }
+    }
+}
+
 /// ANSI commercial taper pins and slotted spring pins with live's whole size
 /// lists (its FSRules tables, behaviours "skasm (2026-10-27) standard content
 /// gaps": taper pins from #7/0, spring pins with 9/64, 5/8, 3/4); every size

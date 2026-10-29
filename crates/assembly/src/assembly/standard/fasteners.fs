@@ -2762,7 +2762,12 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
  * Form 3 (FH™ flush-head studs, sd = the thread start ts): r1 the major
  * radius (no step), the disc 0.075 ts deep, a half-round groove p / 20
  * midway from it to ts, the face split at ts, the end chamfered 0.625 of the
- * thread's triangle height (pitch pt) with the dimple 0.3 p across.
+ * thread's triangle height (pitch pt) with the dimple 0.3 p across. Form 4
+ * (FHL™ low-displacement head studs): a flat head 0.2 hd thick, its top edge
+ * rounded 0.025 hd, 8 slots (r1 sin 7.5° each side of every 45°) cut 0.075 hd
+ * up into it between the major radius and its rim; a flat-bottomed V groove
+ * (0.075 p wide, 0.05 p deep) midway from the head to ts, the face split at
+ * ts, the end as form 3.
  */
 annotation { "Feature Type Name" : "PEM pin" }
 export const pemPin = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2808,6 +2813,11 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
         if (definition.form == 2 || definition.form == 3)
         {
             flushHeadPin(context, id, definition);
+            return;
+        }
+        if (definition.form == 4)
+        {
+            lowDisplacementStud(context, id, definition);
             return;
         }
         const tpxs = definition.form == 1;
@@ -2895,4 +2905,61 @@ function flushHeadPin(context is Context, id is Id, definition is map)
         }
         opDeleteBodies(context, id + "deleteThreadPlane", { "entities" : qCreatedBy(id + "threadPlane", EntityType.BODY) });
     }
+}
+
+/** pemPin form 4 (FHL™ low-displacement head studs). */
+function lowDisplacementStud(context is Context, id is Id, definition is map)
+{
+    const p = definition.p;
+    const ts = definition.sd;
+    const l = definition.l;
+    const R = definition.hd / 2;
+    const f = 0.025 * definition.hd;
+    const hk = 0.2 * definition.hd;
+    const r1 = p / 2;
+    const zc = (-hk - ts) / 2;
+    const hw = 0.0375 * p;
+    const ig = 0.0125 * p;
+    const dep = 0.05 * p;
+    const ch = 0.625 * 0.8660254 * definition.pt;
+    const rd = 0.15 * p;
+    const s45 = sqrt(0.5);
+    const zs = -hk + 0.075 * definition.hd;
+    // The head, slotted, then the shank from the slots' roofs down: its
+    // cylinder runs on up each slot as one face (live's).
+    revolveProfile(context, id + "head", [
+                { "p" : rz(Z, Z) }, { "p" : rz(R - f, Z) }, { "p" : rz(R, -f), "mid" : rz(R - f + f * s45, -f + f * s45) },
+                { "p" : rz(R, -hk) }, { "p" : rz(Z, -hk) }
+            ]);
+    // The 8 slots in the head's underside: parallel sides r1 sin 7.5° off
+    // each 45° radius, from inside the shank out past the rim.
+    var under = XY_PLANE;
+    under.origin[2] = -hk;
+    const w = r1 * sin(7.5 * degree);
+    const far = R + hk;
+    const sk = newSketchOnPlane(context, id + "slotSketch", { "sketchPlane" : under });
+    for (var k = 0; k < 8; k += 1)
+    {
+        const c = 45 * k * degree;
+        const u = vector(cos(c), sin(c));
+        const v = vector(-sin(c), cos(c));
+        skPolyline(sk, "slot" ~ k, { "points" : [u * (0.6 * r1) - v * w, u * far - v * w, u * far + v * w, u * (0.6 * r1) + v * w, u * (0.6 * r1) - v * w] });
+    }
+    skSolve(sk);
+    opExtrude(context, id + "slots", { "entities" : qSketchRegion(id + "slotSketch"), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : 0.075 * definition.hd });
+    opDeleteBodies(context, id + "deleteSlotSketch", { "entities" : qCreatedBy(id + "slotSketch", EntityType.BODY) });
+    subtract(context, id + "cut", qCreatedBy(id + "head", EntityType.BODY), qCreatedBy(id + "slots", EntityType.BODY));
+    revolveProfile(context, id + "shank", [
+                { "p" : rz(Z, zs) }, { "p" : rz(r1, zs) }, { "p" : rz(r1, zc + hw) }, { "p" : rz(r1 - dep, zc + ig) },
+                { "p" : rz(r1 - dep, zc - ig) }, { "p" : rz(r1, zc - hw) }, { "p" : rz(r1, -l + ch) }, { "p" : rz(r1 - ch, -l) },
+                { "p" : rz(rd, -l) }, { "p" : rz(Z, -l + rd / tan(60 * degree)) }
+            ]);
+    uniteAll(context, id);
+    opPlane(context, id + "threadPlane", { "plane" : plane(vector(Z, Z, -ts), vector(0, 0, 1)), "width" : 4 * R, "height" : 4 * R });
+    try silent
+    {
+        opSplitFace(context, id + "threadSplit", { "faceTargets" : qGeometry(qOwnedByBody(solidsOf(context, id), EntityType.FACE), GeometryType.CYLINDER),
+                    "faceTools" : qCreatedBy(id + "threadPlane", EntityType.FACE), "keepToolSurfaces" : false });
+    }
+    opDeleteBodies(context, id + "deleteThreadPlane", { "entities" : qCreatedBy(id + "threadPlane", EntityType.BODY) });
 }

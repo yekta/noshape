@@ -1643,6 +1643,152 @@
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_FLUSH_HEAD_STUD_MAIN, DATA_PEM_SELFCLINCHING_FLUSH_HEAD_STUD_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document e6156fd1a2f8289f5c54739a; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)",
     "plainDescription": true
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching studs",
+    "name": "FHL™/FHLS™ Flush, Low-displacement head studs",
+    "shape": "pemPin",
+    "form": {
+     "form": 4
+    },
+    "materials": [
+     "Stainless Steel",
+     "Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "FHLS",
+      "finish": "Passivated",
+      "finishCode": ""
+     },
+     "Steel": {
+      "code": "FHL",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "M2.5x0.45",
+      "label": "PEM {type}-M2.5-{l}",
+      "d": 2.5,
+      "dims": {
+       "hd": 3.15,
+       "p": 2.5,
+       "sd": 2.1,
+       "pt": 0.45,
+       "dd": 2.5,
+       "hs": 2.5
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "15",
+       "18"
+      ]
+     },
+     {
+      "name": "M3x0.50",
+      "label": "PEM {type}-M3-{l}",
+      "d": 3.0,
+      "dims": {
+       "hd": 3.65,
+       "p": 3.0,
+       "sd": 2.1,
+       "pt": 0.5,
+       "dd": 3.0,
+       "hs": 3.0
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "15",
+       "18",
+       "20",
+       "25"
+      ]
+     },
+     {
+      "name": "M3.5x0.60",
+      "label": "PEM {type}-M3.5-{l}",
+      "d": 3.5,
+      "dims": {
+       "hd": 4.15,
+       "p": 3.5,
+       "sd": 2.3,
+       "pt": 0.6,
+       "dd": 3.5,
+       "hs": 3.5
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "15",
+       "18",
+       "20",
+       "25",
+       "30"
+      ]
+     },
+     {
+      "name": "M4x0.70",
+      "label": "PEM {type}-M4-{l}",
+      "d": 4.0,
+      "dims": {
+       "hd": 4.65,
+       "p": 4.0,
+       "sd": 2.4,
+       "pt": 0.7,
+       "dd": 4.0,
+       "hs": 4.0
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "15",
+       "18",
+       "20",
+       "25",
+       "30",
+       "35"
+      ]
+     },
+     {
+      "name": "M5x0.80",
+      "label": "PEM {type}-M5-{l}",
+      "d": 5.0,
+      "dims": {
+       "hd": 5.9,
+       "p": 5.0,
+       "sd": 2.7,
+       "pt": 0.8,
+       "dd": 5.0,
+       "hs": 5.0
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "15",
+       "18",
+       "20",
+       "25",
+       "30",
+       "35"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_FLUSH_LOW_DISPLACEMENT_HEAD_STUD_MAIN, DATA_PEM_SELFCLINCHING_FLUSH_LOW_DISPLACEMENT_HEAD_STUD_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document fa203d33f36d9880d66d4a3b; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  },
@@ -4403,6 +4549,206 @@
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_FLUSH_HEAD_STUD_MAIN, DATA_PEM_SELFCLINCHING_FLUSH_HEAD_STUD_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 23347d34e49b1c38d459bf9a; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)",
     "plainDescription": true
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching studs",
+    "name": "FHL™/FHLS™ Flush, Low-displacement head studs",
+    "shape": "pemPin",
+    "form": {
+     "form": 4
+    },
+    "materials": [
+     "Stainless Steel",
+     "Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "FHLS",
+      "finish": "Passivated",
+      "finishCode": ""
+     },
+     "Steel": {
+      "code": "FHL",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "#2-56",
+      "label": "PEM {type}-256-{l}",
+      "d": 0.086,
+      "dims": {
+       "hd": 0.112,
+       "p": 0.086,
+       "sd": 0.08,
+       "pt": 0.01785,
+       "dd": 0.086,
+       "hs": 0.086
+      },
+      "lengths": [
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75"
+      ],
+      "lengthNames": {
+       "0.25": "4",
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12"
+      }
+     },
+     {
+      "name": "#4-40",
+      "label": "PEM {type}-440-{l}",
+      "d": 0.112,
+      "dims": {
+       "hd": 0.138,
+       "p": 0.112,
+       "sd": 0.085,
+       "pt": 0.025,
+       "dd": 0.112,
+       "hs": 0.112
+      },
+      "lengths": [
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1"
+      ],
+      "lengthNames": {
+       "0.25": "4",
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16"
+      }
+     },
+     {
+      "name": "#6-32",
+      "label": "PEM {type}-632-{l}",
+      "d": 0.138,
+      "dims": {
+       "hd": 0.164,
+       "p": 0.138,
+       "sd": 0.09,
+       "pt": 0.03125,
+       "dd": 0.138,
+       "hs": 0.138
+      },
+      "lengths": [
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ],
+      "lengthNames": {
+       "0.25": "4",
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24"
+      }
+     },
+     {
+      "name": "#8-32",
+      "label": "PEM {type}-832-{l}",
+      "d": 0.164,
+      "dims": {
+       "hd": 0.19,
+       "p": 0.164,
+       "sd": 0.09,
+       "pt": 0.03125,
+       "dd": 0.164,
+       "hs": 0.164
+      },
+      "lengths": [
+       "0.25",
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ],
+      "lengthNames": {
+       "0.25": "4",
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24"
+      }
+     },
+     {
+      "name": "#10-32",
+      "label": "PEM {type}-032-{l}",
+      "d": 0.19,
+      "dims": {
+       "hd": 0.225,
+       "p": 0.19,
+       "sd": 0.1,
+       "pt": 0.03125,
+       "dd": 0.19,
+       "hs": 0.19
+      },
+      "lengths": [
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ],
+      "lengthNames": {
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_FLUSH_LOW_DISPLACEMENT_HEAD_STUD_MAIN, DATA_PEM_SELFCLINCHING_FLUSH_LOW_DISPLACEMENT_HEAD_STUD_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 786dc0de2c370bb8b7b3299d; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  }
