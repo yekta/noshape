@@ -383,6 +383,22 @@ fn a_budget_still_stops_a_pool_job_of_its_own_thread() {
     assert!(t.elapsed().as_secs_f64() < 5.0, "{:?}", t.elapsed());
 }
 
+/// qa CLI-SUPPRESS-SEGV: a fault inside a budgeted op is caught by the
+/// crash guard past the budget's frame; the budget must end with it (its jump
+/// buffer, its timer), so the next budgeted op gets its own budget and no
+/// tick jumps into the dead frame (the CLI died on the second fault).
+#[cfg(target_os = "linux")]
+#[test]
+fn a_fault_inside_a_budget_leaves_no_budget_behind() {
+    for _ in 0..3 {
+        assert!(crash_inside_kernel(8).is_err());
+        let t = std::time::Instant::now();
+        let e = crash_inside_kernel(3).unwrap_err().to_string();
+        assert!(e.contains("spin took too long"), "{e}");
+        assert!(t.elapsed().as_secs_f64() < 10.0, "{:?}", t.elapsed());
+    }
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn a_budget_never_stops_a_call_inside_the_allocator() {

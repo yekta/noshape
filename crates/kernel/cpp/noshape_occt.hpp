@@ -90,6 +90,26 @@ extern thread_local double                  budget_limit;
 extern thread_local int                     budget_reason;
 extern thread_local const std::atomic<bool>* budget_cancel;
 extern thread_local int                     budget_hold;
+// The running budget's timer (run_budgeted's), for the crash guard to stop
+// when it recovers past that budget's frame.
+extern thread_local void*                   budget_timer_live;
+// The budget as a crash guard found it; restored when the guard recovers
+// from a fault past run_budgeted's frame (qa CLI-SUPPRESS-SEGV: its jump
+// buffer and timer outlived it, and the next tick or budgeted op jumped into
+// the dead frame).
+void budget_timer_stop(void* timer);
+struct BudgetSnapshot
+{
+  sigjmp_buf* jmp   = budget_jmp;
+  void*       timer = budget_timer_live;
+  void        restore() const
+  {
+    if (budget_timer_live != timer && budget_timer_live != nullptr)
+      budget_timer_stop(budget_timer_live);
+    budget_timer_live = timer;
+    budget_jmp        = jmp;
+  }
+};
 bool                                        budget_timer_start(void*& timer);
 void                                        budget_timer_stop(void* timer);
 double                                      thread_cpu_seconds();
@@ -128,10 +148,12 @@ int run_budgeted(double cpu_seconds, F&& f)
   }
   sigjmp_buf        env;
   sigjmp_buf* const crash_outer = crash_guard;
+  budget_timer_live             = timer;
   if (sigsetjmp(env, 1) != 0)
   {
     budget_timer_stop(timer);
-    crash_guard = crash_outer;
+    budget_timer_live = nullptr;
+    crash_guard       = crash_outer;
     return budget_reason;
   }
   budget_limit  = thread_cpu_seconds() + cpu_seconds;
@@ -148,10 +170,12 @@ int run_budgeted(double cpu_seconds, F&& f)
   {
     budget_jmp = nullptr;
     budget_timer_stop(timer);
+    budget_timer_live = nullptr;
     throw;
   }
   budget_jmp = nullptr;
   budget_timer_stop(timer);
+  budget_timer_live = nullptr;
 #else
   (void)cpu_seconds;
   f();
@@ -207,9 +231,15 @@ bool run_guarded(F&& f) noexcept
   install_crash_guard();
   sigjmp_buf        env;
   sigjmp_buf* const outer = crash_guard;
+#ifdef __linux__
+  const BudgetSnapshot budget;
+#endif
   if (sigsetjmp(env, 1) != 0)
   {
     crash_guard = outer;
+#ifdef __linux__
+    budget.restore();
+#endif
     return false;
   }
   crash_guard = &env;
@@ -287,9 +317,15 @@ static void trycatch_timed(Try&& func, Fail&& fail) noexcept
   noshape::install_crash_guard();
   sigjmp_buf        env;
   sigjmp_buf* const outer = noshape::crash_guard;
+#ifdef __linux__
+  const noshape::BudgetSnapshot budget;
+#endif
   if (sigsetjmp(env, 1) != 0)
   {
     noshape::crash_guard = outer;
+#ifdef __linux__
+    budget.restore();
+#endif
     std::string msg = "occt: the kernel crashed (signal ";
     msg += std::to_string(noshape::crash_signal);
     msg += ")";

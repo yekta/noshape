@@ -107,6 +107,13 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 - Parallel pairs: ready on branch agent/core-pairs-on (99185686, not landed, for after the 10-29 release): serial
   inside CPU budgets, off in OCCT until the kernel turns it on; land it with /root/core-scratch/libTKBO.a.0004-on3
   in /root/occt.
+- CLI-SUPPRESS-SEGV (10-29 01:20): a fault inside a budgeted op (OCCT's chamfer under run_budgeted) was caught
+  by a crash guard (the bridge's trycatch_timed, or run_guarded) past run_budgeted's frame, and the budget's jump
+  buffer and CPU timer outlived it: the next budgeted op ran as if nested (no budget of its own) and the stale
+  timer's tick jumped into the dead frame (the CLI's second fault, at a stack address). Both guards now take a
+  `BudgetSnapshot` and restore it when they recover; run_budgeted publishes its timer (`budget_timer_live`). T1
+  `kernel_core::a_fault_inside_a_budget_leaves_no_budget_behind` (a SIGSEGV inside a budget, then a budgeted
+  endless loop, 3 times: "the kernel crashed (signal 11)" before, a clean budget error now).
 - 0005 (10-28; v2 22:30: only jobs with worker threads, a job of the calling thread alone is a serial loop the
   budget must still stop: qa DRAFT-BUDGET-POOL, T1 `kernel_core::a_budget_still_stops_a_pool_job_of_its_own_thread`,
   T2 ops `regen_profile::the_draft_pool_hang_document_opens`) TKernel OSD_ThreadPool::Launcher::perform counts, per thread, the pool jobs it runs

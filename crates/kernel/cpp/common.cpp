@@ -1488,6 +1488,12 @@ void crash_inside_kernel(uint8_t kind)
     // An OCCT exception through a noexcept frame (OCCT 8's gp_Dir of a zero
     // vector): std::terminate, abort.
     [](double x) noexcept { (void)gp_Dir(x, 0, 0); }(0.0);
+  else if (kind == 8)
+  {
+    // A fault inside a budgeted op (qa CLI-SUPPRESS-SEGV): the crash guard
+    // takes it past run_budgeted's frame.
+    run_budgeted(5.0, [] { std::raise(SIGSEGV); });
+  }
   else if (kind == 3)
   {
     // A loop that never ends, under a 0.3 s budget (run_budgeted).
@@ -1697,6 +1703,7 @@ thread_local double                   budget_limit  = 0;
 thread_local int                      budget_reason = 0;
 thread_local const std::atomic<bool>* budget_cancel = nullptr;
 thread_local int                      budget_hold   = 0;
+thread_local void*                    budget_timer_live = nullptr;
 
 double thread_cpu_seconds()
 {
