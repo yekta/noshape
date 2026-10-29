@@ -139,8 +139,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   `{cut.*}`; not checked on a frame part yet), A25 (callout menu order).
 - Left in dx's TICKETS: DRAWING-SHIFT-SLASH (asked the lead), VERSION-FOOTER-STALE (release process).
 - Local `cargo test` runs get a fresh NOSHAPE_CONFIG_DIR (/root/dx-scratch/env.sh, lead 10-29).
-- Next: D24's ISO placement (live request asb 10-25 a), A24's frame-part check, the other 🔧 rows (A33 "click in
-  space to add a target", A32 area size precision, V60 Show/Hide constraints).
+- Night: drawing.md A27 (callouts group onto callouts / symbols / datums, also by clicking while placing; only
+  ungrouped targets, else a group cycle drew both at the origin), A28 (stacked instances reorder; not app-checked),
+  A31 (datum on hole callouts), A32 (area size precision), A33 (datum target in empty space: a SHEET_VIEW point).
+  Live request filed for V60 (view Show/Hide constraints).
+- Next: D24's ISO placement (live request asb 10-25 a), A24's frame-part check, A28's app check, V60 when answered.
 
 ## Morning 10-29 (landed through 8eabd3f5)
 - qa tickets fixed: DWG-ROTATE-VIEW-DIMS-ZERO (edge dimensions turn with the view: `set_view_rotation`),
