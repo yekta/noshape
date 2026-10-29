@@ -42,7 +42,7 @@ defaults are compared on the specs.
 | Hole | ⏳ (structure differs: ours a lookup cascade; compared on screen) | |
 | Linear pattern | ✅ | |
 | Circular pattern | ✅ | |
-| Curve pattern | 🔧 | "Path to pattern along" allowed reordering its picks (`ALLOW_QUERY_ORDER`); live doesn't |
+| Curve pattern | ✅ | "Path to pattern along" allowed reordering its picks (`ALLOW_QUERY_ORDER`); live doesn't qa 10-29 (349290dc): "Path to pattern along" has no ⇅ order icon (Boolean Tools has one); verified. |
 | Mirror | ✅ | |
 | Boolean | ✅ | |
 | Split | ✅ | our `edgeProjectionOptionsGroup` is a group row |
@@ -72,13 +72,13 @@ live and replayed in ours from the same points; side-by-side crops in
 |---|---|---|---|
 | Revolve (Solid, Surface, Thin, one direction) | ✅ | | 0.4.10+ / 2a6d0167 10-27 (live p1audit replay, qa-scratch/p1a) |
 | Extrude (Surface, Thin, every end type, Direction, Starting offset, Symmetric, Draft, Second end position) | ✅ | | 0.4.10+ / 2a6d0167 10-27 (live p1audit replay, qa-scratch/p1a) |
-| Sweep (Surface, Thin, Twist, Scale, each Profile control) | 🔧 | Lock profile direction with nothing picked flagged "Sweep path"; sweep.fs checks the direction first ("Direction to lock" pink), then a thin wall, then the path |  |
-| Loft (Surface, Thin, Guides, Path, Connections, end conditions) | 🔧 | Ticking Guides / Path / Connections makes that field the active one (FeatureScript `FOCUS_ON_VISIBLE`); Profiles, empty, turns pink |  |
+| Sweep (Surface, Thin, Twist, Scale, each Profile control) | ✅ | Lock profile direction with nothing picked flagged "Sweep path"; sweep.fs checks the direction first ("Direction to lock" pink), then a thin wall, then the path qa 10-29 (349290dc): Profile control › Lock profile direction with nothing picked → "Direction to lock" pink, Sweep path not; verified. |  |
+| Loft (Surface, Thin, Guides, Path, Connections, end conditions) | ✅ | Ticking Guides / Path / Connections makes that field the active one (FeatureScript `FOCUS_ON_VISIBLE`); Profiles, empty, turns pink qa 10-29 (349290dc): ticking Guides, Path, Connections makes Guides / "Edges, curves and sketches" / Match connections the active field in turn, empty Profiles pink; verified. |  |
 | Fillet (Full round, Measurement, Control, Asymmetric, Partial, Variable, Smooth corners) | ✅ | Vertices / Points on edges: no reorder (`PREVENT_ARRAY_REORDER`) | 0.4.10+ / 2a6d0167 10-27 (live p1audit replay, qa-scratch/p1a) |
 | Chamfer (types, Tangent) | ✅ | | 0.4.10+ / 2a6d0167 10-27 (live p1audit replay, qa-scratch/p1a) |
 | Draft (Parting line), Shell (Hollow) | ✅ | | 0.4.10+ / 2a6d0167 10-27 (live p1audit replay, qa-scratch/p1a) |
 | Hole (Inch / Metric, Simple / Counterbore / Countersink) | ✅ (HOLE-SIZE-NO-DIAMETER fixed 2044128a) | live's 11.25 mm counterbore was its remembered Metric M6 value | 0.4.10+ / f16b31c6 10-27 |
-| Linear / Circular / Curve pattern (Feature, Face, Second direction, Skip instances) | 🔧 | Skip instances: "Instances to skip" is one field taking clicks on the instance points (`ALLOW_ARRAY_FOCUS`, `TOGGLE_POINTS`): 11 px white discs ringed #606a72, hovered #134e96, skipped #a2b9df and the instance gone, the seed a 4 px white dot; items "(1, 0) ×", a CLEAR button ("Clear all items"); no "Add instance" button |  |
+| Linear / Circular / Curve pattern (Feature, Face, Second direction, Skip instances) | ✅ | Skip instances: "Instances to skip" is one field taking clicks on the instance points (`ALLOW_ARRAY_FOCUS`, `TOGGLE_POINTS`): 11 px white discs ringed #606a72, hovered #134e96, skipped #a2b9df and the instance gone, the seed a 4 px white dot; items "(1, 0) ×", a CLEAR button ("Clear all items"); no "Add instance" button qa 10-29 (349290dc, lpd Part pattern × 3 along an edge): Skip instances shows white discs ringed grey, hover ring blue, the seed a small white dot; a click skips: instance gone, disc light blue, item "(2, 0) ×" and CLEAR; verified (tickets/p1-dialogs-3492.png). |  |
 | Mirror, Boolean, Split, Transform, Plane | ✅ | | 0.4.10+ / 2a6d0167 10-27 (live p1audit replay, qa-scratch/p1a) |
 
 ✓ (all dialogs): live's `canSubmit` enables it once the dialog is dirty
