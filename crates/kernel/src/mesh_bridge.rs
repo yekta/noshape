@@ -55,6 +55,7 @@ pub(crate) fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surface
             let curve = match c[0] as u8 {
                 0 => Some(Curve::Line),
                 1 => Some(Curve::Circle { center: v3(c, 1), normal: v3(c, 4), xdir: v3(c, 7), radius: c[10] }),
+                2 => Some(Curve::Degenerate),
                 _ => None,
             };
             MeshEdge { curve, v: [input.edges[2 * i], input.edges[2 * i + 1]], t0: c[11], t1: c[12] }
@@ -67,6 +68,7 @@ pub(crate) fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surface
             0 => MeshSurface::Plane { origin: v3(s, 1), normal: v3(s, 4), xdir: v3(s, 7) },
             1 => MeshSurface::Cylinder { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], direct: s[12] > 0.5 },
             2 => MeshSurface::Cone { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], angle: s[11], direct: s[12] > 0.5 },
+            4 => MeshSurface::Sphere { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], direct: s[12] > 0.5 },
             3 => MeshSurface::Torus { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], minor: s[11], direct: s[12] > 0.5 },
             _ => MeshSurface::Other,
         };

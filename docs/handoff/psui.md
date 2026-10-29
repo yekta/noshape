@@ -219,6 +219,13 @@ N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes
      16 faces one thread: 17.7), fins-400 488–611 → 100–107 ms (~5×; ours 77–82). Bench (rayon, load ~24): ours
      53 ms (CPU 49) against BRepMesh 235 (218), 4.4×. What's left on fins-400 is OCCT reads, Poly_Triangulation
      building, core's edge loop and mesh_fill (~10 ms each); on live-30 the per-node cost of our output.
+     Step 4 (10-29): spheres (a torus with no hole) and degenerate edges (a cone's apex, a sphere's poles): their
+     use's u from the edge's parameters (the surface's u there, a whole turn kept), the row there one node, its
+     normal the axial part of the next row's. T1 rust_mesh::a_cone_to_its_apex_and_a_sphere (every face ours;
+     area within 1e-3 and bounds within 1e-3 of the face's size for doubly curved faces: rows where BRepMesh has
+     none, ours nearer the exact area). Every surface the lead listed is done; still declined: B-splines,
+     offsets, revolutions / extrusions of free curves, a face with more than two loops on a revolved surface,
+     a torus face bounded at constant u.
 0. **After the cold-start work: our own display mesher (lead 10-28 21:05, user-approved).** `brep::mesh` in crates/brep
    (bool's crate, its Body / Surface / Curve types): planes (polygons with holes), cylinders, cones, spheres, tori from
    their exact parameterisation, shared edge samples (watertight), the display's deflection rules; anything else

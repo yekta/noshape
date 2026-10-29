@@ -7,8 +7,8 @@
 //! mesh node.
 //!
 //! Faces taken so far: planes (constrained Delaunay of their boundary nodes, as the kernel's planar
-//! triangulation), cylinders, cones and tori between two rims at constant v (rows of nodes zipped, as the
-//! kernel's strips: a torus's rows where its sides' nodes are). Edges: lines and circles (arcs split as BRepMesh splits them, so a face it meshes next to
+//! triangulation), cylinders, cones, spheres and tori between two rims at constant v (rows of nodes zipped, as
+//! the kernel's strips: a torus's or sphere's rows where its sides' nodes are; an apex or pole one node). Edges: lines and circles (arcs split as BRepMesh splits them, so a face it meshes next to
 //! one meshed here shares the nodes). A face with a circle another face on it declines is declined too.
 
 pub mod cdt;
@@ -28,6 +28,8 @@ pub enum MeshSurface {
     Cone { origin: DVec3, axis: DVec3, xdir: DVec3, direct: bool, radius: f64, angle: f64 },
     /// OCCT's torus `origin + (radius + minor cos v) (cos u x + sin u y) + minor sin v axis`.
     Torus { origin: DVec3, axis: DVec3, xdir: DVec3, direct: bool, radius: f64, minor: f64 },
+    /// OCCT's sphere `origin + radius cos v (cos u x + sin u y) + radius sin v axis` (a torus with no hole).
+    Sphere { origin: DVec3, axis: DVec3, xdir: DVec3, direct: bool, radius: f64 },
     /// Any other surface: the face is declined (BRepMesh meshes it), its loops tell which edges it is on.
     Other,
 }
@@ -89,6 +91,8 @@ pub fn edge_nodes(vertices: &[DVec3], edge: &MeshEdge, defl: Deflection) -> Opti
     let (a, b) = (*vertices.get(edge.v[0] as usize)?, *vertices.get(edge.v[1] as usize)?);
     match edge.curve {
         Some(Curve::Line) => Some(EdgeNodes { points: vec![a, b], params: vec![edge.t0, edge.t1] }),
+        // A cone's apex or a sphere's pole: its point at both ends (its parameters are the surface's u there).
+        Some(Curve::Degenerate) if edge.v[0] == edge.v[1] => Some(EdgeNodes { points: vec![a, a], params: vec![edge.t0, edge.t1] }),
         Some(Curve::Circle { center, normal, xdir, radius }) => {
             // BRepMesh's split, equal steps; the ends are the vertices.
             let arc = edge.t1 - edge.t0;
@@ -216,11 +220,14 @@ fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &[O
         // A spindle or horn torus (the tube through its axis) isn't meshed here.
         MeshSurface::Torus { origin, axis, xdir, direct, radius, minor } if minor > 0.0 && radius > minor => mesh_strip(edges, face, &Revolved::new(origin, axis, xdir, direct, radius, 0.0, minor), nodes, defl),
         MeshSurface::Torus { .. } => None,
+        MeshSurface::Sphere { origin, axis, xdir, direct, radius } if radius > 0.0 => mesh_strip(edges, face, &Revolved::new(origin, axis, xdir, direct, 0.0, 0.0, radius), nodes, defl),
+        MeshSurface::Sphere { .. } => None,
         MeshSurface::Other => None,
     }
 }
 
-/// A cylinder (`angle` 0), cone or torus (`minor` > 0, `radius` the major one) in OCCT's parameters.
+/// A cylinder (`angle` 0), cone or torus (`minor` > 0, `radius` the major one; a sphere's 0) in OCCT's
+/// parameters.
 struct Revolved {
     origin: DVec3,
     axis: DVec3,
@@ -291,8 +298,22 @@ fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option
     for (l, uses) in face.loops.iter().enumerate() {
         let (pts, per_use) = loop_nodes(edges, uses, nodes)?;
         let mut uv: Vec<DVec2> = pts.iter().map(|&p| s.uv(p)).collect();
+        // An apex or pole (a degenerate edge) has no u of its own: its use runs from its start parameter to its
+        // end one (the surface's u), a whole turn kept as it is.
+        let mut turn: Vec<Option<f64>> = vec![None; uv.len()];
+        for (k, idx) in per_use.iter().enumerate() {
+            let e = edges.get(uses[k].edge as usize)?;
+            if e.curve == Some(Curve::Degenerate) {
+                let (a, b, ta, tb) = if uses[k].reversed { (idx[1], idx[0], e.t1, e.t0) } else { (idx[0], idx[1], e.t0, e.t1) };
+                if b != a + 1 {
+                    return None;
+                }
+                uv[a].x = ta;
+                turn[b] = Some(tb - ta);
+            }
+        }
         for k in 1..uv.len() {
-            uv[k].x = uv[k - 1].x + wrap(uv[k].x - uv[k - 1].x);
+            uv[k].x = uv[k - 1].x + turn[k].unwrap_or_else(|| wrap(uv[k].x - uv[k - 1].x));
             if s.torus() {
                 uv[k].y = uv[k - 1].y + wrap(uv[k].y - uv[k - 1].y);
             }
@@ -370,7 +391,12 @@ fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option
     // Per row its v and nodes: u, point, normal.
     type Row = (f64, Vec<(f64, DVec3, DVec3)>);
     let mut rows: Vec<Row> = Vec::new();
+    let apex = |v: f64| s.ring(v).abs() <= 1e-9 * (s.radius + s.minor);
     let rim = |r: &(f64, Vec<(f64, DVec3)>)| -> Option<Row> {
+        if apex(r.0) {
+            // One node (its normal from the next row's, below).
+            return Some((r.0, vec![(0.5 * (umin + umax), r.1[0].1, DVec3::ZERO)]));
+        }
         let vt = s.v_trig(r.0);
         Some((r.0, r.1.iter().map(|&(u, p)| Some((u, p, s.at(u.sin_cos(), r.0, vt).1?))).collect::<Option<_>>()?))
     };
@@ -392,6 +418,16 @@ fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option
         }
     }
     rows.push(rim(&rims[1])?);
+    // An apex's or pole's normal: the axial part of the normals round it (the same at every u).
+    let last = rows.len() - 1;
+    for (w, next) in [(0, 1), (last, last - 1)] {
+        if rows[w].1.len() == 1 && rows[next].1.len() > 1 {
+            let n = s.axis * s.axis.dot(rows[next].1[0].2);
+            rows[w].1[0].2 = n.try_normalize()?;
+        } else if rows[w].1.len() == 1 {
+            return None;
+        }
+    }
     let mut points = Vec::new();
     let mut normals = Vec::new();
     let mut base = Vec::with_capacity(rows.len());
@@ -423,6 +459,9 @@ fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option
     let node_of = |q: DVec2| -> Option<u32> {
         let w = rows.partition_point(|r| r.0 < q.y - tol);
         let r = &rows.get(w).filter(|r| (r.0 - q.y).abs() <= tol)?.1;
+        if r.len() == 1 {
+            return Some(base[w] as u32);
+        }
         let k = r.partition_point(|x| x.0 < q.x - tol);
         (k < r.len() && (r[k].0 - q.x).abs() <= tol).then_some((base[w] + k) as u32)
     };

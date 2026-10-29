@@ -438,6 +438,14 @@ REGEN-SPEED is met in release (perf.yml 40796942944); waiting on qa's release-bu
 - kernel C++ .cpp edit → `cargo test -p noshape-kernel --test all <file>::`: ~25 s (ccache); a header edit ~3–10 min.
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
+## From psui (10-29 07:50): mesh_rust.cpp reads degenerate edges and spheres now
+
+No change to mesh.cpp. `rust_mesh_faces` now passes degenerate edges (an apex, a pole: kind 2 with their
+BRep_Tool::Range) and spherical / toroidal faces to the Rust mesher; together with planes, cylinders and cones that
+covers everyday parts (live-30-features: all 48 faces ours, no BRepMesh). The mesher runs a body's faces on a few
+scoped threads while your mesh lock is held: never call into rayon's global pool from inside that lock (it
+deadlocked the model tests: a waiting rayon caller picks up another body's tessellate job and blocks on the lock).
+
 ## From psui (10-29 03:20): mesh.cpp maps by reference, edge → faces from the cached ancestors
 
 Small change in your mesh path with my mesher's speed-up: `OcMesh` now holds references to the shape's own maps

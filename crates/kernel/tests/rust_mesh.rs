@@ -73,9 +73,13 @@ fn same_as_brepmesh(s: &Shape) -> usize {
     let tol = s.bounding_box(false).unwrap().diagonal() * 1e-6;
     for (i, (a, b)) in faces(&rust).into_iter().zip(faces(&occt)).enumerate() {
         // Within the polygons' own error: a 144-gon's area is 1 − 8e-5 of its circle's (BRepMesh triangulates a
-        // cone between the same rims a little differently).
-        assert!((a.0 - b.0).abs() <= 2e-4 * b.0.max(MM * MM), "face {i}: area {} against BRepMesh's {}", a.0, b.0);
-        assert!((a.1 - b.1).abs().max_element() <= tol && (a.2 - b.2).abs().max_element() <= tol, "face {i}: bounds");
+        // cone between the same rims a little differently); a sphere's is short in both directions, each up to
+        // (π / 144)² ≈ 5e-4 between its rows (BRepMesh's 7.4e-4 under, ours 4e-4).
+        assert!((a.0 - b.0).abs() <= 1e-3 * b.0.max(MM * MM), "face {i}: area {} against BRepMesh's {}", a.0, b.0);
+        // Its rows where BRepMesh has none, a doubly curved face's extremes differ by up to a polygon's sag (the
+        // sphere's equator: ours on it, BRepMesh's 4.6e-4 of the radius inside).
+        let btol = tol.max(1e-3 * (b.2 - b.1).max_element());
+        assert!((a.1 - b.1).abs().max_element() <= btol && (a.2 - b.2).abs().max_element() <= btol, "face {i}: bounds {:?} {:?} against {:?} {:?}", a.1, a.2, b.1, b.2);
     }
     assert_eq!(rust.edges.len(), occt.edges.len());
     for i in 0..rust.edges.len() {
@@ -132,6 +136,15 @@ fn fillets_round_a_boss_mesh_as_brepmesh_meshes_them() {
     assert_eq!(round.len(), 2);
     let s = fillet(&s, &round, 1.0 * MM).unwrap().shape;
     assert_eq!(same_as_brepmesh(&s), s.faces().len(), "every face");
+}
+
+#[test]
+fn a_cone_to_its_apex_and_a_sphere_mesh_as_brepmesh_meshes_them() {
+    // An apex and two poles: degenerate edges, one node each.
+    let cone = make_cone(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 3.0 * MM, 0.0, 5.0 * MM, TAU).unwrap();
+    assert_eq!(same_as_brepmesh(&cone), cone.faces().len(), "the cone and its base");
+    let ball = make_sphere(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 4.0 * MM, TAU).unwrap();
+    assert_eq!(same_as_brepmesh(&ball), 1, "the sphere");
 }
 
 #[test]

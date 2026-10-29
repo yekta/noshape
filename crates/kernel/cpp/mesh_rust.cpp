@@ -11,6 +11,7 @@
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Line.hxx>
 #include <Geom_Plane.hxx>
+#include <Geom_SphericalSurface.hxx>
 #include <Geom_ToroidalSurface.hxx>
 #include <Geom_TrimmedCurve.hxx>
 #include <Poly_PolygonOnTriangulation.hxx>
@@ -95,7 +96,14 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     double                        f = 0, l = 0;
     const occ::handle<Geom_Curve> c = BRep_Tool::Degenerated(e) || a <= 0 || b <= 0 ? occ::handle<Geom_Curve>() : BRep_Tool::Curve(e, loc, f, l);
     const occ::handle<Geom_Curve> bc = c.IsNull() ? c : basis(c);
-    if (!bc.IsNull() && !occ::down_cast<Geom_Line>(bc).IsNull())
+    if (BRep_Tool::Degenerated(e) && a > 0 && a == b)
+    {
+      // An apex or pole: its parameters are its face's u.
+      BRep_Tool::Range(e, f, l);
+      in.curves.push_back(2);
+      push0(in.curves, 10);
+    }
+    else if (!bc.IsNull() && !occ::down_cast<Geom_Line>(bc).IsNull())
     {
       in.curves.push_back(0);
       push0(in.curves, 10);
@@ -117,7 +125,7 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     in.curves.push_back(f);
     in.curves.push_back(l);
   }
-  // Faces: kind (0 plane, 1 cylinder, 2 cone, 3 torus, 255 not meshed here) and 12 numbers of geometry (below);
+  // Faces: kind (0 plane, 1 cylinder, 2 cone, 3 torus, 4 sphere, 255 not meshed here) and 12 numbers of geometry (below);
   // their wires' edge uses. One face per TFace: the others (a pattern's instances) take its triangulation.
   std::vector<int>                       first(faces.Extent() + 1, 0);
   std::vector<std::vector<int>>          use_edges(faces.Extent() + 1); // per first face: its uses' edges
@@ -145,7 +153,8 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     const occ::handle<Geom_CylindricalSurface> cyl = mf ? occ::handle<Geom_CylindricalSurface>() : occ::down_cast<Geom_CylindricalSurface>(s);
     const occ::handle<Geom_ConicalSurface>     con = mf ? occ::handle<Geom_ConicalSurface>() : occ::down_cast<Geom_ConicalSurface>(s);
     const occ::handle<Geom_ToroidalSurface>    tor = mf ? occ::handle<Geom_ToroidalSurface>() : occ::down_cast<Geom_ToroidalSurface>(s);
-    bool ok = (!pl.IsNull() || !cyl.IsNull() || !con.IsNull() || !tor.IsNull()) && (f.Orientation() == TopAbs_FORWARD || f.Orientation() == TopAbs_REVERSED);
+    const occ::handle<Geom_SphericalSurface>   sph = mf ? occ::handle<Geom_SphericalSurface>() : occ::down_cast<Geom_SphericalSurface>(s);
+    bool ok = (!pl.IsNull() || !cyl.IsNull() || !con.IsNull() || !tor.IsNull() || !sph.IsNull()) && (f.Orientation() == TopAbs_FORWARD || f.Orientation() == TopAbs_REVERSED);
     // Its loops, meshed here or not (a face BRepMesh meshes tells which edges it splits its own way).
     std::vector<int>& ue   = use_edges[(size_t)i];
     for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
@@ -176,6 +185,18 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
       push3(in.surfaces, a.XDirection().Crossed(a.YDirection()).XYZ());
       push3(in.surfaces, a.XDirection().XYZ());
       push0(in.surfaces, 3);
+    }
+    else if (ok && !sph.IsNull())
+    {
+      // Kind, origin, axis, x direction, radius, (spare), whether the frame is right-handed.
+      const gp_Ax3 a = sph->Position().Transformed(loc.Transformation());
+      in.surfaces.push_back(4);
+      push3(in.surfaces, a.Location().XYZ());
+      push3(in.surfaces, a.Direction().XYZ());
+      push3(in.surfaces, a.XDirection().XYZ());
+      in.surfaces.push_back(sph->Radius());
+      in.surfaces.push_back(0);
+      in.surfaces.push_back(a.Direct() ? 1.0 : 0.0);
     }
     else if (ok && !tor.IsNull())
     {

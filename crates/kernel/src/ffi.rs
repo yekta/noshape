@@ -359,8 +359,8 @@ pub(crate) mod ffi {
     extern "Rust" {
         /// noshape's own display mesher (crates/brep `mesh`) on the faces it takes: false when the input is
         /// malformed. The body's faces in flat arrays (cpp/mesh_rust.cpp): x, y, z per vertex; start and end vertex per
-        /// edge; per edge kind (0 line, 1 circle, else not meshed here), centre, normal, x direction, radius,
-        /// its start and end parameters (13 numbers); per face kind (0 plane, 1 cylinder, 2 cone, 3 torus, else not
+        /// edge; per edge kind (0 line, 1 circle, 2 a degenerate one (an apex), else not meshed here), centre, normal, x direction, radius,
+        /// its start and end parameters (13 numbers); per face kind (0 plane, 1 cylinder, 2 cone, 3 torus, 4 sphere, else not
         /// meshed here) and its geometry (13 numbers); per face its first loop (faces + 1), per loop its first
         /// use (loops + 1), edge × 2 + reversed per use; the display's deflections.
         #[allow(clippy::too_many_arguments)]
