@@ -108,6 +108,11 @@ fn flat(b: &Body, out: &mut BrepBody) {
                 out.curves.extend(xyz(center).into_iter().chain(xyz(normal)).chain(xyz(xdir)));
                 out.curves.push(major);
             }
+            Curve::Hyperbola { center, normal, xdir, major, .. } => {
+                out.curves.push(4.0);
+                out.curves.extend(xyz(center).into_iter().chain(xyz(normal)).chain(xyz(xdir)));
+                out.curves.push(major);
+            }
         }
     }
     out.face_loops = vec![0];
@@ -181,7 +186,7 @@ pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: b
     out.face_u0 = r.face_u0;
     for e in &r.body.edges {
         let (minor, faces) = match e.curve {
-            Curve::Ellipse { minor, faces, .. } => (minor, [faces[0].0, faces[0].1, faces[1].0, faces[1].1]),
+            Curve::Ellipse { minor, faces, .. } | Curve::Hyperbola { minor, faces, .. } => (minor, [faces[0].0, faces[0].1, faces[1].0, faces[1].1]),
             _ => (0.0, [0; 4]),
         };
         out.ellipse_minor.push(minor);

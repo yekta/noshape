@@ -55,7 +55,8 @@ impl Circ {
 }
 
 /// An ellipse: centre, unit normal, and its axes: `x` the major one (radius `a`), `y = n × x` the minor one
-/// (radius `b`); parameter t at `c + a cos t x + b sin t y` (OCCT's).
+/// (radius `b`); parameter t at `c + a cos t x + b sin t y` (OCCT's). `hyp`: the hyperbola's branch
+/// `c + a cosh t x + b sinh t y` instead (OCCT's; not closed).
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Ell {
     c: DVec3,
@@ -64,24 +65,31 @@ struct Ell {
     y: DVec3,
     a: f64,
     b: f64,
+    hyp: bool,
 }
 
 impl Ell {
     fn at(&self, t: f64) -> DVec3 {
+        if self.hyp {
+            return self.c + self.x * (self.a * t.cosh()) + self.y * (self.b * t.sinh());
+        }
         self.c + self.x * (self.a * t.cos()) + self.y * (self.b * t.sin())
     }
 
     fn deriv(&self, t: f64) -> DVec3 {
+        if self.hyp {
+            return self.x * (self.a * t.sinh()) + self.y * (self.b * t.cosh());
+        }
         self.y * (self.b * t.cos()) - self.x * (self.a * t.sin())
     }
 
     /// The parameter of the point of it nearest `p` (from its angle, then Newton's method).
     fn param(&self, p: DVec3) -> f64 {
         let w = p - self.c;
-        let mut t = (w.dot(self.y) / self.b).atan2(w.dot(self.x) / self.a);
+        let mut t = if self.hyp { (w.dot(self.y) / self.b).asinh() } else { (w.dot(self.y) / self.b).atan2(w.dot(self.x) / self.a) };
         for _ in 0..8 {
             let (d1, q) = (self.deriv(t), self.at(t) - p);
-            let d2 = self.c - self.at(t);
+            let d2 = if self.hyp { self.at(t) - self.c } else { self.c - self.at(t) };
             let g = q.dot(d1);
             let gp = d1.length_squared() + q.dot(d2);
             if gp.abs() < 1e-300 {
@@ -94,6 +102,24 @@ impl Ell {
             }
         }
         t
+    }
+
+    /// A box around its piece from `t0` through `sweep` (an ellipse: the whole of it).
+    fn piece_box(&self, t0: f64, sweep: f64) -> (DVec3, DVec3) {
+        if !self.hyp {
+            return (self.c - DVec3::splat(self.a), self.c + DVec3::splat(self.a));
+        }
+        // Samples, grown by h² / 8 times its largest second derivative there (|at(t) - c|).
+        const N: usize = 32;
+        let (mut lo, mut hi) = (DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY));
+        for k in 0..=N {
+            let p = self.at(t0 + sweep * k as f64 / N as f64);
+            lo = lo.min(p);
+            hi = hi.max(p);
+        }
+        let big = t0.abs().max((t0 + sweep).abs());
+        let bulge = DVec3::splat((self.a * big.cosh() + self.b * big.sinh()) * (sweep / N as f64).powi(2) / 8.0);
+        (lo - bulge, hi + bulge)
     }
 
     /// Its length from `t0` to `t1` (Gauss–Legendre on 16 pieces).
@@ -191,9 +217,13 @@ impl GFace {
             }
             (Surf::Plane { u, v, .. }, Geo::Ell { e, t0, sweep, .. }) => {
                 let lin = |w: DVec3| DVec2::new(w.dot(*u), w.dot(*v));
+                if e.hyp {
+                    return Ok(C2::Hyp { c: self.to2(e.c), u: lin(e.x) * e.a, v: lin(e.y) * e.b, w: DVec2::ZERO, k: 0.0, t0: *t0, sweep: *sweep });
+                }
                 Ok(C2::Trig { c: self.to2(e.c), u: lin(e.x) * e.a, v: lin(e.y) * e.b, w: DVec2::ZERO, t0: *t0, sweep: *sweep })
             }
-            (Surf::Cyl { k: slope, .. }, Geo::Ell { .. }) if *slope != 0.0 => Err(Decline("an ellipse on a cone")),
+            (Surf::Cyl { k: slope, .. }, Geo::Ell { e, .. }) if *slope != 0.0 && !e.hyp => Err(Decline("an ellipse on a cone")),
+            (Surf::Cyl { k: slope, .. }, Geo::Ell { e, .. }) if *slope == 0.0 && e.hyp => Err(Decline("a hyperbola on a cylinder")),
             (Surf::Cyl { r, th0, a, o, full, .. }, g) => {
                 if *g == Geo::Apex {
                     if !*full {
@@ -235,6 +265,28 @@ impl GFace {
                             return Err(Decline("an arc across a cylinder's seam"));
                         }
                         Ok(C2::Seg { a: q0, b: DVec2::new(x1, q0.y) })
+                    }
+                    Geo::Ell { e, t0, sweep, .. } if e.hyp => {
+                        // Seen along the axis: from its foot on the plane (nearest the axis, at |dd|) along y,
+                        // b sinh t; its angle φ0 + s atan(b sinh t / |dd|), its height hc + A cosh t.
+                        let Surf::Cyl { flip, .. } = self.s else { unreachable!() };
+                        let foot = (e.c - *o) - *a * (e.c - *o).dot(*a);
+                        let dd = foot.length();
+                        let s = if foot.cross(e.y).dot(*a) > 0.0 { 1.0 } else { -1.0 };
+                        let k = e.b / dd;
+                        let ang = |t: f64| s * (k * t.sinh()).atan();
+                        let dth = ang(t0 + sweep) - ang(*t0);
+                        if dth < 0.0 && (at0 || at1) {
+                            q0.x = r * (th0 + TAU);
+                        }
+                        let x1 = q0.x + r * dth;
+                        if x1 < r * th0 - 1e-9 * r || x1 > r * (th0 + TAU) + 1e-9 * r {
+                            return Err(Decline("a hyperbola across a cone's seam"));
+                        }
+                        let (hc, amp) = ((e.c - *o).dot(*a), e.a * e.x.dot(*a));
+                        let sh = if flip { -1.0 } else { 1.0 };
+                        let phi0 = q0.x / r - ang(*t0);
+                        Ok(C2::Hyp { c: DVec2::new(r * phi0, sh * hc), u: DVec2::new(0.0, sh * amp), v: DVec2::ZERO, w: DVec2::new(r * s, 0.0), k, t0: *t0, sweep: *sweep })
                     }
                     Geo::Ell { e, t0, sweep, .. } => {
                         // Seen along the axis the ellipse is the cylinder's circle: its angle φ0 + s t, its height
@@ -519,7 +571,8 @@ impl Ctx {
             }
             Geo::Ell { e, t0, sweep, .. } => {
                 let tp = e.param(p);
-                ((tp - t0).rem_euclid(TAU) / sweep, (e.at(tp) - p).length())
+                let d = if e.hyp { tp - t0 } else { (tp - t0).rem_euclid(TAU) };
+                (d / sweep, (e.at(tp) - p).length())
             }
             Geo::Apex => (0.0, (p - self.p(s.v[0])).length()),
         }
@@ -556,6 +609,9 @@ impl Ctx {
                 let h = (k.c - o).dot(a);
                 let t = t0 + (k.angle(o + a * h + (x * th0.cos() + y * th0.sin()) * (r0 + slope * h)) - t0).rem_euclid(TAU);
                 Some((t, (t - t0) * k.r > tol && (t1 - t) * k.r > tol))
+            }
+            (&Path::Ellipse(e), &Surf::Cyl { th0, full: false, .. }) if e.hyp => {
+                self.hyp_at_angle(f, &e, th0).filter(|&t| t > t0 && t < t1).map(|t| (t, e.length(t0, t) > tol && e.length(t, t1) > tol))
             }
             (&Path::Ellipse(e), &Surf::Cyl { th0, full: false, .. }) => {
                 let t = t0 + (self.ell_at_angle(f, &e, th0) - t0).rem_euclid(TAU);
@@ -676,7 +732,19 @@ impl Ctx {
             }
             cuts.sort_by(|a, b| a.0.total_cmp(&b.0));
         }
-        if let Path::Ellipse(e) = path {
+        if let Path::Ellipse(e) = path
+            && e.hyp
+        {
+            // (Not closed: its ends are where its range ends.)
+            for f in [fs, ft] {
+                let Some(p) = self.seam_at(f, path) else { continue };
+                let t = e.param(p);
+                if e.length(t0, t.max(t0)) > tol && e.length(t.min(t1), t1) > tol {
+                    cuts.push((t, End::Point(p)));
+                }
+            }
+            cuts.sort_by(|a, b| a.0.total_cmp(&b.0));
+        } else if let Path::Ellipse(e) = path {
             for f in [fs, ft] {
                 let Some(p) = self.seam_at(f, path) else { continue };
                 let t = t0 + (e.param(p) - t0).rem_euclid(TAU);
@@ -688,9 +756,10 @@ impl Ctx {
             }
             cuts.sort_by(|a, b| a.0.total_cmp(&b.0));
         }
+        let open = matches!(path, Path::Ellipse(e) if e.hyp);
         for i in 0..cuts.len() {
             let (a, ea) = cuts[i];
-            let (b, eb) = if i + 1 < cuts.len() { cuts[i + 1] } else { (t1, cuts[0].1) };
+            let (b, eb) = if i + 1 < cuts.len() { cuts[i + 1] } else { (t1, if open { End::Open } else { cuts[0].1 }) };
             self.section_part(fs, ft, path, a, b, [ea, eb])?;
         }
         Ok(())
@@ -818,6 +887,7 @@ impl Ctx {
                 let h = (k.c - *o).dot(*a);
                 Some(*o + *a * h + (*x * th0.cos() + *y * th0.sin()) * (r0 + slope * h))
             }
+            (Path::Ellipse(e), Surf::Cyl { th0, full: true, .. }) if e.hyp => self.hyp_at_angle(f, &e, *th0).map(|t| e.at(t)),
             (Path::Ellipse(e), Surf::Cyl { th0, full: true, .. }) => Some(e.at(self.ell_at_angle(f, &e, *th0))),
             _ => None,
         }
@@ -830,6 +900,20 @@ impl Ctx {
         let d = x * th.cos() + y * th.sin();
         let xp = (e.x - a * e.x.dot(a)).normalize();
         d.dot(e.y).atan2(d.dot(xp))
+    }
+
+    /// The parameter of hyperbola `e` (on face `f`'s cone) where the cone's angle is `th`, if it gets there.
+    fn hyp_at_angle(&self, f: usize, e: &Ell, th: f64) -> Option<f64> {
+        let Surf::Cyl { o, a, x, y, .. } = self.faces[f].s else { unreachable!() };
+        // Seen along the axis: from its foot on the plane (nearest the axis) along y, b sinh t.
+        let foot = (e.c - o) - a * (e.c - o).dot(a);
+        let d = x * th.cos() + y * th.sin();
+        let den = e.y.cross(d).dot(a);
+        if den.abs() < 1e-12 {
+            return None;
+        }
+        let sv = -foot.cross(d).dot(a) / den;
+        ((foot + e.y * sv).dot(d) > 0.0).then(|| (sv / e.b).asinh())
     }
 
     /// Whether edge `e` lies on face `f`'s surface.
@@ -951,7 +1035,7 @@ impl Ctx {
             let sn = if flip { -n } else { n };
             let c = o + a * ((d - n.dot(o)) / na);
             let xe = sn.cross(a).cross(sn).normalize();
-            let e = Ell { c, n: sn, x: xe, y: sn.cross(xe), a: r / na.abs(), b: r };
+            let e = Ell { c, n: sn, x: xe, y: sn.cross(xe), a: r / na.abs(), b: r, hyp: false };
             let (lo, hi) = (self.faces[fc].lo, self.faces[fc].hi);
             if !boxes_meet(c - DVec3::splat(e.a), c + DVec3::splat(e.a), lo, hi, GREY * tol) {
                 return Ok(());
@@ -975,10 +1059,26 @@ impl Ctx {
             if dd.abs() > rmax + GREY * tol {
                 return Ok(());
             }
-            if dd.abs() > tol {
-                return Err(Decline("a plane along a cone"));
-            }
             let apex = o - a * (r0 / slope);
+            if dd.abs() > GREY * tol {
+                // OCCT's hyperbola (IntAna_QuadQuadGeo): centred where the plane is nearest the apex, its normal
+                // the plane surface's, its major axis along the cone's axis into the face's nappe, its radii
+                // |dd| / |slope| and |dd|.
+                let Surf::Plane { flip, .. } = self.faces[fp].s else { unreachable!() };
+                let sn = if flip { -n } else { n };
+                let xe = if slope > 0.0 { a } else { -a };
+                let e = Ell { c: apex - n * dd, n: sn, x: xe, y: sn.cross(xe), a: dd.abs() / slope.abs(), b: dd.abs(), hyp: true };
+                // Its range: where it is no farther from the apex along the axis than the face.
+                let far = (h0 - (-r0 / slope)).abs().max((h1 - (-r0 / slope)).abs());
+                if far <= e.a {
+                    return Ok(());
+                }
+                let t = (far / e.a).acosh() * 1.01 + 1e-3;
+                return self.section(fp, fc, Path::Ellipse(e), -t, t);
+            }
+            if dd.abs() > tol {
+                return Err(Decline("a plane nearly through a cone's axis"));
+            }
             if boxes_meet(apex, apex, lo, hi, GREY * tol) {
                 return Err(Decline("a plane through a cone's apex"));
             }
@@ -1138,7 +1238,7 @@ impl Ctx {
         let (ch, sh) = (((1.0 + b) * 0.5).sqrt(), ((1.0 - b) * 0.5).sqrt());
         let (sum, diff) = ((a1 + a2).normalize(), (a1 - a2).normalize());
         for (n, x, major) in [(sum, diff, r1 / ch), (diff, sum, r1 / sh)] {
-            let el = Ell { c, n, x, y: n.cross(x), a: major, b: r1 };
+            let el = Ell { c, n, x, y: n.cross(x), a: major, b: r1, hyp: false };
             let (lo, hi) = (self.faces[f1].lo.max(self.faces[f2].lo), self.faces[f1].hi.min(self.faces[f2].hi));
             if !boxes_meet(c - DVec3::splat(major), c + DVec3::splat(major), lo, hi, GREY * tol) {
                 continue;
@@ -1181,7 +1281,7 @@ impl Ctx {
                 (a.min(b), a.max(b))
             }
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
-            Geo::Ell { e, .. } => (e.c - DVec3::splat(e.a), e.c + DVec3::splat(e.a)),
+            Geo::Ell { e, t0, sweep, .. } => e.piece_box(t0, sweep),
             Geo::Apex => return Ok(vec![s.v[0], s.v[1]]),
         };
         let (lo, hi) = (lo - DVec3::splat(tol), hi + DVec3::splat(tol));
@@ -1487,7 +1587,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         for (i, e) in body.edges.iter().enumerate() {
             let v = [vmap[e.v[0] as usize], vmap[e.v[1] as usize]];
             let g = match e.curve {
-                Curve::Ellipse { .. } => return Err(Decline("an argument's ellipse")),
+                Curve::Ellipse { .. } | Curve::Hyperbola { .. } => return Err(Decline("an argument's ellipse")),
                 Curve::Degenerate => {
                     if v[0] != v[1] {
                         return Err(Decline("a degenerate edge between two vertices"));
@@ -1566,11 +1666,12 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
                 lo -= bulge;
                 hi += bulge;
             }
-            if let Geo::Ell { e, .. } = s.g {
+            if let Geo::Ell { e, t0, sweep, .. } = s.g {
                 // An ellipse by at most h² / 8 times its largest second derivative (a) for steps h ≤ π/8.
+                let (elo, ehi) = e.piece_box(t0, sweep);
                 let bulge = DVec3::splat(e.a * (PI / 8.0).powi(2) / 8.0);
-                lo -= bulge;
-                hi += bulge;
+                lo = lo.min(elo) - bulge;
+                hi = hi.max(ehi) + bulge;
             }
         }
         cx.faces[f].lo = lo;
@@ -1726,7 +1827,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         let (lo, hi) = match s.g {
             Geo::Line | Geo::Apex => (cx.p(s.v[0]).min(cx.p(s.v[1])), cx.p(s.v[0]).max(cx.p(s.v[1]))),
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
-            Geo::Ell { e, .. } => (e.c - DVec3::splat(e.a), e.c + DVec3::splat(e.a)),
+            Geo::Ell { e, t0, sweep, .. } => e.piece_box(t0, sweep),
         };
         let near = es != usize::MAX && (0..ns).any(|t| meets[es * ns + t] && boxes_meet(lo, hi, cx.solids[t].lo, cx.solids[t].hi, GREY * tol));
         let chain = if near { cx.split_among(&s, &lists, Some(cx.edges[e].arg))? } else { vec![s.v[0], s.v[1]] };
@@ -2101,6 +2202,10 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             }
             // (Only new: OCCT's frame as the section made it.)
             Geo::Ell { .. } if flip => return Err(Decline("a piece of an argument's ellipse")),
+            Geo::Ell { e, faces, .. } if e.hyp => {
+                let of = |f: usize| (cx.faces[f].arg, cx.faces[f].index);
+                (seg.v, Curve::Hyperbola { center: e.c, normal: e.n, xdir: e.x, major: e.a, minor: e.b, faces: [of(faces[0]), of(faces[1])] })
+            }
             Geo::Ell { e, faces, .. } => {
                 let of = |f: usize| (cx.faces[f].arg, cx.faces[f].index);
                 (seg.v, Curve::Ellipse { center: e.c, normal: e.n, xdir: e.x, major: e.a, minor: e.b, faces: [of(faces[0]), of(faces[1])] })
@@ -2427,6 +2532,17 @@ fn shell_volume(b: &Body, faces: &[u32]) -> f64 {
                             .map(|k| {
                                 let a = a0 + sweep * k as f64 / 16.0;
                                 center + (xdir * a.cos() + y * a.sin()) * radius
+                            })
+                            .collect()
+                    }
+                    Curve::Hyperbola { center, normal, xdir, major, minor, .. } => {
+                        let y = normal.cross(xdir);
+                        let par = |x: DVec3| ((x - center).dot(y) / minor).asinh();
+                        let (t0, t1) = (par(p), par(q));
+                        (0..=16)
+                            .map(|k| {
+                                let t = t0 + (t1 - t0) * k as f64 / 16.0;
+                                center + xdir * (major * t.cosh()) + y * (minor * t.sinh())
                             })
                             .collect()
                     }

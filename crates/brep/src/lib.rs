@@ -36,6 +36,9 @@ pub enum Curve {
     /// its start to its end as t grows. Only in a Boolean's result: the section of two arguments' faces
     /// (argument, face), OCCT's own section of which gives its curves on them.
     Ellipse { center: DVec3, normal: DVec3, xdir: DVec3, major: f64, minor: f64, faces: [(u32, u32); 2] },
+    /// A hyperbola's branch, its parameter t at `center + major cosh t xdir + minor sinh t (normal × xdir)`: the edge
+    /// from its start to its end as t grows. Only in a Boolean's result, as an ellipse.
+    Hyperbola { center: DVec3, normal: DVec3, xdir: DVec3, major: f64, minor: f64, faces: [(u32, u32); 2] },
     /// No curve: an edge at a point (a cone's apex), its start and end one vertex.
     Degenerate,
 }

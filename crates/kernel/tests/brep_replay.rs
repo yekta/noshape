@@ -388,3 +388,36 @@ fn brep_cross_drilled_holes_match_occt() {
     // inside a face: declined.)
     assert!(taken >= 6, "{taken} taken; declined: {why_not:#?}");
 }
+
+/// A plane along a cone's axis, off it (a slab's wall by a chamfer's cone, a pocket's side by a countersink):
+/// OCCT's hyperbola, its curves on the plane and the cone; noshape's own Boolean takes them as OCCT.
+#[test]
+fn brep_hyperbolas_match_occt() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let mut taken = 0;
+    let mut why_not = Vec::new();
+    for (y1, r1, r2) in [(9.0, 6.0, 2.0), (11.5, 6.0, 2.0), (13.0, 6.0, 2.0), (6.0, 2.0, 6.0), (14.0, 2.0, 6.0)] {
+        for op in [BooleanOp::Fuse, BooleanOp::Cut, BooleanOp::Common] {
+            let b = make_box_corners(DVec3::new(5.0, 0.0, 0.0) * mm, DVec3::new(35.0, y1, 10.0) * mm).unwrap();
+            let cone = make_cone(&Plane::from_normal(DVec3::new(20.0, 10.0, 2.0) * mm, DVec3::Z), r1 * mm, r2 * mm, 6.0 * mm, std::f64::consts::TAU).unwrap();
+            let name = format!("y {y1} r {r1}..{r2} {op:?}");
+            set_rust_boolean_only(true);
+            let r = boolean(op, std::slice::from_ref(&b), std::slice::from_ref(&cone), &BooleanOptions::default());
+            let (path, why) = (last_boolean_path(), last_rust_decline());
+            set_rust_boolean_only(false);
+            set_rust_boolean(Some(false));
+            let o = boolean(op, &[b], &[cone], &BooleanOptions::default());
+            set_rust_boolean(None);
+            if path != "rust" {
+                why_not.push(format!("{name}: {why}"));
+                continue;
+            }
+            taken += 1;
+            let d = Summary::of(&r.unwrap()).differences(&Summary::of(&o.unwrap()));
+            assert!(d.is_empty(), "{name}: {d:?}");
+        }
+    }
+    // (The common of the narrow box and the widening cone: two solids with a void, declined.)
+    assert!(taken >= 14, "{taken} taken; declined: {why_not:#?}");
+}

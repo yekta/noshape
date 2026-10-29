@@ -1,16 +1,19 @@
-//! Curves in a face's parameter plane: straight segments, circular arcs, and trigonometric curves (an ellipse's
-//! arc on a plane, a plane's section on a cylinder: a sinusoid), the last done numerically.
+//! Curves in a face's parameter plane: straight segments, circular arcs, trigonometric curves (an ellipse's
+//! arc on a plane, a plane's section on a cylinder: a sinusoid) and hyperbolic ones (a hyperbola's arc on a plane
+//! or on the cone it is a section of), the last two done numerically.
 
 use glam::DVec2;
 use std::f64::consts::TAU;
 
 /// A segment from `a` to `b`, an arc of the circle (`c`, `r`) from angle `a0` through `sweep` (positive:
-/// counter-clockwise), or the curve c + u cos t + v sin t + w t for t from `t0` through `sweep`.
+/// counter-clockwise), the curve c + u cos t + v sin t + w t, or the curve c + u cosh t + v sinh t + w atan(k sinh t),
+/// for t from `t0` through `sweep`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum C2 {
     Seg { a: DVec2, b: DVec2 },
     Arc { c: DVec2, r: f64, a0: f64, sweep: f64 },
     Trig { c: DVec2, u: DVec2, v: DVec2, w: DVec2, t0: f64, sweep: f64 },
+    Hyp { c: DVec2, u: DVec2, v: DVec2, w: DVec2, k: f64, t0: f64, sweep: f64 },
 }
 
 /// Points along a curve to look for crossings between (a trigonometric curve's turns at most a quarter of a
@@ -42,6 +45,10 @@ impl C2 {
                 let a = t0 + sweep * t;
                 c + u * a.cos() + v * a.sin() + w * a
             }
+            C2::Hyp { c, u, v, w, k, t0, sweep } => {
+                let a = t0 + sweep * t;
+                c + u * a.cosh() + v * a.sinh() + w * (k * a.sinh()).atan()
+            }
         }
     }
 
@@ -56,6 +63,14 @@ impl C2 {
             C2::Trig { u, v, w, t0, sweep, .. } => {
                 let a = t0 + sweep * t;
                 ((-u * a.sin() + v * a.cos() + w) * sweep, (-u * a.cos() - v * a.sin()) * (sweep * sweep))
+            }
+            C2::Hyp { u, v, w, k, t0, sweep, .. } => {
+                // atan(g)' = g' / (1 + g²), atan(g)'' = (g'' (1 + g²) - 2 g g'²) / (1 + g²)², g = k sinh a.
+                let a = t0 + sweep * t;
+                let (g, g1) = (k * a.sinh(), k * a.cosh());
+                let q = 1.0 + g * g;
+                let (d1, d2) = (g1 / q, (g * q - 2.0 * g * g1 * g1) / (q * q));
+                ((u * a.sinh() + v * a.cosh() + w * d1) * sweep, (u * a.cosh() + v * a.sinh() + w * d2) * (sweep * sweep))
             }
         }
     }
@@ -73,6 +88,7 @@ impl C2 {
             C2::Seg { a, b } => C2::Seg { a: b, b: a },
             C2::Arc { c, r, a0, sweep } => C2::Arc { c, r, a0: a0 + sweep, sweep: -sweep },
             C2::Trig { c, u, v, w, t0, sweep } => C2::Trig { c, u, v, w, t0: t0 + sweep, sweep: -sweep },
+            C2::Hyp { c, u, v, w, k, t0, sweep } => C2::Hyp { c, u, v, w, k, t0: t0 + sweep, sweep: -sweep },
         }
     }
 
@@ -80,7 +96,7 @@ impl C2 {
         match *self {
             C2::Seg { a, b } => (b - a).length(),
             C2::Arc { r, sweep, .. } => r * sweep.abs(),
-            C2::Trig { .. } => self.gauss(|t| self.derivs(t).0.length()),
+            C2::Trig { .. } | C2::Hyp { .. } => self.gauss(|t| self.derivs(t).0.length()),
         }
     }
 
@@ -100,7 +116,7 @@ impl C2 {
         match *self {
             C2::Seg { a, b } => (b - a).normalize(),
             C2::Arc { a0, sweep, .. } => dir(a0 + sweep * t).perp() * sweep.signum(),
-            C2::Trig { .. } => self.derivs(t).0.normalize(),
+            C2::Trig { .. } | C2::Hyp { .. } => self.derivs(t).0.normalize(),
         }
     }
 
@@ -109,7 +125,7 @@ impl C2 {
         match *self {
             C2::Seg { .. } => 0.0,
             C2::Arc { r, sweep, .. } => sweep.signum() / r,
-            C2::Trig { .. } => {
+            C2::Trig { .. } | C2::Hyp { .. } => {
                 let (d, dd) = self.derivs(0.0);
                 d.perp_dot(dd) / d.length().powi(3)
             }
@@ -124,7 +140,7 @@ impl C2 {
                 let a1 = a0 + sweep;
                 0.5 * (r * r * sweep + r * c.x * (a1.sin() - a0.sin()) - r * c.y * (a1.cos() - a0.cos()))
             }
-            C2::Trig { .. } => self.gauss(|t| 0.5 * self.at(t).perp_dot(self.derivs(t).0)),
+            C2::Trig { .. } | C2::Hyp { .. } => self.gauss(|t| 0.5 * self.at(t).perp_dot(self.derivs(t).0)),
         }
     }
 
@@ -205,7 +221,7 @@ impl C2 {
                     }
                 }
             }
-            C2::Trig { .. } => {
+            C2::Trig { .. } | C2::Hyp { .. } => {
                 for t in self.roots(|t| (self.at(t) - m).perp_dot(d)) {
                     let s = (self.at(t) - m).dot(d);
                     if s > 0.0 {
@@ -231,7 +247,7 @@ impl C2 {
                 let rel = if sweep >= 0.0 { (a - a0).rem_euclid(TAU) } else { (a0 - a).rem_euclid(TAU) };
                 (rel / sweep.abs(), d)
             }
-            C2::Trig { .. } => {
+            C2::Trig { .. } | C2::Hyp { .. } => {
                 // The nearest sample, then Newton on (q - p)·q' (within 0..1).
                 let mut best = (0.0, f64::INFINITY);
                 for k in 0..=SAMPLES {
@@ -278,7 +294,7 @@ impl C2 {
                     (self.start() - p).length().min((self.end() - p).length())
                 }
             }
-            C2::Trig { .. } => self.param_of(p).1,
+            C2::Trig { .. } | C2::Hyp { .. } => self.param_of(p).1,
         }
     }
 
@@ -347,7 +363,7 @@ impl C2 {
     /// Parameters (on `self`, on `o`) where the two cross, ends included; none where they run together
     /// (within `tol`: collinear segments, arcs of one circle), which their ends lying on each other show.
     pub fn intersections(&self, o: &C2, tol: f64) -> Vec<(f64, f64)> {
-        if matches!(self, C2::Trig { .. }) || matches!(o, C2::Trig { .. }) {
+        if matches!(self, C2::Trig { .. } | C2::Hyp { .. }) || matches!(o, C2::Trig { .. } | C2::Hyp { .. }) {
             return self.numeric_intersections(o, tol);
         }
         let mut out = Vec::new();
@@ -384,7 +400,7 @@ impl C2 {
                 }
             }
             (C2::Arc { .. }, C2::Seg { .. }) => out = o.intersections(self, tol).into_iter().map(|(u, t)| (t, u)).collect(),
-            (C2::Trig { .. }, _) | (_, C2::Trig { .. }) => unreachable!(),
+            (C2::Trig { .. } | C2::Hyp { .. }, _) | (_, C2::Trig { .. } | C2::Hyp { .. }) => unreachable!(),
             (C2::Arc { c: c1, r: r1, a0: s1, sweep: w1 }, C2::Arc { c: c2, r: r2, a0: s2, sweep: w2 }) => {
                 let d = c2 - c1;
                 let dl = d.length();

@@ -22,6 +22,7 @@
 #include <Geom2d_Line.hxx>
 #include <Geom_Circle.hxx>
 #include <Geom_Ellipse.hxx>
+#include <Geom_Hyperbola.hxx>
 #include <IntTools_Curve.hxx>
 #include <IntTools_FaceFace.hxx>
 #include <array>
@@ -368,6 +369,34 @@ const char* ellipse_edge(const BrepResult& r, const std::vector<const OcShape*>&
   const double* cv = &r.body.curves[11 * i];
   const gp_Pnt  ctr(cv[1], cv[2], cv[3]);
   const gp_Dir  n(cv[4], cv[5], cv[6]);
+  if (cv[0] == 4)
+  {
+    // A hyperbola's branch (not closed): the piece of OCCT's that holds it.
+    for (const IntTools_Curve& ic : it->second)
+    {
+      const occ::handle<Geom_Curve>     c  = ic.Curve();
+      const occ::handle<Geom_Hyperbola> hy = occ::down_cast<Geom_Hyperbola>(basis_of(c));
+      if (hy.IsNull())
+        continue;
+      const gp_Hypr g = hy->Hypr();
+      if (g.Location().Distance(ctr) > 1e-9 * g.MajorRadius() || g.Axis().Direction().Dot(n) < 1 - 1e-12)
+        continue;
+      const double first = c->FirstParameter(), last = c->LastParameter();
+      const double t0 = ElCLib::Parameter(g, p0), t1 = ElCLib::Parameter(g, p1);
+      if (!(t1 > t0) || t0 < first - 1e-9 || t1 > last + 1e-9)
+        continue;
+      out.curve     = hy;
+      out.face[0]   = fa;
+      out.face[1]   = fb;
+      out.pcurve[0] = ic.FirstCurve2d();
+      out.pcurve[1] = ic.SecondCurve2d();
+      out.t0        = t0;
+      out.t1        = t1;
+      out.tol       = std::max({ic.Tolerance(), BRep_Tool::Tolerance(fa), BRep_Tool::Tolerance(fb)});
+      return nullptr;
+    }
+    return "a hyperbola unlike OCCT's sections";
+  }
   for (const IntTools_Curve& ic : it->second)
   {
     const occ::handle<Geom_Curve>   c  = ic.Curve();
@@ -484,7 +513,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     }
     else if (cv[0] == 0)
       c = new Geom_Line(p0, gp_Dir(gp_Vec(p0, p1)));
-    else if (cv[0] == 3)
+    else if (cv[0] == 3 || cv[0] == 4)
     {
       // OCCT's own section of the two faces: its ellipse and the part of it this piece is in (OCCT's curves on
       // the faces are made over the part), the curves on the faces.
@@ -520,7 +549,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     }
     const occ::handle<Geom_Curve> bc = basis_of(c);
     double                        t0 = 0, t1 = 0;
-    if (!occ::down_cast<Geom_Ellipse>(bc).IsNull())
+    if (!occ::down_cast<Geom_Ellipse>(bc).IsNull() || !occ::down_cast<Geom_Hyperbola>(bc).IsNull())
     {
       if (kind != 2)
         return "a piece of an ellipse";
@@ -675,7 +704,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           return n * 2 * M_PI;
         };
         double u = 0, v = 0;
-        if (!occ::down_cast<Geom_Ellipse>(bc).IsNull())
+        if (!occ::down_cast<Geom_Ellipse>(bc).IsNull() || !occ::down_cast<Geom_Hyperbola>(bc).IsNull())
         {
           if (const char* why = ellipse_pcurve(ells[k], src, e, s, loc, bb))
             return why;
@@ -756,7 +785,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       for (uint32_t k = b.loop_uses[b.face_loops[i]]; k < b.loop_uses[b.face_loops[i + 1]]; ++k)
       {
         const uint32_t ek = b.uses[k] / 2;
-        if (r.edge_origin[3 * ek] != 0 && b.curves[11 * ek] == 3)
+        if (r.edge_origin[3 * ek] != 0 && (b.curves[11 * ek] == 3 || b.curves[11 * ek] == 4))
         {
           if (const char* why = ellipse_pcurve(ells[ek], src, es[ek], s, loc, bb))
             return why;

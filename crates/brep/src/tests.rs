@@ -488,8 +488,17 @@ fn a_cone_halved_through_its_axis() {
     assert_eq!(counts(&half), (1, 4, 6, 4));
     let rulings = half.body.edges.iter().filter(|e| e.curve == Curve::Line && (half.body.vertices[e.v[0] as usize].z - half.body.vertices[e.v[1] as usize].z).abs() > 0.5).count();
     assert_eq!(rulings, 2);
-    // Along the axis but off it (a hyperbola): declined; clear of the cone: nothing to cut.
-    assert!(boolean(Op::Common, &[&cone, &cuboid((0.0, 0.0, -1.0), (2.2, 4.0, 2.0))], TOL).is_err());
+    // Along the axis but off it: a hyperbola (OCCT's: centred level with the apex, radii |dd| / tan and |dd|).
+    let cut = boolean(Op::Common, &[&cone, &cuboid((0.0, 0.0, -1.0), (2.2, 4.0, 2.0))], TOL).unwrap();
+    check_used_both_ways(&cut.body);
+    assert_eq!(counts(&cut), (1, 4, 6, 4));
+    let hyps: Vec<(DVec3, f64, f64)> = cut.body.edges.iter().filter_map(|e| if let Curve::Hyperbola { center, major, minor, .. } = e.curve { Some((center, major, minor)) } else { None }).collect();
+    // (Two arcs of its branch: its vertex is below the cone.)
+    assert_eq!(hyps.len(), 2);
+    for (c, major, minor) in hyps {
+        assert!((c - DVec3::new(2.2, 2.0, -1.0)).length() < 1e-12 && (major - 0.4).abs() < 1e-12 && (minor - 0.2).abs() < 1e-12, "{c} {major} {minor}");
+    }
+    // Clear of the cone: nothing to cut.
     let clear = boolean(Op::Cut, &[&cone, &cuboid((3.2, 0.0, -1.0), (4.0, 4.0, 2.0))], TOL).unwrap();
     assert_eq!(counts(&clear), (1, 3, 3, 2));
 }

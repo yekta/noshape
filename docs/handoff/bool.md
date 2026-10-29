@@ -377,6 +377,19 @@ bool_corpus_replay and export:: (24) pass.
   14.4 s (13), an internal face 13.8 s (1 slab fuse of 72), the vertex rule 10.6 s (5), tolerant inputs 6.9 s,
   edges crossing on a third's face 5.2 s, an edge ending inside a face 5.1 s.
 
+## Hyperbolas: planes along a cone's axis, off it (10-29 12:40)
+- OCCT's section there is a hyperbola's branch (IntAna_QuadQuadGeo; IntTools_FaceFace keeps it a
+  `Geom_Hyperbola`, in pieces clipped to the faces): centred where the plane is nearest the apex, its normal the
+  plane surface's, its major axis along the cone's axis into the face's nappe, radii |dd| / |slope| and |dd|.
+  The Rust Boolean now makes it (`plane_cyl`; an `Ell` with `hyp`: c + a cosh t x + b sinh t y, not closed, its
+  range from the face's heights), its curves in the faces' parameter planes curve2's new `C2::Hyp`
+  (c + u cosh t + v sinh t + w atan(k sinh t): the plane's hyperbola, the cone's θ = φ + atan(b sinh t / |dd|)),
+  its edges OCCT's own (rust_boolean.cpp's ellipse path takes `Geom_Hyperbola` too, by centre and normal).
+- psui: `noshape_brep::Curve` has a new variant `Hyperbola` (only in a Boolean's result, like `Ellipse`).
+- Tests: kernel T1 `brep_replay::brep_hyperbolas_match_occt` (15 box / cone cases, 14 taken, as OCCT), brep
+  `a_cone_halved_through_its_axis` (now with the off-axis cut).
+- Replays all 0 differ: main 615, corpus2 485, corpus3 492, corpus4 528, corpus5 609, corpus6 566, Shell's 70.
+
 ## Next
 Measured 10-29 07:37 on corpus5 (929 Booleans recorded from today's model and kernel tests, 105 s of OCCT time
 recorded): the Rust path takes 600, and what it leaves costs mostly:
