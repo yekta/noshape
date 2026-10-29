@@ -2444,10 +2444,13 @@ TopoDS_Shape half_box(const gp_Pnt& o, const gp_Dir& n, double size)
 
 TopoDS_Shape common_of(const TopoDS_Shape& a, const TopoDS_Shape& b)
 {
-  BRepAlgoAPI_Common c(a, b);
-  if (c.HasErrors() || !c.IsDone())
+  ShapeList    ca, cb;
+  TopoDS_Shape r;
+  HHist        h;
+  ca.Append(a);
+  cb.Append(b);
+  if (!quick_boolean(2, ca, cb, false, r, h))
     return TopoDS_Shape();
-  TopoDS_Shape r = c.Shape();
   return solid_count(r) > 0 ? r : TopoDS_Shape();
 }
 

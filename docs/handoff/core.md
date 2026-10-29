@@ -483,7 +483,11 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
 - shell.cpp: the six plain BRepAlgoAPI Fuse / Cut / Common blocks (slabs' fuse and cut, the two draft ones' cut and
   fuse) call `quick_boolean` (rust_boolean.cpp): noshape's Boolean where it takes the inputs, else the same OCCT
   call; recorded with NOSHAPE_RECORD_BOOLEANS (path `direct` / `direct_rust`). features.cpp: Thicken's cut and
-  Shell's offset cut too (10-28 20:00); the slabs' inward Common too (10-29).
+  Shell's offset cut too (10-28 20:00); the slabs' inward Common too (10-29). 10-29 07:34: Draft's `common_of` (shell.cpp)
+  and its half-space Common (features.cpp), the chamfer fallbacks' cuts (corner tools, chamfer-plane prisms) too.
+  Left on OCCT on purpose: Shell's offset cut (`BRepAlgoAPI_Cut cut(outer, inner)`) and the regions method's cavity
+  cuts (`cut_by`): with them on the Rust path every Boolean matched OCCT, yet qa's cli-fillet-segv / cli-draft-segv
+  came out different afterwards (more faces after Shell's own unify, parts in another order).
 - 10-29: targets of 200+ faces are no longer declined by the Rust path (it runs after the local Boolean, so it only
   sees ones the local Boolean declined). boolean_groups::a_small_fuse_on_a_big_part_is_done_locally's whole-OCCT
   comparison switches it off (`set_rust_boolean(Some(false))`) for that call, which it would otherwise take. The fillet / chamfer fallbacks' cuts (balls, wedges, chamfer planes) are
