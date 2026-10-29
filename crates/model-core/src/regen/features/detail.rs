@@ -142,9 +142,9 @@ fn overflows(shape: &Shape, edges: &[usize], r: f64) -> bool {
 }
 
 /// Whether a round of the selection both rolls past an unfilleted edge and
-/// overlaps another round of it (live FILLET-OVERSIZE-OK: "End boundary
-/// intersects unfilleted edge."; one round rolling over alone, or rounds
-/// overlapping into a ridge, are fine). Straight edges between planar faces,
+/// overlaps another round of it, the selected edges apart (live
+/// FILLET-OVERSIZE-OK: "End boundary intersects unfilleted edge."; one round
+/// rolling over alone, or rounds overlapping into a ridge, are fine). Straight edges between planar faces,
 /// against the faces' edges parallel to them: a round's setback on a face
 /// past an unfilleted edge rolls over it, two setbacks wider than the face
 /// between their edges overlap.
@@ -154,6 +154,12 @@ type Setbacks = [(u32, DVec3, f64); 2];
 
 fn end_boundary_hits_unfilleted(shape: &Shape, edges: &[usize], radii: &[f64]) -> bool {
     let (Ok(ef), faces, all) = (shape.edge_faces(), shape.faces(), shape.edges()) else { return false };
+    // Edges that meet (the 4 top edges R12, live F2) fail otherwise: "Failed
+    // to fillet selections.", from the kernel.
+    let ends: Vec<Vec<Shape>> = edges.iter().map(|&e| all.get(e).map(|x| x.vertices()).unwrap_or_default()).collect();
+    if ends.iter().enumerate().any(|(i, a)| ends[i + 1..].iter().any(|b| a.iter().any(|v| b.iter().any(|w| v.is_same(w))))) {
+        return false;
+    }
     let mut face_edges = vec![Vec::new(); faces.len()];
     for (e, fs) in ef.iter().enumerate() {
         for &f in fs {

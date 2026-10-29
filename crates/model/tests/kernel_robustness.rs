@@ -2768,6 +2768,8 @@ fn oversize_fillets_like_onshape() {
         ("3 edges R50", &three, "50 mm", None),
         ("4 top edges R12", &top, "12 mm", None),
     ];
+    // Edges that meet fail with the kernel's message (live F2).
+    let fails = |what: &str| if what.starts_with("4 top") { "Failed to fillet selections." } else { "End boundary intersects unfilleted edge." };
     for (what, edges, r, want) in cases {
         let mut t = base.fork();
         let f = t.fillet(edges.clone(), r);
@@ -2777,7 +2779,7 @@ fn oversize_fillets_like_onshape() {
                 assert_eq!(st, FeatureStatus::Ok, "{what}: {msg:?}");
                 assert!((v - want).abs() < 1e-3, "{what}: {v} vs live {want}");
             }
-            None => assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some("End boundary intersects unfilleted edge.")), "{what}: {v} mm³"),
+            None => assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some(fails(what))), "{what}: {v} mm³"),
         }
     }
 }

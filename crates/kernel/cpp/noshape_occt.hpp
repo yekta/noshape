@@ -228,7 +228,8 @@ struct KernelTimer
 template <class F>
 bool run_guarded(F&& f) noexcept
 {
-  bool ok      = true;
+  // volatile: kept across the guard's siglongjmp (-Wclobbered).
+  volatile bool ok = true;
   auto guarded = [&] {
     try
     {
