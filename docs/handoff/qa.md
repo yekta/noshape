@@ -9,6 +9,10 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **02:32 update (greens 5f9cb1ca = + core 5ac53b95 crash-guard fix, dx 6b81b0ff silhouettes; 0eb90b5f = + bool 200a7530 / 0eb90b5f):**
+  CLI-SUPPRESS-SEGV fixed by core (root cause = qa's stacks); qa replay needs a CLI with it (requested). DWG-E2E-SILHOUETTE: silhouette
+  part fixed (Ø20 from two silhouettes, axis centerline from one), hover residual P3. On 0eb9: live-30 60779.484 / 15848.357, mirhole
+  wall still 314.159 (RUST-MIRROR unchanged). GUI fuzz 110–115 alive; 116 / 117 running (5f9c); big sweep 305 / 387, no new diffs.
 - **01:58 update (green 80253527, same code as 0a2a8c87):** GUI fuzz 106–109 (0a2a: live-30, halfmir, boltdwg, asm5) alive; CLI seeds
   176 / 177 / 178 done (documents Rust on = off). HALF-MIRROR also via Mirror New + Boolean union (union with a reflected body).
   Transform / pattern / advanced matrices v0.4.12 vs bool CLI identical. Running: broad sweep of 387 qa-scratch documents v0.4.12 vs bool
