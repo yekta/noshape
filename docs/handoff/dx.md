@@ -130,8 +130,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   submenu.
 - The drawing editor filled its SheetInfo (document / tab names) only on the first edit: properties read "----"
   right after opening; now at once.
-- Next: DWG-NOTE-DIAG-FRACTION, AGENT-ELLIPSE-DIM-VALUE, DRAWING-SHIFT-SLASH, DWG-TOOL-HINTS-PREVIEW, the other P3s;
-  then D24, D21 for the other kinds, V59 / V26.
+- Evening: DWG-NOTE-DIAG-FRACTION, AGENT-ELLIPSE-DIM-VALUE, DWG-LINE-COPY, DWG-GROUP-ANNOTATION-RULE,
+  DWG-TOOL-HINTS-PREVIEW (Datum / GD&T previews), DWG-CIRCLE-FACETS, DWG-E2E-SILHOUETTE residual (edge tools hover one
+  edge), DWG-SHEET-PROPS-ESC, DWG-TABLE-ESC-GHOST, API-ASM-RELATIONS; D24's dragged value (`Annotation.text_along`).
+- Left in dx's TICKETS: DWG-DATUM-PASTE-RED (red needs re-attach by drag first), DWG-EDIT-SECTION-DIALOG's tool button,
+  DRAWING-SHIFT-SLASH (asked the lead), VERSION-FOOTER-STALE (release process).
+- Next: D24's ISO placement (live request asb 10-25 a), D21 for the other kinds, V59 / V26.
 
 ## Morning 10-29 (landed through 8eabd3f5)
 - qa tickets fixed: DWG-ROTATE-VIEW-DIMS-ZERO (edge dimensions turn with the view: `set_view_rotation`),

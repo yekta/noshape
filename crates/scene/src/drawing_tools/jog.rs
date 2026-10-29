@@ -249,7 +249,17 @@ impl SheetPick<'_> {
         match &mut a.kind {
             AnnotationKind::LinearDimension { a: pa, b: pb, offset, orientation, .. } => {
                 if let Some(pl) = pl {
-                    *offset = dim_offset(pl.to_sheet(*pa), pl.to_sheet(*pb), *orientation, c);
+                    let (p, q) = (pl.to_sheet(*pa), pl.to_sheet(*pb));
+                    *offset = dim_offset(p, q, *orientation, c);
+                    // The value follows the pointer along the line (D24; live
+                    // asbdt-1a…c); back near the middle it is centred again.
+                    let dir = match orientation {
+                        noshape_model::drawing::DimOrientation::Horizontal => [1.0, 0.0],
+                        noshape_model::drawing::DimOrientation::Vertical => [0.0, 1.0],
+                        noshape_model::drawing::DimOrientation::Aligned => norm(sub(q, p)),
+                    };
+                    let s = orig.text_along.unwrap_or(0.0) + dot(d, dir);
+                    a.text_along = (s.abs() > 1.0).then_some(s);
                 }
             }
             AnnotationKind::RadialDimension { view, center, radius, angle, knee, .. } => {
@@ -315,6 +325,7 @@ impl SheetPick<'_> {
         if let Some(committed) = self.drawing.sheets.get(self.sheet).and_then(|s| s.annotations.iter().find(|x| x.id == a.id)) {
             let mut out = committed.clone();
             out.position = a.position;
+            out.text_along = a.text_along;
             match (&mut out.kind, &a.kind) {
                 (AnnotationKind::LinearDimension { offset, .. }, AnnotationKind::LinearDimension { offset: o, .. }) => *offset = *o,
                 (AnnotationKind::RadialDimension { angle, knee, .. }, AnnotationKind::RadialDimension { angle: g, knee: k, .. }) => {

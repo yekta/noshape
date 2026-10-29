@@ -116,6 +116,8 @@ pub struct SheetGeometry {
     in_dim: bool,
     /// The annotation being drawn has its arrows flipped (outside).
     flip_arrows: bool,
+    /// The linear dimension being drawn: its value moved along the line.
+    text_along: Option<f64>,
     /// The linear dimension being drawn: its extension line jogs, and where
     /// other dimensions' lines cross its lines (Break dimension).
     jogs: [Option<super::ExtJog>; 2],
@@ -1201,6 +1203,7 @@ impl SheetGeometry {
             starts.push((a, self.texts.len(), self.lines.len(), self.fills.len()));
             self.in_dim = a.kind.is_dimension();
             self.flip_arrows = a.flip_arrows;
+            self.text_along = a.text_along;
             (self.jogs, self.cuts) = match a.kind {
                 AnnotationKind::LinearDimension { .. } => (a.jogs, cuts.remove(&a.id).unwrap_or_default()),
                 _ => ([None; 2], Vec::new()),
@@ -2066,6 +2069,7 @@ impl SheetGeometry {
         }
         self.in_dim = false;
         self.flip_arrows = false;
+        self.text_along = None;
         (self.jogs, self.cuts) = ([None; 2], Vec::new());
         self.style = base;
         // Dimension and annotation colors (construction geometry keeps ink).
@@ -2505,8 +2509,29 @@ impl SheetGeometry {
         // stays centred and the arrows go outside, pointing in, each with a
         // tail as long as itself; no line between the extension lines.
         let a_len = self.style.dim_arrow;
-        let squeezed = inline && !self.flip_arrows && gap.is_some_and(|g| 2.0 * g + 2.0 * a_len > dl);
-        let c = [(dp[0] + dq[0]) / 2.0, (dp[1] + dq[1]) / 2.0];
+        // The value dragged along the line (D24): inside it stays inline with
+        // the line broken around it; past an extension line (live asbdt-1b/c)
+        // the line runs unbroken between the arrows and on to just before it.
+        let mid = [(dp[0] + dq[0]) / 2.0, (dp[1] + dq[1]) / 2.0];
+        let s_along = self.text_along.unwrap_or(0.0);
+        let c = [mid[0] + dir[0] * s_along, mid[1] + dir[1] * s_along];
+        let half_line = dl / 2.0;
+        let outside = s_along.abs() > half_line && self.text_along.is_some();
+        let squeezed = inline && !self.flip_arrows && !outside && gap.is_some_and(|g| 2.0 * g + 2.0 * a_len > dl);
+        if outside {
+            // From the extension line on the value's side to its gap.
+            let g = gap.unwrap_or(font::text_width(&text.main, h) / 2.0 + 0.65 * h);
+            let sign = s_along.signum();
+            let from = [mid[0] + dir[0] * sign * half_line, mid[1] + dir[1] * sign * half_line];
+            // ISO (text above the line): under the value to its far end
+            // (ISO's dragged placement not checked live yet, request asb 10-25 a).
+            let reach = if inline { -g } else { font::text_width(&text.main, h) / 2.0 };
+            let to = [c[0] + dir[0] * sign * reach, c[1] + dir[1] * sign * reach];
+            if (to[0] - from[0]) * dir[0] * sign + (to[1] - from[1]) * dir[1] * sign > 0.0 {
+                self.lines.push(Polyline2 { points: vec![from, to], style: LineStyle::Thin, closed: false, pick });
+            }
+        }
+        let gap = if outside { None } else { gap };
         let broken = |line: [[f64; 2]; 2]| -> Vec<Vec<[f64; 2]>> {
             let Some(g) = gap else { return vec![line.to_vec()] };
             let t = |p: [f64; 2]| (p[0] - c[0]) * du[0] + (p[1] - c[1]) * du[1];
@@ -2575,7 +2600,7 @@ impl SheetGeometry {
             }
             return;
         }
-        let mut mid = [(dp[0] + dq[0]) / 2.0 + up[0] * tg, (dp[1] + dq[1]) / 2.0 + up[1] * tg];
+        let mut mid = [c[0] + up[0] * tg, c[1] + up[1] * tg];
         if self.style.text_horizontal && angle.abs() > 1e-9 {
             // Horizontal text beside a non-horizontal dimension line: clear
             // the line by the text's half width along `up`.
@@ -3005,6 +3030,37 @@ pub fn note_leader_paths(bbox: [f64; 4], leaders: &[super::Leader], targets: &[[
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// D24 (live asbdt-1a…c): a value dragged along an ANSI dimension stays
+    /// inline; inside, the line breaks around it there; past an extension
+    /// line the line runs unbroken between the arrows and on to the value.
+    #[test]
+    fn dimension_value_dragged_along_the_line() {
+        let run = |s: Option<f64>| {
+            let mut g = SheetGeometry::new(420.0, 297.0);
+            g.style.iso = false;
+            g.text_along = s;
+            g.linear_dimension_text([50.0, 100.0], [110.0, 100.0], -20.0, DimOrientation::Horizontal, &DimText::plain("60"), 1);
+            g
+        };
+        let pieces = |g: &SheetGeometry, y: f64| -> Vec<[f64; 2]> {
+            let mut v: Vec<[f64; 2]> = g.lines.iter().filter(|l| l.points.len() == 2 && (l.points[0][1] - y).abs() < 1e-9 && (l.points[1][1] - y).abs() < 1e-9).map(|l| [l.points[0][0].min(l.points[1][0]), l.points[0][0].max(l.points[1][0])]).collect();
+            v.sort_by(|a, b| a[0].total_cmp(&b[0]));
+            v
+        };
+        let h = SheetGeometry::new(420.0, 297.0).style.dim_text;
+        let half = font::text_width("60", h) / 2.0 + 0.65 * h;
+        // Inside, 15 mm right of the middle.
+        let g = run(Some(15.0));
+        let t = g.texts.iter().find(|t| t.text == "60").unwrap();
+        assert_eq!(t.pos[0], 95.0);
+        assert_eq!(pieces(&g, t.pos[1]), [[50.0, 95.0 - half], [95.0 + half, 110.0]]);
+        // Past the right extension line: unbroken, then on to the value.
+        let g = run(Some(50.0));
+        let t = g.texts.iter().find(|t| t.text == "60").unwrap();
+        assert_eq!((t.pos[0], t.anchor), (130.0, Anchor::Center));
+        assert_eq!(pieces(&g, t.pos[1]), [[50.0, 110.0], [110.0, 130.0 - half]]);
+    }
 
     /// Dimensions › Text justification places the lines above / below the
     /// value: Left on its left edge, Right on its right edge, Center centred.
