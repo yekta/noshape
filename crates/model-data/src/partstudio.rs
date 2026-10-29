@@ -43,13 +43,14 @@ impl Feature {
 /// Which rules a studio was saved under: 1, an empty merge scope is an error
 /// unless "Merge with all" is on; 2, a Rib with no Parts is an error (live
 /// L22); 3, a Mate connector needs an owner (live L37); 4, a Hole needs a
-/// Merge scope (live L56); 0, older studios.
+/// Merge scope (live L56); 5, sheet metal runs by std, Onshape's own sheet
+/// metal FeatureScript ([`PartStudio::legacy_sheet_metal`]); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(4)
+        ScopeRule(5)
     }
 }
 
@@ -220,6 +221,11 @@ pub struct PartStudio {
     /// [`ScopeRule`]); older studios are upgraded on load.
     #[serde(default = "ScopeRule::legacy")]
     pub scope_rule: ScopeRule,
+    /// Sheet metal saved before std ran it (ScopeRule < 5): the studio's sheet
+    /// metal features keep running natively, their references name the
+    /// native features' faces.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_sheet_metal: bool,
     /// Rollback bar position: number of features evaluated (None = all).
     #[serde(default)]
     pub rollback: Option<usize>,
@@ -352,6 +358,10 @@ impl PartStudio {
             for f in self.features.iter_mut().filter(|f| f.type_id == "hole" && f.params.query("scope").is_empty()) {
                 f.params.set("legacyAllParts", ParamValue::Bool(true));
             }
+        }
+        // Sheet metal made by the native features stays native.
+        if self.scope_rule.0 < 5 && self.features.iter().any(|f| f.type_id.starts_with("sheetMetal")) {
+            self.legacy_sheet_metal = true;
         }
         self.scope_rule = ScopeRule::default();
     }

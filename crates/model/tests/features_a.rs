@@ -1309,6 +1309,29 @@ fn hole_merge_scope_as_live() {
     t.ok();
 }
 
+/// Sheet metal saved before std ran it (ScopeRule < 5) stays native on load;
+/// other old studios and new ones run std.
+#[test]
+fn sheet_metal_saved_natively_is_marked_on_load() {
+    use noshape_model::partstudio::{PartStudio, ScopeRule};
+    let mut t = T::new();
+    t.add("sheetMetalStart", &[]);
+    let mut old = t.ps.clone();
+    old.scope_rule = ScopeRule(4);
+    old.upgrade_saved_params();
+    assert!(old.legacy_sheet_metal);
+    // Saved again and loaded: still native.
+    let mut again: PartStudio = serde_json::from_slice(&serde_json::to_vec(&old).unwrap()).unwrap();
+    again.upgrade_saved_params();
+    assert!(again.legacy_sheet_metal);
+    let mut plain = PartStudio::new();
+    plain.scope_rule = ScopeRule(4);
+    plain.upgrade_saved_params();
+    assert!(!plain.legacy_sheet_metal);
+    t.ps.upgrade_saved_params();
+    assert!(!t.ps.legacy_sheet_metal, "a studio saved under std");
+}
+
 /// Live L40/L42: instances off the part. A face pattern fails "Pattern
 /// could not be created on the same part." and makes no part; a Feature
 /// pattern (Reapply off) skips an off-part instance silently and fails when

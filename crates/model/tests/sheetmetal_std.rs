@@ -486,3 +486,29 @@ fn flanges_keep_the_part_name_and_colour() {
     let look = |r: &RegenResult| r.display.bodies.iter().map(|b| (b.id.clone(), b.name.clone(), b.color)).collect::<Vec<_>>();
     assert_eq!(look(&after), look(&before));
 }
+
+/// A studio whose sheet metal was saved while it ran natively keeps running
+/// it natively (P1: by std its Flange and Hem lost their edges, "Select edges
+/// to flange.", and the part was the bare plate again).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn sheet_metal_saved_natively_stays_native() {
+    let mut s = Studio::new();
+    s.ps.legacy_sheet_metal = true;
+    let region = s.rectangle(60.0, 40.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let edges = vec![edge_at(&r, DVec3::new(30.0, 0.0, 2.0)), edge_at(&r, DVec3::new(0.0, 20.0, 2.0))];
+    s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(edges));
+        p.set("distance", expr("20 mm"));
+    });
+    // The native flanges (qa5 SM1's 8383.1217; std's are live's 8511.4987).
+    let r = s.ok();
+    assert!((volume_mm3(&r) - 8383.1217).abs() < 1e-3, "{} mm³", volume_mm3(&r));
+}

@@ -20,6 +20,30 @@ pub fn set_std_sheet_metal(on: bool) {
 }
 
 thread_local! {
+    /// The studio regenerating on this thread has sheet metal saved before std
+    /// ran it ([`crate::partstudio::PartStudio::legacy_sheet_metal`]): its sheet
+    /// metal features run natively.
+    static LEGACY_SHEET_METAL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Set by a regeneration for its studio (see `LEGACY_SHEET_METAL`) until
+/// dropped: a Derived studio regenerating inside another gives the outer one
+/// its setting back.
+pub struct LegacySheetMetal(bool);
+
+impl LegacySheetMetal {
+    pub fn set(on: bool) -> Self {
+        Self(LEGACY_SHEET_METAL.replace(on))
+    }
+}
+
+impl Drop for LegacySheetMetal {
+    fn drop(&mut self) {
+        LEGACY_SHEET_METAL.set(self.0);
+    }
+}
+
+thread_local! {
     /// Core features (Extrude, Fillet, ...) run natively; [`set_std_route`]
     /// makes std run them instead, the oracle the native ones are tested
     /// against (tests/std_oracle.rs). Per thread (a regeneration evaluates its
@@ -94,7 +118,7 @@ macro_rules! std_features {
                 return Some(f);
             }
             if !matches!(type_id, "pcbStart" | "pcbEnd")
-                && (!STD_SHEET_METAL.load(std::sync::atomic::Ordering::Relaxed) || crate::regen::custom_features::host().is_none())
+                && (!STD_SHEET_METAL.load(std::sync::atomic::Ordering::Relaxed) || LEGACY_SHEET_METAL.get() || crate::regen::custom_features::host().is_none())
             {
                 return None;
             }

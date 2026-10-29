@@ -130,9 +130,13 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
 
 - Std rebuild naming (10-29): part faces lying on the replaced part's faces keep their names (`keep_names`, several
   pieces: splits), the part its name and colour. Before, every face was new: a Flange dialog couldn't pick a second
-  edge once the first previewed (PREVIEW-SELF-PICK guard), and the part changed colour. **Risk**: documents saved
-  while sheet metal ran natively reference native face names; std names differ (the start feature's faces), so their
-  later sheet metal features may lose their edges. Not seen in a real document yet; check one if a user reports it.
+  edge once the first previewed (PREVIEW-SELF-PICK guard), and the part changed colour.
+- Old documents (10-29, P1 found in the GUI pass): studios saved while sheet metal ran natively reference native face
+  names, so by std their Flange / Hem lost their edges ("Select edges to flange.", qa's smf.noshape a bare plate).
+  ScopeRule 5: on load an older studio with sheet metal gets `PartStudio::legacy_sheet_metal` and keeps the native
+  evaluators (`std_route::LegacySheetMetal`, set per regeneration, nested Derived ones restore it). New studios run
+  std. Documents saved by main builds 10-29 21:07–23:50 (std default, still ScopeRule 4) load as native now and lose
+  their std-named references; only scratch documents were made in that window as far as I know.
 
 ## WIP on agent/skasm
 (none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
