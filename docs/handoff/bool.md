@@ -410,23 +410,23 @@ bool_corpus_replay and export:: (24) pass.
   (the app's notch cut, recorded: tests/data/brep/ad14557ce79005e1).
 
 ## Next
-Measured 10-29 07:37 on corpus5 (929 Booleans recorded from today's model and kernel tests, 105 s of OCCT time
-recorded): the Rust path takes 600, and what it leaves costs mostly:
-- curved edges / faces (B-spline, ellipse; fillets, sweeps, Shell's slabs on filleted parts): 74 s (141 cases).
-  OCCT's (core's phase 1); the slow Shell ones have their curves inside the slabs' reach.
-- a plane at an angle to a cylinder (ellipses): 11 s in 20 cases; 7 taken since 10-29 (above), the rest
-  near-tangencies, cones and crossings on a third face. Next there: arguments with ellipse edges (a part with a
-  tilted hole sends every later Boolean to OCCT).
-- cylinders at an angle (4th-order curves): 7.7 s in 6.
-- a plane along a cone: 2.8 s in 8 (one 2.4 s case; the rest drill tips cut through their axis: the apex).
-- sheets (faces / shells as arguments): none in corpus5. In the main corpus: 56 fuses of faces (sheet metal),
-  55 of them pure glue (faces meeting along whole edges, OCCT keeps each argument's shell in its result), ~1 s
-  in all; 33 coplanar Commons with a face in common, 1–8 ms each.
-- big targets: the local Boolean takes them first (~43 ms on 1612 faces; the Rust path ~54 ms there): 7 cases,
-  0.5 s in corpus5.
-So the lead's remaining list (sheets, direct sites, big targets in place) is worth about 1–2 s of corpus5's
-105 s; the direct sites are done but for Shell's two (above). Proposal: elliptic sections next (with the unify
-check), or hand curved surfaces to core's phase 1; sheets and big targets after.
+Corpus6 (10-29 13:30, recorded OCCT time of what the Rust path still declines, loaded machine): curved edges
+32.8 s (73: helical B-spline sweeps against rods ~15 s in 3, fillet slabs), one slab fuse with an internal face
+(the shelled part's own internal edge) 13.8 s, vertices inside coincident edges of two other arguments 10.6 s (5:
+OCCT's PostTreatFF gives such a vertex a second same-domain hop when sections run along those edges, and its
+history then says Deleted; not predictable cheaply: declined), curves within 1 µm of a face's boundary 10.2 s (9,
+near-tangent hyperbolas in slab fuses), tolerant inputs 6.9 s, edges crossing on a third's face 5.2 s, an edge
+ending inside a face 5.1 s, an apex on a part of a cone 4.4 s, a plane through a cone's apex 2.9 s.
+- Freeform next (the biggest share, and the thread case shows how much: OCCT's Boolean of a rod and a helical
+  sweep (degree 10, 290 poles) takes 18.5 s serial, of which its face/face intersections are 0.5 s; the rest is
+  edge/face intersections and point projections on the B-splines). Plan, each step landed: (a) B-spline surfaces and
+  curves in `Body` (bridge conversion; still declined); (b) evaluation, point inversion, curves on faces from
+  OCCT's pcurves; (c) sections with a B-spline face from OCCT's own IntTools_FaceFace (as for ellipses: curves and
+  pcurves OCCT's, so results stay OCCT's and the corpus keeps comparing), clipped and arranged in the faces'
+  parameter planes by the Rust Boolean, pieces classified without OCCT; (d) tori / spheres / offset surfaces the
+  same way; (e) the Rust Boolean's own marching for the sections once (c) holds, against Onshape's numbers.
+- The unify guard (`usd_kept_volume`) costs a copy and two volumes where round faces merge; measure on the regen
+  profiles and make it cheaper (only the merged faces' share of the volume) if it shows.
 
 ## Requests
 - core / lead: `pattern_second::timed_second_pattern_costs_about_the_same_as_the_first` (perf.yml) compares LP2 to
