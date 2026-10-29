@@ -1354,8 +1354,14 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
                     if t * li > tol && (1.0 - t) * li > tol && u * lj > tol && (1.0 - u) * lj > tol {
                         let n = cx.pool.p.len();
                         cx.pool.add(cx.seg_at(&segs[i], t))?;
-                        // (With a vertex of three arguments or more about, OCCT's choices differ: not done.)
-                        if cx.pool.p.len() > n && cx.pool.inputs.iter().any(|ins| ins.len() >= 3) {
+                        // (With a vertex of three arguments or more on this face, or of four anywhere, OCCT's
+                        // choices differ: not done.)
+                        let three = |w: u32| cx.pool.inputs[w as usize].len() >= 3;
+                        if cx.pool.p.len() > n
+                            && (segs.iter().any(|s| s.v.iter().any(|&w| three(w)))
+                                || cx.faces[f].edges.iter().any(|&(e, _)| cx.edges[e].v.iter().any(|&w| three(w)))
+                                || cx.pool.inputs.iter().any(|ins| ins.len() >= 4))
+                        {
                             return Err(Decline("edges of two arguments crossing on a third's face"));
                         }
                     }
@@ -1906,22 +1912,46 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             }
         }
     }
-    // (A face made only a vertex where one input edge pierces it: where two edges cross, the edges made it;
-    // where faces alone meet, no one.)
-    let mut in_edges = vec![0u8; cx.pool.p.len()];
-    for inner in &edge_inner {
+    // A face made a new vertex inside it where an input edge pierces it, across (edges lying on it crossing
+    // there made it, not the face; where faces alone meet, no one); of faces of several arguments on one plane
+    // there, the first's.
+    let mut edges_through: HashMap<u32, Vec<usize>> = HashMap::default();
+    for (e, inner) in edge_inner.iter().enumerate() {
         for &w in inner {
-            in_edges[w as usize] = in_edges[w as usize].saturating_add(1);
+            edges_through.entry(w).or_default().push(e);
         }
     }
+    let mut makers: HashMap<u32, Vec<usize>> = HashMap::default();
     for (f, inner) in face_inner.iter().enumerate() {
         for &w in inner {
-            if in_edges[w as usize] != 1 {
+            if !cx.pool.inputs[w as usize].is_empty() || vmap.get(w as usize).is_none() {
                 continue;
             }
-            if let (true, Some(o)) = (cx.pool.inputs[w as usize].is_empty(), vmap.get(w as usize)) {
-                h.push(rec(Kind::Face, cx.faces[f].arg, cx.faces[f].index, Relation::Generated, Kind::Vertex, o));
+            let through = edges_through.get(&w).map_or(&[][..], |v| &v[..]);
+            let mut across = false;
+            for &e in through {
+                if !cx.edge_on_surface(e, f)? {
+                    across = true;
+                }
             }
+            if across {
+                makers.entry(w).or_default().push(f);
+            }
+        }
+    }
+    let mut makers: Vec<(u32, Vec<usize>)> = makers.into_iter().collect();
+    makers.sort_unstable();
+    for (w, fs) in makers {
+        let o = vmap[w as usize];
+        for &f in &fs {
+            let same_plane = |g: usize| match (&cx.faces[f].s, &cx.faces[g].s) {
+                (Surf::Plane { n: n1, d: d1, .. }, Surf::Plane { n: n2, d: d2, .. }) => n1.dot(*n2).abs() > 1.0 - 1e-12 && (d1 - d2 * n1.dot(*n2).signum()).abs() <= tol,
+                _ => false,
+            };
+            if fs.iter().any(|&g| g != f && cx.faces[g].arg < cx.faces[f].arg && same_plane(g)) {
+                continue;
+            }
+            h.push(rec(Kind::Face, cx.faces[f].arg, cx.faces[f].index, Relation::Generated, Kind::Vertex, o));
         }
     }
     // Solids: an input solid became the result's solids that are its images (OCCT's): of a cut's object or

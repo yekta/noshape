@@ -120,6 +120,13 @@ Big targets (10-29 04:00): the Rust path runs after the local Boolean, so a targ
 is one the local Boolean declined: no longer declined here (db5f2f3d 1004 faces, 99 tools: 178 ms vs OCCT 865;
 11b69a56 412 faces: 9 vs 88 ms; both as OCCT).
 
+Crossings and the faces that made vertices (10-29 04:30): OCCT says a face made a new vertex inside it where an
+input edge pierces it across (edges lying on it don't count; of faces of several arguments on one plane there,
+the first argument's), not "where exactly one input edge pierces it"; with that, edges of two arguments
+crossing on a third's face decline only with a vertex of three arguments on that face or of four anywhere (at
+four, OCCT leaves some input vertices without an image: tried 10-29, no rule found). Fresh corpus **444 of 692**,
+Shell's 52 of 85, corpus3 451 of 698, main 463: all 0 differ incl. unify.
+
 The grey zone (distances in (tol, GREY × tol] decline as ambiguous) is 10 × now, was 50 × (10-29 03:40): main
 corpus **462 of 972**, fresh 435 of 692, Shell's 44 of 85, corpus3 442 of 698: all 0 differ incl. unify.
 
