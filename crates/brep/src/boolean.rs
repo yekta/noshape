@@ -1174,6 +1174,45 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
     };
     // Vertices, edges, faces and solids of every argument (a vertex outside every other argument's box can't
     // be one of theirs).
+    // Two sheets (faces, no solids) apart, or on planes that cross: an empty common (faces in common only where
+    // they overlap), everything deleted, as OCCT's (model-core asks whether faces overlap so).
+    if op == Op::Common && args.len() == 2 && args.iter().all(|b| b.solids.is_empty() && !b.faces.is_empty()) {
+        let plane = |f: &Face| match f.surface {
+            Surface::Plane { origin, normal } => Some((origin, normal)),
+            _ => None,
+        };
+        let crossing = args[0].faces.iter().all(|f| {
+            args[1].faces.iter().all(|g| match (plane(f), plane(g)) {
+                (Some((o1, n1)), Some((o2, n2))) => n1.cross(n2).length() > 1e-9 || (o2 - o1).dot(n1).abs() > GREY * tol,
+                _ => false,
+            })
+        });
+        let bx = |b: &Body| {
+            let mut lo = DVec3::INFINITY;
+            let mut hi = DVec3::NEG_INFINITY;
+            for &p in &b.vertices {
+                lo = lo.min(p);
+                hi = hi.max(p);
+            }
+            for e in &b.edges {
+                if let Curve::Circle { center, radius, .. } = e.curve {
+                    lo = lo.min(center - DVec3::splat(radius));
+                    hi = hi.max(center + DVec3::splat(radius));
+                }
+            }
+            (lo, hi)
+        };
+        let ((l0, h0), (l1, h1)) = (bx(args[0]), bx(args[1]));
+        if !crossing && boxes_meet(l0, h0, l1, h1, GREY * tol) {
+            return Err(Decline("sheets that meet"));
+        }
+        let mut out = Output::default();
+        for (a, b) in args.iter().enumerate() {
+            let del = |kind: Kind, n: usize| (0..n as u32).map(move |i| Record { kind, arg: a as u32, index: i, relation: Relation::Deleted, out_kind: kind, out: u32::MAX });
+            out.history.extend(del(Kind::Face, b.faces.len()).chain(del(Kind::Edge, b.edges.len())).chain(del(Kind::Vertex, b.vertices.len())));
+        }
+        return Ok(out);
+    }
     // A line alone (an edge, no faces) and a solid: their common (line.rs).
     let line = op == Op::Common && args.len() == 2 && args[0].faces.is_empty() && args[0].edges.len() == 1 && matches!(args[0].edges[0].curve, Curve::Line);
     let arg_box: Vec<(DVec3, DVec3)> = args.iter().map(|b| b.vertices.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), &p| (lo.min(p), hi.max(p)))).collect();

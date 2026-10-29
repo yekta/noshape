@@ -81,8 +81,8 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
   const ShapeIMap& em = s.map(TopAbs_EDGE);
   const ShapeIMap& vm = s.map(TopAbs_VERTEX);
   const ShapeIMap& sm = s.map(TopAbs_SOLID);
-  // (Or an edge alone: a line's common with a solid.)
-  if ((sm.Extent() == 0 || fm.Extent() == 0) && !(sm.Extent() == 0 && fm.Extent() == 0 && em.Extent() == 1))
+  // (Or an edge alone: a line's common with a solid; or faces alone: sheets apart.)
+  if ((sm.Extent() == 0 || fm.Extent() == 0) && !(sm.Extent() == 0 && fm.Extent() == 0 && em.Extent() == 1) && !(sm.Extent() == 0 && fm.Extent() > 0))
     return "no solid";
   b.vertices.reserve(3 * vm.Extent());
   for (int i = 1; i <= vm.Extent(); ++i)
@@ -238,7 +238,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     }
     b.solid_shells.push_back(static_cast<uint32_t>(b.shell_faces.size() - 1));
   }
-  if (b.faces_of_shells.size() != static_cast<size_t>(fm.Extent()))
+  if (sm.Extent() > 0 && b.faces_of_shells.size() != static_cast<size_t>(fm.Extent()))
     return "faces outside the solids";
   return nullptr;
 }

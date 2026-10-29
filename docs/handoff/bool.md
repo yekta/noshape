@@ -120,6 +120,11 @@ Big targets (10-29 04:00): the Rust path runs after the local Boolean, so a targ
 is one the local Boolean declined: no longer declined here (db5f2f3d 1004 faces, 99 tools: 178 ms vs OCCT 865;
 11b69a56 412 faces: 9 vs 88 ms; both as OCCT).
 
+Sheets (10-29 05:20): a Common of faces alone (model-core asking whether faces overlap) keeps only where they
+overlap; faces on planes that cross or lie apart (or boxes apart) have nothing in common: an empty result, all
+deleted, as OCCT's. Coplanar ones that meet still decline (33 of the main corpus, 1–8 ms each, most with a
+face in common). Main corpus **604 of 972** (was 543), fresh 480 of 692: 0 differ.
+
 A line along a face or an edge, and solids with a few tolerant vertices (10-29 05:00): model-core's rays fall
 back to the Boolean exactly where they run along a face (77 of the main corpus) or an edge; such a piece is on
 the solid's boundary and in the common, as OCCT's (an edge it runs along is modified to it too; the face's edges

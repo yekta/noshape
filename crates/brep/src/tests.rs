@@ -399,3 +399,21 @@ fn a_line_through_a_box() {
     assert!(boolean(Op::Common, &[&segment(DVec3::new(6.0, 0.0, -1.0), DVec3::new(6.0, 0.0, 5.0)), &bx], TOL).is_err_and(|d| d == Decline("a line apart from the solid")));
 }
 
+
+#[test]
+fn faces_on_crossing_planes_have_nothing_in_common() {
+    // Two squares, one across the other: faces have in common only where they overlap.
+    let sq = |z: bool| {
+        let p = |a: f64, b: f64| if z { DVec3::new(a, b, 0.5) } else { DVec3::new(a, 0.5, b) };
+        let vertices = vec![p(0.0, 0.0), p(1.0, 0.0), p(1.0, 1.0), p(0.0, 1.0)];
+        let edges = (0..4).map(|k| Edge { v: [k, (k + 1) % 4], curve: Curve::Line }).collect();
+        let normal = if z { DVec3::Z } else { -DVec3::Y };
+        let loops = vec![(0..4).map(|k| Use { edge: k, reversed: false }).collect()];
+        Body { vertices, edges, faces: vec![Face { surface: Surface::Plane { origin: p(0.0, 0.0), normal }, reversed: false, loops }], solids: Vec::new() }
+    };
+    let r = boolean(Op::Common, &[&sq(true), &sq(false)], TOL).unwrap();
+    assert!(r.body.faces.is_empty() && r.body.edges.is_empty());
+    assert_eq!(r.history.iter().filter(|h| h.relation == Relation::Deleted).count(), 18);
+    // The same square twice: declined (their overlap isn't worked out).
+    assert!(boolean(Op::Common, &[&sq(true), &sq(true)], TOL).is_err());
+}
