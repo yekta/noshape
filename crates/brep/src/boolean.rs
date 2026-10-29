@@ -2025,6 +2025,32 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         }
     }
     out.history = h;
+    // Two faces of different inputs on one cylinder meeting at a circle, their seams apart (their x directions
+    // over a quarter turn apart): OCCT's unify_same_domain, merging them, left an invalid face (38b2cd00,
+    // fd7ef128: a hole through a boss in a plate).
+    let mut faces_of: Vec<Vec<usize>> = vec![Vec::new(); out.body.edges.len()];
+    for (fi, f) in out.body.faces.iter().enumerate() {
+        for u in f.loops.iter().flatten() {
+            faces_of[u.edge as usize].push(fi);
+        }
+    }
+    let source = |o: Origin| match o {
+        Origin::Same { arg, .. } | Origin::Piece { arg, .. } => Some(arg),
+        Origin::New => None,
+    };
+    for (e, fs) in faces_of.iter().enumerate() {
+        if let [f, g] = fs[..]
+            && matches!(out.body.edges[e].curve, Curve::Circle { .. })
+            && let (Surface::Cylinder { origin: o1, axis: a1, xdir: x1, radius: r1 }, Surface::Cylinder { origin: o2, axis: a2, xdir: x2, radius: r2 }) = (out.body.faces[f].surface, out.body.faces[g].surface)
+            && source(out.face_origin[f]) != source(out.face_origin[g])
+            && a1.cross(a2).length() <= 1e-9
+            && (r1 - r2).abs() <= tol
+            && (o2 - o1).cross(a1).length() <= tol
+            && x1.dot(x2) < 0.0
+        {
+            return Err(Decline("one cylinder in faces of two inputs, their seams apart"));
+        }
+    }
     Ok(out)
 }
 

@@ -6,7 +6,8 @@
 //! brep_replay::brep_corpus_replay -- --ignored --nocapture` (NOSHAPE_BREP_DIFF=1 prints each mismatch's
 //! history records that differ; NOSHAPE_BREP_ONLY=<name> runs one case; NOSHAPE_BREP_SHOW_OCCT=<name>,... prints
 //! OCCT's result and history records for those cases, taken or not; NOSHAPE_BREP_VS_OCCT=1 compares with OCCT run
-//! here instead of the recorded result: for a corpus recorded with this Boolean on).
+//! here instead of the recorded result: for a corpus recorded with this Boolean on; NOSHAPE_BREP_ALWAYS=<dir> writes
+//! every taken case's two results there).
 
 use noshape_kernel::bool_corpus::{cases, load, Summary};
 use noshape_kernel::*;
@@ -139,9 +140,19 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         if d.is_empty()
             && let Ok(o) = &o
         {
-            let unified = |x: &Shape| unify_same_domain(x).map(|u| (u.shape.count(ShapeType::Face), u.shape.count(ShapeType::Edge))).ok();
-            if unified(&r.shape) != unified(&o.shape) {
-                d.push(format!("unified differently: {:?} vs OCCT {:?}", unified(&r.shape), unified(&o.shape)));
+            // (Faces, edges, validity; its volume to 1e-9.)
+            let unified = |x: &Shape| unify_same_domain(x).map(|u| (u.shape.count(ShapeType::Face), u.shape.count(ShapeType::Edge), u.shape.is_valid(), u.shape.volume().unwrap_or(0.0))).ok();
+            let alike = |a: &Option<(usize, usize, bool, f64)>, b: &Option<(usize, usize, bool, f64)>| match (a, b) {
+                (Some(a), Some(b)) => (a.0, a.1, a.2) == (b.0, b.1, b.2) && (a.3 - b.3).abs() <= 1e-9 * a.3.abs().max(b.3.abs()),
+                _ => a.is_none() && b.is_none(),
+            };
+            if let Some(dump) = std::env::var_os("NOSHAPE_BREP_ALWAYS") {
+                let _ = std::fs::write(Path::new(&dump).join(format!("{name}-rust.brep")), r.shape.to_brep_bytes().unwrap_or_default());
+                let _ = std::fs::write(Path::new(&dump).join(format!("{name}-occt.brep")), o.shape.to_brep_bytes().unwrap_or_default());
+            }
+            let (ur, uo) = (unified(&r.shape), unified(&o.shape));
+            if !alike(&ur, &uo) {
+                d.push(format!("unified differently: {ur:?} vs OCCT {uo:?}"));
             }
         }
         if !d.is_empty() {

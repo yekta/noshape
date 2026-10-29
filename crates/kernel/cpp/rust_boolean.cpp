@@ -474,6 +474,14 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           double                          a0 = 0, a1 = 0;
           const occ::handle<Geom2d_Curve> pf = BRep_Tool::CurveOnSurface(*se, s0, loc, a0, a1);
           const occ::handle<Geom2d_Curve> pr = BRep_Tool::CurveOnSurface(TopoDS::Edge(se->Reversed()), s0, loc, a0, a1);
+          // The one this face uses (by the way round it uses the edge) must be in its angles.
+          bool back = false;
+          for (uint32_t q = b.loop_uses[b.face_loops[i]]; q < b.loop_uses[b.face_loops[i + 1]]; ++q)
+            if (b.uses[q] / 2 == k)
+              back = (b.uses[q] % 2 == 1) != rev;
+          const double um = (back ? pr : pf)->Value(0.5 * (a0 + a1)).X();
+          if (um < umin - eps || um > umax + eps)
+            return "a piece of a seam on the other side of its face";
           bb.UpdateEdge(e, pf, pr, s, loc, BRep_Tool::Tolerance(e));
           continue;
         }
@@ -556,6 +564,25 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         if (r.edge_origin[3 * (b.uses[k] / 2)] != 0)
           BRepLib::BuildPCurveForEdgeOnPlane(es[b.uses[k] / 2], f);
     fs[i] = rev ? TopoDS::Face(f.Reversed()) : f;
+  }
+  // Made faces of cylinders and cones, all their curves set (a later face on the same surface may have set one
+  // of an edge they share): one across its surface's seam angle (its angles over a multiple of 2π, though no
+  // seam bounds it) declines, OCCT's unify having gone wrong on it after a mirror (halfmir2's half pocket: a
+  // reversed face); so does one whose curves span more than a turn (an invalid face).
+  for (size_t i = 0; i < nf; ++i)
+  {
+    if (r.face_origin[3 * i] == 0)
+      continue;
+    TopLoc_Location loc;
+    const occ::handle<Geom_Surface> sf = BRep_Tool::Surface(fs[i], loc);
+    if (occ::down_cast<Geom_CylindricalSurface>(sf).IsNull() && occ::down_cast<Geom_ConicalSurface>(sf).IsNull())
+      continue;
+    double a = 0, z = 0, v1 = 0, v2 = 0;
+    BRepTools::UVBounds(fs[i], a, z, v1, v2);
+    if (z - a < 2 * M_PI - 1e-6 && std::floor((a + 1e-9) / (2 * M_PI)) != std::floor((z - 1e-9) / (2 * M_PI)))
+      return "a piece across its surface's seam angle";
+    if (z - a > 2 * M_PI + 1e-6)
+      return "a face's curves over more than a turn";
   }
   TopoDS_Compound out;
   bb.MakeCompound(out);
