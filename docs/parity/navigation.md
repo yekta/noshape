@@ -143,14 +143,14 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 5.1 | Section "Mouse controls" after Units, before Part Studio settings: "View settings" dropdown (170 px) | live DOM | 🔧 (first section of our page: Language/Units sections are not local) |  |
+| 5.1 | Section "Mouse controls" after Units, before Part Studio settings: "View settings" dropdown (170 px) | live DOM | ✅ | 79c9bf7a 10-29 (qa, Preferences: Mouse controls follows Units / Time format, "View settings" dropdown Onshape (default) · SOLIDWORKS · NX 10 · Creo · AutoCAD; tickets/prefs-mouse-79c9.png) |
 | 5.2 | Presets: Onshape (default), SOLIDWORKS, NX 10, Creo, AutoCAD | client `viewManipulationMapping`; live 62 | ✅ U `presets_follow_their_tables` (app-core navigation, from the bundle) | 0.4.10+ / fa61ba6f 10-27 |
 | 5.3 | Table "3D Part & Assembly" / "2D Drawing" with rows Rotate, Constrained rotate, Pan, Zoom per preset; "Alt + " prefix on Constrained rotate (moves to Rotate when constrained is the default) | live DOM; `mouseActionSettingsMap` | ✅ U `presets_follow_their_tables` (app-core navigation, from the bundle) | 0.4.10+ / fa61ba6f 10-27 |
-| 5.4 | ☐ Reverse scroll wheel zoom direction | live DOM; `isScrollZoomDefault` | 🔧 |  |
-| 5.5 | Choosing SOLIDWORKS ticks Reverse scroll wheel zoom direction (other presets leave it; switching back does not untick) | `setDefaultMouseScrollDirection`; live navigation/63–64 | 🔧 |  |
+| 5.4 | ☐ Reverse scroll wheel zoom direction | live DOM; `isScrollZoomDefault` | ✅ | 79c9bf7a 10-29 (qa, Preferences: ☐ Reverse scroll wheel zoom direction under the table; tickets/prefs-mouse-79c9.png) |
+| 5.5 | Choosing SOLIDWORKS ticks Reverse scroll wheel zoom direction (other presets leave it; switching back does not untick) | `setDefaultMouseScrollDirection`; live navigation/63–64 | ✅ | 79c9bf7a 10-29 (qa, Preferences: SOLIDWORKS ticks Reverse scroll wheel zoom direction; switching back to Onshape (default) leaves it ticked; tickets/prefs-mouse-79c9.png) |
 | 5.6 | ☐ Set default rotation behavior to constrained rotate (Alt then gives free rotate) | live DOM; `axisRotationLock` | ✅ U `constrained_rotate_default_swaps_alt` (app-core navigation, from the bundle) | 0.4.10+ / fa61ba6f 10-27 |
 | 5.7 | ☐ Use pen input as mouse | live DOM | ✅ 10-25: stored and applied (`gpui::set_pen_as_mouse`): off = pen contacts are touches on every platform (row 7.10), on = mouse events | needs platform (pen input) |
-| 5.8 | "Save mouse controls" (disabled until changed) saves and applies at once; nothing applies before saving | live DOM; live 61 | 🔧 |  |
+| 5.8 | "Save mouse controls" (disabled until changed) saves and applies at once; nothing applies before saving | live DOM; live 61 | ✅ | 79c9bf7a 10-29 (qa, Preferences: the Save button is disabled until a change, enabled after choosing SOLIDWORKS; tickets/prefs-mouse-79c9.png) |
 
 ## 6. Drawings (2D: pan and zoom only)
 
