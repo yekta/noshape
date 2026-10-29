@@ -9,6 +9,11 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **00:41 update (green fd036a5c = + dx ff8a56f6 max/min edge, skasm 257abc58 F fit / a277db14 subassembly patterns, psui 020fd2e7
+  own planar mesher):** verified SKETCH-F-FIT, DWG-MAXMIN-LINE, ASM-PATTERN-SUBASSEMBLY. Mesher A/B (bin/meshab.sh: NOSHAPE_MESH_RUST=0
+  vs default, same binary, iso fit) on wf-block, live-30, boltdwg, cli-draft-segv, manyreg: pixel-identical, same triangle counts.
+  Assembly drag (asm5 revolute pin stays) OK. CLI fuzz 172 / 173 (bool CLI, Rust on): 173 done, its document identical Rust on / off;
+  172 near the end. GUI fuzz 98 (76ef, wf-block) alive; 99 (fd03) running.
 - **00:08 update (green 76ef7009 = + dx 110dc605):** verified DWG-DANGLING-WALL, DWG-FORESHORTEN-JUMP. **P0 CLI-SUPPRESS-SEGV** stack
   (tickets/cli-suppress-segv-bt.txt): a guarded OCCT chamfer fault (ChFi3d_EvalTolReached) is recovered once at op 116, the same fault
   at op 119 jumps to a stale stack address → the crash guard does not survive a second fault in a session (in v0.4.12 too).
