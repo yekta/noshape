@@ -271,9 +271,11 @@ N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes
      (**11.4–12.3×**), live-30 12.1–12.6 → 3.6–3.8 ms (3.3×); macOS (Apple silicon, the mesh steps summed, its
      bridge names unreadable) fins-400 189–337 → 15–32 ms (10–15×), live-30 7.3–11.4 → 1.7–1.9 ms (4–6×).
      The fin plate meets ≥ 10× on both; live-30 doesn't: its time is the plate's top face (CDT of ~1450 boundary
-     nodes, ~1.75 ms alone on one thread) and the fillets' tori. Next for live-30: a cheaper planar
-     triangulation (the face is flat: any valid triangulation shades the same; ear clipping with hole bridges,
-     declining to the CDT when unsure), then the strip's per-node copies.
+     nodes, ~1.75 ms alone on one thread) and the fillets' tori. Tried for it, no gain, not landed: ear clipping
+     with hole bridges (a mapbox earcut port: 1.5–2.3 ms on the same face, the long bridged slivers defeat its
+     z-order hash), u32 half-edges, inserting in ring order instead of BRIO (3× slower). live-30's floor is
+     then about that one face plus the fixed per-call costs (~1–2 ms: reads, edges, fill): ~3–6× is near
+     what's reachable without splitting a face's triangulation across threads.
 0. **After the cold-start work: our own display mesher (lead 10-28 21:05, user-approved).** `brep::mesh` in crates/brep
    (bool's crate, its Body / Surface / Curve types): planes (polygons with holes), cylinders, cones, spheres, tori from
    their exact parameterisation, shared edge samples (watertight), the display's deflection rules; anything else

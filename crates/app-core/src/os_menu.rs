@@ -641,6 +641,29 @@ impl Render for OsMenu {
             .text_color(pal.text)
             .children(rows)
             .child(canvas(move |b, _, _| bounds.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+            // A `<select>`'s list closes when the wheel turns outside it (Chrome; the page scrolls on, and the list
+            // stayed behind over another field: PREFS-SELECT-LIST-DETACH). Inside, a long list scrolls.
+            .when(native, |d| {
+                let (me, inside) = (cx.entity().downgrade(), self.bounds.clone());
+                d.child(
+                    canvas(
+                        |_, _, _| {},
+                        move |_, _, window, _| {
+                            let (me, inside) = (me.clone(), inside.clone());
+                            window.on_mouse_event(move |e: &ScrollWheelEvent, phase, window, cx| {
+                                if phase == DispatchPhase::Bubble && !inside.get().contains(&e.position) {
+                                    me.update(cx, |this, cx| {
+                                        this.dismiss(window, cx);
+                                    })
+                                    .ok();
+                                }
+                            });
+                        },
+                    )
+                    .absolute()
+                    .size_0(),
+                )
+            })
     }
 }
 

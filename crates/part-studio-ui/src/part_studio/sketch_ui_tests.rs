@@ -562,3 +562,35 @@ fn no_hole_table_without_a_hole(cx: &mut TestAppContext) {
     })
     .unwrap();
 }
+
+/// PREFS-SELECT-LIST-DETACH: an open `<select>` list closes when the wheel turns outside it (Chrome); inside, it
+/// stays.
+#[gpui::test]
+fn a_select_list_closes_on_a_wheel_outside_it(cx: &mut TestAppContext) {
+    use crate::os_menu::{OsMenu, OsMenuItem};
+    struct Page;
+    impl Render for Page {
+        fn render(&mut self, _: &mut Window, _: &mut gpui_kit::Context<Self>) -> impl IntoElement {
+            div().size_full()
+        }
+    }
+    cx.update(gpui_kit::init);
+    let options = WindowOptions { window_bounds: Some(WindowBounds::Windowed(Bounds { origin: Point::default(), size: size(px(1000.), px(800.)) })), ..Default::default() };
+    let (window, _) = cx.update(|cx| crate::os_menu::open_window(options, cx, |_, cx| cx.new(|_| Page))).unwrap();
+    cx.update_window(window, |_, w, cx| {
+        // Options from a list (not menu labels of the app: the ops menu coverage scans literal ones).
+        let options = ["one", "two"].map(String::from);
+        let menu = OsMenu::build(w, cx, |m, _, _| options.into_iter().fold(m.native_select(170.), |m, o| m.item(OsMenuItem::new(o))));
+        crate::os_menu::open_anchored(gpui_kit::point(px(100.), px(100.)), gpui_kit::Anchor::TopLeft, menu, w, cx);
+    })
+    .unwrap();
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let wheel = |x: f32, y: f32| gpui_kit::ScrollWheelEvent { position: gpui_kit::point(px(x), px(y)), delta: gpui_kit::ScrollDelta::Lines(gpui_kit::point(0., -3.)), ..Default::default() };
+    vcx.simulate_event(wheel(150., 110.));
+    assert!(vcx.update(|_, cx| crate::os_menu::is_open(cx)), "a wheel over the list keeps it");
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_event(wheel(600., 500.));
+    assert!(!vcx.update(|_, cx| crate::os_menu::is_open(cx)), "a wheel outside closes it");
+}
