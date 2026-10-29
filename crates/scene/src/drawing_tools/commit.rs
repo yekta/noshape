@@ -1003,7 +1003,11 @@ impl SheetPick<'_> {
     /// Datum tool's first click on a GD&T frame edge or a dimension's lines
     /// (the red crosshair): the point on the line and where it is.
     pub fn datum_attach_at(&self, c: [f64; 2]) -> Option<([f64; 2], DatumOn)> {
-        self.attach_at(c, self.tol_mm(5.0), &|a: &Annotation| matches!(a.kind, AnnotationKind::Gdt { .. }) || a.kind.is_dimension())
+        // Help datum (drawing.md A31): GD&T frames, dimensions and hole
+        // callouts, not radius / diameter dimensions that are foreshortened.
+        self.attach_at(c, self.tol_mm(5.0), &|a: &Annotation| {
+            matches!(a.kind, AnnotationKind::Gdt { .. } | AnnotationKind::HoleCallout { .. }) || (a.kind.is_dimension() && !matches!(a.kind, AnnotationKind::ForeshortenedRadial { .. } | AnnotationKind::ForeshortenedDiameter { .. }))
+        })
     }
 
     /// The Callout tool's first click on a dimension (help callout_balloon:
