@@ -114,6 +114,9 @@ passes exactly between two curves; the shared-vertex check one map): main corpus
 slower than OCCT (the least gain 3.8×). Declining costs most on the 999-instance pattern fuses: ~2.4 s of Rust
 before OCCT's ~120 s.
 
+The grey zone (distances in (tol, GREY × tol] decline as ambiguous) is 10 × now, was 50 × (10-29 03:40): main
+corpus **462 of 972**, fresh 435 of 692, Shell's 44 of 85, corpus3 442 of 698: all 0 differ incl. unify.
+
 The 30-feature part's edit commit (`regen_profile::edit_commit_profile`, dev build, load 15–19, 10-29 01:44,
 with everything above): Rust Boolean on 102, 124 ms (features 81, 90); off 158, 166 ms (features 130, 134). Hole
 1 15 → 8.5 ms, Linear pattern 1 12 → 4 ms, Boss 6 9 → under 3.5 ms; the chamfers and fillets are now most of it.
@@ -163,6 +166,7 @@ will be listed here.
 - 10-29: a result `Solid` may have more than one shell: the outer one first, then voids (inside out: their faces'
   normals point into the void). Types unchanged.
 - 10-29: a `Body` may be edges alone (no faces or solids): a line's common with a solid, and its input.
+- 10-29: `GREY` (pub const) is 10, was 50.
 
 ## Tests
 - T1 kernel `brep_replay::brep_kept_bodies_give_the_same_result` (each small case's result cut and fused again, from

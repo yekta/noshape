@@ -22,8 +22,9 @@ pub mod mesh;
 pub use boolean::{boolean, boolean_touching, Op};
 use glam::DVec3;
 
-/// Distances in (tol, GREY × tol] are ambiguous: the Boolean declines.
-pub const GREY: f64 = 50.0;
+/// Distances in (tol, GREY × tol] are ambiguous: the Boolean declines. (50 until 10-29; 10 takes 9 more of the
+/// main corpus, all as OCCT.)
+pub const GREY: f64 = 10.0;
 
 /// An edge's curve. Straight edges run between their vertices; an arc runs counter-clockwise about its
 /// circle's `normal` from the edge's start to its end (a whole circle when they are one vertex).
