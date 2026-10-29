@@ -4,7 +4,7 @@ qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA)
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 **v0.4.14 (tag 6b2e0b13 = v0.4.13 + bool c79eed1d) smoke on the Release run's Linux artifact 08:31–08:42: all rows OK**, halfmir2 B
-right (7607.301), mirror set and cli-fillet-segv right; publication pending at 08:42 (then the tarball is compared with the artifact).
+right (7607.301), mirror set and cli-fillet-segv right; published 08:43:30 (all three bundles); the release tarball is byte-identical to the smoked artifact.
 Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfmir2 B P0.
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
@@ -588,7 +588,7 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   Linear pattern in Feature, Part and Face mode: Direction pre-highlights and picks an edge at its middle and a face (not
   the plane behind it); Fillet › Edges and Shell › Faces hover + pick; cfs.noshape custom feature "Edge pick"
   (`EDGE && ALLOWS_AXIS`, 2 picks) and "Plain edge pick" both take two edges.
-### v0.4.14 (tag 6b2e0b13 = v0.4.13 + bool c79eed1d; Release run 40839037570; Linux artifact smoked 08:31–08:42, before publication)
+### v0.4.14 (tag 6b2e0b13 = v0.4.13 + bool c79eed1d; Release run 40839037570; published 08:43:30; Linux artifact smoked 08:31–08:42, the published tarball byte-identical)
 - Artifact noshape-0.4.14-linux-x86_64.tar.gz sha256 71d827c489dccd03…; CLI MCP `"version":"0.4.14"`.
 - **The fix it ships:** halfmir2 A 9130.973 / B **7607.301** / C 7434.513 (8 faces each, no negative-area face); mirhole 14429.204,
   7 faces, one 628.319 mm² wall; halfmir 7214.602, 7 faces; rust-mirror-min 1618.9016, 19 faces; cli-fillet-segv all 15 parts =
