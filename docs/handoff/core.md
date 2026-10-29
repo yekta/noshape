@@ -18,20 +18,16 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   30 mm chamfers on the two vertical edges are Ok here) and "all 12 edges R6 fails" in live (vertex blends).
 - de4d9d6b SHELL-SLOW: Shell's regions path takes convex cones (a chamfer round the top over filleted corners: 2.3 s in slabs
   → 0.2 s, same volumes, one offset face per face where slabs split the inner cones; T1
-  `shell::shell_over_chamfered_fillet_corners_by_regions`). Not yet for parts that also have holes, wf-block among
-  them (its top face 2.9–4.1 s here in slabs, 0.48 s by regions with 5045.963 vs 5045.965 mm³): **open finding**, on
-  main already, a hole's tube that crosses a chamfer's offset plane (but not the side wall's) comes out fuller by
-  regions than by slabs: 0.023 mm³ for two Ø6.35 holes 6 mm from a 1 mm top chamfer at t 1, 0.136 at t 2.5 with the
-  holes mid-part (kernel probe, removed; the live oracle qa5 P1-16 sides with slabs: 3998.627 live, slabs 3998.632,
-  regions 3998.677). Same topology both ways, only the tube face's area differs: one Ø6.35 hole at (15, 6) in a
-  75.554 × 20.245 × 10 block with a 1 mm top chamfer, t 1: regions 234.33971, slabs 234.33552, **exact 234.33553
-  mm²** (2πR·9 minus ∫ 2R·acos((6 − y_c(z))/R) dz over the chamfer offset y_c = z − 8.586, z 9.414 → 10), so the
-  regions path is the one off; exact wall 3479.07658 mm³ by sections, slabs 3479.07652, regions 3479.08807. Edge
-  tolerances there are 3e-6 mm and both integrate adaptively, but regions' answer moves with the tube's length
-  (caps past the cavity box: 3479.09615), outside the part: OCCT's cavity − tube cut where the tube crosses the
-  slanted offset plane is inexact (cavity ∩ solid 11405.6614 vs exact 11405.67292 mm³, the same by the adaptive and
-  the segmented Gauss integrals; the tube's seam turned 180° changes nothing). Try the wall as (solid − cavity) ∪ (solid ∩ tube), or the tube's frame turned;
-  then let cones and holes meet in regions (wf-block's shell → ~0.4 s).
+  `shell::shell_over_chamfered_fillet_corners_by_regions`).
+- SHELL-SLOW (10-29 06:45): parts with holes and chamfers / cones by regions too. Cutting a hole's tube from the planes'
+  polytope came out off where it crosses a sloped offset plane (OCCT's intersection with the big polytope face: a Ø6.35
+  hole by a 1 mm top chamfer, t 1, 3479.08807 vs exact 3479.07658 mm³ by sections; a BOPAlgo_CellsBuilder of solid,
+  cavity and tubes the same); there the tubes are now added to the wall instead: (solid − cavity) ∪ (solid ∩ tubes),
+  each tube a tool of its own (close holes' tubes overlap), one history for the cut and the common side by side
+  (3479.07652). Elsewhere (planes parallel or square to the hole) the cut stays (exact, ~40 ms cheaper). qa5 P1-16
+  1.2 / 2.3 s → 0.26 / 0.36 s at live's volumes and faces; wf-block's top face 2.9–4.1 s → 0.62 s in the CLI (5045.965
+  mm³ = slabs'). `last_shell_path()` says which way a shell went; T1 `shell::shell_of_a_hole_by_a_chamfer_is_exact`,
+  `shell_block_with_close_holes_like_onshape` now on regions.
 - P2 CYL-UNIFY-OPPOSITE (qa, open): reproduced in the kernel (a Ø12 circle on y = 0 extruded 10 mm both ways, fuse,
   unify_same_domain and _whole: 4 faces, two 376.99 mm² cylinders; live one 753.98). same_domain_candidates says yes
   (two cylinders), OCCT's UnifySameDomain then leaves them: their axes point opposite ways (prisms along −n and +n).

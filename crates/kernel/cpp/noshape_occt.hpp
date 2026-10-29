@@ -694,6 +694,7 @@ void                     set_memory_budget_mb(uint64_t mb);
 void                     set_bop_parallel(bool on);
 void                     set_bop_pairs_parallel(bool on);
 rust::String             last_unify_path();
+rust::String             last_shell_path();
 OpOut                    op_unify_whole(const OcShape& s);
 rust::String             last_boolean_path();
 void                     kernel_profile_mark(rust::Str label);
