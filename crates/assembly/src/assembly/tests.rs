@@ -5053,12 +5053,13 @@ fn pem_fh_pins_match_live() {
     assert_eq!(kinds, [("cone", 14), ("cylinder", 27), ("plane", 39), ("torus", 2)].into_iter().collect());
 }
 
-/// The FH™ pins' and studs' every size (T2: a slotted part takes ~2 s to build).
+/// The slotted PEM® pins' and studs' every size, shortest and longest (T2: a
+/// slotted part takes ~1–2 s to build).
 #[test]
 #[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn pem_fh_pin_sizes_build() {
     use super::standard::{self, CATALOGUE, StandardSpec};
-    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™")) {
+    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™") || c.name.starts_with("FHL™") || c.name.starts_with("TFH™")) {
         for s in &c.sizes {
             for l in [s.lengths.first().unwrap(), s.lengths.last().unwrap()] {
                 let mut spec = StandardSpec::new(c);
@@ -5127,8 +5128,7 @@ fn pem_fh4_studs_match_live() {
 }
 
 /// PEM® FHL™ / FHLS™ low-displacement head studs (live's body details): "PEM FHLS-M2.5-6", "PEM FHLS-256-4"; M2.5 x 6 = live's
-/// studio default, 44 faces (PLANE 34, CYLINDER 5, CONE 4, TORUS 1); every
-/// size builds.
+/// studio default, 44 faces (PLANE 34, CYLINDER 5, CONE 4, TORUS 1).
 #[test]
 fn pem_fhl_studs_match_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
@@ -5152,14 +5152,38 @@ fn pem_fhl_studs_match_live() {
         *kinds.entry(k).or_insert(0) += 1;
     }
     assert_eq!(kinds, [("cone", 4), ("cylinder", 5), ("plane", 34), ("torus", 1)].into_iter().collect());
-    for c in [metric, unified] {
-        for s in &c.sizes {
-            let mut spec = StandardSpec::new(c);
-            spec.set_size(&s.name);
-            let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{}: {e}", s.name));
-            assert!(standard::part_body(&r).is_some(), "{}", s.name);
-        }
+}
+
+/// PEM® TFH™ / TFHS™ non-flush studs (live's raw /features and body details):
+/// "PEM TFH-M3-6 ZI" / "PEM TFHS-M3-6" by material, "PEM TFHS-256-4"; M3 x 6 =
+/// live's studio default, 53 faces (PLANE 27, CYLINDER 13, CONE 13).
+#[test]
+fn pem_tfh_studs_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let name = "TFH™/TFHS™ Non-flush studs";
+    let metric = CATALOGUE.iter().find(|c| c.name == name && !c.inch).unwrap();
+    let unified = CATALOGUE.iter().find(|c| c.name == name && c.inch).unwrap();
+    let mut spec = StandardSpec::new(metric);
+    spec.material = Some("Steel".into());
+    assert_eq!(spec.part_name(), "PEM TFH-M3-6 ZI");
+    spec.material = Some("Stainless Steel".into());
+    assert_eq!(spec.part_name(), "PEM TFHS-M3-6");
+    assert_eq!(StandardSpec::new(unified).part_name(), "PEM TFHS-256-4");
+    let r = standard::regenerate(&StandardSpec::new(metric)).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let mut kinds = std::collections::BTreeMap::new();
+    for i in 0..b.faces.len() {
+        let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+            Surface::Plane(_) => "plane",
+            Surface::Cone { .. } => "cone",
+            Surface::Cylinder { .. } => "cylinder",
+            Surface::Torus { .. } => "torus",
+            _ => "other",
+        };
+        *kinds.entry(k).or_insert(0) += 1;
     }
+    assert_eq!(kinds, [("cone", 13), ("cylinder", 13), ("plane", 27)].into_iter().collect());
 }
 
 /// ANSI commercial taper pins and slotted spring pins with live's whole size

@@ -170,9 +170,10 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    constraints; ~2 s a part, the size sweep is T2). Keep that construction: one combined boolean split the r1 face
    (63 cylinders instead of 27). FH studs b13a2459 (pemPin form 3; the thread-start split by opSplitFace, as the
    askew bolt; a size can offer fewer materials: Size.materials / materials_for, pemgen handles it). Done: SO
-   unthreaded / threaded, BSO, TSO, TPS, TPXS, FH pins, FH studs, FH4 ba0d267a, FHL (pemPin form 4: the slotted head
-   and the shank built apart and united, so the shank's cylinder runs up each slot as one face as live's) (Metric +
-   Unified each). Next: the other studs (TFH 53, HFLH 53, HF109 / HFG8 / HFE / HFH 68, FHX 85, SGPC 125), DSO 97,
+   unthreaded / threaded, BSO, TSO, TPS, TPXS, FH pins, FH studs, FH4 ba0d267a, FHL 10f9970c (pemPin form 4: the
+   slotted head and the shank built apart and united, so the shank's cylinder runs up each slot as one face as
+   live's), TFH (form 5, new pemPin param td = T_DIM; steel names "PEM TFH-M3-6 ZI" as live's instance names)
+   (Metric + Unified each; the slotted ones' size sweep is the T2 pem_fh_pin_sizes_build). Next: the other studs ( HFLH 53, HF109 / HFG8 / HFE / HFH 68, FHX 85, SGPC 125), DSO 97,
    SOSG 115, nuts 109–148. Not shown yet: the read-only Hole size / Recommended sheet material rows.
    Live's studio defaults sometimes differ from the table (NAS 1129 thru minor 0.067 vs 0.0667, NASM 45938/4 ax 0.0225
    vs 0.028125): check the construction at the studio values, then test ours at the table's.

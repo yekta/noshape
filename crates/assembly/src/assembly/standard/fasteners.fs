@@ -2767,7 +2767,10 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
  * rounded 0.025 hd, 8 slots (r1 sin 7.5° each side of every 45°) cut 0.075 hd
  * up into it between the major radius and its rim; a flat-bottomed V groove
  * (0.075 p wide, 0.05 p deep) midway from the head to ts, the face split at
- * ts, the end as form 3.
+ * ts, the end as form 3. Form 5 (TFH™ non-flush studs, td = T_DIM): a head
+ * td thick with a 45° dimple 0.15 hd across on top, a 45° collar under it to
+ * 1.05 (hd + p) / 4, cut by 8 slots td wide from (hd + p) / 4 out; the groove
+ * as form 4 midway from the collar to ts, l from the head's underside.
  */
 annotation { "Feature Type Name" : "PEM pin" }
 export const pemPin = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2789,6 +2792,8 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
         isLength(definition.hs, NONNEGATIVE_LENGTH_BOUNDS);
         annotation { "Name" : "pt" }
         isLength(definition.pt, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "td" }
+        isLength(definition.td, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
     }
     {
         const p = definition.p;
@@ -2818,6 +2823,11 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
         if (definition.form == 4)
         {
             lowDisplacementStud(context, id, definition);
+            return;
+        }
+        if (definition.form == 5)
+        {
+            nonFlushStud(context, id, definition);
             return;
         }
         const tpxs = definition.form == 1;
@@ -2955,6 +2965,63 @@ function lowDisplacementStud(context is Context, id is Id, definition is map)
                 { "p" : rz(rd, -l) }, { "p" : rz(Z, -l + rd / tan(60 * degree)) }
             ]);
     uniteAll(context, id);
+    opPlane(context, id + "threadPlane", { "plane" : plane(vector(Z, Z, -ts), vector(0, 0, 1)), "width" : 4 * R, "height" : 4 * R });
+    try silent
+    {
+        opSplitFace(context, id + "threadSplit", { "faceTargets" : qGeometry(qOwnedByBody(solidsOf(context, id), EntityType.FACE), GeometryType.CYLINDER),
+                    "faceTools" : qCreatedBy(id + "threadPlane", EntityType.FACE), "keepToolSurfaces" : false });
+    }
+    opDeleteBodies(context, id + "deleteThreadPlane", { "entities" : qCreatedBy(id + "threadPlane", EntityType.BODY) });
+}
+
+/** pemPin form 5 (TFH™ non-flush studs). */
+function nonFlushStud(context is Context, id is Id, definition is map)
+{
+    const p = definition.p;
+    const ts = definition.sd;
+    const t = definition.td;
+    const R = definition.hd / 2;
+    const r1 = p / 2;
+    const rc = 1.05 * (definition.hd + p) / 4;
+    const zb = -t - (R - rc);
+    const zl = -t - definition.l;
+    const zc = (zb - ts) / 2;
+    const hw = 0.0375 * p;
+    const ig = 0.0125 * p;
+    const dep = 0.05 * p;
+    const ch = 0.625 * 0.8660254 * definition.pt;
+    const rd = 0.15 * p;
+    const rt = 0.075 * definition.hd;
+    revolveProfile(context, id + "body", [
+                { "p" : rz(Z, -rt) }, { "p" : rz(rt, Z) }, { "p" : rz(R, Z) }, { "p" : rz(R, -t) }, { "p" : rz(rc, zb) },
+                { "p" : rz(r1, zb) }, { "p" : rz(r1, zc + hw) }, { "p" : rz(r1 - dep, zc + ig) }, { "p" : rz(r1 - dep, zc - ig) },
+                { "p" : rz(r1, zc - hw) }, { "p" : rz(r1, zl + ch) }, { "p" : rz(r1 - ch, zl) }, { "p" : rz(rd, zl) },
+                { "p" : rz(Z, zl + rd / tan(60 * degree)) }
+            ]);
+    // The 8 slots through the collar: td wide, from (hd + p) / 4 out past
+    // the rim.
+    var under = XY_PLANE;
+    under.origin[2] = zb;
+    const w = t / 2;
+    const ri = (definition.hd + p) / 4;
+    const far = R + t;
+    const sk = newSketchOnPlane(context, id + "slotSketch", { "sketchPlane" : under });
+    for (var k = 0; k < 8; k += 1)
+    {
+        const c = 45 * k * degree;
+        const u = vector(cos(c), sin(c));
+        const v = vector(-sin(c), cos(c));
+        const a = u * sqrt(ri * ri - w * w) - v * w;
+        const b = u * sqrt(ri * ri - w * w) + v * w;
+        skArc(sk, "arc" ~ k, { "start" : a, "mid" : u * ri, "end" : b });
+        skLineSegment(sk, "sb" ~ k, { "start" : b, "end" : u * far + v * w });
+        skLineSegment(sk, "out" ~ k, { "start" : u * far + v * w, "end" : u * far - v * w });
+        skLineSegment(sk, "sa" ~ k, { "start" : u * far - v * w, "end" : a });
+    }
+    skSolve(sk);
+    opExtrude(context, id + "slots", { "entities" : qSketchRegion(id + "slotSketch"), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : -t - zb });
+    opDeleteBodies(context, id + "deleteSlotSketch", { "entities" : qCreatedBy(id + "slotSketch", EntityType.BODY) });
+    subtract(context, id + "cut", qCreatedBy(id + "body", EntityType.BODY), qCreatedBy(id + "slots", EntityType.BODY));
     opPlane(context, id + "threadPlane", { "plane" : plane(vector(Z, Z, -ts), vector(0, 0, 1)), "width" : 4 * R, "height" : 4 * R });
     try silent
     {
