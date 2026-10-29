@@ -9,6 +9,11 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **04:24 update (green c32e66f4):** blocker list re-confirmed at the top of TICKETS: only open regression P1 RUST-MIRROR-EXTRA-FACE,
+  no open P0. In the app on c32e: live-30, halfmir, wf-block right; GUI fuzz 160–166 (2363 / 4b53) alive. Next: watch the cut
+  (`gh release list -R yekta/noshape`), 30-minute smoke of the published release (rows as v0.4.12's, + halfmir 7214.602, the crash
+  documents, draft-pool-hang), notes at the top of this file. Note for GUI scripts: the app keeps the left panel width between runs,
+  so panel / dialog x positions move (585 / 650 / 840); read a full screenshot before cropping.
 - **04:08 update (green 7d5be491 = + psui mesher step 2c, skasm SKETCH-VDIM-SIDE-ARROWS):** release-blocker list written at the top of
   TICKETS (04:05; re-confirm at 04:30): only open regression = P1 RUST-MIRROR-EXTRA-FACE; no open P0. Mesher A/B on 7d5b (boltdwg,
   live-30) identical, renders right. GUI fuzz 142–159 alive; CLI seeds 185 / 186 (core CLI) done. REGEN-SPEED on 7040: commits 91–136 ms,
