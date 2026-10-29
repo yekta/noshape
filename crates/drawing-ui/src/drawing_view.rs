@@ -368,6 +368,8 @@ pub struct DrawingEditor {
     /// Centermark dialog and Align centermark (see `drawing_centermark`).
     pub centermark_dlg: Option<crate::drawing_centermark::CentermarkDlg>,
     pub align_centermark: Option<u64>,
+    /// Align centermark on an automatic centermark (view, center key).
+    pub align_auto_centermark: Option<(ViewId, [i64; 2])>,
     /// Format painter (see `drawing_painter`).
     pub painter: Option<crate::drawing_painter::PainterState>,
     /// Right-side panels (Inspection table, Styles, MBD status; see
@@ -606,6 +608,7 @@ impl DrawingEditor {
             shortcut_toolbar: None,
             centermark_dlg: None,
             align_centermark: None,
+            align_auto_centermark: None,
             painter: None,
             inspection: None,
             hatch_dlg: None,

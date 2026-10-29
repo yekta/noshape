@@ -3452,3 +3452,27 @@ fn chamfer_note_has_a_short_landing_and_no_underline() {
     let horiz: Vec<f64> = g.lines.iter().flat_map(|l| l.points.windows(2).filter(|p| (p[0][1] - p[1][1]).abs() < 1e-9).map(|p| (p[1][0] - p[0][0]).abs()).collect::<Vec<_>>()).collect();
     assert!(!horiz.is_empty() && horiz.iter().all(|h| *h < w * 0.6), "landing {horiz:?} vs text {w}");
 }
+
+/// Align centermark on an automatic centermark (live ~1490, qa
+/// DWG-CENTERMARK-ALIGN): its arms turn by the view's stored angle.
+#[test]
+fn an_automatic_centermark_turns_when_aligned() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    for v in &mut drawing.sheets[0].views {
+        v.show_centerlines = true;
+    }
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let (view, key) = built.picks.iter().find_map(|p| match p { PickTarget::AutoCentermark { view, center } => Some((*view, *center)), _ => None }).expect("an automatic centermark");
+    let arm_angle = |b: &super::build::BuiltSheet| {
+        let pick = b.picks.iter().position(|p| *p == PickTarget::AutoCentermark { view, center: key }).unwrap() as u32;
+        let l = b.geometry.lines.iter().find(|l| l.pick == pick).unwrap();
+        let (p, q) = (l.points[0], l.points[l.points.len() - 1]);
+        (q[1] - p[1]).atan2(q[0] - p[0]).rem_euclid(std::f64::consts::FRAC_PI_2)
+    };
+    let before = arm_angle(&built);
+    drawing.sheets[0].view_mut(view).unwrap().centermark_angles.push((key, 0.3));
+    let after = arm_angle(&render_sheet(&drawing, 0, &sources, &cache, false).unwrap());
+    assert!(((after - before).rem_euclid(std::f64::consts::FRAC_PI_2) - 0.3).abs() < 1e-6, "{before} → {after}");
+}

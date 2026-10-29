@@ -1571,6 +1571,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     let (c, r) = (pl.to_sheet(c), pl.len_to_sheet(r));
                     let (a, gap) = (vt.centermark_mark_size + HIDDEN, vt.centermark_gap_size + HIDDEN);
                     let at = |u: [f64; 2], t: f64| [c[0] + u[0] * t, c[1] + u[1] * t];
+                    // Turned with Align centermark.
+                    let turn = v.centermark_angles.iter().find(|(k, _)| *k == key).map(|(_, a)| *a).unwrap_or(0.0);
+                    let (ux, uy) = if turn != 0.0 { (rotate2(ux, turn), rotate2(uy, turn)) } else { (ux, uy) };
                     for u in [ux, uy] {
                         g.lines.push(Polyline2 { points: vec![at(u, -a), at(u, a)], style: LineStyle::Thin, closed: false, pick: view_pick });
                     }

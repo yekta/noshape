@@ -385,8 +385,10 @@ impl DrawingEditor {
             | Tool::Crop { .. } => self.snap_at(c),
             _ => None,
         };
-        // Dimension tool: hovering a circular edge wakes its center mark,
-        // which stays (an orange center snap with a small cross).
+        // Dimension tool: the hovered circular edge shows its center mark (an
+        // orange center snap with a small cross) only while hovered (live,
+        // qa DWG-DIM-HOVER-STAYS: they piled up hover by hover).
+        self.woken_centers.clear();
         if matches!(self.tool, Tool::Dimension { .. })
             && let Some((view, me)) = self.hovered_edge()
             && let views::EdgeGeom::Circle { center, .. } = me.geom
@@ -944,7 +946,7 @@ impl DrawingEditor {
             cx.stop_propagation();
             return;
         }
-        if e.button == MouseButton::Left && self.align_centermark.is_some() && self.align_centermark_click(cx) {
+        if e.button == MouseButton::Left && (self.align_centermark.is_some() || self.align_auto_centermark.is_some()) && self.align_centermark_click(cx) {
             return;
         }
         if e.button == MouseButton::Left && self.rotate_to_edge.is_some() && self.rotate_to_edge_click(cx) {
@@ -1914,10 +1916,15 @@ impl DrawingEditor {
             Some(Sel::Table(id)) => out.extend(self.table_entries(id, cx)),
             Some(Sel::Sketch(id)) => out.extend(self.sketch_entries(id)),
             Some(Sel::Image(id)) => out.extend(self.image_entries(id)),
-            // Live 483–493: an automatic centermark's menu.
-            Some(Sel::AutoCentermark(..)) => {
+            // Live 483–493, ~1490: an automatic centermark's menu.
+            Some(Sel::AutoCentermark(view, key)) => {
                 out.push(MenuEntry::item("Paste as table", |t, _, cx| {
                     t.start_paste_table(cx);
+                }));
+                out.push(MenuEntry::item("Align centermark", move |t, _, cx| {
+                    t.align_auto_centermark = Some((view, key));
+                    t.status = Some("Align centermark: select a line or edge".into());
+                    cx.notify();
                 }));
                 out.push(MenuEntry::Separator);
                 out.push(MenuEntry::item("Clear selection", |t, _, cx| {

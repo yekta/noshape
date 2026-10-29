@@ -203,6 +203,25 @@ impl DrawingEditor {
 
     /// Click while aligning a centermark: it turns to the clicked straight edge.
     pub fn align_centermark_click(&mut self, cx: &mut Context<Self>) -> bool {
+        // An automatic centermark: its turn stored on the view.
+        if let Some((view, key)) = self.align_auto_centermark.take() {
+            self.update_hover(cx);
+            match self.line_pick() {
+                Some(Pick::Line { a, b }) if a.view == view => {
+                    let turn = (b.p[1] - a.p[1]).atan2(b.p[0] - a.p[0]).rem_euclid(std::f64::consts::FRAC_PI_2);
+                    self.edit_view("Align centermark", view, cx, |v| {
+                        v.centermark_angles.retain(|(k, _)| *k != key);
+                        if turn.abs() > 1e-9 {
+                            v.centermark_angles.push((key, turn));
+                        }
+                    });
+                    self.status = None;
+                }
+                _ => self.status = Some("Align centermark cancelled: select a straight edge".into()),
+            }
+            cx.notify();
+            return true;
+        }
         let Some(id) = self.align_centermark.take() else { return false };
         self.update_hover(cx);
         match self.line_pick() {

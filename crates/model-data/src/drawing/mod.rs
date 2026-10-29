@@ -475,6 +475,11 @@ pub struct DrawingView {
     /// of their centers).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub deleted_centermarks: Vec<[i64; 2]>,
+    /// Automatic centermarks turned with Align centermark (live ~1490, qa
+    /// DWG-CENTERMARK-ALIGN): (the mark's center key, its turn in view
+    /// coordinates, radians).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub centermark_angles: Vec<([i64; 2], f64)>,
     /// Show/hide edges: model edges left out of the view.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden_edges: Vec<(BodyId, TopoName)>,
@@ -736,6 +741,7 @@ impl Default for DrawingView {
             sketch_appearances: false,
             model_annotations: true,
             deleted_centermarks: Vec::new(),
+            centermark_angles: Vec::new(),
             editing_edges: false,
             pinned: None,
             detail_profile: None,
