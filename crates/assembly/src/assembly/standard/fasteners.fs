@@ -3158,3 +3158,82 @@ function swagingCollarStud(context is Context, id is Id, definition is map)
     }
     opDeleteBodies(context, id + "deleteThreadPlane", { "entities" : qCreatedBy(id + "threadPlane", EntityType.BODY) });
 }
+
+/**
+ * Live's PEM® self-clinching nuts (raw /features and body details), z = 0 on
+ * the shank's top (live's "Near"), the length select being the sheet
+ * thickness (unused here; al = its A_LEN). Form 0 (S™ / SS™ / CLS™ / CLSS™ /
+ * SP™): the shank dc across down to tl / 13, coning in at 9° to al / 2; a
+ * ring (dc + de) / 2 across down to al, knurled by 24 V teeth (valleys
+ * midway to the shank's foot); the body de across tl high, its outer edges
+ * rounded de / 40; the thread's minor diameter through, chamfered 45° out to
+ * the major at both ends; "PEM" engraved md deep in the bottom face (letters
+ * 120° apart, read from below, between 0.381 mm off the chamfer and 0.381 mm
+ * inside the rounding).
+ */
+annotation { "Feature Type Name" : "PEM nut" }
+export const pemNut = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Form" }
+        isInteger(definition.form, { (unitless) : [0, 0, 100] } as IntegerBoundSpec);
+        annotation { "Name" : "l" }
+        isLength(definition.l, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dm" }
+        isLength(definition.dm, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dmaj" }
+        isLength(definition.dmaj, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dc" }
+        isLength(definition.dc, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "de" }
+        isLength(definition.de, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "tl" }
+        isLength(definition.tl, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "al" }
+        isLength(definition.al, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "md" }
+        isLength(definition.md, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+    }
+    {
+        const rmaj = definition.dmaj / 2;
+        const rmin = definition.dm / 2;
+        const rc = definition.dc / 2;
+        const re = definition.de / 2;
+        const rk = (definition.dc + definition.de) / 4;
+        const al = definition.al;
+        const tl = definition.tl;
+        const f = definition.de / 40;
+        const zb = -al - tl;
+        const z1 = -tl / 13;
+        const r2 = rc - (al / 2 - tl / 13) * tan(9 * degree);
+        const s45 = sqrt(0.5);
+        revolveProfile(context, id + "body", [
+                    { "p" : rz(rmaj, Z) }, { "p" : rz(rc, Z) }, { "p" : rz(rc, z1) }, { "p" : rz(r2, -al / 2) }, { "p" : rz(rk, -al / 2) },
+                    { "p" : rz(rk, -al) }, { "p" : rz(re - f, -al) }, { "p" : rz(re, -al - f), "mid" : rz(re - f + f * s45, -al - f + f * s45) },
+                    { "p" : rz(re, zb + f) }, { "p" : rz(re - f, zb), "mid" : rz(re - f + f * s45, zb + f - f * s45) },
+                    { "p" : rz(rmaj, zb) }, { "p" : rz(rmin, zb + rmaj - rmin) }, { "p" : rz(rmin, -(rmaj - rmin)) }
+                ]);
+        knurlCut(context, id, qCreatedBy(id + "body", EntityType.BODY), -al, al / 2, 24, (r2 + rk) / 2, rk, 90 * degree);
+        // The marking: each letter's box from 0.381 mm off the chamfer to
+        // 0.381 mm inside the rounding, centred (live's widths per height),
+        // on a plane facing down turned 0°, -120°, 120°. Open Sans' box
+        // height is its ascender: 2189 / 1462 of the cap height.
+        const gap = 0.381 * millimeter;
+        const h = re - f - rmaj - 2 * gap;
+        if (definition.md > EPS && h > EPS)
+        {
+            const letters = [["P", 0, 0.85502], ["E", -120, 0.77907], ["M", 120, 1.20842]];
+            for (var k = 0; k < 3; k += 1)
+            {
+                const a = letters[k][1] * degree;
+                const w = letters[k][2] * h;
+                const sk = newSketchOnPlane(context, id + ("mark" ~ k), { "sketchPlane" : plane(vector(Z, Z, zb), vector(0, 0, -1), vector(cos(a), -sin(a), 0)) });
+                skText(sk, "text", { "text" : letters[k][0], "fontName" : "OpenSans-Regular.ttf",
+                            "firstCorner" : vector(-w / 2, rmaj + gap), "secondCorner" : vector(w / 2, rmaj + gap + h * 2189 / 1462) });
+                skSolve(sk);
+                opExtrude(context, id + ("engrave" ~ k), { "entities" : qSketchRegion(id + ("mark" ~ k), true), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : definition.md });
+                opDeleteBodies(context, id + ("deleteMark" ~ k), { "entities" : qCreatedBy(id + ("mark" ~ k), EntityType.BODY) });
+                subtract(context, id + ("cutMark" ~ k), qCreatedBy(id + "body", EntityType.BODY), qCreatedBy(id + ("engrave" ~ k), EntityType.BODY));
+            }
+        }
+    });

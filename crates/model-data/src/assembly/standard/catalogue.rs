@@ -35,6 +35,8 @@ pub enum Shape {
     PemStandoff,
     /// PEM® self-clinching pins.
     PemPin,
+    /// PEM® self-clinching nuts (the length select is the sheet thickness).
+    PemNut,
 }
 
 impl Shape {
@@ -54,15 +56,16 @@ impl Shape {
             Shape::FlushNut => "flushNut",
             Shape::PemStandoff => "pemStandoff",
             Shape::PemPin => "pemPin",
+            Shape::PemNut => "pemNut",
         }
     }
     /// Whether the component has a length (bolts, screws, pins, keys).
     pub fn has_length(self) -> bool {
-        matches!(self, Shape::Screw | Shape::Pin | Shape::Key | Shape::ShoulderScrew | Shape::SocketShoulderScrew | Shape::Standoff | Shape::PemStandoff | Shape::PemPin)
+        matches!(self, Shape::Screw | Shape::Pin | Shape::Key | Shape::ShoulderScrew | Shape::SocketShoulderScrew | Shape::Standoff | Shape::PemStandoff | Shape::PemPin | Shape::PemNut)
     }
     /// Nuts, washers, rings fit over a shaft: auto-size rounds up.
     pub fn fits_over(self) -> bool {
-        matches!(self, Shape::Nut | Shape::Washer | Shape::RetainingRing | Shape::ORing | Shape::FlushNut)
+        matches!(self, Shape::Nut | Shape::Washer | Shape::RetainingRing | Shape::ORing | Shape::FlushNut | Shape::PemNut)
     }
     /// The script's dimension giving the part's height (its top face, where
     /// the second mate connector sits), for parts with no length.
@@ -165,6 +168,10 @@ pub struct Size {
     /// PEM® FH™ studs M8 have no aluminum).
     #[serde(default)]
     pub materials: Vec<String>,
+    /// A material's part-number type code at this size when not the
+    /// component's (live: PEM® M5 nuts "SS" / "CLSS").
+    #[serde(default)]
+    pub type_codes: BTreeMap<String, String>,
 }
 
 /// How the Thread length list follows from the length.

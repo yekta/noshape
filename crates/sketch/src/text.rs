@@ -77,7 +77,7 @@ pub const SKETCH_FONTS: [SketchFont; 32] = [
 pub const SKETCH_DEFAULT_FONT: &str = "Open Sans";
 
 /// The Text tool's font files, zstd-compressed (unpacked on first use).
-static SKETCH_FILES: [&[u8]; 55] = [
+static SKETCH_FILES: [&[u8]; 53] = [
     include_bytes!("../fonts/sketch/Allerta-Regular.ttf.zst"),
     include_bytes!("../fonts/sketch/AllertaStencil-Regular.ttf.zst"),
     include_bytes!("../fonts/sketch/Arimo-VF.ttf.zst"),
@@ -106,8 +106,6 @@ static SKETCH_FILES: [&[u8]; 55] = [
     include_bytes!("../fonts/sketch/NotoSansKR-VF.ttf.zst"),
     include_bytes!("../fonts/sketch/NotoSerif-VF.ttf.zst"),
     include_bytes!("../fonts/sketch/NotoSerif-Italic-VF.ttf.zst"),
-    include_bytes!("../fonts/sketch/OpenSans-VF.ttf.zst"),
-    include_bytes!("../fonts/sketch/OpenSans-Italic-VF.ttf.zst"),
     include_bytes!("../fonts/sketch/Orbitron-VF.ttf.zst"),
     include_bytes!("../fonts/sketch/Oswald-VF.ttf.zst"),
     include_bytes!("../fonts/sketch/Poppins-Regular.ttf.zst"),
@@ -135,7 +133,7 @@ static SKETCH_FILES: [&[u8]; 55] = [
     include_bytes!("../fonts/sketch/Tinos-BoldItalic.ttf.zst"),
 ];
 
-static SKETCH_UNPACKED: [std::sync::OnceLock<&'static [u8]>; 55] = [const { std::sync::OnceLock::new() }; 55];
+static SKETCH_UNPACKED: [std::sync::OnceLock<&'static [u8]>; 53] = [const { std::sync::OnceLock::new() }; 53];
 
 /// The drawing Font list's files: the releases Onshape's drawings use
 /// (live asb 10-24 "drawing font files", verified against its PDF exports):
@@ -243,6 +241,10 @@ enum SketchFace {
     File(usize, Option<f32>),
     /// The bundled static Noto Sans.
     Noto,
+    /// Open Sans: the 1.10 files drawings use, as live's sketch text (its
+    /// glyphs' segments: one face each when extruded, e.g. the PEM® nuts'
+    /// marking, P 7 curved, M 2).
+    OpenSans,
 }
 
 /// The face of `font` (a [`SKETCH_FONTS`] name) in a style it has; a style it
@@ -270,18 +272,18 @@ fn sketch_face(font: &str, bold: bool, italic: bool) -> Option<SketchFace> {
         "Noto Sans Japanese" => [some(Some((24, None))), some(Some((24, Some(700.0)))), some(None), some(None)],
         "Noto Sans Korean" => [some(Some((25, None))), some(Some((25, Some(700.0)))), some(None), some(None)],
         "Noto Serif" => [some(Some((26, None))), some(Some((26, Some(700.0)))), some(Some((27, None))), some(Some((27, Some(700.0))))],
-        "Open Sans" => [some(Some((28, None))), some(Some((28, Some(700.0)))), some(Some((29, None))), some(Some((29, Some(700.0))))],
-        "Orbitron" => [some(Some((30, None))), some(Some((30, Some(700.0)))), some(None), some(None)],
-        "Oswald" => [some(Some((31, None))), some(Some((31, Some(700.0)))), some(None), some(None)],
-        "Poppins" => [some(Some((32, None))), some(Some((33, None))), some(Some((34, None))), some(Some((35, None)))],
-        "PTSans" => [some(Some((36, None))), some(Some((37, None))), some(Some((38, None))), some(Some((39, None)))],
-        "Rajdhani" => [some(Some((40, None))), some(Some((41, None))), some(None), some(None)],
-        "Roboto" => [some(Some((42, None))), some(Some((42, Some(700.0)))), some(Some((43, None))), some(Some((43, Some(700.0))))],
-        "Roboto Slab" => [some(Some((44, None))), some(Some((44, Some(700.0)))), some(None), some(None)],
-        "Ropa Sans" => [some(Some((45, None))), some(None), some(Some((46, None))), some(None)],
-        "Sofia Sans" => [some(Some((47, None))), some(Some((47, Some(700.0)))), some(Some((48, None))), some(Some((48, Some(700.0))))],
-        "Source Sans Pro" => [some(Some((49, None))), some(Some((49, Some(700.0)))), some(Some((50, None))), some(Some((50, Some(700.0))))],
-        "Tinos" => [some(Some((51, None))), some(Some((52, None))), some(Some((53, None))), some(Some((54, None)))],
+        "Open Sans" => [Some(SketchFace::OpenSans), Some(SketchFace::OpenSans), Some(SketchFace::OpenSans), Some(SketchFace::OpenSans)],
+        "Orbitron" => [some(Some((28, None))), some(Some((28, Some(700.0)))), some(None), some(None)],
+        "Oswald" => [some(Some((29, None))), some(Some((29, Some(700.0)))), some(None), some(None)],
+        "Poppins" => [some(Some((30, None))), some(Some((31, None))), some(Some((32, None))), some(Some((33, None)))],
+        "PTSans" => [some(Some((34, None))), some(Some((35, None))), some(Some((36, None))), some(Some((37, None)))],
+        "Rajdhani" => [some(Some((38, None))), some(Some((39, None))), some(None), some(None)],
+        "Roboto" => [some(Some((40, None))), some(Some((40, Some(700.0)))), some(Some((41, None))), some(Some((41, Some(700.0))))],
+        "Roboto Slab" => [some(Some((42, None))), some(Some((42, Some(700.0)))), some(None), some(None)],
+        "Ropa Sans" => [some(Some((43, None))), some(None), some(Some((44, None))), some(None)],
+        "Sofia Sans" => [some(Some((45, None))), some(Some((45, Some(700.0)))), some(Some((46, None))), some(Some((46, Some(700.0))))],
+        "Source Sans Pro" => [some(Some((47, None))), some(Some((47, Some(700.0)))), some(Some((48, None))), some(Some((48, Some(700.0))))],
+        "Tinos" => [some(Some((49, None))), some(Some((50, None))), some(Some((51, None))), some(Some((52, None)))],
         _ => return None,
     };
     let [r, b, i, bi] = faces;
@@ -291,6 +293,11 @@ fn sketch_face(font: &str, bold: bool, italic: bool) -> Option<SketchFace> {
         (false, true) => i.or(r),
         (false, false) => r,
     }
+}
+
+/// Open Sans 1.10 in a style (the drawing fonts' files).
+fn open_sans(bold: bool, italic: bool) -> &'static [u8] {
+    drawing_face("Open Sans", bold, italic).map(|f| f.data).unwrap_or_default()
 }
 
 /// The Text tool family of an Onshape font file name ("OpenSans-BoldItalic.ttf",
@@ -373,6 +380,7 @@ pub fn sketch_font_files(font: &str) -> Vec<&'static [u8]> {
         let data = match sketch_face(font, bold, italic) {
             Some(SketchFace::File(i, _)) => sketch_file(i),
             Some(SketchFace::Noto) => font_data("Noto Sans", bold, italic),
+            Some(SketchFace::OpenSans) => open_sans(bold, italic),
             None => continue,
         };
         if !out.iter().any(|d| std::ptr::eq(*d, data)) {
@@ -527,6 +535,7 @@ pub fn layout_text(text: &str, font: &str, bold: bool, italic: bool) -> TextLayo
     let (data, wght) = match sketch_face(font, bold, italic) {
         Some(SketchFace::File(i, w)) => (sketch_file(i), w),
         Some(SketchFace::Noto) => (font_data("Noto Sans", bold, italic), None),
+        Some(SketchFace::OpenSans) => (open_sans(bold, italic), None),
         None => (font_data(font, bold, italic), None),
     };
     layout_face(text, data, wght, false, false)

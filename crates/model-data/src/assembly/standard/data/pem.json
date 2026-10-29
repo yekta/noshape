@@ -2625,6 +2625,378 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_GROUNDING_STANDOFF_MAIN, DATA_PEM_SELFCLINCHING_GROUNDING_STANDOFF_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document ee6fb64b700c17e9bdadd080; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching nuts",
+    "name": "S™/SS™/CLS™/CLSS™/SP™ Self-clinching nuts",
+    "shape": "pemNut",
+    "form": {
+     "form": 0
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Stainless Steel",
+     "Hardened Stainless Steel",
+     "Carbon Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "CLS",
+      "finish": "No finish",
+      "finishCode": ""
+     },
+     "Hardened Stainless Steel": {
+      "code": "SP",
+      "finish": "No finish",
+      "finishCode": ""
+     },
+     "Carbon Steel": {
+      "code": "S",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "M2x0.40",
+      "label": "PEM {type}-M2-{l}",
+      "d": 2.0,
+      "dims": {
+       "dm": 1.567,
+       "dmaj": 2.0,
+       "dc": 4.2,
+       "de": 6.35,
+       "tl": 1.5,
+       "md": 0.25
+      },
+      "lengths": [
+       "0.8",
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "0.8": {
+        "al": 0.77
+       },
+       "1": {
+        "al": 0.97
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "0.8": "0",
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M2.5x0.45",
+      "label": "PEM {type}-M2.5-{l}",
+      "d": 2.5,
+      "dims": {
+       "dm": 2.013,
+       "dmaj": 2.5,
+       "dc": 4.2,
+       "de": 6.35,
+       "tl": 1.5,
+       "md": 0.25
+      },
+      "lengths": [
+       "0.8",
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "0.8": {
+        "al": 0.77
+       },
+       "1": {
+        "al": 0.97
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "0.8": "0",
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M3x0.50",
+      "label": "PEM {type}-M3-{l}",
+      "d": 3.0,
+      "dims": {
+       "dm": 2.459,
+       "dmaj": 3.0,
+       "dc": 4.2,
+       "de": 6.35,
+       "tl": 1.5,
+       "md": 0.25
+      },
+      "lengths": [
+       "0.8",
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "0.8": {
+        "al": 0.77
+       },
+       "1": {
+        "al": 0.97
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "0.8": "0",
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M3.5x0.60",
+      "label": "PEM {type}-M3.5-{l}",
+      "d": 3.5,
+      "dims": {
+       "dm": 2.85,
+       "dmaj": 3.5,
+       "dc": 4.73,
+       "de": 7.11,
+       "tl": 1.5,
+       "md": 0.25
+      },
+      "lengths": [
+       "0.8",
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "0.8": {
+        "al": 0.77
+       },
+       "1": {
+        "al": 0.97
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "0.8": "0",
+       "1": "1",
+       "1.4": "2"
+      },
+      "materials": [
+       "Stainless Steel",
+       "Carbon Steel"
+      ]
+     },
+     {
+      "name": "M4x0.70",
+      "label": "PEM {type}-M4-{l}",
+      "d": 4.0,
+      "dims": {
+       "dm": 3.242,
+       "dmaj": 4.0,
+       "dc": 5.38,
+       "de": 7.87,
+       "tl": 2.0,
+       "md": 0.25
+      },
+      "lengths": [
+       "0.8",
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "0.8": {
+        "al": 0.77
+       },
+       "1": {
+        "al": 0.97
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "0.8": "0",
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M5x0.80",
+      "label": "PEM {type}-M5-{l}",
+      "d": 5.0,
+      "dims": {
+       "dm": 4.134,
+       "dmaj": 5.0,
+       "dc": 6.33,
+       "de": 8.64,
+       "tl": 2.0,
+       "md": 0.25
+      },
+      "lengths": [
+       "0.8",
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "0.8": {
+        "al": 0.77
+       },
+       "1": {
+        "al": 0.97
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "0.8": "0",
+       "1": "1",
+       "1.4": "2"
+      },
+      "typeCodes": {
+       "Stainless Steel": "CLSS",
+       "Carbon Steel": "SS"
+      }
+     },
+     {
+      "name": "M6x1.00",
+      "label": "PEM {type}-M6-{l}",
+      "d": 6.0,
+      "dims": {
+       "dm": 4.917,
+       "dmaj": 6.0,
+       "dc": 8.73,
+       "de": 11.18,
+       "tl": 4.08,
+       "md": 0.25
+      },
+      "lengths": [
+       "0.92",
+       "1.2",
+       "1.4",
+       "2.29"
+      ],
+      "lengthDims": {
+       "0.92": {
+        "al": 0.89
+       },
+       "1.2": {
+        "al": 1.15
+       },
+       "1.4": {
+        "al": 1.38
+       },
+       "2.29": {
+        "al": 2.21
+       }
+      },
+      "lengthNames": {
+       "0.92": "00",
+       "1.2": "0",
+       "1.4": "1",
+       "2.29": "2"
+      }
+     },
+     {
+      "name": "M8x1.25",
+      "label": "PEM {type}-M8-{l}",
+      "d": 8.0,
+      "dims": {
+       "dm": 6.647,
+       "dmaj": 8.0,
+       "dc": 10.47,
+       "de": 12.7,
+       "tl": 5.47,
+       "md": 0.25
+      },
+      "lengths": [
+       "1.4",
+       "2.29"
+      ],
+      "lengthDims": {
+       "1.4": {
+        "al": 1.38
+       },
+       "2.29": {
+        "al": 2.21
+       }
+      },
+      "lengthNames": {
+       "1.4": "1",
+       "2.29": "2"
+      }
+     },
+     {
+      "name": "M10x1.5",
+      "label": "PEM {type}-M10-{l}",
+      "d": 10.0,
+      "dims": {
+       "dm": 8.376,
+       "dmaj": 10.0,
+       "dc": 13.97,
+       "de": 17.35,
+       "tl": 7.48,
+       "md": 0.25
+      },
+      "lengths": [
+       "2.29",
+       "3.18"
+      ],
+      "lengthDims": {
+       "2.29": {
+        "al": 2.21
+       },
+       "3.18": {
+        "al": 3.05
+       }
+      },
+      "lengthNames": {
+       "2.29": "1",
+       "3.18": "2"
+      }
+     },
+     {
+      "name": "M12x1.75",
+      "label": "PEM {type}-M12-{l}",
+      "d": 12.0,
+      "dims": {
+       "dm": 10.106,
+       "dmaj": 12.0,
+       "dc": 16.95,
+       "de": 20.57,
+       "tl": 8.5,
+       "md": 0.25
+      },
+      "lengths": [
+       "3.18"
+      ],
+      "lengthDims": {
+       "3.18": {
+        "al": 3.05
+       }
+      },
+      "lengthNames": {
+       "3.18": "1"
+      },
+      "materials": [
+       "Carbon Steel"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_SELF_CLINCHING_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 6486f47556e99e877dd14aa2; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  },
@@ -6732,6 +7104,661 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_GROUNDING_STANDOFF_MAIN, DATA_PEM_SELFCLINCHING_GROUNDING_STANDOFF_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document ac797db2bbadfa852fd38cd5; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching nuts",
+    "name": "S™/SS™/CLS™/CLSS™/SP™ Self-clinching nuts",
+    "shape": "pemNut",
+    "form": {
+     "form": 0
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Stainless Steel",
+     "Hardened Stainless Steel",
+     "Carbon Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "CLS",
+      "finish": "No finish",
+      "finishCode": ""
+     },
+     "Hardened Stainless Steel": {
+      "code": "SP",
+      "finish": "No finish",
+      "finishCode": ""
+     },
+     "Carbon Steel": {
+      "code": "S",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "#2-56",
+      "label": "PEM {type}-256-{l}",
+      "d": 0.086,
+      "dims": {
+       "dm": 0.0667,
+       "dmaj": 0.086,
+       "dc": 0.165,
+       "de": 0.25,
+       "tl": 0.07,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.030",
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.030": {
+        "al": 0.03
+       },
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.030": "0",
+       "0.040": "1",
+       "0.056": "2"
+      }
+     },
+     {
+      "name": "#3-48",
+      "label": "PEM {type}-348-{l}",
+      "d": 0.099,
+      "dims": {
+       "dm": 0.0764,
+       "dmaj": 0.099,
+       "dc": 0.165,
+       "de": 0.25,
+       "tl": 0.07,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.030",
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.030": {
+        "al": 0.03
+       },
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.030": "0",
+       "0.040": "1",
+       "0.056": "2"
+      },
+      "materials": [
+       "Stainless Steel",
+       "Carbon Steel"
+      ]
+     },
+     {
+      "name": "#4-40",
+      "label": "PEM {type}-440-{l}",
+      "d": 0.112,
+      "dims": {
+       "dm": 0.0849,
+       "dmaj": 0.112,
+       "dc": 0.165,
+       "de": 0.25,
+       "tl": 0.07,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.030",
+       "0.040",
+       "0.056",
+       "0.090"
+      ],
+      "lengthDims": {
+       "0.030": {
+        "al": 0.03
+       },
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       },
+       "0.090": {
+        "al": 0.087
+       }
+      },
+      "lengthNames": {
+       "0.030": "0",
+       "0.040": "1",
+       "0.056": "2",
+       "0.090": "3"
+      }
+     },
+     {
+      "name": "#6-32",
+      "label": "PEM {type}-632-{l}",
+      "d": 0.138,
+      "dims": {
+       "dm": 0.104,
+       "dmaj": 0.138,
+       "dc": 0.187,
+       "de": 0.28,
+       "tl": 0.07,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.030",
+       "0.040",
+       "0.056",
+       "0.090"
+      ],
+      "lengthDims": {
+       "0.030": {
+        "al": 0.03
+       },
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       },
+       "0.090": {
+        "al": 0.087
+       }
+      },
+      "lengthNames": {
+       "0.030": "0",
+       "0.040": "1",
+       "0.056": "2",
+       "0.090": "3"
+      }
+     },
+     {
+      "name": "#8-32",
+      "label": "PEM {type}-832-{l}",
+      "d": 0.164,
+      "dims": {
+       "dm": 0.13,
+       "dmaj": 0.164,
+       "dc": 0.212,
+       "de": 0.31,
+       "tl": 0.09,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.030",
+       "0.040",
+       "0.056",
+       "0.090"
+      ],
+      "lengthDims": {
+       "0.030": {
+        "al": 0.03
+       },
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       },
+       "0.090": {
+        "al": 0.087
+       }
+      },
+      "lengthNames": {
+       "0.030": "0",
+       "0.040": "1",
+       "0.056": "2",
+       "0.090": "3"
+      }
+     },
+     {
+      "name": "#10-24",
+      "label": "PEM {type}-024-{l}",
+      "d": 0.19,
+      "dims": {
+       "dm": 0.145,
+       "dmaj": 0.19,
+       "dc": 0.249,
+       "de": 0.34,
+       "tl": 0.09,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.030",
+       "0.040",
+       "0.056",
+       "0.090"
+      ],
+      "lengthDims": {
+       "0.030": {
+        "al": 0.03
+       },
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       },
+       "0.090": {
+        "al": 0.087
+       }
+      },
+      "lengthNames": {
+       "0.030": "0",
+       "0.040": "1",
+       "0.056": "2",
+       "0.090": "3"
+      },
+      "typeCodes": {
+       "Stainless Steel": "CLSS",
+       "Carbon Steel": "SS"
+      }
+     },
+     {
+      "name": "#10-32",
+      "label": "PEM {type}-032-{l}",
+      "d": 0.19,
+      "dims": {
+       "dm": 0.156,
+       "dmaj": 0.19,
+       "dc": 0.249,
+       "de": 0.34,
+       "tl": 0.09,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.030",
+       "0.040",
+       "0.056",
+       "0.090"
+      ],
+      "lengthDims": {
+       "0.030": {
+        "al": 0.03
+       },
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       },
+       "0.090": {
+        "al": 0.087
+       }
+      },
+      "lengthNames": {
+       "0.030": "0",
+       "0.040": "1",
+       "0.056": "2",
+       "0.090": "3"
+      },
+      "typeCodes": {
+       "Stainless Steel": "CLSS",
+       "Carbon Steel": "SS"
+      }
+     },
+     {
+      "name": "#12-24",
+      "label": "PEM {type}-1224-{l}",
+      "d": 0.216,
+      "dims": {
+       "dm": 0.171,
+       "dmaj": 0.216,
+       "dc": 0.276,
+       "de": 0.37,
+       "tl": 0.13,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.047",
+       "0.056",
+       "0.090"
+      ],
+      "lengthDims": {
+       "0.047": {
+        "al": 0.045
+       },
+       "0.056": {
+        "al": 0.054
+       },
+       "0.090": {
+        "al": 0.087
+       }
+      },
+      "lengthNames": {
+       "0.047": "1",
+       "0.056": "2",
+       "0.090": "3"
+      },
+      "materials": [
+       "Stainless Steel",
+       "Carbon Steel"
+      ]
+     },
+     {
+      "name": "1/4-20",
+      "label": "PEM {type}-0420-{l}",
+      "d": 0.25,
+      "dims": {
+       "dm": 0.196,
+       "dmaj": 0.25,
+       "dc": 0.343,
+       "de": 0.44,
+       "tl": 0.17,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.047",
+       "0.056",
+       "0.090",
+       "0.125"
+      ],
+      "lengthDims": {
+       "0.047": {
+        "al": 0.045
+       },
+       "0.056": {
+        "al": 0.054
+       },
+       "0.090": {
+        "al": 0.087
+       },
+       "0.125": {
+        "al": 0.12
+       }
+      },
+      "lengthNames": {
+       "0.047": "0",
+       "0.056": "1",
+       "0.090": "2",
+       "0.125": "3"
+      }
+     },
+     {
+      "name": "1/4-28",
+      "label": "PEM {type}-0428-{l}",
+      "d": 0.25,
+      "dims": {
+       "dm": 0.211,
+       "dmaj": 0.25,
+       "dc": 0.343,
+       "de": 0.44,
+       "tl": 0.17,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.056",
+       "0.090",
+       "0.125"
+      ],
+      "lengthDims": {
+       "0.056": {
+        "al": 0.054
+       },
+       "0.090": {
+        "al": 0.087
+       },
+       "0.125": {
+        "al": 0.12
+       }
+      },
+      "lengthNames": {
+       "0.056": "1",
+       "0.090": "2",
+       "0.125": "3"
+      },
+      "materials": [
+       "Stainless Steel",
+       "Carbon Steel"
+      ]
+     },
+     {
+      "name": "5/16-18",
+      "label": "PEM {type}-0518-{l}",
+      "d": 0.3125,
+      "dims": {
+       "dm": 0.252,
+       "dmaj": 0.3125,
+       "dc": 0.412,
+       "de": 0.5,
+       "tl": 0.23,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.056",
+       "0.090",
+       "0.125"
+      ],
+      "lengthDims": {
+       "0.056": {
+        "al": 0.054
+       },
+       "0.090": {
+        "al": 0.087
+       },
+       "0.125": {
+        "al": 0.12
+       }
+      },
+      "lengthNames": {
+       "0.056": "1",
+       "0.090": "2",
+       "0.125": "3"
+      }
+     },
+     {
+      "name": "5/16-24",
+      "label": "PEM {type}-0524-{l}",
+      "d": 0.3125,
+      "dims": {
+       "dm": 0.267,
+       "dmaj": 0.3125,
+       "dc": 0.412,
+       "de": 0.5,
+       "tl": 0.23,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.056",
+       "0.090",
+       "0.125"
+      ],
+      "lengthDims": {
+       "0.056": {
+        "al": 0.054
+       },
+       "0.090": {
+        "al": 0.087
+       },
+       "0.125": {
+        "al": 0.12
+       }
+      },
+      "lengthNames": {
+       "0.056": "1",
+       "0.090": "2",
+       "0.125": "3"
+      }
+     },
+     {
+      "name": "3/8-16",
+      "label": "PEM {type}-0616-{l}",
+      "d": 0.375,
+      "dims": {
+       "dm": 0.307,
+       "dmaj": 0.375,
+       "dc": 0.499,
+       "de": 0.56,
+       "tl": 0.27,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.090",
+       "0.125",
+       "0.250"
+      ],
+      "lengthDims": {
+       "0.090": {
+        "al": 0.087
+       },
+       "0.125": {
+        "al": 0.12
+       },
+       "0.250": {
+        "al": 0.235
+       }
+      },
+      "lengthNames": {
+       "0.090": "1",
+       "0.125": "2",
+       "0.250": "3"
+      }
+     },
+     {
+      "name": "3/8-24",
+      "label": "PEM {type}-0624-{l}",
+      "d": 0.375,
+      "dims": {
+       "dm": 0.33,
+       "dmaj": 0.375,
+       "dc": 0.499,
+       "de": 0.56,
+       "tl": 0.27,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.090",
+       "0.125",
+       "0.250"
+      ],
+      "lengthDims": {
+       "0.090": {
+        "al": 0.087
+       },
+       "0.125": {
+        "al": 0.12
+       },
+       "0.250": {
+        "al": 0.235
+       }
+      },
+      "lengthNames": {
+       "0.090": "1",
+       "0.125": "2",
+       "0.250": "3"
+      }
+     },
+     {
+      "name": "7/16-20",
+      "label": "PEM {type}-0720-{l}",
+      "d": 0.4375,
+      "dims": {
+       "dm": 0.383,
+       "dmaj": 0.4375,
+       "dc": 0.561,
+       "de": 0.687,
+       "tl": 0.311,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.092"
+      ],
+      "lengthDims": {
+       "0.092": {
+        "al": 0.087
+       }
+      },
+      "lengthNames": {
+       "0.092": "1"
+      },
+      "materials": [
+       "Carbon Steel"
+      ]
+     },
+     {
+      "name": "1/2-13",
+      "label": "PEM {type}-0813-{l}",
+      "d": 0.5,
+      "dims": {
+       "dm": 0.417,
+       "dmaj": 0.5,
+       "dc": 0.655,
+       "de": 0.81,
+       "tl": 0.36,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.125",
+       "0.250"
+      ],
+      "lengthDims": {
+       "0.125": {
+        "al": 0.12
+       },
+       "0.250": {
+        "al": 0.235
+       }
+      },
+      "lengthNames": {
+       "0.125": "1",
+       "0.250": "2"
+      },
+      "materials": [
+       "Stainless Steel",
+       "Carbon Steel"
+      ]
+     },
+     {
+      "name": "1/2-20",
+      "label": "PEM {type}-0820-{l}",
+      "d": 0.5,
+      "dims": {
+       "dm": 0.446,
+       "dmaj": 0.5,
+       "dc": 0.655,
+       "de": 0.81,
+       "tl": 0.36,
+       "md": 0.01
+      },
+      "lengths": [
+       "0.125",
+       "0.250"
+      ],
+      "lengthDims": {
+       "0.125": {
+        "al": 0.12
+       },
+       "0.250": {
+        "al": 0.235
+       }
+      },
+      "lengthNames": {
+       "0.125": "1",
+       "0.250": "2"
+      },
+      "materials": [
+       "Stainless Steel",
+       "Carbon Steel"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_SELF_CLINCHING_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 6ef74964e6c32ca0d8d6d0ce; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  }

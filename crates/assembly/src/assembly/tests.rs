@@ -5059,7 +5059,7 @@ fn pem_fh_pins_match_live() {
 #[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn pem_fh_pin_sizes_build() {
     use super::standard::{self, CATALOGUE, StandardSpec};
-    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™") || c.name.starts_with("FHL™") || c.name.starts_with("TFH™") || c.name.starts_with("HFLH™") || c.name.starts_with("HF") || c.name.starts_with("FHX™") || c.name.starts_with("SGPC™")) {
+    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™") || c.name.starts_with("FHL™") || c.name.starts_with("TFH™") || c.name.starts_with("HFLH™") || c.name.starts_with("HF") || c.name.starts_with("FHX™") || c.name.starts_with("SGPC™") || c.name.starts_with("S™/SS™")) {
         for s in &c.sizes {
             for l in [s.lengths.first().unwrap(), s.lengths.last().unwrap()] {
                 let mut spec = StandardSpec::new(c);
@@ -5417,6 +5417,57 @@ fn pem_sosg_standoffs_match_live() {
                 assert!(standard::part_body(&r).is_some(), "{} x {l}", s.name);
             }
         }
+    }
+}
+
+/// PEM® S™ / SS™ / CLS™ / CLSS™ / SP™ self-clinching nuts (live's raw
+/// /features and body details): the Sheet thickness select (shank codes),
+/// type codes by material and size ("PEM CLS-M2-0", "PEM S-M2-0 ZI", M5
+/// "PEM SS-M5-0 ZI" / "PEM CLSS-M5-0", "PEM SP-M2-0"), M12 carbon steel only;
+/// M8 / 5/16-18 at sheet 1.4 / 0.056 = live's studio defaults: 109 faces
+/// (PLANE 92, CYLINDER 3, CONE 3, TORUS 2 and the "PEM" marking's 9 curved
+/// walls, live's SWEEP: Open Sans 1.10's P 7 and M 2 segments).
+#[test]
+fn pem_s_nuts_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let metric = CATALOGUE.iter().find(|c| c.name.starts_with("S™/SS™") && !c.inch).unwrap();
+    let unified = CATALOGUE.iter().find(|c| c.name.starts_with("S™/SS™") && c.inch).unwrap();
+    assert_eq!(metric.length_label(), "Sheet thickness");
+    let mut spec = StandardSpec::new(metric);
+    assert_eq!((spec.part_name(), spec.description()), ("PEM CLS-M2-0".to_string(), "PEM CLS-M2-0   Stainless Steel No finish".to_string()));
+    spec.length = Some("1.4".into());
+    assert_eq!(spec.part_name(), "PEM CLS-M2-2");
+    spec.material = Some("Carbon Steel".into());
+    assert_eq!(spec.part_name(), "PEM S-M2-2 ZI");
+    spec.set_size("M5x0.80");
+    assert_eq!(spec.part_name(), "PEM SS-M5-2 ZI");
+    spec.material = Some("Stainless Steel".into());
+    assert_eq!(spec.part_name(), "PEM CLSS-M5-2");
+    spec.material = Some("Hardened Stainless Steel".into());
+    spec.set_size("M2x0.40");
+    assert_eq!(spec.part_name(), "PEM SP-M2-2");
+    spec.set_size("M12x1.75");
+    assert_eq!(metric.materials_for(spec.size_row()), ["Carbon Steel"]);
+    assert_eq!(StandardSpec::new(unified).part_name(), "PEM CLS-256-0");
+    for (c, size, sheet) in [(metric, "M8x1.25", "1.4"), (unified, "5/16-18", "0.056")] {
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        spec.length = Some(sheet.into());
+        let r = standard::regenerate(&spec).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let mut kinds = std::collections::BTreeMap::new();
+        for i in 0..b.faces.len() {
+            let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+                Surface::Plane(_) => "plane",
+                Surface::Cone { .. } => "cone",
+                Surface::Cylinder { .. } => "cylinder",
+                Surface::Torus { .. } => "torus",
+                _ => "curved",
+            };
+            *kinds.entry(k).or_insert(0) += 1;
+        }
+        assert_eq!(kinds, [("cone", 3), ("curved", 9), ("cylinder", 3), ("plane", 92), ("torus", 2)].into_iter().collect(), "{size}");
     }
 }
 

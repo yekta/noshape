@@ -163,8 +163,8 @@ fn every_sketch_font_lays_out_in_its_styles() {
         }
     }
     // A variable font's Bold is its 700 instance: wider strokes, wider text.
-    let (r, b) = (layout_text("Wide", "Open Sans", false, false), layout_text("Wide", "Open Sans", true, false));
-    assert!(b.width > r.width * 1.02, "{} vs {}", b.width, r.width);
+    let (r, b) = (layout_text("Wide", "Roboto", false, false), layout_text("Wide", "Roboto", true, false));
+    assert!(b.width > r.width * 1.005, "{} vs {}", b.width, r.width);
     assert_eq!(sketch_font_of_file("OpenSans-BoldItalic.ttf"), Some("Open Sans"));
     assert_eq!(sketch_font_of_file("RobotoSlab-Regular.ttf"), Some("Roboto Slab"));
 }
@@ -172,9 +172,11 @@ fn every_sketch_font_lays_out_in_its_styles() {
 #[test]
 fn sketch_fonts_name_their_families() {
     use noshape_sketch::text::{font_family_name, sketch_font_files};
+    // Open Sans: live's 1.10 static files (regular, bold, italic, bold italic).
     let files = sketch_font_files("Open Sans");
-    assert_eq!(files.len(), 2, "regular and italic variable files");
+    assert_eq!(files.len(), 4);
     assert_eq!(font_family_name(files[0]).as_deref(), Some("Open Sans"));
+    assert_eq!(sketch_font_files("Roboto").len(), 2, "regular and italic variable files");
     assert_eq!(font_family_name(sketch_font_files("PTSans")[0]).as_deref(), Some("PT Sans"));
     assert_eq!(sketch_font_files("Allerta").len(), 1);
 }

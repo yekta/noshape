@@ -330,7 +330,8 @@ impl StandardSpec {
         };
         // PEM®: the material's type code, then its finish code ("PEM SO-43.1-3 ZI").
         if let Some(m) = component(self).and_then(|c| c.material_codes.get(self.material())) {
-            name = name.replace("{type}", &m.code);
+            let code = self.size_row().and_then(|s| s.type_codes.get(self.material())).unwrap_or(&m.code);
+            name = name.replace("{type}", code);
             if !m.finish_code.is_empty() {
                 name = format!("{name} {}", m.finish_code);
             }

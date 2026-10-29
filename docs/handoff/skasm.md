@@ -183,8 +183,13 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    the collar knurled by cutting outside a 28-point star whose tips sit on it; ~350 s for the T2 sweep now). All
    PEM studs done. SGPC 563fc67c. DSO (pemStandoff form 4: SO's profile, round head knurled by knurlCut, the
    helper SGPC uses too) fbd2536c. SOSG (form 5: one groove, hex flats ±X, 32 V notches over the bottom tt by
-   knurlCut). All PEM studs and standoffs done. Next:
-   SOSG 115, nuts 109–148. Not shown yet: the read-only Hole size / Recommended sheet material rows.
+   knurlCut) 9786920b. All PEM studs and standoffs done. Nuts: shape PemNut (pemNut), the length select is
+   "Sheet thickness" (lengthLabel; lengths = its options, lengthNames = shank codes, lengthDims al = A_LEN),
+   Size.typeCodes for per-size codes (M5 SS / CLSS); /root/skasm-scratch/pemnut.py build_nut(). S / SS / CLS / CLSS /
+   SP done (form 0). Live's nuts' SWEEP faces are the engraved "PEM" (Sketch 3 text, OpenSans-Regular.ttf, one face
+   per quadratic segment of Open Sans 1.10): sketch text's Open Sans is now the 1.10 drawing files (was the
+   variable font: P 11 + M 6 curved walls instead of live's 7 + 2). Next nuts: CLA, HNL, H, S-RT, SH, SL, SMPS
+   (109–148 faces). Not shown yet: the read-only Hole size / Recommended sheet material rows.
    Live's studio defaults sometimes differ from the table (NAS 1129 thru minor 0.067 vs 0.0667, NASM 45938/4 ax 0.0225
    vs 0.028125): check the construction at the studio values, then test ours at the table's.
    Earlier: ANSI taper pin crowned ends 10-27.
