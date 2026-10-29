@@ -2390,6 +2390,146 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_FLUSH_HEAD_STUD_XPRESS_THREAD_MAIN, DATA_PEM_SELFCLINCHING_FLUSH_HEAD_STUD_XPRESS_THREAD_LENGTH (component document 2ba86c85e5a2875d4b999be6; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching studs",
+    "name": "SGPC™ Swaging collar studs",
+    "shape": "pemPin",
+    "form": {
+     "form": 10
+    },
+    "materials": [
+     "Stainless Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "SGPC",
+      "finish": "No finish",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "M2.5x0.45",
+      "label": "PEM {type}-M2.5-{l}",
+      "d": 2.5,
+      "dims": {
+       "hd": 5.0,
+       "p": 2.5,
+       "sd": 2.4,
+       "pt": 0.45,
+       "td": 0.5,
+       "dd": 2.5,
+       "hs": 2.5
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "15",
+       "18"
+      ]
+     },
+     {
+      "name": "M3x0.50",
+      "label": "PEM {type}-M3-{l}",
+      "d": 3.0,
+      "dims": {
+       "hd": 6.0,
+       "p": 3.0,
+       "sd": 2.5,
+       "pt": 0.5,
+       "td": 0.6,
+       "dd": 3.0,
+       "hs": 3.0
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "15",
+       "18",
+       "20",
+       "25"
+      ]
+     },
+     {
+      "name": "M4x0.70",
+      "label": "PEM {type}-M4-{l}",
+      "d": 4.0,
+      "dims": {
+       "hd": 7.0,
+       "p": 4.0,
+       "sd": 2.7,
+       "pt": 0.7,
+       "td": 0.6,
+       "dd": 4.0,
+       "hs": 4.0
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "15",
+       "18",
+       "20",
+       "25",
+       "30"
+      ]
+     },
+     {
+      "name": "M5x0.80",
+      "label": "PEM {type}-M5-{l}",
+      "d": 5.0,
+      "dims": {
+       "hd": 8.0,
+       "p": 5.0,
+       "sd": 2.8,
+       "pt": 0.8,
+       "td": 0.6,
+       "dd": 5.0,
+       "hs": 5.0
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "15",
+       "18",
+       "20",
+       "25",
+       "30",
+       "35"
+      ]
+     },
+     {
+      "name": "M6x1.00",
+      "label": "PEM {type}-M6-{l}",
+      "d": 6.0,
+      "dims": {
+       "hd": 9.0,
+       "p": 6.0,
+       "sd": 3.0,
+       "pt": 1.0,
+       "td": 0.7,
+       "dd": 6.0,
+       "hs": 6.0
+      },
+      "lengths": [
+       "10",
+       "12",
+       "15",
+       "18",
+       "20",
+       "25",
+       "30",
+       "35"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_SWAGING_COLLAR_STUD_MAIN, DATA_PEM_SELFCLINCHING_SWAGING_COLLAR_STUD_LENGTH (component document 384e30213ed1f04c3d451665; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  },
@@ -6130,6 +6270,233 @@
       "default": "HFE"
      }
     ]
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching studs",
+    "name": "SGPC™ Swaging collar studs",
+    "shape": "pemPin",
+    "form": {
+     "form": 10
+    },
+    "materials": [
+     "Stainless Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "SGPC",
+      "finish": "No finish",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "#2-56",
+      "label": "PEM {type}-256-{l}",
+      "d": 0.086,
+      "dims": {
+       "hd": 0.189,
+       "p": 0.086,
+       "sd": 0.093,
+       "pt": 0.01785,
+       "td": 0.02,
+       "dd": 0.086,
+       "hs": 0.086
+      },
+      "lengths": [
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75"
+      ],
+      "lengthNames": {
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12"
+      }
+     },
+     {
+      "name": "#4-40",
+      "label": "PEM {type}-440-{l}",
+      "d": 0.112,
+      "dims": {
+       "hd": 0.228,
+       "p": 0.112,
+       "sd": 0.101,
+       "pt": 0.025,
+       "td": 0.024,
+       "dd": 0.112,
+       "hs": 0.112
+      },
+      "lengths": [
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25"
+      ],
+      "lengthNames": {
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20"
+      }
+     },
+     {
+      "name": "#6-32",
+      "label": "PEM {type}-632-{l}",
+      "d": 0.138,
+      "dims": {
+       "hd": 0.256,
+       "p": 0.138,
+       "sd": 0.109,
+       "pt": 0.03125,
+       "td": 0.024,
+       "dd": 0.138,
+       "hs": 0.138
+      },
+      "lengths": [
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ],
+      "lengthNames": {
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24"
+      }
+     },
+     {
+      "name": "#8-32",
+      "label": "PEM {type}-832-{l}",
+      "d": 0.164,
+      "dims": {
+       "hd": 0.279,
+       "p": 0.164,
+       "sd": 0.109,
+       "pt": 0.03125,
+       "td": 0.024,
+       "dd": 0.164,
+       "hs": 0.164
+      },
+      "lengths": [
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ],
+      "lengthNames": {
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24"
+      }
+     },
+     {
+      "name": "#10-32",
+      "label": "PEM {type}-032-{l}",
+      "d": 0.19,
+      "dims": {
+       "hd": 0.307,
+       "p": 0.19,
+       "sd": 0.109,
+       "pt": 0.03125,
+       "td": 0.024,
+       "dd": 0.19,
+       "hs": 0.19
+      },
+      "lengths": [
+       "0.312",
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ],
+      "lengthNames": {
+       "0.312": "5",
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24"
+      }
+     },
+     {
+      "name": "1/4-20",
+      "label": "PEM {type}-0420-{l}",
+      "d": 0.25,
+      "dims": {
+       "hd": 0.366,
+       "p": 0.25,
+       "sd": 0.131,
+       "pt": 0.05,
+       "td": 0.028,
+       "dd": 0.25,
+       "hs": 0.25
+      },
+      "lengths": [
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "0.875",
+       "1",
+       "1.25",
+       "1.5"
+      ],
+      "lengthNames": {
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "0.875": "14",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_SWAGING_COLLAR_STUD_MAIN, DATA_PEM_SELFCLINCHING_SWAGING_COLLAR_STUD_LENGTH (component document 2f3748f159171d01e4ebdd8e; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  }

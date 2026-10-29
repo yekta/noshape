@@ -2781,7 +2781,11 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
  * profile, sd = S_DIM, pt = its taper's length): form 3's serrations and
  * disc, the head's edges rounded 0.02 hd, a collar 1.15 p / 2 coning at 60°
  * to p / 2 at hd / 5; a neck 0.9 p from 0.6 sd to sd between 45° flanks; the
- * end tapered at 25° over pt; no split.
+ * end tapered at 25° over pt; no split. Form 10 (SGPC™ swaging collar
+ * studs): a head td thick, its edges rounded 0.3 td; under it an undercut
+ * td / 10 tall, (hd + p) / 40 deep, then a collar (hd + p) / 4 down to 4 td,
+ * its edges chamfered 0.3 td, knurled by 28 V teeth 0.3 td deep; the split
+ * and the end as form 5.
  */
 annotation { "Feature Type Name" : "PEM pin" }
 export const pemPin = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2841,6 +2845,11 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
         if (definition.form >= 5 && definition.form <= 8)
         {
             nonFlushStud(context, id, definition);
+            return;
+        }
+        if (definition.form == 10)
+        {
+            swagingCollarStud(context, id, definition);
             return;
         }
         const tpxs = definition.form == 1;
@@ -3065,6 +3074,57 @@ function nonFlushStud(context is Context, id is Id, definition is map)
         const flats = prismZ(context, id + "flats", zl - t, -zl + 2 * t, polygonPoints(8, 2 * sqrt(R * R - definition.hd * definition.hd / 64), 0));
         intersect(context, id + "flatCut", qCreatedBy(id + "body", EntityType.BODY), flats);
     }
+    opPlane(context, id + "threadPlane", { "plane" : plane(vector(Z, Z, -ts), vector(0, 0, 1)), "width" : 4 * R, "height" : 4 * R });
+    try silent
+    {
+        opSplitFace(context, id + "threadSplit", { "faceTargets" : qGeometry(qOwnedByBody(solidsOf(context, id), EntityType.FACE), GeometryType.CYLINDER),
+                    "faceTools" : qCreatedBy(id + "threadPlane", EntityType.FACE), "keepToolSurfaces" : false });
+    }
+    opDeleteBodies(context, id + "deleteThreadPlane", { "entities" : qCreatedBy(id + "threadPlane", EntityType.BODY) });
+}
+
+/** pemPin form 10 (SGPC™ swaging collar studs). */
+function swagingCollarStud(context is Context, id is Id, definition is map)
+{
+    const p = definition.p;
+    const t = definition.td;
+    const ts = definition.sd + t;
+    const R = definition.hd / 2;
+    const r1 = p / 2;
+    const rc = (definition.hd + p) / 4;
+    const ru = rc - (definition.hd + p) / 40;
+    const f = 0.3 * t;
+    const zu = -1.1 * t;
+    const zb = -4 * t;
+    const zl = -t - definition.l;
+    const ch = 0.625 * 0.8660254 * definition.pt;
+    const rd = 0.15 * p;
+    const s45 = sqrt(0.5);
+    revolveProfile(context, id + "body", [
+                { "p" : rz(Z, Z) }, { "p" : rz(R - f, Z) }, { "p" : rz(R, -f), "mid" : rz(R - f + f * s45, -f + f * s45) },
+                { "p" : rz(R, -t + f) }, { "p" : rz(R - f, -t), "mid" : rz(R - f + f * s45, -t + f - f * s45) },
+                { "p" : rz(ru, -t) }, { "p" : rz(ru, zu) }, { "p" : rz(rc - f, zu) }, { "p" : rz(rc, zu - f) }, { "p" : rz(rc, zb + f) },
+                { "p" : rz(rc - f, zb) }, { "p" : rz(r1, zb) }, { "p" : rz(r1, zl + ch) }, { "p" : rz(r1 - ch, zl) }, { "p" : rz(rd, zl) },
+                { "p" : rz(Z, zl + rd / tan(60 * degree)) }
+            ]);
+    // The knurl: outside a 28-point star (valleys 0.3 td in, tips on the
+    // collar), through the collar.
+    var under = XY_PLANE;
+    under.origin[2] = zb;
+    const sk = newSketchOnPlane(context, id + "knurlSketch", { "sketchPlane" : under });
+    var star = [];
+    for (var k = 0; k < 28; k += 1)
+    {
+        const a = (90 + 360 / 28 * k) * degree;
+        star = append(star, vector(cos(a), sin(a)) * (rc - f));
+        star = append(star, vector(cos(a + 180 / 28 * degree), sin(a + 180 / 28 * degree)) * rc);
+    }
+    skPolyline(sk, "star", { "points" : append(star, star[0]) });
+    skCircle(sk, "out", { "center" : vector(Z, Z), "radius" : R });
+    skSolve(sk);
+    opExtrude(context, id + "knurl", { "entities" : qSketchRegion(id + "knurlSketch", true), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : zu - zb });
+    opDeleteBodies(context, id + "deleteKnurlSketch", { "entities" : qCreatedBy(id + "knurlSketch", EntityType.BODY) });
+    subtract(context, id + "cut", qCreatedBy(id + "body", EntityType.BODY), qCreatedBy(id + "knurl", EntityType.BODY));
     opPlane(context, id + "threadPlane", { "plane" : plane(vector(Z, Z, -ts), vector(0, 0, 1)), "width" : 4 * R, "height" : 4 * R });
     try silent
     {
