@@ -1892,6 +1892,100 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_NON_FLUSH_STUD_MAIN, DATA_PEM_SELFCLINCHING_NON_FLUSH_STUD_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 2b0bf1190da4ae73e97064c4; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching studs",
+    "name": "HFLH™ Hard panel studs",
+    "shape": "pemPin",
+    "form": {
+     "form": 6
+    },
+    "materials": [
+     "Hardened Alloy Steel"
+    ],
+    "materialCodes": {
+     "Hardened Alloy Steel": {
+      "code": "HFLH",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "M5x0.80",
+      "label": "PEM {type}-M5-{l}",
+      "d": 5.0,
+      "dims": {
+       "hd": 9.6,
+       "p": 5.0,
+       "sd": 2.6,
+       "pt": 0.8,
+       "td": 1.35,
+       "st": 1.0,
+       "dd": 5.0,
+       "hs": 5.0
+      },
+      "lengths": [
+       "15",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "50"
+      ]
+     },
+     {
+      "name": "M6x1.00",
+      "label": "PEM {type}-M6-{l}",
+      "d": 6.0,
+      "dims": {
+       "hd": 11.35,
+       "p": 6.0,
+       "sd": 2.8,
+       "pt": 1.0,
+       "td": 1.52,
+       "st": 1.0,
+       "dd": 6.0,
+       "hs": 6.0
+      },
+      "lengths": [
+       "15",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "50"
+      ]
+     },
+     {
+      "name": "M8x1.25",
+      "label": "PEM {type}-M8-{l}",
+      "d": 8.0,
+      "dims": {
+       "hd": 15.3,
+       "p": 8.0,
+       "sd": 3.3,
+       "pt": 1.25,
+       "td": 2.13,
+       "st": 1.5,
+       "dd": 8.0,
+       "hs": 8.0
+      },
+      "lengths": [
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "50"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_HARD_PANEL_STUD_MAIN, DATA_PEM_SELFCLINCHING_HARD_PANEL_STUD_LENGTH (component document b84f3bd04a5a8599e382cbd8; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  },
@@ -5091,6 +5185,128 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_NON_FLUSH_STUD_MAIN, DATA_PEM_SELFCLINCHING_NON_FLUSH_STUD_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 1ad2edfbb83ce075720ae3fa; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching studs",
+    "name": "HFLH™ Hard panel studs",
+    "shape": "pemPin",
+    "form": {
+     "form": 6
+    },
+    "materials": [
+     "Hardened Alloy Steel"
+    ],
+    "materialCodes": {
+     "Hardened Alloy Steel": {
+      "code": "HFLH",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "#10-32",
+      "label": "PEM {type}-032-{l}",
+      "d": 0.19,
+      "dims": {
+       "hd": 0.357,
+       "p": 0.19,
+       "sd": 0.102,
+       "pt": 0.03125,
+       "td": 0.048,
+       "st": 0.04,
+       "dd": 0.19,
+       "hs": 0.19
+      },
+      "lengths": [
+       "0.5",
+       "0.75",
+       "1",
+       "1.25",
+       "1.5",
+       "1.75",
+       "2"
+      ],
+      "lengthNames": {
+       "0.5": "8",
+       "0.75": "12",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24",
+       "1.75": "28",
+       "2": "32"
+      }
+     },
+     {
+      "name": "1/4-20",
+      "label": "PEM {type}-0420-{l}",
+      "d": 0.25,
+      "dims": {
+       "hd": 0.462,
+       "p": 0.25,
+       "sd": 0.118,
+       "pt": 0.05,
+       "td": 0.06,
+       "st": 0.04,
+       "dd": 0.25,
+       "hs": 0.25
+      },
+      "lengths": [
+       "0.5",
+       "0.75",
+       "1",
+       "1.25",
+       "1.5",
+       "1.75",
+       "2"
+      ],
+      "lengthNames": {
+       "0.5": "8",
+       "0.75": "12",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24",
+       "1.75": "28",
+       "2": "32"
+      }
+     },
+     {
+      "name": "5/16-18",
+      "label": "PEM {type}-0518-{l}",
+      "d": 0.313,
+      "dims": {
+       "hd": 0.586,
+       "p": 0.313,
+       "sd": 0.133,
+       "pt": 0.05555,
+       "td": 0.083,
+       "st": 0.06,
+       "dd": 0.313,
+       "hs": 0.313
+      },
+      "lengths": [
+       "0.5",
+       "0.75",
+       "1",
+       "1.25",
+       "1.5",
+       "1.75",
+       "2"
+      ],
+      "lengthNames": {
+       "0.5": "8",
+       "0.75": "12",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24",
+       "1.75": "28",
+       "2": "32"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_HARD_PANEL_STUD_MAIN, DATA_PEM_SELFCLINCHING_HARD_PANEL_STUD_LENGTH (component document 33444e488ca4189f2d6fe442; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  }

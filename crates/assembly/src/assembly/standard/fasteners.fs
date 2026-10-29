@@ -2770,7 +2770,11 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
  * ts, the end as form 3. Form 5 (TFH™ non-flush studs, td = T_DIM): a head
  * td thick with a 45° dimple 0.15 hd across on top, a 45° collar under it to
  * 1.05 (hd + p) / 4, cut by 8 slots td wide from (hd + p) / 4 out; the groove
- * as form 4 midway from the collar to ts, l from the head's underside.
+ * as form 4 midway from the collar to ts, l and ts from the head's
+ * underside. Form 6 (HFLH™ hard panel studs, st = the sheet thickness): a
+ * head td thick, its top edge rounded 0.2 td, a collar st / 2 under it with
+ * its outer edge rounded st / 2, cut by 8 slots td wide from 1.15 p / 2 out;
+ * the groove as form 5 with its bottom rounded 0.025 p.
  */
 annotation { "Feature Type Name" : "PEM pin" }
 export const pemPin = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2794,6 +2798,8 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
         isLength(definition.pt, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
         annotation { "Name" : "td" }
         isLength(definition.td, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "st" }
+        isLength(definition.st, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
     }
     {
         const p = definition.p;
@@ -2825,7 +2831,7 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
             lowDisplacementStud(context, id, definition);
             return;
         }
-        if (definition.form == 5)
+        if (definition.form == 5 || definition.form == 6)
         {
             nonFlushStud(context, id, definition);
             return;
@@ -2974,15 +2980,16 @@ function lowDisplacementStud(context is Context, id is Id, definition is map)
     opDeleteBodies(context, id + "deleteThreadPlane", { "entities" : qCreatedBy(id + "threadPlane", EntityType.BODY) });
 }
 
-/** pemPin form 5 (TFH™ non-flush studs). */
+/** pemPin forms 5 (TFH™ non-flush studs) and 6 (HFLH™ hard panel studs). */
 function nonFlushStud(context is Context, id is Id, definition is map)
 {
     const p = definition.p;
-    const ts = definition.sd;
     const t = definition.td;
+    const ts = definition.sd + t;
     const R = definition.hd / 2;
     const r1 = p / 2;
-    const rc = 1.05 * (definition.hd + p) / 4;
+    const hard = definition.form == 6;
+    const rc = hard ? R - definition.st / 2 : 1.05 * (definition.hd + p) / 4;
     const zb = -t - (R - rc);
     const zl = -t - definition.l;
     const zc = (zb - ts) / 2;
@@ -2992,18 +2999,24 @@ function nonFlushStud(context is Context, id is Id, definition is map)
     const ch = 0.625 * 0.8660254 * definition.pt;
     const rd = 0.15 * p;
     const rt = 0.075 * definition.hd;
-    revolveProfile(context, id + "body", [
-                { "p" : rz(Z, -rt) }, { "p" : rz(rt, Z) }, { "p" : rz(R, Z) }, { "p" : rz(R, -t) }, { "p" : rz(rc, zb) },
-                { "p" : rz(r1, zb) }, { "p" : rz(r1, zc + hw) }, { "p" : rz(r1 - dep, zc + ig) }, { "p" : rz(r1 - dep, zc - ig) },
+    const s45 = sqrt(0.5);
+    const f = 0.2 * t;
+    const gr = 0.025 * p;
+    const top = hard ? [{ "p" : rz(Z, Z) }, { "p" : rz(R - f, Z) }, { "p" : rz(R, -f), "mid" : rz(R - f + f * s45, -f + f * s45) }, { "p" : rz(R, -t) },
+                { "p" : rz(rc, zb), "mid" : rz(rc + (R - rc) * s45, -t - (R - rc) * s45) }] :
+        [{ "p" : rz(Z, -rt) }, { "p" : rz(rt, Z) }, { "p" : rz(R, Z) }, { "p" : rz(R, -t) }, { "p" : rz(rc, zb) }];
+    const groove = hard ? [{ "p" : rz(r1 - dep, zc + ig) }, { "p" : rz(r1 - dep, zc - ig), "mid" : rz(r1 - dep - gr + gr * cos(30 * degree), zc) }] :
+        [{ "p" : rz(r1 - dep, zc + ig) }, { "p" : rz(r1 - dep, zc - ig) }];
+    revolveProfile(context, id + "body", concatenateArrays([top, [{ "p" : rz(r1, zb) }, { "p" : rz(r1, zc + hw) }], groove, [
                 { "p" : rz(r1, zc - hw) }, { "p" : rz(r1, zl + ch) }, { "p" : rz(r1 - ch, zl) }, { "p" : rz(rd, zl) },
                 { "p" : rz(Z, zl + rd / tan(60 * degree)) }
-            ]);
-    // The 8 slots through the collar: td wide, from (hd + p) / 4 out past
-    // the rim.
+            ]]));
+    // The 8 slots through the collar: td wide, from (hd + p) / 4 (HFLH:
+    // 1.15 p / 2) out past the rim.
     var under = XY_PLANE;
     under.origin[2] = zb;
     const w = t / 2;
-    const ri = (definition.hd + p) / 4;
+    const ri = hard ? 1.15 * p / 2 : (definition.hd + p) / 4;
     const far = R + t;
     const sk = newSketchOnPlane(context, id + "slotSketch", { "sketchPlane" : under });
     for (var k = 0; k < 8; k += 1)
