@@ -17,9 +17,10 @@ of TICKETS (open P0s all carried from v0.4.11).
 - **04:08 update (green 7d5be491 = + psui mesher step 2c, skasm SKETCH-VDIM-SIDE-ARROWS):** release-blocker list written at the top of
   TICKETS (04:05; re-confirm at 04:30): only open regression = P1 RUST-MIRROR-EXTRA-FACE; no open P0. Mesher A/B on 7d5b (boltdwg,
   live-30) identical, renders right. GUI fuzz 142–159 alive; CLI seeds 185 / 186 (core CLI) done. REGEN-SPEED on 7040: commits 91–136 ms,
-  3rd undo 102 ms. **To look at after the cut:** typing a length while drawing a sketch line (value box shows a caret) takes no
-  digits from xdotool here, on 7d5b, 42f7 and v0.4.12 alike (Escape works; extrude / dimension fields take typing) — find out whether
-  it's the input method or a real gap (sketch.md 5.x), then verify SKETCH-VDIM-SIDE-ARROWS.
+  3rd undo 102 ms. Typing a length while drawing a sketch line takes no digits from xdotool on :110 / :131 (7d5b, 42f7, v0.4.12 alike;
+  letters and Escape arrive; text fields take digits): an input-environment artefact — skasm saw the same on :103 ("xdotool digits
+  didn't reach the app, letters did"); the key_down path is covered by skasm's GPUI keystroke tests (OTF-FIRST-KEY). SKETCH-VDIM-SIDE-ARROWS
+  left unverified for that reason.
 - **03:30 update (green 7040c88a = + skasm ASM-SELECT-OTHER, dx D13, bool a48c1227 / 4388b474):** verified ASM-SELECT-OTHER; in the
   app live-30 / halfmir (7214.602) / wf-block unchanged-correct. Core CLI 03:08 (current main code): volsweep = v0.4.12 except the
   intended fillet-oversize-min failure and the known cli-fillet-segv mirror case; shell / hole / feature / fillet / boolean matrices
