@@ -9,6 +9,10 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **03:30 update (green 7040c88a = + skasm ASM-SELECT-OTHER, dx D13, bool a48c1227 / 4388b474):** verified ASM-SELECT-OTHER; in the
+  app live-30 / halfmir (7214.602) / wf-block unchanged-correct. Core CLI 03:08 (current main code): volsweep = v0.4.12 except the
+  intended fillet-oversize-min failure and the known cli-fillet-segv mirror case; shell / hole / feature / fillet / boolean matrices
+  identical. FILLET-OVERSIZE single edge = live 1587. GUI fuzz 136–141 (a933) alive; 142–147 (7040) running; seeds 183 / 184.
 - **03:17 update (green a9339ee7 = + core ae44d8d9 fillet oversize, skasm b7e933c3 F fit / 9d70ff72 triad box):** verified
   **CLI-SUPPRESS-SEGV** (seeds 171 / 174 replay clean with core's CLI 03:08, rel/k/core/0308), **FILLET-OVERSIZE-OK** (all live-answered
   cases, tickets/oversize2.py; the single-edge R25 / R45 still Ok, asked live REQUESTS 03:10), SKETCH-F-FIT (per live 1583),
