@@ -27,7 +27,7 @@ impl DrawingEditor {
         let Some(v) = sheet.view(id) else { return Vec::new() };
         let mut out = Vec::new();
         if matches!(v.kind, ViewKind::Section { .. }) {
-            out.push(MenuEntry::item("Edit section...", move |t, _, cx| t.open_section_edit(id, cx)));
+            out.push(MenuEntry::item("Edit section...", move |t, w, cx| t.open_section_edit(id, w, cx)));
         } else if sheet.section_points(id).is_some_and(|p| p.len() == 2) {
             out.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_cut_angle_panel(id, w, cx)));
         }
@@ -262,7 +262,7 @@ impl DrawingEditor {
         // views (7), `section_line_entries`).
         if matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
             if matches!(v.kind, ViewKind::Section { .. }) {
-                edits.push(MenuEntry::item("Edit section...", move |t, _, cx| t.open_section_edit(id, cx)));
+                edits.push(MenuEntry::item("Edit section...", move |t, w, cx| t.open_section_edit(id, w, cx)));
             } else if sheet.section_points(id).is_some_and(|p| p.len() == 2) {
                 edits.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_cut_angle_panel(id, w, cx)));
             }

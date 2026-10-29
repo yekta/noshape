@@ -555,8 +555,8 @@ impl DrawingEditor {
         } else if base.is_some() {
             preview = base;
         }
-        // Edit detail: the edited view as the dialog has it.
-        if let Some(d) = self.detail_edit_drawing(cx) {
+        // Edit detail / Edit section: the edited view as the dialog has it.
+        if let Some(d) = self.detail_edit_drawing(cx).or_else(|| self.section_edited()) {
             preview = Some(d);
         }
         overlay.infer.extend(self.infer_lines.iter().cloned());
@@ -1133,6 +1133,11 @@ impl DrawingEditor {
             _ => {
                 self.update_hover(cx);
                 self.inspection_hover(cx);
+                // Edit section: the preview jog follows the pointer (qa
+                // DWG-EDIT-SECTION-DIALOG).
+                if self.section_edit.is_some() {
+                    self.update_preview(cx);
+                }
                 if !matches!(self.tool, Tool::Select) {
                     // Placing a dimension or annotation: align with the others
                     // (Shift turns inferencing off).

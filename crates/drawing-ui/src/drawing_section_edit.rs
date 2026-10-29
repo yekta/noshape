@@ -1,13 +1,15 @@
 //! Drawing editor: section view menu › Edit section… (live drawing/499–504,
 //! dom/drawing-edit-section.txt): the Section view dialog reopens (label,
-//! Show cut geometry only, ✓ ✗) with the points the cutting line passes
+//! Show cut geometry only, Section depth, ✓ ✗) with the points the cutting line passes
 //! through as orange dots; hovering another snap point previews the jog to
 //! it, clicking adds a stepped segment through it, clicking a dot again
 //! removes it. The section view updates live; ✗ / Esc puts it back.
 
 use crate::drawing_view::*;
 use crate::theme::p;
-use gpui_kit::component::{h_flex, v_flex};
+use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::{Sizable as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::drawing::{ViewId, ViewKind};
 
@@ -17,27 +19,70 @@ pub struct SectionEdit {
     pub parent: ViewId,
     pub cuts: Vec<[f64; 2]>,
     pub cut_only: bool,
+    /// ☑ Section depth: its field and value (meters).
+    pub depth: Option<(Entity<InputState>, Subscription)>,
+    pub depth_value: Option<f64>,
 }
 
 impl DrawingEditor {
-    pub fn open_section_edit(&mut self, view: ViewId, cx: &mut Context<Self>) {
+    pub fn open_section_edit(&mut self, view: ViewId, window: &mut Window, cx: &mut Context<Self>) {
         let sheet = self.current_sheet();
         let Some(v) = sheet.view(view) else { return };
         let ViewKind::Section { parent, .. } = v.kind else { return };
         let Some(cuts) = sheet.section_cuts(view) else { return };
-        self.section_edit = Some(SectionEdit { view, parent, cuts, cut_only: v.cut_only });
+        let depth = v.section_depth;
+        self.section_edit = Some(SectionEdit { view, parent, cuts, cut_only: v.cut_only, depth: None, depth_value: None });
+        if let Some(d) = depth {
+            self.toggle_edit_depth(Some(d), window, cx);
+        }
         self.tool = Tool::Select;
         cx.notify();
     }
 
+    /// ☐ Section depth (live: as when the section was made): the field,
+    /// starting at `value` (meters) or 10 mm / 0.5 in.
+    fn toggle_edit_depth(&mut self, value: Option<f64>, window: &mut Window, cx: &mut Context<Self>) {
+        let mm = self.drawing.units_mm;
+        let on = self.section_edit.as_ref().is_some_and(|e| e.depth.is_none());
+        let Some(e) = &mut self.section_edit else { return };
+        if !on {
+            (e.depth, e.depth_value) = (None, None);
+        } else {
+            let text = match value {
+                Some(m) if mm => format!("{} mm", noshape_model::drawing::format::format_number(m * 1000.0, None, 3)),
+                Some(m) => format!("{} in", noshape_model::drawing::format::format_number(m / 0.0254, None, 3)),
+                None if mm => "10 mm".into(),
+                None => "0.5 in".into(),
+            };
+            e.depth_value = crate::drawing_section::parse_depth(&text, mm);
+            let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
+            let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
+                if matches!(ev, InputEvent::Change) {
+                    let v = crate::drawing_section::parse_depth(&st.read(cx).value(), mm);
+                    if let Some(e) = &mut this.section_edit {
+                        e.depth_value = v;
+                    }
+                    this.preview_section_edit(cx);
+                }
+            });
+            e.depth = Some((st, sub));
+        }
+        self.preview_section_edit(cx);
+    }
+
     /// The drawing with the edited cut points.
-    fn section_edited(&self) -> Option<noshape_model::drawing::Drawing> {
+    pub fn section_edited(&self) -> Option<noshape_model::drawing::Drawing> {
         let e = self.section_edit.as_ref()?;
         let mut dr = self.drawing.clone();
         let s = dr.sheets.get_mut(self.sheet)?;
         s.set_section_cuts(e.view, e.cuts.clone());
         if let Some(v) = s.view_mut(e.view) {
             v.cut_only = e.cut_only;
+            if e.depth.is_none() {
+                (v.section_depth, v.section_depth_ref) = (None, None);
+            } else if e.depth_value != v.section_depth {
+                (v.section_depth, v.section_depth_ref) = (e.depth_value, None);
+            }
         }
         Some(dr)
     }
@@ -91,7 +136,7 @@ impl DrawingEditor {
             if sheet.set_section_cuts(e.view, cuts)
                 && let Some(line) = sheet.section_points(e.view)
             {
-                overlay.lines.push((line.iter().map(|p| pl.to_sheet(*p)).collect(), true));
+                overlay.tinted.push((line.iter().map(|p| pl.to_sheet(*p)).collect(), [255, 140, 0, 255], 1.5));
             }
         }
     }
@@ -114,6 +159,7 @@ impl DrawingEditor {
             _ => String::new(),
         };
         let cut_only = e.cut_only;
+        let depth = e.depth.as_ref().map(|(st, _)| st.clone());
         Some(
             v_flex()
                 .id("dr-section-edit")
@@ -142,6 +188,8 @@ impl DrawingEditor {
                     }
                     this.preview_section_edit(cx);
                 }))))
+                .child(div().px(px(10.)).pt(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("se-depth").label("Section depth").checked(depth.is_some()).on_click(cx.listener(|this, _: &bool, w, cx| this.toggle_edit_depth(None, w, cx)))))
+                .when_some(depth, |d, st| d.child(div().px(px(10.)).pt(px(4.)).child(Input::new(&st).xsmall())))
                 .into_any_element(),
         )
     }
