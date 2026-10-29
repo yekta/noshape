@@ -8,6 +8,11 @@
 #include <cstring>
 #include <OSD_ThreadPool.hxx>
 #ifdef __linux__
+#include <dlfcn.h>
+#include <link.h>
+#include <unistd.h>
+#endif
+#ifdef __linux__
   #include <ucontext.h>
 // The program's own code (GNU linkers define these).
 extern "C" char __executable_start;
@@ -141,9 +146,11 @@ const ShapeIMap& OcShape::map(TopAbs_ShapeEnum kind) const
   const int k = static_cast<int>(kind);
   if (kind == TopAbs_FACE || kind == TopAbs_EDGE || kind == TopAbs_VERTEX)
   {
+    const LockedSection locked_section_149;
     std::call_once(myFevFlag, [&]() { map_fev(shape, myMaps[TopAbs_FACE], myMaps[TopAbs_EDGE], myMaps[TopAbs_VERTEX]); });
     return myMaps[k];
   }
+  const LockedSection locked_section_152;
   std::call_once(myFlags[k], [&]() {
     if (!shape.IsNull())
       TopExp::MapShapes(shape, kind, myMaps[k]);
@@ -188,6 +195,7 @@ void face_box(const TopoDS_Shape& f, Bnd_Box& b)
 
 const std::vector<Bnd_Box>& OcShape::face_boxes() const
 {
+  const LockedSection locked_section_196;
   std::call_once(myBoxesFlag, [&]() {
     const ShapeIMap& f = map(TopAbs_FACE);
     myBoxes.resize((size_t)f.Extent());
@@ -200,6 +208,7 @@ const std::vector<Bnd_Box>& OcShape::face_boxes() const
 
 void OcShape::adopt_fev(std::array<ShapeIMap, 3>&& m)
 {
+  const LockedSection locked_section_208;
   std::call_once(myFevFlag, [&]() {
     myMaps[TopAbs_FACE]   = std::move(m[0]);
     myMaps[TopAbs_EDGE]   = std::move(m[1]);
@@ -209,6 +218,7 @@ void OcShape::adopt_fev(std::array<ShapeIMap, 3>&& m)
 
 void OcShape::adopt_face_boxes(std::vector<Bnd_Box>&& b)
 {
+  const LockedSection locked_section_217;
   std::call_once(myBoxesFlag, [&]() {
     myBoxes = std::move(b);
     myBoxesReady.store(true);
@@ -761,6 +771,7 @@ const std::pair<std::vector<uint32_t>, std::vector<uint32_t>>& ancestors_cached(
 {
   const int key = (int)kind * 16 + (int)ancestor_kind;
   {
+    const LockedSection locked_section_769;
     std::lock_guard<std::mutex> g(s.myAncestorsLock);
     auto                        it = s.myAncestors.find(key);
     if (it != s.myAncestors.end())
@@ -769,12 +780,14 @@ const std::pair<std::vector<uint32_t>, std::vector<uint32_t>>& ancestors_cached(
   if (ancestor_kind == TopAbs_FACE && (kind == TopAbs_EDGE || kind == TopAbs_VERTEX))
   {
     auto                        both = edge_and_vertex_faces(s);
+    const LockedSection locked_section_777;
     std::lock_guard<std::mutex> g(s.myAncestorsLock);
     s.myAncestors.emplace((int)TopAbs_EDGE * 16 + (int)TopAbs_FACE, std::move(both.first));
     s.myAncestors.emplace((int)TopAbs_VERTEX * 16 + (int)TopAbs_FACE, std::move(both.second));
     return s.myAncestors.find(key)->second;
   }
   auto                        m = ancestor_map_uncached(s, kind, ancestor_kind);
+  const LockedSection locked_section_783;
   std::lock_guard<std::mutex> g(s.myAncestorsLock);
   // std::map's entries stay where they are: the reference outlives the lock.
   return s.myAncestors.emplace(key, std::move(m)).first->second;
@@ -803,6 +816,7 @@ bool is_seam(const TopoDS_Edge& e, const NCollection_List<TopoDS_Shape>* faces)
 // time mapping the 1600-face fin plate's ancestors three times (~70 ms).
 rust::Vec<uint8_t> shown_topology(const OcShape& s)
 {
+  const LockedSection locked_section_811;
   std::call_once(s.myShownFlag, [&]() {
     const KernelTimer timer("shown_topology.make");
     const ShapeIMap&  em = s.map(TopAbs_EDGE);
@@ -1409,6 +1423,10 @@ rust::String dump_shape(const OcShape& s)
 
 } // namespace noshape
 
+namespace noshape {
+thread_local int locked_sections = 0;
+} // namespace noshape
+
 #ifndef _WIN32
 namespace noshape {
 
@@ -1418,10 +1436,46 @@ thread_local int         crash_signal = 0;
 namespace {
 struct sigaction g_previous[32];
 
+// The C library's code (where malloc / free run), found at install.
+uintptr_t g_libc_lo = 0, g_libc_hi = 0;
+
+uintptr_t fault_pc(const void* ctx)
+{
+  const ucontext_t* uc = static_cast<const ucontext_t*>(ctx);
+  if (uc == nullptr)
+    return 0;
+#if defined(__linux__) && defined(__x86_64__)
+  return (uintptr_t)uc->uc_mcontext.gregs[REG_RIP];
+#elif defined(__linux__) && defined(__aarch64__)
+  return (uintptr_t)uc->uc_mcontext.pc;
+#else
+  return 0;
+#endif
+}
+
 void on_crash(int sig, siginfo_t* info, void* ctx)
 {
   if (sigjmp_buf* env = crash_guard)
   {
+    // A fault inside the C library may hold malloc's arena lock (or its heap
+    // is corrupt: glibc's own abort): after a jump the next allocation waits
+    // forever (qa GUARD-SEGV-MALLOC-DEADLOCK). Not recovered: the process
+    // fails as without the guard, at once rather than frozen.
+    // (A signal raised on purpose, raise() / abort(), si_code <= 0, is
+    // delivered in the C library too: still recovered.)
+    // Nor one while this thread holds a kernel lock (LockedSection).
+    const uintptr_t pc   = fault_pc(ctx);
+    const bool      libc = info != nullptr && info->si_code > 0 && pc != 0 && pc >= g_libc_lo && pc < g_libc_hi;
+    if (libc || locked_sections > 0)
+    {
+      static const char in_libc[] = "noshape: the kernel crashed inside the C library; not recoverable\n";
+      static const char in_lock[] = "noshape: the kernel crashed holding a lock; not recoverable\n";
+      [[maybe_unused]] const ssize_t w = libc ? write(2, in_libc, sizeof in_libc - 1) : write(2, in_lock, sizeof in_lock - 1);
+      crash_guard = nullptr;
+      signal(sig, SIG_DFL);
+      raise(sig);
+      return;
+    }
     crash_guard  = nullptr;
     crash_signal = sig;
     siglongjmp(*env, 1);
@@ -1451,9 +1505,40 @@ void on_crash(int sig, siginfo_t* info, void* ctx)
 void install_crash_guard()
 {
   static std::once_flag once;
+  const LockedSection locked_section_1492;
   std::call_once(once, [] {
     if (std::getenv("NOSHAPE_NO_CRASH_GUARD") != nullptr)
       return;
+#ifdef __linux__
+    Dl_info di{};
+    if (dladdr(reinterpret_cast<void*>(&malloc), &di) != 0 && di.dli_fbase != nullptr)
+    {
+      struct Find
+      {
+        const void* base;
+        uintptr_t   lo, hi;
+      } find{di.dli_fbase, 0, 0};
+      dl_iterate_phdr(
+        [](dl_phdr_info* info, size_t, void* data) {
+          Find* f = static_cast<Find*>(data);
+          if ((const void*)info->dlpi_addr != f->base)
+            return 0;
+          for (int k = 0; k < info->dlpi_phnum; ++k)
+          {
+            const ElfW(Phdr)& ph = info->dlpi_phdr[k];
+            if (ph.p_type == PT_LOAD && (ph.p_flags & PF_X))
+            {
+              f->lo = info->dlpi_addr + ph.p_vaddr;
+              f->hi = f->lo + ph.p_memsz;
+            }
+          }
+          return 1;
+        },
+        &find);
+      g_libc_lo = find.lo;
+      g_libc_hi = find.hi;
+    }
+#endif
     for (int sig : {SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT})
     {
       struct sigaction sa;
@@ -1547,6 +1632,23 @@ void crash_inside_kernel(uint8_t kind)
         y = y * 1.0000001 + 1e-9;
     });
     fail_op("budget " + std::to_string(reason) + " after " + std::to_string(done.load()) + " of " + std::to_string(n));
+  }
+  else if (kind == 10)
+  {
+    // A fault holding a kernel lock: not recovered either.
+    run_guarded([&] {
+      const LockedSection held;
+      std::raise(SIGSEGV);
+    });
+    fail_op("survived a fault holding a lock");
+  }
+  else if (kind == 9)
+  {
+    // A fault inside the C library (memset through a null pointer): not
+    // recovered, the process dies (GUARD-SEGV-MALLOC-DEADLOCK).
+    void* (*volatile set)(void*, int, size_t) = &memset;
+    run_guarded([&] { set(nullptr, 0, 64); });
+    fail_op("survived a fault inside the C library");
   }
   else if (kind == 7)
   {
@@ -1672,6 +1774,7 @@ std::chrono::steady_clock::duration kernel_profile_now()
 void kernel_profile_add_named(const char* name, std::chrono::steady_clock::duration took)
 {
   KernelProfile&              p = kernel_profile();
+  const LockedSection locked_section_1751;
   std::lock_guard<std::mutex> g(p.lock);
   auto&                       v = p.calls[std::string("  ") + name];
   v.first += 1;
@@ -1683,6 +1786,7 @@ void kernel_profile_mark(rust::Str label)
   if (!kernel_profile_on())
     return;
   KernelProfile&              p = kernel_profile();
+  const LockedSection locked_section_1762;
   std::lock_guard<std::mutex> g(p.lock);
   p.print(" " + std::string(label));
   p.calls.clear();
@@ -1691,6 +1795,7 @@ void kernel_profile_mark(rust::Str label)
 void kernel_profile_add(const char* what, std::chrono::steady_clock::duration took)
 {
   KernelProfile&              p = kernel_profile();
+  const LockedSection locked_section_1770;
   std::lock_guard<std::mutex> g(p.lock);
   auto&                       v = p.calls[bridge_name(what)];
   v.first += 1;
@@ -1765,6 +1870,7 @@ void on_budget_tick(int, siginfo_t*, void* uctx)
 bool budget_timer_start(void*& timer)
 {
   static std::once_flag once;
+  const LockedSection locked_section_1844;
   std::call_once(once, [] {
     struct sigaction sa;
     std::memset(&sa, 0, sizeof sa);
@@ -1818,6 +1924,7 @@ void set_occt_threads(int32_t n)
 {
   // Once, before any parallel work (the pool can't be resized under load).
   static std::once_flag once;
+  const LockedSection locked_section_1897;
   std::call_once(once, [n] {
     if (n > 0)
       OSD_ThreadPool::DefaultPool()->Init(n);

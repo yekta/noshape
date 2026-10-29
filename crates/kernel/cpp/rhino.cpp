@@ -40,6 +40,7 @@ namespace {
 void on_begin()
 {
   static std::once_flag once;
+  const LockedSection locked_section_43;
   std::call_once(once, [] { ON::Begin(); });
 }
 

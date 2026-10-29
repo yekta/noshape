@@ -3227,6 +3227,7 @@ std::shared_ptr<const MirrorCopy> mirror_copy(const TopoDS_Shape& base, const gp
   static std::mutex                                     mu;
   static std::vector<std::shared_ptr<const MirrorCopy>> cache;
   {
+    const LockedSection locked_section_3220;
     std::lock_guard<std::mutex> g(mu);
     for (const auto& c : cache)
       if (c->base.IsEqual(base) && same_trsf(c->m, m))
@@ -3243,6 +3244,7 @@ std::shared_ptr<const MirrorCopy> mirror_copy(const TopoDS_Shape& base, const gp
     TopExp::MapShapes(base, k, c->subs);
   for (int i = 1; i <= c->subs.Extent(); ++i)
     c->mirrored.push_back(tr.ModifiedShape(c->subs(i)));
+  const LockedSection locked_section_3236;
   std::lock_guard<std::mutex> g(mu);
   if (cache.size() >= 16)
     cache.erase(cache.begin());

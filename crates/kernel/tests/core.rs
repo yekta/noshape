@@ -409,3 +409,31 @@ fn a_budget_never_stops_a_call_inside_the_allocator() {
     let v: Vec<u64> = (0..1 << 20).collect();
     assert_eq!(v.len(), 1 << 20);
 }
+
+/// qa GUARD-SEGV-MALLOC-DEADLOCK: a fault inside the C library (where
+/// malloc's arena lock may be held) or while holding a kernel lock isn't
+/// recovered: the process dies of it, with a message, instead of freezing at
+/// its next allocation or lock. Run in a child process (this test's binary
+/// again).
+#[cfg(target_os = "linux")]
+#[test]
+fn a_fault_inside_the_c_library_ends_the_process() {
+    if let Ok(kind) = std::env::var("NOSHAPE_TEST_LIBC_FAULT") {
+        let _ = crash_inside_kernel(kind.parse().unwrap());
+        std::process::exit(0);
+    }
+    use std::os::unix::process::ExitStatusExt;
+    // 9: inside the C library; 10: holding a kernel lock (LockedSection).
+    for (kind, says) in [(9, "inside the C library"), (10, "holding a lock")] {
+        let out = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "kernel_core::a_fault_inside_the_c_library_ends_the_process", "--nocapture", "--test-threads", "1"])
+            .env("NOSHAPE_TEST_LIBC_FAULT", kind.to_string())
+            .output()
+            .unwrap();
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(out.status.signal(), Some(11), "{kind}: {:?}: {err}", out.status);
+        assert!(err.contains(says), "{kind}: {err}");
+    }
+    // Faults in our own code are still recovered.
+    assert!(crash_inside_kernel(1).is_err());
+}

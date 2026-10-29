@@ -718,6 +718,7 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
   const auto& ef        = ancestors_cached(s, TopAbs_EDGE, TopAbs_FACE);
   auto        faces_of  = [&](int e) { return std::make_pair(ef.second.data() + ef.first[(size_t)e - 1], ef.second.data() + ef.first[(size_t)e]); };
   {
+    const LockedSection locked_section_721;
     std::lock_guard<std::mutex> lock(mesh_mutex());
     IMeshTools_Parameters prm;
     prm.Deflection               = lin;
@@ -1118,6 +1119,7 @@ void mesh_fill(const OcMesh& m, rust::Slice<float> positions, rust::Slice<float>
   // (BRepTools::Clean).
   if (m.cleaned)
     return; // mesh_prepare did
+  const LockedSection locked_section_1121;
   std::lock_guard<std::mutex> lock(mesh_mutex());
   BRepTools::Clean(m.shape);
 }

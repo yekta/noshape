@@ -682,6 +682,7 @@ rust::Vec<double> bounding_box(const OcShape& s, bool optimal)
 {
   require_non_null(s.shape, "shape");
   {
+    const LockedSection locked_section_685;
     std::lock_guard<std::mutex> g(s.myBoxLock);
     if (s.myBoxMade[optimal ? 1 : 0])
     {
@@ -712,6 +713,7 @@ rust::Vec<double> bounding_box(const OcShape& s, bool optimal)
   if (optimal && !has_mesh_faces(s.shape) && has_free_form_face(s.shape))
     tighten_box(s.shape, box);
   {
+    const LockedSection locked_section_715;
     std::lock_guard<std::mutex> g(s.myBoxLock);
     for (int i = 0; i < 6; ++i)
       s.myBox[optimal ? 1 : 0][(size_t)i] = box[i];
@@ -899,6 +901,7 @@ rust::Vec<double> line_crossings(const OcShape& s, P3 p, P3 dir, double len)
   const gp_Vec d(dir.x, dir.y, dir.z);
   if (d.Magnitude() < 1e-12 || !(len > 0))
     fail_invalid("line needs a direction and a length");
+  const LockedSection locked_section_902;
   std::lock_guard<std::mutex> g(s.myLineLock);
   if (!s.myLineHits)
   {
@@ -1105,6 +1108,7 @@ static bool rays_for(const TopoDS_Shape& s)
 int8_t classify_point(const OcShape& solid, P3 p, double tol)
 {
   require_non_null(solid.shape, "solid");
+  const LockedSection locked_section_1108;
   std::lock_guard<std::mutex> g(solid.myClassifyLock);
   const double t = tol > 0 ? tol : 1e-7;
   if (solid.myRays.first != t && rays_for(solid.shape))

@@ -250,6 +250,7 @@ const char* cached_body(const OcShape& s, BrepBody& b, double& max_tol)
   if (std::getenv("NOSHAPE_BREP_NOCACHE") != nullptr)
     return to_body(s, b, max_tol);
   {
+    const LockedSection locked_section_253;
     const std::lock_guard<std::mutex> lock(s.myBrepLock);
     if (s.myBrepWhy != nullptr)
       return s.myBrepWhy;
@@ -263,12 +264,14 @@ const char* cached_body(const OcShape& s, BrepBody& b, double& max_tol)
   // A result of this Boolean's, its body not remapped yet (rust_boolean_keep).
   std::function<std::shared_ptr<const BrepBody>(const OcShape&)> lazy;
   {
+    const LockedSection locked_section_266;
     const std::lock_guard<std::mutex> lock(s.myBrepLock);
     std::swap(lazy, s.myBrepLazy);
   }
   if (lazy)
     if (std::shared_ptr<const BrepBody> kept = lazy(s))
     {
+      const LockedSection locked_section_272;
       const std::lock_guard<std::mutex> lock(s.myBrepLock);
       if (!s.myBrep)
         s.myBrep = kept;
@@ -278,6 +281,7 @@ const char* cached_body(const OcShape& s, BrepBody& b, double& max_tol)
     }
   double      tol = 0;
   const char* why = to_body(s, b, tol);
+  const LockedSection locked_section_281;
   const std::lock_guard<std::mutex> lock(s.myBrepLock);
   if (why != nullptr)
     s.myBrepWhy = why;
@@ -929,6 +933,7 @@ void rust_boolean_keep(const OcShape& out)
   // Remapped on first use (cached_body): the model's unify usually makes a new shape of it first.
   auto done = std::make_shared<Built>();
   std::swap(*done, t_built);
+  const LockedSection locked_section_918;
   const std::lock_guard<std::mutex> lock(out.myBrepLock);
   out.myBrepTol  = done->tol;
   out.myBrepLazy = [done](const OcShape& o) { return kept_body(o, *done); };

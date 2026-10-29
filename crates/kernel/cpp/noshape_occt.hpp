@@ -105,6 +105,7 @@ struct BudgetSnapshot
 {
   sigjmp_buf* jmp   = budget_jmp;
   void*       timer = budget_timer_live;
+  int         hold  = budget_hold; // a BudgetHold jumped past stays counted
   int         pairs = pairs_here();
   static int  pairs_here()
   {
@@ -114,6 +115,7 @@ struct BudgetSnapshot
   }
   void restore() const
   {
+    budget_hold = hold;
     noshape_bop_set_pairs_parallel_here(pairs);
     if (budget_timer_live != timer && budget_timer_live != nullptr)
       budget_timer_stop(budget_timer_live);
@@ -141,6 +143,20 @@ struct BudgetHold
 #endif
   BudgetHold(const BudgetHold&)            = delete;
   BudgetHold& operator=(const BudgetHold&) = delete;
+};
+// A section holding a kernel lock (a cache's mutex, a std::call_once body):
+// no budget jump inside it, and a fault inside it ends the process rather
+// than being recovered, since a jump would leave the lock held and its next
+// user, often this thread, would wait forever (qa GUARD-SEGV-MALLOC-DEADLOCK:
+// the v0.4.13 CLI blocked on a mutex it owned itself).
+extern thread_local int locked_sections;
+struct LockedSection
+{
+  BudgetHold hold;
+  LockedSection() { ++locked_sections; }
+  ~LockedSection() { --locked_sections; }
+  LockedSection(const LockedSection&)            = delete;
+  LockedSection& operator=(const LockedSection&) = delete;
 };
 template <class F>
 int run_budgeted(double cpu_seconds, F&& f)
@@ -407,6 +423,7 @@ public:
   template <class F>
   const GProp_GProps& volume_props(F&& compute) const
   {
+    const LockedSection locked_section_423;
     std::call_once(myVolumeFlag, [&] { myVolume = compute(); });
     return myVolume;
   }
@@ -415,6 +432,7 @@ public:
   template <class F>
   const GProp_GProps& surface_props(F&& compute) const
   {
+    const LockedSection locked_section_431;
     std::call_once(mySurfaceFlag, [&] { mySurface = compute(); });
     return mySurface;
   }

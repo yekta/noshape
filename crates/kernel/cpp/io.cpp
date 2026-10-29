@@ -56,6 +56,7 @@ std::mutex& xde_mutex()
 void quiet_messenger()
 {
   static std::once_flag once;
+  const LockedSection locked_section_59;
   std::call_once(once, []() {
     const occ::handle<Message_Messenger>& m = Message::DefaultMessenger();
     if (!m.IsNull())
@@ -168,6 +169,7 @@ void collect(const occ::handle<XCAFDoc_ShapeTool>& st, const occ::handle<XCAFDoc
 void write_brep_file(const OcShape& s, rust::Str path)
 {
   require_non_null(s.shape, "shape");
+  const LockedSection locked_section_171;
   std::lock_guard<std::mutex> lock(mesh_mutex());
   if (!BRepTools::Write(s.shape, path_str(path).c_str(), false, false,
                         TopTools_FormatVersion_CURRENT))
@@ -188,6 +190,7 @@ rust::Vec<uint8_t> brep_to_bytes(const OcShape& s)
   require_non_null(s.shape, "shape");
   std::ostringstream os;
   {
+    const LockedSection locked_section_191;
     std::lock_guard<std::mutex> lock(mesh_mutex());
     BRepTools::Write(s.shape, os, false, false, TopTools_FormatVersion_CURRENT);
   }
@@ -216,6 +219,7 @@ rust::Vec<uint8_t> bin_to_bytes(const OcShape& s, bool with_triangles)
   require_non_null(s.shape, "shape");
   std::ostringstream os(std::ios::out | std::ios::binary);
   {
+    const LockedSection locked_section_219;
     std::lock_guard<std::mutex> lock(mesh_mutex());
     BinTools::Write(s.shape, os, with_triangles, false, BinTools_FormatVersion_CURRENT);
   }
@@ -242,6 +246,7 @@ std::unique_ptr<OcShape> bin_from_bytes(rust::Slice<const uint8_t> bytes)
 
 StepImport read_step(rust::Str path)
 {
+  const LockedSection locked_section_245;
   std::lock_guard<std::mutex> lock(xde_mutex());
   quiet_messenger();
   const std::string           p = path_str(path);
@@ -418,6 +423,7 @@ void walk_tree(TreeWalk& w, const TDF_Label& label, const TopLoc_Location& loc,
 
 StepTree read_step_tree(rust::Str path)
 {
+  const LockedSection locked_section_421;
   std::lock_guard<std::mutex> lock(xde_mutex());
   quiet_messenger();
   const std::string p = path_str(path);
@@ -484,6 +490,7 @@ void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names
                 rust::Slice<const float> colors, rust::Slice<const bool> has_color,
                 rust::Str path, uint8_t schema, uint8_t file_unit)
 {
+  const LockedSection locked_section_487;
   std::lock_guard<std::mutex> lock(xde_mutex());
   quiet_messenger();
   const std::string           p = path_str(path);
@@ -575,6 +582,7 @@ void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names
 
 std::unique_ptr<OcShape> read_iges(rust::Str path)
 {
+  const LockedSection locked_section_578;
   std::lock_guard<std::mutex> lock(xde_mutex());
   quiet_messenger();
   const std::string           p = path_str(path);
@@ -597,6 +605,7 @@ std::unique_ptr<OcShape> read_iges(rust::Str path)
 // ("S      1", not "S0000001").
 void write_iges(const OcShapeList& shapes, rust::Str path, rust::Str system, rust::Str version)
 {
+  const LockedSection locked_section_600;
   std::lock_guard<std::mutex> lock(xde_mutex());
   quiet_messenger();
   const std::string           p = path_str(path);

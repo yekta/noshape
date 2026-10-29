@@ -325,6 +325,7 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
 
   // Polygonal HLR on the triangulation.
   {
+    const LockedSection locked_section_328;
     std::lock_guard<std::mutex> lock(mesh_mutex());
     BRepMesh_IncrementalMesh    mesher(s.shape, defl, false, 0.25, true);
     (void)mesher;
