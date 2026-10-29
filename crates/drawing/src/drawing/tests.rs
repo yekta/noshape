@@ -3520,3 +3520,22 @@ fn an_automatic_centermark_turns_when_aligned() {
     let after = arm_angle(&render_sheet(&drawing, 0, &sources, &cache, false).unwrap());
     assert!(((after - before).rem_euclid(std::f64::consts::FRAC_PI_2) - 0.3).abs() < 1e-6, "{before} → {after}");
 }
+
+/// A datum target's area size follows its precision (Datum target › Area
+/// size ▾, help datum, drawing.md A32).
+#[test]
+fn datum_target_area_size_precision() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let size = |drawing: &Drawing| {
+        let built = render_sheet(drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+        let p = pick_of(&built, PickTarget::Annotation(950));
+        built.geometry.texts.iter().filter(|t| t.pick == p).map(|t| t.text.clone()).find(|t| t.starts_with('Ø')).unwrap()
+    };
+    let mut a = Annotation { id: 950, kind: AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.03, 0.0], label: "A1".into(), area: DatumTargetArea::Circle { diameter: 0.0251234 } }, position: [60.0, 250.0], ..Default::default() };
+    a.format.precision = Some(1);
+    drawing.sheets[0].annotations.push(a);
+    assert_eq!(size(&drawing), "Ø25.1");
+    drawing.sheets[0].annotations.last_mut().unwrap().format.precision = Some(3);
+    assert_eq!(size(&drawing), "Ø25.123");
+}

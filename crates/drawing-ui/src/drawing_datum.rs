@@ -47,6 +47,8 @@ pub struct DatumDlg {
     pub area_size: bool,
     pub size_a: Entity<InputState>,
     pub size_b: Entity<InputState>,
+    /// Area size's precision ▾ (None: the drawing's; help datum, drawing.md A32).
+    pub size_precision: Option<u8>,
     pub rows: Vec<TargetRow>,
     /// The expanded target.
     pub open: Option<usize>,
@@ -78,7 +80,7 @@ impl DrawingEditor {
                     d.label_text = st.read(cx).value().trim().to_string();
                 }
             });
-            self.datum_dlg = Some(DatumDlg { tab, label, label_text, area: 0, style: TargetStyle::Inside, area_size: false, size_a, size_b, rows: Vec::new(), open: None, picking_origin: None, _subs: vec![sub] });
+            self.datum_dlg = Some(DatumDlg { tab, label, label_text, area: 0, style: TargetStyle::Inside, area_size: false, size_a, size_b, size_precision: None, rows: Vec::new(), open: None, picking_origin: None, _subs: vec![sub] });
         } else if !active {
             self.datum_dlg = None;
         }
@@ -126,6 +128,8 @@ impl DrawingEditor {
             *ar = area;
         }
         a.target = (style != TargetStyle::Inside).then(|| Box::new(DatumTargetOpts { style, ..Default::default() }));
+        // The size's precision (Area size ▾).
+        a.format.precision = self.datum_dlg.as_ref().and_then(|d| d.size_precision);
         let label = match &a.kind {
             AnnotationKind::DatumTarget { label, .. } => label.clone(),
             _ => String::new(),
@@ -331,7 +335,22 @@ impl DrawingEditor {
                             this.edit_datum(|d| d.area_size = v, cx)
                         })))
                         .when(area_size && sized, |e| e.child(div().text_size(px(13.)).child(if d.area == 2 { "Ø" } else { "" })).child(div().w(px(80.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&d.size_a).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
-                        .when(area_size && d.area == 3, |e| e.child(div().w(px(80.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&d.size_b).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall()))),
+                        .when(area_size && d.area == 3, |e| e.child(div().w(px(80.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&d.size_b).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
+                        .when(area_size && sized, |e| {
+                            // Its precision ▾ (help datum: "Area size … with precision").
+                            const PRECISIONS: [(&str, Option<u8>); 8] = [("0", Some(0)), ("0.1", Some(1)), ("0.12", Some(2)), ("0.123", Some(3)), ("(Drawing)", None), ("0.1234", Some(4)), ("0.12345", Some(5)), ("0.123456", Some(6))];
+                            let cur = d.size_precision;
+                            let items: Vec<(String, String, bool, Act)> = PRECISIONS.iter().map(|&(l, p)| (String::new(), l.to_string(), cur == p, std::rc::Rc::new(move |d: &mut DatumDlg| d.size_precision = p) as Act)).collect();
+                            let label = PRECISIONS.iter().find(|x| x.1 == cur).map(|x| x.0).unwrap_or("(Drawing)").to_string();
+                            let ed = ed.clone();
+                            e.child(Button::new("dt-size-prec").ghost().w(px(96.)).h(px(30.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).dropdown_caret(true).child(div().text_size(px(12.)).child(label)).os_dropdown_menu("dt-size-prec-dd", true, move |mut m, _, _| {
+                                for (_, l, on, f) in &items {
+                                    let (e, f) = (ed.clone(), f.clone());
+                                    m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit_datum(|d| f(d), cx))));
+                                }
+                                m
+                            }))
+                        }),
                 );
             // The Targets list.
             let mut list = v_flex()
