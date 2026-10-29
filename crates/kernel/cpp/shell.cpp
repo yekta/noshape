@@ -636,8 +636,11 @@ TopoDS_Shape polytope(const std::vector<std::pair<gp_Pnt, gp_Dir>>& hs, double b
   return so;
 }
 
+TopoDS_Face         polygon_face(const std::vector<gp_Pnt>& pts);
+std::vector<gp_Pnt> clip_at_axis(const std::vector<gp_Pnt>& in, const gp_Pnt& c, const gp_Vec& radial);
+
 // Path 0, inward walls of convex solids bounded by planes and convex
-// cylinders (fillets) with planar faces removed: the cavity is where every
+// cylinders (fillets) or cones with planar faces removed: the cavity is where every
 // kept face's offset leaves it, Parasolid's rule of offset faces extended
 // until they meet. A plane's offset is a half-space; a fillet's offset
 // bounds the angular sector its face spans (the sector beyond the offset
@@ -733,8 +736,40 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
     sources = next;
     return true;
   };
+  // How far a fillet's or cone's region runs past its face's end at v
+  // (`end`: v0 or v1): the margin (beyond a plane square to the axis is
+  // outside the part), none where it meets a cone at an angle (a vertical
+  // fillet under a chamfer's cone: run on, its sector would take wall from
+  // the cone's where the wall is thinner than the fillet's radius).
+  ShapeAncMap ef_all;
+  TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef_all);
+  auto run_on = [&](const TopoDS_Face& f, const std::function<double(const gp_Pnt&)>& v_of, double end) {
+    const double tol = 1e-7 * (1 + std::abs(end)) + 1e-9;
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+      if (BRep_Tool::Degenerated(e))
+        continue;
+      BRepAdaptor_Curve c(e);
+      const double      a = c.FirstParameter(), b = c.LastParameter();
+      if (std::abs(v_of(c.Value(a)) - end) > tol || std::abs(v_of(c.Value(0.5 * (a + b))) - end) > tol || std::abs(v_of(c.Value(b)) - end) > tol)
+        continue;
+      const ShapeList* fl = ef_all.Seek(e);
+      if (fl == nullptr)
+        continue;
+      for (ShapeList::Iterator it(*fl); it.More(); it.Next())
+      {
+        if (it.Value().IsSame(f))
+          continue;
+        if (BRepAdaptor_Surface(TopoDS::Face(it.Value()), false).GetType() == GeomAbs_Cone)
+          return 0.0;
+      }
+    }
+    return margin;
+  };
   std::vector<std::pair<TopoDS_Face, gp_Cylinder>> cylinders;
   std::vector<std::pair<TopoDS_Face, gp_Torus>>    tori;
+  std::vector<std::pair<TopoDS_Face, gp_Cone>>     cones;
   std::vector<std::pair<gp_Pnt, gp_Dir>>           halfspaces;
   std::vector<TopoDS_Shape>                        halfspace_faces;
   for (TopExp_Explorer e(solid, TopAbs_FACE); e.More(); e.Next())
@@ -753,6 +788,11 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
       tori.emplace_back(f, a.Torus());
       continue;
     }
+    if (a.GetType() == GeomAbs_Cone)
+    {
+      cones.emplace_back(f, a.Cone());
+      continue;
+    }
     if (a.GetType() != GeomAbs_Plane)
     {
       if (dbg)
@@ -763,7 +803,7 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
         fb.Get(a0, b0, c0, a1, b1, c1);
         std::fprintf(stderr, "regions: face type %d, box %g %g %g .. %g %g %g\n", (int)a.GetType(), a0, b0, c0, a1, b1, c1);
       }
-      return no("a face isn't a plane, cylinder or torus");
+      return no("a face isn't a plane, cylinder, cone or torus");
     }
     // Outward normal (a left-handed plane frame's surface normal is minus its
     // axis); the offset plane t inside; everything beyond it goes.
@@ -853,8 +893,10 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
     if (!cut_by(region, src))
       return no("a boolean failed");
   }
-  for (const auto& [f, cyl] : cylinders)
+  for (const auto& fc : cylinders)
   {
+    const TopoDS_Face& f   = fc.first;
+    const gp_Cylinder& cyl = fc.second;
     // Convex fillet: the outward normal points away from the axis.
     double u0, u1, v0, v1;
     BRepTools::UVBounds(f, u0, u1, v0, v1);
@@ -878,6 +920,12 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
       // ~90 ms this way, same volumes).
       if (u1 - u0 < 2 * M_PI - 1e-6)
         return no("a concave cylinder isn't all round");
+      // Not next to cones yet: a hole's tube against a chamfer's offset plane
+      // comes out ~0.02 mm³ fuller than the slabs' and live's (qa5 P1-16:
+      // 3998.677 vs live 3998.627 mm³; also chamfered, unfilleted parts with
+      // holes, which take this path), so those keep the slabs' answer.
+      if (!cones.empty())
+        return no("a hole in a part with cones");
       gp_Ax2       tax(ElSLib::Value(0, v0 - margin, gp_Cylinder(ax, 0)), ax.Direction(), ax.XDirection());
       TopoDS_Shape tube = BRepPrimAPI_MakeCylinder(tax, r + t, v1 - v0 + 2 * margin).Shape();
       SourceMap    src;
@@ -890,14 +938,16 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
     if (u1 - u0 >= M_PI - 1e-6)
       return no("a fillet spans a half turn");
     // The sector [u0, u1] beyond radius r - t, over the face's axial extent
-    // and 2t more each way: a prism of the sector's section (an arc at
+    // and past its ends (`run_on`): a prism of the sector's section (an arc at
     // r - t; the centre when the wall is at least as thick as the fillet's
     // radius: its offset vanishes and the whole sector goes). Out to just past
     // the face: beyond it the sector is outside the part (a reach of `big`
     // cut across the whole cavity, ~30 ms a fillet).
     const double L  = r + t;
     auto         at = [&](double u, double rad, double v) { return ElSLib::Value(u, v, gp_Cylinder(ax, rad)); };
-    const double va = v0 - margin, vb = v1 + margin, um = 0.5 * (u0 + u1), wide = L / std::cos(0.5 * (u1 - u0));
+    auto         v_cyl = [&](const gp_Pnt& q) { double qu, qv; ElSLib::Parameters(cyl, q, qu, qv); return qv; };
+    const double va = v0 - run_on(f, v_cyl, v0), vb = v1 + run_on(f, v_cyl, v1), um = 0.5 * (u0 + u1),
+                 wide = L / std::cos(0.5 * (u1 - u0));
     BRepBuilderAPI_MakeWire wire;
     const double            ri = r - t;
     if (ri > 1e-9 * r)
@@ -920,6 +970,53 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
       return no("a fillet's section failed");
     TopoDS_Shape region = BRepPrimAPI_MakePrism(BRepBuilderAPI_MakeFace(wire.Wire(), true).Face(), gp_Vec(ax.Direction()) * (vb - va)).Shape();
     SourceMap src;
+    for (TopExp_Explorer x(region, TopAbs_FACE); x.More(); x.Next())
+      src.Bind(x.Current(), Source{f, (uint8_t)REL_GENERATED});
+    if (!cut_by(region, src))
+      return no("a boolean failed");
+  }
+  for (const auto& fc : cones)
+  {
+    const TopoDS_Face& f    = fc.first;
+    const gp_Cone&     cone = fc.second;
+    // A convex cone (a chamfer over a filleted corner, wf-block): the
+    // cylinder's sector with a sloped generator. Its meridian section at u0,
+    // between the face's line offset t inside and well outside, past its
+    // ends as the cylinders' (`run_on`), clipped at the axis, revolved over
+    // the face's angle (SHELL-SLOW: wf-block's top face went to slabs, ~3 s).
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    if (u1 - u0 >= M_PI - 1e-6)
+      return no("a cone spans a half turn");
+    BRepAdaptor_Surface a(f, true);
+    gp_Pnt              p;
+    gp_Vec              du, dv;
+    a.D1(u0, 0.5 * (v0 + v1), p, du, dv);
+    gp_Vec n = du.Crossed(dv);
+    if (n.Magnitude() < 1e-12)
+      return no("a degenerate cone");
+    n.Normalize();
+    if (f.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    const gp_Ax3& ax = cone.Position();
+    const gp_Vec  radial(gp_Lin(ax.Axis()).Normal(p).Direction());
+    if (n.Dot(radial) <= 0)
+      return no("a concave cone");
+    auto         v_cone = [&](const gp_Pnt& q) { double qu, qv; ElSLib::Parameters(cone, q, qu, qv); return qv; };
+    const double L = t + margin, va = v0 - run_on(f, v_cone, v0), vb = v1 + run_on(f, v_cone, v1);
+    auto         on = [&](double v) { return ElSLib::Value(u0, v, cone); };
+    std::vector<gp_Pnt> sec{on(va).Translated(n * -t), on(vb).Translated(n * -t), on(vb).Translated(n * L), on(va).Translated(n * L)};
+    sec = clip_at_axis(sec, ax.Location(), radial);
+    if (sec.size() < 3)
+      return no("a cone's section failed");
+    const TopoDS_Face face = polygon_face(sec);
+    if (face.IsNull())
+      return no("a cone's section failed");
+    BRepPrimAPI_MakeRevol mk(face, gp_Ax1(ax.Location(), gp_Dir(ax.XDirection().Crossed(ax.YDirection()))), u1 - u0);
+    if (!mk.IsDone())
+      return no("a cone's region failed");
+    TopoDS_Shape region = mk.Shape();
+    SourceMap    src;
     for (TopExp_Explorer x(region, TopAbs_FACE); x.More(); x.Next())
       src.Bind(x.Current(), Source{f, (uint8_t)REL_GENERATED});
     if (!cut_by(region, src))

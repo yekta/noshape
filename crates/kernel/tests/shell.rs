@@ -363,3 +363,31 @@ fn shell_fails_when_a_blind_holes_bottom_is_within_2t_of_the_floor() {
         }
     }
 }
+
+/// SHELL-SLOW: a chamfer round the top over filleted corners makes cones,
+/// which sent the whole part to slabs (here ~2.3 s, regions ~0.2 s; wf-block
+/// keeps slabs for its hole, see by_regions). The regions path builds them
+/// with the slabs' volumes; t below and above the fillets' radius.
+#[test]
+fn shell_over_chamfered_fillet_corners_by_regions() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let (a, b, h) = (40.0 * mm, 20.0 * mm, 10.0 * mm);
+    let mut s = bx([0.0; 3], [a, b, h]);
+    let v = edges_where(&s, |i| (i.start.z - i.end.z).abs() > 1e-9);
+    s = fillet_checked(&s, &v, &[2.0 * mm]).unwrap().shape;
+    let t = edges_where(&s, |i| (i.start.z - h).abs() < 1e-9 && (i.end.z - h).abs() < 1e-9);
+    s = chamfer_checked(&s, &t, ChamferSpec::Equal(1.0 * mm), &[]).unwrap().shape;
+    let faces = faces_where(&s, |c| c.z > h - 1e-9);
+    assert_eq!(faces.len(), 1);
+    // Faces: the slabs split each inner offset cone in two at 1 mm (39); one
+    // offset face per face here.
+    for (th, nf) in [(1.0, 35), (2.5, 27)] {
+        let auto = shell_solid(&s, &faces, th * mm, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+        let slabs = shell_solid(&s, &faces, th * mm, ShellSide::Inside, ShellMethod::Slabs).unwrap().shape;
+        assert!(auto.is_valid());
+        let (va, vs) = (vol(&auto) * 1e9, vol(&slabs) * 1e9);
+        assert!((va - vs).abs() < 1e-6, "{th} mm: {va} vs slabs {vs}");
+        assert_eq!(auto.count(ShapeType::Face), nf, "{th} mm");
+    }
+}
