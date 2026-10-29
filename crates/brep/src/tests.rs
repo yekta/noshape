@@ -247,6 +247,15 @@ fn a_round_boss_on_a_plate() {
     assert_eq!(cut.body.faces.len(), 8);
 }
 
+#[test]
+fn a_cylinder_halved_along_its_seam_declines() {
+    // OCCT's result gives the cut line a seam's two curves on the cylinder, and the model's merging of faces
+    // after (unify_same_domain) went differently on ours (LP2, CP2 in oracle_p1): declined (10-28).
+    let cyl = cylinder(0.0, 0.0, 1.0, 0.0, 2.0);
+    let half = boolean(Op::Cut, &[&cyl, &cuboid((-2.0, -2.0, -1.0), (2.0, 0.0, 3.0))], TOL);
+    assert_eq!(half.err(), Some(Decline("a section along a cylinder's seam")));
+}
+
 /// A drill: a cylinder along z from z0 to z1 with a cone's tip below z0 (half-angle 59°, as a 118° drill point).
 fn drill(cx: f64, cy: f64, r: f64, z0: f64, z1: f64) -> Body {
     let ang = 59f64.to_radians();
@@ -312,4 +321,19 @@ fn check_used_both_ways_but_apex(b: &Body) {
             assert_eq!(*u, [1, 1], "edge {e}");
         }
     }
+}
+
+#[test]
+fn an_arc_leaving_along_a_side_splits_the_face() {
+    use crate::curve2::C2;
+    use glam::DVec2;
+    // A 0.02 × 0.04 rectangle and an arc from its corner to its side, tangent to the side there (a cylinder
+    // touching a box's edge; the face came out with no pieces).
+    let s6 = 0.024_494_897_427_831_803;
+    let pts = [DVec2::ZERO, DVec2::new(-0.02, 0.0), DVec2::new(0.0, -0.04), DVec2::new(-0.02, -0.04), DVec2::new(0.0, -s6)];
+    let seg = |a: usize, b: usize| ([a as u32, b as u32], C2::Seg { a: pts[a], b: pts[b] });
+    let a0 = 1.369_438_406_004_566_6;
+    let arc = C2::Arc { c: DVec2::new(-0.024_999_999_999_999_98, -0.024_494_897_427_831_768), r: 0.024_999_999_999_999_98, a0, sweep: -1.369_438_406_004_567_5 };
+    let segs = [seg(0, 1), seg(2, 3), seg(0, 4), seg(4, 2), seg(1, 3), ([1, 4], arc)];
+    assert_eq!(crate::arrange::regions(&pts, &segs).unwrap().len(), 2);
 }

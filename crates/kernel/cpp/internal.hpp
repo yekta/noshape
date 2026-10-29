@@ -147,7 +147,8 @@ private:
 };
 
 // noshape's own Boolean (crates/brep; rust_boolean.cpp), off with NOSHAPE_BOOL_RUST=0: the Boolean `op` of
-// `args` (the object first) when it takes them (with `touching_only`, only when they merely touch), OCCT's
+// `args` (the object first) when it takes them (with `touching_only`, only when they merely touch; with
+// `merged_after`, the caller merging faces on one surface after, as OCCT's would be merged), OCCT's
 // fuzzy value `fuzzy` added to every tolerance. `srcs`
 // gets an OcShape for each argument (made in `own` where it has none), `out` the result, `hist` its history.
 bool rust_boolean_on();
@@ -161,7 +162,7 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
 bool rust_decline(const char* why);
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
-                  double fuzzy = 0, bool touching_only = false);
+                  double fuzzy = 0, bool touching_only = false, bool merged_after = false);
 // Keeps this thread's last result's flat body on `out` (its OcShape), for the next Boolean on it.
 void rust_boolean_keep(const OcShape& out);
 // The kernel's own Booleans outside op_boolean (Shell, slabs): `op` (0 fuse, 1 cut, 2 common) of `args` by

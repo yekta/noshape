@@ -3,6 +3,7 @@
 use crate::curve2::{inside, C2};
 use crate::Decline;
 use glam::DVec2;
+use std::f64::consts::{PI, TAU};
 
 /// A bounded region: its outer loop (counter-clockwise), its holes (clockwise), each a list of (curve,
 /// reversed), and a point strictly inside it.
@@ -26,16 +27,25 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
     for h in 0..n_h {
         let c = curve(h);
         let d = c.tangent(0.0);
-        out[from(h)].push((d.y.atan2(d.x), c.curvature(), h));
+        // -π is π (one direction).
+        let a = d.y.atan2(d.x);
+        out[from(h)].push((if a < 1e-9 - PI { a + TAU } else { a }, c.curvature(), h));
     }
     let mut pos = vec![0usize; n_h];
     for list in &mut out {
+        // Directions a rounding apart are one (a curve leaving along a side, tangent to it), ordered by turn.
+        list.sort_by(|a, b| a.0.total_cmp(&b.0));
+        for i in 1..list.len() {
+            if list[i].0 - list[i - 1].0 < 1e-9 {
+                list[i].0 = list[i - 1].0;
+            }
+        }
         list.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
         let n = list.len();
         for i in 0..n {
             if n > 1 {
                 let j = (i + 1) % n;
-                let gap = list[j].0 + if j == 0 { std::f64::consts::TAU } else { 0.0 } - list[i].0;
+                let gap = list[j].0 + if j == 0 { TAU } else { 0.0 } - list[i].0;
                 if gap < 1e-9 && (list[j].1 - list[i].1).abs() < 1e-9 {
                     return Err(Decline("two edges leave a vertex in one direction"));
                 }

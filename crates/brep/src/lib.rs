@@ -19,7 +19,7 @@ mod fxhash;
 /// Display meshes of analytic faces (psui).
 pub mod mesh;
 
-pub use boolean::{boolean, boolean_touching, Op};
+pub use boolean::{boolean, boolean_touching, merge_check, Op};
 use glam::DVec3;
 
 /// Distances in (tol, GREY × tol] are ambiguous: the Boolean declines.

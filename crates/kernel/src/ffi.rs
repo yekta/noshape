@@ -382,8 +382,9 @@ pub(crate) mod ffi {
         fn brep_mesh(input: &MeshIn, out: &mut MeshOut) -> bool;
         /// noshape's own Boolean (op 0 fuse, 1 cut, 2 common) of `args` (the object first): false when it
         /// declines (`last_rust_decline` says why).
-        /// `touching_only`: declines unless the arguments only touch (a pattern's checked glue).
-        fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: bool, out: &mut BrepResult) -> bool;
+        /// `touching_only`: declines unless the arguments only touch (a pattern's checked glue);
+        /// `merged_after`: the caller merges faces on one surface after (`noshape_brep::merge_check`).
+        fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: bool, merged_after: bool, out: &mut BrepResult) -> bool;
         /// Notes why the C++ side declined (for `last_rust_decline`).
         fn brep_decline(reason: &str);
         /// Whether op_boolean tries it ([`crate::set_rust_boolean`], else on unless NOSHAPE_BOOL_RUST=0).

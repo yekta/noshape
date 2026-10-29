@@ -53,6 +53,31 @@ came out inside out (seen as "a non-manifold result": two faces running a shared
 main corpus **411 of 972** taken (was 377), fresh corpus 387 of 692, Shell's 28 of 85: all 0 differ; < 50 input
 faces median 0.58 ms vs 7.9 ms.
 
+## Tangent curves, one axis, what the model does next (10-29 00:30)
+- A face's curves leaving a vertex in one direction a rounding apart (an arc tangent to a side: a cylinder
+  touching a box's edge) were ordered by the rounding, not by their turn, so the face had no pieces ("a face
+  lost"): directions within 1e-9 are one now.
+- The check that every cylinder of every argument shares one axis (and every plane is square or parallel to it)
+  is gone: only faces of different arguments that meet are intersected, and those pairs decline themselves.
+- The replay now also compares what `unify_same_domain` (which the model and Shell run on a result) makes of
+  ours and of OCCT's (faces, edges). It found two kinds the plain comparison passed:
+  - Seams (tried 10-28 and reverted): a circle on a part of a cylinder mapped either side of its gap, a section
+    along a seam taken as the seam. +23 cases, but OCCT gives such a cut line a seam's two curves and the
+    model's merging went differently (oracle_p1 LP2 24 faces vs 21, CP2 12 vs 10; land 11 failed on it). They
+    decline again ("an arc across a cylinder's seam", "a section along a cylinder's seam").
+  - Shell's slab fuses with two faces of one cylinder from different inputs meeting at a circle: OCCT's merge
+    into one, ours didn't (bd16a559, f82019a4, since the direct path). `quick_boolean` now declines those
+    (`noshape_brep::merge_check`, and `set_rust_boolean_merged_after` for the replay of direct cases); op_boolean's
+    13 such cases merge alike and stay.
+Main corpus **419 of 972** (was 411), fresh 385 of 692, Shell's 26 of 85: all 0 differ, incl. the merge check.
+
+The "no solid" Commons of a solid with one edge (121 in the fresh corpus, ~20 ms each, 2.4 s) are model-core's
+`ray_intervals` falling back from `line_crossings` (a ray touching an edge, or not a single solid): an idea for
+core, not this Boolean. Arguments sharing faces (17 in the fresh corpus, ~90 ms each): passing the shared
+entities through as one (tried 10-28) gets the shared ones OCCT keeps right, but OCCT also makes anew 3 of the 4
+corners of a shared face between two stacked boxes (a zero-length section where their side faces meet, by
+tolerance): no rule to match; they decline.
+
 ## T2 with it on vs off (10-28 20:20, kernel + model T2)
 Three differed: core's `bool_replay::bool_corpus_replay` (7 cases whose 1 µm-rounded centroid / edge midpoint sat
 on a .5 boundary: a piece now keeps its edge's own parameters at the edge's ends, which fixes 6; one face centroid

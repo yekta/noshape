@@ -77,7 +77,8 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
             continue;
         }
         n += 1;
-        // Declines fail at once (no OCCT run).
+        // Declines fail at once (no OCCT run). Shell's direct ones as Shell runs them.
+        set_rust_boolean_merged_after(c.path.starts_with("direct"));
         set_rust_boolean_only(true);
         let t = Instant::now();
         let r = boolean(c.op, &c.objects, &c.tools, &c.opts);
@@ -116,6 +117,15 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         // The history's hash rounds centroids: compare with OCCT's records within 2 µm.
         if d == ["history differs"] && std::env::var_os("NOSHAPE_BREP_EXACT").is_none() && o.as_ref().is_ok_and(|o| same_records(&records(&r), &records(o))) {
             d.clear();
+        }
+        // What the model does next with a result (merging faces left on one surface) must come out the same.
+        if d.is_empty()
+            && let Ok(o) = &o
+        {
+            let unified = |x: &Shape| unify_same_domain(x).map(|u| (u.shape.count(ShapeType::Face), u.shape.count(ShapeType::Edge))).ok();
+            if unified(&r.shape) != unified(&o.shape) {
+                d.push(format!("unified differently: {:?} vs OCCT {:?}", unified(&r.shape), unified(&o.shape)));
+            }
         }
         if !d.is_empty() {
             let mut line = format!("{name} ({:?}, {} tools, recorded path {}): {}", c.op, c.tools.len(), c.path, d.join(", "));
@@ -167,6 +177,7 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         times[b].push((ms, occt_ms));
         report += &format!("{name} {:?} faces {faces} tools {}: {ms:.2} ms, OCCT {occt_ms:.2} ms ({:.1}x)\n", c.op, c.tools.len(), occt_ms / ms.max(1e-6));
     }
+    set_rust_boolean_merged_after(false);
     report += &format!("{accepted} of {n} cases taken, {} differ from OCCT\n", bad.len());
     for (why, k) in &declines {
         report += &format!("  declined {k}: {why}\n");

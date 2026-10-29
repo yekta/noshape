@@ -576,7 +576,7 @@ bool rust_decline(const char* why) { return decline(why); }
 
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
-                  double fuzzy, bool touching_only)
+                  double fuzzy, bool touching_only, bool merged_after)
 {
   // A stale regeneration's Boolean stops (as OCCT's does through its progress indicator).
   const std::atomic<bool>* cancel = thread_cancel_flag();
@@ -621,7 +621,7 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   t_built.set = false;
   {
     const KernelTimer timer("boolean.rust.brep");
-    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, touching_only, r))
+    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, touching_only, merged_after, r))
       return decline(nullptr);
   }
   const KernelTimer timer("boolean.rust.build");
@@ -745,7 +745,7 @@ bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bo
     std::vector<const OcShape*>           srcs;
     std::vector<std::unique_ptr<OcShape>> own;
     const KernelTimer                     timer("boolean.rust.direct");
-    done = rust_boolean(op, all, srcs, own, out, hist);
+    done = rust_boolean(op, all, srcs, own, out, hist, 0, false, true);
     if (done)
       path = "direct_rust";
   }
