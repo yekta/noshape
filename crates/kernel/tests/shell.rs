@@ -417,3 +417,29 @@ fn shell_of_a_hole_by_a_chamfer_is_exact() {
     assert!((vol(&r) * 1e9 - 3479.07658).abs() < 1e-3, "{}", vol(&r) * 1e9);
     assert_eq!(r.count(ShapeType::Face), 21);
 }
+
+/// qa GUARD-SEGV-MALLOC-DEADLOCK: Shell and Draft leave their input as it was
+/// (OCCT's offset, Booleans and draft change their input in place: added
+/// curves on faces, raised tolerances; on a body the model keeps, and a budget
+/// or guard jump halfway through left it damaged for every later op). The
+/// input's BRep, curves and tolerances included, is the same afterwards.
+#[test]
+fn shell_and_draft_leave_their_input_as_it_was() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let mut s = cut(&bx([0.0; 3], [80.0 * mm, 50.0 * mm, 10.0 * mm]), &cyl_z(40.0 * mm, 25.0 * mm, -mm, 10.0 * mm, 12.0 * mm)).unwrap().shape;
+    let t = edges_where(&s, |i| (i.start.z - 10.0 * mm).abs() < 1e-9 && (i.end.z - 10.0 * mm).abs() < 1e-9);
+    s = fillet_checked(&s, &t, &[2.0 * mm]).unwrap().shape;
+    let before = s.to_brep_bytes().unwrap();
+    let top = faces_where(&s, |c| c.z > 10.0 * mm - 1e-9);
+    for th in [1.5, 2.5] {
+        for m in [ShellMethod::Auto, ShellMethod::Offset, ShellMethod::Slabs] {
+            let _ = shell_solid(&s, &top, th * mm, ShellSide::Inside, m);
+            assert!(s.to_brep_bytes().unwrap() == before, "shell {th} mm {m:?} changed its input");
+        }
+    }
+    let sides = faces_where(&s, |c| (c.x.abs() < 1e-9 || (c.x - 80.0 * mm).abs() < 1e-9) && c.z < 9.0 * mm);
+    assert_eq!(sides.len(), 2);
+    let _ = draft(&s, &sides, DVec3::Z, &Plane::xy(), 3f64.to_radians());
+    assert!(s.to_brep_bytes().unwrap() == before, "draft changed its input");
+}

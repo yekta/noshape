@@ -4523,8 +4523,11 @@ static OpOut op_draft_unbudgeted(const OcShape& s, const OcShapeList& faces, P3 
 OpOut op_draft(const OcShape& s, const OcShapeList& faces, P3 dir, const PlaneF& neutral,
                double angle)
 {
-  OpOut out;
-  const int r = run_budgeted(blend_budget_seconds(), [&] { out = op_draft_unbudgeted(s, faces, dir, neutral, angle); });
+  // On its own copy: OCCT's draft changes its input.
+  const OwnCopy     own(s);
+  const OcShapeList df = own.subs(faces);
+  OpOut             out;
+  const int r = run_budgeted(blend_budget_seconds(), [&] { out = op_draft_unbudgeted(own.shape(), df, dir, neutral, angle); });
   if (r == 1)
     fail_op("draft took too long");
   if (r == 2)

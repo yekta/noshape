@@ -395,4 +395,25 @@ OpOut make_result(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& out
                   const BRepTools_History* h, const std::vector<const OcShape*>* sources = nullptr,
                   std::array<ShapeIMap, 3>* out_maps = nullptr);
 
+// An op's own copy of its input (qa GUARD-SEGV-MALLOC-DEADLOCK): OCCT's
+// offset, its Booleans without NonDestructive and its draft change their
+// input in place (tolerances, curves on faces added to its edges). The input
+// is a body the model keeps (cached results, later features), and a budget or
+// guard jump halfway left it damaged: the next ops faulted on it, then the
+// heap. Such ops work on a copy with its own topology (geometry shared) and
+// the same sub-shape order (TopExp maps), so a history made against the copy
+// indexes as against the input. `shape` is the input itself when the copy's
+// maps don't match.
+struct OwnCopy
+{
+  explicit OwnCopy(const OcShape& in);
+  // `l`'s items as the copy's sub-shapes (same orientation).
+  OcShapeList subs(const OcShapeList& l) const;
+  const OcShape& shape() const { return copy ? *copy : in; }
+
+private:
+  const OcShape&           in;
+  std::unique_ptr<OcShape> copy;
+};
+
 } // namespace noshape

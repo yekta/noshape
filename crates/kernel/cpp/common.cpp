@@ -1431,6 +1431,38 @@ thread_local int locked_sections = 0;
 thread_local int mutex_holds     = 0;
 } // namespace noshape
 
+#if defined(__SANITIZE_ADDRESS__) && defined(__linux__) && defined(__x86_64__)
+  #include <sanitizer/asan_interface.h>
+namespace noshape {
+// AddressSanitizer builds (the GUARD-SEGV-MALLOC-DEADLOCK hunt): a guard or
+// budget jump abandons frames whose stack poisoning ASan can't clear on a
+// big thread stack (the regen thread's 256 MB: "ignoring requested
+// __asan_handle_no_return"), and their reuse then reads as a false
+// stack-use-after-scope. Unpoisoned from the interrupted stack pointer up.
+void asan_unpoison_abandoned(const void* uctx)
+{
+  const ucontext_t* uc = static_cast<const ucontext_t*>(uctx);
+  if (uc == nullptr)
+    return;
+  const uintptr_t sp = (uintptr_t)uc->uc_mcontext.gregs[REG_RSP];
+  pthread_attr_t  a;
+  if (pthread_getattr_np(pthread_self(), &a) != 0)
+    return;
+  void*  base = nullptr;
+  size_t size = 0;
+  pthread_attr_getstack(&a, &base, &size);
+  pthread_attr_destroy(&a);
+  const uintptr_t hi = (uintptr_t)base + size;
+  if (sp >= (uintptr_t)base && sp < hi)
+    __asan_unpoison_memory_region((void*)sp, hi - sp);
+}
+} // namespace noshape
+#else
+namespace noshape {
+inline void asan_unpoison_abandoned(const void*) {}
+} // namespace noshape
+#endif
+
 #ifdef __linux__
 // Every pthread mutex the program's own code (OCCT, the bridge, std::mutex)
 // takes is counted per thread, and every pthread_once it runs: while one is
@@ -1599,6 +1631,18 @@ void on_crash(int sig, siginfo_t* info, void* ctx)
     }
     crash_guard  = nullptr;
     crash_signal = sig;
+    asan_unpoison_abandoned(ctx);
+#ifdef __linux__
+    // NOSHAPE_GUARD_TRACE=1: the recovered ones too (where the kernel faults).
+    if (g_guard_trace)
+    {
+      static const char head[] = "noshape: the kernel crashed; recovered:\n";
+      [[maybe_unused]] const ssize_t w = write(2, head, sizeof head - 1);
+      void*     frames[64];
+      const int n = backtrace(frames, 64);
+      backtrace_symbols_fd(frames, n, 2);
+    }
+#endif
     siglongjmp(*env, 1);
   }
   // Not in a kernel call: the previous handler, or the default action
@@ -2015,6 +2059,7 @@ void on_budget_tick(int, siginfo_t*, void* uctx)
     return;
   budget_jmp    = nullptr;
   budget_reason = over ? 1 : 2;
+  asan_unpoison_abandoned(uctx);
   siglongjmp(*env, 1);
 }
 } // namespace
@@ -2092,4 +2137,46 @@ bool bop_parallel()
   // see a variable set in the process later (boolean_budget's set_var).
   return g_bop_parallel.load();
 }
+} // namespace noshape
+
+namespace noshape {
+OwnCopy::OwnCopy(const OcShape& s) : in(s)
+{
+  if (s.shape.IsNull())
+    return;
+  BRepBuilderAPI_Copy cp(s.shape, false, false);
+  if (!cp.IsDone())
+    return;
+  auto c = std::make_unique<OcShape>(cp.Shape());
+  for (const TopAbs_ShapeEnum k : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+    if (c->map(k).Extent() != s.map(k).Extent())
+      return;
+  copy = std::move(c);
+}
+
+OcShapeList OwnCopy::subs(const OcShapeList& l) const
+{
+  OcShapeList out;
+  for (const TopoDS_Shape& x : l.items)
+  {
+    TopoDS_Shape y = x;
+    if (copy && !x.IsNull())
+    {
+      const TopAbs_ShapeEnum k = x.ShapeType();
+      if (k == TopAbs_FACE || k == TopAbs_EDGE || k == TopAbs_VERTEX)
+      {
+        const int i = in.map(k).FindIndex(x);
+        if (i > 0)
+        {
+          y = copy->map(k)(i);
+          y.Orientation(x.Orientation());
+        }
+      }
+    }
+    out.items.push_back(y);
+    out.sources.push_back(nullptr);
+  }
+  return out;
+}
+
 } // namespace noshape

@@ -2571,8 +2571,11 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
 OpOut op_shell_solid(const OcShape& solid, const OcShapeList& faces, double thickness, bool outward,
                      uint8_t method)
 {
-  OpOut     out;
-  const int r = run_budgeted(blend_budget_seconds(), [&] { out = op_shell_solid_unbudgeted(solid, faces, thickness, outward, method); });
+  // On its own copy: OCCT's offset and Booleans here change their input.
+  const OwnCopy     own(solid);
+  const OcShapeList removed = own.subs(faces);
+  OpOut             out;
+  const int r = run_budgeted(blend_budget_seconds(), [&] { out = op_shell_solid_unbudgeted(own.shape(), removed, thickness, outward, method); });
   if (r == 1)
     fail_op("shell took too long");
   if (r == 2)
