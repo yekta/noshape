@@ -119,33 +119,33 @@ pub fn edge_nodes(vertices: &[DVec3], edge: &MeshEdge, defl: Deflection) -> Opti
 
 /// Meshes the faces of a body (`vertices`, `edges`, `faces`) that are meshed here.
 pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], defl: Deflection) -> BodyMesh {
+    // Each edge's nodes once, shared by the faces on it.
     let mut out = BodyMesh { edges: vec![None; edges.len()], faces: Vec::with_capacity(faces.len()) };
-    let mut done = vec![false; edges.len()];
-    for f in faces {
-        let mut nodes = |e: u32| -> Option<EdgeNodes> {
-            let e = e as usize;
-            if !done[e] {
-                done[e] = true;
-                out.edges[e] = edge_nodes(vertices, edges.get(e)?, defl);
-            }
-            out.edges[e].clone()
-        };
-        out.faces.push(mesh_face(vertices, edges, f, &mut nodes));
-    }
-    // A circle on a face declined here is split by BRepMesh for that face: the faces meshed here on it would
-    // not share its nodes. Declined in turn, until none is left.
-    let mut on_edge: Vec<Vec<usize>> = vec![Vec::new(); edges.len()];
-    for (i, f) in faces.iter().enumerate() {
+    for f in faces.iter().filter(|f| !matches!(f.surface, MeshSurface::Other)) {
         for u in f.loops.iter().flatten() {
-            if let Some(l) = on_edge.get_mut(u.edge as usize).filter(|l| !l.contains(&i)) {
-                l.push(i);
+            let e = u.edge as usize;
+            if let (Some(slot @ None), Some(edge)) = (out.edges.get_mut(e), edges.get(e)) {
+                *slot = edge_nodes(vertices, edge, defl);
             }
         }
     }
+    for f in faces {
+        out.faces.push(mesh_face(vertices, edges, f, &out.edges));
+    }
+    // A circle on a face declined here is split by BRepMesh for that face: the faces meshed here on it would
+    // not share its nodes. Declined in turn, until none is left.
+    // Lines are split the same either way: only the other edges' faces count.
+    let mut on_edge: Vec<(u32, usize)> = Vec::new();
+    for (i, f) in faces.iter().enumerate() {
+        on_edge.extend(f.loops.iter().flatten().filter(|u| !matches!(edges.get(u.edge as usize).map(|e| e.curve), Some(Some(Curve::Line)))).map(|u| (u.edge, i)));
+    }
+    on_edge.sort_unstable();
+    on_edge.dedup();
+    let on_edge: Vec<Vec<usize>> = on_edge.chunk_by(|a, b| a.0 == b.0).map(|c| c.iter().map(|&(_, i)| i).collect()).collect();
     loop {
         let mut changed = false;
-        for (e, l) in on_edge.iter().enumerate() {
-            if matches!(edges[e].curve, Some(Curve::Line)) || l.iter().all(|&i| out.faces[i].is_some()) || l.iter().all(|&i| out.faces[i].is_none()) {
+        for l in &on_edge {
+            if l.iter().all(|&i| out.faces[i].is_some()) || l.iter().all(|&i| out.faces[i].is_none()) {
                 continue;
             }
             for &i in l {
@@ -160,7 +160,7 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
 }
 
 /// One face, its edges' nodes from `nodes`.
-fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &mut dyn FnMut(u32) -> Option<EdgeNodes>) -> Option<FaceMesh> {
+fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &[Option<EdgeNodes>]) -> Option<FaceMesh> {
     match face.surface {
         MeshSurface::Plane { origin, normal, xdir } => mesh_plane(vertices, edges, face, origin, normal, xdir, nodes),
         MeshSurface::Cylinder { origin, axis, xdir, direct, radius } => mesh_strip(edges, face, &Revolved { origin, axis, xdir, direct, radius, angle: 0.0 }, nodes),
@@ -203,7 +203,7 @@ impl Revolved {
 
 /// A cylinder or cone between two rims at constant v (circles round the axis) and at most two sides at
 /// constant u (straight edges along it, seams): the rims' nodes zipped by u, as the kernel's strips.
-fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &mut dyn FnMut(u32) -> Option<EdgeNodes>) -> Option<FaceMesh> {
+fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option<EdgeNodes>]) -> Option<FaceMesh> {
     if face.loops.len() > 2 {
         return None;
     }
@@ -333,7 +333,7 @@ fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &mut dyn
 
 /// A loop's nodes in order round it (each shared vertex once), and per use the indices of its edge's nodes
 /// (from `v[0]` to `v[1]`) into that list. `None` when the uses don't join end to start.
-fn loop_nodes(edges: &[MeshEdge], uses: &[Use], nodes: &mut dyn FnMut(u32) -> Option<EdgeNodes>) -> Option<(Vec<DVec3>, Vec<Vec<usize>>)> {
+fn loop_nodes(edges: &[MeshEdge], uses: &[Use], nodes: &[Option<EdgeNodes>]) -> Option<(Vec<DVec3>, Vec<Vec<usize>>)> {
     let ends = |u: &Use| -> Option<(u32, u32)> {
         let e = edges.get(u.edge as usize)?;
         Some(if u.reversed { (e.v[1], e.v[0]) } else { (e.v[0], e.v[1]) })
@@ -341,24 +341,24 @@ fn loop_nodes(edges: &[MeshEdge], uses: &[Use], nodes: &mut dyn FnMut(u32) -> Op
     // In order round the loop (wires needn't list their edges so): each use's end the next one's start. At a
     // vertex several uses start from (a seam's: the rim on and the seam back), not back along the edge just
     // walked, then the next one in the given order.
-    let mut from: std::collections::HashMap<u32, Vec<usize>> = std::collections::HashMap::with_capacity(uses.len());
-    for (k, u) in uses.iter().enumerate() {
-        from.entry(ends(u)?.0).or_default().push(k);
-    }
+    let mut from: Vec<(u32, usize)> = uses.iter().enumerate().map(|(k, u)| Some((ends(u)?.0, k))).collect::<Option<_>>()?;
+    from.sort_unstable();
+    let mut used = vec![false; uses.len()];
     let mut order = Vec::with_capacity(uses.len());
     let mut i = 0;
     loop {
         order.push(i);
-        let starts = from.get_mut(&ends(&uses[i])?.0)?;
-        starts.retain(|&k| k != i);
+        used[i] = true;
         if order.len() == uses.len() {
             break;
         }
         let end = ends(&uses[i])?.1;
-        let next = from
-            .get(&end)?
+        let at = from.partition_point(|&(v, _)| v < end);
+        let next = from[at..]
             .iter()
-            .copied()
+            .take_while(|&&(v, _)| v == end)
+            .map(|&(_, k)| k)
+            .filter(|&k| !used[k])
             .min_by_key(|&k| (uses[k].edge == uses[i].edge, (k + uses.len() - i) % uses.len()))?;
         i = next;
     }
@@ -370,15 +370,18 @@ fn loop_nodes(edges: &[MeshEdge], uses: &[Use], nodes: &mut dyn FnMut(u32) -> Op
     let mut spans: Vec<(usize, usize, bool)> = vec![(0, 0, false); uses.len()];
     for &k in &order {
         let u = &uses[k];
-        let n = nodes(u.edge)?;
+        let n = nodes.get(u.edge as usize)?.as_ref()?;
         let count = n.points.len();
         if count < 2 {
             return None;
         }
         spans[k] = (pts.len(), count, u.reversed);
         // Along the use; its last node is the next use's first.
-        let along: Box<dyn Iterator<Item = &DVec3>> = if u.reversed { Box::new(n.points.iter().rev()) } else { Box::new(n.points.iter()) };
-        pts.extend(along.take(count - 1));
+        if u.reversed {
+            pts.extend(n.points.iter().rev().take(count - 1));
+        } else {
+            pts.extend(n.points.iter().take(count - 1));
+        }
     }
     let total = pts.len();
     let per_use = spans
@@ -393,7 +396,7 @@ fn loop_nodes(edges: &[MeshEdge], uses: &[Use], nodes: &mut dyn FnMut(u32) -> Op
 }
 
 #[allow(clippy::too_many_arguments)]
-fn mesh_plane(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, origin: DVec3, normal: DVec3, xdir: DVec3, nodes: &mut dyn FnMut(u32) -> Option<EdgeNodes>) -> Option<FaceMesh> {
+fn mesh_plane(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, origin: DVec3, normal: DVec3, xdir: DVec3, nodes: &[Option<EdgeNodes>]) -> Option<FaceMesh> {
     let _ = vertices;
     let ydir = normal.cross(xdir);
     let mut points: Vec<DVec3> = Vec::new();

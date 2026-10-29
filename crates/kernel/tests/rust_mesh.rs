@@ -140,3 +140,47 @@ fn a_patterns_instances_share_one_mesh() {
     let both = Shape::compound(&[s.clone(), moved]);
     assert_eq!(same_as_brepmesh(&both), 2 * s.faces().len());
 }
+
+/// This thread's CPU time in ms (Linux; 0 elsewhere): the bench's measure on a busy machine.
+fn cpu_ms() -> f64 {
+    std::fs::read_to_string("/proc/thread-self/schedstat").ok().and_then(|s| s.split_whitespace().next()?.parse::<f64>().ok()).unwrap_or(0.0) / 1e6
+}
+
+/// The 400-fin plate's display mesh, ours against BRepMesh (fresh copies, so the mesh cache serves nothing,
+/// with their maps made, as a regenerated part has them): median of 5 each, wall and CPU time. `cargo test --release -p noshape-kernel --test all rust_mesh::bench -- --ignored --nocapture`
+#[test]
+#[ignore = "bench"]
+fn bench_fin_plate_display_mesh() {
+    let s = fins(400);
+    let median = |mut v: Vec<f64>| {
+        v.sort_by(|a, b| a.total_cmp(b));
+        v[v.len() / 2]
+    };
+    let times = |rust: bool| {
+        let (wall, cpu): (Vec<f64>, Vec<f64>) = (0..5)
+            .map(|_| {
+                let copy = transform(&s, &Transform::Translate(DVec3::ZERO), true).unwrap().shape;
+                // Its maps, as the regeneration's naming leaves them on a part.
+                let _ = copy.ancestor_map(ShapeType::Edge, ShapeType::Face).unwrap();
+                let (t, c) = (std::time::Instant::now(), cpu_ms());
+                kernel_profile_mark("before");
+                let m = mesh(&copy, rust);
+                kernel_profile_mark(if rust { "ours" } else { "BRepMesh" });
+                assert_eq!(m.rust_faces > 0, rust);
+                (t.elapsed().as_secs_f64() * 1e3, cpu_ms() - c)
+            })
+            .unzip();
+        (median(wall), median(cpu))
+    };
+    let (ours, occt) = (times(true), times(false));
+    eprintln!(
+        "fin plate ({} faces) display mesh: ours {:.1} ms (CPU {:.1}), BRepMesh {:.1} ms (CPU {:.1}): {:.1}× ({:.1}× CPU)",
+        s.faces().len(),
+        ours.0,
+        ours.1,
+        occt.0,
+        occt.1,
+        occt.0 / ours.0,
+        occt.1 / ours.1
+    );
+}

@@ -2,7 +2,7 @@
 //! calls with a body's fresh faces in flat arrays (ffi `MeshIn`) and turns the result (`MeshOut`) into
 //! triangulations and edge polygons.
 
-use crate::ffi::ffi::{MeshIn, MeshOut};
+use crate::ffi::ffi::MeshOut;
 use glam::DVec3;
 use noshape_brep::mesh::{mesh_body, Deflection, MeshEdge, MeshFace, MeshSurface};
 use noshape_brep::{Curve, Use};
@@ -21,12 +21,28 @@ pub fn set_rust_mesh(on: bool) {
     OFF.with(|o| o.set(!on));
 }
 
-/// Meshes the faces of `input` noshape's mesher takes into `out`; false when the input is malformed (or it is
-/// off on this thread).
-pub(crate) fn brep_mesh(input: &MeshIn, out: &mut MeshOut) -> bool {
-    if OFF.with(|o| o.get()) {
-        return false;
-    }
+/// Whether this thread meshes with it.
+pub(crate) fn brep_mesh_on() -> bool {
+    !OFF.with(|o| o.get())
+}
+
+/// The body's faces (ffi `brep_mesh`'s flat arrays).
+struct MeshIn<'a> {
+    vertices: &'a [f64],
+    edges: &'a [u32],
+    curves: &'a [f64],
+    surfaces: &'a [f64],
+    face_loops: &'a [u32],
+    loop_uses: &'a [u32],
+    uses: &'a [u32],
+    linear: f64,
+    angular: f64,
+}
+
+/// Meshes the faces noshape's mesher takes into `out`; false when the input is malformed.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], linear: f64, angular: f64, out: &mut MeshOut) -> bool {
+    let input = &MeshIn { vertices, edges, curves, surfaces, face_loops, loop_uses, uses, linear, angular };
     let vertices: Vec<DVec3> = input.vertices.as_chunks::<3>().0.iter().map(|c| DVec3::new(c[0], c[1], c[2])).collect();
     let ne = input.edges.len() / 2;
     let nf = input.face_loops.len().saturating_sub(1);

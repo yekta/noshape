@@ -706,17 +706,17 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     fail_invalid("linear deflection must be positive");
   if (!(ang > 0) || !std::isfinite(ang))
     fail_invalid("angular deflection must be positive");
-  auto m   = std::make_unique<OcMesh>();
-  m->shape = s.shape;
+  // The shape's maps and its edges' faces, kept on its OcShape (the
+  // regeneration's naming made them already): walking a 1600-face part for
+  // them took ~25 ms of each display mesh.
   std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("mesh.maps");
-  TopExp::MapShapes(s.shape, TopAbs_FACE, m->faces);
-  TopExp::MapShapes(s.shape, TopAbs_EDGE, m->edges);
-  TopExp::MapShapes(s.shape, TopAbs_VERTEX, m->vertices);
+  auto m   = std::make_unique<OcMesh>(s);
+  m->shape = s.shape;
   auto side = std::make_shared<OcMeshFaces>();
   side->faces.resize(m->faces.Extent());
-
-  ShapeAncMap edgeFaces;
-  TopExp::MapShapesAndAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, edgeFaces);
+  // Per edge (1-based) its faces' indices (0-based into m->faces).
+  const auto& ef        = ancestors_cached(s, TopAbs_EDGE, TopAbs_FACE);
+  auto        faces_of  = [&](int e) { return std::make_pair(ef.second.data() + ef.first[(size_t)e - 1], ef.second.data() + ef.first[(size_t)e]); };
   {
     std::lock_guard<std::mutex> lock(mesh_mutex());
     IMeshTools_Parameters prm;
@@ -752,12 +752,10 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     bool partial = set != nullptr && nfresh < m->faces.Extent();
     for (int i = 1; i <= m->edges.Extent() && partial; ++i)
     {
-      const TopoDS_Edge&                    e  = TopoDS::Edge(m->edges(i));
-      const NCollection_List<TopoDS_Shape>* fl = edgeFaces.Seek(e);
-      int                                   nf = 0, nc = 0;
-      if (fl != nullptr)
-        for (NCollection_List<TopoDS_Shape>::Iterator it(*fl); it.More(); it.Next(), ++nf)
-          nc += fresh[(size_t)m->faces.FindIndex(it.Value())] ? 0 : 1;
+      const TopoDS_Edge& e = TopoDS::Edge(m->edges(i));
+      int                nf = 0, nc = 0;
+      for (auto [f, fe] = faces_of(i); f != fe; ++f, ++nf)
+        nc += fresh[(size_t)*f + 1] ? 0 : 1;
       if (nc == 0)
         continue;
       if (nc == nf)
@@ -882,15 +880,18 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     {
       const TopoDS_Edge& e    = TopoDS::Edge(m->edges(i));
       auto&              poly = m->edge_polys[i - 1];
-      const NCollection_List<TopoDS_Shape>* fl = edgeFaces.Seek(e);
-      // Not edges in Onshape: not drawn, so not pickable (shown_topology).
-      if (BRep_Tool::Degenerated(e) || is_seam(e, fl))
+      const auto [f0, f1] = faces_of(i);
+      // Not edges in Onshape: not drawn, so not pickable (shown_topology): a
+      // seam closes every face it bounds.
+      bool seam = f0 != f1;
+      for (const uint32_t* f = f0; f != f1 && seam; ++f)
+        seam = BRep_Tool::IsClosed(e, TopoDS::Face(m->faces((int)*f + 1)));
+      if (BRep_Tool::Degenerated(e) || seam)
         continue;
       // None of its faces meshed now: its polyline from the cache.
-      bool cached = set != nullptr && fl != nullptr;
-      if (cached)
-        for (NCollection_List<TopoDS_Shape>::Iterator it(*fl); it.More() && cached; it.Next())
-          cached = !fresh[(size_t)m->faces.FindIndex(it.Value())];
+      bool cached = set != nullptr && f0 != f1;
+      for (const uint32_t* f = f0; f != f1 && cached; ++f)
+        cached = !fresh[(size_t)*f + 1];
       if (cached)
         if (const std::vector<std::array<float, 3>>* c = set->edges.Seek(e))
         {
@@ -907,11 +908,10 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
         poly = rust_polys[(size_t)i - 1];
         done = true;
       }
-      if (fl != nullptr)
       {
-        for (NCollection_List<TopoDS_Shape>::Iterator it(*fl); it.More() && !done; it.Next())
+        for (const uint32_t* fi = f0; fi != f1 && !done; ++fi)
         {
-          const TopoDS_Face& f = TopoDS::Face(it.Value());
+          const TopoDS_Face& f = TopoDS::Face(m->faces((int)*fi + 1));
           TopLoc_Location    floc;
           const occ::handle<Poly_Triangulation>& tri = BRep_Tool::Triangulation(f, floc);
           if (tri.IsNull())

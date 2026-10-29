@@ -473,11 +473,19 @@ struct OcMeshFaces; // per-face triangulation handles (mesh.cpp)
 class OcMesh
 {
 public:
+  // The meshed shape's maps, kept on its OcShape (made once; it outlives the
+  // mesh: tessellate_with).
+  explicit OcMesh(const OcShape& s)
+      : faces(s.map(TopAbs_FACE)),
+        edges(s.map(TopAbs_EDGE)),
+        vertices(s.map(TopAbs_VERTEX))
+  {
+  }
   std::shared_ptr<OcMeshFaces> faceData;
-  TopoDS_Shape shape;
-  ShapeIMap    faces;
-  ShapeIMap    edges;
-  ShapeIMap    vertices;
+  TopoDS_Shape     shape;
+  const ShapeIMap& faces;
+  const ShapeIMap& edges;
+  const ShapeIMap& vertices;
   size_t       nodes       = 0;
   size_t       indices     = 0;
   size_t       edge_points = 0;

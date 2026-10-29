@@ -340,28 +340,6 @@ pub(crate) mod ffi {
         history: Vec<u32>,
     }
 
-    /// A body's faces for noshape's own display mesher (crates/brep `mesh`; `mesh_bridge`): flat arrays.
-    #[derive(Default)]
-    struct MeshIn {
-        /// x, y, z per vertex.
-        vertices: Vec<f64>,
-        /// Start and end vertex per edge.
-        edges: Vec<u32>,
-        /// Per edge: kind (0 line, 1 circle, else not meshed here), centre, normal, x direction, radius, the
-        /// parameters at its start and end (13 numbers).
-        curves: Vec<f64>,
-        /// Per face: kind (0 plane, else not meshed here), origin, normal (the surface's own), x direction, 3
-        /// spare (13 numbers).
-        surfaces: Vec<f64>,
-        /// Per face, its first loop (faces + 1 entries); per loop, its first use (loops + 1); edge × 2 + reversed.
-        face_loops: Vec<u32>,
-        loop_uses: Vec<u32>,
-        uses: Vec<u32>,
-        /// The display's deflections (BRepMesh's linear and angular).
-        linear: f64,
-        angular: f64,
-    }
-
     /// noshape's display mesher's result: per face meshed (`face_ok`) its nodes, normals and triangles (from
     /// `face_nodes` / `face_tris`, faces + 1 entries; nodes face-local in `tris`); per use of a meshed face (in
     /// order) its node count and nodes from the edge's start; per edge (edges + 1) its first node parameter.
@@ -379,9 +357,16 @@ pub(crate) mod ffi {
     }
 
     extern "Rust" {
-        /// noshape's own display mesher (crates/brep `mesh`) on the faces of `input` it takes: false when the
-        /// input is malformed.
-        fn brep_mesh(input: &MeshIn, out: &mut MeshOut) -> bool;
+        /// noshape's own display mesher (crates/brep `mesh`) on the faces it takes: false when the input is
+        /// malformed. The body's faces in flat arrays (cpp/mesh_rust.cpp): x, y, z per vertex; start and end vertex per
+        /// edge; per edge kind (0 line, 1 circle, else not meshed here), centre, normal, x direction, radius,
+        /// its start and end parameters (13 numbers); per face kind (0 plane, 1 cylinder, 2 cone, else not
+        /// meshed here) and its geometry (13 numbers); per face its first loop (faces + 1), per loop its first
+        /// use (loops + 1), edge × 2 + reversed per use; the display's deflections.
+        #[allow(clippy::too_many_arguments)]
+        fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], linear: f64, angular: f64, out: &mut MeshOut) -> bool;
+        /// Whether this thread meshes with it (`set_rust_mesh`).
+        fn brep_mesh_on() -> bool;
         /// noshape's own Boolean (op 0 fuse, 1 cut, 2 common) of `args` (the object first): false when it
         /// declines (`last_rust_decline` says why).
         /// `touching_only`: declines unless the arguments only touch (a pattern's checked glue).
@@ -752,7 +737,7 @@ pub(crate) mod ffi {
     }
 }
 
-use crate::mesh_bridge::brep_mesh;
+use crate::mesh_bridge::{brep_mesh, brep_mesh_on};
 use crate::brep_bridge::{brep_boolean, brep_decline, brep_enabled, brep_record_direct, brep_recording, brep_strict};
 
 // SAFETY: OcShape wraps an immutable TopoDS_Shape (handles with atomic

@@ -152,7 +152,7 @@ private:
 // fuzzy value `fuzzy` added to every tolerance. `srcs`
 // gets an OcShape for each argument (made in `own` where it has none), `out` the result, `hist` its history.
 bool rust_boolean_on();
-// noshape's own display mesher (mesh_rust.cpp): on unless NOSHAPE_MESH_RUST=0.
+// noshape's own display mesher (mesh_rust.cpp): on unless NOSHAPE_MESH_RUST=0 (or set_rust_mesh(false) on this thread).
 bool rust_mesh_on();
 // Meshes the `fresh` faces it takes (analytic ones): each is marked in `taken` with its triangulation in `tris`
 // (in the face's own frame; per face index), and their edges' polylines go to `polys` (per edge index, the

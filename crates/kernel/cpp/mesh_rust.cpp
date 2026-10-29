@@ -37,14 +37,22 @@ occ::handle<Geom_Curve> basis(occ::handle<Geom_Curve> c)
   }
 }
 
-void push3(rust::Vec<double>& v, const gp_XYZ& p)
+// The input of `brep_mesh` (its slices).
+struct MeshIn
+{
+  std::vector<double>   vertices, curves, surfaces;
+  std::vector<uint32_t> edges, face_loops, loop_uses, uses;
+  double                linear = 0, angular = 0;
+};
+
+void push3(std::vector<double>& v, const gp_XYZ& p)
 {
   v.push_back(p.X());
   v.push_back(p.Y());
   v.push_back(p.Z());
 }
 
-void push0(rust::Vec<double>& v, int n)
+void push0(std::vector<double>& v, int n)
 {
   for (int k = 0; k < n; ++k)
     v.push_back(0);
@@ -58,7 +66,7 @@ bool rust_mesh_on()
     const char* v = std::getenv("NOSHAPE_MESH_RUST");
     return v == nullptr || std::string(v) != "0";
   }();
-  return on;
+  return on && brep_mesh_on();
 }
 
 int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeIMap& vertices, const std::vector<char>& fresh, double lin, double ang,
@@ -117,6 +125,7 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
   in.face_loops.push_back(0);
   in.loop_uses.push_back(0);
   std::vector<int> face_of; // input face -> faces index
+  std::vector<int> input_of(faces.Extent() + 1, -1); // faces index -> input face
   for (int i = 1; i <= faces.Extent(); ++i)
   {
     if (!fresh[(size_t)i])
@@ -186,14 +195,25 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
       push0(in.surfaces, 12);
     }
     in.face_loops.push_back(static_cast<uint32_t>(in.loop_uses.size() - 1));
+    input_of[(size_t)i] = (int)face_of.size();
     face_of.push_back(i);
   }
   if (face_of.empty())
     return 0;
   MeshOut out;
   lap = std::make_unique<KernelTimer>("mesh.rust.mesh");
-  if (!brep_mesh(in, out))
+  auto f64s = [](const std::vector<double>& v) { return rust::Slice<const double>(v.data(), v.size()); };
+  auto u32s = [](const std::vector<uint32_t>& v) { return rust::Slice<const uint32_t>(v.data(), v.size()); };
+  if (!brep_mesh(f64s(in.vertices), u32s(in.edges), f64s(in.curves), f64s(in.surfaces), u32s(in.face_loops), u32s(in.loop_uses), u32s(in.uses), in.linear, in.angular, out))
     return 0;
+  // The output through plain pointers (a rust::Vec's [] asks Rust for its data each time).
+  const uint8_t*  face_ok    = out.face_ok.data();
+  const uint32_t* face_nodes = out.face_nodes.data();
+  const uint32_t* face_tris  = out.face_tris.data();
+  const double*   nodes      = out.nodes.data();
+  const double*   normals    = out.normals.data();
+  const uint32_t* otris      = out.tris.data();
+  const uint32_t* use_nodes  = out.use_nodes.data();
   lap = std::make_unique<KernelTimer>("mesh.rust.out");
   // Per meshed face: its triangulation (in the face's own frame); per edge of one: its polyline (in the
   // map's FORWARD direction, as mesh.cpp's edges loop wants it).
@@ -203,17 +223,17 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
   for (size_t j = 0; j < face_of.size(); ++j)
   {
     const int i = face_of[j];
-    if (!out.face_ok[j])
+    if (!face_ok[j])
       continue; // no use_nodes for a declined face
     const TopoDS_Face& f   = TopoDS::Face(faces(i));
     const gp_Trsf      inv = f.Location().Transformation().Inverted();
-    const uint32_t     n0 = out.face_nodes[j], n1 = out.face_nodes[j + 1], t0 = out.face_tris[j], t1 = out.face_tris[j + 1];
+    const uint32_t     n0 = face_nodes[j], n1 = face_nodes[j + 1], t0 = face_tris[j], t1 = face_tris[j + 1];
     occ::handle<Poly_Triangulation> tri = new Poly_Triangulation((int)(n1 - n0), (int)(t1 - t0), false);
     tri->AddNormals();
     for (uint32_t k = n0; k < n1; ++k)
     {
-      gp_Pnt p(out.nodes[3 * k], out.nodes[3 * k + 1], out.nodes[3 * k + 2]);
-      gp_Dir d(out.normals[3 * k], out.normals[3 * k + 1], out.normals[3 * k + 2]);
+      gp_Pnt p(nodes[3 * k], nodes[3 * k + 1], nodes[3 * k + 2]);
+      gp_Dir d(normals[3 * k], normals[3 * k + 1], normals[3 * k + 2]);
       if (!f.Location().IsIdentity())
       {
         p.Transform(inv);
@@ -223,13 +243,13 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
       tri->SetNormal((int)(k - n0 + 1), d);
     }
     for (uint32_t t = t0; t < t1; ++t)
-      tri->SetTriangle((int)(t - t0 + 1), Poly_Triangle((int)out.tris[3 * t] + 1, (int)out.tris[3 * t + 1] + 1, (int)out.tris[3 * t + 2] + 1));
+      tri->SetTriangle((int)(t - t0 + 1), Poly_Triangle((int)otris[3 * t] + 1, (int)otris[3 * t + 1] + 1, (int)otris[3 * t + 2] + 1));
     tri->Deflection(lin);
     tris[(size_t)i]   = tri;
     use_at[(size_t)i] = un;
     for (uint32_t l = in.face_loops[j]; l < in.face_loops[j + 1]; ++l)
       for (uint32_t u = in.loop_uses[l]; u < in.loop_uses[l + 1]; ++u)
-        un += 1 + out.use_nodes[un];
+        un += 1 + use_nodes[un];
   }
   // Edge polylines of the meshed faces' edges (a pattern's instances: the first's, moved), and the instances'
   // triangulations (the first's).
@@ -245,14 +265,13 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     // From the first face's nodes (global) to this face's place.
     const bool    moved = i != i0 && !f.Location().IsEqual(faces(i0).Location());
     const gp_Trsf to    = moved ? f.Location().Transformation() * faces(i0).Location().Transformation().Inverted() : gp_Trsf();
-    // The first face's j: its nodes start at out.face_nodes[j].
-    const size_t   j0    = (size_t)(std::find(face_of.begin(), face_of.end(), i0) - face_of.begin());
-    const uint32_t nbase = out.face_nodes[j0];
+    // The first face's j: its nodes start at face_nodes[j].
+    const uint32_t nbase = face_nodes[(size_t)input_of[(size_t)i0]];
     size_t         at    = use_at[(size_t)i0];
     for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
       for (TopoDS_Iterator ei(wi.Value()); ei.More(); ei.Next())
       {
-        const uint32_t count = out.use_nodes[at];
+        const uint32_t count = use_nodes[at];
         const int      k     = edges.FindIndex(ei.Value());
         if (k > 0 && polys[(size_t)k - 1].empty())
         {
@@ -260,8 +279,8 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
           poly.reserve(count);
           for (uint32_t c = 0; c < count; ++c)
           {
-            const uint32_t node = nbase + out.use_nodes[at + 1 + c];
-            gp_Pnt         p(out.nodes[3 * node], out.nodes[3 * node + 1], out.nodes[3 * node + 2]);
+            const uint32_t node = nbase + use_nodes[at + 1 + c];
+            gp_Pnt         p(nodes[3 * node], nodes[3 * node + 1], nodes[3 * node + 2]);
             if (moved)
               p.Transform(to);
             poly.push_back({(float)p.X(), (float)p.Y(), (float)p.Z()});

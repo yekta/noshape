@@ -192,6 +192,13 @@ N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes
      Left (kernel profile): core's shape maps 21–24, reading OCCT's geometry 16–18, our mesher 14–25, building the
      triangulations 7–9, edge polylines 5–8. After the fin (core's cache serves most): 134–153 → ~133 ms (the cache's
      own cost, not meshing). live-30-features edit commit: 99–115 ms either way (no display re-mesh in it).
+     Step 2c (10-29): core's maps referenced, not copied (OcMesh), edge → faces from the shape's cached ancestors;
+     slices across the bridge; edge nodes made once per body; the mesh test thread's off switch checked before
+     the input is built. Bench (kernel `rust_mesh::bench_fin_plate_display_mesh`, release, load 27–30, thread CPU
+     time): ours 77–85 ms against BRepMesh 243–255 ms (3–3.3×; wall 3.2–3.9×). perf: our Rust meshing (CDT,
+     loops, strips) ~13 ms of it; the rest is the C++ around it, ~10 ms each: reading OCCT geometry, building
+     Poly_Triangulations, core's edge loop, mesh_fill, the bounding box. Next for ≥10×: our faces written straight
+     into the Tessellation (no Poly_Triangulation / mesh_fill round trip), geometry from the Rust Boolean's bodies.
 0. **After the cold-start work: our own display mesher (lead 10-28 21:05, user-approved).** `brep::mesh` in crates/brep
    (bool's crate, its Body / Surface / Curve types): planes (polygons with holes), cylinders, cones, spheres, tori from
    their exact parameterisation, shared edge samples (watertight), the display's deflection rules; anything else

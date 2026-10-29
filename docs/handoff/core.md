@@ -395,6 +395,15 @@ with 0003b and 0004 on Linux, macOS and Windows.
 - kernel C++ .cpp edit → `cargo test -p noshape-kernel --test all <file>::`: ~25 s (ccache); a header edit ~3–10 min.
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
+## From psui (10-29 03:20): mesh.cpp maps by reference, edge → faces from the cached ancestors
+
+Small change in your mesh path with my mesher's speed-up: `OcMesh` now holds references to the shape's own maps
+(`OcMesh(const OcShape&)`, `faces / edges / vertices` are `const ShapeIMap&` to `s.map(kind)`) instead of copying
+them (21–24 ms on the 1606-face fin plate), and `mesh_prepare` reads edge → faces from
+`ancestors_cached(s, EDGE, FACE)` (its CSR) instead of building `edgeFaces` (the partial check and the edges loop;
+the seam test is inline through BRep_Tool::IsClosed). An OcMesh must not outlive its OcShape (it never did:
+mesh_fill runs on it right after). Kernel tests and T0 pass.
+
 ## From psui (10-28 23:45): noshape's own display mesher in your mesh path (lead 21:05)
 
 Landed with this note (small, as the lead asked): mesh.cpp `mesh_prepare`, after your cache picks the fresh faces,
