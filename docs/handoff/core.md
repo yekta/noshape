@@ -16,7 +16,7 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   between planar faces against the faces' parallel edges only. T1 `kernel_robustness::oversize_fillets_like_onshape`
   (live's 11 answers on the 40 x 20 x 10 block). Open: the chamfer half (live's answers not in yet: qa's 10.5 / 15 /
   30 mm chamfers on the two vertical edges are Ok here) and "all 12 edges R6 fails" in live (vertex blends).
-- SHELL-SLOW: Shell's regions path takes convex cones (a chamfer round the top over filleted corners: 2.3 s in slabs
+- de4d9d6b SHELL-SLOW: Shell's regions path takes convex cones (a chamfer round the top over filleted corners: 2.3 s in slabs
   → 0.2 s, same volumes, one offset face per face where slabs split the inner cones; T1
   `shell::shell_over_chamfered_fillet_corners_by_regions`). Not yet for parts that also have holes, wf-block among
   them (its top face 2.9–4.1 s here in slabs, 0.48 s by regions with 5045.963 vs 5045.965 mm³): **open finding**, on
