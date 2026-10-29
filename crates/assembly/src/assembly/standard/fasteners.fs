@@ -2774,7 +2774,10 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
  * underside. Form 6 (HFLH™ hard panel studs, st = the sheet thickness): a
  * head td thick, its top edge rounded 0.2 td, a collar st / 2 under it with
  * its outer edge rounded st / 2, cut by 8 slots td wide from 1.15 p / 2 out;
- * the groove as form 5 with its bottom rounded 0.025 p.
+ * the groove as form 5 with its bottom rounded 0.025 p. Forms 7 (HFH™,
+ * HF109™, HFG8™ heavy-duty studs) and 8 (HFE™ / THFE™): as form 6 with a
+ * 45° collar, the head cut to 8 flats (chords hd / 4) facing the slots, the
+ * slots td (form 8: hd / 8) wide.
  */
 annotation { "Feature Type Name" : "PEM pin" }
 export const pemPin = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2831,7 +2834,7 @@ export const pemPin = defineFeature(function(context is Context, id is Id, defin
             lowDisplacementStud(context, id, definition);
             return;
         }
-        if (definition.form == 5 || definition.form == 6)
+        if (definition.form >= 5 && definition.form <= 8)
         {
             nonFlushStud(context, id, definition);
             return;
@@ -2980,7 +2983,7 @@ function lowDisplacementStud(context is Context, id is Id, definition is map)
     opDeleteBodies(context, id + "deleteThreadPlane", { "entities" : qCreatedBy(id + "threadPlane", EntityType.BODY) });
 }
 
-/** pemPin forms 5 (TFH™ non-flush studs) and 6 (HFLH™ hard panel studs). */
+/** pemPin forms 5 (TFH™ non-flush studs), 6 (HFLH™ hard panel studs), 7 and 8 (heavy-duty studs). */
 function nonFlushStud(context is Context, id is Id, definition is map)
 {
     const p = definition.p;
@@ -2988,7 +2991,8 @@ function nonFlushStud(context is Context, id is Id, definition is map)
     const ts = definition.sd + t;
     const R = definition.hd / 2;
     const r1 = p / 2;
-    const hard = definition.form == 6;
+    const heavy = definition.form == 7 || definition.form == 8;
+    const hard = definition.form == 6 || heavy;
     const rc = hard ? R - definition.st / 2 : 1.05 * (definition.hd + p) / 4;
     const zb = -t - (R - rc);
     const zl = -t - definition.l;
@@ -3002,9 +3006,11 @@ function nonFlushStud(context is Context, id is Id, definition is map)
     const s45 = sqrt(0.5);
     const f = 0.2 * t;
     const gr = 0.025 * p;
-    const top = hard ? [{ "p" : rz(Z, Z) }, { "p" : rz(R - f, Z) }, { "p" : rz(R, -f), "mid" : rz(R - f + f * s45, -f + f * s45) }, { "p" : rz(R, -t) },
+    const top = heavy ? [{ "p" : rz(Z, Z) }, { "p" : rz(R - f, Z) }, { "p" : rz(R, -f), "mid" : rz(R - f + f * s45, -f + f * s45) }, { "p" : rz(R, -t) },
+                { "p" : rz(rc, zb) }] :
+        (hard ? [{ "p" : rz(Z, Z) }, { "p" : rz(R - f, Z) }, { "p" : rz(R, -f), "mid" : rz(R - f + f * s45, -f + f * s45) }, { "p" : rz(R, -t) },
                 { "p" : rz(rc, zb), "mid" : rz(rc + (R - rc) * s45, -t - (R - rc) * s45) }] :
-        [{ "p" : rz(Z, -rt) }, { "p" : rz(rt, Z) }, { "p" : rz(R, Z) }, { "p" : rz(R, -t) }, { "p" : rz(rc, zb) }];
+        [{ "p" : rz(Z, -rt) }, { "p" : rz(rt, Z) }, { "p" : rz(R, Z) }, { "p" : rz(R, -t) }, { "p" : rz(rc, zb) }]);
     const groove = hard ? [{ "p" : rz(r1 - dep, zc + ig) }, { "p" : rz(r1 - dep, zc - ig), "mid" : rz(r1 - dep - gr + gr * cos(30 * degree), zc) }] :
         [{ "p" : rz(r1 - dep, zc + ig) }, { "p" : rz(r1 - dep, zc - ig) }];
     revolveProfile(context, id + "body", concatenateArrays([top, [{ "p" : rz(r1, zb) }, { "p" : rz(r1, zc + hw) }], groove, [
@@ -3015,7 +3021,7 @@ function nonFlushStud(context is Context, id is Id, definition is map)
     // 1.15 p / 2) out past the rim.
     var under = XY_PLANE;
     under.origin[2] = zb;
-    const w = t / 2;
+    const w = definition.form == 8 ? definition.hd / 16 : t / 2;
     const ri = hard ? 1.15 * p / 2 : (definition.hd + p) / 4;
     const far = R + t;
     const sk = newSketchOnPlane(context, id + "slotSketch", { "sketchPlane" : under });
@@ -3035,6 +3041,13 @@ function nonFlushStud(context is Context, id is Id, definition is map)
     opExtrude(context, id + "slots", { "entities" : qSketchRegion(id + "slotSketch"), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : -t - zb });
     opDeleteBodies(context, id + "deleteSlotSketch", { "entities" : qCreatedBy(id + "slotSketch", EntityType.BODY) });
     subtract(context, id + "cut", qCreatedBy(id + "body", EntityType.BODY), qCreatedBy(id + "slots", EntityType.BODY));
+    if (heavy)
+    {
+        // The 8 flats: chords hd / 4 long, down through the head into the
+        // collar.
+        const flats = prismZ(context, id + "flats", zl - t, -zl + 2 * t, polygonPoints(8, 2 * sqrt(R * R - definition.hd * definition.hd / 64), 0));
+        intersect(context, id + "flatCut", qCreatedBy(id + "body", EntityType.BODY), flats);
+    }
     opPlane(context, id + "threadPlane", { "plane" : plane(vector(Z, Z, -ts), vector(0, 0, 1)), "width" : 4 * R, "height" : 4 * R });
     try silent
     {

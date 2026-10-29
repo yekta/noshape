@@ -1986,6 +1986,349 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_HARD_PANEL_STUD_MAIN, DATA_PEM_SELFCLINCHING_HARD_PANEL_STUD_LENGTH (component document b84f3bd04a5a8599e382cbd8; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching studs",
+    "name": "HF109­­™ Heavy-duty, high tensile strength studs",
+    "shape": "pemPin",
+    "form": {
+     "form": 7
+    },
+    "materials": [
+     "Steel"
+    ],
+    "materialCodes": {
+     "Steel": {
+      "code": "HF109",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "M5x0.80",
+      "label": "PEM {type}-M5-{l}",
+      "d": 5.0,
+      "dims": {
+       "hd": 10.3,
+       "p": 5.0,
+       "sd": 2.6,
+       "pt": 0.8,
+       "td": 2.06,
+       "st": 1.0,
+       "dd": 5.0,
+       "hs": 5.0
+      },
+      "lengths": [
+       "15",
+       "20",
+       "25"
+      ]
+     },
+     {
+      "name": "M6x1.00",
+      "label": "PEM {type}-M6-{l}",
+      "d": 6.0,
+      "dims": {
+       "hd": 12.1,
+       "p": 6.0,
+       "sd": 2.7,
+       "pt": 1.0,
+       "td": 2.29,
+       "st": 1.0,
+       "dd": 6.0,
+       "hs": 6.0
+      },
+      "lengths": [
+       "15",
+       "20",
+       "25"
+      ]
+     },
+     {
+      "name": "M8x1.25",
+      "label": "PEM {type}-M8-{l}",
+      "d": 8.0,
+      "dims": {
+       "hd": 16.6,
+       "p": 8.0,
+       "sd": 3.4,
+       "pt": 1.25,
+       "td": 3.25,
+       "st": 1.5,
+       "dd": 8.0,
+       "hs": 8.0
+      },
+      "lengths": [
+       "20",
+       "25"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_HEAVY_DUTY_HIGH_TENSILE_STRENGTH_STUD_MAIN, DATA_PEM_SELFCLINCHING_HEAVY_DUTY_HIGH_TENSILE_STRENGTH_STUD_LENGTH (component document caeca6c17974862dc8a387f0; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching studs",
+    "name": "HFH™/HFHS™/HFHB™ Heavy-duty studs",
+    "shape": "pemPin",
+    "form": {
+     "form": 7
+    },
+    "materials": [
+     "Stainless Steel",
+     "Steel",
+     "Phosphor Bronze 510"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "HFHS",
+      "finish": "Passivated",
+      "finishCode": ""
+     },
+     "Steel": {
+      "code": "HFH",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     },
+     "Phosphor Bronze 510": {
+      "code": "HFHB",
+      "finish": "No finish",
+      "finishCode": "X"
+     }
+    },
+    "sizes": [
+     {
+      "name": "M5x0.80",
+      "label": "PEM {type}-M5-{l}",
+      "d": 5.0,
+      "dims": {
+       "hd": 7.8,
+       "p": 5.0,
+       "sd": 2.7,
+       "pt": 0.8,
+       "td": 1.14,
+       "st": 1.3,
+       "dd": 5.0,
+       "hs": 5.0
+      },
+      "lengths": [
+       "15",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "50"
+      ]
+     },
+     {
+      "name": "M6x1.00",
+      "label": "PEM {type}-M6-{l}",
+      "d": 6.0,
+      "dims": {
+       "hd": 9.4,
+       "p": 6.0,
+       "sd": 2.8,
+       "pt": 1.0,
+       "td": 1.27,
+       "st": 1.5,
+       "dd": 6.0,
+       "hs": 6.0
+      },
+      "lengths": [
+       "15",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "50"
+      ]
+     },
+     {
+      "name": "M8x1.25",
+      "label": "PEM {type}-M8-{l}",
+      "d": 8.0,
+      "dims": {
+       "hd": 12.5,
+       "p": 8.0,
+       "sd": 3.5,
+       "pt": 1.25,
+       "td": 1.78,
+       "st": 2.0,
+       "dd": 8.0,
+       "hs": 8.0
+      },
+      "lengths": [
+       "15",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "50"
+      ]
+     },
+     {
+      "name": "M10x1.5",
+      "label": "PEM {type}-M10-{l}",
+      "d": 10.0,
+      "dims": {
+       "hd": 15.7,
+       "p": 10.0,
+       "sd": 4.1,
+       "pt": 1.5,
+       "td": 2.29,
+       "st": 2.3,
+       "dd": 10.0,
+       "hs": 10.0
+      },
+      "lengths": [
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "50"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_HEAVY_DUTY_STUD_MAIN, DATA_PEM_SELFCLINCHING_HEAVY_DUTY_STUD_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 11bf9c80642607b47b789445; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching studs",
+    "name": "HFE™/THFE™ Heavy-duty studs for thin sheets",
+    "shape": "pemPin",
+    "form": {
+     "form": 8
+    },
+    "materials": [
+     "Steel"
+    ],
+    "materialCodes": {
+     "Steel": {
+      "code": "HFE",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "M5x0.80",
+      "label": "PEM {Type}-M5-{l}",
+      "d": 5.0,
+      "dims": {
+       "hd": 9.6,
+       "p": 5.0,
+       "sd": 2.6,
+       "pt": 0.8,
+       "td": 1.35,
+       "st": 1.0,
+       "dd": 5.0,
+       "hs": 5.0,
+       "sd@Type=THFE": 2.6,
+       "td@Type=THFE": 1.35,
+       "st@Type=THFE": 1.0
+      },
+      "lengths": [
+       "15",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "50"
+      ],
+      "values": {
+       "Type": [
+        "HFE"
+       ]
+      }
+     },
+     {
+      "name": "M6x1.00",
+      "label": "PEM {Type}-M6-{l}",
+      "d": 6.0,
+      "dims": {
+       "hd": 11.35,
+       "p": 6.0,
+       "sd": 2.8,
+       "pt": 1.0,
+       "td": 1.52,
+       "st": 1.0,
+       "dd": 6.0,
+       "hs": 6.0,
+       "sd@Type=THFE": 2.62,
+       "td@Type=THFE": 1.7,
+       "st@Type=THFE": 0.8
+      },
+      "lengths": [
+       "15",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "50"
+      ],
+      "values": {
+       "Type": [
+        "HFE",
+        "THFE"
+       ]
+      }
+     },
+     {
+      "name": "M8x1.25",
+      "label": "PEM {Type}-M8-{l}",
+      "d": 8.0,
+      "dims": {
+       "hd": 15.3,
+       "p": 8.0,
+       "sd": 3.3,
+       "pt": 1.25,
+       "td": 2.13,
+       "st": 1.5,
+       "dd": 8.0,
+       "hs": 8.0,
+       "sd@Type=THFE": 2.9,
+       "td@Type=THFE": 2.54,
+       "st@Type=THFE": 0.8
+      },
+      "lengths": [
+       "15",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "50"
+      ],
+      "values": {
+       "Type": [
+        "HFE",
+        "THFE"
+       ]
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_HEAVY_DUTY_STUD_MAIN, DATA_PEM_SELFCLINCHING_HEAVY_DUTY_STUD_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 8f45e742b386878a9266bf98; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)",
+    "params": [
+     {
+      "label": "Type",
+      "options": [
+       "HFE",
+       "THFE"
+      ],
+      "default": "HFE"
+     }
+    ]
    }
   ]
  },
@@ -5307,6 +5650,425 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_HARD_PANEL_STUD_MAIN, DATA_PEM_SELFCLINCHING_HARD_PANEL_STUD_LENGTH (component document 33444e488ca4189f2d6fe442; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching studs",
+    "name": "HFG8­­™ Heavy-duty, high tensile strength studs",
+    "shape": "pemPin",
+    "form": {
+     "form": 7
+    },
+    "materials": [
+     "Steel"
+    ],
+    "materialCodes": {
+     "Steel": {
+      "code": "HFG8",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "#10-32",
+      "label": "PEM {type}-032-{l}",
+      "d": 0.19,
+      "dims": {
+       "hd": 0.391,
+       "p": 0.19,
+       "sd": 0.105,
+       "pt": 0.03125,
+       "td": 0.077,
+       "st": 0.04,
+       "dd": 0.19,
+       "hs": 0.19
+      },
+      "lengths": [
+       "0.5",
+       "0.75",
+       "1"
+      ],
+      "lengthNames": {
+       "0.5": "8",
+       "0.75": "12",
+       "1": "16"
+      }
+     },
+     {
+      "name": "1/4-20",
+      "label": "PEM {type}-0420-{l}",
+      "d": 0.25,
+      "dims": {
+       "hd": 0.507,
+       "p": 0.25,
+       "sd": 0.125,
+       "pt": 0.05,
+       "td": 0.09,
+       "st": 0.04,
+       "dd": 0.25,
+       "hs": 0.25
+      },
+      "lengths": [
+       "0.5",
+       "0.75",
+       "1"
+      ],
+      "lengthNames": {
+       "0.5": "8",
+       "0.75": "12",
+       "1": "16"
+      }
+     },
+     {
+      "name": "5/16-18",
+      "label": "PEM {type}-0518-{l}",
+      "d": 0.313,
+      "dims": {
+       "hd": 0.645,
+       "p": 0.313,
+       "sd": 0.14,
+       "pt": 0.05555,
+       "td": 0.126,
+       "st": 0.06,
+       "dd": 0.313,
+       "hs": 0.313
+      },
+      "lengths": [
+       "0.75",
+       "1"
+      ],
+      "lengthNames": {
+       "0.75": "12",
+       "1": "16"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_HEAVY_DUTY_HIGH_TENSILE_STRENGTH_STUD_MAIN, DATA_PEM_SELFCLINCHING_HEAVY_DUTY_HIGH_TENSILE_STRENGTH_STUD_LENGTH (component document 0a5ac0c5084cb14f9abc8cc4; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching studs",
+    "name": "HFH™/HFHS™/HFHB™ Heavy-duty studs",
+    "shape": "pemPin",
+    "form": {
+     "form": 7
+    },
+    "materials": [
+     "Stainless Steel",
+     "Steel",
+     "Phosphor Bronze 510"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "HFHS",
+      "finish": "Passivated",
+      "finishCode": ""
+     },
+     "Steel": {
+      "code": "HFH",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     },
+     "Phosphor Bronze 510": {
+      "code": "HFHB",
+      "finish": "No finish",
+      "finishCode": "X"
+     }
+    },
+    "sizes": [
+     {
+      "name": "#10-32",
+      "label": "PEM {type}-032-{l}",
+      "d": 0.19,
+      "dims": {
+       "hd": 0.3,
+       "p": 0.19,
+       "sd": 0.105,
+       "pt": 0.03125,
+       "td": 0.04,
+       "st": 0.05,
+       "dd": 0.19,
+       "hs": 0.19
+      },
+      "lengths": [
+       "0.5",
+       "0.75",
+       "1",
+       "1.25",
+       "1.5",
+       "1.75",
+       "2"
+      ],
+      "lengthNames": {
+       "0.5": "8",
+       "0.75": "12",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24",
+       "1.75": "28",
+       "2": "32"
+      }
+     },
+     {
+      "name": "1/4-20",
+      "label": "PEM {type}-0420-{l}",
+      "d": 0.25,
+      "dims": {
+       "hd": 0.38,
+       "p": 0.25,
+       "sd": 0.125,
+       "pt": 0.05,
+       "td": 0.05,
+       "st": 0.06,
+       "dd": 0.25,
+       "hs": 0.25
+      },
+      "lengths": [
+       "0.5",
+       "0.75",
+       "1",
+       "1.25",
+       "1.5",
+       "1.75",
+       "2"
+      ],
+      "lengthNames": {
+       "0.5": "8",
+       "0.75": "12",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24",
+       "1.75": "28",
+       "2": "32"
+      }
+     },
+     {
+      "name": "5/16-18",
+      "label": "PEM {type}-0518-{l}",
+      "d": 0.313,
+      "dims": {
+       "hd": 0.48,
+       "p": 0.313,
+       "sd": 0.14,
+       "pt": 0.05555,
+       "td": 0.07,
+       "st": 0.075,
+       "dd": 0.313,
+       "hs": 0.313
+      },
+      "lengths": [
+       "0.5",
+       "0.75",
+       "1",
+       "1.25",
+       "1.5",
+       "1.75",
+       "2"
+      ],
+      "lengthNames": {
+       "0.5": "8",
+       "0.75": "12",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24",
+       "1.75": "28",
+       "2": "32"
+      }
+     },
+     {
+      "name": "3/8-16",
+      "label": "PEM {type}-0616-{l}",
+      "d": 0.375,
+      "dims": {
+       "hd": 0.58,
+       "p": 0.375,
+       "sd": 0.155,
+       "pt": 0.0625,
+       "td": 0.085,
+       "st": 0.09,
+       "dd": 0.375,
+       "hs": 0.375
+      },
+      "lengths": [
+       "0.75",
+       "1",
+       "1.25",
+       "1.5",
+       "1.75",
+       "2"
+      ],
+      "lengthNames": {
+       "0.75": "12",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24",
+       "1.75": "28",
+       "2": "32"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_HEAVY_DUTY_STUD_MAIN, DATA_PEM_SELFCLINCHING_HEAVY_DUTY_STUD_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 0dbf3bf85f0e81e586161aa0; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching studs",
+    "name": "HFE™/THFE™ Heavy-duty studs for thin sheets",
+    "shape": "pemPin",
+    "form": {
+     "form": 8
+    },
+    "materials": [
+     "Steel"
+    ],
+    "materialCodes": {
+     "Steel": {
+      "code": "HFE",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "#10-32",
+      "label": "PEM {Type}-032-{l}",
+      "d": 0.19,
+      "dims": {
+       "hd": 0.357,
+       "p": 0.19,
+       "sd": 0.102,
+       "pt": 0.03125,
+       "td": 0.048,
+       "st": 0.04,
+       "dd": 0.19,
+       "hs": 0.19,
+       "sd@Type=THFE": 0.102,
+       "td@Type=THFE": 0.048,
+       "st@Type=THFE": 0.04
+      },
+      "lengths": [
+       "0.5",
+       "0.75",
+       "1",
+       "1.25",
+       "1.5",
+       "1.75",
+       "2"
+      ],
+      "lengthNames": {
+       "0.5": "8",
+       "0.75": "12",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24",
+       "1.75": "28",
+       "2": "32"
+      },
+      "values": {
+       "Type": [
+        "HFE"
+       ]
+      }
+     },
+     {
+      "name": "1/4-20",
+      "label": "PEM {Type}-0420-{l}",
+      "d": 0.25,
+      "dims": {
+       "hd": 0.462,
+       "p": 0.25,
+       "sd": 0.118,
+       "pt": 0.05,
+       "td": 0.06,
+       "st": 0.04,
+       "dd": 0.25,
+       "hs": 0.25,
+       "sd@Type=THFE": 0.109,
+       "td@Type=THFE": 0.069,
+       "st@Type=THFE": 0.031
+      },
+      "lengths": [
+       "0.5",
+       "0.75",
+       "1",
+       "1.25",
+       "1.5",
+       "1.75",
+       "2"
+      ],
+      "lengthNames": {
+       "0.5": "8",
+       "0.75": "12",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24",
+       "1.75": "28",
+       "2": "32"
+      },
+      "values": {
+       "Type": [
+        "HFE",
+        "THFE"
+       ]
+      }
+     },
+     {
+      "name": "5/16-18",
+      "label": "PEM {Type}-0518-{l}",
+      "d": 0.313,
+      "dims": {
+       "hd": 0.586,
+       "p": 0.313,
+       "sd": 0.133,
+       "pt": 0.05555,
+       "td": 0.083,
+       "st": 0.06,
+       "dd": 0.313,
+       "hs": 0.313,
+       "sd@Type=THFE": 0.117,
+       "td@Type=THFE": 0.099,
+       "st@Type=THFE": 0.031
+      },
+      "lengths": [
+       "0.5",
+       "0.75",
+       "1",
+       "1.25",
+       "1.5",
+       "1.75",
+       "2"
+      ],
+      "lengthNames": {
+       "0.5": "8",
+       "0.75": "12",
+       "1": "16",
+       "1.25": "20",
+       "1.5": "24",
+       "1.75": "28",
+       "2": "32"
+      },
+      "values": {
+       "Type": [
+        "HFE",
+        "THFE"
+       ]
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_HEAVY_DUTY_STUD_MAIN, DATA_PEM_SELFCLINCHING_HEAVY_DUTY_STUD_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 8830a72246ed0596682ae797; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)",
+    "params": [
+     {
+      "label": "Type",
+      "options": [
+       "HFE",
+       "THFE"
+      ],
+      "default": "HFE"
+     }
+    ]
    }
   ]
  }

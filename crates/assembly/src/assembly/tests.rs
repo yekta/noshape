@@ -5059,7 +5059,7 @@ fn pem_fh_pins_match_live() {
 #[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn pem_fh_pin_sizes_build() {
     use super::standard::{self, CATALOGUE, StandardSpec};
-    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™") || c.name.starts_with("FHL™") || c.name.starts_with("TFH™") || c.name.starts_with("HFLH™")) {
+    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™") || c.name.starts_with("FHL™") || c.name.starts_with("TFH™") || c.name.starts_with("HFLH™") || c.name.starts_with("HF")) {
         for s in &c.sizes {
             for l in [s.lengths.first().unwrap(), s.lengths.last().unwrap()] {
                 let mut spec = StandardSpec::new(c);
@@ -5229,6 +5229,58 @@ fn pem_hflh_studs_match_live() {
         .map(|f| f.bounding_box(true).unwrap().max.z * 1e3)
         .collect();
     assert!(tops.iter().any(|z| (z - (-3.95)).abs() < 1e-3), "cylinder tops {tops:?}");
+}
+
+/// PEM® heavy-duty studs HFH™ / HFHS™ / HFHB™, HF109™, HFG8™, HFE™ / THFE™
+/// (live's raw /features and body details): names by material ("PEM
+/// HFHS-M5-15", "PEM HFH-M5-15 ZI", "PEM HFHB-M5-15 X"), one material for
+/// HF109 / HFG8, HFE's Type select (THFE from M6, its own T_DIM); M5 x 15 =
+/// live's studio default, 68 faces (PLANE 35, CYLINDER 19, CONE 12, TORUS 2).
+#[test]
+fn pem_heavy_duty_studs_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let find = |name: &str, inch: bool| CATALOGUE.iter().find(|c| c.name.starts_with(name) && c.inch == inch).unwrap();
+    let hfh = find("HFH™", false);
+    let mut spec = StandardSpec::new(hfh);
+    assert_eq!(spec.part_name(), "PEM HFHS-M5-15");
+    spec.material = Some("Steel".into());
+    assert_eq!(spec.part_name(), "PEM HFH-M5-15 ZI");
+    spec.material = Some("Phosphor Bronze 510".into());
+    assert_eq!(spec.part_name(), "PEM HFHB-M5-15 X");
+    assert_eq!(StandardSpec::new(find("HFH™", true)).part_name(), "PEM HFHS-032-8");
+    assert_eq!(StandardSpec::new(find("HF109", false)).part_name(), "PEM HF109-M5-15 ZI");
+    assert_eq!(StandardSpec::new(find("HFG8", true)).part_name(), "PEM HFG8-032-8 ZI");
+    let hfe = find("HFE™", false);
+    let mut spec = StandardSpec::new(hfe);
+    assert_eq!(spec.description(), "PEM HFE-M5-15  ZI Steel Zinc plated");
+    assert_eq!(hfe.param_options(&hfe.params[0], spec.size_row()), ["HFE"]);
+    spec.set_size("M6x1.00");
+    spec.params.insert("Type".into(), "THFE".into());
+    assert_eq!(spec.part_name(), "PEM THFE-M6-15 ZI");
+    for (c, z) in [(hfh, -3.84), (find("HF109", false), -4.66), (hfe, -3.95)] {
+        let r = standard::regenerate(&StandardSpec::new(c)).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let mut kinds = std::collections::BTreeMap::new();
+        for i in 0..b.faces.len() {
+            let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+                Surface::Plane(_) => "plane",
+                Surface::Cone { .. } => "cone",
+                Surface::Cylinder { .. } => "cylinder",
+                Surface::Torus { .. } => "torus",
+                _ => "other",
+            };
+            *kinds.entry(k).or_insert(0) += 1;
+        }
+        assert_eq!(kinds, [("cone", 12), ("cylinder", 19), ("plane", 35), ("torus", 2)].into_iter().collect(), "{}", c.name);
+        // The thread start's split, from the head's underside (live's).
+        let tops: Vec<f64> = (0..b.faces.len())
+            .map(|i| b.shape.sub_shape(ShapeType::Face, i).unwrap())
+            .filter(|f| matches!(f.face_surface().unwrap(), Surface::Cylinder { .. }))
+            .map(|f| f.bounding_box(true).unwrap().max.z * 1e3)
+            .collect();
+        assert!(tops.iter().any(|t| (t - z).abs() < 1e-3), "{}: cylinder tops {tops:?}", c.name);
+    }
 }
 
 /// ANSI commercial taper pins and slotted spring pins with live's whole size

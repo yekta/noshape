@@ -173,10 +173,13 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    unthreaded / threaded, BSO, TSO, TPS, TPXS, FH pins, FH studs, FH4 ba0d267a, FHL 10f9970c (pemPin form 4: the
    slotted head and the shank built apart and united, so the shank's cylinder runs up each slot as one face as
    live's), TFH 1c68ed37 (form 5, new pemPin param td = T_DIM; steel names "PEM TFH-M3-6 ZI" as live's instance
-   names), HFLH (form 6, param st = SHEET_THICKNESS; one material without a table: pemgen build(..., fixed=(material,
+   names), HFLH 07144d0c (form 6, param st = SHEET_THICKNESS; one material without a table: pemgen build(..., fixed=(material,
    code, finish, finish code))) (Metric + Unified each; the slotted ones' size sweep is the T2
    pem_fh_pin_sizes_build). The sketches in live's /features are pre-solve: read positions from the body details
-   (TFH's thread start is from the head's underside, not the sketch's -1.8). Next: the other studs ( HFLH 53, HF109 / HFG8 / HFE / HFH 68, FHX 85, SGPC 125), DSO 97,
+   (TFH's thread start is from the head's underside, not the sketch's -1.8). Heavy-duty HFH / HF109 / HFG8 (form 7)
+   and HFE / THFE (form 8: slots hd / 8; the Type select's options per size via Size.values, THFE's own T_DIM etc.
+   as "td@Type=THFE" dims). FS `?:` is left-associative as live's: parenthesise nested ternaries. Next: FHX 85,
+   SGPC 125, DSO 97,
    SOSG 115, nuts 109–148. Not shown yet: the read-only Hole size / Recommended sheet material rows.
    Live's studio defaults sometimes differ from the table (NAS 1129 thru minor 0.067 vs 0.0667, NASM 45938/4 ax 0.0225
    vs 0.028125): check the construction at the studio values, then test ours at the table's.
