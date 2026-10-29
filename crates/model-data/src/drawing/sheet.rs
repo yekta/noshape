@@ -1281,6 +1281,8 @@ impl SheetGeometry {
                     let r = radius * env.scale(*view);
                     let dir = [angle.cos(), angle.sin()];
                     let tip = [c[0] + dir[0] * r, c[1] + dir[1] * r];
+                    // Its grip on the circle (re-attaches, live D26).
+                    self.grips.push(Grip { pick, pos: tip, kind: GripKind::Origin });
                     // The knee where the text was dropped (at least clear of the arrow).
                     let k = r + knee.unwrap_or(12.0).max(self.style.dim_arrow + 1.0);
                     let out = [c[0] + dir[0] * k, c[1] + dir[1] * k];
@@ -1339,8 +1341,14 @@ impl SheetGeometry {
                     let at = [out[0] + if left { -1.0 } else { 1.0 }, out[1] + 0.8];
                     self.dim_label(at, 0.0, if left { 1.0 } else { 0.0 }, false, &t, dh, pick);
                 }
-                AnnotationKind::AngularDimension { view, radius, flip_a, flip_b, .. } => {
+                AnnotationKind::AngularDimension { view, radius, flip_a, flip_b, three_point, .. } => {
                     let (vertex, pa, pb) = a.kind.angular_legs().expect("angular");
+                    // A 3 point angular's picked points re-attach (live D26).
+                    if *three_point {
+                        for p in [vertex, pa, pb] {
+                            self.grips.push(Grip { pick, pos: env.to_sheet(*view, p), kind: GripKind::Origin });
+                        }
+                    }
                     let v = env.to_sheet(*view, vertex);
                     let pa = env.to_sheet(*view, pa);
                     let pb = env.to_sheet(*view, pb);
@@ -1661,6 +1669,9 @@ impl SheetGeometry {
                 }
                 AnnotationKind::OrdinateDimension { view, origin, point, horizontal } => {
                     let p = env.to_sheet(*view, *point);
+                    for g in [env.to_sheet(*view, *origin), p] {
+                        self.grips.push(Grip { pick, pos: g, kind: GripKind::Origin });
+                    }
                     let rot = env.rotation(*view);
                     // Leader direction (perpendicular to the measured axis).
                     let n = rotate2(if *horizontal { [0.0, 1.0] } else { [1.0, 0.0] }, rot);
@@ -1761,6 +1772,9 @@ impl SheetGeometry {
                     self.dim_label([c[0] + (rr + 4.0) * tm.cos(), c[1] + (rr + 4.0) * tm.sin()], 0.0, 0.5, true, &t, dh, pick);
                 }
                 AnnotationKind::OrdinateGroup { view, origin, points, horizontal } => {
+                    for p in std::iter::once(origin).chain(points.iter()) {
+                        self.grips.push(Grip { pick, pos: env.to_sheet(*view, *p), kind: GripKind::Origin });
+                    }
                     let rot = env.rotation(*view);
                     // u: measured axis on the sheet; n: leader direction.
                     let u = rotate2(if *horizontal { [1.0, 0.0] } else { [0.0, 1.0] }, rot);

@@ -148,9 +148,30 @@ impl SheetPick<'_> {
         self.selection.iter().find_map(|s| {
             let Sel::Annotation(id) = s else { return None };
             let a = self.resolved_annotation(*id)?;
-            let f = self.dimension_frame(&a)?;
-            (0..2).find(|k| seg_dist(start, f.legs[*k].0, f.legs[*k].0) < tol).map(|k| (a.clone(), k))
+            self.attach_points(&a).into_iter().find(|(_, p)| len(sub(start, *p)) < tol).map(|(k, _)| (a.clone(), k))
         })
+    }
+
+    /// A selected dimension's blue grips on its referenced geometry (sheet
+    /// mm) and the reference slot each re-attaches: a linear dimension's two
+    /// ends; a radial's point on its circle; a 3 point angular's vertex and
+    /// leg points; an ordinate's base and measured points (live behaviours
+    /// D26).
+    pub fn attach_points(&self, a: &Annotation) -> Vec<(usize, [f64; 2])> {
+        if let Some(f) = self.dimension_frame(a) {
+            return vec![(0, f.legs[0].0), (1, f.legs[1].0)];
+        }
+        let Some(pl) = a.kind.view().and_then(|v| self.placement(v)) else { return Vec::new() };
+        match &a.kind {
+            AnnotationKind::RadialDimension { center, radius, angle, .. } => {
+                let (c, r) = (pl.to_sheet(*center), pl.len_to_sheet(*radius));
+                vec![(0, [c[0] + r * angle.cos(), c[1] + r * angle.sin()])]
+            }
+            AnnotationKind::AngularDimension { vertex, a: pa, b: pb, three_point: true, .. } => vec![(0, pl.to_sheet(*vertex)), (1, pl.to_sheet(*pa)), (2, pl.to_sheet(*pb))],
+            AnnotationKind::OrdinateDimension { origin, point, .. } => vec![(0, pl.to_sheet(*origin)), (1, pl.to_sheet(*point))],
+            AnnotationKind::OrdinateGroup { origin, points, .. } => std::iter::once((0, pl.to_sheet(*origin))).chain(points.iter().enumerate().map(|(i, p)| (i + 1, pl.to_sheet(*p)))).collect(),
+            _ => Vec::new(),
+        }
     }
 
     /// The dimension `orig` with end `k` re-attached to the snap point under
@@ -158,14 +179,38 @@ impl SheetPick<'_> {
     /// its grip points to another edge, point or center re-attaches that end").
     pub fn reattached(&self, orig: &Annotation, k: usize) -> Annotation {
         let mut a = orig.clone();
+        // A radial onto another circle: its center and radius.
+        if let AnnotationKind::RadialDimension { view, center, radius, .. } = &mut a.kind {
+            if let Some(super::Pick::Circle { view: v, center: c, radius: r, r: rf }) = self.circle_pick(self.cursor)
+                && v == *view
+            {
+                (*center, *radius) = (c, r);
+                a.refs.retain(|x| x.slot != 0);
+                if let Some(point) = rf {
+                    a.refs.push(noshape_model::drawing::AnnotationRef { slot: 0, point });
+                }
+            }
+            return a;
+        }
         // Midpoints and quadrants too (help D22: available when editing a
         // placed dimension).
         let Some(sp) = self.snap_at_with(self.cursor, true) else { return a };
-        if let AnnotationKind::LinearDimension { view, a: pa, b: pb, .. } = &mut a.kind {
-            if sp.view != *view {
-                return a;
-            }
-            *(if k == 0 { pa } else { pb }) = sp.p;
+        if a.kind.view() != Some(sp.view) {
+            return a;
+        }
+        let target = match &mut a.kind {
+            AnnotationKind::LinearDimension { a: pa, b: pb, .. } => Some(if k == 0 { pa } else { pb }),
+            AnnotationKind::AngularDimension { vertex, a: pa, b: pb, three_point: true, .. } => Some(match k {
+                0 => vertex,
+                1 => pa,
+                _ => pb,
+            }),
+            AnnotationKind::OrdinateDimension { origin, point, .. } => Some(if k == 0 { origin } else { point }),
+            AnnotationKind::OrdinateGroup { origin, points, .. } => if k == 0 { Some(origin) } else { points.get_mut(k - 1) },
+            _ => None,
+        };
+        if let Some(t) = target {
+            *t = sp.p;
             a.refs.retain(|r| r.slot != k as u8);
             if let Some(point) = sp.r {
                 a.refs.push(noshape_model::drawing::AnnotationRef { slot: k as u8, point });
