@@ -69,6 +69,10 @@
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
+#include <Geom2dAdaptor_Curve.hxx>
+#include <Geom_Line.hxx>
+#include <Geom2d_Curve.hxx>
+#include <gp_Lin2d.hxx>
 #include <BRepTools.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <BRep_Tool.hxx>
@@ -1370,6 +1374,141 @@ TopoDS_Shape blend_sector(const TopoDS_Face& f)
   return r;
 }
 
+TopoDS_Face polygon_face(const std::vector<gp_Pnt>& pts);
+
+// The slab of a cylinder or cone face bounded by two of its parallels and two
+// of its rulings (closed faces are split first; a cone's may end at its apex),
+// exact: its section in the plane of the first ruling (a parallelogram: the
+// normal is the same along a ruling) revolved about the axis. OCCT's simple
+// offset makes a cone's walls along the parallels B-spline surfaces and a
+// cylinder's edges B-spline curves, and the slabs' fuse took seconds on them
+// (Shell on a chamfered part: 5–13 s). Null when the face is anything else.
+TopoDS_Shape revolved_slab(const TopoDS_Face& f, double d)
+{
+  BRepAdaptor_Surface s(f);
+  if (s.GetType() != GeomAbs_Cone && s.GetType() != GeomAbs_Cylinder)
+    return TopoDS_Shape();
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  if (!(u1 - u0 > 1e-6) || !(u1 - u0 < 2 * M_PI - 1e-6) || !(v1 - v0 > 1e-9))
+    return TopoDS_Shape();
+  int wires = 0;
+  for (TopExp_Explorer w(f, TopAbs_WIRE); w.More(); w.Next())
+    ++wires;
+  if (wires != 1)
+    return TopoDS_Shape();
+  const double tu = 1e-9 * (1 + std::abs(u0) + std::abs(u1)), tv = 1e-9 * (1 + std::abs(v0) + std::abs(v1));
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+    double                     a, b;
+    const Handle(Geom2d_Curve) c = BRep_Tool::CurveOnSurface(e, f, a, b);
+    if (c.IsNull())
+      return TopoDS_Shape();
+    Geom2dAdaptor_Curve ac(c, a, b);
+    if (ac.GetType() != GeomAbs_Line)
+      return TopoDS_Shape();
+    const gp_Lin2d l = ac.Line();
+    if (std::abs(l.Direction().Y()) < 1e-12)
+    {
+      const double v = l.Location().Y();
+      if (std::abs(v - v0) > tv && std::abs(v - v1) > tv)
+        return TopoDS_Shape();
+    }
+    else if (std::abs(l.Direction().X()) < 1e-12)
+    {
+      const double u = l.Location().X();
+      if (std::abs(u - u0) > tu && std::abs(u - u1) > tu)
+        return TopoDS_Shape();
+    }
+    else
+      return TopoDS_Shape();
+  }
+  gp_Pnt pm;
+  gp_Vec du, dv;
+  s.D1(u0, (v0 + v1) / 2, pm, du, dv);
+  gp_Vec n = du.Crossed(dv);
+  if (n.Magnitude() < 1e-12)
+    return TopoDS_Shape();
+  n.Normalize();
+  if (f.Orientation() == TopAbs_REVERSED)
+    n.Reverse();
+  const gp_Pnt pa = s.Value(u0, v0), pb = s.Value(u0, v1);
+  const gp_Ax3 ax3 = s.GetType() == GeomAbs_Cone ? s.Cone().Position() : s.Cylinder().Position();
+  const gp_Ax1 axis(ax3.Location(), ax3.Direct() ? ax3.Direction() : ax3.Direction().Reversed());
+  // The section stays on one side of the axis (a cone's apex on it).
+  const gp_Lin al(axis);
+  auto         radial_of = [&](const gp_Pnt& p) { return gp_Vec(ElCLib::Value(ElCLib::Parameter(al, p), al), p); };
+  gp_Vec       radial = radial_of(pa).Magnitude() > radial_of(pb).Magnitude() ? radial_of(pa) : radial_of(pb);
+  if (radial.Magnitude() < 1e-7)
+    return TopoDS_Shape();
+  radial.Normalize();
+  const std::vector<gp_Pnt> quad = {pa, pb, pb.Translated(n * d), pa.Translated(n * d)};
+  int                       on_axis = 0;
+  for (const gp_Pnt& q : quad)
+  {
+    const double side = gp_Vec(axis.Location(), q).Dot(radial);
+    if (side < -1e-9)
+      return TopoDS_Shape();
+    if (side <= 1e-7)
+    {
+      if (al.Distance(q) > 1e-9)
+        return TopoDS_Shape();
+      ++on_axis;
+    }
+  }
+  // Only the apex (one of the face's corners) may lie on the axis.
+  if (on_axis > 1 || (on_axis == 1 && al.Distance(pa) > 1e-9 && al.Distance(pb) > 1e-9))
+    return TopoDS_Shape();
+  const TopoDS_Face face = polygon_face(quad);
+  if (face.IsNull())
+    return TopoDS_Shape();
+  BRepPrimAPI_MakeRevol mk(face, axis, u1 - u0);
+  if (!mk.IsDone())
+    return TopoDS_Shape();
+  TopoDS_Shape r = mk.Shape();
+  if (r.ShapeType() != TopAbs_SOLID)
+    return TopoDS_Shape();
+  // Its corners on the face's are the face's to the last bit, and its straight edges run through them
+  // (rotation rounds them 1e-16 off: OCCT then grows tolerances where they meet other slabs' edges, and
+  // the Rust Boolean declines such meetings).
+  std::vector<gp_Pnt> corners;
+  for (TopExp_Explorer x(f, TopAbs_VERTEX); x.More(); x.Next())
+    corners.push_back(BRep_Tool::Pnt(TopoDS::Vertex(x.Current())));
+  BRep_Builder bb;
+  ShapeIMap    vs, es;
+  TopExp::MapShapes(r, TopAbs_VERTEX, vs);
+  TopExp::MapShapes(r, TopAbs_EDGE, es);
+  for (int i = 1; i <= vs.Extent(); ++i)
+  {
+    const TopoDS_Vertex& v = TopoDS::Vertex(vs(i));
+    const gp_Pnt         p = BRep_Tool::Pnt(v);
+    for (const gp_Pnt& c : corners)
+      if (p.Distance(c) < 1e-9 && p.Distance(c) > 0)
+      {
+        bb.UpdateVertex(v, c, BRep_Tool::Tolerance(v));
+        break;
+      }
+  }
+  for (int i = 1; i <= es.Extent(); ++i)
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(es(i));
+    double             a, b;
+    TopLoc_Location    loc;
+    const Handle(Geom_Curve) c = BRep_Tool::Curve(e, loc, a, b);
+    if (c.IsNull() || !loc.IsIdentity() || c->DynamicType() != STANDARD_TYPE(Geom_Line))
+      continue;
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(e, v0, v1);
+    const gp_Pnt p0 = BRep_Tool::Pnt(v0), p1 = BRep_Tool::Pnt(v1);
+    if (v0.Orientation() != TopAbs_FORWARD || p0.Distance(p1) < 1e-9 || std::abs(p0.Distance(p1) - (b - a)) > 1e-9)
+      continue;
+    const gp_Dir dir(gp_Vec(p0, p1));
+    bb.UpdateEdge(e, new Geom_Line(p0.Translated(gp_Vec(dir) * -a), dir), BRep_Tool::Tolerance(e));
+  }
+  return r;
+}
+
 TopoDS_Shape slab(const TopoDS_Face& f, double d, const TopoDS_Shape& src, SourceMap& sources)
 {
   gp_Pnt p;
@@ -1403,8 +1542,20 @@ TopoDS_Shape slab(const TopoDS_Face& f, double d, const TopoDS_Shape& src, Sourc
     // OCCT's simple offset follows the surface normal, not always the face
     // orientation: try both signs and keep the slab on the requested side.
     const gp_Pnt q = p.Translated(gp_Vec(n) * (d * 0.5));
+    if (!std::getenv("NOSHAPE_SHELL_OCCT_SLABS"))
+    {
+      r = revolved_slab(f, d);
+      if (!r.IsNull())
+      {
+        BRepClass3d_SolidClassifier cl(r, q, 1e-7);
+        if (cl.State() != TopAbs_IN || !BRepCheck_Analyzer(r).IsValid())
+          r.Nullify();
+      }
+    }
     for (double sg : {1.0, -1.0})
     {
+      if (!r.IsNull())
+        break;
       BRepOffsetAPI_MakeThickSolid mk;
       mk.MakeThickSolidBySimple(f, sg * d);
       if (!mk.IsDone())

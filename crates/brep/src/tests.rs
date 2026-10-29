@@ -459,3 +459,37 @@ fn a_hole_through_a_tilted_plate() {
     let steep = turned_about_x(&cuboid((-2.0, -2.0, -0.5), (2.0, 2.0, 0.5)), 80f64.to_radians());
     assert!(boolean(Op::Cut, &[&steep, &hole], TOL).is_err());
 }
+
+/// A cone between radius `r0` at height `z0` and `r1` at `z1` about the vertical through (cx, cy), capped.
+fn frustum(cx: f64, cy: f64, r0: f64, r1: f64, z0: f64, z1: f64) -> Body {
+    let (c0, c1) = (DVec3::new(cx, cy, z0), DVec3::new(cx, cy, z1));
+    let circ = |c: DVec3, r: f64| Curve::Circle { center: c, normal: DVec3::Z, xdir: DVec3::X, radius: r };
+    let edges = vec![Edge { v: [0, 0], curve: circ(c0, r0) }, Edge { v: [1, 1], curve: circ(c1, r1) }, Edge { v: [0, 1], curve: Curve::Line }];
+    let u = |e: u32, reversed: bool| Use { edge: e, reversed };
+    let angle = ((r1 - r0) / (z1 - z0)).atan();
+    let faces = vec![
+        Face { surface: Surface::Plane { origin: c0, normal: -DVec3::Z }, reversed: false, loops: vec![vec![u(0, true)]] },
+        Face { surface: Surface::Plane { origin: c1, normal: DVec3::Z }, reversed: false, loops: vec![vec![u(1, false)]] },
+        Face {
+            surface: Surface::Cone { origin: c0, axis: DVec3::Z, xdir: DVec3::X, radius: r0, angle },
+            reversed: false,
+            loops: vec![vec![u(0, false), u(2, false), u(1, true), u(2, true)]],
+        },
+    ];
+    Body { vertices: vec![c0 + DVec3::X * r0, c1 + DVec3::X * r1], edges, faces, solids: vec![Solid { shells: vec![vec![0, 1, 2]] }] }
+}
+
+#[test]
+fn a_cone_halved_through_its_axis() {
+    // A plane through the axis: the cone's two rulings there.
+    let cone = frustum(2.0, 2.0, 0.5, 1.0, 0.0, 1.0);
+    let half = boolean(Op::Common, &[&cone, &cuboid((0.0, 0.0, -1.0), (2.0, 4.0, 2.0))], TOL).unwrap();
+    check_used_both_ways(&half.body);
+    assert_eq!(counts(&half), (1, 4, 6, 4));
+    let rulings = half.body.edges.iter().filter(|e| e.curve == Curve::Line && (half.body.vertices[e.v[0] as usize].z - half.body.vertices[e.v[1] as usize].z).abs() > 0.5).count();
+    assert_eq!(rulings, 2);
+    // Along the axis but off it (a hyperbola): declined; clear of the cone: nothing to cut.
+    assert!(boolean(Op::Common, &[&cone, &cuboid((0.0, 0.0, -1.0), (2.2, 4.0, 2.0))], TOL).is_err());
+    let clear = boolean(Op::Cut, &[&cone, &cuboid((3.2, 0.0, -1.0), (4.0, 4.0, 2.0))], TOL).unwrap();
+    assert_eq!(counts(&clear), (1, 3, 3, 2));
+}

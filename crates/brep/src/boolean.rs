@@ -947,7 +947,32 @@ impl Ctx {
             return self.section(fp, fc, Path::Ellipse(e), ts, ts + TAU);
         }
         if slope != 0.0 {
-            return Err(Decline("a plane along a cone"));
+            // A plane along a cone's axis: through it, the two rulings in the plane (else a hyperbola).
+            let (lo, hi) = (self.faces[fc].lo, self.faces[fc].hi);
+            let corners = (0..8).map(|i| DVec3::new([lo.x, hi.x][i & 1], [lo.y, hi.y][(i >> 1) & 1], [lo.z, hi.z][i >> 2]));
+            let (smin, smax) = corners.fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), c| (a.min(n.dot(c) - d), b.max(n.dot(c) - d)));
+            if smin > GREY * tol || smax < -GREY * tol {
+                return Ok(());
+            }
+            let dd = n.dot(o) - d;
+            // Clear of the face: farther from the axis than its largest radius (its heights its vertices').
+            let hs = self.faces[fc].edges.iter().flat_map(|&(e, _)| self.edges[e].v).map(|w| (self.p(w) - o).dot(a));
+            let (h0, h1) = hs.fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), h| (lo.min(h), hi.max(h)));
+            let rmax = (r0 + slope * h0).abs().max((r0 + slope * h1).abs());
+            if dd.abs() > rmax + GREY * tol {
+                return Ok(());
+            }
+            if dd.abs() > tol {
+                return Err(Decline("a plane along a cone"));
+            }
+            let apex = o - a * (r0 / slope);
+            if boxes_meet(apex, apex, lo, hi, GREY * tol) {
+                return Err(Decline("a plane through a cone's apex"));
+            }
+            for th in circle_line(1.0, x, y, n, 0.0) {
+                self.generator(fp, fc, th)?;
+            }
+            return Ok(());
         }
         // A plane along the axis: lines along it where the plane meets the circle.
         let dd = n.dot(o) - d;
@@ -966,9 +991,9 @@ impl Ctx {
         Ok(())
     }
 
-    /// The section along cylinder face `fc`'s generator at angle `th` (in its frame), with face `f`.
+    /// The section along cylinder or cone face `fc`'s generator at angle `th` (in its frame), with face `f`.
     fn generator(&mut self, f: usize, fc: usize, th: f64) -> R<()> {
-        let Surf::Cyl { o, a, x, y, r, th0, full, .. } = self.faces[fc].s else { unreachable!() };
+        let Surf::Cyl { o, a, x, y, r, r0, k, th0, full, .. } = self.faces[fc].s else { unreachable!() };
         let off = (th - th0).rem_euclid(TAU).min((th0 - th).rem_euclid(TAU)) * r;
         if full && off <= self.tol {
             // Its seam: an edge already, which lies on `f` (its edges on the other's faces add it there).
@@ -977,13 +1002,14 @@ impl Ctx {
         if full && off <= GREY * self.tol {
             return Err(Decline("a section along a cylinder's seam"));
         }
-        let p = o + (x * th.cos() + y * th.sin()) * r;
+        let rad = x * th.cos() + y * th.sin();
+        let (p, d) = if k == 0.0 { (o + rad * r, a) } else { (o + rad * r0, (a + rad * k).normalize()) };
         let (lo, hi) = (self.faces[f].lo.max(self.faces[fc].lo), self.faces[f].hi.min(self.faces[fc].hi));
-        let (t0, t1) = box_range(p, a, lo, hi, self.tol);
+        let (t0, t1) = box_range(p, d, lo, hi, self.tol);
         if t0 >= t1 {
             return Ok(());
         }
-        self.section(f, fc, Path::Line { p, d: a }, t0, t1)
+        self.section(f, fc, Path::Line { p, d }, t0, t1)
     }
 
     /// Face `f` touches cylinder face `fc`'s surface along its generator at `th`: declines where both faces
@@ -1641,6 +1667,8 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             touched[w as usize] = true;
         }
     };
+    // Input vertices inside other arguments' edges, and those edges.
+    let mut inside_edges: HashMap<u32, Vec<usize>> = HashMap::default();
     let mut edge_inner: Vec<Vec<u32>> = Vec::with_capacity(cx.edges.len());
     let mut edge_pieces: Vec<Vec<(usize, bool)>> = Vec::with_capacity(cx.edges.len());
     for (e, &es) in edge_solid.iter().enumerate() {
@@ -1655,6 +1683,11 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         for &w in &chain {
             note(&mut touched, &cx.pool, w, cx.edges[e].arg);
         }
+        for &w in &chain[1..chain.len() - 1] {
+            if !cx.pool.inputs[w as usize].is_empty() {
+                inside_edges.entry(w).or_default().push(e);
+            }
+        }
         edge_inner.push(chain[1..chain.len() - 1].to_vec());
         let mut pieces = Vec::with_capacity(chain.len() - 1);
         for piece in cx.pieces_of(&s, &chain) {
@@ -1665,6 +1698,38 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             pieces.push((si, rev));
         }
         edge_pieces.push(pieces);
+    }
+    // An input vertex inside edges of two other arguments (coincident there: a common block): OCCT
+    // (non-destructive) replaces it for each edge, and again when the block's tolerance grows past the new
+    // vertex's, which rounding decides (4e-16 off: grows), and then its history says Deleted, not Modified.
+    // Taken only where nothing can be rounded: straight edges along an axis, exactly through it.
+    for (&w, es) in &inside_edges {
+        let mut args: Vec<u32> = es.iter().map(|&e| cx.edges[e].arg).collect();
+        args.sort_unstable();
+        args.dedup();
+        if args.len() < 2 {
+            continue;
+        }
+        // (Crossing there: Modified, as for one edge.)
+        let at = |e: usize| {
+            let mut v: Vec<usize> = edge_pieces[e].iter().map(|x| x.0).filter(|&si| sedges[si].seg.v.contains(&w)).collect();
+            v.sort_unstable();
+            v
+        };
+        let coincident = es.iter().enumerate().any(|(i, &e)| es[i + 1..].iter().any(|&g| cx.edges[g].arg != cx.edges[e].arg && at(g) == at(e)));
+        if !coincident {
+            continue;
+        }
+        let p = cx.p(w);
+        let exact = |e: usize| {
+            let [a, b] = cx.edges[e].v;
+            let (a, b) = (cx.p(a), cx.p(b));
+            let d = b - a;
+            cx.edges[e].g == Geo::Line && (p - a).cross(d) == DVec3::ZERO && [d.x, d.y, d.z].iter().filter(|&&c| c == 0.0).count() == 2
+        };
+        if !es.iter().all(|&e| exact(e)) {
+            return Err(Decline("a vertex inside coincident edges of two other arguments"));
+        }
     }
     let mut face_extra: Vec<Vec<usize>> = vec![Vec::new(); cx.faces.len()];
     for (f, extra) in face_extra.iter_mut().enumerate() {

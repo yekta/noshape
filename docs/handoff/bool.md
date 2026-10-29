@@ -343,6 +343,24 @@ bool_corpus_replay and export:: (24) pass.
 - psui: `noshape_brep::Curve` has a new variant `Ellipse` (only in a Boolean's result); `mesh::edge_nodes` returns
   None for it (its `_` arm), so such faces mesh as before.
 
+## Exact slabs for Shell, planes through a cone's axis (10-29 11:10)
+- Shell's slabs of cylinder and cone faces bounded by two parallels and two rulings (closed faces are split first;
+  a cone's may end at its apex) are built exactly (shell.cpp `revolved_slab`: the section in the plane of the first
+  ruling revolved about the axis; corners snapped to the face's own vertices, straight edges through them) instead
+  of OCCT's simple offset, whose walls along a cone's parallels are B-spline surfaces and whose cylinder edges are
+  B-spline curves (the slabs' fuse took 5–13 s on them; the Rust Boolean declined them). Anything else, or a slab
+  that fails the checks (valid, the inner point inside), goes the old way; `NOSHAPE_SHELL_OCCT_SLABS=1`: always
+  the old way. Kernel shell tests (T1): 43 s → 18 s wall; the slab fuses' recorded OCCT time 65.7 → 35.9 s, the
+  Rust path takes 50 of their 88 direct Booleans (was 42).
+- Rust Boolean: a plane through a cone's axis cuts it in its two rulings there (`generator` now does cones); a
+  plane along the axis but off it (a hyperbola) still declines, unless it is farther from the axis than the face's
+  largest radius.
+- OCCT's history for an input vertex inside coincident edges of two other arguments (a common block): replaced
+  for each edge (Modified) and, when the block's tolerance grows past the new vertex's, replaced again and said
+  Deleted (non-destructive mode). Whether it grows is rounding (a fillet's vertex 4.4e-16 off x = 0 grows it, an
+  exact box doesn't), so such vertices are taken only where nothing can be rounded (straight edges along an axis,
+  exactly through the vertex), else declined. Crossing edges (a line and a circle): Modified, as before.
+
 ## Next
 Measured 10-29 07:37 on corpus5 (929 Booleans recorded from today's model and kernel tests, 105 s of OCCT time
 recorded): the Rust path takes 600, and what it leaves costs mostly:
