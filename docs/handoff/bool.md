@@ -98,7 +98,12 @@ in or on it is built anew even when all its faces stay (OCCT deletes it: a cylin
 Main corpus **451 of 972** (was 432), fresh 426 of 692, Shell's 40 of 85, and a corpus recorded with this
 Boolean on (/root/bool-scratch/corpus3, 698 from the model and kernel tests, NOSHAPE_BREP_VS_OCCT=1) 431: all
 0 differ incl. the merge check; oracle_p1 (LP2, CP2) passes. Shell's bd16a559/f82019a4 still unify differently
-(merge_check stays). /root/bool-scratch/tools/usd_dump (a .brep's faces and edges, unified with `u`) showed it.
+(merge_check stays). /root/bool-scratch/tools/usd_dump (a .brep's faces and edges, unified with `u`; PC=1: each
+edge's curve on each face) showed it. For bd16 it shows why: the short wall below the hole (a reversed face on a
+right-handed cylinder, its seam used both ways) has the same oriented edges and curves as OCCT's, but its loop
+lists them -seam, circle, +seam, circle where OCCT's goes +seam, circle, -seam, circle: ours isn't continuous
+in the face's parameter plane, and unify_same_domain then doesn't merge it with the wall above. Next: the loop
+order of a seam face that comes out reversed.
 
 Looked at and left (10-29 01:40):
 - The seam cases (19 "an arc across a cylinder's seam" + 5 "a section along ..." in the fresh corpus, 8 s) are
