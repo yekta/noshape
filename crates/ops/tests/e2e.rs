@@ -3152,9 +3152,20 @@ fn drawing_view_menu_edits() {
     call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": free, "orientation": "front" }));
 
     // Rotate: by, to, then to a straight edge.
+    // An edge dimension turns with the view and keeps its value (qa
+    // DWG-ROTATE-VIEW-DIMS-ZERO; live V44).
+    let fv0 = get(&mut ctx, true)["views"].as_array().unwrap().iter().find(|v| v["id"] == free).cloned().unwrap();
+    let top = fv0["edges"].as_array().unwrap().iter().filter(|e| e["type"] == "line" && (num(&e["a"][1]) - num(&e["b"][1])).abs() < 1e-6).max_by(|x, y| (num(&x["a"][1]) + num(&x["b"][0]) - num(&x["a"][0])).total_cmp(&(num(&y["a"][1]) + num(&y["b"][0]) - num(&y["a"][0])))).cloned().unwrap();
+    let tm = [(num(&top["a"][0]) + num(&top["b"][0])) / 2.0, num(&top["a"][1])];
+    let dim = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": [tm], "place": [tm[0], tm[1] + 15.0] }));
+    let dim_text = |ctx: &mut Ctx| get(ctx, false)["annotations"].as_array().unwrap().iter().find(|x| x["id"] == dim["annotation"]).unwrap()["text"].clone();
+    let before = dim_text(&mut ctx);
+    assert_ne!(before, json!("0"), "{dim}");
     call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": free, "action": "rotate", "by": 90 }));
     assert_eq!(last(&mut ctx, 1), ["Rotate view"]);
     assert!((num(&view(&mut ctx, &free)["rotation"]) - 90.0).abs() < 1e-9);
+    assert_eq!(dim_text(&mut ctx), before, "the edge dimension keeps its value");
+    call(&mut ctx, "drawing_delete", json!({ "drawing": tab, "annotations": [dim["annotation"]] }));
     call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": free, "action": "rotate", "to": 30 }));
     let fv = get(&mut ctx, true)["views"].as_array().unwrap().iter().find(|v| v["id"] == free).cloned().unwrap();
     assert!((num(&fv["rotation"]) - 30.0).abs() < 1e-9, "{fv}");

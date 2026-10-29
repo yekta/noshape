@@ -256,6 +256,16 @@ fn direction(a: &Args) -> Result<bool, OpError> {
     }
 }
 
+/// Turn view `id` (its edge dimensions turn too: `set_view_rotation`).
+fn rotate_view(t: &mut Target, id: ViewId, to: impl FnOnce(f64) -> f64) {
+    let (si, id) = t.d.real_view_of(t.sheet, id);
+    if let Some(s) = t.d.sheets.get_mut(si)
+        && let Some(r) = s.view(id).map(|v| v.rotation)
+    {
+        ve::set_view_rotation(s, id, to(r));
+    }
+}
+
 fn view_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let action = a.str("action")?;
     let od = od(ctx, a)?;
@@ -269,10 +279,10 @@ fn view_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
             let deg = std::f64::consts::PI / 180.0;
             match (a.opt_f64("by")?, a.get("to")) {
-                (Some(by), None) => edit_view(&mut t, id, |v| v.rotation += by * deg),
+                (Some(by), None) => rotate_view(&mut t, id, |r| r + by * deg),
                 (None, Some(to)) => {
                     let to = to.as_f64().ok_or_else(|| OpError::param("to", "an angle in degrees"))?;
-                    edit_view(&mut t, id, |v| v.rotation = to * deg)
+                    rotate_view(&mut t, id, |_| to * deg)
                 }
                 _ => return Err(OpError::param("by", "give `by` (degrees to add) or `to` (absolute degrees)")),
             }
@@ -290,7 +300,7 @@ fn view_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
             let pl = t.m.pick(&Tool::Select, &[], p).placement(id).ok_or_else(|| OpError::param("view", "the view has no geometry"))?;
             let (sa, sb) = (pl.to_sheet(pa.p), pl.to_sheet(pb.p));
-            edit_view(&mut t, id, |v| ve::rotate_to_line(v, sa, sb, vertical));
+            rotate_view(&mut t, id, |r| ve::rotation_to_line(r, sa, sb, vertical));
             if vertical { "Rotate view vertically" } else { "Rotate view horizontally" }
         }
         "order" => {

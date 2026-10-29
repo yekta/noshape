@@ -581,12 +581,12 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
     let Some(old) = d.sheets.get(sheet).and_then(|s| s.view(id)).cloned() else { return };
     let default_name = default_view_name(d, &d.sheets[sheet], &old);
     let default_prefix = default_label_prefix(d, &old.kind);
+    if let Some(r) = p.rotation_deg {
+        noshape_scene::drawing_tools::view_edit::set_view_rotation(&mut d.sheets[sheet], id, r.to_radians());
+    }
     let Some(v) = d.sheets[sheet].view_mut(id) else { return };
     v.scale = p.scale;
     v.sheet_scale = p.sheet_scale && p.scale.is_none();
-    if let Some(r) = p.rotation_deg {
-        v.rotation = r.to_radians();
-    }
     p.tangent.apply(v);
     v.best_quality = p.best_quality;
     if matches!(v.kind, ViewKind::Base { .. }) {

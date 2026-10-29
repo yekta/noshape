@@ -2052,7 +2052,7 @@ impl DrawingEditor {
                 });
             }
             Panel::Rotation { view, input } => match val(&input, cx).trim().trim_end_matches('°').parse::<f64>() {
-                Ok(deg) => self.edit_view("Rotate view", view, cx, |v| v.rotation = deg.to_radians()),
+                Ok(deg) => self.rotate_view("Rotate view", view, deg.to_radians(), cx),
                 Err(_) => self.status = Some("Invalid angle".into()),
             },
             Panel::Cell { table, row, col, input, .. } if self.current_sheet().table(table).is_some_and(|t| matches!(t.kind, TableKind::Revision { .. })) => {

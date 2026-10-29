@@ -493,7 +493,9 @@ impl DrawingEditor {
         let pick = self.line_pick().and_then(|p| if let Pick::Line { a, b } = p { Some((a, b)) } else { None });
         match pick.filter(|(a, _)| a.view == id).and_then(|(a, b)| self.placement(id).map(|pl| (pl.to_sheet(a.p), pl.to_sheet(b.p)))) {
             Some((pa, pb)) => {
-                self.edit_view(if vertical { "Rotate view vertically" } else { "Rotate view horizontally" }, id, cx, |v| noshape_scene::drawing_tools::view_edit::rotate_to_line(v, pa, pb, vertical));
+                let r = self.current_sheet().view(id).map(|v| v.rotation).unwrap_or(0.0);
+                let to = noshape_scene::drawing_tools::view_edit::rotation_to_line(r, pa, pb, vertical);
+                self.rotate_view(if vertical { "Rotate view vertically" } else { "Rotate view horizontally" }, id, to, cx);
                 self.status = None;
             }
             None => self.status = Some("Rotate view cancelled: select a straight edge of the view".into()),

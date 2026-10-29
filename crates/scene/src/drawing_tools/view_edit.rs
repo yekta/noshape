@@ -92,10 +92,11 @@ pub fn align_view(v: &mut DrawingView, at: [f64; 2], vertical: bool) {
     }
 }
 
-/// Rotate view ▸ Vertical to… / Horizontal to…: turn the view by the
-/// smallest angle so the straight edge from `pa` to `pb` (sheet) is vertical
-/// / horizontal (lines have no direction: mod 180°).
-pub fn rotate_to_line(v: &mut DrawingView, pa: [f64; 2], pb: [f64; 2], vertical: bool) {
+/// Rotate view ▸ Vertical to… / Horizontal to…: the rotation (from
+/// `rotation`) that turns the view by the smallest angle so the straight
+/// edge from `pa` to `pb` (sheet) is vertical / horizontal (lines have no
+/// direction: mod 180°). Apply it with [`set_view_rotation`].
+pub fn rotation_to_line(rotation: f64, pa: [f64; 2], pb: [f64; 2], vertical: bool) -> f64 {
     let angle = (pb[1] - pa[1]).atan2(pb[0] - pa[0]);
     let target = if vertical { std::f64::consts::FRAC_PI_2 } else { 0.0 };
     let pi = std::f64::consts::PI;
@@ -103,7 +104,56 @@ pub fn rotate_to_line(v: &mut DrawingView, pa: [f64; 2], pb: [f64; 2], vertical:
     if delta > pi / 2.0 {
         delta -= pi;
     }
-    v.rotation += delta;
+    rotation + delta
+}
+
+/// Set view `id`'s rotation (radians). Its edge dimensions turn with it,
+/// as live (behaviours "V44: Rotate view › Vertical to… with dimensions",
+/// qa DWG-ROTATE-VIEW-DIMS-ZERO): a horizontal / vertical linear dimension
+/// whose points lie along its measured axis keeps its value and side,
+/// swapping orientation on a quarter turn (aligned for other angles);
+/// others keep their sheet orientation and re-measure.
+pub fn set_view_rotation(s: &mut Sheet, id: ViewId, rotation: f64) {
+    let Some(v) = s.view_mut(id) else { return };
+    let old = v.rotation;
+    v.rotation = rotation;
+    let delta = rotation - old;
+    if delta.abs() < 1e-12 {
+        return;
+    }
+    let half_pi = std::f64::consts::FRAC_PI_2;
+    let quarters = (delta / half_pi).round();
+    let square = (delta - quarters * half_pi).abs() < 1e-6;
+    let turn = |x: [f64; 2], a: f64| [x[0] * a.cos() - x[1] * a.sin(), x[0] * a.sin() + x[1] * a.cos()];
+    for a in &mut s.annotations {
+        let AnnotationKind::LinearDimension { view, a: pa, b: pb, offset, orientation, .. } = &mut a.kind else { continue };
+        if *view != id || *orientation == DimOrientation::Aligned {
+            continue;
+        }
+        let (dir, nrm) = if *orientation == DimOrientation::Horizontal { ([1.0, 0.0], [0.0, 1.0]) } else { ([0.0, 1.0], [1.0, 0.0]) };
+        // The measured segment on the sheet before the turn (view → sheet
+        // turns by the old rotation; the scale doesn't matter here).
+        let d = turn([pb[0] - pa[0], pb[1] - pa[1]], old);
+        let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
+        if l < 1e-12 || (d[0] * dir[1] - d[1] * dir[0]).abs() > l * 1e-6 {
+            continue;
+        }
+        let new_d = turn(d, delta);
+        let side = turn(nrm, delta);
+        let (o, n) = if !square {
+            let u = [new_d[0] / l, new_d[1] / l];
+            (DimOrientation::Aligned, [-u[1], u[0]])
+        } else if quarters.rem_euclid(2.0) == 1.0 {
+            if *orientation == DimOrientation::Horizontal { (DimOrientation::Vertical, [1.0, 0.0]) } else { (DimOrientation::Horizontal, [0.0, 1.0]) }
+        } else {
+            (*orientation, nrm)
+        };
+        *orientation = o;
+        // The same side of the edge as before.
+        if side[0] * n[0] + side[1] * n[1] < 0.0 {
+            *offset = -*offset;
+        }
+    }
 }
 
 /// Adjust linestyle's Linestyle, Dashes, Thickness and color.

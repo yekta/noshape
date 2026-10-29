@@ -1864,6 +1864,17 @@ impl DrawingEditor {
         });
     }
 
+    /// Turn view `id` to `rotation` (radians); its edge dimensions turn
+    /// with it (`set_view_rotation`).
+    pub fn rotate_view(&mut self, description: &str, id: ViewId, rotation: f64, cx: &mut Context<Self>) {
+        let (si, id) = self.drawing.real_view_of(self.sheet, id);
+        self.edit(description, cx, |d| {
+            if let Some(s) = d.sheets.get_mut(si) {
+                noshape_scene::drawing_tools::view_edit::set_view_rotation(s, id, rotation);
+            }
+        });
+    }
+
     pub fn edit_view(&mut self, description: &str, id: ViewId, cx: &mut Context<Self>, f: impl FnOnce(&mut DrawingView)) {
         // A mirror of a view on another sheet (a linked section's cutting
         // line on its parent): edit the real view.
