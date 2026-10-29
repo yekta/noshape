@@ -13,7 +13,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::{RenderStyle, TableCorner, ViewId};
+use noshape_model::drawing::{AnnotationKind, RenderStyle, TableCorner, ViewId};
 
 /// What "Move to sheet" moves.
 #[derive(Clone, Copy, PartialEq)]
@@ -61,7 +61,8 @@ impl DrawingEditor {
         if views.len() == self.selection.len() {
             return self.multi_view_entries(views, cx);
         }
-        vec![
+        let mut out = self.group_entries(&views);
+        out.extend([
             MenuEntry::item("Copy", |t, _, cx| t.copy_views(None, cx)),
             MenuEntry::item("Paste as table", |t, _, cx| {
                 t.start_paste_table(cx);
@@ -73,7 +74,43 @@ impl DrawingEditor {
             }),
             MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
             MenuEntry::item("Delete", |t, _, cx| t.delete_selection(cx)),
-        ]
+        ]);
+        out
+    }
+
+    /// Notes and callouts selected together (help H:note, drawing.md A21;
+    /// qa DWG-GROUP-ANNOTATION-MENU): Group annotation (or Remove annotation
+    /// from group); with one view too, Group with the view (or Remove from
+    /// group).
+    fn group_entries(&self, views: &[ViewId]) -> Vec<MenuEntry> {
+        use noshape_scene::drawing_tools::annotation_edit::{group_annotations, group_with_view};
+        let sheet = self.current_sheet();
+        let anns: Vec<&noshape_model::drawing::Annotation> = self.selection.iter().filter_map(|s| if let Sel::Annotation(x) = s { sheet.annotations.iter().find(|a| a.id == *x) } else { None }).collect();
+        let groupable = |a: &&noshape_model::drawing::Annotation| matches!(a.kind, AnnotationKind::Note { .. } | AnnotationKind::Balloon { .. });
+        if anns.is_empty() || !anns.iter().all(groupable) || anns.len() + views.len() != self.selection.len() {
+            return Vec::new();
+        }
+        let ids: Vec<u64> = anns.iter().map(|a| a.id).collect();
+        let mut out = Vec::new();
+        match views {
+            [] if anns.len() >= 2 => {
+                if anns.iter().any(|a| a.ann_group.is_some()) {
+                    out.push(MenuEntry::item("Remove annotation from group", move |t, _, cx| t.edit_sheet("Remove annotation from group", cx, |s| group_annotations(s, &ids, false))));
+                } else {
+                    out.push(MenuEntry::item("Group annotation", move |t, _, cx| t.edit_sheet("Group annotation", cx, |s| group_annotations(s, &ids, true))));
+                }
+            }
+            [v] => {
+                let v = *v;
+                if anns.iter().any(|a| a.view_group.is_some()) {
+                    out.push(MenuEntry::item("Remove from group", move |t, _, cx| t.edit_sheet("Remove from group", cx, |s| group_with_view(s, &ids, None))));
+                } else {
+                    out.push(MenuEntry::item("Group", move |t, _, cx| t.edit_sheet("Group", cx, |s| group_with_view(s, &ids, Some(v)))));
+                }
+            }
+            _ => {}
+        }
+        out
     }
 
     /// Several views selected (live drw2 10-21 j, drawing/1202): Show/hide ▸,
