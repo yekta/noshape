@@ -9,6 +9,12 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **20:41 update (greens fb3fbeb9 → e7b26a16 → 6f5c1fae):** verified DWG-EDIT-SECTION-DIALOG (tool button, fb3fbeb9). bool e7b26a16
+  (thread fused with its rod): new bin/thread.py (rod r5 × 20, helix on its face, a triangle swept along it, Add or Remove; made
+  with the v0.4.14 CLI = OCCT reference) → threads/add2 / add4 / add7 / rem4 / rem7: Rust vs OCCT in the app all 0 px (add4 1631.344 /
+  960.097, rem7 1445.118 / 1092.08 as the CLI), Sweep 1 3.4–11.3 s on both paths; mirror set unchanged. **Reopened
+  DWG-DATUM-PASTE-RED** (dx f53e8173): the pasted copy is red except its triangle (live: red too), and its grip drag doesn't
+  re-attach it (the original's does).
 - **20:08 update (greens 863967f8 → 984c6fbb → 52ad95af → 5894c154):** verified DWG-SHEET-PROPS-ESC, DWG-TABLE-ESC-GHOST (863967f8),
   CYL-UNIFY-OPPOSITE (52ad95af: the two-way Ø12 rod selects as one 20 mm cylinder face; v0.4.14 CLI still 4 faces); drawing D24
   (dragged dimension value, ANSI) matches live's asbdt-1a…c on 5894c154. MESH-EMPTY-LOOP-PANIC again **from v0.4.14 alone**: CLI
