@@ -42,6 +42,18 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   frame the opposite prism's cylinder with the same seam. Don't write pcurves into the input's shared edges (the
   data race b0e757f3 removed).
 - Speed table refreshed from perf.yml run 40796942944 (release): the fin under the 400-fin plate 40–64 ms (< 150 met).
+- T2 (kernel, model, ops) on main 10-29 07:20: reds were export::pvz_structure / pvz_import (the Rust Boolean, ticket
+  PVZ-RUST-BOOL for bool), bool_replay::bool_corpus_replay (bool), the elliptic boss curvature blend (open, mine),
+  blends_match_onshape (my FILLET-OVERSIZE rule pre-empted live F2's "Failed to fillet selections." for four meeting
+  top edges: fixed 445c5ad6), and convert_rips_and_bends_like_onshape once (bbox assert; 7 clean reruns since).
+- Failing blends / shells still take the whole 30 s budget (cli-fillet-hang.noshape: Fillet 2 and Shell 1 each
+  30.0 s, CPU profile): gdb samples put Fillet 2 in OCCT's ChFi3d_Builder::PerformSetOfKGen / CompleteData and Shell 1
+  in the slabs' quick_boolean, IntTools_BeanFaceIntersector on B-spline / offset faces. No cheap early sign of the
+  failure; a shorter budget would also fail slow shells that succeed (qa's delete-crash Shell 2 21.6 s in v0.4.9).
+- CYL-UNIFY-OPPOSITE: the two halves' seams are opposite by construction (seat_circles starts a backward prism's
+  circle at gp_Ax2's default x for its axis, which flips with the axis: (0,0,1) for +y, (0,0,-1) for −y; live's
+  frames), so merging needs one face rebuilt with one seam (its circles split there, the caps' wires updated):
+  left for now (volumes are right; a face count difference).
 - Knurl on main with the pairs back (release, 10-29 06:52, load 25–29): diamond **246.5 s** (was 564 before patch
   0004, 264–329 with the pairs before they went serial), 8142 faces, 75409.760 mm³ as before. Live 32 s.
 - Failing shells on fuzz bodies (qa's bop-pairs-gpf-5267, dev CLI): Shell 4 regions no (a non-elementary face),
