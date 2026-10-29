@@ -297,11 +297,18 @@ impl PartStudioView {
         }
     }
 
-    /// Bounds in use: the user's, else the data's.
+    /// Bounds in use: the user's, else the data's (a curvature map of one value, a cylinder's Gaussian 0:
+    /// −1 … 1, as live).
     fn bar_bounds(&self, bar: Bar, cx: &App) -> Option<(f64, f64)> {
         let (lo, hi) = self.bar_range(bar, cx)?;
+        let (lo, hi) = if self.bar_one_value(bar, cx) { (-1.0, 1.0) } else { (lo, hi) };
         let b = self.bar_ui(bar)?;
         Some((b.bounds[0].unwrap_or(lo), b.bounds[1].unwrap_or(hi)))
+    }
+
+    /// Whether a curvature map's data is one value (its bar then shows that value outside both ends).
+    fn bar_one_value(&self, bar: Bar, cx: &App) -> bool {
+        bar == Bar::Curvature && self.bar_range(bar, cx).is_some_and(|(lo, hi)| lo == hi)
     }
 
     /// Change a bar's settings and recolor.
@@ -373,6 +380,7 @@ impl PartStudioView {
         let b = self.bar_ui(bar)?;
         let pal = p();
         let (palette, user, offset) = (b.palette, [b.bounds[0].is_some(), b.bounds[1].is_some()], b.offset);
+        let one_value = self.bar_one_value(bar, cx);
         let moving = matches!(b.drag, Some(LegendDrag::Move { .. }));
         let editing = b.editing.as_ref().map(|(i, st, _)| (*i, st.clone()));
         let dim = bar == Bar::Thickness && self.ui.thickness.as_ref().is_some_and(|t| t.dim);
@@ -468,7 +476,7 @@ impl PartStudioView {
         };
         let strip = h_flex()
             .items_end()
-            .child(outside(user[0], BELOW, data_lo))
+            .child(outside(user[0] || one_value, BELOW, data_lo))
             .child(tick(0, cx))
             .child(
                 h_flex()
@@ -484,7 +492,7 @@ impl PartStudioView {
                     })),
             )
             .child(tick(1, cx))
-            .child(outside(user[1], ABOVE, data_hi).flex().flex_row_reverse());
+            .child(outside(user[1] || one_value, ABOVE, data_hi).flex().flex_row_reverse());
         // Tick labels: the bounds (blue, editable) and four between.
         let label = |i: usize, value: f64, cx: &mut Context<Self>| -> AnyElement {
             if let Some((_, st)) = editing.as_ref().filter(|(e, _)| *e == i) {

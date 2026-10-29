@@ -112,10 +112,25 @@ pub fn curvature_colors(bodies: &[BodyDisplay], map: Option<&super::thickness::C
                     Some(v) => rgba(palette_color_in(&CURVATURE_PALETTES, palette, if bhi > blo { (v - blo) / (bhi - blo) } else { 0.5 })),
                 })
                 .collect();
-            (b.id.clone(), std::sync::Arc::new(c))
+            (b.id.clone(), std::sync::Arc::new(flat_where_one_value(&b.mesh, c)))
         })
         .collect();
     (colors, range)
+}
+
+/// A face whose vertices all take one color (one curvature: a cylinder's) is painted that color unlit, as live
+/// paints it: its vertices' alpha 128 (the shader's flat map color).
+fn flat_where_one_value(mesh: &noshape_model::display::MeshBuffers, mut colors: Vec<[u8; 4]>) -> Vec<[u8; 4]> {
+    for &(first, count) in &mesh.face_ranges {
+        let Some(ids) = mesh.indices.get(first as usize..(first + count) as usize) else { continue };
+        let Some(&c0) = ids.first().and_then(|&i| colors.get(i as usize)) else { continue };
+        if c0[3] == 255 && ids.iter().all(|&i| colors.get(i as usize) == Some(&c0)) {
+            for &i in ids {
+                colors[i as usize][3] = 128;
+            }
+        }
+    }
+    colors
 }
 
 /// Discrete curvature magnitude per vertex from normal variation along

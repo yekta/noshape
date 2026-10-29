@@ -347,7 +347,11 @@ fn mesh_shade(i: MeshOut, front: bool, st: u32) -> vec4<f32> {
     // the hovered face instead (Onshape).
     let unlit = (inst.params.y & 2u) != 0u;
     var c = highlight(own, select(st & ~HOVER, st, unlit));
-    if (!unlit && (inst.params.y & 4u) != 0u) {
+    // A vertex color with alpha 128 (a curvature map's face of one value): its color as it is, unlit (live),
+    // unless selected.
+    let flat_map = (inst.params.x & 1u) != 0u && abs(i.color.a - 128.0 / 255.0) < 0.1 && (st & SELECTED) == 0u;
+    if (flat_map) {
+    } else if (!unlit && (inst.params.y & 4u) != 0u) {
         c = zebra(i.world, i.normal, front);
         if ((st & SELECTED) != 0u) { c = mix(c, FACE_SELECTED, 0.5); }
     } else if (!unlit) {

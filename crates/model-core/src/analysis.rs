@@ -719,14 +719,31 @@ mod tests {
         let mid = at(nu / 4, nv / 2) as usize;
         assert!((k[mid].0 - 0.5).abs() < 0.03 && (k[mid].1 - 0.5).abs() < 0.03, "{:?}", k[mid]);
         // Cylinder of radius 2 around Z: 1/2 and 0.
-        for (p, n) in pos.iter_mut().zip(nrm.iter_mut()) {
-            let d = DVec3::new(p[0] as f64, p[1] as f64, 0.0).normalize_or_zero();
-            let z = p[2];
-            *p = [(d.x * r) as f32, (d.y * r) as f32, z];
-            *n = [d.x as f32, d.y as f32, 0.0];
+        for j in 0..=nv {
+            for i in 0..=nu {
+                let (z, ph) = (j as f64 / nv as f64 * 4.0, i as f64 / nu as f64 * std::f64::consts::TAU);
+                pos[at(i, j) as usize] = [(ph.cos() * r) as f32, (ph.sin() * r) as f32, z as f32];
+                nrm[at(i, j) as usize] = [ph.cos() as f32, ph.sin() as f32, 0.0];
+            }
         }
         let k = principal_curvatures(&pos, &nrm, &idx);
         assert!((k[mid].0 - 0.5).abs() < 0.05 && k[mid].1.abs() < 0.05, "{:?}", k[mid]);
+        // The color map: the cylinder's Gaussian curvature exactly 0 everywhere (CURV-GAUSS-NOISE), its mean
+        // the estimate's.
+        let mesh = crate::display::MeshBuffers { positions: pos.clone(), normals: nrm.clone(), indices: idx.clone(), face_ranges: vec![(0, idx.len() as u32)], ..Default::default() };
+        let g = curvature_values(&mesh, 10.0, CurvatureKind::Gaussian, 1.0);
+        assert!(g.iter().all(|v| *v == Some(0.0) || v.is_none()), "{:?}", &g[..8]);
+        let m = curvature_values(&mesh, 10.0, CurvatureKind::Mean, 1.0);
+        assert!(m[mid].is_some_and(|m| (m - 0.25).abs() < 0.03), "{:?}", m[mid]);
+        // One value over the cylinder (live paints it one flat colour).
+        assert!(m.iter().flatten().all(|v| *v == m[mid].unwrap()), "{:?}", &m[..8]);
+        // A sphere's normals spread over the sphere: its estimate stays.
+        assert!(!bends_one_way(
+            (0..=nv).flat_map(|j| (0..=nu).map(move |i| (j, i))).map(|(j, i)| {
+                let (th, ph) = (j as f64 / nv as f64 * std::f64::consts::PI, i as f64 / nu as f64 * std::f64::consts::TAU);
+                [(th.sin() * ph.cos()) as f32, (th.sin() * ph.sin()) as f32, th.cos() as f32]
+            }).collect::<Vec<_>>().iter()
+        ));
     }
 }
 
@@ -771,7 +788,69 @@ impl CurvatureKind {
 /// with `meters_per_unit`), `None` where the part is flat. Flat means both
 /// principal curvatures under 1e-3 / the part's box diagonal.
 pub fn curvature_values(mesh: &crate::display::MeshBuffers, size: f64, kind: CurvatureKind, meters_per_unit: f64) -> Vec<Option<f64>> {
-    principal_curvatures(&mesh.positions, &mesh.normals, &mesh.indices).into_iter().map(|k| kind.value(k, meters_per_unit, 1e-3 / size.max(1e-9))).collect()
+    let mut k = principal_curvatures(&mesh.positions, &mesh.normals, &mesh.indices);
+    // A face whose normals all make one angle with an axis (a cylinder, a cone) bends one way only: its other
+    // principal curvature is exactly 0 (Onshape's exact Gaussian 0, one colour), where the mesh estimate only
+    // comes near it (a cylinder's Gaussian curvature showed as stripes of noise over the whole bar).
+    for &(first, count) in &mesh.face_ranges {
+        let Some(ids) = mesh.indices.get(first as usize..(first + count) as usize) else { continue };
+        if bends_one_way(ids.iter().filter_map(|&i| mesh.normals.get(i as usize))) {
+            for &i in ids {
+                if let Some(k) = k.get_mut(i as usize) {
+                    if k.0.abs() < k.1.abs() {
+                        k.0 = 0.0;
+                    } else {
+                        k.1 = 0.0;
+                    }
+                }
+            }
+            // Its other curvature within a few percent everywhere: a cylinder's 1 / r, one value (a cone's
+            // changes along it).
+            let bend: Vec<f64> = ids.iter().filter_map(|&i| k.get(i as usize)).map(|k| k.0 + k.1).collect();
+            let (lo, hi) = bend.iter().fold((f64::MAX, f64::MIN), |(a, b), &x| (a.min(x), b.max(x)));
+            let mean = bend.iter().sum::<f64>() / bend.len().max(1) as f64;
+            if !bend.is_empty() && hi - lo <= 0.05 * mean.abs() {
+                for &i in ids {
+                    if let Some(k) = k.get_mut(i as usize) {
+                        // k1 ≥ k2.
+                        *k = (mean.max(0.0), mean.min(0.0));
+                    }
+                }
+            }
+        }
+    }
+    k.into_iter().map(|k| kind.value(k, meters_per_unit, 1e-3 / size.max(1e-9))).collect()
+}
+
+/// Whether unit normals spread round one circle of the sphere (n · axis the same for all: a cylinder's, a cone's),
+/// not over it (a sphere's, a torus's): their spread across that circle's plane, the smallest eigenvalue of
+/// their covariance, is nothing beside the spread along it.
+fn bends_one_way<'a>(normals: impl Iterator<Item = &'a [f32; 3]> + Clone) -> bool {
+    let n3 = |n: &[f32; 3]| DVec3::new(n[0] as f64, n[1] as f64, n[2] as f64);
+    let count = normals.clone().count();
+    if count < 3 {
+        return false;
+    }
+    let mean = normals.clone().map(n3).sum::<DVec3>() / count as f64;
+    let mut c = glam::DMat3::ZERO;
+    for n in normals {
+        let d = n3(n) - mean;
+        c += glam::DMat3::from_cols(d * d.x, d * d.y, d * d.z);
+    }
+    let c = c / count as f64;
+    // Eigenvalues of the symmetric 3 × 3 (Smith's closed form), smallest and middle.
+    let q = (c.x_axis.x + c.y_axis.y + c.z_axis.z) / 3.0;
+    let p1 = c.y_axis.x.powi(2) + c.z_axis.x.powi(2) + c.z_axis.y.powi(2);
+    let p = (((c.x_axis.x - q).powi(2) + (c.y_axis.y - q).powi(2) + (c.z_axis.z - q).powi(2) + 2.0 * p1) / 6.0).sqrt();
+    if p <= 1e-15 {
+        return false; // all one normal: a plane, flat anyway
+    }
+    let r = ((c - glam::DMat3::from_diagonal(DVec3::splat(q))) / p).determinant().clamp(-2.0, 2.0) / 2.0;
+    let phi = r.acos() / 3.0;
+    let largest = q + 2.0 * p * phi.cos();
+    let smallest = q + 2.0 * p * (phi + 2.0 * std::f64::consts::FRAC_PI_3).cos();
+    let middle = 3.0 * q - largest - smallest;
+    middle > 1e-12 && smallest <= 1e-6 * middle
 }
 
 
