@@ -21,6 +21,8 @@ pub struct InterferenceDialog {
     pub meshes: Vec<noshape_render::MeshHandle>,
     /// Interferences row under the pointer (its box is outlined).
     pub hover: Option<usize>,
+    /// The overlaps for the current instances are in `rows` (not computing).
+    pub done: bool,
     seq: u64,
 }
 
@@ -30,7 +32,7 @@ impl AssemblyView {
         let seq = self.ui.interference.as_ref().map_or(0, |d| d.seq);
         // The dialog's picks are the selection (their list rows highlight).
         self.selected = instances.clone();
-        self.ui.interference = Some(InterferenceDialog { instances, include_standard: false, top_only: false, rows: Vec::new(), meshes: Vec::new(), hover: None, seq });
+        self.ui.interference = Some(InterferenceDialog { instances, include_standard: false, top_only: false, rows: Vec::new(), meshes: Vec::new(), hover: None, done: false, seq });
         self.recompute_interference(cx);
         self.update_capture(cx);
         cx.notify();
@@ -69,6 +71,7 @@ impl AssemblyView {
     fn recompute_interference(&mut self, cx: &mut Context<Self>) {
         let Some(d) = &mut self.ui.interference else { return };
         d.seq += 1;
+        d.done = false;
         let (seq, ids, include) = (d.seq, d.instances.clone(), d.include_standard);
         let result = self.result.clone();
         cx.spawn(async move |this, cx| {
@@ -78,6 +81,7 @@ impl AssemblyView {
                 let Some(d) = this.ui.interference.as_mut().filter(|d| d.seq == seq) else { return };
                 d.meshes = rows.iter().map(|r| up.upload_mesh_parts(&r.overlap.positions, &r.overlap.normals, &vec![0u32; r.overlap.positions.len()], &r.overlap.indices)).collect();
                 d.rows = rows;
+                d.done = true;
                 d.hover = None;
                 this.rebuild_scene(false, cx);
                 cx.notify();
@@ -136,10 +140,12 @@ impl AssemblyView {
                     .into_any_element()
             })
             .collect();
-        let rows: Vec<AnyElement> = self
-            .interference_rows(d, cx)
+        // Live (the Part Studio's component, behaviours 419 / analysis 81):
+        // a finished check without overlaps reads "No interferences".
+        let none = (d.done && d.rows.is_empty() && !d.instances.is_empty()).then(|| crate::os_ui::query_row("aintf-none", "No interferences").text_color(rgb(0x666666)).into_any_element());
+        let rows: Vec<AnyElement> = none
             .into_iter()
-            .map(|(k, label, size)| {
+            .chain(self.interference_rows(d, cx).into_iter()            .map(|(k, label, size)| {
                 crate::os_ui::query_row(SharedString::from(format!("aintf-r-{k}")), label)
                     .text_color(rgb(0x666666))
                     .tooltip(crate::ui::tooltip(size))
@@ -153,7 +159,7 @@ impl AssemblyView {
                         }
                     }))
                     .into_any_element()
-            })
+            }))
             .collect();
         // Include standard content changes what is analyzed; Show top level
         // only just how the rows are named.
