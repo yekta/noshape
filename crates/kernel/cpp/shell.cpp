@@ -2070,25 +2070,20 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     std::fprintf(stderr, "slabs: %d tools, union volume %.6g\n", tools.Extent(), volume_of(union_));
   if (sign < 0)
   {
-    BRepAlgoAPI_Common co;
-    {
-      ShapeList a1, a2;
-      a1.Append(solid);
-      a2.Append(union_);
-      co.SetArguments(a1);
-      co.SetTools(a2);
-      // In parallel: a quarter faster on qa's shell matrix (SHELL-SLOW).
-      co.SetRunParallel(bop_parallel());
-      co.Build();
-    }
-    if (co.HasErrors() || !co.IsDone())
+    ShapeList a1, a2;
+    a1.Append(solid);
+    a2.Append(union_);
+    TopoDS_Shape co_out;
+    HHist        co_hist;
+    // (OCCT's in parallel: a quarter faster on qa's shell matrix, SHELL-SLOW.)
+    if (!quick_boolean(2, a1, a2, bop_parallel(), co_out, co_hist))
     {
       if (dbg)
         std::fprintf(stderr, "slabs: common failed\n");
       return false;
     }
-    r = co.Shape();
-    hb = co.History();
+    r = co_out;
+    hb = co_hist;
   }
   else
   {
