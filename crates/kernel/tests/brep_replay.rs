@@ -79,8 +79,7 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
             continue;
         }
         n += 1;
-        // Declines fail at once (no OCCT run). Shell's direct ones as Shell runs them.
-        set_rust_boolean_merged_after(c.path.starts_with("direct"));
+        // Declines fail at once (no OCCT run).
         set_rust_boolean_only(true);
         let t = Instant::now();
         let r = boolean(c.op, &c.objects, &c.tools, &c.opts);
@@ -195,7 +194,6 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         times[b].push((ms, occt_ms));
         report += &format!("{name} {:?} faces {faces} tools {}: {ms:.2} ms, OCCT {occt_ms:.2} ms ({:.1}x)\n", c.op, c.tools.len(), occt_ms / ms.max(1e-6));
     }
-    set_rust_boolean_merged_after(false);
     report += &format!("{accepted} of {n} cases taken, {} differ from OCCT\n", bad.len());
     for (why, k) in &declines {
         report += &format!("  declined {k}: {why}\n");

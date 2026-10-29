@@ -528,10 +528,11 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       TopoDS_Wire w;
       bb.MakeWire(w);
       const uint32_t u0 = b.loop_uses[l], u1 = b.loop_uses[l + 1];
-      // Built on the surface's side: a reversed face's loops run the other way.
+      // Built on the surface's side: a reversed face's edges the other way round, in the same order (as
+      // OCCT's: unify_same_domain goes by the order of a seam's uses).
       for (uint32_t k = 0; k < u1 - u0; ++k)
       {
-        const uint32_t u    = b.uses[rev ? u1 - 1 - k : u0 + k];
+        const uint32_t u    = b.uses[u0 + k];
         const bool     back = (u % 2 == 1) != rev;
         bb.Add(w, es[u / 2].Oriented(back ? TopAbs_REVERSED : TopAbs_FORWARD));
       }
@@ -613,7 +614,7 @@ bool rust_decline(const char* why) { return decline(why); }
 
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
-                  double fuzzy, bool touching_only, bool merged_after)
+                  double fuzzy, bool touching_only)
 {
   // A stale regeneration's Boolean stops (as OCCT's does through its progress indicator).
   const std::atomic<bool>* cancel = thread_cancel_flag();
@@ -658,7 +659,7 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   t_built.set = false;
   {
     const KernelTimer timer("boolean.rust.brep");
-    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, touching_only, merged_after, r))
+    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, touching_only, r))
       return decline(nullptr);
   }
   const KernelTimer timer("boolean.rust.build");
@@ -787,7 +788,7 @@ bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bo
     std::vector<const OcShape*>           srcs;
     std::vector<std::unique_ptr<OcShape>> own;
     const KernelTimer                     timer("boolean.rust.direct");
-    done = rust_boolean(op, all, srcs, own, out, hist, 0, false, true);
+    done = rust_boolean(op, all, srcs, own, out, hist);
     if (done)
       path = "direct_rust";
   }

@@ -51,7 +51,7 @@ mod step_out;
 pub mod surfacing;
 pub mod transform;
 
-pub use brep_bridge::{last_rust_decline, set_rust_boolean, set_rust_boolean_merged_after, set_rust_boolean_only};
+pub use brep_bridge::{last_rust_decline, set_rust_boolean, set_rust_boolean_only};
 pub use boolean::{
     BooleanOp, BooleanOptions, Glue, boolean, common, cut, fuse, fuse_all, imprint, project_curves, section,
     kernel_profile_mark, last_boolean_path, last_unify_path, section_caps, set_parallel_booleans, section_plane, section_wires, split, split_by_plane, unify_same_domain, unify_same_domain_whole, with_cancel,

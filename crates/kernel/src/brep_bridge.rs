@@ -13,14 +13,6 @@ thread_local! {
     static MODE: Cell<Option<bool>> = const { Cell::new(None) };
     /// A decline fails the Boolean instead of running OCCT (the replay's quick mode).
     static STRICT: Cell<bool> = const { Cell::new(false) };
-    /// Every Boolean as if its caller merged faces after (the replay of Shell's direct ones).
-    static MERGED_AFTER: Cell<bool> = const { Cell::new(false) };
-}
-
-/// This thread's Booleans check their results as Shell's direct ones do (`noshape_brep::merge_check`): for
-/// the replay of those.
-pub fn set_rust_boolean_merged_after(on: bool) {
-    MERGED_AFTER.with(|m| m.set(on));
 }
 
 /// With `on`, this thread's Booleans run noshape's own Boolean only: one it declines fails
@@ -160,7 +152,7 @@ fn origins(o: &[Origin]) -> Vec<u32> {
         .collect()
 }
 
-pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: bool, merged_after: bool, out: &mut BrepResult) -> bool {
+pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: bool, out: &mut BrepResult) -> bool {
     let op = match op {
         0 => Op::Fuse,
         1 => Op::Cut,
@@ -168,7 +160,7 @@ pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: b
     };
     let bodies: Vec<Body> = args.iter().map(body_of).collect();
     let refs: Vec<&Body> = bodies.iter().collect();
-    let r = match noshape_brep::boolean_touching(op, &refs, tol, touching_only).and_then(|r| if merged_after || MERGED_AFTER.with(|m| m.get()) { noshape_brep::merge_check(&r, tol).map(|_| r) } else { Ok(r) }) {
+    let r = match noshape_brep::boolean_touching(op, &refs, tol, touching_only) {
         Ok(r) => r,
         Err(d) => {
             brep_decline(d.0);

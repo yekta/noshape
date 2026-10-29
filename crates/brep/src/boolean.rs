@@ -1959,35 +1959,6 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
     Ok(out)
 }
 
-/// For a caller that merges a result's faces on one surface after (Shell, by OCCT's unify_same_domain):
-/// declines a result with two faces of different input faces on one cylinder meeting at a circle, which that
-/// merges on OCCT's result and not on this one (Shell's slab fuses, 10-28).
-pub fn merge_check(out: &Output, tol: f64) -> Result<(), Decline> {
-    let mut faces_of: Vec<Vec<usize>> = vec![Vec::new(); out.body.edges.len()];
-    for (fi, f) in out.body.faces.iter().enumerate() {
-        for u in f.loops.iter().flatten() {
-            faces_of[u.edge as usize].push(fi);
-        }
-    }
-    let source = |o: Origin| match o {
-        Origin::Same { arg, index } | Origin::Piece { arg, index } => Some((arg, index)),
-        Origin::New => None,
-    };
-    for (e, fs) in faces_of.iter().enumerate() {
-        if let [f, g] = fs[..]
-            && matches!(out.body.edges[e].curve, Curve::Circle { .. })
-            && let (Surface::Cylinder { origin: o1, axis: a1, radius: r1, .. }, Surface::Cylinder { origin: o2, axis: a2, radius: r2, .. }) = (out.body.faces[f].surface, out.body.faces[g].surface)
-            && source(out.face_origin[f]) != source(out.face_origin[g])
-            && a1.cross(a2).length() <= 1e-9
-            && (r1 - r2).abs() <= tol
-            && (o2 - o1).cross(a1).length() <= tol
-        {
-            return Err(Decline("one cylinder in faces of two inputs"));
-        }
-    }
-    Ok(())
-}
-
 /// A map from dense indices (u32::MAX: none).
 struct Dense(Vec<u32>);
 

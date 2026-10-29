@@ -102,8 +102,10 @@ Boolean on (/root/bool-scratch/corpus3, 698 from the model and kernel tests, NOS
 edge's curve on each face) showed it. For bd16 it shows why: the short wall below the hole (a reversed face on a
 right-handed cylinder, its seam used both ways) has the same oriented edges and curves as OCCT's, but its loop
 lists them -seam, circle, +seam, circle where OCCT's goes +seam, circle, -seam, circle: ours isn't continuous
-in the face's parameter plane, and unify_same_domain then doesn't merge it with the wall above. Next: the loop
-order of a seam face that comes out reversed.
+in the face's parameter plane, and unify_same_domain then doesn't merge it with the wall above. Fixed (10-29
+02:10): the C++ build kept a reversed face's loops in reversed order as well as its edges reversed; OCCT keeps
+the order. With that, merge_check (and `set_rust_boolean_merged_after`) is gone: main corpus 451, fresh **434 of
+692**, Shell's **48 of 85**, corpus3 439 of 698 (vs OCCT): all 0 differ incl. unify.
 
 The 30-feature part's edit commit (`regen_profile::edit_commit_profile`, dev build, load 15–19, 10-29 01:44,
 with everything above): Rust Boolean on 102, 124 ms (features 81, 90); off 158, 166 ms (features 130, 134). Hole
