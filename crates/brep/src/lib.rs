@@ -16,6 +16,8 @@ mod arrange;
 mod boolean;
 mod curve2;
 mod fxhash;
+/// NURBS curves and surfaces: points, derivatives, a point's parameters.
+pub mod nurbs;
 /// Display meshes of analytic faces (psui).
 pub mod mesh;
 
