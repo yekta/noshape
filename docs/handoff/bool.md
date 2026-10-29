@@ -293,6 +293,16 @@ the local Boolean's ~50 ms; plain OCCT 1.1 s. So the local Boolean stays first f
 Rust path declines them. Next for it: don't touch untouched faces at all (C++ build and make_result over 1600
 faces are most of what's left).
 
+Big targets in place (10-29 08:00): a Rust result now gets a UnifyScope as the local Boolean's does (its target
+known to have nothing to merge: the faces it changed, every face at their vertices or across their edges, and the
+vertices of the target's edges it lost), so op_unify after it looks only there; and the result's body is remapped
+onto its maps only when a next Boolean asks (the model's unify usually makes a new shape first): 4.5 ms less on a
+1612-face result. NOSHAPE_UNIFY_CHECK=1 (scoped vs whole) clean over the model, kernel and ops tests. Still, on
+local_fuse_bench (a2121c5b, 1612 faces, fresh target each round) the Rust path is ~2× the local Boolean (op_boolean
+86 vs 37 ms: converting the fresh target 17 ms, the Boolean 37 ms, its unify scope 12 ms; the unify after it ~77 vs
+23 ms in merge_planar): the local Boolean stays first. Doing better needs the Boolean itself local (only the faces
+near the tool converted and rebuilt).
+
 ## Next
 Measured 10-29 07:37 on corpus5 (929 Booleans recorded from today's model and kernel tests, 105 s of OCCT time
 recorded): the Rust path takes 600, and what it leaves costs mostly:

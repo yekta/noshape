@@ -502,6 +502,8 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
 ## From bool (10-28 16:30): noshape's own Boolean in op_boolean
 - boolean.cpp: one block (`rust_boolean_on()`) after through_holes, before cut_slabs; **on by default from 10-28
   evening** (NOSHAPE_BOOL_RUST=0: off; docs/handoff/bool.md). Its conversion and result building are in rust_boolean.cpp.
+- 10-29 08:00: OcShape has `myBrepLazy` too (a Rust result's body, remapped on first use), and op_boolean's Rust path
+  sets `myUnifyScope` (rust_unify_scope) like the local Boolean when its target is unify-clean.
 - noshape_occt.hpp: OcShape keeps `myBrep` / `myBrepTol` / `myBrepWhy` (+ `myBrepLock`): the converted body of the
   shape (or why it has none), made once; a result of the Rust Boolean gets its body attached
   (`rust_boolean_keep`), so a chain of Booleans converts a body once. Please keep these when you touch OcShape.

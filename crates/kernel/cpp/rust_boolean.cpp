@@ -4,6 +4,7 @@
 #include "internal.hpp"
 
 #include <chrono>
+#include <functional>
 #include <optional>
 #include <cstdlib>
 
@@ -259,6 +260,22 @@ const char* cached_body(const OcShape& s, BrepBody& b, double& max_tol)
       return nullptr;
     }
   }
+  // A result of this Boolean's, its body not remapped yet (rust_boolean_keep).
+  std::function<std::shared_ptr<const BrepBody>(const OcShape&)> lazy;
+  {
+    const std::lock_guard<std::mutex> lock(s.myBrepLock);
+    std::swap(lazy, s.myBrepLazy);
+  }
+  if (lazy)
+    if (std::shared_ptr<const BrepBody> kept = lazy(s))
+    {
+      const std::lock_guard<std::mutex> lock(s.myBrepLock);
+      if (!s.myBrep)
+        s.myBrep = kept;
+      b       = *s.myBrep;
+      max_tol = std::max(max_tol, s.myBrepTol);
+      return nullptr;
+    }
   double      tol = 0;
   const char* why = to_body(s, b, tol);
   const std::lock_guard<std::mutex> lock(s.myBrepLock);
@@ -279,6 +296,8 @@ struct Built
 {
   BrepBody                  body;
   std::vector<TopoDS_Shape> v, e, f, s;
+  // Per face: the target's own (argument 0's), as it was.
+  std::vector<char>         target_face;
   double                    tol = 0;
   bool                      set = false;
 };
@@ -742,21 +761,22 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   stop();
   if (const char* why = build(r, srcs, max_tol > 0 ? max_tol : 1e-7, out, hist))
     return decline(why);
+  t_built.target_face.assign(r.face_origin.size() / 3, 0);
+  for (size_t i = 0; i < t_built.target_face.size(); ++i)
+    t_built.target_face[i] = r.face_origin[3 * i] == 0 && r.face_origin[3 * i + 1] == 0;
   t_built.body = std::move(r.body);
   t_built.tol  = max_tol;
   t_built.set  = true;
   return true;
 }
 
-void rust_boolean_keep(const OcShape& out)
+namespace
 {
-  if (!t_built.set)
-    return;
-  t_built.set = false;
+// `done`'s body in `out`'s own order (its maps'), or none when they don't match.
+std::shared_ptr<const BrepBody> kept_body(const OcShape& out, const Built& done)
+{
   const KernelTimer timer("boolean.rust.keep");
-  Built             done;
-  std::swap(done, t_built);
-  const BrepBody& b = done.body;
+  const BrepBody&   b = done.body;
   // The body in `out`'s own order (its maps').
   const ShapeIMap& vm = out.map(TopAbs_VERTEX);
   const ShapeIMap& em = out.map(TopAbs_EDGE);
@@ -765,7 +785,7 @@ void rust_boolean_keep(const OcShape& out)
   const size_t nv = b.vertices.size() / 3, ne = b.edges.size() / 2, nf = b.reversed.size(), ns = b.solid_shells.size() - 1;
   if (static_cast<size_t>(vm.Extent()) != nv || static_cast<size_t>(em.Extent()) != ne || static_cast<size_t>(fm.Extent()) != nf
       || static_cast<size_t>(sm.Extent()) != ns)
-    return;
+    return nullptr;
   auto order = [](const ShapeIMap& m, const std::vector<TopoDS_Shape>& built, std::vector<uint32_t>& at) {
     at.resize(built.size());
     for (size_t i = 0; i < built.size(); ++i)
@@ -779,7 +799,7 @@ void rust_boolean_keep(const OcShape& out)
   };
   std::vector<uint32_t> av, ae, af, as;
   if (!order(vm, done.v, av) || !order(em, done.e, ae) || !order(fm, done.f, af) || !order(sm, done.s, as))
-    return;
+    return nullptr;
   auto c = std::make_shared<BrepBody>();
   std::vector<double> vx(3 * nv), cu(11 * ne), su(12 * nf);
   std::vector<uint32_t> ed(2 * ne);
@@ -838,9 +858,66 @@ void rust_boolean_keep(const OcShape& out)
     }
     c->solid_shells.push_back(static_cast<uint32_t>(c->shell_faces.size() - 1));
   }
+  return c;
+}
+} // namespace
+
+std::shared_ptr<const UnifyScope> rust_unify_scope(const OcShape& target)
+{
+  if (!t_built.set)
+    return nullptr;
+  const KernelTimer timer("boolean.rust.unify_scope");
+  auto              sc = std::make_shared<UnifyScope>();
+  ShapeIMap         out_v, out_e, changed, changed_edges;
+  for (const TopoDS_Shape& v : t_built.v)
+    out_v.Add(v);
+  for (const TopoDS_Shape& e : t_built.e)
+    out_e.Add(e);
+  // The faces the target didn't have as they are (pieces, the tools', new): their vertices are seeds, and
+  // so are those of the target's edges the result lost.
+  for (size_t i = 0; i < t_built.f.size(); ++i)
+    if (!t_built.target_face[i])
+      changed.Add(t_built.f[i]);
+  for (int i = 1; i <= changed.Extent(); ++i)
+  {
+    for (TopExp_Explorer x(changed(i), TopAbs_VERTEX); x.More(); x.Next())
+      sc->seeds.Add(x.Current());
+    for (TopExp_Explorer x(changed(i), TopAbs_EDGE); x.More(); x.Next())
+      changed_edges.Add(x.Current());
+  }
+  const ShapeIMap& te = target.map(TopAbs_EDGE);
+  for (int k = 1; k <= te.Extent(); ++k)
+    if (!out_e.Contains(te(k)))
+      for (TopExp_Explorer x(te(k), TopAbs_VERTEX); x.More(); x.Next())
+        if (out_v.Contains(x.Current()))
+          sc->seeds.Add(x.Current());
+  // Where to look: those faces, and every face at a seed or across an edge of one of them.
+  BRep_Builder bb;
+  bb.MakeCompound(sc->faces);
+  for (const TopoDS_Shape& f : t_built.f)
+  {
+    bool in = changed.Contains(f);
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More() && !in; x.Next())
+      in = changed_edges.Contains(x.Current());
+    for (TopExp_Explorer x(f, TopAbs_VERTEX); x.More() && !in; x.Next())
+      in = sc->seeds.Contains(x.Current());
+    if (in)
+      bb.Add(sc->faces, f);
+  }
+  return sc;
+}
+
+void rust_boolean_keep(const OcShape& out)
+{
+  if (!t_built.set)
+    return;
+  t_built.set = false;
+  // Remapped on first use (cached_body): the model's unify usually makes a new shape of it first.
+  auto done = std::make_shared<Built>();
+  std::swap(*done, t_built);
   const std::lock_guard<std::mutex> lock(out.myBrepLock);
-  out.myBrep    = c;
-  out.myBrepTol = done.tol;
+  out.myBrepTol  = done->tol;
+  out.myBrepLazy = [done](const OcShape& o) { return kept_body(o, *done); };
 }
 
 } // namespace noshape

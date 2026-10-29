@@ -166,6 +166,9 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
                   double fuzzy = 0, bool touching_only = false);
 // Keeps this thread's last result's flat body on `out` (its OcShape), for the next Boolean on it.
 void rust_boolean_keep(const OcShape& out);
+// Where in this thread's last result a unify has to look, its target (`target`) having had nothing to merge
+// (as the local Boolean's UnifyScope); call before rust_boolean_keep.
+std::shared_ptr<const UnifyScope> rust_unify_scope(const OcShape& target);
 // The kernel's own Booleans outside op_boolean (Shell, slabs): `op` (0 fuse, 1 cut, 2 common) of `args` by
 // `tools`, noshape's where it takes them, else OCCT's (in parallel with `parallel`); recorded with
 // NOSHAPE_RECORD_BOOLEANS. False when OCCT's fails.

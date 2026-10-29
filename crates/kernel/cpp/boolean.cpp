@@ -2974,13 +2974,23 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     if (done)
     {
       t_bool_path = "rust";
+      // A target known to have nothing to merge: the unify (here or op_unify's) looks only where it changed.
+      std::shared_ptr<const UnifyScope> scope;
+      if (rs[0] != nullptr && rs[0]->myUnifyClean && unify_local_on())
+        scope = rust_unify_scope(*rs[0]);
+      bool clean = false;
       if (opts.unify)
-        out = unify(out, h);
+        out = scope ? unify_in(out, h, scope.get(), &clean) : unify(out, h);
       std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("boolean.rust.result");
       OpOut r = make_result(concat(args.items, tools.items), out, h.get(), &rs);
       lap.reset();
+      if (opts.unify && scope)
+        r.shape->myUnifyClean = clean;
       if (!opts.unify)
+      {
+        r.shape->myUnifyScope = scope;
         rust_boolean_keep(*r.shape);
+      }
       return r;
     }
   }
