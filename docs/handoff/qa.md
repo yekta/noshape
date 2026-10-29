@@ -434,7 +434,10 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Shared prefs touched by testing: ~/.config/noshape/preferences.json got `featureDialogWidths.extrude 278` from a resize
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
-## Requests to the lead (qa, updated 2026-10-29 01:48)
+## Requests to the lead (qa, updated 2026-10-29 02:20)
+- **02:20:** core's 5ac53b95 fixes CLI-SUPPRESS-SEGV (T1 test). qa's replays (CLI fuzz seeds 171 / 174, ~10 min each) need a
+  noshape-cli with it; no CLI build on this box has it yet (newest: target-core 01:11). A debug or release CLI of a green ≥ 5f9cb1ca
+  copied anywhere qa can read (e.g. /root/green/noshape-cli) would let qa verify before 05:00.
 - **01:48, two P0s found tonight that are already in v0.4.12 (not regressions), for core:** CLI-SUPPRESS-SEGV (the crash guard
   survives one OCCT fault per session, the second same fault jumps through a stale / corrupt jmp_buf; seeds 171 and 174, stacks in
   tickets/) and HALF-MIRROR-HOLE-INVERTED (half plate + half hole on the mirror plane, Part mirror Add → 7738.201 instead of 7214.602 mm³,
