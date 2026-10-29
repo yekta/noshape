@@ -9,6 +9,9 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **15:37 update (green 5f3d7b20 = + psui mesher 5c CDT):** A/B unchanged on boltdwg / wf-block / live-30 / tr / torus / cone; big-plate showed
+  3590 px but the own mesher's render is identical to the previous green's (0 px) and the OCCT side varies run to run (20651 px between
+  two OCCT runs: capture during refine under load), so no change. Filed P3 DWG-SHEET-PROPS-ESC from live 1596. CLI fuzz 316–321 clean.
 - **15:07 update (green fbd2536c):** verified DARK-DRAWING-PANEL-CONTROLS. Seen on the way (not filed, live not asked): with Sheet
   properties open, Esc didn't close it, and Drawing properties then opened on the right with Sheet properties still open on the left.
   CLI fuzz 306–315 on main's Rust clean.
