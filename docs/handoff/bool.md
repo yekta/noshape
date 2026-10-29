@@ -105,6 +105,10 @@ lists them -seam, circle, +seam, circle where OCCT's goes +seam, circle, -seam, 
 in the face's parameter plane, and unify_same_domain then doesn't merge it with the wall above. Next: the loop
 order of a seam face that comes out reversed.
 
+The 30-feature part's edit commit (`regen_profile::edit_commit_profile`, dev build, load 15–19, 10-29 01:44,
+with everything above): Rust Boolean on 102, 124 ms (features 81, 90); off 158, 166 ms (features 130, 134). Hole
+1 15 → 8.5 ms, Linear pattern 1 12 → 4 ms, Boss 6 9 → under 3.5 ms; the chamfers and fillets are now most of it.
+
 Looked at and left (10-29 01:40):
 - The seam cases (19 "an arc across a cylinder's seam" + 5 "a section along ..." in the fresh corpus, 8 s) are
   the merge problem above: with the seam change, 02fb69425a58e283's result has the tool's cylinder face (z
