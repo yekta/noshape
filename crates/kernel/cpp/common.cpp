@@ -1536,15 +1536,18 @@ std::terminate_handler     g_previous_terminate = nullptr;
 // The C library's code (where malloc / free run), found at install.
 uintptr_t g_libc_lo = 0, g_libc_hi = 0;
 
-uintptr_t fault_pc(const void* ctx)
+// The faulting instruction (Linux; 0 elsewhere: no C library check there).
+uintptr_t fault_pc([[maybe_unused]] const void* ctx)
 {
+#if defined(__linux__) && (defined(__x86_64__) || defined(__aarch64__))
   const ucontext_t* uc = static_cast<const ucontext_t*>(ctx);
   if (uc == nullptr)
     return 0;
-#if defined(__linux__) && defined(__x86_64__)
+  #if defined(__x86_64__)
   return (uintptr_t)uc->uc_mcontext.gregs[REG_RIP];
-#elif defined(__linux__) && defined(__aarch64__)
+  #else
   return (uintptr_t)uc->uc_mcontext.pc;
+  #endif
 #else
   return 0;
 #endif
