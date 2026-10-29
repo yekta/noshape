@@ -9,6 +9,11 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **01:35 update (green c87fd518 = + skasm 8ed2eeb4 / 24aaab66, psui mesher step 2 2ac8d541; not yet bool 438ec212 / 838d3835):**
+  verified ASM-INTERFERENCE-NONE, ASM-OVERDEFINED-TEXT. Mesher step 2 A/B (wf-block, boltdwg): identical renders and triangle counts
+  (could not confirm the toggle engages: no mesh.rust timer in the log). CLI seeds 176 / 177 fine, 178 / 179 running. Crash-doc
+  sweep: cli-72L-died "NOT done" was my artefact (its content was all in the WAL; checkpointed the fixture). Waiting for a green with
+  bool 838d3835 to re-run mirhole / topomatrix / rbbisect / volsweep / matrices.
 - **01:30 update:** drawing V71 ✅ (Explode/Position ▸ Default · Explode 1 applies). GUI fuzz 100 (fd03, qa-1026-main) alive. Running:
   crash-document open sweep in the green app on :110 (/tmp/qa-crashdocs.sh → cli/crashdocs-<sha>.out), face sweep Rust on / off over
   the crash fixtures + fuzz bodies (cli/facesweep2-bool2253.out), CLI seeds 176 / 177. Note: tonight's tickets/cli-suppress-segv.noshape
