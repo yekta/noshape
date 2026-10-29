@@ -147,9 +147,14 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    live's "Near"); DIN 7050 / 7051 / 967 tapping screws 345bf2c5 with live's lists, names and table values on the
    generic screw (generic cross recess and cone tip: live's drafted Type H / Z recess sketches and C / F / R tips are in
    dom/skasm-sc-gaps/*_features.json to match next). A size label's "{l}" places the length ("… 6.5 x 10 x M5x0.8",
-   "…ST2.2x4.5"; 7049 repeated it before). Already there: DIN 6908 (flat, = live's volume), ISO 10512. Still missing:
-   NASM 45938 with self-locking threads, NASM 45938/4, NAS 1129 blind / thru, PEM ×52: FSRules + body details only (no
-   /features), so their geometry has to come from the B-rep (dom/skasm-sc-gaps, dom/skb-sc-fsrules PEM_*).
+   "…ST2.2x4.5"; 7049 repeated it before). NAS 1129 blind / thru 5166e6dd (standoff feature; a size's lengthDims /
+   lengthNames for the hole depth per length, nameWithoutLength), NASM 45938/4 f85f4917 (flushNut; the Sheet thickness
+   select per size, a param's names at the label's "{Sheet thickness}"); all = live's face types and volumes. Already
+   there: DIN 6908, ISO 10512. Still missing: NASM 45938 *with* self-locking threads (48 faces, 2 B-spline: our form 10
+   body + Revolve 2's conical lip under EDia, two crimp cuts from Plane 1 (Sketch 3: EDia*0.955 flats, EDia/6), two
+   fillets; dom/skasm-sc-gaps/NAS_*45938__features.json) and PEM ×52 (no /features yet: REQUESTS skasm 10-29 07:00).
+   Live's studio defaults sometimes differ from the table (NAS 1129 thru minor 0.067 vs 0.0667, NASM 45938/4 ax 0.0225
+   vs 0.028125): check the construction at the studio values, then test ours at the table's.
    Earlier: ANSI taper pin crowned ends 10-27.
 5. Broken-sketch solve time: a constraint on qa's 438-entity fuzz sketch ~85–125 ms in the sketch crate (9
    exclusion attempts of ~15 ms, the failing component's LM each time). Candidate: retry only the failing component.
