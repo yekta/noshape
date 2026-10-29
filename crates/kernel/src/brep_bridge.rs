@@ -71,7 +71,7 @@ fn nurbs_at(nurbs: &[f64], at: usize) -> Nurbs {
         let k0 = at + 6;
         let p0 = k0 + nk;
         let w0 = p0 + 3 * np;
-        return Nurbs::Curve(NurbsCurve { degree, knots: nurbs[k0..p0].to_vec(), poles: pts(p0, np), weights: if rational { nurbs[w0..w0 + np].to_vec() } else { Vec::new() } });
+        return Nurbs::Curve(NurbsCurve { degree, knots: nurbs[k0..p0].to_vec(), poles: pts(p0, np), weights: if rational { nurbs[w0..w0 + np].to_vec() } else { Vec::new() }, spans: Default::default() });
     }
     let (udegree, vdegree, nku, nkv, nu, nv, rational) = (n(1), n(2), n(3), n(4), n(5), n(6), n(7) == 1);
     let ku = at + 8;

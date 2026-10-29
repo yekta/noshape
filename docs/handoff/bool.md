@@ -526,6 +526,26 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   its helices' pieces on the rod need curves on the rod's cylinder (OCCT splits each helix in 21 and projects them,
   BOPTools_AlgoTools2D::BuildPCurveForEdgeOnFace, tolerance ~1.02e-7): next.
 
+## Free-form speed: helices (lead's step 4, 10-29 19:45 UTC)
+- The thread fused with its rod (8dc3e8d4) got through end to end once a piece of another argument's edge lying
+  on a cylinder got its curve there projected as the pave filler does (`piece_pcurve`:
+  BOPTools_AlgoTools2D::BuildPCurveForEdgeOnFace on the input face). It matched OCCT but took 77 s (OCCT 3-4 s
+  wall): curve/curve crossings on its 290-pole degree-10 helices dominated. Now:
+  - a NURBS part samples 8 points per knot span it covers, not per span of the whole curve;
+  - crossings of two curves look only at runs of 16 chords whose boxes meet, and not at all when the curves'
+    control-polygon boxes are apart (`C2::quick_box`); the nearest-curve distance skips curves whose box is
+    farther than the nearest found yet; a face's vertices are looked for only in a NURBS path's box;
+  - NURBS curves evaluate by de Casteljau on their spans' Bézier pieces, made once per curve (A5.6;
+    `NurbsCurve::spans`, a cache field, `Default` when making a curve: psui, a public type change), instead of the
+    basis functions each time (the same values to ~1e-14; T1 `nurbs::tests::spans_evaluate_as_the_basis_functions`).
+  77 s → 1.6 s CPU for the Rust Boolean (0.35 s of it OCCT's face/face sections), against OCCT's 3-4 s wall.
+- A copy of a NURBS curve starts with no spans (its poles may be changed after: the free-form faces' scaled curves
+  on them did, and evaluated the original's; T1 `nurbs::tests::a_copy_with_other_poles_evaluates_them`).
+- Replays, all 0 differ, one more each: main 660, corpus2 509, corpus3 514, corpus4 553, corpus5 647, corpus6 600
+  (the thread fuse), Shell's 70, direct 52. The thread fuse: ours 2.3 s against OCCT's 3.1 s wall (replay, loaded
+  machine); thread ∩ cylinder (74acee2f) 0.54 s against 0.99 s; extruded-fillet cuts 21 ms against 45 ms.
+- The other thread fuse (45b63a7e) declines "a non-manifold result": next.
+
 ## Next
 Corpus6 (10-29 13:30, recorded OCCT time of what the Rust path still declines, loaded machine): curved edges
 32.8 s (73: helical B-spline sweeps against rods ~15 s in 3, fillet slabs), one slab fuse with an internal face

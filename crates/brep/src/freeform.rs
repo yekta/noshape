@@ -148,7 +148,7 @@ mod tests {
     #[test]
     fn derivatives_of_each_kind() {
         let (x, y, z) = (DVec3::X, DVec3::Y, DVec3::Z);
-        let line = NurbsCurve { degree: 1, knots: vec![0.0, 0.0, 2.0, 2.0], poles: vec![DVec3::new(3.0, 0.0, 0.0), DVec3::new(4.0, 0.0, 2.0)], weights: Vec::new() };
+        let line = NurbsCurve { degree: 1, knots: vec![0.0, 0.0, 2.0, 2.0], poles: vec![DVec3::new(3.0, 0.0, 0.0), DVec3::new(4.0, 0.0, 2.0)], weights: Vec::new(), spans: Default::default() };
         for s in [
             FreeSurface::Torus { o: DVec3::new(1.0, 2.0, 3.0), x, y, z, major: 5.0, minor: 1.5 },
             FreeSurface::Torus { o: DVec3::ZERO, x, y: -y, z, major: 5.0, minor: 1.5 },

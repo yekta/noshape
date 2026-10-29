@@ -2,16 +2,37 @@
 //! points and derivatives (Piegl & Tiller, The NURBS Book, A2.3 / A3.2 / A3.6 / A4.2 / A4.4), and a point's
 //! parameters (from the nearest sample, then Newton's method).
 
-use glam::{DVec2, DVec3};
+use glam::{DVec2, DVec3, DVec4};
+use std::sync::OnceLock;
 
 /// A curve in 3D (2D ones have z = 0): its degree, knots (each as often as its multiplicity), poles, and weights
-/// (empty: polynomial).
-#[derive(Clone, Debug, PartialEq)]
+/// (empty: polynomial); `spans`: its pieces as polynomials, made when first evaluated (`Default` when making one).
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct NurbsCurve {
     pub degree: usize,
     pub knots: Vec<f64>,
     pub poles: Vec<DVec3>,
     pub weights: Vec<f64>,
+    pub spans: Spans,
+}
+
+/// A NURBS curve's non-empty knot spans as Bézier pieces of its homogeneous form (w x, w y, w z, w): (start, end,
+/// control points). Evaluated by de Casteljau's algorithm instead of the basis functions each time.
+#[derive(Debug, Default)]
+pub struct Spans(OnceLock<Vec<(f64, f64, Vec<DVec4>)>>);
+
+impl Clone for Spans {
+    /// (Empty: a copy's poles may be changed, scaled.)
+    fn clone(&self) -> Spans {
+        Spans::default()
+    }
+}
+
+impl PartialEq for Spans {
+    /// (A cache: no part of the curve.)
+    fn eq(&self, _: &Spans) -> bool {
+        true
+    }
 }
 
 /// A surface: degrees, knots, poles row by row (`poles[i * nv + j]`, i along u), weights likewise (empty:
@@ -143,22 +164,125 @@ impl NurbsCurve {
         (self.knots[self.degree], self.knots[self.poles.len()])
     }
 
-    /// The point at `t` and its first and second derivatives.
-    pub fn derivs(&self, t: f64) -> [DVec3; 3] {
+    /// The poles its part from `lo` to `hi` lies in the hull of (weights positive).
+    pub fn poles_of(&self, lo: f64, hi: f64) -> &[DVec3] {
         let (p, n) = (self.degree, self.poles.len());
-        let s = span(&self.knots, p, n, t);
-        let b = basis_derivs(&self.knots, s, t, p, 2);
-        // Homogeneous derivatives (weighted points and weights), then the rational quotient rule (A4.2).
-        let mut aw = [DVec3::ZERO; 3];
-        let mut w = [0.0; 3];
-        for (k, row) in b.iter().enumerate() {
-            for (j, &nj) in row.iter().enumerate().take(p + 1) {
-                let i = s - p + j;
-                let wi = if self.weights.is_empty() { 1.0 } else { self.weights[i] };
-                aw[k] += self.poles[i] * (nj * wi);
-                w[k] += nj * wi;
+        let (a, b) = (span(&self.knots, p, n, lo.min(hi)), span(&self.knots, p, n, lo.max(hi)));
+        &self.poles[a - p..=b]
+    }
+
+    /// Its spans as Bézier pieces (made once; empty when its knots aren't clamped at both ends).
+    fn spans(&self) -> &[(f64, f64, Vec<DVec4>)] {
+        self.spans.0.get_or_init(|| {
+            let (p, np) = (self.degree, self.poles.len());
+            let u = &self.knots;
+            let m = u.len() - 1;
+            if p == 0 || u.len() != np + p + 1 || u[..=p].iter().any(|&k| k != u[0]) || u[m - p..].iter().any(|&k| k != u[m]) {
+                return Vec::new();
+            }
+            let pw: Vec<DVec4> = (0..np).map(|i| {
+                let w = if self.weights.is_empty() { 1.0 } else { self.weights[i] };
+                (self.poles[i] * w).extend(w)
+            }).collect();
+            // Knot insertion to full multiplicity (A5.6).
+            let mut out = Vec::new();
+            let (mut a, mut b) = (p, p + 1);
+            let mut q: Vec<DVec4> = pw[..=p].to_vec();
+            let mut alphas = vec![0.0; p + 1];
+            while b < m {
+                let i = b;
+                while b < m && u[b + 1] == u[b] {
+                    b += 1;
+                }
+                let mult = b - i + 1;
+                let mut next = vec![DVec4::ZERO; p + 1];
+                if mult < p {
+                    let numer = u[b] - u[a];
+                    for j in (mult + 1..=p).rev() {
+                        alphas[j - mult - 1] = numer / (u[a + j] - u[a]);
+                    }
+                    let r = p - mult;
+                    for j in 1..=r {
+                        let save = r - j;
+                        let s = mult + j;
+                        for k in (s..=p).rev() {
+                            let al = alphas[k - s];
+                            q[k] = q[k] * al + q[k - 1] * (1.0 - al);
+                        }
+                        if b < m {
+                            next[save] = q[p];
+                        }
+                    }
+                }
+                out.push((u[a], u[b], std::mem::take(&mut q)));
+                if b < m {
+                    for k in p - mult.min(p)..=p {
+                        next[k] = pw[b - p + k];
+                    }
+                    q = next;
+                    a = b;
+                    b += 1;
+                }
+            }
+            if !q.is_empty() {
+                out.push((u[a], u[b.min(m)], q));
+            }
+            out
+        })
+    }
+
+    /// The homogeneous point at `t` and its first and second derivatives: de Casteljau on its span's Bézier
+    /// piece (None: no pieces).
+    fn homogeneous(&self, t: f64) -> Option<[DVec4; 3]> {
+        let spans = self.spans();
+        if spans.is_empty() {
+            return None;
+        }
+        let k = spans.partition_point(|x| x.0 <= t).saturating_sub(1).min(spans.len() - 1);
+        let (a, b, ref q) = spans[k];
+        let p = q.len() - 1;
+        let h = b - a;
+        let s = (t - a) / h;
+        let mut v = [DVec4::ZERO; M];
+        v[..=p].copy_from_slice(q);
+        let (mut d1, mut d2) = (DVec4::ZERO, DVec4::ZERO);
+        for level in 1..=p {
+            if level == p - 1 && p >= 2 {
+                // The last three points: the second derivative.
+                d2 = (v[2] - v[1] * 2.0 + v[0]) * ((p * (p - 1)) as f64 / (h * h));
+            }
+            if level == p {
+                d1 = (v[1] - v[0]) * (p as f64 / h);
+            }
+            for i in 0..=p - level {
+                v[i] = v[i] * (1.0 - s) + v[i + 1] * s;
             }
         }
+        Some([v[0], d1, d2])
+    }
+
+    /// The point at `t` and its first and second derivatives.
+    pub fn derivs(&self, t: f64) -> [DVec3; 3] {
+        // Homogeneous derivatives (weighted points and weights), then the rational quotient rule (A4.2).
+        let (aw, w) = match self.homogeneous(t) {
+            Some(hd) => ([hd[0].truncate(), hd[1].truncate(), hd[2].truncate()], [hd[0].w, hd[1].w, hd[2].w]),
+            None => {
+                let (p, n) = (self.degree, self.poles.len());
+                let s = span(&self.knots, p, n, t);
+                let b = basis_derivs(&self.knots, s, t, p, 2);
+                let mut aw = [DVec3::ZERO; 3];
+                let mut w = [0.0; 3];
+                for (k, row) in b.iter().enumerate() {
+                    for (j, &nj) in row.iter().enumerate().take(p + 1) {
+                        let i = s - p + j;
+                        let wi = if self.weights.is_empty() { 1.0 } else { self.weights[i] };
+                        aw[k] += self.poles[i] * (nj * wi);
+                        w[k] += nj * wi;
+                    }
+                }
+                (aw, w)
+            }
+        };
         let mut c = [DVec3::ZERO; 3];
         for k in 0..3 {
             let mut v = aw[k];
@@ -171,6 +295,9 @@ impl NurbsCurve {
     }
 
     pub fn at(&self, t: f64) -> DVec3 {
+        if let Some([h, _, _]) = self.homogeneous(t) {
+            return h.truncate() / h.w;
+        }
         let (p, n) = (self.degree, self.poles.len());
         let s = span(&self.knots, p, n, t);
         let b = basis(&self.knots, s, t, p);
@@ -343,7 +470,56 @@ mod tests {
             knots: vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
             poles: vec![DVec3::new(2.0, 0.0, 0.0), DVec3::new(2.0, 2.0, 0.0), DVec3::new(0.0, 2.0, 0.0)],
             weights: vec![1.0, FRAC_1_SQRT_2, 1.0],
+            spans: Default::default(),
         }
+    }
+
+    #[test]
+    fn spans_evaluate_as_the_basis_functions() {
+        // A degree 10 curve of 60 poles, uneven knots, weights: its spans' polynomials against A2.2 / A2.3.
+        let (p, n) = (10usize, 60usize);
+        let mut knots = vec![0.0; p + 1];
+        for k in 1..n - p {
+            knots.push(k as f64 + 0.37 * ((k * 7) % 5) as f64);
+        }
+        let end = knots[knots.len() - 1] + 1.3;
+        knots.extend(std::iter::repeat_n(end, p + 1));
+        let poles: Vec<DVec3> = (0..n).map(|i| DVec3::new((i as f64 * 0.7).cos(), (i as f64 * 0.7).sin(), 0.05 * i as f64) * 0.01).collect();
+        let weights: Vec<f64> = (0..n).map(|i| 1.0 + 0.3 * ((i * 3) % 4) as f64).collect();
+        let c = NurbsCurve { degree: p, knots: knots.clone(), poles: poles.clone(), weights: weights.clone(), spans: Default::default() };
+        let mut worst = [0.0_f64; 3];
+        for k in 0..=2000 {
+            let t = end * k as f64 / 2000.0;
+            let s = span(&knots, p, n, t);
+            let b = basis_derivs(&knots, s, t, p, 2);
+            let (mut aw, mut w) = ([DVec3::ZERO; 3], [0.0; 3]);
+            for (d, row) in b.iter().enumerate() {
+                for (j, &nj) in row.iter().enumerate().take(p + 1) {
+                    aw[d] += poles[s - p + j] * (nj * weights[s - p + j]);
+                    w[d] += nj * weights[s - p + j];
+                }
+            }
+            let c0 = aw[0] / w[0];
+            let c1 = (aw[1] - c0 * w[1]) / w[0];
+            let c2 = (aw[2] - c1 * (2.0 * w[1]) - c0 * w[2]) / w[0];
+            let got = c.derivs(t);
+            for (i, (g, want)) in got.iter().zip([c0, c1, c2]).enumerate() {
+                worst[i] = worst[i].max((*g - want).length() / want.length().max(1e-3));
+            }
+            assert!((c.at(t) - c0).length() <= 1e-16 + 1e-13 * c0.length(), "{t}");
+        }
+        assert!(worst[0] < 1e-13 && worst[1] < 1e-11 && worst[2] < 1e-9, "{worst:?}");
+    }
+
+    #[test]
+    fn a_copy_with_other_poles_evaluates_them() {
+        let c = quarter();
+        let _ = c.at(0.5);
+        let mut d = c.clone();
+        for p in &mut d.poles {
+            *p *= 3.0;
+        }
+        assert!((d.at(0.5) - c.at(0.5) * 3.0).length() < 1e-12);
     }
 
     #[test]

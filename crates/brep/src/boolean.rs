@@ -755,10 +755,19 @@ impl Ctx<'_> {
                 cuts.push((t, End::Point(path.at(t))));
             }
         }
-        // The face's vertices on it (where it runs along the boundary).
+        // The face's vertices on it (where it runs along the boundary; a NURBS curve's: those in its box).
+        let near = match path {
+            Path::Nurbs { c, .. } => Some(free::piece_box(c, t0, t1)),
+            _ => None,
+        };
         for k in 0..self.faces[f].edges.len() {
             let (e, _) = self.faces[f].edges[k];
             for w in self.edges[e].v {
+                if let Some((lo, hi)) = near
+                    && !boxes_meet(self.p(w), self.p(w), lo, hi, GREY * tol)
+                {
+                    continue;
+                }
                 let q = self.faces[f].to2(self.p(w));
                 let (u, dist) = c2.param_of(q);
                 if dist <= tol && u > 0.0 && u < 1.0 {

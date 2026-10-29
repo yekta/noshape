@@ -726,7 +726,15 @@ const char* piece_pcurve(const BrepResult& r, const std::vector<const OcShape*>&
   double            a = 0, z = 0;
   const occ::handle<Geom2d_Curve> pf = BRep_Tool::CurveOnSurface(se, sf, a, z);
   if (pf.IsNull())
-    return "an input edge without its curve on a face";
+  {
+    // A piece of another argument's edge lying on the face: its curve there projected, as the pave filler's
+    // (MakePCurves on the input face; the piece's tolerance to the projection's).
+    BOPTools_AlgoTools2D::BuildPCurveForEdgeOnFace(e, sf);
+    double b0 = 0, b1 = 0;
+    if (BRep_Tool::CurveOnSurface(e, sf, b0, b1).IsNull())
+      return "an input edge without its curve on a face";
+    return nullptr;
+  }
   if (BRep_Tool::IsClosed(se, sf))
     bb.UpdateEdge(e, pf, BRep_Tool::CurveOnSurface(TopoDS::Edge(se.Reversed()), sf, a, z), s, loc, BRep_Tool::Tolerance(e));
   else
@@ -1319,6 +1327,7 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
   const bool        swap = std::make_pair(b_arg, b_face) < std::make_pair(a_arg, a_face);
   const TopoDS_Face fa   = TopoDS::Face(input(*t_free->srcs, swap ? b_arg : a_arg, TopAbs_FACE, swap ? b_face : a_face));
   const TopoDS_Face fb   = TopoDS::Face(input(*t_free->srcs, swap ? a_arg : b_arg, TopAbs_FACE, swap ? a_face : b_face));
+  const KernelTimer timer("boolean.rust.sections");
   IntTools_FaceFace ff;
   ff.SetParameters(true, true, true, 1e-7);
   ff.Perform(fa, fb);

@@ -37,6 +37,18 @@ impl Map {
         self.map_on(p, d, None)
     }
 
+    /// Whether `p` is at a cylinder's angles' ends (where a curve's side there matters).
+    pub fn at_seam(&self, p: DVec3) -> bool {
+        match *self {
+            Map::Plane { .. } => false,
+            Map::Cyl { o, x, y, th0, .. } => {
+                let w = p - o;
+                let th = (w.dot(y).atan2(w.dot(x)) - th0).rem_euclid(TAU);
+                th <= 1e-9 || th >= TAU - 1e-9
+            }
+        }
+    }
+
     /// The same for a point of a curve going on from it along `d` (`end` false) or arriving at it along `d` (`end`
     /// true): at a cylinder's angles' ends, on the side the curve is on there (a curve from end to end of the
     /// angles, once round, starts at one and ends at the other).
@@ -105,8 +117,14 @@ impl C2 {
             }
             C2::Nurbs { ref c, t0, t1 } => c.at(t0 + (t1 - t0) * t).truncate(),
             C2::Mapped { ref c, t0, t1, m } => {
-                let [p, d1, _] = c.derivs(t0 + (t1 - t0) * t);
-                m.map_on(p, d1 * (t1 - t0), Some(t > 0.5)).0
+                let u = t0 + (t1 - t0) * t;
+                let p = c.at(u);
+                if m.at_seam(p) {
+                    let [_, d1, _] = c.derivs(u);
+                    m.map_on(p, d1 * (t1 - t0), Some(t > 0.5)).0
+                } else {
+                    m.map(p, DVec3::ZERO).0
+                }
             }
         }
     }
@@ -223,7 +241,12 @@ impl C2 {
     fn samples(&self) -> usize {
         match self {
             C2::Seg { .. } => 1,
-            C2::Nurbs { c, .. } | C2::Mapped { c, .. } => SAMPLES.max(8 * (c.poles.len() - c.degree)),
+            // (8 a knot span of the part it is.)
+            C2::Nurbs { c, t0, t1 } | C2::Mapped { c, t0, t1, .. } => {
+                let (lo, hi) = (t0.min(*t1), t0.max(*t1));
+                let spans = c.knots[c.degree..=c.poles.len()].windows(2).filter(|w| w[1] > w[0] && w[1] > lo && w[0] < hi).count();
+                SAMPLES.max(8 * spans)
+            }
             _ => SAMPLES,
         }
     }
@@ -378,7 +401,32 @@ impl C2 {
     /// [`Self::intersections`] by sampling both into polylines and refining each crossing near a pair of their
     /// segments by Newton's method on the curves themselves; none where they run together (most of one's
     /// samples within `tol` of the other).
+    /// A box it lies in, when one comes cheaply: a NURBS part's poles' (a cylinder's map: their heights, all its
+    /// angles).
+    pub(crate) fn quick_box(&self) -> Option<(DVec2, DVec2)> {
+        let hull = |q: &mut dyn Iterator<Item = DVec2>| q.fold((DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY)), |(l, h), x| (l.min(x), h.max(x)));
+        match *self {
+            C2::Seg { a, b } => Some((a.min(b), a.max(b))),
+            C2::Arc { c, r, .. } => Some((c - DVec2::splat(r), c + DVec2::splat(r))),
+            C2::Nurbs { ref c, t0, t1 } => Some(hull(&mut c.poles_of(t0, t1).iter().map(|p| p.truncate()))),
+            C2::Mapped { ref c, t0, t1, m: Map::Plane { origin, u, v } } => Some(hull(&mut c.poles_of(t0, t1).iter().map(|p| DVec2::new((*p - origin).dot(u), (*p - origin).dot(v))))),
+            C2::Mapped { ref c, t0, t1, m: Map::Cyl { o, a, r, flip, th0, .. } } => {
+                let s = if flip { -1.0 } else { 1.0 };
+                let (lo, hi) = hull(&mut c.poles_of(t0, t1).iter().map(|p| DVec2::splat(s * (*p - o).dot(a))));
+                Some((DVec2::new(r * th0, lo.y), DVec2::new(r * (th0 + TAU), hi.y)))
+            }
+            C2::Trig { .. } | C2::Hyp { .. } => None,
+        }
+    }
+
     fn numeric_intersections(&self, o: &C2, tol: f64) -> Vec<(f64, f64)> {
+        // (Boxes apart: none.)
+        if let (Some(a), Some(b)) = (self.quick_box(), o.quick_box()) {
+            let g = 4.0 * tol;
+            if a.1.x + g < b.0.x || b.1.x + g < a.0.x || a.1.y + g < b.0.y || b.1.y + g < a.0.y {
+                return Vec::new();
+            }
+        }
         let together = |a: &C2, b: &C2| (0..=8).filter(|&k| b.distance(a.at(k as f64 / 8.0)) <= tol).count() >= 5;
         if together(self, o) || together(o, self) {
             return Vec::new();
@@ -388,52 +436,76 @@ impl C2 {
         let pb: Vec<DVec2> = (0..=nb).map(|k| o.at(k as f64 / nb as f64)).collect();
         let scale = pa.iter().chain(&pb).fold(0.0_f64, |m, p| m.max(p.abs().max_element())).max(1e-9);
         let mut out: Vec<(f64, f64)> = Vec::new();
-        for i in 0..na {
-            let (a0, a1) = (pa[i], pa[i + 1]);
-            let (alo, ahi) = (a0.min(a1) - DVec2::splat(4.0 * tol), a0.max(a1) + DVec2::splat(4.0 * tol));
-            for j in 0..nb {
-                let (b0, b1) = (pb[j], pb[j + 1]);
-                // (Chords bulge from their curve: seeds from any pair whose boxes, grown, meet.)
-                let grow = 0.25 * ((a1 - a0).length() + (b1 - b0).length());
-                let (blo, bhi) = (b0.min(b1) - DVec2::splat(grow), b0.max(b1) + DVec2::splat(grow));
-                if ahi.x < blo.x || bhi.x < alo.x || ahi.y < blo.y || bhi.y < alo.y {
-                    continue;
-                }
-                let (mut s, mut t) = ((i as f64 + 0.5) / na as f64, (j as f64 + 0.5) / nb as f64);
-                let mut ok = false;
-                for _ in 0..40 {
-                    let f = self.at(s) - o.at(t);
-                    let (da, db) = (self.derivs(s).0, -o.derivs(t).0);
-                    let det = da.perp_dot(db);
-                    if det.abs() < 1e-300 {
-                        break;
+        // Runs of 16 chords each, their boxes grown as the chords' below: only runs whose boxes meet are looked at.
+        const RUN: usize = 16;
+        let runs = |p: &[DVec2], n: usize, pad: f64| -> Vec<(DVec2, DVec2)> {
+            (0..n.div_ceil(RUN))
+                .map(|r| {
+                    let q = &p[r * RUN..=((r + 1) * RUN).min(n)];
+                    let (lo, hi) = q.iter().fold((DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY)), |(l, h), &x| (l.min(x), h.max(x)));
+                    let long = q.windows(2).fold(0.0_f64, |m, w| m.max((w[1] - w[0]).length()));
+                    (lo - DVec2::splat(0.25 * long + pad), hi + DVec2::splat(0.25 * long + pad))
+                })
+                .collect()
+        };
+        let (ra, rb) = (runs(&pa, na, 4.0 * tol), runs(&pb, nb, 0.0));
+        let chords = |ia: std::ops::Range<usize>, ib: std::ops::Range<usize>, out: &mut Vec<(f64, f64)>| {
+            for i in ia {
+                let (a0, a1) = (pa[i], pa[i + 1]);
+                let (alo, ahi) = (a0.min(a1) - DVec2::splat(4.0 * tol), a0.max(a1) + DVec2::splat(4.0 * tol));
+                for j in ib.clone() {
+                    let (b0, b1) = (pb[j], pb[j + 1]);
+                    // (Chords bulge from their curve: seeds from any pair whose boxes, grown, meet.)
+                    let grow = 0.25 * ((a1 - a0).length() + (b1 - b0).length());
+                    let (blo, bhi) = (b0.min(b1) - DVec2::splat(grow), b0.max(b1) + DVec2::splat(grow));
+                    if ahi.x < blo.x || bhi.x < alo.x || ahi.y < blo.y || bhi.y < alo.y {
+                        continue;
                     }
-                    let ds = -f.perp_dot(db) / det;
-                    let dt = -da.perp_dot(f) / det;
-                    s += ds;
-                    t += dt;
-                    if !(-0.5..=1.5).contains(&s) || !(-0.5..=1.5).contains(&t) {
-                        break;
+                    let (mut s, mut t) = ((i as f64 + 0.5) / na as f64, (j as f64 + 0.5) / nb as f64);
+                    let mut ok = false;
+                    for _ in 0..40 {
+                        let f = self.at(s) - o.at(t);
+                        let (da, db) = (self.derivs(s).0, -o.derivs(t).0);
+                        let det = da.perp_dot(db);
+                        if det.abs() < 1e-300 {
+                            break;
+                        }
+                        let ds = -f.perp_dot(db) / det;
+                        let dt = -da.perp_dot(f) / det;
+                        s += ds;
+                        t += dt;
+                        if !(-0.5..=1.5).contains(&s) || !(-0.5..=1.5).contains(&t) {
+                            break;
+                        }
+                        if ds.abs() < 1e-15 && dt.abs() < 1e-15 {
+                            ok = true;
+                            break;
+                        }
                     }
-                    if ds.abs() < 1e-15 && dt.abs() < 1e-15 {
-                        ok = true;
-                        break;
+                    let f = (self.at(s) - o.at(t)).length();
+                    if !(ok || f <= 1e-12 * scale) || f > 1e-9 * scale {
+                        continue;
                     }
-                }
-                let f = (self.at(s) - o.at(t)).length();
-                if !(ok || f <= 1e-12 * scale) || f > 1e-9 * scale {
-                    continue;
-                }
-                let e = 1e-9;
-                if s < -e || s > 1.0 + e || t < -e || t > 1.0 + e {
-                    continue;
-                }
-                let (s, t) = (s.clamp(0.0, 1.0), t.clamp(0.0, 1.0));
-                if !out.iter().any(|x| (x.0 - s).abs() < 1e-9 && (x.1 - t).abs() < 1e-9) {
-                    out.push((s, t));
+                    let e = 1e-9;
+                    if s < -e || s > 1.0 + e || t < -e || t > 1.0 + e {
+                        continue;
+                    }
+                    let (s, t) = (s.clamp(0.0, 1.0), t.clamp(0.0, 1.0));
+                    if !out.iter().any(|x| (x.0 - s).abs() < 1e-9 && (x.1 - t).abs() < 1e-9) {
+                        out.push((s, t));
+                    }
                 }
             }
+        };
+        for (ri, a) in ra.iter().enumerate() {
+            for (rj, b) in rb.iter().enumerate() {
+                if a.1.x < b.0.x || b.1.x < a.0.x || a.1.y < b.0.y || b.1.y < a.0.y {
+                    continue;
+                }
+                chords(ri * RUN..((ri + 1) * RUN).min(na), rj * RUN..((rj + 1) * RUN).min(nb), &mut out);
+            }
         }
+        out.sort_by(|x, y| x.0.total_cmp(&y.0).then(x.1.total_cmp(&y.1)));
         out
     }
 
@@ -531,7 +603,17 @@ pub(crate) fn inside(p: DVec2, edges: &[C2]) -> bool {
 
 /// The distance from `p` to the nearest of `edges`.
 pub(crate) fn distance(p: DVec2, edges: &[C2]) -> f64 {
-    edges.iter().map(|e| e.distance(p)).fold(f64::INFINITY, f64::min)
+    // Nearest box first; none whose box is farther than the nearest found yet.
+    let mut order: Vec<(f64, &C2)> = edges.iter().map(|e| (e.quick_box().map_or(0.0, |(lo, hi)| (lo - p).max(p - hi).max(DVec2::ZERO).length()), e)).collect();
+    order.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut best = f64::INFINITY;
+    for (away, e) in order {
+        if away >= best {
+            break;
+        }
+        best = best.min(e.distance(p));
+    }
+    best
 }
 
 #[cfg(test)]
@@ -578,6 +660,7 @@ mod tests {
             knots: vec![0.0, 0.0, 0.0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1.0, 1.0, 1.0],
             poles: xy.iter().enumerate().map(|(k, &(x, y))| DVec3::new(x, y, 0.1 * k as f64)).collect(),
             weights: (0..9).map(|k| if k % 2 == 0 { 1.0 } else { h }).collect(),
+            spans: Default::default(),
         };
         let m = Map::Cyl { o: DVec3::ZERO, a: DVec3::Z, x: DVec3::X, y: DVec3::Y, r: 1.0, flip: false, th0: 0.0, mid: PI };
         let up = C2::Mapped { c: std::sync::Arc::new(c), t0: 0.0, t1: 1.0, m };
