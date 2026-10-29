@@ -4972,6 +4972,50 @@ fn pem_tso_standoffs_match_live() {
     }
 }
 
+/// PEM® TPS™ / TP4™ flush-head pilot pins (live's raw /features and body
+/// details): the Type select names the part ("PEM TPS-3MM-8", "PEM
+/// TP4-3MM-8", "PEM TPS-125-6"), the description as live's ("PEM TPS-3MM-8
+/// Stainless Steel Passivated"); 3 x 8 = live's studio default, 17 faces
+/// (CONE 5, CYLINDER 5, PLANE 4, TORUS 3); every size and length builds.
+#[test]
+fn pem_tps_pins_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let name = "TPS™/TP4™ Flush-head pilot pins";
+    let metric = CATALOGUE.iter().find(|c| c.name == name && !c.inch).unwrap();
+    let unified = CATALOGUE.iter().find(|c| c.name == name && c.inch).unwrap();
+    let mut spec = StandardSpec::new(metric);
+    assert_eq!((spec.part_name(), spec.description()), ("PEM TPS-3MM-8".to_string(), "PEM TPS-3MM-8   Stainless Steel Passivated".to_string()));
+    spec.params.insert("Type".into(), "TP4™".into());
+    assert_eq!(spec.part_name(), "PEM TP4-3MM-8");
+    assert_eq!(StandardSpec::new(unified).part_name(), "PEM TPS-125-6");
+    let r = standard::regenerate(&StandardSpec::new(metric)).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let mut kinds = std::collections::BTreeMap::new();
+    for i in 0..b.faces.len() {
+        let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+            Surface::Plane(_) => "plane",
+            Surface::Cone { .. } => "cone",
+            Surface::Cylinder { .. } => "cylinder",
+            Surface::Torus { .. } => "torus",
+            _ => "other",
+        };
+        *kinds.entry(k).or_insert(0) += 1;
+    }
+    assert_eq!(kinds, [("cone", 5), ("cylinder", 5), ("plane", 4), ("torus", 3)].into_iter().collect());
+    for c in [metric, unified] {
+        for s in &c.sizes {
+            for l in &s.lengths {
+                let mut spec = StandardSpec::new(c);
+                spec.set_size(&s.name);
+                spec.length = Some(l.clone());
+                let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{} x {l}: {e}", s.name));
+                assert!(standard::part_body(&r).is_some(), "{} x {l}", s.name);
+            }
+        }
+    }
+}
+
 /// ANSI commercial taper pins and slotted spring pins with live's whole size
 /// lists (its FSRules tables, behaviours "skasm (2026-10-27) standard content
 /// gaps": taper pins from #7/0, spring pins with 9/64, 5/8, 3/4); every size

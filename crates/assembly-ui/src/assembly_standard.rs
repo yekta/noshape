@@ -832,7 +832,7 @@ fn paint_fastener(b: Bounds<Pixels>, pv: Preview, window: &mut Window) {
             }
             stroke(&circle(ex, ey, r * 0.5), false);
         }
-        Shape::Pin => stroke(&circle(ex, ey, r * 0.6), false),
+        Shape::Pin | Shape::PemPin => stroke(&circle(ex, ey, r * 0.6), false),
         Shape::Key => stroke(&[(ex - r * 0.5, ey - r * 0.5), (ex + r * 0.5, ey - r * 0.5), (ex + r * 0.5, ey + r * 0.5), (ex - r * 0.5, ey + r * 0.5)], true),
         Shape::RetainingRing => {
             stroke(&arc(ex, ey, r, 0.35, TAU - 0.35), false);
@@ -906,7 +906,7 @@ fn paint_fastener(b: Bounds<Pixels>, pv: Preview, window: &mut Window) {
             }
             shank(&mut stroke, x1, hr);
         }
-        Shape::Screw | Shape::Pin => {
+        Shape::Screw | Shape::Pin | Shape::PemPin => {
             let hr = 19.0f32;
             stroke(&[(sx + 3.0, ey - hr), (sx, ey - hr + 3.0), (sx, ey + hr - 3.0), (sx + 3.0, ey + hr)], false);
             stroke(&[(sx + 3.0, ey - hr), (sx + 3.0, ey + hr)], false);

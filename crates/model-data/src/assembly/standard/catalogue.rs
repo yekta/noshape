@@ -33,6 +33,8 @@ pub enum Shape {
     FlushNut,
     /// PEM® self-clinching standoffs.
     PemStandoff,
+    /// PEM® self-clinching pins.
+    PemPin,
 }
 
 impl Shape {
@@ -51,11 +53,12 @@ impl Shape {
             Shape::Standoff => "standoff",
             Shape::FlushNut => "flushNut",
             Shape::PemStandoff => "pemStandoff",
+            Shape::PemPin => "pemPin",
         }
     }
     /// Whether the component has a length (bolts, screws, pins, keys).
     pub fn has_length(self) -> bool {
-        matches!(self, Shape::Screw | Shape::Pin | Shape::Key | Shape::ShoulderScrew | Shape::SocketShoulderScrew | Shape::Standoff | Shape::PemStandoff)
+        matches!(self, Shape::Screw | Shape::Pin | Shape::Key | Shape::ShoulderScrew | Shape::SocketShoulderScrew | Shape::Standoff | Shape::PemStandoff | Shape::PemPin)
     }
     /// Nuts, washers, rings fit over a shaft: auto-size rounds up.
     pub fn fits_over(self) -> bool {

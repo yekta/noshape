@@ -1064,6 +1064,112 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_SELFCLINCHING_THREADED_STANDOFF_FOR_THIN_SHEETS_MAIN, DATA_SELFCLINCHING_THREADED_STANDOFF_FOR_THIN_SHEETS_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 79278c35cb724411a31e1ecd; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching pins",
+    "name": "TPS™/TP4™ Flush-head pilot pins",
+    "shape": "pemPin",
+    "form": {},
+    "params": [
+     {
+      "label": "Type",
+      "options": [
+       "TPS™",
+       "TP4™"
+      ],
+      "default": "TPS™",
+      "names": {
+       "TPS™": "TPS",
+       "TP4™": "TP4"
+      }
+     }
+    ],
+    "materials": [
+     "Stainless Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "",
+      "finish": "Passivated",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "3",
+      "label": "PEM {Type}-3MM-{l}",
+      "d": 3.0,
+      "dims": {
+       "hd": 5.2,
+       "p": 3.0,
+       "dd": 2.11,
+       "sd": 2.29,
+       "hs": 3.5
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "16"
+      ]
+     },
+     {
+      "name": "4",
+      "label": "PEM {Type}-4MM-{l}",
+      "d": 4.0,
+      "dims": {
+       "hd": 6.12,
+       "p": 4.0,
+       "dd": 2.82,
+       "sd": 2.29,
+       "hs": 4.5
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "16"
+      ]
+     },
+     {
+      "name": "5",
+      "label": "PEM {Type}-5MM-{l}",
+      "d": 5.0,
+      "dims": {
+       "hd": 7.19,
+       "p": 5.0,
+       "dd": 3.53,
+       "sd": 2.29,
+       "hs": 5.5
+      },
+      "lengths": [
+       "10",
+       "12",
+       "16",
+       "20"
+      ]
+     },
+     {
+      "name": "6",
+      "label": "PEM {Type}-6MM-{l}",
+      "d": 6.0,
+      "dims": {
+       "hd": 8.13,
+       "p": 6.0,
+       "dd": 4.24,
+       "sd": 2.29,
+       "hs": 6.5
+      },
+      "lengths": [
+       "12",
+       "16",
+       "20"
+      ]
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_FLUSH_HEAD_PILOT_PINS_MAIN, DATA_PEM_SELFCLINCHING_FLUSH_HEAD_PILOT_PINS_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 594b20ce14a98ac84af48ff6; live/dom/skb-sc-fsrules); dialog as live"
    }
   ]
  },
@@ -2609,6 +2715,117 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_SELFCLINCHING_THREADED_STANDOFF_FOR_THIN_SHEETS_MAIN, DATA_SELFCLINCHING_THREADED_STANDOFF_FOR_THIN_SHEETS_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 9ab2c0a94213c6e2d31f716c; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching pins",
+    "name": "TPS™/TP4™ Flush-head pilot pins",
+    "shape": "pemPin",
+    "form": {},
+    "params": [
+     {
+      "label": "Type",
+      "options": [
+       "TPS™",
+       "TP4™"
+      ],
+      "default": "TPS™",
+      "names": {
+       "TPS™": "TPS",
+       "TP4™": "TP4"
+      }
+     }
+    ],
+    "materials": [
+     "Stainless Steel"
+    ],
+    "materialCodes": {
+     "Stainless Steel": {
+      "code": "",
+      "finish": "Passivated",
+      "finishCode": ""
+     }
+    },
+    "sizes": [
+     {
+      "name": "0.125",
+      "label": "PEM {Type}-125-{l}",
+      "d": 0.125,
+      "dims": {
+       "hd": 0.205,
+       "p": 0.125,
+       "dd": 0.09,
+       "sd": 0.09,
+       "hs": 0.144
+      },
+      "lengths": [
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "1"
+      ],
+      "lengthNames": {
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "1": "16"
+      }
+     },
+     {
+      "name": "0.187",
+      "label": "PEM {Type}-187-{l}",
+      "d": 0.187,
+      "dims": {
+       "hd": 0.27,
+       "p": 0.187,
+       "dd": 0.132,
+       "sd": 0.09,
+       "hs": 0.205
+      },
+      "lengths": [
+       "0.375",
+       "0.5",
+       "0.625",
+       "0.75",
+       "1"
+      ],
+      "lengthNames": {
+       "0.375": "6",
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "1": "16"
+      }
+     },
+     {
+      "name": "0.25",
+      "label": "PEM {Type}-250-{l}",
+      "d": 0.25,
+      "dims": {
+       "hd": 0.335,
+       "p": 0.25,
+       "dd": 0.177,
+       "sd": 0.09,
+       "hs": 0.272
+      },
+      "lengths": [
+       "0.5",
+       "0.625",
+       "0.75",
+       "1"
+      ],
+      "lengthNames": {
+       "0.5": "8",
+       "0.625": "10",
+       "0.75": "12",
+       "1": "16"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_PEM_SELFCLINCHING_FLUSH_HEAD_PILOT_PINS_MAIN, DATA_PEM_SELFCLINCHING_FLUSH_HEAD_PILOT_PINS_LENGTH, DATA_FASTENER_MATERIAL_TYPE (component document 78e4aa66458f5a5e90e25739; live/dom/skb-sc-fsrules); dialog as live"
    }
   ]
  }

@@ -2744,3 +2744,62 @@ export const pemStandoff = defineFeature(function(context is Context, id is Id, 
         subtract(context, id + "trim", ring, cylinderZ(context, id + "bore", -g - g, g, rt > EPS ? rt : rc));
         uniteAll(context, id);
     });
+
+/**
+ * Live's PEM® TPS™ / TP4™ flush-head pilot pins (raw /features and body
+ * details): z = 0 on the head top (live's "Near"), the head hd across with
+ * its rim rounded 0.021 hd, 0.18 sd thick; a collar (p + hd) / 2 across
+ * 0.09 sd high; the hole-size band hs with a V groove (0.075 p wide, sides
+ * 2:1, its bottom rounded 0.025 p) centred on it; a 45° step to the pin p at
+ * 0.7 sd; the pin to l, its end tapered 26° to dd with a 120 degree dimple
+ * 0.3 p across.
+ */
+annotation { "Feature Type Name" : "PEM pin" }
+export const pemPin = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "l" }
+        isLength(definition.l, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "hd" }
+        isLength(definition.hd, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "p" }
+        isLength(definition.p, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dd" }
+        isLength(definition.dd, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "sd" }
+        isLength(definition.sd, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "hs" }
+        isLength(definition.hs, NONNEGATIVE_LENGTH_BOUNDS);
+    }
+    {
+        const p = definition.p;
+        const sd = definition.sd;
+        const l = definition.l;
+        const R = definition.hd / 2;
+        const rf = 0.021 * definition.hd;
+        const hk = 0.18 * sd;
+        const rcol = (p + definition.hd) / 4;
+        const zcol = -hk - 0.09 * sd;
+        const rh = definition.hs / 2;
+        const rp = p / 2;
+        const z45 = -0.7 * sd;
+        const zband = z45 + (rh - rp);
+        const zc = (zcol + zband) / 2;
+        const hw = 0.0375 * p;
+        const ig = 0.0125 * p;
+        const dep = 2 * (hw - ig);
+        const rg = 0.025 * p;
+        const cx = rh - dep + sqrt(rg * rg - ig * ig);
+        const re = definition.dd / 2;
+        const zt = -l + (rp - re) / tan(26 * degree);
+        const rd = 0.15 * p;
+        const s45 = sqrt(0.5);
+        revolveProfile(context, id + "body", [
+                    { "p" : rz(Z, Z) }, { "p" : rz(R - rf, Z) }, { "p" : rz(R, -rf), "mid" : rz(R - rf + rf * s45, -rf + rf * s45) },
+                    { "p" : rz(R, -hk + rf) }, { "p" : rz(R - rf, -hk), "mid" : rz(R - rf + rf * s45, -hk + rf - rf * s45) },
+                    { "p" : rz(rcol, -hk) }, { "p" : rz(rcol, zcol) }, { "p" : rz(rh, zcol) }, { "p" : rz(rh, zc + hw) },
+                    { "p" : rz(rh - dep, zc + ig) }, { "p" : rz(rh - dep, zc - ig), "mid" : rz(cx - rg, zc) }, { "p" : rz(rh, zc - hw) },
+                    { "p" : rz(rh, zband) }, { "p" : rz(rp, z45) }, { "p" : rz(rp, zt) }, { "p" : rz(re, -l) }, { "p" : rz(rd, -l) },
+                    { "p" : rz(Z, -l + rd / tan(60 * degree)) }
+                ]);
+    });
