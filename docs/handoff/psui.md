@@ -278,6 +278,13 @@ N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes
      z-order hash), u32 half-edges, inserting in ring order instead of BRIO (3× slower). live-30's floor is
      then about that one face plus the fixed per-call costs (~1–2 ms: reads, edges, fill): ~3–6× is near
      what's reachable without splitting a face's triangulation across threads.
+     Step 5d (d5ae3ded): a planar face's CDT result cached by its rings, grid points and insertion order (the
+     only inputs; 16 kept, faces of 256+ nodes, the final checks re-run on a hit): an edit that moves live-30's
+     plate top along its normal takes the last triangulation. live-30 edit commit here (load ~30): ours
+     3.5–7 ms per display mesh against BRepMesh 18–75 (was 9–28). fins-400 after the fin (model
+     pattern_second::timed_the_fin_plate_redisplays_after_the_fin): the display 52–60 ms (was 133–153), its mesh
+     ~20 ms; the rest is display work outside meshing (N02's open item). perf.yml's mesher step now also times
+     live-30's edit commits ("live-30 edit" rows).
 0. **After the cold-start work: our own display mesher (lead 10-28 21:05, user-approved).** `brep::mesh` in crates/brep
    (bool's crate, its Body / Surface / Curve types): planes (polygons with holes), cylinders, cones, spheres, tori from
    their exact parameterisation, shared edge samples (watertight), the display's deflection rules; anything else
