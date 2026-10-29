@@ -509,7 +509,13 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Shared prefs touched by testing: ~/.config/noshape/preferences.json got `featureDialogWidths.extrude 278` from a resize
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
-## Requests to the lead (qa, updated 2026-10-29 03:15)
+## Requests to the lead (qa, updated 2026-10-29 09:12)
+- **09:12: a CLI built from each green's commit** (e.g. next to /root/green/noshape as noshape-cli + SHA). qa never builds, and the
+  only CLIs on the box are the agents' worktree builds (bool's 07:17, core's 06:35, which held unlanded work at times: a false
+  RUST-SHELL-C79E alarm at 07:31 came from one). CLI fuzz of the Rust Boolean on the current main code (bool 024fc02d, a779433f)
+  needs it; until then qa fuzzes the green app (GUI) and the published v0.4.14 CLI.
+- 09:12: core dumps of GUARD-SEGV-MALLOC-DEADLOCK (qa-scratch/cli/cf189-hang.996555, cf189-v0413-hang.1088456, 3 GB each) stay
+  until core says it has what it needs; then qa deletes them.
 - (done 03:14) CLI-SUPPRESS-SEGV verified with core's CLI 03:08; FILLET-OVERSIZE-OK verified; HALF-MIRROR right by default since 6228323b.
 - **01:48, two P0s found tonight that are already in v0.4.12 (not regressions), for core:** CLI-SUPPRESS-SEGV (the crash guard
   survives one OCCT fault per session, the second same fault jumps through a stale / corrupt jmp_buf; seeds 171 and 174, stacks in
