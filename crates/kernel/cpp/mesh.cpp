@@ -29,6 +29,7 @@
 #include <Poly_Polygon3D.hxx>
 #include <Poly_PolygonOnTriangulation.hxx>
 #include <Poly_Triangle.hxx>
+#include <OSD_Parallel.hxx>
 #include <Poly_Triangulation.hxx>
 #include <TopLoc_Location.hxx>
 
@@ -648,6 +649,7 @@ private:
 struct FaceTri
 {
   occ::handle<Poly_Triangulation> tri;
+  RustFace                        rust; // noshape's mesher's (no tri then)
   gp_Trsf                         trsf;
   bool                            identity = true;
   bool                            reversed = false;
@@ -666,7 +668,8 @@ struct MeshSet
 {
   double lin = 0, ang = 0;
   NCollection_DataMap<TopoDS_Shape, occ::handle<Poly_Triangulation>, TopTools_ShapeMapHasher> faces;
-  NCollection_DataMap<TopoDS_Shape, std::vector<std::array<float, 3>>, TopTools_ShapeMapHasher> edges;
+  NCollection_DataMap<TopoDS_Shape, RustFace, TopTools_ShapeMapHasher>                     rust; // noshape's mesher's
+  NCollection_DataMap<TopoDS_Shape, std::shared_ptr<const std::vector<std::array<float, 3>>>, TopTools_ShapeMapHasher> edges;
   size_t                                                                                        nodes = 0;
 };
 
@@ -683,10 +686,10 @@ MeshSet* mesh_set(double lin, double ang)
     if (m.ang == ang && std::abs(m.lin - lin) <= 0.01 * lin)
     {
       if (m.nodes > 20000000)
-        m = MeshSet{lin, ang, {}, {}, 0};
+        m = MeshSet{lin, ang, {}, {}, {}, 0};
       return &m;
     }
-  sets.push_front(MeshSet{lin, ang, {}, {}, 0});
+  sets.push_front(MeshSet{lin, ang, {}, {}, {}, 0});
   while (sets.size() > 3)
     sets.pop_back();
   return &sets.front();
@@ -748,7 +751,7 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     int               nfresh = m->faces.Extent();
     if (set != nullptr)
       for (int i = 1; i <= m->faces.Extent(); ++i)
-        if (set->faces.IsBound(m->faces(i)))
+        if (set->faces.IsBound(m->faces(i)) || set->rust.IsBound(m->faces(i)))
           fresh[(size_t)i] = 0, --nfresh;
     bool partial = set != nullptr && nfresh < m->faces.Extent();
     for (int i = 1; i <= m->edges.Extent() && partial; ++i)
@@ -776,9 +779,9 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
       std::fill(fresh.begin(), fresh.end(), 1);
     // Faces noshape's own mesher takes (psui, mesh_rust.cpp) aren't BRepMesh's.
     std::vector<char>                              taken((size_t)m->faces.Extent() + 1, 0);
-    std::vector<occ::handle<Poly_Triangulation>>   rust_tris((size_t)m->faces.Extent() + 1);
+    std::vector<RustFace>                          rust_meshes((size_t)m->faces.Extent() + 1);
     std::vector<std::vector<std::array<float, 3>>> rust_polys((size_t)m->edges.Extent());
-    const int ntaken = !relative && !mesh_faces && rust_mesh_on() ? rust_mesh_faces(m->faces, m->edges, m->vertices, fresh, lin, ang, taken, rust_tris, rust_polys) : 0;
+    const int ntaken = !relative && !mesh_faces && rust_mesh_on() ? rust_mesh_faces(m->faces, m->edges, m->vertices, fresh, lin, ang, parallel, taken, rust_meshes, rust_polys) : 0;
     m->rust_faces            = (size_t)ntaken;
     if (partial || ntaken > 0)
     {
@@ -806,6 +809,16 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     {
       const TopoDS_Face& f = TopoDS::Face(m->faces(i));
       TopLoc_Location    loc;
+      if (!fresh[(size_t)i] && set->rust.IsBound(f))
+      {
+        // noshape's mesher's, from the cache.
+        FaceTri& ft = side->faces[i - 1];
+        ft.reversed = f.Orientation() == TopAbs_REVERSED;
+        ft.rust     = set->rust.Find(f);
+        m->nodes += ft.rust.n1 - ft.rust.n0;
+        m->indices += 3 * (size_t)(ft.rust.t1 - ft.rust.t0);
+        continue;
+      }
       if (!fresh[(size_t)i])
       {
         // From the cache, in the face's frame.
@@ -820,12 +833,25 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
         m->indices += 3 * (size_t)tri->NbTriangles();
         continue;
       }
-      // noshape's mesher's (in the face's frame), else BRepMesh's.
-      const occ::handle<Poly_Triangulation> tri = taken[(size_t)i] ? rust_tris[(size_t)i] : BRep_Tool::Triangulation(f, loc);
-      if (taken[(size_t)i])
-        loc = f.Location();
       FaceTri& ft = side->faces[i - 1];
       ft.reversed = f.Orientation() == TopAbs_REVERSED;
+      if (taken[(size_t)i])
+      {
+        // noshape's mesher's, kept for the next mesh.
+        ft.rust = std::move(rust_meshes[(size_t)i]);
+        const size_t nn = ft.rust.n1 - ft.rust.n0;
+        m->nodes += nn;
+        m->indices += 3 * (size_t)(ft.rust.t1 - ft.rust.t0);
+        if (set != nullptr)
+        {
+          if (!set->rust.IsBound(f))
+            set->nodes += nn;
+          set->rust.Bind(f, ft.rust);
+        }
+        continue;
+      }
+      // BRepMesh's.
+      const occ::handle<Poly_Triangulation> tri = BRep_Tool::Triangulation(f, loc);
       if (tri.IsNull())
         continue;
       if (is_mesh_face(f))
@@ -875,12 +901,14 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     }
 
     lap = std::make_unique<KernelTimer>("mesh.edges");
-    // Edge polylines (inside the lock: reads polygons stored on edges).
+    // Edge polylines (inside the lock: reads polygons stored on edges). Each edge's made on its own, in
+    // parallel (OCCT's pool, as BRepMesh's); then the new ones cached and turned to the edge's way, in turn.
     m->edge_polys.resize(m->edges.Extent());
-    for (int i = 1; i <= m->edges.Extent(); ++i)
-    {
+    std::vector<char> made((size_t)m->edges.Extent(), 0); // made now (the FORWARD edge's way), not cached
+    std::vector<std::vector<std::array<float, 3>>> polys((size_t)m->edges.Extent());
+    auto              edge_poly = [&](int i) {
       const TopoDS_Edge& e    = TopoDS::Edge(m->edges(i));
-      auto&              poly = m->edge_polys[i - 1];
+      auto&              poly = polys[(size_t)i - 1];
       const auto [f0, f1] = faces_of(i);
       // Not edges in Onshape: not drawn, so not pickable (shown_topology): a
       // seam closes every face it bounds.
@@ -888,95 +916,104 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
       for (const uint32_t* f = f0; f != f1 && seam; ++f)
         seam = BRep_Tool::IsClosed(e, TopoDS::Face(m->faces((int)*f + 1)));
       if (BRep_Tool::Degenerated(e) || seam)
-        continue;
+        return;
       // None of its faces meshed now: its polyline from the cache.
       bool cached = set != nullptr && f0 != f1;
       for (const uint32_t* f = f0; f != f1 && cached; ++f)
         cached = !fresh[(size_t)*f + 1];
       if (cached)
-        if (const std::vector<std::array<float, 3>>* c = set->edges.Seek(e))
+        if (const auto* c = set->edges.Seek(e))
         {
-          poly = *c;
-          if (e.Orientation() == TopAbs_REVERSED)
-            std::reverse(poly.begin(), poly.end());
-          m->edge_points += poly.size();
-          continue;
+          m->edge_polys[(size_t)i - 1] = *c;
+          return;
         }
-      bool done = false;
+      made[(size_t)i - 1] = 1;
       // noshape's mesher's nodes.
       if (!rust_polys[(size_t)i - 1].empty())
       {
-        poly = rust_polys[(size_t)i - 1];
-        done = true;
+        poly = std::move(rust_polys[(size_t)i - 1]);
+        return;
       }
+      for (const uint32_t* fi = f0; fi != f1; ++fi)
       {
-        for (const uint32_t* fi = f0; fi != f1 && !done; ++fi)
+        const TopoDS_Face& f = TopoDS::Face(m->faces((int)*fi + 1));
+        TopLoc_Location    floc;
+        const occ::handle<Poly_Triangulation>& tri = BRep_Tool::Triangulation(f, floc);
+        if (tri.IsNull())
+          continue;
+        TopLoc_Location eloc;
+        const occ::handle<Poly_PolygonOnTriangulation>& pot =
+          BRep_Tool::PolygonOnTriangulation(e, tri, eloc);
+        if (pot.IsNull())
+          continue;
+        const bool ident = eloc.IsIdentity();
+        gp_Trsf    t     = ident ? gp_Trsf() : eloc.Transformation();
+        poly.reserve(pot->NbNodes());
+        for (int k = 1; k <= pot->NbNodes(); ++k)
         {
-          const TopoDS_Face& f = TopoDS::Face(m->faces((int)*fi + 1));
-          TopLoc_Location    floc;
-          const occ::handle<Poly_Triangulation>& tri = BRep_Tool::Triangulation(f, floc);
-          if (tri.IsNull())
+          const int ni = pot->Node(k);
+          if (ni < 1 || ni > tri->NbNodes())
             continue;
-          TopLoc_Location eloc;
-          const occ::handle<Poly_PolygonOnTriangulation>& pot =
-            BRep_Tool::PolygonOnTriangulation(e, tri, eloc);
-          if (pot.IsNull())
-            continue;
-          const bool ident = eloc.IsIdentity();
-          gp_Trsf    t     = ident ? gp_Trsf() : eloc.Transformation();
-          poly.reserve(pot->NbNodes());
-          for (int k = 1; k <= pot->NbNodes(); ++k)
-          {
-            const int ni = pot->Node(k);
-            if (ni < 1 || ni > tri->NbNodes())
-              continue;
-            gp_Pnt p = tri->Node(ni);
-            if (!ident)
-              p.Transform(t);
-            poly.push_back({(float)p.X(), (float)p.Y(), (float)p.Z()});
-          }
-          done = !poly.empty();
+          gp_Pnt p = tri->Node(ni);
+          if (!ident)
+            p.Transform(t);
+          poly.push_back({(float)p.X(), (float)p.Y(), (float)p.Z()});
         }
+        if (!poly.empty())
+          return;
       }
-      if (!done)
+      TopLoc_Location                    l3;
+      const occ::handle<Poly_Polygon3D>& p3 = BRep_Tool::Polygon3D(e, l3);
+      if (!p3.IsNull())
       {
-        TopLoc_Location                    l3;
-        const occ::handle<Poly_Polygon3D>& p3 = BRep_Tool::Polygon3D(e, l3);
-        if (!p3.IsNull())
+        gp_Trsf t = l3.IsIdentity() ? gp_Trsf() : l3.Transformation();
+        for (int k = p3->Nodes().Lower(); k <= p3->Nodes().Upper(); ++k)
         {
-          gp_Trsf t = l3.IsIdentity() ? gp_Trsf() : l3.Transformation();
-          for (int k = p3->Nodes().Lower(); k <= p3->Nodes().Upper(); ++k)
-          {
-            gp_Pnt p = p3->Nodes().Value(k);
-            if (!l3.IsIdentity())
-              p.Transform(t);
-            poly.push_back({(float)p.X(), (float)p.Y(), (float)p.Z()});
-          }
-          done = !poly.empty();
+          gp_Pnt p = p3->Nodes().Value(k);
+          if (!l3.IsIdentity())
+            p.Transform(t);
+          poly.push_back({(float)p.X(), (float)p.Y(), (float)p.Z()});
         }
+        if (!poly.empty())
+          return;
       }
-      if (!done)
+      try
       {
-        try
+        BRepAdaptor_Curve           c(e);
+        GCPnts_TangentialDeflection d(c, ang, relative ? lin * 0.01 : lin);
+        for (int k = 1; k <= d.NbPoints(); ++k)
         {
-          BRepAdaptor_Curve           c(e);
-          GCPnts_TangentialDeflection d(c, ang, relative ? lin * 0.01 : lin);
-          for (int k = 1; k <= d.NbPoints(); ++k)
-          {
-            gp_Pnt p = d.Value(k);
-            poly.push_back({(float)p.X(), (float)p.Y(), (float)p.Z()});
-          }
-        }
-        catch (const Standard_Failure&)
-        {
-          poly.clear();
+          gp_Pnt p = d.Value(k);
+          poly.push_back({(float)p.X(), (float)p.Y(), (float)p.Z()});
         }
       }
-      if (set != nullptr)
-        set->edges.Bind(e, poly);
-      if (e.Orientation() == TopAbs_REVERSED)
-        std::reverse(poly.begin(), poly.end());
-      m->edge_points += poly.size();
+      catch (const Standard_Failure&)
+      {
+        poly.clear();
+      }
+    };
+    constexpr int run = 64;
+    const int     ne  = m->edges.Extent();
+    OSD_Parallel::For(
+      0, (ne + run - 1) / run,
+      [&](int c) {
+        for (int i = c * run + 1; i <= std::min(ne, (c + 1) * run); ++i)
+        {
+          edge_poly(i);
+          if (made[(size_t)i - 1])
+            m->edge_polys[(size_t)i - 1] = std::make_shared<const std::vector<std::array<float, 3>>>(std::move(polys[(size_t)i - 1]));
+        }
+      },
+      !parallel || ne <= run);
+    lap = std::make_unique<KernelTimer>("mesh.edges.cache");
+    m->edge_reversed.resize((size_t)ne);
+    for (int i = 1; i <= ne; ++i)
+    {
+      auto& poly = m->edge_polys[(size_t)i - 1];
+      if (made[(size_t)i - 1] && set != nullptr)
+        set->edges.Bind(m->edges(i), poly);
+      m->edge_reversed[(size_t)i - 1] = m->edges(i).Orientation() == TopAbs_REVERSED;
+      m->edge_points += poly ? poly->size() : 0;
     }
     // The display mesh is copied out (the handles above keep it): drop it
     // from the model's faces. OCCT's booleans take their boxes from a
@@ -1027,6 +1064,50 @@ void mesh_fill(const OcMesh& m, rust::Slice<float> positions, rust::Slice<float>
     const FaceTri& ft = side->faces[fi];
     face_ranges[4 * fi + 0] = (uint32_t)ibase;
     face_ranges[4 * fi + 2] = (uint32_t)vbase;
+    if (const RustFace& r = ft.rust; r.out)
+    {
+      // noshape's mesher's: global already (a moved instance's moved here), the surface's orientation.
+      const double*   nodes = r.out->nodes.data();
+      const double*   norms = r.out->normals.data();
+      const uint32_t* tris  = r.out->tris.data();
+      const float     sgn   = ft.reversed ? -1.0f : 1.0f;
+      const uint32_t  nn    = r.n1 - r.n0, nt = r.t1 - r.t0;
+      for (uint32_t k = 0; k < nn; ++k)
+      {
+        const double* p  = nodes + 3 * (size_t)(r.n0 + k);
+        const double* nv = norms + 3 * (size_t)(r.n0 + k);
+        float*        pp = &positions[3 * (vbase + k)];
+        float*        np = &normals[3 * (vbase + k)];
+        if (r.moved)
+        {
+          gp_XYZ x(p[0], p[1], p[2]), d(nv[0], nv[1], nv[2]);
+          r.to.Transforms(x);
+          d.Multiply(r.to.HVectorialPart());
+          if (r.to.IsNegative())
+            d.Reverse();
+          pp[0] = (float)x.X(), pp[1] = (float)x.Y(), pp[2] = (float)x.Z();
+          np[0] = (float)d.X() * sgn, np[1] = (float)d.Y() * sgn, np[2] = (float)d.Z() * sgn;
+        }
+        else
+        {
+          pp[0] = (float)p[0], pp[1] = (float)p[1], pp[2] = (float)p[2];
+          np[0] = (float)nv[0] * sgn, np[1] = (float)nv[1] * sgn, np[2] = (float)nv[2] * sgn;
+        }
+      }
+      for (uint32_t t = 0; t < nt; ++t)
+      {
+        const uint32_t* tp = tris + 3 * (size_t)(r.t0 + t);
+        uint32_t*       ip = &indices[ibase + 3 * t];
+        ip[0]              = (uint32_t)vbase + tp[0];
+        ip[1]              = (uint32_t)vbase + (ft.reversed ? tp[2] : tp[1]);
+        ip[2]              = (uint32_t)vbase + (ft.reversed ? tp[1] : tp[2]);
+      }
+      face_ranges[4 * fi + 1] = 3 * nt;
+      face_ranges[4 * fi + 3] = nn;
+      vbase += nn;
+      ibase += 3 * (size_t)nt;
+      continue;
+    }
     if (ft.tri.IsNull())
     {
       face_ranges[4 * fi + 1] = 0;
@@ -1092,11 +1173,13 @@ void mesh_fill(const OcMesh& m, rust::Slice<float> positions, rust::Slice<float>
   size_t ep = 0;
   for (size_t ei = 0; ei < m.edge_polys.size(); ++ei)
   {
-    const auto& poly        = m.edge_polys[ei];
+    const auto&  poly       = m.edge_polys[ei];
+    const size_t n          = poly ? poly->size() : 0;
     edge_ranges[2 * ei + 0] = (uint32_t)ep;
-    edge_ranges[2 * ei + 1] = (uint32_t)poly.size();
-    for (const auto& p : poly)
+    edge_ranges[2 * ei + 1] = (uint32_t)n;
+    for (size_t k = 0; k < n; ++k)
     {
+      const auto& p           = (*poly)[m.edge_reversed[ei] ? n - 1 - k : k];
       edge_points[3 * ep + 0] = p[0];
       edge_points[3 * ep + 1] = p[1];
       edge_points[3 * ep + 2] = p[2];

@@ -154,11 +154,21 @@ private:
 bool rust_boolean_on();
 // noshape's own display mesher (mesh_rust.cpp): on unless NOSHAPE_MESH_RUST=0 (or set_rust_mesh(false) on this thread).
 bool rust_mesh_on();
-// Meshes the `fresh` faces it takes (analytic ones): each is marked in `taken` with its triangulation in `tris`
-// (in the face's own frame; per face index), and their edges' polylines go to `polys` (per edge index, the
-// FORWARD edge's way). Returns how many.
+// A face noshape's mesher meshed: its nodes [n0, n1) and triangles [t0, t1) of `out` (global coordinates, the
+// surface's orientation, triangles face-local), moved by `to` when `moved` (a pattern instance's face, meshed
+// as the first one). No Poly_Triangulation: mesh_fill copies them straight into the display's buffers.
+struct RustFace
+{
+  std::shared_ptr<const MeshOut> out;
+  uint32_t                       n0 = 0, n1 = 0, t0 = 0, t1 = 0;
+  bool                           moved = false;
+  gp_Trsf                        to;
+};
+// Meshes the `fresh` faces it takes (analytic ones): each is marked in `taken` with its mesh in `meshes` (per
+// face index), and their edges' polylines go to `polys` (per edge index, the FORWARD edge's way). Returns how
+// many.
 int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeIMap& vertices, const std::vector<char>& fresh, double lin, double ang,
-                    std::vector<char>& taken, std::vector<occ::handle<Poly_Triangulation>>& tris, std::vector<std::vector<std::array<float, 3>>>& polys);
+                    bool parallel, std::vector<char>& taken, std::vector<RustFace>& meshes, std::vector<std::vector<std::array<float, 3>>>& polys);
 // Notes why it wasn't tried (false; the replay's strict mode fails).
 bool rust_decline(const char* why);
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,

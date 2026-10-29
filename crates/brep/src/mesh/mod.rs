@@ -159,45 +159,24 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
     settle(&mut ok);
     // Each edge's nodes once, shared by the faces on it.
     let mut out = BodyMesh { edges: vec![None; edges.len()], faces: vec![None; faces.len()] };
+    let mut used = vec![false; edges.len()];
     for (f, _) in faces.iter().zip(&ok).filter(|(_, ok)| **ok) {
         for u in f.loops.iter().flatten() {
-            let e = u.edge as usize;
-            if let (Some(slot @ None), Some(edge)) = (out.edges.get_mut(e), edges.get(e)) {
-                *slot = edge_nodes(vertices, edge, defl);
+            if let Some(x) = used.get_mut(u.edge as usize) {
+                *x = true;
             }
         }
     }
-    // The faces on their own, in parallel (as BRepMesh meshes them): scoped threads taking runs of faces, not a
-    // shared pool, whose idle callers would take up other jobs (another body's mesh, waiting on the kernel's
-    // mesh lock this one holds).
+    let used: Vec<usize> = (0..edges.len()).filter(|&e| used[e]).collect();
+    for (e, n) in in_parallel(used.len(), 64, |k| edge_nodes(vertices, &edges[used[k]], defl)) {
+        out.edges[used[e]] = n;
+    }
+    // The faces on their own, in parallel (as BRepMesh meshes them), in runs of a few faces: a part's few tori
+    // can be most of its nodes.
     let edge_nodes = &out.edges;
     let mesh = |i: usize| if ok[i] { mesh_face(vertices, edges, &faces[i], edge_nodes, defl) } else { None };
-    // Runs of a few faces: a part's few tori can be most of its nodes.
-    const RUN: usize = 4;
-    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(8).min(faces.len().div_ceil(RUN));
-    if threads <= 1 {
-        out.faces = (0..faces.len()).map(mesh).collect();
-    } else {
-        let next = std::sync::atomic::AtomicUsize::new(0);
-        let done: Vec<Vec<(usize, Option<FaceMesh>)>> = std::thread::scope(|sc| {
-            let work = || {
-                let mut got = Vec::new();
-                loop {
-                    let a = next.fetch_add(RUN, std::sync::atomic::Ordering::Relaxed);
-                    if a >= faces.len() {
-                        return got;
-                    }
-                    got.extend((a..(a + RUN).min(faces.len())).map(|i| (i, mesh(i))));
-                }
-            };
-            let others: Vec<_> = (1..threads).map(|_| sc.spawn(work)).collect();
-            let mut all = vec![work()];
-            all.extend(others.into_iter().map(|h| h.join().unwrap_or_default()));
-            all
-        });
-        for (i, m) in done.into_iter().flatten() {
-            out.faces[i] = m;
-        }
+    for (i, m) in in_parallel(faces.len(), 4, mesh) {
+        out.faces[i] = m;
     }
     for (ok, m) in ok.iter_mut().zip(&out.faces) {
         *ok = m.is_some();
@@ -209,6 +188,35 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
         }
     }
     out
+}
+
+/// `f` of each of 0..n, in runs of `run` on scoped threads (not a shared pool, whose idle callers would take up
+/// other jobs: another body's mesh, waiting on the kernel's mesh lock this one holds); (index, value) in no
+/// particular order.
+fn in_parallel<T: Send>(n: usize, run: usize, f: impl Fn(usize) -> T + Sync) -> Vec<(usize, T)> {
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(8).min(n.div_ceil(run));
+    if threads <= 1 {
+        return (0..n).map(|i| (i, f(i))).collect();
+    }
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let work = || {
+        let mut got = Vec::new();
+        loop {
+            let a = next.fetch_add(run, std::sync::atomic::Ordering::Relaxed);
+            if a >= n {
+                return got;
+            }
+            got.extend((a..(a + run).min(n)).map(|i| (i, f(i))));
+        }
+    };
+    std::thread::scope(|sc| {
+        let others: Vec<_> = (1..threads).map(|_| sc.spawn(work)).collect();
+        let mut all = work();
+        for h in others {
+            all.extend(h.join().unwrap_or_default());
+        }
+        all
+    })
 }
 
 /// One face, its edges' nodes from `nodes`.

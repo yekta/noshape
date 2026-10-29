@@ -99,6 +99,15 @@ pub(crate) fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surface
         faces.push(MeshFace { surface, loops });
     }
     let m = mesh_body(&vertices, &edges, &faces, Deflection { linear: input.linear, angular: input.angular });
+    // Sized once (a fillet's tori are tens of thousands of nodes).
+    let (nn, nt, nu) = m.faces.iter().flatten().fold((0, 0, 0), |(n, t, u), f| (n + f.points.len(), t + f.triangles.len(), u + f.edge_nodes.iter().flatten().map(|e| 1 + e.len()).sum::<usize>()));
+    out.nodes.reserve(3 * nn);
+    out.normals.reserve(3 * nn);
+    out.tris.reserve(3 * nt);
+    out.use_nodes.reserve(nu);
+    out.face_ok.reserve(m.faces.len());
+    out.face_nodes.reserve(m.faces.len() + 1);
+    out.face_tris.reserve(m.faces.len() + 1);
     out.face_nodes.push(0);
     out.face_tris.push(0);
     for f in &m.faces {

@@ -531,7 +531,9 @@ public:
   size_t       nodes       = 0;
   size_t       indices     = 0;
   size_t       edge_points = 0;
-  std::vector<std::vector<std::array<float, 3>>> edge_polys; // per edge
+  // Per edge its polyline (shared with the mesh cache), the FORWARD edge's way; reversed: drawn the other way.
+  std::vector<std::shared_ptr<const std::vector<std::array<float, 3>>>> edge_polys;
+  std::vector<char>                                                     edge_reversed;
   bool                                           cleaned = false; // the shape's triangulations dropped
   size_t planar_fallbacks = 0; // planar faces BRepMesh's algorithm meshed
   size_t rust_faces       = 0; // faces noshape's own mesher meshed (mesh_rust.cpp)
