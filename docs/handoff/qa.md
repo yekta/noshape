@@ -9,6 +9,11 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **10:59 update (green fe405cb0 = + bool 491acf9a ellipse sections):** RUST-MIRROR-RIM-ERR **verified fixed on main** (mirror and
+  pattern cases right in the app of 60ca6465 / fe405cb0; not in v0.4.14). RUST-HALF-POCKET-3 / RUST-MIRROR-NOTCH unchanged on fe405cb0;
+  clue added: only Top-plane sketches mirrored across Right (circle seam inside the kept half). Interaction 2.3 (assembly click
+  selection) verified. CLI fuzz 199–201 (v0.4.14) clean; one Mirror 167 s in seed 200 (full regen of that document: Rust 56 s,
+  OCCT 44 s, same 22 parts). GUI fuzz seed 325 tainted by a qa check started on :131 too early (noted in its result file).
 - **10:43 update (green 60ca6465):** verified MC-SELECT-NO-READOUT; P1-17 (Mass properties with nothing selected) = live. P1 pass list:
   only P1-16 open (live's p2 model isn't recorded exactly enough to rebuild; core's 239fa250 reports 3998.630 vs live 3998.627).
   Running: CLI fuzz seeds 200–205 on v0.4.14 (/tmp/qa-cfloop.sh → cli/cfloop.summary), GUI fuzz on :110 / :131, a watch for the
