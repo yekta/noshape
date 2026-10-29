@@ -580,7 +580,8 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - Open: on a cylinder or cone a vertex exactly half a turn from the seam is two points in the parameter plane (the
   side of the seam is judged for every vertex, and rounding puts its two ends on either side; it should be only for
   vertices on the seam). Fixing it lets the tilted-holes test's 45° slot common through, whose history then differs
-  from OCCT's: both together, next (the fix alone failed the land, 10-29 23:00).
+  from OCCT's (ours: the part's edge 20 Deleted, OCCT keeps it as it is): both together, next (the fix alone failed
+  the land, 10-29 23:00).
 - Hyperbolas at an angle (not along the axis) still decline "a plane at an angle to a cone".
 - A piece of any curve within the grey band of a face's boundary is judged where it is farthest from the boundary,
   if clearly off it (was B-splines only): those five cases got past it to the parabola.
@@ -595,6 +596,20 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - Replays with the parabolas, all 0 differ: main 680, corpus2 528, corpus3 533, corpus4 574 (+1), corpus5 685 (+3),
   corpus6 640 (+4), Shell's 75 (+4), direct 52. T1: the ruling test's third configuration (through the apex; its fuse declines).
 
+## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
+| corpus | taken | median ours / OCCT | total ours / OCCT |
+|---|---|---|---|
+| main | 680 | 0.48 / 7.7 ms (<50 faces); 18 / 137 ms (50–1000) | 7.3 / 19.1 s (2.6×) |
+| corpus2 | 528 | 0.54 / 9.2 ms; 9.3 / 106 ms | 6.3 / 17.2 s (2.7×) |
+| corpus3 | 533 | 0.62 / 10.6 ms; 11.5 / 163 ms | 7.2 / 21.5 s (3.0×) |
+| corpus4 | 574 | 0.53 / 8.3 ms; 7.2 / 91 ms | 6.8 / 19.0 s (2.8×) |
+| corpus5 | 685 | 0.54 / 8.2 ms; 8.4 / 82 ms | 7.0 / 20.8 s (3.0×) |
+| corpus6 | 640 | 0.60 / 10.0 ms; 8.4 / 111 ms | 8.2 / 28.0 s (3.4×) |
+| Shell's | 75 | 0.39 / 6.0 ms; 4.9 / 52 ms | 0.6 / 4.9 s (8×) |
+| direct | 52 | 0.41 / 8.9 ms; 9.4 / 151 ms | 0.2 / 3.5 s (16×) |
+Medians are 10–20× faster; totals 2.6–3.4× in the corpora, held down by a few slow free-form cases (the thread fuses
+~2 s each against OCCT's 3–4 s). (OCCT's are the recorded times, parallel, on a loaded machine; ours serial.)
+
 ## Next
 Free-form, the lead's four steps (13:35) where they stand (10-29 20:45 UTC): (1) profiled (above); (2) the hybrid
 (OCCT's IntTools_FaceFace curves, everything else ours) takes B-spline, torus, sphere, extruded and revolved faces;
@@ -602,14 +617,15 @@ Free-form, the lead's four steps (13:35) where they stand (10-29 20:45 UTC): (1)
 seams: a few cases, ~4 s recorded in corpus6); (4) the helix cases: the hybrid plus faster curve evaluation and
 crossings take both thread fuses, 2.1–2.3 s against OCCT's 3–4 s (recorded 4.8 / 6.5 s). OCCT's face/face share
 there is 0.35 s: no own intersector needed for them now.
-Corpus6 still declined, by recorded OCCT time (615 / 828 taken): an internal face 13.8 s (1: addb9a14, a slab fuse
-with a B-spline face, the shelled part's own internal edge), tolerant inputs 13.2 s (15), vertices inside coincident
-edges of two other arguments 10.6 s (5: OCCT's PostTreatFF gives such a vertex a second same-domain hop and its
-history then says Deleted; not predictable cheaply), curves within the grey band of a face's boundary 10.1 s (7,
-near-tangent hyperbolas in slab fuses), edges of two arguments crossing on a third's face 5.2 s, an edge ending inside
-a face 5.1 s (21 small commons), an apex on a part of a cone 4.4 s, internal edges 3.6 s, a plane through a cone's
-apex 2.9 s, a cone's / sphere's / B-spline's apex changed 2.6 s (7: another argument through a pole; OCCT makes a new
-degenerate edge there, ours would need one too), the rest under 2 s each.
+Corpus6 still declined, by recorded OCCT time (10-29 23:55 UTC, 640 / 828 taken): an internal face 13.8 s (1:
+addb9a14, a slab fuse with a B-spline face, the shelled part's own internal edge), tolerant inputs 13.1 s (10: 1e-4
+edges where the arguments meet; per-point tolerances would take them), vertices inside coincident edges of two
+other arguments 11.8 s (6: OCCT's PostTreatFF gives such a vertex a second same-domain hop and its history then
+says Deleted; not predictable cheaply), an apex on a part of a cone 8.5 s (7: a cone face that doesn't go round, its
+apex's degenerate edge in its parameter plane), edges of two arguments crossing on a third's face 5.2 s (4), tools
+coincide 5.1 s (4), curves in the grey band of a face's boundary 3.9 s (3), internal edges 3.6 s (6), a plane through
+a pointed cone's apex 2.9 s (5), a cone's / sphere's / B-spline's apex changed 2.6 s (7: another argument through a
+pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
 - The unify guard (`usd_kept_volume`) costs a copy and two volumes where round faces merge; measure on the regen
   profiles and make it cheaper (only the merged faces' share of the volume) if it shows.
 
