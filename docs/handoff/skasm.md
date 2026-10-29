@@ -152,7 +152,14 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    select per size, a param's names at the label's "{Sheet thickness}"); all = live's face types and volumes. Already
    there: DIN 6908, ISO 10512. Still missing: NASM 45938 *with* self-locking threads (48 faces, 2 B-spline: our form 10
    body + Revolve 2's conical lip under EDia, two crimp cuts from Plane 1 (Sketch 3: EDia*0.955 flats, EDia/6), two
-   fillets; dom/skasm-sc-gaps/NAS_*45938__features.json) and PEM ×52 (no /features yet: REQUESTS skasm 10-29 07:00).
+   fillets; dom/skasm-sc-gaps/NAS_*45938__features.json) and PEM ×52. DIN 967 tapping head as live's dome 895ac8b6
+   (87.36 vs live 87.06 mm³); DIN 7051's oval head is 4 % heavy (its rim rounding is set by tangency, see its features),
+   7050 within 0.02 %. PEM plan: /features for all 52 are in dom/skb-sc-fsrules/PEM_PEM_*__features.json (10-29).
+   Geometry is NAS 1129's pattern (revolved profile + extruded hex corners; the standoff feature can grow a PEM
+   form: serration grooves at CDia/25, CDia/30, 0.98 / 0.9333 CDia). The blocker is naming: pem.json is empty, and
+   live's names are part numbers from material + finish ("PEM SO-43.1-3  ZI": TYPE per PEM_MATERIAL in
+   DATA_FASTENER_MATERIAL_TYPE, FINISH_CODE), 4 PEM materials, Hole size / Recommended sheet material selects; asked
+   live for the dialog's behaviour (REQUESTS skasm 10-29 10:30) before building the catalogue support.
    Live's studio defaults sometimes differ from the table (NAS 1129 thru minor 0.067 vs 0.0667, NASM 45938/4 ax 0.0225
    vs 0.028125): check the construction at the studio values, then test ours at the table's.
    Earlier: ANSI taper pin crowned ends 10-27.
