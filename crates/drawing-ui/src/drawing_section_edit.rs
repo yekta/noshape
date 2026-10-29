@@ -182,6 +182,24 @@ impl DrawingEditor {
                         .child(div().id("se-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_section_edit(false, cx)))),
                 )
                 .child(div().px(px(10.)).h(px(26.)).flex().items_center().text_size(px(12.)).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(label))
+                // The tool button (live 499–504, as in the creating dialog): the
+                // cutting line's points are being picked, so it shows active.
+                .child(
+                    h_flex().px(px(10.)).pt(px(6.)).child(
+                        div()
+                            .id("se-line")
+                            .size(px(30.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(2.))
+                            .border_1()
+                            .border_color(gpui_kit::rgb(0x9aa5af))
+                            .bg(gpui_kit::rgb(0xcfdbe5))
+                            .tooltip(crate::ui::tooltip("Cutting line"))
+                            .child(crate::assets::icon("section-cut-line", 20., cx)),
+                    ),
+                )
                 .child(div().px(px(10.)).pt(px(6.)).child(crate::drawing_chrome::DrCheckbox::new("se-cut-only").label("Show cut geometry only").checked(cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
                     if let Some(e) = &mut this.section_edit {
                         e.cut_only = *v;
