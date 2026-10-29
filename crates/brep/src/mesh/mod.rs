@@ -163,11 +163,39 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
             }
         }
     }
-    for (i, f) in faces.iter().enumerate() {
-        if ok[i] {
-            out.faces[i] = mesh_face(vertices, edges, f, &out.edges, defl);
-            ok[i] = out.faces[i].is_some();
+    // The faces on their own, in parallel (as BRepMesh meshes them): scoped threads taking runs of faces, not a
+    // shared pool, whose idle callers would take up other jobs (another body's mesh, waiting on the kernel's
+    // mesh lock this one holds).
+    let edge_nodes = &out.edges;
+    let mesh = |i: usize| if ok[i] { mesh_face(vertices, edges, &faces[i], edge_nodes, defl) } else { None };
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(8).min(faces.len() / 64 + 1);
+    if threads <= 1 {
+        out.faces = (0..faces.len()).map(mesh).collect();
+    } else {
+        const RUN: usize = 16;
+        let next = std::sync::atomic::AtomicUsize::new(0);
+        let done: Vec<Vec<(usize, Option<FaceMesh>)>> = std::thread::scope(|sc| {
+            let work = || {
+                let mut got = Vec::new();
+                loop {
+                    let a = next.fetch_add(RUN, std::sync::atomic::Ordering::Relaxed);
+                    if a >= faces.len() {
+                        return got;
+                    }
+                    got.extend((a..(a + RUN).min(faces.len())).map(|i| (i, mesh(i))));
+                }
+            };
+            let others: Vec<_> = (1..threads).map(|_| sc.spawn(work)).collect();
+            let mut all = vec![work()];
+            all.extend(others.into_iter().map(|h| h.join().unwrap_or_default()));
+            all
+        });
+        for (i, m) in done.into_iter().flatten() {
+            out.faces[i] = m;
         }
+    }
+    for (ok, m) in ok.iter_mut().zip(&out.faces) {
+        *ok = m.is_some();
     }
     settle(&mut ok);
     for (m, ok) in out.faces.iter_mut().zip(&ok) {
@@ -182,10 +210,10 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
 fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &[Option<EdgeNodes>], defl: Deflection) -> Option<FaceMesh> {
     match face.surface {
         MeshSurface::Plane { origin, normal, xdir } => mesh_plane(vertices, edges, face, origin, normal, xdir, nodes),
-        MeshSurface::Cylinder { origin, axis, xdir, direct, radius } => mesh_strip(edges, face, &Revolved { origin, axis, xdir, direct, radius, angle: 0.0, minor: 0.0 }, nodes, defl),
-        MeshSurface::Cone { origin, axis, xdir, direct, radius, angle } => mesh_strip(edges, face, &Revolved { origin, axis, xdir, direct, radius, angle, minor: 0.0 }, nodes, defl),
+        MeshSurface::Cylinder { origin, axis, xdir, direct, radius } => mesh_strip(edges, face, &Revolved::new(origin, axis, xdir, direct, radius, 0.0, 0.0), nodes, defl),
+        MeshSurface::Cone { origin, axis, xdir, direct, radius, angle } => mesh_strip(edges, face, &Revolved::new(origin, axis, xdir, direct, radius, angle, 0.0), nodes, defl),
         // A spindle or horn torus (the tube through its axis) isn't meshed here.
-        MeshSurface::Torus { origin, axis, xdir, direct, radius, minor } if minor > 0.0 && radius > minor => mesh_strip(edges, face, &Revolved { origin, axis, xdir, direct, radius, angle: 0.0, minor }, nodes, defl),
+        MeshSurface::Torus { origin, axis, xdir, direct, radius, minor } if minor > 0.0 && radius > minor => mesh_strip(edges, face, &Revolved::new(origin, axis, xdir, direct, radius, 0.0, minor), nodes, defl),
         MeshSurface::Torus { .. } => None,
         MeshSurface::Other => None,
     }
@@ -196,55 +224,51 @@ struct Revolved {
     origin: DVec3,
     axis: DVec3,
     xdir: DVec3,
-    direct: bool,
+    /// `axis` × `xdir`, or minus that when the frame isn't direct.
+    ydir: DVec3,
     radius: f64,
-    angle: f64,
+    /// A cone's half-angle: its sine and cosine.
+    angle: (f64, f64),
     minor: f64,
 }
 
 impl Revolved {
-    fn ydir(&self) -> DVec3 {
-        let y = self.axis.cross(self.xdir);
-        if self.direct { y } else { -y }
+    #[allow(clippy::too_many_arguments)]
+    fn new(origin: DVec3, axis: DVec3, xdir: DVec3, direct: bool, radius: f64, angle: f64, minor: f64) -> Revolved {
+        let y = axis.cross(xdir);
+        Revolved { origin, axis, xdir, ydir: if direct { y } else { -y }, radius, angle: angle.sin_cos(), minor }
     }
     fn torus(&self) -> bool {
         self.minor > 0.0
     }
-    fn radial(&self, u: f64) -> DVec3 {
-        u.cos() * self.xdir + u.sin() * self.ydir()
-    }
     /// (u in (−π, π], v) of a point on the surface (a torus's v in (−π, π] too).
     fn uv(&self, p: DVec3) -> DVec2 {
         let d = p - self.origin;
-        let (x, y, z) = (d.dot(self.xdir), d.dot(self.ydir()), d.dot(self.axis));
-        let v = if self.torus() { z.atan2(x.hypot(y) - self.radius) } else { z / self.angle.cos() };
+        let (x, y, z) = (d.dot(self.xdir), d.dot(self.ydir), d.dot(self.axis));
+        let v = if self.torus() { z.atan2(x.hypot(y) - self.radius) } else { z / self.angle.1 };
         DVec2::new(y.atan2(x), v)
-    }
-    /// The point at (u, v).
-    fn point(&self, q: DVec2) -> DVec3 {
-        if self.torus() {
-            self.origin + (self.radius + self.minor * q.y.cos()) * self.radial(q.x) + self.minor * q.y.sin() * self.axis
-        } else {
-            let (s, c) = self.angle.sin_cos();
-            self.origin + (self.radius + q.y * s) * self.radial(q.x) + q.y * c * self.axis
-        }
     }
     /// The radius of the circle at constant v.
     fn ring(&self, v: f64) -> f64 {
-        if self.torus() { self.radius + self.minor * v.cos() } else { self.radius + v * self.angle.sin() }
+        if self.torus() { self.radius + self.minor * v.cos() } else { self.radius + v * self.angle.0 }
     }
-    /// The surface's own normal (∂u × ∂v, unit) at (u, v), if not at an apex.
-    fn normal(&self, q: DVec2) -> Option<DVec3> {
-        let radial = self.radial(q.x);
-        let du = self.ring(q.y) * (-q.x.sin() * self.xdir + q.x.cos() * self.ydir());
-        let dv = if self.torus() {
-            self.minor * (-q.y.sin() * radial + q.y.cos() * self.axis)
+    /// The sine and cosine of v that [`Revolved::at`] wants (a torus's; a cone's aren't used).
+    fn v_trig(&self, v: f64) -> (f64, f64) {
+        if self.torus() { v.sin_cos() } else { (0.0, 1.0) }
+    }
+    /// The point and the surface's own normal (∂u × ∂v, unit; none at an apex) at u (its sine and cosine) and
+    /// v (and its, [`Revolved::v_trig`]): the trigonometry once per row and column, not per node.
+    fn at(&self, (su, cu): (f64, f64), v: f64, (sv, cv): (f64, f64)) -> (DVec3, Option<DVec3>) {
+        let radial = cu * self.xdir + su * self.ydir;
+        let tangent = -su * self.xdir + cu * self.ydir;
+        let (ring, dv, z) = if self.torus() {
+            (self.radius + self.minor * cv, self.minor * (-sv * radial + cv * self.axis), self.minor * sv)
         } else {
-            let (s, c) = self.angle.sin_cos();
-            s * radial + c * self.axis
+            let (s, c) = self.angle;
+            (self.radius + v * s, s * radial + c * self.axis, v * c)
         };
-        let n = du.cross(dv);
-        (n.length() > 1e-12 * self.radius.max(1e-9) * self.minor.max(1.0)).then(|| n.normalize())
+        let n = (ring * tangent).cross(dv);
+        (self.origin + ring * radial + z * self.axis, (n.length() > 1e-12 * self.radius.max(1e-9) * self.minor.max(1.0)).then(|| n.normalize()))
     }
 }
 
@@ -342,31 +366,38 @@ fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option
     }
     // Rows from vlo to vhi: the rims, and between them a row at each side node's v (its ends the sides' nodes,
     // split round the axis as a circle there would be).
-    let mut rows: Vec<(f64, Vec<(f64, DVec3)>)> = vec![rims[0].clone()];
+    // Per row its v and nodes: u, point, normal.
+    type Row = (f64, Vec<(f64, DVec3, DVec3)>);
+    let mut rows: Vec<Row> = Vec::new();
+    let rim = |r: &(f64, Vec<(f64, DVec3)>)| -> Option<Row> {
+        let vt = s.v_trig(r.0);
+        Some((r.0, r.1.iter().map(|&(u, p)| Some((u, p, s.at(u.sin_cos(), r.0, vt).1?))).collect::<Option<_>>()?))
+    };
+    rows.push(rim(&rims[0])?);
     if let Some(c0) = cols.first() {
+        let ends = [cols.iter().find(|c| (c.0 - umin).abs() <= tol), cols.iter().find(|c| (c.0 - umax).abs() <= tol)];
         for k in 1..c0.1.len().saturating_sub(1) {
             let v = c0.1[k].0;
+            let vt = s.v_trig(v);
             let n = arc_steps(umax - umin, s.ring(v), defl);
-            let row = (0..=n)
-                .map(|j| {
-                    let u = if j == n { umax } else { umin + (umax - umin) * j as f64 / n as f64 };
-                    let end = if j == 0 { cols.iter().find(|c| (c.0 - umin).abs() <= tol) } else if j == n { cols.iter().find(|c| (c.0 - umax).abs() <= tol) } else { None };
-                    (u, end.map_or_else(|| s.point(DVec2::new(u, v)), |c| c.1[k].1))
-                })
-                .collect();
+            let mut row = Vec::with_capacity(n + 1);
+            for j in 0..=n {
+                let u = if j == n { umax } else { umin + (umax - umin) * j as f64 / n as f64 };
+                let (p, normal) = s.at(u.sin_cos(), v, vt);
+                let end = if j == 0 { ends[0] } else if j == n { ends[1] } else { None };
+                row.push((u, end.map_or(p, |c| c.1[k].1), normal?));
+            }
             rows.push((v, row));
         }
     }
-    rows.push(rims[1].clone());
+    rows.push(rim(&rims[1])?);
     let mut points = Vec::new();
     let mut normals = Vec::new();
     let mut base = Vec::with_capacity(rows.len());
-    for (v, r) in &rows {
+    for (_, r) in &rows {
         base.push(points.len());
-        for &(u, p) in r {
-            points.push(p);
-            normals.push(s.normal(DVec2::new(u, *v))?);
-        }
+        points.extend(r.iter().map(|x| x.1));
+        normals.extend(r.iter().map(|x| x.2));
     }
     // Each row zipped to the next (counter-clockwise in (u, v)), advancing on the row whose next node comes
     // first.
