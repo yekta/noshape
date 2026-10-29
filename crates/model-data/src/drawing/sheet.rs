@@ -1942,6 +1942,10 @@ impl SheetGeometry {
                     let dot = |p: [f64; 2], q: [f64; 2]| p[0] * q[0] + p[1] * q[1];
                     let e = env.to_sheet(*view, *edge);
                     let off = dot([e[0] - a0[0], e[1] - a0[1]], n);
+                    // Flipped by its grip (help foreshorten dimension: "click
+                    // the grip when it shows the flip arrow to flip sides"):
+                    // the other side of the axis, from the mirrored edge.
+                    let (e, off) = if self.flip_arrows { ([e[0] - n[0] * 2.0 * off, e[1] - n[1] * 2.0 * off], -off) } else { (e, off) };
                     let sg = if off < 0.0 { -1.0 } else { 1.0 };
                     let t = dot([a.position[0] - a0[0], a.position[1] - a0[1]], u);
                     let on_axis = [a0[0] + u[0] * t, a0[1] + u[1] * t];
@@ -1956,6 +1960,8 @@ impl SheetGeometry {
                     let far = if *direct { [on_axis[0] - n[0] * off, on_axis[1] - n[1] * off] } else { [on_axis[0] - n[0] * sg * 6.0, on_axis[1] - n[1] * sg * 6.0] };
                     self.lines.push(Polyline2 { points: vec![pe, far], style: LineStyle::Thin, closed: false, pick });
                     self.arrow(pe, [n[0] * sg, n[1] * sg], 3.0);
+                    // The flip node by the arrow.
+                    self.grips.push(Grip { pick, pos: [pe[0] - n[0] * sg * 4.0, pe[1] - n[1] * sg * 4.0], kind: GripKind::Handle });
                     if *direct {
                         self.arrow(far, [-n[0] * sg, -n[1] * sg], 3.0);
                     }

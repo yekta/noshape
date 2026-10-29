@@ -1128,6 +1128,14 @@ fn foreshortened_dimensions() {
     assert!((half - (axis_x - 6.0)).abs() < 1e-6, "overshoots the axis by 6 mm: {half} vs {axis_x}");
     let full = built.geometry.lines.iter().filter(|l| l.pick == p2 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9).map(|l| l.points[1][0]).next().unwrap();
     assert!((full - (axis_x - 12.0)).abs() < 1e-6);
+    // Its flip node (D17) puts it on the other side of the axis, the value kept.
+    assert!(built.geometry.grips.iter().any(|g| g.pick == p1 && g.kind == sheet::GripKind::Handle));
+    drawing.sheets[0].annotations.iter_mut().find(|a| a.id == id + 1).unwrap().flip_arrows = true;
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let p1 = pick_of(&built, PickTarget::Annotation(id + 1));
+    let half = built.geometry.lines.iter().filter(|l| l.pick == p1 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9).map(|l| l.points[1][0]).next().unwrap();
+    assert!((half - (axis_x + 6.0)).abs() < 1e-6, "flipped: {half} vs {axis_x}");
+    assert_eq!(built.geometry.texts.iter().filter(|t| t.pick == p1).map(|t| t.text.clone()).collect::<Vec<_>>(), ["Ø24"]);
 }
 
 #[test]
