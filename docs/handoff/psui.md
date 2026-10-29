@@ -147,7 +147,10 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 
 ## In progress
 
-(nothing unlanded)
+10-29 10:35: 60ca6465 MC-SELECT-NO-READOUT landed (a mate connector selected alone reads "Point:" at its origin;
+T1 a_selected_mate_connector_reads_its_origin; checked on :102: wf-block + Mate connector 1, ring clicked →
+"Point: X 19.500 Y 1.000 Z 10.000 mm"). PSUI-CONE-SHADING already on main (9b9caa54). No open P0 / P1 in psui's
+TICKETS. Now: the mesher toward ≥ 10× on mesh_prepare (profile of fins-400 open, /root/psui-scratch/prof.sh).
 
 Residuals found today: a paused dialog's Depth field
 shows a corner mark in live; Shift+wheel under xdotool loses events after the first (GPUI X11 resets the scroll
