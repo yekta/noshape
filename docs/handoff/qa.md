@@ -9,7 +9,7 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
-- **09:27 update (greens 349290dc → 0e1689b3 = + core 24daf867 guard ends the process past a held lock, bool 4138d9f7):**
+- **09:25 update (greens 349290dc → 0e1689b3 = + core 24daf867 guard ends the process past a held lock, bool 4138d9f7):**
   P1 checklists: workflow-booleans re-run on the v0.4.14 CLI with bin/boolmatrix.py (14 cases, Rust = OCCT, INT2 fixed; two cases
   asked live: disjoint Subtract consumes its tool, Remove extrude with the default direction touches nothing and says Ok);
   p1-dialogs: the last 4 🔧 rows verified (Curve pattern path order, Sweep lock direction, Loft focus, pattern Skip instances);
