@@ -230,6 +230,8 @@ impl SheetPaste for Sheet {
                 *anchor = [anchor[0] + d[0], anchor[1] + d[1]];
                 (*on, *at) = (None, None);
                 a.refs.clear();
+                // Red until it's dragged onto geometry (live, request 1581).
+                a.loose = true;
             }
             a.position = [a.position[0] + d[0], a.position[1] + d[1]];
             pasted.push(a);

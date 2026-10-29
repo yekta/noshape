@@ -1713,6 +1713,10 @@ impl SheetGeometry {
                         let hit = box_exit(c, bw / 2.0, bh / 2.0, u);
                         self.lines.push(Polyline2 { points: vec![apex, hit], style: LineStyle::Thin, closed: false, pick });
                     }
+                    // Its triangle re-attaches by drag (not one on another annotation).
+                    if on.is_none() {
+                        self.grips.push(Grip { pick, pos: anchor, kind: GripKind::Origin });
+                    }
                 }
                 AnnotationKind::OrdinateDimension { view, origin, point, horizontal } => {
                     let p = env.to_sheet(*view, *point);

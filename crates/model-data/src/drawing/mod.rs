@@ -1851,6 +1851,10 @@ pub struct Annotation {
     /// Past an extension line the line runs on to it (live asbdt-1b/c, D24).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text_along: Option<f64>,
+    /// A pasted datum attached to nothing yet: drawn red (dangling) until
+    /// its triangle is dragged onto geometry (live C9, request 1581).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub loose: bool,
     /// Linear dimensions: jogged extension lines (right-click an extension
     /// line › Add jog), one per extension line.
     #[serde(default, skip_serializing_if = "no_jogs")]
@@ -2099,7 +2103,7 @@ impl AnnStyle {
 
 impl Default for Annotation {
     fn default() -> Self {
-        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, text_along: None, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None, target: None, sketch_dim: None, model: None }
+        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, text_along: None, loose: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None, target: None, sketch_dim: None, model: None }
     }
 }
 

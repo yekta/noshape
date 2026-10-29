@@ -499,6 +499,10 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
     let mut out = sheet.clone();
     let mut dangling = Vec::new();
     for a in &mut out.annotations {
+        if a.loose {
+            dangling.push(a.id);
+            continue;
+        }
         if a.refs.is_empty() {
             continue;
         }

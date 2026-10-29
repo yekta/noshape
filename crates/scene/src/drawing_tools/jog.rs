@@ -158,6 +158,11 @@ impl SheetPick<'_> {
     /// leg points; an ordinate's base and measured points (live behaviours
     /// D26).
     pub fn attach_points(&self, a: &Annotation) -> Vec<(usize, [f64; 2])> {
+        // A datum's triangle (not one on another annotation).
+        if let AnnotationKind::Datum { anchor, on: None, at, .. } = &a.kind {
+            let p = at.and_then(|(v, p)| self.placement(v).map(|pl| pl.to_sheet(p))).unwrap_or(*anchor);
+            return vec![(0, p)];
+        }
         if let Some(f) = self.dimension_frame(a) {
             return vec![(0, f.legs[0].0), (1, f.legs[1].0)];
         }
@@ -195,6 +200,19 @@ impl SheetPick<'_> {
         // Midpoints and quadrants too (help D22: available when editing a
         // placed dimension).
         let Some(sp) = self.snap_at_with(self.cursor, true) else { return a };
+        // A datum's triangle dropped on view geometry: attached there, the
+        // box staying put (qa DWG-DATUM-PASTE-RED: a pasted one is red until then).
+        if let AnnotationKind::Datum { anchor, on: None, at, .. } = &mut a.kind {
+            if let Some(pl) = self.placement(sp.view) {
+                (*anchor, *at) = (pl.to_sheet(sp.p), Some((sp.view, sp.p)));
+                a.refs.retain(|r| r.slot != 0);
+                if let Some(point) = sp.r {
+                    a.refs.push(noshape_model::drawing::AnnotationRef { slot: 0, point });
+                }
+                a.loose = false;
+            }
+            return a;
+        }
         if a.kind.view() != Some(sp.view) {
             return a;
         }

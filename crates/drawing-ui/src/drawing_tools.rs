@@ -1153,7 +1153,7 @@ impl DrawingEditor {
                 let a = self.reattached(&orig, k);
                 let mut dr = self.drawing.clone();
                 if let Some(x) = dr.sheets.get_mut(self.sheet).and_then(|s| s.annotations.iter_mut().find(|x| x.id == a.id)) {
-                    (x.kind, x.refs) = (a.kind, a.refs);
+                    (x.kind, x.refs, x.loose) = (a.kind, a.refs, a.loose);
                 }
                 self.set_preview(Some(dr), cx);
             }

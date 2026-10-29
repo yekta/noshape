@@ -3393,6 +3393,16 @@ fn a_pasted_datum_stands_free() {
     // Same shape: the triangle keeps its offset from the box.
     let (dx, dy) = (anchor[0] - pasted.position[0], anchor[1] - pasted.position[1]);
     assert!((dx - 0.0).abs() < 1e-9 && (dy - 10.0).abs() < 1e-9, "{anchor:?} {:?}", pasted.position);
+    // Red (dangling) until its triangle is dragged onto geometry (live
+    // request 1581, qa DWG-DATUM-PASTE-RED); the original isn't.
+    let pid = pasted.id;
+    let (doc, _) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let built = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+    assert!(built.dangling.contains(&pid) && !built.dangling.contains(&id), "{:?}", built.dangling);
+    drawing.sheets[0].annotations.last_mut().unwrap().loose = false;
+    let built = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+    assert!(!built.dangling.contains(&pid));
 }
 
 /// An angular dimension's label dragged past an edge (live D11, qa
