@@ -14,7 +14,8 @@ the app's target shape). A crate never depends on a crate above it.
 ### Engine
 - `crates/units`, `crates/sketch` (the sketch solver), `crates/featurescript` (the FeatureScript language).
 - `crates/brep`: noshape's own B-rep in pure Rust (no OCCT types): topology arenas and a Boolean for solids bounded
-  by planes, which `op_boolean` tries first (docs/BOOLEAN-SPEEDUP.md phase 3, docs/handoff/bool.md).
+  by planes, cylinders and cones (and a line's or faces' common), which `op_boolean`, Shell and Thicken try before
+  OCCT (docs/BOOLEAN-SPEEDUP.md phase 3, docs/handoff/bool.md); psui's display mesher (`brep::mesh`).
 - `crates/kernel`: the OpenCascade (OCCT) bridge: C++ in `crates/kernel/cpp`, patched OCCT at `/root/occt`
   (patches in `patches/occt/`). CI compiles the C++ with GCC 13 and MSVC: direct-initialise OCCT handle conversions,
   no GCC-only headers, guard platform code with `_WIN32` / `_MSC_VER`.
