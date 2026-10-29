@@ -1184,12 +1184,21 @@ impl DrawingEditor {
     }
 
     /// Onshape's placement inferencing: the cursor snaps to the x / y of
-    /// other dimensions and annotations nearby, shown as red dashed lines.
+    /// other dimensions and annotations nearby and of the views' vertices
+    /// and circle centers (help D23: lines near other entities), shown as
+    /// red dashed lines.
     pub fn infer_placement(&mut self, skip: Option<u64>) {
         let tol = self.tol_mm(6.0);
         let c = self.cursor;
-        let sheet = self.current_sheet();
-        let pts: Vec<[f64; 2]> = sheet.annotations.iter().filter(|a| Some(a.id) != skip).map(|a| a.position).chain(sheet.tables.iter().map(|t| t.position)).collect();
+        // The committed sheet: the preview holds the annotation being
+        // placed, at the cursor, which would align with itself.
+        let Some(sheet) = self.drawing.sheets.get(self.sheet) else { return };
+        let mut pts: Vec<[f64; 2]> = sheet.annotations.iter().filter(|a| Some(a.id) != skip).map(|a| a.position).chain(sheet.tables.iter().map(|t| t.position)).collect();
+        for (view, g) in &self.geoms {
+            if let Some(pl) = self.placement(*view) {
+                pts.extend(g.snaps.iter().map(|s| pl.to_sheet(s.p)));
+            }
+        }
         let best = |axis: usize| pts.iter().filter(|p| (p[axis] - c[axis]).abs() < tol).min_by(|a, b| (a[axis] - c[axis]).abs().total_cmp(&(b[axis] - c[axis]).abs())).copied();
         let (bx, by) = (best(0), best(1));
         let mut snapped = c;
