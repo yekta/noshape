@@ -14,9 +14,10 @@
 //! Cylinders are taken where every cylinder of the inputs is parallel to one axis and every plane is square
 //! or parallel to it: then surfaces meet in lines along the axis or circles around it.
 
-use crate::arrange::regions;
+use crate::arrange::{deeper, regions};
 use crate::curve2::{distance as distance2, inside as inside2, C2};
-use crate::nurbs::{NurbsCurve, NurbsSurface};
+use crate::freeform::FreeSurface;
+use crate::nurbs::NurbsCurve;
 use crate::{Body, Curve, Decline, Edge, Face, Kind, Origin, Output, Record, Relation, SectionSource, Solid, Surface, Use, GREY};
 use std::sync::Arc;
 use glam::{DVec2, DVec3};
@@ -182,6 +183,9 @@ struct NCurve {
     tol: f64,
 }
 
+/// A free-form face's edges' curves on it: by (edge, a seam's second), the curve and its range.
+type PCurves = HashMap<(usize, bool), (Arc<NurbsCurve>, f64, f64)>;
+
 struct GFace {
     arg: u32,
     index: u32,
@@ -195,8 +199,10 @@ struct GFace {
     hi: DVec3,
     /// A NURBS face's surface, its edges' curves on it (by edge, a seam's second: OCCT's, in its own parameters,
     /// from the edge's start to its end), and samples for finding a point's parameters.
-    ns: Option<Arc<NurbsSurface>>,
-    pcurves: HashMap<(usize, bool), (Arc<NurbsCurve>, f64, f64)>,
+    ns: Option<Arc<FreeSurface>>,
+    /// A free-form face's parameter box (its edges' curves on it span), (u0, u1, v0, v1).
+    uvbox: [f64; 4],
+    pcurves: PCurves,
     grid: std::cell::OnceCell<Vec<(DVec2, DVec3)>>,
     patches: std::cell::OnceCell<Vec<free::Patch>>,
 }
@@ -224,9 +230,9 @@ impl GFace {
     /// A point's parameters on a NURBS face's surface (from the nearest of its samples).
     fn uv_of(&self, p: DVec3) -> DVec2 {
         let Some(ns) = &self.ns else { return DVec2::ZERO };
-        let grid = self.grid.get_or_init(|| free::samples(ns));
-        let seed = grid.iter().min_by(|a, b| (a.1 - p).length_squared().total_cmp(&(b.1 - p).length_squared())).map(|x| x.0);
-        ns.param_of(p, seed).0
+        let grid = self.grid.get_or_init(|| free::samples(ns, self.uvbox));
+        let seed = grid.iter().min_by(|a, b| (a.1 - p).length_squared().total_cmp(&(b.1 - p).length_squared())).map_or(DVec2::ZERO, |x| x.0);
+        ns.param_of(p, seed, self.uvbox).0
     }
 
     fn to3(&self, q: DVec2) -> DVec3 {
@@ -1588,7 +1594,8 @@ impl Ctx<'_> {
             let mut odd = false;
             for &f in &sol.faces {
                 let g = &self.faces[f];
-                let mut hits: Vec<f64> = Vec::new();
+                // (Each crossing's t, and on a free-form face where on it (its parameters found with it).)
+                let mut hits: Vec<(f64, Option<DVec2>)> = Vec::new();
                 match g.s {
                     Surf::Plane { n, d, .. } => {
                         let den = n.dot(r);
@@ -1599,7 +1606,7 @@ impl Ctx<'_> {
                             }
                             continue;
                         }
-                        hits.push(dist / den);
+                        hits.push((dist / den, None));
                     }
                     Surf::Cyl { o, a, r0, k, .. } => {
                         // |w⊥ + t r⊥| = r0 + k (h + t r·a), on the cone's own side of its apex.
@@ -1624,25 +1631,25 @@ impl Ctx<'_> {
                             roots.push((-qb - disc.sqrt()) / qa);
                             roots.push((-qb + disc.sqrt()) / qa);
                         }
-                        hits.extend(roots.into_iter().filter(|t| r0 + k * (h + t * dz) > -tol));
+                        hits.extend(roots.into_iter().filter(|t| r0 + k * (h + t * dz) > -tol).map(|t| (t, None)));
                     }
-                    Surf::Nurbs { .. } => {
+                    Surf::Nurbs { su, sv, .. } => {
                         let Some(ns) = &g.ns else { continue };
                         if !free::ray_meets(p, r, g.lo, g.hi) {
                             continue;
                         }
-                        for (uv, t) in free::ray_hits(ns, g.patches.get_or_init(|| free::patches(ns)), p, r) {
+                        for (uv, t) in free::ray_hits(ns, g.patches.get_or_init(|| free::patches(ns, g.uvbox)), g.uvbox, p, r) {
                             // Grazing it: another ray.
                             let d = ns.derivs(uv.x, uv.y);
                             if d[1].cross(d[2]).normalize_or_zero().dot(r).abs() < 1e-3 {
                                 continue 'dirs;
                             }
-                            hits.push(t);
+                            hits.push((t, Some(DVec2::new(uv.x * su, uv.y * sv))));
                         }
                     }
                 }
                 let gb = if hits.is_empty() { &[][..] } else { self.bound(f)? };
-                for t in hits {
+                for (t, at) in hits {
                     let q3 = p + r * t;
                     if t.abs() > GREY * tol && !boxes_meet(q3, q3, g.lo, g.hi, GREY * tol) {
                         continue;
@@ -1656,7 +1663,7 @@ impl Ctx<'_> {
                     if t < 0.0 {
                         continue;
                     }
-                    let q = g.to2(p + r * t);
+                    let q = at.unwrap_or_else(|| g.to2(p + r * t));
                     if distance2(q, gb) <= GREY * tol {
                         continue 'dirs;
                     }
@@ -1865,8 +1872,11 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         for (i, f) in body.faces.iter().enumerate() {
             let edges: Vec<(usize, bool)> = f.loops.iter().flatten().map(|u| (first_edge[ai] + u.edge as usize, u.reversed)).collect();
             let s = match f.surface {
-                Surface::Nurbs { .. } if cx.src.is_none() => return Err(Decline("a curved face")),
-                Surface::Nurbs { index } => free::nurbs_surf(&body.nurbs_surfaces[index as usize], f.reversed),
+                Surface::Nurbs { .. } | Surface::Torus { .. } | Surface::Sphere { .. } | Surface::Extrusion { .. } | Surface::Revolution { .. } if cx.src.is_none() => {
+                    return Err(Decline("a curved face"));
+                }
+                // (Its scaling once its parameter box is known, below.)
+                Surface::Nurbs { .. } | Surface::Torus { .. } | Surface::Sphere { .. } | Surface::Extrusion { .. } | Surface::Revolution { .. } => Surf::Nurbs { su: 1.0, sv: 1.0, flip: f.reversed },
                 Surface::Plane { origin, normal } => {
                     let n = if f.reversed { -normal } else { normal };
                     let (u, v) = frame(n);
@@ -1875,19 +1885,32 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 Surface::Cylinder { origin, axis, xdir, radius } => round(&cx, &edges, [origin, axis, xdir], radius, 0.0, f.reversed),
                 Surface::Cone { origin, axis, xdir, radius, angle } => round(&cx, &edges, [origin, axis, xdir], radius, angle.tan(), f.reversed),
             };
-            let (ns, pcurves) = match f.surface {
-                Surface::Nurbs { index } => {
+            let free = match f.surface {
+                Surface::Nurbs { index } => Some(FreeSurface::Nurbs(body.nurbs_surfaces[index as usize].clone())),
+                Surface::Torus { origin, xdir, ydir, zdir, major, minor } => Some(FreeSurface::Torus { o: origin, x: xdir, y: ydir, z: zdir, major, minor }),
+                Surface::Sphere { origin, xdir, ydir, zdir, radius } => Some(FreeSurface::Sphere { o: origin, x: xdir, y: ydir, z: zdir, r: radius }),
+                Surface::Extrusion { curve, dir } => Some(FreeSurface::Extrusion { c: body.nurbs_curves[curve as usize].clone(), d: dir }),
+                Surface::Revolution { curve, origin, axis } => Some(FreeSurface::Revolution { c: body.nurbs_curves[curve as usize].clone(), o: origin, a: axis }),
+                _ => None,
+            };
+            let (ns, pcurves): (Option<Arc<FreeSurface>>, PCurves) = match free {
+                Some(fs) => {
                     let pcurves = body
                         .pcurves
                         .iter()
                         .filter(|p| p.face == i as u32)
                         .map(|p| ((first_edge[ai] + p.edge as usize, p.second), (Arc::new(body.nurbs_curves[p.curve as usize].clone()), p.t0, p.t1)))
                         .collect();
-                    (Some(Arc::new(body.nurbs_surfaces[index as usize].clone())), pcurves)
+                    (Some(Arc::new(fs)), pcurves)
                 }
-                _ => (None, HashMap::default()),
+                None => (None, HashMap::default()),
             };
-            cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, pcurves, grid: Default::default(), patches: Default::default() });
+            let uvbox = free::uv_box(ns.as_deref(), &pcurves);
+            let s = match &ns {
+                Some(fs) => free::nurbs_surf(fs, uvbox, f.reversed),
+                None => s,
+            };
+            cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default() });
         }
         for (i, s) in body.solids.iter().enumerate() {
             let si = cx.solids.len();
@@ -2243,8 +2266,13 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             note(&mut touched, &cx.pool, w, cx.faces[f].arg);
         }
         face_inner[f] = inner;
-        for r in regions(&pts, &lsegs)? {
-            let dist = distance2(r.inside, cx.bound(f)?);
+        for mut r in regions(&pts, &lsegs)? {
+            let mut dist = distance2(r.inside, cx.bound(f)?);
+            if dist <= GREY * tol {
+                // (A thin piece: a point farther in.)
+                r.inside = deeper(&lsegs, &r);
+                dist = distance2(r.inside, cx.bound(f)?);
+            }
             if dist <= GREY * tol {
                 return Err(Decline("a piece's point near its face's boundary"));
             }
@@ -2551,10 +2579,18 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         piece_out.insert(p, out.body.faces.len() as u32);
         out.face_u0.push(if let Surf::Cyl { th0, .. } = g.s { th0 } else { 0.0 });
         // (A NURBS surface into the result's own table.)
-        let surface = match (src.surface, &g.ns) {
-            (Surface::Nurbs { .. }, Some(ns)) => {
-                out.body.nurbs_surfaces.push((**ns).clone());
+        let surface = match (src.surface, g.ns.as_deref()) {
+            (Surface::Nurbs { .. }, Some(FreeSurface::Nurbs(ns))) => {
+                out.body.nurbs_surfaces.push(ns.clone());
                 Surface::Nurbs { index: out.body.nurbs_surfaces.len() as u32 - 1 }
+            }
+            (Surface::Extrusion { dir, .. }, Some(FreeSurface::Extrusion { c, .. })) => {
+                out.body.nurbs_curves.push(c.clone());
+                Surface::Extrusion { curve: out.body.nurbs_curves.len() as u32 - 1, dir }
+            }
+            (Surface::Revolution { origin, axis, .. }, Some(FreeSurface::Revolution { c, .. })) => {
+                out.body.nurbs_curves.push(c.clone());
+                Surface::Revolution { curve: out.body.nurbs_curves.len() as u32 - 1, origin, axis }
             }
             (s, _) => s,
         };

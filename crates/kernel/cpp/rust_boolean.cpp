@@ -27,6 +27,12 @@
 #include <Geom_Hyperbola.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
+#include <Geom_ToroidalSurface.hxx>
+#include <Geom_RectangularTrimmedSurface.hxx>
+#include <Geom_SphericalSurface.hxx>
+#include <Geom_SurfaceOfLinearExtrusion.hxx>
+#include <Geom_SurfaceOfRevolution.hxx>
+#include <GeomAPI_Interpolate.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
 #include <IntTools_Curve.hxx>
@@ -284,12 +290,22 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
   {
     const TopoDS_Face&                    f = TopoDS::Face(fm(i));
     TopLoc_Location                       loc;
-    const occ::handle<Geom_Surface>       surf = BRep_Tool::Surface(f, loc);
+    occ::handle<Geom_Surface>             surf = BRep_Tool::Surface(f, loc);
+    // (A trimmed surface's own: the same parameters.)
+    while (const occ::handle<Geom_RectangularTrimmedSurface> tr = occ::down_cast<Geom_RectangularTrimmedSurface>(surf))
+      surf = tr->BasisSurface();
     const occ::handle<Geom_Plane>         pl   = occ::down_cast<Geom_Plane>(surf);
     const occ::handle<Geom_CylindricalSurface> cyl = occ::down_cast<Geom_CylindricalSurface>(surf);
     const occ::handle<Geom_ConicalSurface>     con = occ::down_cast<Geom_ConicalSurface>(surf);
     const occ::handle<Geom_BSplineSurface>     bss = occ::down_cast<Geom_BSplineSurface>(surf);
-    if (pl.IsNull() && cyl.IsNull() && con.IsNull() && bss.IsNull())
+    const occ::handle<Geom_ToroidalSurface>    tor = occ::down_cast<Geom_ToroidalSurface>(surf);
+    const occ::handle<Geom_SphericalSurface>   sph = occ::down_cast<Geom_SphericalSurface>(surf);
+    const occ::handle<Geom_SurfaceOfLinearExtrusion> ext = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(surf);
+    const occ::handle<Geom_SurfaceOfRevolution>      rvl = occ::down_cast<Geom_SurfaceOfRevolution>(surf);
+    // (A sweep of a B-spline only.)
+    const occ::handle<Geom_BSplineCurve> swept = occ::down_cast<Geom_BSplineCurve>(basis_of(!ext.IsNull() ? ext->BasisCurve() : !rvl.IsNull() ? rvl->BasisCurve() : occ::handle<Geom_Curve>()));
+    const bool free = !bss.IsNull() || !tor.IsNull() || !sph.IsNull() || ((!ext.IsNull() || !rvl.IsNull()) && !swept.IsNull());
+    if (pl.IsNull() && cyl.IsNull() && con.IsNull() && !free)
     {
       const GeomAbs_SurfaceType t = GeomAdaptor_Surface(surf).GetType();
       return t == GeomAbs_Torus ? "a torus face" : t == GeomAbs_Sphere ? "a sphere face" : t == GeomAbs_OffsetSurface ? "an offset face" : t == GeomAbs_SurfaceOfRevolution ? "a face of revolution" : t == GeomAbs_SurfaceOfExtrusion ? "an extruded face" : "a curved face";
@@ -315,6 +331,39 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       b.surfaces.push_back(3);
       b.surfaces.push_back(push_nurbs_surface(b.nurbs, bss, loc));
       for (int k = 0; k < 10; ++k)
+        b.surfaces.push_back(0);
+    }
+    else if (!tor.IsNull() || !sph.IsNull())
+    {
+      // A torus (4) or sphere (5): origin, x and y directions, size (negative: a left-handed frame), a torus's
+      // minor radius; its parameters OCCT's.
+      const gp_Ax3 a = !tor.IsNull() ? tor->Torus().Transformed(loc.Transformation()).Position() : sph->Sphere().Transformed(loc.Transformation()).Position();
+      const double h = a.Direct() ? 1.0 : -1.0;
+      b.surfaces.push_back(!tor.IsNull() ? 4 : 5);
+      push3(b.surfaces, a.Location().XYZ());
+      push3(b.surfaces, a.XDirection().XYZ());
+      push3(b.surfaces, a.YDirection().XYZ());
+      b.surfaces.push_back(h * (!tor.IsNull() ? tor->MajorRadius() : sph->Radius()));
+      b.surfaces.push_back(!tor.IsNull() ? tor->MinorRadius() : 0);
+    }
+    else if (!ext.IsNull())
+    {
+      // A B-spline swept along a direction (6): where its NURBS starts, the direction.
+      b.surfaces.push_back(6);
+      b.surfaces.push_back(push_nurbs(b.nurbs, swept, loc));
+      push3(b.surfaces, ext->Direction().Transformed(loc.Transformation()).XYZ());
+      for (int k = 0; k < 7; ++k)
+        b.surfaces.push_back(0);
+    }
+    else if (!rvl.IsNull())
+    {
+      // A B-spline revolved (7): where its NURBS starts, the axis.
+      const gp_Ax1 ax = rvl->Axis().Transformed(loc.Transformation());
+      b.surfaces.push_back(7);
+      b.surfaces.push_back(push_nurbs(b.nurbs, swept, loc));
+      push3(b.surfaces, ax.Location().XYZ());
+      push3(b.surfaces, ax.Direction().XYZ());
+      for (int k = 0; k < 4; ++k)
         b.surfaces.push_back(0);
     }
     else if (!con.IsNull())
@@ -356,7 +405,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
         if (k <= 0 || (e.Orientation() != TopAbs_FORWARD && e.Orientation() != TopAbs_REVERSED))
           return "an internal edge";
         // A seam (twice in a cylinder's or cone's face) once each way.
-        if (seen[k] == i && ((cyl.IsNull() && con.IsNull() && bss.IsNull()) || BRep_Tool::IsClosed(TopoDS::Edge(e), f) == false))
+        if (seen[k] == i && ((cyl.IsNull() && con.IsNull() && !free) || BRep_Tool::IsClosed(TopoDS::Edge(e), f) == false))
           return "an edge twice in a face";
         seen[k] = i;
         b.uses.push_back(static_cast<uint32_t>(2 * (k - 1) + (e.Orientation() == TopAbs_REVERSED ? 1 : 0)));
@@ -364,7 +413,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       b.loop_uses.push_back(static_cast<uint32_t>(b.uses.size()));
     }
     b.face_loops.push_back(static_cast<uint32_t>(b.loop_uses.size() - 1));
-    if (!bss.IsNull())
+    if (free)
     {
       // Its edges' curves on it (face, edge, a seam's other one, where its NURBS starts, the edge's parameters).
       const TopoDS_Face ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
@@ -521,6 +570,18 @@ struct FreeSections
   std::vector<std::pair<std::array<TopoDS_Face, 2>, IntTools_Curve>> curves;
 };
 thread_local FreeSections* t_free = nullptr;
+
+// A section's tolerance as the pave filler gives it: its own, at least the faces' (ToleranceFF), at least 5e-6
+// unless both faces are planes, cylinders, cones, spheres or tori.
+double section_tol(const IntTools_Curve& ic, const TopoDS_Face& fa, const TopoDS_Face& fb)
+{
+  auto analytic = [](const TopoDS_Face& f) {
+    const GeomAbs_SurfaceType t = GeomAdaptor_Surface(BRep_Tool::Surface(f)).GetType();
+    return t == GeomAbs_Plane || t == GeomAbs_Cylinder || t == GeomAbs_Cone || t == GeomAbs_Sphere || t == GeomAbs_Torus;
+  };
+  const double ff = std::max(BRep_Tool::Tolerance(fa), BRep_Tool::Tolerance(fb));
+  return std::max(ic.Tolerance(), analytic(fa) && analytic(fb) ? ff : std::max(ff, 5e-6));
+}
 
 double turns(double x)
 {
@@ -758,9 +819,18 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       x.pcurve[1] = ic.SecondCurve2d();
       x.t0        = cv[2];
       x.t1        = cv[3];
-      x.tol       = std::max({ic.Tolerance(), BRep_Tool::Tolerance(faces[0]), BRep_Tool::Tolerance(faces[1])});
+      x.tol       = section_tol(ic, faces[0], faces[1]);
       c           = x.curve;
       tol_e       = x.tol;
+      // At its own ends OCCT's paves are its bounds exactly (PutBoundPaveOnCurve; the Boolean's ends there were
+      // found to ~1e-8).
+      const double cf = c->FirstParameter(), cl = c->LastParameter();
+      for (double* t : {&x.t0, &x.t1})
+      {
+        const double bound = *t - cf < cl - *t ? cf : cl;
+        if (c->Value(*t).Distance(c->Value(bound)) <= tol_e)
+          *t = bound;
+      }
       const double need = tol_e + 1e-12;
       for (const uint32_t v : {v0, v1})
         if (BRep_Tool::Tolerance(vs[v]) < need)
@@ -808,11 +878,30 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     }
     const occ::handle<Geom_Curve> bc = basis_of(c);
     double                        t0 = 0, t1 = 0;
-    if (cv[0] == 5)
+    if (cv[0] == 5 && !occ::down_cast<Geom_Conic>(bc).IsNull())
+    {
+      // A piece of OCCT's conic section (the Boolean went by a cubic through it): at its vertices, within the
+      // turn from its start.
+      const occ::handle<Geom_Conic> cn = occ::down_cast<Geom_Conic>(bc);
+      auto par = [&](const gp_Pnt& p) {
+        if (const occ::handle<Geom_Circle> ci = occ::down_cast<Geom_Circle>(cn))
+          return ElCLib::Parameter(ci->Circ(), p);
+        if (const occ::handle<Geom_Ellipse> el = occ::down_cast<Geom_Ellipse>(cn))
+          return ElCLib::Parameter(el->Elips(), p);
+        return cv[2];
+      };
+      t0       = cv[2] + std::remainder(par(p0) - cv[2], 2 * M_PI);
+      t1       = cv[3] + std::remainder(par(p1) - cv[3], 2 * M_PI);
+      if (v0 == v1)
+        t1 = t0 + 2 * M_PI;
+      ells[i].t0 = t0;
+      ells[i].t1 = t1;
+    }
+    else if (cv[0] == 5)
     {
       // (The Boolean's own parameters: a B-spline's, or OCCT's section's.)
-      t0 = cv[2];
-      t1 = cv[3];
+      t0 = ells[i].curve.IsNull() ? cv[2] : ells[i].t0;
+      t1 = ells[i].curve.IsNull() ? cv[3] : ells[i].t1;
     }
     else if (const occ::handle<Geom_Ellipse> el = occ::down_cast<Geom_Ellipse>(bc); !el.IsNull() && kind == 1)
     {
@@ -898,7 +987,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     }
     TopoDS_Face                     f;
     bb.MakeFace(f, s, loc, BRep_Tool::Tolerance(src));
-    const bool free_form = !occ::down_cast<Geom_BSplineSurface>(s).IsNull();
+    const bool free_form = occ::down_cast<Geom_Plane>(s).IsNull() && occ::down_cast<Geom_CylindricalSurface>(s).IsNull() && occ::down_cast<Geom_ConicalSurface>(s).IsNull();
     if (free_form)
     {
       // Its edges' curves on it: OCCT's for its sections, its input edges' own for their pieces (the same
@@ -1242,9 +1331,28 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
       continue;
     const double first = c->FirstParameter(), last = c->LastParameter();
     occ::handle<Geom_BSplineCurve> bs = occ::down_cast<Geom_BSplineCurve>(basis_of(c));
+    if (bs.IsNull() && !occ::down_cast<Geom_Conic>(basis_of(c)).IsNull())
+    {
+      // A circle or ellipse (a torus's section by a plane): for the Boolean's geometry a cubic through 65 of its
+      // points at its own parameters (within ~1e-10 of it); the edge is built on the conic itself.
+      const int                         n = 64;
+      occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, n + 1);
+      occ::handle<NCollection_HArray1<double>> prm = new NCollection_HArray1<double>(1, n + 1);
+      for (int k = 0; k <= n; ++k)
+      {
+        const double t = first + (last - first) * k / n;
+        pts->SetValue(k + 1, c->Value(t));
+        prm->SetValue(k + 1, t);
+      }
+      GeomAPI_Interpolate fit(pts, prm, false, 1e-12);
+      fit.Perform();
+      if (!fit.IsDone())
+        return rust::String("a section OCCT makes as a conic");
+      bs = fit.Curve();
+    }
     if (bs.IsNull())
     {
-      // A line as a degree 1 B-spline over its range (the same parameters); a conic's would differ.
+      // A line as a degree 1 B-spline over its range (the same parameters).
       const occ::handle<Geom_Line> l = occ::down_cast<Geom_Line>(basis_of(c));
       if (l.IsNull())
         return rust::String("a section OCCT makes as a conic");
@@ -1264,12 +1372,23 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
     if (p0.IsNull() || p1.IsNull())
       return rust::String("a section without its curves on the faces");
     const double at3 = push_nurbs(out.nurbs, bs, TopLoc_Location());
-    const double at0 = push_nurbs2(out.nurbs, p0, first, last), at1 = push_nurbs2(out.nurbs, p1, first, last);
+    // (On a plane, cylinder or cone the Boolean maps the 3D curve itself: a curve it can't take there is moot.)
+    auto analytic = [](const TopoDS_Face& f) {
+      const occ::handle<Geom_Surface> g = BRep_Tool::Surface(f);
+      return !occ::down_cast<Geom_Plane>(g).IsNull() || !occ::down_cast<Geom_CylindricalSurface>(g).IsNull() || !occ::down_cast<Geom_ConicalSurface>(g).IsNull();
+    };
+    const occ::handle<Geom2d_Curve> dummy = new Geom2d_Line(gp_Pnt2d(0, 0), gp_Dir2d(1, 0));
+    double at0 = push_nurbs2(out.nurbs, p0, first, last);
+    if (at0 < 0 && analytic(swap ? fb : fa))
+      at0 = push_nurbs2(out.nurbs, dummy, first, last);
+    double at1 = push_nurbs2(out.nurbs, p1, first, last);
+    if (at1 < 0 && analytic(swap ? fa : fb))
+      at1 = push_nurbs2(out.nurbs, dummy, first, last);
     if (at0 < 0 || at1 < 0)
       return rust::String("a section without its curves on the faces");
     const double id = static_cast<double>(t_free->curves.size());
     t_free->curves.push_back({{fa, fb}, ic});
-    for (const double v : {id, first, last, at3, at0, at1, ic.Tolerance()})
+    for (const double v : {id, first, last, at3, at0, at1, section_tol(ic, fa, fb)})
       out.curves.push_back(v);
   }
   return rust::String("");

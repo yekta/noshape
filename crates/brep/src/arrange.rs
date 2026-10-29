@@ -155,3 +155,34 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
     }
     Ok(regions)
 }
+
+/// A point inside region `r` (of the curves `segs`) farther from its curves than [`Region::inside`] when a few
+/// tries find one (a thin region's first point is near its sides): along rays into it from points of its loops,
+/// at fractions of the way across.
+pub(crate) fn deeper(segs: &[([u32; 2], C2)], r: &Region) -> DVec2 {
+    let curves: Vec<C2> = r.outer.iter().chain(r.holes.iter().flatten()).map(|&(s, rev)| if rev { segs[s as usize].1.reversed() } else { segs[s as usize].1.clone() }).collect();
+    let depth = |q: DVec2| curves.iter().map(|c| c.distance(q)).fold(f64::INFINITY, f64::min);
+    let mut best = (depth(r.inside), r.inside);
+    for c in &curves {
+        for t in [0.5, 0.25, 0.75, 0.1, 0.9, 0.02, 0.98] {
+            let m = c.at(t);
+            let dir = c.tangent(t).perp();
+            let mut hits = Vec::new();
+            for g in &curves {
+                g.ray_hits(m, dir, &mut hits);
+            }
+            let nearest = hits.into_iter().filter(|&s| s > 1e-9 * c.length()).fold(f64::INFINITY, f64::min);
+            if !nearest.is_finite() {
+                continue;
+            }
+            for k in [0.5, 0.25, 0.1, 0.03, 0.01] {
+                let q = m + dir * (nearest * k);
+                let d = depth(q);
+                if d > best.0 {
+                    best = (d, q);
+                }
+            }
+        }
+    }
+    best.1
+}

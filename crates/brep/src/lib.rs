@@ -16,6 +16,8 @@ mod arrange;
 mod boolean;
 mod curve2;
 mod fxhash;
+/// Free-form faces' surfaces (NURBS, tori, spheres, sweeps) as the Boolean evaluates them.
+pub mod freeform;
 /// NURBS curves and surfaces: points, derivatives, a point's parameters.
 pub mod nurbs;
 /// Display meshes of analytic faces (psui).
@@ -59,6 +61,15 @@ pub enum Surface {
     Cone { origin: DVec3, axis: DVec3, xdir: DVec3, radius: f64, angle: f64 },
     /// `Body::nurbs_surfaces[index]`, its parameters OCCT's (its edges' curves on it are `Body::pcurves`).
     Nurbs { index: u32 },
+    /// A torus: origin + (major + minor cos v)(cos u xdir + sin u ydir) + minor sin v zdir (OCCT's frame and
+    /// parameters; edges' curves on it in `Body::pcurves`, as the following).
+    Torus { origin: DVec3, xdir: DVec3, ydir: DVec3, zdir: DVec3, major: f64, minor: f64 },
+    /// A sphere: origin + radius cos v (cos u xdir + sin u ydir) + radius sin v zdir.
+    Sphere { origin: DVec3, xdir: DVec3, ydir: DVec3, zdir: DVec3, radius: f64 },
+    /// `Body::nurbs_curves[curve]`(u) + v dir.
+    Extrusion { curve: u32, dir: DVec3 },
+    /// `Body::nurbs_curves[curve]`(v) turned by u about the axis (origin, axis).
+    Revolution { curve: u32, origin: DVec3, axis: DVec3 },
 }
 
 /// An edge's curve on a NURBS face, in the face's parameters: `Body::nurbs_curves[curve]` (x, y) from `t0` (the

@@ -3,15 +3,38 @@
 
 use super::*;
 use crate::curve2::Map;
+use crate::freeform::FreeSurface;
 
-/// A NURBS face's `Surf`: its parameters scaled by the surface's mean speeds along u and v (so lengths in its
-/// parameter plane are about lengths on it, as the tolerances want).
-pub(super) fn nurbs_surf(ns: &NurbsSurface, reversed: bool) -> Surf {
-    let ((u0, u1), (v0, v1)) = ns.range();
+/// A free-form face's parameter box: what its edges' curves on it span (within the surface's own range), grown by
+/// a hundredth.
+pub(super) fn uv_box(ns: Option<&FreeSurface>, pcurves: &PCurves) -> [f64; 4] {
+    let Some(ns) = ns else { return [0.0; 4] };
+    let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
+    for (c, t0, t1) in pcurves.values() {
+        for k in 0..=32 {
+            let q = c.at(t0 + (t1 - t0) * k as f64 / 32.0).truncate();
+            lo = lo.min(q);
+            hi = hi.max(q);
+        }
+    }
+    let grow = (hi - lo) * 0.01 + DVec2::splat(1e-9);
+    let (mut lo, mut hi) = (lo - grow, hi + grow);
+    for (k, r) in ns.range().into_iter().enumerate() {
+        if let Some((a, b)) = r {
+            lo[k] = lo[k].max(a);
+            hi[k] = hi[k].min(b);
+        }
+    }
+    [lo.x, hi.x, lo.y, hi.y]
+}
+
+/// A free-form face's `Surf`: its parameters scaled by the surface's mean speeds along u and v over its box (so
+/// lengths in its parameter plane are about lengths on it, as the tolerances want).
+pub(super) fn nurbs_surf(ns: &FreeSurface, uv: [f64; 4], reversed: bool) -> Surf {
     let (mut su, mut sv) = (0.0, 0.0);
     for i in 0..=4 {
         for j in 0..=4 {
-            let d = ns.derivs(u0 + (u1 - u0) * i as f64 / 4.0, v0 + (v1 - v0) * j as f64 / 4.0);
+            let d = ns.derivs(uv[0] + (uv[1] - uv[0]) * i as f64 / 4.0, uv[2] + (uv[3] - uv[2]) * j as f64 / 4.0);
             su += d[1].length();
             sv += d[2].length();
         }
@@ -19,17 +42,31 @@ pub(super) fn nurbs_surf(ns: &NurbsSurface, reversed: bool) -> Surf {
     Surf::Nurbs { su: (su / 25.0).max(1e-12), sv: (sv / 25.0).max(1e-12), flip: reversed }
 }
 
-/// Points of a NURBS surface on a grid (4 a knot span each way, at least 8), with their parameters: seeds for
-/// finding a point's parameters.
-pub(super) fn samples(ns: &NurbsSurface) -> Vec<(DVec2, DVec3)> {
-    let ((u0, u1), (v0, v1)) = ns.range();
-    let mu = (4 * (ns.nu - ns.udegree)).max(8);
-    let mv = (4 * (ns.nv - ns.vdegree)).max(8);
-    let mut out = Vec::with_capacity((mu + 1) * (mv + 1));
-    for i in 0..=mu {
-        let u = u0 + (u1 - u0) * i as f64 / mu as f64;
-        for j in 0..=mv {
-            let v = v0 + (v1 - v0) * j as f64 / mv as f64;
+/// The values splitting `lo..hi` into pieces: the surface's own breaks there, each gap in `n` parts.
+fn splits(ns: &FreeSurface, along_u: bool, lo: f64, hi: f64, n: usize) -> Vec<f64> {
+    let mut v: Vec<f64> = vec![lo];
+    v.extend(ns.breaks(along_u).into_iter().filter(|&k| k > lo && k < hi));
+    v.push(hi);
+    v.dedup();
+    let mut out = Vec::new();
+    for w in v.windows(2) {
+        for k in 0..n {
+            out.push(w[0] + (w[1] - w[0]) * k as f64 / n as f64);
+        }
+    }
+    out.push(hi);
+    out
+}
+
+/// Points of a free-form face's surface on a grid over its box (4 a span each way, at least 16), with their
+/// parameters: seeds for finding a point's parameters.
+pub(super) fn samples(ns: &FreeSurface, uv: [f64; 4]) -> Vec<(DVec2, DVec3)> {
+    let (us, vs) = (splits(ns, true, uv[0], uv[1], 4), splits(ns, false, uv[2], uv[3], 4));
+    let fill = |s: Vec<f64>| if s.len() < 17 { (0..=16).map(|k| s[0] + (s[s.len() - 1] - s[0]) * k as f64 / 16.0).collect() } else { s };
+    let (us, vs) = (fill(us), fill(vs));
+    let mut out = Vec::with_capacity(us.len() * vs.len());
+    for &u in &us {
+        for &v in &vs {
             out.push((DVec2::new(u, v), ns.at(u, v)));
         }
     }
@@ -65,29 +102,29 @@ pub(super) struct Patch {
     uv: [f64; 4],
 }
 
-/// The surface's patches (each knot span patch split in 4 × 4), boxes from a 5 × 5 grid of points grown by their
-/// chords' sag.
-pub(super) fn patches(ns: &NurbsSurface) -> Vec<Patch> {
-    let (uk, vk) = (spans(&ns.uknots, ns.udegree, ns.nu), spans(&ns.vknots, ns.vdegree, ns.nv));
+/// A free-form face's patches over its box (each span between the surface's breaks in 4, at least 8 a side),
+/// boxes from a 5 × 5 grid of points grown by their chords' sag.
+pub(super) fn patches(ns: &FreeSurface, uv: [f64; 4]) -> Vec<Patch> {
+    let (mut us, mut vs) = (splits(ns, true, uv[0], uv[1], 4), splits(ns, false, uv[2], uv[3], 4));
+    for s in [&mut us, &mut vs] {
+        if s.len() < 9 {
+            *s = (0..=8).map(|k| s[0] + (s[s.len() - 1] - s[0]) * k as f64 / 8.0).collect();
+        }
+    }
     let mut out = Vec::new();
-    for w in uk.windows(2) {
-        for z in vk.windows(2) {
-            for a in 0..4 {
-                for b in 0..4 {
-                    let (ua, ub) = (w[0] + (w[1] - w[0]) * a as f64 / 4.0, w[0] + (w[1] - w[0]) * (a + 1) as f64 / 4.0);
-                    let (va, vb) = (z[0] + (z[1] - z[0]) * b as f64 / 4.0, z[0] + (z[1] - z[0]) * (b + 1) as f64 / 4.0);
-                    let (mut lo, mut hi) = (DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY));
-                    for i in 0..=4 {
-                        for j in 0..=4 {
-                            let q = ns.at(ua + (ub - ua) * i as f64 / 4.0, va + (vb - va) * j as f64 / 4.0);
-                            lo = lo.min(q);
-                            hi = hi.max(q);
-                        }
-                    }
-                    let grow = DVec3::splat(0.25 * (hi - lo).length() + 1e-9);
-                    out.push(Patch { lo: lo - grow, hi: hi + grow, uv: [ua, ub, va, vb] });
+    for w in us.windows(2) {
+        for z in vs.windows(2) {
+            let (ua, ub, va, vb) = (w[0], w[1], z[0], z[1]);
+            let (mut lo, mut hi) = (DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY));
+            for i in 0..=4 {
+                for j in 0..=4 {
+                    let q = ns.at(ua + (ub - ua) * i as f64 / 4.0, va + (vb - va) * j as f64 / 4.0);
+                    lo = lo.min(q);
+                    hi = hi.max(q);
                 }
             }
+            let grow = DVec3::splat(0.25 * (hi - lo).length() + 1e-9);
+            out.push(Patch { lo: lo - grow, hi: hi + grow, uv: [ua, ub, va, vb] });
         }
     }
     out
@@ -95,9 +132,9 @@ pub(super) fn patches(ns: &NurbsSurface) -> Vec<Patch> {
 
 /// Where the ray `p + t r` crosses a NURBS surface: from the middle of each of its patches whose box the ray
 /// passes, Newton's method on (u, v, t); each hit's (u, v) and t (distinct ones).
-pub(super) fn ray_hits(ns: &NurbsSurface, patches: &[Patch], p: DVec3, r: DVec3) -> Vec<(DVec2, f64)> {
+pub(super) fn ray_hits(ns: &FreeSurface, patches: &[Patch], uv: [f64; 4], p: DVec3, r: DVec3) -> Vec<(DVec2, f64)> {
     let mut out: Vec<(DVec2, f64)> = Vec::new();
-    let ((u0, u1), (v0, v1)) = ns.range();
+    let [u0, u1, v0, v1] = uv;
     for pa in patches {
         if !ray_meets_box(p, r, pa.lo, pa.hi) {
             continue;
@@ -133,13 +170,6 @@ pub(super) fn ray_hits(ns: &NurbsSurface, patches: &[Patch], p: DVec3, r: DVec3)
         }
     }
     out
-}
-
-/// Distinct knots from the degree-th to the n-th (the spans' ends).
-fn spans(knots: &[f64], degree: usize, n: usize) -> Vec<f64> {
-    let mut v: Vec<f64> = knots[degree..=n].to_vec();
-    v.dedup();
-    v
 }
 
 /// Whether the ray `p + t r` (t >= 0) passes the box.
@@ -193,25 +223,15 @@ pub(super) fn piece_box(c: &NurbsCurve, t0: f64, t1: f64) -> (DVec3, DVec3) {
     (lo - DVec3::splat(0.25 * step), hi + DVec3::splat(0.25 * step))
 }
 
-/// A box around a NURBS face: its surface over the rectangle of parameters its edges' curves on it span (a grid
-/// of points there, grown by a tenth of its size).
+/// A box around a free-form face: its surface over its parameter box (a grid of points there, grown by a tenth of
+/// its size).
 pub(super) fn face_box(g: &GFace) -> Option<(DVec3, DVec3)> {
     let ns = g.ns.as_ref()?;
-    let (mut ulo, mut uhi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
-    for (c, t0, t1) in g.pcurves.values() {
-        for k in 0..=16 {
-            let q = c.at(t0 + (t1 - t0) * k as f64 / 16.0).truncate();
-            ulo = ulo.min(q);
-            uhi = uhi.max(q);
-        }
-    }
-    if ulo.x > uhi.x || ulo.x.is_nan() {
-        return None;
-    }
+    let [u0, u1, v0, v1] = g.uvbox;
     let (mut lo, mut hi) = (DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY));
     for i in 0..=8 {
         for j in 0..=8 {
-            let p = ns.at(ulo.x + (uhi.x - ulo.x) * i as f64 / 8.0, ulo.y + (uhi.y - ulo.y) * j as f64 / 8.0);
+            let p = ns.at(u0 + (u1 - u0) * i as f64 / 8.0, v0 + (v1 - v0) * j as f64 / 8.0);
             lo = lo.min(p);
             hi = hi.max(p);
         }

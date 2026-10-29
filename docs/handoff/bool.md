@@ -488,8 +488,32 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   tolerance, axis within it over the conic's size, parameters within it along the conic (tol / minor radius), a start
   just short of a turn past OCCT's first is its first, ends just outside OCCT's range clamp to it; "an ellipse ending
   nearly at an axis" from 1e-9 rad off (was 1e-12). Checked with the parameters shifted ±3e-15 … ±1e-10: 19 taken.
-  Windows: dispatched CI on branch bool-ellipse-tol (run 40912100596). Replays all 0 differ, a few more taken: main
+  Windows: CI on branch bool-ellipse-tol (run 40912100596) green on all three, the test passing on MSVC; landed
+  b24ba37b. Replays all 0 differ, a few more taken: main
   638, corpus2 508, corpus3 513, corpus4 552 (+1), corpus5 643 (+1), corpus6 599 (+4), Shell's 70, direct 52.
+
+## Tori, spheres, sweeps (lead's step 3, 10-29 16:50 UTC)
+- `Surface::{Torus, Sphere, Extrusion, Revolution}` in `Body` (OCCT's frames and parameters; the swept curve a
+  B-spline in `Body::nurbs_curves`), `noshape_brep::freeform::FreeSurface` evaluates them (and NURBS) with first and
+  second derivatives; the Boolean treats them as it does B-spline faces: OCCT's IntTools_FaceFace for their sections,
+  the rest ours. A free-form face's parameter box is what its edges' curves span (sweeps and tori are unbounded or
+  periodic), samples / patches / scale over that box.
+- OCCT's section tolerance as the pave filler sets it (`section_tol`: at least the faces', at least 5e-6 unless both
+  faces are planes / cylinders / cones / spheres / tori), on the edge and for the Boolean's "along a boundary" (an
+  invalid result before: the edge 1e-7 against OCCT's 5e-6). A section piece ending at the section's own end takes
+  its bound exactly (PutBoundPaveOnCurve; ours was 2.8e-8 short, 2e-9 of a volume).
+- A ray crossing a free-form face is placed on it by the crossing's own parameters, not by inverting the point (on
+  a thread the inversion from the nearest sample could end on the face's edge: "no clean ray").
+- A thin piece whose first inside point is in the grey band of its face's boundary looks for a deeper one
+  (`arrange::deeper`) before declining.
+- Spheres / tori / revolutions mostly still decline: "two edges leave a vertex in one direction" (a pole or seam
+  vertex is one point in the face's parameter plane for free-form faces; it needs one point per place, and a pole's
+  degenerate edge split where curves reach it). Small in corpus6 (tori 1.2 s, spheres 2.1 s recorded): stopped here.
+- Replays (on top of the ellipse fix), all 0 differ: main 659 (+21: 20 cuts by an extruded fillet slab, one cylinder
+  slab), corpus5 646 (+3), corpus2 508, corpus3 513, corpus4 552, corpus6 599, Shell's 70, direct 52.
+- Tests: two extruded-fillet cuts in tests/data/brep-freeform (the T1 `brep_free_form_cases_match_occt`).
+- The thread fused with its rod (8dc3e8d4) gets further (past the grey band and the thin piece) and now stops at
+  "an edge ends inside a face" on the rod's face.
 
 ## Next
 Corpus6 (10-29 13:30, recorded OCCT time of what the Rust path still declines, loaded machine): curved edges

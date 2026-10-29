@@ -133,6 +133,18 @@ fn body_of(b: &BrepBody) -> Body {
                 out.nurbs_surfaces.push(n);
                 Surface::Nurbs { index: out.nurbs_surfaces.len() as u32 - 1 }
             }
+            // A torus or sphere: its frame's direction x × y, or minus that (the size's sign says).
+            4 | 5 => {
+                let (x, y) = (v3(s, 4), v3(s, 7));
+                let zdir = x.cross(y) * s[10].signum();
+                if s[0] as u8 == 4 {
+                    Surface::Torus { origin: v3(s, 1), xdir: x, ydir: y, zdir, major: s[10].abs(), minor: s[11] }
+                } else {
+                    Surface::Sphere { origin: v3(s, 1), xdir: x, ydir: y, zdir, radius: s[10].abs() }
+                }
+            }
+            6 => Surface::Extrusion { curve: curve_at(&mut out, s[1] as usize), dir: v3(s, 2) },
+            7 => Surface::Revolution { curve: curve_at(&mut out, s[1] as usize), origin: v3(s, 2), axis: v3(s, 5) },
             _ => Surface::Cone { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], angle: s[11] },
         };
         out.faces.push(Face { surface, reversed: b.reversed[f], loops });
@@ -207,6 +219,30 @@ fn flat(b: &Body, out: &mut BrepBody) {
                 out.surfaces.push(2.0);
                 out.surfaces.extend(xyz(origin).into_iter().chain(xyz(axis)).chain(xyz(xdir)));
                 out.surfaces.extend([radius, angle]);
+            }
+            Surface::Torus { origin, xdir, ydir, zdir, major, minor } => {
+                let h = if xdir.cross(ydir).dot(zdir) > 0.0 { 1.0 } else { -1.0 };
+                out.surfaces.push(4.0);
+                out.surfaces.extend(xyz(origin).into_iter().chain(xyz(xdir)).chain(xyz(ydir)));
+                out.surfaces.extend([h * major, minor]);
+            }
+            Surface::Sphere { origin, xdir, ydir, zdir, radius } => {
+                let h = if xdir.cross(ydir).dot(zdir) > 0.0 { 1.0 } else { -1.0 };
+                out.surfaces.push(5.0);
+                out.surfaces.extend(xyz(origin).into_iter().chain(xyz(xdir)).chain(xyz(ydir)));
+                out.surfaces.extend([h * radius, 0.0]);
+            }
+            Surface::Extrusion { curve, dir } => {
+                let at = push_curve(&mut out.nurbs, &b.nurbs_curves[curve as usize]);
+                out.surfaces.extend([6.0, at]);
+                out.surfaces.extend(xyz(dir));
+                out.surfaces.extend([0.0; 7]);
+            }
+            Surface::Revolution { curve, origin, axis } => {
+                let at = push_curve(&mut out.nurbs, &b.nurbs_curves[curve as usize]);
+                out.surfaces.extend([7.0, at]);
+                out.surfaces.extend(xyz(origin).into_iter().chain(xyz(axis)));
+                out.surfaces.extend([0.0; 4]);
             }
             Surface::Nurbs { index } => {
                 let s = &b.nurbs_surfaces[index as usize];

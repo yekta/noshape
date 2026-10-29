@@ -439,7 +439,7 @@ fn turned_about_x(b: &Body, angle: f64) -> Body {
             Surface::Cylinder { origin, axis, xdir, .. } | Surface::Cone { origin, axis, xdir, .. } => {
                 (*origin, *axis, *xdir) = (q * *origin, q * *axis, q * *xdir)
             }
-            Surface::Nurbs { .. } => {}
+            Surface::Nurbs { .. } | Surface::Torus { .. } | Surface::Sphere { .. } | Surface::Extrusion { .. } | Surface::Revolution { .. } => {}
         }
     }
     out
