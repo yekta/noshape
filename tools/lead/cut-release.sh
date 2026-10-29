@@ -39,6 +39,21 @@ tag)
   V=$2; git checkout -q --detach origin/release/v$V
   git tag -f v$V; git push -q origin v$V
   echo "tagged v$V at $(git rev-parse --short HEAD); release.yml publishes"
+  # main's own version follows the releases, so green / CI builds don't report an old one (qa VERSION-FOOTER-STALE, 10-29).
+  # Version fields only: safe to push without land.sh (the watcher still tests it).
+  git fetch -q origin; git checkout -q --detach origin/main
+  old=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+  if [ "$old" != "$V" ]; then
+    sed -i "0,/^version = \"$old\"/s//version = \"$V\"/" Cargo.toml
+    python3 - "$old" "$V" <<'P'
+import re,sys
+old,new=sys.argv[1],sys.argv[2]; p='Cargo.lock'; s=open(p).read()
+s=re.sub(r'(name = "noshape[^"]*"\nversion = )"'+re.escape(old)+'"', r'\1"'+new+'"', s)
+open(p,'w').write(s)
+P
+    git add Cargo.toml Cargo.lock && $G commit -q -m "lead: main's version follows the release: $old -> $V" && git push -q origin HEAD:main \
+      && echo "main's version $old -> $V" || echo "main's version bump failed: do it by hand"
+  fi
   git checkout -q --detach origin/main;;
 now)
   "$0" branch "$2" "$3" && "$0" tag "$2";;
