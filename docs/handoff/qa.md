@@ -10,6 +10,17 @@ recommend the next release from it.** Details under "Daily release smoke" › v0
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **07:07 update (green 5166e6dd = + core f93ac93c parallel pairs, bool c79eed1d, dx 3b67d2f7 / f7c8f430 / 4df6ed3c / 36be21f2):**
+  core's re-runs with the pairs parallel again: **draft-pool-hang** opens in 25 s (Draft 7 15.5 s, stops at its budget);
+  **edit loop** (bin/editloop3.sh, 16 Extrude 1 depth edits on it) 16 / 16, 8–21 s each, RSS 0.9 → 1.2 GB; **CLI fuzz seeds
+  152 and 72** (bin/clifuzz_time.py, 106 steps, core CLI of 2ac952ce) run to the end (152 used to die in ForceInterfEF at
+  step 39: BOP-PAIRS-GPF); GUI fuzz 222–227 alive (mirhole, halfmir2 B, cli-fillet-segv, live-30, boltdwg, asm5), 228 / 229
+  running. Verified DWG-RULER-SELECTOR-CLOSES, DWG-GROUP-ANNOTATION-MENU (single grouped note asked live), DWG-DATUM-PASTE-ATTACHED
+  (+ P3 DWG-DATUM-PASTE-RED), DWG-ARC-REF-FULL-CIRCLE, DWG-ANGULAR-LABEL-ANGLE. v0.4.14 (release/v0.4.14 6b2e0b13 = v0.4.13 +
+  c79eed1d): mirror set right on 5166e6dd in the app; final check on CI run 40832502559's Linux artifact with `bin/mirset.sh
+  <cli>` when it finishes, then the release smoke. DWG-HOLE-CALLOUT-ADD-LEADER (3964a7cf) waits for the next green.
+  Environment: at 06:48 every X display on the box went away (/tmp/.X11-unix emptied) and qa's detached jobs were killed; :107
+  came back by its owner, qa restarted Xvfb :110 / :131 (1600×1000×24) and re-ran the jobs.
 - **06:20 update:** tag v0.4.13 = 5e56477b + version bump; its release isn't published yet (CI). Soak on 5e56 continued: GUI fuzz 196–221
   all alive. Release smoke ready: `bin/relsmoke_cli.sh 0.4.13` (download, CLI version, STEP round trip, volsweep vs v0.4.12: expect only
   fillet-oversize-min to differ, now failing like live), then the GUI rows of v0.4.12's smoke + halfmir 7214.602 + mirhole wall 628.319.
