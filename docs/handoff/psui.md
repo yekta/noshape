@@ -151,7 +151,8 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 T1 a_selected_mate_connector_reads_its_origin; checked on :102: wf-block + Mate connector 1, ring clicked →
 "Point: X 19.500 Y 1.000 Z 10.000 mm"). PSUI-CONE-SHADING already on main (9b9caa54). No open P0 / P1 in psui's
 TICKETS. 13:10: mesher step 5 landed (6f411558, N06 below); on GitHub's Linux runner fins-400's display mesh
-is 11–12.5× BRepMesh's, live-30's 2.8×. 14:40: step 5b landed (edf5dda5). Here: /root/psui-scratch/prof3.sh
+is 11–12.5× BRepMesh's, live-30's 2.8×. 14:25: step 5b landed (edf5dda5); 15:40 step 5c (5f3d7b20, N06);
+15:55 HOLE-TABLE-BUTTON (8b2c53ae). Here: /root/psui-scratch/prof3.sh
 (RUNS, ONLY=live-30) for the documents, rust_mesh::bench_* for the kernel.
 
 Residuals found today: a paused dialog's Depth field
@@ -263,6 +264,16 @@ N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes
      longer welds to its sides: display_mesh_guard). Left for live-30 (≥ 10× there needs ~1 ms): per node,
      mesh_strip's row tuples copied into points / normals and the zip; mesh_fill; fresh pages for every
      buffer (~12 % of ours in perf: kernel_init_pages / page faults).
+     Step 5c (5f3d7b20): faces meshed costliest first, one at a time (brep `mesh_body` order by boundary nodes);
+     the planar CDT ~25 % less CPU (legalisation stack kept, in-circle's bound only for det > 0, boundary
+     half-edges found once; brep bench_cdt_plate_with_holes, 1444 points: ~1.75 ms; u32 indices tried: no gain).
+     **Runner numbers on 5c (perf 40900438407):** Linux fins-400 mesh_prepare 228–233 → 18.9–20.1 ms
+     (**11.4–12.3×**), live-30 12.1–12.6 → 3.6–3.8 ms (3.3×); macOS (Apple silicon, the mesh steps summed, its
+     bridge names unreadable) fins-400 189–337 → 15–32 ms (10–15×), live-30 7.3–11.4 → 1.7–1.9 ms (4–6×).
+     The fin plate meets ≥ 10× on both; live-30 doesn't: its time is the plate's top face (CDT of ~1450 boundary
+     nodes, ~1.75 ms alone on one thread) and the fillets' tori. Next for live-30: a cheaper planar
+     triangulation (the face is flat: any valid triangulation shades the same; ear clipping with hole bridges,
+     declining to the CDT when unsure), then the strip's per-node copies.
 0. **After the cold-start work: our own display mesher (lead 10-28 21:05, user-approved).** `brep::mesh` in crates/brep
    (bool's crate, its Body / Surface / Curve types): planes (polygons with holes), cylinders, cones, spheres, tori from
    their exact parameterisation, shared edge samples (watertight), the display's deflection rules; anything else

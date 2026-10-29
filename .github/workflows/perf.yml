@@ -577,7 +577,9 @@ jobs:
           for doc in fins live-30; do for r in 0 1 0 1 0 1; do
             i=$((i + 1))
             NOSHAPE_MESH_RUST=$r NOSHAPE_KERNEL_PROFILE=1 NOSHAPE_PROFILE_ONLY=$doc cargo test --release --locked -p noshape-ops --test all -- regen_profile::regen_profile --ignored --nocapture > "mesher-$i.log" 2>&1 || true
-            echo "$doc NOSHAPE_MESH_RUST=$r: $(grep -E '  mesh_(prepare|fill)|^profile: .*total' "mesher-$i.log" | tr -s ' ' | tr '\n' ' ')"
+            # The mesh steps summed too: clang's bridge names aren't readable (macOS lists every call as "_0").
+            steps=$(awk '/kernel profile/{p=1} p && $3=="1" && $4 ~ /^mesh\.(cache|edges|edges\.cache|clean|maps)$/ {s+=$1} END{printf "%.1f", s}' "mesher-$i.log")
+            echo "$doc NOSHAPE_MESH_RUST=$r: mesh steps $steps ms; $(grep -E '  mesh_(prepare|fill)|^profile: .*total' "mesher-$i.log" | tr -s ' ' | tr '\n' ' ')"
           done; done | tee display_mesher.log
           { echo "### ${{ matrix.name }}: display mesher (ms)"; echo '```'; cat display_mesher.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
