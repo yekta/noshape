@@ -168,11 +168,12 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
     // mesh lock this one holds).
     let edge_nodes = &out.edges;
     let mesh = |i: usize| if ok[i] { mesh_face(vertices, edges, &faces[i], edge_nodes, defl) } else { None };
-    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(8).min(faces.len() / 64 + 1);
+    // Runs of a few faces: a part's few tori can be most of its nodes.
+    const RUN: usize = 4;
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(8).min(faces.len().div_ceil(RUN));
     if threads <= 1 {
         out.faces = (0..faces.len()).map(mesh).collect();
     } else {
-        const RUN: usize = 16;
         let next = std::sync::atomic::AtomicUsize::new(0);
         let done: Vec<Vec<(usize, Option<FaceMesh>)>> = std::thread::scope(|sc| {
             let work = || {
