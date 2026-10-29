@@ -74,6 +74,8 @@
 #include <BRepExtrema_DistShapeShape.hxx>
 #include <BRepClass_FaceClassifier.hxx>
 #include <BRepTools_ReShape.hxx>
+#include <Geom_Circle.hxx>
+#include <Geom2d_Line.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRep_Builder.hxx>
 #include <TColStd_PackedMapOfInteger.hxx>
@@ -946,6 +948,196 @@ TopoDS_Shape unify(const TopoDS_Shape& s0, HHist& hist)
   return unify_in(s0, hist, nullptr, nullptr);
 }
 
+// Two faces on one cylinder meeting at a full ring, each a band closed at
+// its far end by one circle (a circle extruded both ways from its plane: the
+// halves' axes and seams point opposite ways, live's frames), stay two after
+// OCCT's unify, which can't move a seam (qa CYL-UNIFY-OPPOSITE; live one
+// face). Merged here: one face on the first band's surface over both, its far
+// circle, a new circle at the second band's far end (put into that end's cap
+// face), one new seam. The shape unchanged when there's no such pair or the
+// merge doesn't come out valid with the same volume.
+TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist)
+{
+  ShapeAncMap ef;
+  unique_ancestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  auto cyl_of = [](const TopoDS_Face& f, gp_Cylinder& c) {
+    TopLoc_Location                      loc;
+    occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(f, loc));
+    if (cs.IsNull())
+      return false;
+    c = cs->Cylinder().Transformed(loc.Transformation());
+    return true;
+  };
+  // A band: one wire, one seam, the far end one closed circle, the rest the
+  // ring shared with `other`.
+  struct Band
+  {
+    TopoDS_Edge              seam, end;
+    std::vector<TopoDS_Edge> ring;
+  };
+  auto band_of = [&](const TopoDS_Face& f, const TopoDS_Face& other, Band& b) {
+    int wires = 0;
+    for (TopoDS_Iterator w(f); w.More(); w.Next())
+      ++wires;
+    if (wires != 1)
+      return false;
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+      if (BRep_Tool::IsClosed(e, f))
+      {
+        if (!b.seam.IsNull() && !b.seam.IsSame(e))
+          return false;
+        b.seam = e;
+        continue;
+      }
+      const ShapeList* fl = ef.Seek(e);
+      if (fl == nullptr || fl->Extent() != 2)
+        return false;
+      if (fl->First().IsSame(other) || fl->Last().IsSame(other))
+      {
+        bool seen = false;
+        for (const TopoDS_Edge& r : b.ring)
+          seen = seen || r.IsSame(e);
+        if (!seen)
+          b.ring.push_back(e);
+      }
+      else if (b.end.IsNull())
+        b.end = e;
+      else if (!b.end.IsSame(e))
+        return false;
+    }
+    if (b.seam.IsNull() || b.end.IsNull() || b.ring.empty())
+      return false;
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(b.end, v0, v1);
+    BRepAdaptor_Curve c(b.end);
+    return !v0.IsNull() && v0.IsSame(v1) && c.GetType() == GeomAbs_Circle;
+  };
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    if (ef(i).Extent() != 2)
+      continue;
+    const TopoDS_Face a = TopoDS::Face(ef(i).First()), b = TopoDS::Face(ef(i).Last());
+    gp_Cylinder       ca, cb;
+    if (a.IsSame(b) || !cyl_of(a, ca) || !cyl_of(b, cb))
+      continue;
+    const double r = ca.Radius();
+    if (!ca.Axis().Direction().IsParallel(cb.Axis().Direction(), 1e-12) || std::abs(cb.Radius() - r) > 1e-9 * r
+        || gp_Lin(ca.Axis()).Distance(cb.Location()) > 1e-9 * (1 + r))
+      continue;
+    Band ba, bb;
+    if (!band_of(a, b, ba) || !band_of(b, a, bb))
+      continue;
+    TopLoc_Location                 la;
+    const occ::handle<Geom_Surface> ga = BRep_Tool::Surface(a, la);
+    double                          u0, u1, va0, va1;
+    BRepTools::UVBounds(a, u0, u1, va0, va1);
+    if (std::abs(u1 - u0 - 2 * M_PI) > 1e-9)
+      continue;
+    auto v_of = [&](const TopoDS_Edge& e) {
+      BRepAdaptor_Curve c(e);
+      double            u, v;
+      ElSLib::Parameters(ca, c.Value(c.FirstParameter()), u, v);
+      return v;
+    };
+    const double v_af = v_of(ba.end), v_bf = v_of(bb.end);
+    const double lo = std::min(v_af, v_bf), hi = std::max(v_af, v_bf);
+    if (!(hi - lo > 1e-9))
+      continue;
+    // a's far circle's vertex on a's seam (u0).
+    TopoDS_Vertex a_v0, a_v1;
+    TopExp::Vertices(ba.end, a_v0, a_v1);
+    double au, av;
+    ElSLib::Parameters(ca, BRep_Tool::Pnt(a_v0), au, av);
+    if (std::abs(std::remainder(au - u0, 2 * M_PI)) > 1e-7)
+      continue;
+    const gp_Ax3& A = ca.Position();
+    BRep_Builder  B;
+    const double  tol = std::max(BRep_Tool::Tolerance(ba.end), BRep_Tool::Tolerance(bb.end));
+    // b's far circle in a's frame: its parameter is a's u, its vertex on a's seam.
+    TopoDS_Vertex vb;
+    B.MakeVertex(vb, ElSLib::Value(u0, v_bf, ca), tol);
+    const gp_Dir             n = gp_Dir(gp_Vec(A.XDirection()).Crossed(gp_Vec(A.YDirection())));
+    occ::handle<Geom_Circle> circ =
+      new Geom_Circle(gp_Ax2(A.Location().Translated(gp_Vec(A.Direction()) * v_bf), n, A.XDirection()), r);
+    TopoDS_Edge b_far;
+    B.MakeEdge(b_far, circ, tol);
+    B.Add(b_far, vb.Oriented(TopAbs_FORWARD));
+    B.Add(b_far, vb.Oriented(TopAbs_REVERSED));
+    B.Range(b_far, u0, u0 + 2 * M_PI);
+    // The seam, from the low circle's vertex up.
+    const TopoDS_Vertex    v_lo = v_af < v_bf ? a_v0 : vb, v_hi = v_af < v_bf ? vb : a_v0;
+    occ::handle<Geom_Line> line = new Geom_Line(ElSLib::Value(u0, lo, ca), A.Direction());
+    TopoDS_Edge            seam;
+    B.MakeEdge(seam, line, tol);
+    B.Add(seam, v_lo.Oriented(TopAbs_FORWARD));
+    B.Add(seam, v_hi.Oriented(TopAbs_REVERSED));
+    B.Range(seam, 0, hi - lo);
+    TopoDS_Face F;
+    B.MakeFace(F, ga, la, BRep_Tool::Tolerance(a));
+    B.UpdateEdge(b_far, new Geom2d_Line(gp_Pnt2d(0, v_bf), gp_Dir2d(1, 0)), F, tol);
+    B.Range(b_far, F, u0, u0 + 2 * M_PI);
+    B.UpdateEdge(seam, new Geom2d_Line(gp_Pnt2d(u0 + 2 * M_PI, lo), gp_Dir2d(0, 1)),
+                 new Geom2d_Line(gp_Pnt2d(u0, lo), gp_Dir2d(0, 1)), F, tol);
+    B.Range(seam, F, 0, hi - lo);
+    // a's far circle keeps its curve on a's surface (F's).
+    double                          f2, l2;
+    const TopoDS_Edge               a_far = TopoDS::Edge(ba.end.Oriented(TopAbs_FORWARD));
+    const occ::handle<Geom2d_Curve> pa    = BRep_Tool::CurveOnSurface(a_far, a, f2, l2);
+    if (pa.IsNull())
+      continue;
+    const bool  a_up = pa->Value(f2 + 0.25 * (l2 - f2)).X() > pa->Value(f2).X();
+    const bool  a_low = v_af < v_bf;
+    TopoDS_Wire W;
+    B.MakeWire(W);
+    // Bottom with u growing, the seam up at u0 + 2 pi, the top back, the seam down at u0.
+    const TopoDS_Edge low = a_low ? (a_up ? a_far : TopoDS::Edge(a_far.Reversed())) : b_far;
+    const TopoDS_Edge top = a_low ? TopoDS::Edge(b_far.Reversed()) : (a_up ? TopoDS::Edge(a_far.Reversed()) : a_far);
+    B.Add(W, low);
+    B.Add(W, seam.Oriented(TopAbs_FORWARD));
+    B.Add(W, top);
+    B.Add(W, seam.Oriented(TopAbs_REVERSED));
+    B.Add(F, W);
+    if (!BRepCheck_Analyzer(F).IsValid())
+      continue;
+    // b's far circle in its cap, with the old one's sense.
+    BRepAdaptor_Curve old_c(bb.end);
+    const bool        same  = old_c.Circle().Axis().Direction().Dot(gp_Vec(n)) > 0;
+    const TopoDS_Edge b_new = same ? b_far : TopoDS::Edge(b_far.Reversed());
+    occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+    rs->Replace(a.Oriented(TopAbs_FORWARD), F);
+    rs->Remove(b);
+    rs->Replace(bb.end.Oriented(TopAbs_FORWARD), b_new);
+    const TopoDS_Shape out = rs->Apply(s);
+    if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+      continue;
+    GProp_GProps g0, g1;
+    BRepGProp::VolumeProperties(s, g0);
+    BRepGProp::VolumeProperties(out, g1);
+    if (std::abs(g1.Mass() - g0.Mass()) > 1e-9 * std::abs(g0.Mass()))
+      continue;
+    if (hist.IsNull())
+      hist = new BRepTools_History();
+    // ReShape's (the caps it rebuilt), b onto the new face too.
+    HHist h = rs->History();
+    if (h.IsNull())
+      h = new BRepTools_History();
+    if (h->Modified(a).IsEmpty())
+      h->AddModified(a, F);
+    h->AddModified(b, F);
+    h->AddModified(bb.end, b_far);
+    h->Remove(ba.seam);
+    h->Remove(bb.seam);
+    for (const TopoDS_Edge& e : ba.ring)
+      h->Remove(e);
+    hist->Merge(h);
+    // One pair at a time: the shape changed, look again.
+    return merge_cylinder_bands(out, hist);
+  }
+  return s;
+}
+
 // The unify, looking only in `sc` when given (UnifyScope); `clean` (when
 // given) says whether the result has nothing more to merge.
 TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean)
@@ -974,9 +1166,10 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
     return s;
   }
   lap = std::make_unique<KernelTimer>("unify.usd");
-  if (TopExp_Explorer(s, TopAbs_SOLID).More() && round_candidates(s, sc != nullptr ? &next : nullptr))
-    return usd_kept_volume(s, hist);
-  ShapeUpgrade_UnifySameDomain u(s, true, true, false);
+  const TopoDS_Shape s1 = merge_cylinder_bands(s, hist);
+  if (TopExp_Explorer(s1, TopAbs_SOLID).More() && round_candidates(s1, sc != nullptr ? &next : nullptr))
+    return usd_kept_volume(s1, hist);
+  ShapeUpgrade_UnifySameDomain u(s1, true, true, false);
   u.Build();
   if (!u.History().IsNull())
   {

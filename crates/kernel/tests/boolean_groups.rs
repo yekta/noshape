@@ -279,3 +279,33 @@ fn display_meshes_of_kept_faces_are_reused() {
         assert!(near(&cached.edge_points, &whole.edge_points), "{what}: edge points");
     }
 }
+
+/// qa CYL-UNIFY-OPPOSITE: one circle extruded both ways from its plane, fused
+/// and unified: one cylinder face over the whole length (live: 3 faces, one
+/// 753.98 mm² cylinder), each half's face mapped onto it.
+#[test]
+fn opposite_extrudes_of_a_circle_unify_into_one_cylinder() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let c = make_circle(DVec3::new(0.0, 0.0, 5.0 * mm), DVec3::Y, 6.0 * mm).unwrap();
+    let f = make_face_from_wire(&make_wire(&[c]).unwrap(), true).unwrap();
+    let a = extrude(&f, DVec3::new(0.0, -10.0 * mm, 0.0)).unwrap().shape;
+    let b = extrude(&f, DVec3::new(0.0, 10.0 * mm, 0.0)).unwrap().shape;
+    let fused = fuse(&a, &b).unwrap().shape;
+    let v = fused.volume().unwrap();
+    for (what, r) in [("unify", unify_same_domain(&fused).unwrap()), ("whole", unify_same_domain_whole(&fused).unwrap())] {
+        let s = &r.shape;
+        let cyl: Vec<f64> = s.faces().iter().filter(|x| matches!(x.face_surface(), Ok(Surface::Cylinder { .. }))).map(|x| x.area().unwrap() * 1e6).collect();
+        assert_eq!(s.count(ShapeType::Face), 3, "{what}: {cyl:?}");
+        assert!(cyl.len() == 1 && (cyl[0] - 240.0 * std::f64::consts::PI).abs() < 1e-6, "{what}: {cyl:?}");
+        assert!(s.is_valid() && (s.volume().unwrap() - v).abs() < 1e-9 * v, "{what}");
+        let out_cyl = s.faces().iter().position(|x| matches!(x.face_surface(), Ok(Surface::Cylinder { .. }))).unwrap() as u32;
+        for (i, x) in fused.faces().iter().enumerate() {
+            let images = r.history.modified(0, ShapeType::Face, i as u32);
+            assert_eq!(images.len(), 1, "{what}: face {i}");
+            if matches!(x.face_surface(), Ok(Surface::Cylinder { .. })) {
+                assert_eq!(images[0], out_cyl, "{what}: face {i}");
+            }
+        }
+    }
+}

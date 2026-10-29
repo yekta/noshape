@@ -2783,3 +2783,24 @@ fn oversize_fillets_like_onshape() {
         }
     }
 }
+
+/// qa CYL-UNIFY-OPPOSITE (live request 1584): a Ø12 circle on Front extruded
+/// 10 mm (New), then the same region 10 mm the other way (Add): one part of 3
+/// faces, one 753.98 mm² cylinder over the full 20 mm.
+#[test]
+fn opposite_extrudes_of_one_circle_make_one_cylinder_face() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::new(0.0, 5e-3), 6e-3);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+    t.add("extrude", &[("entities", q(regions.clone())), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    let f2 = t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("ADD")), ("oppositeDirection", ParamValue::Bool(true)), ("defaultScope", ParamValue::Bool(true))]);
+    let r = t.ok(f2);
+    let b = &r.context.bodies[0].shape;
+    let cyl: Vec<f64> = b.faces().iter().filter(|x| matches!(x.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).map(|x| x.area().unwrap() * 1e6).collect();
+    assert_eq!(b.count(noshape_kernel::ShapeType::Face), 3, "{cyl:?}");
+    assert!(cyl.len() == 1 && (cyl[0] - 753.982237).abs() < 1e-5, "{cyl:?}");
+    assert!((volume(&r) - 2261.946711).abs() < 1e-5, "{}", volume(&r));
+}
