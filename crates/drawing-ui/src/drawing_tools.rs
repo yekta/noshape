@@ -950,7 +950,14 @@ impl DrawingEditor {
                 if let Some(mut a) = self.pending_annotation() {
                     // Clicked on a face or a silhouette: the part on the line of sight (qa5 D8).
                     self.pk().finish_callout(&mut a, &anchor);
-                    self.edit_sheet("Callout", cx, |s| s.annotations.push(a));
+                    // Placed on a dimension, callout, weld or surface finish
+                    // symbol or datum: grouped with it (help callout_balloon, A27).
+                    let mut d = self.drawing.clone();
+                    if let Some(s) = d.sheets.get_mut(self.sheet) {
+                        s.annotations.push(a.clone());
+                    }
+                    self.group_callout_on_drop(&a, &mut d);
+                    self.commit("Callout", d, cx);
                     self.tool = Tool::Balloon { anchor: None };
                     self.datum_on = None;
                 }
