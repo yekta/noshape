@@ -640,6 +640,44 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
       if (const char* why = cached_body(*srcs[i], bodies[i], max_tol))
         return decline(why);
   }
+  // A line's common with a solid whose vertices alone are tolerant (model-core's rays at bodies with a few):
+  // those vertices are judged by their own tolerances here (far from the line, else declined), the rest by the
+  // edges' and faces'.
+  if (max_tol > kMaxTol && args.size() == 2 && srcs[0]->map(TopAbs_FACE).Extent() == 0 && srcs[0]->map(TopAbs_EDGE).Extent() == 1)
+  {
+    double ef = 0;
+    for (const OcShape* x : srcs)
+    {
+      const ShapeIMap& em = x->map(TopAbs_EDGE);
+      for (int k = 1; k <= em.Extent(); ++k)
+        ef = std::max(ef, BRep_Tool::Tolerance(TopoDS::Edge(em(k))));
+      const ShapeIMap& fm = x->map(TopAbs_FACE);
+      for (int k = 1; k <= fm.Extent(); ++k)
+        ef = std::max(ef, BRep_Tool::Tolerance(TopoDS::Face(fm(k))));
+    }
+    const ShapeIMap& lv = srcs[0]->map(TopAbs_VERTEX);
+    for (int k = 1; k <= lv.Extent(); ++k)
+      ef = std::max(ef, BRep_Tool::Tolerance(TopoDS::Vertex(lv(k))));
+    if (ef <= kMaxTol && lv.Extent() == 2)
+    {
+      const gp_Pnt a = BRep_Tool::Pnt(TopoDS::Vertex(lv(1))), z = BRep_Tool::Pnt(TopoDS::Vertex(lv(2)));
+      const gp_Vec d(a, z);
+      const ShapeIMap& sv = srcs[1]->map(TopAbs_VERTEX);
+      for (int k = 1; k <= sv.Extent(); ++k)
+      {
+        const TopoDS_Vertex& v  = TopoDS::Vertex(sv(k));
+        const double         vt = BRep_Tool::Tolerance(v);
+        if (vt <= kMaxTol)
+          continue;
+        const gp_Pnt p = BRep_Tool::Pnt(v);
+        const double t = std::clamp(gp_Vec(a, p).Dot(d) / d.SquareMagnitude(), 0.0, 1.0);
+        // (Within ten times the two tolerances: the Rust side's grey zone.)
+        if (p.Distance(a.Translated(d * t)) <= 10 * (vt + std::max(ef, 1e-7)))
+          return decline("a tolerant vertex near the line");
+      }
+      max_tol = ef;
+    }
+  }
   if (max_tol > kMaxTol)
     return decline("a tolerant input");
   // Arguments sharing sub-shapes: OCCT keeps the shared ones as they are. (One map of every argument's vertices

@@ -120,6 +120,13 @@ Big targets (10-29 04:00): the Rust path runs after the local Boolean, so a targ
 is one the local Boolean declined: no longer declined here (db5f2f3d 1004 faces, 99 tools: 178 ms vs OCCT 865;
 11b69a56 412 faces: 9 vs 88 ms; both as OCCT).
 
+A line along a face or an edge, and solids with a few tolerant vertices (10-29 05:00): model-core's rays fall
+back to the Boolean exactly where they run along a face (77 of the main corpus) or an edge; such a piece is on
+the solid's boundary and in the common, as OCCT's (an edge it runs along is modified to it too; the face's edges
+it crosses made its ends). A solid whose vertices alone are tolerant (1e-4, edges and faces 1e-7: 84 of them)
+goes by its edges' and faces' tolerance when no tolerant vertex is within 10 × its tolerance of the line (C++
+side). Main corpus **543 of 972** (was 463), fresh 453 of 692, corpus3 460 of 698: all 0 differ.
+
 Crossings and the faces that made vertices (10-29 04:30): OCCT says a face made a new vertex inside it where an
 input edge pierces it across (edges lying on it don't count; of faces of several arguments on one plane there,
 the first argument's), not "where exactly one input edge pierces it"; with that, edges of two arguments

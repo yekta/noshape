@@ -52,8 +52,10 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
         cuts.push((t, At::Vertex(w as u32)));
     }
     let near_vertex = |cuts: &[(f64, At)], t: f64| cuts.iter().any(|c| matches!(c.1, At::Vertex(_)) && (c.0 - t).abs() <= GREY * tol);
-    // Its edges it crosses.
+    // Its edges it crosses, and the ones it runs along.
     let vertex_cuts = cuts.clone();
+    let mut along_edges: Vec<usize> = Vec::new();
+    let mut along_faces: Vec<usize> = Vec::new();
     for (e, g) in cx.edges.iter().enumerate() {
         if g.arg != 1 {
             continue;
@@ -67,9 +69,11 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
                 let ed = (p1 - p0) / el;
                 let n = d.cross(ed);
                 if n.length() < 1e-9 {
-                    let off = (p0 - a) - d * (p0 - a).dot(d);
-                    if off.length() <= GREY * tol {
-                        return Err(Decline("a line along an edge"));
+                    let off = ((p0 - a) - d * (p0 - a).dot(d)).length();
+                    if off <= tol {
+                        along_edges.push(e);
+                    } else if off <= GREY * tol {
+                        return Err(Decline("a line nearly along an edge"));
                     }
                     continue;
                 }
@@ -132,8 +136,10 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
                 let den = n.dot(d);
                 let dist = dn - n.dot(a);
                 if den.abs() < 1e-9 {
-                    if dist.abs() <= GREY * tol && reaches(cx, f, a, b)? {
-                        return Err(Decline("a line along a face"));
+                    if dist.abs() <= tol {
+                        along_faces.push(f);
+                    } else if dist.abs() <= GREY * tol && reaches(cx, f, a, b)? {
+                        return Err(Decline("a line nearly along a face"));
                     }
                     continue;
                 }
@@ -147,8 +153,11 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
                 let (qa, qb, qc) = (rp.length_squared() - k * k * dz * dz, wp.dot(rp) - k * dz * rad, wp.length_squared() - rad * rad);
                 if qa.abs() < 1e-12 {
                     if qb.abs() < 1e-12 {
-                        if qc.abs() <= GREY * tol * (2.0 * rad.abs() + GREY * tol) && reaches(cx, f, a, b)? {
-                            return Err(Decline("a line along a face"));
+                        // (|w⊥|² - rad²: about 2 rad × the distance.)
+                        if qc.abs() <= tol * (2.0 * rad.abs() + tol) {
+                            along_faces.push(f);
+                        } else if qc.abs() <= GREY * tol * (2.0 * rad.abs() + GREY * tol) && reaches(cx, f, a, b)? {
+                            return Err(Decline("a line nearly along a face"));
                         }
                         continue;
                     }
@@ -211,12 +220,37 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
     let mut ts: Vec<f64> = vec![0.0];
     ts.extend(merged.iter().map(|c| c.0));
     ts.push(len);
+    // (A piece along an edge or on a face is on the solid's boundary: in the common, as OCCT's; the edge's
+    // piece is its image too.)
     let mut inside = Vec::with_capacity(ts.len() - 1);
+    let mut along: Vec<Option<usize>> = Vec::with_capacity(ts.len() - 1);
     for k in 0..ts.len() - 1 {
-        inside.push(match cx.ray_state(a + d * (0.5 * (ts[k] + ts[k + 1])), 0)? {
-            State::In => true,
-            State::Out => false,
-            _ => return Err(Decline("a line piece on the solid's boundary")),
+        let m = a + d * (0.5 * (ts[k] + ts[k + 1]));
+        let on_edge = along_edges.iter().copied().find(|&e| {
+            let (u, dist) = cx.seg_param(&cx.edge_seg(e), m);
+            dist <= tol && u > 0.0 && u < 1.0
+        });
+        let mut on_face = false;
+        for &f in &along_faces {
+            let q = cx.faces[f].to2(m);
+            let bound = cx.bound(f)?;
+            if distance2(q, bound) <= GREY * tol {
+                if on_edge.is_none() {
+                    return Err(Decline("a line piece near a face's boundary"));
+                }
+            } else if inside2(q, bound) {
+                on_face = true;
+            }
+        }
+        along.push(on_edge);
+        inside.push(if on_edge.is_some() || on_face {
+            true
+        } else {
+            match cx.ray_state(m, 0)? {
+                State::In => true,
+                State::Out => false,
+                _ => return Err(Decline("a line piece on the solid's boundary")),
+            }
         });
     }
     let mut out = Output::default();
@@ -245,9 +279,13 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
         vat[k] = Some(v);
         v
     };
+    let mut edge_images: Vec<(usize, u32)> = Vec::new();
     for (k, &kept) in inside.iter().enumerate() {
         if kept {
             let v = [vertex(&mut out, k), vertex(&mut out, k + 1)];
+            if let Some(e) = along[k] {
+                edge_images.push((e, out.body.edges.len() as u32));
+            }
             out.body.edges.push(Edge { v, curve: Curve::Line });
         }
     }
@@ -301,8 +339,11 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
             }
         }
     }
+    for &(e, o) in &edge_images {
+        h.push(rec(Kind::Edge, 1, cx.edges[e].index, Relation::Modified, Kind::Edge, o));
+    }
     for (e, g) in cx.edges.iter().enumerate() {
-        if g.arg == 1 && !made_edge[e] {
+        if g.arg == 1 && !made_edge[e] && !edge_images.iter().any(|x| x.0 == e) {
             h.push(rec(Kind::Edge, 1, g.index, Relation::Deleted, Kind::Edge, u32::MAX));
         }
     }

@@ -387,8 +387,15 @@ fn a_line_through_a_box() {
     assert_eq!(r.body.edges.len(), 1);
     assert_eq!(r.history.iter().filter(|h| h.kind == Kind::Vertex && h.arg == 1 && h.relation == Relation::Modified).count(), 2);
     assert!(r.history.iter().all(|h| h.relation != Relation::Generated));
-    // Along a face: declined; in its plane but beside it: taken (it misses).
-    assert_eq!(boolean(Op::Common, &[&segment(DVec3::new(1.0, 0.0, -1.0), DVec3::new(1.0, 0.0, 5.0)), &bx], TOL).err(), Some(Decline("a line along a face")));
+    // Along a face: its piece on the face, its ends made by the face's edges it crosses.
+    let r = boolean(Op::Common, &[&segment(DVec3::new(1.0, 0.0, -1.0), DVec3::new(1.0, 0.0, 5.0)), &bx], TOL).unwrap();
+    assert_eq!(r.body.edges.len(), 1);
+    assert_eq!(r.history.iter().filter(|h| h.kind == Kind::Edge && h.arg == 1 && h.relation == Relation::Generated).count(), 2);
+    // Along an edge: the edge's piece is the line's too.
+    let r = boolean(Op::Common, &[&segment(DVec3::new(0.0, 0.0, -1.0), DVec3::new(0.0, 0.0, 5.0)), &bx], TOL).unwrap();
+    assert_eq!(r.body.edges.len(), 1);
+    assert_eq!(r.history.iter().filter(|h| h.kind == Kind::Edge && h.relation == Relation::Modified).count(), 2);
+    // Beside it, missing it: declined.
     assert!(boolean(Op::Common, &[&segment(DVec3::new(6.0, 0.0, -1.0), DVec3::new(6.0, 0.0, 5.0)), &bx], TOL).is_err_and(|d| d == Decline("a line apart from the solid")));
 }
 
