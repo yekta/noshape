@@ -1771,8 +1771,11 @@ impl DrawingEditor {
                             t.copy_entities(cx);
                         }));
                     }
-                    // Move to ▸ a format layer (or back to the drawing).
-                    if matches!(a.kind, AnnotationKind::Note { .. } | AnnotationKind::Balloon { .. } | AnnotationKind::Gdt { .. } | AnnotationKind::Datum { .. } | AnnotationKind::DatumTarget { .. } | AnnotationKind::SurfaceFinish { .. } | AnnotationKind::Weld { .. }) {
+                    // Move to ▸ a format layer (or back to the drawing); not
+                    // on datums (live C9: Edit... · Paste · Copy · Paste as
+                    // table | Add comment | Clear selection · Zoom to fit ·
+                    // Delete).
+                    if matches!(a.kind, AnnotationKind::Note { .. } | AnnotationKind::Balloon { .. } | AnnotationKind::Gdt { .. } | AnnotationKind::DatumTarget { .. } | AnnotationKind::SurfaceFinish { .. } | AnnotationKind::Weld { .. }) {
                         let cur = a.layer;
                         let layers = SheetLayer::FORMAT.iter().copied().chain((!cur.is_drawing()).then_some(SheetLayer::Drawing));
                         let items = layers

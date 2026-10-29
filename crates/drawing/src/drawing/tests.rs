@@ -3347,3 +3347,24 @@ fn note_leader_ends_in_an_arrowhead() {
     let tip = |f: &&sheet::Fill2| f.points.iter().any(|p| (p[0] - target[0]).abs() < 1e-6 && (p[1] - target[1]).abs() < 1e-6);
     assert!(built.geometry.fills.iter().any(|f| tip(&f)), "no arrowhead at the leader's end");
 }
+
+/// A pasted datum is a free-standing copy at the paste, its triangle moved
+/// with it and attached to nothing (live C9; qa DWG-DATUM-PASTE-ATTACHED:
+/// its leader ran back to the original edge).
+#[test]
+fn a_pasted_datum_stands_free() {
+    use super::clipboard::{DrawingClipboard, SheetPaste};
+    let (_, mut drawing) = demo();
+    let view = drawing.sheets[0].views[0].id;
+    let id = drawing.sheets[0].next_annotation_id();
+    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::Datum { anchor: [100.0, 100.0], label: "A".into(), on: None, at: Some((view, [0.01, 0.0])) }, position: [100.0, 90.0], ..Default::default() });
+    let clip = drawing.copy_entities(0, &[id], &[]).unwrap();
+    let s = &mut drawing.sheets[0];
+    s.paste_views(&clip, Some([300.0, 200.0]));
+    let pasted = s.annotations.last().unwrap();
+    let AnnotationKind::Datum { anchor, on, at, label } = &pasted.kind else { panic!() };
+    assert_eq!((on.is_none(), at.is_none(), label.as_str()), (true, true, "A"));
+    // Same shape: the triangle keeps its offset from the box.
+    let (dx, dy) = (anchor[0] - pasted.position[0], anchor[1] - pasted.position[1]);
+    assert!((dx - 0.0).abs() < 1e-9 && (dy - 10.0).abs() < 1e-9, "{anchor:?} {:?}", pasted.position);
+}

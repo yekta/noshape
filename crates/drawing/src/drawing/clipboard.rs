@@ -207,6 +207,13 @@ impl SheetPaste for Sheet {
                     None => l.point = [l.point[0] + d[0], l.point[1] + d[1]],
                 }
             }
+            // A datum: a free-standing copy of the same shape at the paste,
+            // attached to nothing (live C9; qa DWG-DATUM-PASTE-ATTACHED).
+            if let super::AnnotationKind::Datum { anchor, on, at, .. } = &mut a.kind {
+                *anchor = [anchor[0] + d[0], anchor[1] + d[1]];
+                (*on, *at) = (None, None);
+                a.refs.clear();
+            }
             a.position = [a.position[0] + d[0], a.position[1] + d[1]];
             pasted.push(a);
         }
