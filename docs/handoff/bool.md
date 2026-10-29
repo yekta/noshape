@@ -223,22 +223,21 @@ Rust path declines them. Next for it: don't touch untouched faces at all (C++ bu
 faces are most of what's left).
 
 ## Next
-What still declines (corpus, 10-28 20:30; recorded OCCT time of the ones under 50 input faces):
-- free-form surfaces and curves (B-spline, linear extrusion, revolution: sweeps, lofts, helices, knurls): ~100
-  cases, ~105 s; OCCT's (core's phase 1).
-- faces or shells as arguments (sheet Booleans: face–face common, coplanar face fuses, solid–face common): 297
-  cases, ~3.5 s, mostly 1–8 ms each; mixed-dimension results (edges, empty results).
-- cylinders at an angle (cross holes: 4th-order curves) 27, planes at an angle to a cylinder (ellipses) 12 + 7
-  shells: would need sinusoids in the cylinder's parameter plane and approximated pcurves; not worth it now.
-- arguments sharing faces (12): OCCT keeps some shared entities and makes others anew by rules not worked out
-  (tried 10-28: 9 of 12 differed).
-- a body with an identical copy (all faces coincident, 3), voids in a result or an input (4), ambiguous
-  geometry within 50 × the tolerance (~15).
+What still declines (10-29 02:30, main corpus 451 of 972 taken; fresh 434 of 692; Shell's 48 of 85):
+- free-form surfaces and curves (B-spline edges and faces, ellipses: sweeps, lofts, fillets of angled edges):
+  ~100 main / 84 fresh, the most OCCT time (~105 s main); OCCT's (core's phase 1).
+- faces or shells as arguments (face–face commons, sheet fuses): ~250 main / 51 fresh, 1–8 ms each.
+- cylinders at an angle (27 main), planes at an angle to a cylinder (8 main / 6 fresh, ~1.4 s each in the fresh
+  corpus: multi-tool cuts round a shaft): ellipses and 4th-order curves; not worth it yet.
+- arguments sharing faces (13 main / 17 fresh, ~90 ms each): OCCT rebuilds some shared corners (see above).
+- edges of two arguments crossing on a third's face near a vertex of three (12 fresh): OCCT's attribution of the
+  crossing vertices goes by more than the face (tried 10-29: crediting the face made 10 others differ).
+- big targets (local Boolean first), pattern fuses with overlapping instances (core's trimmed path), ambiguous
+  geometry within 50 × the tolerance (~25), a line along a face or edge (~6).
 Next:
-1. Default-on follow-up: T2 (oracles, kernel robustness) with it on vs off (running 10-28 20:20), then fix what
-   differs.
-2. Locality's C++ side (above), then let big targets through ahead of the local Boolean.
-3. Sheet Booleans (planar faces as arguments) if the corpus shows them in regenerations that matter.
+1. Big targets: the Rust side (~21 ms of ~54 on 1612 faces) and the build/history over untouched faces, to get
+   under the local Boolean's ~43 ms.
+2. Shared faces, if a rule for OCCT's rebuilt corners turns up.
 
 ## Requests
 - core / lead: `pattern_second::timed_second_pattern_costs_about_the_same_as_the_first` (perf.yml) compares LP2 to
