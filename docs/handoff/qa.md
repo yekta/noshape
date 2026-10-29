@@ -9,6 +9,10 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **02:40 update:** big sweep done (cli/bigsweep.out): ~380 qa-scratch documents give identical per-part volume / area / face counts
+  with the v0.4.12 CLI and bool's CLI 22:53 (Rust on), except the copies of cli-fillet-segv (RUST-MIRROR-EXTRA-FACE) and documents
+  that don't open (bad-trunc, trunc, garbage, notdoc, vq34; same error both ways). GUI fuzz 116 / 117 (5f9c) alive; 118–123 running
+  on both displays (0eb9).
 - **02:32 update (greens 5f9cb1ca = + core 5ac53b95 crash-guard fix, dx 6b81b0ff silhouettes; 0eb90b5f = + bool 200a7530 / 0eb90b5f):**
   CLI-SUPPRESS-SEGV fixed by core (root cause = qa's stacks); qa replay needs a CLI with it (requested). DWG-E2E-SILHOUETTE: silhouette
   part fixed (Ø20 from two silhouettes, axis centerline from one), hover residual P3. On 0eb9: live-30 60779.484 / 15848.357, mirhole
