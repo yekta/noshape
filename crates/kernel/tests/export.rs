@@ -1043,3 +1043,16 @@ fn parasolid_assembly_tree() {
     assert!(read_parasolid_assembly(&one, LengthUnit::Meter).unwrap().is_none());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// PVZ of a through hole cut by noshape's own Boolean (PVZ-RUST-BOOL): its seam's curves at u = 0 and 2π and
+/// its circles on the cylinder's own x axis, as OCCT's (a seam a rounding below 0 failed the writer's trimming).
+#[test]
+fn pvz_of_a_hole_cut_by_the_rust_boolean() {
+    set_rust_boolean(Some(true));
+    let s = part();
+    assert_eq!(last_boolean_path(), "rust");
+    set_rust_boolean(None);
+    let path = std::env::temp_dir().join(format!("noshape-pvz-rust-{}.pvz", std::process::id()));
+    write_pvz(&path, &[ExportShape { shape: s, name: Some("part".into()), color: None }], LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+}

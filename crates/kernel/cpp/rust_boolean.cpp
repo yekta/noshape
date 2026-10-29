@@ -364,9 +364,13 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     {
       const gp_Pnt ctr(cv[1], cv[2], cv[3]);
       const gp_Dir n(cv[4], cv[5], cv[6]);
-      // Its parameter 0 at the start.
+      // Its parameter 0 at the start; on the surface's own x axis (a cylinder's seam) that axis exactly, as
+      // OCCT's section circles (a start a rounding off it tilts the circle and its pcurve's u goes below 0).
       gp_Vec x(ctr, p0);
       x -= gp_Vec(n) * x.Dot(gp_Vec(n));
+      const gp_Vec own(cv[7], cv[8], cv[9]);
+      if (own.Magnitude() > 0.5 && x.Magnitude() > 0 && x.Angle(own) < 1e-12)
+        x = own;
       c = new Geom_Circle(gp_Ax2(ctr, n, gp_Dir(x)), cv[10]);
       f = 0;
     }
@@ -392,7 +396,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     if (at1)
       t1 = *at1;
     if (!(t0 < t1))
-      fail_op("brep: an edge against its curve");
+      return "an edge against its curve";
     TopoDS_Edge e;
     bb.MakeEdge(e, c, loc, tol_e);
     bb.Add(e, vs[v0].Oriented(TopAbs_FORWARD));
@@ -482,6 +486,10 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         BRepTools::UVBounds(src, u1, u2, v1, v2);
         umin += 2 * M_PI * std::floor((0.5 * (u1 + u2) - umin) / (2 * M_PI));
       }
+      // A rounding off a whole turn (an angle from a seam's point a rounding off its axis): the turn, where OCCT's
+      // seams are (a seam's curve at u = -3e-16 failed the PVZ writer's trimming, PVZ-RUST-BOOL).
+      if (const double turn = 2 * M_PI * std::round(umin / (2 * M_PI)); std::abs(umin - turn) < 1e-12)
+        umin = turn;
       const double umax = umin + 2 * M_PI;
       for (size_t k = 0; k < ne; ++k)
       {
@@ -508,11 +516,11 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         TopLoc_Location               el;
         const occ::handle<Geom_Curve> c  = BRep_Tool::Curve(e, el, f0, f1);
         const occ::handle<Geom_Curve> bc = basis_of(c);
-        // u in the face's range.
-        auto shift = [&](double lo, double hi) {
+        // u in the face's range (none: an edge outside it).
+        auto shift = [&](double lo, double hi) -> std::optional<double> {
           const double n = std::ceil((umin - eps - lo) / (2 * M_PI));
           if (hi + n * 2 * M_PI > umax + eps)
-            fail_op("brep: an edge outside its face's range");
+            return std::nullopt;
           return n * 2 * M_PI;
         };
         double u = 0, v = 0;
@@ -522,7 +530,10 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           const double  sg = g.Axis().Direction().Dot(up) > 0 ? 1.0 : -1.0;
           params(ElCLib::Value(0, g), u, v);
           const double a = u + sg * f0, z = u + sg * f1;
-          u += shift(std::min(a, z), std::max(a, z));
+          const std::optional<double> sh = shift(std::min(a, z), std::max(a, z));
+          if (!sh)
+            return "an edge outside its face's range";
+          u += *sh;
           bb.UpdateEdge(e, new Geom2d_Line(gp_Pnt2d(u, v), gp_Dir2d(sg, 0)), s, loc, BRep_Tool::Tolerance(e));
           continue;
         }
@@ -535,7 +546,10 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         params(ElCLib::Value(0.5 * (f0 + f1), g), um, vm);
         u = um;
         const double dv = v1 > v ? 1.0 : -1.0;
-        u += shift(u, u);
+        const std::optional<double> sh = shift(u, u);
+        if (!sh)
+          return "an edge outside its face's range";
+        u += *sh;
         // On the seam's line the edge has both of the seam's curves (the faces either side of it each take one).
         const bool on_seam = std::abs(u - umin) < eps || std::abs(u - umax) < eps;
         if (on_seam)

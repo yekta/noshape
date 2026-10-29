@@ -100,6 +100,11 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
             }
             set_rust_boolean(None);
         }
+        // (Failed without a reason: an error inside it, which the app would show, not a decline.)
+        if let (true, Err(e)) = (path != "rust" && why.is_empty(), &r) {
+            bad.push(format!("{name}: failed: {e}"));
+            continue;
+        }
         if path != "rust" {
             if std::env::var("NOSHAPE_BREP_WHY").is_ok_and(|w| why.contains(&w)) {
                 report += &format!("{name} declined: {why}\n");
