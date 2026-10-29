@@ -559,6 +559,14 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - Replays, all 0 differ: main 680 (+5), corpus2 528 (+4), corpus3 533 (+4), corpus4 573 (+4), corpus5 666 (+5),
   corpus6 620 (+5), Shell's 71 (+1), direct 52. T1: a case (5f078363) in tests/data/brep.
 
+## Empty results, edges touching a face (10-29 21:30 UTC)
+- A piece of a face that another argument's edge touches without cutting it (a box's edge on a tilted box's face)
+  no longer declines unless that piece is kept or coincident; an empty result (nothing kept) is everything
+  deleted, solids too, as OCCT's empty compound (was "an empty result"). Model-core's overlap probes (commons of a
+  thin box and a big tilted one touching along an edge) were most of corpus6's "an edge ends inside a face".
+- Replays, all 0 differ: corpus5 682 (+16), corpus6 636 (+16); main 680, corpus2 528, corpus3 533, corpus4 573,
+  Shell's 71, direct 52 as before. T1: a case (14e82fef) in tests/data/brep.
+
 ## Next
 Free-form, the lead's four steps (13:35) where they stand (10-29 20:45 UTC): (1) profiled (above); (2) the hybrid
 (OCCT's IntTools_FaceFace curves, everything else ours) takes B-spline, torus, sphere, extruded and revolved faces;

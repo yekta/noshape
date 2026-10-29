@@ -442,6 +442,8 @@ struct Piece {
     face: usize,
     loops: Vec<Vec<(usize, bool)>>,
     inside: DVec3,
+    /// An edge ends inside it (one that touches it, as a box's edge on another's face, without cutting it).
+    dangling: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2234,7 +2236,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         if !near && !face_split[f] {
             let loops = vec![cx.faces[f].edges.iter().map(|&(e, r)| (edge_pieces[e][0].0, r ^ edge_pieces[e][0].1)).collect()];
             face_pieces[f].push(pieces.len());
-            pieces.push(Piece { face: f, loops, inside: DVec3::NAN });
+            pieces.push(Piece { face: f, loops, inside: DVec3::NAN, dangling: false });
             continue;
         }
         // The curves in the face's parameter plane (a seam's pieces on both sides).
@@ -2305,15 +2307,12 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             if !inside2(r.inside, cx.bound(f)?) {
                 continue;
             }
-            if r.dangling {
-                return Err(Decline("an edge ends inside a face"));
-            }
             let inside3 = cx.faces[f].to3(r.inside);
             let mut loops = vec![r.outer];
             loops.extend(r.holes);
             let loops = loops.into_iter().map(|l| l.into_iter().map(|(s, rev)| (lsrc[s as usize], rev)).collect()).collect();
             face_pieces[f].push(pieces.len());
-            pieces.push(Piece { face: f, loops, inside: inside3 });
+            pieces.push(Piece { face: f, loops, inside: inside3, dangling: r.dangling });
         }
         if face_pieces[f].is_empty() {
             return Err(Decline("a face lost"));
@@ -2438,10 +2437,20 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             partner[pi] = Some(o);
         }
     }
+    // (A piece an edge ends in: only where it goes, as OCCT's builder leaves such an edge in the face.)
+    if pieces.iter().enumerate().any(|(p, x)| x.dangling && (keep[p].is_some() || on_pairs.iter().any(|o| o.0 == p))) {
+        return Err(Decline("an edge ends inside a face"));
+    }
     // The result's faces and their edges.
     let kept: Vec<usize> = (0..pieces.len()).filter(|&p| keep[p].is_some()).collect();
     if kept.is_empty() {
-        return Err(Decline("an empty result"));
+        // Nothing: everything deleted, as OCCT's (an empty compound).
+        let mut out = Output::default();
+        for (a, b) in args.iter().enumerate() {
+            let del = |kind: Kind, n: usize| (0..n as u32).map(move |i| Record { kind, arg: a as u32, index: i, relation: Relation::Deleted, out_kind: kind, out: u32::MAX });
+            out.history.extend(del(Kind::Solid, b.solids.len()).chain(del(Kind::Face, b.faces.len())).chain(del(Kind::Edge, b.edges.len())).chain(del(Kind::Vertex, b.vertices.len())));
+        }
+        return Ok(out);
     }
     let mut uses: HashMap<usize, [i32; 2]> = HashMap::default();
     for &p in &kept {
