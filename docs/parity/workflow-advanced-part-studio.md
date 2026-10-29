@@ -55,9 +55,9 @@ Status: ✅ matches live/exact, ✗ differs (finding #), ? live data pending.
 | 4.2 | Helix on the Ø6 × 30 face | curve 4 turns | Curve 1, length **81.147 mm** = exact | ✅ | 64997436 10-28 (GUI: Helix on the Ø6×30 side face → Curve 1, a click on it reads Length 81.147 mm) |
 | 4.3 | Space | clears the selection | clears | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | 4.4 | Tool search "thread" | External thread (Did you mean: Helix, Hole) | same | ✅ | 41f60e47 10-28 |
-| 4.5 | External thread: click the Ø6 cylinder's end edge | chip / size mismatch handling (pending) | **no hover, no pick**; a pre-selected edge is dropped on open; outside the dialog the same edge picks fine ("Diameter: 6.000 mm") | ✗ ADV6 |  |
+| 4.5 | External thread: click the Ø6 cylinder's end edge | chip / size mismatch handling (pending) | **no hover, no pick**; a pre-selected edge is dropped on open; outside the dialog the same edge picks fine ("Diameter: 6.000 mm") | ✅ ADV6 fixed | 349290dc 10-29 (qa: cyl6.noshape Ø6 × 20; External thread › hovering the top end edge highlights it, the click takes "Edge of Extrude 1", title black; tickets/adv6-adv-rib-3492.png) |
 | 4.6 | Rib dialog | Sketch profiles, Parts, Thickness, Parallel to sketch plane + flip, ☐ Draft, ☐ Extend profiles to part, ☑ Merge ribs | same; default 2.5 mm (live inch doc 0.1 in) | ✅ | f9185639 10-28 (dialog fields) |
-| 4.7 | Rib: click the Sketch 2 row for "Sketch profiles" | ? | nothing added → ✓ gives "Select sketch profiles to create the ribs." | ? (same pattern as ADV1) |  |
+| 4.7 | Rib: click the Sketch 2 row for "Sketch profiles" | ? | nothing added → ✓ gives "Select sketch profiles to create the ribs." | ✅ | 349290dc 10-29 (qa: Rib, click the Sketch 1 row → "Edges of Sketch 1", Parts prefilled "Part 1") |
 | 4.8 | Rib 4 mm on the L bracket (line (5,15)→(20,5) on Front) | ~10050 (pending exact) | 10044.179 (my line endpoints approximate) | ? |  |
 | 4.9 | Wrap dialog | (pending) | tabs Solid / **Surface** (default) / Split; Tools, Target, ☐ Trim to target, ☐ Specify anchor points, Angle, U shift, V shift | ? |  |
 | 4.10 | New Part Studio from + while Part Studio 2 is active | inserted right after the active tab (behaviours.md "Tab bar") | after the active tab | ✅ | 77870dd4 10-28 (Part Studio 3 inserted after the active PS2) |
@@ -86,7 +86,7 @@ rebuilt exactly to live's spec in /tmp/qa5/home/Documents/noshape/qa5-livecheck.
 | 2.5 | Sweep error tooltip | "Sweep 1 did not regenerate properly: …" | still "Could not create valid swept body, check input."; Helix error tooltip also bare ("Select a cone or cylinder.") | ✗ ADV3 |  |
 | 3.7 | Hole countersink rows | – | "Countersink diameter" label still overlaps "12.878 mm", "82 de" cut | ✗ ADV4 |  |
 | 4.1 | Helix handedness label | live DOM (qa5-adv-helix): the Clockwise select has **no label** | no label | ✅ **ADV5 withdrawn** | f8014efa 10-28 (GUI: new Helix: "Clockwise" select spans the row with no label) |
-| 4.5 | External thread edge pick | picks the edge | **hovers + picks "Edge of Sweep 1"** | ✅ ADV6 fixed | 64997436 10-28 (GUI: hover outlines the Ø6 top edge, click → 'Edge of Extrude 3') |
+| 4.5 | External thread edge pick | picks the edge | **hovers + picks "Edge of Sweep 1"** | ✅ ADV6 fixed | 349290dc 10-29 (qa: cyl6.noshape Ø6 × 20; External thread › hovering the top end edge highlights it, the click takes "Edge of Extrude 1", title black; tickets/adv6-adv-rib-3492.png) |
 | 4.5b | Thread dialog "Threads/inch" value | "20 tpi" (dom qa5-adv-thread) | "20 tpi (UNC)" | ✅ (ADV8 fixed) | 64997436 10-28 (GUI: '20 tpi'; ADV8 fixed) |
 | 4.5c | Thread result | cosmetic, **cylindrical face split at 10 mm (3 → 4 faces)**, area unchanged | area unchanged 2513.2741, **still 3 faces** (Split face ☑ default) | ✅ (ADV7 fixed) | 64997436 10-28 (GUI: committed, the side face is split 10 mm down: hover lights the lower band only; ADV7 fixed; tickets/thread-split-6499.png) |
 | 4.6 | Rib defaults | 2.5 mm, Parallel to sketch plane, Merge ribs ☑; Parts auto-fills "Part 1" | same (UI pass 2) | ✅ | f9185639 10-28 (dialog fields) |
