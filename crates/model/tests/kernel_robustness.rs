@@ -2804,3 +2804,24 @@ fn opposite_extrudes_of_one_circle_make_one_cylinder_face() {
     assert!(cyl.len() == 1 && (cyl[0] - 753.982237).abs() < 1e-5, "{cyl:?}");
     assert!((volume(&r) - 2261.946711).abs() < 1e-5, "{}", volume(&r));
 }
+
+/// qa TOUCH-PATTERN-ADD (live request 1594): a cylinder r10 at (5, −5) × 5
+/// mm, Part linear pattern along Right, 20 mm, 2 instances, Add: the copy only
+/// touches the part along a line. Live: Info "Boolean resulted in no
+/// geometry change. …", two parts of 3 faces each (no split at the line).
+#[test]
+fn part_pattern_add_touching_along_a_line_changes_nothing() {
+    let mut t = T::new();
+    let (_, regions) = t.sketch(&[], &[((5.0, -5.0), 10.0)]);
+    let x = t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("NEW"))]);
+    let p = t.add("linearPattern", &[("patternType", en("PART")), ("entities", q(vec![Reference::Body(noshape_model::reference::BodyId { feature: x, index: 0 })])), ("directionOne", q(vec![Reference::Plane(DatumPlane::Right)])), ("distance", e("20 mm")), ("instanceCount", e("2")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
+    let r = t.regen();
+    let st = r.display.features.iter().find(|s| s.id == p).unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Info, Some("Boolean resulted in no geometry change. The parts either do not intersect or are totally contained.")));
+    let parts: Vec<(usize, f64)> = r.context.bodies.iter().map(|b| (b.shape.count(noshape_kernel::ShapeType::Face), noshape_kernel::volume_properties(&b.shape).unwrap().mass / MM3)).collect();
+    assert_eq!(parts.len(), 2, "{parts:?}");
+    for (faces, v) in parts {
+        assert_eq!(faces, 3);
+        assert!((v - 1570.796327).abs() < 1e-5, "{v}");
+    }
+}

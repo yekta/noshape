@@ -953,7 +953,7 @@ impl<'a> EvalCtx<'a> {
             return self.fuse_targets(targets, tools, opts);
         }
         let tool_shapes: Vec<Shape> = tools.iter().map(|t| t.shape.clone()).collect();
-        let mut new_bodies: Vec<(usize, Vec<Body>)> = Vec::new();
+        let mut new_bodies: Vec<(usize, Vec<Arc<Body>>)> = Vec::new();
         for &ti in targets {
             let target = self.ctx.bodies[ti].clone();
             // A cut or common only needs the tools whose boxes reach this
@@ -1009,6 +1009,23 @@ impl<'a> EvalCtx<'a> {
             if self.cancelled() {
                 return err("Cancelled");
             }
+            // A fuse that merged nothing (tools apart from the part, or only
+            // touching it along a line or at a point): the part stays as it
+            // was, the tools become parts of their own (live request 1594: a
+            // pattern's instances touching along a line, "Boolean resulted in
+            // no geometry change", 3 faces each; qa TOUCH-PATTERN-ADD: the
+            // touching line had split the part's face).
+            let solids = |s: &Shape| s.count(ShapeType::Solid);
+            if op == k::BooleanOp::Fuse && target.kind == BodyKind::Solid && solids(&target.shape) == 1 && near.iter().all(|&i| solids(&tool_shapes[i]) == 1) && solids(&res.shape) == 1 + near.len() {
+                let mut bodies = vec![target.clone()];
+                for (j, &i) in near.iter().enumerate() {
+                    let name = self.ctx.alloc_part_name(target.kind);
+                    let id = BodyId { feature: self.feature, index: 10_000 + (ti as u32) * 64 + 1 + j as u32 };
+                    bodies.push(Arc::new(Body::named(id, name, target.kind, tools[i].shape.clone(), tools[i].names.clone(), target.color, self.feature)));
+                }
+                new_bodies.push((ti, bodies));
+                continue;
+            }
             let mut args: Vec<ShapeNames> = vec![target.shape_names()];
             args.extend(near.iter().map(|&i| tools[i].names.clone()));
             let arg_refs: Vec<&ShapeNames> = args.iter().collect();
@@ -1051,7 +1068,7 @@ impl<'a> EvalCtx<'a> {
                     let name = self.ctx.alloc_part_name(target.kind);
                     (BodyId { feature: self.feature, index: 10_000 + (ti as u32) * 64 + j as u32 }, name, target.color)
                 };
-                bodies.push(Body::named(id, name, target.kind, p.shape, p.names, color, self.feature));
+                bodies.push(Arc::new(Body::named(id, name, target.kind, p.shape, p.names, color, self.feature)));
             }
             if perf {
                 log::info!(target: "perf", "boolean_into: bodies (edge / vertex names) {:.1} ms", (t0.elapsed() - t_split).as_secs_f64() * 1e3);
@@ -1063,7 +1080,7 @@ impl<'a> EvalCtx<'a> {
         for (ti, bodies) in new_bodies {
             self.ctx.bodies.remove(ti);
             for (k2, b) in bodies.into_iter().enumerate() {
-                self.ctx.bodies.insert(ti + k2, Arc::new(b));
+                self.ctx.bodies.insert(ti + k2, b);
             }
         }
         Ok(())
