@@ -9,6 +9,16 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **19:00 update (greens f9d89b7d = + psui cc73aaea, 3a8c7a85 = + core 3a8c7a85 shell / draft wedges on their own copy):** new
+  **P1 MESH-EMPTY-LOOP-PANIC**: CLI fuzz seed 355 (bool 12:13 CLI) died at a Part mirror; its document makes the **v0.4.14 app**
+  hang on open (empty view, spinner for good) and the v0.4.14 CLI abort (exit 134): the own mesher panics in loop_nodes on a face
+  loop with no uses and the panic crosses brep_mesh's FFI. The face comes from Mirror 8, which in v0.4.14 leaves Part 35 at
+  −738.187 mm³ with 3 faces; green f9d89b7d opens the document fine, but main's loop_nodes is still unguarded. Document and logs in
+  qa-scratch/tickets/mesh355/. On 3a8c7a85: Draft dr1–dr7, Shell wfs1 / wfs2.5, mirror set and P0 repros all 0 px against before.
+  App Rust-vs-OCCT A/B for 82d02000: revolve seeds 1–3 and spline seed 1 (25 documents) all equal (3-12 a black capture, re-run
+  queued); spline seed 2 and revolve seed 4 running on :131, then its fzloop restarts. CLI fuzz 346–365 on bool's CLI: only 355;
+  366–380 now on the v0.4.14 CLI (stderr kept: cli/stderr-s<seed>.log). Rust-vs-OCCT CLI round 136–150 / 91–105 / 71–85: only the
+  known split-faces pattern (boolmir 146 #7); 151–165 / 106–120 / 86–100 running.
 - **18:27 update (green c3c8371b = + bool 82d02000 free-form faces in the Rust Boolean, dx 4f549431):** mirror set + P0 repros unchanged
   (0 px); verified DWG-TOOL-HINTS-PREVIEW (Datum / GD&T previews) and the DWG-E2E-SILHOUETTE hover residual. 82d02000 has no CLI yet, so
   it goes through the app: bin/revgen.py (box + revolved sphere / torus / cone / tube, Boolean) and bin/splgen.py (box + an extruded
