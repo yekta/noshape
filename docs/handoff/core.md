@@ -46,9 +46,13 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   call_once body (39 sites + rust_boolean.cpp's): the budget doesn't jump inside, and a fault inside ends the process
   ("…holding a lock; not recoverable", the signal re-raised) as does a real fault (si_code > 0) whose pc is in the C
   library's text (found at install with dladdr(malloc) + dl_iterate_phdr). Raised signals (raise / abort) are still
-  recovered. BudgetSnapshot also restores budget_hold. Not covered: OCCT's own internal mutexes (a budget jump inside
-  one would still leave it held); a TKernel patch counting Standard_Mutex::Sentry / std::mutex holds into the same
-  counter would close it. The heap corruption itself: seed 189 under LD_PRELOAD=libasan (guard on) running.
+  recovered. BudgetSnapshot also restores budget_hold. 45791441 closes OCCT's own mutexes: the executable defines
+  pthread_mutex_lock / trylock / timedlock / clocklock / unlock and pthread_once (common.cpp; the C library's via
+  dlsym(RTLD_NEXT), resolved in a priority-101 constructor), counting `mutex_holds` per thread: no budget jump and
+  no guard recovery while any is held. A SIGABRT under the guard is fatal unless the terminate handler (installed
+  with the guard, chaining the previous one) marked it: glibc's heap checks abort inside malloc. Shared libraries'
+  own locks (libstdc++'s) aren't counted. The heap corruption itself: not found yet (seed 189 under
+  LD_PRELOAD=libasan, guard on, clean once; /root/core-scratch/asan189/run.sh, more runs going).
 - T2 (kernel, model, ops) on main 10-29 07:20: reds were export::pvz_structure / pvz_import (the Rust Boolean, ticket
   PVZ-RUST-BOOL for bool), bool_replay::bool_corpus_replay (bool), the elliptic boss curvature blend (open, mine),
   blends_match_onshape (my FILLET-OVERSIZE rule pre-empted live F2's "Failed to fillet selections." for four meeting
