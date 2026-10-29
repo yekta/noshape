@@ -6,6 +6,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## Release blockers for the 2026-10-29 05:00 release (qa, early notes 10-28 18:55; final list at 04:30)
+- **qa 04:05, list on green 7d5be491 (re-confirm at 04:30):**
+  - **Open regression since v0.4.12 (P1, release blocker per PRIORITIES unless accepted): RUST-MIRROR-EXTRA-FACE (bool, from
+    da75e17b ~22:00).** A part mirrored onto itself with Add (plate with a through hole, Part mirror across its face) keeps the hole
+    wall split in two at the mirror plane (2 × 314.159 mm² instead of one 628.319, plus a seam circle edge); volumes right. Seen in
+    the app on every green since; bool's later commits did not change it. Fix, or have the Rust Boolean decline (OCCT) for this case,
+    or revert da75e17b before the cut. (A ~380-document sweep and all matrices are otherwise identical to v0.4.12.)
+  - **No open P0.** Fixed and verified tonight: DRAFT-BUDGET-POOL (core 34cbea98), CLI-SUPPRESS-SEGV (core 5ac53b95; in v0.4.12 too),
+    FILLET-OVERSIZE-OK (core ae44d8d9; in v0.4.12 too). HALF-MIRROR-HOLE-INVERTED (in v0.4.12 too) is right by default since
+    6228323b (Rust Boolean); only the OCCT fallback still gets it wrong. BOP-PAIRS-GPF stays closed (pairs serial).
+  - Carried, not regressions: REGEN-SPEED / COMMIT-LATENCY now within budget for commits (91–136 ms on 7040c88a), the 3rd undo
+    102 ms (budget 50); SHELL-SLOW, BOOL-THREAD-CRASH (no crash in tonight's fuzz), FEATURE-MIRROR-COPY-FULL-DEPTH (P1, unchanged).
+  - Tonight's coverage: GUI fuzz seeds 88–159 (72 runs × 600 actions, greens 58d8 → 7d5b) all alive; CLI fuzz seeds 170–186 (only the
+    crash-guard crash, now fixed); all 16 crash / hang documents open in the app; DRAFT-BUDGET-POOL document 16 edits; live-30
+    60779.484 mm³ unchanged.
 - **New since v0.4.12, both from f024fd0d (OCCT patch 0004, threaded pave-filler pairs), in every green since 5267fdaf:** P0 BOP-PAIRS-GPF (GPF / segfault in OCCT pave-filler code on pool workers: app on a Mirror preview, debug CLI in a Shell) and P0 DRAFT-BUDGET-POOL (a Draft's defeaturing ignores its budget: endless regen + memory growth; NOSHAPE_BOP_PAIRS_SERIAL=1 makes it stop at 30 s). Either fixed, or the pairs serial by default, before the cut.
 - qa 20:00: resolved for the cut: 58fb2592 / bce87760 make the pairs serial by default and green 4994be03 already runs serial (draft-pool-hang doc opens, Draft 7 stops at its budget). Re-check at 04:30 on the then-green.
 - **qa 21:05: DRAFT-BUDGET-POOL is back on green e4cccdff** (c1f98ed6, OCCT patch 0005: the budget no longer leaves pool jobs, and defeaturing's face/face stage is a pool job even with serial pairs): the draft-pool-hang document never finishes opening (989f756b: 26 s). P0 for the cut unless reverted or fixed.
