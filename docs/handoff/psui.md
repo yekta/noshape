@@ -150,7 +150,8 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 10-29 10:35: 60ca6465 MC-SELECT-NO-READOUT landed (a mate connector selected alone reads "Point:" at its origin;
 T1 a_selected_mate_connector_reads_its_origin; checked on :102: wf-block + Mate connector 1, ring clicked →
 "Point: X 19.500 Y 1.000 Z 10.000 mm"). PSUI-CONE-SHADING already on main (9b9caa54). No open P0 / P1 in psui's
-TICKETS. Now: the mesher toward ≥ 10× on mesh_prepare (profile of fins-400 open, /root/psui-scratch/prof.sh).
+TICKETS. 13:10: mesher step 5 landed (6f411558, N06 below): fins-400 open ≈ 9.5× here at load 32; perf.yml
+model job dispatched for runner numbers (/root/psui-scratch/prof3.sh measures here: RUNS, ONLY=live-30).
 
 Residuals found today: a paused dialog's Depth field
 shows a corner mark in live; Shift+wheel under xdotool loses events after the first (GPUI X11 resets the scroll
@@ -240,6 +241,18 @@ N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes
      with our mesher and with BRepMesh (kernel `set_rust_mesh_everywhere`, a process-wide switch for tests) and
      renders both shaded with edges from three views, 800×600: 5–14 pixels differ (by > 24 in a channel) of
      75k–318k part pixels; asserts ≤ 0.5 %. NOSHAPE_TEST_OUT writes the images.
+     Step 5 (10-29 13:10, 6f411558): our faces go straight into the display buffers (`RustFace`: ranges of the shared
+     MeshOut, a pattern instance's moved in mesh_fill; no Poly_Triangulation; core's mesh cache keeps them as
+     such, `MeshSet::rust`); OCCT reads (edges, faces) and the edge-polyline loop on OCCT's pool in runs of 64
+     (inline when one run), edge samples on scoped threads like the faces (brep `in_parallel`); cached edge
+     polylines shared, not copied (reversed while mesh_fill copies them); the output Vecs sized once.
+     fins-400 open (ops regen_profile, NOSHAPE_KERNEL_PROFILE=1 wall, load 32 on 16 cores, mesh_prepare):
+     BRepMesh 633–841 ms, ours 65–95 ms (≈ 9.5× median; 5.3× before at load 28). live-30: BRepMesh 28–56,
+     ours 10–28 (≈ 3×): its time is the fillets' tori (5365 nodes each, ~0.9 ms) and copying ~60k nodes;
+     wall times here swing 3× with the box's load (a 144-node plane took 5 ms once: preemption).
+     perf.yml's model job now has a "Display mesher (release)" step (ours vs BRepMesh, fins and live-30, 3 each).
+     Next: perf -f jobs=model for clean numbers; then the per-node cost of tori (u sin_cos per node in rows
+     between rims, row tuples copied to points / normals) and of the copy-out (f64 → MeshOut → f32 twice).
 0. **After the cold-start work: our own display mesher (lead 10-28 21:05, user-approved).** `brep::mesh` in crates/brep
    (bool's crate, its Body / Surface / Curve types): planes (polygons with holes), cylinders, cones, spheres, tori from
    their exact parameterisation, shared edge samples (watertight), the display's deflection rules; anything else
