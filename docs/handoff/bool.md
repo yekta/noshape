@@ -18,7 +18,7 @@ scratch /root/bool-scratch.
   split into regions there (`arrange.rs`), each region is in / out / on the other solids (ray parity, coincident
   planes), the op keeps some. Seams stay edges: a piece crossing one is two faces, as in OCCT.
 - Kernel: `op_boolean` tries it after fuse_slabs / on_face / the local Boolean / through_holes (their results are
-  what the corpus records; targets of ≥ 200 faces decline, the local Boolean's), on by default
+  what the corpus records; a big target the local Boolean declined comes here too: 10-29), on by default
   (`NOSHAPE_BOOL_RUST=0` off); Shell's slab and draft Booleans and Thicken's / Shell's offset cuts through
   `quick_boolean`. `cpp/rust_boolean.cpp` converts the arguments (their OcShape maps' indices are the body's; the
   body cached on the OcShape), builds the result (unchanged inputs reused, pieces on the input's curve / surface,
@@ -115,6 +115,10 @@ passes exactly between two curves; the shared-vertex check one map): main corpus
 692, Shell's 44 of 85, corpus3 (recorded with it on, vs OCCT) 437 of 698: all 0 differ incl. unify. No case is
 slower than OCCT (the least gain 3.8×). Declining costs most on the 999-instance pattern fuses: ~2.4 s of Rust
 before OCCT's ~120 s.
+
+Big targets (10-29 04:00): the Rust path runs after the local Boolean, so a target of 200+ faces that reaches it
+is one the local Boolean declined: no longer declined here (db5f2f3d 1004 faces, 99 tools: 178 ms vs OCCT 865;
+11b69a56 412 faces: 9 vs 88 ms; both as OCCT).
 
 The grey zone (distances in (tol, GREY × tol] decline as ambiguous) is 10 × now, was 50 × (10-29 03:40): main
 corpus **462 of 972**, fresh 435 of 692, Shell's 44 of 85, corpus3 442 of 698: all 0 differ incl. unify.

@@ -632,9 +632,6 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
       own.push_back(std::make_unique<OcShape>(args[i]));
       srcs[i] = own.back().get();
     }
-  // Big targets are the local Boolean's (op_boolean), until this one is local too.
-  if (srcs[0]->map(TopAbs_FACE).Extent() >= 200 && std::getenv("NOSHAPE_BREP_BIG") == nullptr)
-    return decline("a big target (the local Boolean's)");
   std::vector<BrepBody> bodies(args.size());
   double                max_tol = 0;
   {

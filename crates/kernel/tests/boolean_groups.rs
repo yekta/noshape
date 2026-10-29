@@ -115,8 +115,11 @@ fn a_small_fuse_on_a_big_part_is_done_locally() {
     assert!(local.shape.is_valid());
     let want = (len * 20.0 * 10.0 + (n + 1) as f64 * 20.0 * 5.0) * 1e-9;
     assert!((local.shape.volume().unwrap() - want).abs() < 1e-9 * want, "{}", local.shape.volume().unwrap());
-    // The whole Boolean's result, through OCCT (a fuzzy value keeps it off the local path).
+    // The whole Boolean's result, through OCCT (a fuzzy value keeps it off the local path; noshape's own
+    // Boolean switched off, which would take it).
+    set_rust_boolean(Some(false));
     let whole = boolean(BooleanOp::Fuse, &[part], &[fin], &BooleanOptions { fuzzy: 1e-12, ..Default::default() }).unwrap();
+    set_rust_boolean(None);
     assert_eq!(last_boolean_path(), "occt");
     assert_eq!(noshape_kernel::bool_corpus::Summary::of(&local).differences(&noshape_kernel::bool_corpus::Summary::of(&whole)), Vec::<String>::new());
 }
