@@ -81,6 +81,21 @@ and an input solid's voids are its faces like the rest (a ray crosses them alike
 passes (BrepBody) has shells now: `solid_shells`, `shell_faces`, `faces_of_shells`. Fresh corpus 400 of 692,
 Shell's 38 of 85, main 419: 0 differ.
 
+Looked at and left (10-29 01:40):
+- The seam cases (19 "an arc across a cylinder's seam" + 5 "a section along ..." in the fresh corpus, 8 s) are
+  the merge problem above: with the seam change, 02fb69425a58e283's result has the tool's cylinder face (z
+  0.02–0.03) and the target's two partial faces on one cylinder meeting at a circle; OCCT's unify_same_domain
+  merges all three on OCCT's result, two on ours. Same as Shell's bd16a559 (op_boolean's 13 such cases merge
+  alike). Representation (curves on the faces at that circle), not geometry: the next thing to find.
+- Edges of two arguments crossing on a third's face (12, 3 s): only declining near a vertex of three arguments on
+  that face takes 9 more but 2 Shell slab fuses differ (OCCT says a face generated vertices our crossing
+  doesn't make and deletes an input vertex we modify, at x = 20 near a four-argument corner): the global rule
+  stays.
+- Pattern fuses whose instances overlap (2 cases, 90 s and 127 s OCCT): their reference is core's
+  `fuse_trimmed` (5006 faces), not a plain fuse (6005): declined.
+- Big targets (a2121c5b, 1612 faces): the Rust side ~21–30 ms (output maps dense now), result and build ~15 ms,
+  total ~54 ms warm vs the local Boolean's ~43 ms: the local one stays first.
+
 The "no solid" Commons of a solid with one edge (121 in the fresh corpus, ~20 ms each, 2.4 s) are model-core's
 `ray_intervals` falling back from `line_crossings` (a ray touching an edge, or not a single solid): an idea for
 core, not this Boolean. Arguments sharing faces (17 in the fresh corpus, ~90 ms each): passing the shared

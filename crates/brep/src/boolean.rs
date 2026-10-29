@@ -1679,8 +1679,8 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
     }
     // Output entities.
     let mut out = Output::default();
-    let mut vmap: HashMap<u32, u32> = HashMap::default();
-    let mut emap: HashMap<usize, u32> = HashMap::default();
+    let mut vmap = Dense::new(cx.pool.p.len());
+    let mut emap = Dense::new(sedges.len());
     let mut used_s: Vec<usize> = uses.keys().copied().collect();
     used_s.sort_unstable();
     let mut used_v: Vec<u32> = used_s.iter().flat_map(|&s| sedges[s].seg.v).collect();
@@ -1688,7 +1688,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
     used_v.dedup();
     let vertex_same = |w: u32| cx.pool.inputs[w as usize].len() == 1 && !touched[w as usize];
     for &w in &used_v {
-        vmap.insert(w, out.body.vertices.len() as u32);
+        vmap.insert(w as usize, out.body.vertices.len() as u32);
         out.body.vertices.push(cx.pool.p[w as usize]);
         out.vertex_origin.push(match cx.pool.inputs[w as usize].as_slice() {
             [(a, i)] if vertex_same(w) => Origin::Same { arg: *a, index: *i },
@@ -1701,7 +1701,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             x.origins.len() == 1 && edge_pieces[x.origins[0]].len() == 1 && vertex_same(x.seg.v[0]) && vertex_same(x.seg.v[1])
         })
         .collect();
-    let mut sedge_flip: HashMap<usize, bool> = HashMap::default();
+    let mut sedge_flip = vec![false; sedges.len()];
     for &s in &used_s {
         let x = &sedges[s];
         // Pieces of an input edge run its way.
@@ -1709,7 +1709,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             Some(&e) => edge_pieces[e].iter().find(|p| p.0 == s).is_some_and(|p| p.1),
             None => false,
         };
-        sedge_flip.insert(s, flip);
+        sedge_flip[s] = flip;
         let seg = x.seg;
         let (v, curve) = match seg.g {
             Geo::Apex if !edge_same[s] => return Err(Decline("a cone's apex changed")),
@@ -1721,7 +1721,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             }
         };
         emap.insert(s, out.body.edges.len() as u32);
-        out.body.edges.push(Edge { v: [vmap[&v[0]], vmap[&v[1]]], curve });
+        out.body.edges.push(Edge { v: [vmap[v[0] as usize], vmap[v[1] as usize]], curve });
         out.edge_origin.push(match x.origins.first() {
             None => Origin::New,
             Some(&e) => {
@@ -1730,7 +1730,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             }
         });
     }
-    let mut piece_out: HashMap<usize, u32> = HashMap::default();
+    let mut piece_out = Dense::new(pieces.len());
     let mut face_same = vec![false; cx.faces.len()];
     for &p in &kept {
         let f = pieces[p].face;
@@ -1758,7 +1758,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             .iter()
             .map(|l| {
                 let start = (0..l.len()).min_by_key(|&k| rank(l[k].0)).unwrap_or(0);
-                let mut l: Vec<Use> = l[start..].iter().chain(&l[..start]).map(|&(s, r)| Use { edge: emap[&s], reversed: r ^ sedge_flip[&s] }).collect();
+                let mut l: Vec<Use> = l[start..].iter().chain(&l[..start]).map(|&(s, r)| Use { edge: emap[s], reversed: r ^ sedge_flip[s] }).collect();
                 if flip {
                     l.reverse();
                     for u in &mut l {
@@ -1782,7 +1782,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         if si == out.body.solids.len() {
             out.body.solids.push(Solid { shells: vec![Vec::new()] });
         }
-        out.body.solids[si].shells[0].push(piece_out[&p]);
+        out.body.solids[si].shells[0].push(piece_out[p]);
     }
     // Shells inside out are voids: of the one solid there is (else declined).
     let (solids, voids): (Vec<Solid>, Vec<Solid>) = std::mem::take(&mut out.body.solids).into_iter().partition(|s| shell_volume(&out.body, &s.shells[0]) > 0.0);
@@ -1815,9 +1815,9 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         let g = &cx.faces[f];
         let mut outs: Vec<u32> = Vec::new();
         for &p in &face_pieces[f] {
-            if let Some(&o) = piece_out.get(&p) {
+            if let Some(o) = piece_out.get(p) {
                 outs.push(o);
-            } else if let Some(o) = partner[p].and_then(|q| piece_out.get(&q).copied()) {
+            } else if let Some(o) = partner[p].and_then(|q| piece_out.get(q)) {
                 outs.push(o);
             }
         }
@@ -1833,7 +1833,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
     }
     for e in 0..cx.edges.len() {
         let g = &cx.edges[e];
-        let outs: Vec<u32> = edge_pieces[e].iter().filter_map(|p| emap.get(&p.0).copied()).collect();
+        let outs: Vec<u32> = edge_pieces[e].iter().filter_map(|p| emap.get(p.0)).collect();
         if outs.len() == 1 && edge_same[edge_pieces[e][0].0] {
             continue;
         }
@@ -1845,7 +1845,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         }
     }
     for w in 0..cx.pool.p.len() as u32 {
-        let o = vmap.get(&w).copied();
+        let o = vmap.get(w as usize);
         for &(a, i) in &cx.pool.inputs[w as usize] {
             match o {
                 None => h.push(rec(Kind::Vertex, a, i, Relation::Deleted, Kind::Vertex, u32::MAX)),
@@ -1855,13 +1855,13 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         }
     }
     for &(s, f) in &section_faces {
-        if let (true, Some(&o)) = (sedges[s].origins.is_empty(), emap.get(&s)) {
+        if let (true, Some(o)) = (sedges[s].origins.is_empty(), emap.get(s)) {
             h.push(rec(Kind::Face, cx.faces[f].arg, cx.faces[f].index, Relation::Generated, Kind::Edge, o));
         }
     }
     for (e, inner) in edge_inner.iter().enumerate() {
         for &w in inner {
-            if let (true, Some(&o)) = (cx.pool.inputs[w as usize].is_empty(), vmap.get(&w)) {
+            if let (true, Some(o)) = (cx.pool.inputs[w as usize].is_empty(), vmap.get(w as usize)) {
                 h.push(rec(Kind::Edge, cx.edges[e].arg, cx.edges[e].index, Relation::Generated, Kind::Vertex, o));
             }
         }
@@ -1879,7 +1879,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             if in_edges[w as usize] != 1 {
                 continue;
             }
-            if let (true, Some(&o)) = (cx.pool.inputs[w as usize].is_empty(), vmap.get(&w)) {
+            if let (true, Some(o)) = (cx.pool.inputs[w as usize].is_empty(), vmap.get(w as usize)) {
                 h.push(rec(Kind::Face, cx.faces[f].arg, cx.faces[f].index, Relation::Generated, Kind::Vertex, o));
             }
         }
@@ -1888,7 +1888,8 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
     // of a common's arguments, the solids holding its pieces or pieces inside it; a fuse's are deleted (the
     // fused solid is no one's image). One left as it was is kept.
     let mut solid_sources: Vec<Vec<usize>> = vec![Vec::new(); out.body.solids.len()];
-    for (&p, &o) in &piece_out {
+    for &p in &kept {
+        let o = piece_out[p];
         let v = &mut solid_sources[solid_of_face[o as usize] as usize];
         v.push(cx.faces[pieces[p].face].solid);
         v.extend(within[p].iter().copied());
@@ -1945,6 +1946,31 @@ pub fn merge_check(out: &Output, tol: f64) -> Result<(), Decline> {
         }
     }
     Ok(())
+}
+
+/// A map from dense indices (u32::MAX: none).
+struct Dense(Vec<u32>);
+
+impl Dense {
+    fn new(n: usize) -> Dense {
+        Dense(vec![u32::MAX; n])
+    }
+
+    fn insert(&mut self, k: usize, v: u32) {
+        self.0[k] = v;
+    }
+
+    fn get(&self, k: usize) -> Option<u32> {
+        Some(self.0[k]).filter(|&v| v != u32::MAX)
+    }
+}
+
+impl std::ops::Index<usize> for Dense {
+    type Output = u32;
+
+    fn index(&self, k: usize) -> &u32 {
+        &self.0[k]
+    }
 }
 
 /// An angle in the gap of the arcs `covered` (start, sweep > 0): the middle of the widest gap.
