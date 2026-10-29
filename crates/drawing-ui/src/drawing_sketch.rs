@@ -223,32 +223,54 @@ impl DrawingEditor {
         if !picks.contains(&id) {
             picks.push(id);
         }
-        // Horizontal / Vertical take one line, or two points.
-        let one_line = picks.len() == 1 && matches!(self.sketch().sketch.entity(EntityId(picks[0])).map(|e| &e.geometry), Some(Geometry::Line { .. }));
-        if (kind.needs() == 1 && one_line) || picks.len() >= 2 {
-            let (a, b) = (EntityId(picks[0]), picks.get(1).map(|x| EntityId(*x)));
-            let ck = match (kind, b) {
-                (SkCon::Horizontal, b) => Some(ConstraintKind::Horizontal { a, b }),
-                (SkCon::Vertical, b) => Some(ConstraintKind::Vertical { a, b }),
-                (SkCon::Coincident, Some(b)) => Some(ConstraintKind::Coincident { a, b }),
-                (SkCon::Perpendicular, Some(b)) => Some(ConstraintKind::Perpendicular { a, b }),
-                (SkCon::Parallel, Some(b)) => Some(ConstraintKind::Parallel { a, b }),
-                (SkCon::Tangent, Some(b)) => Some(ConstraintKind::Tangent { a, b }),
-                _ => None,
-            };
-            if let Some(ck) = ck {
-                let mut err = None;
-                self.edit_sketch(kind.name(), cx, |s| {
-                    if let Err(e) = s.sketch.add_constraint(ck) {
-                        err = Some(e.to_string());
-                    }
-                });
-                self.status = err.map(|e| format!("{}: {e}", kind.name()).into());
-            }
+        if self.constraint_ready(kind, &picks) {
+            self.add_sketch_constraint(kind, &picks, cx);
             picks.clear();
         }
         self.tool = Tool::Constrain { kind, picks };
         self.redraw(cx);
+    }
+
+    /// Whether `picks` (sketch entity ids) complete constraint `kind`:
+    /// Horizontal / Vertical take one line, or two points; the rest two.
+    fn constraint_ready(&self, kind: SkCon, picks: &[u32]) -> bool {
+        let one_line = picks.len() == 1 && matches!(self.sketch().sketch.entity(EntityId(picks[0])).map(|e| &e.geometry), Some(Geometry::Line { .. }));
+        (kind.needs() == 1 && one_line) || picks.len() >= 2
+    }
+
+    fn add_sketch_constraint(&mut self, kind: SkCon, picks: &[u32], cx: &mut Context<Self>) {
+        let (a, b) = (EntityId(picks[0]), picks.get(1).map(|x| EntityId(*x)));
+        let ck = match (kind, b) {
+            (SkCon::Horizontal, b) => Some(ConstraintKind::Horizontal { a, b }),
+            (SkCon::Vertical, b) => Some(ConstraintKind::Vertical { a, b }),
+            (SkCon::Coincident, Some(b)) => Some(ConstraintKind::Coincident { a, b }),
+            (SkCon::Perpendicular, Some(b)) => Some(ConstraintKind::Perpendicular { a, b }),
+            (SkCon::Parallel, Some(b)) => Some(ConstraintKind::Parallel { a, b }),
+            (SkCon::Tangent, Some(b)) => Some(ConstraintKind::Tangent { a, b }),
+            _ => None,
+        };
+        if let Some(ck) = ck {
+            let mut err = None;
+            self.edit_sketch(kind.name(), cx, |s| {
+                if let Err(e) = s.sketch.add_constraint(ck) {
+                    err = Some(e.to_string());
+                }
+            });
+            self.status = err.map(|e| format!("{}: {e}", kind.name()).into());
+        }
+    }
+
+    /// A constraint key with sketch geometry selected (live request 1565,
+    /// qa DWG-CONSTRAINT-PRESELECT): when the selection completes it, the
+    /// constraint applies at once and no tool stays. True when applied.
+    pub fn constrain_preselection(&mut self, kind: SkCon, cx: &mut Context<Self>) -> bool {
+        let picks: Vec<u32> = self.selection.iter().filter_map(|s| if let Sel::Sketch(id) = s { Some(*id) } else { None }).collect();
+        if picks.is_empty() || picks.len() != self.selection.len() || picks.len() > 2 || !self.constraint_ready(kind, &picks) {
+            return false;
+        }
+        self.add_sketch_constraint(kind, &picks, cx);
+        self.redraw(cx);
+        true
     }
 
     /// The tangent direction leaving the curve that ends at point `from`.

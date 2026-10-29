@@ -16,6 +16,13 @@ impl DrawingEditor {
     // ------------------------------------------------------------ tools
 
     pub fn set_tool(&mut self, tool: Tool, cx: &mut Context<Self>) {
+        // A constraint key on a selection that completes it: applied at once.
+        if let Tool::Constrain { kind, picks } = &tool
+            && picks.is_empty()
+            && self.constrain_preselection(*kind, cx)
+        {
+            return;
+        }
         // Live (request 1566, qa DWG-PANEL-ESC-STACK): starting a tool closes
         // View properties first, its pending edits discarded.
         if !matches!(tool, Tool::Select) {
