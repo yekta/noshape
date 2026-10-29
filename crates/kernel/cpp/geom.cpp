@@ -6,6 +6,7 @@
 #include <BRepAdaptor_Surface.hxx>
 #include <algorithm>
 #include <BRepBndLib.hxx>
+#include <OSD_Parallel.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
@@ -692,9 +693,29 @@ rust::Vec<double> bounding_box(const OcShape& s, bool optimal)
       return r;
     }
   }
-  Bnd_Box b;
+  Bnd_Box          b;
+  const ShapeIMap& faces = s.map(TopAbs_FACE);
   if (optimal)
     BRepBndLib::AddOptimal(s.shape, b, false, false);
+  else if (faces.Extent() >= 256)
+  {
+    // A big shape's faces boxed in runs on OCCT's pool, then joined (a box's gap joins as the largest, so this is
+    // BRepBndLib::Add's box: 14 ms → ~3 on the 400-fin plate's 3206 faces, the display's first call on a new
+    // part, psui); its edges outside faces and vertices outside edges as Add does them.
+    constexpr int        run = 64;
+    const int            n   = faces.Extent();
+    std::vector<Bnd_Box> boxes((size_t)((n + run - 1) / run));
+    OSD_Parallel::For(0, (int)boxes.size(), [&](int c) {
+      for (int i = c * run + 1; i <= std::min(n, (c + 1) * run); ++i)
+        BRepBndLib::Add(faces(i), boxes[(size_t)c], false);
+    });
+    for (const Bnd_Box& x : boxes)
+      b.Add(x);
+    for (TopExp_Explorer e(s.shape, TopAbs_EDGE, TopAbs_FACE); e.More(); e.Next())
+      BRepBndLib::Add(e.Current(), b, false);
+    for (TopExp_Explorer v(s.shape, TopAbs_VERTEX, TopAbs_EDGE); v.More(); v.Next())
+      BRepBndLib::Add(v.Current(), b, false);
+  }
   else
     BRepBndLib::Add(s.shape, b, false);
   // Mesh faces have no surface: their triangulation's nodes.

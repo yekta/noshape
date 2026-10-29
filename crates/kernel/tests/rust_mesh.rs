@@ -284,3 +284,19 @@ fn bench_filleted_boss_display_mesh() {
     let (ours, occt) = (times(true), times(false));
     eprintln!("filleted boss ({} nodes) display mesh: ours {:.2} ms (CPU {:.2}), BRepMesh {:.2} ms (CPU {:.2}): {:.1}× ({:.1}× CPU)", ours.2, ours.0, ours.1, occt.0, occt.1, occt.0 / ours.0, occt.1 / ours.1);
 }
+
+/// A big shape's box (its faces boxed in parallel, kernel geom.cpp) is the box of its faces, each boxed alone.
+#[test]
+fn a_big_shapes_box_is_its_faces_boxes() {
+    let s = fins(80);
+    assert!(s.faces().len() >= 256, "the parallel path");
+    let b = s.bounding_box(false).unwrap();
+    let (mut lo, mut hi) = (DVec3::splat(f64::MAX), DVec3::splat(f64::MIN));
+    for f in s.faces() {
+        let fb = f.bounding_box(false).unwrap();
+        lo = lo.min(fb.min);
+        hi = hi.max(fb.max);
+    }
+    // Within the faces' tolerance gaps (one box keeps the largest gap all round).
+    assert!((b.min - lo).abs().max_element() < 1e-6 && (b.max - hi).abs().max_element() < 1e-6, "{b:?} against {lo} {hi}");
+}

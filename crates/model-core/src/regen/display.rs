@@ -158,13 +158,20 @@ pub fn flat_view_display(flat: &crate::sheetmetal::FlatPattern, color: [f32; 4])
 }
 
 fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts: &RegenOptions) -> Arc<MeshBuffers> {
-    let (lin, ang) = display_deflection(shape, quality, opts.preview_meshes);
-    let tt = std::time::Instant::now();
-    let tess = noshape_kernel::tessellate(shape, lin, ang, true);
+    // The shown vertices beside the mesh (the shape's topology classified once, ~12 ms on the 400-fin plate;
+    // the kernel's mesh lock is let go before any wait here, so a stolen job can't wait on it).
+    let ((tess, lin, ang, took), shown) = rayon::join(
+        || {
+            let (lin, ang) = display_deflection(shape, quality, opts.preview_meshes);
+            let tt = std::time::Instant::now();
+            (noshape_kernel::tessellate(shape, lin, ang, true), lin, ang, tt.elapsed())
+        },
+        || shown_vertices(shape),
+    );
     if perf_enabled() {
-        log::info!(target: "perf", "tessellate {} ({}): {:.1} ms (linear {lin:.2e}, angular {ang:.2})", name, if opts.preview_meshes { "preview" } else { "fine" }, tt.elapsed().as_secs_f64() * 1000.0);
+        log::info!(target: "perf", "tessellate {} ({}): {:.1} ms (linear {lin:.2e}, angular {ang:.2})", name, if opts.preview_meshes { "preview" } else { "fine" }, took.as_secs_f64() * 1000.0);
     } else {
-        log::debug!("tessellate {}: {:?} (linear {lin:.2e})", name, tt.elapsed());
+        log::debug!("tessellate {}: {:?} (linear {lin:.2e})", name, took);
     }
     match tess {
         Ok(t) => Arc::new(
@@ -174,7 +181,7 @@ fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts
                 positions: t.positions,
                 normals: t.normals,
                 indices: t.indices,
-                vertices: keep_shown(t.vertices, &shown_vertices(shape)),
+                vertices: keep_shown(t.vertices, &shown),
                 mesh_lines: Vec::new(),
             }
             .with_mesh_lines(shape),
