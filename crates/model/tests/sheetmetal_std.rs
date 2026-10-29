@@ -120,6 +120,32 @@ fn flanges_on_adjacent_edges_match_live() {
     assert!((volume_mm3(&r) - 8511.4987).abs() < 1e-3 && faces == 24, "{} mm³, {} faces", volume_mm3(&r), faces);
 }
 
+/// A flange leaves the plate's other top edges their references (std rebuilds
+/// the part: its faces kept their names only by being on the old ones), so in
+/// the Flange dialog's preview the next edge can still be picked (the preview's
+/// own geometry can't).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn flange_keeps_the_other_edges_references() {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let side = edge_at(&r, DVec3::new(0.0, 20.0, 2.0));
+    let edge = edge_at(&r, DVec3::new(30.0, 0.0, 2.0));
+    s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(vec![edge]));
+        p.set("distance", expr("20 mm"));
+    });
+    let r = s.ok();
+    assert_eq!(edge_at(&r, DVec3::new(0.0, 20.0, 2.0)), side);
+}
+
 /// qa5 3.2: a default Hem on G34's top edge at x = 60 (live: 9378.1835 mm³,
 /// 33 faces: 27 plane, 6 cylinder).
 #[test]
@@ -444,4 +470,19 @@ fn modify_joint_after_two_flange_features() {
     let r = s.ok();
     let b = &r.context.bodies[part(&r)];
     assert!(volume_mm3(&r) > 8000.0 && b.shape.faces().len() > 20, "{} mm³: {:#?}", volume_mm3(&r), face_report(&r));
+}
+
+/// The part std rebuilds keeps its name and colour (qa: after G34's two
+/// flanges the part came out orange, std's miter tools having taken the
+/// colours before it).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn flanges_keep_the_part_name_and_colour() {
+    let mut s = g34();
+    let flange = s.ps.features.pop().unwrap();
+    let before = s.ok();
+    s.ps.features.push(flange);
+    let after = s.ok();
+    let look = |r: &RegenResult| r.display.bodies.iter().map(|b| (b.id.clone(), b.name.clone(), b.color)).collect::<Vec<_>>();
+    assert_eq!(look(&after), look(&before));
 }

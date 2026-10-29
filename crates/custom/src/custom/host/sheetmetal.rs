@@ -1142,6 +1142,42 @@ fn inner_point(f: &Shape) -> Option<DVec3> {
     None
 }
 
+/// The part's faces lying on a face of the part this rebuild replaces take
+/// that face's name (several pieces of one: its splits by `feature`), so what
+/// a feature leaves alone keeps its references and stays pickable in the
+/// feature's preview (Onshape keeps the ids through the definition body).
+fn keep_names(part: &Shape, names: &mut [crate::naming::Name], before: &Shape, before_names: &[crate::naming::Name], feature: crate::reference::FeatureId) {
+    use crate::reference::TopoName;
+    let (new, old) = (part.faces(), before.faces());
+    let probe = |f: &Shape| inner_point(f).and_then(|p| Some((p, f.normal_at_point(p).ok()?)));
+    // On the face, facing the same way, and not on its boundary (a bend's
+    // end face touches the side face it replaces at one edge).
+    let on = |f: &Shape, (p, n): (DVec3, DVec3)| {
+        f.project_point(p).is_ok_and(|pr| pr.distance < 1e-7)
+            && f.normal_at_point(p).is_ok_and(|m| m.dot(n) > 1.0 - 1e-6)
+            && k::make_vertex(p).is_ok_and(|v| f.edges().iter().all(|e| k::distance(&v, e).is_ok_and(|d| d.distance > 1e-6)))
+    };
+    let (new_probes, old_probes): (Vec<_>, Vec<_>) = (new.iter().map(probe).collect(), old.iter().map(probe).collect());
+    let mut of: Vec<Vec<usize>> = vec![Vec::new(); old.len()];
+    for (i, f) in new.iter().enumerate() {
+        let hit = (0..old.len()).find(|&j| new_probes[i].is_some_and(|x| on(&old[j], x)) || old_probes[j].is_some_and(|x| on(f, x)));
+        if let Some(j) = hit.filter(|&j| j < before_names.len()) {
+            of[j].push(i);
+        }
+    }
+    for (j, pieces) in of.iter().enumerate() {
+        match pieces[..] {
+            [] => {}
+            [i] => names[i] = before_names[j].clone(),
+            _ => {
+                for (o, &i) in pieces.iter().enumerate() {
+                    names[i] = Arc::new(TopoName::Split { parent: before_names[j].clone(), by: feature, ordinal: o as u16 });
+                }
+            }
+        }
+    }
+}
+
 /// What each face, edge and vertex of the part comes from.
 fn part_sources(part: &Shape, pieces: &[Piece], topo: &Topo) -> (Vec<Def>, Vec<Def>, Vec<Def>) {
     // Each piece's box (a point outside it is not on it: most pieces are
@@ -1268,6 +1304,8 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             if def_topo != (topo.faces.len(), topo.edges.len()) {
                 return Err(fe("The sheet metal definition changed while rebuilding"));
             }
+            // The parts this rebuild replaces (by `previous`' order).
+            let before: Vec<Option<Arc<crate::regen::context::Body>>> = def.previous.iter().map(|id| ev.ctx.bodies.iter().find(|b| &b.id == id).cloned()).collect();
             ev.ctx.bodies.retain(|b| !def.previous.contains(&b.id));
             // Walls joined only by rips are separate parts (live G34d), first
             // the one holding the lowest definition face.
@@ -1285,8 +1323,11 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 .collect();
             parts.sort_by_key(|p| p.members.first().copied().unwrap_or(usize::MAX));
             let mut others = BTreeMap::new();
-            for p in &mut parts {
+            for (k, p) in parts.iter_mut().enumerate() {
                 p.names = super::ops::fresh_names(ev, &p.solid);
+                if let Some(Some(b)) = before.get(k) {
+                    keep_names(&p.solid, &mut p.names, &b.shape, &b.faces, ev.feature);
+                }
                 let part_faces = p.solid.faces();
                 for &fi in &p.members {
                     if let Some(n) = wall_faces(&topo, fi, &part_faces, &p.named(Def::Face(fi))).0.first() {
@@ -1304,7 +1345,12 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     fresh += 1;
                     BodyId { feature: ev.feature, index: fresh - 1 }
                 });
-                push_body(ev, id.clone(), BodyKind::Solid, p.solid, p.names);
+                // A rebuilt part keeps its name and colour (a fresh colour
+                // came out orange after std's miter tools took the next ones).
+                match before.get(k) {
+                    Some(Some(b)) => ev.ctx.bodies.push(Arc::new(crate::regen::context::Body::new(id.clone(), b.name.clone(), BodyKind::Solid, p.solid, p.names, b.color, ev.feature))),
+                    _ => push_body(ev, id.clone(), BodyKind::Solid, p.solid, p.names),
+                }
                 out.push((n, id, p.sources, flat, data));
             }
         }

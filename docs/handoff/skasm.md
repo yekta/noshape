@@ -128,6 +128,12 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   box test before projecting part faces onto construction pieces (host part_sources: O(faces × pieces) face
   classifications were ~35 %). Profile now flat (std's one-time load, allocation, OCCT adaptors).
 
+- Std rebuild naming (10-29): part faces lying on the replaced part's faces keep their names (`keep_names`, several
+  pieces: splits), the part its name and colour. Before, every face was new: a Flange dialog couldn't pick a second
+  edge once the first previewed (PREVIEW-SELF-PICK guard), and the part changed colour. **Risk**: documents saved
+  while sheet metal ran natively reference native face names; std names differ (the start feature's faces), so their
+  later sheet metal features may lose their edges. Not seen in a real document yet; check one if a user reports it.
+
 ## WIP on agent/skasm
 (none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
 "tools/tiers/land.sh".)

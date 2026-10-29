@@ -198,3 +198,15 @@ The built-in sheet metal features now run std's own features through the FS host
 | 5.6 SM3 Closed corner | 8541.2502 mm³ / 35 faces (live 8535.0418 / 23) | ✗ (T2 closed_corner_matches_live) | |
 | Modify joint radius (table cell) | OK (e2e sheet_metal_table_ops) | ✅ (test) | |
 A GUI pass of the whole list on a green build is next.
+
+### GUI pass on the std route (skasm 10-29 22:05–23:10, /root/green/noshape f1f3117a, then agent/skasm)
+| Row | Ours | Status | Verified |
+|---|---|---|---|
+| 1.1 | rectangle from the origin, D 60 / D 40: fully defined | ✅ | f1f3117a 10-29 |
+| 1.2 | Sheet metal ▾: 15 items incl. Flex PCB model / Finish flex PCB model | ✅ | f1f3117a 10-29 |
+| 1.3 | Convert tab first, Selections (3 fields, Clearance 0, ☐ Include bends, ☐ Keep input parts), General, › Material, › Relief, preview slider; title red, ✓ off (= live dialogs/sheet-metal-model-01-open.png) | ✅ | f1f3117a 10-29 |
+| 1.6 | Material: K Factor, 0.45, 0.5; Relief: Minimal gap 0.02 mm, Corner Simple, **Obround - Scaled**, depth scale 2, width scale **1.063** (SM15) | ✅ | f1f3117a 10-29 |
+| 2.1 | Flange dialog defaults as live | ✅ | f1f3117a 10-29 |
+| 2.3 | x=0 edge in Top view at the plate's boundary: not picked (the edge lies on the Right plane, edge-on) | ? (live pending) | |
+| 2.4 | **second edge not pickable once the first flange previewed** (std rebuild renamed all faces: the preview counted as the feature's own geometry) → fixed: faces lying on the replaced part's keep its names | ✅ after fix | agent/skasm 10-29 (GUI: both edges picked, 2 chips; T2 flange_keeps_the_other_edges_references) |
+| 2.6 | two flanges: **part turned orange** (rebuilt part took a fresh palette colour) → fixed: keeps its name and colour | ✅ after fix | agent/skasm 10-29 (GUI: part stays blue; T2 flanges_keep_the_part_name_and_colour) |
