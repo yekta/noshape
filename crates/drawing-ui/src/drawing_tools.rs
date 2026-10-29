@@ -1671,6 +1671,66 @@ impl DrawingEditor {
         out
     }
 
+    /// Move to ▸ a format layer (or back to the drawing), for annotation `a`
+    /// with the rest of the selection.
+    fn move_to_entry(a: &Annotation) -> MenuEntry {
+        let (id, cur) = (a.id, a.layer);
+        let layers = SheetLayer::FORMAT.iter().copied().chain((!cur.is_drawing()).then_some(SheetLayer::Drawing));
+        let items = layers
+            .filter(|l| *l != cur)
+            .map(|l| {
+                MenuEntry::item(l.name(), move |t, _, cx| {
+                    let ids: Vec<u64> = t.selection.iter().filter_map(|s| if let Sel::Annotation(x) = s { Some(*x) } else { None }).chain([id]).collect();
+                    t.edit_sheet("Move to", cx, |s| s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.layer = l));
+                })
+            })
+            .collect();
+        MenuEntry::Submenu("Move to".into(), items)
+    }
+
+    /// A surface finish symbol (live behaviours A45): on an edge Edit... ·
+    /// Flip · Paste · Copy · Paste as table · Move to ▸; free Paste · Copy ·
+    /// Paste as table · Move to ▸; then Clear selection · Zoom to fit ·
+    /// Delete. No Add leader (qa DWG-SURFACE-FINISH-MENU).
+    fn surface_finish_entries(&self, a: &Annotation, cx: &App) -> Vec<MenuEntry> {
+        let id = a.id;
+        let on_edge = matches!(a.kind, AnnotationKind::SurfaceFinish { on: Some(_), .. });
+        let mut out = Vec::new();
+        if on_edge {
+            let a2 = a.clone();
+            out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
+            out.push(MenuEntry::item("Flip", move |t, _, cx| {
+                t.edit_sheet("Flip", cx, |s| {
+                    if let Some(AnnotationKind::SurfaceFinish { on: Some(o), .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
+                        o.3 = !o.3;
+                    }
+                })
+            }));
+        }
+        out.push(crate::drawing_props::paste_always());
+        out.push(MenuEntry::item("Copy", move |t, _, cx| {
+            if !t.selection.contains(&Sel::Annotation(id)) {
+                t.selection = vec![Sel::Annotation(id)];
+            }
+            t.copy_entities(cx);
+        }));
+        out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+            t.start_paste_table(cx);
+        }));
+        out.push(Self::move_to_entry(a));
+        out.extend([
+            MenuEntry::Separator,
+            MenuEntry::item("Clear selection", |t, _, cx| {
+                t.selection.clear();
+                t.redraw(cx);
+            }),
+            MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
+            MenuEntry::item("Delete", |t, _, cx| t.delete_selection(cx)),
+        ]);
+        let _ = cx;
+        out
+    }
+
     fn context_entries(&self, sel: Option<Sel>, cx: &App) -> Vec<MenuEntry> {
         let mut out = Vec::new();
         // Several entities selected (live drawing/291).
@@ -1728,6 +1788,9 @@ impl DrawingEditor {
                     ];
                 }
                 let a = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).cloned();
+                if let Some(a) = a.as_ref().filter(|a| matches!(a.kind, AnnotationKind::SurfaceFinish { .. })) {
+                    return self.surface_finish_entries(a, cx);
+                }
                 // Hole callouts (live behaviours A56): Edit... · Paste · Copy
                 // · Paste as table · Add leader (· Remove leaders) | Clear
                 // selection · Zoom to fit · Delete.
@@ -1824,18 +1887,7 @@ impl DrawingEditor {
                     // table | Add comment | Clear selection · Zoom to fit ·
                     // Delete).
                     if matches!(a.kind, AnnotationKind::Note { .. } | AnnotationKind::Balloon { .. } | AnnotationKind::Gdt { .. } | AnnotationKind::DatumTarget { .. } | AnnotationKind::SurfaceFinish { .. } | AnnotationKind::Weld { .. }) {
-                        let cur = a.layer;
-                        let layers = SheetLayer::FORMAT.iter().copied().chain((!cur.is_drawing()).then_some(SheetLayer::Drawing));
-                        let items = layers
-                            .filter(|l| *l != cur)
-                            .map(|l| {
-                                MenuEntry::item(l.name(), move |t, _, cx| {
-                                    let ids: Vec<u64> = t.selection.iter().filter_map(|s| if let Sel::Annotation(x) = s { Some(*x) } else { None }).chain([id]).collect();
-                                    t.edit_sheet("Move to", cx, |s| s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.layer = l));
-                                })
-                            })
-                            .collect();
-                        out.push(MenuEntry::Submenu("Move to".into(), items));
+                        out.push(Self::move_to_entry(a));
                     }
                     if !a.refs.is_empty() {
                         out.push(MenuEntry::item("Detach from geometry", move |t, _, cx| {
@@ -1887,7 +1939,8 @@ impl DrawingEditor {
                 // Onshape's empty-sheet menu (live drawing/290): [Paste,]
                 // Paste as table | Sheet properties…, Drawing properties… |
                 // Zoom to fit, Zoom to window, Zoom to sheet.
-                out.extend(crate::drawing_props::paste_entry(cx));
+                // Live (A45): Paste is always there, also with nothing copied.
+                out.push(crate::drawing_props::paste_always());
                 out.push(MenuEntry::item("Paste as table", |t, _, cx| {
                     t.start_paste_table(cx);
                 }));

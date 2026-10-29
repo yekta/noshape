@@ -866,6 +866,12 @@ pub enum AnnotationKind {
         /// Leaders added with Add leader.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         leaders: Vec<Leader>,
+        /// Placed on a view's edge (live behaviours A45): (view, the point
+        /// on the edge and the edge's direction in view coordinates,
+        /// flipped to the other side). The symbol stands on the edge,
+        /// turned square to it; `anchor` is where it was placed.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        on: Option<(ViewId, [f64; 2], [f64; 2], bool)>,
     },
     /// Weld symbol: the arrow points at `target` (view coordinates in
     /// `view`, else sheet), the reference line starts at the annotation's

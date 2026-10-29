@@ -394,6 +394,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Flip Y direction", Op("drawing_table_edit")),
     ("drawing:Flip direction", Op("drawing_view_edit")),
     ("drawing:Flip section direction", Op("drawing_section_view")),
+    ("drawing:Flip", Op("drawing_annotation_edit")),
     ("drawing:Foreshorten dimension (shift+h)", Op("drawing_dimension")),
     ("drawing:Format cell...", Op("drawing_table_edit")),
     ("drawing:Group annotation", Op("drawing_annotation_edit")),

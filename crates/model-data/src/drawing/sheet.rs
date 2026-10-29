@@ -1551,8 +1551,28 @@ impl SheetGeometry {
                     let tips: Vec<[f64; 2]> = std::iter::once(tip).chain(spec.leaders.iter().map(map)).collect();
                     super::weld::render(self, spec, &tips, a.position, ah * 0.75, !env.weld_ansi(), pick);
                 }
-                AnnotationKind::SurfaceFinish { anchor, value, leaders } => {
-                    let p = *anchor;
+                AnnotationKind::SurfaceFinish { anchor, value, leaders, on } => {
+                    // On an edge: standing on it, turned square to it, on
+                    // the upper / right side (Flip: the other).
+                    let turn = on.as_ref().and_then(|&(view, at, dir, flip)| {
+                        let p = env.to_sheet(view, at);
+                        let q = env.to_sheet(view, [at[0] + dir[0], at[1] + dir[1]]);
+                        let (ux, uy) = (q[0] - p[0], q[1] - p[1]);
+                        let l = (ux * ux + uy * uy).sqrt();
+                        if l < 1e-12 {
+                            return None;
+                        }
+                        let mut n = [-uy / l, ux / l];
+                        if n[1] < -1e-9 || (n[1].abs() <= 1e-9 && n[0] < 0.0) {
+                            n = [-n[0], -n[1]];
+                        }
+                        if flip {
+                            n = [-n[0], -n[1]];
+                        }
+                        Some((p, n[1].atan2(n[0]) - std::f64::consts::FRAC_PI_2))
+                    });
+                    let p = turn.map(|t| t.0).unwrap_or(*anchor);
+                    let mark = self.mark();
                     // Leaders (Add leader) run from the symbol's point.
                     for l in leaders {
                         let t = l.view.map(|v| env.to_sheet(v, l.point)).unwrap_or(l.point);
@@ -1562,6 +1582,9 @@ impl SheetGeometry {
                     self.lines.push(Polyline2 { points: vec![[p[0] - 3.0, p[1] + 5.0], p, [p[0] + 6.0, p[1] + 10.0], [p[0] + 14.0, p[1] + 10.0]], style: LineStyle::Thin, closed: false, pick });
                     self.lines.push(Polyline2 { points: vec![[p[0] - 3.0, p[1] + 5.0], [p[0] + 3.0, p[1] + 5.0]], style: LineStyle::Thin, closed: false, pick });
                     self.texts.push(Text2 { pos: [p[0] + 6.5, p[1] + 10.8], height: 2.5, text: env.expand(value), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+                    if let Some((_, angle)) = turn.filter(|t| t.1.abs() > 1e-9) {
+                        self.rotate_since(mark, p, angle);
+                    }
                 }
                 AnnotationKind::Gdt { anchor, frame, leaders, extra } => {
                     // The frame scales with the annotation text height; rows

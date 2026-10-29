@@ -665,7 +665,7 @@ fn dimension_formats_and_new_dimension_types() {
     add(sheet, AnnotationKind::ArcLengthDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.01, a: [0.01, 0.0], b: [0.0, 0.01], mid: [0.00707, 0.00707], offset: 5.0 }, [0.0; 2]);
     add(sheet, AnnotationKind::Gdt { anchor: [40.0, 40.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![], extra: Default::default() }, [40.0, 40.0]);
     add(sheet, AnnotationKind::Datum { anchor: [60.0, 100.0], label: "A".into(), on: None, at: None }, [60.0, 112.0]);
-    add(sheet, AnnotationKind::SurfaceFinish { anchor: [80.0, 100.0], value: "Ra 1.6".into(), leaders: Vec::new() }, [80.0, 100.0]);
+    add(sheet, AnnotationKind::SurfaceFinish { anchor: [80.0, 100.0], value: "Ra 1.6".into(), leaders: Vec::new(), on: None }, [80.0, 100.0]);
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let t = texts(&built);
     for want in ["100", "+0.1", "-0.05", "2.362 in", "Ø24 H7", "0", "88", "2 X 45.0°", "⌒15.71", "⌖", "Ø0.1Ⓜ", "A", "Ra 1.6"] {
@@ -3409,4 +3409,29 @@ fn a_hole_callout_takes_another_leader() {
     let target = built.placement(view).unwrap().to_sheet(second);
     let tip = |f: &&sheet::Fill2| f.points.iter().any(|p| (p[0] - target[0]).abs() < 1e-6 && (p[1] - target[1]).abs() < 1e-6);
     assert!(built.geometry.fills.iter().any(|f| tip(&f)), "an arrowhead on the second hole");
+}
+
+/// A surface finish symbol placed on a view's edge stands on it, turned
+/// square to it, and Flip puts it on the other side (live A45, qa
+/// DWG-SURFACE-FINISH-MENU).
+#[test]
+fn a_surface_finish_on_an_edge_turns_and_flips() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let view = drawing.sheets[0].views[0].id;
+    let text_of = |drawing: &Drawing| {
+        let built = render_sheet(drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+        let t = built.geometry.texts.iter().find(|t| t.text == "Ra 0.8").expect("the value").clone();
+        (t.pos, t.angle, built.placement(view).unwrap().to_sheet([0.01, 0.0]))
+    };
+    // A vertical edge at view x = 0.01.
+    let on = Some((view, [0.01, 0.0], [0.0, 1.0], false));
+    drawing.sheets[0].annotations.push(Annotation { id: 990, kind: AnnotationKind::SurfaceFinish { anchor: [0.0; 2], value: "Ra 0.8".into(), leaders: Vec::new(), on }, ..Default::default() });
+    let (pos, angle, p) = text_of(&drawing);
+    assert!((angle.abs() - std::f64::consts::FRAC_PI_2).abs() < 1e-9, "turned square to the edge: {angle}");
+    if let AnnotationKind::SurfaceFinish { on: Some(o), .. } = &mut drawing.sheets[0].annotations.last_mut().unwrap().kind {
+        o.3 = true;
+    }
+    let (pos2, _, _) = text_of(&drawing);
+    assert!((pos[0] - p[0]) * (pos2[0] - p[0]) < 0.0, "Flip: the other side of the edge ({pos:?} / {pos2:?} about {p:?})");
 }

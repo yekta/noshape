@@ -668,7 +668,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "surface_finish",
             summary: "Surface finish symbol",
-            description: "The Surface finish symbol tool and panel: the symbol at `position` (sheet mm, on the edge it sits on) with the roughness text `value` (the panel starts with \"Ra 3.2\"). One edit (\"Surface finish\").",
+            description: "The Surface finish symbol tool and panel: the symbol at `position` (sheet mm) with the roughness text `value` (the panel starts with \"Ra 3.2\"). On a view's straight edge it stands on the edge, turned square to it (drawing_annotation_edit `flip`: the other side); elsewhere it is free. One edit (\"Surface finish\").",
             fields: with(common(), vec![req("position", point(), "Where the symbol sits (sheet mm)."), opt("value", json!({ "type": "string", "default": "Ra 3.2" }), "Roughness text.")]),
             mutates: true,
             destructive: false,
@@ -1581,7 +1581,13 @@ fn surface_finish(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let sheet = t.sheet;
     let id = t.d.sheets[sheet].next_annotation_id();
     let value = a.opt_str("value")?.unwrap_or(dt::SURFACE_FINISH_DEFAULT).to_string();
-    t.d.sheets[sheet].annotations.push(dt::surface_finish(id, pt_arg(a, "position")?, value));
+    let p = pt_arg(a, "position")?;
+    let on = t.m.pick_snapping(&Tool::SurfaceFinish, &[], p, false).surface_finish_on(p);
+    let mut sf = dt::surface_finish(id, p, value);
+    if let noshape_model::drawing::AnnotationKind::SurfaceFinish { on: o, .. } = &mut sf.kind {
+        *o = on;
+    }
+    t.d.sheets[sheet].annotations.push(sf);
     done(od, t, "Surface finish", "annotation", id)
 }
 

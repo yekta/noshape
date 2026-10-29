@@ -1948,7 +1948,13 @@ impl DrawingEditor {
     /// (the panel stays for more, help surface_finish).
     fn place_surface_finish(&mut self, at: [f64; 2], value: String, cx: &mut Context<Self>) {
         let id = self.current_sheet().next_annotation_id();
-        self.edit_sheet("Surface finish", cx, |s| s.annotations.push(noshape_scene::drawing_tools::surface_finish(id, at, value)));
+        // On a view's straight edge it stands on the edge (live A45).
+        let on = self.pk().surface_finish_on(at);
+        let mut sf = noshape_scene::drawing_tools::surface_finish(id, at, value);
+        if let AnnotationKind::SurfaceFinish { on: o, .. } = &mut sf.kind {
+            *o = on;
+        }
+        self.edit_sheet("Surface finish", cx, |s| s.annotations.push(sf));
         if let Some(Panel::SurfaceFinish { placed, .. }) = &mut self.panel {
             placed.push(id);
         }

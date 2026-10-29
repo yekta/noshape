@@ -1780,6 +1780,12 @@ fn drawing_callouts_ordinates_and_datums() {
     let sf = call(&mut ctx, "drawing_surface_finish", json!({ "drawing": tab, "position": quarter(&lines[0]) }));
     assert_eq!(kind_of(&mut ctx, sf["annotation"].as_u64().unwrap()), "SurfaceFinish");
     assert!(last(&mut ctx).ends_with(":: Surface finish"));
+    // On an edge it stands on it: Flip turns it to the other side (live A45);
+    // a free symbol has no Flip.
+    call(&mut ctx, "drawing_annotation_edit", json!({ "drawing": tab, "annotation": sf["annotation"], "action": "flip" }));
+    assert!(last(&mut ctx).ends_with(":: Flip"), "{}", last(&mut ctx));
+    let free = call(&mut ctx, "drawing_surface_finish", json!({ "drawing": tab, "position": [20, 270] }))["annotation"].clone();
+    assert!(try_call(&mut ctx, "drawing_annotation_edit", json!({ "drawing": tab, "annotation": free, "action": "flip" })).is_err());
     let w = call(&mut ctx, "drawing_weld", json!({ "drawing": tab, "target": a0, "position": [a0[0] - 20.0, a0[1] + 20.0], "spec": { "arrow": { "joint": "Fillet", "size": "6" }, "all_around": true } }));
     assert_eq!(kind_of(&mut ctx, w["annotation"].as_u64().unwrap()), "Weld");
     assert!(last(&mut ctx).ends_with(":: Weld symbol"));

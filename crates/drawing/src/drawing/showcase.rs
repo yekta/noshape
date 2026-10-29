@@ -63,7 +63,7 @@ pub fn showcase_document() -> Document {
         add(s, AnnotationKind::Gdt { anchor: [24.0, 112.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![], extra: Default::default() }, [24.0, 112.0]);
         add(s, AnnotationKind::Datum { anchor: [150.0, 144.0], label: "A".into(), on: None, at: None }, [150.0, 126.0]);
         add(s, AnnotationKind::Datum { anchor: [160.0, 200.0], label: "B".into(), on: None, at: None }, [175.0, 200.0]);
-        add(s, AnnotationKind::SurfaceFinish { anchor: [95.0, 156.2], value: "Ra 1.6".into(), leaders: Vec::new() }, [95.0, 156.2]);
+        add(s, AnnotationKind::SurfaceFinish { anchor: [95.0, 156.2], value: "Ra 1.6".into(), leaders: Vec::new(), on: None }, [95.0, 156.2]);
         // A grouped ordinate dimension along the bottom of the top view.
         let o = [-0.05, -0.03];
         add(s, AnnotationKind::OrdinateGroup { view: ViewId(2), origin: o, points: vec![o, [-0.038, -0.018], [-0.0332, -0.018], [0.0, 0.0], [0.038, 0.018], [0.05, 0.03]], horizontal: true }, [110.0, 168.0]);

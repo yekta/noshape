@@ -362,13 +362,26 @@ pub fn gdt(id: u64, position: [f64; 2], frame: Vec<String>, extra: GdtExtra) -> 
 /// The Surface finish panel's ✓: the symbol with `value` ("Ra 3.2") where
 /// the tool was clicked.
 pub fn surface_finish(id: u64, position: [f64; 2], value: String) -> Annotation {
-    Annotation { id, kind: AnnotationKind::SurfaceFinish { anchor: position, value, leaders: Vec::new() }, position, ..Default::default() }
+    Annotation { id, kind: AnnotationKind::SurfaceFinish { anchor: position, value, leaders: Vec::new(), on: None }, position, ..Default::default() }
 }
 
 /// The Surface finish panel's starting value.
 pub const SURFACE_FINISH_DEFAULT: &str = "Ra 3.2";
 
 impl SheetPick<'_> {
+    /// A surface finish symbol placed at sheet point `at` on a view's
+    /// straight edge (the hovered one) stands on it (live A45): (view, the
+    /// foot on the edge and its direction in view coordinates, not flipped).
+    pub fn surface_finish_on(&self, at: [f64; 2]) -> Option<(ViewId, [f64; 2], [f64; 2], bool)> {
+        let Some(Pick::Line { a, b }) = self.line_pick() else { return None };
+        let pl = self.placement(a.view)?;
+        let v = pl.to_view(at);
+        let d = [b.p[0] - a.p[0], b.p[1] - a.p[1]];
+        let l2 = (d[0] * d[0] + d[1] * d[1]).max(1e-30);
+        let t = (((v[0] - a.p[0]) * d[0] + (v[1] - a.p[1]) * d[1]) / l2).clamp(0.0, 1.0);
+        Some((a.view, [a.p[0] + d[0] * t, a.p[1] + d[1] * t], d, false))
+    }
+
     /// The Weld symbol tool's first click: the entity the arrow points at
     /// (a snap point or a view's geometry, in its view), else the sheet point.
     pub fn weld_target(&self, c: [f64; 2]) -> (Option<ViewId>, [f64; 2]) {

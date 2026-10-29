@@ -67,6 +67,8 @@ impl<'a> SheetPick<'a> {
             Tool::Dimension { kind: DimTool::Point2, .. } => hover,
             Tool::Dimension { kind: DimTool::Linear, .. } | Tool::Sketch { .. } | Tool::Constrain { .. } => edges_only(true).or(hover),
             Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } => edges_only(false).or(hover),
+            // A surface finish symbol stands on the edge under it (live A45).
+            Tool::SurfaceFinish => edges_only(false).or(hover),
             _ => hover,
         };
         let hover = match (self.tool, hover) {
@@ -83,8 +85,9 @@ impl<'a> SheetPick<'a> {
                 Some(PickTarget::Annotation(id)) if self.current_sheet().annotations.iter().any(|a| a.id == *id && matches!(a.kind, AnnotationKind::Centermark { .. })) => Some(h),
                 _ => None,
             },
-            // Dimension-like tools only care about view edges.
-            (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. }, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
+            // Dimension-like tools (and the surface finish symbol) only care
+            // about view edges.
+            (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::SurfaceFinish, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
                 Some(PickTarget::Edge { .. }) => Some(h),
                 _ => None,
             },
