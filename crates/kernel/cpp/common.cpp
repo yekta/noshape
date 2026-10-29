@@ -10,7 +10,9 @@
 #ifdef __linux__
 #include <dlfcn.h>
 #include <link.h>
-#include <unistd.h>
+#endif
+#ifndef _WIN32
+#include <unistd.h> // write() in the crash guard's messages (macOS doesn't get it through other headers)
 #endif
 #ifdef __linux__
   #include <ucontext.h>
