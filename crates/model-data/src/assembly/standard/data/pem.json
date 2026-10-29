@@ -3387,6 +3387,471 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_SELF_CLINCHING_LENGTH (component document a37d53b86a2bdf62ea34b3ae; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching nuts",
+    "name": "S-RT™ Free-running locknuts",
+    "shape": "pemNut",
+    "form": {
+     "form": 3
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Steel"
+    ],
+    "materialCodes": {
+     "Steel": {
+      "code": "S",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "M3x0.5",
+      "label": "PEM {type}-RTM3-{l}",
+      "d": 3.0,
+      "dims": {
+       "dm": 2.459,
+       "dmaj": 3.0,
+       "dc": 4.2,
+       "de": 6.35,
+       "tl": 1.5,
+       "md": 0.015
+      },
+      "lengths": [
+       "0.8",
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "0.8": {
+        "al": 0.77
+       },
+       "1": {
+        "al": 0.97
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "0.8": "0",
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M4x0.7",
+      "label": "PEM {type}-RTM4-{l}",
+      "d": 4.0,
+      "dims": {
+       "dm": 3.242,
+       "dmaj": 4.0,
+       "dc": 5.38,
+       "de": 7.87,
+       "tl": 2.0,
+       "md": 0.02
+      },
+      "lengths": [
+       "0.8",
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "0.8": {
+        "al": 0.77
+       },
+       "1": {
+        "al": 0.97
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "0.8": "0",
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M5x0.8",
+      "label": "PEM {type}-RTM5-{l}",
+      "d": 5.0,
+      "dims": {
+       "dm": 4.134,
+       "dmaj": 5.0,
+       "dc": 6.33,
+       "de": 8.64,
+       "tl": 2.0,
+       "md": 0.02
+      },
+      "lengths": [
+       "0.8",
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "0.8": {
+        "al": 0.77
+       },
+       "1": {
+        "al": 0.97
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "0.8": "0",
+       "1": "1",
+       "1.4": "2"
+      },
+      "typeCodes": {
+       "Steel": "SS"
+      }
+     },
+     {
+      "name": "M6x1",
+      "label": "PEM {type}-RTM6-{l}",
+      "d": 6.0,
+      "dims": {
+       "dm": 4.917,
+       "dmaj": 6.0,
+       "dc": 8.73,
+       "de": 11.18,
+       "tl": 4.08,
+       "md": 0.0408
+      },
+      "lengths": [
+       "0.92",
+       "1.2",
+       "1.4",
+       "2.29"
+      ],
+      "lengthDims": {
+       "0.92": {
+        "al": 0.89
+       },
+       "1.2": {
+        "al": 1.15
+       },
+       "1.4": {
+        "al": 1.38
+       },
+       "2.29": {
+        "al": 2.21
+       }
+      },
+      "lengthNames": {
+       "0.92": "00",
+       "1.2": "0",
+       "1.4": "1",
+       "2.29": "2"
+      }
+     },
+     {
+      "name": "M8x1.25",
+      "label": "PEM {type}-RTM8-{l}",
+      "d": 8.0,
+      "dims": {
+       "dm": 6.647,
+       "dmaj": 8.0,
+       "dc": 10.47,
+       "de": 12.7,
+       "tl": 5.84,
+       "md": 0.0584
+      },
+      "lengths": [
+       "1.4",
+       "2.29"
+      ],
+      "lengthDims": {
+       "1.4": {
+        "al": 1.38
+       },
+       "2.29": {
+        "al": 2.21
+       }
+      },
+      "lengthNames": {
+       "1.4": "1",
+       "2.29": "2"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_SELF_CLINCHING_LENGTH (component document 9f59a0a871c708d0cd2d43df; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching nuts",
+    "name": "SL™ TRI-DENT® Prevailing torque locknuts",
+    "shape": "pemNut",
+    "form": {
+     "form": 4
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Steel"
+    ],
+    "materialCodes": {
+     "Steel": {
+      "code": "SL",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "M3x0.5",
+      "label": "PEM {type}-M3-{l}",
+      "d": 3.0,
+      "dims": {
+       "dm": 2.459,
+       "dmaj": 3.0,
+       "dc": 4.2,
+       "de": 6.35,
+       "tl": 1.5,
+       "md": 0.015
+      },
+      "lengths": [
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "1": {
+        "al": 0.98
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M3.5x0.6",
+      "label": "PEM {type}-M3.5-{l}",
+      "d": 3.5,
+      "dims": {
+       "dm": 2.85,
+       "dmaj": 3.5,
+       "dc": 4.73,
+       "de": 7.11,
+       "tl": 1.5,
+       "md": 0.015
+      },
+      "lengths": [
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "1": {
+        "al": 0.98
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M4x0.7",
+      "label": "PEM {type}-M4-{l}",
+      "d": 4.0,
+      "dims": {
+       "dm": 3.242,
+       "dmaj": 4.0,
+       "dc": 5.38,
+       "de": 7.87,
+       "tl": 2.0,
+       "md": 0.02
+      },
+      "lengths": [
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "1": {
+        "al": 0.98
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M5x0.8",
+      "label": "PEM {type}-M5-{l}",
+      "d": 5.0,
+      "dims": {
+       "dm": 4.134,
+       "dmaj": 5.0,
+       "dc": 6.33,
+       "de": 8.64,
+       "tl": 2.0,
+       "md": 0.02
+      },
+      "lengths": [
+       "1",
+       "1.4"
+      ],
+      "lengthDims": {
+       "1": {
+        "al": 0.98
+       },
+       "1.4": {
+        "al": 1.38
+       }
+      },
+      "lengthNames": {
+       "1": "1",
+       "1.4": "2"
+      }
+     },
+     {
+      "name": "M6x1",
+      "label": "PEM {type}-M6-{l}",
+      "d": 6.0,
+      "dims": {
+       "dm": 4.917,
+       "dmaj": 6.0,
+       "dc": 8.73,
+       "de": 11.18,
+       "tl": 4.08,
+       "md": 0.0408
+      },
+      "lengths": [
+       "1.4",
+       "2.3"
+      ],
+      "lengthDims": {
+       "1.4": {
+        "al": 1.38
+       },
+       "2.3": {
+        "al": 2.21
+       }
+      },
+      "lengthNames": {
+       "1.4": "1",
+       "2.3": "2"
+      }
+     },
+     {
+      "name": "M8x1.25",
+      "label": "PEM {type}-M8-{l}",
+      "d": 8.0,
+      "dims": {
+       "dm": 6.647,
+       "dmaj": 8.0,
+       "dc": 10.47,
+       "de": 12.7,
+       "tl": 5.47,
+       "md": 0.0547
+      },
+      "lengths": [
+       "1.4",
+       "2.3"
+      ],
+      "lengthDims": {
+       "1.4": {
+        "al": 1.38
+       },
+       "2.3": {
+        "al": 2.21
+       }
+      },
+      "lengthNames": {
+       "1.4": "1",
+       "2.3": "2"
+      }
+     },
+     {
+      "name": "M10x1.5",
+      "label": "PEM {type}-M10-{l}",
+      "d": 10.0,
+      "dims": {
+       "dm": 8.376,
+       "dmaj": 10.0,
+       "dc": 13.97,
+       "de": 17.35,
+       "tl": 7.48,
+       "md": 0.0748
+      },
+      "lengths": [
+       "2.29",
+       "3.18"
+      ],
+      "lengthDims": {
+       "2.29": {
+        "al": 2.21
+       },
+       "3.18": {
+        "al": 3.05
+       }
+      },
+      "lengthNames": {
+       "2.29": "1",
+       "3.18": "2"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_SELF_CLINCHING_LENGTH (component document 5b2f05071411e2fa0f106f3f; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching nuts",
+    "name": "H™ Nuts",
+    "shape": "pemNut",
+    "form": {
+     "form": 5
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Steel"
+    ],
+    "materialCodes": {
+     "Steel": {
+      "code": "H",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "M10x1.50",
+      "label": "PEM {type}-M10",
+      "d": 10.0,
+      "dims": {
+       "dm": 8.376,
+       "dmaj": 10.0,
+       "dc": 12.67,
+       "de": 16.5,
+       "tl": 7.9,
+       "al": 1.48,
+       "md": 0.079
+      },
+      "lengths": [],
+      "lengthDims": {},
+      "lengthNames": {}
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_FASTENER_MATERIAL_TYPE (component document f458d785890472b8ed510948; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  },
@@ -8573,6 +9038,500 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_SELF_CLINCHING_LENGTH (component document 7a1df4f6cee5999410c34c63; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching nuts",
+    "name": "S-RT™ Free-running locknuts",
+    "shape": "pemNut",
+    "form": {
+     "form": 3
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Steel"
+    ],
+    "materialCodes": {
+     "Steel": {
+      "code": "S",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "#4-40",
+      "label": "PEM {type}-RT440-{l}",
+      "d": 0.112,
+      "dims": {
+       "dm": 0.0849,
+       "dmaj": 0.112,
+       "dc": 0.165,
+       "de": 0.25,
+       "tl": 0.07,
+       "md": 0.0007
+      },
+      "lengths": [
+       "0.030",
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.030": {
+        "al": 0.03
+       },
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.030": "0",
+       "0.040": "1",
+       "0.056": "2"
+      }
+     },
+     {
+      "name": "#6-32",
+      "label": "PEM {type}-RT632-{l}",
+      "d": 0.138,
+      "dims": {
+       "dm": 0.104,
+       "dmaj": 0.138,
+       "dc": 0.187,
+       "de": 0.28,
+       "tl": 0.07,
+       "md": 0.0007
+      },
+      "lengths": [
+       "0.030",
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.030": {
+        "al": 0.03
+       },
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.030": "0",
+       "0.040": "1",
+       "0.056": "2"
+      }
+     },
+     {
+      "name": "#8-32",
+      "label": "PEM {type}-RT832-{l}",
+      "d": 0.164,
+      "dims": {
+       "dm": 0.13,
+       "dmaj": 0.164,
+       "dc": 0.212,
+       "de": 0.31,
+       "tl": 0.09,
+       "md": 0.0009
+      },
+      "lengths": [
+       "0.030",
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.030": {
+        "al": 0.03
+       },
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.030": "0",
+       "0.040": "1",
+       "0.056": "2"
+      }
+     },
+     {
+      "name": "#10-32",
+      "label": "PEM {type}-RT032-{l}",
+      "d": 0.19,
+      "dims": {
+       "dm": 0.156,
+       "dmaj": 0.19,
+       "dc": 0.249,
+       "de": 0.34,
+       "tl": 0.09,
+       "md": 0.0009
+      },
+      "lengths": [
+       "0.030",
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.030": {
+        "al": 0.03
+       },
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.030": "0",
+       "0.040": "1",
+       "0.056": "2"
+      },
+      "typeCodes": {
+       "Steel": "SS"
+      }
+     },
+     {
+      "name": "1/4-20",
+      "label": "PEM {type}-RT0420-{l}",
+      "d": 0.25,
+      "dims": {
+       "dm": 0.196,
+       "dmaj": 0.25,
+       "dc": 0.343,
+       "de": 0.44,
+       "tl": 0.17,
+       "md": 0.0017
+      },
+      "lengths": [
+       "0.047",
+       "0.056",
+       "0.090"
+      ],
+      "lengthDims": {
+       "0.047": {
+        "al": 0.045
+       },
+       "0.056": {
+        "al": 0.054
+       },
+       "0.090": {
+        "al": 0.087
+       }
+      },
+      "lengthNames": {
+       "0.047": "0",
+       "0.056": "1",
+       "0.090": "2"
+      }
+     },
+     {
+      "name": "5/16-18",
+      "label": "PEM {type}-RT0518-{l}",
+      "d": 0.313,
+      "dims": {
+       "dm": 0.252,
+       "dmaj": 0.313,
+       "dc": 0.412,
+       "de": 0.5,
+       "tl": 0.23,
+       "md": 0.0023
+      },
+      "lengths": [
+       "0.056",
+       "0.090"
+      ],
+      "lengthDims": {
+       "0.056": {
+        "al": 0.054
+       },
+       "0.090": {
+        "al": 0.087
+       }
+      },
+      "lengthNames": {
+       "0.056": "1",
+       "0.090": "2"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_SELF_CLINCHING_LENGTH (component document 5581cd6e0182db65cd1b30c1; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching nuts",
+    "name": "SL™ TRI-DENT® Prevailing torque locknuts",
+    "shape": "pemNut",
+    "form": {
+     "form": 4
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Steel"
+    ],
+    "materialCodes": {
+     "Steel": {
+      "code": "SL",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "#4-40",
+      "label": "PEM {type}-440-{l}",
+      "d": 0.112,
+      "dims": {
+       "dm": 0.0849,
+       "dmaj": 0.112,
+       "dc": 0.165,
+       "de": 0.25,
+       "tl": 0.07,
+       "md": 0.0007
+      },
+      "lengths": [
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.040": "1",
+       "0.056": "2"
+      }
+     },
+     {
+      "name": "#6-32",
+      "label": "PEM {type}-632-{l}",
+      "d": 0.138,
+      "dims": {
+       "dm": 0.104,
+       "dmaj": 0.138,
+       "dc": 0.187,
+       "de": 0.28,
+       "tl": 0.07,
+       "md": 0.0007
+      },
+      "lengths": [
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.040": "1",
+       "0.056": "2"
+      }
+     },
+     {
+      "name": "#8-32",
+      "label": "PEM {type}-832-{l}",
+      "d": 0.164,
+      "dims": {
+       "dm": 0.13,
+       "dmaj": 0.164,
+       "dc": 0.212,
+       "de": 0.31,
+       "tl": 0.09,
+       "md": 0.0009
+      },
+      "lengths": [
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.040": "1",
+       "0.056": "2"
+      }
+     },
+     {
+      "name": "#10-32",
+      "label": "PEM {type}-032-{l}",
+      "d": 0.19,
+      "dims": {
+       "dm": 0.156,
+       "dmaj": 0.19,
+       "dc": 0.249,
+       "de": 0.34,
+       "tl": 0.09,
+       "md": 0.0009
+      },
+      "lengths": [
+       "0.040",
+       "0.056"
+      ],
+      "lengthDims": {
+       "0.040": {
+        "al": 0.038
+       },
+       "0.056": {
+        "al": 0.054
+       }
+      },
+      "lengthNames": {
+       "0.040": "1",
+       "0.056": "2"
+      }
+     },
+     {
+      "name": "1/4-20",
+      "label": "PEM {type}-0420-{l}",
+      "d": 0.25,
+      "dims": {
+       "dm": 0.196,
+       "dmaj": 0.25,
+       "dc": 0.343,
+       "de": 0.44,
+       "tl": 0.17,
+       "md": 0.0017
+      },
+      "lengths": [
+       "0.056",
+       "0.091"
+      ],
+      "lengthDims": {
+       "0.056": {
+        "al": 0.054
+       },
+       "0.091": {
+        "al": 0.087
+       }
+      },
+      "lengthNames": {
+       "0.056": "1",
+       "0.091": "2"
+      }
+     },
+     {
+      "name": "5/16-18",
+      "label": "PEM {type}-0518-{l}",
+      "d": 0.313,
+      "dims": {
+       "dm": 0.252,
+       "dmaj": 0.313,
+       "dc": 0.412,
+       "de": 0.5,
+       "tl": 0.23,
+       "md": 0.0023
+      },
+      "lengths": [
+       "0.056",
+       "0.091"
+      ],
+      "lengthDims": {
+       "0.056": {
+        "al": 0.054
+       },
+       "0.091": {
+        "al": 0.087
+       }
+      },
+      "lengthNames": {
+       "0.056": "1",
+       "0.091": "2"
+      }
+     },
+     {
+      "name": "3/8-16",
+      "label": "PEM {type}-0616-{l}",
+      "d": 0.375,
+      "dims": {
+       "dm": 0.307,
+       "dmaj": 0.375,
+       "dc": 0.499,
+       "de": 0.625,
+       "tl": 0.27,
+       "md": 0.0027
+      },
+      "lengths": [
+       "0.090",
+       "0.125"
+      ],
+      "lengthDims": {
+       "0.090": {
+        "al": 0.087
+       },
+       "0.125": {
+        "al": 0.12
+       }
+      },
+      "lengthNames": {
+       "0.090": "1",
+       "0.125": "2"
+      }
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_SELF_CLINCHING_LENGTH (component document 6b49a7042fb0279fdcfeea4f; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching nuts",
+    "name": "H™ Nuts",
+    "shape": "pemNut",
+    "form": {
+     "form": 5
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Steel"
+    ],
+    "materialCodes": {
+     "Steel": {
+      "code": "H",
+      "finish": "Zinc plated",
+      "finishCode": "ZI"
+     }
+    },
+    "sizes": [
+     {
+      "name": "3/8-16",
+      "label": "PEM {type}-0616",
+      "d": 0.375,
+      "dims": {
+       "dm": 0.307,
+       "dmaj": 0.375,
+       "dc": 0.499,
+       "de": 0.65,
+       "tl": 0.3,
+       "al": 0.058,
+       "md": 0.003
+      },
+      "lengths": [],
+      "lengthDims": {},
+      "lengthNames": {}
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_FASTENER_MATERIAL_TYPE (component document 648038d44e8d1cc5943d52ad; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  }

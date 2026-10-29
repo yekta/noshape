@@ -3174,6 +3174,16 @@ function swagingCollarStud(context is Context, id is Id, definition is map)
  * its bottom edge de / 40. Form 2 (SH™ hard panel nuts): as form 1, the
  * chamfers de / 80 and de / 60; "PEM" over the top and "SH" under (letters
  * mh high, 45° and 60° apart), their tops 0.635 mm inside the chamfer.
+ * Form 3 (S-RT™ free-running locknuts): as form 1 with the body's edges
+ * rounded de / 80 (top) and de / 40; "PEM" and "RT" (30° apart) as form 0's
+ * letters with 0.5 mm clearances. Form 4 (SL™ TRI-DENT® locknuts): form 2's
+ * body; "PEM" in the middle third between the chamfers of the bore and the
+ * body, and between the letters 3 triangular pockets dm / 20 deep, each
+ * pointing out to that third's inner circle with its inner corners on the
+ * bore's. Form 5 (H™ nuts): the shank down to 0.3 al coning in at 10° to
+ * 0.8 al, the ring 0.2 al high scalloped by 24 round notches 0.05 de across
+ * (in to (dc + de) * 0.225), form 0's roundings and letters (0.635 mm
+ * clearances).
  */
 annotation { "Feature Type Name" : "PEM nut" }
 export const pemNut = defineFeature(function(context is Context, id is Id, definition is map)
@@ -3210,33 +3220,58 @@ export const pemNut = defineFeature(function(context is Context, id is Id, defin
         const tl = definition.tl;
         const f = definition.de / 40;
         const zb = -al - tl;
-        const thin = definition.form == 1 || definition.form == 2;
-        const z1 = thin ? -al / 4.5 : -tl / 13;
-        const r2 = rc - (al / 2 + z1) * tan((thin ? 10 : 9) * degree);
+        const scallops = definition.form == 5;
+        const thin = definition.form >= 1;
+        const z1 = scallops ? -0.3 * al : (thin ? -al / 4.5 : -tl / 13);
+        const zr = scallops ? -0.8 * al : -al / 2;
+        const r2 = rc - (z1 - zr) * tan((thin ? 10 : 9) * degree);
         const s45 = sqrt(0.5);
-        const c2 = definition.de / (definition.form == 2 ? 80 : 60);
-        const cb = definition.form == 2 ? definition.de / 60 : f;
-        const edges = thin ? [{ "p" : rz(re - c2, -al) }, { "p" : rz(re, -al - c2) }, { "p" : rz(re, zb + cb) }, { "p" : rz(re - cb, zb) }] :
-            [{ "p" : rz(re - f, -al) }, { "p" : rz(re, -al - f), "mid" : rz(re - f + f * s45, -al - f + f * s45) },
+        const sharp = definition.form == 2 || definition.form == 4;
+        const c2 = definition.de / (sharp ? 80 : 60);
+        const cb = sharp ? definition.de / 60 : f;
+        const ft = definition.form == 3 ? definition.de / 80 : f;
+        const edges = definition.form == 1 || sharp ? [{ "p" : rz(re - c2, -al) }, { "p" : rz(re, -al - c2) }, { "p" : rz(re, zb + cb) }, { "p" : rz(re - cb, zb) }] :
+            [{ "p" : rz(re - ft, -al) }, { "p" : rz(re, -al - ft), "mid" : rz(re - ft + ft * s45, -al - ft + ft * s45) },
                     { "p" : rz(re, zb + f) }, { "p" : rz(re - f, zb), "mid" : rz(re - f + f * s45, zb + f - f * s45) }];
         revolveProfile(context, id + "body", concatenateArrays([[
-                    { "p" : rz(rmaj, Z) }, { "p" : rz(rc, Z) }, { "p" : rz(rc, z1) }, { "p" : rz(r2, -al / 2) }, { "p" : rz(rk, -al / 2) },
+                    { "p" : rz(rmaj, Z) }, { "p" : rz(rc, Z) }, { "p" : rz(rc, z1) }, { "p" : rz(r2, zr) }, { "p" : rz(rk, zr) },
                     { "p" : rz(rk, -al) }], edges, [
                     { "p" : rz(rmaj, zb) }, { "p" : rz(rmin, zb + rmaj - rmin) }, { "p" : rz(rmin, -(rmaj - rmin)) }
                 ]]));
-        knurlCut(context, id, qCreatedBy(id + "body", EntityType.BODY), -al, al / 2, 24, (r2 + rk) / 2, rk, 90 * degree);
+        if (scallops)
+        {
+            // 24 round notches, tangent inside to (dc + de) * 0.225.
+            const rn = 0.05 * definition.de;
+            const rcn = (definition.dc + definition.de) * 0.225 + rn;
+            var base = XY_PLANE;
+            base.origin[2] = -al;
+            const sk = newSketchOnPlane(context, id + "notchSketch", { "sketchPlane" : base });
+            for (var k = 0; k < 24; k += 1)
+            {
+                const a = (90 + 15 * k) * degree;
+                skCircle(sk, "notch" ~ k, { "center" : vector(cos(a), sin(a)) * rcn, "radius" : rn });
+            }
+            skSolve(sk);
+            opExtrude(context, id + "notches", { "entities" : qSketchRegion(id + "notchSketch"), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : 0.2 * al });
+            opDeleteBodies(context, id + "deleteNotchSketch", { "entities" : qCreatedBy(id + "notchSketch", EntityType.BODY) });
+            subtract(context, id + "cutNotches", qCreatedBy(id + "body", EntityType.BODY), qCreatedBy(id + "notches", EntityType.BODY));
+        }
+        else
+            knurlCut(context, id, qCreatedBy(id + "body", EntityType.BODY), -al, al / 2, 24, (r2 + rk) / 2, rk, 90 * degree);
         // The marking: each letter's box from 0.381 mm off the chamfer to
         // 0.381 mm inside the rounding, centred (live's widths per height),
         // on a plane facing down turned 0°, -120°, 120°. Open Sans' box
         // height is its ascender: 2189 / 1462 of the cap height.
-        const gap = 0.381 * millimeter;
+        const gap = (definition.form == 3 ? 0.5 : (scallops ? 0.635 : 0.381)) * millimeter;
         const five = definition.form == 2;
-        const h = five ? definition.mh : re - f - rmaj - 2 * gap;
-        const rb = five ? re - cb - 0.635 * millimeter - h : rmaj + gap;
+        const third = (re - cb - rmaj) / 3;
+        const h = five ? definition.mh : (definition.form == 4 ? third : re - cb - rmaj - 2 * gap);
+        const rb = five ? re - cb - 0.635 * millimeter - h : rmaj + (definition.form == 4 ? third : gap);
         if (definition.md > EPS && h > EPS)
         {
             const letters = five ? [["P", 45, 0.85509], ["E", 0, 0.77913], ["M", -45, 1.2084], ["S", -150, 0.78578], ["H", 150, 0.97917]] :
-                [["P", 0, 0.85502], ["E", -120, 0.77907], ["M", 120, 1.20842]];
+                (definition.form == 3 ? [["P", 75, 0.85503], ["E", 45, 0.77908], ["M", 15, 1.20833], ["R", -30, 0.92491], ["T", -60, 0.84549]] :
+                [["P", 0, 0.85502], ["E", -120, 0.77907], ["M", 120, 1.20842]]);
             for (var k = 0; k < size(letters); k += 1)
             {
                 const a = letters[k][1] * degree;
@@ -3249,5 +3284,24 @@ export const pemNut = defineFeature(function(context is Context, id is Id, defin
                 opDeleteBodies(context, id + ("deleteMark" ~ k), { "entities" : qCreatedBy(id + ("mark" ~ k), EntityType.BODY) });
                 subtract(context, id + ("cutMark" ~ k), qCreatedBy(id + "body", EntityType.BODY), qCreatedBy(id + ("engrave" ~ k), EntityType.BODY));
             }
+        }
+        // TRI-DENT®: equilateral, the outer corner at rb, the inner ones on
+        // the bore's chamfer (side (√3 rb - √(4 rmaj² - rb²)) / 2).
+        if (definition.form == 4)
+        {
+            const side = (sqrt(3) * rb - sqrt(4 * rmaj * rmaj - rb * rb)) / 2;
+            const sk = newSketchOnPlane(context, id + "dents", { "sketchPlane" : plane(vector(Z, Z, zb), vector(0, 0, -1), vector(1, 0, 0)) });
+            for (var k = 0; k < 3; k += 1)
+            {
+                const a = (60 + 120 * k) * degree;
+                const u = vector(cos(a), sin(a));
+                const v = vector(-sin(a), cos(a));
+                const inner = u * (rb - side * sqrt(3) / 2);
+                skPolyline(sk, "dent" ~ k, { "points" : [u * rb, inner + v * side / 2, inner - v * side / 2, u * rb] });
+            }
+            skSolve(sk);
+            opExtrude(context, id + "dentTool", { "entities" : qSketchRegion(id + "dents"), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : definition.dm / 20 });
+            opDeleteBodies(context, id + "deleteDents", { "entities" : qCreatedBy(id + "dents", EntityType.BODY) });
+            subtract(context, id + "cutDents", qCreatedBy(id + "body", EntityType.BODY), qCreatedBy(id + "dentTool", EntityType.BODY));
         }
     });

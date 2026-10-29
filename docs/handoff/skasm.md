@@ -193,8 +193,11 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    without lengths hides the length row) 3022b70b. SH (form 2: chamfers de / 80, de / 60; "PEM" + "SH", fixed
    letter height mh, tops 0.635 mm inside the chamfer). The T2 sweep pem_fh_pin_sizes_build takes ~10 min now.
    Letter placement per form: read the text entities' centre angle / radius / ascent (see /root/skasm-scratch
-   notes in pem_sh.py); widths are live's box width / ascent. Next nuts: S-RT (PEM + RT, 0.5 mm gaps, fillets de /
-   80 top, de / 40 bottom), SL, HNL, H. Not shown yet: the read-only Hole size / Recommended sheet material rows.
+   notes in pem_sh.py); widths are live's box width / ascent. SH 044f90a6. S-RT (form 3: PEM + RT, 0.5 mm gaps,
+   roundings de / 80 and de / 40), SL (form 4: SH's body, PEM in the middle third, 3 triangular pockets dm / 20
+   deep, outer corner on that third's inner circle, inner corners on the bore's), H (form 5: 24 round scallops in
+   the ring, one size, no Sheet thickness). Left: HNL (scallops as H plus a bottom feature: Sketch 3 slots cut
+   TLen·0.15, Extrude 3 adding ALen·0.8, Sketch 4 cones below the body; 120 faces). Not shown yet: the read-only Hole size / Recommended sheet material rows.
    Live's studio defaults sometimes differ from the table (NAS 1129 thru minor 0.067 vs 0.0667, NASM 45938/4 ax 0.0225
    vs 0.028125): check the construction at the studio values, then test ours at the table's.
    Earlier: ANSI taper pin crowned ends 10-27.

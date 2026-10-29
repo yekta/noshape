@@ -5059,7 +5059,7 @@ fn pem_fh_pins_match_live() {
 #[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn pem_fh_pin_sizes_build() {
     use super::standard::{self, CATALOGUE, StandardSpec};
-    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™") || c.name.starts_with("FHL™") || c.name.starts_with("TFH™") || c.name.starts_with("HFLH™") || c.name.starts_with("HF") || c.name.starts_with("FHX™") || c.name.starts_with("SGPC™") || c.name.starts_with("S™/SS™") || c.name.starts_with("CLA™") || c.name.starts_with("SMPS™") || c.name.starts_with("SH™")) {
+    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™") || c.name.starts_with("FHL™") || c.name.starts_with("TFH™") || c.name.starts_with("HFLH™") || c.name.starts_with("HF") || c.name.starts_with("FHX™") || c.name.starts_with("SGPC™") || c.name.starts_with("S™/SS™") || c.name.starts_with("CLA™") || c.name.starts_with("SMPS™") || c.name.starts_with("SH™") || c.name.starts_with("S-RT™") || c.name.starts_with("SL™") || c.name == "H™ Nuts") {
         for s in &c.sizes {
             // (Nuts for thin sheets have no length.)
             let ls = if s.lengths.is_empty() { vec![None] } else { vec![s.lengths.first(), s.lengths.last()] };
@@ -5545,6 +5545,101 @@ fn pem_sh_nuts_match_live() {
             *kinds.entry(k).or_insert(0) += 1;
         }
         assert_eq!(kinds, [("cone", 5), ("curved", 32), ("cylinder", 3), ("plane", 108)].into_iter().collect(), "{}", c.inch);
+    }
+}
+
+/// PEM® S-RT™ free-running locknuts (live's raw /features and body details):
+/// steel only, "PEM S-RTM3-0 ZI", M5 "PEM SS-RTM5-0 ZI", "PEM S-RT440-0 ZI";
+/// at live's studio sizes 138 faces (PLANE 114, CYLINDER 3, CONE 3, TORUS 2,
+/// "PEM RT"'s 16 curved walls).
+#[test]
+fn pem_s_rt_nuts_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let metric = CATALOGUE.iter().find(|c| c.name.starts_with("S-RT™") && !c.inch).unwrap();
+    let unified = CATALOGUE.iter().find(|c| c.name.starts_with("S-RT™") && c.inch).unwrap();
+    let mut spec = StandardSpec::new(metric);
+    assert_eq!((spec.part_name(), spec.description()), ("PEM S-RTM3-0 ZI".to_string(), "PEM S-RTM3-0  ZI Steel Zinc plated".to_string()));
+    spec.set_size("M5x0.8");
+    assert_eq!(spec.part_name(), "PEM SS-RTM5-0 ZI");
+    assert_eq!(StandardSpec::new(unified).part_name(), "PEM S-RT440-0 ZI");
+    for c in [metric, unified] {
+        let r = standard::regenerate(&StandardSpec::new(c)).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let mut kinds = std::collections::BTreeMap::new();
+        for i in 0..b.faces.len() {
+            let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+                Surface::Plane(_) => "plane",
+                Surface::Cone { .. } => "cone",
+                Surface::Cylinder { .. } => "cylinder",
+                Surface::Torus { .. } => "torus",
+                _ => "curved",
+            };
+            *kinds.entry(k).or_insert(0) += 1;
+        }
+        assert_eq!(kinds, [("cone", 3), ("curved", 16), ("cylinder", 3), ("plane", 114), ("torus", 2)].into_iter().collect(), "{}", c.inch);
+    }
+}
+
+/// PEM® SL™ TRI-DENT® prevailing torque locknuts (live's raw /features and
+/// body details): steel only, "PEM SL-M3-1 ZI", "PEM SL-440-1 ZI"; at live's
+/// studio sizes 121 faces (PLANE 104 with the 3 triangular pockets, CYLINDER
+/// 3, CONE 5, "PEM"'s 9 curved walls).
+#[test]
+fn pem_sl_nuts_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let metric = CATALOGUE.iter().find(|c| c.name.starts_with("SL™") && !c.inch).unwrap();
+    let unified = CATALOGUE.iter().find(|c| c.name.starts_with("SL™") && c.inch).unwrap();
+    let spec = StandardSpec::new(metric);
+    assert_eq!((spec.part_name(), spec.description()), ("PEM SL-M3-1 ZI".to_string(), "PEM SL-M3-1  ZI Steel Zinc plated".to_string()));
+    assert_eq!(StandardSpec::new(unified).part_name(), "PEM SL-440-1 ZI");
+    for c in [metric, unified] {
+        let r = standard::regenerate(&StandardSpec::new(c)).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let mut kinds = std::collections::BTreeMap::new();
+        for i in 0..b.faces.len() {
+            let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+                Surface::Plane(_) => "plane",
+                Surface::Cone { .. } => "cone",
+                Surface::Cylinder { .. } => "cylinder",
+                Surface::Torus { .. } => "torus",
+                _ => "curved",
+            };
+            *kinds.entry(k).or_insert(0) += 1;
+        }
+        assert_eq!(kinds, [("cone", 5), ("curved", 9), ("cylinder", 3), ("plane", 104)].into_iter().collect(), "{}", c.inch);
+    }
+}
+
+/// PEM® H™ nuts (live's raw /features and body details): one size, steel
+/// only, "PEM H-M10 ZI" / "PEM H-M10  ZI Steel Zinc plated", "PEM H-0616 ZI";
+/// 109 faces (CYLINDER 51 with the ring's 24 scallops, PLANE 44, CONE 3,
+/// TORUS 2, "PEM"'s 9 curved walls).
+#[test]
+fn pem_h_nuts_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let metric = CATALOGUE.iter().find(|c| c.name == "H™ Nuts" && !c.inch).unwrap();
+    let unified = CATALOGUE.iter().find(|c| c.name == "H™ Nuts" && c.inch).unwrap();
+    let spec = StandardSpec::new(metric);
+    assert_eq!((spec.part_name(), spec.description()), ("PEM H-M10 ZI".to_string(), "PEM H-M10  ZI Steel Zinc plated".to_string()));
+    assert_eq!(StandardSpec::new(unified).part_name(), "PEM H-0616 ZI");
+    for c in [metric, unified] {
+        let r = standard::regenerate(&StandardSpec::new(c)).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let mut kinds = std::collections::BTreeMap::new();
+        for i in 0..b.faces.len() {
+            let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+                Surface::Plane(_) => "plane",
+                Surface::Cone { .. } => "cone",
+                Surface::Cylinder { .. } => "cylinder",
+                Surface::Torus { .. } => "torus",
+                _ => "curved",
+            };
+            *kinds.entry(k).or_insert(0) += 1;
+        }
+        assert_eq!(kinds, [("cone", 3), ("curved", 9), ("cylinder", 51), ("plane", 44), ("torus", 2)].into_iter().collect(), "{}", c.inch);
     }
 }
 
