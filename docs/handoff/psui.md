@@ -415,6 +415,15 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
    variants touched; the older "no silhouettes" run cut p95 46 → 26. Next (landed with this note): vs_silhouette
    decides a candidate isn't a silhouette before line_vertex (same output); bench variants r / nosil
    (NOSHAPE_PERF_SKIP=silhouettes) / nobsil (backsil) / nol on it.
+   **Found (perf 40964180293, NIST at 2×, done_ms):** macOS 14 base mean 25–27 / p95 40–41, nosil 13.6–14.5 /
+   18.4, nobsil 21–25 / 36–37, nol 13.1 / 17.0; macOS 15 base 24.7–25.7 / 35–38, nosil 14.9–15.1 / 17.5–19.9,
+   nol 11.2 / 17.1. **The edge silhouettes are the lines' Retina cost** (~10–12 ms of a ~25 ms GPU frame); the
+   early-out (4d75111d) didn't move it, so it's their number, not their math: every interior tessellation edge
+   of a curved face is a candidate drawn as 6 vertices each frame (scene builder `silhouette_edges`; coplanar
+   pairs already left out), and only a handful per face are silhouettes in any view. Plan: a compute pass per
+   frame culls the candidates (facing test with the instance's normal matrix) into a compacted index list +
+   indirect draw (vs_silhouette pulling the candidate by index); behind a switch first, measured with the same
+   variants, then default.
 0f. (done 10-28: no gain, see above) Retina orbit, experiment for 0c: line segments are instances of 6 vertices (`draw(slots*6, 0..count)`),
    which packs Apple GPUs' vertex SIMD groups badly; pull segments from a storage buffer by vertex_index / 6 with
    the slot as the instance (one instance per copy) and measure with perf.yml.
