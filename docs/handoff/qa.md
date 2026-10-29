@@ -9,6 +9,9 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **16:04 update (greens a6f6c407 → 8b2c53ae):** verified DWG-GDT-MENU-ORDER, DWG-TABLE-SHIFT-EXTEND, DWG-SHEET-DRAG-GHOST, DWG-INFO-TOASTS
+  (a) view Copy / (b) Move to sheet (c not checked), HOLE-TABLE-BUTTON. Left from dx's a6f6c407: DWG-DATUM-TARGET-MENU unchecked.
+  CLI fuzz 322–326 on main's Rust clean.
 - **15:51 update (green 3fb8a668):** verified DWG-PROPERTY-FIELD (editor shows the value). CLI fuzz 322–324 on main's Rust clean; GUI
   fzloop seeds 400–503 alive. Open from today, owners' queue: P1 RUST-MIRROR-SPLIT-FACES, P2 RUST-UNION-MERGES-DISJOINT-FACES,
   P2 MIRROR-BLIND-HOLE-FACES, P2 OCCT-UNION-OFFSET-CYL / OCCT-MIRROR-OVERCOUNT (OCCT path), P2 AGENT-HIDDEN-PARAMS-SILENT, P3
