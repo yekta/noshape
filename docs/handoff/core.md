@@ -42,6 +42,13 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   frame the opposite prism's cylinder with the same seam. Don't write pcurves into the input's shared edges (the
   data race b0e757f3 removed).
 - Speed table refreshed from perf.yml run 40796942944 (release): the fin under the 400-fin plate 40–64 ms (< 150 met).
+- 24daf867 GUARD-SEGV-MALLOC-DEADLOCK (freeze half): `LockedSection` (noshape_occt.hpp) on every kernel mutex and
+  call_once body (39 sites + rust_boolean.cpp's): the budget doesn't jump inside, and a fault inside ends the process
+  ("…holding a lock; not recoverable", the signal re-raised) as does a real fault (si_code > 0) whose pc is in the C
+  library's text (found at install with dladdr(malloc) + dl_iterate_phdr). Raised signals (raise / abort) are still
+  recovered. BudgetSnapshot also restores budget_hold. Not covered: OCCT's own internal mutexes (a budget jump inside
+  one would still leave it held); a TKernel patch counting Standard_Mutex::Sentry / std::mutex holds into the same
+  counter would close it. The heap corruption itself: seed 189 under LD_PRELOAD=libasan (guard on) running.
 - T2 (kernel, model, ops) on main 10-29 07:20: reds were export::pvz_structure / pvz_import (the Rust Boolean, ticket
   PVZ-RUST-BOOL for bool), bool_replay::bool_corpus_replay (bool), the elliptic boss curvature blend (open, mine),
   blends_match_onshape (my FILLET-OVERSIZE rule pre-empted live F2's "Failed to fillet selections." for four meeting
