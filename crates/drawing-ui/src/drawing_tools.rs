@@ -434,7 +434,24 @@ impl DrawingEditor {
                                 overlay.lines.push((vec![sa, sb], false));
                             }
                         }
-                        Pick::Circle { view, center, radius, .. } | Pick::Arc { view, center, radius, .. } | Pick::CircleAt { view, center, radius, .. } => {
+                        // A picked arc shows as itself, not its whole circle
+                        // (qa DWG-ARC-REF-FULL-CIRCLE).
+                        Pick::Arc { view, center, radius, a, b, mid, .. } => {
+                            if let Some(pl) = self.placement(*view) {
+                                let (c, r) = (pl.to_sheet(*center), pl.len_to_sheet(*radius));
+                                let ang = |p: [f64; 2]| (p[1] - c[1]).atan2(p[0] - c[0]);
+                                let tau = std::f64::consts::TAU;
+                                let (t0, t1, tm) = (ang(pl.to_sheet(a.p)), ang(pl.to_sheet(b.p)), ang(pl.to_sheet(*mid)));
+                                let ccw = (t1 - t0).rem_euclid(tau);
+                                let sweep = if (tm - t0).rem_euclid(tau) <= ccw { ccw } else { ccw - tau };
+                                let pts = (0..=48).map(|i| {
+                                    let t = t0 + sweep * i as f64 / 48.0;
+                                    [c[0] + r * t.cos(), c[1] + r * t.sin()]
+                                });
+                                overlay.lines.push((pts.collect(), false));
+                            }
+                        }
+                        Pick::Circle { view, center, radius, .. } | Pick::CircleAt { view, center, radius, .. } => {
                             if let Some(pl) = self.placement(*view) {
                                 overlay.circle(pl.to_sheet(*center), pl.len_to_sheet(*radius), false);
                             }

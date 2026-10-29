@@ -236,6 +236,9 @@ impl DrawingEditor {
                     .cursor_pointer()
                     .tooltip(crate::ui::tooltip(format!("Tab stop alignment: {}", kind.name())))
                     .child(glyph(kind))
+                    // Not a click on the sheet: the note stays in edit (qa
+                    // DWG-RULER-SELECTOR-CLOSES; live cycles it in place).
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.ruler.kind = this.ruler.kind.next();
                         cx.notify();
