@@ -9,6 +9,9 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **16:22 update (green 8d3bc80b):** verified DWG-DATUM-TARGET-MENU, DWG-LINE-MENU (Copy greyed; live asked), DWG-PALETTE-VALUE-EMPTY.
+  Annotation menus show Paste only with something on the clipboard (GD&T, datum target): consistent, noted in the tickets. CLI fuzz
+  331–333 on main's Rust clean.
 - **16:04 update (greens a6f6c407 → 8b2c53ae):** verified DWG-GDT-MENU-ORDER, DWG-TABLE-SHIFT-EXTEND, DWG-SHEET-DRAG-GHOST, DWG-INFO-TOASTS
   (a) view Copy / (b) Move to sheet (c not checked), HOLE-TABLE-BUTTON. Left from dx's a6f6c407: DWG-DATUM-TARGET-MENU unchecked.
   CLI fuzz 322–326 on main's Rust clean.
