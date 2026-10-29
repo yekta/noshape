@@ -1210,11 +1210,9 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY });
         }
         for (i, s) in body.solids.iter().enumerate() {
-            if s.shells.len() != 1 {
-                return Err(Decline("a solid with voids"));
-            }
             let si = cx.solids.len();
-            let faces: Vec<usize> = s.shells[0].iter().map(|&f| face0 + f as usize).collect();
+            // (Its voids' faces too: a ray crosses them as it does the outer shell's.)
+            let faces: Vec<usize> = s.shells.iter().flatten().map(|&f| face0 + f as usize).collect();
             for &f in &faces {
                 if cx.faces[f].solid != usize::MAX {
                     return Err(Decline("a face in two solids"));
@@ -1786,16 +1784,18 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
         }
         out.body.solids[si].shells[0].push(piece_out[&p]);
     }
-    for s in &out.body.solids {
-        if shell_volume(&out.body, &s.shells[0]) <= 0.0 {
-            return Err(Decline("a shell inside out (a void)"));
-        }
+    // Shells inside out are voids: of the one solid there is (else declined).
+    let (solids, voids): (Vec<Solid>, Vec<Solid>) = std::mem::take(&mut out.body.solids).into_iter().partition(|s| shell_volume(&out.body, &s.shells[0]) > 0.0);
+    out.body.solids = solids;
+    if !voids.is_empty() {
+        let [solid] = &mut out.body.solids[..] else { return Err(Decline("a void in a result of several solids")) };
+        solid.shells.extend(voids.into_iter().map(|v| v.shells.into_iter().next().unwrap_or_default()));
     }
     // A result solid that is an input solid with all its faces as they were is that solid.
     let face_index: HashMap<(u32, u32), usize> = cx.faces.iter().enumerate().map(|(g, f)| ((f.arg, f.index), g)).collect();
     let mut solid_of_face = vec![0u32; out.body.faces.len()];
     for (k, so) in out.body.solids.iter().enumerate() {
-        for &f in &so.shells[0] {
+        for &f in so.shells.iter().flatten() {
             solid_of_face[f as usize] = k as u32;
         }
         // Every face the input solid's own, unchanged, and all of them.
@@ -1804,7 +1804,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
             _ => None,
         };
         let first = solid_of(out.face_origin[so.shells[0][0] as usize]);
-        let same = first.filter(|&si| cx.solids[si].faces.len() == so.shells[0].len() && so.shells[0].iter().all(|&f| solid_of(out.face_origin[f as usize]) == Some(si)));
+        let same = first.filter(|&si| cx.solids[si].faces.len() == so.shells.iter().map(Vec::len).sum::<usize>() && so.shells.iter().flatten().all(|&f| solid_of(out.face_origin[f as usize]) == Some(si)));
         let same = same.map(|si| Origin::Same { arg: cx.solids[si].arg, index: cx.solids[si].index });
         out.solid_origin.push(same.unwrap_or(Origin::New));
     }

@@ -215,25 +215,26 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     }
     b.face_loops.push_back(static_cast<uint32_t>(b.loop_uses.size() - 1));
   }
-  b.solid_faces.push_back(0);
+  b.solid_shells.push_back(0);
+  b.shell_faces.push_back(0);
   for (int i = 1; i <= sm.Extent(); ++i)
   {
-    int shells = 0;
     for (TopoDS_Iterator si(sm(i)); si.More(); si.Next())
     {
-      if (si.Value().ShapeType() != TopAbs_SHELL || ++shells > 1)
-        return "a solid with voids";
+      if (si.Value().ShapeType() != TopAbs_SHELL)
+        return "a solid of other than shells";
       for (TopoDS_Iterator fi(si.Value()); fi.More(); fi.Next())
       {
         const int k = fm.FindIndex(fi.Value());
         if (k <= 0)
           return "a shell's face not mapped";
-        b.faces_of_solids.push_back(static_cast<uint32_t>(k - 1));
+        b.faces_of_shells.push_back(static_cast<uint32_t>(k - 1));
       }
+      b.shell_faces.push_back(static_cast<uint32_t>(b.faces_of_shells.size()));
     }
-    b.solid_faces.push_back(static_cast<uint32_t>(b.faces_of_solids.size()));
+    b.solid_shells.push_back(static_cast<uint32_t>(b.shell_faces.size() - 1));
   }
-  if (b.faces_of_solids.size() != static_cast<size_t>(fm.Extent()))
+  if (b.faces_of_shells.size() != static_cast<size_t>(fm.Extent()))
     return "faces outside the solids";
   return nullptr;
 }
@@ -518,8 +519,8 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
   }
   TopoDS_Compound out;
   bb.MakeCompound(out);
-  std::vector<TopoDS_Solid> sol(b.solid_faces.size() - 1);
-  for (size_t s = 0; s + 1 < b.solid_faces.size(); ++s)
+  std::vector<TopoDS_Solid> sol(b.solid_shells.size() - 1);
+  for (size_t s = 0; s + 1 < b.solid_shells.size(); ++s)
   {
     if (r.solid_origin[3 * s] == 0)
     {
@@ -527,13 +528,16 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       bb.Add(out, sol[s]);
       continue;
     }
-    TopoDS_Shell sh;
-    bb.MakeShell(sh);
-    for (uint32_t k = b.solid_faces[s]; k < b.solid_faces[s + 1]; ++k)
-      bb.Add(sh, fs[b.faces_of_solids[k]]);
-    sh.Closed(true);
     bb.MakeSolid(sol[s]);
-    bb.Add(sol[s], sh);
+    for (uint32_t h = b.solid_shells[s]; h < b.solid_shells[s + 1]; ++h)
+    {
+      TopoDS_Shell sh;
+      bb.MakeShell(sh);
+      for (uint32_t k = b.shell_faces[h]; k < b.shell_faces[h + 1]; ++k)
+        bb.Add(sh, fs[b.faces_of_shells[k]]);
+      sh.Closed(true);
+      bb.Add(sol[s], sh);
+    }
     bb.Add(out, sol[s]);
   }
   t_built.v.assign(vs.begin(), vs.end());
@@ -648,7 +652,7 @@ void rust_boolean_keep(const OcShape& out)
   const ShapeIMap& em = out.map(TopAbs_EDGE);
   const ShapeIMap& fm = out.map(TopAbs_FACE);
   const ShapeIMap& sm = out.map(TopAbs_SOLID);
-  const size_t nv = b.vertices.size() / 3, ne = b.edges.size() / 2, nf = b.reversed.size(), ns = b.solid_faces.size() - 1;
+  const size_t nv = b.vertices.size() / 3, ne = b.edges.size() / 2, nf = b.reversed.size(), ns = b.solid_shells.size() - 1;
   if (static_cast<size_t>(vm.Extent()) != nv || static_cast<size_t>(em.Extent()) != ne || static_cast<size_t>(fm.Extent()) != nf
       || static_cast<size_t>(sm.Extent()) != ns)
     return;
@@ -711,13 +715,18 @@ void rust_boolean_keep(const OcShape& out)
   std::vector<size_t> solid_of(ns);
   for (size_t i = 0; i < ns; ++i)
     solid_of[as[i]] = i;
-  c->solid_faces.push_back(0);
+  c->solid_shells.push_back(0);
+  c->shell_faces.push_back(0);
   for (size_t j = 0; j < ns; ++j)
   {
     const size_t i = solid_of[j];
-    for (uint32_t k = b.solid_faces[i]; k < b.solid_faces[i + 1]; ++k)
-      c->faces_of_solids.push_back(af[b.faces_of_solids[k]]);
-    c->solid_faces.push_back(static_cast<uint32_t>(c->faces_of_solids.size()));
+    for (uint32_t h = b.solid_shells[i]; h < b.solid_shells[i + 1]; ++h)
+    {
+      for (uint32_t k = b.shell_faces[h]; k < b.shell_faces[h + 1]; ++k)
+        c->faces_of_shells.push_back(af[b.faces_of_shells[k]]);
+      c->shell_faces.push_back(static_cast<uint32_t>(c->faces_of_shells.size()));
+    }
+    c->solid_shells.push_back(static_cast<uint32_t>(c->shell_faces.size() - 1));
   }
   const std::lock_guard<std::mutex> lock(out.myBrepLock);
   out.myBrep    = c;

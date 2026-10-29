@@ -220,6 +220,22 @@ fn check_used_both_ways(b: &Body) {
 }
 
 #[test]
+fn a_void_and_a_cut_through_it() {
+    let block = cuboid((0.0, 0.0, 0.0), (4.0, 4.0, 4.0));
+    let hollow = boolean(Op::Cut, &[&block, &cuboid((1.0, 1.0, 1.0), (3.0, 3.0, 3.0))], TOL).unwrap();
+    // One solid: the block's shell and the void's, inside out.
+    assert_eq!(hollow.body.solids.len(), 1);
+    assert_eq!(hollow.body.solids[0].shells.len(), 2);
+    check_closed(&hollow.body);
+    assert!((volume(&hollow.body) - 56.0).abs() < 1e-12);
+    // A hole from the top into the void: one shell again.
+    let open = boolean(Op::Cut, &[&hollow.body, &cuboid((1.5, 1.5, 2.0), (2.5, 2.5, 5.0))], TOL).unwrap();
+    assert_eq!(open.body.solids[0].shells.len(), 1);
+    check_closed(&open.body);
+    assert!((volume(&open.body) - 55.0).abs() < 1e-12);
+}
+
+#[test]
 fn a_slot_cut_by_two_boxes_side_by_side() {
     // The tools' faces where they meet face each other inside the tools: in neither's piece of the result.
     let plate = cuboid((0.0, 0.0, 0.0), (4.0, 4.0, 1.0));

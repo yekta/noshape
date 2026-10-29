@@ -317,9 +317,11 @@ pub(crate) mod ffi {
         loop_uses: Vec<u32>,
         /// Edge × 2 + reversed.
         uses: Vec<u32>,
-        /// Per solid, its first face (solids + 1); the faces of its one shell.
-        solid_faces: Vec<u32>,
-        faces_of_solids: Vec<u32>,
+        /// Per solid, its first shell (solids + 1; the outer one first, then its voids); per shell, its first
+        /// face (shells + 1); the shells' faces.
+        solid_shells: Vec<u32>,
+        shell_faces: Vec<u32>,
+        faces_of_shells: Vec<u32>,
     }
 
     /// noshape's own Boolean's result: the body, its entities' origins (kind 0 the input itself, 1 a piece

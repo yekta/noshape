@@ -90,7 +90,8 @@ fn body_of(b: &BrepBody) -> Body {
         };
         out.faces.push(Face { surface, reversed: b.reversed[f], loops });
     }
-    out.solids = (0..b.solid_faces.len().saturating_sub(1)).map(|s| Solid { shells: vec![b.faces_of_solids[b.solid_faces[s] as usize..b.solid_faces[s + 1] as usize].to_vec()] }).collect();
+    let shell = |h: usize| b.faces_of_shells[b.shell_faces[h] as usize..b.shell_faces[h + 1] as usize].to_vec();
+    out.solids = (0..b.solid_shells.len().saturating_sub(1)).map(|s| Solid { shells: (b.solid_shells[s] as usize..b.solid_shells[s + 1] as usize).map(shell).collect() }).collect();
     out
 }
 
@@ -138,10 +139,14 @@ fn flat(b: &Body, out: &mut BrepBody) {
         }
         out.face_loops.push(out.loop_uses.len() as u32 - 1);
     }
-    out.solid_faces = vec![0];
+    out.solid_shells = vec![0];
+    out.shell_faces = vec![0];
     for s in &b.solids {
-        out.faces_of_solids.extend(s.shells.iter().flatten());
-        out.solid_faces.push(out.faces_of_solids.len() as u32);
+        for h in &s.shells {
+            out.faces_of_shells.extend(h);
+            out.shell_faces.push(out.faces_of_shells.len() as u32);
+        }
+        out.solid_shells.push(out.shell_faces.len() as u32 - 1);
     }
 }
 

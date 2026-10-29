@@ -76,6 +76,11 @@ Then (10-29 00:50): inputs with tolerances up to 1e-3 (was 1e-5; the ones taken 
 Shell's slabs): those pieces are inside the tools, kept by neither. Facing one way still declines (OCCT then
 says the object's solid was deleted, not modified). Fresh corpus 393 of 692, Shell's 34 of 85, main 419: 0 differ.
 
+Voids (10-29 01:20): a result shell inside out is a void of the one solid there is (several solids: declined),
+and an input solid's voids are its faces like the rest (a ray crosses them alike). The flat body the kernel
+passes (BrepBody) has shells now: `solid_shells`, `shell_faces`, `faces_of_shells`. Fresh corpus 400 of 692,
+Shell's 38 of 85, main 419: 0 differ.
+
 The "no solid" Commons of a solid with one edge (121 in the fresh corpus, ~20 ms each, 2.4 s) are model-core's
 `ray_intervals` falling back from `line_crossings` (a ray touching an edge, or not a single solid): an idea for
 core, not this Boolean. Arguments sharing faces (17 in the fresh corpus, ~90 ms each): passing the shared
@@ -98,6 +103,8 @@ OCCT does, 2.1 → 1.5–1.8 s; whole 3.9 → 2.4 s): see Requests.
 Cone}` (cone: radius at height h along the axis = `radius + h tan(angle)`), `Curve::{Line, Circle, Degenerate}`
 (Degenerate: a cone's apex, start = end). Loops run counter-clockwise about the outward normal. Changes to these
 will be listed here.
+- 10-29: a result `Solid` may have more than one shell: the outer one first, then voids (inside out: their faces'
+  normals point into the void). Types unchanged.
 
 ## Tests
 - T1 kernel `brep_replay::brep_kept_bodies_give_the_same_result` (each small case's result cut and fused again, from
