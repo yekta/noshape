@@ -2233,6 +2233,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             cx.faces[f].edges.iter().filter(|&&(e, _)| !seen.insert(e)).flat_map(|&(e, _)| edge_pieces[e].iter().map(|x| x.0)).collect()
         };
         let mut local: HashMap<(u32, bool), u32> = HashMap::default();
+        // (On a free-form face a vertex is a point per place it is at, both sides of a seam: its curves' ends there
+        // within 100 tol.)
+        let mut places: HashMap<u32, Vec<(DVec2, u32)>> = HashMap::default();
         let mut pts: Vec<DVec2> = Vec::new();
         let mut lsegs: Vec<([u32; 2], C2)> = Vec::with_capacity(segs.len());
         let mut lsrc: Vec<usize> = Vec::with_capacity(segs.len());
@@ -2249,6 +2252,19 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                         Surf::Cyl { r, th0, .. } => q.x > r * (th0 + PI),
                         Surf::Plane { .. } | Surf::Nurbs { .. } => false,
                     };
+                    if let Surf::Nurbs { .. } = cx.faces[f].s {
+                        let at = places.entry(w).or_default();
+                        ends[k] = match at.iter().find(|x| (x.0 - q).length() <= 100.0 * tol) {
+                            Some(x) => x.1,
+                            None => {
+                                pts.push(q);
+                                at.push((q, (pts.len() - 1) as u32));
+                                (pts.len() - 1) as u32
+                            }
+                        };
+                        local.insert((w, false), ends[k]);
+                        continue;
+                    }
                     ends[k] = *local.entry((w, right)).or_insert_with(|| {
                         pts.push(q);
                         (pts.len() - 1) as u32

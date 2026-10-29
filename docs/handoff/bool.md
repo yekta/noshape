@@ -515,6 +515,17 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - The thread fused with its rod (8dc3e8d4) gets further (past the grey band and the thin piece) and now stops at
   "an edge ends inside a face" on the rod's face.
 
+## Seams of curved faces (10-29 18:30 UTC)
+- A curve once round a cylinder from its seam to its seam (a thread's helix on its rod, in parts at the seam)
+  mapped both ends to the seam's near side (the side was chosen by the curve's middle, which is half a turn from
+  both): now each end is on the side the curve leaves to or arrives from (`Map::map_on`). T1
+  `curve2::tests::a_curve_once_round_a_cylinder_spans_its_angles`.
+- On a free-form face a vertex is a point per place it is at (both sides of a seam), as on cylinders.
+- Replays unchanged, all 0 differ (main 659, corpus2 508, corpus3 513, corpus4 552, corpus5 646, corpus6 599,
+  Shell's 70, direct 52). The thread fused with its rod now gets through the Rust Boolean and stops in the builder:
+  its helices' pieces on the rod need curves on the rod's cylinder (OCCT splits each helix in 21 and projects them,
+  BOPTools_AlgoTools2D::BuildPCurveForEdgeOnFace, tolerance ~1.02e-7): next.
+
 ## Next
 Corpus6 (10-29 13:30, recorded OCCT time of what the Rust path still declines, loaded machine): curved edges
 32.8 s (73: helical B-spline sweeps against rods ~15 s in 3, fillet slabs), one slab fuse with an internal face

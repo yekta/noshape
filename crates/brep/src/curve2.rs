@@ -34,21 +34,36 @@ pub(crate) enum Map {
 impl Map {
     /// Point `p` and its derivative `d` (along a curve) mapped.
     pub fn map(&self, p: DVec3, d: DVec3) -> (DVec2, DVec2) {
+        self.map_on(p, d, None)
+    }
+
+    /// The same for a point of a curve going on from it along `d` (`end` false) or arriving at it along `d` (`end`
+    /// true): at a cylinder's angles' ends, on the side the curve is on there (a curve from end to end of the
+    /// angles, once round, starts at one and ends at the other).
+    pub fn map_on(&self, p: DVec3, d: DVec3, end: Option<bool>) -> (DVec2, DVec2) {
         match *self {
             Map::Plane { origin, u, v } => (DVec2::new((p - origin).dot(u), (p - origin).dot(v)), DVec2::new(d.dot(u), d.dot(v))),
             Map::Cyl { o, a, x, y, r, flip, th0, mid } => {
                 let w = p - o;
                 let (wx, wy) = (w.dot(x), w.dot(y));
                 let mut th = th0 + (wy.atan2(wx) - th0).rem_euclid(TAU);
-                // At the angles' ends: the side the curve is on.
+                let dth = (wx * d.dot(y) - wy * d.dot(x)) / (wx * wx + wy * wy);
+                // At the angles' ends: the side the curve is on (where it goes from there, or comes from; else the
+                // side of its middle).
                 let eps = 1e-9;
-                if (th - th0).abs() <= eps && mid > r * (th0 + std::f64::consts::PI) {
+                let at_end = (th - th0).abs() <= eps || (th - th0 - TAU).abs() <= eps;
+                let into = match end {
+                    Some(e) if at_end && (r * dth).abs() > 1e-6 * d.length() => Some(if e { -dth } else { dth }),
+                    _ => None,
+                };
+                if let Some(into) = into {
+                    th = if into > 0.0 { th0 } else { th0 + TAU };
+                } else if (th - th0).abs() <= eps && mid > r * (th0 + std::f64::consts::PI) {
                     th = th0 + TAU;
                 } else if (th - th0 - TAU).abs() <= eps && mid < r * (th0 + std::f64::consts::PI) {
                     th = th0;
                 }
                 let s = if flip { -1.0 } else { 1.0 };
-                let dth = (wx * d.dot(y) - wy * d.dot(x)) / (wx * wx + wy * wy);
                 (DVec2::new(r * th, s * w.dot(a)), DVec2::new(r * dth, s * d.dot(a)))
             }
         }
@@ -89,7 +104,10 @@ impl C2 {
                 c + u * a.cosh() + v * a.sinh() + w * (k * a.sinh()).atan()
             }
             C2::Nurbs { ref c, t0, t1 } => c.at(t0 + (t1 - t0) * t).truncate(),
-            C2::Mapped { ref c, t0, t1, m } => m.map(c.at(t0 + (t1 - t0) * t), DVec3::ZERO).0,
+            C2::Mapped { ref c, t0, t1, m } => {
+                let [p, d1, _] = c.derivs(t0 + (t1 - t0) * t);
+                m.map_on(p, d1 * (t1 - t0), Some(t > 0.5)).0
+            }
         }
     }
 
@@ -548,6 +566,25 @@ mod tests {
         let mut hits = Vec::new();
         disk.ray_hits(DVec2::ZERO, DVec2::X, &mut hits);
         assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn a_curve_once_round_a_cylinder_spans_its_angles() {
+        // A circle's NURBS rising along the axis: from the cylinder's seam once round to it, 0.8 higher.
+        let h = std::f64::consts::FRAC_1_SQRT_2;
+        let xy = [(1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (-1.0, 1.0), (-1.0, 0.0), (-1.0, -1.0), (0.0, -1.0), (1.0, -1.0), (1.0, 0.0)];
+        let c = crate::nurbs::NurbsCurve {
+            degree: 2,
+            knots: vec![0.0, 0.0, 0.0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1.0, 1.0, 1.0],
+            poles: xy.iter().enumerate().map(|(k, &(x, y))| DVec3::new(x, y, 0.1 * k as f64)).collect(),
+            weights: (0..9).map(|k| if k % 2 == 0 { 1.0 } else { h }).collect(),
+        };
+        let m = Map::Cyl { o: DVec3::ZERO, a: DVec3::Z, x: DVec3::X, y: DVec3::Y, r: 1.0, flip: false, th0: 0.0, mid: PI };
+        let up = C2::Mapped { c: std::sync::Arc::new(c), t0: 0.0, t1: 1.0, m };
+        assert!(up.start().distance(DVec2::new(0.0, 0.0)) < 1e-12, "{:?}", up.start());
+        assert!(up.end().distance(DVec2::new(TAU, 0.8)) < 1e-12, "{:?}", up.end());
+        let down = up.reversed();
+        assert!(down.start().distance(DVec2::new(TAU, 0.8)) < 1e-12 && down.end().distance(DVec2::ZERO) < 1e-12);
     }
 
     #[test]
