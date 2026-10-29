@@ -488,9 +488,10 @@ pub struct AsmUi {
     pub group: Option<(Option<MateId>, Vec<InstanceId>)>,
     /// Mate indicators in overlay pick order.
     pub overlay_mates: Vec<MateId>,
-    /// Select other (`): instances under the cursor (nearest first), the
-    /// chosen one and where the list opens (viewport-local).
-    pub select_other: Option<(Vec<InstanceId>, usize, DVec2)>,
+    /// Select other (`): its rows (the entity under the cursor, then the
+    /// instances under it, nearest first), the bold one and where the list
+    /// opens (viewport-local).
+    pub select_other: Option<(Vec<SelectOtherRow>, usize, DVec2)>,
     /// Standard content tab of the Insert dialog and its edit dialog.
     pub std: StdUi,
     /// Isolate / Make transparent › Expand: (by connectivity, steps, the
@@ -3386,29 +3387,39 @@ impl AssemblyView {
         noshape_ops::assembly::instances_under(&self.result, self.isolate.as_ref(), o, d)
     }
 
-    /// ` (Select other): cycles through the instances under the cursor
-    /// (Shift+` backwards), selecting each; the list shows them all.
+    /// ` (Select other), live (behaviours "qa (2026-10-28, P3) assembly.md
+    /// K27"): the Part Studio's dialog listing the face under the pointer
+    /// ("Face of Part 2 <1>") and the instances under it; the instance (what
+    /// a click selects) is bold. ` again (Shift+` backwards) moves the bold
+    /// row; hovering a row pre-highlights it, a click selects it.
     pub(super) fn select_other(&mut self, backwards: bool, cx: &mut Context<Self>) {
-        let (list, ix, at) = match self.ui.select_other.take() {
-            Some((list, ix, at)) if !list.is_empty() => {
-                let n = list.len();
+        let (rows, ix, at) = match self.ui.select_other.take() {
+            Some((rows, ix, at)) if !rows.is_empty() => {
+                let n = rows.len();
                 let ix = if backwards { (ix + n - 1) % n } else { (ix + 1) % n };
-                (list, ix, at)
+                (rows, ix, at)
             }
             _ => {
-                let list = self.instances_under(self.pointer, cx);
-                if list.is_empty() {
-                    return;
-                }
-                // The first press picks the one behind the current choice.
-                let first = self.selected.first().and_then(|s| list.iter().position(|x| x == s)).map(|i| (i + 1) % list.len()).unwrap_or(0);
-                (list, first, self.pointer)
+                let mut rows: Vec<SelectOtherRow> = self.hover.clone().filter(|t| matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex)).map(SelectOtherRow::Entity).into_iter().collect();
+                rows.extend(self.instances_under(self.pointer, cx).into_iter().map(SelectOtherRow::Instance));
+                let ix = if backwards { rows.len().saturating_sub(1) } else { 1 % rows.len().max(1) };
+                (rows, ix, self.pointer)
             }
         };
-        self.selected = vec![list[ix]];
-        self.selected_mate = None;
+        self.ui.select_other = Some((rows, ix, at));
+        cx.notify();
+    }
+
+    /// Select a Select other row (replacing the selection).
+    fn choose_select_other(&mut self, row: SelectOtherRow, cx: &mut Context<Self>) {
+        self.ui.select_other = None;
+        self.ui.list_hover = None;
+        self.clear_selection();
+        match row {
+            SelectOtherRow::Entity(t) => self.select_entity(t, false),
+            SelectOtherRow::Instance(id) => self.selected = vec![id],
+        }
         self.ui.scroll_to_selection = true;
-        self.ui.select_other = Some((list, ix, at));
         self.refresh_scene(false, cx);
         cx.notify();
     }
@@ -3417,31 +3428,94 @@ impl AssemblyView {
         let (list, ix, at) = self.ui.select_other.clone()?;
         let pal = p();
         let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
-        let mut col = v_flex().id("asm-select-other").occlude().absolute().left(px(at.x as f32 + 12.)).top(px(at.y as f32 + 12.)).min_w(px(160.)).p_1().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.border_strong).shadow_lg();
-        for (k, id) in list.into_iter().enumerate() {
-            col = col.child(
+        let label = |r: &SelectOtherRow| match r {
+            SelectOtherRow::Instance(id) => names.get(id).cloned().unwrap_or_default(),
+            SelectOtherRow::Entity(t) => {
+                let part = self.result.node(&t.path).map(|n| n.name.clone()).unwrap_or_default();
+                match t.kind {
+                    PickKind::Edge => format!("Edge of {part}"),
+                    PickKind::Vertex => format!("Vertex of {part}"),
+                    _ => format!("Face of {part}"),
+                }
+            }
+        };
+        let mut rows: Vec<AnyElement> = Vec::new();
+        for (k, r) in list.iter().enumerate() {
+            let (hover_row, pick_row) = (r.clone(), r.clone());
+            rows.push(
                 h_flex()
                     .id(SharedString::from(format!("so-{k}")))
-                    .h(px(22.))
-                    .px_2()
-                    .rounded_sm()
-                    .text_sm()
-                    .text_color(pal.text)
+                    .flex_none()
+                    .h(px(24.))
+                    .pl(px(6.))
+                    .pr(px(20.))
                     .cursor_pointer()
-                    .when(k == ix, |d| d.bg(pal.accent_soft))
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(names.get(&id).cloned().unwrap_or_default())
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        this.selected = vec![id];
-                        this.ui.select_other = None;
-                        this.ui.scroll_to_selection = true;
+                    .when(k % 2 == 1, |d| d.bg(gpui_kit::rgba(0xffffff59)))
+                    .child(div().truncate().text_size(px(13.33)).text_color(pal.text).when(k == ix, |d| d.font_weight(FontWeight::BOLD)).child(label(r)))
+                    // Hovering a row pre-highlights its entity or instance.
+                    .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                        match &hover_row {
+                            SelectOtherRow::Entity(t) => this.hover = h.then(|| t.clone()),
+                            SelectOtherRow::Instance(id) => this.ui.list_hover = h.then_some(*id),
+                        }
                         this.refresh_scene(false, cx);
                         cx.notify();
-                    })),
+                    }))
+                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, _, cx| {
+                        cx.stop_propagation();
+                        this.choose_select_other(pick_row.clone(), cx);
+                    }))
+                    .into_any_element(),
             );
         }
-        Some(col.into_any_element())
+        if rows.is_empty() {
+            rows.push(h_flex().id("so-none").h(px(24.)).pl(px(6.)).text_size(px(13.33)).child("(No selections found)").into_any_element());
+        }
+        let list_h = (rows.len() as f32 * 24. + 2.).min(92.);
+        let size = self.viewport.read(cx).size();
+        let (w, h) = (220., 29. + list_h + 28.);
+        let left = (at.x as f32 + 100.).min(size.x as f32 - w).max(0.);
+        let top = (at.y as f32 + 51.).min(size.y as f32 - h).max(0.);
+        let close = cx.listener(|this, _: &ClickEvent, _, cx| {
+            this.ui.select_other = None;
+            this.ui.list_hover = None;
+            this.refresh_scene(false, cx);
+            cx.notify();
+        });
+        Some(
+            v_flex()
+                .id("asm-select-other")
+                .occlude()
+                .absolute()
+                .left(px(left))
+                .top(px(top))
+                .w(px(w))
+                .bg(pal.dialog_bg)
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .text_color(pal.text)
+                .child(
+                    h_flex()
+                        .h(px(29.))
+                        .flex_none()
+                        .bg(gpui_kit::rgb(0xffffff))
+                        .border_b_1()
+                        .border_color(pal.border)
+                        .child(div().flex_1().pl(px(9.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Select other"))
+                        .child(div().id("so-close").size(px(28.)).flex().items_center().justify_center().child(crate::assets::icon("dialog-cancel", 24., cx)).on_click(close)),
+                )
+                .child(div().id("so-list").h(px(list_h)).flex_none().border_1().border_color(pal.border).rounded(px(2.)).hover(|d| d.border_color(gpui_kit::rgb(0x1651b0))).child(v_flex().id("so-rows").size_full().overflow_y_scroll().children(rows)))
+                // Live: the help row, its "?" 14 px, 4 px from the right.
+                .child(h_flex().h(px(28.)).flex_none().items_start().justify_end().pt(px(10.)).pr(px(4.)).child(crate::ui::glyph("help-dot", 14., crate::theme::help_dot(0xa0a0a0))))
+                .into_any_element(),
+        )
     }
+}
+
+/// A row of the assembly's Select other dialog.
+#[derive(Clone, Debug)]
+pub enum SelectOtherRow {
+    Entity(AsmPickTarget),
+    Instance(InstanceId),
 }
 
 // ---------------------------------------------------------------- Insert: configuration inputs
