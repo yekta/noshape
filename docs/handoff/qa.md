@@ -9,7 +9,7 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
-- **10:17 update:** boolmir seeds 16–45: more RUST-HALF-POCKET-3 / RUST-MIRROR-NOTCH cases, **P1 RUST-MIRROR-RIM-ERR** (Rust fails a
+- **10:16 update:** boolmir seeds 16–45: more RUST-HALF-POCKET-3 / RUST-MIRROR-NOTCH cases, **P1 RUST-MIRROR-RIM-ERR** (Rust fails a
   mirror v0.4.12 did), **P1 RUST-MIRROR-SPLIT-FACES**, P2 OCCT-MIRROR-OVERCOUNT (OCCT path). Live 1593 / 1594 → **P2
   RUST-UNION-MERGES-DISJOINT-FACES**, P3 TOUCH-PATTERN-ADD. Caution: the box hit OOM at 10:00 (nginx in a docker container killed,
   earlyoom SIGTERMed alloy at 10:05) while qa ran 4 CLIs + 2 apps beside the agents' builds; qa now runs one Rust/OCCT pair at a time.
