@@ -589,7 +589,7 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   the plane behind it); Fillet › Edges and Shell › Faces hover + pick; cfs.noshape custom feature "Edge pick"
   (`EDGE && ALLOWS_AXIS`, 2 picks) and "Plain edge pick" both take two edges.
 ### v0.4.14 (tag 6b2e0b13 = v0.4.13 + bool c79eed1d; Release run 40839037570; published 08:43:30; Linux artifact smoked 08:31–08:42, the published tarball byte-identical)
-- Artifact noshape-0.4.14-linux-x86_64.tar.gz sha256 71d827c489dccd03…; CLI MCP `"version":"0.4.14"`.
+- Artifact noshape-0.4.14-linux-x86_64.tar.gz sha256 71d827c489dccd03… (= the published tarball); start page "(0.4.14.6b2e0b133bf7)"; CLI MCP `"version":"0.4.14"`.
 - **The fix it ships:** halfmir2 A 9130.973 / B **7607.301** / C 7434.513 (8 faces each, no negative-area face); mirhole 14429.204,
   7 faces, one 628.319 mm² wall; halfmir 7214.602, 7 faces; rust-mirror-min 1618.9016, 19 faces; cli-fillet-segv all 15 parts =
   v0.4.12 (Part 1 1198.544).
