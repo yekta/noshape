@@ -26,9 +26,6 @@ pub struct ToolValues {
     pub datum_target_letter: Option<char>,
     /// Dimension tool: the drawing-sketch entity picked (SK7).
     pub sketch_dim_pick: Option<u32>,
-    /// Note tool with no note being typed: the "NOTE" placeholder follows
-    /// the cursor (live, request 1558).
-    pub note_preview: bool,
 }
 
 impl SheetPick<'_> {
@@ -214,10 +211,6 @@ impl SheetPick<'_> {
                     a.refs.push(AnnotationRef { slot, point: r });
                 }
                 Some(a)
-            }
-            Tool::Note if v.note_preview => {
-                let h = self.drawing.props.ann_type(sheet::AnnType::Notes).height.unwrap_or(self.drawing.props.ann_text_height);
-                Some(Annotation { id, kind: AnnotationKind::note("NOTE", h), position: c, ..Default::default() })
             }
             Tool::Datum { anchor: Some(a) } => {
                 if len(sub(c, *a)) < 3.0 {

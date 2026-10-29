@@ -1223,7 +1223,12 @@ impl DrawingEditor {
                 }
             }
             if let Some(h) = self.hover {
-                let single = matches!(self.tool, Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. });
+                // Tools that pick edges highlight the hovered edge alone, not its
+                // view (qa DWG-E2E-SILHOUETTE: Edge to edge centerline tinted the view).
+                let single = matches!(
+                    self.tool,
+                    Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::SurfaceFinish | Tool::Sketch { .. } | Tool::Constrain { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. }
+                );
                 match self.sel_of_pick(h) {
                     // Onshape (drawing/14): a hovered annotation turns tan with
                     // a tan label box and its grips, drawn on top below.

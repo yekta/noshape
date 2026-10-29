@@ -368,6 +368,21 @@ impl DrawingEditor {
         }
     }
 
+    /// Live (request 1558, qa DWG-TOOL-HINTS-PREVIEW): before its first pick
+    /// the Datum tool shows its flag at the cursor, and the Geometric
+    /// tolerance tool its frame (an empty position frame until typed).
+    fn cursor_tool_preview(&self, cx: &App) -> Option<Annotation> {
+        let c = self.cursor;
+        match self.tool {
+            Tool::Datum { anchor: None } => Some(Annotation { kind: AnnotationKind::Datum { anchor: c, label: self.datum_dialog_label(), on: None, at: None }, position: [c[0] + 8.0, c[1]], ..Default::default() }),
+            Tool::Gdt if self.gdt_dlg.as_ref().is_some_and(|d| d.edit.is_none()) => {
+                let (frame, extra) = self.gdt_values(cx).unwrap_or_else(|| (vec![noshape_scene::drawing_tools::GDT_TYPES[0].0.to_string(), String::new()], Default::default()));
+                Some(noshape_scene::drawing_tools::gdt(0, c, frame, extra))
+            }
+            _ => None,
+        }
+    }
+
     /// The dialog and tool state the previews read (see `ToolValues`).
     pub fn tool_values(&self) -> noshape_scene::drawing_tools::ToolValues {
         noshape_scene::drawing_tools::ToolValues {
@@ -378,7 +393,6 @@ impl DrawingEditor {
             datum_at: self.datum_at,
             datum_target_letter: self.datum_target_letter,
             sketch_dim_pick: self.sketch_dim_pick,
-            note_preview: matches!(self.tool, Tool::Note) && !matches!(self.panel, Some(Panel::Note { .. })),
         }
     }
 
@@ -576,6 +590,13 @@ impl DrawingEditor {
             let mut d = base.clone().unwrap_or_else(|| self.drawing.clone());
             if let Some(s) = d.sheets.get_mut(self.sheet) {
                 let a = note_tool_preview(&self.drawing, s, c);
+                s.annotations.push(a);
+            }
+            preview = Some(d);
+        } else if let Some(mut a) = self.cursor_tool_preview(cx) {
+            let mut d = base.clone().unwrap_or_else(|| self.drawing.clone());
+            if let Some(s) = d.sheets.get_mut(self.sheet) {
+                a.id = s.next_annotation_id();
                 s.annotations.push(a);
             }
             preview = Some(d);

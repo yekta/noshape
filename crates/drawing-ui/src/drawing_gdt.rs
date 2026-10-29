@@ -174,7 +174,7 @@ impl DrawingEditor {
     }
 
     /// The dialog's frame (first row) and extra, None when nothing is entered.
-    fn gdt_values(&self, cx: &App) -> Option<(Vec<String>, GdtExtra)> {
+    pub(crate) fn gdt_values(&self, cx: &App) -> Option<(Vec<String>, GdtExtra)> {
         let d = self.gdt_dlg.as_ref()?;
         let v = |e: &Entity<InputState>| e.read(cx).value().to_string();
         let rows: Vec<noshape_scene::drawing_tools::GdtRowValues> = d
