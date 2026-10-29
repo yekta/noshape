@@ -122,9 +122,13 @@ skasm's now; see docs/handoff/skasm.md.
 - MIRROR-BLIND-HOLE-FACES (part): a blind hole centred on the mirror plane, Part mirror Add, came out with no face
   merged across the plane (14; live 8): the drill tip's two half cones meet at their apex (each half has its own
   degenerate apex edge), where USD gives an invalid solid from every wire start, so usd_kept_volume dropped the
-  whole unify, planes included. Now (boolean.cpp) it unifies the rest with the edges between cone faces kept
-  (USD KeepShape), else with every pair on one kind of periodic surface kept apart: 9 faces (countersink 11). Left:
-  the two half cones as one face (a merge like merge_cylinder_bands for cones with an apex). T1
+  whole unify, planes included. 49ff6c58: usd_kept_volume's last resort unifies the rest with the edges between
+  cone faces kept (USD KeepShape), else every pair on one kind of periodic surface kept apart (14 -> 9). Then
+  `merge_apex_cones` (boolean.cpp, before the unify, like merge_cylinder_bands): two faces on one cone meeting along
+  two lines, each from a degenerate apex edge to arcs of one circle, become one face on the first's surface (one
+  line the seam, a new degenerate edge), built on a copy of the shape, kept only valid with the same volume; and
+  the last resort keeps apart only cones with an apex (the countersink's frustum halves merge): live's 8 faces
+  (countersink 9). Also the circular-pattern case below. T1
   `kernel_robustness::part_mirror_of_a_half_blind_hole_merges_across_the_plane`.
 - Found on the way (no ticket): a circular Part pattern x2 (Add) of a half plate about its blind hole's axis gave
   5935.887 mm³ for 2 x 2920.820 and an invalid part: OCCT's fuse with the located instance (copy_bodies moves, not

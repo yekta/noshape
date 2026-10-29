@@ -2855,11 +2855,11 @@ fn feature_mirror_of_a_boss_copies_the_boss() {
 /// qa MIRROR-BLIND-HOLE-FACES: a half plate with a blind hole centred on
 /// Right, Part mirror Add across Right. The drill tip's two half cones meet
 /// at their apex, where OCCT's UnifySameDomain gives an invalid solid from
-/// every wire start; the rest still merges across the plane (live: 8 faces,
-/// one cone; here the cone stays two halves: 9; with a countersink 11).
+/// every wire start: merge_apex_cones makes them one face (live: 8 faces, 6
+/// planes, the cylinder and the cone; with a countersink 9).
 #[test]
 fn part_mirror_of_a_half_blind_hole_merges_across_the_plane() {
-    for (style, want_v, want_f) in [("SIMPLE", 5841.6394, 9), ("C_SINK", 5728.5421, 11)] {
+    for (style, want_v, want_f) in [("SIMPLE", 5841.6394, 8), ("C_SINK", 5728.5421, 9)] {
         let mut t = T::new();
         let (_, regions) = t.sketch(&[&[(0.0, -10.0), (15.0, -10.0), (15.0, 10.0), (0.0, 10.0)]], &[]);
         t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
@@ -2920,6 +2920,6 @@ fn circular_part_pattern_onto_itself_keeps_its_volume() {
         assert_eq!(r.context.bodies.len(), 1, "{style}");
         assert!((volume(&r) - 2.0 * half).abs() < 1e-6, "{style}: {} mm³, want {}", volume(&r), 2.0 * half);
         assert!(r.context.bodies[0].shape.is_valid(), "{style}");
-        assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), if style == "NONE" { 6 } else { 9 }, "{style}");
+        assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), if style == "NONE" { 6 } else { 8 }, "{style}");
     }
 }
