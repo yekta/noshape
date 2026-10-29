@@ -13958,6 +13958,241 @@
     }
    },
    {
+    "category": "Bolts & screws",
+    "class": "Socket head screws",
+    "name": "Socket head shoulder screw ISO 7379",
+    "shape": "socketShoulderScrew",
+    "form": {},
+    "sizes": [
+     {
+      "name": "6.5",
+      "label": "Socket head shoulder screw 6.5 x {l} x M5x0.8",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "dk": 10.0,
+       "k": 4.5,
+       "hf": 0.25,
+       "dsn": 5.92,
+       "snw": 2.5,
+       "ds": 6.5,
+       "dtn": 3.68,
+       "tnw": 2.0,
+       "tnf": 0.5,
+       "b": 9.75,
+       "p": 0.8,
+       "s": 3.0,
+       "t": 2.4
+      },
+      "lengths": [
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "40"
+      ]
+     },
+     {
+      "name": "8",
+      "label": "Socket head shoulder screw 8 x {l} x M6x1",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "dk": 13.0,
+       "k": 5.5,
+       "hf": 0.4,
+       "dsn": 7.42,
+       "snw": 2.5,
+       "ds": 8.0,
+       "dtn": 4.4,
+       "tnw": 2.5,
+       "tnf": 0.53,
+       "b": 11.25,
+       "p": 1.0,
+       "s": 4.0,
+       "t": 3.3
+      },
+      "lengths": [
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "40",
+       "50"
+      ]
+     },
+     {
+      "name": "10",
+      "label": "Socket head shoulder screw 10 x {l} x M8x1.25",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dk": 16.0,
+       "k": 7.0,
+       "hf": 0.6,
+       "dsn": 9.42,
+       "snw": 2.5,
+       "ds": 10.0,
+       "dtn": 6.03,
+       "tnw": 3.1,
+       "tnf": 0.64,
+       "b": 13.25,
+       "p": 1.25,
+       "s": 5.0,
+       "t": 4.2
+      },
+      "lengths": [
+       "16",
+       "20",
+       "25",
+       "30",
+       "40",
+       "50",
+       "60",
+       "70",
+       "80",
+       "90",
+       "100",
+       "120"
+      ]
+     },
+     {
+      "name": "13",
+      "label": "Socket head shoulder screw 13 x {l} x M10x1.5",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "dk": 18.0,
+       "k": 9.0,
+       "hf": 0.6,
+       "dsn": 12.42,
+       "snw": 2.5,
+       "ds": 13.0,
+       "dtn": 7.69,
+       "tnw": 3.7,
+       "tnf": 0.77,
+       "b": 16.4,
+       "p": 1.5,
+       "s": 6.0,
+       "t": 4.9
+      },
+      "lengths": [
+       "16",
+       "20",
+       "25",
+       "30",
+       "40",
+       "50",
+       "60",
+       "70",
+       "80",
+       "90",
+       "100",
+       "120"
+      ]
+     },
+     {
+      "name": "16",
+      "label": "Socket head shoulder screw 16 x {l} x M12x1.75",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "dk": 24.0,
+       "k": 11.0,
+       "hf": 0.6,
+       "dsn": 15.42,
+       "snw": 2.5,
+       "ds": 16.0,
+       "dtn": 9.35,
+       "tnw": 4.4,
+       "tnf": 0.87,
+       "b": 18.4,
+       "p": 1.75,
+       "s": 8.0,
+       "t": 6.6
+      },
+      "lengths": [
+       "30",
+       "40",
+       "50",
+       "60",
+       "70",
+       "80",
+       "90",
+       "100",
+       "120"
+      ]
+     },
+     {
+      "name": "20",
+      "label": "Socket head shoulder screw 20 x {l} x M16x2",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "dk": 30.0,
+       "k": 14.0,
+       "hf": 0.8,
+       "dsn": 19.42,
+       "snw": 2.5,
+       "ds": 20.0,
+       "dtn": 12.96,
+       "tnw": 5.0,
+       "tnf": 1.14,
+       "b": 22.4,
+       "p": 2.0,
+       "s": 10.0,
+       "t": 8.8
+      },
+      "lengths": [
+       "40",
+       "50",
+       "60",
+       "70",
+       "80",
+       "90",
+       "100",
+       "120"
+      ]
+     },
+     {
+      "name": "25",
+      "label": "Socket head shoulder screw 25 x {l} x M20x2.5",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "dk": 36.0,
+       "k": 16.0,
+       "hf": 0.8,
+       "dsn": 24.42,
+       "snw": 3.0,
+       "ds": 25.0,
+       "dtn": 16.3,
+       "tnw": 6.3,
+       "tnf": 1.38,
+       "b": 27.4,
+       "p": 2.5,
+       "s": 12.0,
+       "t": 10.0
+      },
+      "lengths": [
+       "50",
+       "60",
+       "70",
+       "80",
+       "90",
+       "100",
+       "120"
+      ]
+     }
+    ],
+    "source": "Onshape standard content table DATA_ISO_7379_HEX_SOCKET_SHOULDER_SCREW_MAIN / _LENGTHS (component document ac631d5ef566811eee0d6c3e; live/dom/skb-sc-fsrules)",
+    "sizeLabel": "Shoulder size",
+    "lengthLabel": "Shoulder length"
+   },
+   {
     "category": "Nuts",
     "class": "Hex nuts",
     "name": "Hex flange nut ISO 4161",

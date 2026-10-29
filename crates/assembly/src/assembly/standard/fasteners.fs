@@ -2435,3 +2435,89 @@ export const shoulderScrew = defineFeature(function(context is Context, id is Id
         const slot = cuboid(context, id + "slot", vector(-definition.n / 2, -R - definition.k, top - definition.t), vector(definition.n / 2, R + definition.k, top + definition.k));
         subtract(context, id + "cut", body, slot);
     });
+
+/**
+ * Live's ISO 7379 socket head shoulder screw (raw /features): one revolved
+ * sketch, the shoulder end at z = 0 (live's "Near") with the head above: the
+ * head (dk, k) with its top edge rounded hf, a fillet hf into the neck under
+ * the head (dsn, snw below the head) and a 45 degree step out to the shoulder
+ * (ds, l long), the shoulder end, the thread neck (dtn, tnw long) with a
+ * fillet tnf into the shoulder end, a step out to d and the thread down to b
+ * below the shoulder end, both its edges chamfered 0.625 of the thread's
+ * triangle height; then the hex socket (s across flats, t deep) with a 140
+ * degree drill point.
+ */
+annotation { "Feature Type Name" : "Socket shoulder screw" }
+export const socketShoulderScrew = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "d" }
+        isLength(definition.d, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "l" }
+        isLength(definition.l, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dk" }
+        isLength(definition.dk, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "k" }
+        isLength(definition.k, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "hf" }
+        isLength(definition.hf, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dsn" }
+        isLength(definition.dsn, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "snw" }
+        isLength(definition.snw, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "ds" }
+        isLength(definition.ds, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "dtn" }
+        isLength(definition.dtn, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "tnw" }
+        isLength(definition.tnw, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "tnf" }
+        isLength(definition.tnf, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "b" }
+        isLength(definition.b, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "p" }
+        isLength(definition.p, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "s" }
+        isLength(definition.s, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "t" }
+        isLength(definition.t, NONNEGATIVE_LENGTH_BOUNDS);
+    }
+    {
+        const R = definition.dk / 2;
+        const hf = definition.hf;
+        const rsn = definition.dsn / 2;
+        const rs = definition.ds / 2;
+        const rtn = definition.dtn / 2;
+        const f = definition.tnf;
+        const rm = definition.d / 2;
+        const ls = definition.l;
+        const top = ls + definition.k;
+        const ch = 0.625 * 0.8660254 * definition.p;
+        const s45 = sqrt(0.5);
+        const neckEnd = ls - definition.snw;
+        const body = revolveProfile(context, id + "body", [
+                    { "p" : rz(Z, top) },
+                    { "p" : rz(R - hf, top) },
+                    { "p" : rz(R, top - hf), "mid" : rz(R - hf + hf * s45, top - hf + hf * s45) },
+                    { "p" : rz(R, ls) },
+                    { "p" : rz(rsn + hf, ls) },
+                    { "p" : rz(rsn, ls - hf), "mid" : rz(rsn + hf - hf * s45, ls - hf + hf * s45) },
+                    { "p" : rz(rsn, neckEnd) },
+                    { "p" : rz(rs, neckEnd - (rs - rsn)) },
+                    { "p" : rz(rs, Z) },
+                    { "p" : rz(rtn + f, Z) },
+                    { "p" : rz(rtn, -f), "mid" : rz(rtn + f - f * s45, -f + f * s45) },
+                    { "p" : rz(rtn, -definition.tnw) },
+                    { "p" : rz(rm - ch, -definition.tnw) },
+                    { "p" : rz(rm, -definition.tnw - ch) },
+                    { "p" : rz(rm, -definition.b + ch) },
+                    { "p" : rz(rm - ch, -definition.b) },
+                    { "p" : rz(Z, -definition.b) }
+                ]);
+        // The socket: a hexagon s across flats, t deep, then a 140 degree
+        // drill point from its inscribed circle.
+        const sock = prismZ(context, id + "socket", top - definition.t, definition.t + definition.k, polygonPoints(6, definition.s, 1));
+        const rc = definition.s / 2;
+        const tip = revolveProfile(context, id + "drill", [{ "p" : rz(Z, top - definition.t) }, { "p" : rz(rc, top - definition.t) }, { "p" : rz(Z, top - definition.t - rc / tan(70 * degree)) }]);
+        subtract(context, id + "cut", body, qUnion([sock, tip]));
+    });

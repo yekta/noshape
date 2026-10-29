@@ -4640,6 +4640,43 @@ fn din_923_shoulder_screw_matches_live() {
     }
 }
 
+/// ISO 7379 socket head shoulder screw as live's component (behaviours
+/// "skasm (2026-10-27) standard content gaps": 6.5 x 10 x M5 has 29 faces,
+/// PLANE 17, CYLINDER 5, CONE 4, TORUS 3, 821.4534477 mm³ in 821.366 –
+/// 821.541; live's name "Socket head shoulder screw 6.5 x 10 x M5x0.8").
+#[test]
+fn iso_7379_shoulder_screw_matches_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let c = CATALOGUE.iter().find(|c| c.name == "Socket head shoulder screw ISO 7379").unwrap();
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("6.5");
+    assert_eq!(spec.length.as_deref(), Some("10"));
+    assert_eq!(spec.part_name(), "Socket head shoulder screw 6.5 x 10 x M5x0.8");
+    let r = standard::regenerate(&spec).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let v = b.shape.volume().unwrap() * 1e9;
+    let mut kinds = std::collections::BTreeMap::new();
+    for i in 0..b.faces.len() {
+        let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+            Surface::Plane(_) => "plane",
+            Surface::Cone { .. } => "cone",
+            Surface::Cylinder { .. } => "cylinder",
+            Surface::Torus { .. } => "torus",
+            _ => "other",
+        };
+        *kinds.entry(k).or_insert(0) += 1;
+    }
+    assert_eq!(kinds, [("cone", 4), ("cylinder", 5), ("plane", 17), ("torus", 3)].into_iter().collect(), "{v} mm³");
+    assert!((821.366..=821.541).contains(&v), "{v} mm³, live 821.4534477");
+    for s in &c.sizes {
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(&s.name);
+        let r = standard::regenerate(&spec).unwrap();
+        assert!(standard::part_body(&r).is_some(), "{}", s.name);
+    }
+}
+
 /// ANSI commercial taper pins and slotted spring pins with live's whole size
 /// lists (its FSRules tables, behaviours "skasm (2026-10-27) standard content
 /// gaps": taper pins from #7/0, spring pins with 9/64, 5/8, 3/4); every size
