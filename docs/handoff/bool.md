@@ -120,6 +120,17 @@ Big targets (10-29 03:05): the Rust path runs after the local Boolean, so a targ
 is one the local Boolean declined: no longer declined here (db5f2f3d 1004 faces, 99 tools: 178 ms vs OCCT 865;
 11b69a56 412 faces: 9 vs 88 ms; both as OCCT).
 
+What the model's unify does with a result (10-29 05:46): qa's halfmir2 variant B (a blind half pocket on the
+mirror plane, Part mirror, Add) came out wrong with the Rust Boolean from 2520afc4 (01:36; the seam changes) on:
+7869.1 mm³ with a −78.54 mm² face, OCCT 7607.301. Every Boolean in it matched OCCT, even after unify; the half
+pocket's cut (a piece of the pocket's cylinder across its surface's seam angle, u 4.71–7.85) differed only in
+its loop's order, and after the mirror OCCT's unify turned the merged pocket wall over. Now declined: a part of a
+cylinder or cone across its surface's seam angle, or whose curves span more than a turn; and two faces of
+different inputs on one cylinder meeting at a circle with their seams apart (x directions over a quarter turn
+apart: 38b2cd00 and fd7ef128, a hole through a boss, were invalid after unify, since before today). The replay's
+unify check compares validity and volume now too. halfmir2 A/B/C, mirhole, halfmir, rust-mirror-min, the rod: all
+right. Main corpus 610 of 972, fresh 482 of 692, corpus3 489 of 698, Shell's 52 of 85: 0 differ.
+
 RUST-MIRROR-EXTRA-FACE (qa P1, 10-29 04:30): a part mirrored onto itself (Add) kept its hole wall in two after
 the model's unify_same_domain (8 faces, OCCT and live 7). The wall's halves are a cylinder and its mirror image
 (left-handed); OCCT's unify goes by the order of a seam's uses in the loop, and on a left-handed surface ours ran
