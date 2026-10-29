@@ -59,6 +59,17 @@ fn topology_queries() {
         // Outward normals: centroid + normal is outside the unit cube center.
         assert!((c + n * 0.1 - DVec3::splat(0.5)).length() > (c - DVec3::splat(0.5)).length());
     }
+    // A mirror's faces have left-handed plane frames: their normals still point out of the part, and a face
+    // and its mirror image parallel to the mirror plane keep one normal.
+    let m = b.transformed(&Transform::Mirror(Plane::from_normal(DVec3::new(2.0, 0.0, 0.0), DVec3::X))).unwrap();
+    let mid = DVec3::new(3.5, 0.5, 0.5);
+    for f in m.faces() {
+        let n = f.face_plane().unwrap().unwrap().normal;
+        let c = f.centroid().unwrap();
+        assert!((c + n * 0.1 - mid).length() > (c - mid).length(), "mirrored face at {c} has normal {n}");
+    }
+    let top = |s: &Shape| s.faces().into_iter().find(|f| f.centroid().unwrap().z > 0.99).unwrap();
+    assert!(close(angle_between(&top(&b), &top(&m)).unwrap(), 0.0, 1e-9));
     let e = &b.edges()[0];
     let info = e.edge_info().unwrap();
     assert!(matches!(info.curve, Curve::Line { .. }));

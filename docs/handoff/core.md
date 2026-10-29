@@ -113,6 +113,12 @@ skasm's now; see docs/handoff/skasm.md.
   face (normal_at_point), not face_plane(): a mirrored copy's planar faces have left-handed frames, and
   find_plane's normal pointed into the part there, so the mirrored boss's top looked like an overhang and grew a
   column the part's depth. T1 `kernel_robustness::feature_mirror_of_a_boss_copies_the_boss`.
+- Mirrored faces' normals: find_plane (face_plane()) and angle_between's linear_direction (geom.cpp) read a planar
+  face's normal as its frame's Z, but a mirror's image has a left-handed frame whose surface normal X × Y is -Z, so
+  every planar face of a mirrored part (Mirror, Feature/Part pattern with a mirror, a mirrored instance) gave the
+  inward normal to sketch-on-face, holes, up-to faces, mate connectors and Measure's angles. Both now flip Z for an
+  indirect frame. T1 `kernel_core::topology_queries` checks a mirrored box. (The bool corpus case d0e4644e7ce32085,
+  a fuse that was empty, is now a solid of 1.185e-5 by the Glue::Shift retry: rebased.)
 
 ## Landed on main (10-26 / 10-27)
 - 81c8d9cd psb's face blend WIP (curved sides, live's message rule). a2b34ade: the elliptic boss as live (a sketch
@@ -463,8 +469,8 @@ with 0003b and 0004 on Linux, macOS and Windows.
    "not recoverable" exit now names its place; the in-place edits that corrupted bodies are gone from the budgeted ops.
 2. P0 SHELL-SLOW tail: concave parts with fillets (a pocket with floor fillets 2.3–2.9 s in slabs) need regions with
    concave edges; failing shells on fuzz bodies still spend 20–26 s in the slabs' Booleans (no early sign known).
-3. find_plane / linear_direction (geom.cpp) on mirrored faces: left-handed plane frames give the inward normal
-   to every face_plane() user (sketch on face, holes, mates, up-to faces).
+3. Other `a.Plane().Axis().Direction()` readers of a face's normal in the kernel: features.cpp and shell.cpp
+   already check Direct(); surface_info (face_surface) reports the frame as is, by design.
 4. Waiting on live: FILLET-OVERSIZE's chamfer half; RIB-CHAIN-NORMAL (live's +160 mm³ for the L normal rib).
 5. kern's open item: forward-oriented edges.
 Knurl Phase 1 stopped at 246 s (its steps left are 10–40 s each); REGEN-SPEED met in release (qa to re-measure).

@@ -756,7 +756,11 @@ PlaneQ find_plane(const OcShape& s, double tolerance)
     BRepAdaptor_Surface a(TopoDS::Face(s.shape), true);
     if (a.GetType() == GeomAbs_Plane)
     {
+      // A left-handed frame (a mirror's image) has its surface normal X × Y
+      // along -Z.
       gp_Ax3 ax = a.Plane().Position();
+      if (!ax.Direct())
+        ax.ZReverse();
       if (s.shape.Orientation() == TopAbs_REVERSED)
         ax.ZReverse();
       q.found = true;
@@ -877,6 +881,8 @@ static bool linear_direction(const TopoDS_Shape& s, gp_Dir& d, bool& is_plane)
     if (a.GetType() != GeomAbs_Plane)
       return false;
     d = a.Plane().Axis().Direction();
+    if (!a.Plane().Position().Direct())
+      d.Reverse();
     if (s.Orientation() == TopAbs_REVERSED)
       d.Reverse();
     is_plane = true;
