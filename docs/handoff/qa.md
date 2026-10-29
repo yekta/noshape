@@ -429,7 +429,11 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Shared prefs touched by testing: ~/.config/noshape/preferences.json got `featureDialogWidths.extrude 278` from a resize
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
-## Requests to the lead (qa, updated 2026-10-28 23:18)
+## Requests to the lead (qa, updated 2026-10-29 01:48)
+- **01:48, two P0s found tonight that are already in v0.4.12 (not regressions), for core:** CLI-SUPPRESS-SEGV (the crash guard
+  survives one OCCT fault per session, the second same fault jumps through a stale / corrupt jmp_buf; seeds 171 and 174, stacks in
+  tickets/) and HALF-MIRROR-HOLE-INVERTED (half plate + half hole on the mirror plane, Part mirror Add → 7738.201 instead of 7214.602 mm³,
+  a reversed face; tickets/halfmir.py). Both are listed in the 10-29 blocker notes as "not regressions"; the lead decides.
 - **23:18, for bool / the cut:** P1 RUST-MIRROR-EXTRA-FACE (TICKETS › Rust Boolean): since da75e17b (likely) the Rust Boolean keeps one
   more face after a part mirror than OCCT on tickets/cli-fillet-segv.noshape, and a later Chamfer cuts 0.039 mm³ more. Needs bool's
   judgement (which result matches live) before 05:00, or OCCT for mirrored faces.
