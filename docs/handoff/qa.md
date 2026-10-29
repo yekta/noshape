@@ -9,6 +9,12 @@ of TICKETS (open P0s all carried from v0.4.11).
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **00:55 update (green fd036a5c):** RUST-MIRROR-EXTRA-FACE narrowed: a plate with a through hole mirrored onto itself (Add)
+  keeps the hole wall split (2 × 314.159 mm²; OCCT / live one 628.319 mm²), seen in the app (tickets/mirhole.py, rust-mirror-min).
+  bin/topomatrix.py (stacked cylinders, stacked plates with holes, side-by-side boxes, opposite extrudes) agrees Rust vs OCCT; the
+  opposite-extrudes cylinder stays 2 faces in both (live asked, REQUESTS 00:51). CLI fuzz 172 / 173 fine; **174 segfaulted** at op
+  173 (face query after two failed Shells); gdb replay running (cli/gdb-174h.txt; a second gdb sits on seed 175's CLI,
+  cli/gdb-175h.txt).
 - **00:41 update (green fd036a5c = + dx ff8a56f6 max/min edge, skasm 257abc58 F fit / a277db14 subassembly patterns, psui 020fd2e7
   own planar mesher):** verified SKETCH-F-FIT, DWG-MAXMIN-LINE, ASM-PATTERN-SUBASSEMBLY. Mesher A/B (bin/meshab.sh: NOSHAPE_MESH_RUST=0
   vs default, same binary, iso fit) on wf-block, live-30, boltdwg, cli-draft-segv, manyreg: pixel-identical, same triangle counts.
