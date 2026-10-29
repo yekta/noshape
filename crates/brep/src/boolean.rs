@@ -642,6 +642,22 @@ impl Ctx<'_> {
     /// (a piece of), whose curve on a free-form face is OCCT's).
     fn c2_of(&self, f: usize, s: &Seg, copy: usize, edge: Option<usize>) -> R<C2> {
         let g = &self.faces[f];
+        if let (Geo::Apex, Surf::Cyl { full: false, .. }) = (s.g, &g.s) {
+            // A part of a cone at its apex: at the apex's height, from the angle of the face's ruling that comes to
+            // the apex to that of the one that leaves it (its own way along the edge).
+            let e = edge.ok_or(Decline("an apex on a part of a cone"))?;
+            let es = &g.edges;
+            let k = es.iter().position(|x| x.0 == e).ok_or(Decline("an apex on a part of a cone"))?;
+            let w = s.v[0];
+            let ends = |&(e, rev): &(usize, bool)| if rev { [self.edges[e].v[1], self.edges[e].v[0]] } else { self.edges[e].v };
+            let rulings = |at: usize| es.iter().filter(|x| self.edges[x.0].g == Geo::Line && ends(x)[at] == w).map(|x| ends(x)[1 - at]).collect::<Vec<u32>>();
+            let (into, out) = (rulings(1), rulings(0));
+            let (&[from], &[to]) = (into.as_slice(), out.as_slice()) else { return Err(Decline("an apex on a part of a cone")) };
+            let (from, to) = (self.p(from), self.p(to));
+            let y = g.to2(self.p(s.v[0])).y;
+            let (a, b) = (DVec2::new(g.to2(from).x, y), DVec2::new(g.to2(to).x, y));
+            return Ok(if es[k].1 { C2::Seg { a: b, b: a } } else { C2::Seg { a, b } });
+        }
         if let Surf::Nurbs { su, sv, .. } = g.s {
             if let Geo::Nurbs { id, t0, t1 } = s.g
                 && let Some((faces, on, _)) = &self.ncurves[id as usize].sec
@@ -2429,6 +2445,11 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             cx.faces[f].edges.iter().filter(|&&(e, _)| !seen.insert(e)).flat_map(|&(e, _)| edge_pieces[e].iter().map(|x| x.0)).collect()
         };
         let mut local: HashMap<(u32, bool), u32> = HashMap::default();
+        // The apex of a part of a cone: a point per place too.
+        let apex_part: Vec<u32> = match cx.faces[f].s {
+            Surf::Cyl { full: false, .. } => cx.faces[f].edges.iter().filter(|&&(e, _)| cx.edges[e].g == Geo::Apex).map(|&(e, _)| cx.edges[e].v[0]).collect(),
+            _ => Vec::new(),
+        };
         // (On a free-form face a vertex is a point per place it is at, both sides of a seam: its curves' ends there
         // within 100 tol.)
         let mut places: HashMap<u32, Vec<(DVec2, u32)>> = HashMap::default();
@@ -2448,7 +2469,8 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                         Surf::Cyl { r, th0, .. } => q.x > r * (th0 + PI),
                         Surf::Plane { .. } | Surf::Nurbs { .. } => false,
                     };
-                    if let Surf::Nurbs { .. } = cx.faces[f].s {
+                    // (A part of a cone's apex: at both its rulings' angles.)
+                    if apex_part.contains(&w) || matches!(cx.faces[f].s, Surf::Nurbs { .. }) {
                         let at = places.entry(w).or_default();
                         ends[k] = match at.iter().find(|x| (x.0 - q).length() <= 100.0 * tol) {
                             Some(x) => x.1,

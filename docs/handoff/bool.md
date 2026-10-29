@@ -597,6 +597,14 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - Replays with the parabolas, all 0 differ: main 680, corpus2 528, corpus3 533, corpus4 574 (+1), corpus5 685 (+3),
   corpus6 640 (+4), Shell's 75 (+4), direct 52. T1: the ruling test's third configuration (through the apex; its fuse declines).
 
+## Apexes of cone faces that don't go round (10-30 00:30 UTC)
+- A cone face that doesn't go round and reaches its apex (a countersink's or drill point's half): its apex's
+  degenerate edge in the parameter plane runs at the apex's height from the angle of the ruling coming to the apex
+  to that of the one leaving it (found by their vertices: the face's edges aren't listed in loop order), and the
+  apex vertex is a point per place there, as a free-form face's vertices.
+- Replays, all 0 differ: main 683 (+3), corpus2 531 (+3), corpus3 536 (+3), corpus4 577 (+3), corpus5 688 (+3),
+  corpus6 644 (+4), Shell's 76 (+1), direct 52. T1: a case (017a8af6) in tests/data/brep.
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|
@@ -623,7 +631,7 @@ addb9a14, a slab fuse with a B-spline face, the shelled part's own internal edge
 edges where the arguments meet; per-point tolerances would take them), vertices inside coincident edges of two
 other arguments 11.8 s (6: OCCT's PostTreatFF gives such a vertex a second same-domain hop and its history then
 says Deleted; not predictable cheaply), an apex on a part of a cone 8.5 s (7: a cone face that doesn't go round, its
-apex's degenerate edge in its parameter plane), edges of two arguments crossing on a third's face 5.2 s (4), tools
+apex's degenerate edge in its parameter plane: 4 taken since, the rest stop at other reasons), edges of two arguments crossing on a third's face 5.2 s (4), tools
 coincide 5.1 s (4), curves in the grey band of a face's boundary 3.9 s (3), internal edges 3.6 s (6), a plane through
 a pointed cone's apex 2.9 s (5), a cone's / sphere's / B-spline's apex changed 2.6 s (7: another argument through a
 pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
