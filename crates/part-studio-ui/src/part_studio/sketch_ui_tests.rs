@@ -457,6 +457,21 @@ fn box_select_with_a_dialog_open(cx: &mut TestAppContext) {
     draw(cx, window);
 }
 
+/// A number an editing logic sets shows in its field (std's Tab logic set
+/// Subtraction offset 0.02 mm and the field still read "0 mm").
+#[gpui::test]
+fn a_value_set_by_editing_logic_shows_in_its_field(cx: &mut TestAppContext) {
+    use noshape_model::params::ParamValue;
+    let (window, view) = part_studio(cx, "logic-text");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    assert!(dialog.update(cx, |d, cx| d.field_text("depth", cx)).is_some(), "the Depth field is drawn");
+    dialog.update(cx, |d, cx| d.set_value_logic("depth", ParamValue::Expr(noshape_units::ExprValue::new("0.02 mm")), cx));
+    draw(cx, window);
+    assert_eq!(dialog.update(cx, |d, cx| d.field_text("depth", cx)).as_deref(), Some("0.02 mm"));
+}
+
 /// SECTION-DIALOG-STACK: starting a feature with the Section view dialog open
 /// closes that dialog as with ✓ and keeps the section (live 10-27).
 #[gpui::test]

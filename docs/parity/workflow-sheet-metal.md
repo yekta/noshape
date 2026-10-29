@@ -210,3 +210,19 @@ A GUI pass of the whole list on a green build is next.
 | 2.3 | x=0 edge in Top view at the plate's boundary: not picked (the edge lies on the Right plane, edge-on) | ? (live pending) | |
 | 2.4 | **second edge not pickable once the first flange previewed** (std rebuild renamed all faces: the preview counted as the feature's own geometry) → fixed: faces lying on the replaced part's keep its names | ✅ after fix | agent/skasm 10-29 (GUI: both edges picked, 2 chips; T2 flange_keeps_the_other_edges_references) |
 | 2.6 | two flanges: **part turned orange** (rebuilt part took a fresh palette colour) → fixed: keeps its name and colour | ✅ after fix | agent/skasm 10-29 (GUI: part stays blue; T2 flanges_keep_the_part_name_and_colour) |
+| 3.1 | Hem: Straight (+ flip), ☑ Flattened, Total length 12.5 mm, Outer, Simple; lists Straight / Rolled / Tear drop, Outer / In place, Simple / Closed; chip "Edge of Sheet metal model 1" | ✅ | 6fb0344f 10-29 |
+| 3.2 | Hem result | 9378.1835 / 33 by T2 hem_on_g34_matches_live | ✅ (test) | |
+| 4.1 | Tab: Tab profile, Flange to merge, Subtraction offset, Subtraction scope, preview slider | ✅ | 6fb0344f 10-29 |
+| 4.2 | first region click fills Flange to merge "Face of Sheet metal model 1" (SM16) and the offset 0.02 mm, but **the field kept showing "0 mm"** (value right: reopened it reads 0.02 mm) → fixed (psui: editing logic values redraw their fields); Tab OK | ✅ after fix | agent/skasm 10-29 (UI test a_value_set_by_editing_logic_shows_in_its_field) |
+| 5.1 | Bend relief: field "Bend relief", Obround - Sized, Bend relief depth 5 mm, ☐ Extend bend relief | ✅ | 6fb0344f 10-29 |
+| 5.2 | bend end vertex by the hem: chip "Vertex of Hem 1"; red; **"Bend relief 1 did not regenerate properly: Selection is not a bend relief."** (SM7) | ✅ | 6fb0344f 10-29 |
+| 5.3 / 5.7 | Corner: Square - Sized, Corner relief width 5 mm; list Square - Sized, Rectangle - Scaled, Round - Sized, Round - Scaled, Closed, Simple | ✅ | 6fb0344f 10-29 |
+| 5.8 | Esc closes the open list, the 2nd Esc cancels Corner | ✅ | 6fb0344f 10-29 |
+| 6.1 | strip button tooltip "Sheet metal table and flat view" | ✅ | 6fb0344f 10-29 |
+| 6.2 | "Sheet metal context: [Sheet metal model 1 ▾]"; Bends # · Name · Radius(mm) · Angle(deg) · Bend direction · K Factor; Other joints Name · Type [Rip ▾] · Style [Edge joint ▾]; 3D flat view with its view cube (SM4) | ✅ | 6fb0344f 10-29 |
+| 6.2 names | ours Bend A, Bend B, Hem C, Joint D; live Joint A, Bend B, Bend C, Hem D (live letters follow Onshape's own joint order: qa4 r4 s1 had Bend A before Joint B) | ✗ minor (P3) | |
+| 6.3 | flanges bent up: "Up" (SM5) | ✅ | 6fb0344f 10-29 |
+| 6.4 | click "#": row selected, the bend lit in 3D and in the flat | ✅ | 6fb0344f 10-29 |
+| 6.5 | flat: bend strips, dashed centre lines, relief notches at the bend ends (SM6) | ✅ | 6fb0344f 10-29 |
+| 6.6 menu | flat right-click: Edit Sheet metal model 1…, Edit Sketch 1…, Show dimensions, Show dependencies…, Export DXF/DWG of Flat pattern of Part 1…, Zoom to fit, View normal to, Delete Sheet metal model 1; **missing** New sketch…, Copy Flat pattern of Part 1, Create Drawing of Flat pattern of Part 1…, Select other…, Add comment, Zoom to selection | ✗ (SM13 part) | |
+| 6.6 dialog | Export DXF/DWG… opens a plain path prompt "Export flat pattern"; live has the Export DXF/DWG options dialog (file name, format, version, units, options) | ✗ (SM13 part) | |

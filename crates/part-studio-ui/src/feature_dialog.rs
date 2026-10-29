@@ -567,6 +567,16 @@ impl FeatureDialog {
         cx.notify();
     }
 
+    /// [`Self::set_value_auto`] for a value an editing logic sets: a number
+    /// field shows it too (its input is made again from the value; the Tab's
+    /// Subtraction offset kept "0 mm" after std set 0.02 mm).
+    pub fn set_value_logic(&mut self, path: &str, v: ParamValue, cx: &mut Context<Self>) {
+        if matches!(v, ParamValue::Expr(_)) {
+            self.inputs.remove(path);
+        }
+        self.set_value_auto(path, v, cx);
+    }
+
     /// Set a numeric field from outside (manipulator drag): updates the value
     /// and the visible input text.
     pub fn set_expr_text(&mut self, path: &str, text: &str, window: &mut Window, cx: &mut Context<Self>) {
@@ -1429,6 +1439,12 @@ impl FeatureDialog {
             s.select_all(window, cx);
         });
         self.create_var = Some(CreateVar { path, initial, configuration: false, kind: k, config_kind: ck, name, value, description, min, max });
+    }
+
+    /// The text a number field shows (`None`: not drawn yet).
+    #[cfg(test)]
+    pub(crate) fn field_text(&self, path: &str, cx: &gpui_kit::App) -> Option<String> {
+        self.inputs.get(path).map(|st| st.read(cx).value().to_string())
     }
 
     /// A field's input: the dialog's own, or the outside one that opened

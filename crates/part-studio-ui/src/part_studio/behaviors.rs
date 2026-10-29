@@ -3526,7 +3526,7 @@ impl PartStudioView {
                 if !changes.is_empty() {
                     dialog.update(cx, |d, cx| {
                         for (k, v) in changes {
-                            d.set_value_auto(k, v, cx);
+                            d.set_value_logic(k, v, cx);
                         }
                     });
                 }
@@ -3560,7 +3560,7 @@ impl PartStudioView {
         }
         dialog.update(cx, |d, cx| {
             for (k, v) in changes {
-                d.set_value_auto(k, v, cx);
+                d.set_value_logic(k, v, cx);
             }
         });
     }
@@ -3606,7 +3606,7 @@ impl PartStudioView {
                 this.ui.std_edit_old = Some(next);
                 dialog.update(cx, |d, cx| {
                     for (k, v) in changes {
-                        d.set_value_auto(&k, v, cx);
+                        d.set_value_logic(&k, v, cx);
                     }
                 });
             });
@@ -3748,7 +3748,7 @@ impl PartStudioView {
         }
         dialog.update(cx, |d, cx| {
             for (k, v) in changes {
-                d.set_value_auto(k, v, cx);
+                d.set_value_logic(k, v, cx);
             }
         });
     }
@@ -3774,7 +3774,7 @@ impl PartStudioView {
         }
         dialog.update(cx, |d, cx| {
             for (k, v) in changes {
-                d.set_value_auto(k, v, cx);
+                d.set_value_logic(k, v, cx);
             }
         });
     }
@@ -3806,7 +3806,7 @@ impl PartStudioView {
         }
         dialog.update(cx, |d, cx| {
             for (k, v) in changes {
-                d.set_value_auto(k, v, cx);
+                d.set_value_logic(k, v, cx);
             }
         });
     }
