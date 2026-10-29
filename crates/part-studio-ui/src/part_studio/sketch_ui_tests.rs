@@ -506,3 +506,32 @@ fn section_rotate_handles_and_their_dead_centre(cx: &mut TestAppContext) {
         }
     });
 }
+
+/// MC-SELECT-NO-READOUT: a mate connector selected alone reads "Point:" at its
+/// origin (live "psui (2026-10-27, P2) interaction 3.4"); with something else
+/// selected too the readout measures the selection as before.
+#[gpui::test]
+fn a_selected_mate_connector_reads_its_origin(cx: &mut TestAppContext) {
+    use noshape_model::display::ConnectorDisplay;
+    use noshape_model::reference::FeatureId;
+    let (window, view) = part_studio(cx, "mc-readout");
+    let mc = Reference::MateConnector { feature: FeatureId(7), index: 0 };
+    let origin = glam::DVec3::new(0.02, 0.01, 0.01);
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, _| {
+            std::sync::Arc::make_mut(&mut v.display).connectors.push(ConnectorDisplay {
+                reference: mc.clone(),
+                name: "Mate connector 1".into(),
+                origin,
+                x: glam::DVec3::X,
+                z: glam::DVec3::Z,
+            });
+            assert_eq!(v.readout_connector_origin(), None, "nothing selected");
+            v.selection = vec![mc.clone()];
+            assert_eq!(v.readout_connector_origin(), Some(origin));
+            v.selection.push(Reference::Plane(DatumPlane::Top));
+            assert_eq!(v.readout_connector_origin(), None, "a connector with a plane is a measurement of both");
+        })
+    })
+    .unwrap();
+}

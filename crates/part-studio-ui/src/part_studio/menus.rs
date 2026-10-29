@@ -873,16 +873,29 @@ impl PartStudioView {
         u
     }
 
+    /// The mate connector the readout measures, "Point:" at its origin: while
+    /// Mass properties' reference field is active its connector (live
+    /// ui-mass/07), else a mate connector selected alone (live "psui
+    /// (2026-10-27, P2) interaction 3.4").
+    pub(crate) fn readout_connector_origin(&self) -> Option<glam::DVec3> {
+        let r = if self.show_mass && self.ui.mass_ref_active {
+            self.ui.mass_reference.as_ref()?
+        } else if let [r] = &self.selection[..] {
+            r
+        } else {
+            return None;
+        };
+        Some(self.display.connectors.iter().find(|c| &c.reference == r)?.origin)
+    }
+
     /// The live measurement of the selection left of the evaluation tools
     /// (live part-studio/81: "Perp planes angle: 90.000 deg", the number in
     /// monospace; a point reads "Point: X↘ … Y↗ … Z↑ …" with colored axes).
     fn selection_readout(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        // Live (ui-mass/07): while Mass properties' reference field is active
-        // the readout measures its mate connector, "Point:" at its origin.
-        let line = if self.show_mass && self.ui.mass_ref_active {
-            let r = self.ui.mass_reference.as_ref()?;
-            let c = self.display.connectors.iter().find(|c| &c.reference == r)?;
-            vec![("Point".to_string(), Measurement::Point(c.origin))]
+        let line = if let Some(o) = self.readout_connector_origin() {
+            vec![("Point".to_string(), Measurement::Point(o))]
+        } else if self.show_mass && self.ui.mass_ref_active {
+            return None;
         } else {
             let sel = self.selection.clone();
             let sel_count = sel.len();
