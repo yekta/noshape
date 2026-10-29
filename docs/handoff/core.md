@@ -84,6 +84,19 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
   back into one periodic face, and the moved halves came out invalid. So the fix is our own band merge: one face on
   the first surface, u 0–2π, v over both, its two circles and one seam, the caps' circle edges replaced (ReShape),
   history from both halves.
+- 3a8c7a85 the old shell API, draft wedges and the parting-curve draft on their own copy too; T1
+  `shell::ops_leave_their_input_as_it_was` runs 21 ops on a fresh part each and compares its BRep before / after.
+- 52ad95af CYL-UNIFY-OPPOSITE: `merge_cylinder_bands` (boolean.cpp, before the unify) builds one face for two bands
+  on one cylinder meeting at a full ring (each band: one wire, one seam, one closed far circle); kept only valid with
+  the same volume. More general cases (bands with split far ends, partial bands) still stay two faces.
+- cabcdb40 TOUCH-PATTERN-ADD: an Add whose fuse merged nothing keeps the part as it was (eval.rs boolean_into_with).
+- SHELL-SLOW left: a pocket with filleted floor edges goes to slabs (2.3–2.9 s; OCCT's offset gives no solid, its
+  MakeThickSolid gives wrong volumes: 4403.5 / 6337.6 vs 4395.3 / 8283.2 mm³ at 1 / 2 mm); the regions path would
+  need concave edges (the cavity isn't a convex polytope then: decompose, or offset per region). Plain steps and
+  pockets go by OCCT's offset in 35–60 ms.
+- T2 flake: model sheetmetal_frames::convert_rips_and_bends_like_onshape fails only in the full parallel T2 run
+  (3 of 3 such runs today), passes alone every time: shared state between tests (perhaps ~/.config/noshape, which
+  tests shared with the app before NOSHAPE_CONFIG_DIR). For skasm (sheet metal is theirs since 10-29 19:42).
 - Knurl on main with the pairs back (release, 10-29 06:52, load 25–29): diamond **246.5 s** (was 564 before patch
   0004, 264–329 with the pairs before they went serial), 8142 faces, 75409.760 mm³ as before. Live 32 s.
 - Failing shells on fuzz bodies (qa's bop-pairs-gpf-5267, dev CLI): Shell 4 regions no (a non-elementary face),
