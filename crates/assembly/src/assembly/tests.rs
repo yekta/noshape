@@ -5059,7 +5059,7 @@ fn pem_fh_pins_match_live() {
 #[ignore = "T2: standard content vs live (P3 long tail; slow)"]
 fn pem_fh_pin_sizes_build() {
     use super::standard::{self, CATALOGUE, StandardSpec};
-    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™") || c.name.starts_with("FHL™") || c.name.starts_with("TFH™") || c.name.starts_with("HFLH™") || c.name.starts_with("HF") || c.name.starts_with("FHX™") || c.name.starts_with("SGPC™") || c.name.starts_with("S™/SS™") || c.name.starts_with("CLA™") || c.name.starts_with("SMPS™") || c.name.starts_with("SH™") || c.name.starts_with("S-RT™") || c.name.starts_with("SL™") || c.name == "H™ Nuts") {
+    for c in CATALOGUE.iter().filter(|c| c.name == "FH™/FHS™/FHA™ Flush-head pins" || c.name == "FH™/FHS™/FHA™ Flush-head studs" || c.name.starts_with("FH4™") || c.name.starts_with("FHL™") || c.name.starts_with("TFH™") || c.name.starts_with("HFLH™") || c.name.starts_with("HF") || c.name.starts_with("FHX™") || c.name.starts_with("SGPC™") || c.name.starts_with("S™/SS™") || c.name.starts_with("CLA™") || c.name.starts_with("SMPS™") || c.name.starts_with("SH™") || c.name.starts_with("S-RT™") || c.name.starts_with("SL™") || c.name == "H™ Nuts" || c.name.starts_with("HNL™")) {
         for s in &c.sizes {
             // (Nuts for thin sheets have no length.)
             let ls = if s.lengths.is_empty() { vec![None] } else { vec![s.lengths.first(), s.lengths.last()] };
@@ -5640,6 +5640,38 @@ fn pem_h_nuts_match_live() {
             *kinds.entry(k).or_insert(0) += 1;
         }
         assert_eq!(kinds, [("cone", 3), ("curved", 9), ("cylinder", 51), ("plane", 44), ("torus", 2)].into_iter().collect(), "{}", c.inch);
+    }
+}
+
+/// PEM® HNL™ prevailing torque locknuts (live's raw /features and body
+/// details): carbon steel only, "PEM HNL-M6 LZ" / "PEM HNL-M6  LZ Carbon
+/// Steel Zinc plated", "PEM HNL-0420 LZ"; M6 / 1/4-20 = live's studio
+/// defaults: 120 faces (PLANE 54, CYLINDER 51, CONE 5 with the coned tabs,
+/// TORUS 1, "PEM"'s 9 curved walls).
+#[test]
+fn pem_hnl_nuts_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    use noshape_kernel::{ShapeType, Surface};
+    let metric = CATALOGUE.iter().find(|c| c.name.starts_with("HNL™") && !c.inch).unwrap();
+    let unified = CATALOGUE.iter().find(|c| c.name.starts_with("HNL™") && c.inch).unwrap();
+    let spec = StandardSpec::new(metric);
+    assert_eq!((spec.part_name(), spec.description()), ("PEM HNL-M6 LZ".to_string(), "PEM HNL-M6  LZ Carbon Steel Zinc plated".to_string()));
+    assert_eq!(StandardSpec::new(unified).part_name(), "PEM HNL-0420 LZ");
+    for c in [metric, unified] {
+        let r = standard::regenerate(&StandardSpec::new(c)).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let mut kinds = std::collections::BTreeMap::new();
+        for i in 0..b.faces.len() {
+            let k = match b.shape.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap() {
+                Surface::Plane(_) => "plane",
+                Surface::Cone { .. } => "cone",
+                Surface::Cylinder { .. } => "cylinder",
+                Surface::Torus { .. } => "torus",
+                _ => "curved",
+            };
+            *kinds.entry(k).or_insert(0) += 1;
+        }
+        assert_eq!(kinds, [("cone", 5), ("curved", 9), ("cylinder", 51), ("plane", 54), ("torus", 1)].into_iter().collect(), "{}", c.inch);
     }
 }
 

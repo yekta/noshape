@@ -3183,7 +3183,12 @@ function swagingCollarStud(context is Context, id is Id, definition is map)
  * bore's. Form 5 (H™ nuts): the shank down to 0.3 al coning in at 10° to
  * 0.8 al, the ring 0.2 al high scalloped by 24 round notches 0.05 de across
  * (in to (dc + de) * 0.225), form 0's roundings and letters (0.635 mm
- * clearances).
+ * clearances). Form 6 (HNL™ prevailing torque locknuts): H's shank and
+ * scallops, the ring's foot at 1.47214 mm (live's), the body's top edge
+ * rounded de / 20; at the bottom two flats 0.94 de apart 0.15 tl high, two
+ * tabs 1.6 al wide hanging 0.8 al from them (between 0.35 de and the flats),
+ * coned inside from 0.35 de out to (de - al) / 2 at their foot, and "PEM"
+ * between those radii.
  */
 annotation { "Feature Type Name" : "PEM nut" }
 export const pemNut = defineFeature(function(context is Context, id is Id, definition is map)
@@ -3219,23 +3224,26 @@ export const pemNut = defineFeature(function(context is Context, id is Id, defin
         const al = definition.al;
         const tl = definition.tl;
         const f = definition.de / 40;
-        const zb = -al - tl;
-        const scallops = definition.form == 5;
+        const hnl = definition.form == 6;
+        const zrb = hnl ? -1.47214 * millimeter : -al;
+        const zb = zrb - tl;
+        const scallops = definition.form == 5 || hnl;
         const thin = definition.form >= 1;
         const z1 = scallops ? -0.3 * al : (thin ? -al / 4.5 : -tl / 13);
-        const zr = scallops ? -0.8 * al : -al / 2;
+        const zr = scallops ? zrb + 0.2 * al : -al / 2;
         const r2 = rc - (z1 - zr) * tan((thin ? 10 : 9) * degree);
         const s45 = sqrt(0.5);
         const sharp = definition.form == 2 || definition.form == 4;
         const c2 = definition.de / (sharp ? 80 : 60);
         const cb = sharp ? definition.de / 60 : f;
-        const ft = definition.form == 3 ? definition.de / 80 : f;
-        const edges = definition.form == 1 || sharp ? [{ "p" : rz(re - c2, -al) }, { "p" : rz(re, -al - c2) }, { "p" : rz(re, zb + cb) }, { "p" : rz(re - cb, zb) }] :
+        const ft = definition.form == 3 ? definition.de / 80 : (hnl ? definition.de / 20 : f);
+        const edges = hnl ? [{ "p" : rz(re - ft, zrb) }, { "p" : rz(re, zrb - ft), "mid" : rz(re - ft + ft * s45, zrb - ft + ft * s45) }, { "p" : rz(re, zb) }] :
+            (definition.form == 1 || sharp ? [{ "p" : rz(re - c2, -al) }, { "p" : rz(re, -al - c2) }, { "p" : rz(re, zb + cb) }, { "p" : rz(re - cb, zb) }] :
             [{ "p" : rz(re - ft, -al) }, { "p" : rz(re, -al - ft), "mid" : rz(re - ft + ft * s45, -al - ft + ft * s45) },
-                    { "p" : rz(re, zb + f) }, { "p" : rz(re - f, zb), "mid" : rz(re - f + f * s45, zb + f - f * s45) }];
+                    { "p" : rz(re, zb + f) }, { "p" : rz(re - f, zb), "mid" : rz(re - f + f * s45, zb + f - f * s45) }]);
         revolveProfile(context, id + "body", concatenateArrays([[
                     { "p" : rz(rmaj, Z) }, { "p" : rz(rc, Z) }, { "p" : rz(rc, z1) }, { "p" : rz(r2, zr) }, { "p" : rz(rk, zr) },
-                    { "p" : rz(rk, -al) }], edges, [
+                    { "p" : rz(rk, zrb) }], edges, [
                     { "p" : rz(rmaj, zb) }, { "p" : rz(rmin, zb + rmaj - rmin) }, { "p" : rz(rmin, -(rmaj - rmin)) }
                 ]]));
         if (scallops)
@@ -3244,7 +3252,7 @@ export const pemNut = defineFeature(function(context is Context, id is Id, defin
             const rn = 0.05 * definition.de;
             const rcn = (definition.dc + definition.de) * 0.225 + rn;
             var base = XY_PLANE;
-            base.origin[2] = -al;
+            base.origin[2] = zrb;
             const sk = newSketchOnPlane(context, id + "notchSketch", { "sketchPlane" : base });
             for (var k = 0; k < 24; k += 1)
             {
@@ -3265,8 +3273,37 @@ export const pemNut = defineFeature(function(context is Context, id is Id, defin
         const gap = (definition.form == 3 ? 0.5 : (scallops ? 0.635 : 0.381)) * millimeter;
         const five = definition.form == 2;
         const third = (re - cb - rmaj) / 3;
-        const h = five ? definition.mh : (definition.form == 4 ? third : re - cb - rmaj - 2 * gap);
-        const rb = five ? re - cb - 0.635 * millimeter - h : rmaj + (definition.form == 4 ? third : gap);
+        const rcone = re - al / 2;
+        const h = five ? definition.mh : (definition.form == 4 ? third : (hnl ? rcone - 0.35 * definition.de : re - cb - rmaj - 2 * gap));
+        const rb = five ? re - cb - 0.635 * millimeter - h : (hnl ? 0.35 * definition.de : rmaj + (definition.form == 4 ? third : gap));
+        if (hnl)
+        {
+            // The flats, then the tabs under them, coned inside.
+            const xf = 0.47 * definition.de;
+            const w = 0.8 * al;
+            const ri = 0.35 * definition.de;
+            const xi = sqrt(ri * ri - w * w);
+            var bottom = XY_PLANE;
+            bottom.origin[2] = zb;
+            const fs = newSketchOnPlane(context, id + "flatSketch", { "sketchPlane" : bottom });
+            const tsk = newSketchOnPlane(context, id + "tabSketch", { "sketchPlane" : bottom });
+            for (var k = 0; k < 2; k += 1)
+            {
+                const sg = k == 0 ? 1 : -1;
+                skPolyline(fs, "flat" ~ k, { "points" : [vector(sg * xf, -re), vector(sg * 2 * re, -re), vector(sg * 2 * re, re), vector(sg * xf, re), vector(sg * xf, -re)] });
+                skArc(tsk, "tabArc" ~ k, { "start" : vector(sg * xi, -w), "mid" : vector(sg * ri, Z), "end" : vector(sg * xi, w) });
+                skPolyline(tsk, "tab" ~ k, { "points" : [vector(sg * xi, w), vector(sg * xf, w), vector(sg * xf, -w), vector(sg * xi, -w)] });
+            }
+            skSolve(fs);
+            skSolve(tsk);
+            opExtrude(context, id + "flats", { "entities" : qSketchRegion(id + "flatSketch"), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : 0.15 * tl });
+            opExtrude(context, id + "tabs", { "entities" : qSketchRegion(id + "tabSketch"), "direction" : vector(0, 0, -1), "endBound" : BoundingType.BLIND, "endDepth" : 0.8 * al });
+            opDeleteBodies(context, id + "deleteBottomSketches", { "entities" : qUnion([qCreatedBy(id + "flatSketch", EntityType.BODY), qCreatedBy(id + "tabSketch", EntityType.BODY)]) });
+            subtract(context, id + "cutFlats", qCreatedBy(id + "body", EntityType.BODY), qCreatedBy(id + "flats", EntityType.BODY));
+            opBoolean(context, id + "addTabs", { "tools" : qUnion([qCreatedBy(id + "body", EntityType.BODY), qCreatedBy(id + "tabs", EntityType.BODY)]), "operationType" : BooleanOperationType.UNION });
+            revolveProfile(context, id + "cone", [{ "p" : rz(ri, zb) }, { "p" : rz(ri, zb - 0.8 * al - EPS) }, { "p" : rz(rcone + EPS, zb - 0.8 * al - EPS) }]);
+            subtract(context, id + "coneCut", qCreatedBy(id + "body", EntityType.BODY), qCreatedBy(id + "cone", EntityType.BODY));
+        }
         if (definition.md > EPS && h > EPS)
         {
             const letters = five ? [["P", 45, 0.85509], ["E", 0, 0.77913], ["M", -45, 1.2084], ["S", -150, 0.78578], ["H", 150, 0.97917]] :

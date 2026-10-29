@@ -3852,6 +3852,81 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_FASTENER_MATERIAL_TYPE (component document f458d785890472b8ed510948; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Metric",
+    "class": "Self-clinching nuts",
+    "name": "HNL™ Prevailing torque locknuts",
+    "shape": "pemNut",
+    "form": {
+     "form": 6
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Carbon Steel"
+    ],
+    "materialCodes": {
+     "Carbon Steel": {
+      "code": "HNL",
+      "finish": "Zinc plated",
+      "finishCode": "LZ"
+     }
+    },
+    "sizes": [
+     {
+      "name": "M6x1.00",
+      "label": "PEM {type}-M6",
+      "d": 6.0,
+      "dims": {
+       "dm": 4.917,
+       "dmaj": 6.0,
+       "dc": 8.72,
+       "de": 12.7,
+       "tl": 5.0,
+       "al": 1.48,
+       "md": 0.05
+      },
+      "lengths": [],
+      "lengthDims": {},
+      "lengthNames": {}
+     },
+     {
+      "name": "M8x1.25",
+      "label": "PEM {type}-M8",
+      "d": 8.0,
+      "dims": {
+       "dm": 6.647,
+       "dmaj": 8.0,
+       "dc": 10.47,
+       "de": 14.6,
+       "tl": 6.3,
+       "al": 1.48,
+       "md": 0.063
+      },
+      "lengths": [],
+      "lengthDims": {},
+      "lengthNames": {}
+     },
+     {
+      "name": "M10x1.50",
+      "label": "PEM {type}-M10",
+      "d": 10.0,
+      "dims": {
+       "dm": 8.376,
+       "dmaj": 10.0,
+       "dc": 12.67,
+       "de": 16.5,
+       "tl": 7.9,
+       "al": 1.48,
+       "md": 0.079
+      },
+      "lengths": [],
+      "lengthDims": {},
+      "lengthNames": {}
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN (component document 618f9033dde41fb7297b5536; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  },
@@ -9532,6 +9607,81 @@
     ],
     "nearOnly": false,
     "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN, DATA_FASTENER_MATERIAL_TYPE (component document 648038d44e8d1cc5943d52ad; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
+   },
+   {
+    "category": "Unified",
+    "class": "Self-clinching nuts",
+    "name": "HNL™ Prevailing torque locknuts",
+    "shape": "pemNut",
+    "form": {
+     "form": 6
+    },
+    "lengthLabel": "Sheet thickness",
+    "materials": [
+     "Carbon Steel"
+    ],
+    "materialCodes": {
+     "Carbon Steel": {
+      "code": "HNL",
+      "finish": "Zinc plated",
+      "finishCode": "LZ"
+     }
+    },
+    "sizes": [
+     {
+      "name": "1/4-20",
+      "label": "PEM {type}-0420",
+      "d": 0.25,
+      "dims": {
+       "dm": 0.196,
+       "dmaj": 0.25,
+       "dc": 0.343,
+       "de": 0.5,
+       "tl": 0.189,
+       "al": 0.058,
+       "md": 0.00189
+      },
+      "lengths": [],
+      "lengthDims": {},
+      "lengthNames": {}
+     },
+     {
+      "name": "5/16-18",
+      "label": "PEM {type}-0518",
+      "d": 0.313,
+      "dims": {
+       "dm": 0.252,
+       "dmaj": 0.313,
+       "dc": 0.412,
+       "de": 0.575,
+       "tl": 0.24,
+       "al": 0.058,
+       "md": 0.0024
+      },
+      "lengths": [],
+      "lengthDims": {},
+      "lengthNames": {}
+     },
+     {
+      "name": "3/8-16",
+      "label": "PEM {type}-0616",
+      "d": 0.375,
+      "dims": {
+       "dm": 0.307,
+       "dmaj": 0.375,
+       "dc": 0.499,
+       "de": 0.65,
+       "tl": 0.3,
+       "al": 0.058,
+       "md": 0.003
+      },
+      "lengths": [],
+      "lengthDims": {},
+      "lengthNames": {}
+     }
+    ],
+    "nearOnly": false,
+    "source": "Onshape standard content tables DATA_SELF_LOCKING_CLINCH_NUT_MAIN (component document 4f7725c5981ee6f593304498; live/dom/skb-sc-fsrules); dialog as live (behaviours request 1591)"
    }
   ]
  }
