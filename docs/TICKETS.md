@@ -6,6 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## Release blockers for the 2026-10-29 05:00 release (qa, early notes 10-28 18:55; final list at 04:30)
+- **qa 05:50: tag v0.4.13 = 110539f2 = 5e56477b + "Release v0.4.13" (Cargo.toml / Cargo.lock version only)**, the code checked below; artifact smoke when published.
 - **qa 05:03, for the held v0.4.13 cut from green 5e56477b: no open release blocker.** RUST-MIRROR-EXTRA-FACE (the only open
   regression in the 04:05 list) is **fixed and verified on 5e56477b** (bool 6c16a4ce): the mirrored plate's hole wall is one 628.319 mm²
   face again and cli-fillet-segv's Part 1 is back to v0.4.12's 1198.544 mm³; halfmir, live-30, wf-block unchanged-correct in the app.
