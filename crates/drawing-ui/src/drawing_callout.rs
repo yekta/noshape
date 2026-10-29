@@ -271,6 +271,16 @@ impl DrawingEditor {
     }
 }
 
+/// A stacked instance row being dragged (its index); no ghost.
+#[derive(Clone)]
+struct StackDrag(usize);
+
+impl Render for StackDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
 /// Add stacked callouts (live drawing/191–194): the anchor callout, the
 /// picked instances ("Stacked instances", each with ✕), and Add instances
 /// from BOM (then clicks on the BOM table's first column add its rows).
@@ -360,10 +370,34 @@ impl DrawingEditor {
             .border_1()
             .border_color(pal.accent)
             .bg(gpui_kit::rgb(0xe4f1fb))
-            .child(h_flex().child(div().flex_1().text_size(px(10.)).text_color(pal.text_muted).child("Stacked instances")).child(div().text_size(px(11.)).text_color(pal.text_muted).child("⇅")));
+            .child(h_flex().child(div().flex_1().text_size(px(10.)).text_color(pal.text_muted).child("Stacked instances")).child(
+                // ⇅ reverses the order; a row dragged onto another moves there
+                // (drawing.md A28).
+                div().id("stack-reverse").text_size(px(11.)).text_color(pal.text_muted).cursor_pointer().child("⇅").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    if let Some(d) = &mut this.stack_dlg {
+                        d.picks.reverse();
+                    }
+                    cx.notify();
+                })),
+            ));
         for (i, (name, _)) in d.picks.iter().enumerate() {
             list = list.child(
-                h_flex().h(px(20.)).child(div().flex_1().text_size(px(12.)).child(crate::ui::user_text(name.clone()))).child(
+                h_flex()
+                    .id(("stack-row", i))
+                    .h(px(20.))
+                    .cursor_grab()
+                    .on_drag(StackDrag(i), |d, _, _, cx| cx.new(|_| d.clone()))
+                    .on_drop(cx.listener(move |this, from: &StackDrag, _, cx| {
+                        if let Some(d) = &mut this.stack_dlg
+                            && from.0 < d.picks.len()
+                            && i < d.picks.len()
+                        {
+                            let x = d.picks.remove(from.0);
+                            d.picks.insert(i, x);
+                        }
+                        cx.notify();
+                    }))
+                    .child(div().flex_1().text_size(px(12.)).child(crate::ui::user_text(name.clone()))).child(
                     div().id(("stack-x", i)).px(px(4.)).cursor_pointer().text_color(pal.text_muted).child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(d) = &mut this.stack_dlg
                             && i < d.picks.len()
