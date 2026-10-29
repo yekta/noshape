@@ -499,6 +499,10 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- FYI 10-29 05:28: /root/occt/lib/libTKBO.a is patch 0004's "on" build (/root/core-scratch/libTKBO.a.0004-on3), landed
+  with f93ac93c; the previous one is /root/core-scratch/libTKBO.a.0004-optin. Its pairs stay serial unless the kernel
+  turns them on, so older trees built against it behave as before. The same prune also deletes binaries copied out
+  of target dirs when they keep the `noshape-*` name (a CLI copy in /root/core-scratch vanished mid-run at 03:16).
 - Never swap an OCCT lib into the shared /root/occt before its patch lands (I did 10-28 20:50-22:05 with a "pairs
   on" TKBO, and qa's 21:05 build picked it up): /root/occt-core + /root/target-core-bop is the place to try them.
 - /tmp/lead/disk-loop.sh's `prune-exes.py` (every ~30 min) keeps the newest 2 builds of each noshape crate per
