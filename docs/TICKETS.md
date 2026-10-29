@@ -6,7 +6,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## Release blockers for the 2026-10-29 05:00 release (qa, early notes 10-28 18:55; final list at 04:30)
-- **qa 04:05, list on green 7d5be491 (re-confirm at 04:30):**
+- **qa 04:26, re-confirmed on green c32e66f4** (adds bool f9c88af1 / a37109e5, dx 3bb808d2, skasm c32e66f4 since 7d5b; live-30 60779.484 / 15848.357, halfmir 7214.602, wf-block 6649.885 in the app; GUI fuzz 160–166 alive): the list below stands; RUST-MIRROR-EXTRA-FACE is still the only open regression (no bool commit for it on main).
+- **qa 04:05, list on green 7d5be491:**
   - **Open regression since v0.4.12 (P1, release blocker per PRIORITIES unless accepted): RUST-MIRROR-EXTRA-FACE (bool, from
     da75e17b ~22:00).** A part mirrored onto itself with Add (plate with a through hole, Part mirror across its face) keeps the hole
     wall split in two at the mirror plane (2 × 314.159 mm² instead of one 628.319, plus a seam circle edge); volumes right. Seen in
