@@ -705,27 +705,43 @@ rust::Vec<double> bounding_box(const OcShape& s, bool optimal)
     constexpr int        run = 64;
     const int            n   = faces.Extent();
     std::vector<Bnd_Box> boxes((size_t)((n + run - 1) / run));
-    OSD_Parallel::For(0, (int)boxes.size(), [&](int c) {
-      for (int i = c * run + 1; i <= std::min(n, (c + 1) * run); ++i)
-        BRepBndLib::Add(faces(i), boxes[(size_t)c], false);
-    });
+    {
+      const KernelTimer timer("box.faces");
+      OSD_Parallel::For(0, (int)boxes.size(), [&](int c) {
+        for (int i = c * run + 1; i <= std::min(n, (c + 1) * run); ++i)
+          BRepBndLib::Add(faces(i), boxes[(size_t)c], false);
+      });
+    }
     for (const Bnd_Box& x : boxes)
       b.Add(x);
-    for (TopExp_Explorer e(s.shape, TopAbs_EDGE, TopAbs_FACE); e.More(); e.Next())
-      BRepBndLib::Add(e.Current(), b, false);
-    for (TopExp_Explorer v(s.shape, TopAbs_VERTEX, TopAbs_EDGE); v.More(); v.Next())
-      BRepBndLib::Add(v.Current(), b, false);
+    // A solid's (or solids') edges all bound its faces, and its vertices its edges: nothing outside to walk to.
+    const KernelTimer  timer("box.rest");
+    const TopAbs_ShapeEnum t      = s.shape.ShapeType();
+    bool                   solids = t == TopAbs_SOLID || t == TopAbs_COMPSOLID;
+    if (t == TopAbs_COMPOUND)
+    {
+      solids = true;
+      for (TopoDS_Iterator it(s.shape); it.More() && solids; it.Next())
+        solids = it.Value().ShapeType() == TopAbs_SOLID;
+    }
+    if (!solids)
+    {
+      for (TopExp_Explorer e(s.shape, TopAbs_EDGE, TopAbs_FACE); e.More(); e.Next())
+        BRepBndLib::Add(e.Current(), b, false);
+      for (TopExp_Explorer v(s.shape, TopAbs_VERTEX, TopAbs_EDGE); v.More(); v.Next())
+        BRepBndLib::Add(v.Current(), b, false);
+    }
   }
   else
     BRepBndLib::Add(s.shape, b, false);
   // Mesh faces have no surface: their triangulation's nodes.
-  for (TopExp_Explorer e(s.shape, TopAbs_FACE); e.More(); e.Next())
-    if (is_mesh_face(TopoDS::Face(e.Current())))
+  for (int i = 1; i <= faces.Extent(); ++i)
+    if (is_mesh_face(TopoDS::Face(faces(i))))
     {
       TopLoc_Location                       l;
-      const occ::handle<Poly_Triangulation> t = BRep_Tool::Triangulation(TopoDS::Face(e.Current()), l);
-      for (int i = 1; i <= t->NbNodes(); ++i)
-        b.Add(t->Node(i).Transformed(l.Transformation()));
+      const occ::handle<Poly_Triangulation> t = BRep_Tool::Triangulation(TopoDS::Face(faces(i)), l);
+      for (int k = 1; k <= t->NbNodes(); ++k)
+        b.Add(t->Node(k).Transformed(l.Transformation()));
     }
   if (b.IsVoid())
     fail_invalid("shape has no geometry (void bounding box)");
