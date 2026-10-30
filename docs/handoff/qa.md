@@ -9,6 +9,15 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **10-30 07:20 update (greens eef0848d … f9541749; release v0.4.15):** v0.4.15 smoked (TICKETS top; handoff › Daily release smoke):
+  no blocker; new **P2 DRAFT-BLOWUP-0415** (cli-draft-segv: a 30° neutral-plane Draft grows a part to 112331 mm³, x −60…60, z −69.3;
+  also with OCCT; core's Draft / Shell rework). Verified BOOL-TOUCH-INFO (eef0848d), ENCLOSE-NO-REGION-MSG + BODY-NAME-BY-TYPE
+  (58810bd9), AGENT-ELLIPSE-DIM-VALUE + API-ASM-RELATIONS (on dx's debug CLI 02:26, rel/k/dx/0226). FILL-MERGE-WITH-ALL still
+  New / no checkbox (58810bd9). **MIRROR-HANG-402 reopened**: the app commit still hangs on fd65effd; core's worktree CLI (05:38,
+  rel/k/core/0538) finishes the CLI form in 60 s — re-check the app on the next green with core's work. bool 5b31f344 / 7523035a /
+  235fb4a2: app Rust-vs-OCCT all equal except POINT-TOUCH 3-27; **sheets (bool e1ae2e22) can't be measured in the app**: Mass
+  properties takes no Surface (bin/shgen.py documents in qa-scratch/sheetdocs made; only the 0-volume intersect case compares,
+  equal) — needs a CLI of main. CLI fuzz v0.4.14 441–500 clean; v0.4.15 501–507 clean (fuzz moved to the release CLI).
 - **10-30 02:56 update (greens 75a04b06 … 80499a93):** verified DRAWING-SHIFT-SLASH (75a04b06), OCCT-MIRROR-OVERCOUNT (c6148db2:
   boolmir 17 #13 = 785.398 mm³ with NOSHAPE_BOOL_RUST=0), OCCT-UNION-OFFSET-CYL (c6077d3c: 1670.629 on both paths),
   MASS-INERTIA-APPROX (ff8286e5: CoM (0,0,15), Lxx = Lyy; Lxy shows "5.313e-7" instead of 0, noted). MESH-EMPTY-LOOP-PANIC (psui
