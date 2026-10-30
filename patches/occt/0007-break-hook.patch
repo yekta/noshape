@@ -1,7 +1,7 @@
 diff -ru a/src/ModelingAlgorithms/TKFillet/BRepBlend/BRepBlend_Walking.cxx b/src/ModelingAlgorithms/TKFillet/BRepBlend/BRepBlend_Walking.cxx
 --- a/src/ModelingAlgorithms/TKFillet/BRepBlend/BRepBlend_Walking.cxx	2026-10-30 11:40:53.934212753 +0000
-+++ b/src/ModelingAlgorithms/TKFillet/BRepBlend/BRepBlend_Walking.cxx	2026-10-30 11:40:53.952341849 +0000
-@@ -13,6 +13,12 @@
++++ b/src/ModelingAlgorithms/TKFillet/BRepBlend/BRepBlend_Walking.cxx	2026-10-30 14:17:41.606055106 +0000
+@@ -13,6 +13,20 @@
  // commercial license or contractual agreement.
  
  #include <BRepBlend_Walking.hxx>
@@ -11,10 +11,18 @@ diff -ru a/src/ModelingAlgorithms/TKFillet/BRepBlend/BRepBlend_Walking.cxx b/src
 +// noshape's kernel, boolean.cpp): the blend and draft builds take no progress
 +// indicator, so a budget off Linux can't stop them otherwise.
 +extern "C" int noshape_should_break();
++#if defined(__GNUC__)
++// The default for a program that doesn't define the hook (noshape before
++// it did): never stop.
++extern "C" __attribute__((weak)) int noshape_should_break()
++{
++  return 0;
++}
++#endif
  
  #include <Adaptor2d_Curve2d.hxx>
  #include <Adaptor3d_Curve.hxx>
-@@ -1972,6 +1978,8 @@
+@@ -1972,6 +1986,8 @@
  
    while (!Arrive)
    {
@@ -25,8 +33,8 @@ diff -ru a/src/ModelingAlgorithms/TKFillet/BRepBlend/BRepBlend_Walking.cxx b/src
      nbcomputedsection++;
 diff -ru a/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder.cxx b/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder.cxx
 --- a/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder.cxx	2026-10-30 11:40:53.934450815 +0000
-+++ b/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder.cxx	2026-10-30 11:40:53.966611931 +0000
-@@ -15,6 +15,11 @@
++++ b/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder.cxx	2026-10-30 14:17:41.604963202 +0000
+@@ -15,6 +15,19 @@
  // commercial license or contractual agreement.
  
  #include <Adaptor2d_Curve2d.hxx>
@@ -35,10 +43,18 @@ diff -ru a/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder.cxx b/src/Model
 +// noshape's kernel, boolean.cpp): the blend and draft builds take no progress
 +// indicator, so a budget off Linux can't stop them otherwise.
 +extern "C" int noshape_should_break();
++#if defined(__GNUC__)
++// The default for a program that doesn't define the hook (noshape before
++// it did): never stop.
++extern "C" __attribute__((weak)) int noshape_should_break()
++{
++  return 0;
++}
++#endif
  #include <Blend_FuncInv.hxx>
  #include <BRepBlend_Line.hxx>
  #include <BRepLib.hxx>
-@@ -270,6 +275,8 @@
+@@ -270,6 +283,8 @@
      try
      {
        OCC_CATCH_SIGNALS
@@ -47,7 +63,7 @@ diff -ru a/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder.cxx b/src/Model
        PerformSetOfSurf(itel.ChangeValue());
      }
      catch (Standard_Failure const& anException)
-@@ -307,6 +314,8 @@
+@@ -307,6 +322,8 @@
        try
        {
          OCC_CATCH_SIGNALS
@@ -58,8 +74,8 @@ diff -ru a/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder.cxx b/src/Model
        catch (Standard_Failure const& anException)
 diff -ru a/src/ModelingAlgorithms/TKOffset/Draft/Draft_Modification_1.cxx b/src/ModelingAlgorithms/TKOffset/Draft/Draft_Modification_1.cxx
 --- a/src/ModelingAlgorithms/TKOffset/Draft/Draft_Modification_1.cxx	2026-10-30 11:40:53.935417678 +0000
-+++ b/src/ModelingAlgorithms/TKOffset/Draft/Draft_Modification_1.cxx	2026-10-30 11:40:53.987747401 +0000
-@@ -15,6 +15,11 @@
++++ b/src/ModelingAlgorithms/TKOffset/Draft/Draft_Modification_1.cxx	2026-10-30 14:17:41.603407032 +0000
+@@ -15,6 +15,19 @@
  // commercial license or contractual agreement.
  
  #include <Adaptor3d_CurveOnSurface.hxx>
@@ -68,10 +84,18 @@ diff -ru a/src/ModelingAlgorithms/TKOffset/Draft/Draft_Modification_1.cxx b/src/
 +// noshape's kernel, boolean.cpp): the blend and draft builds take no progress
 +// indicator, so a budget off Linux can't stop them otherwise.
 +extern "C" int noshape_should_break();
++#if defined(__GNUC__)
++// The default for a program that doesn't define the hook (noshape before
++// it did): never stop.
++extern "C" __attribute__((weak)) int noshape_should_break()
++{
++  return 0;
++}
++#endif
  #include <GeomAdaptor_SurfaceOfLinearExtrusion.hxx>
  #include <Approx_CurveOnSurface.hxx>
  #include <BRep_Builder.hxx>
-@@ -724,6 +729,8 @@
+@@ -724,6 +737,8 @@
  
      for (int i = 1; i <= myFMap.Extent(); i++)
      {
