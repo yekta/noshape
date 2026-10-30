@@ -117,9 +117,10 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
 - Table letters (10-30): `Context::sm_births`, the std rebuild's first-sight order of definition edges (by end points)
   and rolled faces (by box): an edge a later feature changes is new, as Onshape's transient ids; Bend / Rip `birth`;
   the panel sorts joints by it (live request 1604; T2 joint_births_follow_live_letters).
-- Open (10-30 morning): (1) (was: table letters, done above). (2) **Butt joint Direction 1 after a Convert**
-  and evaluateQuery order generally: live returns faces in creation order (extrude: first side, start cap, end cap,
-  other sides; rebuilt faces last; request 1608), ours in body order. (3) rect→triangle loft: 51 vs 49 faces (live's
+- Open (10-30 morning): (1) (was: table letters, done above). (2) evaluateQuery order generally: live returns faces in
+  creation order (rebuilt faces last; request 1608); the host lists a body only one Extrude made in live's order
+  (first side, start cap, end cap, other sides: query.rs `creation_order`, which fixed the Convert's Butt Direction 1),
+  other bodies in body order. (3) rect→triangle loft: 51 vs 49 faces (live's
   2 swept faces where three bends meet; their place unknown). (4) Flat view: Copy Flat pattern (live pastes a flat part
   instance into an assembly), Select other…, the sketch frame in the flat view. Closed corner: done (live's regen
   volume 8535.1655548, request 1606; its 8535.0418 was /massproperties).

@@ -228,7 +228,7 @@ impl<'a> QueryCx<'a> {
                     out.push(Ent::Body(*b));
                 }
                 if want(EType::Face) {
-                    out.extend((0..body.faces.len()).map(|f| Ent::Face(*b, f)));
+                    out.extend(creation_order(&body.faces).into_iter().map(|f| Ent::Face(*b, f)));
                 }
                 if want(EType::Edge) {
                     out.extend((0..body.edges.len()).map(|e| Ent::Edge(*b, e)));
@@ -850,6 +850,33 @@ pub fn relocated(q: &QueryCx, r: &Reference, snap: &Snapshot) -> Option<Ent> {
 fn snap_matches(q: &QueryCx, snap: &Snapshot, e: &Ent) -> bool {
     entity_type_of(e) == snap.etype
         && q.shape(e).is_some_and(|s| snap.points.iter().all(|p| k::make_vertex(*p).ok().and_then(|v| k::distance(&v, &s).ok()).is_some_and(|d| d.distance < 1e-7)))
+}
+
+/// A body's faces in Onshape's evaluateQuery order (creation order, live
+/// request 1608) where we know it: a body only one Extrude made gives the
+/// first profile edge's side, the start cap, the end cap, then the other
+/// sides in profile order (std's Convert numbers its walls in this order;
+/// Butt joint - Direction 1 follows it). Other bodies: body order.
+fn creation_order(faces: &[crate::naming::Name]) -> Vec<usize> {
+    use crate::reference::{Role, TopoName};
+    let plain: Option<Vec<(u8, Option<&crate::reference::Source>)>> = faces
+        .iter()
+        .map(|n| match &**n {
+            TopoName::Face { feature, role: Role::Side(s) } => Some((*feature, 0, Some(s))),
+            TopoName::Face { feature, role: Role::CapStart(_) } => Some((*feature, 1, None)),
+            TopoName::Face { feature, role: Role::CapEnd(_) } => Some((*feature, 2, None)),
+            _ => None,
+        })
+        .collect::<Option<Vec<_>>>()
+        .filter(|v| v.windows(2).all(|w| w[0].0 == w[1].0) && v.iter().filter(|x| x.1 == 1).count() == 1 && v.iter().filter(|x| x.1 == 2).count() == 1)
+        .map(|v| v.into_iter().map(|(_, k, s)| (k, s)).collect());
+    let Some(plain) = plain else { return (0..faces.len()).collect() };
+    let mut sides: Vec<usize> = (0..faces.len()).filter(|&i| plain[i].0 == 0).collect();
+    sides.sort_by(|a, b| plain[*a].1.cmp(&plain[*b].1).then(a.cmp(b)));
+    let cap = |k: u8| (0..faces.len()).find(|&i| plain[i].0 == k);
+    let mut out: Vec<usize> = sides.first().copied().into_iter().chain(cap(1)).chain(cap(2)).collect();
+    out.extend(sides.iter().skip(1));
+    out
 }
 
 fn uniq(v: Vec<Ent>) -> Vec<Ent> {

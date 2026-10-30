@@ -56,7 +56,7 @@ numbers), ◐ = partly, ✗ = differs, — = no live data.
 | 6.9 Finish | "Sheet metal parts" Part 1, INFO notice, table stays | ✅ | GUI 10-30 |
 | 9 parts list | only Part 1 | ✅ | GUI 10-30 |
 | Bend / Jog / Make joint / Tab-beside / cut / hole / counterbore then Flange / partial flange / Butt direction | see the 10-29/10-30 tables below | ✅ | T2s |
-| Butt direction after a Convert | top wall should run through (live: faces in creation order, request 1608) | ✗ P3 | T2 convert_rips_and_bends_like_onshape |
+| Butt direction after a Convert | the top wall runs through (a body one Extrude made lists its faces in live's order: first side, start cap, end cap, other sides; request 1608) | ✅ | T2 convert_rips_and_bends_like_onshape |
 | Sheet metal loft rect → triangle | 51 vs 49 faces | ✗ P3 | T2 sheet_metal_loft_rectangle_to_triangle |
 
 ## 1. Base: sketch + Sheet metal model (Thicken)
