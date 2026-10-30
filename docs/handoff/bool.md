@@ -824,6 +824,14 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   argument and the original solid keeps no record: Deleted then, by where sections end, not by caps. The whole
   knurl (one scaled OCCT cut in the model) says Modified, as ours; our early "tools coincide" decline stays until
   this is understood.
+  Answer (23:45): neither. Plain OCCT (BRepAlgoAPI_Cut, serial or parallel, non-destructive or not) says Modified on
+  the 10-groove piece too. The Deleted is the kernel's: op_boolean builds a cut by 8 or more tools that fall into 2+
+  disjoint groups with core's CutByFaces (the cut from the faces' classification, no split solids), whose history
+  has no record for the target's solid (Deleted); where that build fails it builds again the usual way (Modified).
+  5 grooves: under 8 tools, Modified; 10 / 26 grooves and 6cf0bfdc (14 tools): CutByFaces, Deleted; the whole
+  knurl: CutByFaces failed, Modified. So "tools coincide" (its comment: "OCCT may build the object's solid anew")
+  was most likely this too. Request to core below; until then noshape's Boolean can't match today's record on such
+  cuts without knowing whether CutByFaces succeeds.
 - perf.sh: both bool_patterns runs (cc8837a7, 620d5eaf) ran no test ("0 passed, 175 filtered out": the binary of
   another commit; the ~/perf/wt race in Requests), so vibe3 numbers for the pattern set are still to come; the
   numbers above are this machine's (relative only).
@@ -864,6 +872,12 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   profiles and make it cheaper (only the merged faces' share of the volume) if it shows.
 
 ## Requests
+- core (10-30 23:45 UTC): op_boolean's CutByFaces build (a cut by 8+ tools in 2+ disjoint groups) leaves the
+  target's solid without a record (history: Deleted), where every other path (OCCT's usual build, its fallback when
+  CutByFaces fails, noshape's Boolean) says Modified into the result's solid. Could CutByFaces record the target's
+  solid as Modified into the result's? Then noshape's Boolean can take those cuts (the B94.6 knurl's is one: it now
+  declines "tools coincide" on that account) with the same history as today. If anything (names, bodies) relies on
+  the Deleted, tell me and I'll mirror it instead.
 - lead (10-30 19:00 UTC): tools/tiers/perf-remote.sh checks out the shared ~/perf/wt before it takes ~/perf/lock, so
   a second perf.sh started meanwhile can switch the tree under the first's build (mine ran a commit without the test:
   "0 passed, 175 filtered out"); take the lock before the checkout.
