@@ -330,3 +330,35 @@ fn rust_blends_of_rims_are_occts() {
         }
     }
 }
+
+/// noshape's own blends of straight edges ending on caps square to them: a block's four vertical edges
+/// (each its own chain, the top's and bottom's edges cut short by two of them), and a step's concave edge,
+/// filleted and chamfered: OCCT's result and history.
+#[test]
+fn rust_blends_of_open_chains_are_occts() {
+    let block = make_box_corners(DVec3::ZERO, DVec3::new(40.0, 20.0, 10.0)).unwrap();
+    let step = fuse(&block, &make_box_corners(DVec3::new(0.0, 0.0, 10.0), DVec3::new(15.0, 20.0, 20.0)).unwrap()).unwrap().shape;
+    let step = unify_same_domain(&step).unwrap().shape;
+    let vertical = |s: &Shape| -> Vec<Shape> { s.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| (i.start.z - i.end.z).abs() > 9.9 && (i.start.x - i.end.x).abs() < 1e-9 && (i.start.y - i.end.y).abs() < 1e-9 && i.start.z.min(i.end.z) < 1e-9)).collect() };
+    let concave = |s: &Shape| -> Vec<Shape> { s.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| (i.start.x - 15.0).abs() < 1e-9 && (i.end.x - 15.0).abs() < 1e-9 && (i.start.z - 10.0).abs() < 1e-9 && (i.end.z - 10.0).abs() < 1e-9)).collect() };
+    for (what, part, edges) in [("block's verticals", &block, vertical(&block)), ("step's concave edge", &step, concave(&step))] {
+        assert!(!edges.is_empty(), "{what}");
+        for spec in ["fillet", "chamfer"] {
+            let run = || match spec {
+                "fillet" => fillet(part, &edges, 2.0),
+                _ => chamfer(part, &edges, ChamferSpec::Equal(1.5), &[]),
+            };
+            set_rust_blend(Some(false));
+            let occt = run().unwrap();
+            set_rust_blend(Some(true));
+            reset_blend_decline();
+            let ours = run();
+            set_rust_blend(None);
+            let why = last_blend_decline();
+            let ours = ours.unwrap();
+            assert_eq!(why, "", "{what} {spec}: declined");
+            let d = bool_corpus::Summary::of(&ours).differences(&bool_corpus::Summary::of(&occt));
+            assert!(d.is_empty(), "{what} {spec}: {}", d.join(", "));
+        }
+    }
+}

@@ -3557,16 +3557,6 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     rs.push_back(r);
     rmax = std::max(rmax, r);
   }
-  // noshape's own (NOSHAPE_BLEND_RUST=1), where it builds the blend exactly.
-  {
-    std::vector<std::array<double, 3>> sp;
-    for (double r : rs)
-      sp.push_back({0, r, r});
-    TopoDS_Shape r;
-    HHist        h;
-    if (rust_blend(s, es, sp, {}, r, h))
-      return make_result({s.shape}, r, h.get());
-  }
   // One square corner edge: built directly.
   if (checked && es.size() == 1)
   {
@@ -3578,6 +3568,17 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
       done = fillet_square_corner(s.shape, es[0], rs[0], r, h);
     }
     if (done)
+      return make_result({s.shape}, r, h.get());
+  }
+  // noshape's own (NOSHAPE_BLEND_RUST=1), where it builds the blend exactly (after the square corner, which
+  // takes its single edges with a history of its own).
+  {
+    std::vector<std::array<double, 3>> sp;
+    for (double r : rs)
+      sp.push_back({0, r, r});
+    TopoDS_Shape r;
+    HHist        h;
+    if (rust_blend(s, es, sp, {}, r, h))
       return make_result({s.shape}, r, h.get());
   }
   if (checked)

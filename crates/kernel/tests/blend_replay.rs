@@ -129,3 +129,66 @@ fn blend_case_diff() {
         println!("ours only: {x}");
     }
 }
+
+/// The corpus's cases by shape (for choosing what noshape's blend takes next): per decline reason, the edges'
+/// curves and their two faces' surfaces. `cargo test -p noshape-kernel --test all blend_replay::blend_corpus_shapes -- --ignored --nocapture`
+#[test]
+#[ignore = "T2 tool: the blend corpus by shape"]
+fn blend_corpus_shapes() {
+    use noshape_brep::{Curve, Surface};
+    let dir = std::env::var("NOSHAPE_BLEND_CORPUS").unwrap_or_else(|_| "/root/core-scratch/blend-corpus".into());
+    let mut tally: std::collections::BTreeMap<String, usize> = Default::default();
+    noshape_kernel::set_rust_blend(Some(true));
+    for name in blend_corpus::cases(Path::new(&dir)) {
+        let Some(case) = blend_corpus::load(Path::new(&dir), &name) else { continue };
+        noshape_kernel::reset_blend_decline();
+        let _ = blend_corpus::run(&case);
+        let why = noshape_kernel::last_blend_decline();
+        let Ok(body) = noshape_kernel::brep_body(&case.shape) else {
+            *tally.entry(format!("{why} | no body")).or_insert(0) += 1;
+            continue;
+        };
+        let mut faces_of = vec![Vec::new(); body.edges.len()];
+        for (f, face) in body.faces.iter().enumerate() {
+            for lp in &face.loops {
+                for u in lp {
+                    faces_of[u.edge as usize].push(f);
+                }
+            }
+        }
+        let sk = |s: &Surface| match s {
+            Surface::Plane { .. } => "plane",
+            Surface::Cylinder { .. } => "cyl",
+            Surface::Cone { .. } => "cone",
+            Surface::Torus { .. } => "torus",
+            Surface::Sphere { .. } => "sphere",
+            _ => "free",
+        };
+        let mut kinds: Vec<String> = case
+            .edges
+            .iter()
+            .filter_map(|e| case.shape.index_of(e, noshape_kernel::ShapeType::Edge))
+            .map(|i| {
+                let c = match body.edges[i].curve {
+                    Curve::Line => "line",
+                    Curve::Circle { .. } => "arc",
+                    _ => "other",
+                };
+                let mut fs: Vec<&str> = faces_of[i].iter().map(|&f| sk(&body.faces[f].surface)).collect();
+                fs.sort();
+                format!("{c}({})", fs.join("/"))
+            })
+            .collect();
+        kinds.sort();
+        kinds.dedup();
+        let n = case.edges.len();
+        let bucket = if n == 1 { "1".to_string() } else if n <= 4 { "2-4".into() } else { "5+".into() };
+        *tally.entry(format!("{why} | {bucket} edges | {}", kinds.join(" "))).or_insert(0) += 1;
+    }
+    noshape_kernel::set_rust_blend(None);
+    let mut v: Vec<_> = tally.into_iter().collect();
+    v.sort_by(|a, b| b.1.cmp(&a.1));
+    for (k, n) in v {
+        println!("{n:4} {k}");
+    }
+}

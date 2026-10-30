@@ -193,8 +193,7 @@ fn outward_at(f: &Face, p: DVec3) -> Option<DVec3> {
     Some(if f.reversed { -n } else { n })
 }
 
-/// One blended edge of a chain: its blend's distances into P (`a`) and along its wall (`b`), the side it
-/// takes, and its new entities.
+/// One blended edge of a chain.
 #[derive(Clone, Debug)]
 struct Link {
     edge: u32,
@@ -202,24 +201,51 @@ struct Link {
     rev: bool,
     wall: u32,
     spec: Spec,
-    a: f64,
-    b: f64,
-    /// Into P from the edge, square to it (at its start; an arc's turns with it).
+    /// Into P from the edge, square to it, at the use's start (an arc's turns with it).
     q0: DVec3,
+    /// Into the wall from the edge, square to it (the same all along a line, or an arc's square wall).
+    t: DVec3,
 }
 
-/// A chain: a whole loop of the planar face P, its vertices (the one at each link's start, in P's order).
+/// An open chain's end: P's next edge there (not blended), the edge down the wall, the cap face they bound.
+#[derive(Clone, Copy, Debug)]
+struct End {
+    g: u32,
+    s: u32,
+    cap: u32,
+}
+
+/// A chain: a run of tangent blended edges of a loop of the planar face P.
 #[derive(Clone, Debug)]
 struct Chain {
     face: u32,
-    lp: u32,
     links: Vec<Link>,
-    /// Per link, the vertex where P's use of it starts.
-    starts: Vec<u32>,
-    /// P's outward normal; the walls' way from P (−σ n); convex: +1, concave: −1.
-    n: DVec3,
-    t: DVec3,
+    /// Its vertices in P's order: link i runs from verts[i] to verts[i + 1] (round to verts[0] when closed).
+    verts: Vec<u32>,
+    closed: bool,
+    /// An open chain's ends (at verts[0], at its last vertex).
+    ends: [Option<End>; 2],
+    /// The blend's reach into P and along the walls, and (a fillet) its centre's from the edge along the bisector.
+    d1: f64,
+    d2: f64,
+    centre: f64,
+    /// Convex (+1: the blend takes material) or concave (−1: it adds some).
     sigma: f64,
+}
+
+impl Chain {
+    fn k(&self) -> usize {
+        self.links.len()
+    }
+    /// The link before vertex `j` and the one after (an open chain's ends have one).
+    fn at(&self, j: usize) -> (Option<usize>, Option<usize>) {
+        let k = self.k();
+        if self.closed {
+            (Some((j + k - 1) % k), Some(j % k))
+        } else {
+            ((j > 0).then(|| j - 1), (j < k).then_some(j))
+        }
+    }
 }
 
 /// Blends `edges` of `body` (one solid), whose points are one within `tol`.
@@ -253,141 +279,256 @@ pub fn blend(body: &Body, edges: &[BlendEdge], tol: f64) -> Result<Output, Decli
         }
         spec_of[e.edge as usize] = Some(*e);
     }
-    let chains = chains(body, &uses, &spec_of, margin)?;
     let ve = vertex_edges(body);
+    let chains = chains(body, &uses, &ve, &spec_of, margin)?;
     let boxes: Vec<(DVec3, DVec3)> = body.edges.iter().map(|e| edge_box(body, e)).collect();
     for c in &chains {
         check_clearance(body, &ve, &boxes, c, &chains, margin)?;
     }
-    build(body, &uses, &chains, margin)
+    build(body, &ve, &chains, margin)
 }
 
-/// The chains `spec_of` makes: whole loops of planar faces, every edge tangent to the next, walls square to the
-/// face. Declines anything else.
-fn chains(b: &Body, uses: &EdgeUses, spec_of: &[Option<BlendEdge>], margin: f64) -> Result<Vec<Chain>, Decline> {
+/// A loop's uses in their order round (the body's loops may list them in any order); None when a vertex has
+/// more than one way on.
+fn ordered(b: &Body, lp: &[Use]) -> Option<Vec<Use>> {
+    let start = |u: &Use| b.edges[u.edge as usize].v[u.reversed as usize];
+    let end = |u: &Use| b.edges[u.edge as usize].v[!u.reversed as usize];
+    let mut out = vec![lp[0]];
+    let mut left: Vec<Use> = lp[1..].to_vec();
+    while !left.is_empty() {
+        let at = end(out.last().unwrap());
+        let next: Vec<usize> = (0..left.len()).filter(|&i| start(&left[i]) == at).collect();
+        let [i] = next[..] else { return None };
+        out.push(left.remove(i));
+    }
+    (end(out.last().unwrap()) == start(&out[0])).then_some(out)
+}
+
+/// The chains `spec_of` makes: runs of tangent blended edges along loops of planar faces (an edge between two
+/// planar faces goes with the first of them), each edge's wall a plane (a line) or a cylinder about an axis
+/// square to P (an arc), an open run ending at cap faces square to it. Declines anything else.
+fn chains(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdge>], margin: f64) -> Result<Vec<Chain>, Decline> {
     let mut owner: Vec<Option<usize>> = vec![None; b.edges.len()];
     let mut out: Vec<Chain> = Vec::new();
     for (f, face) in b.faces.iter().enumerate() {
         let Some(n) = plane_normal(face) else { continue };
         for (l, lp) in face.loops.iter().enumerate() {
-            if lp.is_empty() || !lp.iter().all(|u| spec_of[u.edge as usize].is_some()) {
+            if !lp.iter().any(|u| spec_of[u.edge as usize].is_some()) {
                 continue;
             }
-            let mut links = Vec::new();
-            let mut starts = Vec::new();
-            for u in lp {
-                let e = &b.edges[u.edge as usize];
-                let spec = spec_of[u.edge as usize].unwrap();
-                let wall = uses[u.edge as usize].iter().find(|x| x.0 != f as u32).map(|x| x.0);
-                let Some(wall) = wall else { return no("an edge with P on both sides") };
-                let (a, bb) = match spec.spec {
-                    Spec::Fillet { radius } => (radius, radius),
-                    Spec::Chamfer { d1, d2 } => {
-                        if d1 == d2 || spec.reference == f as u32 {
-                            (d1, d2)
-                        } else if spec.reference == wall {
-                            (d2, d1)
-                        } else {
-                            return no("a chamfer's reference face not the edge's");
-                        }
-                    }
-                };
-                let p_start = b.vertices[e.v[u.reversed as usize] as usize];
-                let Some(t_own) = tangent(b, e, u.reversed) else { return no("an edge not a line or an arc") };
-                let t_use = if u.reversed { -t_own } else { t_own };
-                let q0 = n.cross(t_use).normalize();
-                if (q0.dot(n)).abs() > 1e-9 {
-                    return no("an edge out of its plane");
-                }
-                links.push(Link { edge: u.edge, rev: u.reversed, wall, spec: spec.spec, a, b: bb, q0 });
-                let _ = p_start;
-                starts.push(e.v[u.reversed as usize]);
+            // Runs of blended edges, tangent at the vertices between.
+            let Some(mut lp) = ordered(b, lp) else { return no("a loop not a simple round") };
+            if let Some(i) = lp.iter().position(|u| spec_of[u.edge as usize].is_none()) {
+                lp.rotate_left(i);
             }
-            for x in &links {
-                if owner[x.edge as usize].is_some_and(|o| o != out.len()) {
+            let closed_all = lp.iter().all(|u| spec_of[u.edge as usize].is_some());
+            let mut runs: Vec<Vec<Use>> = Vec::new();
+            for u in &lp {
+                if spec_of[u.edge as usize].is_none() {
+                    runs.push(Vec::new());
+                    continue;
+                }
+                if runs.is_empty() {
+                    runs.push(Vec::new());
+                }
+                let r = runs.last_mut().unwrap();
+                if let Some(prev) = r.last() {
+                    let (ep, eu) = (&b.edges[prev.edge as usize], &b.edges[u.edge as usize]);
+                    let (Some(tp), Some(tu)) = (tangent(b, ep, !prev.reversed), tangent(b, eu, u.reversed)) else {
+                        return no("an edge not a line or an arc");
+                    };
+                    let tp = if prev.reversed { -tp } else { tp };
+                    let tu = if u.reversed { -tu } else { tu };
+                    if tp.dot(tu) < 1.0 - 1e-12 {
+                        return no("a corner between blended edges");
+                    }
+                }
+                r.push(*u);
+            }
+            runs.retain(|r| !r.is_empty());
+            // A whole loop: closed only if tangent where it closes too.
+            let mut closed = false;
+            if closed_all {
+                let (first, last) = (&lp[0], lp.last().unwrap());
+                let (el, ef) = (&b.edges[last.edge as usize], &b.edges[first.edge as usize]);
+                let (Some(tl), Some(tf)) = (tangent(b, el, !last.reversed), tangent(b, ef, first.reversed)) else {
+                    return no("an edge not a line or an arc");
+                };
+                let tl = if last.reversed { -tl } else { tl };
+                let tf = if first.reversed { -tf } else { tf };
+                if tl.dot(tf) < 1.0 - 1e-12 {
+                    return no("a corner between blended edges");
+                }
+                closed = true;
+                runs = vec![lp.clone()];
+            }
+            for run in runs {
+                // Claimed by an earlier face: skip it whole (an edge between two planar faces), else decline.
+                let claimed = run.iter().filter(|u| owner[u.edge as usize].is_some()).count();
+                if claimed == run.len() {
+                    continue;
+                }
+                if claimed > 0 {
                     return no("an edge in two chains");
                 }
-                owner[x.edge as usize] = Some(out.len());
+                let c = chain(b, uses, ve, spec_of, f as u32, l as u32, n, &run, closed, margin)?;
+                for x in &c.links {
+                    owner[x.edge as usize] = Some(out.len());
+                }
+                out.push(c);
             }
-            out.push(Chain { face: f as u32, lp: l as u32, links, starts, n, t: DVec3::ZERO, sigma: 0.0 });
         }
     }
     if spec_of.iter().enumerate().any(|(i, s)| s.is_some() && owner[i].is_none()) {
-        return no("an edge not in a whole loop of a planar face");
-    }
-    for c in &mut out {
-        // Each wall square to P along its edge, the same side everywhere.
-        let mut sigma = 0.0;
-        for x in &c.links {
-            let e = &b.edges[x.edge as usize];
-            let w = &b.faces[x.wall as usize];
-            match (e.curve, w.surface) {
-                (Curve::Line, Surface::Plane { .. }) => {}
-                (Curve::Circle { center, normal, radius, .. }, Surface::Cylinder { origin, axis, radius: rc, .. }) => {
-                    let off = center - origin;
-                    if axis.cross(normal).length() > 1e-9 || (off - axis * off.dot(axis)).length() > margin || (radius - rc).abs() > margin {
-                        return no("an arc not round its wall's axis");
-                    }
-                }
-                _ => return no("a wall not a plane or a cylinder round the edge"),
-            }
-            if let Curve::Circle { normal, .. } = e.curve
-                && normal.cross(c.n).length() > 1e-9
-            {
-                return no("an arc not in P");
-            }
-            let ps = b.vertices[e.v[x.rev as usize] as usize];
-            let Some(m) = outward_at(w, ps) else { return no("a wall not a plane or a cylinder") };
-            if m.dot(c.n).abs() > 1e-9 {
-                return no("a wall not square to P");
-            }
-            // q into P: −m for a convex edge, +m for a concave one (at the use's start).
-            let qm = x.q0.dot(m);
-            if (qm.abs() - 1.0).abs() > 1e-9 {
-                return no("a wall not square to the edge");
-            }
-            let s = -qm.signum();
-            if sigma != 0.0 && s != sigma {
-                return no("a chain both convex and concave");
-            }
-            sigma = s;
-        }
-        c.sigma = sigma;
-        c.t = -sigma * c.n;
-        // Tangent at every vertex.
-        let k = c.links.len();
-        for i in 0..k {
-            let x = &c.links[i];
-            let y = &c.links[(i + 1) % k];
-            let (ex, ey) = (&b.edges[x.edge as usize], &b.edges[y.edge as usize]);
-            let tx = tangent(b, ex, !x.rev).unwrap() * if x.rev { -1.0 } else { 1.0 };
-            let ty = tangent(b, ey, y.rev).unwrap() * if y.rev { -1.0 } else { 1.0 };
-            if tx.dot(ty) < 1.0 - 1e-12 {
-                return no("a corner between blended edges");
-            }
-            if x.a != y.a || x.b != y.b || x.spec != y.spec {
-                return no("blends that change along a chain");
-            }
-        }
-        // Arcs whose radius the blend takes away.
-        for x in &c.links {
-            if let Curve::Circle { center, radius, .. } = b.edges[x.edge as usize].curve {
-                let ps = b.vertices[b.edges[x.edge as usize].v[x.rev as usize] as usize];
-                let out = (ps - center).normalize();
-                let into_p = x.q0.dot(out);
-                if radius + into_p * x.a <= 100.0 * margin {
-                    return no("an arc the blend closes up");
-                }
-                if let Spec::Fillet { radius: r } = x.spec {
-                    // The fillet's centre circle round the axis, not through it.
-                    if radius + into_p * r <= r + 100.0 * margin && into_p < 0.0 {
-                        return no("a fillet over an arc of its own radius or less");
-                    }
-                }
-            }
-        }
+        return no("an edge not on a planar face");
     }
     Ok(out)
+}
+
+/// One chain along P (face `f`, its outward normal `n`): its links, walls, ends; why not.
+#[allow(clippy::too_many_arguments)]
+fn chain(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdge>], f: u32, l: u32, n: DVec3, run: &[Use], closed: bool, margin: f64) -> Result<Chain, Decline> {
+    let mut links = Vec::new();
+    let mut verts = Vec::new();
+    for u in run {
+        let e = &b.edges[u.edge as usize];
+        let spec = spec_of[u.edge as usize].unwrap();
+        let Some(&(wall, ..)) = uses[u.edge as usize].iter().find(|x| x.0 != f) else { return no("an edge with P on both sides") };
+        let w = &b.faces[wall as usize];
+        let ps = b.vertices[e.v[u.reversed as usize] as usize];
+        let Some(t_own) = tangent(b, e, u.reversed) else { return no("an edge not a line or an arc") };
+        let t_use = if u.reversed { -t_own } else { t_own };
+        let q0 = n.cross(t_use);
+        let Some(m) = outward_at(w, ps) else { return no("a wall not a plane or a cylinder") };
+        let t = m.cross(-t_use);
+        if (q0.length() - 1.0).abs() > 1e-9 || (t.length() - 1.0).abs() > 1e-9 {
+            return no("a wall not along the edge");
+        }
+        match (e.curve, w.surface) {
+            (Curve::Line, Surface::Plane { .. }) => {}
+            (Curve::Circle { center, normal, radius, .. }, Surface::Cylinder { origin, axis, radius: rc, .. }) => {
+                let off = center - origin;
+                if axis.cross(normal).length() > 1e-9 || (off - axis * off.dot(axis)).length() > margin || (radius - rc).abs() > margin {
+                    return no("an arc not round its wall's axis");
+                }
+                if normal.cross(n).length() > 1e-9 || t.cross(n).length() > 1e-9 {
+                    return no("a wall not square to P");
+                }
+            }
+            _ => return no("a wall not a plane or a cylinder round the edge"),
+        }
+        links.push(Link { edge: u.edge, rev: u.reversed, wall, spec: spec.spec, q0, t });
+        verts.push(e.v[u.reversed as usize]);
+    }
+    if !closed {
+        let last = run.last().unwrap();
+        verts.push(b.edges[last.edge as usize].v[!last.reversed as usize]);
+    }
+    // One blend all along: the same spec, angle and side, the walls going on where links meet.
+    let x0 = &links[0];
+    let alpha = x0.q0.dot(x0.t).clamp(-1.0, 1.0).acos();
+    if !(1e-3..std::f64::consts::PI - 1e-3).contains(&alpha) {
+        return no("faces nearly tangent or folded at the edge");
+    }
+    let sigma = if n.dot(x0.t) < 0.0 { 1.0 } else { -1.0 };
+    for (i, x) in links.iter().enumerate() {
+        if x.spec != x0.spec || (x.q0.dot(x.t).clamp(-1.0, 1.0).acos() - alpha).abs() > 1e-9 {
+            return no("blends that change along a chain");
+        }
+        if i > 0 && x.t.dot(links[i - 1].t) < 1.0 - 1e-12 {
+            return no("walls that turn where two blended edges meet");
+        }
+    }
+    let (d1, d2, centre) = match x0.spec {
+        Spec::Fillet { radius } => {
+            let d = radius / (0.5 * alpha).tan();
+            (d, d, radius / (0.5 * alpha).sin())
+        }
+        Spec::Chamfer { d1, d2 } => {
+            let r = spec_of[x0.edge as usize].unwrap().reference;
+            if d1 == d2 || r == f {
+                (d1, d2, 0.0)
+            } else if r == x0.wall {
+                (d2, d1, 0.0)
+            } else {
+                return no("a chamfer's reference face not the edge's");
+            }
+        }
+    };
+    let mut c = Chain { face: f, links, verts, closed, ends: [None, None], d1, d2, centre, sigma };
+    // Arcs whose radius the blend takes away.
+    for x in &c.links {
+        if let Curve::Circle { center, radius, .. } = b.edges[x.edge as usize].curve {
+            let ps = b.vertices[b.edges[x.edge as usize].v[x.rev as usize] as usize];
+            let into_p = x.q0.dot((ps - center).normalize());
+            if radius + into_p * d1 <= 100.0 * margin {
+                return no("an arc the blend closes up");
+            }
+            if let Spec::Fillet { radius: r } = x.spec
+                && into_p < 0.0
+                && radius + into_p * r <= r + 100.0 * margin
+            {
+                return no("a fillet over an arc of its own radius or less");
+            }
+        }
+    }
+    // The ends: P's next edge into P, the edge down the wall, the cap square to the chain between them.
+    if !closed {
+        for (side, j) in [(0usize, 0usize), (1, c.k())] {
+            let v = c.verts[j];
+            let (before, after) = c.at(j);
+            let x = &c.links[before.or(after).unwrap()];
+            let e = &b.edges[x.edge as usize];
+            let p = b.vertices[v as usize];
+            let others: Vec<u32> = ve[v as usize].iter().copied().filter(|&o| o != x.edge).collect();
+            let [o1, o2] = others[..] else { return no("a chain end with more than three edges") };
+            let in_p = |o: u32| b.faces[f as usize].loops[l as usize].iter().any(|u| u.edge == o);
+            let (g, s) = if in_p(o1) { (o1, o2) } else { (o2, o1) };
+            if !in_p(g) || in_p(s) {
+                return no("a chain end not between P's edge and an edge down");
+            }
+            if spec_of[g as usize].is_some() || spec_of[s as usize].is_some() {
+                return no("a corner between blended edges");
+            }
+            let q = into_p_at(b, x, p);
+            for (o, dir, len) in [(g, q, d1), (s, x.t, d2)] {
+                let oe = &b.edges[o as usize];
+                if oe.curve != Curve::Line {
+                    return no("a chain end's edge not a line");
+                }
+                let far = if oe.v[0] == v { oe.v[1] } else { oe.v[0] };
+                let d = b.vertices[far as usize] - p;
+                if d.normalize().dot(dir) < 1.0 - 1e-9 || d.length() <= len + margin {
+                    return no("a chain end's edge not along the blend's side or too short");
+                }
+            }
+            let fs = |o: u32| uses[o as usize].iter().map(|u| u.0).collect::<Vec<u32>>();
+            let (gf, sf) = (fs(g), fs(s));
+            let caps: Vec<u32> = gf.iter().copied().filter(|cf| sf.contains(cf) && *cf != f && *cf != x.wall).collect();
+            let [cap] = caps[..] else { return no("a chain end without one cap face") };
+            let Some(nc) = plane_normal(&b.faces[cap as usize]) else { return no("a cap face not planar") };
+            let Some(te) = tangent(b, e, j != 0 && !x.rev || j == 0 && x.rev) else { return no("an edge not a line or an arc") };
+            if nc.cross(te).length() > 1e-9 {
+                return no("a cap face not square to the chain");
+            }
+            c.ends[side] = Some(End { g, s, cap });
+        }
+    }
+    Ok(c)
+}
+
+/// Into P from link `x`'s edge at its point `p`, square to it.
+fn into_p_at(b: &Body, x: &Link, p: DVec3) -> DVec3 {
+    match b.edges[x.edge as usize].curve {
+        Curve::Circle { center, normal, .. } => {
+            // q turns with the arc: at the use's start it is q0; elsewhere the same side of the radius.
+            let ps = b.vertices[b.edges[x.edge as usize].v[x.rev as usize] as usize];
+            let side = x.q0.dot((ps - center).normalize());
+            let r = p - center;
+            (r - normal * r.dot(normal)).normalize() * side
+        }
+        _ => x.q0,
+    }
 }
 
 /// The edges at each vertex.
@@ -402,11 +543,17 @@ fn vertex_edges(b: &Body) -> Vec<Vec<u32>> {
     out
 }
 
-/// The edge down the walls from each of the chain's vertices: one line, along `t`, longer than the blend.
-fn down_edges(b: &Body, c: &Chain, ve: &[Vec<u32>], margin: f64) -> Result<Vec<u32>, Decline> {
+/// The edge down the walls from each of the chain's vertices between links: one line, along the walls, longer
+/// than the blend (an end's is its End's).
+fn down_edges(b: &Body, c: &Chain, ve: &[Vec<u32>], margin: f64) -> Result<Vec<Option<u32>>, Decline> {
     let mut out = Vec::new();
-    for (i, &v) in c.starts.iter().enumerate() {
-        let chain_edges = [c.links[i].edge, c.links[(i + c.links.len() - 1) % c.links.len()].edge];
+    for (j, &v) in c.verts.iter().enumerate() {
+        let (before, after) = c.at(j);
+        let (Some(i0), Some(i1)) = (before, after) else {
+            out.push(None);
+            continue;
+        };
+        let chain_edges = [c.links[i0].edge, c.links[i1].edge];
         let others: Vec<u32> = ve[v as usize].iter().copied().filter(|e| !chain_edges.contains(e)).collect();
         let [s] = others[..] else { return no("a chain vertex with more than one edge down") };
         let e = &b.edges[s as usize];
@@ -415,23 +562,27 @@ fn down_edges(b: &Body, c: &Chain, ve: &[Vec<u32>], margin: f64) -> Result<Vec<u
         }
         let far = if e.v[0] == v { e.v[1] } else { e.v[0] };
         let d = b.vertices[far as usize] - b.vertices[v as usize];
-        if d.normalize().dot(c.t) < 1.0 - 1e-12 {
+        if d.normalize().dot(c.links[i1].t) < 1.0 - 1e-12 {
             return no("an edge down the walls not along them");
         }
-        if d.length() <= c.links[i].b + margin {
+        if d.length() <= c.d2 + margin {
             return no("a wall shorter than the blend");
         }
-        out.push(s);
+        out.push(Some(s));
     }
     Ok(out)
 }
 
-/// The blend's strips on P and on the walls are clear of every other edge of those faces, and the chain of
-/// any other's.
+/// The blend's strips on P, the walls and the caps are clear of every other edge of those faces, and of any
+/// other chain's.
 fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chain, all: &[Chain], margin: f64) -> Result<(), Decline> {
     let downs = down_edges(b, c, ve, margin)?;
-    let chain_edges: Vec<u32> = c.links.iter().map(|x| x.edge).collect();
-    let reach = c.links.iter().fold(0.0f64, |m, x| m.max(x.a).max(x.b));
+    let mut skip: Vec<u32> = c.links.iter().map(|x| x.edge).collect();
+    skip.extend(downs.iter().flatten());
+    for e in c.ends.iter().flatten() {
+        skip.extend([e.g, e.s]);
+    }
+    let reach = c.d1.max(c.d2).max(c.centre);
     // Edge `e` of the chain more than `d` from edge `o` (boxes apart by more are).
     let far = |e: u32, o: u32, d: f64| -> Result<bool, Decline> {
         if !boxes_meet(boxes[e as usize], boxes[o as usize], d + 2.0 * margin) {
@@ -442,25 +593,51 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
             None => no("an edge near the blend whose distance isn't known"),
         }
     };
-    // P: its other edges.
-    let pface = &b.faces[c.face as usize];
-    for (l, lp) in pface.loops.iter().enumerate() {
-        if l as u32 == c.lp {
-            continue;
-        }
+    // P's and the walls' other edges.
+    for lp in &b.faces[c.face as usize].loops {
         for u in lp {
+            if skip.contains(&u.edge) {
+                continue;
+            }
             for x in &c.links {
-                if !far(x.edge, u.edge, x.a)? {
+                if !far(x.edge, u.edge, c.d1)? {
                     return no("another edge of P within the blend");
                 }
             }
         }
     }
-    // The chain's own non-neighbouring edges.
-    let k = c.links.len();
+    for x in &c.links {
+        for lp in &b.faces[x.wall as usize].loops {
+            for u in lp {
+                if !skip.contains(&u.edge) && !far(x.edge, u.edge, c.d2)? {
+                    return no("another edge of a wall within the blend");
+                }
+            }
+        }
+    }
+    // The caps' other edges, from the chain's ends.
+    for (side, end) in c.ends.iter().enumerate() {
+        let Some(end) = end else { continue };
+        let v = c.verts[if side == 0 { 0 } else { c.k() }];
+        let p = b.vertices[v as usize];
+        for lp in &b.faces[end.cap as usize].loops {
+            for u in lp {
+                if u.edge == end.g || u.edge == end.s {
+                    continue;
+                }
+                match point_edge_distance(b, &b.edges[u.edge as usize], p) {
+                    Some(d) if d > reach + margin => {}
+                    Some(_) => return no("another edge of a cap within the blend"),
+                    None => return no("an edge near the blend whose distance isn't known"),
+                }
+            }
+        }
+    }
+    // The chain's own non-neighbouring edges, and other chains'.
+    let k = c.k();
     for i in 0..k {
         for j in i + 2..k {
-            if i == 0 && j == k - 1 {
+            if c.closed && i == 0 && j == k - 1 {
                 continue;
             }
             if !far(c.links[i].edge, c.links[j].edge, 2.0 * reach)? {
@@ -468,20 +645,6 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
             }
         }
     }
-    // Each wall: its edges other than the chain's and the ones down.
-    for x in &c.links {
-        for lp in &b.faces[x.wall as usize].loops {
-            for u in lp {
-                if chain_edges.contains(&u.edge) || downs.contains(&u.edge) {
-                    continue;
-                }
-                if !far(x.edge, u.edge, x.b)? {
-                    return no("another edge of a wall within the blend");
-                }
-            }
-        }
-    }
-    // Other chains' edges.
     for o in all {
         if std::ptr::eq(o, c) {
             continue;
@@ -497,46 +660,46 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
     Ok(())
 }
 
-/// The result: P and the walls trimmed, the blend faces between.
-fn build(body: &Body, uses: &EdgeUses, chains: &[Chain], margin: f64) -> Result<Output, Decline> {
-    let ve = vertex_edges(body);
+/// The result: P, the walls and the caps trimmed, the blend faces between.
+fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<Output, Decline> {
     let mut b = body.clone();
-    let nv = body.vertices.len();
-    let ne = body.edges.len();
-    let nf = body.faces.len();
+    let (nv, ne, nf) = (body.vertices.len(), body.edges.len(), body.faces.len());
     let mut vertex_origin: Vec<Origin> = (0..nv as u32).map(|i| Origin::Same { arg: 0, index: i }).collect();
     let mut edge_origin: Vec<Origin> = (0..ne as u32).map(|i| Origin::Same { arg: 0, index: i }).collect();
     let mut face_origin: Vec<Origin> = (0..nf as u32).map(|i| Origin::Same { arg: 0, index: i }).collect();
     let mut history = vec![Record { kind: Kind::Solid, arg: 0, index: 0, relation: Relation::Modified, out_kind: Kind::Solid, out: 0 }];
     let mut dead_v = vec![false; nv];
     let mut dead_e = vec![false; ne];
-    // Edge replaced by edge, in every loop.
+    // Edge replaced by edge (a piece), in every loop.
     let mut replace: Vec<Option<u32>> = vec![None; ne];
     let mut touched_faces: Vec<u32> = Vec::new();
+    let touch = |f: u32, t: &mut Vec<u32>| {
+        if !t.contains(&f) {
+            t.push(f);
+        }
+    };
     let mut new_faces: Vec<(u32, Face)> = Vec::new();
+    let mut extra_uses: Vec<(u32, u32, Use)> = Vec::new();
     for c in chains {
-        let k = c.links.len();
-        let downs = down_edges(body, c, &ve, margin)?;
-        // New vertices at each chain vertex: on P (v1), on the walls (v2); the cross-section edge between.
-        let mut v1 = Vec::with_capacity(k);
-        let mut v2 = Vec::with_capacity(k);
-        let mut cross = Vec::with_capacity(k);
-        for (i, (&v, x)) in c.starts.iter().zip(&c.links).enumerate() {
+        let k = c.k();
+        let downs = down_edges(body, c, ve, margin)?;
+        // At each vertex: a vertex on P (v1), one on the walls (v2), the cross-section edge between.
+        let (mut v1, mut v2, mut cross) = (Vec::new(), Vec::new(), Vec::new());
+        for (j, &v) in c.verts.iter().enumerate() {
+            let (before, after) = c.at(j);
+            let x = &c.links[after.or(before).unwrap()];
             let p = body.vertices[v as usize];
-            let q = into_p(body, c, x, p);
-            let p1 = p + q * x.a;
-            let p2 = p + c.t * x.b;
-            b.vertices.push(p1);
-            vertex_origin.push(Origin::New);
-            b.vertices.push(p2);
-            vertex_origin.push(Origin::New);
+            let q = into_p_at(body, x, p);
+            let (p1, p2) = (p + q * c.d1, p + x.t * c.d2);
+            b.vertices.extend([p1, p2]);
+            vertex_origin.extend([Origin::New, Origin::New]);
             let (i1, i2) = (b.vertices.len() as u32 - 2, b.vertices.len() as u32 - 1);
             v1.push(i1);
             v2.push(i2);
             dead_v[v as usize] = true;
             let curve = match x.spec {
                 Spec::Fillet { radius } => {
-                    let ctr = p + (q + c.t) * radius;
+                    let ctr = p + (q + x.t).normalize() * c.centre;
                     let normal = (p1 - ctr).cross(p2 - ctr).normalize();
                     Curve::Circle { center: ctr, normal, xdir: (p1 - ctr) / radius, radius }
                 }
@@ -545,57 +708,68 @@ fn build(body: &Body, uses: &EdgeUses, chains: &[Chain], margin: f64) -> Result<
             b.edges.push(Edge { v: [i1, i2], curve });
             edge_origin.push(Origin::New);
             cross.push(b.edges.len() as u32 - 1);
-            // The edge down, from the wall vertex.
-            let s = downs[i];
-            let mut se = body.edges[s as usize];
-            if se.v[0] == v {
-                se.v[0] = i2;
-            } else {
-                se.v[1] = i2;
+            // The edges that ended at the vertex: from the new ones on.
+            // (An edge cut short at both ends, by two chains: its one piece.)
+            let mut cut_short = |s: u32, at: u32, b: &mut Body| {
+                if let Some(si) = replace[s as usize] {
+                    let pe = &mut b.edges[si as usize];
+                    let end = if body.edges[s as usize].v[0] == v { 0 } else { 1 };
+                    pe.v[end] = at;
+                    return;
+                }
+                let mut se = body.edges[s as usize];
+                if se.v[0] == v {
+                    se.v[0] = at;
+                } else {
+                    se.v[1] = at;
+                }
+                b.edges.push(se);
+                edge_origin.push(Origin::Piece { arg: 0, index: s });
+                let si = b.edges.len() as u32 - 1;
+                replace[s as usize] = Some(si);
+                dead_e[s as usize] = true;
+                history.push(Record { kind: Kind::Edge, arg: 0, index: s, relation: Relation::Modified, out_kind: Kind::Edge, out: si });
+            };
+            if let Some(s) = downs[j] {
+                cut_short(s, i2, &mut b);
             }
-            b.edges.push(se);
-            edge_origin.push(Origin::Piece { arg: 0, index: s });
-            let si = b.edges.len() as u32 - 1;
-            replace[s as usize] = Some(si);
-            dead_e[s as usize] = true;
-            history.push(Record { kind: Kind::Edge, arg: 0, index: s, relation: Relation::Modified, out_kind: Kind::Edge, out: si });
+            let end = if c.closed { None } else if j == 0 { c.ends[0] } else if j == k { c.ends[1] } else { None };
+            if let Some(end) = end {
+                cut_short(end.s, i2, &mut b);
+                cut_short(end.g, i1, &mut b);
+                // The cap takes the cross-section the other way from the blend face beside it.
+                let lp = body.faces[end.cap as usize].loops.iter().position(|lp| lp.iter().any(|u| u.edge == end.g)).unwrap() as u32;
+                extra_uses.push((end.cap, lp, Use { edge: *cross.last().unwrap(), reversed: j == 0 }));
+                touch(end.cap, &mut touched_faces);
+            }
         }
         // Each link: its edge on P, on its wall, its blend face.
-        for i in 0..k {
-            let x = &c.links[i];
+        for (i, x) in c.links.iter().enumerate() {
             let e = body.edges[x.edge as usize];
-            let j = (i + 1) % k;
-            // P's use runs from starts[i] to starts[j]; the edge's own direction: v[0] -> v[1].
+            let j = if c.closed { (i + 1) % k } else { i + 1 };
+            // P's use runs from verts[i] to verts[j]; the edge's own direction: v[0] -> v[1].
             let (s0, s1) = if x.rev { (j, i) } else { (i, j) };
             let (c1, c2) = match e.curve {
                 Curve::Line => (Curve::Line, Curve::Line),
                 Curve::Circle { center, normal, xdir, radius } => {
                     let ps = body.vertices[e.v[0] as usize];
-                    let out = (ps - center).normalize();
-                    // Into P from the edge's start along its own direction: the use's q, or minus it.
-                    let q = into_p(body, c, x, ps);
-                    let r1 = radius + q.dot(out) * x.a;
-                    (Curve::Circle { center, normal, xdir, radius: r1 }, Curve::Circle { center: center + c.t * x.b, normal, xdir, radius })
+                    let q = into_p_at(body, x, ps);
+                    let r1 = radius + q.dot((ps - center).normalize()) * c.d1;
+                    (Curve::Circle { center, normal, xdir, radius: r1 }, Curve::Circle { center: center + x.t * c.d2, normal, xdir, radius })
                 }
                 _ => return no("an edge not a line or an arc"),
             };
             b.edges.push(Edge { v: [v1[s0], v1[s1]], curve: c1 });
-            edge_origin.push(Origin::New);
-            let e1 = b.edges.len() as u32 - 1;
             b.edges.push(Edge { v: [v2[s0], v2[s1]], curve: c2 });
-            edge_origin.push(Origin::New);
-            let e2 = b.edges.len() as u32 - 1;
+            edge_origin.extend([Origin::New, Origin::New]);
+            let (e1, e2) = (b.edges.len() as u32 - 2, b.edges.len() as u32 - 1);
             dead_e[x.edge as usize] = true;
-            // P's loop takes e1 for the edge, the wall's loops e2.
             replace_in(&mut b.faces[c.face as usize], x.edge, e1);
             replace_in(&mut b.faces[x.wall as usize], x.edge, e2);
-            for f in [c.face, x.wall] {
-                if !touched_faces.contains(&f) {
-                    touched_faces.push(f);
-                }
-            }
-            // The blend face: e1 the other way from P, the cross-section at P's start of the use, e2 the
-            // other way from the wall (P's way), the cross-section at its end back.
+            touch(c.face, &mut touched_faces);
+            touch(x.wall, &mut touched_faces);
+            // The blend face: e1 the other way from P, the cross-section at the use's start, e2 the other way
+            // from the wall (P's way), the cross-section at its end back.
             let lp = vec![
                 Use { edge: e1, reversed: !x.rev },
                 Use { edge: cross[i], reversed: false },
@@ -605,22 +779,23 @@ fn build(body: &Body, uses: &EdgeUses, chains: &[Chain], margin: f64) -> Result<
             let surface = blend_surface(body, c, x, &e)?;
             // Outward: away from the material; a convex blend's old edge is outside it, a concave one's inside.
             let pm = body.vertices[e.v[0] as usize];
-            let q = into_p(body, c, x, pm);
-            let (pa, pb) = (pm + q * x.a, pm + c.t * x.b);
+            let q = into_p_at(body, x, pm);
+            let (pa, pb) = (pm + q * c.d1, pm + x.t * c.d2);
             let probe = match x.spec {
                 Spec::Fillet { radius } => {
-                    let ctr = pm + (q + c.t) * radius;
+                    let ctr = pm + (q + x.t).normalize() * c.centre;
                     ctr + ((pa - ctr) + (pb - ctr)).normalize() * radius
                 }
                 Spec::Chamfer { .. } => 0.5 * (pa + pb),
             };
-            let sn = surface_normal(&surface, probe);
-            let reversed = sn.dot(pm - probe) * c.sigma < 0.0;
-            let lp = if k == 1 { vec![lp[0], lp[1], lp[2], Use { edge: cross[0], reversed: true }] } else { lp };
+            let reversed = surface_normal(&surface, probe).dot(pm - probe) * c.sigma < 0.0;
             new_faces.push((x.edge, Face { surface, reversed, loops: vec![lp] }));
         }
     }
-    // Pieces of the edges down in every face that uses them.
+    for (f, l, u) in extra_uses {
+        b.faces[f as usize].loops[l as usize].push(u);
+    }
+    // Pieces of the edges cut short in every face that uses them.
     for f in &mut b.faces {
         for lp in &mut f.loops {
             for u in lp.iter_mut() {
@@ -649,8 +824,7 @@ fn build(body: &Body, uses: &EdgeUses, chains: &[Chain], margin: f64) -> Result<
     }
     // Drop the dead vertices and edges (renumbering the rest).
     let mut vmap = vec![u32::MAX; b.vertices.len()];
-    let mut vs = Vec::new();
-    let mut vo = Vec::new();
+    let (mut vs, mut vo) = (Vec::new(), Vec::new());
     for (i, p) in b.vertices.iter().enumerate() {
         if i < nv && dead_v[i] {
             continue;
@@ -660,8 +834,7 @@ fn build(body: &Body, uses: &EdgeUses, chains: &[Chain], margin: f64) -> Result<
         vo.push(vertex_origin[i]);
     }
     let mut emap = vec![u32::MAX; b.edges.len()];
-    let mut es = Vec::new();
-    let mut eo = Vec::new();
+    let (mut es, mut eo) = (Vec::new(), Vec::new());
     for (i, e) in b.edges.iter().enumerate() {
         if i < ne && dead_e[i] {
             continue;
@@ -690,7 +863,6 @@ fn build(body: &Body, uses: &EdgeUses, chains: &[Chain], margin: f64) -> Result<
     }
     b.vertices = vs;
     b.edges = es;
-    let _ = uses;
     let face_u0 = vec![0.0; b.faces.len()];
     let edge_section = vec![u32::MAX; b.edges.len()];
     history.sort_unstable();
@@ -700,54 +872,39 @@ fn build(body: &Body, uses: &EdgeUses, chains: &[Chain], margin: f64) -> Result<
     Ok(Output { body: b, vertex_origin: vo, edge_origin: eo, face_origin, solid_origin, face_u0, edge_section, history })
 }
 
-/// Into P from link `x`'s edge at its point `p`, square to it.
-fn into_p(b: &Body, c: &Chain, x: &Link, p: DVec3) -> DVec3 {
-    match b.edges[x.edge as usize].curve {
-        Curve::Circle { center, normal, .. } => {
-            // q turns with the arc: at the use's start it is q0; elsewhere the same side of the radius.
-            let ps = b.vertices[b.edges[x.edge as usize].v[x.rev as usize] as usize];
-            let side = x.q0.dot((ps - center).normalize());
-            let r = p - center;
-            (r - normal * r.dot(normal)).normalize() * side
-        }
-        _ => {
-            let _ = c;
-            x.q0
-        }
-    }
-}
-
 /// The blend surface of link `x` (edge `e`).
 fn blend_surface(b: &Body, c: &Chain, x: &Link, e: &Edge) -> Result<Surface, Decline> {
     let p0 = b.vertices[e.v[0] as usize];
     let p1 = b.vertices[e.v[1] as usize];
+    let q = into_p_at(b, x, p0);
+    let (pa, pb) = (p0 + q * c.d1, p0 + x.t * c.d2);
     match (x.spec, e.curve) {
         (Spec::Fillet { radius }, Curve::Line) => {
-            let q = into_p(b, c, x, p0);
-            Ok(Surface::Cylinder { origin: p0 + (q + c.t) * radius, axis: (p1 - p0).normalize(), xdir: -c.t, radius })
+            // As OCCT frames its fillet cylinders: x towards the tangent line on P, the one on the wall at a
+            // positive angle below a half turn.
+            let ctr = p0 + (q + x.t).normalize() * c.centre;
+            let xdir = (pa - ctr) / radius;
+            let mut axis = (p1 - p0).normalize();
+            if axis.cross(xdir).dot(pb - ctr) < 0.0 {
+                axis = -axis;
+            }
+            Ok(Surface::Cylinder { origin: ctr, axis, xdir, radius })
         }
         (Spec::Fillet { radius }, Curve::Circle { center, normal, radius: rho, .. }) => {
             let out = (p0 - center).normalize();
-            let q = into_p(b, c, x, p0);
-            let major = rho + q.dot(out) * radius;
+            let major = rho + q.dot(out) * c.d1;
             let zdir = normal;
-            let xdir = out;
-            Ok(Surface::Torus { origin: center + c.t * radius, xdir, ydir: zdir.cross(xdir), zdir, major, minor: radius })
+            Ok(Surface::Torus { origin: center + x.t * c.d2, xdir: out, ydir: zdir.cross(out), zdir, major, minor: radius })
         }
         (Spec::Chamfer { .. }, Curve::Line) => {
-            let q = into_p(b, c, x, p0);
-            let (pa, pb) = (p0 + q * x.a, p0 + c.t * x.b);
             let dir = (p1 - p0).normalize();
-            let normal = dir.cross(pb - pa).normalize();
-            Ok(Surface::Plane { origin: pa, normal })
+            Ok(Surface::Plane { origin: pa, normal: dir.cross(pb - pa).normalize() })
         }
-        (Spec::Chamfer { .. }, Curve::Circle { center, normal, radius: rho, .. }) => {
+        (Spec::Chamfer { .. }, Curve::Circle { center, radius: rho, .. }) => {
             let out = (p0 - center).normalize();
-            let q = into_p(b, c, x, p0);
-            let r_p = rho + q.dot(out) * x.a;
-            // As OCCT frames it: at the wall's circle (radius rho, b along t from P), the radius r_p back at P.
-            let _ = normal;
-            Ok(Surface::Cone { origin: center + c.t * x.b, axis: c.t, xdir: out, radius: rho, angle: ((rho - r_p) / x.b).atan() })
+            let r_p = rho + q.dot(out) * c.d1;
+            // As OCCT frames it: at the wall's circle (radius rho, d2 along t from P), the radius r_p back at P.
+            Ok(Surface::Cone { origin: center + x.t * c.d2, axis: x.t, xdir: out, radius: rho, angle: ((rho - r_p) / c.d2).atan() })
         }
         _ => no("an edge not a line or an arc"),
     }
