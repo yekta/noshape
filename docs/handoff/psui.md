@@ -166,6 +166,12 @@ MIRROR-DIALOG-STATE closed (live's answer 1597 = ours). Open in psui's TICKETS: 
 path); API-VAR-REDEFINE (P3, the agent API's variable_create + model-data's variable_table::create: dx / core's
 code, not a UI change: left for them).
 18:20: d5ae3ded mesher 5d (CDT cache), cc73aaea display off the critical path (N06).
+10-30 08:15: COMMIT-LATENCY (P0, core asked psui to confirm on a perf run): perf 41005801257 had commit within
+budget (medians 149 / 122 ms) but undo 200–364 ms in 6 of 9 runs with a 2 ms regen; the regen's 12 ms coalescing
+timer fired late (locally ~180 ms). d21f7678: the wait only for bursts → perf 41014326054 undo median 36 ms
+(both macOS), redo ~30, commit ~100. Two slow outliers per OS remain (250–350 ms between scheduling and the
+result); 62d49da8 logs whether that's the thread start or the lock (`regen #n: started … lock …`); perf
+41020683102 dispatched: read it, then close COMMIT-LATENCY or chase the outliers.
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC
