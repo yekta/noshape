@@ -9,6 +9,14 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **10-30 10:01 update (greens 5abeb8e4 … 41815809):** **P1 MEM-RUNAWAY-508** (v0.4.15 and main via core's CLI): CLI fuzz seed
+  508 grows to 10 GB (cgroup cap, step 81) / 18 GB (earlyoom on the box) across a session — a fresh open of the same state peaks
+  at 1.8 GB, simple suppress loops stay flat; repro = the seed replay (bin/mem508-replay.sh, jump at step 64); v0.4.14's run
+  diverges at step 13 so it says nothing either way. RUST-UNION-POINT-TOUCH fixed in v0.4.15 (7d8b25d7). App Rust-vs-OCCT:
+  bool 6b7f1857 (patterns into the target) on 55276d5c, 64 linear-pattern documents (patdocs/, boolmir 72–74) all equal; 39 no-op /
+  touching documents equal on 235fb4a2; mirror set + P0 0 px on 55276d5c. Sheets (bool e1ae2e22) still need a CLI of main.
+  CLI fuzz v0.4.15 501–527: only 508; long-running jobs now capped (systemd-run MemoryMax=10G, /tmp/qa-cliwrap-mem.sh) after the
+  07:15 box OOM. dx drawing greens not checked one by one.
 - **10-30 07:20 update (greens eef0848d … f9541749; release v0.4.15):** v0.4.15 smoked (TICKETS top; handoff › Daily release smoke):
   no blocker; new **P2 DRAFT-BLOWUP-0415** (cli-draft-segv: a 30° neutral-plane Draft grows a part to 112331 mm³, x −60…60, z −69.3;
   also with OCCT; core's Draft / Shell rework). Verified BOOL-TOUCH-INFO (eef0848d), ENCLOSE-NO-REGION-MSG + BODY-NAME-BY-TYPE
