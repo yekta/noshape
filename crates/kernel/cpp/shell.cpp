@@ -2545,6 +2545,9 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
   // method: 0 = automatic, 1 = offset only, 2 = slabs only (tests).
   const bool dbg = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
   auto       timed = [&](const char* what, auto&& run) {
+    // (Also when it starts: a path the budget stops never reports its end.)
+    if (dbg)
+      std::fprintf(stderr, "shell: %s ...\n", what);
     const auto t0 = std::chrono::steady_clock::now();
     const bool ok = run();
     if (ok)

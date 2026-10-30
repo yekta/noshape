@@ -534,7 +534,13 @@ with 0003b and 0004 on Linux, macOS and Windows.
 1. qa's re-run of fuzz seed 189 (151 / 152 / 174) on a green with 8311f20f + 3a8c7a85 (NOSHAPE_GUARD_TRACE=1): any
    "not recoverable" exit now names its place; the in-place edits that corrupted bodies are gone from the budgeted ops.
 2. P0 SHELL-SLOW tail: concave parts with fillets (a pocket with floor fillets 2.3–2.9 s in slabs) need regions with
-   concave edges; failing shells on fuzz bodies still spend 20–26 s in the slabs' Booleans (no early sign known).
+   concave edges. The fuzz shells that "fail" after 30 s (qa's hang402 before-mirror.noshape: Shell 3 and 5, 35 s
+   each) are the budget, not the geometry: regions declines, offset is ruled out, the slabs and their union take
+   ~1 s, and OCCT's common of the solid with the union takes ~50 s and succeeds (Shell 3: 1 solid, 9.146e-5 m³).
+   Its time is in two tiny rational B-spline slivers (0.085 mm², 67 / 131 poles) whose slabs (MakeThickSolidBySimple)
+   are new geometry lying on the solid's own faces: coincident B-spline faces OCCT intersects slowly. Next try:
+   slabs that share the solid's face (TShape) on that side, or leave such slivers to their neighbours' slabs.
+   NOSHAPE_SHELL_DEBUG=1 now also names each path as it starts.
 3. Other `a.Plane().Axis().Direction()` readers of a face's normal in the kernel: features.cpp and shell.cpp
    already check Direct(); surface_info (face_surface) reports the frame as is, by design.
 4. Waiting on live: FILLET-OVERSIZE's chamfer half; RIB-CHAIN-NORMAL (live's +160 mm³ for the L normal rib).
