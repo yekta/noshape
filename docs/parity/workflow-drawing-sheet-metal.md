@@ -53,3 +53,8 @@ Live answered "qa5 pass 7" (4) + asb (d) "shaded drawing views": picker filters 
 - **DSM2 / SM5** still open: bend notes "DOWN 90.0° R2" where live reads "UP 90.0° …". The notes print `FlatBendLine.up`
   (sheetmetal/flat.rs:300); fs's test `sheetmetal_frames.rs:271` still asserts a flange is *not* up. asb: lands with fs's
   std-route switch → qa5-routing DSM2 (**fs**).
+
+## Re-check (skasm, 2026-10-30 evening, main 94056b26)
+- DSM2 / SM5: fixed (step 5 above: "UP 90.0° R2"; the std route's bend directions, T2s).
+- DSM3: a new view, flat ones included, starts Hidden lines removed (drawing create.rs: `RenderStyle::HiddenLinesRemoved`),
+  i.e. unshaded, so its Show/hide offers "Show shaded view" as live. ✅

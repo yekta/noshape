@@ -84,19 +84,16 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
   the shape; API polygon descriptions.
 
 ## Speed targets (PLAN 2.7), current numbers
-Measured 10-27 14:00 in the dev test profile (opt-level 1; no release build: disk under the 30 GB floor), load ~40;
-release is faster. Each is a timed T2/perf test with the target as its gate.
+On vibe3 (tools/tiers/perf.sh: release, the machine to itself, 3 runs; 10-30 evening at 94056b26). Each is a timed
+T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this machine are superseded.)
 - Sketch drag step, ~200 entities (219 entities, 178 constraints; pointer move + solve + the sketch's regeneration):
-  **median 3.52 ms** (solve 1.03 ms; 10-27 after CONFLICT-COLLAPSE-ON-DRAG: a drag solves only the dragged
-  components), worst 14 ms. Target < 8 ms. Full solve with the DOF analysis: **0.96 ms**
-  (target < 8 ms). `cargo test -p noshape-scene --test all sketch_perf::speed_target -- --ignored --nocapture`.
-- Assembly drag, 200 instances / 300 mates: frame with the scene **median 5.40 ms** in plane, **6.18 ms** off plane
-  (worst 23–26 ms); target 120 fps = 8.33 ms. Insert into the 300-mate assembly **11.9 ms** (target ≤ 20 ms). Adding
-  a mate 40 ms. 1000 free pins: drag frame 1.49 ms, insert 3.9 ms. `cargo test -p noshape-ops --test all
-  assembly_perf:: -- --ignored --nocapture --test-threads=1`.
-- Re-run 14:40 (load ~30): assembly drag frame median 1.48–2.93 ms, worst ≤ 3.05 ms; insert 5.7–7.7 ms; 1000 pins
-  drag 1.4–1.5 ms. Sketch step per-step times (3 runs): worst 5–9 ms, sporadic (no step pattern): the earlier
-  18–26 ms worst cases were machine load, not a code path.
+  **median 1.37 ms** (solve 0.43 ms), worst 1.64 ms; target < 8 ms. Full solve with the DOF analysis **0.36 ms**
+  (worst 0.38). `tools/tiers/perf.sh -p noshape-scene --test all sketch_perf::speed_target -- --ignored --nocapture
+  --test-threads=1`.
+- Assembly, 200 instances / 300 mates: drag frame with the scene **median 0.75 ms** in plane (worst 0.91), **1.03 ms**
+  off plane (worst 1.19); target 8.33 ms (120 fps). First evaluation 10.7 ms, again 2.8 ms; adding a mate 4.3 ms;
+  inserting a pin **2.8 ms** (target ≤ 20 ms). 1000 free pins: drag frame 0.38 ms, insert 1.3 ms.
+  `tools/tiers/perf.sh -p noshape-ops --test all assembly_perf:: -- --ignored --nocapture --test-threads=1`.
 - Live (behaviours "speed: skasm sketch and assembly", request 1501; server-solved, one request in flight): sketch
   drag ≈ 400 ms a step at 188 entities (≈ 310 ms at 20) → ours ≈ 4–5 ms (dev build), ~80× faster; adding a
   dimension ≈ 2.2 s and a Coincident ≈ 1.7 s of server solve → ours ≈ 1 ms; assembly drag ≈ 1.2 s a step at 200
@@ -170,9 +167,9 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
 - Done 10-30: partial Outer flange (opEdgeChange steps a moved piece of an edge off its collinear neighbours and keeps
   the edges' names; the relief reaches its depth past a moved-in bend edge; request 1599 (a): 6027.5617 / 6204.5617
   exact); SM-FACES passes on std (3211.3274 mm³, 14 faces).
-- Speed (ops regen_profile "sheet metal (std)": 200 × 150 plate, 4 flanges, hem): 2.9 s → 0.66 s (dev build) by a
-  box test before projecting part faces onto construction pieces (host part_sources: O(faces × pieces) face
-  classifications were ~35 %). Profile now flat (std's one-time load, allocation, OCCT adaptors).
+- Speed (vibe3, perf.sh, release, 10-30 evening at 47c866c5; ops regen_profile "sheet metal (std)": 200 × 150 plate,
+  4 flanges, hem): **1321 ms** a regeneration, of it **Hem 1 1089 ms** (the slowest feature in the whole profile after
+  fins-400's pattern). The earlier "0.66 s" was a dev build on this machine and is superseded. Next: the Hem.
 
 - Std rebuild naming (10-29): part faces lying on the replaced part's faces keep their names (`keep_names`, several
   pieces: splits), the part its name and colour. Before, every face was new: a Flange dialog couldn't pick a second
