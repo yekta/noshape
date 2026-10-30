@@ -33,11 +33,14 @@ pub struct Form {
 }
 
 /// The forms we build, in the picker's (alphabetical) order.
-pub const FORMS: &[Form] = &[Form { id: "circle-emboss", name: "Circle emboss" }, Form { id: "circle-extrusion", name: "Circle extrusion" }, Form { id: "countersink", name: "Countersink" }];
+pub const FORMS: &[Form] = &[Form { id: "circle-emboss", name: "Circle emboss" }, Form { id: "circle-extrusion", name: "Circle extrusion" }, Form { id: "countersink", name: "Countersink" }, Form { id: "slot-emboss", name: "Slot emboss" }, Form { id: "slot-extrusion", name: "Slot extrusion" }];
 
 /// Radius control (live `List_WrgkY2rdTeUGo2`): the forms' bend radii.
 const RADIUS_CONTROL: [(&str, &str); 4] = [("Default", "Double thickness"), ("Thickness", "Thickness"), ("Half_thickness", "Half thickness"), ("Custom", "Custom")];
 const RADIUS_CONTROL_INPUT: &str = "Radius control";
+/// Length to (live `List_rZVuoqSoy79i0I` / `List_OrKvSo3y1S6Ua4`): a slot's length between its ends' centres or tangents.
+const LENGTH_TO: [(&str, &str); 2] = [("Default", "Slot centers"), ("Slot_tangents", "Slot tangents")];
+const LENGTH_TO_INPUT: &str = "Length to";
 
 fn variable(name: &str, kind: VariableKind, default: &str) -> ConfigInput {
     ConfigInput { id: name.into(), name: name.into(), kind: ConfigInputKind::Variable { kind, default: ExprValue::new(default), min: None, max: None }, visible_when: None, excluded: false }
@@ -49,6 +52,13 @@ pub fn configuration(id: &str) -> Option<Configuration> {
         id: RADIUS_CONTROL_INPUT.into(),
         name: RADIUS_CONTROL_INPUT.into(),
         kind: ConfigInputKind::List { options: RADIUS_CONTROL.iter().map(|(id, name)| ListOption { id: (*id).into(), name: (*name).into() }).collect(), default: "Default".into() },
+        visible_when: None,
+        excluded: false,
+    };
+    let length_to = ConfigInput {
+        id: LENGTH_TO_INPUT.into(),
+        name: LENGTH_TO_INPUT.into(),
+        kind: ConfigInputKind::List { options: LENGTH_TO.iter().map(|(id, name)| ListOption { id: (*id).into(), name: (*name).into() }).collect(), default: "Default".into() },
         visible_when: None,
         excluded: false,
     };
@@ -69,6 +79,26 @@ pub fn configuration(id: &str) -> Option<Configuration> {
             variable("radius", VariableKind::Length, "1 mm"),
         ],
         "countersink" => vec![variable("thickness", VariableKind::Length, "1 mm"), variable("clearance_hole", VariableKind::Length, "10 mm"), variable("angle", VariableKind::Angle, "90 deg")],
+        "slot-emboss" => vec![
+            variable("thickness", VariableKind::Length, "1 mm"),
+            variable("length", VariableKind::Length, "100 mm"),
+            length_to,
+            variable("width", VariableKind::Length, "5 mm"),
+            variable("height", VariableKind::Length, "5 mm"),
+            variable("draft", VariableKind::Angle, "90 deg"),
+            radius_control,
+            variable("int_radius", VariableKind::Length, "1 mm"),
+            variable("ext_radius", VariableKind::Length, "1 mm"),
+        ],
+        "slot-extrusion" => vec![
+            variable("thickness", VariableKind::Length, "1 mm"),
+            variable("length", VariableKind::Length, "100 mm"),
+            length_to,
+            variable("width", VariableKind::Length, "5 mm"),
+            variable("depth", VariableKind::Length, "1 mm"),
+            radius_control,
+            variable("radius", VariableKind::Length, "1 mm"),
+        ],
         _ => return None,
     };
     Some(Configuration { inputs, configured: Vec::new() })
@@ -87,6 +117,8 @@ pub fn input_label(name: &str) -> &str {
         "radius" => "Radius",
         "clearance_hole" => "Clearance hole",
         "angle" => "Angle",
+        "length" => "Length",
+        "width" => "Width",
         other => other,
     }
 }
@@ -117,7 +149,7 @@ fn make_studio(id: &str) -> Option<PartStudio> {
         let expr = |s: &str| ParamValue::Expr(ExprValue::new(s));
         tool.params.set("form", ParamValue::Text(id.into()));
         tool.params.set("part", ParamValue::Enum(part.into()));
-        for (param, var) in [("thickness", "thickness"), ("diameter", "diameter"), ("height", "height"), ("draft", "draft"), ("intRadius", "int_radius"), ("extRadius", "ext_radius"), ("depth", "depth"), ("radius", "radius"), ("clearanceHole", "clearance_hole"), ("angle", "angle")] {
+        for (param, var) in [("thickness", "thickness"), ("diameter", "diameter"), ("height", "height"), ("draft", "draft"), ("intRadius", "int_radius"), ("extRadius", "ext_radius"), ("depth", "depth"), ("radius", "radius"), ("clearanceHole", "clearance_hole"), ("angle", "angle"), ("length", "length"), ("width", "width")] {
             if ps.configuration.inputs.iter().any(|i| i.name == var) {
                 tool.params.set(param, expr(&format!("#{var}")));
             }
@@ -125,13 +157,15 @@ fn make_studio(id: &str) -> Option<PartStudio> {
         let fid = tool.id;
         ids.push(fid);
         ps.features.push(tool);
-        if ps.configuration.inputs.iter().any(|i| i.id == RADIUS_CONTROL_INPUT) {
-            ps.configuration.configured.push(ConfiguredParam {
-                input: RADIUS_CONTROL_INPUT.into(),
-                feature: fid,
-                param: "radiusControl".into(),
-                values: RADIUS_CONTROL.iter().map(|(o, _)| ((*o).to_string(), ParamValue::Enum((*o).into()))).collect::<BTreeMap<_, _>>(),
-            });
+        for (input, param, options) in [(RADIUS_CONTROL_INPUT, "radiusControl", &RADIUS_CONTROL[..]), (LENGTH_TO_INPUT, "lengthTo", &LENGTH_TO[..])] {
+            if ps.configuration.inputs.iter().any(|i| i.id == input) {
+                ps.configuration.configured.push(ConfiguredParam {
+                    input: input.into(),
+                    feature: fid,
+                    param: param.into(),
+                    values: options.iter().map(|(o, _)| ((*o).to_string(), ParamValue::Enum((*o).into()))).collect::<BTreeMap<_, _>>(),
+                });
+            }
         }
     }
     let mut tag = ps.new_feature("tag", &units)?;
@@ -163,6 +197,15 @@ pub fn tool_feature(ev: &mut EvalCtx) -> FResult<()> {
         "circle-emboss" => circle_emboss(t, ev.length("diameter")?, ev.length("height")?, ev.angle("draft")?, radius(ev, "intRadius")?, radius(ev, "extRadius")?)?,
         "circle-extrusion" => circle_extrusion(t, ev.length("diameter")?, ev.length("depth")?, ev.length("radius")?)?,
         "countersink" => countersink(t, ev.length("clearanceHole")?, ev.angle("angle")?)?,
+        "slot-emboss" | "slot-extrusion" => {
+            let (length, width) = (ev.length("length")?, ev.length("width")?);
+            let tangents = ev.enum_("lengthTo") == "Slot_tangents";
+            if form == "slot-emboss" {
+                slot_emboss(t, length, tangents, width, ev.length("height")?, ev.angle("draft")?, radius(ev, "intRadius")?, radius(ev, "extRadius")?)?
+            } else {
+                slot_extrusion(t, length, tangents, width, ev.length("depth")?, radius(ev, "radius")?)?
+            }
+        }
         _ => return err("Unknown library form"),
     };
     let Some(s) = tools.into_iter().nth(if ev.enum_("part") == "SUBTRACT" { 1 } else { 0 }) else { return err("The form has no such tool") };
@@ -175,14 +218,14 @@ fn profile_plane() -> k::Plane {
     k::Plane::new(DVec3::ZERO, DVec3::NEG_Y, DVec3::X)
 }
 
-/// Circle emboss (live features "Circle emboss"): a sheet `t` thick bent up
-/// into a cone and a flat top. Its outer (top) surfaces' sharp corners sit
-/// at diameter `d` and height `h` (clamped to t / 2 … 10 t); the cone stands
-/// at half the full `draft` angle from the vertical; the top's inner bend
-/// radius `ri`, the base's `re`. Subtract material: the sheet's disc out to
-/// where the base bend meets the sheet (live t 1: 273.79979 / 217.909344
-/// mm³; on a 2 mm plate +94.552620).
-fn circle_emboss(t: f64, d: f64, h: f64, draft: f64, ri: f64, re: f64) -> FResult<Vec<Shape>> {
+/// The emboss cross-section (Circle emboss, Slot emboss; live features): a
+/// sheet `t` thick bent up into a cone and a flat top, r from the axis (or
+/// the slot's centre line). Its outer (top) surfaces' sharp corners sit at
+/// r = `d` / 2 and height `h` (clamped to t / 2 … 10 t); the cone stands at
+/// half the full `draft` angle from the vertical; the top's inner bend
+/// radius `ri`, the base's `re`. With the r where the base bend meets the
+/// sheet (Subtract material's edge).
+fn emboss_profile(t: f64, d: f64, h: f64, draft: f64, ri: f64, re: f64) -> FResult<(Vec<k::Segment2d>, f64)> {
     let h = h.clamp(t * 0.5, 10.0 * t);
     let th = draft * 0.5;
     if !(1e-6..std::f64::consts::FRAC_PI_2 - 1e-6).contains(&th) || ri <= 0.0 || re <= 0.0 {
@@ -207,11 +250,6 @@ fn circle_emboss(t: f64, d: f64, h: f64, draft: f64, ri: f64, re: f64) -> FResul
     let at = |c: DVec2, r: f64, a: f64| c + DVec2::new(a.cos(), a.sin()) * r;
     let arc = |c: DVec2, r: f64, a0: f64, a1: f64| k::Segment2d::Arc { center: c, radius: r, start_angle: a0.min(a1), end_angle: a0.max(a1) };
     let mut segs = Vec::new();
-    let line = |a: DVec2, b: DVec2, segs: &mut Vec<k::Segment2d>| {
-        if a.distance(b) > 1e-12 {
-            segs.push(k::Segment2d::Line { a, b });
-        }
-    };
     // Outer (top) side, from the axis out to the sheet; the end; the inner side back.
     line(DVec2::new(0.0, h), DVec2::new(r_top, h), &mut segs);
     segs.push(arc(ci, rmi + t * 0.5, a_top, a_cone));
@@ -223,11 +261,38 @@ fn circle_emboss(t: f64, d: f64, h: f64, draft: f64, ri: f64, re: f64) -> FResul
     segs.push(arc(ci, rmi - t * 0.5, a_top, a_cone));
     line(DVec2::new(r_top, h - t), DVec2::new(0.0, h - t), &mut segs);
     line(DVec2::new(0.0, h - t), DVec2::new(0.0, h), &mut segs);
-    let face = k::make_face_2d(&profile_plane(), &segs, &[])?;
-    let add = k::revolve(&face, DVec3::ZERO, DVec3::Z, std::f64::consts::TAU)?.shape;
-    let disc = k::make_face_2d(&k::Plane::new(DVec3::new(0.0, 0.0, -t), DVec3::Z, DVec3::X), &[k::Segment2d::Circle { center: DVec2::ZERO, radius: r_sub }], &[])?;
-    let sub = k::extrude(&disc, DVec3::Z * t)?.shape;
-    Ok(vec![add, sub])
+    Ok((segs, r_sub))
+}
+
+/// A line of a profile, unless it has no length.
+fn line(a: DVec2, b: DVec2, segs: &mut Vec<k::Segment2d>) {
+    if a.distance(b) > 1e-12 {
+        segs.push(k::Segment2d::Line { a, b });
+    }
+}
+
+/// Circle emboss: the emboss revolved; Subtract material the sheet's disc
+/// out to the base bend (live t 1: 273.79979 / 217.909344 mm³; on a 2 mm
+/// plate +94.552620).
+fn circle_emboss(t: f64, d: f64, h: f64, draft: f64, ri: f64, re: f64) -> FResult<Vec<Shape>> {
+    let (segs, r) = emboss_profile(t, d, h, draft, ri, re)?;
+    Ok(vec![revolved(&segs)?, sheet_disc(t, r)?])
+}
+
+/// Slot emboss: the emboss run along a slot of `length` between its ends'
+/// centres (or tangents) and width `width` (live: no measured tools; its
+/// features are Circle emboss's along the slot).
+#[allow(clippy::too_many_arguments)]
+fn slot_emboss(t: f64, length: f64, tangents: bool, width: f64, h: f64, draft: f64, ri: f64, re: f64) -> FResult<Vec<Shape>> {
+    let l = slot_length(length, tangents, width.max(t));
+    let (segs, r) = emboss_profile(t, width, h, draft, ri, re)?;
+    Ok(vec![slot_swept(&segs, l)?, sheet_stadium(t, r, l)?])
+}
+
+/// The straight run between a slot's end centres (live's Length variable:
+/// tangent lengths less twice the width).
+fn slot_length(length: f64, tangents: bool, width: f64) -> f64 {
+    if tangents { (length - 2.0 * width).max(0.0) } else { length.max(0.0) }
 }
 
 /// A disc of radius `r` through the sheet (z -t … 0).
@@ -236,29 +301,62 @@ fn sheet_disc(t: f64, r: f64) -> FResult<Shape> {
     Ok(k::extrude(&disc, DVec3::Z * t)?.shape)
 }
 
+/// A slot's stadium (half-width `r`, end centres `l` apart along x)
+/// through the sheet.
+fn sheet_stadium(t: f64, r: f64, l: f64) -> FResult<Shape> {
+    if l <= 1e-12 {
+        return sheet_disc(t, r);
+    }
+    let (h, q) = (l * 0.5, std::f64::consts::FRAC_PI_2);
+    let segs = [
+        k::Segment2d::Line { a: DVec2::new(-h, -r), b: DVec2::new(h, -r) },
+        k::Segment2d::Arc { center: DVec2::new(h, 0.0), radius: r, start_angle: -q, end_angle: q },
+        k::Segment2d::Line { a: DVec2::new(h, r), b: DVec2::new(-h, r) },
+        k::Segment2d::Arc { center: DVec2::new(-h, 0.0), radius: r, start_angle: q, end_angle: 3.0 * q },
+    ];
+    let face = k::make_face_2d(&k::Plane::new(DVec3::new(0.0, 0.0, -t), DVec3::Z, DVec3::X), &segs, &[])?;
+    Ok(k::extrude(&face, DVec3::Z * t)?.shape)
+}
+
 /// A closed (r, z) profile of lines and arcs revolved about the z axis.
 fn revolved(segs: &[k::Segment2d]) -> FResult<Shape> {
     let face = k::make_face_2d(&profile_plane(), segs, &[])?;
     Ok(k::revolve(&face, DVec3::ZERO, DVec3::Z, std::f64::consts::TAU)?.shape)
 }
 
-/// Circle extrusion (live "Circle extrusion"): a hole of diameter `d`
-/// (at least t) whose rim is bent down into a collar `depth` deep (t …
-/// (d + t) / 2) round an outer radius radius + t (≤ the depth). Subtract
-/// material: the sheet's disc out to the bend (live t 1: 15.177413 /
-/// 38.484510 mm³).
-fn circle_extrusion(t: f64, d: f64, depth: f64, radius: f64) -> FResult<Vec<Shape>> {
+/// An (r, z) profile along a slot: half revolved round each end's centre
+/// (x = ±l / 2) and run straight between them on both sides (live: the
+/// half Revolves, Extrudes, Splits and Mirrors); `l` 0: revolved.
+fn slot_swept(segs: &[k::Segment2d], l: f64) -> FResult<Shape> {
+    if l <= 1e-12 {
+        return revolved(segs);
+    }
+    let (h, pi, q) = (l * 0.5, std::f64::consts::PI, std::f64::consts::FRAC_PI_2);
+    let mut pieces = Vec::new();
+    for (x, a0) in [(h, -q), (-h, q)] {
+        let c = DVec3::new(x, 0.0, 0.0);
+        let face = k::make_face_2d(&k::Plane::new(c, DVec3::NEG_Y, DVec3::X), segs, &[])?;
+        pieces.push(k::revolve_between(&face, c, DVec3::Z, a0, a0 + pi)?.shape);
+    }
+    for (n, u) in [(DVec3::X, DVec3::Y), (DVec3::NEG_X, DVec3::NEG_Y)] {
+        let face = k::make_face_2d(&k::Plane::new(DVec3::new(-h, 0.0, 0.0), n, u), segs, &[])?;
+        pieces.push(k::extrude(&face, DVec3::X * l)?.shape);
+    }
+    let fused = k::fuse_all(&pieces, &k::BooleanOptions::default())?.shape;
+    Ok(k::unify_same_domain(&fused)?.shape)
+}
+
+/// The extrusion cross-section (Circle extrusion, Slot extrusion; live
+/// features): a hole of width `d` (at least t) whose rim is bent down into a
+/// collar `depth` deep (t … (d + t) / 2) round an outer radius radius + t
+/// (≤ the depth). With the r where the bend meets the sheet.
+fn extrusion_profile(t: f64, d: f64, depth: f64, radius: f64) -> (Vec<k::Segment2d>, f64) {
     let d = d.max(t);
     let depth = depth.clamp(t, (d + t) * 0.5);
     let r = (radius + t).clamp(0.0, depth);
     let (h, c) = (d * 0.5, DVec2::new(d * 0.5 + r, -r));
     let (pi, half) = (std::f64::consts::PI, std::f64::consts::FRAC_PI_2);
     let mut segs = Vec::new();
-    let line = |a: DVec2, b: DVec2, segs: &mut Vec<k::Segment2d>| {
-        if a.distance(b) > 1e-12 {
-            segs.push(k::Segment2d::Line { a, b });
-        }
-    };
     // Bottom of the collar, its outer wall up, the inner bend, the sheet's
     // edge, the outer bend down to the hole's wall.
     line(DVec2::new(h, -depth), DVec2::new(h + t, -depth), &mut segs);
@@ -269,7 +367,23 @@ fn circle_extrusion(t: f64, d: f64, depth: f64, radius: f64) -> FResult<Vec<Shap
     line(DVec2::new(h + r, -t), DVec2::new(h + r, 0.0), &mut segs);
     segs.push(k::Segment2d::Arc { center: c, radius: r, start_angle: half, end_angle: pi });
     line(DVec2::new(h, -r), DVec2::new(h, -depth), &mut segs);
-    Ok(vec![revolved(&segs)?, sheet_disc(t, h + r)?])
+    (segs, h + r)
+}
+
+/// Circle extrusion: the collar revolved; Subtract material the sheet's
+/// disc out to the bend (live t 1: 15.177413 / 38.484510 mm³).
+fn circle_extrusion(t: f64, d: f64, depth: f64, radius: f64) -> FResult<Vec<Shape>> {
+    let (segs, r) = extrusion_profile(t, d, depth, radius);
+    Ok(vec![revolved(&segs)?, sheet_disc(t, r)?])
+}
+
+/// Slot extrusion: the collar along a slot (live t 1, 100 × 5: 172.257045
+/// / 738.484510 mm³).
+fn slot_extrusion(t: f64, length: f64, tangents: bool, width: f64, depth: f64, radius: f64) -> FResult<Vec<Shape>> {
+    let w = width.max(t);
+    let l = slot_length(length, tangents, w);
+    let (segs, r) = extrusion_profile(t, w, depth, radius);
+    Ok(vec![slot_swept(&segs, l)?, sheet_stadium(t, r, l)?])
 }
 
 /// Countersink (live "Countersink"): a hole of the clearance diameter, its

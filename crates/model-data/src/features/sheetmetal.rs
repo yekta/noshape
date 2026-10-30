@@ -450,6 +450,9 @@ pub fn form_tool() -> FeatureType {
         ParamSpec::num("radius", "Radius", NumSpec::positive_length(1.0, 0.04)),
         ParamSpec::num("clearanceHole", "Clearance hole", NumSpec::positive_length(10.0, 0.4)),
         ParamSpec::angle("angle", "Angle", 90.0),
+        ParamSpec::num("length", "Length", NumSpec::positive_length(100.0, 4.0)),
+        ParamSpec::num("width", "Width", NumSpec::positive_length(5.0, 0.2)),
+        ParamSpec::enum_("lengthTo", "Length to", &[("Default", "Slot centers"), ("Slot_tangents", "Slot tangents")]),
     ];
     FeatureType::new("smFormTool", "Form tool", Category::SheetMetal, p).hidden().icon("form").describe("A form of the sheet metal form library")
 }

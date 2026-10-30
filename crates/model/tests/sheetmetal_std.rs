@@ -826,6 +826,7 @@ fn library_form_tools_as_live() {
         ("circle-emboss", vec![], 273.79979, 217.909344),
         ("circle-extrusion", vec![], 15.177413, 38.48451),
         ("countersink", vec![("clearance_hole", "1 mm"), ("angle", "60 deg")], 1.491592, 1.774456),
+        ("slot-extrusion", vec![], 172.257045, 738.48451),
     ] {
         let studio = noshape_model::sheetmetal::forms::studio(form).expect("studio");
         let mut config = studio.configuration.defaults();
@@ -834,6 +835,13 @@ fn library_form_tools_as_live() {
         let st: Vec<_> = r.display.features.iter().map(|f| (f.status, f.message.clone())).collect();
         let v: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.volume().unwrap_or(0.0) * 1e9).collect();
         assert!(v.len() == 2 && (v[0] - add).abs() < 1e-5 && (v[1] - sub).abs() < 1e-5, "{form}: {v:?} vs {add} / {sub}; {st:?}");
+    }
+    // Every form builds both tools at its defaults (Slot emboss has no live figures).
+    for form in noshape_model::sheetmetal::forms::FORMS {
+        let studio = noshape_model::sheetmetal::forms::studio(form.id).expect("studio");
+        let r = Regenerator::new().regenerate(&studio, &studio.configuration.defaults(), &UnitPrefs::default(), &RegenOptions::default());
+        let v: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.volume().unwrap_or(0.0) * 1e9).collect();
+        assert!(v.len() == 2 && v.iter().all(|x| *x > 0.0), "{}: {v:?}", form.id);
     }
 }
 
