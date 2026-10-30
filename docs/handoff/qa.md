@@ -790,6 +790,16 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   Linear pattern in Feature, Part and Face mode: Direction pre-highlights and picks an edge at its middle and a face (not
   the plane behind it); Fillet › Edges and Shell › Faces hover + pick; cfs.noshape custom feature "Edge pick"
   (`EDGE && ALLOWS_AXIS`, 2 picks) and "Plain edge pick" both take two edges.
+### v0.4.15 (tag b6290397 = 58810bd9 + version bump; published 05:42:35, all three bundles; Linux tarball smoked 05:45–06:11)
+- Draft asset and published tarball identical (sha256 7df6134f…). Start page "(0.4.15.b62903976aec)"; CLI MCP `"version":"0.4.15"`.
+- Round trip = v0.4.14. volsweep vs v0.4.14: fmir 9500 → 9000 (FEATURE-MIRROR-COPY-FULL-DEPTH fixed), fillet-oversize-min unchanged;
+  **cli-delete-crash, cli-shell-gpf, cli-draft-segv changed** (see TICKETS top; bisect in cli/rbb-*-v0414/v0415.out).
+- MESH-EMPTY-LOOP-PANIC documents (tickets/mesh355/fz355-b1213m, fz375-v14m) open in the v0.4.15 CLI, no panic.
+- Mirror set + P0 repros in the release app 0 px. Pick sweep (28 tools) = v0.4.14 — run it with HOME=/tmp/qa-home3 and a
+  longer start wait (/tmp/qa-picksweep45.sh: the release app spent ~80 s on a portal D-Bus timeout at start, and /root's layout
+  puts the dialog elsewhere: two false "all differ" runs before that). live-30: 3 Extrude 1 edits committed.
+- Not run: PDF export, asm5 pin drag.
+
 ### v0.4.14 (tag 6b2e0b13 = v0.4.13 + bool c79eed1d; Release run 40839037570; published 08:43:30; Linux artifact smoked 08:31–08:42, the published tarball byte-identical)
 - Artifact noshape-0.4.14-linux-x86_64.tar.gz sha256 71d827c489dccd03… (= the published tarball); start page "(0.4.14.6b2e0b133bf7)"; CLI MCP `"version":"0.4.14"`.
 - **The fix it ships:** halfmir2 A 9130.973 / B **7607.301** / C 7434.513 (8 faces each, no negative-area face); mirhole 14429.204,
