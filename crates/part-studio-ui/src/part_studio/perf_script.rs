@@ -3,7 +3,8 @@
 //! `delete-undo-last` deletes its last feature as the Delete key does, then
 //! undoes; `edit-undo-redo` commits a new depth for its first Extrude (the
 //! feature dialog's commit: every feature after it regenerates), then undoes
-//! and redoes.
+//! and redoes. `NOSHAPE_PERF_SCRIPT_WAIT_MS=<ms>`: `edit-undo-redo` starts that long after the studio is shown
+//! (COMMIT-LATENCY: the runners' first frames after opening take 250–500 ms on the GPU and hold the UI thread).
 
 use super::PartStudioView;
 use gpui_kit::*;
@@ -18,6 +19,10 @@ pub(super) enum Script {
     Undone(Instant),
     /// `edit-undo-redo`: waiting for the opened studio.
     EditOpen,
+    /// Shown, waiting `NOSHAPE_PERF_SCRIPT_WAIT_MS` before the edit.
+    EditWaiting,
+    /// The wait is over: edit now.
+    EditNow,
     /// Extrude 1's depth committed then.
     Edited(Instant),
     EditUndone(Instant),
@@ -69,8 +74,26 @@ impl PartStudioView {
                 log::info!(target: "perf", "perf script: undo shown in {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
                 Script::Done
             }
-            Script::EditOpen => {
-                log::info!(target: "perf", "perf script: open shown {:.0} ms after start", noshape_render::perf::process_start().elapsed().as_secs_f64() * 1e3);
+            Script::EditOpen | Script::EditNow => {
+                if matches!(step, Script::EditOpen) {
+                    log::info!(target: "perf", "perf script: open shown {:.0} ms after start", noshape_render::perf::process_start().elapsed().as_secs_f64() * 1e3);
+                    let wait = std::env::var("NOSHAPE_PERF_SCRIPT_WAIT_MS").ok().and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+                    if wait > 0 {
+                        cx.spawn(async move |this, cx| {
+                            cx.background_executor().timer(std::time::Duration::from_millis(wait)).await;
+                            let _ = this.update(cx, |this: &mut Self, cx| {
+                                if matches!(this.perf_script, Some(Script::EditWaiting)) {
+                                    log::info!(target: "perf", "perf script: waited {wait} ms");
+                                    this.perf_script = Some(Script::EditNow);
+                                    this.perf_script_step(cx);
+                                }
+                            });
+                        })
+                        .detach();
+                        self.perf_script = Some(Script::EditWaiting);
+                        return;
+                    }
+                }
                 let tab = self.tab;
                 let edited = self.doc.update(cx, |doc, cx| {
                     doc.edit_studio(tab, "Edit Extrude 1", cx, |ps| {
@@ -105,6 +128,7 @@ impl PartStudioView {
                 log::info!(target: "perf", "perf script: redo shown in {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
                 Script::Done
             }
+            Script::EditWaiting => Script::EditWaiting,
             Script::Done => Script::Done,
         });
     }

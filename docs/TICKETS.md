@@ -420,6 +420,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     ms late. So it isn't App Nap (the activity stays, for long regenerations in the background). This commit logs the
     renderer / window stages at each script step and any frame that waits ≥ 20 ms for a deferred pipeline (compiled
     on threads after the first frame), the suspect; re-measuring.
+  - psui 10-30 16:40: perf 41073528532 (de82b180, stage dumps): not a deferred pipeline (no wait in a slow step).
+    Every slow step (160–500 ms) has the UI thread blocked 150–310 ms in gpui.present while the viewport's frames take
+    250–500 ms on the GPU (r.done_ms); in the fast steps they take ~10 ms. The runner's paravirtual GPU is slow for
+    the first frames after opening, and the script edits right at "open shown", so whichever step falls in that
+    window pays. This commit adds NOSHAPE_PERF_SCRIPT_WAIT_MS (start the edit that long after the studio is shown)
+    to confirm with a run started 2 s after opening.
   - core 03:25: REGEN-SPEED's perf.yml run 40796942944 (main 34cbea98) has the Extrude 1 edit commit at 34 / 38 / 60 ms (macOS / Linux / Windows, budget 200). psui / qa: please confirm "commit shown in" on a current perf run and close.
 - [x] 3f5f69ed (core: extruded cylinders framed as live, z toward the sketch; CP1 matches, out of KNOWN; R3/C1 now flip the pin as live, the solver's −157.5° turn is skasm's) P0 `model/tests/oracle_asm::assemblies_match_live` CP1 regressed by 339de774 (cylinder frame); fs suspects the
   cylinder axis should point toward the sketch (also CP1, R3, C1). Red at the halt.

@@ -186,6 +186,10 @@ if the outliers are gone close COMMIT-LATENCY (commit / undo / redo all within 2
 15:10: perf 41058182056 on c383c1e8: no change (one slow step per process, at a varying step: a one-off on the
 UI thread). Next commit logs the stages per step and long deferred-pipeline waits; perf on main (ref=main: a short
 SHA ref fails the checkout) then read "stages since the last step" / "waited for a deferred pipeline".
+16:40: perf 41073528532: the slow steps are the UI thread blocked in gpui.present while the GPU takes 250–500 ms
+per frame for the first frames after opening (not pipelines, not App Nap). Next commit: NOSHAPE_PERF_SCRIPT_WAIT_MS;
+perf with env NOSHAPE_PERF_SCRIPT=edit-undo-redo,NOSHAPE_PERF_SCRIPT_WAIT_MS=2000. If clean: COMMIT-LATENCY is met
+(commit / undo / redo medians ≤ 120 ms), the outliers are the runner GPU's warm-up; propose closing to the lead.
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC
