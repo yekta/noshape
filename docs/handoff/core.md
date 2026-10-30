@@ -568,6 +568,11 @@ with 0003b and 0004 on Linux, macOS and Windows.
    rounds and a single edge's roll-over are fine. T1 `kernel_robustness::oversize_fillets_like_onshape` (22 cases) and
    `oversize_chamfers_like_onshape` (20).
 5. kern's open item: forward-oriented edges.
+6. dx's I1 done 10-30 (8adbec06), in io.cpp (dx's file; the integrator was right): the STEP file has no pcurves and
+   OCCT's projection drifts next to a B-spline patch's pole (v = 0.9958 instead of 1, edge tolerance 0.0043), so the
+   blend lost a sliver. `fix_pole_pcurves` in read_step / read_step_tree re-projects the edges meeting a degenerate
+   edge, snaps them onto the boundary iso they follow and re-spans the degenerate edge: 13.200065 mm² each (live
+   13.20006), 7582.9778 mm³ (live STEP 7582.977). 56 STEP files swept: only the G24 part changes, none invalid.
 Knurl Phase 1 stopped at 246 s (its steps left are 10–40 s each); REGEN-SPEED met in release (qa to re-measure).
 
 ## End-of-day walk (10-27 03:45, green 8165fca6)
