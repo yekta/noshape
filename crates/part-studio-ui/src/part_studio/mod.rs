@@ -593,6 +593,8 @@ impl PartStudioView {
         self.last_regen_request = Some(std::time::Instant::now());
         let asked = std::time::Instant::now();
         self.regen_task = Some(cx.spawn_in(window, async move |this, cx| {
+            // When the UI thread first ran this task (COMMIT-LATENCY: before the background thread starts below).
+            let polled = asked.elapsed();
             if burst {
                 cx.background_executor().timer(Duration::from_millis(12)).await;
             }
@@ -603,7 +605,7 @@ impl PartStudioView {
                     let started = asked.elapsed();
                     let mut regen = regen.lock();
                     if noshape_render::perf::enabled() {
-                        log::info!(target: "perf", "regen #{seq}: started {:.1} ms after asked, lock {:.1} ms", started.as_secs_f64() * 1e3, (asked.elapsed() - started).as_secs_f64() * 1e3);
+                        log::info!(target: "perf", "regen #{seq}: polled {:.1} ms, started {:.1} ms after asked, lock {:.1} ms", polled.as_secs_f64() * 1e3, started.as_secs_f64() * 1e3, (asked.elapsed() - started).as_secs_f64() * 1e3);
                     }
                     let r = regen.regenerate(&studio, &config, &units, &opts);
                     drop(regen);
