@@ -209,7 +209,7 @@ impl UndoStack {
     /// changed ([`NOT_UNDOABLE_PURGING`]).
     fn forget_touching(&mut self, doc: &Document, before: MicroversionId, after: MicroversionId) -> Result<()> {
         let tabs: Vec<String> = doc.diff(before, after)?.into_iter().map(|c| c.name).filter(|n| n.starts_with("tab/")).collect();
-        let mut keep = |e: &Entry| Self::changed_names(doc, e).map_or(false, |c| !c.iter().any(|n| tabs.contains(n)));
+        let mut keep = |e: &Entry| Self::changed_names(doc, e).is_ok_and(|c| !c.iter().any(|n| tabs.contains(n)));
         self.undo.retain(&mut keep);
         self.redo.retain(&mut keep);
         Ok(())
