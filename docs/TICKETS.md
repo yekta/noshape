@@ -112,7 +112,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cli-shell-gpf, cli-fillet-segv, cli-fillet2-segv and cli-draft-segv.noshape** (/root/qa-scratch/tickets/; green 19555ca3
   opens all five).
 ## Core
-- [x] P0 KNURL-FS-NO-OP (lead 10-30 11:30 user time) the Feature Studio knurl "Printable ANSI/ASME B94.6 knurling" on a
+- [x] verified 84a12216 + core CLI 13:03 (qa 14:51: bin/knurl.py builds the Feature Studio from crates/model/tests/fs/knurl_b94.fs and a Ø50 × 50 cylinder (Top circle r25, Extrude 50), knurl CP12 / 80° / 30° / 100 %, as the T2. **Straight**: 95877.733 mm³ / 224 faces = live on the v0.4.15 CLI, core's CLI and in the green app (Mass properties 95877.733, regen 2 s). **Diamond**: core's debug CLI 13:03 (rel/k/core/1303, with abb1e636 / be531578) Ok **94272.890 mm³ / 10362 faces** (live 94271.838 / 10362), 242 s, inside a 10 GB cgroup; v0.4.15 still "Selected tools and targets do not intersect." (98174.77, uncut); the green app builds it without error, the knurled cylinder shown, but its regen takes **441–478 s** (live 49 s) and its Mass properties couldn't be read (the bottom-right strip icons were not drawn in that document); tickets/knurl-diamond-green-84a1.png, qa-scratch/knurldocs/) P0 KNURL-FS-NO-OP (lead 10-30 11:30 user time) the Feature Studio knurl "Printable ANSI/ASME B94.6 knurling" on a
   50 × 50 cylinder (Diamond, CP12, 80°, 30°, 100 %) failed after ~2 min with "Selected tools and targets do not
   intersect.": its subtract stopped at the Boolean memory budget (4096 MB of growth since 10-25 17:19, b43d57aa) and the
   FS host reported every op failure as the op's code. Now the budget's default is half the machine's memory (4–16 GB),
@@ -120,7 +120,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   hands freed memory back (malloc_trim) after a big Boolean. Diamond Ok: 94272.890 mm³, 10362 faces, 363 s, +8.2 GB;
   Straight 95877.733 mm³, 224 faces, 1.6 s. T2 `custom_features::knurl_feature_b94_on_a_cylinder` against live
   (request 1615: Straight 95877.733 mm³ / 224 faces = ours; Diamond 94271.838 / 10362 faces, ours +1.05 mm³; live 49 s).
-- [x] P1 KNURL-MEMORY (core) the diamond knurl's subtract (148 helical grooves) grew the process by ~8.2 GB in the
+- [x] partly verified (qa 14:51: the Diamond regen on core's CLI finished inside a 10 GB memory cgroup (no OOM kill); growth itself not measured by qa) P1 KNURL-MEMORY (core) the diamond knurl's subtract (148 helical grooves) grew the process by ~8.2 GB in the
   model's metres. op_boolean now runs a cut by 64+ tools at the blends' working scale (mm; ScaledInputs: each TShape
   scaled once, instances keep their locations, so patch 0001's congruent pairs still hold): +4.45 GB, 315 s (was
   363), the same 94272.890 mm³ / 10362 faces. T2 `custom_features::knurl_feature_b94_on_a_cylinder` bounds it at
