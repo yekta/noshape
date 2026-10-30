@@ -107,6 +107,11 @@ sheet_metal_aware! {
     sm_loft => "loft", crate::regen::features::solid_a::loft, "loft.fs", "loft";
 }
 
+/// Sheet metal runs by std (the setting; a legacy studio still runs natively).
+pub fn std_sheet_metal_on() -> bool {
+    STD_SHEET_METAL.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 /// Sheet metal runs by std in this regeneration (on, not a legacy studio, the
 /// FeatureScript host registered).
 pub fn std_sheet_metal() -> bool {
@@ -135,6 +140,9 @@ macro_rules! std_features {
         $(fn $f(ev: &mut EvalCtx) -> FResult<()> {
             evaluate_std(ev, $module, $name)
         })*
+
+        /// The built-in feature types std runs (sheet metal, Tag, PCB).
+        pub const STD_TYPES: &[&str] = &[$($name,)*];
 
         /// The std module and feature of a built-in feature type.
         pub fn std_name(type_id: &str) -> Option<(&'static str, &'static str)> {

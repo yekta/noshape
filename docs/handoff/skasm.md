@@ -185,6 +185,21 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
 (none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
 "tools/tiers/land.sh".)
 
+## 10-30 evening batch (lead 16:55: Copy Flat pattern, Form ▾ pictures, perf.sh figures, then the rows left)
+- Landed: Copy Flat pattern (flat body ids `noshape_model::sheetmetal::flat_body_id`; the assembly evaluates such a
+  Part instance to the flat view's solid, "Flat pattern of <part>"; T1 a_flat_pattern_instance_is_the_flat; GUI: pasted
+  into Assembly 1 as live), OsSelect pictures (`set_pictures`; Form ▾ rows 70 × 40, psui.md line), the partial cylinder
+  Radius readout (MEASURE-PARTIAL-CYL-RADIUS), a user form studio's flat sketch (T1), the rebuild speed-up (keep_names
+  box test, glued wall/bend fuse: the Hem's host rebuild 2.4 s → 0.47 s dev build), no comb on a straight curve.
+- Louver settled: live's evVolume HIGH 19611.187053 = ours (its /massproperties was 0.15 low); T2 within 1e-4 for all three.
+- workflow-sheet-metal.md: every row ✅. workflow-drawing-sheet-metal.md re-checked (DSM2 / DSM3 ✅). The assembly /
+  configured-assembly / sketch docs' open-looking rows are all fixed in later passes (A7, A10, A19, CA4–6, D17, D18,
+  C17 / ASM-PATTERN-SUBASSEMBLY verified fd036a5c).
+- Speed (vibe3): the regen profile's Hem stays ~1.1 s on its *first* run in a process: std's sheetMetalHem.fs load
+  (one-time per app session, FS interpreter: not the rebuild). The profile now prints a warm run too. A first Hem in
+  the app pays it; pre-loading std's sheet metal modules at startup (in the background) would hide it: core / fs's
+  call, noted for the lead.
+
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
 (standard content) → mates/assembly workflow gaps (all ✅, UNCONFIRMED all answered 10-27) → standard content.

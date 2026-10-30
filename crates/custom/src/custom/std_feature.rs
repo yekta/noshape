@@ -53,6 +53,15 @@ pub fn prewarm() {
                     loaded(module, name);
                 }
             }
+            // Then the sheet metal features std runs: a first Hem in a
+            // session paid ~1 s compiling sheetMetalHem.fs (vibe3 regen profile).
+            if crate::regen::std_route::std_sheet_metal_on() {
+                for ty in crate::regen::std_route::STD_TYPES {
+                    if let Some((module, _)) = std_name(ty) {
+                        let _ = noshape_featurescript::std_module(module);
+                    }
+                }
+            }
         });
     });
 }
