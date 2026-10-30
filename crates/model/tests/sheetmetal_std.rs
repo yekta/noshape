@@ -896,6 +896,10 @@ fn library_circle_emboss_as_live() {
         }] += 1;
         n
     });
+    // The flat: the form's footprint (r 9.1569, live's DXF FORM_UP circle) once.
+    let fp = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
+    let radii: Vec<f64> = fp.forms.iter().flat_map(|f| f.loops.iter().map(|l| l.iter().map(|p| (*p - f.center).length() * 1e3).fold(0.0, f64::max))).collect();
+    assert_eq!(radii.iter().filter(|r| (**r - 9.156854).abs() < 1e-3).count(), 1, "form loops {radii:?}");
     assert!((volume_mm3(&r) - 9694.552619769172).abs() < 1e-3 && kinds == [8, 4, 2, 0], "{} mm³, PLANE/TORUS/CONE/other {kinds:?}: {:#?}", volume_mm3(&r), face_report(&r));
 }
 

@@ -2043,6 +2043,15 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
                 }
             }
             ls.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
+            // The add and subtract tools often share an outline at the sheet: once.
+            let same = |a: &Vec<DVec3>, b: &Vec<DVec3>| (extent(a) - extent(b)).abs() < 1e-9 && a.iter().copied().sum::<DVec3>().distance(b.iter().copied().sum::<DVec3>()) / (a.len().max(1) as f64) < 1e-7;
+            let mut kept: Vec<Vec<DVec3>> = Vec::new();
+            for l in ls {
+                if !kept.iter().any(|k| same(k, &l)) {
+                    kept.push(l);
+                }
+            }
+            let ls = kept;
             if ls.first().map(extent).unwrap_or(0.0) > loops.first().map(extent).unwrap_or(0.0) + 1e-9 {
                 loops = ls;
             }
