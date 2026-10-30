@@ -680,6 +680,13 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - Replays, all 0 differ: main 747 (+53), corpus2 547 (+8), corpus3 550 (+8), corpus4 594 (+8), corpus5 711 (+8),
   corpus6 656 (+8), Shell's 78, direct 58. T1: a sheet fuse (1a39dedd) and a sheet cut (dbdc4a4f) in tests/data/brep.
 - skasm owns sheet metal: the shells and coplanar-overlap cases are what their models will hit; progress here.
+- Coplanar overlaps, tried (10-30 06:50 UTC, not landed): treating sheets on each other in a fuse as one piece (the
+  first argument's, either facing) matches OCCT on two plainly overlapping rectangles (0, 5 µm, 0.1 mm, 1 mm:
+  OCCT's three faces) and takes 71 of the 114 corpus sheet cases, but two differ: 0c538d2c (strips sharing side
+  lines, overlapping 5 µm: OCCT keeps all eleven faces as they were, plain OCCT path, not understood) and 7895f375
+  (a disc filling a plate's hole exactly, the two circles starting at different points: ours invalid). Both have a
+  vertex of one sheet on the other's edge between its vertices, as do the plain overlaps, so the vertex rule can't
+  tell them apart yet: the conservative rule stays (53 taken).
 
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
