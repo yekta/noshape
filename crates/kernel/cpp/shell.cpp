@@ -100,6 +100,20 @@ rust::String             last_shell_path() { return rust::String(t_shell_path); 
 
 namespace {
 
+// An OCCT Boolean of `a` and `b` built under the thread's cancel / budget
+// indicator, so a budget stops it by throwing (its memory freed) rather than
+// by the timer's jump (MEM-RUNAWAY-508).
+template <class Op>
+void build_stoppable(Op& op, const TopoDS_Shape& a, const TopoDS_Shape& b)
+{
+  TopTools_ListOfShape x, y;
+  x.Append(a);
+  y.Append(b);
+  op.SetArguments(x);
+  op.SetTools(y);
+  op.Build(new_cancel_indicator()->Start());
+}
+
 using HHist = occ::handle<BRepTools_History>;
 
 double volume_of(const TopoDS_Shape& s)
@@ -335,7 +349,8 @@ bool by_offset(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
   }
   const TopoDS_Shape& outer = sign < 0 ? solid : offset;
   const TopoDS_Shape& inner = sign < 0 ? offset : solid;
-  BRepAlgoAPI_Cut     cut(outer, inner);
+  BRepAlgoAPI_Cut     cut;
+  build_stoppable(cut, outer, inner);
   if (cut.HasErrors() || !cut.IsDone())
     return no("cut failed");
   TopoDS_Shape r = cut.Shape();
@@ -716,7 +731,8 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
   auto cut_by = [&](const TopoDS_Shape& tool, const SourceMap& src) {
     const KernelTimer timer("regions.cut_cavity");
     const auto        t0 = std::chrono::steady_clock::now();
-    BRepAlgoAPI_Cut c(cavity, tool);
+    BRepAlgoAPI_Cut c;
+    build_stoppable(c, cavity, tool);
     if (dbg)
     {
       int nt = 0, nc = 0;
@@ -1043,7 +1059,8 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
       return no("a boolean failed");
   }
   std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("regions.final_cut");
-  BRepAlgoAPI_Cut c(solid, cavity);
+  BRepAlgoAPI_Cut c;
+  build_stoppable(c, solid, cavity);
   if (c.HasErrors() || !c.IsDone())
     return no("a boolean failed");
   TopoDS_Shape       walls = c.Shape();
@@ -1070,10 +1087,11 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
       tools.Append(x);
     m.SetArguments(objs);
     m.SetTools(tools);
-    m.Build();
+    m.Build(new_cancel_indicator()->Start());
     if (m.HasErrors() || !m.IsDone())
       return no("a hole tube's common failed");
-    BRepAlgoAPI_Fuse fu(walls, m.Shape());
+    BRepAlgoAPI_Fuse fu;
+    build_stoppable(fu, walls, m.Shape());
     if (fu.HasErrors() || !fu.IsDone())
       return no("a hole tube's fuse failed");
     // One history for the cut and the common side by side: each input's

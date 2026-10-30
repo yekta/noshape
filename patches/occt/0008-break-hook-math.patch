@@ -1,0 +1,33 @@
+diff -ru a/src/FoundationClasses/TKMath/math/math_FunctionSetRoot.cxx b/src/FoundationClasses/TKMath/math/math_FunctionSetRoot.cxx
+--- a/src/FoundationClasses/TKMath/math/math_FunctionSetRoot.cxx	2026-10-30 16:27:40.580745892 +0000
++++ b/src/FoundationClasses/TKMath/math/math_FunctionSetRoot.cxx	2026-10-30 16:27:40.625869915 +0000
+@@ -37,6 +37,20 @@
+ #include <Precision.hxx>
+ #include <Standard_DimensionError.hxx>
+ #include <StdFail_NotDone.hxx>
++#include <Standard_Failure.hxx>
++
++// noshape: whether the caller's budget or cancel says stop (defined in
++// noshape's kernel, boolean.cpp). Checked at each solve: a long curve /
++// surface intersection inside one Boolean step runs thousands of them
++// between the Boolean's progress checks.
++extern "C" int noshape_should_break();
++#if defined(__GNUC__)
++// The default for a program that doesn't define the hook: never stop.
++extern "C" __attribute__((weak)) int noshape_should_break()
++{
++  return 0;
++}
++#endif
+ 
+ //===========================================================================
+ // - A partir d une solution de depart, recherche d une direction.( Newton la
+@@ -799,6 +813,8 @@
+                                    const math_Vector&               theSupBound,
+                                    bool                             theStopOnDivergent)
+ {
++  if (noshape_should_break() != 0)
++    throw Standard_Failure("noshape: stopped");
+   int Ninc = F.NbVariables(), Neq = F.NbEquations();
+ 
+   if ((Neq <= 0) || (StartingPoint.Length() != Ninc) || (theInfBound.Length() != Ninc)

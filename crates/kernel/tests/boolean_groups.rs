@@ -312,9 +312,10 @@ fn opposite_extrudes_of_a_circle_unify_into_one_cylinder() {
 
 /// with_call_budget: a section that takes longer than its budget fails with
 /// "section took too long" (std's collision checks in editing logic give up
-/// on such a pair, qa MIRROR-HANG-402); without one it runs to the end.
+/// on such a pair, qa MIRROR-HANG-402); without one it runs to the end. The
+/// budget is so small that the first check of the deadline (the section's
+/// progress indicator) stops it, whatever the machine's speed.
 #[test]
-#[ignore = "T2: depends on the op outlasting its budget (machine speed; flaked on vibe2 10-30); T1 again once budgets stop by deadline"]
 fn a_section_under_a_call_budget_gives_up() {
     let plate = make_box_corners(DVec3::ZERO, DVec3::new(100.0, 100.0, 10.0)).unwrap();
     let mut tools = Vec::new();
@@ -327,7 +328,7 @@ fn a_section_under_a_call_budget_gives_up() {
     let tilted = make_box_corners(DVec3::new(-10.0, -10.0, 4.0), DVec3::new(110.0, 110.0, 6.0)).unwrap();
     let tilted = tilted.transformed(&Transform::Rotate { origin: DVec3::new(50.0, 50.0, 5.0), axis: DVec3::new(1.0, 1.0, 0.0), angle: 0.05 }).unwrap();
     let t = std::time::Instant::now();
-    let r = with_call_budget(1e-4, || section(&holes, &tilted));
+    let r = with_call_budget(1e-9, || section(&holes, &tilted));
     let e = r.err().map(|e| e.to_string()).unwrap_or_default();
     assert!(e.contains("took too long"), "{e:?} after {:?}", t.elapsed());
     let s = section(&holes, &tilted).unwrap().shape;
@@ -337,9 +338,11 @@ fn a_section_under_a_call_budget_gives_up() {
 /// with_blend_budget: a fillet longer than its budget fails with "fillet took
 /// too long" on every platform (off Linux the budget is a deadline OCCT patch
 /// 0007's hook stops the fillet builder at; BUDGET-OFF-LINUX), and without a
-/// short budget it builds.
+/// short budget it builds. The budget is so small that the hook's first
+/// check stops it; T2 until /root/occt on the land and watcher machines has
+/// patch 0007's TKFillet (the hook), as CI's OCCT has.
 #[test]
-#[ignore = "T2: depends on the op outlasting its budget (machine speed; flaked on vibe2 10-30); T1 again once budgets stop by deadline"]
+#[ignore = "T2: needs patch 0007's TKFillet in /root/occt (the hook)"]
 fn a_fillet_under_a_short_budget_gives_up() {
     let plate = make_box_corners(DVec3::ZERO, DVec3::new(100.0, 100.0, 10.0)).unwrap();
     let mut tools = Vec::new();
@@ -353,7 +356,7 @@ fn a_fillet_under_a_short_budget_gives_up() {
     let edges: Vec<Shape> = plate.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, Curve::Circle { .. }) && e.point_at(i.first_param).is_ok_and(|p| p.z > 9.9))).collect();
     assert_eq!(edges.len(), 100);
     let t = std::time::Instant::now();
-    let r = with_blend_budget(0.02, || fillet(&plate, &edges, 1.0));
+    let r = with_blend_budget(1e-9, || fillet(&plate, &edges, 1.0));
     let e = r.err().map(|e| e.to_string()).unwrap_or_default();
     assert!(e.contains("took too long"), "{e:?} after {:?}", t.elapsed());
     let full = fillet(&plate, &edges, 1.0).unwrap().shape;

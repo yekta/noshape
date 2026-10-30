@@ -2797,7 +2797,12 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
     rounded = exact_vertex_blends(rounded, corners);
     if (!corners.IsNull())
       h2 = compose(full, h2, corners);
-    BRepAlgoAPI_Common cm(rounded, input);
+    BRepAlgoAPI_Common cm; // (not the two-shape constructor: it builds at once)
+    ShapeList          cm_args, cm_tools;
+    cm_args.Append(rounded);
+    cm_tools.Append(input);
+    cm.SetArguments(cm_args);
+    cm.SetTools(cm_tools);
     cm.SetToFillHistory(true);
     cm.Build(new_cancel_indicator()->Start());
     if (!cm.IsDone() || cm.HasErrors())

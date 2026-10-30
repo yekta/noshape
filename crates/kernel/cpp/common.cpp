@@ -73,6 +73,16 @@ double steady_seconds()
   return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
+double deadline_now(const Deadline& d)
+{
+#ifdef __linux__
+  timespec ts{};
+  if (d.clock != CLOCK_MONOTONIC && clock_gettime(d.clock, &ts) == 0)
+    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
+#endif
+  return steady_seconds();
+}
+
 namespace {
 std::atomic<double> g_working_scale{1.0};
 }
@@ -2027,6 +2037,7 @@ void kernel_profile_add(const char* what, std::chrono::steady_clock::duration to
 
 #ifdef __linux__
   #include <ctime>
+  #include <pthread.h>
   #include <unistd.h>
   #include <sys/syscall.h>
 namespace noshape {
@@ -2034,6 +2045,7 @@ thread_local sigjmp_buf*              budget_jmp    = nullptr;
 thread_local double                   budget_limit  = 0;
 thread_local int                      budget_reason = 0;
 thread_local const std::atomic<bool>* budget_cancel = nullptr;
+thread_local double                   budget_cancel_seen = -1;
 thread_local int                      budget_hold   = 0;
 thread_local void*                    budget_timer_live = nullptr;
 
@@ -2042,6 +2054,12 @@ double thread_cpu_seconds()
   timespec ts{};
   clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
   return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
+}
+
+clockid_t this_thread_cpu_clock()
+{
+  clockid_t c;
+  return pthread_getcpuclockid(pthread_self(), &c) == 0 ? c : CLOCK_THREAD_CPUTIME_ID;
 }
 
 namespace {
@@ -2079,8 +2097,14 @@ void on_budget_tick(int, siginfo_t*, void* uctx)
   // OCCT patch 0005 counts them. The next tick after.
   if (env == nullptr || budget_hold > 0 || mutex_holds > 0 || noshape_osd_pool_depth() > 0 || !in_own_code(uctx))
     return;
-  const bool over   = thread_cpu_seconds() > budget_limit;
-  const bool cancel = budget_cancel != nullptr && budget_cancel->load(std::memory_order_relaxed);
+  // A cancel waits a grace too: the deadline's indicator and hook see the
+  // flag as well and stop the build by throwing.
+  const double now    = thread_cpu_seconds();
+  const bool   over   = now > budget_limit;
+  bool         cancel = budget_cancel != nullptr && budget_cancel->load(std::memory_order_relaxed);
+  if (cancel && budget_cancel_seen < 0)
+    budget_cancel_seen = now;
+  cancel = cancel && now - budget_cancel_seen > 1.0;
   if (!over && !cancel)
     return;
   budget_jmp    = nullptr;

@@ -49,6 +49,7 @@ struct UnifyScope;   // internal.hpp, the unify
 #ifndef _WIN32
   #include <csetjmp>
   #include <csignal>
+  #include <ctime>
 namespace noshape {
 // Crash guard (qa DRAFT-SEGV-DOC / DOC-POISON): a SIGSEGV, SIGBUS, SIGFPE,
 // SIGILL or SIGABRT (std::terminate: OCCT 8 throws from noexcept code, e.g.
@@ -90,6 +91,9 @@ extern thread_local sigjmp_buf*             budget_jmp;
 extern thread_local double                  budget_limit;
 extern thread_local int                     budget_reason;
 extern thread_local const std::atomic<bool>* budget_cancel;
+// When the timer first saw the cancel flag set (thread CPU seconds; -1: not
+// yet): the jump waits a grace for the cooperative stop as for the deadline.
+extern thread_local double                  budget_cancel_seen;
 extern thread_local int                     budget_hold;
 // OCCT patch 0004: this thread's override of the pairs' mode (-1 none, 0 serial); returns the one before.
 extern "C" int noshape_bop_set_pairs_parallel_here(int on);
@@ -126,6 +130,7 @@ struct BudgetSnapshot
 bool                                        budget_timer_start(void*& timer);
 void                                        budget_timer_stop(void* timer);
 double                                      thread_cpu_seconds();
+clockid_t                                   this_thread_cpu_clock();
 #endif
 // CPU seconds a blend, draft or shell may take (30; NOSHAPE_BLEND_BUDGET).
 double blend_budget_seconds();
@@ -161,18 +166,25 @@ struct LockedSection
   LockedSection(const LockedSection&)            = delete;
   LockedSection& operator=(const LockedSection&) = delete;
 };
-// A budget off Linux (no CPU timer signal to jump out with there): its
-// deadline on the steady clock, which OCCT's builds see through their
-// progress indicator (boolean.cpp CancelIndicator: Booleans, sections) and
-// stop at; `hit` once one did. Captured by the indicator when it is made (its
-// UserBreak may run on a pool thread).
+// A budget's deadline, which OCCT's builds see through their progress
+// indicator (boolean.cpp CancelIndicator: Booleans, sections) or patch 0007's
+// hook (blends, Draft) and stop at by throwing, so their memory is freed;
+// `hit` once one did. Off Linux on the steady clock; on Linux on the budgeted
+// thread's CPU clock (`clock`), the budget's own measure, ahead of its timer's
+// jump. Captured by the indicator when it is made (its UserBreak may run on a
+// pool thread, which reads the owner's clock).
 struct Deadline
 {
   double            at = 0;
   std::atomic<bool> hit{false};
+#ifdef __linux__
+  clockid_t clock = CLOCK_MONOTONIC;
+#endif
 };
 extern thread_local Deadline* t_deadline;
 double                        steady_seconds();
+// The deadline's clock now.
+double deadline_now(const Deadline& d);
 
 template <class F>
 int run_budgeted(double cpu_seconds, F&& f)
@@ -197,36 +209,55 @@ int run_budgeted(double cpu_seconds, F&& f)
   // on pool workers is out of the budget's reach (qa DRAFT-BUDGET-POOL: a
   // worker's endless intersection line went on past the budget).
   const int pairs_outer = noshape_bop_set_pairs_parallel_here(0);
+  Deadline* const deadline_outer = t_deadline;
   if (sigsetjmp(env, 1) != 0)
   {
     budget_timer_stop(timer);
     budget_timer_live = nullptr;
     crash_guard       = crash_outer;
+    t_deadline        = deadline_outer;
     noshape_bop_set_pairs_parallel_here(pairs_outer);
     return budget_reason;
   }
-  budget_limit  = thread_cpu_seconds() + cpu_seconds;
-  budget_cancel = thread_cancel_flag();
-  budget_jmp    = &env;
+  // First the deadline: OCCT's builds stop at it by throwing, so what they
+  // built is freed. The timer's jump skips every destructor (a 30 s Shell
+  // Boolean cut off by it left GBs behind each time: qa MEM-RUNAWAY-508's
+  // fuzz session grew to 18 GB), so it only comes after a grace, for code
+  // that checks neither the indicator nor the hook.
+  Deadline d;
+  d.clock               = this_thread_cpu_clock();
+  d.at                  = thread_cpu_seconds() + cpu_seconds;
+  t_deadline            = &d;
+  budget_limit          = d.at + std::max(0.1, 0.5 * cpu_seconds);
+  budget_cancel         = thread_cancel_flag();
+  budget_cancel_seen    = -1;
+  budget_jmp            = &env;
   // Seen by the signal handler before `f` runs (else a store before an
   // endless loop can be dropped).
   std::atomic_signal_fence(std::memory_order_seq_cst);
+  const auto done = [&] {
+    budget_jmp = nullptr;
+    budget_timer_stop(timer);
+    budget_timer_live = nullptr;
+    noshape_bop_set_pairs_parallel_here(pairs_outer);
+    t_deadline = deadline_outer;
+  };
   try
   {
     f();
   }
   catch (...)
   {
-    budget_jmp = nullptr;
-    budget_timer_stop(timer);
-    budget_timer_live = nullptr;
-    noshape_bop_set_pairs_parallel_here(pairs_outer);
+    done();
+    if (d.hit.load())
+      return 1;
+    if (budget_cancel != nullptr && budget_cancel->load(std::memory_order_relaxed))
+      return 2;
     throw;
   }
-  budget_jmp = nullptr;
-  budget_timer_stop(timer);
-  budget_timer_live = nullptr;
-  noshape_bop_set_pairs_parallel_here(pairs_outer);
+  done();
+  if (d.hit.load())
+    return 1;
 #else
   // Wall time here (the indicator's checks are cheap and portable); the
   // earlier of this and an enclosing budget's.

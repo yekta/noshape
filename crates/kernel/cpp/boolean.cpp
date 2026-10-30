@@ -184,12 +184,17 @@ public:
   {
     if (cancelled(myFlag) || myOver)
       return true;
-    if (myDeadline != nullptr && steady_seconds() > myDeadline->at)
-    {
-      myDeadline->hit.store(true);
-      return true;
-    }
     const auto now = std::chrono::steady_clock::now();
+    // (A CPU clock is a system call: every 5 ms.)
+    if (myDeadline != nullptr && now - myDeadlineChecked >= std::chrono::milliseconds(5))
+    {
+      myDeadlineChecked = now;
+      if (deadline_now(*myDeadline) > myDeadline->at)
+      {
+        myDeadline->hit.store(true);
+        return true;
+      }
+    }
     if (now - myChecked < std::chrono::milliseconds(50))
       return false;
     myChecked = now;
@@ -229,12 +234,13 @@ private:
   std::mutex                            myStepLock;
   std::string                           myStep;
   std::chrono::steady_clock::duration   myStepStart{};
+  std::chrono::steady_clock::time_point myDeadlineChecked{};
 };
 
 } // namespace
 
 // A progress indicator for an OCCT build that takes one: stopped by the
-// thread's cancel flag, the memory budget and a budget's deadline off Linux.
+// thread's cancel flag, the memory budget and a budget's deadline.
 occ::handle<Message_ProgressIndicator> new_cancel_indicator()
 {
   return new CancelIndicator(t_cancel);
@@ -306,12 +312,25 @@ TopoDS_Shape ScaledInputs::unscale(const TopoDS_Shape& r, occ::handle<BRepTools_
 extern "C" int noshape_should_break()
 {
   Deadline* const d = t_deadline;
-  if (d != nullptr && steady_seconds() > d->at)
+  if (cancelled(t_cancel))
+    return 1;
+  if (d == nullptr)
+    return 0;
+  if (d->hit.load(std::memory_order_relaxed))
+    return 1;
+  // Called at every math solve (patch 0008): the deadline's CPU clock is a
+  // system call, so read once a millisecond (the steady clock is cheap).
+  thread_local double next = 0;
+  const double        now  = steady_seconds();
+  if (now < next)
+    return 0;
+  next = now + 1e-3;
+  if (deadline_now(*d) > d->at)
   {
     d->hit.store(true);
     return 1;
   }
-  return cancelled(t_cancel) ? 1 : 0;
+  return 0;
 }
 
 namespace {
