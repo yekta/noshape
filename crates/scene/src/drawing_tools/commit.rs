@@ -1004,9 +1004,16 @@ impl SheetPick<'_> {
     /// (the red crosshair): the point on the line and where it is.
     pub fn datum_attach_at(&self, c: [f64; 2]) -> Option<([f64; 2], DatumOn)> {
         // Help datum (drawing.md A31): GD&T frames, dimensions and hole
-        // callouts, not radius / diameter dimensions that are foreshortened.
+        // callouts, not radius / diameter dimensions that are or could
+        // become foreshortened (those in detail and cropped views, where
+        // they are placed foreshortened; help D15).
+        let sheet = self.current_sheet();
+        let may_foreshorten = |a: &Annotation| {
+            matches!(a.kind, AnnotationKind::RadialDimension { .. })
+                && a.kind.view().and_then(|v| sheet.view(v)).is_some_and(|v| matches!(v.kind, noshape_model::drawing::ViewKind::Detail { .. }) || v.crop.is_some())
+        };
         self.attach_at(c, self.tol_mm(5.0), &|a: &Annotation| {
-            matches!(a.kind, AnnotationKind::Gdt { .. } | AnnotationKind::HoleCallout { .. }) || (a.kind.is_dimension() && !matches!(a.kind, AnnotationKind::ForeshortenedRadial { .. } | AnnotationKind::ForeshortenedDiameter { .. }))
+            matches!(a.kind, AnnotationKind::Gdt { .. } | AnnotationKind::HoleCallout { .. }) || (a.kind.is_dimension() && !matches!(a.kind, AnnotationKind::ForeshortenedRadial { .. } | AnnotationKind::ForeshortenedDiameter { .. }) && !may_foreshorten(a))
         })
     }
 

@@ -105,6 +105,23 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Live answered the derived colour question: the target's next default colour unless the source part's appearance is
   explicit (then carried); ours now does both.
 
+## Night 10-30 (lead 23:45 order: drawing.md 🔧 rows → import matrix → data exchange)
+- Landed: the Keyboard shortcuts modal is app-core's `shortcut_sheet` (Drawing / Part Studio / Assembly, start tab
+  per studio; psui told in psui.md); SK16 sketch Thickness / Pitch scale; S9 + TB30 drag view / table rows onto
+  another sheet's row; S3 continuation sheets (ANSI A from drw2-l, ISO A3 from live 1603: the same strip, scaled with
+  the title block height); A50 / A51 centerlines (free clicks, ends snap, end grips, middle-snap move; ops
+  centerline_end / move_centerline); S29 (a set scale ticks Scale label; default Off as live); V48 multi-line Prefix /
+  Suffix; A55 centermark arm edge snap + red diamond; A58 hole callout shaft hidden; promotions V23, D14, D37, D41,
+  A4, A17, A21, A26, TB29, C9, S24, SK13, S28, TB17 n/a.
+- Import matrix (docs/parity/workflow-import-matrix.md "Re-run 2026-10-30"): 128 / 143 samples identical to qa's
+  10-28 run; the 14 dx-asm-xt files and the NIST assembly now import through the CLI (= live's tabs, names, 36
+  instances; IM1b BOM element missing, api); I1 graded per face: x_t ✅, SAT ✗ small, STEP ✗ = the integral of the
+  degenerate blend patch (the file's patch integrated independently = live's 13.20006; core's, TICKETS I1).
+- Live requests: 1603 answered (ISO continuation, Reset ordinate = nothing, no BOM override in drawings, Scale label
+  default); new (03:35) A51 concentric arcs, TB4 table midpoint grips, D16 single-silhouette foreshorten.
+- Next: the remaining 🔧 rows that need no live answer (V49 BOM / cut list references, A31 detail-view radial datums,
+  SK15 constraints, C10, D40 red grips), then the data-exchange list above (Next 0, 3).
+
 ## Night 10-28 (landed through acc43c43; walk on green 52ca0b97, :131, /root/dx-scratch/w3/a*.png)
 - Walk 03:15: hole table on a 3-hole part (Ø6.6 THRU ×3): TAG / X LOC / Y LOC / SIZE "⌀6.6 THRU" / QTY 3 merged;
   the tag axis' menu (Hole table properties..., Flip X / Y | Clear selection, Zoom to fit), Flip X negates X LOC;
