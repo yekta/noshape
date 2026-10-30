@@ -353,6 +353,11 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   model after an edit 53 s. T0 after a sketch/scene edit 830 s total chain (incl. the tests above).
 
 ## Requests to the lead
+- perf.sh (10-30 ~21:00–22:10): two runs of `regen_profile::sheet_metal_profile` failed to *build* on vibe3 in
+  noshape-drawing (first `BrokenOut` missing `offset`, then `TableKind::Bom` has no `default_template`) at commits
+  that compiled in their lands (8fd55b58 landed just before). The shared ~/perf/wt looks like it builds stale or mixed
+  sources (another agent's run between fetch and build?). The earlier runs (sketch, assembly, regen_profile) worked;
+  the numbers above are from those.
 - shared ~/.config/noshape (10-29 04:00): every agent's app runs and the GPUI UI tests read and write the same config
   dir; left_panel_width.txt was 853 (some GUI session dragged the feature list wide), which shrinks the test
   viewports and changed a measured value enough to fail part-studio-ui dimension_box_escape_as_live locally (it passed
