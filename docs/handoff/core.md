@@ -145,6 +145,12 @@ skasm's now; see docs/handoff/skasm.md.
   one cylinder sharing one chain of edges (the mirror's wall patch in the notch's bay) become the first one's wire
   with the chain replaced by the second's other edges (lines along the axis, circles round it), on a copy, kept
   only valid with the same volume. T1 `kernel_robustness::part_mirror_of_a_notched_cylinder_is_the_cylinder`.
+- OCCT-UNION-OFFSET-CYL: two cylinders r5 on Top, axes 1 mm apart, bottoms coplanar: OCCT finds no interaction at
+  all (union = both, cut = the target, common empty; fuzzy 1e-7 too; 1 µm apart or fuzzy 1e-6: right). op_boolean's
+  OCCT path (<= 8 tools, no glue, no fuzzy, solids): a result that shows no interaction while a point just inside a
+  face of one input lies inside another runs again with fuzzy 1e-7, then 1e-6, kept when it does interact and its
+  volume can be right (path "occt_fuzzy"): 1670.62941 mm³, 5 faces, as the Rust Boolean. T1
+  `kernel_robustness::union_of_offset_cylinders_on_one_plane`.
 - For skasm: T2 `sheetmetal_frames::convert_rips_and_bends_like_onshape` now fails alone too (BUTT: top wall max x
   39.98 mm), on main since 969c5069 (std sheet metal by default); the 21:34 T2 before it passed.
 

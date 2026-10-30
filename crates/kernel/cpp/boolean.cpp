@@ -60,6 +60,7 @@
 #include <IntTools_Context.hxx>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
+#include <BRepGProp_Face.hxx>
 #include <BOPTools_AlgoTools3D.hxx>
 #include <BOPAlgo_Builder.hxx>
 #include <TopAbs.hxx>
@@ -3706,6 +3707,59 @@ bool all_solids(const std::vector<TopoDS_Shape>& l)
   return true;
 }
 
+// Whether `r` is what the Boolean gives for solids that don't overlap: a
+// union of their volume together, a cut of the target's, an empty common.
+bool no_interaction(uint8_t op, const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_Shape>& t, const TopoDS_Shape& r)
+{
+  double va = 0, vt = 0;
+  for (const TopoDS_Shape& x : a)
+    va += volume_of(x);
+  for (const TopoDS_Shape& x : t)
+    vt += volume_of(x);
+  const double v = volume_of(r), tol = 1e-9 * std::max(va + vt, 1e-12);
+  switch (op)
+  {
+    case 0:
+      return std::abs(v - (va + vt)) <= tol;
+    case 1:
+      return std::abs(v - va) <= tol;
+    default:
+      return v <= tol;
+  }
+}
+
+// Whether some solid of `t` reaches into one of `a`: a point just inside a
+// face of a tool (at its middle) inside an argument.
+bool tools_reach_in(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_Shape>& t)
+{
+  for (const TopoDS_Shape& x : t)
+  {
+    Bnd_Box bx;
+    BRepBndLib::Add(x, bx);
+    const double eps = 1e-6 * std::sqrt(bx.SquareExtent());
+    for (TopExp_Explorer fx(x, TopAbs_FACE); fx.More(); fx.Next())
+    {
+      const TopoDS_Face& f = TopoDS::Face(fx.Current());
+      double             u0, u1, v0, v1;
+      BRepTools::UVBounds(f, u0, u1, v0, v1);
+      BRepGProp_Face gf(f);
+      gp_Pnt         p;
+      gp_Vec         n;
+      gf.Normal(0.5 * (u0 + u1), 0.5 * (v0 + v1), p, n);
+      if (n.Magnitude() < 1e-12)
+        continue;
+      // Into the tool (BRepGProp_Face's normal is the face's outward one).
+      const gp_Pnt q = p.Translated(-n.Normalized() * eps);
+      if (BRepClass3d_SolidClassifier(x, q, eps * 1e-3).State() != TopAbs_IN)
+        continue;
+      for (const TopoDS_Shape& y : a)
+        if (BRepClass3d_SolidClassifier(y, q, eps * 1e-3).State() == TopAbs_IN)
+          return true;
+    }
+  }
+  return false;
+}
+
 } // namespace
 
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
@@ -3977,6 +4031,33 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
         hist        = new BRepTools_History(to_list(inputs), *b2);
         res         = b2->Shape();
       }
+    }
+  }
+  // OCCT finding no interaction between solids that overlap (two cylinders
+  // 1 mm apart standing on one plane, qa OCCT-UNION-OFFSET-CYL: the union came
+  // back as the two, the cut as the target, the common empty; with their
+  // bottoms 1 µm apart, right): again with a fuzzy value, kept when it does
+  // interact and can be right.
+  if (t_bool_path == std::string("occt") && n_tools <= 8 && first.glue == 0 && first.fuzzy <= 0 && facets.source.empty() && all_solids(inputs)
+      && no_interaction(op, args.items, tools.items, res) && (tools_reach_in(args.items, tools.items) || tools_reach_in(tools.items, args.items)))
+  {
+    for (const double fz : {1e-7, 1e-6})
+    {
+      BoolOpts fuzzy = first;
+      fuzzy.fuzzy    = fz;
+      std::unique_ptr<BRepAlgoAPI_BooleanOperation> b2 = make();
+      b2->SetArguments(to_list(args.items));
+      b2->SetTools(to_list(tools.items));
+      apply_opts(*b2, fuzzy);
+      build_cancellable(*b2);
+      fail_if_cancelled();
+      if (b2->HasErrors() || !b2->IsDone() || no_interaction(op, args.items, tools.items, b2->Shape()) || !volume_possible(op, args.items, tools.items, b2->Shape()))
+        continue;
+      t_bool_path = "occt_fuzzy";
+      inputs      = concat(args.items, tools.items);
+      hist        = new BRepTools_History(to_list(inputs), *b2);
+      res         = b2->Shape();
+      break;
     }
   }
   if (opts.unify)

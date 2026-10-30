@@ -2948,3 +2948,26 @@ fn part_mirror_of_a_notched_cylinder_is_the_cylinder() {
         assert!(b.is_valid());
     }
 }
+
+/// qa OCCT-UNION-OFFSET-CYL: two cylinders r5 standing on Top with their axes
+/// 1 mm apart, Boolean Union: one part of 785.398 + 1570.796 - 685.565 mm³,
+/// 5 faces, on both Boolean paths (OCCT found no interaction with the bottoms
+/// coplanar: "no geometry change"; now again with a fuzzy value).
+#[test]
+fn union_of_offset_cylinders_on_one_plane() {
+    for rust in [false, true] {
+        noshape_kernel::set_rust_boolean(Some(rust));
+        let mut t = T::new();
+        let (_, regions) = t.sketch(&[], &[((13.0, 9.0), 5.0)]);
+        t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+        let (_, regions) = t.sketch(&[], &[((13.0, 8.0), 5.0)]);
+        let e2 = t.add("extrude", &[("entities", q(regions)), ("depth", e("20 mm")), ("operationType", en("NEW"))]);
+        let ids: Vec<Reference> = t.ok(e2).context.bodies.iter().map(|b| Reference::Body(b.id.clone())).collect();
+        let u = t.add("booleanBodies", &[("operationType", en("UNION")), ("tools", q(ids))]);
+        let r = t.ok(u);
+        noshape_kernel::set_rust_boolean(None);
+        assert_eq!(r.context.bodies.len(), 1, "rust {rust}");
+        assert!((volume(&r) - 1670.629411).abs() < 1e-5, "rust {rust}: {} mm³", volume(&r));
+        assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), 5, "rust {rust}");
+    }
+}
