@@ -640,6 +640,11 @@ impl PartStudioView {
         let k = self.comb_factor(t, res);
         let mut lines = LineData::default();
         for (comb, color) in &res.combs {
+            // A straight curve has no comb (live 1622: nothing drawn for a
+            // straight edge, not even the envelope along it).
+            if t.kind != ToolKind::Dihedral && comb.max_len() <= 1e-12 {
+                continue;
+            }
             let mut tips = Vec::with_capacity(comb.base.len());
             for (b, tooth) in comb.base.iter().zip(&comb.teeth) {
                 // Dihedral thresholds: teeth above the high limit turn yellow,
