@@ -521,3 +521,5 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
   lines on curved faces, `NOSHAPE_SIL_CULL=0` restores the old path; Linux (GPUI's shared device, 4 storage
   buffers) keeps the old path anyway.
 (none; 4e55b01f is in v0.4.10)
+- (FYI from skasm 10-30, lead-approved) `OsSelect::set_pictures(id → RenderImage)`: rows of items with a picture are 40 px with a
+  70 × 40 image before the label (live Form ▾ of the form library, request 1622 (d)). No picture set: unchanged.

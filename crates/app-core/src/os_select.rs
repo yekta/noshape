@@ -24,6 +24,10 @@ use gpui_kit::*;
 use std::cell::Cell;
 use std::rc::Rc;
 
+fn img_element(img: std::sync::Arc<RenderImage>) -> impl IntoElement {
+    gpui_kit::img(img).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain)
+}
+
 /// Row height, list padding and text inset (live).
 const ROW_H: f32 = 26.;
 const LIST_PAD_TOP: f32 = 5.;
@@ -59,6 +63,9 @@ pub struct OsSelect {
     id: SharedString,
     /// (id, label) in display order.
     items: Vec<(SharedString, SharedString)>,
+    /// Pictures of items by id: their rows are 40 px with a 70 × 40 picture
+    /// before the label (live Form ▾ of the form library, request 1622 (d)).
+    pictures: std::collections::HashMap<SharedString, std::sync::Arc<RenderImage>>,
     /// The labels are already in the UI language (a feature dialog's
     /// options, [`crate::i18n::spec`]): drawn as they are.
     translated: bool,
@@ -94,12 +101,17 @@ impl OsSelect {
     }
 
     pub fn new(id: impl Into<SharedString>) -> Self {
-        Self { id: id.into(), items: Vec::new(), translated: false, current: SharedString::default(), height: FIELD_H, search: None, query: String::new(), highlight: 0, return_focus: None, focus: None, bounds: Default::default(), list_bounds: Default::default(), list_overflow: Default::default(), scroll: ScrollHandle::new(), _subs: Vec::new() }
+        Self { id: id.into(), items: Vec::new(), pictures: Default::default(), translated: false, current: SharedString::default(), height: FIELD_H, search: None, query: String::new(), highlight: 0, return_focus: None, focus: None, bounds: Default::default(), list_bounds: Default::default(), list_overflow: Default::default(), scroll: ScrollHandle::new(), _subs: Vec::new() }
     }
 
     /// A shorter field (Hole's lookup rows are 22 px).
     pub fn set_height(&mut self, height: f32) {
         self.height = height;
+    }
+
+    /// Pictures shown in the list's rows, by item id.
+    pub fn set_pictures(&mut self, pictures: std::collections::HashMap<SharedString, std::sync::Arc<RenderImage>>) {
+        self.pictures = pictures;
     }
 
     /// The items and the current one (call on every host render).
@@ -251,8 +263,10 @@ impl OsSelect {
         let hl = self.highlight.min(m.len().saturating_sub(1));
         let width = self.bounds.get().size.width.max(px(120.));
         let probe = self.list_bounds.clone();
+        let pictured = !self.pictures.is_empty();
         let rows = m.into_iter().enumerate().map(|(row, (i, range))| {
             let label = self.items[i].1.clone();
+            let picture = self.pictures.get(&self.items[i].0).cloned();
             let on = row == hl;
             let text: AnyElement = match range {
                 Some(r) => StyledText::new(label).with_highlights([(r, HighlightStyle { font_weight: Some(FontWeight::BOLD), ..Default::default() })]).into_any_element(),
@@ -261,12 +275,13 @@ impl OsSelect {
             };
             div()
                 .id(row)
-                .h(px(ROW_H))
+                .h(px(if pictured { 40. } else { ROW_H }))
                 // Rows keep their height: a long list scrolls (live 7½ rows).
                 .flex_none()
                 .flex()
                 .items_center()
-                .pl(px(TEXT_INSET))
+                .pl(px(if pictured { 4. } else { TEXT_INSET }))
+                .when(pictured, |d| d.gap(px(8.)).child(div().w(px(70.)).h(px(40.)).flex_none().children(picture.map(|img| img_element(img)))))
                 .text_size(px(14.))
                 .when(on, |d| d.bg(accent).text_color(gpui_kit::rgb_static(0xffffff)))
                 .when(!on, |d| d.text_color(gpui_kit::rgb(0x666666)))

@@ -543,7 +543,12 @@ impl SelectItemPanel {
             }
         };
         let items: Vec<(SharedString, SharedString)> = sources.iter().map(|s| (SharedString::from(s.tab.clone()), SharedString::from(s.name.clone()))).collect();
-        select.update(cx, |s, _| s.set_items(items, key.clone()));
+        // Live 1622 (d): each row of Form ▾ with its 70 × 40 picture.
+        let pictures = sources.iter().filter_map(|s| Some((SharedString::from(s.tab.clone()), self.thumbs.get(&s.tab)?.clone()))).collect();
+        select.update(cx, |s, _| {
+            s.set_items(items, key.clone());
+            s.set_pictures(pictures);
+        });
         let form_row = h_flex()
             .h(px(30.))
             .px(px(6.))
