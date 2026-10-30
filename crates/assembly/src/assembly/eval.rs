@@ -953,6 +953,9 @@ pub trait ExternalStudios: Send + Sync {
     }
 }
 
+/// A flat pattern instance's cache key: (studio, configuration, flat id).
+type FlatKey = (TabId, String, BodyId);
+
 /// Evaluates assemblies; keeps Part Studio regenerations cached across calls.
 #[derive(Default)]
 pub struct AssemblyEvaluator {
@@ -961,7 +964,7 @@ pub struct AssemblyEvaluator {
     mirrored: HashMap<MirrorKey, (Arc<RegenResult>, Arc<RegenResult>)>,
     /// Flat patterns of sheet metal parts inserted as parts: (source
     /// regeneration, the flat's result) by (studio, configuration, flat id).
-    flats: HashMap<(TabId, String, BodyId), (Arc<RegenResult>, Arc<RegenResult>)>,
+    flats: HashMap<FlatKey, (Arc<RegenResult>, Arc<RegenResult>)>,
     external: Option<Arc<dyn ExternalStudios>>,
     /// Regenerated external Part Studios by (key, configuration); pinned
     /// snapshots never change.

@@ -33,7 +33,7 @@ pub fn flat_body_id(part: &crate::reference::BodyId) -> crate::reference::BodyId
 
 /// The part whose flat pattern `id` is ([`flat_body_id`]).
 pub fn part_of_flat(id: &crate::reference::BodyId) -> Option<crate::reference::BodyId> {
-    (id.feature.0 & FLAT_BIT != 0).then(|| crate::reference::BodyId { feature: FeatureId(id.feature.0 & !FLAT_BIT), index: id.index })
+    (id.feature.0 & FLAT_BIT != 0).then_some(crate::reference::BodyId { feature: FeatureId(id.feature.0 & !FLAT_BIT), index: id.index })
 }
 
 /// The flat pattern of the part [`flat_body_id`] `id` names, as a body of

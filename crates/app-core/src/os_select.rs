@@ -281,7 +281,7 @@ impl OsSelect {
                 .flex()
                 .items_center()
                 .pl(px(if pictured { 4. } else { TEXT_INSET }))
-                .when(pictured, |d| d.gap(px(8.)).child(div().w(px(70.)).h(px(40.)).flex_none().children(picture.map(|img| img_element(img)))))
+                .when(pictured, |d| d.gap(px(8.)).child(div().w(px(70.)).h(px(40.)).flex_none().children(picture.map(img_element))))
                 .text_size(px(14.))
                 .when(on, |d| d.bg(accent).text_color(gpui_kit::rgb_static(0xffffff)))
                 .when(!on, |d| d.text_color(gpui_kit::rgb(0x666666)))
