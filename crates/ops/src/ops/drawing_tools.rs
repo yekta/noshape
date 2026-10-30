@@ -507,7 +507,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "centerline",
             summary: "Centerlines: 2 point, edge to edge, 3 point / 2 point circle",
-            description: "The centerline tools, on clicks `picks` (sheet mm): two_point (two snap points of one view), edge_to_edge (one cylinder silhouette edge gives its axis; or two edges give their middle line), circle_3_point (three snap points) and circle_2_point (center, then a point on the circle). Associative to the model points snapped. One edit with the tool's name.",
+            description: "The centerline tools, on clicks `picks` (sheet mm): two_point (two points of one view: snap points, else the clicks themselves; centerline ends snap too), edge_to_edge (one cylinder silhouette edge gives its axis; or two edges give their middle line), circle_3_point (three snap points) and circle_2_point (center, then a point on the circle). Associative to the model points snapped. One edit with the tool's name.",
             fields: with(
                 common(),
                 vec![
@@ -1119,8 +1119,10 @@ fn centerline(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             if cs.len() != 2 {
                 return Err(OpError::param("picks", "two points"));
             }
-            let p = snap(&t, &Tool::Centerline { first: None }, 0, None)?;
-            let q = snap(&t, &Tool::Centerline { first: Some(p.clone()) }, 1, Some(&p))?;
+            // Snaps optional (help A50): else the click itself in the view.
+            let free = |i: usize, view: Option<noshape_model::drawing::ViewId>| t.m.pick(&Tool::Centerline { first: None }, &[], cs[i]).centerline_point(cs[i], view).ok_or_else(|| OpError::param(&format!("picks[{i}]"), "not in a view"));
+            let p = free(0, None)?;
+            let q = free(1, Some(p.view))?;
             (dt::centerline(id, &p, &q, c), "Centerline")
         }
         "edge_to_edge" => {

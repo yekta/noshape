@@ -244,6 +244,8 @@ pub enum Drag {
     Reattach { orig: Annotation, k: usize },
     /// An arm end of a centermark.
     CentermarkArm { orig: Annotation, k: usize },
+    /// An end grip of a centerline (along its line).
+    CenterlineEnd { orig: Annotation, k: usize },
     MoveTable { id: u64, start: [f64; 2], orig: [f64; 2] },
     /// Drag-select table cells: a rubber band from `start` (help H:table:
     /// the cells it touches are selected on release).

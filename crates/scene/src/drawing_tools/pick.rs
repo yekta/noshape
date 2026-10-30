@@ -231,15 +231,17 @@ impl<'a> SheetPick<'a> {
                     best = Some((d, PickedPoint { view: pl.id, p: sn.p, r: sn.point.clone() }));
                 }
             }
-            // Construction annotations: virtual sharps and circle centerline
-            // centers (and their quadrants) are snap points too.
+            // Construction annotations: virtual sharps, circle centerline
+            // centers and centerline ends (help A50) are snap points too.
             for a in self.current_sheet().annotations.iter().filter(|a| a.kind.view() == Some(pl.id)) {
-                let cand: Option<([f64; 2], Option<PointRef>)> = match &a.kind {
-                    AnnotationKind::VirtualSharp { a1, b1, a2, b2, .. } => AnnotationKind::line_intersection(*a1, *b1, *a2, *b2).map(|x| (x, a.refs.iter().find(|r| r.slot == 4).map(|r| r.point.clone()))),
-                    AnnotationKind::CircleCenterline { points, .. } => AnnotationKind::circle_centerline(points).map(|(cc, _)| (cc, None)),
-                    _ => None,
+                let slot = |s: u8| a.refs.iter().find(|r| r.slot == s).map(|r| r.point.clone());
+                let cand: Vec<([f64; 2], Option<PointRef>)> = match &a.kind {
+                    AnnotationKind::VirtualSharp { a1, b1, a2, b2, .. } => AnnotationKind::line_intersection(*a1, *b1, *a2, *b2).map(|x| (x, slot(4))).into_iter().collect(),
+                    AnnotationKind::CircleCenterline { points, .. } => AnnotationKind::circle_centerline(points).map(|(cc, _)| (cc, None)).into_iter().collect(),
+                    AnnotationKind::Centerline { a: pa, b: pb, .. } => vec![(*pa, slot(0)), (*pb, slot(1))],
+                    _ => Vec::new(),
                 };
-                if let Some((p, r)) = cand {
+                for (p, r) in cand {
                     let d = len(sub(p, vp)) * pl.scale * 1000.0;
                     if len(sub(p, vp)) <= tol && best.as_ref().is_none_or(|(bd, _)| d < *bd) {
                         best = Some((d, PickedPoint { view: pl.id, p, r }));
@@ -417,6 +419,17 @@ impl<'a> SheetPick<'a> {
     /// A point in a view: snap, else the point on a hovered edge (the click
     /// projected onto it: an ordinate base clicked beside an edge measures
     /// from the edge, qa4 R5v3-S11-a), else free.
+    /// A 2 point centerline's click (help A50: snaps optional): the snap
+    /// point there (in `view` when given), else the spot itself in that view
+    /// or the view under it.
+    pub fn centerline_point(&self, s: [f64; 2], view: Option<ViewId>) -> Option<PickedPoint> {
+        if let Some(p) = self.snap_at(s).filter(|p| view.is_none_or(|v| v == p.view)) {
+            return Some(p);
+        }
+        let view = view.or_else(|| self.view_at(s))?;
+        Some(PickedPoint { view, p: self.placement(view)?.to_view(s), r: None })
+    }
+
     pub fn any_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
         if let Some(p) = self.snap_at(s) {
             return Some(p);

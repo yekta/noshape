@@ -917,12 +917,12 @@ impl DrawingEditor {
                 }
             }
             Tool::Centerline { first: None } => {
-                if let Some(p) = self.snap_at(c) {
+                if let Some(p) = self.pk().centerline_point(c, None) {
                     self.tool = Tool::Centerline { first: Some(p) };
                 }
             }
             Tool::Centerline { first: Some(a) } => {
-                if let Some(b) = self.snap_at(c).filter(|b| b.view == a.view) {
+                if let Some(b) = self.pk().centerline_point(c, Some(a.view)) {
                     let id = self.current_sheet().next_annotation_id();
                     self.edit_sheet("Centerline", cx, |s| s.annotations.push(dt::centerline(id, &a, &b, c)));
                     self.tool = Tool::Centerline { first: None };
@@ -1164,6 +1164,14 @@ impl DrawingEditor {
                 }
                 self.set_preview(Some(dr), cx);
             }
+            Drag::CenterlineEnd { orig, k } => {
+                let a = self.dragged_centerline(&orig, k);
+                let mut dr = self.drawing.clone();
+                if let Some(x) = dr.sheets.get_mut(self.sheet).and_then(|s| s.annotations.iter_mut().find(|x| x.id == a.id)) {
+                    x.kind = a.kind;
+                }
+                self.set_preview(Some(dr), cx);
+            }
             Drag::CentermarkArm { orig, k } => {
                 let a = self.dragged_centermark(&orig, k, e.modifiers.shift);
                 let mut dr = self.drawing.clone();
@@ -1351,11 +1359,12 @@ impl DrawingEditor {
                     self.commit("Move annotation", p, cx);
                 }
             }
-            Drag::Jog { .. } | Drag::Reattach { .. } | Drag::CentermarkArm { .. } => {
+            Drag::Jog { .. } | Drag::Reattach { .. } | Drag::CentermarkArm { .. } | Drag::CenterlineEnd { .. } => {
                 if let Some(p) = self.preview.take() {
                     let name = match drag {
                         Drag::Jog { .. } => "Move jog",
                         Drag::Reattach { .. } => "Re-attach dimension",
+                        Drag::CenterlineEnd { .. } => "Resize centerline",
                         _ => "Resize centermark",
                     };
                     self.commit(name, p, cx);
@@ -1579,6 +1588,12 @@ impl DrawingEditor {
         }
         if let Some((orig, k)) = self.centermark_grip_at(start) {
             return Drag::CentermarkArm { orig, k };
+        }
+        if let Some((orig, k)) = self.centerline_grip_at(start) {
+            return Drag::CenterlineEnd { orig, k };
+        }
+        if let Some(orig) = self.centerline_middle_at(start) {
+            return Drag::MoveAnnotation { start, orig };
         }
         // Nothing there: a box select (qa DRAWING-BOX-SELECT).
         let Some(sel) = self.sel_at(pick, start) else { return Drag::SelectBox { start } };

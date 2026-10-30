@@ -1499,6 +1499,11 @@ impl SheetGeometry {
                     let p = env.to_sheet(*view, *pa);
                     let q = env.to_sheet(*view, *pb);
                     self.lines.push(Polyline2 { points: vec![p, q], style: LineStyle::Centerline, closed: false, pick });
+                    // Selected: end grips (drag to lengthen or shorten) and
+                    // the middle snap (drag to move; help A51).
+                    self.grips.push(Grip { pick, pos: p, kind: GripKind::End });
+                    self.grips.push(Grip { pick, pos: q, kind: GripKind::End });
+                    self.grips.push(Grip { pick, pos: [(p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0], kind: GripKind::Origin });
                 }
                 AnnotationKind::CircleCenterline { view, points } => {
                     if let Some((c, r)) = AnnotationKind::circle_centerline(points) {

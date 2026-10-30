@@ -4147,7 +4147,7 @@ Examples:
 
 Centerlines: 2 point, edge to edge, 3 point / 2 point circle (edits the document (one undoable history entry)).
 
-The centerline tools, on clicks `picks` (sheet mm): two_point (two snap points of one view), edge_to_edge (one cylinder silhouette edge gives its axis; or two edges give their middle line), circle_3_point (three snap points) and circle_2_point (center, then a point on the circle). Associative to the model points snapped. One edit with the tool's name.
+The centerline tools, on clicks `picks` (sheet mm): two_point (two points of one view: snap points, else the clicks themselves; centerline ends snap too), edge_to_edge (one cylinder silhouette edge gives its axis; or two edges give their middle line), circle_3_point (three snap points) and circle_2_point (center, then a point on the circle). Associative to the model points snapped. One edit with the tool's name.
 
 Examples:
 
@@ -4736,6 +4736,7 @@ The annotation context menus, one edit each with the menu's edit text:
 - Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.
 - `detach` (Detach from geometry: stays put, no longer follows the model).
 - Centermarks: `align_centermark` to the straight edge at `point`.
+- Centerlines (drag their grips): `centerline_end` slides end `end` along the line to `point` (shorter or longer than the references; not an end on a model point); `move_centerline` puts an edge to edge one's middle at `point`.
 - Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).
 - Ordinate dimensions: `reset_ordinate` (Reset ordinate; as in the editor nothing moves: the values always sit on the group's text line, so no edit).
 - Linear dimensions: `orientation` (`value` horizontal / vertical / aligned: "Dimension orientation"); dimensions: `flip_arrows` (the flip node: "Flip arrows"); maximum / minimum dimensions: `arc_condition` (`end` 0 / 1, `value` center / minimum / maximum: "Arc condition").
@@ -4754,9 +4755,9 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `annotation` | integer | required | Annotation id (drawing_get). |
-| `action` | one of `add_jog`, `remove_jog`, `add_leader`, `remove_leaders`, `add_node`, `remove_node`, `delete_leader`, `move_leader`, `foreshorten`, `remove_foreshorten`, `hide_dimension`, `show_dimensions`, `flip`, `group`, `remove_from_group`, `group_annotation`, `remove_annotation_from_group`, `detach`, `align_centermark`, `stacked_callouts`, `break`, `reset_ordinate`, `orientation`, `flip_arrows`, `arc_condition` | required | The menu action. |
+| `action` | one of `add_jog`, `remove_jog`, `add_leader`, `remove_leaders`, `add_node`, `remove_node`, `delete_leader`, `move_leader`, `foreshorten`, `remove_foreshorten`, `hide_dimension`, `show_dimensions`, `flip`, `group`, `remove_from_group`, `group_annotation`, `remove_annotation_from_group`, `detach`, `align_centermark`, `centerline_end`, `move_centerline`, `stacked_callouts`, `break`, `reset_ordinate`, `orientation`, `flip_arrows`, `arc_condition` | required | The menu action. |
 | `line` | one of 0, 1 |  | add_jog / remove_jog: the extension line. |
-| `point` | array of number |  | add_leader: where it points; add_node: on the leader line; move_leader: where the leader's end goes; align_centermark: on a straight edge (sheet mm). |
+| `point` | array of number |  | add_leader: where it points; add_node: on the leader line; move_leader: where the leader's end goes; align_centermark: on a straight edge; centerline_end: where the end goes (projected onto the line); move_centerline: the new middle (sheet mm). |
 | `leader` | integer |  | add_node / remove_node / delete_leader / move_leader: the leader (a note's 0 = first; a callout's 0 = the one to its anchor). |
 | `node` | integer |  | remove_node: the node (0 = nearest the note). |
 | `from_node` | array of integer |  | add_leader on a note or callout: branch from [leader, node]. |
@@ -4766,7 +4767,7 @@ Examples:
 | `parts` | array of string |  | stacked_callouts: part names. |
 | `on` | boolean |  | break: Break (true) or Unbreak (false) dimension. |
 | `value` | one of `horizontal`, `vertical`, `aligned`, `center`, `minimum`, `maximum` |  | orientation: horizontal / vertical / aligned; arc_condition: center / minimum / maximum. |
-| `end` | one of 0, 1 |  | arc_condition: the end (0 = end 1). |
+| `end` | one of 0, 1 |  | arc_condition: the end (0 = end 1); centerline_end: the end (0 = first). |
 
 #### drawing_mbd
 

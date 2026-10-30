@@ -117,6 +117,21 @@ impl DrawingEditor {
         self.pk().dragged_centermark(orig, k, shift)
     }
 
+    /// An end grip of a selected centerline under `start`: (centerline, end).
+    pub fn centerline_grip_at(&self, start: [f64; 2]) -> Option<(Annotation, usize)> {
+        self.pk().centerline_grip_at(start)
+    }
+
+    /// The middle snap of a selected centerline under `start`.
+    pub fn centerline_middle_at(&self, start: [f64; 2]) -> Option<Annotation> {
+        self.pk().centerline_middle_at(start)
+    }
+
+    /// The centerline `orig` with end `k` dragged to the cursor along its line.
+    pub fn dragged_centerline(&self, orig: &Annotation, k: usize) -> Annotation {
+        self.pk().dragged_centerline(orig, k)
+    }
+
     /// An attachment point (light-blue grip) of a selected linear dimension
     /// under `start`: (dimension, end 0 / 1).
     pub fn attach_grip_at(&self, start: [f64; 2]) -> Option<(Annotation, usize)> {

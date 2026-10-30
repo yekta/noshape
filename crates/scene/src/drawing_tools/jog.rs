@@ -141,6 +141,53 @@ impl SheetPick<'_> {
         a
     }
 
+    /// An end grip of a selected centerline under `start`: (centerline,
+    /// end 0 / 1). Not an end that follows a model point.
+    pub fn centerline_grip_at(&self, start: [f64; 2]) -> Option<(Annotation, usize)> {
+        let tol = self.tol_mm(5.0);
+        self.selection.iter().find_map(|s| {
+            let Sel::Annotation(id) = s else { return None };
+            let a = self.resolved_annotation(*id)?;
+            let AnnotationKind::Centerline { view, a: pa, b: pb } = &a.kind else { return None };
+            let pl = self.placement(*view)?;
+            [pl.to_sheet(*pa), pl.to_sheet(*pb)].iter().enumerate().find(|(k, p)| len(sub(start, **p)) < tol && !a.refs.iter().any(|r| r.slot as usize == *k)).map(|(k, _)| (a.clone(), k))
+        })
+    }
+
+    /// The middle snap of a selected centerline on no model points under
+    /// `start` (dragging it moves the centerline; help A51).
+    pub fn centerline_middle_at(&self, start: [f64; 2]) -> Option<Annotation> {
+        let tol = self.tol_mm(5.0);
+        self.selection.iter().find_map(|s| {
+            let Sel::Annotation(id) = s else { return None };
+            let a = self.resolved_annotation(*id)?;
+            let AnnotationKind::Centerline { view, a: pa, b: pb } = &a.kind else { return None };
+            let pl = self.placement(*view)?;
+            let (p, q) = (pl.to_sheet(*pa), pl.to_sheet(*pb));
+            (a.refs.is_empty() && len(sub(start, [(p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0])) < tol).then_some(a)
+        })
+    }
+
+    /// The centerline `orig` with end `k` dragged to the cursor along its
+    /// line: longer or shorter than its references (help A51), at least
+    /// 1 mm on the sheet.
+    pub fn dragged_centerline(&self, orig: &Annotation, k: usize) -> Annotation {
+        let mut a = orig.clone();
+        let AnnotationKind::Centerline { view, a: pa, b: pb } = &mut a.kind else { return a };
+        let Some(pl) = self.placement(*view) else { return a };
+        let (p, q) = (pl.to_sheet(*pa), pl.to_sheet(*pb));
+        let (fixed, moved) = if k == 0 { (q, p) } else { (p, q) };
+        let u = norm(sub(moved, fixed));
+        let t = dot(sub(self.cursor, fixed), u).max(1.0);
+        let end = pl.to_view([fixed[0] + u[0] * t, fixed[1] + u[1] * t]);
+        if k == 0 {
+            *pa = end;
+        } else {
+            *pb = end;
+        }
+        a
+    }
+
     /// An attachment point (light-blue grip) of a selected linear dimension
     /// under `start`: (dimension, end 0 / 1).
     pub fn attach_grip_at(&self, start: [f64; 2]) -> Option<(Annotation, usize)> {
@@ -322,6 +369,14 @@ impl SheetPick<'_> {
             AnnotationKind::SurfaceFinish { anchor, .. } | AnnotationKind::Gdt { anchor, .. } | AnnotationKind::RevisionCallout { anchor, .. } => {
                 *anchor = [anchor[0] + d[0], anchor[1] + d[1]];
             }
+            // An edge to edge centerline (no model points) moves by its
+            // middle snap (help A51).
+            AnnotationKind::Centerline { a: pa, b: pb, .. } if orig.refs.is_empty() => {
+                if let Some(pl) = pl {
+                    *pa = pl.to_view(add2(pl.to_sheet(*pa), d));
+                    *pb = pl.to_view(add2(pl.to_sheet(*pb), d));
+                }
+            }
             _ => a.position = [orig.position[0] + d[0], orig.position[1] + d[1]],
         }
         // An angular dimension's label goes where it is dragged (the arc
@@ -375,6 +430,7 @@ impl SheetPick<'_> {
                     *offset = *o;
                 }
                 (AnnotationKind::ForeshortenedRadial { jog, .. }, AnnotationKind::ForeshortenedRadial { jog: j, .. }) => *jog = *j,
+                (AnnotationKind::Centerline { a: pa, b: pb, .. }, AnnotationKind::Centerline { a: na, b: nb, .. }) if orig.refs.is_empty() => (*pa, *pb) = (*na, *nb),
                 _ => {}
             }
             return out;
