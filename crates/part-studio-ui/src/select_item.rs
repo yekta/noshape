@@ -66,6 +66,34 @@ pub struct PanelSetup {
     pub except: String,
     pub gpu: Option<crate::gpu::Gpu>,
     pub value: String,
+    /// Offer the Libraries tab (a Form's Form Part Studio: the sheet metal
+    /// form library, live psui/forms f-2).
+    pub libraries: bool,
+}
+
+/// The sheet metal form library's forms as configured sources.
+fn library_sources() -> Vec<RefSource> {
+    use noshape_model::sheetmetal::forms;
+    forms::FORMS
+        .iter()
+        .map(|f| RefSource { tab: format!("{}{}", forms::PREFIX, f.id), name: f.name.to_string(), what: RefSourceKind::PartStudio(Vec::new()), configuration: forms::configuration(f.id) })
+        .collect()
+}
+
+/// How a configuration input shows (its label), or hidden: a library
+/// form's Thickness comes from the sheet, its radii only with Custom
+/// radius control (live f-3).
+fn input_label(key: &str, input: &noshape_model::configuration::ConfigInput, editing: &ConfigValues) -> Option<String> {
+    use noshape_model::sheetmetal::forms;
+    if !key.starts_with(forms::PREFIX) {
+        return Some(input.name.clone());
+    }
+    let custom = editing.0.get("Radius control").is_some_and(|v| v == "Custom");
+    match input.name.as_str() {
+        "thickness" => None,
+        "int_radius" | "ext_radius" | "radius" if !custom => None,
+        n => Some(forms::input_label(n).to_string()),
+    }
 }
 
 pub struct SelectItemPanel {
@@ -82,6 +110,9 @@ pub struct SelectItemPanel {
     /// The current value (highlighted row).
     pub value: String,
     other_documents: bool,
+    /// The Libraries tab is offered / shown.
+    libraries: bool,
+    in_libraries: bool,
     search: Entity<InputState>,
     /// Part Studios whose parts are listed.
     expanded: HashSet<String>,
@@ -160,7 +191,8 @@ fn texts(PanelMode::Reference(kind): PanelMode) -> (&'static str, &'static str, 
 
 impl SelectItemPanel {
     pub fn new(setup: PanelSetup, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let PanelSetup { mode, sources, doc_name, doc_path, except, gpu, value } = setup;
+        let PanelSetup { mode, sources, doc_name, doc_path, except, gpu, value, libraries } = setup;
+        let in_libraries = libraries && (value.is_empty() || value.starts_with(noshape_model::sheetmetal::forms::PREFIX));
         let search = cx.new(|cx| InputState::new(window, cx));
         let url = cx.new(|cx| InputState::new(window, cx));
         let subs = vec![
@@ -191,6 +223,8 @@ impl SelectItemPanel {
             thumbs: HashMap::new(),
             value,
             other_documents: false,
+            libraries,
+            in_libraries,
             search,
             expanded: focused.iter().cloned().collect(),
             focused,
@@ -495,6 +529,7 @@ impl SelectItemPanel {
         let label = |t: String| div().pt(px(7.)).px(px(5.)).flex_none().text_size(px(12.)).line_height(px(16.)).text_color(gpui_kit::rgb(0x666666)).child(t);
         let mut col = v_flex().pl(px(40.)).pr(px(26.));
         for input in &cfg.inputs {
+            let Some(name) = input_label(key, input, &editing) else { continue };
             let current = editing.0.get(&input.id).cloned().unwrap_or_default();
             let k = (key.to_string(), input.id.clone());
             let control: AnyElement = match &input.kind {
@@ -516,12 +551,12 @@ impl SelectItemPanel {
                         }
                     };
                     sel.update(cx, |s, _| s.set_items(items, current.clone()));
-                    h_flex().h(px(28.)).child(label(input.name.clone())).child(div().flex_1().child(sel)).into_any_element()
+                    h_flex().h(px(28.)).child(label(name.clone())).child(div().flex_1().child(sel)).into_any_element()
                 }
                 ConfigInputKind::Checkbox { .. } => {
                     let on = current == "true";
                     let (key2, iid, base_vals) = (key.to_string(), input.id.clone(), editing.clone());
-                    crate::ui::os_checkbox(SharedString::from(format!("sel-cfg-cb-{key}-{}", input.id)), input.name.clone(), on)
+                    crate::ui::os_checkbox(SharedString::from(format!("sel-cfg-cb-{key}-{}", input.id)), name.clone(), on)
                         .h(px(27.))
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             this.cfg_edit.entry(key2.clone()).or_insert_with(|| base_vals.clone()).0.insert(iid.clone(), (!on).to_string());
@@ -550,7 +585,7 @@ impl SelectItemPanel {
                     };
                     h_flex()
                         .h(px(26.))
-                        .child(label(input.name.clone()))
+                        .child(label(name.clone()))
                         .child(gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&field).appearance(false).text_size(px(13.33)).h(px(25.)).when(right, |i| i.text_align(TextAlign::Right)))))
                         .into_any_element()
                 }
@@ -968,10 +1003,11 @@ impl Render for SelectItemPanel {
         let import_file = matches!(mode, PanelMode::Reference(ReferenceKind::Csv | ReferenceKind::Image));
         let blue = gpui_kit::rgb(BLUE);
         let line = gpui_kit::rgb(0xeeeeee);
+        let tab_w = if self.libraries { 100. } else { 150. };
         let tab = |id: &'static str, label: &'static str, on: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
-                .w(px(150.))
+                .w(px(tab_w))
                 .h_full()
                 .p(px(5.))
                 .flex()
@@ -984,6 +1020,11 @@ impl Render for SelectItemPanel {
                 .child(label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     let to_other = id == "sel-other";
+                    let to_libraries = id == "sel-libraries";
+                    if this.in_libraries != to_libraries {
+                        this.in_libraries = to_libraries;
+                        cx.notify();
+                    }
                     if this.other_documents != to_other {
                         this.other_documents = to_other;
                         this.graph = false;
@@ -997,7 +1038,32 @@ impl Render for SelectItemPanel {
         };
         let mut body = v_flex().flex_1().min_h_0();
         let shown = if other { self.other.as_ref() } else { self.current.as_ref() };
-        if other && shown.is_none() {
+        let in_libraries = self.in_libraries;
+        if in_libraries {
+            // Library ▾ / Type ▾ (one each), then the forms (live f-2, f-3).
+            let pick_row = |label: &'static str, value: &'static str| {
+                h_flex()
+                    .h(px(30.))
+                    .px(px(6.))
+                    .gap(px(6.))
+                    .child(div().w(px(56.)).flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child(label))
+                    .child(
+                        h_flex()
+                            .flex_1()
+                            .h(px(26.))
+                            .px(px(6.))
+                            .rounded(px(3.))
+                            .border_1()
+                            .border_color(gpui_kit::rgb(0xcccccc))
+                            .text_size(px(12.))
+                            .child(div().flex_1().truncate().child(value))
+                            .child(crate::ui::glyph("expander-down", 8., pal.text)),
+                    )
+            };
+            body = body.child(v_flex().pt(px(6.)).gap(px(2.)).child(pick_row("Library", "Onshape sheet metal forms")).child(pick_row("Type", "Onshape form library")));
+            let items = self.source_rows(&library_sources(), &query, window, cx);
+            body = body.child(v_flex().id("sel-library-list").flex_1().min_h_0().pt(px(4.)).overflow_y_scroll().children(items));
+        } else if other && shown.is_none() {
             body = body.child(self.render_document_browser(cx));
         } else {
             let (doc_name, doc_path, version_label) = match shown {
@@ -1095,7 +1161,16 @@ impl Render for SelectItemPanel {
                                 .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(SelectItemEvent::Close))),
                         ),
             )
-            .child(h_flex().h(px(32.)).flex_none().border_t_1().border_color(line).child(tab("sel-current", "Current document", !other, cx)).child(tab("sel-other", "Other documents", other, cx)))
+            .child(
+                h_flex()
+                    .h(px(32.))
+                    .flex_none()
+                    .border_t_1()
+                    .border_color(line)
+                    .child(tab("sel-current", "Current document", !other && !in_libraries, cx))
+                    .child(tab("sel-other", "Other documents", other && !in_libraries, cx))
+                    .when(self.libraries, |d| d.child(tab("sel-libraries", "Libraries", in_libraries, cx))),
+            )
             .child(body)
             .when(import_file, |d| {
                 d.child(

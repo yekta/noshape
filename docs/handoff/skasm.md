@@ -133,8 +133,12 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   with it (the wall beside a Hem's end).
 - Flat unfold (10-30): `place_from` chose a bend's turn by `dot > 0`, which both turns pass under 45°: the loft's
   33.8° bend stood its walls up out of the flat (area 2.6 % high). Now the nearer turn (T2 a_shallow_flange_unfolds_flat).
-- Open (10-30 noon): Form library: live's Form picker offers "Onshape sheet metal forms" (9 forms); ours only takes a
-  Part Studio of the document; crawl requested (REQUESTS 10:30), then ship the forms as built-in form studios.
+- Form library (10-30, live 1616, dom/sm-forms-v4/): `sheetmetal::forms` (model-core): each form a built-in Part Studio
+  `library:<id>` (inputs named as live's variables so std's Form fills `thickness`; one hidden `smFormTool` feature per
+  tool, then std `tag` FORM; two tools from one feature lost the negative one's attribute in std's instantiation), the
+  regeneration's derived provider wrapped (`WithLibrary`). UI: the Select Part Studio panel's Libraries tab
+  (select_item.rs `library_sources`, `input_label`). Done: Circle emboss (exact). Next: Circle knockout, Circle
+  extrusion, Countersink, Louver, Slot emboss / extrusion, Bridge lance, Lance (their features in the crawl).
   Copy Flat pattern needs an assembly instance source for a flat body (assembly crate, not mine).
 - Open (10-30 morning): (1) (was: table letters, done above). (2) evaluateQuery order generally: live returns faces in
   creation order (rebuilt faces last; request 1608); the host lists a body only one Extrude made in live's order

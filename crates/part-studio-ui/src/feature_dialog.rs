@@ -2385,6 +2385,12 @@ impl FeatureDialog {
                 }
             }
             ParamKind::Text { .. } if s.id == "partStudio" && self.ty.id == "importDerived" => self.render_derived_picker(cx),
+            // The Form's tool studio: the Select Part Studio panel, with the
+            // form library (live psui/forms f-1, f-2).
+            ParamKind::Text { .. } if s.id == "formPartStudio" && self.ty.id == "sheetMetalFormed" => {
+                let value = self.feature.params.text("formPartStudio").to_string();
+                self.render_reference_field("Form Part Studio", "formPartStudio", noshape_model::params::ReferenceKind::PartStudio, &value, cx)
+            }
             ParamKind::Num(_) | ParamKind::Text { .. } => {
                 let e = self.render_inline_value(s, path, values, window, cx)?;
                 // Tolerance options on tolerant quantities (Onshape ± icon).

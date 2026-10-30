@@ -52,6 +52,10 @@ fn ext_key(value: &str) -> Option<crate::derived::ExternalRef> {
 /// The name a stored value shows: a tab of this document, or of another
 /// document or version (the field shows only the file name, live 610, 628).
 fn value_name(sources: &[RefSource], value: &str) -> Option<String> {
+    use noshape_model::sheetmetal::forms;
+    if let Some(id) = value.split('\t').next().and_then(|v| v.strip_prefix(forms::PREFIX)) {
+        return forms::FORMS.iter().find(|f| f.id == id).map(|f| f.name.to_string());
+    }
     if let Some(r) = ext_key(value) {
         let doc = crate::derived::external_snapshot(&r.path, r.microversion).ok()?;
         return doc.tabs.iter().find(|t| t.id.to_string() == r.tab).map(|t| t.name.clone());
@@ -213,6 +217,7 @@ impl FeatureDialog {
             except: self.ref_except.clone(),
             gpu: self.ref_gpu.clone(),
             value,
+            libraries: self.ty.id == "sheetMetalFormed" && path == "formPartStudio",
         };
         let panel = cx.new(|cx| SelectItemPanel::new(setup, window, cx));
         let p2 = path.clone();
