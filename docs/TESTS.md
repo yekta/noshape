@@ -104,12 +104,3 @@ delete the line to bring it back to T1. Record the move below.
 - **Back to T1 (skasm 10-27, lead's SKETCH-SOLVED-WITH-RESIDUAL):** sketch `fuzz::random_sketch_edits_never_panic` at
   seeds 1–3 × 60 steps (1.6 s dev build); the wider default (1–5 × 80) stays T2 as
   `random_sketch_edits_never_panic_wide`.
-
-## Timing on the perf server (vibe3, 10-30)
-This machine's load makes local timings meaningless. Time a perf test at your commit with
-`tools/tiers/perf.sh [-n RUNS] <cargo test args>` (e.g. `tools/tiers/perf.sh -p noshape-model --test all --
-custom_features::knurl_feature_b94_on_a_cylinder --ignored --nocapture --test-threads=1`): the commit goes to a temporary
-`perf/` branch, vibe3 builds release and runs it RUNS times (3 by default) with the machine to itself (land checks wait),
-and prints each run's wall time, the test's timing lines, best and median. Quote those numbers in handoffs and commits.
-vibe3 also times the standard set (knurl, big plate, pattern_second, the timed pattern checks) on every new last-green,
-every 6 h; a > 15 % slower median is flagged to the lead. perf.yml on GitHub stays the cross-platform reference.
