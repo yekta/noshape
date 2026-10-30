@@ -9,6 +9,11 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **10-30 11:57 update (greens f2ffe3a7 … 99729fe4):** MIRROR-HANG-402 **no longer hangs** on f2ffe3a7 (core's OCCT patch 0006):
+  the Add / Merge with all mirror now ends after 240 s with "boolean failed: BOPAlgo_AlertBuilderFailed" — lowered to P2.
+  bool e918363e / 9fc68fd8 / 91d360dd (angled cylinders / cones): new bin/revgen-tilt.py (revolve axis tilted 15–60°), 60
+  documents (qa-scratch/tiltdocs), app Rust-vs-OCCT on 91d360dd all equal (cli/abtilt.summary); mirror set + P0 0 px. CLI fuzz
+  v0.4.15 501–560: only 508 (MEM-RUNAWAY-508); each CLI now in a 10 GB cgroup (/tmp/qa-cliwrap15e.sh); 561–580 running.
 - **10-30 10:01 update (greens 5abeb8e4 … 41815809):** **P1 MEM-RUNAWAY-508** (v0.4.15 and main via core's CLI): CLI fuzz seed
   508 grows to 10 GB (cgroup cap, step 81) / 18 GB (earlyoom on the box) across a session — a fresh open of the same state peaks
   at 1.8 GB, simple suppress loops stay flat; repro = the seed replay (bin/mem508-replay.sh, jump at step 64); v0.4.14's run
