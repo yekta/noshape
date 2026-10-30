@@ -642,6 +642,18 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - Still declined, now understood: vertices inside coincident edges of two other arguments (OCCT's vertex
   tolerance growth decided by rounding, its history Deleted or Modified accordingly: not the merge rule).
 
+## Windows CI again: a shell's orientation (lead 01:55, fixed 10-30 02:00 UTC)
+- `brep_cones_cut_along_a_ruling_match_occt` took 7 on MSVC (needs 8): "0 mm, 2 mm Common: a void in a result of
+  several solids". The result is one shell (the cone's piece and two planes); its volume by its edges' chords is ±5e-23,
+  next to nothing (the cone piece's boundary is the two planes' boundaries, so its chords span nothing), and the sign
+  rounding's: MSVC's came out negative, a void. Reproduced on Linux by tilting the cut 1e-15 rad or moving it 1e-18 m.
+  Now a result's single shell is a solid whatever the chords say, and with several shells one whose chord volume is
+  under 1e-6 of its box declines ("a shell whose orientation is unclear"). All 13 perturbations taken; replays
+  unchanged, 0 differ. Windows CI on branch bool-void-fix (run 40988955215) before landing.
+- (The 5 mm fuse declines on Linux and macOS too, "an edge ends inside a face": the test's 8 counts it out.)
+- Rule from here (lead): a new test that asserts how many cases the Rust Boolean takes gets a Windows CI run on its
+  branch before it lands.
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|

@@ -2874,8 +2874,29 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
         out.body.solids[si].shells[0].push(piece_out[p]);
     }
-    // Shells inside out are voids: of the one solid there is (else declined).
-    let (solids, voids): (Vec<Solid>, Vec<Solid>) = std::mem::take(&mut out.body.solids).into_iter().partition(|s| shell_volume(&out.body, &s.shells[0]) > 0.0);
+    // Shells inside out are voids: of the one solid there is (else declined). (One shell alone is a solid; a shell
+    // whose volume by its edges' chords is next to nothing beside its box's (a cone's piece bounded by two planes'
+    // edges: the chords span nothing, its sign rounding's) is unclear.)
+    let shells = std::mem::take(&mut out.body.solids);
+    if shells.len() > 1 {
+        for s in &shells {
+            let (mut lo, mut hi) = (DVec3::INFINITY, DVec3::NEG_INFINITY);
+            for &f in &s.shells[0] {
+                for u in out.body.faces[f as usize].loops.iter().flatten() {
+                    for &w in &out.body.edges[u.edge as usize].v {
+                        lo = lo.min(out.body.vertices[w as usize]);
+                        hi = hi.max(out.body.vertices[w as usize]);
+                    }
+                }
+            }
+            let size = (hi - lo).max(DVec3::splat(tol));
+            if shell_volume(&out.body, &s.shells[0]).abs() <= 1e-6 * size.x * size.y * size.z {
+                return Err(Decline("a shell whose orientation is unclear"));
+            }
+        }
+    }
+    let one = shells.len() == 1;
+    let (solids, voids): (Vec<Solid>, Vec<Solid>) = shells.into_iter().partition(|s| one || shell_volume(&out.body, &s.shells[0]) > 0.0);
     out.body.solids = solids;
     if !voids.is_empty() {
         let [solid] = &mut out.body.solids[..] else { return Err(Decline("a void in a result of several solids")) };
