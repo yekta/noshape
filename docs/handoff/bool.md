@@ -577,7 +577,7 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   result, kind 6 in the bridge: vertex, normal, the way it opens, focal length; `Ell::par`, `C2::Conic` with `par`).
   T1 `brep_replay::brep_cones_cut_along_a_ruling_match_occt` (a 45° cone and a 45° box: 6 taken, as OCCT). A plane
   through the apex along a ruling declines ("a plane through a cone's apex": corpus6's 45° cases are those).
-- Open: on a cylinder or cone a vertex exactly half a turn from the seam is two points in the parameter plane (the
+- (Fixed 10-30, below.) On a cylinder or cone a vertex exactly half a turn from the seam was two points in the parameter plane (the
   side of the seam is judged for every vertex, and rounding puts its two ends on either side; it should be only for
   vertices on the seam). Fixing it lets the tilted-holes test's 45° slot common through, whose history then differs
   from OCCT's: the part's edge 20 (a generator of the 45° hole) is in neither result, ours says Deleted, OCCT's
@@ -616,6 +616,31 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   direct 54 (+2); main 683, corpus3 536.
 - The slab fuse with an internal face (addb9a14, corpus6's biggest decline, 13.8 s): OCCT's own result is invalid
   (recorded valid 0): left declined.
+
+## Closed edges on free-form faces; the seam-side vertex; OCCT's history merge (10-30 02:40 UTC)
+- A whole closed edge (a full circle) on a free-form face took its curve there from its vertex to itself, nothing:
+  it takes the whole curve now (tori, revolutions: a fillet's quarter torus "lost" a face).
+- The seam-side vertex is fixed (a vertex half a turn from a cylinder's seam is one point). The history question it
+  raised: OCCT's history had no record for the tilted-holes part's hole generator, which ours called Deleted. OCCT's
+  BOPAlgo_Builder::PrepareHistory does mark it removed, but BRepAlgoAPI then merges the builder's history into its
+  own (BRepTools_History::Merge), which keeps a removed shape out of the removed when it has generations ("Propagate
+  R23 to R12": `!myShapeToGenerated.IsBound`). So OCCT's final history never says Deleted for an input that generated
+  something; ours now drops such Deleted records too. The tilted-holes test takes all 24 now (was 19).
+- Spheres / tori: of the nine small ones collected, five taken now; three concentric-sphere cuts decline "a void in a
+  result of several solids" (the shells' orientation goes by an edge-polyline volume, empty for a sphere whose only
+  edges are its seam and poles: a surface-based one next), one sphere whose poles lie on a box's faces declines.
+- A partial cylinder's angles (its seam in the gap) come from its ellipses' and B-splines' too, not only its arcs
+  (corpus2's "a cylinder face without arcs": 3 taken, 9 stop at "an edge on another argument's free-form face").
+- A result with any free-form face (tori, spheres, sweeps too, not only B-splines) isn't kept as a body for the next
+  Boolean (the kept-body test caught a torus: kept and converted afresh disagreed).
+- Replays, all 0 differ (against the tolerant-inputs land): main 694 (+11), corpus2 537 (+4), corpus3 540 (+4),
+  corpus4 584 (+5), corpus5 701 (+9), corpus6 648 (+2), Shell's 78, direct 56 (+2). T1: a torus fillet case
+  (39a1a52d) in tests/data/brep; tilted holes ≥ 24.
+- Not taken: the main corpus's three pattern fuses with overlapping instances (217 s recorded) go noshape's
+  "trimmed" way (the tools cut back by the argument, then glued), not the plain Boolean: ours would need that
+  too.
+- Still declined, now understood: vertices inside coincident edges of two other arguments (OCCT's vertex
+  tolerance growth decided by rounding, its history Deleted or Modified accordingly: not the merge rule).
 
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |

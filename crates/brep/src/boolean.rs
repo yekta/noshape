@@ -670,8 +670,10 @@ impl Ctx<'_> {
             let c = free::scaled(pc, su, sv);
             let (a, b) = match s.g {
                 Geo::Nurbs { t0, t1, .. } => (t0, t1),
-                // (A degenerate edge (the surface closing at a point): its whole curve on the face.)
+                // (A degenerate edge (the surface closing at a point), or a closed one whole: its whole curve on the
+                // face.)
                 Geo::Apex => (*pt0, *pt1),
+                _ if s.v[0] == s.v[1] => (*pt0, *pt1),
                 _ => {
                     // A piece of a straight or round edge: its ends' parameters on the edge's curve on the face.
                     let whole = C2::Nurbs { c: c.clone(), t0: *pt0, t1: *pt1 };
@@ -2194,8 +2196,26 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                     let along = if let Surf::Cyl { a, .. } = cx.faces[f].s { k.n.dot(a) > 0.0 } else { true };
                     covered.push(if along { (s, sweep) } else { (s - sweep, sweep) });
                 }
+                // An ellipse's or B-spline's: the angles of points along it, unwrapped.
+                let pts: Vec<DVec3> = match cx.edges[e].g {
+                    Geo::Ell { e: el, t0, sweep, .. } => (0..=32).map(|k| el.at(t0 + sweep * k as f64 / 32.0)).collect(),
+                    Geo::Nurbs { id, t0, t1 } => (0..=64).map(|k| cx.ncurves[id as usize].c.at(t0 + (t1 - t0) * k as f64 / 64.0)).collect(),
+                    _ => Vec::new(),
+                };
+                if pts.len() > 1 {
+                    let ang = |p: DVec3| (p - o).dot(y).atan2((p - o).dot(x));
+                    let (first, mut prev, mut acc) = (ang(pts[0]), ang(pts[0]), 0.0);
+                    for &p in &pts[1..] {
+                        let a = ang(p);
+                        acc += (a - prev + PI).rem_euclid(TAU) - PI;
+                        prev = a;
+                    }
+                    if acc.abs() > 1e-9 {
+                        covered.push(if acc > 0.0 { (first, acc) } else { (first + acc, -acc) });
+                    }
+                }
             }
-            let Some(th0) = gap(&covered) else { return Err(Decline("a cylinder face without arcs")) };
+            let Some(th0) = gap(&covered) else { return Err(Decline("a cylinder face without curved edges")) };
             if let Surf::Cyl { th0: t, .. } = &mut cx.faces[f].s {
                 *t = th0;
             }
@@ -2464,9 +2484,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 let c = cx.c2_of(f, &s, copy, own)?;
                 let mut ends = [0u32; 2];
                 for (k, (w, q)) in [(s.v[0], c.start()), (s.v[1], c.end())].into_iter().enumerate() {
-                    // A vertex on a seam (or a cone's apex) is at two places in the parameter plane.
+                    // A vertex on a seam (or a cone's apex) is at two places in the parameter plane (any other at one,
+                    // half a turn from the seam too).
                     let right = match cx.faces[f].s {
-                        Surf::Cyl { r, th0, .. } => q.x > r * (th0 + PI),
+                        Surf::Cyl { r, th0, .. } => ((q.x - r * th0).abs() <= tol || (q.x - r * (th0 + TAU)).abs() <= tol) && q.x > r * (th0 + PI),
                         Surf::Plane { .. } | Surf::Nurbs { .. } => false,
                     };
                     // (A part of a cone's apex: at both its rulings' angles.)
@@ -3009,6 +3030,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             h.push(rec(Kind::Solid, s.arg, s.index, Relation::Modified, Kind::Solid, o));
         }
     }
+    // An input that generated something isn't deleted (OCCT's BRepTools_History::Merge, as BRepAlgoAPI takes its
+    // builder's history: a removed shape with generations stays out of the removed).
+    let generated: std::collections::HashSet<(Kind, u32, u32)> = h.iter().filter(|r| r.relation == Relation::Generated).map(|r| (r.kind, r.arg, r.index)).collect();
+    h.retain(|r| r.relation != Relation::Deleted || !generated.contains(&(r.kind, r.arg, r.index)));
     out.history = h;
     // Two faces of different inputs on one cylinder meeting at a circle, their seams apart (their x directions
     // over a quarter turn apart): OCCT's unify_same_domain, merging them, left an invalid face (38b2cd00,

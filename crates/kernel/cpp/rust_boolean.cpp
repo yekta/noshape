@@ -1603,7 +1603,7 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   // (A result with free-form faces isn't kept as a body: the next Boolean converts it, curves on faces and all;
   // nor one with ellipses or hyperbolas: converted, they are OCCT's curves, frame and parameters.)
   for (size_t i = 0; i < r.body.surfaces.size(); i += 12)
-    if (r.body.surfaces[i] == 3)
+    if (r.body.surfaces[i] >= 3)
       return true;
   for (size_t i = 0; i < r.body.curves.size(); i += 11)
     if (r.body.curves[i] == 3 || r.body.curves[i] == 4 || r.body.curves[i] == 6)

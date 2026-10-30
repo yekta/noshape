@@ -616,6 +616,6 @@ fn brep_parts_with_tilted_holes_match_occt() {
             }
         }
     }
-    // (Not yet: the 45° slot, whose section ends inside a face; commons that come out empty.)
-    assert!(taken >= 19, "{taken} taken; declined: {why_not:#?}");
+    // (All of them.)
+    assert!(taken >= 24, "{taken} taken; declined: {why_not:#?}");
 }
