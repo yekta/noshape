@@ -1137,6 +1137,11 @@ impl DrawingEditor {
         self.note_grip_overlay(&mut overlay);
         self.leader_overlay(&mut overlay);
         self.detail_circle_overlay(&mut overlay);
+        // A centermark arm snapped onto an edge: a red diamond (live A55).
+        if let Drag::CentermarkArm { snap: Some(p), .. } = &self.drag {
+            let r = 8.0 / self.zoom.max(1e-6);
+            overlay.tinted.push((vec![[p[0] - r, p[1]], [p[0], p[1] - r], [p[0] + r, p[1]], [p[0], p[1] + r], [p[0] - r, p[1]]], [0xdc, 0x28, 0x28, 255], 1.5));
+        }
         if overlay.is_empty() {
             self.overlay_handles = None;
             return;

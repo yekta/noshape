@@ -119,14 +119,45 @@ impl SheetPick<'_> {
         })
     }
 
+    /// Where arm `k` of the centermark `orig`, dragged near the cursor,
+    /// crosses a drawn edge of its view: (sheet mm from the center, the
+    /// point). Live A55: a red diamond snap shows there (not with Shift).
+    pub fn centermark_edge_snap(&self, orig: &Annotation, k: usize) -> Option<(f64, [f64; 2])> {
+        let (c, dirs, _) = self.centermark_arms(orig)?;
+        let view = orig.kind.view()?;
+        let (pl, g) = (self.placement(view)?, self.geoms.get(&view)?);
+        let d = dirs[k];
+        let along = dot(sub(self.cursor, c), d);
+        let tol = self.tol_mm(8.0);
+        let mut best: Option<(f64, [f64; 2])> = None;
+        for e in g.edges.iter().filter(|e| e.visible) {
+            for w in e.points.windows(2) {
+                let (p, q) = (pl.to_sheet(w[0]), pl.to_sheet(w[1]));
+                let s = sub(q, p);
+                let den = d[0] * s[1] - d[1] * s[0];
+                if den.abs() < 1e-12 {
+                    continue;
+                }
+                let r = sub(p, c);
+                let (t, u) = ((r[0] * s[1] - r[1] * s[0]) / den, (r[0] * d[1] - r[1] * d[0]) / den);
+                if t > 0.5 && (0.0..=1.0).contains(&u) && (t - along).abs() < tol && best.is_none_or(|(b, _)| (t - along).abs() < (b - along).abs()) {
+                    best = Some((t, [c[0] + d[0] * t, c[1] + d[1] * t]));
+                }
+            }
+        }
+        best
+    }
+
     /// The centermark `orig` with arm `k`'s end dragged to the cursor: all
-    /// four arms change by the same amount, only that arm with Shift.
+    /// four arms change by the same amount (the end snapping onto a drawn
+    /// edge it crosses), only that arm with Shift (no snap).
     pub fn dragged_centermark(&self, orig: &Annotation, k: usize, shift: bool) -> Annotation {
         let mut a = orig.clone();
         let Some((c, dirs, lens)) = self.centermark_arms(orig) else { return a };
+        let snap = if shift { None } else { self.centermark_edge_snap(orig, k) };
         let AnnotationKind::Centermark { view, size, arms, .. } = &mut a.kind else { return a };
         let Some(pl) = self.placement(*view) else { return a };
-        let along = (self.cursor[0] - c[0]) * dirs[k][0] + (self.cursor[1] - c[1]) * dirs[k][1];
+        let along = snap.map(|s| s.0).unwrap_or_else(|| (self.cursor[0] - c[0]) * dirs[k][0] + (self.cursor[1] - c[1]) * dirs[k][1]);
         // Sheet mm -> view units.
         let per = pl.len_to_sheet(1.0).max(1e-12);
         let delta = (along.max(0.5) - lens[k]) / per;

@@ -111,6 +111,11 @@ impl DrawingEditor {
         self.pk().centermark_grip_at(start)
     }
 
+    /// Where arm `k` of `orig` dragged near the cursor crosses a drawn edge.
+    pub fn centermark_edge_snap(&self, orig: &Annotation, k: usize) -> Option<(f64, [f64; 2])> {
+        self.pk().centermark_edge_snap(orig, k)
+    }
+
     /// The centermark `orig` with arm `k`'s end dragged to the cursor: all
     /// four arms change by the same amount, only that arm with Shift.
     pub fn dragged_centermark(&self, orig: &Annotation, k: usize, shift: bool) -> Annotation {

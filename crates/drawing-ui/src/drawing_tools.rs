@@ -1172,8 +1172,10 @@ impl DrawingEditor {
                 }
                 self.set_preview(Some(dr), cx);
             }
-            Drag::CentermarkArm { orig, k } => {
+            Drag::CentermarkArm { orig, k, .. } => {
+                let snap = if e.modifiers.shift { None } else { self.centermark_edge_snap(&orig, k).map(|s| s.1) };
                 let a = self.dragged_centermark(&orig, k, e.modifiers.shift);
+                self.drag = Drag::CentermarkArm { orig, k, snap };
                 let mut dr = self.drawing.clone();
                 if let Some(x) = dr.sheets.get_mut(self.sheet).and_then(|s| s.annotations.iter_mut().find(|x| x.id == a.id)) {
                     x.kind = a.kind;
@@ -1587,7 +1589,7 @@ impl DrawingEditor {
             return Drag::Reattach { orig, k };
         }
         if let Some((orig, k)) = self.centermark_grip_at(start) {
-            return Drag::CentermarkArm { orig, k };
+            return Drag::CentermarkArm { orig, k, snap: None };
         }
         if let Some((orig, k)) = self.centerline_grip_at(start) {
             return Drag::CenterlineEnd { orig, k };

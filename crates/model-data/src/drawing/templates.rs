@@ -77,7 +77,7 @@ pub fn default_fields(style: TitleBlockStyle, inches: bool) -> Vec<(String, Stri
         TitleBlockStyle::Simple => vec![("Title", ""), ("Drawn by", ""), ("Date", ""), ("Part number", ""), ("Revision", ""), ("Material", ""), ("Scale", ""), ("Sheet", "")],
         // Onshape's ANSI and ISO templates share one block (sheet.rs
         // `onshape_title_block`); the tolerance notes are fixed text.
-        TitleBlockStyle::Iso | TitleBlockStyle::Ansi | TitleBlockStyle::AnsiContinuation => vec![
+        TitleBlockStyle::Iso | TitleBlockStyle::Ansi | TitleBlockStyle::AnsiContinuation | TitleBlockStyle::IsoContinuation => vec![
             // Live drawing/156, 164: DRAWN is the user and today; APPROVED
             // and the three TITLE lines are property fields shown as "----"
             // until set; MATERIAL starts blank.

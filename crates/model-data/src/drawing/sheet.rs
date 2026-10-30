@@ -821,7 +821,7 @@ impl SheetGeometry {
         };
         match sheet.title_style {
             TitleBlockStyle::None => {}
-            TitleBlockStyle::AnsiContinuation => self.ansi_continuation_block(sheet, &value_of),
+            TitleBlockStyle::AnsiContinuation | TitleBlockStyle::IsoContinuation => self.continuation_block(sheet, &value_of),
             TitleBlockStyle::Simple => {
                 // Two columns of fields, 180 mm wide, in the lower-right corner.
                 let (tw, th) = (180.0, 8.0 * ((sheet.title_block.fields.len() as f64) / 2.0).ceil());
@@ -1062,15 +1062,17 @@ impl SheetGeometry {
         value_in(self, scale_cols[1] + 0.03, 1.0, 0.0, right_rows[3] - 0.03, "Sheet", 1.8 * lab);
     }
 
-    /// The ANSI continuation block (live samples/drw2-l-sheet2.dxf, ANSI A in
+    /// The continuation block (live samples/drw2-l-sheet2.dxf, ANSI A in
     /// inches; offsets from the frame's lower right): one 0.195 in strip,
     /// DWG NO. 1.65 / SIZE 0.375 / SCALE 0.66 / SHEET 0.75 / REV. 0.30 in;
     /// labels 0.0288 in (REV. 0.024) at the cell's top left, values 0.0864 in.
-    fn ansi_continuation_block(&mut self, sheet: &Sheet, value_of: &dyn Fn(&str, &str) -> String) {
-        const IN: f64 = 25.4;
+    /// ISO the same (live 1603, samples/dx1603-iso-a3-sheet2.dxf); everything
+    /// scales with the title block's height (A3: 4/3 of ANSI A's).
+    fn continuation_block(&mut self, sheet: &Sheet, value_of: &dyn Fn(&str, &str) -> String) {
+        let inch = 25.4 * continuation_scale(sheet.size);
         let [_, y0, r, _] = sheet.size.frame_rect();
-        let top = y0 + 0.195 * IN;
-        let x = |d: f64| r - d * IN;
+        let top = y0 + 0.195 * inch;
+        let x = |d: f64| r - d * inch;
         self.line([x(3.735), top], [r, top], LineStyle::Thin);
         for d in [3.735, 2.085, 1.71, 1.05, 0.30] {
             self.line([x(d), y0], [x(d), top], LineStyle::Thin);
@@ -1085,9 +1087,9 @@ impl SheetGeometry {
         ];
         for (label, lx, lh, key, vx, (c0, c1)) in cells {
             let ly = if label == "REV." { 0.1734 } else { 0.16908 };
-            self.text([x(lx), y0 + ly * IN], lh * IN, label.to_string(), Anchor::TopLeft);
+            self.text([x(lx), y0 + ly * inch], lh * inch, label.to_string(), Anchor::TopLeft);
             let t0 = self.texts.len();
-            self.text([x(vx), y0 + 0.0975 * IN], 0.0864 * IN, value_of(key, sheet.title_field(key).unwrap_or("")), Anchor::Center);
+            self.text([x(vx), y0 + 0.0975 * inch], 0.0864 * inch, value_of(key, sheet.title_field(key).unwrap_or("")), Anchor::Center);
             self.title_cells.push((key.to_string(), [x(c0), y0, x(c1), top], t0..self.texts.len()));
         }
     }
@@ -2867,9 +2869,18 @@ pub fn title_block_rect(sheet: &Sheet) -> Option<[f64; 4]> {
         // on ANSI).
         TitleBlockStyle::Iso => (4.25 * tb, tb),
         TitleBlockStyle::Ansi => (4.05 * tb, tb),
-        TitleBlockStyle::AnsiContinuation => (3.735 * 25.4, 0.195 * 25.4),
+        TitleBlockStyle::AnsiContinuation | TitleBlockStyle::IsoContinuation => {
+            let k = 25.4 * continuation_scale(sheet.size);
+            (3.735 * k, 0.195 * k)
+        }
     };
     Some([x1 - bw, y0, x1, y0 + bh])
+}
+
+/// The continuation strip's size relative to ANSI A's (it scales with the
+/// title block's height: live ANSI A 1, ISO A3 4/3).
+fn continuation_scale(size: super::SheetSize) -> f64 {
+    size.title_block_height() / 38.1
 }
 
 /// Where a ray from the center of a `hw` x `hh` (half sizes) box in
@@ -3122,6 +3133,34 @@ mod tests {
         let r = title_block_rect(s).unwrap();
         let [_, y0, x1, _] = s.size.frame_rect();
         assert!((r[2] - x1).abs() < 1e-9 && (r[1] - y0).abs() < 1e-9 && (r[3] - r[1] - 4.953).abs() < 1e-9 && (r[2] - r[0] - 94.869).abs() < 1e-9, "{r:?}");
+    }
+
+    /// After an ISO A3 sheet: the same strip, 4/3 the ANSI A one (live 1603,
+    /// samples/dx1603-iso-a3-sheet2.dxf, mm): cells from x 284.008, 339.888,
+    /// 352.588, 374.94, 400.34 to the frame's 410.5, 6.604 high; DWG NO. at
+    /// (284.544, 15.726) h 0.975; values at y 13.302, h 2.926.
+    #[test]
+    fn iso_continuation_sheets() {
+        let mut d = super::super::Drawing::default();
+        d.sheets[0].size = super::super::SheetSize::A3;
+        d.sheets[0].title_style = TitleBlockStyle::Iso;
+        d.sheets[0].title_block.fields = super::super::templates::default_fields(TitleBlockStyle::Iso, false);
+        let i = d.add_sheet(0);
+        let s = &d.sheets[i];
+        assert_eq!(s.title_style, TitleBlockStyle::IsoContinuation);
+        let mut g = SheetGeometry::new(420.0, 297.0);
+        g.add_border_and_title_full(s, super::super::Projection::FirstAngle, &|v: &str| v.replace("{sheet.number} of {sheet.count}", "2 of 2").replace("{sheet.scale}", "----"));
+        let near = |a: f64, b: f64| (a - b).abs() < 2e-3;
+        for x in [284.008, 339.888, 352.588, 374.94, 400.34] {
+            assert!(g.lines.iter().any(|l| near(l.points[0][0], x) && near(l.points[1][0], x) && near(l.points[0][1].min(l.points[1][1]), 10.0) && near(l.points[0][1].max(l.points[1][1]), 16.604)), "{x}");
+        }
+        let t = |s: &str| g.texts.iter().find(|t| t.text == s).unwrap_or_else(|| panic!("{s}"));
+        let dwg = t("DWG NO.");
+        assert!(near(dwg.pos[0], 284.544) && near(dwg.pos[1], 15.726) && near(dwg.height, 0.975), "{:?} {}", dwg.pos, dwg.height);
+        let sheet = t("2 of 2");
+        assert!(near(sheet.pos[0], 389.266) && near(sheet.pos[1], 13.302) && near(sheet.height, 2.926), "{:?}", sheet.pos);
+        assert!(near(t("A3").pos[0], 348.27) && near(t("----").pos[1], 13.302));
+        assert!(near(t("REV.").pos[0], 400.787) && near(t("REV.").pos[1], 15.873));
     }
 
     /// D24 (live asbdt-1a…c): a value dragged along an ANSI dimension stays

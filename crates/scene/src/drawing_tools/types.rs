@@ -242,8 +242,9 @@ pub enum Drag {
     /// An attachment point (end `k`) of a linear dimension dragged to
     /// another edge, point or center (re-attaches that end).
     Reattach { orig: Annotation, k: usize },
-    /// An arm end of a centermark.
-    CentermarkArm { orig: Annotation, k: usize },
+    /// An arm end of a centermark (`snap`: the red diamond on the edge it
+    /// snapped to).
+    CentermarkArm { orig: Annotation, k: usize, snap: Option<[f64; 2]> },
     /// An end grip of a centerline (along its line).
     CenterlineEnd { orig: Annotation, k: usize },
     MoveTable { id: u64, start: [f64; 2], orig: [f64; 2] },

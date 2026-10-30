@@ -182,6 +182,9 @@ pub enum TitleBlockStyle {
     /// SIZE / SCALE / SHEET / REV. (live 1410, 1449; a new sheet after an
     /// ANSI sheet, drawing.md S3).
     AnsiContinuation,
+    /// The ISO templates' continuation sheet block: the same strip (live
+    /// request 1603, samples/dx1603-iso-a3-sheet2.dxf).
+    IsoContinuation,
 }
 
 impl TitleBlockStyle {
@@ -193,7 +196,13 @@ impl TitleBlockStyle {
             TitleBlockStyle::Ansi => "ANSI (ASME Y14.1)",
             TitleBlockStyle::None => "None",
             TitleBlockStyle::AnsiContinuation => "ANSI continuation",
+            TitleBlockStyle::IsoContinuation => "ISO continuation",
         }
+    }
+
+    /// The one-strip block of a sheet added after the first (S3).
+    pub fn is_continuation(self) -> bool {
+        matches!(self, TitleBlockStyle::AnsiContinuation | TitleBlockStyle::IsoContinuation)
     }
 }
 
@@ -3805,6 +3814,8 @@ pub struct ViewDefaults {
     pub hidden_lines: bool,
     /// Tangent edges: 0 Hidden, 1 Solid, 2 Phantom.
     pub tangent: u8,
+    /// Scale label (live default Off: a new base view's checkbox unticked; a
+    /// scale set in View properties ticks it, live 1603 (d)).
     pub scale_label: bool,
     /// Threads (Parts) Shown, Bend lines (Parts) On, Bend notes (Parts) On
     /// (live's defaults).
@@ -3818,7 +3829,7 @@ pub struct ViewDefaults {
 
 impl Default for ViewDefaults {
     fn default() -> Self {
-        Self { simplification: Simplification::Auto, auto_centermarks: true, auto_centerlines: false, hidden_lines: false, tangent: 1, scale_label: true, threads: true, bend_lines: true, bend_notes: true }
+        Self { simplification: Simplification::Auto, auto_centermarks: true, auto_centerlines: false, hidden_lines: false, tangent: 1, scale_label: false, threads: true, bend_lines: true, bend_notes: true }
     }
 }
 
@@ -3999,9 +4010,11 @@ impl Drawing {
             sheet.size = src.size;
             sheet.scale = src.scale;
             sheet.title_block = src.title_block.clone();
-            // Live (1410, 1449): after an ANSI sheet, the continuation block.
+            // Live (1410, 1449, 1603): after an ANSI or ISO sheet, the
+            // continuation block.
             sheet.title_style = match src.title_style {
                 TitleBlockStyle::Ansi => TitleBlockStyle::AnsiContinuation,
+                TitleBlockStyle::Iso => TitleBlockStyle::IsoContinuation,
                 s => s,
             };
         }

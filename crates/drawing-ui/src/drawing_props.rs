@@ -7,7 +7,7 @@
 use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::input::{Input, InputState, Textarea, TextareaState};
 use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -105,8 +105,9 @@ pub struct ViewProps {
     name: Entity<InputState>,
     view_label: bool,
     label: Entity<InputState>,
-    /// Section / detail views: the label's Prefix and Suffix (live asbv-97).
-    affixes: Option<(Entity<InputState>, Entity<InputState>)>,
+    /// Section / detail views: the label's Prefix and Suffix (live asbv-97;
+    /// multi-line, help H:views).
+    affixes: Option<(Entity<TextareaState>, Entity<TextareaState>)>,
     scale_label: bool,
     /// View simplification (None: the parent's) and its value field.
     simplification: Option<Simplification>,
@@ -557,7 +558,8 @@ impl DrawingEditor {
             label: input(label, window, cx),
             affixes: auto_label.then(|| {
                 let prefix = v.label_prefix.clone().or_else(|| noshape_ops::drawing::default_label_prefix(&self.drawing, &v.kind)).unwrap_or_default();
-                (input(prefix, window, cx), input(v.label_suffix.clone().unwrap_or_default(), window, cx))
+                let area = |text: String, window: &mut Window, cx: &mut Context<Self>| cx.new(|cx| TextareaState::new(window, cx).auto_grow(1, 4).default_value(text));
+                (area(prefix, window, cx), area(v.label_suffix.clone().unwrap_or_default(), window, cx))
             }),
             scale_label: v.scale_label_shown(),
             simplification: v.simplification,
@@ -784,6 +786,8 @@ impl DrawingEditor {
             .into_any_element()
         };
         let field = |input: &Entity<InputState>| div().h(px(25.)).border_b_1().border_color(line).text_color(field_ink).child(Input::new(input).appearance(false).xsmall().text_size(px(13.33))).into_any_element();
+        // Multi-line (Enter starts a new line): a view label's Prefix / Suffix.
+        let area_field = |input: &Entity<TextareaState>| div().min_h(px(25.)).border_b_1().border_color(line).text_color(field_ink).child(Textarea::new(input).appearance(false).xsmall().text_size(px(13.33))).into_any_element();
         // Reference block.
         let reference = h_flex()
             .gap(px(3.))
@@ -1069,9 +1073,9 @@ impl DrawingEditor {
             // Section / detail views: Prefix, Letter, Suffix (live asbv-97).
             match &props.affixes {
                 Some((prefix, suffix)) => {
-                    rows.push(row("Prefix", field(prefix)));
+                    rows.push(row("Prefix", area_field(prefix)));
                     rows.push(row("Letter", field(&props.label)));
-                    rows.push(row("Suffix", field(suffix)));
+                    rows.push(row("Suffix", area_field(suffix)));
                 }
                 None => rows.push(row("Label", field(&props.label))),
             }

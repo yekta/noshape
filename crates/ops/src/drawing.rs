@@ -606,7 +606,11 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
     v.simplification = p.simplification;
     let name = p.name.trim();
     v.name = (!name.is_empty() && name != default_name).then(|| name.to_string());
-    v.scale_label = Some(p.scale_label);
+    // Live (request 1603 (d)): setting a view's own scale ticks its Scale
+    // label (unless the checkbox was changed too), whatever the drawing's
+    // Insert view default.
+    let scale_set = p.scale.is_some() && p.scale != old.scale;
+    v.scale_label = Some(p.scale_label || (scale_set && !old.scale_label_shown()));
     let label = p.label.trim().to_string();
     // ☐ View label hides a section / detail / auxiliary label.
     let auto = old.auto_label();

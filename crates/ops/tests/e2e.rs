@@ -3282,6 +3282,12 @@ fn drawing_view_menu_edits() {
     assert_eq!(fv["label"], "MAIN", "{fv}");
     assert!((num(&fv["scale"]) - 0.5).abs() < 1e-12, "{fv}");
     assert_eq!(fv["tangent_edges"], "hidden", "{fv}");
+    // A new scale ticks Scale label even without a view label (live 1603 (d)).
+    call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": free, "set": { "view_label": false, "scale_label": false } }));
+    call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": free, "set": { "scale": "1:4" } }));
+    let p = call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": free }));
+    assert_eq!(p["properties"]["scale_label"], json!(true), "{p}");
+    call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": free, "set": { "scale": "1:2", "view_label": true } }));
     let e = try_call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": free, "set": { "bogus": 1 } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("set.bogus"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": base, "set": { "rotation": 45 } })).unwrap_err();
