@@ -39,7 +39,7 @@ pub const FORMS: &[Form] = &[Form { id: "bridge-lance", name: "Bridge lance" }, 
 const RADIUS_CONTROL: [(&str, &str); 4] = [("Default", "Double thickness"), ("Thickness", "Thickness"), ("Half_thickness", "Half thickness"), ("Custom", "Custom")];
 const RADIUS_CONTROL_INPUT: &str = "Radius control";
 /// Length to (live `List_rZVuoqSoy79i0I` / `List_OrKvSo3y1S6Ua4`): a slot's length between its ends' centres or tangents.
-const LENGTH_TO: [(&str, &str); 2] = [("Default", "Slot centers"), ("Slot_tangents", "Slot tangents")];
+const LENGTH_TO: [(&str, &str); 2] = [("Default", "Slot centers"), ("slot_tangents", "Slot tangents")];
 const LENGTH_TO_INPUT: &str = "Length to";
 /// Lance's Profile (live `List_g6XZAvs1qlzUG1`).
 const PROFILE: [(&str, &str); 2] = [("Default", "Flat"), ("Straight", "Straight")];
@@ -238,11 +238,12 @@ pub fn tool_feature(ev: &mut EvalCtx) -> FResult<()> {
         "circle-knockout" => circle_knockout(t, ev.length("diameter")?)?,
         "countersink" => countersink(t, ev.length("clearanceHole")?, ev.angle("angle")?)?,
         "louver" => louver(t, ev.length("height")?, ev.length("length")?, ev.length("width")?, radius(ev, "radius")?)?,
+        "lance" if ev.enum_("profile") == "Straight" => lance_straight(t, ev.length("width")?, ev.length("height")?, ev.angle("draft")?, radius(ev, "extRadius")?)?,
         "lance" => lance(t, ev.length("length")?, ev.length("width")?, ev.length("height")?, ev.angle("draft")?, radius(ev, "intRadius")?, radius(ev, "extRadius")?)?,
         "bridge-lance" => bridge_lance(t, ev.length("length")?, ev.length("width")?, ev.length("height")?, ev.angle("draft")?, radius(ev, "intRadius")?, radius(ev, "extRadius")?)?,
         "slot-emboss" | "slot-extrusion" => {
             let (length, width) = (ev.length("length")?, ev.length("width")?);
-            let tangents = ev.enum_("lengthTo") == "Slot_tangents";
+            let tangents = ev.enum_("lengthTo") == "slot_tangents";
             if form == "slot-emboss" {
                 slot_emboss(t, length, tangents, width, ev.length("height")?, ev.angle("draft")?, radius(ev, "intRadius")?, radius(ev, "extRadius")?)?
             } else {
@@ -323,9 +324,8 @@ fn bent_profile(t: f64, r_top: f64, h: f64, th: f64, ri: f64, re: f64) -> FResul
 /// flat top `length` long from the free end, its wall at `draft` from the
 /// horizontal, the bends `ri` / `re`. Subtract material: the slit, as long
 /// as the strip unbent (live t 1, h 5, 100 × 1, 90°: 107.853982 both).
-/// Live places it by a mate connector we don't know the place of: here the
-/// slit's middle sits on the location. The Straight profile is built as
-/// Flat.
+/// Live places it by a mate connector at the slit's top face's centroid
+/// (request 1618): the slit's middle sits on the location.
 #[allow(clippy::too_many_arguments)]
 fn lance(t: f64, length: f64, width: f64, h: f64, draft: f64, ri: f64, re: f64) -> FResult<Vec<Shape>> {
     let w = width.max(t);
@@ -358,7 +358,9 @@ fn circle_emboss(t: f64, d: f64, h: f64, draft: f64, ri: f64, re: f64) -> FResul
 /// features are Circle emboss's along the slot).
 #[allow(clippy::too_many_arguments)]
 fn slot_emboss(t: f64, length: f64, tangents: bool, width: f64, h: f64, draft: f64, ri: f64, re: f64) -> FResult<Vec<Shape>> {
-    let l = slot_length(length, tangents, width.max(t));
+    // Tangents: the length runs between the top's end tangents (live 1618:
+    // centres 100, tangents 95 for 100 × 5).
+    let l = if tangents { (length - width).max(0.0) } else { length.max(0.0) };
     let (segs, r) = emboss_profile(t, width, h, draft, ri, re)?;
     Ok(vec![slot_swept(&segs, l)?, sheet_stadium(t, r, l)?])
 }
@@ -527,6 +529,38 @@ fn circle_knockout(t: f64, d: f64) -> FResult<Vec<Shape>> {
     }
     let add = k::unify_same_domain(&k::boolean(k::BooleanOp::Fuse, &[disc], &tabs, &opts)?.shape)?.shape;
     Ok(vec![add, sheet_disc(t, r)?])
+}
+
+/// Lance, Straight profile (live request 1618): no flat top, the strip
+/// bent up from the sheet over the base bend `re` (`draft` from the
+/// horizontal) into a wall up to max(h, re + 2 t). The slit: the wall and
+/// the bend's arc at re + t (live t 1, h 5, 1 wide, 90°: 6.926991 /
+/// 7.712389 mm³).
+fn lance_straight(t: f64, width: f64, h: f64, draft: f64, re: f64) -> FResult<Vec<Shape>> {
+    let w = width.max(t);
+    let sh = h.max(re + 2.0 * t);
+    let a = draft.clamp(1e-6, std::f64::consts::FRAC_PI_2);
+    // (x, z): the base bend's centre at x 0, re above the sheet's top.
+    let c = DVec2::new(0.0, re);
+    let dir = DVec2::new(-a.cos(), a.sin());
+    let pi = std::f64::consts::PI;
+    let (b0, b1) = (1.5 * pi - a, 1.5 * pi);
+    let at = |r: f64, ang: f64| c + DVec2::new(ang.cos(), ang.sin()) * r;
+    let wall = (sh - re) / a.sin();
+    let (p_in, p_out) = (at(re, b0), at(re + t, b0));
+    let segs = vec![
+        k::Segment2d::Arc { center: c, radius: re, start_angle: b0, end_angle: b1 },
+        k::Segment2d::Line { a: DVec2::new(0.0, 0.0), b: DVec2::new(0.0, -t) },
+        k::Segment2d::Arc { center: c, radius: re + t, start_angle: b0, end_angle: b1 },
+        k::Segment2d::Line { a: p_out, b: p_out + dir * wall },
+        k::Segment2d::Line { a: p_out + dir * wall, b: p_in + dir * wall },
+        k::Segment2d::Line { a: p_in + dir * wall, b: p_in },
+    ];
+    let slit = wall + a * (re + t);
+    let plane = k::Plane::new(DVec3::new(slit * 0.5, -w * 0.5, 0.0), DVec3::NEG_Y, DVec3::X);
+    let add = k::extrude(&k::make_face_2d(&plane, &segs, &[])?, DVec3::Y * w)?.shape;
+    let sub = k::make_box(&k::Plane::new(DVec3::new(-slit * 0.5, -w * 0.5, -t), DVec3::Z, DVec3::X), slit, w, t)?;
+    Ok(vec![add, sub])
 }
 
 /// The profile mirrored across its axis (r -> -r).

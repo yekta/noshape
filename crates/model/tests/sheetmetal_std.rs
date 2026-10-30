@@ -833,6 +833,9 @@ fn library_form_tools_as_live() {
         ("louver", vec![("height", "5 mm")], 1975.3626, 1889.368549, 1e-3),
         ("bridge-lance", vec![("length", "100 mm"), ("width", "1 mm")], 115.3687, 111.656854, 1e-4),
         ("lance", vec![("length", "100 mm"), ("width", "1 mm"), ("draft", "90 deg")], 107.853982, 107.853982, 1e-5),
+        ("lance", vec![("length", "100 mm"), ("width", "1 mm"), ("draft", "90 deg"), ("Profile", "Straight")], 6.926991, 7.712389, 1e-5),
+        ("slot-emboss", vec![], 2310.669816, 1883.594769, 1e-3),
+        ("slot-emboss", vec![("Length to", "slot_tangents")], 2208.826315, 1800.310497, 1e-3),
     ] {
         let studio = noshape_model::sheetmetal::forms::studio(form).expect("studio");
         let mut config = studio.configuration.defaults();
@@ -842,7 +845,7 @@ fn library_form_tools_as_live() {
         let v: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.volume().unwrap_or(0.0) * 1e9).collect();
         assert!(v.len() == 2 && (v[0] - add).abs() < tol && (v[1] - sub).abs() < tol, "{form}: {v:?} vs {add} / {sub}; {st:?}");
     }
-    // Every form builds both tools at its defaults (Slot emboss has no live figures).
+    // Every form builds both tools at its defaults.
     for form in noshape_model::sheetmetal::forms::FORMS {
         let studio = noshape_model::sheetmetal::forms::studio(form.id).expect("studio");
         let r = Regenerator::new().regenerate(&studio, &studio.configuration.defaults(), &UnitPrefs::default(), &RegenOptions::default());
