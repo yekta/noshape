@@ -166,6 +166,12 @@ MIRROR-DIALOG-STATE closed (live's answer 1597 = ours). Open in psui's TICKETS: 
 path); API-VAR-REDEFINE (P3, the agent API's variable_create + model-data's variable_table::create: dx / core's
 code, not a UI change: left for them).
 18:20: d5ae3ded mesher 5d (CDT cache), cc73aaea display off the critical path (N06).
+10-30 12:50: 65559a25 CUSTOM-ERROR-HIDDEN (P1, user via lead 11:20): with a new feature's dialog open its row
+(the editing placeholder) had no tooltip and the FeatureScript notices panel walked only the document's committed
+features; now the placeholder has the rows' error tooltip and the panel lists the open dialog's feature
+(custom::run::set_draft, set in apply_display). Committed failing features already showed both. Verified on :102
+with a tiny "No-op cut" Feature Studio (/root/psui-scratch/cfail/, built by noshape-cli): don't open the knurl
+document in the app (16.7 GB, earlyoom; core's P0).
 10-30 08:15: COMMIT-LATENCY (P0, core asked psui to confirm on a perf run): perf 41005801257 had commit within
 budget (medians 149 / 122 ms) but undo 200–364 ms in 6 of 9 runs with a 2 ms regen; the regen's 12 ms coalescing
 timer fired late (locally ~180 ms). d21f7678: the wait only for bursts → perf 41014326054 undo median 36 ms
