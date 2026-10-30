@@ -80,6 +80,17 @@ impl FlatPattern {
         DMat4::from_cols(x.extend(0.0), y.extend(0.0), n.extend(0.0), self.frame.origin.extend(1.0)).inverse()
     }
 
+    /// A model point in the flat view's place (the base wall's points land
+    /// on the flat).
+    pub fn to_flat_view(&self, p: DVec3) -> DVec3 {
+        self.flat_view_matrix().transform_point3(p)
+    }
+
+    /// A model direction in the flat view's place.
+    pub fn to_flat_view_vector(&self, v: DVec3) -> DVec3 {
+        self.flat_view_matrix().transform_vector3(v)
+    }
+
     /// The flat as a solid in the flat view's place: the sheet under z 0,
     /// `thickness` deep.
     pub fn flat_view_solid(&self) -> Option<Shape> {

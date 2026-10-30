@@ -13,6 +13,7 @@ use noshape_model::display::StudioDisplay;
 use noshape_model::reference::Reference;
 use noshape_model::sheetmetal::FlatPattern;
 use noshape_render::{Drawable, Instance, LineData, LineSegment, Scene, StandardView};
+use glam::DVec3;
 use std::sync::Arc;
 
 pub struct FlatView {
@@ -35,6 +36,9 @@ pub struct FlatView {
     selected: Option<bool>,
     /// The bend line selected (index into the pattern's bend lines).
     selected_bend: Option<usize>,
+    /// The open sketch's frame on the flat, its name's top-left and in-plane
+    /// x / y directions, and the name.
+    sketch_frame: Option<SketchFrame>,
     /// Keep the Top view fitted while the view's size settles (until the
     /// user moves the camera), and the size it was last fitted at.
     pending_fit: bool,
@@ -52,6 +56,17 @@ pub enum FlatViewEvent {
     /// The flat's face selected (live request 1605: picking it selects the
     /// model face): its reference side (`true`), its back, or nothing.
     Selected(Option<bool>),
+}
+
+/// An open sketch's box on the flat (live request 1605: New sketch… on the
+/// flat's face shows the plane's frame, named, in the flat view).
+#[derive(Clone, Debug, PartialEq)]
+pub struct SketchFrame {
+    pub corners: [DVec3; 4],
+    pub name_at: DVec3,
+    pub x: DVec3,
+    pub y: DVec3,
+    pub name: String,
 }
 
 /// What a right-click in the flat view is on.
@@ -106,7 +121,7 @@ impl FlatView {
             ViewportEvent::CameraChanged if this.fitted.is_some_and(|c| c != this.viewport.read(cx).camera) => this.pending_fit = false,
             _ => {}
         });
-        Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, flat: None, parts: None, hover: None, sides: Vec::new(), selected: None, selected_bend: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
+        Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, flat: None, parts: None, hover: None, sides: Vec::new(), selected: None, selected_bend: None, sketch_frame: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
     }
 
     /// Show `flat` in `color` (linear RGBA, the part's). The first pattern
@@ -125,6 +140,14 @@ impl FlatView {
         self.hover = None;
         self.compose(true, cx);
         cx.notify();
+    }
+
+    /// The open sketch's frame on the flat, or none.
+    pub fn show_sketch_frame(&mut self, frame: Option<SketchFrame>, cx: &mut Context<Self>) {
+        if frame != self.sketch_frame {
+            self.sketch_frame = frame;
+            self.compose(false, cx);
+        }
     }
 
     /// The bend line within 5 px of a viewport-local point.
@@ -178,6 +201,23 @@ impl FlatView {
             lines.push_polyline(&[a.as_vec3().to_array(), b.as_vec3().to_array()], [r, g, b8, 0xff], 0, 3.0, LineSegment::ON_TOP);
             extra_now.push(Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(14));
         }
+        // The open sketch's frame and name, in the 3D view's sketch box colour.
+        let [_, r, g, b8] = noshape_scene::sketch_mode::SKETCH_BOX_COLOR.to_be_bytes();
+        let mut fills = Vec::new();
+        if let Some(sf) = &self.sketch_frame {
+            let mut lines = LineData::default();
+            let mut ring: Vec<[f32; 3]> = sf.corners.iter().map(|c| c.as_vec3().to_array()).collect();
+            ring.push(ring[0]);
+            lines.push_polyline(&ring, [r, g, b8, 0xff], 0, 1.0, LineSegment::ON_TOP);
+            extra_now.push(Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(14));
+            // The name at its top-left, its height a twentieth of the frame's.
+            let asc = 0.045 * sf.corners[0].distance(sf.corners[3]);
+            let mut contours = Vec::new();
+            super::in_plane_contours(&sf.name, sf.name_at, sf.x, sf.y, asc, &mut contours);
+            let c = gpui_kit::Rgba::from(gpui_kit::Hsla::from(gpui_kit::rgb(noshape_scene::sketch_mode::SKETCH_BOX_COLOR)));
+            fills.push(noshape_render::overlay::WorldFill { contours: Arc::new(contours), color: [c.r, c.g, c.b, c.a] });
+        }
+        self.viewport.update(cx, |vp, cx| vp.set_plane_labels(fills, cx));
         let scene = match &self.parts {
             Some((display, built, _)) => crate::scene_builder::with_highlights(built, display, &selected, self.hover.as_ref(), &[], extra_now, false, self.gpu.uploader()),
             None => Scene::default(),

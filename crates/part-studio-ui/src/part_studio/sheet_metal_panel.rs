@@ -825,7 +825,31 @@ impl PartStudioView {
             Some((0, row, _)) => Some(row),
             _ => None,
         };
-        fv.update(cx, |v, cx| v.show(flat.as_ref(), color, highlight, hovered, cx));
+        // An open sketch on a face of the flat's part: the face's box on the
+        // flat, with a margin, and the sketch's name at its top-left (live
+        // request 1605, g-4).
+        let sketch_frame = self.sketch.as_ref().zip(flat.as_ref()).zip(self.context.as_ref()).and_then(|((_, f), ctx)| {
+            let feature = &self.edit.as_ref()?.dialog.read(cx).feature;
+            let Some(noshape_model::params::ParamValue::Query(plane)) = feature.params.get("sketchPlane") else { return None };
+            let faces: Vec<_> = plane.iter().flat_map(|r| noshape_model::regen::measure::resolve_shapes(ctx, r)).collect();
+            let b = faces.first()?.bounding_box(false).ok()?;
+            let on: Vec<glam::DVec3> = (0..8).map(|k| f.to_flat_view(glam::DVec3::new([b.min.x, b.max.x][k & 1], [b.min.y, b.max.y][(k >> 1) & 1], [b.min.z, b.max.z][(k >> 2) & 1]))).collect();
+            // Only a face lying on the flat's sheet (its top or bottom).
+            let on_sheet = |z: f64| z.abs() < 1e-6 || (z.abs() - f.thickness).abs() < 1e-6;
+            if !on.iter().all(|c| on_sheet(c.z)) {
+                return None;
+            }
+            let (lo, hi) = on.iter().fold((glam::DVec2::splat(f64::INFINITY), glam::DVec2::splat(f64::NEG_INFINITY)), |(lo, hi), c| (lo.min(c.truncate()), hi.max(c.truncate())));
+            let m = 0.06 * (hi - lo).max_element();
+            let (lo, hi) = (lo - glam::DVec2::splat(m), hi + glam::DVec2::splat(m));
+            let at = |x: f64, y: f64| glam::DVec3::new(x, y, 0.0);
+            let asc = 0.045 * (hi.y - lo.y);
+            Some(super::flat_view::SketchFrame { corners: [at(lo.x, lo.y), at(hi.x, lo.y), at(hi.x, hi.y), at(lo.x, hi.y)], name_at: at(lo.x + 0.3 * asc, hi.y - 0.3 * asc), x: glam::DVec3::X, y: glam::DVec3::Y, name: feature.name.clone() })
+        });
+        fv.update(cx, |v, cx| {
+            v.show(flat.as_ref(), color, highlight, hovered, cx);
+            v.show_sketch_frame(sketch_frame, cx);
+        });
 
         let split = SPLIT.with(|s| s.get());
         v_flex()
