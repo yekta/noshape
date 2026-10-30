@@ -503,6 +503,24 @@ pub fn notice_entries(doc: &crate::document::Document, notices: &[noshape_featur
 /// notices in Feature Studios first, then those in the standard library, each
 /// by line, a compile notice before runtime ones on its line; then the
 /// printed text.
+/// The feature an open dialog is creating or editing, by Part Studio: it runs (its notices are in [`outputs`]) before
+/// the document has it, and the notices panel lists it too (live: a new custom feature's errors show while its
+/// dialog is open).
+static DRAFTS: LazyLock<Mutex<HashMap<crate::document::TabId, crate::partstudio::Feature>>> = LazyLock::new(Default::default);
+
+/// The Part Studio's open dialog's feature (`None`: no dialog).
+pub fn set_draft(part_studio: crate::document::TabId, feature: Option<crate::partstudio::Feature>) {
+    let mut d = DRAFTS.lock();
+    match feature {
+        Some(f) => {
+            d.insert(part_studio, f);
+        }
+        None => {
+            d.remove(&part_studio);
+        }
+    }
+}
+
 pub fn monitor(doc: &crate::document::Document, part_studio: crate::document::TabId) -> (Vec<MonitorEntry>, String) {
     use crate::document::{TabContent, TabId};
     let Some(tab) = doc.tab(part_studio) else { return (Vec::new(), String::new()) };
@@ -517,7 +535,13 @@ pub fn monitor(doc: &crate::document::Document, part_studio: crate::document::Ta
     let mut text = String::new();
     let mut studios_done = Vec::new();
     let scripts = super::DocumentScripts::from_document(doc);
-    for f in ps.features.iter().filter(|f| !f.suppressed && super::is_custom(&f.type_id)) {
+    // The open dialog's feature in place of the stored one, or after the others when it's new.
+    let draft = DRAFTS.lock().get(&part_studio).cloned();
+    let mut features: Vec<&crate::partstudio::Feature> = ps.features.iter().map(|f| draft.as_ref().filter(|d| d.id == f.id).unwrap_or(f)).collect();
+    if let Some(d) = draft.as_ref().filter(|d| ps.features.iter().all(|f| f.id != d.id)) {
+        features.push(d);
+    }
+    for f in features.into_iter().filter(|f| !f.suppressed && super::is_custom(&f.type_id)) {
         let Some((studio_tab, _)) = super::parse_type_id(&f.type_id) else { continue };
         if !studios_done.contains(&studio_tab)
             && let Some(studio) = super::CustomFeatureProvider::studio(&*scripts, studio_tab)

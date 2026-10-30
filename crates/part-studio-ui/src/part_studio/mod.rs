@@ -806,6 +806,8 @@ impl PartStudioView {
             vp.pick_priority = prio;
             vp.orbit_pivot_fn = Some(pivot);
         });
+        // The notices panel lists the open dialog's feature too (a new one isn't in the document yet).
+        noshape_model::custom::run::set_draft(self.tab, self.edit.as_ref().map(|e| e.dialog.read(cx).row_feature()));
         // Update dialog status from the edited feature's state.
         if let Some(e) = &self.edit {
             let id = e.dialog.read(cx).feature.id;
@@ -3271,7 +3273,7 @@ impl PartStudioView {
             // A row's place in the list, for its side tooltip.
             let slot = (rows.len(), item_indent(&item));
             rows.push(match item {
-                ListItem::Placeholder => self.render_editing_placeholder(cx),
+                ListItem::Placeholder => self.render_editing_placeholder(slot, cx),
                 // Inside a folder: indented under its guide like the children (live ROLLBACK-BAR-IN-FOLDER).
                 ListItem::Rollback(i, x) => indent(x, last, self.render_rollback_bar(i, window, cx)),
                 ListItem::Ellipsis => ellipsis(),
@@ -4165,7 +4167,7 @@ impl PartStudioView {
         self.edit.as_ref().is_some_and(|e| matches!(e.dialog.read(cx).status.as_ref().map(|s| s.0), Some(FeatureStatus::Error)))
     }
 
-    fn render_editing_placeholder(&self, cx: &App) -> AnyElement {
+    fn render_editing_placeholder(&self, slot: (usize, f32), cx: &App) -> AnyElement {
         let pal = p();
         // Live: a new Hole's row reads "Ø 6.35 mm ↧ 12 mm" while it is drawn.
         let name = self
@@ -4181,14 +4183,25 @@ impl PartStudioView {
             })
             .unwrap_or_default();
         let icon = self.edit.as_ref().map(|e| feature_icon(&e.dialog.read(cx).feature.type_id)).unwrap_or_else(|| icon_path("part"));
-        crate::ui::tree_row("editing-placeholder", true)
+        // Hovered, its error as a feature row's (live: a new feature failing in its dialog, the custom knurl):
+        // "<name> did not regenerate properly: <message>", else its name.
+        let dialog = self.edit.as_ref().map(|e| e.dialog.clone());
+        let type_name = self.edit.as_ref().map(|e| e.dialog.read(cx).ty.name).unwrap_or_default();
+        let head = if needs_type_tag(&name, type_name) { format!("{name} [{type_name}]") } else { name.clone() };
+        let row = crate::ui::tree_row("editing-placeholder", true)
             .mr(px(5.))
             .bg(pal.accent_soft)
             .font_weight(FontWeight::SEMIBOLD)
             .when(self.edit_invalid(cx), |d| d.text_color(pal.text_invalid))
             .child(crate::ui::tree_icon(&icon, false, cx))
-            .child(div().flex_1().truncate().child(crate::ui::user_text(name)))
-            .into_any_element()
+            .child(div().flex_1().truncate().child(crate::ui::user_text(name)));
+        crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), move |cx| {
+            match dialog.as_ref().and_then(|d| d.read(cx).status.clone()) {
+                Some((FeatureStatus::Error | FeatureStatus::Warning, m)) => format!("{head} did not regenerate properly: {m}").into(),
+                _ => head.clone().into(),
+            }
+        })
+        .into_any_element()
     }
 
     fn render_rollback_bar(&self, index: usize, window: &Window, cx: &mut Context<Self>) -> AnyElement {

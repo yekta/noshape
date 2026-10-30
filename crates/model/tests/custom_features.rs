@@ -1923,3 +1923,42 @@ fn bench_std_regen() {
     }
 }
 
+
+/// A new custom feature failing in its dialog (the user's knurl: "Selected tools and targets do not intersect."):
+/// the preview's state carries the message and the notices (the row's and the dialog title's tooltips read it),
+/// and the FeatureScript notices panel lists its errors, with the "Part Studio 1 (feature)" stack row, while the
+/// document doesn't have the feature yet (`custom::run::set_draft`).
+#[test]
+fn a_failing_draft_custom_features_errors_reach_the_notices_and_its_state() {
+    let src = r#"FeatureScript 3095;
+import(path : "onshape/std/geometry.fs", version : "3095.0");
+
+annotation { "Feature Type Name" : "No-op cut" }
+export const noOpCut = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        throw regenError(ErrorStringEnum.BOOLEAN_SUBTRACT_NO_OP);
+    });
+"#;
+    let mut fx = Fixture::new(src);
+    let ps_tab = fx.doc.add_tab("Part Studio 1", TabContent::PartStudio(PartStudio::new()));
+    let mut shown = PartStudio::new();
+    let draft = shown.new_feature(&fx.ty("noOpCut"), &fx.units).unwrap();
+    shown.features.push(draft.clone());
+    // The dialog's preview: the studio with the draft, which the document hasn't.
+    let r = fx.regen(&mut Regenerator::new(), &shown);
+    let st = r.display.feature_state(draft.id).expect("the draft's state");
+    assert_eq!(st.status, FeatureStatus::Error);
+    assert_eq!(st.message.as_deref(), Some("Selected tools and targets do not intersect."));
+    // The panel: nothing for the document alone, the draft's error once its dialog is open.
+    let (none, _) = custom::run::monitor(&fx.doc, ps_tab);
+    assert!(none.is_empty(), "{:?}", none.iter().map(|e| &e.message).collect::<Vec<_>>());
+    custom::run::set_draft(ps_tab, Some(draft.clone()));
+    let (entries, _) = custom::run::monitor(&fx.doc, ps_tab);
+    custom::run::set_draft(ps_tab, None);
+    let thrown = entries.iter().find(|e| e.message == "throw BOOLEAN_SUBTRACT_NO_OP").expect("the thrown error listed");
+    assert_eq!(thrown.rows.last().map(|r| r.1.as_str()), Some(format!("Part Studio 1 ({})", draft.name).as_str()), "{:?}", thrown.rows);
+    let _ = &mut fx;
+}
