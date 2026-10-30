@@ -1270,6 +1270,25 @@ fn intersect_of_parts_apart_makes_nothing() {
     }
 }
 
+/// qa BOOL-TOUCH-INFO: Intersect of two blocks that only touch face to
+/// face: both parts go (live), Info "The parts either do not intersect or
+/// are totally contained."; ☑ Keep tools keeps them.
+#[test]
+fn intersect_of_parts_touching_face_to_face_deletes_both() {
+    for keep in [false, true] {
+        let mut t = T::new();
+        t.block(0.0, 0.0, 0.02, 0.02, "10 mm");
+        t.block(0.02, 0.0, 0.04, 0.02, "10 mm");
+        let ids: Vec<BodyId> = t.ok().context.bodies.iter().map(|b| b.id.clone()).collect();
+        assert_eq!(ids.len(), 2);
+        let f = t.add("booleanBodies", &[("operationType", en("INTERSECTION")), ("tools", q(ids.iter().cloned().map(Reference::Body).collect())), ("keepTools", b(keep))]);
+        let r = t.regen();
+        let st = r.display.features.iter().find(|x| x.id == f).unwrap();
+        assert_eq!(st.message.as_deref(), Some("The parts either do not intersect or are totally contained."), "keep {keep}");
+        assert_eq!(parts(&r).len(), if keep { 2 } else { 0 }, "keep {keep}");
+    }
+}
+
 /// Live "fail preview 2": Fillet 1 (2 mm on the top front edge of a
 /// 40 x 30 x 20 mm block) edited to 50 mm regenerates OK in Onshape, the
 /// volume going from 24000 to 7458.6158 mm³ (wider than both faces: the

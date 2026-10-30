@@ -7,6 +7,9 @@ use noshape_units::Dim;
 /// Onshape's note for a Boolean that changes nothing (live qa5 BOOL1).
 use crate::regen::eval::NO_GEOMETRY_CHANGE;
 
+/// Live's info for an Intersect of parts that only touch.
+const TOUCHING_INTERSECT: &str = "The parts either do not intersect or are totally contained.";
+
 pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
     let tools_idx = ev.resolve_bodies(ev.query("tools"));
     if tools_idx.is_empty() {
@@ -65,6 +68,18 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
                 let made: Vec<NamedShape> = if untouched { Vec::new() } else { ev.ctx.bodies.iter().filter(|b| b.id == first_id || (b.id.feature == ev.feature && !tool_ids.contains(&b.id))).map(|b| NamedShape { shape: b.shape.clone(), names: b.shape_names() }).collect() };
                 if made.is_empty() {
                     ev.ctx.bodies = saved;
+                    // Parts that only touch (two blocks face to face, live
+                    // BOOL-TOUCH-INFO): they go (unless kept), with live's
+                    // shorter info; parts apart change nothing (INT2).
+                    let first_shape = ev.ctx.bodies[first].shape.clone();
+                    let touching = tools_idx[1..].iter().any(|&i| k::distance(&first_shape, &ev.ctx.bodies[i].shape).is_ok_and(|d| d.distance < 1e-9));
+                    if touching {
+                        if !ev.bool("keepTools") {
+                            ev.ctx.bodies.retain(|b| !tool_ids.contains(&b.id));
+                        }
+                        ev.infos.push(TOUCHING_INTERSECT.into());
+                        return Ok(());
+                    }
                     ev.infos.push(NO_GEOMETRY_CHANGE.into());
                     return Ok(());
                 }

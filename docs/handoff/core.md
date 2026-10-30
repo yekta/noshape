@@ -157,6 +157,9 @@ skasm's now; see docs/handoff/skasm.md.
   its centre 5.8e-5 off the axis, Ixx / Iyy 1.7e-5 apart; a torus 1e-5). Not for volume(): ~0.85 ms more a face.
   Faces on our own integrator (B-splines, wrapping faces, meshes) as before. T1
   `kernel_core::mass_properties_of_tubes_and_a_torus_are_exact`.
+- BOOL-TOUCH-INFO: Boolean Intersect (no targets) of parts that only touch (distance 0, nothing in common): both
+  go unless ☑ Keep tools, Info "The parts either do not intersect or are totally contained." (live); parts apart
+  keep INT2's "no geometry change" and stay. T1 `engine::intersect_of_parts_touching_face_to_face_deletes_both`.
 - For skasm: T2 `sheetmetal_frames::convert_rips_and_bends_like_onshape` now fails alone too (BUTT: top wall max x
   39.98 mm), on main since 969c5069 (std sheet metal by default); the 21:34 T2 before it passed.
 
