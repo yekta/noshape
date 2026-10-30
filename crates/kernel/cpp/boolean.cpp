@@ -161,6 +161,11 @@ public:
   {
     if (cancelled(myFlag) || myOver)
       return true;
+    if (myDeadline != nullptr && steady_seconds() > myDeadline->at)
+    {
+      myDeadline->hit.store(true);
+      return true;
+    }
     const auto now = std::chrono::steady_clock::now();
     if (now - myChecked < std::chrono::milliseconds(50))
       return false;
@@ -177,6 +182,7 @@ public:
 
 private:
   const std::atomic<bool>*              myFlag;
+  Deadline*                             myDeadline = t_deadline;
   size_t                                myStart;
   bool                                  myOver = false;
   std::chrono::steady_clock::time_point myChecked = std::chrono::steady_clock::now();
@@ -4463,9 +4469,10 @@ static OpOut op_section_unbudgeted(const OcShape& a, const OcShape& b)
   sec.ComputePCurveOn1(true);
   sec.ComputePCurveOn2(true);
   sec.SetRunParallel(bop_parallel());
-  // Its inputs as they were if a budget stops it (see run_budgeted).
+  // Its inputs as they were if a budget stops it (see run_budgeted); stopped
+  // through its progress indicator off Linux.
   sec.SetNonDestructive(true);
-  sec.Build();
+  build_cancellable(sec);
   if (sec.HasErrors() || !sec.IsDone())
     fail_op("section failed: " + algo_errors(sec));
   std::vector<TopoDS_Shape> args{a.shape, b.shape};

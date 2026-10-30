@@ -66,6 +66,13 @@ namespace noshape {
 void fail_invalid(const std::string& msg) { throw std::runtime_error("invalid: " + msg); }
 void fail_op(const std::string& msg) { throw std::runtime_error("failed: " + msg); }
 
+thread_local Deadline* t_deadline = nullptr;
+
+double steady_seconds()
+{
+  return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 namespace {
 std::atomic<double> g_working_scale{1.0};
 }

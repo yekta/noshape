@@ -161,10 +161,24 @@ struct LockedSection
   LockedSection(const LockedSection&)            = delete;
   LockedSection& operator=(const LockedSection&) = delete;
 };
+// A budget off Linux (no CPU timer signal to jump out with there): its
+// deadline on the steady clock, which OCCT's builds see through their
+// progress indicator (boolean.cpp CancelIndicator: Booleans, sections) and
+// stop at; `hit` once one did. Captured by the indicator when it is made (its
+// UserBreak may run on a pool thread).
+struct Deadline
+{
+  double            at = 0;
+  std::atomic<bool> hit{false};
+};
+extern thread_local Deadline* t_deadline;
+double                        steady_seconds();
+
 template <class F>
 int run_budgeted(double cpu_seconds, F&& f)
 {
-#ifdef __linux__
+  // (NOSHAPE_PORTABLE_BUDGET: the deadline also on Linux, to test it there.)
+#if defined(__linux__) && !defined(NOSHAPE_PORTABLE_BUDGET)
   if (budget_jmp != nullptr)
   {
     f();
@@ -214,8 +228,32 @@ int run_budgeted(double cpu_seconds, F&& f)
   budget_timer_live = nullptr;
   noshape_bop_set_pairs_parallel_here(pairs_outer);
 #else
-  (void)cpu_seconds;
-  f();
+  // Wall time here (the indicator's checks are cheap and portable); the
+  // earlier of this and an enclosing budget's.
+  Deadline        d;
+  Deadline* const outer = t_deadline;
+  d.at                  = steady_seconds() + cpu_seconds;
+  if (outer != nullptr && outer->at < d.at)
+    d.at = outer->at;
+  t_deadline = &d;
+  try
+  {
+    f();
+  }
+  catch (...)
+  {
+    t_deadline = outer;
+    if (d.hit.load())
+    {
+      if (outer != nullptr && outer->at <= d.at)
+        outer->hit.store(true);
+      return 1;
+    }
+    throw;
+  }
+  t_deadline = outer;
+  if (d.hit.load())
+    return 1;
 #endif
   return 0;
 }
