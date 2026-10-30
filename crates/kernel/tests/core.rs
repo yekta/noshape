@@ -212,6 +212,34 @@ fn tessellation_sanity() {
     assert!((p[1] - p[0]).cross(p[2] - p[0]).z < 0.0);
 }
 
+/// qa MASS-INERTIA-APPROX: the mass properties shown are exact on curved
+/// parts too (inertia about the centre of mass, density 1): a tube cut and
+/// revolved (Ø40 / Ø20 × 30; the revolved one's Ixy read -870 mm⁵ and its
+/// centre 5.8e-5 off the axis) and a torus R30 r5.
+#[test]
+fn mass_properties_of_tubes_and_a_torus_are_exact() {
+    let outer = make_cylinder(&Plane::xy(), 20.0, 30.0, 2.0 * PI).unwrap();
+    let inner = make_cylinder(&Plane::new(DVec3::new(0.0, 0.0, -1.0), DVec3::Z, DVec3::X), 10.0, 32.0, 2.0 * PI).unwrap();
+    let cut = boolean(BooleanOp::Cut, &[outer], &[inner], &BooleanOptions::default()).unwrap().shape;
+    let pts = [DVec3::new(10.0, 0.0, 0.0), DVec3::new(20.0, 0.0, 0.0), DVec3::new(20.0, 0.0, 30.0), DVec3::new(10.0, 0.0, 30.0)];
+    let face = make_face_from_wire(&make_polyline(&pts, true).unwrap(), true).unwrap();
+    let revolved = revolve(&face, DVec3::ZERO, DVec3::Z, 2.0 * PI).unwrap().shape;
+    let (r1, r2, h) = (20.0f64, 10.0f64, 30.0f64);
+    let m = PI * (r1 * r1 - r2 * r2) * h;
+    let tube = (m, DVec3::new(0.0, 0.0, 15.0), m * (3.0 * (r1 * r1 + r2 * r2) + h * h) / 12.0, m * (r1 * r1 + r2 * r2) / 2.0);
+    let torus = make_torus(&Plane::xy(), 30.0, 5.0, 2.0 * PI).unwrap();
+    let tm = 2.0 * PI * PI * 30.0 * 25.0;
+    let ring = (tm, DVec3::ZERO, tm * (4.0 * 900.0 + 5.0 * 25.0) / 8.0, tm * (4.0 * 900.0 + 3.0 * 25.0) / 4.0);
+    for (what, s, (mass, c, ixx, izz)) in [("cut tube", &cut, tube), ("revolved tube", &revolved, tube), ("torus", &torus, ring)] {
+        let p = mass_properties(s).unwrap();
+        let i = p.inertia;
+        assert!(close(p.mass, mass, 1e-9 * mass), "{what}: mass {}", p.mass);
+        assert!((p.center - c).length() < 1e-9, "{what}: centre {}", p.center);
+        assert!(close(i.x_axis.x, ixx, 1e-9 * ixx) && close(i.y_axis.y, ixx, 1e-9 * ixx) && close(i.z_axis.z, izz, 1e-9 * izz), "{what}: {i}");
+        assert!(i.y_axis.x.abs() < 1e-8 * ixx && i.z_axis.x.abs() < 1e-8 * ixx && i.z_axis.y.abs() < 1e-8 * ixx, "{what}: {i}");
+    }
+}
+
 #[test]
 fn mass_properties_box() {
     let b = make_box(&Plane::xy(), 2.0, 4.0, 6.0).unwrap();

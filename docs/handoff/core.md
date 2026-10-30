@@ -151,6 +151,12 @@ skasm's now; see docs/handoff/skasm.md.
   face of one input lies inside another runs again with fuzzy 1e-7, then 1e-6, kept when it does interact and its
   volume can be right (path "occt_fuzzy"): 1670.62941 mm³, 5 faces, as the Rust Boolean. T1
   `kernel_robustness::union_of_offset_cylinders_on_one_plane`.
+- MASS-INERTIA-APPROX: the mass properties shown (measure.rs `mass_properties`) now come from the kernel's
+  `mass_properties` (common.cpp `volume_props_precise`): OCCT's adaptive integrator at 1e-12 (1e-10 above 1000
+  faces) where volume_props uses 1e-7, which controls the mass's error only (a revolved tube's Ixy -870 mm⁵ for 0,
+  its centre 5.8e-5 off the axis, Ixx / Iyy 1.7e-5 apart; a torus 1e-5). Not for volume(): ~0.85 ms more a face.
+  Faces on our own integrator (B-splines, wrapping faces, meshes) as before. T1
+  `kernel_core::mass_properties_of_tubes_and_a_torus_are_exact`.
 - For skasm: T2 `sheetmetal_frames::convert_rips_and_bends_like_onshape` now fails alone too (BUTT: top wall max x
   39.98 mm), on main since 969c5069 (std sheet metal by default); the 21:34 T2 before it passed.
 

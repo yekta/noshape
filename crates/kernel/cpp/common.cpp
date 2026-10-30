@@ -1351,6 +1351,25 @@ GProp_GProps volume_props(const TopoDS_Shape& s)
   return out;
 }
 
+// For the mass properties shown (centre of mass, inertia): OCCT's adaptive
+// integrator controls the error of the mass only, and at volume_props'
+// 1e-7 a revolved tube's Ixy read -870 mm⁵ for 0 and its Ixx / Iyy differed
+// by 1.7e-5 (qa MASS-INERTIA-APPROX); at 1e-12 they are exact to 1e-10. Not
+// for every volume: 1e-12 costs ~0.85 ms more a face (1e-10 on big parts).
+GProp_GProps volume_props_precise(const TopoDS_Shape& s)
+{
+  TopoDS_Compound          rest;
+  std::vector<TopoDS_Face> wrapping;
+  if (has_mesh_faces(s) || split_wrapping(s, rest, wrapping) || !analytic_only(s))
+    return volume_props(s);
+  int faces = 0;
+  for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
+    ++faces;
+  GProp_GProps out;
+  BRepGProp::VolumeProperties(s, out, faces <= 1000 ? 1e-12 : 1e-10, true);
+  return out;
+}
+
 GProp_GProps surface_props(const TopoDS_Shape& s)
 {
   GProp_GProps out;

@@ -465,6 +465,7 @@ pub(crate) mod ffi {
         fn bounding_box(s: &OcShape, optimal: bool) -> Result<Vec<f64>>;
         fn find_plane(s: &OcShape, tolerance: f64) -> Result<PlaneQ>;
         fn props_volume(s: &OcShape) -> Result<PropsF>;
+        fn props_volume_precise(s: &OcShape) -> Result<PropsF>;
         fn props_surface(s: &OcShape) -> Result<PropsF>;
         fn props_linear(s: &OcShape) -> Result<PropsF>;
         fn min_distance(a: &OcShape, b: &OcShape) -> Result<DistanceF>;

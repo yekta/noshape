@@ -34,6 +34,12 @@ pub fn volume_properties(shape: &Shape) -> Result<MassProperties> {
     Ok(conv(ck(ffi::props_volume(shape.raw()))?))
 }
 
+/// [`volume_properties`] with the centre of mass and inertia integrated
+/// tighter (the mass properties shown; slower, not cached).
+pub fn mass_properties(shape: &Shape) -> Result<MassProperties> {
+    Ok(conv(ck(ffi::props_volume_precise(shape.raw()))?))
+}
+
 /// Surface properties (mass = area) of faces/shells/solids.
 pub fn surface_properties(shape: &Shape) -> Result<MassProperties> {
     Ok(conv(ck(ffi::props_surface(shape.raw()))?))

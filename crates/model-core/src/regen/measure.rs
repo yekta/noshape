@@ -581,7 +581,7 @@ pub fn mass_properties(ctx: &Context, bodies: &[crate::reference::BodyId], densi
     // measure a surface, wire or point (live qa4 round 4 s3: an open loft
     // surface leaves Parts to measure, Volume and Surface area blank).
     for b in ctx.bodies.iter().filter(|b| b.kind == crate::display::BodyKind::Solid && (bodies.is_empty() || bodies.contains(&b.id))) {
-        let Ok(p) = k::volume_properties(&b.shape) else { continue };
+        let Ok(p) = k::mass_properties(&b.shape) else { continue };
         let Ok(s) = k::surface_properties(&b.shape) else { continue };
         let rho = densities(&b.id);
         if rho.is_none() {

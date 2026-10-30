@@ -622,6 +622,7 @@ P3    vertex_point(const OcShape& v);
 rust::Vec<double>        bounding_box(const OcShape& s, bool optimal);
 PlaneQ                   find_plane(const OcShape& s, double tolerance);
 PropsF                   props_volume(const OcShape& s);
+PropsF                   props_volume_precise(const OcShape& s);
 PropsF                   props_surface(const OcShape& s);
 PropsF                   props_linear(const OcShape& s);
 DistanceF                min_distance(const OcShape& a, const OcShape& b);

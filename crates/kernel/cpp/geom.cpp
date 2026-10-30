@@ -814,6 +814,12 @@ PropsF props_volume(const OcShape& s)
   return to_props(s.volume_props([&] { return volume_props(s.shape); }));
 }
 
+PropsF props_volume_precise(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  return to_props(volume_props_precise(s.shape));
+}
+
 PropsF props_surface(const OcShape& s)
 {
   require_non_null(s.shape, "shape");
