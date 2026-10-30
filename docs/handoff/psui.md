@@ -166,6 +166,8 @@ MIRROR-DIALOG-STATE closed (live's answer 1597 = ours). Open in psui's TICKETS: 
 path); API-VAR-REDEFINE (P3, the agent API's variable_create + model-data's variable_table::create: dx / core's
 code, not a UI change: left for them).
 18:20: d5ae3ded mesher 5d (CDT cache), cc73aaea display off the critical path (N06).
+10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC
+(P1, qa 10-29 18:51: an edgeless loop is declined, a mesher panic falls back to BRepMesh at the bridge).
 
 Residuals found today: a paused dialog's Depth field
 shows a corner mark in live; Shift+wheel under xdotool loses events after the first (GPUI X11 resets the scroll
