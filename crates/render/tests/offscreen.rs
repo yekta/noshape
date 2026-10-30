@@ -2094,7 +2094,7 @@ fn a_see_through_part_in_front_wins_the_pick_when_solid() {
     assert_eq!(picked(&mut r, true), 2, "the see-through part's own top face (+Z, id 2) wins");
 }
 
-/// The silhouette cull (`Renderer::set_silhouette_cull`, NOSHAPE_SIL_CULL) draws what the plain silhouette pass draws:
+/// The silhouette cull (`Renderer::set_silhouette_cull`, on by default) draws what the plain silhouette pass draws:
 /// a ring of candidates round a cylinder, in two copies of one buffer (two slots), from an oblique view.
 #[test]
 fn culled_silhouettes_draw_as_the_plain_ones() {
@@ -2127,6 +2127,7 @@ fn culled_silhouettes_draw_as_the_plain_ones() {
     let copy = |dx: f32| Instance::new(Drawable::Lines(lines.clone())).with_color([0.0, 0.0, 0.0, 1.0]).with_transform(glam::Mat4::from_translation(glam::Vec3::new(dx, 0.0, 0.0)));
     let scene = Scene { instances: vec![copy(-0.015), copy(0.015)], ..Default::default() };
     let frame = |r: &mut Renderer| r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap().bgra;
+    r.set_silhouette_cull(false);
     let plain = frame(&mut r);
     if !r.set_silhouette_cull(true) {
         eprintln!("skipping: no silhouette cull on this device");

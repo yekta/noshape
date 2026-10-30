@@ -1578,7 +1578,7 @@ enum LayoutKind {
 }
 
 /// What compiling a pipeline needs, owned (for compile threads).
-/// `NOSHAPE_SIL_CULL=1`: the edge silhouette candidates (every tessellation edge inside a curved face, 6 vertices
+/// The edge silhouette candidates (every tessellation edge inside a curved face, 6 vertices
 /// each, the Retina orbit's line cost: perf 40964180293) culled on the GPU before the color pass: `cs_sil_cull` keeps
 /// the ones that are silhouettes in this view, counting them into an indirect draw of `vs_silhouette_pulled`.
 struct SilCull {
@@ -1605,7 +1605,8 @@ struct SilDraw {
 
 impl SilCull {
     fn new_if_on(device: &wgpu::Device, globals: &wgpu::BindGroupLayout, inst: &wgpu::BindGroupLayout, compare: &wgpu::BindGroupLayout, shader: &wgpu::ShaderModule) -> Option<Self> {
-        if std::env::var("NOSHAPE_SIL_CULL").ok().as_deref() != Some("1") {
+        // On by default (perf 40973793607: NIST at 2× presented 48.7–55.7 → 62.0–65.8 fps); NOSHAPE_SIL_CULL=0: off.
+        if std::env::var("NOSHAPE_SIL_CULL").ok().as_deref() == Some("0") {
             return None;
         }
         Self::new(device, globals, inst, compare, shader)
@@ -1641,7 +1642,7 @@ impl SilCull {
 }
 
 impl Renderer {
-    /// Turns the silhouette cull ([`SilCull`]) on or off (`NOSHAPE_SIL_CULL=1` turns it on at start); whether it's
+    /// Turns the silhouette cull ([`SilCull`]) on or off (on at start unless `NOSHAPE_SIL_CULL=0`); whether it's
     /// on (the device may not have the bindings).
     pub fn set_silhouette_cull(&mut self, on: bool) -> bool {
         if on != self.sil.is_some() {
@@ -1971,7 +1972,7 @@ impl SlotBuffer {
 }
 
 pub struct Renderer {
-    /// `NOSHAPE_SIL_CULL=1`: the edge silhouettes culled on the GPU each frame.
+    /// The edge silhouettes culled on the GPU each frame (off with `NOSHAPE_SIL_CULL=0` or too few bindings).
     sil: Option<SilCull>,
     device: wgpu::Device,
     queue: wgpu::Queue,

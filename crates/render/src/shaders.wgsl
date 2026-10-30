@@ -780,7 +780,7 @@ fn is_silhouette(a: vec3<f32>, m1: vec3<f32>, m2: vec3<f32>) -> bool {
     return !((d1 > eps && d2 > eps) || (d1 < -eps && d2 < -eps));
 }
 
-// NOSHAPE_SIL_CULL: the candidates of one silhouette draw (14 words each: a, b, n1, n2, pick, width) and the ones
+// The silhouette cull (renderer.rs SilCull): the candidates of one silhouette draw (14 words each: a, b, n1, n2, pick, width) and the ones
 // cs_sil_cull found to be silhouettes this frame (candidate, slot), drawn indirectly by vs_silhouette_pulled.
 @group(2) @binding(0) var<storage, read> sil_cands: array<u32>;
 @group(2) @binding(1) var<storage, read_write> sil_found: array<u32>;
