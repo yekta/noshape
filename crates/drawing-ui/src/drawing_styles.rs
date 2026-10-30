@@ -490,6 +490,12 @@ impl DrawingEditor {
             let d_label = num(own.datum_size.unwrap_or(props.datum_size));
             body = body.child(row("Datum size", unit(select("st-datum", d_label, 80., presets(own.datum_size, props.datum_size, set_datum)))));
         }
+        // Help styles (drawing.md A64): an entity the panel can't style in
+        // the selection (a view, table, sketch entity…) disables it.
+        if self.selection.iter().any(|s| !matches!(s, Sel::Annotation(_))) {
+            let off = div().relative().child(body.opacity(0.45)).child(div().absolute().inset_0().occlude());
+            return Self::styles_with_footer(off.into_any_element(), "st-revert", |_, _, _| {}, cx);
+        }
         let revert = cx.listener(|this, _: &ClickEvent, _, cx| this.edit_styles(std::rc::Rc::new(|a: &mut Annotation| a.style = None), cx));
         Self::styles_with_footer(body.into_any_element(), "st-revert", revert, cx)
     }
