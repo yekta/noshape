@@ -664,12 +664,45 @@ struct FaceTri
 // absolute deflections within 1 % of its own (the display's scale with the
 // part's diagonal, which a small feature barely changes); the latest three
 // sets, each up to 20 M nodes. Under mesh_mutex. NOSHAPE_MESH_CACHE=0: off.
+// Edge polylines by edge, in 16 maps by the edge's hash: a big part's thousands of new ones go in a map each in
+// parallel (one map took 1.3 ms of the 400-fin plate's ~14 on the perf server, in turn).
+struct EdgeCache
+{
+  using Poly = std::shared_ptr<const std::vector<std::array<float, 3>>>;
+  static constexpr size_t                                                  N = 16;
+  std::array<NCollection_DataMap<TopoDS_Shape, Poly, TopTools_ShapeMapHasher>, N> maps;
+  static size_t shard(const TopoDS_Shape& e)
+  {
+    // The hash's high bits, mixed (a TShape address's low bits are its alignment).
+    return (size_t)((std::hash<TopoDS_Shape>{}(e) * 0x9E3779B97F4A7C15ull) >> 60);
+  }
+  bool        IsBound(const TopoDS_Shape& e) const { return maps[shard(e)].IsBound(e); }
+  const Poly* Seek(const TopoDS_Shape& e) const { return maps[shard(e)].Seek(e); }
+  // `edges(i)`'s polyline `polys[i - 1]` for each i in `which`, in parallel when many.
+  template <class Edges>
+  void bind(const Edges& edges, const std::vector<Poly>& polys, const std::vector<int>& which)
+  {
+    std::array<std::vector<int>, N> by;
+    for (const int i : which)
+      by[shard(edges(i))].push_back(i);
+    OSD_Parallel::For(
+      0, (int)N,
+      [&](int k) {
+        auto& m = maps[(size_t)k];
+        m.ReSize(m.Extent() + (int)by[(size_t)k].size());
+        for (const int i : by[(size_t)k])
+          m.Bind(edges(i), polys[(size_t)i - 1]);
+      },
+      which.size() < 1024);
+  }
+};
+
 struct MeshSet
 {
   double lin = 0, ang = 0;
   NCollection_DataMap<TopoDS_Shape, occ::handle<Poly_Triangulation>, TopTools_ShapeMapHasher> faces;
   NCollection_DataMap<TopoDS_Shape, RustFace, TopTools_ShapeMapHasher>                     rust; // noshape's mesher's
-  NCollection_DataMap<TopoDS_Shape, std::shared_ptr<const std::vector<std::array<float, 3>>>, TopTools_ShapeMapHasher> edges;
+  EdgeCache                                                                                   edges;
   size_t                                                                                        nodes = 0;
 };
 
@@ -787,7 +820,6 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     if (set != nullptr && ntaken > 0)
     {
       set->rust.ReSize(set->rust.Extent() + ntaken);
-      set->edges.ReSize(set->edges.Extent() + m->edges.Extent());
     }
     if (partial || ntaken > 0)
     {
@@ -1013,14 +1045,17 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
       !parallel || ne < 1024); // a small part's edges stay here (mesh_rust.cpp in_chunks)
     lap = std::make_unique<KernelTimer>("mesh.edges.cache");
     m->edge_reversed.resize((size_t)ne);
+    std::vector<int> fresh_edges;
     for (int i = 1; i <= ne; ++i)
     {
-      auto& poly = m->edge_polys[(size_t)i - 1];
+      const auto& poly = m->edge_polys[(size_t)i - 1];
       if (made[(size_t)i - 1] && set != nullptr)
-        set->edges.Bind(m->edges(i), poly);
+        fresh_edges.push_back(i);
       m->edge_reversed[(size_t)i - 1] = m->edges(i).Orientation() == TopAbs_REVERSED;
       m->edge_points += poly ? poly->size() : 0;
     }
+    if (set != nullptr)
+      set->edges.bind(m->edges, m->edge_polys, fresh_edges);
     // The display mesh is copied out (the handles above keep it): drop it
     // from the model's faces. OCCT's booleans take their boxes from a
     // stored triangulation, enlarged by its deflection: a coarse display
