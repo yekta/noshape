@@ -28,7 +28,14 @@ pub struct FlatBendLine {
 /// A form shown in the flat pattern: its outline and center mark.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FlatForm {
+    /// Closed outlines (a form without a flat sketch: its tools' widest
+    /// sections), drawn as its up / down outline.
     pub loops: Vec<Vec<DVec2>>,
+    /// The form studio's flat sketch (live 1623): open curves, `true` a
+    /// tear (a cut through the sheet: the sketch's own geometry, solid,
+    /// SHEETMETAL_FORM_TEAR), else an outline (its construction geometry,
+    /// the up / down dash-dot).
+    pub curves: Vec<(Vec<DVec2>, bool)>,
     pub center: DVec2,
     /// It stands out toward the viewer (the flat's reference side): live
     /// draws "up" forms always, "down" ones with hidden lines only.
@@ -173,6 +180,10 @@ impl FlatPattern {
                 if l.len() >= 2 {
                     g.lines.push(Polyline2 { points: l.iter().map(|p| map(*p)).collect(), style: LineStyle::Thin, closed: true, pick: 0 });
                 }
+            }
+            // Live 1623: tears solid, outlines dash-dot.
+            for (l, tear) in f.curves.iter().filter(|c| c.0.len() >= 2) {
+                g.lines.push(Polyline2 { points: l.iter().map(|p| map(*p)).collect(), style: if *tear { LineStyle::Thin } else { LineStyle::Centerline }, closed: false, pick: 0 });
             }
             let c = map(f.center);
             let arm = text_h * 0.6;
@@ -392,7 +403,7 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
                 }
                 let center = mk.center().map(|c| frame.to_local(m.transform_point3(c))).unwrap_or_default();
                 let up = mk.direction.is_none_or(|d| m.transform_vector3(d).dot(frame.normal) > 0.0);
-                forms.push(FlatForm { loops: loops3.iter().map(|l| l.iter().map(|p| frame.to_local(*p)).collect()).collect(), center, up });
+                forms.push(FlatForm { loops: loops3.iter().map(|l| l.iter().map(|p| frame.to_local(*p)).collect()).collect(), curves: Vec::new(), center, up });
             }
             super::FlatMarkKind::Cut => cuts.extend(face),
         }

@@ -1640,8 +1640,9 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 if ft.cut {
                     cut_shapes.push((ft.face, tools));
                 } else {
-                    let sketches = ft.sketches.iter().filter_map(|f| ev.ctx.sketches.iter().find(|s| s.feature == *f)).flat_map(|s| sketch_loops(s)).collect();
-                    form_shapes.push((ft.face, tools, sketches));
+                    let sketches: Vec<_> = ft.sketches.iter().filter_map(|f| ev.ctx.sketches.iter().find(|s| s.feature == *f)).collect();
+                    let sketch = FormSketch { curves: sketches.iter().flat_map(|s| sketch_curves(s)).collect(), origin: sketches.first().map(|s| s.frame.origin) };
+                    form_shapes.push((ft.face, tools, sketch));
                 }
             }
             // The definition body's own topology order (references are by index).
@@ -2046,27 +2047,28 @@ fn wall_faces(topo: &Topo, fi: usize, part_faces: &[Shape], named: &[(usize, cra
 /// definition plane at z = 0, seen from +z; dom/qa5-sm-flat.dxf): walls and
 /// bend strips unfolded, bend lines on the strips' centres, up when the bend
 /// rises toward the viewer.
-/// A form on wall `.0`: its tools, and its flat sketches' closed loops (model space).
-type FormShapes = (usize, Vec<Shape>, Vec<Vec<DVec3>>);
+/// A form on wall `.0`: its tools, and its flat sketch.
+type FormShapes = (usize, Vec<Shape>, FormSketch);
 
-/// A sketch's closed wires as points in model space.
-fn sketch_loops(s: &crate::regen::context::SketchResult) -> Vec<Vec<DVec3>> {
+/// A form's flat sketch in model space (live 1623): its curves (`true` a
+/// tear: the sketch's own geometry; else an outline: its construction
+/// geometry) and its origin, the form's point.
+#[derive(Clone, Debug, Default)]
+struct FormSketch {
+    curves: Vec<(Vec<DVec3>, bool)>,
+    origin: Option<DVec3>,
+}
+
+/// A sketch's curves as points in model space, each with whether it is a
+/// tear (not construction).
+fn sketch_curves(s: &crate::regen::context::SketchResult) -> Vec<(Vec<DVec3>, bool)> {
     let f = &s.frame;
-    s.wires
-        .iter()
-        .filter(|w| w.closed)
-        .map(|w| {
-            let mut pts: Vec<DVec3> = Vec::new();
-            for seg in &w.segments {
-                let skip = usize::from(!pts.is_empty());
-                pts.extend(seg.tessellate(1e-6).into_iter().skip(skip).map(|p| f.origin + f.x * p.x + f.y * p.y));
-            }
-            if pts.len() > 1 && pts[0].distance(pts[pts.len() - 1]) < 1e-9 {
-                pts.pop();
-            }
-            pts
+    s.sketch
+        .entities()
+        .filter_map(|e| {
+            let pts = s.sketch.curve(e.id)?.tessellate(1e-6);
+            (pts.len() >= 2).then(|| (pts.into_iter().map(|p| f.origin + f.x * p.x + f.y * p.y).collect(), !e.construction))
         })
-        .filter(|l| l.len() >= 3)
         .collect()
 }
 
@@ -2150,14 +2152,17 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
         {
             pieces.extend(fill.shape.faces());
         }
-        let Some(first) = loops.first() else { continue };
-        let center = first.iter().copied().sum::<DVec3>() / first.len() as f64;
-        // A form with a flat sketch: its footprint and the sketch (live:
-        // Circle emboss draws the r 9.1569 footprint and its Ø d circle).
-        if !sketched.is_empty() {
-            loops.truncate(1);
+        // A form with a flat sketch shows only that (live 1623), centred on
+        // the form's point; else its tools' widest sections.
+        let center = match (sketched.origin.filter(|_| !sketched.curves.is_empty()), loops.first()) {
+            (Some(o), _) => to_plane(o),
+            (None, Some(first)) => first.iter().copied().sum::<DVec3>() / first.len() as f64,
+            (None, None) => continue,
+        };
+        if !sketched.curves.is_empty() {
+            loops.clear();
         }
-        loops.extend(sketched.iter().map(|l| l.iter().copied().map(to_plane).collect::<Vec<DVec3>>()));
+        let curves: Vec<(Vec<DVec3>, bool)> = sketched.curves.iter().map(|(l, tear)| (l.iter().copied().map(to_plane).collect(), *tear)).collect();
         // Up: the tools stand out of the wall toward the flat's viewer (+z).
         // The side they reach furthest past the sheet ([-back, front] along
         // n): a form's cut tool runs through the sheet, its added material
@@ -2173,6 +2178,7 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
         let up = m.transform_vector3(n * side.signum()).z > 0.0;
         flat_forms.push(crate::sheetmetal::flat::FlatForm {
             loops: loops.iter().map(|l| l.iter().map(|p| frame.to_local(m.transform_point3(*p))).collect()).collect(),
+            curves: curves.iter().map(|(l, tear)| (l.iter().map(|p| frame.to_local(m.transform_point3(*p))).collect(), *tear)).collect(),
             center: frame.to_local(m.transform_point3(center)),
             up,
         });

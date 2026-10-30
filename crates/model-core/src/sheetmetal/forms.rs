@@ -230,44 +230,139 @@ fn make_studio(id: &str) -> Option<PartStudio> {
     Some(ps)
 }
 
-/// The forms whose studio has a flat sketch (all but Lance); the ones
-/// whose sketch we draw: the circle and slot forms (live's sketches: the
-/// footprint, which the flat shows from the tools anyway, and the form's
-/// own Ø d circle or width slot).
+/// The forms whose studio has a flat sketch (all but Lance, live 1616).
 fn profile_forms(id: &str) -> bool {
-    matches!(id, "circle-emboss" | "circle-extrusion" | "countersink" | "slot-emboss" | "slot-extrusion")
+    id != "lance" && FORMS.iter().any(|f| f.id == id)
 }
 
-/// The form's flat sketch on Top (the sheet's top): its Ø d circle (live
-/// "live form emboss" flat: r 2.5 for Diameter 5, with the r 9.1569
-/// footprint), the clearance hole, or the slot of the form's width.
-fn profile_sketch(ev: &EvalCtx, form: &str, t: f64) -> FResult<noshape_sketch::Sketch> {
+/// The form's flat sketch on Top (the sheet's top), as live's "Form
+/// profile" / "Flat sketch" (request 1623, the crawled studios' sketches):
+/// its own geometry is where the form cuts the sheet (a tear: a hole, the
+/// louver's slit, the lance's sides, the knockout's ring), its construction
+/// geometry the form's outline (the footprint where its bends meet the
+/// sheet, an emboss's Ø d, the bridge's ends).
+fn profile_sketch(ev: &EvalCtx, form: &str, t: f64, radius: &dyn Fn(&EvalCtx, &str) -> FResult<f64>) -> FResult<noshape_sketch::Sketch> {
+    use std::f64::consts::{FRAC_PI_2, PI};
     let mut sk = noshape_sketch::Sketch::new();
-    match form {
-        "circle-emboss" | "circle-extrusion" => {
-            sk.add_circle(DVec2::ZERO, ev.length("diameter")? * 0.5);
+    // Outlines are construction geometry.
+    fn mark(sk: &mut noshape_sketch::Sketch, id: noshape_sketch::EntityId, outline: bool) {
+        if outline {
+            let _ = sk.set_construction(id, true);
         }
-        "countersink" => {
-            sk.add_circle(DVec2::ZERO, ev.length("clearanceHole")? * 0.5);
+    }
+    let circle = |sk: &mut noshape_sketch::Sketch, r: f64, outline: bool| {
+        let id = sk.add_circle(DVec2::ZERO, r);
+        mark(sk, id, outline);
+    };
+    let line = |sk: &mut noshape_sketch::Sketch, a: DVec2, b: DVec2, outline: bool| {
+        let (pa, pb) = (sk.add_point(a), sk.add_point(b));
+        if let Ok(id) = sk.add_line_between(pa, pb) {
+            mark(sk, id, outline);
         }
-        _ => {
-            let (length, width) = (ev.length("length")?, ev.length("width")?);
-            let tangents = ev.enum_("lengthTo") == "slot_tangents";
-            // Slot emboss's sketch: radius #width / 2; Slot extrusion's #Width / 2 (at least t).
-            let w = if form == "slot-extrusion" { width.max(t) } else { width };
-            let l = slot_length(length, tangents, w);
-            let (h, r) = (l * 0.5, w * 0.5);
-            if l <= 1e-12 {
-                sk.add_circle(DVec2::ZERO, r);
-            } else {
-                let p = [(-h, -r), (h, -r), (h, r), (-h, r)].map(|(x, y)| sk.add_point(DVec2::new(x, y)));
-                let c = [sk.add_point(DVec2::new(h, 0.0)), sk.add_point(DVec2::new(-h, 0.0))];
-                let _ = sk.add_line_between(p[0], p[1]);
-                let _ = sk.add_arc_between(c[0], p[1], p[2]);
-                let _ = sk.add_line_between(p[2], p[3]);
-                let _ = sk.add_arc_between(c[1], p[3], p[0]);
+    };
+    let arc = |sk: &mut noshape_sketch::Sketch, c: DVec2, r: f64, a0: f64, a1: f64, outline: bool| {
+        let id = sk.add_arc_angles(c, r, a0, a1);
+        mark(sk, id, outline);
+    };
+    // A slot of radius r between centres ±h on x (a circle when h is 0).
+    let stadium = |sk: &mut noshape_sketch::Sketch, h: f64, r: f64, outline: bool| {
+        if h <= 1e-12 {
+            let id = sk.add_circle(DVec2::ZERO, r);
+            mark(sk, id, outline);
+            return;
+        }
+        for (a, b) in [(DVec2::new(-h, -r), DVec2::new(h, -r)), (DVec2::new(h, r), DVec2::new(-h, r))] {
+            let (pa, pb) = (sk.add_point(a), sk.add_point(b));
+            if let Ok(id) = sk.add_line_between(pa, pb) {
+                mark(sk, id, outline);
             }
         }
+        for (x, a0) in [(h, -FRAC_PI_2), (-h, FRAC_PI_2)] {
+            let id = sk.add_arc_angles(DVec2::new(x, 0.0), r, a0, a0 + PI);
+            mark(sk, id, outline);
+        }
+    };
+    match form {
+        "circle-emboss" => {
+            let d = ev.length("diameter")?;
+            let (_, foot) = emboss_profile(t, d, ev.length("height")?, ev.angle("draft")?, radius(ev, "intRadius")?, radius(ev, "extRadius")?)?;
+            circle(&mut sk, foot, true);
+            circle(&mut sk, d * 0.5, true);
+        }
+        "circle-extrusion" => {
+            let d = ev.length("diameter")?;
+            let (_, foot) = extrusion_profile(t, d, ev.length("depth")?, ev.length("radius")?);
+            circle(&mut sk, d * 0.5, false);
+            circle(&mut sk, foot, true);
+        }
+        "countersink" => {
+            let rh = ev.length("clearanceHole")? * 0.5;
+            circle(&mut sk, rh, false);
+            circle(&mut sk, rh + 0.9 * t * (ev.angle("angle")? * 0.5).tan(), true);
+        }
+        "slot-emboss" | "slot-extrusion" => {
+            let (length, width) = (ev.length("length")?, ev.length("width")?);
+            let tangents = ev.enum_("lengthTo") == "slot_tangents";
+            if form == "slot-emboss" {
+                let l = if tangents { (length - width).max(0.0) } else { length.max(0.0) };
+                let (_, foot) = emboss_profile(t, width, ev.length("height")?, ev.angle("draft")?, radius(ev, "intRadius")?, radius(ev, "extRadius")?)?;
+                stadium(&mut sk, l * 0.5, width * 0.5, true);
+                stadium(&mut sk, l * 0.5, foot, true);
+            } else {
+                let w = width.max(t);
+                let l = slot_length(length, tangents, w);
+                let (_, foot) = extrusion_profile(t, w, ev.length("depth")?, radius(ev, "radius")?);
+                stadium(&mut sk, l * 0.5, w * 0.5, false);
+                stadium(&mut sk, l * 0.5, foot, true);
+            }
+        }
+        // The slit along x, the hood's "D" on +y (live 1623: 100 × 20: the
+        // slit 10…110, arcs r 20 on 30 and 90, the top at y + 20).
+        "louver" => {
+            let h = ev.length("height")?.clamp(t, 10.0 * t);
+            let w = ev.length("width")?.max(2.0 * h);
+            let l = ev.length("length")?.max(2.0 * w);
+            let a = l * 0.5 - w;
+            line(&mut sk, DVec2::new(-l * 0.5, 0.0), DVec2::new(l * 0.5, 0.0), false);
+            arc(&mut sk, DVec2::new(a, 0.0), w, 0.0, FRAC_PI_2, true);
+            arc(&mut sk, DVec2::new(-a, 0.0), w, FRAC_PI_2, PI, true);
+            line(&mut sk, DVec2::new(-a, w), DVec2::new(a, w), true);
+        }
+        // Its sides cut, its ends (where the ramps leave the sheet) and the
+        // bridge's top ends outlined (live 1623: 63.313708 × 20, ends ±25).
+        "bridge-lance" => {
+            let (length, w) = (ev.length("length")?, ev.length("width")?.max(t));
+            let (_, foot) = emboss_profile(t, length.max(0.0), ev.length("height")?, ev.angle("draft")?, radius(ev, "intRadius")?, radius(ev, "extRadius")?)?;
+            let hw = w * 0.5;
+            for y in [hw, -hw] {
+                line(&mut sk, DVec2::new(-foot, y), DVec2::new(foot, y), false);
+            }
+            for x in [-foot, foot, -length * 0.5, length * 0.5] {
+                line(&mut sk, DVec2::new(x, -hw), DVec2::new(x, hw), true);
+            }
+        }
+        // The ring cut but for two tabs t wide at 0° and 180°: their outer
+        // ends outlined, inner ends and sides cut (live 1623, Ø 25 on 2 mm:
+        // r 12.5 and 10.9 = 12.5 − 0.8 t).
+        "circle-knockout" => {
+            let r = ev.length("diameter")? * 0.5;
+            let (ri, s) = (r - 0.8 * t, t * 0.5);
+            if ri > s {
+                let (ao, ai) = ((s / r).asin(), (s / ri).asin());
+                for base in [0.0, PI] {
+                    arc(&mut sk, DVec2::ZERO, r, base + ao, base + PI - ao, false);
+                    arc(&mut sk, DVec2::ZERO, r, base - ao, base + ao, true);
+                    arc(&mut sk, DVec2::ZERO, ri, base - ai, base + ai, false);
+                }
+                let (xi, xo) = ((ri * ri - s * s).sqrt(), (r * r - s * s).sqrt());
+                for sx in [1.0, -1.0] {
+                    for y in [s, -s] {
+                        line(&mut sk, DVec2::new(sx * xi, y), DVec2::new(sx * xo, y), false);
+                    }
+                }
+            }
+        }
+        _ => {}
     }
     Ok(sk)
 }
@@ -281,15 +376,6 @@ pub fn tool_feature(ev: &mut EvalCtx) -> FResult<()> {
     if t <= 0.0 {
         return err("The thickness must be positive");
     }
-    if ev.enum_("part") == "SKETCH" {
-        let mut sk = profile_sketch(ev, &form, t)?;
-        let report = sk.solve();
-        let (regions, wires) = (sk.regions(), sk.wires());
-        let (feature, name) = (ev.feature, ev.name.to_string());
-        ev.ctx.sketches.retain(|s| s.feature != feature);
-        ev.ctx.sketches.push(Arc::new(crate::regen::context::SketchResult { feature, name, frame: crate::display::PlaneFrame::TOP, sketch: sk, report, regions, wires, dimension_text: BTreeMap::new(), images: Vec::new() }));
-        return Ok(());
-    }
     let control = ev.enum_("radiusControl").to_string();
     let radius = |ev: &EvalCtx, custom: &str| -> FResult<f64> {
         Ok(match control.as_str() {
@@ -299,6 +385,15 @@ pub fn tool_feature(ev: &mut EvalCtx) -> FResult<()> {
             _ => 2.0 * t,
         })
     };
+    if ev.enum_("part") == "SKETCH" {
+        let mut sk = profile_sketch(ev, &form, t, &radius)?;
+        let report = sk.solve();
+        let (regions, wires) = (sk.regions(), sk.wires());
+        let (feature, name) = (ev.feature, ev.name.to_string());
+        ev.ctx.sketches.retain(|s| s.feature != feature);
+        ev.ctx.sketches.push(Arc::new(crate::regen::context::SketchResult { feature, name, frame: crate::display::PlaneFrame::TOP, sketch: sk, report, regions, wires, dimension_text: BTreeMap::new(), images: Vec::new() }));
+        return Ok(());
+    }
     let tools = match form.as_str() {
         "circle-emboss" => circle_emboss(t, ev.length("diameter")?, ev.length("height")?, ev.angle("draft")?, radius(ev, "intRadius")?, radius(ev, "extRadius")?)?,
         "circle-extrusion" => circle_extrusion(t, ev.length("diameter")?, ev.length("depth")?, ev.length("radius")?)?,

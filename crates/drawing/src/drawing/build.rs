@@ -1702,7 +1702,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // Counterbore/Countersink up / down's.
             let forms = geo.flat_forms.iter().map(|(pts, up)| (pts, *up, if *up { 3 } else { 4 }));
             let heads = geo.flat_heads.iter().map(|(pts, up)| (pts, *up, if *up { 0 } else { 1 }));
-            for (pts, up, row) in forms.chain(heads) {
+            // Tears go through the sheet: always shown, in Form tear's style.
+            let tears = geo.flat_tears.iter().map(|pts| (pts, true, 2));
+            for (pts, up, row) in forms.chain(heads).chain(tears) {
                 if !up && v.style != RenderStyle::HiddenLinesVisible {
                     continue;
                 }

@@ -147,8 +147,8 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   them; everywhere else std's sheet metal needs them not modifiable: custom_features sm3 got 3 extra "parts"), opMergeContexts / opPattern copy sketches
   under op-marker ids (qCreatedBy finds them), moved, with their attributes, hidden (`Context.hidden_sketches`);
   `flat_of` draws the footprint plus the sketch's closed wires (live's Circle emboss flat: r 9.1569 + r 2.5).
-  Knockout / Louver / Bridge lance: no sketch yet (their live sketches have tabs / louver outlines; the flat keeps
-  the tools' sections). Mate connectors still don't come through the derive (std deletes them; merge has no connectors).
+  All forms but Lance have their sketch (live 1623 DXFs): non-construction = tear, construction = outline; the flat
+  shows only the sketch. Louver placed at defaults: 0.15 mm³ over live's /massproperties, its evVolume pending (1623 (c)). Mate connectors still don't come through the derive (std deletes them; merge has no connectors).
   Copy Flat pattern needs an assembly instance source for a flat body (assembly crate, not mine).
 - Open (10-30 morning): (1) (was: table letters, done above). (2) evaluateQuery order generally: live returns faces in
   creation order (rebuilt faces last; request 1608); the host lists a body only one Extrude made in live's order

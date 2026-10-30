@@ -100,6 +100,7 @@ const BEND_DOWN: &str = "SHEETMETAL_BEND_LINES_DOWN";
 const TANGENT: &str = "SHEETMETAL_BEND_TANGENT_LI";
 const CBORE_UP: &str = "SHEETMETAL_CBORE_CSINK_UP";
 const CBORE_DOWN: &str = "SHEETMETAL_CBORE_CSINK_DOW";
+const FORM_TEAR: &str = "SHEETMETAL_FORM_TEAR";
 const FORM_UP: &str = "SHEETMETAL_FORM_UP";
 const FORM_DOWN: &str = "SHEETMETAL_FORM_DOWN";
 const FORM_MARK: &str = "SHEETMETAL_FORM_CENTERMARK";
@@ -193,9 +194,16 @@ pub fn flats_document(flats: &[FlatPattern], o: &FlatExport) -> Result<CadDocume
                     }
                 }
             }
+            for (l, tear) in f.curves.iter().filter(|_| o.form_outlines) {
+                for w in l.windows(2) {
+                    if w[0].distance(w[1]) > 1e-12 {
+                        add(&mut doc, w[0], w[1], if *tear { FORM_TEAR } else { layer })?;
+                    }
+                }
+            }
             if o.form_centermarks {
-                // A cross over the form's center, its outline's size.
-                let r = f.loops.iter().flatten().map(|p| p.distance(f.center)).fold(0.0, f64::max).max(1e-3);
+                // Live 1616 / 1623: a ±0.25 mm cross on the form's point.
+                let r = 0.25e-3;
                 add(&mut doc, f.center - glam::DVec2::X * r, f.center + glam::DVec2::X * r, FORM_MARK)?;
                 add(&mut doc, f.center - glam::DVec2::Y * r, f.center + glam::DVec2::Y * r, FORM_MARK)?;
             }
@@ -271,7 +279,7 @@ mod tests {
     fn the_flat_export_options_write_their_layers() {
         let mut f = flat(0.0);
         f.heads.push(crate::sheetmetal::flat::FlatHead { center: DVec2::new(0.01, 0.02), radius: 4e-3, up: true });
-        f.forms.push(crate::sheetmetal::flat::FlatForm { loops: vec![vec![DVec2::new(0.045, 0.015), DVec2::new(0.055, 0.015), DVec2::new(0.055, 0.025)]], center: DVec2::new(0.05, 0.02), up: false });
+        f.forms.push(crate::sheetmetal::flat::FlatForm { loops: vec![vec![DVec2::new(0.045, 0.015), DVec2::new(0.055, 0.015), DVec2::new(0.055, 0.025)]], curves: Vec::new(), center: DVec2::new(0.05, 0.02), up: false });
         let on = |o: &FlatExport, layer: &str| flats_document(std::slice::from_ref(&f), o).unwrap().entities().filter(|e| e.common().layer == layer).count();
         let none = FlatExport::default();
         let all = FlatExport { tangent_lines: true, cbore_lines: true, form_outlines: true, form_centermarks: true, ..none };

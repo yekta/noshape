@@ -956,6 +956,8 @@ pub struct ViewGeometry {
     /// Flat pattern views: form outlines (closed, view coordinates) and
     /// whether the form points up (toward the viewer).
     pub flat_forms: Vec<(Vec<[f64; 2]>, bool)>,
+    /// Forms' tear lines (cuts through the sheet, live 1623: Form tear).
+    pub flat_tears: Vec<Vec<[f64; 2]>>,
     /// Flat pattern views: counterbore / countersink head circles and
     /// whether the head is on the viewer's side.
     pub flat_heads: Vec<(Vec<[f64; 2]>, bool)>,
@@ -2872,6 +2874,14 @@ fn flat_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewF
             let mut pts: Vec<[f64; 2]> = l.iter().map(|p| pt(*p)).collect();
             pts.push(pts[0]);
             g.flat_forms.push((pts, f.up));
+        }
+        for (l, tear) in f.curves.iter().filter(|c| c.0.len() >= 2) {
+            let pts: Vec<[f64; 2]> = l.iter().map(|p| pt(*p)).collect();
+            if *tear {
+                g.flat_tears.push(pts);
+            } else {
+                g.flat_forms.push((pts, f.up));
+            }
         }
         g.form_marks.push(pt(f.center));
         g.snaps.push(Snap { p: pt(f.center), kind: SnapKind::Center, point: None });
