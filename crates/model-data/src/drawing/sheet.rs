@@ -1630,7 +1630,7 @@ impl SheetGeometry {
                     let tips: Vec<[f64; 2]> = std::iter::once(tip).chain(spec.leaders.iter().map(map)).collect();
                     super::weld::render(self, spec, &tips, a.position, ah * 0.75, !env.weld_ansi(), pick);
                 }
-                AnnotationKind::SurfaceFinish { anchor, value, leaders, on, spec } => {
+                AnnotationKind::SurfaceFinish { anchor, value, leaders, on, spec, ext } => {
                     // On an edge: standing on it, turned square to it, on
                     // the upper / right side (Flip: the other).
                     let turn = on.as_ref().and_then(|&(view, at, dir, flip)| {
@@ -1651,6 +1651,17 @@ impl SheetGeometry {
                         Some((p, n[1].atan2(n[0]) - std::f64::consts::FRAC_PI_2))
                     });
                     let p = turn.map(|t| t.0).unwrap_or(*anchor);
+                    // On an extension line: past its end the line is carried
+                    // on to the symbol's tip (live request 1624).
+                    if let Some((_, w0, w1, false)) = ext.as_ref().and_then(|o| self.attached_point(&starts, o)) {
+                        let d = [w1[0] - w0[0], w1[1] - w0[1]];
+                        let dd = (d[0] * d[0] + d[1] * d[1]).max(1e-12);
+                        let t = ((p[0] - w0[0]) * d[0] + (p[1] - w0[1]) * d[1]) / dd;
+                        if !(0.0..=1.0).contains(&t) {
+                            let end = if t > 1.0 { w1 } else { w0 };
+                            self.lines.push(Polyline2 { points: vec![end, [w0[0] + d[0] * t, w0[1] + d[1] * t]], style: LineStyle::Thin, closed: false, pick });
+                        }
+                    }
                     let mark = self.mark();
                     // Leaders (Add leader) run from the symbol's point. One
                     // to a face ends in a dot and reaches the symbol through
@@ -1750,11 +1761,18 @@ impl SheetGeometry {
                         let to_right = t[0] > (x0 + x1) / 2.0;
                         let start = if to_right { [x1, ym] } else { [x0, ym] };
                         let sh = [start[0] + if to_right { 4.0 } else { -4.0 }, ym];
+                        let leader_mark = self.mark();
                         self.lines.push(Polyline2 { points: vec![start, sh, t], style: LineStyle::Thin, closed: false, pick });
                         if l.dot {
                             self.leader_dot(t);
                         } else {
                             self.arrow(t, [t[0] - sh[0], t[1] - sh[1]], 3.0);
+                        }
+                        // Its model point lost: the leader red, a red dot at
+                        // the old attach point (live request 1625).
+                        if l.lost {
+                            self.leader_dot(t);
+                            self.color_since(leader_mark, [0xdd, 0x52, 0x28]);
                         }
                         let circle = |r: f64| (0..=24).map(|i| i as f64 / 24.0 * std::f64::consts::TAU).map(|a| [sh[0] + r * a.cos(), sh[1] + r * a.sin()]).collect::<Vec<_>>();
                         match extra.leader {

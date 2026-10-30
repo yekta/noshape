@@ -309,6 +309,8 @@ pub struct DrawingEditor {
     pub paste_table: Option<Vec<Vec<String>>>,
     /// Note tool: the leader anchored by the first click (on a snap point).
     pub note_leader: Option<Leader>,
+    /// Geometric tolerance tool: the model point of `note_leader`.
+    pub leader_ref: Option<PointRef>,
     /// The open note editor's property fields (shown as their values).
     pub note_fields: crate::drawing_note::NoteFields,
     /// Add leader on a note: where the new leader starts (`drawing_leaders`).
@@ -612,6 +614,7 @@ impl DrawingEditor {
             styles_gap: None,
             table_tool: None,
             note_leader: None,
+            leader_ref: None,
             note_fields: Default::default(),
             leader_from: None,
             leader_sel: None,

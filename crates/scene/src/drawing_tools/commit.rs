@@ -362,7 +362,7 @@ pub fn gdt(id: u64, position: [f64; 2], frame: Vec<String>, extra: GdtExtra) -> 
 /// The Surface finish panel's ✓: the symbol with `value` (the first right
 /// cell) and `spec` where the tool was clicked.
 pub fn surface_finish(id: u64, position: [f64; 2], value: String, spec: SfSpec) -> Annotation {
-    Annotation { id, kind: AnnotationKind::SurfaceFinish { anchor: position, value, leaders: Vec::new(), on: None, spec: Box::new(spec) }, position, ..Default::default() }
+    Annotation { id, kind: AnnotationKind::SurfaceFinish { anchor: position, value, leaders: Vec::new(), on: None, spec: Box::new(spec), ext: None }, position, ..Default::default() }
 }
 
 /// The Surface finish panel's starting value (live request 1628: empty).
@@ -420,6 +420,12 @@ impl SheetPick<'_> {
         }
         let value = self.built?.resolved.annotations.iter().find(|x| x.id == on.ann).map(|x| x.position).unwrap_or(q);
         Some((view, foot, dir, dot(n, sub(q, value)) < 0.0))
+    }
+
+    /// Where on the hovered dimension's lines `c` is (a surface finish on
+    /// an extension line keeps it, live request 1624).
+    pub fn hovered_dim_on(&self, c: [f64; 2]) -> Option<DatumOn> {
+        self.hovered_dim_segment(c).map(|s| s.0)
     }
 
     /// A geometric tolerance clicked on a dimension's value (live request

@@ -211,6 +211,10 @@ impl DrawingEditor {
             if let AnnotationKind::Gdt { leaders, .. } = &mut a.kind {
                 leaders.push(l);
             }
+            // Associative: a lost point turns the leader red (live 1625).
+            if let Some(r) = self.leader_ref.take() {
+                a.refs.push(noshape_model::drawing::AnnotationRef { slot: 100, point: r });
+            }
             self.edit_sheet("Geometric tolerance", cx, |s| s.annotations.push(a));
             cx.notify();
             return true;
@@ -230,6 +234,7 @@ impl DrawingEditor {
         // A view snap (a dimension's end sits on one): a leader to it.
         if let Some(p) = self.snap_at(c) {
             self.note_leader = Some(noshape_model::drawing::Leader { view: Some(p.view), point: p.p, ..Default::default() });
+            self.leader_ref = p.r.clone();
             cx.notify();
             return true;
         }
@@ -244,6 +249,7 @@ impl DrawingEditor {
         // Inside a face region: a leader from a dot there (live request 1624).
         if let Some(l) = self.face_leader(c) {
             self.note_leader = Some(l);
+            self.leader_ref = None;
             cx.notify();
             return true;
         }

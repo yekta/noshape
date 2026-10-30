@@ -147,6 +147,10 @@ pub fn remove_leaders(s: &mut Sheet, id: u64) {
     if let Some(l) = find(s, id).and_then(leaders_mut) {
         l.clear();
     }
+    // A geometric tolerance's leader references go with them.
+    if let Some(a) = s.annotations.iter_mut().find(|a| a.id == id && matches!(a.kind, AnnotationKind::Gdt { .. })) {
+        a.refs.retain(|r| r.slot < 100);
+    }
 }
 
 /// A note's unrotated box (sheet mm) and its rotation.
@@ -374,6 +378,15 @@ pub fn move_leader_end(a: &mut Annotation, leader: usize, view: Option<ViewId>, 
             moved = true;
         }
     });
+    // A geometric tolerance's leader keeps the model point it lands on
+    // (dragged onto new geometry, a lost one re-attaches; live 1625).
+    if moved && matches!(a.kind, AnnotationKind::Gdt { .. }) {
+        let slot = 100 + leader.min(150) as u8;
+        a.refs.retain(|x| x.slot != slot);
+        if let Some(r) = r {
+            a.refs.push(noshape_model::drawing::AnnotationRef { slot, point: r });
+        }
+    }
     moved
 }
 

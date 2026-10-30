@@ -511,6 +511,27 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
         if a.refs.is_empty() {
             continue;
         }
+        // A geometric tolerance's leaders end on model points of their own
+        // views (refs slot 100 + leader); a lost one leaves the frame black
+        // and turns only its leader red (live request 1625).
+        if let AnnotationKind::Gdt { leaders, .. } = &mut a.kind {
+            for r in a.refs.iter().filter(|r| r.slot >= 100) {
+                let Some(l) = leaders.get_mut(r.slot as usize - 100) else { continue };
+                let at = l.view.and_then(|v| {
+                    let geo = views.get(&v).filter(|g| g.frame.is_some())?;
+                    let ctx = views::view_source(sheet, v).and_then(|(key, _)| sources.get(&key))?;
+                    resolve_in_view(&ctx.context, geo, &r.point)
+                });
+                match at {
+                    Some((p, _)) => l.point = p,
+                    None => {
+                        l.lost = true;
+                        lost.push((a.id, r.slot));
+                    }
+                }
+            }
+            continue;
+        }
         let Some(view) = a.kind.view() else { continue };
         let geo = views.get(&view).filter(|g| g.frame.is_some());
         let ctx = views::view_source(sheet, view).and_then(|(key, _)| sources.get(&key)).map(|s| s.context.clone());

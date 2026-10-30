@@ -902,6 +902,11 @@ pub enum AnnotationKind {
         /// the first right cell; live request 1628).
         #[serde(default, skip_serializing_if = "SfSpec::is_default")]
         spec: Box<SfSpec>,
+        /// Placed on a dimension's extension line (live request 1624): the
+        /// symbol stays put and the line is carried on to its tip when the
+        /// dimension moves away.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ext: Option<DatumOn>,
     },
     /// Weld symbol: the arrow points at `target` (view coordinates in
     /// `view`, else sheet), the reference line starts at the annotation's
@@ -1024,6 +1029,11 @@ pub struct Leader {
     /// surface finish placed inside a face region; live request 1624).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub dot: bool,
+    /// Set by the sheet build when the model point the leader is attached
+    /// to (a geometric tolerance's ref slot 100 + its index) is lost: the
+    /// leader alone is drawn red (live request 1625).
+    #[serde(skip)]
+    pub lost: bool,
 }
 
 /// Where a note leader starts: the note's side, or a branch off the bend or

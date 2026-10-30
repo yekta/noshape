@@ -679,7 +679,7 @@ fn dimension_formats_and_new_dimension_types() {
     add(sheet, AnnotationKind::ArcLengthDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.01, a: [0.01, 0.0], b: [0.0, 0.01], mid: [0.00707, 0.00707], offset: 5.0 }, [0.0; 2]);
     add(sheet, AnnotationKind::Gdt { anchor: [40.0, 40.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![], extra: Default::default() }, [40.0, 40.0]);
     add(sheet, AnnotationKind::Datum { anchor: [60.0, 100.0], label: "A".into(), on: None, at: None }, [60.0, 112.0]);
-    add(sheet, AnnotationKind::SurfaceFinish { anchor: [80.0, 100.0], value: "Ra 1.6".into(), leaders: Vec::new(), on: None, spec: Default::default() }, [80.0, 100.0]);
+    add(sheet, AnnotationKind::SurfaceFinish { anchor: [80.0, 100.0], value: "Ra 1.6".into(), leaders: Vec::new(), on: None, spec: Default::default(), ext: None }, [80.0, 100.0]);
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let t = texts(&built);
     for want in ["100", "+0.1", "-0.05", "2.362 in", "Ø24 H7", "0", "88", "2 X 45.0°", "⌒15.71", "⌖", "Ø0.1Ⓜ", "A", "Ra 1.6"] {
@@ -2374,6 +2374,59 @@ fn gdt_on_dimension_follows_it() {
     assert!(built.geometry.fills.iter().any(|f| f.points.len() == 8 && (f.points[0][0] - 60.6).abs() < 1e-6 && (f.points[0][1] - 60.0).abs() < 1e-6));
 }
 
+/// A surface finish on an extension line (live request 1624): when the
+/// line ends short of the symbol, it is carried on to the symbol's tip.
+#[test]
+fn surface_finish_carries_its_extension_line_on() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let dim = drawing.sheets[0].annotations.iter().find(|a| matches!(a.kind, AnnotationKind::LinearDimension { .. })).expect("a linear dimension").id;
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let dpick = built.picks.iter().position(|p| *p == PickTarget::Annotation(dim)).unwrap() as u32;
+    let l = built.geometry.lines.iter().find(|l| l.pick == dpick).unwrap();
+    let (w0, w1) = (l.points[0], l.points[1]);
+    let d = [w1[0] - w0[0], w1[1] - w0[1]];
+    let tip = [w1[0] + d[0] * 0.5, w1[1] + d[1] * 0.5];
+    let id = drawing.sheets[0].next_annotation_id();
+    let on = DatumOn { ann: dim, line: 0, seg: 0, t: 1.0 };
+    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::SurfaceFinish { anchor: tip, value: String::new(), leaders: Vec::new(), on: None, spec: Default::default(), ext: Some(on) }, position: tip, ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(id)).unwrap() as u32;
+    let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).abs() < 1e-6 && (a[1] - b[1]).abs() < 1e-6;
+    assert!(built.geometry.lines.iter().any(|l| l.pick == pick && l.points.len() == 2 && near(l.points[0], w1) && near(l.points[1], tip)), "the line runs on to the tip");
+}
+
+/// A geometric tolerance's leader on a model point (live request 1625):
+/// the point lost, only the leader turns red, the frame stays black.
+#[test]
+fn gdt_leader_to_a_lost_point_turns_red() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let view = ViewId(1);
+    let snap = built.placements.iter().find(|p| p.id == view).and_then(|_| {
+        let g = compute_view(&drawing, &drawing.sheets[0], view, &sources, &cache, false);
+        g.snaps.iter().find_map(|s| s.point.clone().map(|r| (s.p, r)))
+    });
+    let (p, r) = snap.expect("a snap point with a reference");
+    let id = drawing.sheets[0].next_annotation_id();
+    let leader = Leader { view: Some(view), point: p, ..Default::default() };
+    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: [40.0, 40.0], frame: vec!["⌖".into(), "0.1".into()], leaders: vec![leader], extra: Default::default() }, position: [40.0, 40.0], refs: vec![AnnotationRef { slot: 100, point: r.clone() }], ..Default::default() });
+    let red = |built: &super::build::BuiltSheet| built.geometry.colors.iter().any(|c| c.rgb == [0xdd, 0x52, 0x28]);
+    let ok = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(ok.lost.is_empty() && !red(&ok), "{:?}", ok.lost);
+    // A reference to a body that isn't there: lost.
+    let mut gone = r;
+    let (PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. }) = &mut gone;
+    body.index += 1000;
+    drawing.sheets[0].annotations.last_mut().unwrap().refs = vec![AnnotationRef { slot: 100, point: gone }];
+    let bad = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert_eq!(bad.lost, vec![(id, 100)]);
+    assert!(red(&bad) && !bad.dangling.contains(&id), "only the leader is red");
+}
+
 #[test]
 fn datum_on_dimension_arrow_hides_it() {
     let (doc, mut drawing) = demo();
@@ -3663,7 +3716,7 @@ fn a_surface_finish_on_an_edge_turns_and_flips() {
     };
     // A vertical edge at view x = 0.01.
     let on = Some((view, [0.01, 0.0], [0.0, 1.0], false));
-    drawing.sheets[0].annotations.push(Annotation { id: 990, kind: AnnotationKind::SurfaceFinish { anchor: [0.0; 2], value: "Ra 0.8".into(), leaders: Vec::new(), on, spec: Default::default() }, ..Default::default() });
+    drawing.sheets[0].annotations.push(Annotation { id: 990, kind: AnnotationKind::SurfaceFinish { anchor: [0.0; 2], value: "Ra 0.8".into(), leaders: Vec::new(), on, spec: Default::default(), ext: None }, ..Default::default() });
     let (pos, angle, p) = text_of(&drawing);
     assert!((angle.abs() - std::f64::consts::FRAC_PI_2).abs() < 1e-9, "turned square to the edge: {angle}");
     if let AnnotationKind::SurfaceFinish { on: Some(o), .. } = &mut drawing.sheets[0].annotations.last_mut().unwrap().kind {

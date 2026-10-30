@@ -1597,8 +1597,15 @@ fn gdt(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if let Some(v) = a.get("anchor") {
         use noshape_scene::drawing_tools::annotation_edit as ae;
         let p = point_value(v, "anchor")?;
-        let leader = ae::leader_to(&t.m.pick(&Tool::GdtLeader { id }, &[], p), p);
+        let tool = Tool::GdtLeader { id };
+        let pk = t.m.pick(&tool, &[], p);
+        let leader = ae::leader_to(&pk, p);
+        // On a model point: associative (a lost point turns the leader red).
+        let r = pk.snap_at(p).and_then(|s| s.r);
         ae::add_leader(&mut t.d.sheets[sheet], id, leader, start);
+        if let (Some(r), Some(a)) = (r, t.d.sheets[sheet].annotations.iter_mut().find(|a| a.id == id)) {
+            a.refs.push(noshape_model::drawing::AnnotationRef { slot: 100, point: r });
+        }
     }
     done(od, t, "Geometric tolerance", "annotation", id)
 }
@@ -1615,10 +1622,13 @@ fn surface_finish(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     };
     let p = pt_arg(a, "position")?;
     let pk = t.m.pick_snapping(&Tool::SurfaceFinish, &[], p, false);
-    let on = pk.surface_finish_on_dimension(p).or_else(|| pk.surface_finish_on(p));
+    let on_dim = pk.surface_finish_on_dimension(p);
+    let ext = on_dim.and_then(|_| pk.hovered_dim_on(p));
+    let on = on_dim.or_else(|| pk.surface_finish_on(p));
     let mut sf = dt::surface_finish(id, p, value, spec);
-    if let noshape_model::drawing::AnnotationKind::SurfaceFinish { on: o, .. } = &mut sf.kind {
+    if let noshape_model::drawing::AnnotationKind::SurfaceFinish { on: o, ext: e, .. } = &mut sf.kind {
         *o = on;
+        *e = ext;
     }
     t.d.sheets[sheet].annotations.push(sf);
     done(od, t, "Surface finish", "annotation", id)
