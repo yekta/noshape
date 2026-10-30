@@ -387,18 +387,25 @@ pub fn measure_shapes(shapes: &[Vec<Shape>]) -> Vec<(String, Measurement)> {
                     }
                 },
                 ShapeType::Face => {
-                    // Live: Diameter | Area | Radius (cylinder); Area.
+                    // Live: Diameter | Area | Radius (cylinder); Area. A
+                    // partial cylinder (a sheet metal bend's quarter) reads
+                    // its Radius first (live request 1622 b-9: "Radius:
+                    // 2.000 mm"; MEASURE-PARTIAL-CYL-RADIUS).
                     let round = match s.face_surface() {
                         Ok(k::Surface::Cylinder { radius, .. }) | Ok(k::Surface::Sphere { radius, .. }) => Some(radius),
                         _ => None,
                     };
-                    if let Some(r) = round {
+                    let partial = matches!(s.face_surface(), Ok(k::Surface::Cylinder { .. })) && s.uv_bounds().is_ok_and(|[u0, u1, _, _]| u1 - u0 < std::f64::consts::TAU - 1e-6);
+                    if let Some(r) = round.filter(|_| partial) {
+                        out.push(("Radius".into(), Measurement::Radius(r)));
+                    }
+                    if let Some(r) = round.filter(|_| !partial) {
                         out.push(("Diameter".into(), Measurement::Diameter(r * 2.0)));
                     }
                     if let Ok(a) = s.area() {
                         out.push(("Area".into(), Measurement::Area(a)));
                     }
-                    if let Some(r) = round {
+                    if let Some(r) = round.filter(|_| !partial) {
                         out.push(("Radius".into(), Measurement::Radius(r)));
                     }
                 }
@@ -925,5 +932,10 @@ mod tests {
         let one = measure_shapes(&[vec![a]]);
         let labels: Vec<&str> = one.iter().map(|(l, _)| l.as_str()).collect();
         assert_eq!(labels, ["Diameter", "Area", "Radius"]);
+        // A quarter cylinder (a sheet metal bend face) reads its Radius (live 1622 b-9).
+        let quarter = k::make_cylinder(&k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 0.002, 0.02, std::f64::consts::FRAC_PI_2).unwrap();
+        let rows = measure_shapes(&[vec![wall(&quarter)]]);
+        let labels: Vec<&str> = rows.iter().map(|(l, _)| l.as_str()).collect();
+        assert!(labels == ["Radius", "Area"] && matches!(rows[0].1, Measurement::Radius(r) if (r - 0.002).abs() < 1e-12), "{labels:?}");
     }
 }
