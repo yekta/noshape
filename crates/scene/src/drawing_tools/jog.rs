@@ -246,6 +246,7 @@ impl SheetPick<'_> {
         }
         let Some(pl) = a.kind.view().and_then(|v| self.placement(v)) else { return Vec::new() };
         match &a.kind {
+            AnnotationKind::Centermark { center, .. } => vec![(0, pl.to_sheet(*center))],
             AnnotationKind::RadialDimension { center, radius, angle, .. } => {
                 let (c, r) = (pl.to_sheet(*center), pl.len_to_sheet(*radius));
                 vec![(0, [c[0] + r * angle.cos(), c[1] + r * angle.sin()])]
@@ -262,6 +263,20 @@ impl SheetPick<'_> {
     /// its grip points to another edge, point or center re-attaches that end").
     pub fn reattached(&self, orig: &Annotation, k: usize) -> Annotation {
         let mut a = orig.clone();
+        // A centermark's center onto a circle: that circle's mark (help
+        // D40: a dangling one is fixed by its red grip).
+        if let AnnotationKind::Centermark { view, center, size, .. } = &mut a.kind {
+            if let Some(super::Pick::Circle { view: v, center: c, radius: r, r: rf }) = self.circle_pick(self.cursor)
+                && v == *view
+            {
+                (*center, *size) = (c, r * 1.25);
+                a.refs.retain(|x| x.slot != 0);
+                if let Some(point) = rf {
+                    a.refs.push(noshape_model::drawing::AnnotationRef { slot: 0, point });
+                }
+            }
+            return a;
+        }
         // A radial onto another circle: its center and radius.
         if let AnnotationKind::RadialDimension { view, center, radius, .. } = &mut a.kind {
             if let Some(super::Pick::Circle { view: v, center: c, radius: r, r: rf }) = self.circle_pick(self.cursor)
