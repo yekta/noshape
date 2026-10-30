@@ -544,6 +544,28 @@ kept in order (the first error in order still wins). NOSHAPE_PERF logs extrude's
 Phase 1 stopped at patch 0004 (the remaining steps are 10-40 s each, listed above); CI run 40718671419 built OCCT
 with 0003b and 0004 on Linux, macOS and Windows.
 
+## noshape's own blends (BLEND-RUST, lead 10-30 20:50)
+- crates/brep/src/blend.rs `blend(body, edges, tol)`: recognises chains, checks clearances (edge boxes, then
+  sampled distances), builds the result body with origins and history (Output, like the Boolean's). Step 1 takes
+  closed tangent chains (whole loops of a planar face P) of lines and arcs whose walls are planes / cylinders square
+  to P: each edge's blend face (cylinder, torus, plane, cone) between P's loop moved into P and the walls' edges
+  moved along them; the edges down the walls shortened. Frames as OCCT's (a chamfer cone at the wall's circle).
+- crates/kernel/cpp/rust_blend.cpp: cached flat body → brep_blend (FFI, panics caught) → shapes: input entities
+  kept, pieces of input lines on their curves with the input's curves on their faces, new lines / arcs; curves on
+  blend faces are iso-lines at unit speed checked at 17 samples, each loop ordered by connectivity and shifted by
+  whole periods onto its neighbours (the body's loops may list uses in any order; a REVERSED face's TShape wire
+  runs them the other way), a new face's angles from 0 as OCCT's. History as OCCT's fillet builder gives it through
+  BRepTools_History: faces Modified / Generated from the blended edge, shortened edges Modified, the solid
+  Modified, every other input edge and vertex removed (OCCT's quirk). No BRepCheck in production
+  (NOSHAPE_BLEND_CHECK=1: 100 ms of the 100-hole plate); the corpus replay checks every result's validity.
+- Corpus: NOSHAPE_RECORD_BLENDS=<dir> (kernel blend_corpus.rs; records the working scale), 310 cases in
+  /root/core-scratch/blend-corpus (kernel + model tests, T1 and the oracle T2s). Replay:
+  `NOSHAPE_BLEND_RUST=1 cargo test -p noshape-kernel --test all blend_replay::blend_corpus_replay -- --ignored
+  --nocapture` (paths per decline reason; NOSHAPE_BLEND_LIST=<reason> lists cases); one case both ways with
+  timings and its history diff: NOSHAPE_BLEND_CASE=<name> blend_replay::blend_case_diff (NOSHAPE_BLEND_FACES=1/2).
+- Declines left in the corpus (10-30 22:00): edges not in a whole loop 174, corners between blended edges 70,
+  not tried 21 (variable radius, distance-angle), edges in two chains 9, walls not square 6.
+
 ## Next, in order
 (lead 10-29: big structural wins, land small and often, stop when returns flatten.)
 0. (10-30 20:12) MEM-RUNAWAY-508 landed (2feeebcb, a7023995); the 0007w / 0008 libs are in /root/occt here since 19:10

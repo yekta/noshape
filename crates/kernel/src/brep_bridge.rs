@@ -336,6 +336,12 @@ pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: b
         }
     };
     brep_decline("");
+    fill_result(r, out);
+    true
+}
+
+/// `r` for the C++ side.
+fn fill_result(r: noshape_brep::Output, out: &mut BrepResult) {
     flat(&r.body, &mut out.body);
     out.vertex_origin = origins(&r.vertex_origin);
     out.edge_origin = origins(&r.edge_origin);
@@ -370,7 +376,67 @@ pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: b
             [kind(h.kind), h.arg, h.index, rel, kind(h.out_kind), h.out]
         })
         .collect();
-    true
+}
+
+
+thread_local! {
+    /// This thread's switch for noshape's own blends: None as NOSHAPE_BLEND_RUST says.
+    static BLEND_MODE: Cell<Option<bool>> = const { Cell::new(None) };
+}
+
+/// Turns noshape's own fillets and chamfers on or off for this thread (`None`: as NOSHAPE_BLEND_RUST says, off
+/// unless 1 while they're new); the blend corpus replay compares them with OCCT's.
+pub fn set_rust_blend(on: Option<bool>) {
+    BLEND_MODE.with(|m| m.set(on));
+}
+
+pub(crate) fn brep_blend_enabled() -> bool {
+    static ENV: OnceLock<bool> = OnceLock::new();
+    BLEND_MODE.with(|m| m.get()).unwrap_or_else(|| *ENV.get_or_init(|| std::env::var("NOSHAPE_BLEND_RUST").as_deref() == Ok("1")))
+}
+
+/// noshape's own fillet / chamfer of `body` (crates/brep blend): per edge 5 numbers in `spec` (edge, kind 0
+/// fillet / 1 chamfer, its first distance (the radius), its second, the chamfer's reference face). False (and
+/// `brep_last_decline` says why) when it declines.
+pub(crate) fn brep_blend(body: &BrepBody, spec: &[f64], tol: f64, out: &mut BrepResult) -> bool {
+    use noshape_brep::blend::{blend, BlendEdge, Spec};
+    let edges: Vec<BlendEdge> = spec
+        .chunks(5)
+        .map(|c| BlendEdge {
+            edge: c[0] as u32,
+            spec: if c[1] == 0.0 { Spec::Fillet { radius: c[2] } } else { Spec::Chamfer { d1: c[2], d2: c[3] } },
+            reference: c[4] as u32,
+        })
+        .collect();
+    // (A panic here would abort the process from inside the C++ call: a decline instead.)
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| blend(&body_of(body), &edges, tol))).unwrap_or(Err(Decline("noshape's blend panicked")));
+    LAST_BLEND.with(|c| *c.borrow_mut() = r.as_ref().err().map_or(String::new(), |d| d.0.to_string()));
+    match r {
+        Ok(r) => {
+            brep_decline("");
+            fill_result(r, out);
+            true
+        }
+        Err(d) => {
+            brep_decline(d.0);
+            false
+        }
+    }
+}
+
+thread_local! {
+    static LAST_BLEND: RefCell<String> = const { RefCell::new(String::new()) };
+}
+
+/// Why this thread's last blend didn't go noshape's way: "" when noshape's own blend made it (its result may
+/// still have been declined by the C++ side: `last_rust_decline`), else the reason.
+pub fn last_blend_decline() -> String {
+    LAST_BLEND.with(|c| c.borrow().clone())
+}
+
+/// Marks this thread's next blend as not tried yet.
+pub fn reset_blend_decline() {
+    LAST_BLEND.with(|c| *c.borrow_mut() = "not tried".to_string());
 }
 
 pub(crate) fn brep_recording() -> bool {

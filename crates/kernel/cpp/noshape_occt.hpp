@@ -762,6 +762,7 @@ OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
               rust::Slice<const double> start_points, rust::Slice<const double> conditions, const OcShape& path,
               int32_t path_count);
 void  set_working_scale(double k);
+double working_scale();
 // Raises a signal inside a bridge call (tests of the crash guard): 0 SIGSEGV, 1 SIGFPE,
 // 2 std::terminate, 3 a loop under a 0.3 s budget (Linux).
 void  crash_inside_kernel(uint8_t kind);

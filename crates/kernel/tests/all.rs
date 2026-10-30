@@ -3,6 +3,7 @@
 
 mod bbox;
 mod blend;
+mod blend_replay;
 mod bool_patterns;
 mod bool_replay;
 mod boolean_groups;
@@ -21,8 +22,8 @@ mod instances;
 mod mesh_import;
 mod perf;
 mod planar_mesh;
-mod rust_mesh;
 mod projection;
+mod rust_mesh;
 mod seam;
 mod shell;
 mod surfacing;

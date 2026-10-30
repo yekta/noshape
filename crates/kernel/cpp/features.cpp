@@ -3557,6 +3557,16 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     rs.push_back(r);
     rmax = std::max(rmax, r);
   }
+  // noshape's own (NOSHAPE_BLEND_RUST=1), where it builds the blend exactly.
+  {
+    std::vector<std::array<double, 3>> sp;
+    for (double r : rs)
+      sp.push_back({0, r, r});
+    TopoDS_Shape r;
+    HHist        h;
+    if (rust_blend(s, es, sp, {}, r, h))
+      return make_result({s.shape}, r, h.get());
+  }
   // One square corner edge: built directly.
   if (checked && es.size() == 1)
   {
@@ -4211,6 +4221,21 @@ static OpOut op_chamfer_unbudgeted(const OcShape& s, const OcShapeList& edges, c
       return true;
     };
   };
+  // noshape's own (NOSHAPE_BLEND_RUST=1), where it builds the blend exactly.
+  if (mode != 2)
+  {
+    std::vector<std::array<double, 3>> sp;
+    std::vector<TopoDS_Shape>          refs;
+    for (size_t i = 0; i < es.size(); ++i)
+    {
+      sp.push_back({1, d1, mode == 0 ? d1 : d2});
+      refs.push_back(fs[i]);
+    }
+    TopoDS_Shape r;
+    HHist        h;
+    if (rust_blend(s, es, sp, refs, r, h))
+      return make_result({s.shape}, r, h.get());
+  }
   // A chamfer into the corner where two fillets meet: Parasolid's blend
   // patch (OCCT's retries "succeed" there with a different solid).
   if (checked && mode == 0)

@@ -187,6 +187,12 @@ std::string rust_last_decline();
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
                   double fuzzy = 0, bool touching_only = false);
+// `s` as a flat body (its maps' indices the body's), from its cache; why not, or null.
+const char* brep_body_cached(const OcShape& s, BrepBody& b, double& max_tol);
+// noshape's own fillet / chamfer (rust_blend.cpp, NOSHAPE_BLEND_RUST=1): `es` with per edge (kind 0 fillet / 1
+// chamfer, d1 (the radius), d2) and a chamfer's reference face (`refs`, may be null); false when it declines.
+bool rust_blend(const OcShape& s, const std::vector<TopoDS_Edge>& es, const std::vector<std::array<double, 3>>& spec,
+                const std::vector<TopoDS_Shape>& refs, TopoDS_Shape& result, occ::handle<BRepTools_History>& hist);
 // Keeps this thread's last result's flat body on `out` (its OcShape), for the next Boolean on it.
 void rust_boolean_keep(const OcShape& out);
 // Where in this thread's last result a unify has to look, its target (`target`) having had nothing to merge

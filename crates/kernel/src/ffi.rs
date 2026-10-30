@@ -398,6 +398,8 @@ pub(crate) mod ffi {
         /// `touching_only`: declines unless the arguments only touch (a pattern's checked glue).
         fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: bool, out: &mut BrepResult) -> bool;
         /// Notes why the C++ side declined (for `last_rust_decline`).
+        fn brep_blend(body: &BrepBody, spec: &[f64], tol: f64, out: &mut BrepResult) -> bool;
+        fn brep_blend_enabled() -> bool;
         fn brep_decline(reason: &str);
         /// Why this thread's last call of noshape's own Boolean declined ("" when it didn't).
         fn brep_last_decline() -> String;
@@ -581,6 +583,7 @@ pub(crate) mod ffi {
             path_count: i32,
         ) -> Result<OpOut>;
         fn set_working_scale(k: f64) -> Result<()>;
+        fn working_scale() -> f64;
         fn crash_inside_kernel(kind: u8) -> Result<()>;
         fn op_thicken(s: &OcShape, t1: f64, t2: f64) -> Result<OpOut>;
         fn op_shell(solid: &OcShape, faces: &OcShapeList, thickness: f64, join: u8)
@@ -781,7 +784,7 @@ pub(crate) mod ffi {
 }
 
 use crate::mesh_bridge::{brep_mesh, brep_mesh_on};
-use crate::brep_bridge::{brep_boolean, brep_decline, brep_enabled, brep_last_decline, brep_record_direct, brep_recording, brep_strict};
+use crate::brep_bridge::{brep_blend, brep_blend_enabled, brep_boolean, brep_decline, brep_enabled, brep_last_decline, brep_record_direct, brep_recording, brep_strict};
 
 // SAFETY: OcShape wraps an immutable TopoDS_Shape (handles with atomic
 // reference counts); its lazily-built maps are guarded by std::call_once.

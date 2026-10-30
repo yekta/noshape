@@ -391,6 +391,11 @@ pub fn set_working_scale(k: f64) -> Result<()> {
     Ok(ffi::set_working_scale(k)?)
 }
 
+/// The working scale [`set_working_scale`] set.
+pub fn working_scale() -> f64 {
+    ffi::working_scale()
+}
+
 /// Raises SIGSEGV (`kind` 0), SIGFPE (1), std::terminate (2) or a never-ending loop under a
 /// 0.3 s budget (3, Linux); 4: allocations under short budgets; 5: a short budget over an OCCT
 /// thread pool loop (Linux) inside a kernel call: the crash
@@ -402,17 +407,19 @@ pub fn crash_inside_kernel(kind: u8) -> Result<()> {
 
 // ---------------------------------------------------------------- fillet / chamfer
 
+use crate::blend_corpus::Blend;
+
 /// Constant-radius fillet of `edges`. History: each filleted edge `Generated`
 /// its blend face(s); adjacent faces are `Modified`.
 pub fn fillet(shape: &Shape, edges: &[Shape], radius: f64) -> Result<OpResult> {
     let l = vec_to_list(edges);
-    op(ffi::op_fillet(shape.raw(), &l, &[radius], false))
+    recorded(|| Blend::Fillet { radii: vec![radius] }, false, shape, edges, &[], || op(ffi::op_fillet(shape.raw(), &l, &[radius], false)))
 }
 
 /// Fillet with one radius per edge.
 pub fn fillet_radii(shape: &Shape, edges: &[Shape], radii: &[f64]) -> Result<OpResult> {
     let l = vec_to_list(edges);
-    op(ffi::op_fillet(shape.raw(), &l, radii, false))
+    recorded(|| Blend::Fillet { radii: radii.to_vec() }, false, shape, edges, &[], || op(ffi::op_fillet(shape.raw(), &l, radii, false)))
 }
 
 /// [`fillet_radii`] that always gives a valid solid (or fails): blends that
@@ -422,7 +429,7 @@ pub fn fillet_radii(shape: &Shape, edges: &[Shape], radii: &[f64]) -> Result<OpR
 /// every edge.
 pub fn fillet_checked(shape: &Shape, edges: &[Shape], radii: &[f64]) -> Result<OpResult> {
     let l = vec_to_list(edges);
-    op(ffi::op_fillet(shape.raw(), &l, radii, true))
+    recorded(|| Blend::Fillet { radii: radii.to_vec() }, true, shape, edges, &[], || op(ffi::op_fillet(shape.raw(), &l, radii, true)))
 }
 
 /// Variable-radius fillet of one edge: `(relative parameter in [0, 1],
@@ -430,14 +437,14 @@ pub fn fillet_checked(shape: &Shape, edges: &[Shape], radii: &[f64]) -> Result<O
 pub fn fillet_variable(shape: &Shape, edge: &Shape, law: &[(f64, f64)]) -> Result<OpResult> {
     let params: Vec<f64> = law.iter().map(|p| p.0).collect();
     let radii: Vec<f64> = law.iter().map(|p| p.1).collect();
-    op(ffi::op_fillet_variable(shape.raw(), edge.raw(), &params, &radii, false))
+    recorded(|| Blend::FilletVariable { law: law.to_vec() }, false, shape, std::slice::from_ref(edge), &[], || op(ffi::op_fillet_variable(shape.raw(), edge.raw(), &params, &radii, false)))
 }
 
 /// [`fillet_variable`] with [`fillet_checked`]'s guarantees.
 pub fn fillet_variable_checked(shape: &Shape, edge: &Shape, law: &[(f64, f64)]) -> Result<OpResult> {
     let params: Vec<f64> = law.iter().map(|p| p.0).collect();
     let radii: Vec<f64> = law.iter().map(|p| p.1).collect();
-    op(ffi::op_fillet_variable(shape.raw(), edge.raw(), &params, &radii, true))
+    recorded(|| Blend::FilletVariable { law: law.to_vec() }, true, shape, std::slice::from_ref(edge), &[], || op(ffi::op_fillet_variable(shape.raw(), edge.raw(), &params, &radii, true)))
 }
 
 /// Chamfer specification.
@@ -473,7 +480,15 @@ fn chamfer_impl(shape: &Shape, edges: &[Shape], spec: ChamferSpec, reference_fac
     };
     let le = vec_to_list(edges);
     let lf = vec_to_list(reference_faces);
-    op(ffi::op_chamfer(shape.raw(), &le, &lf, mode, d1, d2, checked))
+    recorded(|| Blend::Chamfer(spec), checked, shape, edges, reference_faces, || op(ffi::op_chamfer(shape.raw(), &le, &lf, mode, d1, d2, checked)))
+}
+
+/// `run`, recorded in the blend corpus when recording (NOSHAPE_RECORD_BLENDS).
+fn recorded(blend: impl FnOnce() -> Blend, checked: bool, shape: &Shape, edges: &[Shape], faces: &[Shape], run: impl FnOnce() -> Result<OpResult>) -> Result<OpResult> {
+    match crate::blend_corpus::recording() {
+        Some(dir) => crate::blend_corpus::record(&dir, blend(), checked, shape, edges, faces, run),
+        None => run(),
+    }
 }
 
 // ---------------------------------------------------------------- draft / direct edit

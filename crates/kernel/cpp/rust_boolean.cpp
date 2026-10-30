@@ -1983,4 +1983,6 @@ bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bo
   return true;
 }
 
+const char* brep_body_cached(const OcShape& s, BrepBody& b, double& max_tol) { return cached_body(s, b, max_tol); }
+
 } // namespace noshape

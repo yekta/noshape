@@ -13,6 +13,8 @@
 //! it) is ambiguous, and the Boolean declines rather than guess.
 
 mod arrange;
+/// noshape's own fillets and chamfers where the blend surface is an elementary one.
+pub mod blend;
 mod boolean;
 mod curve2;
 mod fxhash;

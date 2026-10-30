@@ -293,3 +293,40 @@ fn a_square_corner_fillet_built_directly() {
     let generated = r.history.generated(0, ShapeType::Edge, edge_index);
     assert!(generated.iter().any(|(k, _)| *k == ShapeType::Face), "{generated:?}");
 }
+
+
+/// noshape's own blends (crates/brep blend.rs) against OCCT's on whole loops of a plate's top: a hole's rim
+/// (convex), a boss's top rim (convex) and its base (concave), filleted and chamfered: the same faces, edges,
+/// vertices, volume (1e-9) and history, and noshape's way taken.
+#[test]
+fn rust_blends_of_rims_are_occts() {
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(60.0, 30.0, 10.0)).unwrap();
+    let hole = make_cylinder(&Plane::new(DVec3::new(15.0, 15.0, -1.0), DVec3::Z, DVec3::X), 5.0, 12.0, std::f64::consts::TAU).unwrap();
+    let boss = make_cylinder(&Plane::new(DVec3::new(42.0, 15.0, 10.0), DVec3::Z, DVec3::X), 6.0, 8.0, std::f64::consts::TAU).unwrap();
+    let part = fuse(&cut(&plate, &hole).unwrap().shape, &boss).unwrap().shape;
+    let circle_at = |s: &Shape, x: f64, z: f64| -> Vec<Shape> {
+        s.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, Curve::Circle { center, .. } if (center.x - x).abs() < 1e-9 && (center.z - z).abs() < 1e-9))).collect()
+    };
+    for (what, x, z) in [("hole rim", 15.0, 10.0), ("boss top", 42.0, 18.0), ("boss base", 42.0, 10.0)] {
+        let edges = circle_at(&part, x, z);
+        assert_eq!(edges.len(), 1, "{what}");
+        for spec in ["fillet", "chamfer", "chamfer 2"] {
+            let run = || match spec {
+                "fillet" => fillet(&part, &edges, 2.0),
+                "chamfer" => chamfer(&part, &edges, ChamferSpec::Equal(1.5), &[]),
+                _ => chamfer(&part, &edges, ChamferSpec::TwoDistances(1.0, 2.0), &[]),
+            };
+            set_rust_blend(Some(false));
+            let occt = run().unwrap();
+            set_rust_blend(Some(true));
+            reset_blend_decline();
+            let ours = run();
+            set_rust_blend(None);
+            let why = last_blend_decline();
+            let ours = ours.unwrap();
+            assert_eq!(why, "", "{what} {spec}: declined");
+            let d = bool_corpus::Summary::of(&ours).differences(&bool_corpus::Summary::of(&occt));
+            assert!(d.is_empty(), "{what} {spec}: {}", d.join(", "));
+        }
+    }
+}
