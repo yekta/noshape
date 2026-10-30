@@ -1291,14 +1291,33 @@ impl DrawingEditor {
             let orig = self.current_sheet().view(view)?.aux_ref.clone()?;
             return Some(Drag::AuxIndicator { view, grip, orig });
         }
+        // A selected table's grips, wherever the pick lands (live 1607 (b)):
+        // the resize midpoints, then the corners (a move).
+        let tol = self.tol_mm(9.0);
+        for s in &self.selection {
+            let Sel::Table(id) = *s else { continue };
+            let (Some(t), Some(l)) = (self.current_sheet().table(id).cloned(), self.built.as_ref().and_then(|b| b.table_layout(id)).cloned()) else { continue };
+            if let Some(axis) = l.resize_grips(t.corner).iter().position(|g| len(sub(start, *g)) < tol) {
+                let widths: Vec<f64> = l.xs.windows(2).map(|w| w[1] - w[0]).collect();
+                let size = [l.max()[0] - l.min()[0], l.max()[1] - l.min()[1]];
+                return Some(Drag::ResizeTable { id, start, orig: t, size, widths, axis });
+            }
+            if l.corners().iter().any(|g| len(sub(start, *g)) < tol) {
+                return Some(Drag::MoveTable { id, start, orig: t.position });
+            }
+        }
         let target = self.built.as_ref()?.picks.get(pick? as usize)?.clone();
         let sheet = self.drawing.sheets.get(self.sheet)?;
         match target {
             PickTarget::Table(id) => {
                 let t = sheet.table(id)?.clone();
                 let l = self.built.as_ref()?.table_layout(id)?.clone();
+                // A selected table's grips (live 1607 (b)): the edge midpoints
+                // away from the fixed corner resize, the corners move it.
+                let tol = self.tol_mm(9.0);
+                let mid = if self.selection.contains(&Sel::Table(id)) { l.resize_grips(t.corner).iter().position(|g| len(sub(start, *g)) < tol) } else { None };
+                let near_grip = mid.is_some() || l.corners().iter().any(|g| len(sub(start, *g)) < tol);
                 // A selected table: dragging a divider resizes its cells.
-                let near_grip = len(sub(start, l.free_corner(t.corner))) < self.tol_mm(9.0);
                 // Inside a cell (away from its lines): drag-select cells; the
                 // lines and grips move or resize the table.
                 if !near_grip && l.cell_at(start).is_some() && !self.on_table_line(&l, start) {
@@ -1314,11 +1333,10 @@ impl DrawingEditor {
                     return Some(Drag::TableDivider { id, col, row, start, widths, heights });
                 }
                 self.selection = vec![Sel::Table(id)];
-                let grip = l.free_corner(t.corner);
-                if len(sub(start, grip)) < self.tol_mm(9.0) {
+                if let Some(axis) = mid {
                     let widths: Vec<f64> = l.xs.windows(2).map(|w| w[1] - w[0]).collect();
                     let size = [l.max()[0] - l.min()[0], l.max()[1] - l.min()[1]];
-                    Some(Drag::ResizeTable { id, start, orig: t, size, widths })
+                    Some(Drag::ResizeTable { id, start, orig: t, size, widths, axis })
                 } else {
                     Some(Drag::MoveTable { id, start, orig: t.position })
                 }
@@ -1376,6 +1394,65 @@ impl DrawingEditor {
         // Row boundaries below the title row.
         let row = l.ys.iter().enumerate().skip(t0 + 1).find(|(_, y)| (p[1] - **y).abs() < tol && inside_x).map(|(i, _)| i - t0);
         (col.is_some() || row.is_some()).then_some((col, row))
+    }
+
+    /// A selected table's grips (live 1607 (b)): round on the corners (the
+    /// fixed one black), square on the two resize midpoints; while a corner
+    /// sits on the frame's corner, the red snap square with a "+".
+    pub fn table_grip_overlay(&self, o: &mut crate::drawing_scene::Overlay) {
+        if !matches!(self.tool, Tool::Select) {
+            return;
+        }
+        let Some(b) = self.built.as_ref() else { return };
+        let k = 1.0 / self.zoom.max(1e-6);
+        const TAN: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
+        for s in &self.selection {
+            let Sel::Table(id) = s else { continue };
+            let (Some(t), Some(l)) = (self.current_sheet().table(*id), b.table_layout(*id)) else { continue };
+            let fixed = l.fixed_corner(t.corner);
+            for c in l.corners() {
+                o.dots.push((c, if c == fixed { [0, 0, 0, 255] } else { TAN }));
+            }
+            for g in l.resize_grips(t.corner) {
+                let h = 3.5 * k;
+                o.tinted.push((vec![[g[0] - h, g[1]], [g[0] + h, g[1]]], TAN, 7.0));
+            }
+        }
+        if let Drag::MoveTable { id, .. } = &self.drag
+            && let Some(l) = b.table_layout(*id)
+        {
+            let [x0, y0, x1, y1] = self.current_sheet().size.frame_rect();
+            for f in [[x0, y1], [x1, y1], [x0, y0], [x1, y0]] {
+                if l.corners().iter().any(|c| len(sub(*c, f)) < 1e-6) {
+                    let h = 5.0 * k;
+                    const RED: [u8; 4] = [0xdc, 0x28, 0x28, 255];
+                    o.tinted.push((vec![[f[0] - h, f[1] - h], [f[0] + h, f[1] - h], [f[0] + h, f[1] + h], [f[0] - h, f[1] + h], [f[0] - h, f[1] - h]], RED, 1.5));
+                    o.tinted.push((vec![[f[0] - h, f[1]], [f[0] + h, f[1]]], RED, 1.5));
+                    o.tinted.push((vec![[f[0], f[1] - h], [f[0], f[1] + h]], RED, 1.5));
+                }
+            }
+        }
+    }
+
+    /// Double-click on a selected table's resize grip (live 1607 (b)): the
+    /// columns (or rows) fit their content, the fixed corner stays.
+    pub fn fit_table_grip(&mut self, id: u64, cx: &mut Context<Self>) -> bool {
+        let Some(l) = self.built.as_ref().and_then(|b| b.table_layout(id)).cloned() else { return false };
+        let Some(t) = self.current_sheet().table(id).cloned() else { return false };
+        let tol = self.tol_mm(9.0);
+        let Some(axis) = l.resize_grips(t.corner).iter().position(|g| len(sub(self.cursor, *g)) < tol) else { return false };
+        let data = noshape_model::drawing::tables::table_data_with(&self.drawing, &t, None, None, None, &self.info, &|s| s.to_string());
+        let auto = noshape_model::drawing::tables::auto_widths(&t, &data);
+        self.edit_table(id, "Fit to content", cx, |t| {
+            if axis == 0 {
+                t.col_widths = auto;
+            } else {
+                t.row_heights.clear();
+                // A new table's rows for its text (7 mm at 3 mm).
+                t.row_height = t.text_height * 7.0 / 3.0;
+            }
+        });
+        true
     }
 
     /// Double-click on a table divider: fit that column (or row) to its text.
@@ -1443,8 +1520,22 @@ impl DrawingEditor {
             }
             Drag::SelectCells { .. } => {}
             Drag::MoveTable { id, start, orig } => {
+                let mut pos = add(*orig, sub(c, *start));
+                // A corner near the sheet frame's corner snaps onto it (live
+                // 1607 (b)).
+                if let Some(l) = self.built.as_ref().and_then(|b| b.table_layout(*id))
+                    && let Some(t0) = self.current_sheet().table(*id)
+                {
+                    let d = sub(pos, t0.position);
+                    let [x0, y0, x1, y1] = self.current_sheet().size.frame_rect();
+                    let tol = self.tol_mm(10.0);
+                    let snap = l.corners().iter().flat_map(|k| [[x0, y1], [x1, y1], [x0, y0], [x1, y0]].map(|f| sub(f, add(*k, d)))).filter(|v| len(*v) < tol).min_by(|a, b| len(*a).total_cmp(&len(*b)));
+                    if let Some(v) = snap {
+                        pos = add(pos, v);
+                    }
+                }
                 if let Some(t) = sheet.table_mut(*id) {
-                    t.position = add(*orig, sub(c, *start));
+                    t.position = pos;
                 }
             }
             Drag::TableDivider { id, col, row, start, widths, heights } => {
@@ -1479,15 +1570,21 @@ impl DrawingEditor {
                     }
                 }
             }
-            Drag::ResizeTable { id, start, orig, size, widths } => {
+            Drag::ResizeTable { id, start, orig, size, widths, axis } => {
+                // One direction: every column (or row) scales by the same
+                // factor, the fixed corner stays (live 1607 (b)).
                 let d = sub(c, *start);
                 let sx = if matches!(orig.corner, TableCorner::TopLeft | TableCorner::BottomLeft) { 1.0 } else { -1.0 };
                 let sy = if matches!(orig.corner, TableCorner::TopLeft | TableCorner::TopRight) { -1.0 } else { 1.0 };
-                let kx = ((size[0] + d[0] * sx) / size[0]).max(0.3);
-                let ky = ((size[1] + d[1] * sy) / size[1]).max(0.5);
                 if let Some(t) = sheet.table_mut(*id) {
-                    t.col_widths = widths.iter().map(|w| w * kx).collect();
-                    t.row_height = (orig.row_height * ky).max(orig.text_height * 1.4);
+                    if *axis == 0 {
+                        let kx = ((size[0] + d[0] * sx) / size[0]).max(0.3);
+                        t.col_widths = widths.iter().map(|w| w * kx).collect();
+                    } else {
+                        let ky = ((size[1] + d[1] * sy) / size[1]).max(0.5);
+                        t.row_height = (orig.row_height * ky).max(orig.text_height * 1.4);
+                        t.row_heights = orig.row_heights.iter().map(|h| (h * ky).max(orig.text_height * 1.4)).collect();
+                    }
                 }
             }
             Drag::MoveSectionLine { view, start, orig } => {

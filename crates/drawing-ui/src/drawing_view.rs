@@ -1140,6 +1140,7 @@ impl DrawingEditor {
         self.note_grip_overlay(&mut overlay);
         self.leader_overlay(&mut overlay);
         self.detail_circle_overlay(&mut overlay);
+        self.table_grip_overlay(&mut overlay);
         // A lost reference: a red grip where it was (help D40; drag it onto
         // new geometry to re-attach).
         if let Some(b) = &self.built {

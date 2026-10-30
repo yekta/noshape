@@ -255,7 +255,8 @@ pub enum Drag {
     /// window box; what it wholly encloses is selected on release).
     SelectBox { start: [f64; 2] },
     /// Resize a table from its free corner (scales column widths and rows).
-    ResizeTable { id: u64, start: [f64; 2], orig: Table, size: [f64; 2], widths: Vec<f64> },
+    /// A resize grip: `axis` 0 the columns, 1 the rows (live 1607 (b)).
+    ResizeTable { id: u64, start: [f64; 2], orig: Table, size: [f64; 2], widths: Vec<f64>, axis: usize },
     /// A table divider: column boundary `col` or row boundary `row` (index
     /// into the layout's xs / ys), with the widths and heights at the start.
     TableDivider { id: u64, col: Option<usize>, row: Option<usize>, start: [f64; 2], widths: Vec<f64>, heights: Vec<f64> },

@@ -662,7 +662,32 @@ impl TableLayout {
         let (lo, hi) = (self.min(), self.max());
         p[0] >= lo[0] - margin && p[0] <= hi[0] + margin && p[1] >= lo[1] - margin && p[1] <= hi[1] + margin
     }
-    /// The corner opposite to the fixed one (the resize grip).
+    /// Its four corners: top left, top right, bottom left, bottom right
+    /// (live 1607 (b): round grips that move the table).
+    pub fn corners(&self) -> [[f64; 2]; 4] {
+        let (lo, hi) = (self.min(), self.max());
+        [[lo[0], hi[1]], [hi[0], hi[1]], [lo[0], lo[1]], [hi[0], lo[1]]]
+    }
+    /// The fixed corner (its grip drawn black).
+    pub fn fixed_corner(&self, corner: TableCorner) -> [f64; 2] {
+        let c = self.corners();
+        match corner {
+            TableCorner::TopLeft => c[0],
+            TableCorner::TopRight => c[1],
+            TableCorner::BottomLeft => c[2],
+            TableCorner::BottomRight => c[3],
+        }
+    }
+    /// The square resize grips (live 1607 (b)): the midpoints of the two
+    /// edges away from the fixed corner; [0] resizes the columns, [1] the
+    /// rows.
+    pub fn resize_grips(&self, corner: TableCorner) -> [[f64; 2]; 2] {
+        let (lo, hi) = (self.min(), self.max());
+        let x = if matches!(corner, TableCorner::TopLeft | TableCorner::BottomLeft) { hi[0] } else { lo[0] };
+        let y = if matches!(corner, TableCorner::TopLeft | TableCorner::TopRight) { lo[1] } else { hi[1] };
+        [[x, (lo[1] + hi[1]) / 2.0], [(lo[0] + hi[0]) / 2.0, y]]
+    }
+    /// The corner opposite to the fixed one.
     pub fn free_corner(&self, corner: TableCorner) -> [f64; 2] {
         let (lo, hi) = (self.min(), self.max());
         match corner {
@@ -946,6 +971,17 @@ impl CadTables for SheetGeometry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Live 1607 (b): the fixed corner (top right by default) and the
+    /// resize grips on the edges away from it.
+    #[test]
+    fn table_grips_follow_the_fixed_corner() {
+        let l = TableLayout { xs: vec![10.0, 30.0, 50.0], ys: vec![100.0, 93.0, 86.0], title: false };
+        assert_eq!(l.corners(), [[10.0, 100.0], [50.0, 100.0], [10.0, 86.0], [50.0, 86.0]]);
+        assert_eq!(l.fixed_corner(TableCorner::TopRight), [50.0, 100.0]);
+        assert_eq!(l.resize_grips(TableCorner::TopRight), [[10.0, 93.0], [30.0, 86.0]]);
+        assert_eq!(l.resize_grips(TableCorner::BottomLeft), [[50.0, 93.0], [30.0, 100.0]]);
+    }
 
     #[test]
     fn general_table_layout() {
