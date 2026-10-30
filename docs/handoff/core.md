@@ -556,7 +556,15 @@ with 0003b and 0004 on Linux, macOS and Windows.
    10-30 12:45: the slow common was OCCT in metres: the same common at the working scale (mm) takes 0.8 s, not 30
    (same volume to 1e-11). quick_boolean's OCCT fallback (the slabs, the blend fallbacks, draft wedges) now runs
    scaled (ScaledInputs, internal.hpp): hang402's Shell 3 builds in 3.4 s instead of failing at its 30 s budget;
-   Shell 5 still fails (its common 328 s in metres, not re-measured scaled). Perf documents unchanged (live-30,
+   Shell 5 still fails: 13:05 re-measured: its time is the slabs' fuse (85 slabs, 33 s scaled / 94 s in metres; tools
+   0.8 s), not the common. Three slabs cost it (each pair with a neighbour 2–7 s, 141 s over 627 pairs): the slabs of
+   0.054 mm² corner patches (rational 67×3 B-splines, a vertex blend of r ≈ 0.3 mm in an inner corner) offset by t =
+   5 mm fan out into 18 mm² offset faces with 323-pole ruled sides lying almost on the tangent neighbours' slab sides;
+   OCCT's edge / face checks against those (IntTools_BeanFaceIntersector, Extrema_GenExtPS) are the time. Next try:
+   one MakeThickSolidBySimple per tangent-connected chain of faces (no side faces between G1 neighbours), or analytic
+   fans for small blends as blend_sector does for collapsing ones. Dumped inputs: /root/core-scratch/hang402/dumps
+   (fuse85.brep: the slabs then the solid, metres). Probe: the G1 chain of one corner patch is 13 faces (planes, fillets,
+   the patches); MakeThickSolidBySimple of that shell builds in 0.02 s, valid (one sign): a redesign of by_slabs, not done. Perf documents unchanged (live-30,
    fins-400, big-plate). Scaling every OCCT Boolean of 9+ tools was 25 % slower over the corpus with 7 of 974
    changed: kept to cuts by 64+ tools and quick_boolean.
 3. Other `a.Plane().Axis().Direction()` readers of a face's normal in the kernel: features.cpp and shell.cpp
