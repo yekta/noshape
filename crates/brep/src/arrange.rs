@@ -103,6 +103,11 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         }
     }
     let cycle_curves: Vec<Vec<C2>> = cycles.iter().map(|c| curves_of(c)).collect();
+    // Each cycle's box (its curves' control points'; None where one has none): a point outside isn't inside.
+    let cycle_box: Vec<Option<(DVec2, DVec2)>> = cycle_curves
+        .iter()
+        .map(|cs| cs.iter().try_fold((DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY)), |(lo, hi), c| c.quick_box().map(|(a, b)| (lo.min(a), hi.max(b)))))
+        .collect();
     let mut members: Vec<Vec<usize>> = vec![Vec::new(); regions.len()];
     for (ci, c) in cycles.iter().enumerate() {
         if areas[ci] > 0.0 {
@@ -114,6 +119,9 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         let mut best: Option<usize> = None;
         for cj in 0..cycles.len() {
             if areas[cj] <= 0.0 || comp_of[cj] == comp_of[ci] || best.is_some_and(|b| areas[b] <= areas[cj]) {
+                continue;
+            }
+            if cycle_box[cj].is_some_and(|(lo, hi)| q.x < lo.x || q.y < lo.y || q.x > hi.x || q.y > hi.y) {
                 continue;
             }
             if inside(q, &cycle_curves[cj]) {
@@ -131,8 +139,10 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         r.dangling = hs.iter().any(|&h| members[ri].contains(&cycle_of[h ^ 1]));
         // A point inside: from the middle of the outer loop's longest curve, halfway to the nearest curve
         // across (elsewhere on it, then on the others, when that ray passes exactly between two curves).
-        let mut outer = cycles[members[ri][0]].clone();
-        outer.sort_by(|&a, &b| curve(b).length().total_cmp(&curve(a).length()));
+        // (Longest first, each length found once.)
+        let mut by_length: Vec<(f64, usize)> = cycles[members[ri][0]].iter().map(|&h| (curve(h).length(), h)).collect();
+        by_length.sort_by(|a, b| b.0.total_cmp(&a.0));
+        let outer: Vec<usize> = by_length.into_iter().map(|x| x.1).collect();
         let mut found = None;
         'tries: for &h in &outer {
             let c = curve(h);

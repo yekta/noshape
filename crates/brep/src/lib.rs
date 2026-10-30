@@ -153,7 +153,7 @@ pub struct SectionCurve {
 
 /// Where the Boolean gets the sections of free-form faces: the curves where face `a` (argument, face) and face `b`
 /// meet, curves on them in that order.
-pub trait SectionSource {
+pub trait SectionSource: Sync {
     fn sections(&self, a: (u32, u32), b: (u32, u32)) -> Result<Vec<SectionCurve>, Decline>;
 }
 

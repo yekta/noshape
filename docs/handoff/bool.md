@@ -726,6 +726,50 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   argument's ellipse on another's face"; its pieces in the face go in now as on a plane: main 772 (+3, 7–12× OCCT),
   the rest unchanged, 0 differ.
 
+## The B94.6 diamond knurl (lead 10:40 / 11:40, 10-30 16:30 UTC)
+- The case: one cut of a 50 × 50 cylinder by 148 helical grooves (74 a pattern, 74 their mirror; each groove a
+  diamond swept along a helix: four Bézier faces of degree 1 × 6 and two caps on the cylinder's end planes). OCCT
+  336 s here (8.35 GB); recorded as d14b48a8 in /root/bool-scratch/knurl-corpus. perf.yml's model job times the
+  knurl feature now (straight and diamond; 99729fe4). On GitHub's runners, main (OCCT): diamond 135.1 s / +4.1 GB
+  (Linux), 81.1 s (macOS); straight 0.7 / 0.6 s (live 0.8 s).
+- Taken now, as OCCT: 10362 faces, every history record the same, valid. Its volume differs by 3.3e-8 (relative;
+  converged integrals 9.4272885885e-5 against OCCT's 9.4272888993e-5 m³, live's 94271.838 mm³ is 1.1e-5 from
+  both): ~1.4e-15 m³ per groove crossing (the 2-tool and 6-tool pieces of it match to 2e-17 / 1.4e-14), the
+  sections' approximations (OCCT's pave filler seeds each with its edge/face crossing points, IntTools alone
+  doesn't). The replay's 1e-9 volume check flags it; reported, not hidden.
+- What it took:
+  - OCCT's sections made once per placement: the 148 tools are 2 TShapes at 148 locations, so a pair of faces
+    is keyed by their TShapes and relative location; a pair seen before gets the earlier curves moved (pcurves
+    unchanged). 83k section requests: 415 s of IntTools → 11 s.
+  - Faces apart by their control points (each Bézier face cut in 32 along v by de Casteljau; a separating axis
+    among a few): no section asked, no edge tested on the other (81k of 83k face pairs never meet).
+  - An edge on another argument's surface: a point clearly off ends the test (was 7 inversions per edge per
+    pair); a B-spline edge lying on another's free-form face is projected there like lines and arcs.
+  - Two arguments' coincident B-spline edges made one: on the face whose own edge it isn't, its curve there
+    goes by its ends' parameters (was the other edge's, reversed); the C++ side finds that face's own coincident
+    edge's curve and reparametrizes it.
+  - A cut: a tool's piece on the object's face and on other tools' (each pair's shared end cap on the cylinder's
+    end face) goes as on the object alone; tools' coincident caps outside the object are taken only where those
+    tools also lie on the object's faces (6cf0bfdc, two holes' caps out of the object: OCCT says the object's solid
+    Deleted; still declined).
+  - Grey band on free-form faces: OCCT's curve 2 tolerances clear of the boundary is clear (was 3), against
+    model-tolerance distances there (both curves OCCT's).
+  - Speed: classification rays use the Bézier pieces' boxes (530 s → 7 s); crossings of curves on one face
+    filtered by tighter boxes (a curve on a cylinder by its poles' angles); edge splits by the curves' piece
+    boxes; regions' longest-curve order with lengths found once; and on all threads: classification, crossings
+    (per curve), edge and section splits, OCCT sections' places in their faces (applied in the same order, results
+    unchanged).
+- Times: this server is loaded (load average 25–30): ours 104 s there against OCCT's 336 s recorded; the runners'
+  numbers (perf.yml on the branch) follow in the next entry. Still to do for live's 49 s: the face-pair walk
+  (serial, ~40% of ours), the big face's regions, the result's build on the C++ side.
+- Replays, all 0 differ, the counts unchanged (main 772, corpus2 553, corpus3 556, corpus4 600, corpus5 717,
+  corpus6 662, Shell's 78, direct 58). T1: 2d342daf (the cylinder with one groove and its mirror, unify off) in
+  tests/data/brep; `nurbs::piece_boxes_hold_the_curve`.
+- Also in, no case taken by them yet: an extrusion of an ellipse or circle converted (a cubic through 129 of its
+  points at its parameters), closed B-spline edges, an argument's ellipse on another's free-form face projected
+  (main's four elliptic extrusions, 4.9 s recorded, stop at their closed ellipse's projection across the seam).
+- psui: `noshape_brep::SectionSource` is `: Sync` now (the Boolean's threads share it); nothing else public changed.
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|
@@ -760,6 +804,11 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   profiles and make it cheaper (only the merged faces' share of the volume) if it shows.
 
 ## Requests
+- core (10-30 17:30 UTC): with `unify` on, a Boolean's history records come out in a different order run to run
+  (same records, same shape; e.g. a face's Modified faces [2, 0, 1] then [2, 1, 0]): the unify history's
+  composition iterates something keyed by addresses. Seen on the knurl's 2-groove piece with noshape's Boolean (its
+  own records are the same every run, the order changes after it); OCCT's path goes through the same code. Matters
+  if anything names by record order.
 - core (10-30 06:15 UTC): `boolean_groups::a_section_under_a_call_budget_gives_up` (fd65effd, 04:39) fails on
   Windows and macOS in my branch CI (run 41008061871: "" after 0.48 s, the section ran to the end under a 1e-4 s
   budget); Linux passes. It hasn't been on a scheduled run yet (main's last, 03:27, predates it). The budget is CPU

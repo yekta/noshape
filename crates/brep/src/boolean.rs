@@ -208,6 +208,8 @@ struct NCurve {
     sec: Option<([usize; 2], [Arc<NurbsCurve>; 2], u32)>,
     /// OCCT's tolerance for a section (0 for an input's curve).
     tol: f64,
+    /// Boxes holding it (`NurbsCurve::piece_boxes`).
+    boxes: std::sync::OnceLock<Vec<(f64, f64, DVec3, DVec3)>>,
 }
 
 /// A free-form face's edges' curves on it: by (edge, a seam's second), the curve and its range.
@@ -221,7 +223,7 @@ struct GFace {
     /// Its input boundary, every loop together.
     edges: Vec<(usize, bool)>,
     /// The same in its parameter plane (a seam twice), made when first asked for ([`Ctx::bound`]).
-    bound: std::cell::OnceCell<R<Vec<C2>>>,
+    bound: std::sync::OnceLock<R<Vec<C2>>>,
     lo: DVec3,
     hi: DVec3,
     /// A NURBS face's surface, its edges' curves on it (by edge, a seam's second: OCCT's, in its own parameters,
@@ -230,8 +232,10 @@ struct GFace {
     /// A free-form face's parameter box (its edges' curves on it span), (u0, u1, v0, v1).
     uvbox: [f64; 4],
     pcurves: PCurves,
-    grid: std::cell::OnceCell<Vec<(DVec2, DVec3)>>,
-    patches: std::cell::OnceCell<Vec<free::Patch>>,
+    grid: std::sync::OnceLock<Vec<(DVec2, DVec3)>>,
+    patches: std::sync::OnceLock<Vec<free::Patch>>,
+    /// A Bézier face's surface in pieces, each its control points (holding it).
+    hulls: std::sync::OnceLock<Option<Vec<free::Hull>>>,
 }
 
 impl GFace {
@@ -577,6 +581,8 @@ struct Ctx<'a> {
     coplanar: Vec<(usize, usize)>,
     /// Where two faces cross (the curve, the faces).
     sections: Vec<(Seg, usize, usize)>,
+    /// OCCT's sections' parts whose places in the two faces are found later, on all threads (in order).
+    pending: Vec<(usize, usize, Path, f64, f64, [End; 2])>,
     /// NURBS curves (`Geo::Nurbs`), and where OCCT's sections of free-form faces come from.
     ncurves: Vec<NCurve>,
     src: Option<&'a dyn SectionSource>,
@@ -669,12 +675,14 @@ impl Ctx<'_> {
                 let k = if faces[0] == f { 0 } else if faces[1] == f { 1 } else { return Err(Decline("a section on a third face")) };
                 return Ok(C2::Nurbs { c: free::scaled(&on[k], su, sv), t0, t1 });
             }
-            // (Another argument's straight or round edge lying on it: the one whose curve on it was projected.)
+            // (Another argument's straight, round, elliptic or B-spline edge lying on it: the one whose curve on it was
+            // projected.)
             let e = edge.or_else(|| self.projected_edge(f, s)).ok_or(Decline("a curve on a free-form face not its own"))?;
             let (pc, pt0, pt1) = g.pcurves.get(&(e, copy == 1)).ok_or(Decline("an edge without its curve on a free-form face"))?;
             let c = free::scaled(pc, su, sv);
             let (a, b) = match s.g {
-                Geo::Nurbs { t0, t1, .. } => (t0, t1),
+                // (Its own curve's piece; another's coincident with it goes by its ends, below.)
+                Geo::Nurbs { id, t0, t1 } if matches!(self.edges[e].g, Geo::Nurbs { id: own, .. } if own == id) => (t0, t1),
                 // (A degenerate edge (the surface closing at a point), or a closed one whole: its whole curve on the
                 // face.)
                 Geo::Apex => (*pt0, *pt1),
@@ -703,6 +711,8 @@ impl Ctx<'_> {
         let g = &self.faces[f];
         g.pcurves.keys().filter(|k| !k.1 && self.edges[k.0].arg != g.arg).map(|k| k.0).find(|&e| match (self.edges[e].g, s.g) {
             (Geo::Arc { k: k1, .. }, Geo::Arc { k: k2, .. }) => k1 == k2,
+            (Geo::Ell { e: e1, .. }, Geo::Ell { e: e2, .. }) => e1 == e2,
+            (Geo::Nurbs { id: i1, .. }, Geo::Nurbs { id: i2, .. }) => i1 == i2,
             (Geo::Line, Geo::Line) => {
                 let [a, b] = self.edges[e].v;
                 let (a, b) = (self.p(a), self.p(b));
@@ -784,7 +794,7 @@ impl Ctx<'_> {
 
     /// The intervals of `path` (parameters `t0..t1`) inside face `f` (with its boundary when `closed`).
     /// `ends`: the path's own end vertices, if it has them.
-    fn intervals(&mut self, f: usize, path: &Path, t0: f64, t1: f64, ends: [End; 2], closed: bool) -> R<Vec<Ival>> {
+    fn intervals(&self, f: usize, path: &Path, t0: f64, t1: f64, ends: [End; 2], closed: bool) -> R<Vec<Ival>> {
         // (OCCT's section of a free-form face: within its own tolerance of where the faces meet.)
         let tol = match path {
             Path::Nurbs { id, .. } => self.tol.max(self.ncurves[*id as usize].tol),
@@ -821,13 +831,13 @@ impl Ctx<'_> {
             return Ok(out);
         }
         let geo = path.geo(t0, t1);
-        let c2 = if let Path::Nurbs { .. } = path {
-            // (A NURBS curve's part needs no vertices.)
-            self.c2_of(f, &Seg { v: [u32::MAX; 2], g: geo }, 0, None)?
-        } else if let (Some((g, c)), Surf::Nurbs { su, sv, .. }) = (&self.on_free, &self.faces[f].s)
+        let c2 = if let (Some((g, c)), Surf::Nurbs { su, sv, .. }) = (&self.on_free, &self.faces[f].s)
             && *g == f
         {
             C2::Nurbs { c: free::scaled(c, *su, *sv), t0, t1 }
+        } else if let Path::Nurbs { .. } = path {
+            // (A NURBS curve's part needs no vertices.)
+            self.c2_of(f, &Seg { v: [u32::MAX; 2], g: geo }, 0, None)?
         } else {
             self.faces[f].curve2(path.at(t0), path.at(t1), &geo, 0)?
         };
@@ -888,6 +898,9 @@ impl Ctx<'_> {
             }
         }
         let cuts = merged;
+        // Clear of the boundary: on a free-form face OCCT's section's curve on it against its edges' (OCCT's too), as
+        // OCCT tells it: beyond the model's tolerance.
+        let ctol = if let (Path::Nurbs { .. }, Surf::Nurbs { .. }) = (path, &self.faces[f].s) { self.tol } else { tol };
         let mut out: Vec<Ival> = Vec::new();
         for k in 0..cuts.len() - 1 {
             let (a, b) = (cuts[k], cuts[k + 1]);
@@ -929,8 +942,10 @@ impl Ctx<'_> {
                 // Judged where it is farthest from the boundary (a shallow helix rising from a rod's end, an arc
                 // nearly tangent to a face's edge), if that is clearly off it; else ambiguous.
                 let far = (1..8).map(|k| c2.at(((a.0 + (b.0 - a.0) * k as f64 / 8.0) - t0) / (t1 - t0))).map(|q| (distance2(q, &bound), q)).max_by(|x, y| x.0.total_cmp(&y.0));
+                // (OCCT's curve is within its tolerance of the faces' section: two of them off is clear.)
+                let clear = if let Path::Nurbs { .. } = path { 2.0 } else { 3.0 };
                 match far {
-                    Some((d, q)) if d > 3.0 * tol => inside2(q, &bound),
+                    Some((d, q)) if d > clear * ctol => inside2(q, &bound),
                     _ => return Err(Decline("a curve nearly along a face's boundary")),
                 }
             } else {
@@ -1016,11 +1031,20 @@ impl Ctx<'_> {
     }
 
     fn section_part(&mut self, fs: usize, ft: usize, path: Path, t0: f64, t1: f64, ends: [End; 2]) -> R<()> {
+        if let Path::Nurbs { .. } = path {
+            self.pending.push((fs, ft, path, t0, t1, ends));
+            return Ok(());
+        }
         let ia = self.intervals(fs, &path, t0, t1, ends, false)?;
         if ia.is_empty() {
             return Ok(());
         }
         let ib = self.intervals(ft, &path, t0, t1, ends, false)?;
+        self.section_from(fs, ft, path, ia, ib)
+    }
+
+    /// Where both faces' intervals of a section overlap: its edges, in both faces.
+    fn section_from(&mut self, fs: usize, ft: usize, path: Path, ia: Vec<Ival>, ib: Vec<Ival>) -> R<()> {
         let tol = self.tol;
         // The length along it between two parameters.
         let apart = |x: f64, y: f64| path.length(x, y);
@@ -1092,9 +1116,8 @@ impl Ctx<'_> {
                 (Path::Line { p: a, d: (b - a) / l }, 0.0, l)
             }
             Geo::Arc { k, a0, sweep } => (Path::Circle(k), a0, a0 + sweep),
-            Geo::Ell { e, t0, sweep, .. } if !e.hyp && (matches!(self.faces[f].s, Surf::Plane { .. }) || !e.par && matches!(self.faces[f].s, Surf::Cyl { .. })) => (Path::Ellipse(e), t0, t0 + sweep),
+            Geo::Ell { e, t0, sweep, .. } if !e.hyp && (matches!(self.faces[f].s, Surf::Plane { .. }) || !e.par && matches!(self.faces[f].s, Surf::Cyl { .. } | Surf::Nurbs { .. })) => (Path::Ellipse(e), t0, t0 + sweep),
             Geo::Ell { .. } => return Err(Decline("an argument's ellipse")),
-            Geo::Nurbs { .. } if matches!(self.faces[f].s, Surf::Nurbs { .. }) => return Err(Decline("a curved edge on another argument's free-form face")),
             Geo::Nurbs { id, t0, t1 } => (Path::Nurbs { id, c: self.ncurves[id as usize].c.clone() }, t0, t1),
             Geo::Apex => return Ok(()),
         };
@@ -1119,11 +1142,15 @@ impl Ctx<'_> {
             }
         }
         // On a free-form face: its curve there, by projection (as the face's own edges' curves are used).
-        if matches!(self.faces[f].s, Surf::Nurbs { .. }) && matches!(path, Path::Line { .. } | Path::Circle(_)) {
-            let at = |t: f64| match path {
-                Path::Line { p, d } => (p + d * t, d),
+        if matches!(self.faces[f].s, Surf::Nurbs { .. }) {
+            let at = |t: f64| match &path {
+                Path::Line { p, d } => (*p + *d * t, *d),
                 Path::Circle(k) => (k.at(t), (k.y * t.cos() - k.x * t.sin()) * k.r),
-                _ => unreachable!(),
+                Path::Ellipse(e) => (e.at(t), e.deriv(t)),
+                Path::Nurbs { c, .. } => {
+                    let d = c.derivs(t);
+                    (d[0], d[1])
+                }
             };
             let Some(c) = free::projected(&self.faces[f], &at, t0, t1, self.tol) else { return Err(Decline("an edge on another argument's free-form face")) };
             self.faces[f].pcurves.insert((e, false), (c.clone(), t0, t1));
@@ -1250,12 +1277,19 @@ impl Ctx<'_> {
                 // without being clearly off, ambiguous.
                 let s = self.edge_seg(e);
                 let (mut on, mut near) = (0, 0);
-                for k in 0..=6 {
-                    let d = free::surface_distance(&self.faces[f], self.seg_at(&s, k as f64 / 6.0));
+                // (The middle first: one point clearly off, it isn't on it.)
+                for k in [3, 0, 6, 1, 2, 4, 5] {
+                    let p = self.seg_at(&s, k as f64 / 6.0);
+                    if free::clearly_off(&self.faces[f], p, GREY * tol) {
+                        return Ok(false);
+                    }
+                    let d = free::surface_distance(&self.faces[f], p);
                     if d <= tol {
                         on += 1;
                     } else if d <= GREY * tol {
                         near += 1;
+                    } else {
+                        return Ok(false);
                     }
                 }
                 if on == 7 {
@@ -1270,11 +1304,19 @@ impl Ctx<'_> {
                     {
                         return Ok(true);
                     }
+                    // (An ellipse on a free-form face: its curve there projected, edge_in_face.)
+                    if let (Geo::Ell { e: el, .. }, Surf::Nurbs { .. }) = (self.edges[e].g, &self.faces[f].s)
+                        && !el.open()
+                        && self.src.is_some()
+                    {
+                        return Ok(true);
+                    }
                     if let Geo::Ell { .. } = self.edges[e].g {
                         return Err(Decline("an argument's ellipse on another's face"));
                     }
-                    // (A straight or round edge on a free-form face: its curve there projected, edge_in_face.)
-                    if matches!(self.edges[e].g, Geo::Line | Geo::Arc { .. }) && self.src.is_some() {
+                    // (A straight, round or B-spline edge on a free-form face: its curve there projected,
+                    // edge_in_face.)
+                    if matches!(self.edges[e].g, Geo::Line | Geo::Arc { .. } | Geo::Nurbs { .. }) && self.src.is_some() {
                         return Ok(true);
                     }
                     return Err(Decline("an edge on another argument's free-form face"));
@@ -1290,6 +1332,10 @@ impl Ctx<'_> {
     /// Faces `fs` and `ft` (one free-form) meet where OCCT's section says (its curves, its curves on them).
     fn nurbs_pair(&mut self, fs: usize, ft: usize) -> R<()> {
         let Some(src) = self.src else { return Err(Decline("a curved face")) };
+        // (Clearly apart, their control points tell: no section, without asking.)
+        if free::apart(&self.faces[fs], &self.faces[ft], GREY * self.tol.max(5e-6)) {
+            return Ok(());
+        }
         let (a, b) = ((self.faces[fs].arg, self.faces[fs].index), (self.faces[ft].arg, self.faces[ft].index));
         for c in src.sections(a, b)? {
             if c.t1 <= c.t0 || c.t1.is_nan() {
@@ -1298,7 +1344,7 @@ impl Ctx<'_> {
             let id = self.ncurves.len() as u32;
             let cc = Arc::new(c.curve);
             let [on0, on1] = c.on;
-            self.ncurves.push(NCurve { c: cc.clone(), sec: Some(([fs, ft], [Arc::new(on0), Arc::new(on1)], c.id)), tol: c.tol });
+            self.ncurves.push(NCurve { c: cc.clone(), sec: Some(([fs, ft], [Arc::new(on0), Arc::new(on1)], c.id)), tol: c.tol, boxes: Default::default() });
             let cuts = free::seam_cuts(self, [fs, ft], &cc, c.t0, c.t1);
             self.section_nurbs(fs, ft, Path::Nurbs { id, c: cc }, c.t0, c.t1, &cuts)?;
         }
@@ -1325,6 +1371,10 @@ impl Ctx<'_> {
     }
 
     fn face_pair(&mut self, fs: usize, ft: usize) -> R<()> {
+        // (Clearly apart: no section, and no edge of one in the other.)
+        if free::apart(&self.faces[fs], &self.faces[ft], GREY * self.tol.max(5e-6)) {
+            return Ok(());
+        }
         for (f, g) in [(fs, ft), (ft, fs)] {
             let (lo, hi) = (self.faces[g].lo, self.faces[g].hi);
             for k in 0..self.faces[f].edges.len() {
@@ -1814,6 +1864,16 @@ impl Ctx<'_> {
             if p.y < lo.y || p.y > hi.y || p.z < lo.z || p.z > hi.z {
                 continue;
             }
+            // (A NURBS curve's pieces' boxes: clear of them, clear of it.)
+            if let Geo::Nurbs { id, t0, t1 } = s.g {
+                let nc = &self.ncurves[id as usize];
+                let boxes = nc.boxes.get_or_init(|| nc.c.piece_boxes(8));
+                let g = GREY * tol;
+                let (ta, tb) = (t0.min(t1), t0.max(t1));
+                if !boxes.is_empty() && boxes.iter().filter(|x| x.1 >= ta && x.0 <= tb).all(|x| (x.2 - p).max_element() > g || (p - x.3).max_element() > g) {
+                    continue;
+                }
+            }
             let (t, off) = self.seg_param(s, p);
             if t <= 0.0 || t >= 1.0 || t * len <= tol || (1.0 - t) * len <= tol {
                 continue;
@@ -1945,7 +2005,7 @@ impl Ctx<'_> {
                         if !free::ray_meets(p, r, g.lo, g.hi) {
                             continue;
                         }
-                        for (uv, t) in free::ray_hits(ns, g.patches.get_or_init(|| free::patches(ns, g.uvbox)), g.uvbox, p, r) {
+                        for (uv, t) in free::ray_hits(ns, g.patches.get_or_init(|| free::patches(g)), g.uvbox, p, r) {
                             // Grazing it: another ray.
                             let d = ns.derivs(uv.x, uv.y);
                             if d[1].cross(d[2]).normalize_or_zero().dot(r).abs() < 1e-3 {
@@ -2048,6 +2108,36 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
     boolean_with(op, args, tol, touching_only, None)
 }
 
+/// `f` of 0..n on all threads, in order.
+fn par_map<T: Send>(n: usize, f: &(dyn Fn(usize) -> T + Sync)) -> Vec<T> {
+    let threads = std::thread::available_parallelism().map_or(1, |x| x.get()).min(n.div_ceil(64)).max(1);
+    if threads == 1 {
+        return (0..n).map(f).collect();
+    }
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let mut parts: Vec<Vec<(usize, T)>> = std::thread::scope(|sc| {
+        let hs: Vec<_> = (0..threads)
+            .map(|_| {
+                sc.spawn(|| {
+                    let mut out = Vec::new();
+                    loop {
+                        let k = next.fetch_add(16, std::sync::atomic::Ordering::Relaxed);
+                        if k >= n {
+                            break;
+                        }
+                        out.extend((k..(k + 16).min(n)).map(|i| (i, f(i))));
+                    }
+                    out
+                })
+            })
+            .collect();
+        hs.into_iter().map(|h| h.join().expect("a worker")).collect()
+    });
+    let mut all: Vec<(usize, T)> = parts.drain(..).flatten().collect();
+    all.sort_by_key(|x| x.0);
+    all.into_iter().map(|x| x.1).collect()
+}
+
 /// The same; free-form (NURBS) faces taken where `src` gives their sections (else declined).
 pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option<&dyn SectionSource>) -> R<Output> {
     if args.len() < 2 {
@@ -2068,6 +2158,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         face_segs: Vec::new(),
         coplanar: Vec::new(),
         sections: Vec::new(),
+        pending: Vec::new(),
         ncurves: Vec::new(),
         src,
     };
@@ -2149,7 +2240,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 Curve::Hyperbola { .. } | Curve::Parabola { .. } => return Err(Decline("an argument's hyperbola")),
                 Curve::Nurbs { .. } if cx.src.is_none() => return Err(Decline("a curved edge")),
                 Curve::Nurbs { index, t0, t1 } => {
-                    cx.ncurves.push(NCurve { c: Arc::new(body.nurbs_curves[index as usize].clone()), sec: None, tol: 0.0 });
+                    cx.ncurves.push(NCurve { c: Arc::new(body.nurbs_curves[index as usize].clone()), sec: None, tol: 0.0, boxes: Default::default() });
                     Geo::Nurbs { id: cx.ncurves.len() as u32 - 1, t0, t1 }
                 }
                 Curve::Degenerate => {
@@ -2218,7 +2309,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 Some(fs) => free::nurbs_surf(fs, uvbox, f.reversed),
                 None => s,
             };
-            cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default() });
+            cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default() });
         }
         for (i, s) in body.solids.iter().enumerate() {
             let si = cx.solids.len();
@@ -2402,6 +2493,22 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
         }
     }
+    // OCCT's sections' places in their faces, on all threads, then their edges in order.
+    let pending = std::mem::take(&mut cx.pending);
+    let places = par_map(pending.len(), &|k| -> R<(Vec<Ival>, Vec<Ival>)> {
+        let (fs, ft, ref path, t0, t1, ends) = pending[k];
+        let ia = cx.intervals(fs, path, t0, t1, ends, false)?;
+        if ia.is_empty() {
+            return Ok((ia, Vec::new()));
+        }
+        Ok((ia, cx.intervals(ft, path, t0, t1, ends, false)?))
+    });
+    for ((fs, ft, path, _, _, _), x) in pending.into_iter().zip(places) {
+        let (ia, ib) = x?;
+        if !ia.is_empty() {
+            cx.section_from(fs, ft, path, ia, ib)?;
+        }
+    }
     // Coplanar faces where a sheet is one of them: taken where they only meet at each other's vertices (side by
     // side, sharing corners); a vertex of one inside the other or on its edge between its vertices declines (OCCT
     // left two strips overlapping by 5 µm, one's corner on the other's edge, as they were: 0c538d2c).
@@ -2428,31 +2535,64 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     }
     // Curves added to one face that cross each other (edges of two arguments lying on a third's face): a
     // vertex where they cross.
-    for f in 0..cx.faces.len() {
-        let segs = cx.face_segs[f].clone();
-        if segs.len() < 2 {
-            continue;
+    // (Each face's curves' crossings with the curves after them, on all threads; their vertices made in order
+    // below.)
+    // (A face's curves and their boxes.)
+    type FaceCurves = (Vec<C2>, Vec<Option<(DVec2, DVec2)>>);
+    let curves_of = |f: usize| -> R<FaceCurves> {
+        let c2: Vec<C2> = if cx.face_segs[f].len() < 2 { Vec::new() } else { cx.face_segs[f].iter().map(|s| cx.c2_of(f, s, 0, None)).collect::<R<_>>()? };
+        // (Curves whose control points' boxes are apart don't cross.)
+        let boxes = c2.iter().map(|c| c.quick_box()).collect();
+        Ok((c2, boxes))
+    };
+    let curves = par_map(cx.faces.len(), &curves_of);
+    let mut items: Vec<(usize, usize)> = Vec::new();
+    for (f, c) in curves.iter().enumerate() {
+        if let Ok((c2, _)) = c {
+            items.extend((0..c2.len()).map(|i| (f, i)));
         }
-        let c2: Vec<C2> = segs.iter().map(|s| cx.c2_of(f, s, 0, None)).collect::<R<_>>()?;
-        for i in 0..segs.len() {
-            for j in i + 1..segs.len() {
-                for (t, u) in c2[i].intersections(&c2[j], tol) {
-                    let (li, lj) = (cx.seg_length(&segs[i]), cx.seg_length(&segs[j]));
-                    if t * li > tol && (1.0 - t) * li > tol && u * lj > tol && (1.0 - u) * lj > tol {
-                        let n = cx.pool.p.len();
-                        cx.pool.add(cx.seg_at(&segs[i], t))?;
-                        // (With a vertex of three arguments or more on this face, or of four anywhere, OCCT's
-                        // choices differ: not done.)
-                        let three = |w: u32| cx.pool.inputs[w as usize].len() >= 3;
-                        if cx.pool.p.len() > n
-                            && (segs.iter().any(|s| s.v.iter().any(|&w| three(w)))
-                                || cx.faces[f].edges.iter().any(|&(e, _)| cx.edges[e].v.iter().any(|&w| three(w)))
-                                || cx.pool.inputs.iter().any(|ins| ins.len() >= 4))
-                        {
-                            return Err(Decline("edges of two arguments crossing on a third's face"));
-                        }
-                    }
+    }
+    let crossings_of = |k: usize| -> Vec<(usize, f64)> {
+        let (f, i) = items[k];
+        let Ok((c2, boxes)) = &curves[f] else { return Vec::new() };
+        let segs = &cx.face_segs[f];
+        let mut out = Vec::new();
+        for j in i + 1..segs.len() {
+            if let (Some((li, hi)), Some((lj, hj))) = (boxes[i], boxes[j])
+                && ((li - hj).max_element() > tol || (lj - hi).max_element() > tol)
+            {
+                continue;
+            }
+            for (t, u) in c2[i].intersections(&c2[j], tol) {
+                let (li, lj) = (cx.seg_length(&segs[i]), cx.seg_length(&segs[j]));
+                if t * li > tol && (1.0 - t) * li > tol && u * lj > tol && (1.0 - u) * lj > tol {
+                    out.push((i, t));
                 }
+            }
+        }
+        out
+    };
+    let found = par_map(items.len(), &crossings_of);
+    let mut all_crossings: Vec<R<Vec<(usize, f64)>>> = curves.iter().map(|c| c.as_ref().map(|_| Vec::new()).map_err(|e| *e)).collect();
+    for (k, x) in found.into_iter().enumerate() {
+        if let Ok(v) = &mut all_crossings[items[k].0] {
+            v.extend(x);
+        }
+    }
+    for (f, crossings) in all_crossings.into_iter().enumerate() {
+        let segs = cx.face_segs[f].clone();
+        for (i, t) in crossings? {
+            let n = cx.pool.p.len();
+            cx.pool.add(cx.seg_at(&segs[i], t))?;
+            // (With a vertex of three arguments or more on this face, or of four anywhere, OCCT's choices differ:
+            // not done.)
+            let three = |w: u32| cx.pool.inputs[w as usize].len() >= 3;
+            if cx.pool.p.len() > n
+                && (segs.iter().any(|s| s.v.iter().any(|&w| three(w)))
+                    || cx.faces[f].edges.iter().any(|&(e, _)| cx.edges[e].v.iter().any(|&w| three(w)))
+                    || cx.pool.inputs.iter().any(|ins| ins.len() >= 4))
+            {
+                return Err(Decline("edges of two arguments crossing on a third's face"));
             }
         }
     }
@@ -2514,7 +2654,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     let mut inside_edges: HashMap<u32, Vec<usize>> = HashMap::default();
     let mut edge_inner: Vec<Vec<u32>> = Vec::with_capacity(cx.edges.len());
     let mut edge_pieces: Vec<Vec<(usize, bool)>> = Vec::with_capacity(cx.edges.len());
-    for (e, &es) in edge_solid.iter().enumerate() {
+    // (Each input edge's split points, on all threads; taken in order.)
+    let edge_chain = |e: usize| -> R<Vec<u32>> {
+        let es = edge_solid[e];
         let s = cx.edge_seg(e);
         let (lo, hi) = match s.g {
             Geo::Line | Geo::Apex => (cx.p(s.v[0]).min(cx.p(s.v[1])), cx.p(s.v[0]).max(cx.p(s.v[1]))),
@@ -2523,7 +2665,12 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             Geo::Nurbs { id, t0, t1 } => free::piece_box(&cx.ncurves[id as usize].c, t0, t1),
         };
         let near = es != usize::MAX && (0..ns).any(|t| meets[es * ns + t] && boxes_meet(lo, hi, cx.solids[t].lo, cx.solids[t].hi, GREY * tol));
-        let chain = if near { cx.split_among(&s, &lists, Some(cx.edges[e].arg))? } else { vec![s.v[0], s.v[1]] };
+        if near { cx.split_among(&s, &lists, Some(cx.edges[e].arg)) } else { Ok(vec![s.v[0], s.v[1]]) }
+    };
+    let edge_chains = par_map(edge_solid.len(), &edge_chain);
+    for (e, chain) in edge_chains.into_iter().enumerate() {
+        let s = cx.edge_seg(e);
+        let chain = chain?;
         for &w in &chain {
             note(&mut touched, &cx.pool, w, cx.edges[e].arg);
         }
@@ -2575,21 +2722,22 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             return Err(Decline("a vertex inside coincident edges of two other arguments"));
         }
     }
+    // (Where the curves added to faces and the sections are split, on all threads; taken in order.)
+    let extra_segs: Vec<(usize, Seg)> = (0..cx.faces.len()).flat_map(|f| cx.face_segs[f].iter().map(move |&s| (f, s))).collect();
+    let extra_chains = par_map(extra_segs.len(), &|k| cx.split(&extra_segs[k].1, &by_x));
+    let section_chains = par_map(cx.sections.len(), &|k| cx.split(&cx.sections[k].0, &by_x));
     let mut face_extra: Vec<Vec<usize>> = vec![Vec::new(); cx.faces.len()];
-    for (f, extra) in face_extra.iter_mut().enumerate() {
-        for k in 0..cx.face_segs[f].len() {
-            let s = cx.face_segs[f][k];
-            let chain = cx.split(&s, &by_x)?;
-            for piece in cx.pieces_of(&s, &chain) {
-                extra.push(get_sedge(&cx, &mut sedges, piece).0);
-            }
+    for (&(f, s), chain) in extra_segs.iter().zip(extra_chains) {
+        let chain = chain?;
+        for piece in cx.pieces_of(&s, &chain) {
+            face_extra[f].push(get_sedge(&cx, &mut sedges, piece).0);
         }
     }
     // The faces each section edge was made by (OCCT: they generated it).
     let mut section_faces: Vec<(usize, usize)> = Vec::new();
-    for k in 0..cx.sections.len() {
+    for (k, chain) in section_chains.into_iter().enumerate() {
         let (s, fs, ft) = cx.sections[k];
-        let chain = cx.split(&s, &by_x)?;
+        let chain = chain?;
         for piece in cx.pieces_of(&s, &chain) {
             let (si, _) = get_sedge(&cx, &mut sedges, piece);
             section_faces.push((si, fs));
@@ -2722,7 +2870,8 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     let mut within: Vec<Vec<usize>> = vec![Vec::new(); pieces.len()];
     // Solids another argument's piece is in or on (OCCT builds them anew).
     let mut reached = vec![false; cx.solids.len()];
-    for pi in 0..pieces.len() {
+    // (Each piece's states against the solids, on all threads; taken in order below.)
+    let state_of = |pi: usize| -> R<Vec<(usize, State)>> {
         let f = pieces[pi].face;
         let s = cx.faces[f].solid;
         let arg = cx.faces[f].arg;
@@ -2761,6 +2910,23 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             };
             states.push((t, st));
         }
+        Ok(states)
+    };
+    let all_states = par_map(pieces.len(), &state_of);
+    // Solids with a piece on the object's faces (a pattern's end caps on its end face).
+    let mut on_object = vec![false; cx.solids.len()];
+    for (pi, st) in all_states.iter().enumerate() {
+        if let Ok(st) = st
+            && st.iter().any(|&(t, x)| cx.solids[t].arg == 0 && matches!(x, State::OnSame | State::OnOpposite))
+        {
+            on_object[cx.faces[pieces[pi].face].solid] = true;
+        }
+    }
+    for (pi, states) in all_states.into_iter().enumerate() {
+        let states = states?;
+        let f = pieces[pi].face;
+        let s = cx.faces[f].solid;
+        let arg = cx.faces[f].arg;
         within[pi] = states.iter().filter(|x| matches!(x.1, State::In | State::OnSame)).map(|x| x.0).collect();
         for &(t, st) in &states {
             if st != State::Out {
@@ -2771,7 +2937,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         if !ons.is_empty() && (cx.solids[s].sheet || ons.iter().any(|&(t, _)| cx.solids[t].sheet)) {
             return Err(Decline("sheets coincident"));
         }
-        if ons.len() > 1 && op != Op::Fuse {
+        // (A cut: a tool's piece on the object's face and other tools' (a pattern's end caps on the object's end
+        // face) goes as on the object's alone; the object's on several tools' as on one facing its way, if any.)
+        let several_ok = op == Op::Cut && (arg == 0 || ons.iter().any(|&(t, _)| cx.solids[t].arg == 0));
+        if ons.len() > 1 && op != Op::Fuse && !several_ok {
             return Err(Decline("a piece on two solids"));
         }
         let in_any = states.iter().any(|x| x.1 == State::In);
@@ -2780,12 +2949,20 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
         let in_obj = states.iter().any(|x| x.1 == State::In && cx.solids[x.0].arg == 0);
         let in_tool = states.iter().any(|x| x.1 == State::In && cx.solids[x.0].arg != 0);
-        let on = ons.first().copied();
+        let on = if ons.len() > 1 && op == Op::Cut {
+            if arg != 0 { ons.iter().find(|&&(t, _)| cx.solids[t].arg == 0) } else { ons.iter().find(|x| x.1 == State::OnSame) }.or(ons.first()).copied()
+        } else {
+            ons.first().copied()
+        };
         // Two tools' pieces coinciding (a cut), facing each other: inside the tools.
         let tools_on = op == Op::Cut && arg != 0 && on.is_some_and(|(t, _)| cx.solids[t].arg != 0);
         if let Some((t, st)) = on {
             // (Facing one way OCCT may build the object's solid anew: its history says it's deleted.)
-            if op != Op::Fuse && arg != 0 && cx.solids[t].arg != 0 && (op == Op::Common || st == State::OnSame) {
+            // (Outside the object in a cut, of tools whose pieces lie on the object's faces too (a pattern's end
+            // caps on its end face), nowhere in the result, the object's solid Modified as OCCT's; other tools'
+            // (two holes' end caps, out of the object) OCCT builds the object's solid anew.)
+            let caps = op == Op::Cut && !in_obj && on_object[s] && on_object[t];
+            if op != Op::Fuse && arg != 0 && cx.solids[t].arg != 0 && (op == Op::Common || st == State::OnSame) && !caps {
                 return Err(Decline("tools coincide"));
             }
             on_pairs.push((pi, t));

@@ -172,6 +172,38 @@ impl NurbsCurve {
     }
 
     /// Its spans as Bézier pieces (made once; empty when its knots aren't clamped at both ends).
+    /// Boxes holding it: each knot span cut in `n` by de Casteljau, its piece's parameter range and its control
+    /// points' box (empty where its weights aren't all positive or it has no spans).
+    pub(crate) fn piece_boxes(&self, n: usize) -> Vec<(f64, f64, DVec3, DVec3)> {
+        let mut out = Vec::new();
+        for (a, b, q) in self.spans() {
+            if q.iter().any(|h| h.w <= 0.0) {
+                return Vec::new();
+            }
+            // The rest of the span after each cut, cut again at the next piece's end.
+            let mut rest = q.clone();
+            for k in 0..n {
+                let t = 1.0 / (n - k) as f64;
+                let mut left = Vec::with_capacity(rest.len());
+                let mut v = rest.clone();
+                let m = v.len();
+                let mut right = vec![DVec4::ZERO; m];
+                for r in 0..m {
+                    left.push(v[0]);
+                    right[m - 1 - r] = v[m - 1 - r];
+                    for i in 0..m - 1 - r {
+                        v[i] = v[i] * (1.0 - t) + v[i + 1] * t;
+                    }
+                }
+                let (lo, hi) = left.iter().map(|h| h.truncate() / h.w).fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(l, h), x| (l.min(x), h.max(x)));
+                let (ta, tb) = (a + (b - a) * k as f64 / n as f64, a + (b - a) * (k + 1) as f64 / n as f64);
+                out.push((ta, tb, lo, hi));
+                rest = right;
+            }
+        }
+        out
+    }
+
     fn spans(&self) -> &[(f64, f64, Vec<DVec4>)] {
         self.spans.0.get_or_init(|| {
             let (p, np) = (self.degree, self.poles.len());
@@ -520,6 +552,21 @@ mod tests {
             *p *= 3.0;
         }
         assert!((d.at(0.5) - c.at(0.5) * 3.0).length() < 1e-12);
+    }
+
+    #[test]
+    fn piece_boxes_hold_the_curve() {
+        let c = quarter();
+        let boxes = c.piece_boxes(8);
+        assert_eq!(boxes.len(), 8);
+        for k in 0..=400 {
+            let t = k as f64 / 400.0;
+            let p = c.at(t);
+            let b = boxes.iter().find(|b| b.0 <= t && t <= b.1).expect("a piece");
+            assert!((b.2 - p).max_element() <= 1e-12 && (p - b.3).max_element() <= 1e-12, "{t}: {p} outside {b:?}");
+        }
+        // (Tighter than the whole curve's poles.)
+        assert!(boxes.iter().all(|b| (b.3 - b.2).length() < 1.0));
     }
 
     #[test]
