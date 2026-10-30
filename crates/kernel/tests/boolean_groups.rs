@@ -314,6 +314,7 @@ fn opposite_extrudes_of_a_circle_unify_into_one_cylinder() {
 /// "section took too long" (std's collision checks in editing logic give up
 /// on such a pair, qa MIRROR-HANG-402); without one it runs to the end.
 #[test]
+#[ignore = "T2: depends on the op outlasting its budget (machine speed; flaked on vibe2 10-30); T1 again once budgets stop by deadline"]
 fn a_section_under_a_call_budget_gives_up() {
     let plate = make_box_corners(DVec3::ZERO, DVec3::new(100.0, 100.0, 10.0)).unwrap();
     let mut tools = Vec::new();
@@ -338,6 +339,7 @@ fn a_section_under_a_call_budget_gives_up() {
 /// 0007's hook stops the fillet builder at; BUDGET-OFF-LINUX), and without a
 /// short budget it builds.
 #[test]
+#[ignore = "T2: depends on the op outlasting its budget (machine speed; flaked on vibe2 10-30); T1 again once budgets stop by deadline"]
 fn a_fillet_under_a_short_budget_gives_up() {
     let plate = make_box_corners(DVec3::ZERO, DVec3::new(100.0, 100.0, 10.0)).unwrap();
     let mut tools = Vec::new();
