@@ -211,7 +211,8 @@ fn cpu_ms() -> f64 {
 }
 
 /// The 400-fin plate's display mesh, ours against BRepMesh (fresh copies, so the mesh cache serves nothing,
-/// with their maps made, as a regenerated part has them): median of 5 each, wall and CPU time. `cargo test --release -p noshape-kernel --test all rust_mesh::bench -- --ignored --nocapture`
+/// with their maps made, as a regenerated part has them): median of 5 each, wall and CPU time. `cargo test --release -p noshape-kernel --test all rust_mesh::bench -- --ignored --nocapture`;
+/// NOSHAPE_BENCH_OURS=1: ours only, 40 copies (under `perf record`).
 #[test]
 #[ignore = "bench"]
 fn bench_fin_plate_display_mesh() {
@@ -236,6 +237,22 @@ fn bench_fin_plate_display_mesh() {
             .unzip();
         (median(wall), median(cpu))
     };
+    if std::env::var_os("NOSHAPE_BENCH_OURS").is_some() {
+        // Ours only, many rounds on one set of copies' worth of work (under `perf record`).
+        let copies: Vec<Shape> = (0..40).map(|_| transform(&s, &Transform::Translate(DVec3::ZERO), true).unwrap().shape).collect();
+        for c in &copies {
+            let _ = c.ancestor_map(ShapeType::Edge, ShapeType::Face).unwrap();
+        }
+        // A profiler attaches here (`perf record -p`), past the setup.
+        eprintln!("fin plate: meshing in 1 s");
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let t = std::time::Instant::now();
+        for c in &copies {
+            mesh(c, true);
+        }
+        eprintln!("fin plate, ours: {:.1} ms each", t.elapsed().as_secs_f64() * 1e3 / 40.0);
+        return;
+    }
     let (ours, occt) = (times(true), times(false));
     eprintln!(
         "fin plate ({} faces) display mesh: ours {:.1} ms (CPU {:.1}), BRepMesh {:.1} ms (CPU {:.1}): {:.1}× ({:.1}× CPU)",
@@ -247,6 +264,28 @@ fn bench_fin_plate_display_mesh() {
         occt.0 / ours.0,
         occt.1 / ours.1
     );
+}
+
+/// The fin plate's display mesh by step (the kernel profile, wall time) over three fresh copies: for
+/// tools/tiers/perf.sh, which can't pass the environment. `cargo test --release -p noshape-kernel --test all
+/// rust_mesh::bench_profile_fin -- --ignored --nocapture --test-threads=1` (alone: the profile switch is read once).
+#[test]
+#[ignore = "bench"]
+fn bench_profile_fin_plate_display_mesh() {
+    // SAFETY: set before any kernel call of this test process (run alone), read by the kernel once.
+    unsafe { std::env::set_var("NOSHAPE_KERNEL_PROFILE", "1") };
+    let s = fins(400);
+    let copies: Vec<Shape> = (0..3).map(|_| transform(&s, &Transform::Translate(DVec3::ZERO), true).unwrap().shape).collect();
+    for c in &copies {
+        let _ = c.ancestor_map(ShapeType::Edge, ShapeType::Face).unwrap();
+    }
+    kernel_profile_mark("setup");
+    let t = std::time::Instant::now();
+    for c in &copies {
+        mesh(c, true);
+    }
+    eprintln!("fin plate, ours: {:.1} ms each (profiled)", t.elapsed().as_secs_f64() * 1e3 / 3.0);
+    kernel_profile_mark("ours, three copies");
 }
 
 /// This process's CPU time in ms, its threads' that ended included (Linux, 10 ms ticks; 0 elsewhere).
