@@ -841,7 +841,13 @@ impl QueryCx<'_> {
 pub fn relocated_pieces(q: &QueryCx, r: &Reference, snap: &Snapshot) -> Option<Vec<Ent>> {
     let found = q.from_ref(r);
     if !found.is_empty() && found.iter().all(|e| snap_matches(q, snap, e)) {
-        return None;
+        // Still there, but under another name now (its faces renamed): the
+        // entity's own name, which the attribute lookups compare (qa4 S1's
+        // x = 100 bend lost its joint after the slot split the plate).
+        return match found.as_slice() {
+            [e] if q.to_ref(e) != *r => Some(vec![e.clone()]),
+            _ => None,
+        };
     }
     let pieces = q.tracked(snap, false);
     (!pieces.is_empty()).then_some(pieces)

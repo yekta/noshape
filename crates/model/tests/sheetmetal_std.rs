@@ -764,6 +764,58 @@ fn a_cut_after_flanges_keeps_the_bends() {
     assert!(solids == 1 && data.bends.len() == 2 && (volume_mm3(&r) - (8511.4987 - hole)).abs() < 1e-3, "{solids} solids, {} bends, {} mm³", data.bends.len(), volume_mm3(&r));
 }
 
+/// qa4 round 4 S1 (live behaviours "qa4 round 4 s1"): 100 × 60 plate,
+/// 1.5 mm, R 1.5; Flange 30 mm on y = 0, y = 60, x = 100: 20295.0752 mm³,
+/// 34 faces; Hem on the y = 0 flange's top: 22074.8607, 43; a Ø12 circle on
+/// Front at (50, 1.5) cut through all both ways slots the plate and both
+/// long bends: 20805.4123, 61.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn qa4_s1_enclosure_as_live() {
+    let mut s = Studio::new();
+    let region = s.rectangle(100.0, 60.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("1.5 mm"));
+        p.set("radius", expr("1.5 mm"));
+    });
+    let r = s.ok();
+    let edges = vec![edge_at(&r, DVec3::new(50.0, 0.0, 1.5)), edge_at(&r, DVec3::new(50.0, 60.0, 1.5)), edge_at(&r, DVec3::new(100.0, 30.0, 1.5))];
+    s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(edges));
+        p.set("distance", expr("30 mm"));
+    });
+    let r = s.ok();
+    let faces = |r: &RegenResult| r.context.bodies[part(r)].shape.faces().len();
+    let flange = (volume_mm3(&r), faces(&r));
+    let edge = edge_at(&r, DVec3::new(50.0, 0.0, 30.0));
+    s.add("sheetMetalHem", |p| p.set("edges", ParamValue::Query(vec![edge])));
+    let r = s.ok();
+    let hem = (volume_mm3(&r), faces(&r));
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(glam::DVec2::new(mm(50.0), mm(1.5)), mm(6.0));
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Front)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
+    let key = sk.regions[0].key.clone();
+    s.add("extrude", |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        p.set("operationType", en("REMOVE"));
+        p.set("defaultScope", ParamValue::Bool(true));
+        p.set("endBound", en("THROUGH_ALL"));
+        p.set("hasSecondDirection", ParamValue::Bool(true));
+        p.set("secondDirectionBound", en("THROUGH_ALL"));
+    });
+    let r = s.ok();
+    let cut = (volume_mm3(&r), faces(&r));
+    let ok = |(v, n): (f64, usize), (lv, ln): (f64, usize)| (v - lv).abs() < 1e-3 && n == ln;
+    assert!(ok(flange, (20295.0752, 34)) && ok(hem, (22074.8607, 43)) && ok(cut, (20805.4123, 61)), "flange {flange:?}, hem {hem:?}, cut {cut:?}: {:#?}", face_report(&r));
+}
+
 /// A cut on an active sheet metal part stays when a later sheet metal
 /// feature rebuilds the part (Onshape cuts the definition sheet: std
 /// handleSheetMetalCutAndAttribution). Plate 60 × 40, Ø10 hole at (30, 20)

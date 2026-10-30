@@ -124,6 +124,13 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   sides (or a rip) at different places, the bend runs on and is cut back by a lofted ruled cutter; the definition-side
   arc lies on the plane of the two sides through the vertex, eased linearly onto a rip's pulled-back side. Edge-joint
   rips pull each wall back clearance / (1 − cos) of the walls' in-plane directions (0.02 at 90°, 0.018071 at 96.1°).
+- Cuts across bends (10-30, qa4 S1, live 1617): four FS host fixes made std's sheetMetalAwareBoolean work on a flanged
+  part: opThicken of a face thickened its whole body too; INTERSECTION ignored keepTools (std trims its tool by each
+  thickened definition face in turn); attributes follow every piece of a split edge (`relocated_pieces`) and are
+  re-keyed when their entity is renamed under them (else `sm_attribute`'s equality lookup missed the x = 100 bend).
+  Walls with curved free sides (the notch arc) are built from the definition face less a strip per pulled side
+  (`pulled_face`, `run_inside` for the pulled sides' exact ends), unified; a free side in line with a rip is pulled
+  with it (the wall beside a Hem's end).
 - Flat unfold (10-30): `place_from` chose a bend's turn by `dot > 0`, which both turns pass under 45°: the loft's
   33.8° bend stood its walls up out of the flat (area 2.6 % high). Now the nearer turn (T2 a_shallow_flange_unfolds_flat).
 - Open (10-30 noon): Form library: live's Form picker offers "Onshape sheet metal forms" (9 forms); ours only takes a

@@ -57,6 +57,7 @@ numbers), ◐ = partly, ✗ = differs, — = no live data.
 | 9 parts list | only Part 1 | ✅ | GUI 10-30 |
 | Bend / Jog / Make joint / Tab-beside / cut / hole / counterbore then Flange / partial flange / Butt direction | see the 10-29/10-30 tables below | ✅ | T2s |
 | Butt direction after a Convert | the top wall runs through (a body one Extrude made lists its faces in live's order: first side, start cap, end cap, other sides; request 1608) | ✅ | T2 convert_rips_and_bends_like_onshape |
+| qa4 S1 enclosure: Flange ×3, Hem, a Ø12 slot cut through all across both long bends | 20295.0752 / 34, 22074.8607 / 43, 20805.4123 / 61 as live (request 1617): std cuts the definition (plate split, flanges notched by the arc), the bends split and end square at the slot, the notch an r 6 cylinder from the bend tangent; was: the cut did nothing | ✅ | T2 qa4_s1_enclosure_as_live |
 | Sheet metal loft rect → triangle | 49 faces as live: a bend meeting the profile at a slant ends in one ruled face (rulings radial, its definition-side arc on the plane of the two walls' sides through the vertex, eased onto a rip's pulled-back side), and an edge-joint rip pulls each wall back clearance / (1 − cos) (0.018071 mm at the 96.1° seam); 17452.9223 vs live's evVolume 17452.9189 (request 1612) | ✅ | features_c::sheet_metal_loft_rectangle_to_triangle |
 
 ## 1. Base: sketch + Sheet metal model (Thicken)

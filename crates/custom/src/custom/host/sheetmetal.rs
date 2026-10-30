@@ -1029,6 +1029,22 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                 }
             }
         }
+        // A free side running on in line from a rip (the corner's wall
+        // beside a Hem's end): pulled back with it, no step (live qa4 S1:
+        // the x = 100 wall's 0.02 mm beside the hem, request 1617).
+        for k in 0..m {
+            if !def.rips.contains(&l.side[k]) || offset[k] <= TOL {
+                continue;
+            }
+            let dir = (l.pts[(k + 1) % m] - l.pts[k]).normalize_or_zero();
+            for j in [(k + m - 1) % m, (k + 1) % m] {
+                let e = l.side[j];
+                let along = (l.pts[(j + 1) % m] - l.pts[j]).normalize_or_zero();
+                if !def.bends.contains_key(&e) && !def.rips.contains(&e) && !l.curved[j] && along.cross(dir).length() <= 1e-9 && offset[j] <= TOL {
+                    offset[j] = offset[k];
+                }
+            }
+        }
         let mut sides = pulled_sides(&l, n, &offset);
         // Curved sides: the wall from its face, the pulled sides' ends where
         // their lines leave it.
@@ -1285,6 +1301,11 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             }
         };
         let mut slab = k::extrude(&base, n * (front + back)).map_err(|e| fe(format!("Sheet metal wall failed: {e}")))?.shape;
+        // A curved side the definition carries in pieces (a cut's arc split
+        // at its top): one face, as live (qa4 S1's notch, request 1617).
+        if exact.contains_key(&fi) {
+            slab = k::unify_same_domain(&slab).map_err(|e| fe(format!("Sheet metal wall failed: {e}")))?.shape;
+        }
         let mut reliefs = relief_tools(def, &topo, l, n, front + back)?;
         reliefs.extend(cuts.remove(&fi).unwrap_or_default());
         // The wall in the flat: its outline on the definition plane, reliefs cut.
