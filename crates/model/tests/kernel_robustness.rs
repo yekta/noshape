@@ -2923,3 +2923,28 @@ fn circular_part_pattern_onto_itself_keeps_its_volume() {
         assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), if style == "NONE" { 6 } else { 8 }, "{style}");
     }
 }
+
+/// qa OCCT-MIRROR-OVERCOUNT: a cylinder notched at one side, Part mirror Add
+/// across a plane through its axis: the plain cylinder, 3 faces as live, on
+/// both Boolean paths (OCCT's unify left the mirror's wall patches apart: 8
+/// faces with OCCT's fuse, 4 with the Rust one; merge_cylinder_patches).
+#[test]
+fn part_mirror_of_a_notched_cylinder_is_the_cylinder() {
+    for rust in [false, true] {
+        noshape_kernel::set_rust_boolean(Some(rust));
+        let mut t = T::new();
+        let (_, regions) = t.sketch(&[], &[((0.0, -5.0), 5.0)]);
+        t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+        let (_, regions) = t.sketch(&[], &[((5.0, -5.0), 3.0)]);
+        let n = t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))]);
+        let id = t.ok(n).context.bodies[0].id.clone();
+        let m = t.add("mirror", &[("patternType", en("PART")), ("operationType", en("ADD")), ("entities", q(vec![Reference::Body(id)])), ("mirrorPlane", q(vec![Reference::Plane(DatumPlane::Right)])), ("defaultScope", ParamValue::Bool(true))]);
+        let r = t.ok(m);
+        noshape_kernel::set_rust_boolean(None);
+        let b = &r.context.bodies[0].shape;
+        assert_eq!(r.context.bodies.len(), 1);
+        assert!((volume(&r) - 250.0 * std::f64::consts::PI).abs() < 1e-6, "rust {rust}: {} mm³", volume(&r));
+        assert_eq!(b.count(noshape_kernel::ShapeType::Face), 3, "rust {rust}");
+        assert!(b.is_valid());
+    }
+}

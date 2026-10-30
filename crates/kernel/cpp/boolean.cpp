@@ -88,6 +88,7 @@
 #include <TopoDS_Compound.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
+#include <BRepTools_WireExplorer.hxx>
 #include <Geom_ConicalSurface.hxx>
 #include <BRepExtrema_SelfIntersection.hxx>
 #include <TopoDS_Wire.hxx>
@@ -882,22 +883,49 @@ TopoDS_Shape rotate_round_wires(const TopoDS_Shape& s, int k, HHist& h)
 // place: qa's RUST-MIRROR-NOTCH and RUST-HALF-POCKET-3 (the Rust Boolean's wires
 // start elsewhere than OCCT's). So: on a copy, the volume kept, else again with
 // those wires started further on; none keeping it: not unified.
+// `s` with the sub-shapes of its compounds, solids and shells in reverse
+// order (the same faces).
+TopoDS_Shape faces_reversed(const TopoDS_Shape& s)
+{
+  if (s.ShapeType() == TopAbs_FACE || s.ShapeType() > TopAbs_FACE)
+    return s;
+  std::vector<TopoDS_Shape> kids;
+  for (TopoDS_Iterator it(s, false, false); it.More(); it.Next())
+    kids.push_back(it.Value());
+  TopoDS_Shape r = s.EmptyCopied();
+  BRep_Builder B;
+  for (auto x = kids.rbegin(); x != kids.rend(); ++x)
+    B.Add(r, faces_reversed(*x));
+  r.Closed(s.Closed());
+  return r;
+}
+
 TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
 {
   GProp_GProps g0;
   BRepGProp::VolumeProperties(s, g0);
   const double v0 = g0.Mass();
-  for (int k = 0; k < 8; ++k)
+  // USD's result depends on the order of the faces too (a notched cylinder
+  // fused with its mirror, qa OCCT-MIRROR-OVERCOUNT: one order of the same
+  // faces merged to 4, the other gave 4/3 the volume from every start).
+  for (int k = 0; k < 16; ++k)
   {
     BRepBuilderAPI_Copy cp(s, false, false);
     TopoDS_Shape        in = cp.Shape();
     HHist               hc = new BRepTools_History(to_list(std::vector<TopoDS_Shape>{s}), cp);
     HHist               hr;
-    if (k > 0)
+    if (k >= 8)
+      in = faces_reversed(in);
+    if (k % 8 > 0)
     {
-      in = rotate_round_wires(in, k, hr);
+      in = rotate_round_wires(in, k % 8, hr);
       if (in.IsNull())
-        break;
+      {
+        if (k >= 8)
+          break;
+        k = 7;
+        continue;
+      }
     }
     ShapeUpgrade_UnifySameDomain u(in, true, true, false);
     u.Build();
@@ -1426,6 +1454,201 @@ TopoDS_Shape merge_apex_cones(const TopoDS_Shape& s, HHist& hist)
   return s;
 }
 
+// Two faces on one cylinder that USD leaves apart, sharing one chain of
+// edges (a notched cylinder fused with its mirror: a patch of the mirror's
+// wall filling the notch's bay in the other's, qa OCCT-MIRROR-OVERCOUNT; live
+// one face): on a copy, the first face's wire with that chain replaced by the
+// second's other edges (lines along the axis and circles round it), on the
+// first's surface. The shape unchanged when there's no such pair or the
+// merge doesn't come out valid with the same volume.
+TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist)
+{
+  ShapeAncMap ef;
+  unique_ancestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  auto cyl_of = [](const TopoDS_Face& f, gp_Cylinder& c) {
+    TopLoc_Location                      loc;
+    occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(f, loc));
+    if (cs.IsNull())
+      return false;
+    c = cs->Cylinder().Transformed(loc.Transformation());
+    return true;
+  };
+  auto one_wire = [](const TopoDS_Face& f, TopoDS_Wire& w) {
+    int n = 0;
+    for (TopoDS_Iterator it(f); it.More(); it.Next(), ++n)
+      w = TopoDS::Wire(it.Value());
+    return n == 1;
+  };
+  // The edges of `f`'s wire in order, oriented as `f` (oriented) runs them.
+  auto ordered = [](const TopoDS_Face& f, const TopoDS_Wire& w) {
+    std::vector<TopoDS_Edge> l;
+    for (BRepTools_WireExplorer we(w, f); we.More(); we.Next())
+      l.push_back(we.Current());
+    return l;
+  };
+  // Each pair both ways (the first one's u range must take the second's edges).
+  for (int q = 0; q < 2 * ef.Extent(); ++q)
+  {
+    const int i = q / 2 + 1;
+    if (ef(i).Extent() != 2)
+      continue;
+    const TopoDS_Face a0 = TopoDS::Face(q % 2 == 0 ? ef(i).First() : ef(i).Last()), b0 = TopoDS::Face(q % 2 == 0 ? ef(i).Last() : ef(i).First());
+    gp_Cylinder       ca, cb;
+    if (a0.IsSame(b0) || !cyl_of(a0, ca) || !cyl_of(b0, cb))
+      continue;
+    const double r = ca.Radius();
+    if (!ca.Axis().Direction().IsParallel(cb.Axis().Direction(), 1e-12) || std::abs(cb.Radius() - r) > 1e-9 * r
+        || gp_Lin(ca.Axis()).Distance(cb.Location()) > 1e-9 * (1 + r))
+      continue;
+    TopoDS_Wire wa0, wb0;
+    if (!one_wire(a0, wa0) || !one_wire(b0, wb0))
+      continue;
+    // On a copy from here (the second's edges get curves on the new face).
+    BRepBuilderAPI_Copy cp(s, false, false);
+    const TopoDS_Shape  c     = cp.Shape();
+    auto                image = [&](const TopoDS_Shape& x) {
+      TopoDS_Shape y = cp.ModifiedShape(x);
+      return x.Orientation() == y.Orientation() ? y : y.Reversed();
+    };
+    const TopoDS_Face a = TopoDS::Face(image(a0)), b = TopoDS::Face(image(b0));
+    TopoDS_Wire       wa, wb;
+    one_wire(a, wa);
+    one_wire(b, wb);
+    std::vector<TopoDS_Edge> ea = ordered(a, wa), eb = ordered(b, wb);
+    auto shared = [&](const TopoDS_Edge& e, const std::vector<TopoDS_Edge>& other) {
+      return std::any_of(other.begin(), other.end(), [&](const TopoDS_Edge& x) { return x.IsSame(e); });
+    };
+    // Each list turned to end with its one run of shared edges.
+    auto chain_last = [&](std::vector<TopoDS_Edge>& l, const std::vector<TopoDS_Edge>& other) {
+      const size_t n = l.size();
+      int          runs = 0;
+      size_t       start = 0;
+      for (size_t k = 0; k < n; ++k)
+        if (!shared(l[k], other) && shared(l[(k + 1) % n], other))
+        {
+          ++runs;
+          start = (k + 1) % n;
+        }
+      if (runs != 1)
+        return false;
+      size_t end = start;
+      while (shared(l[end % n], other))
+        ++end;
+      std::rotate(l.begin(), l.begin() + (long)(end % n), l.end());
+      return true;
+    };
+    if (ea.size() < 2 || eb.size() < 2 || !chain_last(ea, eb) || !chain_last(eb, ea))
+      continue;
+    std::vector<TopoDS_Edge> merged, own_a, from_b;
+    for (const TopoDS_Edge& e : ea)
+      if (!shared(e, eb))
+        own_a.push_back(e);
+    for (const TopoDS_Edge& e : eb)
+      if (!shared(e, ea))
+        from_b.push_back(e);
+    if (own_a.empty() || from_b.empty())
+      continue;
+    // a's surface and its u range; b's edges as lines (u fixed) and circles
+    // (v fixed) on it.
+    cyl_of(a, ca);
+    TopLoc_Location                 la;
+    const occ::handle<Geom_Surface> ga = BRep_Tool::Surface(a, la);
+    double                          u0, u1, v0, v1;
+    BRepTools::UVBounds(a, u0, u1, v0, v1);
+    const double tol = std::max(BRep_Tool::Tolerance(a), BRep_Tool::Tolerance(b));
+    auto         uv  = [&](const gp_Pnt& p) {
+      double u, v;
+      ElSLib::Parameters(ca, p, u, v);
+      return std::make_pair(u, v);
+    };
+    // u moved by turns into a's range (false when it can't be).
+    auto into = [&](double& u) {
+      u = u0 + std::fmod(std::fmod(u - u0, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
+      if (u > u1 + 1e-9 && u - 2 * M_PI >= u0 - 1e-9)
+        u -= 2 * M_PI;
+      return u >= u0 - 1e-9 && u <= u1 + 1e-9;
+    };
+    TopoDS_Face TF;
+    BRep_Builder B;
+    B.MakeFace(TF, ga, la, BRep_Tool::Tolerance(a));
+    bool ok = true;
+    for (const TopoDS_Edge& e : from_b)
+    {
+      BRepAdaptor_Curve cc(e);
+      const double      f = cc.FirstParameter(), l = cc.LastParameter(), m = 0.5 * (f + l);
+      auto              pf = uv(cc.Value(f)), pm = uv(cc.Value(m));
+      if (ElSLib::Value(pm.first, pm.second, ca).Distance(cc.Value(m)) > tol)
+      {
+        ok = false;
+        break;
+      }
+      occ::handle<Geom2d_Curve> c2;
+      if (cc.GetType() == GeomAbs_Line && std::abs(std::remainder(pm.first - pf.first, 2 * M_PI)) < 1e-9)
+      {
+        double um = pm.first;
+        const double dv = pm.second - pf.second, slope = dv > 0 ? 1.0 : -1.0;
+        if (!into(um) || std::abs(std::abs(dv) - (m - f)) > 1e-7)
+          ok = false;
+        c2 = new Geom2d_Line(gp_Pnt2d(um, pm.second - slope * m), gp_Dir2d(0, slope));
+      }
+      else if (cc.GetType() == GeomAbs_Circle && std::abs(pm.second - pf.second) < tol)
+      {
+        double       um = pm.first;
+        const double du = std::remainder(pm.first - pf.first, 2 * M_PI), slope = du > 0 ? 1.0 : -1.0;
+        if (!into(um) || std::abs(std::abs(du) - (m - f)) > 1e-7 || std::min(um + slope * (f - m), um + slope * (l - m)) < u0 - 1e-9
+            || std::max(um + slope * (f - m), um + slope * (l - m)) > u1 + 1e-9)
+          ok = false;
+        c2 = new Geom2d_Line(gp_Pnt2d(um - slope * m, pm.second), gp_Dir2d(slope, 0));
+      }
+      else
+        ok = false;
+      if (!ok)
+        break;
+      B.UpdateEdge(e, c2, TF, tol);
+    }
+    if (!ok)
+      continue;
+    // As a's TShape has them (a's orientation in the shell undone).
+    const bool  flip = a.Orientation() == TopAbs_REVERSED;
+    TopoDS_Wire W;
+    B.MakeWire(W);
+    for (const std::vector<TopoDS_Edge>* l : {&own_a, &from_b})
+      for (const TopoDS_Edge& e : *l)
+        B.Add(W, flip ? e.Reversed() : TopoDS_Shape(e));
+    W.Closed(true);
+    B.Add(TF, flip ? W.Reversed() : TopoDS_Shape(W));
+    if (!BRepCheck_Analyzer(TF).IsValid())
+      continue;
+    occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+    rs->Replace(a.Oriented(TopAbs_FORWARD), TF);
+    rs->Remove(b);
+    const TopoDS_Shape out = rs->Apply(c);
+    if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+      continue;
+    GProp_GProps g0, g1;
+    BRepGProp::VolumeProperties(s, g0);
+    BRepGProp::VolumeProperties(out, g1);
+    if (std::abs(g1.Mass() - g0.Mass()) > 1e-9 * std::abs(g0.Mass()))
+      continue;
+    if (hist.IsNull())
+      hist = new BRepTools_History();
+    hist->Merge(new BRepTools_History(to_list(std::vector<TopoDS_Shape>{s}), cp));
+    HHist h = rs->History();
+    if (h.IsNull())
+      h = new BRepTools_History();
+    if (h->Modified(a).IsEmpty())
+      h->AddModified(a, TF);
+    h->AddModified(b, TF);
+    for (const TopoDS_Edge& e : ea)
+      if (shared(e, eb))
+        h->Remove(e);
+    hist->Merge(h);
+    // One pair at a time: the shape changed, look again.
+    return merge_cylinder_patches(out, hist);
+  }
+  return s;
+}
+
 // The unify, looking only in `sc` when given (UnifyScope); `clean` (when
 // given) says whether the result has nothing more to merge.
 TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean)
@@ -1456,7 +1679,7 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
   lap = std::make_unique<KernelTimer>("unify.usd");
   const TopoDS_Shape s1 = merge_apex_cones(merge_cylinder_bands(s, hist), hist);
   if (TopExp_Explorer(s1, TopAbs_SOLID).More() && round_candidates(s1, sc != nullptr ? &next : nullptr))
-    return usd_kept_volume(s1, hist);
+    return merge_cylinder_patches(usd_kept_volume(s1, hist), hist);
   ShapeUpgrade_UnifySameDomain u(s1, true, true, false);
   u.Build();
   if (!u.History().IsNull())

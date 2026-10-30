@@ -138,6 +138,13 @@ skasm's now; see docs/handoff/skasm.md.
   located and there are <= 8 tools without glue; an impossible one is built again on copies with the locations
   baked in (path "occt_baked"; the history by index holds for the copies). T1
   `kernel_robustness::circular_part_pattern_onto_itself_keeps_its_volume`.
+- OCCT-MIRROR-OVERCOUNT (a cylinder notched at one side, Part mirror Add across a plane through its axis): 3
+  faces as live on both Boolean paths (were 8 with OCCT's fuse, 4 with the Rust one). usd_kept_volume also tries
+  the shells' faces in reverse order (USD's result depends on it: one order of the same 10 faces gave 4/3 the
+  volume from every start, the other merged to 4); then `merge_cylinder_patches` (after the unify): two faces on
+  one cylinder sharing one chain of edges (the mirror's wall patch in the notch's bay) become the first one's wire
+  with the chain replaced by the second's other edges (lines along the axis, circles round it), on a copy, kept
+  only valid with the same volume. T1 `kernel_robustness::part_mirror_of_a_notched_cylinder_is_the_cylinder`.
 - For skasm: T2 `sheetmetal_frames::convert_rips_and_bends_like_onshape` now fails alone too (BUTT: top wall max x
   39.98 mm), on main since 969c5069 (std sheet metal by default); the 21:34 T2 before it passed.
 
