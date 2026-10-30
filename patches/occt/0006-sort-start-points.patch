@@ -1,0 +1,133 @@
+diff -ru a/src/ModelingAlgorithms/TKGeomAlgo/IntCurveSurface/IntCurveSurface_InterUtils.pxx b/src/ModelingAlgorithms/TKGeomAlgo/IntCurveSurface/IntCurveSurface_InterUtils.pxx
+--- a/src/ModelingAlgorithms/TKGeomAlgo/IntCurveSurface/IntCurveSurface_InterUtils.pxx	2026-10-30 06:45:56.663456241 +0000
++++ b/src/ModelingAlgorithms/TKGeomAlgo/IntCurveSurface/IntCurveSurface_InterUtils.pxx	2026-10-30 06:45:56.672473523 +0000
+@@ -44,6 +44,8 @@
+ #include <math_FunctionSetRoot.hxx>
+ #include <NCollection_DynamicArray.hxx>
+ #include <Precision.hxx>
++#include <algorithm>
++#include <vector>
+ #include <ProjLib_Plane.hxx>
+ #include <gp_Pnt.hxx>
+ #include <NCollection_Array2.hxx>
+@@ -1376,74 +1378,66 @@
+ }
+ 
+ //! Sort start points by W, then U, then V parameters.
+-//! Uses bubble sort to eliminate duplicates.
++//! noshape: the three bubble sorts' result in O(n log n) (they were 72 % of a
++//! Boolean of two fuzz parts whose rational B-spline slivers gave thousands of
++//! start points): a stable sort by W; runs whose W is within ptol of the run's
++//! first take that W and are sorted (stably) by U; runs of those whose U is
++//! within ptol of the run's first take that U and have their V values sorted.
+ inline void SortStartPoints(SortedStartPoints& thePoints)
+ {
+-  int NbStartPoints = thePoints.Size();
+-  if (NbStartPoints == 0)
++  const int aNb = thePoints.Size();
++  if (aNb == 0)
+   {
+     return;
+   }
+-
+-  double ptol = 10 * Precision::PConfusion();
+-
+-  // Sort by W
+-  bool Triok;
+-  do
++  const double ptol = 10 * Precision::PConfusion();
++  struct Pnt
++  {
++    double W, U, V;
++  };
++  std::vector<Pnt> aP((size_t)aNb);
++  for (int i = 0; i < aNb; i++)
+   {
+-    Triok = true;
+-    for (int i = 1; i < NbStartPoints; i++)
++    aP[(size_t)i] = {thePoints.TabW(i), thePoints.TabU(i), thePoints.TabV(i)};
++  }
++  std::stable_sort(aP.begin(), aP.end(), [](const Pnt& a, const Pnt& b) { return a.W < b.W; });
++  for (size_t s = 0; s < aP.size();)
++  {
++    size_t e = s + 1;
++    while (e < aP.size() && aP[e].W - aP[s].W < ptol)
+     {
+-      int im1 = i - 1;
+-      if (thePoints.TabW(i) < thePoints.TabW(im1))
+-      {
+-        std::swap(thePoints.TabW.ChangeValue(i), thePoints.TabW.ChangeValue(im1));
+-        std::swap(thePoints.TabU.ChangeValue(i), thePoints.TabU.ChangeValue(im1));
+-        std::swap(thePoints.TabV.ChangeValue(i), thePoints.TabV.ChangeValue(im1));
+-        Triok = false;
+-      }
++      aP[e].W = aP[s].W;
++      e++;
+     }
+-  } while (!Triok);
+-
+-  // Sort by U for same W
+-  do
+-  {
+-    Triok = true;
+-    for (int i = 1; i < NbStartPoints; i++)
++    std::stable_sort(aP.begin() + (long)s, aP.begin() + (long)e, [](const Pnt& a, const Pnt& b) { return a.U < b.U; });
++    for (size_t a = s; a < e;)
+     {
+-      int im1 = i - 1;
+-      if ((thePoints.TabW(i) - thePoints.TabW(im1)) < ptol)
++      size_t b = a + 1;
++      while (b < e && aP[b].U - aP[a].U < ptol)
+       {
+-        thePoints.TabW.ChangeValue(i) = thePoints.TabW(im1);
+-        if (thePoints.TabU(i) < thePoints.TabU(im1))
+-        {
+-          std::swap(thePoints.TabU.ChangeValue(i), thePoints.TabU.ChangeValue(im1));
+-          std::swap(thePoints.TabV.ChangeValue(i), thePoints.TabV.ChangeValue(im1));
+-          Triok = false;
+-        }
++        aP[b].U = aP[a].U;
++        b++;
+       }
+-    }
+-  } while (!Triok);
+-
+-  // Sort by V for same W and U
+-  do
+-  {
+-    Triok = true;
+-    for (int i = 1; i < NbStartPoints; i++)
+-    {
+-      int im1 = i - 1;
+-      if (((thePoints.TabW(i) - thePoints.TabW(im1)) < ptol)
+-          && ((thePoints.TabU(i) - thePoints.TabU(im1)) < ptol))
++      std::vector<double> aV;
++      for (size_t k = a; k < b; k++)
+       {
+-        thePoints.TabU.ChangeValue(i) = thePoints.TabU(im1);
+-        if (thePoints.TabV(i) < thePoints.TabV(im1))
+-        {
+-          std::swap(thePoints.TabV.ChangeValue(i), thePoints.TabV.ChangeValue(im1));
+-          Triok = false;
+-        }
++        aV.push_back(aP[k].V);
+       }
++      std::sort(aV.begin(), aV.end());
++      for (size_t k = a; k < b; k++)
++      {
++        aP[k].V = aV[k - a];
++      }
++      a = b;
+     }
+-  } while (!Triok);
++    s = e;
++  }
++  for (int i = 0; i < aNb; i++)
++  {
++    thePoints.TabW.ChangeValue(i) = aP[(size_t)i].W;
++    thePoints.TabU.ChangeValue(i) = aP[(size_t)i].U;
++    thePoints.TabV.ChangeValue(i) = aP[(size_t)i].V;
++  }
+ }
+ 
+ //! Process sorted start points through exact intersection.

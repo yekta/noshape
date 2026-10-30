@@ -268,6 +268,14 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
   min_distance (~140 calls, ~0.8 ms each, BRepExtrema rebuilt per call).
 
 ## OCCT patches (patches/occt)
+- 0006 (10-30) TKGeomAlgo IntCurveSurface_InterUtils.pxx `SortStartPoints`: OCCT's three bubble sorts of a curve /
+  surface intersection's start points (O(n²): 72–80 % of a Boolean of two of qa's hang402 fuzz parts, whose rational
+  B-spline slivers give thousands of points) as one stable sort and two run sorts, O(n log n), bit-identical (20 000
+  random near-tie cases against the old code: /root/core-scratch/occt0006/eq). The pair fuse 19 → 6 s; the
+  12-body Merge-with-all fuse of MIRROR-HANG-402 now stops at its memory budget after 105 s instead of failing after
+  732 s. The header is also compiled into TKHLR (HLRBRep_InterCSurf.cxx): both libs rebuilt (static linking keeps
+  one inline copy: with TKHLR's old one linked first the patch didn't take). Libs: /root/core-scratch/libTKGeomAlgo.a.0006,
+  libTKHLR.a.0006; the old ones in /root/core-scratch/occt-lib-backup/*.pre0006.
 - 0001 kern's congruent-pair reuse (TKBO). 0002 core's crash fixes (TKOffset Draft_Modification_1, TKGeomBase
   Extrema_ExtCS, TKShHealing ShapeUpgrade_UnifySameDomain). Local: patched sources in /root/core-scratch/occt-patch/b,
   built in /root/kern-scratch/occt-build (`cmake --build build --target <TK>`), the .a swapped into /root/occt/lib with
