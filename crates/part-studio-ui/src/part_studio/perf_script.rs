@@ -35,6 +35,14 @@ pub(super) fn from_env() -> Option<Script> {
 }
 
 impl PartStudioView {
+    /// A stage of the step in progress (the regeneration scheduled, its result in, its display applied), logged
+    /// with the time since the step began: where an undo's time goes (COMMIT-LATENCY).
+    pub(super) fn perf_script_note(&self, what: &str) {
+        if let Some(Script::Edited(t) | Script::EditUndone(t) | Script::Redone(t) | Script::Deleted(t) | Script::Undone(t)) = &self.perf_script {
+            log::info!(target: "perf", "perf script: {what} at {:.1} ms", t.elapsed().as_secs_f64() * 1e3);
+        }
+    }
+
     /// A full display was applied: the script's next step.
     pub(super) fn perf_script_step(&mut self, cx: &mut Context<Self>) {
         let Some(step) = self.perf_script.take() else { return };
@@ -77,13 +85,17 @@ impl PartStudioView {
             }
             Script::Edited(t) => {
                 log::info!(target: "perf", "perf script: commit shown in {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
+                let t = Instant::now();
                 self.doc.update(cx, |doc, cx| doc.undo(cx));
-                Script::EditUndone(Instant::now())
+                log::info!(target: "perf", "perf script: undo call {:.1} ms", t.elapsed().as_secs_f64() * 1e3);
+                Script::EditUndone(t)
             }
             Script::EditUndone(t) => {
                 log::info!(target: "perf", "perf script: undo shown in {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
+                let t = Instant::now();
                 self.doc.update(cx, |doc, cx| doc.redo(cx));
-                Script::Redone(Instant::now())
+                log::info!(target: "perf", "perf script: redo call {:.1} ms", t.elapsed().as_secs_f64() * 1e3);
+                Script::Redone(t)
             }
             Script::Redone(t) => {
                 log::info!(target: "perf", "perf script: redo shown in {:.0} ms", t.elapsed().as_secs_f64() * 1e3);

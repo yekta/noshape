@@ -341,6 +341,8 @@ pub struct PartStudioView {
     ui: behaviors::UiState,
     /// `NOSHAPE_PERF_SCRIPT` (benchmarks).
     perf_script: Option<perf_script::Script>,
+    /// When the last regeneration was asked for: a burst (typing) waits a little to coalesce (`schedule_regen`).
+    last_regen_request: Option<std::time::Instant>,
     _subs: Vec<Subscription>,
 }
 
@@ -467,6 +469,7 @@ impl PartStudioView {
             flat_view: None,
             ui: behaviors::UiState::new(cx),
             perf_script: perf_script::from_env(),
+            last_regen_request: None,
             _subs: subs,
         };
         // Graphics preferences apply live (camera and render options dialog).
@@ -541,6 +544,7 @@ impl PartStudioView {
     #[track_caller]
     pub fn schedule_regen(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let caller = std::panic::Location::caller();
+        self.perf_script_note("regen scheduled");
         // Paused regeneration (Onshape): edits wait until "Regenerate".
         if self.ui.regen_paused.is_some() && !std::mem::take(&mut self.ui.force_regen) {
             // Nothing starts: an "Opening…" waiting for this run goes. The
@@ -582,9 +586,15 @@ impl PartStudioView {
         // View in high quality (Shift+R, kept for the session once used):
         // the Very fine level, refined to view by view.
         let deflection = RegenOptions::default().relative_deflection * if self.ui.high_quality_seen { 0.25 } else { 1.0 };
+        // Coalesce bursts of edits (typing in a field): wait a little only when another request came just now. A
+        // lone one (a commit, undo, redo) starts at once: the timer fired ~180 ms late on a busy machine, and macOS
+        // coalesces a background window's timers, which made undo 200–360 ms on the perf runners (COMMIT-LATENCY).
+        let burst = self.last_regen_request.is_some_and(|t| t.elapsed() < Duration::from_millis(100));
+        self.last_regen_request = Some(std::time::Instant::now());
         self.regen_task = Some(cx.spawn_in(window, async move |this, cx| {
-            // Coalesce bursts of edits (typing in a field).
-            cx.background_executor().timer(Duration::from_millis(12)).await;
+            if burst {
+                cx.background_executor().timer(Duration::from_millis(12)).await;
+            }
             let result = cx
                 .background_spawn(async move {
                     let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, relative_deflection: deflection, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), ..Default::default() };
@@ -611,6 +621,7 @@ impl PartStudioView {
                 if !refine {
                     this.end_pending(seq, cx);
                 }
+                this.perf_script_note(if refine { "preview result in" } else { "result in" });
                 this.context = Some(result.context.clone());
                 scene_builder::log_regen_perf(if refine { "preview" } else { "full" }, &result.display, &studio);
                 let display = Arc::new(result.display);
@@ -619,6 +630,7 @@ impl PartStudioView {
                     crate::start_thumbnail::regen_done(&path, this.tab, made, cx);
                 }
                 this.apply_display(display, window, cx);
+                this.perf_script_note("display applied");
                 if !refine {
                     this.perf_script_step(cx);
                 }

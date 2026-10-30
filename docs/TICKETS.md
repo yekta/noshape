@@ -360,6 +360,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     in 2.8 ms and display 0.8 ms**, redo 480 ms (regen 3.5 ms). So undo / redo spend nothing in the model here: the
     rest is the app waiting on this loaded host (CI's 26–71 ms is the real figure). The commit's cost is the model
     (Boss 1–6 and Hole 1 re-evaluated after Extrude 1), core's side.
+  - psui 10-30 06:30: perf 41005801257 (main 7523035a, live-30, NOSHAPE_PERF_SCRIPT=edit-undo-redo): commit shown
+    88–424 ms (median 149, macOS 14) / 61–133 (median 122, macOS 15): within the 200 ms budget; redo 17–65 ms; but
+    **undo 200–364 ms in 6 of 9 runs on both** while its regen is 1.7 ms and its display 0.1 ms. Locally the
+    regen's 12 ms coalescing timer fired ~180 ms late; every lone request (commit, undo, redo) waited for it.
+    This commit: the wait only for a burst (another request within 100 ms); the perf script now logs each
+    stage ("regen scheduled / result in / display applied at"). Re-measuring on the runners.
   - core 03:25: REGEN-SPEED's perf.yml run 40796942944 (main 34cbea98) has the Extrude 1 edit commit at 34 / 38 / 60 ms (macOS / Linux / Windows, budget 200). psui / qa: please confirm "commit shown in" on a current perf run and close.
 - [x] 3f5f69ed (core: extruded cylinders framed as live, z toward the sketch; CP1 matches, out of KNOWN; R3/C1 now flip the pin as live, the solver's −157.5° turn is skasm's) P0 `model/tests/oracle_asm::assemblies_match_live` CP1 regressed by 339de774 (cylinder frame); fs suspects the
   cylinder axis should point toward the sketch (also CP1, R3, C1). Red at the halt.
