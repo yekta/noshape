@@ -807,6 +807,24 @@ fn seg_range(segs: &[[[f64; 2]; 2]], axis: usize) -> f64 {
     hi - lo
 }
 
+/// Exclude from cut (V28): a part the broken-out section excludes stays
+/// whole.
+#[test]
+fn broken_out_exclude_from_cut_leaves_the_part_whole() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let (key, _) = super::views::view_source(&drawing.sheets[0], ViewId(1)).unwrap();
+    let all: Vec<crate::reference::BodyId> = sources[&key].context.bodies.iter().map(|b| b.id.clone()).collect();
+    let profile = vec![[-0.02, -0.003], [0.0, -0.005], [0.02, -0.003], [0.022, 0.015], [-0.022, 0.015]];
+    let bo = |exclude: Vec<crate::reference::BodyId>| BrokenOut { profile: profile.clone(), spline: true, depth: 0.03, depth_ref: None, offset: 0.0, exclude };
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out = vec![bo(Vec::new())];
+    assert!(!compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, true).section_segments.is_empty());
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out = vec![bo(all)];
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, true);
+    assert!(g.error.is_none() && g.section_segments.is_empty(), "{:?}", g.error);
+}
+
 #[test]
 fn broken_out_section_exposes_interior() {
     let (doc, mut drawing) = demo();
@@ -817,7 +835,7 @@ fn broken_out_section_exposes_interior() {
     // Front view (x right, z up): open the plate down to its middle (y = 0)
     // around the center hole.
     let profile = vec![[-0.02, -0.003], [0.0, -0.005], [0.02, -0.003], [0.022, 0.015], [-0.022, 0.015]];
-    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile: profile.clone(), spline: true, depth: 0.03, depth_ref: None, offset: 0.0 });
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile: profile.clone(), spline: true, depth: 0.03, depth_ref: None, offset: 0.0, exclude: Vec::new() });
     let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, true);
     assert!(g.error.is_none(), "{:?}", g.error);
     assert!(!g.section_segments.is_empty(), "pocket floor is hatched");
@@ -840,7 +858,7 @@ fn broken_out_section_exposes_interior() {
     let ctx = sources[&SourceKey::studio(studio)].context.clone();
     let back = views::vertex_ref_near(&ctx, glam::DVec3::new(-0.05, 0.03, 0.0), 1e-6).expect("back vertex");
     let frame = g.frame.unwrap();
-    let bo = BrokenOut { profile, spline: true, depth: 0.0, depth_ref: Some(back.clone()), offset: 0.0 };
+    let bo = BrokenOut { profile, spline: true, depth: 0.0, depth_ref: Some(back.clone()), offset: 0.0, exclude: Vec::new() };
     assert!((views::broken_out_depth(&ctx, None, &frame, &bo) - 0.06).abs() < 1e-9);
     // Its depth point gone after an update (help V29): the profile is drawn
     // red, the stored depth still cuts.
@@ -866,7 +884,7 @@ fn projected_views_inherit_broken_out_and_section_cuts() {
     // top view (2), cut along the front view's direction.
     let before = compute_view(&drawing, &drawing.sheets[0], ViewId(2), &sources, &cache, false);
     let profile = vec![[-0.02, -0.003], [0.0, -0.005], [0.02, -0.003], [0.022, 0.015], [-0.022, 0.015]];
-    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile, spline: true, depth: 0.03, depth_ref: None, offset: 0.0 });
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile, spline: true, depth: 0.03, depth_ref: None, offset: 0.0, exclude: Vec::new() });
     let cuts = views::broken_out_cuts(&drawing, &drawing.sheets[0], ViewId(2));
     assert_eq!(cuts.len(), 1);
     assert_eq!(Some(cuts[0].1), views::view_frame(&drawing, &drawing.sheets[0], ViewId(1)));

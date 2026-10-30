@@ -151,7 +151,7 @@ impl DrawingEditor {
     }
 
     /// The part whose view edge is under a sheet point.
-    fn edge_body_at(&self, c: [f64; 2]) -> Option<noshape_model::BodyId> {
+    pub fn edge_body_at(&self, c: [f64; 2]) -> Option<noshape_model::BodyId> {
         use noshape_model::drawing::build::PickTarget;
         let b = self.built.as_ref()?;
         let PickTarget::Edge { view, edge } = b.picks.get(b.hit(c, self.tol_mm(5.0))? as usize)?.clone() else { return None };

@@ -1742,7 +1742,7 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
         b.spline.hash(&mut h);
         fx(b.depth, &mut h);
         fx(b.offset, &mut h);
-        format!("{:?}", b.depth_ref).hash(&mut h);
+        format!("{:?}{:?}", b.depth_ref, b.exclude).hash(&mut h);
         for p in &b.profile {
             fx(p[0], &mut h);
             fx(p[1], &mut h);
@@ -2629,7 +2629,7 @@ fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, view: &
     let diag = bodies_diagonal(&bodies);
     let center = bodies_center(&bodies);
     let margin = diag * 0.05 + 1e-4;
-    let mut tools: Vec<Shape> = Vec::new();
+    let mut tools: Vec<(Shape, &[BodyId])> = Vec::new();
     let mut regions: Vec<(Vec<[f64; 2]>, f64, ViewFrame)> = Vec::new();
     let mut error = None;
     // Each profile is cut along the frame of the view it was drawn in (a
@@ -2649,7 +2649,7 @@ fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, view: &
         // Plane coordinates of `view_plane` are the view coordinates.
         let plane = view_plane(frame, front - margin);
         match noshape_kernel::make_face_2d(&plane, &segs, &[]).and_then(|f| noshape_kernel::extrude(&f, frame.dir * (depth + margin))) {
-            Ok(t) => tools.push(t.shape),
+            Ok(t) => tools.push((t.shape, &b.exclude)),
             Err(e) => error = Some(format!("Broken-out section failed: {e}")),
         }
         regions.push((poly, front + depth, *frame));
@@ -2662,8 +2662,29 @@ fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, view: &
         }
         return g;
     }
-    let tool = Ok(if tools.len() == 1 { tools.remove(0) } else { Shape::compound(&tools) });
-    let (pbs, faces, err2) = cut_bodies(&bodies, &tool, frame.dir);
+    // Exclude from cut: each part takes the sections that don't exclude it
+    // (parts grouped by that set; none: the part whole).
+    let mut groups: Vec<(Vec<usize>, Vec<&Arc<Body>>)> = Vec::new();
+    for b in &bodies {
+        let set: Vec<usize> = (0..tools.len()).filter(|i| !tools[*i].1.contains(&b.id)).collect();
+        match groups.iter_mut().find(|g| g.0 == set) {
+            Some(g) => g.1.push(b),
+            None => groups.push((set, vec![b])),
+        }
+    }
+    let (mut pbs, mut faces, mut err2) = (Vec::new(), Vec::new(), None);
+    for (set, bs) in groups {
+        if set.is_empty() {
+            pbs.extend(bs.iter().map(|b| ProjBody { body: b, shape: b.shape.clone(), edge_map: None }));
+            continue;
+        }
+        let shapes: Vec<Shape> = set.iter().map(|i| tools[*i].0.clone()).collect();
+        let tool = Ok(if shapes.len() == 1 { shapes[0].clone() } else { Shape::compound(&shapes) });
+        let (p, f, e) = cut_bodies(&bs, &tool, frame.dir);
+        pbs.extend(p);
+        faces.extend(f);
+        err2 = err2.or(e);
+    }
     // Vertices removed by a pocket are no snap points.
     let tol = diag * 1e-7;
     let keep = |_: usize, p: DVec3| !regions.iter().any(|(poly, floor, f)| p.dot(f.dir) < floor - tol && point_in_polygon(f.project(p), poly));

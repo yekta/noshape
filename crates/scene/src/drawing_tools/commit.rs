@@ -709,7 +709,7 @@ pub fn broken_out_refused(sheet: &noshape_model::drawing::Sheet, view: ViewId) -
 pub fn broken_out(profile: Vec<[f64; 2]>, spline: bool, depth: Option<f64>, depth_ref: Option<PointRef>, offset: f64) -> Option<BrokenOut> {
     let depth = depth.filter(|d| d.is_finite() && *d > 0.0).or(depth_ref.as_ref().map(|_| 0.0))?;
     let offset = if depth_ref.is_some() && offset.is_finite() { offset } else { 0.0 };
-    Some(BrokenOut { profile, spline, depth, depth_ref, offset })
+    Some(BrokenOut { profile, spline, depth, depth_ref, offset, exclude: Vec::new() })
 }
 
 /// The Broken-out section dialog's Blind depth (live: 25 mm, 1 in in

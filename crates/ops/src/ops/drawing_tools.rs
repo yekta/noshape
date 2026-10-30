@@ -234,6 +234,7 @@ pub fn ops() -> Vec<Op> {
                     opt("depth", json!({ "type": ["string", "number"] }), "Blind depth: a length (\"5 mm\"; a bare number is in workspace units)."),
                     opt("depth_to", point(), "Up to entity: a model point (vertex, circle center...) of a view of the same model (sheet mm)."),
                     opt("offset", json!({ "type": ["string", "number"] }), "Up to entity: the Offset past the point (a length; negative stops short)."),
+                    opt("exclude", json!({ "type": "array", "items": { "type": "string" } }), "Exclude from cut: parts left whole (`body:…`)."),
                     opt("index", json!({ "type": "integer", "minimum": 0 }), "Edit the view's broken-out section number `index` (0-based, drawing_get) instead of adding one."),
                 ],
             ),
@@ -1100,7 +1101,15 @@ fn broken_out_section(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => 0.0,
     };
     let spline = index.and_then(|i| t.d.sheets[t.sheet].view(view)?.broken_out.get(i).map(|b| b.spline)).unwrap_or(true);
-    let b = dt::broken_out(pts, spline, depth, depth_ref, offset).ok_or_else(|| OpError::param("depth", "Invalid depth"))?;
+    let mut b = dt::broken_out(pts, spline, depth, depth_ref, offset).ok_or_else(|| OpError::param("depth", "Invalid depth"))?;
+    if let Some(list) = a.opt_array("exclude")? {
+        for (i, x) in list.iter().enumerate() {
+            match x.as_str().and_then(refs::parse_str) {
+                Some(noshape_model::reference::Reference::Body(x)) => b.exclude.push(x),
+                _ => return Err(OpError::param(&format!("exclude[{i}]"), "a part id (`body:…`)")),
+            }
+        }
+    }
     edit_view(&mut t, view, |v| dt::set_broken_out(v, index, b));
     done(od, t, "Broken-out section", "view", view.0)
 }

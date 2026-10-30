@@ -418,7 +418,13 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                 j["breaks"] = json!(v.breaks.len());
             }
             if !v.broken_out.is_empty() {
-                j["broken_out"] = v.broken_out.iter().map(|b| if b.depth_ref.is_some() { json!({ "up_to_point": true, "offset_mm": r3(b.offset * 1000.0) }) } else { json!({ "depth_mm": r3(b.depth * 1000.0) }) }).collect();
+                j["broken_out"] = v.broken_out.iter().map(|b| {
+                        let mut j = if b.depth_ref.is_some() { json!({ "up_to_point": true, "offset_mm": r3(b.offset * 1000.0) }) } else { json!({ "depth_mm": r3(b.depth * 1000.0) }) };
+                        if !b.exclude.is_empty() {
+                            j["excluded_parts"] = json!(b.exclude.len());
+                        }
+                        j
+                    }).collect();
             }
             let pl = m.built.as_ref().and_then(|b| b.placement(v.id)).copied();
             if let Some(pl) = pl {

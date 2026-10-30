@@ -309,6 +309,9 @@ pub struct BrokenOut {
     pub depth_ref: Option<PointRef>,
     #[serde(default)]
     pub offset: f64,
+    /// Exclude from cut: parts this section leaves whole (assembly views).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude: Vec<BodyId>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

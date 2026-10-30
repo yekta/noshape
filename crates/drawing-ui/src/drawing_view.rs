@@ -84,7 +84,9 @@ pub enum Panel {
     /// Depth of a new (`edit` None) or existing broken-out section.
     /// Live's panel: [Up to entity | Blind]; Up to entity takes a model
     /// point ("Depth of section cut") and ☐ Offset, Blind a Depth.
-    BrokenOut { view: ViewId, edit: Option<usize>, profile: Vec<[f64; 2]>, spline: bool, up_to: bool, depth: Entity<InputState>, depth_ref: Option<PointRef>, offset: Option<Entity<InputState>> },
+    /// `exclude`: Exclude from cut (assembly views); `picking`: its field
+    /// takes clicks on parts.
+    BrokenOut { view: ViewId, edit: Option<usize>, profile: Vec<[f64; 2]>, spline: bool, up_to: bool, depth: Entity<InputState>, depth_ref: Option<PointRef>, offset: Option<Entity<InputState>>, exclude: Vec<noshape_model::BodyId>, picking: bool },
     /// Angle of a straight cutting line.
     CutAngle { view: ViewId, input: Entity<InputState> },
     /// Table cell formatting; `scope`: 0 cell, 1 row, 2 column, 3 table.

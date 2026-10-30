@@ -3804,6 +3804,7 @@ Examples:
 | `depth` | string or number |  | Blind depth: a length ("5 mm"; a bare number is in workspace units). |
 | `depth_to` | array of number |  | Up to entity: a model point (vertex, circle center...) of a view of the same model (sheet mm). |
 | `offset` | string or number |  | Up to entity: the Offset past the point (a length; negative stops short). |
+| `exclude` | array of string |  | Exclude from cut: parts left whole (`body:…`). |
 | `index` | integer |  | Edit the view's broken-out section number `index` (0-based, drawing_get) instead of adding one. |
 
 #### drawing_edit_hatch

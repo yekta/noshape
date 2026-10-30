@@ -144,6 +144,20 @@ impl DrawingEditor {
                 }
             }
             Tool::BrokenOut { done: true, .. } => {
+                // Exclude from cut: a click on a part toggles it.
+                if let Some(Panel::BrokenOut { picking: true, .. }) = &self.panel {
+                    let body = self.edge_body_at(c);
+                    if let (Some(body), Some(Panel::BrokenOut { exclude, .. })) = (body, &mut self.panel) {
+                        match exclude.iter().position(|b| *b == body) {
+                            Some(i) => {
+                                exclude.remove(i);
+                            }
+                            None => exclude.push(body),
+                        }
+                    }
+                    cx.notify();
+                    return true;
+                }
                 // Up to entity: a snap point (in any view of the same model) sets the depth.
                 if let Some(p) = self.snap_at(c)
                     && let Some(r) = p.r.clone()
@@ -224,7 +238,7 @@ impl DrawingEditor {
                 let d = noshape_scene::drawing_tools::broken_out_blind_default(u);
                 let depth = self.input(&format::format_number(d / u.meters(), None, 3), window, cx);
                 Self::focus_input(&depth, window, cx);
-                self.panel = Some(Panel::BrokenOut { view, edit: None, profile: points, spline: true, up_to: false, depth, depth_ref: None, offset: None });
+                self.panel = Some(Panel::BrokenOut { view, edit: None, profile: points, spline: true, up_to: false, depth, depth_ref: None, offset: None, exclude: Vec::new(), picking: false });
                 self.update_preview(cx);
                 true
             }
@@ -478,7 +492,7 @@ impl DrawingEditor {
         let depth = self.input(&format::format_number(blind / u.meters(), None, 4), window, cx);
         Self::focus_input(&depth, window, cx);
         let offset = (b.offset != 0.0).then(|| self.input(&format::format_number(b.offset / u.meters(), None, 4), window, cx));
-        self.panel = Some(Panel::BrokenOut { view, edit: Some(index), profile: b.profile, spline: b.spline, up_to: b.depth_ref.is_some(), depth, depth_ref: b.depth_ref, offset });
+        self.panel = Some(Panel::BrokenOut { view, edit: Some(index), profile: b.profile, spline: b.spline, up_to: b.depth_ref.is_some(), depth, depth_ref: b.depth_ref, offset, exclude: b.exclude, picking: false });
         cx.notify();
     }
 
@@ -505,8 +519,11 @@ impl DrawingEditor {
         let units = format::length_units(&self.drawing, &DimFormat::default()).symbol();
         let panel = self.panel.as_ref()?;
         Some(match panel {
-            Panel::BrokenOut { up_to, depth, depth_ref, offset, .. } => {
+            Panel::BrokenOut { view, up_to, depth, depth_ref, offset, exclude, picking, .. } => {
                 let up = *up_to;
+                // Exclude from cut: assembly views only (as Section view's).
+                let assembly = views::view_source(self.current_sheet(), *view).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly);
+                let (n, on) = (exclude.len(), *picking);
                 // [Up to entity | Blind] (live).
                 let mode = |id: &'static str, label: &'static str, v: bool, cx: &mut Context<Self>| {
                     Button::new(id).label(label).xsmall().when(v == up, |b| b.primary()).when(v != up, |b| b.outline()).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -539,6 +556,27 @@ impl DrawingEditor {
                     }
                 } else {
                     rows.push(Self::label_row("Depth", h_flex().gap_2().child(Input::new(depth).xsmall().w(px(80.))).child(div().text_xs().text_color(pal.text_faint).child(units)).into_any_element()));
+                }
+                if assembly {
+                    let field = div()
+                        .id("dr-bo-exclude")
+                        .h(px(24.))
+                        .px(px(6.))
+                        .flex()
+                        .items_center()
+                        .text_xs()
+                        .border_1()
+                        .border_color(if on { pal.accent } else { gpui_kit::rgb(0xd3d7d9) })
+                        .when(on, |d| d.bg(gpui_kit::rgb(0xe8f1fb)))
+                        .cursor_pointer()
+                        .child(if n == 0 { "Select parts".to_string() } else { format!("{n} part{}", if n == 1 { "" } else { "s" }) })
+                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            if let Some(Panel::BrokenOut { picking, .. }) = &mut this.panel {
+                                *picking = !*picking;
+                            }
+                            cx.notify();
+                        }));
+                    rows.push(Self::label_row("Exclude from cut", field.into_any_element()));
                 }
                 ("Broken-out section", rows)
             }
@@ -625,18 +663,19 @@ impl DrawingEditor {
         let u = format::length_units(&self.drawing, &DimFormat::default()).meters();
         let num = |s: String| s.trim().parse::<f64>().ok().filter(|v| v.is_finite());
         match panel {
-            Panel::BrokenOut { view, edit, profile, spline, up_to, depth, depth_ref, offset } => {
+            Panel::BrokenOut { view, edit, profile, spline, up_to, depth, depth_ref, offset, exclude, picking } => {
                 if up_to && depth_ref.is_none() {
                     self.status = Some("Select a model point for the depth of the section cut".into());
-                    self.panel = Some(Panel::BrokenOut { view, edit, profile, spline, up_to, depth, depth_ref, offset });
+                    self.panel = Some(Panel::BrokenOut { view, edit, profile, spline, up_to, depth, depth_ref, offset, exclude, picking });
                     return;
                 }
                 let depth_ref = depth_ref.filter(|_| up_to);
                 let off = offset.as_ref().and_then(|o| num(val(o, cx))).map(|v| v * u).unwrap_or(0.0);
-                let Some(b) = noshape_scene::drawing_tools::broken_out(profile, spline, num(val(&depth, cx)).map(|v| v * u), depth_ref, off) else {
+                let Some(mut b) = noshape_scene::drawing_tools::broken_out(profile, spline, num(val(&depth, cx)).map(|v| v * u), depth_ref, off) else {
                     self.status = Some("Invalid depth".into());
                     return;
                 };
+                b.exclude = exclude;
                 self.edit_view("Broken-out section", view, cx, |v| noshape_scene::drawing_tools::set_broken_out(v, edit, b));
                 self.tool = Tool::Select;
                 self.selection = vec![Sel::View(view)];
