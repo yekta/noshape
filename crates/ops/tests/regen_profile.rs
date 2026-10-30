@@ -115,6 +115,11 @@ fn sheet_metal(rows: &mut Vec<Row>) {
         });
     }
     profile("sheet metal (std): plate 200x150 + 4 flanges + hem", &ps, &units, rows);
+    // Again, std's Hem module loaded (the first run includes loading it).
+    let t = Instant::now();
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let times: Vec<String> = ps.features.iter().zip(&r.display.features).map(|(f, s)| format!("{} {:.0} ms", f.name, s.time_ms)).collect();
+    eprintln!("profile: sheet metal (std) warm: {:.0} ms total; {}", t.elapsed().as_secs_f64() * 1e3, times.join(", "));
 }
 
 #[test]
