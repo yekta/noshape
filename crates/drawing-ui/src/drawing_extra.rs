@@ -1455,6 +1455,35 @@ impl DrawingEditor {
         true
     }
 
+    /// Double-click on a table divider: fit that column (or row) to its text.
+    pub fn fit_table_divider(&mut self, id: u64, cx: &mut Context<Self>) -> bool {
+        let Some(l) = self.built.as_ref().and_then(|b| b.table_layout(id)).cloned() else { return false };
+        let Some((col, row)) = self.table_divider_at(&l, self.cursor) else { return false };
+        let Some(t) = self.current_sheet().table(id).cloned() else { return false };
+        let data = noshape_model::drawing::tables::table_data_with(&self.drawing, &t, None, None, None, &self.info, &|s| s.to_string());
+        let auto = noshape_model::drawing::tables::auto_widths(&t, &data);
+        let widths: Vec<f64> = l.xs.windows(2).map(|w| w[1] - w[0]).collect();
+        let heights: Vec<f64> = l.ys.windows(2).skip(l.title as usize).map(|w| w[0] - w[1]).collect();
+        let rows = data.all_rows().iter().map(|r| r.to_vec()).collect::<Vec<_>>();
+        self.edit_table(id, "Fit to content", cx, |t| {
+            if let Some(i) = col.filter(|i| *i > 0) {
+                let mut w = widths.clone();
+                if let (Some(x), Some(a)) = (w.get_mut(i - 1), auto.get(i - 1)) {
+                    *x = *a;
+                }
+                t.col_widths = w;
+            }
+            if let Some(j) = row.filter(|j| *j > 0) {
+                let mut h = heights.clone();
+                if let (Some(x), Some(r)) = (h.get_mut(j - 1), rows.get(j - 1)) {
+                    *x = noshape_model::drawing::tables::row_need(t, &data, j - 1, r, data.padding[1]);
+                }
+                t.row_heights = h;
+            }
+        });
+        true
+    }
+
     pub fn extra_drag_move(&mut self, drag: &Drag, cx: &mut Context<Self>) {
         let c = self.cursor;
         let aux = if let Drag::AuxIndicator { view, .. } = drag { self.aux_indicator_of(*view) } else { None };

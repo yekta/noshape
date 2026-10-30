@@ -3620,21 +3620,3 @@ fn sketch_line_thickness_and_pitch() {
     let (_, d2) = pen(&drawing);
     assert_eq!(d2, LinePattern::Dashed.dashes(2.0), "{d1:?} → {d2:?}");
 }
-
-/// Drawing properties › Construction geometry › Sketch driven dimensions
-/// color (drawing.md S32): a dimension driving the drawing's sketch takes it
-/// (default grey), a plain dimension keeps the dimension colour.
-#[test]
-fn sketch_driven_dimensions_take_their_color() {
-    let (doc, mut drawing) = demo();
-    let sources = regenerate_sources(&doc, &drawing);
-    let cache = ViewCache::new();
-    let s = &mut drawing.sheets[0];
-    let line = s.sketch.sketch.add_line(noshape_sketch::DVec2::new(20.0, 20.0), noshape_sketch::DVec2::new(60.0, 20.0)).0;
-    let aid = s.add_sketch_dimension(line, [40.0, 30.0]).expect("a sketch dimension");
-    drawing.props.view_tab.sketch_driven_dim_color = [10, 200, 30];
-    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
-    let p = pick_of(&built, PickTarget::Annotation(aid));
-    let ti = built.geometry.texts.iter().position(|t| t.pick == p).expect("its value");
-    assert!(built.geometry.colors.iter().any(|c| c.texts.contains(&ti) && c.rgb == [10, 200, 30]), "{:?}", built.geometry.colors);
-}

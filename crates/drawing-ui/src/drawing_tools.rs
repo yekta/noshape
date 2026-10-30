@@ -1696,9 +1696,7 @@ impl DrawingEditor {
                         Some(K::Hole { .. }) => self.open_hole_table_props(id, cx),
                         _ => self.open_table_props_corner(id, cx),
                     }
-                // A cell border opens the Cell panel like a cell (live 2009);
-                // the resize grips fit (live 1607 (b)).
-                } else if !self.fit_table_grip(id, cx) {
+                } else if !self.fit_table_grip(id, cx) && !self.fit_table_divider(id, cx) {
                     self.open_cell_panel(id, window, cx)
                 }
             }
