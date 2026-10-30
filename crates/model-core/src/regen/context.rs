@@ -335,10 +335,11 @@ pub struct Context {
     /// feature (std Form's tool bodies, kept in the walls' attributes).
     pub fs_transients: Vec<(Arc<str>, crate::reference::Reference)>,
     /// Sheet metal definition joints in the order they appeared (the std
-    /// rebuild's: an edge by its end points, a rolled face by its box, in
-    /// 0.1 µm): an entity a later feature changes is new, as Onshape gives it
-    /// a new transient id. The table letters follow it (live request 1604).
-    pub sm_births: Vec<[i64; 6]>,
+    /// rebuild's: an edge by its end points and its faces' boxes, a rolled
+    /// face by its box, in 0.1 µm): an entity a later feature changes, or an
+    /// edge beside a face it cuts down, is new, as Onshape gives it a new
+    /// transient id. The table letters follow it (live request 1604).
+    pub sm_births: Vec<Vec<i64>>,
     /// Parts named from outside the studio (an imported file's names, a
     /// Derived source's): `renumber_default_names` leaves them as they are
     /// (live, qa5 NAME3).

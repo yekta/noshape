@@ -1638,22 +1638,72 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 /// When each definition edge and rolled face appeared (see
 /// [`crate::regen::context::Context::sm_births`]): new ones registered in
 /// definition order. Returns the births by edge index and by rolled face.
-fn births(seen: &mut Vec<[i64; 6]>, def: &Definition, topo: &Topo) -> (Vec<u64>, BTreeMap<usize, u64>) {
+fn births(seen: &mut Vec<Vec<i64>>, def: &Definition, topo: &Topo) -> (Vec<u64>, BTreeMap<usize, u64>) {
     let q = |v: f64| (v * 1e7).round() as i64;
-    let key = |a: DVec3, b: DVec3| {
+    let pair = |a: DVec3, b: DVec3| {
         let (a, b) = ([q(a.x), q(a.y), q(a.z)], [q(b.x), q(b.y), q(b.z)]);
-        let (a, b) = if a <= b { (a, b) } else { (b, a) };
-        [a[0], a[1], a[2], b[0], b[1], b[2]]
+        if a <= b { [a, b] } else { [b, a] }
     };
-    let mut birth = |k: [i64; 6]| match seen.iter().position(|x| *x == k) {
-        Some(i) => i as u64,
-        None => {
-            seen.push(k);
-            seen.len() as u64 - 1
+    let boxed = |f: usize| topo.faces.get(f).and_then(|f| f.bounding_box(false).ok()).map_or([0; 6], |b| {
+        let [a, b] = [b.min, b.max].map(|p| [q(p.x), q(p.y), q(p.z)]);
+        [a[0], a[1], a[2], b[0], b[1], b[2]]
+    });
+    // `a` holds `b` (1 unit slack).
+    let holds = |a: &[i64], b: &[i64]| (0..3).all(|k| a[k] <= b[k] + 1 && a[k + 3] >= b[k + 3] - 1);
+    // An entry: [kind, its end points or box, then its faces' boxes]. An
+    // edge is the one seen before when its ends and face count are the same
+    // and each face only grew (live qa5: a Tab merged into the plate kept
+    // the plate's bends, the Hem's trim of the plate renewed them; a
+    // Flange's new wall renews the edge it stands on).
+    let same = |x: &Vec<i64>, head: &[i64], faces: &[[i64; 6]]| {
+        if x.len() != head.len() + 6 * faces.len() || x[..head.len()] != *head {
+            return false;
+        }
+        let old: Vec<&[i64]> = x[head.len()..].chunks(6).collect();
+        match faces.len() {
+            0 => true,
+            2 => (holds(&faces[0], old[0]) && holds(&faces[1], old[1])) || (holds(&faces[0], old[1]) && holds(&faces[1], old[0])),
+            _ => faces.iter().zip(&old).all(|(f, o)| holds(f, o)),
         }
     };
-    let edges = topo.edge_ends.iter().map(|(a, b)| birth(key(*a, *b))).collect();
-    let faces = def.rolled.keys().filter_map(|&fi| Some((fi, birth(topo.faces.get(fi)?.bounding_box(false).ok().map(|b| key(b.min, b.max))?)))).collect();
+    let keys: Vec<(Vec<i64>, Vec<[i64; 6]>)> = (0..topo.edge_ends.len())
+        .map(|e| {
+            let [a, b] = pair(topo.edge_ends[e].0, topo.edge_ends[e].1);
+            ([0, a[0], a[1], a[2], b[0], b[1], b[2]].to_vec(), topo.edge_faces[e].iter().map(|f| boxed(*f as usize)).collect())
+        })
+        .collect();
+    let found: Vec<Option<usize>> = keys.iter().map(|(h, f)| seen.iter().position(|x| same(x, h, f))).collect();
+    // New ones: those renewed in place (same ends, a face rebuilt) first,
+    // then moved and new ones, each in definition order (live qa5: the Hem
+    // renewed x = 0 before y = 0, whose end it moved, then made its own).
+    let in_place = |h: &[i64]| seen.iter().any(|x| x.len() >= h.len() && x[..h.len()] == *h);
+    let mut order: Vec<usize> = (0..keys.len()).filter(|&e| found[e].is_none()).collect();
+    order.sort_by_key(|&e| (!in_place(&keys[e].0), e));
+    let entry = |(h, f): &(Vec<i64>, Vec<[i64; 6]>)| h.iter().copied().chain(f.iter().flatten().copied()).collect::<Vec<i64>>();
+    let mut edges = vec![0u64; keys.len()];
+    for (e, i) in found.iter().enumerate() {
+        if let Some(i) = *i {
+            seen[i] = entry(&keys[e]);
+            edges[e] = i as u64;
+        }
+    }
+    for e in order {
+        seen.push(entry(&keys[e]));
+        edges[e] = seen.len() as u64 - 1;
+    }
+    let faces = def
+        .rolled
+        .keys()
+        .filter(|&&fi| fi < topo.faces.len())
+        .map(|&fi| {
+            let head: Vec<i64> = [1].into_iter().chain(boxed(fi)).collect();
+            let i = seen.iter().position(|x| *x == head).unwrap_or_else(|| {
+                seen.push(head);
+                seen.len() - 1
+            });
+            (fi, i as u64)
+        })
+        .collect();
     (edges, faces)
 }
 

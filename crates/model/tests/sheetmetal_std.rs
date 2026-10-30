@@ -173,6 +173,48 @@ fn face_at(r: &RegenResult, p: DVec3) -> Reference {
     panic!("no face at {p:?}");
 }
 
+/// Live request 1604, qa5: one Flange (y = 0, x = 0), a Hem on x = 60, a Tab
+/// merged into the plate, a Corner at (2, 2, 2): Joint A (the rip, its edge
+/// untouched since the Flange), Bend B (x = 0), Bend C (y = 0), Hem D (the
+/// Hem rebuilt the plate, so its edges, then made its own).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn qa5_letters_follow_live() {
+    use noshape_model::sheetmetal::BendKind;
+    let mut s = g34();
+    let r = s.ok();
+    let edge = edge_at(&r, DVec3::new(60.0, 20.0, 2.0));
+    s.add("sheetMetalHem", |p| p.set("edges", ParamValue::Query(vec![edge])));
+    let r = s.ok();
+    let top = face_at(&r, DVec3::new(30.0, 20.0, 2.0));
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(20.0, 40.0), (40.0, 40.0), (40.0, 50.0), (20.0, 50.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    for i in 0..4 {
+        sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
+    }
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
+    let key = sk.regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).expect("region").key.clone();
+    s.add("sheetMetalTab", |p| {
+        p.set("tabFaces", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        p.set("booleanUnionScope", ParamValue::Query(vec![top]));
+    });
+    let r = s.ok();
+    let v = vertex_at(&r, DVec3::new(2.0, 2.0, 2.0));
+    s.add("sheetMetalCorner", |p| p.set("corner", ParamValue::Query(vec![v])));
+    let r = s.ok();
+    let data = r.context.sheet_metal.get(&r.context.bodies[part(&r)].id).expect("data");
+    let bend = |hem: bool, along_x: bool| data.bends.iter().find(|b| matches!(b.kind, BendKind::Hem) == hem && (hem || (b.axis.x.abs() > 0.9) == along_x)).map(|b| b.birth).expect("bend");
+    let (y0, x0, hem) = (bend(false, true), bend(false, false), bend(true, false));
+    assert_eq!(data.rips.len(), 1);
+    let rip = data.rips[0].birth;
+    assert!(rip < x0 && x0 < y0 && y0 < hem, "rip {rip}, x = 0 {x0}, y = 0 {y0}, hem {hem}");
+}
+
 /// qa5 SM2: a Tab (Sketch 2 on Top: x 20..40, y 40..50) merged into the
 /// plate's top face (live: OK, like sm8 dom/fs-smprobe3-8.txt; ours said
 /// "The tab must lie in the plane of a sheet metal wall").
