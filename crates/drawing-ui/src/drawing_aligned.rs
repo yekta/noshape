@@ -18,6 +18,8 @@ use noshape_model::drawing::{ViewId, ViewKind};
 pub struct AlignedDlg {
     pub label: Entity<InputState>,
     pub cut_only: bool,
+    /// The Viewing plane location's flip button: the view looks the other way.
+    pub flip: bool,
     /// Edit aligned section...: the view edited (the tool stays Select).
     pub edit: Option<ViewId>,
 }
@@ -30,10 +32,10 @@ impl DrawingEditor {
             && let Some(v) = self.current_sheet().view(view)
             && let ViewKind::AlignedSection { label, .. } = &v.kind
         {
-            let (label, cut_only) = (label.clone(), v.cut_only);
+            let (label, cut_only, flip) = (label.clone(), v.cut_only, v.flip);
             let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(label));
             self.tool = Tool::Select;
-            self.aligned_dlg = Some(AlignedDlg { label: st, cut_only, edit: Some(view) });
+            self.aligned_dlg = Some(AlignedDlg { label: st, cut_only, flip, edit: Some(view) });
             return;
         }
         let active = matches!(self.tool, Tool::AlignedSection { .. });
@@ -42,7 +44,7 @@ impl DrawingEditor {
             (None, true) => {
                 let next = self.current_sheet().next_label();
                 let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(next));
-                self.aligned_dlg = Some(AlignedDlg { label: st, cut_only: false, edit: None });
+                self.aligned_dlg = Some(AlignedDlg { label: st, cut_only: false, flip: false, edit: None });
             }
             (Some(_), false) if !editing => self.aligned_dlg = None,
             _ => {}
@@ -55,16 +57,16 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    /// The panel's Section id and Show cut geometry only for a new view.
-    pub fn aligned_values(&self, cx: &App) -> Option<(String, bool)> {
+    /// The panel's Section id, Show cut geometry only and flip.
+    pub fn aligned_values(&self, cx: &App) -> Option<(String, bool, bool)> {
         let d = self.aligned_dlg.as_ref()?;
         let t = d.label.read(cx).value().trim().to_string();
-        Some((t, d.cut_only))
+        Some((t, d.cut_only, d.flip))
     }
 
     /// ✓: an edit applies; a new view is placed where its preview is.
     fn aligned_ok(&mut self, cx: &mut Context<Self>) {
-        let Some((label, cut_only)) = self.aligned_values(cx) else { return };
+        let Some((label, cut_only, flip)) = self.aligned_values(cx) else { return };
         if let Some(view) = self.aligned_dlg.as_ref().and_then(|d| d.edit) {
             self.aligned_dlg = None;
             self.edit_view("Edit aligned section", view, cx, |v| {
@@ -74,6 +76,7 @@ impl DrawingEditor {
                     *l = label.clone();
                 }
                 v.cut_only = cut_only;
+                v.flip = flip;
             });
             return;
         }
@@ -85,13 +88,14 @@ impl DrawingEditor {
     /// Place the pending aligned section view with the panel's values.
     pub fn place_aligned_section(&mut self, cx: &mut Context<Self>) {
         let Some(mut v) = self.pending_view() else { return };
-        if let Some((label, cut_only)) = self.aligned_values(cx) {
+        if let Some((label, cut_only, flip)) = self.aligned_values(cx) {
             if let ViewKind::AlignedSection { label: l, .. } = &mut v.kind
                 && !label.is_empty()
             {
                 *l = label;
             }
             v.cut_only = cut_only;
+            v.flip = flip;
         }
         let id = v.id;
         self.edit_sheet("Aligned section view", cx, |s| s.views.push(v));
@@ -130,7 +134,7 @@ impl DrawingEditor {
                 .when(done, |e| e.child(h_flex().gap(px(4.)).child(div().px(px(5.)).rounded(px(2.)).bg(gpui_kit::rgb(0xe5ebf0)).text_size(px(12.)).text_color(ink).child("Point ×"))))
                 .into_any_element()
         };
-        let check_on = d.cut_only;
+        let (check_on, flipped) = (d.cut_only, d.flip);
         Some(
             v_flex()
                 .id("dr-aligned-dlg")
@@ -185,7 +189,34 @@ impl DrawingEditor {
                         .p(px(3.))
                         .child(div().mt(px(1.)).h(px(25.)).flex().items_end().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()))
                         .child(query("da-center", "Center", 0))
-                        .child(query("da-viewing", "Viewing plane location", 1))
+                        .child(
+                            h_flex()
+                                .child(div().flex_1().child(query("da-viewing", "Viewing plane location", 1)))
+                                // Flip: the view looks the other way (help
+                                // aligned_section_view).
+                                .child(
+                                    div()
+                                        .id("da-flip")
+                                        .size(px(24.))
+                                        .mt(px(6.))
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .border_1()
+                                        .border_color(gpui_kit::rgb(0xd3d7d9))
+                                        .when(flipped, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
+                                        .cursor_pointer()
+                                        .tooltip(crate::ui::tooltip("Flip direction"))
+                                        .child(crate::assets::icon(&crate::assets::icon_path("flip"), 16., cx))
+                                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                            if let Some(d) = &mut this.aligned_dlg {
+                                                d.flip = !d.flip;
+                                            }
+                                            this.update_preview(cx);
+                                            cx.notify();
+                                        })),
+                                ),
+                        )
                         .child(query("da-revolved", "Revolved plane location", 2))
                         .child(
                             div().h(px(30.)).px(px(4.)).flex().items_center().child(

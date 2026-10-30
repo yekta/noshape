@@ -422,7 +422,13 @@ impl DrawingEditor {
 
     /// The view the active view tool would create at the cursor.
     pub fn pending_view(&self) -> Option<DrawingView> {
-        self.pk().pending_view(&self.view_options())
+        let mut v = self.pk().pending_view(&self.view_options())?;
+        // The Aligned section view panel's flip and cut-only show in the preview.
+        if let (Tool::AlignedSection { .. }, Some(d)) = (&self.tool, &self.aligned_dlg) {
+            v.flip = d.flip;
+            v.cut_only = d.cut_only;
+        }
+        Some(v)
     }
 
     /// Rebuild the preview drawing and the overlay for the current tool state.
@@ -1663,8 +1669,15 @@ impl DrawingEditor {
                 Some(a) if !matches!(a.kind, AnnotationKind::Centermark { .. } | AnnotationKind::Centerline { .. }) => Drag::MoveAnnotation { start, orig: a },
                 _ => Drag::None,
             },
-            // Drag a sketch entity (its points move, the sketch solves).
-            Sel::Sketch(id) => Drag::MoveSketch { id, start, orig: sheet.sketch.clone() },
+            // Drag a sketch entity (its points move, the sketch solves); on a
+            // spline's own point only that point moves, reshaping it (help
+            // drawing_sketch_tools: "Drag points to reshape").
+            Sel::Sketch(id) => {
+                let sk = &sheet.sketch.sketch;
+                let spline = sk.entity(noshape_sketch::EntityId(id)).is_some_and(|e| matches!(e.geometry, noshape_sketch::Geometry::FitSpline { .. } | noshape_sketch::Geometry::BSpline { .. }));
+                let point = self.sketch_point_at(start).map(|p| p.0).filter(|p| spline && crate::drawing_sketch::entity_points(sk, noshape_sketch::EntityId(id)).contains(p));
+                Drag::MoveSketch { id: point.map(|p| p.0).unwrap_or(id), start, orig: sheet.sketch.clone() }
+            }
             Sel::Image(id) => match sheet.images.iter().find(|i| i.id == id) {
                 Some(im) => Drag::MoveImage { id, start, orig: im.pos },
                 None => Drag::None,

@@ -142,6 +142,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   drawing properties (units resolved), its tab is listed under Create drawing › Created by me (the new drawing takes
   its formats and properties) and in Drawing properties › Select a DWT (checked in the app :147, w3/dwt1-*).
   Open: the DWT doesn't carry the projection (a drawing from it keeps the base template's), its tables.
+- Landed c59e86eb (DWT templates), 160b9daf (V28 Exclude from cut), then A44 (the extension line carried on to a
+  surface finish on it) + D40 (GD&T leaders on model points are associative: refs slot 100 + leader; lost → that
+  leader red with a red dot; end grip re-attaches). Next batch: SK5 (dragging a spline's own point reshapes it),
+  V27 flip button (Viewing plane location; preview follows).
+- Still open in my rows: A41 drag-off-dimension (frame slides along the dimension axis with a leader extension);
+  D40 section lines (not associative: needs a model-point anchor on the cutting line, red line + view when lost);
+  V35 related views sharing breaks (ask live which views); V57 assembly Show sketches.
 
 ## Afternoon 10-30 (landed through b76761b6, 16:49 UTC)
 - From live 1613: TB5 grid-line drags (the fixed-corner side's row / column, the table grows) ✅; EX18 image menu
