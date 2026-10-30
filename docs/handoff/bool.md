@@ -605,6 +605,18 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - Replays, all 0 differ: main 683 (+3), corpus2 531 (+3), corpus3 536 (+3), corpus4 577 (+3), corpus5 688 (+3),
   corpus6 644 (+4), Shell's 76 (+1), direct 52. T1: a case (017a8af6) in tests/data/brep.
 
+## Tolerant inputs where the arguments touch exactly (10-30 01:30 UTC)
+- A tolerant sub-shape (over 1e-5) that reaches another argument no longer declines when every sub-shape of the
+  other arguments near it (boxes grown by the grey band of the two tolerances) is either on it exactly (within the
+  rest's tolerance: OCCT and the Boolean put them together alike) or clearly apart (past the grey band of the sum of
+  the two tolerances, OCCT's merging distance): then the Boolean goes by the rest's tolerance. Distances in between
+  still decline (per-point tolerances would take them; corpus6's biggest, f516559d, has a vertex of 1.7e-4 at 1e-4
+  from another argument's face). Over 64 tolerant sub-shapes: declined (the distances cost).
+- Replays, all 0 differ: corpus2 533 (+2), corpus4 579 (+2), corpus5 692 (+4), corpus6 646 (+2), Shell's 78 (+2),
+  direct 54 (+2); main 683, corpus3 536.
+- The slab fuse with an internal face (addb9a14, corpus6's biggest decline, 13.8 s): OCCT's own result is invalid
+  (recorded valid 0): left declined.
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|
