@@ -72,7 +72,9 @@ pub enum Panel {
     Datum { edit: Option<u64>, anchor: [f64; 2], input: Entity<InputState> },
     /// `placed`: the symbols placed since it opened (help surface_finish:
     /// keep placing until ✓; ✕ takes them back).
-    SurfaceFinish { edit: Option<u64>, pos: [f64; 2], input: Entity<InputState>, placed: Vec<u64> },
+    /// `input`: the first right cell; `spec` holds the type, checkboxes and
+    /// lay (its cells live in `left` / `right`).
+    SurfaceFinish { edit: Option<u64>, pos: [f64; 2], input: Entity<InputState>, placed: Vec<u64>, spec: noshape_model::drawing::SfSpec, left: [Entity<InputState>; 3], right: Vec<Entity<InputState>> },
     /// A table cell's text; `note`: the Note panel's style of a general
     /// table cell (live 743: the cell is a note).
     Cell { table: u64, row: usize, col: usize, input: Entity<TextareaState>, note: Option<Box<CellNote>> },
@@ -1536,6 +1538,7 @@ impl DrawingEditor {
         }
         self.sync_section_dlg(window, cx);
         self.sync_aligned_dlg(window, cx);
+        self.sync_sf_panel(window, cx);
         self.sync_break_dlg(window, cx);
         self.sync_aux_dlg(window, cx);
         self.sync_detail_dlg(window, cx);

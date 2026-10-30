@@ -56,6 +56,7 @@ pub mod drawing_revision;
 pub mod drawing_ruler;
 pub mod drawing_scene;
 pub mod drawing_aligned;
+pub mod drawing_sf;
 pub mod drawing_section;
 pub mod drawing_section_edit;
 pub mod drawing_shaded;

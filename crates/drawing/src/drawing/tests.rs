@@ -679,7 +679,7 @@ fn dimension_formats_and_new_dimension_types() {
     add(sheet, AnnotationKind::ArcLengthDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.01, a: [0.01, 0.0], b: [0.0, 0.01], mid: [0.00707, 0.00707], offset: 5.0 }, [0.0; 2]);
     add(sheet, AnnotationKind::Gdt { anchor: [40.0, 40.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![], extra: Default::default() }, [40.0, 40.0]);
     add(sheet, AnnotationKind::Datum { anchor: [60.0, 100.0], label: "A".into(), on: None, at: None }, [60.0, 112.0]);
-    add(sheet, AnnotationKind::SurfaceFinish { anchor: [80.0, 100.0], value: "Ra 1.6".into(), leaders: Vec::new(), on: None }, [80.0, 100.0]);
+    add(sheet, AnnotationKind::SurfaceFinish { anchor: [80.0, 100.0], value: "Ra 1.6".into(), leaders: Vec::new(), on: None, spec: Default::default() }, [80.0, 100.0]);
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let t = texts(&built);
     for want in ["100", "+0.1", "-0.05", "2.362 in", "Ø24 H7", "0", "88", "2 X 45.0°", "⌒15.71", "⌖", "Ø0.1Ⓜ", "A", "Ra 1.6"] {
@@ -3628,7 +3628,7 @@ fn a_surface_finish_on_an_edge_turns_and_flips() {
     };
     // A vertical edge at view x = 0.01.
     let on = Some((view, [0.01, 0.0], [0.0, 1.0], false));
-    drawing.sheets[0].annotations.push(Annotation { id: 990, kind: AnnotationKind::SurfaceFinish { anchor: [0.0; 2], value: "Ra 0.8".into(), leaders: Vec::new(), on }, ..Default::default() });
+    drawing.sheets[0].annotations.push(Annotation { id: 990, kind: AnnotationKind::SurfaceFinish { anchor: [0.0; 2], value: "Ra 0.8".into(), leaders: Vec::new(), on, spec: Default::default() }, ..Default::default() });
     let (pos, angle, p) = text_of(&drawing);
     assert!((angle.abs() - std::f64::consts::FRAC_PI_2).abs() < 1e-9, "turned square to the edge: {angle}");
     if let AnnotationKind::SurfaceFinish { on: Some(o), .. } = &mut drawing.sheets[0].annotations.last_mut().unwrap().kind {

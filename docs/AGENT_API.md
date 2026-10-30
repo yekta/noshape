@@ -4350,7 +4350,7 @@ Examples:
 
 Surface finish symbol (edits the document (one undoable history entry)).
 
-The Surface finish symbol tool and panel: the symbol at `position` (sheet mm) with the roughness text `value` (the panel starts with "Ra 3.2"). On a view's straight edge it stands on the edge, turned square to it (drawing_annotation_edit `flip`: the other side); elsewhere it is free. One edit ("Surface finish").
+The Surface finish symbol tool and panel: the symbol at `position` (sheet mm) with `value` in its first right cell (the panel starts empty) and the rest of the dialog in `spec`. On a view's edge or a dimension's extension line it stands on it, turned square to it (drawing_annotation_edit `flip`: the other side); elsewhere it is free. One edit ("Surface finish").
 
 Examples:
 
@@ -4364,7 +4364,8 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `position` | array of number | required | Where the symbol sits (sheet mm). |
-| `value` | string |  | Roughness text. |
+| `value` | string |  | The first right cell (the roughness, e.g. "Ra 3.2"). |
+| `spec` | object |  | The rest of the dialog: `kind` (Basic, RemovalRequired, RemovalProhibited, IsoBasic, IsoRemovalRequired, IsoRemovalProhibited), `all_around`, `parens`, `left` (3 cells, top to bottom), `right` (the right cells after the first; more than 2 adds rows), `lay` (Angular, Circular, MultiDirectional, Parallel, Perpendicular, Protuberant, Radial). |
 
 #### drawing_weld
 

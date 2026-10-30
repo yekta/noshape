@@ -1630,7 +1630,7 @@ impl SheetGeometry {
                     let tips: Vec<[f64; 2]> = std::iter::once(tip).chain(spec.leaders.iter().map(map)).collect();
                     super::weld::render(self, spec, &tips, a.position, ah * 0.75, !env.weld_ansi(), pick);
                 }
-                AnnotationKind::SurfaceFinish { anchor, value, leaders, on } => {
+                AnnotationKind::SurfaceFinish { anchor, value, leaders, on, spec } => {
                     // On an edge: standing on it, turned square to it, on
                     // the upper / right side (Flip: the other).
                     let turn = on.as_ref().and_then(|&(view, at, dir, flip)| {
@@ -1668,9 +1668,11 @@ impl SheetGeometry {
                         self.lines.push(Polyline2 { points: vec![p, t], style: LineStyle::Thin, closed: false, pick });
                         self.arrow(t, [t[0] - p[0], t[1] - p[1]], self.style.ann_arrow);
                     }
-                    self.lines.push(Polyline2 { points: vec![[p[0] - 3.0, p[1] + 5.0], p, [p[0] + 6.0, p[1] + 10.0], [p[0] + 14.0, p[1] + 10.0]], style: LineStyle::Thin, closed: false, pick });
-                    self.lines.push(Polyline2 { points: vec![[p[0] - 3.0, p[1] + 5.0], [p[0] + 3.0, p[1] + 5.0]], style: LineStyle::Thin, closed: false, pick });
-                    self.texts.push(Text2 { pos: [p[0] + 6.5, p[1] + 10.8], height: 2.5, text: env.expand(value), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+                    let symbol = self.mark();
+                    self.surface_finish_symbol(p, &env.expand(value), spec, ah, pick);
+                    if spec.parens {
+                        self.surface_finish_parens(symbol, ah, pick);
+                    }
                     if let Some((_, angle)) = turn.filter(|t| t.1.abs() > 1e-9) {
                         self.rotate_since(mark, p, angle);
                     }

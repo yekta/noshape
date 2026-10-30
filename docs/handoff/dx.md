@@ -135,7 +135,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Landed 441ee2c5 (V28, A41, A44, CR5, D15, D40). Next batch: EX18 image menu (Copy / Paste as table / Move to ▸ /
   Bring to front / Send to back; images in the drawing clipboard), EX17 two-click image placement, V21 partial by
   dragging a cutting line's end inside the part (all checked in the app :147: w3/ex2-*, v21-*).
-- Asked live (A43): the Surface finish dialog's types, six cells, All around / Parenthesis, Direction lay, Add row.
+- Landed 76d8f633 (EX17, EX18, V21). A43 from live 1628: the full Surface finish dialog and symbol
+  (`SfSpec` on the annotation; `model-data/src/drawing/surface_finish.rs`, `drawing-ui/src/drawing_sf.rs`); the
+  panel now starts empty (live), not "Ra 3.2".
+- Live 1627 answered (BOM Template: Follow assembly | Onshape Default BOM; DWT pick / Update properties from a
+  template / Lock): next.
 
 ## Afternoon 10-30 (landed through b76761b6, 16:49 UTC)
 - From live 1613: TB5 grid-line drags (the fixed-corner side's row / column, the table grows) ✅; EX18 image menu

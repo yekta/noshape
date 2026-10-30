@@ -1162,16 +1162,12 @@ impl DrawingEditor {
                 }
             }
             // Keep placing until ✓ (help surface_finish).
-            Tool::SurfaceFinish => match &self.panel {
-                Some(Panel::SurfaceFinish { edit: None, input, .. }) => {
-                    let value = input.read(cx).value().to_string();
-                    self.place_surface_finish(c, value, cx);
+            Tool::SurfaceFinish => {
+                if !matches!(self.panel, Some(Panel::SurfaceFinish { edit: None, .. })) {
+                    self.open_surface_finish_panel(None, c, noshape_scene::drawing_tools::SURFACE_FINISH_DEFAULT, &Default::default(), window, cx);
                 }
-                _ => {
-                    self.open_surface_finish_panel(None, c, noshape_scene::drawing_tools::SURFACE_FINISH_DEFAULT, window, cx);
-                    self.place_surface_finish(c, noshape_scene::drawing_tools::SURFACE_FINISH_DEFAULT.to_string(), cx);
-                }
-            },
+                self.place_surface_finish(c, cx);
+            }
             _ => return false,
         }
         true
@@ -2172,16 +2168,10 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    fn open_surface_finish_panel(&mut self, edit: Option<u64>, pos: [f64; 2], value: &str, window: &mut Window, cx: &mut Context<Self>) {
-        let input = self.input(value, window, cx);
-        Self::focus_input(&input, window, cx);
-        self.panel = Some(Panel::SurfaceFinish { edit, pos, input, placed: Vec::new() });
-        cx.notify();
-    }
-
     /// The Surface finish tool's click: a symbol there with the panel's value
     /// (the panel stays for more, help surface_finish).
-    fn place_surface_finish(&mut self, at: [f64; 2], value: String, cx: &mut Context<Self>) {
+    fn place_surface_finish(&mut self, at: [f64; 2], cx: &mut Context<Self>) {
+        let (value, spec) = self.sf_panel_values(cx).unwrap_or_default();
         let id = self.current_sheet().next_annotation_id();
         let pending = self.note_leader.take();
         // On a dimension's line (an extension line) or a view's edge it
@@ -2198,7 +2188,7 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
-        let mut sf = noshape_scene::drawing_tools::surface_finish(id, at, value);
+        let mut sf = noshape_scene::drawing_tools::surface_finish(id, at, value, spec);
         if let AnnotationKind::SurfaceFinish { on: o, leaders, .. } = &mut sf.kind {
             *o = on;
             leaders.extend(pending);
@@ -2233,7 +2223,7 @@ impl DrawingEditor {
         let Some(a) = self.drawing.sheets[self.sheet].annotations.iter().find(|x| x.id == a.id).cloned() else { return };
         match &a.kind {
             AnnotationKind::Gdt { .. } => self.open_gdt_edit(a.id, window, cx),
-            AnnotationKind::SurfaceFinish { anchor, value, .. } => self.open_surface_finish_panel(Some(a.id), *anchor, value, window, cx),
+            AnnotationKind::SurfaceFinish { anchor, value, spec, .. } => self.open_surface_finish_panel(Some(a.id), *anchor, value, spec, window, cx),
             AnnotationKind::Datum { anchor, label, .. } => {
                 let input = self.input(label, window, cx);
                 Self::focus_input(&input, window, cx);
@@ -2291,7 +2281,7 @@ impl DrawingEditor {
                         .into_any_element(),
                 ],
             ),
-            Panel::SurfaceFinish { input, .. } => ("Surface finish", vec![Self::label_row("Roughness", Input::new(input).small().w(px(160.)).into_any_element())]),
+            Panel::SurfaceFinish { .. } => ("Surface finish", self.sf_panel_rows(cx)),
             Panel::Datum { input, anchor, .. } => (if anchor[0].is_nan() { "Callout text (empty = BOM item)" } else { "Datum" }, vec![Self::label_row("Label", Input::new(input).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).small().w(px(120.)).into_any_element())]),
             _ => return None,
         })
@@ -2336,28 +2326,33 @@ impl DrawingEditor {
                     }
                 });
             }
-            Panel::SurfaceFinish { edit, pos, input, placed } => {
-                let value = val(&input, cx);
+            p @ Panel::SurfaceFinish { .. } => {
+                // The values are read with the panel in place.
+                self.panel = Some(p);
+                let (value, spec) = self.sf_panel_values(cx).unwrap_or_default();
+                let Some(Panel::SurfaceFinish { edit, pos, placed, .. }) = self.panel.take() else { return };
                 match edit {
-                    // ✓: the symbols placed take the panel's value.
+                    // ✓: the symbols placed take the panel's values.
                     None if !placed.is_empty() => {
                         self.edit_sheet("Surface finish", cx, |s| {
                             for a in s.annotations.iter_mut().filter(|a| placed.contains(&a.id)) {
-                                if let AnnotationKind::SurfaceFinish { value: v, .. } = &mut a.kind {
+                                if let AnnotationKind::SurfaceFinish { value: v, spec: sp, .. } = &mut a.kind {
                                     *v = value.clone();
+                                    **sp = spec.clone();
                                 }
                             }
                         });
                         self.tool = Tool::Select;
                     }
                     Some(id) => self.edit_sheet("Edit surface finish", cx, |s| {
-                        if let Some(AnnotationKind::SurfaceFinish { value: v, .. }) = s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
+                        if let Some(AnnotationKind::SurfaceFinish { value: v, spec: sp, .. }) = s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
                             *v = value;
+                            **sp = spec;
                         }
                     }),
                     None => {
                         let id = self.current_sheet().next_annotation_id();
-                        self.edit_sheet("Surface finish", cx, |s| s.annotations.push(noshape_scene::drawing_tools::surface_finish(id, pos, value)));
+                        self.edit_sheet("Surface finish", cx, |s| s.annotations.push(noshape_scene::drawing_tools::surface_finish(id, pos, value, spec)));
                         self.tool = Tool::Select;
                     }
                 }

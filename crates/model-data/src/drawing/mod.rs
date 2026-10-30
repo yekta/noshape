@@ -895,6 +895,10 @@ pub enum AnnotationKind {
         /// turned square to it; `anchor` is where it was placed.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         on: Option<(ViewId, [f64; 2], [f64; 2], bool)>,
+        /// The dialog's type, cells, All around, ( ) and lay (`value` is
+        /// the first right cell; live request 1628).
+        #[serde(default, skip_serializing_if = "SfSpec::is_default")]
+        spec: Box<SfSpec>,
     },
     /// Weld symbol: the arrow points at `target` (view coordinates in
     /// `view`, else sheet), the reference line starts at the annotation's
@@ -4178,6 +4182,8 @@ pub mod cad_layers;
 pub mod links;
 pub mod mbd;
 pub mod dwt;
+pub mod surface_finish;
+pub use surface_finish::{SfKind, SfLay, SfSpec};
 
 /// Rotate a 2D vector counter-clockwise by `a` radians.
 pub fn rotate2(v: [f64; 2], a: f64) -> [f64; 2] {

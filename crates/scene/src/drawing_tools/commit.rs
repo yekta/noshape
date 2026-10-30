@@ -359,14 +359,14 @@ pub fn gdt(id: u64, position: [f64; 2], frame: Vec<String>, extra: GdtExtra) -> 
     Annotation { id, kind: AnnotationKind::Gdt { anchor: position, frame, leaders: vec![], extra: Box::new(extra) }, position, ..Default::default() }
 }
 
-/// The Surface finish panel's ✓: the symbol with `value` ("Ra 3.2") where
-/// the tool was clicked.
-pub fn surface_finish(id: u64, position: [f64; 2], value: String) -> Annotation {
-    Annotation { id, kind: AnnotationKind::SurfaceFinish { anchor: position, value, leaders: Vec::new(), on: None }, position, ..Default::default() }
+/// The Surface finish panel's ✓: the symbol with `value` (the first right
+/// cell) and `spec` where the tool was clicked.
+pub fn surface_finish(id: u64, position: [f64; 2], value: String, spec: SfSpec) -> Annotation {
+    Annotation { id, kind: AnnotationKind::SurfaceFinish { anchor: position, value, leaders: Vec::new(), on: None, spec: Box::new(spec) }, position, ..Default::default() }
 }
 
-/// The Surface finish panel's starting value.
-pub const SURFACE_FINISH_DEFAULT: &str = "Ra 3.2";
+/// The Surface finish panel's starting value (live request 1628: empty).
+pub const SURFACE_FINISH_DEFAULT: &str = "";
 
 impl SheetPick<'_> {
     /// A surface finish symbol placed at sheet point `at` on a view's

@@ -1847,6 +1847,11 @@ fn drawing_callouts_ordinates_and_datums() {
     assert!(last(&mut ctx).ends_with(":: Flip"), "{}", last(&mut ctx));
     let free = call(&mut ctx, "drawing_surface_finish", json!({ "drawing": tab, "position": [20, 270] }))["annotation"].clone();
     assert!(try_call(&mut ctx, "drawing_annotation_edit", json!({ "drawing": tab, "annotation": free, "action": "flip" })).is_err());
+    // The whole dialog (live request 1628): type, cells, lay; a bad type is refused.
+    let iso = call(&mut ctx, "drawing_surface_finish", json!({ "drawing": tab, "position": [60, 270], "value": "Ra 1.6", "spec": { "kind": "IsoRemovalRequired", "left": ["a", "b", "c"], "right": ["R2", "R3", "R4"], "lay": "Angular", "parens": true } }));
+    assert_eq!(kind_of(&mut ctx, iso["annotation"].as_u64().unwrap()), "SurfaceFinish");
+    let e = try_call(&mut ctx, "drawing_surface_finish", json!({ "drawing": tab, "position": [80, 270], "spec": { "kind": "Shiny" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("spec"), "{e:?}");
     let w = call(&mut ctx, "drawing_weld", json!({ "drawing": tab, "target": a0, "position": [a0[0] - 20.0, a0[1] + 20.0], "spec": { "arrow": { "joint": "Fillet", "size": "6" }, "all_around": true } }));
     assert_eq!(kind_of(&mut ctx, w["annotation"].as_u64().unwrap()), "Weld");
     assert!(last(&mut ctx).ends_with(":: Weld symbol"));

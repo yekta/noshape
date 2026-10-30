@@ -669,8 +669,19 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "surface_finish",
             summary: "Surface finish symbol",
-            description: "The Surface finish symbol tool and panel: the symbol at `position` (sheet mm) with the roughness text `value` (the panel starts with \"Ra 3.2\"). On a view's straight edge it stands on the edge, turned square to it (drawing_annotation_edit `flip`: the other side); elsewhere it is free. One edit (\"Surface finish\").",
-            fields: with(common(), vec![req("position", point(), "Where the symbol sits (sheet mm)."), opt("value", json!({ "type": "string", "default": "Ra 3.2" }), "Roughness text.")]),
+            description: "The Surface finish symbol tool and panel: the symbol at `position` (sheet mm) with `value` in its first right cell (the panel starts empty) and the rest of the dialog in `spec`. On a view's edge or a dimension's extension line it stands on it, turned square to it (drawing_annotation_edit `flip`: the other side); elsewhere it is free. One edit (\"Surface finish\").",
+            fields: with(
+                common(),
+                vec![
+                    req("position", point(), "Where the symbol sits (sheet mm)."),
+                    opt("value", json!({ "type": "string", "default": "" }), "The first right cell (the roughness, e.g. \"Ra 3.2\")."),
+                    opt(
+                        "spec",
+                        json!({ "type": "object" }),
+                        "The rest of the dialog: `kind` (Basic, RemovalRequired, RemovalProhibited, IsoBasic, IsoRemovalRequired, IsoRemovalProhibited), `all_around`, `parens`, `left` (3 cells, top to bottom), `right` (the right cells after the first; more than 2 adds rows), `lay` (Angular, Circular, MultiDirectional, Parallel, Perpendicular, Protuberant, Radial).",
+                    ),
+                ],
+            ),
             mutates: true,
             destructive: false,
             run: surface_finish,
@@ -1589,9 +1600,14 @@ fn surface_finish(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let sheet = t.sheet;
     let id = t.d.sheets[sheet].next_annotation_id();
     let value = a.opt_str("value")?.unwrap_or(dt::SURFACE_FINISH_DEFAULT).to_string();
+    let spec: noshape_model::drawing::SfSpec = match a.get("spec") {
+        None | Some(Value::Null) => Default::default(),
+        Some(v) => serde_json::from_value(v.clone()).map_err(|e| OpError::param("spec", &e.to_string()))?,
+    };
     let p = pt_arg(a, "position")?;
-    let on = t.m.pick_snapping(&Tool::SurfaceFinish, &[], p, false).surface_finish_on(p);
-    let mut sf = dt::surface_finish(id, p, value);
+    let pk = t.m.pick_snapping(&Tool::SurfaceFinish, &[], p, false);
+    let on = pk.surface_finish_on_dimension(p).or_else(|| pk.surface_finish_on(p));
+    let mut sf = dt::surface_finish(id, p, value, spec);
     if let noshape_model::drawing::AnnotationKind::SurfaceFinish { on: o, .. } = &mut sf.kind {
         *o = on;
     }
