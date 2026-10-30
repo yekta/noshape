@@ -8,7 +8,7 @@
 
 use crate::drawing_scene;
 use crate::drawing_view::*;
-use noshape_model::drawing::{PointRef, ViewId};
+use noshape_model::drawing::{AnnotationKind, PointRef, ViewId};
 use noshape_model::drawing::build::PickTarget;
 use noshape_model::drawing::views::ModelEdge;
 use noshape_render::{Drawable, Instance, LineData, LineSegment, PointData, PointSprite, Scene, state};
@@ -164,11 +164,17 @@ impl DrawingEditor {
             let up = self.gpu.uploader();
             scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&data))).per_primitive_color().unpickable().layer(18));
         }
-        // The rest of a hovered / selected annotation's group (yellow).
+        // The rest of a hovered / selected annotation's group, and of a datum
+        // target's series (A1 → A2, A3; help C10) (yellow).
         let sheet = self.current_sheet();
+        let series = |a: &noshape_model::drawing::Annotation| match &a.kind {
+            AnnotationKind::DatumTarget { label, .. } => Some(label.trim_end_matches(|c: char| c.is_ascii_digit()).to_string()).filter(|s| !s.is_empty()),
+            _ => None,
+        };
         for id in anns.iter().copied() {
-            let Some(g) = sheet.annotations.iter().find(|a| a.id == id).and_then(|a| a.ann_group) else { continue };
-            for other in sheet.annotations.iter().filter(|x| x.ann_group == Some(g) && x.id != id) {
+            let Some(a) = sheet.annotations.iter().find(|a| a.id == id) else { continue };
+            let (g, letter) = (a.ann_group, series(a));
+            for other in sheet.annotations.iter().filter(|x| x.id != id && ((g.is_some() && x.ann_group == g) || (letter.is_some() && series(x) == letter))) {
                 for p in self.picks_of(Sel::Annotation(other.id)) {
                     scene.add_flag(p, state::ACCENT);
                 }
