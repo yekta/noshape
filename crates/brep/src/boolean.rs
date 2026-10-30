@@ -834,6 +834,14 @@ impl Ctx<'_> {
         // Where it meets the face's boundary.
         let mut cuts: Vec<(f64, End)> = vec![(t0, ends[0]), (t1, ends[1])];
         let bound = self.bound(f)?.to_vec();
+        // (OCCT's curve ending on the boundary, as it does at the face's parameter bounds: a point there.)
+        if let Path::Nurbs { .. } = path {
+            for (k, u) in [(0, 0.0), (1, 1.0)] {
+                if ends[k] == End::Open && distance2(c2.at(u), &bound) <= tol {
+                    cuts[k].1 = End::Point(path.at(cuts[k].0));
+                }
+            }
+        }
         for b in &bound {
             for (u, _) in c2.intersections(b, tol) {
                 let t = t0 + (t1 - t0) * u;
@@ -1699,6 +1707,10 @@ impl Ctx<'_> {
         }
         let rel = (r1 - r2).abs() / r1.max(r2);
         if dist > 1e-9 || rel > 1e-14 {
+            // (A curve of the fourth order: OCCT's section, as a free-form face's.)
+            if self.src.is_some() {
+                return self.nurbs_pair(f1, f2);
+            }
             return Err(Decline("cylinders at an angle"));
         }
         let (b, d, e) = (a1.dot(a2), a1.dot(w), a2.dot(w));

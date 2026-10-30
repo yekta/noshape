@@ -706,6 +706,18 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   (5 or 6 touching fuses per corpus lost).
 - T1: the 9-instance case (58c61d5d) in tests/data/brep (taken in strict mode).
 
+## Cylinders at an angle, any radii (10-30 10:30 UTC)
+- Two cylinders at an angle, other than of one radius with axes meeting (a curve of the fourth order), declined
+  "cylinders at an angle" (main corpus 26 cases, 5.2 s recorded). Now they go the free-form way: OCCT's section
+  (IntTools_FaceFace, as the pave filler asks it), everything else ours.
+- OCCT's curve can end on a face's boundary at its parameter bounds (a half cylinder's straight edge), where the
+  crossing with the boundary at the very end isn't found: such an open end is a point there now (OCCT's curves only).
+- Replays, all 0 differ: main 768 (+18), corpus2 552 (+5), corpus3 555 (+5), corpus4 599 (+5), corpus5 716 (+5),
+  corpus6 661 (+5), Shell's 78, direct 58. Times: most 2–10× OCCT's (5–35 ms against 35–170 ms), a few even
+  (OCCT's own section is most of those). Six stop at "a section without ends": OCCT returns half of a thin tool's
+  loop on a big cylinder, its ends inside both faces (understood no further; declined).
+- T1: aff9a32d (angled cylinders) and 90710765 (a section ending on a half cylinder's edge) in tests/data/brep.
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|
