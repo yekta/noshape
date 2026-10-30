@@ -113,6 +113,19 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Live answered the derived colour question: the target's next default colour unless the source part's appearance is
   explicit (then carried); ours now does both.
 
+## Morning 10-30 (lead 07:05 order; landed through fe843162, 08:42 UTC)
+- BOM after import (IM1b): not a gap: live's "BOM : <assembly>" element is hidden BOM data, never a tab; our imported
+  assembly's BOM has live's names and quantities (matrix row).
+- Selectable PDF vs live's anatomy: compact font subset (drawn glyphs renumbered, live's nine tables, CIDToGIDMap
+  stream), no unused base-14 fonts: 18.5 → 11.6 kB (live 10.5) (EX7 note).
+- Import matrix: SAT I1 fixed (sat_read.cpp: forward line / conic edges keep the file's parameter range; tolerant
+  vertices no longer shorten them; plane 384 as live); import toasts as live (IM3). Left: STEP integral (core), g50 F8
+  (live keeps an extruded surface) and the McMaster helices (tolerant edges), both inside live's bands.
+- drawing.md: V29 red broken-out spline, A64 chamfer content + greyed panel, S33 hole indicator (live 1609), TB15
+  row highlights (BOM part edges, hole circles), A20, S30/S31/S32, TB5 double-click; 62 🔧 left.
+- Live requests open: 08:38 EX18 image menu / TB5 cell edges. Most remaining 🔧 rows need live data or are larger
+  features (MBD in views, section dialogs, surface finish dialog, DWT templates, BOM templates).
+
 ## Night 10-30 (lead 23:45 order: drawing.md 🔧 rows → import matrix → data exchange)
 - Landed: the Keyboard shortcuts modal is app-core's `shortcut_sheet` (Drawing / Part Studio / Assembly, start tab
   per studio; psui told in psui.md); SK16 sketch Thickness / Pitch scale; S9 + TB30 drag view / table rows onto
