@@ -389,7 +389,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (patch 0001's EF/VF changes or OCCT), and OSD_Parallel::For loops that run several booleans at once (cut_slabs,
   fuse_slabs, fuse_trimmed) still do.
   Still there with add45a95 (qa 13:45, watcher CLI 12:59): seed 72 run 1 died at step 63 (delete, marker "Mirror 8" evaluating), **no kernel trap logged** this time (so an abort, e.g. a heap check, not a segfault); the saved document opens fine (tickets/cli-72L-died.noshape + -wal, 190695.576 mm³); the replay with stderr captured ran all 106 steps clean, two more replays (FZTAG L3 / L4, stderr in cli/err-72L{3,4}.txt) running. So the budget's longjmp wasn't the (only) cause.
-- [ ] P0 COMMIT-LATENCY edit commit on tests/perf/live-30-features.noshape is over budget on main (perf.yml run
+- [x] (psui 10-30 17:30: perf 41092110782, main e10b29fd, live-30, edit-undo-redo started 2 s after the studio is shown: all 54 steps ≤ 164 ms, medians commit 75 / 74, undo 57 / 28, redo 19 / 33 ms (macOS 14 / 15), budget 200; the earlier 160–500 ms outliers were the runner GPU's first frames after opening (250–500 ms each, holding gpui's present), see the 16:40 note) P0 COMMIT-LATENCY edit commit on tests/perf/live-30-features.noshape is over budget on main (perf.yml run
   40421862773, abac9266, 10-27): "commit shown in" 315–378 ms (macOS 14) and 241–635 ms (macOS 15), budget ≤ 200 ms
   (PLAN 2.6; perf measured 174 / 149 ms on 10-26 before the later landings). The time is the model: regen[preview]
   285 ms for Extrude 1's edit (Boss 1–6 8–25 ms each, Linear pattern 1 45 ms, Fillet 3 19 ms, Hole 1 18 ms, Fillet 2

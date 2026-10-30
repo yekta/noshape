@@ -190,6 +190,10 @@ SHA ref fails the checkout) then read "stages since the last step" / "waited for
 per frame for the first frames after opening (not pipelines, not App Nap). Next commit: NOSHAPE_PERF_SCRIPT_WAIT_MS;
 perf with env NOSHAPE_PERF_SCRIPT=edit-undo-redo,NOSHAPE_PERF_SCRIPT_WAIT_MS=2000. If clean: COMMIT-LATENCY is met
 (commit / undo / redo medians ≤ 120 ms), the outliers are the runner GPU's warm-up; propose closing to the lead.
+17:30: perf 41092110782 (e10b29fd, WAIT_MS=2000): all steps ≤ 164 ms (medians commit 75 / 74, undo 57 / 28, redo
+19 / 33): COMMIT-LATENCY closed in TICKETS. Left open (not a ticket): the macOS runners' first viewport frames after
+opening take 250–500 ms on the GPU (paravirtual Metal); if real Macs show it, look at GPU-side first use. Mesher
+numbers: use tools/tiers/perf.sh (vibe3, machine to itself) once it's back on main (the lead reverted it at eb85b1ec).
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC
