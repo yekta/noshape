@@ -571,12 +571,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the excess is ours or the STEP approximation's.
   qa 06:30 (v0.4.12 CLI import matrix): unchanged, x_t 7583.000866 / SAT 7582.996453 / STEP 7582.693101, 18 faces each; all
   inside live's band 7576.24–7589.58 (grading rule 10-24).
-- [ ] P2 BOOL-TOUCH-INFO Boolean Intersect of two blocks that only touch face to face: both parts deleted (= live), but
+- [x] 7f2c4647 P2 BOOL-TOUCH-INFO Boolean Intersect of two blocks that only touch face to face: both parts deleted (= live), but
   live reports INFO "The parts either do not intersect or are totally contained." (dialog bubble); ours OK with no message.
   A disjoint pair: live OK, no message (= ours) (behaviours "qa (2026-10-26, P1 boolean edge cases)") (qa 2026-10-26)
   qa 09:27 (watcher CLI 08:30): now INFO "Boolean resulted in no geometry change. The parts either do not intersect or are
   totally contained." but **both parts are kept** (query_parts: 2); live deletes both and its text is only "The parts either
   do not intersect or are totally contained." Result and wording both differ now.
+  - core 03:00: Intersect of parts that only touch: both go (☑ Keep tools keeps them), Info "The parts either do not intersect or are totally contained."; parts apart stay as INT2 (7f2c4647). T1 `engine::intersect_of_parts_touching_face_to_face_deletes_both`.
 - [ ] P2 ADV2 (qa5 kern row, re-checked) Loft of a 20×20 square on Top to a Ø16 circle 20 mm up (Plane 1): 5927.755 mm³
   in the green app; live 5927.728022 (docs/handoff/qa5-routing.md "kern" table) (qa 2026-10-26, build 4d2f6b0c)
   qa 20:30 (main CLI 12:08): live's other loft (behaviours pvz-shapes "Loft": 20×20 square (110..130, −10..10) to a circle r8 at
@@ -590,12 +591,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 09:30 (watcher CLI 08:30): the same hole is now flipped into the part by itself (feature_get oppositeDirection true,
   scope filled) and cuts (23793.819 = block − hole), status INFO "Parameters have been overridden." Live's dialog doesn't
   auto-flip a hole (L57: "Opposite direction does not flip itself"); it reports "None of the holes intersected a part."
+  - core 03:00: not the Hole's regen: the flip and the filled scope come from std's own editing logic (hole.fs `holeScopeFlipHeuristicsCall`: canEditFlip when oppositeDirection wasn't specified and the run is comprehensive), which the CLI's feature_add runs. With the scope filled and no flip our regen says "None of the holes intersected a part." (HOLE_NO_HITS) as live; an empty scope gives std's HOLE_EMPTY_SCOPE. Whether live's dialog runs that heuristic on a picked point (L57 says it doesn't flip) is for the std host's owner (lead to route).
 - [ ] P2 PATTERN-REAPPLY-CUT-ONLY Feature pattern with ☑ Reapply features of a Remove extrude alone (its sketch not in
   the pattern; 40×30×10 block, Ø6 cut through all at x 10 drawn on the top face, direction = a bottom edge, 15 mm, count 4):
   ours moves the cut to each instance (3 holes, 706.858 mm³ removed, OK); live L40 (behaviours ~8484): the reapplied cut
   resolves its region on the unpatterned sketch, so every instance re-cuts the original hole → **INFO, no geometry
   change** (with Reapply off ours = live: OK, copies moved, the off-part copy silently does nothing). Check against psb's
   f202f693 / FSW-pattern (qa 2026-10-26, main CLI ~20:18)
+  - core 03:00: not changed: live's own oracle disagrees. `kernel_robustness::patterns_match_onshape` R2 (a through-all Remove extrude on Front, its sketch not in the pattern, circular ×6 with Reapply) is Ok in live with six holes (53234.34 mm³), i.e. the cut moves with each instance there. L40 differs in its sketch being on the part's top face and a linear direction along an edge. qa: please re-check L40 (and R2) in live before we make the reapplied sketch stay put.
 - [x] (dx 10-27 08:20, CLI, load ~22: with the document open 5 s the first Extrude add is 9 ms, then 7–25 ms; only an add sent right at open takes 232 ms, because std's editing logic is still loading on the prewarm thread (ops doc.rs and the app's viewport start it at open; Extrude is first in its order). The app's first user add comes after that, so the budget holds; /root/dx-scratch/w/py/t_add.py) P1 Extrude add 308 ms (std logic 55 ms, ~250 ms in ops' add path regens): target ≤ 150 ms (PLAN 2.6).
   dx 10-27 re-timed through the CLI (load ~25): the first Extrude add of a process 230–330 ms (one-time std warm-up),
   later ones 8–23 ms; Hole add 250–290 ms (was ~330: the API's add path stopped running holeEditLogic a third time),
