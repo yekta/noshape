@@ -1051,7 +1051,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         let closed_at = |start: bool| wraps.iter().any(|rc| rc.edge == e && matches!(rc.shape, CutShape::Closed { angle, .. } if angle <= std::f64::consts::FRAC_PI_2 + 1e-9) && (rc.v.distance(b.start) < TOL) == start);
         // A slanted end: on past both walls' ends (its arc can bulge past
         // them), cut back below.
-        let margin = |i: usize| skew[i].map_or(0.0, |(ta, tb, _, _)| b.angle.abs() * (((b.axis_point - b.start).length() + front + back)) + 2.0 * (front + back) + (ta - tb).abs());
+        let margin = |i: usize| skew[i].map_or(0.0, |(ta, tb, _, _)| b.angle.abs() * ((b.axis_point - b.start).length() + front + back) + 2.0 * (front + back) + (ta - tb).abs());
         let (m0, m1) = (if closed_at(true) { front + back } else { margin(0) }, if closed_at(false) { front + back } else { margin(1) });
         let (q1, qlen) = (p1 - b.dir * m0, len + m0 + m1);
         let strip = [q1 - n1 * back, q1 + n1 * front, q1 + n1 * front + b.dir * qlen, q1 - n1 * back + b.dir * qlen];
