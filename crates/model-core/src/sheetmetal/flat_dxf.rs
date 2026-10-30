@@ -5,7 +5,7 @@
 
 use super::flat::FlatPattern;
 use acadrust::tables::linetype::LineTypeElement;
-use acadrust::{CadDocument, Color, DwgWriter, DxfVersion, DxfWriter, EntityType, Layer, Line, LineType, Vector3};
+use acadrust::{CadDocument, Circle, Color, DwgWriter, DxfVersion, DxfWriter, EntityType, Layer, Line, LineType, Vector3};
 
 /// The export dialog's settings that change the file.
 #[derive(Clone, Copy, Debug)]
@@ -15,12 +15,20 @@ pub struct FlatExport {
     pub version: DxfVersion,
     /// "Include bend centerlines" (on by default).
     pub bend_centerlines: bool,
+    /// "Include bend tangent lines": each bend zone's two edges.
+    pub tangent_lines: bool,
+    /// "Include counterbore and countersink lines": the heads' circles.
+    pub cbore_lines: bool,
+    /// "Include form feature outlines" / "… centermarks".
+    pub form_outlines: bool,
+    pub form_centermarks: bool,
 }
 
 impl Default for FlatExport {
     fn default() -> Self {
-        // Live: DXF switches the version to Release 14.
-        Self { insunits: 4, version: DxfVersion::AC1014, bend_centerlines: true }
+        // Live: DXF switches the version to Release 14; only the bend
+        // centerlines are on.
+        Self { insunits: 4, version: DxfVersion::AC1014, bend_centerlines: true, tangent_lines: false, cbore_lines: false, form_outlines: false, form_centermarks: false }
     }
 }
 
@@ -89,6 +97,12 @@ const LAYERS: [(&str, &str, bool, bool); 47] = [
 const CUT: &str = "SHEETMETAL_CUT_LINES";
 const BEND_UP: &str = "SHEETMETAL_BEND_LINES_UP";
 const BEND_DOWN: &str = "SHEETMETAL_BEND_LINES_DOWN";
+const TANGENT: &str = "SHEETMETAL_BEND_TANGENT_LI";
+const CBORE_UP: &str = "SHEETMETAL_CBORE_CSINK_UP";
+const CBORE_DOWN: &str = "SHEETMETAL_CBORE_CSINK_DOW";
+const FORM_UP: &str = "SHEETMETAL_FORM_UP";
+const FORM_DOWN: &str = "SHEETMETAL_FORM_DOWN";
+const FORM_MARK: &str = "SHEETMETAL_FORM_CENTERMARK";
 
 /// Units per meter of a DXF $INSUNITS code.
 fn units_per_meter(insunits: u8) -> f64 {
@@ -154,6 +168,38 @@ pub fn flats_document(flats: &[FlatPattern], o: &FlatExport) -> Result<CadDocume
                 add(&mut doc, b.a, b.b, if b.up { BEND_UP } else { BEND_DOWN })?;
             }
         }
+        if o.tangent_lines {
+            for b in &flat.bend_lines {
+                let d = (b.b - b.a).normalize_or_zero();
+                let side = glam::DVec2::new(-d.y, d.x) * (b.allowance * 0.5);
+                add(&mut doc, b.a + side, b.b + side, TANGENT)?;
+                add(&mut doc, b.a - side, b.b - side, TANGENT)?;
+            }
+        }
+        if o.cbore_lines {
+            for h in &flat.heads {
+                let mut e = EntityType::Circle(Circle::from_center_radius(p3(h.center), h.radius * k));
+                e.common_mut().layer = (if h.up { CBORE_UP } else { CBORE_DOWN }).into();
+                doc.add_entity(e).map_err(|e| e.to_string())?;
+            }
+        }
+        for f in &flat.forms {
+            let layer = if f.up { FORM_UP } else { FORM_DOWN };
+            for l in f.loops.iter().filter(|_| o.form_outlines) {
+                for (i, a) in l.iter().enumerate() {
+                    let b = l[(i + 1) % l.len()];
+                    if a.distance(b) > 1e-12 {
+                        add(&mut doc, *a, b, layer)?;
+                    }
+                }
+            }
+            if o.form_centermarks {
+                // A cross over the form's center, its outline's size.
+                let r = f.loops.iter().flatten().map(|p| p.distance(f.center)).fold(0.0, f64::max).max(1e-3);
+                add(&mut doc, f.center - glam::DVec2::X * r, f.center + glam::DVec2::X * r, FORM_MARK)?;
+                add(&mut doc, f.center - glam::DVec2::Y * r, f.center + glam::DVec2::Y * r, FORM_MARK)?;
+            }
+        }
     }
     Ok(doc)
 }
@@ -217,5 +263,25 @@ mod tests {
         let doc = flats_document(&flats, &FlatExport { bend_centerlines: false, ..FlatExport::default() }).unwrap();
         assert_eq!(doc.entities().filter(|e| e.common().layer == BEND_UP).count(), 0);
         assert!(flats_dwg(&flats, &FlatExport { version: DxfVersion::AC1015, ..FlatExport::default() }).is_ok_and(|b| !b.is_empty()));
+    }
+
+    /// The export's other checkboxes: bend tangent lines (the bend zone's
+    /// edges), counterbore / countersink heads, form outlines and marks.
+    #[test]
+    fn the_flat_export_options_write_their_layers() {
+        let mut f = flat(0.0);
+        f.heads.push(crate::sheetmetal::flat::FlatHead { center: DVec2::new(0.01, 0.02), radius: 4e-3, up: true });
+        f.forms.push(crate::sheetmetal::flat::FlatForm { loops: vec![vec![DVec2::new(0.045, 0.015), DVec2::new(0.055, 0.015), DVec2::new(0.055, 0.025)]], center: DVec2::new(0.05, 0.02), up: false });
+        let on = |o: &FlatExport, layer: &str| flats_document(std::slice::from_ref(&f), o).unwrap().entities().filter(|e| e.common().layer == layer).count();
+        let none = FlatExport::default();
+        let all = FlatExport { tangent_lines: true, cbore_lines: true, form_outlines: true, form_centermarks: true, ..none };
+        for (layer, n) in [(TANGENT, 2), (CBORE_UP, 1), (FORM_DOWN, 3), (FORM_MARK, 2)] {
+            assert_eq!((on(&none, layer), on(&all, layer)), (0, n), "{layer}");
+        }
+        // The tangent lines run the allowance apart, centred on the bend line.
+        let doc = flats_document(std::slice::from_ref(&f), &all).unwrap();
+        let mut xs: Vec<f64> = doc.entities().filter_map(|e| match e { EntityType::Line(l) if e.common().layer == TANGENT => Some(l.start.x), _ => None }).collect();
+        xs.sort_by(f64::total_cmp);
+        assert!((xs[0] - 28.0).abs() < 1e-9 && (xs[1] - 32.0).abs() < 1e-9, "{xs:?}");
     }
 }

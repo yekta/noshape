@@ -138,7 +138,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   hole was gone. Fixed for Simple holes: the native Hole cuts active sheet metal parts through std's booleanBodies (its
   sheet metal aware Boolean cuts the definition), the rest natively. T2 sheetmetal_std a_hole_survives_a_later_flange
   (part and flat). Counterbore / countersink: SM-CBORE-THEN-FLANGE.
-- [x] skasm-cbore P2 SM-CBORE-THEN-FLANGE (skasm 10-30) a Counterbore / Countersink Hole on an active sheet metal part still runs
+- [x] bcd28cc4 P2 SM-CBORE-THEN-FLANGE (skasm 10-30) a Counterbore / Countersink Hole on an active sheet metal part still runs
   natively and a later sheet metal feature rebuilds it away. Cutting the definition by the tool's outline would put the
   head through; live registers such tools on the wall (std registerSheetMetalBooleanTools, cuttingToolBodyIds, which our
   rebuild now cuts), but std's Hole then needs the hole's edges on the definition sheet created by the rebuild

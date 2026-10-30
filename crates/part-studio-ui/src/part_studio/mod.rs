@@ -3773,7 +3773,7 @@ impl PartStudioView {
                     })).icon_name("menu-copy"))
                     .separator()
                     .item(item(&format!("Create Drawing of {part_name}…"), Box::new(move |this, w, cx| {
-                        let source = Some(noshape_model::drawing::create::DrawingSource { tab: this.tab, part: Some(b10.clone()), config: Default::default(), sketch: None });
+                        let source = Some(noshape_model::drawing::create::DrawingSource { tab: this.tab, part: Some(b10.clone()), config: Default::default(), sketch: None, flat: false });
                         let name = this.display.body(&b10).map(|d| d.name.clone());
                         crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name }, w, cx);
                     })).icon_name("menu-create-drawing"))

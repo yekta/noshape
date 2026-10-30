@@ -21,6 +21,9 @@ pub struct DrawingSource {
     pub config: ConfigValues,
     /// A sketch of the Part Studio ("Create Drawing of Sketch N…").
     pub sketch: Option<crate::FeatureId>,
+    /// The part's flat pattern (the sheet metal flat view's "Create Drawing
+    /// of Flat pattern of Part N…").
+    pub flat: bool,
 }
 
 /// The scales Suggested views picks from, largest first (view scale =
@@ -49,6 +52,14 @@ pub fn source_bounds(doc: &Document, src: &DrawingSource) -> Option<(DVec3, DVec
             }
         }
         return acc;
+    }
+    // A flat pattern: its extent in its own plane (x, y), the thickness in z.
+    if src.flat {
+        let flat = crate::sheetmetal::flat_pattern_for(&model.context, src.part.as_ref()?).ok()?;
+        let pts = flat.loops.iter().flatten();
+        let lo = pts.clone().fold(glam::DVec2::splat(f64::INFINITY), |a, p| a.min(*p));
+        let hi = pts.fold(glam::DVec2::splat(f64::NEG_INFINITY), |a, p| a.max(*p));
+        return Some((lo.extend(0.0), hi.extend(flat.thickness)));
     }
     for b in model.context.bodies.iter().filter(|b| src.part.as_ref().is_none_or(|p| &b.id == p)) {
         let Ok(bb) = b.shape.bounding_box(false) else { continue };
@@ -111,6 +122,9 @@ pub fn create_drawing(template: &DrawingTemplate, source: Option<&DrawingSource>
     let (lo, hi) = bounds.unwrap_or((DVec3::splat(-0.05), DVec3::splat(0.05)));
     let e = (hi - lo) * 1000.0;
     let (w, h) = d.sheets[0].size.size_mm();
+    if src.flat {
+        return flat_drawing(d, src, e, w, h);
+    }
     let s = suggested_scale(hi - lo, w, h);
     d.sheets[0].scale = s;
     let iso = (e.x + e.y) * 0.87 * s;
@@ -157,6 +171,34 @@ pub fn create_drawing(template: &DrawingTemplate, source: Option<&DrawingSource>
     d
 }
 
+/// Suggested views of a flat pattern (live dx 10-27: the flat view, and the
+/// part's isometric view beside it; live adds two edge views of the flat,
+/// which projected views of a flat view can't show yet). `e`: the flat's
+/// extent (mm, x by y).
+fn flat_drawing(mut d: Drawing, src: &DrawingSource, e: DVec3, w: f64, h: f64) -> Drawing {
+    let iso = (e.x + e.y) * 0.6;
+    let (need_w, need_h) = (e.x + iso, e.y.max(iso * 0.6));
+    let s = SCALES.iter().copied().find(|s| need_w * s <= w * 0.6 && need_h * s <= h * 0.6).unwrap_or(*SCALES.last().expect("scales"));
+    d.sheets[0].scale = s;
+    let gap = 25.0;
+    let x0 = (w - (e.x + iso) * s - gap) * 0.5;
+    let y = 15.0 + (h - 15.0) * 0.5;
+    let vd = d.props.view_defaults.clone();
+    let view = |id: u64, orientation: ViewOrientation, position: [f64; 2], flat: bool| DrawingView {
+        id: ViewId(id),
+        kind: ViewKind::Base { source: src.tab, config: src.config.clone(), orientation, part: src.part.clone() },
+        position,
+        style: RenderStyle::HiddenLinesRemoved,
+        show_centerlines: vd.auto_centermarks,
+        auto_centerlines: Some(vd.auto_centerlines),
+        flat,
+        ..Default::default()
+    };
+    d.sheets[0].views.push(view(1, ViewOrientation::Top, [x0 + e.x * s * 0.5, y], true));
+    d.sheets[0].views.push(view(2, ViewOrientation::Isometric, [x0 + e.x * s + gap + iso * s * 0.5, y], false));
+    d
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -169,7 +211,7 @@ mod tests {
         if let TabContent::PartStudio(ps) = &mut doc.tabs[0].content {
             *ps = crate::demo::plate_studio();
         }
-        let src = DrawingSource { tab: doc.tabs[0].id, part: None, config: ConfigValues::default(), sketch: None };
+        let src = DrawingSource { tab: doc.tabs[0].id, part: None, config: ConfigValues::default(), sketch: None, flat: false };
         let bounds = source_bounds(&doc, &src).expect("bounds");
         // The plate: 100 x 60 x 12 mm.
         assert!(((bounds.1 - bounds.0) * 1000.0 - DVec3::new(100.0, 60.0, 12.0)).length() < 1e-3, "{bounds:?}");

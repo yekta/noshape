@@ -39,7 +39,7 @@ pub fn request_create_drawing(req: CreateRequest, window: &mut Window, cx: &mut 
 /// Part Studio › "Create Drawing of Sketch N…": the Create Drawing dialog
 /// for a sketch view of feature `sketch` (named after the sketch).
 pub fn request_create_drawing_of_sketch(tab: noshape_model::document::TabId, sketch: noshape_model::FeatureId, sketch_name: &str, window: &mut Window, cx: &mut App) {
-    let source = noshape_model::drawing::create::DrawingSource { tab, part: None, config: Default::default(), sketch: Some(sketch) };
+    let source = noshape_model::drawing::create::DrawingSource { tab, part: None, config: Default::default(), sketch: Some(sketch), flat: false };
     request_create_drawing(CreateRequest { source: Some(source), name: Some(sketch_name.to_string()) }, window, cx);
 }
 

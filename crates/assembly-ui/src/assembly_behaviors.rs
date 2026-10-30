@@ -1154,7 +1154,7 @@ impl AssemblyView {
             let tab = self.tab;
             let aname = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
             m.push(icon_item(format!("Create Drawing of {aname}…"), "menu-create-drawing", move |_, w, cx| {
-                let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default(), sketch: None });
+                let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default(), sketch: None, flat: false });
                 crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(aname.clone()) }, w, cx);
             }));
             m.push(export);
@@ -1256,7 +1256,7 @@ impl AssemblyView {
         // The part's own name (the instance name without " <n>").
         let base = inst.name.rsplit_once(" <").map(|(b, _)| b.to_string()).unwrap_or_else(|| inst.name.clone());
         Some(icon_item(format!("Create Drawing of {base}…"), "menu-create-drawing", move |_, w, cx| {
-            let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: part.clone(), config: config.clone(), sketch: None });
+            let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: part.clone(), config: config.clone(), sketch: None, flat: false });
             crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(base.clone()) }, w, cx);
         }))
     }
@@ -1867,7 +1867,7 @@ impl AssemblyView {
         m.push(MenuEntry::Sep);
         let name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
         m.push(icon_item(format!("Create Drawing of {name}…"), "menu-create-drawing", move |_, w, cx| {
-            let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default(), sketch: None });
+            let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default(), sketch: None, flat: false });
             crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(name.clone()) }, w, cx);
         }));
         m.push(item("Add exploded view…", |t, _, cx| {
@@ -2074,7 +2074,7 @@ impl AssemblyView {
                 let tab = self.tab;
                 let aname = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
                 m.push(icon_item(format!("Create Drawing of {aname}…"), "menu-create-drawing", move |_, w, cx| {
-                    let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default(), sketch: None });
+                    let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default(), sketch: None, flat: false });
                     crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(aname.clone()) }, w, cx);
                 }));
                 m.push(MenuEntry::Sep);

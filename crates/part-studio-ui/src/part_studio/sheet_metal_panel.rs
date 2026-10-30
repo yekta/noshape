@@ -203,9 +203,8 @@ impl PartStudioView {
         // DXF/DWG of Flat pattern of <part>… | Select other… | Add comment |
         // Zoom to fit, Zoom to selection, View normal to | Delete <model>.
         // "Add comment" is cloud (not built, as in the other menus).
-        // TODO(SM4): New sketch…, Copy Flat pattern…, Create Drawing of Flat
-        // pattern…, Select other… and Zoom to selection need the flat face's
-        // model face (the flat pattern doesn't keep it yet).
+        // TODO(SM4): New sketch…, Copy Flat pattern…, Select other… and Zoom
+        // to selection (asked live what they do: REQUESTS skasm 2026-10-30 04:00).
         let menu = OsMenu::build(window, cx, move |m, _, _| {
             type Action = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
             let item = |label: String, f: Action| {
@@ -228,6 +227,14 @@ impl PartStudioView {
                 cx.notify();
             })))
             .separator()
+            .item(item(format!("Create Drawing of Flat pattern of {part}…"), {
+                let (b, part) = (b.clone(), part.clone());
+                Box::new(move |this, w, cx| {
+                    // Live (dx 10-27): a drawing "Flat pattern of Part 1", Suggested views from its flat view.
+                    let source = Some(noshape_model::drawing::create::DrawingSource { tab: this.tab, part: Some(b.clone()), config: Default::default(), sketch: None, flat: true });
+                    crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(format!("Flat pattern of {part}")) }, w, cx);
+                })
+            }))
             .item(item(format!("Export DXF/DWG of Flat pattern of {part}…"), Box::new(move |this, w, cx| this.open_flat_export(b.clone(), w, cx))))
             .separator()
             .item(item("Zoom to fit".into(), Box::new(move |_, _, cx| {

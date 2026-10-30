@@ -1684,6 +1684,27 @@ fn flat_bracket() -> (crate::Document, Drawing) {
     (doc, drawing)
 }
 
+/// The sheet metal flat view's "Create Drawing of Flat pattern of Part 1…"
+/// (live dx 10-27): Suggested views start from the part's flat view, with
+/// its isometric view beside it, scaled to the flat's extent.
+#[test]
+fn a_drawing_of_a_flat_pattern() {
+    let (doc, drawing) = flat_bracket();
+    let ViewKind::Base { source, part, .. } = &drawing.sheets[0].views[0].kind else { unreachable!() };
+    let src = create::DrawingSource { tab: *source, part: part.clone(), config: Default::default(), sketch: None, flat: true };
+    let bounds = create::source_bounds(&doc, &src).expect("the flat's extent");
+    let e = (bounds.1 - bounds.0) * 1000.0;
+    assert!(e.x > e.z * 5.0 && e.y > e.z * 5.0, "{e:?}");
+    let d = create::create_drawing(&templates::template_by_name("ANSI A").unwrap(), Some(&src), Some(bounds), true, None);
+    let views = &d.sheets[0].views;
+    assert_eq!(views.len(), 2);
+    assert!(views[0].flat && matches!(views[0].kind, ViewKind::Base { part: Some(_), .. }));
+    assert!(!views[1].flat && matches!(views[1].kind, ViewKind::Base { orientation: ViewOrientation::Isometric, .. }));
+    // Both on the sheet.
+    let (w, h) = d.sheets[0].size.size_mm();
+    assert!(views.iter().all(|v| v.position[0] > 0.0 && v.position[0] < w && v.position[1] > 0.0 && v.position[1] < h));
+}
+
 #[test]
 fn flat_pattern_view_shows_bend_lines_and_notes() {
     let (doc, mut drawing) = flat_bracket();

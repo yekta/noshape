@@ -10,6 +10,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## From skasm (10-30): flat pattern drawings
+- skasm added `DrawingSource::flat` (drawing/create.rs; every construction site now sets it) for the sheet metal flat
+  view's "Create Drawing of Flat pattern of Part N…": `source_bounds` gives the flat's extent and Suggested views make
+  the flat view (Base, `flat: true`) and the part's isometric view (`flat_drawing`; test drawing::tests
+  a_drawing_of_a_flat_pattern). **Yours if you like**: live adds two edge views of the flat (behaviours "dx (2026-10-27,
+  P3) flat pattern line styles": "a flat view plus an iso view and two edge views"); projected views of a flat view
+  don't show the flat yet, so they were left out.
+
 ## Build times (load ~25–30)
 - 10-26 after c9540ae6: first build ~25 min; edit ops/src/values.rs → `cargo test -p noshape-ops --test all
   e2e::hole_standard` 74 s.

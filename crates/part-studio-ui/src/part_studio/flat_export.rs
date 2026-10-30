@@ -4,10 +4,10 @@
 //! pattern of <part>"; Format DXF | DWG (DXF starts at Release 14, DWG at
 //! 2000); Version; Scope (the part, its model's parts, the Part Studio's);
 //! ☑ Use workspace units (Units grayed while on); Options; the flat's eight
-//! checkboxes with live's defaults. The format, version, scope, units and
-//! bend centerlines change the file; the other checkboxes have nothing to
-//! write yet (our flats have no splines, tangent, counterbore, form or
-//! sketch geometry).
+//! checkboxes with live's defaults. Bend centerlines, bend tangent lines,
+//! counterbore / countersink lines and form outlines / centermarks go on
+//! their Onshape layers; our flats are lines at z 0 already (splines as
+//! polylines, z-height to zero) and have no sketches to include.
 
 use super::PartStudioView;
 use super::export::{modal_checkbox, store_export, store_written};
@@ -149,7 +149,7 @@ impl PartStudioView {
             }
         }
         let units = if s.workspace_units { self.workspace_insunits(cx) } else { UNITS[s.units.min(5)].1 };
-        let o = FlatExport { insunits: units, version: CAD_VERSIONS[s.version.min(CAD_VERSIONS.len() - 1)].1, bend_centerlines: s.checks[CENTERLINES] };
+        let o = FlatExport { insunits: units, version: CAD_VERSIONS[s.version.min(CAD_VERSIONS.len() - 1)].1, bend_centerlines: s.checks[CENTERLINES], tangent_lines: s.checks[3], cbore_lines: s.checks[4], form_outlines: s.checks[5], form_centermarks: s.checks[6] };
         let bytes = match if s.dwg { flats_dwg(&flats, &o) } else { flats_dxf(&flats, &o) } {
             Ok(b) => b,
             Err(e) => return self.flash_info(format!("Export failed: {e}"), cx),

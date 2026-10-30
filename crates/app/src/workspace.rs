@@ -1235,7 +1235,7 @@ impl Workspace {
                         let menu = if kind == "assembly" {
                             let n = tab_name.clone();
                             menu.item(I::new(format!("Create Drawing of {tab_name}…")).icon_name("menu-create-drawing").on_click(move |_, w, cx| {
-                                let source = Some(noshape_model::drawing::create::DrawingSource { tab: id, part: None, config: Default::default(), sketch: None });
+                                let source = Some(noshape_model::drawing::create::DrawingSource { tab: id, part: None, config: Default::default(), sketch: None, flat: false });
                                 let req = crate::drawing_create::CreateRequest { source, name: Some(n.clone()) };
                                 v3.update(cx, |t, cx| t.open_create_drawing(req, w, cx));
                             }))
