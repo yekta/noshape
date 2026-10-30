@@ -136,6 +136,15 @@ fn regen_profile() {
     }
 }
 
+/// The sheet metal model alone (cold: the Hem's std module loads; then
+/// warm), for `tools/tiers/perf.sh -p noshape-ops --test all
+/// regen_profile::sheet_metal_profile -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn sheet_metal_profile() {
+    sheet_metal(&mut Vec::new());
+}
+
 /// REGEN-SPEED (core): live's 30-feature part, Extrude 1's depth edited
 /// 10 → 12 and committed, as the app does (the regenerator's cache keeps the
 /// features before the edit). Prints each re-evaluated feature's time.
