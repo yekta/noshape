@@ -1510,32 +1510,33 @@ impl DrawingEditor {
                 }
             }
             Drag::TableDivider { id, col, row, start, widths, heights } => {
+                // Live 1613 (b): a dragged grid line resizes only the column
+                // (row) on the fixed corner's side of it (fixed top right: the
+                // column right of a vertical line, the row above a horizontal
+                // one); the table grows, the others keep their size and move.
+                // An outer line with nothing on that side resizes the other.
                 let d = sub(c, *start);
                 let min = 3.0;
                 if let Some(t) = sheet.table_mut(*id) {
+                    let fixed_right = matches!(t.corner, TableCorner::TopRight | TableCorner::BottomRight);
+                    let fixed_top = matches!(t.corner, TableCorner::TopLeft | TableCorner::TopRight);
                     if let Some(i) = *col {
                         let mut w = widths.clone();
-                        if i == w.len() {
-                            // The right edge: the last column grows, the table too.
-                            w[i - 1] = (w[i - 1] + d[0]).max(min);
-                        } else if i > 0 {
-                            // An inner divider: its neighbours change, the table doesn't.
-                            let dx = d[0].clamp(min - w[i - 1], w[i] - min);
-                            w[i - 1] += dx;
-                            w[i] -= dx;
+                        // (column, its change): right of the line −dx, left of it +dx.
+                        let right = (i < w.len()).then_some((i, -d[0]));
+                        let left = (i > 0).then_some((i.wrapping_sub(1), d[0]));
+                        if let Some((k, dw)) = if fixed_right { right.or(left) } else { left.or(right) } {
+                            w[k] = (w[k] + dw).max(min);
                         }
                         t.col_widths = w;
                     }
                     if let Some(j) = *row {
                         let mut h = heights.clone();
-                        let dy = -d[1];
-                        if j == h.len() {
-                            // The bottom edge: the last row grows.
-                            h[j - 1] = (h[j - 1] + dy).max(min);
-                        } else if j > 0 {
-                            let dy = dy.clamp(min - h[j - 1], h[j] - min);
-                            h[j - 1] += dy;
-                            h[j] -= dy;
+                        // (row, its change): above the line −dy, below it +dy (sheet y up).
+                        let above = (j > 0).then_some((j.wrapping_sub(1), -d[1]));
+                        let below = (j < h.len()).then_some((j, d[1]));
+                        if let Some((k, dh)) = if fixed_top { above.or(below) } else { below.or(above) } {
+                            h[k] = (h[k] + dh).max(min);
                         }
                         t.row_heights = h;
                     }
