@@ -10,6 +10,55 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending (request 
 **Last run: 2026-10-21 (session 12:05–13:35), qa5**, binary /tmp/qa5/noshape-1206 (target-shared build 11:50), Xvfb 1600×1000,
 window 1440×900.
 
+## Status of every row, skasm 2026-10-30 (std route, main d3d10e3f and later)
+The passes below are history; this is where each row stands now. ✅ = matches live (GUI or a test with live's
+numbers), ◐ = partly, ✗ = differs, — = no live data.
+
+| Row | Now | Status | Verified by |
+|---|---|---|---|
+| 1.1 sketch, D 60 / D 40 | fully defined | ✅ | GUI 10-29 |
+| 1.2 Sheet metal ▾ | 15 items with the Flex PCB pair (SM12) | ✅ | GUI 10-29 |
+| 1.3 dialog on open | as live's screenshot, slider too | ✅ | GUI 10-29 |
+| 1.4 Thicken pick | "Face of Sketch 1" | ✅ | GUI 10-29 |
+| 1.5 Thickness / radius | "2 mm", stays open | ✅ | GUI 10-29 |
+| 1.6 Material / Relief | K 0.45 / 0.5, gap 0.02, Simple, Obround - Scaled, 2, 1.063 (SM15) | ✅ | GUI 10-29 |
+| 1.7 ✓ | 4800 mm³, Sketch 1 hidden | ✅ | GUI 10-28/29 |
+| 2.1 Flange defaults | as live | ✅ | GUI 10-29 |
+| 2.2 first edge | "Edge of Sheet metal model 1", preview | ✅ | GUI 10-29 |
+| 2.3 x = 0 edge picked in Top view on the face boundary | nothing picked (the edge lies edge-on on the Right plane) | — (live untested) | GUI 10-29 |
+| 2.4 second edge | picked, 2 chips (fixed 10-29: preview picks) | ✅ | GUI 10-29, T2 flange_keeps_the_other_edges_references |
+| 2.5 Distance 20 | commits | ✅ | GUI 10-29 |
+| 2.6 geometry (SM1) | 8511.4987 / 24 faces; part keeps name and colour | ✅ | T2 flanges_on_adjacent_edges_match_live, flanges_keep_the_part_name_and_colour |
+| 3.1 Hem dialog | defaults and lists as live | ✅ | GUI 10-30 |
+| 3.2 Hem result | 9378.1835 / 33 | ✅ | T2 hem_on_g34_matches_live |
+| 4.1 Tab dialog | fields as live | ✅ | GUI 10-30 |
+| 4.2 Tab (SM2, SM16) | merges; auto-fills merge face and 0.02 mm (field shows it since 10-30) | ✅ | GUI 10-30, T2 tab_merges_into_the_top_face, tab_editing_logic…, UI test a_value_set_by_editing_logic… |
+| 4.3 bottom face as merge | — (only shows the old native rule) | — | |
+| 5.1 Bend relief dialog | Obround - Sized, 5 mm, ☐ Extend | ✅ | GUI 10-30 |
+| 5.2 bend end vertex (SM7) | "Selection is not a bend relief." | ✅ | GUI 10-30 |
+| 5.3 Corner dialog (SM8 withdrawn) | Square - Sized, 5 mm | ✅ | GUI 10-30 |
+| 5.4 Corner off a corner | "Sheet metal corner not found." (the dialog also refuses such picks) | ✅ | T2 corner_off_a_corner_fails_as_live |
+| 5.5 inner corner vertex | OK | ✅ | T2 closed_corner / corner tests |
+| 5.6 Closed (SM3) | 23 faces, 8535.1616 (live regen 8535.1655548) | ✅ | T2 closed_corner_matches_live |
+| 5.7 corner type labels | as live | ✅ | GUI 10-30 |
+| 5.8 Esc after a list (SM9) | 2nd Esc cancels | ✅ | GUI 10-30 |
+| 5.9 select tooltip (SM11) | none while open | ✅ | GUI 10-28 |
+| 6.1 strip button | "Sheet metal table and flat view" | ✅ | GUI 10-30 |
+| 6.2 panel (SM4) | live's design | ✅ | GUI 10-30 |
+| 6.2 row names | Bend A, Bend B, Hem C, Joint D vs live Joint A, Bend B, Bend C, Hem D (live: creation order of the joints' definition edges, request 1604) | ✗ P3 | GUI 10-30 |
+| 6.3 Up (SM5) | Up | ✅ | GUI 10-30 |
+| 6.4 row click | row selected, bend lit in 3D and flat | ✅ | GUI 10-30 |
+| 6.5 flat (SM6, SM17) | reliefs, live placement and size | ✅ | GUI 10-30, T2 flat_pattern_keeps_the_model_placement |
+| 6.6 flat menu (SM13) | live's items except Copy Flat pattern, Select other…, Add comment (cloud) | ◐ P3 | GUI 10-30 |
+| 6.6 export dialog / DXF (SM14) | live's dialog and options; AC1014, live's layers | ✅ | GUI 10-30, T1 the_flat_export_options…, T2 flat_dxf_is_written_as_live |
+| 6.7 part menu | no flat items | ✅ | GUI 10-30 |
+| 6.8 notice (SM10) | auto-dismisses | ✅ | GUI 10-28 |
+| 6.9 Finish | "Sheet metal parts" Part 1, INFO notice, table stays | ✅ | GUI 10-30 |
+| 9 parts list | only Part 1 | ✅ | GUI 10-30 |
+| Bend / Jog / Make joint / Tab-beside / cut / hole / counterbore then Flange / partial flange / Butt direction | see the 10-29/10-30 tables below | ✅ | T2s |
+| Butt direction after a Convert | top wall should run through (live: faces in creation order, request 1608) | ✗ P3 | T2 convert_rips_and_bends_like_onshape |
+| Sheet metal loft rect → triangle | 51 vs 49 faces | ✗ P3 | T2 sheet_metal_loft_rectangle_to_triangle |
+
 ## 1. Base: sketch + Sheet metal model (Thicken)
 
 | # | Step | Live | Ours | Status | Verified |

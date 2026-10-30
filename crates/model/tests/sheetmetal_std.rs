@@ -848,3 +848,18 @@ fn a_counterbore_survives_a_later_flange() {
     assert_eq!(flat.heads.len(), 1, "{:?}", flat.heads);
     assert!((flat.heads[0].radius - 4e-3).abs() < 1e-6, "{:?}", flat.heads);
 }
+
+/// qa5 5.4 (live behaviours "qa5 sheet metal"): a Corner on a vertex that is
+/// no sheet metal corner (the top of G34's front wall end) fails "Sheet metal
+/// corner not found.".
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn corner_off_a_corner_fails_as_live() {
+    let mut s = g34();
+    let r = s.ok();
+    let v = vertex_at(&r, DVec3::new(0.02, 0.0, 20.0));
+    s.add("sheetMetalCorner", |p| p.set("corner", ParamValue::Query(vec![v])));
+    let r = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions::default());
+    let last = r.display.features.last().unwrap();
+    assert_eq!((last.status, last.message.as_deref()), (FeatureStatus::Error, Some("Sheet metal corner not found.")));
+}
