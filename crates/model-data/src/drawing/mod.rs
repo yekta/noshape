@@ -178,6 +178,10 @@ pub enum TitleBlockStyle {
     Ansi,
     /// No title block.
     None,
+    /// The ANSI templates' continuation sheet block: one strip DWG NO. /
+    /// SIZE / SCALE / SHEET / REV. (live 1410, 1449; a new sheet after an
+    /// ANSI sheet, drawing.md S3).
+    AnsiContinuation,
 }
 
 impl TitleBlockStyle {
@@ -188,6 +192,7 @@ impl TitleBlockStyle {
             TitleBlockStyle::Iso => "ISO 7200",
             TitleBlockStyle::Ansi => "ANSI (ASME Y14.1)",
             TitleBlockStyle::None => "None",
+            TitleBlockStyle::AnsiContinuation => "ANSI continuation",
         }
     }
 }
@@ -3994,7 +3999,11 @@ impl Drawing {
             sheet.size = src.size;
             sheet.scale = src.scale;
             sheet.title_block = src.title_block.clone();
-            sheet.title_style = src.title_style;
+            // Live (1410, 1449): after an ANSI sheet, the continuation block.
+            sheet.title_style = match src.title_style {
+                TitleBlockStyle::Ansi => TitleBlockStyle::AnsiContinuation,
+                s => s,
+            };
         }
         // After a DWT was picked: its continuation format (live z2 (4)).
         if let Some(t) = self.new_sheet_template().cloned() {

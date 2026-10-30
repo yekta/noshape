@@ -821,6 +821,7 @@ impl SheetGeometry {
         };
         match sheet.title_style {
             TitleBlockStyle::None => {}
+            TitleBlockStyle::AnsiContinuation => self.ansi_continuation_block(sheet, &value_of),
             TitleBlockStyle::Simple => {
                 // Two columns of fields, 180 mm wide, in the lower-right corner.
                 let (tw, th) = (180.0, 8.0 * ((sheet.title_block.fields.len() as f64) / 2.0).ceil());
@@ -1059,6 +1060,36 @@ impl SheetGeometry {
         value_in(self, mid + 0.03, scale_cols[0], 0.0, right_rows[3] - 0.03, "Scale", 1.8 * lab);
         value_in(self, scale_cols[0], scale_cols[1], 0.0, right_rows[3] - 0.03, "Weight", 1.8 * lab);
         value_in(self, scale_cols[1] + 0.03, 1.0, 0.0, right_rows[3] - 0.03, "Sheet", 1.8 * lab);
+    }
+
+    /// The ANSI continuation block (live samples/drw2-l-sheet2.dxf, ANSI A in
+    /// inches; offsets from the frame's lower right): one 0.195 in strip,
+    /// DWG NO. 1.65 / SIZE 0.375 / SCALE 0.66 / SHEET 0.75 / REV. 0.30 in;
+    /// labels 0.0288 in (REV. 0.024) at the cell's top left, values 0.0864 in.
+    fn ansi_continuation_block(&mut self, sheet: &Sheet, value_of: &dyn Fn(&str, &str) -> String) {
+        const IN: f64 = 25.4;
+        let [_, y0, r, _] = sheet.size.frame_rect();
+        let top = y0 + 0.195 * IN;
+        let x = |d: f64| r - d * IN;
+        self.line([x(3.735), top], [r, top], LineStyle::Thin);
+        for d in [3.735, 2.085, 1.71, 1.05, 0.30] {
+            self.line([x(d), y0], [x(d), top], LineStyle::Thin);
+        }
+        // (label, its x, its height, key, the value's x, the cell)
+        let cells = [
+            ("DWG NO.", 3.71916, 0.0288, "Part number", 2.826, (3.735, 2.085)),
+            ("SIZE", 2.06916, 0.0288, "Size", 1.8375, (2.085, 1.71)),
+            ("SCALE", 1.69416, 0.0288, "Scale", 1.32, (1.71, 1.05)),
+            ("SHEET", 1.03416, 0.0288, "Sheet", 0.627, (1.05, 0.30)),
+            ("REV.", 0.2868, 0.024, "Revision", 0.135, (0.30, 0.0)),
+        ];
+        for (label, lx, lh, key, vx, (c0, c1)) in cells {
+            let ly = if label == "REV." { 0.1734 } else { 0.16908 };
+            self.text([x(lx), y0 + ly * IN], lh * IN, label.to_string(), Anchor::TopLeft);
+            let t0 = self.texts.len();
+            self.text([x(vx), y0 + 0.0975 * IN], 0.0864 * IN, value_of(key, sheet.title_field(key).unwrap_or("")), Anchor::Center);
+            self.title_cells.push((key.to_string(), [x(c0), y0, x(c1), top], t0..self.texts.len()));
+        }
     }
 
     /// First / third angle projection symbol (a truncated cone) centered at `c`.
@@ -2831,6 +2862,7 @@ pub fn title_block_rect(sheet: &Sheet) -> Option<[f64; 4]> {
         // on ANSI).
         TitleBlockStyle::Iso => (4.25 * tb, tb),
         TitleBlockStyle::Ansi => (4.05 * tb, tb),
+        TitleBlockStyle::AnsiContinuation => (3.735 * 25.4, 0.195 * 25.4),
     };
     Some([x1 - bw, y0, x1, y0 + bh])
 }
@@ -3063,6 +3095,29 @@ pub fn note_leader_paths(bbox: [f64; 4], leaders: &[super::Leader], targets: &[[
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A new sheet after an ANSI sheet gets the continuation block (live
+    /// 1410, samples/drw2-l-sheet2.dxf): one strip with DWG NO. / SIZE /
+    /// SCALE / SHEET / REV. at the frame's lower right.
+    #[test]
+    fn ansi_continuation_sheets() {
+        let mut d = super::super::Drawing::default();
+        d.sheets[0].size = super::super::SheetSize::AnsiA;
+        d.sheets[0].title_style = TitleBlockStyle::Ansi;
+        d.sheets[0].title_block.fields = super::super::templates::default_fields(TitleBlockStyle::Ansi, true);
+        let i = d.add_sheet(0);
+        let s = &d.sheets[i];
+        assert_eq!(s.title_style, TitleBlockStyle::AnsiContinuation);
+        let mut g = SheetGeometry::new(279.4, 215.9);
+        g.add_border_and_title_full(s, super::super::Projection::ThirdAngle, &|v: &str| v.replace("{sheet.number} of {sheet.count}", "2 of 2"));
+        let texts: Vec<&str> = g.texts.iter().map(|t| t.text.as_str()).collect();
+        for t in ["DWG NO.", "SIZE", "SCALE", "SHEET", "REV.", "A", "2 of 2"] {
+            assert!(texts.contains(&t), "{t} in {texts:?}");
+        }
+        let r = title_block_rect(s).unwrap();
+        let [_, y0, x1, _] = s.size.frame_rect();
+        assert!((r[2] - x1).abs() < 1e-9 && (r[1] - y0).abs() < 1e-9 && (r[3] - r[1] - 4.953).abs() < 1e-9 && (r[2] - r[0] - 94.869).abs() < 1e-9, "{r:?}");
+    }
 
     /// D24 (live asbdt-1a…c): a value dragged along an ANSI dimension stays
     /// inline; inside, the line breaks around it there; past an extension
