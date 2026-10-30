@@ -1137,6 +1137,17 @@ impl DrawingEditor {
         self.note_grip_overlay(&mut overlay);
         self.leader_overlay(&mut overlay);
         self.detail_circle_overlay(&mut overlay);
+        // A lost reference: a red grip where it was (help D40; drag it onto
+        // new geometry to re-attach).
+        if let Some(b) = &self.built {
+            let pk = self.pk();
+            for (id, slot) in &b.lost {
+                let Some(a) = b.resolved.annotations.iter().find(|a| a.id == *id) else { continue };
+                if let Some((_, p)) = pk.attach_points(a).into_iter().find(|(k, _)| *k == *slot as usize) {
+                    overlay.dots.push((p, [0xdd, 0x28, 0x28, 255]));
+                }
+            }
+        }
         // A centermark arm snapped onto an edge: a red diamond (live A55).
         if let Drag::CentermarkArm { snap: Some(p), .. } = &self.drag {
             let r = 8.0 / self.zoom.max(1e-6);

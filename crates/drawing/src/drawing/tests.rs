@@ -1177,9 +1177,19 @@ fn aligned_section_dimensions_are_associative() {
     });
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     assert!(!built.dangling.contains(&aid), "{:?}", built.dangling);
+    assert!(built.lost.is_empty(), "{:?}", built.lost);
     let want = format::format_len(&drawing, &DimFormat::default(), (sb.p[0] - sa.p[0]).abs());
     let p = pick_of(&built, PickTarget::Annotation(aid));
     assert_eq!(built.geometry.texts.iter().find(|t| t.pick == p).unwrap().text, want);
+    // Its second end on a body that is gone: dangling, that slot lost (help
+    // D40: a red grip there).
+    let mut gone = sb.point.clone().unwrap();
+    let (PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. }) = &mut gone;
+    body.index += 1000;
+    drawing.sheets[0].annotations.iter_mut().find(|a| a.id == aid).unwrap().refs[1].point = gone;
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(built.dangling.contains(&aid), "{:?}", built.dangling);
+    assert_eq!(built.lost, [(aid, 1)]);
 }
 
 #[test]

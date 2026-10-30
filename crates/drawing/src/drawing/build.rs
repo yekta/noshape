@@ -215,6 +215,9 @@ pub struct BuiltSheet {
     pub resolved: Sheet,
     /// Annotations whose references could not be resolved.
     pub dangling: Vec<u64>,
+    /// Which references were lost: (annotation, slot) (help D40: a red grip
+    /// there).
+    pub lost: Vec<(u64, u8)>,
     /// Table grids (table id, layout).
     pub tables: Vec<(u64, TableLayout)>,
     /// Title block rectangle [x0, y0, x1, y1] (mm).
@@ -494,10 +497,11 @@ pub fn placement_of(sheet: &Sheet, id: ViewId, g: &ViewGeometry) -> Option<ViewP
 }
 
 /// Resolve associative annotation inputs against current model geometry.
-pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<ViewId, Arc<ViewGeometry>>, sources: &Sources) -> (Sheet, Vec<u64>) {
+pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<ViewId, Arc<ViewGeometry>>, sources: &Sources) -> (Sheet, Vec<u64>, Vec<(u64, u8)>) {
     let _ = drawing;
     let mut out = sheet.clone();
     let mut dangling = Vec::new();
+    let mut lost = Vec::new();
     for a in &mut out.annotations {
         if a.loose {
             dangling.push(a.id);
@@ -519,6 +523,7 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
         for r in &a.refs {
             let Some((p, radius)) = resolve_in_view(&ctx, geo, &r.point) else {
                 ok = false;
+                lost.push((a.id, r.slot));
                 continue;
             };
             match (&mut a.kind, r.slot) {
@@ -623,7 +628,7 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
             dangling.push(a.id);
         }
     }
-    (out, dangling)
+    (out, dangling, lost)
 }
 
 /// 45-degree hatch lines (sheet coordinates) inside the region bounded by
@@ -2098,7 +2103,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     }
 
     // Annotations with resolved references.
-    let (mut resolved, dangling) = resolve_annotations(drawing, sheet, views, sources);
+    let (mut resolved, dangling, lost) = resolve_annotations(drawing, sheet, views, sources);
     // MBD datums from the Part Studio: anchored on their face in their view.
     let to_sheet_in = |id: ViewId, p: [f64; 2]| placements.iter().find(|pl| pl.id == id).map(|pl| pl.to_sheet(p)).unwrap_or(p);
     super::mbd::resolve_model_annotations(&mut resolved, views, sources, &to_sheet_in);
@@ -2341,7 +2346,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     }
     // Mirrors aren't views of this sheet (not picked, not listed).
     placements.retain(|p| !p.id.is_ghost());
-    BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, tables: table_layouts, title_rect, title_cells }
+    BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, lost, tables: table_layouts, title_rect, title_cells }
 }
 
 /// The foot of the perpendicular from `p` to the line through `a` and `b`.
