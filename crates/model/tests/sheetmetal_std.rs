@@ -996,14 +996,13 @@ fn library_circle_emboss_as_live() {
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn library_forms_placed_as_live() {
     let mut bad = Vec::new();
-    // (form, volume, its tolerance, faces, tear extents, outline extents).
-    // Louver: ours 19611.1870, 0.15 over live's /massproperties (7.7e-6;
-    // its tools were exact at the crawled t 1 / h 5): live's evVolume is
-    // pending (request 1623 (c)).
+    // (form, volume (live evVolume HIGH, request 1623 (c): the Louver's
+    // /massproperties was 0.15 low), its tolerance, faces, tear extents,
+    // outline extents).
     for (form, volume, tol, faces, tear, outline) in [
-        ("louver", 19611.036584, 0.2, 20, (100.0, 0.0), (100.0, 20.0)),
-        ("bridge-lance", 19331.262256, 1e-3, 24, (63.313708, 20.0), (63.313708, 20.0)),
-        ("circle-knockout", 19205.851952, 1e-3, 24, (24.919872, 25.0), (25.0, 2.0)),
+        ("louver", 19611.18705282609, 1e-4, 20, (100.0, 0.0), (100.0, 20.0)),
+        ("bridge-lance", 19331.262255870253, 1e-4, 24, (63.313708, 20.0), (63.313708, 20.0)),
+        ("circle-knockout", 19205.85213320318, 1e-4, 24, (24.919872, 25.0), (25.0, 2.0)),
     ] {
         let mut s = Studio::new();
         let region = s.rectangle(120.0, 80.0);
