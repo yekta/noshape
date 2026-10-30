@@ -959,6 +959,9 @@ pub struct AssemblyEvaluator {
     studios: HashMap<(TabId, String), StudioCacheEntry>,
     /// Mirrored parts: (source regeneration, mirrored result).
     mirrored: HashMap<MirrorKey, (Arc<RegenResult>, Arc<RegenResult>)>,
+    /// Flat patterns of sheet metal parts inserted as parts: (source
+    /// regeneration, the flat's result) by (studio, configuration, flat id).
+    flats: HashMap<(TabId, String, BodyId), (Arc<RegenResult>, Arc<RegenResult>)>,
     external: Option<Arc<dyn ExternalStudios>>,
     /// Regenerated external Part Studios by (key, configuration); pinned
     /// snapshots never change.
@@ -1105,6 +1108,26 @@ fn mirror_mesh(m: &MeshBuffers, p: DVec3, n: DVec3) -> MeshBuffers {
 
 /// A regeneration result holding only `body`, mirrored across a plane
 /// (kernel mirror transform; face, edge and vertex names are kept).
+/// A Part Studio regeneration holding only flat pattern `flat` of one of its
+/// sheet metal parts (live request 1605: "Flat pattern of Part 1", pasted
+/// into an assembly from the flat view, is a part instance).
+pub fn flat_result(src: &RegenResult, flat: &BodyId) -> Option<RegenResult> {
+    let part = crate::sheetmetal::part_of_flat(flat)?;
+    let name = src.display.bodies.iter().find(|b| b.id == part).map(|b| b.name.clone()).or_else(|| src.context.body(&part).map(|b| b.name.clone()))?;
+    let body = crate::sheetmetal::flat_body(&src.context, flat, &name)?;
+    let fp = crate::sheetmetal::flat_pattern_for(&src.context, &part).ok()?;
+    let color = src.display.bodies.iter().find(|b| b.id == part).map_or([0.6, 0.7, 0.8, 1.0], |b| b.color);
+    let mut display = crate::regen::flat_view_display(&fp, color)?;
+    for d in &mut display.bodies {
+        d.id = flat.clone();
+        d.name = body.name.clone();
+    }
+    let mut ctx: Context = (*src.context).clone();
+    ctx.bodies = vec![Arc::new(body)];
+    ctx.connectors.clear();
+    Some(RegenResult { display, needs_refine: false, context: Arc::new(ctx), cancelled: false, evaluated: Vec::new() })
+}
+
 pub fn mirrored_result(src: &RegenResult, body: &BodyId, point: DVec3, normal: DVec3) -> Option<RegenResult> {
     let n = normal.normalize_or_zero();
     if n == DVec3::ZERO {
@@ -1918,7 +1941,22 @@ impl AssemblyEvaluator {
         Some(cached_symmetry(&regen, body).iter().any(|s| *s))
     }
 
+    /// The regeneration a Part instance of flat pattern `body` draws from
+    /// ([`flat_result`]), cached against its source's.
+    fn flat_studio(&mut self, tab: TabId, config: &ConfigValues, body: &BodyId, src: &Arc<RegenResult>) -> Option<Arc<RegenResult>> {
+        let key = (tab, serde_json::to_string(config).unwrap_or_default(), body.clone());
+        if let Some((s, r)) = self.flats.get(&key)
+            && Arc::ptr_eq(s, src)
+        {
+            return Some(r.clone());
+        }
+        let r = Arc::new(flat_result(src, body)?);
+        self.flats.insert(key, (src.clone(), r.clone()));
+        Some(r)
+    }
+
     pub fn retain_tabs(&mut self, doc: &Document) {
+        self.flats.retain(|(t, _, _), _| doc.tab(*t).is_some());
         self.studios.retain(|(t, _), _| doc.tab(*t).is_some());
         self.mirrored.retain(|(t, _, _, _), _| doc.tab(*t).is_some());
     }
@@ -2173,7 +2211,13 @@ impl AssemblyEvaluator {
             match &inst.source {
                 InstanceSource::Part { studio, body, config } => {
                     node.kind = NodeKind::Part;
-                    match self.studio(doc, *studio, config) {
+                    // A sheet metal part's flat pattern: its own regeneration.
+                    let studio_result = self.studio(doc, *studio, config);
+                    let studio_result = match (studio_result, crate::sheetmetal::part_of_flat(body)) {
+                        (Some(r), Some(_)) => self.flat_studio(*studio, config, body, &r).or(Some(r)),
+                        (r, _) => r,
+                    };
+                    match studio_result {
                         Some(r) => {
                             if r.context.body(body).is_none() {
                                 node.error = Some(INSTANCE_LOST.into());

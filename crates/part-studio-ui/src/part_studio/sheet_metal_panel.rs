@@ -126,8 +126,6 @@ impl PartStudioView {
         // DXF/DWG of Flat pattern of <part>… | Select other… | Add comment |
         // Zoom to fit, Zoom to selection, View normal to | Delete <model>.
         // "Add comment" is cloud (not built, as in the other menus).
-        // Not built: Copy Flat pattern of <part> (live pastes a flat-pattern
-        // part instance into an assembly: our flats aren't parts).
         let menu = OsMenu::build(window, cx, move |m, _, _| {
             type Action = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
             let item = |label: String, f: Action| {
@@ -156,6 +154,11 @@ impl PartStudioView {
                 })));
             }
             m.separator()
+            .item(item(format!("Copy Flat pattern of {part}"), {
+                let (b, part) = (b.clone(), part.clone());
+                Box::new(move |this, _, cx| this.copy_flat_pattern(&b, &part, cx))
+            }))
+            .separator()
             .item(item(format!("Create Drawing of Flat pattern of {part}…"), {
                 let (b, part) = (b.clone(), part.clone());
                 Box::new(move |this, w, cx| {
@@ -194,6 +197,20 @@ impl PartStudioView {
         menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
         self.context_menu = Some((position, menu, sub));
         cx.notify();
+    }
+
+    /// Copy Flat pattern of <part> (live request 1605): no message; Ctrl+V in
+    /// an assembly of the document inserts a Part instance "Flat pattern of
+    /// <part> <1>" of the flat (its own body, [`noshape_model::sheetmetal::flat_body_id`]),
+    /// at the pointer, as a copied part instance.
+    fn copy_flat_pattern(&mut self, body: &BodyId, part: &str, cx: &mut Context<Self>) {
+        use noshape_model::assembly::{Instance, InstanceId, InstanceSource, Placement};
+        let config = self.studio(cx).map(|s| self.current_config(s)).unwrap_or_default();
+        let source = InstanceSource::Part { studio: self.tab, body: noshape_model::sheetmetal::flat_body_id(body), config };
+        let clip = noshape_model::assembly::ops::InstanceClipboard { instances: vec![Instance::new(InstanceId(1), format!("Flat pattern of {part} <1>"), source, Placement::default())], mates: Vec::new(), connectors: Vec::new() };
+        if let Ok(json) = serde_json::to_string(&serde_json::json!({ "noshape_instances": clip })) {
+            cx.write_to_clipboard(ClipboardItem::new_string(json));
+        }
     }
 
     /// The model face of the flat's reference side (`true`) or back: the

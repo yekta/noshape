@@ -21,6 +21,31 @@ pub mod forms;
 pub mod flat_dxf;
 pub use flat::{FlatBendLine, FlatForm, FlatHead, FlatPattern, flat_pattern, flat_pattern_for};
 
+/// The bit that marks a part's flat pattern as a body of its own.
+const FLAT_BIT: u64 = 1 << 60;
+
+/// A sheet metal part's flat pattern as a body (live: "Flat pattern of Part
+/// 1" is a part of its own; an assembly can insert it, request 1605): the
+/// part's id with the flat bit.
+pub fn flat_body_id(part: &crate::reference::BodyId) -> crate::reference::BodyId {
+    crate::reference::BodyId { feature: FeatureId(part.feature.0 | FLAT_BIT), index: part.index }
+}
+
+/// The part whose flat pattern `id` is ([`flat_body_id`]).
+pub fn part_of_flat(id: &crate::reference::BodyId) -> Option<crate::reference::BodyId> {
+    (id.feature.0 & FLAT_BIT != 0).then(|| crate::reference::BodyId { feature: FeatureId(id.feature.0 & !FLAT_BIT), index: id.index })
+}
+
+/// The flat pattern of the part [`flat_body_id`] `id` names, as a body of
+/// `ctx` (the flat view's solid: the sheet in its flat place, its faces
+/// named as [`crate::regen::flat_view_display`]'s), named "Flat pattern of <name>".
+pub fn flat_body(ctx: &crate::regen::context::Context, id: &crate::reference::BodyId, name: &str) -> Option<crate::regen::context::Body> {
+    let part = part_of_flat(id)?;
+    let shape = flat_pattern_for(ctx, &part).ok()?.flat_view_solid()?;
+    let faces = (0..shape.faces().len()).map(|i| std::sync::Arc::new(TopoName::face(FeatureId(0), crate::reference::Role::New(i as u32)))).collect();
+    Some(crate::regen::context::Body::new(id.clone(), format!("Flat pattern of {name}"), crate::display::BodyKind::Solid, shape, faces, 0, FeatureId(0)))
+}
+
 /// Bend relief shape (model default or Bend relief override).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BendReliefStyle {

@@ -1255,7 +1255,9 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   - Set screws: live's socket is a 0.7 mm flat-bottomed hex in the one capture, against table depths of 2 / 3.5; asked live
     (REQUESTS "skb (10-25) set screw sockets").
 
-## From skasm (2026-10-30): Copy Flat pattern into an assembly (sheet metal flat view, P3)
+## From skasm (2026-10-30): Copy Flat pattern into an assembly (sheet metal flat view, P3) — done by skasm (lead: assembly is skasm's area)
+
+Done 10-30 evening: `InstanceSource::Part` with `noshape_model::sheetmetal::flat_body_id(part)`; eval.rs `flat_result` / `flat_studio` give such an instance the flat view's solid ("Flat pattern of <part>"); test a_flat_pattern_instance_is_the_flat. Original note:
 
 Live (behaviours "skasm (2026-10-30, P3 sheet metal) Flat view right-click menus …", request 1605): the flat view's
 "Copy Flat pattern of Part 1", then Ctrl+V in an assembly of the same document, inserts a **Part instance "Flat pattern of

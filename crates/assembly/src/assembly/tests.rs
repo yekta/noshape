@@ -5745,3 +5745,37 @@ fn instances_follow_their_part_name() {
     assert_eq!(a.instances.iter().map(|i| i.name.as_str()).collect::<Vec<_>>(), ["Pin <1>", "Pin <2>"]);
 }
 
+
+/// Copy Flat pattern, pasted into an assembly (live request 1605): a Part
+/// instance of the flat itself, "Flat pattern of Part 1", the sheet in its
+/// flat place (80 × 60 plate, 2 mm: the flat view's solid, z −2 … 0).
+#[test]
+fn a_flat_pattern_instance_is_the_flat() {
+    let units = UnitPrefs::default();
+    let mut sk = noshape_sketch::Sketch::new();
+    rect(&mut sk, 0.0, 0.0, 0.08, 0.06);
+    let mut ps = PartStudio::new();
+    let mut sketch = ps.new_feature("sketch", &units).unwrap();
+    sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    let sid = sketch.id;
+    ps.features.push(sketch);
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let key = r.display.sketches[0].regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).unwrap().key.clone();
+    let mut sm = ps.new_feature("sheetMetalStart", &units).unwrap();
+    sm.params.set("process", ParamValue::Enum("THICKEN".into()));
+    sm.params.set("regions", ParamValue::Query(vec![Reference::SketchRegion { sketch: sid, key }]));
+    sm.params.set("thickness", ParamValue::Expr(ExprValue::new("2 mm")));
+    ps.features.push(sm);
+    let f = doc_with(vec![ps]);
+    let mut ev = AssemblyEvaluator::new();
+    let (part, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let flat = crate::sheetmetal::flat_body_id(&part);
+    let asm = Assembly { instances: vec![part_instance(1, "Flat pattern of Part 1 <1>", f.studios[0], flat.clone(), DVec3::ZERO, true)], ..Default::default() };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.nodes[0].error.is_none(), "{:?}", res.nodes[0].error);
+    let o = res.occurrences.iter().find(|o| o.body == flat).expect("the flat's occurrence");
+    let b = o.local_bounds.expect("bounds");
+    let size = (b.1 - b.0) * 1e3;
+    assert!(o.body_name == "Flat pattern of Part 1" && (size - DVec3::new(80.0, 60.0, 2.0)).length() < 1e-3, "{} {size:?}", o.body_name);
+}
