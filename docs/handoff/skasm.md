@@ -167,9 +167,8 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
 - Done 10-30: partial Outer flange (opEdgeChange steps a moved piece of an edge off its collinear neighbours and keeps
   the edges' names; the relief reaches its depth past a moved-in bend edge; request 1599 (a): 6027.5617 / 6204.5617
   exact); SM-FACES passes on std (3211.3274 mm³, 14 faces).
-- Speed (vibe3, perf.sh, release, 10-30 evening at 47c866c5; ops regen_profile "sheet metal (std)": 200 × 150 plate,
-  4 flanges, hem): **1321 ms** a regeneration, of it **Hem 1 1089 ms** (the slowest feature in the whole profile after
-  fins-400's pattern). The earlier "0.66 s" was a dev build on this machine and is superseded. Next: the Hem.
+- Speed: see "10-30 evening batch" above (sheet metal model ~300 ms, Hem ~181 ms on vibe3 release after the
+  keep_names box test and the glued fuse; was 1321 / 1089 ms).
 
 - Std rebuild naming (10-29): part faces lying on the replaced part's faces keep their names (`keep_names`, several
   pieces: splits), the part its name and colour. Before, every face was new: a Flange dialog couldn't pick a second
@@ -195,10 +194,12 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
 - workflow-sheet-metal.md: every row ✅. workflow-drawing-sheet-metal.md re-checked (DSM2 / DSM3 ✅). The assembly /
   configured-assembly / sketch docs' open-looking rows are all fixed in later passes (A7, A10, A19, CA4–6, D17, D18,
   C17 / ASM-PATTERN-SUBASSEMBLY verified fd036a5c).
-- Speed (vibe3): the regen profile's Hem stays ~1.1 s on its *first* run in a process: std's sheetMetalHem.fs load
-  (one-time per app session, FS interpreter: not the rebuild). The profile now prints a warm run too. A first Hem in
-  the app pays it; pre-loading std's sheet metal modules at startup (in the background) would hide it: core / fs's
-  call, noted for the lead.
+- Speed (vibe3, release, perf.sh at 7f7364d3, `regen_profile::sheet_metal_profile`): the sheet metal model (200 × 150
+  plate, 4 flanges, hem) **~300 ms** a regeneration (was 1321), **Hem ~181 ms** (was 1089), **Flange ~105 ms** (was
+  ~225); cold = warm (std's module load is cheap in release: my "first-run load" explanation was wrong; the startup
+  prewarm of the sheet metal modules I added is at most a small help). Open: inside the full `regen_profile`, after
+  its other fixtures (fins-400, the NIST assembly), the same Hem still measures ~1.1 s (a88e8c29); not explained yet
+  (allocator / OCCT state after the big fixtures?).
 
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
