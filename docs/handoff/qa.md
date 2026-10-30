@@ -9,6 +9,15 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **10-30 14:29 update (lead 14:00: sheet metal, knurl, custom errors):** **sheet metal (skasm)** on 84a12216 / bde22a89: verified
+  SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE, SM-CBORE-THEN-FLANGE (bin/smgen.py, smdocs/: 6888.407 / 6988.938 / 6938.673 mm³ in the app;
+  v0.4.15 loses the counterbore), SM-OLD-DOCS (smf.noshape keeps its flanges), SM-FLANGE-CORNER (G34 8511.499); workflow-sheet-metal
+  rows 1.6, 2.6, 6.1–6.4, 6.7 ✅, 6.6 flat menu ◐ (no Copy Flat pattern, known), export dialog + DXF = live (AC1014, the same 48
+  layers). Not re-walked: Hem / Tab / Bend relief / Corner dialogs. **Knurl (core abb1e636 / cd9560ad)**: bin/knurl.py (Feature Studio
+  from crates/model/tests/fs/knurl_b94.fs + Ø50 × 50 cylinder): Straight 95877.733 mm³ / 224 faces = live (CLI 1.2 s; green app the
+  same volume); Diamond on core's CLI 13:03: Ok 94272.89 mm³ (live 94271.838, 1.1e-5) / 10362 faces = live, 242 s (debug); v0.4.15
+  still "Selected tools and targets do not intersect."; in green 84a12216 the regen takes **469 s** (live 49 s), volume read pending.
+  **CUSTOM-ERROR-HIDDEN verified** (row hover + notices panel with the stack). Watch restarted (skasm commits included, 100 min).
 - **10-30 11:57 update (greens f2ffe3a7 … 99729fe4):** MIRROR-HANG-402 **no longer hangs** on f2ffe3a7 (core's OCCT patch 0006):
   the Add / Merge with all mirror now ends after 240 s with "boolean failed: BOPAlgo_AlertBuilderFailed" — lowered to P2.
   bool e918363e / 9fc68fd8 / 91d360dd (angled cylinders / cones): new bin/revgen-tilt.py (revolve axis tilted 15–60°), 60
