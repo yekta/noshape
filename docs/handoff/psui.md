@@ -456,6 +456,12 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
    variant shares, i.e. per-frame fixed cost (MSAA resolve, the texture present / copy into GPUI's frame at
    2388×1588, pacing). Next for 120 fps: time those stages (r.* perf scopes around resolve and present) on the
    runners.
+   **Floor measured (perf 40993453087, NOSHAPE_PERF_SKIP=lines+meshes: an empty frame):** done_ms p50 7.0–9.5 ms,
+   presented 87–110 fps (4× MSAA) and 113–125 fps with MSAA 1; the full NIST frame in the same jobs 64.7–78.1 fps.
+   So ~8 ms of the 2× frame is fixed: MSAA clears / resolve, depth kept for AO and the AO pass, background, the
+   texture present. Next: which of those (a variant skipping AO on the empty frame needs `+` support in
+   NOSHAPE_PERF_SKIP's `ao` / `backsil` / `silhouettes` tokens, which split on ',' only; bench.sh splits a
+   variant's env on ','), then memoryless MSAA attachments (StoreOp::Discard on depth where AO doesn't need it).
 0f. (done 10-28: no gain, see above) Retina orbit, experiment for 0c: line segments are instances of 6 vertices (`draw(slots*6, 0..count)`),
    which packs Apple GPUs' vertex SIMD groups badly; pull segments from a storage buffer by vertex_index / 6 with
    the slot as the instance (one instance per copy) and measure with perf.yml.
