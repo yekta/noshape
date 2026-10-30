@@ -568,6 +568,8 @@ struct Ctx<'a> {
     solids: Vec<GSolid>,
     side_cache: HashMap<(u32, usize), i8>,
     in_face_done: HashSet<(usize, usize)>,
+    /// While a straight or round edge goes into a free-form face: that face and the edge's curve on it.
+    on_free: Option<(usize, Arc<NurbsCurve>)>,
     /// Curves added to each face.
     face_segs: Vec<Vec<Seg>>,
     coplanar: Vec<(usize, usize)>,
@@ -665,7 +667,8 @@ impl Ctx<'_> {
                 let k = if faces[0] == f { 0 } else if faces[1] == f { 1 } else { return Err(Decline("a section on a third face")) };
                 return Ok(C2::Nurbs { c: free::scaled(&on[k], su, sv), t0, t1 });
             }
-            let e = edge.ok_or(Decline("a curve on a free-form face not its own"))?;
+            // (Another argument's straight or round edge lying on it: the one whose curve on it was projected.)
+            let e = edge.or_else(|| self.projected_edge(f, s)).ok_or(Decline("a curve on a free-form face not its own"))?;
             let (pc, pt0, pt1) = g.pcurves.get(&(e, copy == 1)).ok_or(Decline("an edge without its curve on a free-form face"))?;
             let c = free::scaled(pc, su, sv);
             let (a, b) = match s.g {
@@ -690,6 +693,22 @@ impl Ctx<'_> {
             return free::mapped(g, &self.ncurves[id as usize].c, t0, t1);
         }
         g.curve2(self.p(s.v[0]), self.p(s.v[1]), &s.g, copy)
+    }
+
+    /// The edge of another argument, lying on free-form face `f`, whose curve on it was projected (its pieces in `f`
+    /// keep to it) that holds segment `s`.
+    fn projected_edge(&self, f: usize, s: &Seg) -> Option<usize> {
+        let g = &self.faces[f];
+        g.pcurves.keys().filter(|k| !k.1 && self.edges[k.0].arg != g.arg).map(|k| k.0).find(|&e| match (self.edges[e].g, s.g) {
+            (Geo::Arc { k: k1, .. }, Geo::Arc { k: k2, .. }) => k1 == k2,
+            (Geo::Line, Geo::Line) => {
+                let [a, b] = self.edges[e].v;
+                let (a, b) = (self.p(a), self.p(b));
+                let d = (b - a).normalize();
+                s.v.iter().all(|&w| (self.p(w) - a).cross(d).length() <= self.tol)
+            }
+            _ => false,
+        })
     }
 
     /// Face `f`'s boundary in its parameter plane.
@@ -803,6 +822,10 @@ impl Ctx<'_> {
         let c2 = if let Path::Nurbs { .. } = path {
             // (A NURBS curve's part needs no vertices.)
             self.c2_of(f, &Seg { v: [u32::MAX; 2], g: geo }, 0, None)?
+        } else if let (Some((g, c)), Surf::Nurbs { su, sv, .. }) = (&self.on_free, &self.faces[f].s)
+            && *g == f
+        {
+            C2::Nurbs { c: free::scaled(c, *su, *sv), t0, t1 }
         } else {
             self.faces[f].curve2(path.at(t0), path.at(t1), &geo, 0)?
         };
@@ -1058,10 +1081,28 @@ impl Ctx<'_> {
                 parts = vec![(t0, End::Vertex(s.v[0]), ts, End::Point(seam)), (ts, End::Point(seam), t1, End::Vertex(s.v[1]))];
             }
         }
+        // On a free-form face: its curve there, by projection (as the face's own edges' curves are used).
+        if matches!(self.faces[f].s, Surf::Nurbs { .. }) && matches!(path, Path::Line { .. } | Path::Circle(_)) {
+            let at = |t: f64| match path {
+                Path::Line { p, d } => (p + d * t, d),
+                Path::Circle(k) => (k.at(t), (k.y * t.cos() - k.x * t.sin()) * k.r),
+                _ => unreachable!(),
+            };
+            let Some(c) = free::projected(&self.faces[f], &at, t0, t1, self.tol) else { return Err(Decline("an edge on another argument's free-form face")) };
+            self.faces[f].pcurves.insert((e, false), (c.clone(), t0, t1));
+            self.on_free = Some((f, c));
+        }
         let mut ivs = Vec::new();
         for (a0, e0, a1, e1) in parts {
-            ivs.extend(self.intervals(f, &path, a0, a1, [e0, e1], true)?);
+            match self.intervals(f, &path, a0, a1, [e0, e1], true) {
+                Ok(v) => ivs.extend(v),
+                Err(x) => {
+                    self.on_free = None;
+                    return Err(x);
+                }
+            }
         }
+        self.on_free = None;
         for iv in ivs {
             let mut ends = [0u32; 2];
             for k in 0..2 {
@@ -1193,6 +1234,10 @@ impl Ctx<'_> {
                     }
                     if let Geo::Ell { .. } = self.edges[e].g {
                         return Err(Decline("an argument's ellipse on another's face"));
+                    }
+                    // (A straight or round edge on a free-form face: its curve there projected, edge_in_face.)
+                    if matches!(self.edges[e].g, Geo::Line | Geo::Arc { .. }) && self.src.is_some() {
+                        return Ok(true);
                     }
                     return Err(Decline("an edge on another argument's free-form face"));
                 }
@@ -1971,6 +2016,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         solids: Vec::new(),
         side_cache: HashMap::default(),
         in_face_done: Default::default(),
+        on_free: None,
         face_segs: Vec::new(),
         coplanar: Vec::new(),
         sections: Vec::new(),

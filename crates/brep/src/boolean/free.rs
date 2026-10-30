@@ -293,3 +293,51 @@ pub(super) fn surface_distance(g: &GFace, p: DVec3) -> f64 {
         }),
     }
 }
+
+/// A straight or round edge lying on free-form face `g` (its point and derivative at `t` from `at`): its curve on the
+/// face, in the face's own parameters and the edge's parameter, `t0` to `t1`: its points' parameters there (Newton
+/// from the one before), cubic between them with the surface's own tangents. None where a point is off the face's
+/// surface by more than `tol` or the curve jumps (across the face's seam).
+pub(super) fn projected(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, t1: f64, tol: f64) -> Option<Arc<NurbsCurve>> {
+    let ns = g.ns.as_ref()?;
+    const N: usize = 64;
+    let [u0, u1, v0, v1] = g.uvbox;
+    let mut qs: Vec<(DVec2, DVec2)> = Vec::with_capacity(N + 1);
+    for k in 0..=N {
+        let t = t0 + (t1 - t0) * k as f64 / N as f64;
+        let (p, dp) = at(t);
+        let seed = qs.last().map_or_else(|| g.uv_of(p), |q| q.0);
+        let (uv, dist) = ns.param_of(p, seed, g.uvbox);
+        if dist > tol {
+            return None;
+        }
+        if let Some(q) = qs.last()
+            && ((uv.x - q.0.x).abs() > 0.25 * (u1 - u0) || (uv.y - q.0.y).abs() > 0.25 * (v1 - v0))
+        {
+            return None;
+        }
+        // Its tangent there: [Su Sv] (u', v') = P' (least squares).
+        let d = ns.derivs(uv.x, uv.y);
+        let (a, b, c) = (d[1].dot(d[1]), d[1].dot(d[2]), d[2].dot(d[2]));
+        let (e, f) = (d[1].dot(dp), d[2].dot(dp));
+        let det = a * c - b * b;
+        if det.abs() < 1e-300 {
+            return None;
+        }
+        qs.push((uv, DVec2::new((c * e - b * f) / det, (a * f - b * e) / det)));
+    }
+    // Bézier pieces between the points (a B-spline with triple knots).
+    let h = (t1 - t0) / N as f64;
+    let mut knots = vec![t0; 4];
+    let mut poles = vec![qs[0].0.extend(0.0)];
+    for k in 0..N {
+        let (q, dq) = qs[k];
+        let (r, dr) = qs[k + 1];
+        poles.push((q + dq * (h / 3.0)).extend(0.0));
+        poles.push((r - dr * (h / 3.0)).extend(0.0));
+        poles.push(r.extend(0.0));
+        let t = t0 + h * (k + 1) as f64;
+        knots.extend(if k + 1 == N { [t1; 4].to_vec() } else { vec![t; 3] });
+    }
+    Some(Arc::new(NurbsCurve { degree: 3, knots, poles, weights: Vec::new(), spans: Default::default() }))
+}

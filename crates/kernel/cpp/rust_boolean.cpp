@@ -1601,12 +1601,13 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   if (const char* why = build(r, srcs, max_tol > 0 ? max_tol : 1e-7, out, hist))
     return decline(why);
   // (A result with free-form faces isn't kept as a body: the next Boolean converts it, curves on faces and all;
-  // nor one with ellipses or hyperbolas: converted, they are OCCT's curves, frame and parameters.)
+  // nor one with ellipses, hyperbolas or parabolas: converted, they are OCCT's curves, frame and parameters; nor one
+  // with B-spline edges, whose curves the kept body doesn't carry over.)
   for (size_t i = 0; i < r.body.surfaces.size(); i += 12)
     if (r.body.surfaces[i] >= 3)
       return true;
   for (size_t i = 0; i < r.body.curves.size(); i += 11)
-    if (r.body.curves[i] == 3 || r.body.curves[i] == 4 || r.body.curves[i] == 6)
+    if (r.body.curves[i] == 3 || r.body.curves[i] == 4 || r.body.curves[i] == 5 || r.body.curves[i] == 6)
       return true;
   t_built.target_face.assign(r.face_origin.size() / 3, 0);
   for (size_t i = 0; i < t_built.target_face.size(); ++i)

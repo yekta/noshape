@@ -654,6 +654,17 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - Rule from here (lead): a new test that asserts how many cases the Rust Boolean takes gets a Windows CI run on its
   branch before it lands.
 
+## Straight and round edges on another argument's free-form face (10-30 03:00 UTC)
+- A line or arc of one argument lying on another's free-form face (a cylinder's rim on a B-spline wall) goes into
+  that face: its curve there by projection (`free::projected`: its points' parameters on the surface, Newton from
+  the one before, cubic Bézier pieces between them with the surface's own tangents, in the edge's parameter; a point
+  off the surface or a jump across its seam declines), then clipped and arranged as the face's own edges; the
+  result's curves on the face are OCCT's projections (`piece_pcurve`).
+- Replays, all 0 differ: corpus2 539 (+2), corpus3 542 (+2), corpus4 586 (+2), corpus5 703 (+2), direct 58 (+2);
+  main 694, corpus6 648, Shell's 78. T1: a cylinder face without arcs (b79a02be) in tests/data/brep.
+- A result with B-spline edges isn't kept as a body for the next Boolean either (that case's result has them, and
+  the kept body's B-spline curve indexed past its data: a panic across the bridge in the kept-body test).
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|
