@@ -225,7 +225,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "broken_out_section",
             summary: "Broken-out section: cut away a closed profile of a view",
-            description: "The Broken-out section tool: the closed spline profile through `points` (sheet mm, at least 3; vertices snap) cut into the view to a blind `depth` from the model's nearest point (default: half the model's depth along the line of sight, as the dialog), or up to the model point snapped at `depth_to`. `index` edits the view's existing broken-out section instead. One edit (\"Broken-out section\"). Projected views of the view show the cut too.",
+            description: "The Broken-out section tool: the closed spline profile through `points` (sheet mm, at least 3; vertices snap) cut into the view to a blind `depth` from the model's nearest point (default 25 mm, 1 in in inch drawings, as the dialog), or up to the model point snapped at `depth_to` (plus `offset`). `index` edits the view's existing broken-out section instead. One edit (\"Broken-out section\"). Projected views of the view show the cut too.",
             fields: with(
                 common(),
                 vec![
@@ -233,6 +233,7 @@ pub fn ops() -> Vec<Op> {
                     req("points", points(3, 1000), "Profile points (sheet mm)."),
                     opt("depth", json!({ "type": ["string", "number"] }), "Blind depth: a length (\"5 mm\"; a bare number is in workspace units)."),
                     opt("depth_to", point(), "Up to entity: a model point (vertex, circle center...) of a view of the same model (sheet mm)."),
+                    opt("offset", json!({ "type": ["string", "number"] }), "Up to entity: the Offset past the point (a length; negative stops short)."),
                     opt("index", json!({ "type": "integer", "minimum": 0 }), "Edit the view's broken-out section number `index` (0-based, drawing_get) instead of adding one."),
                 ],
             ),
@@ -1079,11 +1080,16 @@ fn broken_out_section(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     };
     let depth = match a.get("depth") {
         Some(v) => Some(super::sketch::length_value(v, &units).map_err(|e| OpError::param("depth", &e.message))?),
-        None if depth_ref.is_none() => Some(t.m.pick(&Tool::Select, &[], [0.0; 2]).broken_out_default_depth(view)),
+        None if depth_ref.is_none() => Some(dt::broken_out_blind_default(noshape_model::drawing::format::length_units(&t.d, &Default::default()))),
         None => None,
     };
+    let offset = match a.get("offset") {
+        Some(_) if depth_ref.is_none() => return Err(OpError::param("offset", "Offset needs depth_to (Up to entity)")),
+        Some(v) => super::sketch::length_value(v, &units).map_err(|e| OpError::param("offset", &e.message))?,
+        None => 0.0,
+    };
     let spline = index.and_then(|i| t.d.sheets[t.sheet].view(view)?.broken_out.get(i).map(|b| b.spline)).unwrap_or(true);
-    let b = dt::broken_out(pts, spline, depth, depth_ref).ok_or_else(|| OpError::param("depth", "Invalid depth"))?;
+    let b = dt::broken_out(pts, spline, depth, depth_ref, offset).ok_or_else(|| OpError::param("depth", "Invalid depth"))?;
     edit_view(&mut t, view, |v| dt::set_broken_out(v, index, b));
     done(od, t, "Broken-out section", "view", view.0)
 }

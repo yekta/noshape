@@ -3786,7 +3786,7 @@ Examples:
 
 Broken-out section: cut away a closed profile of a view (edits the document (one undoable history entry)).
 
-The Broken-out section tool: the closed spline profile through `points` (sheet mm, at least 3; vertices snap) cut into the view to a blind `depth` from the model's nearest point (default: half the model's depth along the line of sight, as the dialog), or up to the model point snapped at `depth_to`. `index` edits the view's existing broken-out section instead. One edit ("Broken-out section"). Projected views of the view show the cut too.
+The Broken-out section tool: the closed spline profile through `points` (sheet mm, at least 3; vertices snap) cut into the view to a blind `depth` from the model's nearest point (default 25 mm, 1 in in inch drawings, as the dialog), or up to the model point snapped at `depth_to` (plus `offset`). `index` edits the view's existing broken-out section instead. One edit ("Broken-out section"). Projected views of the view show the cut too.
 
 Examples:
 
@@ -3803,6 +3803,7 @@ Examples:
 | `points` | array of array of number | required | Profile points (sheet mm). |
 | `depth` | string or number |  | Blind depth: a length ("5 mm"; a bare number is in workspace units). |
 | `depth_to` | array of number |  | Up to entity: a model point (vertex, circle center...) of a view of the same model (sheet mm). |
+| `offset` | string or number |  | Up to entity: the Offset past the point (a length; negative stops short). |
 | `index` | integer |  | Edit the view's broken-out section number `index` (0-based, drawing_get) instead of adding one. |
 
 #### drawing_edit_hatch

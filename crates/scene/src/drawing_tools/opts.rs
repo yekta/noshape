@@ -416,6 +416,7 @@ pub fn gdt_values(rows: &[GdtRowValues], upper: &str, lower: &str, leader: GdtLe
         suffix: rows.iter().map(|r| r.suffix.trim().to_string()).collect(),
         rows: rows.iter().skip(1).map(|r| cells(r, false)).collect(),
         leader,
+        on: None,
     };
     if extra.prefix.iter().all(String::is_empty) {
         extra.prefix.clear();

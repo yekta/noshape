@@ -256,6 +256,7 @@ pub fn new_drawing(doc: &Document, template: &DrawingTemplate, source: Option<&D
     // DRAWN's date: the day it was made (UTC).
     d.meta.created = Some(noshape_model::drawing::format::today());
     if suggested {
+        noshape_model::drawing::mbd::trim_suggested_views(&mut d, doc);
         noshape_model::drawing::mbd::place_model_datums(&mut d, doc);
     }
     d

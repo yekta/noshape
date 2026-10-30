@@ -502,6 +502,7 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
     let mut out = sheet.clone();
     let mut dangling = Vec::new();
     let mut lost = Vec::new();
+    let mut gone = Vec::new();
     for a in &mut out.annotations {
         if a.loose {
             dangling.push(a.id);
@@ -625,8 +626,18 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
             *pb = foot_on_line(*pa, e0, e1);
         }
         if !ok {
-            dangling.push(a.id);
+            // A centermark doesn't dangle: it goes with its circle and comes
+            // back with it (live request 1625).
+            if matches!(a.kind, AnnotationKind::Centermark { .. }) {
+                gone.push(a.id);
+            } else {
+                dangling.push(a.id);
+            }
         }
+    }
+    if !gone.is_empty() {
+        out.annotations.retain(|a| !gone.contains(&a.id));
+        lost.retain(|(id, _)| !gone.contains(id));
     }
     (out, dangling, lost)
 }

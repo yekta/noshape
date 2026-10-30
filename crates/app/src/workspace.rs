@@ -2098,6 +2098,7 @@ impl Workspace {
                     d.drawn_by = Some(noshape_store::local_user_name()).filter(|n| !n.is_empty());
                     // Suggested views show the Part Studio's MBD datums (live behaviours "MBD datums in drawings").
                     if suggested {
+                        noshape_model::drawing::mbd::trim_suggested_views(&mut d, &doc);
                         noshape_model::drawing::mbd::place_model_datums(&mut d, &doc);
                     }
                     d

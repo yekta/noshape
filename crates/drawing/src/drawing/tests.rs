@@ -817,7 +817,7 @@ fn broken_out_section_exposes_interior() {
     // Front view (x right, z up): open the plate down to its middle (y = 0)
     // around the center hole.
     let profile = vec![[-0.02, -0.003], [0.0, -0.005], [0.02, -0.003], [0.022, 0.015], [-0.022, 0.015]];
-    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile: profile.clone(), spline: true, depth: 0.03, depth_ref: None });
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile: profile.clone(), spline: true, depth: 0.03, depth_ref: None, offset: 0.0 });
     let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, true);
     assert!(g.error.is_none(), "{:?}", g.error);
     assert!(!g.section_segments.is_empty(), "pocket floor is hatched");
@@ -840,7 +840,7 @@ fn broken_out_section_exposes_interior() {
     let ctx = sources[&SourceKey::studio(studio)].context.clone();
     let back = views::vertex_ref_near(&ctx, glam::DVec3::new(-0.05, 0.03, 0.0), 1e-6).expect("back vertex");
     let frame = g.frame.unwrap();
-    let bo = BrokenOut { profile, spline: true, depth: 0.0, depth_ref: Some(back.clone()) };
+    let bo = BrokenOut { profile, spline: true, depth: 0.0, depth_ref: Some(back.clone()), offset: 0.0 };
     assert!((views::broken_out_depth(&ctx, None, &frame, &bo) - 0.06).abs() < 1e-9);
     // Its depth point gone after an update (help V29): the profile is drawn
     // red, the stored depth still cuts.
@@ -866,7 +866,7 @@ fn projected_views_inherit_broken_out_and_section_cuts() {
     // top view (2), cut along the front view's direction.
     let before = compute_view(&drawing, &drawing.sheets[0], ViewId(2), &sources, &cache, false);
     let profile = vec![[-0.02, -0.003], [0.0, -0.005], [0.02, -0.003], [0.022, 0.015], [-0.022, 0.015]];
-    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile, spline: true, depth: 0.03, depth_ref: None });
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile, spline: true, depth: 0.03, depth_ref: None, offset: 0.0 });
     let cuts = views::broken_out_cuts(&drawing, &drawing.sheets[0], ViewId(2));
     assert_eq!(cuts.len(), 1);
     assert_eq!(Some(cuts[0].1), views::view_frame(&drawing, &drawing.sheets[0], ViewId(1)));
@@ -1936,7 +1936,7 @@ fn chamfer_dimension_style_and_content() {
 fn composite_gdt_frame_with_texts() {
     let drawing = Drawing::default();
     let env = sheet::PlainEnv { drawing: &drawing, scale: 1000.0 };
-    let extra = GdtExtra { upper: "UPPER TEXT".into(), lower: "LOWER TEXT".into(), prefix: vec!["4X".into()], suffix: vec!["SFX".into()], rows: vec![vec!["Composite".into(), "0.1".into(), "A".into()]], leader: GdtLeader::Leader };
+    let extra = GdtExtra { upper: "UPPER TEXT".into(), lower: "LOWER TEXT".into(), prefix: vec!["4X".into()], suffix: vec!["SFX".into()], rows: vec![vec!["Composite".into(), "0.1".into(), "A".into()]], leader: GdtLeader::Leader, on: None };
     let kind = AnnotationKind::Gdt { anchor: [100.0, 100.0], frame: vec!["⌖".into(), "0.5".into(), "A".into(), "B".into(), "C".into()], leaders: vec![], extra: Box::new(extra) };
     let s = Sheet { annotations: vec![Annotation { id: 1, kind, position: [100.0, 100.0], ..Default::default() }], ..Default::default() };
     let mut g = sheet::SheetGeometry::new(420.0, 297.0);
@@ -2296,6 +2296,49 @@ fn datum_on_gdt_frame_follows_it() {
     assert!((t[0] - mid[0] - 13.0).abs() < 1e-6 && (t[1] - y + 5.0).abs() < 1e-6, "{t:?}");
 }
 
+/// A geometric tolerance placed on a linear dimension (live request 1624)
+/// follows it when the dimension line is dragged; with a leader to a face
+/// it ends in a dot.
+#[test]
+fn gdt_on_dimension_follows_it() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let dim = drawing.sheets[0].annotations.iter().find(|a| matches!(a.kind, AnnotationKind::LinearDimension { .. })).expect("a linear dimension").id;
+    let id = drawing.sheets[0].next_annotation_id();
+    let extra = GdtExtra { on: Some(GdtOn { at: DatumOn { ann: dim, line: 0, seg: 0, t: 0.5 }, offset: [0.0, -3.0], centered: true }), ..Default::default() };
+    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: [10.0, 10.0], frame: vec!["⌖".into(), "0.1".into()], leaders: vec![], extra: Box::new(extra) }, position: [10.0, 10.0], ..Default::default() });
+    let frame_at = |drawing: &Drawing| {
+        let built = render_sheet(drawing, 0, &sources, &cache, false).unwrap();
+        let pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(id)).unwrap() as u32;
+        let dpick = built.picks.iter().position(|p| *p == PickTarget::Annotation(dim)).unwrap() as u32;
+        let l = built.geometry.lines.iter().find(|l| l.pick == dpick).unwrap();
+        let mid = [(l.points[0][0] + l.points[1][0]) / 2.0, (l.points[0][1] + l.points[1][1]) / 2.0];
+        let t = built.geometry.texts.iter().find(|t| t.pick == pick && t.text == "0.1").unwrap().pos;
+        (t, mid)
+    };
+    // Not at its stored anchor: under the dimension's line.
+    let (t0, m0) = frame_at(&drawing);
+    assert!((t0[0] - 10.0).abs() > 1.0 && t0[1] < m0[1] - 3.0, "{t0:?} {m0:?}");
+    // Drag the dimension: the frame keeps its place relative to it.
+    if let AnnotationKind::LinearDimension { offset, .. } = &mut drawing.sheets[0].annotations.iter_mut().find(|a| a.id == dim).unwrap().kind {
+        *offset += 8.0;
+    }
+    let (t1, m1) = frame_at(&drawing);
+    let (dm, dt) = ([m1[0] - m0[0], m1[1] - m0[1]], [t1[0] - t0[0], t1[1] - t0[1]]);
+    assert!((dm[0].abs() + dm[1].abs()) > 1.0, "the dimension moved: {dm:?}");
+    assert!((dm[0] - dt[0]).abs() < 1e-6 && (dm[1] - dt[1]).abs() < 1e-6, "{dm:?} {dt:?}");
+    // A leader to a face ends in a dot, not an arrowhead.
+    let before = render_sheet(&drawing, 0, &sources, &cache, false).unwrap().geometry.fills.len();
+    if let AnnotationKind::Gdt { leaders, extra, .. } = &mut drawing.sheets[0].annotations.last_mut().unwrap().kind {
+        extra.on = None;
+        leaders.push(Leader { point: [60.0, 60.0], dot: true, ..Default::default() });
+    }
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert_eq!(built.geometry.fills.len(), before + 1);
+    assert!(built.geometry.fills.iter().any(|f| f.points.len() == 8 && (f.points[0][0] - 60.6).abs() < 1e-6 && (f.points[0][1] - 60.0).abs() < 1e-6));
+}
+
 #[test]
 fn datum_on_dimension_arrow_hides_it() {
     let (doc, mut drawing) = demo();
@@ -2386,6 +2429,43 @@ fn assembly_views_display_state_and_follow_parent() {
     let (k, _) = views::view_source(&drawing.sheets[0], ViewId(2)).unwrap();
     assert_eq!(k.display.as_deref(), Some("gone"));
     assert!(!sources.contains_key(&k));
+}
+
+/// Suggested views with MBD data (live: datums on the top and front faces
+/// gave Top and Front only): the views the datums need; without, all four.
+#[test]
+fn suggested_views_follow_mbd_datums() {
+    use super::create::{DrawingSource, create_drawing, source_bounds};
+    let (mut doc, _) = demo();
+    let ps = doc.tabs.iter().find(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap().id;
+    let src = DrawingSource { tab: ps, part: None, config: Default::default(), sketch: None, flat: false };
+    let t = templates::template_by_name("ISO A3").unwrap();
+    let make = |doc: &crate::Document| {
+        let mut d = create_drawing(&t, Some(&src), source_bounds(doc, &src), true, None);
+        mbd::trim_suggested_views(&mut d, doc);
+        mbd::place_model_datums(&mut d, doc);
+        d
+    };
+    assert_eq!(make(&doc).sheets[0].views.len(), 4);
+    let datum = |id: u32, letter: &str, normal: [f64; 3]| crate::annotations::Annotation { id, kind: crate::annotations::AnnotationKind::Datum { letter: letter.into() }, face: crate::reference::Reference::Origin, at: [0.0; 3], normal, up: [0.0, 1.0, 0.0], offset: None };
+    let set = |doc: &mut crate::Document, list: Vec<crate::annotations::Annotation>| {
+        if let Some(TabContent::PartStudio(p)) = doc.tabs.iter_mut().find(|t| t.id == ps).map(|t| &mut t.content) {
+            p.annotations = list;
+        }
+    };
+    // A on the top face, B on the front face: Front (A) and Top (B).
+    set(&mut doc, vec![datum(1, "A", [0.0, 0.0, 1.0]), datum(2, "B", [0.0, -1.0, 0.0])]);
+    let d = make(&doc);
+    let ids: Vec<u64> = d.sheets[0].views.iter().map(|v| v.id.0).collect();
+    assert_eq!(ids, vec![1, 2], "Front and Top");
+    let on: Vec<(String, ViewId)> = d.sheets[0].annotations.iter().filter_map(|a| match &a.kind {
+        AnnotationKind::Datum { label, .. } => Some((label.clone(), a.model.as_ref()?.view)),
+        _ => None,
+    }).collect();
+    assert_eq!(on, vec![("A".to_string(), ViewId(1)), ("B".to_string(), ViewId(2))]);
+    // Only the top face: the Front view alone.
+    set(&mut doc, vec![datum(1, "A", [0.0, 0.0, 1.0])]);
+    assert_eq!(make(&doc).sheets[0].views.len(), 1);
 }
 
 #[test]

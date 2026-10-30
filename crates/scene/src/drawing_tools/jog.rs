@@ -412,8 +412,14 @@ impl SheetPick<'_> {
                     *jog = pl.to_view(add2(pl.to_sheet(*jog), d));
                 }
             }
-            AnnotationKind::SurfaceFinish { anchor, .. } | AnnotationKind::Gdt { anchor, .. } | AnnotationKind::RevisionCallout { anchor, .. } => {
+            AnnotationKind::SurfaceFinish { anchor, .. } | AnnotationKind::RevisionCallout { anchor, .. } => {
                 *anchor = [anchor[0] + d[0], anchor[1] + d[1]];
+            }
+            AnnotationKind::Gdt { anchor, extra, .. } => {
+                *anchor = [anchor[0] + d[0], anchor[1] + d[1]];
+                if let Some(o) = &mut extra.on {
+                    o.offset = [o.offset[0] + d[0], o.offset[1] + d[1]];
+                }
             }
             // An edge to edge centerline (no model points) moves by its
             // middle snap (help A51).
@@ -468,7 +474,10 @@ impl SheetPick<'_> {
                     }
                 }
                 (AnnotationKind::SurfaceFinish { anchor, .. }, AnnotationKind::SurfaceFinish { anchor: n, .. }) => *anchor = *n,
-                (AnnotationKind::Gdt { anchor, .. }, AnnotationKind::Gdt { anchor: n, .. }) => *anchor = *n,
+                (AnnotationKind::Gdt { anchor, extra, .. }, AnnotationKind::Gdt { anchor: n, extra: e, .. }) => {
+                    *anchor = *n;
+                    extra.on = e.on;
+                }
                 (AnnotationKind::RevisionCallout { anchor, .. }, AnnotationKind::RevisionCallout { anchor: n, .. }) => *anchor = *n,
                 (AnnotationKind::MaxMinDimension { offset, .. }, AnnotationKind::MaxMinDimension { offset: o, .. }) => *offset = *o,
                 (AnnotationKind::ArcLengthDimension { mid, offset, .. }, AnnotationKind::ArcLengthDimension { mid: m, offset: o, .. }) => {

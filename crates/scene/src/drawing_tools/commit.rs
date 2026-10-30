@@ -401,6 +401,73 @@ impl SheetPick<'_> {
         Some((a.view, [a.p[0] + d[0] * t, a.p[1] + d[1] * t], d, false))
     }
 
+    /// A surface finish symbol clicked on a hovered dimension's line (live
+    /// request 1624: an extension line): it stands on the line, square to
+    /// it, on the side away from the dimension's value, and stays with the
+    /// view (in the dimension's view coordinates, as on an edge).
+    pub fn surface_finish_on_dimension(&self, at: [f64; 2]) -> Option<(ViewId, [f64; 2], [f64; 2], bool)> {
+        let (on, q, w0, w1) = self.hovered_dim_segment(at)?;
+        let a = self.drawing.sheets.get(self.sheet)?.annotations.iter().find(|a| a.id == on.ann)?;
+        let view = a.kind.view()?;
+        let pl = self.placement(view)?;
+        let d = norm(sub(w1, w0));
+        let foot = pl.to_view(q);
+        let dir = sub(pl.to_view(add2(q, d)), foot);
+        // The side the symbol takes unflipped (as drawn: upper / right).
+        let mut n = [-d[1], d[0]];
+        if n[1] < -1e-9 || (n[1].abs() <= 1e-9 && n[0] < 0.0) {
+            n = [-n[0], -n[1]];
+        }
+        let value = self.built?.resolved.annotations.iter().find(|x| x.id == on.ann).map(|x| x.position).unwrap_or(q);
+        Some((view, foot, dir, dot(n, sub(q, value)) < 0.0))
+    }
+
+    /// A geometric tolerance clicked on a dimension's value (live request
+    /// 1624): centred under the value, following the dimension (attached to
+    /// its line nearest the value).
+    pub fn gdt_on_dimension_value(&self, c: [f64; 2]) -> Option<GdtOn> {
+        let b = self.built?;
+        let sheet = self.drawing.sheets.get(self.sheet)?;
+        let (dim, lo, hi) = b.geometry.texts.iter().find_map(|t| {
+            let q = noshape_model::drawing::font::text_box(t);
+            let (lo, hi) = q.iter().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]));
+            let inside = c[0] >= lo[0] && c[0] <= hi[0] && c[1] >= lo[1] && c[1] <= hi[1];
+            match b.picks.get(t.pick as usize) {
+                Some(noshape_model::drawing::build::PickTarget::Annotation(a)) if inside && sheet.annotations.iter().any(|x| x.id == *a && x.kind.is_dimension()) => Some((*a, lo, hi)),
+                _ => None,
+            }
+        })?;
+        let mid = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0];
+        let (q, at) = self.attach_at(mid, f64::INFINITY, &|a: &Annotation| a.id == dim)?;
+        let top = [mid[0], lo[1] - 1.0];
+        Some(GdtOn { at, offset: sub(top, q), centered: true })
+    }
+
+    /// A geometric tolerance clicked on a hovered dimension's line (live
+    /// request 1624: an extension line): its left edge on the line at the
+    /// click, keeping its distance to the dimension line when the dimension
+    /// moves (attached at the line's end nearer the value: an extension
+    /// line's end at the dimension line).
+    pub fn gdt_on_dimension_line(&self, c: [f64; 2]) -> Option<GdtOn> {
+        let (mut at, q, w0, w1) = self.hovered_dim_segment(c)?;
+        let value = self.built?.resolved.annotations.iter().find(|x| x.id == at.ann).map(|x| x.position).unwrap_or(q);
+        let (t, end) = if len(sub(w0, value)) <= len(sub(w1, value)) { (0.0, w0) } else { (1.0, w1) };
+        at.t = t;
+        Some(GdtOn { at, offset: sub(q, end), centered: false })
+    }
+
+    /// The hovered dimension's line nearest `c`: where on it, the point and
+    /// the segment's ends.
+    fn hovered_dim_segment(&self, c: [f64; 2]) -> Option<DimSegment> {
+        let b = self.built?;
+        let Some(noshape_model::drawing::build::PickTarget::Annotation(id)) = self.hover.and_then(|h| b.picks.get(h as usize)) else { return None };
+        let id = *id;
+        let (q, on) = self.attach_at(c, f64::INFINITY, &|a: &Annotation| a.id == id && a.kind.is_dimension())?;
+        let l = b.geometry.lines.iter().filter(|l| matches!(b.picks.get(l.pick as usize), Some(noshape_model::drawing::build::PickTarget::Annotation(x)) if *x == id)).nth(on.line as usize)?;
+        let (i, n) = (on.seg as usize, l.points.len());
+        Some((on, q, *l.points.get(i)?, l.points[(i + 1) % n]))
+    }
+
     /// The Weld symbol tool's first click: the entity the arrow points at
     /// (a snap point or a view's geometry, in its view), else the sheet point.
     pub fn weld_target(&self, c: [f64; 2]) -> (Option<ViewId>, [f64; 2]) {
@@ -410,6 +477,10 @@ impl SheetPick<'_> {
         }
     }
 }
+
+/// Where on a dimension's lines a click is: the attachment, the point and
+/// the segment's ends (sheet mm).
+type DimSegment = (DatumOn, [f64; 2], [f64; 2], [f64; 2]);
 
 /// The Weld symbol tool's second click: the symbol with `spec`, its
 /// reference line starting at `position`.
@@ -536,20 +607,6 @@ pub fn view_table(id: u64, kind: TableTool, view: ViewId, origin: Option<PickedP
     (Table::new(id, tk, position), name)
 }
 
-impl SheetPick<'_> {
-    /// The Broken-out section dialog's default depth: half the model's
-    /// depth along the line of sight (10 mm when the view isn't built).
-    pub fn broken_out_default_depth(&self, view: ViewId) -> f64 {
-        (|| {
-            let g = self.geoms.get(&view)?;
-            let (key, part) = views::view_source(self.drawing.sheets.get(self.sheet)?, view)?;
-            let src = self.sources.get(&key)?;
-            Some(views::model_depth(&src.context, part.as_ref(), g.frame.as_ref()?) / 2.0)
-        })()
-        .unwrap_or(0.01)
-    }
-}
-
 /// Edit hatch section... (live asb 10-23 views (4)): the region of the
 /// view's cut containing `at` (view coordinates) takes `style` (its `at` is
 /// set to `at`; None: back to the drawing's hatch). False when `at` isn't
@@ -649,9 +706,16 @@ pub fn broken_out_refused(sheet: &noshape_model::drawing::Sheet, view: ViewId) -
 
 /// The Broken-out section dialog's ✓: a blind depth (meters, > 0) or up to
 /// a model point. `None`: invalid depth. New profiles are splines.
-pub fn broken_out(profile: Vec<[f64; 2]>, spline: bool, depth: Option<f64>, depth_ref: Option<PointRef>) -> Option<BrokenOut> {
+pub fn broken_out(profile: Vec<[f64; 2]>, spline: bool, depth: Option<f64>, depth_ref: Option<PointRef>, offset: f64) -> Option<BrokenOut> {
     let depth = depth.filter(|d| d.is_finite() && *d > 0.0).or(depth_ref.as_ref().map(|_| 0.0))?;
-    Some(BrokenOut { profile, spline, depth, depth_ref })
+    let offset = if depth_ref.is_some() && offset.is_finite() { offset } else { 0.0 };
+    Some(BrokenOut { profile, spline, depth, depth_ref, offset })
+}
+
+/// The Broken-out section dialog's Blind depth (live: 25 mm, 1 in in
+/// inch drawings).
+pub fn broken_out_blind_default(units: DimUnits) -> f64 {
+    if matches!(units, DimUnits::Millimeter | DimUnits::Centimeter | DimUnits::Meter) { 0.025 } else { 0.0254 }
 }
 
 /// Add broken-out section `b` to a view, or replace its `edit`th one.

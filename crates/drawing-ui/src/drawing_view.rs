@@ -80,7 +80,9 @@ pub enum Panel {
     Rotation { view: ViewId, input: Entity<InputState> },
     TitleBlock { inputs: Vec<(String, Entity<InputState>)> },
     /// Depth of a new (`edit` None) or existing broken-out section.
-    BrokenOut { view: ViewId, edit: Option<usize>, profile: Vec<[f64; 2]>, spline: bool, depth: Entity<InputState>, depth_ref: Option<PointRef> },
+    /// Live's panel: [Up to entity | Blind]; Up to entity takes a model
+    /// point ("Depth of section cut") and ☐ Offset, Blind a Depth.
+    BrokenOut { view: ViewId, edit: Option<usize>, profile: Vec<[f64; 2]>, spline: bool, up_to: bool, depth: Entity<InputState>, depth_ref: Option<PointRef>, offset: Option<Entity<InputState>> },
     /// Angle of a straight cutting line.
     CutAngle { view: ViewId, input: Entity<InputState> },
     /// Table cell formatting; `scope`: 0 cell, 1 row, 2 column, 3 table.

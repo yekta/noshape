@@ -306,10 +306,11 @@ impl DrawingEditor {
             Tool::Table { kind: TableTool::Hole, origin: None, .. } => "Select the origin (a vertex or circle center)",
             Tool::Table { .. } => "Click to place the table (top-right corner)",
             Tool::Gdt if self.note_leader.is_some() => "Click to place the geometric tolerance",
-            Tool::Gdt => "Click a dimension, a point for the leader, an edge, or click to place the geometric tolerance",
+            Tool::Gdt => "Click a dimension, an edge, a point or a face for the leader, or click to place the geometric tolerance",
             Tool::Datum { anchor: None } => "Click the edge or point the datum is attached to",
             Tool::Datum { .. } => "Click to place the datum box",
-            Tool::SurfaceFinish => "Click the edge the symbol sits on",
+            Tool::SurfaceFinish if self.note_leader.is_some() => "Click to place the surface finish symbol",
+            Tool::SurfaceFinish => "Click an edge or an extension line the symbol sits on, or a face for a leader",
             Tool::Weld if self.weld_dlg.as_ref().is_some_and(|d| d.target.is_some()) => "Click to place the symbol",
             Tool::Weld => "Select an entity to associate the symbol",
             Tool::RevisionCallout { .. } => "Click to place the revision callout",
@@ -583,7 +584,7 @@ impl DrawingEditor {
             }
             Tool::Sketch { .. } => self.sketch_overlay(&mut overlay),
             Tool::Weld => self.weld_overlay(&mut overlay),
-            Tool::Note | Tool::Gdt if self.note_leader.is_some() => {
+            Tool::Note | Tool::Gdt | Tool::SurfaceFinish if self.note_leader.is_some() => {
                 if let Some(a) = self.note_leader.as_ref().and_then(|l| Some(self.placement(l.view?)?.to_sheet(l.point))) {
                     overlay.lines.push((vec![a, self.cursor], true));
                 }

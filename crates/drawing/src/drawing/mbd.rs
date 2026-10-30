@@ -23,6 +23,37 @@ fn edge_on(frame: &ViewFrame, normal: DVec3) -> bool {
     normal.normalize_or_zero().dot(frame.dir.normalize()).abs() < 1e-6
 }
 
+/// Suggested views of a part with MBD data (live behaviours "MBD datums
+/// in drawings": "Suggested views provide only necessary views when MBD
+/// data is present"; datums on the top and front faces gave Top and Front
+/// only): the Front view, plus the Top, else the Right view for each datum
+/// the views kept so far don't show edge-on. Without MBD data, or on a
+/// layout other than the suggested one, nothing changes.
+pub fn trim_suggested_views(drawing: &mut Drawing, doc: &Document) {
+    let Some(sheet) = drawing.sheets.first() else { return };
+    if sheet.views.len() != 4 || !sheet.views.iter().map(|v| v.id.0).eq(1..=4) {
+        return;
+    }
+    let Some((key, _)) = views::view_source(sheet, ViewId(1)) else { return };
+    let Some(TabContent::PartStudio(ps)) = doc.tab(key.tab).map(|t| &t.content) else { return };
+    if ps.annotations.is_empty() {
+        return;
+    }
+    let frames: Vec<Option<ViewFrame>> = (1..=3).map(|i| views::view_frame(drawing, sheet, ViewId(i))).collect();
+    let mut keep = vec![1u64];
+    for m in &ps.annotations {
+        let n = DVec3::from_array(m.normal);
+        let shown = |id: u64| frames[id as usize - 1].as_ref().is_some_and(|f| edge_on(f, n));
+        if keep.iter().any(|&id| shown(id)) {
+            continue;
+        }
+        if let Some(id) = [2, 3].into_iter().find(|&id| shown(id)) {
+            keep.push(id);
+        }
+    }
+    drawing.sheets[0].views.retain(|v| keep.contains(&v.id.0));
+}
+
 /// Place the source Part Studios' datums in a new drawing (Suggested views):
 /// each in the first view, in sheet order, that shows its face edge-on and
 /// shows annotations from the model.

@@ -113,6 +113,26 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Live answered the derived colour question: the target's next default colour unless the source part's appearance is
   explicit (then carried); ours now does both.
 
+## Evening 10-30 (lead 16:50 order: A41, A44, D15, D40, then the large drawing features)
+- Landed: A41 first pass (snap leader, dimension, edge), A44 circular edges, D40 centermark re-attach, V27 Aligned
+  section panel (e7030441: Section id, Center / Viewing / Revolved, Show cut geometry only, Edit aligned section...).
+- From live 1624 (A41 / A44): GD&T on a dimension's value (centred under it) or line (left edge on it) follows the
+  dimension (`GdtExtra.on`, a `GdtOn` at the line's end at the dimension line); GD&T and surface finish inside a face
+  region take a dot leader (`Leader.dot`; two clicks); surface finish on an extension line stands square to it, away
+  from the value. Still open: a frame dragged off its dimension slides along the dimension line with a leader
+  extension; the extension line lengthening to a surface finish symbol.
+- V28 broken-out panel: [Up to entity | Blind], ☐ Offset (`BrokenOut.offset`, API `offset`), Blind 25 mm / 1 in
+  default (API default too). Still open: Exclude from cut, the Spline / Spline point dropdown, ✓ header.
+- CR5: Suggested views of a part with MBD datums keep only the views they need (`mbd::trim_suggested_views`: Front,
+  plus Top else Right per datum). MBD dimensions (CR18 / V5) need Part Studio MBD dimensions first (only datums exist
+  in `annotations.rs`): not drawing work.
+- From live 1625: D15 ✅ (live doesn't foreshorten in detail / crop views either); D40 lost centermarks now disappear
+  and come back with their circle (`build.rs` resolve_annotations). Still open (D40): section lines aren't associative
+  (live: red line + section view, red dot grip re-attaches and regenerates), GD&T leaders have no reference.
+- GD&T / surface finish hover: only view edges and dimensions (pick.rs), since other annotations can overlap an
+  extension line (cl1's annotation 3 did). App checks on :147: w3/t30-*, t31-* (t31.noshape).
+- Asked live 18:02: BOM Template list / DWT templates / Update properties from a template, Lock drawing properties.
+
 ## Afternoon 10-30 (landed through b76761b6, 16:49 UTC)
 - From live 1613: TB5 grid-line drags (the fixed-corner side's row / column, the table grows) ✅; EX18 image menu
   (Image properties..., Switch to <tab>), a deleted image tab marks the drawing out of date and Update drops the image

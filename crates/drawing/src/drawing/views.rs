@@ -1721,6 +1721,7 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
     for b in &v.broken_out {
         b.spline.hash(&mut h);
         fx(b.depth, &mut h);
+        fx(b.offset, &mut h);
         format!("{:?}", b.depth_ref).hash(&mut h);
         for p in &b.profile {
             fx(p[0], &mut h);
@@ -2594,7 +2595,7 @@ pub fn broken_out_cuts(drawing: &Drawing, sheet: &Sheet, id: ViewId) -> Vec<(Bro
 pub fn broken_out_depth(ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, b: &BrokenOut) -> f64 {
     match &b.depth_ref {
         Some(r) => match resolve_point3(ctx, r) {
-            Some((p, _)) => p.dot(frame.dir) - depth_range(&view_bodies(ctx, part), frame.dir).0,
+            Some((p, _)) => p.dot(frame.dir) - depth_range(&view_bodies(ctx, part), frame.dir).0 + b.offset,
             None => b.depth,
         },
         None => b.depth,

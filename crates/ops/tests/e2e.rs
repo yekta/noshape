@@ -2004,8 +2004,9 @@ fn drawing_broken_out_sections_and_profile_crops() {
     assert_eq!(r["view"], a["id"], "{r}");
     assert!(last(&mut ctx).ends_with(":: Broken-out section"));
     let v = views_of(&mut ctx).into_iter().find(|v| v["id"] == a["id"]).unwrap();
+    // Blind 25 mm by default (live).
     let d0 = num(&v["broken_out"][0]["depth_mm"]);
-    assert!(d0 > 0.0, "{v}");
+    assert!((d0 - 25.0).abs() < 1e-9, "{v}");
     // Edit it to a 3 mm blind depth.
     call(&mut ctx, "drawing_broken_out_section", json!({ "drawing": tab, "view": a["id"], "points": tri(a), "depth": "3 mm", "index": 0 }));
     let v = views_of(&mut ctx).into_iter().find(|v| v["id"] == a["id"]).unwrap();
@@ -2015,6 +2016,9 @@ fn drawing_broken_out_sections_and_profile_crops() {
     assert_eq!(e.param.as_deref(), Some("depth"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_broken_out_section", json!({ "drawing": tab, "view": a["id"], "points": tri(a), "index": 4 })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("index"), "{e:?}");
+    // Offset goes with Up to entity only.
+    let e = try_call(&mut ctx, "drawing_broken_out_section", json!({ "drawing": tab, "view": a["id"], "points": tri(a), "offset": "2 mm" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("offset"), "{e:?}");
     // Not on section, detail or aligned section views (help broken_out_section_view).
     let (ax, ay) = ((num(&a["bounds"]["min"][0]) + num(&a["bounds"]["max"][0])) / 2.0, (num(&a["bounds"]["min"][1]) + num(&a["bounds"]["max"][1])) / 2.0);
     let det = call(&mut ctx, "drawing_detail_view", json!({ "drawing": tab, "parent": a["id"], "center": [ax, ay], "radius": 6, "position": [350, 250] }));

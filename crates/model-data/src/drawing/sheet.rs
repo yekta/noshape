@@ -584,6 +584,18 @@ impl SheetGeometry {
         Some(([w0[0] + (w1[0] - w0[0]) * o.t, w0[1] + (w1[1] - w0[1]) * o.t], w0, w1, line.closed))
     }
 
+    /// A leader's dot on a face (as a callout's).
+    fn leader_dot(&mut self, p: [f64; 2]) {
+        self.fills.push(Fill2 {
+            points: (0..8)
+                .map(|i| {
+                    let t = i as f64 / 8.0 * std::f64::consts::TAU;
+                    [p[0] + 0.6 * t.cos(), p[1] + 0.6 * t.sin()]
+                })
+                .collect(),
+        });
+    }
+
     /// A datum on a dimension hides the arrowheads it covers (help H:datum):
     /// the dimension's filled triangles with a corner within `r` of `at` are
     /// emptied (not removed, so later indices stay valid).
@@ -1640,9 +1652,19 @@ impl SheetGeometry {
                     });
                     let p = turn.map(|t| t.0).unwrap_or(*anchor);
                     let mark = self.mark();
-                    // Leaders (Add leader) run from the symbol's point.
+                    // Leaders (Add leader) run from the symbol's point. One
+                    // to a face ends in a dot and reaches the symbol through
+                    // a shoulder its tip stands on (live request 1624).
                     for l in leaders {
                         let t = l.view.map(|v| env.to_sheet(v, l.point)).unwrap_or(l.point);
+                        if l.dot {
+                            let (s0, s1) = ([p[0] - 4.0, p[1]], [p[0] + 8.0, p[1]]);
+                            let end = if t[0] > p[0] { s1 } else { s0 };
+                            self.lines.push(Polyline2 { points: vec![s0, s1], style: LineStyle::Thin, closed: false, pick });
+                            self.lines.push(Polyline2 { points: vec![end, t], style: LineStyle::Thin, closed: false, pick });
+                            self.leader_dot(t);
+                            continue;
+                        }
                         self.lines.push(Polyline2 { points: vec![p, t], style: LineStyle::Thin, closed: false, pick });
                         self.arrow(t, [t[0] - p[0], t[1] - p[1]], self.style.ann_arrow);
                     }
@@ -1658,10 +1680,22 @@ impl SheetGeometry {
                     // stack downward from the anchor row (live drawing/212–215).
                     let k = ah / 3.5;
                     let (h, rh) = (3.0 * k, 7.0 * k);
-                    let (x0, y) = (anchor[0], anchor[1]);
                     let cell_w = |c: &str| (font::text_width(c, h) + 3.0 * k).max(7.0 * k);
                     let rows: Vec<&Vec<String>> = std::iter::once(frame).chain(extra.rows.iter()).collect();
                     let sym_w = rows.iter().filter_map(|r| r.first()).filter(|c| c.as_str() != "Composite").map(|c| cell_w(c)).fold(7.0 * k, f64::max);
+                    // On a dimension it follows the dimension (live request 1624).
+                    let (x0, y) = match extra.on.as_ref().and_then(|o| Some((o, self.attached_point(&starts, &o.at)?.0))) {
+                        Some((o, p)) => {
+                            let q = [p[0] + o.offset[0], p[1] + o.offset[1]];
+                            if o.centered {
+                                let w = rows.iter().map(|r| sym_w + r.iter().skip(1).filter(|c| !c.is_empty()).map(|c| cell_w(c)).sum::<f64>()).fold(0.0, f64::max);
+                                (q[0] - w / 2.0, q[1] - rh)
+                            } else {
+                                (q[0], q[1] - rh / 2.0)
+                            }
+                        }
+                        None => (anchor[0], anchor[1]),
+                    };
                     let mut right = x0;
                     let mut sym_top = 0usize;
                     for (ri, row) in rows.iter().enumerate() {
@@ -1715,7 +1749,11 @@ impl SheetGeometry {
                         let start = if to_right { [x1, ym] } else { [x0, ym] };
                         let sh = [start[0] + if to_right { 4.0 } else { -4.0 }, ym];
                         self.lines.push(Polyline2 { points: vec![start, sh, t], style: LineStyle::Thin, closed: false, pick });
-                        self.arrow(t, [t[0] - sh[0], t[1] - sh[1]], 3.0);
+                        if l.dot {
+                            self.leader_dot(t);
+                        } else {
+                            self.arrow(t, [t[0] - sh[0], t[1] - sh[1]], 3.0);
+                        }
                         let circle = |r: f64| (0..=24).map(|i| i as f64 / 24.0 * std::f64::consts::TAU).map(|a| [sh[0] + r * a.cos(), sh[1] + r * a.sin()]).collect::<Vec<_>>();
                         match extra.leader {
                             super::GdtLeader::Leader => {}

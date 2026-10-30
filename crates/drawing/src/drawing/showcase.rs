@@ -134,7 +134,7 @@ pub fn showcase_document() -> Document {
         let mut front = base(1, ViewOrientation::Front, [110.0, 245.0]);
         front.scale = Some(1.5);
         front.label = Some("BROKEN-OUT SECTION".into());
-        front.broken_out.push(BrokenOut { profile: vec![[-0.024, -0.003], [0.0, -0.006], [0.024, -0.003], [0.026, 0.016], [0.0, 0.019], [-0.026, 0.016]], spline: true, depth: 0.03, depth_ref: None });
+        front.broken_out.push(BrokenOut { profile: vec![[-0.024, -0.003], [0.0, -0.006], [0.024, -0.003], [0.026, 0.016], [0.0, 0.019], [-0.026, 0.016]], spline: true, depth: 0.03, depth_ref: None, offset: 0.0 });
         s.views.push(front);
         s.views.push(base(2, ViewOrientation::Top, [85.0, 150.0]));
         s.views.push(DrawingView { id: ViewId(3), kind: ViewKind::Section { parent: ViewId(2), line: vec![[-0.025, -0.012], [-0.025, 0.012]], label: "E".into(), cuts: vec![] }, position: [175.0, 150.0], partial: true, label: Some("PARTIAL".into()), ..Default::default() });

@@ -297,7 +297,8 @@ pub struct SectionHatch {
 /// `spline`, else a polygon) is removed from the viewer down to `depth`
 /// (meters, measured along the line of sight from the model's nearest
 /// point), exposing the interior locally. With `depth_ref` the depth runs
-/// to that model point instead (associative "up to entity").
+/// to that model point instead (associative "up to entity"), plus `offset`
+/// (meters, live's ☐ Offset; may be negative).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BrokenOut {
     pub profile: Vec<[f64; 2]>,
@@ -306,6 +307,8 @@ pub struct BrokenOut {
     pub depth: f64,
     #[serde(default)]
     pub depth_ref: Option<PointRef>,
+    #[serde(default)]
+    pub offset: f64,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -1010,6 +1013,10 @@ pub struct Leader {
     /// existing landing's bend, or from a node of a leader).
     #[serde(default, skip_serializing_if = "LeaderStart::is_side")]
     pub start: LeaderStart,
+    /// Ends in a dot on a face, not an arrow (geometric tolerance and
+    /// surface finish placed inside a face region; live request 1624).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dot: bool,
 }
 
 /// Where a note leader starts: the note's side, or a branch off the bend or
@@ -3494,6 +3501,21 @@ pub struct GdtExtra {
     /// Rows after the first: symbol (or "Composite"), tolerance, datums.
     pub rows: Vec<Vec<String>>,
     pub leader: GdtLeader,
+    /// Placed on a dimension (live request 1624): the frame follows it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on: Option<GdtOn>,
+}
+
+/// Where a geometric tolerance sits on a dimension: `offset` (sheet mm)
+/// from the point `at` of the dimension's lines to the frame's top centre
+/// (`centered`: placed on the value, centred under it) or its left middle
+/// (placed on a line: the left edge on it).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GdtOn {
+    pub at: DatumOn,
+    pub offset: [f64; 2],
+    #[serde(default)]
+    pub centered: bool,
 }
 
 impl GdtExtra {

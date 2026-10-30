@@ -2183,11 +2183,25 @@ impl DrawingEditor {
     /// (the panel stays for more, help surface_finish).
     fn place_surface_finish(&mut self, at: [f64; 2], value: String, cx: &mut Context<Self>) {
         let id = self.current_sheet().next_annotation_id();
-        // On a view's straight edge it stands on the edge (live A45).
-        let on = self.pk().surface_finish_on(at);
+        let pending = self.note_leader.take();
+        // On a dimension's line (an extension line) or a view's edge it
+        // stands on it (live A45, request 1624).
+        let pk = self.pk();
+        let on = if pending.is_some() { None } else { pk.surface_finish_on_dimension(at).or_else(|| pk.surface_finish_on(at)) };
+        // Inside a face region: the first click puts a leader's dot there,
+        // the second places the symbol (live request 1624).
+        if pending.is_none()
+            && on.is_none()
+            && let Some(l) = self.face_leader(at)
+        {
+            self.note_leader = Some(l);
+            cx.notify();
+            return;
+        }
         let mut sf = noshape_scene::drawing_tools::surface_finish(id, at, value);
-        if let AnnotationKind::SurfaceFinish { on: o, .. } = &mut sf.kind {
+        if let AnnotationKind::SurfaceFinish { on: o, leaders, .. } = &mut sf.kind {
             *o = on;
+            leaders.extend(pending);
         }
         self.edit_sheet("Surface finish", cx, |s| s.annotations.push(sf));
         if let Some(Panel::SurfaceFinish { placed, .. }) = &mut self.panel {
