@@ -33,7 +33,7 @@ pub struct Form {
 }
 
 /// The forms we build, in the picker's (alphabetical) order.
-pub const FORMS: &[Form] = &[Form { id: "circle-emboss", name: "Circle emboss" }];
+pub const FORMS: &[Form] = &[Form { id: "circle-emboss", name: "Circle emboss" }, Form { id: "circle-extrusion", name: "Circle extrusion" }, Form { id: "countersink", name: "Countersink" }];
 
 /// Radius control (live `List_WrgkY2rdTeUGo2`): the forms' bend radii.
 const RADIUS_CONTROL: [(&str, &str); 4] = [("Default", "Double thickness"), ("Thickness", "Thickness"), ("Half_thickness", "Half thickness"), ("Custom", "Custom")];
@@ -62,6 +62,13 @@ pub fn configuration(id: &str) -> Option<Configuration> {
             variable("int_radius", VariableKind::Length, "1 mm"),
             variable("ext_radius", VariableKind::Length, "1 mm"),
         ],
+        "circle-extrusion" => vec![
+            variable("thickness", VariableKind::Length, "1 mm"),
+            variable("diameter", VariableKind::Length, "5 mm"),
+            variable("depth", VariableKind::Length, "1 mm"),
+            variable("radius", VariableKind::Length, "1 mm"),
+        ],
+        "countersink" => vec![variable("thickness", VariableKind::Length, "1 mm"), variable("clearance_hole", VariableKind::Length, "10 mm"), variable("angle", VariableKind::Angle, "90 deg")],
         _ => return None,
     };
     Some(Configuration { inputs, configured: Vec::new() })
@@ -76,6 +83,10 @@ pub fn input_label(name: &str) -> &str {
         "draft" => "Angle",
         "int_radius" => "Internal radius",
         "ext_radius" => "External radius",
+        "depth" => "Depth",
+        "radius" => "Radius",
+        "clearance_hole" => "Clearance hole",
+        "angle" => "Angle",
         other => other,
     }
 }
@@ -106,7 +117,7 @@ fn make_studio(id: &str) -> Option<PartStudio> {
         let expr = |s: &str| ParamValue::Expr(ExprValue::new(s));
         tool.params.set("form", ParamValue::Text(id.into()));
         tool.params.set("part", ParamValue::Enum(part.into()));
-        for (param, var) in [("thickness", "thickness"), ("diameter", "diameter"), ("height", "height"), ("draft", "draft"), ("intRadius", "int_radius"), ("extRadius", "ext_radius")] {
+        for (param, var) in [("thickness", "thickness"), ("diameter", "diameter"), ("height", "height"), ("draft", "draft"), ("intRadius", "int_radius"), ("extRadius", "ext_radius"), ("depth", "depth"), ("radius", "radius"), ("clearanceHole", "clearance_hole"), ("angle", "angle")] {
             if ps.configuration.inputs.iter().any(|i| i.name == var) {
                 tool.params.set(param, expr(&format!("#{var}")));
             }
@@ -150,6 +161,8 @@ pub fn tool_feature(ev: &mut EvalCtx) -> FResult<()> {
     };
     let tools = match form.as_str() {
         "circle-emboss" => circle_emboss(t, ev.length("diameter")?, ev.length("height")?, ev.angle("draft")?, radius(ev, "intRadius")?, radius(ev, "extRadius")?)?,
+        "circle-extrusion" => circle_extrusion(t, ev.length("diameter")?, ev.length("depth")?, ev.length("radius")?)?,
+        "countersink" => countersink(t, ev.length("clearanceHole")?, ev.angle("angle")?)?,
         _ => return err("Unknown library form"),
     };
     let Some(s) = tools.into_iter().nth(if ev.enum_("part") == "SUBTRACT" { 1 } else { 0 }) else { return err("The form has no such tool") };
@@ -215,6 +228,76 @@ fn circle_emboss(t: f64, d: f64, h: f64, draft: f64, ri: f64, re: f64) -> FResul
     let disc = k::make_face_2d(&k::Plane::new(DVec3::new(0.0, 0.0, -t), DVec3::Z, DVec3::X), &[k::Segment2d::Circle { center: DVec2::ZERO, radius: r_sub }], &[])?;
     let sub = k::extrude(&disc, DVec3::Z * t)?.shape;
     Ok(vec![add, sub])
+}
+
+/// A disc of radius `r` through the sheet (z -t … 0).
+fn sheet_disc(t: f64, r: f64) -> FResult<Shape> {
+    let disc = k::make_face_2d(&k::Plane::new(DVec3::new(0.0, 0.0, -t), DVec3::Z, DVec3::X), &[k::Segment2d::Circle { center: DVec2::ZERO, radius: r }], &[])?;
+    Ok(k::extrude(&disc, DVec3::Z * t)?.shape)
+}
+
+/// A closed (r, z) profile of lines and arcs revolved about the z axis.
+fn revolved(segs: &[k::Segment2d]) -> FResult<Shape> {
+    let face = k::make_face_2d(&profile_plane(), segs, &[])?;
+    Ok(k::revolve(&face, DVec3::ZERO, DVec3::Z, std::f64::consts::TAU)?.shape)
+}
+
+/// Circle extrusion (live "Circle extrusion"): a hole of diameter `d`
+/// (at least t) whose rim is bent down into a collar `depth` deep (t …
+/// (d + t) / 2) round an outer radius radius + t (≤ the depth). Subtract
+/// material: the sheet's disc out to the bend (live t 1: 15.177413 /
+/// 38.484510 mm³).
+fn circle_extrusion(t: f64, d: f64, depth: f64, radius: f64) -> FResult<Vec<Shape>> {
+    let d = d.max(t);
+    let depth = depth.clamp(t, (d + t) * 0.5);
+    let r = (radius + t).clamp(0.0, depth);
+    let (h, c) = (d * 0.5, DVec2::new(d * 0.5 + r, -r));
+    let (pi, half) = (std::f64::consts::PI, std::f64::consts::FRAC_PI_2);
+    let mut segs = Vec::new();
+    let line = |a: DVec2, b: DVec2, segs: &mut Vec<k::Segment2d>| {
+        if a.distance(b) > 1e-12 {
+            segs.push(k::Segment2d::Line { a, b });
+        }
+    };
+    // Bottom of the collar, its outer wall up, the inner bend, the sheet's
+    // edge, the outer bend down to the hole's wall.
+    line(DVec2::new(h, -depth), DVec2::new(h + t, -depth), &mut segs);
+    line(DVec2::new(h + t, -depth), DVec2::new(h + t, -r), &mut segs);
+    if r - t > 1e-12 {
+        segs.push(k::Segment2d::Arc { center: c, radius: r - t, start_angle: half, end_angle: pi });
+    }
+    line(DVec2::new(h + r, -t), DVec2::new(h + r, 0.0), &mut segs);
+    segs.push(k::Segment2d::Arc { center: c, radius: r, start_angle: half, end_angle: pi });
+    line(DVec2::new(h, -r), DVec2::new(h, -depth), &mut segs);
+    Ok(vec![revolved(&segs)?, sheet_disc(t, h + r)?])
+}
+
+/// Countersink (live "Countersink"): a hole of the clearance diameter, its
+/// cone at half the `angle` down to 0.1 t above the sheet's bottom.
+/// Subtract material: that countersunk hole; Add material: the rest of the
+/// sheet's disc out to the cone's top (live t 1, Ø1, 60°: 1.491592 /
+/// 1.774456 mm³).
+fn countersink(t: f64, clearance: f64, angle: f64) -> FResult<Vec<Shape>> {
+    let half = angle * 0.5;
+    if !(1e-6..std::f64::consts::FRAC_PI_2 - 1e-6).contains(&half) || clearance <= 0.0 {
+        return err("The countersink's angle and hole must be positive");
+    }
+    let rh = clearance * 0.5;
+    let top = rh + 0.9 * t * half.tan();
+    let hole = [
+        k::Segment2d::Line { a: DVec2::new(0.0, -t), b: DVec2::new(rh, -t) },
+        k::Segment2d::Line { a: DVec2::new(rh, -t), b: DVec2::new(rh, -0.9 * t) },
+        k::Segment2d::Line { a: DVec2::new(rh, -0.9 * t), b: DVec2::new(top, 0.0) },
+        k::Segment2d::Line { a: DVec2::new(top, 0.0), b: DVec2::new(0.0, 0.0) },
+        k::Segment2d::Line { a: DVec2::new(0.0, 0.0), b: DVec2::new(0.0, -t) },
+    ];
+    let ring = [
+        k::Segment2d::Line { a: DVec2::new(rh, -t), b: DVec2::new(top, -t) },
+        k::Segment2d::Line { a: DVec2::new(top, -t), b: DVec2::new(top, 0.0) },
+        k::Segment2d::Line { a: DVec2::new(top, 0.0), b: DVec2::new(rh, -0.9 * t) },
+        k::Segment2d::Line { a: DVec2::new(rh, -0.9 * t), b: DVec2::new(rh, -t) },
+    ];
+    Ok(vec![revolved(&ring)?, revolved(&hole)?])
 }
 
 type Built = Mutex<HashMap<(String, ConfigValues), Option<Arc<Context>>>>;

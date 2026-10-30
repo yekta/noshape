@@ -88,7 +88,8 @@ fn input_label(key: &str, input: &noshape_model::configuration::ConfigInput, edi
     if !key.starts_with(forms::PREFIX) {
         return Some(input.name.clone());
     }
-    let custom = editing.0.get("Radius control").is_some_and(|v| v == "Custom");
+    // Radii follow the Radius control where the form has one.
+    let custom = editing.0.get("Radius control").is_none_or(|v| v == "Custom");
     match input.name.as_str() {
         "thickness" => None,
         "int_radius" | "ext_radius" | "radius" if !custom => None,

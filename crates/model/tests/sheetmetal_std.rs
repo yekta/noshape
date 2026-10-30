@@ -816,17 +816,25 @@ fn qa4_s1_enclosure_as_live() {
     assert!(ok(flange, (20295.0752, 34)) && ok(hem, (22074.8607, 43)) && ok(cut, (20805.4123, 61)), "flange {flange:?}, hem {hem:?}, cut {cut:?}: {:#?}", face_report(&r));
 }
 
-/// The form library's Circle emboss studio at its defaults (t 1 mm): Add
-/// material 273.799790 mm³, Subtract material 217.909344 (live dom/sm-forms-v4).
+/// The form library's studios' tools (Add, Subtract material, mm³) in the
+/// configurations live measured them in (dom/sm-forms-v4, currentConfiguration).
 #[test]
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
-fn library_circle_emboss_tools_as_live() {
+fn library_form_tools_as_live() {
     let _ = Studio::new();
-    let studio = noshape_model::sheetmetal::forms::studio("circle-emboss").expect("studio");
-    let r = Regenerator::new().regenerate(&studio, &studio.configuration.defaults(), &UnitPrefs::default(), &RegenOptions::default());
-    let st: Vec<_> = r.display.features.iter().map(|f| (f.status, f.message.clone())).collect();
-    let v: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.volume().unwrap_or(0.0) * 1e9).collect();
-    assert!(v.len() == 2 && (v[0] - 273.79979).abs() < 1e-5 && (v[1] - 217.909344).abs() < 1e-5, "{v:?} {st:?} attrs {}", r.context.fs_attributes.len());
+    for (form, values, add, sub) in [
+        ("circle-emboss", vec![], 273.79979, 217.909344),
+        ("circle-extrusion", vec![], 15.177413, 38.48451),
+        ("countersink", vec![("clearance_hole", "1 mm"), ("angle", "60 deg")], 1.491592, 1.774456),
+    ] {
+        let studio = noshape_model::sheetmetal::forms::studio(form).expect("studio");
+        let mut config = studio.configuration.defaults();
+        config.0.extend(values.into_iter().map(|(k, v)| (k.to_string(), v.to_string())));
+        let r = Regenerator::new().regenerate(&studio, &config, &UnitPrefs::default(), &RegenOptions::default());
+        let st: Vec<_> = r.display.features.iter().map(|f| (f.status, f.message.clone())).collect();
+        let v: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.volume().unwrap_or(0.0) * 1e9).collect();
+        assert!(v.len() == 2 && (v[0] - add).abs() < 1e-5 && (v[1] - sub).abs() < 1e-5, "{form}: {v:?} vs {add} / {sub}; {st:?}");
+    }
 }
 
 /// The form library's Circle emboss with its defaults on a 2 mm plate (live

@@ -446,6 +446,10 @@ pub fn form_tool() -> FeatureType {
         ParamSpec::enum_("radiusControl", "Radius control", &[("Default", "Double thickness"), ("Thickness", "Thickness"), ("Half_thickness", "Half thickness"), ("Custom", "Custom")]),
         ParamSpec::num("intRadius", "Internal radius", NumSpec::positive_length(1.0, 0.04)),
         ParamSpec::num("extRadius", "External radius", NumSpec::positive_length(1.0, 0.04)),
+        ParamSpec::num("depth", "Depth", NumSpec::positive_length(1.0, 0.04)),
+        ParamSpec::num("radius", "Radius", NumSpec::positive_length(1.0, 0.04)),
+        ParamSpec::num("clearanceHole", "Clearance hole", NumSpec::positive_length(10.0, 0.4)),
+        ParamSpec::angle("angle", "Angle", 90.0),
     ];
     FeatureType::new("smFormTool", "Form tool", Category::SheetMetal, p).hidden().icon("form").describe("A form of the sheet metal form library")
 }
