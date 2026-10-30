@@ -134,13 +134,13 @@ pub struct SelectOther {
 /// The offset as live places it (behaviours "spec: psui part-studio.md 2.16 /
 /// 2.17 … Select other": the pointer + (100, 51); the bundle's −25 is from
 /// another origin).
-const SELECT_OTHER_OFFSET: (f32, f32) = (100., 51.);
+pub(super) const SELECT_OTHER_OFFSET: (f32, f32) = (100., 51.);
 const SELECT_OTHER_ZONE_PX: f64 = 8.;
 /// The zoom-window mode's prompt (live part-studio/psui-kb-w-armed).
 const ZOOM_WINDOW_PROMPT: &str = "Drag to create zoom bounding box.";
 const SELECT_OTHER_PICK_PX: f64 = 8.;
 const SELECT_OTHER_MAX: usize = 20;
-const SELECT_OTHER_SIZE: (f32, f32) = (220., 149.);
+pub(super) const SELECT_OTHER_SIZE: (f32, f32) = (220., 149.);
 
 /// Consumed dialog picks: (picks, accent picks, before-model, lines).
 pub type ConsumedLines = (Vec<Reference>, Vec<Reference>, Vec<Reference>, usize, Option<noshape_render::Instance>);
@@ -402,6 +402,8 @@ pub struct UiState {
     /// The bend (index into the model's bends) whose line is selected in the
     /// flat view: Shift+C analyses it (live request 1622).
     pub sm_flat_bend: Option<usize>,
+    /// The flat view's Select other list (live 1605 / 1622: the titled popup).
+    pub sm_select_other: Option<super::sheet_metal_panel::FlatSelectOther>,
     /// The Bends cell being edited (row, column 2 Radius / 5 K Factor), and
     /// whether its field still needs the focus.
     pub sm_edit: Option<(usize, usize)>,
@@ -661,6 +663,7 @@ impl UiState {
             sm_bends_scroll: ScrollHandle::new(),
             sm_hover: None,
             sm_flat_bend: None,
+            sm_select_other: None,
             sm_edit: None,
             sm_edit_focus: false,
             sm_cell: None,

@@ -41,6 +41,24 @@ impl Render for SmSplitDrag {
     }
 }
 
+/// A row of the flat view's Select other list.
+#[derive(Clone, Debug)]
+pub enum FlatRow {
+    /// The flat's reference side (`true`) or back.
+    Side(bool),
+    /// A bend line (its index in the flat, the model's bend).
+    Edge { line: usize, bend: usize },
+    /// A bend's face, its line in the flat and its Bends row.
+    Face { face: Reference, line: usize, row: usize },
+}
+
+/// The flat view's open Select other list: where it was asked for, its rows.
+#[derive(Clone, Debug)]
+pub struct FlatSelectOther {
+    pub at: Point<Pixels>,
+    pub rows: Vec<(String, FlatRow)>,
+}
+
 impl PartStudioView {
     /// The sheet metal models (feature, name), by name (live: orderBy name).
     fn sheet_metal_models(&self, cx: &App) -> Vec<(FeatureId, String)> {
@@ -259,76 +277,128 @@ impl PartStudioView {
     /// Select other… on a flat bend line (live request 1622): "Edge of
     /// <model>" (the line) and the bend's two faces, "Face of <its
     /// feature>"; a face selects it in 3D, the bend in the flat, its row.
-    fn open_flat_bend_select_other(&mut self, position: Point<Pixels>, line: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let (view, fv) = (cx.entity(), self.flat_view.clone());
-        let Some(bend) = fv.as_ref().and_then(|f| f.read(cx).bend_of_line(line)) else { return };
+    fn open_flat_bend_select_other(&mut self, position: Point<Pixels>, line: usize, _: &mut Window, cx: &mut Context<Self>) {
+        let Some(bend) = self.flat_view.as_ref().and_then(|f| f.read(cx).bend_of_line(line)) else { return };
         let models = self.sheet_metal_models(cx);
         let Some(model) = self.sheet_metal_context(&models) else { return };
         let Some(data) = self.context.as_ref().and_then(|c| c.sheet_metal.values().find(|d| d.model == model).cloned()) else { return };
         let Some(b) = data.bends.get(bend) else { return };
         let model_name = models.iter().find(|(f, _)| *f == model).map(|(_, n)| n.clone()).unwrap_or_default();
         let feature_name = self.studio(cx).and_then(|s| s.feature(b.feature).map(|f| f.name.clone())).unwrap_or_else(|| model_name.clone());
-        let faces: Vec<Reference> = b.inner_faces.iter().take(1).chain(b.outer_faces.iter().take(1)).map(|n| Reference::Face((**n).clone())).collect();
         let row = noshape_ops::sheetmetal::joint_of(&data, bend);
-        let menu = OsMenu::build(window, cx, move |m, _, _| {
-            let (v, f) = (view.clone(), fv.clone());
-            let mut m = m.item(OsMenuItem::new(format!("Edge of {model_name}")).on_click(move |_, _, cx| {
-                v.update(cx, |this, cx| {
-                    this.close_context_menu(cx);
-                    this.selection.clear();
-                    this.ui.sm_flat_bend = Some(bend);
-                    this.refresh_scene(false, cx);
-                });
-                if let Some(f) = &f {
+        let mut rows = vec![(format!("Edge of {model_name}"), FlatRow::Edge { line, bend })];
+        rows.extend(b.inner_faces.iter().take(1).chain(b.outer_faces.iter().take(1)).map(|n| (format!("Face of {feature_name}"), FlatRow::Face { face: Reference::Face((**n).clone()), line, row })));
+        self.ui.sm_select_other = Some(FlatSelectOther { at: position, rows });
+        cx.notify();
+    }
+
+    /// Take Select other row `i` of the flat view's list.
+    fn choose_flat_select_other(&mut self, i: usize, cx: &mut Context<Self>) {
+        let Some(so) = self.ui.sm_select_other.take() else { return };
+        let Some((_, row)) = so.rows.get(i).cloned() else { return };
+        self.hover = None;
+        let fv = self.flat_view.clone();
+        match row {
+            FlatRow::Side(side) => {
+                if let Some(f) = &fv {
+                    f.update(cx, |f, cx| f.select(Some(side), cx));
+                }
+                self.select_flat_face(Some(side), cx);
+            }
+            FlatRow::Edge { line, bend } => {
+                self.selection.clear();
+                self.ui.sm_flat_bend = Some(bend);
+                if let Some(f) = &fv {
                     f.update(cx, |f, cx| f.select_bend(Some(line), cx));
                 }
-            }));
-            for face in &faces {
-                let (v, f, face) = (view.clone(), fv.clone(), face.clone());
-                m = m.item(OsMenuItem::new(format!("Face of {feature_name}")).on_click(move |_, _, cx| {
-                    v.update(cx, |this, cx| {
-                        this.close_context_menu(cx);
-                        this.selection = vec![face.clone()];
-                        this.ui.sm_cell = Some((0, row, 0));
-                        this.ui.sm_flat_bend = None;
+                self.refresh_scene(false, cx);
+            }
+            FlatRow::Face { face, line, row } => {
+                self.selection = vec![face];
+                self.ui.sm_cell = Some((0, row, 0));
+                self.ui.sm_flat_bend = None;
+                if let Some(f) = &fv {
+                    f.update(cx, |f, cx| f.select_bend(Some(line), cx));
+                }
+                self.refresh_scene(false, cx);
+            }
+        }
+        cx.notify();
+    }
+
+    /// The flat view's Select other list (live 1605 g-2, 1622 b-1): the 3D
+    /// list's popup ("Select other", ✕, 24 px rows) beside the pointer; a
+    /// hovered face row pre-highlights the face.
+    pub(super) fn render_flat_select_other(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let so = self.ui.sm_select_other.as_ref()?;
+        let pal = p();
+        let rows: Vec<AnyElement> = so
+            .rows
+            .iter()
+            .enumerate()
+            .map(|(i, (label, row))| {
+                let hover = match row {
+                    FlatRow::Face { face, .. } => Some(face.clone()),
+                    FlatRow::Side(side) => self.flat_model_face(*side),
+                    FlatRow::Edge { .. } => None,
+                };
+                h_flex()
+                    .id(SharedString::from(format!("sm-so-{i}")))
+                    .flex_none()
+                    .h(px(24.))
+                    .pl(px(6.))
+                    .pr(px(20.))
+                    .cursor_pointer()
+                    .when(i % 2 == 1, |d| d.bg(gpui_kit::rgba(0xffffff59)))
+                    .hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)))
+                    .child(div().truncate().text_size(px(13.33)).text_color(pal.text).child(label.clone()))
+                    .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                        this.hover = if *h { hover.clone() } else { None };
                         this.refresh_scene(false, cx);
                         cx.notify();
-                    });
-                    if let Some(f) = &f {
-                        f.update(cx, |f, cx| f.select_bend(Some(line), cx));
-                    }
-                }));
-            }
-            m
+                    }))
+                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, _, cx| {
+                        cx.stop_propagation();
+                        this.choose_flat_select_other(i, cx);
+                    }))
+                    .into_any_element()
+            })
+            .collect();
+        let close = cx.listener(|this, _: &ClickEvent, _, cx| {
+            this.ui.sm_select_other = None;
+            this.hover = None;
+            this.refresh_scene(false, cx);
+            cx.notify();
         });
-        let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| this.close_context_menu(cx));
-        menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
-        self.context_menu = Some((position, menu, sub));
-        cx.notify();
+        let (dx, dy) = super::behaviors::SELECT_OTHER_OFFSET;
+        let at = so.at + point(px(dx), px(dy - super::behaviors::SELECT_OTHER_SIZE.1 * 0.5));
+        let popup = v_flex()
+            .id("sm-select-other")
+            .occlude()
+            .w(px(super::behaviors::SELECT_OTHER_SIZE.0))
+            .bg(pal.dialog_bg)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .text_color(pal.text)
+            .child(
+                h_flex()
+                    .h(px(29.))
+                    .flex_none()
+                    .bg(gpui_kit::rgb(0xffffff))
+                    .border_b_1()
+                    .border_color(pal.border)
+                    .child(div().flex_1().pl(px(9.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Select other"))
+                    .child(div().id("sm-so-close").size(px(28.)).flex().items_center().justify_center().child(crate::assets::icon("dialog-cancel", 24., cx)).on_click(close)),
+            )
+            .child(div().h(px(92.)).flex_none().border_1().border_color(pal.border).rounded(px(2.)).child(v_flex().id("sm-so-rows").size_full().overflow_y_scroll().children(rows)))
+            .child(h_flex().h(px(28.)).flex_none().items_start().justify_end().pt(px(10.)).pr(px(4.)).child(crate::ui::glyph("help-dot", 14., crate::theme::help_dot(0xa0a0a0))));
+        Some(deferred(anchored().position(at).snap_to_window_with_margin(px(8.)).child(popup)).with_priority(2).into_any_element())
     }
 
     /// Select other… on the flat's face (live request 1605): its two faces,
     /// the reference side and the back, both "Face of <model>".
-    fn open_flat_select_other(&mut self, position: Point<Pixels>, label: String, window: &mut Window, cx: &mut Context<Self>) {
-        let (view, fv) = (cx.entity(), self.flat_view.clone());
-        let menu = OsMenu::build(window, cx, move |mut m, _, _| {
-            for side in [true, false] {
-                let (v, fv) = (view.clone(), fv.clone());
-                m = m.item(OsMenuItem::new(label.clone()).on_click(move |_, _, cx| {
-                    if let Some(fv) = &fv {
-                        fv.update(cx, |f, cx| f.select(Some(side), cx));
-                    }
-                    v.update(cx, |this, cx| {
-                        this.close_context_menu(cx);
-                        this.select_flat_face(Some(side), cx);
-                    });
-                }));
-            }
-            m
-        });
-        let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| this.close_context_menu(cx));
-        menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
-        self.context_menu = Some((position, menu, sub));
+    fn open_flat_select_other(&mut self, position: Point<Pixels>, label: String, _: &mut Window, cx: &mut Context<Self>) {
+        let rows = [true, false].into_iter().map(|side| (label.clone(), FlatRow::Side(side))).collect();
+        self.ui.sm_select_other = Some(FlatSelectOther { at: position, rows });
         cx.notify();
     }
 
@@ -796,11 +866,15 @@ impl PartStudioView {
             None => {
                 let gpu = self.gpu.clone();
                 let fv = cx.new(|cx| FlatView::new(gpu, window, cx));
-                self._subs.push(cx.subscribe_in(&fv, window, |this, _, ev: &FlatViewEvent, window, cx| match ev {
-                    FlatViewEvent::ContextMenu(at, FlatPick::Bend(b)) => this.open_flat_bend_menu(*at, *b, window, cx),
-                    FlatViewEvent::ContextMenu(at, on) => this.open_flat_menu(*at, *on == FlatPick::Face, window, cx),
-                    FlatViewEvent::Selected(side) => this.select_flat_face(*side, cx),
-                    FlatViewEvent::BendSelected(b) => this.ui.sm_flat_bend = *b,
+                self._subs.push(cx.subscribe_in(&fv, window, |this, _, ev: &FlatViewEvent, window, cx| {
+                    // A click in the flat view closes its Select other list.
+                    this.ui.sm_select_other = None;
+                    match ev {
+                        FlatViewEvent::ContextMenu(at, FlatPick::Bend(b)) => this.open_flat_bend_menu(*at, *b, window, cx),
+                        FlatViewEvent::ContextMenu(at, on) => this.open_flat_menu(*at, *on == FlatPick::Face, window, cx),
+                        FlatViewEvent::Selected(side) => this.select_flat_face(*side, cx),
+                        FlatViewEvent::BendSelected(b) => this.ui.sm_flat_bend = *b,
+                    }
                 }));
                 self.flat_view = Some(fv.clone());
                 fv
