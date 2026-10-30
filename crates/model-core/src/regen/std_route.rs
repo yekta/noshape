@@ -88,6 +88,37 @@ core_features! {
     core_split => "splitPart", "splitpart.fs", "splitPart";
 }
 
+macro_rules! sheet_metal_aware {
+    ($($f:ident => $ty:literal, $native:path, $module:literal, $name:literal;)*) => {
+        $(fn $f(ev: &mut EvalCtx) -> FResult<()> {
+            if adds_to_active_sheet_metal(ev) { evaluate_std(ev, $module, $name) } else { $native(ev) }
+        })*
+
+        /// Core features std runs when they add to or cut an active sheet
+        /// metal part (type, evaluator).
+        const SHEET_METAL_AWARE: &[(&str, EvalFn)] = &[$(($ty, $f),)*];
+    };
+}
+
+sheet_metal_aware! {
+    sm_extrude => "extrude", crate::regen::features::extrude::eval, "extrude.fs", "extrude";
+    sm_revolve => "revolve", crate::regen::features::revolve::eval, "revolve.fs", "revolve";
+    sm_sweep => "sweep", crate::regen::features::solid_a::sweep, "sweep.fs", "sweep";
+    sm_loft => "loft", crate::regen::features::solid_a::loft, "loft.fs", "loft";
+}
+
+/// The feature's boolean (Add / Remove / Intersect) reaches an active sheet
+/// metal part: std's sheetMetalAwareBoolean then cuts the model's
+/// definition sheet, so the cut lasts through the model's later features (a
+/// native cut was rebuilt away by the next Flange), and adding to one is
+/// live's error.
+fn adds_to_active_sheet_metal(ev: &EvalCtx) -> bool {
+    if !ev.ctx.sheet_metal.values().any(|d| d.active) || matches!(ev.enum_("operationType"), "NEW" | "") {
+        return false;
+    }
+    crate::regen::features::extrude::scope(ev).is_some_and(|s| s.iter().any(|&i| ev.ctx.sheet_metal.get(&ev.ctx.bodies[i].id).is_some_and(|d| d.active)))
+}
+
 /// The built-in feature type std's feature `name` stands for (Transform: fTransform), else `name`.
 pub fn core_type(name: &str) -> &str {
     CORE.iter().find(|c| c.2 == name).map_or(name, |c| c.0)
@@ -121,6 +152,9 @@ macro_rules! std_features {
                 && (!STD_SHEET_METAL.load(std::sync::atomic::Ordering::Relaxed) || LEGACY_SHEET_METAL.get() || crate::regen::custom_features::host().is_none())
             {
                 return None;
+            }
+            if let Some(&(_, f)) = SHEET_METAL_AWARE.iter().find(|(t, _)| *t == type_id) {
+                return Some(f);
             }
             Some(match type_id {
                 $($name => $f,)*

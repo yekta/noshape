@@ -239,6 +239,8 @@ struct FormTools {
     face: usize,
     add: Vec<BodyId>,
     remove: Vec<BodyId>,
+    /// A cutting tool (a hole), not a form: cut out of the flat too, no form outline.
+    cut: bool,
 }
 
 /// The body ids a wall attribute's `formedToolBodyIds` name, by role, and every
@@ -259,7 +261,17 @@ fn form_tools(st: &CtxState, wall: &Value, face: usize, ids: &mut Vec<(Arc<str>,
         for sk in item.get("sketchBodyIds").as_array().iter().flat_map(|a| a.iter()) {
             body(sk);
         }
-        out.push(FormTools { face, add, remove });
+        out.push(FormTools { face, add, remove, cut: false });
+    }
+    // Tools std registered to cut the wall (registerSheetMetalBooleanTools:
+    // a Hole through it, counterbores too).
+    for item in wall.get("cuttingToolBodyIds").as_array().iter().flat_map(|a| a.iter()) {
+        let Some(s) = item.as_str() else { continue };
+        let Some(r) = st.transient_ref(&s).cloned() else { continue };
+        ids.push((s, r.clone()));
+        if let Reference::Body(b) = r {
+            out.push(FormTools { face, add: Vec::new(), remove: vec![b], cut: true });
+        }
     }
     out
 }
@@ -287,6 +299,25 @@ struct Piece {
 struct Loop {
     pts: Vec<DVec3>,
     side: Vec<usize>,
+}
+
+/// A face's outer wire: the one spanning the most.
+fn outer_wire(face: &Shape) -> Option<Shape> {
+    let size = |w: &Shape| w.bounding_box(false).map_or(0.0, |b| b.diagonal());
+    face.wires().into_iter().max_by(|a, b| size(a).total_cmp(&size(b)))
+}
+
+/// A wall's holes (a cut std made in the definition sheet: an Extrude or
+/// Hole through an active sheet metal part): each inner wire as a face on
+/// the definition plane, and its edges (definition edge indices).
+fn wall_holes(face: &Shape, topo: &Topo) -> FResult<Vec<(Shape, Vec<usize>)>> {
+    let Some(outer) = outer_wire(face) else { return Ok(Vec::new()) };
+    let mut out = Vec::new();
+    for w in face.wires().into_iter().filter(|w| !w.is_same(&outer)) {
+        let edges = w.edges().iter().filter_map(|e| topo.edges.iter().position(|x| x.is_same(e))).collect();
+        out.push((k::make_face_from_wire(&w, true).map_err(|e| fe(e.to_string()))?, edges));
+    }
+    Ok(out)
 }
 
 /// Definition topology: faces, edges (with their points and faces) and vertices.
@@ -322,7 +353,7 @@ impl Topo {
 
 /// A face's outer loop (straight edges only), chained end to end.
 fn wall_loop(face: &Shape, topo: &Topo) -> FResult<Loop> {
-    let wire = face.wires().into_iter().next().ok_or_else(|| fe("A sheet metal wall has no boundary"))?;
+    let wire = outer_wire(face).ok_or_else(|| fe("A sheet metal wall has no boundary"))?;
     let mut segs: Vec<(DVec3, DVec3, usize)> = Vec::new();
     for e in wire.edges() {
         let info = e.edge_info().map_err(|x| fe(x.to_string()))?;
@@ -1106,6 +1137,22 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         reliefs.extend(cuts.remove(&fi).unwrap_or_default());
         // The wall in the flat: its outline on the definition plane, reliefs cut.
         let mut flat = k::make_face_from_wire(&k::make_polyline(&outline_points(pulled), true).map_err(|e| fe(e.to_string()))?, true).map_err(|e| fe(e.to_string()))?;
+        // Its holes, through the thickness (and out of the flat).
+        for (hole, edges) in wall_holes(&topo.faces[fi], &topo)? {
+            if let Ok(r) = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&flat), std::slice::from_ref(&hole), &k::BooleanOptions::default()) {
+                flat = r.shape;
+            }
+            let base = hole.translated(-n * (back + front + back)).map_err(|e| fe(e.to_string()))?;
+            let tool = k::extrude(&base, n * (front + back) * 3.0).map_err(|e| fe(e.to_string()))?.shape;
+            slab = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&slab), std::slice::from_ref(&tool), &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal wall hole failed: {e}")))?.shape;
+            // Its sides come from the hole's definition edges.
+            for face in tool.faces() {
+                let c = inner_point(&face).unwrap_or_default();
+                let near = |e: &usize| k::make_vertex(c).ok().and_then(|v| k::distance(&v, &topo.edges[*e]).ok()).map_or(f64::INFINITY, |d| d.distance);
+                let from = edges.iter().copied().min_by(|a, b| near(a).total_cmp(&near(b))).map_or(Def::Face(fi), Def::Edge);
+                pieces.push(Piece { face, from });
+            }
+        }
         if !reliefs.is_empty() {
             let tools: Vec<Shape> = reliefs.iter().map(|r| r.0.clone()).collect();
             if let Ok(r) = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&flat), &tools, &k::BooleanOptions::default()) {
@@ -1356,6 +1403,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             // Forms: the parts to remove cut, then the parts to add united;
             // their faces belong to the wall they sit on.
             let mut form_shapes: Vec<(usize, Vec<Shape>)> = Vec::new();
+            let mut wall_flats = wall_flats;
             for ft in &def.forms {
                 let shapes = |ids: &[BodyId]| -> Vec<Shape> { ids.iter().filter_map(|id| ev.ctx.bodies.iter().find(|b| &b.id == id)).map(|b| b.shape.clone()).collect() };
                 let (adds, removes) = (shapes(&ft.add), shapes(&ft.remove));
@@ -1367,7 +1415,15 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 }
                 let tools: Vec<Shape> = removes.into_iter().chain(adds).collect();
                 pieces.extend(tools.iter().flat_map(|t| t.faces()).map(|face| Piece { face, from: Def::Face(ft.face) }));
-                form_shapes.push((ft.face, tools));
+                if ft.cut {
+                    for (_, flat) in wall_flats.iter_mut().filter(|w| w.0 == ft.face) {
+                        if let Ok(r) = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(flat), &tools, &k::BooleanOptions::default()) {
+                            *flat = r.shape;
+                        }
+                    }
+                } else {
+                    form_shapes.push((ft.face, tools));
+                }
             }
             // The definition body's own topology order (references are by index).
             let def_topo = (ev.ctx.bodies[bi].faces.len(), ev.ctx.bodies[bi].edges.len());
@@ -1443,7 +1499,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     }
     if !renamed.is_empty() {
         for (_, v) in st.attributes.iter_mut() {
-            if v.get("attribute").get("formedToolBodyIds").as_array().is_some() {
+            if v.get("attribute").get("formedToolBodyIds").as_array().is_some() || v.get("attribute").get("cuttingToolBodyIds").as_array().is_some() {
                 *v = rename_strings(v, &renamed);
             }
         }

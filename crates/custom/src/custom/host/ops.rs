@@ -49,6 +49,7 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("opOffsetFace", op_offset_face),
     ("opCreateBSplineCurve", op_create_bspline_curve),
     ("opExtractSurface", op_extract_surface),
+    ("opCreateOutline", op_create_outline),
     ("opSplitFace", op_split_face),
     ("opSplitEdges", op_split_edges),
     ("opExtendSheetBody", op_extend_sheet_body),
@@ -1203,6 +1204,41 @@ fn op_extract_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     p.set("offset", length_param(offset.abs()));
     p.set("oppositeDirection", ParamValue::Bool(offset < 0.0));
     run_op_with(i, &cx, &id, "REGEN_ERROR", &p, crate::regen::features::surfaces::offset_surface)?;
+    Ok(Value::Undefined)
+}
+
+/// @opCreateOutline (@internal; std sheet metal booleans cut a definition
+/// face with it): each tool's outline on the target face's plane, what of
+/// the plane lies inside the tool, as a sheet. Planar targets only (std also
+/// takes cylinders and extruded surfaces); `offsetFaces` is not used.
+fn op_create_outline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let (cx, id, def) = args(i, &a)?;
+    let tools = evaluate_refs(i, &cx, def.get("tools"))?;
+    let target = evaluate_refs(i, &cx, def.get("target"))?;
+    run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
+        let Some(&(b, f)) = ev.resolve_faces(&target).first() else { return err("Select a face to outline on.") };
+        let face = ev.face_shape(b, f)?;
+        let Some(plane) = face.face_plane().map_err(|e| FeatureError::new(e.to_string()))? else { return err("Outlines on curved faces are not supported yet") };
+        let mut made = Vec::new();
+        for t in ev.resolve_bodies(&tools) {
+            let tool = ev.ctx.bodies[t].shape.clone();
+            let Ok(bb) = tool.bounding_box(false) else { continue };
+            // A square of the plane round the tool's shadow.
+            let (c, r) = (plane.to_local(bb.center()), bb.diagonal());
+            let corners: Vec<DVec3> = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)].iter().map(|(u, v)| plane.to_world(c + glam::DVec2::new(*u, *v) * r)).collect();
+            let wire = k::make_polyline(&corners, true).map_err(|e| FeatureError::new(e.to_string()))?;
+            let square = k::make_face_from_wire(&wire, true).map_err(|e| FeatureError::new(e.to_string()))?;
+            let inside = k::boolean(k::BooleanOp::Common, &[square], &[tool], &k::BooleanOptions::default()).map_err(|e| FeatureError::new(format!("Failed to outline the tool: {e}")))?.shape;
+            if !inside.faces().is_empty() {
+                let names = fresh_names(ev, &inside);
+                made.push(NamedShape { shape: inside, names: ShapeNames { faces: names, ..Default::default() } });
+            }
+        }
+        if made.is_empty() {
+            return Ok(());
+        }
+        add_bodies(ev, made, BodyKind::Surface)
+    })?;
     Ok(Value::Undefined)
 }
 

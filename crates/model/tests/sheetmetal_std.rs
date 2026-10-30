@@ -624,3 +624,106 @@ fn butt_joint_direction_follows_the_first_picked_flange_edge() {
         assert_eq!((has(992.0), has(672.0)), (front_through, !front_through), "{case}: {:#?}", face_report(&r));
     }
 }
+
+/// A cut on an active sheet metal part stays when a later sheet metal
+/// feature rebuilds the part (Onshape cuts the definition sheet: std
+/// handleSheetMetalCutAndAttribution). Plate 60 × 40, Ø10 hole at (30, 20)
+/// by Extrude Remove through all, then a Flange on the y = 0 edge.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_cut_survives_a_later_flange() {
+    let mut s = plate("2 mm");
+    s.ok();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(glam::DVec2::new(mm(30.0), mm(20.0)), mm(5.0));
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
+    let key = sk.regions.iter().min_by(|a, b| a.area.total_cmp(&b.area)).expect("region").key.clone();
+    s.add("extrude", |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        p.set("operationType", en("REMOVE"));
+        p.set("defaultScope", ParamValue::Bool(true));
+        p.set("endBound", en("THROUGH_ALL"));
+    });
+    let r = s.ok();
+    let hole = std::f64::consts::PI * 25.0 * 2.0;
+    assert!((volume_mm3(&r) - (4800.0 - hole)).abs() < 1e-3, "after the cut {} mm³", volume_mm3(&r));
+    let edge = edge_at(&r, DVec3::new(10.0, 0.0, 2.0));
+    s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(vec![edge]));
+        p.set("distance", expr("20 mm"));
+    });
+    let r = s.ok();
+    let cylinders = r.context.bodies[part(&r)].shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { radius, .. }) if (radius - 5e-3).abs() < 1e-9)).count();
+    assert_eq!(cylinders, 1, "the hole after the flange: {:#?}", face_report(&r));
+    // And in the flat: the outline and the hole.
+    let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
+    assert_eq!(flat.loops.len(), 2, "{:?}", flat.loops.iter().map(|l| l.len()).collect::<Vec<_>>());
+    // Adding to an active sheet metal part is std's error (its own text).
+    let mut s2 = plate("2 mm");
+    s2.ok();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(glam::DVec2::new(mm(30.0), mm(20.0)), mm(5.0));
+    let sketch = s2.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s2.ok();
+    let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
+    let key = sk.regions.iter().min_by(|a, b| a.area.total_cmp(&b.area)).expect("region").key.clone();
+    s2.add("extrude", |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        p.set("operationType", en("ADD"));
+        p.set("defaultScope", ParamValue::Bool(true));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = Regenerator::new().regenerate(&s2.ps, &ConfigValues::default(), &s2.units, &RegenOptions::default());
+    let last = r.display.features.last().unwrap();
+    assert_eq!((last.status, last.message.as_deref()), (FeatureStatus::Error, Some("Only Remove can be used with sheet metal. Add Finish sheet metal model to allow other operations.")), "{:?}", last.message);
+}
+
+/// A Hole through an active sheet metal part stays when a later Flange
+/// rebuilds it (std hole.fs: handleSheetMetalCutAndAttribution registers the
+/// hole tools on the wall, cuttingToolBodyIds, for the rebuild to cut).
+/// Ours: the Hole runs natively and the Flange rebuilds it away. By std it
+/// stops at HOLE_NO_HITS: std then looks for the hole's circular edges on the
+/// definition sheet, made by the rebuild (our rebuild cuts only the part), and
+/// tracks the hole tool's faces into them (our tracking keeps entity types).
+#[test]
+#[ignore = "in progress (fs): the hole is lost after a later Flange (SM-HOLE-THEN-FLANGE)"]
+fn a_hole_survives_a_later_flange() {
+    let mut s = plate("2 mm");
+    let r = s.ok();
+    let body = r.context.bodies[part(&r)].id.clone();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(glam::DVec2::new(mm(30.0), mm(20.0)));
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.ok();
+    s.add("hole", |h| {
+        h.set("scope", ParamValue::Query(vec![Reference::Body(body)]));
+        h.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: p.0 }]));
+        h.set("oppositeDirection", ParamValue::Bool(true));
+        h.set("unitsSystem", en("METRIC"));
+        h.set("styleV2", en("SIMPLE"));
+        h.set("endStyleV2", en("THROUGH"));
+        h.set("holeDiameterV3", expr("6 mm"));
+    });
+    let r = s.ok();
+    let hole = std::f64::consts::PI * 9.0 * 2.0;
+    assert!((volume_mm3(&r) - (4800.0 - hole)).abs() < 1e-3, "after the hole {} mm³", volume_mm3(&r));
+    let edge = edge_at(&r, DVec3::new(10.0, 0.0, 2.0));
+    s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(vec![edge]));
+        p.set("distance", expr("20 mm"));
+    });
+    let r = s.ok();
+    let cylinders = r.context.bodies[part(&r)].shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { radius, .. }) if (radius - 3e-3).abs() < 1e-9)).count();
+    assert_eq!(cylinders, 1, "the hole after the flange: {:#?}", face_report(&r));
+}
