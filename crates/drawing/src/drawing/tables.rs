@@ -475,8 +475,24 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
             let u = length_units(drawing, &f);
             let len = |m: Option<f64>| m.map(|m| format!("{} {}", format_number(m / u.meters(), None, 3), u.symbol())).unwrap_or_default();
             let ang = |a: Option<f64>| a.map(|a| format!("{} deg", format_number(a.to_degrees(), None, 3))).unwrap_or_default();
+            // The frame members its view shows: one composite part's cut
+            // list when the view shows that part (help TB27; a composite
+            // stands for its members); all of them when none match.
+            let in_view: Option<Vec<crate::reference::BodyId>> = view_geo.map(|g| {
+                let mut ids: Vec<crate::reference::BodyId> = g.model_edges.iter().map(|m| m.body.clone()).collect();
+                if let Some(s) = source {
+                    let members: Vec<crate::reference::BodyId> = s.context.bodies.iter().filter(|b| ids.contains(&b.id)).filter_map(|b| b.composite.as_ref()).flat_map(|c| c.members.iter().cloned()).collect();
+                    ids.extend(members);
+                }
+                ids.sort();
+                ids.dedup();
+                ids
+            });
             let mut rows: Vec<Vec<String>> = source
-                .map(|s| crate::regen::features::frames::cut_list(&s.context, None))
+                .map(|s| {
+                    let some = in_view.as_deref().map(|ids| crate::regen::features::frames::cut_list(&s.context, Some(ids))).filter(|r| !r.is_empty());
+                    some.unwrap_or_else(|| crate::regen::features::frames::cut_list(&s.context, None))
+                })
                 .unwrap_or_default()
                 .into_iter()
                 .map(|r| vec![r.item.to_string(), r.qty.to_string(), if r.standard.is_empty() { r.description } else { format!("{} {}", r.standard, r.description) }, len(r.length), ang(r.angle1), ang(r.angle2)])
