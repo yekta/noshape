@@ -728,3 +728,73 @@ fn a_hole_survives_a_later_flange() {
     let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
     assert_eq!(flat.loops.len(), 2, "the hole in the flat too");
 }
+
+/// Live ("qa5 sm tools", Jog with all defaults: Blind 5 mm, anchor Inside,
+/// Preserve material) on the Bend test's plate and line: 4825.132741228719
+/// mm³, 22 faces (18 plane, 4 cylinder); the raised flange at z 7..9 ends
+/// at x 55.8893813 (flat length kept).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn jog_matches_live() {
+    let mut s = plate("2 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let (a, b) = (sk.add_point(glam::DVec2::new(mm(30.0), 0.0)), sk.add_point(glam::DVec2::new(mm(30.0), mm(40.0))));
+    let line = sk.add_line_between(a, b).unwrap().0;
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let top = face_at(&r, DVec3::new(30.0, 20.0, 2.0));
+    s.add("sheetMetalJog", move |p| {
+        p.set("bendReference", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: line }]));
+        p.set("face", ParamValue::Query(vec![top]));
+    });
+    let r = s.ok();
+    let body = &r.context.bodies[part(&r)];
+    let bb = body.shape.bounding_box(true).unwrap();
+    let near = |a: f64, b: f64| (a * 1e3 - b).abs() < 2e-4;
+    assert!((volume_mm3(&r) - 4825.132741228719).abs() < 1e-6 && body.faces.len() == 22 && near(bb.max.z, 9.0) && near(bb.max.x, 55.8893813), "{} mm³, {} faces, {bb:?}: {:#?}", volume_mm3(&r), body.faces.len(), face_report(&r));
+}
+
+/// Live ("qa5 sm tools"): a Tab (60,10)–(75,30) beside the plate merges into
+/// the plate (5400 mm³, 10 faces); without a flange to merge it fails "Select
+/// a sheet metal wall to join the tab to." and adds nothing.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn tab_beside_the_plate_as_live() {
+    for merge in [true, false] {
+        let mut s = plate("2 mm");
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = [(60.0, 10.0), (75.0, 10.0), (75.0, 30.0), (60.0, 30.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+        for i in 0..4 {
+            sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
+        }
+        let plane = s.add("cPlane", |pv| {
+            pv.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+            pv.set("offset", expr("2 mm"));
+        });
+        let sketch = s.add("sketch", |pv| {
+            pv.set("sketchPlane", ParamValue::Query(vec![Reference::FeaturePlane(plane)]));
+            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        });
+        let r = s.ok();
+        let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
+        let key = sk.regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).expect("region").key.clone();
+        let top = face_at(&r, DVec3::new(30.0, 20.0, 2.0));
+        s.add("sheetMetalTab", |p| {
+            p.set("tabFaces", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+            p.set("booleanUnionScope", ParamValue::Query(if merge { vec![top] } else { Vec::new() }));
+            p.set("booleanOffset", expr("0.02 mm"));
+        });
+        let r = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions::default());
+        let last = r.display.features.last().unwrap();
+        if merge {
+            assert_eq!(last.status, FeatureStatus::Ok, "{:?}", last.message);
+            assert!((volume_mm3(&r) - 5400.0).abs() < 1e-6 && r.context.bodies[part(&r)].faces.len() == 10, "{} mm³ {:#?}", volume_mm3(&r), face_report(&r));
+        } else {
+            assert_eq!((last.status, last.message.as_deref()), (FeatureStatus::Error, Some("Select a sheet metal wall to join the tab to.")));
+            assert!((volume_mm3(&r) - 4800.0).abs() < 1e-6);
+        }
+    }
+}
