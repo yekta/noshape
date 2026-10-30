@@ -469,6 +469,31 @@ jobs:
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           exit $status
 
+      # The Feature Studio knurl (crates/model/tests/custom_features.rs, ANSI/ASME
+      # B94.6 on a 50 × 50 cylinder): straight, and diamond (one subtract of 148
+      # helical grooves), against live's 0.8 s / 49 s with live's volume and faces.
+      - name: Knurl (release)
+        if: ${{ !cancelled() && runner.os != 'Windows' }}
+        shell: bash
+        run: |
+          status=0
+          cargo test --release --locked -p noshape-model --test all -- custom_features::knurl_feature_b94_on_a_cylinder --ignored --nocapture --test-threads=1 2>&1 | tee knurl.log || status=$?
+          { echo "### ${{ matrix.name }}: knurl (live: straight 0.8 s, diamond 49 s)"; echo '```'; grep -E "^knurl |panicked|assert" knurl.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      - name: Knurl (release, Windows)
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          cargo test --release --locked -p noshape-model --test all -- custom_features::knurl_feature_b94_on_a_cylinder --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath knurl.log
+          $status = $LASTEXITCODE
+          "### ${{ matrix.name }}: knurl (live: straight 0.8 s, diamond 49 s)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          Select-String -Path knurl.log -Pattern '^knurl |panicked|assert' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          exit $status
+
       # User bug 10-24 (crates/model/tests/pattern_second.rs): ×400 fins on top
       # (LP1) and the same pattern under the plate (LP2), with and without
       # Reapply; LP2 must cost about LP1, and an abort must return at once.
