@@ -4317,7 +4317,20 @@ OpOut op_gtransform(const OcShape& s, rust::Slice<const double> m)
   return make_result(args, tr.Shape(), hist.get());
 }
 
-OpOut op_section(const OcShape& a, const OcShape& b)
+namespace
+{
+// set_call_budget's: the CPU seconds a section may take (0: no limit).
+thread_local double t_call_budget = 0;
+} // namespace
+
+double set_call_budget(double seconds)
+{
+  const double was = t_call_budget;
+  t_call_budget    = seconds > 0 ? seconds : 0;
+  return was;
+}
+
+static OpOut op_section_unbudgeted(const OcShape& a, const OcShape& b)
 {
   require_non_null(a.shape, "first shape");
   require_non_null(b.shape, "second shape");
@@ -4326,12 +4339,30 @@ OpOut op_section(const OcShape& a, const OcShape& b)
   sec.ComputePCurveOn1(true);
   sec.ComputePCurveOn2(true);
   sec.SetRunParallel(bop_parallel());
+  // Its inputs as they were if a budget stops it (see run_budgeted).
+  sec.SetNonDestructive(true);
   sec.Build();
   if (sec.HasErrors() || !sec.IsDone())
     fail_op("section failed: " + algo_errors(sec));
   std::vector<TopoDS_Shape> args{a.shape, b.shape};
   HHist                     hist = new BRepTools_History(to_list(args), sec);
   return make_result(args, sec.Shape(), hist.get());
+}
+
+// Under set_call_budget's limit when one is set (the collision checks of
+// std's editing logic: a section of two of a fuzz body's curved faces took
+// up to 28 s, qa MIRROR-HANG-402).
+OpOut op_section(const OcShape& a, const OcShape& b)
+{
+  if (t_call_budget <= 0)
+    return op_section_unbudgeted(a, b);
+  OpOut     out;
+  const int r = run_budgeted(t_call_budget, [&] { out = op_section_unbudgeted(a, b); });
+  if (r == 1)
+    fail_op("section took too long");
+  if (r == 2)
+    fail_op("cancelled");
+  return out;
 }
 
 std::unique_ptr<OcShape> section_plane(const OcShape& s, const PlaneF& plane)

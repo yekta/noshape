@@ -174,6 +174,15 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
   CLI's feature_add, not the Hole's regen), PATTERN-REAPPLY-CUT-ONLY (live's R2 oracle moves the reapplied cut),
   FILL-MERGE-WITH-ALL (behaviors.rs already switches Fill to Add on an open edge: qa to re-check), COMMIT-LATENCY
   (REGEN-SPEED's perf run has the Extrude 1 edit commit at 34 / 38 / 60 ms: psui / qa to confirm on a current run).
+- MIRROR-HANG-402 (P1): not the Add's fuse. The Mirror's editing logic (std booleanHeuristics →
+  evCollisionDetection, our host evaluate.rs) checked 2242 touching face pairs of the 11 overlapping fuzz parts,
+  each with the faces' common and a section (single pairs 14–28 s, OCCT's IntCurveSurface), natively, past the
+  interpreter's 60 s deadline: > 20 min. Now `faces_cross` takes the common only for faces on one plane / cylinder /
+  cone / sphere / torus, the section runs under `k::with_call_budget(0.5 s)` (op_section budgeted, made
+  non-destructive; over budget counts as crossing), and the collision loops call the interpreter's new
+  `check_deadline`: qa's before-mirror.noshape mirror Add in 80 s in the dev CLI (60 s editing logic giving up, then
+  the regen). Faster would need a cheaper per-face clash than a section (the body pairs here all overlap). T1
+  `boolean_groups::a_section_under_a_call_budget_gives_up`.
 - For skasm: T2 `sheetmetal_frames::convert_rips_and_bends_like_onshape` now fails alone too (BUTT: top wall max x
   39.98 mm), on main since 969c5069 (std sheet metal by default); the 21:34 T2 before it passed.
 

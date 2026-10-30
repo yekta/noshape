@@ -133,6 +133,20 @@ pub fn boolean(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &Boolean
     Ok(res)
 }
 
+/// Runs `f` with this thread's [`section`]s limited to `seconds` of CPU
+/// each (they fail with "section took too long" past it): for checks that
+/// may give up (std's collision detection in editing logic).
+pub fn with_call_budget<T>(seconds: f64, f: impl FnOnce() -> T) -> T {
+    struct Restore(f64);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            ffi::set_call_budget(self.0);
+        }
+    }
+    let _restore = Restore(ffi::set_call_budget(seconds));
+    f()
+}
+
 /// 0: NOSHAPE_BOP_PARALLEL decides; 1: serial; 2: parallel.
 static PARALLEL_OVERRIDE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 

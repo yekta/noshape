@@ -309,3 +309,26 @@ fn opposite_extrudes_of_a_circle_unify_into_one_cylinder() {
         }
     }
 }
+
+/// with_call_budget: a section that takes longer than its budget fails with
+/// "section took too long" (std's collision checks in editing logic give up
+/// on such a pair, qa MIRROR-HANG-402); without one it runs to the end.
+#[test]
+fn a_section_under_a_call_budget_gives_up() {
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(100.0, 100.0, 10.0)).unwrap();
+    let mut tools = Vec::new();
+    for i in 0..20 {
+        for j in 0..20 {
+            tools.push(make_cylinder(&Plane::new(DVec3::new(2.5 + 5.0 * i as f64, 2.5 + 5.0 * j as f64, -1.0), DVec3::Z, DVec3::X), 1.5, 12.0, 2.0 * PI).unwrap());
+        }
+    }
+    let holes = boolean(BooleanOp::Cut, &[plate], &tools, &BooleanOptions::default()).unwrap().shape;
+    let tilted = make_box_corners(DVec3::new(-10.0, -10.0, 4.0), DVec3::new(110.0, 110.0, 6.0)).unwrap();
+    let tilted = tilted.transformed(&Transform::Rotate { origin: DVec3::new(50.0, 50.0, 5.0), axis: DVec3::new(1.0, 1.0, 0.0), angle: 0.05 }).unwrap();
+    let t = std::time::Instant::now();
+    let r = with_call_budget(1e-4, || section(&holes, &tilted));
+    let e = r.err().map(|e| e.to_string()).unwrap_or_default();
+    assert!(e.contains("took too long"), "{e:?} after {:?}", t.elapsed());
+    let s = section(&holes, &tilted).unwrap().shape;
+    assert!(s.count(ShapeType::Edge) > 400);
+}

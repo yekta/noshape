@@ -286,6 +286,19 @@ impl Interp {
         }
     }
 
+    /// The deadline's error once it has passed: for native functions that
+    /// loop long between the interpreter's own checks (std's collision
+    /// detection over many faces, qa MIRROR-HANG-402).
+    pub fn check_deadline(&mut self) -> R<()> {
+        if let Some(d) = self.deadline
+            && Instant::now() > d
+        {
+            self.deadline = None;
+            return Err(self.error("Regeneration timed out"));
+        }
+        Ok(())
+    }
+
     fn tick(&mut self) -> R<()> {
         self.steps += 1;
         if self.steps & 0xFFFF == 0

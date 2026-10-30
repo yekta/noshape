@@ -869,15 +869,24 @@ fn face_pair(a: &k::Shape, b: &k::Shape) -> bool {
 /// (std Tab: a tab on its wall, live sm8). Faces of two solids lying on each
 /// other from opposite sides (a boss sketched on a part's face) interfere:
 /// std's boolean heuristics then pick Add, as live (qa5 EXT1).
+///
+/// Only faces on one surface can lie on each other, so only those get the
+/// faces' common; the section runs under a short budget and one that takes
+/// longer counts as crossing (on a fuzz body's curved faces a pair's common
+/// and section took up to 28 s, and a Part mirror's editing logic over 11
+/// such parts never finished: qa MIRROR-HANG-402).
 fn faces_cross(a: &k::Shape, b: &k::Shape, solids: bool) -> bool {
-    if let Some(c) = k::common(a, b).ok().filter(|c| c.shape.area().is_ok_and(|x| x > 1e-12)) {
+    if one_surface(a, b) && let Some(c) = k::common(a, b).ok().filter(|c| c.shape.area().is_ok_and(|x| x > 1e-12)) {
         let facing = || {
             let p = c.shape.faces().first()?.bounding_box(false).ok()?.center();
             Some(a.normal_at_point(p).ok()?.dot(b.normal_at_point(p).ok()?) < 0.0)
         };
         return solids && facing() == Some(true);
     }
-    let Ok(sec) = k::section(a, b) else { return false };
+    let sec = match k::with_call_budget(SECTION_BUDGET, || k::section(a, b)) {
+        Ok(sec) => sec,
+        Err(e) => return e.to_string().contains("took too long"),
+    };
     let interior = |f: &k::Shape, p: DVec3| {
         let Ok(v) = k::make_vertex(p) else { return false };
         f.edges().iter().all(|e| k::distance(&v, e).is_ok_and(|d| d.distance > 1e-7))
@@ -887,6 +896,29 @@ fn faces_cross(a: &k::Shape, b: &k::Shape, solids: bool) -> bool {
         let Ok(m) = e.point_at(0.5 * (info.first_param + info.last_param)) else { return false };
         interior(a, m) && interior(b, m)
     })
+}
+
+/// The CPU seconds a section of two touching faces may take in
+/// [`faces_cross`].
+const SECTION_BUDGET: f64 = 0.5;
+
+/// Whether two faces lie on one plane, cylinder, cone, sphere or torus.
+fn one_surface(a: &k::Shape, b: &k::Shape) -> bool {
+    const TOL: f64 = 1e-7;
+    let (Ok(sa), Ok(sb)) = (a.face_surface(), b.face_surface()) else { return false };
+    let parallel = |u: DVec3, v: DVec3| u.normalize_or_zero().cross(v.normalize_or_zero()).length() < 1e-9;
+    // The distance from `p` to the line through `o` along `d`.
+    let off = |p: DVec3, o: DVec3, d: DVec3| (p - o).reject_from(d.normalize_or_zero()).length();
+    match (sa, sb) {
+        (k::Surface::Plane(p), k::Surface::Plane(q)) => parallel(p.normal, q.normal) && (q.origin - p.origin).dot(p.unit_normal()).abs() < TOL,
+        (k::Surface::Cylinder { origin: o1, axis: a1, radius: r1, .. }, k::Surface::Cylinder { origin: o2, axis: a2, radius: r2, .. }) => parallel(a1, a2) && (r1 - r2).abs() < TOL && off(o2, o1, a1) < TOL,
+        (k::Surface::Cone { axis: a1, half_angle: h1, apex: p1, .. }, k::Surface::Cone { axis: a2, half_angle: h2, apex: p2, .. }) => parallel(a1, a2) && (h1.abs() - h2.abs()).abs() < 1e-9 && p1.distance(p2) < TOL,
+        (k::Surface::Sphere { center: c1, radius: r1, .. }, k::Surface::Sphere { center: c2, radius: r2, .. }) => c1.distance(c2) < TOL && (r1 - r2).abs() < TOL,
+        (k::Surface::Torus { center: c1, axis: a1, major_radius: m1, minor_radius: n1 }, k::Surface::Torus { center: c2, axis: a2, major_radius: m2, minor_radius: n2 }) => {
+            c1.distance(c2) < TOL && parallel(a1, a2) && (m1 - m2).abs() < TOL && (n1 - n2).abs() < TOL
+        }
+        _ => false,
+    }
 }
 
 /// How far apart two boxes may be and their shapes still touch (the
@@ -974,6 +1006,7 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             if tb == gb || !meet(tx, gx) {
                 continue;
             }
+            i.check_deadline()?;
             let (tt, gt) = (tt.get_or_init(|| tight(t)), gt.get_or_init(|| tight(g)));
             if (!holds(tt, gt) && !holds(gt, tt)) || !k::distance(t, g).is_ok_and(|d| d.distance <= 1e-8) {
                 continue;
@@ -996,6 +1029,7 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             if t.is_same(g) || !meet(tx, gx) {
                 continue;
             }
+            i.check_deadline()?;
             let Ok(d) = k::distance(t, g) else { continue };
             if d.distance > 1e-8 {
                 continue;
