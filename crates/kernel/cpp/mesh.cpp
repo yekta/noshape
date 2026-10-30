@@ -783,6 +783,12 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     std::vector<std::vector<std::array<float, 3>>> rust_polys((size_t)m->edges.Extent());
     const int ntaken = !relative && !mesh_faces && rust_mesh_on() ? rust_mesh_faces(m->faces, m->edges, m->vertices, fresh, lin, ang, parallel, taken, rust_meshes, rust_polys) : 0;
     m->rust_faces            = (size_t)ntaken;
+    // Their cache entries go in below one by one: room for them at once (not grown as they come).
+    if (set != nullptr && ntaken > 0)
+    {
+      set->rust.ReSize(set->rust.Extent() + ntaken);
+      set->edges.ReSize(set->edges.Extent() + m->edges.Extent());
+    }
     if (partial || ntaken > 0)
     {
       BRep_Builder    B;

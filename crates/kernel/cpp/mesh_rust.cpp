@@ -297,7 +297,16 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
         un += 1 + use_nodes[un];
   }
   // Edge polylines of the meshed faces' edges (a pattern's instances: the first's, moved), and the instances'
-  // meshes (the first's, moved).
+  // meshes (the first's, moved). Each edge's polyline comes from its first meshed face's use: found here in
+  // turn, then made in parallel (made in turn, 1.9 ms of the 400-fin plate's 15.5 on the perf server).
+  struct PolyFrom
+  {
+    int      face = 0; // 0: none
+    size_t   at   = 0; // its count in out.use_nodes
+    uint32_t base = 0; // the first face's first node
+  };
+  std::vector<PolyFrom> from((size_t)edges.Extent());
+  std::vector<int>      ks;
   for (int i = 1; i <= faces.Extent(); ++i)
   {
     if (!fresh[(size_t)i] || first[(size_t)i] == 0 || !meshes[(size_t)first[(size_t)i]].out)
@@ -307,20 +316,19 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     taken[(size_t)i]      = 1;
     ++n;
     // From the first face's nodes (global) to this face's place.
-    const bool    moved = i != i0 && !f.Location().IsEqual(faces(i0).Location());
-    const gp_Trsf to    = moved ? f.Location().Transformation() * faces(i0).Location().Transformation().Inverted() : gp_Trsf();
+    const bool moved = i != i0 && !f.Location().IsEqual(faces(i0).Location());
     if (i != i0)
     {
       meshes[(size_t)i]       = meshes[(size_t)i0];
       meshes[(size_t)i].moved = moved;
-      meshes[(size_t)i].to    = to;
+      meshes[(size_t)i].to    = moved ? f.Location().Transformation() * faces(i0).Location().Transformation().Inverted() : gp_Trsf();
     }
     // The first face's j: its nodes start at face_nodes[j].
     const size_t   j0    = (size_t)input_of[(size_t)i0];
     const uint32_t nbase = face_nodes[j0];
     size_t         at    = use_at[(size_t)i0];
     // Its uses' edges: the first face's read above, an instance's found in the map.
-    std::vector<int> ks;
+    ks.clear();
     if (i == i0)
       for (uint32_t u = in.loop_uses[in.face_loops[j0]]; u < in.loop_uses[in.face_loops[j0 + 1]]; ++u)
         ks.push_back((int)(in.uses[u] >> 1) + 1);
@@ -330,23 +338,28 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
           ks.push_back(edges.FindIndex(ei.Value()));
     for (const int k : ks)
     {
-      const uint32_t count = use_nodes[at];
-      if (k > 0 && polys[(size_t)k - 1].empty())
-      {
-        auto& poly = polys[(size_t)k - 1];
-        poly.reserve(count);
-        for (uint32_t c = 0; c < count; ++c)
-        {
-          const uint32_t node = nbase + use_nodes[at + 1 + c];
-          gp_Pnt         p(nodes[3 * node], nodes[3 * node + 1], nodes[3 * node + 2]);
-          if (moved)
-            p.Transform(to);
-          poly.push_back({(float)p.X(), (float)p.Y(), (float)p.Z()});
-        }
-      }
-      at += 1 + count;
+      if (k > 0 && from[(size_t)k - 1].face == 0)
+        from[(size_t)k - 1] = {i, at, nbase};
+      at += 1 + use_nodes[at];
     }
   }
+  in_chunks(edges.Extent(), parallel, [&](int k) {
+    const PolyFrom& pf = from[(size_t)k - 1];
+    if (pf.face == 0)
+      return;
+    const RustFace& r     = meshes[(size_t)pf.face];
+    const uint32_t  count = use_nodes[pf.at];
+    auto&           poly  = polys[(size_t)k - 1];
+    poly.reserve(count);
+    for (uint32_t c = 0; c < count; ++c)
+    {
+      const uint32_t node = pf.base + use_nodes[pf.at + 1 + c];
+      gp_Pnt         p(nodes[3 * node], nodes[3 * node + 1], nodes[3 * node + 2]);
+      if (r.moved)
+        p.Transform(r.to);
+      poly.push_back({(float)p.X(), (float)p.Y(), (float)p.Z()});
+    }
+  });
   return n;
 }
 
