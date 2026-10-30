@@ -49,7 +49,7 @@ numbers), ◐ = partly, ✗ = differs, — = no live data.
 | 6.3 Up (SM5) | Up | ✅ | GUI 10-30 |
 | 6.4 row click | row selected, bend lit in 3D and flat | ✅ | GUI 10-30 |
 | 6.5 flat (SM6, SM17) | reliefs, live placement and size | ✅ | GUI 10-30, T2 flat_pattern_keeps_the_model_placement |
-| 6.6 flat menu (SM13) | live's items except Copy Flat pattern, Select other…, Add comment (cloud) | ◐ P3 | GUI 10-30 |
+| 6.6 flat menu (SM13) | live's items (New sketch… while active, Create Drawing, Select other…: the flat's two faces as "Face of <model>", Zoom to selection); clicking the flat selects it and its model face. Not built: Copy Flat pattern (live pastes a flat part instance into an assembly; our flats aren't parts), Add comment (cloud), the bend line's own menu | ◐ P3 | GUI 10-30 |
 | 6.6 export dialog / DXF (SM14) | live's dialog and options; AC1014, live's layers | ✅ | GUI 10-30, T1 the_flat_export_options…, T2 flat_dxf_is_written_as_live |
 | 6.7 part menu | no flat items | ✅ | GUI 10-30 |
 | 6.8 notice (SM10) | auto-dismisses | ✅ | GUI 10-28 |

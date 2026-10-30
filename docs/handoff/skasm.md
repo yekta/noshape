@@ -122,7 +122,7 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   (first side, start cap, end cap, other sides: query.rs `creation_order`, which fixed the Convert's Butt Direction 1),
   other bodies in body order. (3) rect→triangle loft: 51 vs 49 faces (live's
   2 swept faces where three bends meet; their place unknown). (4) Flat view: Copy Flat pattern (live pastes a flat part
-  instance into an assembly), Select other…, the sketch frame in the flat view. Closed corner: done (live's regen
+  instance into an assembly), the bend lines' own selection and menu, the sketch frame in the flat view. Closed corner: done (live's regen
   volume 8535.1655548, request 1606; its 8535.0418 was /massproperties).
 - Cuts on sheet metal (10-30): Extrude / Revolve / Sweep / Loft adding to or cutting an active sheet metal part run by
   std (`std_route::SHEET_METAL_AWARE`), so the cut goes into the definition and lasts (host @opCreateOutline, planar

@@ -29,6 +29,10 @@ pub struct FlatView {
     /// highlights), and the face under the pointer.
     parts: Option<(StudioDisplay, crate::scene_builder::BuiltScene, Vec<Instance>)>,
     hover: Option<Reference>,
+    /// Each flat face's side: the reference side (the top, z 0), the back,
+    /// or `None` (an edge face); and the side selected.
+    sides: Vec<Option<bool>>,
+    selected: Option<bool>,
     /// Keep the Top view fitted while the view's size settles (until the
     /// user moves the camera), and the size it was last fitted at.
     pending_fit: bool,
@@ -42,6 +46,9 @@ pub struct FlatView {
 pub enum FlatViewEvent {
     /// Right-click at this window position, on the flat or not.
     ContextMenu(Point<Pixels>, bool),
+    /// The flat's face selected (live request 1605: picking it selects the
+    /// model face): its reference side (`true`), its back, or nothing.
+    Selected(Option<bool>),
 }
 
 impl EventEmitter<FlatViewEvent> for FlatView {}
@@ -60,11 +67,16 @@ impl FlatView {
                 }
             }
             ViewportEvent::ContextMenu { position, pick } => cx.emit(FlatViewEvent::ContextMenu(*position, pick.is_some())),
+            ViewportEvent::Click { pick, .. } => {
+                let side = pick.and_then(|id| this.face_side(id));
+                this.select(if side.is_some() && side == this.selected { None } else { side }, cx);
+                cx.emit(FlatViewEvent::Selected(this.selected));
+            }
             // The user zoomed, panned or turned the flat: keep their view.
             ViewportEvent::CameraChanged if this.fitted.is_some_and(|c| c != this.viewport.read(cx).camera) => this.pending_fit = false,
             _ => {}
         });
-        Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, flat: None, parts: None, hover: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
+        Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, flat: None, parts: None, hover: None, sides: Vec::new(), selected: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
     }
 
     /// Show `flat` in `color` (linear RGBA, the part's). The first pattern
@@ -79,15 +91,33 @@ impl FlatView {
         self.shown = key;
         self.flat = flat.map(|f| (f.clone(), highlight));
         self.parts = flat.and_then(|f| flat_parts(f, color, highlight, hovered, &self.gpu));
+        self.sides = flat.and_then(|f| f.flat_view_solid()).map(|s| s.faces().iter().map(|f| f.face_plane().ok().flatten().map(|p| p.unit_normal().z)).map(|z| z.filter(|z| z.abs() > 0.5).map(|z| z > 0.0)).collect()).unwrap_or_default();
         self.hover = None;
         self.compose(true, cx);
         cx.notify();
     }
 
+    /// The side of the flat face a pick id is on (`None`: not a top / back face).
+    fn face_side(&self, id: u32) -> Option<bool> {
+        let r = self.parts.as_ref()?.1.picks.get(id)?.reference.clone();
+        let Reference::Face(n) = r else { return None };
+        let noshape_model::reference::TopoName::Face { role: noshape_model::reference::Role::New(i), .. } = &n else { return None };
+        self.sides.get(*i as usize).copied().flatten()
+    }
+
+    /// Select the flat's reference-side (`true`) or back face, or nothing.
+    pub fn select(&mut self, side: Option<bool>, cx: &mut Context<Self>) {
+        if side != self.selected {
+            self.selected = side;
+            self.compose(false, cx);
+        }
+    }
+
     /// The scene: the flat with the hovered face outlined, and the overlays.
     fn compose(&mut self, geometry_changed: bool, cx: &mut Context<Self>) {
+        let selected: Vec<Reference> = self.selected.and_then(|side| self.sides.iter().position(|s| *s == Some(side))).map(|i| Reference::Face(noshape_model::reference::TopoName::face(noshape_model::reference::FeatureId(0), noshape_model::reference::Role::New(i as u32)))).into_iter().collect();
         let scene = match &self.parts {
-            Some((display, built, extra)) => crate::scene_builder::with_highlights(built, display, &[], self.hover.as_ref(), &[], extra.clone(), false, self.gpu.uploader()),
+            Some((display, built, extra)) => crate::scene_builder::with_highlights(built, display, &selected, self.hover.as_ref(), &[], extra.clone(), false, self.gpu.uploader()),
             None => Scene::default(),
         };
         self.viewport.update(cx, |vp, cx| vp.set_scene(Arc::new(scene), geometry_changed, cx));

@@ -214,8 +214,7 @@ impl PartStudioView {
         // Zoom to fit, Zoom to selection, View normal to | Delete <model>.
         // "Add comment" is cloud (not built, as in the other menus).
         // Not built: Copy Flat pattern of <part> (live pastes a flat-pattern
-        // part instance into an assembly: our flats aren't parts) and Select
-        // other… (the flat's two faces; the flat view has no selection yet).
+        // part instance into an assembly: our flats aren't parts).
         let menu = OsMenu::build(window, cx, move |m, _, _| {
             type Action = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
             let item = |label: String, f: Action| {
@@ -254,6 +253,11 @@ impl PartStudioView {
             }))
             .item(item(format!("Export DXF/DWG of Flat pattern of {part}…"), Box::new(move |this, w, cx| this.open_flat_export(b.clone(), w, cx))))
             .separator()
+            .item(item("Select other…".into(), {
+                let label = format!("Face of {model_name}");
+                Box::new(move |this, w, cx| this.open_flat_select_other(position, label.clone(), w, cx))
+            }))
+            .separator()
             .item(item("Zoom to fit".into(), Box::new(move |_, _, cx| {
                 if let Some(fv) = &f1 {
                     fv.update(cx, |f, cx| f.zoom_to_fit(cx));
@@ -276,6 +280,54 @@ impl PartStudioView {
         let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| this.close_context_menu(cx));
         menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
         self.context_menu = Some((position, menu, sub));
+        cx.notify();
+    }
+
+    /// The model face of the flat's reference side (`true`) or back: the
+    /// base wall's (live request 1605: picking the flat's face selects it).
+    fn flat_model_face(&self, side: bool) -> Option<noshape_model::reference::Reference> {
+        let models = self.sheet_metal_models_ctx();
+        let model = self.ui.sm_context.or(models)?;
+        let d = self.context.as_ref()?.sheet_metal.values().find(|d| d.model == model)?;
+        let w = d.walls.iter().find(|w| !w.is_virtual())?;
+        let faces = if side != d.view_back { &w.faces } else { &w.back };
+        faces.first().map(|n| noshape_model::reference::Reference::Face((**n).clone()))
+    }
+
+    /// Select other… on the flat's face (live request 1605): its two faces,
+    /// the reference side and the back, both "Face of <model>".
+    fn open_flat_select_other(&mut self, position: Point<Pixels>, label: String, window: &mut Window, cx: &mut Context<Self>) {
+        let (view, fv) = (cx.entity(), self.flat_view.clone());
+        let menu = OsMenu::build(window, cx, move |mut m, _, _| {
+            for side in [true, false] {
+                let (v, fv) = (view.clone(), fv.clone());
+                m = m.item(OsMenuItem::new(label.clone()).on_click(move |_, _, cx| {
+                    if let Some(fv) = &fv {
+                        fv.update(cx, |f, cx| f.select(Some(side), cx));
+                    }
+                    v.update(cx, |this, cx| {
+                        this.close_context_menu(cx);
+                        this.select_flat_face(Some(side), cx);
+                    });
+                }));
+            }
+            m
+        });
+        let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| this.close_context_menu(cx));
+        menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
+        self.context_menu = Some((position, menu, sub));
+        cx.notify();
+    }
+
+    /// The first sheet metal model of the context by name (no `App` needed).
+    fn sheet_metal_models_ctx(&self) -> Option<FeatureId> {
+        self.context.as_ref()?.sheet_metal.values().map(|d| d.model).next()
+    }
+
+    /// The flat's face selected in the flat view: the model face selected.
+    fn select_flat_face(&mut self, side: Option<bool>, cx: &mut Context<Self>) {
+        self.selection = side.and_then(|s| self.flat_model_face(s)).into_iter().collect();
+        self.refresh_scene(false, cx);
         cx.notify();
     }
 
@@ -733,6 +785,7 @@ impl PartStudioView {
                 let fv = cx.new(|cx| FlatView::new(gpu, window, cx));
                 self._subs.push(cx.subscribe_in(&fv, window, |this, _, ev: &FlatViewEvent, window, cx| match ev {
                     FlatViewEvent::ContextMenu(at, on_part) => this.open_flat_menu(*at, *on_part, window, cx),
+                    FlatViewEvent::Selected(side) => this.select_flat_face(*side, cx),
                 }));
                 self.flat_view = Some(fv.clone());
                 fv
