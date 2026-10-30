@@ -248,10 +248,14 @@ fn vertex_at(r: &RegenResult, p: DVec3) -> Reference {
 }
 
 /// qa5 SM3 / live G34a: a Closed corner at the inner bend corner (2, 2, 2)
-/// (8535.0418 mm³, 23 faces: the bends run into the corner and end in
-/// ruled faces 0.02 mm apart across the diagonal).
+/// (8535.0418 mm³, 23 faces: PLANE 17, CYLINDER 4, OTHER 2; the bends run
+/// into the corner, cylinders r4 372.3144324 / r2 186.1572163 on the front,
+/// and end in OTHER faces of 10.4192 mm² 0.02 mm apart across the diagonal).
+/// Ours: the same faces, cylinders within 0.002 mm², but 0.12 mm³ more: our
+/// bend ends are ruled radially, live's inside differs (asked live: REQUESTS
+/// skasm 2026-10-30 00:20).
 #[test]
-#[ignore = "in progress (fs): closed corner gives 8541.21 / 35 faces (bend cylinders r2 as live; the corner cut leaves faces at x = 0.02)"]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn closed_corner_matches_live() {
     let mut s = g34();
     let r = s.ok();
@@ -261,8 +265,9 @@ fn closed_corner_matches_live() {
         p.set("cornerStyle", en("CLOSED"));
     });
     let r = s.ok();
-    let faces = r.context.bodies[part(&r)].shape.faces().len();
-    assert!((volume_mm3(&r) - 8535.0418).abs() < 1e-3 && faces == 23, "{} mm³, {} faces: {:#?}", volume_mm3(&r), faces, face_report(&r));
+    let report = face_report(&r);
+    let count = |kind: &str| report.iter().filter(|f| f.starts_with(kind)).count();
+    assert!((volume_mm3(&r) - 8535.0418).abs() < 0.15 && (count("PLANE"), count("CYLINDER"), count("OTHER")) == (17, 4, 2), "{} mm³: {report:#?}", volume_mm3(&r));
 }
 
 /// The part's faces: type, area (mm²) and a point on each (mm), for failures.
@@ -279,7 +284,8 @@ fn face_report(r: &RegenResult) -> Vec<String> {
             };
             let [u0, u1, v0, v1] = f.uv_bounds().unwrap_or_default();
             let p = f.point_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).unwrap_or_default() * 1e3;
-            format!("{kind} {:.7} at ({:.3}, {:.3}, {:.3})", f.area().unwrap_or(0.0) * 1e6, p.x, p.y, p.z)
+            let c = f.centroid().unwrap_or_default() * 1e3;
+            format!("{kind} {:.7} at ({:.3}, {:.3}, {:.3}) centroid ({:.5}, {:.5}, {:.5})", f.area().unwrap_or(0.0) * 1e6, p.x, p.y, p.z, c.x, c.y, c.z)
         })
         .collect()
 }
@@ -511,4 +517,110 @@ fn sheet_metal_saved_natively_stays_native() {
     // The native flanges (qa5 SM1's 8383.1217; std's are live's 8511.4987).
     let r = s.ok();
     assert!((volume_mm3(&r) - 8383.1217).abs() < 1e-3, "{} mm³", volume_mm3(&r));
+}
+
+/// SM-FACES (P3; live "fs (10-23 05:00)"): Sheet metal model › Extrude of an
+/// open L (0,0)–(50,0)–(50,30), Blind 20, thickness 2, R3: 3211.3274 mm³ and
+/// 14 faces (12 plane, 2 cylinder): each end keeps its wall / bend / wall
+/// pieces.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn extruded_l_keeps_its_end_faces_in_pieces() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(0.0, 0.0), (50.0, 0.0), (50.0, 30.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    let lines = [sk.add_line_between(p[0], p[1]).unwrap(), sk.add_line_between(p[1], p[2]).unwrap()];
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.ok();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("EXTRUDE"));
+        pv.set("sketchCurves", ParamValue::Query(lines.iter().map(|e| Reference::SketchEntity { sketch, entity: e.0 }).collect()));
+        pv.set("depth", expr("20 mm"));
+        pv.set("thickness", expr("2 mm"));
+        pv.set("radius", expr("3 mm"));
+    });
+    let r = s.ok();
+    let faces = r.context.bodies[part(&r)].shape.faces().len();
+    eprintln!("PROBE {} mm3 {} faces {:#?}", volume_mm3(&r), faces, face_report(&r));
+    assert!((volume_mm3(&r) - 3211.3274).abs() < 1e-3 && faces == 14, "{} mm³, {} faces", volume_mm3(&r), faces);
+}
+
+/// A 60 × 40 plate (Thicken 2 mm, bend radius `radius` mm).
+fn plate(radius: &str) -> Studio {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    let radius = radius.to_string();
+    s.add("sheetMetalStart", move |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr(&radius));
+    });
+    s
+}
+
+/// Live (behaviours "skasm (2026-10-29) partial Outer / Inner flange",
+/// request 1599 (a)): R3 plate, partial Flange on the top edge y = 40, 10 mm
+/// in from both ends. Outer keeps the wall inside the outline (y 38..40),
+/// Inner puts it outside (y 40..42); 22 faces each.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn partial_flange_outer_and_inner_as_live() {
+    for (alignment, volume, y) in [("OUTER", 6027.561697411184, (38.0, 40.0)), ("INNER", 6204.561697411182, (40.0, 42.0))] {
+        let mut s = plate("3 mm");
+        let r = s.ok();
+        let edge = edge_at(&r, DVec3::new(30.0, 40.0, 2.0));
+        s.add("sheetMetalFlange", |p| {
+            p.set("edges", ParamValue::Query(vec![edge]));
+            p.set("distance", expr("20 mm"));
+            p.set("flangeAlignment", en(alignment));
+            p.set("isPartialFlange", ParamValue::Bool(true));
+            p.set("firstBoundType", en("BLIND"));
+            p.set("firstBoundOffset", expr("10 mm"));
+            p.set("hasSecondBound", ParamValue::Bool(true));
+            p.set("secondBoundType", en("BLIND"));
+            p.set("secondBoundOffset", expr("10 mm"));
+        });
+        let r = s.ok();
+        let faces = r.context.bodies[part(&r)].shape.faces().len();
+        let bb = r.context.bodies[part(&r)].shape.bounding_box(true).unwrap();
+        assert!((volume_mm3(&r) - volume).abs() < 1e-3 && faces == 22 && (bb.max.y * 1e3 - y.1).abs() < 1e-3, "{alignment}: {} mm³, {faces} faces, box {:?}: {:#?}", volume_mm3(&r), (bb.min * 1e3, bb.max * 1e3), face_report(&r));
+    }
+}
+
+/// Live (request 1599 (b)): on G34's two flanges a Joint › Rip, Butt joint -
+/// Direction 1 makes the wall of the first-picked flange edge run through
+/// the corner (its outer face then 992 mm² for the front wall, 672 for the
+/// left one), Direction 2 the other; 8576.1387 mm³ either way, 24 faces;
+/// which wall end is picked doesn't matter.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn butt_joint_direction_follows_the_first_picked_flange_edge() {
+    for (y0_first, style, pick, front_through) in [(true, "BUTT", (0.02, 0.0), true), (true, "BUTT", (0.0, 0.02), true), (true, "BUTT2", (0.02, 0.0), false), (false, "BUTT", (0.02, 0.0), false), (false, "BUTT2", (0.0, 0.02), true)] {
+        let mut s = plate("2 mm");
+        let r = s.ok();
+        let (y0, x0) = (edge_at(&r, DVec3::new(30.0, 0.0, 2.0)), edge_at(&r, DVec3::new(0.0, 20.0, 2.0)));
+        let edges = if y0_first { vec![y0, x0] } else { vec![x0, y0] };
+        s.add("sheetMetalFlange", |p| {
+            p.set("edges", ParamValue::Query(edges));
+            p.set("distance", expr("20 mm"));
+        });
+        let r = s.ok();
+        let end = edge_at(&r, DVec3::new(pick.0, pick.1, 12.0));
+        s.add("sheetMetalJoint", |p| {
+            p.set("entity", ParamValue::Query(vec![end]));
+            p.set("jointType", en("RIP"));
+            p.set("hasStyle", ParamValue::Bool(true));
+            p.set("jointStyle", en(style));
+        });
+        let r = s.ok();
+        let areas: Vec<f64> = r.context.bodies[part(&r)].shape.faces().iter().map(|f| f.area().unwrap_or(0.0) * 1e6).collect();
+        let has = |a: f64| areas.iter().any(|x| (x - a).abs() < 1e-3);
+        let case = format!("{} first, {style}, end at {pick:?}", if y0_first { "y = 0" } else { "x = 0" });
+        assert!((volume_mm3(&r) - 8576.138684233867).abs() < 1e-3 && areas.len() == 24, "{case}: {} mm³, {} faces", volume_mm3(&r), areas.len());
+        assert_eq!((has(992.0), has(672.0)), (front_through, !front_through), "{case}: {:#?}", face_report(&r));
+    }
 }

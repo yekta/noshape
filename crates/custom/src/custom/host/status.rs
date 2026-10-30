@@ -474,14 +474,22 @@ fn get_attributes(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let pattern = def.get("attributePattern").clone();
     let name = def.get("name").clone();
     let st = cx.state.lock();
-    let mut out: Vec<Value> = Vec::new();
+    // In the entities' order (Onshape: a Flange's walls are numbered in the
+    // order its edges were picked, which Butt joint - Direction 1 follows).
+    let mut by_entity: std::collections::HashMap<&Reference, Vec<&Value>> = std::collections::HashMap::new();
     for (e, v) in &st.attributes {
-        if !refs.contains(e) || (!name.is_undefined() && *v.get("name") != name) {
-            continue;
-        }
-        let attr = v.get("attribute");
-        if matches_pattern(attr, &pattern) && !out.contains(attr) {
-            out.push(attr.clone());
+        by_entity.entry(e).or_default().push(v);
+    }
+    let mut out: Vec<Value> = Vec::new();
+    for e in &refs {
+        for v in by_entity.get(e).into_iter().flatten() {
+            if !name.is_undefined() && *v.get("name") != name {
+                continue;
+            }
+            let attr = v.get("attribute");
+            if matches_pattern(attr, &pattern) && !out.contains(attr) {
+                out.push(attr.clone());
+            }
         }
     }
     Ok(Value::array(out))
