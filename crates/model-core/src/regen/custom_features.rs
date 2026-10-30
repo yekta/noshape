@@ -5,6 +5,7 @@
 //! prewarm, …); a regeneration that needs it before then fails the feature with [`NO_HOST`].
 
 use crate::document::TabId;
+use crate::reference::BodyId;
 use crate::features::FeatureType;
 use crate::params::{Hints, NumKind, NumSpec, QueryFilter};
 use crate::regen::eval::{EvalCtx, FResult, err};
@@ -183,6 +184,9 @@ pub struct CustomHost {
     /// Evaluates the current feature with std's feature `name` of `module` (e.g. "sheetMetalFlange.fs",
     /// "sheetMetalFlange").
     pub evaluate_std: fn(&mut EvalCtx, &'static str, &'static str) -> FResult<()>,
+    /// Cut active sheet metal parts (`.0`) with tool bodies (`.1`, consumed) as std's Hole does: the tools
+    /// registered on the walls they cut (registerSheetMetalBooleanTools), the rest subtracted (booleanBodies).
+    pub sheet_metal_cut: fn(&mut EvalCtx, &[BodyId], &[BodyId]) -> FResult<()>,
 }
 
 static HOST: OnceLock<CustomHost> = OnceLock::new();
@@ -195,6 +199,14 @@ pub fn set_host(host: CustomHost) {
 /// The registered FeatureScript host, if noshape-custom has registered it.
 pub fn host() -> Option<&'static CustomHost> {
     HOST.get()
+}
+
+/// Cut active sheet metal `parts` with `tools` as std's Hole does (the host's [`CustomHost::sheet_metal_cut`]).
+pub fn sheet_metal_cut(ev: &mut EvalCtx, parts: &[BodyId], tools: &[BodyId]) -> FResult<()> {
+    match host() {
+        Some(h) => (h.sheet_metal_cut)(ev, parts, tools),
+        None => err(NO_HOST),
+    }
 }
 
 /// A feature's error when it needs the FeatureScript host and nothing has registered it.

@@ -19,6 +19,7 @@ pub mod host;
 mod provider;
 pub(crate) mod reference;
 pub mod run;
+mod sm_cut;
 pub mod std_feature;
 pub mod studio;
 pub mod table;
@@ -49,6 +50,7 @@ pub fn register() {
             fallback_provider: || std::sync::Arc::new(provider::Latest),
             evaluate_custom: run::evaluate,
             evaluate_std: std_feature::evaluate,
+            sheet_metal_cut: sm_cut::cut,
         });
     });
 }

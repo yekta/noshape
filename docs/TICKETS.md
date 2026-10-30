@@ -138,12 +138,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   hole was gone. Fixed for Simple holes: the native Hole cuts active sheet metal parts through std's booleanBodies (its
   sheet metal aware Boolean cuts the definition), the rest natively. T2 sheetmetal_std a_hole_survives_a_later_flange
   (part and flat). Counterbore / countersink: SM-CBORE-THEN-FLANGE.
-- [ ] P2 SM-CBORE-THEN-FLANGE (skasm 10-30) a Counterbore / Countersink Hole on an active sheet metal part still runs
+- [x] skasm-cbore P2 SM-CBORE-THEN-FLANGE (skasm 10-30) a Counterbore / Countersink Hole on an active sheet metal part still runs
   natively and a later sheet metal feature rebuilds it away. Cutting the definition by the tool's outline would put the
   head through; live registers such tools on the wall (std registerSheetMetalBooleanTools, cuttingToolBodyIds, which our
   rebuild now cuts), but std's Hole then needs the hole's edges on the definition sheet created by the rebuild
   (qCreatedBy of the boolean) and tracked from the hole tool's faces: our edge names carry no creating op and our
   tracking keeps entity types. Owner skasm.
+  skasm 10-30 fixed: the native Hole hands counterbore / countersink tools to a small internal FeatureScript feature
+  (custom/sm_cut.rs) that calls std's registerSheetMetalBooleanTools (and booleanBodies for tools it declines), as
+  std's Hole does; the rebuild cuts the walls' cuttingToolBodyIds (a form_tools early return skipped them) and the
+  flat loses the through part and draws the head. T2 sheetmetal_std a_counterbore_survives_a_later_flange.
 - [x] d532b13b P1 SM-OLD-DOCS (skasm 10-29 GUI pass) documents saved while sheet metal ran natively lost their sheet
   metal under the std default: qa-scratch/smf.noshape opens with "Flange 1 did not regenerate properly: Select edges to
   flange." and the bare plate (std names the part's faces differently). Fixed: such studios keep the native features

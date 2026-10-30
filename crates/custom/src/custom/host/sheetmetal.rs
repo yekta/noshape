@@ -247,8 +247,7 @@ struct FormTools {
 /// transient id in them with its entity.
 fn form_tools(st: &CtxState, wall: &Value, face: usize, ids: &mut Vec<(Arc<str>, Reference)>) -> Vec<FormTools> {
     let mut out = Vec::new();
-    let Some(items) = wall.get("formedToolBodyIds").as_array() else { return out };
-    for item in items.iter() {
+    for item in wall.get("formedToolBodyIds").as_array().iter().flat_map(|a| a.iter()) {
         let mut body = |v: &Value| -> Option<BodyId> {
             let s = v.as_str()?;
             let r = st.transient_ref(&s)?.clone();
@@ -1403,7 +1402,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             // Forms: the parts to remove cut, then the parts to add united;
             // their faces belong to the wall they sit on.
             let mut form_shapes: Vec<(usize, Vec<Shape>)> = Vec::new();
-            let mut wall_flats = wall_flats;
+            let mut cut_shapes: Vec<(usize, Vec<Shape>)> = Vec::new();
             for ft in &def.forms {
                 let shapes = |ids: &[BodyId]| -> Vec<Shape> { ids.iter().filter_map(|id| ev.ctx.bodies.iter().find(|b| &b.id == id)).map(|b| b.shape.clone()).collect() };
                 let (adds, removes) = (shapes(&ft.add), shapes(&ft.remove));
@@ -1416,11 +1415,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let tools: Vec<Shape> = removes.into_iter().chain(adds).collect();
                 pieces.extend(tools.iter().flat_map(|t| t.faces()).map(|face| Piece { face, from: Def::Face(ft.face) }));
                 if ft.cut {
-                    for (_, flat) in wall_flats.iter_mut().filter(|w| w.0 == ft.face) {
-                        if let Ok(r) = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(flat), &tools, &k::BooleanOptions::default()) {
-                            *flat = r.shape;
-                        }
-                    }
+                    cut_shapes.push((ft.face, tools));
                 } else {
                     form_shapes.push((ft.face, tools));
                 }
@@ -1465,7 +1460,8 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let walls: Vec<(usize, Shape)> = wall_flats.iter().filter(|w| p.members.contains(&w.0)).cloned().collect();
                 let own: Vec<Strip> = strips.iter().filter(|s| p.members.contains(&s.wall_a)).cloned().collect();
                 let own_forms: Vec<(usize, Vec<Shape>)> = form_shapes.iter().filter(|f| p.members.contains(&f.0)).cloned().collect();
-                let flat = flat_of(def, &topo, &walls, &own, &own_forms);
+                let own_cuts: Vec<(usize, Vec<Shape>)> = cut_shapes.iter().filter(|f| p.members.contains(&f.0)).cloned().collect();
+                let flat = flat_of(def, &topo, &walls, &own, &own_forms, &own_cuts);
                 let data = sheet_data(def, &topo, &own, &p, flat.as_ref(), &others);
                 let id = def.previous.get(k).cloned().unwrap_or_else(|| {
                     fresh += 1;
@@ -1727,15 +1723,43 @@ fn wall_faces(topo: &Topo, fi: usize, part_faces: &[Shape], named: &[(usize, cra
 /// definition plane at z = 0, seen from +z; dom/qa5-sm-flat.dxf): walls and
 /// bend strips unfolded, bend lines on the strips' centres, up when the bend
 /// rises toward the viewer.
-fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips: &[Strip], forms: &[(usize, Vec<Shape>)]) -> Option<crate::sheetmetal::FlatPattern> {
+fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips: &[Strip], forms: &[(usize, Vec<Shape>)], cuts: &[(usize, Vec<Shape>)]) -> Option<crate::sheetmetal::FlatPattern> {
     let unfolded = unfold(def, def.k_factor, topo).ok()?;
-    let mut pieces = Vec::new();
-    for (fi, face) in wall_flats {
-        let m = unfolded.walls.get(fi)?;
-        pieces.push(k::transform(face, &k::Transform::Matrix(*m), true).ok()?.shape);
-    }
     let thickness = def.front + def.back;
     let frame = k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
+    let mut pieces = Vec::new();
+    let mut heads = Vec::new();
+    for (fi, face) in wall_flats {
+        let m = unfolded.walls.get(fi)?;
+        let mut face = face.clone();
+        // The wall's cutting tools (a counterbore Hole): the flat loses what
+        // goes through the sheet (the tool's sections at both faces, where
+        // they overlap); a bigger section on one face is the head, drawn as
+        // a circle (live dx 10-27 flat pattern line styles).
+        if let Ok(Some(plane)) = face.face_plane() {
+            let (o, n, x) = (plane.origin, plane.normal.normalize(), plane.x_dir);
+            let eps = 1e-3 * thickness;
+            for tool in cuts.iter().filter(|c| c.0 == *fi).flat_map(|c| c.1.iter()) {
+                let cap = |h: f64| k::section_caps(tool, &k::Plane::new(o + n * h, n, x)).ok().filter(|c| c.count(ShapeType::Face) > 0).and_then(|c| c.translated(-n * h).ok());
+                let (Some(front), Some(back)) = (cap(def.front - eps), cap(-def.back + eps)) else { continue };
+                let Ok(through) = k::boolean(k::BooleanOp::Common, std::slice::from_ref(&front), std::slice::from_ref(&back), &k::BooleanOptions::default()) else { continue };
+                if let Ok(r) = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&face), std::slice::from_ref(&through.shape), &k::BooleanOptions::default()) {
+                    face = r.shape;
+                }
+                let area = |s: &Shape| s.area().unwrap_or(0.0);
+                let (af, ab) = (area(&front), area(&back));
+                if (af - ab).abs() > 1e-3 * af.max(ab) {
+                    let (head, side) = if af > ab { (front, n) } else { (back, -n) };
+                    let Ok(bb) = head.bounding_box(false) else { continue };
+                    let c = m.transform_point3(bb.center());
+                    let size = bb.max - bb.min;
+                    let radius = (size - n * size.dot(n)).abs().max_element() * 0.5;
+                    heads.push(crate::sheetmetal::flat::FlatHead { center: frame.to_local(c), radius, up: m.transform_vector3(side).z > 0.0 });
+                }
+            }
+        }
+        pieces.push(k::transform(&face, &k::Transform::Matrix(*m), true).ok()?.shape);
+    }
     // Forms: their footprint fills the flat, outlined with a center mark (as the native route).
     let mut flat_forms = Vec::new();
     for (fi, tools) in forms {
@@ -1822,6 +1846,7 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
     }
     let mut flat = crate::sheetmetal::flat::flat_from_pieces(frame, &pieces, lines, thickness).ok()?;
     flat.forms = flat_forms;
+    flat.heads = heads;
     Some(flat)
 }
 

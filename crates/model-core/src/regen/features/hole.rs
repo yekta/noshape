@@ -741,11 +741,7 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         // Active sheet metal parts: cut through std's sheet metal aware
         // Boolean, which cuts the model's definition, so the hole lasts
         // through the model's later features (SM-HOLE-THEN-FLANGE).
-        // Simple holes only: the definition is cut by the tool's outline, a
-        // counterbore's head would go through (std registers those as the
-        // wall's cutting tools, which we don't rebuild into the definition yet).
-        let simple = ev.params.is("styleV2", "SIMPLE");
-        let sheet_metal = |id: &BodyId| simple && crate::regen::std_route::std_sheet_metal() && ev.ctx.sheet_metal.get(id).is_some_and(|d| d.active);
+        let sheet_metal = |id: &BodyId| crate::regen::std_route::std_sheet_metal() && ev.ctx.sheet_metal.get(id).is_some_and(|d| d.active);
         let (sm, ids): (Vec<BodyId>, Vec<BodyId>) = ids.into_iter().partition(|id| sheet_metal(id));
         if !sm.is_empty() {
             cut_sheet_metal(ev, &sm, tools.clone())?;
@@ -770,9 +766,11 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     Ok(())
 }
 
-/// Cut active sheet metal parts with hole tools by std's booleanBodies (its
-/// sheetMetalAwareBoolean subtracts the tools' outlines from the model's
-/// definition sheet and rebuilds the parts).
+/// Cut active sheet metal parts with hole tools: a Simple hole by std's
+/// booleanBodies (its sheetMetalAwareBoolean subtracts the tools' outlines
+/// from the model's definition sheet and rebuilds the parts); a counterbore
+/// or countersink as std's Hole (its tools registered on the walls they cut,
+/// which the rebuild cuts: the definition cut would put the head through).
 fn cut_sheet_metal(ev: &mut EvalCtx, parts: &[BodyId], tools: Vec<NamedShape>) -> FResult<()> {
     let first = 30_000 + ev.ctx.bodies.iter().filter(|b| b.id.feature == ev.feature).count() as u32;
     let mut tool_ids = Vec::new();
@@ -780,6 +778,9 @@ fn cut_sheet_metal(ev: &mut EvalCtx, parts: &[BodyId], tools: Vec<NamedShape>) -
         let id = BodyId { feature: ev.feature, index: first + k as u32 };
         crate::regen::features::helpers_a::push_body(ev, id.clone(), crate::display::BodyKind::Solid, t.shape, t.names.faces);
         tool_ids.push(id);
+    }
+    if !ev.params.is("styleV2", "SIMPLE") {
+        return crate::regen::custom_features::sheet_metal_cut(ev, parts, &tool_ids).map_err(|_| fe("Hole creates invalid geometry."));
     }
     let mut p = crate::params::ParamValues::default();
     p.set("operationType", crate::params::ParamValue::Enum("SUBTRACTION".into()));

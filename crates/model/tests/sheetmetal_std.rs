@@ -798,3 +798,53 @@ fn tab_beside_the_plate_as_live() {
         }
     }
 }
+
+/// SM-CBORE-THEN-FLANGE: a counterbore Hole (Ø4 through, Ø8 × 1 from the
+/// top) on an active sheet metal part stays when a later Flange rebuilds
+/// it (its tool registered on the wall, as std's Hole does); the flat shows
+/// the through hole and the head (live dx 10-27 flat pattern line styles).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_counterbore_survives_a_later_flange() {
+    let mut s = plate("2 mm");
+    let r = s.ok();
+    let body = r.context.bodies[part(&r)].id.clone();
+    let plane = s.add("cPlane", |pv| {
+        pv.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("offset", expr("2 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(glam::DVec2::new(mm(30.0), mm(20.0)));
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::FeaturePlane(plane)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.ok();
+    s.add("hole", |h| {
+        h.set("scope", ParamValue::Query(vec![Reference::Body(body)]));
+        h.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: p.0 }]));
+        h.set("unitsSystem", en("METRIC"));
+        h.set("styleV2", en("C_BORE"));
+        h.set("endStyleV2", en("THROUGH"));
+        h.set("holeDiameterV3", expr("4 mm"));
+        h.set("cBoreDiameterV3", expr("8 mm"));
+        h.set("cBoreDepthV3", expr("1 mm"));
+    });
+    let r = s.ok();
+    let pi = std::f64::consts::PI;
+    let cut = pi * 4.0 * 1.0 + pi * 16.0 * 1.0;
+    let bodies: Vec<String> = r.context.bodies.iter().map(|b| format!("{:?} {:?} {:.3}", b.id, b.kind, b.shape.volume().unwrap_or(0.0) * 1e9)).collect();
+    assert!((volume_mm3(&r) - (4800.0 - cut)).abs() < 1e-3, "after the hole {} mm³: {bodies:#?} {:?} {:?}", volume_mm3(&r), r.display.features.last().map(|f| (f.status, f.message.clone())), s.ps.features.last().and_then(|f| noshape_model::custom::run::output_of(f.id)).map(|o| o.notices));
+    let edge = edge_at(&r, DVec3::new(10.0, 0.0, 2.0));
+    s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(vec![edge]));
+        p.set("distance", expr("20 mm"));
+    });
+    let r = s.ok();
+    let radii: Vec<f64> = r.context.bodies[part(&r)].shape.faces().iter().filter_map(|f| match f.face_surface() { Ok(noshape_kernel::Surface::Cylinder { radius, .. }) if radius < 5e-3 => Some(radius * 1e3), _ => None }).collect();
+    assert!(radii.iter().any(|r| (r - 2.0).abs() < 1e-6) && radii.iter().any(|r| (r - 4.0).abs() < 1e-6), "the counterbore after the flange: {radii:?} {:#?}", face_report(&r));
+    let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
+    assert_eq!(flat.loops.len(), 2, "outline and the through hole");
+    assert_eq!(flat.heads.len(), 1, "{:?}", flat.heads);
+    assert!((flat.heads[0].radius - 4e-3).abs() < 1e-6, "{:?}", flat.heads);
+}
