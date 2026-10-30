@@ -434,6 +434,10 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
    77.7–84.5 (done_ms mean 30–32 → 22, nosil 17); macOS 15 r 55.7, cull 62.0–65.5, nosil 74.7–82.4. On by default
    since 10-30 00:40 (NOSHAPE_SIL_CULL=0 turns it off). The gap to nosil is the cull's own per-candidate work:
    next, fewer candidates (per-face normal cones / screen-space bounds to skip whole faces) or a cheaper test.
+   The cull reads 56 bytes a candidate (bandwidth-bound at millions of candidates): a packed cull-only copy (oct
+   normals + position, ~20 bytes) would cut that. Beyond silhouettes, the frame without any (nosil) is still
+   ~17 ms GPU at 2× (faces at 4× MSAA, AO, edges): 120 fps needs that halved too; measure with the existing
+   NOSHAPE_PERF_SKIP variants (ao, meshes) the same way (done_ms within one job).
 0f. (done 10-28: no gain, see above) Retina orbit, experiment for 0c: line segments are instances of 6 vertices (`draw(slots*6, 0..count)`),
    which packs Apple GPUs' vertex SIMD groups badly; pull segments from a storage buffer by vertex_index / 6 with
    the slot as the instance (one instance per copy) and measure with perf.yml.
