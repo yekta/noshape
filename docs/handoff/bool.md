@@ -726,6 +726,35 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   argument's ellipse on another's face"; its pieces in the face go in now as on a plane: main 772 (+3, 7–12× OCCT),
   the rest unchanged, 0 differ.
 
+## The knurl, first attempt: not landed (10-30 18:30 UTC)
+- The B94.6 diamond knurl's one cut (148 helical grooves, two TShapes at 148 locations) through the generic Rust
+  Boolean, on branch bool-knurl (2 commits, 40f006ee + 40a5d849 in /root/bool-scratch/dev4): OCCT's sections made once
+  per placement (a pair of faces keyed by TShapes and relative location), faces apart by their Bézier pieces skipped,
+  coincident B-spline edges of two arguments, a pattern's end caps on the object's face, and classification,
+  crossings, splits and sections' places on all threads. Replays all 0 differ with it; the recorded knurl
+  (d14b48a8, /root/bool-scratch/knurl-corpus) is taken in the replay (same faces, every history record; volume
+  3.3e-8 off from the sections' approximations, ~1.4e-15 m³ per groove crossing).
+- Not landed: in core's model test (the live feature) it declines "a non-manifold result" after ~100–300 s, then
+  OCCT runs: GitHub runners 170–200 s against today's 135 s (Linux) / 81 s (macOS). The result tips on rounding at
+  one near-degenerate crossing family (grooves grazing at the bottom plane): with OCCT's section computed per pair
+  (not moved from the first of each placement) the same happens in the replay. Generic pairwise sectioning is the
+  wrong shape for this case (lead 17:45).
+- Baselines, GitHub runners, main 99729fe4: diamond 135.1 s +4.1 GB (Linux), 81.1 s (macOS); straight 0.7 / 0.6 s;
+  vibe3 idle (lead): 137.6 s, 4.3 GB; live 49 s.
+- Next (lead 17:45 / 18:00, binding: geometry only, nothing keyed on a feature or test): (1) a stage profile of the
+  137 s through perf.sh (OCCT's progress scopes timed: sections, splitting, classification, building, history);
+  (2) a pattern test set (T1/T2, against OCCT): circular patterns of holes / slots on a cylinder and a plate, linear
+  pockets, gear-like teeth, the 400-fin plate, a helical pattern, the knurl, timed with perf.sh before / after;
+  (3) tools that are exact rigid copies of each other (rotation about an axis, translation, both; found by comparing
+  geometry under the transform within tolerance) solved once per period and the result's faces / edges moved into
+  the other periods and sewn at the period boundaries, history per copy; anything not proven (copies not lining up,
+  tools across period boundaries the sewing can't prove) the normal path; (4) exact sections where they exist (a
+  helix-swept line against a cylinder or another such face).
+- Also from this work, for core: with `unify` on, a Boolean's history records come out in a different order run to
+  run (same records, same shape), the unify history's composition iterating something keyed by addresses (seen on
+  the knurl's 2-groove piece; OCCT's path goes through the same code). core's `boolean_budget` test builds a 16-groove
+  knurl to exhaust OCCT's 64 MB budget; noshape's Boolean takes that one (branch bool-knurl sets it to OCCT's path).
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|
