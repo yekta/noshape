@@ -769,6 +769,12 @@ fn assembly_views_and_exploded_views() {
     assert!(!g1.edges.is_empty());
     let size = |g: &views::ViewGeometry| (g.max[0] - g.min[0]).max(g.max[1] - g.min[1]);
     assert!(size(&g2) > size(&g1) * 1.2, "exploded {} vs {}", size(&g2), size(&g1));
+    // The exploded view draws its explode lines, in Exploded lines' colour
+    // (drawing.md S30); the plain one none.
+    assert!(g1.explode_lines.is_empty() && !g2.explode_lines.is_empty(), "{:?}", g2.explode_lines);
+    drawing.props.view_tab.exploded_color = Some([200, 10, 10]);
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(built.geometry.colors.iter().any(|c| c.rgb == [200, 10, 10] && !c.lines.is_empty()));
     // Dimensions in assembly views resolve against occurrence bodies.
     let snap = g1.snaps.iter().find(|s| s.point.is_some()).unwrap();
     let src = &sources[&SourceKey::studio(asm)];

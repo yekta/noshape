@@ -115,6 +115,8 @@ pub struct SourceModel {
     /// Part Studios: their sketches' appearances (Edit sketch appearance…),
     /// sRGB, drawn by views with Show sketch appearances.
     pub sketch_colors: Vec<(crate::FeatureId, [u8; 3])>,
+    /// Assemblies shown exploded: the explode lines (model space).
+    pub explode_trails: Vec<(DVec3, DVec3)>,
 }
 
 /// One row of a Structured BOM.
@@ -332,7 +334,7 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
                     _ => None,
                 })
                 .collect();
-            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![], bom_structured: vec![], model_annotations: ps.annotations.clone(), own: None, sketch_colors })
+            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![], bom_structured: vec![], model_annotations: ps.annotations.clone(), own: None, sketch_colors, explode_trails: Vec::new() })
         }
         TabContent::Assembly(asm) => {
             // A named position: its placements and mate values; a display
@@ -426,7 +428,7 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
             row.name = r.name.clone();
         }
     }
-    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new(), model_annotations: Vec::new(), own: None, sketch_colors: Vec::new() }
+    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new(), model_annotations: Vec::new(), own: None, sketch_colors: Vec::new(), explode_trails: result.explode_trails.clone() }
 }
 
 /// Regenerate every source a drawing references (headless helper for
@@ -940,6 +942,8 @@ pub struct ViewGeometry {
     pub clip_poly: Option<Vec<[f64; 2]>>,
     /// Center of mass (view coordinates) when shown.
     pub com: Option<[f64; 2]>,
+    /// An exploded assembly view's explode lines (view coordinates).
+    pub explode_lines: Vec<[[f64; 2]; 2]>,
     /// Flat pattern views: bend lines and form centermarks.
     pub bends: Vec<FlatBend>,
     /// Cosmetic threads of tapped holes seen end-on: center and major
@@ -1811,6 +1815,13 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
             g.com = Some(p);
             g.snaps.push(Snap { p, kind: SnapKind::Vertex, point: None });
         }
+    }
+    // An exploded view's explode lines (Drawing properties › Views ›
+    // Exploded lines styles them).
+    if !matches!(v.kind, ViewKind::Detail { .. })
+        && let Some(src) = sources.get(&skey)
+    {
+        g.explode_lines = src.explode_trails.iter().map(|(a, b)| [frame.project(*a), frame.project(*b)]).collect();
     }
     // Cosmetic threads: tapped holes whose entrance (or exit, through)
     // faces the viewer; holes seen from the side are inside the material.

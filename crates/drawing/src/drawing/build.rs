@@ -1771,6 +1771,20 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 g.pens.push(super::sheet::PenSpan { centered: false, lines, width_mm: vt.thread_line.thickness, dashes: st.dashes().iter().map(|d| d * vt.thread_dashes.max(0.01)).collect() });
             }
             color_lines_since(&mut g, thread_mark, vt.thread_line.color);
+            // Explode lines of an exploded assembly view: dashed, with
+            // Drawing properties › Views › Exploded lines' thickness, dashes
+            // and colour (drawing.md S30).
+            let explode_mark = g.mark();
+            for [a, b] in &geo.explode_lines {
+                for piece in map_polyline(&pl, &[*a, *b]) {
+                    g.lines.push(Polyline2 { points: piece, style: LineStyle::Hidden, closed: false, pick: view_pick });
+                }
+            }
+            if g.lines.len() > explode_mark.0 {
+                let lines = explode_mark.0..g.lines.len();
+                g.pens.push(super::sheet::PenSpan { centered: false, lines, width_mm: vt.exploded_thickness, dashes: LineStyle::Hidden.dashes().iter().map(|d| d * vt.exploded_dashes.max(0.01)).collect() });
+            }
+            color_lines_since(&mut g, explode_mark, vt.exploded_color);
             // Flat pattern views › Form centermarks: style and colour.
             let form_mark = g.mark();
             let form_style = match vt.form_centermark_line {
