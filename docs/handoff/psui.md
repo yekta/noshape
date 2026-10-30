@@ -453,4 +453,8 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- (FYI 10-30 00:50, no reply needed) 6ca3c756 turns the edge-silhouette GPU cull on by default (compute pass +
+  indirect draw; macOS 14/15 NIST orbit at 2× +20–35 % fps). If the release smoke shows missing or extra outline
+  lines on curved faces, `NOSHAPE_SIL_CULL=0` restores the old path; Linux (GPUI's shared device, 4 storage
+  buffers) keeps the old path anyway.
 (none; 4e55b01f is in v0.4.10)
