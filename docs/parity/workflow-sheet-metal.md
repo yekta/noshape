@@ -16,6 +16,7 @@ numbers), ◐ = partly, ✗ = differs, — = no live data.
 
 | Row | Now | Status | Verified by |
 |---|---|---|---|
+| qa check 14:25 | green bde22a89 / 84a12216 on qa-scratch/smf.noshape and smdocs (bin/smgen.py): **1.6** relief Minimal gap 0.02, Simple, Obround - Scaled, depth 2, width **1.063** ✅; **2.6** G34 flanges 8511.499 mm³ ✅; **6.1** tooltip "Sheet metal table and flat view" ✅; **6.2** panel (context ▾, Bends #/Name/Radius/Angle/Bend direction/K, Other joints) ✅; **6.3** Up ✅; **6.4** "#" click selects the row and lights the bend in 3D and flat (our orange selection colour; live "yellow") ✅; **6.6** flat menu ◐ (no Copy Flat pattern), export dialog + DXF ✅; **6.7** part / edge menu has no flat items ✅; cut / Simple hole / counterbore then Flange keep the hole (6888.407 / 6988.938 / 6938.673 mm³) ✅. Not re-walked: 3.x Hem, 4.x Tab, 5.x Bend relief / Corner dialogs (their T2s cover the numbers). | | qa |
 | 1.1 sketch, D 60 / D 40 | fully defined | ✅ | GUI 10-29 |
 | 1.2 Sheet metal ▾ | 15 items with the Flex PCB pair (SM12) | ✅ | GUI 10-29 |
 | 1.3 dialog on open | as live's screenshot, slider too | ✅ | GUI 10-29 |
