@@ -276,8 +276,14 @@ fn circle_sketch(s: &mut Studio, r_mm: f64) -> FeatureId {
 
 /// Form tool studio: a tube boss, radii 4 to 5, 3 mm high, rooted through
 /// the 2 mm sheet (added; std Form registers only tools that intersect the
-/// sheet), over a hole of radius 4 through the sheet (removed), tagged as a form.
+/// sheet), over a hole of radius 4 through the sheet (removed), tagged as a
+/// form; `flat`: with a flat sketch on Top (the Tag's flatFormSketch): the
+/// hole's circle (a tear) and a construction circle r 6 (an outline).
 fn form_studio(tag: bool) -> std::sync::Arc<noshape_model::regen::context::Context> {
+    form_studio_with(tag, false)
+}
+
+fn form_studio_with(tag: bool, flat: bool) -> std::sync::Arc<noshape_model::regen::context::Context> {
     let mut s = Studio::new();
     let mut sk = noshape_sketch::Sketch::new();
     sk.add_circle(DVec2::ZERO, mm(5.0));
@@ -304,15 +310,56 @@ fn form_studio(tag: bool) -> std::sync::Arc<noshape_model::regen::context::Conte
     });
     let r = s.ok();
     assert_eq!(r.context.bodies.len(), 2);
+    let profile = flat.then(|| {
+        let mut sk = noshape_sketch::Sketch::new();
+        sk.add_circle(DVec2::ZERO, mm(4.0));
+        let outline = sk.add_circle(DVec2::ZERO, mm(6.0));
+        sk.set_construction(outline, true).unwrap();
+        s.sketch(Reference::Plane(DatumPlane::Top), sk)
+    });
     if tag {
         let (add, rem) = (r.context.bodies[0].id.clone(), r.context.bodies[1].id.clone());
         s.add("tag", move |p| {
             p.set("tagPurpose", en("FORM"));
             p.set("positivePart", q(Reference::Body(add)));
             p.set("negativePart", q(Reference::Body(rem)));
+            if let Some(f) = profile {
+                p.set("flatFormSketch", q(Reference::Sketch(f)));
+            }
         });
     }
     s.ok().context
+}
+
+/// A form studio's own flat sketch (the Tag's "Sketch for flat view"): the
+/// flat shows only it, its geometry a tear, its construction an outline,
+/// centred on the form's point (live 1623's rule, on a user's studio).
+#[test]
+fn a_form_studios_flat_sketch_is_its_flat() {
+    let mut s = plate();
+    s.opts.derived = Some(std::sync::Arc::new(Tabs([("form".to_string(), form_studio_with(true, true))].into_iter().collect())));
+    let mut sk = noshape_sketch::Sketch::new();
+    let p1 = sk.add_point(DVec2::new(mm(30.0), mm(20.0)));
+    let pl = s.add("cPlane", |p| {
+        p.set("entities", q(Reference::Plane(DatumPlane::Top)));
+        p.set("offset", expr("2 mm"));
+    });
+    let sid = s.sketch(Reference::FeaturePlane(pl), sk);
+    let top = face_at(&s.ok(), 0, DVec3::new(mm(50.0), mm(20.0), mm(2.0)));
+    s.add("sheetMetalFormed", move |p| {
+        p.set("formPartStudio", ParamValue::Text("form".into()));
+        p.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch: sid, entity: p1.0 }]));
+        p.set("targetFaces", q(top));
+    });
+    let r = s.ok();
+    let fp = flat(&r, 0);
+    assert_eq!(fp.forms.len(), 1);
+    let f = &fp.forms[0];
+    let radius = |tear: bool| f.curves.iter().filter(|c| c.1 == tear).flat_map(|c| c.0.iter().map(|p| (*p - f.center).length())).fold(0.0, f64::max);
+    assert!(f.loops.is_empty() && near(radius(true), mm(4.0), 1e-6) && near(radius(false), mm(6.0), 1e-6), "loops {}, tear r {}, outline r {}", f.loops.len(), radius(true), radius(false));
+    // The form's sketch isn't shown in the Part Studio.
+    let form_sketches: Vec<_> = r.display.sketches.iter().filter(|x| r.context.hidden_sketches.contains(&x.feature)).collect();
+    assert!(!form_sketches.is_empty() && form_sketches.iter().all(|x| x.hidden), "{} form sketches", form_sketches.len());
 }
 
 #[test]
