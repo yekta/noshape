@@ -113,6 +113,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Live answered the derived colour question: the target's next default colour unless the source part's appearance is
   explicit (then carried); ours now does both.
 
+## Afternoon 10-30 (landed through b76761b6, 16:49 UTC)
+- From live 1613: TB5 grid-line drags (the fixed-corner side's row / column, the table grows) ✅; EX18 image menu
+  (Image properties..., Switch to <tab>), a deleted image tab marks the drawing out of date and Update drops the image
+  with "Failed to resolve image target tab"; menu coverage got "drawing:Image properties...".
+- C6 was stale (leader ends re-attach by grip) ✅; V35 dragging a break line moves the break (related views open:
+  breaks are per view). TB27 cut list per composite part (compile-checked only).
+- Use tools/tiers/perf.sh (vibe3) for any speed numbers from now on.
+
 ## Morning 10-30 (lead 07:05 order; landed through fe843162, 08:42 UTC)
 - BOM after import (IM1b): not a gap: live's "BOM : <assembly>" element is hidden BOM data, never a tab; our imported
   assembly's BOM has live's names and quantities (matrix row).
