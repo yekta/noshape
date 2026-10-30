@@ -689,12 +689,11 @@ fn a_cut_survives_a_later_flange() {
 /// A Hole through an active sheet metal part stays when a later Flange
 /// rebuilds it (std hole.fs: handleSheetMetalCutAndAttribution registers the
 /// hole tools on the wall, cuttingToolBodyIds, for the rebuild to cut).
-/// Ours: the Hole runs natively and the Flange rebuilds it away. By std it
-/// stops at HOLE_NO_HITS: std then looks for the hole's circular edges on the
-/// definition sheet, made by the rebuild (our rebuild cuts only the part), and
-/// tracks the hole tool's faces into them (our tracking keeps entity types).
+/// Ours: the native Hole cuts active sheet metal parts through std's
+/// booleanBodies (its sheet metal aware Boolean cuts the definition), so the
+/// hole lasts.
 #[test]
-#[ignore = "in progress (fs): the hole is lost after a later Flange (SM-HOLE-THEN-FLANGE)"]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn a_hole_survives_a_later_flange() {
     let mut s = plate("2 mm");
     let r = s.ok();
@@ -726,4 +725,6 @@ fn a_hole_survives_a_later_flange() {
     let r = s.ok();
     let cylinders = r.context.bodies[part(&r)].shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { radius, .. }) if (radius - 3e-3).abs() < 1e-9)).count();
     assert_eq!(cylinders, 1, "the hole after the flange: {:#?}", face_report(&r));
+    let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
+    assert_eq!(flat.loops.len(), 2, "the hole in the flat too");
 }

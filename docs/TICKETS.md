@@ -131,11 +131,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   part run by std (its sheetMetalAwareBoolean cuts the definition sheet: host @opCreateOutline added; the rebuild
   cuts walls' holes through the part and the flat); Add gives std's "Only Remove can be used with sheet metal…".
   T2 sheetmetal_std a_cut_survives_a_later_flange.
-- [ ] P1 SM-HOLE-THEN-FLANGE (skasm 10-30) the same for a Hole: plate, Hole Ø6 through, then a Flange → the hole is gone
-  (the Hole still runs natively). By std (hole.fs handleSheetMetalCutAndAttribution, the hole tools registered on the
-  wall as cuttingToolBodyIds, which the rebuild now cuts) it stops at HOLE_NO_HITS: std looks for the hole's circular
-  edges on the definition sheet made by the rebuild, tracked from the hole tool's faces; our rebuild cuts only the part
-  and our tracking keeps entity types. T2 sheetmetal_std a_hole_survives_a_later_flange (ignored, in progress). Owner skasm.
+- [x] skasm-hole P1 SM-HOLE-THEN-FLANGE (skasm 10-30) the same for a Hole: plate, Hole Ø6 through, then a Flange → the
+  hole was gone. Fixed for Simple holes: the native Hole cuts active sheet metal parts through std's booleanBodies (its
+  sheet metal aware Boolean cuts the definition), the rest natively. T2 sheetmetal_std a_hole_survives_a_later_flange
+  (part and flat). Counterbore / countersink: SM-CBORE-THEN-FLANGE.
+- [ ] P2 SM-CBORE-THEN-FLANGE (skasm 10-30) a Counterbore / Countersink Hole on an active sheet metal part still runs
+  natively and a later sheet metal feature rebuilds it away. Cutting the definition by the tool's outline would put the
+  head through; live registers such tools on the wall (std registerSheetMetalBooleanTools, cuttingToolBodyIds, which our
+  rebuild now cuts), but std's Hole then needs the hole's edges on the definition sheet created by the rebuild
+  (qCreatedBy of the boolean) and tracked from the hole tool's faces: our edge names carry no creating op and our
+  tracking keeps entity types. Owner skasm.
 - [x] d532b13b P1 SM-OLD-DOCS (skasm 10-29 GUI pass) documents saved while sheet metal ran natively lost their sheet
   metal under the std default: qa-scratch/smf.noshape opens with "Flange 1 did not regenerate properly: Select edges to
   flange." and the bare plate (std names the part's faces differently). Fixed: such studios keep the native features

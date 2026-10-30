@@ -107,6 +107,12 @@ sheet_metal_aware! {
     sm_loft => "loft", crate::regen::features::solid_a::loft, "loft.fs", "loft";
 }
 
+/// Sheet metal runs by std in this regeneration (on, not a legacy studio, the
+/// FeatureScript host registered).
+pub fn std_sheet_metal() -> bool {
+    STD_SHEET_METAL.load(std::sync::atomic::Ordering::Relaxed) && !LEGACY_SHEET_METAL.get() && crate::regen::custom_features::host().is_some()
+}
+
 /// The feature's boolean (Add / Remove / Intersect) reaches an active sheet
 /// metal part: std's sheetMetalAwareBoolean then cuts the model's
 /// definition sheet, so the cut lasts through the model's later features (a

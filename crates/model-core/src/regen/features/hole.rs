@@ -738,6 +738,18 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     for (ids, tools) in groups {
+        // Active sheet metal parts: cut through std's sheet metal aware
+        // Boolean, which cuts the model's definition, so the hole lasts
+        // through the model's later features (SM-HOLE-THEN-FLANGE).
+        // Simple holes only: the definition is cut by the tool's outline, a
+        // counterbore's head would go through (std registers those as the
+        // wall's cutting tools, which we don't rebuild into the definition yet).
+        let simple = ev.params.is("styleV2", "SIMPLE");
+        let sheet_metal = |id: &BodyId| simple && crate::regen::std_route::std_sheet_metal() && ev.ctx.sheet_metal.get(id).is_some_and(|d| d.active);
+        let (sm, ids): (Vec<BodyId>, Vec<BodyId>) = ids.into_iter().partition(|id| sheet_metal(id));
+        if !sm.is_empty() {
+            cut_sheet_metal(ev, &sm, tools.clone())?;
+        }
         let targets: Vec<usize> = ids.iter().filter_map(|id| index_of_body(ev, id)).collect();
         if targets.is_empty() {
             continue;
@@ -755,6 +767,32 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         let v = if locs.len() > 1 { ComputedValue::Text("Multiple".into()) } else { ComputedValue::Length(h) };
         ev.computed.push(("holeDepthComputedV3".into(), v));
     }
+    Ok(())
+}
+
+/// Cut active sheet metal parts with hole tools by std's booleanBodies (its
+/// sheetMetalAwareBoolean subtracts the tools' outlines from the model's
+/// definition sheet and rebuilds the parts).
+fn cut_sheet_metal(ev: &mut EvalCtx, parts: &[BodyId], tools: Vec<NamedShape>) -> FResult<()> {
+    let first = 30_000 + ev.ctx.bodies.iter().filter(|b| b.id.feature == ev.feature).count() as u32;
+    let mut tool_ids = Vec::new();
+    for (k, t) in tools.into_iter().enumerate() {
+        let id = BodyId { feature: ev.feature, index: first + k as u32 };
+        crate::regen::features::helpers_a::push_body(ev, id.clone(), crate::display::BodyKind::Solid, t.shape, t.names.faces);
+        tool_ids.push(id);
+    }
+    let mut p = crate::params::ParamValues::default();
+    p.set("operationType", crate::params::ParamValue::Enum("SUBTRACTION".into()));
+    p.set("tools", crate::params::ParamValue::Query(tool_ids.into_iter().map(Reference::Body).collect()));
+    p.set("targets", crate::params::ParamValue::Query(parts.iter().cloned().map(Reference::Body).collect()));
+    p.set("keepTools", crate::params::ParamValue::Bool(false));
+    let mut sub = EvalCtx::new(ev.feature, ev.name, &p, ev.units, ev.ctx.clone(), ev.outer_vars);
+    sub.cancel = ev.cancel.clone();
+    let res = crate::regen::custom_features::evaluate_std(&mut sub, "boolean.fs", "booleanBodies");
+    ev.warnings.extend(sub.warnings);
+    ev.infos.extend(sub.infos);
+    res.map_err(|_| fe("Hole creates invalid geometry."))?;
+    ev.ctx = sub.ctx;
     Ok(())
 }
 

@@ -130,7 +130,8 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   its splines / z-height / tangent / counterbore / form / sketch checkboxes don't change the file yet.
 - Cuts on sheet metal (10-30): Extrude / Revolve / Sweep / Loft adding to or cutting an active sheet metal part run by
   std (`std_route::SHEET_METAL_AWARE`), so the cut goes into the definition and lasts (host @opCreateOutline, planar
-  faces; the rebuild cuts each wall's inner loops). Open P1 SM-HOLE-THEN-FLANGE (see TICKETS): Hole still native.
+  faces; the rebuild cuts each wall's inner loops). Simple Holes on active sheet metal cut through std's booleanBodies
+  from the native Hole (hole.rs `cut_sheet_metal`); counterbores / countersinks: open P2 SM-CBORE-THEN-FLANGE.
 - Done 10-30: partial Outer flange (opEdgeChange steps a moved piece of an edge off its collinear neighbours and keeps
   the edges' names; the relief reaches its depth past a moved-in bend edge; request 1599 (a): 6027.5617 / 6204.5617
   exact); SM-FACES passes on std (3211.3274 mm³, 14 faces).
