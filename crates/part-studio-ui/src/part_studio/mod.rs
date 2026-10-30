@@ -591,6 +591,7 @@ impl PartStudioView {
         // coalesces a background window's timers, which made undo 200–360 ms on the perf runners (COMMIT-LATENCY).
         let burst = self.last_regen_request.is_some_and(|t| t.elapsed() < Duration::from_millis(100));
         self.last_regen_request = Some(std::time::Instant::now());
+        let asked = std::time::Instant::now();
         self.regen_task = Some(cx.spawn_in(window, async move |this, cx| {
             if burst {
                 cx.background_executor().timer(Duration::from_millis(12)).await;
@@ -598,7 +599,14 @@ impl PartStudioView {
             let result = cx
                 .background_spawn(async move {
                     let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, relative_deflection: deflection, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), ..Default::default() };
-                    let r = regen.lock().regenerate(&studio, &config, &units, &opts);
+                    // Where a slow round trip waits (COMMIT-LATENCY): the background thread starting, the regenerator's lock.
+                    let started = asked.elapsed();
+                    let mut regen = regen.lock();
+                    if noshape_render::perf::enabled() {
+                        log::info!(target: "perf", "regen #{seq}: started {:.1} ms after asked, lock {:.1} ms", started.as_secs_f64() * 1e3, (asked.elapsed() - started).as_secs_f64() * 1e3);
+                    }
+                    let r = regen.regenerate(&studio, &config, &units, &opts);
+                    drop(regen);
                     (r, studio, config, units, upto, editing_sketch, doc_vars)
                 })
                 .await;
