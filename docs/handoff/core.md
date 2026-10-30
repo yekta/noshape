@@ -567,7 +567,9 @@ with 0003b and 0004 on Linux, macOS and Windows.
    one MakeThickSolidBySimple per tangent-connected chain of faces (no side faces between G1 neighbours), or analytic
    fans for small blends as blend_sector does for collapsing ones. Dumped inputs: /root/core-scratch/hang402/dumps
    (fuse85.brep: the slabs then the solid, metres). Probe: the G1 chain of one corner patch is 13 faces (planes, fillets,
-   the patches); MakeThickSolidBySimple of that shell builds in 0.02 s, valid (one sign): a redesign of by_slabs, not done. Perf documents unchanged (live-30,
+   the patches); MakeThickSolidBySimple of that shell builds in 0.02 s, valid (one sign). 14:40, tried on the whole of Shell 5 (probe /root/core-scratch/i1/chains.cpp,
+   dumps/fuse85_-0.005000.brep = slabs, solid, removed faces): 25 chains, 2 s of offsets, but their fuse still takes
+   22 s and two chains give no slab, so chains are no fix; the corner patches' fans themselves are the cost. Perf documents unchanged (live-30,
    fins-400, big-plate). Scaling every OCCT Boolean of 9+ tools was 25 % slower over the corpus with 7 of 974
    changed: kept to cuts by 64+ tools and quick_boolean.
 3. Other `a.Plane().Axis().Direction()` readers of a face's normal in the kernel: features.cpp and shell.cpp
