@@ -33,7 +33,7 @@ numbers), ◐ = partly, ✗ = differs, — = no live data.
 | 3.2 Hem result | 9378.1835 / 33 | ✅ | T2 hem_on_g34_matches_live |
 | 4.1 Tab dialog | fields as live | ✅ | GUI 10-30 |
 | 4.2 Tab (SM2, SM16) | merges; auto-fills merge face and 0.02 mm (field shows it since 10-30) | ✅ | GUI 10-30, T2 tab_merges_into_the_top_face, tab_editing_logic…, UI test a_value_set_by_editing_logic… |
-| 4.3 bottom face as merge | — (only shows the old native rule) | — | |
+| 4.3 bottom face as merge | OK, 8911.4987 mm³, 28 faces, as live (request 1614 (a)) | ✅ | T2 tab_merges_into_the_bottom_face |
 | 5.1 Bend relief dialog | Obround - Sized, 5 mm, ☐ Extend | ✅ | GUI 10-30 |
 | 5.2 bend end vertex (SM7) | "Selection is not a bend relief." | ✅ | GUI 10-30 |
 | 5.3 Corner dialog (SM8 withdrawn) | Square - Sized, 5 mm | ✅ | GUI 10-30 |
@@ -45,7 +45,7 @@ numbers), ◐ = partly, ✗ = differs, — = no live data.
 | 5.9 select tooltip (SM11) | none while open | ✅ | GUI 10-28 |
 | 6.1 strip button | "Sheet metal table and flat view" | ✅ | GUI 10-30 |
 | 6.2 panel (SM4) | live's design | ✅ | GUI 10-30 |
-| 6.2 row names | letters in the order the joints' definition edges appeared (live request 1604): an edge is renewed when its ends move or a face beside it is cut down or gains a wall (a face that only grows, a Tab merged in, keeps it); renewals in place come before moved and new edges. Live's (a)/(b)/(c) cases and qa5 (Flange, Hem, Tab, Corner: Joint A, Bend B (x = 0), Bend C (y = 0), Hem D) exact | ✅ | T2 joint_births_follow_live_letters, qa5_letters_follow_live |
+| 6.2 row names | letters in the order the joints' definition edges appeared (live request 1604): an edge is renewed when its ends move or a face beside it is cut down or gains a wall (a face that only grows, a Tab merged in, keeps it); renewals in place come before moved and new edges. Live's (a)/(b)/(c) cases, the Hem alone (request 1614 (b)) and qa5 (Flange, Hem, Tab, Corner: Joint A, Bend B (x = 0), Bend C (y = 0), Hem D) exact | ✅ | T2 joint_births_follow_live_letters, qa5_letters_follow_live |
 | 6.3 Up (SM5) | Up | ✅ | GUI 10-30 |
 | 6.4 row click | row selected, bend lit in 3D and flat | ✅ | GUI 10-30 |
 | 6.5 flat (SM6, SM17) | reliefs, live placement and size | ✅ | GUI 10-30, T2 flat_pattern_keeps_the_model_placement |

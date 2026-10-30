@@ -173,10 +173,41 @@ fn face_at(r: &RegenResult, p: DVec3) -> Reference {
     panic!("no face at {p:?}");
 }
 
+/// Live request 1614 (a): the same Tab merged into the plate's bottom face
+/// (z = 0, coplanar with the sketch) is accepted too: 8911.4987 mm³, 28
+/// faces (row 4.3).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn tab_merges_into_the_bottom_face() {
+    let mut s = g34();
+    let r = s.ok();
+    let bottom = face_at(&r, DVec3::new(30.0, 20.0, 0.0));
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(20.0, 40.0), (40.0, 40.0), (40.0, 50.0), (20.0, 50.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    for i in 0..4 {
+        sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
+    }
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
+    let key = sk.regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).expect("region").key.clone();
+    s.add("sheetMetalTab", |p| {
+        p.set("tabFaces", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        p.set("booleanUnionScope", ParamValue::Query(vec![bottom]));
+    });
+    let r = s.ok();
+    let faces = r.context.bodies[part(&r)].shape.faces().len();
+    assert!((volume_mm3(&r) - 8911.4987).abs() < 1e-3 && faces == 28, "{} mm³, {faces} faces: {:#?}", volume_mm3(&r), face_report(&r));
+}
+
 /// Live request 1604, qa5: one Flange (y = 0, x = 0), a Hem on x = 60, a Tab
 /// merged into the plate, a Corner at (2, 2, 2): Joint A (the rip, its edge
 /// untouched since the Flange), Bend B (x = 0), Bend C (y = 0), Hem D (the
-/// Hem rebuilt the plate, so its edges, then made its own).
+/// Hem rebuilt the plate, so its edges, then made its own; the same after
+/// the Hem alone, request 1614).
 #[test]
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn qa5_letters_follow_live() {
@@ -186,6 +217,15 @@ fn qa5_letters_follow_live() {
     let edge = edge_at(&r, DVec3::new(60.0, 20.0, 2.0));
     s.add("sheetMetalHem", |p| p.set("edges", ParamValue::Query(vec![edge])));
     let r = s.ok();
+    // The Hem alone already gives these letters (live request 1614 (b)).
+    let order = |r: &RegenResult| {
+        let data = r.context.sheet_metal.get(&r.context.bodies[part(r)].id).expect("data");
+        let bend = |hem: bool, along_x: bool| data.bends.iter().find(|b| matches!(b.kind, BendKind::Hem) == hem && (hem || (b.axis.x.abs() > 0.9) == along_x)).map(|b| b.birth).expect("bend");
+        assert_eq!(data.rips.len(), 1);
+        (data.rips[0].birth, bend(false, false), bend(false, true), bend(true, false))
+    };
+    let (rip, x0, y0, hem) = order(&r);
+    assert!(rip < x0 && x0 < y0 && y0 < hem, "Hem alone: rip {rip}, x = 0 {x0}, y = 0 {y0}, hem {hem}");
     let top = face_at(&r, DVec3::new(30.0, 20.0, 2.0));
     let mut sk = noshape_sketch::Sketch::new();
     let p = [(20.0, 40.0), (40.0, 40.0), (40.0, 50.0), (20.0, 50.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
@@ -206,12 +246,7 @@ fn qa5_letters_follow_live() {
     let r = s.ok();
     let v = vertex_at(&r, DVec3::new(2.0, 2.0, 2.0));
     s.add("sheetMetalCorner", |p| p.set("corner", ParamValue::Query(vec![v])));
-    let r = s.ok();
-    let data = r.context.sheet_metal.get(&r.context.bodies[part(&r)].id).expect("data");
-    let bend = |hem: bool, along_x: bool| data.bends.iter().find(|b| matches!(b.kind, BendKind::Hem) == hem && (hem || (b.axis.x.abs() > 0.9) == along_x)).map(|b| b.birth).expect("bend");
-    let (y0, x0, hem) = (bend(false, true), bend(false, false), bend(true, false));
-    assert_eq!(data.rips.len(), 1);
-    let rip = data.rips[0].birth;
+    let (rip, x0, y0, hem) = order(&s.ok());
     assert!(rip < x0 && x0 < y0 && y0 < hem, "rip {rip}, x = 0 {x0}, y = 0 {y0}, hem {hem}");
 }
 
