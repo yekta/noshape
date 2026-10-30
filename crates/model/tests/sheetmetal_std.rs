@@ -838,7 +838,7 @@ fn form_editing_logic_fills_the_target_face() {
         // The point at world (30, 20, 2), in the sketch's own frame.
         let sketch = s.add("sketch", |pv| {
             pv.set("sketchPlane", ParamValue::Query(vec![plane]));
-            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData::default())));
+            pv.set("sketch", ParamValue::Sketch(Box::default()));
         });
         let r = s.ok();
         let frame = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch").frame;
