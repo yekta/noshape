@@ -827,6 +827,7 @@ fn library_form_tools_as_live() {
     for (form, values, add, sub, tol) in [
         ("circle-emboss", vec![], 273.79979, 217.909344, 1e-5),
         ("circle-extrusion", vec![], 15.177413, 38.48451, 1e-5),
+        ("circle-knockout", vec![], 491.604683, 490.873852, 1e-5),
         ("countersink", vec![("clearance_hole", "1 mm"), ("angle", "60 deg")], 1.491592, 1.774456, 1e-5),
         ("slot-extrusion", vec![], 172.257045, 738.48451, 1e-5),
         ("louver", vec![("height", "5 mm")], 1975.3626, 1889.368549, 1e-3),

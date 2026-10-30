@@ -33,7 +33,7 @@ pub struct Form {
 }
 
 /// The forms we build, in the picker's (alphabetical) order.
-pub const FORMS: &[Form] = &[Form { id: "bridge-lance", name: "Bridge lance" }, Form { id: "circle-emboss", name: "Circle emboss" }, Form { id: "circle-extrusion", name: "Circle extrusion" }, Form { id: "countersink", name: "Countersink" }, Form { id: "lance", name: "Lance" }, Form { id: "louver", name: "Louver" }, Form { id: "slot-emboss", name: "Slot emboss" }, Form { id: "slot-extrusion", name: "Slot extrusion" }];
+pub const FORMS: &[Form] = &[Form { id: "bridge-lance", name: "Bridge lance" }, Form { id: "circle-emboss", name: "Circle emboss" }, Form { id: "circle-extrusion", name: "Circle extrusion" }, Form { id: "circle-knockout", name: "Circle knockout" }, Form { id: "countersink", name: "Countersink" }, Form { id: "lance", name: "Lance" }, Form { id: "louver", name: "Louver" }, Form { id: "slot-emboss", name: "Slot emboss" }, Form { id: "slot-extrusion", name: "Slot extrusion" }];
 
 /// Radius control (live `List_WrgkY2rdTeUGo2`): the forms' bend radii.
 const RADIUS_CONTROL: [(&str, &str); 4] = [("Default", "Double thickness"), ("Thickness", "Thickness"), ("Half_thickness", "Half thickness"), ("Custom", "Custom")];
@@ -81,6 +81,7 @@ pub fn configuration(id: &str) -> Option<Configuration> {
             variable("depth", VariableKind::Length, "1 mm"),
             variable("radius", VariableKind::Length, "1 mm"),
         ],
+        "circle-knockout" => vec![variable("thickness", VariableKind::Length, "1 mm"), variable("diameter", VariableKind::Length, "25 mm")],
         "countersink" => vec![variable("thickness", VariableKind::Length, "1 mm"), variable("clearance_hole", VariableKind::Length, "10 mm"), variable("angle", VariableKind::Angle, "90 deg")],
         "bridge-lance" => vec![
             variable("thickness", VariableKind::Length, "1 mm"),
@@ -234,6 +235,7 @@ pub fn tool_feature(ev: &mut EvalCtx) -> FResult<()> {
     let tools = match form.as_str() {
         "circle-emboss" => circle_emboss(t, ev.length("diameter")?, ev.length("height")?, ev.angle("draft")?, radius(ev, "intRadius")?, radius(ev, "extRadius")?)?,
         "circle-extrusion" => circle_extrusion(t, ev.length("diameter")?, ev.length("depth")?, ev.length("radius")?)?,
+        "circle-knockout" => circle_knockout(t, ev.length("diameter")?)?,
         "countersink" => countersink(t, ev.length("clearanceHole")?, ev.angle("angle")?)?,
         "louver" => louver(t, ev.length("height")?, ev.length("length")?, ev.length("width")?, radius(ev, "radius")?)?,
         "lance" => lance(t, ev.length("length")?, ev.length("width")?, ev.length("height")?, ev.angle("draft")?, radius(ev, "intRadius")?, radius(ev, "extRadius")?)?,
@@ -484,6 +486,47 @@ fn countersink(t: f64, clearance: f64, angle: f64) -> FResult<Vec<Shape>> {
         k::Segment2d::Line { a: DVec2::new(rh, -0.9 * t), b: DVec2::new(rh, -t) },
     ];
     Ok(vec![revolved(&ring)?, revolved(&hole)?])
+}
+
+/// Circle knockout (live "Circle knockout"; its faces,
+/// dom/sm-forms-v4/circle-knockout__bodydetails): the disc of the
+/// diameter pressed 0.8 t out of the sheet, held by two bridges t wide on
+/// the x axis, each an S of two 0.8 t quarter arcs from the disc's edge
+/// (r - 0.8 t) to the sheet. Subtract material: the disc through the sheet
+/// (live t 1, Ø25: 491.604683 / 490.873852 mm³).
+fn circle_knockout(t: f64, d: f64) -> FResult<Vec<Shape>> {
+    let r = d * 0.5;
+    let (c, q) = (0.8 * t, std::f64::consts::FRAC_PI_2);
+    if r <= c {
+        return err("The knockout's diameter must be more than 1.6 times the thickness");
+    }
+    let opts = k::BooleanOptions::default();
+    let raised = k::make_face_2d(&k::Plane::new(DVec3::new(0.0, 0.0, -0.2 * t), DVec3::Z, DVec3::X), &[k::Segment2d::Circle { center: DVec2::ZERO, radius: r }], &[])?;
+    let mut disc = k::extrude(&raised, DVec3::Z * t)?.shape;
+    let inner = k::make_face_2d(&k::Plane::new(DVec3::new(0.0, 0.0, -2.0 * t), DVec3::Z, DVec3::X), &[k::Segment2d::Circle { center: DVec2::ZERO, radius: r - c }], &[])?;
+    let inner = k::extrude(&inner, DVec3::Z * (4.0 * t))?.shape;
+    // The bridge's section: the disc's edge, the upper arc to the sheet's
+    // top, the sheet's edge, the lower arc back.
+    let s = [
+        k::Segment2d::Line { a: DVec2::new(r - c, -0.2 * t), b: DVec2::new(r - c, 0.8 * t) },
+        k::Segment2d::Arc { center: DVec2::new(r - c, 0.0), radius: c, start_angle: 0.0, end_angle: q },
+        k::Segment2d::Line { a: DVec2::new(r, 0.0), b: DVec2::new(r, -t) },
+        k::Segment2d::Arc { center: DVec2::new(r, -0.2 * t), radius: c, start_angle: 2.0 * q, end_angle: 3.0 * q },
+    ];
+    let section = k::make_face_2d(&profile_plane(), &s, &[])?;
+    let mut tabs = Vec::new();
+    for side in [1.0, -1.0] {
+        // The strip the bridge runs in (x on this side, |y| ≤ t/2).
+        let x0 = if side > 0.0 { 0.0 } else { -(r + t) };
+        let strip = k::make_box(&k::Plane::new(DVec3::new(x0, -t * 0.5, -2.0 * t), DVec3::Z, DVec3::X), r + t, t, 4.0 * t)?;
+        let notch = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&strip), std::slice::from_ref(&inner), &opts)?.shape;
+        disc = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&disc), &[notch], &opts)?.shape;
+        let a0 = if side > 0.0 { 0.0 } else { 2.0 * q };
+        let swept = k::revolve_between(&section, DVec3::ZERO, DVec3::Z, a0 - q / 3.0, a0 + q / 3.0)?.shape;
+        tabs.push(k::boolean(k::BooleanOp::Common, &[swept], &[strip], &opts)?.shape);
+    }
+    let add = k::unify_same_domain(&k::boolean(k::BooleanOp::Fuse, &[disc], &tabs, &opts)?.shape)?.shape;
+    Ok(vec![add, sheet_disc(t, r)?])
 }
 
 /// The profile mirrored across its axis (r -> -r).

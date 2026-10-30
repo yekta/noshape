@@ -139,8 +139,8 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   regeneration's derived provider wrapped (`WithLibrary`). UI: the Select Part Studio panel's Libraries tab
   (select_item.rs `library_sources`, `input_label`). Done: Circle emboss, Circle extrusion, Countersink,
   Slot extrusion, Louver, Bridge lance, Lance (exact at live's measured configurations: NB the crawl's part figures are at each studio's
-  currentConfiguration, not its defaults), Slot emboss (no live figures). Next: Circle knockout (two partly
-  revolved bridge tabs and cuts); Lance's placement (live's mate connector) and Straight profile.
+  currentConfiguration, not its defaults), Slot emboss (no live figures). Circle knockout too: all 9. Left: the
+  picker's thumbnails / preview; Lance's placement (live's mate connector) and Straight profile.
   Copy Flat pattern needs an assembly instance source for a flat body (assembly crate, not mine).
 - Open (10-30 morning): (1) (was: table letters, done above). (2) evaluateQuery order generally: live returns faces in
   creation order (rebuilt faces last; request 1608); the host lists a body only one Extrude made in live's order
