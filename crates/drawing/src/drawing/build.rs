@@ -2197,6 +2197,25 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 }
             }
         }
+        // Styles panel › Thickness / Pitch scale of sketch entities (SK16):
+        // their own pen, the dashes scaled.
+        let pens: Vec<(u32, Option<f64>, Option<f64>, super::sheet_sketch::SketchLine)> = sheet
+            .sketch
+            .styles
+            .iter()
+            .filter(|(_, s)| s.thickness.is_some() || s.pitch.is_some())
+            .map(|(id, s)| (cell.borrow_mut().id(PickTarget::SketchEntity(*id)), s.thickness, s.pitch, s.line))
+            .collect();
+        if !pens.is_empty() {
+            for i in sketch_mark.0..g.lines.len() {
+                let Some(&(_, w, pitch, line)) = pens.iter().find(|(p, ..)| *p == g.lines[i].pick) else { continue };
+                let dashes = match pitch {
+                    Some(k) => line.pattern().dashes(k),
+                    None => g.lines[i].style.dashes().to_vec(),
+                };
+                g.pens.push(super::sheet::PenSpan { centered: false, lines: i..i + 1, width_mm: w.unwrap_or(drawing.props.view_tab.sketch_line.thickness), dashes });
+            }
+        }
     }
 
     // Tables (and hole tags in their views).

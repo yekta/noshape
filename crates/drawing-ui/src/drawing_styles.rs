@@ -183,7 +183,23 @@ impl DrawingEditor {
                 cx,
             )
         });
-        let rows = v_flex().child(row("Linestyle", select("st-sk-line", cur.line.name().to_string(), lines))).child(row("Color", select("st-sk-color", color_label, colors)));
+        // Thickness and Pitch scale (help styles, SK16; pitch not for Solid).
+        let base_w = self.drawing.props.view_tab.sketch_line.thickness;
+        let thicknesses: Vec<(String, bool, SkEdit)> = std::iter::once((format!("{base_w:.2} mm (Drawing)"), cur.thickness.is_none(), std::rc::Rc::new(|x: &mut SketchStyle| x.thickness = None) as SkEdit))
+            .chain(noshape_model::drawing::LINE_THICKNESSES.iter().map(|&t| (format!("{t:.2} mm"), cur.thickness == Some(t), std::rc::Rc::new(move |x: &mut SketchStyle| x.thickness = Some(t)) as SkEdit)))
+            .collect();
+        let w_label = cur.thickness.map(|t| format!("{t:.2} mm")).unwrap_or_else(|| format!("{base_w:.2} mm (Drawing)"));
+        let pitches: Vec<(String, bool, SkEdit)> = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0]
+            .into_iter()
+            .map(|k| (format!("{k:.2}"), cur.pitch.unwrap_or(1.0) == k, std::rc::Rc::new(move |x: &mut SketchStyle| x.pitch = (k != 1.0).then_some(k)) as SkEdit))
+            .collect();
+        let p_label = format!("{:.2}", cur.pitch.unwrap_or(1.0));
+        let solid = cur.line == SketchLine::Solid;
+        let rows = v_flex()
+            .child(row("Linestyle", select("st-sk-line", cur.line.name().to_string(), lines)))
+            .when(!solid, |e| e.child(row("Pitch scale", select("st-sk-pitch", p_label, pitches))))
+            .child(row("Thickness", select("st-sk-width", w_label, thicknesses)))
+            .child(row("Color", select("st-sk-color", color_label, colors)));
         Self::styles_with_footer(rows.into_any_element(), "st-sk-revert", revert, cx)
     }
 

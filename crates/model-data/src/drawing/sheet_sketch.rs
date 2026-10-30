@@ -30,6 +30,17 @@ impl SketchLine {
             SketchLine::Dotted => "Dotted",
         }
     }
+    /// Its dash pattern (Pitch scale scales it).
+    pub fn pattern(self) -> super::LinePattern {
+        match self {
+            SketchLine::Solid => super::LinePattern::Solid,
+            SketchLine::Phantom => super::LinePattern::Phantom,
+            SketchLine::Center => super::LinePattern::Center,
+            SketchLine::Dashed => super::LinePattern::Dashed,
+            SketchLine::Dotted => super::LinePattern::Dotted,
+        }
+    }
+
     fn line_style(self) -> LineStyle {
         match self {
             SketchLine::Solid => LineStyle::Thin,
@@ -48,6 +59,12 @@ pub struct SketchStyle {
     pub color: Option<[u8; 3]>,
     #[serde(default, skip_serializing_if = "super::SheetLayer::is_drawing")]
     pub layer: super::SheetLayer,
+    /// Styles panel › Thickness (mm) and Pitch scale (dash scale, not for
+    /// Solid) (help styles, drawing.md SK16); None: the drawing's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thickness: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pitch: Option<f64>,
 }
 
 /// A hatch region: a closed boundary (sheet mm) filled with a pattern.

@@ -3569,3 +3569,23 @@ fn ansi_radial_values_dropped_inside_the_circle() {
     let r = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap().placement(ViewId(2)).unwrap().len_to_sheet(0.012);
     assert!((t[1] - c[1]).abs() < 1.0 && (t[0] - (c[0] + r - 4.0)).abs() < 1.0, "where dropped: {t:?} vs {c:?} r {r}");
 }
+
+/// Styles panel › Thickness / Pitch scale on a sheet sketch line (SK16): its
+/// pen width, its dashes scaled.
+#[test]
+fn sketch_line_thickness_and_pitch() {
+    let (doc, mut drawing) = demo();
+    let l = drawing.sheets[0].sketch.sketch.add_line(noshape_sketch::DVec2::new(20.0, 20.0), noshape_sketch::DVec2::new(80.0, 20.0));
+    let sources = regenerate_sources(&doc, &drawing);
+    let pen = |d: &Drawing| {
+        let g = render_sheet(d, 0, &sources, &ViewCache::new(), false).unwrap().geometry;
+        let i = g.lines.iter().position(|x| x.points.first().is_some_and(|p| (p[0] - 20.0).abs() < 1e-6 && (p[1] - 20.0).abs() < 1e-6)).expect("the line");
+        g.line_pen(i)
+    };
+    drawing.sheets[0].sketch.styles.insert(l.0, sheet_sketch::SketchStyle { line: sheet_sketch::SketchLine::Dashed, thickness: Some(1.0), ..Default::default() });
+    let (w, d1) = pen(&drawing);
+    assert_eq!(w, 1.0);
+    drawing.sheets[0].sketch.styles.get_mut(&l.0).unwrap().pitch = Some(2.0);
+    let (_, d2) = pen(&drawing);
+    assert_eq!(d2, LinePattern::Dashed.dashes(2.0), "{d1:?} → {d2:?}");
+}
