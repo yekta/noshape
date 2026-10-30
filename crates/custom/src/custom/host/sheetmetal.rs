@@ -448,8 +448,8 @@ fn pulled_face(face: &Shape, l: &Loop, n: DVec3, offset: &[f64], free: impl Fn(u
     let big = face.bounding_box(false).map_err(|e| fe(e.to_string()))?.diagonal() * 2.0;
     let m = l.pts.len();
     let mut strips = Vec::new();
-    for k in 0..m {
-        if offset[k] <= TOL || l.curved[k] {
+    for (k, &off) in offset.iter().enumerate().take(m) {
+        if off <= TOL || l.curved[k] {
             continue;
         }
         let (a, b) = (l.pts[k], l.pts[(k + 1) % m]);
@@ -458,7 +458,7 @@ fn pulled_face(face: &Shape, l: &Loop, n: DVec3, offset: &[f64], free: impl Fn(u
         let u = inward(l, n, k);
         let across = |j: usize| free(j) && (l.curved[j] || (l.pts[(j + 1) % m] - l.pts[j]).normalize_or_zero().cross(d).length() > 1e-6);
         let (s0, s1) = (if across((k + m - 1) % m) { -big } else { 0.0 }, if across((k + 1) % m) { len + big } else { len });
-        let quad = [a + d * s0 - u * big, a + d * s1 - u * big, a + d * s1 + u * offset[k], a + d * s0 + u * offset[k]];
+        let quad = [a + d * s0 - u * big, a + d * s1 - u * big, a + d * s1 + u * off, a + d * s0 + u * off];
         let w = k::make_polyline(&quad, true).map_err(|e| fe(e.to_string()))?;
         strips.push(k::make_face_from_wire(&w, true).map_err(|e| fe(e.to_string()))?);
     }
