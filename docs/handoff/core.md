@@ -546,8 +546,12 @@ with 0003b and 0004 on Linux, macOS and Windows.
 
 ## Next, in order
 (lead 10-29: big structural wins, land small and often, stop when returns flatten.)
-1. qa's re-run of fuzz seed 189 (151 / 152 / 174) on a green with 8311f20f + 3a8c7a85 (NOSHAPE_GUARD_TRACE=1): any
-   "not recoverable" exit now names its place; the in-place edits that corrupted bodies are gone from the budgeted ops.
+0. (10-30 18:15) MEM-RUNAWAY-508: land ba9397af..56adfe14 (cooperative budgets, patch 0008, trim) once CI run
+   41097497981 is green, with the 0007w / 0008 libs swapped into /root/occt first (backups to
+   /root/core-scratch/occt-lib-backup/*.pre0007); then the fillet budget test back to T1 once vibe2 / vibe3 have the
+   libs. Remaining jumps (code that checks neither the indicator nor the hooks: the Rust Boolean? qa's fuzz will
+   tell) still leak; NOSHAPE_GUARD_TRACE doesn't show them: a "budget jump" line under it would.
+1. qa verified seed 189 (GUARD-SEGV-MALLOC-DEADLOCK) on 10-30; nothing left here.
 2. P0 SHELL-SLOW tail: concave parts with fillets (a pocket with floor fillets 2.3–2.9 s in slabs) need regions with
    concave edges. The fuzz shells that "fail" after 30 s (qa's hang402 before-mirror.noshape: Shell 3 and 5, 35 s
    each) are the budget, not the geometry: regions declines, offset is ruled out, the slabs and their union take
