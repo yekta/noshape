@@ -410,6 +410,8 @@ struct GSolid {
     faces: Vec<usize>,
     lo: DVec3,
     hi: DVec3,
+    /// A sheet argument's faces (no solid: nothing is inside it).
+    sheet: bool,
 }
 
 /// Every vertex, input and new, by position.
@@ -1846,7 +1848,7 @@ impl Ctx<'_> {
         ];
         let tol = self.tol;
         let sol = &self.solids[s];
-        if !boxes_meet(p, p, sol.lo, sol.hi, tol) {
+        if sol.sheet || !boxes_meet(p, p, sol.lo, sol.hi, tol) {
             return Ok(State::Out);
         }
         'dirs: for r in DIRS {
@@ -2182,7 +2184,17 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 }
                 cx.faces[f].solid = si;
             }
-            cx.solids.push(GSolid { arg: a, index: i as u32, faces, lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY });
+            cx.solids.push(GSolid { arg: a, index: i as u32, faces, lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, sheet: false });
+        }
+        // A sheet (faces, no solid): one of its own, with no inside.
+        if body.solids.is_empty() && !body.faces.is_empty() && !line {
+            let si = cx.solids.len();
+            let faces: Vec<usize> = (face0..cx.faces.len()).collect();
+            for &f in &faces {
+                cx.faces[f].solid = si;
+            }
+            cx.solids.push(GSolid { arg: a, index: u32::MAX, faces, lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, sheet: true });
+            continue;
         }
         if cx.faces[face0..].iter().any(|f| f.solid == usize::MAX) {
             return Err(Decline("a face outside a solid"));
@@ -2190,6 +2202,12 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         if body.solids.is_empty() && !(line && ai == 0) {
             return Err(Decline("an argument without solids"));
         }
+    }
+    // Sheets: a fuse of sheets alone, or a sheet cut by solids or in common with them (else not yet).
+    let sheet_arg: Vec<bool> = (0..args.len()).map(|a| cx.solids.iter().any(|s| s.sheet && s.arg == a as u32)).collect();
+    let sheets = sheet_arg.iter().any(|&x| x);
+    if sheets && !((op == Op::Fuse && sheet_arg.iter().all(|&x| x)) || (op != Op::Fuse && sheet_arg[0] && !sheet_arg[1..].iter().any(|&x| x))) {
+        return Err(Decline("sheets with solids"));
     }
     // Each face: its parameter range (a partial cylinder's starts in the gap), boundary, box.
     for f in 0..cx.faces.len() {
@@ -2303,6 +2321,30 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                     let (x, y) = (&cx.faces[fs], &cx.faces[ft]);
                     if boxes_meet(x.lo, x.hi, y.lo, y.hi, GREY * tol) {
                         cx.face_pair(fs, ft)?;
+                    }
+                }
+            }
+        }
+    }
+    // Coplanar faces where a sheet is one of them: taken where they only meet at each other's vertices (side by
+    // side, sharing corners); a vertex of one inside the other or on its edge between its vertices declines (OCCT
+    // left two strips overlapping by 5 µm, one's corner on the other's edge, as they were: 0c538d2c).
+    for k in 0..cx.coplanar.len() {
+        let (f, g) = cx.coplanar[k];
+        if !cx.solids[cx.faces[f].solid].sheet && !cx.solids[cx.faces[g].solid].sheet {
+            continue;
+        }
+        for (a, b) in [(f, g), (g, f)] {
+            let theirs: HashSet<u32> = cx.faces[b].edges.iter().flat_map(|&(e, _)| cx.edges[e].v).collect();
+            for &(e, _) in &cx.faces[a].edges {
+                for w in cx.edges[e].v {
+                    if theirs.contains(&w) {
+                        continue;
+                    }
+                    let q = cx.faces[b].to2(cx.p(w));
+                    let bound = cx.bound(b)?;
+                    if distance2(q, bound) <= GREY * tol || inside2(q, bound) {
+                        return Err(Decline("coplanar sheets"));
                     }
                 }
             }
@@ -2650,6 +2692,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
         }
         let ons: Vec<(usize, State)> = states.iter().copied().filter(|x| matches!(x.1, State::OnSame | State::OnOpposite)).collect();
+        if !ons.is_empty() && (cx.solids[s].sheet || ons.iter().any(|&(t, _)| cx.solids[t].sheet)) {
+            return Err(Decline("sheets coincident"));
+        }
         if ons.len() > 1 && op != Op::Fuse {
             return Err(Decline("a piece on two solids"));
         }
@@ -2735,13 +2780,13 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
         }
     }
-    // (A cone's apex is used once.)
-    if uses.iter().any(|(&s, u)| sedges[s].seg.g != Geo::Apex && (u[0] != u[1] || u[0] == 0)) {
+    // (A cone's apex is used once; a sheet's edges any way.)
+    if !sheets && uses.iter().any(|(&s, u)| sedges[s].seg.g != Geo::Apex && (u[0] != u[1] || u[0] == 0)) {
         return Err(Decline("a non-manifold result"));
     }
     // Seams: an edge one face uses both ways; any other edge two faces once each.
     for (&s, u) in &uses {
-        if u[0] > 1 && sedges[s].seg.g != Geo::Apex {
+        if !sheets && u[0] > 1 && sedges[s].seg.g != Geo::Apex {
             let users = kept.iter().filter(|&&p| pieces[p].loops.iter().flatten().any(|x| x.0 == s)).count();
             if users != 1 || u[0] != 1 {
                 return Err(Decline("a non-manifold result"));
@@ -2909,9 +2954,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         out.body.faces.push(Face { surface, reversed: src.reversed ^ flip, loops });
         out.face_origin.push(if same { Origin::Same { arg: g.arg, index: g.index } } else { Origin::Piece { arg: g.arg, index: g.index } });
     }
-    // Solids, one per shell, outward.
+    // Solids, one per shell, outward (a sheet's result: faces alone).
     let mut shell_of: HashMap<usize, usize> = HashMap::default();
-    for (k, &p) in kept.iter().enumerate() {
+    for (k, &p) in kept.iter().enumerate().filter(|_| !sheets) {
         let c = find(&mut comp, k);
         let n = shell_of.len();
         let si = *shell_of.entry(c).or_insert(n);
@@ -3070,7 +3115,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // of a common's arguments, the solids holding its pieces or pieces inside it; a fuse's are deleted (the
     // fused solid is no one's image). One left as it was is kept.
     let mut solid_sources: Vec<Vec<usize>> = vec![Vec::new(); out.body.solids.len()];
-    for &p in &kept {
+    for &p in kept.iter().filter(|_| !sheets) {
         let o = piece_out[p];
         let v = &mut solid_sources[solid_of_face[o as usize] as usize];
         v.push(cx.faces[pieces[p].face].solid);
@@ -3081,6 +3126,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         v.dedup();
     }
     for (si, s) in cx.solids.iter().enumerate() {
+        if s.sheet {
+            continue;
+        }
         let image = |k: usize| match op {
             Op::Cut => s.arg == 0 && solid_sources[k].contains(&si),
             Op::Common => solid_sources[k].contains(&si),

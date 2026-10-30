@@ -1313,6 +1313,10 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     }
     bb.Add(out, sol[s]);
   }
+  // A sheet's result: its faces alone, in the compound (as OCCT's).
+  if (b.solid_shells.size() <= 1)
+    for (size_t i = 0; i < nf; ++i)
+      bb.Add(out, fs[i]);
   // A result of edges alone (a line's common with a solid).
   if (nf == 0)
     for (const TopoDS_Edge& e : es)
@@ -1504,6 +1508,11 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
       max_tol = ef;
     }
   }
+  // A sheet of shells (not faces): OCCT's result keeps them shells, the Rust Boolean's sheets are faces alone (not
+  // yet).
+  for (size_t i = 0; i < args.size(); ++i)
+    if (srcs[i]->map(TopAbs_SOLID).Extent() == 0 && srcs[i]->map(TopAbs_SHELL).Extent() > 0 && srcs[i]->map(TopAbs_FACE).Extent() > 0)
+      return decline("a sheet of shells");
   // Tolerant sub-shapes that meet no other argument where their tolerance would matter: each sub-shape of another
   // argument near one (their boxes, grown by the grey band of the tolerances, meeting) is on it exactly (within the
   // rest's tolerance: OCCT and the Boolean put them together alike) or clearly apart (past the grey band of the two
@@ -1601,13 +1610,12 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   if (const char* why = build(r, srcs, max_tol > 0 ? max_tol : 1e-7, out, hist))
     return decline(why);
   // (A result with free-form faces isn't kept as a body: the next Boolean converts it, curves on faces and all;
-  // nor one with ellipses, hyperbolas or parabolas: converted, they are OCCT's curves, frame and parameters; nor one
-  // with B-spline edges, whose curves the kept body doesn't carry over.)
+  // nor one with ellipses, hyperbolas or parabolas: converted, they are OCCT's curves, frame and parameters.)
   for (size_t i = 0; i < r.body.surfaces.size(); i += 12)
     if (r.body.surfaces[i] >= 3)
       return true;
   for (size_t i = 0; i < r.body.curves.size(); i += 11)
-    if (r.body.curves[i] == 3 || r.body.curves[i] == 4 || r.body.curves[i] == 5 || r.body.curves[i] == 6)
+    if (r.body.curves[i] == 3 || r.body.curves[i] == 4 || r.body.curves[i] == 6)
       return true;
   t_built.target_face.assign(r.face_origin.size() / 3, 0);
   for (size_t i = 0; i < t_built.target_face.size(); ++i)
@@ -1676,6 +1684,8 @@ std::shared_ptr<const BrepBody> kept_body(const OcShape& out, const Built& done)
     c->curves.push_back(x);
   for (double x : su)
     c->surfaces.push_back(x);
+  // (The B-spline edges' curves: the curves above index into it as they are.)
+  c->nurbs = b.nurbs;
   c->face_loops.push_back(0);
   c->loop_uses.push_back(0);
   for (size_t j = 0; j < nf; ++j)

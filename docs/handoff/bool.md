@@ -662,8 +662,24 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   result's curves on the face are OCCT's projections (`piece_pcurve`).
 - Replays, all 0 differ: corpus2 539 (+2), corpus3 542 (+2), corpus4 586 (+2), corpus5 703 (+2), direct 58 (+2);
   main 694, corpus6 648, Shell's 78. T1: a cylinder face without arcs (b79a02be) in tests/data/brep.
-- A result with B-spline edges isn't kept as a body for the next Boolean either (that case's result has them, and
-  the kept body's B-spline curve indexed past its data: a panic across the bridge in the kept-body test).
+
+## Sheets, first step (10-30 04:50 UTC)
+- A sheet argument (faces, no solid) is a solid of its own with nothing inside (a ray never finds a point in it).
+  Taken: a fuse of sheets alone, and a sheet cut by solids or in common with them; the result is its faces in the
+  compound, as OCCT's for face arguments (no shells, no closed-shell checks). Coplanar sheets are taken where they
+  only meet at each other's vertices (side by side, sharing corners: OCCT gives two faces sharing an edge, as ours);
+  a vertex of one inside the other or on its edge between its vertices declines ("coplanar sheets": OCCT left two
+  strips overlapping by 5 µm, one's corner on the other's edge, as they were, 0c538d2c), and overlapping pieces
+  decline ("sheets coincident"; OCCT splits two plainly overlapping rectangles into three faces: next).
+- Not yet: sheets of shells ("a sheet of shells": OCCT's result keeps them shells; the first try returned faces and
+  failed three sheet-metal jog / bend model tests in CI, features_c), sheets with solids otherwise, the commons of
+  two sheets that meet.
+- A kept body (a result's, for the next Boolean) carries its B-spline edges' curves now (`kept_body` copied the
+  curves' indices but not the NURBS data: a panic across the bridge in the kept-body test on b79a02be); results with
+  B-spline edges are kept again.
+- Replays, all 0 differ: main 747 (+53), corpus2 547 (+8), corpus3 550 (+8), corpus4 594 (+8), corpus5 711 (+8),
+  corpus6 656 (+8), Shell's 78, direct 58. T1: a sheet fuse (1a39dedd) and a sheet cut (dbdc4a4f) in tests/data/brep.
+- skasm owns sheet metal: the shells and coplanar-overlap cases are what their models will hit; progress here.
 
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
@@ -699,6 +715,11 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   profiles and make it cheaper (only the merged faces' share of the volume) if it shows.
 
 ## Requests
+- core (10-30 06:15 UTC): `boolean_groups::a_section_under_a_call_budget_gives_up` (fd65effd, 04:39) fails on
+  Windows and macOS in my branch CI (run 41008061871: "" after 0.48 s, the section ran to the end under a 1e-4 s
+  budget); Linux passes. It hasn't been on a scheduled run yet (main's last, 03:27, predates it). The budget is CPU
+  time while BRepAlgoAPI_Section runs parallel (bop_parallel): the calling thread's CPU may stay under it there. Not
+  bool's code (an OCCT section of a plate with 400 holes, the holes made by the Rust Boolean as before).
 - core / lead: `pattern_second::timed_second_pattern_costs_about_the_same_as_the_first` (perf.yml) compares LP2 to
   LP1; the Rust Boolean made LP1 ~5× faster, so `LP2 < 3 LP1 + 300 ms` fails though nothing got slower. Compare
   LP2 with an absolute budget instead (it's ~1.5–1.8 s dev here, 2.1 s before).
