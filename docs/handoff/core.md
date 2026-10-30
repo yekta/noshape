@@ -271,7 +271,10 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
 - 0007 (10-30) TKFillet BRepBlend_Walking (walking loop), ChFi3d_Builder::Compute (each stripe and vertex), TKOffset
   Draft_Modification::Perform (each face): `noshape_should_break()` (boolean.cpp: a budget's deadline off Linux, or
   the thread's cancel flag) throws Standard_Failure("noshape: stopped"); these builds ignore their progress range.
-  Libs: /root/core-scratch/libTKFillet.a.0007, libTKOffset.a.0007 (/root/occt-core has them).
+  With GCC / Clang each patched file also defines a weak `noshape_should_break` returning 0, so a program that
+  doesn't define the hook (a branch from before 64d0b0b7) still links. Libs with it: /root/core-scratch/
+  libTKFillet.a.0007w, libTKOffset.a.0007w (link-tested: no hook builds, a strong hook stops the fillet); to go
+  into /root/occt once CI has built the weak version (Linux uses the signal path anyway, so nothing waits on it).
 - 0006 (10-30) TKGeomAlgo IntCurveSurface_InterUtils.pxx `SortStartPoints`: OCCT's three bubble sorts of a curve /
   surface intersection's start points (O(n²): 72–80 % of a Boolean of two of qa's hang402 fuzz parts, whose rational
   B-spline slivers give thousands of points) as one stable sort and two run sorts, O(n log n), bit-identical (20 000
@@ -577,7 +580,7 @@ with 0003b and 0004 on Linux, macOS and Windows.
    `oversize_chamfers_like_onshape` (20). Live F2's all 12 edges (R4.99 / R5 Ok at live's volumes, R6 "Failed to fillet
    selections.") hold too (13:29, in the fillet test).
 5. kern's open item: forward-oriented edges.
-6. dx's I1 done 10-30 (8adbec06), in io.cpp (dx's file; the integrator was right): the STEP file has no pcurves and
+6. dx's I1 done 10-30 (d475d490), in io.cpp (dx's file; the integrator was right): the STEP file has no pcurves and
    OCCT's projection drifts next to a B-spline patch's pole (v = 0.9958 instead of 1, edge tolerance 0.0043), so the
    blend lost a sliver. `fix_pole_pcurves` in read_step / read_step_tree re-projects the edges meeting a degenerate
    edge, snaps them onto the boundary iso they follow and re-spans the degenerate edge: 13.200065 mm² each (live
@@ -688,6 +691,17 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20�
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- 10-30 14:45: landed through 61d9c2b3: BUDGET-OFF-LINUX (64d0b0b7, CI run 41051461870 green on all three with
+  patch 0007; fillet / chamfer / Draft / Shell / face deletion stop off Linux), KNURL-MEMORY's scaled fallback for
+  quick_boolean (85f3a880), FILLET-OVERSIZE's chamfer half (b2f72ed1), and dx's I1 (d475d490). I1's fix is in io.cpp
+  (dx's file; the face integrator was right): OCCT's projection of pcurve-less STEP edges drifted next to a B-spline
+  patch's pole; `fix_pole_pcurves` re-projects them and snaps them to the boundary iso (13.200065 mm², live
+  13.20006); dx: the import matrix's STEP row should now be ✅. dx's std_features flake: 20 / 20 runs pass here
+  with BodyBits. Branch core-budget-off-linux can be deleted.
+- 10-30 14:45: patch 0007's libs are NOT in /root/occt: as landed, they leave `noshape_should_break` undefined, so any
+  tree from before 64d0b0b7 would fail to link against them. 0733baa5 (on branch core-0007-weak, CI run
+  41072035980) gives the patch a weak default under GCC / Clang; I'll land it and swap the libs once that run is
+  green. Until then CI builds 0007 itself and Linux budgets use the signal path, so nothing waits on the swap.
 - 10-30 10:40: OCCT patch 0006 landed (5cfd6c74) and its two libs (TKGeomAlgo, TKHLR) are in /root/occt here
   (backups in /root/core-scratch/occt-lib-backup/*.pre0006). vibe3's land checks and CI's OCCT cache need it built
   too (bit-identical results, only faster: nothing breaks without it). The branch core-portable-budget (CI run
