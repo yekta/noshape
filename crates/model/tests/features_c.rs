@@ -491,10 +491,11 @@ fn sheet_metal_loft_hopper_flattens() {
 }
 
 #[test]
-#[ignore = "std: 51 faces, 17449.70 mm³ (planar patches where three bends meet; live has 2 swept ones); native: unequal corner counts unsupported"]
 fn sheet_metal_loft_rectangle_to_triangle() {
     // Rectangle (4 sides) to triangle (3), dialog defaults (live, behaviours.md "fs (10-23 10:30)"): one part,
-    // 17452.843417228427 mm³, 49 faces (10 cylinders: 5 bends), the seam a rip.
+    // 49 faces (10 cylinders: 5 bends; 2 ruled bend ends where a bend meets a
+    // profile at a slant), the seam a rip; the regen's evVolume 17452.918948
+    // mm³ (request 1612; /massproperties under-reports spline faces).
     let mut s = Studio::new();
     let mut sk = noshape_sketch::Sketch::new();
     let a = polyline(&mut sk, &[(-40.0, -30.0), (40.0, -30.0), (40.0, 30.0), (-40.0, 30.0)], true);
@@ -516,7 +517,8 @@ fn sheet_metal_loft_rectangle_to_triangle() {
     let radii = cylinder_radii(&r, 0);
     assert_eq!((r.context.bodies[0].faces.len(), radii.len()), (49, 10), "faces; volume {v}; radii {radii:?}");
     assert!(radii.iter().all(|&x| near(x, mm(2.3), 1e-9) || near(x, mm(3.9), 1e-9)), "{radii:?}");
-    assert!(near(v, 17_452.843_417_228_43, 1e-3), "volume {v}");
+    // Ours 17452.9223 (the two ruled ends are lofted through 35 sections).
+    assert!(near(v, 17_452.918_948, 5e-3), "volume {v}");
 }
 
 /// Cylinder of radius 20 mm around Z, 60 mm long centered at z = 0, and a

@@ -49,7 +49,7 @@ numbers), ◐ = partly, ✗ = differs, — = no live data.
 | 6.3 Up (SM5) | Up | ✅ | GUI 10-30 |
 | 6.4 row click | row selected, bend lit in 3D and flat | ✅ | GUI 10-30 |
 | 6.5 flat (SM6, SM17) | reliefs, live placement and size | ✅ | GUI 10-30, T2 flat_pattern_keeps_the_model_placement |
-| 6.6 flat menu (SM13) | live's items (New sketch… while active, Create Drawing, Select other…: the flat's two faces as "Face of <model>", Zoom to selection); clicking the flat selects it and its model face. Not built: Copy Flat pattern (live pastes a flat part instance into an assembly; our flats aren't parts), Add comment (cloud), the bend line's own menu | ◐ P3 | GUI 10-30 |
+| 6.6 flat menu (SM13) | live's items (New sketch… while active, Create Drawing, Select other…: the flat's two faces as "Face of <model>", Zoom to selection); clicking the flat selects it and its model face; a bend line selects (orange) and has Zoom to fit / Zoom to selection / Align view with vertical axis. Not built: Copy Flat pattern (live pastes a flat part instance into an assembly; our flats aren't parts), Add comment (cloud), a bend line's Curve/surface analysis… and Select other… | ◐ P3 | GUI 10-30 |
 | 6.6 export dialog / DXF (SM14) | live's dialog and options; AC1014, live's layers | ✅ | GUI 10-30, T1 the_flat_export_options…, T2 flat_dxf_is_written_as_live |
 | 6.7 part menu | no flat items | ✅ | GUI 10-30 |
 | 6.8 notice (SM10) | auto-dismisses | ✅ | GUI 10-28 |
@@ -57,7 +57,7 @@ numbers), ◐ = partly, ✗ = differs, — = no live data.
 | 9 parts list | only Part 1 | ✅ | GUI 10-30 |
 | Bend / Jog / Make joint / Tab-beside / cut / hole / counterbore then Flange / partial flange / Butt direction | see the 10-29/10-30 tables below | ✅ | T2s |
 | Butt direction after a Convert | the top wall runs through (a body one Extrude made lists its faces in live's order: first side, start cap, end cap, other sides; request 1608) | ✅ | T2 convert_rips_and_bends_like_onshape |
-| Sheet metal loft rect → triangle | 51 vs 49 faces | ✗ P3 | T2 sheet_metal_loft_rectangle_to_triangle |
+| Sheet metal loft rect → triangle | 49 faces as live: a bend meeting the profile at a slant ends in one ruled face (rulings radial, its definition-side arc on the plane of the two walls' sides through the vertex, eased onto a rip's pulled-back side), and an edge-joint rip pulls each wall back clearance / (1 − cos) (0.018071 mm at the 96.1° seam); 17452.9223 vs live's evVolume 17452.9189 (request 1612) | ✅ | features_c::sheet_metal_loft_rectangle_to_triangle |
 
 ## 1. Base: sketch + Sheet metal model (Thicken)
 

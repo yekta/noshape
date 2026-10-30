@@ -973,15 +973,46 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         let (t0, t1) = ((sides[k].0 - start).dot(dir), (sides[k].1 - start).dot(dir));
         Some((t0.min(t1), t0.max(t1)))
     };
+    // Wall `f`'s side next to edge `e` at its end near `v`, when it is a free
+    // side or a rip across the bend's end (not a bend, not running on along it).
+    let free_end = |f: usize, e: usize, v: DVec3, dir: DVec3| -> Option<DVec3> {
+        let (l, _, _) = outlines[f].as_ref()?;
+        let k = l.side.iter().position(|x| *x == e)?;
+        let m = l.pts.len();
+        let j = if l.pts[k].distance(v) < l.pts[(k + 1) % m].distance(v) { (k + m - 1) % m } else { (k + 1) % m };
+        let along = (l.pts[(j + 1) % m] - l.pts[j]).normalize_or_zero();
+        (!def.bends.contains_key(&l.side[j]) && along.cross(dir).length() > 1e-6).then_some(along)
+    };
     let (clips, extends, mut cuts, wraps) = corner_reliefs(def, &topo, &outlines, &bends, &setbacks)?;
     for (e, fa, fb, b) in bends {
         // The bend runs where both walls do (a simple corner ends it where
         // the neighbouring bend starts: live sm4, sm6), less a corner relief.
         let (mut t0, mut t1) = (0.0, b.len);
-        for f in [fa, fb] {
-            if let Some((a0, a1)) = extent(f, e, b.start, b.dir) {
-                t0 = f64::max(t0, a0);
-                t1 = f64::min(t1, a1);
+        let (ea, eb) = (extent(fa, e, b.start, b.dir), extent(fb, e, b.start, b.dir));
+        for (a0, a1) in [ea, eb].into_iter().flatten() {
+            t0 = f64::max(t0, a0);
+            t1 = f64::min(t1, a1);
+        }
+        // An end where both walls stop on free sides at different places
+        // (a loft's bend meeting the profile at a slant): the bend runs to
+        // each wall's end, its end one ruled face, rulings radial, its
+        // definition-side arc on the plane of the two free sides (live
+        // request 1612: 7.348509 mm², centroid within 1e-3).
+        let mut skew: [Option<(f64, f64, DVec3, DVec3)>; 2] = [None, None];
+        if let (Some(ea), Some(eb)) = (ea, eb) {
+            let none_at = |at: DVec3| !clips.iter().chain(extends.iter()).any(|(ce, v, _)| *ce == e && v.distance(at) < TOL);
+            let end = b.start + b.dir * b.len;
+            for (i, v, (ta, tb)) in [(0, b.start, (ea.0, eb.0)), (1, end, (ea.1, eb.1))] {
+                if (ta - tb).abs() <= TOL || !none_at(v) {
+                    continue;
+                }
+                let (Some(da), Some(db)) = (free_end(fa, e, v, b.dir), free_end(fb, e, v, b.dir)) else { continue };
+                skew[i] = Some((ta, tb, v, da.cross(db).normalize_or_zero()));
+                if i == 0 {
+                    t0 = ta.min(tb);
+                } else {
+                    t1 = ta.max(tb);
+                }
             }
         }
         for (ce, v, d) in &clips {
@@ -1018,7 +1049,10 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         // thickness before it (the cut's end face meets the bend's start
         // plane tangentially at the flange side, live G34a).
         let closed_at = |start: bool| wraps.iter().any(|rc| rc.edge == e && matches!(rc.shape, CutShape::Closed { angle, .. } if angle <= std::f64::consts::FRAC_PI_2 + 1e-9) && (rc.v.distance(b.start) < TOL) == start);
-        let (m0, m1) = (if closed_at(true) { front + back } else { 0.0 }, if closed_at(false) { front + back } else { 0.0 });
+        // A slanted end: on past both walls' ends (its arc can bulge past
+        // them), cut back below.
+        let margin = |i: usize| skew[i].map_or(0.0, |(ta, tb, _, _)| b.angle.abs() * (((b.axis_point - b.start).length() + front + back)) + 2.0 * (front + back) + (ta - tb).abs());
+        let (m0, m1) = (if closed_at(true) { front + back } else { margin(0) }, if closed_at(false) { front + back } else { margin(1) });
         let (q1, qlen) = (p1 - b.dir * m0, len + m0 + m1);
         let strip = [q1 - n1 * back, q1 + n1 * front, q1 + n1 * front + b.dir * qlen, q1 - n1 * back + b.dir * qlen];
         let wire = k::make_polyline(&strip, true).map_err(|e| fe(e.to_string()))?;
@@ -1043,12 +1077,14 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         };
         // Along the axis (`dir * sign`) from the axis point at the edge's start.
         let (s0, s1) = (t0 * sign, t1 * sign);
+        // A slanted end: each wall's side of the strip runs to that wall's end.
+        let (ta, tb) = ([skew[0].map_or(t0, |x| x.0), skew[1].map_or(t1, |x| x.0)], [skew[0].map_or(t0, |x| x.1), skew[1].map_or(t1, |x| x.1)]);
         strips.push(Strip {
             edge: e,
             wall_a: fa,
             wall_b: fb,
-            a: [p1, p1 + b.dir * len],
-            b: [p2, p2 + b.dir * len],
+            a: ta.map(|t| p1 + b.dir * (t - t0)),
+            b: tb.map(|t| p2 + b.dir * (t - t0)),
             angle: b.angle,
             radius: def.bends.get(&e).copied().unwrap_or(0.0),
             normal_a: n1,
@@ -1062,16 +1098,44 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         });
         let mut bend = k::revolve(&face, b.axis_point, b.dir * sign, b.angle).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
         let (v0, v1) = (topo.nearest_vertex(b.start), topo.nearest_vertex(b.start + b.dir * b.len));
+        let neutral = def.bends.get(&e).copied().unwrap_or(0.0) + def.k_factor * (front + back);
+        let turn = |p: DVec3, ang: f64| {
+            let r = p - b.axis_point;
+            let along = b.dir * r.dot(b.dir);
+            let perp = r - along;
+            b.axis_point + along + perp * ang.cos() + b.dir.cross(perp) * ang.sin()
+        };
+        for (i, end) in skew.iter().enumerate() {
+            let Some((ta, tb, v, plane)) = *end else { continue };
+            // Sections every so far across the flat strip (wall a at w = 0,
+            // wall b at w = ba), the definition side's point at t(w) on the
+            // sides' plane through the vertex, eased linearly onto the walls'
+            // ends (a rip's side is pulled off the vertex; live 1612's bend D
+            // top: 3.0233 mm²) (or a straight line between the walls' ends,
+            // no plane); the cut reaches past the bend's square end.
+            let (ba, steps) = (b.angle.abs() * neutral, 34);
+            let reach = 2.0 * (b.angle.abs() * ((b.axis_point - b.start).length() + front + back) + 2.0 * (front + back) + (ta - tb).abs());
+            let base = b.start + a1 * b.setback;
+            let on_plane = |w: f64| (plane.length() > 0.5 && b.dir.dot(plane).abs() > 1e-6).then(|| (v - turn(base, sign * w / neutral)).dot(plane) / b.dir.dot(plane));
+            let ease = on_plane(0.0).zip(on_plane(ba)).map(|(p0, p1)| (ta - p0, tb - p1));
+            let mut sections = Vec::new();
+            for k in 0..=steps {
+                let w = ba * (k as f64 - 1.0) / (steps - 2) as f64;
+                let t = match (on_plane(w), ease) {
+                    (Some(t), Some((e0, e1))) => t + e0 + (e1 - e0) * w / ba,
+                    _ => ta + (tb - ta) * w / ba,
+                };
+                let (t_in, t_out) = if i == 0 { (t, t - reach) } else { (t, t + reach) };
+                let (s_lo, s_hi) = (-back - (front + back), front + (front + back));
+                let quad: Vec<DVec3> = [(t_in, s_lo), (t_out, s_lo), (t_out, s_hi), (t_in, s_hi)].iter().map(|(t, s)| turn(base + b.dir * *t + n1 * *s, sign * w / neutral)).collect();
+                sections.push(k::make_polyline(&quad, true).map_err(|e| fe(e.to_string()))?);
+            }
+            let cutter = k::loft(&sections, &k::LoftOptions { solid: true, ruled: false, closed: false, ..Default::default() }).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
+            bend = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&bend), &[cutter], &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
+        }
         // Round corner reliefs: the flat circle wrapped onto the bend (angle
         // = flat distance / (r + K T)), cut out through the thickness.
-        let neutral = def.bends.get(&e).copied().unwrap_or(0.0) + def.k_factor * (front + back);
         for rc in wraps.iter().filter(|rc| rc.edge == e) {
-            let turn = |p: DVec3, ang: f64| {
-                let r = p - b.axis_point;
-                let along = b.dir * r.dot(b.dir);
-                let perp = r - along;
-                b.axis_point + along + perp * ang.cos() + b.dir.cross(perp) * ang.sin()
-            };
             let at_start = rc.v.distance(b.start) < TOL;
             let base = b.start + a1 * b.setback;
             if let CutShape::Closed { plate_end, flange_end, angle } = rc.shape
@@ -1686,7 +1750,6 @@ fn rip_offset(def: &Definition, topo: &Topo, e: usize, f: usize) -> f64 {
     if coplanar_rip(topo, e) {
         return 0.0;
     }
-    let Some(style) = def.rip_styles.get(&e) else { return def.clearance };
     let walls = &topo.edge_faces[e];
     let Some(other) = walls.iter().map(|x| *x as usize).find(|x| *x != f) else { return def.clearance };
     // Direction 1: the wall std made first runs through (live: the wall of
@@ -1697,7 +1760,7 @@ fn rip_offset(def: &Definition, topo: &Topo, e: usize, f: usize) -> f64 {
         (Some((a, m)), Some((b, n))) if a == b => if m < n { f } else { other },
         _ => f.min(other),
     };
-    let through = if style == "BUTT2" { first != f } else { first == f };
+    let through = if def.rip_styles.get(&e).is_some_and(|s| s == "BUTT2") { first != f } else { first == f };
     let (s, t) = topo.edge_ends[e];
     let dir = (t - s).normalize_or_zero();
     // A wall's in-plane direction from its inside toward the rip.
@@ -1713,6 +1776,12 @@ fn rip_offset(def: &Definition, topo: &Topo, e: usize, f: usize) -> f64 {
         Some((a.min(b), a.max(b)))
     };
     let (Some(uf), Some(uo)) = (toward(f), toward(other)) else { return def.clearance };
+    // An edge joint: both walls stop short by the clearance over one less
+    // the cosine between their directions in from the rip (toward it, alike) (live: 0.02 mm at
+    // 90°, fs-smprobe3-{4,6}; 0.018071 mm at a loft's 96.1° seam, request 1612).
+    if !def.rip_styles.contains_key(&e) {
+        return def.clearance / (1.0 - uf.dot(uo)).max(1e-9);
+    }
     if through {
         span(other, uf).map_or(0.0, |(_, hi)| -hi.max(0.0))
     } else {
