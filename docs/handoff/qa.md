@@ -9,6 +9,13 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **10-30 02:56 update (greens 75a04b06 … 80499a93):** verified DRAWING-SHIFT-SLASH (75a04b06), OCCT-MIRROR-OVERCOUNT (c6148db2:
+  boolmir 17 #13 = 785.398 mm³ with NOSHAPE_BOOL_RUST=0), OCCT-UNION-OFFSET-CYL (c6077d3c: 1670.629 on both paths),
+  MASS-INERTIA-APPROX (ff8286e5: CoM (0,0,15), Lxx = Lyy; Lxy shows "5.313e-7" instead of 0, noted). MESH-EMPTY-LOOP-PANIC (psui
+  bca7f3d1): no regression on 2d2cc2b6, but main has no trigger, so the fallback waits for the next release's fuzz.
+  RUST-UNION-POINT-TOUCH still on 7523035a. App Rust-vs-OCCT on bool 7523035a: 97 documents (spheres / tori / splines / threads /
+  no-op / touching) all equal except 3-27 (cli/ab75.summary; 3-9 and s1-5 were black captures, equal on re-run); mirror set + P0
+  0 px. CLI fuzz v0.4.14 421–460 clean; 461–480 running; Rust-vs-OCCT CLI round 181–195 / 136–150 / 116–130: face counts only.
 - **10-30 01:01 update (greens 52760eab … 6ca3c756):** **MIRROR-HANG-402 reproduced on main**: the fuzz mirror (Part 2 across
   Top) as Add / Merge with all never finishes in the app (green 512717af, ~10 cores, > 12 min); as New it is instant (the CLI's
   mirror defaults to Add with a merge scope, so the CLI hangs too). RUST-UNION-POINT-TOUCH: live 1601 = INFO + two parts (= OCCT),
