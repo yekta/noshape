@@ -294,7 +294,8 @@ impl CtxState {
     pub fn remap_attributes(&mut self, changed: &HashSet<BodyId>) {
         // Each moved entity's new place, or its pieces when split (each
         // gets the attribute, as Parasolid's split keeps it on both).
-        let moves: Vec<(Reference, Vec<(Reference, (BodyId, query::Snapshot))>)> = {
+        type Placed = (Reference, (BodyId, query::Snapshot));
+        let moves: Vec<(Reference, Vec<Placed>)> = {
             let q = query::QueryCx::new(self);
             let mut out = Vec::new();
             for (r, (body, snap)) in &self.attr_snapshots {
@@ -302,7 +303,7 @@ impl CtxState {
                     continue;
                 }
                 let Some(pieces) = query::relocated_pieces(&q, r, snap) else { continue };
-                let to: Vec<(Reference, (BodyId, query::Snapshot))> = pieces.iter().filter_map(|e| Some((q.to_ref(e), q.attribute_snapshot(&q.to_ref(e))?))).collect();
+                let to: Vec<Placed> = pieces.iter().filter_map(|e| Some((q.to_ref(e), q.attribute_snapshot(&q.to_ref(e))?))).collect();
                 if !to.is_empty() {
                     out.push((r.clone(), to));
                 }
