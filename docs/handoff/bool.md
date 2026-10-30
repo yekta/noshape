@@ -700,6 +700,10 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - The three taken, as OCCT: 999 instances in ~16–19 s against OCCT's ~37 s in the same replay (loaded machine);
   the 9-instance one 15 ms against 177 ms. Of the 16 s: the first, touching attempt ~2.6 s (it declines at
   classification), the cuts ~6 s, the fuse the rest; telling the overlap earlier would save the first.
+- Told earlier now (10-30 09:30 UTC): before any section, an instance's vertex inside another argument's solid (by
+  the ray, and at least 100 tolerances from all its surfaces; free-form solids not this way) declines at once. The
+  999-instance case 13.4 s (was ~16 s; OCCT's 26.5 s here). Without the margin a vertex on another's face counted
+  (5 or 6 touching fuses per corpus lost).
 - T1: the 9-instance case (58c61d5d) in tests/data/brep (taken in strict mode).
 
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)

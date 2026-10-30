@@ -2303,6 +2303,36 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         return line::line_common(&cx, tol);
     }
     cx.face_segs = vec![Vec::new(); cx.faces.len()];
+    // A pattern's instances that must only touch: one with a vertex inside another argument's solid overlaps it,
+    // told before any section (the classification would tell it at the end).
+    if touching_only {
+        for s in 0..cx.solids.len() {
+            for t in 0..cx.solids.len() {
+                if s == t || cx.solids[s].arg == cx.solids[t].arg || cx.solids[t].sheet || !boxes_meet(cx.solids[s].lo, cx.solids[s].hi, cx.solids[t].lo, cx.solids[t].hi, 0.0) {
+                    continue;
+                }
+                let ws: HashSet<u32> = cx.solids[s].faces.iter().flat_map(|&f| cx.faces[f].edges.iter().flat_map(|&(e, _)| cx.edges[e].v)).collect();
+                // Clear of all of the solid's surfaces (a vertex on one, or near one, or a free-form face: not this way).
+                let clear = |p: DVec3| {
+                    cx.solids[t].faces.iter().all(|&f| match cx.faces[f].s {
+                        Surf::Plane { n, d, .. } => (n.dot(p) - d).abs() > 100.0 * cx.tol,
+                        Surf::Cyl { o, a, r0, k, .. } => {
+                            let w = p - o;
+                            let h = w.dot(a);
+                            ((w - a * h).length() - (r0 + k * h)).abs() / (1.0 + k * k).sqrt() > 100.0 * cx.tol
+                        }
+                        Surf::Nurbs { .. } => false,
+                    })
+                };
+                for w in ws {
+                    // (A ray that can't tell: not this way.)
+                    if cx.pool.inputs[w as usize].len() == 1 && clear(cx.p(w)) && matches!(cx.ray_state(cx.p(w), t), Ok(State::In)) {
+                        return Err(Decline("pattern instances overlapping"));
+                    }
+                }
+            }
+        }
+    }
     // Pairs of solids that may meet, and their faces.
     let ns = cx.solids.len();
     let mut meets = vec![false; ns * ns];
