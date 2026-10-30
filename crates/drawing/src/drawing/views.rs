@@ -944,6 +944,9 @@ pub struct ViewGeometry {
     pub com: Option<[f64; 2]>,
     /// An exploded assembly view's explode lines (view coordinates).
     pub explode_lines: Vec<[[f64; 2]; 2]>,
+    /// The view's broken-out sections whose depth point no longer resolves
+    /// (help V29: their spline turns red; the stored depth still cuts).
+    pub broken_out_lost: Vec<usize>,
     /// Flat pattern views: bend lines and form centermarks.
     pub bends: Vec<FlatBend>,
     /// Cosmetic threads of tapped holes seen end-on: center and major
@@ -1802,6 +1805,7 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
     if !matches!(v.kind, ViewKind::Detail { .. }) {
         simplify_edges(&mut g, &ctx, part.as_ref(), simplification);
     }
+    g.broken_out_lost = v.broken_out.iter().enumerate().filter(|(_, b)| b.depth_ref.as_ref().is_some_and(|r| resolve_point3(&ctx, r).is_none())).map(|(i, _)| i).collect();
     // Center of mass of the view's parts (parts with materials), a snap
     // point for dimensions.
     if v.show_com {

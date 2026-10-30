@@ -826,8 +826,21 @@ fn broken_out_section_exposes_interior() {
     let ctx = sources[&SourceKey::studio(studio)].context.clone();
     let back = views::vertex_ref_near(&ctx, glam::DVec3::new(-0.05, 0.03, 0.0), 1e-6).expect("back vertex");
     let frame = g.frame.unwrap();
-    let bo = BrokenOut { profile, spline: true, depth: 0.0, depth_ref: Some(back) };
+    let bo = BrokenOut { profile, spline: true, depth: 0.0, depth_ref: Some(back.clone()) };
     assert!((views::broken_out_depth(&ctx, None, &frame, &bo) - 0.06).abs() < 1e-9);
+    // Its depth point gone after an update (help V29): the profile is drawn
+    // red, the stored depth still cuts.
+    let mut lost = back;
+    let (PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. }) = &mut lost;
+    body.index += 1000;
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out[0].depth_ref = Some(lost);
+    let cache = ViewCache::new();
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    assert_eq!(g.broken_out_lost, [0]);
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let bp = pick_of(&built, PickTarget::BrokenOut { view: ViewId(1), index: 0 });
+    let li = built.geometry.lines.iter().position(|l| l.pick == bp).expect("the profile");
+    assert!(built.geometry.colors.iter().any(|c| c.lines.contains(&li) && c.rgb == [0xdd, 0x52, 0x28]));
 }
 
 #[test]

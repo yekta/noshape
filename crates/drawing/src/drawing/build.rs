@@ -1549,6 +1549,11 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     let poles: Vec<[f64; 2]> = super::cad_objects::catmull_rom_poles(&b.profile).into_iter().map(|p| pl.to_sheet(p)).collect();
                     g.add_cad_spline(cad_mark.0, poles);
                 }
+                // Its depth point lost in an update: red (help V29; live's
+                // dangling #DD5228).
+                if geo.broken_out_lost.contains(&index) {
+                    g.colors.push(super::sheet::ColorSpan { lines: cad_mark.0..g.lines.len(), texts: 0..0, fills: 0..0, rgb: [0xdd, 0x52, 0x28] });
+                }
                 g.cad_since(cad_mark, CadLayer::SectionJogLines);
             }
             // Detail boundary ("Show detail view profile"; none with "Clip
