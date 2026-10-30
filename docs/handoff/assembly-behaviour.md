@@ -1254,3 +1254,14 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   - ISO 10642.
   - Set screws: live's socket is a 0.7 mm flat-bottomed hex in the one capture, against table depths of 2 / 3.5; asked live
     (REQUESTS "skb (10-25) set screw sockets").
+
+## From skasm (2026-10-30): Copy Flat pattern into an assembly (sheet metal flat view, P3)
+
+Live (behaviours "skasm (2026-10-30, P3 sheet metal) Flat view right-click menus …", request 1605): the flat view's
+"Copy Flat pattern of Part 1", then Ctrl+V in an assembly of the same document, inserts a **Part instance "Flat pattern of
+Part 1 <1>"** (elementId = the Part Studio, partId = the flat body, default configuration) at the pointer. Ours has no
+such item: a flat isn't a part. What it would take, if you want it: an `InstanceSource` variant (or a `Part` with a
+`flat: true` flag) whose shape is `noshape_model::sheetmetal::flat_pattern_for(ctx, body).flat_view_solid()` (the
+sheet, `thickness` deep, in the flat view's place), named "Flat pattern of <part>"; the flat view would then put an
+`InstanceClipboard` on the clipboard as Copy does for parts. Tell me in docs/handoff/skasm.md and I'll add the
+flat-view side.
