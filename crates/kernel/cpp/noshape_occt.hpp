@@ -131,6 +131,11 @@ bool                                        budget_timer_start(void*& timer);
 void                                        budget_timer_stop(void* timer);
 double                                      thread_cpu_seconds();
 clockid_t                                   this_thread_cpu_clock();
+// The process's resident bytes; malloc_trim when they grew > 512 MB since
+// `start` (glibc keeps what a big op freed: a fuzz session's 95 MB of live
+// heap held 1.1 GB): after budgeted ops as after Booleans (boolean.cpp).
+size_t process_resident_bytes();
+void   trim_if_grown(size_t start);
 #endif
 // CPU seconds a blend, draft or shell may take (30; NOSHAPE_BLEND_BUDGET).
 double blend_budget_seconds();
@@ -210,8 +215,10 @@ int run_budgeted(double cpu_seconds, F&& f)
   // worker's endless intersection line went on past the budget).
   const int pairs_outer = noshape_bop_set_pairs_parallel_here(0);
   Deadline* const deadline_outer = t_deadline;
+  const size_t    rss_start      = process_resident_bytes();
   if (sigsetjmp(env, 1) != 0)
   {
+    trim_if_grown(rss_start);
     budget_timer_stop(timer);
     budget_timer_live = nullptr;
     crash_guard       = crash_outer;
@@ -241,6 +248,7 @@ int run_budgeted(double cpu_seconds, F&& f)
     budget_timer_live = nullptr;
     noshape_bop_set_pairs_parallel_here(pairs_outer);
     t_deadline = deadline_outer;
+    trim_if_grown(rss_start);
   };
   try
   {

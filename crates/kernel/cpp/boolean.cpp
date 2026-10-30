@@ -4031,6 +4031,8 @@ bool tools_reach_in(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS
 // handed back to the system (glibc keeps freed memory in its per-thread
 // arenas, so each big Boolean started from the last one's peak: the app grew
 // to 16.7 GB over a knurl document's regenerations, lead 10-30).
+size_t process_resident_bytes() { return resident_bytes(); }
+
 void trim_if_grown(size_t start)
 {
 #if defined(__linux__) && defined(__GLIBC__)
