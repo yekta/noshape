@@ -1697,12 +1697,32 @@ impl SheetGeometry {
                     let rows: Vec<&Vec<String>> = std::iter::once(frame).chain(extra.rows.iter()).collect();
                     let sym_w = rows.iter().filter_map(|r| r.first()).filter(|c| c.as_str() != "Composite").map(|c| cell_w(c)).fold(7.0 * k, f64::max);
                     // On a dimension it follows the dimension (live request 1624).
-                    let (x0, y) = match extra.on.as_ref().and_then(|o| Some((o, self.attached_point(&starts, &o.at)?.0))) {
-                        Some((o, p)) => {
+                    let frame_w = || rows.iter().map(|r| sym_w + r.iter().skip(1).filter(|c| !c.is_empty()).map(|c| cell_w(c)).sum::<f64>()).fold(0.0, f64::max);
+                    let mut beside_leader = None;
+                    let (x0, y) = match extra.on.as_ref().and_then(|o| Some((o, self.attached_point(&starts, &o.at)?))) {
+                        // Dragged off the dimension: on its line's axis, past
+                        // an end; the line runs on to the frame as a leader
+                        // with an arrowhead at that end, from outside.
+                        Some((o, (p, w0, w1, _))) if o.beside => {
+                            let d = [w1[0] - w0[0], w1[1] - w0[1]];
+                            let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-12);
+                            let u = [d[0] / l, d[1] / l];
+                            let q = [p[0] + u[0] * o.offset[0], p[1] + u[1] * o.offset[0]];
+                            let t = ((q[0] - w0[0]) * u[0] + (q[1] - w0[1]) * u[1]) / l;
+                            if t > 1.0 {
+                                beside_leader = Some((q, w1));
+                                (q[0], q[1] - rh / 2.0)
+                            } else if t < 0.0 {
+                                beside_leader = Some((q, w0));
+                                (q[0] - frame_w(), q[1] - rh / 2.0)
+                            } else {
+                                (q[0], q[1] - rh / 2.0)
+                            }
+                        }
+                        Some((o, (p, ..))) => {
                             let q = [p[0] + o.offset[0], p[1] + o.offset[1]];
                             if o.centered {
-                                let w = rows.iter().map(|r| sym_w + r.iter().skip(1).filter(|c| !c.is_empty()).map(|c| cell_w(c)).sum::<f64>()).fold(0.0, f64::max);
-                                (q[0] - w / 2.0, q[1] - rh)
+                                (q[0] - frame_w() / 2.0, q[1] - rh)
                             } else {
                                 (q[0], q[1] - rh / 2.0)
                             }
@@ -1749,6 +1769,10 @@ impl SheetGeometry {
                     }
                     if !extra.lower.is_empty() {
                         self.texts.push(Text2 { pos: [x0, bottom - 1.0 * k - h], height: h, text: extra.lower.clone(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+                    }
+                    if let Some((from, end)) = beside_leader {
+                        self.lines.push(Polyline2 { points: vec![from, end], style: LineStyle::Thin, closed: false, pick });
+                        self.arrow(end, [end[0] - from[0], end[1] - from[1]], 3.0);
                     }
                     // Leaders leave the nearer short side of the first row through
                     // a shoulder; All around / All over add a circle (two) there.

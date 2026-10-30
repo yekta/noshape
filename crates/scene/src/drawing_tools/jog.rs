@@ -417,8 +417,19 @@ impl SheetPick<'_> {
             }
             AnnotationKind::Gdt { anchor, extra, .. } => {
                 *anchor = [anchor[0] + d[0], anchor[1] + d[1]];
+                // Under a dimension's value it stays bound to it, sliding
+                // along its line (the drag across ignored; live request
+                // 1624); on an extension line it moves freely.
+                let seg = extra.on.as_ref().filter(|o| o.centered || o.beside).and_then(|o| self.attach_segment(&o.at));
                 if let Some(o) = &mut extra.on {
-                    o.offset = [o.offset[0] + d[0], o.offset[1] + d[1]];
+                    match seg {
+                        Some((w0, w1)) => {
+                            let u = norm(sub(w1, w0));
+                            let s0 = if o.beside { o.offset[0] } else { dot(o.offset, u) };
+                            *o = noshape_model::drawing::GdtOn { offset: [s0 + dot(d, u), 0.0], centered: false, beside: true, ..*o };
+                        }
+                        None => o.offset = [o.offset[0] + d[0], o.offset[1] + d[1]],
+                    }
                 }
             }
             // An edge to edge centerline (no model points) moves by its

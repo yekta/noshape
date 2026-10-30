@@ -2341,7 +2341,7 @@ fn gdt_on_dimension_follows_it() {
     let cache = ViewCache::new();
     let dim = drawing.sheets[0].annotations.iter().find(|a| matches!(a.kind, AnnotationKind::LinearDimension { .. })).expect("a linear dimension").id;
     let id = drawing.sheets[0].next_annotation_id();
-    let extra = GdtExtra { on: Some(GdtOn { at: DatumOn { ann: dim, line: 0, seg: 0, t: 0.5 }, offset: [0.0, -3.0], centered: true }), ..Default::default() };
+    let extra = GdtExtra { on: Some(GdtOn { at: DatumOn { ann: dim, line: 0, seg: 0, t: 0.5 }, offset: [0.0, -3.0], centered: true, beside: false }), ..Default::default() };
     drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: [10.0, 10.0], frame: vec!["⌖".into(), "0.1".into()], leaders: vec![], extra: Box::new(extra) }, position: [10.0, 10.0], ..Default::default() });
     let frame_at = |drawing: &Drawing| {
         let built = render_sheet(drawing, 0, &sources, &cache, false).unwrap();
@@ -2363,6 +2363,25 @@ fn gdt_on_dimension_follows_it() {
     let (dm, dt) = ([m1[0] - m0[0], m1[1] - m0[1]], [t1[0] - t0[0], t1[1] - t0[1]]);
     assert!((dm[0].abs() + dm[1].abs()) > 1.0, "the dimension moved: {dm:?}");
     assert!((dm[0] - dt[0]).abs() < 1e-6 && (dm[1] - dt[1]).abs() < 1e-6, "{dm:?} {dt:?}");
+    // Dragged off the dimension (beside): on the line's axis past its end,
+    // with the line run on to it and an arrowhead at the end.
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let dpick = built.picks.iter().position(|p| *p == PickTarget::Annotation(dim)).unwrap() as u32;
+    let l = built.geometry.lines.iter().find(|l| l.pick == dpick).unwrap();
+    let (w0, w1) = (l.points[0], l.points[1]);
+    let len = (w1[0] - w0[0]).hypot(w1[1] - w0[1]);
+    if let AnnotationKind::Gdt { extra, .. } = &mut drawing.sheets[0].annotations.last_mut().unwrap().kind {
+        extra.on = Some(GdtOn { at: DatumOn { ann: dim, line: 0, seg: 0, t: 0.5 }, offset: [len / 2.0 + 10.0, 0.0], centered: false, beside: true });
+    }
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(id)).unwrap() as u32;
+    let u = [(w1[0] - w0[0]) / len, (w1[1] - w0[1]) / len];
+    let q = [w1[0] + u[0] * 10.0, w1[1] + u[1] * 10.0];
+    let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).abs() < 1e-6 && (a[1] - b[1]).abs() < 1e-6;
+    assert!(built.geometry.lines.iter().any(|l| l.pick == pick && l.points.len() == 2 && near(l.points[0], q) && near(l.points[1], w1)), "leader from the frame to the line's end");
+    if let AnnotationKind::Gdt { extra, .. } = &mut drawing.sheets[0].annotations.last_mut().unwrap().kind {
+        extra.on = Some(GdtOn { at: DatumOn { ann: dim, line: 0, seg: 0, t: 0.5 }, offset: [0.0, -3.0], centered: true, beside: false });
+    }
     // A leader to a face ends in a dot, not an arrowhead.
     let before = render_sheet(&drawing, 0, &sources, &cache, false).unwrap().geometry.fills.len();
     if let AnnotationKind::Gdt { leaders, extra, .. } = &mut drawing.sheets[0].annotations.last_mut().unwrap().kind {

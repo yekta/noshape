@@ -446,7 +446,7 @@ impl SheetPick<'_> {
         let mid = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0];
         let (q, at) = self.attach_at(mid, f64::INFINITY, &|a: &Annotation| a.id == dim)?;
         let top = [mid[0], lo[1] - 1.0];
-        Some(GdtOn { at, offset: sub(top, q), centered: true })
+        Some(GdtOn { at, offset: sub(top, q), centered: true, beside: false })
     }
 
     /// A geometric tolerance clicked on a hovered dimension's line (live
@@ -459,7 +459,7 @@ impl SheetPick<'_> {
         let value = self.built?.resolved.annotations.iter().find(|x| x.id == at.ann).map(|x| x.position).unwrap_or(q);
         let (t, end) = if len(sub(w0, value)) <= len(sub(w1, value)) { (0.0, w0) } else { (1.0, w1) };
         at.t = t;
-        Some(GdtOn { at, offset: sub(q, end), centered: false })
+        Some(GdtOn { at, offset: sub(q, end), centered: false, beside: false })
     }
 
     /// The hovered dimension's line nearest `c`: where on it, the point and
@@ -469,9 +469,17 @@ impl SheetPick<'_> {
         let Some(noshape_model::drawing::build::PickTarget::Annotation(id)) = self.hover.and_then(|h| b.picks.get(h as usize)) else { return None };
         let id = *id;
         let (q, on) = self.attach_at(c, f64::INFINITY, &|a: &Annotation| a.id == id && a.kind.is_dimension())?;
-        let l = b.geometry.lines.iter().filter(|l| matches!(b.picks.get(l.pick as usize), Some(noshape_model::drawing::build::PickTarget::Annotation(x)) if *x == id)).nth(on.line as usize)?;
+        let (w0, w1) = self.attach_segment(&on)?;
+        Some((on, q, w0, w1))
+    }
+
+    /// The ends of the segment of an annotation's lines `on` names, as
+    /// built (sheet mm).
+    pub fn attach_segment(&self, on: &DatumOn) -> Option<([f64; 2], [f64; 2])> {
+        let b = self.built?;
+        let l = b.geometry.lines.iter().filter(|l| matches!(b.picks.get(l.pick as usize), Some(noshape_model::drawing::build::PickTarget::Annotation(x)) if *x == on.ann)).nth(on.line as usize)?;
         let (i, n) = (on.seg as usize, l.points.len());
-        Some((on, q, *l.points.get(i)?, l.points[(i + 1) % n]))
+        Some((*l.points.get(i)?, l.points[(i + 1) % n]))
     }
 
     /// The Weld symbol tool's first click: the entity the arrow points at

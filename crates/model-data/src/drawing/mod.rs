@@ -3534,13 +3534,17 @@ pub struct GdtExtra {
 /// Where a geometric tolerance sits on a dimension: `offset` (sheet mm)
 /// from the point `at` of the dimension's lines to the frame's top centre
 /// (`centered`: placed on the value, centred under it) or its left middle
-/// (placed on a line: the left edge on it).
+/// (placed on a line: the left edge on it). `beside`: dragged off the
+/// dimension (live request 1624), the frame slides along the dimension
+/// line, `offset[0]` from `at`, and the line runs on to it as a leader.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GdtOn {
     pub at: DatumOn,
     pub offset: [f64; 2],
     #[serde(default)]
     pub centered: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub beside: bool,
 }
 
 impl GdtExtra {
