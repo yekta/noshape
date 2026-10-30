@@ -53,6 +53,20 @@ impl Render for SheetDrag {
     }
 }
 
+/// A view or table row dragged in the Sheets panel onto a sheet row:
+/// moved to that sheet (help sheets, drawing.md S9 / TB30). No ghost.
+#[derive(Clone)]
+pub struct ItemDrag {
+    view: Option<ViewId>,
+    table: Option<u64>,
+}
+
+impl Render for ItemDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
 /// Width of the open Sheets panel (live drawing/30).
 pub const SHEETS_W: f32 = 258.;
 
@@ -376,6 +390,7 @@ impl DrawingEditor {
             _ => None,
         });
         crate::ui::tree_row(SharedString::from(format!("dr-table-{id}")), self.selection.contains(&Sel::Table(id)))
+            .on_drag(ItemDrag { view: None, table: Some(id) }, |d, _, _, cx| cx.new(|_| d.clone()))
             .pl(px(indent))
             .text_color(rgb(0x666666))
             .child(sheets_icon(icon, cx))
@@ -455,7 +470,7 @@ impl DrawingEditor {
             .child(sheets_icon(icon, cx))
             .child(div().flex_1().truncate().child(label))
             .when(current, |row| {
-                row.on_click(cx.listener(move |this, e: &ClickEvent, _, cx| {
+                row.on_drag(ItemDrag { view: Some(id), table: None }, |d, _, _, cx| cx.new(|_| d.clone())).on_click(cx.listener(move |this, e: &ClickEvent, _, cx| {
                     let m = e.modifiers();
                     if m.control || m.platform {
                         match this.selection.iter().position(|s| *s == Sel::View(id)) {
@@ -634,6 +649,17 @@ impl DrawingEditor {
                 .on_drop(cx.listener(|this, d: &SheetDrag, _, cx| {
                     if let Some(to) = this.sheet_drop {
                         this.drop_sheets(&d.rows, to, cx);
+                    }
+                }))
+                // A view or table row dropped on another sheet moves there.
+                .on_drop(cx.listener(move |this, d: &ItemDrag, _, cx| {
+                    if i == this.sheet {
+                        return;
+                    }
+                    if let Some(v) = d.view {
+                        this.move_selected_views(v, Some(i), cx);
+                    } else if let Some(t) = d.table {
+                        this.move_table_to_sheet(t, Some(i), cx);
                     }
                 }))
                 // Live: a blue line across the panel where the rows go.
