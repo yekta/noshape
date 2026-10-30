@@ -2129,6 +2129,21 @@ impl AnnStyle {
     }
 }
 
+impl Annotation {
+    /// The view it moves with (help A20: annotations attached to view
+    /// geometry are grouped automatically; a note attaches to one view
+    /// only): its Group view, else a note's first leader on a view's
+    /// geometry, else a callout's anchor view.
+    pub fn moves_with_view(&self) -> Option<ViewId> {
+        self.view_group.or(match &self.kind {
+            AnnotationKind::Note { style, .. } => style.leaders.iter().find_map(|l| l.view),
+            AnnotationKind::Balloon { view, .. } => Some(*view),
+            _ => None,
+        })
+        .filter(|v| *v != SHEET_VIEW)
+    }
+}
+
 impl Default for Annotation {
     fn default() -> Self {
         Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, text_along: None, loose: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None, target: None, sketch_dim: None, model: None }

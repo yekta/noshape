@@ -1122,8 +1122,9 @@ impl DrawingEditor {
                             v.position = [p[0] + d[0], p[1] + d[1]];
                         }
                     }
-                    // Notes and callouts grouped with a moved view go along.
-                    for a in s.annotations.iter_mut().filter(|a| a.view_group.is_some_and(|v| orig.iter().any(|(o, _)| *o == v))) {
+                    // Notes and callouts grouped with a moved view, or attached
+                    // to its geometry, go along (help A20).
+                    for a in s.annotations.iter_mut().filter(|a| a.moves_with_view().is_some_and(|v| orig.iter().any(|(o, _)| *o == v))) {
                         a.position = [a.position[0] + d[0], a.position[1] + d[1]];
                     }
                 }

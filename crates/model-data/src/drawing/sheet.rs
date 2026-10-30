@@ -3138,6 +3138,23 @@ mod tests {
         assert!((r[2] - x1).abs() < 1e-9 && (r[1] - y0).abs() < 1e-9 && (r[3] - r[1] - 4.953).abs() < 1e-9 && (r[2] - r[0] - 94.869).abs() < 1e-9, "{r:?}");
     }
 
+    /// Help A20: a note whose leader ends on a view, and a callout anchored
+    /// in one, move with that view; a sheet note doesn't.
+    #[test]
+    fn annotations_attached_to_a_view_move_with_it() {
+        use super::super::{Annotation, AnnotationKind, Leader, ViewId, SHEET_VIEW};
+        let mut note = Annotation { kind: AnnotationKind::note("N", 3.5), ..Default::default() };
+        assert_eq!(note.moves_with_view(), None);
+        if let AnnotationKind::Note { style, .. } = &mut note.kind {
+            style.leaders.push(Leader { view: Some(ViewId(3)), point: [0.01, 0.0], ..Default::default() });
+        }
+        assert_eq!(note.moves_with_view(), Some(ViewId(3)));
+        let callout = Annotation { kind: AnnotationKind::Balloon { view: ViewId(2), anchor: [0.0; 2], text: String::new(), callout: Default::default() }, ..Default::default() };
+        assert_eq!(callout.moves_with_view(), Some(ViewId(2)));
+        let free = Annotation { kind: AnnotationKind::Balloon { view: SHEET_VIEW, anchor: [0.0; 2], text: String::new(), callout: Default::default() }, ..Default::default() };
+        assert_eq!(free.moves_with_view(), None);
+    }
+
     /// After an ISO A3 sheet: the same strip, 4/3 the ANSI A one (live 1603,
     /// samples/dx1603-iso-a3-sheet2.dxf, mm): cells from x 284.008, 339.888,
     /// 352.588, 374.94, 400.34 to the frame's 410.5, 6.604 high; DWG NO. at
