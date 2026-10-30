@@ -688,6 +688,20 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   vertex of one sheet on the other's edge between its vertices, as do the plain overlaps, so the vertex rule can't
   tell them apart yet: the conservative rule stays (53 taken).
 
+## Patterns whose instances reach into the target (10-30 07:30 UTC)
+- A pattern's checked glue (fuse, glue shift_checked, many tools) whose instances overlap the target declined
+  ("pattern instances overlapping") and went OCCT's way: GlueShift, its volumes not adding up, then fuse_trimmed
+  (each instance cut by the target, then a glued fuse of what's left). The main corpus's three such fuses were its
+  biggest time left (217 s recorded; two of 999 instances). Now the Rust path does what fuse_trimmed does, noshape's
+  Boolean throughout (`rust_fuse_trimmed`, boolean.cpp): the instances' cuts (in parallel, as OCCT's), then the
+  touching fuse, the history composed as fuse_trimmed's; any decline gives up (OCCT's way then). op_boolean tries the
+  touching fuse first under `RustLenient` (a decline returns even in the replay's strict mode) and reads why it
+  declined (`rust_last_decline`, a new bridge call).
+- The three taken, as OCCT: 999 instances in ~16–19 s against OCCT's ~37 s in the same replay (loaded machine);
+  the 9-instance one 15 ms against 177 ms. Of the 16 s: the first, touching attempt ~2.6 s (it declines at
+  classification), the cuts ~6 s, the fuse the rest; telling the overlap earlier would save the first.
+- T1: the 9-instance case (58c61d5d) in tests/data/brep (taken in strict mode).
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|

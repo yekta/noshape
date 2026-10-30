@@ -63,13 +63,23 @@ namespace noshape {
 bool rust_boolean_on() { return brep_enabled(); }
 
 namespace {
+// While a caller tries noshape's Boolean one way before another (RustLenient): a decline returns, even in the
+// replay's strict mode; why, for the caller.
+thread_local int t_lenient = 0;
+} // namespace
+
+RustLenient::RustLenient() { ++t_lenient; }
+RustLenient::~RustLenient() { --t_lenient; }
+std::string rust_last_decline() { return std::string(brep_last_decline()); }
+
+namespace {
 
 // Declines (the replay's strict mode: fails).
 bool decline(const char* why)
 {
   if (why != nullptr)
     brep_decline(why);
-  if (brep_strict())
+  if (brep_strict() && t_lenient == 0)
     fail_unsupported("noshape's Boolean declined");
   return false;
 }

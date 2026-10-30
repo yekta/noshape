@@ -171,6 +171,16 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
                     bool parallel, std::vector<char>& taken, std::vector<RustFace>& meshes, std::vector<std::vector<std::array<float, 3>>>& polys);
 // Notes why it wasn't tried (false; the replay's strict mode fails).
 bool rust_decline(const char* why);
+// While one lives, this thread's declines of noshape's Boolean return instead of failing in the replay's strict
+// mode (a caller trying it one way before another); rust_last_decline says why the last one declined.
+struct RustLenient
+{
+  RustLenient();
+  ~RustLenient();
+  RustLenient(const RustLenient&)            = delete;
+  RustLenient& operator=(const RustLenient&) = delete;
+};
+std::string rust_last_decline();
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
                   double fuzzy = 0, bool touching_only = false);
