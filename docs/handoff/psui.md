@@ -178,6 +178,11 @@ timer fired late (locally ~180 ms). d21f7678: the wait only for bursts → perf 
 (both macOS), redo ~30, commit ~100. Two slow outliers per OS remain (250–350 ms between scheduling and the
 result); 62d49da8 logs whether that's the thread start or the lock (`regen #n: started … lock …`); perf
 41020683102 dispatched: read it, then close COMMIT-LATENCY or chase the outliers.
+10-30 10:50: perf 41036130143 (4b4e2b4a, logs "polled"): the slow undo / redo (166–462 ms, 3–4 of 18 per OS)
+are the UI thread first running the spawned regen task 170–430 ms late (regen 1 ms, lock 0, nothing else on the
+UI thread): App Nap on the runner's background window. This commit holds gpui's prevent_app_nap activity for the
+regen task (schedule → shown). Next: dispatch perf (jobs=bench, live-30, NOSHAPE_PERF_SCRIPT=edit-undo-redo) on it;
+if the outliers are gone close COMMIT-LATENCY (commit / undo / redo all within 200 ms), else look at the run loop.
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC
