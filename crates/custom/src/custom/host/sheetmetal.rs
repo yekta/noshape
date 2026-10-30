@@ -71,6 +71,9 @@ struct Definition {
     rips: Vec<usize>,
     /// Rip styles other than EDGE (BUTT / BUTT2) by rip edge.
     rip_styles: BTreeMap<usize, String>,
+    /// Each joint's attribute id (its pieces share it after a cut splits it):
+    /// by edge, and by rolled face.
+    joint_ids: JointIds,
     clearance: f64,
     /// Bend relief at the ends of a partial bend: style, depth scale (× bend
     /// radius) and width scale (× thickness), from the model attribute.
@@ -96,22 +99,33 @@ struct Definition {
 
 /// A definition body's bends (edge index → radius), rips (edge indices),
 /// rolled bends (face index → radius) and butt rip styles (edge → style).
-type Joints = (BTreeMap<usize, f64>, Vec<usize>, BTreeMap<usize, f64>, BTreeMap<usize, String>);
+/// Bends (edge → radius), rips, rolled bends (face → radius), rip styles,
+/// and each joint's attribute id (edges, then rolled faces).
+type Joints = (BTreeMap<usize, f64>, Vec<usize>, BTreeMap<usize, f64>, BTreeMap<usize, String>, JointIds);
+type JointIds = (BTreeMap<usize, Arc<str>>, BTreeMap<usize, Arc<str>>);
 
 fn joints(st: &CtxState, q: &QueryCx, b: usize) -> Joints {
     let mut bends = BTreeMap::new();
     let mut rips = Vec::new();
     let mut styles = BTreeMap::new();
     let mut rolled = BTreeMap::new();
+    let mut ids: JointIds = (BTreeMap::new(), BTreeMap::new());
+    let id_of = |j: &Value| j.get("attributeId").as_str().map(|s| Arc::<str>::from(&*s));
     for f in 0..st.ctx.bodies[b].faces.len() {
         if let Some(j) = sm_attribute(st, &q.to_ref(&Ent::Face(b, f)), "JOINT")
             && j.get("jointType").get("value").as_str().as_deref() == Some("BEND")
         {
             rolled.insert(f, length_field(&j, "radius"));
+            if let Some(id) = id_of(&j) {
+                ids.1.insert(f, id);
+            }
         }
     }
     for e in 0..st.ctx.bodies[b].edges.len() {
         let Some(j) = sm_attribute(st, &q.to_ref(&Ent::Edge(b, e)), "JOINT") else { continue };
+        if let Some(id) = id_of(&j) {
+            ids.0.insert(e, id);
+        }
         match j.get("jointType").get("value").as_str().as_deref() {
             Some("BEND") => {
                 bends.insert(e, length_field(&j, "radius"));
@@ -125,7 +139,7 @@ fn joints(st: &CtxState, q: &QueryCx, b: usize) -> Joints {
             _ => {}
         }
     }
-    (bends, rips, rolled, styles)
+    (bends, rips, rolled, styles, ids)
 }
 
 /// An enum field of an SM attribute (stored bare: `defaultBendReliefStyle : OBROUND`).
@@ -1543,7 +1557,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             if !changed_owners.is_empty() && !changed_owners.contains(&body.id) {
                 continue;
             }
-            let (bends, rips, rolled, rip_styles) = joints(&st, &q, b);
+            let (bends, rips, rolled, rip_styles, joint_ids) = joints(&st, &q, b);
             // The part made from it before: the solid carrying its association.
             let own = associations(&st, &body_ref);
             let previous: Vec<BodyId> = st.ctx.bodies.iter().enumerate().filter(|(pb, p)| p.kind == BodyKind::Solid && !own.is_empty() && associations(&st, &q.to_ref(&Ent::Body(*pb))).iter().any(|x| own.contains(x))).map(|(_, p)| p.id.clone()).collect();
@@ -1557,7 +1571,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     }
                 }
             }
-            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous, wall_ids });
+            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous, wall_ids });
             let faces: Vec<Reference> = (0..body.faces.len()).map(|f| q.to_ref(&Ent::Face(b, f))).collect();
             let edges: Vec<Reference> = (0..body.edges.len()).map(|e| q.to_ref(&Ent::Edge(b, e))).collect();
             let vertices: Vec<Reference> = (0..body.vertices.len()).map(|v| q.to_ref(&Ent::Vertex(b, v))).collect();
@@ -1768,24 +1782,35 @@ fn births(seen: &mut Vec<Vec<i64>>, def: &Definition, topo: &Topo) -> (Vec<u64>,
     // and each face only grew (live qa5: a Tab merged into the plate kept
     // the plate's bends, the Hem's trim of the plate renewed them; a
     // Flange's new wall renews the edge it stands on).
-    let same = |x: &Vec<i64>, head: &[i64], faces: &[[i64; 6]]| {
+    // A face a cut split (one of several coplanar pieces inside the old
+    // face's box) is kept too (live qa4 S1: a cut across the plate kept its
+    // bend as Bend A); one face that only shrank is not.
+    let boxes: Vec<[i64; 6]> = (0..topo.faces.len()).map(boxed).collect();
+    let planes: Vec<Option<(DVec3, DVec3)>> = topo.faces.iter().map(|f| f.face_plane().ok().flatten().and_then(|_| face_normal(f).ok())).collect();
+    let split = |f: usize, o: &[i64]| {
+        let Some((p, n)) = planes[f] else { return false };
+        holds(o, &boxes[f]) && (0..topo.faces.len()).any(|g| g != f && holds(o, &boxes[g]) && planes[g].is_some_and(|(pg, ng)| ng.dot(n) > 1.0 - 1e-9 && (pg - p).dot(n).abs() < TOL))
+    };
+    let kept = |f: u32, o: &[i64]| holds(&boxes[f as usize], o) || split(f as usize, o);
+    let same = |x: &Vec<i64>, head: &[i64], faces: &[u32]| {
         if x.len() != head.len() + 6 * faces.len() || x[..head.len()] != *head {
             return false;
         }
         let old: Vec<&[i64]> = x[head.len()..].chunks(6).collect();
         match faces.len() {
             0 => true,
-            2 => (holds(&faces[0], old[0]) && holds(&faces[1], old[1])) || (holds(&faces[0], old[1]) && holds(&faces[1], old[0])),
-            _ => faces.iter().zip(&old).all(|(f, o)| holds(f, o)),
+            2 => (kept(faces[0], old[0]) && kept(faces[1], old[1])) || (kept(faces[0], old[1]) && kept(faces[1], old[0])),
+            _ => faces.iter().zip(&old).all(|(f, o)| kept(*f, o)),
         }
     };
-    let keys: Vec<(Vec<i64>, Vec<[i64; 6]>)> = (0..topo.edge_ends.len())
+    let heads: Vec<Vec<i64>> = (0..topo.edge_ends.len())
         .map(|e| {
             let [a, b] = pair(topo.edge_ends[e].0, topo.edge_ends[e].1);
-            ([0, a[0], a[1], a[2], b[0], b[1], b[2]].to_vec(), topo.edge_faces[e].iter().map(|f| boxed(*f as usize)).collect())
+            [0, a[0], a[1], a[2], b[0], b[1], b[2]].to_vec()
         })
         .collect();
-    let found: Vec<Option<usize>> = keys.iter().map(|(h, f)| seen.iter().position(|x| same(x, h, f))).collect();
+    let keys: Vec<(Vec<i64>, Vec<[i64; 6]>)> = heads.iter().enumerate().map(|(e, h)| (h.clone(), topo.edge_faces[e].iter().map(|f| boxes[*f as usize]).collect())).collect();
+    let found: Vec<Option<usize>> = (0..keys.len()).map(|e| seen.iter().position(|x| same(x, &heads[e], &topo.edge_faces[e]))).collect();
     // New ones: those renewed in place (same ends, a face rebuilt) first,
     // then moved and new ones, each in definition order (live qa5: the Hem
     // renewed x = 0 before y = 0, whose end it moved, then made its own).
@@ -1871,6 +1896,10 @@ fn sheet_data(def: &Definition, topo: &Topo, strips: &[Strip], part: &PartOf, fl
                 Some(fi) => births.1.get(&fi).copied().unwrap_or(u64::MAX),
                 None => births.0.get(st.edge).copied().unwrap_or(u64::MAX),
             },
+            joint: match st.rolled {
+                Some(fi) => def.joint_ids.1.get(&fi).cloned(),
+                None => def.joint_ids.0.get(&st.edge).cloned(),
+            },
         });
     }
     for &e in def.rips.iter().filter(|&&e| !coplanar_rip(topo, e)) {
@@ -1888,6 +1917,7 @@ fn sheet_data(def: &Definition, topo: &Topo, strips: &[Strip], part: &PartOf, fl
             other: if b_here.is_none() { b.and_then(|b| others.get(&b).cloned()) } else { None },
             faces: named(Def::Edge(e)).into_iter().map(|x| x.1).collect(),
             birth: births.0.get(e).copied().unwrap_or(u64::MAX),
+            joint: def.joint_ids.0.get(&e).cloned(),
         });
     }
     data
@@ -2246,9 +2276,9 @@ fn ev_sheet_metal_flat_transformation(i: &mut Interp, a: Vec<Value>) -> R<Value>
         });
         def_entity.map(|(e, b, model)| {
             let body = &st.ctx.bodies[b];
-            let (bends, rips, rolled, rip_styles) = joints(&st, &q, b);
+            let (bends, rips, rolled, rip_styles, joint_ids) = joints(&st, &q, b);
             let k_factor = model.get("k-factor").get("value").as_number().unwrap_or(0.45);
-            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new(), wall_ids: BTreeMap::new() };
+            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new(), wall_ids: BTreeMap::new() };
             (e, body.shape.clone(), def, k_factor)
         })
     };

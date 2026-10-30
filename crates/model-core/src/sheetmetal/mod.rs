@@ -106,6 +106,9 @@ pub struct Bend {
     pub flat: bool,
     /// When its definition entity appeared ([`crate::regen::context::Context::sm_births`]; 0 natively).
     pub birth: u64,
+    /// Its joint attribute's id: a bend a cut split is one joint (live: one
+    /// table row, qa4 S1); `None` natively.
+    pub joint: Option<std::sync::Arc<str>>,
 }
 
 impl Bend {
@@ -172,6 +175,8 @@ pub struct Rip {
     pub faces: Vec<Name>,
     /// When its definition edge appeared (as [`Bend::birth`]).
     pub birth: u64,
+    /// Its joint attribute's id (as [`Bend::joint`]).
+    pub joint: Option<std::sync::Arc<str>>,
 }
 
 impl Rip {

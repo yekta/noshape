@@ -820,6 +820,26 @@ fn qa4_s1_enclosure_as_live() {
     assert!((size.x - 128.9165).abs() < 1e-3 && (size.y - 129.4650).abs() < 1e-3 && fp.bend_lines.len() == 6, "flat {size:?}, {} bend lines", fp.bend_lines.len());
     let ok = |(v, n): (f64, usize), (lv, ln): (f64, usize)| (v - lv).abs() < 1e-3 && n == ln;
     assert!(ok(flange, (20295.0752, 34)) && ok(hem, (22074.8607, 43)) && ok(cut, (20805.4123, 61)), "flange {flange:?}, hem {hem:?}, cut {cut:?}: {:#?}", face_report(&r));
+    // Live's table (behaviours "qa4 round 4 s1" (b)): Bend A (x = 100),
+    // Hem D, Bend E, Bend F; Other joints Joint B, Joint C. A long bend the
+    // slot split is one row: its pieces share the joint.
+    use noshape_model::sheetmetal::BendKind;
+    let data = r.context.sheet_metal.get(&r.context.bodies[part(&r)].id).expect("data");
+    let long: Vec<_> = data.bends.iter().filter(|b| !matches!(b.kind, BendKind::Hem) && b.axis.x.abs() > 0.9).collect();
+    let mut joints: Vec<_> = long.iter().map(|b| b.joint.clone().expect("joint id")).collect();
+    joints.sort();
+    joints.dedup();
+    let birth = |j: &std::sync::Arc<str>| long.iter().filter(|b| b.joint.as_ref() == Some(j)).map(|b| b.birth).min().unwrap_or(0);
+    let x100 = data.bends.iter().find(|b| b.axis.y.abs() > 0.9).map(|b| b.birth).expect("x = 100 bend");
+    let hem_b = data.bends.iter().find(|b| matches!(b.kind, BendKind::Hem)).map(|b| b.birth).expect("hem");
+    let rips: Vec<u64> = data.rips.iter().map(|r| r.birth).collect();
+    let longs: Vec<u64> = joints.iter().map(birth).collect();
+    assert!(
+        long.len() == 4 && joints.len() == 2 && rips.len() == 2 && rips.iter().all(|&b| x100 < b && b < hem_b) && longs.iter().all(|&b| hem_b < b),
+        "{} long pieces, {} joints; x = 100 {x100}, rips {rips:?}, hem {hem_b}, long {longs:?}",
+        long.len(),
+        joints.len()
+    );
 }
 
 /// The Form dialog's editing logic (std formedEditLogic) fills Target

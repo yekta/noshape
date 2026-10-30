@@ -245,7 +245,7 @@ pub fn recognize(ev: &mut EvalCtx) -> FResult<()> {
                 inner_faces: vec![body.faces[inner].clone()],
                 outer_faces: vec![body.faces[outer].clone()],
                 flat: false,
-                birth: 0,
+                birth: 0, joint: None,
             });
         }
         if ev.length("radius").unwrap_or(0.0) <= 0.0

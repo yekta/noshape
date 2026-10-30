@@ -12,7 +12,8 @@ use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::reference::{BodyId, FeatureId, Reference};
-use noshape_model::sheetmetal::{BendKind, SheetMetalData};
+use noshape_model::sheetmetal::SheetMetalData;
+use noshape_ops::sheetmetal::{bend_faces, bend_row_order, insert_joint_edit, joint_edit_index, joint_rows, plain};
 use std::sync::Arc;
 
 /// os-splitter-container: the tables' default share and the two minimums
@@ -38,112 +39,6 @@ impl Render for SmSplitDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         div()
     }
-}
-
-/// One row of the Bends or Other joints table.
-struct JointRow {
-    name: String,
-    radius: f64,
-    angle: f64,
-    up: Option<bool>,
-    k_factor: f64,
-    /// Other joints: the rip's style.
-    style: &'static str,
-}
-
-/// The rows of a sheet metal model: (bends, other joints). Live ("ui (10-24
-/// a)" (1)): one letter sequence over all the model's joints in the order
-/// their features made them, a feature's bends before its rips ("Bend A +
-/// Joint B + Joint C" from one Flange); "<kind> <letter>", kind Bend / Hem
-/// / Joint. `order`: a feature's place in the list.
-fn joint_rows(data: &SheetMetalData, up: &dyn Fn(usize) -> Option<bool>, order: &dyn Fn(FeatureId) -> usize) -> (Vec<JointRow>, Vec<JointRow>) {
-    let letter = |i: usize| {
-        let mut s = String::new();
-        let mut n = i;
-        loop {
-            s.insert(0, (b'A' + (n % 26) as u8) as char);
-            if n < 26 {
-                break;
-            }
-            n = n / 26 - 1;
-        }
-        s
-    };
-    // One sequence for bends and joints, in the order their definition
-    // entities appeared (live request 1604: Onshape's transient-id order,
-    // an entity a later feature rebuilt last), then (natively) feature
-    // place, bends first, index -> letter.
-    let mut seq: Vec<(u64, usize, u8, usize)> = data.bends.iter().enumerate().map(|(i, b)| (b.birth, order(b.feature), 0, i)).chain(data.rips.iter().enumerate().map(|(i, r)| (r.birth, order(r.feature), 1, i))).collect();
-    seq.sort();
-    let name_of = |kind: u8, i: usize| seq.iter().position(|e| e.2 == kind && e.3 == i).map(letter).unwrap_or_default();
-    let mut joints = Vec::new();
-    for (ri, r) in data.rips.iter().enumerate() {
-        joints.push(JointRow {
-            name: format!("Joint {}", name_of(1, ri)),
-            radius: 0.0,
-            angle: 0.0,
-            up: None,
-            k_factor: 0.0,
-            style: match r.style.as_str() {
-                "BUTT" => "Butt joint - Direction 1",
-                "BUTT2" => "Butt joint - Direction 2",
-                _ => "Edge joint",
-            },
-        });
-    }
-    let mut bends = Vec::new();
-    for (i, b) in data.bends.iter().enumerate() {
-        let kind = match b.kind {
-            BendKind::Bend => "Bend",
-            BendKind::Hem => "Hem",
-            BendKind::Rolled => "Rolled",
-        };
-        bends.push(JointRow { name: format!("{kind} {}", name_of(0, i)), radius: b.radius, angle: b.angle.to_degrees(), up: up(i), k_factor: b.k_factor, style: "" });
-    }
-    (bends, joints)
-}
-
-/// Where a table edit's Modify joint goes (live "ui (10-24 b)"): at the
-/// rollback bar, but before the model's Finish sheet metal model when that
-/// comes first.
-fn joint_edit_index(ps: &noshape_model::partstudio::PartStudio, model: FeatureId) -> usize {
-    let bar = ps.rollback_index();
-    let from = ps.features.iter().position(|f| f.id == model).map_or(0, |i| i + 1);
-    let finish = ps.features.iter().enumerate().skip(from).find(|(_, f)| f.type_id == "sheetMetalEnd" && !f.suppressed).map(|(i, _)| i);
-    finish.map_or(bar, |f| f.min(bar))
-}
-
-/// Insert a table edit's feature at `at`, the rollback bar staying under it.
-fn insert_joint_edit(ps: &mut noshape_model::partstudio::PartStudio, f: noshape_model::partstudio::Feature, at: usize) {
-    let at = at.min(ps.features.len());
-    ps.features.insert(at, f);
-    if let Some(r) = ps.rollback
-        && at <= r
-    {
-        ps.rollback = Some(r + 1);
-    }
-}
-
-/// A bend's faces as references.
-fn bend_faces(b: &noshape_model::sheetmetal::Bend) -> Vec<Reference> {
-    b.inner_faces.iter().chain(&b.outer_faces).map(|n| Reference::Face((**n).clone())).collect()
-}
-
-/// The Bends rows' order (indices into the model's bends): the stored Move
-/// up / Move down order, then the rest in model order.
-fn bend_row_order(data: &SheetMetalData, stored: &[Reference]) -> Vec<usize> {
-    let key = |i: usize| bend_faces(&data.bends[i]).iter().filter_map(|r| stored.iter().position(|s| s == r)).min().unwrap_or(usize::MAX);
-    let mut idx: Vec<usize> = (0..data.bends.len()).collect();
-    idx.sort_by_key(|&i| (key(i), i));
-    idx
-}
-
-/// A table number as live writes it ("2", "0.01", "0.45", "180"): up to
-/// six decimals, trailing zeros dropped.
-fn plain(x: f64) -> String {
-    let s = format!("{:.6}", x);
-    let s = s.trim_end_matches('0').trim_end_matches('.');
-    if s == "-0" { "0".into() } else { s.to_string() }
 }
 
 impl PartStudioView {

@@ -24,11 +24,23 @@ pub struct JointRow {
     pub style: &'static str,
 }
 
-/// The table rows (live "ui (10-24 a)" (1)): one letter sequence over all the
-/// model's joints in the order their features made them, a feature's bends
-/// before its rips ("Bend A + Joint B + Joint C" from one Flange); "<kind>
-/// <letter>", kind Bend / Hem / Joint. `order`: a feature's place in the
-/// list. Rows in model order; [`bend_row_order`] gives the shown order.
+/// The first bend of `i`'s joint (a bend a cut split is one joint: its
+/// pieces share the joint attribute; live qa4 S1, one table row).
+pub fn joint_of(data: &SheetMetalData, i: usize) -> usize {
+    match &data.bends[i].joint {
+        Some(j) => data.bends.iter().position(|b| b.joint.as_ref() == Some(j)).unwrap_or(i),
+        None => i,
+    }
+}
+
+/// The table rows (live "ui (10-24 a)" (1), request 1604): one letter
+/// sequence over all the model's joints in the order their definition
+/// entities appeared (Onshape's transient-id order, an entity a later
+/// feature rebuilt last), then (natively) feature place, bends first,
+/// index; "<kind> <letter>", kind Bend / Hem / Joint. `order`: a feature's
+/// place in the list. Rows in model order, one per bend (a split joint's
+/// pieces share their first piece's letter); [`bend_row_order`] gives the
+/// shown rows.
 pub fn joint_rows(data: &SheetMetalData, up: &dyn Fn(usize) -> Option<bool>, order: &dyn Fn(FeatureId) -> usize) -> (Vec<JointRow>, Vec<JointRow>) {
     let letter = |i: usize| {
         let mut s = String::new();
@@ -42,10 +54,19 @@ pub fn joint_rows(data: &SheetMetalData, up: &dyn Fn(usize) -> Option<bool>, ord
         }
         s
     };
-    // (feature place, bends first, index) -> letter.
-    let mut seq: Vec<(usize, u8, usize)> = data.bends.iter().enumerate().map(|(i, b)| (order(b.feature), 0, i)).chain(data.rips.iter().enumerate().map(|(i, r)| (order(r.feature), 1, i))).collect();
+    // (birth, feature place, bends first, index) -> letter; a joint's pieces
+    // one entry, at its earliest piece's birth.
+    let birth = |i: usize| data.bends.iter().enumerate().filter(|(j, _)| joint_of(data, *j) == i).map(|(_, b)| b.birth).min().unwrap_or(data.bends[i].birth);
+    let mut seq: Vec<(u64, usize, u8, usize)> = (0..data.bends.len())
+        .filter(|&i| joint_of(data, i) == i)
+        .map(|i| (birth(i), order(data.bends[i].feature), 0, i))
+        .chain(data.rips.iter().enumerate().map(|(i, r)| (r.birth, order(r.feature), 1, i)))
+        .collect();
     seq.sort();
-    let name_of = |kind: u8, i: usize| seq.iter().position(|e| e.1 == kind && e.2 == i).map(letter).unwrap_or_default();
+    let name_of = |kind: u8, i: usize| {
+        let i = if kind == 0 { joint_of(data, i) } else { i };
+        seq.iter().position(|e| e.2 == kind && e.3 == i).map(letter).unwrap_or_default()
+    };
     let mut joints = Vec::new();
     for (ri, r) in data.rips.iter().enumerate() {
         joints.push(JointRow {
@@ -105,10 +126,11 @@ pub fn bend_face(b: &Bend) -> Option<Reference> {
 }
 
 /// The Bends rows' order (indices into the model's bends): the stored Move
-/// up / Move down order, then the rest in model order.
+/// up / Move down order, then the rest in model order; a split joint once
+/// (its first piece).
 pub fn bend_row_order(data: &SheetMetalData, stored: &[Reference]) -> Vec<usize> {
     let key = |i: usize| bend_faces(&data.bends[i]).iter().filter_map(|r| stored.iter().position(|s| s == r)).min().unwrap_or(usize::MAX);
-    let mut idx: Vec<usize> = (0..data.bends.len()).collect();
+    let mut idx: Vec<usize> = (0..data.bends.len()).filter(|&i| joint_of(data, i) == i).collect();
     idx.sort_by_key(|&i| (key(i), i));
     idx
 }

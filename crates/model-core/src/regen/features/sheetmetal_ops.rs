@@ -154,7 +154,7 @@ pub fn bend_corner(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, paren
         inner_faces: current_names(&nb, &[inner_name]),
         outer_faces: current_names(&nb, &[outer_name]),
         flat: false,
-        birth: 0,
+        birth: 0, joint: None,
     });
     data.rips.retain(|x| !((x.a == parent && x.b == child) || (x.a == child && x.b == parent)));
     Ok(())
@@ -291,7 +291,7 @@ pub fn rip_corners(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, cuts:
             gap,
             other: None,
             faces: tool_names.clone(),
-            birth: 0,
+            birth: 0, joint: None,
         });
     }
     let pieces = solid_count(&shape).max(1);
@@ -356,7 +356,7 @@ pub fn slot_rip(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, wa: usiz
         ev.warnings.push("The rip separated the part into several parts".into());
     }
     ev.replace_body(bi, shape, names);
-    data.rips.push(Rip { birth: 0, feature, a: wa, b: wb, style: if style.is_empty() { "EDGE".into() } else { style.to_string() }, gap, other: None, faces: Vec::new() });
+    data.rips.push(Rip { birth: 0, joint: None, feature, a: wa, b: wb, style: if style.is_empty() { "EDGE".into() } else { style.to_string() }, gap, other: None, faces: Vec::new() });
     Ok(())
 }
 
@@ -956,7 +956,7 @@ pub fn bend_core(ev: &mut EvalCtx, bi: usize, fi: usize, data: &mut SheetMetalDa
         inner_faces: current_names(&nb, &[side_name(feature, &fname, kbase)]),
         outer_faces: current_names(&nb, &[side_name(feature, &fname, kbase + 1)]),
         flat: false,
-        birth: 0,
+        birth: 0, joint: None,
     });
     Ok((w2, m))
 }
