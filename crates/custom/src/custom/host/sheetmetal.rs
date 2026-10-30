@@ -298,6 +298,9 @@ struct Piece {
 struct Loop {
     pts: Vec<DVec3>,
     side: Vec<usize>,
+    /// A chord of a curved side (an arc a cut left across a flange): the
+    /// wall itself is then built from its face ([`pulled_face`]).
+    curved: Vec<bool>,
 }
 
 /// A face's outer wire: the one spanning the most.
@@ -353,33 +356,39 @@ impl Topo {
 /// A face's outer loop (straight edges only), chained end to end.
 fn wall_loop(face: &Shape, topo: &Topo) -> FResult<Loop> {
     let wire = outer_wire(face).ok_or_else(|| fe("A sheet metal wall has no boundary"))?;
-    let mut segs: Vec<(DVec3, DVec3, usize)> = Vec::new();
+    let mut segs: Vec<(DVec3, DVec3, usize, bool)> = Vec::new();
     for e in wire.edges() {
         let info = e.edge_info().map_err(|x| fe(x.to_string()))?;
-        if !matches!(info.curve, k::Curve::Line { .. }) {
-            return Err(fe("Curved sheet metal wall edges are not supported yet"));
-        }
         let idx = topo.edges.iter().position(|x| x.is_same(&e)).ok_or_else(|| fe("Sheet metal wall edge not found"))?;
-        segs.push((info.start, info.end, idx));
+        if matches!(info.curve, k::Curve::Line { .. }) {
+            segs.push((info.start, info.end, idx, false));
+        } else {
+            // Two chords through its middle.
+            let mid = e.point_at(info.first_param + (info.last_param - info.first_param) * 0.5).map_err(|x| fe(x.to_string()))?;
+            segs.push((info.start, mid, idx, true));
+            segs.push((mid, info.end, idx, true));
+        }
     }
     if segs.len() < 3 {
         return Err(fe("A sheet metal wall needs at least three edges"));
     }
     // Chain the sides: each starts where the previous one ended.
-    let (first_start, mut at, first_idx) = segs.swap_remove(0);
+    let (first_start, mut at, first_idx, first_curved) = segs.swap_remove(0);
     let mut pts = vec![first_start];
     let mut side = vec![first_idx];
+    let mut curved = vec![first_curved];
     while !segs.is_empty() {
-        let Some(k) = segs.iter().position(|(a, b, _)| a.distance(at) < 1e-7 || b.distance(at) < 1e-7) else {
+        let Some(k) = segs.iter().position(|(a, b, _, _)| a.distance(at) < 1e-7 || b.distance(at) < 1e-7) else {
             return Err(fe("A sheet metal wall boundary is not closed"));
         };
-        let (a, b, idx) = segs.swap_remove(k);
+        let (a, b, idx, c) = segs.swap_remove(k);
         let next = if a.distance(at) < 1e-7 { b } else { a };
         pts.push(at);
         side.push(idx);
+        curved.push(c);
         at = next;
     }
-    Ok(Loop { pts, side })
+    Ok(Loop { pts, side, curved })
 }
 
 /// The outward (oriented) normal of a planar face.
@@ -427,6 +436,61 @@ fn bend_geometry(topo: &Topo, e: usize, fa: usize, fb: usize, radius: f64, front
     let setback = def_radius * (angle * 0.5).tan();
     let axis_point = s + a1 * setback + m1 * def_radius;
     Ok(Bend { start: s, dir, len, angle, setback, axis_point })
+}
+
+/// A wall with curved sides (a cut's arc across a flange) as its definition
+/// face less a strip along each pulled side. A strip runs on past an end
+/// whose neighbour is a free side across it (the face's outline stops it),
+/// not past a joint or a free side running on in line (as [`pulled_sides`]).
+fn pulled_face(face: &Shape, l: &Loop, n: DVec3, offset: &[f64], free: impl Fn(usize) -> bool) -> FResult<Shape> {
+    let wire = outer_wire(face).ok_or_else(|| fe("A sheet metal wall has no boundary"))?;
+    let base = k::make_face_from_wire(&wire, true).map_err(|e| fe(e.to_string()))?;
+    let big = face.bounding_box(false).map_err(|e| fe(e.to_string()))?.diagonal() * 2.0;
+    let m = l.pts.len();
+    let mut strips = Vec::new();
+    for k in 0..m {
+        if offset[k] <= TOL || l.curved[k] {
+            continue;
+        }
+        let (a, b) = (l.pts[k], l.pts[(k + 1) % m]);
+        let len = a.distance(b);
+        let d = (b - a) / len;
+        let u = inward(l, n, k);
+        let across = |j: usize| free(j) && (l.curved[j] || (l.pts[(j + 1) % m] - l.pts[j]).normalize_or_zero().cross(d).length() > 1e-6);
+        let (s0, s1) = (if across((k + m - 1) % m) { -big } else { 0.0 }, if across((k + 1) % m) { len + big } else { len });
+        let quad = [a + d * s0 - u * big, a + d * s1 - u * big, a + d * s1 + u * offset[k], a + d * s0 + u * offset[k]];
+        let w = k::make_polyline(&quad, true).map_err(|e| fe(e.to_string()))?;
+        strips.push(k::make_face_from_wire(&w, true).map_err(|e| fe(e.to_string()))?);
+    }
+    if strips.is_empty() {
+        return Ok(base);
+    }
+    Ok(k::boolean(k::BooleanOp::Cut, &[base], &strips, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal wall failed: {e}")))?.shape)
+}
+
+/// Where pulled side `k`'s line runs inside the pulled face `pf`: the piece
+/// over the side's own run, from its start's end on (as [`pulled_sides`]).
+fn run_inside(pf: &Shape, l: &Loop, n: DVec3, k: usize, offset: f64) -> Option<(DVec3, DVec3)> {
+    let m = l.pts.len();
+    let (a, b) = (l.pts[k], l.pts[(k + 1) % m]);
+    let d = (b - a).normalize_or_zero();
+    let u = inward(l, n, k);
+    let o = a + u * offset;
+    let plane = k::Plane::new(o, u, d);
+    let len = a.distance(b);
+    k::section_wires(pf, &plane)
+        .ok()?
+        .iter()
+        .flat_map(|w| w.edges())
+        .filter_map(|e| {
+            let i = e.edge_info().ok()?;
+            let (t0, t1) = ((i.start - o).dot(d), (i.end - o).dot(d));
+            let (t0, t1) = (t0.min(t1), t0.max(t1));
+            let overlap = t1.min(len) - t0.max(0.0);
+            (overlap > TOL).then_some((overlap, o + d * t0, o + d * t1))
+        })
+        .max_by(|x, y| x.0.total_cmp(&y.0))
+        .map(|(_, p, q)| (p, q))
 }
 
 /// Pull the loop's sides in by `offset[k]` (0 for free edges), in the wall
@@ -928,6 +992,8 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     // Walls with curved sides and no joints (a Corner break's arc): built
     // as they are.
     let mut plain = std::collections::BTreeSet::new();
+    // Walls with curved sides: their pulled face (definition plane).
+    let mut exact: BTreeMap<usize, Shape> = BTreeMap::new();
     for (fi, face) in topo.faces.iter().enumerate() {
         if face.face_plane().map_err(|e| fe(e.to_string()))?.is_none() {
             outlines.push(None);
@@ -963,7 +1029,25 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                 }
             }
         }
-        let sides = pulled_sides(&l, n, &offset);
+        let mut sides = pulled_sides(&l, n, &offset);
+        // Curved sides: the wall from its face, the pulled sides' ends where
+        // their lines leave it.
+        if l.curved.iter().any(|c| *c) {
+            if l.curved.iter().zip(&l.side).any(|(c, e)| *c && (def.bends.contains_key(e) || def.rips.contains(e))) {
+                return Err(fe("Curved sheet metal joints are not supported yet"));
+            }
+            let free = |j: usize| !def.bends.contains_key(&l.side[j]) && !def.rips.contains(&l.side[j]);
+            let pf = pulled_face(face, &l, n, &offset, free)?;
+            for k in 0..m {
+                if offset[k] > TOL
+                    && !l.curved[k]
+                    && let Some(run) = run_inside(&pf, &l, n, k, offset[k])
+                {
+                    sides[k] = run;
+                }
+            }
+            exact.insert(fi, pf);
+        }
         outlines.push(Some((l, n, sides)));
     }
     // Where a wall's pulled-back side along edge `e` runs, as distances along `dir` from `start`.
@@ -981,7 +1065,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         let m = l.pts.len();
         let j = if l.pts[k].distance(v) < l.pts[(k + 1) % m].distance(v) { (k + m - 1) % m } else { (k + 1) % m };
         let along = (l.pts[(j + 1) % m] - l.pts[j]).normalize_or_zero();
-        (!def.bends.contains_key(&l.side[j]) && along.cross(dir).length() > 1e-6).then_some(along)
+        (!def.bends.contains_key(&l.side[j]) && !l.curved[j] && along.cross(dir).length() > 1e-6).then_some(along)
     };
     let (clips, extends, mut cuts, wraps) = corner_reliefs(def, &topo, &outlines, &bends, &setbacks)?;
     for (e, fa, fb, b) in bends {
@@ -1192,14 +1276,22 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             continue;
         };
         let n = *n;
-        let pts: Vec<DVec3> = outline_points(pulled).into_iter().map(|p| p - n * back).collect();
-        let wire = k::make_polyline(&pts, true).map_err(|e| fe(e.to_string()))?;
-        let base = k::make_face_from_wire(&wire, true).map_err(|e| fe(e.to_string()))?;
+        let base = match exact.get(&fi) {
+            Some(pf) => pf.translated(-n * back).map_err(|e| fe(e.to_string()))?,
+            None => {
+                let pts: Vec<DVec3> = outline_points(pulled).into_iter().map(|p| p - n * back).collect();
+                let wire = k::make_polyline(&pts, true).map_err(|e| fe(e.to_string()))?;
+                k::make_face_from_wire(&wire, true).map_err(|e| fe(e.to_string()))?
+            }
+        };
         let mut slab = k::extrude(&base, n * (front + back)).map_err(|e| fe(format!("Sheet metal wall failed: {e}")))?.shape;
         let mut reliefs = relief_tools(def, &topo, l, n, front + back)?;
         reliefs.extend(cuts.remove(&fi).unwrap_or_default());
         // The wall in the flat: its outline on the definition plane, reliefs cut.
-        let mut flat = k::make_face_from_wire(&k::make_polyline(&outline_points(pulled), true).map_err(|e| fe(e.to_string()))?, true).map_err(|e| fe(e.to_string()))?;
+        let mut flat = match exact.get(&fi) {
+            Some(pf) => pf.clone(),
+            None => k::make_face_from_wire(&k::make_polyline(&outline_points(pulled), true).map_err(|e| fe(e.to_string()))?, true).map_err(|e| fe(e.to_string()))?,
+        };
         // Its holes, through the thickness (and out of the flat).
         for (hole, edges) in wall_holes(&topo.faces[fi], &topo)? {
             if let Ok(r) = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&flat), std::slice::from_ref(&hole), &k::BooleanOptions::default()) {
