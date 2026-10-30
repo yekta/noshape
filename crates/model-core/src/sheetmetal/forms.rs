@@ -38,7 +38,8 @@ pub const FORMS: &[Form] = &[Form { id: "bridge-lance", name: "Bridge lance" }, 
 /// Radius control (live `List_WrgkY2rdTeUGo2`): the forms' bend radii.
 const RADIUS_CONTROL: [(&str, &str); 4] = [("Default", "Double thickness"), ("Thickness", "Thickness"), ("Half_thickness", "Half thickness"), ("Custom", "Custom")];
 const RADIUS_CONTROL_INPUT: &str = "Radius control";
-/// Length to (live `List_rZVuoqSoy79i0I` / `List_OrKvSo3y1S6Ua4`): a slot's length between its ends' centres or tangents.
+/// Length to (live `List_rZVuoqSoy79i0I` / `List_OrKvSo3y1S6Ua4`): a slot's length between its ends' centres or tangents
+/// (Slot extrusion's option id is `tangents`, Slot emboss's `slot_tangents`; the tool's lengthTo is `slot_tangents`).
 const LENGTH_TO: [(&str, &str); 2] = [("Default", "Slot centers"), ("slot_tangents", "Slot tangents")];
 const LENGTH_TO_INPUT: &str = "Length to";
 /// Lance's Profile (live `List_g6XZAvs1qlzUG1`).
@@ -61,7 +62,10 @@ pub fn configuration(id: &str) -> Option<Configuration> {
     let length_to = ConfigInput {
         id: LENGTH_TO_INPUT.into(),
         name: LENGTH_TO_INPUT.into(),
-        kind: ConfigInputKind::List { options: LENGTH_TO.iter().map(|(id, name)| ListOption { id: (*id).into(), name: (*name).into() }).collect(), default: "Default".into() },
+        kind: ConfigInputKind::List {
+            options: LENGTH_TO.iter().map(|(o, name)| ListOption { id: if id == "slot-extrusion" && *o == "slot_tangents" { "tangents".into() } else { (*o).into() }, name: (*name).into() }).collect(),
+            default: "Default".into(),
+        },
         visible_when: None,
         excluded: false,
     };
@@ -196,15 +200,10 @@ fn make_studio(id: &str) -> Option<PartStudio> {
         let fid = tool.id;
         ids.push(fid);
         ps.features.push(tool);
-        for (input, param, options) in [(RADIUS_CONTROL_INPUT, "radiusControl", &RADIUS_CONTROL[..]), (LENGTH_TO_INPUT, "lengthTo", &LENGTH_TO[..]), (PROFILE_INPUT, "profile", &PROFILE[..])] {
-            if ps.configuration.inputs.iter().any(|i| i.id == input) {
-                ps.configuration.configured.push(ConfiguredParam {
-                    input: input.into(),
-                    feature: fid,
-                    param: param.into(),
-                    values: options.iter().map(|(o, _)| ((*o).to_string(), ParamValue::Enum((*o).into()))).collect::<BTreeMap<_, _>>(),
-                });
-            }
+        for (input, param) in [(RADIUS_CONTROL_INPUT, "radiusControl"), (LENGTH_TO_INPUT, "lengthTo"), (PROFILE_INPUT, "profile")] {
+            let Some(ConfigInputKind::List { options, .. }) = ps.configuration.inputs.iter().find(|i| i.id == input).map(|i| &i.kind) else { continue };
+            let values = options.iter().map(|o| (o.id.clone(), ParamValue::Enum(if o.id == "tangents" { "slot_tangents".into() } else { o.id.clone() }))).collect::<BTreeMap<_, _>>();
+            ps.configuration.configured.push(ConfiguredParam { input: input.into(), feature: fid, param: param.into(), values });
         }
     }
     let mut tag = ps.new_feature("tag", &units)?;
@@ -365,10 +364,11 @@ fn slot_emboss(t: f64, length: f64, tangents: bool, width: f64, h: f64, draft: f
     Ok(vec![slot_swept(&segs, l)?, sheet_stadium(t, r, l)?])
 }
 
-/// The straight run between a slot's end centres (live's Length variable:
-/// tangent lengths less twice the width).
+/// The straight run between a slot's end centres (live's Length variable,
+/// slot-extrusion__features.json: `max(#length - #Width, 0 mm)` for Slot
+/// tangents, as Slot emboss).
 fn slot_length(length: f64, tangents: bool, width: f64) -> f64 {
-    if tangents { (length - 2.0 * width).max(0.0) } else { length.max(0.0) }
+    if tangents { (length - width).max(0.0) } else { length.max(0.0) }
 }
 
 /// A disc of radius `r` through the sheet (z -t … 0).
