@@ -574,7 +574,7 @@ with 0003b and 0004 on Linux, macOS and Windows.
    changed: kept to cuts by 64+ tools and quick_boolean.
 3. Other `a.Plane().Axis().Direction()` readers of a face's normal in the kernel: features.cpp and shell.cpp
    already check Direct(); surface_info (face_surface) reports the frame as is, by design.
-4. Waiting on live: RIB-CHAIN-NORMAL (live's +160 mm³ for the L normal rib). FILLET-OVERSIZE's chamfer half done
+4. RIB-CHAIN-NORMAL done 10-30 (per-edge ribs, live 1620). FILLET-OVERSIZE's chamfer half done
    10-30: detail.rs `round_overrun` (live's thresholds, both blends): with 2+ selected edges, an edge sharing a face
    with another selected edge may set back at most each face's width; past a selected edge "End boundary intersects
    unfilleted / unchamfered edge.", past an unselected one "Failed to fillet / chamfer selections."; overlapping
