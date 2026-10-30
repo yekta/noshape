@@ -1060,11 +1060,13 @@ private:
     Cursor c = cursor(idx);
     c.topology();
     const long long vs = c.ref();
+    // The edge's parameter range on its curve (SAT after 4.0).
+    std::optional<double> ps, pe;
     if (file.version > 4.0)
-      c.num();
+      ps = c.num();
     const long long ve = c.ref();
     if (file.version > 4.0)
-      c.num();
+      pe = c.num();
     c.ref(); // a coedge
     const long long cv  = c.ref();
     const bool      rev = c.reversed();
@@ -1078,6 +1080,23 @@ private:
       g = g->Reversed();
     TopoDS_Vertex v1 = vertex(vs), v2 = vertex(ve);
     double        t1 = param_on(g, BRep_Tool::Pnt(v1)), t2 = param_on(g, BRep_Tool::Pnt(v2));
+    // A forward edge on a line, circle or ellipse: its own range, exact
+    // where a tolerant vertex's stored point is off the curve (g25-b.sat:
+    // the blend apexes 0.03 mm away, so projecting them shortened the
+    // plane's edges; live's import keeps the plane at exactly 384 mm²).
+    // Reversed edges and other curves keep the projection.
+    const bool line = g->DynamicType() == STANDARD_TYPE(Geom_Line);
+    const bool conic = g->DynamicType() == STANDARD_TYPE(Geom_Circle) || g->DynamicType() == STANDARD_TYPE(Geom_Ellipse);
+    if (ps && pe && !rev && (line || conic) && *ps < *pe)
+    {
+      const double k = line ? mm : 1.0, s0 = *ps * k, s1 = *pe * k;
+      const double d0 = g->Value(s0).Distance(BRep_Tool::Pnt(v1)), d1 = g->Value(s1).Distance(BRep_Tool::Pnt(v2));
+      if (d0 <= BRep_Tool::Tolerance(v1) + tol && d1 <= BRep_Tool::Tolerance(v2) + tol)
+      {
+        t1 = s0;
+        t2 = s1;
+      }
+    }
     if (g->IsPeriodic())
     {
       const double per = g->Period();

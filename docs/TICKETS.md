@@ -610,6 +610,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (/root/dx-scratch/i1/patch.py: its rational (3,2) B-spline over the whole (u, v) domain, the face being the whole patch,
   degenerate to a point at u = 7.854; midpoint rule 100² / 300² → 13.200259 / 13.200087, limit ≈ 13.20006 mm²) = live's
   STEP faces (13.20006–13.20009): the file is right and only our integral of that face is short (core, as above).
+  dx 10-30 later: SAT fixed (live 1611: its SAT import keeps plane 384 and equal cylinder pairs): forward SAT edges on
+  lines / circles / ellipses take the file's parameter range instead of projecting the tolerant blend-apex vertices
+  (0.03 mm off); now plane 384, pairs exact, volume 7582.989 (live HIGH 7582.993). x_t ✅, SAT ✅; STEP stays core's.
 - [x] verified eef0848d (qa 03:09: two 20×20×10 blocks touching at x = 20, Boolean Intersect (made by the v0.4.14 CLI: Info, 2 parts kept; qa-scratch/tickets/bool-touch-info.noshape) → in the green app **Parts (0)**, and editing Boolean 1 shows the blue bubble **"The parts either do not intersect or are totally contained."** = live; tickets/bool-touch-info-eef0.png) 7f2c4647 P2 BOOL-TOUCH-INFO Boolean Intersect of two blocks that only touch face to face: both parts deleted (= live), but
   live reports INFO "The parts either do not intersect or are totally contained." (dialog bubble); ours OK with no message.
   A disjoint pair: live OK, no message (= ours) (behaviours "qa (2026-10-26, P1 boolean edge cases)") (qa 2026-10-26)
