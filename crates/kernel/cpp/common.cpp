@@ -2110,6 +2110,17 @@ void on_budget_tick(int, siginfo_t*, void* uctx)
   budget_jmp    = nullptr;
   budget_reason = over ? 1 : 2;
   asan_unpoison_abandoned(uctx);
+  // NOSHAPE_GUARD_TRACE=1: where a budget jumped (it skips the op's
+  // destructors, so what the op built leaks: MEM-RUNAWAY-508; the deadline
+  // stops what checks it by throwing).
+  if (g_guard_trace)
+  {
+    static const char head[] = "noshape: a budget jumped out of the kernel at:\n";
+    [[maybe_unused]] const ssize_t w = write(2, head, sizeof head - 1);
+    void*     frames[64];
+    const int n = backtrace(frames, 64);
+    backtrace_symbols_fd(frames, n, 2);
+  }
   siglongjmp(*env, 1);
 }
 } // namespace
