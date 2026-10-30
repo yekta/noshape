@@ -19,7 +19,7 @@ use crate::curve2::{distance as distance2, inside as inside2, Map, C2};
 use crate::freeform::FreeSurface;
 use crate::nurbs::NurbsCurve;
 use crate::pattern::Rigid;
-use crate::{Body, Curve, Decline, Edge, Face, Kind, Origin, Output, Record, Relation, SectionSource, Solid, Surface, Use, GREY};
+use crate::{Body, Curve, Decline, Edge, Face, Kind, Origin, Output, Record, Relation, SectionCurve, SectionSource, Solid, Surface, Use, GREY};
 use std::sync::Arc;
 use glam::{DVec2, DVec3};
 use crate::fxhash::{HashMap, HashSet};
@@ -1344,16 +1344,18 @@ impl Ctx<'_> {
             return Ok(());
         }
         let (a, b) = ((self.faces[fs].arg, self.faces[fs].index), (self.faces[ft].arg, self.faces[ft].index));
-        for c in src.sections(a, b, self.moved_pair(fs, ft))? {
-            if c.t1 <= c.t0 || c.t1.is_nan() {
-                continue;
-            }
+        let secs: Vec<SectionCurve> = src.sections(a, b, self.moved_pair(fs, ft))?.into_iter().filter(|c| c.t1 > c.t0).collect();
+        // (An end of one where another of them ends: OCCT's curves of one loop in parts; a vertex there.)
+        let ends: Vec<[DVec3; 2]> = secs.iter().map(|c| [c.curve.at(c.t0), c.curve.at(c.t1)]).collect();
+        let joined = |i: usize, k: usize| ends.iter().enumerate().any(|(j, e)| j != i && e.iter().any(|q| (*q - ends[i][k]).length() <= self.tol));
+        let joins: Vec<[bool; 2]> = (0..secs.len()).map(|i| [joined(i, 0), joined(i, 1)]).collect();
+        for (c, join) in secs.into_iter().zip(joins) {
             let id = self.ncurves.len() as u32;
             let cc = Arc::new(c.curve);
             let [on0, on1] = c.on;
             self.ncurves.push(NCurve { c: cc.clone(), sec: Some(([fs, ft], [Arc::new(on0), Arc::new(on1)], c.id)), tol: c.tol, boxes: Default::default() });
             let cuts = free::seam_cuts(self, [fs, ft], &cc, c.t0, c.t1);
-            self.section_nurbs(fs, ft, Path::Nurbs { id, c: cc }, c.t0, c.t1, &cuts)?;
+            self.section_nurbs(fs, ft, Path::Nurbs { id, c: cc }, (c.t0, c.t1), &cuts, join)?;
         }
         Ok(())
     }
@@ -1375,9 +1377,10 @@ impl Ctx<'_> {
 
     /// A section along OCCT's curve from `t0` to `t1`, cut at `cuts` (seams it crosses): a closed one has a
     /// vertex where it starts (as OCCT's), an open one ends where it does.
-    fn section_nurbs(&mut self, fs: usize, ft: usize, path: Path, t0: f64, t1: f64, cuts: &[f64]) -> R<()> {
+    fn section_nurbs(&mut self, fs: usize, ft: usize, path: Path, (t0, t1): (f64, f64), cuts: &[f64], join: [bool; 2]) -> R<()> {
         let closed = (path.at(t0) - path.at(t1)).length() <= self.tol;
-        let first = if closed { End::Point(path.at(t0)) } else { End::Open };
+        let first = if closed || join[0] { End::Point(path.at(t0)) } else { End::Open };
+        let last = if closed { first } else if join[1] { End::Point(path.at(t1)) } else { End::Open };
         let mut at: Vec<(f64, End)> = vec![(t0, first)];
         for &t in cuts {
             if path.length(t0, t) > self.tol && path.length(t, t1) > self.tol {
@@ -1386,7 +1389,7 @@ impl Ctx<'_> {
         }
         for i in 0..at.len() {
             let (a, ea) = at[i];
-            let (b, eb) = if i + 1 < at.len() { at[i + 1] } else { (t1, if closed { first } else { End::Open }) };
+            let (b, eb) = if i + 1 < at.len() { at[i + 1] } else { (t1, last) };
             self.section_part(fs, ft, path.clone(), a, b, [ea, eb])?;
         }
         Ok(())

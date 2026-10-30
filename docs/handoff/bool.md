@@ -799,6 +799,9 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   `MovedPair`); `noshape_brep::pattern` is new. Nothing else public changed.
 - Replays, all 0 differ, the counts unchanged (main 772, corpus2 553, corpus3 556, corpus4 600, corpus5 717,
   corpus6 662, Shell's 78, direct 58).
+- OCCT's curves of one pair that meet end to end (a hole's loop on a cylinder in two parts) have a vertex there,
+  as the pave filler's: radial holes into a cylinder taken now (bool_patterns: 472 ms / OCCT 623 ms here, was
+  OCCT's after "a section without ends"); main corpus 776 (+4), the rest unchanged, all 0 differ.
 - Next for the knurl (lead 17:45): its end caps (the "tools coincide" history) and the 26-groove piece's volume
   (1.4e-9 off: OCCT seeds each section with the pave filler's edge/face points); then the period solve.
 
