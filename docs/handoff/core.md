@@ -8,7 +8,11 @@ Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache g
 (/root/core-scratch/env.sh; long jobs via /root/core-scratch/job.sh <log> "<cmd>").
 **Sheet metal moved to skasm (lead 10-29 19:40):** model-core's sheet metal (crates/model-core/src/sheetmetal,
 regen/features/sheetmetal*.rs, the FS host's custom/host/sheetmetal.rs) and its Part Studio dialogs / table are
-skasm's now; see docs/handoff/skasm.md.
+skasm's now; see docs/handoff/skasm.md. skasm 10-30, touching core's files for sheet metal: Extrude / Revolve /
+Sweep / Loft whose boolean reaches an active sheet metal part run by std (regen/std_route.rs `SHEET_METAL_AWARE`), and
+a Simple Hole cuts such parts through std's booleanBodies (features/hole.rs `cut_sheet_metal`): native cuts were
+rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studios saved with sheet metal before std
+ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 ## Tonight (10-29, before the 05:00 release)
 - 5ac53b95 P0 CLI-SUPPRESS-SEGV: a crash guard that recovers past a budgeted op ends that budget (details under OCCT

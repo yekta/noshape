@@ -131,7 +131,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   part run by std (its sheetMetalAwareBoolean cuts the definition sheet: host @opCreateOutline added; the rebuild
   cuts walls' holes through the part and the flat); Add gives std's "Only Remove can be used with sheet metal…".
   T2 sheetmetal_std a_cut_survives_a_later_flange.
-- [x] skasm-hole P1 SM-HOLE-THEN-FLANGE (skasm 10-30) the same for a Hole: plate, Hole Ø6 through, then a Flange → the
+- [x] 381d3080 P1 SM-HOLE-THEN-FLANGE (skasm 10-30) the same for a Hole: plate, Hole Ø6 through, then a Flange → the
   hole was gone. Fixed for Simple holes: the native Hole cuts active sheet metal parts through std's booleanBodies (its
   sheet metal aware Boolean cuts the definition), the rest natively. T2 sheetmetal_std a_hole_survives_a_later_flange
   (part and flat). Counterbore / countersink: SM-CBORE-THEN-FLANGE.
