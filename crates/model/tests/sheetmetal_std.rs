@@ -251,9 +251,9 @@ fn vertex_at(r: &RegenResult, p: DVec3) -> Reference {
 /// (8535.0418 mm³, 23 faces: PLANE 17, CYLINDER 4, OTHER 2; the bends run
 /// into the corner, cylinders r4 372.3144324 / r2 186.1572163 on the front,
 /// and end in OTHER faces of 10.4192 mm² 0.02 mm apart across the diagonal).
-/// Ours: the same faces, cylinders within 0.002 mm², but 0.12 mm³ more: our
-/// bend ends are ruled radially, live's inside differs (asked live: REQUESTS
-/// skasm 2026-10-30 00:20).
+/// Ours: the same faces, cylinders within 0.002 mm², but 0.12 mm³ more. The
+/// bend ends are ruled radially as live's (request 1602: live's x(θ) is
+/// within 0.0008 of ours, −0.003 mm³), so the excess is elsewhere.
 #[test]
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn closed_corner_matches_live() {

@@ -117,7 +117,9 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
 - Open: Closed corner volume (sheetmetal_std closed_corner_matches_live: 23 faces as live, PLANE 17 / CYLINDER 4 /
   OTHER 2, cylinders within 0.002 mm², but 8535.1616 vs live 8535.0418 mm³: our bend ends are one exact rational
   B-spline face each, ruled along the radial lines with x(θ) = x0 + (x1 − x0) sin θ / sin angle (`closed_cutter`);
-  the cylinder areas pin both end curves, so live's inside differs: asked live, REQUESTS skasm 2026-10-30 00:20);
+  live answered (behaviours "skasm (2026-10-30) Closed corner bend end", request 1602): its end face is ruled
+  radially too (B-spline 1×3, 50 poles), x(θ) within 0.0008 of ours, worth only −0.003 mm³: the +0.12 is elsewhere,
+  not found yet (face areas all match within 0.002 mm²));
   Butt joint direction on a Convert (sheetmetal_frames convert_rips_and_bends: Direction 1 should be the top wall;
   ours follows the converted part's face order; flanges now follow live's pick order, request 1599 (b), through
   getAttributes keeping its entities' order); rect→triangle loft (51 vs 49 faces); holes through std's own sheet
