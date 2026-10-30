@@ -651,15 +651,6 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20�
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
-- 10-30 06:45, evOffsetDetection nondeterminism (lead 06:15): not reproduced in ~730 runs here (200 alone with
-  NOSHAPE_OCCT_THREADS 2–8, RAYON 1–4, BOP parallel on / pairs off; 45 full model binaries, 3 at a time; 480 harness
-  runs 8 threads at once). Ruled out by reading: the query's body order (uniq keeps order), the Rust Boolean (FxHash,
-  single-threaded), patch 0004 (records used in pair order; these Booleans are under its 64 pairs), feature-id
-  collisions in run.rs OUTPUTS (48 random bits), crash markers (off in tests). The function itself is deterministic
-  for given faces; a varying result needs the tube's faces to vary. New T1
-  `custom_features::ops_and_evaluations_are_the_same_on_many_threads` (4 threads × 2) prints the whole output when it
-  trips. Please send the failing run's output (the check line's detail) if you still have it: it says which of the
-  four results was off.
 - FYI 10-29 05:28: /root/occt/lib/libTKBO.a is patch 0004's "on" build (/root/core-scratch/libTKBO.a.0004-on3), landed
   with f93ac93c; the previous one is /root/core-scratch/libTKBO.a.0004-optin. Its pairs stay serial unless the kernel
   turns them on, so older trees built against it behave as before. The same prune also deletes binaries copied out
