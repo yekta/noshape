@@ -9,6 +9,16 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **10-30 01:01 update (greens 52760eab … 6ca3c756):** **MIRROR-HANG-402 reproduced on main**: the fuzz mirror (Part 2 across
+  Top) as Add / Merge with all never finishes in the app (green 512717af, ~10 cores, > 12 min); as New it is instant (the CLI's
+  mirror defaults to Add with a merge scope, so the CLI hangs too). RUST-UNION-POINT-TOUCH: live 1601 = INFO + two parts (= OCCT),
+  Rust still merges on 3ea95a1a. MESH-EMPTY-LOOP-PANIC a third time on v0.4.14 (seed 404, at a delete). Verified
+  FEATURE-MIRROR-COPY-FULL-DEPTH (031394bc), VERSION-FOOTER-STALE (beb1e515: "0.4.14.beb1e51505a7"). MIRROR-BLIND-HOLE-FACES at 9
+  faces on 49ff6c58 / 512717af (cone halves split; live 8). App Rust-vs-OCCT: 39 no-op / touching documents equal except 3-27
+  (= POINT-TOUCH); 32 cone documents equal on 6bec12d8. Render A/B on psui 4d75111d (silhouette candidates) and 6ca3c756 (cull on
+  by default): bolt / l30 / torus / cone / wf identical to before. Mirror set + P0 repros 0 px on d039df7e, 3ea95a1a. CLI fuzz
+  v0.4.14 401–434: 402 (hang), 404 (mesh panic), rest clean; clifuzz_time.py now logs "mirror-args". dx drawing greens not
+  checked one by one.
 - **21:56 update (greens e7ae194e → 031394bc → 62befcf0):** **new P2 RUST-UNION-POINT-TOUCH**: the Rust Boolean unions a sphere
   touching a box at one point into one 1413.097 mm³ part, OCCT keeps two (Info "no geometry change"); came with bool
   863967f8…503730d7 (same on 9e3ff3d9, e7ae194e, 62befcf0); live asked (REQUESTS qa 21:5x). The other 38 no-op / touching /
