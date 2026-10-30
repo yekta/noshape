@@ -25,7 +25,7 @@ numbers), ◐ = partly, ✗ = differs, — = no live data.
 | 1.7 ✓ | 4800 mm³, Sketch 1 hidden | ✅ | GUI 10-28/29 |
 | 2.1 Flange defaults | as live | ✅ | GUI 10-29 |
 | 2.2 first edge | "Edge of Sheet metal model 1", preview | ✅ | GUI 10-29 |
-| 2.3 x = 0 edge picked in Top view on the face boundary | nothing picked (the edge lies edge-on on the Right plane) | — (live untested) | GUI 10-29 |
+| 2.3 x = 0 edge picked in Top view on the face boundary | the x = 0 top edge picked, chip "Edge of Sheet metal model 1" (live request 1610: the edge is picked) | ✅ | GUI 10-30 |
 | 2.4 second edge | picked, 2 chips (fixed 10-29: preview picks) | ✅ | GUI 10-29, T2 flange_keeps_the_other_edges_references |
 | 2.5 Distance 20 | commits | ✅ | GUI 10-29 |
 | 2.6 geometry (SM1) | 8511.4987 / 24 faces; part keeps name and colour | ✅ | T2 flanges_on_adjacent_edges_match_live, flanges_keep_the_part_name_and_colour |
@@ -256,7 +256,7 @@ A GUI pass of the whole list on a green build is next.
 | 1.3 | Convert tab first, Selections (3 fields, Clearance 0, ☐ Include bends, ☐ Keep input parts), General, › Material, › Relief, preview slider; title red, ✓ off (= live dialogs/sheet-metal-model-01-open.png) | ✅ | f1f3117a 10-29 |
 | 1.6 | Material: K Factor, 0.45, 0.5; Relief: Minimal gap 0.02 mm, Corner Simple, **Obround - Scaled**, depth scale 2, width scale **1.063** (SM15) | ✅ | f1f3117a 10-29 |
 | 2.1 | Flange dialog defaults as live | ✅ | f1f3117a 10-29 |
-| 2.3 | x=0 edge in Top view at the plate's boundary: not picked (the edge lies on the Right plane, edge-on) | ? (live pending) | |
+| 2.3 | x=0 edge in Top view at the plate's boundary: live picks the edge (request 1610); ours picks the x = 0 top edge, wall along x = 0 (the 10-29 miss was the click landing off the boundary) | ✅ | GUI 10-30 |
 | 2.4 | **second edge not pickable once the first flange previewed** (std rebuild renamed all faces: the preview counted as the feature's own geometry) → fixed: faces lying on the replaced part's keep its names | ✅ after fix | agent/skasm 10-29 (GUI: both edges picked, 2 chips; T2 flange_keeps_the_other_edges_references) |
 | 2.6 | two flanges: **part turned orange** (rebuilt part took a fresh palette colour) → fixed: keeps its name and colour | ✅ after fix | agent/skasm 10-29 (GUI: part stays blue; T2 flanges_keep_the_part_name_and_colour) |
 | 3.1 | Hem: Straight (+ flip), ☑ Flattened, Total length 12.5 mm, Outer, Simple; lists Straight / Rolled / Tear drop, Outer / In place, Simple / Closed; chip "Edge of Sheet metal model 1" | ✅ | 6fb0344f 10-29 |

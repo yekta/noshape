@@ -5,7 +5,7 @@
 //! joints tables (top half), a splitter, and the flat view (bottom half).
 
 use super::PartStudioView;
-use super::flat_view::{FlatView, FlatViewEvent};
+use super::flat_view::{FlatPick, FlatView, FlatViewEvent};
 use crate::os_menu::{OsMenu, OsMenuItem};
 use crate::theme::p;
 use gpui_kit::component::{h_flex, v_flex};
@@ -292,6 +292,30 @@ impl PartStudioView {
         let w = d.walls.iter().find(|w| !w.is_virtual())?;
         let faces = if side != d.view_back { &w.faces } else { &w.back };
         faces.first().map(|n| noshape_model::reference::Reference::Face((**n).clone()))
+    }
+
+    /// A bend line's right-click menu in the flat view (live request 1605:
+    /// Curve/surface analysis…, Select other…, Zoom to fit, Zoom to selection,
+    /// Align view with vertical axis; the first two need a model entity the
+    /// flat's line isn't).
+    fn open_flat_bend_menu(&mut self, position: Point<Pixels>, bend: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let (view, fv) = (cx.entity(), self.flat_view.clone());
+        let menu = OsMenu::build(window, cx, move |m, _, _| {
+            let item = |label: &'static str, f: fn(&mut FlatView, usize, &mut Context<FlatView>)| {
+                let (v, fv) = (view.clone(), fv.clone());
+                OsMenuItem::new(label).on_click(move |_, _, cx| {
+                    v.update(cx, |this, cx| this.close_context_menu(cx));
+                    if let Some(fv) = &fv {
+                        fv.update(cx, |flat, cx| f(flat, bend, cx));
+                    }
+                })
+            };
+            m.item(item("Zoom to fit", |f, _, cx| f.zoom_to_fit(cx))).item(item("Zoom to selection", |f, _, cx| f.zoom_to_selection(cx))).item(item("Align view with vertical axis", |f, b, cx| f.align_bend_vertical(b, cx)))
+        });
+        let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| this.close_context_menu(cx));
+        menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
+        self.context_menu = Some((position, menu, sub));
+        cx.notify();
     }
 
     /// Select other… on the flat's face (live request 1605): its two faces,
@@ -784,7 +808,8 @@ impl PartStudioView {
                 let gpu = self.gpu.clone();
                 let fv = cx.new(|cx| FlatView::new(gpu, window, cx));
                 self._subs.push(cx.subscribe_in(&fv, window, |this, _, ev: &FlatViewEvent, window, cx| match ev {
-                    FlatViewEvent::ContextMenu(at, on_part) => this.open_flat_menu(*at, *on_part, window, cx),
+                    FlatViewEvent::ContextMenu(at, FlatPick::Bend(b)) => this.open_flat_bend_menu(*at, *b, window, cx),
+                    FlatViewEvent::ContextMenu(at, on) => this.open_flat_menu(*at, *on == FlatPick::Face, window, cx),
                     FlatViewEvent::Selected(side) => this.select_flat_face(*side, cx),
                 }));
                 self.flat_view = Some(fv.clone());

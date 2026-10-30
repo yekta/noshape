@@ -33,6 +33,8 @@ pub struct FlatView {
     /// or `None` (an edge face); and the side selected.
     sides: Vec<Option<bool>>,
     selected: Option<bool>,
+    /// The bend line selected (index into the pattern's bend lines).
+    selected_bend: Option<usize>,
     /// Keep the Top view fitted while the view's size settles (until the
     /// user moves the camera), and the size it was last fitted at.
     pending_fit: bool,
@@ -44,11 +46,20 @@ pub struct FlatView {
 
 /// What the flat view asks of its Part Studio.
 pub enum FlatViewEvent {
-    /// Right-click at this window position, on the flat or not.
-    ContextMenu(Point<Pixels>, bool),
+    /// Right-click at this window position: on the flat's face, on a bend
+    /// line (or anywhere while one is selected: live request 1605), or not.
+    ContextMenu(Point<Pixels>, FlatPick),
     /// The flat's face selected (live request 1605: picking it selects the
     /// model face): its reference side (`true`), its back, or nothing.
     Selected(Option<bool>),
+}
+
+/// What a right-click in the flat view is on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FlatPick {
+    Empty,
+    Face,
+    Bend(usize),
 }
 
 impl EventEmitter<FlatViewEvent> for FlatView {}
@@ -66,17 +77,36 @@ impl FlatView {
                     this.compose(false, cx);
                 }
             }
-            ViewportEvent::ContextMenu { position, pick } => cx.emit(FlatViewEvent::ContextMenu(*position, pick.is_some())),
-            ViewportEvent::Click { pick, .. } => {
+            ViewportEvent::ContextMenu { position, pick } => {
+                let o = this.viewport.read(cx).origin();
+                let local = glam::DVec2::new(f64::from(f32::from(position.x - o.x)), f64::from(f32::from(position.y - o.y)));
+                let what = match (this.bend_at(local, cx).or(this.selected_bend), pick) {
+                    (Some(b), _) => FlatPick::Bend(b),
+                    (None, Some(_)) => FlatPick::Face,
+                    (None, None) => FlatPick::Empty,
+                };
+                cx.emit(FlatViewEvent::ContextMenu(*position, what));
+            }
+            ViewportEvent::Click { pick, position, .. } => {
+                // A bend line (live: it highlights, the face doesn't), else the face.
+                if let Some(b) = this.bend_at(*position, cx) {
+                    this.selected_bend = if this.selected_bend == Some(b) { None } else { Some(b) };
+                    this.selected = None;
+                    this.compose(false, cx);
+                    cx.emit(FlatViewEvent::Selected(None));
+                    return;
+                }
+                this.selected_bend = None;
                 let side = pick.and_then(|id| this.face_side(id));
                 this.select(if side.is_some() && side == this.selected { None } else { side }, cx);
+                this.compose(false, cx);
                 cx.emit(FlatViewEvent::Selected(this.selected));
             }
             // The user zoomed, panned or turned the flat: keep their view.
             ViewportEvent::CameraChanged if this.fitted.is_some_and(|c| c != this.viewport.read(cx).camera) => this.pending_fit = false,
             _ => {}
         });
-        Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, flat: None, parts: None, hover: None, sides: Vec::new(), selected: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
+        Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, flat: None, parts: None, hover: None, sides: Vec::new(), selected: None, selected_bend: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
     }
 
     /// Show `flat` in `color` (linear RGBA, the part's). The first pattern
@@ -95,6 +125,30 @@ impl FlatView {
         self.hover = None;
         self.compose(true, cx);
         cx.notify();
+    }
+
+    /// The bend line within 5 px of a viewport-local point.
+    fn bend_at(&self, p: glam::DVec2, cx: &App) -> Option<usize> {
+        let (f, _) = self.flat.as_ref()?;
+        let vp = self.viewport.read(cx);
+        f.flat_view_bend_lines()
+            .iter()
+            .enumerate()
+            .filter_map(|(i, (a, b))| {
+                let (a, b) = (vp.project(*a)?, vp.project(*b)?);
+                let t = ((p - a).dot(b - a) / (b - a).length_squared().max(1e-12)).clamp(0.0, 1.0);
+                Some((i, (a + (b - a) * t).distance(p)))
+            })
+            .filter(|x| x.1 <= 5.0)
+            .min_by(|x, y| x.1.total_cmp(&y.1))
+            .map(|x| x.0)
+    }
+
+    /// Align view with vertical axis: the selected bend line upright.
+    pub fn align_bend_vertical(&mut self, bend: usize, cx: &mut Context<Self>) {
+        let Some((a, b)) = self.flat.as_ref().and_then(|(f, _)| f.flat_view_bend_lines().get(bend).copied()) else { return };
+        let Some((fwd, up)) = noshape_scene::camera_ops::align_vertical(&self.viewport.read(cx).camera, (b - a).normalize_or_zero()) else { return };
+        self.viewport.update(cx, |vp, cx| vp.animate_to_direction(fwd, up, cx));
     }
 
     /// The side of the flat face a pick id is on (`None`: not a top / back face).
@@ -116,8 +170,16 @@ impl FlatView {
     /// The scene: the flat with the hovered face outlined, and the overlays.
     fn compose(&mut self, geometry_changed: bool, cx: &mut Context<Self>) {
         let selected: Vec<Reference> = self.selected.and_then(|side| self.sides.iter().position(|s| *s == Some(side))).map(|i| Reference::Face(noshape_model::reference::TopoName::face(noshape_model::reference::FeatureId(0), noshape_model::reference::Role::New(i as u32)))).into_iter().collect();
+        let mut extra_now = self.parts.as_ref().map(|p| p.2.clone()).unwrap_or_default();
+        // The selected bend line in the selection colour (live: orange).
+        if let Some((a, b)) = self.selected_bend.and_then(|i| self.flat.as_ref().and_then(|(f, _)| f.flat_view_bend_lines().get(i).copied())) {
+            let mut lines = LineData::default();
+            let [_, r, g, b8] = noshape_scene::palette::viewport::SELECTION.to_be_bytes();
+            lines.push_polyline(&[a.as_vec3().to_array(), b.as_vec3().to_array()], [r, g, b8, 0xff], 0, 3.0, LineSegment::ON_TOP);
+            extra_now.push(Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(14));
+        }
         let scene = match &self.parts {
-            Some((display, built, extra)) => crate::scene_builder::with_highlights(built, display, &selected, self.hover.as_ref(), &[], extra.clone(), false, self.gpu.uploader()),
+            Some((display, built, _)) => crate::scene_builder::with_highlights(built, display, &selected, self.hover.as_ref(), &[], extra_now, false, self.gpu.uploader()),
             None => Scene::default(),
         };
         self.viewport.update(cx, |vp, cx| vp.set_scene(Arc::new(scene), geometry_changed, cx));
@@ -139,7 +201,10 @@ impl FlatView {
     /// the whole flat.
     pub fn zoom_to_selection(&mut self, cx: &mut Context<Self>) {
         let strip = self.flat.as_ref().and_then(|(f, bend)| {
-            let l = f.bend_lines.iter().find(|l| Some(l.bend) == *bend)?;
+            let l = match self.selected_bend {
+                Some(i) => f.bend_lines.get(i)?,
+                None => f.bend_lines.iter().find(|l| Some(l.bend) == *bend)?,
+            };
             let d = (l.b - l.a).normalize_or_zero();
             let n = glam::DVec2::new(-d.y, d.x) * (l.allowance / 2.0);
             let pts = [l.a - n, l.a + n, l.b - n, l.b + n];
