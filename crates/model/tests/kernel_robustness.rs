@@ -2830,7 +2830,9 @@ fn oversize_chamfers_like_onshape() {
     assert_eq!((two.len(), three.len(), one.len(), long.len()), (2, 3, 1, 2));
     const END: &str = "End boundary intersects unchamfered edge.";
     const FAILED: &str = "Failed to chamfer selections.";
-    let cases: [(&str, &Vec<Reference>, &str, Result<(f64, usize), &str>); 20] = [
+    // (what, edges, distance, live's volume and faces or message)
+    type Case<'a> = (&'a str, &'a Vec<Reference>, &'a str, Result<(f64, usize), &'a str>);
+    let cases: [Case; 20] = [
         ("2 edges 5", &two, "5 mm", Ok((7750.0, 8))),
         ("2 edges 10", &two, "10 mm", Ok((7000.0, 7))),
         ("2 edges 10.5", &two, "10.5 mm", Ok((6900.0, 7))),
