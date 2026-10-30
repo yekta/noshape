@@ -4795,7 +4795,7 @@ Examples:
 
 A placed table's properties (BOM, cut list, revision, custom or general table) (edits the document (one undoable history entry)).
 
-The table's right-click › … table properties dialog, one edit with its name. BOM: `structured`, `bottom_to_top`, `corner` ("BOM table properties"); cut list: `bottom_to_top`, `corner` ("Cut list table properties"); revision: `see_sheet1`, `visible_rows` (1-100), `newest_top`, `hide_callouts`, `corner` ("Revision table properties"); custom: `bottom_to_top`, `corner` ("Custom table properties"; its table and Part Studio: drawing_custom_table with `id`); general and hole tables: Table properties… `corner`, the table staying where it is ("Table fixed corner"). Fields not given keep their values; a field the table's dialog doesn't have is refused.
+The table's right-click › … table properties dialog, one edit with its name. BOM: `structured`, `bottom_to_top`, `template` (follow_assembly: the assembly BOM's columns | onshape_default: Item, Quantity, Part number, Description), `corner` ("BOM table properties"); cut list: `bottom_to_top`, `corner` ("Cut list table properties"); revision: `see_sheet1`, `visible_rows` (1-100), `newest_top`, `hide_callouts`, `corner` ("Revision table properties"); custom: `bottom_to_top`, `corner` ("Custom table properties"; its table and Part Studio: drawing_custom_table with `id`); general and hole tables: Table properties… `corner`, the table staying where it is ("Table fixed corner"). Fields not given keep their values; a field the table's dialog doesn't have is refused.
 
 Examples:
 
@@ -4812,6 +4812,7 @@ Examples:
 | `table` | integer | required | Table id (drawing_get). |
 | `corner` | one of `top_left`, `top_right`, `bottom_left`, `bottom_right` |  | Fixed corner. |
 | `structured` | boolean |  | BOM: Structured (else Flattened). |
+| `template` | one of `follow_assembly`, `onshape_default` |  | BOM: Template (Follow assembly \| Onshape Default BOM). |
 | `bottom_to_top` | boolean |  | BOM, cut list, custom: rows bottom to top. |
 | `see_sheet1` | boolean |  | Revision: "See sheet 1" on the other sheets (else Linked). |
 | `visible_rows` | integer |  | Revision: visible rows. |

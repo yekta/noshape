@@ -48,13 +48,14 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "table_properties",
             summary: "A placed table's properties (BOM, cut list, revision, custom or general table)",
-            description: "The table's right-click › … table properties dialog, one edit with its name. BOM: `structured`, `bottom_to_top`, `corner` (\"BOM table properties\"); cut list: `bottom_to_top`, `corner` (\"Cut list table properties\"); revision: `see_sheet1`, `visible_rows` (1-100), `newest_top`, `hide_callouts`, `corner` (\"Revision table properties\"); custom: `bottom_to_top`, `corner` (\"Custom table properties\"; its table and Part Studio: drawing_custom_table with `id`); general and hole tables: Table properties… `corner`, the table staying where it is (\"Table fixed corner\"). Fields not given keep their values; a field the table's dialog doesn't have is refused.",
+            description: "The table's right-click › … table properties dialog, one edit with its name. BOM: `structured`, `bottom_to_top`, `template` (follow_assembly: the assembly BOM's columns | onshape_default: Item, Quantity, Part number, Description), `corner` (\"BOM table properties\"); cut list: `bottom_to_top`, `corner` (\"Cut list table properties\"); revision: `see_sheet1`, `visible_rows` (1-100), `newest_top`, `hide_callouts`, `corner` (\"Revision table properties\"); custom: `bottom_to_top`, `corner` (\"Custom table properties\"; its table and Part Studio: drawing_custom_table with `id`); general and hole tables: Table properties… `corner`, the table staying where it is (\"Table fixed corner\"). Fields not given keep their values; a field the table's dialog doesn't have is refused.",
             fields: with(
                 common(),
                 vec![
                     req("table", json!({ "type": "integer" }), "Table id (drawing_get)."),
                     opt("corner", json!({ "type": "string", "enum": CORNERS.iter().map(|c| c.0).collect::<Vec<_>>() }), "Fixed corner."),
                     opt("structured", json!({ "type": "boolean" }), "BOM: Structured (else Flattened)."),
+                    opt("template", json!({ "type": "string", "enum": ["follow_assembly", "onshape_default"] }), "BOM: Template (Follow assembly | Onshape Default BOM)."),
                     opt("bottom_to_top", json!({ "type": "boolean" }), "BOM, cut list, custom: rows bottom to top."),
                     opt("see_sheet1", json!({ "type": "boolean" }), "Revision: \"See sheet 1\" on the other sheets (else Linked)."),
                     opt("visible_rows", json!({ "type": "integer", "minimum": 1, "maximum": 100 }), "Revision: visible rows."),
@@ -174,12 +175,12 @@ fn table_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let sheet = t.sheet;
     let Some(old) = t.d.sheets[sheet].table(id).cloned() else { return Err(OpError::param("table", "no table with that id on the sheet (drawing_get)")) };
     let allowed: &[&str] = match old.kind {
-        TableKind::Bom { .. } => &["corner", "structured", "bottom_to_top"],
+        TableKind::Bom { .. } => &["corner", "structured", "bottom_to_top", "template"],
         TableKind::CutList { .. } | TableKind::Custom { .. } => &["corner", "bottom_to_top"],
         TableKind::Revision { .. } => &["corner", "see_sheet1", "visible_rows", "newest_top", "hide_callouts"],
         _ => &["corner"],
     };
-    for k in ["corner", "structured", "bottom_to_top", "see_sheet1", "visible_rows", "newest_top", "hide_callouts"] {
+    for k in ["corner", "structured", "bottom_to_top", "template", "see_sheet1", "visible_rows", "newest_top", "hide_callouts"] {
         if a.get(k).is_some() && !allowed.contains(&k) {
             return Err(OpError::param(k, &format!("this table's properties have no `{k}` (they have: {})", allowed.join(", "))));
         }
@@ -188,9 +189,10 @@ fn table_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let layout = t.m.built.as_ref().and_then(|b| b.table_layout(id)).cloned();
     let table = t.d.sheets[sheet].tables.iter_mut().find(|x| x.id == id).expect("found");
     let description = match &mut table.kind {
-        TableKind::Bom { structured, bottom_to_top, .. } => {
+        TableKind::Bom { structured, bottom_to_top, default_template, .. } => {
             *structured = a.bool_or("structured", *structured)?;
             *bottom_to_top = a.bool_or("bottom_to_top", *bottom_to_top)?;
+            *default_template = enum_arg(a, "template", &[("follow_assembly", false), ("onshape_default", true)], *default_template)?;
             table.corner = corner;
             "BOM table properties"
         }

@@ -82,7 +82,7 @@ pub fn showcase_document() -> Document {
         s.views.push(DrawingView { id: ViewId(1), kind: ViewKind::Base { source: asm, config: Default::default(), orientation: ViewOrientation::Isometric, part: None }, position: [110.0, 190.0], label: Some("ASSEMBLED".into()), scale: Some(1.5), ..Default::default() });
         s.views.push(DrawingView { id: ViewId(2), kind: ViewKind::Base { source: asm, config: Default::default(), orientation: ViewOrientation::Isometric, part: None }, position: [300.0, 150.0], label: Some("EXPLODED".into()), explode: Some(0), scale: Some(0.5), ..Default::default() });
         s.views.push(DrawingView { id: ViewId(3), kind: ViewKind::Base { source: asm, config: Default::default(), orientation: ViewOrientation::Front, part: None }, position: [110.0, 80.0], style: RenderStyle::HiddenLinesVisible, ..Default::default() });
-        s.tables.push(Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: Vec::new() }, [421.8, 269.4]));
+        s.tables.push(Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: Vec::new(), default_template: false }, [421.8, 269.4]));
         s.annotations.push(Annotation { id: 1, kind: AnnotationKind::note("{model.name}: {part.name}\nSHEET {sheet.number} OF {sheet.count}", 3.5), position: [25.0, 40.0], ..Default::default() });
     }
 

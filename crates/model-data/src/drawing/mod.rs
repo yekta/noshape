@@ -1408,6 +1408,11 @@ pub enum TableKind {
         /// Overridden cells: (item number, column, value).
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         overrides: Vec<(String, usize, String)>,
+        /// Template "Onshape Default BOM" (Item, Quantity, Part number,
+        /// Description), else "Follow assembly": the assembly BOM's columns
+        /// (live request 1627).
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        default_template: bool,
     },
     /// Holes (face-on circular bores) of `view`, located from `origin`
     /// (view coordinates, associative through `origin_ref`).

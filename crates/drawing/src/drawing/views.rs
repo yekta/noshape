@@ -107,6 +107,10 @@ pub struct SourceModel {
     /// Assemblies only: the Structured BOM (item "3.1", depth, name,
     /// part number, material, quantity).
     pub bom_structured: Vec<StructuredBomRow>,
+    /// Assemblies only: the assembly BOM's columns (their headers) and each
+    /// `bom` row's text in them ("Follow assembly" BOM tables).
+    pub bom_columns: Vec<String>,
+    pub bom_cells: Vec<Vec<String>>,
     /// Part Studios: their MBD annotations (Model definitions datums).
     pub model_annotations: Vec<crate::annotations::Annotation>,
     /// Assemblies: the assembly's own Properties (name, part number, …),
@@ -334,7 +338,7 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
                     _ => None,
                 })
                 .collect();
-            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![], bom_structured: vec![], model_annotations: ps.annotations.clone(), own: None, sketch_colors, explode_trails: Vec::new() })
+            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![], bom_structured: vec![], bom_columns: vec![], bom_cells: vec![], model_annotations: ps.annotations.clone(), own: None, sketch_colors, explode_trails: Vec::new() })
         }
         TabContent::Assembly(asm) => {
             // A named position: its placements and mate values; a display
@@ -350,6 +354,22 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
             let result = assemblies.evaluate(doc, asm, &opts, key.explode);
             let mut s = assembly_source(doc, &result, hash, tab.name.clone(), hidden.as_deref());
             s.bom_structured = structured_bom(doc, key.tab, &result);
+            // The assembly BOM's own columns, each row matched to its line
+            // by name and quantity (live request 1627: Follow assembly).
+            let settings = crate::assembly::bom::BomSettings { bom_type: crate::assembly::bom::BomType::Flattened, ..asm.bom.clone() };
+            let mut lines: Vec<crate::assembly::bom::BomLine> = crate::assembly::bom::lines(doc, key.tab, &result, &settings).into_iter().filter(|l| !l.excluded && !l.top_level).collect();
+            s.bom_columns = asm.bom.columns.iter().map(|c| c.label().to_string()).collect();
+            s.bom_cells = s
+                .bom
+                .iter()
+                .map(|row| match lines.iter().position(|l| l.name == row.name && l.quantity == row.quantity) {
+                    Some(i) => {
+                        let l = lines.remove(i);
+                        asm.bom.columns.iter().map(|c| crate::assembly::bom::cell(doc, &result, &l, *c).text()).collect()
+                    }
+                    None => vec![String::new(); asm.bom.columns.len()],
+                })
+                .collect();
             let p = &asm.properties;
             s.own = Some(PartInfo { name: tab.name.clone(), number: p.part_number.clone().unwrap_or_default(), description: p.description.clone().unwrap_or_default(), revision: p.revision.clone().unwrap_or_default(), meta: p.meta.clone(), mass_override: p.mass_override, ..Default::default() });
             Some(s)
@@ -428,7 +448,7 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
             row.name = r.name.clone();
         }
     }
-    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new(), model_annotations: Vec::new(), own: None, sketch_colors: Vec::new(), explode_trails: result.explode_trails.clone() }
+    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new(), bom_columns: Vec::new(), bom_cells: Vec::new(), model_annotations: Vec::new(), own: None, sketch_colors: Vec::new(), explode_trails: result.explode_trails.clone() }
 }
 
 /// Regenerate every source a drawing references (headless helper for

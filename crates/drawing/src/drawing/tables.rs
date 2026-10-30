@@ -355,10 +355,12 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
             let col_align = vec![CellAlign::Left; cells.iter().map(|r| r.len()).max().unwrap_or(0)];
             TableData { title: title.as_ref().map(|t| expand(t)), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), col_align, header_bold: true, style: None, merges: Vec::new() }
         }
-        TableKind::Bom { structured, bottom_to_top, overrides, .. } => {
+        TableKind::Bom { structured, bottom_to_top, overrides, default_template, .. } => {
             // Onshape's BOM table columns (live drawing/189): Item, Quantity,
-            // Part number, Description; no title row.
-            let header = Some(BOM_HEADER.map(String::from).to_vec());
+            // Part number, Description; no title row. "Follow assembly"
+            // takes the assembly BOM's columns (live request 1627).
+            let follow = source.filter(|s| !*default_template && !*structured && s.assembly && !s.bom_columns.is_empty() && s.bom_cells.len() == s.bom.len() && s.bom_columns.iter().map(String::as_str).ne(BOM_HEADER));
+            let header = Some(follow.map(|s| s.bom_columns.clone()).unwrap_or_else(|| BOM_HEADER.map(String::from).to_vec()));
             let description = |s: &SourceModel, body: Option<&crate::reference::BodyId>| body.and_then(|b| s.part(Some(b))).map(|p| p.description.clone()).unwrap_or_default();
             let mut rows: Vec<Vec<String>> = match source {
                 // Structured: nested rows ("3.1").
@@ -368,6 +370,24 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
                     .map(|r| {
                         let body = s.bom.iter().find(|e| e.name == r.name && e.number == r.number).and_then(|e| e.bodies.first());
                         vec![r.item.clone(), r.quantity.to_string(), r.number.clone(), description(s, body)]
+                    })
+                    .collect(),
+                Some(s) if s.assembly && follow.is_some() => s
+                    .bom
+                    .iter()
+                    .zip(&s.bom_cells)
+                    .map(|(r, cells)| {
+                        s.bom_columns
+                            .iter()
+                            .zip(cells)
+                            .map(|(c, v)| match c.as_str() {
+                                "Item" => r.item.to_string(),
+                                "Quantity" => r.quantity.to_string(),
+                                "Part number" => r.number.clone(),
+                                "Description" => description(s, r.bodies.first()),
+                                _ => v.clone(),
+                            })
+                            .collect()
                     })
                     .collect(),
                 Some(s) if s.assembly => s.bom.iter().map(|r| vec![r.item.to_string(), r.quantity.to_string(), r.number.clone(), description(s, r.bodies.first())]).collect(),

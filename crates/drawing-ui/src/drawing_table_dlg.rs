@@ -28,6 +28,8 @@ pub struct TableDlg {
     pub structured: bool,
     pub bottom_to_top: bool,
     pub corner: TableCorner,
+    /// Template: "Onshape Default BOM" (else "Follow assembly").
+    pub default_template: bool,
 }
 
 impl DrawingEditor {
@@ -68,7 +70,7 @@ impl DrawingEditor {
                     _ => None,
                 };
                 let view = preferred.or_else(|| sources.first().map(|s| s.0));
-                self.table_dlg = Some(TableDlg { kind: k, table: None, original: None, view, structured: false, bottom_to_top: false, corner: TableCorner::TopRight });
+                self.table_dlg = Some(TableDlg { kind: k, table: None, original: None, view, structured: false, bottom_to_top: false, corner: TableCorner::TopRight, default_template: false });
             }
             Some(_) => {}
             // The properties dialog of a placed table stays.
@@ -80,13 +82,14 @@ impl DrawingEditor {
     /// Right-click › BOM table properties… / Cut list table properties….
     pub fn open_table_props(&mut self, id: u64, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(id).cloned() else { return };
+        let default_template = matches!(t.kind, TableKind::Bom { default_template: true, .. });
         let (kind, view, structured, bottom_to_top) = match t.kind {
             TableKind::Bom { view, structured, bottom_to_top, .. } => (TableTool::Bom, view, structured, bottom_to_top),
             TableKind::CutList { view, bottom_to_top } => (TableTool::CutList, view, false, bottom_to_top),
             _ => return,
         };
         self.tool = Tool::Select;
-        self.table_dlg = Some(TableDlg { kind, table: Some(id), original: Some((t.kind.clone(), t.corner)), view: Some(view), structured, bottom_to_top, corner: t.corner });
+        self.table_dlg = Some(TableDlg { kind, table: Some(id), original: Some((t.kind.clone(), t.corner)), view: Some(view), structured, bottom_to_top, corner: t.corner, default_template });
         cx.notify();
     }
 
@@ -95,10 +98,10 @@ impl DrawingEditor {
         if let Some(d) = &self.table_dlg
             && let Some(id) = d.table
         {
-            let (structured_v, bottom, corner) = (d.structured, d.bottom_to_top, d.corner);
+            let (structured_v, bottom, corner, template) = (d.structured, d.bottom_to_top, d.corner, d.default_template);
             self.edit_table(id, if d.kind == TableTool::Bom { "BOM table properties" } else { "Cut list table properties" }, cx, |t| {
                 match &mut t.kind {
-                    TableKind::Bom { structured, bottom_to_top, .. } => (*structured, *bottom_to_top) = (structured_v, bottom),
+                    TableKind::Bom { structured, bottom_to_top, default_template, .. } => (*structured, *bottom_to_top, *default_template) = (structured_v, bottom, template),
                     TableKind::CutList { bottom_to_top, .. } => *bottom_to_top = bottom,
                     _ => {}
                 }
@@ -253,7 +256,7 @@ impl DrawingEditor {
         let c = self.cursor;
         let id = self.current_sheet().next_table_id();
         let (kind, name) = match d.kind {
-            TableTool::Bom => (TableKind::Bom { view, structured: d.structured, bottom_to_top: d.bottom_to_top, overrides: Vec::new() }, "BOM table"),
+            TableTool::Bom => (TableKind::Bom { view, structured: d.structured, bottom_to_top: d.bottom_to_top, overrides: Vec::new(), default_template: d.default_template }, "BOM table"),
             _ => (TableKind::CutList { view, bottom_to_top: d.bottom_to_top }, "Cut list table"),
         };
         let corner = d.corner;
@@ -304,6 +307,11 @@ impl DrawingEditor {
         let types: Vec<(String, bool, Set)> = vec![
             ("Flattened".into(), !d.structured, std::rc::Rc::new(|d: &mut TableDlg| d.structured = false) as Set),
             ("Structured".into(), d.structured, std::rc::Rc::new(|d: &mut TableDlg| d.structured = true) as Set),
+        ];
+        // Live request 1627: exactly these two.
+        let templates: Vec<(String, bool, Set)> = vec![
+            ("Follow assembly".into(), !d.default_template, std::rc::Rc::new(|d: &mut TableDlg| d.default_template = false) as Set),
+            ("Onshape Default BOM".into(), d.default_template, std::rc::Rc::new(|d: &mut TableDlg| d.default_template = true) as Set),
         ];
         let orders: Vec<(String, bool, Set)> = vec![
             ("Top to bottom".into(), !d.bottom_to_top, std::rc::Rc::new(|d: &mut TableDlg| d.bottom_to_top = false) as Set),
@@ -390,7 +398,7 @@ impl DrawingEditor {
                             .child(select("table-dlg-source", source_label.clone(), 120., source_items)),
                     )
                 })
-                .when(bom, |v| v.child(row("Template", div().w(px(120.)).text_size(px(11.)).child("Follow assembly").into_any_element())).child(row("BOM type", select("table-dlg-type", if d.structured { "Structured".into() } else { "Flattened".into() }, 120., types).into_any_element())))
+                .when(bom, |v| v.child(row("Template", select("table-dlg-template", if d.default_template { "Onshape Default BOM".into() } else { "Follow assembly".into() }, 120., templates).into_any_element())).child(row("BOM type", select("table-dlg-type", if d.structured { "Structured".into() } else { "Flattened".into() }, 120., types).into_any_element())))
                 .when_some(d.table.filter(|_| editing && !bom), |v, id| {
                     let names: Vec<String> = self.drawing.sheets.iter().map(|s| s.name.clone()).collect();
                     let cur = self.sheet;

@@ -608,9 +608,10 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                 j["part_rows"] = json!(r);
             }
             match &t.kind {
-                noshape_model::drawing::TableKind::Bom { structured, bottom_to_top, .. } => {
+                noshape_model::drawing::TableKind::Bom { structured, bottom_to_top, default_template, .. } => {
                     j["structured"] = json!(structured);
                     j["bottom_to_top"] = json!(bottom_to_top);
+                    j["template"] = json!(if *default_template { "onshape_default" } else { "follow_assembly" });
                 }
                 noshape_model::drawing::TableKind::CutList { bottom_to_top, .. } => j["bottom_to_top"] = json!(bottom_to_top),
                 noshape_model::drawing::TableKind::Hole { flip_x, flip_y, precision, .. } => {

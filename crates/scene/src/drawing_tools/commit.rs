@@ -595,7 +595,7 @@ pub fn default_break_gap_mm(units_mm: bool) -> f64 {
 /// edit's description.
 pub fn view_table(id: u64, kind: TableTool, view: ViewId, origin: Option<PickedPoint>, position: [f64; 2]) -> (Table, &'static str) {
     let tk = match kind {
-        TableTool::Bom => TableKind::Bom { view, structured: false, bottom_to_top: false, overrides: Vec::new() },
+        TableTool::Bom => TableKind::Bom { view, structured: false, bottom_to_top: false, overrides: Vec::new(), default_template: false },
         TableTool::CutList => TableKind::CutList { view, bottom_to_top: false },
         _ => TableKind::Hole { view, origin: origin.as_ref().map(|o| o.p).unwrap_or([0.0; 2]), origin_ref: origin.and_then(|o| o.r), precision: None, flip_x: false, flip_y: false , show_location: true, bottom_to_top: false },
     };
