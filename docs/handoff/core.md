@@ -550,7 +550,7 @@ with 0003b and 0004 on Linux, macOS and Windows.
    41097497981 is green, with the 0007w / 0008 libs swapped into /root/occt first (backups to
    /root/core-scratch/occt-lib-backup/*.pre0007); then the fillet budget test back to T1 once vibe2 / vibe3 have the
    libs. Remaining jumps (code that checks neither the indicator nor the hooks: the Rust Boolean? qa's fuzz will
-   tell) still leak; NOSHAPE_GUARD_TRACE doesn't show them: a "budget jump" line under it would.
+   tell) still leak; NOSHAPE_GUARD_TRACE=1 prints each one with its stack ("a budget jumped out of the kernel at:").
 1. qa verified seed 189 (GUARD-SEGV-MALLOC-DEADLOCK) on 10-30; nothing left here.
 2. P0 SHELL-SLOW tail: concave parts with fillets (a pocket with floor fillets 2.3–2.9 s in slabs) need regions with
    concave edges. The fuzz shells that "fail" after 30 s (qa's hang402 before-mirror.noshape: Shell 3 and 5, 35 s
