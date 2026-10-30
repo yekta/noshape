@@ -1413,7 +1413,10 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     let fused = if solids.len() == 1 {
         solids.remove(0)
     } else {
-        k::fuse_all(&solids, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape
+        // The walls and bends only touch (on the faces they share): glued
+        // (kept only when the volumes add up, else fused as usual).
+        let glued = k::BooleanOptions { glue: k::Glue::ShiftChecked, ..Default::default() };
+        k::fuse_all(&solids, &glued).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape
     };
     // Coplanar walls (split by a rip) are one face.
     let fused = if (0..topo.edges.len()).any(|e| coplanar_rip(&topo, e)) { k::unify_same_domain(&fused).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape } else { fused };
@@ -1492,9 +1495,14 @@ fn keep_names(part: &Shape, names: &mut [crate::naming::Name], before: &Shape, b
             && k::make_vertex(p).is_ok_and(|v| f.edges().iter().all(|e| k::distance(&v, e).is_ok_and(|d| d.distance > 1e-6)))
     };
     let (new_probes, old_probes): (Vec<_>, Vec<_>) = (new.iter().map(probe).collect(), old.iter().map(probe).collect());
+    // A point outside a face's box is not on it (most pairs skip the
+    // projection: a hem's rebuild spent 2 s here, part_sources' rule).
+    let boxed = |fs: &[Shape]| -> Vec<Option<k::BoundingBox>> { fs.iter().map(|f| f.bounding_box(false).ok()).collect() };
+    let (new_boxes, old_boxes) = (boxed(&new), boxed(&old));
+    let in_box = |b: &Option<k::BoundingBox>, x: &Option<(DVec3, DVec3)>| x.is_some_and(|(p, _)| b.as_ref().is_none_or(|b| (b.min - DVec3::splat(1e-6)).cmple(p).all() && p.cmple(b.max + DVec3::splat(1e-6)).all()));
     let mut of: Vec<Vec<usize>> = vec![Vec::new(); old.len()];
     for (i, f) in new.iter().enumerate() {
-        let hit = (0..old.len()).find(|&j| new_probes[i].is_some_and(|x| on(&old[j], x)) || old_probes[j].is_some_and(|x| on(f, x)));
+        let hit = (0..old.len()).find(|&j| (in_box(&old_boxes[j], &new_probes[i]) && new_probes[i].is_some_and(|x| on(&old[j], x))) || (in_box(&new_boxes[i], &old_probes[j]) && old_probes[j].is_some_and(|x| on(f, x))));
         if let Some(j) = hit.filter(|&j| j < before_names.len()) {
             of[j].push(i);
         }
