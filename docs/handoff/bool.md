@@ -832,6 +832,12 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   knurl: CutByFaces failed, Modified. So "tools coincide" (its comment: "OCCT may build the object's solid anew")
   was most likely this too. Request to core below; until then noshape's Boolean can't match today's record on such
   cuts without knowing whether CutByFaces succeeds.
+- perf.sh, vibe3, main 1009c879 (bool_patterns, one run; ours / OCCT's alone on the same inputs, faces and volume
+  the same): pocket grid 23 ms / 396 ms (17×), gear slots 10 / 189 ms (19×), helical grooves 243 / 455 ms (1.9×;
+  before this work OCCT's after a decline), radial holes 140 / 247 ms (1.8×; likewise), holes on a circle 1.2 / 1.3
+  ms (the through-holes path), crossing helical grooves 8.1 s both (OCCT's, "tools coincide"; OCCT's result
+  invalid). The knurl's cut: OCCT's (183 s here at scale 1, 137 s at the model's mm scale per lead), declined in
+  0.1 s.
 - perf.sh: both bool_patterns runs (cc8837a7, 620d5eaf) ran no test ("0 passed, 175 filtered out": the binary of
   another commit; the ~/perf/wt race in Requests), so vibe3 numbers for the pattern set are still to come; the
   numbers above are this machine's (relative only).
