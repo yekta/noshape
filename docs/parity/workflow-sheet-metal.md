@@ -45,7 +45,7 @@ numbers), ◐ = partly, ✗ = differs, — = no live data.
 | 5.9 select tooltip (SM11) | none while open | ✅ | GUI 10-28 |
 | 6.1 strip button | "Sheet metal table and flat view" | ✅ | GUI 10-30 |
 | 6.2 panel (SM4) | live's design | ✅ | GUI 10-30 |
-| 6.2 row names | Bend A, Bend B, Hem C, Joint D vs live Joint A, Bend B, Bend C, Hem D (live: creation order of the joints' definition edges, request 1604) | ✗ P3 | GUI 10-30 |
+| 6.2 row names | letters in the order the joints' definition entities appeared, a rebuilt one last (live request 1604): live's (a)/(b)/(c) cases exact; G34 + Hem gives Bend A (x = 0), Joint B, Bend C (y = 0), Hem D (live's qa5, with a Tab and Corner too: Joint A, Bend B (x = 0), Bend C (y = 0), Hem D) | ◐ | T2 joint_births_follow_live_letters |
 | 6.3 Up (SM5) | Up | ✅ | GUI 10-30 |
 | 6.4 row click | row selected, bend lit in 3D and flat | ✅ | GUI 10-30 |
 | 6.5 flat (SM6, SM17) | reliefs, live placement and size | ✅ | GUI 10-30, T2 flat_pattern_keeps_the_model_placement |

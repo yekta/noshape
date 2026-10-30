@@ -103,6 +103,8 @@ pub struct Bend {
     /// Unfolded in the model (Unfold feature): the bend region is a flat
     /// strip and the walls past it already lie in the flat position.
     pub flat: bool,
+    /// When its definition entity appeared ([`crate::regen::context::Context::sm_births`]; 0 natively).
+    pub birth: u64,
 }
 
 impl Bend {
@@ -167,6 +169,8 @@ pub struct Rip {
     pub other: Option<Name>,
     /// Faces the rip cut (the walls' ends facing each other).
     pub faces: Vec<Name>,
+    /// When its definition edge appeared (as [`Bend::birth`]).
+    pub birth: u64,
 }
 
 impl Rip {

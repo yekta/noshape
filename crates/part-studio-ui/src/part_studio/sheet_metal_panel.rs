@@ -69,10 +69,13 @@ fn joint_rows(data: &SheetMetalData, up: &dyn Fn(usize) -> Option<bool>, order: 
         }
         s
     };
-    // (feature place, bends first, index) -> letter.
-    let mut seq: Vec<(usize, u8, usize)> = data.bends.iter().enumerate().map(|(i, b)| (order(b.feature), 0, i)).chain(data.rips.iter().enumerate().map(|(i, r)| (order(r.feature), 1, i))).collect();
+    // One sequence for bends and joints, in the order their definition
+    // entities appeared (live request 1604: Onshape's transient-id order,
+    // an entity a later feature rebuilt last), then (natively) feature
+    // place, bends first, index -> letter.
+    let mut seq: Vec<(u64, usize, u8, usize)> = data.bends.iter().enumerate().map(|(i, b)| (b.birth, order(b.feature), 0, i)).chain(data.rips.iter().enumerate().map(|(i, r)| (r.birth, order(r.feature), 1, i))).collect();
     seq.sort();
-    let name_of = |kind: u8, i: usize| seq.iter().position(|e| e.1 == kind && e.2 == i).map(letter).unwrap_or_default();
+    let name_of = |kind: u8, i: usize| seq.iter().position(|e| e.2 == kind && e.3 == i).map(letter).unwrap_or_default();
     let mut joints = Vec::new();
     for (ri, r) in data.rips.iter().enumerate() {
         joints.push(JointRow {

@@ -863,3 +863,44 @@ fn corner_off_a_corner_fails_as_live() {
     let last = r.display.features.last().unwrap();
     assert_eq!((last.status, last.message.as_deref()), (FeatureStatus::Error, Some("Sheet metal corner not found.")));
 }
+
+/// Live request 1604: the table letters follow the order the joints'
+/// definition edges appeared. One Flange on the y = 0 and x = 0 edges, in
+/// either pick order: Bend A = y = 0, Bend B = x = 0, Joint C = the corner rip;
+/// two Flange features: A = y = 0, B = x = 0, no joint.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn joint_births_follow_live_letters() {
+    for (case, picks) in [("a", vec!["y0", "x0"]), ("b", vec!["x0", "y0"]), ("c", vec!["y0+", "x0+"])] {
+        let mut s = plate("2 mm");
+        let r = s.ok();
+        let edge = |r: &RegenResult, w: &str| if w.starts_with("y0") { edge_at(r, DVec3::new(30.0, 0.0, 2.0)) } else { edge_at(r, DVec3::new(0.0, 20.0, 2.0)) };
+        if case == "c" {
+            for w in &picks {
+                let r = s.ok();
+                let e = edge(&r, w);
+                s.add("sheetMetalFlange", |p| {
+                    p.set("edges", ParamValue::Query(vec![e]));
+                    p.set("distance", expr("20 mm"));
+                });
+            }
+        } else {
+            let edges: Vec<Reference> = picks.iter().map(|w| edge(&r, w)).collect();
+            s.add("sheetMetalFlange", |p| {
+                p.set("edges", ParamValue::Query(edges));
+                p.set("distance", expr("20 mm"));
+            });
+        }
+        let r = s.ok();
+        let data = r.context.sheet_metal.get(&r.context.bodies[part(&r)].id).expect("data");
+        let along_x = data.bends.iter().find(|b| b.axis.x.abs() > 0.9).expect("y = 0 bend").birth;
+        let along_y = data.bends.iter().find(|b| b.axis.y.abs() > 0.9).expect("x = 0 bend").birth;
+        assert!(along_x < along_y, "{case}: y = 0 bend {along_x}, x = 0 bend {along_y}");
+        if case == "c" {
+            assert!(data.rips.is_empty(), "{case}: {} rips", data.rips.len());
+        } else {
+            assert!(data.rips.len() == 1 && data.rips[0].birth > along_y, "{case}: rips {:?}", data.rips.iter().map(|r| r.birth).collect::<Vec<_>>());
+        }
+    }
+}
+

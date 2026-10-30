@@ -114,9 +114,10 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   feature built it (`FlatPattern::built_for`, `body_key`), else the native flattener on std's data (a later Hole's
   hole and counterbore heads); per-vertex Bend relief settings (`Definition::reliefs`); pulled wall sides that come
   out reversed are dropped (Modify joint radius on a corner a later flange shortened); ops' table skips stale parts.
-- Open (10-30 morning): (1) **table letters**: live orders joints by their definition edge's creation (transient id
-  order; an edge a later feature rebuilds moves to the end; request 1604), ours by feature then bends before rips;
-  needs a creation sequence for definition edges our names don't carry. (2) **Butt joint Direction 1 after a Convert**
+- Table letters (10-30): `Context::sm_births`, the std rebuild's first-sight order of definition edges (by end points)
+  and rolled faces (by box): an edge a later feature changes is new, as Onshape's transient ids; Bend / Rip `birth`;
+  the panel sorts joints by it (live request 1604; T2 joint_births_follow_live_letters).
+- Open (10-30 morning): (1) (was: table letters, done above). (2) **Butt joint Direction 1 after a Convert**
   and evaluateQuery order generally: live returns faces in creation order (extrude: first side, start cap, end cap,
   other sides; rebuilt faces last; request 1608), ours in body order. (3) rect→triangle loft: 51 vs 49 faces (live's
   2 swept faces where three bends meet; their place unknown). (4) Flat view: Copy Flat pattern (live pastes a flat part

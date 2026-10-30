@@ -373,6 +373,7 @@ fn extrude(ev: &mut EvalCtx, t: f64) -> FResult<()> {
                     inner_faces: vec![if ref_inner { path_name.clone() } else { off_name.clone() }],
                     outer_faces: vec![if ref_inner { off_name } else { path_name }],
                     flat: false,
+                    birth: 0,
                 });
                 pending = Some(data.bends.len() - 1);
                 last_wall = None;

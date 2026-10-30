@@ -1399,6 +1399,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let Some(bi) = ev.ctx.bodies.iter().position(|b| b.id == def.body) else { continue };
             let shape = ev.ctx.bodies[bi].shape.clone();
             let Built { mut part, mut pieces, topo, wall_flats, strips } = build_part(def, &shape)?;
+            let births = births(&mut ev.ctx.sm_births, def, &topo);
             // Forms: the parts to remove cut, then the parts to add united;
             // their faces belong to the wall they sit on.
             let mut form_shapes: Vec<(usize, Vec<Shape>)> = Vec::new();
@@ -1462,7 +1463,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let own_forms: Vec<(usize, Vec<Shape>)> = form_shapes.iter().filter(|f| p.members.contains(&f.0)).cloned().collect();
                 let own_cuts: Vec<(usize, Vec<Shape>)> = cut_shapes.iter().filter(|f| p.members.contains(&f.0)).cloned().collect();
                 let flat = flat_of(def, &topo, &walls, &own, &own_forms, &own_cuts);
-                let data = sheet_data(def, &topo, &own, &p, flat.as_ref(), &others);
+                let data = sheet_data(def, &topo, &own, &p, flat.as_ref(), &others, &births);
                 let id = def.previous.get(k).cloned().unwrap_or_else(|| {
                     fresh += 1;
                     BodyId { feature: ev.feature, index: fresh - 1 }
@@ -1570,7 +1571,30 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 /// first), bends in strip order with up as in the flat, rips.
 /// `others`: the reference-side face of every wall, for rips to a wall in
 /// another part.
-fn sheet_data(def: &Definition, topo: &Topo, strips: &[Strip], part: &PartOf, flat: Option<&crate::sheetmetal::FlatPattern>, others: &BTreeMap<usize, crate::naming::Name>) -> crate::sheetmetal::SheetMetalData {
+/// When each definition edge and rolled face appeared (see
+/// [`crate::regen::context::Context::sm_births`]): new ones registered in
+/// definition order. Returns the births by edge index and by rolled face.
+fn births(seen: &mut Vec<[i64; 6]>, def: &Definition, topo: &Topo) -> (Vec<u64>, BTreeMap<usize, u64>) {
+    let q = |v: f64| (v * 1e7).round() as i64;
+    let key = |a: DVec3, b: DVec3| {
+        let (a, b) = ([q(a.x), q(a.y), q(a.z)], [q(b.x), q(b.y), q(b.z)]);
+        let (a, b) = if a <= b { (a, b) } else { (b, a) };
+        [a[0], a[1], a[2], b[0], b[1], b[2]]
+    };
+    let mut birth = |k: [i64; 6]| match seen.iter().position(|x| *x == k) {
+        Some(i) => i as u64,
+        None => {
+            seen.push(k);
+            seen.len() as u64 - 1
+        }
+    };
+    let edges = topo.edge_ends.iter().map(|(a, b)| birth(key(*a, *b))).collect();
+    let faces = def.rolled.keys().filter_map(|&fi| Some((fi, birth(topo.faces.get(fi)?.bounding_box(false).ok().map(|b| key(b.min, b.max))?)))).collect();
+    (edges, faces)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn sheet_data(def: &Definition, topo: &Topo, strips: &[Strip], part: &PartOf, flat: Option<&crate::sheetmetal::FlatPattern>, others: &BTreeMap<usize, crate::naming::Name>, births: &(Vec<u64>, BTreeMap<usize, u64>)) -> crate::sheetmetal::SheetMetalData {
     use crate::sheetmetal::{Bend as SmBend, BendKind, BendReliefStyle, Rip, SheetMetalData, Wall};
     let thickness = def.front + def.back;
     let mut data = SheetMetalData::new(def.body.feature, thickness, def.default_radius, def.k_factor);
@@ -1616,6 +1640,10 @@ fn sheet_data(def: &Definition, topo: &Topo, strips: &[Strip], part: &PartOf, fl
             inner_faces: inner,
             outer_faces: outer,
             flat: false,
+            birth: match st.rolled {
+                Some(fi) => births.1.get(&fi).copied().unwrap_or(u64::MAX),
+                None => births.0.get(st.edge).copied().unwrap_or(u64::MAX),
+            },
         });
     }
     for &e in def.rips.iter().filter(|&&e| !coplanar_rip(topo, e)) {
@@ -1632,6 +1660,7 @@ fn sheet_data(def: &Definition, topo: &Topo, strips: &[Strip], part: &PartOf, fl
             gap: def.clearance,
             other: if b_here.is_none() { b.and_then(|b| others.get(&b).cloned()) } else { None },
             faces: named(Def::Edge(e)).into_iter().map(|x| x.1).collect(),
+            birth: births.0.get(e).copied().unwrap_or(u64::MAX),
         });
     }
     data
