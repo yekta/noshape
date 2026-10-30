@@ -194,6 +194,13 @@ perf with env NOSHAPE_PERF_SCRIPT=edit-undo-redo,NOSHAPE_PERF_SCRIPT_WAIT_MS=200
 19 / 33): COMMIT-LATENCY closed in TICKETS. Left open (not a ticket): the macOS runners' first viewport frames after
 opening take 250–500 ms on the GPU (paravirtual Metal); if real Macs show it, look at GPU-side first use. Mesher
 numbers: use tools/tiers/perf.sh (vibe3, machine to itself) once it's back on main (the lead reverted it at eb85b1ec).
+10-30 23:50: mesher on the perf server (tools/tiers/perf.sh, `rust_mesh::bench_f`): the first real numbers were
+8.2–8.7× on the fin plate (this machine's / CI's 11–13× were optimistic), and runs before c68adf77 timed other trees
+(perf-remote.sh checked out before its lock; fixed in c68adf77, request below). Now f94a0486: **fin plate 12.2–13.5 ms
+(median 12.9) against BRepMesh 133–135: 10.0–10.8×, median 10.4× over 5 runs**; filleted boss 1.80–1.85 ms against
+2.61–2.80 (1.4–1.6×). Steps (`rust_mesh::bench_profile_fin`, per copy): brep's mesh 5.3, box 1.6 (faces in parallel,
+a solid skips the outside-edge walks), reading in 1.8, out 0.7 (polylines in parallel), edge cache 0.55 (16 maps
+bound in parallel), fill 0.7. Next if more is wanted: the box's per-face BRepBndLib (1.5), brep's per-face Vecs.
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC
