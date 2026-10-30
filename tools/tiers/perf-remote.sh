@@ -9,6 +9,9 @@ set -uo pipefail
 name=$1; ref=$2; runs=$3; shift 3
 . "$HOME/noshape-env.sh"
 mkdir -p "$HOME/perf" "$HOME/land"
+# One perf run at a time, from the checkout on: a run waiting here had its tree replaced by the next one's checkout
+# and timed that commit under its own sha (10-30).
+exec 7>"$HOME/perf/lock"; flock 7
 wt="$HOME/perf/wt"; [ -d "$wt" ] || git -C "$HOME/projects/noshape" worktree add -q --detach "$wt" origin/main
 cd "$wt" && git fetch -q origin "$ref" 2>/dev/null; git checkout -q -f --detach FETCH_HEAD 2>/dev/null || git checkout -q -f --detach "$ref" || { echo "PERF FAILED: checkout"; exit 1; }
 git clean -fdq
@@ -16,7 +19,6 @@ export CARGO_TARGET_DIR="$HOME/target-perf" NOSHAPE_CONFIG_DIR=$(mktemp -d -t no
 sha=$(git rev-parse --short HEAD)
 echo "== perf on $(hostname -s) at $sha: cargo test --release $*"
 # Build without timing, outside the exclusive slots (lands go on meanwhile).
-exec 7>"$HOME/perf/lock"; flock 7   # one perf run at a time
 cargo test --release --locked --no-run "$@" > /tmp/perf-build-$$.log 2>&1 || { tail -20 /tmp/perf-build-$$.log; echo "PERF FAILED: build"; exit 1; }
 times=()
 for i in $(seq "$runs"); do
