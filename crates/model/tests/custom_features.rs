@@ -1840,7 +1840,11 @@ fn std_sheet_metal_matches_onshape() {
         // sm8: a Tab merged into the plate (live dom/fs-smprobe3-8.txt).
         "sm8 parts 1 areas [ 850 , 850 , 80 , 40 , 40 , 30 , 30 , 20 , 10 , 10 ]",
         // Bend reliefs of partial flanges and corner reliefs (live dom/fs-smprobe3-{5,6,6c}.txt,
-        // dom/fs-smprobe4-*.txt). Not yet equal: ROUND (sm6b, sm6d), CLOSED (sm6h).
+        // dom/fs-smprobe4-*.txt). Not yet equal to the 4th decimal, face for face otherwise: ROUND
+        // (sm6b, sm6d: the wrapped relief's spline bend ends ≤ 0.0008 mm² off), CLOSED (sm6h, the
+        // model's defaultTwoCornerStyle: its line below is ours; live's four bend cylinders are
+        // 184.988 / 123.3254 / 90.7403 / 60.4935, ours ≤ 0.0015 mm² less: the ruled bend ends, as G34a).
+        "sm6h flanged parts 1 areas [ 683.9999 , 683.9999 , 199.9 , 199.9 , 184.9866 , 123.3244 , 99.9 , 99.9 , 90.7388 , 60.4925 , 39.98 , 38 , 19.98 , 18 , 5 , 5 , 5 , 5 , 4.4967 , 4.4967 , 3.927 , 3.927 , 0.02 ]",
         "sm5 flanged parts 1 areas [ 767.9534 , 767.9534 , 100 , 100 , 94.2478 , 80 , 40 , 40 , 40 , 31.4159 , 15.75 , 15.75 , 10 , 10 , 6.6759 , 6.6759 , 6.2832 , 6.2832 , 4 , 4 , 2 , 2 ]",
         "sm5b flanged parts 1 areas [ 740.2329 , 740.2329 , 100 , 100 , 94.2478 , 62.8319 , 40 , 20 , 20 , 20 , 8.5 , 8.5 , 6 , 6 , 5 , 5 , 4 , 4 , 3.927 , 3.927 , 2.3562 , 2.3562 ]",
         "sm5c flanged parts 1 areas [ 739.75 , 739.75 , 100 , 100 , 94.2478 , 62.8319 , 40 , 20 , 20 , 20 , 8.5 , 8.5 , 6.75 , 6.75 , 5 , 5 , 4.75 , 4.75 , 3.927 , 3.927 , 1.5 , 1.5 ]",

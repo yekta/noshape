@@ -171,6 +171,9 @@ struct BendRelief {
 #[derive(Clone, Debug)]
 struct CornerRelief {
     style: String,
+    /// The model's style where three bends meet (std getDefaultThreeCornerStyle:
+    /// Closed falls back to Simple there); `style` is the two-bend corners'.
+    three: String,
     scale: f64,
     width: f64,
     diameter: f64,
@@ -181,8 +184,10 @@ impl CornerRelief {
     /// sizes the model's.
     fn of_corner(attr: &Value, model: &CornerRelief) -> CornerRelief {
         let len = |k: &str, d: f64| attr.get(k).get("value").as_number().or_else(|| length_of(attr.get(k).get("value"))).unwrap_or(d);
+        let style = enum_field(attr, "cornerStyle").unwrap_or_else(|| model.style.clone());
         CornerRelief {
-            style: enum_field(attr, "cornerStyle").unwrap_or_else(|| model.style.clone()),
+            three: style.clone(),
+            style,
             scale: attr.get("cornerReliefScale").get("value").as_number().unwrap_or(model.scale),
             width: len("squareReliefWidth", model.width),
             diameter: len("roundReliefDiameter", model.diameter),
@@ -190,8 +195,12 @@ impl CornerRelief {
     }
 
     fn of(model: &Value) -> CornerRelief {
+        let three = enum_field(model, "defaultThreeCornerStyle").unwrap_or_else(|| "SIMPLE".to_string());
         CornerRelief {
-            style: enum_field(model, "defaultThreeCornerStyle").unwrap_or_else(|| "SIMPLE".to_string()),
+            // Two-bend corners (std sheetMetalStart getDefaultTwoCornerStyle:
+            // a model's Closed corners; harness sm6h).
+            style: enum_field(model, "defaultTwoCornerStyle").unwrap_or_else(|| three.clone()),
+            three,
             scale: model.get("defaultCornerReliefScale").get("value").as_number().unwrap_or(1.5),
             width: length_field(model, "defaultSquareReliefWidth"),
             diameter: length_field(model, "defaultRoundReliefDiameter"),
@@ -770,8 +779,11 @@ fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &B
             let (e1, e2) = (l.side[(k + m - 1) % m], l.side[k]);
             let v = l.pts[k];
             let vi = topo.nearest_vertex(v);
-            // The Corner feature's setting at this vertex, else the model's.
-            let corner = def.corners.get(&vi).unwrap_or(&def.corner);
+            // The Corner feature's setting at this vertex, else the model's
+            // (its three-bend style where three bends meet).
+            let three = def.bends.keys().filter(|&&e| e < topo.edge_ends.len() && [topo.edge_ends[e].0, topo.edge_ends[e].1].iter().any(|p| p.distance(topo.vertices[vi]) < TOL)).count() >= 3;
+            let model = CornerRelief { style: if three { def.corner.three.clone() } else { def.corner.style.clone() }, ..def.corner.clone() };
+            let corner = def.corners.get(&vi).unwrap_or(&model);
             let style = corner.style.as_str();
             let (Some(&s1), Some(&s2), Some(x1), Some(x2), Some(b1), Some(b2)) = (setbacks.get(&e1), setbacks.get(&e2), ext(corner, e1), ext(corner, e2), ba(e1), ba(e2)) else { continue };
             let (d1, d2) = ((l.pts[(k + m - 1) % m] - v).normalize(), (l.pts[(k + 1) % m] - v).normalize());
