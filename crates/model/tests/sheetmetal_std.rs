@@ -822,11 +822,14 @@ fn qa4_s1_enclosure_as_live() {
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn library_form_tools_as_live() {
     let _ = Studio::new();
-    for (form, values, add, sub) in [
-        ("circle-emboss", vec![], 273.79979, 217.909344),
-        ("circle-extrusion", vec![], 15.177413, 38.48451),
-        ("countersink", vec![("clearance_hole", "1 mm"), ("angle", "60 deg")], 1.491592, 1.774456),
-        ("slot-extrusion", vec![], 172.257045, 738.48451),
+    // Live's figures are /massproperties: on the Louver's spheres and tori
+    // 0.0006 over the exact 1975.3619777 (Pappus on its section), ours.
+    for (form, values, add, sub, tol) in [
+        ("circle-emboss", vec![], 273.79979, 217.909344, 1e-5),
+        ("circle-extrusion", vec![], 15.177413, 38.48451, 1e-5),
+        ("countersink", vec![("clearance_hole", "1 mm"), ("angle", "60 deg")], 1.491592, 1.774456, 1e-5),
+        ("slot-extrusion", vec![], 172.257045, 738.48451, 1e-5),
+        ("louver", vec![("height", "5 mm")], 1975.3626, 1889.368549, 1e-3),
     ] {
         let studio = noshape_model::sheetmetal::forms::studio(form).expect("studio");
         let mut config = studio.configuration.defaults();
@@ -834,7 +837,7 @@ fn library_form_tools_as_live() {
         let r = Regenerator::new().regenerate(&studio, &config, &UnitPrefs::default(), &RegenOptions::default());
         let st: Vec<_> = r.display.features.iter().map(|f| (f.status, f.message.clone())).collect();
         let v: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.volume().unwrap_or(0.0) * 1e9).collect();
-        assert!(v.len() == 2 && (v[0] - add).abs() < 1e-5 && (v[1] - sub).abs() < 1e-5, "{form}: {v:?} vs {add} / {sub}; {st:?}");
+        assert!(v.len() == 2 && (v[0] - add).abs() < tol && (v[1] - sub).abs() < tol, "{form}: {v:?} vs {add} / {sub}; {st:?}");
     }
     // Every form builds both tools at its defaults (Slot emboss has no live figures).
     for form in noshape_model::sheetmetal::forms::FORMS {

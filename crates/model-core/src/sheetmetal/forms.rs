@@ -33,7 +33,7 @@ pub struct Form {
 }
 
 /// The forms we build, in the picker's (alphabetical) order.
-pub const FORMS: &[Form] = &[Form { id: "circle-emboss", name: "Circle emboss" }, Form { id: "circle-extrusion", name: "Circle extrusion" }, Form { id: "countersink", name: "Countersink" }, Form { id: "slot-emboss", name: "Slot emboss" }, Form { id: "slot-extrusion", name: "Slot extrusion" }];
+pub const FORMS: &[Form] = &[Form { id: "circle-emboss", name: "Circle emboss" }, Form { id: "circle-extrusion", name: "Circle extrusion" }, Form { id: "countersink", name: "Countersink" }, Form { id: "louver", name: "Louver" }, Form { id: "slot-emboss", name: "Slot emboss" }, Form { id: "slot-extrusion", name: "Slot extrusion" }];
 
 /// Radius control (live `List_WrgkY2rdTeUGo2`): the forms' bend radii.
 const RADIUS_CONTROL: [(&str, &str); 4] = [("Default", "Double thickness"), ("Thickness", "Thickness"), ("Half_thickness", "Half thickness"), ("Custom", "Custom")];
@@ -79,6 +79,14 @@ pub fn configuration(id: &str) -> Option<Configuration> {
             variable("radius", VariableKind::Length, "1 mm"),
         ],
         "countersink" => vec![variable("thickness", VariableKind::Length, "1 mm"), variable("clearance_hole", VariableKind::Length, "10 mm"), variable("angle", VariableKind::Angle, "90 deg")],
+        "louver" => vec![
+            variable("thickness", VariableKind::Length, "1 mm"),
+            variable("height", VariableKind::Length, "8 mm"),
+            variable("length", VariableKind::Length, "100 mm"),
+            variable("width", VariableKind::Length, "20 mm"),
+            radius_control,
+            variable("radius", VariableKind::Length, "1 mm"),
+        ],
         "slot-emboss" => vec![
             variable("thickness", VariableKind::Length, "1 mm"),
             variable("length", VariableKind::Length, "100 mm"),
@@ -197,6 +205,7 @@ pub fn tool_feature(ev: &mut EvalCtx) -> FResult<()> {
         "circle-emboss" => circle_emboss(t, ev.length("diameter")?, ev.length("height")?, ev.angle("draft")?, radius(ev, "intRadius")?, radius(ev, "extRadius")?)?,
         "circle-extrusion" => circle_extrusion(t, ev.length("diameter")?, ev.length("depth")?, ev.length("radius")?)?,
         "countersink" => countersink(t, ev.length("clearanceHole")?, ev.angle("angle")?)?,
+        "louver" => louver(t, ev.length("height")?, ev.length("length")?, ev.length("width")?, radius(ev, "radius")?)?,
         "slot-emboss" | "slot-extrusion" => {
             let (length, width) = (ev.length("length")?, ev.length("width")?);
             let tangents = ev.enum_("lengthTo") == "Slot_tangents";
@@ -412,6 +421,58 @@ fn countersink(t: f64, clearance: f64, angle: f64) -> FResult<Vec<Shape>> {
         k::Segment2d::Line { a: DVec2::new(rh, -0.9 * t), b: DVec2::new(rh, -t) },
     ];
     Ok(vec![revolved(&ring)?, revolved(&hole)?])
+}
+
+/// Louver (live "Louver"; its faces, dom/sm-forms-v4/louver__bodydetails):
+/// a hood opening along y = 0 into +y. Its outer surface a cylinder along
+/// x with spheres at the ends (x = ±(l/2 - w)), through (0, w, 0) and (0, 0,
+/// h) in section; joined to the sheet's top by a fillet of radius `rf`
+/// (`rf` + t underneath); the sheet `t` thick inside. Height t … 10 t, width
+/// at least 2 h, length at least 2 w. Subtract material: the D-shaped
+/// footprint to where the fillets meet the sheet (live t 1, h 5, 100 × 20:
+/// 1975.362600 / 1889.368549 mm³).
+fn louver(t: f64, height: f64, length: f64, width: f64, rf: f64) -> FResult<Vec<Shape>> {
+    let h = height.clamp(t, 10.0 * t);
+    let w = width.max(2.0 * h);
+    let l = length.max(2.0 * w);
+    let a = l * 0.5 - w;
+    let ro = (w * w + h * h) / (2.0 * h);
+    let co = DVec2::new(0.0, h - ro);
+    let yf = ((ro + rf).powi(2) - (rf - co.y).powi(2)).sqrt();
+    let cf = DVec2::new(yf, rf);
+    let toward = (cf - co).normalize();
+    let (to, tf) = (toward.y.atan2(toward.x), toward.y.atan2(toward.x) + std::f64::consts::PI);
+    let (top, bottom) = (std::f64::consts::FRAC_PI_2, 1.5 * std::f64::consts::PI);
+    // (y, z): the opening at y = 0, the hood, the fillets, the footprint's edge.
+    let segs = vec![
+        k::Segment2d::Arc { center: co, radius: ro, start_angle: to, end_angle: top },
+        k::Segment2d::Arc { center: cf, radius: rf, start_angle: tf, end_angle: bottom },
+        k::Segment2d::Line { a: DVec2::new(yf, 0.0), b: DVec2::new(yf, -t) },
+        k::Segment2d::Arc { center: cf, radius: rf + t, start_angle: tf, end_angle: bottom },
+        k::Segment2d::Arc { center: co, radius: ro - t, start_angle: to, end_angle: top },
+        k::Segment2d::Line { a: DVec2::new(0.0, h - t), b: DVec2::new(0.0, h) },
+    ];
+    let half = std::f64::consts::FRAC_PI_2;
+    let mut pieces = Vec::new();
+    for (x, a0, a1) in [(a, -half, 0.0), (-a, 0.0, half)] {
+        let c = DVec3::new(x, 0.0, 0.0);
+        let face = k::make_face_2d(&k::Plane::new(c, DVec3::X, DVec3::Y), &segs, &[])?;
+        pieces.push(k::revolve_between(&face, c, DVec3::Z, a0, a1)?.shape);
+    }
+    if a > 1e-12 {
+        let face = k::make_face_2d(&k::Plane::new(DVec3::new(-a, 0.0, 0.0), DVec3::X, DVec3::Y), &segs, &[])?;
+        pieces.push(k::extrude(&face, DVec3::X * (2.0 * a))?.shape);
+    }
+    let add = k::unify_same_domain(&k::fuse_all(&pieces, &k::BooleanOptions::default())?.shape)?.shape;
+    let foot = [
+        k::Segment2d::Line { a: DVec2::new(-a - yf, 0.0), b: DVec2::new(a + yf, 0.0) },
+        k::Segment2d::Arc { center: DVec2::new(a, 0.0), radius: yf, start_angle: 0.0, end_angle: half },
+        k::Segment2d::Line { a: DVec2::new(a, yf), b: DVec2::new(-a, yf) },
+        k::Segment2d::Arc { center: DVec2::new(-a, 0.0), radius: yf, start_angle: half, end_angle: 2.0 * half },
+    ];
+    let face = k::make_face_2d(&k::Plane::new(DVec3::new(0.0, 0.0, -t), DVec3::Z, DVec3::X), &foot, &[])?;
+    let sub = k::extrude(&face, DVec3::Z * t)?.shape;
+    Ok(vec![add, sub])
 }
 
 type Built = Mutex<HashMap<(String, ConfigValues), Option<Arc<Context>>>>;

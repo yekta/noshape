@@ -138,8 +138,8 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   tool, then std `tag` FORM; two tools from one feature lost the negative one's attribute in std's instantiation), the
   regeneration's derived provider wrapped (`WithLibrary`). UI: the Select Part Studio panel's Libraries tab
   (select_item.rs `library_sources`, `input_label`). Done: Circle emboss, Circle extrusion, Countersink,
-  Slot extrusion (exact at live's measured configurations: NB the crawl's part figures are at each studio's
-  currentConfiguration, not its defaults), Slot emboss (no live figures). Next: Circle knockout, Louver, Bridge
+  Slot extrusion, Louver (exact at live's measured configurations: NB the crawl's part figures are at each studio's
+  currentConfiguration, not its defaults), Slot emboss (no live figures). Next: Circle knockout, Bridge
   lance, Lance (their features in the crawl).
   Copy Flat pattern needs an assembly instance source for a flat body (assembly crate, not mine).
 - Open (10-30 morning): (1) (was: table letters, done above). (2) evaluateQuery order generally: live returns faces in
