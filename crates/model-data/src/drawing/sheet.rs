@@ -388,6 +388,9 @@ pub struct SheetStyle {
     pub dim_arrow: f64,
     pub dim_arrow_type: ArrowType,
     pub dim_color: Option<[u8; 3]>,
+    /// Drawing properties › Construction geometry › Sketch driven dimensions
+    /// color: dimensions that drive the drawing's sketch.
+    pub sketch_dim_color: Option<[u8; 3]>,
     pub ann_text: f64,
     pub ann_arrow: f64,
     pub ann_arrow_type: ArrowType,
@@ -505,7 +508,7 @@ impl SheetStyle {
 
 impl Default for SheetStyle {
     fn default() -> Self {
-        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, dim_justify: super::TextJustify::Center, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false, iso: true, virtual_sharp_extension: false, virtual_sharp_pen: 0.4, virtual_sharp_color: None, revision_callout: RevisionCalloutStyle::default() }
+        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, sketch_dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, dim_justify: super::TextJustify::Center, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false, iso: true, virtual_sharp_extension: false, virtual_sharp_pen: 0.4, virtual_sharp_color: None, revision_callout: RevisionCalloutStyle::default() }
     }
 }
 
@@ -2154,7 +2157,7 @@ impl SheetGeometry {
                 ts.font = style.font.clone().or(ts.font);
             }
             let own = a.style.as_deref();
-            let c = own.and_then(|s| s.color).or(if a.kind.is_dimension() { self.style.dim_color } else if construction { None } else { ts.color.or(self.style.ann_color) });
+            let c = own.and_then(|s| s.color).or(if a.sketch_dim.is_some() { self.style.sketch_dim_color.or(self.style.dim_color) } else if a.kind.is_dimension() { self.style.dim_color } else if construction { None } else { ts.color.or(self.style.ann_color) });
             let (l1, t1, f1) = starts.get(k + 1).map(|s| (s.2, s.1, s.3)).unwrap_or(end);
             if !a.layer.is_drawing() {
                 self.layers.push(LayerSpan { lines: l0..l1, texts: t0..t1, fills: f0..f1, layer: a.layer });

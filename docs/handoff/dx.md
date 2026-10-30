@@ -127,6 +127,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   degenerate blend patch (the file's patch integrated independently = live's 13.20006; core's, TICKETS I1).
 - Live requests: 1603 answered (ISO continuation, Reset ordinate = nothing, no BOM override in drawings, Scale label
   default); new (03:35) A51 concentric arcs, TB4 table midpoint grips, D16 single-silhouette foreshorten.
+- Flaky, for core (10-30 06:17): the watcher reverted c48f3aea (S32 sketch-driven dimension colour, TB5; drawing
+  crates only) for `custom_features::std_features_match_onshape` failing on main (custom_features.rs:1873). With the
+  commit re-applied on main the test passed 7 of 7 runs (`cargo test -p noshape-model --test all
+  custom_features::std_features_match_onshape`, a fresh NOSHAPE_CONFIG_DIR each), so it is the nondeterministic
+  result core is chasing in that file; re-landed as is.
 - Next: the remaining 🔧 rows that need no live answer (V49 BOM / cut list references, A31 detail-view radial datums,
   SK15 constraints, C10, D40 red grips), then the data-exchange list above (Next 0, 3).
 
