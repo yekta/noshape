@@ -197,9 +197,9 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
 - Speed (vibe3, release, perf.sh at 7f7364d3, `regen_profile::sheet_metal_profile`): the sheet metal model (200 × 150
   plate, 4 flanges, hem) **~300 ms** a regeneration (was 1321), **Hem ~181 ms** (was 1089), **Flange ~105 ms** (was
   ~225); cold = warm (std's module load is cheap in release: my "first-run load" explanation was wrong; the startup
-  prewarm of the sheet metal modules I added is at most a small help). Open: inside the full `regen_profile`, after
-  its other fixtures (fins-400, the NIST assembly), the same Hem still measures ~1.1 s (a88e8c29); not explained yet
-  (allocator / OCCT state after the big fixtures?).
+  prewarm of the sheet metal modules I added is at most a small help). The full `regen_profile` run that still showed
+  the Hem at ~1.1 s "at a88e8c29" most likely built stale sources (see the perf.sh request below): locally the same
+  dev build gives the Hem 465 ms alone and 472–528 ms after the big fixtures, so no fixture effect.
 
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
@@ -357,8 +357,9 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
 - perf.sh (10-30 ~21:00–22:10): two runs of `regen_profile::sheet_metal_profile` failed to *build* on vibe3 in
   noshape-drawing (first `BrokenOut` missing `offset`, then `TableKind::Bom` has no `default_template`) at commits
   that compiled in their lands (8fd55b58 landed just before). The shared ~/perf/wt looks like it builds stale or mixed
-  sources (another agent's run between fetch and build?). The earlier runs (sketch, assembly, regen_profile) worked;
-  the numbers above are from those.
+  sources (another agent's run between fetch and build?). Its regen_profile at a88e8c29 also showed the old Hem
+  time (1.1 s) where the same commit's own sheet_metal_profile later gave 181 ms: the run may have built a stale tree
+  without failing. A third run at 7f7364d3 built and gave the numbers above.
 - shared ~/.config/noshape (10-29 04:00): every agent's app runs and the GPUI UI tests read and write the same config
   dir; left_panel_width.txt was 853 (some GUI session dragged the feature list wide), which shrinks the test
   viewports and changed a measured value enough to fail part-studio-ui dimension_box_escape_as_live locally (it passed
