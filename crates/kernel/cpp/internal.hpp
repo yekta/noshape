@@ -6,6 +6,8 @@
 #include "noshape-kernel/src/ffi.rs.h"
 
 #include <BRepTools_History.hxx>
+#include <NCollection_DataMap.hxx>
+#include <TopTools_ShapeMapHasher.hxx>
 #include <Bnd_Box.hxx>
 #include <IntCurvesFace_Intersector.hxx>
 #include <TopAbs_State.hxx>
@@ -367,6 +369,32 @@ GProp_GProps volume_props(const TopoDS_Shape& s);
 // cancel flag, the memory budget or a budget's deadline off Linux; pass
 // `->Start()` as the build's range.
 occ::handle<Message_ProgressIndicator> new_cancel_indicator();
+
+// The inputs of a Boolean at another scale (the blends' working scale: the
+// model's metres in mm; OCCT's absolute tolerances made a fuzz shell's slab
+// common take 30 s in metres, 0.8 s in mm, and a diamond knurl's subtract
+// 1.8 times the memory: KNURL-MEMORY, SHELL-SLOW). Each TShape is scaled once
+// and its instances keep their locations (scaled), so a pattern's instances
+// still share one TShape (OCCT patch 0001's congruent pairs); `hist` takes
+// every input's solids, faces, edges and vertices to their images (boolean.cpp).
+struct ScaledInputs
+{
+  struct Entry
+  {
+    TopoDS_Shape              copy;
+    ShapeIMap                 subs;
+    std::vector<TopoDS_Shape> images;
+  };
+  gp_Trsf                                                        S, Sinv;
+  NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> index;
+  std::vector<Entry>                                             entries;
+  occ::handle<BRepTools_History>                                 hist = new BRepTools_History();
+
+  explicit ScaledInputs(double k);
+  TopoDS_Shape scale(const TopoDS_Shape& x);
+  // `r` (at the scaled size) back at the inputs', `h` extended to it.
+  TopoDS_Shape unscale(const TopoDS_Shape& r, occ::handle<BRepTools_History>& h) const;
+};
 GProp_GProps volume_props_precise(const TopoDS_Shape& s);
 // Area properties likewise (faces wrapping a periodic surface more than once).
 GProp_GProps surface_props(const TopoDS_Shape& s);

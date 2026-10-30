@@ -1816,6 +1816,20 @@ bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bo
   }
   if (!done)
   {
+    // OCCT at the working scale (ScaledInputs: a fuzz shell's slab common
+    // took 30 s in metres, 0.8 s in mm; SHELL-SLOW).
+    std::unique_ptr<ScaledInputs> sc;
+    ShapeList                     sargs = args, stools = tools;
+    if (working_scale() != 1.0 && std::getenv("NOSHAPE_BOOL_NO_SCALE") == nullptr)
+    {
+      sc = std::make_unique<ScaledInputs>(working_scale());
+      sargs.Clear();
+      stools.Clear();
+      for (const TopoDS_Shape& x : args)
+        sargs.Append(sc->scale(x));
+      for (const TopoDS_Shape& x : tools)
+        stools.Append(sc->scale(x));
+    }
     std::unique_ptr<BRepAlgoAPI_BooleanOperation> b;
     if (op == 0)
       b = std::make_unique<BRepAlgoAPI_Fuse>();
@@ -1823,14 +1837,21 @@ bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bo
       b = std::make_unique<BRepAlgoAPI_Cut>();
     else
       b = std::make_unique<BRepAlgoAPI_Common>();
-    b->SetArguments(args);
-    b->SetTools(tools);
+    b->SetArguments(sargs);
+    b->SetTools(stools);
     b->SetRunParallel(parallel);
     b->Build(new_cancel_indicator()->Start());
     if (b->HasErrors() || !b->IsDone())
       return false;
     out  = b->Shape();
     hist = b->History();
+    if (sc)
+    {
+      out                                    = sc->unscale(out, hist);
+      occ::handle<BRepTools_History> whole = sc->hist;
+      whole->Merge(hist);
+      hist = whole;
+    }
   }
   if (brep_recording())
   {

@@ -553,6 +553,12 @@ with 0003b and 0004 on Linux, macOS and Windows.
    are new geometry lying on the solid's own faces: coincident B-spline faces OCCT intersects slowly. Next try:
    slabs that share the solid's face (TShape) on that side, or leave such slivers to their neighbours' slabs.
    NOSHAPE_SHELL_DEBUG=1 now also names each path as it starts.
+   10-30 12:45: the slow common was OCCT in metres: the same common at the working scale (mm) takes 0.8 s, not 30
+   (same volume to 1e-11). quick_boolean's OCCT fallback (the slabs, the blend fallbacks, draft wedges) now runs
+   scaled (ScaledInputs, internal.hpp): hang402's Shell 3 builds in 3.4 s instead of failing at its 30 s budget;
+   Shell 5 still fails (its common 328 s in metres, not re-measured scaled). Perf documents unchanged (live-30,
+   fins-400, big-plate). Scaling every OCCT Boolean of 9+ tools was 25 % slower over the corpus with 7 of 974
+   changed: kept to cuts by 64+ tools and quick_boolean.
 3. Other `a.Plane().Axis().Direction()` readers of a face's normal in the kernel: features.cpp and shell.cpp
    already check Direct(); surface_info (face_surface) reports the frame as is, by design.
 4. Waiting on live: RIB-CHAIN-NORMAL (live's +160 mm³ for the L normal rib). FILLET-OVERSIZE's chamfer half done
