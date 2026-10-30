@@ -813,7 +813,10 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   own results, all 1 solid): 5 grooves (none sharing a start) Modified; 10 grooves (none sharing a start either)
   Deleted; 26 grooves Deleted; all 148 Modified. Not the shared caps then; for a cut BOPAlgo_BOP takes the result
   from the split solids (BuildRC), so the split solid of the cylinder is or isn't the result's solid: next, why
-  BOPAlgo_Builder's split solid differs (every groove's end caps lie on the cylinder's end faces).
+  BOPAlgo_Builder's split solid differs (every groove's end caps lie on the cylinder's end faces). Not the unify:
+  with unify off the 10-groove piece's raw cut says Deleted too (158 faces both ways, ours Modified). For a cut,
+  BOPAlgo_BOP::BuildRC keeps the cylinder's split images that no tool's image contains; next, OCCT's images of the
+  cylinder's solid on that piece (BRepAlgoAPI_Cut::Modified on the solid) to see what replaced it.
 - perf.sh: both bool_patterns runs (cc8837a7, 620d5eaf) ran no test ("0 passed, 175 filtered out": the binary of
   another commit; the ~/perf/wt race in Requests), so vibe3 numbers for the pattern set are still to come; the
   numbers above are this machine's (relative only).
