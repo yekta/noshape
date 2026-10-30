@@ -2078,6 +2078,9 @@ pub struct AnnStyle {
     /// Callouts: Stack direction and Stack gap size (Styles panel, A64).
     pub stack: Option<StackDirection>,
     pub stack_gap: Option<f64>,
+    /// Chamfer dimensions: "45 degree content" / "Non 45 degree content"
+    /// (Styles panel, A64); None: the drawing's.
+    pub chamfer_content: Option<ChamferContent>,
 }
 
 impl AnnStyle {
@@ -2141,6 +2144,18 @@ impl Annotation {
             _ => None,
         })
         .filter(|v| *v != SHEET_VIEW)
+    }
+}
+
+impl AnnotationKind {
+    /// Whether a chamfer dimension's chamfer is 45° (its content choices:
+    /// Drawing properties › Chamfer dimensions › 45 / Non 45 degree content).
+    pub fn chamfer_is_45(&self) -> Option<bool> {
+        let AnnotationKind::ChamferDimension { a, b, c, d, .. } = self else { return None };
+        let (u, w) = ([b[0] - a[0], b[1] - a[1]], [d[0] - c[0], d[1] - c[1]]);
+        let (lu, lw) = (u[0].hypot(u[1]), w[0].hypot(w[1]));
+        let cosang = if lu * lw > 0.0 { ((u[0] * w[0] + u[1] * w[1]) / (lu * lw)).abs().min(1.0) } else { 1.0 };
+        Some((cosang.acos().to_degrees() - 45.0).abs() < 0.05)
     }
 }
 

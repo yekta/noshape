@@ -465,6 +465,25 @@ impl DrawingEditor {
                 .child(row("Stack direction", select("st-stack", drawing(cur.name().to_string(), own.stack.is_none()), 220., dirs)))
                 .child(row("Stack gap size", unit(select("st-stack-gap", num(own.stack_gap.unwrap_or(props.callout_stack_gap)), 80., gaps))));
         }
+        // Chamfer dimensions (help styles, drawing.md A64): X degree content,
+        // "45 degree content" or "Non 45 degree content" as the chamfer is,
+        // with Drawing properties' choices for it.
+        if !sel.is_empty() && sel.iter().all(|a| matches!(a.kind, AnnotationKind::ChamferDimension { .. })) {
+            use noshape_model::drawing::ChamferContent as C;
+            let is45 = sel[0].kind.chamfer_is_45().unwrap_or(false);
+            let base = if is45 { props.chamfer_45_content } else { props.chamfer_content };
+            let opts: &[C] = if is45 { &C::ALL } else { &[C::LengthXAngle, C::LengthXLength] };
+            let items: Vec<(String, bool, Edit)> = opts
+                .iter()
+                .map(|&k| {
+                    let inherited = k == base;
+                    let f: Edit = if inherited { st(|s| s.chamfer_content = None) } else { std::rc::Rc::new(move |a: &mut Annotation| a.style.get_or_insert_with(Default::default).chamfer_content = Some(k)) };
+                    (drawing(k.name().to_string(), inherited), own.chamfer_content.map_or(inherited, |c| c == k), f)
+                })
+                .collect();
+            let cur = own.chamfer_content.unwrap_or(base);
+            body = body.child(row(if is45 { "45 degree content" } else { "Non 45 degree content" }, select("st-chamfer", drawing(cur.name().to_string(), own.chamfer_content.is_none()), 220., items)));
+        }
         // Datums (help styles, drawing.md A64): Datum size.
         if sel.iter().all(|a| matches!(a.kind, AnnotationKind::Datum { .. })) {
             let set_datum: fn(&mut AnnStyle, f64) = |s, h| s.datum_size = (!h.is_nan()).then_some(h);

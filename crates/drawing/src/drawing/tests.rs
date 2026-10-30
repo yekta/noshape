@@ -1901,7 +1901,21 @@ fn chamfer_dimension_style_and_content() {
     d2.props.chamfer_45_content = ChamferContent::CLength;
     assert!(texts(&d2, k.clone()).iter().any(|t| t.starts_with('C')));
     d2.props.chamfer_45_content = ChamferContent::AngleXLength;
-    assert!(texts(&d2, k).iter().any(|t| t.starts_with("45.0° X")));
+    assert!(texts(&d2, k.clone()).iter().any(|t| t.starts_with("45.0° X")));
+    // Its own content (Styles panel › 45 degree content, A64) wins.
+    assert_eq!(k.chamfer_is_45(), Some(true));
+    let own = |d: &Drawing, kind: AnnotationKind, c: ChamferContent| {
+        let style = Some(Box::new(AnnStyle { chamfer_content: Some(c), ..Default::default() }));
+        let s = Sheet { annotations: vec![Annotation { id: 1, kind, position: [60.0, 60.0], style, ..Default::default() }], ..Default::default() };
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        g.add_annotations(&s, &sheet::PlainEnv { drawing: d, scale: 1000.0 });
+        g.texts.iter().map(|t| t.text.clone()).collect::<Vec<_>>()
+    };
+    assert!(own(&d2, k.clone(), ChamferContent::CLength).iter().any(|t| t.starts_with('C')));
+    // Not 45°: a 2 × 4 chamfer.
+    let k2 = AnnotationKind::ChamferDimension { view: ViewId(1), a: [0.0, 0.0], b: [0.002, 0.004], c: [0.0, 0.0], d: [0.01, 0.0] };
+    assert_eq!(k2.chamfer_is_45(), Some(false));
+    assert!(own(&drawing, k2, ChamferContent::LengthXLength).iter().any(|t| t.contains(" X ") && !t.contains('°')));
 }
 
 #[test]

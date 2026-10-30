@@ -1829,7 +1829,8 @@ impl SheetGeometry {
                     // style places two leg dimensions instead).
                     let c = env.chamfer_style();
                     let is45 = (ang.to_degrees() - 45.0).abs() < 0.05;
-                    let content = if is45 { c.content45 } else { c.content };
+                    // Its own (Styles panel, A64), else the drawing's.
+                    let content = a.style.as_deref().and_then(|s| s.chamfer_content).unwrap_or(if is45 { c.content45 } else { c.content });
                     let mut la = a.clone();
                     if c.length_precision.is_some() {
                         la.format.precision = c.length_precision;
