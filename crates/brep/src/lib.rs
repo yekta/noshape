@@ -20,6 +20,8 @@ mod fxhash;
 pub mod freeform;
 /// NURBS curves and surfaces: points, derivatives, a point's parameters.
 pub mod nurbs;
+/// Arguments that are rigid copies of each other, found from their geometry.
+pub mod pattern;
 /// Display meshes of analytic faces (psui).
 pub mod mesh;
 

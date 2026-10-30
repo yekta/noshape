@@ -131,3 +131,28 @@ fn the_b94_diamond_knurl() {
     let c = k::bool_corpus::load(&dir, "d14b48a8ddf91647").expect("the recorded knurl");
     bench("B94.6 diamond knurl", c.op, &c.objects[0], &c.tools, &c.opts);
 }
+
+/// Tools that are rigid copies are found from their geometry (noshape_brep::pattern): a circle of holes is one
+/// family turning by 15°; the B94.6 knurl's 148 grooves two families of 74 (the pattern and its mirror), each
+/// turning by 360° / 74 about the cylinder's axis.
+#[test]
+fn copies_among_patterned_tools() {
+    use noshape_brep::pattern::families;
+    let hole = k::make_cylinder(&z_frame(DVec3::new(0.035, 0.0, -0.001)), 0.003, 0.012, TAU).unwrap();
+    let holes: Vec<_> = rotated(&hole, DVec3::ZERO, DVec3::Z, 24).iter().map(|t| k::brep_body(t).unwrap()).collect();
+    let fams = families(&holes.iter().collect::<Vec<_>>(), 1e-7);
+    assert_eq!(fams.len(), 1);
+    let (_, axis, angle) = fams[0][1].1.rotation().expect("a rotation");
+    assert!(axis.cross(DVec3::Z).length() < 1e-9 && (angle - TAU / 24.0).abs() < 1e-9, "{axis} {angle}");
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/patterns");
+    let c = k::bool_corpus::load(&dir, "d14b48a8ddf91647").expect("the recorded knurl");
+    let grooves: Vec<_> = c.tools.iter().map(|t| k::brep_body(t).unwrap()).collect();
+    let fams = families(&grooves.iter().collect::<Vec<_>>(), 1e-7);
+    assert_eq!(fams.iter().map(|f| f.len()).collect::<Vec<_>>(), [74, 74]);
+    for f in &fams {
+        let (_, axis, angle) = f[1].1.rotation().expect("a rotation");
+        assert!(axis.cross(DVec3::Z).length() < 1e-9, "{axis}");
+        let turns = angle / (TAU / 74.0);
+        assert!((turns - turns.round()).abs() < 1e-6, "{angle}");
+    }
+}

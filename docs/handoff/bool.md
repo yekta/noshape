@@ -750,6 +750,20 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   the other periods and sewn at the period boundaries, history per copy; anything not proven (copies not lining up,
   tools across period boundaries the sewing can't prove) the normal path; (4) exact sections where they exist (a
   helix-swept line against a cylinder or another such face).
+- (1) Profile (perf.sh, vibe3, d4ee3290; bool_patterns::the_b94_diamond_knurl, NOSHAPE_KERNEL_PROFILE, OCCT's named
+  steps timed through the kernel's progress indicator): op_boolean 136 s = OCCT's build 115 s (edge/face
+  intersections 20 s, intersection otherwise 22 s, classifying faces against solids 16 s, edge/edge 10 s, section
+  edges 7 s, internal shapes 6 s, vertex/face 5 s, making faces 5 s, splits of compounds 5 s, history 4 s, face/face
+  3 s, the rest < 3 s each) + unify 16 s + unscale 1 s. Pairwise work over the 148 tools, not any one step.
+- (2) bool_patterns (crates/kernel/tests, T2): each case both ways (noshape's / OCCT's alone), faces and volume
+  compared; here (loaded): a pocket grid 71 ms (rust) / 1260 ms, gear slots 54 / 528 ms, radial holes 495 / 533
+  (OCCT's), helical grooves 820 / 782 (OCCT's), 16 crossing helical grooves each way 13.2 / 14.6 s (OCCT's), holes on
+  a circle 3 / 2.5 ms (through-holes path); the knurl's cut 183 s each way (vibe3, both OCCT's).
+- (3), first piece: `noshape_brep::pattern` finds tools that are rigid copies (`copy_of`: one motion takes every
+  vertex, curve, surface onto the other's of the same index, curves on faces unchanged, within a tolerance;
+  `families`; `Rigid::rotation` its axis and angle). T1 `bool_patterns::copies_among_patterned_tools`: a circle of
+  holes is one family turning 15°, the knurl's grooves two families of 74 turning 360° / 74. Not used by the Boolean
+  yet.
 - Also from this work, for core: with `unify` on, a Boolean's history records come out in a different order run to
   run (same records, same shape), the unify history's composition iterating something keyed by addresses (seen on
   the knurl's 2-groove piece; OCCT's path goes through the same code). core's `boolean_budget` test builds a 16-groove
@@ -789,6 +803,9 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   profiles and make it cheaper (only the merged faces' share of the volume) if it shows.
 
 ## Requests
+- lead (10-30 19:00 UTC): tools/tiers/perf-remote.sh checks out the shared ~/perf/wt before it takes ~/perf/lock, so
+  a second perf.sh started meanwhile can switch the tree under the first's build (mine ran a commit without the test:
+  "0 passed, 175 filtered out"); take the lock before the checkout.
 - core (10-30 06:15 UTC): `boolean_groups::a_section_under_a_call_budget_gives_up` (fd65effd, 04:39) fails on
   Windows and macOS in my branch CI (run 41008061871: "" after 0.48 s, the section ran to the end under a 1e-4 s
   budget); Linux passes. It hasn't been on a scheduled run yet (main's last, 03:27, predates it). The budget is CPU
