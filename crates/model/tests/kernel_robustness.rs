@@ -2758,7 +2758,9 @@ fn oversize_fillets_like_onshape() {
     let one = at(&mut base, &[(40.0, 0.0)]);
     let long = base.edges_where(|i| !vertical(i) && (i.start.z - 0.01).abs() < 1e-9 && (i.end.x - i.start.x).abs() > 0.03);
     assert_eq!((one.len(), long.len()), (1, 2));
-    let cases: [(&str, &Vec<Reference>, &str, Option<f64>); 22] = [
+    let all = base.edges_where(|_| true);
+    assert_eq!(all.len(), 12);
+    let cases: [(&str, &Vec<Reference>, &str, Option<f64>); 25] = [
         ("2 edges R10", &two, "10 mm", Some(7570.796327)),
         ("2 edges R10.5", &two, "10.5 mm", Some(7526.842646)),
         ("2 edges R12", &two, "12 mm", Some(7384.178285)),
@@ -2784,10 +2786,14 @@ fn oversize_fillets_like_onshape() {
         ("2 long R5", &long, "5 mm", None),
         ("2 long R10", &long, "10 mm", None),
         ("2 long R10.5", &long, "10.5 mm", None),
+        // Live F2: all 12 edges, up to half the height.
+        ("all 12 R4.99", &all, "4.99 mm", Some(6670.191853561291)),
+        ("all 12 R5", &all, "5 mm", Some(6665.191429188093)),
+        ("all 12 R6", &all, "6 mm", None),
     ];
     // Edges that meet fail with the kernel's message (live F2); a round past an
     // edge that isn't selected, "Failed to fillet selections.".
-    let fails = |what: &str| if what.starts_with("4 top") || what.starts_with("2 long") { "Failed to fillet selections." } else { "End boundary intersects unfilleted edge." };
+    let fails = |what: &str| if what.starts_with("4 top") || what.starts_with("2 long") || what.starts_with("all 12") { "Failed to fillet selections." } else { "End boundary intersects unfilleted edge." };
     for (what, edges, r, want) in cases {
         let mut t = base.fork();
         let f = t.fillet(edges.clone(), r);

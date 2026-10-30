@@ -574,7 +574,8 @@ with 0003b and 0004 on Linux, macOS and Windows.
    with another selected edge may set back at most each face's width; past a selected edge "End boundary intersects
    unfilleted / unchamfered edge.", past an unselected one "Failed to fillet / chamfer selections."; overlapping
    rounds and a single edge's roll-over are fine. T1 `kernel_robustness::oversize_fillets_like_onshape` (22 cases) and
-   `oversize_chamfers_like_onshape` (20).
+   `oversize_chamfers_like_onshape` (20). Live F2's all 12 edges (R4.99 / R5 Ok at live's volumes, R6 "Failed to fillet
+   selections.") hold too (13:29, in the fillet test).
 5. kern's open item: forward-oriented edges.
 6. dx's I1 done 10-30 (8adbec06), in io.cpp (dx's file; the integrator was right): the STEP file has no pcurves and
    OCCT's projection drifts next to a B-spline patch's pole (v = 0.9958 instead of 1, edge tolerance 0.0043), so the
