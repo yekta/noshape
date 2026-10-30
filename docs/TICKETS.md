@@ -118,8 +118,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   FS host reported every op failure as the op's code. Now the budget's default is half the machine's memory (4–16 GB),
   a limit (memory, time, cancel) reaches the user in its own words, op_boolean frees its builder before the unify and
   hands freed memory back (malloc_trim) after a big Boolean. Diamond Ok: 94272.890 mm³, 10362 faces, 363 s, +8.2 GB;
-  Straight 95877.733 mm³, 224 faces, 1.6 s. T2 `custom_features::knurl_feature_b94_on_a_cylinder` (live's numbers
-  requested from live 10-30 09:00).
+  Straight 95877.733 mm³, 224 faces, 1.6 s. T2 `custom_features::knurl_feature_b94_on_a_cylinder` against live
+  (request 1615: Straight 95877.733 mm³ / 224 faces = ours; Diamond 94271.838 / 10362 faces, ours +1.05 mm³; live 49 s).
 - [ ] P1 KNURL-MEMORY (core) the diamond knurl's one OCCT subtract grows the process by ~8.2 GB in the model's metres
   (5.9 GB in a kernel run in metres, 4.0 GB in mm; the app reached 16.7 GB over several regenerations before the
   trim); 315 s of its 363 s are that build (live 32 s). Next: Booleans of many tools at the blends' working scale (mm),

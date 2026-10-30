@@ -1982,7 +1982,9 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
 "#;
     let src = format!("{}\n{CYLINDER}", include_str!("fs/knurl_b94.fs"));
     let only = std::env::var("KNURL").ok();
-    for kind in ["STRAIGHT", "DIAMOND"] {
+    // Live (behaviours request 1615, evVolume at default accuracy): Straight 95877.733 mm³, 224 faces, 0.8 s;
+    // Diamond 94271.838 mm³, 10362 faces, 49 s.
+    for (kind, live_v, live_faces, tol) in [("STRAIGHT", 95877.73341313552, 224, 1e-5), ("DIAMOND", 94271.8383934932, 10362, 2e-5)] {
         if only.as_deref().is_some_and(|k| !k.eq_ignore_ascii_case(kind)) {
             continue;
         }
@@ -2042,5 +2044,7 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
             assert!(growth < 9.0, "knurl {kind}: the regeneration grew the process by {growth:.2} GB");
         }
         assert_eq!(r.context.bodies.len(), 1, "knurl {kind}");
+        assert_eq!(faces, live_faces, "knurl {kind}: faces");
+        assert!((v - live_v).abs() < tol * live_v, "knurl {kind}: {v} mm³, live {live_v}");
     }
 }
