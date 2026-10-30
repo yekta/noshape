@@ -894,8 +894,35 @@ impl Ctx<'_> {
             if apart(a.0, b.0) <= tol {
                 continue;
             }
+            // (OCCT's curve clear of the boundary but touching it between its crossings: OCCT may put a vertex
+            // there.)
             let mid = c2.at(((a.0 + b.0) * 0.5 - t0) / (t1 - t0));
             let dist = distance2(mid, &bound);
+            if let (Path::Nurbs { .. }, true) = (path, dist > GREY * tol) {
+                // (The distance's local minima along it, each narrowed down.)
+                let margin = 3.0 * GREY * tol;
+                let d = |t: f64| distance2(c2.at((t - t0) / (t1 - t0)), &bound);
+                let ts: Vec<f64> = (0..=32).map(|k| a.0 + (b.0 - a.0) * k as f64 / 32.0).collect();
+                let ds: Vec<f64> = ts.iter().map(|&t| d(t)).collect();
+                for k in 1..32 {
+                    if ds[k] > ds[k - 1] || ds[k] > ds[k + 1] {
+                        continue;
+                    }
+                    let (mut lo, mut hi) = (ts[k - 1], ts[k + 1]);
+                    for _ in 0..50 {
+                        let (m1, m2) = (lo + (hi - lo) / 3.0, hi - (hi - lo) / 3.0);
+                        if d(m1) < d(m2) {
+                            hi = m2;
+                        } else {
+                            lo = m1;
+                        }
+                    }
+                    let t = 0.5 * (lo + hi);
+                    if apart(a.0, t) > margin && apart(t, b.0) > margin && d(t) <= GREY * tol {
+                        return Err(Decline("a section touching a face's boundary"));
+                    }
+                }
+            }
             let inside = if dist <= tol {
                 closed
             } else if dist <= GREY * tol {
@@ -1628,6 +1655,9 @@ impl Ctx<'_> {
         let tol = self.tol;
         if a1.cross(a2).length() > 1e-12 {
             if k1 != 0.0 || k2 != 0.0 {
+                if self.src.is_some() {
+                    return self.nurbs_pair(f1, f2);
+                }
                 return Err(Decline("a cone at an angle"));
             }
             return self.cyl_cyl_angled(f1, f2);
@@ -1636,6 +1666,9 @@ impl Ctx<'_> {
         let w = w - a1 * w.dot(a1);
         let dl = w.length();
         if (k1 != 0.0 || k2 != 0.0) && dl > GREY * tol {
+            if self.src.is_some() {
+                return self.nurbs_pair(f1, f2);
+            }
             return Err(Decline("a cone off another's axis"));
         }
         if k1 != 0.0 || k2 != 0.0 {
