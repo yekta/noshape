@@ -273,7 +273,7 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
 
 /// A Bootstrap modal checkbox (live document/80): a 14 px box (1 px gray,
 /// radius 3; checked blue with a white check), 8 px gap, 14 px `#333` label.
-fn modal_checkbox(id: &'static str, label: &'static str, on: bool) -> Stateful<Div> {
+pub(super) fn modal_checkbox(id: &'static str, label: &'static str, on: bool) -> Stateful<Div> {
     let pal = crate::theme::p();
     h_flex()
         .id(id)

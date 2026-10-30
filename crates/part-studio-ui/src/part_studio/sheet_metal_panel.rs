@@ -228,7 +228,7 @@ impl PartStudioView {
                 cx.notify();
             })))
             .separator()
-            .item(item(format!("Export DXF/DWG of Flat pattern of {part}…"), Box::new(move |this, w, cx| this.export_flat(b.clone(), "dxf", w, cx))))
+            .item(item(format!("Export DXF/DWG of Flat pattern of {part}…"), Box::new(move |this, w, cx| this.open_flat_export(b.clone(), w, cx))))
             .separator()
             .item(item("Zoom to fit".into(), Box::new(move |_, _, cx| {
                 if let Some(fv) = &f1 {

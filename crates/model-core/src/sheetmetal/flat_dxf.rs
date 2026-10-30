@@ -104,6 +104,12 @@ fn units_per_meter(insunits: u8) -> f64 {
 
 /// The flat as a CAD document.
 pub fn flat_document(flat: &FlatPattern, o: &FlatExport) -> Result<CadDocument, String> {
+    flats_document(std::slice::from_ref(flat), o)
+}
+
+/// Flats (the export's Scope: a part, its model's parts, the Part Studio's)
+/// as one CAD document, each where it lies.
+pub fn flats_document(flats: &[FlatPattern], o: &FlatExport) -> Result<CadDocument, String> {
     let mut doc = CadDocument::with_version(o.version);
     doc.header.insertion_units = o.insunits as i16;
     for (name, description, pattern) in LINE_TYPES {
@@ -134,17 +140,19 @@ pub fn flat_document(flat: &FlatPattern, o: &FlatExport) -> Result<CadDocument, 
         e.common_mut().layer = layer.into();
         doc.add_entity(e).map(|_| ()).map_err(|e| e.to_string())
     };
-    for l in &flat.loops {
-        for (i, a) in l.iter().enumerate() {
-            let b = l[(i + 1) % l.len()];
-            if a.distance(b) > 1e-12 {
-                add(&mut doc, *a, b, CUT)?;
+    for flat in flats {
+        for l in &flat.loops {
+            for (i, a) in l.iter().enumerate() {
+                let b = l[(i + 1) % l.len()];
+                if a.distance(b) > 1e-12 {
+                    add(&mut doc, *a, b, CUT)?;
+                }
             }
         }
-    }
-    if o.bend_centerlines {
-        for b in &flat.bend_lines {
-            add(&mut doc, b.a, b.b, if b.up { BEND_UP } else { BEND_DOWN })?;
+        if o.bend_centerlines {
+            for b in &flat.bend_lines {
+                add(&mut doc, b.a, b.b, if b.up { BEND_UP } else { BEND_DOWN })?;
+            }
         }
     }
     Ok(doc)
@@ -160,4 +168,54 @@ pub fn flat_dxf(flat: &FlatPattern, o: &FlatExport) -> Result<Vec<u8>, String> {
 pub fn flat_dwg(flat: &FlatPattern, o: &FlatExport) -> Result<Vec<u8>, String> {
     let doc = flat_document(flat, o)?;
     DwgWriter::write_to_vec(&doc).map_err(|e| e.to_string())
+}
+
+/// Flats as one DXF file.
+pub fn flats_dxf(flats: &[FlatPattern], o: &FlatExport) -> Result<Vec<u8>, String> {
+    let doc = flats_document(flats, o)?;
+    DxfWriter::new(&doc).write_to_vec().map_err(|e| e.to_string())
+}
+
+/// Flats as one DWG file.
+pub fn flats_dwg(flats: &[FlatPattern], o: &FlatExport) -> Result<Vec<u8>, String> {
+    let doc = flats_document(flats, o)?;
+    DwgWriter::write_to_vec(&doc).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sheetmetal::flat::FlatBendLine;
+    use glam::DVec2;
+
+    /// A 60 × 40 mm flat at `x` with one bend line up its middle.
+    fn flat(x: f64) -> FlatPattern {
+        let p = |a: f64, b: f64| DVec2::new((x + a) * 1e-3, b * 1e-3);
+        FlatPattern {
+            frame: noshape_kernel::Plane::xy(),
+            loops: vec![vec![p(0.0, 0.0), p(60.0, 0.0), p(60.0, 40.0), p(0.0, 40.0)]],
+            bend_lines: vec![FlatBendLine { a: p(30.0, 0.0), b: p(30.0, 40.0), up: true, angle: std::f64::consts::FRAC_PI_2, radius: 2e-3, k_factor: 0.45, allowance: 4e-3, bend: 0 }],
+            forms: Vec::new(),
+            heads: Vec::new(),
+            shape: None,
+            thickness: 2e-3,
+            warnings: Vec::new(),
+            built_for: None,
+        }
+    }
+
+    /// The export's Scope over several parts writes them all into one file,
+    /// each where it lies; the bend lines go with "Include bend centerlines".
+    #[test]
+    fn several_flats_go_into_one_file() {
+        let flats = [flat(0.0), flat(100.0)];
+        let doc = flats_document(&flats, &FlatExport::default()).unwrap();
+        let on = |layer: &str| doc.entities().filter(|e| e.common().layer == layer).count();
+        assert_eq!((on(CUT), on(BEND_UP)), (8, 2));
+        let far = doc.entities().any(|e| matches!(e, EntityType::Line(l) if (l.start.x - 160.0).abs() < 1e-9 || (l.end.x - 160.0).abs() < 1e-9));
+        assert!(far, "the second flat at x 100…160 mm");
+        let doc = flats_document(&flats, &FlatExport { bend_centerlines: false, ..FlatExport::default() }).unwrap();
+        assert_eq!(doc.entities().filter(|e| e.common().layer == BEND_UP).count(), 0);
+        assert!(flats_dwg(&flats, &FlatExport { version: DxfVersion::AC1015, ..FlatExport::default() }).is_ok_and(|b| !b.is_empty()));
+    }
 }

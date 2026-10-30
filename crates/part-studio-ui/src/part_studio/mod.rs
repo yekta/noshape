@@ -40,6 +40,7 @@ mod thickness;
 mod flatten_tool;
 mod draft_tool;
 pub mod export;
+mod flat_export;
 mod connector_look;
 mod plane_handles;
 mod shown_dims;

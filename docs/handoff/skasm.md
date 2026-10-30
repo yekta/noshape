@@ -123,8 +123,9 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   getAttributes keeping its entities' order); rect→triangle loft (51 vs 49 faces); holes through std's own sheet
   metal hole path (std hole.fs handleSheetMetalCutAndAttribution: HOLE_NO_HITS on our host; holes still run natively
   and the flat follows the part); the flat view's right-click lacks New sketch…, Copy Flat pattern…, Create Drawing
-  of Flat pattern… (needs a flat drawing source: dx), Select other…, Zoom to selection; its Export DXF/DWG… is a path
-  prompt, not live's options dialog; table letters follow feature order, live's Onshape's own joint order.
+  of Flat pattern… (needs a flat drawing source: dx), Select other…, Zoom to selection; table letters follow feature
+  order, live's Onshape's own joint order. The flat's Export as DXF/DWG modal (flat_export.rs) has live's fields;
+  its splines / z-height / tangent / counterbore / form / sketch checkboxes don't change the file yet.
 - Done 10-30: partial Outer flange (opEdgeChange steps a moved piece of an edge off its collinear neighbours and keeps
   the edges' names; the relief reaches its depth past a moved-in bend edge; request 1599 (a): 6027.5617 / 6204.5617
   exact); SM-FACES passes on std (3211.3274 mm³, 14 faces).

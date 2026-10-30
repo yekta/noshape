@@ -173,7 +173,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   solid_a.rs only gives the live text when k::enclose returns no solid, but k::enclose itself errors here, so the
   "Failed…" text wins. Same for a lone wrapped surface (live text for that not recorded). Same in v0.4.11 CLI; parity
   feature-sweep Enclose row 3 had it 🔧 ✅ (tickets/enclose-3planes-b504.png) (qa 2026-10-28 05:19, build b504234e)
-- [x] skasm-smfaces P3 SM-FACES Sheet metal model › Extrude of an open L ((0,0)–(50,0)–(50,30), Blind 20, thickness 2, R3; live "fs (10-23
+- [x] 0a14b389 P3 SM-FACES Sheet metal model › Extrude of an open L ((0,0)–(50,0)–(50,30), Blind 20, thickness 2, R3; live "fs (10-23
   05:00)"): volumes exact (3211.3274 / flipped 3051.3274) and the folded boxes = live, but ours has **10 faces**, live **14**
   (12 PLANE + 2 CYLINDER): live keeps each end face (z 0 and z 20) split into wall / bend / wall pieces, ours merges each end
   into one face, so picking "the end of the 30 mm wall" selects the whole end (watcher CLI 09:50) (qa 2026-10-27)

@@ -772,36 +772,6 @@ impl PartStudioView {
         self.open_part_export(bodies, window, cx);
     }
 
-    pub(super) fn export_flat(&mut self, body: BodyId, ext: &'static str, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(ctx) = self.context.clone() else { return };
-        let flat = match noshape_model::sheetmetal::flat_pattern_for(&ctx, &body) {
-            Ok(f) => f,
-            Err(e) => {
-                self.message = Some((noshape_model::display::FeatureStatus::Error, e));
-                cx.notify();
-                return;
-            }
-        };
-        let name = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_else(|| "flat".into());
-        let view = cx.entity();
-        crate::file_dialogs::request_save_path("Export flat pattern", format!("{name} flat.{ext}"), ext, window, cx, move |path, cx| {
-            // DXF as live's "Export DXF/DWG of Flat pattern" writes it (SM14).
-            let bytes = if ext == "dxf" {
-                noshape_model::sheetmetal::flat_dxf::flat_dxf(&flat, &Default::default())
-            } else {
-                Ok(noshape_model::drawing::export::to_svg(&flat.to_sheet_geometry()).into_bytes())
-            };
-            let msg = match bytes.and_then(|b| std::fs::write(&path, b).map_err(|e| e.to_string())) {
-                Ok(()) => (noshape_model::display::FeatureStatus::Info, format!("Exported {}", path.display())),
-                Err(e) => (noshape_model::display::FeatureStatus::Error, format!("Export failed: {e}")),
-            };
-            view.update(cx, |this, cx| {
-                this.message = Some(msg);
-                cx.notify();
-            });
-        });
-    }
-
     // ------------------------------------------------------------ measurement
 
     fn fmt(&self, q: Quantity, cx: &App) -> String {
