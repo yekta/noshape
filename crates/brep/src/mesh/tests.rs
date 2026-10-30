@@ -253,3 +253,14 @@ fn a_big_face_met_again_takes_its_last_triangulation() {
     assert!(cdt::cache_hits() > hits, "the second one came from the cache");
     assert_eq!(first, again);
 }
+
+/// MESH-EMPTY-LOOP-PANIC: a face with a loop of no edges (CLI fuzz seed 355's mirror) is declined, not a panic.
+#[test]
+fn a_loop_with_no_edges_is_declined() {
+    let (mut v, mut e) = (Vec::new(), Vec::new());
+    let outer = square(&mut v, &mut e, DVec3::ZERO, 4.0);
+    let plane = MeshSurface::Plane { origin: DVec3::ZERO, normal: DVec3::Z, xdir: DVec3::X };
+    let faces = [MeshFace { surface: plane, loops: vec![outer, Vec::new()] }, MeshFace { surface: plane, loops: vec![Vec::new()] }];
+    let out = mesh_body(&v, &e, &faces, DEFL);
+    assert!(out.faces.iter().all(Option::is_none));
+}

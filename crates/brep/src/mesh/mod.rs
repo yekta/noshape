@@ -155,7 +155,9 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
             break;
         }
     };
-    let mut ok: Vec<bool> = faces.iter().map(|f| !matches!(f.surface, MeshSurface::Other)).collect();
+    // A face with no loop, or a loop with no edge (a part a mirror left inverted, CLI fuzz seed 355), is BRepMesh's
+    // (MESH-EMPTY-LOOP-PANIC).
+    let mut ok: Vec<bool> = faces.iter().map(|f| !matches!(f.surface, MeshSurface::Other) && !f.loops.is_empty() && f.loops.iter().all(|l| !l.is_empty())).collect();
     settle(&mut ok);
     // Each edge's nodes once, shared by the faces on it.
     let mut out = BodyMesh { edges: vec![None; edges.len()], faces: vec![None; faces.len()] };
@@ -549,6 +551,10 @@ fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option
 /// A loop's nodes in order round it (each shared vertex once), and per use the indices of its edge's nodes
 /// (from `v[0]` to `v[1]`) into that list. `None` when the uses don't join end to start.
 fn loop_nodes(edges: &[MeshEdge], uses: &[Use], nodes: &[Option<EdgeNodes>]) -> Option<(Vec<DVec3>, Vec<Vec<usize>>)> {
+    // A wire with no edges (MESH-EMPTY-LOOP-PANIC): nothing to go round.
+    if uses.is_empty() {
+        return None;
+    }
     let ends = |u: &Use| -> Option<(u32, u32)> {
         let e = edges.get(u.edge as usize)?;
         Some(if u.reversed { (e.v[1], e.v[0]) } else { (e.v[0], e.v[1]) })

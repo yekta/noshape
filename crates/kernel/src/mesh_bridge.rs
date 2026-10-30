@@ -50,6 +50,21 @@ struct MeshIn<'a> {
 /// Meshes the faces noshape's mesher takes into `out`; false when the input is malformed.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], linear: f64, angular: f64, out: &mut MeshOut) -> bool {
+    // A panic here would abort the process (it can't cross the bridge): declined instead, BRepMesh meshes every face
+    // (MESH-EMPTY-LOOP-PANIC hung the app on open).
+    let mut made = MeshOut::default();
+    let ok = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| mesh_into(vertices, edges, curves, surfaces, face_loops, loop_uses, uses, linear, angular, &mut made))).unwrap_or_else(|_| {
+        log::error!("noshape's mesher panicked: the body goes to BRepMesh");
+        false
+    });
+    if ok {
+        *out = made;
+    }
+    ok
+}
+
+#[allow(clippy::too_many_arguments)]
+fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], linear: f64, angular: f64, out: &mut MeshOut) -> bool {
     let input = &MeshIn { vertices, edges, curves, surfaces, face_loops, loop_uses, uses, linear, angular };
     let vertices: Vec<DVec3> = input.vertices.as_chunks::<3>().0.iter().map(|c| DVec3::new(c[0], c[1], c[2])).collect();
     let ne = input.edges.len() / 2;
