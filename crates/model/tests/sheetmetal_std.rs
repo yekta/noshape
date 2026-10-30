@@ -604,6 +604,36 @@ fn plate(radius: &str) -> Studio {
     s
 }
 
+/// A Flange bent 30° (under 45°) unfolds into the flat's plane: the
+/// unfold turned such a wall the wrong way (the rect → triangle loft's
+/// 33.8° bend stood its walls up out of the flat). The flat is the sheet:
+/// the plate, the 20 mm flange and the bend's developed strip, R 2, K 0.45.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_shallow_flange_unfolds_flat() {
+    let mut s = plate("2 mm");
+    let r = s.ok();
+    let edge = edge_at(&r, DVec3::new(30.0, 0.0, 2.0));
+    s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(vec![edge]));
+        p.set("distance", expr("20 mm"));
+        p.set("bendAngle", expr("30 deg"));
+    });
+    let r = s.ok();
+    let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
+    let n = flat.frame.normal.normalize();
+    for f in flat.shape.as_ref().expect("flat shape").faces() {
+        let p = f.face_plane().ok().flatten().expect("a planar flat face");
+        assert!(p.unit_normal().cross(n).length() < 1e-9, "a flat face off the flat's plane: {:?}", p.unit_normal());
+    }
+    // Plate and flange less their pull-backs, plus the strip: volume / 2 mm
+    // less the strip's neutral-line shortfall (K 0.45 against the middle:
+    // 30° × 60 mm × 0.05 × 2 mm).
+    let (sheet, area) = (volume_mm3(&r) / 2.0, flat.area() * 1e6);
+    let short = std::f64::consts::FRAC_PI_6 * 60.0 * 0.05 * 2.0;
+    assert!((sheet - area - short).abs() < 0.01, "flat {area} mm² vs sheet {sheet} less {short}");
+}
+
 /// Live (behaviours "skasm (2026-10-29) partial Outer / Inner flange",
 /// request 1599 (a)): R3 plate, partial Flange on the top edge y = 40, 10 mm
 /// in from both ends. Outer keeps the wall inside the outline (y 38..40),
