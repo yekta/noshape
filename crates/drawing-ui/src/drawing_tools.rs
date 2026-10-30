@@ -2095,7 +2095,7 @@ impl DrawingEditor {
             }
             Some(Sel::Table(id)) => out.extend(self.table_entries(id, cx)),
             Some(Sel::Sketch(id)) => out.extend(self.sketch_entries(id)),
-            Some(Sel::Image(id)) => out.extend(self.image_entries(id)),
+            Some(Sel::Image(id)) => out.extend(self.image_entries(id, cx)),
             // Live 483–493, ~1490: an automatic centermark's menu.
             Some(Sel::AutoCentermark(view, key)) => {
                 out.push(MenuEntry::item("Paste as table", |t, _, cx| {

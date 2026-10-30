@@ -90,6 +90,9 @@ pub enum Panel {
     /// Table cell › Resize: the column's width and the row height (sheet mm).
     CellResize { table: u64, col: usize, width: Entity<InputState>, height: Entity<InputState> },
     DatumTarget { id: u64, label: Entity<InputState>, area: usize, width: Entity<InputState>, height: Entity<InputState> },
+    /// Image properties... (live 1613 (a)): read-only Document, Workspace,
+    /// Reference (the image tab, a link) and Sheet.
+    ImageProps { rows: Vec<(&'static str, String)>, tab: Option<TabId> },
 }
 
 /// The Note panel of a general table cell edited in place: its style (font,
@@ -930,6 +933,7 @@ impl DrawingEditor {
         }
         self.ensure_sources(true, cx);
         self.status = Some("Updating drawing…".into());
+        self.drop_unresolved_images(cx);
     }
 
     // ------------------------------------------------------------ geometry

@@ -275,7 +275,10 @@ impl DrawingEditor {
 
     pub fn render_toolbar(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let ed = cx.entity();
-        let up_to_date = !self.out_of_date && self.sources.len() >= views::referenced_sources(&self.drawing).len();
+        // An image whose tab is gone also makes it out of date (live 1613 (a):
+        // Update highlighted until the image is dropped).
+        let out_of_date = self.out_of_date || self.images_stale(cx);
+        let up_to_date = !out_of_date && self.sources.len() >= views::referenced_sources(&self.drawing).len();
         let imported = self.drawing.sheets.iter().any(|s| s.imported.is_some());
         let groups = self.toolbar_groups();
         let container = f32::from(window.viewport_size().width) - 46.;
@@ -289,7 +292,7 @@ impl DrawingEditor {
                 crate::ui::tool_button("dr-update", "drawing-update", false, cx)
                     .w(px(CELL))
                     .h(px(CELL))
-                    .when(self.out_of_date, |b| b.bg(gpui_kit::rgb(0xfcda7f)).border_2().border_color(gpui_kit::rgb(0xfab601)))
+                    .when(out_of_date, |b| b.bg(gpui_kit::rgb(0xfcda7f)).border_2().border_color(gpui_kit::rgb(0xfab601)))
                     .opacity(if imported { 0.3 } else if up_to_date { 0.4 } else { 1.0 })
                     .tooltip("Update from this workspace (ctrl+q)")
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {

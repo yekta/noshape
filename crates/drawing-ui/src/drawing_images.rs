@@ -7,6 +7,7 @@
 use crate::drawing_view::*;
 use gpui_kit::*;
 use noshape_render::{Drawable, ImageData, ImageHandle, Instance};
+use noshape_model::document::TabId;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -115,8 +116,58 @@ impl DrawingEditor {
             .collect()
     }
 
-    /// Context menu of an image.
-    pub fn image_entries(&self, id: u64) -> Vec<MenuEntry> {
+    /// The image tab an image came from (its data), with the tab's name.
+    pub fn image_tab(doc: &noshape_model::Document, im: &noshape_model::drawing::SheetImage) -> Option<(TabId, String)> {
+        doc.tabs.iter().find_map(|t| match &t.content {
+            noshape_model::document::TabContent::File(f) if Arc::ptr_eq(&f.data_base64, &im.data_base64) || f.data_base64 == im.data_base64 => Some((t.id, t.name.clone())),
+            _ => None,
+        })
+    }
+
+    /// Whether an image's tab is gone (the drawing then needs an Update).
+    pub fn images_stale(&self, cx: &App) -> bool {
+        let doc = &self.doc.read(cx).session.doc;
+        self.drawing.sheets.iter().flat_map(|s| &s.images).any(|im| Self::image_tab(doc, im).is_none())
+    }
+
+    /// Update: images whose image tab is gone leave the sheets, with live's
+    /// bubble (live 1613 (a): "Failed to resolve image target tab").
+    pub fn drop_unresolved_images(&mut self, cx: &mut Context<Self>) {
+        let doc = self.doc.read(cx).session.doc.clone();
+        let lost: Vec<(usize, u64)> = self.drawing.sheets.iter().enumerate().flat_map(|(si, s)| s.images.iter().filter(|im| Self::image_tab(&doc, im).is_none()).map(move |im| (si, im.id))).collect();
+        if lost.is_empty() {
+            return;
+        }
+        self.selection.retain(|s| !matches!(s, Sel::Image(i) if lost.iter().any(|(_, l)| l == i)));
+        self.edit("Update", cx, |d| {
+            for (si, id) in &lost {
+                if let Some(s) = d.sheets.get_mut(*si) {
+                    s.images.retain(|im| im.id != *id);
+                }
+            }
+        });
+        self.status = Some("Failed to resolve image target tab".into());
+    }
+
+    /// Image properties... (live 1613 (a)): read only.
+    fn open_image_props(&mut self, id: u64, cx: &mut Context<Self>) {
+        let Some(im) = self.current_sheet().images.iter().find(|i| i.id == id).cloned() else { return };
+        let dm = self.doc.read(cx);
+        let tab = Self::image_tab(&dm.session.doc, &im);
+        let rows = vec![
+            ("Document", dm.name()),
+            ("Workspace", "Main".to_string()),
+            ("Reference", tab.as_ref().map(|t| format!("{}  In progress", t.1)).unwrap_or_else(|| im.name.clone())),
+            ("Sheet", self.current_sheet().name.clone()),
+        ];
+        self.panel = Some(Panel::ImageProps { rows, tab: tab.map(|t| t.0) });
+        cx.notify();
+    }
+
+    /// Context menu of an image (live 1613 (a), in order): Image
+    /// properties..., Show / Hide image borders, Paste, (ours: Move to sheet
+    /// ▸), Switch to <image tab>, Clear selection, Zoom to fit, Delete.
+    pub fn image_entries(&self, id: u64, cx: &App) -> Vec<MenuEntry> {
         let borders = self.drawing.props.image_borders;
         let cur = self.sheet;
         let sheets: Vec<MenuEntry> = self
@@ -134,11 +185,25 @@ impl DrawingEditor {
                 })
             })
             .collect();
-        let mut out = vec![MenuEntry::item(noshape_ops::drawing::image_borders_label(borders), move |t, _, cx| t.edit(noshape_ops::drawing::IMAGE_BORDERS, cx, |d| d.props.image_borders = !borders))];
+        let mut out = vec![
+            MenuEntry::item("Image properties...", move |t, _, cx| t.open_image_props(id, cx)),
+            MenuEntry::item(noshape_ops::drawing::image_borders_label(borders), move |t, _, cx| t.edit(noshape_ops::drawing::IMAGE_BORDERS, cx, |d| d.props.image_borders = !borders)),
+            crate::drawing_props::paste_always(),
+        ];
         if !sheets.is_empty() {
             out.push(MenuEntry::Submenu("Move to sheet".into(), sheets));
         }
+        let tab = self.current_sheet().images.iter().find(|i| i.id == id).and_then(|im| Self::image_tab(&self.doc.read(cx).session.doc, im));
+        if let Some((tab, name)) = tab {
+            out.push(MenuEntry::Separator);
+            out.push(MenuEntry::item(format!("Switch to {name}"), move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx)));
+        }
         out.push(MenuEntry::Separator);
+        out.push(MenuEntry::item("Clear selection", |t, _, cx| {
+            t.selection.clear();
+            t.redraw(cx);
+        }));
+        out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
         out.push(MenuEntry::item("Delete", move |t, _, cx| {
             t.selection.clear();
             t.edit_sheet("Delete image", cx, |s| s.images.retain(|x| x.id != id));
