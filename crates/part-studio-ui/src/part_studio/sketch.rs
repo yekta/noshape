@@ -4391,7 +4391,7 @@ impl PartStudioView {
                     cx.notify();
                     return;
                 }
-                let transient = this.show_shortcuts || this.context_menu.is_some() || this.ui.mini_toolbar.is_some() || this.ui.select_other.is_some() || this.ui.dependencies.is_some() || this.viewport.read(cx).zoom_window;
+                let transient = this.shortcut_sheet.is_some() || this.context_menu.is_some() || this.ui.mini_toolbar.is_some() || this.ui.select_other.is_some() || this.ui.dependencies.is_some() || this.viewport.read(cx).zoom_window;
                 if !transient && this.sketch.is_some() {
                     if let Some(ui) = this.ui_mut() {
                         ui.degree_edit = None;

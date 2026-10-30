@@ -408,15 +408,6 @@ pub struct UiState {
     /// Dynamic suppression editor: feature, expression input.
     /// The Dynamic suppression dialog: what it sets and its input.
     pub dyn_suppression: Option<(DynTarget, Entity<InputState>, Subscription)>,
-    /// Shortcut map search box.
-    pub shortcut_filter: Option<(Entity<InputState>, Subscription)>,
-    /// The shortcut map's list: it has the keyboard while the map is open.
-    pub shortcut_list_focus: Option<FocusHandle>,
-    pub shortcut_query: String,
-    /// Shortcut sheet tab (General, Part Studio, …).
-    pub shortcut_tab: usize,
-    /// The shortcut map's rows (Chrome's scrollbar, live menus/616).
-    pub shortcut_scroll: gpui_kit::ScrollHandle,
     /// Recently started tools, newest first (Search tools with no query).
     pub recent_tools: Vec<&'static str>,
     /// Camera menu "Orient normal to sketch on edit" and its state: an
@@ -670,11 +661,6 @@ impl UiState {
             sm_edit_focus: false,
             sm_cell: None,
             dyn_suppression: None,
-            shortcut_filter: None,
-            shortcut_query: String::new(),
-            shortcut_tab: 0,
-            shortcut_scroll: gpui_kit::ScrollHandle::new(),
-            shortcut_list_focus: None,
             recent_tools: Vec::new(),
             orient_on_edit: false,
             orient_pending: false,

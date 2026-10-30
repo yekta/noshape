@@ -309,8 +309,8 @@ pub struct AsmUi {
     pub np_cell: Option<super::positions::NpCell>,
     pub np_toast: Option<String>,
     pub np_count: usize,
-    /// Keyboard shortcut list (Shift+/).
-    pub show_shortcuts: bool,
+    /// The Shift+/ Keyboard shortcuts sheet (app-core's, shared by the studios).
+    pub shortcut_sheet: Option<(Entity<crate::shortcut_sheet::ShortcutSheet>, Subscription)>,
     /// Insert dialog: search box, source (0 current document, 1 other
     /// documents) and element tab (0 Part Studios, 1 Assemblies).
     pub insert_search: Option<Entity<InputState>>,
@@ -2482,63 +2482,20 @@ impl AssemblyView {
         )
     }
 
-    // ------------------------------------------------------------ shortcut list
+    // ------------------------------------------------------------ shortcut sheet
 
-    pub(super) fn render_shortcuts(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if !self.ui.show_shortcuts {
-            return None;
+    /// Shift+/ toggles the Keyboard shortcuts sheet (app-core's, shared by
+    /// the studios; it replaced the assembly's own short list), on its
+    /// Assembly tab.
+    pub(super) fn toggle_shortcut_sheet(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.ui.shortcut_sheet.take().is_some() {
+            window.focus(&self.focus, cx);
+        } else {
+            let sheet = crate::shortcut_sheet::ShortcutSheet::open(crate::shortcuts::Tab::Assembly, window, cx);
+            let sub = cx.subscribe_in(&sheet, window, |this: &mut Self, _, _: &DismissEvent, window, cx| this.toggle_shortcut_sheet(window, cx));
+            self.ui.shortcut_sheet = Some((sheet, sub));
         }
-        let pal = p();
-        let rows: &[(&str, &str)] = &[
-            ("i", "Insert parts and assemblies"),
-            ("m", "Fastened mate"),
-            ("Ctrl+M", "Mate connector"),
-            ("j", "Show or hide mates"),
-            ("k", "Show or hide mate connectors"),
-            ("h", "Show mates mode"),
-            ("Shift+S", "Snap mode"),
-            ("a", "Flip primary axis (mate / mate connector / snap drag)"),
-            ("q", "Reorient secondary axis (snap drag)"),
-            ("Shift (hold)", "Lock mate inference"),
-            ("Ctrl (tap)", "Cycle the dragged mate connector (snap mode)"),
-            ("Enter / Shift+Enter", "Commit / commit and start another"),
-            ("Esc", "Cancel"),
-            ("Space", "Clear selection"),
-            ("Delete", "Delete selection"),
-            ("Shift+N", "Rename selection"),
-            ("y / Shift+Y", "Hide hovered or selected / show hidden"),
-            ("Shift+I / Shift+T", "Isolate / make transparent"),
-            ("Ctrl+C / Ctrl+V", "Copy / paste instances"),
-            ("s", "Shortcut toolbar"),
-            ("Shift+/", "Keyboard shortcuts"),
-        ];
-        let mut list = v_flex().gap_0p5();
-        for (k, d) in rows {
-            list = list.child(h_flex().gap_3().text_xs().child(div().w(px(130.)).text_color(pal.accent_hover).child(k.to_string())).child(div().text_color(pal.text).child(d.to_string())));
-        }
-        Some(
-            v_flex()
-                .id("asm-shortcuts")
-                .occlude()
-                .absolute()
-                .top(px(40.))
-                .left(relative(0.5))
-                .ml(px(-210.))
-                .w(px(420.))
-                .p_3()
-                .gap_2()
-                .rounded_lg()
-                .bg(pal.panel_raised)
-                .border_1()
-                .border_color(pal.border_strong)
-                .shadow_lg()
-                .child(h_flex().justify_between().child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Assembly keyboard shortcuts")).child(Button::new("asm-sc-close").ghost().xsmall().opacity(0.86).child(crate::ui::glyph("close", 21., gpui_kit::rgb(0x333333))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.ui.show_shortcuts = false;
-                    cx.notify();
-                }))))
-                .child(list)
-                .into_any_element(),
-        )
+        cx.notify();
     }
 }
 

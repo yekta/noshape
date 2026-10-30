@@ -38,6 +38,7 @@ pub mod repair_mode;
 pub mod scene_builder;
 pub mod section_dialog;
 pub mod session;
+pub mod shortcut_sheet;
 pub mod shortcuts;
 pub mod start_library;
 pub mod start_thumbnail;

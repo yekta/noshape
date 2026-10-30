@@ -7,7 +7,6 @@ use crate::doc_model::DocModel;
 use crate::gpu::Gpu;
 use crate::library::DocEntry;
 use crate::material_libraries::AddedLibrary;
-use crate::shortcuts::KeyStyle;
 use gpui_kit::*;
 use noshape_model::configuration::ConfigValues;
 use noshape_model::document::{Document, TabId};
@@ -55,12 +54,6 @@ pub struct Hooks {
     pub last_viewed_config: fn(TabId) -> Option<ConfigValues>,
     /// The Create version dialog of a document.
     pub create_version: fn(Entity<DocModel>, &mut Window, &mut App),
-    /// Preferences › Keyboard shortcuts.
-    pub show_keyboard_shortcuts: fn(&mut App),
-    /// The Shift+/ keyboard shortcuts sheet's window (beside the opener's size).
-    pub show_shortcuts_page: fn(Option<Size<Pixels>>, &mut App),
-    /// A key chip as Preferences › Keyboard shortcuts draws it.
-    pub key_chip: fn(SharedString, KeyStyle) -> Div,
     /// The Export dialogs' "View export rules" link.
     pub export_rules_link: fn(&'static str) -> Stateful<Div>,
     /// Preferences: the parts list shows properties.
@@ -142,18 +135,6 @@ pub fn last_viewed_config(tab: TabId) -> Option<ConfigValues> {
 
 pub fn create_version(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
     (hooks().create_version)(doc, window, cx)
-}
-
-pub fn show_keyboard_shortcuts(cx: &mut App) {
-    (hooks().show_keyboard_shortcuts)(cx)
-}
-
-pub fn show_shortcuts_page(opener: Option<Size<Pixels>>, cx: &mut App) {
-    (hooks().show_shortcuts_page)(opener, cx)
-}
-
-pub fn key_chip(text: impl Into<SharedString>, style: KeyStyle) -> Div {
-    (hooks().key_chip)(text.into(), style)
 }
 
 pub fn export_rules_link(id: &'static str) -> Stateful<Div> {
@@ -243,9 +224,6 @@ pub fn register_for_tests() {
         note_viewed_config: |_, _| {},
         last_viewed_config: |_| None,
         create_version: |_, _, _| {},
-        show_keyboard_shortcuts: |_| {},
-        show_shortcuts_page: |_, _| {},
-        key_chip: |text, _| div().child(text),
         export_rules_link: |id| div().id(id),
         parts_list_properties: || false,
         set_parts_list_properties: |_| {},

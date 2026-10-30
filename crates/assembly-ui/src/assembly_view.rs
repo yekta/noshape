@@ -5394,8 +5394,8 @@ impl AssemblyView {
         if let Some(el) = self.render_mini_toolbar(cx) {
             out.push(el);
         }
-        if let Some(el) = self.render_shortcuts(cx) {
-            out.push(el);
+        if let Some((s, _)) = &self.ui.shortcut_sheet {
+            out.push(s.clone().into_any_element());
         }
         if let Some(el) = self.render_select_other(cx) {
             out.push(el);
@@ -5916,11 +5916,12 @@ impl AssemblyView {
             self.message = None;
             self.activate_explode(None, cx);
             cx.notify();
-        } else if self.ui.ctx_menu.is_some() || self.ui.mini_toolbar.is_some() || self.ui.show_shortcuts || self.ui.select_other.is_some() {
+        } else if self.ui.shortcut_sheet.is_some() {
+            self.toggle_shortcut_sheet(window, cx);
+        } else if self.ui.ctx_menu.is_some() || self.ui.mini_toolbar.is_some() || self.ui.select_other.is_some() {
             self.ui.select_other = None;
             self.ui.ctx_menu = None;
             self.ui.mini_toolbar = None;
-            self.ui.show_shortcuts = false;
             cx.notify();
         } else if self.ui.measure.is_some() {
             self.toggle_measure(cx);
@@ -5979,10 +5980,7 @@ impl AssemblyView {
             .on_action(cx.listener(|this, _: &Paste, _, cx| this.paste_instances(cx)))
             .on_action(cx.listener(|this, _: &RenameSelected, window, cx| this.rename_selected(window, cx)))
             .on_action(cx.listener(|this, _: &ShortcutToolbar, _, cx| this.toggle_mini_toolbar(cx)))
-            .on_action(cx.listener(|this, _: &ToggleShortcutHelp, _, cx| {
-                this.ui.show_shortcuts = !this.ui.show_shortcuts;
-                cx.notify();
-            }))
+            .on_action(cx.listener(|this, _: &ToggleShortcutHelp, window, cx| this.toggle_shortcut_sheet(window, cx)))
             .on_action(cx.listener(|this, _: &MateConnectorTool, window, cx| this.open_mc(None, window, cx)))
             .on_action(cx.listener(|this, _: &SelectOther, _, cx| this.select_other(false, cx)))
             .on_action(cx.listener(|this, _: &MeasureTool, _, cx| this.toggle_measure(cx)))

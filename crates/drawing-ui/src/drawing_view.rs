@@ -383,6 +383,8 @@ pub struct DrawingEditor {
     pub sheet_rows: Vec<usize>,
     /// The Sheets panel's Shift+N "Rename" popup: its row and field.
     pub row_rename: Option<(crate::drawing_extra::RowRename, Entity<InputState>)>,
+    /// The Shift+/ Keyboard shortcuts sheet (app-core's, shared by the studios).
+    pub shortcut_sheet: Option<(Entity<crate::shortcut_sheet::ShortcutSheet>, Subscription)>,
     /// While sheet rows are dragged: the row the drop goes before (the
     /// number of sheets: after the last), shown as a blue line (S8).
     pub sheet_drop: Option<usize>,
@@ -624,6 +626,7 @@ impl DrawingEditor {
             mbd_model: 0,
             sheet_rows: Vec::new(),
             row_rename: None,
+            shortcut_sheet: None,
             sheet_drop: None,
             inplace_hidden: None,
             inplace_cell: None,
@@ -1617,6 +1620,7 @@ impl DrawingEditor {
             .children(self.render_sheet_props(cx))
             .children(self.render_drawing_props(cx))
             .children(self.render_toast(cx))
+            .children(self.shortcut_sheet.as_ref().map(|(s, _)| s.clone()))
             .children(self.render_section_dlg(cx))
             .children(self.render_break_dlg(cx))
             .children(self.render_aux_dlg(cx))
@@ -1686,6 +1690,7 @@ impl DrawingEditor {
             .on_action(cx.listener(|this, _: &ShortcutToolbar, _, cx| this.toggle_shortcut_toolbar(cx)))
             .on_action(cx.listener(|this, _: &MeasureTool, _, cx| this.toggle_measure(cx)))
             .on_action(cx.listener(|this, _: &RenameSelected, window, cx| this.rename_selected(window, cx)))
+            .on_action(cx.listener(|this, _: &ToggleShortcutHelp, window, cx| this.toggle_shortcut_sheet(window, cx)))
             .on_action(cx.listener(|this, _: &Paste, _, cx| {
                 // Spreadsheet cells paste as a new table; copied views as views.
                 if !this.start_paste_table(cx) {

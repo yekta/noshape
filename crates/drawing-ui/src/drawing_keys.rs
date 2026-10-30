@@ -71,6 +71,19 @@ impl DrawingEditor {
         self.redraw(cx);
     }
 
+    /// Shift+/: the Keyboard shortcuts sheet (app-core's, shared by the
+    /// studios), on its Drawing tab (live, qa DRAWING-SHIFT-SLASH).
+    pub fn toggle_shortcut_sheet(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.shortcut_sheet.take().is_some() {
+            window.focus(&self.focus, cx);
+        } else {
+            let sheet = crate::shortcut_sheet::ShortcutSheet::open(crate::shortcuts::Tab::Drawing, window, cx);
+            let sub = cx.subscribe_in(&sheet, window, |this: &mut Self, _, _: &DismissEvent, window, cx| this.toggle_shortcut_sheet(window, cx));
+            self.shortcut_sheet = Some((sheet, sub));
+        }
+        cx.notify();
+    }
+
     /// Shift+N: rename the selected view (View properties › Name), else the current sheet.
     /// With the Sheets panel open (live K20): one selected view or sheet row
     /// gets a "Rename" popup beside its row; any other selection, nothing.

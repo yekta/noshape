@@ -6,6 +6,16 @@ document with noshape-cli; ink.py measures plane-name ink boxes). Live: my own t
 (`UI=1 node r.mjs …` in /root/live-pw, target id in /root/ui-scratch/live/.ui-tab); captures in onshape-research/live/psui/.
 Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079` (planes then sit on live's pixels).
 
+## From dx (10-30, lead's decision)
+
+- The Shift+/ Keyboard shortcuts sheet moved to app-core (`crates/app-core/src/shortcut_sheet.rs`, `ShortcutSheet`,
+  registered hooks for the key chip / Preferences links from crates/app main.rs) so the Part Studio, assemblies and
+  drawings share one copy. In the Part Studio: `show_shortcuts` and `ui.shortcut_*` are gone, replaced by
+  `shortcut_sheet: Option<(Entity<ShortcutSheet>, Subscription)>`; `toggle_shortcut_sheet` (view_tools.rs) opens it on
+  General as before; part_studio_hooks lost `show_keyboard_shortcuts`, `show_shortcuts_page` and `key_chip` (only the
+  sheet used them); the test `shortcut_sheet_lists_every_part_studio_key` moved to app-core. Behaviour unchanged
+  (checked on :147: tabs, Shift+/ and Esc close, click outside closes). Further sheet changes go in app-core.
+
 ## Landed on main
 
 - 10-27 00:15 (cdde1c06..8ef8c97b): e6b2a956 dialog audit model side; 396eea65 plane names (within 1 px of live), hollow

@@ -278,9 +278,6 @@ fn register_part_studio_hooks() {
         note_viewed_config: release_dialog::note_viewed_config,
         last_viewed_config: release_dialog::last_viewed_config,
         create_version: history_panel::open_create_version_in,
-        show_keyboard_shortcuts: |cx| preferences_window::show(preferences_window::Page::KeyboardShortcuts, cx),
-        show_shortcuts_page: shortcuts_page::show,
-        key_chip: |text, style| preferences_window::key_chip(text, style),
         export_rules_link: preferences_window::export_rules_link,
         parts_list_properties: preferences_window::parts_list_properties,
         set_parts_list_properties: preferences_window::set_parts_list_properties,
@@ -382,6 +379,12 @@ fn main() {
     register_drawing_hooks();
     register_assembly_hooks();
     register_part_studio_hooks();
+    // The Shift+/ Keyboard shortcuts sheet every studio opens.
+    noshape_app_core::shortcut_sheet::register(noshape_app_core::shortcut_sheet::Hooks {
+        key_chip: |text, style| preferences_window::key_chip(text, style),
+        show_keyboard_shortcuts: |cx| preferences_window::show(preferences_window::Page::KeyboardShortcuts, cx),
+        show_shortcuts_page: shortcuts_page::show,
+    });
     register_variable_hooks();
     register_preferences_hooks();
     register_release_hooks();

@@ -321,7 +321,8 @@ pub struct PartStudioView {
     needs_regen: bool,
     palette: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     palette_query: String,
-    show_shortcuts: bool,
+    /// The Shift+/ Keyboard shortcuts sheet (app-core's, shared by the studios).
+    shortcut_sheet: Option<(Entity<crate::shortcut_sheet::ShortcutSheet>, Subscription)>,
     renaming: Option<(FeatureId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     dim_input: Option<(noshape_sketch::ConstraintId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     manip_drag: Option<manipulators::ManipDrag>,
@@ -452,7 +453,7 @@ impl PartStudioView {
             needs_regen: false,
             palette: None,
             palette_query: String::new(),
-            show_shortcuts: false,
+            shortcut_sheet: None,
             renaming: None,
             dim_input: None,
             manip_drag: None,
@@ -5359,7 +5360,7 @@ impl PartStudioView {
             self.viewport.update(cx, |vp, cx| vp.set_overlay_labels(labels, cx));
         }
         overlay.extend(self.render_palette(window, cx));
-        overlay.extend(self.render_shortcut_sheet(window, cx));
+        overlay.extend(self.shortcut_sheet.as_ref().map(|(s, _)| s.clone().into_any_element()));
         overlay.extend(self.render_create_selection(cx));
         overlay.extend(self.render_material_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-material"))));
         overlay.extend(self.render_variable_input(cx));
@@ -5485,7 +5486,7 @@ impl Render for PartStudioView {
                 // Esc closes transient UI first (S toolbar, Select other,
                 // zoom to window, dependencies), then the tool or dialog,
                 // then isolate / make transparent; never the selection.
-                if this.show_shortcuts {
+                if this.shortcut_sheet.is_some() {
                     this.toggle_shortcut_sheet(window, cx);
                     return;
                 }
