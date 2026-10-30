@@ -262,6 +262,8 @@ pub enum Drag {
     TableDivider { id: u64, col: Option<usize>, row: Option<usize>, start: [f64; 2], widths: Vec<f64>, heights: Vec<f64> },
     /// Move a section view's cutting line (parallel offset).
     MoveSectionLine { view: ViewId, start: [f64; 2], orig: ViewKind },
+    /// A view break dragged by one of its lines along its axis (help V35).
+    MoveBreak { view: ViewId, index: usize, start: [f64; 2], orig: noshape_model::drawing::ViewBreak },
     /// Move a detail view's circle in its parent.
     MoveDetailCircle { view: ViewId, start: [f64; 2], orig: [f64; 2] },
     /// Resize a detail view's circle by its grip (live asbv-9).

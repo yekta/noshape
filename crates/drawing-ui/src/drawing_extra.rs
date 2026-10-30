@@ -1341,6 +1341,12 @@ impl DrawingEditor {
                     Some(Drag::MoveTable { id, start, orig: t.position })
                 }
             }
+            // A break line: dragging moves the break (help V35).
+            PickTarget::BreakLine { view, index } => {
+                let orig = sheet.view(view)?.breaks.get(index)?.clone();
+                self.selection = vec![Sel::Break(view, index)];
+                Some(Drag::MoveBreak { view, index, start, orig })
+            }
             PickTarget::SectionLine(v) => {
                 self.selection = vec![Sel::View(v)];
                 // Near a point of the line: move that point only.
@@ -1557,6 +1563,16 @@ impl DrawingEditor {
                         t.row_height = (orig.row_height * ky).max(orig.text_height * 1.4);
                         t.row_heights = orig.row_heights.iter().map(|h| (h * ky).max(orig.text_height * 1.4)).collect();
                     }
+                }
+            }
+            Drag::MoveBreak { view, index, start, orig } => {
+                // The break slides along the part (its band keeps its width),
+                // so its lines follow the pointer.
+                let Some(pl) = self.placement(*view) else { return };
+                let nrm = pl.dir_to_sheet(if orig.vertical { [1.0, 0.0] } else { [0.0, 1.0] });
+                let dm = dot(sub(c, *start), nrm) / (pl.scale * 1000.0);
+                if let Some(b) = sheet.view_mut(*view).and_then(|v| v.breaks.get_mut(*index)) {
+                    (b.a, b.b) = (orig.a + dm, orig.b + dm);
                 }
             }
             Drag::MoveSectionLine { view, start, orig } => {

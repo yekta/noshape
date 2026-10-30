@@ -1132,7 +1132,7 @@ impl DrawingEditor {
             }
             Drag::SelectCells { .. } => self.update_preview(cx),
             Drag::SelectBox { .. } => cx.notify(),
-            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } => {
+            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveBreak { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } => {
                 let drag = self.drag.clone();
                 self.extra_drag_move(&drag, cx);
             }
@@ -1390,13 +1390,14 @@ impl DrawingEditor {
             }
             Drag::SelectCells { id, start } => self.select_cells_in(id, start, self.cursor, cx),
             Drag::SelectBox { start } => self.select_in_box(start, self.cursor, e.modifiers.shift, cx),
-            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } | Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } => {
+            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveBreak { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } | Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } => {
                 let name = match drag {
                     Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } => "Move by grip",
                     Drag::MoveTable { .. } => "Move table",
                     Drag::TableDivider { .. } => "Resize cells",
                     Drag::ResizeTable { .. } => "Resize table",
                     Drag::MoveSectionLine { .. } => "Move cutting line",
+                    Drag::MoveBreak { .. } => "Move break",
                     Drag::MoveSectionPoint { .. } => "Edit cutting line",
                     Drag::AuxIndicator { .. } => "Edit view reference indicator",
                     Drag::MoveViewLabel { .. } => "Move view label",
