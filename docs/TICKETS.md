@@ -120,10 +120,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   hands freed memory back (malloc_trim) after a big Boolean. Diamond Ok: 94272.890 mm³, 10362 faces, 363 s, +8.2 GB;
   Straight 95877.733 mm³, 224 faces, 1.6 s. T2 `custom_features::knurl_feature_b94_on_a_cylinder` against live
   (request 1615: Straight 95877.733 mm³ / 224 faces = ours; Diamond 94271.838 / 10362 faces, ours +1.05 mm³; live 49 s).
-- [ ] P1 KNURL-MEMORY (core) the diamond knurl's one OCCT subtract grows the process by ~8.2 GB in the model's metres
-  (5.9 GB in a kernel run in metres, 4.0 GB in mm; the app reached 16.7 GB over several regenerations before the
-  trim); 315 s of its 363 s are that build (live 32 s). Next: Booleans of many tools at the blends' working scale (mm),
-  then the Phase 1 items in docs/handoff/core.md (knurl).
+- [x] P1 KNURL-MEMORY (core) the diamond knurl's subtract (148 helical grooves) grew the process by ~8.2 GB in the
+  model's metres. op_boolean now runs a cut by 64+ tools at the blends' working scale (mm; ScaledInputs: each TShape
+  scaled once, instances keep their locations, so patch 0001's congruent pairs still hold): +4.45 GB, 315 s (was
+  363), the same 94272.890 mm³ / 10362 faces. T2 `custom_features::knurl_feature_b94_on_a_cylinder` bounds it at
+  5.5 GB. (Its time is bool's: the Rust Boolean.)
 - [ ] P1 BUDGET-OFF-LINUX (core, lead 10-30 07:45) the CPU budgets are a timer signal and a jump on Linux only. Since
   core-portable-budget (3df8a3b0) a budget off Linux is a deadline that OCCT's progress indicator checks
   (CancelIndicator: op_boolean's builds, op_section), so std's collision checks (MIRROR-HANG-402) and Booleans stop

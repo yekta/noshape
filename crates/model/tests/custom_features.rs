@@ -2037,11 +2037,10 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
         let growth = peak.saturating_sub(start) as f64 / (1u64 << 30) as f64;
         eprintln!("knurl {kind}: {v:.3} mm³, {faces} faces, {took:.1} s, grew {growth:.2} GB");
         // (Linux: /proc; other tests running beside it add theirs.) The
-        // diamond's one OCCT subtract of 148 helical grooves needs ~8.2 GB
-        // (its pave filler; 4.0 GB for the same knurl in mm: KNURL-MEMORY);
-        // the bound keeps it from growing further.
+        // diamond's OCCT subtract of 148 helical grooves at the working scale
+        // (mm): +4.45 GB (8.2 in metres; KNURL-MEMORY).
         if cfg!(target_os = "linux") {
-            assert!(growth < 9.0, "knurl {kind}: the regeneration grew the process by {growth:.2} GB");
+            assert!(growth < 5.5, "knurl {kind}: the regeneration grew the process by {growth:.2} GB");
         }
         assert_eq!(r.context.bodies.len(), 1, "knurl {kind}");
         assert_eq!(faces, live_faces, "knurl {kind}: faces");

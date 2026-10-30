@@ -3798,6 +3798,88 @@ rust::String last_boolean_path()
 namespace
 {
 
+// The inputs of a Boolean at another scale (the blends' working scale: the
+// model's metres in mm). Each TShape is scaled once and its instances keep
+// their locations (scaled), so a pattern's instances still share one TShape
+// (OCCT patch 0001's congruent pairs); `hist` takes every input's solids,
+// faces, edges and vertices to their images. A diamond knurl's subtract of
+// 148 instances grew the process by 5.9 GB in metres, 4.0 GB in mm (and
+// took 325 s against 260; KNURL-MEMORY).
+struct ScaledInputs
+{
+  struct Entry
+  {
+    TopoDS_Shape              copy;
+    ShapeIMap                 subs;
+    std::vector<TopoDS_Shape> images;
+  };
+  gp_Trsf                                                        S, Sinv;
+  NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> index;
+  std::vector<Entry>                                             entries;
+  HHist                                                          hist = new BRepTools_History();
+
+  explicit ScaledInputs(double k)
+  {
+    S.SetScale(gp_Pnt(0, 0, 0), k);
+    Sinv.SetScale(gp_Pnt(0, 0, 0), 1.0 / k);
+  }
+
+  TopoDS_Shape scale(const TopoDS_Shape& x)
+  {
+    const TopLoc_Location l    = x.Location();
+    const TopoDS_Shape    base = x.Located(TopLoc_Location()).Oriented(TopAbs_FORWARD);
+    int                   j    = 0;
+    if (const int* found = index.Seek(base))
+      j = *found;
+    else
+    {
+      BRepBuilderAPI_Transform tr(base, S, true);
+      if (!tr.IsDone())
+        fail_op("scaling a Boolean input failed");
+      Entry e;
+      e.copy = tr.Shape();
+      for (TopAbs_ShapeEnum k : {TopAbs_SOLID, TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+        TopExp::MapShapes(base, k, e.subs);
+      for (int i = 1; i <= e.subs.Extent(); ++i)
+        e.images.push_back(tr.ModifiedShape(e.subs(i)));
+      entries.push_back(std::move(e));
+      j = (int)entries.size() - 1;
+      index.Bind(base, j);
+    }
+    const Entry&          e = entries[(size_t)j];
+    const TopLoc_Location k(S * l.Transformation() * Sinv);
+    for (TopAbs_ShapeEnum t : {TopAbs_SOLID, TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+    {
+      ShapeIMap subs;
+      TopExp::MapShapes(x, t, subs);
+      for (int i = 1; i <= subs.Extent(); ++i)
+      {
+        const TopoDS_Shape& y = subs(i);
+        const int           m = e.subs.FindIndex(y.Located(l.Inverted() * y.Location()));
+        if (m == 0)
+          continue;
+        TopoDS_Shape r = e.images[(size_t)m - 1].Moved(k);
+        if (y.Orientation() != e.subs(m).Orientation())
+          r.Reverse();
+        hist->AddModified(y, r);
+      }
+    }
+    return e.copy.Moved(k).Oriented(x.Orientation());
+  }
+
+  // `r` (at the scaled size) back at the inputs', `h` extended to it.
+  TopoDS_Shape unscale(const TopoDS_Shape& r, HHist& h) const
+  {
+    BRepBuilderAPI_Transform tr(r, Sinv, true);
+    if (!tr.IsDone())
+      fail_op("scaling a Boolean result back failed");
+    if (h.IsNull())
+      h = new BRepTools_History();
+    h->Merge(new BRepTools_History(to_list(std::vector<TopoDS_Shape>{r}), tr));
+    return tr.Shape();
+  }
+};
+
 // `s` with its location put into its geometry: a fresh copy, its sub-shapes
 // in the same map order (a history by index holds for both).
 TopoDS_Shape bake_location(const TopoDS_Shape& s)
@@ -4107,6 +4189,16 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   // Many tools (not a pattern's checked glue, which handles its own): the
   // ones apart from each other as one argument each group.
   const size_t n_tools = t.size();
+  // A cut by many tools at the working scale (KNURL-MEMORY; ScaledInputs).
+  std::unique_ptr<ScaledInputs> scaled;
+  if (op == 1 && n_tools >= 64 && opts.glue == 0 && facets.source.empty() && working_scale() != 1.0 && std::getenv("NOSHAPE_BOOL_NO_SCALE") == nullptr)
+  {
+    scaled = std::make_unique<ScaledInputs>(working_scale());
+    for (TopoDS_Shape& x : a)
+      x = scaled->scale(x);
+    for (TopoDS_Shape& x : t)
+      x = scaled->scale(x);
+  }
   if (opts.glue != 3 && facets.source.empty())
     t = group_disjoint(t);
   b->SetArguments(to_list(a));
@@ -4250,6 +4342,14 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   {
     const KernelTimer timer("boolean.unify");
     res = unify(res, hist);
+  }
+  if (scaled)
+  {
+    const KernelTimer timer("boolean.unscale");
+    res          = scaled->unscale(res, hist);
+    HHist  whole = scaled->hist;
+    whole->Merge(hist);
+    hist = whole;
   }
   res = remesh_facets(res, facets, hist);
   const KernelTimer timer("boolean.result");
