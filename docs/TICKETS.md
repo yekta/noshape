@@ -397,6 +397,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     runs; was 200–364 in 6 of 9), redo median 30 / 29, commit median 98 / 108 (budget 200). The 2 slow undo /
     redo per OS (201–376 ms) still wait 250–350 ms between scheduling and the regen result; the next commit logs
     whether that's the background thread starting or the regenerator's lock ("regen #n: started … lock …").
+  - psui 10-30 10:50: perf 41036130143 (4b4e2b4a): undo / redo medians 26 / 29 ms, commit 120 / 81 ms (macOS 14 / 15);
+    the slow ones (166–462 ms, 3–4 of 18 per OS) are all **"polled" late**: the UI thread first runs the spawned regen
+    task 170–430 ms after it was asked (regen 1 ms, background start +20 ms, lock 0), with nothing else logged on it
+    meanwhile: macOS App Nap / timer coalescing on the runner's non-frontmost window. This commit holds an App Nap
+    activity (gpui prevent_app_nap) from scheduling a regeneration until it's shown; re-measuring.
   - core 03:25: REGEN-SPEED's perf.yml run 40796942944 (main 34cbea98) has the Extrude 1 edit commit at 34 / 38 / 60 ms (macOS / Linux / Windows, budget 200). psui / qa: please confirm "commit shown in" on a current perf run and close.
 - [x] 3f5f69ed (core: extruded cylinders framed as live, z toward the sketch; CP1 matches, out of KNOWN; R3/C1 now flip the pin as live, the solver's −157.5° turn is skasm's) P0 `model/tests/oracle_asm::assemblies_match_live` CP1 regressed by 339de774 (cylinder frame); fs suspects the
   cylinder axis should point toward the sketch (also CP1, R3, C1). Red at the halt.
