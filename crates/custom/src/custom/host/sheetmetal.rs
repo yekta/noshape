@@ -18,7 +18,7 @@
 use super::query::{Ent, QueryCx, evaluate_refs};
 use super::{CtxState, FsId, context_arg, convert::*, run_op, std_tag};
 use crate::display::BodyKind;
-use crate::reference::{BodyId, Reference};
+use crate::reference::{BodyId, FeatureId, Reference};
 use crate::regen::eval::{FResult, FeatureError};
 use crate::regen::features::helpers_a::push_body;
 use glam::DVec3;
@@ -255,6 +255,8 @@ struct FormTools {
     remove: Vec<BodyId>,
     /// A cutting tool (a hole), not a form: cut out of the flat too, no form outline.
     cut: bool,
+    /// Its flat sketches (the form studio Tag's flatFormSketch, placed with the tools).
+    sketches: Vec<FeatureId>,
 }
 
 /// The body ids a wall attribute's `formedToolBodyIds` name, by role, and every
@@ -271,10 +273,14 @@ fn form_tools(st: &CtxState, wall: &Value, face: usize, ids: &mut Vec<(Arc<str>,
         let add = body(item.get("positiveBodyId")).into_iter().collect();
         let remove = body(item.get("negativeBodyId")).into_iter().collect();
         body(item.get("placementBodyId"));
+        let mut sketches = Vec::new();
         for sk in item.get("sketchBodyIds").as_array().iter().flat_map(|a| a.iter()) {
             body(sk);
+            if let Some(Reference::Sketch(f)) = sk.as_str().and_then(|s| st.transient_ref(&s).cloned()) {
+                sketches.push(f);
+            }
         }
-        out.push(FormTools { face, add, remove, cut: false });
+        out.push(FormTools { face, add, remove, cut: false, sketches });
     }
     // Tools std registered to cut the wall (registerSheetMetalBooleanTools:
     // a Hole through it, counterbores too).
@@ -283,7 +289,7 @@ fn form_tools(st: &CtxState, wall: &Value, face: usize, ids: &mut Vec<(Arc<str>,
         let Some(r) = st.transient_ref(&s).cloned() else { continue };
         ids.push((s, r.clone()));
         if let Reference::Body(b) = r {
-            out.push(FormTools { face, add: Vec::new(), remove: vec![b], cut: true });
+            out.push(FormTools { face, add: Vec::new(), remove: vec![b], cut: true, sketches: Vec::new() });
         }
     }
     out
@@ -1606,7 +1612,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let births = births(&mut ev.ctx.sm_births, def, &topo);
             // Forms: the parts to remove cut, then the parts to add united;
             // their faces belong to the wall they sit on.
-            let mut form_shapes: Vec<(usize, Vec<Shape>)> = Vec::new();
+            let mut form_shapes: Vec<FormShapes> = Vec::new();
             let mut cut_shapes: Vec<(usize, Vec<Shape>)> = Vec::new();
             for ft in &def.forms {
                 let shapes = |ids: &[BodyId]| -> Vec<Shape> { ids.iter().filter_map(|id| ev.ctx.bodies.iter().find(|b| &b.id == id)).map(|b| b.shape.clone()).collect() };
@@ -1622,7 +1628,8 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 if ft.cut {
                     cut_shapes.push((ft.face, tools));
                 } else {
-                    form_shapes.push((ft.face, tools));
+                    let sketches = ft.sketches.iter().filter_map(|f| ev.ctx.sketches.iter().find(|s| s.feature == *f)).flat_map(|s| sketch_loops(s)).collect();
+                    form_shapes.push((ft.face, tools, sketches));
                 }
             }
             // The definition body's own topology order (references are by index).
@@ -1664,7 +1671,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             for (k, p) in parts.into_iter().enumerate() {
                 let walls: Vec<(usize, Shape)> = wall_flats.iter().filter(|w| p.members.contains(&w.0)).cloned().collect();
                 let own: Vec<Strip> = strips.iter().filter(|s| p.members.contains(&s.wall_a)).cloned().collect();
-                let own_forms: Vec<(usize, Vec<Shape>)> = form_shapes.iter().filter(|f| p.members.contains(&f.0)).cloned().collect();
+                let own_forms: Vec<FormShapes> = form_shapes.iter().filter(|f| p.members.contains(&f.0)).cloned().collect();
                 let own_cuts: Vec<(usize, Vec<Shape>)> = cut_shapes.iter().filter(|f| p.members.contains(&f.0)).cloned().collect();
                 let flat = flat_of(def, &topo, &walls, &own, &own_forms, &own_cuts);
                 let data = sheet_data(def, &topo, &own, &p, flat.as_ref(), &others, &births);
@@ -2027,7 +2034,31 @@ fn wall_faces(topo: &Topo, fi: usize, part_faces: &[Shape], named: &[(usize, cra
 /// definition plane at z = 0, seen from +z; dom/qa5-sm-flat.dxf): walls and
 /// bend strips unfolded, bend lines on the strips' centres, up when the bend
 /// rises toward the viewer.
-fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips: &[Strip], forms: &[(usize, Vec<Shape>)], cuts: &[(usize, Vec<Shape>)]) -> Option<crate::sheetmetal::FlatPattern> {
+/// A form on wall `.0`: its tools, and its flat sketches' closed loops (model space).
+type FormShapes = (usize, Vec<Shape>, Vec<Vec<DVec3>>);
+
+/// A sketch's closed wires as points in model space.
+fn sketch_loops(s: &crate::regen::context::SketchResult) -> Vec<Vec<DVec3>> {
+    let f = &s.frame;
+    s.wires
+        .iter()
+        .filter(|w| w.closed)
+        .map(|w| {
+            let mut pts: Vec<DVec3> = Vec::new();
+            for seg in &w.segments {
+                let skip = usize::from(!pts.is_empty());
+                pts.extend(seg.tessellate(1e-6).into_iter().skip(skip).map(|p| f.origin + f.x * p.x + f.y * p.y));
+            }
+            if pts.len() > 1 && pts[0].distance(pts[pts.len() - 1]) < 1e-9 {
+                pts.pop();
+            }
+            pts
+        })
+        .filter(|l| l.len() >= 3)
+        .collect()
+}
+
+fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips: &[Strip], forms: &[FormShapes], cuts: &[(usize, Vec<Shape>)]) -> Option<crate::sheetmetal::FlatPattern> {
     let unfolded = unfold(def, def.k_factor, topo).ok()?;
     let thickness = def.front + def.back;
     let frame = k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
@@ -2066,7 +2097,7 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
     }
     // Forms: their footprint fills the flat, outlined with a center mark (as the native route).
     let mut flat_forms = Vec::new();
-    for (fi, tools) in forms {
+    for (fi, tools, sketched) in forms {
         let (Some(m), Some((_, wall))) = (unfolded.walls.get(fi), wall_flats.iter().find(|w| w.0 == *fi)) else { continue };
         let Ok(Some(plane)) = wall.face_plane() else { continue };
         let (o, n, x) = (plane.origin, plane.normal.normalize(), plane.x_dir);
@@ -2109,6 +2140,12 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
         }
         let Some(first) = loops.first() else { continue };
         let center = first.iter().copied().sum::<DVec3>() / first.len() as f64;
+        // A form with a flat sketch: its footprint and the sketch (live:
+        // Circle emboss draws the r 9.1569 footprint and its Ø d circle).
+        if !sketched.is_empty() {
+            loops.truncate(1);
+        }
+        loops.extend(sketched.iter().map(|l| l.iter().copied().map(to_plane).collect::<Vec<DVec3>>()));
         // Up: the tools stand out of the wall toward the flat's viewer (+z).
         // The side they reach furthest past the sheet ([-back, front] along
         // n): a form's cut tool runs through the sheet, its added material

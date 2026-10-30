@@ -636,11 +636,15 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     if transforms.len() > 2500 {
         return Err(raise_error(i, "PATTERN_INPUT_TOO_MANY_INSTANCES", None));
     }
-    let made = run_op(i, &cx, &id, "PATTERN_BODY_FAILED", |ev| {
+    let sketch_refs: Vec<crate::reference::FeatureId> = refs.iter().filter_map(|r| if let Reference::Sketch(f) = r { Some(*f) } else { None }).collect();
+    let (made, sketches) = run_op(i, &cx, &id, "PATTERN_BODY_FAILED", |ev| {
         let bodies = ev.resolve_bodies(&refs);
-        if bodies.is_empty() {
+        // Sketches too (std Form's flat sketches go with its tools).
+        let sources: Vec<(Arc<crate::regen::context::SketchResult>, DMat4)> = sketch_refs.iter().filter_map(|f| ev.ctx.sketches.iter().find(|s| s.feature == *f).cloned()).flat_map(|s| transforms.iter().map(move |m| (s.clone(), *m))).collect();
+        if bodies.is_empty() && sources.is_empty() {
             return err("Could not pattern selected parts.");
         }
+        let sketches = copy_sketches(ev, &id, sources.into_iter(), false);
         let mut n = 0u32;
         let mut made: Vec<(String, BodyId, BodyId)> = Vec::new();
         for bi in bodies {
@@ -656,11 +660,18 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 n += 1;
             }
         }
-        Ok(made)
+        Ok((made, sketches))
     })?;
     // Instance bodies as renamed after the operation.
     let mut st = cx.state.lock();
     let (marker, feature) = (super::marker_of(&id), st.feature);
+    own_sketches(&mut st, marker, &sketches);
+    for (source, copy) in &sketches {
+        let copied: Vec<Value> = st.attributes.iter().filter(|(r, _)| *r == Reference::Sketch(*source)).map(|(_, v)| v.clone()).collect();
+        for v in copied {
+            st.push_attribute(Reference::Sketch(*copy), v);
+        }
+    }
     for (name, source, b) in made {
         let inst = super::wrap_body_id(&b, marker, st.op_bits(marker), feature);
         // A copy keeps its body's attributes (std Form's tool instances keep the Tag's form attributes).
@@ -1691,24 +1702,28 @@ fn op_merge_contexts(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let o = other.state.lock();
         (o.ctx.clone(), o.attributes.clone())
     };
-    let (marker, moved) = run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
+    let (marker, moved, sketches) = run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
         let mut moved: Vec<(BodyId, u32)> = Vec::new();
         for b in &source.bodies {
             let index = ev.ctx.bodies.len() as u32;
             moved.push((b.id.clone(), index));
             push_body(ev, BodyId { feature: ev.feature, index }, b.kind, b.shape.clone(), b.faces.clone());
         }
-        ev.ctx.sketches.extend(source.sketches.iter().cloned());
-        Ok((ev.feature, moved))
+        // The sketches under ids of this operation (created by it, as its
+        // bodies; the source's ids may be this studio's features'), hidden.
+        let sketches = copy_sketches(ev, &id, source.sketches.iter().map(|s| (s.clone(), DMat4::IDENTITY)), true);
+        Ok((ev.feature, moved, sketches))
     })?;
     let mut st = cx.state.lock();
     let feature = st.feature;
     let bits = st.op_bits(marker);
+    own_sketches(&mut st, marker, &sketches);
     let merged = |r: Reference| match &r {
         Reference::Body(old) => match moved.iter().find(|(o, _)| o == old) {
             Some((_, index)) => Reference::Body(super::wrap_body_id(&BodyId { feature: marker, index: *index }, marker, bits, feature)),
             None => r,
         },
+        Reference::Sketch(old) => sketches.iter().find(|(o, _)| o == old).map_or(r.clone(), |(_, n)| Reference::Sketch(*n)),
         _ => r,
     };
     // The merged entities keep their attributes (std Form imports its tools by
@@ -1730,6 +1745,35 @@ fn op_merge_contexts(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         })
         .collect();
     Ok(Value::array(out))
+}
+
+/// Copies of `sketches` (each moved by its matrix) under ids made from
+/// operation `id` (marker ids: [`own_sketches`] makes them created by it);
+/// hidden when `hide` or the source is. (source, copy) ids.
+fn copy_sketches(ev: &mut EvalCtx, id: &[Arc<str>], sketches: impl Iterator<Item = (Arc<crate::regen::context::SketchResult>, DMat4)>, hide: bool) -> Vec<(crate::reference::FeatureId, crate::reference::FeatureId)> {
+    let mut out = Vec::new();
+    for (s, m) in sketches {
+        let mut sub = id.to_vec();
+        sub.push(Arc::from(format!("sketch{}", out.len())));
+        let new = super::marker_of(&sub);
+        let frame = crate::regen::eval::transform_frame(&s.frame, &m);
+        ev.ctx.sketches.retain(|x| x.feature != new);
+        ev.ctx.sketches.push(Arc::new(crate::regen::context::SketchResult { feature: new, frame, ..(*s).clone() }));
+        if hide || ev.ctx.hidden_sketches.contains(&s.feature) {
+            ev.ctx.hidden_sketches.push(new);
+        }
+        out.push((s.feature, new));
+    }
+    out
+}
+
+/// The sketch copies' ids name operation `marker` (qCreatedBy finds them).
+fn own_sketches(st: &mut super::CtxState, marker: crate::reference::FeatureId, copies: &[(crate::reference::FeatureId, crate::reference::FeatureId)]) {
+    if let Some(op) = st.ops.get(&marker).cloned() {
+        for (_, new) in copies {
+            st.ops.insert(*new, op.clone());
+        }
+    }
 }
 
 /// `opConstrainedSurface`: a surface through `points` (each `{ point,

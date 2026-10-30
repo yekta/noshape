@@ -443,6 +443,7 @@ fn build_part_studio(i: &mut noshape_featurescript::interp::Interp, a: Vec<Value
     let c = super::host::FsContext::new((*ctx).clone(), crate::reference::FeatureId(0), String::new(), Default::default(), Default::default(), None);
     {
         let mut st = c.state.lock();
+        st.loaded = true;
         for b in &ctx.bodies {
             st.name_transient(part_transient(&tab, &b.id), crate::reference::Reference::Body(b.id.clone()));
         }

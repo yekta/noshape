@@ -98,6 +98,10 @@ pub struct CtxState {
     pub units: UnitPrefs,
     pub outer_vars: BTreeMap<String, Quantity>,
     pub xform: Option<DMat4>,
+    /// A Part Studio loaded for a derive (buildPartStudio): its sketch
+    /// bodies are modifiable there (std derive keeps a form studio's flat
+    /// sketch with its tools).
+    pub loaded: bool,
     transient_ids: HashMap<Arc<str>, Reference>,
     transient_of: HashMap<Reference, Arc<str>>,
     /// Transient ids kept from feature to feature ([`Context::fs_transients`]).
@@ -206,6 +210,7 @@ impl FsContext {
                 units,
                 outer_vars,
                 xform,
+                loaded: false,
                 transient_ids: HashMap::new(),
                 transient_of: HashMap::new(),
                 persistent,

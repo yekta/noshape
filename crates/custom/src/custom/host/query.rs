@@ -478,8 +478,12 @@ impl<'a> QueryCx<'a> {
         matches!(e, Ent::SketchBody(_) | Ent::SketchRegion(..) | Ent::SketchEdge(..) | Ent::SketchVertex(..))
     }
 
+    /// Sketch bodies too in a Part Studio loaded for a derive (std derive
+    /// keeps them there: a form studio's flat sketch comes in with its
+    /// tools, live 1616's Circle emboss flat); elsewhere std's sheet metal
+    /// counts on them not being parts.
     pub fn is_modifiable(&self, e: &Ent) -> bool {
-        matches!(e, Ent::Body(_) | Ent::Face(..) | Ent::Edge(..) | Ent::Vertex(..))
+        matches!(e, Ent::Body(_) | Ent::Face(..) | Ent::Edge(..) | Ent::Vertex(..)) || (self.st.loaded && matches!(e, Ent::SketchBody(_)))
     }
 
     /// A representative point (vertex position, curve / face / body centroid).

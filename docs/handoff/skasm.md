@@ -141,11 +141,14 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   Slot extrusion, Louver, Bridge lance, Lance (exact at live's measured configurations: NB the crawl's part figures are at each studio's
   currentConfiguration, not its defaults), Slot emboss (no live figures). Circle knockout too: all 9. Pictures: each
   form's Add material. Lance Straight, Slot emboss and Lance's placement checked
-  against live 1618. Left: the preview; the flat's inner form outline: live draws the form's flat sketch (Circle emboss: Ø d circle
-  besides the r 9.1569 footprint), ours the tools' widest sections: give the library studios their "Form profile"
-  sketches (circles sized by `dimension_exprs` `#diameter`) as the tag's flatFormSketch (tried 10-30: std's tag
-  marks the sketch sketchForFlatView fine) and draw FormTools' sketchBodyIds in `flat_of`; first the host's
-  opMergeContexts must bring a derived sketch in as a (transformed) wire body: it now only appends `ctx.sketches`.
+  against live 1618. Left: the preview. Flat sketches (10-30 evening): the circle and slot forms' studios have a "Form profile"
+  (an smFormTool part SKETCH: the Ø d circle, clearance hole or width slot) as the Tag's flatFormSketch; the host's
+  qModifiableEntityFilter keeps sketch bodies in a studio loaded for a derive (`CtxState.loaded`; std derive dropped
+  them; everywhere else std's sheet metal needs them not modifiable: custom_features sm3 got 3 extra "parts"), opMergeContexts / opPattern copy sketches
+  under op-marker ids (qCreatedBy finds them), moved, with their attributes, hidden (`Context.hidden_sketches`);
+  `flat_of` draws the footprint plus the sketch's closed wires (live's Circle emboss flat: r 9.1569 + r 2.5).
+  Knockout / Louver / Bridge lance: no sketch yet (their live sketches have tabs / louver outlines; the flat keeps
+  the tools' sections). Mate connectors still don't come through the derive (std deletes them; merge has no connectors).
   Copy Flat pattern needs an assembly instance source for a flat body (assembly crate, not mine).
 - Open (10-30 morning): (1) (was: table letters, done above). (2) evaluateQuery order generally: live returns faces in
   creation order (rebuilt faces last; request 1608); the host lists a body only one Extrude made in live's order

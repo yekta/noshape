@@ -290,6 +290,9 @@ pub struct Context {
     /// Sketch copies a Feature pattern made (live L41): (the pattern, the
     /// copy's own id). The copies follow the pattern's visibility.
     pub sketch_copies: Vec<(FeatureId, FeatureId)>,
+    /// Sketches FeatureScript brought in or copied for its own use, never
+    /// shown (std Form's flat sketches: a form's "Form profile").
+    pub hidden_sketches: Vec<FeatureId>,
     pub planes: Vec<PlaneEntity>,
     pub connectors: Vec<Connector>,
     /// Mate connectors' owner parts: a connector moves with its owner

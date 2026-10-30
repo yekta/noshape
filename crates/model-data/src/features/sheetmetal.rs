@@ -438,7 +438,7 @@ pub fn form() -> FeatureType {
 pub fn form_tool() -> FeatureType {
     let p = vec![
         ParamSpec::text("form", "Form", ""),
-        ParamSpec::enum_("part", "Part", &[("ADD", "Add material"), ("SUBTRACT", "Subtract material")]),
+        ParamSpec::enum_("part", "Part", &[("ADD", "Add material"), ("SUBTRACT", "Subtract material"), ("SKETCH", "Form profile")]),
         ParamSpec::num("thickness", "Thickness", NumSpec::positive_length(1.0, 0.04)),
         ParamSpec::num("diameter", "Diameter", NumSpec::positive_length(5.0, 0.2)),
         ParamSpec::num("height", "Height", NumSpec::positive_length(5.0, 0.2)),

@@ -206,21 +206,89 @@ fn make_studio(id: &str) -> Option<PartStudio> {
             ps.configuration.configured.push(ConfiguredParam { input: input.into(), feature: fid, param: param.into(), values });
         }
     }
+    // The flat pattern's sketch (live's "Form profile" / "Flat sketch",
+    // the Tag's flatFormSketch; Lance has none): one more tool feature.
+    let sketch = profile_forms(id).then(|| {
+        let mut f = ps.new_feature("smFormTool", &units)?;
+        f.name = "Form profile".into();
+        f.params = ps.features.last()?.params.clone();
+        f.params.set("part", ParamValue::Enum("SKETCH".into()));
+        let fid = f.id;
+        let configured: Vec<ConfiguredParam> = ps.configuration.configured.iter().filter(|c| c.feature == ids[0]).map(|c| ConfiguredParam { feature: fid, ..c.clone() }).collect();
+        ps.configuration.configured.extend(configured);
+        ps.features.push(f);
+        Some(fid)
+    });
     let mut tag = ps.new_feature("tag", &units)?;
     tag.params.set("tagPurpose", ParamValue::Enum("FORM".into()));
+    if let Some(Some(fid)) = sketch {
+        tag.params.set("flatFormSketch", ParamValue::Query(vec![Reference::Sketch(fid)]));
+    }
     tag.params.set("positivePart", ParamValue::Query(vec![Reference::Body(BodyId { feature: ids[0], index: 0 })]));
     tag.params.set("negativePart", ParamValue::Query(vec![Reference::Body(BodyId { feature: ids[1], index: 0 })]));
     ps.features.push(tag);
     Some(ps)
 }
 
+/// The forms whose studio has a flat sketch (all but Lance); the ones
+/// whose sketch we draw: the circle and slot forms (live's sketches: the
+/// footprint, which the flat shows from the tools anyway, and the form's
+/// own Ø d circle or width slot).
+fn profile_forms(id: &str) -> bool {
+    matches!(id, "circle-emboss" | "circle-extrusion" | "countersink" | "slot-emboss" | "slot-extrusion")
+}
+
+/// The form's flat sketch on Top (the sheet's top): its Ø d circle (live
+/// "live form emboss" flat: r 2.5 for Diameter 5, with the r 9.1569
+/// footprint), the clearance hole, or the slot of the form's width.
+fn profile_sketch(ev: &EvalCtx, form: &str, t: f64) -> FResult<noshape_sketch::Sketch> {
+    let mut sk = noshape_sketch::Sketch::new();
+    match form {
+        "circle-emboss" | "circle-extrusion" => {
+            sk.add_circle(DVec2::ZERO, ev.length("diameter")? * 0.5);
+        }
+        "countersink" => {
+            sk.add_circle(DVec2::ZERO, ev.length("clearanceHole")? * 0.5);
+        }
+        _ => {
+            let (length, width) = (ev.length("length")?, ev.length("width")?);
+            let tangents = ev.enum_("lengthTo") == "slot_tangents";
+            // Slot emboss's sketch: radius #width / 2; Slot extrusion's #Width / 2 (at least t).
+            let w = if form == "slot-extrusion" { width.max(t) } else { width };
+            let l = slot_length(length, tangents, w);
+            let (h, r) = (l * 0.5, w * 0.5);
+            if l <= 1e-12 {
+                sk.add_circle(DVec2::ZERO, r);
+            } else {
+                let p = [(-h, -r), (h, -r), (h, r), (-h, r)].map(|(x, y)| sk.add_point(DVec2::new(x, y)));
+                let c = [sk.add_point(DVec2::new(h, 0.0)), sk.add_point(DVec2::new(-h, 0.0))];
+                let _ = sk.add_line_between(p[0], p[1]);
+                let _ = sk.add_arc_between(c[0], p[1], p[2]);
+                let _ = sk.add_line_between(p[2], p[3]);
+                let _ = sk.add_arc_between(c[1], p[3], p[0]);
+            }
+        }
+    }
+    Ok(sk)
+}
+
 /// `smFormTool`: the form's Add material or Subtract material tool
-/// (`part`), the sheet's top at z = 0, the sheet under it.
+/// (`part`), the sheet's top at z = 0, the sheet under it; or (`SKETCH`)
+/// its flat sketch.
 pub fn tool_feature(ev: &mut EvalCtx) -> FResult<()> {
     let form = ev.params.text("form").to_string();
     let t = ev.length("thickness")?;
     if t <= 0.0 {
         return err("The thickness must be positive");
+    }
+    if ev.enum_("part") == "SKETCH" {
+        let mut sk = profile_sketch(ev, &form, t)?;
+        let report = sk.solve();
+        let (regions, wires) = (sk.regions(), sk.wires());
+        let (feature, name) = (ev.feature, ev.name.to_string());
+        ev.ctx.sketches.retain(|s| s.feature != feature);
+        ev.ctx.sketches.push(Arc::new(crate::regen::context::SketchResult { feature, name, frame: crate::display::PlaneFrame::TOP, sketch: sk, report, regions, wires, dimension_text: BTreeMap::new(), images: Vec::new() }));
+        return Ok(());
     }
     let control = ev.enum_("radiusControl").to_string();
     let radius = |ev: &EvalCtx, custom: &str| -> FResult<f64> {
