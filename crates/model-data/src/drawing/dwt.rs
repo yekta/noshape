@@ -14,6 +14,11 @@ use serde::{Deserialize, Serialize};
 /// The custom document property holding the formats.
 pub const PROPERTY: &str = "noshape.sheet_formats";
 
+/// The custom document property holding the drawing properties as they
+/// were at export (live request 1627: a drawing made from the DWT, or
+/// Update properties from a template…, takes them).
+pub const PROPS_PROPERTY: &str = "noshape.drawing_props";
+
 /// A sheet's format: what a template defines.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SheetTemplate {

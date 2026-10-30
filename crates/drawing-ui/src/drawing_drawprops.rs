@@ -1780,11 +1780,49 @@ impl DrawingEditor {
         h_flex().gap(px(3.)).child(toggle(ids.0, "B", false, rt.bold, cx)).child(toggle(ids.1, "I", true, rt.italic, cx)).into_any_element()
     }
 
+    /// Update properties from a template… with a DWT tab: the drawing
+    /// properties it was exported with; the field shows its name (live
+    /// request 1627).
+    fn apply_dwt_props(&mut self, name: &str, data: &str, cx: &mut Context<Self>) {
+        match noshape_model::sketch_feature::base64_decode(data).and_then(|b| noshape_model::drawing::dwt::read_dwt_props(&b)) {
+            Some(mut props) => {
+                props.template = Some(name.to_string());
+                self.set_drawing_prop(&move |p| *p = props.clone(), cx);
+            }
+            None => {
+                self.status = Some("This template has no drawing properties".into());
+                cx.notify();
+            }
+        }
+    }
+
     fn drawing_props_footer(&self, cx: &mut Context<Self>) -> AnyElement {
         let ed = cx.entity();
         let locked = self.drawing.props.locked;
         let template = self.drawing.props.template.clone();
+        // The document's DWT tabs (live request 1627), then the standard ones.
+        let tabs: Vec<(String, std::sync::Arc<str>)> = self
+            .doc
+            .read(cx)
+            .session
+            .doc
+            .tabs
+            .iter()
+            .filter_map(|t| match &t.content {
+                noshape_model::document::TabContent::File(f) if f.kind() == noshape_model::file_tab::FileKind::Template => Some((t.name.clone(), f.data_base64.clone())),
+                _ => None,
+            })
+            .collect();
         let dwt = Button::new("dp-dwt").ghost().small().w(px(26.)).h(px(26.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("dwt-template"), 20., cx)).tooltip("Select a DWT").os_dropdown_menu("dp-dwt-dd", true, move |mut m, _, _| {
+            for (name, data) in &tabs {
+                let (e, name, data) = (ed.clone(), name.clone(), data.clone());
+                m = m.item(crate::os_menu::OsMenuItem::new(name.clone()).on_click(move |_, _, cx| {
+                    e.update(cx, |t, cx| t.apply_dwt_props(&name, &data, cx))
+                }));
+            }
+            if !tabs.is_empty() {
+                m = m.separator();
+            }
             for row in noshape_ops::drawing::template_rows() {
                 let e = ed.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new(row.file).on_click(move |_, _, cx| {

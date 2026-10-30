@@ -138,8 +138,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Landed 76d8f633 (EX17, EX18, V21). A43 from live 1628: the full Surface finish dialog and symbol
   (`SfSpec` on the annotation; `model-data/src/drawing/surface_finish.rs`, `drawing-ui/src/drawing_sf.rs`); the
   panel now starts empty (live), not "Ra 3.2".
-- Live 1627 answered (BOM Template: Follow assembly | Onshape Default BOM; DWT pick / Update properties from a
-  template / Lock): next.
+- From live 1627: TB13 / TB18 BOM Template (landed 9375e089); S22 / CR10 / S20: the DWT export carries the
+  drawing properties (units resolved), its tab is listed under Create drawing › Created by me (the new drawing takes
+  its formats and properties) and in Drawing properties › Select a DWT (checked in the app :147, w3/dwt1-*).
+  Open: the DWT doesn't carry the projection (a drawing from it keeps the base template's), its tables.
 
 ## Afternoon 10-30 (landed through b76761b6, 16:49 UTC)
 - From live 1613: TB5 grid-line drags (the fixed-corner side's row / column, the table grows) ✅; EX18 image menu

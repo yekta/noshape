@@ -302,7 +302,10 @@ pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sou
         // With the sheet formats, so Select a DWT gets them back exactly.
         DrawingFormat::Dwt => {
             let templates: Vec<noshape_model::drawing::dwt::SheetTemplate> = sheets.iter().filter_map(|i| drawing.sheets.get(*i)).map(noshape_model::drawing::dwt::SheetTemplate::of).collect();
-            vec![(String::new(), noshape_model::drawing::dwt::to_dwt(&pages.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), &templates, insunits, cad_version.unwrap_or(DWT_VERSIONS[0].1))?)]
+            // The units as shown (a drawing following its document's units
+            // has none of its own).
+            let props = noshape_model::drawing::DrawingProps { units: drawing.props.units.or(Some(noshape_model::drawing::format::length_units(&drawing, &Default::default()))), ..drawing.props.clone() };
+            vec![(String::new(), noshape_model::drawing::dwt::to_dwt(&pages.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), &templates, Some(&props), insunits, cad_version.unwrap_or(DWT_VERSIONS[0].1))?)]
         }
         _ => pages.iter().map(|(n, g, _)| (n.clone(), export::to_svg(g).into_bytes())).collect(),
     };

@@ -52,12 +52,26 @@ pub fn take_request() -> Option<CreateRequest> {
 const SOURCES: [(&str, &str); 6] = [("noshape", "noshape-logo"), ("Owned by me", "src-owned"), ("Recently opened", "src-recent"), ("Created by me", "src-created"), ("Shared with me", "src-shared"), ("Public", "src-public")];
 
 pub enum CreateDrawingEvent {
-    Create { name: String, template: DrawingTemplate, source: Option<DrawingSource>, suggested: bool },
+    Create { name: String, template: DrawingTemplate, source: Option<DrawingSource>, suggested: bool, dwt: Option<Box<DwtTab>> },
     Cancel,
 }
 
+/// A DWT tab of the document, listed under "Created by me" (live request
+/// 1627: text rows Template | Document | Owner).
+#[derive(Clone, Debug)]
+pub struct DwtTab {
+    pub name: String,
+    pub document: String,
+    pub data_base64: std::sync::Arc<str>,
+}
+
+/// "Created by me" in [`SOURCES`].
+const CREATED_BY_ME: usize = 3;
+
 pub struct CreateDrawingDialog {
     source: Option<DrawingSource>,
+    dwts: Vec<DwtTab>,
+    selected_dwt: Option<usize>,
     name: Entity<InputState>,
     rows: Vec<TemplateRow>,
     /// Template source (index into [`SOURCES`]; 0 = the built-in templates, "noshape").
@@ -87,13 +101,15 @@ impl CreateDrawingDialog {
     /// `metric`: the document works in millimeters (the Custom template's
     /// units; the list preselects ANSI_A_INCH, Onshape's first row). `default_name`: the name
     /// Onshape suggests ("Part 1 Drawing 1", or "Drawing 1" without a source).
-    pub fn new(req: CreateRequest, default_name: String, metric: bool, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(req: CreateRequest, default_name: String, metric: bool, dwts: Vec<DwtTab>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let name = cx.new(|cx| InputState::new(window, cx).default_value(default_name));
         let rows = template_rows();
         // Live drawing/01, qa5 D1: ANSI_A_INCH.dwt whatever the units.
         let selected = rows.iter().position(|r| r.file == "ANSI_A_INCH.dwt").unwrap_or(0);
         Self {
             source: req.source,
+            dwts,
+            selected_dwt: None,
             name,
             rows,
             source_filter: 0,
@@ -125,7 +141,11 @@ impl CreateDrawingDialog {
         let name = self.name.read(cx).value().trim().to_string();
         // No source: there are no views to suggest.
         let suggested = self.suggested && self.source.is_some();
-        cx.emit(CreateDrawingEvent::Create { name, template, source: self.source.clone(), suggested });
+        let dwt = self.selected_dwt.filter(|_| !self.custom && self.source_filter == CREATED_BY_ME).and_then(|i| self.dwts.get(i).cloned()).map(Box::new);
+        if !self.custom && self.source_filter == CREATED_BY_ME && dwt.is_none() {
+            return;
+        }
+        cx.emit(CreateDrawingEvent::Create { name, template, source: self.source.clone(), suggested, dwt });
     }
 
     fn visible_rows(&self) -> Vec<usize> {
@@ -174,8 +194,38 @@ impl CreateDrawingDialog {
                 .child(div().w(px(200.)).child("Document"))
                 .child(div().flex_1().child("…")),
         );
+        // Created by me: the document's DWT tabs (text rows, live 1627).
+        if self.source_filter == CREATED_BY_ME {
+            if self.dwts.is_empty() {
+                list = list.child(div().px(px(10.)).py_2().text_size(px(13.)).text_color(pal.text_muted).child("No templates. Export a drawing as DWT (Store file in a new tab) to make one."));
+            }
+            for (i, t) in self.dwts.iter().enumerate() {
+                let sel = self.selected_dwt == Some(i);
+                list = list.child(
+                    h_flex()
+                        .id(SharedString::from(format!("cd-dwt-{i}")))
+                        .flex_none()
+                        .h(px(30.))
+                        .px(px(10.))
+                        .text_size(px(14.))
+                        .cursor_pointer()
+                        .when(sel, |d| d.bg(gpui_kit::rgb(0xb2ddf6)).font_weight(FontWeight::SEMIBOLD))
+                        .when(!sel, |d| d.hover(|d| d.bg(pal.row_hover)))
+                        .child(div().w(px(209.)).truncate().child(t.name.clone()))
+                        .child(div().w(px(200.)).truncate().child(t.document.clone()))
+                        .child(div().flex_1().child("…"))
+                        .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
+                            this.selected_dwt = Some(i);
+                            if ev.click_count() >= 2 {
+                                this.accept(cx);
+                            }
+                            cx.notify();
+                        })),
+                );
+            }
+        }
         let visible = self.visible_rows();
-        if visible.is_empty() {
+        if visible.is_empty() && self.source_filter != CREATED_BY_ME {
             list = list.child(div().px(px(10.)).py_2().text_size(px(13.)).text_color(pal.text_muted).child("No templates for this standard."));
         }
         for i in visible {

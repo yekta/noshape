@@ -2067,10 +2067,20 @@ impl Workspace {
         // Onshape: "<part> Drawing 1" for a part or assembly, else "Drawing 1".
         let default_name = doc.next_tab_name(&req.name.as_ref().map(|n| format!("{n} Drawing")).unwrap_or_else(|| "Drawing".into()));
         let metric = !matches!(doc.settings.units.length, noshape_units::LengthUnit::Inch | noshape_units::LengthUnit::Foot | noshape_units::LengthUnit::Yard);
-        let dialog = cx.new(|cx| CreateDrawingDialog::new(req, default_name, metric, window, cx));
+        // The document's DWT tabs: Create drawing › Created by me (live request 1627).
+        let document = self.doc.read(cx).name();
+        let dwts = doc
+            .tabs
+            .iter()
+            .filter_map(|t| match &t.content {
+                noshape_model::document::TabContent::File(f) if f.kind() == noshape_model::file_tab::FileKind::Template => Some(crate::drawing_create::DwtTab { name: t.name.clone(), document: document.clone(), data_base64: f.data_base64.clone() }),
+                _ => None,
+            })
+            .collect();
+        let dialog = cx.new(|cx| CreateDrawingDialog::new(req, default_name, metric, dwts, window, cx));
         let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &CreateDrawingEvent, window, cx| {
-            if let CreateDrawingEvent::Create { name, template, source, suggested } = ev {
-                this.create_drawing_tab(name.clone(), *template, source.clone(), *suggested, window, cx);
+            if let CreateDrawingEvent::Create { name, template, source, suggested, dwt } = ev {
+                this.create_drawing_tab(name.clone(), (*template, dwt.as_deref().cloned()), source.clone(), *suggested, window, cx);
             }
             this.create_drawing = None;
             cx.notify();
@@ -2084,7 +2094,10 @@ impl Workspace {
     /// Create the Drawing tab: suggested views are laid out from the source's
     /// bounds (computed in the background); with No views the new drawing
     /// starts placing a view of the source at the cursor.
-    fn create_drawing_tab(&mut self, name: String, template: noshape_model::drawing::templates::DrawingTemplate, source: Option<noshape_model::drawing::create::DrawingSource>, suggested: bool, window: &mut Window, cx: &mut Context<Self>) {
+    /// `template`: a built-in template, and the document's DWT tab chosen
+    /// under Created by me (its formats and properties go over it).
+    fn create_drawing_tab(&mut self, name: String, template: (noshape_model::drawing::templates::DrawingTemplate, Option<crate::drawing_create::DwtTab>), source: Option<noshape_model::drawing::create::DrawingSource>, suggested: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let (template, dwt) = template;
         let doc = self.doc.read(cx).session.doc.clone();
         cx.spawn_in(window, async move |this, cx| {
             let src = source.clone();
@@ -2094,6 +2107,14 @@ impl Workspace {
                     // Sketch sources face the sketch plane.
                     let frame = src.as_ref().and_then(|s| noshape_model::drawing::create::source_frame(&doc, s));
                     let mut d = noshape_model::drawing::create::create_drawing(&template, src.as_ref(), bounds, suggested, frame);
+                    // A DWT template: its sheet formats and drawing properties
+                    // (live request 1627), the views as laid out.
+                    if let Some(t) = &dwt
+                        && let Some(bytes) = noshape_model::sketch_feature::base64_decode(&t.data_base64)
+                        && let Err(e) = noshape_model::drawing::dwt::apply_dwt_template(&mut d, &t.name, &bytes)
+                    {
+                        log::warn!("DWT template {}: {e}", t.name);
+                    }
                     // DRAWN: who created it, saved with the drawing (qa5 D13).
                     d.drawn_by = Some(noshape_store::local_user_name()).filter(|n| !n.is_empty());
                     // Suggested views show the Part Studio's MBD datums (live behaviours "MBD datums in drawings").
