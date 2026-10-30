@@ -571,7 +571,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the excess is ours or the STEP approximation's.
   qa 06:30 (v0.4.12 CLI import matrix): unchanged, x_t 7583.000866 / SAT 7582.996453 / STEP 7582.693101, 18 faces each; all
   inside live's band 7576.24–7589.58 (grading rule 10-24).
-- [x] 7f2c4647 P2 BOOL-TOUCH-INFO Boolean Intersect of two blocks that only touch face to face: both parts deleted (= live), but
+- [x] verified eef0848d (qa 03:09: two 20×20×10 blocks touching at x = 20, Boolean Intersect (made by the v0.4.14 CLI: Info, 2 parts kept; qa-scratch/tickets/bool-touch-info.noshape) → in the green app **Parts (0)**, and editing Boolean 1 shows the blue bubble **"The parts either do not intersect or are totally contained."** = live; tickets/bool-touch-info-eef0.png) 7f2c4647 P2 BOOL-TOUCH-INFO Boolean Intersect of two blocks that only touch face to face: both parts deleted (= live), but
   live reports INFO "The parts either do not intersect or are totally contained." (dialog bubble); ours OK with no message.
   A disjoint pair: live OK, no message (= ours) (behaviours "qa (2026-10-26, P1 boolean edge cases)") (qa 2026-10-26)
   qa 09:27 (watcher CLI 08:30): now INFO "Boolean resulted in no geometry change. The parts either do not intersect or are
