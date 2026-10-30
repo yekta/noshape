@@ -125,7 +125,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   scaled once, instances keep their locations, so patch 0001's congruent pairs still hold): +4.45 GB, 315 s (was
   363), the same 94272.890 mm³ / 10362 faces. T2 `custom_features::knurl_feature_b94_on_a_cylinder` bounds it at
   5.5 GB. (Its time is bool's: the Rust Boolean.)
-- [ ] P1 BUDGET-OFF-LINUX (core, lead 10-30 07:45) the CPU budgets are a timer signal and a jump on Linux only. Since
+- [ ] P1 BUDGET-OFF-LINUX (core, lead 10-30 07:45; core 11:45: fillet / chamfer / Draft through OCCT patch 0007's hook
+  (noshape_should_break: blend walking, the fillet builder's stripes and vertices, Draft's faces), the shell's offset,
+  slabs' Booleans, face deletion and the fillet fallbacks' Booleans through new_cancel_indicator; T1
+  `boolean_groups::a_fillet_under_a_short_budget_gives_up` (with_blend_budget) on all three; awaiting CI) the CPU budgets are a timer signal and a jump on Linux only. Since
   core-portable-budget (3df8a3b0) a budget off Linux is a deadline that OCCT's progress indicator checks
   (CancelIndicator: op_boolean's builds, op_section), so std's collision checks (MIRROR-HANG-402) and Booleans stop
   on macOS / Windows too. Still unbounded off Linux: fillet / chamfer (BRepFilletAPI), the offset and slabs of Shell

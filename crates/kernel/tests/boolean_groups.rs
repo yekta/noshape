@@ -332,3 +332,28 @@ fn a_section_under_a_call_budget_gives_up() {
     let s = section(&holes, &tilted).unwrap().shape;
     assert!(s.count(ShapeType::Edge) > 400);
 }
+
+/// with_blend_budget: a fillet longer than its budget fails with "fillet took
+/// too long" on every platform (off Linux the budget is a deadline OCCT patch
+/// 0007's hook stops the fillet builder at; BUDGET-OFF-LINUX), and without a
+/// short budget it builds.
+#[test]
+fn a_fillet_under_a_short_budget_gives_up() {
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(100.0, 100.0, 10.0)).unwrap();
+    let mut tools = Vec::new();
+    for i in 0..10 {
+        for j in 0..10 {
+            tools.push(make_cylinder(&Plane::new(DVec3::new(5.0 + 10.0 * i as f64, 5.0 + 10.0 * j as f64, -1.0), DVec3::Z, DVec3::X), 3.0, 12.0, 2.0 * PI).unwrap());
+        }
+    }
+    let plate = boolean(BooleanOp::Cut, &[plate], &tools, &BooleanOptions::default()).unwrap().shape;
+    // The holes' top circles.
+    let edges: Vec<Shape> = plate.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, Curve::Circle { .. }) && e.point_at(i.first_param).is_ok_and(|p| p.z > 9.9))).collect();
+    assert_eq!(edges.len(), 100);
+    let t = std::time::Instant::now();
+    let r = with_blend_budget(0.02, || fillet(&plate, &edges, 1.0));
+    let e = r.err().map(|e| e.to_string()).unwrap_or_default();
+    assert!(e.contains("took too long"), "{e:?} after {:?}", t.elapsed());
+    let full = fillet(&plate, &edges, 1.0).unwrap().shape;
+    assert_eq!(full.count(ShapeType::Solid), 1);
+}

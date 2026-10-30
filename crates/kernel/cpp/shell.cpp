@@ -308,7 +308,7 @@ bool by_offset(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
     mo.Initialize(solid, sign * t, 1e-6, BRepOffset_Skin, false, false, GeomAbs_Intersection);
     for (const TopoDS_Shape& f : removed)
       mo.SetOffsetOnFace(TopoDS::Face(f), 0.0);
-    mo.MakeOffsetShape();
+    mo.MakeOffsetShape(new_cancel_indicator()->Start());
     if (!mo.IsDone())
       return no("BRepOffset failed");
     offset = solid_of(mo.Shape());

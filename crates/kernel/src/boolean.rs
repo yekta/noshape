@@ -147,6 +147,20 @@ pub fn with_call_budget<T>(seconds: f64, f: impl FnOnce() -> T) -> T {
     f()
 }
 
+/// Runs `f` with this thread's blends, drafts, shells and face deletions
+/// limited to `seconds` (they fail with "... took too long" past it): tests
+/// of the budgets on every platform.
+pub fn with_blend_budget<T>(seconds: f64, f: impl FnOnce() -> T) -> T {
+    struct Restore(f64);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            ffi::set_blend_budget(self.0);
+        }
+    }
+    let _restore = Restore(ffi::set_blend_budget(seconds));
+    f()
+}
+
 /// 0: NOSHAPE_BOP_PARALLEL decides; 1: serial; 2: parallel.
 static PARALLEL_OVERRIDE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 

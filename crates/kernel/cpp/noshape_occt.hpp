@@ -661,6 +661,7 @@ rust::Vec<double>        bounding_box(const OcShape& s, bool optimal);
 PlaneQ                   find_plane(const OcShape& s, double tolerance);
 PropsF                   props_volume(const OcShape& s);
 double                   set_call_budget(double seconds);
+double                   set_blend_budget(double seconds);
 PropsF                   props_volume_precise(const OcShape& s);
 PropsF                   props_surface(const OcShape& s);
 PropsF                   props_linear(const OcShape& s);

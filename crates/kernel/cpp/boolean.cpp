@@ -209,6 +209,31 @@ private:
   std::chrono::steady_clock::time_point myChecked = std::chrono::steady_clock::now();
 };
 
+} // namespace
+
+// A progress indicator for an OCCT build that takes one: stopped by the
+// thread's cancel flag, the memory budget and a budget's deadline off Linux.
+occ::handle<Message_ProgressIndicator> new_cancel_indicator()
+{
+  return new CancelIndicator(t_cancel);
+}
+
+// OCCT patch 0007's hook (blend walking, the fillet builder's stripes and
+// vertices, Draft's faces; they take no progress indicator): the deadline of
+// a budget off Linux has passed, or the thread's cancel flag is set.
+extern "C" int noshape_should_break()
+{
+  Deadline* const d = t_deadline;
+  if (d != nullptr && steady_seconds() > d->at)
+  {
+    d->hit.store(true);
+    return 1;
+  }
+  return cancelled(t_cancel) ? 1 : 0;
+}
+
+namespace {
+
 // Build `algo`, stoppable through the thread's cancel flag and the memory
 // budget.
 // OCCT patch 0001 (BOPAlgo_Builder_3.cxx): the next boolean on this thread,

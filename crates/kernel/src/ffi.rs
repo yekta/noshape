@@ -638,6 +638,9 @@ pub(crate) mod ffi {
         fn set_memory_budget_mb(mb: u64);
         /// The CPU seconds a section may take on this thread (0: no limit); returns the previous.
         fn set_call_budget(seconds: f64) -> f64;
+        /// The CPU seconds a blend, draft, shell or face deletion may take on this thread (0: the default 30 /
+        /// NOSHAPE_BLEND_BUDGET); returns the previous.
+        fn set_blend_budget(seconds: f64) -> f64;
         fn set_bop_parallel(on: bool);
         /// OCCT patch 0004's pair intersections on the thread pool.
         fn set_bop_pairs_parallel(on: bool);

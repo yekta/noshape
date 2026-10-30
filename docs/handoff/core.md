@@ -268,6 +268,10 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
   min_distance (~140 calls, ~0.8 ms each, BRepExtrema rebuilt per call).
 
 ## OCCT patches (patches/occt)
+- 0007 (10-30) TKFillet BRepBlend_Walking (walking loop), ChFi3d_Builder::Compute (each stripe and vertex), TKOffset
+  Draft_Modification::Perform (each face): `noshape_should_break()` (boolean.cpp: a budget's deadline off Linux, or
+  the thread's cancel flag) throws Standard_Failure("noshape: stopped"); these builds ignore their progress range.
+  Libs: /root/core-scratch/libTKFillet.a.0007, libTKOffset.a.0007 (/root/occt-core has them).
 - 0006 (10-30) TKGeomAlgo IntCurveSurface_InterUtils.pxx `SortStartPoints`: OCCT's three bubble sorts of a curve /
   surface intersection's start points (O(n²): 72–80 % of a Boolean of two of qa's hang402 fuzz parts, whose rational
   B-spline slivers give thousands of points) as one stable sort and two run sorts, O(n log n), bit-identical (20 000

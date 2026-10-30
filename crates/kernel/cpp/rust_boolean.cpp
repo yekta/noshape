@@ -1826,7 +1826,7 @@ bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bo
     b->SetArguments(args);
     b->SetTools(tools);
     b->SetRunParallel(parallel);
-    b->Build();
+    b->Build(new_cancel_indicator()->Start());
     if (b->HasErrors() || !b->IsDone())
       return false;
     out  = b->Shape();

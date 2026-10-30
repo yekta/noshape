@@ -1,6 +1,7 @@
 // Internal helpers shared by the bridge implementation files (not seen by cxx).
 #pragma once
 
+#include <Message_ProgressIndicator.hxx>
 #include "noshape-kernel/cpp/noshape_occt.hpp"
 #include "noshape-kernel/src/ffi.rs.h"
 
@@ -362,6 +363,10 @@ std::vector<XtPart> read_rhino_parts(const std::string& path);
 
 // Volume properties that survive OCCT's integrator weaknesses (see common.cpp).
 GProp_GProps volume_props(const TopoDS_Shape& s);
+// boolean.cpp: a progress indicator stopping an OCCT build at the thread's
+// cancel flag, the memory budget or a budget's deadline off Linux; pass
+// `->Start()` as the build's range.
+occ::handle<Message_ProgressIndicator> new_cancel_indicator();
 GProp_GProps volume_props_precise(const TopoDS_Shape& s);
 // Area properties likewise (faces wrapping a periodic surface more than once).
 GProp_GProps surface_props(const TopoDS_Shape& s);

@@ -2772,7 +2772,7 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
       faces.Append(ends(i));
     df.AddFacesToRemove(faces);
     df.SetToFillHistory(true);
-    df.Build();
+    df.Build(new_cancel_indicator()->Start());
     if (!df.IsDone() || df.HasErrors())
       return std::nullopt;
     const TopoDS_Shape full = df.Shape();
@@ -2799,7 +2799,7 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
       h2 = compose(full, h2, corners);
     BRepAlgoAPI_Common cm(rounded, input);
     cm.SetToFillHistory(true);
-    cm.Build();
+    cm.Build(new_cancel_indicator()->Start());
     if (!cm.IsDone() || cm.HasErrors())
       return std::nullopt;
     TopoDS_Shape out = cm.Shape();
@@ -2956,7 +2956,7 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_as_cut(const TopoDS_Shape& 
   args.Append(input);
   cut.SetArguments(args);
   cut.SetTools(tools);
-  cut.Build();
+  cut.Build(new_cancel_indicator()->Start());
   if (!cut.IsDone() || cut.HasErrors() || !valid_shape(cut.Shape()))
     return std::nullopt;
   HHist h = history_of({input}, cut);
@@ -3214,8 +3214,23 @@ static std::optional<std::pair<TopoDS_Shape, HHist>> fillet_split_closed(
 // CPU seconds a fillet, chamfer, draft or face deletion may take (qa
 // FILLET-HANG: > 1 h in OCCT's blend approximation; DRAFT-HANG: > 20 min in
 // its defeaturing); NOSHAPE_BLEND_BUDGET overrides (tests).
+namespace
+{
+// set_blend_budget's: this thread's budget for the blends (0: the default).
+thread_local double t_blend_budget = 0;
+} // namespace
+
+double set_blend_budget(double seconds)
+{
+  const double was = t_blend_budget;
+  t_blend_budget   = seconds > 0 ? seconds : 0;
+  return was;
+}
+
 double blend_budget_seconds()
 {
+  if (t_blend_budget > 0)
+    return t_blend_budget;
   const char* v = std::getenv("NOSHAPE_BLEND_BUDGET");
   return v != nullptr ? std::atof(v) : 30.0;
 }
@@ -4555,7 +4570,7 @@ static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
   // DRAFT-HANG: 623 s in one call).
   mk.SetRunParallel(false);
   mk.SetToFillHistory(true);
-  mk.Build();
+  mk.Build(new_cancel_indicator()->Start());
   if (!mk.IsDone() || mk.HasErrors())
     fail_op("delete face failed: " + algo_errors(mk));
   std::vector<TopoDS_Shape> args{s.shape};
