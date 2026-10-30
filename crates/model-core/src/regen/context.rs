@@ -454,7 +454,11 @@ impl Context {
                 BodyKind::Surface => ("Surface ", 1),
                 BodyKind::Wire | BodyKind::Point => ("Curve ", 2),
             };
-            let default = b.composite.is_none() && !self.own_names.contains(&b.id) && b.name.strip_prefix(prefix).is_some_and(|r| !r.is_empty() && r.bytes().all(|c| c.is_ascii_digit()));
+            // Any kind's default name: a part turned into a sheet (Delete
+            // face › Leave open) becomes "Surface n" (live request 1547, qa
+            // BODY-NAME-BY-TYPE).
+            let numbered = |p: &str| b.name.strip_prefix(p).is_some_and(|r| !r.is_empty() && r.bytes().all(|c| c.is_ascii_digit()));
+            let default = b.composite.is_none() && !self.own_names.contains(&b.id) && ["Part ", "Surface ", "Curve "].into_iter().any(numbered);
             if !default {
                 continue;
             }

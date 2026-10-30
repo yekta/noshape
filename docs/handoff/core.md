@@ -164,6 +164,16 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
 - BOOL-TOUCH-INFO: Boolean Intersect (no targets) of parts that only touch (distance 0, nothing in common): both
   go unless ☑ Keep tools, Info "The parts either do not intersect or are totally contained." (live); parts apart
   keep INT2's "no geometry change" and stay. T1 `engine::intersect_of_parts_touching_face_to_face_deletes_both`.
+- ENCLOSE-NO-REGION-MSG: the kernel's "selections do not enclose a region" reaches the user as live's L30 text
+  (solid_a.rs mapped every enclose error to "Failed to create a part…"). T1
+  `features_a::enclose_of_the_default_planes_says_no_region`.
+- BODY-NAME-BY-TYPE: renumber_default_names takes any kind's default name ("Part n", "Surface n", "Curve n") and
+  numbers it in the body's own kind: a part left open by Delete face is "Surface 1", the next new solid "Part 1".
+  T1 `features_a::a_part_left_open_is_named_as_a_surface`.
+- Tickets left with notes (10-30 03:00): HOLE-MISS-MSG (the flip is std's holeScopeFlipHeuristicsCall run by the
+  CLI's feature_add, not the Hole's regen), PATTERN-REAPPLY-CUT-ONLY (live's R2 oracle moves the reapplied cut),
+  FILL-MERGE-WITH-ALL (behaviors.rs already switches Fill to Add on an open edge: qa to re-check), COMMIT-LATENCY
+  (REGEN-SPEED's perf run has the Extrude 1 edit commit at 34 / 38 / 60 ms: psui / qa to confirm on a current run).
 - For skasm: T2 `sheetmetal_frames::convert_rips_and_bends_like_onshape` now fails alone too (BUTT: top wall max x
   39.98 mm), on main since 969c5069 (std sheet metal by default); the 21:34 T2 before it passed.
 

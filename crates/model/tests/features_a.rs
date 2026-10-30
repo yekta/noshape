@@ -376,6 +376,17 @@ fn enclose_body() {
     assert!(near(total_volume(&res.context), 2.0 * 8e-6, 1e-6));
 }
 
+/// qa ENCLOSE-NO-REGION-MSG: Enclose of the three default planes: live L30
+/// "Selections do not enclose a region." (was "Failed to create a part from
+/// enclosed region.").
+#[test]
+fn enclose_of_the_default_planes_says_no_region() {
+    let mut t = T::new();
+    t.add("enclose", &[("entities", q(vec![Reference::Plane(DatumPlane::Top), Reference::Plane(DatumPlane::Front), Reference::Plane(DatumPlane::Right)]))]);
+    let st = t.regen().display.features.last().cloned().unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Selections do not enclose a region.")));
+}
+
 #[test]
 fn rib_in_l_bracket() {
     let mut t = T::new();
@@ -865,6 +876,24 @@ fn delete_face_heal_cap_void() {
     t.set(d, "healType", en("VOID"));
     let res = t.ok();
     assert_eq!(res.context.bodies[0].kind, noshape_model::display::BodyKind::Surface);
+}
+
+/// qa BODY-NAME-BY-TYPE (live request 1547): Delete face › Leave open turns
+/// "Part 1" into "Surface 1" (the same body), and the next new solid is
+/// "Part 1" again.
+#[test]
+fn a_part_left_open_is_named_as_a_surface() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let b = t.ok().context.bodies[0].clone();
+    let top = face_with_normal(&b, DVec3::Z);
+    t.add("deleteFace", &[("deleteFaces", q(vec![top])), ("healType", en("VOID"))]);
+    let res = t.ok();
+    assert_eq!((res.context.bodies[0].id.clone(), res.context.bodies[0].name.as_str()), (b.id.clone(), "Surface 1"));
+    t.block(0.06, 0.0, 0.08, 0.02, "10 mm");
+    let res = t.ok();
+    let names: Vec<&str> = res.context.bodies.iter().map(|b| b.name.as_str()).collect();
+    assert_eq!(names, ["Surface 1", "Part 1"]);
 }
 
 #[test]

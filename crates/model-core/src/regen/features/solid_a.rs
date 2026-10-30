@@ -1117,7 +1117,8 @@ pub fn enclose(ev: &mut EvalCtx) -> FResult<()> {
     if shapes.is_empty() {
         return crate::regen::eval::err_at(&["entities"], "Select faces, parts, or planes to form a solid.");
     }
-    let mut res = k::enclose(&shapes).map_err(|_| fe("Failed to create a part from enclosed region."))?;
+    // The kernel's "no solid" is live's L30 text (the three default planes).
+    let mut res = k::enclose(&shapes).map_err(|e| fe(if e.to_string().contains("do not enclose a region") { "Selections do not enclose a region." } else { "Failed to create a part from enclosed region." }))?;
     if res.shape.count(ShapeType::Solid) == 0 {
         return err("Selections do not enclose a region.");
     }
