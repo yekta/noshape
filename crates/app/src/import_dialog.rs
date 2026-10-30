@@ -219,7 +219,7 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
     let choice = imp::ImportChoice { combine: c.combine, appearances: c.appearances, density: c.density, y_up: c.y_up, unit: c.unit, composite: c.composite, join: c.join };
     let (inputs, errors) = imp::read_inputs(paths, &choice, keep_files, &units);
     for e in errors {
-        doc.update(cx, |_, cx| cx.emit(DocEvent::Error(e)));
+        doc.update(cx, |_, cx| cx.emit(DocEvent::Error(failed_toast(&e))));
     }
     // A file Onshape couldn't translate still gets its file tab.
     if inputs.is_empty() {
@@ -230,16 +230,44 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
     let mut errors = Vec::new();
     doc.update(cx, |doc, cx| {
         doc.edit_document(&description, cx, |d| (first, errors) = imp::apply(d, inputs, &choice, after, &units));
+        let ok = errors.is_empty();
         for e in errors {
-            cx.emit(DocEvent::Error(e));
+            cx.emit(DocEvent::Error(failed_toast(&e)));
+        }
+        // Live: "onshape-cone.sat has been imported. Open document ×".
+        if let ([p], true, Some(_)) = (paths, ok, first) {
+            let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            cx.emit(DocEvent::Info(format!("{name} has been imported.")));
         }
     });
     first
 }
 
+/// Live's toast for a file that didn't translate ("g47-3parts-unique.zip
+/// uploaded but failed to translate."; the reason goes to its Notifications
+/// bell, behaviours "qa5 zip import"); the agent API keeps the reason.
+fn failed_toast(e: &str) -> String {
+    let name = if let Some((n, _)) = e.split_once(" was not translated.") {
+        n.to_string()
+    } else if let Some(rest) = e.strip_prefix("Import failed: ") {
+        let path = rest.split_once(": ").map_or(rest, |(p, _)| p);
+        std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string())
+    } else {
+        return e.to_string();
+    };
+    format!("{name} uploaded but failed to translate.")
+}
+
 #[cfg(test)]
 mod tests {
     use super::wrapped_lines;
+
+    #[::core::prelude::v1::test]
+    fn failed_imports_toast_as_live() {
+        assert_eq!(super::failed_toast("g47-3parts-unique.zip was not translated. Translation is not supported for STEP (.stp) files."), "g47-3parts-unique.zip uploaded but failed to translate.");
+        assert_eq!(super::failed_toast("Import failed: /tmp/x/tri.jt: no geometry"), "tri.jt uploaded but failed to translate.");
+        assert_eq!(super::failed_toast("Something else"), "Something else");
+    }
 
     #[::core::prelude::v1::test]
     fn the_question_mark_follows_the_last_word() {
