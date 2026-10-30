@@ -400,6 +400,8 @@ pub struct DrawingEditor {
     pub glyph_hover: Option<u32>,
     /// The sketch entity whose glyphs show.
     pub glyph_entity: Option<u32>,
+    /// A clicked constraint glyph (constraint, its entity): Delete removes it.
+    pub glyph_selected: Option<(u32, u32)>,
     /// Hatch region dialog (see `drawing_hatch`).
     pub hatch_dlg: Option<crate::drawing_hatch::HatchDlg>,
     /// Inspection item dialog (see `drawing_inspection`).
@@ -621,6 +623,7 @@ impl DrawingEditor {
             hatch_dlg: None,
             glyph_hover: None,
             glyph_entity: None,
+            glyph_selected: None,
             image_cache: Default::default(),
             right_panel: None,
             mbd_model: 0,

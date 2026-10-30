@@ -79,7 +79,7 @@ impl DrawingEditor {
         (p, lines)
     }
 
-    fn edit_sketch(&mut self, name: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut SheetSketch)) {
+    pub(crate) fn edit_sketch(&mut self, name: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut SheetSketch)) {
         self.edit_sheet(name, cx, |s| {
             f(&mut s.sketch);
             let _ = s.sketch.sketch.solve();
@@ -491,6 +491,7 @@ impl DrawingEditor {
             Some(e) => Some(e),
             None => self.glyph_entity.map(EntityId).filter(|e| {
                 self.glyph_hover.is_some()
+                    || self.glyph_selected.is_some_and(|(_, ge)| ge == e.0)
                     || self.glyph_anchor(*e).is_some_and(|a| {
                         let (p, c) = (self.sheet_to_local(a), self.sheet_to_local(self.cursor));
                         ((p[0] - c[0]).powi(2) + (p[1] - c[1]).powi(2)).sqrt() < 70.0
@@ -515,12 +516,29 @@ impl DrawingEditor {
                 }
             }
         }
+        // Unsolvable constraints are red (help SK15).
+        let bad: Vec<noshape_sketch::ConstraintId> = if by_entity.is_empty() {
+            Vec::new()
+        } else {
+            let r = sk.clone().solve();
+            r.conflicting().iter().chain(&r.invalid).copied().collect()
+        };
         let mut out = Vec::new();
         for (e, glyphs) in by_entity {
             let Some(a) = self.glyph_anchor(e) else { continue };
             let base = self.sheet_to_local(a);
             for (k, (cid, icon)) in glyphs.into_iter().enumerate() {
                 let on = self.glyph_hover == Some(cid.0);
+                let picked = self.glyph_selected.is_some_and(|(c, _)| c == cid.0);
+                let bg = if on {
+                    gpui_kit::rgb(0xfff27a)
+                } else if picked {
+                    gpui_kit::rgb(0xf5b65c)
+                } else if bad.contains(&cid) {
+                    gpui_kit::rgb(0xf28b82)
+                } else {
+                    gpui_kit::rgba(0xffffffcc)
+                };
                 out.push(
                     div()
                         .id(SharedString::from(format!("sk-glyph-{}-{}", cid.0, e.0)))
@@ -532,7 +550,7 @@ impl DrawingEditor {
                         .items_center()
                         .justify_center()
                         .rounded(px(2.))
-                        .bg(if on { gpui_kit::rgb(0xfff27a) } else { gpui_kit::rgba(0xffffffcc) })
+                        .bg(bg)
                         .child(crate::assets::icon(icon, 15., cx))
                         .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                             this.glyph_hover = if *h { Some(cid.0) } else if this.glyph_hover == Some(cid.0) { None } else { this.glyph_hover };
@@ -555,7 +573,17 @@ impl DrawingEditor {
                                 crate::os_menu::open(ev.position, menu, window, cx);
                             }),
                         )
-                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        // A click selects it (Delete removes it).
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                                cx.stop_propagation();
+                                window.focus(&this.focus, cx);
+                                this.selection.clear();
+                                this.glyph_selected = Some((cid.0, e.0));
+                                this.redraw(cx);
+                            }),
+                        )
                         .into_any_element(),
                 );
             }

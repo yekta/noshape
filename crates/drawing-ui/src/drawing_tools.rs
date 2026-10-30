@@ -209,6 +209,14 @@ impl DrawingEditor {
     }
 
     pub fn delete_selection(&mut self, cx: &mut Context<Self>) {
+        // A selected constraint glyph (help SK15: Delete removes it).
+        if let Some((cid, _)) = self.glyph_selected.take() {
+            self.glyph_hover = None;
+            self.edit_sketch("Delete constraint", cx, |s| {
+                let _ = s.sketch.remove_constraint(noshape_sketch::ConstraintId(cid));
+            });
+            return;
+        }
         if self.selection.is_empty() {
             return;
         }
@@ -970,6 +978,7 @@ impl DrawingEditor {
     // ------------------------------------------------------------ mouse
 
     pub fn on_mouse_down(&mut self, e: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        self.glyph_selected = None;
         let lp = self.local(e.position);
         self.cursor = self.to_sheet(lp);
         window.focus(&self.focus, cx);
