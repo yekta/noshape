@@ -4,6 +4,15 @@
 // unit conversion is done by the Rust layer.
 #include "internal.hpp"
 #include <BRepBuilderAPI_Transform.hxx>
+#include <BRepAdaptor_Curve.hxx>
+#include <BRepAdaptor_Surface.hxx>
+#include <Geom2d_BSplineCurve.hxx>
+#include <Geom2d_Line.hxx>
+#include <Geom2d_TrimmedCurve.hxx>
+#include <Precision.hxx>
+#include <ShapeFix_Edge.hxx>
+#include <TopExp_Explorer.hxx>
+#include <array>
 #include <iterator>
 #include <regex>
 
@@ -160,6 +169,181 @@ void collect(const occ::handle<XCAFDoc_ShapeTool>& st, const occ::handle<XCAFDoc
     }
   }
   out.push_back(leaf);
+}
+
+// The largest distance between an edge and its pcurve on `f` (sampled).
+double pcurve_deviation(const TopoDS_Edge& e, const TopoDS_Face& f)
+{
+  double                          a, b;
+  const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, f, a, b);
+  if (pc.IsNull())
+    return -1;
+  const BRepAdaptor_Curve   c(e);
+  const BRepAdaptor_Surface s(f, false);
+  double                    m = 0;
+  for (int k = 0; k <= 64; ++k)
+  {
+    const double   t = a + (b - a) * k / 64;
+    const gp_Pnt2d q = pc->Value(t);
+    m                = std::max(m, s.Value(q.X(), q.Y()).Distance(c.Value(t)));
+  }
+  return m;
+}
+
+// The B-spline pcurve moved onto the boundary iso of `S` it runs along (all
+// its poles within a thousandth of the parameter range of it), or null.
+occ::handle<Geom2d_Curve> snapped_to_iso(const occ::handle<Geom2d_Curve>& c, const occ::handle<Geom_Surface>& S)
+{
+  occ::handle<Geom2d_Curve> basis = c;
+  while (auto tc = occ::down_cast<Geom2d_TrimmedCurve>(basis))
+    basis = tc->BasisCurve();
+  const auto bs = occ::down_cast<Geom2d_BSplineCurve>(basis);
+  if (bs.IsNull())
+    return {};
+  double u0, u1, v0, v1;
+  S->Bounds(u0, u1, v0, v1);
+  for (int axis = 0; axis < 2; ++axis)
+    for (const double iso : axis ? std::array<double, 2>{v0, v1} : std::array<double, 2>{u0, u1})
+    {
+      if (Precision::IsInfinite(iso))
+        continue;
+      const double eps      = 1e-3 * (axis ? v1 - v0 : u1 - u0);
+      bool         near_iso = true, already = true;
+      for (int k = 1; k <= bs->NbPoles() && near_iso; ++k)
+      {
+        const double x = axis ? bs->Pole(k).Y() : bs->Pole(k).X();
+        near_iso       = std::abs(x - iso) < eps;
+        already        = already && x == iso;
+      }
+      if (!near_iso || already)
+        continue;
+      const auto out = occ::down_cast<Geom2d_BSplineCurve>(bs->Copy());
+      for (int k = 1; k <= out->NbPoles(); ++k)
+      {
+        gp_Pnt2d p = out->Pole(k);
+        if (axis)
+          p.SetY(iso);
+        else
+          p.SetX(iso);
+        out->SetPole(k, p);
+      }
+      return occ::handle<Geom2d_Curve>(out);
+    }
+  return {};
+}
+
+// STEP files carry no pcurves for most edges and OCCT's projection goes
+// wrong next to a surface's pole: on I1's blends (rational B-spline
+// patches that close to a point at one u) the edges along v = 0 / 1 got
+// pcurves drifting to v = 0.9958 towards the pole, the pole's degenerate
+// edge followed, and each face lost a sliver (13.18188 mm² of live's
+// 13.20006). On faces with a degenerate edge, the edges meeting it are
+// projected again when they're off, moved onto the boundary iso they run
+// along, and the degenerate edges then span their neighbours' ends.
+void fix_pole_pcurves(const std::vector<TopoDS_Shape>& shapes)
+{
+  ShapeIMap faces;
+  for (const TopoDS_Shape& s : shapes)
+    TopExp::MapShapes(s, TopAbs_FACE, faces);
+  BRep_Builder B;
+  for (int i = 1; i <= faces.Extent(); ++i)
+  {
+    const TopoDS_Face f = TopoDS::Face(faces(i).Oriented(TopAbs_FORWARD));
+    ShapeIMap         poles;
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+      if (BRep_Tool::Degenerated(TopoDS::Edge(e.Current())))
+        poles.Add(TopExp::FirstVertex(TopoDS::Edge(e.Current())));
+    if (poles.IsEmpty())
+      continue;
+    TopLoc_Location                 loc;
+    const occ::handle<Geom_Surface> S = BRep_Tool::Surface(f, loc);
+    if (S.IsNull())
+      continue;
+    bool changed = false;
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+    {
+      const TopoDS_Edge ed = TopoDS::Edge(e.Current());
+      TopLoc_Location cl;
+      double          c0, c1;
+      if (BRep_Tool::Degenerated(ed) || BRep_Tool::IsClosed(ed, f) || BRep_Tool::Curve(ed, cl, c0, c1).IsNull())
+        continue;
+      if (!poles.Contains(TopExp::FirstVertex(ed)) && !poles.Contains(TopExp::LastVertex(ed)))
+        continue;
+      double                          a, b;
+      const occ::handle<Geom2d_Curve> old = BRep_Tool::CurveOnSurface(ed, f, a, b);
+      if (old.IsNull())
+        continue;
+      const auto put = [&](const occ::handle<Geom2d_Curve>& c, double first, double last) {
+        B.UpdateEdge(ed, c, S, loc, 0.);
+        B.Range(ed, S, loc, first, last);
+      };
+      const double before = pcurve_deviation(ed, f);
+      if (before > 1e-5)
+      {
+        B.UpdateEdge(ed, occ::handle<Geom2d_Curve>(), S, loc, 0.);
+        ShapeFix_Edge fx;
+        if (!fx.FixAddPCurve(ed, f, false, 1e-7) || !(pcurve_deviation(ed, f) < before / 2))
+          put(old, a, b);
+      }
+      double                          a2, b2;
+      const occ::handle<Geom2d_Curve> c    = BRep_Tool::CurveOnSurface(ed, f, a2, b2);
+      const double                    good = pcurve_deviation(ed, f);
+      if (const occ::handle<Geom2d_Curve> iso = snapped_to_iso(c, S))
+      {
+        put(iso, a2, b2);
+        if (!(pcurve_deviation(ed, f) < std::max(2 * good, 1e-6)))
+          put(c, a2, b2);
+      }
+      double a3, b3;
+      if (BRep_Tool::CurveOnSurface(ed, f, a3, b3) == old)
+        continue;
+      changed = true;
+      // Tolerances only grow: the pcurve on the edge's other face may need
+      // the old one.
+      const double tol = 1.1 * pcurve_deviation(ed, f);
+      if (tol > BRep_Tool::Tolerance(ed))
+      {
+        B.UpdateEdge(ed, tol);
+        for (TopoDS_Iterator v(ed); v.More(); v.Next())
+          B.UpdateVertex(TopoDS::Vertex(v.Value()), tol);
+      }
+    }
+    if (!changed)
+      continue;
+    std::vector<gp_Pnt2d> ends; // the other edges' (u, v) at a pole
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+    {
+      const TopoDS_Edge& ed = TopoDS::Edge(e.Current());
+      double             a, b;
+      const occ::handle<Geom2d_Curve> c = BRep_Tool::Degenerated(ed) ? nullptr : BRep_Tool::CurveOnSurface(ed, f, a, b);
+      if (c.IsNull())
+        continue;
+      if (poles.Contains(TopExp::FirstVertex(ed)))
+        ends.push_back(c->Value(a));
+      if (poles.Contains(TopExp::LastVertex(ed)))
+        ends.push_back(c->Value(b));
+    }
+    const auto nearest = [&](const gp_Pnt2d& p) {
+      gp_Pnt2d best = ends.front();
+      for (const gp_Pnt2d& q : ends)
+        if (q.SquareDistance(p) < best.SquareDistance(p))
+          best = q;
+      return best;
+    };
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+    {
+      const TopoDS_Edge& d = TopoDS::Edge(e.Current());
+      double             a, b;
+      const occ::handle<Geom2d_Curve> c = BRep_Tool::Degenerated(d) ? BRep_Tool::CurveOnSurface(d, f, a, b) : nullptr;
+      if (c.IsNull() || ends.empty())
+        continue;
+      const gp_Pnt2d p = nearest(c->Value(a)), q = nearest(c->Value(b));
+      if (p.Distance(q) < 1e-12)
+        continue;
+      B.UpdateEdge(d, new Geom2d_Line(p, gp_Dir2d(gp_Vec2d(p, q))), f, BRep_Tool::Tolerance(d));
+      B.Range(d, 0, p.Distance(q));
+    }
+  }
 }
 
 } // namespace
@@ -323,6 +507,7 @@ StepImport read_step(rust::Str path)
   }
   if (out.shapes->items.empty())
     fail_io("STEP file contains no shapes: " + p);
+  fix_pole_pcurves(out.shapes->items);
   return out;
 }
 
@@ -483,6 +668,7 @@ StepTree read_step_tree(rust::Str path)
   }
   out.instances = std::move(w.instances);
   app->Close(doc);
+  fix_pole_pcurves(out.parts.shapes->items);
   return out;
 }
 

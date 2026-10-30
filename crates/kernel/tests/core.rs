@@ -494,3 +494,21 @@ fn a_fault_inside_the_c_library_ends_the_process() {
     // Faults in our own code are still recovered.
     assert!(crash_inside_kernel(1).is_err());
 }
+
+/// Onshape's STEP of the G24 corner-blend part (dx I1): its four blends are
+/// rational B-spline patches closing to a point, with no pcurves in the
+/// file. OCCT's projection drifted near the point and each blend lost a
+/// sliver (13.18188 mm²); live gives 13.20006-13.20009 and 7582.977 mm³.
+#[test]
+fn step_blends_closing_to_a_point_keep_their_area() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/step/g25-b.step");
+    let parts = read_step(&path, LengthUnit::Millimeter).unwrap();
+    assert_eq!(parts.len(), 1);
+    let s = &parts[0].shape;
+    assert!(s.is_valid());
+    let blends: Vec<f64> = s.faces().iter().map(|f| surface_properties(f).unwrap().mass).filter(|a| (a - 13.2).abs() < 0.05).collect();
+    assert_eq!(blends.len(), 4, "{blends:?}");
+    assert!(blends.iter().all(|a| (a - 13.20007).abs() < 3e-5), "{blends:?}");
+    let v = s.volume().unwrap();
+    assert!((v - 7582.977).abs() < 2e-3, "{v}");
+}
