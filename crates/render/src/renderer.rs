@@ -1828,10 +1828,15 @@ impl std::ops::Deref for Lazy {
     fn deref(&self) -> &wgpu::RenderPipeline {
         self.pipeline.get_or_init(|| {
             let _t = perf::scope("r.pipeline_wait");
-            match self.job.lock().expect("pipeline job").take().expect("pipeline job") {
-                LazyJob::Waiting(make) => make(),
-                LazyJob::Compiling(job) => job.join().expect("pipeline compile thread"),
+            let t = std::time::Instant::now();
+            let (p, how) = match self.job.lock().expect("pipeline job").take().expect("pipeline job") {
+                LazyJob::Waiting(make) => (make(), "compiled"),
+                LazyJob::Compiling(job) => (job.join().expect("pipeline compile thread"), "waited for"),
+            };
+            if perf::enabled() && t.elapsed().as_millis() >= 20 {
+                log::info!(target: "perf", "renderer: a frame {how} a deferred pipeline for {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
             }
+            p
         })
     }
 }

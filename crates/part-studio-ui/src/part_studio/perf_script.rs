@@ -46,6 +46,10 @@ impl PartStudioView {
     /// A full display was applied: the script's next step.
     pub(super) fn perf_script_step(&mut self, cx: &mut Context<Self>) {
         let Some(step) = self.perf_script.take() else { return };
+        // What the UI thread spent since the last step, frames included (COMMIT-LATENCY: an undo's regeneration task
+        // sometimes first runs 200–300 ms after it was asked, with nothing else logged meanwhile).
+        log::info!(target: "perf", "perf script: stages since the last step:");
+        noshape_render::perf::flush();
         self.perf_script = Some(match step {
             Script::Open => {
                 log::info!(target: "perf", "perf script: open shown {:.0} ms after start", noshape_render::perf::process_start().elapsed().as_secs_f64() * 1e3);

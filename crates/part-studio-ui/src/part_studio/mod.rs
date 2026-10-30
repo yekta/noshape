@@ -592,8 +592,8 @@ impl PartStudioView {
         let burst = self.last_regen_request.is_some_and(|t| t.elapsed() < Duration::from_millis(100));
         self.last_regen_request = Some(std::time::Instant::now());
         let asked = std::time::Instant::now();
-        // macOS App Nap throttles a window that isn't in front: the UI thread first ran this task 170–430 ms after
-        // it was asked on the perf runners (COMMIT-LATENCY). The regeneration holds an activity until it's shown.
+        // macOS App Nap throttles an app that isn't in front: a long regeneration keeps its pace when the user
+        // switches away (the activity lasts until it's shown). It wasn't COMMIT-LATENCY's late first poll.
         let awake = cx.background_executor().prevent_app_nap("Regenerating the Part Studio");
         self.regen_task = Some(cx.spawn_in(window, async move |this, cx| {
             let _awake = awake;

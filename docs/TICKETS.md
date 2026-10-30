@@ -414,6 +414,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     task 170–430 ms after it was asked (regen 1 ms, background start +20 ms, lock 0), with nothing else logged on it
     meanwhile: macOS App Nap / timer coalescing on the runner's non-frontmost window. This commit holds an App Nap
     activity (gpui prevent_app_nap) from scheduling a regeneration until it's shown; re-measuring.
+  - psui 10-30 15:10: perf 41058182056 (main c383c1e8, with the activity): no change, still one slow step per process
+    (160–522 ms, commit / undo / redo in turn: a one-off, not a step's own cost), the undo's task first polled 184–285
+    ms late. So it isn't App Nap (the activity stays, for long regenerations in the background). This commit logs the
+    renderer / window stages at each script step and any frame that waits ≥ 20 ms for a deferred pipeline (compiled
+    on threads after the first frame), the suspect; re-measuring.
   - core 03:25: REGEN-SPEED's perf.yml run 40796942944 (main 34cbea98) has the Extrude 1 edit commit at 34 / 38 / 60 ms (macOS / Linux / Windows, budget 200). psui / qa: please confirm "commit shown in" on a current perf run and close.
 - [x] 3f5f69ed (core: extruded cylinders framed as live, z toward the sketch; CP1 matches, out of KNOWN; R3/C1 now flip the pin as live, the solver's −157.5° turn is skasm's) P0 `model/tests/oracle_asm::assemblies_match_live` CP1 regressed by 339de774 (cylinder frame); fs suspects the
   cylinder axis should point toward the sketch (also CP1, R3, C1). Red at the halt.
