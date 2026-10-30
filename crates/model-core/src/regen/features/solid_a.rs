@@ -1200,19 +1200,30 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
         let body = ev.ctx.bodies[bi].clone();
         let mut shape = body.shape.clone();
         for w in &wires {
-            let res = if normal && w.edges().len() > 1 {
-                rib_normal(&shape, w, dir, t, draft)
-            } else if normal {
-                rib_sheet(&shape, w, dir, None, t, extend, draft)
+            // Normal to the sketch plane, an open chain is one rib per edge as
+            // in rib.fs (each edge of the profiles query is a profile): a leg
+            // that only runs along the rim is dropped as excess, the others
+            // stay (live L24's L: only its vertical leg, 2 × 8 × 8).
+            let pieces = if normal && w.edges().len() > 1 && !w.is_closed().unwrap_or(false) {
+                w.edges().iter().map(|e| k::make_wire(std::slice::from_ref(e))).collect::<Result<Vec<_>, _>>()?
             } else {
-                rib_parallel(&shape, w, frame.normal, opposite, t, extend, draft)
+                vec![w.clone()]
             };
-            match res {
-                Ok(r) => {
-                    shape = r.shape;
-                    made += 1;
+            for w in &pieces {
+                let res = if normal && w.edges().len() > 1 {
+                    rib_normal(&shape, w, dir, t, draft)
+                } else if normal {
+                    rib_sheet(&shape, w, dir, None, t, extend, draft)
+                } else {
+                    rib_parallel(&shape, w, frame.normal, opposite, t, extend, draft)
+                };
+                match res {
+                    Ok(r) => {
+                        shape = r.shape;
+                        made += 1;
+                    }
+                    Err(e) => last_err = Some(e),
                 }
-                Err(e) => last_err = Some(e),
             }
         }
         if shape.is_same(&body.shape) {
@@ -1393,7 +1404,7 @@ fn draft_rib(base: &Shape, rib: &[Shape], profile: &Shape, caps: impl Fn(&Shape)
     Ok(out)
 }
 
-/// Rib normal to the sketch plane from a chain of curves: the profile
+/// Rib normal to the sketch plane from a closed chain of curves: the profile
 /// thickened in-plane, extruded along `dir` up to the part, fused with it.
 fn rib_normal(base: &Shape, wire: &Shape, dir: DVec3, t: f64, draft: Option<(f64, bool)>) -> FResult<k::OpResult> {
     let outline = k::offset_wire_2d(wire, t * 0.5, k::JoinType::Arc, false).map_err(|_| fe(RIB_FAILED))?;

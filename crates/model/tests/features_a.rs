@@ -1205,6 +1205,51 @@ fn rib_extend_profiles_as_live() {
     assert_eq!(run((0.002, 0.015), (0.038, 0.015), true), Err("Failed to create a rib from a selected profile.".into()));
 }
 
+/// Live L24 (request 1620): an L of two lines (one along the rim) normal to
+/// the mid plane: only the leg that spans the pocket becomes a rib (x 19..21,
+/// y 10..18, z 2..10 at 2 mm); the rim leg goes as excess (qa RIB-CHAIN-NORMAL).
+#[test]
+fn rib_of_an_l_normal_to_its_plane_as_live() {
+    let run = |thickness: &str, merge: bool| -> Vec<(f64, usize, DVec3, DVec3)> {
+        let mut t = T::new();
+        let (_, x) = t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+        let top = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+        let ps = t.sketch(Reference::FeaturePlane(top), rect(0.002, 0.002, 0.038, 0.018));
+        let r = t.regions(ps)[0].clone();
+        let cut = t.extrude(r, "8 mm", "REMOVE");
+        t.set(cut, "oppositeDirection", b(true));
+        let mid = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Front)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm")), ("oppositeDirection", b(true))]);
+        let mut sk = noshape_sketch::Sketch::new();
+        let p0 = sk.add_point(DVec2::new(0.002, 0.01));
+        let p1 = sk.add_point(DVec2::new(0.02, 0.01));
+        let p2 = sk.add_point(DVec2::new(0.02, 0.002));
+        let a = sk.add_line_between(p0, p1).unwrap();
+        let l = sk.add_line_between(p1, p2).unwrap();
+        let s = t.sketch(Reference::FeaturePlane(mid), sk);
+        let profiles = q(vec![Reference::SketchEntity { sketch: s, entity: a.0 }, Reference::SketchEntity { sketch: s, entity: l.0 }]);
+        t.add("rib", &[("profiles", profiles), ("parts", q(vec![Reference::Body(BodyId { feature: x, index: 0 })])), ("thickness", e(thickness)), ("ribExtrusionDirection", en("NORMAL_TO_SKETCH_PLANE")), ("mergeRibs", b(merge))]);
+        let res = t.ok();
+        res.context
+            .bodies
+            .iter()
+            .map(|b| {
+                let bb = b.shape.bounding_box(true).unwrap();
+                (b.shape.volume().unwrap() * 1e9, b.shape.count(noshape_kernel::ShapeType::Face), bb.min * 1e3, bb.max * 1e3)
+            })
+            .collect()
+    };
+    let merged = run("2 mm", true);
+    assert_eq!(merged.len(), 1);
+    assert!((merged[0].0 - 3520.0).abs() < 1e-6, "{merged:?}");
+    let apart = run("2 mm", false);
+    assert_eq!(apart.len(), 2, "{apart:?}");
+    let (v, faces, lo, hi) = apart[1];
+    assert!((v - 128.0).abs() < 1e-6 && faces == 6, "{apart:?}");
+    assert!((lo - DVec3::new(19.0, 10.0, 2.0)).length() < 1e-6 && (hi - DVec3::new(21.0, 18.0, 10.0)).length() < 1e-6, "{lo} {hi}");
+    let thick = run("2.5 mm", true);
+    assert!((thick[0].0 - 3552.0).abs() < 1e-6, "{thick:?}");
+}
+
 /// qa RIB-CLOSED-PROFILE-MSG: a closed profile parallel to the sketch plane
 /// fails with rib.fs's RIB_ONLY_OPEN_PROFILES, before anything else.
 #[test]
