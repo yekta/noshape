@@ -141,24 +141,41 @@ fn overflows(shape: &Shape, edges: &[usize], r: f64) -> bool {
     })
 }
 
-/// Whether a round of the selection both rolls past an unfilleted edge and
-/// overlaps another round of it, the selected edges apart (live
-/// FILLET-OVERSIZE-OK: "End boundary intersects unfilleted edge."; one round
-/// rolling over alone, or rounds overlapping into a ridge, are fine). Straight edges between planar faces,
-/// against the faces' edges parallel to them: a round's setback on a face
-/// past an unfilleted edge rolls over it, two setbacks wider than the face
-/// between their edges overlap.
 /// A selected edge's setback on each of its two planar faces: (face, the
 /// direction into it across the edge, the setback).
 type Setbacks = [(u32, DVec3, f64); 2];
 
-fn end_boundary_hits_unfilleted(shape: &Shape, edges: &[usize], radii: &[f64]) -> bool {
-    let (Ok(ef), faces, all) = (shape.edge_faces(), shape.faces(), shape.edges()) else { return false };
+/// Where a round of a multi-edge selection runs past a face (see
+/// [`round_overrun`]).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Overrun {
+    /// Across the face to another selected edge: "End boundary intersects
+    /// unfilleted edge." / "... unchamfered edge.".
+    PastSelected,
+    /// Past an edge that isn't selected: "Failed to fillet selections." /
+    /// "Failed to chamfer selections.".
+    PastUnselected,
+}
+
+/// Live's rule for rounds and chamfers of two or more edges (behaviours
+/// "spec: kernel FILLET-OVERSIZE-OK chamfer cases and fillet thresholds",
+/// request 1516 / 1587): a selected straight edge between planar faces that
+/// shares a face with another selected edge may set back on each of its faces
+/// at most that face's width (to the parallel edge across it); one step
+/// beyond, the feature fails and the part stays as it was. Rounds that only
+/// overlap each other are fine; a single edge rolls over any face. `amount(i,
+/// t)`: the setback of the selection's edge `i` on a face, `t` the tangent of
+/// half the angle between the faces' normals (a fillet's r·t, a chamfer's d).
+fn round_overrun(shape: &Shape, edges: &[usize], amount: &dyn Fn(usize, f64) -> f64) -> Option<Overrun> {
+    if edges.len() < 2 {
+        return None;
+    }
+    let (Ok(ef), faces, all) = (shape.edge_faces(), shape.faces(), shape.edges()) else { return None };
     // Edges that meet (the 4 top edges R12, live F2) fail otherwise: "Failed
     // to fillet selections.", from the kernel.
     let ends: Vec<Vec<Shape>> = edges.iter().map(|&e| all.get(e).map(|x| x.vertices()).unwrap_or_default()).collect();
     if ends.iter().enumerate().any(|(i, a)| ends[i + 1..].iter().any(|b| a.iter().any(|v| b.iter().any(|w| v.is_same(w))))) {
-        return false;
+        return None;
     }
     let mut face_edges = vec![Vec::new(); faces.len()];
     for (e, fs) in ef.iter().enumerate() {
@@ -174,7 +191,7 @@ fn end_boundary_hits_unfilleted(shape: &Shape, edges: &[usize], radii: &[f64]) -
     };
     let plane = |f: u32| matches!(faces.get(f as usize).map(|f| f.face_surface()), Some(Ok(k::Surface::Plane(_))));
     // Convex edges only.
-    let setbacks = |e: usize, r: f64| -> Option<Setbacks> {
+    let setbacks = |i: usize, e: usize| -> Option<Setbacks> {
         let (a, b) = line(e)?;
         let fs = ef.get(e)?;
         if fs.len() != 2 || !plane(fs[0]) || !plane(fs[1]) {
@@ -183,7 +200,7 @@ fn end_boundary_hits_unfilleted(shape: &Shape, edges: &[usize], radii: &[f64]) -
         let d = (b - a).normalize_or_zero();
         let mid = (a + b) * 0.5;
         let n = [faces[fs[0] as usize].normal_at_point(mid).ok()?.normalize(), faces[fs[1] as usize].normal_at_point(mid).ok()?.normalize()];
-        let setback = r * (n[0].dot(n[1]).clamp(-1.0, 1.0).acos() / 2.0).tan();
+        let setback = amount(i, (n[0].dot(n[1]).clamp(-1.0, 1.0).acos() / 2.0).tan());
         let mut out = [(0, DVec3::ZERO, 0.0); 2];
         for k in 0..2 {
             // Into the face: the side its vertices are on.
@@ -198,13 +215,17 @@ fn end_boundary_hits_unfilleted(shape: &Shape, edges: &[usize], radii: &[f64]) -
         }
         Some(out)
     };
-    let radius = |i: usize| radii.get(i).or(radii.first()).copied().unwrap_or(0.0);
-    let selected: Vec<(usize, Setbacks)> = edges.iter().enumerate().filter_map(|(i, &e)| Some((e, setbacks(e, radius(i))?))).collect();
-    let tol = 1e-9 * (1.0 + radii.iter().fold(0.0, |m: f64, r| m.max(*r)));
-    selected.iter().any(|(e, sides)| {
+    let selected: Vec<(usize, Setbacks)> = edges.iter().enumerate().filter_map(|(i, &e)| Some((e, setbacks(i, e)?))).collect();
+    let largest = selected.iter().flat_map(|(_, s)| s.iter().map(|x| x.2)).fold(0.0, f64::max);
+    let tol = 1e-9 * (1.0 + largest);
+    let (mut past_selected, mut past_unselected) = (false, false);
+    for (e, sides) in &selected {
+        // With another selected edge on one of its faces.
+        if !sides.iter().any(|&(f, _, _)| face_edges.get(f as usize).is_some_and(|l| l.iter().any(|o| o != e && edges.contains(o)))) {
+            continue;
+        }
         let (a, b) = line(*e).unwrap_or_default();
         let d = (b - a).normalize_or_zero();
-        let (mut rolls, mut overlaps) = (false, false);
         for &(f, w, setback) in sides {
             for &o in face_edges.get(f as usize).into_iter().flatten() {
                 let Some((p, q)) = line(o) else { continue };
@@ -214,14 +235,23 @@ fn end_boundary_hits_unfilleted(shape: &Shape, edges: &[usize], radii: &[f64]) -
                 if o == *e || (q - p).normalize_or_zero().dot(d).abs() < 1.0 - 1e-9 || width <= tol || s0.max(s1) <= tol || s0.min(s1) >= (b - a).length() - tol {
                     continue;
                 }
-                match selected.iter().find(|(x, _)| *x == o) {
-                    None => rolls |= setback > width + tol,
-                    Some((_, other)) => overlaps |= other.iter().any(|&(g, _, s)| g == f && setback + s > width + tol),
+                if setback > width + tol {
+                    if edges.contains(&o) {
+                        past_selected = true;
+                    } else {
+                        past_unselected = true;
+                    }
                 }
             }
         }
-        rolls && overlaps
-    })
+    }
+    if past_selected {
+        Some(Overrun::PastSelected)
+    } else if past_unselected {
+        Some(Overrun::PastUnselected)
+    } else {
+        None
+    }
 }
 
 pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
@@ -350,8 +380,11 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         } else {
             vec![radius]
         };
-        if end_boundary_hits_unfilleted(&body.shape, &edges, &radii) {
-            return err("End boundary intersects unfilleted edge.");
+        let radius_of = |i: usize| radii.get(i).or(radii.first()).copied().unwrap_or(0.0);
+        match round_overrun(&body.shape, &edges, &|i, t| radius_of(i) * t) {
+            Some(Overrun::PastSelected) => return err("End boundary intersects unfilleted edge."),
+            Some(Overrun::PastUnselected) => return err("Failed to fillet selections."),
+            None => {}
         }
         let res = match k::fillet_checked(&body.shape, &shapes, &radii) {
             Ok(r) => r,
@@ -514,6 +547,13 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
             let flipped: BTreeSet<usize> = overrides.iter().filter(|(b, _)| *b == bi).map(|&(_, e)| e).collect();
             distance_one_faces(ev, &body, &edges, &flipped, ev.bool("oppositeDirection"))?
         };
+        if let k::ChamferSpec::Equal(d) = spec {
+            match round_overrun(&body.shape, &edges, &|_, _| d) {
+                Some(Overrun::PastSelected) => return err("End boundary intersects unchamfered edge."),
+                Some(Overrun::PastUnselected) => return err("Failed to chamfer selections."),
+                None => {}
+            }
+        }
         let res = k::chamfer_checked(&body.shape, &shapes, spec, &reference).map_err(chamfer_failed)?;
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));

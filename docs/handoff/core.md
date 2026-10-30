@@ -555,7 +555,12 @@ with 0003b and 0004 on Linux, macOS and Windows.
    NOSHAPE_SHELL_DEBUG=1 now also names each path as it starts.
 3. Other `a.Plane().Axis().Direction()` readers of a face's normal in the kernel: features.cpp and shell.cpp
    already check Direct(); surface_info (face_surface) reports the frame as is, by design.
-4. Waiting on live: FILLET-OVERSIZE's chamfer half; RIB-CHAIN-NORMAL (live's +160 mm³ for the L normal rib).
+4. Waiting on live: RIB-CHAIN-NORMAL (live's +160 mm³ for the L normal rib). FILLET-OVERSIZE's chamfer half done
+   10-30: detail.rs `round_overrun` (live's thresholds, both blends): with 2+ selected edges, an edge sharing a face
+   with another selected edge may set back at most each face's width; past a selected edge "End boundary intersects
+   unfilleted / unchamfered edge.", past an unselected one "Failed to fillet / chamfer selections."; overlapping
+   rounds and a single edge's roll-over are fine. T1 `kernel_robustness::oversize_fillets_like_onshape` (22 cases) and
+   `oversize_chamfers_like_onshape` (20).
 5. kern's open item: forward-oriented edges.
 Knurl Phase 1 stopped at 246 s (its steps left are 10–40 s each); REGEN-SPEED met in release (qa to re-measure).
 

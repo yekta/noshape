@@ -2755,25 +2755,48 @@ fn oversize_fillets_like_onshape() {
     let three = at(&mut base, &[(40.0, 0.0), (40.0, 20.0), (0.0, 20.0)]);
     let top = base.edges_where(|i| !vertical(i) && (i.start.z - 0.01).abs() < 1e-9);
     assert_eq!((two.len(), three.len(), top.len()), (2, 3, 4));
-    let cases: [(&str, &Vec<Reference>, &str, Option<f64>); 11] = [
+    let one = at(&mut base, &[(40.0, 0.0)]);
+    let long = base.edges_where(|i| !vertical(i) && (i.start.z - 0.01).abs() < 1e-9 && (i.end.x - i.start.x).abs() > 0.03);
+    assert_eq!((one.len(), long.len()), (1, 2));
+    let cases: [(&str, &Vec<Reference>, &str, Option<f64>); 22] = [
         ("2 edges R10", &two, "10 mm", Some(7570.796327)),
         ("2 edges R10.5", &two, "10.5 mm", Some(7526.842646)),
         ("2 edges R12", &two, "12 mm", Some(7384.178285)),
         ("2 edges R20", &two, "20 mm", Some(6456.739397)),
+        // Live 10-28 (behaviours "spec: kernel FILLET-OVERSIZE-OK chamfer cases and fillet thresholds").
+        ("2 edges R25", &two, "25 mm", None),
+        ("2 edges R30", &two, "30 mm", None),
+        ("2 edges R39.9", &two, "39.9 mm", None),
+        ("2 edges R40.1", &two, "40.1 mm", None),
         ("2 edges R50", &two, "50 mm", None),
         ("3 edges R10", &three, "10 mm", Some(7356.194490)),
         ("3 edges R12", &three, "12 mm", Some(7075.151640)),
         ("3 edges R20", &three, "20 mm", Some(5598.332051)),
+        ("3 edges R20.5", &three, "20.5 mm", None),
         ("3 edges R25", &three, "25 mm", None),
         ("3 edges R50", &three, "50 mm", None),
         ("4 top edges R12", &top, "12 mm", None),
+        // One edge rolls over (no limit).
+        ("1 edge R20.5", &one, "20.5 mm", Some(7098.145945)),
+        ("1 edge R39.9", &one, "39.9 mm", Some(4926.226525)),
+        ("1 edge R40.5", &one, "40.5 mm", Some(4849.584982)),
+        // The two top long edges past their 10-tall sides (as live's chamfers).
+        ("2 long R5", &long, "5 mm", None),
+        ("2 long R10", &long, "10 mm", None),
+        ("2 long R10.5", &long, "10.5 mm", None),
     ];
-    // Edges that meet fail with the kernel's message (live F2).
-    let fails = |what: &str| if what.starts_with("4 top") { "Failed to fillet selections." } else { "End boundary intersects unfilleted edge." };
+    // Edges that meet fail with the kernel's message (live F2); a round past an
+    // edge that isn't selected, "Failed to fillet selections.".
+    let fails = |what: &str| if what.starts_with("4 top") || what.starts_with("2 long") { "Failed to fillet selections." } else { "End boundary intersects unfilleted edge." };
     for (what, edges, r, want) in cases {
         let mut t = base.fork();
         let f = t.fillet(edges.clone(), r);
         let (st, msg, v) = status(&mut t, f);
+        // (The top long edges R5 / R10: Ok, volumes not in live's table.)
+        if what == "2 long R5" || what == "2 long R10" {
+            assert_eq!(st, FeatureStatus::Ok, "{what}: {msg:?}");
+            continue;
+        }
         match want {
             Some(want) => {
                 assert_eq!(st, FeatureStatus::Ok, "{what}: {msg:?}");
@@ -2782,6 +2805,62 @@ fn oversize_fillets_like_onshape() {
             None => assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some(fails(what))), "{what}: {v} mm³"),
         }
     }
+}
+
+/// Chamfers (Equal distance) on the same 40 × 20 × 10 block as live (behaviours
+/// "spec: kernel FILLET-OVERSIZE-OK chamfer cases and fillet thresholds"):
+/// two or three vertical edges fail past the 20-wide end face ("End boundary
+/// intersects unchamfered edge."), the two top long edges past their 10-tall
+/// sides ("Failed to chamfer selections."), one edge rolls over.
+#[test]
+fn oversize_chamfers_like_onshape() {
+    let mut base = T::new();
+    base.block(40.0, 20.0, 10.0);
+    let at = |t: &mut T, xy: &[(f64, f64)]| t.edges_where(|i| vertical(i) && xy.iter().any(|&(x, y)| (i.start.x - x * 1e-3).abs() < 1e-9 && (i.start.y - y * 1e-3).abs() < 1e-9));
+    let two = at(&mut base, &[(40.0, 0.0), (40.0, 20.0)]);
+    let three = at(&mut base, &[(40.0, 0.0), (40.0, 20.0), (0.0, 20.0)]);
+    let one = at(&mut base, &[(40.0, 0.0)]);
+    let long = base.edges_where(|i| !vertical(i) && (i.start.z - 0.01).abs() < 1e-9 && (i.end.x - i.start.x).abs() > 0.03);
+    assert_eq!((two.len(), three.len(), one.len(), long.len()), (2, 3, 1, 2));
+    const END: &str = "End boundary intersects unchamfered edge.";
+    const FAILED: &str = "Failed to chamfer selections.";
+    let cases: [(&str, &Vec<Reference>, &str, Result<(f64, usize), &str>); 20] = [
+        ("2 edges 5", &two, "5 mm", Ok((7750.0, 8))),
+        ("2 edges 10", &two, "10 mm", Ok((7000.0, 7))),
+        ("2 edges 10.5", &two, "10.5 mm", Ok((6900.0, 7))),
+        ("2 edges 15", &two, "15 mm", Ok((6000.0, 7))),
+        ("2 edges 20", &two, "20 mm", Ok((5000.0, 7))),
+        ("2 edges 20.5", &two, "20.5 mm", Err(END)),
+        ("2 edges 25", &two, "25 mm", Err(END)),
+        ("2 edges 30", &two, "30 mm", Err(END)),
+        ("3 edges 10", &three, "10 mm", Ok((6500.0, 8))),
+        ("3 edges 12", &three, "12 mm", Ok((5880.0, 8))),
+        ("3 edges 20", &three, "20 mm", Ok((3000.0, 6))),
+        ("3 edges 25", &three, "25 mm", Err(END)),
+        ("2 long 5", &long, "5 mm", Ok((7000.0, 8))),
+        ("2 long 10", &long, "10 mm", Ok((4000.0, 5))),
+        ("2 long 10.5", &long, "10.5 mm", Err(FAILED)),
+        ("1 edge 19.9", &one, "19.9 mm", Ok((6019.95, 7))),
+        ("1 edge 20", &one, "20 mm", Ok((6000.0, 6))),
+        ("1 edge 20.5", &one, "20.5 mm", Ok((5900.0, 6))),
+        ("1 edge 39.9", &one, "39.9 mm", Ok((2020.0, 6))),
+        ("1 edge 40.5", &one, "40.5 mm", Ok((1901.25, 5))),
+    ];
+    let mut bad = Vec::new();
+    for (what, edges, d, want) in cases {
+        let mut t = base.fork();
+        let f = t.chamfer(edges.clone(), d);
+        let (st, msg, v) = status(&mut t, f);
+        let faces = t.regen().context.bodies.first().map_or(0, |b| b.faces.len());
+        let ok = match want {
+            Ok((wv, wf)) => st == FeatureStatus::Ok && (v - wv).abs() < 5e-3 && faces == wf,
+            Err(m) => st == FeatureStatus::Error && msg.as_deref() == Some(m),
+        };
+        if !ok {
+            bad.push(format!("{what}: {st:?} {msg:?} {v:.4} mm³ {faces} faces, live {want:?}"));
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
 
 /// qa CYL-UNIFY-OPPOSITE (live request 1584): a Ø12 circle on Front extruded
