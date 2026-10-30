@@ -187,7 +187,7 @@ fn blend_corpus_shapes() {
     }
     noshape_kernel::set_rust_blend(None);
     let mut v: Vec<_> = tally.into_iter().collect();
-    v.sort_by(|a, b| b.1.cmp(&a.1));
+    v.sort_by_key(|x| std::cmp::Reverse(x.1));
     for (k, n) in v {
         println!("{n:4} {k}");
     }
