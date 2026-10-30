@@ -112,6 +112,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cli-shell-gpf, cli-fillet-segv, cli-fillet2-segv and cli-draft-segv.noshape** (/root/qa-scratch/tickets/; green 19555ca3
   opens all five).
 ## Core
+- [x] P0 KNURL-FS-NO-OP (lead 10-30 11:30 user time) the Feature Studio knurl "Printable ANSI/ASME B94.6 knurling" on a
+  50 × 50 cylinder (Diamond, CP12, 80°, 30°, 100 %) failed after ~2 min with "Selected tools and targets do not
+  intersect.": its subtract stopped at the Boolean memory budget (4096 MB of growth since 10-25 17:19, b43d57aa) and the
+  FS host reported every op failure as the op's code. Now the budget's default is half the machine's memory (4–16 GB),
+  a limit (memory, time, cancel) reaches the user in its own words, op_boolean frees its builder before the unify and
+  hands freed memory back (malloc_trim) after a big Boolean. Diamond Ok: 94272.890 mm³, 10362 faces, 363 s, +8.2 GB;
+  Straight 95877.733 mm³, 224 faces, 1.6 s. T2 `custom_features::knurl_feature_b94_on_a_cylinder` (live's numbers
+  requested from live 10-30 09:00).
+- [ ] P1 KNURL-MEMORY (core) the diamond knurl's one OCCT subtract grows the process by ~8.2 GB in the model's metres
+  (5.9 GB in a kernel run in metres, 4.0 GB in mm; the app reached 16.7 GB over several regenerations before the
+  trim); 315 s of its 363 s are that build (live 32 s). Next: Booleans of many tools at the blends' working scale (mm),
+  then the Phase 1 items in docs/handoff/core.md (knurl).
 - [ ] P1 BUDGET-OFF-LINUX (core, lead 10-30 07:45) the CPU budgets are a timer signal and a jump on Linux only. Since
   core-portable-budget (3df8a3b0) a budget off Linux is a deadline that OCCT's progress indicator checks
   (CancelIndicator: op_boolean's builds, op_section), so std's collision checks (MIRROR-HANG-402) and Booleans stop

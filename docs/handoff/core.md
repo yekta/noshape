@@ -651,6 +651,11 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- 10-30 10:05, knurl P0: the false "do not intersect" was the 4 GB Boolean memory budget (the FS host turned the
+  limit into BOOLEAN_SUBTRACT_NO_OP). Fixed (budget default half the RAM, 4â€“16 GB; limits reported in their own words;
+  builder freed before the unify; malloc_trim after big Booleans). The diamond regen still needs ~8.2 GB (OCCT's pave
+  filler for 148 helical grooves): KNURL-MEMORY. Portable budgets (BUDGET-OFF-LINUX) verified in CI run 41023931518
+  on all three before landing.
 - 10-30 07:40, the custom ops' thread dependence (lead 06:15 / 06:55): found and fixed. Operation bodies' ids are
   the custom feature's id with 20 bits of the operation's marker (+ 12 bits of index); two operations whose bits
   collide (about 1 feature in 100 of ~150 operations: the markers depend on the random feature id, so each run and

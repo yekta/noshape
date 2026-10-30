@@ -771,6 +771,11 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
                 // A built-in evaluator's Onshape message: its member.
                 None => match error_code(&e.message) {
                     Some(c) => (c.to_string(), e.message.clone(), e.faulty.iter().map(|f| f.to_string()).collect()),
+                    // A kernel limit (memory, CPU) or a cancel is not the
+                    // operation's own failure: its words, not the code's (a
+                    // knurl's subtract past the memory budget read "Selected
+                    // tools and targets do not intersect.", lead 10-30 11:30).
+                    None if stopped_by_a_limit(&e.message) => ("CUSTOM_ERROR".to_string(), e.message.clone(), Vec::new()),
                     None => (failure.to_string(), e.message.clone(), Vec::new()),
                 },
             };
@@ -792,6 +797,12 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
             Err(raise_with(i, &code, (code == "CUSTOM_ERROR").then_some(msg.as_str()), &faulty))
         }
     }
+}
+
+/// Whether a kernel error is a limit stopping the operation (the memory or
+/// CPU budget, a cancel) rather than its geometry failing.
+fn stopped_by_a_limit(message: &str) -> bool {
+    ["operation stopped: it needed more than", "took too long", "Cancelled", "cancelled"].iter().any(|m| message.contains(m))
 }
 
 /// An operation failure reported as a specific `ErrorStringEnum` member.

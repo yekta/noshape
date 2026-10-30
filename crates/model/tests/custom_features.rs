@@ -1962,3 +1962,85 @@ export const noOpCut = defineFeature(function(context is Context, id is Id, defi
     assert_eq!(thrown.rows.last().map(|r| r.1.as_str()), Some(format!("Part Studio 1 ({})", draft.name).as_str()), "{:?}", thrown.rows);
     let _ = &mut fx;
 }
+
+/// The Feature Studio knurl "Printable ANSI/ASME B94.6 knurling" (the lead's
+/// user, tests/fs/knurl_b94.fs) on a 50 × 50 cylinder: circular pitch 12 TPI,
+/// tooth 80°, helix 30°, groove 100 %, Straight and Diamond. The Diamond's
+/// subtract stopped at the old 4 GB memory budget and read "Selected tools
+/// and targets do not intersect." (lead 10-30). Volume, faces, time and the
+/// process's growth while it regenerates (KNURL=straight|diamond: one).
+#[test]
+#[ignore = "T2: the B94.6 knurl feature (minutes for the diamond)"]
+fn knurl_feature_b94_on_a_cylinder() {
+    const CYLINDER: &str = r#"
+annotation { "Feature Type Name" : "Test cylinder" }
+export const testCylinder = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 50) * millimeter, "radius" : 25 * millimeter });
+    });
+"#;
+    let src = format!("{}\n{CYLINDER}", include_str!("fs/knurl_b94.fs"));
+    let only = std::env::var("KNURL").ok();
+    for kind in ["STRAIGHT", "DIAMOND"] {
+        if only.as_deref().is_some_and(|k| !k.eq_ignore_ascii_case(kind)) {
+            continue;
+        }
+        let fx = Fixture::new(&src);
+        let opts = fx.opts();
+        let mut ps = PartStudio::new();
+        ps.features.push(ps.new_feature(&fx.ty("testCylinder"), &fx.units).unwrap());
+        let mut reg = Regenerator::new();
+        let r = reg.regenerate(&ps, &ConfigValues::default(), &fx.units, &opts);
+        assert_ok(&r);
+        let body = &r.context.bodies[0];
+        let circles: Vec<Reference> = (0..body.edges.len())
+            .filter(|&i| body.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).ok().and_then(|e| e.edge_info().ok()).is_some_and(|info| matches!(info.curve, noshape_kernel::Curve::Circle { .. })))
+            .map(|i| Reference::Edge((*body.edges[i]).clone()))
+            .collect();
+        assert_eq!(circles.len(), 2);
+        let mut f = ps.new_feature(&fx.ty("myFeature"), &fx.units).unwrap();
+        f.params.set("edges", ParamValue::Query(circles));
+        f.params.set("knurlType", ParamValue::Enum(kind.into()));
+        f.params.set("knurlFace", ParamValue::Enum("OUTER".into()));
+        f.params.set("pitchType", ParamValue::Enum("CIRCULAR".into()));
+        f.params.set("circularPitch", ParamValue::Enum("CP12".into()));
+        f.params.set("toothAngle", expr("80 deg"));
+        f.params.set("toothHelixAngle", expr("30 deg"));
+        f.params.set("grooveDepthPercent", expr("100"));
+        f.params.set("targets", ParamValue::Query(vec![Reference::Body(body.id.clone())]));
+        ps.features.push(f);
+        // The process's resident memory, sampled while the knurl regenerates.
+        let rss = || std::fs::read_to_string("/proc/self/statm").ok().and_then(|s| s.split_whitespace().nth(1)?.parse::<u64>().ok()).map_or(0, |p| p * 4096);
+        let start = rss();
+        let done = std::sync::atomic::AtomicBool::new(false);
+        let t = std::time::Instant::now();
+        let (r, peak) = std::thread::scope(|s| {
+            let sampler = s.spawn(|| {
+                let mut peak = 0;
+                while !done.load(std::sync::atomic::Ordering::Relaxed) {
+                    peak = peak.max(rss());
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+                peak
+            });
+            let r = reg.regenerate(&ps, &ConfigValues::default(), &fx.units, &opts);
+            done.store(true, std::sync::atomic::Ordering::Relaxed);
+            (r, sampler.join().unwrap())
+        });
+        let took = t.elapsed().as_secs_f64();
+        assert_ok(&r);
+        let b = &r.context.bodies[0];
+        let (v, faces) = (b.shape.volume().unwrap() * 1e9, b.shape.count(noshape_kernel::ShapeType::Face));
+        let growth = peak.saturating_sub(start) as f64 / (1u64 << 30) as f64;
+        eprintln!("knurl {kind}: {v:.3} mm³, {faces} faces, {took:.1} s, grew {growth:.2} GB");
+        // (Linux: /proc; other tests running beside it add theirs.) The
+        // diamond's one OCCT subtract of 148 helical grooves needs ~8.2 GB
+        // (its pave filler; 4.0 GB for the same knurl in mm: KNURL-MEMORY);
+        // the bound keeps it from growing further.
+        if cfg!(target_os = "linux") {
+            assert!(growth < 9.0, "knurl {kind}: the regeneration grew the process by {growth:.2} GB");
+        }
+        assert_eq!(r.context.bodies.len(), 1, "knurl {kind}");
+    }
+}

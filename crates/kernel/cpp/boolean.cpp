@@ -17,8 +17,12 @@
 #endif
 #elif defined(__APPLE__)
 #include <mach/mach.h>
+#include <sys/sysctl.h>
 #else
 #include <unistd.h>
+#endif
+#if defined(__linux__) && defined(__GLIBC__)
+#include <malloc.h>
 #endif
 #include "internal.hpp"
 
@@ -102,6 +106,23 @@
 
 namespace noshape {
 
+// The machine's physical memory in MB (0 when unknown).
+static uint64_t physical_memory_mb()
+{
+#if defined(_WIN32)
+  MEMORYSTATUSEX m;
+  m.dwLength = sizeof m;
+  return GlobalMemoryStatusEx(&m) ? (uint64_t)(m.ullTotalPhys >> 20) : 0;
+#elif defined(__APPLE__)
+  uint64_t size = 0;
+  size_t   len  = sizeof size;
+  return sysctlbyname("hw.memsize", &size, &len, nullptr, 0) == 0 ? size >> 20 : 0;
+#else
+  const long pages = sysconf(_SC_PHYS_PAGES), page = sysconf(_SC_PAGESIZE);
+  return pages > 0 && page > 0 ? ((uint64_t)pages * (uint64_t)page) >> 20 : 0;
+#endif
+}
+
 // The process's resident memory in bytes (0 when unknown).
 static size_t resident_bytes()
 {
@@ -142,7 +163,7 @@ bool cancelled(const std::atomic<bool>* flag)
 // operation stops with an error. Set from Rust before each boolean
 // (NOSHAPE_BOOLEAN_MEMORY_MB, default 4096: std::getenv on Windows reads the
 // CRT's copy of the environment and misses changes made after startup).
-std::atomic<uint64_t> g_memory_budget_mb{4096};
+std::atomic<uint64_t> g_memory_budget_mb{8192};
 
 size_t memory_budget() { return (size_t)g_memory_budget_mb.load() << 20; }
 
@@ -3753,9 +3774,14 @@ extern "C" void noshape_bop_set_pairs_parallel(int on); // OCCT patch 0004
 
 void set_bop_pairs_parallel(bool on) { noshape_bop_set_pairs_parallel(on ? 1 : 0); }
 
+// The default: half the machine's memory, 4 to 16 GB. A flat 4 GB stopped
+// a diamond knurl's subtract (5.9 GB at its peak in the model's metres; lead
+// 10-30 11:30: "Selected tools and targets do not intersect."), and the 17 GB
+// runaway the budget is for still stops on a 16 GB machine (at 8 GB).
 void set_memory_budget_mb(uint64_t mb)
 {
-  g_memory_budget_mb.store(mb > 0 ? mb : 4096);
+  const uint64_t half = physical_memory_mb() / 2;
+  g_memory_budget_mb.store(mb > 0 ? mb : std::min<uint64_t>(std::max<uint64_t>(half, 4096), 16384));
 }
 
 namespace
@@ -3875,9 +3901,34 @@ bool tools_reach_in(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS
 
 } // namespace
 
+// After a Boolean that grew the process by more than 512 MB: what it freed
+// handed back to the system (glibc keeps freed memory in its per-thread
+// arenas, so each big Boolean started from the last one's peak: the app grew
+// to 16.7 GB over a knurl document's regenerations, lead 10-30).
+void trim_if_grown(size_t start)
+{
+#if defined(__linux__) && defined(__GLIBC__)
+  const size_t now = resident_bytes();
+  if (now > start && now - start > (size_t(512) << 20))
+    malloc_trim(0);
+#else
+  (void)start;
+#endif
+}
+
+struct TrimAfter
+{
+  size_t start = resident_bytes();
+  TrimAfter() = default;
+  TrimAfter(const TrimAfter&)            = delete;
+  TrimAfter& operator=(const TrimAfter&) = delete;
+  ~TrimAfter() { trim_if_grown(start); }
+};
+
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts)
 {
+  const TrimAfter trim_after;
   t_bool_path = "occt";
   // The inputs' OcShapes for the history (their maps are made already).
   std::vector<const OcShape*> srcs = args.sources;
@@ -4125,6 +4176,11 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     hist = new BRepTools_History(to_list(concat(a, t)), *b);
   }
   res = b->Shape();
+  // The builder's data (its pave filler: most of a big Boolean's memory)
+  // freed before the unify and the checks below, and handed back: a diamond
+  // knurl's subtract held 8 GB through its 30 s unify.
+  b.reset();
+  trim_if_grown(trim_after.start);
   fail_if_cancelled();
   // A located input (a pattern's instance: moved, not copied) that OCCT got
   // wrong: a circular Part pattern x2 of a half plate whose blind hole's drill
