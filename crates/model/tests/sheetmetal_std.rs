@@ -830,6 +830,8 @@ fn library_form_tools_as_live() {
         ("countersink", vec![("clearance_hole", "1 mm"), ("angle", "60 deg")], 1.491592, 1.774456, 1e-5),
         ("slot-extrusion", vec![], 172.257045, 738.48451, 1e-5),
         ("louver", vec![("height", "5 mm")], 1975.3626, 1889.368549, 1e-3),
+        ("bridge-lance", vec![("length", "100 mm"), ("width", "1 mm")], 115.3687, 111.656854, 1e-4),
+        ("lance", vec![("length", "100 mm"), ("width", "1 mm"), ("draft", "90 deg")], 107.853982, 107.853982, 1e-5),
     ] {
         let studio = noshape_model::sheetmetal::forms::studio(form).expect("studio");
         let mut config = studio.configuration.defaults();
