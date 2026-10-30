@@ -462,6 +462,11 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
    texture present. Next: which of those (a variant skipping AO on the empty frame needs `+` support in
    NOSHAPE_PERF_SKIP's `ao` / `backsil` / `silhouettes` tokens, which split on ',' only; bench.sh splits a
    variant's env on ','), then memoryless MSAA attachments (StoreOp::Discard on depth where AO doesn't need it).
+   **Isolated (perf 40999839485, deabae0d's `+` tokens):** the empty frame's done_ms p50 is 9.0–9.5 ms with AO
+   or without, with 4× MSAA or 1 (presented 91–120 fps); the full NIST frame 10.6–11.1 p50 (75–80 fps). So the
+   floor isn't our passes: our submission waits behind the window's own compositing / present at 2× (done_ms is
+   submit → completed). What our scene adds is now ~2–5 ms. 120 fps at Retina would need the present path
+   itself (GPUI's texture compositing) to get cheaper: that's GPUI's, not the renderer's; left here.
 0f. (done 10-28: no gain, see above) Retina orbit, experiment for 0c: line segments are instances of 6 vertices (`draw(slots*6, 0..count)`),
    which packs Apple GPUs' vertex SIMD groups badly; pull segments from a storage buffer by vertex_index / 6 with
    the slot as the instance (one instance per copy) and measure with perf.yml.
