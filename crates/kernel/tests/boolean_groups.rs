@@ -339,10 +339,8 @@ fn a_section_under_a_call_budget_gives_up() {
 /// too long" on every platform (off Linux the budget is a deadline OCCT patch
 /// 0007's hook stops the fillet builder at; BUDGET-OFF-LINUX), and without a
 /// short budget it builds. The budget is so small that the hook's first
-/// check stops it; T2 until /root/occt on the land and watcher machines has
-/// patch 0007's TKFillet (the hook), as CI's OCCT has.
+/// check stops it, whatever the machine's speed.
 #[test]
-#[ignore = "T2: needs patch 0007's TKFillet in /root/occt (the hook)"]
 fn a_fillet_under_a_short_budget_gives_up() {
     let plate = make_box_corners(DVec3::ZERO, DVec3::new(100.0, 100.0, 10.0)).unwrap();
     let mut tools = Vec::new();
