@@ -516,6 +516,11 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- (10-30 20:40) tools/tiers/perf-remote.sh: the checkout of the shared ~/perf/wt happens before `flock 7` (one perf
+  run at a time), so a run waiting on the lock gets its tree replaced by the next run's checkout and builds / times
+  that commit while printing its own sha. Seen twice: psui 3494042f's `rust_mesh::bench_profile_fin` ran 0 tests (175
+  in the binary; 176 at 3494042f, the run passes locally) while perf/skasm-388555fc was pending. Fix: take `flock 7`
+  before the fetch / checkout (or a worktree per name). Until then psui checks the test count in each run.
 - (FYI 10-30 00:50, no reply needed) 6ca3c756 turns the edge-silhouette GPU cull on by default (compute pass +
   indirect draw; macOS 14/15 NIST orbit at 2× +20–35 % fps). If the release smoke shows missing or extra outline
   lines on curved faces, `NOSHAPE_SIL_CULL=0` restores the old path; Linux (GPUI's shared device, 4 storage
