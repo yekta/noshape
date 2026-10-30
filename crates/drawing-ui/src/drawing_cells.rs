@@ -7,7 +7,7 @@
 use crate::drawing_view::*;
 use gpui_kit::*;
 use noshape_model::drawing::build::PickTarget;
-use noshape_model::drawing::{Table, TableKind};
+use noshape_model::drawing::{Table, TableKind, ViewId};
 
 /// BOM / cut list tables showing the same rows (same kind and view).
 use noshape_scene::drawing_tools::table_edit as te;
@@ -220,19 +220,52 @@ impl DrawingEditor {
         ts.iter().map(|t| t.text.as_str()).collect::<Vec<_>>().join(" ")
     }
 
-    /// Hovering a BOM row: the picks of the callouts showing its item
-    /// number (Onshape highlights them).
+    /// Hovering a BOM or hole table row (help TB15): the picks of the
+    /// callouts showing its item number and of its part's edges in the
+    /// views of that source; a hole table row's hole circles.
     pub fn table_row_highlight(&self) -> Vec<u32> {
         let (Some(b), Some(h)) = (&self.built, self.hover) else { return Vec::new() };
         let Some(PickTarget::Table(id)) = b.picks.get(h as usize) else { return Vec::new() };
         let Some(t) = self.current_sheet().table(*id) else { return Vec::new() };
-        if !matches!(t.kind, TableKind::Bom { .. }) {
-            return Vec::new();
-        }
         let Some((r, _)) = b.table_layout(*id).and_then(|l| l.cell_at(self.cursor)) else { return Vec::new() };
+        // Edge picks of `view` whose model edge passes `keep`.
+        let edge_picks = |view: ViewId, keep: &dyn Fn(&noshape_model::drawing::views::ModelEdge) -> bool| -> Vec<u32> {
+            let Some(g) = self.geoms.get(&view) else { return Vec::new() };
+            b.picks
+                .iter()
+                .enumerate()
+                .filter_map(|(i, p)| match p {
+                    PickTarget::Edge { view: v, edge } if *v == view => g.edges.get(*edge as usize).and_then(|e| g.model_edges.get(e.model? as usize)).filter(|me| keep(me)).map(|_| i as u32),
+                    _ => None,
+                })
+                .collect()
+        };
+        if let TableKind::Hole { view, origin, .. } = &t.kind {
+            let tag = self.cell_text(*id, r, 0);
+            let Some(g) = self.geoms.get(view) else { return Vec::new() };
+            let Some(row) = noshape_model::drawing::tables::hole_rows(g, *origin).into_iter().find(|h| h.tag == tag) else { return Vec::new() };
+            let c = row.center;
+            return edge_picks(*view, &|me| matches!(me.geom, noshape_model::drawing::views::EdgeGeom::Circle { center, .. } if (center[0] - c[0]).hypot(center[1] - c[1]) < 1e-7));
+        }
+        let TableKind::Bom { view: bom_view, .. } = &t.kind else { return Vec::new() };
         let item = self.cell_text(*id, r, 0);
         if item.is_empty() || item == "Item" {
             return Vec::new();
+        }
+        // The row's part in every view of the table's source.
+        let sheet = self.current_sheet();
+        let key = noshape_model::drawing::views::view_source(sheet, *bom_view).map(|(k, _)| k);
+        let bodies: Vec<_> = key
+            .as_ref()
+            .and_then(|k| self.sources.get(k))
+            .and_then(|s| item.parse::<usize>().ok().and_then(|n| s.bom.iter().find(|e| e.item == n)))
+            .map(|e| e.bodies.clone())
+            .unwrap_or_default();
+        let mut part_edges: Vec<u32> = Vec::new();
+        if !bodies.is_empty() {
+            for v in sheet.views.iter().filter(|v| noshape_model::drawing::views::view_source(sheet, v.id).map(|(k, _)| k) == key) {
+                part_edges.extend(edge_picks(v.id, &|me| bodies.contains(&me.body)));
+            }
         }
         // Callouts whose text is the item number.
         let balloons: Vec<u64> = self.current_sheet().annotations.iter().filter(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Balloon { .. })).map(|a| a.id).collect();
@@ -246,7 +279,9 @@ impl DrawingEditor {
                 _ => None,
             })
             .collect();
-        b.picks.iter().enumerate().filter(|(_, t)| matches!(t, PickTarget::Annotation(a) if hits.contains(a))).map(|(i, _)| i as u32).collect()
+        let mut out: Vec<u32> = b.picks.iter().enumerate().filter(|(_, t)| matches!(t, PickTarget::Annotation(a) if hits.contains(a))).map(|(i, _)| i as u32).collect();
+        out.extend(part_edges);
+        out
     }
 
     /// Double-click a BOM cell: its value with "Override" (grayed out when
