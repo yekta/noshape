@@ -342,7 +342,8 @@ impl Regenerator {
                         ev.cancel = opts.cancel.clone();
                         ev.editing_sketch = opts.editing_sketch;
                         ev.features = &effective;
-                        ev.derived = opts.derived.clone();
+                        // The sheet metal form library's studios too (`library:<id>`).
+                        ev.derived = Some(Arc::new(crate::sheetmetal::forms::WithLibrary(opts.derived.clone())));
                         ev.custom = opts.custom_features.clone();
                         ev.custom_type = crate::custom::is_custom(&f.type_id).then(|| f.type_id.clone());
                         let specs = f.feature_type().map(|t| t.params.as_slice()).unwrap_or(&[]);

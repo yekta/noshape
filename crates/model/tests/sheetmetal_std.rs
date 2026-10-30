@@ -816,6 +816,67 @@ fn qa4_s1_enclosure_as_live() {
     assert!(ok(flange, (20295.0752, 34)) && ok(hem, (22074.8607, 43)) && ok(cut, (20805.4123, 61)), "flange {flange:?}, hem {hem:?}, cut {cut:?}: {:#?}", face_report(&r));
 }
 
+/// The form library's Circle emboss studio at its defaults (t 1 mm): Add
+/// material 273.799790 mm³, Subtract material 217.909344 (live dom/sm-forms-v4).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn library_circle_emboss_tools_as_live() {
+    let _ = Studio::new();
+    let studio = noshape_model::sheetmetal::forms::studio("circle-emboss").expect("studio");
+    let r = Regenerator::new().regenerate(&studio, &studio.configuration.defaults(), &UnitPrefs::default(), &RegenOptions::default());
+    let st: Vec<_> = r.display.features.iter().map(|f| (f.status, f.message.clone())).collect();
+    let v: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.volume().unwrap_or(0.0) * 1e9).collect();
+    assert!(v.len() == 2 && (v[0] - 273.79979).abs() < 1e-5 && (v[1] - 217.909344).abs() < 1e-5, "{v:?} {st:?} attrs {}", r.context.fs_attributes.len());
+}
+
+/// The form library's Circle emboss with its defaults on a 2 mm plate (live
+/// "live form emboss", behaviours "skasm (2026-10-30) Onshape sheet metal
+/// forms library"): 9694.552619769172 mm³, 14 faces (PLANE 8, TORUS 4,
+/// CONE 2), the top a 0.0147 mm disc.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn library_circle_emboss_as_live() {
+    let mut s = Studio::new();
+    let region = s.rectangle(80.0, 60.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let top = face_at(&r, DVec3::new(40.0, 30.0, 2.0));
+    let mut sk = noshape_sketch::Sketch::new();
+    let point = sk.add_point(glam::DVec2::new(mm(40.0), mm(30.0)));
+    // On a plane at the top face (a sketch on the face itself has its x
+    // axis along -X here).
+    let plane = s.add("cPlane", |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        p.set("offset", expr("2 mm"));
+    });
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::FeaturePlane(plane)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.add("sheetMetalFormed", |p| {
+        p.set("formPartStudio", ParamValue::Text("library:circle-emboss".into()));
+        p.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: point.0 }]));
+        p.set("targetFaces", ParamValue::Query(vec![top]));
+    });
+    let r = s.ok();
+    let faces = r.context.bodies[part(&r)].shape.faces();
+    let kinds = faces.iter().fold([0usize; 4], |mut n, f| {
+        n[match f.face_surface() {
+            Ok(noshape_kernel::Surface::Plane(_)) => 0,
+            Ok(noshape_kernel::Surface::Torus { .. }) => 1,
+            Ok(noshape_kernel::Surface::Cone { .. }) => 2,
+            _ => 3,
+        }] += 1;
+        n
+    });
+    assert!((volume_mm3(&r) - 9694.552619769172).abs() < 1e-3 && kinds == [8, 4, 2, 0], "{} mm³, PLANE/TORUS/CONE/other {kinds:?}: {:#?}", volume_mm3(&r), face_report(&r));
+}
+
 /// A cut on an active sheet metal part stays when a later sheet metal
 /// feature rebuilds the part (Onshape cuts the definition sheet: std
 /// handleSheetMetalCutAndAttribution). Plate 60 × 40, Ø10 hole at (30, 20)

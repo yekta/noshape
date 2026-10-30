@@ -118,6 +118,7 @@ pub fn evaluator(type_id: &str) -> Option<EvalFn> {
         "sheetMetalBend" => sheetmetal::bend,
         "sheetMetalJog" => sheetmetal::jog,
         "sheetMetalFormed" => sheetmetal::form,
+        "smFormTool" => crate::sheetmetal::forms::tool_feature,
         "sheetMetalLoft" => sheetmetal::loft,
         "sheetMetalMakeJoint" => sheetmetal::make_joint,
         "sheetMetalJoint" => sheetmetal::modify_joint,

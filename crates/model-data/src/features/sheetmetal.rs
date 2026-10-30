@@ -15,6 +15,7 @@ pub fn register(out: &mut Vec<FeatureType>) {
     out.push(bend());
     out.push(jog());
     out.push(form());
+    out.push(form_tool());
     out.push(sheet_metal_loft());
     out.push(make_joint());
     out.push(corner());
@@ -429,6 +430,24 @@ pub fn form() -> FeatureType {
         ParamSpec::query("targetFaces", "Target face(s)", QueryFilter::PLANAR_FACE),
     ];
     FeatureType::new("sheetMetalFormed", "Form", Category::SheetMetal, p).icon("form").describe("Stamp a form tool onto sheet metal walls")
+}
+
+/// A form of the sheet metal form library: its tools from the form's
+/// configuration (the built-in form Part Studios, noshape-model-core's
+/// `sheetmetal::forms`). Not in the toolbar.
+pub fn form_tool() -> FeatureType {
+    let p = vec![
+        ParamSpec::text("form", "Form", ""),
+        ParamSpec::enum_("part", "Part", &[("ADD", "Add material"), ("SUBTRACT", "Subtract material")]),
+        ParamSpec::num("thickness", "Thickness", NumSpec::positive_length(1.0, 0.04)),
+        ParamSpec::num("diameter", "Diameter", NumSpec::positive_length(5.0, 0.2)),
+        ParamSpec::num("height", "Height", NumSpec::positive_length(5.0, 0.2)),
+        ParamSpec::angle("draft", "Angle", 90.0),
+        ParamSpec::enum_("radiusControl", "Radius control", &[("Default", "Double thickness"), ("Thickness", "Thickness"), ("Half_thickness", "Half thickness"), ("Custom", "Custom")]),
+        ParamSpec::num("intRadius", "Internal radius", NumSpec::positive_length(1.0, 0.04)),
+        ParamSpec::num("extRadius", "External radius", NumSpec::positive_length(1.0, 0.04)),
+    ];
+    FeatureType::new("smFormTool", "Form tool", Category::SheetMetal, p).hidden().icon("form").describe("A form of the sheet metal form library")
 }
 
 pub fn sheet_metal_loft() -> FeatureType {
