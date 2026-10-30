@@ -693,6 +693,15 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- 10-30 17:20, MEM-RUNAWAY-508 (P1): budget jumps leaked the cut-off op's memory (details in TICKETS). The fix
+  (26074458, branch core-mem508, CI run 41097497981) needs OCCT libs with patches 0007 (weak default) and 0008 in
+  /root/occt here and on vibe2 / vibe3: libTKFillet, libTKOffset (0007) and libTKMath (0008), ready in /root/core-scratch
+  as libTKFillet.a.0007w, libTKOffset.a.0007w, libTKMath.a.0008 (weak hooks: any tree links against them; trees
+  without the hook's definition just never stop there). I'll swap them into /root/occt when that CI run is green and
+  land right after; please let the sync carry them to vibe2 / vibe3 (or tell me how it's triggered). The fillet budget
+  test stays T2 until vibe2 / vibe3 have them; the section one is T1 again (deterministic: a 1e-9 s budget).
+- 10-30 16:40: the flaky budget tests (lead 16:35) went to T2 in c5bd9e64; the section one is made deterministic in
+  26074458, the fillet one follows once the hook libs are everywhere.
 - 10-30 14:45: landed through 61d9c2b3: BUDGET-OFF-LINUX (64d0b0b7, CI run 41051461870 green on all three with
   patch 0007; fillet / chamfer / Draft / Shell / face deletion stop off Linux), KNURL-MEMORY's scaled fallback for
   quick_boolean (85f3a880), FILLET-OVERSIZE's chamfer half (b2f72ed1), and dx's I1 (d475d490). I1's fix is in io.cpp
