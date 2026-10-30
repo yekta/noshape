@@ -458,7 +458,7 @@ fn bend_geometry(topo: &Topo, e: usize, fa: usize, fb: usize, radius: f64, front
 /// not past a joint or a free side running on in line (as [`pulled_sides`]).
 fn pulled_face(face: &Shape, l: &Loop, n: DVec3, offset: &[f64], free: impl Fn(usize) -> bool) -> FResult<Shape> {
     let wire = outer_wire(face).ok_or_else(|| fe("A sheet metal wall has no boundary"))?;
-    let base = k::make_face_from_wire(&wire, true).map_err(|e| fe(e.to_string()))?;
+    let base = on_definition(face, &wire, DVec3::ZERO)?;
     let big = face.bounding_box(false).map_err(|e| fe(e.to_string()))?.diagonal() * 2.0;
     let m = l.pts.len();
     let mut strips = Vec::new();
@@ -480,6 +480,19 @@ fn pulled_face(face: &Shape, l: &Loop, n: DVec3, offset: &[f64], free: impl Fn(u
         return Ok(base);
     }
     Ok(k::boolean(k::BooleanOp::Cut, &[base], &strips, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal wall failed: {e}")))?.shape)
+}
+
+/// A face bounded by `wire` on definition face `face`'s plane moved by
+/// `shift`, with that plane's axes: a sketch on the wall's faces gets the
+/// definition's frame (live request 1619: a sketch on a sheet metal plate's
+/// top has x = +X, as on an extruded plate's; a plane fitted to the outline
+/// turned it). Any other face: the outline's own.
+fn on_definition(face: &Shape, wire: &Shape, shift: DVec3) -> FResult<Shape> {
+    match face.face_surface() {
+        Ok(k::Surface::Plane(pl)) => k::make_face(&k::Plane::new(pl.origin + shift, pl.normal, pl.x_dir), wire, &[]),
+        _ => k::make_face_from_wire(wire, true),
+    }
+    .map_err(|e| fe(e.to_string()))
 }
 
 /// Where pulled side `k`'s line runs inside the pulled face `pf`: the piece
@@ -1311,7 +1324,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             None => {
                 let pts: Vec<DVec3> = outline_points(pulled).into_iter().map(|p| p - n * back).collect();
                 let wire = k::make_polyline(&pts, true).map_err(|e| fe(e.to_string()))?;
-                k::make_face_from_wire(&wire, true).map_err(|e| fe(e.to_string()))?
+                on_definition(&topo.faces[fi], &wire, -n * back)?
             }
         };
         let mut slab = k::extrude(&base, n * (front + back)).map_err(|e| fe(format!("Sheet metal wall failed: {e}")))?.shape;

@@ -949,16 +949,15 @@ fn library_circle_emboss_as_live() {
     let top = face_at(&r, DVec3::new(40.0, 30.0, 2.0));
     let mut sk = noshape_sketch::Sketch::new();
     let point = sk.add_point(glam::DVec2::new(mm(40.0), mm(30.0)));
-    // On a plane at the top face (a sketch on the face itself has its x
-    // axis along -X here).
-    let plane = s.add("cPlane", |p| {
-        p.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        p.set("offset", expr("2 mm"));
-    });
+    // On the top face itself, as live: its frame is x = +X, y = +Y from the
+    // world origin's projection (request 1619), so the point is at (40, 30, 2).
     let sketch = s.add("sketch", |pv| {
-        pv.set("sketchPlane", ParamValue::Query(vec![Reference::FeaturePlane(plane)]));
+        pv.set("sketchPlane", ParamValue::Query(vec![top.clone()]));
         pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
     });
+    let f = s.ok().context.sketch(sketch).expect("sketch").frame;
+    let at = (f.origin + f.x * mm(40.0) + f.y * mm(30.0)) * 1e3;
+    assert!(at.distance(DVec3::new(40.0, 30.0, 2.0)) < 1e-6 && f.x.distance(DVec3::X) < 1e-9, "the point at {at:?}, x {:?}", f.x);
     s.add("sheetMetalFormed", |p| {
         p.set("formPartStudio", ParamValue::Text("library:circle-emboss".into()));
         p.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: point.0 }]));
@@ -1260,4 +1259,3 @@ fn joint_births_follow_live_letters() {
         }
     }
 }
-
