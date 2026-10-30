@@ -114,20 +114,14 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   feature built it (`FlatPattern::built_for`, `body_key`), else the native flattener on std's data (a later Hole's
   hole and counterbore heads); per-vertex Bend relief settings (`Definition::reliefs`); pulled wall sides that come
   out reversed are dropped (Modify joint radius on a corner a later flange shortened); ops' table skips stale parts.
-- Open: Closed corner volume (sheetmetal_std closed_corner_matches_live: 23 faces as live, PLANE 17 / CYLINDER 4 /
-  OTHER 2, cylinders within 0.002 mm², but 8535.1616 vs live 8535.0418 mm³: our bend ends are one exact rational
-  B-spline face each, ruled along the radial lines with x(θ) = x0 + (x1 − x0) sin θ / sin angle (`closed_cutter`);
-  live answered (behaviours "skasm (2026-10-30) Closed corner bend end", request 1602): its end face is ruled
-  radially too (B-spline 1×3, 50 poles), x(θ) within 0.0008 of ours, worth only −0.003 mm³: the +0.12 is elsewhere,
-  not found yet (face areas all match within 0.002 mm²));
-  Butt joint direction on a Convert (sheetmetal_frames convert_rips_and_bends: Direction 1 should be the top wall;
-  ours follows the converted part's face order; flanges now follow live's pick order, request 1599 (b), through
-  getAttributes keeping its entities' order); rect→triangle loft (51 vs 49 faces); holes through std's own sheet
-  metal hole path (std hole.fs handleSheetMetalCutAndAttribution: HOLE_NO_HITS on our host; holes still run natively
-  and the flat follows the part); the flat view's right-click lacks New sketch…, Copy Flat pattern…, Create Drawing
-  of Flat pattern… (needs a flat drawing source: dx), Select other…, Zoom to selection; table letters follow feature
-  order, live's Onshape's own joint order. The flat's Export as DXF/DWG modal (flat_export.rs) has live's fields;
-  its splines / z-height / tangent / counterbore / form / sketch checkboxes don't change the file yet.
+- Open (10-30 morning): (1) **table letters**: live orders joints by their definition edge's creation (transient id
+  order; an edge a later feature rebuilds moves to the end; request 1604), ours by feature then bends before rips;
+  needs a creation sequence for definition edges our names don't carry. (2) **Butt joint Direction 1 after a Convert**
+  and evaluateQuery order generally: live returns faces in creation order (extrude: first side, start cap, end cap,
+  other sides; rebuilt faces last; request 1608), ours in body order. (3) rect→triangle loft: 51 vs 49 faces (live's
+  2 swept faces where three bends meet; their place unknown). (4) Flat view: Copy Flat pattern (live pastes a flat part
+  instance into an assembly), Select other…, the sketch frame in the flat view. Closed corner: done (live's regen
+  volume 8535.1655548, request 1606; its 8535.0418 was /massproperties).
 - Cuts on sheet metal (10-30): Extrude / Revolve / Sweep / Loft adding to or cutting an active sheet metal part run by
   std (`std_route::SHEET_METAL_AWARE`), so the cut goes into the definition and lasts (host @opCreateOutline, planar
   faces; the rebuild cuts each wall's inner loops). Simple Holes on active sheet metal cut through std's booleanBodies

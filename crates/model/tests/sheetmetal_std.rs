@@ -251,9 +251,9 @@ fn vertex_at(r: &RegenResult, p: DVec3) -> Reference {
 /// (8535.0418 mm³, 23 faces: PLANE 17, CYLINDER 4, OTHER 2; the bends run
 /// into the corner, cylinders r4 372.3144324 / r2 186.1572163 on the front,
 /// and end in OTHER faces of 10.4192 mm² 0.02 mm apart across the diagonal).
-/// Ours: the same faces, cylinders within 0.002 mm², but 0.12 mm³ more. The
-/// bend ends are ruled radially as live's (request 1602: live's x(θ) is
-/// within 0.0008 of ours, −0.003 mm³), so the excess is elsewhere.
+/// Live's 8535.0418 is its /massproperties figure, 0.124 low on the spline
+/// bend ends; its regeneration's evVolume is 8535.1655548 (request 1606).
+/// Ours is within 0.004 of that (live's x(θ) is a 50-pole fit, request 1602).
 #[test]
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn closed_corner_matches_live() {
@@ -267,7 +267,7 @@ fn closed_corner_matches_live() {
     let r = s.ok();
     let report = face_report(&r);
     let count = |kind: &str| report.iter().filter(|f| f.starts_with(kind)).count();
-    assert!((volume_mm3(&r) - 8535.0418).abs() < 0.15 && (count("PLANE"), count("CYLINDER"), count("OTHER")) == (17, 4, 2), "{} mm³: {report:#?}", volume_mm3(&r));
+    assert!((volume_mm3(&r) - 8535.1655548).abs() < 0.01 && (count("PLANE"), count("CYLINDER"), count("OTHER")) == (17, 4, 2), "{} mm³: {report:#?}", volume_mm3(&r));
 }
 
 /// The part's faces: type, area (mm²) and a point on each (mm), for failures.

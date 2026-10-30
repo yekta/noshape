@@ -194,6 +194,13 @@ impl PartStudioView {
         let Some(model) = self.sheet_metal_context(&models) else { return };
         let model_name = models.iter().find(|(f, _)| *f == model).map(|(_, n)| n.clone()).unwrap_or_default();
         let Some(body) = self.context.as_ref().and_then(|c| c.sheet_metal.iter().find(|(_, d)| d.model == model).map(|(b, _)| b.clone())) else { return };
+        // New sketch…: on the base wall's face on the flat's side (live
+        // request 1605: "Face of Sheet metal 1", while the model is active).
+        let sketch_face = self.context.as_ref().and_then(|c| c.sheet_metal.get(&body)).filter(|d| d.active).and_then(|d| {
+            let w = d.walls.iter().find(|w| !w.is_virtual())?;
+            let side = if d.view_back { &w.back } else { &w.faces };
+            side.first().map(|n| noshape_model::reference::Reference::Face((**n).clone()))
+        });
         let part = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_default();
         let sketch = self.studio(cx).and_then(|s| s.feature(model).and_then(|f| noshape_model::interaction::source_sketch(&s.features, f)).and_then(|id| s.feature(id).map(|f| (id, f.name.clone()))));
         let (view, fv) = (cx.entity(), self.flat_view.clone());
@@ -203,8 +210,9 @@ impl PartStudioView {
         // DXF/DWG of Flat pattern of <part>… | Select other… | Add comment |
         // Zoom to fit, Zoom to selection, View normal to | Delete <model>.
         // "Add comment" is cloud (not built, as in the other menus).
-        // TODO(SM4): New sketch…, Copy Flat pattern… and Select other… (asked
-        // live what they do: REQUESTS skasm 2026-10-30 04:00).
+        // Not built: Copy Flat pattern of <part> (live pastes a flat-pattern
+        // part instance into an assembly: our flats aren't parts) and Select
+        // other… (the flat's two faces; the flat view has no selection yet).
         let menu = OsMenu::build(window, cx, move |m, _, _| {
             type Action = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
             let item = |label: String, f: Action| {
@@ -222,11 +230,17 @@ impl PartStudioView {
             }
             let b = body.clone();
             let (f1, f2, f3) = (fv.clone(), fv.clone(), fv.clone());
-            m.item(item(format!("Show dependencies of {model_name}…"), Box::new(move |this, _, cx| {
+            let mut m = m.item(item(format!("Show dependencies of {model_name}…"), Box::new(move |this, _, cx| {
                 this.ui.dependencies = Some(model);
                 cx.notify();
-            })))
-            .separator()
+            })));
+            if let Some(face) = sketch_face.clone() {
+                m = m.separator().item(item("New sketch…".into(), Box::new(move |this, w, cx| {
+                    this.selection = vec![face.clone()];
+                    this.start_feature("sketch", w, cx);
+                })));
+            }
+            m.separator()
             .item(item(format!("Create Drawing of Flat pattern of {part}…"), {
                 let (b, part) = (b.clone(), part.clone());
                 Box::new(move |this, w, cx| {
