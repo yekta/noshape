@@ -132,6 +132,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - GD&T / surface finish hover: only view edges and dimensions (pick.rs), since other annotations can overlap an
   extension line (cl1's annotation 3 did). App checks on :147: w3/t30-*, t31-* (t31.noshape).
 - Asked live 18:02: BOM Template list / DWT templates / Update properties from a template, Lock drawing properties.
+- Landed 441ee2c5 (V28, A41, A44, CR5, D15, D40). Next batch: EX18 image menu (Copy / Paste as table / Move to ▸ /
+  Bring to front / Send to back; images in the drawing clipboard), EX17 two-click image placement, V21 partial by
+  dragging a cutting line's end inside the part (all checked in the app :147: w3/ex2-*, v21-*).
+- Asked live (A43): the Surface finish dialog's types, six cells, All around / Parenthesis, Direction lay, Add row.
 
 ## Afternoon 10-30 (landed through b76761b6, 16:49 UTC)
 - From live 1613: TB5 grid-line drags (the fixed-corner side's row / column, the table grows) ✅; EX18 image menu

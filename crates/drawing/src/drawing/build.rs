@@ -1960,9 +1960,10 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     let pick = picks.id(PickTarget::SectionLine(v.id));
                     let mut pts: Vec<[f64; 2]> = cut.points.iter().map(|p| ppl.to_sheet(*p)).collect();
                     // Both end legs run 0.25 in past the view's geometry (live
-                    // qa4-r5-s11.dxf, drw2-k: exactly 6.35 mm / 0.25 in).
+                    // qa4-r5-s11.dxf, drw2-k: exactly 6.35 mm / 0.25 in); a
+                    // partial section's line stays as placed.
                     let n = pts.len();
-                    for (e, i) in [(0, 1), (n - 1, n - 2)] {
+                    for (e, i) in [(0, 1), (n - 1, n - 2)].into_iter().filter(|_| !cut.partial) {
                         let d = [pts[e][0] - pts[i][0], pts[e][1] - pts[i][1]];
                         let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
                         if l < 1e-9 {

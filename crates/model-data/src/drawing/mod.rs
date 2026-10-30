@@ -2510,6 +2510,9 @@ pub struct SheetImage {
     pub data_base64: std::sync::Arc<str>,
     pub pos: [f64; 2],
     pub size: [f64; 2],
+    /// Move to ▸ (live request 1613).
+    #[serde(default, skip_serializing_if = "SheetLayer::is_drawing")]
+    pub layer: SheetLayer,
 }
 
 impl Sheet {

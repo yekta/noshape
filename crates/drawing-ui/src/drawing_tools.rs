@@ -1004,7 +1004,7 @@ impl DrawingEditor {
             cx.stop_propagation();
             return;
         }
-        if e.button == MouseButton::Left && self.image_mouse_down() {
+        if e.button == MouseButton::Left && self.image_mouse_down(cx) {
             cx.stop_propagation();
             return;
         }
@@ -1407,13 +1407,35 @@ impl DrawingEditor {
                     Drag::NoteGrip { .. } => "Resize note",
                     _ => "Move detail circle",
                 };
-                if let Some(p) = self.preview.take() {
+                if let Some(mut p) = self.preview.take() {
+                    // A section line's end pulled inside the part makes a
+                    // partial section, pulled out again a full one (help V21).
+                    if let Drag::MoveSectionPoint { view, .. } = drag {
+                        self.section_partial_by_ends(&mut p, view);
+                    }
                     self.commit(name, p, cx);
                 }
             }
             _ => {}
         }
         cx.notify();
+    }
+
+    /// A straight section view's `partial` from its cutting line's ends in
+    /// `d`: partial when an end lies inside the part (a closed region of the
+    /// parent view's visible edges).
+    fn section_partial_by_ends(&self, d: &mut Drawing, view: ViewId) {
+        let sheet = &d.sheets[self.sheet];
+        let Some(v) = sheet.view(view) else { return };
+        let ViewKind::Section { parent, line, .. } = &v.kind else { return };
+        let (Some(a), Some(b)) = (line.first(), line.last()) else { return };
+        let Some(pl) = self.placement(*parent) else { return };
+        let pk = self.pk();
+        let inside = |p: &[f64; 2]| pk.view_region_at(*parent, pl.to_sheet(*p)).is_some();
+        let partial = inside(a) || inside(b);
+        if let Some(v) = d.sheets[self.sheet].view_mut(view) {
+            v.partial = partial;
+        }
     }
 
     /// Wheel / two-finger scroll: zoom about the pointer with Onshape's amounts

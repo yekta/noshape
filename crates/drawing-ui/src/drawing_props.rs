@@ -421,7 +421,8 @@ impl DrawingEditor {
         let anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(a) = s { Some(*a) } else { None }).collect();
         let tables: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Table(t) = s { Some(*t) } else { None }).collect();
         let sketch: Vec<u32> = self.selection.iter().filter_map(|s| if let Sel::Sketch(e) = s { Some(*e) } else { None }).collect();
-        if let Ok(c) = self.drawing.copy_selection(self.sheet, &anns, &tables, &sketch) {
+        let images: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Image(i) = s { Some(*i) } else { None }).collect();
+        if let Ok(c) = self.drawing.copy_selection(self.sheet, &anns, &tables, &sketch, &images) {
             cx.write_to_clipboard(ClipboardItem::new_string(c.to_json()));
             cx.notify();
         }

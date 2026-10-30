@@ -8,6 +8,7 @@ use crate::drawing_view::*;
 use gpui_kit::*;
 use noshape_render::{Drawable, ImageData, ImageHandle, Instance};
 use noshape_model::document::TabId;
+use noshape_model::drawing::SheetLayer;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -28,7 +29,7 @@ fn decode_rgba(data_base64: &str) -> Option<ImageData> {
 
 impl DrawingEditor {
     /// Toolbar › Insert image: pick an image file tab of the document (or
-    /// Import one), then click and drag to place it.
+    /// Import one), then two clicks set opposite corners of its box.
     pub fn insert_image(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let this = cx.entity().downgrade();
         let doc = self.doc.clone();
@@ -38,7 +39,7 @@ impl DrawingEditor {
                 match read {
                     Ok(aspect) => {
                         this.tool = Tool::PlaceImage { name: file.file_name.clone(), data: file.data_base64.clone(), aspect, start: None };
-                        this.status = Some("Click and drag to place the image".into());
+                        this.status = Some("Click two opposite corners to place the image".into());
                     }
                     Err(e) => this.status = Some(format!("Insert image failed: {e}").into()),
                 }
@@ -53,25 +54,42 @@ impl DrawingEditor {
         self.pk().image_box(start, aspect)
     }
 
-    /// Mouse down while placing: the drag starts. True when used.
-    pub fn image_mouse_down(&mut self) -> bool {
-        if let Tool::PlaceImage { start, .. } = &mut self.tool {
-            *start = Some(self.cursor);
-            return true;
+    /// Mouse down while placing: the first click sets a corner, the second
+    /// the opposite one (live request 1613: two clicks). True when used.
+    pub fn image_mouse_down(&mut self, cx: &mut Context<Self>) -> bool {
+        match &mut self.tool {
+            Tool::PlaceImage { start: start @ None, .. } => {
+                *start = Some(self.cursor);
+                self.status = Some("Click to place the opposite corner".into());
+                cx.notify();
+                true
+            }
+            Tool::PlaceImage { start: Some(_), .. } => {
+                self.place_image(cx);
+                true
+            }
+            _ => false,
         }
-        false
     }
 
-    /// Mouse up while placing: the image goes in. True when used.
+    /// Mouse up while placing: a drag places the image at once, a click
+    /// waits for the second corner. True when used.
     pub fn image_mouse_up(&mut self, cx: &mut Context<Self>) -> bool {
-        let Tool::PlaceImage { name, data, aspect, start: Some(start) } = self.tool.clone() else { return false };
+        let Tool::PlaceImage { start, .. } = &self.tool else { return false };
+        if start.is_some_and(|s| (self.cursor[0] - s[0]).hypot(self.cursor[1] - s[1]) > self.tol_mm(6.0)) {
+            self.place_image(cx);
+        }
+        true
+    }
+
+    fn place_image(&mut self, cx: &mut Context<Self>) {
+        let Tool::PlaceImage { name, data, aspect, start: Some(start) } = self.tool.clone() else { return };
         let (pos, size) = self.image_box(start, aspect);
         self.tool = Tool::Select;
         self.status = None;
         self.edit_sheet("Insert image", cx, |s| {
             noshape_scene::drawing_tools::add_sheet_image(s, name, data, pos, size);
         });
-        true
     }
 
     pub fn image_overlay(&self, overlay: &mut crate::drawing_scene::Overlay) {
@@ -149,6 +167,20 @@ impl DrawingEditor {
         self.status = Some("Failed to resolve image target tab".into());
     }
 
+    /// Bring to front / Send to back: the image list is the stacking order.
+    fn order_image(&mut self, id: u64, front: bool, cx: &mut Context<Self>) {
+        self.edit_sheet(if front { "Bring to front" } else { "Send to back" }, cx, |s| {
+            if let Some(i) = s.images.iter().position(|x| x.id == id) {
+                let im = s.images.remove(i);
+                if front {
+                    s.images.push(im);
+                } else {
+                    s.images.insert(0, im);
+                }
+            }
+        });
+    }
+
     /// Image properties... (live 1613 (a)): read only.
     fn open_image_props(&mut self, id: u64, cx: &mut Context<Self>) {
         let Some(im) = self.current_sheet().images.iter().find(|i| i.id == id).cloned() else { return };
@@ -165,7 +197,8 @@ impl DrawingEditor {
     }
 
     /// Context menu of an image (live 1613 (a), in order): Image
-    /// properties..., Show / Hide image borders, Paste, (ours: Move to sheet
+    /// properties..., Show / Hide image borders, Paste, Copy, Paste as
+    /// table, Move to ▸, Bring to front, Send to back, (ours: Move to sheet
     /// ▸), Switch to <image tab>, Clear selection, Zoom to fit, Delete.
     pub fn image_entries(&self, id: u64, cx: &App) -> Vec<MenuEntry> {
         let borders = self.drawing.props.image_borders;
@@ -189,7 +222,35 @@ impl DrawingEditor {
             MenuEntry::item("Image properties...", move |t, _, cx| t.open_image_props(id, cx)),
             MenuEntry::item(noshape_ops::drawing::image_borders_label(borders), move |t, _, cx| t.edit(noshape_ops::drawing::IMAGE_BORDERS, cx, |d| d.props.image_borders = !borders)),
             crate::drawing_props::paste_always(),
+            MenuEntry::item("Copy", move |t, _, cx| {
+                if !t.selection.contains(&Sel::Image(id)) {
+                    t.selection = vec![Sel::Image(id)];
+                }
+                t.copy_entities(cx);
+            }),
+            MenuEntry::item("Paste as table", |t, _, cx| {
+                t.start_paste_table(cx);
+            }),
         ];
+        let sheet = self.current_sheet();
+        let cur = sheet.images.iter().find(|i| i.id == id).map(|i| i.layer).unwrap_or_default();
+        let layers: Vec<MenuEntry> = SheetLayer::FORMAT
+            .iter()
+            .copied()
+            .chain((!cur.is_drawing()).then_some(SheetLayer::Drawing))
+            .filter(|l| *l != cur)
+            .map(|l| {
+                MenuEntry::item(l.name(), move |t, _, cx| {
+                    t.edit_sheet("Move to", cx, |s| s.images.iter_mut().filter(|i| i.id == id).for_each(|i| i.layer = l));
+                })
+            })
+            .collect();
+        out.push(MenuEntry::Submenu("Move to".into(), layers));
+        // The image list is their stacking order; live greys Bring to front
+        // when the image is already in front.
+        let front = sheet.images.last().is_some_and(|i| i.id == id);
+        out.push(MenuEntry::item("Bring to front", move |t, _, cx| t.order_image(id, true, cx)).disabled(front));
+        out.push(MenuEntry::item("Send to back", move |t, _, cx| t.order_image(id, false, cx)));
         if !sheets.is_empty() {
             out.push(MenuEntry::Submenu("Move to sheet".into(), sheets));
         }

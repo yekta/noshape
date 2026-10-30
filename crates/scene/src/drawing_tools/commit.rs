@@ -745,6 +745,14 @@ impl SheetPick<'_> {
         if matches!(view.kind, ViewKind::Detail { .. }) || !view.breaks.is_empty() {
             return None;
         }
+        Some((self.view_region_at(v, s)?, Some(v)))
+    }
+
+    /// The smallest closed region of view `v`'s visible edges containing
+    /// sheet point `s` (view coordinates).
+    pub fn view_region_at(&self, v: ViewId, s: [f64; 2]) -> Option<Profile> {
+        use noshape_sketch::DVec2;
+        let pts = |l: &noshape_sketch::ProfileLoop, tol: f64| l.tessellate(tol).into_iter().map(|p| [p.x, p.y]).collect::<Vec<_>>();
         let pl = self.placement(v)?;
         let g = self.geoms.get(&v)?;
         let mut sk = noshape_sketch::Sketch::new();
@@ -764,7 +772,7 @@ impl SheetPick<'_> {
         let c = DVec2::new(p[0], p[1]);
         let regions = sk.regions();
         let r = regions.iter().filter(|r| r.contains(c)).min_by(|a, b| a.area().abs().total_cmp(&b.area().abs()))?;
-        Some(((pts(&r.outer, 1e-5), r.holes.iter().map(|h| pts(h, 1e-5)).collect()), Some(v)))
+        Some((pts(&r.outer, 1e-5), r.holes.iter().map(|h| pts(h, 1e-5)).collect()))
     }
 }
 
@@ -834,7 +842,7 @@ pub fn image_aspect(bytes: &[u8]) -> Result<f64, String> {
 /// Insert image: the image goes on the sheet; its id.
 pub fn add_sheet_image(s: &mut Sheet, name: String, data_base64: std::sync::Arc<str>, pos: [f64; 2], size: [f64; 2]) -> u64 {
     let id = s.images.iter().map(|i| i.id).max().unwrap_or(0) + 1;
-    s.images.push(SheetImage { id, name, data_base64, pos, size });
+    s.images.push(SheetImage { id, name, data_base64, pos, size, layer: SheetLayer::Drawing });
     id
 }
 

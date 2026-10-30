@@ -34,7 +34,7 @@ impl ViewClipboard {
     pub fn from_json(text: &str) -> Option<Self> {
         let c: ViewClipboard = serde_json::from_str(text).ok()?;
         let s = &c.sheet;
-        (c.noshape_drawing_views == 1 && !(s.views.is_empty() && s.annotations.is_empty() && s.tables.is_empty() && s.sketch.sketch.entity_count() == 0)).then_some(c)
+        (c.noshape_drawing_views == 1 && !(s.views.is_empty() && s.annotations.is_empty() && s.tables.is_empty() && s.images.is_empty() && s.sketch.sketch.entity_count() == 0)).then_some(c)
     }
 
     /// Live's message when these views can't be pasted into `document` /
@@ -57,7 +57,8 @@ impl ViewClipboard {
             return a;
         }
         let mut pts: Vec<[f64; 2]> = if self.sheet.views.is_empty() {
-            self.sheet.annotations.iter().map(|a| a.position).chain(self.sheet.tables.iter().map(|t| t.position)).collect()
+            let images = self.sheet.images.iter().map(|i| [i.pos[0] + i.size[0] / 2.0, i.pos[1] + i.size[1] / 2.0]);
+            self.sheet.annotations.iter().map(|a| a.position).chain(self.sheet.tables.iter().map(|t| t.position)).chain(images).collect()
         } else {
             self.sheet.views.iter().map(|v| v.position).collect()
         };
@@ -106,12 +107,12 @@ pub trait DrawingClipboard {
     /// Copy annotations and tables of sheet `sheet` (Copy on a note,
     /// callout, GD&T frame, datum, surface finish or weld symbol, table).
     fn copy_entities(&self, sheet: usize, annotations: &[u64], tables: &[u64]) -> Result<ViewClipboard, String> {
-        self.copy_selection(sheet, annotations, tables, &[])
+        self.copy_selection(sheet, annotations, tables, &[], &[])
     }
 
-    /// Annotations, tables and drawing sketch entities (with their styles;
-    /// live request 1598, qa DWG-LINE-COPY).
-    fn copy_selection(&self, sheet: usize, annotations: &[u64], tables: &[u64], sketch: &[u32]) -> Result<ViewClipboard, String>;
+    /// Annotations, tables, drawing sketch entities (with their styles;
+    /// live request 1598, qa DWG-LINE-COPY) and images (live request 1613).
+    fn copy_selection(&self, sheet: usize, annotations: &[u64], tables: &[u64], sketch: &[u32], images: &[u64]) -> Result<ViewClipboard, String>;
 
     /// Copy views `ids` of sheet `sheet` (with their derived views and attached
     /// annotations and tables).
@@ -119,25 +120,26 @@ pub trait DrawingClipboard {
 }
 
 impl DrawingClipboard for Drawing {
-    fn copy_selection(&self, sheet: usize, annotations: &[u64], tables: &[u64], sketch: &[u32]) -> Result<ViewClipboard, String> {
+    fn copy_selection(&self, sheet: usize, annotations: &[u64], tables: &[u64], sketch: &[u32], images: &[u64]) -> Result<ViewClipboard, String> {
         let src = self.sheets.get(sheet).ok_or("No sheet")?;
         let annotations: Vec<_> = src.annotations.iter().filter(|a| annotations.contains(&a.id)).cloned().collect();
         let tables: Vec<_> = src.tables.iter().filter(|t| tables.contains(&t.id)).cloned().collect();
+        let images: Vec<_> = src.images.iter().filter(|i| images.contains(&i.id)).cloned().collect();
         let mut sk = super::sheet_sketch::SheetSketch::default();
         if !sketch.is_empty() {
             let ids: Vec<noshape_sketch::EntityId> = sketch.iter().map(|i| noshape_sketch::EntityId(*i)).collect();
             sk.sketch = src.sketch.sketch.extract(&ids);
             sk.styles = src.sketch.styles.iter().filter(|(k, _)| sketch.contains(k)).map(|(k, v)| (*k, *v)).collect();
         }
-        if annotations.is_empty() && tables.is_empty() && sk.sketch.entity_count() == 0 {
+        if annotations.is_empty() && tables.is_empty() && images.is_empty() && sk.sketch.entity_count() == 0 {
             return Err("Nothing to copy".into());
         }
-        Ok(ViewClipboard { noshape_drawing_views: 1, sheet: Sheet { views: vec![], annotations, tables, sketch: sk, ..src.clone() }, anchor: None, origin: None })
+        Ok(ViewClipboard { noshape_drawing_views: 1, sheet: Sheet { views: vec![], annotations, tables, images, sketch: sk, ..src.clone() }, anchor: None, origin: None })
     }
 
     fn copy_views(&self, sheet: usize, ids: &[ViewId], sources: Option<&Sources>) -> Result<ViewClipboard, String> {
         let src = self.sheets.get(sheet).ok_or("No sheet")?;
-        let mut tmp = Drawing { sheets: vec![src.clone(), Sheet { views: vec![], annotations: vec![], tables: vec![], sketch: Default::default(), ..src.clone() }], projection: self.projection, units_mm: self.units_mm, props: self.props.clone(), active_sheet: 0, continuation: None, drawn_by: self.drawn_by.clone(), sources_at: None, meta: self.meta.clone() };
+        let mut tmp = Drawing { sheets: vec![src.clone(), Sheet { views: vec![], annotations: vec![], tables: vec![], images: vec![], sketch: Default::default(), ..src.clone() }], projection: self.projection, units_mm: self.units_mm, props: self.props.clone(), active_sheet: 0, continuation: None, drawn_by: self.drawn_by.clone(), sources_at: None, meta: self.meta.clone() };
         tmp.move_views_to_sheet(0, ids, 1, sources)?;
         Ok(ViewClipboard { noshape_drawing_views: 1, sheet: tmp.sheets.swap_remove(1), anchor: None, origin: None })
     }
@@ -247,6 +249,13 @@ impl SheetPaste for Sheet {
             t.position = [t.position[0] + d[0], t.position[1] + d[1]];
             self.tables.push(t);
         }
+        // Images, with new ids.
+        for im in &clip.sheet.images {
+            let mut im = im.clone();
+            im.id = self.images.iter().map(|i| i.id).max().unwrap_or(0) + 1;
+            im.pos = [im.pos[0] + d[0], im.pos[1] + d[1]];
+            self.images.push(im);
+        }
         // Drawing sketch entities, with their styles.
         let sk = &clip.sheet.sketch;
         if clip.sheet.views.is_empty() && sk.sketch.entity_count() > 0 {
@@ -322,7 +331,7 @@ mod tests {
         let l = s0.sketch.sketch.add_line(noshape_sketch::DVec2::new(10.0, 10.0), noshape_sketch::DVec2::new(30.0, 10.0));
         s0.sketch.styles.insert(l.0, crate::drawing::sheet_sketch::SketchStyle { color: Some([255, 0, 0]), ..Default::default() });
         s0.sketch.sketch.add_circle(noshape_sketch::DVec2::new(100.0, 100.0), 5.0);
-        let clip = ViewClipboard::from_json(&d.copy_selection(0, &[], &[], &[l.0]).unwrap().to_json()).expect("a sketch copy round trips");
+        let clip = ViewClipboard::from_json(&d.copy_selection(0, &[], &[], &[l.0], &[]).unwrap().to_json()).expect("a sketch copy round trips");
         assert!(d.copy_entities(0, &[], &[]).is_err());
         let before = d.sheets[0].sketch.sketch.entity_count();
         d.sheets[0].paste_views(&clip, Some([50.0, 50.0]));
@@ -334,6 +343,22 @@ mod tests {
         let (pa, pb) = (sk.sketch.point(a).unwrap(), sk.sketch.point(b).unwrap());
         assert!(((pa + pb) / 2.0 - noshape_sketch::DVec2::new(50.0, 50.0)).length() < 1e-6, "{pa} {pb}");
         assert_eq!(sk.style(new.id).color, Some([255, 0, 0]));
+    }
+
+    /// Copy on an image (live request 1613): it pastes centred on the
+    /// cursor with a new id; nothing else of the sheet comes along.
+    #[test]
+    fn copy_and_paste_an_image() {
+        let mut d = Drawing::default();
+        let im = |id: u64, pos: [f64; 2]| crate::drawing::SheetImage { id, name: "a.png".into(), data_base64: "AAAA".into(), pos, size: [20.0, 10.0], layer: Default::default() };
+        d.sheets[0].images = vec![im(1, [10.0, 10.0]), im(2, [100.0, 100.0])];
+        let clip = ViewClipboard::from_json(&d.copy_selection(0, &[], &[], &[], &[2]).unwrap().to_json()).expect("an image copy round trips");
+        assert_eq!(clip.sheet.images.len(), 1);
+        d.sheets[0].paste_views(&clip, Some([50.0, 50.0]));
+        let ims = &d.sheets[0].images;
+        assert_eq!(ims.len(), 3);
+        assert_eq!(ims[2].id, 3);
+        assert_eq!(ims[2].pos, [40.0, 45.0]);
     }
 
     #[test]
