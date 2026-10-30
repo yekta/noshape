@@ -732,6 +732,38 @@ fn butt_joint_direction_follows_the_first_picked_flange_edge() {
     }
 }
 
+/// A cut after the flanges keeps their bends (std cuts the definition sheet;
+/// the joints' attributes ride on the split and untouched edges): g34, a
+/// Ø10 hole through the plate at (30, 20).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_cut_after_flanges_keeps_the_bends() {
+    let mut s = g34();
+    s.ok();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(glam::DVec2::new(mm(30.0), mm(20.0)), mm(5.0));
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
+    let key = sk.regions.iter().min_by(|a, b| a.area.total_cmp(&b.area)).expect("region").key.clone();
+    s.add("extrude", |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        p.set("operationType", en("REMOVE"));
+        p.set("defaultScope", ParamValue::Bool(true));
+        p.set("endBound", en("THROUGH_ALL"));
+        p.set("hasSecondDirection", ParamValue::Bool(true));
+        p.set("secondDirectionBound", en("THROUGH_ALL"));
+    });
+    let r = s.ok();
+    let solids = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).count();
+    let data = r.context.sheet_metal.get(&r.context.bodies[part(&r)].id).expect("data");
+    let hole = std::f64::consts::PI * 25.0 * 2.0;
+    assert!(solids == 1 && data.bends.len() == 2 && (volume_mm3(&r) - (8511.4987 - hole)).abs() < 1e-3, "{solids} solids, {} bends, {} mm³", data.bends.len(), volume_mm3(&r));
+}
+
 /// A cut on an active sheet metal part stays when a later sheet metal
 /// feature rebuilds the part (Onshape cuts the definition sheet: std
 /// handleSheetMetalCutAndAttribution). Plate 60 × 40, Ø10 hole at (30, 20)

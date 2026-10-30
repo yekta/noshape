@@ -292,17 +292,19 @@ impl CtxState {
     /// metal definition's vertices are renamed when a flange adds faces
     /// beside them; live keeps their association attributes).
     pub fn remap_attributes(&mut self, changed: &HashSet<BodyId>) {
-        let moves: Vec<(Reference, Reference, (BodyId, query::Snapshot))> = {
+        // Each moved entity's new place, or its pieces when split (each
+        // gets the attribute, as Parasolid's split keeps it on both).
+        let moves: Vec<(Reference, Vec<(Reference, (BodyId, query::Snapshot))>)> = {
             let q = query::QueryCx::new(self);
             let mut out = Vec::new();
             for (r, (body, snap)) in &self.attr_snapshots {
                 if !changed.contains(body) {
                     continue;
                 }
-                if let Some(e) = query::relocated(&q, r, snap)
-                    && let Some(s) = q.attribute_snapshot(&q.to_ref(&e))
-                {
-                    out.push((r.clone(), q.to_ref(&e), s));
+                let Some(pieces) = query::relocated_pieces(&q, r, snap) else { continue };
+                let to: Vec<(Reference, (BodyId, query::Snapshot))> = pieces.iter().filter_map(|e| Some((q.to_ref(e), q.attribute_snapshot(&q.to_ref(e))?))).collect();
+                if !to.is_empty() {
+                    out.push((r.clone(), to));
                 }
             }
             out
@@ -311,17 +313,22 @@ impl CtxState {
             return;
         }
         // All at once: one entity's new name may be another's old one.
-        let map: HashMap<Reference, Reference> = moves.iter().map(|(o, n, _)| (o.clone(), n.clone())).collect();
-        for (r, _) in self.attributes.iter_mut() {
-            if let Some(n) = map.get(r) {
-                *r = n.clone();
+        let map: HashMap<Reference, Vec<Reference>> = moves.iter().map(|(o, to)| (o.clone(), to.iter().map(|(n, _)| n.clone()).collect())).collect();
+        let mut copies = Vec::new();
+        for (r, v) in self.attributes.iter_mut() {
+            if let Some(to) = map.get(r) {
+                copies.extend(to[1..].iter().map(|n| (n.clone(), v.clone())));
+                *r = to[0].clone();
             }
         }
-        for (old, _, _) in &moves {
+        self.attributes.extend(copies);
+        for (old, _) in &moves {
             self.attr_snapshots.remove(old);
         }
-        for (_, new, snap) in moves {
-            self.attr_snapshots.insert(new, snap);
+        for (_, to) in moves {
+            for (new, snap) in to {
+                self.attr_snapshots.insert(new, snap);
+            }
         }
     }
 

@@ -454,6 +454,21 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 if tools.len() < 2 {
                     return Err(super::code_error("BOOLEAN_BAD_INPUT"));
                 }
+                // keepTools: the tools stay, their common volume is a new body
+                // (std's sheet metal boolean trims its tool by each thickened
+                // definition face in turn, then deletes the trimmed piece: the
+                // tool must outlive the first face, qa4 S1's slot).
+                if keep {
+                    let shapes: Vec<Shape> = tools.iter().filter_map(|id| index(ev, id)).map(|i| ev.ctx.bodies[i].shape.clone()).collect();
+                    let res = k::boolean(k::BooleanOp::Common, &shapes[..1], &shapes[1..], &k::BooleanOptions::default())?;
+                    if res.shape.faces().is_empty() {
+                        return Ok(None);
+                    }
+                    let names = fresh_names(ev, &res.shape);
+                    let kind = solid_kind(&res.shape);
+                    add_bodies(ev, vec![NamedShape::new(res.shape, names)], kind)?;
+                    return Ok(None);
+                }
                 let first = index(ev, &tools[0]).ok_or_else(|| fe("missing body"))?;
                 let others: Vec<NamedShape> = tools[1..].iter().filter_map(|id| index(ev, id)).map(|i| body_named(ev, i)).collect();
                 let remove: Vec<BodyId> = tools[1..].to_vec();
@@ -763,7 +778,12 @@ fn op_thicken(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let t2 = def_length(i, &def, "thickness2")?;
     run_op(i, &cx, &id, "THICKEN_FAILED", |ev| {
         let mut shapes: Vec<Shape> = ev.resolve_faces(&refs).iter().filter_map(|(b, f)| ev.face_shape(*b, *f).ok()).collect();
-        for bi in ev.resolve_bodies(&refs) {
+        // Sheet bodies given as bodies; a face stands for itself, not its
+        // body (std's sheet metal boolean thickens one definition face of a
+        // many-face sheet: the whole sheet came out too, qa4 S1's slot cut
+        // nothing).
+        let bodies: Vec<Reference> = refs.iter().filter(|r| !matches!(r, Reference::Face(_) | Reference::Edge(_))).cloned().collect();
+        for bi in ev.resolve_bodies(&bodies) {
             if ev.ctx.bodies[bi].kind == BodyKind::Surface {
                 shapes.push(ev.ctx.bodies[bi].shape.clone());
             }

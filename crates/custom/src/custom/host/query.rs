@@ -834,17 +834,17 @@ impl QueryCx<'_> {
 }
 
 /// Where an attributed entity is now, if an operation renamed it (its name
-/// gone, or now naming another entity): the one entity of its kind lying
-/// where it was. `None`: it is where it was, or nothing (or several) is.
-pub fn relocated(q: &QueryCx, r: &Reference, snap: &Snapshot) -> Option<Ent> {
+/// gone, or now naming another entity): what of its kind lies where it was,
+/// its pieces when the operation split it (a definition edge a cut runs across: Parasolid gives
+/// every piece the attribute, and std's assignSMAttributesToNewOrSplitEntities
+/// sorts them out).
+pub fn relocated_pieces(q: &QueryCx, r: &Reference, snap: &Snapshot) -> Option<Vec<Ent>> {
     let found = q.from_ref(r);
     if !found.is_empty() && found.iter().all(|e| snap_matches(q, snap, e)) {
         return None;
     }
-    match q.tracked(snap, false).as_slice() {
-        [e] => Some(e.clone()),
-        _ => None,
-    }
+    let pieces = q.tracked(snap, false);
+    (!pieces.is_empty()).then_some(pieces)
 }
 
 fn snap_matches(q: &QueryCx, snap: &Snapshot, e: &Ent) -> bool {
