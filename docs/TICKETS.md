@@ -427,6 +427,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     window pays. This commit adds NOSHAPE_PERF_SCRIPT_WAIT_MS (start the edit that long after the studio is shown)
     to confirm with a run started 2 s after opening.
   - core 03:25: REGEN-SPEED's perf.yml run 40796942944 (main 34cbea98) has the Extrude 1 edit commit at 34 / 38 / 60 ms (macOS / Linux / Windows, budget 200). psui / qa: please confirm "commit shown in" on a current perf run and close.
+  qa 17:28 (green e20a0d67, local Xvfb + llvmpipe, a sanity check, not the runners' measure): live-30, 5 Extrude 1 depth edits (bin/editloop3.sh) all commit, preview regen 102–153 ms, full regen ≤ 30 ms, app alive; no step over the 200 ms budget in the logs.
 - [x] 3f5f69ed (core: extruded cylinders framed as live, z toward the sketch; CP1 matches, out of KNOWN; R3/C1 now flip the pin as live, the solver's −157.5° turn is skasm's) P0 `model/tests/oracle_asm::assemblies_match_live` CP1 regressed by 339de774 (cylinder frame); fs suspects the
   cylinder axis should point toward the sketch (also CP1, R3, C1). Red at the halt.
 - [x] cc6c4b54 (core: live's rule, a blind hole's bottom within 2t of the floor fails the shell before OCCT runs; back in T1) P0 `model/tests/qa_regressions::shell_that_breaks_the_part_fails` red on macOS arm64 in every CI run of 10-26 (T2
