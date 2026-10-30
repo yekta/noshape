@@ -179,7 +179,7 @@ pub fn last_boolean_path() -> String {
 }
 
 /// With NOSHAPE_KERNEL_PROFILE set: prints the kernel calls made since the
-/// last mark under `label` (one feature's) and starts counting again.
+/// last mark under `label` (one feature's) and starts counting again; an empty `label` only starts again.
 pub fn kernel_profile_mark(label: &str) {
     ffi::kernel_profile_mark(label)
 }

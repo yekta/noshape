@@ -2020,7 +2020,8 @@ void kernel_profile_mark(rust::Str label)
   KernelProfile&              p = kernel_profile();
   const LockedSection locked_section_1762;
   std::lock_guard<std::mutex> g(p.lock);
-  p.print(" " + std::string(label));
+  if (label.size() > 0) // an empty label drops them (a bench's setup)
+    p.print(" " + std::string(label));
   p.calls.clear();
 }
 

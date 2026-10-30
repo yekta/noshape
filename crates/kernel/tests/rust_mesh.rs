@@ -279,7 +279,7 @@ fn bench_profile_fin_plate_display_mesh() {
     for c in &copies {
         let _ = c.ancestor_map(ShapeType::Edge, ShapeType::Face).unwrap();
     }
-    kernel_profile_mark("setup");
+    kernel_profile_mark("");
     let t = std::time::Instant::now();
     for c in &copies {
         mesh(c, true);
