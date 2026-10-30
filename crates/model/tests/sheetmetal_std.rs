@@ -816,6 +816,53 @@ fn qa4_s1_enclosure_as_live() {
     assert!(ok(flange, (20295.0752, 34)) && ok(hem, (22074.8607, 43)) && ok(cut, (20805.4123, 61)), "flange {flange:?}, hem {hem:?}, cut {cut:?}: {:#?}", face_report(&r));
 }
 
+/// The Form dialog's editing logic (std formedEditLogic) fills Target
+/// face(s) from the location: a point on the plate's top gives the top face
+/// (live 1616 f-5: "Face of Sheet metal model 1").
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn form_editing_logic_fills_the_target_face() {
+    for on_face in [false, true] {
+        let mut s = plate("2 mm");
+        let r = s.ok();
+        let top = face_at(&r, DVec3::new(30.0, 20.0, 2.0));
+        let plane = if on_face {
+            top.clone()
+        } else {
+            let pl = s.add("cPlane", |p| {
+                p.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+                p.set("offset", expr("2 mm"));
+            });
+            Reference::FeaturePlane(pl)
+        };
+        // The point at world (30, 20, 2), in the sketch's own frame.
+        let sketch = s.add("sketch", |pv| {
+            pv.set("sketchPlane", ParamValue::Query(vec![plane]));
+            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData::default())));
+        });
+        let r = s.ok();
+        let frame = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch").frame;
+        let w = DVec3::new(mm(30.0), mm(20.0), mm(2.0)) - frame.origin;
+        let mut sk = noshape_sketch::Sketch::new();
+        let point = sk.add_point(glam::DVec2::new(w.dot(frame.x), w.dot(frame.y)));
+        let f = s.ps.features.iter_mut().find(|f| f.id == sketch).expect("sketch feature");
+        f.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        s.ok();
+        s.add("sheetMetalFormed", |p| {
+            p.set("formPartStudio", ParamValue::Text("library:circle-emboss".into()));
+            p.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: point.0 }]));
+        });
+        let index = s.ps.features.len() - 1;
+        let new = s.ps.features[index].params.clone();
+        // As the dialog asks: the Form Part Studio picked first, then the location.
+        let mut before = new.clone();
+        before.set("locations", ParamValue::Query(Vec::new()));
+        let specified = ["formPartStudio".to_string(), "locations".to_string()];
+        let changed = noshape_model::custom::std_feature::editing_logic(&s.ps, index, &ConfigValues::default(), &s.units, &RegenOptions::default(), &before, &new, &specified, true).expect("editing logic");
+        assert!(matches!(changed.get("targetFaces"), Some(ParamValue::Query(q)) if q.len() == 1), "on face {on_face}: {changed:?}");
+    }
+}
+
 /// The form library's studios' tools (Add, Subtract material, mm³) in the
 /// configurations live measured them in (dom/sm-forms-v4, currentConfiguration).
 #[test]

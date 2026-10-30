@@ -660,7 +660,17 @@ fn built(id: &str, values: &ConfigValues) -> Option<Arc<Context>> {
     }
     let r = crate::regen::Regenerator::new().regenerate(&studio, &all, &UnitPrefs::default(), &crate::regen::RegenOptions::default());
     let ok = r.display.features.iter().all(|f| !matches!(f.status, crate::display::FeatureStatus::Error));
-    let ctx = ok.then_some(r.context);
+    // The native Form (legacy sheet metal studios) takes its tools from
+    // `form_tools`, which only the native Tag fills: the two tools.
+    let ctx = ok.then(|| {
+        let mut c = (*r.context).clone();
+        if c.form_tools.is_empty() {
+            let solids: Vec<BodyId> = c.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| b.id.clone()).collect();
+            let feature = studio.features.last().map_or(crate::reference::FeatureId(0), |f| f.id);
+            c.form_tools.push(crate::sheetmetal::FormTool { feature, add: solids.first().cloned(), remove: solids.get(1).cloned(), sketch: None, origin: None });
+        }
+        Arc::new(c)
+    });
     BUILT.lock().ok()?.insert(key, ctx.clone());
     ctx
 }
