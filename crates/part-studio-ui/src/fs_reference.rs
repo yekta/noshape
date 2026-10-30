@@ -337,6 +337,35 @@ pub async fn render_thumbnails(gpu: crate::gpu::Gpu, doc: Document, tabs: Vec<no
     out
 }
 
+/// 70×40 pictures of the sheet metal form library's forms (their Add
+/// material at the defaults), keyed `library:<id>` like their rows (live
+/// f-3: a thumbnail per form).
+pub async fn render_library_thumbnails(gpu: crate::gpu::Gpu) -> Vec<(String, std::sync::Arc<RenderImage>)> {
+    use noshape_model::display::BodyKind;
+    use noshape_model::regen::{RegenOptions, Regenerator};
+    use noshape_model::sheetmetal::forms;
+    let mut out = Vec::new();
+    for f in forms::FORMS {
+        let Some(ps) = forms::studio(f.id) else { continue };
+        let r = Regenerator::new().regenerate(&ps, &ps.configuration.defaults(), &noshape_units::UnitPrefs::default(), &RegenOptions::default());
+        let mut d = r.display.clone();
+        let Some(add) = d.bodies.iter().find(|b| b.kind == BodyKind::Solid).map(|b| b.id.clone()) else { continue };
+        for b in &mut d.bodies {
+            b.hidden = b.id != add;
+        }
+        let opts = crate::scene_builder::SceneOptions { show_planes: false, show_sketches: false, show_origin: false, ..Default::default() };
+        let mut cache = crate::scene_builder::GpuCache::default();
+        let built = crate::scene_builder::build(&d, &opts, &mut cache, gpu.uploader());
+        let Some((lo, hi)) = built.scene.bounds() else { continue };
+        let camera = crate::start_thumbnail::fit_camera(lo.as_dvec3(), hi.as_dvec3(), 140. / 80.);
+        let Ok(png) = gpu.render_png(std::sync::Arc::new(built.scene), camera, crate::start_thumbnail::thumbnail_style(), 140, 80).await else { continue };
+        if let Some(img) = decode(&png) {
+            out.push((format!("{}{}", forms::PREFIX, f.id), img));
+        }
+    }
+    out
+}
+
 /// A camera looking at the box normal to a sketch plane (its X right).
 fn fit_camera_normal(lo: glam::DVec3, hi: glam::DVec3, aspect: f64, frame: &noshape_model::display::PlaneFrame) -> noshape_render::Camera {
     let mut camera = noshape_render::Camera { rotation: noshape_render::Camera::look_rotation(-frame.normal, frame.y), ..Default::default() };

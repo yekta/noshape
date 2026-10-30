@@ -1945,13 +1945,25 @@ impl PartStudioView {
             d.ref_gpu = Some(gpu_for_dialog);
             cx.notify();
         });
+        // The Form's library forms' pictures (live f-3), in the background.
+        if dialog.read(cx).ty.id == "sheetMetalFormed" {
+            let (gpu, dialog) = (self.gpu.clone(), dialog.downgrade());
+            cx.spawn(async move |_, cx| {
+                let pictures = cx.background_spawn(crate::fs_reference::render_library_thumbnails(gpu)).await;
+                let _ = dialog.update(cx, |d, cx| {
+                    d.ref_thumbs.extend(pictures);
+                    cx.notify();
+                });
+            })
+            .detach();
+        }
         // Pictures of the other Part Studios and their parts, in the background.
         if wants_pictures && !studios.is_empty() {
             let (gpu, dialog) = (self.gpu.clone(), dialog.downgrade());
             cx.spawn(async move |_, cx| {
                 let pictures = cx.background_spawn(crate::fs_reference::render_thumbnails(gpu, doc, studios, |t| t.to_string())).await;
                 let _ = dialog.update(cx, |d, cx| {
-                    d.ref_thumbs = pictures.into_iter().collect();
+                    d.ref_thumbs.extend(pictures);
                     cx.notify();
                 });
             })
@@ -2008,7 +2020,8 @@ impl PartStudioView {
         }
         // Derived's Part Studio field names its studio from these too (qa5
         // DOC3: a pasted part opened with the empty "Select Part Studio…").
-        if is_derived || dialog.read(cx).ty.params.iter().any(|s| matches!(s.kind, noshape_model::params::ParamKind::Reference { .. })) {
+        // The Form's Form Part Studio too (its library's pictures).
+        if is_derived || dialog.read(cx).ty.id == "sheetMetalFormed" || dialog.read(cx).ty.params.iter().any(|s| matches!(s.kind, noshape_model::params::ParamKind::Reference { .. })) {
             self.set_reference_sources(&dialog, cx);
         }
         let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &DialogEvent, window, cx| match ev {
