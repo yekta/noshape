@@ -134,6 +134,12 @@ pub struct SelectItemPanel {
     cfg_edit: HashMap<String, ConfigValues>,
     cfg_selects: HashMap<(String, String), (Entity<crate::os_select::OsSelect>, Subscription)>,
     cfg_fields: HashMap<(String, String), (Entity<InputState>, Subscription)>,
+    /// The Libraries tab's form (its Form ▾) and that select.
+    lib_form: Option<String>,
+    lib_select: Option<(Entity<crate::os_select::OsSelect>, Subscription)>,
+    /// A library form's values as last Generate preview'ed (Select takes
+    /// them only then, live request 1622 (d)).
+    lib_generated: HashMap<String, ConfigValues>,
     _subs: Vec<Subscription>,
 }
 
@@ -240,6 +246,9 @@ impl SelectItemPanel {
             cfg_edit: HashMap::new(),
             cfg_selects: HashMap::new(),
             cfg_fields: HashMap::new(),
+            lib_form: None,
+            lib_select: None,
+            lib_generated: HashMap::new(),
             _subs: subs,
         }
     }
@@ -486,7 +495,7 @@ impl SelectItemPanel {
                 .collect();
             if open && let Some(cfg) = s.configuration.clone() {
                 let tab = s.tab.clone();
-                out.push(self.config_editor(&tab, &cfg, taken, window, cx));
+                out.push(self.config_editor(&tab, &cfg, taken, false, window, cx));
             }
             // Live 409 (qa5 DER10): a changed configuration empties the
             // contents until Generate lists them again.
@@ -509,6 +518,70 @@ impl SelectItemPanel {
         out
     }
 
+    /// The Libraries tab under Library / Type (live 1622 (d), psui/forms
+    /// f-3): Form ▾, its inputs and [Generate preview], the form's picture
+    /// (a stored 240 × 136 thumbnail: Generate doesn't redraw it), and
+    /// [Select] at the bottom, off while there are values not yet
+    /// previewed; it sets the field.
+    fn render_library_form(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        use noshape_model::sheetmetal::forms;
+        let pal = p();
+        let sources = library_sources();
+        let picked = source_of(split_value(&self.value).0);
+        let key = self.lib_form.clone().filter(|k| sources.iter().any(|s| &s.tab == k)).or_else(|| sources.iter().find(|s| s.tab == picked).map(|s| s.tab.clone())).unwrap_or_else(|| format!("{}{}", forms::PREFIX, forms::FORMS[0].id));
+        let select = match &self.lib_select {
+            Some((s, _)) => s.clone(),
+            None => {
+                let s = cx.new(|_| crate::os_select::OsSelect::new("sel-lib-form"));
+                let sub = cx.subscribe(&s, |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, cx| {
+                    let crate::os_select::OsSelectEvent::Picked(id) = ev;
+                    this.lib_form = Some(id.to_string());
+                    cx.notify();
+                });
+                self.lib_select = Some((s.clone(), sub));
+                s
+            }
+        };
+        let items: Vec<(SharedString, SharedString)> = sources.iter().map(|s| (SharedString::from(s.tab.clone()), SharedString::from(s.name.clone()))).collect();
+        select.update(cx, |s, _| s.set_items(items, key.clone()));
+        let form_row = h_flex()
+            .h(px(30.))
+            .px(px(6.))
+            .gap(px(6.))
+            .child(div().w(px(56.)).flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("Form"))
+            .child(div().flex_1().child(select));
+        let mut col = v_flex().id("sel-library-form").flex_1().min_h_0().overflow_y_scroll().pt(px(2.)).child(form_row);
+        let Some(cfg) = sources.iter().find(|s| s.tab == key).and_then(|s| s.configuration.clone()) else { return col.into_any_element() };
+        col = col.child(self.config_editor(&key, &cfg, Vec::new(), true, window, cx));
+        if let Some(img) = self.thumbs.get(&key) {
+            col = col.child(div().pl(px(23.)).pt(px(6.)).child(gpui_kit::img(img.clone()).w(px(240.)).h(px(136.)).object_fit(ObjectFit::Contain)));
+        }
+        let (changed, editing) = self.preview_changed(&key, &cfg);
+        let select_button = div()
+            .id("sel-lib-select")
+            .h(px(30.))
+            .px(px(16.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(px(3.))
+            .bg(pal.accent)
+            .text_size(px(14.67))
+            .text_color(gpui_kit::rgb(0xffffff))
+            .when(changed, |d| d.opacity(0.4))
+            .when(!changed, |d| d.cursor_pointer().hover(|d| d.bg(pal.accent_hover)))
+            .child("Select")
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                if changed {
+                    return;
+                }
+                this.cfg_edit.remove(&key);
+                this.lib_generated.remove(&key);
+                this.pick(join_value(&key, &editing), cx);
+            }));
+        v_flex().flex_1().min_h_0().child(col).child(h_flex().flex_none().justify_end().p(px(8.)).border_t_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(select_button)).into_any_element()
+    }
+
     /// A configured Part Studio's inputs under its row (live fs-refcfg-panel:
     /// 40 px indent, Size ▾, ☐ Hole, Len, Txt) and Generate, pale until a
     /// value changes; Generate applies the configuration to the field.
@@ -523,12 +596,21 @@ impl SelectItemPanel {
         (editing != effective, editing)
     }
 
-    fn config_editor(&mut self, key: &str, cfg: &Configuration, taken: Vec<String>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
+    /// A library form's inputs changed since its last Generate preview
+    /// (or since it was picked), and the values being edited.
+    fn preview_changed(&self, key: &str, cfg: &Configuration) -> (bool, ConfigValues) {
         let (changed, editing) = self.config_changed(key, cfg);
+        (self.lib_generated.get(key).map_or(changed, |g| *g != editing), editing)
+    }
+
+    /// `preview`: a library form's (live 1622 (d)): "Generate preview"
+    /// only takes the values for [Select], the field keeps its value.
+    fn config_editor(&mut self, key: &str, cfg: &Configuration, taken: Vec<String>, preview: bool, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let (changed, editing) = if preview { self.preview_changed(key, cfg) } else { self.config_changed(key, cfg) };
         // Live 741: labels only as wide as their text, the editor fills the rest.
         let label = |t: String| div().pt(px(7.)).px(px(5.)).flex_none().text_size(px(12.)).line_height(px(16.)).text_color(gpui_kit::rgb(0x666666)).child(t);
-        let mut col = v_flex().pl(px(40.)).pr(px(26.));
+        let mut col = v_flex().pl(px(if preview { 6. } else { 40. })).pr(px(if preview { 6. } else { 26. }));
         for input in &cfg.inputs {
             let Some(name) = input_label(key, input, &editing) else { continue };
             let current = editing.0.get(&input.id).cloned().unwrap_or_default();
@@ -603,7 +685,7 @@ impl SelectItemPanel {
                 div()
                     .id(SharedString::from(format!("sel-cfg-generate-{key}")))
                     .ml(px(3.))
-                    .w(px(81.))
+                    .w(px(if preview { 130. } else { 81. }))
                     .h(px(30.))
                     .flex()
                     .items_center()
@@ -615,8 +697,15 @@ impl SelectItemPanel {
                     .text_color(pal.text)
                     .when(!changed, |d| d.opacity(0.25))
                     .when(changed, |d| d.cursor_pointer().hover(|d| d.bg(pal.panel_hover)))
-                    .child("Generate")
+                    .child(if preview { "Generate preview" } else { "Generate" })
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if preview {
+                            if let Some(cfg) = this.cfg_edit.get(&key2).cloned() {
+                                this.lib_generated.insert(key2.clone(), cfg);
+                            }
+                            cx.notify();
+                            return;
+                        }
                         let Some(cfg) = this.cfg_edit.remove(&key2) else { return };
                         let (base, _) = split_value(&this.value);
                         let base = if source_of(base) == key2 { base.to_string() } else { key2.clone() };
@@ -1062,8 +1151,7 @@ impl Render for SelectItemPanel {
                     )
             };
             body = body.child(v_flex().pt(px(6.)).gap(px(2.)).child(pick_row("Library", "Onshape sheet metal forms")).child(pick_row("Type", "Onshape form library")));
-            let items = self.source_rows(&library_sources(), &query, window, cx);
-            body = body.child(v_flex().id("sel-library-list").flex_1().min_h_0().pt(px(4.)).overflow_y_scroll().children(items));
+            body = body.child(self.render_library_form(window, cx));
         } else if other && shown.is_none() {
             body = body.child(self.render_document_browser(cx));
         } else {
