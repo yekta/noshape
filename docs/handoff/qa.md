@@ -9,6 +9,7 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **10-30 20:15 update (greens a88e8c29 … cc8837a7):** green cc8837a7 (bool pattern detection + NOSHAPE_KERNEL_PROFILE in boolean.cpp) vs 76d8f633 in the app: 22 pattern documents (every 3rd of p72/p73/p74) Mass properties pixel-identical; skasm's faster sheet metal rebuild (a88e8c29) keeps every verified volume: smA 6888.407, smB 6988.938, smC 6938.673, g34 8511.499, facesketch 9543.451 mm³ (preview regen 0.48–1.45 s). Note: the 131 GUI fuzz loop shares :131; A/B scripts must pause it (touch /tmp/qa-fz-pause-131, wait for idle). CLI fuzz v0.4.15 seeds 641–656 clean, 661–680 queued.
 - **10-30 17:14 update (greens d11cddec … 94056b26):** verified FACE-SKETCH-FRAME (3d50d5be: a Hole sketched on a std plate's top
   face lands at +X: 9543.451 mm³; v0.4.15 misses), KNURL-FS-NO-OP (Diamond on core's CLI = live's 10362 faces / +1.05 mm³; the green
   app builds it in 441–478 s, its Mass properties unreadable there — the bottom-right strip wasn't drawn in that document),
