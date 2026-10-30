@@ -296,9 +296,14 @@ fn origins(o: &[Origin]) -> Vec<u32> {
 struct Occt;
 
 impl SectionSource for Occt {
-    fn sections(&self, a: (u32, u32), b: (u32, u32)) -> Result<Vec<SectionCurve>, Decline> {
+    fn sections(&self, a: (u32, u32), b: (u32, u32), moved: Option<noshape_brep::MovedPair>) -> Result<Vec<SectionCurve>, Decline> {
         let mut out = BrepSections::default();
-        let why = raw::brep_occt_sections(a.0, a.1, b.0, b.1, &mut out);
+        // (The canonical pair, then the motion: its matrix by rows and its translation.)
+        let moved: Vec<f64> = moved.map_or_else(Vec::new, |((ca, cb), r)| {
+            let m = r.m.transpose().to_cols_array();
+            [ca.0 as f64, ca.1 as f64, cb.0 as f64, cb.1 as f64].into_iter().chain(m).chain([r.t.x, r.t.y, r.t.z]).collect()
+        });
+        let why = raw::brep_occt_sections(a.0, a.1, b.0, b.1, &moved, &mut out);
         if !why.is_empty() {
             // (Reasons are static strings on the Rust side.)
             return Err(Decline(match why.as_str() {

@@ -769,6 +769,39 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   the knurl's 2-groove piece; OCCT's path goes through the same code). core's `boolean_budget` test builds a 16-groove
   knurl to exhaust OCCT's 64 MB budget; noshape's Boolean takes that one (branch bool-knurl sets it to OCCT's path).
 
+## Patterned tools, step 2 (10-30 21:30 UTC)
+- The generic part of the first knurl attempt, on main now: OCCT's sections of a pair of faces of two tools that are
+  rigid copies of another pair (`pattern::families`, by geometry, any feature) made once and moved
+  (`SectionSource::sections(.., moved)`, `MovedPair`; the C++ side caches by the canonical pair); faces apart by
+  their Bézier pieces' control points skipped; an edge on another's surface given up at its first clearly-off
+  point; coincident B-spline edges of two arguments (the curve on the face whose own edge it isn't by its ends;
+  the C++ side reparametrizes that face's own coincident edge's curve); the grey band on free-form faces against
+  OCCT's own curves; classification, crossings, edge and section splits and the faces' pairing pieces on all
+  threads, applied in their order (results unchanged); regions' longest-curve order with lengths found once.
+- Found on the way: the classification's ray against a Bézier piece (exact boxes) missed a crossing (Newton from
+  the piece's middle only, its steps stalling at rounding): a piece 1 mm from every face of a groove came out
+  inside it, and the knurl's "non-manifold result" was that. Now 9 starts per piece met and a stalled point taken
+  where it is on the ray (1e-12 m).
+- The knurl itself still goes OCCT's way, now declined before any section ("tools coincide", 0.1 s instead of
+  ~50–300 s of work first): each groove and its mirror image share their end cap on the cylinder's end face.
+  OCCT's history then says the cylinder's solid Deleted or Modified by whether its image shares a face with
+  another solid (BOPAlgo_BOP::BuildSolid keeps a solid as is only then; otherwise BOPAlgo_BuilderSolid makes a new
+  one): Deleted in the 10- and 26-groove pieces of it, Modified on the whole knurl; ours can't tell yet, so
+  declined (an early check: two tools' coplanar planar faces facing one way, one's middle clearly inside the
+  other).
+- bool_patterns now (here, loaded; ours / OCCT's): pocket grid 60–80 ms / 915 ms, gear slots 33 ms / 423 ms,
+  helical grooves 425–600 ms (rust; was OCCT's) / 670 ms, radial holes 690 ms (OCCT's: "a section without ends") /
+  450 ms, holes on a circle 3 ms (through-holes path), crossing helical grooves 11.5 s (OCCT's: tools coincide).
+  OCCT's result of the 16+16 crossing grooves is not valid (BRepCheck): 6.33e-5 m³, 101 faces, where the grooves
+  remove ~8e-7 m³ of the 7.85e-5 cylinder (ours, when it took it: 7.78e-5, 421 faces, valid). The bench compares
+  faces and volume only where OCCT's is valid, else needs ours valid.
+- psui: `noshape_brep::SectionSource` is `: Sync` and its `sections` takes `moved: Option<MovedPair>` (new public
+  `MovedPair`); `noshape_brep::pattern` is new. Nothing else public changed.
+- Replays, all 0 differ, the counts unchanged (main 772, corpus2 553, corpus3 556, corpus4 600, corpus5 717,
+  corpus6 662, Shell's 78, direct 58).
+- Next for the knurl (lead 17:45): its end caps (the "tools coincide" history) and the 26-groove piece's volume
+  (1.4e-9 off: OCCT seeds each section with the pave filler's edge/face points); then the period solve.
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|

@@ -15,6 +15,8 @@ fn boolean_over_its_memory_budget_stops_with_an_error() {
         std::env::set_var("NOSHAPE_BOP_PARALLEL", "1");
     }
     let _ = k::set_working_scale(1000.0);
+    // (OCCT's pave filler's budget: noshape's Boolean takes this knurl in a few MB, so off here.)
+    k::set_rust_boolean(Some(false));
     let frame = k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
     // A small cut stays well inside the budget.
     let block = k::make_box_corners(DVec3::ZERO, DVec3::splat(0.02)).unwrap();

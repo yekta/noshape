@@ -16,17 +16,28 @@ fn bench(name: &str, op: k::BooleanOp, object: &k::Shape, tools: &[k::Shape], op
         let r = k::boolean(op, std::slice::from_ref(object), tools, opts).unwrap_or_else(|e| panic!("{name}: {e}"));
         let ms = t.elapsed().as_secs_f64() * 1e3;
         let path = k::last_boolean_path();
+        // (Where noshape's Boolean declined: why.)
+        let path = if path != "rust" && rust.is_none() && !k::last_rust_decline().is_empty() { format!("{path}: {}", k::last_rust_decline()) } else { path };
         k::set_rust_boolean(None);
         let v: f64 = r.shape.volume().unwrap_or(0.0);
-        (ms, path, v, r.shape.count(k::ShapeType::Face))
+        (ms, path, v, r.shape.count(k::ShapeType::Face), r.shape.is_valid())
     };
     let ours = run(None);
     k::kernel_profile_mark(&format!("{name} (ours)"));
+    // (NOSHAPE_PATTERNS_OURS=1: noshape's way alone, not compared.)
+    if std::env::var_os("NOSHAPE_PATTERNS_OURS").is_some() {
+        eprintln!("pattern {name}: {:.1} ms ({}); {:.6e} m³, {} faces, valid {}", ours.0, ours.1, ours.2, ours.3, ours.4);
+        return;
+    }
     let occt = run(Some(false));
     k::kernel_profile_mark(&format!("{name} (OCCT)"));
-    eprintln!("pattern {name}: {:.1} ms ({}), OCCT {:.1} ms ({:.1}x); {:.6e} m³, {} faces; {} tools", ours.0, ours.1, occt.0, occt.0 / ours.0, ours.2, ours.3, tools.len());
-    assert_eq!(ours.3, occt.3, "{name}: faces");
-    assert!((ours.2 - occt.2).abs() <= 1e-9 * occt.2.abs(), "{name}: volume {} against OCCT's {}", ours.2, occt.2);
+    eprintln!("pattern {name}: {:.1} ms ({}), OCCT {:.1} ms ({:.1}x); {:.6e} m³, {} faces, valid {}; {} tools (OCCT's: {:.6e} m³, {} faces, valid {})", ours.0, ours.1, occt.0, occt.0 / ours.0, ours.2, ours.3, ours.4, tools.len(), occt.2, occt.3, occt.4);
+    // (Where OCCT's result isn't valid, ours must be: not the same as it.)
+    assert!(ours.4 || !occt.4, "{name}: not valid");
+    if occt.4 {
+        assert_eq!(ours.3, occt.3, "{name}: faces");
+        assert!((ours.2 - occt.2).abs() <= 1e-9 * occt.2.abs(), "{name}: volume {} against OCCT's {}", ours.2, occt.2);
+    }
 }
 
 fn rotated(tool: &k::Shape, axis_origin: DVec3, axis: DVec3, n: usize) -> Vec<k::Shape> {

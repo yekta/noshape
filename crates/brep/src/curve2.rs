@@ -441,10 +441,21 @@ impl C2 {
             C2::Arc { c, r, .. } => Some((c - DVec2::splat(r), c + DVec2::splat(r))),
             C2::Nurbs { ref c, t0, t1 } => Some(hull(&mut c.poles_of(t0, t1).iter().map(|p| p.truncate()))),
             C2::Mapped { ref c, t0, t1, m: Map::Plane { origin, u, v } } => Some(hull(&mut c.poles_of(t0, t1).iter().map(|p| DVec2::new((*p - origin).dot(u), (*p - origin).dot(v))))),
-            C2::Mapped { ref c, t0, t1, m: Map::Cyl { o, a, r, flip, th0, .. } } => {
+            C2::Mapped { ref c, t0, t1, m: Map::Cyl { o, a, x, y, r, flip, th0, .. } } => {
                 let s = if flip { -1.0 } else { 1.0 };
-                let (lo, hi) = hull(&mut c.poles_of(t0, t1).iter().map(|p| DVec2::splat(s * (*p - o).dot(a))));
-                Some((DVec2::new(r * th0, lo.y), DVec2::new(r * (th0 + TAU), hi.y)))
+                let poles = c.poles_of(t0, t1);
+                let (lo, hi) = hull(&mut poles.iter().map(|p| DVec2::splat(s * (*p - o).dot(a))));
+                // Its angles: within its poles' where they span less than half a turn clear of the seam (the
+                // sector holds their hull), else the whole turn.
+                let (mut amin, mut amax) = (f64::INFINITY, f64::NEG_INFINITY);
+                for p in poles {
+                    let w = *p - o;
+                    let th = th0 + (w.dot(y).atan2(w.dot(x)) - th0).rem_euclid(TAU);
+                    amin = amin.min(th);
+                    amax = amax.max(th);
+                }
+                let (amin, amax) = if amax - amin < 3.0 && amin > th0 + 1e-6 && amax < th0 + TAU - 1e-6 { (amin, amax) } else { (th0, th0 + TAU) };
+                Some((DVec2::new(r * amin, lo.y), DVec2::new(r * amax, hi.y)))
             }
             C2::Trig { .. } | C2::Hyp { .. } | C2::Conic { .. } => None,
         }

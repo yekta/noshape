@@ -38,9 +38,13 @@
 #include <GeomAPI_Interpolate.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
+#include <Geom2dConvert.hxx>
+#include <GeomAPI_ProjectPointOnCurve.hxx>
+#include <BSplCLib.hxx>
 #include <IntTools_Curve.hxx>
 #include <IntTools_FaceFace.hxx>
 #include <array>
+#include <algorithm>
 #include <map>
 #include <BOPTools_AlgoTools2D.hxx>
 #include <gp_Elips.hxx>
@@ -101,6 +105,26 @@ occ::handle<Geom_Curve> basis_of(const occ::handle<Geom_Curve>& c)
       return b;
     b = t->BasisCurve();
   }
+}
+
+// An ellipse or circle as a cubic B-spline through 129 of its points at its own parameters over one turn (within
+// ~1e-11 of it; its parameters the conic's), else null: the curve swept into an extruded face.
+occ::handle<Geom_BSplineCurve> conic_as_bspline(const occ::handle<Geom_Curve>& c)
+{
+  if (occ::down_cast<Geom_Ellipse>(c).IsNull() && occ::down_cast<Geom_Circle>(c).IsNull())
+    return occ::handle<Geom_BSplineCurve>();
+  const int                                n   = 128;
+  occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, n + 1);
+  occ::handle<NCollection_HArray1<double>> prm = new NCollection_HArray1<double>(1, n + 1);
+  for (int k = 0; k <= n; ++k)
+  {
+    const double t = 2 * M_PI * k / n;
+    pts->SetValue(k + 1, c->Value(t));
+    prm->SetValue(k + 1, t);
+  }
+  GeomAPI_Interpolate fit(pts, prm, false, 1e-12);
+  fit.Perform();
+  return fit.IsDone() ? fit.Curve() : occ::handle<Geom_BSplineCurve>();
 }
 
 void push3(rust::Vec<double>& v, const gp_XYZ& p)
@@ -259,7 +283,9 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     TopExp::Vertices(e, v1, v2);
     if (v1.IsNull() || v2.IsNull())
       return "an edge without vertices";
-    if (v1.IsSame(v2) && ((circ.IsNull() && ell.IsNull()) || std::abs(l - f - 2 * M_PI) > 1e-9))
+    // (A closed B-spline: the whole of a closed curve, one vertex where it starts.)
+    const bool closed_bs = !bsc.IsNull() && bsc->IsClosed() && std::abs(f - bsc->FirstParameter()) < 1e-12 && std::abs(l - bsc->LastParameter()) < 1e-12;
+    if (v1.IsSame(v2) && !closed_bs && ((circ.IsNull() && ell.IsNull()) || std::abs(l - f - 2 * M_PI) > 1e-9))
       return "a closed edge";
     b.ellipse_minor.push_back(ell.IsNull() ? 0 : ell->MinorRadius());
     if (!bsc.IsNull())
@@ -317,8 +343,10 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     const occ::handle<Geom_SphericalSurface>   sph = occ::down_cast<Geom_SphericalSurface>(surf);
     const occ::handle<Geom_SurfaceOfLinearExtrusion> ext = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(surf);
     const occ::handle<Geom_SurfaceOfRevolution>      rvl = occ::down_cast<Geom_SurfaceOfRevolution>(surf);
-    // (A sweep of a B-spline only.)
-    const occ::handle<Geom_BSplineCurve> swept = occ::down_cast<Geom_BSplineCurve>(basis_of(!ext.IsNull() ? ext->BasisCurve() : !rvl.IsNull() ? rvl->BasisCurve() : occ::handle<Geom_Curve>()));
+    // (A sweep of a B-spline only; an extrusion's ellipse or circle as one.)
+    occ::handle<Geom_BSplineCurve> swept = occ::down_cast<Geom_BSplineCurve>(basis_of(!ext.IsNull() ? ext->BasisCurve() : !rvl.IsNull() ? rvl->BasisCurve() : occ::handle<Geom_Curve>()));
+    if (swept.IsNull() && !ext.IsNull())
+      swept = conic_as_bspline(basis_of(ext->BasisCurve()));
     const bool free = !bss.IsNull() || !tor.IsNull() || !sph.IsNull() || ((!ext.IsNull() || !rvl.IsNull()) && !swept.IsNull());
     if (pl.IsNull() && cyl.IsNull() && con.IsNull() && !free)
     {
@@ -583,7 +611,63 @@ struct FreeSections
 {
   const std::vector<const OcShape*>*                     srcs = nullptr;
   std::vector<std::pair<std::array<TopoDS_Face, 2>, IntTools_Curve>> curves;
+  // OCCT's sections already made for a pair another pair is a rigid copy of (by its arguments and faces, in the
+  // order they were asked: the earlier argument's face first).
+  std::map<std::array<uint32_t, 4>, std::vector<IntTools_Curve>> made;
 };
+
+// Edge `e`'s curve on face `f` (over its own 3D curve's parameters) from the face's own edge lying along it (an
+// edge of another argument coincident with it, which the Boolean made one): that edge's, its parameters mapped
+// onto `e`'s (they correspond affinely, checked along it); null if none does.
+occ::handle<Geom2d_Curve> coincident_pcurve(const TopoDS_Edge& e, const TopoDS_Face& f, double tol)
+{
+  double                        ea = 0, eb = 0;
+  const occ::handle<Geom_Curve> ec = BRep_Tool::Curve(e, ea, eb);
+  if (ec.IsNull())
+    return occ::handle<Geom2d_Curve>();
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const TopoDS_Edge             o = TopoDS::Edge(x.Current());
+    double                        oa = 0, ob = 0, ca = 0, cb = 0;
+    const occ::handle<Geom_Curve> oc = BRep_Tool::Curve(o, oa, ob);
+    if (oc.IsNull() || BRep_Tool::IsClosed(o, f))
+      continue;
+    const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(o, f, ca, cb);
+    if (pc.IsNull())
+      continue;
+    // Where e's ends are on o's curve, then e's points between against o's there.
+    double p[2];
+    bool   ok = true;
+    for (int k = 0; k < 2 && ok; ++k)
+    {
+      GeomAPI_ProjectPointOnCurve pr(ec->Value(k == 0 ? ea : eb), oc, oa, ob);
+      ok = pr.NbPoints() > 0 && pr.LowerDistance() <= tol;
+      if (ok)
+        p[k] = pr.LowerDistanceParameter();
+    }
+    if (!ok || std::abs(p[1] - p[0]) < 1e-12)
+      continue;
+    const double al = (p[1] - p[0]) / (eb - ea);
+    for (int k = 1; k < 8 && ok; ++k)
+    {
+      const double t = ea + (eb - ea) * k / 8;
+      ok = ec->Value(t).Distance(oc->Value(p[0] + al * (t - ea))) <= tol;
+    }
+    if (!ok)
+      continue;
+    occ::handle<Geom2d_BSplineCurve> bs = Geom2dConvert::CurveToBSplineCurve(new Geom2d_TrimmedCurve(pc, std::min(p[0], p[1]), std::max(p[0], p[1])));
+    if (bs.IsNull())
+      continue;
+    if (al < 0)
+      bs->Reverse();
+    NCollection_Array1<double> knots = bs->Knots();
+    BSplCLib::Reparametrize(ea, eb, knots);
+    bs->SetKnots(knots);
+    return bs;
+  }
+  return occ::handle<Geom2d_Curve>();
+}
+
 thread_local FreeSections* t_free = nullptr;
 
 // A section's tolerance as the pave filler gives it: its own, at least the faces' (ToleranceFF), at least 5e-6
@@ -1065,7 +1149,10 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         const TopoDS_Edge se = TopoDS::Edge(input(srcs, r.edge_origin[3 * k + 1], TopAbs_EDGE, r.edge_origin[3 * k + 2]).Oriented(TopAbs_FORWARD));
         const TopoDS_Face sf = TopoDS::Face(src.Oriented(TopAbs_FORWARD));
         double            a = 0, z = 0;
-        const occ::handle<Geom2d_Curve> pf = BRep_Tool::CurveOnSurface(se, sf, a, z);
+        occ::handle<Geom2d_Curve> pf = BRep_Tool::CurveOnSurface(se, sf, a, z);
+        // (Another argument's edge coincident with one of this face's: that one's curve on it.)
+        if (pf.IsNull() && !BRep_Tool::IsClosed(se, sf))
+          pf = coincident_pcurve(es[k], sf, 1e-7 + BRep_Tool::Tolerance(es[k]));
         if (pf.IsNull())
           return "an input edge without its curve on a free-form face";
         if (BRep_Tool::IsClosed(se, sf))
@@ -1369,7 +1456,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
 
 bool rust_decline(const char* why) { return decline(why); }
 
-rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, BrepSections& out)
+rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> moved, BrepSections& out)
 {
   if (t_free == nullptr || t_free->srcs == nullptr)
     return rust::String("no Boolean running");
@@ -1379,12 +1466,44 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
   const TopoDS_Face fa   = TopoDS::Face(input(*t_free->srcs, swap ? b_arg : a_arg, TopAbs_FACE, swap ? b_face : a_face));
   const TopoDS_Face fb   = TopoDS::Face(input(*t_free->srcs, swap ? a_arg : b_arg, TopAbs_FACE, swap ? a_face : b_face));
   const KernelTimer timer("boolean.rust.sections");
-  IntTools_FaceFace ff;
-  ff.SetParameters(true, true, true, 1e-7);
-  ff.Perform(fa, fb);
-  if (!ff.IsDone())
+  auto section = [](const TopoDS_Face& x, const TopoDS_Face& y, std::vector<IntTools_Curve>& lines) {
+    IntTools_FaceFace ff;
+    ff.SetParameters(true, true, true, 1e-7);
+    ff.Perform(x, y);
+    if (!ff.IsDone())
+      return false;
+    for (const IntTools_Curve& ic : ff.Lines())
+      lines.push_back(ic);
+    return true;
+  };
+  std::vector<IntTools_Curve> lines;
+  if (moved.size() == 16)
+  {
+    // A rigid copy of another pair (the same roles): that pair's sections (made once), moved; the curves on the
+    // faces the same (the copies' surfaces are parametrized alike).
+    const std::array<uint32_t, 4> c{static_cast<uint32_t>(moved[0]), static_cast<uint32_t>(moved[1]), static_cast<uint32_t>(moved[2]), static_cast<uint32_t>(moved[3])};
+    const std::array<uint32_t, 4> key = swap ? std::array<uint32_t, 4>{c[2], c[3], c[0], c[1]} : c;
+    auto it = t_free->made.find(key);
+    if (it == t_free->made.end())
+    {
+      std::vector<IntTools_Curve> made;
+      const TopoDS_Face ca = TopoDS::Face(input(*t_free->srcs, key[0], TopAbs_FACE, key[1]));
+      const TopoDS_Face cb = TopoDS::Face(input(*t_free->srcs, key[2], TopAbs_FACE, key[3]));
+      if (!section(ca, cb, made))
+        return rust::String("OCCT's section failed");
+      it = t_free->made.emplace(key, std::move(made)).first;
+    }
+    gp_Trsf move;
+    move.SetValues(moved[4], moved[5], moved[6], moved[13], moved[7], moved[8], moved[9], moved[14], moved[10], moved[11], moved[12], moved[15]);
+    for (const IntTools_Curve& ic : it->second)
+    {
+      const occ::handle<Geom_Curve> cv = ic.Curve().IsNull() ? occ::handle<Geom_Curve>() : occ::down_cast<Geom_Curve>(ic.Curve()->Transformed(move));
+      lines.emplace_back(cv, ic.FirstCurve2d(), ic.SecondCurve2d(), ic.Tolerance(), ic.TangentialTolerance());
+    }
+  }
+  else if (!section(fa, fb, lines))
     return rust::String("OCCT's section failed");
-  for (const IntTools_Curve& ic : ff.Lines())
+  for (const IntTools_Curve& ic : lines)
   {
     const occ::handle<Geom_Curve> c = ic.Curve();
     if (c.IsNull())

@@ -4,6 +4,7 @@
 use super::*;
 use crate::curve2::Map;
 use crate::freeform::FreeSurface;
+use glam::DVec4;
 
 /// A free-form face's parameter box: what its edges' curves on it span (within the surface's own range), grown by
 /// a hundredth.
@@ -102,11 +103,19 @@ pub(super) struct Patch {
     lo: DVec3,
     hi: DVec3,
     uv: [f64; 4],
+    /// A Bézier piece's (its box its control points'): Newton from a 3 × 3 grid of starts in it.
+    piece: bool,
 }
 
 /// A free-form face's patches over its box (each span between the surface's breaks in 4, at least 8 a side),
 /// boxes from a 5 × 5 grid of points grown by their chords' sag.
-pub(super) fn patches(ns: &FreeSurface, uv: [f64; 4]) -> Vec<Patch> {
+pub(super) fn patches(g: &GFace) -> Vec<Patch> {
+    let (ns, uv) = (g.ns.as_deref().expect("a free-form face"), g.uvbox);
+    // (A Bézier surface's pieces: their control points' boxes hold them.)
+    if let Some(hs) = g.hulls.get_or_init(|| hulls(ns)).as_deref() {
+        let grow = DVec3::splat(1e-9);
+        return hs.iter().filter(|h| h.uv[1] >= uv[0] && h.uv[0] <= uv[1] && h.uv[3] >= uv[2] && h.uv[2] <= uv[3]).map(|h| Patch { lo: h.lo - grow, hi: h.hi + grow, uv: h.uv, piece: true }).collect();
+    }
     let (mut us, mut vs) = (splits(ns, true, uv[0], uv[1], 4), splits(ns, false, uv[2], uv[3], 4));
     for s in [&mut us, &mut vs] {
         if s.len() < 9 {
@@ -126,7 +135,7 @@ pub(super) fn patches(ns: &FreeSurface, uv: [f64; 4]) -> Vec<Patch> {
                 }
             }
             let grow = DVec3::splat(0.25 * (hi - lo).length() + 1e-9);
-            out.push(Patch { lo: lo - grow, hi: hi + grow, uv: [ua, ub, va, vb] });
+            out.push(Patch { lo: lo - grow, hi: hi + grow, uv: [ua, ub, va, vb], piece: false });
         }
     }
     out
@@ -142,33 +151,40 @@ pub(super) fn ray_hits(ns: &FreeSurface, patches: &[Patch], uv: [f64; 4], p: DVe
             continue;
         }
         let [ua, ub, va, vb] = pa.uv;
-        let mut uv = DVec2::new(0.5 * (ua + ub), 0.5 * (va + vb));
-        let mut t = (ns.at(uv.x, uv.y) - p).dot(r);
-        let mut ok = false;
-        for _ in 0..40 {
-            let d = ns.derivs(uv.x, uv.y);
-            // F = S(u, v) - p - t r = 0: [Su Sv -r] (du dv dt) = -F.
-            let f = d[0] - p - r * t;
-            let m = glam::DMat3::from_cols(d[1], d[2], -r);
-            if m.determinant().abs() < 1e-300 {
-                break;
+        let starts: &[(f64, f64)] = if pa.piece { &[(0.5, 0.5), (0.1, 0.1), (0.5, 0.1), (0.9, 0.1), (0.1, 0.5), (0.9, 0.5), (0.1, 0.9), (0.5, 0.9), (0.9, 0.9)] } else { &[(0.5, 0.5)] };
+        for &(fu, fv) in starts {
+            let mut uv = DVec2::new(ua + (ub - ua) * fu, va + (vb - va) * fv);
+            let mut t = (ns.at(uv.x, uv.y) - p).dot(r);
+            let mut ok = false;
+            for _ in 0..40 {
+                let d = ns.derivs(uv.x, uv.y);
+                // F = S(u, v) - p - t r = 0: [Su Sv -r] (du dv dt) = -F.
+                let f = d[0] - p - r * t;
+                let m = glam::DMat3::from_cols(d[1], d[2], -r);
+                if m.determinant().abs() < 1e-300 {
+                    break;
+                }
+                let x = m.inverse() * -f;
+                uv += DVec2::new(x.x, x.y);
+                t += x.z;
+                if x.length() < 1e-15 * (1.0 + uv.length() + t.abs()) {
+                    ok = true;
+                    break;
+                }
             }
-            let x = m.inverse() * -f;
-            uv += DVec2::new(x.x, x.y);
-            t += x.z;
-            if x.length() < 1e-15 * (1.0 + uv.length() + t.abs()) {
-                ok = true;
-                break;
+            // (A piece's start: where the steps stall at rounding, there if it is on the ray.)
+            if pa.piece && !ok {
+                ok = (ns.at(uv.x, uv.y) - p - r * t).length() <= 1e-12;
             }
-        }
-        if !ok || uv.x < u0 - 1e-12 || uv.x > u1 + 1e-12 || uv.y < v0 - 1e-12 || uv.y > v1 + 1e-12 {
-            continue;
-        }
-        if (ns.at(uv.x, uv.y) - p - r * t).length() > 1e-9 {
-            continue;
-        }
-        if !out.iter().any(|h| (h.1 - t).abs() < 1e-9) {
-            out.push((uv, t));
+            if !ok || uv.x < u0 - 1e-12 || uv.x > u1 + 1e-12 || uv.y < v0 - 1e-12 || uv.y > v1 + 1e-12 {
+                continue;
+            }
+            if (ns.at(uv.x, uv.y) - p - r * t).length() > 1e-9 {
+                continue;
+            }
+            if !out.iter().any(|h| (h.1 - t).abs() < 1e-9) {
+                out.push((uv, t));
+            }
         }
     }
     out
@@ -340,4 +356,118 @@ pub(super) fn projected(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, 
         knots.extend(if k + 1 == N { [t1; 4].to_vec() } else { vec![t; 3] });
     }
     Some(Arc::new(NurbsCurve { degree: 3, knots, poles, weights: Vec::new(), spans: Default::default() }))
+}
+
+/// A piece of a Bézier surface: its control points (the piece lies in their hull), their box, and its directions
+/// across and along (corner to corner).
+pub(super) struct Hull {
+    pts: Vec<DVec3>,
+    lo: DVec3,
+    hi: DVec3,
+    du: DVec3,
+    dv: DVec3,
+    /// Its parameter range (u0, u1, v0, v1).
+    uv: [f64; 4],
+}
+
+/// The pieces of a face's NURBS surface of one span each way (a Bézier patch): cut by de Casteljau (homogeneous)
+/// into 32 along v and 4 along u (one along a straight u); None for other surfaces.
+fn hulls(ns: &FreeSurface) -> Option<Vec<Hull>> {
+    let FreeSurface::Nurbs(s) = ns else { return None };
+    let (p, q) = (s.udegree, s.vdegree);
+    if s.nu != p + 1 || s.nv != q + 1 || s.uknots.len() != 2 * (p + 1) || s.vknots.len() != 2 * (q + 1) || s.weights.iter().any(|&w| w <= 0.0) {
+        return None;
+    }
+    let w = |k: usize| if s.weights.is_empty() { 1.0 } else { s.weights[k] };
+    // Homogeneous rows (each a curve along v), then each cut along v.
+    let rows: Vec<Vec<DVec4>> = (0..=p).map(|i| (0..=q).map(|j| (s.poles[i * s.nv + j] * w(i * s.nv + j)).extend(w(i * s.nv + j))).collect()).collect();
+    // A Bézier curve's piece from parameter a to b (of [0, 1]): cut at b, then the left part at a / b.
+    let piece = |c: &[DVec4], a: f64, b: f64| -> Vec<DVec4> {
+        let cut = |c: &[DVec4], t: f64, left: bool| -> Vec<DVec4> {
+            let mut c = c.to_vec();
+            let n = c.len();
+            let mut out = vec![DVec4::ZERO; n];
+            for r in 0..n {
+                out[if left { r } else { n - 1 - r }] = if left { c[0] } else { c[n - 1 - r] };
+                for k in 0..n - 1 - r {
+                    c[k] = c[k] * (1.0 - t) + c[k + 1] * t;
+                }
+            }
+            out
+        };
+        let l = cut(c, b, true);
+        if a <= 0.0 { l } else { cut(&l, a / b, false) }
+    };
+    let (nu, nv) = (if p == 1 { 1 } else { 4 }, 32);
+    let ((ra, rb), (sa, sb)) = s.range();
+    let mut out = Vec::with_capacity(nu * nv);
+    for kv in 0..nv {
+        let (va, vb) = (kv as f64 / nv as f64, (kv + 1) as f64 / nv as f64);
+        let cols: Vec<Vec<DVec4>> = rows.iter().map(|r| piece(r, va, vb)).collect();
+        for ku in 0..nu {
+            let (ua, ub) = (ku as f64 / nu as f64, (ku + 1) as f64 / nu as f64);
+            // Along u: each column (j fixed) cut too.
+            let mut grid: Vec<Vec<DVec3>> = Vec::with_capacity(q + 1);
+            for j in 0..=q {
+                let col: Vec<DVec4> = cols.iter().map(|c| c[j]).collect();
+                grid.push(piece(&col, ua, ub).iter().map(|h| h.truncate() / h.w).collect());
+            }
+            let pts: Vec<DVec3> = grid.iter().flatten().copied().collect();
+            let (lo, hi) = pts.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), &x| (lo.min(x), hi.max(x)));
+            let du = grid[q / 2][p] - grid[q / 2][0];
+            let dv = grid[q][p / 2] - grid[0][p / 2];
+            let uv = [ra + (rb - ra) * ua, ra + (rb - ra) * ub, sa + (sb - sa) * va, sa + (sb - sa) * vb];
+            out.push(Hull { pts, lo, hi, du, dv, uv });
+        }
+    }
+    Some(out)
+}
+
+/// Whether two pieces are farther apart than `gap`: on one of a few axes (the coordinate axes, either piece's
+/// normal, the cross products of their directions) their control points' extents are.
+fn hulls_apart(a: &Hull, b: &Hull, gap: f64) -> bool {
+    if (a.lo - b.hi).max_element() > gap || (b.lo - a.hi).max_element() > gap {
+        return true;
+    }
+    for ax in [a.du.cross(a.dv), b.du.cross(b.dv), a.dv.cross(b.dv), a.du.cross(b.dv), a.dv.cross(b.du), a.du.cross(b.du)] {
+        let l = ax.length();
+        if l < 1e-300 {
+            continue;
+        }
+        let ax = ax / l;
+        let ext = |h: &Hull| h.pts.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), x| (lo.min(x.dot(ax)), hi.max(x.dot(ax))));
+        let ((alo, ahi), (blo, bhi)) = (ext(a), ext(b));
+        if alo - bhi > gap || blo - ahi > gap {
+            return true;
+        }
+    }
+    false
+}
+
+/// Whether two faces, one or both free-form, are farther apart than `gap`, as their surfaces' control points tell
+/// (a Bézier surface against another or a plane; else false).
+pub(super) fn apart(f: &GFace, g: &GFace, gap: f64) -> bool {
+    fn pieces(x: &GFace) -> Option<&[Hull]> {
+        x.hulls.get_or_init(|| x.ns.as_deref().and_then(hulls)).as_deref()
+    }
+    match (pieces(f), pieces(g)) {
+        (Some(a), Some(b)) => a.iter().all(|x| b.iter().all(|y| hulls_apart(x, y, gap))),
+        (Some(a), None) | (None, Some(a)) => {
+            let other = if pieces(f).is_some() { g } else { f };
+            match other.s {
+                Surf::Plane { n, d, .. } => {
+                    let side = |x: &DVec3| n.dot(*x) - d;
+                    a.iter().all(|h| h.pts.iter().all(|x| side(x) > gap)) || a.iter().all(|h| h.pts.iter().all(|x| side(x) < -gap))
+                }
+                _ => false,
+            }
+        }
+        (None, None) => false,
+    }
+}
+
+/// Whether `p` is farther than `gap` from face `g`'s Bézier surface (outside all its pieces' boxes grown by it).
+pub(super) fn clearly_off(g: &GFace, p: DVec3, gap: f64) -> bool {
+    let Some(ns) = g.ns.as_deref() else { return false };
+    g.hulls.get_or_init(|| hulls(ns)).as_deref().is_some_and(|hs| hs.iter().all(|h| (h.lo - p).max_element() > gap || (p - h.hi).max_element() > gap))
 }
