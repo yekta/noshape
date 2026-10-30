@@ -1320,10 +1320,11 @@ fn perf_overrides() -> &'static PerfOverrides {
             skip_lines: skip.contains("lines"),
             skip_meshes: skip.contains("meshes"),
             skip_instancing: skip.contains("instancing"),
-            skip_backsil: skip.split(',').any(|t| t == "backsil"),
-            no_solid: skip.split(',').any(|t| t == "solid"),
-            skip_silhouettes: skip.split(',').any(|t| t == "silhouettes"),
-            skip_ao: skip.split(',').any(|t| t == "ao"),
+            // Tokens split on ',' or '+' (perf.yml variants split their env on ',': `lines+meshes+ao`).
+            skip_backsil: skip.split([',', '+']).any(|t| t == "backsil"),
+            no_solid: skip.split([',', '+']).any(|t| t == "solid"),
+            skip_silhouettes: skip.split([',', '+']).any(|t| t == "silhouettes"),
+            skip_ao: skip.split([',', '+']).any(|t| t == "ao"),
         }
     })
 }
