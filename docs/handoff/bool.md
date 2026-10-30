@@ -717,6 +717,11 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   (OCCT's own section is most of those). Six stop at "a section without ends": OCCT returns half of a thin tool's
   loop on a big cylinder, its ends inside both faces (understood no further; declined).
 - T1: aff9a32d (angled cylinders) and 90710765 (a section ending on a half cylinder's edge) in tests/data/brep.
+- Cones the same way (at an angle to another cone or cylinder, or off its axis). One cone at an angle differed:
+  OCCT's section touches the tool's rim circle at two points and OCCT puts vertices there (the edges split), ours
+  didn't. Now an OCCT curve clear of a face's boundary in the middle of a stretch but coming within the grey band of
+  it (its distance's local minima narrowed down) declines "a section touching a face's boundary"; it declines that
+  one case only.
 
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
