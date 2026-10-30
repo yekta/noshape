@@ -816,7 +816,14 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   BOPAlgo_Builder's split solid differs (every groove's end caps lie on the cylinder's end faces). Not the unify:
   with unify off the 10-groove piece's raw cut says Deleted too (158 faces both ways, ours Modified). For a cut,
   BOPAlgo_BOP::BuildRC keeps the cylinder's split images that no tool's image contains; next, OCCT's images of the
-  cylinder's solid on that piece (BRepAlgoAPI_Cut::Modified on the solid) to see what replaced it.
+  cylinder's solid on that piece (BRepAlgoAPI_Cut::Modified on the solid) to see what replaced it. Ruled out
+  since: the kernel's grouping (one OCCT build on that piece, profile), the open-solid fallback of
+  BOPAlgo_BOP::BuildShape (CheckArgsForOpenSolid: every argument here closed). Hypothesis to test next: the
+  kernel runs OCCT non-destructive (SetNonDestructive), so where an input's edge or vertex must take a larger
+  tolerance (a B-spline section, 5e-6 or more, ending on the cylinder's rim) OCCT works on a copy of that
+  argument and the original solid keeps no record: Deleted then, by where sections end, not by caps. The whole
+  knurl (one scaled OCCT cut in the model) says Modified, as ours; our early "tools coincide" decline stays until
+  this is understood.
 - perf.sh: both bool_patterns runs (cc8837a7, 620d5eaf) ran no test ("0 passed, 175 filtered out": the binary of
   another commit; the ~/perf/wt race in Requests), so vibe3 numbers for the pattern set are still to come; the
   numbers above are this machine's (relative only).
