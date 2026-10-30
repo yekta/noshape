@@ -373,6 +373,25 @@ impl SheetPick<'_> {
     /// straight edge (the hovered one) stands on it (live A45): (view, the
     /// foot on the edge and its direction in view coordinates, not flipped).
     pub fn surface_finish_on(&self, at: [f64; 2]) -> Option<(ViewId, [f64; 2], [f64; 2], bool)> {
+        // On a circular edge (help A44): at the nearest point of the circle,
+        // along its tangent, on the outside.
+        if let Some((view, me)) = self.hovered_edge()
+            && let views::EdgeGeom::Circle { center, radius, .. } = me.geom
+        {
+            let pl = self.placement(view)?;
+            let v = pl.to_view(at);
+            let r = sub(v, center);
+            let n = if len(r) > 1e-12 { norm(r) } else { [0.0, 1.0] };
+            let foot = [center[0] + n[0] * radius, center[1] + n[1] * radius];
+            let dir = [-n[1], n[0]];
+            // The symbol's side as drawn (upper / right of the edge): flipped
+            // when that is inside the circle.
+            let mut side = [-dir[1], dir[0]];
+            if side[1] < -1e-9 || (side[1].abs() <= 1e-9 && side[0] < 0.0) {
+                side = [-side[0], -side[1]];
+            }
+            return Some((view, foot, dir, dot(side, n) < 0.0));
+        }
         let Some(Pick::Line { a, b }) = self.line_pick() else { return None };
         let pl = self.placement(a.view)?;
         let v = pl.to_view(at);
