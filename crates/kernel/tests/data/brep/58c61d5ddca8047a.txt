@@ -1,0 +1,17 @@
+op fuse
+fuzzy 0e0
+glue shift_checked
+unify 0
+parallel 1
+obb 1
+objects 1
+tools 9
+target_faces 11
+valid 1
+volume 3.12400000000000112e-4
+faces 56
+edges 132
+vertices 88
+history eb26f7af2c105103
+ms 250.715
+path trimmed

@@ -49,6 +49,10 @@ pub fn last_rust_decline() -> String {
     LAST_DECLINE.with(|c| c.borrow().clone())
 }
 
+pub(crate) fn brep_last_decline() -> String {
+    last_rust_decline()
+}
+
 pub(crate) fn brep_decline(reason: &str) {
     LAST_DECLINE.with(|c| *c.borrow_mut() = reason.to_string());
 }

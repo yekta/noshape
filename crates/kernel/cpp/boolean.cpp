@@ -1841,6 +1841,113 @@ bool fuse_trimmed(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_S
   return true;
 }
 
+// fuse_trimmed with noshape's own Boolean throughout: each tool cut by the arguments, then the arguments fused with
+// what is left of the tools (they only touch now). False (nothing done) where any of them declines.
+bool rust_fuse_trimmed(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_Shape>& t, const BoolOpts& opts, TopoDS_Shape& out, HHist& hist)
+{
+  const RustLenient lenient;
+  const size_t n = t.size();
+  std::vector<TopoDS_Shape> trimmed(n);
+  std::vector<HHist>        cuts(n);
+  // (In parallel, as fuse_trimmed's cuts: each thread's Boolean is its own.)
+  std::vector<char>        failed(n, 0);
+  const std::atomic<bool>* flag = t_cancel;
+  OSD_Parallel::For(0, static_cast<int>(n), [&](int i) {
+    if (cancelled(flag))
+    {
+      failed[static_cast<size_t>(i)] = 1;
+      return;
+    }
+    try
+    {
+      const RustLenient                     lenient_here;
+      std::vector<TopoDS_Shape>             in{t[static_cast<size_t>(i)]};
+      std::vector<const OcShape*>           rs;
+      std::vector<std::unique_ptr<OcShape>> own;
+      in.insert(in.end(), a.begin(), a.end());
+      if (!rust_boolean(1, in, rs, own, trimmed[static_cast<size_t>(i)], cuts[static_cast<size_t>(i)], opts.fuzzy, false))
+        failed[static_cast<size_t>(i)] = 1;
+    }
+    catch (...)
+    {
+      failed[static_cast<size_t>(i)] = 1;
+    }
+  });
+  fail_if_cancelled();
+  for (size_t i = 0; i < n; ++i)
+    if (failed[i])
+      return false;
+  std::vector<TopoDS_Shape> rest;
+  for (size_t i = 0; i < n; ++i)
+    if (TopExp_Explorer e(trimmed[i], TopAbs_SOLID); e.More())
+      rest.push_back(trimmed[i]);
+  if (rest.empty())
+    return false;
+  TopoDS_Shape                          fused;
+  HHist                                 h2;
+  std::vector<const OcShape*>           rs;
+  std::vector<std::unique_ptr<OcShape>> own;
+  if (!rust_boolean(0, concat(a, rest), rs, own, fused, h2, opts.fuzzy, true) || !volumes_add_up(concat(a, rest), fused))
+    return false;
+  // History from the original inputs, as fuse_trimmed's: the arguments as the fuse has them; a tool's sub-shapes
+  // through its cut, then through the fuse.
+  HHist h    = new BRepTools_History();
+  auto  thru = [&](const TopoDS_Shape& s, const TopoDS_Shape& x, bool generated) {
+    bool kept = false;
+    if (!h2->IsRemoved(x))
+    {
+      const ShapeList& m = h2->Modified(x);
+      if (m.IsEmpty())
+      {
+        kept = true;
+        if (!x.IsSame(s))
+          generated ? h->AddGenerated(s, x) : h->AddModified(s, x);
+      }
+      for (ShapeList::Iterator it(m); it.More(); it.Next())
+      {
+        kept = true;
+        generated ? h->AddGenerated(s, it.Value()) : h->AddModified(s, it.Value());
+      }
+    }
+    for (ShapeList::Iterator it(h2->Generated(x)); it.More(); it.Next())
+      h->AddGenerated(s, it.Value());
+    return kept;
+  };
+  for (const TopoDS_Shape& x : a)
+    for_sub_shapes(x, [&](const TopoDS_Shape& s) {
+      if (h2->IsRemoved(s))
+        h->Remove(s);
+      for (ShapeList::Iterator it(h2->Modified(s)); it.More(); it.Next())
+        h->AddModified(s, it.Value());
+      for (ShapeList::Iterator it(h2->Generated(s)); it.More(); it.Next())
+        h->AddGenerated(s, it.Value());
+    });
+  for (size_t i = 0; i < n; ++i)
+  {
+    const HHist& c = cuts[i];
+    for_sub_shapes(t[i], [&](const TopoDS_Shape& s) {
+      if (c->IsRemoved(s))
+      {
+        h->Remove(s);
+        return;
+      }
+      const ShapeList& m1   = c->Modified(s);
+      bool             kept = false;
+      if (m1.IsEmpty())
+        kept = thru(s, s, false);
+      for (ShapeList::Iterator it(m1); it.More(); it.Next())
+        kept |= thru(s, it.Value(), false);
+      for (ShapeList::Iterator it(c->Generated(s)); it.More(); it.Next())
+        thru(s, it.Value(), true);
+      if (!kept)
+        h->Remove(s);
+    });
+  }
+  out  = fused;
+  hist = h;
+  return true;
+}
+
 // One stage of a staged boolean: where each sub-shape of its inputs went.
 struct Stage
 {
@@ -3885,8 +3992,25 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     bool                                  done = false;
     {
       const KernelTimer timer("boolean.rust");
-      // (A pattern's checked glue: OCCT's result is the plain Boolean's only where the instances just touch.)
-      done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, op == 0 && opts.glue == 3 && t.size() > 1);
+      // (A pattern's checked glue: OCCT's result is the plain Boolean's only where the instances just touch; where
+      // they reach into the arguments, OCCT's is fuse_trimmed's: so is ours then, noshape's Boolean throughout.)
+      const bool checked = op == 0 && opts.glue == 3 && t.size() > 1;
+      if (checked)
+      {
+        {
+          const RustLenient lenient;
+          done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, true);
+        }
+        if (!done && rust_last_decline() == "pattern instances overlapping")
+        {
+          const KernelTimer trim("boolean.rust.trimmed");
+          done = rust_fuse_trimmed(a, t, opts, out, h);
+        }
+        if (!done)
+          rust_decline(nullptr);
+      }
+      else
+        done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, false);
     }
     if (done)
     {
