@@ -75,6 +75,22 @@ impl DrawingEditor {
             Panel::Datum { .. } | Panel::SurfaceFinish { .. } | Panel::Cell { .. } | Panel::SheetName { .. } | Panel::Rotation { .. } => self.extra_panel_rows(cx)?,
             Panel::BrokenOut { .. } | Panel::CutAngle { .. } | Panel::CellFormat { .. } | Panel::CellResize { .. } | Panel::DatumTarget { .. } => self.more_panel_rows(cx)?,
             Panel::BomCell { .. } => ("BOM cell", self.bom_cell_rows(cx)),
+            Panel::ImageProps { rows, tab } => {
+                let tab = *tab;
+                let rows = rows
+                    .iter()
+                    .map(|(k, val)| {
+                        let value = div().text_xs().child(val.clone());
+                        // The Reference: a link to the image tab.
+                        let value = match (k, tab) {
+                            (&"Reference", Some(t)) => value.id("dr-image-ref").text_color(pal.accent).cursor_pointer().on_click(move |_, w, cx| crate::actions::request_activate_tab(t, w, cx)).into_any_element(),
+                            _ => value.into_any_element(),
+                        };
+                        h_flex().gap_2().child(div().w(px(90.)).text_xs().text_color(pal.text_muted).child(*k)).child(value).into_any_element()
+                    })
+                    .collect();
+                ("Image properties", rows)
+            }
             Panel::TitleBlock { inputs } => (
                 "Title block (fields like {part.name}, {sheet.scale} allowed)",
                 inputs
