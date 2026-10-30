@@ -151,7 +151,7 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 
 | target | goal | current (where measured) |
 |---|---|---|
-| orbit / pan / zoom, NIST assembly at Retina | 120 fps | v0.4.11 (perf.yml 40528877198, macOS 14, 2388×1588 device px, frame-driven): presented 76.7 / 73.6 / 64.9 fps, UI CPU p95 0.35 / 0.33 / 0.37 ms; GPU time not reported on Metal (r.done_ms lands with ab488e30, after v0.4.11). At 1× the runner presents ~30 fps (its timer) |
+| orbit / pan / zoom, NIST assembly at Retina | 120 fps | 10-30 (perf 40987999836, main 7523035a, silhouette cull on, 2× frames-driven): presented 79–85 fps, GPU frame mean 12.8–15 ms (before the cull: 48.7–55.7 fps, perf 40973793607). Earlier: v0.4.11 (perf.yml 40528877198, macOS 14, 2388×1588 device px, frame-driven): presented 76.7 / 73.6 / 64.9 fps, UI CPU p95 0.35 / 0.33 / 0.37 ms; GPU time not reported on Metal (r.done_ms lands with ab488e30, after v0.4.11). At 1× the runner presents ~30 fps (its timer) |
 | cold start to first frame | ≤ 1 s | 10-28 (perf 40755981437, Metal cache cleared each launch, precompiled metallibs): median 1364 ms (macOS 14) / 1560 ms (macOS 15), shader compile 65–141 ms (was 540–900); the window itself is the rest. Earlier: | v0.4.11: the job's first launch 1356 ms (OS first run: gpui_kit::init 285 ms vs 20 warm; the held shader compile 421 ms starts at the first window draw, 784 ms); warm launches 276–385 ms ✓. COLD=1 run 40526882894 (Metal shader cache cleared each launch) pending |
 | open a document | ≤ 0.5 s | v0.4.11 warm: opening → first viewport frame 130–200 ms ✓; first launch 800 ms |
 
@@ -450,6 +450,12 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
    normals + position, ~20 bytes) would cut that. Beyond silhouettes, the frame without any (nosil) is still
    ~17 ms GPU at 2× (faces at 4× MSAA, AO, edges): 120 fps needs that halved too; measure with the existing
    NOSHAPE_PERF_SKIP variants (ao, meshes) the same way (done_ms within one job).
+   **Measured 10-30 02:40 (perf 40987999836, main 7523035a, cull on):** NIST at 2× presented 79.4–81.9 fps (macOS
+   14) / 71.6–85 (15), done_ms mean 12.8 / 14.4–15.0, p50 ~10.5; noao, msaa1, nol, nomesh all within noise of it
+   (11.6–14.7 mean, p50 10.1–12.2). So after the cull nothing in the scene dominates: a ~10 ms p50 floor every
+   variant shares, i.e. per-frame fixed cost (MSAA resolve, the texture present / copy into GPUI's frame at
+   2388×1588, pacing). Next for 120 fps: time those stages (r.* perf scopes around resolve and present) on the
+   runners.
 0f. (done 10-28: no gain, see above) Retina orbit, experiment for 0c: line segments are instances of 6 vertices (`draw(slots*6, 0..count)`),
    which packs Apple GPUs' vertex SIMD groups badly; pull segments from a storage buffer by vertex_index / 6 with
    the slot as the instance (one instance per copy) and measure with perf.yml.
