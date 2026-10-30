@@ -118,7 +118,13 @@ impl SheetPick<'_> {
                 Some(ann(kind, refs))
             }
 
-            Tool::HoleCallout { circle: Some((view, center, radius, r)) } => Some(ann(AnnotationKind::HoleCallout { view: *view, center: *center, radius: *radius, leaders: Vec::new() }, vec![(0, r.clone())])),
+            Tool::HoleCallout { circle: Some((view, center, radius, r)) } => {
+                let mut a = ann(AnnotationKind::HoleCallout { view: *view, center: *center, radius: *radius, leaders: Vec::new() }, vec![(0, r.clone())]);
+                // Help hole_thread_callout (drawing.md A58): the shaft class
+                // starts hidden ("Toggle shaft class visibility").
+                a.format.fit.hide_shaft = true;
+                Some(a)
+            }
             Tool::Balloon { anchor: Some(a) } => {
                 // In assembly views a callout on a part shows its BOM item (empty text = linked).
                 // A click on an edge away from its snap points: that edge's part.
