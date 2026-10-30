@@ -659,6 +659,10 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- 10-30 10:40: OCCT patch 0006 landed (5cfd6c74) and its two libs (TKGeomAlgo, TKHLR) are in /root/occt here
+  (backups in /root/core-scratch/occt-lib-backup/*.pre0006). vibe3's land checks and CI's OCCT cache need it built
+  too (bit-identical results, only faster: nothing breaks without it). The branch core-portable-budget (CI run
+  41023931518, green on all three) can be deleted.
 - 10-30 10:05, knurl P0: the false "do not intersect" was the 4 GB Boolean memory budget (the FS host turned the
   limit into BOOLEAN_SUBTRACT_NO_OP). Fixed (budget default half the RAM, 4â€“16 GB; limits reported in their own words;
   builder freed before the unify; malloc_trim after big Booleans). The diamond regen still needs ~8.2 GB (OCCT's pave
