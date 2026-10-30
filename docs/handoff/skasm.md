@@ -155,8 +155,9 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   (first side, start cap, end cap, other sides: query.rs `creation_order`, which fixed the Convert's Butt Direction 1),
   other bodies in body order. (3) rect→triangle loft: done (request 1612; build_part's
   `skew` ends and rip_offset's edge-joint rule). (4) Flat view: Copy Flat pattern (live pastes a flat part
-  instance into an assembly), Curve/surface analysis… and Select other… on a bend
-  line (bend lines select by a 5 px screen hit test, draw orange, and have Zoom to fit / Zoom to selection / Align view
+  instance into an assembly) is left. A bend line's Curve/surface analysis… / Shift+C (the bend's straight 3D edge:
+  live analyses the flat's own edge, chip "Edge") and Select other… (Edge of <model>, Face of <feature> × 2, live
+  1622) are done (130d51d3); the Form picker is live's layout (22f7b473). Bend lines select by a 5 px screen hit test, draw orange, and have Zoom to fit / Zoom to selection / Align view
   with vertical axis; a right-click anywhere while one is selected shows that menu, as live 1605). An open sketch on a
   face of the flat's part shows that face's box (+6 %) and the sketch's name in the flat view (live 1605 g-4). Closed corner: done (live's regen
   volume 8535.1655548, request 1606; its 8535.0418 was /massproperties).
