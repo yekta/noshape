@@ -546,9 +546,9 @@ with 0003b and 0004 on Linux, macOS and Windows.
 
 ## Next, in order
 (lead 10-29: big structural wins, land small and often, stop when returns flatten.)
-0. (10-30 20:20) MEM-RUNAWAY-508 landed (2feeebcb, a7023995); the 0007w / 0008 libs are in /root/occt here since 19:10
-   (backups /root/core-scratch/occt-lib-backup/*.pre0007). Left: the fillet budget test back to T1 once vibe2 / vibe3
-   have the libs (boolean_groups::a_fillet_under_a_short_budget_gives_up, its budget already 1e-9 s). Remaining jumps (code that checks neither the indicator nor the hooks: the Rust Boolean? qa's fuzz will
+0. (10-30 20:12) MEM-RUNAWAY-508 landed (2feeebcb, a7023995); the 0007w / 0008 libs are in /root/occt here since 19:10
+   (backups /root/core-scratch/occt-lib-backup/*.pre0007; vibe2 / vibe3 have them through vibe2-sync.sh, checked
+   20:15); both budget tests T1 again, deterministic (1e-9 s budgets). Remaining jumps (code that checks neither the indicator nor the hooks: the Rust Boolean? qa's fuzz will
    tell) still leak; NOSHAPE_GUARD_TRACE=1 prints each one with its stack ("a budget jumped out of the kernel at:").
 1. qa verified seed 189 (GUARD-SEGV-MALLOC-DEADLOCK) on 10-30; nothing left here.
 2. P0 SHELL-SLOW tail: concave parts with fillets (a pocket with floor fillets 2.3â€“2.9 s in slabs) need regions with
@@ -699,7 +699,7 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
 - 10-30 17:20, MEM-RUNAWAY-508 (P1): budget jumps leaked the cut-off op's memory (details in TICKETS). The fix
   (26074458, branch core-mem508, CI run 41097497981) needs OCCT libs with patches 0007 (weak default) and 0008 in
   /root/occt here and on vibe2 / vibe3: libTKFillet, libTKOffset (0007) and libTKMath (0008). **Done here 19:10, landed
-  20:20 (2feeebcb)**: each lib differs from the old one only in the patched objects (checked member by member), and
+  20:12 (2feeebcb)**: each lib differs from the old one only in the patched objects (checked member by member), and
   their hooks are weak, so any tree links against them. Please let the sync carry them to vibe2 / vibe3 (or tell
   me how it's triggered). Branches core-mem508, core-0007-weak and core-budget-off-linux can be deleted. The fillet budget
   test stays T2 until vibe2 / vibe3 have them; the section one is T1 again (deterministic: a 1e-9 s budget).
