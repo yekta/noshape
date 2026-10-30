@@ -1495,10 +1495,55 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
     }
     gp_Trsf move;
     move.SetValues(moved[4], moved[5], moved[6], moved[13], moved[7], moved[8], moved[9], moved[14], moved[10], moved[11], moved[12], moved[15]);
+    // A face the pair shares with the other (another argument's, the motion keeping its plane or cylinder): its
+    // curves move in its parameters too (a plane's in its frame, a cylinder's or cone's by the angle and height).
+    const TopoDS_Face ca = TopoDS::Face(input(*t_free->srcs, key[0], TopAbs_FACE, key[1]));
+    const TopoDS_Face cb = TopoDS::Face(input(*t_free->srcs, key[2], TopAbs_FACE, key[3]));
+    std::array<std::optional<gp_Trsf2d>, 2> in2d;
+    for (int k = 0; k < 2; ++k)
+    {
+      const TopoDS_Face& f = k == 0 ? fa : fb;
+      if (!f.IsSame(k == 0 ? ca : cb))
+        continue;
+      const occ::handle<Geom_Surface> sf = BRep_Tool::Surface(f);
+      const gp_Pnt2d                  uv[3] = {gp_Pnt2d(0, 0), gp_Pnt2d(1e-3, 0), gp_Pnt2d(0, 1e-3)};
+      gp_Pnt2d                        to[3];
+      GeomAdaptor_Surface             ad(sf);
+      for (int i = 0; i < 3; ++i)
+      {
+        const gp_Pnt q = sf->Value(uv[i].X(), uv[i].Y()).Transformed(move);
+        double       u = 0, v = 0;
+        if (ad.GetType() == GeomAbs_Plane)
+          ElSLib::Parameters(ad.Plane(), q, u, v);
+        else if (ad.GetType() == GeomAbs_Cylinder)
+          ElSLib::Parameters(ad.Cylinder(), q, u, v);
+        else if (ad.GetType() == GeomAbs_Cone)
+          ElSLib::Parameters(ad.Cone(), q, u, v);
+        else
+          return rust::String("OCCT's section failed");
+        // (Angles: the first's turn kept for the others.)
+        if (i > 0 && ad.GetType() != GeomAbs_Plane)
+          u = to[0].X() + std::remainder(u - to[0].X(), 2 * M_PI);
+        to[i] = gp_Pnt2d(u, v);
+      }
+      // A rotation (by where the first direction goes) and a translation; the three points checked.
+      const gp_Vec2d d(to[0], to[1]);
+      gp_Trsf2d      t;
+      t.SetRotation(gp::Origin2d(), std::atan2(d.Y(), d.X()));
+      t.SetTranslationPart(gp_Vec2d(to[0].XY()));
+      for (int i = 0; i < 3; ++i)
+        if (uv[i].Transformed(t).Distance(to[i]) > 1e-9)
+          return rust::String("OCCT's section failed");
+      in2d[k] = t;
+    }
     for (const IntTools_Curve& ic : it->second)
     {
       const occ::handle<Geom_Curve> cv = ic.Curve().IsNull() ? occ::handle<Geom_Curve>() : occ::down_cast<Geom_Curve>(ic.Curve()->Transformed(move));
-      lines.emplace_back(cv, ic.FirstCurve2d(), ic.SecondCurve2d(), ic.Tolerance(), ic.TangentialTolerance());
+      occ::handle<Geom2d_Curve>     c2[2] = {ic.FirstCurve2d(), ic.SecondCurve2d()};
+      for (int k = 0; k < 2; ++k)
+        if (in2d[k] && !c2[k].IsNull())
+          c2[k] = occ::down_cast<Geom2d_Curve>(c2[k]->Transformed(*in2d[k]));
+      lines.emplace_back(cv, c2[0], c2[1], ic.Tolerance(), ic.TangentialTolerance());
     }
   }
   else if (!section(fa, fb, lines))

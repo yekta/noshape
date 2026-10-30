@@ -597,6 +597,9 @@ struct Ctx<'a> {
     families: Vec<Vec<(usize, Rigid)>>,
     /// The arguments' size (largest coordinate): how far a motion's difference is measured.
     size: f64,
+    /// For a face of another argument and a family's tool face (by index): the member its sections are made
+    /// with (moved to the others), by its place in the family.
+    canonical: HashMap<(usize, usize, u32), usize>,
     /// NURBS curves (`Geo::Nurbs`), and where OCCT's sections of free-form faces come from.
     ncurves: Vec<NCurve>,
     src: Option<&'a dyn SectionSource>,
@@ -1344,7 +1347,38 @@ impl Ctx<'_> {
             return Ok(());
         }
         let (a, b) = ((self.faces[fs].arg, self.faces[fs].index), (self.faces[ft].arg, self.faces[ft].index));
-        let secs: Vec<SectionCurve> = src.sections(a, b, self.moved_pair(fs, ft))?.into_iter().filter(|c| c.t1 > c.t0).collect();
+        let moved = self.moved_pair(fs, ft);
+        let mut secs: Vec<SectionCurve> = src.sections(a, b, moved)?.into_iter().filter(|c| c.t1 > c.t0).collect();
+        // (Moved onto a face of another argument: only where they stay inside it (and the curves they were moved
+        // from); else from another member (up to the third), else made for these.)
+        let other = [fs, ft].into_iter().find(|&f| self.copies.get(self.faces[f].arg as usize).copied().flatten().is_none());
+        if let (Some((_, mut r)), Some(f)) = (moved, other) {
+            let tool = if f == fs { ft } else { fs };
+            let key = (f, self.copies[self.faces[tool].arg as usize].map_or(0, |x| x.0), self.faces[tool].index);
+            loop {
+                let (moved_clear, from_clear) = self.clear_inside(f, &secs, &r)?;
+                if moved_clear && from_clear {
+                    break;
+                }
+                if !moved_clear {
+                    // (These reach the face's boundary: made for themselves.)
+                    secs = src.sections(a, b, None)?.into_iter().filter(|c| c.t1 > c.t0).collect();
+                    break;
+                }
+                let k = self.canonical.get(&key).copied().unwrap_or(0) + 1;
+                self.canonical.insert(key, k);
+                match self.moved_pair(fs, ft) {
+                    Some(m) if k < 3 => {
+                        r = m.1;
+                        secs = src.sections(a, b, Some(m))?.into_iter().filter(|c| c.t1 > c.t0).collect();
+                    }
+                    _ => {
+                        secs = src.sections(a, b, None)?.into_iter().filter(|c| c.t1 > c.t0).collect();
+                        break;
+                    }
+                }
+            }
+        }
         // (An end of one where another of them ends: OCCT's curves of one loop in parts; a vertex there.)
         let ends: Vec<[DVec3; 2]> = secs.iter().map(|c| [c.curve.at(c.t0), c.curve.at(c.t1)]).collect();
         let joined = |i: usize, k: usize| ends.iter().enumerate().any(|(j, e)| j != i && e.iter().any(|q| (*q - ends[i][k]).length() <= self.tol));
@@ -1365,6 +1399,21 @@ impl Ctx<'_> {
     /// the motion from it; None where they aren't, or are that pair.
     fn moved_pair(&self, fs: usize, ft: usize) -> Option<crate::MovedPair> {
         let (a, b) = (self.faces[fs].arg as usize, self.faces[ft].arg as usize);
+        // A face of another argument (no copies of it) and a copied tool's: that face's surface where the motion
+        // leaves it (a plane across a rotation's axis, a cylinder about it) with the family's first's face.
+        let copy = |x: usize| self.copies.get(x).copied().flatten();
+        if let (None, Some((fam, r))) | (Some((fam, r)), None) = (copy(a), copy(b)) {
+            let (fo, ftool, tool) = if copy(a).is_none() { (fs, ft, b) } else { (ft, fs, a) };
+            // (The member whose sections with this face are made: the one found clear of its boundary, at first
+            // the family's first.)
+            let k = *self.canonical.get(&(fo, fam, self.faces[ftool].index)).unwrap_or(&0);
+            let (c, rc) = *self.families[fam].get(k)?;
+            if c == tool || !self.kept_by(fo, &r) {
+                return None;
+            }
+            let (o, t) = ((self.faces[fo].arg, self.faces[fo].index), (c as u32, self.faces[ftool].index));
+            return Some((if fo == fs { (o, t) } else { (t, o) }, r.after(&rc.inverse())));
+        }
         let ((fa, ra), (fb, rb)) = (*self.copies.get(a)?.as_ref()?, *self.copies.get(b)?.as_ref()?);
         let rel = ra.inverse().after(&rb);
         let &(m, _) = self.families[fb].iter().find(|x| x.1.near(&rel, self.tol, self.size))?;
@@ -1373,6 +1422,38 @@ impl Ctx<'_> {
             return None;
         }
         Some((((base as u32, self.faces[fs].index), (m as u32, self.faces[ft].index)), ra))
+    }
+
+    /// Whether motion `r` takes face `f`'s surface onto itself (a plane or a cylinder; a cone's apex kept).
+    fn kept_by(&self, f: usize, r: &Rigid) -> bool {
+        match self.faces[f].s {
+            Surf::Plane { n, d, origin, .. } => (r.dir(n) - n).length() <= 1e-9 && (n.dot(r.point(origin)) - d).abs() <= self.tol,
+            Surf::Cyl { o, a, k, .. } => {
+                let w = r.point(o) - o;
+                (r.dir(a) - a).length() <= 1e-9 && if k == 0.0 { w.cross(a).length() <= self.tol } else { w.length() <= self.tol }
+            }
+            Surf::Nurbs { .. } => false,
+        }
+    }
+
+    /// Whether OCCT's moved section curves on the other argument's face `f`, and the curves they were moved from,
+    /// stay clear of its boundary (the face trims and splits OCCT's curves there): (moved, from).
+    fn clear_inside(&self, f: usize, curves: &[SectionCurve], r: &Rigid) -> R<(bool, bool)> {
+        let bound = self.bound(f)?;
+        let back = r.inverse();
+        let clear = |q: DVec3| {
+            let q2 = self.faces[f].to2(q);
+            distance2(q2, bound) > 100.0 * GREY * self.tol && inside2(q2, bound)
+        };
+        let (mut moved, mut from) = (true, true);
+        for c in curves {
+            for k in 0..=32 {
+                let p = c.curve.at(c.t0 + (c.t1 - c.t0) * k as f64 / 32.0);
+                moved &= clear(p);
+                from &= clear(back.point(p));
+            }
+        }
+        Ok((moved, from))
     }
 
     /// A section along OCCT's curve from `t0` to `t1`, cut at `cuts` (seams it crosses): a closed one has a
@@ -2186,6 +2267,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         copies: Vec::new(),
         families: Vec::new(),
         size: 0.0,
+        canonical: HashMap::default(),
         ncurves: Vec::new(),
         src,
     };

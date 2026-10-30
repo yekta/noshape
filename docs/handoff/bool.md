@@ -802,6 +802,13 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - OCCT's curves of one pair that meet end to end (a hole's loop on a cylinder in two parts) have a vertex there,
   as the pave filler's: radial holes into a cylinder taken now (bool_patterns: 472 ms / OCCT 623 ms here, was
   OCCT's after "a section without ends"); main corpus 776 (+4), the rest unchanged, all 0 differ.
+- OCCT's sections of a copied tool's face with a face of another argument whose plane or cylinder the copy's
+  motion keeps (holes round a shaft, a pattern on a plate): made once for one member and moved, its curves on that
+  face moved in its parameters too (the C++ builder takes OCCT's own curve on an analytic face); only where every
+  curve, moved and as made, stays clear of the face's boundary and seam (OCCT trims and splits there), the member
+  made with chosen per face (the next one where the first's reach the boundary), else made for the pair. Found by
+  bool_patterns: without the curves on the face moved, radial holes came out invalid. Radial holes 278 ms / OCCT's
+  439 ms here (was 472); replays all 0 differ, the counts unchanged.
 - Next for the knurl (lead 17:45): its end caps (the "tools coincide" history) and the 26-groove piece's volume
   (1.4e-9 off: OCCT seeds each section with the pave filler's edge/face points); then the period solve.
 
