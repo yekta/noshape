@@ -9,6 +9,14 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
+- **10-30 17:14 update (greens d11cddec … 94056b26):** verified FACE-SKETCH-FRAME (3d50d5be: a Hole sketched on a std plate's top
+  face lands at +X: 9543.451 mm³; v0.4.15 misses), KNURL-FS-NO-OP (Diamond on core's CLI = live's 10362 faces / +1.05 mm³; the green
+  app builds it in 441–478 s, its Mass properties unreadable there — the bottom-right strip wasn't drawn in that document),
+  KNURL-MEMORY partly (the Diamond inside a 10 GB cgroup). Sheet metal: Hem / Tab / Bend relief / Corner dialogs = live; flat
+  bend line menu + Select other = live (skasm 130d51d3) except the readout → **new P3 MEASURE-PARTIAL-CYL-RADIUS** (psui: a quarter
+  cylinder reads "Diameter: 4.000 mm", live "Radius: 2.000 mm"); G34 unchanged after skasm's corner-style default (b36c080d).
+  Note: two app instances must not share a HOME, and bin/q.sh sets DISPLAY=:110 — export DISPLAY after sourcing it. CLI fuzz
+  v0.4.15 501–617: only 508. Watch restarted every time (skasm commits included).
 - **10-30 14:29 update (lead 14:00: sheet metal, knurl, custom errors):** **sheet metal (skasm)** on 84a12216 / bde22a89: verified
   SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE, SM-CBORE-THEN-FLANGE (bin/smgen.py, smdocs/: 6888.407 / 6988.938 / 6938.673 mm³ in the app;
   v0.4.15 loses the counterbore), SM-OLD-DOCS (smf.noshape keeps its flanges), SM-FLANGE-CORNER (G34 8511.499); workflow-sheet-metal
