@@ -921,6 +921,38 @@ fn frame_sketch_profile_tangent_merge_and_limit_ends() {
     assert!(near(total, area * mm(600.0), 1e-12), "pinwheel volume {total}");
 }
 
+/// Convert of a 60 × 20 × 1 plate with every field at its default, as Sheet
+/// metal model and as Flex PCB model (live request 1621, qa5 PCB-CONVERT):
+/// each face a wall 1.6 mm thick outward, all 12 edges rips trimming 0.02 mm:
+/// 6 separate parts (1914.88256 ×2, 92.09856 ×2, 30.65856 ×2 mm³).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn convert_a_plate_with_defaults_makes_six_walls() {
+    for ty in ["sheetMetalStart", "pcbStart"] {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(0.0, 0.0), (60.0, 0.0), (60.0, 20.0), (0.0, 20.0)], true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let r = s.regen();
+        let key = r.display.sketches[0].regions[0].key.clone();
+        s.add("extrude", move |p| {
+            p.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: sid, key }]));
+            p.set("depth", expr("1 mm"));
+        });
+        let r = s.ok();
+        let body = r.context.bodies[0].id.clone();
+        s.add(ty, move |p| {
+            p.set("process", en("CONVERT"));
+            p.set("partToConvert", ParamValue::Query(vec![Reference::Body(body)]));
+        });
+        let r = s.ok();
+        let mut v: Vec<f64> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.shape.volume().unwrap() * 1e9).collect();
+        v.sort_by(f64::total_cmp);
+        let want = [30.65856, 30.65856, 92.09856, 92.09856, 1914.88256, 1914.88256];
+        assert!(v.len() == 6 && v.iter().zip(want).all(|(a, b)| (a - b).abs() < 1e-4), "{ty}: {v:?}");
+    }
+}
+
 /// Convert like Onshape (live G34d): the top and +X faces of a 40 x 30 x 20
 /// block (the other four excluded), 1 mm thick, bend radius 1 mm, minimal gap
 /// 0.02 mm. Walls are built outward from the faces; with no bend edges they
