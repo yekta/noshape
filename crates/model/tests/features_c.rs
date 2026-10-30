@@ -519,6 +519,15 @@ fn sheet_metal_loft_rectangle_to_triangle() {
     assert!(radii.iter().all(|&x| near(x, mm(2.3), 1e-9) || near(x, mm(3.9), 1e-9)), "{radii:?}");
     // Ours 17452.9223 (the two ruled ends are lofted through 35 sections).
     assert!(near(v, 17_452.918_948, 5e-3), "volume {v}");
+    // The flat: five bend lines, its area the sheet's (volume / thickness,
+    // less a little: the bends' neutral line, K 0.45, is under their middle;
+    // 10885.5 mm², 2.6 % more while a 33.8° bend unfolded the wrong way),
+    // the slanted ends' strips running between the walls' corners.
+    let fp = flat(&r, 0);
+    assert_eq!(fp.bend_lines.len(), 5);
+    assert!(fp.warnings.is_empty(), "{:?}", fp.warnings);
+    let sheet = v / 1.6;
+    assert!((fp.area() * 1e6 - sheet).abs() < sheet * 3e-3, "flat area {} mm² vs {sheet}", fp.area() * 1e6);
 }
 
 /// Cylinder of radius 20 mm around Z, 60 mm long centered at z = 0, and a

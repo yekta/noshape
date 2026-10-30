@@ -2057,8 +2057,10 @@ fn place_from(def: &Definition, k_factor: f64, topo: &Topo, root: usize, walls: 
             };
             let (a1, a2) = (into(w1)?, into(w2)?);
             let developed = b.angle * (radius + k_factor * thickness);
-            // Turning a2 onto -a1 about the bend axis.
-            let sign = if glam::DMat4::from_axis_angle(b.dir, b.angle).transform_vector3(a2).dot(-a1) > 0.0 { 1.0 } else { -1.0 };
+            // Turning a2 onto -a1 about the bend axis (the nearer way: under
+            // 45° both turns leave it on -a1's side).
+            let turned = |s: f64| glam::DMat4::from_axis_angle(b.dir, s * b.angle).transform_vector3(a2).dot(-a1);
+            let sign = if turned(1.0) >= turned(-1.0) { 1.0 } else { -1.0 };
             let step = |f: f64| glam::DMat4::from_translation(-a1 * developed * f) * rotation_about(b.axis_point, b.dir, sign * b.angle * f);
             bends.entry(e).or_insert(base * step(0.5));
             if let std::collections::btree_map::Entry::Vacant(v) = walls.entry(w2) {
@@ -2094,7 +2096,8 @@ fn place_from(def: &Definition, k_factor: f64, topo: &Topo, root: usize, walls: 
             };
             let (a1, a2) = (into(w1, line1[0])?, into(w2, line2[0])?);
             let developed = st.angle * (radius + k_factor * thickness);
-            let sign = if glam::DMat4::from_axis_angle(axis, st.angle).transform_vector3(a2).dot(-a1) > 0.0 { 1.0 } else { -1.0 };
+            let turned = |s: f64| glam::DMat4::from_axis_angle(axis, s * st.angle).transform_vector3(a2).dot(-a1);
+            let sign = if turned(1.0) >= turned(-1.0) { 1.0 } else { -1.0 };
             walls.insert(w2, base * glam::DMat4::from_translation(-a1 * developed) * rotation_about(st.origin, axis, sign * st.angle));
             queue.push(w2);
         }
