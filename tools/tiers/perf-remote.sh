@@ -23,10 +23,15 @@ for i in $(seq "$runs"); do
   exec 8>"$HOME/land/slot1"; flock 8; exec 9>"$HOME/land/slot2"; flock 9   # the machine to ourselves
   t0=$(date +%s.%N)
   out=$(cargo test --release --locked "$@" 2>&1); rc=$?
-  t=$(echo "$(date +%s.%N) - $t0" | bc)
+  wall=$(echo "$(date +%s.%N) - $t0" | bc)
   exec 8>&- 9>&-
+  # The measure is the tests' own run time (libtest's "finished in", summed over test binaries), not cargo's wall
+  # time: a rebuild cargo decides on between the build and the run (an OCCT library synced in meanwhile) once added
+  # 395 s to a 161 s knurl (10-30).
+  t=$(echo "$out" | sed -n 's/.*finished in \([0-9.]*\)s.*/\1/p' | awk '{s+=$1} END {printf "%.2f", s}')
+  [ "$t" = "0.00" ] && t=$wall
   times+=("$(printf %.2f "$t")")
-  echo "-- run $i: ${times[-1]} s (exit $rc)"
+  echo "-- run $i: ${times[-1]} s in the tests ($(printf %.1f "$wall") s wall, exit $rc)"
   echo "$out" | grep -vE "^\s*(Compiling|Finished|Running|Blocking|Doc-tests)|^running [0-9]+ test|^$|^warning: " | grep -E "timed|×[0-9]|[0-9.]+ ?(ms|s)\b|mm³|faces|panicked|FAILED|test result" | head -25
   [ $rc -ne 0 ] && { echo "PERF FAILED: tests"; break; }
 done
