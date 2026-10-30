@@ -91,6 +91,13 @@ impl<'a> SheetPick<'a> {
                 Some(PickTarget::Edge { .. }) => Some(h),
                 _ => None,
             },
+            // Geometric tolerance (help A41): a dimension it attaches to, or a
+            // view edge.
+            (Tool::Gdt, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
+                Some(PickTarget::Edge { .. }) => Some(h),
+                Some(PickTarget::Annotation(id)) if self.current_sheet().annotations.iter().any(|a| a.id == *id && a.kind.is_dimension()) => Some(h),
+                _ => None,
+            },
             // Sketch tools and constraints: sketch geometry and view edges.
             (Tool::Sketch { .. } | Tool::Constrain { .. }, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
                 Some(PickTarget::Edge { .. } | PickTarget::SketchEntity(_)) => Some(h),

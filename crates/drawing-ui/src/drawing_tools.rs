@@ -305,7 +305,8 @@ impl DrawingEditor {
             Tool::Table { view: None, .. } => "Select the view the table is for",
             Tool::Table { kind: TableTool::Hole, origin: None, .. } => "Select the origin (a vertex or circle center)",
             Tool::Table { .. } => "Click to place the table (top-right corner)",
-            Tool::Gdt => "Click to place the geometric tolerance",
+            Tool::Gdt if self.note_leader.is_some() => "Click to place the geometric tolerance",
+            Tool::Gdt => "Click a dimension, a point for the leader, an edge, or click to place the geometric tolerance",
             Tool::Datum { anchor: None } => "Click the edge or point the datum is attached to",
             Tool::Datum { .. } => "Click to place the datum box",
             Tool::SurfaceFinish => "Click the edge the symbol sits on",
@@ -582,7 +583,7 @@ impl DrawingEditor {
             }
             Tool::Sketch { .. } => self.sketch_overlay(&mut overlay),
             Tool::Weld => self.weld_overlay(&mut overlay),
-            Tool::Note if self.note_leader.is_some() => {
+            Tool::Note | Tool::Gdt if self.note_leader.is_some() => {
                 if let Some(a) = self.note_leader.as_ref().and_then(|l| Some(self.placement(l.view?)?.to_sheet(l.point))) {
                     overlay.lines.push((vec![a, self.cursor], true));
                 }

@@ -193,7 +193,11 @@ impl DrawingEditor {
         noshape_scene::drawing_tools::gdt_values(&rows, &v(&d.upper), &v(&d.lower), d.leader)
     }
 
-    /// A click with the tool: place a frame there (the dialog stays open).
+    /// A click with the tool (the dialog stays open; help A41): on a
+    /// dimension the frame goes under its value and follows it (grouped);
+    /// on a view snap the click anchors a leader and the next click places
+    /// the frame; on an edge the frame goes there, without a leader, and
+    /// moves with the view; elsewhere it goes on the sheet.
     pub fn gdt_click(&mut self, cx: &mut Context<Self>) -> bool {
         if !matches!(self.tool, Tool::Gdt) {
             return false;
@@ -201,7 +205,53 @@ impl DrawingEditor {
         let Some((frame, extra)) = self.gdt_values(cx) else { return true };
         let c = self.cursor;
         let id = self.current_sheet().next_annotation_id();
-        self.edit_sheet("Geometric tolerance", cx, |s| s.annotations.push(noshape_scene::drawing_tools::gdt(id, c, frame, extra)));
+        // The second click of a leader placement.
+        if let Some(l) = self.note_leader.take() {
+            let mut a = noshape_scene::drawing_tools::gdt(id, c, frame, extra);
+            if let AnnotationKind::Gdt { leaders, .. } = &mut a.kind {
+                leaders.push(l);
+            }
+            self.edit_sheet("Geometric tolerance", cx, |s| s.annotations.push(a));
+            cx.notify();
+            return true;
+        }
+        // A view snap first (a dimension's end sits on one).
+        if let Some(p) = self.snap_at(c) {
+            self.note_leader = Some(noshape_model::drawing::Leader { view: Some(p.view), point: p.p, ..Default::default() });
+            cx.notify();
+            return true;
+        }
+        // A dimension: its lines, or its value under the pointer.
+        let is_dim = |a: u64| self.current_sheet().annotations.iter().any(|x| x.id == a && x.kind.is_dimension());
+        let hovered_dim = self.built.as_ref().and_then(|b| {
+            b.geometry.texts.iter().find_map(|t| {
+                let q = noshape_model::drawing::font::text_box(t);
+                let (lo, hi) = q.iter().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]));
+                let inside = c[0] >= lo[0] && c[0] <= hi[0] && c[1] >= lo[1] && c[1] <= hi[1];
+                match b.picks.get(t.pick as usize) {
+                    Some(noshape_model::drawing::build::PickTarget::Annotation(a)) if inside && is_dim(*a) => Some(*a),
+                    _ => None,
+                }
+            })
+        });
+        if let Some(dim) = hovered_dim.or_else(|| self.pk().dimension_anchor(c).map(|(_, on)| on.ann)) {
+            // Under the dimension's value, grouped with it.
+            // Its value sits at its position (resolved): the frame's top
+            // just under it.
+            let h = self.drawing.props.dim_text_height;
+            let at = self.built.as_ref().and_then(|b| b.resolved.annotations.iter().find(|a| a.id == dim)).map(|a| [a.position[0] - 6.0, a.position[1] - 0.7 * h - 1.0 - 2.0 * h]);
+            let pos = at.unwrap_or(c);
+            self.edit_sheet("Geometric tolerance", cx, |s| {
+                s.annotations.push(noshape_scene::drawing_tools::gdt(id, pos, frame, extra));
+                noshape_scene::drawing_tools::annotation_edit::group_annotations(s, &[dim, id], true);
+            });
+            cx.notify();
+            return true;
+        }
+        let on_edge = self.any_point(c).map(|p| p.view);
+        let mut a = noshape_scene::drawing_tools::gdt(id, c, frame, extra);
+        a.view_group = on_edge;
+        self.edit_sheet("Geometric tolerance", cx, |s| s.annotations.push(a));
         cx.notify();
         true
     }
