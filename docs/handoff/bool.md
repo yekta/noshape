@@ -809,6 +809,14 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   made with chosen per face (the next one where the first's reach the boundary), else made for the pair. Found by
   bool_patterns: without the curves on the face moved, radial holes came out invalid. Radial holes 278 ms / OCCT's
   439 ms here (was 472); replays all 0 differ, the counts unchanged.
+- The knurl's open question, OCCT's record of the cylinder's solid (Modified or Deleted), from pieces of it (OCCT's
+  own results, all 1 solid): 5 grooves (none sharing a start) Modified; 10 grooves (none sharing a start either)
+  Deleted; 26 grooves Deleted; all 148 Modified. Not the shared caps then; for a cut BOPAlgo_BOP takes the result
+  from the split solids (BuildRC), so the split solid of the cylinder is or isn't the result's solid: next, why
+  BOPAlgo_Builder's split solid differs (every groove's end caps lie on the cylinder's end faces).
+- perf.sh: both bool_patterns runs (cc8837a7, 620d5eaf) ran no test ("0 passed, 175 filtered out": the binary of
+  another commit; the ~/perf/wt race in Requests), so vibe3 numbers for the pattern set are still to come; the
+  numbers above are this machine's (relative only).
 - Next for the knurl (lead 17:45): its end caps (the "tools coincide" history) and the 26-groove piece's volume
   (1.4e-9 off: OCCT seeds each section with the pave filler's edge/face points); then the period solve.
 
