@@ -552,6 +552,26 @@ fn draft_side_face() {
     assert!(near((v - v0).abs(), dv, 1e-3), "draft volume change {} vs {dv}", v - v0);
 }
 
+/// qa DRAFT-BLOWUP-0415, live request 1626: a neutral-plane Draft of a face
+/// parallel to the pull (a 120 × 40 × 20 block's bottom about its end face)
+/// turns the face about their common line, 30° over 120 mm: the part grows by
+/// that wedge, or (flipped) is cut down to it, as in live.
+#[test]
+fn draft_of_a_face_parallel_to_the_pull_as_live() {
+    for (flip, want, faces) in [(false, 262276.8775, 6), (true, 13856.4065, 5)] {
+        let mut t = T::new();
+        t.block(-0.06, 0.0, 0.06, 0.04, "20 mm");
+        let res = t.ok();
+        let bottom = face_with_normal(&res.context.bodies[0], DVec3::NEG_Z);
+        let end = face_with_normal(&res.context.bodies[0], DVec3::NEG_X);
+        t.add("draft", &[("neutralPlane", q(vec![end])), ("draftFaces", q(vec![bottom])), ("angle", e("30 deg")), ("pullDirection", b(flip))]);
+        let res = t.ok();
+        let v = total_volume(&res.context) * 1e9;
+        assert!((v - want).abs() < 1e-3, "flip {flip}: {v} vs live {want}");
+        assert_eq!(res.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), faces, "flip {flip}");
+    }
+}
+
 #[test]
 fn face_blend_adjacent_faces() {
     let mut t = T::new();
