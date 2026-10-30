@@ -114,9 +114,21 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   feature built it (`FlatPattern::built_for`, `body_key`), else the native flattener on std's data (a later Hole's
   hole and counterbore heads); per-vertex Bend relief settings (`Definition::reliefs`); pulled wall sides that come
   out reversed are dropped (Modify joint radius on a corner a later flange shortened); ops' table skips stale parts.
-- Table letters (10-30): `Context::sm_births`, the std rebuild's first-sight order of definition edges (by end points)
-  and rolled faces (by box): an edge a later feature changes is new, as Onshape's transient ids; Bend / Rip `birth`;
-  the panel sorts joints by it (live request 1604; T2 joint_births_follow_live_letters).
+- Table letters (10-30): `Context::sm_births`, the std rebuild's first-sight registry of definition edges (end points
+  plus the boxes of the faces beside them) and rolled faces (box). An edge is new when its ends move, a face beside it
+  is cut down (the Hem's trim of the plate renews the plate's bends) or gains a wall (a Flange); a face that only
+  grows (a Tab merged in) keeps it. New ones: renewed-in-place first, then moved / new, each in definition order.
+  Bend / Rip `birth`; the panel sorts joints by it (live 1604, 1614; T2 joint_births_follow_live_letters,
+  qa5_letters_follow_live).
+- Slanted bend ends (10-30, loft rect → triangle, live 1612): build_part's `skew` ends: where both walls stop on free
+  sides (or a rip) at different places, the bend runs on and is cut back by a lofted ruled cutter; the definition-side
+  arc lies on the plane of the two sides through the vertex, eased linearly onto a rip's pulled-back side. Edge-joint
+  rips pull each wall back clearance / (1 − cos) of the walls' in-plane directions (0.02 at 90°, 0.018071 at 96.1°).
+- Flat unfold (10-30): `place_from` chose a bend's turn by `dot > 0`, which both turns pass under 45°: the loft's
+  33.8° bend stood its walls up out of the flat (area 2.6 % high). Now the nearer turn (T2 a_shallow_flange_unfolds_flat).
+- Open (10-30 noon): Form library: live's Form picker offers "Onshape sheet metal forms" (9 forms); ours only takes a
+  Part Studio of the document; crawl requested (REQUESTS 10:30), then ship the forms as built-in form studios.
+  Copy Flat pattern needs an assembly instance source for a flat body (assembly crate, not mine).
 - Open (10-30 morning): (1) (was: table letters, done above). (2) evaluateQuery order generally: live returns faces in
   creation order (rebuilt faces last; request 1608); the host lists a body only one Extrude made in live's order
   (first side, start cap, end cap, other sides: query.rs `creation_order`, which fixed the Convert's Butt Direction 1),
