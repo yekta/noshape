@@ -269,6 +269,10 @@ pub struct DrawingEditor {
     pub drawing_props: crate::drawing_drawprops::DrawingPropsUi,
     /// Section view dialog (see `drawing_section`).
     pub section_dlg: Option<crate::drawing_section::SectionDlg>,
+    /// The Aligned section view panel (see `drawing_aligned`).
+    pub aligned_dlg: Option<crate::drawing_aligned::AlignedDlg>,
+    /// Edit aligned section... asked (opened at the next render).
+    pub aligned_edit_request: Option<ViewId>,
     /// Auxiliary view dialog (see `drawing_aux`) and its label text.
     pub aux_dlg: Option<crate::drawing_aux::AuxDlg>,
     pub aux_letter: String,
@@ -564,6 +568,8 @@ impl DrawingEditor {
             sheet_props: None,
             drawing_props: Default::default(),
             section_dlg: None,
+            aligned_dlg: None,
+            aligned_edit_request: None,
             break_dlg: None,
             detail_dlg: None,
             crop_dlg: None,
@@ -1527,6 +1533,7 @@ impl DrawingEditor {
             window.focus(&self.focus, cx);
         }
         self.sync_section_dlg(window, cx);
+        self.sync_aligned_dlg(window, cx);
         self.sync_break_dlg(window, cx);
         self.sync_aux_dlg(window, cx);
         self.sync_detail_dlg(window, cx);
@@ -1646,6 +1653,7 @@ impl DrawingEditor {
             .children(self.render_toast(cx))
             .children(self.shortcut_sheet.as_ref().map(|(s, _)| s.clone()))
             .children(self.render_section_dlg(cx))
+            .children(self.render_aligned_dlg(cx))
             .children(self.render_break_dlg(cx))
             .children(self.render_aux_dlg(cx))
             .children(self.render_aux_edit(cx))

@@ -1030,7 +1030,9 @@ impl DrawingEditor {
                     self.tool = Tool::JoggedSection { parent: Some(pid), points: pts, done: false };
                 }
             }
-            Tool::JoggedSection { done: true, .. } | Tool::AlignedSection { b: Some(_), .. } => {
+            // Aligned: the panel's Section id and Show cut geometry only.
+            Tool::AlignedSection { b: Some(_), .. } => self.place_aligned_section(cx),
+            Tool::JoggedSection { done: true, .. } => {
                 if let Some(v) = self.pending_view() {
                     let id = v.id;
                     let name = if matches!(v.kind, ViewKind::AlignedSection { .. }) { "Aligned section view" } else { "Section view" };

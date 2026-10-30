@@ -379,6 +379,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Edit auxiliary view...", Op("drawing_auxiliary_view")),
     ("drawing:Edit crop...", Op("drawing_crop_view")),
     ("drawing:Edit detail...", Op("drawing_edit_detail")),
+    ("drawing:Edit aligned section...", Op("drawing_view_properties")),
     ("drawing:Edit hatch", Op("drawing_hatch_region")),
     ("drawing:Edit hatch section...", Op("drawing_edit_hatch")),
     ("drawing:Edit note...", Op("drawing_note")),

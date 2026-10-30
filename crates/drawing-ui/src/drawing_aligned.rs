@@ -1,0 +1,204 @@
+//! Drawing editor: Onshape's Aligned section view panel (live asb 10-24
+//! "aligned section dialog"): Section id (the next free letter), Center,
+//! Viewing plane location, Revolved plane location (each "Point ×" once
+//! clicked, the next one active), ☐ Show cut geometry only. ✓ is enabled
+//! once the three points are picked; a click on the sheet places the view.
+//! Edit aligned section... reopens it prefilled (✓ applies the Section id
+//! and Show cut geometry only).
+
+use crate::drawing_view::*;
+use crate::theme::p;
+use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::{Sizable as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::*;
+use noshape_model::drawing::{ViewId, ViewKind};
+
+/// Aligned section view panel state.
+pub struct AlignedDlg {
+    pub label: Entity<InputState>,
+    pub cut_only: bool,
+    /// Edit aligned section...: the view edited (the tool stays Select).
+    pub edit: Option<ViewId>,
+}
+
+impl DrawingEditor {
+    /// Create / drop the panel with the Aligned section view tool (called
+    /// from render); an edit request opens it prefilled.
+    pub fn sync_aligned_dlg(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(view) = self.aligned_edit_request.take()
+            && let Some(v) = self.current_sheet().view(view)
+            && let ViewKind::AlignedSection { label, .. } = &v.kind
+        {
+            let (label, cut_only) = (label.clone(), v.cut_only);
+            let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(label));
+            self.tool = Tool::Select;
+            self.aligned_dlg = Some(AlignedDlg { label: st, cut_only, edit: Some(view) });
+            return;
+        }
+        let active = matches!(self.tool, Tool::AlignedSection { .. });
+        let editing = self.aligned_dlg.as_ref().is_some_and(|d| d.edit.is_some());
+        match (&self.aligned_dlg, active) {
+            (None, true) => {
+                let next = self.current_sheet().next_label();
+                let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(next));
+                self.aligned_dlg = Some(AlignedDlg { label: st, cut_only: false, edit: None });
+            }
+            (Some(_), false) if !editing => self.aligned_dlg = None,
+            _ => {}
+        }
+    }
+
+    /// Edit aligned section... (the cutting line's and the view's menus).
+    pub fn open_aligned_edit(&mut self, view: ViewId, cx: &mut Context<Self>) {
+        self.aligned_edit_request = Some(view);
+        cx.notify();
+    }
+
+    /// The panel's Section id and Show cut geometry only for a new view.
+    pub fn aligned_values(&self, cx: &App) -> Option<(String, bool)> {
+        let d = self.aligned_dlg.as_ref()?;
+        let t = d.label.read(cx).value().trim().to_string();
+        Some((t, d.cut_only))
+    }
+
+    /// ✓: an edit applies; a new view is placed where its preview is.
+    fn aligned_ok(&mut self, cx: &mut Context<Self>) {
+        let Some((label, cut_only)) = self.aligned_values(cx) else { return };
+        if let Some(view) = self.aligned_dlg.as_ref().and_then(|d| d.edit) {
+            self.aligned_dlg = None;
+            self.edit_view("Edit aligned section", view, cx, |v| {
+                if let ViewKind::AlignedSection { label: l, .. } = &mut v.kind
+                    && !label.is_empty()
+                {
+                    *l = label.clone();
+                }
+                v.cut_only = cut_only;
+            });
+            return;
+        }
+        if matches!(self.tool, Tool::AlignedSection { b: Some(_), .. }) {
+            self.place_aligned_section(cx);
+        }
+    }
+
+    /// Place the pending aligned section view with the panel's values.
+    pub fn place_aligned_section(&mut self, cx: &mut Context<Self>) {
+        let Some(mut v) = self.pending_view() else { return };
+        if let Some((label, cut_only)) = self.aligned_values(cx) {
+            if let ViewKind::AlignedSection { label: l, .. } = &mut v.kind
+                && !label.is_empty()
+            {
+                *l = label;
+            }
+            v.cut_only = cut_only;
+        }
+        let id = v.id;
+        self.edit_sheet("Aligned section view", cx, |s| s.views.push(v));
+        self.tool = Tool::Select;
+        self.aligned_dlg = None;
+        self.selection = vec![Sel::View(id)];
+    }
+
+    pub fn render_aligned_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let d = self.aligned_dlg.as_ref()?;
+        let pal = p();
+        let editing = d.edit.is_some();
+        // Picked so far: 0 none, 1 center, 2 + viewing, 3 + revolved.
+        let picked = match &self.tool {
+            _ if editing => 3,
+            Tool::AlignedSection { center: None, .. } => 0,
+            Tool::AlignedSection { a: None, .. } => 1,
+            Tool::AlignedSection { b: None, .. } => 2,
+            _ => 3,
+        };
+        let ink = gpui_kit::rgb(0x333333);
+        let caption = gpui_kit::rgb(0x616b73);
+        // A query row: its caption, then "Point ×" once picked; the next one
+        // to pick is active (blue underline), later ones disabled.
+        let query = |id: &'static str, title: &'static str, k: usize| {
+            let (done, active) = (picked > k, picked == k && !editing);
+            v_flex()
+                .id(id)
+                .mt(px(4.))
+                .px(px(4.))
+                .pb(px(3.))
+                .border_b_1()
+                .border_color(if active { pal.accent } else { gpui_kit::rgb(0xdddddd) })
+                .when(!done && !active, |e| e.opacity(0.45))
+                .child(div().text_size(px(11.)).text_color(caption).child(title))
+                .when(done, |e| e.child(h_flex().gap(px(4.)).child(div().px(px(5.)).rounded(px(2.)).bg(gpui_kit::rgb(0xe5ebf0)).text_size(px(12.)).text_color(ink).child("Point ×"))))
+                .into_any_element()
+        };
+        let check_on = d.cut_only;
+        Some(
+            v_flex()
+                .id("dr-aligned-dlg")
+                .absolute()
+                .top(px(DIALOG_TOP))
+                .left(px(self.dialog_left()))
+                .w(px(229.))
+                .bg(pal.dialog_bg)
+                .shadow(crate::drawing_chrome::dialog_shadow())
+                .text_color(pal.text)
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .child(
+                    h_flex()
+                        .h(px(28.))
+                        .pl(px(11.))
+                        .border_b_1()
+                        .border_color(gpui_kit::rgb(0xd3d7d9))
+                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Aligned section view"))
+                        // ✓ once the three points are picked.
+                        .child(
+                            div()
+                                .id("da-ok")
+                                .w(px(28.))
+                                .h(px(27.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .bg(gpui_kit::rgb(0x009500))
+                                .when(picked < 3, |e| e.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED)))
+                                .when(picked == 3, |e| e.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.aligned_ok(cx))))
+                                .child(crate::ui::glyph("check", 18., gpui_kit::white())),
+                        )
+                        .child(
+                            div()
+                                .id("da-cancel")
+                                .w(px(28.))
+                                .h(px(27.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .child(crate::drawing_chrome::cancel_x(cx))
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.aligned_dlg = None;
+                                    this.cancel(cx);
+                                })),
+                        ),
+                )
+                .child(
+                    v_flex()
+                        .p(px(3.))
+                        .child(div().mt(px(1.)).h(px(25.)).flex().items_end().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()))
+                        .child(query("da-center", "Center", 0))
+                        .child(query("da-viewing", "Viewing plane location", 1))
+                        .child(query("da-revolved", "Revolved plane location", 2))
+                        .child(
+                            div().h(px(30.)).px(px(4.)).flex().items_center().child(
+                                crate::drawing_chrome::DrCheckbox::new("da-cut-only").native().label("Show cut geometry only").checked(check_on).on_click(cx.listener(|this, v: &bool, _, cx| {
+                                    if let Some(d) = &mut this.aligned_dlg {
+                                        d.cut_only = *v;
+                                    }
+                                    this.update_preview(cx);
+                                })),
+                            ),
+                        ),
+                )
+                .into_any_element(),
+        )
+    }
+}

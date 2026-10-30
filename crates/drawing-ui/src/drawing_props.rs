@@ -28,6 +28,9 @@ impl DrawingEditor {
         let mut out = Vec::new();
         if matches!(v.kind, ViewKind::Section { .. }) {
             out.push(MenuEntry::item("Edit section...", move |t, w, cx| t.open_section_edit(id, w, cx)));
+        } else if matches!(v.kind, ViewKind::AlignedSection { .. }) {
+            // Live asb 10-24 (5).
+            out.push(MenuEntry::item("Edit aligned section...", move |t, _, cx| t.open_aligned_edit(id, cx)));
         } else if sheet.section_points(id).is_some_and(|p| p.len() == 2) {
             out.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_cut_angle_panel(id, w, cx)));
         }
@@ -264,6 +267,8 @@ impl DrawingEditor {
         if matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
             if matches!(v.kind, ViewKind::Section { .. }) {
                 edits.push(MenuEntry::item("Edit section...", move |t, w, cx| t.open_section_edit(id, w, cx)));
+            } else if matches!(v.kind, ViewKind::AlignedSection { .. }) {
+                edits.push(MenuEntry::item("Edit aligned section...", move |t, _, cx| t.open_aligned_edit(id, cx)));
             } else if sheet.section_points(id).is_some_and(|p| p.len() == 2) {
                 edits.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_cut_angle_panel(id, w, cx)));
             }
