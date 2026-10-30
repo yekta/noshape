@@ -840,6 +840,14 @@ impl Viewport {
         }
     }
 
+    /// Zoom (animated) so the model box `lo`–`hi` fills the view, as
+    /// [`Self::zoom_to_fit`] does the scene.
+    pub fn zoom_to_bounds(&mut self, lo: DVec3, hi: DVec3, cx: &mut Context<Self>) {
+        let mut to = self.camera;
+        fit_camera_to_box(&mut to, lo, hi, self.size(), self.fit_inset_left);
+        self.animate_to(to, cx);
+    }
+
     /// Zoom so the box (viewport-local corners) fills the view.
     pub fn zoom_to_box(&mut self, a: DVec2, b: DVec2, cx: &mut Context<Self>) {
         if let Some(to) = noshape_scene::camera_ops::zoom_to_window(&self.camera, a, b, self.size()) {

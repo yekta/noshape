@@ -23,6 +23,8 @@ pub struct FlatView {
     /// The pattern shown (by identity) and its highlighted bend: a change
     /// rebuilds the scene.
     shown: Option<(usize, Option<usize>, Option<usize>)>,
+    /// The pattern shown and its highlighted (table-selected) bend.
+    flat: Option<(Arc<FlatPattern>, Option<usize>)>,
     /// The flat's display, its built scene and the overlays (bend lines,
     /// highlights), and the face under the pointer.
     parts: Option<(StudioDisplay, crate::scene_builder::BuiltScene, Vec<Instance>)>,
@@ -62,7 +64,7 @@ impl FlatView {
             ViewportEvent::CameraChanged if this.fitted.is_some_and(|c| c != this.viewport.read(cx).camera) => this.pending_fit = false,
             _ => {}
         });
-        Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, parts: None, hover: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
+        Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, flat: None, parts: None, hover: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
     }
 
     /// Show `flat` in `color` (linear RGBA, the part's). The first pattern
@@ -75,6 +77,7 @@ impl FlatView {
         }
         self.pending_fit |= self.shown.is_none();
         self.shown = key;
+        self.flat = flat.map(|f| (f.clone(), highlight));
         self.parts = flat.and_then(|f| flat_parts(f, color, highlight, hovered, &self.gpu));
         self.hover = None;
         self.compose(true, cx);
@@ -100,6 +103,23 @@ impl FlatView {
 
     pub fn zoom_to_fit(&mut self, cx: &mut Context<Self>) {
         self.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx));
+    }
+
+    /// Zoom to selection: the bend selected in the table (its strip), else
+    /// the whole flat.
+    pub fn zoom_to_selection(&mut self, cx: &mut Context<Self>) {
+        let strip = self.flat.as_ref().and_then(|(f, bend)| {
+            let l = f.bend_lines.iter().find(|l| Some(l.bend) == *bend)?;
+            let d = (l.b - l.a).normalize_or_zero();
+            let n = glam::DVec2::new(-d.y, d.x) * (l.allowance / 2.0);
+            let pts = [l.a - n, l.a + n, l.b - n, l.b + n];
+            let (lo, hi) = pts.iter().fold((glam::DVec2::splat(f64::INFINITY), glam::DVec2::splat(f64::NEG_INFINITY)), |(lo, hi), p| (lo.min(*p), hi.max(*p)));
+            Some((lo.extend(-f.thickness), hi.extend(0.0)))
+        });
+        match strip {
+            Some((lo, hi)) => self.viewport.update(cx, |vp, cx| vp.zoom_to_bounds(lo, hi, cx)),
+            None => self.zoom_to_fit(cx),
+        }
     }
 
     fn cube_click(&mut self, cell: CubeCell, cx: &mut Context<Self>) {

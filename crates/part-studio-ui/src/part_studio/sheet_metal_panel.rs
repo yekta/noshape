@@ -203,8 +203,8 @@ impl PartStudioView {
         // DXF/DWG of Flat pattern of <part>… | Select other… | Add comment |
         // Zoom to fit, Zoom to selection, View normal to | Delete <model>.
         // "Add comment" is cloud (not built, as in the other menus).
-        // TODO(SM4): New sketch…, Copy Flat pattern…, Select other… and Zoom
-        // to selection (asked live what they do: REQUESTS skasm 2026-10-30 04:00).
+        // TODO(SM4): New sketch…, Copy Flat pattern… and Select other… (asked
+        // live what they do: REQUESTS skasm 2026-10-30 04:00).
         let menu = OsMenu::build(window, cx, move |m, _, _| {
             type Action = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
             let item = |label: String, f: Action| {
@@ -221,7 +221,7 @@ impl PartStudioView {
                 m = m.item(item(format!("Edit {sname}…"), Box::new(move |this, w, cx| this.edit_feature(sid, w, cx)))).item(item("Show dimensions".into(), Box::new(move |this, w, cx| this.show_dimensions(sid, w, cx))));
             }
             let b = body.clone();
-            let (f1, f2) = (fv.clone(), fv.clone());
+            let (f1, f2, f3) = (fv.clone(), fv.clone(), fv.clone());
             m.item(item(format!("Show dependencies of {model_name}…"), Box::new(move |this, _, cx| {
                 this.ui.dependencies = Some(model);
                 cx.notify();
@@ -240,6 +240,11 @@ impl PartStudioView {
             .item(item("Zoom to fit".into(), Box::new(move |_, _, cx| {
                 if let Some(fv) = &f1 {
                     fv.update(cx, |f, cx| f.zoom_to_fit(cx));
+                }
+            })))
+            .item(item("Zoom to selection".into(), Box::new(move |_, _, cx| {
+                if let Some(fv) = &f3 {
+                    fv.update(cx, |f, cx| f.zoom_to_selection(cx));
                 }
             })))
             // The flat lies in XY: normal to any of its faces is Top.
