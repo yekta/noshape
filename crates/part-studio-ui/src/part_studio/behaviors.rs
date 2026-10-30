@@ -399,6 +399,9 @@ pub struct UiState {
     /// The table cell under the pointer: (table: 0 Bends / 1 Other joints,
     /// row, column).
     pub sm_hover: Option<(u8, usize, usize)>,
+    /// The bend (index into the model's bends) whose line is selected in the
+    /// flat view: Shift+C analyses it (live request 1622).
+    pub sm_flat_bend: Option<usize>,
     /// The Bends cell being edited (row, column 2 Radius / 5 K Factor), and
     /// whether its field still needs the focus.
     pub sm_edit: Option<(usize, usize)>,
@@ -657,6 +660,7 @@ impl UiState {
             sm_joints_closed: false,
             sm_bends_scroll: ScrollHandle::new(),
             sm_hover: None,
+            sm_flat_bend: None,
             sm_edit: None,
             sm_edit_focus: false,
             sm_cell: None,

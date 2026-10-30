@@ -198,6 +198,9 @@ impl PartStudioView {
         let key = kind.title();
         // A preselection replaces the remembered selection.
         let pre: Vec<Reference> = self.selection.iter().filter(|r| self.analysis_accepts(kind, r)).filter_map(|r| self.tool_entity(kind, r)).collect();
+        // A bend line selected in the flat view (live request 1622: Shift+C
+        // opens the panel with "Edge").
+        let pre = if pre.is_empty() && kind == ToolKind::CurveSurface { self.ui.sm_flat_bend.and_then(|b| self.bend_line_edge(b)).into_iter().collect() } else { pre };
         // The tool takes the preselection (it doesn't stay selected).
         let had_pre = !pre.is_empty();
         // Over a feature dialog the field starts empty (live "psui (10-27,

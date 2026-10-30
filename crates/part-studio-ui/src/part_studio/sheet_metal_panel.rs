@@ -189,13 +189,56 @@ impl PartStudioView {
         faces.first().map(|n| noshape_model::reference::Reference::Face((**n).clone()))
     }
 
+    /// A straight edge of bend `bend` along its axis: what Curve/surface
+    /// analysis takes for its flat bend line (live request 1622: the panel
+    /// opens with "Edge" and draws nothing for the straight line).
+    pub(super) fn bend_line_edge(&self, bend: usize) -> Option<Reference> {
+        let ctx = self.context.as_ref()?;
+        let data = ctx.sheet_metal.values().find(|d| d.bends.len() > bend && Some(d.model) == self.ui.sm_context.or_else(|| self.sheet_metal_models_ctx()))?;
+        let b = &data.bends[bend];
+        for name in b.inner_faces.iter().chain(&b.outer_faces) {
+            let Some(body) = ctx.bodies.iter().find(|x| x.faces.iter().any(|n| n == name)) else { continue };
+            let fi = body.faces.iter().position(|n| n == name)?;
+            let face = body.shape.sub_shape(noshape_kernel::ShapeType::Face, fi).ok()?;
+            let all = body.shape.edges();
+            for e in face.edges() {
+                let along = matches!(e.edge_curve(), Ok(noshape_kernel::Curve::Line { direction, .. }) if direction.normalize().cross(b.axis.normalize()).length() < 1e-6);
+                if along && let Some(ei) = all.iter().position(|x| x.is_same(&e)) {
+                    return body.edges.get(ei).map(|n| Reference::Edge((**n).clone()));
+                }
+            }
+        }
+        None
+    }
+
     /// A bend line's right-click menu in the flat view (live request 1605:
     /// Curve/surface analysis…, Select other…, Zoom to fit, Zoom to selection,
-    /// Align view with vertical axis; the first two need a model entity the
-    /// flat's line isn't).
+    /// Align view with vertical axis).
     fn open_flat_bend_menu(&mut self, position: Point<Pixels>, bend: usize, window: &mut Window, cx: &mut Context<Self>) {
         let (view, fv) = (cx.entity(), self.flat_view.clone());
+        let model_bend = fv.as_ref().and_then(|f| f.read(cx).bend_of_line(bend));
+        let edge = model_bend.and_then(|b| self.bend_line_edge(b));
+        let (v1, v2) = (view.clone(), view.clone());
         let menu = OsMenu::build(window, cx, move |m, _, _| {
+            let (edge, v1, v2) = (edge.clone(), v1.clone(), v2.clone());
+            let m = m
+                .item(OsMenuItem::new("Curve/surface analysis…").on_click(move |_, w, cx| {
+                    let edge = edge.clone();
+                    v1.update(cx, |this, cx| {
+                        this.close_context_menu(cx);
+                        if let Some(e) = edge {
+                            this.selection = vec![e];
+                            this.ui.analysis_tool = None;
+                            this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx);
+                        }
+                    })
+                }))
+                .item(OsMenuItem::new("Select other…").on_click(move |_, w, cx| {
+                    v2.update(cx, |this, cx| {
+                        this.close_context_menu(cx);
+                        this.open_flat_bend_select_other(position, bend, w, cx);
+                    })
+                }));
             let item = |label: &'static str, f: fn(&mut FlatView, usize, &mut Context<FlatView>)| {
                 let (v, fv) = (view.clone(), fv.clone());
                 OsMenuItem::new(label).on_click(move |_, _, cx| {
@@ -206,6 +249,57 @@ impl PartStudioView {
                 })
             };
             m.item(item("Zoom to fit", |f, _, cx| f.zoom_to_fit(cx))).item(item("Zoom to selection", |f, _, cx| f.zoom_to_selection(cx))).item(item("Align view with vertical axis", |f, b, cx| f.align_bend_vertical(b, cx)))
+        });
+        let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| this.close_context_menu(cx));
+        menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
+        self.context_menu = Some((position, menu, sub));
+        cx.notify();
+    }
+
+    /// Select other… on a flat bend line (live request 1622): "Edge of
+    /// <model>" (the line) and the bend's two faces, "Face of <its
+    /// feature>"; a face selects it in 3D, the bend in the flat, its row.
+    fn open_flat_bend_select_other(&mut self, position: Point<Pixels>, line: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let (view, fv) = (cx.entity(), self.flat_view.clone());
+        let Some(bend) = fv.as_ref().and_then(|f| f.read(cx).bend_of_line(line)) else { return };
+        let models = self.sheet_metal_models(cx);
+        let Some(model) = self.sheet_metal_context(&models) else { return };
+        let Some(data) = self.context.as_ref().and_then(|c| c.sheet_metal.values().find(|d| d.model == model).cloned()) else { return };
+        let Some(b) = data.bends.get(bend) else { return };
+        let model_name = models.iter().find(|(f, _)| *f == model).map(|(_, n)| n.clone()).unwrap_or_default();
+        let feature_name = self.studio(cx).and_then(|s| s.feature(b.feature).map(|f| f.name.clone())).unwrap_or_else(|| model_name.clone());
+        let faces: Vec<Reference> = b.inner_faces.iter().take(1).chain(b.outer_faces.iter().take(1)).map(|n| Reference::Face((**n).clone())).collect();
+        let row = noshape_ops::sheetmetal::joint_of(&data, bend);
+        let menu = OsMenu::build(window, cx, move |m, _, _| {
+            let (v, f) = (view.clone(), fv.clone());
+            let mut m = m.item(OsMenuItem::new(format!("Edge of {model_name}")).on_click(move |_, _, cx| {
+                v.update(cx, |this, cx| {
+                    this.close_context_menu(cx);
+                    this.selection.clear();
+                    this.ui.sm_flat_bend = Some(bend);
+                    this.refresh_scene(false, cx);
+                });
+                if let Some(f) = &f {
+                    f.update(cx, |f, cx| f.select_bend(Some(line), cx));
+                }
+            }));
+            for face in &faces {
+                let (v, f, face) = (view.clone(), fv.clone(), face.clone());
+                m = m.item(OsMenuItem::new(format!("Face of {feature_name}")).on_click(move |_, _, cx| {
+                    v.update(cx, |this, cx| {
+                        this.close_context_menu(cx);
+                        this.selection = vec![face.clone()];
+                        this.ui.sm_cell = Some((0, row, 0));
+                        this.ui.sm_flat_bend = None;
+                        this.refresh_scene(false, cx);
+                        cx.notify();
+                    });
+                    if let Some(f) = &f {
+                        f.update(cx, |f, cx| f.select_bend(Some(line), cx));
+                    }
+                }));
+            }
+            m
         });
         let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| this.close_context_menu(cx));
         menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
@@ -706,6 +800,7 @@ impl PartStudioView {
                     FlatViewEvent::ContextMenu(at, FlatPick::Bend(b)) => this.open_flat_bend_menu(*at, *b, window, cx),
                     FlatViewEvent::ContextMenu(at, on) => this.open_flat_menu(*at, *on == FlatPick::Face, window, cx),
                     FlatViewEvent::Selected(side) => this.select_flat_face(*side, cx),
+                    FlatViewEvent::BendSelected(b) => this.ui.sm_flat_bend = *b,
                 }));
                 self.flat_view = Some(fv.clone());
                 fv

@@ -56,6 +56,8 @@ pub enum FlatViewEvent {
     /// The flat's face selected (live request 1605: picking it selects the
     /// model face): its reference side (`true`), its back, or nothing.
     Selected(Option<bool>),
+    /// A bend line selected (the model's bend index), or none.
+    BendSelected(Option<usize>),
 }
 
 /// An open sketch's box on the flat (live request 1605: New sketch… on the
@@ -109,9 +111,12 @@ impl FlatView {
                     this.selected = None;
                     this.compose(false, cx);
                     cx.emit(FlatViewEvent::Selected(None));
+                    cx.emit(FlatViewEvent::BendSelected(this.selected_bend.and_then(|l| this.bend_of_line(l))));
                     return;
                 }
-                this.selected_bend = None;
+                if this.selected_bend.take().is_some() {
+                    cx.emit(FlatViewEvent::BendSelected(None));
+                }
                 let side = pick.and_then(|id| this.face_side(id));
                 this.select(if side.is_some() && side == this.selected { None } else { side }, cx);
                 this.compose(false, cx);
@@ -165,6 +170,18 @@ impl FlatView {
             .filter(|x| x.1 <= 5.0)
             .min_by(|x, y| x.1.total_cmp(&y.1))
             .map(|x| x.0)
+    }
+
+    /// The model's bend (index into its bends) of bend line `line`.
+    pub fn bend_of_line(&self, line: usize) -> Option<usize> {
+        self.flat.as_ref()?.0.bend_lines.get(line).map(|l| l.bend)
+    }
+
+    /// Select bend line `line` (or none), the face unselected.
+    pub fn select_bend(&mut self, line: Option<usize>, cx: &mut Context<Self>) {
+        self.selected_bend = line;
+        self.selected = None;
+        self.compose(false, cx);
     }
 
     /// Align view with vertical axis: the selected bend line upright.
