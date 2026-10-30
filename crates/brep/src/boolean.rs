@@ -1092,7 +1092,7 @@ impl Ctx<'_> {
                 (Path::Line { p: a, d: (b - a) / l }, 0.0, l)
             }
             Geo::Arc { k, a0, sweep } => (Path::Circle(k), a0, a0 + sweep),
-            Geo::Ell { e, t0, sweep, .. } if !e.hyp && matches!(self.faces[f].s, Surf::Plane { .. }) => (Path::Ellipse(e), t0, t0 + sweep),
+            Geo::Ell { e, t0, sweep, .. } if !e.hyp && (matches!(self.faces[f].s, Surf::Plane { .. }) || !e.par && matches!(self.faces[f].s, Surf::Cyl { .. })) => (Path::Ellipse(e), t0, t0 + sweep),
             Geo::Ell { .. } => return Err(Decline("an argument's ellipse")),
             Geo::Nurbs { .. } if matches!(self.faces[f].s, Surf::Nurbs { .. }) => return Err(Decline("a curved edge on another argument's free-form face")),
             Geo::Nurbs { id, t0, t1 } => (Path::Nurbs { id, c: self.ncurves[id as usize].c.clone() }, t0, t1),
@@ -1264,8 +1264,9 @@ impl Ctx<'_> {
                     if let (Geo::Nurbs { .. }, Surf::Plane { .. } | Surf::Cyl { .. }) = (self.edges[e].g, &self.faces[f].s) {
                         return Ok(true);
                     }
-                    if let (Geo::Ell { e: el, .. }, Surf::Plane { .. }) = (self.edges[e].g, &self.faces[f].s)
+                    if let (Geo::Ell { e: el, .. }, s @ (Surf::Plane { .. } | Surf::Cyl { .. })) = (self.edges[e].g, &self.faces[f].s)
                         && !el.hyp
+                        && (!el.par || matches!(s, Surf::Plane { .. }))
                     {
                         return Ok(true);
                     }

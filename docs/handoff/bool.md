@@ -722,6 +722,9 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   didn't. Now an OCCT curve clear of a face's boundary in the middle of a stretch but coming within the grey band of
   it (its distance's local minima narrowed down) declines "a section touching a face's boundary"; it declines that
   one case only.
+- An argument's ellipse lying on another's cylinder (fuses of tilted holes into tilted bosses) declined "an
+  argument's ellipse on another's face"; its pieces in the face go in now as on a plane: main 772 (+3, 7–12× OCCT),
+  the rest unchanged, 0 differ.
 
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
