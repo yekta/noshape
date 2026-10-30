@@ -3,6 +3,7 @@
 
 mod bbox;
 mod blend;
+mod bool_patterns;
 mod bool_replay;
 mod boolean_groups;
 mod brep_replay;

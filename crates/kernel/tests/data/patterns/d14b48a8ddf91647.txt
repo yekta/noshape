@@ -1,0 +1,17 @@
+op cut
+fuzzy 0e0
+glue off
+unify 1
+parallel 1
+obb 0
+objects 1
+tools 148
+target_faces 3
+valid 1
+volume 9.42728895147679224e-5
+faces 10362
+edges 20942
+vertices 10582
+history 2b02fca30b6751ad
+ms 336408.360
+path occt

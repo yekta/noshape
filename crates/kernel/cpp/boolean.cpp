@@ -178,6 +178,8 @@ class CancelIndicator : public Message_ProgressIndicator
 {
 public:
   explicit CancelIndicator(const std::atomic<bool>* flag) : myFlag(flag), myStart(resident_bytes()) {}
+  // (With NOSHAPE_KERNEL_PROFILE: the time to here goes to the step OCCT last showed.)
+  ~CancelIndicator() override { Show(nullptr); }
   bool UserBreak() override
   {
     if (cancelled(myFlag) || myOver)
@@ -199,14 +201,34 @@ public:
     }
     return myOver;
   }
-  void Show(const Message_ProgressScope&, const bool) override {}
+  // With NOSHAPE_KERNEL_PROFILE: each of OCCT's named steps' time (from one progress report to the next, to the
+  // innermost named step shown), as "occt: <step>".
+  void Show(const Message_ProgressScope& scope, const bool) override { Show(&scope); }
 
 private:
+  void Show(const Message_ProgressScope* scope)
+  {
+    if (!kernel_profile_on())
+      return;
+    const char* name = nullptr;
+    for (const Message_ProgressScope* s = scope; s != nullptr && name == nullptr; s = s->Parent())
+      name = s->Name();
+    const std::lock_guard<std::mutex> g(myStepLock);
+    const auto                        now = kernel_profile_now();
+    if (!myStep.empty())
+      kernel_profile_add_named(("occt: " + myStep).c_str(), now - myStepStart);
+    myStepStart = now;
+    myStep      = name != nullptr ? name : "";
+  }
+
   const std::atomic<bool>*              myFlag;
   Deadline*                             myDeadline = t_deadline;
   size_t                                myStart;
   bool                                  myOver = false;
   std::chrono::steady_clock::time_point myChecked = std::chrono::steady_clock::now();
+  std::mutex                            myStepLock;
+  std::string                           myStep;
+  std::chrono::steady_clock::duration   myStepStart{};
 };
 
 } // namespace
