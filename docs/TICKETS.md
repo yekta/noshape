@@ -281,7 +281,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   core 10-27: cpp/seh.cpp (MSVC): __try/__except around every bridge call and run_guarded, std::terminate inside a
   guarded call raised as a structured exception; crash_inputs and kernel_core::a_crash_inside_the_kernel_fails_only_that_call
   on all platforms again (crash_inside_kernel makes real faults on Windows). To verify on Windows CI.
-- [ ] P2 MASS-INERTIA-APPROX inertia and centre of mass aren't exact on curved parts: a Steel tube (Ø40 / Ø20 × 30,
+- [x] 6203ccbb P2 MASS-INERTIA-APPROX inertia and centre of mass aren't exact on curved parts: a Steel tube (Ø40 / Ø20 × 30,
+  - core 02:35: the mass properties shown integrate tighter (OCCT's adaptive integrator at 1e-12, 1e-10 above 1000 faces; volume() unchanged): the revolved tube's Ixy 0.03 mm⁵ (steel 2.4e-7 kg·mm²), its centre 1.6e-10 off the axis, Ixx = Iyy to 1e-10, the torus exact to 3e-9 (6203ccbb). T1 `kernel_core::mass_properties_of_tubes_and_a_torus_are_exact`.
   revolved; /root/qa-scratch/rev.noshape Part 1, part_set_material Steel 7850.021 kg/m³) → query_mass_properties: mass
   0.221954 kg and Izz 55.488606 right, but Ixx 44.391247 / Iyy 44.390476 (both exactly m(3(R²+r²)+h²)/12 = 44.39082),
   Ixy −0.006832 (exactly 0) and CoM x 5.8e-5 (0). At the panel's 3 decimals that reads Lxy −0.007, Lxx ≠ Lyy; live
