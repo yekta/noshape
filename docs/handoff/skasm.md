@@ -143,8 +143,9 @@ release is faster. Each is a timed T2/perf test with the target as its gate.
   form's Add material. Left: the preview; Lance's placement (live's mate connector) and Straight profile (asked,
   REQUESTS 16:20); the flat's inner form outline: live draws the form's flat sketch (Circle emboss: Ø d circle
   besides the r 9.1569 footprint), ours the tools' widest sections: give the library studios their "Form profile"
-  sketches (circles sized by `dimension_exprs` `#diameter`) as the tag's flatFormSketch and draw FormTools'
-  sketchBodyIds in `flat_of`.
+  sketches (circles sized by `dimension_exprs` `#diameter`) as the tag's flatFormSketch (tried 10-30: std's tag
+  marks the sketch sketchForFlatView fine) and draw FormTools' sketchBodyIds in `flat_of`; first the host's
+  opMergeContexts must bring a derived sketch in as a (transformed) wire body: it now only appends `ctx.sketches`.
   Copy Flat pattern needs an assembly instance source for a flat body (assembly crate, not mine).
 - Open (10-30 morning): (1) (was: table letters, done above). (2) evaluateQuery order generally: live returns faces in
   creation order (rebuilt faces last; request 1608); the host lists a body only one Extrude made in live's order
