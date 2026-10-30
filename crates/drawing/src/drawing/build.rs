@@ -2291,28 +2291,47 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // on its own (live: its menu has the flips).
             let pick = picks.id(PickTarget::HoleAxis(t.id));
             let (sx, sy) = (if *flip_x { -1.0 } else { 1.0 }, if *flip_y { -1.0 } else { 1.0 });
-            let (xt, yt) = ([os[0] + 8.0 * sx, os[1]], [os[0], os[1] + 8.0 * sy]);
-            // Drawing properties › Tables › Hole tables: Indicator lines'
-            // pen and arrowhead size.
+            // Live (request 1609, samples/holetable-indicator-{ansi,iso}.dxf,
+            // ANSI A mm): an extension line from 1/16 in off the origin to
+            // 0.8 in, away from the part, along each axis; the X arrow (0.5 in
+            // with its head) leaves the line under the origin 0.7375 in down,
+            // the Y arrow the line left of it; "X" / "Y" past the tips. ISO
+            // adds a 1/48 in circle and a "0" at each arrow's tail.
+            const IN: f64 = 25.4;
             let ts = &drawing.props.table_styles;
+            let head = ts.hole_indicator_arrow.unwrap_or(0.18 * IN);
+            let at = |p: [f64; 2], d: [f64; 2], k: f64| [p[0] + d[0] * k, p[1] + d[1] * k];
+            let (ex, ey) = ([sx, 0.0], [0.0, sy]);
+            let (back_x, back_y) = ([-sx, 0.0], [0.0, -sy]);
+            let xs = at(os, back_y, 0.7375 * IN);
+            let ys = at(os, back_x, 0.7375 * IN);
+            let (xt, yt) = (at(xs, ex, 0.5 * IN), at(ys, ey, 0.5 * IN));
             let l0 = g.lines.len();
-            g.lines.push(Polyline2 { points: vec![os, xt], style: LineStyle::Thin, closed: false, pick });
-            g.lines.push(Polyline2 { points: vec![os, yt], style: LineStyle::Thin, closed: false, pick });
-            g.pens.push(super::sheet::PenSpan { centered: false, lines: l0..l0 + 2, width_mm: ts.hole_indicator_line, dashes: Vec::new() });
-            match ts.hole_indicator_arrow {
-                Some(a) => {
-                    g.arrow_as(xt, [sx, 0.0], a, super::sheet::ArrowType::Filled);
-                    g.arrow_as(yt, [0.0, sy], a, super::sheet::ArrowType::Filled);
-                }
-                None => {
-                    g.arrow(xt, [sx, 0.0], 2.0);
-                    g.arrow(yt, [0.0, sy], 2.0);
+            g.lines.push(Polyline2 { points: vec![at(os, back_y, IN / 16.0), at(os, back_y, 0.8 * IN)], style: LineStyle::Thin, closed: false, pick });
+            g.lines.push(Polyline2 { points: vec![xs, at(xt, back_x, head)], style: LineStyle::Thin, closed: false, pick });
+            g.lines.push(Polyline2 { points: vec![at(os, back_x, IN / 16.0), at(os, back_x, 0.8 * IN)], style: LineStyle::Thin, closed: false, pick });
+            g.lines.push(Polyline2 { points: vec![ys, at(yt, back_y, head)], style: LineStyle::Thin, closed: false, pick });
+            // Drawing properties › Tables › Hole tables: Indicator lines' pen
+            // and arrowhead size, Indicator style.
+            g.arrow_as(xt, ex, head, super::sheet::ArrowType::Filled);
+            g.arrow_as(yt, ey, head, super::sheet::ArrowType::Filled);
+            if ts.hole_indicator_iso {
+                for c in [xs, ys] {
+                    g.lines.push(Polyline2 { points: circle_points(c, IN / 48.0, 16), style: LineStyle::Thin, closed: true, pick });
                 }
             }
+            g.pens.push(super::sheet::PenSpan { centered: false, lines: l0..g.lines.len(), width_mm: ts.hole_indicator_line, dashes: Vec::new() });
             color_lines_since(&mut g, origin_mark, ts.hole_indicator_color);
-            g.texts.push(Text2 { pos: [xt[0] + 1.5 * sx - if sx < 0.0 { 1.8 } else { 0.0 }, xt[1] - 0.9], height: 1.8, text: "X".into(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
-            g.texts.push(Text2 { pos: [yt[0] - 0.6, yt[1] + if sy > 0.0 { 1.0 } else { -2.8 }], height: 1.8, text: "Y".into(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
-            g.fills.push(Fill2 { points: circle_points(os, 0.8, 8) });
+            let h = drawing.props.ann_text_height;
+            // Top-left anchors as live's MTEXT (a letter's width ≈ 0.65 h
+            // when it goes to the left).
+            let w = 0.65 * h;
+            g.texts.push(Text2 { pos: [xt[0] + if sx > 0.0 { 1.8354 } else { -1.8354 - w }, xt[1] + 1.5302], height: h, text: "X".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
+            g.texts.push(Text2 { pos: [yt[0] - 1.2032, yt[1] + if sy > 0.0 { 4.5782 } else { -1.6 }], height: h, text: "Y".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
+            if ts.hole_indicator_iso {
+                g.texts.push(Text2 { pos: [xs[0] + if sx > 0.0 { -3.8484 } else { 1.6 }, xs[1] + 1.5209], height: h, text: "0".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
+                g.texts.push(Text2 { pos: [ys[0] - 0.8004, ys[1] + if sy > 0.0 { -1.5271 } else { 4.4 }], height: h, text: "0".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
+            }
             g.cad_since(origin_mark, CadLayer::OriginIndicators);
             let tag_mark = g.texts.len();
             let tags = &ts.hole_tags;

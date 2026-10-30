@@ -640,6 +640,20 @@ fn bom_hole_table_and_linked_balloons() {
     assert!(export::to_svg(&built.geometry).contains("HOLE TABLE"));
     assert!(export::to_dxf(&built.geometry).contains("HOLE TABLE"));
     assert!(export::pdf_texts(&export::to_pdf(&built.geometry)).iter().any(|t| t == "HOLE TABLE"));
+    // The origin indicator as live 1609: the X arrow starts 0.7375 in under
+    // the origin and runs 0.5 in to +X; ISO adds a "0" and a circle at each
+    // arrow's tail.
+    let ap = pick_of(&built, PickTarget::HoleAxis(1));
+    let os = built.placements.iter().find(|p| p.id == ViewId(2)).unwrap().to_sheet(origin);
+    let axis_lines = |b: &build::BuiltSheet| b.geometry.lines.iter().filter(|l| l.pick == ap).cloned().collect::<Vec<_>>();
+    let xs = [os[0], os[1] - 0.7375 * 25.4];
+    assert!(axis_lines(&built).iter().any(|l| (l.points[0][0] - xs[0]).abs() < 1e-6 && (l.points[0][1] - xs[1]).abs() < 1e-6 && l.points[1][0] > xs[0]), "{:?}", axis_lines(&built));
+    let zeros = |b: &build::BuiltSheet| b.geometry.texts.iter().filter(|t| t.pick == ap && t.text == "0").count();
+    assert_eq!(zeros(&built), 0);
+    drawing.props.table_styles.hole_indicator_iso = true;
+    let iso = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert_eq!(zeros(&iso), 2);
+    assert_eq!(axis_lines(&iso).len(), axis_lines(&built).len() + 2);
 }
 
 #[test]
