@@ -322,10 +322,12 @@ STATUS D10 / D12 (2026-10-24 17:05, qa5): fixed on main by api (b4b803af): PDF i
   reject with `invalid_argument`.
 
 ## FLAT-ROT — fs — flat pattern is turned 90° against Onshape's
+- **Done (skasm 10-30, std route):** 128.9165 × 129.4650 as live (T2 qa4_s1_enclosure_as_live).
 - qa4 round 4 S1 (r4/s1.py): live flat bounding box x 128.9165 × y 129.4650 mm; ours 129.465 × 128.916 (panel "Flat size" and the
   drawing's flat view both turned). Live keeps the base in place: the x = 100 flange extends along +x, the y walls along ±y.
 
 ## FLAT-SEG — fs — bend lines split by a cutout
+- **Done (skasm 10-30, std route):** the slot splits both long bends: 6 bend lines as live (T2 qa4_s1_enclosure_as_live).
 - qa4 round 4 S1: a Ø12 cut through both long bends splits each bend line in two in live (6 "Bend line" bodies, 5 × "UP 90.0°
   R1.5" + "UP 180.0° R0.01" notes in the drawing's flat view); ours keeps one bend line per bend (3 + 1 notes).
 

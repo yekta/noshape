@@ -812,6 +812,12 @@ fn qa4_s1_enclosure_as_live() {
     });
     let r = s.ok();
     let cut = (volume_mm3(&r), faces(&r));
+    let fp = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
+    let (lo, hi) = fp.bounds();
+    // Live: the flat 128.9165 × 129.4650 (FLAT-ROT: not turned), 6 bend lines
+    // (FLAT-SEG: the slot splits both long bends; the x = 100 bend; the hem).
+    let size = (hi - lo) * 1e3;
+    assert!((size.x - 128.9165).abs() < 1e-3 && (size.y - 129.4650).abs() < 1e-3 && fp.bend_lines.len() == 6, "flat {size:?}, {} bend lines", fp.bend_lines.len());
     let ok = |(v, n): (f64, usize), (lv, ln): (f64, usize)| (v - lv).abs() < 1e-3 && n == ln;
     assert!(ok(flange, (20295.0752, 34)) && ok(hem, (22074.8607, 43)) && ok(cut, (20805.4123, 61)), "flange {flange:?}, hem {hem:?}, cut {cut:?}: {:#?}", face_report(&r));
 }
