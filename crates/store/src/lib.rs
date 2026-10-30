@@ -43,7 +43,7 @@ pub use error::{Result, StoreError};
 pub use ids::{BlobHash, BranchId, MicroversionId, VersionId};
 pub use manifest::{ChangeKind, Manifest, NameChange, diff};
 pub use schema::{APPLICATION_ID, SCHEMA_VERSION};
-pub use undo::UndoStack;
+pub use undo::{UndoStack, is_not_undoable};
 
 /// Merge resolver that keeps the target branch's content.
 pub fn take_ours(

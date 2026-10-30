@@ -383,7 +383,7 @@ impl Session {
     /// writer appends to one workspace and neither loses the other's edit.
     fn write(&mut self, changes: Changes, description: &str, undoable: bool) -> Result<MicroversionId> {
         let (changes, moved) = self.rebase(changes)?;
-        let after = if undoable && !self.tab_bar_only(&changes)? {
+        let after = if undoable && !noshape_store::is_not_undoable(description) && !self.tab_bar_only(&changes)? {
             self.undo.commit(&mut self.store, &changes, description)?
         } else {
             self.undo.commit_not_undoable(&mut self.store, &changes, description)?

@@ -2790,6 +2790,9 @@ fn assembly_instance_menu() {
     // Move to new subassembly, lock it, dissolve it.
     let m = call(&mut ctx, "assembly_move_to_subassembly", json!({ "instances": [a, pasted] }));
     assert!(last(&mut ctx).ends_with("Move to new subassembly"), "{}", last(&mut ctx));
+    // Live (request 1582): the move takes no undo step and the assembly's Undo is off after it.
+    let u = call(&mut ctx, "history_undo", json!({ "tab": "Assembly 1" }));
+    assert_eq!((u["undone"].clone(), u["can_undo"].clone()), (json!(false), json!(false)), "{u}");
     assert_eq!(count(&m), 2, "the two moved, one subassembly instance: {m}");
     let sub = m["new_instance"]["id"].as_str().unwrap().to_string();
     let tabs = call(&mut ctx, "document_info", json!({}));
@@ -2802,6 +2805,10 @@ fn assembly_instance_menu() {
     let dv = call(&mut ctx, "assembly_dissolve_subassembly", json!({ "instances": [sub] }));
     assert_eq!(count(&dv), 3, "{dv}");
     assert!(last(&mut ctx).ends_with("Dissolve subassembly"));
+    // No undo step for the dissolve either (live); ours keeps Undo off for the
+    // edits before the move (whole-tab undo would bring the moved instances back).
+    let u = call(&mut ctx, "history_undo", json!({ "tab": "Assembly 1" }));
+    assert_eq!(u["undone"], json!(false), "{u}");
     let cs = call(&mut ctx, "assembly_create_subassembly", json!({}));
     assert_eq!(count(&cs), 4);
     // Insert a sketch.

@@ -28,10 +28,23 @@ pub const NOT_UNDOABLE_PREFIXES: &[&str] = &[
 /// back for a blob: given its name and the value undo/redo would restore.
 pub type KeepBlob<'a> = dyn Fn(&str, Option<Vec<u8>>) -> Option<Vec<u8>> + 'a;
 
-/// Whether a change description is one of [`NOT_UNDOABLE_PREFIXES`].
+/// Edits Ctrl+Z can't revert that also end the undo of the tabs they
+/// change: live (request 1582) disables an assembly's Undo after Move to new
+/// subassembly, and neither it nor Dissolve subassembly takes a step. (Live
+/// then reaches the edits before the move again; ours restores whole tab
+/// states, which would bring the moved instances back, so those go.)
+pub const NOT_UNDOABLE_PURGING: &[&str] = &["Move to new subassembly", "Dissolve subassembly"];
+
+/// Whether a change description is one of [`NOT_UNDOABLE_PREFIXES`] or
+/// [`NOT_UNDOABLE_PURGING`].
 pub fn is_not_undoable(description: &str) -> bool {
     // Edits of a tab read "<tab name> :: <edit>" (a tab may be called "Import 1").
-    !description.contains(" :: ") && NOT_UNDOABLE_PREFIXES.iter().any(|p| description.starts_with(p))
+    !description.contains(" :: ") && NOT_UNDOABLE_PREFIXES.iter().chain(NOT_UNDOABLE_PURGING).any(|p| description.starts_with(p))
+}
+
+/// Whether a change description is one of [`NOT_UNDOABLE_PURGING`].
+pub fn purges_undo(description: &str) -> bool {
+    !description.contains(" :: ") && NOT_UNDOABLE_PURGING.iter().any(|p| description.starts_with(p))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -109,6 +122,9 @@ impl UndoStack {
             }
             let d = m.description.as_str();
             if is_not_undoable(d) {
+                if purges_undo(d) {
+                    stack.forget_touching(doc, parent, m.id)?;
+                }
                 stack.expected_head = Some(m.id);
                 continue;
             }
@@ -182,8 +198,21 @@ impl UndoStack {
             self.undo.clear();
         }
         self.redo.clear();
+        if purges_undo(description) {
+            self.forget_touching(doc, before, after)?;
+        }
         self.expected_head = Some(after);
         Ok(after)
+    }
+
+    /// Drops the entries that changed a tab the edit `before` → `after`
+    /// changed ([`NOT_UNDOABLE_PURGING`]).
+    fn forget_touching(&mut self, doc: &Document, before: MicroversionId, after: MicroversionId) -> Result<()> {
+        let tabs: Vec<String> = doc.diff(before, after)?.into_iter().map(|c| c.name).filter(|n| n.starts_with("tab/")).collect();
+        let mut keep = |e: &Entry| Self::changed_names(doc, e).map_or(false, |c| !c.iter().any(|n| tabs.contains(n)));
+        self.undo.retain(&mut keep);
+        self.redo.retain(&mut keep);
+        Ok(())
     }
 
     fn changed_names(doc: &Document, e: &Entry) -> Result<Vec<String>> {

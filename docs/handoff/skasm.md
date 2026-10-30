@@ -210,8 +210,9 @@ Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's b
    ASM-OVERDEFINED-TEXT 8ed2eeb4, ASM-TRIAD-VALUE-STAYS 9d70ff72, ASM-SELECT-OTHER 681183a9, SKETCH-VDIM-SIDE-ARROWS
    (+ RECT-DIM-GLYPHS (a)), SKETCH-DIM-CURVE-PAIR's warning bubble. SKETCH-MODEL-EDGE-SELECT residual answered (display
    latency: :103 frames cost 0.6–1.1 s GPU under load). An expanded subassembly row now lists its instances, its patterns (copies
-   under their caret) and its own Mate features folder (live request 1582). Gap left: after Move to new subassembly
-   live's Undo is disabled (ours undoes it). :103 note: this session xdotool digits didn't reach the app
+   under their caret) and its own Mate features folder (live request 1582). Move to new subassembly / Dissolve subassembly
+   take no undo step and turn the assembly's Undo off, as live (store NOT_UNDOABLE_PURGING; live re-enables the older
+   history after a dissolve, ours can't safely: whole-tab undo). :103 note: this session xdotool digits didn't reach the app
    (letters did); windowfocus --sync before keys helps with letters.
    Older: open tickets (10-28 18:30): SKETCH-RECT-DIM-GLYPHS (a) vertical edge glyph side, (b) corner Coincident glyphs,
    (c) the top-edge glyphs on the height dimension's arrow: see its note (needs our rectangle's edges to run as live's,
