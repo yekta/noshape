@@ -647,7 +647,7 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let mut st = cx.state.lock();
     let (marker, feature) = (super::marker_of(&id), st.feature);
     for (name, source, b) in made {
-        let inst = super::wrap_body_id(&b, marker, feature);
+        let inst = super::wrap_body_id(&b, marker, st.op_bits(marker), feature);
         // A copy keeps its body's attributes (std Form's tool instances keep the Tag's form attributes).
         let copied: Vec<Value> = st.attributes.iter().filter(|(r, _)| *r == Reference::Body(source.clone())).map(|(_, v)| v.clone()).collect();
         for v in copied {
@@ -1683,9 +1683,10 @@ fn op_merge_contexts(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     })?;
     let mut st = cx.state.lock();
     let feature = st.feature;
+    let bits = st.op_bits(marker);
     let merged = |r: Reference| match &r {
         Reference::Body(old) => match moved.iter().find(|(o, _)| o == old) {
-            Some((_, index)) => Reference::Body(super::wrap_body_id(&BodyId { feature: marker, index: *index }, marker, feature)),
+            Some((_, index)) => Reference::Body(super::wrap_body_id(&BodyId { feature: marker, index: *index }, marker, bits, feature)),
             None => r,
         },
         _ => r,

@@ -1504,7 +1504,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     for (n, part_id, (faces, edges, vertices), flat, data) in built {
         let Some((body_ref, dfaces, dedges, dverts)) = def_refs.get(n) else { continue };
         // New parts were renamed to the feature after the operation.
-        let part_id = super::wrap_body_id(&part_id, marker, feature);
+        let part_id = super::wrap_body_id(&part_id, marker, st.op_bits(marker), feature);
         // Its face names as the operation's bodies were renamed after it.
         let mut data = data;
         let wrap = |v: &mut Vec<crate::naming::Name>| v.iter_mut().for_each(|n| *n = super::wrap_name(n, marker, feature));

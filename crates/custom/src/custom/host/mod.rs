@@ -110,6 +110,8 @@ pub struct CtxState {
     pub merged_creators: HashMap<BodyId, Vec<FsId>>,
     /// The operation that created each body (exact, see `body_creator`).
     pub body_ops: HashMap<BodyId, FsId>,
+    /// Each operation's bits of its bodies' ids (unique in this feature).
+    body_bits: BodyBits,
     /// The operation number after the last operation that made or changed
     /// each body (bodies from earlier features are not listed).
     pub touched: HashMap<BodyId, u32>,
@@ -210,6 +212,7 @@ impl FsContext {
                 ops: HashMap::new(),
                 merged_creators: HashMap::new(),
                 body_ops: HashMap::new(),
+                body_bits: BodyBits::default(),
                 touched: HashMap::new(),
                 used_ids: HashSet::new(),
                 next_seq: 1,
@@ -417,7 +420,13 @@ impl CtxState {
         let seq = self.next_seq;
         self.next_seq += 1;
         self.ops.insert(marker, OpInfo { id: id.to_vec(), seq });
+        self.body_bits.assign(marker);
         Some(marker)
+    }
+
+    /// The bits of the ids of the bodies operation `marker` creates.
+    pub fn op_bits(&self, marker: FeatureId) -> u32 {
+        self.body_bits.of(marker)
     }
 
     /// The id of the operation (or feature) that created a body.
@@ -428,8 +437,8 @@ impl CtxState {
             if let Some(op) = self.body_ops.get(id) {
                 return Some(op.clone());
             }
-            if let Some(op) = self.ops.iter().find(|(m, _)| marker_bits(**m) == (id.index & 0xFFFF_F000)) {
-                return Some(op.1.id.clone());
+            if let Some(op) = self.body_bits.owner(id.index & 0xFFFF_F000).and_then(|m| self.ops.get(&m)) {
+                return Some(op.id.clone());
             }
         }
         if is_marker(id.feature) {
@@ -501,12 +510,47 @@ fn mentions(n: &TopoName, marker: FeatureId) -> bool {
     }
 }
 
+/// The bits of operation bodies' ids per operation of one feature. Two
+/// operations whose markers share their 20 bits (about 1 feature in 100 of
+/// ~150 operations, by the random feature id) gave their bodies one id, and
+/// either's qCreatedBy found the other's body (the ops harness on threads: a
+/// wire 1.2 m away, a duplicated offset group): the later one takes the next
+/// free bits.
+#[derive(Default)]
+struct BodyBits {
+    of: HashMap<FeatureId, u32>,
+    owner: HashMap<u32, FeatureId>,
+}
+
+impl BodyBits {
+    fn assign(&mut self, marker: FeatureId) -> u32 {
+        if let Some(b) = self.of.get(&marker) {
+            return *b;
+        }
+        let mut bits = marker_bits(marker);
+        while self.owner.contains_key(&bits) {
+            bits = bits.wrapping_add(1 << 12);
+        }
+        self.owner.insert(bits, marker);
+        self.of.insert(marker, bits);
+        bits
+    }
+
+    fn of(&self, marker: FeatureId) -> u32 {
+        self.of.get(&marker).copied().unwrap_or_else(|| marker_bits(marker))
+    }
+
+    fn owner(&self, bits: u32) -> Option<FeatureId> {
+        self.owner.get(&bits).copied()
+    }
+}
+
 /// Body id for a body an operation created: stable per operation id.
-fn wrap_body_id(id: &BodyId, marker: FeatureId, feature: FeatureId) -> BodyId {
+fn wrap_body_id(id: &BodyId, marker: FeatureId, bits: u32, feature: FeatureId) -> BodyId {
     if id.feature != marker {
         return id.clone();
     }
-    BodyId { feature, index: marker_bits(marker) | (id.index & 0xFFF) }
+    BodyId { feature, index: bits | (id.index & 0xFFF) }
 }
 
 /// 20 well-mixed bits of an operation's marker for its bodies' indices
@@ -523,18 +567,18 @@ fn marker_bits(marker: FeatureId) -> u32 {
 
 /// After an operation: give everything it created names of the custom
 /// feature (see the module docs).
-pub fn rename_created(ctx: &mut Context, marker: FeatureId, feature: FeatureId) {
+pub fn rename_created(ctx: &mut Context, marker: FeatureId, bits: u32, feature: FeatureId) {
     for b in ctx.bodies.iter_mut() {
         let touches = b.id.feature == marker || b.faces.iter().any(|f| mentions(f, marker)) || (b.faces.is_empty() && b.edges.iter().any(|e| mentions(e, marker)));
         if !touches {
             continue;
         }
         let faces: Vec<Arc<TopoName>> = b.faces.iter().map(|f| wrap_name(f, marker, feature)).collect();
-        let id = wrap_body_id(&b.id, marker, feature);
+        let id = wrap_body_id(&b.id, marker, bits, feature);
         let mut nb = Body::new(id, b.name.clone(), b.kind, b.shape.clone(), faces, b.color, feature);
         // Keep what the operation made it (a composite part's members).
         nb.composite = b.composite.clone().map(|mut c| {
-            c.members = c.members.iter().map(|m| wrap_body_id(m, marker, feature)).collect();
+            c.members = c.members.iter().map(|m| wrap_body_id(m, marker, bits, feature)).collect();
             c
         });
         if b.faces.is_empty() {
@@ -674,8 +718,9 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
     let mut ctx = ev.ctx;
     match r {
         Ok(v) => {
-            let created: Vec<BodyId> = ctx.bodies.iter().filter(|b| b.id.feature == marker).map(|b| wrap_body_id(&b.id, marker, st.feature)).collect();
-            rename_created(&mut ctx, marker, st.feature);
+            let bits = st.op_bits(marker);
+            let created: Vec<BodyId> = ctx.bodies.iter().filter(|b| b.id.feature == marker).map(|b| wrap_body_id(&b.id, marker, bits, st.feature)).collect();
+            rename_created(&mut ctx, marker, bits, st.feature);
             let seq = st.next_seq;
             for b in created {
                 st.touched.insert(b.clone(), seq);
@@ -812,3 +857,28 @@ pub fn enum_name(v: &Value) -> Option<Arc<str>> {
 }
 
 pub use crate::regen::custom_features::{error_code, error_text};
+
+#[cfg(test)]
+mod body_bits_tests {
+    use super::*;
+
+    /// Two operations whose markers share their 20 bits get bodies of their
+    /// own, each found as its operation's.
+    #[test]
+    fn colliding_operations_get_bits_of_their_own() {
+        let id = |n: &str| -> Vec<Arc<str>> { vec![Arc::from("F1234abcd"), Arc::from(n)] };
+        let mut seen: HashMap<u32, String> = HashMap::new();
+        let (a, b) = (0..).map(|k| format!("op{k}")).find_map(|n| seen.insert(marker_bits(marker_of(&id(&n))), n.clone()).map(|prev| (prev, n))).unwrap();
+        let (ma, mb) = (marker_of(&id(&a)), marker_of(&id(&b)));
+        assert_ne!(ma, mb);
+        assert_eq!(marker_bits(ma), marker_bits(mb));
+        let mut bits = BodyBits::default();
+        let (ba, bb) = (bits.assign(ma), bits.assign(mb));
+        assert_ne!(ba, bb);
+        assert_eq!((bits.owner(ba), bits.owner(bb)), (Some(ma), Some(mb)));
+        assert_eq!((bits.assign(ma), bits.of(mb)), (ba, bb));
+        let feature = FeatureId(7);
+        let body = |m: FeatureId, bits: u32| wrap_body_id(&BodyId { feature: m, index: 0 }, m, bits, feature);
+        assert_ne!(body(ma, ba), body(mb, bb));
+    }
+}

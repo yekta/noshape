@@ -983,6 +983,34 @@ fn ops_and_evaluations_run_in_custom_features() {
     assert!(bad.is_empty() && out.output.ends_with("done\n"), "{}\n{}", out.output, notices.join("\n"));
 }
 
+/// The same harness on 4 threads at once (NOSHAPE_TEST_THREADS), twice each:
+/// every run passes and prints the same lines (lead 10-30: a duplicated
+/// evOffsetDetection group, a wire 1.2 m off in opEditCurve's check; two
+/// operations' bodies had one id when their markers' 20 bits collided).
+#[test]
+fn ops_and_evaluations_are_the_same_on_many_threads() {
+    let run = || {
+        let fx = Fixture::new(include_str!("fs/ops_harness.fs"));
+        let mut ps = PartStudio::new();
+        let f = ps.new_feature(&fx.ty("opsHarness"), &fx.units).unwrap();
+        let fid = f.id;
+        ps.features.push(f);
+        let mut reg = Regenerator::new();
+        let _ = fx.regen(&mut reg, &ps);
+        custom::run::output_of(fid).expect("output").output
+    };
+    let outs: Vec<String> = std::thread::scope(|s| {
+        let n: usize = std::env::var("NOSHAPE_TEST_THREADS").ok().and_then(|v| v.parse().ok()).unwrap_or(4);
+        let hs: Vec<_> = (0..n).map(|_| s.spawn(|| (0..2).map(|_| run()).collect::<Vec<_>>())).collect();
+        hs.into_iter().flat_map(|h| h.join().unwrap()).collect()
+    });
+    for o in &outs {
+        let bad: Vec<&str> = o.lines().filter(|l| !l.ends_with(" ok") && *l != "done").collect();
+        assert!(bad.is_empty() && o.ends_with("done\n"), "{o}");
+        assert_eq!(o, &outs[0]);
+    }
+}
+
 /// std helix() around a circular edge, Turns and Pitch (a user's knurl
 /// script: surfaceGeometry.fs calls `@alignCanonically(context, { "plane" :
 /// plane })`, which the native read as a plane and every Circle helix threw).
@@ -1894,3 +1922,4 @@ fn bench_std_regen() {
         println!("{name}: {:.1} ms per regen", start.elapsed().as_secs_f64() * 1000.0 / runs as f64);
     }
 }
+

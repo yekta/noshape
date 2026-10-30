@@ -651,6 +651,17 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- 10-30 07:40, the custom ops' thread dependence (lead 06:15 / 06:55): found and fixed. Operation bodies' ids are
+  the custom feature's id with 20 bits of the operation's marker (+ 12 bits of index); two operations whose bits
+  collide (about 1 feature in 100 of ~150 operations: the markers depend on the random feature id, so each run and
+  thread draws again) gave their bodies ONE id, and body_ops / body_creator (a HashMap scan, random order per
+  instance) gave either body to either operation: qCreatedBy(editcurve "w") also returned bsurf's polyline 1.2 m
+  away (dev 1.2000188 m, after 5.5 mm), a second plate in evOffsetDetection's query (the duplicated group).
+  host/mod.rs `BodyBits`: begin_op gives each operation of a feature its own bits (the next free ones on a
+  collision), body_creator looks the owner up exactly. T1 custom `colliding_operations_get_bits_of_their_own` (a real
+  colliding pair, found by search) and model `custom_features::ops_and_evaluations_are_the_same_on_many_threads`
+  back (NOSHAPE_TEST_THREADS, default 4): 50 / 50 runs at 4 and at 8 threads here. dx's std_features flake is
+  likely the same (std features in a custom context).
 - FYI 10-29 05:28: /root/occt/lib/libTKBO.a is patch 0004's "on" build (/root/core-scratch/libTKBO.a.0004-on3), landed
   with f93ac93c; the previous one is /root/core-scratch/libTKBO.a.0004-optin. Its pairs stay serial unless the kernel
   turns them on, so older trees built against it behave as before. The same prune also deletes binaries copied out
