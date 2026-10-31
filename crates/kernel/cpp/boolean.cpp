@@ -1149,9 +1149,24 @@ std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, con
 
 TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
 {
-  GProp_GProps g0;
-  BRepGProp::VolumeProperties(s, g0);
-  const double v0 = g0.Mass();
+  // The volume of `s` only when the check needs it (one integral of every face: 14 s of the knurl's unify):
+  // a change past 1e-9 of the box's volume is past 1e-9 of the solid's, one under 1e-14 of it is noise.
+  std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("usd.box");
+  Bnd_Box                      box;
+  BRepBndLib::Add(s, box, false);
+  const double bv = box.IsVoid() ? 0 : std::sqrt(box.SquareExtent()) * std::sqrt(box.SquareExtent()) * std::sqrt(box.SquareExtent());
+  lap.reset();
+  std::optional<double> v0;
+  auto volume0 = [&] {
+    if (!v0)
+    {
+      const KernelTimer timer("usd.volume");
+      GProp_GProps      g0;
+      BRepGProp::VolumeProperties(s, g0);
+      v0 = g0.Mass();
+    }
+    return *v0;
+  };
   std::vector<TopoDS_Shape> sf;
   for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
     sf.push_back(x.Current());
@@ -1183,20 +1198,27 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
   auto keeps_volume = [&](const std::optional<double>& change, const TopoDS_Shape& out) {
     double d;
     if (change)
+    {
       d = *change;
+      if (std::abs(d) > 1e-9 * bv)
+        return false;
+      if (std::abs(d) <= 1e-14 * bv)
+        return true;
+    }
     else
     {
       GProp_GProps g1;
       BRepGProp::VolumeProperties(out, g1);
-      d = g1.Mass() - v0;
+      d = g1.Mass() - volume0();
     }
-    return std::abs(d) <= 1e-9 * std::abs(v0);
+    return std::abs(d) <= 1e-9 * std::abs(volume0());
   };
   // USD's result depends on the order of the faces too (a notched cylinder
   // fused with its mirror, qa OCCT-MIRROR-OVERCOUNT: one order of the same
   // faces merged to 4, the other gave 4/3 the volume from every start).
   for (int k = 0; k < 16; ++k)
   {
+    lap = std::make_unique<KernelTimer>("usd.copy");
     BRepBuilderAPI_Copy cp(s, false, false);
     TopoDS_Shape        in = cp.Shape();
     HHist               hc = new BRepTools_History(to_list(std::vector<TopoDS_Shape>{s}), cp);
@@ -1214,13 +1236,17 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
         continue;
       }
     }
+    lap = std::make_unique<KernelTimer>("usd.shares");
     std::vector<TopoDS_Shape> image;
     std::vector<FaceShare>    share;
     images(cp, hr, in, image, share);
+    lap = std::make_unique<KernelTimer>("usd.build");
     ShapeUpgrade_UnifySameDomain u(in, true, true, false);
     u.Build();
+    lap = std::make_unique<KernelTimer>("usd.check");
     if (!keeps_volume(usd_volume_change(sf, image, share, u.Shape()), u.Shape()))
       continue;
+    lap = std::make_unique<KernelTimer>("usd.history");
     if (hist.IsNull())
       hist = new BRepTools_History();
     hist->Merge(hc);
@@ -1965,10 +1991,15 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
       *clean = true;
     return s;
   }
-  lap = std::make_unique<KernelTimer>("unify.usd");
+  lap = std::make_unique<KernelTimer>("unify.bands");
   const TopoDS_Shape s1 = merge_apex_cones(merge_cylinder_bands(s, hist), hist);
+  lap                   = std::make_unique<KernelTimer>("unify.usd");
   if (TopExp_Explorer(s1, TopAbs_SOLID).More() && round_candidates(s1, sc != nullptr ? &next : nullptr))
-    return merge_cylinder_patches(usd_kept_volume(s1, hist), hist);
+  {
+    const TopoDS_Shape s2 = usd_kept_volume(s1, hist);
+    lap                   = std::make_unique<KernelTimer>("unify.patches");
+    return merge_cylinder_patches(s2, hist);
+  }
   ShapeUpgrade_UnifySameDomain u(s1, true, true, false);
   u.Build();
   if (!u.History().IsNull())

@@ -23,6 +23,12 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
   standard-content tests that way). A face counts as unchanged only if its `face_share` (orientation, surface
   handle, each edge use with its range and curve-on-face end points) is the same as before USD: USD edits its input
   in place (the notched cylinder fused with its mirror: same face TShape and edges, another volume share).
+- Then the whole solid's volume (only the tolerance's scale) was still 13.8 of unify.usd's 21.5 s CPU on the knurl
+  (local, loaded; timers usd.box / volume / copy / shares / build / check / history, unify.bands / patches): now a
+  change over 1e-9 of the box's volume (diagonal cubed) rejects, one under 1e-14 of it accepts, and only between
+  is the solid integrated. Left in unify.usd: USD itself 3.3 s on all 10k faces, the copy 1.4, history 0.5: a
+  USD of just the round candidates' faces would remove most of that.
+- Knurl on main: the Rust Boolean still declines it (bool's patterned cut not landed yet): OCCT's build is most of it.
 - THIN-LOFT-TRIM-ENDS probes (/root/core-scratch/thick/probe.cpp, built with build.sh against /root/occt, g++ 15 as
   OCCT was): square 20 → Ø16 loft sheet (4 B-spline faces as live), outward 1 mm. MakeThickSolidBySimple (ours)
   1081.08 (live untrimmed 1368.57, 16 faces); BRepOffset_MakeOffset thickening with GeomAbs_Arc 1363.62 valid but 28
