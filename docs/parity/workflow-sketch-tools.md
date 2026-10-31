@@ -35,12 +35,12 @@ Doc /tmp/qa5/d29/sk.noshape (same steps as pass 14). Shots z20–z29.
 |---|---|---|---|
 | OFF1 Offset after a click | hollow grey arrow, no value box (z20) | ✅ **fixed** | 0.4.10+ / 2d9a275c 10-27 |
 | FIL1 fillet manipulator | hollow grey arrow + "R" leader (z21) | ✅ **fixed** | 0.4.10+ / 2d9a275c 10-27 |
-| (new) **FIL2** default sketch-fillet radius | **R5** (z21, z22); live mm default **R20 mm** (sketch/301; pass 14 had R20) | ✗ **FIL2** (skb, regression) |  |
+| (new) **FIL2** default sketch-fillet radius | **R5** (z21, z22); live mm default **R20 mm** (sketch/301; pass 14 had R20) | ✗ **FIL2** (skb, regression) → fixed later: FIL2 ✅ (row 78) |  |
 | VB1 glyphs over the value box | box clear (z22) | ✅ **fixed** | 0.4.10+ / 2d9a275c 10-27 |
-| SK5 rectangle after R5 → R3 | left edge still moves ~10 px (was ~37 px from R20); bottom edge stays (z23) | ✗ still (smaller; live answer pending) |  |
-| SLOT1 slot preview / committed | unchanged (z24, z25) | ✗ still |  |
-| PAT1 linear pattern preview | unchanged (z26) | ✗ still |  |
-| POLY1 polygon | solid construction circle, horizontal spinner (z27) | ✗ still |  |
+| SK5 rectangle after R5 → R3 | left edge still moves ~10 px (was ~37 px from R20); bottom edge stays (z23) | ✗ still (smaller; live answer pending) → fixed later: SK5 ✅ = live (row 96) |  |
+| SLOT1 slot preview / committed | unchanged (z24, z25) | ✗ still → fixed later: SLOT1 ✅ (rows 72, 2d9a275c) |  |
+| PAT1 linear pattern preview | unchanged (z26) | ✗ still → fixed later: PAT1 ✅ (row 74) |  |
+| POLY1 polygon | solid construction circle, horizontal spinner (z27) | ✗ still → fixed later: POLY1 ✅ (row 98) |  |
 | STB1 S toolbar | at cursor x+10, y−30, square corners (z28) | ✅ **fixed** | 0.4.10+ / 2d9a275c 10-27 |
 | CH1 chamfer preview | preview chamfer + hollow arrow + two dimension lines ✅, but **no dimension values** (only extension lines and tiny arrowheads; live shows "5" twice) (z29) | ✗ **CH2** (skb, partly) |  |
 
@@ -48,11 +48,11 @@ Doc /tmp/qa5/d29/sk.noshape (same steps as pass 14). Shots z20–z29.
 | Row | Live | Ours | Status | Verified |
 |---|---|---|---|---|
 | FIL2 fillet default | **R5 on every fresh page load**, then sticky per tab (last radius used) | UI R5 on a fresh doc ✅ (pass 19); pass 14's R20 was a leftover → **FIL2 withdrawn**; sticky: R5 → 3 → the next fillet previews R3 (z40). CLI `sketch_fillet` still documents/uses "20 mm / 0.5 in" as default | ✅ UI; ✗ minor CLI default (api) | 0.4.10+ / 2d9a275c 10-27 |
-| SK5 radius edit (CLI, exact: rect (0,0)–(30.089,22.065), fillet top-right R5 → set the fillet's R) | R3: top 25.089, bottom 28.089, left 22.065, right 19.065. R8: top 25.089, bottom 33.089, left 22.065, right 14.065 (the edge trimmed first keeps its length, height stays, the far edge moves; a `visualSharp` point coincident with both lines) | R3: top **26.089**, bottom **29.089**, left **21.065**, right **18.065**. R8: top **23.589**, bottom **31.589**, left **23.565**, right **15.565** (the change is split over both edges; no visualSharp point) | ✗ **SK5** confirmed (skb; /root/qa5-scratch/pass20/sk5.py + sk5b.py) |  |
-| (new) corner rectangle constraints | PERPENDICULAR, 2 × PARALLEL, HORIZONTAL + corner coincidents (glyphs ∥ ∥ ⊥ — in sketch/303) | 2 × HORIZONTAL + 2 × VERTICAL (glyphs — — \| \|) | ✗ **RECT1** (skb) |  |
-| Trim hover | only the stub up to the intersection | whole line (k12) | ✗ **TRIM1** (skb) |  |
-| SLOT1 constraints | 14: COINCIDENT ×6, TANGENT ×4, OFFSET ×3, DIAMETER; glyph hover shows no tooltip | tangent + equal glyphs (k21, z25) | ✗ SLOT1 (detail added) |  |
-| CH2 chamfer | preview with two distance dimensions labelled "5", hollow arrow; Enter → box "5 mm", 2nd Enter → second distance box | preview dims without values (z29) | ✗ CH2 |  |
+| SK5 radius edit (CLI, exact: rect (0,0)–(30.089,22.065), fillet top-right R5 → set the fillet's R) | R3: top 25.089, bottom 28.089, left 22.065, right 19.065. R8: top 25.089, bottom 33.089, left 22.065, right 14.065 (the edge trimmed first keeps its length, height stays, the far edge moves; a `visualSharp` point coincident with both lines) | R3: top **26.089**, bottom **29.089**, left **21.065**, right **18.065**. R8: top **23.589**, bottom **31.589**, left **23.565**, right **15.565** (the change is split over both edges; no visualSharp point) | ✗ **SK5** confirmed (skb; /root/qa5-scratch/pass20/sk5.py + sk5b.py) → fixed later: SK5 ✅ = live (row 96) |  |
+| (new) corner rectangle constraints | PERPENDICULAR, 2 × PARALLEL, HORIZONTAL + corner coincidents (glyphs ∥ ∥ ⊥ — in sketch/303) | 2 × HORIZONTAL + 2 × VERTICAL (glyphs — — \| \|) | ✗ **RECT1** (skb) → fixed later: RECT1 ✅ (row 69) |  |
+| Trim hover | only the stub up to the intersection | whole line (k12) | ✗ **TRIM1** (skb) → fixed later: TRIM1 ✅ (row 73) |  |
+| SLOT1 constraints | 14: COINCIDENT ×6, TANGENT ×4, OFFSET ×3, DIAMETER; glyph hover shows no tooltip | tangent + equal glyphs (k21, z25) | ✗ SLOT1 (detail added) → fixed later: SLOT1 ✅ (rows 72, 2d9a275c) |  |
+| CH2 chamfer | preview with two distance dimensions labelled "5", hollow arrow; Enter → box "5 mm", 2nd Enter → second distance box | preview dims without values (z29) | ✗ CH2 → fixed later: CH2 ✅ (row 71) |  |
 
 ## Re-run pass 21 (2026-10-23 ~17:30–18:30, app = /root/target-lead/debug/noshape 10-23 17:10 (main 88fbf8f), CLI = target-lead noshape-cli 10-23 13:45)
 | SK5 radius edit (pass20/sk5.py + sk5b.py) | R3: top 25.089, bottom 28.089, left 22.065, right 19.065; R8: 25.089 / 33.089 / 22.065 / 14.065 = live exactly | ✅ **fixed** |
@@ -72,8 +72,8 @@ Doc /tmp/qa5/d29/sk.noshape (same steps as pass 14). Shots z20–z29.
 | SLOT1 slot preview | ✅ "Ø20" with a vertical leader, four tangent points |
 | TRIM1 trim hover | ✅ only the stub up to the slot lights up |
 | PAT1 linear pattern | ✅ hollow arrows, square handles, "3x" with a leader, 25 spacing dimension with extension lines |
-| **POLY1** inscribed polygon | ✗ **still** (= qa5 pass 21): construction circle solid while pending (looked before the vertex click, so the spinner wasn't checked) → qa5-routing POLY1 (skb). Evidence /root/qa4-scratch/gate-v047/poly1-main-a0e360a3.png |
-| OFF1, VB1, STB1, SK5 | fixed in earlier passes / code (SK5 matches live's numbers, d1a1d056 test) |
+| **POLY1** inscribed polygon | ✗ **still** (= qa5 pass 21): construction circle solid while pending (looked before the vertex click, so the spinner wasn't checked) → qa5-routing POLY1 (skb). Evidence /root/qa4-scratch/gate-v047/poly1-main-a0e360a3.png → fixed later: POLY1 ✅ (row 98) |
+| OFF1, VB1, STB1, SK5 | fixed in earlier passes / code (SK5 matches live's numbers, d1a1d056 test) → fixed later: SK5 ✅ = live (row 96) |
 
 | FIL2 CLI default (pass 21, 10-23) | `sketch_fillet` documents and uses 5 mm (0.5 in in inch documents) at first, then the tab's last radius | ✅ fixed |
 
@@ -87,14 +87,14 @@ Doc /tmp/qa5/d29/sk.noshape (same steps as pass 14). Shots z20–z29.
 | 9–10 Slot on the line | Ø20 preview with vertical leader + 4 tangent points; commits filled, Ø20, coincident / tangent glyphs, centre line solid | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 11 Linear pattern on a circle | 3x / 1x with leaders, hollow arrows, square handles, 25 dimension with extension lines | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 18 sketch Chamfer (tool search "chamfer" → 2nd row) | preview, two "5" dimensions, hollow arrow | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| (new) Tool search in a sketch | "chamfer" lists the Part Studio **Chamfer** first and **"Sketch chamfer"** second; Enter on the first confirms the sketch and opens the feature (live names the sketch tool "Chamfer", behaviours ~7819; Part Studio features in sketch-mode search not captured) | ? live requested "qa5 (10-24, sketch tool search)" |  |
-| (new) **SEL1** Fillet / Chamfer take sketch curves | with Fillet or Chamfer open, clicking a sketch line adds "Sketch 1 line" (live: SketchObject.NO in fillet.fs / chamfer.fs) | ✗ SEL1 (cross-area fix proposed to the lead) |  |
+| (new) Tool search in a sketch | "chamfer" lists the Part Studio **Chamfer** first and **"Sketch chamfer"** second; Enter on the first confirms the sketch and opens the feature (live names the sketch tool "Chamfer", behaviours ~7819; Part Studio features in sketch-mode search not captured) | ✅ live (behaviours "qa5 (10-24) sketch tool search"): only sketch tools, plainly named; ours the same: chamfer → Chamfer; fillet → Fillet (Shift+F); pattern → Linear pattern, Circular pattern; mirror → Mirror; offset → Offset (O) | skasm 10-31 (main CLI ui_search_tools sketch: true) |
+| (new) **SEL1** Fillet / Chamfer take sketch curves | with Fillet or Chamfer open, clicking a sketch line adds "Sketch 1 line" (live: SketchObject.NO in fillet.fs / chamfer.fs) | ✗ SEL1 (cross-area fix proposed to the lead) → fixed later: SEL1 ✅ (row 100) |  |
 
 ## Release re-check v0.4.8 (qa5, 2026-10-25 02:20, release asset noshape-cli 0.4.8 linux-x86_64)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | SK5 fillet radius edit (pass20/sk5.py + sk5b.py) | R3: top 25.089, bottom 28.089, left 22.065, right 19.065; R8: 25.089 / 33.089 / 22.065 / 14.065 = live | ✅ | v0.4.12 CLI 10-28 (bin/sk5.py: R3 top 25.089 / bottom 28.089 / left 22.065 / right 19.065; R8 25.089 / 33.089 / 22.065 / 14.065 = live) |
-| POLY1 dash-dot along the whole polygon preview | not in v0.4.8 (fix eb764d1b is in ready/qa5) | — |  |
+| POLY1 dash-dot along the whole polygon preview | not in v0.4.8 (fix eb764d1b is in ready/qa5) | — → fixed later: POLY1 ✅ (row 98) |  |
 | POLY1 on main 358fcd83 (queue build 12:55) | inscribed polygon pending: the construction circle is dash-dot along its whole length | ✅ **fixed** | 0.4.10+ / 2d9a275c 10-27 |
 | Tool search in a sketch (green 461aefb0) | "chamfer" → only the sketch **Chamfer** (sketch icon, live description); "fillet" → **Fillet** with "shift f" | ✅ **fixed** | 0.4.10+ / 2d9a275c 10-27 |
 | SEL1 on green 62524c30 (Fillet, visible Sketch 5 line + plate edge) | the sketch line adds nothing; the part edge adds "Edge of Extrude 1" | ✅ **fixed** (live: fillet.fs SketchObject.NO) |  |
