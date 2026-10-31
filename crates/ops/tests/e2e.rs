@@ -5284,3 +5284,31 @@ fn mass_properties_name_the_reference_connector_without_a_material() {
     let m = call(&mut ctx, "query_mass_properties", json!({ "reference": mc }));
     assert_eq!(m["reference"], "Mate connector 1", "{m}");
 }
+
+/// This machine's setup through the API (Help › Install command line tool…
+/// and Connect to coding agents…): the agents listed with their state, the
+/// command line tool linked into a folder, bad agent ids named. No agent's
+/// configuration is changed here (crates/ops/tests/install.rs does that
+/// against fake homes).
+#[test]
+fn agents_and_command_line_tool_ops() {
+    let mut ctx = Ctx::new();
+    let st = call(&mut ctx, "agents_status", json!({ "command": "/opt/noshape/noshape" }));
+    let ids: Vec<&str> = st["agents"].as_array().unwrap().iter().map(|a| a["id"].as_str().unwrap()).collect();
+    assert_eq!(ids, ["claude_code", "codex", "claude_desktop"], "{st}");
+    assert_eq!(st["command"], "/opt/noshape/noshape");
+    let e = try_call(&mut ctx, "agents_connect", json!({ "agents": ["cursor"] })).unwrap_err();
+    assert_eq!((e.code, e.param.as_deref()), ("invalid_argument", Some("agents")), "{}", e.to_json());
+    let e = try_call(&mut ctx, "agents_disconnect", json!({ "agents": "claude_code,nope" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("agents"));
+    #[cfg(unix)]
+    {
+        let dir = scratch("cli-install-bin");
+        let target = scratch("cli-install-target");
+        std::fs::write(&target, "").unwrap();
+        let r = call(&mut ctx, "cli_install", json!({ "dir": dir.to_str().unwrap(), "command": target.to_str().unwrap() }));
+        assert_eq!(r["path"], dir.join("noshape").to_str().unwrap(), "{r}");
+        assert_eq!(std::fs::read_link(dir.join("noshape")).unwrap(), target);
+        assert_eq!(r["on_path"], false);
+    }
+}

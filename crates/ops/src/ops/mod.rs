@@ -17,6 +17,7 @@ mod feature;
 mod featurestudio;
 mod history;
 mod import;
+mod install;
 mod list;
 mod meta;
 mod parts;
@@ -72,6 +73,7 @@ pub fn all() -> Vec<Op> {
     v.extend(import::ops());
     v.extend(featurestudio::ops());
     v.extend(history::ops());
+    v.extend(install::ops());
     v
 }
 
