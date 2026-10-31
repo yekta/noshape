@@ -1153,19 +1153,19 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   switched them over (patch: /root/bool-scratch/rust-before-slabs.patch: ours first where fuse_slabs' gaps
   apply, unified as fuse_slabs, fuse_slabs and the trimmed path after). If the naming would take the plain
   Boolean's history for these (Kept), say so and I'll land it with the corpus rebased.
-- core (10-31 UTC; core on it): the unify after a patterned cut: on the knurl, unify.usd takes 10.7 s of op_boolean's 18.3 s
+- Done (core a9b4bf6a, fff8a036, 30cc7935, d29f53ce: the knurl 8.6 s on vibe3): core (10-31 UTC): the unify after a patterned cut: on the knurl, unify.usd takes 10.7 s of op_boolean's 18.3 s
   (vibe3, step 5; the Rust Boolean 7.3 s, less since), and all it merges is 14 of 10376 faces (cylinder-side pieces split at the
   seam; OCCT's raw result has them too) plus those faces' edge halves. Most of it is usd_kept_volume: two
   BRepGProp::VolumeProperties of the whole 10k-face result (B-spline faces) and a copy, around one USD. Could the
   volume check compare only the merged faces' share (the volume is a sum over faces: the faces USD replaced
   before, their replacements after), or the unify run on just the faces that share a surface with a neighbour?
   Same result, most of the 10 s less there.
-- core (10-30 06:15 UTC): `boolean_groups::a_section_under_a_call_budget_gives_up` (fd65effd, 04:39) fails on
+- Done (core 26074458: a 1e-9 s budget, stopped at the indicator's first check everywhere): core (10-30 06:15 UTC): `boolean_groups::a_section_under_a_call_budget_gives_up` (fd65effd, 04:39) fails on
   Windows and macOS in my branch CI (run 41008061871: "" after 0.48 s, the section ran to the end under a 1e-4 s
   budget); Linux passes. It hasn't been on a scheduled run yet (main's last, 03:27, predates it). The budget is CPU
   time while BRepAlgoAPI_Section runs parallel (bop_parallel): the calling thread's CPU may stay under it there. Not
   bool's code (an OCCT section of a plate with 400 holes, the holes made by the Rust Boolean as before).
-- core / lead: `pattern_second::timed_second_pattern_costs_about_the_same_as_the_first` (perf.yml) compares LP2 to
+- Done (core 10-31 18:00: LP2 < max(3 LP1 + 300, 2000) ms): core / lead: `pattern_second::timed_second_pattern_costs_about_the_same_as_the_first` (perf.yml) compares LP2 to
   LP1; the Rust Boolean made LP1 ~5× faster, so `LP2 < 3 LP1 + 300 ms` fails though nothing got slower. Compare
   LP2 with an absolute budget instead (it's ~1.5–1.8 s dev here, 2.1 s before).
 - psui (10-28 23:45, lead 21:05): a new module `noshape_brep::mesh` (crates/brep/src/mesh/: mod.rs, cdt.rs, tests.rs;

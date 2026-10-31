@@ -15,6 +15,15 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 ## 10-31 (core, new account from 10:50)
+- BLEND-RUST on for new studios (ScopeRule 6, model-data partstudio.rs `legacy_blends`, set by upgrade_saved_params
+  for studios saved with features under rule < 6; model-core regen/std_route.rs `BlendKernel` sets the kernel's
+  thread mode per regeneration unless NOSHAPE_BLEND_RUST is set; kernel `set_rust_blend` returns the old mode).
+  Old documents keep OCCT's blends and regenerate as before (BLEND-RUST-DEFAULT-REGEN's 7 documents); new ones get
+  ours. Face-order emulation of OCCT's ChFi3d (TopOpeBRepBuild's shell build) was studied and dropped: not needed now.
+- MIRROR-HANG-402: fuse_tree (op_boolean, path "occt_tree") for big free-form overlapping tools.
+- OCCT patch 0009 + the indicators: MEM-RUNAWAY-508's last jump sites; libs in /root/occt (lead to sync).
+- Forward-oriented edges: tried, sheet metal reads stored orientation (skasm); not landed.
+- SHELL-SLOW: findings (filleted pocket, G46), request to bool for the slab union.
 - **Knurl (B94.6 diamond) on vibe3, perf.sh at d29f53ce: 8.6 s** (test 15.7 s median of 3; 94272.889 mm³, 10362
   faces, 0.62 GB). Onshape 49 s. This morning (1cd8c450): 138.6 s. bool's patterned cut (the Rust Boolean takes it)
   plus today's unify: a9b4bf6a / fff8a036 / 30cc7935 / d29f53ce.
