@@ -38,11 +38,17 @@ pub struct HoleTableDlg {
     /// field takes the next straight edge clicked.
     pub x_dir: Option<[f64; 2]>,
     pub x_picking: bool,
+    /// Y direction takes the next straight edge instead (live request
+    /// 1682: the X axis then a quarter turn clockwise from it); `y_set`:
+    /// the axes came from the Y field (the X field is hidden, and the other
+    /// way round).
+    pub y_picking: bool,
+    pub y_set: bool,
 }
 
 impl Default for HoleTableDlg {
     fn default() -> Self {
-        Self { show_location: true, precision: None, bottom_to_top: false, corner: TableCorner::TopRight, table: None, flip_x: false, flip_y: false, exclude: Vec::new(), picking: false, x_dir: None, x_picking: false }
+        Self { show_location: true, precision: None, bottom_to_top: false, corner: TableCorner::TopRight, table: None, flip_x: false, flip_y: false, exclude: Vec::new(), picking: false, x_dir: None, x_picking: false, y_picking: false, y_set: false }
     }
 }
 
@@ -66,7 +72,7 @@ impl DrawingEditor {
     pub fn open_hole_table_props(&mut self, id: u64, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(id) else { return };
         let TableKind::Hole { show_location, precision, bottom_to_top, flip_x, flip_y, ref exclude, x_dir, .. } = t.kind else { return };
-        self.hole_dlg = Some(HoleTableDlg { show_location, precision, bottom_to_top, corner: t.corner, table: Some(id), flip_x, flip_y, exclude: exclude.clone(), picking: false, x_dir, x_picking: false });
+        self.hole_dlg = Some(HoleTableDlg { show_location, precision, bottom_to_top, corner: t.corner, table: Some(id), flip_x, flip_y, exclude: exclude.clone(), picking: false, x_dir, x_picking: false, y_picking: false, y_set: false });
         cx.notify();
     }
 
@@ -101,11 +107,25 @@ impl DrawingEditor {
         table.corner = d.corner;
     }
 
+    /// Place the hole table being inserted at the pointer's last spot (a
+    /// click on the sheet, or ✓).
+    pub fn place_hole_table(&mut self, cx: &mut Context<Self>) {
+        let Tool::Table { kind: TableTool::Hole, view: Some(v), origin: Some(o) } = self.tool.clone() else { return };
+        let id = self.current_sheet().next_table_id();
+        let (mut table, name) = noshape_scene::drawing_tools::view_table(id, TableTool::Hole, v, Some(o), self.cursor);
+        self.apply_hole_table_dlg(&mut table);
+        self.edit_sheet(name, cx, |s| s.tables.push(table));
+        self.hole_dlg = None;
+        self.tool = Tool::Select;
+        self.selection = vec![Sel::Table(id)];
+        cx.notify();
+    }
+
     /// The hole table being placed, at the pointer (live 1985: the table,
     /// the view's tags and the origin arrows follow it before the click).
     pub fn hole_table_preview(&self) -> Option<noshape_model::drawing::Table> {
         let Tool::Table { kind: TableTool::Hole, view: Some(v), origin: Some(o) } = &self.tool else { return None };
-        if self.hole_dlg.as_ref().is_some_and(|d| d.picking || d.x_picking) {
+        if self.hole_dlg.as_ref().is_some_and(|d| d.picking || d.x_picking || d.y_picking) {
             return None;
         }
         let id = self.current_sheet().next_table_id();
@@ -118,28 +138,36 @@ impl DrawingEditor {
     /// table's view sets the table's X axis along it (live 1985). True when
     /// used.
     pub fn hole_x_dir_click(&mut self, cx: &mut Context<Self>) -> bool {
-        let Some(d) = self.hole_dlg.as_ref().filter(|d| d.x_picking) else { return false };
+        let Some(d) = self.hole_dlg.as_ref().filter(|d| d.x_picking || d.y_picking) else { return false };
         let v = match (&self.tool, d.table.and_then(|id| self.current_sheet().table(id))) {
             (_, Some(t)) => t.view(),
             (Tool::Table { kind: TableTool::Hole, view, .. }, None) => *view,
             _ => None,
         };
         let Some(v) = v else { return false };
-        // Straight edges only.
-        let dir = self.pk().hovered_edge().filter(|(ev, _)| *ev == v).and_then(|(_, me)| match me.geom {
-            noshape_model::drawing::views::EdgeGeom::Line { a, b } => {
-                let l = (b[0] - a[0]).hypot(b[1] - a[1]);
-                (l > 1e-9).then(|| {
-                    let u = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
-                    // Pointing right (or up when vertical), as a picked axis reads.
-                    if u[0] < -1e-9 || (u[0].abs() <= 1e-9 && u[1] < 0.0) { [-u[0], -u[1]] } else { u }
-                })
-            }
-            _ => None,
-        });
+        // Straight edges only; by geometry near the pointer (with the table
+        // tool the hover is the view, not its edge).
+        let tol = self.tol_mm(5.0);
+        let dir = (|| {
+            let g = self.geoms.get(&v)?;
+            let pl = self.placement(v)?;
+            let c = self.cursor;
+            let near = |e: &noshape_model::drawing::views::ViewEdge| e.points.windows(2).any(|w| noshape_scene::drawing_tools::seg_dist(c, pl.to_sheet(w[0]), pl.to_sheet(w[1])) < tol);
+            let me = g.edges.iter().filter(|e| e.visible && near(e)).find_map(|e| g.model_edges.get(e.model? as usize))?;
+            let noshape_model::drawing::views::EdgeGeom::Line { a, b } = me.geom else { return None };
+            let l = (b[0] - a[0]).hypot(b[1] - a[1]);
+            (l > 1e-9).then(|| {
+                let u = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+                // Pointing right (or up when vertical), as a picked axis reads.
+                if u[0] < -1e-9 || (u[0].abs() <= 1e-9 && u[1] < 0.0) { [-u[0], -u[1]] } else { u }
+            })
+        })();
         if let (Some(dir), Some(d)) = (dir, &mut self.hole_dlg) {
-            d.x_dir = Some(dir);
-            d.x_picking = false;
+            // A Y edge: X a quarter turn clockwise from it (live 1682: Y
+            // along the top edge → X down).
+            d.y_set = d.y_picking;
+            d.x_dir = Some(if d.y_picking { [dir[1], -dir[0]] } else { dir });
+            (d.x_picking, d.y_picking) = (false, false);
         }
         self.update_preview(cx);
         cx.notify();
@@ -268,7 +296,10 @@ impl DrawingEditor {
                                 .bg(pal.accept)
                                 .when(!origin, |d| d.opacity(0.3))
                                 .child(crate::ui::glyph("check", 16., gpui_kit::white()))
-                                .when(editing.is_some(), |d| d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_hole_table_props(true, cx)))),
+                                .when(editing.is_some(), |d| d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_hole_table_props(true, cx))))
+                                // Inserting (live request 1682): ✓ places the table with its
+                                // fixed corner at the pointer's last spot on the sheet.
+                                .when(editing.is_none() && origin, |d| d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.place_hole_table(cx)))),
                         )
                         .child(div().id("hole-table-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if editing.is_some() {
@@ -291,12 +322,15 @@ impl DrawingEditor {
                 .when(show, |v| v.child(row("Location precision", select("hole-table-precision", precision_label, 112., precisions).into_any_element())))
                 .child(field(view_name.clone().unwrap_or_else(|| "Views".into()), view.is_none()))
                 .when(view.is_some(), |v| v.child(field(if origin { "Origin ✓".into() } else { "Origin: a vertex or circle center".into() }, !origin)))
-                // Live 1985: X direction (a straight edge of the view).
+                // Live 1985 / 1682: X direction and Y direction, each a
+                // straight edge of the view; setting one hides the other (the
+                // other axis is square to it); a click on a set one clears it.
                 .when(view.is_some(), |v| {
-                    let (on, set) = (d.x_picking, d.x_dir.is_some());
-                    v.child(
+                    let axis = |id: &'static str, label: &'static str, y: bool, cx: &mut Context<Self>| {
+                        let on = if y { d.y_picking } else { d.x_picking };
+                        let set = d.x_dir.is_some() && d.y_set == y;
                         div()
-                            .id("hole-table-x-dir")
+                            .id(id)
                             .mx(px(8.))
                             .my(px(2.))
                             .px(px(6.))
@@ -308,15 +342,25 @@ impl DrawingEditor {
                             .border_color(if on { pal.accent } else { gpui_kit::rgb(0xd3d7d9) })
                             .when(on, |d| d.bg(gpui_kit::rgb(0xdbf1fa)))
                             .cursor_pointer()
-                            .child(if set { "X direction ✓" } else { "X direction" })
-                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            .child(if set { format!("{label}: Edge ×") } else { label.to_string() })
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if let Some(d) = &mut this.hole_dlg {
-                                    d.x_picking = !d.x_picking;
+                                    if set {
+                                        (d.x_dir, d.y_set) = (None, false);
+                                    } else if y {
+                                        (d.y_picking, d.x_picking) = (!d.y_picking, false);
+                                    } else {
+                                        (d.x_picking, d.y_picking) = (!d.x_picking, false);
+                                    }
                                     d.picking = false;
                                 }
+                                this.update_preview(cx);
                                 cx.notify();
-                            })),
-                    )
+                            }))
+                            .into_any_element()
+                    };
+                    let v = if d.x_dir.is_some() && d.y_set { v } else { v.child(axis("hole-table-x-dir", "X direction", false, cx)) };
+                    if d.x_dir.is_some() && !d.y_set { v } else { v.child(axis("hole-table-y-dir", "Y direction", true, cx)) }
                 })
                 // Live 1609: the X / Y flip icons and Holes to exclude.
                 .when(view.is_some(), |v| {
