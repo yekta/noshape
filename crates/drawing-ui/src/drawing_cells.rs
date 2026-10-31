@@ -253,7 +253,9 @@ impl DrawingEditor {
             let Ok(n) = self.cell_text(*id, r, 0).parse::<usize>() else { return Vec::new() };
             let sheet = self.current_sheet();
             let key = noshape_model::drawing::views::view_source(sheet, *view).map(|(k, _)| k);
-            let rows = noshape_model::drawing::tables::cut_list_rows(self.geoms.get(view).map(|g| g.as_ref()), key.as_ref().and_then(|k| self.sources.get(k)));
+            // The rows as the table lists them (its own configuration).
+            let table_key = noshape_model::drawing::views::table_source(sheet, t);
+            let rows = noshape_model::drawing::tables::cut_list_rows(self.geoms.get(view).map(|g| g.as_ref()), table_key.as_ref().and_then(|k| self.sources.get(k)));
             let bodies = rows.into_iter().find(|row| row.item == n).map(|row| row.bodies).unwrap_or_default();
             let mut out = Vec::new();
             for v in sheet.views.iter().filter(|v| noshape_model::drawing::views::view_source(sheet, v.id).map(|(k, _)| k) == key) {

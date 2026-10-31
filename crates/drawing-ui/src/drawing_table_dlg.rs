@@ -85,7 +85,7 @@ impl DrawingEditor {
         let default_template = matches!(t.kind, TableKind::Bom { default_template: true, .. });
         let (kind, view, structured, bottom_to_top) = match t.kind {
             TableKind::Bom { view, structured, bottom_to_top, .. } => (TableTool::Bom, view, structured, bottom_to_top),
-            TableKind::CutList { view, bottom_to_top } => (TableTool::CutList, view, false, bottom_to_top),
+            TableKind::CutList { view, bottom_to_top, .. } => (TableTool::CutList, view, false, bottom_to_top),
             _ => return,
         };
         self.tool = Tool::Select;
@@ -257,7 +257,7 @@ impl DrawingEditor {
         let id = self.current_sheet().next_table_id();
         let (kind, name) = match d.kind {
             TableTool::Bom => (TableKind::Bom { view, structured: d.structured, bottom_to_top: d.bottom_to_top, overrides: Vec::new(), default_template: d.default_template }, "BOM table"),
-            _ => (TableKind::CutList { view, bottom_to_top: d.bottom_to_top }, "Cut list table"),
+            _ => (TableKind::CutList { view, bottom_to_top: d.bottom_to_top, config: None }, "Cut list table"),
         };
         let corner = d.corner;
         self.edit_sheet(name, cx, |s| {
@@ -281,7 +281,18 @@ impl DrawingEditor {
         let editing = d.table.is_some();
         let source_tab = d.view.and_then(|v| views::view_source(self.current_sheet(), v)).map(|(k, _)| k.tab);
         let sources = self.table_sources(d.kind);
-        let source_label = sources.iter().find(|s| Some(s.0) == d.view).map(|s| s.1.clone()).unwrap_or_default();
+        // The listed view of the table's source (one per source; the table's
+        // own view may not be the one listed).
+        let key_of = |v: ViewId| views::view_source(self.current_sheet(), v).map(|(k, _)| k);
+        let source_label = sources.iter().find(|s| Some(s.0) == d.view || (d.view.is_some() && key_of(s.0) == d.view.and_then(key_of))).map(|s| s.1.clone()).unwrap_or_default();
+        // Cut list table properties › Configurations (live request 1638 (b)).
+        let config_line = d
+            .table
+            .filter(|_| d.kind == TableTool::CutList)
+            .and_then(|id| self.current_sheet().table(id))
+            .and_then(|t| views::table_source(self.current_sheet(), t))
+            .map(|k| self.config_summary(k.tab, &k.config, cx))
+            .filter(|s| !s.is_empty());
         type Set = std::rc::Rc<dyn Fn(&mut TableDlg)>;
         let select = |id: &'static str, label: String, w: f32, items: Vec<(String, bool, Set)>| {
             let ed = ed.clone();
@@ -320,7 +331,7 @@ impl DrawingEditor {
             ("Top to bottom".into(), !d.bottom_to_top, std::rc::Rc::new(|d: &mut TableDlg| d.bottom_to_top = false) as Set),
             ("Bottom to top".into(), d.bottom_to_top, std::rc::Rc::new(|d: &mut TableDlg| d.bottom_to_top = true) as Set),
         ];
-        let row = |label: &'static str, body: AnyElement| h_flex().h(px(28.)).px(px(8.)).child(div().w(px(70.)).text_size(px(11.)).child(label)).child(body).into_any_element();
+        let row = |label: &'static str, body: AnyElement| h_flex().h(px(28.)).px(px(8.)).child(div().min_w(px(70.)).pr(px(6.)).flex_none().whitespace_nowrap().text_size(px(11.)).child(label)).child(body).into_any_element();
         let corner = d.corner;
         let corner_btn = |k: TableCorner, i: usize, cx: &mut Context<Self>| {
             let on = corner == k;
@@ -391,6 +402,7 @@ impl DrawingEditor {
                             .into_any_element(),
                     ))
                 })
+                .when_some(config_line, |v, text| v.child(row("Configurations", div().text_size(px(12.)).text_color(ink).child(text).into_any_element())))
                 .when(!editing, |v| {
                     v.child(
                         h_flex()

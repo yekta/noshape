@@ -2324,7 +2324,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         let pick = picks.id(PickTarget::Table(t.id));
         let view = t.view();
         let geo = view.and_then(|v| views.get(&v)).map(|g| g.as_ref());
-        let source = view.and_then(|v| views::view_source(sheet, v)).and_then(|(k, _)| sources.get(&k));
+        let source = views::table_source(sheet, t).and_then(|k| sources.get(&k));
         let origin = match &t.kind {
             TableKind::Hole { origin, origin_ref, .. } => {
                 match (origin_ref, geo, source) {

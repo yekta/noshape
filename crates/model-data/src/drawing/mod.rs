@@ -1496,6 +1496,11 @@ pub enum TableKind {
         view: ViewId,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         bottom_to_top: bool,
+        /// Change configuration...: the table's own configuration of the
+        /// Part Studio (None: its view's); the views keep theirs (live
+        /// request 1638 (b)).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        config: Option<ConfigValues>,
     },
     /// The drawing's revisions from the release log (rows resolved when the
     /// sheet is built, from [`build::SheetInfo::revisions`]).

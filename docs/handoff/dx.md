@@ -185,6 +185,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   so A24's cut list item default is gone; View properties shows the table references as live. For core: live's
   Cut list feature makes "Composite part 1" (ours none; the reference row falls back to "Cut list").
   TB15 / TB27 / A24 app-checked on a frame drawing (/root/dx-scratch/w3/frm.noshape, built by CLI).
+- Then TB28 (cut list table › Change configuration..., live 1638 (b); w3/frmc.noshape: a frame on a #L-configured
+  rectangle). Asked live 08:41 D13 / V56 / V55, 09:01 C11 / D9 (inference colours, the jog grip drag).
 - Open in my rows: V57 assembly Show sketches (assembly sources skip sketch wires), V35 (d) sections of broken views,
   D40 hatch / title red, C11 inference points, D9 ordinate jogs.
 

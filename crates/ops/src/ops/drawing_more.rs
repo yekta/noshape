@@ -61,6 +61,7 @@ pub fn ops() -> Vec<Op> {
                     opt("visible_rows", json!({ "type": "integer", "minimum": 1, "maximum": 100 }), "Revision: visible rows."),
                     opt("newest_top", json!({ "type": "boolean" }), "Revision: order Bottom to top (newest at the top)."),
                     opt("hide_callouts", json!({ "type": "boolean" }), "Revision: hide callouts no longer in the table."),
+                    opt("configuration", json!({ "type": ["object", "null"] }), "Cut list: Change configuration... — the table's own configuration of the Part Studio, {input name or id: value} (a list input takes its option's name); the views keep theirs (live). null: back to its view's."),
                 ],
             ),
             mutates: true,
@@ -176,16 +177,47 @@ fn table_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let Some(old) = t.d.sheets[sheet].table(id).cloned() else { return Err(OpError::param("table", "no table with that id on the sheet (drawing_get)")) };
     let allowed: &[&str] = match old.kind {
         TableKind::Bom { .. } => &["corner", "structured", "bottom_to_top", "template"],
-        TableKind::CutList { .. } | TableKind::Custom { .. } => &["corner", "bottom_to_top"],
+        TableKind::CutList { .. } => &["corner", "bottom_to_top", "configuration"],
+        TableKind::Custom { .. } => &["corner", "bottom_to_top"],
         TableKind::Revision { .. } => &["corner", "see_sheet1", "visible_rows", "newest_top", "hide_callouts"],
         _ => &["corner"],
     };
-    for k in ["corner", "structured", "bottom_to_top", "template", "see_sheet1", "visible_rows", "newest_top", "hide_callouts"] {
+    for k in ["corner", "structured", "bottom_to_top", "template", "see_sheet1", "visible_rows", "newest_top", "hide_callouts", "configuration"] {
         if a.get(k).is_some() && !allowed.contains(&k) {
             return Err(OpError::param(k, &format!("this table's properties have no `{k}` (they have: {})", allowed.join(", "))));
         }
     }
     let corner = enum_arg(a, "corner", &CORNERS, old.corner)?;
+    // Cut list › Change configuration... (live request 1638 (b)): None
+    // unchanged, Some(None) back to the view's.
+    let new_config: Option<Option<noshape_model::configuration::ConfigValues>> = match a.get("configuration") {
+        None => None,
+        Some(Value::Null) => Some(None),
+        Some(Value::Object(m)) => {
+            use noshape_model::configuration::ConfigInputKind;
+            let key = noshape_model::drawing::views::table_source(&t.d.sheets[sheet], &old).ok_or_else(|| OpError::param("table", "the table's view has no source"))?;
+            let inputs = match od.doc().tab(key.tab).map(|x| &x.content) {
+                Some(noshape_model::document::TabContent::PartStudio(ps)) => ps.configuration.inputs.clone(),
+                _ => Vec::new(),
+            };
+            let mut values = key.config.clone();
+            for (k, v) in m {
+                let names: Vec<&str> = inputs.iter().map(|i| i.name.as_str()).collect();
+                let input = inputs.iter().find(|i| i.id == *k || i.name == *k).ok_or_else(|| OpError::param("configuration", &format!("no input `{k}` (the Part Studio's: {})", names.join(", "))))?;
+                let text = v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string());
+                let text = match &input.kind {
+                    ConfigInputKind::List { options, .. } => {
+                        let opts: Vec<&str> = options.iter().map(|o| o.name.as_str()).collect();
+                        options.iter().find(|o| o.name == text || o.id == text).map(|o| o.id.clone()).ok_or_else(|| OpError::param("configuration", &format!("`{}` takes one of {}", input.name, opts.join(", "))))?
+                    }
+                    _ => text,
+                };
+                values.0.insert(input.id.clone(), text);
+            }
+            Some(Some(values))
+        }
+        Some(_) => return Err(OpError::param("configuration", "an object {input: value}, or null")),
+    };
     let layout = t.m.built.as_ref().and_then(|b| b.table_layout(id)).cloned();
     let table = t.d.sheets[sheet].tables.iter_mut().find(|x| x.id == id).expect("found");
     let description = match &mut table.kind {
@@ -196,10 +228,16 @@ fn table_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             table.corner = corner;
             "BOM table properties"
         }
-        TableKind::CutList { bottom_to_top, .. } => {
+        TableKind::CutList { bottom_to_top, config, .. } => {
             *bottom_to_top = a.bool_or("bottom_to_top", *bottom_to_top)?;
             table.corner = corner;
-            "Cut list table properties"
+            match new_config {
+                Some(c) => {
+                    *config = c;
+                    "Change configuration"
+                }
+                None => "Cut list table properties",
+            }
         }
         TableKind::Custom { bottom_to_top, .. } => {
             *bottom_to_top = a.bool_or("bottom_to_top", *bottom_to_top)?;

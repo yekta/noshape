@@ -574,7 +574,7 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
         .map(|t| {
             let view = t.view();
             let geo = view.and_then(|v| m.geoms.get(&v)).map(|g| g.as_ref());
-            let source = view.and_then(|v| noshape_model::drawing::views::view_source(sheet, v)).and_then(|(k, _)| m.sources.get(&k));
+            let source = noshape_model::drawing::views::table_source(sheet, t).and_then(|k| m.sources.get(&k));
             let origin = match &t.kind {
                 noshape_model::drawing::TableKind::Hole { origin, origin_ref, .. } => match (origin_ref, geo, source) {
                     (Some(r), Some(g), Some(src)) => noshape_model::drawing::views::resolve_in_view(&src.context, g, r).map(|(p, _)| p).or(Some(*origin)),
@@ -623,7 +623,13 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                     j["bottom_to_top"] = json!(bottom_to_top);
                     j["template"] = json!(if *default_template { "onshape_default" } else { "follow_assembly" });
                 }
-                noshape_model::drawing::TableKind::CutList { bottom_to_top, .. } => j["bottom_to_top"] = json!(bottom_to_top),
+                noshape_model::drawing::TableKind::CutList { bottom_to_top, config, .. } => {
+                    j["bottom_to_top"] = json!(bottom_to_top);
+                    // Change configuration... (input id: value; the views keep theirs).
+                    if let Some(c) = config {
+                        j["configuration"] = json!(c.0);
+                    }
+                }
                 noshape_model::drawing::TableKind::Hole { flip_x, flip_y, precision, .. } => {
                     j["flip_x"] = json!(flip_x);
                     j["flip_y"] = json!(flip_y);

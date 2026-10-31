@@ -260,6 +260,13 @@ impl DrawingEditor {
         if !matches!(t.kind, TableKind::General { .. }) {
             out.extend(self.split_entries(t, cell));
         }
+        // Live request 1638 (b): a configured Part Studio's cut list.
+        if let TableKind::CutList { view, .. } = t.kind
+            && let Some((key, _)) = noshape_model::drawing::views::view_source(sheet, view)
+            && self.reference_configurable(key.tab, cx)
+        {
+            out.push(MenuEntry::item("Change configuration...", move |t, w, cx| t.open_table_change_config(id, w, cx)));
+        }
         out.push(MenuEntry::item("Copy", move |t, _, cx| {
             if !t.selection.contains(&Sel::Table(id)) {
                 t.selection = vec![Sel::Table(id)];

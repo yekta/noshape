@@ -19,6 +19,9 @@ pub struct ChangeConfigDlg {
     pub tab: TabId,
     pub part: Option<noshape_model::BodyId>,
     pub values: ConfigValues,
+    /// Cut list table › Change configuration...: the table configured (only
+    /// it changes; live request 1638 (b)); None: the reference's views.
+    pub table: Option<u64>,
     /// Variable / text inputs: (input id, field).
     fields: Vec<(String, Entity<InputState>)>,
 }
@@ -37,9 +40,57 @@ impl DrawingEditor {
             .unwrap_or_default()
     }
 
+    /// A configuration as properties panels list it ("Length: Long"; live
+    /// request 1638 (b)); empty when the Part Studio has no inputs.
+    pub fn config_summary(&self, tab: TabId, values: &ConfigValues, cx: &App) -> String {
+        let Some(TabContent::PartStudio(ps)) = self.doc.read(cx).session.doc.tab(tab).map(|t| &t.content) else { return String::new() };
+        ps.configuration
+            .inputs
+            .iter()
+            .map(|input| {
+                let v = values.0.get(&input.id);
+                let shown = match &input.kind {
+                    ConfigInputKind::List { options, default } => {
+                        let cur = v.unwrap_or(default);
+                        options.iter().find(|o| &o.id == cur || &o.name == cur).map(|o| o.name.clone()).unwrap_or_else(|| cur.clone())
+                    }
+                    ConfigInputKind::Checkbox { default } => v.map(|s| s == "true").unwrap_or(*default).to_string(),
+                    ConfigInputKind::Variable { default, .. } => v.cloned().unwrap_or_else(|| default.text.clone()),
+                    ConfigInputKind::Text { default } => v.cloned().unwrap_or_else(|| default.clone()),
+                };
+                format!("{}: {shown}", input.name)
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+
     /// Whether the reference's Part Studio has configuration inputs.
     pub fn reference_configurable(&self, tab: TabId, cx: &App) -> bool {
         matches!(self.doc.read(cx).session.doc.tab(tab).map(|t| &t.content), Some(TabContent::PartStudio(ps)) if !ps.configuration.inputs.is_empty())
+    }
+
+    /// Cut list table › Change configuration...: the panel for the table's
+    /// Part Studio, showing the table's configuration (else its view's).
+    pub fn open_table_change_config(&mut self, table: u64, window: &mut Window, cx: &mut Context<Self>) {
+        let sheet = self.current_sheet();
+        let Some(t) = sheet.table(table) else { return };
+        let Some(key) = noshape_model::drawing::views::table_source(sheet, t) else { return };
+        let part = t.view().and_then(|v| noshape_model::drawing::views::view_source(sheet, v)).and_then(|(_, p)| p);
+        self.open_change_config(key.tab, part, window, cx);
+        if let Some(d) = &mut self.change_config {
+            d.values = key.config;
+            d.table = Some(table);
+        }
+        // The variable / text fields show the table's values.
+        if let Some(d) = &self.change_config {
+            let fields: Vec<(String, Entity<InputState>)> = d.fields.clone();
+            let values = d.values.clone();
+            for (id, st) in fields {
+                if let Some(v) = values.0.get(&id).cloned() {
+                    st.update(cx, |i, cx| i.set_value(v, window, cx));
+                }
+            }
+        }
     }
 
     pub fn open_change_config(&mut self, tab: TabId, part: Option<noshape_model::BodyId>, window: &mut Window, cx: &mut Context<Self>) {
@@ -56,7 +107,7 @@ impl DrawingEditor {
                 fields.push((input.id.clone(), st));
             }
         }
-        self.change_config = Some(ChangeConfigDlg { tab, part, values, fields });
+        self.change_config = Some(ChangeConfigDlg { tab, part, values, table: None, fields });
         cx.notify();
     }
 
@@ -71,9 +122,17 @@ impl DrawingEditor {
                 }
             }
             let (tab, part) = (d.tab, d.part);
-            self.edit("Change configuration", cx, |dr| {
-                noshape_scene::drawing_tools::view_edit::change_configuration(dr, tab, &part, &values);
-            });
+            match d.table {
+                // Only the table changes; the views keep theirs (live 1638 (b)).
+                Some(id) => self.edit_table(id, "Change configuration", cx, move |t| {
+                    if let noshape_model::drawing::TableKind::CutList { config, .. } = &mut t.kind {
+                        *config = Some(values);
+                    }
+                }),
+                None => self.edit("Change configuration", cx, |dr| {
+                    noshape_scene::drawing_tools::view_edit::change_configuration(dr, tab, &part, &values);
+                }),
+            }
             self.ensure_sources(false, cx);
         }
         cx.notify();

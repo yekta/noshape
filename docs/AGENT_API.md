@@ -4819,6 +4819,7 @@ Examples:
 | `visible_rows` | integer |  | Revision: visible rows. |
 | `newest_top` | boolean |  | Revision: order Bottom to top (newest at the top). |
 | `hide_callouts` | boolean |  | Revision: hide callouts no longer in the table. |
+| `configuration` | object or null |  | Cut list: Change configuration... — the table's own configuration of the Part Studio, {input name or id: value} (a list input takes its option's name); the views keep theirs (live). null: back to its view's. |
 
 #### drawing_copy
 

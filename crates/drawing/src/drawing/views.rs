@@ -267,6 +267,16 @@ pub fn referenced_sources(drawing: &Drawing) -> Vec<SourceKey> {
             }
         }
     }
+    // A cut list at its own configuration (Change configuration...).
+    for sheet in &drawing.sheets {
+        for t in &sheet.tables {
+            if let Some(k) = table_source(sheet, t)
+                && !out.contains(&k)
+            {
+                out.push(k);
+            }
+        }
+    }
     // Custom tables tabulate a Part Studio the views need not show.
     for k in super::tables::custom_table_keys(drawing) {
         if !out.contains(&k.source) {
@@ -274,6 +284,17 @@ pub fn referenced_sources(drawing: &Drawing) -> Vec<SourceKey> {
         }
     }
     out
+}
+
+/// The source a BOM, cut list or hole table reads: its view's, at a cut
+/// list's own configuration when it has one (Change configuration..., live
+/// request 1638 (b)).
+pub fn table_source(sheet: &Sheet, t: &super::Table) -> Option<SourceKey> {
+    let (mut k, _) = view_source(sheet, t.view()?)?;
+    if let super::TableKind::CutList { config: Some(c), .. } = &t.kind {
+        k.config = c.clone();
+    }
+    Some(k)
 }
 
 /// Tabs referenced by a drawing (with the configuration of the first view
