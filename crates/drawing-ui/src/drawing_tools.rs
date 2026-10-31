@@ -1089,6 +1089,11 @@ impl DrawingEditor {
         if e.button == MouseButton::Left && self.aligned_dlg.as_ref().is_some_and(|d| d.picking) && self.aligned_exclude_click(cx) {
             return;
         }
+        // Stacked callouts panel: picks add instances (the panel leaves the
+        // Select tool on, so they don't reach tool_click).
+        if e.button == MouseButton::Left && self.stack_dlg.is_some() && matches!(self.tool, Tool::Select) && self.stack_click(cx) {
+            return;
+        }
         // Hole table properties… › Holes to exclude taking picks.
         if e.button == MouseButton::Left && self.hole_dlg.as_ref().is_some_and(|d| d.picking && d.table.is_some()) && self.hole_exclude_click(cx) {
             return;
@@ -2125,6 +2130,11 @@ impl DrawingEditor {
                     }
                     if a.ann_group.is_some() {
                         own.push(MenuEntry::item("Remove from grouped annotation", move |t, _, cx| t.edit_sheet("Remove from grouped annotation", cx, |s| group_annotations(s, &[id], false))));
+                    }
+                    // With a BOM table in the drawing: Add stacked callouts…
+                    // (live drawing/191).
+                    if self.drawing.sheets.iter().flat_map(|s| &s.tables).any(|t| matches!(t.kind, TableKind::Bom { .. })) {
+                        own.push(MenuEntry::item("Add stacked callouts...", move |t, _, cx| t.open_stack_dlg(id, cx)));
                     }
                     return self.live_order_entries(a, edit, own, true, cx);
                 }

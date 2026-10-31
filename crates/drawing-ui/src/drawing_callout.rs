@@ -288,6 +288,9 @@ pub struct StackDlg {
     pub id: u64,
     pub picks: Vec<(String, noshape_model::BodyId)>,
     pub from_bom: bool,
+    /// The Stacked instances list in reorder mode (live request 1682: ⇅
+    /// "Reorder items" shows ≡ drag handles and DONE, the × buttons hide).
+    pub reorder: bool,
 }
 
 impl DrawingEditor {
@@ -304,7 +307,7 @@ impl DrawingEditor {
         let bodies: Vec<noshape_model::BodyId> = callout.stacked.iter().filter_map(|s| s.body.clone()).collect();
         let name = |b: &noshape_model::BodyId| self.callout_source(id).and_then(|s| s.part(Some(b))).map(|p| p.name.clone()).unwrap_or_default();
         let picks = bodies.iter().map(|b| (name(b), b.clone())).collect();
-        self.stack_dlg = Some(StackDlg { id, picks, from_bom: false });
+        self.stack_dlg = Some(StackDlg { id, picks, from_bom: false, reorder: false });
         self.tool = Tool::Select;
         cx.notify();
     }
@@ -332,7 +335,9 @@ impl DrawingEditor {
                 self.callout_source(id)?.bom.iter().find(|e| e.item == item)?.bodies.first().cloned()
             })
         } else {
-            self.any_point(c).and_then(|p| p.r).map(|r| r.body().clone())
+            // An instance's edge: its part (a point on it carries no
+            // reference when it isn't a snap point).
+            self.any_point(c).and_then(|p| p.r).map(|r| r.body().clone()).or_else(|| self.pk().hovered_edge().map(|(_, me)| me.body))
         };
         let Some(body) = body else { return true };
         let name = self.callout_source(id).and_then(|s| s.part(Some(&body))).map(|p| p.name.clone()).unwrap_or_default();
@@ -361,7 +366,12 @@ impl DrawingEditor {
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
         let anchor = self.current_sheet().annotations.iter().find(|a| a.id == d.id).and_then(|a| {
-            let body = a.refs.iter().find(|r| r.slot == 0)?.point.body().clone();
+            // Its reference, else the part stored when it was placed on an edge.
+            let stored = match &a.kind {
+                AnnotationKind::Balloon { callout, .. } => callout.part.clone(),
+                _ => None,
+            };
+            let body = a.refs.iter().find(|r| r.slot == 0).map(|r| r.point.body().clone()).or(stored)?;
             self.callout_source(d.id)?.part(Some(&body)).map(|p| p.name.clone())
         });
         let mut list = v_flex()
@@ -371,21 +381,29 @@ impl DrawingEditor {
             .border_color(pal.accent)
             .bg(gpui_kit::rgb(0xe4f1fb))
             .child(h_flex().child(div().flex_1().text_size(px(10.)).text_color(pal.text_muted).child("Stacked instances")).child(
-                // ⇅ reverses the order; a row dragged onto another moves there
-                // (drawing.md A28).
-                div().id("stack-reverse").text_size(px(11.)).text_color(pal.text_muted).cursor_pointer().child("⇅").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    if let Some(d) = &mut this.stack_dlg {
-                        d.picks.reverse();
-                    }
-                    cx.notify();
-                })),
+                // Live request 1682: ⇅ ("Reorder items") switches the list to
+                // reorder mode, DONE back.
+                div()
+                    .id("stack-reorder")
+                    .text_size(px(11.))
+                    .text_color(if d.reorder { pal.accent } else { pal.text_muted })
+                    .cursor_pointer()
+                    .child(if d.reorder { "DONE" } else { "⇅" })
+                    .when(!d.reorder, |e| e.tooltip(|w, cx| gpui_kit::component::tooltip::Tooltip::new("Reorder items").build(w, cx)))
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        if let Some(d) = &mut this.stack_dlg {
+                            d.reorder = !d.reorder;
+                        }
+                        cx.notify();
+                    })),
             ));
+        let reorder = d.reorder;
         for (i, (name, _)) in d.picks.iter().enumerate() {
-            list = list.child(
-                h_flex()
-                    .id(("stack-row", i))
-                    .h(px(20.))
-                    .cursor_grab()
+            let row = h_flex().id(("stack-row", i)).h(px(20.)).gap(px(4.));
+            // Reorder mode: a ≡ handle, the row dragged onto another moves
+            // there; else its × removes it.
+            let row = if reorder {
+                row.cursor_grab()
                     .on_drag(StackDrag(i), |d, _, _, cx| cx.new(|_| d.clone()))
                     .on_drop(cx.listener(move |this, from: &StackDrag, _, cx| {
                         if let Some(d) = &mut this.stack_dlg
@@ -397,7 +415,10 @@ impl DrawingEditor {
                         }
                         cx.notify();
                     }))
-                    .child(div().flex_1().text_size(px(12.)).child(crate::ui::user_text(name.clone()))).child(
+                    .child(div().text_color(pal.text_muted).child("≡"))
+                    .child(div().flex_1().text_size(px(12.)).child(crate::ui::user_text(name.clone())))
+            } else {
+                row.child(div().flex_1().text_size(px(12.)).child(crate::ui::user_text(name.clone()))).child(
                     div().id(("stack-x", i)).px(px(4.)).cursor_pointer().text_color(pal.text_muted).child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(d) = &mut this.stack_dlg
                             && i < d.picks.len()
@@ -406,8 +427,9 @@ impl DrawingEditor {
                         }
                         cx.notify();
                     })),
-                ),
-            );
+                )
+            };
+            list = list.child(row);
         }
         Some(
             v_flex()
