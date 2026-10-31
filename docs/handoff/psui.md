@@ -272,6 +272,9 @@ panels 992–999, history.
 10-31 17:10: context menus that don't fit under the pointer open above it when there's more room there, clamped to the
 window (live dk-974 / 975); before they shifted up just enough. Vendor gpui-pre Anchored::switch_anchor_or_snap
 (NOSHAPE PATCH), used by the window menu host, the Part Studio canvas menu and skasm's assembly canvas menu.
+10-31 17:56: landed d8c1b80c. Dark sheet: also checked dk-975, 976 (sketch menu icons added), 992, 995, 999 (Properties'
+Reset all disabled until something differs). Open in dark-mode: 971–973 / 982 (sheet metal), 994 (custom table),
+tab manager 989–991, left panels 996–998, history 9a0–9a1.
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC
