@@ -302,6 +302,9 @@ pub(crate) mod ffi {
     struct BrepBody {
         /// x, y, z per vertex.
         vertices: Vec<f64>,
+        /// Per vertex and per edge, its tolerance (an input's; empty in a result).
+        vertex_tol: Vec<f64>,
+        edge_tol: Vec<f64>,
         /// Start and end vertex per edge.
         edges: Vec<u32>,
         /// Per edge: kind (0 line, 1 circle, 2 none: a cone's apex, 3 an ellipse, 4 a hyperbola: only in a

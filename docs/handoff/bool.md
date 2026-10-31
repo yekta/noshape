@@ -1079,6 +1079,35 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## The goal from 10-31 19:00 (user): noshape's Boolean takes every case; OCCT only a temporary fallback
+Work the declines by OCCT time, biggest first: implement OCCT's rule where it's definite (per-vertex tolerances,
+the pave filler's same-domain handling); where OCCT's choice is arbitrary rounding, match within tolerance (same
+topology, volume and area within the model tolerance, valid, the same faces in the history, the same after the
+unify) and count it "equivalent" with its deltas; an internal face's reference (OCCT's result invalid) is a valid
+result and live's numbers; then the long tail, sheets and every surface type, until no decline is left. Track the
+share by count and by OCCT time on all replay sets after each step (/root/bool-scratch/share.py <why.tsv>, from a
+NOSHAPE_BREP_WHY="" replay of every set: /root/bool-scratch/why2N.sh).
+
+| step (UTC) | count | OCCT time | main corpus by time | the other sets by time |
+|---|---|---|---|---|
+| before (why20, 17:13) | 80.5 % | 53.8 % | 89.6 % | 15–47 % |
+| three arguments' coincident edges (why21, 18:16) | 80.7 % | 54.0 % | 89.6 % | 16–48 % |
+
+## Equivalent results; per-entity tolerances (10-31 19:39 UTC)
+- brep_replay: a case whose result differs from OCCT's only by OCCT's arbitrary choices is "equivalent" (not a
+  difference): the same solids, faces, edges, vertices, both valid, the volume within area × 1e-7 m and the area
+  within edge length × 1e-7 m, every face record the same (2 µm), the same after the unify; its deltas reported.
+  NOSHAPE_BREP_EXACT=1 counts them as differing.
+- Per-entity tolerances (OCCT's rule): `Body::vertex_tol` / `edge_tol` (public type change, filled by the C++
+  conversion), the pool merging a vertex with another within the sum of their own tolerances where that's more
+  than the Boolean's (`find_tol`; tolerant ones checked against every vertex), a vertex on an edge within the sum
+  of the two's (`split_tol`). Between two inputs' vertices nothing but rounding is grey; beside a tolerant one a
+  new vertex (OCCT's own tolerance, at most ~1e-5) is apart past the sum + 1e-5. The C++ side passes inputs whose
+  tolerant sub-shapes are vertices and edges only (faces over 1e-5 still declined), the Boolean going by the rest.
+- Replays all 0 differ, 0 equivalent: main 786, corpus2 563 (+2), corpus3 568 (+4), corpus4 614 (+2), corpus5 750
+  (+2), corpus6 680 (+2), Shell's 85 (+2), direct 62 (+2). The tolerant-input cases: 6 of 18 taken; the rest stop
+  at other reasons now (vertices near planes, apexes on parts of cones, ...).
+
 ## Vertices inside coincident edges of three other arguments; the crossing guard gone (10-31 18:16 UTC)
 - Shell's slab fuses: slabs meeting along a line put an argument's vertex inside the coincident edges of three
   others. OCCT's history then says that vertex was Deleted (not Modified) when it is that one argument's alone;

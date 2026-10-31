@@ -102,7 +102,7 @@ pub fn brep_body(shape: &Shape) -> Result<Body, String> {
 }
 
 fn body_of(b: &BrepBody) -> Body {
-    let mut out = Body { vertices: (0..b.vertices.len() / 3).map(|i| v3(&b.vertices, 3 * i)).collect(), ..Default::default() };
+    let mut out = Body { vertices: (0..b.vertices.len() / 3).map(|i| v3(&b.vertices, 3 * i)).collect(), vertex_tol: b.vertex_tol.clone(), edge_tol: b.edge_tol.clone(), ..Default::default() };
     // NURBS curves by where they start in `b.nurbs`.
     let mut curves: HashMap<usize, u32> = HashMap::new();
     let mut curve_at = |out: &mut Body, at: usize| -> u32 {

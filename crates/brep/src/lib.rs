@@ -139,6 +139,10 @@ pub struct Body {
     pub nurbs_curves: Vec<nurbs::NurbsCurve>,
     pub nurbs_surfaces: Vec<nurbs::NurbsSurface>,
     pub pcurves: Vec<PCurve>,
+    /// Per vertex and per edge, its tolerance (how far what lies on it may be from it: OCCT's); empty where none
+    /// was given (the Boolean's own for all).
+    pub vertex_tol: Vec<f64>,
+    pub edge_tol: Vec<f64>,
 }
 
 /// A curve where two faces meet, as the kernel's OCCT makes it (a free-form face's sections come from there, so

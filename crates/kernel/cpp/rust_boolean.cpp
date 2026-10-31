@@ -248,6 +248,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     const TopoDS_Vertex& v = TopoDS::Vertex(vm(i));
     const gp_Pnt         p = BRep_Tool::Pnt(v);
     max_tol                = std::max(max_tol, BRep_Tool::Tolerance(v));
+    b.vertex_tol.push_back(BRep_Tool::Tolerance(v));
     b.vertices.push_back(p.X());
     b.vertices.push_back(p.Y());
     b.vertices.push_back(p.Z());
@@ -268,6 +269,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
         b.curves.push_back(0);
       b.edges.push_back(static_cast<uint32_t>(vm.FindIndex(v1) - 1));
       b.edges.push_back(static_cast<uint32_t>(vm.FindIndex(v1) - 1));
+      b.edge_tol.push_back(BRep_Tool::Tolerance(e));
       continue;
     }
     TopLoc_Location               loc;
@@ -323,6 +325,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       b.curves.push_back(g.Radius());
     }
     max_tol = std::max(max_tol, BRep_Tool::Tolerance(e));
+    b.edge_tol.push_back(BRep_Tool::Tolerance(e));
     b.edges.push_back(static_cast<uint32_t>(vm.FindIndex(v1) - 1));
     b.edges.push_back(static_cast<uint32_t>(vm.FindIndex(v2) - 1));
   }
@@ -1909,7 +1912,12 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
         }
       }
     const double exact   = 2 * std::max(rest, 1e-7);
-    bool         reaches = tolerant.size() > 64;
+    // (Tolerant vertices and edges alone: noshape's Boolean goes by each one's own tolerance, OCCT's rule, the
+    // Boolean's by the rest.)
+    const bool faces_exact = std::none_of(tolerant.begin(), tolerant.end(), [](const auto& x) { return x.second.ShapeType() == TopAbs_FACE; });
+    bool       reaches     = !faces_exact && tolerant.size() > 64;
+    if (faces_exact)
+      tolerant.clear();
     std::vector<Bnd_Box> whole(args.size());
     for (size_t i = 0; i < args.size() && !reaches; ++i)
       BRepBndLib::Add(srcs[i]->shape, whole[i]);
