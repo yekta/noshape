@@ -415,7 +415,11 @@ pub(crate) fn brep_blend(body: &BrepBody, spec: &[f64], tol: f64, out: &mut Brep
         .chunks(5)
         .map(|c| BlendEdge {
             edge: c[0] as u32,
-            spec: if c[1] == 0.0 { Spec::Fillet { radius: c[2] } } else { Spec::Chamfer { d1: c[2], d2: c[3] } },
+            spec: match c[1] as u32 {
+                0 => Spec::Fillet { radius: c[2] },
+                1 => Spec::Chamfer { d1: c[2], d2: c[3] },
+                _ => Spec::ChamferAngle { d: c[2], angle: c[3] },
+            },
             reference: c[4] as u32,
         })
         .collect();

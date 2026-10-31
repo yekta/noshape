@@ -4233,14 +4233,14 @@ static OpOut op_chamfer_unbudgeted(const OcShape& s, const OcShapeList& edges, c
       return true;
     };
   };
-  // noshape's own (NOSHAPE_BLEND_RUST=0: off), where it builds the blend exactly.
-  if (mode != 2)
+  // noshape's own (NOSHAPE_BLEND_RUST=0: off), where it builds the blend exactly (kind 1: two distances, 2: a
+  // distance and an angle).
   {
     std::vector<std::array<double, 3>> sp;
     std::vector<TopoDS_Shape>          refs;
     for (size_t i = 0; i < es.size(); ++i)
     {
-      sp.push_back({1, d1, mode == 0 ? d1 : d2});
+      sp.push_back({mode == 2 ? 2.0 : 1.0, d1, mode == 0 ? d1 : d2});
       refs.push_back(fs[i]);
     }
     TopoDS_Shape r;

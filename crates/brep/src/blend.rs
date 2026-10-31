@@ -21,6 +21,8 @@ pub enum Spec {
     Fillet { radius: f64 },
     /// A flat cut `d1` into the reference face and `d2` into the edge's other face.
     Chamfer { d1: f64, d2: f64 },
+    /// A flat cut `d` into the reference face at `angle` (radians) to it (OCCT's AddDA).
+    ChamferAngle { d: f64, angle: f64 },
 }
 
 /// One edge to blend: the body's edge, how, and (a chamfer's) reference face.
@@ -280,6 +282,7 @@ pub fn blend(body: &Body, edges: &[BlendEdge], tol: f64) -> Result<Output, Decli
         match e.spec {
             Spec::Fillet { radius } if radius > margin => {}
             Spec::Chamfer { d1, d2 } if d1 > margin && d2 > margin => {}
+            Spec::ChamferAngle { d, angle } if d > margin && angle > 1e-6 && angle < std::f64::consts::FRAC_PI_2 - 1e-6 => {}
             _ => return no("a blend too small"),
         }
         if spec_of[e.edge as usize].is_some() {
@@ -472,7 +475,29 @@ fn chain(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdge
                 return no("a chamfer's reference face not the edge's");
             }
         }
+        Spec::ChamferAngle { d, angle } => {
+            // The section's triangle: the edge's angle alpha, `angle` at the reference face's end; the other
+            // face's side by the law of sines.
+            if alpha + angle >= std::f64::consts::PI - 1e-6 {
+                return no("a chamfer's angle past the other face");
+            }
+            let other = d * angle.sin() / (alpha + angle).sin();
+            let r = spec_of[x0.edge as usize].unwrap().reference;
+            if r == f {
+                (d, other, 0.0)
+            } else if r == x0.wall {
+                (other, d, 0.0)
+            } else {
+                return no("a chamfer's reference face not the edge's");
+            }
+        }
     };
+    // From here on a chamfer is its two distances (on P, on the walls).
+    if let Spec::ChamferAngle { .. } = x0.spec {
+        for x in &mut links {
+            x.spec = Spec::Chamfer { d1, d2 };
+        }
+    }
     let corner = vec![false; verts.len()];
     let mut c = Chain { face: f, links, verts, corner, closed, ends: [None, None], d1, d2, centre, sigma };
     // Corners: where two links (lines) meet at an angle. A fillet's two cylinders meet along an ellipse in the
@@ -793,7 +818,7 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<
                     let normal = (p1 - ctr).cross(p2 - ctr).normalize();
                     Curve::Circle { center: ctr, normal, xdir: (p1 - ctr) / radius, radius }
                 }
-                Spec::Chamfer { .. } => Curve::Line,
+                Spec::Chamfer { .. } | Spec::ChamferAngle { .. } => Curve::Line,
             };
             b.edges.push(Edge { v: [i1, i2], curve });
             edge_origin.push(Origin::New);
@@ -875,7 +900,7 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<
                     let ctr = pm + (q + x.t).normalize() * c.centre;
                     ctr + ((pa - ctr) + (pb - ctr)).normalize() * radius
                 }
-                Spec::Chamfer { .. } => 0.5 * (pa + pb),
+                Spec::Chamfer { .. } | Spec::ChamferAngle { .. } => 0.5 * (pa + pb),
             };
             let reversed = surface_normal(&surface, probe).dot(pm - probe) * c.sigma < 0.0;
             new_faces.push((x.edge, Face { surface, reversed, loops: vec![lp] }));

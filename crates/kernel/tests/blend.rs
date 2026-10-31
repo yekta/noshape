@@ -468,3 +468,34 @@ fn rust_blends_on_oblique_caps_are_occts() {
         }
     }
 }
+
+/// noshape's own distance-angle chamfers (OCCT's AddDA: the distance on the reference face, the angle there): a
+/// block's vertical edges and a hole's rim, at 30° from either face: OCCT's result and history.
+#[test]
+fn rust_distance_angle_chamfers_are_occts() {
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(40.0, 20.0, 10.0)).unwrap();
+    let hole = make_cylinder(&Plane::new(DVec3::new(20.0, 10.0, -1.0), DVec3::Z, DVec3::X), 5.0, 12.0, std::f64::consts::TAU).unwrap();
+    let part = cut(&plate, &hole).unwrap().shape;
+    let vertical: Vec<Shape> = part.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| (i.start.z - i.end.z).abs() > 9.9 && matches!(i.curve, Curve::Line { .. }) && (i.start.x.abs() < 1e-9 || (i.start.x - 40.0).abs() < 1e-9))).collect();
+    let rim: Vec<Shape> = part.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, Curve::Circle { center, .. } if center.z > 9.9))).collect();
+    let top = part.faces().into_iter().find(|f| f.centroid().is_ok_and(|c| c.z > 9.9)).unwrap();
+    let front = part.faces().into_iter().find(|f| f.centroid().is_ok_and(|c| c.y.abs() < 1e-9)).unwrap();
+    assert_eq!((vertical.len(), rim.len()), (4, 1));
+    let corner = vec![vertical.iter().find(|e| e.edge_info().is_ok_and(|i| i.start.x.abs() < 1e-9 && i.start.y.abs() < 1e-9)).unwrap().clone()];
+    for (what, edges, face) in [("a block's corner, front face", &corner, &front), ("a hole's rim, top face", &rim, &top)] {
+        for angle in [30f64, 60.0] {
+            let run = || chamfer(&part, edges, ChamferSpec::DistanceAngle(2.0, angle.to_radians()), std::slice::from_ref(face));
+            set_rust_blend(Some(false));
+            let occt = run().unwrap();
+            set_rust_blend(Some(true));
+            reset_blend_decline();
+            let ours = run();
+            set_rust_blend(None);
+            let why = last_blend_decline();
+            let ours = ours.unwrap();
+            assert_eq!(why, "", "{what} {angle}°: declined");
+            let d = bool_corpus::Summary::of(&ours).differences(&bool_corpus::Summary::of(&occt));
+            assert!(d.is_empty(), "{what} {angle}°: {}", d.join(", "));
+        }
+    }
+}
