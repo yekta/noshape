@@ -410,6 +410,8 @@ pub struct DrawingEditor {
     pub inplace_hidden: Option<u64>,
     /// The general table cell edited in place (table, row, column).
     pub inplace_cell: Option<(u64, usize, usize)>,
+    /// A title block field edited in place: its cell's text is hidden.
+    pub inplace_field: Option<String>,
     pub panel_highlight: Option<Sel>,
     pub insp_table: crate::drawing_panels::InspectionTableUi,
     /// Inserted image textures (see `drawing_images`).
@@ -655,6 +657,7 @@ impl DrawingEditor {
             sheet_drop: None,
             inplace_hidden: None,
             inplace_cell: None,
+            inplace_field: None,
             panel_highlight: None,
             insp_table: Default::default(),
             measure: None,
@@ -976,6 +979,13 @@ impl DrawingEditor {
             && let Some(AnnotationKind::Note { text, .. }) = d.sheets.get_mut(si).and_then(|s| s.annotations.iter_mut().find(|a| a.id == id)).map(|a| &mut a.kind)
         {
             text.clear();
+        }
+        // A title block field edited in place: the editor shows its text
+        // (live 1991: the cell's own text hidden meanwhile).
+        if let Some(key) = &self.inplace_field
+            && let Some(s) = d.sheets.get_mut(si)
+        {
+            noshape_scene::drawing_tools::set_title_field(s, key, " ");
         }
         if let Some((id, r, c)) = self.inplace_cell
             && let Some(TableKind::General { cells, .. }) = d.sheets.get_mut(si).and_then(|s| s.tables.iter_mut().find(|t| t.id == id)).map(|t| &mut t.kind)
@@ -1606,9 +1616,14 @@ impl DrawingEditor {
             Some(Panel::Cell { table, row, col, .. }) if self.current_sheet().table(*table).is_some_and(|t| matches!(t.kind, TableKind::General { .. })) => Some((*table, *row, *col)),
             _ => None,
         };
-        if editing != self.inplace_hidden || cell != self.inplace_cell {
+        let field = match &self.panel {
+            Some(Panel::Note { field: Some(k), .. }) => Some(k.clone()),
+            _ => None,
+        };
+        if editing != self.inplace_hidden || cell != self.inplace_cell || field != self.inplace_field {
             self.inplace_hidden = editing;
             self.inplace_cell = cell;
+            self.inplace_field = field;
             self.refresh(cx);
         }
         // The closed panel's sheet chips are drawn on the canvas under the
