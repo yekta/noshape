@@ -528,15 +528,9 @@ fn chain(
         return no("faces nearly tangent or folded at the edge");
     }
     let sigma = if n.dot(x0.t) < 0.0 { 1.0 } else { -1.0 };
-    for (i, x) in links.iter().enumerate() {
+    for x in &links {
         if x.spec != x0.spec || (x.q0.dot(x.t).clamp(-1.0, 1.0).acos() - alpha).abs() > 1e-9 {
             return no("blends that change along a chain");
-        }
-        if i > 0 && x.t.dot(links[i - 1].t) < 1.0 - 1e-12 {
-            return no("walls that turn where two blended edges meet");
-        }
-        if closed && i == 0 && x.t.dot(links[links.len() - 1].t) < 1.0 - 1e-12 {
-            return no("walls that turn where two blended edges meet");
         }
     }
     let (d1, d2, centre) = match x0.spec {
@@ -591,13 +585,14 @@ fn chain(
         // (Into P at the vertex itself: an arc's q0 is at its start.)
         let p = b.vertices[c.verts[j] as usize];
         if into_p_at(b, a, p).dot(into_p_at(b, z, p)) < 1.0 - 1e-12 {
-            if matches!(a.spec, Spec::Fillet { .. }) && (alpha - std::f64::consts::FRAC_PI_2).abs() > 1e-9 {
-                return no("a fillet's corner between walls not square to P");
-            }
+            // (Walls at the same angle to P, drafted ones turning with the edges: mirror images in the plane
+            // through P's normal halving the corner, where the two blends meet.)
             if a.wall == z.wall {
                 return no("a corner on one wall");
             }
             c.corner[j] = true;
+        } else if a.t.dot(z.t) < 1.0 - 1e-12 {
+            return no("walls that turn where two blended edges meet");
         }
     }
     // Arcs whose radius the blend takes away: exactly (to its centre, between two links going on from it), or
@@ -750,10 +745,22 @@ fn down_edges(b: &Body, c: &Chain, ve: &[Vec<u32>], margin: f64) -> Result<Vec<O
         }
         let far = if e.v[0] == v { e.v[1] } else { e.v[0] };
         let d = b.vertices[far as usize] - b.vertices[v as usize];
-        if d.normalize().dot(c.links[i1].t) < 1.0 - 1e-12 {
-            return no("an edge down the walls not along them");
-        }
-        if d.length() <= c.d2 + margin {
+        let (ta, tz) = (c.links[i0].t, c.links[i1].t);
+        let reach = if ta.dot(tz) < 1.0 - 1e-12 {
+            // Drafted walls at a corner: the edge between them, as far down it as the blends' lines on the walls.
+            let s = d.normalize();
+            let m = |x: &Link| x.t.cross(b.vertices[b.edges[x.edge as usize].v[1] as usize] - b.vertices[b.edges[x.edge as usize].v[0] as usize]).normalize();
+            if s.dot(m(&c.links[i0])).abs() > 1e-9 || s.dot(m(&c.links[i1])).abs() > 1e-9 || s.dot(tz) < 0.2 {
+                return no("an edge down the walls not along them");
+            }
+            c.d2 / s.dot(tz)
+        } else {
+            if d.normalize().dot(tz) < 1.0 - 1e-12 {
+                return no("an edge down the walls not along them");
+            }
+            c.d2
+        };
+        if d.length() <= reach + margin {
             return no("a wall shorter than the blend");
         }
         out.push(Some(s));
@@ -910,9 +917,19 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorn
                 q * c.d1
             };
             let end = if c.closed { None } else if j == 0 { c.ends[0] } else if j == k { c.ends[1] } else { None };
-            let (p1, p2) = match end {
-                Some(end) => (p + end.w1, p + end.w2),
-                None => (p + w, p + x.t * c.d2),
+            // Drafted walls turning at a corner: the blends' lines on them meet the edge down between them.
+            let turn = match (before, after) {
+                (Some(i0), Some(i1)) if c.corner[j] && c.links[i0].t.dot(c.links[i1].t) < 1.0 - 1e-12 => downs[j].map(|s| {
+                    let se = &body.edges[s as usize];
+                    let far = if se.v[0] == v { se.v[1] } else { se.v[0] };
+                    (body.vertices[far as usize] - p).normalize()
+                }),
+                _ => None,
+            };
+            let (p1, p2) = match (end, turn) {
+                (Some(end), _) => (p + end.w1, p + end.w2),
+                (None, Some(s)) => (p + w, p + s * (c.d2 / s.dot(x.t))),
+                (None, None) => (p + w, p + x.t * c.d2),
             };
             // A cap at an angle to the line: its normal and the line's direction.
             let oblique = end.filter(|e| e.corner.is_none()).and_then(|end| {
@@ -939,6 +956,21 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorn
             v2.push(i2);
             dead_v[v as usize] = true;
             let curve = match x.spec {
+                Spec::Fillet { radius } if c.corner[j] && turn.is_some() => {
+                    // The two cylinders' axes meet in the plane the walls are mirror images in (P's normal and
+                    // the corner's bisector): their section there an ellipse about that point, its minor axis R
+                    // to p1 on P, its major R / sin(edge, bisector) along P.
+                    let Some(n) = plane_normal(&body.faces[c.face as usize]) else { return no("a corner off P") };
+                    let ydir = -n * c.sigma;
+                    let ctr = p1 + ydir * radius;
+                    // (Towards p2: the short way round from p1.)
+                    let xdir = (p - p1).normalize();
+                    let xdir = if (p2 - ctr).dot(xdir) < 0.0 { -xdir } else { xdir };
+                    let ea = (body.vertices[body.edges[x.edge as usize].v[1] as usize] - body.vertices[body.edges[x.edge as usize].v[0] as usize]).normalize();
+                    let normal = xdir.cross(ydir).normalize();
+                    let n2 = (u32::MAX, u32::MAX);
+                    Curve::Ellipse { center: ctr, normal, xdir, major: radius / xdir.cross(ea).length(), minor: radius, faces: [n2, n2] }
+                }
                 Spec::Fillet { radius } if c.corner[j] => {
                     // The two cylinders' intersection: an ellipse about where their axes meet (below p1), from p1
                     // (on its minor axis, parameter -pi/2) to p2 (its major axis' end, 0).

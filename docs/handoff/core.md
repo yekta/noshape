@@ -659,6 +659,23 @@ with 0003b and 0004 on Linux, macOS and Windows.
   of along it): End.w1 / w2 are where P's and the wall's offset lines meet the cap, a fillet's section the ellipse
   (minor R, major R / cos along the line in the cap); clearance checks widen by the shift along the line.
 
+- Drafted walls (10-31 19:10): corners where the walls turn (a drafted block's top loop, live N5's reapplied R2):
+  the walls are mirror images in the plane through P's normal halving the corner (all links have one angle
+  alpha), so the two blends meet there: a fillet's cylinders in an ellipse about where their axes cross that plane
+  (minor R along P's normal to p1, major R / |x × edge| along P), a chamfer's planes in a line; the wall points at
+  the corner on the edge down between the walls, d2 / (s · t) along it. T1 kernel
+  `blend::rust_blends_on_drafted_walls_are_occts` (fillet R2 / chamfer 1.5, widening and narrowing 5°: OCCT's
+  counts, volume to 1e-7, exact to 1e-9). The corpus's 4 such cases are taken (88 → 9 ms the slowest); two of them
+  OCCT built through its scaled retry (its as-is result invalid), whose history has every face Modified: the replay
+  compares those by their Generated faces and edge pieces only (to 1e-6 of the size).
+- What the corpus declines now (19:00, OCCT's time recorded): mixed-radius vertex blends on a drafted block (live
+  G1 D3 reapplied: R3 slanted edges + R2 top loop, 6.3 / 11.4 s in OCCT; a corner patch, not elementary), "an
+  edge in two chains" 4 s (the 2 / 4 mm mixed box 1.6-1.9 s: the same kind of corner), "two chains' blends close"
+  3.2 s and "a chain end's edge not along the blend's side or too short" 3.0 s (FILLET-OVERSIZE's blocks: blends
+  that eat a whole end face), "an arc the blend closes up" 2.0 s (a top loop over R3 vertical fillets at R4-R8:
+  the ball can't roll inside the corner arc; OCCT makes B-spline corners), "a chain end with more than three
+  edges" 1.2 s (a chamfer running onto the fillets' mitre: a B-spline patch). None elementary: returns flatten
+  here.
 - BLEND-RUST-DEFAULT-REGEN (b) (10-31 12:10, TICKETS): a later OCCT blend in metres (scaled_blend's as_is try)
   depends on its input's face order, and ours lists faces in the input's order where OCCT's builder lists them its
   own way. OCCT's order (probe /root/core-scratch/thick/order.cpp <case.brep> fillet|chamfer <size>, labels m<i>

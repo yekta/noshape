@@ -46,9 +46,14 @@ fn replay(dir: &Path) -> (usize, Vec<String>, String) {
                     noshape_kernel::set_rust_blend(Some(false));
                     let occt = blend_corpus::run(&case);
                     noshape_kernel::set_rust_blend(None);
-                    if occt.is_ok_and(|o| same_records(&o, &res)) {
-                        d.clear();
-                        *paths.entry("rust (as OCCT to 1e-7: its corners approximated)".into()).or_insert(0) += 1;
+                    if let Ok(o) = occt {
+                        if same_records(&o, &res, false) {
+                            d.clear();
+                            *paths.entry("rust (as OCCT to 1e-7: its corners approximated)".into()).or_insert(0) += 1;
+                        } else if retried(&o, &case) && same_records(&o, &res, true) {
+                            d.clear();
+                            *paths.entry("rust (as OCCT to 1e-6, its history through its scaled retry)".into()).or_insert(0) += 1;
+                        }
                     }
                 }
                 if !d.is_empty() && live.contains(&name) {
@@ -66,9 +71,19 @@ fn replay(dir: &Path) -> (usize, Vec<String>, String) {
     (n, diffs, format!("{n} cases, recorded {was_ms:.0} ms, now {now_ms:.0} ms; paths:\n{}", paths.join("\n")))
 }
 
+/// OCCT's blend went through its retry at the working scale (its first try failed or was invalid): the
+/// history through the scaled copy has every input face Modified, the untouched ones too, and no solid.
+fn retried(o: &noshape_kernel::OpResult, case: &blend_corpus::Case) -> bool {
+    use noshape_kernel::{Relation, ShapeType};
+    let faces = case.shape.count(ShapeType::Face);
+    let modified = o.history.records.iter().filter(|h| h.input_kind == ShapeType::Face && h.relation == Relation::Modified).map(|h| h.input_index).collect::<std::collections::BTreeSet<_>>();
+    modified.len() == faces && !o.history.records.iter().any(|h| h.input_kind == ShapeType::Solid)
+}
+
 /// The two results' history records the same, each output's place (centroid / midpoint / point, area /
-/// length) to 1e-7 of the part's size.
-fn same_records(a: &noshape_kernel::OpResult, b: &noshape_kernel::OpResult) -> bool {
+/// length) to 1e-7 of the part's size (`made`: only the faces generated and the edges' pieces, as a retried
+/// OCCT blend's history keeps them, to 1e-6: its corners at the working scale are coarser).
+fn same_records(a: &noshape_kernel::OpResult, b: &noshape_kernel::OpResult, made: bool) -> bool {
     use noshape_kernel::ShapeType;
     let size = a.shape.bounding_box(false).map(|x| x.diagonal()).unwrap_or(1.0).max(1e-9);
     let place = |r: &noshape_kernel::OpResult, kind: ShapeType, i: u32| -> [f64; 4] {
@@ -84,13 +99,14 @@ fn same_records(a: &noshape_kernel::OpResult, b: &noshape_kernel::OpResult) -> b
     // (arg, input kind, index, relation, output kind) and the output's place.
     type Rec = ((u32, u8, u32, u8, u8), [f64; 4]);
     let recs = |r: &noshape_kernel::OpResult| -> Vec<Rec> {
-        let mut v: Vec<_> = r.history.records.iter().map(|h| ((h.arg, h.input_kind as u8, h.input_index, h.relation as u8, h.output_kind as u8), place(r, h.output_kind, h.output_index))).collect();
+        let keep = |h: &&noshape_kernel::HistoryRecord| !made || h.relation == noshape_kernel::Relation::Generated || (h.relation == noshape_kernel::Relation::Modified && h.input_kind == ShapeType::Edge);
+        let mut v: Vec<_> = r.history.records.iter().filter(keep).map(|h| ((h.arg, h.input_kind as u8, h.input_index, h.relation as u8, h.output_kind as u8), place(r, h.output_kind, h.output_index))).collect();
         v.sort_by(|x, y| x.0.cmp(&y.0).then(x.1.partial_cmp(&y.1).unwrap_or(std::cmp::Ordering::Equal)));
         v
     };
     let (ra, rb) = (recs(a), recs(b));
     ra.len() == rb.len()
-        && ra.iter().zip(&rb).all(|(x, y)| x.0 == y.0 && x.1.iter().zip(&y.1).all(|(p, q)| (p.is_nan() && q.is_nan()) || (p - q).abs() <= 1e-7 * size))
+        && ra.iter().zip(&rb).all(|(x, y)| x.0 == y.0 && x.1.iter().zip(&y.1).all(|(p, q)| (p.is_nan() && q.is_nan()) || (p - q).abs() <= if made { 1e-6 } else { 1e-7 } * size))
 }
 
 #[test]
@@ -148,6 +164,10 @@ fn blend_case_diff() {
         }
         t.elapsed().as_secs_f64() * 1e3 / n as f64
     };
+    for (i, e) in case.edges.iter().enumerate() {
+        let x = e.edge_info().unwrap();
+        println!("blended edge {i}: {:?} {:.6?} -> {:.6?} ({:?})", x.curve, x.start, x.end, case.blend);
+    }
     println!("time: OCCT {:.2} ms, ours {:.2} ms", time(false), time(true));
     set_rust_blend(Some(false));
     let occt = blend_corpus::run(&case).expect("OCCT's");
@@ -174,6 +194,15 @@ fn blend_case_diff() {
         }
     }
     let (a, b) = (records(&occt), records(&ours));
+    if std::env::var_os("NOSHAPE_BLEND_HISTORY").is_some() {
+        for x in &a {
+            println!("OCCT: {x}");
+        }
+        for (i, e) in case.shape.edges().iter().enumerate() {
+            let x = e.edge_info().unwrap();
+            println!("input edge {i}: {:.6?} -> {:.6?}", x.start, x.end);
+        }
+    }
     for x in a.iter().filter(|x| !b.contains(x)) {
         println!("OCCT only: {x}");
     }

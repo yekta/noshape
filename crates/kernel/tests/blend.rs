@@ -620,3 +620,99 @@ fn rust_blends_close_arcs_like_onshape() {
     assert_eq!(count(&f, |x| matches!(x, Surface::Sphere { .. })), 4);
     assert_eq!(count(&c, |x| matches!(x, Surface::Cone { .. })), 4);
 }
+
+/// noshape's own blends round a drafted block's top loop (live N5's reapplied R2: the walls turn at the
+/// corners, the blends meet in the plane the two walls are mirror images in): OCCT's result and history, and
+/// the exact volume (the frustum less the section times its centroid line round the corners).
+#[test]
+fn rust_blends_on_drafted_walls_are_occts() {
+    let block = make_box_corners(DVec3::ZERO, DVec3::new(40.0, 20.0, 10.0)).unwrap();
+    let sides: Vec<Shape> = block.faces().into_iter().filter(|f| f.centroid().is_ok_and(|c| c.z > 1.0 && c.z < 9.0)).collect();
+    assert_eq!(sides.len(), 4);
+    let pi = std::f64::consts::PI;
+    for pull in [DVec3::Z, -DVec3::Z] {
+        let drafted = draft(&block, &sides, pull, &Plane::from_normal(DVec3::ZERO, DVec3::Z), 5f64.to_radians()).unwrap().shape;
+        let top: Vec<Shape> = drafted.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| i.start.z > 9.9 && i.end.z > 9.9)).collect();
+        assert_eq!(top.len(), 4);
+        // The top's sides and the walls' angle to it (inside the material).
+        let bb = drafted.bounding_box(false).unwrap();
+        let widening = bb.max.x > 40.0 + 1e-6;
+        let k = if widening { 5f64.to_radians().tan() } else { -5f64.to_radians().tan() };
+        let (a, b, h) = (40.0 + 20.0 * k, 20.0 + 20.0 * k, 10.0);
+        let frustum = 40.0 * 20.0 * h + (40.0 + 20.0) * k * h * h + 4.0 / 3.0 * k * k * h * h * h;
+        let alpha = if widening { 0.5 * pi - 5f64.to_radians() } else { 0.5 * pi + 5f64.to_radians() };
+        for spec in ["fillet", "chamfer"] {
+            let what = format!("{} {spec}", if widening { "widening" } else { "narrowing" });
+            let run = || match spec {
+                "fillet" => fillet(&drafted, &top, 2.0),
+                _ => chamfer(&drafted, &top, ChamferSpec::Equal(1.5), &[]),
+            };
+            set_rust_blend(Some(false));
+            let occt = run().unwrap();
+            set_rust_blend(Some(true));
+            reset_blend_decline();
+            let ours = run();
+            set_rust_blend(None);
+            let why = last_blend_decline();
+            let ours = ours.unwrap();
+            assert_eq!(why, "", "{what}: declined");
+            assert!(ours.shape.is_valid(), "{what}: invalid");
+            let (x, y) = (bool_corpus::Summary::of(&ours), bool_corpus::Summary::of(&occt));
+            assert_eq!((x.faces, x.edges, x.vertices), (y.faces, y.edges, y.vertices), "{what}");
+            assert!((x.volume - y.volume).abs() <= 1e-7 * y.volume, "{what}: {} vs {}", x.volume, y.volume);
+            // The section (the edge at 0, P along +x, the wall at alpha from it): its area and centroid's x.
+            let (area, inset) = if spec == "fillet" {
+                let r = 2.0f64;
+                let d = r / (0.5 * alpha).tan();
+                let cx = r / (0.5 * alpha).sin() * (0.5 * alpha).cos();
+                let kite = d * r;
+                let kite_x = 0.5 * d * r * (d + cx) / 3.0 + 0.5 * d * r * (cx + d * alpha.cos()) / 3.0;
+                let phi = pi - alpha;
+                let sector = 0.5 * phi * r * r;
+                let sector_x = sector * (cx - (0.5 * alpha).cos() * 4.0 * r * (0.5 * phi).sin() / (3.0 * phi));
+                (kite - sector, (kite_x - sector_x) / (kite - sector))
+            } else {
+                let c = 1.5f64;
+                (0.5 * c * c * alpha.sin(), (c + c * alpha.cos()) / 3.0)
+            };
+            let exact = frustum - area * (2.0 * (a + b) - 8.0 * inset);
+            assert!((x.volume - exact).abs() <= 1e-9 * exact, "{what}: {} vs exact {exact}", x.volume);
+        }
+    }
+}
+
+/// The same round a drafted boss (on a plate, its sides drafted 5° from the plate's top): its base loop (concave)
+/// and its top loop (convex), fillet and chamfer: OCCT's counts and volume.
+#[test]
+fn rust_blends_round_a_drafted_boss_are_occts() {
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(60.0, 40.0, 5.0)).unwrap();
+    let boss = make_box_corners(DVec3::new(20.0, 10.0, 5.0), DVec3::new(40.0, 30.0, 15.0)).unwrap();
+    let part = fuse(&plate, &boss).unwrap().shape;
+    let sides: Vec<Shape> = part.faces().into_iter().filter(|f| f.centroid().is_ok_and(|c| c.z > 6.0 && c.z < 14.0)).collect();
+    assert_eq!(sides.len(), 4);
+    let drafted = draft(&part, &sides, DVec3::Z, &Plane::from_normal(DVec3::new(0.0, 0.0, 5.0), DVec3::Z), 5f64.to_radians()).unwrap().shape;
+    let inside = |p: DVec3| p.x > 15.0 && p.x < 45.0 && p.y > 5.0 && p.y < 35.0;
+    let lp = |z: f64| -> Vec<Shape> { drafted.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| (i.start.z - z).abs() < 1e-9 && (i.end.z - z).abs() < 1e-9 && inside(i.start) && inside(i.end))).collect() };
+    for (what, edges) in [("base", lp(5.0)), ("top", lp(15.0))] {
+        assert_eq!(edges.len(), 4, "{what}");
+        for spec in ["fillet", "chamfer"] {
+            let run = || match spec {
+                "fillet" => fillet(&drafted, &edges, 2.0),
+                _ => chamfer(&drafted, &edges, ChamferSpec::Equal(1.5), &[]),
+            };
+            set_rust_blend(Some(false));
+            let occt = run().unwrap();
+            set_rust_blend(Some(true));
+            reset_blend_decline();
+            let ours = run();
+            set_rust_blend(None);
+            let why = last_blend_decline();
+            let ours = ours.unwrap();
+            assert_eq!(why, "", "{what} {spec}: declined");
+            assert!(ours.shape.is_valid(), "{what} {spec}: invalid");
+            let (x, y) = (bool_corpus::Summary::of(&ours), bool_corpus::Summary::of(&occt));
+            assert_eq!((x.faces, x.edges, x.vertices), (y.faces, y.edges, y.vertices), "{what} {spec}");
+            assert!((x.volume - y.volume).abs() <= 1e-7 * y.volume, "{what} {spec}: {} vs {}", x.volume, y.volume);
+        }
+    }
+}
