@@ -47,7 +47,9 @@ pub fn command_named(name: &str) -> Command {
     } else {
         "noshape CAD for scripts and agents: every operation of the app, JSON in and out"
     };
+    // The command's name in usage lines, not argv[0]'s file name ("noshape.exe" on Windows).
     let mut cmd = Command::new(name.to_string())
+        .bin_name(name.to_string())
         .version(noshape_ops::VERSION)
         .about(about)
         .after_help(format!("Values are JSON when they parse (numbers, arrays, objects, true/false), strings otherwise.\nExamples:\n  {name} document create --path /tmp/a.noshape\n  {name} sketch create --doc /tmp/a.noshape --plane plane:top\n  {name} call feature_add '{{\"doc\":\"/tmp/a.noshape\",\"type\":\"extrude\",\"params\":{{\"depth\":\"10 mm\"}}}}'\n  {name} mcp   # MCP server on stdio\n  {name} agents connect   # register it with Claude Code, Codex, Claude Desktop"))
@@ -220,6 +222,16 @@ mod tests {
     fn command_tree_is_valid() {
         super::command().debug_assert();
         super::command_named("noshape").debug_assert();
+    }
+
+    /// Usage names the command, whatever the program file is called
+    /// (Windows' argv[0] ends in .exe).
+    #[test]
+    fn usage_names_the_command_not_the_file() {
+        for (argv0, name) in [("/opt/noshape/noshape.exe", "noshape"), ("C:/noshape/noshape-cli.exe", "noshape-cli")] {
+            let help = super::command_named(name).try_get_matches_from([argv0, "--help"]).unwrap_err().to_string();
+            assert!(help.contains(&format!("Usage: {name} <COMMAND>")), "{help}");
+        }
     }
 
     /// The app binary hands these to the CLI; a document path or a --demo
