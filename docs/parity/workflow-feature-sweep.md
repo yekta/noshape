@@ -46,30 +46,30 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | 4 | Translate direction auto-fill | Direction = the first planar face picked (moveFaceEditingLogic) | stays empty | 🔧 a new Move face (Translate) takes the first planar moved face, until the user sets Direction |  |
 | 5 | Rotate, no axis | text from evAxis | "Select a rotation axis" | ✅ (was 🔧 L5 "Cannot determine rotation axis." on Axis) | skasm 10-31 56277472 (CLI errsweep2.py: text and the field it marks) |
 | 6 | Up to entity, nothing / unresolvable | "Cannot resolve entities." on limitEntity | "Select the entity to move up to" | ✅ (was 🔧) | skasm 10-31 56277472 (CLI errsweep2.py: text and the field it marks) |
-| 7 | Translate up to a plane | first face must be planar ("When moving up to a plane, first selected face must be planar.") and parallel ("Limit face must be parallel to face being moved.") | any plane, distance computed | 🔧 ✅ L6 (no field) | 1b81b7ca 10-28 (blk40: top face, Translate, Up to entity = Right plane → "Limit face must be parallel to face being moved."; planar-first-face case not run) |
-| 8 | Offset up to a non-parallel plane | the extended face meets the plane: distance 0 | distance along the normal | 🔧 |  |
-| 9 | 0 offset / translation | succeeds, part unchanged | went to the kernel | 🔧 |  |
-| 10 | Kernel failure | "Could not offset selected faces as requested." / "Could not transform selected faces as requested." | "Move face failed: …" | 🔧 |  |
-| 11 | Reapply fillet | removes and re-rolls fillets touching the moved faces | ignored | 🔧 on by default: the fillets beside the moved faces are removed, the faces moved, the fillets rolled again at their radii (shared with Draft) |  |
+| 7 | Translate up to a plane | first face must be planar ("When moving up to a plane, first selected face must be planar.") and parallel ("Limit face must be parallel to face being moved.") | any plane, distance computed | ✅ (was 🔧 ✅ L6 (no field)) | skasm 10-31 56277472 (CLI direct.py): text, no field (L6) |
+| 8 | Offset up to a non-parallel plane | the extended face meets the plane: distance 0 | distance along the normal | ✅ (was 🔧) | skasm 10-31 56277472 (CLI direct.py): Offset up to Right from the top face: OK, 8000 unchanged |
+| 9 | 0 offset / translation | succeeds, part unchanged | went to the kernel | ✅ (was 🔧) | skasm 10-31 56277472 (CLI direct.py): Offset / Translate 0 mm OK, unchanged |
+| 10 | Kernel failure | "Could not offset selected faces as requested." / "Could not transform selected faces as requested." | "Move face failed: …" | ✅ (was 🔧) | skasm 10-31 (code: direct.rs has both texts) |
+| 11 | Reapply fillet | removes and re-rolls fillets touching the moved faces | ignored | ✅ (was 🔧 on by default: the fillets beside the moved faces are removed, the faces moved, the fillets rolled again at their radii (shared with Draft)) | skasm 10-31 56277472 (CLI direct.py): R3 edge fillet, front face offset 2 mm: 7922.7433 → 8722.7433 (+800), 7 faces (fillet re-rolled) |
 
 ## Replace face
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1 | Fields | Faces to replace, Faces to replace with, Flip alignment ☐, Offset distance 0 + flip | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Empty Faces to replace | "Select faces to replace." on Faces to replace | no period, no field | ✅ (was 🔧) | skasm 10-31 56277472 (CLI errsweep2.py: text and the field it marks) |
-| 3 | Failure | "Could not replace faces as requested." | our own texts with kernel detail | 🔧 |  |
-| 4 | Flip alignment | used; hidden when several replace-with faces; defaults on when the normals oppose (replaceFaceEditLogic) | ignored, always shown, always off | 🔧 L7/L8: wrong sense fails "Could not replace faces as requested.", offset along the template's (flipped) normal, hidden with 2 faces, auto-ticked when the normals oppose |  |
-| 5 | Several replace-with faces | used (must be adjacent, one body) | only the first | 🔧 the faces are sewn into one template (not joined: "Could not replace faces as requested.") |  |
-| 6 | Empty replace-with | kernel text | "Select the face or plane to replace with" | 🔧 L9 "Cannot resolve entities." on Faces to replace with |  |
+| 3 | Failure | "Could not replace faces as requested." | our own texts with kernel detail | ✅ (was 🔧) | skasm 10-31 (code: direct.rs) |
+| 4 | Flip alignment | used; hidden when several replace-with faces; defaults on when the normals oppose (replaceFaceEditLogic) | ignored, always shown, always off | ✅ (was 🔧 L7/L8: wrong sense fails "Could not replace faces as requested.", offset along the template's (flipped) normal, hidden with 2 faces, auto-ticked when the normals oppose) | skasm 10-31 56277472 (T replace_face_flip_alignment_as_live, live L7/L8) |
+| 5 | Several replace-with faces | used (must be adjacent, one body) | only the first | ✅ (was 🔧 the faces are sewn into one template (not joined: "Could not replace faces as requested.")) | skasm 10-31 56277472 (T replace_face_with_two_faces) |
+| 6 | Empty replace-with | kernel text | "Select the face or plane to replace with" | ✅ (was 🔧 L9 "Cannot resolve entities." on Faces to replace with) | skasm 10-31 56277472 (CLI direct.py): "Cannot resolve entities." on templateFace |
 
 ## Delete face
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1 | Fields | Delete faces, Type Heal / Cap / Leave open (Heal), ☑ Delete fillet faces | same | ✅ | f9185639 10-28 (dialog fields) |
-| 2 | Failure | "Could not delete selected faces." (live) | "Delete face failed (…): <kernel>", cap texts | 🔧 |  |
-| 3 | Every face picked | live: OK, the part disappears, no message | "Cannot delete every face of a part" | 🔧 |  |
+| 2 | Failure | "Could not delete selected faces." (live) | "Delete face failed (…): <kernel>", cap texts | ✅ (was 🔧) | skasm 10-31 (code: direct.rs) |
+| 3 | Every face picked | live: OK, the part disappears, no message | "Cannot delete every face of a part" | ✅ (was 🔧) | skasm 10-31 56277472 (CLI direct.py): all 6 faces → OK, no part, no message |
 | 4 | Surface picked first | Type switches to Leave open (deleteFaceEditLogic) | stays Heal | 🔧 L10 |  |
-| 5 | Delete fillet faces | fillets of any origin (imported parts) | only fillets our Fillet feature named | 🔧 L11: fillets recognised from the geometry (cylinder / torus / sphere / B-spline face tangent to a deleted face and to another), imported parts too; Heal without them fails "Could not delete selected faces." (test with live's 7922.7433) |  |
+| 5 | Delete fillet faces | fillets of any origin (imported parts) | only fillets our Fillet feature named | ✅ (was 🔧 L11: fillets recognised from the geometry (cylinder / torus / sphere / B-spline face tangent to a deleted face and to another), imported parts too; Heal without them fails "Could not delete selected faces." (test with live's 7922.7433)) | skasm 10-31 56277472 (T delete_face_removes_fillets_by_geometry_as_live, live L11: 7922.7433) |
 
 ## Sweep
 | # | Area | Onshape | Ours | Status | Verified |
