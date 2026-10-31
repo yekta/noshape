@@ -475,8 +475,9 @@ fn thin_loft_of_squares_walls_them_as_live() {
 /// A thin loft between two open L-shaped chains (10 + 10 mm legs, 20 mm
 /// apart, 1 mm) is the wall of each chain offset in its plane, lofted: 380
 /// mm³ on the L's inside (the mitred corner overlaps), 420 outside, 8 faces;
-/// thickening the creased sheet gave 343 / 330. Which side the default takes
-/// is asked of live (REQUESTS "skasm (2026-10-31 16:10)").
+/// thickening the creased sheet gave 343 / 330. Live 1677: Flip wall off
+/// grows to the right of the drawing direction, the L's outside (420; 5 mm:
+/// 2500 / 1500).
 #[test]
 fn thin_loft_of_open_l_chains_walls_them() {
     let l_chain = || {
@@ -491,20 +492,17 @@ fn thin_loft_of_open_l_chains_walls_them() {
         v.set("wireProfileEntities", q(vec![Reference::Sketch(s)]));
         v
     };
-    let mut got = Vec::new();
-    for flip in [false, true] {
+    for (t1, flip, mm3) in [("1 mm", false, 420.0), ("1 mm", true, 380.0), ("5 mm", false, 2500.0), ("5 mm", true, 1500.0)] {
         let mut t = T::new();
         let a = t.sketch(Reference::Plane(DatumPlane::Top), l_chain());
         let p20 = t.top_plane("20 mm");
         let b2 = t.sketch(Reference::FeaturePlane(p20), l_chain());
-        t.add("loft", &[("bodyType", en("THIN")), ("wireProfilesArray", ParamValue::Array(vec![item(a), item(b2)])), ("thickness1", e("1 mm")), ("flipWall", b(flip))]);
+        t.add("loft", &[("bodyType", en("THIN")), ("wireProfilesArray", ParamValue::Array(vec![item(a), item(b2)])), ("thickness1", e(t1)), ("flipWall", b(flip))]);
         let res = t.ok();
         let body = res.context.bodies.iter().find(|b| b.kind == BodyKind::Solid).unwrap();
-        assert_eq!(body.shape.faces().len(), 8, "flip {flip}");
-        got.push((total_volume(&res.context) * 1e9 * 1e6).round() / 1e6);
+        let v = total_volume(&res.context) * 1e9;
+        assert!((v - mm3).abs() < 1e-6 && body.shape.faces().len() == 8, "{t1} flip {flip}: {v} mm³, {} faces", body.shape.faces().len());
     }
-    got.sort_by(f64::total_cmp);
-    assert_eq!(got, [380.0, 420.0]);
 }
 
 /// Live (behaviours "skasm (2026-10-31, P2 feature-sweep Loft 8)"): a thin

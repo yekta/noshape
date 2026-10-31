@@ -846,7 +846,13 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
             let failed = || fe("Failed to thicken lofted body, check thickness.");
             let mut loops = Vec::new();
             let mut starts = Vec::new();
-            let mut reference = None;
+            // The sides are taken about the first profile's sketch normal.
+            let mut reference = ev.params.array("wireProfilesArray").first().and_then(|item| {
+                item.query("wireProfileEntities").iter().find_map(|r| match r {
+                    Reference::SketchEntity { sketch, .. } | Reference::Sketch(sketch) => ev.ctx.sketch(*sketch).map(|s| s.frame.normal),
+                    _ => None,
+                })
+            });
             for s in &shapes {
                 match super::thin::open_wall_loop(s, reference, t1, t2).map_err(|_| failed())? {
                     Some((l, start, n)) => {

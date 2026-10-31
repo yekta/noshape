@@ -316,9 +316,10 @@ fn offset_side(w: &Shape, d: f64, m: DVec3, left: DVec3) -> FResult<Shape> {
 }
 
 /// A thin loft's wall loop around an open planar chain: its offsets `t1` to
-/// the left of its first edge about `normal` (flipped to agree with
-/// `reference`, the first profile's) and `t2` to the right, joined by end
-/// caps; with the loop's corner at the chain's start on the `t1` side, so the
+/// the right of its first edge (live 1677: Flip wall off grows to the right
+/// of the drawing direction) about its plane's normal (flipped to agree with
+/// `reference`: the first profile's sketch normal) and `t2` to the left,
+/// joined by end caps; with the loop's corner at the chain's start on the `t1` side, so the
 /// loops of several profiles loft corner to corner. None for a chain with no
 /// plane (a straight line).
 pub fn open_wall_loop(w: &Shape, reference: Option<DVec3>, t1: f64, t2: f64) -> FResult<Option<(Shape, DVec3, DVec3)>> {
@@ -332,8 +333,8 @@ pub fn open_wall_loop(w: &Shape, reference: Option<DVec3>, t1: f64, t2: f64) -> 
     };
     let first = w.edges()[0].clone();
     let (m, left) = left_of(&first, normal)?;
-    let o1 = offset_side(w, t1, m, left)?;
-    let o2 = offset_side(w, t2, m, -left)?;
+    let o1 = offset_side(w, t1, m, -left)?;
+    let o2 = offset_side(w, t2, m, left)?;
     let (ws, we) = ends(w).ok_or_else(|| fe("The wall chain is not open"))?;
     let pair = |o: &Shape| -> FResult<(DVec3, DVec3)> {
         let (a, b) = ends(o).ok_or_else(|| fe("The wall offset is not an open chain"))?;
