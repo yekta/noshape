@@ -73,9 +73,11 @@ impl DrawingEditor {
         self.cell_sel = None;
         if let (true, Some(id)) = (accept, d.table) {
             let (sl, pr, bt, corner, fx, fy) = (d.show_location, d.precision, d.bottom_to_top, d.corner, d.flip_x, d.flip_y);
+            let excluded = d.exclude.clone();
             self.edit_table(id, "Hole table properties", cx, move |t| {
-                if let TableKind::Hole { show_location, precision, bottom_to_top, flip_x, flip_y, .. } = &mut t.kind {
+                if let TableKind::Hole { show_location, precision, bottom_to_top, flip_x, flip_y, exclude, .. } = &mut t.kind {
                     (*show_location, *precision, *bottom_to_top, *flip_x, *flip_y) = (sl, pr, bt, fx, fy);
+                    *exclude = excluded;
                 }
                 t.corner = corner;
             });
@@ -93,13 +95,17 @@ impl DrawingEditor {
         table.corner = d.corner;
     }
 
-    /// A click while Holes to exclude takes picks (inserting): a hole
-    /// circle of the table's view toggles. True when used.
+    /// A click while Holes to exclude takes picks (inserting, or Hole table
+    /// properties…): a hole circle of the table's view toggles. True when
+    /// used.
     pub fn hole_exclude_click(&mut self, cx: &mut Context<Self>) -> bool {
-        let Tool::Table { kind: TableTool::Hole, view: Some(v), .. } = self.tool.clone() else { return false };
-        if !self.hole_dlg.as_ref().is_some_and(|d| d.picking) {
-            return false;
-        }
+        let Some(d) = self.hole_dlg.as_ref().filter(|d| d.picking) else { return false };
+        let v = match (&self.tool, d.table.and_then(|id| self.current_sheet().table(id))) {
+            (_, Some(t)) => t.view(),
+            (Tool::Table { kind: TableTool::Hole, view, .. }, None) => *view,
+            _ => None,
+        };
+        let Some(v) = v else { return false };
         if let Some(noshape_scene::drawing_tools::Pick::Circle { view, center, .. }) = self.pk().circle_pick(self.cursor)
             && view == v
             && let Some(d) = &mut self.hole_dlg
@@ -257,7 +263,7 @@ impl DrawingEditor {
                     };
                     v.child(h_flex().px(px(8.)).h(px(28.)).gap(px(6.)).child(flip("hole-table-flip-x", "Flip X", d.flip_x, |d| d.flip_x = !d.flip_x, cx)).child(flip("hole-table-flip-y", "Flip Y", d.flip_y, |d| d.flip_y = !d.flip_y, cx)))
                 })
-                .when(view.is_some() && editing.is_none(), |v| {
+                .when(view.is_some(), |v| {
                     let n = d.exclude.len();
                     let on = d.picking;
                     v.child(
