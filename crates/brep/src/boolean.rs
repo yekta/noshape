@@ -423,6 +423,8 @@ struct GEdge {
     index: u32,
     v: [u32; 2],
     g: Geo,
+    /// Its own tolerance (an input's, OCCT's).
+    t: f64,
 }
 
 struct GSolid {
@@ -443,6 +445,10 @@ struct Pool {
     grid: HashMap<(i64, i64, i64), Vec<u32>>,
     cell: f64,
     tol: f64,
+    /// Per vertex its own tolerance (an input's, OCCT's; 0 for a new one), and those over half the Boolean's
+    /// (tolerant ones: within the sum of the two's tolerances another is the same vertex, OCCT's rule).
+    t: Vec<f64>,
+    loose: Vec<u32>,
 }
 
 impl Pool {
@@ -452,32 +458,75 @@ impl Pool {
 
     /// The vertex within `tol` of `p`, if any.
     fn find(&self, p: DVec3) -> R<Option<u32>> {
-        let k = self.key(p);
+        self.find_tol(p, 0.0)
+    }
+
+    /// The vertex `p` (its own tolerance `tp`) is: one within the Boolean's tolerance, or within the sum of the
+    /// two's own where that's more (OCCT's rule for tolerant vertices); none in the grey band past that.
+    fn find_tol(&self, p: DVec3, tp: f64) -> R<Option<u32>> {
+        let half = 0.5 * self.tol;
         let mut found: Option<u32> = None;
+        let mut take = |i: u32| -> R<()> {
+            let ti = self.t[i as usize];
+            let reach = self.tol.max(tp + ti);
+            // (Two inputs' vertices: OCCT's rule is the sum of their tolerances, nothing in between but rounding. A
+            // new vertex's tolerance is OCCT's own choice, at most ~1e-5: past that beside a tolerant one; else the
+            // grey band.)
+            let band = if tp > 0.0 && ti > 0.0 {
+                reach * (1.0 + 1e-9)
+            } else if tp + ti > self.tol {
+                reach + 1e-5
+            } else {
+                GREY * reach
+            };
+            let d = (self.p[i as usize] - p).length();
+            if d <= reach {
+                if found.is_some_and(|f| f != i) {
+                    return Err(Decline("a point near two vertices"));
+                }
+                found = Some(i);
+            } else if d <= band {
+                return Err(Decline("two vertices nearly coincide"));
+            }
+            Ok(())
+        };
+        if tp > half {
+            // (A tolerant point: against every vertex.)
+            for i in 0..self.p.len() as u32 {
+                take(i)?;
+            }
+            return Ok(found);
+        }
+        let k = self.key(p);
         for dx in -1..=1 {
             for dy in -1..=1 {
                 for dz in -1..=1 {
                     let Some(list) = self.grid.get(&(k.0 + dx, k.1 + dy, k.2 + dz)) else { continue };
                     for &i in list {
-                        let d = (self.p[i as usize] - p).length();
-                        if d <= self.tol {
-                            if found.is_some_and(|f| f != i) {
-                                return Err(Decline("a point near two vertices"));
-                            }
-                            found = Some(i);
-                        } else if d <= GREY * self.tol {
-                            return Err(Decline("two vertices nearly coincide"));
+                        if self.t[i as usize] <= half {
+                            take(i)?;
                         }
                     }
                 }
             }
         }
+        for &i in &self.loose {
+            take(i)?;
+        }
         Ok(found)
     }
 
     fn push(&mut self, p: DVec3) -> u32 {
+        self.push_tol(p, 0.0)
+    }
+
+    fn push_tol(&mut self, p: DVec3, t: f64) -> u32 {
         let i = self.p.len() as u32;
         self.p.push(p);
+        self.t.push(t);
+        if t > 0.5 * self.tol {
+            self.loose.push(i);
+        }
         self.inputs.push(Vec::new());
         let k = self.key(p);
         self.grid.entry(k).or_default().push(i);
@@ -2157,7 +2206,8 @@ impl Ctx<'_> {
     /// The pool vertices strictly inside `s`, in order from its start.
     /// The pool vertices strictly inside `s`, in order from its start: of `lists` (each sorted by x), the
     /// ones not `own`'s (an argument's vertices never lie inside its own edges).
-    fn split_among(&self, s: &Seg, lists: &ByOwner, own: Option<u32>) -> R<Vec<u32>> {
+    /// (`te`: the edge's own tolerance: a vertex within the sum of the two's is on it, OCCT's rule.)
+    fn split_among(&self, s: &Seg, lists: &ByOwner, own: Option<u32>, te: f64) -> R<Vec<u32>> {
         if matches!(s.g, Geo::Apex { .. }) {
             return Ok(vec![s.v[0], s.v[1]]);
         }
@@ -2166,7 +2216,7 @@ impl Ctx<'_> {
             if own.is_some() && *who == own {
                 continue;
             }
-            let c = self.split(s, list)?;
+            let c = self.split_tol(s, list, te)?;
             for &w in &c[1..c.len() - 1] {
                 chain.push((self.seg_param(s, self.p(w)).0, w));
             }
@@ -2179,7 +2229,14 @@ impl Ctx<'_> {
     }
 
     fn split(&self, s: &Seg, sorted_x: &[(f64, u32)]) -> R<Vec<u32>> {
+        self.split_tol(s, sorted_x, 0.0)
+    }
+
+    /// `split`, a vertex on `s` within the Boolean's tolerance or the sum of its own and `te` where that's more.
+    fn split_tol(&self, s: &Seg, sorted_x: &[(f64, u32)], te: f64) -> R<Vec<u32>> {
         let tol = self.tol;
+        let reach = |w: u32| tol.max(te + self.pool.t[w as usize]);
+        let tol_far = self.pool.loose.iter().fold(tol, |m, &w| m.max(reach(w))).max(tol.max(te));
         let (lo, hi) = match s.g {
             Geo::Line => {
                 let (a, b) = (self.p(s.v[0]), self.p(s.v[1]));
@@ -2190,7 +2247,7 @@ impl Ctx<'_> {
             Geo::Nurbs { id, t0, t1 } => free::piece_box(&self.ncurves[id as usize].c, t0, t1),
             Geo::Apex { .. } => return Ok(vec![s.v[0], s.v[1]]),
         };
-        let (lo, hi) = (lo - DVec3::splat(tol), hi + DVec3::splat(tol));
+        let (lo, hi) = (lo - DVec3::splat(tol_far), hi + DVec3::splat(tol_far));
         let start = sorted_x.partition_point(|x| x.0 < lo.x);
         // (Its length found when a vertex near it asks.)
         let len = std::cell::OnceCell::new();
@@ -2210,7 +2267,7 @@ impl Ctx<'_> {
             if let Geo::Nurbs { id, t0, t1 } = s.g {
                 let nc = &self.ncurves[id as usize];
                 let boxes = nc.boxes.get_or_init(|| nc.c.piece_boxes(8));
-                let g = GREY * tol;
+                let g = GREY * tol_far;
                 let (ta, tb) = (t0.min(t1), t0.max(t1));
                 if !boxes.is_empty() && boxes.iter().filter(|x| x.1 >= ta && x.0 <= tb).all(|x| (x.2 - p).max_element() > g || (p - x.3).max_element() > g) {
                     continue;
@@ -2221,12 +2278,13 @@ impl Ctx<'_> {
                 continue;
             }
             let len = *len.get_or_init(|| self.seg_length(s));
-            if t * len <= tol || (1.0 - t) * len <= tol {
+            let r = reach(w);
+            if t * len <= r || (1.0 - t) * len <= r {
                 continue;
             }
-            if off <= tol {
+            if off <= r {
                 on.push((t, w));
-            } else if off <= GREY * tol {
+            } else if off <= GREY * r {
                 return Err(Decline("a vertex nearly on an edge"));
             }
         }
@@ -2494,7 +2552,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     }
     let mut cx = Ctx {
         tol,
-        pool: Pool { p: Vec::new(), inputs: Vec::new(), grid: HashMap::default(), cell: GREY * tol * 1.01, tol },
+        pool: Pool { p: Vec::new(), inputs: Vec::new(), grid: HashMap::default(), cell: GREY * tol * 1.01, tol, t: Vec::new(), loose: Vec::new() },
         faces: Vec::new(),
         edges: Vec::new(),
         solids: Vec::new(),
@@ -2564,8 +2622,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         let a = ai as u32;
         let mut vmap = Vec::with_capacity(body.vertices.len());
         for (i, &p) in body.vertices.iter().enumerate() {
-            let near = arg_box.iter().enumerate().any(|(k, b)| k != ai && boxes_meet(p, p, b.0, b.1, GREY * tol));
-            let found = if near { cx.pool.find(p)? } else { None };
+            let tv = body.vertex_tol.get(i).copied().unwrap_or(0.0);
+            let near = arg_box.iter().enumerate().any(|(k, b)| k != ai && boxes_meet(p, p, b.0, b.1, GREY * tol.max(2.0 * tv)));
+            let found = if near { cx.pool.find_tol(p, tv)? } else { None };
             let w = match found {
                 Some(w) => {
                     if cx.pool.inputs[w as usize].iter().any(|x| x.0 == a) {
@@ -2573,7 +2632,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                     }
                     w
                 }
-                None => cx.pool.push(p),
+                None => cx.pool.push_tol(p, tv),
             };
             cx.pool.inputs[w as usize].push((a, i as u32));
             vmap.push(w);
@@ -2618,7 +2677,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                     Geo::Arc { k, a0, sweep }
                 }
             };
-            cx.edges.push(GEdge { arg: a, index: i as u32, v, g });
+            cx.edges.push(GEdge { arg: a, index: i as u32, v, g, t: body.edge_tol.get(i).copied().unwrap_or(0.0) });
         }
         let face0 = cx.faces.len();
         for (i, f) in body.faces.iter().enumerate() {
@@ -3380,7 +3439,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             Geo::Nurbs { id, t0, t1 } => free::piece_box(&cx.ncurves[id as usize].c, t0, t1),
         };
         let near = es != usize::MAX && (0..ns).any(|t| meets[es * ns + t] && boxes_meet(lo, hi, cx.solids[t].lo, cx.solids[t].hi, GREY * tol));
-        if near { cx.split_among(&s, &lists, Some(cx.edges[e].arg)) } else { Ok(vec![s.v[0], s.v[1]]) }
+        if near { cx.split_among(&s, &lists, Some(cx.edges[e].arg), cx.edges[e].t) } else { Ok(vec![s.v[0], s.v[1]]) }
     };
     // (With the arrangement the same under a rotation: a curve in a later period whose ends and middle turn back
     // onto a curve's in the first has that one's split points turned, the vertices there; any other found.)
