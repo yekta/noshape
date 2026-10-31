@@ -526,3 +526,15 @@ fn cross_drilled_holes_of_one_radius() {
     let thinner = turned_about_x(&cylinder(0.0, 0.0, 0.4, -3.0, 3.0), 90f64.to_radians());
     assert!(boolean(Op::Cut, &[&block, &down, &thinner], TOL).is_err());
 }
+
+/// A Boolean under a set cancel flag declines "cancelled" (the kernel stops there instead of handing it to OCCT).
+#[test]
+fn a_cancelled_boolean_declines() {
+    let flag = std::sync::atomic::AtomicBool::new(true);
+    crate::set_thread_cancel(&flag as *const _ as usize);
+    let (a, b) = (cuboid((0.0, 0.0, 0.0), (2.0, 2.0, 2.0)), cuboid((1.0, 1.0, 1.0), (3.0, 3.0, 3.0)));
+    let r = crate::boolean(crate::Op::Fuse, &[&a, &b], 1e-7);
+    crate::set_thread_cancel(0);
+    assert!(matches!(r, Err(crate::Decline("cancelled"))), "{:?}", r.map(|_| ()));
+    assert!(crate::boolean(crate::Op::Fuse, &[&a, &b], 1e-7).is_ok());
+}

@@ -1974,7 +1974,11 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   {
     const KernelTimer timer("boolean.rust.brep");
     if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, touching_only, r))
+    {
+      // (Declined "cancelled": stopped, not handed to OCCT.)
+      stop();
       return decline(nullptr);
+    }
   }
   const KernelTimer timer("boolean.rust.build");
   stop();

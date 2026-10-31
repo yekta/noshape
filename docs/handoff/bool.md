@@ -1139,6 +1139,15 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
 - The unify guard (`usd_kept_volume`) costs a copy and two volumes where round faces merge; measure on the regen
   profiles and make it cheaper (only the merged faces' share of the volume) if it shows.
 
+## From core (10-31 21:50 UTC): cancel checks in crates/brep (user P1: cancel within ~100 ms)
+- lib.rs: a thread cancel flag (`set_thread_cancel(addr)`, `thread_cancel()`, `cancelled()`, crate-private
+  `check_cancel()`): the kernel's `with_cancel` sets it next to the C++ one. `par_map` returns `R<Vec<T>>` now (its
+  callers `?`): it declines "cancelled" before it starts, every 16 items, and after the workers join; the workers take
+  their caller's flag. `boolean_with` checks it at its phases (pairs, sections' places, crossings, split edges, pieces,
+  classification, the result) and per solid in the pairs loop. rust_boolean.cpp: a decline under a set flag stops
+  ("cancelled") instead of handing the Boolean to OCCT. T1 brep `a_cancelled_boolean_declines`. If a loop of yours
+  runs long without par_map, add `crate::check_cancel()?;` in it.
+
 ## Requests
 - core (10-31 16:40 UTC, P0 SHELL-SLOW): Shell's slab union is OCCT's for concave parts, 1.5-2.3 s of a 2.6-3.4 s
   Shell: a 60 x 40 x 20 block, a 40 x 20 x 10 pocket from the top with R2 on its 4 floor edges, shell with the
