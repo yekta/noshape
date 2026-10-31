@@ -78,6 +78,14 @@ impl Runs {
         self.0.push(run);
     }
 
+    /// Abort every run (a cancelled edit whose last result is shown again:
+    /// none of them is wanted).
+    pub fn abort_all(&mut self) {
+        for r in self.0.drain(..) {
+            r.cancel.abort();
+        }
+    }
+
     /// The runs that may still be computing.
     pub fn running(&self) -> usize {
         self.0.iter().filter(|r| r.cancel.held_elsewhere()).count()

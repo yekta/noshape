@@ -181,6 +181,16 @@ pub fn feature_icon(type_id: &str) -> SharedString {
 /// A menu entry's action on the Part Studio view.
 type ViewAction = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
 
+/// The committed document's regeneration result kept while a dialog is open
+/// (`PartStudioView::before_edit`), with what it was computed from.
+struct BeforeEdit {
+    studio: PartStudio,
+    upto: Option<usize>,
+    config: noshape_model::configuration::ConfigValues,
+    display: Arc<StudioDisplay>,
+    context: Option<Arc<noshape_model::regen::context::Context>>,
+}
+
 struct EditSession {
     dialog: Entity<FeatureDialog>,
     /// Index the feature occupies (new features are inserted at the rollback bar).
@@ -274,6 +284,10 @@ pub struct PartStudioView {
     /// The running regenerations (model regen::runs: a newer request
     /// aborts or supersedes each).
     regen_runs: noshape_model::regen::runs::Runs,
+    /// The document as shown when the dialog opened (its regeneration done):
+    /// cancelling the dialog shows it again at once, without waiting for the
+    /// preview's regeneration to stop (user P1, 10-31).
+    before_edit: Option<BeforeEdit>,
     /// A regeneration whose result isn't shown yet, its overlay timer and
     /// spinner.
     pending: Option<pending::Pending>,
@@ -428,6 +442,7 @@ impl PartStudioView {
             regen_seq: 0,
             regen_task: None,
             regen_runs: Default::default(),
+            before_edit: None,
             pending: None,
             pending_timer: None,
             pending_spinner: None,
@@ -2124,6 +2139,13 @@ impl PartStudioView {
         // A new feature's first change runs std's editing logic with an
         // empty old definition; an edited one starts from its values.
         self.ui.std_edit_old = (!is_new).then(|| dialog.read(cx).feature.params.clone());
+        // What a cancel goes back to: the shown result, when it is the
+        // committed document's (no regeneration pending).
+        self.before_edit = if self.edit.is_none() && self.pending.is_none() {
+            self.effective_studio(cx).map(|(studio, upto)| BeforeEdit { config: self.current_config(&studio), studio, upto, display: self.display.clone(), context: self.context.clone() })
+        } else {
+            None
+        };
         self.edit = Some(EditSession { dialog, index, is_new, _sub: sub, history });
         // Live ("Panels vs feature dialogs"): opening a feature dialog closes
         // the tool panels (Mass and section properties, Named views) for good;
@@ -2215,9 +2237,34 @@ impl PartStudioView {
         if self.edit.take().is_some() {
             self.sync_manipulator(cx);
             window.focus(&self.focus, cx);
-            self.schedule_regen(window, cx);
+            if !self.restore_before_edit(window, cx) {
+                self.schedule_regen(window, cx);
+            }
             cx.notify();
         }
+    }
+
+    /// A cancelled dialog: the document as it was before the edit, at once
+    /// (user P1 10-31: the spinner went on until the cancelled preview's
+    /// regeneration stopped). Its result was kept when the dialog opened; the
+    /// running regenerations are aborted and a late result is dropped
+    /// (`regen_seq`). False when the document changed since (then it
+    /// regenerates).
+    fn restore_before_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(b) = self.before_edit.take() else { return false };
+        let same = self.ui.regen_paused.is_none()
+            && self.effective_studio(cx).is_some_and(|(studio, upto)| upto == b.upto && self.current_config(&studio) == b.config && studio == b.studio);
+        if !same {
+            return false;
+        }
+        self.regen_seq += 1;
+        self.regen_runs.abort_all();
+        self.regen_task = None;
+        self.pending = None;
+        self.pending_timer = None;
+        self.context = b.context;
+        self.apply_display(b.display, window, cx);
+        true
     }
 
     /// Restore link of the "has been canceled" toast: reopen the draft.
