@@ -604,6 +604,8 @@ pub trait OsDropdownExt: IntoElement + Sized {
         let bounds: Rc<Cell<Bounds<Pixels>>> = Default::default();
         let probe = bounds.clone();
         let f = Rc::new(f);
+        let id: ElementId = id.into();
+        let key = id.to_string();
         div()
             .id(id)
             .relative()
@@ -617,6 +619,7 @@ pub trait OsDropdownExt: IntoElement + Sized {
                     let m = if select { m.select_list(width) } else { m.dropdown() };
                     f(m, window, cx)
                 });
+                OPEN_DROPDOWNS.with(|o| o.borrow_mut().insert(key.clone(), menu.downgrade()));
                 // Near the window's right edge the menu aligns to the button's right.
                 if b.right() + px(260.) > window.viewport_size().width {
                     crate::os_menu::open_anchored(point(b.right(), b.bottom()), Anchor::TopRight, menu, window, cx);
@@ -625,6 +628,17 @@ pub trait OsDropdownExt: IntoElement + Sized {
                 }
             })
     }
+}
+
+thread_local! {
+    /// The menu each dropdown (by its element id) opened last.
+    static OPEN_DROPDOWNS: std::cell::RefCell<std::collections::HashMap<String, WeakEntity<crate::os_menu::OsMenu>>> = Default::default();
+}
+
+/// Whether the dropdown `id` ([`OsDropdownExt::os_dropdown_menu`]) has its menu open: its button keeps the open look
+/// while the pointer is in the menu (live dk-913b: the documents page's Create stays #769fcc).
+pub fn dropdown_open(id: &str, cx: &App) -> bool {
+    OPEN_DROPDOWNS.with(|o| o.borrow().get(id).is_some_and(|m| crate::os_menu::is_open_menu(m, cx)))
 }
 
 /// A context-menu-style list opening upward from a button at the bottom of

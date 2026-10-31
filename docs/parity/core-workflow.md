@@ -127,97 +127,97 @@ and closes again with ✕/Esc/Cancel. Expected results follow live (behaviours.m
 **8.1 Feature row, sketch (Sketch 1)**
 | # | Item | Expected | Status | Verified |
 |---|---|---|---|---|
-| 8.1.1 | Rename | inline name field, all selected; Esc reverts | – |  |
-| 8.1.2 | Edit… | Sketch 1 opens for editing | – |  |
-| 8.1.3 | Copy sketch | copied (no visible change; Paste in another sketch pastes it) | – |  |
-| 8.1.4 | Show dimensions | the sketch's dimensions show in the graphics | – |  |
-| 8.1.5 | Add selection to folder… | Folder name popup beside the row | – |  |
-| 8.1.6 | Hide / Show | the sketch hides / shows; eye toggles | – |  |
-| 8.1.7 | Create Drawing of Sketch 1… | Create Drawing dialog | – |  |
-| 8.1.8 | Export as DXF/DWG… | export dialog | – |  |
-| 8.1.9 | Suppress / Unsuppress | struck-through italic / back | – |  |
-| 8.1.10 | Dynamic suppression ▸ Add expression… | expression popup | – |  |
-| 8.1.11 | Zoom to selection | view zooms to the sketch | – |  |
-| 8.1.12 | View normal to | view turns normal to its plane | – |  |
-| 8.1.13 | Show dependencies… | "Dependencies of Sketch 1" panel | – |  |
-| 8.1.14 | Roll to here | rollback bar moves under Sketch 1 | – |  |
-| 8.1.15 | Edit sketch appearance… | appearance editor | – |  |
-| 8.1.16 | Delete | deleted (Ctrl+Z restores) | – |  |
+| 8.1.1 | Rename | inline name field, all selected; Esc reverts | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.2 | Edit… | Sketch 1 opens for editing | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.3 | Copy sketch | copied (no visible change; Paste in another sketch pastes it) | ✅ copied, no toast (the "Copied 1 feature" toast removed, as live's Copy Part) | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.4 | Show dimensions | the sketch's dimensions show in the graphics | ✅ the sketch's dimensions drawn in its plane with their values ("40", "20"); T1 shown_dimensions_draw_their_values | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.5 | Add selection to folder… | Folder name popup beside the row | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.6 | Hide / Show | the sketch hides / shows; eye toggles | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.7 | Create Drawing of Sketch 1… | Create Drawing dialog | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.8 | Export as DXF/DWG… | export dialog | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.9 | Suppress / Unsuppress | struck-through italic / back | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.10 | Dynamic suppression ▸ Add expression… | expression popup | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.11 | Zoom to selection | view zooms to the sketch | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.12 | View normal to | view turns normal to its plane | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.13 | Show dependencies… | "Dependencies of Sketch 1" panel | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.14 | Roll to here | rollback bar moves under Sketch 1 | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.15 | Edit sketch appearance… | appearance editor | ❌ appearance editor opens; Esc keeps it open, live: one Esc cancels it (behaviours request 1663 (a)) | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.16 | Delete | deleted (Ctrl+Z restores) | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 
 **8.2 Feature row, other feature (Extrude 1)**
 | # | Item | Expected | Status | Verified |
 |---|---|---|---|---|
-| 8.2.1 | Rename | inline name field; Esc reverts | – |  |
-| 8.2.2 | Edit… | Extrude 1 dialog | – |  |
-| 8.2.3 | Edit Sketch 1… | Sketch 1 opens | – |  |
-| 8.2.4 | Show dimensions | dimensions show | – |  |
-| 8.2.5 | Add selection to folder… | Folder name popup | – |  |
-| 8.2.6 | Suppress / Unsuppress | struck-through / back | – |  |
-| 8.2.7 | Dynamic suppression ▸ Add expression… | expression popup | – |  |
-| 8.2.8 | Zoom to selection | zooms | – |  |
-| 8.2.9 | Show dependencies… | dependencies panel | – |  |
-| 8.2.10 | Roll to here | bar under Extrude 1 | – |  |
-| 8.2.11 | Add appearance to feature… | appearance editor | – |  |
-| 8.2.12 | Delete | deleted (Ctrl+Z restores) | – |  |
+| 8.2.1 | Rename | inline name field; Esc reverts | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.2.2 | Edit… | Extrude 1 dialog | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.2.3 | Edit Sketch 1… | Sketch 1 opens | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.2.4 | Show dimensions | dimensions show | ✅ the feature's sketch dimensions, as live ("the feature's sketch dimensions") | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.2.5 | Add selection to folder… | Folder name popup | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.2.6 | Suppress / Unsuppress | struck-through / back | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.2.7 | Dynamic suppression ▸ Add expression… | expression popup | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.2.8 | Zoom to selection | zooms | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.2.9 | Show dependencies… | dependencies panel | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.2.10 | Roll to here | bar under Extrude 1 | ✅ on a rolled-back Extrude 1 (Roll to here / Roll to end); hidden when the bar is already under it | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.2.11 | Add appearance to feature… | appearance editor | ❌ ours opens the appearance panel; live opens a feature dialog "Face appearance 1" (Faces or features = Extrude 1, palette / mixer, ✓ ✕) and Esc cancels it (request 1663 (a)) | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.2.12 | Delete | deleted (Ctrl+Z restores) | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 
 **8.3 Several feature rows (Shift-click two)**
 | # | Item | Expected | Status | Verified |
 |---|---|---|---|---|
-| 8.3.1 | Add selection to folder… | Folder name popup | – |  |
-| 8.3.2 | Section view… | Section view dialog | – |  |
-| 8.3.3 | Suppress | both struck-through | – |  |
-| 8.3.4 | Dynamic suppression ▸ | submenu | – |  |
-| 8.3.5 | Clear selection | rows unselected | – |  |
-| 8.3.6 | Edit sketch appearance… / Add appearance to feature… | appearance editor | – |  |
-| 8.3.7 | Delete | both deleted (Ctrl+Z restores) | – |  |
+| 8.3.1 | Add selection to folder… | Folder name popup | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.3.2 | Section view… | Section view dialog | ✅ Section view dialog (a stale saved drag offset puts it partly under the feature list, drawn over it: open) | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.3.3 | Suppress | both struck-through | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.3.4 | Dynamic suppression ▸ | submenu | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.3.5 | Clear selection | rows unselected | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.3.6 | Edit sketch appearance… / Add appearance to feature… | appearance editor | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.3.7 | Delete | both deleted (Ctrl+Z restores) | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 
 **8.4 Default geometry: plane (Top) and Origin**
 | # | Item | Expected | Status | Verified |
 |---|---|---|---|---|
-| 8.4.1 | Top › Rename | inline field; Esc reverts | – |  |
-| 8.4.2 | Top › New sketch… | Sketch dialog on Top | – |  |
-| 8.4.3 | Top › Offset plane… | Plane dialog, Offset, Top picked | – |  |
-| 8.4.4 | Top › Size to Part Studio | plane resizes to the parts | – |  |
-| 8.4.5 | Top › Hide / Show | plane hides / shows | – |  |
-| 8.4.6 | Top › Hide other planes | Front, Right hide | – |  |
-| 8.4.7 | Top › Hide all planes | all planes hide | – |  |
-| 8.4.8 | Top › Zoom to selection | zooms | – |  |
-| 8.4.9 | Top › View normal to | view normal to Top | – |  |
-| 8.4.10 | Top › Show dependencies… | dependencies panel | – |  |
-| 8.4.11 | Origin › Rename / Hide / Show dependencies… | as above | – |  |
+| 8.4.1 | Top › Rename | inline field; Esc reverts | ✅ inline field; Esc reverts; the field's late blur no longer records a rename (an undo step that ate the next menu click); T1 an_escaped_plane_rename_records_nothing | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.4.2 | Top › New sketch… | Sketch dialog on Top | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.4.3 | Top › Offset plane… | Plane dialog, Offset, Top picked | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.4.4 | Top › Size to Part Studio | plane resizes to the parts | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.4.5 | Top › Hide / Show | plane hides / shows | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.4.6 | Top › Hide other planes | Front, Right hide | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.4.7 | Top › Hide all planes | all planes hide | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.4.8 | Top › Zoom to selection | zooms | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.4.9 | Top › View normal to | view normal to Top | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.4.10 | Top › Show dependencies… | dependencies panel | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.4.11 | Origin › Rename / Hide / Show dependencies… | as above | ❌ Rename / Hide / Show dependencies ✅; "Dependencies of Origin" lists nothing, live lists Sketch 1 when a sketch point is coincident with the origin (request 1663 (b)) | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 
 **8.5 Folder row**
 | # | Item | Expected | Status | Verified |
 |---|---|---|---|---|
-| 8.5.1 | Expand / Collapse | folder opens / closes | – |  |
-| 8.5.2 | Rename | inline field; Esc reverts | – |  |
-| 8.5.3 | Suppress / Unsuppress | its features struck-through / back | – |  |
-| 8.5.4 | Expand all / Collapse all | all folders open / close | – |  |
-| 8.5.5 | Unpack folder | folder removed, features stay | – |  |
+| 8.5.1 | Expand / Collapse | folder opens / closes | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.5.2 | Rename | inline field; Esc reverts | ✅ inline field; Esc reverts; no rename recorded after Esc; T1 an_escaped_folder_rename_records_nothing | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.5.3 | Suppress / Unsuppress | its features struck-through / back | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.5.4 | Expand all / Collapse all | all folders open / close | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.5.5 | Unpack folder | folder removed, features stay | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 
 **8.6 Parts list row (Part 1)**
 | # | Item | Expected | Status | Verified |
 |---|---|---|---|---|
-| 8.6.1 | Rename | inline white field; Esc reverts (**crashed on aa75fdf**, qa5) | – |  |
-| 8.6.2 | Properties… | Properties dialog (Name focused) | – |  |
-| 8.6.3 | Assign material… | material panel | – |  |
-| 8.6.4 | Edit appearance… | appearance editor | – |  |
-| 8.6.5 | Copy here… | Transform dialog, Translate by XYZ, ☑ Copy part | – |  |
-| 8.6.6 | Copy Part 1 | copied (no toast) | – |  |
-| 8.6.7 | Create Drawing of Part 1… | Create Drawing dialog | – |  |
-| 8.6.8 | Export… | Export dialog | – |  |
-| 8.6.9 | Release… | Release dialog | – |  |
-| 8.6.10 | Hide / Show | part hides / shows | – |  |
-| 8.6.11 | Isolate… | Isolate panel | – |  |
-| 8.6.12 | Make transparent… | part translucent | – |  |
-| 8.6.13 | Zoom to selection | zooms | – |  |
-| 8.6.14 | Delete… | Delete part feature (Ctrl+Z restores) | – |  |
+| 8.6.1 | Rename | inline white field; Esc reverts (**crashed on aa75fdf**, qa5) | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.6.2 | Properties… | Properties dialog (Name focused) | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.6.3 | Assign material… | material panel | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.6.4 | Edit appearance… | appearance editor | ◐ opens; live: one Esc cancels it (request 1663 (a)) | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.6.5 | Copy here… | Transform dialog, Translate by XYZ, ☑ Copy part | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.6.6 | Copy Part 1 | copied (no toast) | ✅ copied, no toast (skasm 09714588) | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.6.7 | Create Drawing of Part 1… | Create Drawing dialog | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.6.8 | Export… | Export dialog | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.6.9 | Release… | Release dialog | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.6.10 | Hide / Show | part hides / shows | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.6.11 | Isolate… | Isolate panel | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.6.12 | Make transparent… | part translucent | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.6.13 | Zoom to selection | zooms | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.6.14 | Delete… | Delete part feature (Ctrl+Z restores) | ✅ Delete part 1 dialog; ✓ then Ctrl+Z restores | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 
 **8.7 Parts list section header ("Parts (N)")**
 | # | Item | Expected | Status | Verified |
 |---|---|---|---|---|
-| 8.7.1 | Show / Hide parts list properties | properties columns show / hide | – |  |
-| 8.7.2 | Hide all parts | all parts hide | – |  |
+| 8.7.1 | Show / Hide parts list properties | properties columns show / hide | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.7.2 | Hide all parts | all parts hide | ✅ live's header menu has only "Show parts list properties" too (request 1666); Hide all parts is on a part row's menu | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 
 ## Findings (2026-10-21 run; owner per item)
 

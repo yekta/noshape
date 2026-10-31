@@ -2691,11 +2691,11 @@ impl PartStudioView {
                 // Live (00, 183): white while no panel is open; with one
                 // open the others turn `#eaeaea` and the open one stays white
                 // and joins the panel (no right border).
-                // Dark (live dk-920, dk-929): #333 with no panel, every button
-                // #1c1c1c with one open; the #aaa outline stays.
+                // Dark (live dk-920, dk-929, dk-930): #333 with no panel; with
+                // one open the others #1c1c1c and the open one #333, joining
+                // its panel; the #aaa outline stays.
                 .bg(match (active.is_none(), on) {
-                    (true, _) => pal.panel,
-                    (false, true) => pal.bg_senary,
+                    (true, _) | (false, true) => pal.panel,
                     (false, false) => pal.strip_inactive,
                 })
                 .hover(|d| d.bg(pal.panel_hover))

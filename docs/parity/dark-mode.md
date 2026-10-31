@@ -28,11 +28,11 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-911-documents-row-hover | dkdocs | hover = `--os-hover-primary` #0a4780 (the capture shows no pointer on a row) | ☑ |
 | dk-912-documents-row-selected |  | selected row `accent_soft` #134e96 = live | ☑ |
 | dk-913-create-menu | dkcreate | open Create #769fcc, menu #333 with #d7d7d7 outline; icons are icons2 dark art; "Import from" is cloud | ☑ colours |
-| dk-913b-create-menu-hover | | | ☐ |
+| dk-913b-create-menu-hover | psui-scratch d4c | Create keeps #769fcc while its menu is open and the pointer is in it (os_ui::dropdown_open); back to #1651b0 after Esc / click outside | ☑ psui 10-31 |
 | dk-914-new-document-modal | | | ☐ |
 | dk-915-state | | | ☐ |
 | dk-920-partstudio | dk2/dk3 | viewport #333, planes, cube, navbar, toolbar, rail #2c2c2c, panel #333 = live; toolbar icons = live dk-921 (icons2, re-checked 10-26) | ☑ |
-| dk-921-partstudio | | | ☐ |
+| dk-921-partstudio | psui-scratch d1 | wordmark "noshape" white (was #4a4a4a), tab bar + #ccc | ☑ psui 10-31 |
 | dk-922-feature-hover | | | ☐ |
 | dk-923-feature-selected | | | ☐ |
 | dk-924-feature-rmb | dkrmb2 | menu #333, #ccc outline (static), #ddd separators, Delete ⊗ (masked icons keep their mask) | ☑ |
@@ -41,7 +41,7 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-927-variable-table | dkvt5 | title #90cef1 (emphasis) over #3e94ff, bars and headers #555 (table_header), cells #1c1c1c (bg_senary) | ☑ |
 | dk-928-configurations | dkcfg | Configure Part Studio button, empty state; strip #1c1c1c with #aaa outlines while a panel is open | ☑ |
 | dk-929-face-selected-measure | dk3 | bg, planes 1/2 stacked, plane edges, origin, cube = live within a few levels | ☑ |
-| dk-930-face-hover | | | ☐ |
+| dk-930-face-hover | psui-scratch d2 | right strip with a panel open: the open button #333 joining its panel, the others #1c1c1c (measured 51 / 28) | ☑ psui 10-31 |
 | dk-931-sketch-line | dksk2 | under-defined #3e94ff, sketch box #90cef1, white origin; regions #f2f2f2 at 20% (#616161 on a plane) | ☑ |
 | dk-932-sketch-dimension |  | dimension lines white (scene); edit box follows the palette | ◐ box not compared |
 | dk-933-sketch-after |  | dimension values white, driven #ccc, conflicts #ff6b6b | ☑ |

@@ -551,7 +551,8 @@ impl Workspace {
                             // Onshape: the logo goes to the documents page.
                             .on_click(|_, _, cx| crate::files::show_start_window(cx))
                             .child(crate::assets::icon("noshape-logo", 24., cx))
-                            .child(div().text_size(px(21.)).font_weight(FontWeight::NORMAL).text_color(gpui_kit::rgb(0x4a4a4a)).child("noshape")),
+                            // The wordmark: #4a4a4a, white in dark mode (live dk-921).
+                            .child(div().text_size(px(21.)).font_weight(FontWeight::NORMAL).text_color(crate::theme::themed(0x4a4a4a, 0xffffff)).child("noshape")),
                     )
                     .child(self.render_doc_menu(cx))
                     .child(div().flex_none().pr(px(4.)).py(px(2.)).text_size(px(22.)).font_weight(FontWeight::BOLD).text_color(pal.text).truncate().cursor_text().child(crate::ui::user_text(name)))
@@ -947,7 +948,7 @@ impl Workspace {
         // Render Studio) are not part of noshape.
         // A protected workspace takes no new tabs: "+" greyed, inert (live wp-932).
         let protected = self.doc.read(cx).session.is_protected();
-        let add = cell("add-tab", cx).w(px(34.)).child(crate::ui::glyph("plus", 20., gpui_kit::rgb(if protected { 0xc0c0c0 } else { 0x555555 }))).tooltip("Insert new tab").on_click(move |_, window, cx| {
+        let add = cell("add-tab", cx).w(px(34.)).child(crate::ui::glyph("plus", 20., if protected { gpui_kit::rgb(0xc0c0c0) } else { crate::theme::themed(0x555555, 0xcccccc) })).tooltip("Insert new tab").on_click(move |_, window, cx| {
             if protected {
                 return;
             }

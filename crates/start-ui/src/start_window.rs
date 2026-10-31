@@ -9,6 +9,7 @@ use crate::start_library::{self as lib, DocEntry, Library, ScanInput};
 use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
+use gpui_kit::component::Selectable as _;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use crate::os_menu::{OsContextMenuExt as _, OsMenu, OsMenuItem};
 use crate::os_ui::OsDropdownExt as _;
@@ -1880,8 +1881,12 @@ impl StartView {
         let pal = p();
         let view = cx.entity();
         let labels_nav = self.render_labels_nav(cx);
+        // Its menu open, Create keeps the hover blue (live dk-913b, documents/41).
+        let open = crate::os_ui::dropdown_open("create-dd", cx);
         let create = Button::new("create")
             .primary()
+            // (A custom variant's own fill is a tint; open, it paints its solid `active` colour.)
+            .when(open, |b| b.custom(ButtonCustomVariant::new(cx).color(pal.accent_hover.into()).foreground(gpui_kit::rgb_static(0xffffff).into()).hover(pal.accent_hover.into()).active(pal.accent_hover.into()).shadow(false)).open(true))
             .w(px(150.))
             .h(px(34.))
             .rounded(px(3.))
