@@ -36,7 +36,7 @@ pub fn ops() -> Vec<Op> {
         group: "view",
         verb: "camera",
         summary: "Move the graphics area's camera as the view menus do (zoom to fit / selection / window, zoom in / out, previous view, standard views, view normal to, align vertical, perspective)",
-        description: "The camera of a Part Studio's or Assembly's graphics area, or a drawing's zoom, as the window has it (kept per tab for the session; `get` reads it). 3D tabs: `zoom_fit` (Zoom to fit: the shown parts, sketches, planes and origin; an assembly's instances), `view` (a standard view zoomed to fit; `view`, default isometric), `zoom_selection` (the `refs`, else the window's selection (ui_select): parts, faces, edges, vertices, sketches, planes; an assembly's instances), `zoom_in` / `zoom_out` (Z / Shift+Z: ×1.75 about the centre, within Onshape's limits), `zoom_window` (`box`: two corners in graphics-area pixels), `previous` (Previous view: back one change), `normal_to` (View normal to the first of `refs`: a planar face, plane, sketch or mate connector; in an assembly a planar face {\"instance\", \"entity\"}; again on the same plane turns to its back), `normal_to_sketch` (View normal to sketch plane: `refs` [the sketch]), `align_vertical` (Align view with vertical axis: `refs` [a straight edge]), `perspective` (`on`). Drawings: `zoom_fit` / `zoom_sheet`, `zoom_in` / `zoom_out` (×2 / ×½), `zoom_window`. The graphics area is 1280×800 px until `viewport` sets it. With the app open the window does the same move at its own size. Returns the camera: the viewing direction and up (world), the target point and the visible height (document units), projection; a drawing's zoom (px per mm) and the sheet point at the centre (mm).",
+        description: "The camera of a Part Studio's or Assembly's graphics area, or a drawing's zoom, as the window has it (kept per tab for the session; `get` reads it). 3D tabs: `zoom_fit` (Zoom to fit: the shown parts, sketches, planes and origin; an assembly's instances), `view` (a standard view zoomed to fit; `view`, default isometric), `zoom_selection` (the `refs`, else the window's selection (ui_select): parts, faces, edges, vertices, sketches, planes; an assembly's instances), `zoom_in` / `zoom_out` (Z / Shift+Z: ×1.75 about the centre, within Onshape's limits), `zoom_window` (`box`: two corners in graphics-area pixels), `previous` (Previous view: back one change), `normal_to` (View normal to the first of `refs`: a planar face, plane, sketch or mate connector; in an assembly a planar face {\"instance\", \"entity\"}; again on the same plane turns to its back), `normal_to_sketch` (View normal to sketch plane: `refs` [the sketch]), `align_vertical` (Align view with vertical axis: `refs` [a straight edge]), `perspective` (`on`). Drawings: `zoom_fit` / `zoom_sheet`, `zoom_in` / `zoom_out` (×2 / ×½), `zoom_window`. The graphics area is 1280×800 px until `viewport` sets it. With the app open the window does the same move at its own size. Returns the camera: the viewing direction and up (world), the target point and the visible height (document units), projection, `standard_view` (the standard view, else the view cube face looked at square on: `bottom` after `normal_to` twice on Top); a drawing's zoom (px per mm) and the sheet point at the centre (mm).",
         fields: vec![
             doc_field(),
             opt("tab", s(), "Part Studio, Assembly or Drawing tab, by name or id. Default: the window's tab."),
@@ -266,7 +266,11 @@ fn camera(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 pub(crate) fn camera_json(vc: &ViewCamera, k: f64) -> Value {
     let c = &vc.camera;
     let v3 = |v: DVec3| json!([v.x, v.y, v.z]);
-    let standard = VIEWS.iter().find(|(_, v)| Camera::rotation_for(*v).dot(c.rotation).abs() > 1.0 - 1e-9).map(|v| v.0);
+    // A standard view, else the view cube face looked at square on with
+    // another up (live: the 2nd n in a Top sketch shows "Bottom", mirrored).
+    let standard = VIEWS.iter().find(|(_, v)| Camera::rotation_for(*v).dot(c.rotation).abs() > 1.0 - 1e-9).map(|v| v.0).or_else(|| {
+        VIEWS[1..7].iter().find(|(_, v)| (Camera::rotation_for(*v) * DVec3::NEG_Z).dot(c.forward()) > 1.0 - 1e-9).map(|v| v.0)
+    });
     json!({
         "view_direction": v3(c.forward()),
         "up": v3(c.up()),

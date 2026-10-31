@@ -4578,6 +4578,8 @@ fn view_camera_menus() {
     assert!((num(&n["view_direction"][2]) + 1.0).abs() < 1e-9, "{n}");
     let n = cam(&mut ctx, json!({ "action": "normal_to", "refs": ["plane:top"] }));
     assert!((num(&n["view_direction"][2]) - 1.0).abs() < 1e-9, "{n}");
+    // Live: the back of Top keeps Y up, X to the left; the cube shows Bottom.
+    assert_eq!((n["standard_view"].clone(), n["up"][1].as_f64().map(f64::round)), (json!("bottom"), Some(1.0)), "{n}");
     // Align view with vertical axis: an X edge points up the screen.
     let xedge = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "line" }))["edges"].as_array().unwrap().iter().find(|e| num(&e["direction"][0]).abs() > 0.99).unwrap()["id"].as_str().unwrap().to_string();
     let al = cam(&mut ctx, json!({ "action": "align_vertical", "refs": [xedge] }));
