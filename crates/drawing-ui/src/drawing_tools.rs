@@ -427,6 +427,7 @@ impl DrawingEditor {
         if let (Tool::AlignedSection { .. }, Some(d)) = (&self.tool, &self.aligned_dlg) {
             v.flip = d.flip;
             v.cut_only = d.cut_only;
+            v.exclude_from_cut = d.exclude.clone();
         }
         Some(v)
     }
@@ -1047,6 +1048,9 @@ impl DrawingEditor {
             return;
         }
         if e.button == MouseButton::Left && self.aligned_dlg.as_ref().is_some_and(|d| d.repick.is_some()) && self.aligned_repick_click(cx) {
+            return;
+        }
+        if e.button == MouseButton::Left && self.aligned_dlg.as_ref().is_some_and(|d| d.picking) && self.aligned_exclude_click(cx) {
             return;
         }
         if e.button == MouseButton::Left && e.click_count >= 2 && matches!(self.tool, Tool::Select) {

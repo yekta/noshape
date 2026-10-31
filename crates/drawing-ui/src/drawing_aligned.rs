@@ -27,6 +27,10 @@ pub struct AlignedDlg {
     /// query row clicked).
     pub points: Option<([f64; 2], [f64; 2], [f64; 2])>,
     pub repick: Option<usize>,
+    /// Exclude from cut (assembly views): parts left whole; `picking`: its
+    /// field takes clicks on parts.
+    pub exclude: Vec<noshape_model::BodyId>,
+    pub picking: bool,
 }
 
 impl DrawingEditor {
@@ -37,10 +41,10 @@ impl DrawingEditor {
             && let Some(v) = self.current_sheet().view(view)
             && let ViewKind::AlignedSection { label, center, a, b, .. } = &v.kind
         {
-            let (label, cut_only, flip, points) = (label.clone(), v.cut_only, v.flip, (*center, *a, *b));
+            let (label, cut_only, flip, points, exclude) = (label.clone(), v.cut_only, v.flip, (*center, *a, *b), v.exclude_from_cut.clone());
             let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(label));
             self.tool = Tool::Select;
-            self.aligned_dlg = Some(AlignedDlg { label: st, cut_only, flip, edit: Some(view), points: Some(points), repick: None });
+            self.aligned_dlg = Some(AlignedDlg { label: st, cut_only, flip, edit: Some(view), points: Some(points), repick: None, exclude, picking: false });
             return;
         }
         let active = matches!(self.tool, Tool::AlignedSection { .. });
@@ -49,7 +53,7 @@ impl DrawingEditor {
             (None, true) => {
                 let next = self.current_sheet().next_label();
                 let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(next));
-                self.aligned_dlg = Some(AlignedDlg { label: st, cut_only: false, flip: false, edit: None, points: None, repick: None });
+                self.aligned_dlg = Some(AlignedDlg { label: st, cut_only: false, flip: false, edit: None, points: None, repick: None, exclude: Vec::new(), picking: false });
             }
             (Some(_), false) if !editing => self.aligned_dlg = None,
             _ => {}
@@ -86,6 +90,27 @@ impl DrawingEditor {
         true
     }
 
+    /// Exclude from cut taking picks: a click on a part toggles it. True
+    /// when used.
+    pub fn aligned_exclude_click(&mut self, cx: &mut Context<Self>) -> bool {
+        if !self.aligned_dlg.as_ref().is_some_and(|d| d.picking) {
+            return false;
+        }
+        if let Some(body) = self.edge_body_at(self.cursor)
+            && let Some(d) = &mut self.aligned_dlg
+        {
+            match d.exclude.iter().position(|b| *b == body) {
+                Some(i) => {
+                    d.exclude.remove(i);
+                }
+                None => d.exclude.push(body),
+            }
+        }
+        self.update_preview(cx);
+        cx.notify();
+        true
+    }
+
     /// Edit aligned section... (the cutting line's and the view's menus).
     pub fn open_aligned_edit(&mut self, view: ViewId, cx: &mut Context<Self>) {
         self.aligned_edit_request = Some(view);
@@ -102,6 +127,7 @@ impl DrawingEditor {
     /// ✓: an edit applies; a new view is placed where its preview is.
     fn aligned_ok(&mut self, cx: &mut Context<Self>) {
         let Some((label, cut_only, flip)) = self.aligned_values(cx) else { return };
+        let exclude = self.aligned_dlg.as_ref().map(|d| d.exclude.clone()).unwrap_or_default();
         if let Some(view) = self.aligned_dlg.as_ref().and_then(|d| d.edit) {
             let points = self.aligned_dlg.as_ref().and_then(|d| d.points);
             self.aligned_dlg = None;
@@ -117,6 +143,7 @@ impl DrawingEditor {
                 }
                 v.cut_only = cut_only;
                 v.flip = flip;
+                v.exclude_from_cut = exclude;
             });
             return;
         }
@@ -136,6 +163,9 @@ impl DrawingEditor {
             }
             v.cut_only = cut_only;
             v.flip = flip;
+        }
+        if let Some(d) = &self.aligned_dlg {
+            v.exclude_from_cut = d.exclude.clone();
         }
         let id = v.id;
         self.edit_sheet("Aligned section view", cx, |s| s.views.push(v));
@@ -185,6 +215,13 @@ impl DrawingEditor {
                 .into_any_element()
         };
         let (check_on, flipped) = (d.cut_only, d.flip);
+        // Exclude from cut: assembly views only (as Section view's).
+        let parent = match &self.tool {
+            Tool::AlignedSection { parent, .. } => *parent,
+            _ => d.edit.and_then(|v| self.current_sheet().parent_of(v)),
+        };
+        let assembly = parent.and_then(|p| noshape_model::drawing::views::view_source(self.current_sheet(), p)).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly);
+        let (n_excl, picking) = (d.exclude.len(), d.picking);
         Some(
             v_flex()
                 .id("dr-aligned-dlg")
@@ -268,6 +305,30 @@ impl DrawingEditor {
                                 ),
                         )
                         .child(query("da-revolved", "Revolved plane location", 2, cx))
+                        .when(assembly, |e| {
+                            e.child(div().px(px(4.)).pt(px(4.)).text_size(px(11.)).text_color(caption).child("Exclude from cut")).child(
+                                div()
+                                    .id("da-exclude")
+                                    .mx(px(4.))
+                                    .my(px(3.))
+                                    .h(px(24.))
+                                    .px(px(6.))
+                                    .flex()
+                                    .items_center()
+                                    .text_size(px(12.))
+                                    .border_1()
+                                    .border_color(if picking { pal.accent } else { gpui_kit::rgb(0xd3d7d9) })
+                                    .when(picking, |d| d.bg(gpui_kit::rgb(0xe8f1fb)))
+                                    .cursor_pointer()
+                                    .child(if n_excl == 0 { "Select parts".to_string() } else { format!("{n_excl} part{}", if n_excl == 1 { "" } else { "s" }) })
+                                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                        if let Some(d) = &mut this.aligned_dlg {
+                                            d.picking = !d.picking;
+                                        }
+                                        cx.notify();
+                                    })),
+                            )
+                        })
                         .child(
                             div().h(px(30.)).px(px(4.)).flex().items_center().child(
                                 crate::drawing_chrome::DrCheckbox::new("da-cut-only").native().label("Show cut geometry only").checked(check_on).on_click(cx.listener(|this, v: &bool, _, cx| {
