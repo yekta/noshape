@@ -975,6 +975,7 @@ impl DrawingEditor {
                     overlay.points.push(s);
                 }
             }
+            // The hole table itself follows the pointer (`hole_table_preview`).
             Tool::Table { kind: TableTool::Hole, origin: Some(o), .. } => {
                 if let Some(s) = self.pick_sheet(o) {
                     overlay.points.push(s);

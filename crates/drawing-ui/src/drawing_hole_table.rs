@@ -101,6 +101,19 @@ impl DrawingEditor {
         table.corner = d.corner;
     }
 
+    /// The hole table being placed, at the pointer (live 1985: the table,
+    /// the view's tags and the origin arrows follow it before the click).
+    pub fn hole_table_preview(&self) -> Option<noshape_model::drawing::Table> {
+        let Tool::Table { kind: TableTool::Hole, view: Some(v), origin: Some(o) } = &self.tool else { return None };
+        if self.hole_dlg.as_ref().is_some_and(|d| d.picking || d.x_picking) {
+            return None;
+        }
+        let id = self.current_sheet().next_table_id();
+        let (mut t, _) = noshape_scene::drawing_tools::view_table(id, TableTool::Hole, *v, Some(o.clone()), self.cursor);
+        self.apply_hole_table_dlg(&mut t);
+        Some(t)
+    }
+
     /// A click while X direction takes a pick: a straight edge of the
     /// table's view sets the table's X axis along it (live 1985). True when
     /// used.
