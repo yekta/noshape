@@ -2019,6 +2019,9 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
         // The process's resident memory, sampled while the knurl regenerates.
         let rss = || std::fs::read_to_string("/proc/self/statm").ok().and_then(|s| s.split_whitespace().nth(1)?.parse::<u64>().ok()).map_or(0, |p| p * 4096);
         let start = rss();
+        // (NOSHAPE_FS_PROFILE=1: the knurl's slowest FeatureScript lines too.)
+        let fs_profile = std::env::var_os("NOSHAPE_FS_PROFILE").is_some();
+        custom::run::set_profiling(fs_profile);
         let done = std::sync::atomic::AtomicBool::new(false);
         let t = std::time::Instant::now();
         let (r, peak) = std::thread::scope(|s| {
@@ -2036,6 +2039,13 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
         });
         let took = t.elapsed().as_secs_f64();
         assert_ok(&r);
+        if fs_profile && let Some(o) = custom::run::output_of(ps.features[1].id) {
+            let mut lines = o.line_times.clone();
+            lines.sort_by_key(|l| std::cmp::Reverse(l.2));
+            for (m, l, d) in lines.iter().take(40) {
+                eprintln!("  {d:>10.2?} {m}:{l}");
+            }
+        }
         let b = &r.context.bodies[0];
         let (v, faces) = (b.shape.volume().unwrap() * 1e9, b.shape.count(noshape_kernel::ShapeType::Face));
         let growth = peak.saturating_sub(start) as f64 / (1u64 << 30) as f64;
