@@ -464,7 +464,15 @@ fn rust_blends_on_oblique_caps_are_occts() {
             assert!(ours.shape.is_valid(), "{what} {spec}: invalid");
             let (a, b) = (bool_corpus::Summary::of(&ours), bool_corpus::Summary::of(&occt));
             assert_eq!((a.faces, a.edges, a.vertices), (b.faces, b.edges, b.vertices), "{what} {spec}");
-            assert!((a.volume - b.volume).abs() <= 1e-9 * b.volume, "{what} {spec}: {} vs {}", a.volume, b.volume);
+            assert!((a.volume - b.volume).abs() <= 1e-7 * b.volume, "{what} {spec}: {} vs {}", a.volume, b.volume);
+            if what == "top edges to a chamfer" && spec == "fillet" {
+                // Exact: the strips' section area times their centroid lines, from the square caps to the chamfer
+                // plane x - y = 34 (OCCT's is 8e-5 mm³ off).
+                let (r, pi) = (2.0f64, std::f64::consts::PI);
+                let (area, inset) = (r * r * (1.0 - pi / 4.0), r * (5.0 / 6.0 - pi / 4.0) / (1.0 - pi / 4.0));
+                let exact = 40.0 * 20.0 * 10.0 - 0.5 * 36.0 * 10.0 - area * ((34.0 + inset) + (20.0 - (6.0 - inset)));
+                assert!((a.volume - exact).abs() <= 1e-9 * exact, "{what} {spec}: {} vs exact {exact}", a.volume);
+            }
         }
     }
 }
