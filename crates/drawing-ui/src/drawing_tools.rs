@@ -657,7 +657,7 @@ impl DrawingEditor {
                 s.annotations.push(a);
             }
             preview = Some(d);
-        } else if let Some(t) = self.hole_table_preview() {
+        } else if let Some(t) = self.hole_table_preview().or_else(|| self.table_dlg_preview()) {
             let mut d = self.drawing.clone();
             if let Some(s) = d.sheets.get_mut(self.sheet) {
                 s.tables.push(t);

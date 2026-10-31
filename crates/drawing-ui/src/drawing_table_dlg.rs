@@ -247,24 +247,35 @@ impl DrawingEditor {
     }
 
     /// A click with the dialog open: place the table there. True when used.
-    pub fn table_dlg_click(&mut self, cx: &mut Context<Self>) -> bool {
-        let Some(d) = &self.table_dlg else { return false };
-        if d.table.is_some() {
-            return false;
-        }
-        let Some(view) = d.view else { return true };
-        let c = self.cursor;
+    /// The BOM or cut list table the dialog would place at sheet point `at`
+    /// (inserting, a source chosen), and its edit's name.
+    fn table_dlg_table(&self, at: [f64; 2]) -> Option<(noshape_model::drawing::Table, &'static str)> {
+        let d = self.table_dlg.as_ref().filter(|d| d.table.is_none())?;
+        let view = d.view?;
         let id = self.current_sheet().next_table_id();
         let (kind, name) = match d.kind {
             TableTool::Bom => (TableKind::Bom { view, structured: d.structured, bottom_to_top: d.bottom_to_top, overrides: Vec::new(), default_template: d.default_template }, "BOM table"),
             _ => (TableKind::CutList { view, bottom_to_top: d.bottom_to_top, config: None }, "Cut list table"),
         };
-        let corner = d.corner;
-        self.edit_sheet(name, cx, |s| {
-            let mut t = noshape_model::drawing::Table::new(id, kind, c);
-            t.corner = corner;
-            s.tables.push(t);
-        });
+        let mut t = noshape_model::drawing::Table::new(id, kind, at);
+        t.corner = d.corner;
+        Some((t, name))
+    }
+
+    /// The BOM / cut list table being placed, at the pointer (as the hole
+    /// table's).
+    pub fn table_dlg_preview(&self) -> Option<noshape_model::drawing::Table> {
+        self.table_dlg_table(self.cursor).map(|(t, _)| t)
+    }
+
+    pub fn table_dlg_click(&mut self, cx: &mut Context<Self>) -> bool {
+        let Some(d) = &self.table_dlg else { return false };
+        if d.table.is_some() {
+            return false;
+        }
+        let Some((t, name)) = self.table_dlg_table(self.cursor) else { return true };
+        let id = t.id;
+        self.edit_sheet(name, cx, |s| s.tables.push(t));
         self.table_dlg = None;
         self.tool = Tool::Select;
         self.selection = vec![Sel::Table(id)];

@@ -987,6 +987,9 @@ impl DrawingEditor {
                 }
             }
             Tool::Table { kind: TableTool::General, .. } => {}
+            // BOM and cut list tables with a source follow the pointer
+            // themselves (`table_dlg_preview`).
+            Tool::Table { kind: TableTool::Bom | TableTool::CutList, .. } if self.table_dlg_preview().is_some() => {}
             Tool::Table { kind, view, .. } if matches!(kind, TableTool::Revision | TableTool::Bom | TableTool::CutList) || view.is_some() => {
                 overlay.rect([self.cursor[0] - 90.0, self.cursor[1] - 20.0], self.cursor, true);
             }
