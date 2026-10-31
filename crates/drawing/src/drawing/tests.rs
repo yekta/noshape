@@ -1117,7 +1117,7 @@ fn grouped_ordinate_dimensions() {
         }
     }
     let id = drawing.sheets[0].next_annotation_id();
-    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::OrdinateGroup { view: ViewId(2), origin, points: pts.clone(), horizontal: true, shifts: Vec::new() }, position: [100.0, 262.0], refs, ..Default::default() });
+    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::OrdinateGroup { view: ViewId(2), origin, points: pts.clone(), horizontal: true, shifts: Vec::new(), knees: Vec::new() }, position: [100.0, 262.0], refs, ..Default::default() });
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     assert!(built.dangling.is_empty(), "{:?}", built.dangling);
     let pick = pick_of(&built, PickTarget::Annotation(id));
@@ -1151,6 +1151,19 @@ fn grouped_ordinate_dimensions() {
     let mut pos = vec![0.0, 18.0, 20.0];
     sheet::ordinate_push_apart(&mut pos, &[0.0, 8.0, 0.0], 5.0);
     assert_eq!(pos, vec![0.0, 18.0, 23.0]);
+    // The jogged value's knee has a round grip; moving it (live 1662) moves
+    // the bend along the extension line, the value staying.
+    let knee = |b: &super::build::BuiltSheet| b.geometry.lines.iter().find(|l| l.pick == pick && l.points.len() == 4).unwrap().points[1];
+    let grip = after.geometry.grips.iter().find(|g| g.pick == pick && g.kind == sheet::GripKind::Jog).expect("knee grip").pos;
+    let k0 = knee(&after);
+    assert!((grip[0] - k0[0]).abs() < 1e-9 && (grip[1] - k0[1]).abs() < 1e-9);
+    if let AnnotationKind::OrdinateGroup { knees, .. } = &mut drawing.sheets[0].annotations.last_mut().unwrap().kind {
+        *knees = vec![sheet::ORDINATE_KNEE - 2.0; 4];
+    }
+    let moved = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let k1 = knee(&moved);
+    assert!((k1[0] - k0[0]).abs() < 1e-9 && ((k1[1] - k0[1]).abs() - 2.0).abs() < 1e-9, "{k0:?} -> {k1:?}");
+    assert!((x50(&moved) - x50(&after)).abs() < 1e-9);
 }
 
 #[test]
@@ -1871,7 +1884,7 @@ fn ordinate_group_with_a_lost_point_is_red_as_a_whole() {
     let id = drawing.sheets[0].next_annotation_id();
     drawing.sheets[0].annotations.push(Annotation {
         id,
-        kind: AnnotationKind::OrdinateGroup { view, origin: snaps[0].p, points: vec![snaps[0].p, snaps[1].p, snaps[2].p], horizontal: true, shifts: Vec::new() },
+        kind: AnnotationKind::OrdinateGroup { view, origin: snaps[0].p, points: vec![snaps[0].p, snaps[1].p, snaps[2].p], horizontal: true, shifts: Vec::new(), knees: Vec::new() },
         position: [100.0, 100.0],
         refs: vec![AnnotationRef { slot: 0, point: snaps[0].point.clone().unwrap() }, AnnotationRef { slot: 1, point: snaps[0].point.clone().unwrap() }, AnnotationRef { slot: 2, point: snaps[1].point.clone().unwrap() }, AnnotationRef { slot: 3, point: lost }],
         ..Default::default()

@@ -1009,6 +1009,11 @@ pub enum AnnotationKind {
         /// point): its extension line jogs over to it (live request 1603).
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         shifts: Vec<f64>,
+        /// A jogged value's knee (its round grip; live request 1662): how
+        /// far before the value row the extension line bends (sheet mm, per
+        /// point; 0 / missing: `sheet::ORDINATE_KNEE`).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        knees: Vec<f64>,
     },
     /// Maximum / minimum (arc condition) dimension between `a` and `b`
     /// (view coordinates). An end with a radius (`ra` / `rb` > 0) is a

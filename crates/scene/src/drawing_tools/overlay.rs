@@ -8,8 +8,12 @@ use noshape_render::{LineData, LineSegment, PointData, PointSprite};
 pub struct Overlay {
     pub lines: Vec<(Vec<[f64; 2]>, bool)>,
     pub points: Vec<[f64; 2]>,
-    /// Placement inference lines (Onshape: thin red dashed lines).
+    /// Placement inference lines (live request 1662: light magenta
+    /// rgb(255,198,255), 2 px, dotted, running across the whole canvas).
     pub infer: Vec<([f64; 2], [f64; 2])>,
+    /// Red ✕ marks (centre, half size mm): the pointer on an inference
+    /// line (live request 1662: 10 × 10 px, rgb(255,0,0)).
+    pub crosses: Vec<([f64; 2], f64)>,
     /// Snap point markers (Onshape: orange square = endpoint, triangle =
     /// midpoint, diamond = quadrant, circle = center): (point, kind, size mm).
     pub marks: Vec<([f64; 2], SnapMark, f64)>,
@@ -44,7 +48,7 @@ impl SnapMark {
 
 impl Overlay {
     pub fn is_empty(&self) -> bool {
-        self.lines.is_empty() && self.points.is_empty() && self.infer.is_empty() && self.marks.is_empty() && self.tinted.is_empty() && self.dots.is_empty()
+        self.lines.is_empty() && self.points.is_empty() && self.infer.is_empty() && self.crosses.is_empty() && self.marks.is_empty() && self.tinted.is_empty() && self.dots.is_empty()
     }
     pub fn circle(&mut self, c: [f64; 2], r: f64, dashed: bool) {
         let pts = (0..=72).map(|i| {
@@ -77,7 +81,21 @@ impl Overlay {
             }
         }
         for (a, b) in &self.infer {
-            l.segments.push(LineSegment { a: [a[0] as f32, a[1] as f32, 0.5], b: [b[0] as f32, b[1] as f32, 0.5], color: [230, 40, 40, 255], pick_id: 0, width: 1.0, style: LineSegment::ON_TOP | LineSegment::DASHED });
+            // Across the canvas: 10 m past both ends.
+            let d = [b[0] - a[0], b[1] - a[1]];
+            let len = d[0].hypot(d[1]);
+            let (a, b) = if len > 1e-9 {
+                let k = 1.0e4 / len;
+                ([a[0] - d[0] * k, a[1] - d[1] * k], [b[0] + d[0] * k, b[1] + d[1] * k])
+            } else {
+                (*a, *b)
+            };
+            l.segments.push(LineSegment { a: [a[0] as f32, a[1] as f32, 0.5], b: [b[0] as f32, b[1] as f32, 0.5], color: [255, 198, 255, 255], pick_id: 0, width: 2.0, style: LineSegment::ON_TOP | LineSegment::DASHED });
+        }
+        for &(c, h) in &self.crosses {
+            for (p, q) in [([c[0] - h, c[1] - h], [c[0] + h, c[1] + h]), ([c[0] - h, c[1] + h], [c[0] + h, c[1] - h])] {
+                l.segments.push(LineSegment { a: [p[0] as f32, p[1] as f32, 0.5], b: [q[0] as f32, q[1] as f32, 0.5], color: [255, 0, 0, 255], pick_id: 0, width: 1.5, style: LineSegment::ON_TOP });
+            }
         }
         const ORANGE: [u8; 4] = [255, 140, 0, 255];
         for &(c, kind, s) in &self.marks {

@@ -149,16 +149,33 @@ impl DrawingEditor {
         if let Some(Sel::Annotation(a)) = self.hover.and_then(|h| self.sel_of_pick(h)) {
             anns.push(a);
         }
-        if anns.is_empty() && self.table_row_highlight().is_empty() {
+        let (row_callouts, row_geometry) = self.table_row_highlight();
+        if anns.is_empty() && row_callouts.is_empty() && row_geometry.is_empty() {
             return;
         }
         let mut edges: Vec<u32> = anns.iter().flat_map(|a| self.reference_edge_picks(*a)).collect();
         let touches: Vec<(Vec<u32>, Vec<[f64; 2]>)> = anns.iter().map(|a| self.leader_touches(*a)).collect();
         edges.extend(touches.iter().flat_map(|(e, _)| e.iter().copied()));
         // A hovered BOM row's callouts (live drawing/421: blue).
-        edges.extend(self.table_row_highlight());
+        edges.extend(row_callouts);
         edges.sort_unstable();
         edges.dedup();
+        // ... and its part's edges in the views tan (live drawing/421; a cut
+        // list row's members, live 1647; a hole table row's circles).
+        if !row_geometry.is_empty() {
+            const TAN: [u8; 4] = [0xcc, 0xb2, 0x92, 255];
+            let mut lines = LineData::default();
+            for l in b.geometry.lines.iter().filter(|l| row_geometry.contains(&l.pick)) {
+                let width = drawing_scene::px_width(l.style, self.zoom).max(2.0);
+                for w in l.points.windows(2) {
+                    lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: TAN, pick_id: 0, width, style: LineSegment::ON_TOP });
+                }
+            }
+            if !lines.segments.is_empty() {
+                let up = self.gpu.uploader();
+                scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
+            }
+        }
         if !edges.is_empty() {
             let mut lines = LineData::default();
             for l in b.geometry.lines.iter().filter(|l| edges.contains(&l.pick)) {

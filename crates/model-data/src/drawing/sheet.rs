@@ -1999,7 +1999,7 @@ impl SheetGeometry {
                     let t = env.text(a, radius * sweep.abs(), false, "⌒");
                     self.dim_label([c[0] + (rr + 4.0) * tm.cos(), c[1] + (rr + 4.0) * tm.sin()], 0.0, 0.5, true, &t, dh, pick);
                 }
-                AnnotationKind::OrdinateGroup { view, origin, points, horizontal, shifts } => {
+                AnnotationKind::OrdinateGroup { view, origin, points, horizontal, shifts, knees } => {
                     for p in std::iter::once(origin).chain(points.iter()) {
                         self.grips.push(Grip { pick, pos: env.to_sheet(*view, *p), kind: GripKind::Origin });
                     }
@@ -2038,10 +2038,13 @@ impl SheetGeometry {
                         let pts = if (s1 - s0).abs() < 1e-6 {
                             vec![at(s0, l0), at(s0, level)]
                         } else {
-                            // Jog: straight, slanted over to the text, straight again.
-                            let k1 = level - sg * 6.0;
+                            // Jog: straight, slanted over to the text, straight
+                            // again; the knee's round grip moves the bend along
+                            // the extension line (live request 1662).
+                            let k1 = level - sg * knees.get(i).copied().filter(|k| *k > 0.0).unwrap_or(ORDINATE_KNEE);
                             let k2 = level - sg * 3.0;
                             let k1 = if (k1 - l0) * sg < 0.0 { l0 } else { k1 };
+                            self.grips.push(Grip { pick, pos: at(s0, k1), kind: GripKind::Jog });
                             vec![at(s0, l0), at(s0, k1), at(s1, k2), at(s1, level)]
                         };
                         self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
@@ -2941,6 +2944,10 @@ fn crossing(a: [[f64; 2]; 2], b: [[f64; 2]; 2]) -> Option<[f64; 2]> {
 
 /// Text positions (along the measured axis) of ordinate values at `along`,
 /// at least `gap` apart: overlapping runs are spread around their mean.
+/// How far before an ordinate group's value row a jogged extension line
+/// bends by default (sheet mm); the slant ends 3 mm before the row.
+pub const ORDINATE_KNEE: f64 = 6.0;
+
 /// Ordinate values pushed apart from the ones dragged sideways (`shifts`
 /// non-zero): going outward from each, a value closer than `gap` to the
 /// previous one moves on to `gap` (live request 1603: the neighbour a dragged

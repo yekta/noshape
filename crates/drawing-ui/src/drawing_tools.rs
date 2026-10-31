@@ -639,6 +639,10 @@ impl DrawingEditor {
             preview = Some(d);
         }
         overlay.infer.extend(self.infer_lines.iter().cloned());
+        // The pointer on an inference line: a red ✕ (live request 1662).
+        if !self.infer_lines.is_empty() {
+            overlay.crosses.push((self.cursor, self.tol_mm(5.0)));
+        }
         for (c, r) in self.centermark_overlay() {
             overlay.circle(c, r, false);
         }
@@ -1255,7 +1259,7 @@ impl DrawingEditor {
                     // Placing a dimension or annotation: align with the others
                     // (Shift turns inferencing off).
                     self.infer_lines.clear();
-                    if !e.modifiers.shift && self.pending_annotation().is_some() {
+                    if !e.modifiers.shift && (self.pending_annotation().is_some() || self.placing_note()) {
                         self.infer_placement(None);
                     } else if !e.modifiers.shift && self.placing_table() {
                         self.infer_table_placement();
@@ -1324,6 +1328,13 @@ impl DrawingEditor {
     /// other dimensions and annotations nearby and of the views' vertices
     /// and circle centers (help D23: lines near other entities), shown as
     /// red dashed lines.
+    /// The Note tool with its "NOTE" preview at the pointer (no leader
+    /// pending, no note being typed): it infers placement too (live request
+    /// 1662).
+    fn placing_note(&self) -> bool {
+        matches!(self.tool, Tool::Note) && self.note_leader.is_none() && !matches!(self.panel, Some(Panel::Note { .. }))
+    }
+
     pub fn infer_placement(&mut self, skip: Option<u64>) {
         let tol = self.tol_mm(6.0);
         let c = self.cursor;
@@ -1365,7 +1376,7 @@ impl DrawingEditor {
         }
         // Placement inference also applies to the click that places.
         self.infer_lines.clear();
-        if e.button == MouseButton::Left && !e.modifiers.shift && matches!(self.drag, Drag::Pending { .. }) && !matches!(self.tool, Tool::Select) && self.pending_annotation().is_some() {
+        if e.button == MouseButton::Left && !e.modifiers.shift && matches!(self.drag, Drag::Pending { .. }) && !matches!(self.tool, Tool::Select) && (self.pending_annotation().is_some() || self.placing_note()) {
             self.infer_placement(None);
             self.infer_lines.clear();
         } else if e.button == MouseButton::Left && !e.modifiers.shift && matches!(self.drag, Drag::Pending { .. }) && self.placing_table() {

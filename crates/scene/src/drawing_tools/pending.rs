@@ -201,7 +201,7 @@ impl SheetPick<'_> {
                 let n = self.ordinate_normal(o.view, horizontal);
                 let pos = add2(os, mul(n, dot(sub(c, os), n)));
                 // A new ordinate group holding the datum's own "0".
-                Some(Annotation { id, kind: AnnotationKind::OrdinateGroup { view: o.view, origin: o.p, points: vec![o.p], horizontal, shifts: Vec::new() }, position: pos, refs: refs(vec![(0, o.r.clone()), (1, o.r.clone())]), ..Default::default() })
+                Some(Annotation { id, kind: AnnotationKind::OrdinateGroup { view: o.view, origin: o.p, points: vec![o.p], horizontal, shifts: Vec::new(), knees: Vec::new() }, position: pos, refs: refs(vec![(0, o.r.clone()), (1, o.r.clone())]), ..Default::default() })
             }
             Tool::Ordinate { origin: Some(o), horizontal: Some(_), group: Some(gid), .. } => {
                 // The group with the point under the cursor added.

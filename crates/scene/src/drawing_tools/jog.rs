@@ -377,6 +377,44 @@ impl SheetPick<'_> {
             .map(|(i, _)| (i, u))
     }
 
+    /// A jogged ordinate value whose knee (round grip) is at sheet point
+    /// `s`: its index, the extension line's direction on the sheet and the
+    /// side the values sit on (live request 1662).
+    #[allow(clippy::too_many_arguments)]
+    fn ordinate_knee_at(&self, view: noshape_model::drawing::ViewId, points: &[[f64; 2]], horizontal: bool, shifts: &[f64], knees: &[f64], position: [f64; 2], s: [f64; 2]) -> Option<(usize, [f64; 2], f64)> {
+        use noshape_model::drawing::sheet::{ORDINATE_KNEE, ordinate_push_apart, ordinate_text_positions};
+        let pl = self.placement(view)?;
+        let rot = noshape_model::drawing::views::view_rotation(self.current_sheet(), view);
+        let u = noshape_model::drawing::views::rotate2(if horizontal { [1.0, 0.0] } else { [0.0, 1.0] }, rot);
+        let n = noshape_model::drawing::views::rotate2(if horizontal { [0.0, 1.0] } else { [1.0, 0.0] }, rot);
+        let dh = self.drawing.props.dim_text_height;
+        let pts: Vec<[f64; 2]> = points.iter().map(|p| pl.to_sheet(*p)).collect();
+        if pts.is_empty() {
+            return None;
+        }
+        let level = dot(position, n);
+        let mean = pts.iter().map(|p| dot(*p, n)).sum::<f64>() / pts.len() as f64;
+        let sg = if level >= mean { 1.0 } else { -1.0 };
+        let along: Vec<f64> = pts.iter().map(|p| dot(*p, u)).collect();
+        let mut at = ordinate_text_positions(&along, dh + 1.5);
+        for (t, sh) in at.iter_mut().zip(shifts.iter()) {
+            *t += sh;
+        }
+        ordinate_push_apart(&mut at, shifts, dh + 1.5);
+        (0..pts.len())
+            .filter(|&i| (at[i] - along[i]).abs() >= 1e-6)
+            .map(|i| {
+                let l0 = dot(pts[i], n) + sg;
+                let k = level - sg * knees.get(i).copied().filter(|k| *k > 0.0).unwrap_or(ORDINATE_KNEE);
+                let k = if (k - l0) * sg < 0.0 { l0 } else { k };
+                let p = [u[0] * along[i] + n[0] * k, u[1] * along[i] + n[1] * k];
+                (i, (p[0] - s[0]).hypot(p[1] - s[1]))
+            })
+            .filter(|(_, d)| *d < 1.5)
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(i, _)| (i, n, sg))
+    }
+
     pub fn dragged_annotation(&self, orig: &Annotation, start: [f64; 2]) -> Annotation {
         let c = self.cursor;
         let d = sub(c, start);
@@ -465,6 +503,15 @@ impl SheetPick<'_> {
                     *pb = pl.to_view(add2(pl.to_sheet(*pb), d));
                 }
             }
+            // A jogged value's knee grip slides along its extension line
+            // only: the bend height, the value staying put (live request
+            // 1662).
+            AnnotationKind::OrdinateGroup { view, points, horizontal, shifts, knees, .. } if self.ordinate_knee_at(*view, points, *horizontal, shifts, knees, orig.position, start).is_some() => {
+                let (i, n, sg) = self.ordinate_knee_at(*view, points, *horizontal, shifts, knees, orig.position, start).expect("checked");
+                knees.resize(points.len(), 0.0);
+                let cur = if knees[i] > 0.0 { knees[i] } else { noshape_model::drawing::sheet::ORDINATE_KNEE };
+                knees[i] = (cur - sg * dot(d, n)).max(3.5);
+            }
             // A value under the pointer moves sideways alone, its extension
             // line jogging over to it (live request 1603); elsewhere the
             // group moves.
@@ -524,7 +571,10 @@ impl SheetPick<'_> {
                 }
                 (AnnotationKind::RevisionCallout { anchor, .. }, AnnotationKind::RevisionCallout { anchor: n, .. }) => *anchor = *n,
                 (AnnotationKind::MaxMinDimension { offset, .. }, AnnotationKind::MaxMinDimension { offset: o, .. }) => *offset = *o,
-                (AnnotationKind::OrdinateGroup { shifts, .. }, AnnotationKind::OrdinateGroup { shifts: s, .. }) => shifts.clone_from(s),
+                (AnnotationKind::OrdinateGroup { shifts, knees, .. }, AnnotationKind::OrdinateGroup { shifts: s, knees: k, .. }) => {
+                    shifts.clone_from(s);
+                    knees.clone_from(k);
+                }
                 (AnnotationKind::ArcLengthDimension { mid, offset, .. }, AnnotationKind::ArcLengthDimension { mid: m, offset: o, .. }) => {
                     *mid = *m;
                     *offset = *o;

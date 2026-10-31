@@ -186,7 +186,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   Cut list feature makes "Composite part 1" (ours none; the reference row falls back to "Cut list").
   TB15 / TB27 / A24 app-checked on a frame drawing (/root/dx-scratch/w3/frm.noshape, built by CLI).
 - Then TB28 (cut list table › Change configuration..., live 1638 (b); w3/frmc.noshape: a frame on a #L-configured
-  rectangle). Asked live 08:41 D13 / V56 / V55, 09:01 C11 / D9 (inference colours, the jog grip drag).
+  rectangle). Live 1649 / 1662 answered: D9 knee grip, C11 inference colours + ✕ (done); TB15 row hover tan;
+  D13 needs no guide line (ISO inline radial still open); V56 part intersections draw nothing in live (toggle
+  only); V55 shaded section / detail (cut face shaded, hatch on top) open.
 - Open in my rows: V57 assembly Show sketches (assembly sources skip sketch wires), V35 (d) sections of broken views,
   D40 hatch / title red, C11 inference points, D9 ordinate jogs.
 
