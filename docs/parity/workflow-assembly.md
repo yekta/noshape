@@ -18,7 +18,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | 1.1 | + › Import… → STEP | file prompt, then the Import dialog | path prompt (no-native-dialog mode), "Import to Onshape" dialog: Import to this document / Combine to a single Part Studio, ☑ Import appearances, ☐ Y axis up, ☐ composite, ☐ join surfaces | ✅ (see kern G38h for live's dialog) | 6acf6b94 (qa 10:30, qa5's mkasm.py doc: + › Import… → path prompt → Import to Onshape dialog (this document / Combine, ☑ appearances, ☐ Y up, ☐ composite, ☐ join)) |
 | 1.2 | Import | Part Studio tab named after the file; the new tabs go right after the open tab (SPECS 10-27, behaviours Import "inserted right after the active tab") | tab "bracket" (Import 1 → Part 1) + folder tab "CAD Imports"; the new tab is placed after Part Studio 1, not at the end | ✅ (= live with Part Studio 1 open) | 6acf6b94 (qa 10:30, qa5's mkasm.py doc: bracket.step (g25-b) → tab "bracket" right after Part Studio 1 + CAD Imports folder) |
 | 1.3 | Assembly, i | "Insert parts and assemblies", Current document › Part Studios, filters, tree with thumbnails, "Inserted: 0", "Undo to remove instances" | same | ✅ | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) |
-| 1.4 | Click Part 1 (empty assembly) | instance at identity, **amber (selected)**, row selected, view zooms to fit it | at identity, but **not amber, row not selected**; the zoom-to-fit crops the plate at the right edge | ✅ (skasm 10-27: amber + row selected; fitted beside the Insert dialog, GUI :103); was ✗ A1 | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) (amber + row selected; zoom-to-fit still crops the plate's right end) |
+| 1.4 | Click Part 1 (empty assembly) | instance at identity, **amber (selected)**, row selected, view zooms to fit it | at identity, but **not amber, row not selected**; the zoom-to-fit crops the plate at the right edge | ✅ (skasm 10-27: amber + row selected; fitted beside the Insert dialog, GUI :103); was ✗ A1 | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) (amber + row selected; zoom-to-fit still crops the plate's right end) → fixed later: A1 ✅ 6acf6b94 (fit, row 169) |
 | 1.5 | Click Part 2, move to graphics, click | follows the cursor amber; drops at the click | same | ✅ | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) |
 | 1.6 | Bracket (Part 1 of "bracket") | "Part 1 <2>": live numbers by name across parts, lowest free number (behaviours "skasm (2026-10-27) instance numbering") | instance named "Part 1 <2>" (`next_instance_name`: by name, lowest free) | ✅ | 6acf6b94 (qa 10:30, qa5's mkasm.py doc: Insert › bracket › Part 1 → "Part 1 <2>") |
 | 1.7 | ✓, F | – | 5 instances | ✅ | 6acf6b94 (qa 10:30, qa5's mkasm.py doc: ✓, F → Instances (5), all in view) |
@@ -30,25 +30,25 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 2.1 | Revolute: shaft bottom edge, hole 1 top edge | connector snaps to the circle centre; 2nd pick jumps the part, **amber preview**, HUD | snaps, jumps, HUD; the moved part is drawn normally (not amber) | ✅ (GUI green 8165fca6, skasm 10-27: the moved part amber while the dialog is open); was ✗ A2 | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) (pin bottom edge → hole top edge, snaps, jumps, HUD) |
-| 2.2 | Dialog ✓ | "Revolute 1" row, **new mates hidden: light grey row, tooltip "… (Hidden)"** | row in normal dark text | ✅ (GUI green 8165fca6, skasm 10-27: the new mate row light grey, "(Hidden)"); was ✗ A3 | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) (row grey, hidden) |
+| 2.2 | Dialog ✓ | "Revolute 1" row, **new mates hidden: light grey row, tooltip "… (Hidden)"** | row in normal dark text | ✅ (GUI green 8165fca6, skasm 10-27: the new mate row light grey, "(Hidden)"); was ✗ A3 | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) (row grey, hidden) → fixed later: A3 ✅ 77870dd4 10-28 |
 | 2.3 | Drag the shaft | rotates about the axis only | stays on the axis | ✅ | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) |
 | 2.4 | Cylindrical: pin bottom edge, hole 2 top edge; drag up | slides + rotates | aligned (2nd connector landed at the hole's bottom edge); drag slides along the axis | ✅ / ? | ff379982 10-28 (asm5 copy: Cylindrical pin top rim ↔ front hole rim, a to stand it up, ✓ (with the pin's Revolute 1 still active both go red = live's both-red; Revolute 1 suppressed → Cylindrical solves); dragging the pin up slides it along the hole axis and it stays lifted; the spin is invisible on a plain cylinder) |
-| 2.5 | Slider: block top face → plate top face; HUD flip primary axis | flip turns the block over | block stays inside the plate; CLI: **rotation identity after the flip** (flip had no effect) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 | 6acf6b94 (qa 10:36: Slider block top → plate top, HUD flip → the block turns over onto the plate (as 2.5 / A4)) |
+| 2.5 | Slider: block top face → plate top face; HUD flip primary axis | flip turns the block over | block stays inside the plate; CLI: **rotation identity after the flip** (flip had no effect) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 | 6acf6b94 (qa 10:36: Slider block top → plate top, HUD flip → the block turns over onto the plate (as 2.5 / A4)) → fixed later: A4 ✅ 6acf6b94 (flip turns the block over, row 164) |
 | 2.6 | Fastened: bracket → plate; flip, flip back | flips | flips correctly | ✅ | 6acf6b94 (qa 10:37: Fastened bracket top face → plate top face (bracket into the plate), HUD flip → it turns over onto the plate, flip again → back; tickets/asm-fastened-flip-6acf.png) |
-| 2.7 | Mate connector tool hover on a face | **orange outline on the hovered face, white dots only at that face's inference points, small triad + ring** (assembly/31-*) | no face outline, **dark dots on many edges of other faces**, large triad without ring | ✅ (GUI :103 skasm 10-27: orange outline on the hovered face, small triad + ring at the nearest inference point, no dots on other parts); was ✗ A5 | 77870dd4 10-28 |
+| 2.7 | Mate connector tool hover on a face | **orange outline on the hovered face, white dots only at that face's inference points, small triad + ring** (assembly/31-*) | no face outline, **dark dots on many edges of other faces**, large triad without ring | ✅ (GUI :103 skasm 10-27: orange outline on the hovered face, small triad + ring at the nearest inference point, no dots on other parts); was ✗ A5 | 77870dd4 10-28 → fixed later: A5 ✅ 77870dd4 10-28 |
 | 2.8 | Place, ✓ | "Mate connector 1" under Mate features | same | ✅ | 6acf6b94 (qa 10:36: Mate connector (Ctrl+M), hover the pattern copy's front face (orange outline, white dots, small triad + ring), click, ✓ → "Mate connector 1" under Mate features (3)) |
 
 ## 3. Replicate, patterns
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 3.1 | Replicate dialog | standard feature dialog (✓ ✕) (pending capture) | custom panel: ALL-CAPS headers "SEED INSTANCE", "MATE TO BE MATCHED", a "Use selection" button, yellow hint text, a blue **OK** button, no ✓ | ✅ (GUI green 8165fca6, skasm 10-27: Replicate is a standard feature dialog ✓ ✕); was ✗ A6 | 77870dd4 10-28 |
-| 3.2 | Seed Part 3 <1> (Cylindrical 1), OK | one copy per free matching hole | "3 match(es) found": **two pins stacked inside hole 1 (where the shaft is) and one on top of the seed in hole 2** (z-fighting stripes) | ✗ A7 |  |
+| 3.1 | Replicate dialog | standard feature dialog (✓ ✕) (pending capture) | custom panel: ALL-CAPS headers "SEED INSTANCE", "MATE TO BE MATCHED", a "Use selection" button, yellow hint text, a blue **OK** button, no ✓ | ✅ (GUI green 8165fca6, skasm 10-27: Replicate is a standard feature dialog ✓ ✕); was ✗ A6 | 77870dd4 10-28 → fixed later: A6 ✅ 77870dd4 10-28 |
+| 3.2 | Seed Part 3 <1> (Cylindrical 1), OK | one copy per free matching hole | "3 match(es) found": **two pins stacked inside hole 1 (where the shaft is) and one on top of the seed in hole 2** (z-fighting stripes) | ✗ A7 → fixed later: A7 ✅ 6acf6b94 (row 106) |  |
 | 3.3 | Ctrl+Z | removes it | removed | ✅ | 6acf6b94 (qa 10:40, Assembly 2: plate + shaft, Revolute 1 on hole 2's top rim: Ctrl+Z after ✓ removes Replicate 1 and Part 2 <2>) |
-| 3.4 | Assembly linear pattern dialog | standard feature dialog with preview | same custom panel style (INSTANCES / DIRECTION, boxed inputs, OK); **no preview** | ✅ (GUI green 8165fca6, skasm 10-27: Linear pattern a standard feature dialog); was ✗ A6, A8 | 77870dd4 10-28 |
-| 3.5 | Direction = plate front edge, 25 mm × 3 | copies along the edge | the edge pick becomes "Mate connector of Part 1 <1>" and copies go **along its Z (the face normal, −Y)**, off the plate | ✅ (T: assembly `linear_pattern_along_an_edge`); was ✗ A9 | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) (Direction "Edge of Part 1 <1>", copy along +X) |
+| 3.4 | Assembly linear pattern dialog | standard feature dialog with preview | same custom panel style (INSTANCES / DIRECTION, boxed inputs, OK); **no preview** | ✅ (GUI green 8165fca6, skasm 10-27: Linear pattern a standard feature dialog); was ✗ A6, A8 | 77870dd4 10-28 → fixed later: A6 ✅ 77870dd4 10-28; A8 ✅ 6acf6b94 |
+| 3.5 | Direction = plate front edge, 25 mm × 3 | copies along the edge | the edge pick becomes "Mate connector of Part 1 <1>" and copies go **along its Z (the face normal, −Y)**, off the plate | ✅ (T: assembly `linear_pattern_along_an_edge`); was ✗ A9 | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) (Direction "Edge of Part 1 <1>", copy along +X) → fixed later: A9 / A9b ✅ skasm 10-31 (CLI) |
 | 3.6 | Assembly circular pattern, axis = shaft face, 4 × 360 | 3 copies around the axis | 3 copies around the shaft axis; tree "Circular pattern 1 (3)" | ✅ / ? | 77870dd4 10-28 |
-| 3.7 | Button tooltip after clicking it | hides | "Assembly circular pattern" tooltip stays over the graphics | ✗ A10 |  |
+| 3.7 | Button tooltip after clicking it | hides | "Assembly circular pattern" tooltip stays over the graphics | ✗ A10 → fixed later: A10 ✅ 6acf6b94 |  |
 
 ## 4. Explode, BOM
 
@@ -60,23 +60,23 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | 4.4 | ✓, Done | unexploded graphics, banner gone | same | ✅ | 0.4.10+ / daf1f50c 10-27 (Assembly 2 in a pin.noshape copy) |
 | 4.5 | BOM panel | BOM type Flattened, Add column ▾, ⋯; Item / Quantity / Part number / Description | same; Part 3 quantity 6 | ✅ | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) |
 | 4.6 | Double-click Part number, "PN-001", Enter | commits, selection moves one row down | same | ✅ | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) |
-| 4.7 | Type into the selected cell | typing starts editing | **nothing happens** (typed text lost) | ✅ (GUI :103 skasm 10-27: "PN-002" typed into a selected cell lands whole, Enter commits); was ✗ A11 | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) ("PN-002" typed into the selected cell) |
+| 4.7 | Type into the selected cell | typing starts editing | **nothing happens** (typed text lost) | ✅ (GUI :103 skasm 10-27: "PN-002" typed into a selected cell lands whole, Enter commits); was ✗ A11 | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) ("PN-002" typed into the selected cell) → fixed later: A11 ✅ 6acf6b94 |
 
 ## Findings (2026-10-21 run)
 
 | # | Finding | Repro | Owner |
 |---|---|---|---|
-| A7 | **Replicate places duplicates**: two copies stacked in an occupied hole and one on top of the seed; should be one per free matching target, never the seed's own | §3.2 | skb |
-| A9 | **Assembly linear pattern goes the wrong way** when the direction is an edge: uses the auto mate connector's Z (face normal) instead of the edge direction | §3.5 | skb |
-| A4 | Slider: HUD "Flip primary axis" has no effect (instance rotation unchanged) | §2.5 | skb |
-| A6 | Replicate / linear / circular pattern dialogs are custom panels (caps headers, OK button, no ✓, boxed inputs), not Onshape feature dialogs | §3.1, 3.4 | skb + ui2 |
-| A8 | Assembly patterns show no preview while editing | §3.4 | skb |
-| A1 | First inserted instance not selected/amber; zoom-to-fit crops it | §1.4 | skb |
-| A2 | Mate preview: moved part not amber | §2.1 | skb |
-| A3 | New mates not hidden by default (row not light grey) | §2.2 | skb |
-| A5 | Mate connector inference look: no face outline, dark dots everywhere, big triad without ring | §2.7 | skb / ui2 |
-| A10 | Toolbar tooltip stays after clicking the button (dialog open) | §3.7 | ui2 |
-| A11 | BOM: typing into a selected cell doesn't start editing | §4.7 | skb |
+| A7 | **Replicate places duplicates**: two copies stacked in an occupied hole and one on top of the seed; should be one per free matching target, never the seed's own | §3.2 | skb → ✅ 6acf6b94 |
+| A9 | **Assembly linear pattern goes the wrong way** when the direction is an edge: uses the auto mate connector's Z (face normal) instead of the edge direction | §3.5 | skb → ✅ (A9b too, skasm 10-31 CLI) |
+| A4 | Slider: HUD "Flip primary axis" has no effect (instance rotation unchanged) | §2.5 | skb → ✅ 6acf6b94 |
+| A6 | Replicate / linear / circular pattern dialogs are custom panels (caps headers, OK button, no ✓, boxed inputs), not Onshape feature dialogs | §3.1, 3.4 | skb + ui2 → ✅ 77870dd4 |
+| A8 | Assembly patterns show no preview while editing | §3.4 | skb → ✅ 6acf6b94 |
+| A1 | First inserted instance not selected/amber; zoom-to-fit crops it | §1.4 | skb → ✅ 6acf6b94 |
+| A2 | Mate preview: moved part not amber | §2.1 | skb → ✅ 6acf6b94 (row 101) |
+| A3 | New mates not hidden by default (row not light grey) | §2.2 | skb → ✅ 77870dd4 |
+| A5 | Mate connector inference look: no face outline, dark dots everywhere, big triad without ring | §2.7 | skb / ui2 → ✅ 77870dd4 |
+| A10 | Toolbar tooltip stays after clicking the button (dialog open) | §3.7 | ui2 → fixed later: A10 ✅ 6acf6b94 |
+| A11 | BOM: typing into a selected cell doesn't start editing | §4.7 | skb → ✅ 6acf6b94 |
 
 ## Update from live's answer (behaviours.md "qa5 assembly", 10-21)
 
@@ -84,11 +84,11 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 |---|---|---|---|
 | 2.1 | Revolute | connector on a cylindrical face lands at mid-height; shaft keeps +Z; drag rotates only | ✅ (we picked edges) |
 | 2.4 | Cylindrical | pin mid-height connector → hole top centre; drag slides + rotates | ✅; our 2nd pick on the hole's top edge landed at its bottom → ? |
-| 2.5 | Slider | slides along the connectors' Z (face normal), Limits fields "No minimum"/"No maximum" | A4 stays (flip had no effect) |
-| 2.7 | Mate connector hover | white inference dots on the hovered face + triad preview; dialog: [On entity \| Between entities], Origin entity, ☐ Realign, ☐ Move | A5 confirmed |
-| 3.1 | Replicate dialog | Instances; Mate to be matched (auto-filled from the instance); [Match faces in parts \| Match faces in features \| Match individual faces]; Parts to find match in | A6 confirmed |
-| 3.2 | Replicate result | **one** new pin in hole 1 (the only other Ø10 face), row "Replicate 1" with Part 3 <2> + Mate features (1) | A7 confirmed |
-| 3.4–3.5 | Linear pattern | Instances, Direction, Distance 25 mm, Instance count **2**, ☐ Equal spacing, ☐ Centered, ☐ Second direction; plate edge → copies along X | A6, A9 confirmed |
+| 2.5 | Slider | slides along the connectors' Z (face normal), Limits fields "No minimum"/"No maximum" | A4 stays (flip had no effect) → fixed later: A4 ✅ 6acf6b94 (flip turns the block over, row 164) |
+| 2.7 | Mate connector hover | white inference dots on the hovered face + triad preview; dialog: [On entity \| Between entities], Origin entity, ☐ Realign, ☐ Move | A5 confirmed → fixed later: A5 ✅ 77870dd4 10-28 |
+| 3.1 | Replicate dialog | Instances; Mate to be matched (auto-filled from the instance); [Match faces in parts \| Match faces in features \| Match individual faces]; Parts to find match in | A6 confirmed → fixed later: A6 ✅ 77870dd4 10-28 |
+| 3.2 | Replicate result | **one** new pin in hole 1 (the only other Ø10 face), row "Replicate 1" with Part 3 <2> + Mate features (1) | A7 confirmed → fixed later: A7 ✅ 6acf6b94 (row 106) |
+| 3.4–3.5 | Linear pattern | Instances, Direction, Distance 25 mm, Instance count **2**, ☐ Equal spacing, ☐ Centered, ☐ Second direction; plate edge → copies along X | A6, A9 confirmed → fixed later: A6 ✅ 77870dd4 10-28; A9 / A9b ✅ skasm 10-31 (CLI) |
 | 3.6 | Circular pattern | Instances, Axis, Angle 360, count 2, ☑ Equal spacing, ☐ Centered | ✅ result |
 | list | Instance list | pattern rows appear while the dialog is open; header counts top-level rows ("Instances (7)") | ✅ (qa5 P2-A6 / P2-A7, 9703d9b9, verified 21d6a89e; skasm 10-27 saw the pending "Replicate 1" row) |
 | 4.5 | BOM | Flattened default; Item/Quantity/Part number/Description | ✅ |
@@ -97,48 +97,48 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 
 | # | Row | Ours | Status | Verified |
 |---|---|---|---|---|
-| 1.4 | First insert into an empty assembly | **amber + row selected now** (the "Assembly 2" root row is highlighted too); zoom-to-fit still crops the plate (right and bottom off-screen, dialog over it) | ✅ (skasm 10-27: amber + row selected; fitted beside the Insert dialog, GUI :103); was ✗ A1 (partly fixed) | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) |
+| 1.4 | First insert into an empty assembly | **amber + row selected now** (the "Assembly 2" root row is highlighted too); zoom-to-fit still crops the plate (right and bottom off-screen, dialog over it) | ✅ (skasm 10-27: amber + row selected; fitted beside the Insert dialog, GUI :103); was ✗ A1 (partly fixed) | 0.4.10+ / daf1f50c 10-27 (pin.noshape copy, new Assembly 2) → fixed later: A1 ✅ 6acf6b94 (fit, row 169) |
 | 2.1 | Revolute 2nd pick | moved part previews **amber** | ✅ A2 fixed | 6acf6b94 (qa 10:31: Revolute, shaft face near its bottom, then a hole rim → the shaft jumps into the hole, amber while the dialog is open) |
-| 2.2 | New mate row | tooltip "Revolute 1 (Hidden)" + eye-off icon ✅, but the row text is still #333333 (live light grey) | ✅ (GUI green 8165fca6, skasm 10-27: the row light grey); was ✗ A3 (partly fixed) | 77870dd4 10-28 |
-| 2.5 | Slider flip primary axis | block still inside the plate (only its top face z-fights at the plate top) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 | 6acf6b94 (qa 10:31: Slider block top → plate top puts the block inside the plate; HUD flip → it stands on the plate; tickets/slider-flip-6acf.png) |
-| 2.7 | Mate connector hover on the plate top | orange outline + white inference dots on that face ✅; **extra white dots on other parts** (bracket edges, shaft bottom) | ✅ (GUI :103 skasm 10-27: orange outline on the hovered face, small triad + ring at the nearest inference point, no dots on other parts); was ✗ A5 (partly fixed) | 77870dd4 10-28 |
-| 3.1 / 3.4 / 3.6 | Replicate / Linear / Circular pattern dialogs | standard feature dialogs with live's fields (dom/ui2-asm-*) ✅; Replicate adds red hints "Select the instances to pattern (seed)" / "Select the geometry to find match in" that live doesn't show | ✅ A6 fixed / ✗ **A14** (hint text) | 77870dd4 10-28 |
-| 3.2 | Replicate Part 3 <1> (Cylindrical 1) in Part 1 | one copy in hole 1 → "Replicate 1 ▸ Part 3 <7>" ✅; the new mate "Cylindrical 2" goes to the top-level Mate features (live nests "Mate features (1)" under the Replicate row) | ✅ (T: assembly `replicate_on_matching_holes`, qa5 A12 assert); was ✅ A7 fixed / ✗ **A12** | 6acf6b94 (qa 10:40, Assembly 2: plate + shaft, Revolute 1 on hole 2's top rim: Replicate Part 2 <1>, Match edges on face, plate top face → one copy in the free hole 1, none stacked; tickets/asm-replicate-6acf.png) |
+| 2.2 | New mate row | tooltip "Revolute 1 (Hidden)" + eye-off icon ✅, but the row text is still #333333 (live light grey) | ✅ (GUI green 8165fca6, skasm 10-27: the row light grey); was ✗ A3 (partly fixed) | 77870dd4 10-28 → fixed later: A3 ✅ 77870dd4 10-28 |
+| 2.5 | Slider flip primary axis | block still inside the plate (only its top face z-fights at the plate top) | ✅ (T: assembly `slider_flip_primary_turns_the_part_over`); was ✗ A4 | 6acf6b94 (qa 10:31: Slider block top → plate top puts the block inside the plate; HUD flip → it stands on the plate; tickets/slider-flip-6acf.png) → fixed later: A4 ✅ 6acf6b94 (flip turns the block over, row 164) |
+| 2.7 | Mate connector hover on the plate top | orange outline + white inference dots on that face ✅; **extra white dots on other parts** (bracket edges, shaft bottom) | ✅ (GUI :103 skasm 10-27: orange outline on the hovered face, small triad + ring at the nearest inference point, no dots on other parts); was ✗ A5 (partly fixed) | 77870dd4 10-28 → fixed later: A5 ✅ 77870dd4 10-28 |
+| 3.1 / 3.4 / 3.6 | Replicate / Linear / Circular pattern dialogs | standard feature dialogs with live's fields (dom/ui2-asm-*) ✅; Replicate adds red hints "Select the instances to pattern (seed)" / "Select the geometry to find match in" that live doesn't show | ✅ A6 fixed / ✗ **A14** (hint text) | 77870dd4 10-28 → fixed later: A6 ✅ 77870dd4 10-28; A14 ✅ 6acf6b94 |
+| 3.2 | Replicate Part 3 <1> (Cylindrical 1) in Part 1 | one copy in hole 1 → "Replicate 1 ▸ Part 3 <7>" ✅; the new mate "Cylindrical 2" goes to the top-level Mate features (live nests "Mate features (1)" under the Replicate row) | ✅ (T: assembly `replicate_on_matching_holes`, qa5 A12 assert); was ✅ A7 fixed / ✗ **A12** | 6acf6b94 (qa 10:40, Assembly 2: plate + shaft, Revolute 1 on hole 2's top rim: Replicate Part 2 <1>, Match edges on face, plate top face → one copy in the free hole 1, none stacked; tickets/asm-replicate-6acf.png) → fixed later: A12 ✅ 6acf6b94; A7 ✅ 6acf6b94 (row 106) |
 | 3.4 | Linear pattern preview | grey preview copy | ✅ A8 fixed | 6acf6b94 (qa 10:32: Assembly linear pattern of Part 4 <1> → grey preview copy while editing; tickets/asm-linear-pattern-6acf.png) |
 | 3.5 | Direction = plate front edge | copy along the edge, 25 mm | ✅ A9 fixed | 6acf6b94 (qa 10:32: Direction = plate top front edge → chip "Edge of Part 1 <1>", the copy 25 mm along the edge) |
 | 3.7 | Toolbar button tooltip after click | hides | ✅ A10 fixed | 6acf6b94 (qa 10:33: hover Fastened → tooltip "Fastened mate (m)"; click → Fastened 1 dialog, tooltip gone with the pointer still on the button) |
-| 4.7 | Type into a selected BOM cell | editing starts but the **first character is lost** ("PN-002" → "N-002") and is committed on its own: Esc leaves "P" in the cell; Delete doesn't clear a cell | ✅ (GUI :103 skasm 10-27: "PN-002" whole; Enter commits and moves down); was ✗ A11 (changed) | 6acf6b94 (qa 10:33: BOM (Flattened), click row 1 Part number, type QA1, Enter → stored, row 2's cell selected) |
-| – | Relation toolbar button | live: Gear / Rack and pinion / Screw / Linear relation tools (feature dialogs) | **custom "Relation" panel**: tabs Gear / Rack & pinion / Screw / Linear, "Select mate" dropdowns, Lead per radian, blue **OK** | ✗ **A13** |  |
-| – | Tab position of a new Assembly made with + while Part Studio 1 was active | after Part Studio 1 (stays there) | was placed after Part Studio 1, **later shown at the end of the tab bar** (after a BOM edit / undo / tab switches) | ✗ **DOC5** |  |
+| 4.7 | Type into a selected BOM cell | editing starts but the **first character is lost** ("PN-002" → "N-002") and is committed on its own: Esc leaves "P" in the cell; Delete doesn't clear a cell | ✅ (GUI :103 skasm 10-27: "PN-002" whole; Enter commits and moves down); was ✗ A11 (changed) | 6acf6b94 (qa 10:33: BOM (Flattened), click row 1 Part number, type QA1, Enter → stored, row 2's cell selected) → fixed later: A11 ✅ 6acf6b94 |
+| – | Relation toolbar button | live: Gear / Rack and pinion / Screw / Linear relation tools (feature dialogs) | **custom "Relation" panel**: tabs Gear / Rack & pinion / Screw / Linear, "Select mate" dropdowns, Lead per radian, blue **OK** | ✗ **A13** → fixed later: A13 ✅ 77870dd4 (four relation tools) |  |
+| – | Tab position of a new Assembly made with + while Part Studio 1 was active | after Part Studio 1 (stays there) | was placed after Part Studio 1, **later shown at the end of the tab bar** (after a BOM edit / undo / tab switches) | ✗ **DOC5** → fixed later: DOC5 ✅ 6acf6b94 (row 177) |  |
 
 ## Update from live's answer (behaviours.md "Assembly relation dialogs", 10-21)
 
 | # | Row | Live | Ours | Verdict |
 |---|---|---|---|---|
-| – | Relation tools | **four toolbar buttons** (Gear / Rack and pinion / Screw / Linear relation); **one feature dialog** (220 px, "<Type> 1" ✓ ✕): unlabelled type select (Gear, Rack and pinion, Screw, Linear), **Mate(s)** query (chips like "⟳ - z - Revolute 1"), one value row (Relation ratio 1 / Distance per revolution 25 mm), ☐ Reverse direction; row "Gear 1" etc. at the end of Mate features | one button opening a custom "Relation" panel with tabs, "Select mate" dropdowns, "Lead per radian 1 mm", blue OK | ✗ **A13 confirmed** (skb) |
+| – | Relation tools | **four toolbar buttons** (Gear / Rack and pinion / Screw / Linear relation); **one feature dialog** (220 px, "<Type> 1" ✓ ✕): unlabelled type select (Gear, Rack and pinion, Screw, Linear), **Mate(s)** query (chips like "⟳ - z - Revolute 1"), one value row (Relation ratio 1 / Distance per revolution 25 mm), ☐ Reverse direction; row "Gear 1" etc. at the end of Mate features | one button opening a custom "Relation" panel with tabs, "Select mate" dropdowns, "Lead per radian 1 mm", blue OK | ✗ **A13 confirmed** (skb) → fixed later: A13 ✅ 77870dd4 (four relation tools) |
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
-| A1 first insert | amber + selected ✅, fit crops plate | ✗ still (partly) |
-| A3 hidden mate rows | #333333 | ✗ still |
-| A4 slider flip | no effect | ✗ still |
-| A5 MC hover dots | dots on other parts | ✗ still |
-| A11 BOM typing | first char lost ("QA1" → "A1") | ✗ still |
-| A12 Replicate mate placement | "Cylindrical 2" top level | ✗ still |
-| A13 relations | custom Relation panel | ✗ still |
-| A14 Replicate red hints | still shown | ✗ still |
+| A1 first insert | amber + selected ✅, fit crops plate | ✗ still (partly) → fixed later: A1 ✅ 6acf6b94 (fit, row 169) |
+| A3 hidden mate rows | #333333 | ✗ still → fixed later: A3 ✅ 77870dd4 10-28 |
+| A4 slider flip | no effect | ✗ still → fixed later: A4 ✅ 6acf6b94 (flip turns the block over, row 164) |
+| A5 MC hover dots | dots on other parts | ✗ still → fixed later: A5 ✅ 77870dd4 10-28 |
+| A11 BOM typing | first char lost ("QA1" → "A1") | ✗ still → fixed later: A11 ✅ 6acf6b94; A1 ✅ 6acf6b94 (fit, row 169) |
+| A12 Replicate mate placement | "Cylindrical 2" top level | ✗ still → fixed later: A12 ✅ 6acf6b94 |
+| A13 relations | custom Relation panel | ✗ still → fixed later: A13 ✅ 77870dd4 (four relation tools) |
+| A14 Replicate red hints | still shown | ✗ still → fixed later: A14 ✅ 6acf6b94 |
 
 ## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
 Pass 6 (17:11) had found A12 fixed (mate nests under "Replicate 1 ▸ Mate features (1)").
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | A1 first insert fit | as tight as live (ins-902: live's block also runs under the right strip) | ✅ fit | 6acf6b94 (qa 10:30, qa5's mkasm.py doc: first Part 1 inserted at identity, fitted beside the Insert dialog, its right end under the right strip as in ins-902) |
-| A15 (new) pending first instance look | face (229,163,54) with **black edges** vs live (242,182,72) with amber edges (255,192,76); **a transform triad at the instance** (live none); root row "Assembly 5" highlighted with the instance row (live only the instance row) | ✗ **A15** (skb / ui2) |  |
+| A15 (new) pending first instance look | face (229,163,54) with **black edges** vs live (242,182,72) with amber edges (255,192,76); **a transform triad at the instance** (live none); root row "Assembly 5" highlighted with the instance row (live only the instance row) | ✗ **A15** (skb / ui2) → ✅ fixed in pass 8 (row 148; ASM-SELECTED-EDGES-DARK) |  |
 | A3 hidden mate rows | light grey | ✅ **fixed** | 77870dd4 10-28 |
 | A13 relations | four toolbar buttons; Gear → "Gear 1" dialog: type select, Mate(s), Relation ratio 1, ☐ Reverse direction | ✅ **fixed** | 77870dd4 10-28 |
 | A11 typing into a BOM cell | "QA1" kept | ✅ **fixed** (Ctrl+Z doesn't revert the BOM edit; live ?) | 6acf6b94 (qa 10:33: "QA1" kept) |
 | A14 Replicate red hints | none | ✅ **fixed** | 6acf6b94 (qa 10:40, Assembly 2: plate + shaft, Revolute 1 on hole 2's top rim: the dialog shows no hint text, only the empty field's red border) |
-| A16 (new) | "solving…" label at the top right for as long as the Replicate dialog is open (nothing selected); gone on cancel | ? A16 (live request filed) |  |
-| A4 Slider flip | block still inside the plate (Front view) | ✗ still |  |
+| A16 (new) | "solving…" label at the top right for as long as the Replicate dialog is open (nothing selected); gone on cancel | ? A16 (live request filed) → ✅ 6acf6b94 (row 149) |  |
+| A4 Slider flip | block still inside the plate (Front view) | ✗ still → fixed later: A4 ✅ 6acf6b94 (flip turns the block over, row 164) |  |
 | A5 mate connector hover | dots only on the hovered face, small triad + ring | ✅ **fixed** | 77870dd4 10-28 |
 
 ## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
@@ -148,15 +148,15 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 | A15 selected instance | (242,182,73) top, amber edges, only the instance row highlighted | ✅ (ASM-SELECTED-EDGES-DARK fixed) | 77870dd4 10-28 (faces amber ✅, interior edges near-black) · verified c725f68f 10-28 (TICKETS ASM-SELECTED-EDGES-DARK) |
 | A16 "solving…" label | gone | ✅ **fixed** | 6acf6b94 (qa 10:40, Assembly 2: plate + shaft, Revolute 1 on hole 2's top rim: no "solving…" label during the Replicate / mates) |
 | A19 (new) empty Replicate | title red ✅; **no pending red "Replicate N" row with error badge in the list, no badge on the root row, no red border on "Parts to find match in"** (live has all three) | ✗ **A19** (skb) |  |
-| A11 BOM edit + Ctrl+Z | not undone | ✅ (= live) | 6acf6b94 (qa 10:33: Esc, Ctrl+Z over the view → undoes the last assembly edit (a drag), QA1 stays) |
-| A4 Slider flip | block still inside the plate | ✗ still |  |
+| A11 BOM edit + Ctrl+Z | not undone | ✅ (= live) | 6acf6b94 (qa 10:33: Esc, Ctrl+Z over the view → undoes the last assembly edit (a drag), QA1 stays) → fixed later: A11 ✅ 6acf6b94 |
+| A4 Slider flip | block still inside the plate | ✗ still → fixed later: A4 ✅ 6acf6b94 (flip turns the block over, row 164) |  |
 | A18 repeat insert, ✓ without entering graphics | (5.000025, 2.500025, 1.250025) | ✅ **fixed** (live exact 5 / 2.5 / 1.25) | 78958d0f 10-28 (GUI Insert, Part 2 (10×10×30) twice, ✓ without entering the graphics → (1.25, 1.25, 3.75), (2.5, 2.5, 7.5) exactly: 1/8 steps with no 0.000025 drift) |
 
 ## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | A19 empty Replicate | pending red "Replicate 1" row + badge, root badge, red border on "Parts to find match in" | ✅ **fixed** (m80) | 6acf6b94 (qa 10:40: Replicate with nothing picked → red "Replicate 1" row + dot, dot on Assembly 1, red border on "Parts to find match in") |
-| A4 Slider flip | not re-run: the "qa5 assembly" doc was lost with /tmp/qa5/home | – |  |
+| A4 Slider flip | not re-run: the "qa5 assembly" doc was lost with /tmp/qa5/home | – → ✅ 6acf6b94 (row 164) |  |
 
 ## Re-run pass 14 (2026-10-22, main aa75fdf, app /tmp/qa5/noshape-0503; doc rebuilt: /tmp/qa5/d14/asm.noshape via /root/qa5-scratch/pass14/mkasm2.py = mkasm + plate fixed, block, shaft)
 | Row | Ours | Status | Verified |
@@ -174,7 +174,7 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 | A8 pattern preview | grey preview copy while editing (b14) | ✅ **fixed** | 6acf6b94 (qa 10:32: grey preview copy while editing) |
 | A9 direction from an edge | the copy moves along the picked edge (implicit "Mate connector of Part 1 <1>" on the edge), not the face normal; it goes toward −X (b14) | ✅ direction / ? sign | 6acf6b94 (qa 10:32: Direction chip "Edge of Part 1 <1>", the copy runs along the edge) |
 | A5 MC inference | hovering the hole rim: rim highlighted, connector at the hole centre, no dots on other parts (b16) | ✅ **fixed** | 77870dd4 10-28 |
-| DOC5 new Assembly tab position | + › Create Assembly with Part Studio 1 active → "Assembly 2" right after Part Studio 1, stays there after tab switches (t01) | ✅ **fixed** | 6acf6b94 (qa 10:35: Part Studio 1 active, + › Create Assembly → "Assembly 2" right after Part Studio 1; still there after switching tabs) |
+| DOC5 new Assembly tab position | + › Create Assembly with Part Studio 1 active → "Assembly 2" right after Part Studio 1, stays there after tab switches (t01) | ✅ **fixed** | 6acf6b94 (qa 10:35: Part Studio 1 active, + › Create Assembly → "Assembly 2" right after Part Studio 1; still there after switching tabs) → fixed later: DOC5 ✅ 6acf6b94 (row 177) |
 | A15 / A18 | fixed in pass 8 (rows in workflow-configured-assembly.md are stale) | ✅ |  |
 
 ## skb P3 check (2026-10-24 evening, agent/skb after the drag-speed batch)
@@ -182,14 +182,14 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 |---|---|---|---|---|
 | PT1 pattern field chips | Direction "Edge of Part 1 <2>", Axis of pattern "Face of Part 2 <1>", Mirror plane "Mate connector" (dom/dialog-asm-{linear,circular}-pattern-filled, -mirror-filled) | were "Mate connector of Part 1 <1>" for all three; now the entity ("Edge of Part 1 <1>") for Direction/Axis, "Mate connector" for the mirror plane (perf/p21, p22) | ✅ **fixed** | 6acf6b94 (qa 10:32: Direction "Edge of Part 1 <1>" (Axis / Mirror chips not checked)) |
 | PT2 pattern follows its seed | copies keep their pattern placement relative to the seed | circular pattern of a revolute pin (6): dragging the seed turns every copy by the same −19.2° (CLI list), 1.6 ms per drag solve | ✅ | 6acf6b94 (qa 10:32: dragging the (unfixed) plate carries the Slider-mated seed and its copy together, 25 mm apart) |
-| A9 sign | (behaviours "skb (10-24) linear pattern edge direction") the B-rep edge direction (tangent at parameter 0), a planar face's normal; ⇄ negates; ⇄ is kept when the Direction is re-picked | same rule (our edge direction, ⇄ negates, ⇄ kept on re-pick). Same 40×20×10 block via the CLI (/root/skb-scratch/pat/mk.py): (a) bottom front edge +X ✅, (d) top face +Z ✅; but **(b) top back edge +X (live −X) and (c) vertical edge x40 y0 +Z (live −Z)**. The difference is the **kernel's edge orientation** of an extruded body: Parasolid's cap edges follow the sketch curves on both caps, and its side edges run top → bottom; OCCT's don't | ✗ **A9b** (kernel, not skb: reported to the lead) |  |
+| A9 sign | (behaviours "skb (10-24) linear pattern edge direction") the B-rep edge direction (tangent at parameter 0), a planar face's normal; ⇄ negates; ⇄ is kept when the Direction is re-picked | same rule (our edge direction, ⇄ negates, ⇄ kept on re-pick). Same 40×20×10 block via the CLI (/root/skb-scratch/pat/mk.py): (a) bottom front edge +X ✅, (d) top face +Z ✅; but **(b) top back edge +X (live −X) and (c) vertical edge x40 y0 +Z (live −Z)**. The difference is the **kernel's edge orientation** of an extruded body: Parasolid's cap edges follow the sketch curves on both caps, and its side edges run top → bottom; OCCT's don't | ✗ **A9b** (kernel, not skb: reported to the lead) → fixed later: A9 / A9b ✅ skasm 10-31 (CLI) |  |
 | LI1 instance list clicks (behaviours "skb (10-24) section base snap + move to origin" (3)) | plain click adds (a selected row toggles off); Shift+click selects the range from the last click over the visible rows; Ctrl+click opens the row menu, selection unchanged; Esc doesn't clear | was: plain click replaced the selection, Shift/Ctrl toggled one row. Now as live (perf/c1–c2, r2); Esc never cleared (Space does) | ✅ **fixed** | 3f4e10d9 10-28 (asm5: click Part 1 <1>, click Part 2 <1> → both selected; clicking Part 1 <1> again drops it) |
 | LI2 pattern row position | in the instance order where its first instance is ("<3>, Linear pattern 1, <5>") | was after every instance; now in place (perf/r1) | ✅ **fixed** | 6acf6b94 (qa 10:32: ✓ → "Linear pattern 1 ▸ Part 4 <2>" after Part 1 <2>, where its new instance is) |
 | LI3 Shift-range over a pattern row | the pattern row itself is selected too | now the range runs over the visible instance and pattern rows; a pattern row in it is selected with the instances (perf/li3) | ✅ **fixed** | 6acf6b94 (qa 10:36: click Part 3 <1>, Shift+click Part 4 <2> (pattern child) → <3>, <4>, Part 1 <2>, Linear pattern 1 and Part 4 <2> selected) |
-| MO1 Move to origin | first item of the triad's right-click menu only; the triad point (bounding-box centre, or the clicked point) goes to the origin, rotation kept; a fastened instance doesn't move | same (code: triad menu centre item, `triad_action`, solve with targets) | ❌ (ASM-TRIAD-MENU) | 6acf6b94 (qa 10:35: Move to origin moves the triad point to the origin, but the menu opens only after left-clicking the triad ball first and then has only that item; a plain right-click on the triad gives the empty-space menu) |
+| MO1 Move to origin | first item of the triad's right-click menu only; the triad point (bounding-box centre, or the clicked point) goes to the origin, rotation kept; a fastened instance doesn't move | same (code: triad menu centre item, `triad_action`, solve with targets) | ✅ (ASM-TRIAD-MENU fixed 871438c0, verified 4c06fe81: right-click the triad's centre ball or the face → instance menu with Move to origin first) | 6acf6b94 (qa 10:35: Move to origin moves the triad point to the origin, but the menu opens only after left-clicking the triad ball first and then has only that item; a plain right-click on the triad gives the empty-space menu) |
 | SV1 Section view… from a face's menu | "Section plane 1 (Top)" parallel to the face, manipulator at its centroid | was an empty "Section planes" (the hover is gone by the menu click); now the selected face seeds it (mates/sv06) | ✅ **fixed** | 6acf6b94 (qa 10:35: right-click the plate's top face › Section view… → "Section plane 1 (Top)", manipulator at the face centre, blocks / shaft hatched; tickets/asm-section-from-face-6acf.png) |
 | SV2 section base drag snapping (behaviours "skb (10-24) section base snap + move to origin" (1)) | vertex ≤ 22 px; a face bounded by one circle → its centre; an edge of the face under the pointer ≤ 35 px → nearest point (edge orange, connector triad + pale disc); on the face → the face point; off the parts → free; on release the plane moves through the snapped point | same (`section_base_snap`, CPU ray pick + B-rep edge→face adjacency): back edge in-plane keeps z 5 (sv07/08); bottom front edge (z 0) moves the cut to z 0 on release (sv12/13) | ✅ |  |
-| SV3 cut exactly on a part's face | the cap is drawn hatched at the base (skb-sv/bottom-edge-released) | nothing drawn for the coplanar cut (renderer capping, not skb) | ✗ (renderer) |  |
+| SV3 cut exactly on a part's face | the cap is drawn hatched at the base (skb-sv/bottom-edge-released) | ✅ the cap is drawn hatched over the whole base | skasm 10-31 (GUI :103: block in Assembly 1, face › Section view…, base dragged onto the bottom front edge → plane z 0, base hatched as live; Part Studio Top section of the same block the same) |
 | HV1 face hover (no tool) | the face's boundary edges orange, no fill (behaviours "Assembly selection model" (1)) | was nothing (edges did highlight; same on main 538981d5); now the boundary is outlined (mates/hv-fix) | ✅ **fixed** | 77870dd4 10-28 |
 | RM1 right-click an unselected instance | the instance menu (no Clear selection when nothing is selected), e.g. Section view… cutting parallel to the right-clicked face (live skb-move-origin-menu-graphics.png) | was the general (empty-space) menu; now the instance menu, Section view… from it uses that face (mates/rm01, rm02) | ✅ **fixed** | 77870dd4 10-28 |
 | DR1 DRAG-RUNAWAY (qa4 round 5 v3 s10; live: only the dragged cube moves, ≈21 ms a step) | dragging the top cube of a 10/19-cube Planar stack moves only that cube | was: the column leant, and at 19 cubes the others flew ±2.5 million mm. Now least change: the dragged instance alone is solved unless moving the rest of its group gets the drag closer (a one-step check with the mates rigid), and undragged free bodies get a stay term when the whole group must move. qa4's v3s10n.py NCUBES=19 in the app: a 150 px drag moves only Part 2 <19> (70 mm), the 18 others unchanged; solve 3 ms/step (p50, app log). Tests: `planar_stack_drag_moves_only_the_dragged_cube`, `coupled_drag_leaves_free_bodies_put`; perf `drag_speed` (`--ignored`): 19 cubes 2.2 ms, 20-link chain 18 ms | ✅ **fixed** |  |
