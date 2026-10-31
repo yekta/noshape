@@ -45,7 +45,7 @@ pub struct InsertViewState {
     pub replace_part: Option<Option<noshape_model::BodyId>>,
     /// View orientation › one of the source's named views and its frame
     /// (replaces the standard orientation while set).
-    pub named: Option<(String, [[f64; 3]; 2], Vec<[f64; 4]>)>,
+    pub named: Option<noshape_scene::drawing_tools::NamedPick>,
     /// Assemblies: Explode/Position and Display state (None: Show all) of
     /// new views (prefilled from the assembly's last applied ones).
     pub asm_position: AsmPosition,

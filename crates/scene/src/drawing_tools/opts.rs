@@ -13,6 +13,9 @@ use noshape_model::drawing::views;
 use noshape_model::drawing::*;
 
 /// Insert view panel: what new base views take.
+/// View orientation › a named view: its name, frame and section planes.
+pub type NamedPick = (String, [[f64; 3]; 2], Vec<[f64; 4]>);
+
 #[derive(Clone, Debug)]
 pub struct InsertOpts {
     /// View scale (None: the sheet scale).
@@ -24,9 +27,8 @@ pub struct InsertOpts {
     /// Assemblies: Explode/Position and Display state (None: Show all).
     pub asm_position: AsmPosition,
     pub display_state: Option<String>,
-    /// View orientation › a named view of the source, its frame and
-    /// section planes.
-    pub named: Option<(String, [[f64; 3]; 2], Vec<[f64; 4]>)>,
+    /// View orientation › a named view of the source.
+    pub named: Option<NamedPick>,
     /// Insert a sketch of the source (a sketch view).
     pub sketch: Option<noshape_model::FeatureId>,
     /// Another document's Part Studio / assembly (Other documents): the
