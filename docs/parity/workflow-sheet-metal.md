@@ -79,7 +79,7 @@ numbers), ◐ = partly, ✗ = differs, — = no live data.
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 2.1 | Flange dialog defaults | flangeAlignment INNER, BLIND 25 mm, bend angle 90, auto miter on, model radius, partial off | Inner, Blind, 25 mm, Bend angle 90 deg, ☑ Automatic miter, ☑ Use model bend radius, ☐ Partial flange | ✅ (spec) / ? (look) | 77870dd4 10-28 |
+| 2.1 | Flange dialog defaults | flangeAlignment INNER, BLIND 25 mm, bend angle 90, auto miter on, model radius, partial off | Inner, Blind, 25 mm, Bend angle 90 deg, ☑ Automatic miter, ☑ Use model bend radius, ☐ Partial flange | ✅ (spec) / ? (look) → now ✅ labels = live (behaviours 5831: Inner / Blind / 25 mm / Bend angle 90 deg / ☑ Automatic miter / ☑ Use model bend radius / ☐ Partial flange) | 77870dd4 10-28 |
 | 2.2 | Click the top edge at y=0 | "Edge of Sheet metal 1", preview | "Edge of Sheet metal model 1", preview | ✅ | 77870dd4 10-28 |
 | 2.3 | Pick the second (x=0) edge in Top view at the face boundary | ? (edge expected) | picks the **top face** (hover shows the face outline) → feature red, no preview | ✅ now: the x = 0 top edge picked, chip "Edge of Sheet metal model 1" (live request 1610: the edge is picked) | GUI 10-30; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
 | 2.4 | Pick the x=0 side from the Left view | chip | "Edge of Sheet metal model 1", both flanges preview | ✅ | 77870dd4 10-28 |
@@ -90,7 +90,7 @@ numbers), ◐ = partly, ✗ = differs, — = no live data.
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 3.1 | Dialog defaults | hemType STRAIGHT, useMinimalGap true, length 12.5 mm, OUTER, SIMPLE | Straight, ☑ Flattened, Total length 12.5 mm, Outer, Simple | ✅ spec / ? labels | 77870dd4 10-28 |
+| 3.1 | Dialog defaults | hemType STRAIGHT, useMinimalGap true, length 12.5 mm, OUTER, SIMPLE | Straight, ☑ Flattened, Total length 12.5 mm, Outer, Simple | ✅ spec / ? labels → now ✅ labels = live (behaviours 5836: Straight / ☑ Flattened / Total length 12.5 mm / Outer / Simple) | 77870dd4 10-28 |
 | 3.2 | Pick edge, ✓ | ? | OK; 30 faces, 9254.2367 mm³; closed hem r 0.01, obround relief r 1.0625 where it meets the flange | ✅ now: 9378.1835 / 33 | T2 hem_on_g34_matches_live; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
 
 ## 4. Tab (Sketch 2 on Top: x 20..40, y 40..50; merge = plate top face)

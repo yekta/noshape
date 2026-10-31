@@ -204,12 +204,13 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   - Draft analysis now opens at the bottom right with Entities to check empty, as live.
   - Curve/surface analysis labels now read as live. Knot points / Details are asked of live.
 - **workflow-tabs:** all ✅ except row 3 (rename to an existing name), which is asked of live.
-- **Live requests open:**
-  - "skasm (2026-10-31 03:40)" thin loft (core's THIN-LOFT-TRIM-ENDS);
-  - "07:10" Curve/surface Knot points / Details / defaults;
-  - "07:30" tabs row 3;
-  - the "n twice" question appended to 06:30 after it was answered: re-ask it.
-
+- **Live answers folded in (all requests from this batch are answered):**
+  - **Thin loft:** Trim ends fails as live with a two-sided wall or three profiles (solid_a.rs, T engine). Live's volumes are in TICKETS THIN-LOFT-TRIM-ENDS. Ours are 18–21 % short. That is core's thicken, now P2.
+  - **Curve/surface analysis:** as live (fresh defaults, Knot points, violet / red U / blue V control grids, Details hover table). Analysis row 18 ✅.
+  - **Tabs row 3:** duplicate names are allowed, = live.
+  - **n twice:** toggles normal ↔ the plane's back with Y kept up, = live (CLI view_camera ×4). The view cube label on the back side reads no standard view where live says "Bottom": cosmetic, not filed.
+- **Stale old pass rows in the seven sheets:** the ✗ / ? cells whose fix was verified in a later row or ticket now carry "→ now ✅" with the reference (SPLIT1, BOOL1b / 3 / 4 / 4b, FILL-MERGE-WITH-ALL, Keep tools auto-on, Flange / Hem labels (behaviours 5831 / 5836), P1-8 / P1-9 (columns were swapped), P2-D1, DOC6, TABS1).
+- **Only open ✗ left in these sheets:** booleans 141 / 142 / 144, bool's Rust / OCCT union cases (OCCT-UNION-OFFSET-CYL, RUST-UNION-MERGES-DISJOINT-FACES).
 ## Own areas, lead 10-31: workflow-assembly / navigation / workflow-sketch-tools
 - **workflow-assembly.md: every row ✅.**
   - A9b re-checked by CLI. Edge directions now follow live in the assembly and in the Part Studio Part pattern: (a) +X, (b) −X, (c) −Z.

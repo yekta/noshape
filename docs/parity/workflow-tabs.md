@@ -10,7 +10,7 @@ the rest pending (REQUESTS.md "qa5 tabs"). Status: ✅ ok, ✗ differs, ? live p
 | 3 | Rename to an existing tab's name | ? | allowed (became "PartStudio1" because of DOC6) | ? → now ✅ DOC6 fixed (a6c56638; qa4 re-check "r t x" kept) |  |
 | 4 | Part Studio tab right-click | Delete \| Open in new browser tab, Rename, Properties…, Show code \| Duplicate, Copy to clipboard \| Select as document thumbnail \| Move to document…, Export… | same minus "Open in new browser tab" (browser-only) | ✅ | a6c56638 10-28 (+ Export… last, live rmb-tab-partstudio-2 / TAB-EXPORT-MISSING) |
 | 5 | Duplicate | ? | "Part Studio 1 (copy)", inserted right after the source, not activated | ? → now ✅ TABS2 fixed ("<name> Copy 1") |  |
-| 6 | Drag a tab 2 slots right | ? | ghost label follows the cursor, blue drop line; a tab hover-preview card pops up during the drag; drop moves the tab | ✅ / ? (preview card) | a6c56638 10-28 |
+| 6 | Drag a tab 2 slots right | ? | ghost label follows the cursor, blue drop line; a tab hover-preview card pops up during the drag; drop moves the tab | ✅ / ? (preview card) → now ✅ live has no card during a drag (row 6 below), ours neither (TABS1 a6c56638) | a6c56638 10-28 |
 | 7 | + › Create folder | ? | "Folder 1" right after the active tab, in rename mode | ? → now ✅ = live ("Folder 1" right after the active tab, in rename mode; behaviours "qa5 tabs" (c)) |  |
 | 8 | Drag a tab onto the folder | ? | folder highlights light blue; tab moves into it | ? → now ✅ = live (the folder highlights light blue, the tab moves in; behaviours "qa5 tabs" (c)) |  |
 | 9 | Open the folder | breadcrumb 🏠 › 📁 CAD Imports › tabs (live, line 34) | 🏠 › Folder 1 › PartStudio1 | ✅ | a6c56638 10-28 |
@@ -20,9 +20,9 @@ the rest pending (REQUESTS.md "qa5 tabs"). Status: ✅ ok, ✗ differs, ? live p
 
 | # | Row | Live | Ours | Verdict |
 |---|---|---|---|---|
-| 2/3 | Rename (duplicate name) | allowed silently | allowed; but spaces are swallowed | ✅ / ✗ DOC6 |
+| 2/3 | Rename (duplicate name) | allowed silently | allowed; but spaces are swallowed | ✅ / ✗ DOC6 → now ✅ DOC6 fixed (a6c56638), duplicates allowed as live (row 3) |
 | 5 | Duplicate | "**<name> Copy 1**", right after the source, not activated | "Part Studio 1 (copy)", after the source, not activated | ✗ **TABS2** (name) → now ✅ TABS2 fixed ("<name> Copy 1") |
-| 6 | Drag | 100 px **ghost** (bg #eaeaea, shadow 0 5px 10px rgba(0,0,0,.2), label truncated), horizontal only; the other tabs close up and a **gap placeholder** (tab width) shows the drop place; **no line indicator**; dropping past the last tab does nothing | ghost label, a **blue drop line**, tabs don't open a gap; a **tab hover-preview card** pops up during the drag | ✗ **TABS1** |
+| 6 | Drag | 100 px **ghost** (bg #eaeaea, shadow 0 5px 10px rgba(0,0,0,.2), label truncated), horizontal only; the other tabs close up and a **gap placeholder** (tab width) shows the drop place; **no line indicator**; dropping past the last tab does nothing | ghost label, a **blue drop line**, tabs don't open a gap; a **tab hover-preview card** pops up during the drag | ✗ **TABS1** → now ✅ TABS1 (a6c56638 10-28: ghost, gap placeholder, no line, no card; row "TABS1 drag" below) |
 | 7 | Create folder | "Folder 1" right after the active tab, inline rename, not activated | same | ✅ |
 | 8 | Drop on folder | folder light-blue highlight, ghost translucent over it, tab leaves the bar | same highlight; tab moves in | ✅ |
 | 9 | Open folder | breadcrumbs 🏠 › 📁 Folder 1 › tabs; 🏠 returns | same | ✅ |

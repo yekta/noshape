@@ -14,8 +14,8 @@ then edits, undo/redo, rollback and suppress.
 | Chamfer (tool search), 1 mm, tangent propagation | 7-edge chain chamfered (faces 9 → 16) | — | ✅ | 0.4.10+ / fa61ba6f 10-27 (wf-block, bottom chain) |
 | Sketch on a preselected face | "Face of Extrude 1" in Sketch plane | same | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Points aligned with the origin | a 3rd point entity at (0,0) + Horizontal constraints | no entity; a Horizontal constraint from each point to the **external** Origin | ✅ P1-4 (5c94bb51: an external reference-only Origin entity, never drawn or listed; sketch_get names "origin"; e2e `sketch_get_names_the_origin_not_a_hidden_point`) | 0.4.10+ / 203c4d6f 10-27 |
-| Hole on 2 picked points | "Vertices of Sketch 2" (one chip); 2 holes, −633.385 mm³; title "Ø 6.35 mm ↧ 12 mm" ✅ | **two chips "Vertex of Sketch 1"** (one per click; "Vertices of …" only when the sketch row is picked) | ✗ **P1-8** (ui) |  |
-| Linear pattern › Feature pattern | order Part / Feature / Face ✅; chip **"Hole 1"**; Direction pink until picked ✅ | chip **"Ø 6.35 mm ↧ 12 mm"** (the feature's shown name) | ✗ **P1-9** (ui) |  |
+| Hole on 2 picked points | "Vertices of Sketch 2" (one chip); 2 holes, −633.385 mm³; title "Ø 6.35 mm ↧ 12 mm" ✅ | **two chips "Vertex of Sketch 1"** (one per click; "Vertices of …" only when the sketch row is picked) | ✗ **P1-8** (ui) → now ✅ (columns were swapped: live keeps one "Vertex of Sketch N" chip per click, one "Vertices of …" chip from the row; fixed, verified 41f60e47) |  |
+| Linear pattern › Feature pattern | order Part / Feature / Face ✅; chip **"Hole 1"**; Direction pink until picked ✅ | chip **"Ø 6.35 mm ↧ 12 mm"** (the feature's shown name) | ✗ **P1-9** (ui) → now ✅ (columns were swapped: live's chip is the Hole's shown callout "Ø 6.35 mm ↧ 12 mm"; ours the same, part_studio/mod.rs "qa5 P1-9") |  |
 | Shell 2.5 mm (top face) | 8960 mm³, 59 faces | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | Edit Extrude 1 10 → 15 mm | everything regenerates Ok but Shell returns 4 slivers, status Ok | **Shell 1 ERROR "Could not shell part with selections."**, part stays unshelled (behaviours "qa5 (10-25 p1)" (5)) | ✗ **P1-5** (psb + kern) → now ✅ P1-5 fixed (a52d1e44, re-check table below) |  |
 | Undo / Redo / Undo | 8960 ↔ slivers ↔ 8960 | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
@@ -49,7 +49,7 @@ then edits, undo/redo, rollback and suppress.
 | Part Studio tab menu | Delete, Rename, Properties…, Show code, Duplicate, Copy to clipboard, Select as document thumbnail, Move to document…, Export… | same (+ Open in new browser tab, browser only) | ✅ | 0.4.10+ / f16b31c6 10-27 |
 | Part row › Create Drawing of Part 1… | "Part 1 Drawing 1" tab right after Part Studio 1, 4 views | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Dimension on a straight edge (assembly drawing) | "2.362" placed | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| Dimension on a hole circle | part drawing "Ø.394" ✅; **assembly drawing: click not taken** | — | ✗ **P2-D1** |  |
+| Dimension on a hole circle | part drawing "Ø.394" ✅; **assembly drawing: click not taken** | — | ✗ **P2-D1** → now ✅ (817d9cb1, verified on green af9f1e4c: row "P2-D1 on green" below) |  |
 | BOM panel (right strip) | "Bill of materials", BOM type ▾ Flattened, Add column ▾, ⋯; Item / Quantity / Part number / Description; rows 1 | 1, 2 | 1 | same columns (behaviours 1270) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 
 ## P2 assembly, green 461aefb0
@@ -83,7 +83,7 @@ then edits, undo/redo, rollback and suppress.
 | Sketch Trim (m) on a crossing line | the clicked segment past the crossing is removed; the new end is coincident with the other line | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Sketch Offset (o) on a line | light-blue offset preview with a hollow arrow manipulator, side not following the cursor | same (behaviours 172: preview + arrow, click the arrow to flip) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Sketch Use (u) on a plate edge | prompt "Click edges, faces or sketch entities to use (project) them"; a black projected line with use glyphs | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
-| n twice | the second n flips the view to the plane's back (Bottom, mirrored labels) | Onshape flips too (as far as known; not in behaviours) | ? → now ? live request "skasm (2026-10-31 06:30)" (b) |  |
+| n twice | the second n flips the view to the plane's back (Bottom, mirrored labels) | Onshape flips too (as far as known; not in behaviours) | ? → now ✅ = live (behaviours "skasm (2026-10-31, P3 p1-pass \"n twice\")": n toggles normal ↔ the plane's back on every press, Y kept up, X mirrored, no zoom change); ours the same (CLI view_camera normal_to plane:top ×4 in a Top sketch: view −Z / +Z / −Z / +Z, up Y throughout, height unchanged; GUI n uses the same camera_ops::normal_forward) |  |
 | View cube face hover | fill #b1d9f1 | #bce2f7 (behaviours 403) | ✗ **P1-15** (ui, minor) → now ✅ P1-15 fixed (76da6649) |  |
 | Drawing (Part 1) after Split in the Part Studio | Update button saturated (out of date) | same rule | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Drawing Section view tool: one point picked | a vertical cutting line through it ("A–A" arrows), preview "SECTION A - A" follows the cursor | live default tab Vertical (behaviours 1492) | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
