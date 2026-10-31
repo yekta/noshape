@@ -1704,6 +1704,9 @@ impl Ctx<'_> {
     /// The rotation the arrangement is the same under, if one: its step from the largest family of copies whose
     /// motions are rotations about one axis (a whole turn in whole steps), checked on every argument.
     fn symmetry(&self) -> Option<Sym> {
+        if std::env::var_os("NOSHAPE_X_NOSYM").is_some() {
+            return None;
+        }
         let fam = self.families.iter().filter(|f| f.len() >= 3).max_by_key(|f| f.len())?;
         let (o, a, _) = fam.iter().find_map(|x| x.1.rotation())?;
         // The members' angles about that axis; the least is the step.
