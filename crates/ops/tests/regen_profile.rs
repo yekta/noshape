@@ -222,3 +222,62 @@ fn the_draft_pool_hang_document_opens() {
     eprintln!("draft pool hang document: opened and regenerated in {secs:.0} s; slow: {slow:?}");
     assert!(secs < 180.0, "{secs:.0} s; slow: {slow:?}");
 }
+
+/// BLEND-RUST (core): the big test models regenerated from scratch, OCCT's blends against noshape's own
+/// (noshape_kernel::set_rust_blend), and live-30's edit commit both ways: medians of 5, and each model's fillets and
+/// chamfers summed. `tools/tiers/perf.sh -p noshape-ops --test all -- regen_profile::blend_rust_profile --ignored --nocapture --test-threads=1`
+#[test]
+#[ignore]
+fn blend_rust_profile() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf");
+    for model in ["live-30-features.noshape", "big-plate.noshape", "fins-400.noshape"] {
+        let tmp = std::env::temp_dir().join(format!("noshape-blend-profile-{}-{model}", std::process::id()));
+        std::fs::copy(dir.join(model), &tmp).unwrap();
+        let s = noshape_ops::session::Session::open(&tmp).unwrap();
+        let units = s.doc.settings.units;
+        let ps = s.doc.tabs.iter().find_map(|t| if let TabContent::PartStudio(ps) = &t.content { Some(ps.clone()) } else { None }).unwrap();
+        let opts = RegenOptions::default();
+        for rust in [false, true] {
+            noshape_kernel::set_rust_blend(Some(rust));
+            let (mut totals, mut blends) = (Vec::new(), Vec::new());
+            let mut volume = 0.0;
+            for _ in 0..5 {
+                let t = Instant::now();
+                let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
+                totals.push(t.elapsed().as_secs_f64() * 1e3);
+                blends.push(ps.features.iter().zip(&r.display.features).filter(|(f, _)| matches!(f.type_id.as_str(), "fillet" | "chamfer")).map(|(_, s)| s.time_ms as f64).sum::<f64>());
+                volume = r.context.bodies.iter().filter_map(|b| b.shape.volume().ok()).sum();
+            }
+            totals.sort_by(|a, b| a.total_cmp(b));
+            blends.sort_by(|a, b| a.total_cmp(b));
+            eprintln!("blend profile: {model} {}: regen median {:.1} ms (min {:.1}), fillets + chamfers {:.1} ms, volume {volume:.12e}", if rust { "noshape" } else { "OCCT" }, totals[2], totals[0], blends[2]);
+        }
+        noshape_kernel::set_rust_blend(None);
+        let _ = std::fs::remove_file(&tmp);
+    }
+    // live-30's edit commit (Extrude 1's depth 10 → 12; the features before it cached).
+    let tmp = std::env::temp_dir().join(format!("noshape-blend-edit-{}.noshape", std::process::id()));
+    std::fs::copy(dir.join("live-30-features.noshape"), &tmp).unwrap();
+    let s = noshape_ops::session::Session::open(&tmp).unwrap();
+    let units = s.doc.settings.units;
+    let ps0 = s.doc.tabs.iter().find_map(|t| if let TabContent::PartStudio(ps) = &t.content { Some(ps.clone()) } else { None }).unwrap();
+    let opts = RegenOptions::default();
+    for rust in [false, true] {
+        noshape_kernel::set_rust_blend(Some(rust));
+        let mut totals = Vec::new();
+        for _ in 0..5 {
+            let mut reg = Regenerator::new();
+            let _ = reg.regenerate(&ps0, &ConfigValues::default(), &units, &opts);
+            let mut ps = ps0.clone();
+            let ex = ps.features.iter_mut().find(|f| f.name == "Extrude 1").unwrap();
+            ex.params.set("depth", ParamValue::Expr(ExprValue::new("12 mm")));
+            let t = Instant::now();
+            let _ = reg.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+            totals.push(t.elapsed().as_secs_f64() * 1e3);
+        }
+        totals.sort_by(|a, b| a.total_cmp(b));
+        eprintln!("blend profile: live-30 edit commit {}: median {:.1} ms (min {:.1})", if rust { "noshape" } else { "OCCT" }, totals[2], totals[0]);
+    }
+    noshape_kernel::set_rust_blend(None);
+    let _ = std::fs::remove_file(&tmp);
+}
