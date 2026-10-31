@@ -116,6 +116,29 @@ impl DrawingEditor {
         Some(Drag::LeaderBend { id, leader, start, orig })
     }
 
+    /// A drag starting on a leader's node: the node follows the pointer
+    /// (help A5).
+    pub fn leader_node_drag(&self, start: [f64; 2]) -> Option<Drag> {
+        let Some(LeaderHit::Node { id, leader, node }) = self.leader_hit(start) else { return None };
+        let orig = self.current_sheet().annotations.iter().find(|a| a.id == id)?.clone();
+        Some(Drag::LeaderNode { id, leader, node, orig })
+    }
+
+    pub fn leader_node_move(&mut self, drag: &Drag, cx: &mut Context<Self>) {
+        let Drag::LeaderNode { id, leader, node, orig } = drag else { return };
+        let c = self.cursor;
+        let mut dr = self.drawing.clone();
+        if let Some(a) = dr.sheets.get_mut(self.sheet).and_then(|s| s.annotations.iter_mut().find(|a| a.id == *id)) {
+            *a = orig.clone();
+            ae::with_all_leaders(a, |l| {
+                if let Some(n) = l.get_mut(*leader).and_then(|ld| ld.nodes.get_mut(*node)) {
+                    *n = c;
+                }
+            });
+        }
+        self.set_preview(Some(dr), cx);
+    }
+
     /// A drag starting on a selected note's or callout's leader anchor (its
     /// circle grip, live (1)).
     pub fn leader_end_drag(&self, start: [f64; 2]) -> Option<Drag> {

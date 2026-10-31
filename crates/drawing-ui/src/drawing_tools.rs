@@ -1155,6 +1155,10 @@ impl DrawingEditor {
                 let drag = self.drag.clone();
                 self.leader_end_move(&drag, cx);
             }
+            Drag::LeaderNode { .. } => {
+                let drag = self.drag.clone();
+                self.leader_node_move(&drag, cx);
+            }
             // A datum from the model moves along its face normal only.
             Drag::MoveAnnotation { start, orig } if orig.model.is_some() => self.drag_model_datum(&orig, start, cx),
             Drag::MoveAnnotation { start, orig } => {
@@ -1401,9 +1405,9 @@ impl DrawingEditor {
             }
             Drag::SelectCells { id, start } => self.select_cells_in(id, start, self.cursor, cx),
             Drag::SelectBox { start } => self.select_in_box(start, self.cursor, e.modifiers.shift, cx),
-            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveBreak { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } | Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } => {
+            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveBreak { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } | Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } | Drag::LeaderNode { .. } => {
                 let name = match drag {
-                    Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } => "Move by grip",
+                    Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } | Drag::LeaderNode { .. } => "Move by grip",
                     Drag::MoveTable { .. } => "Move table",
                     Drag::TableDivider { .. } => "Resize cells",
                     Drag::ResizeTable { .. } => "Resize table",
@@ -1638,7 +1642,7 @@ impl DrawingEditor {
     }
 
     fn start_drag(&mut self, pick: Option<u32>, start: [f64; 2]) -> Drag {
-        if let Some(d) = self.leader_bend_drag(start).or_else(|| self.leader_end_drag(start)) {
+        if let Some(d) = self.leader_bend_drag(start).or_else(|| self.leader_node_drag(start)).or_else(|| self.leader_end_drag(start)) {
             return d;
         }
         if let Some(d) = self.note_grip_drag(start) {
