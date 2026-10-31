@@ -72,7 +72,7 @@ end;
 function FoundAgents(Param: String): String;
 var
   Code, P: Integer;
-  Out: AnsiString;
+  Raw: AnsiString;
   Text, Key: String;
 begin
   if not Checked then
@@ -81,9 +81,9 @@ begin
     Found := '';
     // Piped through PowerShell, which waits for the (GUI-subsystem) program and hands it a pipe.
     if ExecAsOriginalUser('powershell.exe', '-NoProfile -NonInteractive -Command "& ''' + ExpandConstant('{app}\noshape.exe') + ''' agents status | Out-File -Encoding ascii ''' + ExpandConstant('{tmp}\agents.json') + '''"', '', SW_HIDE, ewWaitUntilTerminated, Code)
-      and LoadStringFromFile(ExpandConstant('{tmp}\agents.json'), Out) then
+      and LoadStringFromFile(ExpandConstant('{tmp}\agents.json'), Raw) then
     begin
-      Text := String(Out);
+      Text := String(Raw);
       Key := '"found_names": "';
       P := Pos(Key, Text);
       if P > 0 then
