@@ -9,7 +9,6 @@ use crate::start_library::{self as lib, DocEntry, Library, ScanInput};
 use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
-use gpui_kit::component::Selectable as _;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use crate::os_menu::{OsContextMenuExt as _, OsMenu, OsMenuItem};
 use crate::os_ui::OsDropdownExt as _;
@@ -243,6 +242,12 @@ fn load_prefs() -> Prefs {
 
 pub struct StartView {
     focus: FocusHandle,
+    /// The Create button's keyboard focus: pressed, and back after its menu
+    /// closes with Esc, it keeps live's focus look (dk-915).
+    create_focus: FocusHandle,
+    /// Set by a press on Create, so the window's press handler (after it)
+    /// leaves the focus there.
+    create_press: bool,
     /// The window's body (sidebar, documents, details) as a cached view, so a
     /// keystroke or caret blink in the search box re-renders only the title
     /// bar (see `crate::cached_slice`); the search notifies it.
@@ -378,10 +383,15 @@ impl StartView {
         });
         let mut subs = subs;
         subs.push(adv_sub);
+        let create_focus = cx.focus_handle().tab_stop(true);
+        subs.push(cx.on_focus(&create_focus, window, |_, _, cx| cx.notify()));
+        subs.push(cx.on_blur(&create_focus, window, |_, _, cx| cx.notify()));
         let prefs = load_prefs();
         let source = prefs.source.clone().unwrap_or(if crate::doc_files::recent().is_empty() { Source::All } else { Source::Recent });
         let mut this = Self {
             focus: cx.focus_handle(),
+            create_focus,
+            create_press: false,
             body: None,
             library: Library::default(),
             docs: Vec::new(),
@@ -1877,19 +1887,33 @@ impl StartView {
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_source(source.clone(), cx)))
     }
 
-    fn render_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    fn render_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let view = cx.entity();
         let labels_nav = self.render_labels_nav(cx);
-        // Its menu open, Create keeps the hover blue (live dk-913b, documents/41).
-        let open = crate::os_ui::dropdown_open("create-dd", cx);
-        let create = Button::new("create")
-            .primary()
-            // (A custom variant's own fill is a tint; open, it paints its solid `active` colour.)
-            .when(open, |b| b.custom(ButtonCustomVariant::new(cx).color(pal.accent_hover.into()).foreground(gpui_kit::rgb_static(0xffffff).into()).hover(pal.accent_hover.into()).active(pal.accent_hover.into()).shadow(false)).open(true))
+        // Live (dk-913b, request 1669): Create's :focus look, #769fcc with a
+        // 2 px #3e94ff ring, while its menu is open and after Esc closes it
+        // (the focus comes back) until Tab or a press elsewhere moves the
+        // focus; hover #769fcc too. Not themed.
+        let lit = crate::os_ui::dropdown_open("create-dd", cx) || self.create_focus.is_focused(window);
+        let create = div()
+            .id("create")
+            .track_focus(&self.create_focus)
             .w(px(150.))
             .h(px(34.))
+            .flex()
+            .items_center()
+            .justify_center()
             .rounded(px(3.))
+            .cursor_pointer()
+            .text_color(gpui_kit::rgb_static(0xffffff))
+            .bg(gpui_kit::rgb_static(if lit { 0x769fcc } else { 0x1651b0 }))
+            .hover(|d| d.bg(gpui_kit::rgb_static(0x769fcc)))
+            .when(lit, |d| d.shadow(vec![BoxShadow { color: gpui_kit::rgb_static(0x3e94ff).into(), offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(2.), inset: false }]))
+            .on_mouse_down(MouseButton::Left, cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                this.create_press = true;
+                window.focus(&this.create_focus, cx);
+            }))
             .child(h_flex().gap(px(6.)).text_size(px(14.)).child("Create").child(os::glyph(os::GLYPH_CARET, 8., gpui_kit::rgb_static(0xffffff))))
             .os_dropdown_menu("create-dd", false, move |menu, _, _| {
                 // Onshape (live documents/41): Document…, Folder… | Import
@@ -2783,7 +2807,7 @@ impl StartView {
 
 impl StartView {
     /// Sidebar, documents and the details panel (see `body`).
-    fn render_body(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    fn render_body(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let docs = self.visible();
         let header = self.render_header(cx);
         // Searching hides the folder area, except an advanced search for folders.
@@ -2795,7 +2819,7 @@ impl StartView {
             .flex_1()
             .min_h_0()
             .items_start()
-            .child(self.render_sidebar(cx))
+            .child(self.render_sidebar(window, cx))
             .child(
                 v_flex()
                     .flex_1()
@@ -2836,7 +2860,7 @@ impl Render for StartView {
         let body = match &self.body {
             Some(b) => b.clone(),
             None => {
-                let b = crate::cached_slice::Slice::new(&cx.entity(), |this, _, cx| this.render_body(cx), cx);
+                let b = crate::cached_slice::Slice::new(&cx.entity(), |this, window, cx| this.render_body(window, cx), cx);
                 self.body = Some(b.clone());
                 b
             }
@@ -2847,6 +2871,13 @@ impl Render for StartView {
             .text_color(pal.text)
             .key_context(CONTEXT)
             .track_focus(&self.focus)
+            // A press anywhere but on Create takes the focus off it, as a
+            // click on the page blurs a focused button (live request 1669).
+            .on_mouse_down(MouseButton::Left, cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                if !std::mem::take(&mut this.create_press) && this.create_focus.is_focused(window) {
+                    window.focus(&this.focus, cx);
+                }
+            }))
             .on_action(cx.listener(|this, _: &NewDocument, window, cx| this.new_document(window, cx)))
             .on_action(cx.listener(|this, _: &OpenDocument, window, cx| this.import_files(window, cx)))
             .on_action(cx.listener(|_, _: &CloseWindow, window, _| window.remove_window()))

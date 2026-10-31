@@ -30,7 +30,7 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-913-create-menu | dkcreate | open Create #769fcc, menu #333 with #d7d7d7 outline; icons are icons2 dark art; "Import from" is cloud | ☑ colours |
 | dk-913b-create-menu-hover | psui-scratch d4c | Create keeps #769fcc while its menu is open and the pointer is in it (os_ui::dropdown_open); back to #1651b0 after Esc / click outside | ☑ psui 10-31 |
 | dk-914-new-document-modal | dkdocs | the capture is the documents page without a modal (Create #1651b0 closed): = dk-910 | ☑ psui 10-31 |
-| dk-915-state | | Create #769fcc with a #3e94ff ring, no menu: which state is unknown, asked live (REQUESTS psui 10-31 10:52) | ◐ |
+| dk-915-state | psui-scratch rb | Create's focus look (live request 1669): #769fcc + 2 px #3e94ff ring with its menu open and after Esc closes it, until Tab or a press elsewhere (measured: open / Esc lit, Tab / outside click #1651b0); not themed | ☑ psui 10-31 |
 | dk-920-partstudio | dk2/dk3 | viewport #333, planes, cube, navbar, toolbar, rail #2c2c2c, panel #333 = live; toolbar icons = live dk-921 (icons2, re-checked 10-26) | ☑ |
 | dk-921-partstudio | psui-scratch d1 | wordmark "noshape" white (was #4a4a4a), tab bar + #ccc | ☑ psui 10-31 |
 | dk-922-feature-hover | psui-scratch g2 | the capture shows no hover; live dk-9c0: row #0a4780 = ours (measured 10,71,128) | ☑ psui 10-31 |
