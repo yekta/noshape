@@ -1666,18 +1666,30 @@ impl SheetGeometry {
                     // Leaders (Add leader) run from the symbol's point. One
                     // to a face ends in a dot and reaches the symbol through
                     // a shoulder its tip stands on (live request 1624).
-                    for l in leaders {
+                    for (li, l) in leaders.iter().enumerate() {
                         let t = l.view.map(|v| env.to_sheet(v, l.point)).unwrap_or(l.point);
+                        // Through its nodes (Add node, help A5).
+                        let path = |from: [f64; 2]| {
+                            let mut points = vec![from];
+                            points.extend(l.nodes.iter().copied());
+                            points.push(t);
+                            points
+                        };
                         if l.dot {
                             let (s0, s1) = ([p[0] - 4.0, p[1]], [p[0] + 8.0, p[1]]);
                             let end = if t[0] > p[0] { s1 } else { s0 };
                             self.lines.push(Polyline2 { points: vec![s0, s1], style: LineStyle::Thin, closed: false, pick });
-                            self.lines.push(Polyline2 { points: vec![end, t], style: LineStyle::Thin, closed: false, pick });
+                            let points = path(end);
+                            self.lines.push(Polyline2 { points: points.clone(), style: LineStyle::Thin, closed: false, pick });
+                            self.leader_paths.push((a.id, li, LeaderPath { points, head: 1 }));
                             self.leader_dot(t);
                             continue;
                         }
-                        self.lines.push(Polyline2 { points: vec![p, t], style: LineStyle::Thin, closed: false, pick });
-                        self.arrow(t, [t[0] - p[0], t[1] - p[1]], self.style.ann_arrow);
+                        let points = path(p);
+                        let last = points[points.len() - 2];
+                        self.lines.push(Polyline2 { points: points.clone(), style: LineStyle::Thin, closed: false, pick });
+                        self.leader_paths.push((a.id, li, LeaderPath { points, head: 1 }));
+                        self.arrow(t, [t[0] - last[0], t[1] - last[1]], self.style.ann_arrow);
                     }
                     let symbol = self.mark();
                     self.surface_finish_symbol(p, &env.expand(value), spec, ah, pick);
@@ -1777,7 +1789,7 @@ impl SheetGeometry {
                     // Leaders leave the nearer short side of the first row through
                     // a shoulder; All around / All over add a circle (two) there.
                     let (x1, ym) = (right, y + rh / 2.0);
-                    for l in leaders {
+                    for (li, l) in leaders.iter().enumerate() {
                         let t = match l.view {
                             Some(v) => env.to_sheet(v, l.point),
                             None => l.point,
@@ -1786,11 +1798,17 @@ impl SheetGeometry {
                         let start = if to_right { [x1, ym] } else { [x0, ym] };
                         let sh = [start[0] + if to_right { 4.0 } else { -4.0 }, ym];
                         let leader_mark = self.mark();
-                        self.lines.push(Polyline2 { points: vec![start, sh, t], style: LineStyle::Thin, closed: false, pick });
+                        // Through its nodes (Add node, help A5), as a note's.
+                        let mut points = vec![start, sh];
+                        points.extend(l.nodes.iter().copied());
+                        points.push(t);
+                        let last = points[points.len() - 2];
+                        self.lines.push(Polyline2 { points: points.clone(), style: LineStyle::Thin, closed: false, pick });
+                        self.leader_paths.push((a.id, li, LeaderPath { points, head: 2 }));
                         if l.dot {
                             self.leader_dot(t);
                         } else {
-                            self.arrow(t, [t[0] - sh[0], t[1] - sh[1]], 3.0);
+                            self.arrow(t, [t[0] - last[0], t[1] - last[1]], 3.0);
                         }
                         // Its model point lost: the leader red, a red dot at
                         // the old attach point (live request 1625).

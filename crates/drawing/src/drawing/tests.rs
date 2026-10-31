@@ -2522,6 +2522,23 @@ fn synchronized_breaks_come_from_the_parent() {
     assert!(p.breaks().iter().any(|b| b.inherited && b.axis == 0 && (b.b - b.a - 0.02).abs() < 1e-9), "{:?}", p.breaks());
 }
 
+/// GD&T leaders take nodes like a note's (help A5) and publish their
+/// paths (for their grips, Add node and end drags).
+#[test]
+fn gdt_leader_runs_through_its_nodes() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let id = drawing.sheets[0].next_annotation_id();
+    let leader = Leader { point: [80.0, 20.0], nodes: vec![[70.0, 30.0]], ..Default::default() };
+    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: [40.0, 40.0], frame: vec!["⌖".into(), "0.1".into()], leaders: vec![leader], extra: Default::default() }, position: [40.0, 40.0], ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let (_, i, path) = built.geometry.leader_paths.iter().find(|(a, ..)| *a == id).expect("a leader path");
+    assert_eq!((*i, path.head, path.points.len()), (0, 2, 4));
+    assert_eq!(path.points[2], [70.0, 30.0]);
+    assert_eq!(*path.points.last().unwrap(), [80.0, 20.0]);
+}
+
 #[test]
 fn datum_on_dimension_arrow_hides_it() {
     let (doc, mut drawing) = demo();

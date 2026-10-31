@@ -264,6 +264,7 @@ pub enum LeaderHit {
 pub fn all_leaders(a: &Annotation) -> Option<Vec<Leader>> {
     match &a.kind {
         AnnotationKind::Note { style, .. } => Some(style.leaders.clone()),
+        AnnotationKind::Gdt { leaders, .. } | AnnotationKind::SurfaceFinish { leaders, .. } => Some(leaders.clone()),
         AnnotationKind::Balloon { view, anchor, callout, .. } => Some(callout.all_leaders(*view, *anchor)),
         _ => None,
     }
@@ -273,6 +274,7 @@ pub fn all_leaders(a: &Annotation) -> Option<Vec<Leader>> {
 pub fn with_all_leaders(a: &mut Annotation, f: impl FnOnce(&mut Vec<Leader>)) -> bool {
     match &mut a.kind {
         AnnotationKind::Note { style, .. } => f(&mut style.leaders),
+        AnnotationKind::Gdt { leaders, .. } | AnnotationKind::SurfaceFinish { leaders, .. } => f(leaders),
         AnnotationKind::Balloon { view, anchor, callout, .. } => {
             let mut all = callout.all_leaders(*view, *anchor);
             f(&mut all);
@@ -299,7 +301,11 @@ pub fn leader_paths(built: Option<&BuiltSheet>, a: &Annotation) -> Vec<(usize, L
                 .collect();
             note_leader_paths(bbox, &style.leaders, &targets).into_iter().enumerate().collect()
         }
-        AnnotationKind::Balloon { .. } => built.map(|b| b.geometry.leader_paths.iter().filter(|(id, ..)| *id == a.id).map(|(_, i, p)| (*i, p.clone())).collect()).unwrap_or_default(),
+        // As last drawn (help A5: geometric tolerances and surface finish
+        // symbols take nodes too).
+        AnnotationKind::Balloon { .. } | AnnotationKind::Gdt { .. } | AnnotationKind::SurfaceFinish { .. } => {
+            built.map(|b| b.geometry.leader_paths.iter().filter(|(id, ..)| *id == a.id).map(|(_, i, p)| (*i, p.clone())).collect()).unwrap_or_default()
+        }
         _ => Vec::new(),
     }
 }

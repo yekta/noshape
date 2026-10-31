@@ -155,6 +155,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   `views::compute_sheet_views` and `build::assemble_sheet`, the drag compares with a snapshot taken at drag start,
   `DrawingEditor.cut_drag`).
 - Then V35 from live 1630: Synchronize breaks from parent (projected views; parent → child only).
+- Then D9 (a dragged ordinate value jogs), V35 (d) (sections of broken views; breaks map through the frames), D40
+  (the lost section view red as a whole), A5 (GD&T / surface finish leaders publish their paths: menu, nodes, end
+  grip; the D40 GD&T re-attach by end grip needed this). Seen: after placing a GD&T with a snap leader, a stale
+  dashed rubber band stays drawn until the next preview rebuild (gone after a reload).
 - Open in my rows: V57 assembly Show sketches (assembly sources skip sketch wires), V35 (d) sections of broken views,
   D40 hatch / title red, C11 inference points, D9 ordinate jogs.
 
