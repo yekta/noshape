@@ -67,6 +67,9 @@ impl DrawingEditor {
         }
         let pal = p();
         let panel = self.panel.as_ref()?;
+        // Live's feature-style dialogs confirm with ✓ ✕ in the title row
+        // (Broken-out section, live 6132 / 12604), the rest with OK / Cancel.
+        let checkmark = matches!(panel, Panel::BrokenOut { .. });
         let (title, rows): (&str, Vec<AnyElement>) = match panel {
             Panel::Note { edit, .. } => {
                 let title = if edit.is_some() { "Edit note" } else { "Note" };
@@ -135,15 +138,23 @@ impl DrawingEditor {
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .child(div().font_weight(FontWeight::SEMIBOLD).child(title))
-                .children(rows)
                 .child(
+                    h_flex()
+                        .gap_1()
+                        .child(div().flex_1().font_weight(FontWeight::SEMIBOLD).child(title))
+                        .when(checkmark, |h| {
+                            h.child(div().id("dr-panel-check").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_panel(cx))))
+                                .child(div().id("dr-panel-x").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel_panel(cx))))
+                        }),
+                )
+                .children(rows)
+                .when(!checkmark, |v| v.child(
                     h_flex()
                         .gap_2()
                         .justify_end()
                         .child(Button::new("dr-panel-cancel").label("Cancel").ghost().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel_panel(cx))))
                         .child(Button::new("dr-panel-ok").label("OK").primary().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_panel(cx)))),
-                )
+                ))
                 .into_any_element(),
         )
     }
