@@ -3369,6 +3369,25 @@ fn tapping_screw_recesses_iii_and_vi() {
     }
 }
 
+/// Flat countersunk head tapping screw #8, Type VI (assembly.md LA54; live
+/// skb-sc-geom): the 0.002 in mouth fillet on the Ø0.132 recess builds, 14
+/// faces.
+#[test]
+#[ignore = "T2: standard content vs live (P3 long tail; slow)"]
+fn flat_countersunk_type_vi_mouth_fillet() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let c = CATALOGUE.iter().find(|c| c.name == "Flat countersunk head tapping screw").expect("in the catalogue");
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("#8");
+    spec.params.insert("Head type".into(), "Type VI".into());
+    spec.fix_length();
+    let r = standard::regenerate(&spec).unwrap();
+    let failed: Vec<_> = r.display.features.iter().filter_map(|f| f.message.clone()).collect();
+    let body = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    assert!(failed.is_empty(), "{failed:?}");
+    assert_eq!(body.faces.len(), 14);
+}
+
 /// Pan head tapping screw #8, tip A (live skb-sc-geom): crown sphere
 /// R 1.65·D = 0.2706 in, head Ø0.322 × 0.115 with an R0.015 edge fillet;
 /// faces: Slot 10, Type III 19, Type VI 15.
