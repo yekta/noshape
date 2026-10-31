@@ -53,6 +53,12 @@
 #include <BRepOffsetAPI_NormalProjection.hxx>
 #include <BRepProj_Projection.hxx>
 #include <Bnd_Box.hxx>
+#include <GeomLib_IsPlanarSurface.hxx>
+#include <Geom_BSplineCurve.hxx>
+#include <Geom_BezierCurve.hxx>
+#include <Geom_ElementarySurface.hxx>
+#include <Geom_SweptSurface.hxx>
+#include <Geom_RectangularTrimmedSurface.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
 #include <TopExp_Explorer.hxx>
 #include <gp_GTrsf.hxx>
@@ -440,6 +446,14 @@ bool same_domain_candidates(const TopoDS_Shape& s, const UnifyScope* sc = nullpt
     pl = p->Pln().Transformed(loc.Transformation());
     return true;
   };
+  NCollection_DataMap<const Standard_Transient*, bool> planarity;
+  auto planar = [&](const occ::handle<Geom_Surface>& g) {
+    if (const bool* known = planarity.Seek(g.get()))
+      return *known;
+    const bool r = GeomLib_IsPlanarSurface(g, Precision::Confusion()).IsPlanar();
+    planarity.Bind(g.get(), r);
+    return r;
+  };
   for (int i = 1; i <= ef.Extent(); ++i)
   {
     const ShapeList& fs = ef(i);
@@ -460,9 +474,17 @@ bool same_domain_candidates(const TopoDS_Shape& s, const UnifyScope* sc = nullpt
     }
     if (planar_a || planar_b)
       continue;
-    // Two curved faces: the same kind of surface may be one domain.
+    // Two curved faces: the same kind of surface may be one domain. Free-form ones (B-splines, ...) on different
+    // surfaces only if both are planar: USD's IsSameDomain (the knurl's 10k B-spline faces made every unify of it
+    // run a USD that merges nothing).
     if (ga->DynamicType() == gb->DynamicType())
-      return true;
+    {
+      if (ga->IsKind(STANDARD_TYPE(Geom_ElementarySurface)) || ga->IsKind(STANDARD_TYPE(Geom_SweptSurface)) ||
+          ga->IsKind(STANDARD_TYPE(Geom_RectangularTrimmedSurface)))
+        return true;
+      if (planar(ga) && planar(gb))
+        return true;
+    }
   }
   // Collinear edges that could merge: a vertex shared by exactly two
   // straight edges on one line.
@@ -483,7 +505,13 @@ bool same_domain_candidates(const TopoDS_Shape& s, const UnifyScope* sc = nullpt
       continue;
     if (a.IsNull())
     {
-      if (c1->DynamicType() == c2->DynamicType())
+      // USD joins circles of one circle and straight B-splines / Beziers (two poles) only.
+      auto straight = [](const occ::handle<Geom_Curve>& c) {
+        const occ::handle<Geom_BSplineCurve> b = occ::down_cast<Geom_BSplineCurve>(c);
+        const occ::handle<Geom_BezierCurve>  z = occ::down_cast<Geom_BezierCurve>(c);
+        return b.IsNull() && z.IsNull() ? true : (!b.IsNull() ? b->NbPoles() : z->NbPoles()) == 2;
+      };
+      if (c1->DynamicType() == c2->DynamicType() && straight(c1) && straight(c2))
         return true;
       continue;
     }
