@@ -1066,6 +1066,12 @@ process 0.62 GB; straight 0.6 s. The knurl target is met: the regeneration and t
   (+19), corpus6 676 (+4), Shell's 81, direct 58. T1: 079531266b0370d5 (a drilled hole's tip cut by two planes
   through its axis), 2b1c8fd20fcce7d5 (a plane along a ruling) in tests/data/brep.
 
+## The knurl at 8d4cf857 (vibe3, 10-31 16:05 UTC; with core's cheaper unify)
+The hourly baseline: the whole test 15.96 s (162.88 s at 09714588 this morning). Profiled there (KNURL=diamond,
+NOSHAPE_KERNEL_PROFILE, the machine held): the regeneration 8.8 s (live 49 s), the feature 7.9 s = op_boolean
+7.24 s (noshape's Boolean 4.93 s: its brep part 4.35, the build 0.57, OCCT's sections ahead 0.57; unify.usd 2.0 s:
+USD 1.32, its copy 0.35) + op_unify 0.1 s; the rest of the test (its volume, meshing, the straight knurl) ~6.5 s.
+
 ## What still declines, by OCCT's recorded time (replays 10-31 13:10 UTC, each case once over all corpora)
 An internal face 25.3 s (2: b2511301 a Shell slab fuse of 72 tools whose OCCT result is invalid, addb9a14), a
 tolerant input 23.9 s (18), edges of two arguments crossing on a third's face 22.2 s (14), a plane through a

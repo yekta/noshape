@@ -723,6 +723,10 @@ Knurl Phase 1 stopped at 246 s (its steps left are 10–40 s each); REGEN-SPEED 
   results checked: same bits). The knurl's 10k-face volume 56 s → 8.3 s on this loaded box; the knurl feature
   test spends most of its time outside the regeneration there. Only that loop changed.
 
+## From bool (10-31 16:05 UTC): one field in blend.rs
+- `noshape_brep::Output` has a new field `edge_apex` (a cone's apex in pieces, ede3be15); blend.rs's Output
+  literal sets it empty (`edge_apex: Vec::new()`), nothing else there changed.
+
 ## From skasm (10-31 05:40): G46 shell numbers (core-workflow 3.6)
 
 Live "kern G46" (behaviours ~5683): 50 × 30 × 30 block, R3 on the two top edges at (50, 0, 30), Chamfer 2 mm on the vertical edge between them, Shell with the top face removed. Main CLI, /root/skasm-scratch/feat/g46.py:
