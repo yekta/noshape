@@ -4179,7 +4179,8 @@ impl PartStudioView {
             // Section view…); only for curves.
             if all_curves && !tool_active {
                 m = m.separator().item(item("Construction", Box::new(|this, w, cx| this.toggle_construction(w, cx))));
-                m = m.separator().item(item("Extrude…", Box::new(|_, w, cx| w.dispatch_action(Box::new(Extrude), cx)))).item(item("Revolve…", Box::new(|_, w, cx| w.dispatch_action(Box::new(Revolve), cx))));
+                // Live (dk-976): with the tools' icons.
+                m = m.separator().item(item("Extrude…", Box::new(|_, w, cx| w.dispatch_action(Box::new(Extrude), cx))).icon_name("extrude")).item(item("Revolve…", Box::new(|_, w, cx| w.dispatch_action(Box::new(Revolve), cx))).icon_name("revolve"));
             }
             m = m.separator();
             if n == 0 {
@@ -4266,10 +4267,10 @@ impl PartStudioView {
             }
             if let Some(cid) = dim {
                 let label = if dim_is_dimension { "Delete dimension" } else { "Delete sketch entity" };
-                m = m.separator().item(item(label, Box::new(move |this, w, cx| this.dim_menu_action(cid, "delete", w, cx))));
+                m = m.separator().item(item(label, Box::new(move |this, w, cx| this.dim_menu_action(cid, "delete", w, cx))).icon_name("menu-delete"));
             } else if n > 0 && !tool_active {
                 let label = if n == 1 { "Delete sketch entity".to_string() } else { format!("Delete {n} sketch entities") };
-                m = m.separator().item(item(&label, Box::new(|this, w, cx| this.sketch_delete(w, cx))));
+                m = m.separator().item(item(&label, Box::new(|this, w, cx| this.sketch_delete(w, cx))).icon_name("menu-delete"));
             }
             m
         });
