@@ -3215,6 +3215,7 @@ impl AssemblyView {
     fn render_panel_rail(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let exploded = self.explode.is_some();
+        let any_open = self.panel.is_some() || exploded;
         let btn = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
@@ -3225,14 +3226,17 @@ impl AssemblyView {
                 .flex()
                 .items_center()
                 .justify_center()
-                .bg(if on { pal.row_hover } else { pal.panel })
+                // As the Part Studio's strip (live assembly/181-*, dk-942):
+                // with a panel open the others turn #eaeaea (dark #1c1c1c)
+                // and the open one keeps the panel colour, joining it.
+                .bg(if any_open && !on { pal.strip_inactive } else { pal.panel })
                 .hover(|d| d.bg(pal.panel_hover))
                 .cursor_pointer()
                 .border_1()
                 // Live keeps the #aaa outline in dark (dk-929).
                 .border_color(gpui_kit::rgb_static(0xaaaaaa))
+                .when(on, |d| d.border_r_0())
                 .child(crate::assets::icon(icon, 20., cx))
-                .when(on, |d| d.child(div().absolute().right_0().top_0().bottom_0().w(px(3.)).bg(pal.accent)))
                 .tooltip(crate::ui::tooltip(tip))
         };
         let toggle = |this: &mut Self, panel: SidePanel, cx: &mut Context<Self>| {

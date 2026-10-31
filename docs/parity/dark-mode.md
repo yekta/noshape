@@ -29,12 +29,12 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-912-documents-row-selected |  | selected row `accent_soft` #134e96 = live | ☑ |
 | dk-913-create-menu | dkcreate | open Create #769fcc, menu #333 with #d7d7d7 outline; icons are icons2 dark art; "Import from" is cloud | ☑ colours |
 | dk-913b-create-menu-hover | psui-scratch d4c | Create keeps #769fcc while its menu is open and the pointer is in it (os_ui::dropdown_open); back to #1651b0 after Esc / click outside | ☑ psui 10-31 |
-| dk-914-new-document-modal | | | ☐ |
-| dk-915-state | | | ☐ |
+| dk-914-new-document-modal | dkdocs | the capture is the documents page without a modal (Create #1651b0 closed): = dk-910 | ☑ psui 10-31 |
+| dk-915-state | | Create #769fcc with a #3e94ff ring, no menu: which state is unknown, asked live (REQUESTS psui 10-31 10:52) | ◐ |
 | dk-920-partstudio | dk2/dk3 | viewport #333, planes, cube, navbar, toolbar, rail #2c2c2c, panel #333 = live; toolbar icons = live dk-921 (icons2, re-checked 10-26) | ☑ |
 | dk-921-partstudio | psui-scratch d1 | wordmark "noshape" white (was #4a4a4a), tab bar + #ccc | ☑ psui 10-31 |
-| dk-922-feature-hover | | | ☐ |
-| dk-923-feature-selected | | | ☐ |
+| dk-922-feature-hover | psui-scratch g2 | the capture shows no hover; live dk-9c0: row #0a4780 = ours (measured 10,71,128) | ☑ psui 10-31 |
+| dk-923-feature-selected | psui-scratch g1 | selected row #134e96 = ours (19,78,150) | ☑ psui 10-31 |
 | dk-924-feature-rmb | dkrmb2 | menu #333, #ccc outline (static), #ddd separators, Delete ⊗ (masked icons keep their mask) | ☑ |
 | dk-925-tool-tooltip | dktip | title #4b5761, body #333, white text; the description text is ours (tool_text.rs policy) | ☑ colours |
 | dk-926-feature-dialog | dkext2 | dialog #333, active query box #142434 + #3e94ff border, related row #092046, selected #134e96 = live | ☑ |
@@ -46,8 +46,8 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-932-sketch-dimension |  | dimension lines white (scene); edit box follows the palette | ◐ box not compared |
 | dk-933-sketch-after |  | dimension values white, driven #ccc, conflicts #ff6b6b | ☑ |
 | dk-940-assembly | dkasm | chrome, list and viewport match; toolbar icons = live (icons2, re-checked 10-26; the Search tools box sits ~2 px right: ui) | ☑ |
-| dk-941-mate-dialog | | | ☐ |
-| dk-942-bom | | | ☐ |
+| dk-941-mate-dialog | psui-scratch h2 | dialog / title #333, active Mate connectors box #142434 with a #3e94ff border = live (Revolute, no picks) | ☑ psui 10-31 |
+| dk-942-bom | psui-scratch h5 | BOM header row and bar #555, cells #1c1c1c = live; the assembly strip as the Part Studio's (open #333 joining the panel, others #1c1c1c; was a blue row with an accent bar) | ☑ psui 10-31 |
 | dk-950-drawing | dkdraw | shell dark (navbar, rail, tab bar), toolbar, sheet surround and sheet light | ☑ |
 | dk-951-drawing-properties | qa c82818b7 | selects light = live; unticked checkboxes solid #333 and their labels #ccc (live white box, #333 label); Sheet properties select values white on white (DARK-DRAWING-PANEL-CONTROLS) | ☑ fixed dx, verified fbd2536c (qa 10-30 15:07: Sheet properties values dark on white with ▾; Drawing properties checkboxes white boxes, #333-like labels) |
 | dk-960-feature-studio | dkfs2 | Ace twilight on #333: tokens, gutter #232323, numbers #e2e2e2 = live computed | ☑ |
