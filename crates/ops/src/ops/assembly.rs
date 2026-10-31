@@ -108,6 +108,7 @@ pub fn ops() -> Vec<Op> {
                 opt("rotation_axis", json!({ "type": "string", "enum": ["x", "y", "z"], "default": "z" }), "Axis of the rotation offset."),
                 opt("limits", json!({ "type": "object" }), "Limits: {\"<axis>\": {\"min\": expr, \"max\": expr}} for the mate type's axes (Revolute rz; Slider z; Cylindrical z, rz; Pin slot x, rz; Planar x, y, rz; Parallel z; Ball cone)."),
                 opt("tangent_propagation", json!({ "type": "boolean", "default": true }), "Tangent mates: Tangent propagation."),
+                opt("simulation_connection", json!({ "type": "boolean", "default": false }), "Simulation connection (stored; every mate but Pin slot, Parallel, Tangent and Width)."),
                 opt("solve_all", json!({ "type": "boolean" }), "Solve every mate (the dialog's Solve) instead of only moving this mate's first instance."),
                 opt("reset", json!({ "type": "boolean" }), "With `mate`: the mate menu's Reset, its degrees of freedom back to 0 (\"Reset : <mate>\"; not Fastened, Tangent or Width)."),
             ],
@@ -330,6 +331,9 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
             }
             if m.mate_type == MateType::Tangent {
                 v["tangent_propagation"] = json!(m.tangent_propagation);
+            }
+            if m.mate_type.has_simulation_connection() {
+                v["simulation_connection"] = json!(m.simulation_connection);
             }
             v
         })
@@ -786,6 +790,7 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         m.limits = out;
     }
     m.tangent_propagation = a.bool_or("tangent_propagation", m.tangent_propagation)?;
+    m.simulation_connection = a.bool_or("simulation_connection", m.simulation_connection)? && mate_type.has_simulation_connection();
     if mate_type == MateType::Width {
         let c = conn("c")?.or_else(|| m.extra.first().cloned()).ok_or_else(|| OpError::param("c", "Two width mate connectors are required."))?;
         let d = conn("d")?.or_else(|| m.extra.get(1).cloned());

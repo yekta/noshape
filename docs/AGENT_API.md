@@ -2346,6 +2346,7 @@ Examples:
 | `rotation_axis` | one of `x`, `y`, `z` |  | Axis of the rotation offset. |
 | `limits` | object |  | Limits: {"<axis>": {"min": expr, "max": expr}} for the mate type's axes (Revolute rz; Slider z; Cylindrical z, rz; Pin slot x, rz; Planar x, y, rz; Parallel z; Ball cone). |
 | `tangent_propagation` | boolean |  | Tangent mates: Tangent propagation. |
+| `simulation_connection` | boolean |  | Simulation connection (stored; every mate but Pin slot, Parallel, Tangent and Width). |
 | `solve_all` | boolean |  | Solve every mate (the dialog's Solve) instead of only moving this mate's first instance. |
 | `reset` | boolean |  | With `mate`: the mate menu's Reset, its degrees of freedom back to 0 ("Reset : <mate>"; not Fastened, Tangent or Width). |
 

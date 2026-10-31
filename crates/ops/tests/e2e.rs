@@ -229,6 +229,12 @@ fn assembly_with_mates() {
     assert_eq!(mj["limits"]["rz"], json!({ "min": "-30 deg", "max": "45 deg" }), "{mj}");
     assert_eq!(mj["offset"]["z"], "5 mm", "{mj}");
     assert_eq!(mj["reorient_secondary"], 1, "{mj}");
+    // Simulation connection: the dialog's last checkbox, stored (Onshape
+    // help: every mate but Pin slot, Parallel, Tangent and Width).
+    assert_eq!(mj["simulation_connection"], false, "{mj}");
+    call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "simulation_connection": true }));
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    assert_eq!(list["mates"].as_array().unwrap().iter().find(|x| x["name"] == "Revolute 1").unwrap()["simulation_connection"], true);
     // Mate menu › Reset: its rotation back to 0, one edit.
     call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "reset": true }));
     let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));

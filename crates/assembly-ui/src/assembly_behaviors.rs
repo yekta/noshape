@@ -2254,6 +2254,8 @@ impl AssemblyView {
             self.close_insert(window, cx);
         } else {
             self.close_mate(window, cx);
+            // The session is one step of its own (✕ / Esc revert just it).
+            self.end_insert_step(cx);
             self.insert_open = true;
             self.ui.insert_inserted.clear();
             self.std_take_selection(cx);
@@ -2300,8 +2302,24 @@ impl AssemblyView {
         cx.notify();
     }
 
-    /// Close the Insert dialog (checkmark / Esc): an instance still following
-    /// the cursor stays where it is.
+    /// Cancel the Insert dialog (✕ / Esc): its instances go, the one
+    /// following the cursor too (live: nothing is committed before ✓;
+    /// "✕ / Esc cancels and removes the inserted instances", behaviours
+    /// "Standard content … (2)", 5114).
+    pub(super) fn cancel_insert(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let inserted = self.placing.take().is_some_and(|ids| !ids.is_empty()) || self.inserted_count(cx) > 0;
+        self.placing_point = None;
+        self.message = None;
+        if inserted && self.doc.read(cx).has_pending() {
+            // Undo commits the pending session step, then reverts it.
+            self.doc.update(cx, |d, cx| d.undo(cx));
+            self.selected.clear();
+        }
+        self.close_insert(window, cx);
+    }
+
+    /// Close the Insert dialog (checkmark, the toolbar's Insert): an
+    /// instance still following the cursor stays where it is.
     pub(super) fn close_insert(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.placing.is_some() {
             self.finish_placing(true, window, cx);

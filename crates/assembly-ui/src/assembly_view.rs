@@ -3846,7 +3846,16 @@ impl AssemblyView {
         if m.hidden || !self.show_mates {
             head.push_str(" (Hidden)");
         }
-        let mut lines = vec![head, format!("{} mate", m.mate_type.name())];
+        // Then the dialog's rows by their labels: the type, its checkboxes
+        // (live: "Revolute" / "Offset" / "Limits" / "Simulation connection",
+        // "Tangent propagation"; behaviours 8733, E9), a set offset or limit
+        // with its values.
+        let t = m.mate_type;
+        let mut lines = vec![head, t.name().to_string()];
+        if t == MateType::Tangent {
+            lines.push("Tangent propagation".into());
+        }
+        let (ox, oy, oz, orot) = noshape_model::assembly::eval::offset_axes(t);
         let mut offs: Vec<String> = Vec::new();
         for (label, e) in [("X", &m.offset_x), ("Y", &m.offset_y), ("Z", &m.offset_z)] {
             if let Some(e) = e.as_ref().filter(|e| !e.text.trim().is_empty()) {
@@ -3856,7 +3865,12 @@ impl AssemblyView {
         if let Some(e) = m.rotation.as_ref().filter(|e| !e.text.trim().is_empty()) {
             offs.push(format!("rotation {} about {}", e.text, ["X", "Y", "Z"][(m.rotation_axis as usize).min(2)]));
         }
-        lines.push(if offs.is_empty() { "Offset: off".into() } else { format!("Offset: {}", offs.join(", ")) });
+        if ox || oy || oz || orot {
+            lines.push(if offs.is_empty() { "Offset".into() } else { format!("Offset: {}", offs.join(", ")) });
+        }
+        if m.limits.is_empty() && !noshape_model::assembly::eval::limit_keys(t).is_empty() {
+            lines.push("Limits".into());
+        }
         if !m.limits.is_empty() {
             let mut ls = Vec::new();
             for (k, l) in &m.limits {
@@ -3871,6 +3885,9 @@ impl AssemblyView {
                 ls.push(format!("{label} {} to {}", t(&l.min), t(&l.max)));
             }
             lines.push(format!("Limits: {}", ls.join(", ")));
+        }
+        if t.has_simulation_connection() {
+            lines.push("Simulation connection".into());
         }
         lines.join("\n")
     }
@@ -4901,7 +4918,7 @@ impl AssemblyView {
                             .child(crate::assets::icon("dialog-ok", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx))),
                     )
-                    .child(Button::new("insert-close").ghost().cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 24., cx)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx))))
+                    .child(Button::new("insert-close").ghost().cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 24., cx)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.cancel_insert(window, cx))))
                     .into_any_element()
     }
 
@@ -5857,8 +5874,8 @@ impl AssemblyView {
             self.cancel_step_edit(cx);
             cx.notify();
         } else if self.placing.is_some() || self.insert_open {
-            // Esc ends the insertion: placed instances stay (Undo removes them).
-            self.close_insert(window, cx);
+            // Esc cancels the insertion as ✕ (live: the inserted instances go).
+            self.cancel_insert(window, cx);
         } else if self.mate.is_some() {
             self.close_mate(window, cx);
         } else if self.anim.is_some() {

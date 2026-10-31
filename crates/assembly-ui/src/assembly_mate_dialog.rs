@@ -85,6 +85,8 @@ pub struct MateDialog {
     pub suppressed: bool,
     /// Tangent mates: contact may move onto tangent-connected faces.
     pub tangent_propagation: bool,
+    /// "Simulation connection" (stored only).
+    pub simulation_connection: bool,
     /// Axis of the rotation offset (0 = X, 1 = Y, 2 = Z).
     pub rotation_axis: u8,
     /// Mate indicator hidden (kept when editing).
@@ -288,6 +290,7 @@ impl MateDialog {
             reorient: mate.reorient_secondary,
             suppressed: mate.suppressed,
             tangent_propagation: mate.tangent_propagation,
+            simulation_connection: mate.simulation_connection,
             rotation_axis: mate.rotation_axis,
             hidden: mate.hidden,
             unsuppressed_if: mate.unsuppressed_if.clone(),
@@ -471,6 +474,7 @@ impl MateDialog {
             suppressed: self.suppressed,
             extra,
             tangent_propagation: self.tangent_propagation,
+            simulation_connection: self.simulation_connection && self.mate_type.has_simulation_connection(),
             hidden: self.hidden,
             unsuppressed_if: self.unsuppressed_if.clone(),
         })
@@ -862,6 +866,15 @@ impl Render for MateDialog {
                             cx.notify();
                         })))
                         .when(self.use_limits, |d| d.child(limit_rows))
+                    })
+                    // Live (dom/assembly-revolute-dialog-both.txt, behaviours 1326): the
+                    // last checkbox, on every mate but Pin slot, Parallel, Tangent and Width.
+                    .when(t.has_simulation_connection(), |d| {
+                        d.child(os::checkbox("mate-simulation", "Simulation connection", self.simulation_connection).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.simulation_connection = !this.simulation_connection;
+                            cx.emit(MateDialogEvent::Changed);
+                            cx.notify();
+                        })))
                     })
                     // Onshape's bottom row: flip primary axis, reorient secondary
                     // axis, animate, Solve; the help ? at the right. Live

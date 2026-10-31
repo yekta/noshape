@@ -26,9 +26,9 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 |---|---|---|---|---|---|
 | 2.1 | Move face: click near the edge of the x=40 face | field "Faces to move" only accepts faces (picks the face) | **chip "Edge of Import 1"** (feature red); 3 times in this run, also inside the hole | ✅ hover near the x=40 edge outlines the face; chip "Face of Import 1" (I2 fixed) | 77870dd4 10-28 |
 | 2.2 | Move face, x=40 face, Offset 20 mm, flipped (O1) | **3607.3009183012764**, 1 part | **3607.300918**, 8 faces | ✅ | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported: 3607.300918, 8 faces) |
-| 2.3 | Move face, hole face 5 mm default direction (O4) | **8000** | 8000.0 (CLI; the hole wall could not be picked in the UI, see I2) | ✅ | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported: 8000.0, 6 faces) |
+| 2.3 | Move face, hole face 5 mm default direction (O4) | **8000** | 8000.0 (CLI; the hole wall could not be picked in the UI, see I2) | ✅; the hole wall is pickable now (skasm 10-31 GUI :103 (a 40 × 20 × 10 block with a Ø12 through hole, exported to STEP and imported): Move face, the pointer inside the hole outlines the hole wall, a click gives "Face of Import 1" (preview: the wall offset 5 mm inward), the field stays active for more faces) | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported: 8000.0, 6 faces) |
 | 2.4 | … opposite direction | **2429.203673**, 1 part | 2429.203532, 1 part | ✅ | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported: 2429.20361, 1 part (live 2429.203673)) |
-| 2.5 | Feature row menu (last feature) | Rename, Edit…, Add selection to folder…, Suppress, Add comment, Zoom to selection, Show dependencies…, Add appearance…, Delete | same + Dynamic suppression | ✅ |  |
+| 2.5 | Feature row menu (last feature) | Rename, Edit…, Add selection to folder…, Suppress, Add comment, Zoom to selection, Show dependencies…, Add appearance…, Delete | same + Dynamic suppression | ✅ | skasm 10-31 GUI :103 (Import 1 row, the last feature): Rename, Edit…, Add selection to folder…, Suppress, Dynamic suppression ▸, Zoom to selection, Show dependencies…, Add appearance to feature…, Delete = live's feature row order (behaviours "qa5 derived" (4) has Dynamic suppression there too); Add comment is cloud-only |
 | 2.6 | Delete face (hole), Heal | 8000, 6 faces | 8000.0, 6 faces | ✅ | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported: 8000.0, 6 faces) |
 | 2.7 | Replace face: top face, replace with Plane 1 (Top + 15) | ? (request) | plane refused, notice "Select faces." | ✅ I3 fixed: Plane 1 (Top + 15) as "Faces to replace with" → OK 12000 mm³ = live | skasm 10-31 (main CLI skasm-scratch/feat/repl.py) |
 | 2.8 | Fillet (Shift+F) top front edge R3 | 8000 − (1−π/4)·9·40 = 7922.743339 | 7922.743339 | ✅ | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported, hole healed, top front edge R3: 7922.743339, 7 faces) |
@@ -45,21 +45,21 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 
 ## Findings (2026-10-21 run)
 
-| # | Finding | Repro | Owner |
-|---|---|---|---|
-| I2 | **Face-only query fields accept edges** (Move face "Faces to move"); with edges dominating near borders and inside holes, the hole wall can't be picked | Move face, click near a face border / inside a hole | psb |
-| I1 | Imported volumes differ by format for the same part: SAT +3.066 mm³ (+0.04 %), X_T +0.089, STEP −0.199 vs live 7582.912205 | import samples/g25-b.* | kern |
-| I5 | Parasolid export writes schema v12 while the dialog says 38.1 | Part › Export… Parasolid | kern |
-| I6 | CLI/MCP has no import operation | `noshape-cli tools` | api |
-| I3 | Replace face refuses a plane as the replacement (verify live) | §2.7 | psb |
-| I4 | Feature-list row tooltip lingers over the dialog opened by the click | Plane / Sketch on Top | ui |
+| # | Finding | Repro | Owner | Status |
+|---|---|---|---|---|
+| I2 | **Face-only query fields accept edges** (Move face "Faces to move"); with edges dominating near borders and inside holes, the hole wall can't be picked | Move face, click near a face border / inside a hole | psb | ✅ fixed: border 6acf6b94 (row 2.1 below); hole wall skasm 10-31 GUI :103 (a 40 × 20 × 10 block with a Ø12 through hole, exported to STEP and imported): Move face, the pointer inside the hole outlines the hole wall, a click gives "Face of Import 1" (preview: the wall offset 5 mm inward), the field stays active for more faces |
+| I1 | Imported volumes differ by format for the same part: SAT +3.066 mm³ (+0.04 %), X_T +0.089, STEP −0.199 vs live 7582.912205 | import samples/g25-b.* | kern | ✅ SAT 7582.989, X_T 7583.001, STEP 7582.978 (live 7582.912 ± 4.22; skasm 10-31 CLI) |
+| I5 | Parasolid export writes schema v12 while the dialog says 38.1 | Part › Export… Parasolid | kern | ✅ SCH_3801231_38101 (workflow-document.md, skasm 10-31 CLI) |
+| I6 | CLI/MCP has no import operation | `noshape-cli tools` | api | ✅ import_files |
+| I3 | Replace face refuses a plane as the replacement (verify live) | §2.7 | psb | ✅ I3 fixed (row 2.7) |
+| I4 | Feature-list row tooltip lingers over the dialog opened by the click | Plane / Sketch on Top | ui | ✅ 6acf6b94 |
 
 ## Update from live's answer (behaviours.md "qa5 import/surfaces", 10-21)
 
 | # | Row | Live | Verdict |
 |---|---|---|---|
-| 2.1 | Move face click 2 px from a border | picks the face (field is face-filtered); dialog type [Offset \| Translate \| Rotate], End type, Distance 5 mm, ☑ Reapply fillet | I2 confirmed |
-| 2.7 | Replace face with Plane 1 | "Faces to replace with" (needs focus) accepts **Plane 1** (list or viewport); ✓ OK 12000 mm³ | **I3 confirmed** |
+| 2.1 | Move face click 2 px from a border | picks the face (field is face-filtered); dialog type [Offset \| Translate \| Rotate], End type, Distance 5 mm, ☑ Reapply fillet | I2 confirmed → ✅ fixed (border 6acf6b94; hole wall skasm 10-31 GUI :103 (a 40 × 20 × 10 block with a Ø12 through hole, exported to STEP and imported): Move face, the pointer inside the hole outlines the hole wall, a click gives "Face of Import 1" (preview: the wall offset 5 mm inward), the field stays active for more faces) |
+| 2.7 | Replace face with Plane 1 | "Faces to replace with" (needs focus) accepts **Plane 1** (list or viewport); ✓ OK 12000 mm³ | **I3 confirmed** → ✅ I3 fixed (row 2.7) |
 
 ## Re-run pass 3 (2026-10-21 15:05–15:15; UI /tmp/qa5/noshape-1448 = target-shared 14:48, CLI /tmp/qa5/noshape-cli-1436)
 
