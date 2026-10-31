@@ -178,6 +178,36 @@ fn chamfer_then_fillets_shell_like_onshape() {
     assert!(r.is_valid() && vol(&r) > 0.0);
 }
 
+/// Live G46: R3 on the two top edges at (50, 0, 30) of a 50 x 30 x 30 block, then a 2 mm chamfer of the vertical
+/// edge between them (OCCT's patch across the fillets, a B-spline), shelled with the top removed. Live HIGH (request
+/// 1674): 6052.6808 / 13946.7022 mm³, 21 faces; ours is the exact offset (live's inner patch isn't symmetric, so
+/// this pins ours). Slabs, ~3 s a shell (SHELL-SLOW: three of the nine slabs are free-form).
+#[test]
+#[ignore = "T2: ~7 s, our exact offset vs live's +1.2 mm³ (docs/handoff/core.md G46)"]
+fn fillets_then_chamfer_shell_like_onshape() {
+    let _ = set_working_scale(1000.0);
+    let s = bx([0.0; 3], [0.05, 0.03, 0.03]);
+    let tops = edges_where(&s, |i| (i.start.z - 0.03).abs() < 1e-9 && (i.end.z - 0.03).abs() < 1e-9 && ((i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9) || ((i.start.x - 0.05).abs() < 1e-9 && (i.end.x - 0.05).abs() < 1e-9)));
+    assert_eq!(tops.len(), 2);
+    let s = fillet_checked(&s, &tops, &[0.003]).unwrap().shape;
+    let corner = edges_where(&s, |i| (i.start.z - i.end.z).abs() > 1e-9 && (i.start.x - 0.05).abs() < 1e-9 && i.start.y.abs() < 1e-9 && (i.end.x - 0.05).abs() < 1e-9 && i.end.y.abs() < 1e-9);
+    assert_eq!(corner.len(), 1);
+    let s = chamfer_checked(&s, &corner, ChamferSpec::Equal(0.002), &[]).unwrap().shape;
+    assert_eq!(s.count(ShapeType::Face), 10);
+    assert!((vol(&s) * 1e9 - 44790.075177).abs() < 1e-4, "{}", vol(&s) * 1e9);
+    let top = faces_where(&s, |c| c.z > 0.029999);
+    assert_eq!(top.len(), 1);
+    for (t, want) in [(0.001, 6053.881842), (0.0025, 13946.756013)] {
+        let t0 = std::time::Instant::now();
+        let r = shell_solid(&s, &top, t, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+        let took = t0.elapsed();
+        let v = vol(&r) * 1e9;
+        assert_eq!(r.count(ShapeType::Face), 21, "{t}");
+        assert!((v - want).abs() < 1e-3, "{t}: {v} vs {want}");
+        eprintln!("shell {t}: {v:.6} mm³ in {took:?} ({})", last_shell_path());
+    }
+}
+
 /// fs's std_reference shellTop (live 2653.5 mm³): a 20 mm cube at x = 900
 /// with its top removed, shelled 1.5 mm inward. Its caps lie on planes whose
 /// origin stayed at the sketch's (the world origin), 900 mm from the faces:
