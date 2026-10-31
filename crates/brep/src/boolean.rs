@@ -3938,6 +3938,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 let q = cx.faces[g].to2(pieces[pi].inside);
                 let d = distance2(q, cx.bound(g)?);
                 if d <= GREY * tol {
+                    if std::env::var_os("NOSHAPE_X_NM").is_some() {
+                        eprintln!("CB d {d:e} tol {tol:e} piece {pi} face {f} arg {arg} at {:?} on face {g} arg {} kinds {:?}/{:?}", pieces[pi].inside, cx.faces[g].arg, std::mem::discriminant(&cx.faces[f].s), std::mem::discriminant(&cx.faces[g].s));
+                    }
                     return Err(Decline("a piece's point near a coincident face's boundary"));
                 }
                 if inside2(q, cx.bound(g)?) {
