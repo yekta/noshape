@@ -362,3 +362,42 @@ fn rust_blends_of_open_chains_are_occts() {
         }
     }
 }
+
+/// noshape's own blends round corners between blended straight edges whose edge down the walls stays sharp: a
+/// block's top loop (four corners), filleted (the cylinders meet along ellipses) and chamfered (planes along
+/// lines): OCCT's volume (1e-9), counts, and history to 1e-7 of the part (OCCT approximates the corners' curves).
+#[test]
+fn rust_blends_round_corners_are_occts() {
+    let block = make_box_corners(DVec3::ZERO, DVec3::new(40.0, 20.0, 10.0)).unwrap();
+    let top: Vec<Shape> = block.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| i.start.z > 9.9 && i.end.z > 9.9)).collect();
+    assert_eq!(top.len(), 4);
+    for spec in ["fillet", "chamfer"] {
+        let run = || match spec {
+            "fillet" => fillet(&block, &top, 2.0),
+            _ => chamfer(&block, &top, ChamferSpec::Equal(1.5), &[]),
+        };
+        set_rust_blend(Some(false));
+        let occt = run().unwrap();
+        set_rust_blend(Some(true));
+        reset_blend_decline();
+        let ours = run();
+        set_rust_blend(None);
+        let why = last_blend_decline();
+        let ours = ours.unwrap();
+        assert_eq!(why, "", "{spec}: declined");
+        assert!(ours.shape.is_valid(), "{spec}: invalid");
+        let (a, b) = (bool_corpus::Summary::of(&ours), bool_corpus::Summary::of(&occt));
+        assert_eq!((a.faces, a.edges, a.vertices), (b.faces, b.edges, b.vertices), "{spec}");
+        assert!((a.volume - b.volume).abs() <= 1e-9 * b.volume, "{spec}: {} vs {}", a.volume, b.volume);
+        // Exact: the cross-section along the frame's centroid line (mitered at the corners).
+        let (r, l, w) = (if spec == "fillet" { 2.0f64 } else { 1.5 }, 40.0, 20.0);
+        let (area, inset) = if spec == "fillet" {
+            let pi = std::f64::consts::PI;
+            (r * r * (1.0 - pi / 4.0), r * (5.0 / 6.0 - pi / 4.0) / (1.0 - pi / 4.0))
+        } else {
+            (0.5 * r * r, r / 3.0)
+        };
+        let exact = l * w * 10.0 - area * (2.0 * (l + w) - 8.0 * inset);
+        assert!((a.volume - exact).abs() <= 1e-9 * exact, "{spec}: {} vs exact {exact}", a.volume);
+    }
+}

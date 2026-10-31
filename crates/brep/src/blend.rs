@@ -222,6 +222,8 @@ struct Chain {
     links: Vec<Link>,
     /// Its vertices in P's order: link i runs from verts[i] to verts[i + 1] (round to verts[0] when closed).
     verts: Vec<u32>,
+    /// Per vertex: a corner between two links (not tangent there).
+    corner: Vec<bool>,
     closed: bool,
     /// An open chain's ends (at verts[0], at its last vertex).
     ends: [Option<End>; 2],
@@ -310,6 +312,7 @@ fn ordered(b: &Body, lp: &[Use]) -> Option<Vec<Use>> {
 fn chains(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdge>], margin: f64) -> Result<Vec<Chain>, Decline> {
     let mut owner: Vec<Option<usize>> = vec![None; b.edges.len()];
     let mut out: Vec<Chain> = Vec::new();
+    let mut candidates: Vec<(u32, u32, DVec3, Vec<Use>, bool)> = Vec::new();
     for (f, face) in b.faces.iter().enumerate() {
         let Some(n) = plane_normal(face) else { continue };
         for (l, lp) in face.loops.iter().enumerate() {
@@ -339,8 +342,9 @@ fn chains(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdg
                     };
                     let tp = if prev.reversed { -tp } else { tp };
                     let tu = if u.reversed { -tu } else { tu };
-                    if tp.dot(tu) < 1.0 - 1e-12 {
-                        return no("a corner between blended edges");
+                    // A corner between them: the two blends meet along their intersection (lines only).
+                    if tp.dot(tu) < 1.0 - 1e-12 && (ep.curve != Curve::Line || eu.curve != Curve::Line) {
+                        return no("a corner between blended edges not lines");
                     }
                 }
                 r.push(*u);
@@ -356,28 +360,33 @@ fn chains(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdg
                 };
                 let tl = if last.reversed { -tl } else { tl };
                 let tf = if first.reversed { -tf } else { tf };
-                if tl.dot(tf) < 1.0 - 1e-12 {
-                    return no("a corner between blended edges");
+                if tl.dot(tf) < 1.0 - 1e-12 && (el.curve != Curve::Line || ef.curve != Curve::Line) {
+                    return no("a corner between blended edges not lines");
                 }
                 closed = true;
                 runs = vec![lp.clone()];
             }
             for run in runs {
-                // Claimed by an earlier face: skip it whole (an edge between two planar faces), else decline.
-                let claimed = run.iter().filter(|u| owner[u.edge as usize].is_some()).count();
-                if claimed == run.len() {
-                    continue;
-                }
-                if claimed > 0 {
-                    return no("an edge in two chains");
-                }
-                let c = chain(b, uses, ve, spec_of, f as u32, l as u32, n, &run, closed, margin)?;
-                for x in &c.links {
-                    owner[x.edge as usize] = Some(out.len());
-                }
-                out.push(c);
+                candidates.push((f as u32, l as u32, n, run, closed));
             }
         }
+    }
+    // The longest first (a whole loop before the single edges its edges also are on other faces), then by face.
+    candidates.sort_by(|x, y| y.4.cmp(&x.4).then(y.3.len().cmp(&x.3.len())).then(x.0.cmp(&y.0)).then(x.1.cmp(&y.1)));
+    for (f, l, n, run, closed) in candidates {
+        // Claimed by a chain before: skip it whole (an edge between two planar faces), else decline.
+        let claimed = run.iter().filter(|u| owner[u.edge as usize].is_some()).count();
+        if claimed == run.len() {
+            continue;
+        }
+        if claimed > 0 {
+            return no("an edge in two chains");
+        }
+        let c = chain(b, uses, ve, spec_of, f, l, n, &run, closed, margin)?;
+        for x in &c.links {
+            owner[x.edge as usize] = Some(out.len());
+        }
+        out.push(c);
     }
     if spec_of.iter().enumerate().any(|(i, s)| s.is_some() && owner[i].is_none()) {
         return no("an edge not on a planar face");
@@ -438,6 +447,9 @@ fn chain(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdge
         if i > 0 && x.t.dot(links[i - 1].t) < 1.0 - 1e-12 {
             return no("walls that turn where two blended edges meet");
         }
+        if closed && i == 0 && x.t.dot(links[links.len() - 1].t) < 1.0 - 1e-12 {
+            return no("walls that turn where two blended edges meet");
+        }
     }
     let (d1, d2, centre) = match x0.spec {
         Spec::Fillet { radius } => {
@@ -455,7 +467,28 @@ fn chain(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdge
             }
         }
     };
-    let mut c = Chain { face: f, links, verts, closed, ends: [None, None], d1, d2, centre, sigma };
+    let corner = vec![false; verts.len()];
+    let mut c = Chain { face: f, links, verts, corner, closed, ends: [None, None], d1, d2, centre, sigma };
+    // Corners: where two links (lines) meet at an angle. A fillet's two cylinders meet along an ellipse in the
+    // corner's bisector plane only with walls square to P.
+    for j in 0..c.verts.len() {
+        let (Some(i0), Some(i1)) = c.at(j) else { continue };
+        if i0 == i1 {
+            continue;
+        }
+        let (a, z) = (&c.links[i0], &c.links[i1]);
+        // (Into P at the vertex itself: an arc's q0 is at its start.)
+        let p = b.vertices[c.verts[j] as usize];
+        if into_p_at(b, a, p).dot(into_p_at(b, z, p)) < 1.0 - 1e-12 {
+            if matches!(a.spec, Spec::Fillet { .. }) && (alpha - std::f64::consts::FRAC_PI_2).abs() > 1e-9 {
+                return no("a fillet's corner between walls not square to P");
+            }
+            if a.wall == z.wall {
+                return no("a corner on one wall");
+            }
+            c.corner[j] = true;
+        }
+    }
     // Arcs whose radius the blend takes away.
     for x in &c.links {
         if let Curve::Circle { center, radius, .. } = b.edges[x.edge as usize].curve {
@@ -690,7 +723,14 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<
             let x = &c.links[after.or(before).unwrap()];
             let p = body.vertices[v as usize];
             let q = into_p_at(body, x, p);
-            let (p1, p2) = (p + q * c.d1, p + x.t * c.d2);
+            // At a corner: where the two offset lines on P meet (d1 from both edges).
+            let w = if c.corner[j] {
+                let qb = into_p_at(body, &c.links[before.unwrap()], p);
+                c.d1 * (q + qb) / (1.0 + q.dot(qb))
+            } else {
+                q * c.d1
+            };
+            let (p1, p2) = (p + w, p + x.t * c.d2);
             b.vertices.extend([p1, p2]);
             vertex_origin.extend([Origin::New, Origin::New]);
             let (i1, i2) = (b.vertices.len() as u32 - 2, b.vertices.len() as u32 - 1);
@@ -698,6 +738,16 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<
             v2.push(i2);
             dead_v[v as usize] = true;
             let curve = match x.spec {
+                Spec::Fillet { radius } if c.corner[j] => {
+                    // The two cylinders' intersection: an ellipse about where their axes meet (below p1), from p1
+                    // (on its minor axis, parameter -pi/2) to p2 (its major axis' end, 0).
+                    let ctr = p1 + x.t * radius;
+                    let major = p2 - ctr;
+                    let xdir = major.normalize();
+                    let normal = xdir.cross(x.t).normalize();
+                    let n = (u32::MAX, u32::MAX);
+                    Curve::Ellipse { center: ctr, normal, xdir, major: major.length(), minor: radius, faces: [n, n] }
+                }
                 Spec::Fillet { radius } => {
                     let ctr = p + (q + x.t).normalize() * c.centre;
                     let normal = (p1 - ctr).cross(p2 - ctr).normalize();
@@ -860,6 +910,16 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<
         if h.relation != Relation::Deleted && h.out_kind == Kind::Edge {
             h.out = emap[h.out as usize];
         }
+    }
+    // (No check of the whole runs in production: a geometry gone wrong must not get out.)
+    let finite = |p: DVec3| p.is_finite();
+    let curve_ok = |c: &Curve| match *c {
+        Curve::Circle { center, normal, xdir, radius } => finite(center) && finite(normal) && finite(xdir) && radius.is_finite() && radius > 0.0,
+        Curve::Ellipse { center, normal, xdir, major, minor, .. } => finite(center) && finite(normal) && finite(xdir) && major.is_finite() && minor.is_finite() && minor > 0.0 && major >= minor,
+        _ => true,
+    };
+    if !vs.iter().all(|&p| finite(p)) || !es.iter().all(|e| curve_ok(&e.curve) && (e.v[0] == e.v[1] || vs[e.v[0] as usize] != vs[e.v[1] as usize])) {
+        return no("a blend whose geometry came out wrong");
     }
     b.vertices = vs;
     b.edges = es;

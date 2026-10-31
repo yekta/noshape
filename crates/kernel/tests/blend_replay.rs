@@ -15,6 +15,9 @@ fn replay(dir: &Path) -> (usize, Vec<String>, String) {
         let Some(case) = blend_corpus::load(dir, &name) else { continue };
         n += 1;
         noshape_kernel::reset_blend_decline();
+        if std::env::var_os("NOSHAPE_BLEND_VERBOSE").is_some() {
+            eprintln!("case {name}");
+        }
         let t = std::time::Instant::now();
         let r = blend_corpus::run(&case);
         let why = noshape_kernel::last_blend_decline();
@@ -29,7 +32,22 @@ fn replay(dir: &Path) -> (usize, Vec<String>, String) {
         now_ms += ms;
         match r {
             Ok(res) => {
-                let d = noshape_kernel::bool_corpus::Summary::of(&res).differences(&case.summary);
+                let mut d = noshape_kernel::bool_corpus::Summary::of(&res).differences(&case.summary);
+                // A history that differs by its hash only: the records again against OCCT's own, their places to
+                // 1e-7 (a fillet corner's exact ellipse against OCCT's approximation of it).
+                // (And the volume to 1e-7: OCCT's corners are approximations, its volume off the exact one by up
+                // to ~5e-9 where noshape's is exact to 1e-12, plate-with-hole-and-frame 21788e8f.)
+                let near = |d: &Vec<String>| d.iter().all(|x| x == "history differs" || x.starts_with("volume "));
+                let vol_close = (noshape_kernel::bool_corpus::Summary::of(&res).volume - case.summary.volume).abs() <= 1e-7 * case.summary.volume.abs();
+                if !d.is_empty() && near(&d) && vol_close {
+                    noshape_kernel::set_rust_blend(Some(false));
+                    let occt = blend_corpus::run(&case);
+                    noshape_kernel::set_rust_blend(None);
+                    if occt.is_ok_and(|o| same_records(&o, &res)) {
+                        d.clear();
+                        *paths.entry("rust (as OCCT to 1e-7: its corners approximated)".into()).or_insert(0) += 1;
+                    }
+                }
                 if !d.is_empty() {
                     diffs.push(format!("{name} [{path}] ({:?}, {} edges): {}", case.blend, case.edges.len(), d.join(", ")));
                 }
@@ -39,6 +57,33 @@ fn replay(dir: &Path) -> (usize, Vec<String>, String) {
     }
     let paths: Vec<String> = paths.iter().map(|(p, k)| format!("  {k:4} {p}")).collect();
     (n, diffs, format!("{n} cases, recorded {was_ms:.0} ms, now {now_ms:.0} ms; paths:\n{}", paths.join("\n")))
+}
+
+/// The two results' history records the same, each output's place (centroid / midpoint / point, area /
+/// length) to 1e-7 of the part's size.
+fn same_records(a: &noshape_kernel::OpResult, b: &noshape_kernel::OpResult) -> bool {
+    use noshape_kernel::ShapeType;
+    let size = a.shape.bounding_box(false).map(|x| x.diagonal()).unwrap_or(1.0).max(1e-9);
+    let place = |r: &noshape_kernel::OpResult, kind: ShapeType, i: u32| -> [f64; 4] {
+        let Ok(x) = r.shape.sub_shape(kind, i as usize) else { return [f64::NAN; 4] };
+        let (p, m) = match kind {
+            ShapeType::Face => (x.centroid().unwrap_or_default(), x.area().unwrap_or(0.0) / size),
+            ShapeType::Edge => (x.edge_info().ok().and_then(|e| x.point_at(0.5 * (e.first_param + e.last_param)).ok()).unwrap_or_default(), x.length().unwrap_or(0.0)),
+            ShapeType::Vertex => (x.vertex_point().unwrap_or_default(), 0.0),
+            _ => (Default::default(), 0.0),
+        };
+        [p.x, p.y, p.z, m]
+    };
+    // (arg, input kind, index, relation, output kind) and the output's place.
+    type Rec = ((u32, u8, u32, u8, u8), [f64; 4]);
+    let recs = |r: &noshape_kernel::OpResult| -> Vec<Rec> {
+        let mut v: Vec<_> = r.history.records.iter().map(|h| ((h.arg, h.input_kind as u8, h.input_index, h.relation as u8, h.output_kind as u8), place(r, h.output_kind, h.output_index))).collect();
+        v.sort_by(|x, y| x.0.cmp(&y.0).then(x.1.partial_cmp(&y.1).unwrap_or(std::cmp::Ordering::Equal)));
+        v
+    };
+    let (ra, rb) = (recs(a), recs(b));
+    ra.len() == rb.len()
+        && ra.iter().zip(&rb).all(|(x, y)| x.0 == y.0 && x.1.iter().zip(&y.1).all(|(p, q)| (p.is_nan() && q.is_nan()) || (p - q).abs() <= 1e-7 * size))
 }
 
 #[test]

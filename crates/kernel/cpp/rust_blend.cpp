@@ -26,6 +26,10 @@
 #include <map>
 #include <Geom2d_Curve.hxx>
 #include <Geom_Circle.hxx>
+#include <Geom_Ellipse.hxx>
+#include <Geom2dAPI_Interpolate.hxx>
+#include <Geom2d_BSplineCurve.hxx>
+#include <NCollection_HArray1.hxx>
 #include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Line.hxx>
@@ -129,7 +133,8 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
     bool     rev;      // the use in the face's own (TShape) wire
     bool     fixed;    // an input edge's curve, not moved
     gp_Pnt2d p0, p1;   // where the use starts and ends
-    gp_Vec2d d;        // per unit of the edge's parameter (along the edge's own direction)
+    occ::handle<Geom2d_Curve> pc; // a new edge's curve on the face (in its own parameter), before shifting
+    gp_Vec2d shift;               // the whole periods it moved by
     double   t0, t1;
     uint32_t v0, v1;   // the use's start and end vertices
   };
@@ -141,7 +146,8 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
     for (uint32_t k = o.loop_uses[l]; k < o.loop_uses[l + 1]; ++k)
     {
       UseCurve c;
-      c.edge = o.uses[k] / 2;
+      c.shift = gp_Vec2d(0, 0);
+      c.edge  = o.uses[k] / 2;
       c.rev  = (o.uses[k] % 2 == 1) != flip;
       c.v0   = o.edges[2 * c.edge + (c.rev ? 1 : 0)];
       c.v1   = o.edges[2 * c.edge + (c.rev ? 0 : 1)];
@@ -178,18 +184,57 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
           }
         }
         const gp_Vec2d d((uv[n].X() - uv[0].X()) / (c.t1 - c.t0), (uv[n].Y() - uv[0].Y()) / (c.t1 - c.t0));
-        if (std::abs(d.Magnitude() - 1) > 1e-9)
-          return "an edge's curve on a blend face not at unit speed";
-        for (int s = 0; s <= n; ++s)
+        bool iso = std::abs(d.Magnitude() - 1) <= 1e-9;
+        for (int s2 = 0; s2 <= n && iso; ++s2)
         {
-          const gp_Pnt2d q(uv[0].X() + d.X() * (c.t1 - c.t0) * s / n, uv[0].Y() + d.Y() * (c.t1 - c.t0) * s / n);
-          if (q.Distance(uv[s]) > 1e-9 * std::max(1.0, std::abs(c.t1 - c.t0)))
-            return "an edge's curve on a blend face not an iso-line";
+          const gp_Pnt2d q(uv[0].X() + d.X() * (c.t1 - c.t0) * s2 / n, uv[0].Y() + d.Y() * (c.t1 - c.t0) * s2 / n);
+          iso = q.Distance(uv[s2]) <= 1e-9 * std::max(1.0, std::abs(c.t1 - c.t0));
+        }
+        if (iso)
+          c.pc = new Geom2d_Line(gp_Pnt2d(uv[0].X() - d.X() * c.t0, uv[0].Y() - d.Y() * c.t0), gp_Dir2d(d));
+        else
+        {
+          // Not an iso-line (a fillet corner's ellipse on its cylinders): a cubic through its parameters at
+          // 64 steps (unwrapped as the samples above), checked half-way between them against the edge.
+          const int m = 64;
+          occ::handle<NCollection_HArray1<gp_Pnt2d>> pts = new NCollection_HArray1<gp_Pnt2d>(1, m + 1);
+          occ::handle<NCollection_HArray1<double>>   prm = new NCollection_HArray1<double>(1, m + 1);
+          gp_Pnt2d prev;
+          for (int s2 = 0; s2 <= m; ++s2)
+          {
+            const double t = c.t0 + (c.t1 - c.t0) * s2 / m;
+            gp_Pnt2d     q;
+            if (!uv_of(a, loc, ca.Value(t), q))
+              return "a blend face not elementary";
+            if (s2 > 0)
+            {
+              double du = q.X() - prev.X(), dv = q.Y() - prev.Y();
+              if (up > 0)
+                du = std::remainder(du, up);
+              if (vp > 0)
+                dv = std::remainder(dv, vp);
+              q.SetCoord(prev.X() + du, prev.Y() + dv);
+            }
+            pts->SetValue(s2 + 1, q);
+            prm->SetValue(s2 + 1, t);
+            prev = q;
+          }
+          Geom2dAPI_Interpolate ip(pts, prm, false, 1e-12);
+          ip.Perform();
+          if (!ip.IsDone())
+            return "an edge's curve on a blend face not made";
+          c.pc = ip.Curve();
+          for (int s2 = 0; s2 < m; ++s2)
+          {
+            const double   t = c.t0 + (c.t1 - c.t0) * (s2 + 0.5) / m;
+            const gp_Pnt2d q = c.pc->Value(t);
+            if (S->Value(q.X(), q.Y()).Distance(ca.Value(t)) > 0.1 * tol)
+              return "an edge's curve on a blend face off it";
+          }
         }
         c.fixed = false;
-        c.d     = d;
-        c.p0    = c.rev ? uv[n] : uv[0];
-        c.p1    = c.rev ? uv[0] : uv[n];
+        c.p0    = c.pc->Value(c.rev ? c.t1 : c.t0);
+        c.p1    = c.pc->Value(c.rev ? c.t0 : c.t1);
       }
       lp.push_back(c);
     }
@@ -249,6 +294,7 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
         const gp_Vec2d sh(c.p0, cur.p1);
         c.p0.Translate(sh);
         c.p1.Translate(sh);
+        c.shift += sh;
         c.fixed = true;
       }
       order.push_back(c);
@@ -284,6 +330,7 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
       {
         c.p0.Translate(gp_Vec2d(su, sv));
         c.p1.Translate(gp_Vec2d(su, sv));
+        c.shift += gp_Vec2d(su, sv);
       }
   }
   // The curves: per made edge, its use(s) here.
@@ -295,10 +342,7 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
   for (const auto& [e, cs] : per_edge)
   {
     auto curve = [](const UseCurve& c) -> occ::handle<Geom2d_Curve> {
-      // Along the edge's own direction: from where its forward way starts, at unit speed in its parameter.
-      const gp_Pnt2d s0 = c.rev ? c.p1 : c.p0;
-      const gp_Pnt2d origin(s0.X() - c.d.X() * c.t0, s0.Y() - c.d.Y() * c.t0);
-      return new Geom2d_Line(origin, gp_Dir2d(c.d));
+      return occ::down_cast<Geom2d_Curve>(c.pc->Translated(c.shift));
     };
     if (cs.size() == 1)
       bb.UpdateEdge(eo[e], curve(*cs[0]), S, loc, tol);
@@ -445,9 +489,20 @@ bool rust_blend(const OcShape& s, const std::vector<TopoDS_Edge>& es, const std:
           d = 2 * M_PI;
         t1 = t0 + d;
       }
+      else if (cv[0] == 3)
+      {
+        const gp_Pnt ctr(cv[1], cv[2], cv[3]);
+        const gp_Elips g(gp_Ax2(ctr, dir3(cv + 4), dir3(cv + 7)), cv[10], out.ellipse_minor[i]);
+        c        = new Geom_Ellipse(g);
+        t0       = ElCLib::Parameter(g, p0);
+        double d = std::fmod(std::fmod(ElCLib::Parameter(g, p1) - t0, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
+        if (v0 == v1 || d < 1e-12)
+          d = 2 * M_PI;
+        t1 = t0 + d;
+      }
       else
       {
-        brep_decline("a new edge not a line or an arc");
+        brep_decline("a new edge not a line, an arc or an ellipse");
         return false;
       }
       bb.MakeEdge(e, c, tol);

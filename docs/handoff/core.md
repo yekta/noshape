@@ -563,6 +563,14 @@ with 0003b and 0004 on Linux, macOS and Windows.
   `NOSHAPE_BLEND_RUST=1 cargo test -p noshape-kernel --test all blend_replay::blend_corpus_replay -- --ignored
   --nocapture` (paths per decline reason; NOSHAPE_BLEND_LIST=<reason> lists cases); one case both ways with
   timings and its history diff: NOSHAPE_BLEND_CASE=<name> blend_replay::blend_case_diff (NOSHAPE_BLEND_FACES=1/2).
+- Corners (step 3, 10-31): at a vertex where two blended lines meet at an angle with the edge down the walls
+  unblended, the vertex on P is where the two offset lines meet (d1 (q_a + q_b) / (1 + q_a·q_b)); a fillet's cross
+  section there is the ellipse where its two cylinders meet (centre on both axes, minor R along the walls, major
+  R / sin(θ/2) in the bisector plane), its curves on the cylinders cubics through 65 points of (u, v) checked half way
+  between (GeomProjLib's projection failed BRepCheck's same-parameter test). OCCT approximates these corners: its
+  volumes are off the exact ones by up to ~5e-9 where ours are exact (TICKETS); the replay accepts volume and
+  history to 1e-7 there. Guards: a result with any non-finite vertex or curve declines (a wrong corner test made
+  NaN vertices that only BRepCheck, off in production, would have caught; BRepCheck of such a solid ran minutes).
 - Declines left in the corpus (10-30 22:00): edges not in a whole loop 174, corners between blended edges 70,
   not tried 21 (variable radius, distance-angle), edges in two chains 9, walls not square 6.
 
