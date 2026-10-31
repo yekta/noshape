@@ -30,6 +30,8 @@ pub struct SectionDlg {
     pub depth_ref: Option<noshape_model::drawing::PointRef>,
     /// "Exclude from cut" (assembly views): the parts picked.
     pub exclude: Vec<noshape_model::BodyId>,
+    /// The model point under the cutting line's first click.
+    pub anchor: Option<noshape_model::drawing::PointRef>,
     /// Which field takes clicks: 1 = depth entity, 2 = excluded parts.
     pub picking: u8,
     /// Angular: "Cut angle" (degrees from horizontal) and its field,
@@ -70,7 +72,7 @@ impl DrawingEditor {
                 let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(next));
                 // Live drawing/20: the dialog opens with the label selected.
                 label.update(cx, |s, cx| s.focus(window, cx));
-                self.section_dlg = Some(SectionDlg { mode: 0, label, label_focused: true, select_label: true, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, exclude: Vec::new(), picking: 0, angle: 45.0, angle_input: None, opposite: false, flip: false, cut_from: true });
+                self.section_dlg = Some(SectionDlg { mode: 0, label, label_focused: true, select_label: true, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, exclude: Vec::new(), anchor: None, picking: 0, angle: 45.0, angle_input: None, opposite: false, flip: false, cut_from: true });
             }
             (Some(_), false) => self.section_dlg = None,
             _ => {}

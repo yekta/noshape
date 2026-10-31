@@ -863,7 +863,10 @@ fn section_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let tool0 = Tool::Section { parent: None, p0: None, line: None, partial, jogs: vec![] };
     let pk = t.m.pick(&tool0, &[], p);
     let pl = pk.placement(parent).ok_or_else(|| OpError::param("parent", "the view isn't drawn"))?;
-    let p0 = snap_in(&t, &tool0, parent, p).map(|s| s.p).unwrap_or(pl.to_view(p));
+    let snap0 = snap_in(&t, &tool0, parent, p);
+    let p0 = snap0.as_ref().map(|s| s.p).unwrap_or(pl.to_view(p));
+    // On a model point the line follows it (live request 1625).
+    let anchor = snap0.and_then(|s| s.r);
     let line = if partial {
         // The second click: snapped to horizontal / vertical, then to a snap point.
         let end = pt_arg(a, "end").map_err(|_| OpError::param("end", "a partial section needs the line's other end"))?;
@@ -895,7 +898,7 @@ fn section_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             jogs.push(q);
         }
     }
-    let mut section = SectionOpts { cut_only: a.bool_or("cut_only", false)?, flip: a.bool_or("flip", false)?, cut_from: a.bool_or("cut_from_section", true)?, ..Default::default() };
+    let mut section = SectionOpts { cut_only: a.bool_or("cut_only", false)?, flip: a.bool_or("flip", false)?, cut_from: a.bool_or("cut_from_section", true)?, anchor, ..Default::default() };
     if let Some(depth) = a.opt_f64("depth")? {
         section.depth_on = true;
         section.depth_value = Some(depth / 1000.0);

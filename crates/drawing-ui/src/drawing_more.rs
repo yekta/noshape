@@ -259,7 +259,7 @@ impl DrawingEditor {
         if !matches!(self.tool, Tool::Select) {
             return vec![];
         }
-        let sheet = self.current_sheet();
+        let sheet = self.drawn_sheet();
         let mut out = Vec::new();
         for s in &self.selection {
             let Sel::View(v) = s else { continue };
@@ -270,9 +270,15 @@ impl DrawingEditor {
         out
     }
 
+    /// The sheet as built: section lines where their model points put them
+    /// (live 1625).
+    pub fn drawn_sheet(&self) -> &noshape_model::drawing::Sheet {
+        self.built.as_ref().map(|b| &b.resolved).filter(|s| s.views.len() == self.current_sheet().views.len()).unwrap_or(self.current_sheet())
+    }
+
     /// Index of the cutting line point of section view `view` near sheet point `s`.
     pub fn section_point_at(&self, view: ViewId, s: [f64; 2]) -> Option<usize> {
-        let sheet = self.current_sheet();
+        let sheet = self.drawn_sheet();
         let pl = self.placement(sheet.parent_of(view)?)?;
         let tol = self.tol_mm(8.0);
         sheet

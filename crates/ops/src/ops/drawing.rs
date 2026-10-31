@@ -417,6 +417,10 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if !v.breaks.is_empty() {
                 j["breaks"] = json!(v.breaks.len());
             }
+            // A section line placed on a model point follows it (live 1625).
+            if v.cut_anchor.is_some() {
+                j["line_follows_point"] = json!(true);
+            }
             if !v.broken_out.is_empty() {
                 j["broken_out"] = v.broken_out.iter().map(|b| {
                         let mut j = if b.depth_ref.is_some() { json!({ "up_to_point": true, "offset_mm": r3(b.offset * 1000.0) }) } else { json!({ "depth_mm": r3(b.depth * 1000.0) }) };

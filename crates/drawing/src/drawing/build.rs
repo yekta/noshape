@@ -329,6 +329,9 @@ pub fn format_length(drawing: &Drawing, meters: f64) -> String {
 }
 
 /// Compute all views of a sheet and assemble it (headless convenience).
+/// Dangling entities' red (live: #DD5228).
+const LOST_RED: [u8; 3] = [0xdd, 0x52, 0x28];
+
 pub fn render_sheet(drawing: &Drawing, sheet_index: usize, sources: &Sources, cache: &ViewCache, exact: bool) -> Option<BuiltSheet> {
     render_sheet_with(drawing, sheet_index, sources, cache, exact, &SheetInfo::default())
 }
@@ -1213,6 +1216,10 @@ impl Env<'_> {
 
 /// Assemble sheet `si` from computed view geometry.
 pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<ViewGeometry>>, sources: &Sources, info: &SheetInfo) -> BuiltSheet {
+    // Section lines follow the model points they were placed through (as
+    // `views::compute_sheet_views` sees them).
+    let moved = views::resolve_cut_anchors(drawing, si, sources);
+    let drawing = moved.as_ref().unwrap_or(drawing);
     let empty = Sheet::default();
     let sheet = drawing.sheets.get(si).unwrap_or(&empty);
     let (w, h) = sheet.size.size_mm();
@@ -1466,6 +1473,10 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 }
             }
             g.view_edges.push((v.id, edges0..g.lines.len()));
+            // Its cutting line's point lost: the section view red (live 1625).
+            if v.cut_lost {
+                g.colors.push(super::sheet::ColorSpan { lines: edges0..g.lines.len(), texts: 0..0, fills: 0..0, rgb: LOST_RED });
+            }
             // Section hatching: computed on the unbroken view, then cropped and
             // broken in view coordinates.
             let cad_mark = g.mark();
@@ -2041,6 +2052,14 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     }
                     color_lines_since(&mut g, cad_mark, vtab.section_line.color);
                     label_since(&mut g, t0, &vtab.section_label);
+                    // Its point lost (live 1625): the line, arrows and letters
+                    // red, a red dot where the point was.
+                    if v.cut_lost {
+                        if let Some((_, at)) = &v.cut_anchor {
+                            g.fills.push(Fill2 { points: circle_points(ppl.to_sheet(*at), 0.8, 12) });
+                        }
+                        g.color_since(cad_mark, LOST_RED);
+                    }
                 }
             }
             // Auxiliary view reference indicator: a viewing-plane line beside

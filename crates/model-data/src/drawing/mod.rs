@@ -433,6 +433,15 @@ pub struct DrawingView {
     /// the cutting line (its ends are not extended past the model).
     #[serde(default)]
     pub partial: bool,
+    /// Section views: the model point the cutting line was placed through
+    /// (its first click, on a snap) and where it was (parent view
+    /// coordinates); the line follows it (live request 1625).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cut_anchor: Option<(PointRef, [f64; 2])>,
+    /// Set by the sheet build when `cut_anchor` is lost: the cutting line and
+    /// the view are drawn red.
+    #[serde(skip)]
+    pub cut_lost: bool,
     /// Section views: "Show cut geometry only" (just the cut faces).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub cut_only: bool,
@@ -741,6 +750,8 @@ impl Default for DrawingView {
             breaks: Vec::new(),
             explode: None,
             partial: false,
+            cut_anchor: None,
+            cut_lost: false,
             cut_only: false,
             section_depth: None,
             flip: false,

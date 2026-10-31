@@ -683,6 +683,47 @@ pub fn section_cut(sheet: &Sheet, id: ViewId) -> Option<SectionCut> {
     Some(SectionCut { points, p0, p1, toward_view: [n[0] * s, n[1] * s], partial: v.partial && section, cut_only: v.cut_only, depth: v.section_depth.filter(|d| *d > 0.0), depth_ref: v.section_depth_ref.clone(), exclude: v.exclude_from_cut.clone() })
 }
 
+/// Section lines placed through a model point follow it (live request
+/// 1625): a copy of `drawing` with each such line moved as far as its point
+/// moved in the parent view, `cut_lost` set where the point is gone. None:
+/// sheet `si` has no anchored line.
+pub fn resolve_cut_anchors(drawing: &Drawing, si: usize, sources: &Sources) -> Option<Drawing> {
+    let s = resolve_sheet_cut_anchors(drawing, drawing.sheets.get(si)?, sources)?;
+    let mut d = drawing.clone();
+    d.sheets[si] = s;
+    Some(d)
+}
+
+/// [`resolve_cut_anchors`] for one sheet of `drawing`.
+pub fn resolve_sheet_cut_anchors(drawing: &Drawing, sheet: &Sheet, sources: &Sources) -> Option<Sheet> {
+    if !sheet.views.iter().any(|v| v.cut_anchor.is_some()) {
+        return None;
+    }
+    let mut out = sheet.clone();
+    for v in &sheet.views {
+        let (Some((r, at)), ViewKind::Section { parent, .. }) = (&v.cut_anchor, &v.kind) else { continue };
+        let now = (|| {
+            let (key, _) = view_source(sheet, *parent)?;
+            let ctx = &sources.get(&key)?.context;
+            let frame = view_frame(drawing, sheet, *parent)?;
+            Some(frame.project(resolve_point3(ctx, r)?.0))
+        })();
+        let Some(dv) = out.view_mut(v.id) else { continue };
+        match now {
+            Some(p) => {
+                let delta = [p[0] - at[0], p[1] - at[1]];
+                if let ViewKind::Section { line, cuts, .. } = &mut dv.kind {
+                    for q in line.iter_mut().chain(cuts.iter_mut()) {
+                        *q = [q[0] + delta[0], q[1] + delta[1]];
+                    }
+                }
+            }
+            None => dv.cut_lost = true,
+        }
+    }
+    Some(out)
+}
+
 /// The frame of any view on a sheet (follows the parent chain).
 /// The standard orthographic orientation a view looks along, if any
 /// (Onshape names projected views "Right", "Top"... by it).
@@ -1986,6 +2027,9 @@ fn apply_crop(g: &mut ViewGeometry, crop: &Crop) {
 
 /// Compute every view of a sheet (parents first).
 pub fn compute_sheet_views(drawing: &Drawing, sheet: &Sheet, sources: &Sources, cache: &ViewCache, exact: bool) -> HashMap<ViewId, Arc<ViewGeometry>> {
+    // Section lines follow the model points they were placed through.
+    let moved = resolve_sheet_cut_anchors(drawing, sheet, sources);
+    let sheet = moved.as_ref().unwrap_or(sheet);
     sheet.views.iter().map(|v| (v.id, compute_view(drawing, sheet, v.id, sources, cache, exact))).collect()
 }
 

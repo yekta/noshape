@@ -2446,6 +2446,33 @@ fn gdt_leader_to_a_lost_point_turns_red() {
     assert!(red(&bad) && !bad.dangling.contains(&id), "only the leader is red");
 }
 
+/// A section line placed through a model point follows it; lost, the line
+/// and the section view turn red (live request 1625).
+#[test]
+fn section_line_follows_its_point() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    let (p, r) = g.snaps.iter().find_map(|s| s.point.clone().map(|r| (s.p, r))).expect("a snap point");
+    let id = drawing.sheets[0].next_view_id();
+    let mut v = DrawingView { id, kind: ViewKind::Section { parent: ViewId(1), line: vec![[p[0] - 0.1, p[1]], [p[0] + 0.1, p[1]]], label: "Z".into(), cuts: Vec::new() }, position: [300.0, 60.0], ..Default::default() };
+    // Stored as if the point had been 2 mm lower when placed.
+    v.cut_anchor = Some((r.clone(), [p[0], p[1] - 0.002]));
+    drawing.sheets[0].views.push(v);
+    let moved = super::views::resolve_cut_anchors(&drawing, 0, &sources).unwrap();
+    let Some(ViewKind::Section { line, .. }) = moved.sheets[0].view(id).map(|v| &v.kind) else { panic!() };
+    assert!((line[0][1] - (p[1] + 0.002)).abs() < 1e-9, "{line:?}");
+    assert!(!moved.sheets[0].view(id).unwrap().cut_lost);
+    // A point that isn't there: red.
+    let mut gone = r;
+    let (PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. }) = &mut gone;
+    body.index += 1000;
+    drawing.sheets[0].view_mut(id).unwrap().cut_anchor = Some((gone, p));
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(built.geometry.colors.iter().any(|c| c.rgb == [0xdd, 0x52, 0x28]));
+}
+
 #[test]
 fn datum_on_dimension_arrow_hides_it() {
     let (doc, mut drawing) = demo();

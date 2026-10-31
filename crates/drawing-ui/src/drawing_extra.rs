@@ -1347,11 +1347,15 @@ impl DrawingEditor {
             }
             PickTarget::SectionLine(v) => {
                 self.selection = vec![Sel::View(v)];
+                // A line following its model point is dragged where it is
+                // drawn (live 1625).
+                let drawn = self.built.as_ref().map(|b| &b.resolved).filter(|s| s.view(v).is_some()).unwrap_or(sheet);
+                self.cut_drag = Some((v, drawn.view(v).is_some_and(|x| x.cut_lost), drawn.section_points(v).unwrap_or_default()));
                 // Near a point of the line: move that point only.
                 if let Some(index) = self.section_point_at(v, start) {
-                    return Some(Drag::MoveSectionPoint { view: v, index, orig: sheet.section_points(v)? });
+                    return Some(Drag::MoveSectionPoint { view: v, index, orig: drawn.section_points(v)? });
                 }
-                Some(Drag::MoveSectionLine { view: v, start, orig: sheet.view(v)?.kind.clone() })
+                Some(Drag::MoveSectionLine { view: v, start, orig: drawn.view(v)?.kind.clone() })
             }
             PickTarget::AuxIndicator(v) => {
                 let grip = self.aux_grip_at(v, start)?;
@@ -1631,6 +1635,10 @@ impl DrawingEditor {
                 }
             }
             _ => return,
+        }
+        // A line following its model point: the preview as it will be.
+        if let Drag::MoveSectionPoint { view, .. } | Drag::MoveSectionLine { view, .. } = drag {
+            self.rebase_cut_anchor(&mut dr, *view);
         }
         self.set_preview(Some(dr), cx);
     }

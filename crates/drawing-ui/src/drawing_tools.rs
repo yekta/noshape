@@ -387,7 +387,7 @@ impl DrawingEditor {
         ViewOptions {
             insert: InsertOpts { scale: i.scale, simplification: i.simplification, flat: i.flat, sketch_appearances: i.sketch_appearances, model_annotations: i.model_annotations, asm_position: i.asm_position, display_state: i.display_state.clone(), named: i.named.clone(), sketch: i.sketch, pinned: i.pinned.clone() },
             aux: self.aux_dlg.as_ref().map(|d| AuxOpts { reverse: d.reverse, show_ref: d.show_ref, anchor: d.anchor, letter: self.aux_letter.clone() }),
-            section: self.section_dlg.as_ref().map(|d| SectionOpts { cut_only: d.cut_only, flip: d.flip, depth_on: d.depth.is_some(), depth_value: d.depth_value, up_to: d.up_to, depth_ref: d.depth_ref.clone(), exclude: d.exclude.clone(), cut_from: d.cut_from }),
+            section: self.section_dlg.as_ref().map(|d| SectionOpts { cut_only: d.cut_only, flip: d.flip, depth_on: d.depth.is_some(), depth_value: d.depth_value, up_to: d.up_to, depth_ref: d.depth_ref.clone(), exclude: d.exclude.clone(), cut_from: d.cut_from, anchor: d.anchor.clone() }),
             detail: self.detail_dlg.as_ref().map(|d| DetailOpts { scale: d.scale, profile: d.profile.clone(), style: d.style, show_profile: d.show_profile, clip_border: d.clip_border, label: self.detail_label.clone() }),
         }
     }
@@ -769,6 +769,9 @@ impl DrawingEditor {
                 if let Some(pp) = pick {
                     // Section view dialog › Vertical / Horizontal: one click places the whole line.
                     let axis_line = self.section_axis().filter(|_| !partial).and_then(|e| self.placement(pp.view).and_then(|pl| self.extend_cut(pp.view, pl.to_sheet(pp.p), e)));
+                    if let Some(d) = &mut self.section_dlg {
+                        d.anchor = pp.r.clone();
+                    }
                     self.tool = Tool::Section { parent: Some(pp.view), p0: Some(pp.p), line: axis_line, partial, jogs: vec![] };
                 }
             }
@@ -1425,6 +1428,30 @@ impl DrawingEditor {
             _ => {}
         }
         cx.notify();
+    }
+
+    /// A line following its model point was dragged where it is drawn: its
+    /// anchor moves with it; a lost one dropped on a model point of the
+    /// parent re-attaches there (live request 1625).
+    pub(crate) fn rebase_cut_anchor(&self, d: &mut Drawing, view: ViewId) {
+        // As the line was when the drag started (the build since is the
+        // drag's preview).
+        let Some((_, lost, drawn)) = self.cut_drag.clone().filter(|c| c.0 == view) else { return };
+        let stored = self.current_sheet().section_points(view);
+        let parent = self.current_sheet().parent_of(view);
+        let snap = self.snap_at(self.cursor).filter(|p| Some(p.view) == parent && p.r.is_some());
+        let Some(v) = d.sheets[self.sheet].view_mut(view) else { return };
+        if lost {
+            if let Some(p) = snap {
+                v.cut_anchor = p.r.map(|r| (r, p.p));
+            }
+            return;
+        }
+        if let (Some((_, at)), Some(s)) = (&mut v.cut_anchor, stored)
+            && let (Some(s0), Some(r0)) = (s.first(), drawn.first())
+        {
+            *at = [at[0] + r0[0] - s0[0], at[1] + r0[1] - s0[1]];
+        }
     }
 
     /// A straight section view's `partial` from its cutting line's ends in

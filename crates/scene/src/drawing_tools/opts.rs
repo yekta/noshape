@@ -67,6 +67,9 @@ pub struct SectionOpts {
     pub exclude: Vec<noshape_model::BodyId>,
     /// "Cut from section" (sectioning a section view).
     pub cut_from: bool,
+    /// The model point under the cutting line's first click (the line
+    /// follows it).
+    pub anchor: Option<PointRef>,
 }
 
 /// Detail view dialog.
@@ -182,7 +185,7 @@ impl SheetPick<'_> {
                 }
                 Some(v)
             }
-            Tool::Section { parent: Some(pid), line: Some((a, b)), jogs, .. } => {
+            Tool::Section { parent: Some(pid), p0, line: Some((a, b)), jogs, .. } => {
                 let parent = sheet.view(*pid)?;
                 let pl = self.placement(*pid)?;
                 let (sa, sb) = (pl.to_sheet(*a), pl.to_sheet(*b));
@@ -195,6 +198,7 @@ impl SheetPick<'_> {
                 v.partial = matches!(self.tool, Tool::Section { partial: true, .. });
                 // Section view dialog: Show cut geometry only, Section depth.
                 self.apply_section_options(&mut v, o);
+                v.cut_anchor = o.section.as_ref().and_then(|d| d.anchor.clone()).zip(*p0);
                 Some(v)
             }
             Tool::Detail { parent: Some(pid), center: Some(center), radius: Some(r) } => {
