@@ -3915,6 +3915,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     let turned_pieces = |f: usize| -> Option<FacePieces> {
         let sym = sym.as_ref()?;
         let (f0, j) = copy_step(f)?;
+        if std::env::var("NOSHAPE_X_FACE").is_ok_and(|v| v == format!("{},{}", cx.faces[f].arg, cx.faces[f].index)) {
+            eprintln!("TURNED face {f} from {f0} ({}, {}) step {j}", cx.faces[f0].arg, cx.faces[f0].index);
+        }
         let Some(Ok((split0, inner0, pieces0))) = &first_pieces[f0] else { return None };
         let ((segs, split), (segs0, _)) = (face_curves(f), face_curves(f0));
         if split != *split0 || segs.len() != segs0.len() {
