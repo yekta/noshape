@@ -3491,15 +3491,19 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             let o = &sedges[i].seg;
             // (Pieces of an apex: by their angles.)
             let apart = matches!((o.g, s.g), (Geo::Apex { a0, a1 }, Geo::Apex { a0: b0, a1: b1 }) if a0.to_bits() != b0.to_bits() || a1.to_bits() != b1.to_bits());
-            // (Of two curve kinds, one course (a line and a B-spline of it): one, its ends apart and the two's points
-            // along it together, as OCCT's common block.)
-            let alike = std::mem::discriminant(&o.g) == std::mem::discriminant(&s.g)
-                || (s.v[0] != s.v[1]
+            // (One course though of two curve kinds (a line and a B-spline of it) or parameterized otherwise (two of
+            // OCCT's sections of one curve, their middles apart): one, its ends apart and each one's points along it
+            // on the other, as OCCT's common block.)
+            let kind = std::mem::discriminant(&o.g) == std::mem::discriminant(&s.g);
+            let near_mid = (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * cx.tol;
+            let one_course = || {
+                s.v[0] != s.v[1]
                     && !matches!(o.g, Geo::Apex { .. })
                     && !matches!(s.g, Geo::Apex { .. })
                     && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(o, cx.seg_at(&s, t)).1 <= cx.tol)
-                    && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(&s, cx.seg_at(o, t)).1 <= cx.tol));
-            if alike && !apart && (std::mem::discriminant(&o.g) != std::mem::discriminant(&s.g) || (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * cx.tol) {
+                    && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(&s, cx.seg_at(o, t)).1 <= cx.tol)
+            };
+            if !apart && ((kind && near_mid) || one_course()) {
                 let rev = match (o.g, s.g) {
                     (Geo::Arc { k: k1, .. }, Geo::Arc { k: k2, .. }) => k1.n.dot(k2.n) < 0.0,
                     (Geo::Ell { e: e1, t0: a1, sweep: s1, .. }, Geo::Ell { e: e2, t0: a2, sweep: s2, .. }) => e1.deriv(a1 + 0.5 * s1).dot(e2.deriv(a2 + 0.5 * s2)) < 0.0,
