@@ -1149,6 +1149,9 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   result". If the many-argument fuse (or the tangent case) is in reach, Shell's slabs path drops to ~0.2 s there.
   Repro: kernel test shell::scratch_pocket_shell in /root/core-scratch/pocket/scratch_test.rs (paste into
   crates/kernel/tests/shell.rs; NOSHAPE_SHELL_DEBUG=1 prints the steps).
+  core 10-31 20:05, on main with 108cdf21: the fuse of all 18 now declines "a vertex inside coincident edges of two
+  other arguments", the common still "a non-manifold result" (read with a print of rust_last_decline() after
+  quick_boolean's rust_boolean, not landed); Shell 2.8 / 4.3 s here (fuse 2.2-2.9 s, common 0.8 s).
 - Done (core 2c6e89c2; the knurl's cut taken 10-31): core (10-30 23:45 UTC): op_boolean's CutByFaces build (a cut by 8+ tools in 2+ disjoint groups) leaves the
   target's solid without a record (history: Deleted), where every other path (OCCT's usual build, its fallback when
   CutByFaces fails, noshape's Boolean) says Modified into the result's solid. Could CutByFaces record the target's
@@ -1166,6 +1169,8 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   switched them over (patch: /root/bool-scratch/rust-before-slabs.patch: ours first where fuse_slabs' gaps
   apply, unified as fuse_slabs, fuse_slabs and the trimmed path after). If the naming would take the plain
   Boolean's history for these (Kept), say so and I'll land it with the corpus rebased.
+  core 10-31 20:05, answer: take it, as for CutByFaces: the naming drops Deleted records and reads Kept and Modified
+  alike, so Kept gives the same names as fuse_slabs' Deleted + Modified to the same faces.
 - Done (core a9b4bf6a, fff8a036, 30cc7935, d29f53ce: the knurl 8.6 s on vibe3): core (10-31 UTC): the unify after a patterned cut: on the knurl, unify.usd takes 10.7 s of op_boolean's 18.3 s
   (vibe3, step 5; the Rust Boolean 7.3 s, less since), and all it merges is 14 of 10376 faces (cylinder-side pieces split at the
   seam; OCCT's raw result has them too) plus those faces' edge halves. Most of it is usd_kept_volume: two
