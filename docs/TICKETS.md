@@ -752,13 +752,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   a point on the bottom face flips Opposite direction by itself at the pick, fills Merge scope with "Part 1", and gives
   status OK (oppositeDirection true, 23754.548992 = block − Ø5 × 12 hole). A point on the top face doesn't flip.
   Ours (main CLI, holemiss.py): flipped, scope Part 1, status OK.
-- [ ] P2 PATTERN-REAPPLY-CUT-ONLY Feature pattern with ☑ Reapply features of a Remove extrude alone (its sketch not in
+- [x] P2 PATTERN-REAPPLY-CUT-ONLY Feature pattern with ☑ Reapply features of a Remove extrude alone (its sketch not in
   the pattern; 40×30×10 block, Ø6 cut through all at x 10 drawn on the top face, direction = a bottom edge, 15 mm, count 4):
   ours moves the cut to each instance (3 holes, 706.858 mm³ removed, OK); live L40 (behaviours ~8484): the reapplied cut
   resolves its region on the unpatterned sketch, so every instance re-cuts the original hole → **INFO, no geometry
   change** (with Reapply off ours = live: OK, copies moved, the off-part copy silently does nothing). Check against psb's
   f202f693 / FSW-pattern (qa 2026-10-26, main CLI ~20:18)
   - core 03:00: not changed: live's own oracle disagrees. `kernel_robustness::patterns_match_onshape` R2 (a through-all Remove extrude on Front, its sketch not in the pattern, circular ×6 with Reapply) is Ok in live with six holes (53234.34 mm³), i.e. the cut moves with each instance there. L40 differs in its sketch being on the part's top face and a linear direction along an edge. qa: please re-check L40 (and R2) in live before we make the reapplied sketch stay put.
+  skasm 10-31: **not a bug, ours = live.** Live re-ran qa's exact case (behaviours "spec … L40" ~18620: 40×30×10,
+  Ø6 through-all cut on the top face, Feature pattern of the cut alone, 15 mm × 4, Reapply on). It's OK, 11293.1417 mm³
+  (706.858 removed), with the cut moved to each instance, the same with Reapply off; sketch + cut with Reapply is INFO "Sketch
+  dimensions and constraints using the Origin or the default planes…" (ours: pattern.rs SKETCH_REAPPLY_INFO). L40's
+  in-place re-cut is specific to that studio and couldn't be isolated in live.
 - [x] (dx 10-27 08:20, CLI, load ~22: with the document open 5 s the first Extrude add is 9 ms, then 7–25 ms; only an add sent right at open takes 232 ms, because std's editing logic is still loading on the prewarm thread (ops doc.rs and the app's viewport start it at open; Extrude is first in its order). The app's first user add comes after that, so the budget holds; /root/dx-scratch/w/py/t_add.py) P1 Extrude add 308 ms (std logic 55 ms, ~250 ms in ops' add path regens): target ≤ 150 ms (PLAN 2.6).
   dx 10-27 re-timed through the CLI (load ~25): the first Extrude add of a process 230–330 ms (one-time std warm-up),
   later ones 8–23 ms; Hole add 250–290 ms (was ~330: the API's add path stopped running holeEditLogic a third time),
