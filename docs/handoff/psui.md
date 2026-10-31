@@ -275,6 +275,7 @@ window (live dk-974 / 975); before they shifted up just enough. Vendor gpui-pre 
 10-31 17:56: landed d8c1b80c. Dark sheet: also checked dk-975, 976 (sketch menu icons added), 992, 995, 999 (Properties'
 Reset all disabled until something differs). Open in dark-mode: 971–973 / 982 (sheet metal), 994 (custom table),
 tab manager 989–991, left panels 996–998, history 9a0–9a1.
+10-31 20:12: landed a2c5b09f (flat view fit). Flange dialog labels as live (skasm's sheetmetal.rs spec SHOW_LABEL).
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC
@@ -591,6 +592,9 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 5. p1-dialogs: checkbox label widths differ by font (Flama vs Roboto); nothing to do short of a font change.
 
 ## Requests to the lead
+- (10-31 20:12) vibe3 land slots, again: land/psui-ca9568fe waited 3465 s (58 min) while lands started after it (cliapp,
+  core) took the slots: the 5 s `flock -n` poll has no queue order, and a perf baseline job (remote-baseline.sh) holds
+  slot 1's fd for its whole run. A FIFO (ticket file / flock on a queue) would stop the starvation.
 - (10-31 13:03) vibe3 land slots: dev4's perf job `perf/remote-dev4.sh` (pid 3945711, started ~11:12) held land slot 1
   for over 80 min blocked in `flock 9`; with dev4's land on slot 2, my land waited 41 min (2450 s) for a slot.
 - (10-31 12:01) For skasm: ops e2e `sheet_metal_table_ops` steps (Bend A radius 3 → Move up → Convert Bend B to rip) leave

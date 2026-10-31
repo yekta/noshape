@@ -260,8 +260,9 @@ pub fn flange() -> FeatureType {
     let flange_len = NumSpec::positive_length(25.0, 1.0).bounded(1e-5, 500.0);
     let mut p = vec![
         ParamSpec::query("edges", "Edges or side faces to flange", SM_EDGES).hints(Hints::INITIAL_FOCUS),
-        ParamSpec::enum_("flangeAlignment", "Flange alignment", &[("INNER", "Inner"), ("OUTER", "Outer"), ("MIDDLE", "Middle"), ("BEND", "Hold line")]),
-        ParamSpec::enum_("limitType", "End type", BOUND),
+        // UIHint.SHOW_LABEL in std's sheetMetalFlange.fs (live dk-982: "Flange alignment ▾ Inner", "End type ▾ Blind").
+        ParamSpec::enum_("flangeAlignment", "Flange alignment", &[("INNER", "Inner"), ("OUTER", "Outer"), ("MIDDLE", "Middle"), ("BEND", "Hold line")]).hints(Hints::SHOW_LABEL),
+        ParamSpec::enum_("limitType", "End type", BOUND).hints(Hints::SHOW_LABEL),
         ParamSpec::num("distance", "Distance", flange_len).visible(move |v| lim(v, "BLIND")),
         ParamSpec::query1("limitEntity", "Up to entity", QueryFilter::ANY_FACE | QueryFilter::PLANE | QueryFilter::POINT_LIKE)
             .visible(move |v| !lim(v, "BLIND")),

@@ -63,7 +63,7 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-979-dialog-linear-pattern | psui-scratch cdlg | title red, ✓ / ✕, type select, New / Add / Remove / Intersect, active query #142434 + #3e94ff, other fields, rows, slider and ? = live | ☑ psui 10-31 |
 | dk-980-dialog-mirror | psui-scratch cdlg | title red, ✓ / ✕, type select, New / Add / Remove / Intersect, active query #142434 + #3e94ff, other fields, rows, slider and ? = live | ☑ psui 10-31 |
 | dk-981-dialog-sweep | psui-scratch cdlg | title red, ✓ / ✕, type select, New / Add / Remove / Intersect, active query #142434 + #3e94ff, other fields, rows, slider and ? = live | ☑ psui 10-31 |
-| dk-982-dialog-sm-flange |  |  | ☐ |
+| dk-982-dialog-sm-flange | psui-scratch c982b | colours and rows = live; "Flange alignment" / "End type" now labelled (std's UIHint.SHOW_LABEL; skasm's spec); residual: our Partial flange carries a group chevron live doesn't draw | ◐ psui 10-31 |
 | dk-989-tab-manager-open / dk-990-tab-manager-detailed / dk-991-tab-manager-sort-open | psui-scratch c989 / c990 / c991 | header icons, search, type filters, Clear, detailed rows with thumbnails (live's default; dk-989 is its persisted list view), sort menu = live | ☑ psui 10-31 |
 | dk-992-panel-variable-table | psui-scratch vt | title, section bar, headers #555, cells #1c1c1c, add row = live (live's document has Variable Studios inserted, ours none) | ☑ psui 10-31 |
 | dk-993-panel-appearances |  | live's studio has a sketch, no parts: "No parts or surfaces in this document" (ours hides the button only with neither parts nor sketches) | ◐ |
