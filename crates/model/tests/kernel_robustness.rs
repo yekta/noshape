@@ -3058,3 +3058,32 @@ fn union_of_offset_cylinders_on_one_plane() {
         assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), 5, "rust {rust}");
     }
 }
+
+/// qa's HALF-MIRROR-HOLE (halfmir.noshape): a 20 x 20 x 10 half plate with a half Ø10 hole on the Right plane, Part
+/// mirror Add across it: the whole plate with a through hole (8000 - 250π mm³, live's 7 faces, one 314.16 mm² hole
+/// wall), with noshape's Boolean and with OCCT's (where noshape's declines it falls back there; it gave 7738.201 mm³
+/// with a -157.08 mm² face until 10-29).
+#[test]
+fn part_mirror_of_a_half_through_hole_is_the_whole_plate() {
+    for rust in [true, false] {
+        noshape_kernel::set_rust_boolean(Some(rust));
+        let mut t = T::new();
+        let (s, _) = t.sketch(&[&[(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 20.0)]], &[((0.0, 10.0), 5.0)]);
+        // The plate's region: the biggest (the circle's two halves are 39.27 mm² each).
+        let r = t.regen();
+        let sk = r.display.sketches.iter().find(|x| x.feature == s).unwrap();
+        let plate: Vec<Reference> = sk.regions.iter().filter(|g| g.area > 300e-6).map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+        assert_eq!(plate.len(), 1, "rust {rust}");
+        let ex = t.add("extrude", &[("entities", q(plate)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+        let body = t.ok(ex).context.bodies[0].id.clone();
+        let m = t.add("mirror", &[("patternType", en("PART")), ("operationType", en("ADD")), ("entities", q(vec![Reference::Body(body)])), ("mirrorPlane", q(vec![Reference::Plane(DatumPlane::Right)])), ("defaultScope", ParamValue::Bool(true))]);
+        let r = t.ok(m);
+        noshape_kernel::set_rust_boolean(None);
+        assert_eq!(r.context.bodies.len(), 1, "rust {rust}");
+        let b = &r.context.bodies[0].shape;
+        let exact = 8000.0 - 250.0 * std::f64::consts::PI;
+        assert!((volume(&r) - exact).abs() < 1e-6, "rust {rust}: {} mm³", volume(&r));
+        assert_eq!(b.count(noshape_kernel::ShapeType::Face), 7, "rust {rust}");
+        assert!(b.faces().iter().any(|f| (f.area().unwrap() * 1e6 - 100.0 * std::f64::consts::PI).abs() < 1e-6), "rust {rust}: no whole hole wall");
+    }
+}

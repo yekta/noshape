@@ -14,6 +14,13 @@ a Simple Hole cuts such parts through std's booleanBodies (features/hole.rs `cut
 rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studios saved with sheet metal before std
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
+## 10-31 evening (core, moved account from 18:45)
+- 76cd8d31 BLEND-RUST: corners between drafted walls (details under "noshape's own blends"); the corpus's remaining
+  declines are all non-elementary corner patches or face-consuming blends: returns flatten there.
+- SHELL-SLOW filleted pocket on main with bool's 108cdf21: the slab fuse now declines "a vertex inside coincident
+  edges of two other arguments" (bool's top open decline), the common "a non-manifold result"; 2.8 / 4.3 s.
+  Request updated in bool.md (81dd0b46), and answered bool's fuse_slabs history question (take the plain Boolean's).
+
 ## 10-31 (core, new account from 10:50)
 - BLEND-RUST on for new studios (ScopeRule 6, model-data partstudio.rs `legacy_blends`, set by upgrade_saved_params
   for studios saved with features under rule < 6; model-core regen/std_route.rs `BlendKernel` sets the kernel's
