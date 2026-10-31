@@ -744,6 +744,27 @@ fn a_features_appearance_opens_as_live(cx: &mut TestAppContext) {
     assert_eq!(open(cx, EditTarget::Feature(FeatureId(9001), None)), ("Appearance".into(), None, [0x99, 0x99, 0x99], true));
 }
 
+/// workflow-keyboard-mouse "p" (live request 1673): p sets the default planes' own visibility: with Top shown and
+/// Front / Right hidden it hides Top too, then shows all three.
+#[gpui::test]
+fn p_hides_the_default_planes_then_shows_them(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "p-planes");
+    let planes = [DatumPlane::Top, DatumPlane::Front, DatumPlane::Right].map(Reference::Plane);
+    cx.update(|cx| view.update(cx, |v, cx| v.set_visibility(&planes[1..], true, cx)));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    cx.update_window(window, |_, w, cx| {
+        let focus = view.read(cx).focus.clone();
+        w.focus(&focus, cx);
+    })
+    .unwrap();
+    let hidden = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).map(|s| planes.iter().filter(|p| s.hidden_defaults.contains(p)).count()).unwrap_or(0));
+    assert_eq!(hidden(cx), 2);
+    keys(cx, window, &["p"]);
+    assert_eq!(hidden(cx), 3, "a shown plane: p hides all three");
+    keys(cx, window, &["p"]);
+    assert_eq!(hidden(cx), 0, "all hidden: p shows all three");
+}
+
 /// A feature dialog of `type_id` (its defaults, `set` applied) in the test window's app, with no field active yet.
 fn dialog_of(cx: &mut TestAppContext, view: &Entity<PartStudioView>, type_id: &str, set: impl FnOnce(&mut noshape_model::params::ParamValues)) -> Entity<crate::feature_dialog::FeatureDialog> {
     cx.update(|cx| {

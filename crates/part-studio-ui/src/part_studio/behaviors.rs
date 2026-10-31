@@ -1330,6 +1330,26 @@ impl PartStudioView {
         self.set_visibility(&planes, true, cx);
     }
 
+    /// Shift+H (live request 1673): each sketch's own visibility: all shown
+    /// when any is hidden (a consumed sketch's auto-hide too), else all
+    /// hidden.
+    pub(super) fn toggle_sketches(&mut self, cx: &mut Context<Self>) {
+        let all: Vec<Reference> = self.display.sketches.iter().map(|s| Reference::Feature(s.feature)).collect();
+        let any_hidden = self.display.sketches.iter().any(|s| s.hidden);
+        self.set_visibility(&all, !any_hidden, cx);
+    }
+
+    /// p (live request 1673): the default planes' own visibility: all three
+    /// hidden when any is shown, else all shown (the opposite tie-break to
+    /// Shift+H).
+    pub(super) fn toggle_default_planes(&mut self, cx: &mut Context<Self>) {
+        use noshape_model::reference::DatumPlane;
+        let planes = [DatumPlane::Top, DatumPlane::Front, DatumPlane::Right].map(Reference::Plane);
+        let hidden = self.studio(cx).map(|s| s.hidden_defaults.clone()).unwrap_or_default();
+        let any_shown = planes.iter().any(|p| !hidden.contains(p));
+        self.set_visibility(&planes, any_shown, cx);
+    }
+
     /// Sketch menus "Hide other sketches" (keep one) / "Hide all sketches".
     pub(super) fn hide_sketches(&mut self, keep: Option<FeatureId>, cx: &mut Context<Self>) {
         let sketches: Vec<Reference> = self.display.sketches.iter().filter(|s| !s.hidden && Some(s.feature) != keep).map(|s| Reference::Feature(s.feature)).collect();

@@ -5688,16 +5688,8 @@ impl Render for PartStudioView {
             .on_action(cx.listener(|this, _: &ZoomToFit, _, cx| this.zoom_fit(cx)))
             .on_action(cx.listener(|this, _: &ZoomIn, _, cx| this.viewport.update(cx, |vp, cx| vp.zoom_step(true, cx))))
             .on_action(cx.listener(|this, _: &ZoomOut, _, cx| this.viewport.update(cx, |vp, cx| vp.zoom_step(false, cx))))
-            .on_action(cx.listener(|this, _: &TogglePlanes, window, cx| {
-                this.opts.show_planes = !this.opts.show_planes;
-                let d = this.display.clone();
-                this.apply_display(d, window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &ToggleSketches, window, cx| {
-                this.opts.show_sketches = !this.opts.show_sketches;
-                let d = this.display.clone();
-                this.apply_display(d, window, cx);
-            }))
+            .on_action(cx.listener(|this, _: &TogglePlanes, _, cx| this.toggle_default_planes(cx)))
+            .on_action(cx.listener(|this, _: &ToggleSketches, _, cx| this.toggle_sketches(cx)))
             .on_action(cx.listener(|this, _: &ToggleProjection, _, cx| {
                 this.viewport.update(cx, |vp, cx| {
                     let p = match vp.camera.projection {
