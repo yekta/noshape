@@ -3031,7 +3031,8 @@ impl PartStudioView {
                                 .justify_center()
                                 .bg(rgb(0xffffff))
                                 .border_1()
-                                .border_color(rgb(0xcccccc))
+                                // Dark keeps the light outline (live dk-932: #ccc on #333).
+                                .border_color(gpui_kit::rgb_static(0xcccccc))
                                 .text_size(px(9.33))
                                 .text_color(pal.text)
                                 .cursor(CursorStyle::Move)
@@ -3054,7 +3055,7 @@ impl PartStudioView {
                                 .bg(rgb(0xffffff))
                                 .border_1()
                                 .border_t_0()
-                                .border_color(rgb(0xcccccc))
+                                .border_color(gpui_kit::rgb_static(0xcccccc))
                                 .shadow_md()
                                 .child(div().w(px(20.)).flex().justify_center().child(crate::ui::glyph("ui-chevron-right", 12., rgb(0xd7d7d7))))
                                 .child(gpui_kit::base::input::input_frame(crate::quantity_field::invalid_field(
@@ -3129,7 +3130,8 @@ impl PartStudioView {
                                         .border_color(rgb(0xcccccc))
                                         .cursor_pointer()
                                         .hover(|d| d.bg(pal.panel_hover))
-                                        .child(crate::assets::icon("dialog-cancel", 22., cx))
+                                        // Its ✕ stays #bd3039 in dark (live dk-932), where a dialog's turns #ff6b6b.
+                                        .child(crate::assets::icon("dim-cancel", 22., cx))
                                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                                             this.sketch_cancel(cx);
                                             window.focus(&this.focus, cx);

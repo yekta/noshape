@@ -5420,19 +5420,22 @@ impl SketchEditor {
             }
             let selected = self.selected_constraints.contains(&g.constraint);
             let hovered = self.hover_constraint == Some(g.constraint);
-            // Onshape dimension colors: black driving, gray driven, gold hover/selection.
-            use crate::palette::{rgb8, viewport as vc};
-            let color = if selected {
-                rgb8(0x6a4f06)
+            // Onshape dimension colors: black driving, gray driven, gold hover/selection;
+            // dark (live dk-932, the dark --os-dimension-* tokens): white, #ccc, #fcda7f / #dba517.
+            use crate::palette::{pick, rgb8, viewport as vc, viewport_dark as vd};
+            let color = rgb8(if selected {
+                pick(0x6a4f06, 0xdba517)
+            } else if hovered && g.driving {
+                pick(0x987107, 0xfcda7f)
             } else if hovered {
-                rgb8(0x987107)
+                pick(vc::DIM_DRIVEN, vd::DIM_DRIVEN)
             } else if self.conflicting.contains(&g.constraint) {
-                rgb8(vc::SKETCH_OVER)
+                pick(vc::SKETCH_OVER, vd::SKETCH_OVER)
             } else if g.driving {
-                rgb8(vc::SKETCH_FULL)
+                pick(vc::SKETCH_FULL, vd::SKETCH_FULL)
             } else {
-                rgb8(vc::DIM_DRIVEN)
-            };
+                pick(vc::DIM_DRIVEN, vd::DIM_DRIVEN)
+            });
             // Live (sketch/17, 24): ~1.1 px of ink, ~1.6 px selected; our
             // line AA puts about width − 0.4 px of ink down.
             let width = if selected { 2.0 } else { 1.5 };

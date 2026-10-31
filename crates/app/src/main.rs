@@ -92,11 +92,6 @@ fn load_fonts(cx: &mut App) {
 fn apply_theme(cx: &mut App) {
     load_fonts(cx);
     Theme::change(ThemeMode::Light, None, cx);
-    let white: Hsla = gpui_kit::rgb_static(0xffffff).into();
-    // Live (sketch/13): text selected in a focused field is Chrome's
-    // `#3367d1` with white text; code editors keep `t.selection` below
-    // (patched gpui-base, vendor/gpui-base).
-    cx.set_global(gpui_kit::base::input::PlainSelectionColors { background: gpui_kit::rgb(0x3367d1).into(), foreground: white });
     // Onshape (live dom/caret-inputs.json): `input::placeholder { font-style:
     // italic; font-weight: 300 }` in `rgb(102, 102, 102)`.
     // Preferences › Language and Theming, as saved.
@@ -139,6 +134,10 @@ fn fill_kit_theme(cx: &mut App) {
     let pal = theme::p();
     let white: Hsla = gpui_kit::rgb_static(0xffffff).into();
     let dark = gpui_kit::hex_theme_active();
+    // Live (sketch/13): text selected in a focused field is Chrome's
+    // `#3367d1` with white text, `#0a3ea8` in dark (dk-932); code editors
+    // keep `t.selection` below (patched gpui-base, vendor/gpui-base).
+    cx.set_global(gpui_kit::base::input::PlainSelectionColors { background: gpui_kit::rgb_static(if dark { 0x0a3ea8 } else { 0x3367d1 }).into(), foreground: white });
     // Feature Studio's current-line gutter cell: light #dcdcdc; dark (Ace
     // twilight, live dom/dark-drawing-fs-vs.json) white at 3%.
     let active_cell = if dark { gpui_kit::rgba_static(0xffffff08) } else { gpui_kit::rgb(0xdcdcdc) };

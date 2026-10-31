@@ -43,7 +43,7 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-929-face-selected-measure | dk3 | bg, planes 1/2 stacked, plane edges, origin, cube = live within a few levels | ☑ |
 | dk-930-face-hover | psui-scratch d2 | right strip with a panel open: the open button #333 joining its panel, the others #1c1c1c (measured 51 / 28) | ☑ psui 10-31 |
 | dk-931-sketch-line | dksk2 | under-defined #3e94ff, sketch box #90cef1, white origin; regions #f2f2f2 at 20% (#616161 on a plane) | ☑ |
-| dk-932-sketch-dimension |  | dimension lines white (scene); edit box follows the palette | ◐ box not compared |
+| dk-932-sketch-dimension | psui-scratch p2 | the edited dimension's lines white (they were black: scene sketch_mode used the light palette), hovered #fcda7f / selected #dba517 / driven #ccc (dark tokens); the box #333 with live's #ccc outline, selected text #0a3ea8, its ✕ #bd3039 (measured = live) | ☑ psui 10-31 |
 | dk-933-sketch-after |  | dimension values white, driven #ccc, conflicts #ff6b6b | ☑ |
 | dk-940-assembly | dkasm | chrome, list and viewport match; toolbar icons = live (icons2, re-checked 10-26; the Search tools box sits ~2 px right: ui) | ☑ |
 | dk-941-mate-dialog | psui-scratch h2 | dialog / title #333, active Mate connectors box #142434 with a #3e94ff border = live (Revolute, no picks) | ☑ psui 10-31 |

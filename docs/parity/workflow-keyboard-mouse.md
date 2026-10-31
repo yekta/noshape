@@ -44,7 +44,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | Shift+P | hide all construction | planes hidden / back | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | y / Shift+Y | hide / show selected parts | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 (y hides; Shift+Y shows only with the pointer over the hidden part = live behaviours psui 2.16/2.17) |
 | p | hide/show planes | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
-| Shift+I | Make isolate | Isolate dialog (Transparency / Component controls) | ✅ dialog; **planes stay visible** (live: other parts and planes/origin go translucent) | ✗ KB3 |  |
+| Shift+I | Make isolate | Isolate dialog (Transparency / Component controls) | Isolate dialog; other parts translucent, planes faint, Default geometry rows grey (later passes, rows KB3 below) | ✅ KB3 | psui 10-31 (stale row; pass 13) |
 | Shift+T | Make transparent | "Make transparent" dialog | ✅ | 0.4.10+ / dd1b5037 10-27 (dialog: Transparency / Component controls) |
 | Shift+V | Named views | panel "Named views": New view name, +, "No views created" | ✅; one Esc closes it (live spec "Named views panel": first Esc) | ✅ KB2 | psui 10-31 (:102 cm3) |
 | Shift+X | Section view | ✅ (see workflow-analysis AN3) | ✅ | 0.4.10+ / dd1b5037 10-27 |

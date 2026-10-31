@@ -249,6 +249,11 @@ rip a Modify joint made has no `faces` (custom host sheetmetal.rs `named(Def::Ed
 Modify joint through the rip's joint id instead (see Requests). Asked skasm via lead: the flake below.
 10-31 13:03: landed ff5594ef (SM4i). MODAL-HELP-MARK: os_ui::modal_help ("?" before ✕) on Export Drawing and Export as
 DXF/DWG (live drawing/90).
+10-31 13:40: landed dbb094e0 (modal "?"). Dark dk-932: an edited / hovered / selected sketch dimension in the dark
+palette (scene sketch_mode used the light one: black lines on #333), the dimension box's outline #ccc and ✕ #bd3039
+as live, focused-field text selection #0a3ea8 in dark (app main.rs PlainSelectionColors per theme). Origin
+dependencies "selected row" residual: live's capture was a hover (tooltip shown), ours does the same: closed.
+Asked live 13:03: the feature list's multi-selection menu with a sketch in it (core-workflow 8.3).
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC
