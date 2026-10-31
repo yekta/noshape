@@ -43,7 +43,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | 1 | Fields | order, labels, visibility, Distance 5 mm, Angle 0, Offset 0, Opposite offset ☑, Reapply fillet ☑ | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Check order | faces first: "Select faces to move." | direction / axis first | ✅ (was 🔧) | skasm 10-31 56277472 (CLI errsweep2.py: text and the field it marks) |
 | 3 | No translation direction | "Cannot determine translation direction." on Direction | "Select a direction", no field | ✅ (was 🔧) | skasm 10-31 56277472 (CLI errsweep2.py: text and the field it marks) |
-| 4 | Translate direction auto-fill | Direction = the first planar face picked (moveFaceEditingLogic) | stays empty | 🔧 a new Move face (Translate) takes the first planar moved face, until the user sets Direction |  |
+| 4 | Translate direction auto-fill | Direction = the first planar face picked (moveFaceEditingLogic) | stays empty | ✅ (was 🔧 a new Move face (Translate) takes the first planar moved face, until the user sets Direction) | skasm 10-31 GUI :103 at 56277472 (Translate, top face picked → Direction = Face of Extrude 1) |
 | 5 | Rotate, no axis | text from evAxis | "Select a rotation axis" | ✅ (was 🔧 L5 "Cannot determine rotation axis." on Axis) | skasm 10-31 56277472 (CLI errsweep2.py: text and the field it marks) |
 | 6 | Up to entity, nothing / unresolvable | "Cannot resolve entities." on limitEntity | "Select the entity to move up to" | ✅ (was 🔧) | skasm 10-31 56277472 (CLI errsweep2.py: text and the field it marks) |
 | 7 | Translate up to a plane | first face must be planar ("When moving up to a plane, first selected face must be planar.") and parallel ("Limit face must be parallel to face being moved.") | any plane, distance computed | ✅ (was 🔧 ✅ L6 (no field)) | skasm 10-31 56277472 (CLI direct.py): text, no field (L6) |
@@ -68,7 +68,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | 1 | Fields | Delete faces, Type Heal / Cap / Leave open (Heal), ☑ Delete fillet faces | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Failure | "Could not delete selected faces." (live) | "Delete face failed (…): <kernel>", cap texts | ✅ (was 🔧) | skasm 10-31 (code: direct.rs) |
 | 3 | Every face picked | live: OK, the part disappears, no message | "Cannot delete every face of a part" | ✅ (was 🔧) | skasm 10-31 56277472 (CLI direct.py): all 6 faces → OK, no part, no message |
-| 4 | Surface picked first | Type switches to Leave open (deleteFaceEditLogic) | stays Heal | 🔧 L10 |  |
+| 4 | Surface picked first | Type switches to Leave open (deleteFaceEditLogic) | stays Heal | ✅ (was 🔧 L10) | skasm 10-31 GUI :103 at 56277472 (a surface's face first → Leave open) |
 | 5 | Delete fillet faces | fillets of any origin (imported parts) | only fillets our Fillet feature named | ✅ (was 🔧 L11: fillets recognised from the geometry (cylinder / torus / sphere / B-spline face tangent to a deleted face and to another), imported parts too; Heal without them fails "Could not delete selected faces." (test with live's 7922.7433)) | skasm 10-31 56277472 (T delete_face_removes_fillets_by_geometry_as_live, live L11: 7922.7433) |
 
 ## Sweep
@@ -105,7 +105,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | 2 | Empty | "Select surfaces or faces to thicken." on entities | same | ✅ | 67f88fd1 10-28 ("Select surfaces or faces to thicken.") |
 | 3 | Keep tools off, some faces of a surface | the surface is kept unless all its faces are picked | deleted when any face is picked | ✅ (was 🔧 L16) | skasm 10-31 56277472 (CLI: one face of a 2-face surface thickened, Keep tools off → the surface stays, L16) |
 | 4 | Adjacent faces | one operation: one body | each face separately | ✗ L17: one L-shaped part of 2560 mm³ (square corner); ours 2 slabs — needs the kernel's intersection join (kern); overlapping slabs of one body are fused |  |
-| 5 | Auto Add from a surface face | only faces of solids count (thicken.fs) | surface faces count (opens on Add) | 🔧 L18 (surface face stays New); a user-picked Add / Remove sets the flip (canSetBooleanFlip) |  |
+| 5 | Auto Add from a surface face | only faces of solids count (thicken.fs) | surface faces count (opens on Add) | ✅ (was 🔧 L18 (surface face stays New); a user-picked Add / Remove sets the flip (canSetBooleanFlip)) | skasm 10-31 GUI :103 at 56277472 (a surface's face → stays New) |
 | 6 | Errors | "Failed to thicken all selections." (likely) | "Thickness must be positive", "Thicken failed: …" | ✅ (was 🔧 L19 "Invalid input selections." (no field)) | skasm 10-31 56277472 (T thicken_as_live, L19) |
 
 ## Wrap
@@ -113,9 +113,9 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 |---|---|---|---|---|---|
 | 1 | Fields | Creation type Solid / Surface / Split (Surface), operations for Solid, flip, Trim to target, anchors, Thickness 2.5 | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Position group | Angle / U shift / V shift in a collapsed "Position" group | always shown, no group | ✅ (fs: the std group, collapsed) | 67f88fd1 10-28 (Position group collapsed) |
-| 3 | Filters | Tools planar only; Target cylindrical or conical only; no unwrap | wider, plus unwrap | 🔧 L20 (no unwrap; forced picks fail with live's texts) |  |
+| 3 | Filters | Tools planar only; Target cylindrical or conical only; no unwrap | wider, plus unwrap | ✅ (was 🔧 L20 (no unwrap; forced picks fail with live's texts)) | skasm 10-31 GUI :103 at 56277472 (a cylinder face isn't taken as a Tool) |
 | 4 | Errors | "Select planar faces or sketch regions to wrap." (source), "Select a cylindrical or conical face to wrap around." (destination), "Source entities must all lie on the same plane.", "Select anchor points.", auto-anchor text, "Failed to imprint edges onto destination face.", ambiguous anchor | own texts, no fields | ✅ (was 🔧 (unwrap keeps its own texts)) | skasm 10-31 56277472 (CLI: source / destination texts on their fields; the other texts in surfacing_c.rs) |
-| 5 | Dialog dump | — | — | 🔧 L21 Position group collapsed (FS compiler lacks the group, dialog comparison excludes wrap) |  |
+| 5 | Dialog dump | — | — | ✅ (was 🔧 L21 Position group collapsed (FS compiler lacks the group, dialog comparison excludes wrap)) | skasm 10-31 GUI :103 at 56277472 (Position group collapsed) |
 
 ## Rib
 | # | Area | Onshape | Ours | Status | Verified |
@@ -123,7 +123,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | 1 | Fields | order, labels, Thickness 2.5 mm, Parallel, Opposite direction ☑, Draft ☐ 3°, Extend ☐, Merge ribs ☑ | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Empty profiles | "Select sketch profiles to create the ribs." on profiles | same | ✅ | 67f88fd1 10-28 ("Select sketch profiles to create the ribs.") |
 | 3 | Empty Parts | "Select parts where the rib will be fitted into." | all solids used | ✅ (was 🔧 L22 (no field); older ribs keep using every part) | skasm 10-31 56277472 (CLI errsweep2.py: text and the field it marks); no field, as live L22 |
-| 4 | Parts / direction auto-fill | edit logic fills Parts and picks the side | none | 🔧 L22 Parts filled with the studio's parts on open |  |
+| 4 | Parts / direction auto-fill | edit logic fills Parts and picks the side | none | ✅ (was 🔧 L22 Parts filled with the studio's parts on open) | skasm 10-31 GUI :103 at 56277472 (new Rib: Parts = Part 1, Part 2) |
 | 5 | Closed profile, Parallel | "Only open sketch profiles can be used when rib direction is parallel to sketch plane." | no check | ✅ (was 🔧 ? L23) | core 82580226 10-29 (qa: the text); skasm 10-31 re-read |
 | 6 | Draft, Extend profiles to part | supported | "not supported yet" / ignored | ✅ (Extend was 🔧 L22: parallel ribs are built as rib.fs does (swept past the part, split by it, excess removed; ends extended with the checkbox or when they sit on a face they point into), all five live rows match (3692, 3932, 4112, 4562, error). Draft was 🔧 rib.fs applyDraft: the sides drafted about the rib's top (wider into the part, narrower with Opposite), split by the part again; live G33c 27048.155585660817 matched (test `rib_draft_as_live`), Normal to sketch plane drafted the same way (no live number). Extend with Normal to sketch plane (L24: error) stays ✗) | skasm 10-31 56277472 (T rib_extend_profiles_as_live, rib_draft_as_live, rib_of_an_l_normal_to_its_plane_as_live) |
 | 7 | Errors | "Failed to create a rib from a selected profile.", "None of the ribs intersected a part.", "Failed to merge ribs into parts." | own texts | ✅ (was 🔧) | skasm 10-31 (code: the texts) |
@@ -141,7 +141,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 |---|---|---|---|---|---|
 | 1 | Fields | order, Guides group, Sample size 5, isocurves 10, Merge with all ☑ | same | ✅ | 67f88fd1 10-28 (New / Add, Guides group (Vertices or curves, Precise), Show isocurves Count 10, Add: Merge with all ☑) |
 | 2 | Empty edges | "Select laminar edges or curves as fill surface boundary." on edges | own text, no field | ✅ (was 🔧) | skasm 10-31 56277472 (CLI errsweep2.py: text and the field it marks) |
-| 3 | Continuity label | "Continuity [Position]" label shown (SHOW_LABEL) | no label | 🔧 SHOW_LABEL |  |
+| 3 | Continuity label | "Continuity [Position]" label shown (SHOW_LABEL) | no label | ✅ (was 🔧 SHOW_LABEL) | skasm 10-31 GUI :103 at 56277472 (edge chip "[Position] Edge of Extrude 2", Continuity select) |
 | 4 | Loop errors | "A boundary edge can have only one type of continuity constraint.", "Cannot create fill surface between multiple loops.", "Boundary edges selected do not form a closed loop.", "Cannot create tangency or curvature constraint for a curve selection." | own texts | ✅ (was 🔧 ? L27 (internal-edge variant)) | skasm 10-31 (code: the texts) |
 | 5 | Guides | live "psb (10-24 d)": Guides on with nothing picked is the plain fill; Precise passes through the guides (≤1.1e-4 mm), each touching the boundary at one end at least, else "Guide entities cannot be used as selected." (no field); arc + vertex: warning "Guide curves and vertices cannot be used in combination in Precise mode. Vertex selections are not used."; Sampled only approximates | not checked; always sampled | ✅ (was 🔧 all those rules (Precise curves as free MakeFilling constraints); test `fill_guides_as_fs`; our surface is OCCT's, so areas differ slightly (live arc 1845.4473)) | skasm 10-31 56277472 (T fill_guides_as_fs) |
 | 6 | Add when the edges are surface edges | automatic (SF7) | no | ✗ (SF7) |  |
@@ -151,7 +151,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 |---|---|---|---|---|---|
 | 1 | Fields | order, items, seven conditions (None), magnitude 1 | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Profile arrays | driven-query rows "[None] Edges of Curve U1" (live L28: no limit, a third row is taken) | "Add Profile" UI | ✅ driven query with the "[#uCondition] #uProfileEntities" item label | da18f886 10-28 (Boundary surface U profiles: rows "[None] Edge of Arcs sketch" ×2, a driven-query row per pick; see workflow-surfaces 11) |
-| 3 | Boundary condition label | SHOW_LABEL | no label | 🔧 SHOW_LABEL |  |
+| 3 | Boundary condition label | SHOW_LABEL | no label | ✅ (was 🔧 SHOW_LABEL) | skasm 10-31 GUI :103 at 56277472 (the same SHOW_LABEL mechanism as Fill's) |
 | 4 | Too few profiles | "Select edges to specify at least two profiles." on both arrays | own text, no field | ✅ (was 🔧 L28; a third profile / mid-span crossing fail with live's texts was 🔧; 1U+1V was 🔧 builds the sheet the U sweeps along the V (the other two sides are the profiles moved to each other's far end; live 2099)) | skasm 10-31 56277472 (CLI err3.py: text and field) |
 | 5 | Boundary conditions | applied, with their errors | warning only | ✅ (was 🔧 rows in one direction: the first / last row's condition is the loft end condition (same rule as Loft 4); live L28's "Only planar profiles are valid for Normal/Tangent to profile start condition." on a part edge (test `boundary_condition_needs_a_planar_profile`); U+V networks still warn) | skasm 10-31 (code: solid_a.rs's planar-profile text; loft end rule T loft_end_conditions_as_live) |
 | 6 | Failure | "Could not create boundary surface with given information. Check profile order, intersections or end conditions." | own text | ✅ (was 🔧) | skasm 10-31 (code: the texts) |
@@ -176,7 +176,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | 6 | Start / end point | must be coplanar with the axis start / end (errors on startPoint / endPoint), snapped onto the radius | moves the plane, own errors | ✅ (was 🔧 helix.fs texts on startPoint / endPoint (end point only checked on a face: on an axis it sets the height); a point on a face or circle is moved onto the radius) | skasm 10-31 56277472 (T helix_points_as_fs) |
 | 7 | Computed revolutions / pitch | filled | never | ✅ (was 🔧 filled when the end type is End point (helix.fs)) | skasm 10-31 56277472 (T helix_points_as_fs) |
 | 8 | Show start and end profiles | magenta circles | nothing | ✅ (was 🔧 magenta debug circles (#ff2bc1) and centre dots (#e224e3) at both ends while the dialog is open (helix.fs drawConstructionEnds)) | skasm 10-31 56277472 (T helix_start_end_profiles: the circles and centres as debug geometry) |
-| 9 | Preselection, start angle 0 | type from the preselection; canonical start angle | no; surface x direction | 🔧 L34 the preselection picks the tab (face → Surface, line edge / connector / sketch line → Axis, circle → Circle). L35 won't be matched: live's start angle follows Parasolid's own surface frames (a Z or X cylinder starts at the extrude's end, a tilted one at its base), which OCCT doesn't share |  |
+| 9 | Preselection, start angle 0 | type from the preselection; canonical start angle | no; surface x direction | ✅ (was 🔧 L34 the preselection picks the tab (face → Surface, line edge / connector / sketch line → Axis, circle → Circle). L35 won't be matched: live's start angle follows Parasolid's own surface frames (a Z or X cylinder starts at the extrude's end, a tilted one at its base), which OCCT doesn't share) | skasm 10-31 GUI :103 at 56277472 (a preselected cylinder face → Cylinder/Cone tab, face filled; L35 start angle won't match, as noted) |
 
 ## Composite part
 | # | Area | Onshape | Ours | Status | Verified |
@@ -190,7 +190,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 |---|---|---|---|---|---|
 | 1 | Fields, empty origin | order, labels; "Cannot resolve entities." on Origin entity | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Empty owner | "Cannot determine owner of mate connector." on Select owner entity | no error | ✅ (was 🔧 L37 (owner inferred from the origin's part or the only part, as the dialog does)) | skasm 10-31 56277472 (CLI cmp.py: origin with three parts → the text on ownerPart) |
-| 3 | Owner / attachment auto-fill | from the origin entity or the only part (connectorEditLogic) | none | 🔧 L37 |  |
+| 3 | Owner / attachment auto-fill | from the origin entity or the only part (connectorEditLogic) | none | ✅ (was 🔧 L37) | skasm 10-31 GUI :103 at 56277472 (a face of Part 1 → owner Part 1, Attach to selection) |
 | 4 | To selection, empty | "Select an entity for the mate connector attachment." on Attach to | no check | ✅ (already in refgeom.rs; the doc was stale) | v0.4.12 CLI 10-28 (cent copy: Mate connector on the top face, attachmentOption TO_SELECTION, attachTo [] → Error "Select an entity for the mate connector attachment.", faulty attachTo) |
 | 5 | Owner / attachment at regen | the connector follows them | not stored | ✅ (was 🔧 the owner part is kept with the connector and a Transform that moves the part moves it (attachment to a selection still follows the owner, not the selected face)) | skasm 10-31 56277472 (T mate_connector_follows_its_owner) |
 | 6 | Move vs Reorient secondary axis | translation in the reoriented frame (likely) | translated first | ✅ (was 🔧 L38 order: flip/reorient, move, rotate; "+Y" = X to −Y) | skasm 10-31 56277472 (T mate_connector_frame_order_as_live, L38) |
