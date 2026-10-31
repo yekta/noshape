@@ -842,6 +842,12 @@ impl Viewport {
     /// Zoom to fit [`Self::fit_bounds`] (the whole scene when unset), like
     /// Onshape: parts fill the view, default planes only count when there is
     /// nothing else, and an overlay at the left is kept clear.
+    /// Whether [`Self::zoom_to_fit`] has something to fit yet (the scene's
+    /// bounds arrive with its first upload).
+    pub fn can_fit(&self) -> bool {
+        self.fit_bounds.is_some() || self.scene_bounds.is_some()
+    }
+
     pub fn zoom_to_fit(&mut self, animate: bool, cx: &mut Context<Self>) {
         let Some((lo, hi)) = self.fit_bounds.or_else(|| self.scene_bounds.map(|(lo, hi)| (lo.as_dvec3(), hi.as_dvec3()))) else { return };
         let size = self.size();

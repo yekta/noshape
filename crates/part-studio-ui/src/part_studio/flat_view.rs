@@ -122,8 +122,9 @@ impl FlatView {
                 this.compose(false, cx);
                 cx.emit(FlatViewEvent::Selected(this.selected));
             }
-            // The user zoomed, panned or turned the flat: keep their view.
-            ViewportEvent::CameraChanged if this.fitted.is_some_and(|c| c != this.viewport.read(cx).camera) => this.pending_fit = false,
+            // The user zoomed, panned or turned the flat: keep their view (a
+            // resize changes the camera too: the panel settling isn't the user).
+            ViewportEvent::CameraChanged if this.fitted.is_some_and(|c| c != this.viewport.read(cx).camera) && this.viewport.read(cx).size() == this.fit_size => this.pending_fit = false,
             _ => {}
         });
         Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, flat: None, parts: None, hover: None, sides: Vec::new(), selected: None, selected_bend: None, sketch_frame: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
@@ -340,15 +341,18 @@ impl Render for FlatView {
             placed: |this, at, cx| this.viewport.update(cx, |vp, cx| vp.set_view_cube_origin(at, cx)),
         };
         let size = self.viewport.read(cx).size();
-        if self.pending_fit && size.x > 0.0 && size.y > 0.0 && size != self.fit_size {
+        let can_fit = self.viewport.read(cx).can_fit();
+        if self.pending_fit && size.x > 0.0 && size.y > 0.0 && size != self.fit_size && can_fit {
             self.fit_size = size;
             self.fitted = Some(self.viewport.update(cx, |vp, cx| {
                 vp.camera.rotation = noshape_render::Camera::rotation_for(StandardView::Top);
                 vp.zoom_to_fit(false, cx);
                 vp.camera
             }));
-        } else if self.pending_fit && size.x <= 0.0 {
-            // Not laid out yet: look again next frame.
+        } else if self.pending_fit && self.parts.is_some() && (size.x <= 0.0 || !can_fit) {
+            // Not laid out, or the flat not uploaded, yet: look again next
+            // frame (a wide panel settled its size before the flat's bounds
+            // came, and the flat was never fitted).
             cx.on_next_frame(window, |_, _, cx| cx.notify());
         }
         // No camera menu under this cube (live sm-104).
