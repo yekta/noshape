@@ -765,6 +765,38 @@ fn p_hides_the_default_planes_then_shows_them(cx: &mut TestAppContext) {
     assert_eq!(hidden(cx), 0, "all hidden: p shows all three");
 }
 
+/// User P1 (10-31): Esc on a dialog whose preview is still regenerating shows the document as it was before the edit
+/// at once (the same display, no dialog, no spinner, in the same update), and the cancelled run's late result never
+/// replaces it.
+#[gpui::test]
+fn cancel_shows_the_document_before_the_edit_at_once(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "cancel-at-once");
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    draw(cx, window);
+    let before = cx.update(|cx| view.read(cx).display.clone());
+    assert!(cx.update(|cx| view.read(cx).pending.is_none()), "settled before the edit");
+    // The dialog opens and its preview regeneration starts; the executor doesn't run it before the Esc (a slow one).
+    let after_esc = cx
+        .update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| v.start_feature("extrude", w, cx));
+            assert!(view.read(cx).edit.is_some() && view.read(cx).pending.is_some(), "the preview regenerating");
+            let focus = view.read(cx).focus.clone();
+            w.focus(&focus, cx);
+            w.dispatch_keystroke(Keystroke::parse("escape").unwrap(), cx);
+            let v = view.read(cx);
+            (v.edit.is_some(), v.pending.is_some(), std::sync::Arc::ptr_eq(&v.display, &before))
+        })
+        .unwrap();
+    assert_eq!(after_esc, (false, false, true), "(dialog open, spinner, other display) right after Esc");
+    // Whatever the cancelled run still delivers is dropped.
+    draw(cx, window);
+    let settled = cx.update(|cx| {
+        let v = view.read(cx);
+        (v.pending.is_some(), std::sync::Arc::ptr_eq(&v.display, &before))
+    });
+    assert_eq!(settled, (false, true), "no late result, no spinner");
+}
+
 /// A feature dialog of `type_id` (its defaults, `set` applied) in the test window's app, with no field active yet.
 fn dialog_of(cx: &mut TestAppContext, view: &Entity<PartStudioView>, type_id: &str, set: impl FnOnce(&mut noshape_model::params::ParamValues)) -> Entity<crate::feature_dialog::FeatureDialog> {
     cx.update(|cx| {

@@ -276,6 +276,15 @@ window (live dk-974 / 975); before they shifted up just enough. Vendor gpui-pre 
 Reset all disabled until something differs). Open in dark-mode: 971–973 / 982 (sheet metal), 994 (custom table),
 tab manager 989–991, left panels 996–998, history 9a0–9a1.
 10-31 20:12: landed a2c5b09f (flat view fit). Flange dialog labels as live (skasm's sheetmetal.rs spec SHOW_LABEL).
+10-31 21:43: **P1 from the user: instant cancel.** Cancelling a dialog while its preview regenerates (the knurl at
+45 / 45°) left the spinner going: cancel_edit scheduled a regeneration of the restored document, which waited on the
+regenerator lock behind the cancelled run. Now the committed document's result (display, context, the studio /
+upto / config it came from) is kept when a dialog opens (`before_edit`, only when no regeneration is pending); on
+cancel, if the document is unchanged, it is shown in the same update, `regen_seq` bumps (late results dropped),
+the runs are aborted (`Runs::abort_all`, model-core) and the spinner ends. T1 sketch_ui_tests
+cancel_shows_the_document_before_the_edit_at_once. Asked live (REQUESTS psui 10-31 21:24) for Onshape's toast /
+list / dialog behaviour on cancel; behaviours 4227 already says Esc doesn't cancel a committed regeneration and there
+is no cancel button.
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC
