@@ -20,7 +20,7 @@ it, so re-take positions after every selection.
 | 1.1 | Start window › Create › Document… | Dialog with the name "Untitled document" selected | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 1.2 | Type a name, Enter | Creates and opens it | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 1.3 | New document contents | Part Studio 1 (active) + Assembly 1; "Features (4)", Default geometry, rollback bar under Right, "Parts (0)"; isometric | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| 1.4 | Start window footer version | (ours) should read the release version | ❌ (VERSION-FOOTER-STALE) re-checked 10-23 on main 88fbf8f5: footer "(0.4.6.88fbf8f5fa11)" = release version + commit (was ✗ F27) | 0.4.10+ / daf1f50c 10-27 (footer "(0.4.6.daf1f50c6bcf)") |
+| 1.4 | Start window footer version | (ours) should read the release version | ✅ VERSION-FOOTER-STALE verified beb1e515 (footer "(0.4.14.beb1e51505a7)": main is bumped with every release); before: re-checked 10-23 on main 88fbf8f5: footer "(0.4.6.88fbf8f5fa11)" = release version + commit (was ✗ F27) | 0.4.10+ / daf1f50c 10-27 (footer "(0.4.6.daf1f50c6bcf)") |
 
 ## 2. Sketch on Top (live: "Sketch mode", "Input behaviour" › G)
 
@@ -261,8 +261,8 @@ and closes again with ✕/Esc/Cancel. Expected results follow live (behaviours.m
 | F5 | ✅ fixed | re-opened box shows "(10+5) mm" |
 | F6 | ✅ fixed | "#w" opens Create variable (Feature / Configuration, Length…, Name "w") |
 | F7 | ✅ fixed | pink field, red underline, ✓ disabled, hover "Enter a valid expression.", no raw toast |
-| F8 | ✗ still failing | chamfer 5 mm on the vertical edge next to a 3 mm fillet: red |
-| F9 | ✗ still failing | Shell 2.5 mm, top face removed: red |
+| F8 | ✅ later (row 3.5: live refuses 5 mm too, "Distance of chamfer on face too large."; 2 mm builds); 10-21: ✗ still failing | chamfer 5 mm on the vertical edge next to a 3 mm fillet: red |
+| F9 | ◐ later (row 3.6: 2.5 mm and 1 mm shell, volumes within 2e-5, edge count kern); 10-21: ✗ still failing | Shell 2.5 mm, top face removed: red |
 | F10 | ✅ fixed | one chip "Vertices of Sketch 2", two holes, no stray origin hole |
 | F11 | ✅ fixed | click near the edge midpoint gives "Edge of Extrude 1" |
 | F12 | ✅ fixed | Feature pattern of the Hole cuts real holes; Extrude 1 30 → 25 mm keeps Part 1 |
@@ -278,8 +278,8 @@ and closes again with ✕/Esc/Cancel. Expected results follow live (behaviours.m
 | F23 | ✅ fixed (verify) | Workspace units no longer cancels the sketch: it **accepts** it first (live behaviour not captured) |
 | F24 | ✅ fixed | follows from F23 (no sketch dialog under it) |
 | F25 | ✅ fixed | first instance placed at the assembly origin |
-| F26 | ✗ still failing | two parts → PRODUCT('Part 1'), ('Part 2') and root ('SOLID'); header still "Open CASCADE Model" |
-| F27 | ✗ still failing | footer now "(0.1.0)": still not the release version |
+| F26 | ✅ later (row 7.2: flat products Part 1…n, AP242 header); 10-21: ✗ still failing | two parts → PRODUCT('Part 1'), ('Part 2') and root ('SOLID'); header still "Open CASCADE Model" |
+| F27 | ✅ later (row 1.4, VERSION-FOOTER-STALE verified beb1e515); 10-21: ✗ still failing | footer now "(0.1.0)": still not the release version |
 | F2, F16 | – | F2 is a note for psb/lead; F16 withdrawn |
 
 New in this run:
@@ -300,16 +300,16 @@ New in this run:
 | 1 New document | 1.1–1.4 | ✅ (footer "(0.4.4.e4b90e209380)": the hash is the stale HEAD of /root/noshape-lead, not 5d28447; CI builds are fine) |
 | 2 Sketch | 2.1–2.21 | ✅ all (fresh defaults ☑ Show constraints / ☑ Show errors; ƒ, (10+5) mm, #w popup, invalid state, F29 Esc path, Enter does not accept) |
 | 3 Features | 3.1–3.4, 3.7–3.11, 3.13–3.15 | ✅ |
-| | 3.5 chamfer 5 mm next to fillets (F8) | ✗ kern |
-| | 3.6 shell 2.5 / 1 mm (F9) | ✗ kern |
-| | 3.12 Feature pattern of the Hole **after a Part pattern** (direction = Part 1's bottom edge, 10 mm × 2) | ✗ **new path of F12**: no extra holes, Part 1's filleted top corner turns into twisted facets and a sliver **Part 4** is split off |
+| | 3.5 chamfer 5 mm next to fillets (F8) | ✅ later (row 3.5); 10-21: ✗ kern |
+| | 3.6 shell 2.5 / 1 mm (F9) | ◐ later (row 3.6, kern); 10-21: ✗ kern |
+| | 3.12 Feature pattern of the Hole **after a Part pattern** (direction = Part 1's bottom edge, 10 mm × 2) | ✅ later (10-22 run: real holes, Parts (3); row 3.12 verified 8bb8a6d1); 10-21: ✗ **new path of F12**: no extra holes, Part 1's filleted top corner turns into twisted facets and a sliver **Part 4** is split off |
 | | 3.16 Boolean union | ? (the mirrored part didn't touch Part 3 in this layout; committed without error, parts unchanged) |
-| 4 Edit / history | 4.1 Extrude 1 30 → 25 mm | ✗ **Part 1 disappears with no error** (Parts 3) while Linear pattern 2 (the Feature pattern above) is active — data loss |
+| 4 Edit / history | 4.1 Extrude 1 30 → 25 mm | ✅ later (row 4.1 verified 1c853f78 10-27); 10-21: ✗ **Part 1 disappears with no error** (Parts 3) while Linear pattern 2 (the Feature pattern above) is active — data loss |
 | | 4.2–4.8 | ✅ (suppressing Linear pattern 2 brings Part 1 back; reorder, undo/redo, rollback arrows, Delete key, menu Delete + undo). Note: plain clicks in the list add to the selection, so Delete removed the two selected rows (verify against live's list selection) |
 | 5 Variables … units | 5.1–5.11 | ✅ (5.5 centre of mass blank = F18, live request open; 5.11 mm → inch changes only the Hole row's text) |
 | 6 Assembly / drawing | 6.1–6.7 | ✅ (first instance at the origin; "Select a mate connector on a different instance" hint; coincident fastened faces show z-fighting lines: ? vs live) |
 | 7 Export / reopen | 7.1, 7.3 | ✅ |
-| | 7.2 STEP (F26) | ✗ kern: 4 parts → PRODUCT Part 1–4 plus **three** PRODUCT('SOLID'); header "Open CASCADE Model" |
+| | 7.2 STEP (F26) | ✅ later (row 7.2); 10-21: ✗ kern: 4 parts → PRODUCT Part 1–4 plus **three** PRODUCT('SOLID'); header "Open CASCADE Model" |
 
 Repro for the F12 path: new doc; sketch rectangle on Top, extrude 30; fillet two top edges 3 mm; chamfer the vertical edge 2 mm;
 sketch 2 points on the top face, Hole; Linear pattern (Part) Part 1, 40 mm × 3; Linear pattern (Feature) Hole 1,
@@ -328,14 +328,14 @@ direction = Part 1's bottom-right edge, 10 mm × 2 → sliver Part 4 + facets; t
 | 1 New document | 1.1–1.4 | ✅ (footer hash again the stale /root/noshape-lead HEAD e4b90e2) |
 | 2 Sketch | 2.1–2.20 | ✅ all (☑ Show constraints / ☑ Show errors; chain, Enter mid-chain, Esc; G/C/A; E; D value box selected; 25; 1 in → Ø25.4 tan; ƒ Ø15; (10+5) mm; Esc reverts + blurs; #w → Create variable; abc → pink, ✓ disabled, "Enter a valid expression."; R20 / 40 typed right after the placing click; Enter with no tool keeps the sketch) |
 | 3 Features | 3.1–3.4, 3.7–3.11, 3.13–3.15 | ✅ |
-| | 3.5 chamfer 5 mm next to the two 3 mm fillets (F8) | ✗ kern (red; 2 mm works) |
-| | 3.6 shell 2.5 mm, top face removed (F9) | ✗ kern (red) |
-| | 3.10 count field | ✗ **F30** (Enter kept the dialog open; see below) |
+| | 3.5 chamfer 5 mm next to the two 3 mm fillets (F8) | ✅ later (row 3.5: live refuses 5 mm as well); 10-22: ✗ kern (red; 2 mm works) |
+| | 3.6 shell 2.5 mm, top face removed (F9) | ◐ later (row 3.6, kern); 10-22: ✗ kern (red) |
+| | 3.10 count field | ✅ later (F30 fixed, re-run line 366); 10-22: ✗ **F30** (Enter kept the dialog open; see below) |
 | | 3.12 Feature pattern of Hole 1 after the Part pattern, Part 1's bottom-right edge, 10 mm × 2 (F12 path) | ✅ real holes, Parts (3), no sliver or facets |
 | | 3.16 Boolean union of the disjoint Part 3 + mirrored Part 4 | ? (no error, parts unchanged; same as last run) |
 | 4 Edit / history | 4.1 Extrude 1 → 25 mm with the Feature pattern active (F12) | ✅ rolled back while editing; Part 1 kept |
 | | 4.2, 4.4–4.8 | ✅ |
-| | 4.3 drag Fillet 1 down onto the Sketch 2 row | ✗ **F33**: the drop line is drawn above Sketch 2, but the feature lands **below** Sketch 2 (dragging up lands where the line is) |
+| | 4.3 drag Fillet 1 down onto the Sketch 2 row | ✅ later (F33 fixed, re-run line 370; re-checked line 474); 10-22: ✗ **F33**: the drop line is drawn above Sketch 2, but the feature lands **below** Sketch 2 (dragging up lands where the line is) |
 | 5 Variables … units | 5.1–5.11 | ✅ (5.6 F19 now as live: toast ≈3.4 s after opening, gone by ≈8 s, not shown again on reopening; 5.11 accepts the sketch first, live not captured) |
 | 6 Assembly / drawing | 6.1–6.7 | ✅ |
 | 7 Export / reopen | 7.1–7.3 | ✅ (7.2 F26: flat products Part 4…1, id = name = description, no PRODUCT('SOLID'), AP242 header, METRE, one colour per part = live G47; originating system 'NOSHAPE 0.4.4' vs live 'ONSHAPE BY PTC INC') |
@@ -402,7 +402,7 @@ Re-run the whole section on the build with ui's fix (`menurun.sh BIN menus-ps.tx
 | Sections 1–7 | ✅ (as the aa75fdf run; 3.5 5 mm chamfer red, 2 mm builds; 3.6 shell builds; 3.12/4.1 F12; 3.16 blue note; F19 toast ≈3.4 s / gone ≈8.2 s; STEP 4 products, live colours). 2.17: my script's R20/40 after the #w-popup + "abc" steps didn't get created (twice now); the same steps by hand create them every time, so not counted. |
 | Section 8 (73 context-menu items) | ✅ all alive, incl. 8.6.1 Parts list › Rename |
 | (a) "lp wall over" Feature pattern (CLI-built, live G-URGENT model) | ✅ Reapply off: row and dialog title red, tooltip exactly `Linear pattern 1 did not regenerate properly: Could not create all instances as entered. Try selecting "Reapply features" option.`, ✓ enabled green, seed wall + direction drawn red, no second wall. Reapply on: title black, orange preview, two walls, volume **20042 mm³** (= live). |
-| (b) failed Extrude (Up to face on the block's parallel x=0 face) | ✗ title / row red, tooltip exactly `Extrude 2 did not regenerate properly: Failed to extrude selections, check input.`, ✓ enabled, no ghost; the up-to face's edge is red, **but the input sketch region (10×10 square) isn't drawn at all**: live draws it as a red outline with a light red fill. |
+| (b) failed Extrude (Up to face on the block's parallel x=0 face) | ✅ later (v0.4.6 c and v0.4.7 gate (c): red region + light fill, direction arrow); 8da7e78: ✗ title / row red, tooltip exactly `Extrude 2 did not regenerate properly: Failed to extrude selections, check input.`, ✓ enabled, no ghost; the up-to face's edge is red, **but the input sketch region (10×10 square) isn't drawn at all**: live draws it as a red outline with a light red fill. |
 | (c) Parts list › Rename | ✅ white field, all selected, no hover band; "Bracket" + Enter renames; no crash |
 | (d) import g48-two.step | ✅ names as live: Part 1 = G48 body (1.379 in³ ≈ 22597 mm³), Part 2 = the 10 mm cube. **New finding:** selecting Part 1 highlights the cube too, selecting Part 2 highlights the cube plus a face of the G48 body (selection highlight crosses the imported parts); the Parts list shows Part 2 above Part 1 (live order not captured). |
 | (e) noshape-cli live mode (CLI built from 8da7e78) | ✅ with failext.noshape open in the app: sketch_create / sketch_draw / feature_add extrude via the CLI appear in the window at once (Sketch 3, Extrude 3, Part 2); Ctrl+Z in the app undoes the extrude. |
@@ -420,7 +420,7 @@ Models: /root/qa4-scratch/mk-models.py CLI DIR (lpwall.noshape, failext.noshape)
 | Section 7 | ✅ STEP: 4 MANIFOLD_SOLID_BREP, products Part 1–4; quit / Recently opened (thumbnail) / reopen: all tabs, features, Configurations panel back. |
 | Section 8 (73 items, menurun.sh, fresh demo app each) | ✅ all ALIVE, every screenshot shows its dialog / action |
 | (a) lp wall over | ✅ red row + title, tooltip exact, ✓ green, seed wall and Right plane red; Reapply on: black title, two walls, **20042 mm³** |
-| (b) failed Extrude | ✗ title / row red, tooltip exact (`Extrude 2 did not regenerate properly: Failed to extrude selections, check input.`), ✓ enabled, up-to face edge red; **the input region (x 50–60, y 10–20 on Top) is not drawn** (checked iso and Top view, zoomed) |
+| (b) failed Extrude | ✅ later (as above); v046: ✗ title / row red, tooltip exact (`Extrude 2 did not regenerate properly: Failed to extrude selections, check input.`), ✓ enabled, up-to face edge red; **the input region (x 50–60, y 10–20 on Top) is not drawn** (checked iso and Top view, zoomed) |
 | (c) Parts list › Rename | ✅ white field, "Part 1" selected; "Bracket" + Enter; no crash |
 | (d) import g48-two.step | ✅ names (Part 1 = G48 body, Part 2 = cube); still: selection highlight crosses parts (Part 1 lights the cube too; Part 2 lights the cube + a G48 face), list order Part 2 above Part 1 |
 | (e) CLI live mode | ✅ sketch_create / sketch_draw / feature_add on the open failext.noshape appear at once (Sketch 3, Extrude 3, Part 2); Ctrl+Z in the app removes Extrude 3 |
@@ -438,7 +438,7 @@ banding on the side faces).
 |---|---|
 | Display (new planar meshing) | ✅ demo plate shaded with edges / shaded without edges, zoomed on holes + fillets; Flange (annular planar faces with bolt-circle holes); tests/perf/big-plate (one planar face, hundreds of holes): no cracks, slivers or stray triangles; edges right |
 | (a) lp wall over | ✅ red row + title, tooltip exact, ✓ green, seed wall + Right plane red; Reapply on: two walls, 20042 mm³ |
-| (b) failed Extrude | ✗ as before: red title / row, tooltip exact, ✓ enabled, up-to face edge red; input region not drawn |
+| (b) failed Extrude | ✅ later (as above); v046b: ✗ as before: red title / row, tooltip exact, ✓ enabled, up-to face edge red; input region not drawn |
 | (e) CLI live mode | ✅ sketch_create / sketch_draw / feature_add on the open failext.noshape appear at once; Ctrl+Z removes Extrude 3 |
 | Section 8 (73 items) | ✅ all ALIVE; screenshots as the 8da7e78 run (montage /tmp/qa4/cm/mont46c.png) |
 

@@ -6,13 +6,13 @@ open points requested ("qa5 featurescript"). Status: ✅ matches live/expected, 
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1 | + › Create Feature Studio | tab "Feature Studio 1", Ace editor, lines 1–2 template, **empty lines 3–4**, caret on 4; toolbar Versions, Undo/Redo, New feature, 6 snippet ▾, Import, Format, Commit ▾ (pale), Search tools, Monitor Part Studio 1 ▾, Module outline ▾ | same toolbar and template, caret line 4 ("Line 4 , Column 1"), but **5 lines** | ✅ / ✗ **FS1** (minor) | 77870dd4 10-28 |
+| 1 | + › Create Feature Studio | tab "Feature Studio 1", Ace editor, lines 1–2 template, **empty lines 3–4**, caret on 4; toolbar Versions, Undo/Redo, New feature, 6 snippet ▾, Import, Format, Commit ▾ (pale), Search tools, Monitor Part Studio 1 ▾, Module outline ▾ | same toolbar and template, caret line 4 ("Line 4 , Column 1"), but **5 lines** | ✅ (FS1 fixed: four lines, caret on 4) | psui 042e254a 10-31 (qa5 mkfs.py doc, then fCuboidX committed): + › Create Feature Studio → lines 1–4, "Line 4 , Column 1" |
 | 2 | Paste the source, Ctrl+S | commit; Commit pale again | same; Module outline shows "qaCube(conte…" | ✅ | 77870dd4 10-28 |
 | 3 | Part Studio toolbar | ? (same-document custom features) | a new split button "Custom features in this workspace" ▾ → header "Custom features" + "QA cube" | ? |  |
 | 4 | QA cube dialog | – | "QA cube 1", Size **25 mm** selected; preview cube | ? (default for LENGTH_BOUNDS in a mm doc) |  |
 | 5 | ✓ | – | Part 1, **15625.000 mm³** | ✅ | 77870dd4 10-28 |
-| 6 | Commit with `fCuboidX(` (undefined function) | parse/compile: ⚠ "Variable x not found." style warning at line:col, red {!} navbar icon for errors | ⚠ in the gutter at 12 + squiggle; **no tooltip on hovering the ⚠**; navbar { } icon unchanged | ✗ **FS2** (tooltip) / ? (icon for runtime errors) |  |
-| 7 | Part Studio | feature red; tooltip "QA cube 1 did not regenerate properly: …"? | row red, tooltip only **"Error regenerating."**; Parts (0) but the **volume readout still shows 15625.000 mm³** | ✗ ADV3 / ✗ **FS3** (stale readout) |  |
+| 6 | Commit with `fCuboidX(` (undefined function) | parse/compile: ⚠ "Variable x not found." style warning at line:col, red {!} navbar icon for errors | ⚠ in the gutter at 12 + squiggle; **no tooltip on hovering the ⚠**; navbar { } icon unchanged | ✅ (FS2 fixed: ⚠ on line 1, underline on 12, tooltip "Function fCuboidX with 3 argument(s) not found"; the navbar shows the red {!}) | psui 042e254a 10-31 (qa5 mkfs.py doc, then fCuboidX committed) |
+| 7 | Part Studio | feature red; tooltip "QA cube 1 did not regenerate properly: …"? | row red, tooltip only **"Error regenerating."**; Parts (0) but the **volume readout still shows 15625.000 mm³** | ✅ (ADV3, FS3 fixed: "QA cube 1 did not regenerate properly: Error regenerating.", Parts (0), no volume readout) | psui 042e254a 10-31 (qa5 mkfs.py doc, then fCuboidX committed) |
 | 8 | { } › FeatureScript notices | panel: Filter notices, per-studio sections, Monitor ▾, "Result: …" | Feature Studio 1 ⚠ "Function fCuboidX with 3 argument(s) not found 12:9"; Part Studio 1 ⚠ + {!} same text with stack 12:91 Feature Studio 1 (const qaCube) / 61:17 onshape/std/feature.fs (defineFeature) / Part Studio 1 (QA cube 1); "Result: Regeneration failed: Error regenerating." | ✅ (texts ?) | 77870dd4 10-28 |
 | 9 | Fix the code, commit | regenerates | Part 1 back | ✅ | 77870dd4 10-28 |
 
@@ -20,13 +20,13 @@ open points requested ("qa5 featurescript"). Status: ✅ matches live/expected, 
 
 | # | Row | Live | Ours | Verdict |
 |---|---|---|---|---|
-| 3 | Toolbar | no own button; toolbar ends with "**Add custom features**" + "**Custom features in this workspace**" ▾ (feature-studio icon); entries with a **two-letter initials icon** ("Qc"), tooltip "QA cube" + italic "Feature from current workspace" | "Custom features in this workspace" ▾ with header "Custom features" + "QA cube" (small generic icon) | ✗ **FS4** (initials icon, tooltip line; "Add custom features" button + header row to check) |
+| 3 | Toolbar | no own button; toolbar ends with "**Add custom features**" + "**Custom features in this workspace**" ▾ (feature-studio icon); entries with a **two-letter initials icon** ("Qc"), tooltip "QA cube" + italic "Feature from current workspace" | "Custom features in this workspace" ▾ with header "Custom features" + "QA cube" (small generic icon) | ✅ later (FS4 fixed: dashed "Add custom features" + "Custom features" ▾ with the "Qc" QA cube; psui 042e254a 10-31 (qa5 mkfs.py doc, then fCuboidX committed)); 10-21: ✗ **FS4** (initials icon, tooltip line; "Add custom features" button + header row to check) |
 | 4 | Dialog | "QA cube 1", Size **25 mm** focused, ✓ enabled | same | ✅ |
 | 5 | Volume | 15625.0000000000 | 15625.000 | ✅ |
-| 6 | Gutter after the broken commit | ⚠ on **line 1**, orange wavy underline under the whole call on line 12; tooltip "⚠ Function fCuboidX with 3 argument(s) not found" (gutter or underline hover) | ⚠ on line 12, short squiggle, **no tooltip** | ✗ FS2 |
-| 7 | Part Studio row | red, "Qc" icon outlined red, header error icon, Parts (0); tooltip "**QA cube 1 did not regenerate properly: Error regenerating.**" | red; tooltip "Error regenerating." | ✗ ADV3 |
-| 8 | Notices panel | same messages/stack; last line "**Result: Regeneration complete**" | "Result: Regeneration failed: Error regenerating." | ✗ **FS5** (minor) |
-| 9 | Volume after the part disappears | Onshape has **no bottom-right volume readout**; the Mass properties panel empties within 2 s | our status bar shows "Volume: 15625.000 mm³" and keeps it | ✗ **RD1** (readout doesn't exist in Onshape + goes stale) |
+| 6 | Gutter after the broken commit | ⚠ on **line 1**, orange wavy underline under the whole call on line 12; tooltip "⚠ Function fCuboidX with 3 argument(s) not found" (gutter or underline hover) | ⚠ on line 12, short squiggle, **no tooltip** | ✅ later (FS2 fixed; psui 042e254a 10-31 (qa5 mkfs.py doc, then fCuboidX committed)) |
+| 7 | Part Studio row | red, "Qc" icon outlined red, header error icon, Parts (0); tooltip "**QA cube 1 did not regenerate properly: Error regenerating.**" | red; tooltip "Error regenerating." | ✅ later (ADV3 fixed, "Qc" outlined red; psui 042e254a 10-31 (qa5 mkfs.py doc, then fCuboidX committed)) |
+| 8 | Notices panel | same messages/stack; last line "**Result: Regeneration complete**" | "Result: Regeneration failed: Error regenerating." | ✅ later (FS5 fixed: "Result: Regeneration complete" with the stack rows; psui 042e254a 10-31 (qa5 mkfs.py doc, then fCuboidX committed)) |
+| 9 | Volume after the part disappears | Onshape has **no bottom-right volume readout**; the Mass properties panel empties within 2 s | our status bar shows "Volume: 15625.000 mm³" and keeps it | ✅ later (RD1: no bottom-right volume readout; psui 042e254a 10-31 (qa5 mkfs.py doc, then fCuboidX committed)) |
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
 
@@ -38,8 +38,8 @@ open points requested ("qa5 featurescript"). Status: ✅ matches live/expected, 
 | FS5 notices result | ✅ "Result: Regeneration complete" |
 | RD1 / FS3 volume readout | ✅ no bottom-right volume readout any more |
 | FS4 toolbar | ✅ "Add custom features" + "Custom features in this workspace" ▾, entry with the "Qc" initials box, tooltip "QA cube" + italic "Feature from current workspace" |
-| Row 7 "Qc" icon on the failing row | ✗ outlined #999 (live red) → **fixed by qa4** (ui.rs `initials_icon_status`, red #bd3039 while failing; test `failing_custom_feature_icon_is_outlined_red`) |
-| FS1 new Feature Studio | ✗ 5 lines (live 4: lines 1–2, empty 3–4, caret on 4) → **fixed by qa4** (ops `FS_TEMPLATE` ends `;\n\n`, the app reuses it; test `new_feature_studio_has_four_lines`) |
+| Row 7 "Qc" icon on the failing row | ✅ fixed by qa4 (psui 042e254a 10-31 (qa5 mkfs.py doc, then fCuboidX committed): red outline); was ✗ outlined #999 (live red) → (ui.rs `initials_icon_status`, red #bd3039 while failing; test `failing_custom_feature_icon_is_outlined_red`) |
+| FS1 new Feature Studio | ✅ fixed by qa4 (psui 042e254a 10-31 (qa5 mkfs.py doc, then fCuboidX committed): four lines, caret on 4); was ✗ 5 lines → (ops `FS_TEMPLATE` ends `;\n\n`, the app reuses it; test `new_feature_studio_has_four_lines`) |
 
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app; doc built by /root/qa5-scratch/pass21/mkfs.py: QA cube committed, then `fCuboid` → `fCuboidX` + Ctrl+S in the app)
 | Row | Ours now | Status | Verified |

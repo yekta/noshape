@@ -18,7 +18,7 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | VC4 | ▾ button while its menu is open | `#e5e5e5` (229) | stays at the hover `#eaeaea` | ✅ pressed `#e5e5e5` while the menu is open (`os_menu::is_open_menu`) | f9185639 10-28 |
 | VC5 | Camera menu border | 1 px `#d7d7d7` (215) | `#ccc` (204), the right-click menu colour | ✅ `#d7d7d7` for the camera menu and its submenus | f9185639 10-28 |
 | VC6 | Submenus (Shaded…, Hidden edges…, Tangent edges…) | ✓ at +14, text at +29 from the border, like the main menu | ✓ +17, text +36 (right-click menu insets) | ✅ submenus inherit the camera menu's insets | f9185639 10-28 |
-| VC7 | Menu font | Flama 12 px `#555` | our UI font 12 px | ✗ app-wide font (Open Sans / Flama not bundled; see theme-layout.md) |  |
+| VC7 | Menu font | Flama 12 px `#555` | our UI font 12 px | – accepted: Flama is commercial; the app bundles Roboto, the closest freely licensed match (crates/app/assets/fonts/README.md, docs/ONSHAPE_UI_SPEC.md 2.1) |  |
 | VC8 | Assembly camera menu | (not compared yet) | a shorter dropdown (`assembly_view::render_camera_menu`, chevron caret) | ✗ to compare (assembly) |  |
 | VC9 | Esc with the camera menu open | closes it | did nothing: the viewport under the ▾ button took the click and the focus back from the menu | ✅ the button's container occludes the viewport | f9185639 10-28 |
 
@@ -75,7 +75,7 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | RP4 | Inspection table (empty) | header text 125–134; tool band 154–199 (46 px, full width, 1 px #d7d7d7 line at 198), icons 170–189 from x 1217; illustration ink 304–453 (170 × 149); text from 480 | header 122–131; band 142–177 (36 px, inset), no line; icons 150–169 from 1225; ink 246–359 (128 × 113); text from 389 | ✅ band, header, 172 px illustration (checked 10-23: within 1 px) | b504234e 10-28 (Model definitions: header 125–134, icons 170–189, ink 304–453 (172 px), text from 480 = live) |
 | RP5 | Variable table (empty) | ink 312–461 (168 × 149); two lines from 488, the second ending in the link **"Learn more about variable tables."** | ink 272–429 (178 × 157); text from 468; no link | ✅ 171 px illustration lower, the link (checked 10-23: within 1 px) | b504234e 10-28 (ink 312–461, lines 488/509, link "Learn more about variable tables.") |
 | RP6 | Custom tables illustration art | no inner line | an extra vertical line in front of the cube | ✅ matches live part-studio/77 (re-checked 10-26 by icons2: grid, cube with its centre edge, braces) | b504234e 10-28 (grid, cube, braces; tickets/right-panels-b504.png) |
-| RP7 | Help-text width | Flama/Open Sans | our UI font is a little narrower | ✗ app-wide font (VC7) |  |
+| RP7 | Help-text width | Flama/Open Sans | our UI font is a little narrower | – accepted: Flama is commercial; the app bundles Roboto, the closest freely licensed match (crates/app/assets/fonts/README.md, docs/ONSHAPE_UI_SPEC.md 2.1) |  |
 
 ## 8. Mass and section properties (live part-studio/80; dom/dialog-mass-properties.txt)
 
@@ -83,7 +83,7 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 |---|---|---|---|---|---|
 | MP1 | Dialog rows (borders, underlines) | 107, 133, 141–182, 188, 214, 276, 305, 333, 392, 423, 454, 513, 541, 569 | the same, except the empty mate connector field ends at 213 and its text sits 2 px high | ✅ empty field caption 25 px with 2 px top padding | f9185639 10-28 |
 | MP2 | Parts to measure prefilled from the selection | Part 1 (red: no material) | the same | ✅ matches | f9185639 10-28 |
-| MP3 | Text baselines of the labels | — | within 1–2 px (font metrics) | ✗ app-wide font (VC7) |  |
+| MP3 | Text baselines of the labels | — | within 1–2 px (font metrics) | – accepted: Flama is commercial; the app bundles Roboto, the closest freely licensed match (crates/app/assets/fonts/README.md, docs/ONSHAPE_UI_SPEC.md 2.1) |  |
 | MP4 | Face tab (live skb/851–854) | Faces to measure, Mate connector for reference frame, ☐ Show calculation variance; Surface area, Perimeter; Area moment of inertia (mm⁴) Lxx Lxy / Lyx Lyy; Polar moment of inertia (mm⁴) Lzz (left half); no Override boxes; values to 3 decimals, a zero as "0"; faces that aren't coplanar: everything blank, the title red, tooltip "Face selections are not coplanar" | a list of value rows: Faces (count), Surface area, Perimeter, Centroid | ✅ live's layout; moments about the faces' centroid in the face plane's axes (10 × 10 face: 833.333 / 0 / 833.333, Lzz 1666.667; test `rectangle_moments_match_live` with live's 40 × 20 numbers) | 1b81b7ca 10-28 (blk40 top face: Faces to measure, Mate connector…, ☐ Show calculation variance; Surface area 800 mm², Perimeter 120 mm; Lxx 26666.667, Lxy 0, Lyx 0, Lyy 106666.667; Lzz 133333.333 (exact); non-coplanar case not run) |
 
 ## 9. Measure panel (live part-studio/82; measured at 1×)
@@ -104,7 +104,7 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | VC8 Assembly camera menu | Isometric, Dimetric, Trimetric \| Zoom to fit \| Perspective view, Show mates; larger rows, chevron caret; the Part Studio menu (v01) has the full live list | ? live capture requested ("qa5 (10-23 pass 21, ui VC8)") |  |
-| VC7 menu font, KS1 shortcuts pop-out page | not local (app-wide font / new window) | ✗ VC7 → ui (qa5-routing.md); ✅ KS1 (row KS1 above) |  |
+| VC7 menu font, KS1 shortcuts pop-out page | not local (app-wide font / new window) | – VC7 accepted (Flama is commercial, Roboto bundled); ✅ KS1 (row KS1 above) |  |
 | VC8 (live answered, behaviours "qa5 assembly camera menu") | live = Part Studio menu minus "Orient normal to sketch on edit" / "Highlight boundary edges", no "Show mates". qa5: "Show mates" removed, "Section view…" added; the rest needs assembly features (render modes, named / previous views, graphics prefs, zoom to window, high quality) → qa5-routing ui | 🔧 partly / ✗ ui |  |
 
 ## 10. Sheet metal table and flat view (SM4; live "qa5 sm" (8), qa5/sm-091…105, dark/dk-973, behaviours "ui (10-24 a)")
@@ -123,7 +123,7 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | SM4j | Two models | the context select switches the tables and the flat; "the other part dark grey" is only Part 2's default colour (#a5a5a5, ui-sm4-2c / 2e) | — | ✅ nothing to do |  |
 | SM4k | Flat-face hover | the face under the pointer outlined in #FFC685 (ui-sm4-4a); the flat has a face per wall and per bend zone, with solid edges along both sides of each zone (sm-091) | — | ✅ outline; ✗ our flat pattern is one face without the zone edges (model / fs), so the whole flat lights up |  |
 | SM4l | Flat-part right-click (sm-111) | Edit <model>…, Edit <sketch>…, Show dimensions, Show dependencies of <model>… \| New sketch… \| Copy Flat pattern of <part> \| Create Drawing of Flat pattern of <part>…, Export DXF/DWG of Flat pattern of <part>… \| Select other… \| Add comment \| Zoom to fit, Zoom to selection, View normal to \| Delete <model>; about 250 px wide, long labels cut with … | — | ✅ Edit, Edit sketch, Show dimensions, Show dependencies, Export DXF/DWG, Zoom to fit, View normal to, Delete (Add comment is cloud); ✗ New sketch…, Copy Flat pattern…, Create Drawing of Flat pattern…, Select other…, Zoom to selection (need the flat face's model face), label cut-off | 8627322e 10-28 (smf copy, Sheet metal table and flat view: menu as the row says, the ✗ items still missing) |
-| SM4m | Joint letters after a change | the changed joint moves to the end and every letter is re-sequenced ("ui (10-24 a)" (1)) | letters by feature order only | ✗ |  |
+| SM4m | Joint letters after a change | the changed joint moves to the end and every letter is re-sequenced ("ui (10-24 a)" (1)) | letters by feature order only | ✅ (skasm bde22a89: letters by the joints' definition-edge births, a joint a later feature changed re-lettered last, live request 1604; workflow-sheet-metal.md 6.2) | T2 joint_births_follow_live_letters, qa5_letters_follow_live |
 
 ## qa5 MEAS1 (2026-10-24)
 | MEAS1 / MS1 | Top row alone: ours "Area: 4000000000000.000 mm²" | live (behaviours "ui (10-23 a)", case e): nothing in the status bar; panel "No measurements available for current selection." Fixed on ready/ui 6f16c117 (not on main yet, c59c5af9); re-check when it lands | ui |

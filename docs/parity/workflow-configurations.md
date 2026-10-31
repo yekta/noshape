@@ -20,7 +20,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 1.5 | Value "30" Enter | "30 mm" | "30 mm" | ✅ | a6c56638 10-28 |
 | 1.6 | Type list | Length, Angle, Number, Any, Measured, From import | same | ✅ | a6c56638 10-28 |
 | 1.7 | Value "#h * 3" (h from a Variable Studio) | accepted | accepted; list "#w = #h * 3" | ✅ (list "#w = #h * 3"; live label not captured) | a6c56638 10-28 |
-| 1.8 | Double-click Extrude 1 **while the Variable table panel is open** | edit dialog opens | **row only selected, no dialog**; the keys typed next went to the viewport ("#" = Shift+3 → Left view) | ✗ C4 |  |
+| 1.8 | Double-click Extrude 1 **while the Variable table panel is open** | edit dialog opens | **row only selected, no dialog**; the keys typed next went to the viewport ("#" = Shift+3 → Left view) | ✅ later (C4 fixed, pass 3: the edit dialog opens) | a6c56638 10-28 |  |
 
 ## 2. Create variable popup, configuration variable
 
@@ -29,7 +29,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 2.1 | Extrude Depth "#d" Enter | "Create variable" popup next to the field: Feature / Configuration; Length / Angle / Number / Any; Name "d"; Value = old value selected | same (core F6 fixed) | ✅ | a6c56638 10-28 |
 | 2.2 | Configuration tab | Length / Angle / Integer / Real / Text; Name, Default 10 mm, Minimum 0 mm, Maximum 100000 mm | same | ✅ | a6c56638 10-28 |
 | 2.3 | ✓ | configuration variable created at once; "Configurations" box above the feature list (d 10 mm); Depth shows "#d" | same | ✅ | a6c56638 10-28 |
-| 2.4 | Configurations box: d "25" Enter | "25 mm" (bare number gets the unit) | "25" (no unit); geometry updates to 25 | ✗ C8 |  |
+| 2.4 | Configurations box: d "25" Enter | "25 mm" (bare number gets the unit) | "25" (no unit); geometry updates to 25 | ✅ later (C8 fixed, pass 3: "25 mm") | a6c56638 10-28 |  |
 | 2.5 | Configuration panel (strip) | tabs Configurations / Configured properties, Filter inputs + icons + ⋯; input sections | same; d section "d (#d) Default: 10 mm" with Usages: Extrude 1 Depth | ✅ (d (#d) Default: 10 mm, Usages 1: Extrude 1 Depth) | a6c56638 10-28 |
 
 ## 3. List input and Configure features
@@ -59,7 +59,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 5.1 | Insert dialog, Part Studio row | configuration inputs under the row, "Set to last viewed configuration" button; inserts with the default configuration | inputs (d, List 2 ▾) + a configuration button | ✅ / ? | a6c56638 10-28 |
 | 5.2 | List 2 = Large, insert Part 1 | instance in Large | instance symmetric about the origin (Large) | ✅ | a6c56638 10-28 |
 | 5.3 | Instance menu | (live list for configured instances not captured) | adds "Change configuration…" → custom panel with chips and a blue **Apply** button (not an Onshape dialog) | ✅ (C7 fixed: feature-style "Change configuration" ✓ ✕, document + branch, Part Studio row with [▦ ▾], inputs, greyed Generate, part list; Default applied. Menu = live 1381 except the item has no ▦ icon) | a6c56638 10-28 |
-| 5.4 | Plane rows Top / Right highlighted and the plane drawn orange after tab switches / typing in a panel, without clicking them | – | seen twice, no clean repro yet | ✗ STRIP-CLICK-THROUGH (repro found: the right strip passes clicks to the viewport) | a6c56638 10-28 |
+| 5.4 | Plane rows Top / Right highlighted and the plane drawn orange after tab switches / typing in a panel, without clicking them | – | seen twice, no clean repro yet | ✅ STRIP-CLICK-THROUGH fixed, verified c56b5367 (qa: the strip over the planes pre-highlights nothing; its clicks only open panels); was ✗ (the right strip passed clicks to the viewport) | a6c56638 10-28 |
 
 ## Findings (2026-10-21 run)
 
@@ -88,15 +88,15 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 
 | # | Row | Ours | Status | Verified |
 |---|---|---|---|---|
-| 1.4 / 3.7 | Info bubble "Renamed some new variables…" | **auto-dismisses now (<12 s)**, but still centred over the graphics and **clipped under the open right panel** ("Renamed some" visible); the configure toast is clipped the same way | ✗ C5 (partly fixed) |  |
+| 1.4 / 3.7 | Info bubble "Renamed some new variables…" | **auto-dismisses now (<12 s)**, but still centred over the graphics and **clipped under the open right panel** ("Renamed some" visible); the configure toast is clipped the same way | ✅ later (C5: window top centre, over the panel, auto-dismisses; pass 6 and 88fbf8f5) |  |
 | 1.8 | Double-click Extrude 1 with the Variable table open | edit dialog opens | ✅ C4 fixed | a6c56638 10-28 |
 | 2.4 | "25" Enter | "25 mm" | ✅ C8 fixed | a6c56638 10-28 |
-| 3.1 | New List inputs (doc already has "List 2") | next one "Configuration" ✅, the one after **"List 4"** (live "List input 1") | ✗ C1 (partly fixed) | ✅ (C1 fixed: "Configuration") |
+| 3.1 | New List inputs (doc already has "List 2") | next one "Configuration" ✅, the one after **"List 4"** (live "List input 1") | ✅ later (C1 fixed, pass 7: "Configuration", then "List input 1") ✅ (C1 fixed: "Configuration") |
 | 3.5 | Configure mode, click Draft (unconfigured checkbox) | stays unchecked, column "Extrude 1 / Draft" added, toast | ✅ C2 fixed | ✅ (not toggled, dotted outline, column, toast) |
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
-| C1 third List name | "List 4" | ✗ still |
-| C5 bubble | clipped under the right panel | ✗ still |
+| C1 third List name | "List 4" | ✅ later (pass 7) |
+| C5 bubble | clipped under the right panel | ✅ later (pass 6, 88fbf8f5) |
 
 ## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
 Pass 6 (17:11) had found C5 fixed (bubble at the window's top centre, unclipped, auto-dismisses); not re-checked.
