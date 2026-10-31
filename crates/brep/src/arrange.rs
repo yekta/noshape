@@ -134,17 +134,16 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
             members[r].push(ci);
         }
     }
-    for (ri, r) in regions.iter_mut().enumerate() {
+    // Each region's point inside (on all threads): from the middle of the outer loop's longest curve, halfway to
+    // the nearest curve across (elsewhere on it, then on the others, when that ray passes exactly between two
+    // curves).
+    let inside_of = |ri: usize| -> (bool, Option<DVec2>) {
         let hs: Vec<usize> = members[ri].iter().flat_map(|&ci| cycles[ci].iter().copied()).collect();
-        r.dangling = hs.iter().any(|&h| members[ri].contains(&cycle_of[h ^ 1]));
-        // A point inside: from the middle of the outer loop's longest curve, halfway to the nearest curve
-        // across (elsewhere on it, then on the others, when that ray passes exactly between two curves).
+        let dangling = hs.iter().any(|&h| members[ri].contains(&cycle_of[h ^ 1]));
         // (Longest first, each length found once.)
         let mut by_length: Vec<(f64, usize)> = cycles[members[ri][0]].iter().map(|&h| (curve(h).length(), h)).collect();
         by_length.sort_by(|a, b| b.0.total_cmp(&a.0));
-        let outer: Vec<usize> = by_length.into_iter().map(|x| x.1).collect();
-        let mut found = None;
-        'tries: for &h in &outer {
+        for &(len, h) in &by_length {
             let c = curve(h);
             for t in [0.5, 0.381_966, 0.618_034] {
                 let m = c.at(t);
@@ -153,14 +152,18 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
                 for &g in &hs {
                     curve(g).ray_hits(m, dir, &mut hits);
                 }
-                let nearest = hits.into_iter().filter(|&s| s > 1e-9 * c.length()).fold(f64::INFINITY, f64::min);
+                let nearest = hits.into_iter().filter(|&s| s > 1e-9 * len).fold(f64::INFINITY, f64::min);
                 if nearest.is_finite() {
-                    found = Some(m + dir * (nearest * 0.5));
-                    break 'tries;
+                    return (dangling, Some(m + dir * (nearest * 0.5)));
                 }
             }
         }
-        let Some(inside) = found else { return Err(Decline("no point inside a face piece")) };
+        (dangling, None)
+    };
+    let found = crate::boolean::par_map(regions.len(), &inside_of);
+    for (r, (dangling, inside)) in regions.iter_mut().zip(found) {
+        r.dangling = dangling;
+        let Some(inside) = inside else { return Err(Decline("no point inside a face piece")) };
         r.inside = inside;
     }
     Ok(regions)

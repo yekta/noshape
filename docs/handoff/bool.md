@@ -855,6 +855,28 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - Next for the knurl (lead 17:45): its end caps (the "tools coincide" history) and the 26-groove piece's volume
   (1.4e-9 off: OCCT seeds each section with the pave filler's edge/face points); then the period solve.
 
+## Patterned tools, step 3 (10-31 UTC)
+- OCCT's sections of a copied pair are now made once on the Rust side (`canon_secs`) and moved there; the C++ side
+  only records each moved section (the one moved from, the motion, which faces are shared) and builds its curves
+  when the build takes an edge from it (`brep_occt_moved`): most moved sections end up in no edge. The pair moved
+  from takes its own sections from the same cache (no second OCCT call).
+- Sections on another argument's face moved: the check that they stay clear of the face's boundary only counts
+  the boundary the motion doesn't keep (a whole circle about a rotation's axis, a shaft's rim, is the same there)
+  and tests the curves against it exactly (crossings, ends, the seam) instead of 33 points each; curves moved onto
+  a cylinder or cone go by whole turns into [0, 2π) as OCCT's, and the seam-angle check allows 1e-7 rad of rounding.
+- The classification's ray against a Bézier piece: pieces the ray passes clear of (by the control points'
+  extent across the ray) or that lie behind the point skipped; Newton stops once a crossing in the piece is found
+  or the steps leave the piece by more than its size. Regions' points inside on all threads.
+- psui: `SectionSource::sections` lost its `moved` argument; a new `SectionSource::moved(ids, a, b, &MovedPair)`
+  gives the ids of sections moved from the given ones. Nothing else public changed.
+- Replays, all 0 differ, the counts unchanged (main 776, corpus2 553, corpus3 556, corpus4 600, corpus5 717,
+  corpus6 662, Shell's 78, direct 58).
+- The knurl, with the "tools coincide" declines lifted (not landed: waits for core's CutByFaces record), on vibe3:
+  op_boolean 49 → 38.6 s, the Rust Boolean 38 → 27.7 s (OCCT's own: 137 s); result valid, 10362 faces, volume
+  9.427289e-5 as live. Left: pairs' sections 9.1 s, crossings 4.0 s, splits 1.8 s, regions 6.5 s, classification
+  5.4 s, then the unify's USD 10.7 s (Requests). Next: one period's crossings / classification reused for its
+  copies, exact sections of helix-swept faces.
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|
@@ -895,9 +917,11 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   solid as Modified into the result's? Then noshape's Boolean can take those cuts (the B94.6 knurl's is one: it now
   declines "tools coincide" on that account) with the same history as today. If anything (names, bodies) relies on
   the Deleted, tell me and I'll mirror it instead.
-- lead (10-30 19:00 UTC): tools/tiers/perf-remote.sh checks out the shared ~/perf/wt before it takes ~/perf/lock, so
-  a second perf.sh started meanwhile can switch the tree under the first's build (mine ran a commit without the test:
-  "0 passed, 175 filtered out"); take the lock before the checkout.
+- core (10-31 UTC): the unify after a patterned cut: on the knurl, ShapeUpgrade_UnifySameDomain takes 10.7 s of
+  38.6 s, and all it merges is 14 of 10376 faces (cylinder-side pieces split at the seam; OCCT's raw result has
+  them too) plus those faces' edge halves. Could the unify run on just the faces that share a surface with a
+  neighbour (found from the result's faces' surfaces, cheap) and leave the rest as they are? Same result, ~10 s
+  less there.
 - core (10-30 06:15 UTC): `boolean_groups::a_section_under_a_call_budget_gives_up` (fd65effd, 04:39) fails on
   Windows and macOS in my branch CI (run 41008061871: "" after 0.48 s, the section ran to the end under a 1e-4 s
   budget); Linux passes. It hasn't been on a scheduled run yet (main's last, 03:27, predates it). The budget is CPU

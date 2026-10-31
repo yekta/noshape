@@ -216,6 +216,9 @@ struct NCurve {
 /// A free-form face's edges' curves on it: by (edge, a seam's second), the curve and its range.
 type PCurves = HashMap<(usize, bool), (Arc<NurbsCurve>, f64, f64)>;
 
+/// Two faces, each (argument, face).
+type FacePair = ((u32, u32), (u32, u32));
+
 /// A section's part or an edge lying on a face, its places there to be found.
 enum Pending {
     /// The two faces, the path, its range and ends.
@@ -600,6 +603,8 @@ struct Ctx<'a> {
     /// For a face of another argument and a family's tool face (by index): the member its sections are made
     /// with (moved to the others), by its place in the family.
     canonical: HashMap<(usize, usize, u32), usize>,
+    /// OCCT's sections of pairs copies are moved from (by the pair, its roles as asked).
+    canon_secs: HashMap<FacePair, Vec<SectionCurve>>,
     /// NURBS curves (`Geo::Nurbs`), and where OCCT's sections of free-form faces come from.
     ncurves: Vec<NCurve>,
     src: Option<&'a dyn SectionSource>,
@@ -1348,11 +1353,16 @@ impl Ctx<'_> {
         }
         let (a, b) = ((self.faces[fs].arg, self.faces[fs].index), (self.faces[ft].arg, self.faces[ft].index));
         let moved = self.moved_pair(fs, ft);
-        let mut secs: Vec<SectionCurve> = src.sections(a, b, moved)?.into_iter().filter(|c| c.t1 > c.t0).collect();
+        let mut secs = match moved {
+            Some(m) => self.moved_sections(src, a, b, &m)?,
+            None => src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect(),
+        };
         // (Moved onto a face of another argument: only where they stay inside it (and the curves they were moved
         // from); else from another member (up to the third), else made for these.)
         let other = [fs, ft].into_iter().find(|&f| self.copies.get(self.faces[f].arg as usize).copied().flatten().is_none());
-        if let (Some((_, mut r)), Some(f)) = (moved, other) {
+        if let (Some((canon, mut r)), Some(f)) = (moved, other)
+            && canon != (a, b)
+        {
             let tool = if f == fs { ft } else { fs };
             let key = (f, self.copies[self.faces[tool].arg as usize].map_or(0, |x| x.0), self.faces[tool].index);
             loop {
@@ -1362,7 +1372,7 @@ impl Ctx<'_> {
                 }
                 if !moved_clear {
                     // (These reach the face's boundary: made for themselves.)
-                    secs = src.sections(a, b, None)?.into_iter().filter(|c| c.t1 > c.t0).collect();
+                    secs = src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect();
                     break;
                 }
                 let k = self.canonical.get(&key).copied().unwrap_or(0) + 1;
@@ -1370,10 +1380,10 @@ impl Ctx<'_> {
                 match self.moved_pair(fs, ft) {
                     Some(m) if k < 3 => {
                         r = m.1;
-                        secs = src.sections(a, b, Some(m))?.into_iter().filter(|c| c.t1 > c.t0).collect();
+                        secs = self.moved_sections(src, a, b, &m)?;
                     }
                     _ => {
-                        secs = src.sections(a, b, None)?.into_iter().filter(|c| c.t1 > c.t0).collect();
+                        secs = src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect();
                         break;
                     }
                 }
@@ -1394,6 +1404,31 @@ impl Ctx<'_> {
         Ok(())
     }
 
+    /// OCCT's sections of faces `a` and `b` as pair `m.0`'s (made once) moved by `m.1`: the curves moved here, their
+    /// ids from the source.
+    fn moved_sections(&mut self, src: &dyn SectionSource, a: (u32, u32), b: (u32, u32), m: &crate::MovedPair) -> R<Vec<SectionCurve>> {
+        let (canon, r) = *m;
+        if let std::collections::hash_map::Entry::Vacant(e) = self.canon_secs.entry(canon) {
+            e.insert(src.sections(canon.0, canon.1)?.into_iter().filter(|c| c.t1 > c.t0).collect());
+        }
+        let made = &self.canon_secs[&canon];
+        if made.is_empty() || canon == (a, b) {
+            return Ok(made.clone());
+        }
+        let ids = src.moved(&made.iter().map(|c| c.id).collect::<Vec<_>>(), a, b, m)?;
+        Ok(made
+            .iter()
+            .zip(ids)
+            .map(|(c, id)| {
+                let mut curve = c.curve.clone();
+                for p in &mut curve.poles {
+                    *p = r.point(*p);
+                }
+                SectionCurve { curve, t0: c.t0, t1: c.t1, on: c.on.clone(), id, tol: c.tol }
+            })
+            .collect())
+    }
+
     /// Faces `fs` and `ft` of two tools that are rigid copies of another pair (each tool a member of a family of
     /// copies): that pair (the first face's family's first and the member the second's tool goes to with it) and
     /// the motion from it; None where they aren't, or are that pair.
@@ -1403,12 +1438,12 @@ impl Ctx<'_> {
         // leaves it (a plane across a rotation's axis, a cylinder about it) with the family's first's face.
         let copy = |x: usize| self.copies.get(x).copied().flatten();
         if let (None, Some((fam, r))) | (Some((fam, r)), None) = (copy(a), copy(b)) {
-            let (fo, ftool, tool) = if copy(a).is_none() { (fs, ft, b) } else { (ft, fs, a) };
+            let (fo, ftool) = if copy(a).is_none() { (fs, ft) } else { (ft, fs) };
             // (The member whose sections with this face are made: the one found clear of its boundary, at first
             // the family's first.)
             let k = *self.canonical.get(&(fo, fam, self.faces[ftool].index)).unwrap_or(&0);
             let (c, rc) = *self.families[fam].get(k)?;
-            if c == tool || !self.kept_by(fo, &r) {
+            if !self.kept_by(fo, &r) {
                 return None;
             }
             let (o, t) = ((self.faces[fo].arg, self.faces[fo].index), (c as u32, self.faces[ftool].index));
@@ -1418,9 +1453,7 @@ impl Ctx<'_> {
         let rel = ra.inverse().after(&rb);
         let &(m, _) = self.families[fb].iter().find(|x| x.1.near(&rel, self.tol, self.size))?;
         let base = self.families[fa][0].0;
-        if (base, m) == (a, b) {
-            return None;
-        }
+        // (That pair itself: its own sections, kept for the copies.)
         Some((((base as u32, self.faces[fs].index), (m as u32, self.faces[ft].index)), ra))
     }
 
@@ -1440,18 +1473,36 @@ impl Ctx<'_> {
     /// stay clear of its boundary (the face trims and splits OCCT's curves there): (moved, from).
     fn clear_inside(&self, f: usize, curves: &[SectionCurve], r: &Rigid) -> R<(bool, bool)> {
         let bound = self.bound(f)?;
-        let back = r.inverse();
-        let clear = |q: DVec3| {
-            let q2 = self.faces[f].to2(q);
-            distance2(q2, bound) > 100.0 * GREY * self.tol && inside2(q2, bound)
+        // (Only the boundary the motion doesn't keep counts: a whole circle about a rotation's axis is the same
+        // there, and OCCT's curves meet it alike.)
+        let axis = r.rotation();
+        let kept = |e: usize| match (self.edges[e].g, axis) {
+            (Geo::Arc { k, sweep, .. }, Some((o, a, _))) => (sweep.abs() - TAU).abs() <= 1e-12 && (k.c - o).cross(a).length() <= self.tol && k.n.cross(a).length() <= 1e-9,
+            _ => false,
         };
+        let moving: Vec<C2> = self.faces[f].edges.iter().zip(bound).filter(|x| !kept(x.0.0)).map(|x| x.1.clone()).collect();
+        let margin = 100.0 * GREY * self.tol;
+        // A curve on the face's parameter plane clear of that boundary: not meeting it, its ends not on it.
+        let clear = |c: &NurbsCurve, t0: f64, t1: f64| -> R<bool> {
+            // (Across a round face's seam: not clear.)
+            if !free::seam_cuts(self, [f, usize::MAX], c, t0, t1).is_empty() {
+                return Ok(false);
+            }
+            let c2 = free::mapped(&self.faces[f], &Arc::new(c.clone()), t0, t1)?;
+            if [c2.start(), c2.end()].iter().any(|&q| distance2(q, &moving) <= margin) {
+                return Ok(false);
+            }
+            Ok(moving.iter().all(|b| c2.intersections(b, margin).is_empty()))
+        };
+        let back = r.inverse();
         let (mut moved, mut from) = (true, true);
         for c in curves {
-            for k in 0..=32 {
-                let p = c.curve.at(c.t0 + (c.t1 - c.t0) * k as f64 / 32.0);
-                moved &= clear(p);
-                from &= clear(back.point(p));
+            moved &= clear(&c.curve, c.t0, c.t1)?;
+            let mut source = c.curve.clone();
+            for p in &mut source.poles {
+                *p = back.point(*p);
             }
+            from &= clear(&source, c.t0, c.t1)?;
         }
         Ok((moved, from))
     }
@@ -2215,7 +2266,7 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
 }
 
 /// `f` of 0..n on all threads, in order.
-fn par_map<T: Send>(n: usize, f: &(dyn Fn(usize) -> T + Sync)) -> Vec<T> {
+pub(crate) fn par_map<T: Send>(n: usize, f: &(dyn Fn(usize) -> T + Sync)) -> Vec<T> {
     let threads = std::thread::available_parallelism().map_or(1, |x| x.get()).min(n.div_ceil(64)).max(1);
     if threads == 1 {
         return (0..n).map(f).collect();
@@ -2268,6 +2319,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         families: Vec::new(),
         size: 0.0,
         canonical: HashMap::default(),
+        canon_secs: HashMap::default(),
         ncurves: Vec::new(),
         src,
     };

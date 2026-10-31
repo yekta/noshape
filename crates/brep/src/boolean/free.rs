@@ -105,6 +105,8 @@ pub(super) struct Patch {
     uv: [f64; 4],
     /// A Bézier piece's (its box its control points'): Newton from a 3 × 3 grid of starts in it.
     piece: bool,
+    /// A Bézier piece's control points (holding it).
+    pts: Vec<DVec3>,
 }
 
 /// A free-form face's patches over its box (each span between the surface's breaks in 4, at least 8 a side),
@@ -114,7 +116,7 @@ pub(super) fn patches(g: &GFace) -> Vec<Patch> {
     // (A Bézier surface's pieces: their control points' boxes hold them.)
     if let Some(hs) = g.hulls.get_or_init(|| hulls(ns)).as_deref() {
         let grow = DVec3::splat(1e-9);
-        return hs.iter().filter(|h| h.uv[1] >= uv[0] && h.uv[0] <= uv[1] && h.uv[3] >= uv[2] && h.uv[2] <= uv[3]).map(|h| Patch { lo: h.lo - grow, hi: h.hi + grow, uv: h.uv, piece: true }).collect();
+        return hs.iter().filter(|h| h.uv[1] >= uv[0] && h.uv[0] <= uv[1] && h.uv[3] >= uv[2] && h.uv[2] <= uv[3]).map(|h| Patch { lo: h.lo - grow, hi: h.hi + grow, uv: h.uv, piece: true, pts: h.pts.clone() }).collect();
     }
     let (mut us, mut vs) = (splits(ns, true, uv[0], uv[1], 4), splits(ns, false, uv[2], uv[3], 4));
     for s in [&mut us, &mut vs] {
@@ -135,7 +137,7 @@ pub(super) fn patches(g: &GFace) -> Vec<Patch> {
                 }
             }
             let grow = DVec3::splat(0.25 * (hi - lo).length() + 1e-9);
-            out.push(Patch { lo: lo - grow, hi: hi + grow, uv: [ua, ub, va, vb], piece: false });
+            out.push(Patch { lo: lo - grow, hi: hi + grow, uv: [ua, ub, va, vb], piece: false, pts: Vec::new() });
         }
     }
     out
@@ -149,6 +151,16 @@ pub(super) fn ray_hits(ns: &FreeSurface, patches: &[Patch], uv: [f64; 4], p: DVe
     for pa in patches {
         if !ray_meets_box(p, r, pa.lo, pa.hi) {
             continue;
+        }
+        // (A piece the ray passes clear of, across it, or that lies behind the point: not met.)
+        if pa.piece {
+            let (a, b) = r.any_orthonormal_pair();
+            let ext = |ax: DVec3| pa.pts.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), q| (lo.min(q.dot(ax)), hi.max(q.dot(ax))));
+            let ((alo, ahi), (blo, bhi), (_, thi)) = (ext(a), ext(b), ext(r));
+            let m = 1e-9;
+            if p.dot(a) < alo - m || p.dot(a) > ahi + m || p.dot(b) < blo - m || p.dot(b) > bhi + m || thi < p.dot(r) - m {
+                continue;
+            }
         }
         let [ua, ub, va, vb] = pa.uv;
         let starts: &[(f64, f64)] = if pa.piece { &[(0.5, 0.5), (0.1, 0.1), (0.5, 0.1), (0.9, 0.1), (0.1, 0.5), (0.9, 0.5), (0.1, 0.9), (0.5, 0.9), (0.9, 0.9)] } else { &[(0.5, 0.5)] };
@@ -171,6 +183,10 @@ pub(super) fn ray_hits(ns: &FreeSurface, patches: &[Patch], uv: [f64; 4], p: DVe
                     ok = true;
                     break;
                 }
+                // (A piece's start gone a piece away: the crossing, if any, is another piece's.)
+                if pa.piece && (uv.x < 2.0 * ua - ub || uv.x > 2.0 * ub - ua || uv.y < 2.0 * va - vb || uv.y > 2.0 * vb - va) {
+                    break;
+                }
             }
             // (A piece's start: where the steps stall at rounding, there if it is on the ray.)
             if pa.piece && !ok {
@@ -184,6 +200,11 @@ pub(super) fn ray_hits(ns: &FreeSurface, patches: &[Patch], uv: [f64; 4], p: DVe
             }
             if !out.iter().any(|h| (h.1 - t).abs() < 1e-9) {
                 out.push((uv, t));
+            }
+            // (The crossing in this piece found: no more starts.)
+            let m = 1e-9 * (1.0 + (ub - ua).abs() + (vb - va).abs());
+            if uv.x >= ua - m && uv.x <= ub + m && uv.y >= va - m && uv.y <= vb + m {
+                break;
             }
         }
     }

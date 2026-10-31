@@ -673,7 +673,10 @@ pub(crate) mod ffi {
         fn brep_body_of(s: &OcShape, out: &mut BrepBody) -> String;
         /// During noshape's own Boolean: OCCT's sections of face `a_face` of argument `a_arg` and face `b_face`
         /// of `b_arg`: "" or why it can't give them.
-        fn brep_occt_sections(a_arg: u32, a_face: u32, b_arg: u32, b_face: u32, moved: &[f64], out: &mut BrepSections) -> String;
+        fn brep_occt_sections(a_arg: u32, a_face: u32, b_arg: u32, b_face: u32, out: &mut BrepSections) -> String;
+        /// Sections `ids` (of the pair `moved` names first) moved onto faces `a`, `b` (`moved`: that pair, then the
+        /// motion's matrix by rows and translation): their ids (built when an edge takes one); empty if not.
+        fn brep_occt_moved(ids: &[u32], a_arg: u32, a_face: u32, b_arg: u32, b_face: u32, moved: &[f64]) -> Vec<u32>;
         fn op_enclose(shapes: &OcShapeList) -> Result<OpOut>;
         fn op_transform(s: &OcShape, m: &[f64], copy: bool) -> Result<OpOut>;
         fn op_gtransform(s: &OcShape, m: &[f64]) -> Result<OpOut>;

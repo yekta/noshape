@@ -161,9 +161,11 @@ pub struct SectionCurve {
 pub type MovedPair = (((u32, u32), (u32, u32)), pattern::Rigid);
 
 pub trait SectionSource: Sync {
-    /// `moved`: the faces are a rigid copy of another pair's (the same roles, the arguments' copies proven by
-    /// `pattern::copy_of`): their sections are that pair's moved by the motion (curves on the faces the same).
-    fn sections(&self, a: (u32, u32), b: (u32, u32), moved: Option<MovedPair>) -> Result<Vec<SectionCurve>, Decline>;
+    fn sections(&self, a: (u32, u32), b: (u32, u32)) -> Result<Vec<SectionCurve>, Decline>;
+    /// The sections of faces `a` and `b`, a rigid copy of pair `canon` (the same roles; the arguments' copies proven
+    /// by `pattern::copy_of`): that pair's sections `ids` moved by the motion (the caller moves the curves; curves
+    /// on the copies' faces the same): their ids for these.
+    fn moved(&self, ids: &[u32], a: (u32, u32), b: (u32, u32), moved: &MovedPair) -> Result<Vec<u32>, Decline>;
 }
 
 /// Why a Boolean declined.

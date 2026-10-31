@@ -611,9 +611,19 @@ struct FreeSections
 {
   const std::vector<const OcShape*>*                     srcs = nullptr;
   std::vector<std::pair<std::array<TopoDS_Face, 2>, IntTools_Curve>> curves;
-  // OCCT's sections already made for a pair another pair is a rigid copy of (by its arguments and faces, in the
-  // order they were asked: the earlier argument's face first).
-  std::map<std::array<uint32_t, 4>, std::vector<IntTools_Curve>> made;
+  // Sections moved from others (brep_occt_moved), by id (the same as `curves`'): built when an edge takes one.
+  struct Moved
+  {
+    uint32_t from;
+    gp_Trsf  move;
+    // Whether the faces' order is the other way round from the section's moved from's (arguments ordered), and
+    // which faces are that section's own (another argument's face both pairs share: its curves move too).
+    bool swap;
+    bool same[2];
+  };
+  std::vector<std::optional<Moved>> moved;
+  // The section `id`, built if it is a moved one.
+  const std::pair<std::array<TopoDS_Face, 2>, IntTools_Curve>& curve(uint32_t id);
 };
 
 // Edge `e`'s curve on face `f` (over its own 3D curve's parameters) from the face's own edge lying along it (an
@@ -949,7 +959,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       const uint32_t id = r.edge_section[i];
       if (t_free == nullptr || id >= t_free->curves.size())
         return "a section not OCCT's";
-      const auto& [faces, ic] = t_free->curves[id];
+      const auto& [faces, ic] = t_free->curve(id);
       EllEdge& x  = ells[i];
       x.curve     = ic.Curve();
       x.face[0]   = faces[0];
@@ -1382,7 +1392,8 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       continue;
     double a = 0, z = 0, v1 = 0, v2 = 0;
     BRepTools::UVBounds(fs[i], a, z, v1, v2);
-    if (z - a < 2 * M_PI - 1e-6 && std::floor((a + 1e-9) / (2 * M_PI)) != std::floor((z - 1e-9) / (2 * M_PI)))
+    // (An end a rounding past a whole turn, 1e-7 radians: not across it.)
+    if (z - a < 2 * M_PI - 1e-6 && std::floor((a + 1e-7) / (2 * M_PI)) != std::floor((z - 1e-7) / (2 * M_PI)))
       return "a piece across its surface's seam angle";
     if (z - a > 2 * M_PI + 1e-6)
       return "a face's curves over more than a turn";
@@ -1456,7 +1467,108 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
 
 bool rust_decline(const char* why) { return decline(why); }
 
-rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> moved, BrepSections& out)
+namespace {
+// A motion keeping face `f`'s plane, cylinder or cone, in the face's parameters: a rotation and a translation of
+// them (checked at three points); none for other surfaces or where it isn't one.
+std::optional<gp_Trsf2d> params_moved(const TopoDS_Face& f, const gp_Trsf& move)
+{
+  const occ::handle<Geom_Surface> sf = BRep_Tool::Surface(f);
+  const GeomAdaptor_Surface       ad(sf);
+  const gp_Pnt2d                  uv[3] = {gp_Pnt2d(0, 0), gp_Pnt2d(1e-3, 0), gp_Pnt2d(0, 1e-3)};
+  gp_Pnt2d                        to[3];
+  for (int i = 0; i < 3; ++i)
+  {
+    const gp_Pnt q = sf->Value(uv[i].X(), uv[i].Y()).Transformed(move);
+    double       u = 0, v = 0;
+    if (ad.GetType() == GeomAbs_Plane)
+      ElSLib::Parameters(ad.Plane(), q, u, v);
+    else if (ad.GetType() == GeomAbs_Cylinder)
+      ElSLib::Parameters(ad.Cylinder(), q, u, v);
+    else if (ad.GetType() == GeomAbs_Cone)
+      ElSLib::Parameters(ad.Cone(), q, u, v);
+    else
+      return std::nullopt;
+    // (Angles: the first's turn kept for the others.)
+    if (i > 0 && ad.GetType() != GeomAbs_Plane)
+      u = to[0].X() + std::remainder(u - to[0].X(), 2 * M_PI);
+    to[i] = gp_Pnt2d(u, v);
+  }
+  const gp_Vec2d d(to[0], to[1]);
+  gp_Trsf2d      t;
+  t.SetRotation(gp::Origin2d(), std::atan2(d.Y(), d.X()));
+  t.SetTranslationPart(gp_Vec2d(to[0].XY()));
+  for (int i = 0; i < 3; ++i)
+    if (uv[i].Transformed(t).Distance(to[i]) > 1e-9)
+      return std::nullopt;
+  return t;
+}
+} // namespace
+
+const std::pair<std::array<TopoDS_Face, 2>, IntTools_Curve>& FreeSections::curve(uint32_t id)
+{
+  if (id < moved.size() && moved[id])
+  {
+    const Moved m = *moved[id];
+    moved[id].reset();
+    const IntTools_Curve&           ic   = curve(m.from).second;
+    const occ::handle<Geom_Curve>   c    = ic.Curve().IsNull() ? occ::handle<Geom_Curve>() : occ::down_cast<Geom_Curve>(ic.Curve()->Transformed(m.move));
+    occ::handle<Geom2d_Curve>       c2[2] = {ic.FirstCurve2d(), ic.SecondCurve2d()};
+    if (m.swap)
+      std::swap(c2[0], c2[1]);
+    for (int k = 0; k < 2; ++k)
+      if (m.same[k] && !c2[k].IsNull())
+      {
+        // (Its curve on another argument's face both pairs share: moved in its parameters; else left out, the
+        // build makes it.)
+        const std::optional<gp_Trsf2d> t = params_moved(curves[id].first[k], m.move);
+        c2[k] = t ? occ::down_cast<Geom2d_Curve>(c2[k]->Transformed(*t)) : occ::handle<Geom2d_Curve>();
+        // (On a cylinder or cone, its angles by whole turns into the surface's [0, 2π), as OCCT's own curves; the
+        // ones moved here don't cross the seam.)
+        const GeomAbs_SurfaceType st = GeomAdaptor_Surface(BRep_Tool::Surface(curves[id].first[k])).GetType();
+        if (!c2[k].IsNull() && (st == GeomAbs_Cylinder || st == GeomAbs_Cone))
+        {
+          const double um = c2[k]->Value(0.5 * (c2[k]->FirstParameter() + c2[k]->LastParameter())).X();
+          const double turn = 2 * M_PI * std::floor(um / (2 * M_PI));
+          if (turn != 0)
+          {
+            gp_Trsf2d sh;
+            sh.SetTranslation(gp_Vec2d(-turn, 0));
+            c2[k] = occ::down_cast<Geom2d_Curve>(c2[k]->Transformed(sh));
+          }
+        }
+      }
+    curves[id].second = IntTools_Curve(c, c2[0], c2[1], ic.Tolerance(), ic.TangentialTolerance());
+  }
+  return curves[id];
+}
+
+rust::Vec<uint32_t> brep_occt_moved(rust::Slice<const uint32_t> ids, uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> moved)
+{
+  rust::Vec<uint32_t> out;
+  if (t_free == nullptr || t_free->srcs == nullptr || moved.size() != 16)
+    return out;
+  const std::pair<uint32_t, uint32_t> a{a_arg, a_face}, b{b_arg, b_face};
+  const std::pair<uint32_t, uint32_t> ca{static_cast<uint32_t>(moved[0]), static_cast<uint32_t>(moved[1])}, cb{static_cast<uint32_t>(moved[2]), static_cast<uint32_t>(moved[3])};
+  const bool        swap = b < a, cswap = cb < ca;
+  const TopoDS_Face fa   = TopoDS::Face(input(*t_free->srcs, swap ? b_arg : a_arg, TopAbs_FACE, swap ? b_face : a_face));
+  const TopoDS_Face fb   = TopoDS::Face(input(*t_free->srcs, swap ? a_arg : b_arg, TopAbs_FACE, swap ? a_face : b_face));
+  gp_Trsf           move;
+  move.SetValues(moved[4], moved[5], moved[6], moved[13], moved[7], moved[8], moved[9], moved[14], moved[10], moved[11], moved[12], moved[15]);
+  // (The faces in argument order, each with the role it has: a face the moved-from pair has too is its own.)
+  const std::pair<uint32_t, uint32_t> first = swap ? b : a, second = swap ? a : b;
+  const std::pair<uint32_t, uint32_t> cfirst = swap ? cb : ca, csecond = swap ? ca : cb;
+  for (const uint32_t id : ids)
+  {
+    if (id >= t_free->curves.size())
+      return rust::Vec<uint32_t>();
+    out.push_back(static_cast<uint32_t>(t_free->curves.size()));
+    t_free->curves.push_back({{fa, fb}, IntTools_Curve()});
+    t_free->moved.push_back(FreeSections::Moved{id, move, swap != cswap, {first == cfirst, second == csecond}});
+  }
+  return out;
+}
+
+rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, BrepSections& out)
 {
   if (t_free == nullptr || t_free->srcs == nullptr)
     return rust::String("no Boolean running");
@@ -1466,88 +1578,14 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
   const TopoDS_Face fa   = TopoDS::Face(input(*t_free->srcs, swap ? b_arg : a_arg, TopAbs_FACE, swap ? b_face : a_face));
   const TopoDS_Face fb   = TopoDS::Face(input(*t_free->srcs, swap ? a_arg : b_arg, TopAbs_FACE, swap ? a_face : b_face));
   const KernelTimer timer("boolean.rust.sections");
-  auto section = [](const TopoDS_Face& x, const TopoDS_Face& y, std::vector<IntTools_Curve>& lines) {
-    IntTools_FaceFace ff;
-    ff.SetParameters(true, true, true, 1e-7);
-    ff.Perform(x, y);
-    if (!ff.IsDone())
-      return false;
-    for (const IntTools_Curve& ic : ff.Lines())
-      lines.push_back(ic);
-    return true;
-  };
-  std::vector<IntTools_Curve> lines;
-  if (moved.size() == 16)
-  {
-    // A rigid copy of another pair (the same roles): that pair's sections (made once), moved; the curves on the
-    // faces the same (the copies' surfaces are parametrized alike).
-    const std::array<uint32_t, 4> c{static_cast<uint32_t>(moved[0]), static_cast<uint32_t>(moved[1]), static_cast<uint32_t>(moved[2]), static_cast<uint32_t>(moved[3])};
-    const std::array<uint32_t, 4> key = swap ? std::array<uint32_t, 4>{c[2], c[3], c[0], c[1]} : c;
-    auto it = t_free->made.find(key);
-    if (it == t_free->made.end())
-    {
-      std::vector<IntTools_Curve> made;
-      const TopoDS_Face ca = TopoDS::Face(input(*t_free->srcs, key[0], TopAbs_FACE, key[1]));
-      const TopoDS_Face cb = TopoDS::Face(input(*t_free->srcs, key[2], TopAbs_FACE, key[3]));
-      if (!section(ca, cb, made))
-        return rust::String("OCCT's section failed");
-      it = t_free->made.emplace(key, std::move(made)).first;
-    }
-    gp_Trsf move;
-    move.SetValues(moved[4], moved[5], moved[6], moved[13], moved[7], moved[8], moved[9], moved[14], moved[10], moved[11], moved[12], moved[15]);
-    // A face the pair shares with the other (another argument's, the motion keeping its plane or cylinder): its
-    // curves move in its parameters too (a plane's in its frame, a cylinder's or cone's by the angle and height).
-    const TopoDS_Face ca = TopoDS::Face(input(*t_free->srcs, key[0], TopAbs_FACE, key[1]));
-    const TopoDS_Face cb = TopoDS::Face(input(*t_free->srcs, key[2], TopAbs_FACE, key[3]));
-    std::array<std::optional<gp_Trsf2d>, 2> in2d;
-    for (int k = 0; k < 2; ++k)
-    {
-      const TopoDS_Face& f = k == 0 ? fa : fb;
-      if (!f.IsSame(k == 0 ? ca : cb))
-        continue;
-      const occ::handle<Geom_Surface> sf = BRep_Tool::Surface(f);
-      const gp_Pnt2d                  uv[3] = {gp_Pnt2d(0, 0), gp_Pnt2d(1e-3, 0), gp_Pnt2d(0, 1e-3)};
-      gp_Pnt2d                        to[3];
-      GeomAdaptor_Surface             ad(sf);
-      for (int i = 0; i < 3; ++i)
-      {
-        const gp_Pnt q = sf->Value(uv[i].X(), uv[i].Y()).Transformed(move);
-        double       u = 0, v = 0;
-        if (ad.GetType() == GeomAbs_Plane)
-          ElSLib::Parameters(ad.Plane(), q, u, v);
-        else if (ad.GetType() == GeomAbs_Cylinder)
-          ElSLib::Parameters(ad.Cylinder(), q, u, v);
-        else if (ad.GetType() == GeomAbs_Cone)
-          ElSLib::Parameters(ad.Cone(), q, u, v);
-        else
-          return rust::String("OCCT's section failed");
-        // (Angles: the first's turn kept for the others.)
-        if (i > 0 && ad.GetType() != GeomAbs_Plane)
-          u = to[0].X() + std::remainder(u - to[0].X(), 2 * M_PI);
-        to[i] = gp_Pnt2d(u, v);
-      }
-      // A rotation (by where the first direction goes) and a translation; the three points checked.
-      const gp_Vec2d d(to[0], to[1]);
-      gp_Trsf2d      t;
-      t.SetRotation(gp::Origin2d(), std::atan2(d.Y(), d.X()));
-      t.SetTranslationPart(gp_Vec2d(to[0].XY()));
-      for (int i = 0; i < 3; ++i)
-        if (uv[i].Transformed(t).Distance(to[i]) > 1e-9)
-          return rust::String("OCCT's section failed");
-      in2d[k] = t;
-    }
-    for (const IntTools_Curve& ic : it->second)
-    {
-      const occ::handle<Geom_Curve> cv = ic.Curve().IsNull() ? occ::handle<Geom_Curve>() : occ::down_cast<Geom_Curve>(ic.Curve()->Transformed(move));
-      occ::handle<Geom2d_Curve>     c2[2] = {ic.FirstCurve2d(), ic.SecondCurve2d()};
-      for (int k = 0; k < 2; ++k)
-        if (in2d[k] && !c2[k].IsNull())
-          c2[k] = occ::down_cast<Geom2d_Curve>(c2[k]->Transformed(*in2d[k]));
-      lines.emplace_back(cv, c2[0], c2[1], ic.Tolerance(), ic.TangentialTolerance());
-    }
-  }
-  else if (!section(fa, fb, lines))
+  IntTools_FaceFace ff;
+  ff.SetParameters(true, true, true, 1e-7);
+  ff.Perform(fa, fb);
+  if (!ff.IsDone())
     return rust::String("OCCT's section failed");
+  std::vector<IntTools_Curve> lines;
+  for (const IntTools_Curve& ic : ff.Lines())
+    lines.push_back(ic);
   for (const IntTools_Curve& ic : lines)
   {
     const occ::handle<Geom_Curve> c = ic.Curve();
@@ -1612,6 +1650,7 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
       return rust::String("a section without its curves on the faces");
     const double id = static_cast<double>(t_free->curves.size());
     t_free->curves.push_back({{fa, fb}, ic});
+    t_free->moved.emplace_back();
     for (const double v : {id, first, last, at3, at0, at1, section_tol(ic, fa, fb)})
       out.curves.push_back(v);
   }

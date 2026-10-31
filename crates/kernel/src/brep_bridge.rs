@@ -296,14 +296,9 @@ fn origins(o: &[Origin]) -> Vec<u32> {
 struct Occt;
 
 impl SectionSource for Occt {
-    fn sections(&self, a: (u32, u32), b: (u32, u32), moved: Option<noshape_brep::MovedPair>) -> Result<Vec<SectionCurve>, Decline> {
+    fn sections(&self, a: (u32, u32), b: (u32, u32)) -> Result<Vec<SectionCurve>, Decline> {
         let mut out = BrepSections::default();
-        // (The canonical pair, then the motion: its matrix by rows and its translation.)
-        let moved: Vec<f64> = moved.map_or_else(Vec::new, |((ca, cb), r)| {
-            let m = r.m.transpose().to_cols_array();
-            [ca.0 as f64, ca.1 as f64, cb.0 as f64, cb.1 as f64].into_iter().chain(m).chain([r.t.x, r.t.y, r.t.z]).collect()
-        });
-        let why = raw::brep_occt_sections(a.0, a.1, b.0, b.1, &moved, &mut out);
+        let why = raw::brep_occt_sections(a.0, a.1, b.0, b.1, &mut out);
         if !why.is_empty() {
             // (Reasons are static strings on the Rust side.)
             return Err(Decline(match why.as_str() {
@@ -317,6 +312,17 @@ impl SectionSource for Occt {
             Nurbs::Surface(_) => unreachable!(),
         };
         Ok(out.curves.chunks(7).map(|c| SectionCurve { curve: curve(c[3]), t0: c[1], t1: c[2], on: [curve(c[4]), curve(c[5])], id: c[0] as u32, tol: c[6] }).collect())
+    }
+
+    fn moved(&self, ids: &[u32], a: (u32, u32), b: (u32, u32), moved: &noshape_brep::MovedPair) -> Result<Vec<u32>, Decline> {
+        // (The pair moved from, then the motion: its matrix by rows and its translation.)
+        let ((ca, cb), r) = *moved;
+        let m: Vec<f64> = [ca.0 as f64, ca.1 as f64, cb.0 as f64, cb.1 as f64].into_iter().chain(r.m.transpose().to_cols_array()).chain([r.t.x, r.t.y, r.t.z]).collect();
+        let out = raw::brep_occt_moved(ids, a.0, a.1, b.0, b.1, &m);
+        if out.len() != ids.len() {
+            return Err(Decline("OCCT's section failed"));
+        }
+        Ok(out)
     }
 }
 
