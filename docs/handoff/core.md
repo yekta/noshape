@@ -20,6 +20,17 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
 - SHELL-SLOW filleted pocket on main with bool's 108cdf21: the slab fuse now declines "a vertex inside coincident
   edges of two other arguments" (bool's top open decline), the common "a non-manifold result"; 2.8 / 4.3 s.
   Request updated in bool.md (81dd0b46), and answered bool's fuse_slabs history question (take the plain Boolean's).
+- HALF-MIRROR-HOLE: right on OCCT's Boolean too now; T1 model kernel_robustness::part_mirror_of_a_half_through_hole_is_
+  the_whole_plate runs both.
+- BLEND-RUST-DEFAULT-REGEN closed: every difference explained (TICKETS). cli-draft-die was the draft wedges
+  (shell.cpp op_draft_wedges: a sliver chamfer face with 0.1 mm vertex tolerances lost its wedge in OCCT's common;
+  now a clean polygon's prisms, in a box the prisms' size; T1 crash_inputs::draft_wedges_of_a_chamfer_sliver_are_
+  the_same_on_both_inputs); cli-shell-gpf's Draft 3 reblend: OCCT's R0.5 fillet ending on a 5° cap is 0.14 mm³
+  short, ours exact; cli-chamfer-hang-pre: the slabs' unify (opposite-axis cylinder halves of a mirrored hole), not
+  blends. Tools: /root/core-scratch/drafdie (rbbisect both modes, upto.py + NOSHAPE_DUMP_OPS, the untracked
+  crates/kernel/examples/core_scratch.rs to run dumped ops without touching tracked files during a land).
+- Live request (REQUESTS 20:50): mixed-radius vertex blends (R2 verticals + R4 top loop in one fillet, and the
+  drafted G1 reapply): OCCT's degree 6x5 corner patches take 2-11 s; next BLEND-RUST step once live's corner is known.
 
 ## 10-31 (core, new account from 10:50)
 - BLEND-RUST on for new studios (ScopeRule 6, model-data partstudio.rs `legacy_blends`, set by upgrade_saved_params
