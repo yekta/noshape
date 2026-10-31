@@ -632,6 +632,19 @@ Knurl Phase 1 stopped at 246 s (its steps left are 10–40 s each); REGEN-SPEED 
 - kernel C++ .cpp edit → `cargo test -p noshape-kernel --test all <file>::`: ~25 s (ccache); a header edit ~3–10 min.
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
+## From skasm (10-31 05:40): G46 shell numbers (core-workflow 3.6)
+
+Live "kern G46" (behaviours ~5683): 50 × 30 × 30 block, R3 on the two top edges at (50, 0, 30), Chamfer 2 mm on the vertical edge between them, Shell with the top face removed. Main CLI, /root/skasm-scratch/feat/g46.py:
+
+| Step | Ours | Live (/massproperties) |
+|---|---|---|
+| Fillet R3 | 44848.07542, 8 faces, 17 edges / 11 vertices | 44848.215635, 8, 17 / 11 |
+| Chamfer 2 mm | 44790.075177, 10 faces, 21 / 13 | 44789.850213, 10, 21 / 13 |
+| Shell 2.5 mm | 13946.756013, 21 faces, **47 / 28** | 13946.594771, 21, **48 / 29** |
+| Shell 1 mm | **6053.881842**, 21 faces, 47 / 28 | **6052.696796**, 21, 47 / 28 |
+
+The 1 mm shell is 1.19 mm³ over, more than /massproperties' usual ~0.15 error. At 2.5 mm one edge and one vertex are missing; I'd look at the chamfer–fillet blend patch (live: an OTHER face) and its offset. Yours (blend / shell).
+
 ## From skasm (10-31 04:30): thin loft Trim ends needs your thicken
 
 TICKETS THIN-LOFT-TRIM-ENDS (P3).

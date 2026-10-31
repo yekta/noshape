@@ -56,8 +56,8 @@ it, so re-take positions after every selection.
 | 3.2 | Depth: 1st click / "30" Enter / Enter | Selects all / "30 mm" re-selected, dialog stays / commits; sketch hidden | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 3.3 | Shift+7 | Isometric | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 3.4 | Shift+F, two edges, "3" Enter Enter | Fillet 1 | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| 3.5 | Chamfer on the vertical edge meeting both 3 mm fillets: 5 mm, then 2 mm | 5 mm: **error "Distance of chamfer on face too large."** (live G46: Onshape refuses it too); 2 mm builds Onshape's 10-face shape | (F8 fixed per kern 10-22; re-run) |  |
-| 3.6 | Shell, remove top face, 2.5 / 1 mm | Shells (2.5 mm: 13946.59 mm³, 21 faces, kern 10-22) | (F9 fixed per kern 10-22; re-run) |  |
+| 3.5 | Chamfer on the vertical edge meeting both 3 mm fillets: 5 mm, then 2 mm | 5 mm: **error "Distance of chamfer on face too large."** (live G46: Onshape refuses it too); 2 mm builds Onshape's 10-face shape | ✅ 5 mm: "Distance of chamfer on face too large." (Error) = live; 2 mm: 10 faces, 21 edges / 13 vertices = live, 44790.075177 (live /massproperties 44789.850213, +0.22) | skasm 10-31 (CLI skasm-scratch/feat/g46.py) |
+| 3.6 | Shell, remove top face, 2.5 / 1 mm | Shells (2.5 mm: 13946.59 mm³, 21 faces, kern 10-22) | ◐ 2.5 mm: 13946.756013, 21 faces (live 13946.594771, 21), but 47 edges / 28 vertices (live 48 / 29); 1 mm: 6053.881842, 21 faces, 47 / 28 (live 6052.696796: **+1.19 mm³**). The chamfer–fillet blend patch and its offset differ: kernel blend / shell, routed to core (handoff "From skasm (10-31 05:40)") | skasm 10-31 (CLI g46.py) |
 | 3.7 | After Enter committed a value, Esc | Cancels the dialog (no pending edit) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | 3.8 | Sketch points on the top face; Hole from the sketch | One chip "Vertices of Sketch 2"; one hole per point | ✅ re-checked 10-23: one chip "Vertices of Sketch 2", one hole per point (was ✗ F10) | 0.4.10+ / f16b31c6 10-27 (wf-block hole) |
 | 3.9 | Hole defaults and callout | Drilled 1/4 (6.35 mm), 12 mm blind, 118 deg; "Ø6.35 ↧ 12" callout; row "Ø 6.35 mm ↧ 12 mm" | ✅ | 0.4.10+ / f16b31c6 10-27 (wf-block hole) |
