@@ -23,7 +23,7 @@ then edits, undo/redo, rollback and suppress.
 | Suppress Fillet 1 (row menu) | italic strike-through, sharp corners, rest Ok (8446.23) | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Row menus | Extrude: Rename, Edit…, Edit Sketch 1…, Show dimensions, … ✅; Fillet: no "Show dimensions" | Fillet: no "Show dimensions" either (+ Add comment, out of scope) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Mirror › Feature mirror of the Hole about the Right plane | dropdown Part / Feature / Face mirror; chips "Hole 1", "Right plane"; −158.35 mm³ (two holes through the 2.5 mm floor) | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
-| Edit Fillet 1 R2 → R1 (dialog: later features greyed, "Final" ☐) | R1 applied; **Shell 1 Error "Could not shell part with selections."** at any thickness 1–2.5 mm | live? (request (6)) | ✗? **P1-6** (kern, needs live) |  |
+| Edit Fillet 1 R2 → R1 (dialog: later features greyed, "Final" ☐) | R1 applied; **Shell 1 Error "Could not shell part with selections."** at any thickness 1–2.5 mm | live (6) (behaviours "qa5 1405"): depth 10, R1 shells OK, the through holes become tubes in the cavity | ✅ P1-6 = P1-16's model, fixed (2.5 mm 8503.961 / 47 faces, 1 mm 3998.630 / 33 = live) | TICKETS P1-16 verified (watcher CLI 04:06, ≥ bcf401ca) |
 | Undo the R1 edit | back to 8801.649 mm³ | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | Rename (row menu) "Edge break" | stored "Edge break" | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | Row menus of Fillet / Chamfer | no "Show dimensions" (Extrude has it) | same | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
@@ -146,4 +146,4 @@ then edits, undo/redo, rollback and suppress.
 | P1-3 (psb 44927ecb) | Fillet arrow on the last picked edge | ✅ fixed | 0.4.10+ / 203c4d6f 10-27 |
 | P1-13 (psb 44927ecb) | part-pattern copies keep the seed colour | ✅ fixed | 0.4.10+ / 203c4d6f 10-27 |
 | P1-5 (psb a52d1e44) | Shell 2.5 on the depth-15 model: "Could not shell part with selections." | ✅ fixed | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
-| P1-16 (kern) | Shell 1 mm on live's p2 model still fails; 2.5 mm 8487.861 mm³ | ✗ open |  |
+| P1-16 (kern) | Shell 1 mm on live's p2 model still fails; 2.5 mm 8487.861 mm³ | ✅ fixed later: 2.5 mm 8503.961 / 47 faces, 1 mm 3998.630 / 33 = live | TICKETS (core 10-27, verified watcher CLI 04:06, ≥ bcf401ca) |
