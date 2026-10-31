@@ -125,6 +125,13 @@ Same setup built by the CLI; every case gives identical parts with NOSHAPE_BOOL_
 | (new) Extrude Remove, Merge with all | into the parts: 7000 / 785.398163 / 3000 = live; the default direction is the flipped one (= live: Remove points against the sketch normal); away from the parts: **Ok, no message** | ✗ **REMOVE-NO-HIT-INFO** (live 1592 (b): INFO + blue bubble "Selected tools and targets do not intersect.", row black) | v0.4.14 10-29 |
 | (live 1592) New Extrude on Sketch 4 (Top plane), switch New → Remove | ☐ Merge with all unticked, Merge scope empty and active, title red = live; but a blue bubble **"Selected tools and targets do not intersect."** shows while the scope is empty (BOOL4b's leftover; live names the missing scope: "No merge scope selected." on ✓) | ✗ BOOL4B-BUBBLE | 96a9a9eb 10-29 (tickets/remove-scope-bubble-96a9.png) |
 
+## Re-check (skasm, 2026-10-31, main CLI, skasm-scratch/feat/bool2.py)
+| Row | Ours now | Status | Verified |
+|---|---|---|---|
+| 7 NAME2 Union picking Pin first, then Part 1 | the result is **"Pin"** (Pin's id, grey #a5a5a5), 9000; Part 3 → "Part 2" | ✅ fixed | skasm 10-31 (CLI) |
+| 13 COPY1 Transform › Translate by XYZ, Copy part, of Part 3 | copy "Part 4" **#3b61b4** (Part 3's colour), 4000 | ✅ fixed | skasm 10-31 (CLI) |
+| BOOL3 / BOOL4 / INT2 / 17–19 / REMOVE-NO-HIT-INFO / BOOL4B-BUBBLE | fixed in qa's v0.4.14 pass and by core (TICKETS 363, 365) | ✅ |  |
+
 ## Random Rust-vs-OCCT Boolean sweeps (qa 2026-10-29, v0.4.14 CLI; bin/boolrand.py, bin/boolgrid.py, logs qa-scratch/cli/bool{rand,grid}-*)
 Random 2–3 boxes / cylinders (Extrude New, some with a start offset) and a random Union / Subtract / Intersect (Keep tools at times),
 each case with NOSHAPE_BOOL_RUST=1 and =0. boolrand: 43 seeds × 40–60 cases; boolgrid (5 mm grid: coincident faces, coaxial and
