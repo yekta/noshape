@@ -113,6 +113,50 @@ pub fn face_curvature(ctx: &Context, face: &Reference, u_curves: usize, v_curves
     Some((along_u, along_v))
 }
 
+/// Show isocurves (loft.fs, bsurf.fs, fillSurface.fs, …; help "colors":
+/// the Boundary surface's isocurves): on each face `feature` made, its
+/// profile caps excepted, `count` curves of constant u and `count` of
+/// constant v, as polylines (only the stretches on the trimmed face).
+pub fn feature_isocurves(ctx: &Context, feature: crate::reference::FeatureId, count: usize, samples: usize) -> Vec<Vec<DVec3>> {
+    use crate::reference::{Role, TopoName};
+    let mut out = Vec::new();
+    let count = count.max(1);
+    let n = samples.max(3);
+    let lerp = |a: f64, b: f64, t: f64| a + (b - a) * t;
+    for b in &ctx.bodies {
+        for (fi, name) in b.faces.iter().enumerate() {
+            let TopoName::Face { feature: f, role } = name.root() else { continue };
+            if *f != feature || matches!(role, Role::CapStart(_) | Role::CapEnd(_) | Role::Profile(_)) {
+                continue;
+            }
+            let Ok(s) = b.shape.sub_shape(ShapeType::Face, fi) else { continue };
+            let Ok([u0, u1, v0, v1]) = s.uv_bounds() else { continue };
+            let on_face = |p: DVec3| s.project_point(p).map(|q| q.point.distance(p) < 1e-7_f64.max(p.length() * 1e-7)).unwrap_or(false);
+            let mut push = |pts: Vec<Option<DVec3>>| {
+                let mut run: Vec<DVec3> = Vec::new();
+                for p in pts {
+                    match p.filter(|p| on_face(*p)) {
+                        Some(p) => run.push(p),
+                        None if run.len() > 1 => out.push(std::mem::take(&mut run)),
+                        None => run.clear(),
+                    }
+                }
+                if run.len() > 1 {
+                    out.push(run);
+                }
+            };
+            for j in 0..count {
+                let t = (j as f64 + 0.5) / count as f64;
+                let v = lerp(v0, v1, t);
+                push((0..=n).map(|i| s.point_at_uv(lerp(u0, u1, i as f64 / n as f64), v).ok()).collect());
+                let u = lerp(u0, u1, t);
+                push((0..=n).map(|i| s.point_at_uv(u, lerp(v0, v1, i as f64 / n as f64)).ok()).collect());
+            }
+        }
+    }
+    out
+}
+
 /// Dihedral comb of an edge between two faces: at each sample the tooth
 /// length is the angle (radians) between the faces' normals there, pointing
 /// out of the material; returns the comb and the min / max angle in degrees.
@@ -621,6 +665,32 @@ mod tests {
         // A circular edge has a comb with a finite minimum radius.
         let curved = (0..b.edges.len()).filter_map(|e| edge_curvature(&ctx, &r(e), 16)).any(|(c, m)| c.max_len() > 0.0 && m.is_some());
         assert!(curved);
+    }
+
+    /// Show isocurves draws on the faces a feature made, its caps excepted,
+    /// and only on the faces.
+    #[test]
+    fn isocurves_lie_on_the_feature_faces() {
+        let ps = crate::demo::plate_studio();
+        let ctx = crate::regen::Regenerator::new().regenerate(&ps, &Default::default(), &noshape_units::UnitPrefs::default(), &crate::regen::RegenOptions::default()).context;
+        let fillet = ps.features.iter().find(|f| f.type_id == "fillet").unwrap().id;
+        let lines = feature_isocurves(&ctx, fillet, 3, 8);
+        assert!(!lines.is_empty());
+        let body = &ctx.bodies[0].shape;
+        for p in lines.iter().flatten() {
+            let v = noshape_kernel::make_vertex(*p).unwrap();
+            assert!(noshape_kernel::distance(&v, body).unwrap().distance < 1e-7, "{p}");
+        }
+        // The extrude's sides get them, its caps (the plate's top and
+        // bottom, z constant) don't.
+        let extrude = ps.features.iter().find(|f| f.type_id == "extrude").unwrap().id;
+        let sides = feature_isocurves(&ctx, extrude, 3, 8);
+        assert!(!sides.is_empty());
+        let bb = body.bounding_box(false).unwrap();
+        let in_cap = |l: &Vec<DVec3>| [bb.min.z, bb.max.z].iter().any(|z| l.iter().all(|p| (p.z - z).abs() < 1e-9));
+        assert!(!sides.iter().any(in_cap), "no isocurve on the top or bottom cap");
+        let sketch = ps.features.iter().find(|f| f.type_id == "sketch").unwrap().id;
+        assert!(feature_isocurves(&ctx, sketch, 3, 8).is_empty());
     }
 
     #[test]

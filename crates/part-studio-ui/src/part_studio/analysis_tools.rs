@@ -8,6 +8,7 @@
 use super::PartStudioView;
 use crate::theme::p;
 use glam::DVec3;
+use std::sync::Arc;
 use crate::quantity_field::{QuantityEvent, QuantityInput, QuantitySpec};
 use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::component::{h_flex, v_flex};
@@ -165,6 +166,8 @@ const DIHEDRAL_IN: [u8; 4] = [0x4d, 0xa7, 0xa3, 255];
 const DIHEDRAL_HIGH: [u8; 4] = [0xfd, 0xec, 0x51, 255];
 const DIHEDRAL_LOW: [u8; 4] = [0x69, 0x34, 0x76, 255];
 const ENVELOPE: [u8; 4] = [210, 40, 200, 255];
+/// Show isocurves / Show ruled lines (help "colors": vivid magenta #d403f9).
+const ISOCURVE: [u8; 4] = [0xd4, 0x03, 0xf9, 255];
 const U_CURVES: [u8; 4] = [220, 50, 40, 255];
 const V_CURVES: [u8; 4] = [40, 90, 220, 255];
 
@@ -627,6 +630,37 @@ impl PartStudioView {
     }
 
     /// Combs, envelopes, control polygons and markers over the model.
+    /// Show isocurves (Loft, Boundary surface, Fill, Fillet, …): while the
+    /// dialog is open, `Count` isocurves each way on the faces the feature
+    /// makes, vivid magenta #d403f9 (help "colors": Show isocurves; the
+    /// loft / fill help pictures).
+    pub(super) fn isocurve_overlay(&self, cx: &App) -> Vec<Instance> {
+        let Some(e) = &self.edit else { return Vec::new() };
+        let d = e.dialog.read(cx);
+        let p = &d.feature.params;
+        if !p.bool("showIsocurves") {
+            return Vec::new();
+        }
+        let Some(ctx) = &self.context else { return Vec::new() };
+        let count = p.expr("curveCount").and_then(|x| x.cached.map(|q| q.value).or_else(|| x.text.trim().parse().ok())).unwrap_or(10.0).round().clamp(1.0, 50.0) as usize;
+        let key = (Arc::as_ptr(ctx) as usize, d.feature.id, count);
+        let mut cache = self.ui.isocurves.borrow_mut();
+        if cache.as_ref().is_none_or(|(k, _)| *k != key) {
+            *cache = Some((key, noshape_model::analysis::feature_isocurves(ctx, d.feature.id, count, 32)));
+        }
+        let Some((_, curves)) = cache.as_ref() else { return Vec::new() };
+        if curves.is_empty() {
+            return Vec::new();
+        }
+        let f = |v: &DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
+        let mut lines = LineData::default();
+        for c in curves {
+            let pts: Vec<[f32; 3]> = c.iter().map(f).collect();
+            lines.push_polyline(&pts, ISOCURVE, 0, 1.5, 0);
+        }
+        vec![Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(35)]
+    }
+
     pub(super) fn analysis_tool_overlay(&self) -> Vec<Instance> {
         if let Some(s) = &self.ui.flatten {
             return s.drawn.clone();

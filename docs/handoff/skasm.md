@@ -210,7 +210,7 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   PATTERN-REAPPLY-CUT-ONLY closed (live = ours). Landed SKETCH-DIM-CURVE-PAIR-PREVIEW (640f0c7c).
 - Live requests open:
   - "skasm (2026-10-31 03:10)": advanced 1.7.
-  - "03:40": thin loft + Show isocurves picture. Implement Show isocurves (Loft, Boundary, Fill, …) once it's answered.
+  - "03:40": thin loft + the Show isocurves picture. Show isocurves is done from the help's colour (#d403f9) and pictures; compare with live's (e) when it's answered.
   - "04:50": part colours after Split / Mirror / pattern, SF4.
   - "05:10": search ranking ("Fill" + Enter opens Fillet in ours).
 - Sketch: SKETCH-DEGENERATE-SOLVE (P3). Live solves a fillet R6 → R20 on a 20 × 10 rectangle with the top line shrunk to a

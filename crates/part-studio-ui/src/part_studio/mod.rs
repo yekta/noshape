@@ -1044,6 +1044,7 @@ impl PartStudioView {
         extra.extend(self.shown_dims_overlay(cx));
         extra.extend(self.hole_callout_overlay(cx));
         extra.extend(self.analysis_tool_overlay());
+        extra.extend(self.isocurve_overlay(cx));
         extra.extend(self.context_overlay());
         extra.extend(self.context_ref_overlay(&selection, cx));
         self.sync_manipulator(cx);
