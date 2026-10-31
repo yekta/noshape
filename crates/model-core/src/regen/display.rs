@@ -144,7 +144,12 @@ pub fn flat_view_display(flat: &crate::sheetmetal::FlatPattern, color: [f32; 4])
         // Each face its own name: the flat view outlines the face under the
         // pointer (live "ui (10-24 a)" (4a)).
         face_refs: (0..mesh.face_ranges.len()).map(|i| Reference::Face(crate::reference::TopoName::face(crate::reference::FeatureId(0), crate::reference::Role::New(i as u32)))).collect(),
-        edge_refs: vec![me.clone(); mesh.edges.len()],
+        // And each edge too, so a face's outline is its own edges: the flat
+        // has a face per wall and per bend zone (live 4a: one outlined).
+        edge_refs: {
+            let flat = Arc::new(crate::reference::TopoName::face(crate::reference::FeatureId(0), crate::reference::Role::New(u32::MAX)));
+            (0..mesh.edges.len()).map(|i| Reference::Edge(crate::reference::TopoName::Boundary { face: flat.clone(), ordinal: i as u16 })).collect()
+        },
         vertex_refs: vec![me; mesh.vertices.len()],
         mesh,
         coarser: Vec::new(),

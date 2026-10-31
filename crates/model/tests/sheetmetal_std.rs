@@ -693,6 +693,10 @@ fn a_shallow_flange_unfolds_flat() {
     let n = flat.frame.normal.normalize();
     // Live (qa5 sm-091, psui SM4k): a face per wall and per bend zone.
     assert_eq!(flat.shape.as_ref().expect("flat shape").faces().len(), 3, "plate, bend zone, flange");
+    // The flat view names each edge, so a hovered face outlines only its own (psui SM4k).
+    let shown = noshape_model::regen::flat_view_display(&flat, [0.5; 4]).expect("flat view");
+    let edges = &shown.bodies[0].edge_refs;
+    assert!(edges.len() > 4 && edges.iter().collect::<std::collections::HashSet<_>>().len() == edges.len(), "{edges:?}");
     for f in flat.shape.as_ref().expect("flat shape").faces() {
         let p = f.face_plane().ok().flatten().expect("a planar flat face");
         assert!(p.unit_normal().cross(n).length() < 1e-9, "a flat face off the flat's plane: {:?}", p.unit_normal());

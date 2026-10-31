@@ -238,6 +238,11 @@ plain. core-workflow section 8: every row checked; no unchecked rows left in the
 Studio's (skasm's assembly_view.rs render_panel_rail: open button joins its panel, others strip_inactive; was a blue
 row with an accent bar; live assembly/181, dk-942). dk-915 (Create #769fcc with a #3e94ff ring) asked live (REQUESTS
 psui 10-31 10:52). Left in dark-mode: dk-990 (restored light), dk-961 not captured.
+10-31 11:29: landed 59380fbb Ctrl+Space tab switcher (live spec: card while Ctrl is held, MRU thumbnails, release
+switches; `switcher_next`, TabThumbs queues). SM4k: the flat view outlines only the hovered wall / bend zone
+(model-core flat_view_display names each edge; the assembly's pasted flat keeps its edges naming the part). Asked
+live: Shift+H / p semantics (REQUESTS psui 10-31 11:14; ours toggles a global show flag). Next: SM4i (Other joints
+Type ▾ Bend / Rip, Style ▾ Edge joint / Butt joint - Direction 1 / 2 → a Modify joint on the rip's wall-end edge).
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC

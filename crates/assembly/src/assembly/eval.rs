@@ -1124,6 +1124,9 @@ pub fn flat_result(src: &RegenResult, flat: &BodyId) -> Option<RegenResult> {
     for d in &mut display.bodies {
         d.id = flat.clone();
         d.name = body.name.clone();
+        // Its edges name the part here (the flat view's own edge names
+        // aren't the context body's).
+        d.edge_refs = vec![Reference::Body(flat.clone()); d.edge_refs.len()];
     }
     let mut ctx: Context = (*src.context).clone();
     ctx.bodies = vec![Arc::new(body)];
