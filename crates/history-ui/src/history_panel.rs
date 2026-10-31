@@ -1090,7 +1090,8 @@ impl Render for HistoryPanel {
                     .cursor_pointer()
                     .text_size(px(13.))
                     .text_color(pal.text_muted)
-                    .when(selected, |d| d.bg(pal.accent_soft))
+                    // Live: #b2ddf6, dark #092046 (dk-9a0), not the list's #134e96.
+                    .when(selected, |d| d.bg(crate::theme::themed(0xb2ddf6, 0x092046)))
                     .when_some(compare_side, |d, (base, _)| {
                         let (fill, bar) = if base { (crate::compare_mode::BASE_ROW, crate::compare_mode::BASE_BLUE) } else { (crate::compare_mode::TARGET_ROW, crate::compare_mode::TARGET_RED) };
                         d.bg(rgb(fill)).border_l(px(3.)).border_color(rgb(bar))
@@ -1132,7 +1133,8 @@ impl Render for HistoryPanel {
                     .text_size(px(14.))
                     .line_height(px(21.))
                     .text_color(pal.text_muted)
-                    .when(selected, |d| d.bg(pal.accent_soft))
+                    // Live: #b2ddf6, dark #092046 (dk-9a0), not the list's #134e96.
+                    .when(selected, |d| d.bg(crate::theme::themed(0xb2ddf6, 0x092046)))
                     .when_some(compare_side, |d, (base, _)| {
                         let (fill, bar) = if base { (crate::compare_mode::BASE_ROW, crate::compare_mode::BASE_BLUE) } else { (crate::compare_mode::TARGET_ROW, crate::compare_mode::TARGET_RED) };
                         d.bg(rgb(fill)).border_l(px(3.)).border_color(rgb(bar))
