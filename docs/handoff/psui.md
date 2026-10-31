@@ -472,14 +472,10 @@ N0. 10-28 04:20–06:00 landed: 54324599 Create selection's see-through result f
     (last folder). P0 COMMIT-LATENCY / undo 392 ms (qa, this machine at load ~30; CI 26–71 ms): profile on the runners
     with core before changing anything; the regen cache already keeps several versions per feature.
 
-N1. Open live answers still pending: interaction 4.9 (Measure asterisk), 6.2 (Section arrow vs Extrude arrow crops).
-N2. part-studio 🔧 rows to compare with live captures: 3.19 (Create selection, part-studio/380–398), 7.7 (parts list
-    properties: ask live), 10.1, 11.5–11.7.
+N1. (10-31) interaction 4.1 / 4.8 / 4.9 and part-studio 3.19 / 7.7 / 10.1 / 11.5–11.7 all ✅ now.
 N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOperationType sits before
     NewBodyOperationType in ours); Shift+Tab in a snippet (untested live).
 
-0. Live answer pending (REQUESTS psui 10-27, P2 interaction 4.9): when the Measure readout puts an asterisk after
-   a value (live saw "Min dist: 0.000* in" with two picks on a mesh, none for mesh + Origin). Apply when answered.
 0a. P2 P1-8 caveat (Hole chips): a sketch's vertices picked from its row and clicked one by one are stored the same,
    so a reopened Hole can't tell them apart; needs the row pick stored as such (a model change).
 0b. Cold start (COLD=1 run 40547478509 compared it: base 1.55–1.93 s, early 1.42–1.59 s, the window drawn later with
@@ -579,7 +575,6 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
    the paravirtual macOS runners (NIST assembly texture "orbit" 33.2 → 19.3 fps; that log is the pan run, kind
    mislabelled; the orbit log reads 30.8 fps). Run 40467324821 (`-f ref=main`, 07:28) measures main: read its
    summaries into viewport-performance.md and compare.
-4. interaction.md 🔧 rows left: 4.1, 4.2, 4.8, 4.9, 5.1, 5.3, 6.2–6.4, 6.8, 2.3, 2.6.
 5. p1-dialogs: checkbox label widths differ by font (Flama vs Roboto); nothing to do short of a font change.
 
 ## Requests to the lead
@@ -590,10 +585,6 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
   didn't check the table there so it passes either way; ids are random per run, so std's joint matching looks
   order-dependent. Also under std a converted rip's `Rip::faces` is empty (no entity for a new Modify joint).
 
-- (10-31) For skasm (sheet-metal model), from the chrome-sweep rows I own: **SM4i** the Other joints Type ▾ / Style ▾
-  need Modify joint to restyle an existing rip (now "The joint is already a rip") and to turn a rip into a bend from
-  the table; **SM4k** the flat pattern is one face (live: a face per wall and per bend zone, with the zone edges), so
-  hovering lights the whole flat. psui adds the table dropdowns once the model takes them.
 - (10-30 20:40) tools/tiers/perf-remote.sh: the checkout of the shared ~/perf/wt happens before `flock 7` (one perf
   run at a time), so a run waiting on the lock gets its tree replaced by the next run's checkout and builds / times
   that commit while printing its own sha. Seen twice: psui 3494042f's `rust_mesh::bench_profile_fin` ran 0 tests (175
