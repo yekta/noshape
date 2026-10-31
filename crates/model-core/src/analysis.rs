@@ -216,6 +216,91 @@ pub fn feature_ruled_lines(ctx: &Context, feature: crate::reference::FeatureId, 
     out
 }
 
+/// Curve/surface analysis's Knot points, Control point grids and Details
+/// (live behaviours "skasm (2026-10-31, P3 workflow-analysis 18)"): for a
+/// spline curve or face only.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SplineInfo {
+    /// The points at the distinct knots (a face: every (u, v) knot pair).
+    pub knots: Vec<DVec3>,
+    /// Control points.
+    pub poles: Vec<DVec3>,
+    /// Control polygons; `true` for a face's V columns (its U rows and a
+    /// curve's polygon `false`).
+    pub polygons: Vec<(Vec<DVec3>, bool)>,
+    /// (degree, control points, spans) of the curve or the face's U.
+    pub u: (usize, usize, usize),
+    /// The face's V.
+    pub v: Option<(usize, usize, usize)>,
+}
+
+/// Distinct knots of a full knot vector inside its domain.
+fn distinct_knots(full: &[f64], degree: usize) -> Vec<f64> {
+    if full.len() < 2 * degree + 2 {
+        return Vec::new();
+    }
+    let (a, b) = (full[degree], full[full.len() - 1 - degree]);
+    let mut out: Vec<f64> = Vec::new();
+    for &k in &full[degree..full.len() - degree] {
+        if k >= a - 1e-12 && k <= b + 1e-12 && out.last().is_none_or(|l| (k - l).abs() > 1e-12) {
+            out.push(k);
+        }
+    }
+    out
+}
+
+/// A part edge on a B-spline curve.
+pub fn edge_spline(ctx: &Context, edge: &Reference) -> Option<SplineInfo> {
+    let (b, kind, e) = body_of(ctx, edge)?;
+    if kind != ShapeType::Edge {
+        return None;
+    }
+    let s = b.shape.sub_shape(ShapeType::Edge, e).ok()?;
+    if !matches!(s.edge_curve().ok()?, noshape_kernel::Curve::BSpline { .. }) {
+        return None;
+    }
+    let d = s.edge_bspline().ok()?;
+    let knots: Vec<DVec3> = d.knots.iter().filter_map(|k| s.point_at(*k).ok()).collect();
+    let spans = d.knots.len().saturating_sub(1);
+    Some(SplineInfo { knots, polygons: vec![(d.poles.clone(), false)], u: (d.degree as usize, d.poles.len(), spans), poles: d.poles, v: None })
+}
+
+/// A part face on a B-spline surface.
+pub fn face_spline(ctx: &Context, face: &Reference) -> Option<SplineInfo> {
+    let (b, kind, f) = body_of(ctx, face)?;
+    if kind != ShapeType::Face {
+        return None;
+    }
+    let s = b.shape.sub_shape(ShapeType::Face, f).ok()?;
+    if !matches!(s.face_surface().ok()?, noshape_kernel::Surface::BSpline { .. }) {
+        return None;
+    }
+    let d = s.face_bspline().ok()?;
+    let (pu, pv) = (d.u_degree as usize, d.v_degree as usize);
+    let (ku, kv) = (distinct_knots(&d.u_knots, pu), distinct_knots(&d.v_knots, pv));
+    let knots = ku.iter().flat_map(|u| kv.iter().map(move |v| (*u, *v))).filter_map(|(u, v)| s.point_at_uv(u, v).ok()).collect();
+    let at = |i: usize, j: usize| d.poles[i * d.nv + j];
+    let mut polygons: Vec<(Vec<DVec3>, bool)> = (0..d.nv).map(|j| ((0..d.nu).map(|i| at(i, j)).collect(), false)).collect();
+    polygons.extend((0..d.nu).map(|i| ((0..d.nv).map(|j| at(i, j)).collect(), true)));
+    Some(SplineInfo {
+        knots,
+        polygons,
+        u: (pu, d.nu, ku.len().saturating_sub(1)),
+        v: Some((pv, d.nv, kv.len().saturating_sub(1))),
+        poles: d.poles,
+    })
+}
+
+/// A sketch spline (fit spline, B-spline, conic).
+pub fn sketch_spline(ctx: &Context, sketch: crate::reference::FeatureId, entity: u32) -> Option<SplineInfo> {
+    let sr = ctx.sketch(sketch)?;
+    let noshape_sketch::Curve2::Nurbs(n) = sr.sketch.curve(noshape_sketch::EntityId(entity))? else { return None };
+    let w = |p: glam::DVec2| sr.frame.to_world(p);
+    let ks = distinct_knots(&n.knots, n.degree);
+    let poles: Vec<DVec3> = n.ctrl.iter().map(|c| w(*c)).collect();
+    Some(SplineInfo { knots: ks.iter().map(|k| w(n.point(*k))).collect(), polygons: vec![(poles.clone(), false)], u: (n.degree, n.ctrl.len(), ks.len().saturating_sub(1)), poles, v: None })
+}
+
 /// Dihedral comb of an edge between two faces: at each sample the tooth
 /// length is the angle (radians) between the faces' normals there, pointing
 /// out of the material; returns the comb and the min / max angle in degrees.
@@ -750,6 +835,12 @@ mod tests {
         assert!(!sides.iter().any(in_cap), "no isocurve on the top or bottom cap");
         let sketch = ps.features.iter().find(|f| f.type_id == "sketch").unwrap().id;
         assert!(feature_isocurves(&ctx, sketch, 3, 8).is_empty());
+    }
+
+    #[test]
+    fn distinct_knots_inside_the_domain() {
+        assert_eq!(distinct_knots(&[0.0, 0.0, 0.0, 0.0, 0.5, 0.75, 1.0, 1.0, 1.0, 1.0], 3), vec![0.0, 0.5, 0.75, 1.0]);
+        assert_eq!(distinct_knots(&[0.0, 0.0, 1.0, 1.0], 1), vec![0.0, 1.0]);
     }
 
     #[test]

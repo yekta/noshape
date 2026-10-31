@@ -807,6 +807,12 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         // Thin loft: the lofted surface (through the wire profiles) is
         // thickened by thickness 1 / 2 (Flip wall swaps the sides).
         let (t1, t2) = super::thin::thicknesses(ev)?;
+        // Live (behaviours "skasm (2026-10-31, P2 feature-sweep Loft 8)"):
+        // Trim ends can't trim a wall on both sides of the loft surface, nor
+        // a loft through more than two profiles.
+        if ev.bool("trimEnds") && ((t1 > 0.0 && t2 > 0.0) || shapes.len() > 2) {
+            return err(THIN_TRIM_FAILED);
+        }
         let inp = ThickenInput {
             shape: res.shape.clone(),
             face_sources: names.iter().map(|n| Source::Topo(n.clone())).collect(),

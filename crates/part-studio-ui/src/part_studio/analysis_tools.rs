@@ -83,6 +83,10 @@ pub struct ToolOptions {
     pub min_radius: bool,
     pub extend: bool,
     pub control_points: bool,
+    /// Knot points (black dots at a spline's knots).
+    pub knots: bool,
+    /// Details: the hover table of a selected spline (Deg. / CP / Spans).
+    pub details: bool,
     /// Dihedral: angles in radians (else degrees).
     pub radians: bool,
     pub threshold: bool,
@@ -100,8 +104,9 @@ pub struct ToolOptions {
 }
 
 impl Default for ToolOptions {
+    // Fresh defaults as live (behaviours "skasm (2026-10-31, P3 workflow-analysis 18)" (a)).
     fn default() -> Self {
-        Self { combs: true, show_u: true, show_v: true, u_curves: 8, v_curves: 8, inflections: true, min_radius: false, extend: false, control_points: false, radians: false, threshold: false, high_deg: 180.0, low_deg: 0.0, scale: 0.3, surface: false, show_class: [false, true, true, true, true], tolerances: Default::default(), zebra: Default::default(), reflection: Default::default() }
+        Self { combs: true, show_u: true, show_v: true, u_curves: 8, v_curves: 8, inflections: false, min_radius: true, extend: false, control_points: false, knots: false, details: false, radians: false, threshold: false, high_deg: 180.0, low_deg: 0.0, scale: 0.3, surface: false, show_class: [false, true, true, true, true], tolerances: Default::default(), zebra: Default::default(), reflection: Default::default() }
     }
 }
 
@@ -112,6 +117,8 @@ pub struct ToolResult {
     pub combs: Vec<(Comb, [u8; 4])>,
     /// Polylines (control point grids), magenta.
     pub polylines: Vec<Vec<DVec3>>,
+    /// Curve/surface analysis: the selected splines' knots, control grids and details.
+    pub splines: Vec<(Reference, noshape_model::analysis::SplineInfo)>,
     /// Inflection points of sketch curves.
     pub inflections: Vec<DVec3>,
     /// Minimum radius and where.
@@ -169,6 +176,11 @@ const ENVELOPE: [u8; 4] = [210, 40, 200, 255];
 /// The open dialog's Show isocurves / Show ruled lines: (context, feature,
 /// count, ruled) and the lines.
 pub(super) type IsocurveCache = ((usize, noshape_model::FeatureId, usize, bool), Vec<Vec<DVec3>>);
+/// Curve/surface analysis control grids (live 18 (b)): violet points, red U
+/// (and curve) polygons, blue V polygons.
+const CP_POINT: [u8; 4] = [128, 0, 255, 255];
+const CP_U: [u8; 4] = [196, 71, 79, 255];
+const CP_V: [u8; 4] = [91, 164, 255, 255];
 /// Show isocurves / Show ruled lines (help "colors": vivid magenta #d403f9).
 const ISOCURVE: [u8; 4] = [0xd4, 0x03, 0xf9, 255];
 const U_CURVES: [u8; 4] = [220, 50, 40, 255];
@@ -512,16 +524,17 @@ impl PartStudioView {
                                     }
                                     keep_min(&mut res.min_radius, min);
                                 }
-                                if o.control_points
-                                    && let Some(poles) = edge_poles(&ctx, r)
-                                {
-                                    res.polylines.push(poles);
+                                if let Some(sp) = noshape_model::analysis::edge_spline(&ctx, r) {
+                                    res.splines.push((r.clone(), sp));
                                 }
                             }
                             Reference::SketchEntity { sketch, entity } => {
                                 let Some(c) = self.display.sketches.iter().find(|s| s.feature == *sketch).and_then(|s| s.curves.iter().find(|c| c.entity == *entity)) else { continue };
                                 let pts: Vec<DVec3> = c.points.iter().map(|p| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)).collect();
                                 let (comb, min) = noshape_model::analysis::polyline_comb(&pts);
+                                if let Some(sp) = noshape_model::analysis::sketch_spline(&ctx, *sketch, *entity) {
+                                    res.splines.push((r.clone(), sp));
+                                }
                                 if o.inflections {
                                     res.inflections.extend(inflections(&comb));
                                 }
@@ -534,6 +547,9 @@ impl PartStudioView {
                         }
                     }
                     for f in &faces {
+                        if let Some(sp) = noshape_model::analysis::face_spline(&ctx, f) {
+                            res.splines.push((f.clone(), sp));
+                        }
                         if let Some((along_u, along_v)) = noshape_model::analysis::face_curvature(&ctx, f, o.u_curves, o.v_curves, samples) {
                             if o.show_u {
                                 res.combs.extend(along_u.into_iter().map(|c| (c, U_CURVES)));
@@ -712,6 +728,16 @@ impl PartStudioView {
             let pts: Vec<[f32; 3]> = pl.iter().map(|p| f(*p)).collect();
             lines.push_polyline(&pts, ENVELOPE, 0, 1.0, LineSegment::ON_TOP | LineSegment::DASHED);
         }
+        // Live (18 (b)): control polygons red along U (and a curve's), blue
+        // along V.
+        if t.kind == ToolKind::CurveSurface && t.options.control_points {
+            for (_, sp) in &res.splines {
+                for (pl, along_v) in &sp.polygons {
+                    let pts: Vec<[f32; 3]> = pl.iter().map(|p| f(*p)).collect();
+                    lines.push_polyline(&pts, if *along_v { CP_V } else { CP_U }, 0, 1.0, LineSegment::ON_TOP);
+                }
+            }
+        }
         // Deviation: minimum (blue) and maximum (red) between the two.
         let mut dev_pts = Vec::new();
         if let Some((min, max)) = res.deviation {
@@ -776,6 +802,21 @@ impl PartStudioView {
         }
         for p in res.polylines.iter().flatten() {
             pts.points.push(PointSprite { position: f(*p), color: ENVELOPE, pick_id: 0, size: 6.0, style: LineSegment::ON_TOP, _pad: 0 });
+        }
+        // Control points violet; knots black, drawn over them (live 18 (b)).
+        if t.kind == ToolKind::CurveSurface {
+            for (_, sp) in &res.splines {
+                if t.options.control_points {
+                    for p in &sp.poles {
+                        pts.points.push(PointSprite { position: f(*p), color: CP_POINT, pick_id: 0, size: 7.0, style: LineSegment::ON_TOP, _pad: 0 });
+                    }
+                }
+                if t.options.knots {
+                    for p in &sp.knots {
+                        pts.points.push(PointSprite { position: f(*p), color: [0, 0, 0, 255], pick_id: 0, size: 7.0, style: LineSegment::ON_TOP, _pad: 0 });
+                    }
+                }
+            }
         }
         if !pts.points.is_empty() {
             out.push(Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(36));
@@ -1003,7 +1044,9 @@ impl PartStudioView {
                     .child(check("at-infl", "Sketch inflection points", o.inflections, |o, v| o.inflections = v, cx))
                     .child(check("at-minr", "Minimum radius", o.min_radius, |o, v| o.min_radius = v, cx))
                     .child(check("at-ext", "Extend across face", o.extend, |o, v| o.extend = v, cx))
-                    .child(check("at-cp", "Control point grids", o.control_points, |o, v| o.control_points = v, cx));
+                    .child(check("at-cp", "Control point grids", o.control_points, |o, v| o.control_points = v, cx))
+                    .child(check("at-knots", "Knot points", o.knots, |o, v| o.knots = v, cx))
+                    .child(check("at-details", "Details", o.details, |o, v| o.details = v, cx));
                 if o.min_radius
                     && let Some((r, _)) = t.result.as_ref().and_then(|r| r.min_radius)
                 {
@@ -1341,6 +1384,47 @@ impl PartStudioView {
         {
             out.push(div().absolute().left(px(s.x as f32 + 8.)).top(px(s.y as f32 - 8.)).px(px(3.)).bg(gpui_kit::rgb(0xffffff)).border_1().border_color(gpui_kit::rgb(0xd228c8)).text_size(px(12.)).text_color(pal.text).child(format!("R {}", fmt_len(r))).into_any_element());
         }
+        // Details (live 18 (c)): over a selected spline, a table 15 px
+        // right of and 12 px below the pointer: Deg. / CP / Spans, with U and
+        // V columns for a face.
+        if o.details
+            && kind == ToolKind::CurveSurface
+            && let Some(h) = &self.hover
+            && let Some((_, sp)) = t.result.as_ref().and_then(|r| r.splines.iter().find(|(r, _)| r == h))
+        {
+            let at = self.viewport.read(cx).pointer_position();
+            let text = gpui_kit::rgb(0x333333);
+            let cell = |w: f32, s: String, bold: bool, color: gpui_kit::Rgba| {
+                let d = div().w(px(w)).py(px(1.)).text_color(color).child(s);
+                if bold { d.font_weight(FontWeight::BOLD) } else { d }
+            };
+            let mut table = v_flex().text_size(px(14.));
+            if sp.v.is_some() {
+                table = table.child(h_flex().child(cell(64., String::new(), true, text)).child(cell(30., "U".into(), true, gpui_kit::rgb(0xbd3039))).child(cell(30., "V".into(), true, gpui_kit::rgb(0x3e94ff))));
+            }
+            for (name, pick) in [("Deg.", 0usize), ("CP", 1), ("Spans", 2)] {
+                let get = |x: &(usize, usize, usize)| [x.0, x.1, x.2][pick].to_string();
+                let mut row = h_flex().child(div().pl(px(10.)).child(cell(54., name.into(), true, text))).child(cell(30., get(&sp.u), false, text));
+                if let Some(v) = &sp.v {
+                    row = row.child(cell(30., get(v), false, text));
+                }
+                table = table.child(row);
+            }
+            out.push(
+                div()
+                    .absolute()
+                    .left(px(at.x as f32 + 15.))
+                    .top(px(at.y as f32 + 12.))
+                    .pt(px(4.))
+                    .pb(px(4.))
+                    .pr(px(8.))
+                    .rounded(px(5.))
+                    .bg(gpui_kit::rgba(0xffffffbf))
+                    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(1.)), blur_radius: px(4.), spread_radius: px(0.), inset: false }])
+                    .child(table)
+                    .into_any_element(),
+            );
+        }
         out.extend(self.render_env_picker(cx));
         out
     }
@@ -1364,16 +1448,6 @@ fn inflections(c: &Comb) -> Vec<DVec3> {
         }
     }
     out
-}
-
-/// Control polygon of a B-spline part edge.
-fn edge_poles(ctx: &noshape_model::regen::context::Context, r: &Reference) -> Option<Vec<DVec3>> {
-    let Reference::Edge(n) = r else { return None };
-    ctx.bodies.iter().find_map(|b| {
-        let e = *b.find_edges(n).first()?;
-        let s = b.shape.sub_shape(noshape_kernel::ShapeType::Edge, e).ok()?;
-        s.edge_bspline().ok().map(|d| d.poles)
-    })
 }
 
 /// Points evenly spread along a polyline (at least `n` of them).

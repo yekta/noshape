@@ -184,6 +184,32 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
 (none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
 "tools/tiers/land.sh".)
 
+## Lead 10-31 (2): sheet metal / advanced / booleans / surfaces / p1-pass / analysis / tabs re-checked
+- **workflow-sheet-metal:** every row re-checked on main.
+  - T2 sheetmetal_std passes 34/34.
+  - GUI: SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over an open list.
+  - Rows carry the status table's evidence.
+- **workflow-advanced-part-studio:** every row ✅.
+  - GUI: ADV1 the Plane 1 row, ADV3 sweep / helix tooltips with the prefix, ADV4 countersink rows, TAB1 tab switch.
+  - CLI: ADV7 thread faces.
+- **workflow-booleans:**
+  - qa's boolmatrix matches live except a Remove that only touches a part. Fixed bf3312aa: live's "Selected tools and targets do not intersect." info, and the touched part keeps its edges (REMOVE-NO-HIT-INFO).
+  - GUI: DEL1 / DEL2 / MENU1 / BOOL4.
+  - Open with bool: RUST-UNION-MERGES-DISJOINT-FACES (boolgrid 15 #42 and 38 #12).
+- **workflow-surfaces:** SF4 = live; row 12 = live. Boundary surface with one U and one V profile that don't meet now marks U profiles.
+- **workflow-p1-pass:** all ✅ except "n twice", which is asked of live.
+  - P1-1 / P1-2 header, P1-18 ⚠ row badge: GUI.
+  - P2-D2 drawing not out of date after an unrelated import: CLI.
+- **workflow-analysis:** AN1–AN4 and rows 5 / 11 / 13–17 ✅ (GUI / CLI).
+  - Draft analysis now opens at the bottom right with Entities to check empty, as live.
+  - Curve/surface analysis labels now read as live. Knot points / Details are asked of live.
+- **workflow-tabs:** all ✅ except row 3 (rename to an existing name), which is asked of live.
+- **Live requests open:**
+  - "skasm (2026-10-31 03:40)" thin loft (core's THIN-LOFT-TRIM-ENDS);
+  - "07:10" Curve/surface Knot points / Details / defaults;
+  - "07:30" tabs row 3;
+  - the "n twice" question appended to 06:30 after it was answered: re-ask it.
+
 ## Own areas, lead 10-31: workflow-assembly / navigation / workflow-sketch-tools
 - **workflow-assembly.md: every row ✅.**
   - A9b re-checked by CLI. Edge directions now follow live in the assembly and in the Part Studio Part pattern: (a) +X, (b) −X, (c) −Z.

@@ -661,6 +661,11 @@ impl Viewport {
     }
 
     /// The pointer is over the viewport.
+    /// The pointer's last position over the viewport (logical px).
+    pub fn pointer_position(&self) -> DVec2 {
+        self.last_pos
+    }
+
     pub fn pointer_inside(&self) -> bool {
         self.pointer_inside
     }

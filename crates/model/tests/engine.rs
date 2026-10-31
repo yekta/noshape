@@ -448,6 +448,37 @@ fn thin_revolve_sweep_and_loft() {
     assert!(near(v, a, 2e-3) || near(v, b2, 2e-3), "{v}");
 }
 
+/// Live (behaviours "skasm (2026-10-31, P2 feature-sweep Loft 8)"): a thin
+/// loft's Trim ends fails ("Failed to trim result body, try deselecting
+/// "Trim ends" option.") with a wall on both sides or through three profiles;
+/// without Trim ends both build.
+#[test]
+fn thin_loft_trim_ends_refuses_two_sided_walls_and_three_profiles() {
+    let failed = |t: &mut T| {
+        let res = t.regen();
+        res.display.features.last().and_then(|f| f.message.clone())
+    };
+    let item = |s: FeatureId| {
+        let mut v = ParamValues::default();
+        v.set("wireProfileEntities", q(vec![Reference::Sketch(s)]));
+        v
+    };
+    for (three, t2) in [(false, "0.5 mm"), (true, "0 mm")] {
+        let mut t = T::new();
+        let mut profiles = vec![t.sketch(Reference::Plane(DatumPlane::Top), circle(DVec2::ZERO, 0.01))];
+        let p30 = t.top_plane("30 mm");
+        profiles.push(t.sketch(Reference::FeaturePlane(p30), circle(DVec2::ZERO, 0.008)));
+        if three {
+            let p60 = t.top_plane("60 mm");
+            profiles.push(t.sketch(Reference::FeaturePlane(p60), circle(DVec2::ZERO, 0.01)));
+        }
+        let l = t.add("loft", &[("bodyType", en("THIN")), ("wireProfilesArray", ParamValue::Array(profiles.iter().map(|s| item(*s)).collect())), ("thickness1", e("1 mm")), ("thickness2", e(t2))]);
+        assert_eq!(failed(&mut t).as_deref(), Some("Failed to trim result body, try deselecting \"Trim ends\" option."), "three {three}");
+        t.set(l, "trimEnds", b(false));
+        assert!(failed(&mut t).is_none(), "three {three}: without Trim ends it builds");
+    }
+}
+
 // ------------------------------------------------------------------ end types
 
 #[test]
