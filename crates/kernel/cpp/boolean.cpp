@@ -2379,6 +2379,38 @@ HHist compose(const std::vector<TopoDS_Shape>& originals, const std::vector<std:
   return h;
 }
 
+// The union of `all` two at a time, a balanced tree of OCCT fuses, and its history from `all`. False when one fails.
+bool fuse_tree(const std::vector<TopoDS_Shape>& all, const BoolOpts& opts, TopoDS_Shape& out, HHist& hist)
+{
+  std::vector<TopoDS_Shape>       level = all;
+  std::vector<std::vector<Stage>> stages;
+  while (level.size() > 1)
+  {
+    std::vector<TopoDS_Shape> next;
+    std::vector<Stage>        st;
+    for (size_t i = 0; i + 1 < level.size(); i += 2)
+    {
+      const std::vector<TopoDS_Shape> pair{level[i], level[i + 1]};
+      BRepAlgoAPI_Fuse                f;
+      f.SetArguments(to_list(std::vector<TopoDS_Shape>{level[i]}));
+      f.SetTools(to_list(std::vector<TopoDS_Shape>{level[i + 1]}));
+      apply_opts(f, opts);
+      build_cancellable(f);
+      if (cancelled(t_cancel) || f.HasErrors() || !f.IsDone())
+        return false;
+      st.push_back(stage_of(pair, new BRepTools_History(to_list(pair), f)));
+      next.push_back(f.Shape());
+    }
+    if (level.size() % 2 == 1)
+      next.push_back(level.back());
+    stages.push_back(std::move(st));
+    level = std::move(next);
+  }
+  out  = level[0];
+  hist = compose(all, stages);
+  return true;
+}
+
 // Solids that meet only on shared faces (the same TShape in both, as the
 // splitter leaves the cuts between slabs) joined into one: their faces
 // without the shared ones, one closed shell. Null when the parts aren't
@@ -4458,14 +4490,64 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   // classification. OCCT's split solids of the target and of every tool
   // (each cut up by the crossing ones) took minutes and gigabytes, and a cut
   // keeps none of the tools'.
+  // Big free-form tools overlapping each other fused (qa MIRROR-HANG-402: a Part mirror's Add with Merge with all
+  // over 11 overlapping copies of a 38-face free-form part): OCCT's one fuse of them intersects every pair at once
+  // (220 s, then BOPAlgo_AlertBuilderFailed); two at a time in a balanced tree gave live's solid in 33 s (a loaded
+  // box). Small ones stay one fuse (the tree was up to 7 times slower on the corpus's 3-10 tool fuses).
+  TopoDS_Shape tree;
+  HHist        tree_hist;
+  bool         by_tree = false;
+  auto heavy = [&] {
+    int  faces = 0;
+    bool free  = false;
+    for (const TopoDS_Shape& x : concat(a, t))
+      for (TopExp_Explorer f(x, TopAbs_FACE); f.More(); f.Next(), ++faces)
+        if (!free)
+          switch (BRepAdaptor_Surface(TopoDS::Face(f.Current()), false).GetType())
+          {
+            case GeomAbs_Plane:
+            case GeomAbs_Cylinder:
+            case GeomAbs_Cone:
+            case GeomAbs_Sphere:
+            case GeomAbs_Torus:
+              break;
+            default:
+              free = true;
+          }
+    return free && faces >= 100;
+  };
+  if (op == 0 && first.glue == 0 && facets.source.empty() && t.size() >= 3 && heavy() && std::getenv("NOSHAPE_BOOL_NO_TREE") == nullptr)
+  {
+    // At the working scale (in metres OCCT's fuses of those parts failed).
+    std::vector<TopoDS_Shape>     all = concat(a, t);
+    std::unique_ptr<ScaledInputs> sc;
+    if (!scaled && working_scale() != 1.0 && std::getenv("NOSHAPE_BOOL_NO_SCALE") == nullptr)
+    {
+      sc = std::make_unique<ScaledInputs>(working_scale());
+      for (TopoDS_Shape& x : all)
+        x = sc->scale(x);
+    }
+    {
+      const KernelTimer timer("boolean.tree");
+      by_tree = fuse_tree(all, first, tree, tree_hist);
+    }
+    fail_if_cancelled();
+    if (by_tree)
+    {
+      t_bool_path = "occt_tree";
+      if (sc)
+        scaled = std::move(sc);
+    }
+  }
   bool by_faces = op == 1 && n_tools >= 8 && t.size() >= 2 && t.size() < n_tools;
+  if (!by_tree)
   {
     const KernelTimer timer("boolean.build");
     const CutByFaces scope(by_faces);
     build_cancellable(*b);
   }
   fail_if_cancelled();
-  if (by_faces && (b->HasErrors() || !b->IsDone()))
+  if (!by_tree && by_faces && (b->HasErrors() || !b->IsDone()))
   {
     by_faces = false;
     // As usual, with the split solids.
@@ -4480,9 +4562,9 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   // merely touch; then the union's volume is the sum of theirs. Tools that
   // reach into the arguments: trimmed first (fuse_trimmed). Otherwise (a
   // cut, overlapping tools) the boolean runs again without glue.
-  HHist        hist;
-  TopoDS_Shape res;
-  if (first.glue == 3 && (b->HasErrors() || !b->IsDone() || !volumes_add_up(concat(a, t), b->Shape())))
+  HHist        hist = tree_hist;
+  TopoDS_Shape res  = tree;
+  if (!by_tree && first.glue == 3 && (b->HasErrors() || !b->IsDone() || !volumes_add_up(concat(a, t), b->Shape())))
   {
     const bool trimmed = t.size() > 1 && fuse_trimmed(a, t, opts, res, hist);
     fail_if_cancelled();
@@ -4505,8 +4587,9 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     }
   }
   fail_if_cancelled();
-  if (b->HasErrors() || !b->IsDone())
+  if (!by_tree && (b->HasErrors() || !b->IsDone()))
     fail_op("boolean failed: " + algo_errors(*b));
+  if (!by_tree)
   {
     const KernelTimer timer("boolean.history");
     hist = new BRepTools_History(to_list(concat(a, t)), *b);
@@ -4538,7 +4621,8 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
           }
         }
   }
-  res = b->Shape();
+  if (!by_tree)
+    res = b->Shape();
   // The builder's data (its pave filler: most of a big Boolean's memory)
   // freed before the unify and the checks below, and handed back: a diamond
   // knurl's subtract held 8 GB through its 30 s unify.
@@ -4555,7 +4639,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   auto located = [](const std::vector<TopoDS_Shape>& l) {
     return std::any_of(l.begin(), l.end(), [](const TopoDS_Shape& x) { return !x.Location().IsIdentity(); });
   };
-  if (n_tools <= 8 && first.glue == 0 && facets.source.empty() && (located(args.items) || located(tools.items)) && all_solids(inputs)
+  if (!by_tree && n_tools <= 8 && first.glue == 0 && facets.source.empty() && (located(args.items) || located(tools.items)) && all_solids(inputs)
       && !volume_possible(op, args.items, tools.items, res))
   {
     std::vector<TopoDS_Shape> a2, t2;

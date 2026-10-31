@@ -34,6 +34,12 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
 - 30cc7935: unify candidates as USD's own rules (two free-form faces on different surfaces only when both are
   planar, non-line edge pairs only circles or straight B-splines): the knurl's second unify (op_unify after
   boolean_into) ran a whole USD that merged nothing, ~3 s CPU; now "clean" at once.
+- MIRROR-HANG-402 (P2): op_boolean fuses big free-form tools that overlap each other (3+ groups after
+  group_disjoint, 100+ faces, a free-form face) as a balanced tree of two-shape OCCT fuses at the working scale
+  (`fuse_tree`, path "occt_tree", NOSHAPE_BOOL_NO_TREE=1 off): qa's 11 overlapping fuzz parts + the mirror: one
+  solid of live's volume, 15 faces after the unify, 40-64 s dev (was 220-420 s and a failure). Small multi-tool
+  fuses stay one fuse (the tree was up to 7x slower on the corpus's 3-10 tool cases; corpus 0 differ with the guard).
+  Still far from live's 2 s: each pair of these parts is 2-4 s of OCCT face/face intersections.
 - Knurl with bool's patterned cut on main (local, loaded, NOSHAPE_KERNEL_PROFILE=proc): 293 s → 44.3 s; then
   op_boolean: the Rust Boolean ~34 s CPU (bool's), unify.usd 18 s of which the whole volume 13 s: the knurl's change
   was 1.0e-14 of its box, just over the accept bound, so the bound is 1e-12 of the box now (7e-12 of the solid's
@@ -699,7 +705,11 @@ with 0003b and 0004 on Linux, macOS and Windows.
    rounds and a single edge's roll-over are fine. T1 `kernel_robustness::oversize_fillets_like_onshape` (22 cases) and
    `oversize_chamfers_like_onshape` (20). Live F2's all 12 edges (R4.99 / R5 Ok at live's volumes, R6 "Failed to fillet
    selections.") hold too (13:29, in the fillet test).
-5. kern's open item: forward-oriented edges.
+5. kern's open item: forward-oriented edges. 10-31 16:30 tried again (/root/core-scratch/forward-edges-1031.patch:
+   common.cpp `handed_out` + T1 `kernel_core::edges_run_their_curves_way`): the two drawing e2e flows pass now, but
+   land failed on sheet metal (skasm's): model features_c::counterbore_head_shows_in_flat, form_adds_and_cuts_and_
+   shows_in_flat ("form direction vs the flat's viewing side") and ops e2e::sheet_metal_table_ops (Flange 2
+   "Collision in sheet metal model."): that code reads the stored edge orientation. Not landed; with skasm next.
 6. dx's I1 done 10-30 (d475d490), in io.cpp (dx's file; the integrator was right): the STEP file has no pcurves and
    OCCT's projection drifts next to a B-spline patch's pole (v = 0.9958 instead of 1, edge tolerance 0.0043), so the
    blend lost a sliver. `fix_pole_pcurves` in read_step / read_step_tree re-projects the edges meeting a degenerate

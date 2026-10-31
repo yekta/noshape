@@ -269,3 +269,26 @@ fn copies_among_patterned_tools() {
         assert!((turns - turns.round()).abs() < 1e-6, "{angle}");
     }
 }
+
+/// qa MIRROR-HANG-402 (live request 1629): a Part mirror (across Top), Add with Merge with all, over 11 overlapping
+/// copies of a 38-face free-form fuzz part: live one solid of 243267.537 mm³ in ~2 s. OCCT's one fuse of all 12 ran
+/// ~220 s and failed (BOPAlgo_AlertBuilderFailed); fused two at a time in a balanced tree it is live's solid.
+#[test]
+#[ignore = "T2: qa's STEP outside the repo (onshape-research/live/samples/qa-hang402-11parts.step), ~30 s"]
+fn overlapping_free_form_parts_merge_like_onshape() {
+    let path = std::path::Path::new("/root/onshape-research/live/samples/qa-hang402-11parts.step");
+    let _ = k::set_working_scale(1000.0);
+    let parts: Vec<k::Shape> = k::read_step(path, k::LengthUnit::Meter).unwrap().into_iter().map(|p| p.shape).collect();
+    assert_eq!(parts.len(), 11);
+    let pick = parts.iter().position(|p| (p.bounding_box(false).unwrap().min.x + 0.052).abs() < 5e-4).unwrap();
+    let mirrored = parts[pick].transformed(&k::Transform::Mirror(k::Plane::from_normal(DVec3::ZERO, DVec3::Z))).unwrap();
+    let t0 = std::time::Instant::now();
+    let r = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&mirrored), &parts, &k::BooleanOptions::default()).unwrap();
+    let v = k::volume_properties(&r.shape).unwrap().mass * 1e9;
+    eprintln!("{:?} ({}): {v:.6} mm³, {} solids, {} faces", t0.elapsed(), k::last_boolean_path(), r.shape.count(k::ShapeType::Solid), r.shape.count(k::ShapeType::Face));
+    assert_eq!(r.shape.count(k::ShapeType::Solid), 1);
+    assert!((v - 243267.537419).abs() < 0.01, "{v}");
+    // Live: 15 faces once the regen's unify merges them.
+    let u = k::unify_same_domain(&r.shape).unwrap().shape;
+    assert_eq!(u.count(k::ShapeType::Face), 15);
+}
