@@ -683,6 +683,13 @@ with 0003b and 0004 on Linux, macOS and Windows.
    22 s and two chains give no slab, so chains are no fix; the corner patches' fans themselves are the cost. Perf documents unchanged (live-30,
    fins-400, big-plate). Scaling every OCCT Boolean of 9+ tools was 25 % slower over the corpus with 7 of 974
    changed: kept to cuts by 64+ tools and quick_boolean.
+   10-31 16:40: a pocket with R2 floor fillets in a 60 x 40 x 20 block, bottom removed, 1 / 2 mm: slabs 2.6-3.4 s
+   (fuse 1.5-2.3, common 0.6-0.7). The Rust Boolean declines the 18-slab fuse at once ("edges of two arguments
+   crossing on a third's face"), pairwise ("a non-manifold result": slabs of a concave edge touch along it before
+   their filler) and one by one ("two edges leave a vertex in one direction": the fillets' slabs); tried both
+   orders 10-31, slower (failed tries + OCCT's fuse). Request in bool.md. The same pocket shelled with the TOP
+   removed is two solids (the pocket's skin floats) and fails like live's rule (qa5 P1-5); live asked to confirm.
+   G46 (fillets + chamfer patch, convex): 3 of 9 slabs are free-form; fusing the analytic ones first doesn't help.
 3. Other `a.Plane().Axis().Direction()` readers of a face's normal in the kernel: features.cpp and shell.cpp
    already check Direct(); surface_info (face_surface) reports the frame as is, by design.
 4. RIB-CHAIN-NORMAL done 10-30 (per-edge ribs, live 1620). FILLET-OVERSIZE's chamfer half done
