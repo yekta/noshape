@@ -151,6 +151,28 @@ impl DrawingEditor {
                     self.tool = Tool::BrokenOut { parent: Some(pp.view), points, done: false };
                 }
             }
+            // Spline point (live 1147-1149): a click on the closed profile
+            // adds a point there.
+            Tool::BrokenOut { done: true, .. } if matches!(self.panel, Some(Panel::BrokenOut { add_point: true, .. })) => {
+                let pl = match &self.panel {
+                    Some(Panel::BrokenOut { view, .. }) => self.placement(*view),
+                    _ => None,
+                };
+                if let (Some(pl), Some(Panel::BrokenOut { profile, add_point, .. })) = (pl, &mut self.panel) {
+                    let p = pl.to_view(c);
+                    let n = profile.len();
+                    if let Some(i) = (0..n).min_by(|&a, &b| views::dist_to_segment(p, profile[a], profile[(a + 1) % n]).total_cmp(&views::dist_to_segment(p, profile[b], profile[(b + 1) % n]))) {
+                        profile.insert(i + 1, p);
+                        *add_point = false;
+                        // The tool's copy (its overlay) too.
+                        let pts = profile.clone();
+                        if let Tool::BrokenOut { points, .. } = &mut self.tool {
+                            *points = pts;
+                        }
+                    }
+                }
+                self.update_preview(cx);
+            }
             Tool::BrokenOut { done: true, .. } => {
                 // Exclude from cut: a click on a part toggles it.
                 if let Some(Panel::BrokenOut { picking: true, .. }) = &self.panel {
@@ -246,7 +268,7 @@ impl DrawingEditor {
                 let d = noshape_scene::drawing_tools::broken_out_blind_default(u);
                 let depth = self.input(&format::format_number(d / u.meters(), None, 3), window, cx);
                 Self::focus_input(&depth, window, cx);
-                self.panel = Some(Panel::BrokenOut { view, edit: None, profile: points, spline: true, up_to: false, depth, depth_ref: None, offset: None, exclude: Vec::new(), picking: false });
+                self.panel = Some(Panel::BrokenOut { view, edit: None, profile: points, spline: true, up_to: false, depth, depth_ref: None, offset: None, exclude: Vec::new(), picking: false, add_point: false });
                 self.update_preview(cx);
                 true
             }
@@ -506,7 +528,7 @@ impl DrawingEditor {
         let depth = self.input(&format::format_number(blind / u.meters(), None, 4), window, cx);
         Self::focus_input(&depth, window, cx);
         let offset = (b.offset != 0.0).then(|| self.input(&format::format_number(b.offset / u.meters(), None, 4), window, cx));
-        self.panel = Some(Panel::BrokenOut { view, edit: Some(index), profile: b.profile, spline: b.spline, up_to: b.depth_ref.is_some(), depth, depth_ref: b.depth_ref, offset, exclude: b.exclude, picking: false });
+        self.panel = Some(Panel::BrokenOut { view, edit: Some(index), profile: b.profile, spline: b.spline, up_to: b.depth_ref.is_some(), depth, depth_ref: b.depth_ref, offset, exclude: b.exclude, picking: false, add_point: false });
         cx.notify();
     }
 
@@ -531,9 +553,24 @@ impl DrawingEditor {
     /// (Spline; Spline point in its list) and the closed profile box,
     /// "Create closed profile" (active) until it closes, then the "Profile"
     /// chip.
-    fn broken_out_profile_rows(&self, closed: bool) -> Vec<AnyElement> {
+    fn broken_out_profile_rows(&self, closed: bool, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let pal = p();
-        let tool = Button::new("dr-bo-spline").label("Spline").xsmall().outline().dropdown_caret(true);
+        let adding = matches!(self.panel, Some(Panel::BrokenOut { add_point: true, .. }));
+        let ed = cx.entity();
+        let tool = Button::new("dr-bo-spline").label(if adding { "Spline point" } else { "Spline" }).xsmall().outline().dropdown_caret(true).os_dropdown_menu("dr-bo-spline-dd", true, move |mut m, _, _| {
+            for (label, on) in [("Spline", false), ("Spline point", true)] {
+                let e = ed.clone();
+                m = m.item(crate::os_menu::OsMenuItem::new(label).checked(adding == on).on_click(move |_, _, cx| {
+                    e.update(cx, |t, cx| {
+                        if let Some(Panel::BrokenOut { add_point, .. }) = &mut t.panel {
+                            *add_point = on;
+                        }
+                        cx.notify();
+                    })
+                }));
+            }
+            m
+        });
         let field = div()
             .h(px(24.))
             .px(px(6.))
@@ -577,7 +614,7 @@ impl DrawingEditor {
                     .child(div().w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).opacity(0.3).child(crate::ui::glyph("check", 16., gpui_kit::white())))
                     .child(div().id("dr-bo-start-x").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_tool(Tool::Select, cx)))),
             )
-            .children(self.broken_out_profile_rows(false))
+            .children(self.broken_out_profile_rows(false, cx))
             .child(h_flex().gap_1().child(Button::new("dr-bo-start-upto").label("Up to entity").xsmall().outline()).child(Button::new("dr-bo-start-blind").label("Blind").xsmall().primary()))
             .child(Self::label_row("Depth", h_flex().gap_2().child(div().text_xs().child(depth)).child(div().text_xs().text_color(pal.text_faint).child(u.symbol())).into_any_element()))
             .into_any_element()
@@ -604,7 +641,7 @@ impl DrawingEditor {
                         cx.notify();
                     }))
                 };
-                let mut rows = self.broken_out_profile_rows(true);
+                let mut rows = self.broken_out_profile_rows(true, cx);
                 rows.push(h_flex().gap_1().child(mode("dr-bo-upto", "Up to entity", true, cx)).child(mode("dr-bo-blind", "Blind", false, cx)).into_any_element());
                 if up {
                     let what = if depth_ref.is_some() { "1 entity" } else { "Select a vertex" };
@@ -734,10 +771,10 @@ impl DrawingEditor {
         let u = format::length_units(&self.drawing, &DimFormat::default()).meters();
         let num = |s: String| s.trim().parse::<f64>().ok().filter(|v| v.is_finite());
         match panel {
-            Panel::BrokenOut { view, edit, profile, spline, up_to, depth, depth_ref, offset, exclude, picking } => {
+            Panel::BrokenOut { view, edit, profile, spline, up_to, depth, depth_ref, offset, exclude, picking, add_point } => {
                 if up_to && depth_ref.is_none() {
                     self.status = Some("Select a model point for the depth of the section cut".into());
-                    self.panel = Some(Panel::BrokenOut { view, edit, profile, spline, up_to, depth, depth_ref, offset, exclude, picking });
+                    self.panel = Some(Panel::BrokenOut { view, edit, profile, spline, up_to, depth, depth_ref, offset, exclude, picking, add_point });
                     return;
                 }
                 let depth_ref = depth_ref.filter(|_| up_to);
