@@ -520,6 +520,16 @@ impl Pool {
         self.push_tol(p, 0.0)
     }
 
+    /// Vertex `w`'s tolerance at least `t` (another merged into it, as OCCT's merged vertex covers both).
+    fn grow(&mut self, w: u32, t: f64) {
+        if t > self.t[w as usize] {
+            if t > 0.5 * self.tol && self.t[w as usize] <= 0.5 * self.tol {
+                self.loose.push(w);
+            }
+            self.t[w as usize] = t;
+        }
+    }
+
     fn push_tol(&mut self, p: DVec3, t: f64) -> u32 {
         let i = self.p.len() as u32;
         self.p.push(p);
@@ -735,9 +745,13 @@ impl Ctx<'_> {
         }
         let Surf::Plane { n, d, .. } = self.faces[f].s else { return Ok(1) };
         let x = n.dot(self.p(v)) - d;
-        let s = if x.abs() <= self.tol {
+        // (A tolerant vertex: on the plane within its own tolerance and the face's (OCCT's rule; the face's at most
+        // ~1e-5 here), apart past that.)
+        let tv = self.pool.t[v as usize];
+        let (reach, band) = if tv > 0.5 * self.tol { (tv + 0.5 * self.tol, tv + 0.5 * self.tol + 1e-5) } else { (self.tol, GREY * self.tol) };
+        let s = if x.abs() <= reach {
             0
-        } else if x.abs() <= GREY * self.tol {
+        } else if x.abs() <= band {
             return Err(Decline("a vertex nearly on a plane"));
         } else if x > 0.0 {
             1
@@ -1079,9 +1093,11 @@ impl Ctx<'_> {
                 let far = (1..8).map(|k| c2.at(((a.0 + (b.0 - a.0) * k as f64 / 8.0) - t0) / (t1 - t0))).map(|q| (distance2(q, &bound), q)).max_by(|x, y| x.0.total_cmp(&y.0));
                 // (OCCT's curve is within its tolerance of the faces' section: two of them off is clear.)
                 let clear = if let Path::Nurbs { .. } = path { 2.0 } else { 3.0 };
+                // (Within the grey band all along: on the boundary, as within the tolerance (OCCT's section within
+                // its own tolerance of the edge: a common block).)
                 match far {
                     Some((d, q)) if d > clear * ctol => inside2(q, &bound),
-                    _ => return Err(Decline("a curve nearly along a face's boundary")),
+                    _ => closed,
                 }
             } else {
                 inside2(mid, &bound)
@@ -1493,10 +1509,79 @@ impl Ctx<'_> {
     }
 
     /// Faces `fs` and `ft` (one free-form) meet where OCCT's section says (its curves, its curves on them).
+    /// Points of face `f` on its own surface: its vertices, its edges' middles and a grid over its parameters.
+    fn face_samples(&self, f: usize) -> Vec<DVec3> {
+        let g = &self.faces[f];
+        let mut out: Vec<DVec3> = g.edges.iter().flat_map(|&(e, _)| [self.p(self.edges[e].v[0]), self.seg_at(&self.edge_seg(e), 0.5)]).collect();
+        const N: usize = 4;
+        match g.s {
+            Surf::Nurbs { .. } => {
+                if let Some(ns) = &g.ns {
+                    let [u0, u1, v0, v1] = g.uvbox;
+                    for i in 1..N {
+                        for j in 1..N {
+                            out.push(ns.at(u0 + (u1 - u0) * i as f64 / N as f64, v0 + (v1 - v0) * j as f64 / N as f64));
+                        }
+                    }
+                }
+            }
+            Surf::Cyl { o, a, x, y, r0, k, .. } => {
+                let (mut lo, mut hi, mut h0, mut h1) = (f64::INFINITY, f64::NEG_INFINITY, f64::INFINITY, f64::NEG_INFINITY);
+                for &(e, _) in &g.edges {
+                    for w in self.edges[e].v {
+                        let p = self.p(w) - o;
+                        let h = p.dot(a);
+                        let r = p - a * h;
+                        if r.length() > 1e-12 {
+                            let th = r.dot(y).atan2(r.dot(x));
+                            (lo, hi) = (lo.min(th), hi.max(th));
+                        }
+                        (h0, h1) = (h0.min(h), h1.max(h));
+                    }
+                }
+                if lo.is_finite() {
+                    for i in 1..N {
+                        for j in 1..N {
+                            let (th, h) = (lo + (hi - lo) * i as f64 / N as f64, h0 + (h1 - h0) * j as f64 / N as f64);
+                            out.push(o + a * h + (x * th.cos() + y * th.sin()) * (r0 + k * h));
+                        }
+                    }
+                }
+            }
+            Surf::Plane { .. } => {}
+        }
+        out
+    }
+
+    /// Whether faces `fs` and `ft` lie on one surface where they overlap: every point of each (its samples within
+    /// the other's box) on the other's surface, and some.
+    fn same_surface(&self, fs: usize, ft: usize) -> bool {
+        let tol = self.tol;
+        let mut n = 0;
+        for (f, g) in [(fs, ft), (ft, fs)] {
+            let (lo, hi) = (self.faces[g].lo, self.faces[g].hi);
+            for p in self.face_samples(f) {
+                if !boxes_meet(p, p, lo, hi, tol) {
+                    continue;
+                }
+                if free::surface_distance(&self.faces[g], p) > tol {
+                    return false;
+                }
+                n += 1;
+            }
+        }
+        n >= 8
+    }
+
     fn nurbs_pair(&mut self, fs: usize, ft: usize) -> R<()> {
         let Some(src) = self.src else { return Err(Decline("a curved face")) };
         // (Clearly apart, their control points tell: no section, without asking.)
         if self.faces_apart(fs, ft) {
+            return Ok(());
+        }
+        // (One surface (a cone and a B-spline of it, two copies of a patch): coincident, like coplanar faces.)
+        if self.same_surface(fs, ft) {
+            self.coplanar.push((fs, ft));
             return Ok(());
         }
         let (a, b) = ((self.faces[fs].arg, self.faces[fs].index), (self.faces[ft].arg, self.faces[ft].index));
@@ -2630,6 +2715,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                     if cx.pool.inputs[w as usize].iter().any(|x| x.0 == a) {
                         return Err(Decline("two vertices of one argument coincide"));
                     }
+                    if tv > 0.0 {
+                        let d = (cx.p(w) - p).length();
+                        cx.pool.grow(w, tv + d);
+                    }
                     w
                 }
                 None => cx.pool.push_tol(p, tv),
@@ -3402,7 +3491,15 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             let o = &sedges[i].seg;
             // (Pieces of an apex: by their angles.)
             let apart = matches!((o.g, s.g), (Geo::Apex { a0, a1 }, Geo::Apex { a0: b0, a1: b1 }) if a0.to_bits() != b0.to_bits() || a1.to_bits() != b1.to_bits());
-            if std::mem::discriminant(&o.g) == std::mem::discriminant(&s.g) && !apart && (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * cx.tol {
+            // (Of two curve kinds, one course (a line and a B-spline of it): one, its ends apart and the two's points
+            // along it together, as OCCT's common block.)
+            let alike = std::mem::discriminant(&o.g) == std::mem::discriminant(&s.g)
+                || (s.v[0] != s.v[1]
+                    && !matches!(o.g, Geo::Apex { .. })
+                    && !matches!(s.g, Geo::Apex { .. })
+                    && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(o, cx.seg_at(&s, t)).1 <= cx.tol)
+                    && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(&s, cx.seg_at(o, t)).1 <= cx.tol));
+            if alike && !apart && (std::mem::discriminant(&o.g) != std::mem::discriminant(&s.g) || (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * cx.tol) {
                 let rev = match (o.g, s.g) {
                     (Geo::Arc { k: k1, .. }, Geo::Arc { k: k2, .. }) => k1.n.dot(k2.n) < 0.0,
                     (Geo::Ell { e: e1, t0: a1, sweep: s1, .. }, Geo::Ell { e: e2, t0: a2, sweep: s2, .. }) => e1.deriv(a1 + 0.5 * s1).dot(e2.deriv(a2 + 0.5 * s2)) < 0.0,
@@ -3542,9 +3639,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     }
     // An input vertex inside edges of two other arguments (coincident there: a common block): OCCT
     // (non-destructive) replaces it for each edge, and again when the block's tolerance grows past the new
-    // vertex's, which rounding decides (4e-16 off: grows), and then its history says Deleted, not Modified.
-    // Taken only where nothing can be rounded: straight edges along an axis, exactly through it. Inside coincident
-    // edges of three other arguments OCCT's history says Deleted (Shell's slabs meeting: four arguments at a line).
+    // vertex's, which rounding decides (4e-16 off: grows), and then its history says Deleted, not Modified. Ours says
+    // Modified (OCCT's where nothing rounds; else an equivalent result), and inside coincident edges of three other
+    // arguments Deleted when the vertex is one argument's alone (Shell's slabs meeting: four arguments at a line).
     let mut deleted_v: HashSet<u32> = HashSet::default();
     for (&w, es) in &inside_edges {
         let mut args: Vec<u32> = es.iter().map(|&e| cx.edges[e].arg).collect();
@@ -3563,16 +3660,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         if !coincident {
             continue;
         }
-        let p = cx.p(w);
-        let exact = |e: usize| {
-            let [a, b] = cx.edges[e].v;
-            let (a, b) = (cx.p(a), cx.p(b));
-            let d = b - a;
-            cx.edges[e].g == Geo::Line && (p - a).cross(d) == DVec3::ZERO && [d.x, d.y, d.z].iter().filter(|&&c| c == 0.0).count() == 2
-        };
-        if !es.iter().all(|&e| exact(e)) {
-            return Err(Decline("a vertex inside coincident edges of two other arguments"));
-        }
+
         // (One argument's vertex alone: one already two arguments' (merged with another's first) stays Modified.)
         if args.len() >= 3 && cx.pool.inputs[w as usize].len() == 1 && es.iter().all(|&e| at(e) == at(es[0])) {
             deleted_v.insert(w);
@@ -3998,7 +4086,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     for &(pi, _) in &on_pairs {
         let e = by_key.entry(piece_key(&pieces[pi])).or_insert((pi, 0));
         e.1 += 1;
-        if cx.faces[pieces[pi].face].arg < cx.faces[pieces[e.0].face].arg {
+        // (A fuse's: a piece of a face that was split before a whole face, as OCCT's same-domain faces' first.)
+        let rank = |p: usize| (op == Op::Fuse && !face_split[pieces[p].face], cx.faces[pieces[p].face].arg);
+        if rank(pi) < rank(e.0) {
             e.0 = pi;
         }
     }
@@ -4009,6 +4099,11 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
         if o != pi {
             partner[pi] = Some(o);
+            // (A fuse keeps the group's chosen piece.)
+            if op == Op::Fuse && keep[pi].is_some() && keep[o].is_none() {
+                keep[o] = keep[pi];
+                keep[pi] = None;
+            }
         }
     }
     // (A piece an edge ends in: only where it goes, as OCCT's builder leaves such an edge in the face.)
@@ -4084,6 +4179,8 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     for &w in &used_v {
         vmap.insert(w as usize, out.body.vertices.len() as u32);
         out.body.vertices.push(cx.pool.p[w as usize]);
+        // (Its tolerance where an input's or merged ones' was more than the Boolean's: the C++ build keeps it.)
+        out.body.vertex_tol.push(cx.pool.t[w as usize]);
         out.vertex_origin.push(match cx.pool.inputs[w as usize].as_slice() {
             [(a, i)] if vertex_same(w) => Origin::Same { arg: *a, index: *i },
             _ => Origin::New,
