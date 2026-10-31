@@ -4229,6 +4229,15 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                     if let Geo::Nurbs { id, .. } = sedges[s].seg.g {
                         if let Some((fs, _, _)) = &cx.ncurves[id as usize].sec {
                             eprintln!("  section of faces {:?} (arg, index) {:?} acc {:e}", fs, fs.iter().map(|&f| (cx.faces[f].arg, cx.faces[f].index)).collect::<Vec<_>>(), cx.ncurves[id as usize].acc);
+                            let near = |k: usize| sedges[k].seg.v.iter().any(|&w| sedges[s].seg.v.iter().any(|&x| (cx.p(x) - cx.p(w)).length() < 3e-5));
+                            for &f in fs {
+                                for &p in &face_pieces[f] {
+                                    if pieces[p].loops.iter().flatten().any(|x| near(x.0)) {
+                                        eprintln!("  face {f} piece {p} kept {:?} inside {:?} loops {:?}", keep[p], pieces[p].inside, pieces[p].loops);
+                                    }
+                                }
+                                eprintln!("  face {f} split {:?}", face_split[f]);
+                            }
                         }
                     }
                     for (k, o) in sedges.iter().enumerate() {
