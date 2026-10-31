@@ -2061,3 +2061,62 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
         assert!((v - live_v).abs() < tol * live_v, "knurl {kind}: {v} mm³, live {live_v}");
     }
 }
+
+/// How long a cancelled regeneration keeps its worker: the B94.6 knurl at 45° / 45° (the user's long one),
+/// aborted after each of NOSHAPE_CANCEL_AT (seconds, default "0.5,1,2,4,8"); prints the time from the abort to
+/// the regeneration's return.
+#[test]
+#[ignore = "T2 tool: cancel latency on the 45 / 45 knurl"]
+fn knurl_cancel_latency_probe() {
+    const CYLINDER: &str = r#"
+annotation { "Feature Type Name" : "Test cylinder" }
+export const testCylinder = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 50) * millimeter, "radius" : 25 * millimeter });
+    });
+"#;
+    let src = format!("{}\n{CYLINDER}", include_str!("fs/knurl_b94.fs"));
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    ps.features.push(ps.new_feature(&fx.ty("testCylinder"), &fx.units).unwrap());
+    let mut reg = Regenerator::new();
+    let r = reg.regenerate(&ps, &ConfigValues::default(), &fx.units, &fx.opts());
+    assert_ok(&r);
+    let body = &r.context.bodies[0];
+    let circles: Vec<Reference> = (0..body.edges.len())
+        .filter(|&i| body.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).ok().and_then(|e| e.edge_info().ok()).is_some_and(|info| matches!(info.curve, noshape_kernel::Curve::Circle { .. })))
+        .map(|i| Reference::Edge((*body.edges[i]).clone()))
+        .collect();
+    let mut f = ps.new_feature(&fx.ty("myFeature"), &fx.units).unwrap();
+    f.params.set("edges", ParamValue::Query(circles));
+    f.params.set("knurlType", ParamValue::Enum(std::env::var("KNURL").unwrap_or("DIAMOND".into())));
+    f.params.set("knurlFace", ParamValue::Enum("OUTER".into()));
+    f.params.set("pitchType", ParamValue::Enum("CIRCULAR".into()));
+    f.params.set("circularPitch", ParamValue::Enum("CP12".into()));
+    f.params.set("toothAngle", expr("45 deg"));
+    f.params.set("toothHelixAngle", expr("45 deg"));
+    f.params.set("grooveDepthPercent", expr("100"));
+    f.params.set("targets", ParamValue::Query(vec![Reference::Body(body.id.clone())]));
+    ps.features.push(f);
+    let at: Vec<f64> = std::env::var("NOSHAPE_CANCEL_AT").unwrap_or("0.5,1,2,4,8".into()).split(',').filter_map(|x| x.trim().parse().ok()).collect();
+    for t in at {
+        let cancel = noshape_model::regen::RegenCancel::default();
+        let mut opts = fx.opts();
+        opts.cancel = Some(cancel.clone());
+        let mut reg2 = Regenerator::new();
+        let start = std::time::Instant::now();
+        let (latency, cancelled) = std::thread::scope(|s| {
+            let h = s.spawn(|| {
+                let r = reg2.regenerate(&ps, &ConfigValues::default(), &fx.units, &opts);
+                (std::time::Instant::now(), r.cancelled)
+            });
+            std::thread::sleep(std::time::Duration::from_secs_f64(t));
+            let aborted_at = std::time::Instant::now();
+            cancel.abort();
+            let (done, cancelled) = h.join().unwrap();
+            (done.saturating_duration_since(aborted_at), cancelled)
+        });
+        eprintln!("cancel at {t:.2} s: stopped {:.0} ms later (cancelled {cancelled}, total {:.2} s)", latency.as_secs_f64() * 1e3, start.elapsed().as_secs_f64());
+    }
+}

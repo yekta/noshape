@@ -2454,21 +2454,32 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
     boolean_with(op, args, tol, touching_only, None)
 }
 
-/// `f` of 0..n on all threads, in order.
-pub(crate) fn par_map<T: Send>(n: usize, f: &(dyn Fn(usize) -> T + Sync)) -> Vec<T> {
+/// `f` of 0..n on all threads, in order; declines "cancelled" once the caller's cancel flag is set (checked
+/// every 16 items; the workers take the caller's flag).
+pub(crate) fn par_map<T: Send>(n: usize, f: &(dyn Fn(usize) -> T + Sync)) -> R<Vec<T>> {
+    crate::check_cancel()?;
     let threads = std::thread::available_parallelism().map_or(1, |x| x.get()).min(n.div_ceil(64)).max(1);
     if threads == 1 {
-        return (0..n).map(f).collect();
+        let mut out = Vec::with_capacity(n);
+        for i in 0..n {
+            if i % 16 == 15 {
+                crate::check_cancel()?;
+            }
+            out.push(f(i));
+        }
+        return Ok(out);
     }
     let next = std::sync::atomic::AtomicUsize::new(0);
+    let flag = crate::thread_cancel();
     let mut parts: Vec<Vec<(usize, T)>> = std::thread::scope(|sc| {
         let hs: Vec<_> = (0..threads)
             .map(|_| {
                 sc.spawn(|| {
+                    crate::set_thread_cancel(flag);
                     let mut out = Vec::new();
                     loop {
                         let k = next.fetch_add(16, std::sync::atomic::Ordering::Relaxed);
-                        if k >= n {
+                        if k >= n || crate::cancelled() {
                             break;
                         }
                         out.extend((k..(k + 16).min(n)).map(|i| (i, f(i))));
@@ -2479,9 +2490,10 @@ pub(crate) fn par_map<T: Send>(n: usize, f: &(dyn Fn(usize) -> T + Sync)) -> Vec
             .collect();
         hs.into_iter().map(|h| h.join().expect("a worker")).collect()
     });
+    crate::check_cancel()?;
     let mut all: Vec<(usize, T)> = parts.drain(..).flatten().collect();
     all.sort_by_key(|x| x.0);
-    all.into_iter().map(|x| x.1).collect()
+    Ok(all.into_iter().map(|x| x.1).collect())
 }
 
 /// The same; free-form (NURBS) faces taken where `src` gives their sections (else declined).
@@ -2857,6 +2869,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     };
     let lone_at: Vec<DVec3> = lone.iter().map(|&(_, w)| cx.p(w)).collect();
     let near_lone = |lo: DVec3, hi: DVec3| lone_at.iter().any(|&p| p.cmpge(lo - DVec3::splat(GREY * tol)).all() && p.cmple(hi + DVec3::splat(GREY * tol)).all());
+    crate::check_cancel()?;
     // Pairs of solids that may meet, and their faces.
     let ns = cx.solids.len();
     // (OCCT's sections free-form faces' pairs below will ask for, a copied pair's the pair it is moved from, made
@@ -2896,7 +2909,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 }
             }
         }
-        let found = par_map(ahead.len(), &|k| cx.on_free_surface(ahead[k].0, ahead[k].1));
+        let found = par_map(ahead.len(), &|k| cx.on_free_surface(ahead[k].0, ahead[k].1))?;
         cx.on_surface = ahead.into_iter().zip(found).collect();
     }
     if let Some(src) = cx.src {
@@ -2918,7 +2931,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
         }
         // (Which are clearly apart, on all threads, kept for the pairing.)
-        let apart = par_map(pairs.len(), &|k| free::apart(&cx.faces[pairs[k].0], &cx.faces[pairs[k].1], GREY * tol.max(5e-6)));
+        let apart = par_map(pairs.len(), &|k| free::apart(&cx.faces[pairs[k].0], &cx.faces[pairs[k].1], GREY * tol.max(5e-6)))?;
         let mut ahead: Vec<FacePair> = Vec::new();
         let mut seen: HashSet<FacePair> = HashSet::default();
         for (&(fs, ft), x) in pairs.iter().zip(apart) {
@@ -2936,6 +2949,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     }
     let mut meets = vec![false; ns * ns];
     for s in 0..ns {
+        crate::check_cancel()?;
         for t in s + 1..ns {
             let (a, b) = (&cx.solids[s], &cx.solids[t]);
             if a.arg == b.arg || !boxes_meet(a.lo, a.hi, b.lo, b.hi, GREY * tol) {
@@ -2955,6 +2969,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
         }
     }
+    crate::check_cancel()?;
     // The sections' parts and the edges lying on faces: their places in the faces on all threads, their edges in
     // the order the faces were paired.
     let pending = std::mem::take(&mut cx.pending);
@@ -3022,7 +3037,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             *x = firsts.get(&(fs0, ft0, from, a, b)).map(|&k0| (k0, j));
         }
     }
-    let first = par_map(pending.len(), &|k| source[k].is_none().then(|| place(k)));
+    let first = par_map(pending.len(), &|k| source[k].is_none().then(|| place(k)))?;
     // A place turned by `j` steps from face `f0` onto face `f` (its vertex the one of `f` there), if it can be.
     let turn_end = |e: End, f: usize, also: Option<usize>, g: &Rigid| -> Option<End> {
         Some(match e {
@@ -3068,7 +3083,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         let ivs = |x: &[Ival], f: usize| -> Option<Vec<Ival>> { x.iter().map(|iv| Some([(iv[0].0, turn_end(iv[0].1, f, None, &g)?), (iv[1].0, turn_end(iv[1].1, f, None, &g)?)])).collect() };
         Some((ivs(ia0, fs)?, ivs(ib0, ft)?))
     };
-    let rest = par_map(pending.len(), &|k| first[k].is_none().then(|| turned(k).map_or_else(|| place(k), Ok)));
+    let rest = par_map(pending.len(), &|k| first[k].is_none().then(|| turned(k).map_or_else(|| place(k), Ok)))?;
     let places: Vec<R<(Vec<Ival>, Vec<Ival>)>> = first.into_iter().zip(rest).map(|(a, b)| a.or(b).expect("a part's places")).collect();
     for (p, x) in pending.into_iter().zip(places) {
         let (ia, ib) = x?;
@@ -3102,6 +3117,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
         }
     }
+    crate::check_cancel()?;
     // Curves added to one face that cross each other (edges of two arguments lying on a third's face): a
     // vertex where they cross.
     // (Each face's curves' crossings with the curves after them, on all threads; their vertices made in order
@@ -3145,14 +3161,14 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
         Some((f0, to))
     };
-    let firsts: Vec<Option<(usize, Vec<usize>)>> = par_map(cx.faces.len(), &like_first);
+    let firsts: Vec<Option<(usize, Vec<usize>)>> = par_map(cx.faces.len(), &like_first)?;
     let curves_of = |f: usize| -> R<FaceCurves> {
         let c2: Vec<C2> = if cx.face_segs[f].len() < 2 { Vec::new() } else { cx.face_segs[f].iter().map(|s| cx.c2_of(f, s, 0, None)).collect::<R<_>>()? };
         // (Curves whose control points' boxes are apart don't cross.)
         let boxes = c2.iter().map(|c| c.quick_box()).collect();
         Ok((c2, boxes))
     };
-    let curves = par_map(cx.faces.len(), &|f| if firsts[f].is_some() { Ok((Vec::new(), Vec::new())) } else { curves_of(f) });
+    let curves = par_map(cx.faces.len(), &|f| if firsts[f].is_some() { Ok((Vec::new(), Vec::new())) } else { curves_of(f) })?;
     // (Each face's curves' lengths, found once when asked.)
     let lengths: Vec<Vec<std::sync::OnceLock<f64>>> = curves.iter().map(|c| c.as_ref().map_or(Vec::new(), |x| (0..x.0.len()).map(|_| Default::default()).collect())).collect();
     let mut items: Vec<(usize, usize)> = Vec::new();
@@ -3195,7 +3211,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
         m
     };
-    let maps: Vec<HashMap<[u32; 2], Vec<usize>>> = par_map(cx.faces.len(), &|f| if matches!(&curves[f], Ok((c2, _)) if !c2.is_empty()) && sym.is_some() { seg_map(f) } else { HashMap::default() });
+    let maps: Vec<HashMap<[u32; 2], Vec<usize>>> = par_map(cx.faces.len(), &|f| if matches!(&curves[f], Ok((c2, _)) if !c2.is_empty()) && sym.is_some() { seg_map(f) } else { HashMap::default() })?;
     // The curve of face `to` that face `from`'s curve `i` turns into by `g` (its ends and middle), if any.
     let turn_seg = |to: usize, from: usize, i: usize, g: &Rigid| -> Option<usize> {
         let s1 = &cx.face_segs[from][i];
@@ -3233,7 +3249,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             From::Image(..) => None,
             From::Own => Some(crossings_in(f, i, &curves)),
         }
-    });
+    })?;
     let mut item_of: HashMap<(usize, usize), usize> = HashMap::default();
     for (k, &x) in items.iter().enumerate() {
         item_of.insert(x, k);
@@ -3269,7 +3285,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         out.sort_by(|a, b| a.1.cmp(&b.1).then(a.2.total_cmp(&b.2)).then(a.3.total_cmp(&b.3)));
         Some(out)
     };
-    let found_rest = par_map(items.len(), &|k| found_first[k].is_none().then(|| turned_crossings(k).unwrap_or_else(|| crossings_in(items[k].0, items[k].1, &curves))));
+    let found_rest = par_map(items.len(), &|k| found_first[k].is_none().then(|| turned_crossings(k).unwrap_or_else(|| crossings_in(items[k].0, items[k].1, &curves))))?;
     let found: Vec<Crossings> = found_first
         .iter()
         .zip(found_rest)
@@ -3309,6 +3325,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             cx.pool.add(cx.seg_at(&segs[i], t))?;
         }
     }
+    crate::check_cancel()?;
     // Split edges.
     let mut by_x: Vec<(f64, u32)> = cx.pool.p.iter().enumerate().map(|(i, p)| (p.x, i as u32)).collect();
     by_x.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -3384,7 +3401,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     };
     // (With the arrangement the same under a rotation: a curve in a later period whose ends and middle turn back
     // onto a curve's in the first has that one's split points turned, the vertices there; any other found.)
-    let by_period = |n: usize, seg_of: &(dyn Fn(usize) -> Seg + Sync), find: &(dyn Fn(usize) -> R<Vec<u32>> + Sync)| -> Vec<R<Vec<u32>>> {
+    let by_period = |n: usize, seg_of: &(dyn Fn(usize) -> Seg + Sync), find: &(dyn Fn(usize) -> R<Vec<u32>> + Sync)| -> R<Vec<R<Vec<u32>>>> {
         let Some(sym) = sym.as_ref() else { return par_map(n, find) };
         let period: Vec<Option<usize>> = (0..n).map(|k| sym.period(cx.seg_at(&seg_of(k), 0.5), size)).collect();
         let mut at: HashMap<[u32; 2], Vec<usize>> = HashMap::default();
@@ -3393,7 +3410,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 at.entry(seg_of(k).v).or_default().push(k);
             }
         }
-        let first = par_map(n, &|k| period[k].is_none_or(|j| j == 0).then(|| find(k)));
+        let first = par_map(n, &|k| period[k].is_none_or(|j| j == 0).then(|| find(k)))?;
         let turned = |k: usize| -> Option<Vec<u32>> {
             let j = period[k]?;
             let (back, g) = (sym.turn(-(j as f64)), sym.turn(j as f64));
@@ -3411,8 +3428,8 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             let chain = chain0.iter().map(|&w| cx.pool.find(g.point(cx.p(w))).ok().flatten()).collect::<Option<Vec<u32>>>()?;
             (chain.first() == Some(&s.v[0]) && chain.last() == Some(&s.v[1])).then_some(chain)
         };
-        let rest = par_map(n, &|k| first[k].is_none().then(|| turned(k).map_or_else(|| find(k), Ok)));
-        first.into_iter().zip(rest).map(|(a, b)| a.or(b).expect("a curve's split points")).collect()
+        let rest = par_map(n, &|k| first[k].is_none().then(|| turned(k).map_or_else(|| find(k), Ok)))?;
+        Ok(first.into_iter().zip(rest).map(|(a, b)| a.or(b).expect("a curve's split points")).collect())
     };
     // A whole cone's apex where curves on the cone come to it (a plane through its axis and apex: two rulings): in
     // pieces between their angles and its seam's, each its own degenerate edge, as OCCT's.
@@ -3457,7 +3474,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         let ends: Vec<f64> = std::iter::once(from).chain(at).chain(std::iter::once(to)).collect();
         Ok(ends.windows(2).map(|x| Seg { v: s.v, g: Geo::Apex { a0: x[0], a1: x[1] } }).collect())
     };
-    let edge_chains = by_period(edge_solid.len(), &|e| cx.edge_seg(e), &edge_chain);
+    let edge_chains = by_period(edge_solid.len(), &|e| cx.edge_seg(e), &edge_chain)?;
     for (e, chain) in edge_chains.into_iter().enumerate() {
         let s = cx.edge_seg(e);
         let chain = chain?;
@@ -3523,9 +3540,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // (A section's split once, for both faces' curves it is.)
     let extra_segs: Vec<(usize, Seg)> = (0..cx.faces.len()).flat_map(|f| cx.face_segs[f].iter().map(move |&s| (f, s))).collect();
     let extra_of: Vec<usize> = (0..cx.faces.len()).flat_map(|f| cx.seg_section[f].iter().copied()).collect();
-    let section_chains = by_period(cx.sections.len(), &|k| cx.sections[k].0, &|k| cx.split(&cx.sections[k].0, &by_x));
+    let section_chains = by_period(cx.sections.len(), &|k| cx.sections[k].0, &|k| cx.split(&cx.sections[k].0, &by_x))?;
     let own: Vec<usize> = (0..extra_segs.len()).filter(|&k| extra_of[k] == usize::MAX).collect();
-    let mut own_chains = by_period(own.len(), &|i| extra_segs[own[i]].1, &|i| cx.split(&extra_segs[own[i]].1, &by_x)).into_iter();
+    let mut own_chains = by_period(own.len(), &|i| extra_segs[own[i]].1, &|i| cx.split(&extra_segs[own[i]].1, &by_x))?.into_iter();
     let extra_chains: Vec<R<Vec<u32>>> = (0..extra_segs.len()).map(|k| if extra_of[k] == usize::MAX { own_chains.next().expect("a curve's split points") } else { section_chains[extra_of[k]].clone() }).collect();
     let mut face_extra: Vec<Vec<usize>> = vec![Vec::new(); cx.faces.len()];
     for (&(f, s), chain) in extra_segs.iter().zip(extra_chains) {
@@ -3547,6 +3564,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     }
     section_faces.sort_unstable();
     section_faces.dedup();
+    crate::check_cancel()?;
     // Pieces of faces.
     let mut pieces: Vec<Piece> = Vec::new();
     let mut face_pieces: Vec<Vec<usize>> = vec![Vec::new(); cx.faces.len()];
@@ -3670,7 +3688,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // (With the arrangement the same under a rotation: a copied tool's face whose split curves are its first
     // member's face's turned, one for one in the same order, has that face's pieces, their curves the ones here,
     // their points turned; its vertices inside likewise. Any other found itself.)
-    let first_pieces = par_map(cx.faces.len(), &|f| copy_step(f).is_none().then(|| of_face(f)));
+    let first_pieces = par_map(cx.faces.len(), &|f| copy_step(f).is_none().then(|| of_face(f)))?;
     let turned_pieces = |f: usize| -> Option<FacePieces> {
         let sym = sym.as_ref()?;
         let (f0, j) = copy_step(f)?;
@@ -3729,7 +3747,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         pieces.sort_by_key(|p| half(&p.loops[0][0]));
         Some((split, inner, pieces))
     };
-    let rest_pieces = par_map(cx.faces.len(), &|f| first_pieces[f].is_none().then(|| turned_pieces(f).map_or_else(|| of_face(f), Ok)));
+    let rest_pieces = par_map(cx.faces.len(), &|f| first_pieces[f].is_none().then(|| turned_pieces(f).map_or_else(|| of_face(f), Ok)))?;
     let all_pieces: Vec<R<FacePieces>> = first_pieces.into_iter().zip(rest_pieces).map(|(a, b)| a.or(b).expect("a face's pieces")).collect();
     for (f, x) in all_pieces.into_iter().enumerate() {
         let (split, inner, out) = x?;
@@ -3743,6 +3761,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             pieces.push(p);
         }
     }
+    crate::check_cancel()?;
     // Where each piece is against the other arguments' solids.
     let mut keep: Vec<Option<bool>> = vec![None; pieces.len()]; // Some(reversed)
     let mut partner: Vec<Option<usize>> = vec![None; pieces.len()];
@@ -3809,7 +3828,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
         sym.period(p, size).filter(|&j| j > 0)
     };
-    let first = par_map(pieces.len(), &|pi| if later(pi).is_some() { None } else { Some(state_of(pi)) });
+    let first = par_map(pieces.len(), &|pi| if later(pi).is_some() { None } else { Some(state_of(pi)) })?;
     let cell = 1e-6 * size;
     let key = |f: usize, p: DVec3| (f, (p.x / cell).round() as i64, (p.y / cell).round() as i64, (p.z / cell).round() as i64);
     let mut by_place: HashMap<(usize, i64, i64, i64), Vec<usize>> = HashMap::default();
@@ -3867,7 +3886,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         } else {
             Some(turned(pi).map_or_else(|| state_of(pi), Ok))
         }
-    });
+    })?;
     let all_states: Vec<R<Vec<(usize, State)>>> = first.into_iter().zip(rest).map(|(a, b)| a.or(b).expect("a piece's states")).collect();
     for (pi, states) in all_states.into_iter().enumerate() {
         let states = states?;
@@ -3956,6 +3975,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     if pieces.iter().enumerate().any(|(p, x)| x.dangling && (keep[p].is_some() || on_pairs.iter().any(|o| o.0 == p))) {
         return Err(Decline("an edge ends inside a face"));
     }
+    crate::check_cancel()?;
     // The result's faces and their edges.
     let kept: Vec<usize> = (0..pieces.len()).filter(|&p| keep[p].is_some()).collect();
     if kept.is_empty() {

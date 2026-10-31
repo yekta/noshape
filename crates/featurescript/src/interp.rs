@@ -167,6 +167,8 @@ pub struct Interp {
     pub pos: Pos,
     steps: u64,
     deadline: Option<Instant>,
+    /// The regeneration's cancel (a newer edit made it stale, or the user's cancel): checked with the deadline.
+    cancel: Option<Box<dyn Fn() -> bool + Send>>,
     silent: u32,
     pub notices: Vec<Notice>,
     /// `print` / `println` output.
@@ -212,6 +214,7 @@ impl Interp {
             pos: Pos::default(),
             steps: 0,
             deadline: None,
+            cancel: None,
             silent: 0,
             notices: Vec::new(),
             output: String::new(),
@@ -226,6 +229,20 @@ impl Interp {
     /// Abort evaluation with an error after `deadline`.
     pub fn set_deadline(&mut self, deadline: Option<Instant>) {
         self.deadline = deadline;
+    }
+
+    /// Abort evaluation ("Regeneration cancelled") once `cancel` says so: looked at as often as the deadline
+    /// (every 16k steps, a few ms of script; natives in long loops call [`Interp::check_deadline`]).
+    pub fn set_cancel(&mut self, cancel: Option<Box<dyn Fn() -> bool + Send>>) {
+        self.cancel = cancel;
+    }
+
+    fn cancelled(&mut self) -> R<()> {
+        if self.cancel.as_ref().is_some_and(|c| c()) {
+            self.cancel = None;
+            return Err(self.error("Regeneration cancelled"));
+        }
+        Ok(())
     }
 
     pub fn module(&self) -> &Arc<str> {
@@ -290,6 +307,7 @@ impl Interp {
     /// loop long between the interpreter's own checks (std's collision
     /// detection over many faces, qa MIRROR-HANG-402).
     pub fn check_deadline(&mut self) -> R<()> {
+        self.cancelled()?;
         if let Some(d) = self.deadline
             && Instant::now() > d
         {
@@ -301,6 +319,9 @@ impl Interp {
 
     fn tick(&mut self) -> R<()> {
         self.steps += 1;
+        if self.steps & 0x3FFF == 0 {
+            self.cancelled()?;
+        }
         if self.steps & 0xFFFF == 0
             && let Some(d) = self.deadline
             && Instant::now() > d
