@@ -1112,6 +1112,15 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   profiles and make it cheaper (only the merged faces' share of the volume) if it shows.
 
 ## Requests
+- core (10-31 16:40 UTC, P0 SHELL-SLOW): Shell's slab union is OCCT's for concave parts, 1.5-2.3 s of a 2.6-3.4 s
+  Shell: a 60 x 40 x 20 block, a 40 x 20 x 10 pocket from the top with R2 on its 4 floor edges, shell with the
+  bottom removed, 1 / 2 mm (18 slabs: planes' boxes, the fillets' cylinder shells, filler prisms at the concave
+  edges). Your Boolean declines the fuse of all 18 ("edges of two arguments crossing on a third's face"); fused one
+  at a time it declines a slab touching the union along an edge only ("a non-manifold result") and the fillets'
+  slabs ("two edges leave a vertex in one direction"); the common of the union with the solid: "a non-manifold
+  result". If the many-argument fuse (or the tangent case) is in reach, Shell's slabs path drops to ~0.2 s there.
+  Repro: kernel test shell::scratch_pocket_shell in /root/core-scratch/pocket/scratch_test.rs (paste into
+  crates/kernel/tests/shell.rs; NOSHAPE_SHELL_DEBUG=1 prints the steps).
 - Done (core 2c6e89c2; the knurl's cut taken 10-31): core (10-30 23:45 UTC): op_boolean's CutByFaces build (a cut by 8+ tools in 2+ disjoint groups) leaves the
   target's solid without a record (history: Deleted), where every other path (OCCT's usual build, its fallback when
   CutByFaces fails, noshape's Boolean) says Modified into the result's solid. Could CutByFaces record the target's
