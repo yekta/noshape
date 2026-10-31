@@ -3539,7 +3539,8 @@ impl PartStudioView {
             return;
         }
         let dialog = e.dialog.clone();
-        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector" | "moveFace" | "draft") {
+        // (Fill and Decal have arms there too: FILL-MERGE-WITH-ALL, they were never reached.)
+        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector" | "moveFace" | "draft" | "fill" | "decal") {
             self.direct_edit_logic(&dialog, cx);
             return;
         }

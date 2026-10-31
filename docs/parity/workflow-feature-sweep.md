@@ -144,7 +144,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | 3 | Continuity label | "Continuity [Position]" label shown (SHOW_LABEL) | no label | ✅ (was 🔧 SHOW_LABEL) | skasm 10-31 GUI :103 at 56277472 (edge chip "[Position] Edge of Extrude 2", Continuity select) |
 | 4 | Loop errors | "A boundary edge can have only one type of continuity constraint.", "Cannot create fill surface between multiple loops.", "Boundary edges selected do not form a closed loop.", "Cannot create tangency or curvature constraint for a curve selection." | own texts | ✅ (was 🔧 ? L27 (internal-edge variant)) | skasm 10-31 (code: the texts) |
 | 5 | Guides | live "psb (10-24 d)": Guides on with nothing picked is the plain fill; Precise passes through the guides (≤1.1e-4 mm), each touching the boundary at one end at least, else "Guide entities cannot be used as selected." (no field); arc + vertex: warning "Guide curves and vertices cannot be used in combination in Precise mode. Vertex selections are not used."; Sampled only approximates | not checked; always sampled | ✅ (was 🔧 all those rules (Precise curves as free MakeFilling constraints); test `fill_guides_as_fs`; our surface is OCCT's, so areas differ slightly (live arc 1845.4473)) | skasm 10-31 56277472 (T fill_guides_as_fs) |
-| 6 | Add when the edges are surface edges | automatic (SF7) | no | ✗ (SF7) |  |
+| 6 | Add when the edges are surface edges | automatic (SF7) | Add with ☑ Merge with all once an open edge of a surface is picked; knits the open box (8000 mm³) | ✅ (was ✗ SF7 / FILL-MERGE-WITH-ALL: the dialog's dispatch never ran the fill arm) | skasm 10-31 GUI :103 (sf7.noshape: 4 rim edges → Add, Merge with all, Parts (1)) |
 
 ## Boundary surface
 | # | Area | Onshape | Ours | Status | Verified |
