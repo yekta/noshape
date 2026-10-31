@@ -120,7 +120,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
 | 3.1 | Arrow keys rotate 15° about the camera's up (←/→) or right (↑/↓) axis through the camera target; ← from Front brings the Right face in, ↑ the Bottom (= dragging that way) | help; `rotateInDirection`; live navigation/75–80 | ✅ R: ← turns exactly 15.000°, ↑ 15.000° (Wayland and X11); live navigation/75–80 directions, qa4 in-app | 0.4.10+ / 2a6d0167 10-27 |
-| 3.2 | Shift+arrows 90°, Ctrl+arrows 5° | help | ✅ angles / 🔧 axes | 0.4.10+ / fa61ba6f 10-27 |
+| 3.2 | Shift+arrows 90°, Ctrl+arrows 5° | help | ✅ angles and axes (qa4 re-check below: Shift+← from Front lands exactly on Right) | 0.4.10+ / fa61ba6f 10-27 |
 | 3.3 | Each step animates linearly over 250 ms | `animateRotation`, `CAMERA_SHORT_ANIMATION_TIME_MS` | ✅ linear over 250 ms (`StepRotation::advance`; was 500 ms, eased) | skasm 10-31 (T app-core navigation `step_rotation_is_linear_and_view_animations_smootherstep`; qa 10-29: an arrow step ends 267 ms after the first change) |
 | 3.4 | Holding an arrow rotates continuously: every key repeat starts another step that runs alongside the earlier ones (they add up) | help; `setAllowRepeat` for ROTATE_*, `startAnimation`; live navigation/910–921: a 1 s hold (X repeat 660 ms / 25 Hz, 11 keydowns) turns 165° | ✅ nav 10-19: a 1 s held ← turns 165°, as live navigation/910–921 | 8627322e 10-28 (wf-block: one Left press turns the view one step (cube ~15°); Left held 1.5 s keeps turning (several steps, Right face now in front); step overlap not measured) |
 | 3.5 | Ctrl+Shift+arrows pan: the model moves 150 px toward the arrow (measured at the scene centre), 250 ms smootherstep; ignored while the camera animates | help; `animatePan`, `animateTo` | ✅ R: Ctrl+Shift+→ moves the model exactly 150 px, no rotation | 0.4.10+ / 2a6d0167 10-27 |
@@ -163,7 +163,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 6.5 | Z zooms out ×½, Shift+Z in ×2, about the view centre | live navigation/50–51 | ✅ (was ×0.8/×1.25) | 2bd06bb3 10-29 (qa, boltdwg drawing: Z ×½ and Shift+Z ×2 about the view centre; tickets/dwg-nav-2bd0.png) |
 | 6.6 | Ctrl+Shift+arrows move the sheet 10 % of the canvas width toward the arrow | live navigation/54–55 | ✅ (was missing) | 2bd06bb3 10-29 (qa, boltdwg drawing: Ctrl+Shift+Right moves the sheet ≈10 % of the canvas width to the right; tickets/dwg-nav-2bd0.png) |
 | 6.7 | Double middle click and F zoom to fit the sheet | live navigation/45–46, 56 | ✅ (double middle was missing) | 2bd06bb3 10-29 (qa, boltdwg drawing: double middle click fits the sheet again; tickets/dwg-nav-2bd0.png) |
-| 6.8 | Left-drag on empty sheet: box select | live navigation/44 | 🔧 dx 10-28 (after qa DRAWING-BOX-SELECT): the window box (#1651B0 20 % / 60 %) and what it wholly encloses selected, Shift adds (`Drag::SelectBox`, `select_in_box`); ✅ verified | 867a7720 10-28 (wf-block drawing: drag from empty sheet → window box #1651B0 20 % fill, the enclosed view selected) |
+| 6.8 | Left-drag on empty sheet: box select | live navigation/44 | ✅ dx 10-28 (after qa DRAWING-BOX-SELECT): the window box (#1651B0 20 % / 60 %) and what it wholly encloses selected, Shift adds (`Drag::SelectBox`, `select_in_box`); ✅ verified | 867a7720 10-28 (wf-block drawing: drag from empty sheet → window box #1651B0 20 % fill, the enclosed view selected) |
 
 ## 7. Touchscreen (iOS, Android and browser table)
 
