@@ -51,6 +51,40 @@ fn same_records(a: &[(String, [i64; 3])], b: &[(String, [i64; 3])]) -> bool {
         })
 }
 
+/// Where ours differs from OCCT's only by OCCT's arbitrary choices (rounding): the same solids, faces, edges and
+/// vertices, both valid, the volume within the area times the model tolerance and the area within the edges'
+/// length times it, every face record (an input face Kept, Modified or Deleted, to the same output faces within
+/// 2 µm) the same, and the same after the unify. Then the deltas (volume, area, other records apart), else None.
+fn equivalent(r: &OpResult, o: &OpResult) -> Option<String> {
+    const TOL: f64 = 1e-7;
+    for k in [ShapeType::Solid, ShapeType::Face, ShapeType::Edge, ShapeType::Vertex] {
+        if r.shape.count(k) != o.shape.count(k) {
+            return None;
+        }
+    }
+    if !r.shape.is_valid() || !o.shape.is_valid() {
+        return None;
+    }
+    let (vr, vo) = (r.shape.volume().ok()?, o.shape.volume().ok()?);
+    let (ar, ao) = (r.shape.area().ok()?, o.shape.area().ok()?);
+    let len: f64 = o.shape.sub_shapes(ShapeType::Edge).iter().map(|e| e.length().unwrap_or(0.0)).sum();
+    if (vr - vo).abs() > ao * TOL || (ar - ao).abs() > len * TOL {
+        return None;
+    }
+    let faces = |x: &[(String, [i64; 3])]| x.iter().filter(|r| r.0.split(' ').nth(1).is_some_and(|w| w.starts_with("Face")) && !r.0.ends_with(" Edge") && !r.0.ends_with(" Vertex")).cloned().collect::<Vec<_>>();
+    let (mine, theirs) = (records(r), records(o));
+    if !same_records(&faces(&mine), &faces(&theirs)) {
+        return None;
+    }
+    let unified = |x: &Shape| unify_same_domain(x).map(|u| (u.shape.count(ShapeType::Face), u.shape.count(ShapeType::Edge), u.shape.is_valid(), u.shape.volume().unwrap_or(0.0))).ok();
+    let (ur, uo) = (unified(&r.shape)?, unified(&o.shape)?);
+    if (ur.0, ur.1, ur.2) != (uo.0, uo.1, uo.2) || (ur.3 - uo.3).abs() > ao * TOL {
+        return None;
+    }
+    let apart = mine.iter().filter(|x| !theirs.contains(x)).count() + theirs.iter().filter(|x| !mine.contains(x)).count();
+    Some(format!("volume {:+.2e} m³ ({:.1e} relative), area {:+.2e} m², {apart} records apart", vr - vo, (vr - vo).abs() / vo.abs().max(1e-30), ar - ao))
+}
+
 fn median(v: &mut [f64]) -> f64 {
     if v.is_empty() {
         return 0.0;
@@ -71,6 +105,7 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
     // By size bucket: (rust ms, occt ms) of each accepted case.
     let mut times: [Vec<(f64, f64)>; 3] = Default::default();
     let (mut n, mut accepted) = (0, 0);
+    let mut equivalents: Vec<String> = Vec::new();
     for name in cases(dir) {
         if only.as_ref().is_some_and(|o| *o != name) || unstable.contains(&name) {
             continue;
@@ -160,6 +195,15 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
                 d.push(format!("unified differently: {ur:?} vs OCCT {uo:?}"));
             }
         }
+        // (OCCT's arbitrary choices only: equivalent, its deltas reported, unless NOSHAPE_BREP_EXACT.)
+        if !d.is_empty()
+            && std::env::var_os("NOSHAPE_BREP_EXACT").is_none()
+            && let Ok(o) = &o
+            && let Some(deltas) = equivalent(&r, o)
+        {
+            equivalents.push(format!("{name} ({:?}, {} tools): {}; {deltas}", c.op, c.tools.len(), d.join(", ")));
+            d.clear();
+        }
         if !d.is_empty() {
             let mut line = format!("{name} ({:?}, {} tools, recorded path {}): {}", c.op, c.tools.len(), c.path, d.join(", "));
             if let Some(dump) = std::env::var_os("NOSHAPE_BREP_DUMP") {
@@ -210,7 +254,10 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         times[b].push((ms, occt_ms));
         report += &format!("{name} {:?} faces {faces} tools {}: {ms:.2} ms, OCCT {occt_ms:.2} ms ({:.1}x)\n", c.op, c.tools.len(), occt_ms / ms.max(1e-6));
     }
-    report += &format!("{accepted} of {n} cases taken, {} differ from OCCT\n", bad.len());
+    report += &format!("{accepted} of {n} cases taken, {} differ from OCCT, {} equivalent\n", bad.len(), equivalents.len());
+    for x in &equivalents {
+        report += &format!("  equivalent: {x}\n");
+    }
     for (why, k) in &declines {
         report += &format!("  declined {k}: {why}\n");
     }
