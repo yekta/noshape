@@ -813,6 +813,32 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         if ev.bool("trimEnds") && ((t1 > 0.0 && t2 > 0.0) || shapes.len() > 2) {
             return err(THIN_TRIM_FAILED);
         }
+        // Closed planar profiles: the wall between each profile and its
+        // offset, lofted (the outer loops' loft less the inner ones'), as a
+        // thin extrude builds its wall. Live 1668 (i): two 4 × 4 squares, the
+        // default 5 mm outwards → 3600 mm³, 10 faces; thickening the lofted
+        // tube creased at its corners (16 faces, 1137 mm³).
+        if shapes.len() >= 2 && shapes.iter().all(super::thin::closed_planar_wire) {
+            let failed = || fe("Failed to thicken lofted body, check thickness.");
+            let (mut outer, mut inner) = (Vec::new(), Vec::new());
+            for s in &shapes {
+                let (o, i) = super::thin::wall_loops(s, t1, t2).map_err(|_| failed())?;
+                outer.push(o);
+                inner.push(i);
+            }
+            let solid_opts = k::LoftOptions { solid: true, ..opts.clone() };
+            let o = k::loft(&outer, &solid_opts).map_err(|_| failed())?.shape;
+            let i = k::loft(&inner, &solid_opts).map_err(|_| failed())?.shape;
+            let wall = k::boolean(k::BooleanOp::Cut, &[o], &[i], &k::BooleanOptions::default()).map_err(|_| failed())?.shape;
+            if wall.count(ShapeType::Solid) == 0 {
+                return Err(failed());
+            }
+            let names = super::helpers_a::name_new(ev, &wall);
+            let tools = vec![NamedShape::new(wall, names)];
+            let op = ev.enum_("operationType").to_string();
+            let scope = super::extrude::scope(ev);
+            return ev.apply_operation(tools, &op, scope, BodyKind::Solid);
+        }
         let inp = ThickenInput {
             shape: res.shape.clone(),
             face_sources: names.iter().map(|n| Source::Topo(n.clone())).collect(),

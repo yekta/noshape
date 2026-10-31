@@ -79,6 +79,12 @@ pub fn offset_surface(ev: &mut EvalCtx) -> FResult<()> {
             let names: Vec<Name> = base_sources.iter().map(|s| face_name(ev, Role::Offset(s.clone()))).collect();
             (copy, names)
         } else {
+            // Live 1668 (e): a cylinder or sphere offset toward its axis /
+            // centre by its radius or more fails (OCCT would turn it inside
+            // out at the remaining distance).
+            if shapes.iter().any(|f| offset_past_centre(f, d)) {
+                return err("Could not offset selected faces as requested.");
+            }
             // Live L25: e.g. a concave fillet offset by more than its radius.
             let res = k::offset_shape(&base, d, k::JoinType::Arc).map_err(|_| FeatureError::new("Could not offset selected faces as requested."))?;
             let mut names = names_from_sources(ev, &res.history, &res.shape, 0, &base_sources, |s| Role::Offset(s.clone()));
@@ -91,6 +97,21 @@ pub fn offset_surface(ev: &mut EvalCtx) -> FResult<()> {
         tools.push(NamedShape::new(shape, names));
     }
     ev.apply_operation(tools, "NEW", None, BodyKind::Surface)
+}
+
+/// Whether offsetting `f` by `d` along its normal passes its cylinder's axis
+/// or its sphere's centre.
+fn offset_past_centre(f: &Shape, d: f64) -> bool {
+    let (centre_of, radius): (Box<dyn Fn(DVec3) -> DVec3>, f64) = match f.face_surface() {
+        Ok(k::Surface::Cylinder { origin, axis, radius, .. }) => (Box::new(move |p: DVec3| origin + axis * (p - origin).dot(axis)), radius),
+        Ok(k::Surface::Sphere { center, radius, .. }) => (Box::new(move |_| center), radius),
+        _ => return false,
+    };
+    let Ok([u0, u1, v0, v1]) = f.uv_bounds() else { return false };
+    let Ok(p) = f.point_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5) else { return false };
+    let Ok(n) = f.normal_at_point(p) else { return false };
+    let toward = if n.dot(centre_of(p) - p) > 0.0 { d } else { -d };
+    toward >= radius * (1.0 - 1e-9)
 }
 
 // ------------------------------------------------------------------ fill
@@ -120,6 +141,9 @@ fn adjacent_face(ev: &EvalCtx, edge: &Shape) -> Option<Shape> {
 
 /// Live L27: a tangency row on a sketch curve.
 const FILL_TANGENCY: &str = "Could not meet tangency constraints at highlighted points.";
+
+/// Live's text when the profiles cross (request 1668 (j)).
+const BSURF_SPLINE_FAILED: &str = "A B-spline surface could not be created with the given definition.";
 
 /// Onshape's BSURF_FAILED.
 const BSURF_FAILED: &str = "Could not create boundary surface with given information. Check profile order, intersections or end conditions.";
@@ -562,6 +586,17 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
                 _ => None,
             })
         };
+        // Live 1668 (j): profiles that cross each other (away from their
+        // ends) give no surface.
+        let ends_of = |w: &Shape| w.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect::<Vec<_>>();
+        for (i, a) in sections.iter().enumerate() {
+            for b in &sections[i + 1..] {
+                let Ok(d) = k::distance(a, b) else { continue };
+                if d.distance < 1e-9 && !ends_of(a).iter().chain(&ends_of(b)).any(|p| p.distance(d.point_a) < 1e-7) {
+                    return err(BSURF_SPLINE_FAILED);
+                }
+            }
+        }
         let mut opts = k::LoftOptions::default();
         if let ([first, last], [s0, s1]) = (items.as_slice(), sections.as_slice()) {
             opts.start = super::solid_a::loft_end(ev, first, ids, s0, sketch_normal(ev, first), "start")?;

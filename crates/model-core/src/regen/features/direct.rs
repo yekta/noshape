@@ -108,6 +108,11 @@ pub fn delete_face(ev: &mut EvalCtx) -> FResult<()> {
             "HEAL" => {
                 let del: Vec<Shape> = set.iter().map(|f| all[*f].clone()).collect();
                 let res = k::delete_faces(&body.shape, &del).map_err(failed)?;
+                // Live 1668 (d): the top and bottom of a block can't be
+                // healed; OCCT hands the block back unchanged.
+                if res.shape.faces().len() >= all.len() || !res.shape.is_valid() {
+                    return err(DELETE_FAILED);
+                }
                 let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None);
                 ev.replace_body(bi, res.shape, names);
             }

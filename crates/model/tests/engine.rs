@@ -448,6 +448,30 @@ fn thin_revolve_sweep_and_loft() {
     assert!(near(v, a, 2e-3) || near(v, b2, 2e-3), "{v}");
 }
 
+/// Live 1668 (i): a thin loft between two 4 × 4 squares 20 mm apart is the
+/// wall between each square and its offset (sharp corners), outwards by
+/// default: ((4 + 2t)² − 16) · 20 mm³, 10 faces; flipped, inwards. Thickening
+/// the lofted tube had creased its corners (16 faces, 1137 mm³ at 5 mm).
+#[test]
+fn thin_loft_of_squares_walls_them_as_live() {
+    let item = |s: FeatureId| {
+        let mut v = ParamValues::default();
+        v.set("wireProfileEntities", q(vec![Reference::Sketch(s)]));
+        v
+    };
+    for (t1, flip, mm3) in [("5 mm", false, 3600.0), ("30 mm", false, 81600.0), ("1 mm", true, 240.0)] {
+        let mut t = T::new();
+        let a = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.0, 0.0, 0.004, 0.004));
+        let p20 = t.top_plane("20 mm");
+        let b2 = t.sketch(Reference::FeaturePlane(p20), rect(0.0, 0.0, 0.004, 0.004));
+        t.add("loft", &[("bodyType", en("THIN")), ("wireProfilesArray", ParamValue::Array(vec![item(a), item(b2)])), ("thickness1", e(t1)), ("flipWall", b(flip))]);
+        let res = t.ok();
+        let body = res.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let v = total_volume(&res.context) * 1e9;
+        assert!((v - mm3).abs() < 1e-6 && body.shape.faces().len() == 10, "{t1} flip {flip}: {v} mm³, {} faces", body.shape.faces().len());
+    }
+}
+
 /// Live (behaviours "skasm (2026-10-31, P2 feature-sweep Loft 8)"): a thin
 /// loft's Trim ends fails ("Failed to trim result body, try deselecting
 /// "Trim ends" option.") with a wall on both sides or through three profiles;

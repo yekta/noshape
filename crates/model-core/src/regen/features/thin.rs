@@ -215,8 +215,15 @@ fn area_of(w: &Shape) -> f64 {
     k::make_face_from_wire(w, true).and_then(|f| f.area()).unwrap_or(0.0)
 }
 
-/// Thin wall around a closed loop.
-fn closed_wall(frame: &PlaneFrame, w: &Shape, sources: &[SourcedEdge], t_out: f64, t_in: f64, key: Source) -> FResult<Profile> {
+/// Whether `s` is a closed planar wire (a thin loft's profile it walls by
+/// offsets, [`wall_loops`]).
+pub fn closed_planar_wire(s: &Shape) -> bool {
+    s.shape_type() == noshape_kernel::ShapeType::Wire && closed_chain(s) && wire_frame(s).is_ok()
+}
+
+/// A closed loop's wall: the loop offset `t_out` outwards and `t_in`
+/// inwards in its plane (the loop itself for a 0 side).
+pub fn wall_loops(w: &Shape, t_out: f64, t_in: f64) -> FResult<(Shape, Shape)> {
     let a0 = area_of(w);
     let probe = t_out.max(t_in);
     let grow = offset(w, probe, false).map(|o| area_of(&o) > a0).unwrap_or(true);
@@ -231,6 +238,12 @@ fn closed_wall(frame: &PlaneFrame, w: &Shape, sources: &[SourcedEdge], t_out: f6
     } else {
         w.clone()
     };
+    Ok((outer, inner))
+}
+
+/// Thin wall around a closed loop.
+fn closed_wall(frame: &PlaneFrame, w: &Shape, sources: &[SourcedEdge], t_out: f64, t_in: f64, key: Source) -> FResult<Profile> {
+    let (outer, inner) = wall_loops(w, t_out, t_in)?;
     let face = k::make_face(&kernel_plane(frame), &outer, std::slice::from_ref(&inner)).map_err(kerr("Could not build the thin wall"))?;
     let edge_sources = tag_sources(&face, &outer, &inner, sources, None);
     Ok(Profile { shape: face, frame: *frame, edge_sources, key, from_face: false })
