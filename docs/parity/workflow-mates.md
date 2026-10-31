@@ -40,7 +40,7 @@ Docs /tmp/qa5/d24b/m.noshape (mate-base copy), /tmp/qa5/d24b/full.noshape (pass 
 | MT3 chip clock tooltip | "Mate connector of Part 1 <2> (Click to edit)" | ✅ **fixed** (m56) | 0.4.10+ / daf1f50c 10-27 (qa-scratch/mate.noshape) |
 | MT4 connector panel | chip bold, instance row highlighted | ✅ (MATE-CONNECTOR-PANEL-HIGHLIGHT fixed) | 6570fa0d (qa 10:08: chip bold ✓; owning instance row not highlighted (both rows #ecf0f4), whole instance orange) · verified 4c97692e 10-28 (TICKETS MATE-CONNECTOR-PANEL-HIGHLIGHT) |
 | MT5 / MT6 Offset values / default axis | regular black "0 mm"; Rotate about X | ✅ **fixed** (m53) | 0.4.10+ / daf1f50c 10-27 (qa-scratch/mate.noshape) |
-| MT7 selected Revolute at 0° | mated face amber, instance rows highlighted, triad letters, no circle ✅; label **"0.000°" italic, past the X axis** (live "0°" upright on the X-axis end, trailing zeros dropped) | ✗ still (label only) (m60) |  |
+| MT7 selected Revolute at 0° | mated face amber, instance rows highlighted, triad letters, no circle ✅; label **"0.000°" italic, past the X axis** (live "0°" upright on the X-axis end, trailing zeros dropped) | ✗ still (label only) (m60) → now ✅ (row "MT7 label at 0°": MATE-ANGLE-360 07ead631, qa verified c5e53806) |  |
 | MT8 Mate connector tool | no preview slider; Move rows X↘ Y↗ Z↑ icons, Rotate about Z | ✅ **fixed** (m61, m62) | 77870dd4 10-28 |
 | MT9 Replace instance → unresolvable mate | stays red, tooltip "Revolute 1 has error: Mate cannot resolve mate connectors. (Hidden)" | ✅ **fixed** (m75, m76) | 6570fa0d (qa 10:07: after ✓ Revolute 1 stays red; tooltip "Revolute 1 has error: Mate cannot resolve mate connectors. (Hidden)" / Revolute mate / Offset: off) |
 

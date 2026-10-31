@@ -334,6 +334,13 @@ impl MateDialog {
         self.active.is_some()
     }
 
+    /// Every connector field is filled. The last field keeps the focus once
+    /// full (live R5), so this, not [`Self::awaiting_pick`], says both picks
+    /// are in (the heads-up panel, the default flip).
+    pub fn connectors_complete(&self) -> bool {
+        self.query_fields().iter().flatten().all(|f| self.slot(*f).is_some())
+    }
+
     /// Tangent mates pick bare faces / edges / vertices instead of mate connectors.
     pub fn picks_entities(&self) -> bool {
         self.mate_type == MateType::Tangent
@@ -1128,8 +1135,11 @@ mod advance_tests {
     fn mate_connectors_keep_the_focus_full_and_drop_the_oldest(cx: &mut TestAppContext) {
         let d = dialog(cx, MateType::Fastened);
         assert!(set(cx, &d, 1));
+        assert!(!cx.update(|cx| d.read(cx).connectors_complete()));
         assert!(set(cx, &d, 2));
         assert_eq!(state(cx, &d), (Some(0), Some(1), Some(2)));
+        // Still taking picks, but both are in: the mate's heads-up panel shows (live 2220).
+        assert!(cx.update(|cx| { let d = d.read(cx); d.awaiting_pick() && d.connectors_complete() }));
         assert!(set(cx, &d, 3));
         assert_eq!(state(cx, &d), (Some(0), Some(2), Some(3)), "the oldest went");
     }

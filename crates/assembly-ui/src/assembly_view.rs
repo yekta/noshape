@@ -998,7 +998,11 @@ impl AssemblyView {
         // Mate highlight: a selected mate shows only its mated faces /
         // edges amber (live 305, qa5 MT7); a hovered row its instances.
         // Both show the connector triads.
-        let selected_mate = self.selected_mate.and_then(|id| self.assembly(cx).and_then(|a| a.mate(id).cloned()));
+        // The mate dialog's mate, once both connectors are in, looks selected
+        // (live 2220: its mated faces amber, the lettered triad, its glyph).
+        let dialog_mate = self.mate.as_ref().and_then(|s| s.dialog.read(cx).to_mate(cx));
+        let shown_mate = dialog_mate.as_ref().map(|m| m.id).or(self.selected_mate);
+        let selected_mate = dialog_mate.or_else(|| self.selected_mate.and_then(|id| self.assembly(cx).and_then(|a| a.mate(id).cloned())));
         if let Some(m) = &selected_mate {
             for c in m.connectors() {
                 let entity = match &c.reference {
@@ -1013,7 +1017,7 @@ impl AssemblyView {
                 }
             }
         }
-        for mid in [self.selected_mate, self.list_hover_mate].into_iter().flatten() {
+        for mid in [shown_mate, self.list_hover_mate].into_iter().flatten() {
             if selected_mate.as_ref().is_none_or(|m| m.id != mid) {
                 h.accent_tops.extend(self.mate_instances(mid, cx));
             }
@@ -1106,7 +1110,10 @@ impl AssemblyView {
         // Mate indicators (pickable): displayed mates, plus the hovered /
         // selected one; not while a dialog field takes picks.
         let mut overlay_mates = Vec::new();
-        if !picking && let Some(asm) = self.assembly(cx) {
+        // A full mate dialog still takes picks (its last field keeps the
+        // focus, live R5) but shows its mate's indicator (live 2220).
+        let mate_full = self.mate.as_ref().is_some_and(|s| s.dialog.read(cx).connectors_complete());
+        if (!picking || mate_full) && let Some(asm) = self.assembly(cx) {
             let shown_mode: Vec<MateId> = match (self.show_mates_mode, self.mates_pinned.or_else(|| self.hover.as_ref().map(|t| t.path[0]))) {
                 (true, Some(top)) => asm.mates.iter().filter(|m| m.uses_instance(top)).map(|m| m.id).collect(),
                 _ => Vec::new(),
@@ -1117,7 +1124,7 @@ impl AssemblyView {
             for ms in &self.result.mates {
                 let pending = new_mate == Some(ms.id) && asm.mate(ms.id).is_none();
                 let visible = match asm.mate(ms.id) {
-                    Some(m) => (self.show_mates && !m.hidden && !ms.inactive) || self.selected_mate == Some(m.id) || self.list_hover_mate == Some(m.id) || shown_mode.contains(&m.id),
+                    Some(m) => (!picking && ((self.show_mates && !m.hidden && !ms.inactive) || self.selected_mate == Some(m.id) || self.list_hover_mate == Some(m.id) || shown_mode.contains(&m.id))) || shown_mate == Some(m.id),
                     None if pending => true,
                     None => continue,
                 };
@@ -1125,7 +1132,7 @@ impl AssemblyView {
                 let Some(f) = ms.frame_b.or(ms.frame_a) else { continue };
                 if visible {
                     let i = overlay_mates.len();
-                    let hl = hovered_overlay == Some(OverlayPick::Mate(i)) || self.selected_mate == Some(ms.id);
+                    let hl = hovered_overlay == Some(OverlayPick::Mate(i)) || shown_mate == Some(ms.id);
                     let st = if ms.inactive || suppressed {
                         assembly_scene::MateGlyphState::Inactive
                     } else if !ms.ok {
@@ -2200,7 +2207,7 @@ impl AssemblyView {
             let is_new = self.mate.as_ref().is_some_and(|s| s.editing.is_none());
             dialog.update(cx, |d, cx| d.set_connector(c, cx));
             // Both connectors picked: the heads-up checkmark appears at the cursor.
-            if is_new && !dialog.read(cx).awaiting_pick() {
+            if is_new && dialog.read(cx).connectors_complete() {
                 // Default primary-axis alignment (`default_flip_primary`: the
                 // moving instance keeps its orientation, a tie aligns; Onshape's
                 // flip = !flip_primary).
@@ -5202,7 +5209,7 @@ impl AssemblyView {
                 left = left.child(dialog.clone());
             }
             any_left = true;
-            if let Some(at) = hud.filter(|_| !dialog.read(cx).awaiting_pick()) {
+            if let Some(at) = hud.filter(|_| dialog.read(cx).connectors_complete()) {
                 out.push(self.render_mate_hud(at, dialog, cx));
             }
         }

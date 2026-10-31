@@ -38,7 +38,7 @@ Status: ✅ matches live, ✗ differs, ? live pending. Shots /tmp/qa5/shots/x01�
 | EXV2 editing tree | indent guide line, rollback bar indented, info text on one line (x02) | ✅ **fixed** | f9185639 10-28 |
 | EXV3 triad | grey-outlined arrows with rings, no planar handles (x03z) | ✅ **fixed** | f9185639 10-28 |
 | EXV4 / EXV5 / NP1 / NP2 / MNU2 | fixed on main (code cites the qa5 IDs; NP1 Delete gated by np_editing; MNU2's separators around the driver item removed 10-28 per live's DOM, dom/context-menus-assembly-revolute.txt, ASM-MATE-MENU-SEPARATORS) | ✅ (code-verified; NP2 measured against live 155 by skasm 10-27) |  |
-| EXV6 rollback pill | not re-checked (my drag made no step this run) | – |  |
+| EXV6 rollback pill | not re-checked (my drag made no step this run) | – → ✅ (row below: re-dragged by skasm 10-27) |  |
 
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871)
 | EXV6 rollback pill | in code (assembly_panels.rs: 100 × 31 blue "Rollback bar" pill under the cursor, live 820); re-dragged in the app by skasm 10-27 (row 15) | ✅ |

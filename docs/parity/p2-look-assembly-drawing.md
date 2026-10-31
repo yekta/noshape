@@ -16,7 +16,7 @@ asked, → owner.
 | AL4 | Insert ghost | the part follows the pointer, amber (assembly/04) | same | ✅ (placement → skb) | 77870dd4 10-28 |
 | AL5 | New mate's row while its dialog is open | "Revolute 1" in Mate features, selected, red with the error badge until both connectors are picked; the count includes it (assembly/2219) | no row until ✓ | ✅ (17:19 build: red row + badge, count 1, normal once both are picked) | 77870dd4 10-28 |
 | AL6 | Mate connectors box once both are picked | stays active: blue frame, light-blue fill (assembly/2220) | plain | ✅ | 77870dd4 10-28 |
-| AL7 | New mate's indicator while its dialog is open | the mate glyph at the connectors (2220) | only the triads | ✅ |  |
+| AL7 | New mate's indicator while its dialog is open | the mate glyph at the connectors (2220) | only the triads | ✅ | skasm 10-31 GUI :103 (qa asm5, Revolute pin → hole): was broken again since the dialog's last field keeps the focus (psui 9f288920, live R5): no HUD, no indicator, no letters; fixed: once both connectors are in, the HUD, the mate's indicator (highlighted) and the X / Y / Z letters show, as live 2220; also when editing a mate |
 | AL8 | Mate dialog fields, HUD (type select, flip, reorient, Solve, ✓ ✕) | 2219/2220 | within 1 px; "Simulation connection" ⊘ (simulation) | ✅ | 77870dd4 10-28 |
 | AL9 | BOM pane (header, BOM type, Add column, ⋯, table) | assembly/1362 | within 1–2 px | ✅ | 77870dd4 10-28 |
 

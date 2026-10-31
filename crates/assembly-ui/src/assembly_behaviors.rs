@@ -3894,12 +3894,20 @@ impl AssemblyView {
     }
 
     /// The selected mate's connector triad carries X / Y / Z letters in the
-    /// axis colours just past the tips (live 305z, qa5 MT7).
+    /// axis colours just past the tips (live 305z, qa5 MT7); so does the mate
+    /// dialog's once both connectors are in (live 2220).
     fn render_triad_letters(&self, cx: &App) -> Vec<AnyElement> {
-        if self.mate.is_some() {
-            return vec![];
-        }
-        let Some(ms) = self.selected_mate.and_then(|id| self.result.mates.iter().find(|m| m.id == id)) else { return vec![] };
+        let id = match &self.mate {
+            Some(s) => {
+                let d = s.dialog.read(cx);
+                if !d.connectors_complete() {
+                    return vec![];
+                }
+                Some(d.id)
+            }
+            None => self.selected_mate,
+        };
+        let Some(ms) = id.and_then(|id| self.result.mates.iter().find(|m| m.id == id)) else { return vec![] };
         let Some(f) = ms.frame_b.or(ms.frame_a) else { return vec![] };
         let vp = self.viewport.read(cx);
         let size = self.triad_size();

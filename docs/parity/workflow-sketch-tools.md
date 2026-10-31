@@ -42,7 +42,7 @@ Doc /tmp/qa5/d29/sk.noshape (same steps as pass 14). Shots z20–z29.
 | PAT1 linear pattern preview | unchanged (z26) | ✗ still → fixed later: PAT1 ✅ (row 74) |  |
 | POLY1 polygon | solid construction circle, horizontal spinner (z27) | ✗ still → fixed later: POLY1 ✅ (row 98) |  |
 | STB1 S toolbar | at cursor x+10, y−30, square corners (z28) | ✅ **fixed** | 0.4.10+ / 2d9a275c 10-27 |
-| CH1 chamfer preview | preview chamfer + hollow arrow + two dimension lines ✅, but **no dimension values** (only extension lines and tiny arrowheads; live shows "5" twice) (z29) | ✗ **CH2** (skb, partly) |  |
+| CH1 chamfer preview | preview chamfer + hollow arrow + two dimension lines ✅, but **no dimension values** (only extension lines and tiny arrowheads; live shows "5" twice) (z29) | ✗ **CH2** (skb, partly) → now ✅ (CH2 rows 64 / 71: two "5" dimensions and the hollow arrow) |  |
 
 ## Update from live's answer "qa5 sketch tools" (behaviours.md ~7780, 7983) + lead's notes, 10-22
 | Row | Live | Ours | Status | Verified |
