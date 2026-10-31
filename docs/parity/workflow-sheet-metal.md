@@ -72,7 +72,7 @@ numbers), ◐ = partly, ✗ = differs, — = no live data.
 | 1.3 | Sheet metal model dialog on open | Convert tab, Selections (3 query fields, Clearance 0, ☐ Include bends, ☐ Keep input parts), General, › Material, › Relief; title red + ✓ disabled until a selection | same layout and states | ✅ | 77870dd4 10-28 |
 | 1.4 | Thicken tab, click the region | chip "Face of Sketch 1" | same | ✅ | 77870dd4 10-28 |
 | 1.5 | Thickness "2" Enter, Bend radius "2" Enter | "2 mm", value re-selected, dialog stays | same | ✅ | 77870dd4 10-28 |
-| 1.6 | Material / Relief defaults | K 0.45, rolled K 0.5, min. gap 0.02 mm, corner Simple, bend relief Obround depth scale 2, width scale 1.0625 | same values; width scale shown "1.062" | ? (display precision) |  |
+| 1.6 | Material / Relief defaults | K 0.45, rolled K 0.5, min. gap 0.02 mm, corner Simple, bend relief Obround depth scale 2, width scale 1.0625 | same values; width scale shown "1.062" | ✅ now: K 0.45 / 0.5, gap 0.02, Simple, Obround - Scaled, 2, 1.063 (SM15) | GUI 10-29; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
 | 1.7 | ✓ | Part 1, plate z 0..2, 4800 mm³ | 4800 mm³, Sketch 1 auto-hidden | ✅ | 77870dd4 10-28 |
 
 ## 2. Flange (G34: top edges y=0 and x=0, 20 mm, defaults)
@@ -81,92 +81,92 @@ numbers), ◐ = partly, ✗ = differs, — = no live data.
 |---|---|---|---|---|---|
 | 2.1 | Flange dialog defaults | flangeAlignment INNER, BLIND 25 mm, bend angle 90, auto miter on, model radius, partial off | Inner, Blind, 25 mm, Bend angle 90 deg, ☑ Automatic miter, ☑ Use model bend radius, ☐ Partial flange | ✅ (spec) / ? (look) | 77870dd4 10-28 |
 | 2.2 | Click the top edge at y=0 | "Edge of Sheet metal 1", preview | "Edge of Sheet metal model 1", preview | ✅ | 77870dd4 10-28 |
-| 2.3 | Pick the second (x=0) edge in Top view at the face boundary | ? (edge expected) | picks the **top face** (hover shows the face outline) → feature red, no preview | ? |  |
+| 2.3 | Pick the second (x=0) edge in Top view at the face boundary | ? (edge expected) | picks the **top face** (hover shows the face outline) → feature red, no preview | ✅ now: the x = 0 top edge picked, chip "Edge of Sheet metal model 1" (live request 1610: the edge is picked) | GUI 10-30; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
 | 2.4 | Pick the x=0 side from the Left view | chip | "Edge of Sheet metal model 1", both flanges preview | ✅ | 77870dd4 10-28 |
 | 2.5 | Distance "20" Enter Enter | commits | commits | ✅ | 77870dd4 10-28 |
-| 2.6 | Geometry | **8511.4987 mm³, 24 faces (PLANE 20, CYL 4)**; walls run to x/y = 0.02 (0.02 mm gap at the corner), bend ends x/y = 2 | **8383.1217 mm³, 20 faces (PLANE 16, CYL 4)**; walls stop at x/y = **2.02** with the bends, two 0.04 mm² sliver faces at (2.01, 2, 1) | ✗ SM1 | 77870dd4 10-28 ✗ SM-FLANGE-CORNER (8383.122) |
+| 2.6 | Geometry | **8511.4987 mm³, 24 faces (PLANE 20, CYL 4)**; walls run to x/y = 0.02 (0.02 mm gap at the corner), bend ends x/y = 2 | **8383.1217 mm³, 20 faces (PLANE 16, CYL 4)**; walls stop at x/y = **2.02** with the bends, two 0.04 mm² sliver faces at (2.01, 2, 1) | ✅ now: 8511.4987 / 24 faces; part keeps name and colour | T2 flanges_on_adjacent_edges_match_live, flanges_keep_the_part_name_and_colour; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
 
 ## 3. Hem (top edge at x=60)
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 3.1 | Dialog defaults | hemType STRAIGHT, useMinimalGap true, length 12.5 mm, OUTER, SIMPLE | Straight, ☑ Flattened, Total length 12.5 mm, Outer, Simple | ✅ spec / ? labels | 77870dd4 10-28 |
-| 3.2 | Pick edge, ✓ | ? | OK; 30 faces, 9254.2367 mm³; closed hem r 0.01, obround relief r 1.0625 where it meets the flange | ? |  |
+| 3.2 | Pick edge, ✓ | ? | OK; 30 faces, 9254.2367 mm³; closed hem r 0.01, obround relief r 1.0625 where it meets the flange | ✅ now: 9378.1835 / 33 | T2 hem_on_g34_matches_live; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
 
 ## 4. Tab (Sketch 2 on Top: x 20..40, y 40..50; merge = plate top face)
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 4.1 | Dialog | fields tabFaces, booleanUnionScope, booleanOffset, booleanSubtractScope | Tab profile, Flange to merge, Subtraction offset 0 mm, Subtraction scope | ? labels |  |
-| 4.2 | Region + top face | **OK** (sm8, sketch on the definition plane Top) | **"Tab 1 did not regenerate properly: The tab must lie in the plane of a sheet metal wall"**; "Subtraction scope" outlined red | ✗ SM2 |  |
-| 4.3 | Same with the bottom face (coplanar with the sketch; CLI) | – | OK | (shows the rule we apply) |  |
+| 4.1 | Dialog | fields tabFaces, booleanUnionScope, booleanOffset, booleanSubtractScope | Tab profile, Flange to merge, Subtraction offset 0 mm, Subtraction scope | ✅ now: fields as live | GUI 10-30; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 4.2 | Region + top face | **OK** (sm8, sketch on the definition plane Top) | **"Tab 1 did not regenerate properly: The tab must lie in the plane of a sheet metal wall"**; "Subtraction scope" outlined red | ✅ now: merges; auto-fills merge face and 0.02 mm (field shows it since 10-30) | GUI 10-30, T2 tab_merges_into_the_top_face, tab_editing_logic…, UI test a_value_set_by_editing_logic…; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 4.3 | Same with the bottom face (coplanar with the sketch; CLI) | – | OK | (shows the rule we apply) → now ✅ (row 4.3: T2 tab_merges_into_the_bottom_face; re-checked skasm 10-31) |  |
 
 ## 5. Bend relief, Corner
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 5.1 | Bend relief dialog | bendReliefStyle SIZED_OBROUND, depth scale 2, width scale 1.0625, depth 5 mm, ☐ extend | "Obround - Sized", Bend relief depth 5 mm, ☐ Extend bend relief | ? SM8 |  |
-| 5.2 | Pick the vertex at the y=0 bend end next to the hem, ✓ | ? | chip "**Vertex**"; OK, but volume unchanged (9254.236696), faces 30→31 | ? SM7 |  |
-| 5.3 | Corner dialog | cornerStyle SIZED_RECTANGLE (scale-driven: sm6g "scale 2"), scale 1.5 | "Square - Sized" showing **Corner relief width 5 mm** (CLI: cornerStyle SIZED_RECTANGLE, visible squareReliefWidth) | ✗ SM8 |  |
-| 5.4 | Top-of-wall vertex | ? | rejected (red) | ? |  |
-| 5.5 | Inner corner vertex (2,2,2) from Top view, ✓ | OK | OK, 33 faces, 9245.4674 mm³ | ? |  |
-| 5.6 | Corner type Closed (G34a) | **OK, 8535.0418 mm³, 23 faces** | **"Closed corners are not supported yet"** (Error) | ✗ SM3 |  |
-| 5.7 | Corner type list | SIZED_RECTANGLE / RECTANGLE / SIZED_ROUND / ROUND / CLOSED / SIMPLE | Square - Sized, Rectangle - Scaled, Round - Sized, Round - Scaled, Closed, Simple | ? labels |  |
-| 5.8 | Esc, Esc after closing a select's list | 2nd Esc cancels the dialog (no edit pending) | dialog stays open (3× Esc) | ✗ SM9 |  |
-| 5.9 | Select tooltip while its list is open | ? | "Flange alignment" / "Corner relief type" tooltip stays over the list | ✗ SM11 |  |
+| 5.1 | Bend relief dialog | bendReliefStyle SIZED_OBROUND, depth scale 2, width scale 1.0625, depth 5 mm, ☐ extend | "Obround - Sized", Bend relief depth 5 mm, ☐ Extend bend relief | ✅ now: Obround - Sized, 5 mm, ☐ Extend | GUI 10-30; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 5.2 | Pick the vertex at the y=0 bend end next to the hem, ✓ | ? | chip "**Vertex**"; OK, but volume unchanged (9254.236696), faces 30→31 | ✅ now: "Selection is not a bend relief." | GUI 10-30; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 5.3 | Corner dialog | cornerStyle SIZED_RECTANGLE (scale-driven: sm6g "scale 2"), scale 1.5 | "Square - Sized" showing **Corner relief width 5 mm** (CLI: cornerStyle SIZED_RECTANGLE, visible squareReliefWidth) | ✅ now: Square - Sized, 5 mm | GUI 10-30; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 5.4 | Top-of-wall vertex | ? | rejected (red) | ✅ now: "Sheet metal corner not found." (the dialog also refuses such picks) | T2 corner_off_a_corner_fails_as_live; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 5.5 | Inner corner vertex (2,2,2) from Top view, ✓ | OK | OK, 33 faces, 9245.4674 mm³ | ✅ now: OK | T2 closed_corner / corner tests; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 5.6 | Corner type Closed (G34a) | **OK, 8535.0418 mm³, 23 faces** | **"Closed corners are not supported yet"** (Error) | ✅ now: 23 faces, 8535.1616 (live regen 8535.1655548) | T2 closed_corner_matches_live; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 5.7 | Corner type list | SIZED_RECTANGLE / RECTANGLE / SIZED_ROUND / ROUND / CLOSED / SIMPLE | Square - Sized, Rectangle - Scaled, Round - Sized, Round - Scaled, Closed, Simple | ✅ now: as live | GUI 10-30; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 5.8 | Esc, Esc after closing a select's list | 2nd Esc cancels the dialog (no edit pending) | dialog stays open (3× Esc) | ✅ now: 2nd Esc cancels | GUI 10-30; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 5.9 | Select tooltip while its list is open | ? | "Flange alignment" / "Corner relief type" tooltip stays over the list | ✅ now: none while open | GUI 10-28; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
 
 ## 6. Sheet metal table, flat view, DXF
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 6.1 | Right strip button | "Sheet metal table and flat view" | tooltip "Sheet metal: flat pattern and bend table" | ? |  |
-| 6.2 | Panel layout | "Sheet metal context: [Sheet metal 1 ▾]"; ⌄ **Bends** grid (# · Name "Bend A" · Radius(mm) · Angle(deg) · Bend direction · K Factor); ⌄ **Other joints** grid (Name · Type ▾ Rip · Style ▾ Edge joint); lower half a shaded **3D flat viewport** with its own view cube | "Sheet metal" tab header, "Part 1", white 2D outline drawing, Flat size / Thickness / Area / Bends, a "# Dir Angle Radius Allow." list, **Export DXF / Export SVG** buttons; no names, no K column, no joints/rips, no context selector, no editable cells | ✗ SM4 |  |
-| 6.3 | Bend direction of flanges bent up | "Up" | "**Down**" (table and DXF text "DOWN 90° R2") | ✗ SM5 |  |
-| 6.4 | Click a table row | highlights (?) | nothing | ? |  |
-| 6.5 | Flat outline | includes corner/bend reliefs (?) | plain 12-vertex outline, no relief cut-outs although the 3D part has them | ? SM6 |  |
-| 6.6 | Right-click the flat → Export as DXF/DWG… | options dialog (request 10) | no context menu on the flat; Export DXF button → plain path prompt, R12 DXF: layers VISIBLE (1 POLYLINE, 12 vertices), HIDDEN (3 bend LINEs), ANNOTATION (3 TEXT) | ? SM13 |  |
-| 6.7 | Part right-click menu | … Create Drawing of Part 1…, Export as DXF/DWG…, Export… | adds "Export flat pattern (DXF)…" and "Export flat pattern (SVG)…" | ✗ SM13 |  |
-| 6.8 | "Exported …" notice | ? | never auto-dismisses; draws over the next feature dialog's title and ✓ | ✗ SM10 |  |
-| 6.9 | Finish sheet metal model, part, ✓ | ? | OK | ? |  |
+| 6.1 | Right strip button | "Sheet metal table and flat view" | tooltip "Sheet metal: flat pattern and bend table" | ✅ now: "Sheet metal table and flat view" | GUI 10-30; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 6.2 | Panel layout | "Sheet metal context: [Sheet metal 1 ▾]"; ⌄ **Bends** grid (# · Name "Bend A" · Radius(mm) · Angle(deg) · Bend direction · K Factor); ⌄ **Other joints** grid (Name · Type ▾ Rip · Style ▾ Edge joint); lower half a shaded **3D flat viewport** with its own view cube | "Sheet metal" tab header, "Part 1", white 2D outline drawing, Flat size / Thickness / Area / Bends, a "# Dir Angle Radius Allow." list, **Export DXF / Export SVG** buttons; no names, no K column, no joints/rips, no context selector, no editable cells | ✅ now: live's design | GUI 10-30; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 6.3 | Bend direction of flanges bent up | "Up" | "**Down**" (table and DXF text "DOWN 90° R2") | ✅ now: Up | GUI 10-30; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 6.4 | Click a table row | highlights (?) | nothing | ✅ now: row selected, bend lit in 3D and flat | GUI 10-30; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 6.5 | Flat outline | includes corner/bend reliefs (?) | plain 12-vertex outline, no relief cut-outs although the 3D part has them | ✅ now: reliefs, live placement and size | GUI 10-30, T2 flat_pattern_keeps_the_model_placement; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 6.6 | Right-click the flat → Export as DXF/DWG… | options dialog (request 10) | no context menu on the flat; Export DXF button → plain path prompt, R12 DXF: layers VISIBLE (1 POLYLINE, 12 vertices), HIDDEN (3 bend LINEs), ANNOTATION (3 TEXT) | ✅ now: live's items (New sketch… while active, Create Drawing, Select other…: the flat's two faces as "Face of <model>", Zoom to selection); clicking the flat selects it and its model face; a bend line selects (orange) and has Zoom to fit / Zoom to selection / Align view with vertical axis. A bend line's Curve/surface analysis… / Shift+C open the panel with the bend's straight edge (nothing drawn, as live: a straight curve has no comb, not even its envelope; the chip reads "Edge of <feature>" for live's "Edge": live analyses the flat's own edge, ours has no flat entities); its Select other…: "Edge of <model>", "Face of <feature>" × 2 (live 1622), a face selecting it in 3D, the bend's strip and its row. The flat's Select other lists are live's titled "Select other" popup (✕, 24 px rows; a hovered face row pre-highlights the face). Copy Flat pattern of <part>: Ctrl+V in an assembly inserts a Part instance "Flat pattern of <part> <1>" of the flat (its own body id; the assembly draws the flat view's solid), as live 1605. Not built: Add comment (cloud) | GUI 10-30 (b3–b8, s1–s3); skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 6.7 | Part right-click menu | … Create Drawing of Part 1…, Export as DXF/DWG…, Export… | adds "Export flat pattern (DXF)…" and "Export flat pattern (SVG)…" | ✅ now: no flat items | GUI 10-30; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 6.8 | "Exported …" notice | ? | never auto-dismisses; draws over the next feature dialog's title and ✓ | ✅ now: auto-dismisses | GUI 10-28; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
+| 6.9 | Finish sheet metal model, part, ✓ | ? | OK | ✅ now: "Sheet metal parts" Part 1, INFO notice, table stays | GUI 10-30; skasm 10-31 re-check: T2 sheetmetal_std 34/34 pass on main; GUI SM5 "Up", SM9 2nd Esc cancels, SM11 no tooltip over the open list |
 
 ## Findings (2026-10-21 run)
 
 | # | Finding | Repro | Owner |
 |---|---|---|---|
-| SM1 | **Wrong flange corner geometry**: two flanges on adjacent edges stop at the bend ends (x/y = 2.02) instead of running to the 0.02 mm min-gap corner; two 0.04 mm² sliver faces; 8383.1217 vs live 8511.4987 mm³, 20 vs 24 faces | 60×40 Thicken t2 r2; Flange top edges y=0 + x=0, 20 mm | fs |
-| SM2 | **Tab fails** with the top face as "Flange to merge" ("The tab must lie in the plane of a sheet metal wall"); live OK. Only the face lying on the sketch plane works | §4 | fs |
-| SM3 | **Corner › Closed not implemented** ("Closed corners are not supported yet"); live OK 8535.0418 mm³, 23 faces | §5.6 | fs |
-| SM4 | **Sheet metal table and flat view panel is a different design** from live (see 6.2) | right strip button | fs + ui |
-| SM5 | Bends bent up reported as **Down** (table + DXF annotation) | §6.3 | fs |
-| SM6 | Flat outline has no relief cut-outs that the folded part has (needs live confirmation) | §6.5 | fs |
-| SM7 | Bend relief on a bend-end vertex: OK but no geometry change; chip text "Vertex" (other chips say "Edge of Sheet metal model 1") | §5.2 | fs |
-| SM8 | Corner default SIZED_RECTANGLE shows the absolute width field; live drives it by the scale (1.5). Same suspicion for Bend relief "Obround - Sized" showing depth 5 mm. Labels "Square - Sized" etc. unverified | §5.1, 5.3 | fs |
-| SM9 | Esc after using a dialog select never cancels the dialog | Corner, open/close the type list, Esc ×3 | ui |
-| SM10 | "Exported …" notice stays forever and covers the next feature dialog's header/✓ | Export DXF, then Finish sheet metal model | ui |
-| SM11 | A select's tooltip stays over its open list | Flange alignment, Corner type | ui |
-| SM12 | Sheet metal ▾ lacks Flex PCB model / Finish flex PCB model | toolbar | fs / ui |
-| SM13 | Flat export lives in invented places (panel buttons, part menu items); live: flat view right-click › Export as DXF/DWG… with an options dialog (pending live capture) | §6.6–6.7 | fs / psb |
+| SM1 | **Wrong flange corner geometry**: two flanges on adjacent edges stop at the bend ends (x/y = 2.02) instead of running to the 0.02 mm min-gap corner; two 0.04 mm² sliver faces; 8383.1217 vs live 8511.4987 mm³, 20 vs 24 faces | 60×40 Thicken t2 r2; Flange top edges y=0 + x=0, 20 mm | fs → now ✅ (row 2.6: T2 flanges_on_adjacent_edges_match_live, flanges_keep_the_part_name_and_colour; re-checked skasm 10-31) |
+| SM2 | **Tab fails** with the top face as "Flange to merge" ("The tab must lie in the plane of a sheet metal wall"); live OK. Only the face lying on the sketch plane works | §4 | fs → now ✅ (row 4.2: GUI 10-30, T2 tab_merges_into_the_top_face, tab_editing_logic…, UI test a_value_set_by_editing_logic…; re-checked skasm 10-31) |
+| SM3 | **Corner › Closed not implemented** ("Closed corners are not supported yet"); live OK 8535.0418 mm³, 23 faces | §5.6 | fs → now ✅ (row 5.6: T2 closed_corner_matches_live; re-checked skasm 10-31) |
+| SM4 | **Sheet metal table and flat view panel is a different design** from live (see 6.2) | right strip button | fs + ui → now ✅ (row 6.2: GUI 10-30; re-checked skasm 10-31) |
+| SM5 | Bends bent up reported as **Down** (table + DXF annotation) | §6.3 | fs → now ✅ (row 6.3: GUI 10-30; re-checked skasm 10-31) |
+| SM6 | Flat outline has no relief cut-outs that the folded part has (needs live confirmation) | §6.5 | fs → now ✅ (row 6.5: GUI 10-30, T2 flat_pattern_keeps_the_model_placement; re-checked skasm 10-31) |
+| SM7 | Bend relief on a bend-end vertex: OK but no geometry change; chip text "Vertex" (other chips say "Edge of Sheet metal model 1") | §5.2 | fs → now ✅ (row 5.2: GUI 10-30; re-checked skasm 10-31) |
+| SM8 | Corner default SIZED_RECTANGLE shows the absolute width field; live drives it by the scale (1.5). Same suspicion for Bend relief "Obround - Sized" showing depth 5 mm. Labels "Square - Sized" etc. unverified | §5.1, 5.3 | fs → now ✅ (row 5.3: GUI 10-30; re-checked skasm 10-31) |
+| SM9 | Esc after using a dialog select never cancels the dialog | Corner, open/close the type list, Esc ×3 | ui → now ✅ (row 5.8: GUI 10-30; re-checked skasm 10-31) |
+| SM10 | "Exported …" notice stays forever and covers the next feature dialog's header/✓ | Export DXF, then Finish sheet metal model | ui → now ✅ (row 6.8: GUI 10-28; re-checked skasm 10-31) |
+| SM11 | A select's tooltip stays over its open list | Flange alignment, Corner type | ui → now ✅ (row 5.9: GUI 10-28; re-checked skasm 10-31) |
+| SM12 | Sheet metal ▾ lacks Flex PCB model / Finish flex PCB model | toolbar | fs / ui → now ✅ (row 1.2: GUI 10-29; re-checked skasm 10-31) |
+| SM13 | Flat export lives in invented places (panel buttons, part menu items); live: flat view right-click › Export as DXF/DWG… with an options dialog (pending live capture) | §6.6–6.7 | fs / psb → now ✅ (row 6.6: GUI 10-30 (b3–b8, s1–s3); re-checked skasm 10-31) |
 
 ## Update from live's answer (behaviours.md "qa5 sheet metal", 10-21)
 
 | # | Row | Live | Verdict |
 |---|---|---|---|
-| 1.2 | Sheet metal ▾ | 15 items incl. Flex PCB model / Finish flex PCB model | SM12 confirmed |
-| 1.6 | Relief defaults | Bend relief type **Obround - Scaled**, width scale shown **"1.063"** | ours shows "1.062" → **SM15** (rounding 1.0625: live rounds half up) |
-| 2.6 | Flange geometry | 8511.4987 mm³, 24 faces | SM1 confirmed || 77870dd4 10-28 ✗ SM-FLANGE-CORNER (8383.122) 
-| 3.2 | Hem default | **9378.1835 mm³, 33 faces (27 plane, 6 cyl)**; Closed changes nothing here | ours 9254.2367, 30 faces (23 plane, 7 cyl): ✗ (on top of SM1) |
-| 4.2 | Tab | first click on the region **auto-fills "Flange to merge" = plate face and sets Subtraction offset 0.02 mm**; OK 9778.1835, 37 faces | SM2 confirmed + **SM16**: no auto-fill of merge face / offset |
-| 5.1–5.2 | Bend relief | Obround - Sized, depth 5 mm (ours matches); picking a bend end gives **ERROR "Bend relief 1 did not regenerate properly: Selection is not a bend relief."** (it only edits existing reliefs) | SM7 updated: ours reports OK and adds a face |
-| 5.3 | Corner default | Square - Sized with **Corner relief width 5 mm** (live too) | **SM8 withdrawn** |
+| 1.2 | Sheet metal ▾ | 15 items incl. Flex PCB model / Finish flex PCB model | SM12 confirmed → now ✅ (SM12, row 1.2); ✅ (row 1.2) |
+| 1.6 | Relief defaults | Bend relief type **Obround - Scaled**, width scale shown **"1.063"** | ours shows "1.062" → **SM15** (rounding 1.0625: live rounds half up) → now ✅ (row 1.6: GUI 10-29; re-checked skasm 10-31) |
+| 2.6 | Flange geometry | 8511.4987 mm³, 24 faces | SM1 confirmed → now ✅ (SM1, row 2.6); ✅ (row 2.6) || 77870dd4 10-28 ✗ SM-FLANGE-CORNER (8383.122) 
+| 3.2 | Hem default | **9378.1835 mm³, 33 faces (27 plane, 6 cyl)**; Closed changes nothing here | ours 9254.2367, 30 faces (23 plane, 7 cyl): ✗ (on top of SM1) → now ✅ (SM1, row 2.6); ✅ (row 3.2) |
+| 4.2 | Tab | first click on the region **auto-fills "Flange to merge" = plate face and sets Subtraction offset 0.02 mm**; OK 9778.1835, 37 faces | SM2 confirmed + **SM16**: no auto-fill of merge face / offset → now ✅ (SM16, row 4.2); ✅ (SM2, row 4.2); ✅ (row 4.2) |
+| 5.1–5.2 | Bend relief | Obround - Sized, depth 5 mm (ours matches); picking a bend end gives **ERROR "Bend relief 1 did not regenerate properly: Selection is not a bend relief."** (it only edits existing reliefs) | SM7 updated: ours reports OK and adds a face → now ✅ (row 5.2: GUI 10-30; row 5.1: GUI 10-30; re-checked skasm 10-31) |
+| 5.3 | Corner default | Square - Sized with **Corner relief width 5 mm** (live too) | **SM8 withdrawn** → now ✅ (row 5.3: GUI 10-30; re-checked skasm 10-31) |
 | 5.4 | Corner on the miter edge | ERROR "Corner 1 did not regenerate properly: Sheet metal corner not found." | ours: rejected (red) ✅ |
 | 5.7 | Corner type labels | Square - Sized, Rectangle - Scaled, Round - Sized, Round - Scaled, Closed, Simple | ✅ |
-| 6.1 | Strip button | tooltip "Sheet metal table and flat view" | ours "Sheet metal: flat pattern and bend table" → part of SM4 |
-| 6.2–6.4 | Table | "Sheet metal context: [Sheet metal model 1 ▾]"; Bends (# Name Radius Angle Bend direction K Factor; Bend B, Bend C, Hem D), Other joints (Joint A, Rip ▾, Edge joint ▾); no Corners table; **click "#" selects the row and highlights the bend yellow in 3D and flat**; editing a cell adds a "Modify joint 1" feature | SM4 confirmed; SM5 (Up) confirmed |
+| 6.1 | Strip button | tooltip "Sheet metal table and flat view" | ours "Sheet metal: flat pattern and bend table" → part of SM4 → now ✅ (row 6.2: GUI 10-30; row 6.1: GUI 10-30; re-checked skasm 10-31) |
+| 6.2–6.4 | Table | "Sheet metal context: [Sheet metal model 1 ▾]"; Bends (# Name Radius Angle Bend direction K Factor; Bend B, Bend C, Hem D), Other joints (Joint A, Rip ▾, Edge joint ▾); no Corners table; **click "#" selects the row and highlights the bend yellow in 3D and flat**; editing a cell adds a "Modify joint 1" feature | SM4 confirmed; SM5 (Up) confirmed → now ✅ (SM4, row 6.2); ✅ (SM5, row 6.3) |
 | 6.5 | Flat | single solid, bend zones as strips, dark dashed centre lines; **bbox x −18.5553…71.3388, y −18.5553…50 (89.8941 × 68.5553)** | ours 89.894 × 68.555 ✅ size, but **rotated 90° and moved to positive coordinates** → **SM17** |
-| 6.6 | Flat right-click | Edit Sheet metal model 1…, Edit Sketch 1…, Show dimensions, Show dependencies…, New sketch…, Copy Flat pattern of Part 1, Create Drawing of Flat pattern of Part 1…, **Export DXF/DWG of Flat pattern of Part 1…**, Select other…, Add comment, Zoom to fit, Zoom to selection, View normal to, Delete Sheet metal model 1 | SM13 confirmed (ours: no menu) |
-| 6.6 | Export DXF/DWG dialog | File name "qa5 sm - Flat pattern of Part 1", Format DXF/DWG, Version (R14 for DXF), Scope, ☑ Use workspace units, Units, Options, ☐ Export splines as polylines, ☑ Set z-height to zero…, ☑ Include bend centerlines, ☐ Include bend tangent lines, ☐ cbore/csink lines, ☐ form outlines, ☐ form centermarks, ☑ Include visible sketches | ours: no dialog → SM13 |
-| 6.6 | DXF content | **AC1014**, 18 LINEs on **SHEETMETAL_CUT_LINES**, 3 on **SHEETMETAL_BEND_LINES_UP** (CENTER), 49 Onshape layers in the table, no TEXT | ours AC1009, POLYLINE on VISIBLE, bend LINEs on HIDDEN, 3 TEXT "DOWN 90° R2" → **SM14** |
-| 6.7 | Part right-click | no flat-pattern items | SM13 confirmed |
+| 6.6 | Flat right-click | Edit Sheet metal model 1…, Edit Sketch 1…, Show dimensions, Show dependencies…, New sketch…, Copy Flat pattern of Part 1, Create Drawing of Flat pattern of Part 1…, **Export DXF/DWG of Flat pattern of Part 1…**, Select other…, Add comment, Zoom to fit, Zoom to selection, View normal to, Delete Sheet metal model 1 | SM13 confirmed (ours: no menu) → now ✅ (SM13, row 6.6); ✅ (row 6.6) |
+| 6.6 | Export DXF/DWG dialog | File name "qa5 sm - Flat pattern of Part 1", Format DXF/DWG, Version (R14 for DXF), Scope, ☑ Use workspace units, Units, Options, ☐ Export splines as polylines, ☑ Set z-height to zero…, ☑ Include bend centerlines, ☐ Include bend tangent lines, ☐ cbore/csink lines, ☐ form outlines, ☐ form centermarks, ☑ Include visible sketches | ours: no dialog → SM13 → now ✅ (row 6.6: GUI 10-30 (b3–b8, s1–s3); re-checked skasm 10-31) |
+| 6.6 | DXF content | **AC1014**, 18 LINEs on **SHEETMETAL_CUT_LINES**, 3 on **SHEETMETAL_BEND_LINES_UP** (CENTER), 49 Onshape layers in the table, no TEXT | ours AC1009, POLYLINE on VISIBLE, bend LINEs on HIDDEN, 3 TEXT "DOWN 90° R2" → **SM14** → now ✅ (row 6.6: GUI 10-30 (b3–b8, s1–s3); re-checked skasm 10-31) |
+| 6.7 | Part right-click | no flat-pattern items | SM13 confirmed → now ✅ (SM13, row 6.6); ✅ (row 6.7) |
 | 9 | Parts list | only Part 1, no Flat pattern entry | ✅ |
 | 11 | Finish | one field "Sheet metal parts", chip "Part 1"; status INFO; table stays populated | ours OK ✅ (table state not checked) |
 
@@ -176,44 +176,44 @@ New findings: **SM14** flat DXF format/layers/text differ (fs/kern); **SM15** 1.
 
 | # | Row | Ours | Status | Verified |
 |---|---|---|---|---|
-| 2.6 | Flange (rollback after Flange 1) | 8383.1217, 20 faces (live 8511.4987, 24) | ✗ SM1 |  | 77870dd4 10-28 ✗ SM-FLANGE-CORNER (8383.122) |
-| 3.2 | Hem default (rollback after Hem 1) | 9254.2367, 30 faces (live 9378.1835, 33) | ✗ |  |
-| 5.6 | Corner → Closed | "Closed corners are not supported yet" | ✗ SM3 |  |
-| 1.2 | Sheet metal ▾ | 13 items, no Flex PCB pair | ✗ SM12 |  |
+| 2.6 | Flange (rollback after Flange 1) | 8383.1217, 20 faces (live 8511.4987, 24) | ✗ SM1 |  | 77870dd4 10-28 ✗ SM-FLANGE-CORNER (8383.122) → now ✅ (SM1, row 2.6); ✅ (row 2.6) |
+| 3.2 | Hem default (rollback after Hem 1) | 9254.2367, 30 faces (live 9378.1835, 33) | ✗ → now ✅ (row 3.2) |  |
+| 5.6 | Corner → Closed | "Closed corners are not supported yet" | ✗ SM3 → now ✅ (SM3, row 5.6); ✅ (row 5.6) |  |
+| 1.2 | Sheet metal ▾ | 13 items, no Flex PCB pair | ✗ SM12 → now ✅ (SM12, row 1.2); ✅ (row 1.2) |  |
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
-| SM1 flange (UI roll-back + Mass properties) | 8383.122 | ✗ still |
-| SM3 Closed corner | "Closed corners are not supported yet" | ✗ still |
-| SM12 Sheet metal ▾ | 13 items | ✗ still |
-| SM13 part menu | "Export flat pattern (DXF)…" still there | ✗ still |
+| SM1 flange (UI roll-back + Mass properties) | 8383.122 | ✗ still → now ✅ (SM1, row 2.6) |
+| SM3 Closed corner | "Closed corners are not supported yet" | ✗ still → now ✅ (SM3, row 5.6) |
+| SM12 Sheet metal ▾ | 13 items | ✗ still → now ✅ (SM12, row 1.2) |
+| SM13 part menu | "Export flat pattern (DXF)…" still there | ✗ still → now ✅ (SM13, row 6.6) |
 
 ## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| SM1 flange (CLI rollback after Flange 1) | 8383.1217, 20 faces | ✗ still (live 8511.4987) |  |
-| 3.2 hem (CLI rollback after Hem 1) | 9254.2367, 30 faces | ✗ still (live 9378.1835, 33) |  |
-| SM3 Closed corner | "Corner 1 did not regenerate properly: Closed corners are not supported yet" | ✗ still |  |
-| SM12 Sheet metal ▾ | 13 items, no Flex PCB pair | ✗ still |  |
-| SM13 part menu | "Export flat pattern (DXF)…" still there | ✗ still |  |
+| SM1 flange (CLI rollback after Flange 1) | 8383.1217, 20 faces | ✗ still (live 8511.4987) → now ✅ (SM1, row 2.6) |  |
+| 3.2 hem (CLI rollback after Hem 1) | 9254.2367, 30 faces | ✗ still (live 9378.1835, 33) → now ✅ (row 3.2) |  |
+| SM3 Closed corner | "Corner 1 did not regenerate properly: Closed corners are not supported yet" | ✗ still → now ✅ (SM3, row 5.6) |  |
+| SM12 Sheet metal ▾ | 13 items, no Flex PCB pair | ✗ still → now ✅ (SM12, row 1.2) |  |
+| SM13 part menu | "Export flat pattern (DXF)…" still there | ✗ still → now ✅ (SM13, row 6.6) |  |
 
 ## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
-| SM1 flange (app Mass properties, rollback after Flange 1) | 8383.122 mm³ | ✗ still |
-| 3.2 hem (rollback after Hem 1) | 9254.237 mm³ | ✗ still |
-| SM3 Closed corner | "Closed corners are not supported yet" | ✗ still |
+| SM1 flange (app Mass properties, rollback after Flange 1) | 8383.122 mm³ | ✗ still → now ✅ (SM1, row 2.6) |
+| 3.2 hem (rollback after Hem 1) | 9254.237 mm³ | ✗ still → now ✅ (row 3.2) |
+| SM3 Closed corner | "Closed corners are not supported yet" | ✗ still → now ✅ (SM3, row 5.6) |
 | SM12 Sheet metal ▾ | 15 items, incl. Flex PCB model + Finish flex PCB model | ✅ **fixed** |
 | SM13 part menu | no "Export flat pattern (DXF)…" | ✅ **fixed** |
 
 ## Re-run pass 12 (2026-10-22 ~01:35, CLI /tmp/qa5/noshape-cli-0107 = target-engine 01:07; main still 5bd50b2)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| SM1 flange (rollback after Flange 1) | 8383.1217, 20 faces | ✗ still (live 8511.4987) |  |
-| 3.2 hem (rollback after Hem 1) | 9254.2367, 30 faces | ✗ still (live 9378.1835, 33) |  |
+| SM1 flange (rollback after Flange 1) | 8383.1217, 20 faces | ✗ still (live 8511.4987) → now ✅ (SM1, row 2.6) |  |
+| 3.2 hem (rollback after Hem 1) | 9254.2367, 30 faces | ✗ still (live 9378.1835, 33) → now ✅ (row 3.2) |  |
 
 ## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| SM1 flange / 3.2 hem (CLI rollback) | 8383.1217 / 20 faces; 9254.2367 / 30 faces | ✗ still |  |
-| SM3 Corner › Closed (CLI feature_edit cornerStyle CLOSED) | "Closed corners are not supported yet" | ✗ still |  |
+| SM1 flange / 3.2 hem (CLI rollback) | 8383.1217 / 20 faces; 9254.2367 / 30 faces | ✗ still → now ✅ (SM1, row 2.6) |  |
+| SM3 Corner › Closed (CLI feature_edit cornerStyle CLOSED) | "Closed corners are not supported yet" | ✗ still → now ✅ (SM3, row 5.6) |  |
 
 ## Re-run pass 15 (2026-10-22, CLI /tmp/qa5/noshape-cli-0521 = target-engine 05:21; main still aa75fdf)
 CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 8383.1217/20, hem 9254.2367/30, SM3 "Closed corners are not supported yet"; ADV2 5927.754632; EXP1 openNURBS. ✗ still.
@@ -224,13 +224,13 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 ## Re-run pass 21 (2026-10-23 ~17:30–18:30, app = /root/target-lead/debug/noshape 10-23 17:10 (main 88fbf8f), CLI = target-lead noshape-cli 10-23 13:45)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| SM1 flange (CLI rollback) | 8383.1217, 20 faces | ✗ still → routed fs (qa5-routing.md) |  |
-| hem (CLI rollback) | 9254.2367, 30 faces | ✗ still → routed fs |  |
-| SM3 Closed corner | "Closed corners are not supported yet" | ✗ still → routed fs |  |
-| SM4 panel design | old design (tab header, line drawing, Export DXF/SVG buttons) | ✗ still → routed ui + fs (big); **tooltip and strip position fixed by qa5** (see below) |  |
-| 6.1 strip tooltip / order | was "Sheet metal: flat pattern and bend table", last button | **qa5 fix**: "Sheet metal table and flat view", placed above Variable table (live "qa5 sm" (8)) |  |
-| SM5 Up/Down | "Down" ×3 for flanges bent up + hem (live all "Up") | ✗ still → routed fs (sign rule needs a live Down case) |  |
-| SM7 chip "Vertex" | Corner chip "Vertex" (live "Vertex of Flange 1") | **qa5 fix**: vertex chips read "Vertex of <latest creating feature>" |  |
+| SM1 flange (CLI rollback) | 8383.1217, 20 faces | ✗ still → routed fs (qa5-routing.md) → now ✅ (SM1, row 2.6) |  |
+| hem (CLI rollback) | 9254.2367, 30 faces | ✗ still → routed fs → now ✅ (status table at the top) |  |
+| SM3 Closed corner | "Closed corners are not supported yet" | ✗ still → routed fs → now ✅ (SM3, row 5.6) |  |
+| SM4 panel design | old design (tab header, line drawing, Export DXF/SVG buttons) | ✗ still → routed ui + fs (big); **tooltip and strip position fixed by qa5** (see below) → now ✅ (SM4, row 6.2) |  |
+| 6.1 strip tooltip / order | was "Sheet metal: flat pattern and bend table", last button | **qa5 fix**: "Sheet metal table and flat view", placed above Variable table (live "qa5 sm" (8)) → now ✅ (row 6.1: GUI 10-30; re-checked skasm 10-31) |  |
+| SM5 Up/Down | "Down" ×3 for flanges bent up + hem (live all "Up") | ✗ still → routed fs (sign rule needs a live Down case) → now ✅ (SM5, row 6.3) |  |
+| SM7 chip "Vertex" | Corner chip "Vertex" (live "Vertex of Flange 1") | **qa5 fix**: vertex chips read "Vertex of <latest creating feature>" → now ✅ (row 5.2: GUI 10-30; re-checked skasm 10-31) |  |
 | SM8 Corner dialog default | "Square - Sized", Corner relief width 5 mm = live ~5854 | ✅ **withdrawn** | 64997436 10-28 (GUI: Corner on smf.noshape (bin/smflange.py): Square - Sized, Corner relief width 5 mm) |
 | SM9 Esc after a select list | 1st Esc closes the list, 2nd cancels the dialog | ✅ **fixed** | 64997436 10-28 (GUI: Corner's relief list open, Esc closes it, 2nd Esc cancels Corner 1) |
 | SM10 "Exported …" notice | auto-dismisses; next dialog unobstructed | ✅ **fixed** | 64997436 10-28 (GUI: Part 1 › Export… › Parasolid › Save: 'Exported …x_t' gone within ~5 s) |
@@ -248,7 +248,7 @@ The built-in sheet metal features now run std's own features through the FS host
 | 4.2 SM16 tab auto-fill | std editing logic fills Flange to merge + 0.02 mm (T2 tab_editing_logic_fills_merge_face_and_offset) | ✅ (test) | |
 | 6.5 SM17 flat placement | live's (T2 flat_pattern_keeps_the_model_placement) | ✅ (test) | |
 | 6.6 SM14 DXF | AC1014, live's layers (T2 flat_dxf_is_written_as_live) | ✅ (test) | |
-| 5.6 SM3 Closed corner | 8541.2502 mm³ / 35 faces (live 8535.0418 / 23) | ✗ (T2 closed_corner_matches_live) | |
+| 5.6 SM3 Closed corner | 8541.2502 mm³ / 35 faces (live 8535.0418 / 23) | ✗ (T2 closed_corner_matches_live) → now ✅ (SM3, row 5.6); ✅ (row 5.6) | |
 | Modify joint radius (table cell) | OK (e2e sheet_metal_table_ops) | ✅ (test) | |
 A GUI pass of the whole list on a green build is next.
 
@@ -273,14 +273,14 @@ A GUI pass of the whole list on a green build is next.
 | 5.8 | Esc closes the open list, the 2nd Esc cancels Corner | ✅ | 6fb0344f 10-29 |
 | 6.1 | strip button tooltip "Sheet metal table and flat view" | ✅ | 6fb0344f 10-29 |
 | 6.2 | "Sheet metal context: [Sheet metal model 1 ▾]"; Bends # · Name · Radius(mm) · Angle(deg) · Bend direction · K Factor; Other joints Name · Type [Rip ▾] · Style [Edge joint ▾]; 3D flat view with its view cube (SM4) | ✅ | 6fb0344f 10-29 |
-| 6.2 names | ours Bend A, Bend B, Hem C, Joint D; live Joint A, Bend B, Bend C, Hem D (live letters follow Onshape's own joint order: qa4 r4 s1 had Bend A before Joint B) | ✗ minor (P3) | |
+| 6.2 names | ours Bend A, Bend B, Hem C, Joint D; live Joint A, Bend B, Bend C, Hem D (live letters follow Onshape's own joint order: qa4 r4 s1 had Bend A before Joint B) | ✗ minor (P3) → now ✅ (row 6.2) | |
 | 6.3 | flanges bent up: "Up" (SM5) | ✅ | 6fb0344f 10-29 |
 | 6.4 | click "#": row selected, the bend lit in 3D and in the flat | ✅ | 6fb0344f 10-29 |
 | 6.5 | flat: bend strips, dashed centre lines, relief notches at the bend ends (SM6) | ✅ | 6fb0344f 10-29 |
-| 6.6 menu | flat right-click: Edit Sheet metal model 1…, Edit Sketch 1…, Show dimensions, Show dependencies…, Export DXF/DWG of Flat pattern of Part 1…, Zoom to fit, View normal to, Delete Sheet metal model 1; **missing** New sketch…, Copy Flat pattern of Part 1, Create Drawing of Flat pattern of Part 1…, Select other…, Add comment, Zoom to selection | ✗ (SM13 part) | |
-| 6.6 dialog | Export DXF/DWG… opens a plain path prompt "Export flat pattern"; live has the Export DXF/DWG options dialog (file name, format, version, units, options) | ✗ (SM13 part) | |
+| 6.6 menu | flat right-click: Edit Sheet metal model 1…, Edit Sketch 1…, Show dimensions, Show dependencies…, Export DXF/DWG of Flat pattern of Part 1…, Zoom to fit, View normal to, Delete Sheet metal model 1; **missing** New sketch…, Copy Flat pattern of Part 1, Create Drawing of Flat pattern of Part 1…, Select other…, Add comment, Zoom to selection | ✗ (SM13 part) → now ✅ (SM13, row 6.6); ✅ (row 6.6) | |
+| 6.6 dialog | Export DXF/DWG… opens a plain path prompt "Export flat pattern"; live has the Export DXF/DWG options dialog (file name, format, version, units, options) | ✗ (SM13 part) → now ✅ (SM13, row 6.6); ✅ (row 6.6) | |
 | 6.6 dialog (fixed) | "Export as DXF/DWG": File name "<studio> - Flat pattern of Part 1" (+ View export rules), Format DXF / DWG (DWG → Version 2000, DXF → Release 14), Version, Scope (3), ☑ Use workspace units (Units grayed), Options (3), the 8 checkboxes with live's defaults; DWG writes AC1015. Scope, units, version and bend centerlines change the file; splines / z-height / tangent / counterbore / form / sketch options have nothing to write yet | ✅ | agent/skasm 10-30 (GUI on qa's smf.noshape; T1 several_flats_go_into_one_file) |
-| 6.6 menu (10-30) | "Create Drawing of Flat pattern of Part 1…" added: drawing "Flat pattern of Part 1 Drawing 1", Suggested views = the flat view (bend lines, "UP 90.0° R2" notes) + the part's iso view (live also two edge views: dx). Zoom to selection added (the table's selected bend's strip, else fit); New sketch… (active models: a sketch on the base wall's face, the 3D view not turned, live request 1605). Not built: Copy Flat pattern… (live pastes a flat-pattern part instance into an assembly; our flats aren't parts), Select other… (the flat's two faces), the sketch frame drawn in the flat view, Add comment (cloud, not built anywhere) | ◐ | agent/skasm 10-30 (GUI on smf.noshape) |
+| 6.6 menu (10-30) | "Create Drawing of Flat pattern of Part 1…" added: drawing "Flat pattern of Part 1 Drawing 1", Suggested views = the flat view (bend lines, "UP 90.0° R2" notes) + the part's iso view (live also two edge views: dx). Zoom to selection added (the table's selected bend's strip, else fit); New sketch… (active models: a sketch on the base wall's face, the 3D view not turned, live request 1605). Not built: Copy Flat pattern… (live pastes a flat-pattern part instance into an assembly; our flats aren't parts), Select other… (the flat's two faces), the sketch frame drawn in the flat view, Add comment (cloud, not built anywhere) | ◐ | agent/skasm 10-30 (GUI on smf.noshape) → now ✅ (row 6.6) |
 | 6.6 export options (10-30) | Include bend tangent lines / counterbore and countersink lines / form outlines / form centermarks write SHEETMETAL_BEND_TANGENT_LI, _CBORE_CSINK_UP/_DOW, _FORM_UP/_DOWN, _FORM_CENTERMARK (T1 the_flat_export_options_write_their_layers) | ✅ (test) | agent/skasm 10-30 |
 | 5.6 SM3 | Closed corner (T2 closed_corner_matches_live): 23 faces as live (PLANE 17, CYLINDER 4, OTHER 2), 8535.1616 mm³ vs live's regen evVolume 8535.1655548 (its 8535.0418 is /massproperties, 0.124 low on spline faces: request 1606) | ✅ | agent/skasm 10-30 |
 | partial flange | Outer / Inner partial flange (live request 1599 (a)): 6027.5617 / 6204.5617 mm³, 22 faces, wall inside / outside the outline (T2 partial_flange_outer_and_inner_as_live) | ✅ (test) | agent/skasm 10-30 |
