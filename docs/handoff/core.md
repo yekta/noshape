@@ -15,6 +15,9 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 ## 10-31 (core, new account from 10:50)
+- **Knurl (B94.6 diamond) on vibe3, perf.sh at d29f53ce: 8.6 s** (test 15.7 s median of 3; 94272.889 mm³, 10362
+  faces, 0.62 GB). Onshape 49 s. This morning (1cd8c450): 138.6 s. bool's patterned cut (the Rust Boolean takes it)
+  plus today's unify: a9b4bf6a / fff8a036 / 30cc7935 / d29f53ce.
 - Unify's kept-volume check (boolean.cpp `usd_kept_volume`): integrates only the faces USD changed, not the whole
   result (the knurl: 14 of ~10k faces merged; two whole-solid integrals of B-spline faces were most of unify.usd's
   10.7 s). `usd_volume_change`: the faces of the input whose images USD removed or changed, reversed, plus the faces
@@ -382,6 +385,7 @@ perf.yml model job (release) on main 10-29 00:53 (run 40796942944, 34cbea98; the
 | fins-400 full regen (8 features) | 1748 ms | 1945 ms | 2353 ms | |
 | Shell on qa's filleted plate with a hole (`kernel_robustness::timed_shell_on_a_filleted_plate_with_a_hole`) | 85 ms | 62 ms | 61 ms | ≤ 200 (dev here 140) |
 | fin under the 400-fin plate (Extrude 3; `pattern_second::timed_the_fin_under_the_fin_plate_regenerates_locally`, 2 runs) | 40 / 64 ms | 60 / 64 ms | 46 / 50 ms | **< 150 met** (was 2.7 s; here release under load 324) |
+| B94.6 diamond knurl (`custom_features::knurl_feature_b94_on_a_cylinder`, KNURL=diamond; perf.sh vibe3 10-31 d29f53ce) | | **8.6 s** | | < 49 (live) **met** (138.6 s that morning) |
 | that fin plus the redisplay (`timed_the_fin_plate_redisplays_after_the_fin`, total) | 61 / 102 ms | 96 / 99 ms | 88 / 88 ms | |
 | editing that fin (`timed_editing_the_fin_under_the_fin_plate`: feature, display, whole edit) | 30 + 24 = 56 ms / 96 | 49 + 40 = 91 ms / 93 | 42 + 34 = 76 ms / 93 | (was 802 ms dev) |
 This machine (load 20–40) runs ~3× slower than the macOS runner; compare there. Landed for these today: patch 0003,
