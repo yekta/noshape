@@ -174,8 +174,9 @@ enum Geo {
     Line,
     Arc { k: Circ, a0: f64, sweep: f64 },
     Ell { e: Ell, t0: f64, sweep: f64, faces: [usize; 2] },
-    /// No curve: an edge at a cone's apex.
-    Apex,
+    /// No curve: an edge at a cone's apex; a piece of it from angle `a0` to `a1` about the cone's axis (as its
+    /// face's parameter plane has them), NaN for an input's whole edge.
+    Apex { a0: f64, a1: f64 },
     /// `Ctx::ncurves[id]` from parameter `t0` to `t1` (an input's B-spline edge, or a piece of OCCT's section of
     /// two faces, one of them free-form).
     Nurbs { id: u32, t0: f64, t1: f64 },
@@ -295,7 +296,7 @@ impl GFace {
         match (&self.s, g) {
             (Surf::Nurbs { .. }, _) | (_, Geo::Nurbs { .. }) => Err(Decline("a curve on a free-form face")),
             (Surf::Plane { .. }, Geo::Line) => Ok(C2::Seg { a: self.to2(p0), b: self.to2(p1) }),
-            (Surf::Plane { .. }, Geo::Apex) => Err(Decline("an apex on a plane")),
+            (Surf::Plane { .. }, Geo::Apex { .. }) => Err(Decline("an apex on a plane")),
             (Surf::Plane { n, .. }, Geo::Arc { k, sweep, .. }) => {
                 let c = self.to2(k.c);
                 let d = self.to2(p0) - c;
@@ -325,11 +326,15 @@ impl GFace {
             }
             (Surf::Cyl { k: slope, .. }, Geo::Ell { e, .. }) if *slope == 0.0 && e.open() => Err(Decline("a hyperbola on a cylinder")),
             (Surf::Cyl { r, th0, a, o, full, .. }, g) => {
-                if *g == Geo::Apex {
+                if let Geo::Apex { a0, a1 } = *g {
+                    let y = self.to2(p0).y;
+                    // (A piece of it: its own angles.)
+                    if !a0.is_nan() {
+                        return Ok(C2::Seg { a: DVec2::new(r * a0, y), b: DVec2::new(r * a1, y) });
+                    }
                     if !*full {
                         return Err(Decline("an apex on a part of a cone"));
                     }
-                    let y = self.to2(p0).y;
                     return Ok(C2::Seg { a: DVec2::new(r * th0, y), b: DVec2::new(r * (th0 + TAU), y) });
                 }
                 // A line's angle from its end off the axis (a cone's generator may start at the apex).
@@ -349,7 +354,7 @@ impl GFace {
                     q0.x = r * (th0 + TAU);
                 }
                 match g {
-                    Geo::Apex | Geo::Nurbs { .. } => unreachable!(),
+                    Geo::Apex { .. } | Geo::Nurbs { .. } => unreachable!(),
                     Geo::Line => {
                         let q1 = DVec2::new(q0.x, self.to2(p1).y);
                         Ok(C2::Seg { a: q0, b: q1 })
@@ -717,7 +722,9 @@ impl Ctx<'_> {
     /// (a piece of), whose curve on a free-form face is OCCT's).
     fn c2_of(&self, f: usize, s: &Seg, copy: usize, edge: Option<usize>) -> R<C2> {
         let g = &self.faces[f];
-        if let (Geo::Apex, Surf::Cyl { full: false, .. }) = (s.g, &g.s) {
+        if let (Geo::Apex { a0, .. }, Surf::Cyl { full: false, .. }) = (s.g, &g.s)
+            && a0.is_nan()
+        {
             // A part of a cone at its apex: at the apex's height, from the angle of the face's ruling that comes to
             // the apex to that of the one that leaves it (its own way along the edge).
             let e = edge.ok_or(Decline("an apex on a part of a cone"))?;
@@ -750,7 +757,7 @@ impl Ctx<'_> {
                 Geo::Nurbs { id, t0, t1 } if matches!(self.edges[e].g, Geo::Nurbs { id: own, .. } if own == id) => (t0, t1),
                 // (A degenerate edge (the surface closing at a point), or a closed one whole: its whole curve on the
                 // face.)
-                Geo::Apex => (*pt0, *pt1),
+                Geo::Apex { .. } => (*pt0, *pt1),
                 _ if s.v[0] == s.v[1] => (*pt0, *pt1),
                 _ => {
                     // A piece of a straight or round edge: its ends' parameters on the edge's curve on the face.
@@ -809,7 +816,7 @@ impl Ctx<'_> {
             Geo::Line => self.p(s.v[0]).lerp(self.p(s.v[1]), t),
             Geo::Arc { k, a0, sweep } => k.at(a0 + sweep * t),
             Geo::Ell { e, t0, sweep, .. } => e.at(t0 + sweep * t),
-            Geo::Apex => self.p(s.v[0]),
+            Geo::Apex { .. } => self.p(s.v[0]),
             Geo::Nurbs { id, t0, t1 } => self.ncurves[id as usize].c.at(t0 + (t1 - t0) * t),
         }
     }
@@ -835,7 +842,7 @@ impl Ctx<'_> {
                 let d = if e.open() { tp - t0 } else { (tp - t0).rem_euclid(TAU) };
                 (d / sweep, (e.at(tp) - p).length())
             }
-            Geo::Apex => (0.0, (p - self.p(s.v[0])).length()),
+            Geo::Apex { .. } => (0.0, (p - self.p(s.v[0])).length()),
             Geo::Nurbs { id, t0, t1 } => {
                 let (t, d) = self.ncurves[id as usize].c.param_of(p);
                 ((t - t0) / (t1 - t0), d)
@@ -848,7 +855,7 @@ impl Ctx<'_> {
             Geo::Line => (self.p(s.v[1]) - self.p(s.v[0])).length(),
             Geo::Arc { k, sweep, .. } => k.r * sweep,
             Geo::Ell { e, t0, sweep, .. } => e.length(t0, t0 + sweep),
-            Geo::Apex => 0.0,
+            Geo::Apex { .. } => 0.0,
             Geo::Nurbs { id, t0, t1 } => free::length(&self.ncurves[id as usize].c, t0, t1),
         }
     }
@@ -1207,7 +1214,7 @@ impl Ctx<'_> {
             Geo::Ell { e, t0, sweep, .. } if !e.hyp && (matches!(self.faces[f].s, Surf::Plane { .. }) || !e.par && matches!(self.faces[f].s, Surf::Cyl { .. } | Surf::Nurbs { .. })) => (Path::Ellipse(e), t0, t0 + sweep),
             Geo::Ell { .. } => return Err(Decline("an argument's ellipse")),
             Geo::Nurbs { id, t0, t1 } => (Path::Nurbs { id, c: self.ncurves[id as usize].c.clone() }, t0, t1),
-            Geo::Apex => return Ok(()),
+            Geo::Apex { .. } => return Ok(()),
         };
         // An arc across a round face's seam: in two parts, a vertex where it crosses.
         let mut parts = vec![(t0, End::Vertex(s.v[0]), t1, End::Vertex(s.v[1]))];
@@ -1356,7 +1363,7 @@ impl Ctx<'_> {
                 let h = w.dot(*ax);
                 Ok(k.n.cross(*ax).length() <= 1e-9 && (w - *ax * h).length() <= tol && (k.r - (r0 + slope * h)).abs() <= tol)
             }
-            (_, Geo::Apex) => Ok(false),
+            (_, Geo::Apex { .. }) => Ok(false),
             (Surf::Nurbs { .. }, _) | (_, Geo::Nurbs { .. } | Geo::Ell { .. }) => match self.on_surface.get(&(e, f)) {
                 Some(&x) => x,
                 None => self.on_free_surface(e, f),
@@ -1366,7 +1373,7 @@ impl Ctx<'_> {
 
     /// Whether edge `e` takes points along it to tell whether it lies on face `f`'s surface.
     fn by_points(&self, e: usize, f: usize) -> bool {
-        !matches!(self.edges[e].g, Geo::Apex) && (matches!(self.faces[f].s, Surf::Nurbs { .. }) || matches!(self.edges[e].g, Geo::Nurbs { .. } | Geo::Ell { .. }))
+        !matches!(self.edges[e].g, Geo::Apex { .. }) && (matches!(self.faces[f].s, Surf::Nurbs { .. }) || matches!(self.edges[e].g, Geo::Nurbs { .. } | Geo::Ell { .. }))
     }
 
     /// [`Self::edge_on_surface`] by points along the edge.
@@ -1846,9 +1853,7 @@ impl Ctx<'_> {
             if dd.abs() > tol {
                 return Err(Decline("a plane nearly through a cone's axis"));
             }
-            if self.apex_on_face(fc) {
-                return Err(Decline("a plane through a cone's apex"));
-            }
+            // (Through its apex too: the two rulings come to it, the apex in pieces between them (apex_parts).)
             for th in circle_line(1.0, x, y, n, 0.0) {
                 self.generator(fp, fc, th)?;
             }
@@ -1952,10 +1957,8 @@ impl Ctx<'_> {
         let den = n.dot(across);
         let s = (d - n.dot(apex)) / den;
         if s.abs() <= GREY * tol {
-            // Through the apex along the ruling: touching the cone along it (as a plane a cylinder).
-            if self.apex_on_face(fc) {
-                return Err(Decline("a plane through a cone's apex"));
-            }
+            // Through the apex along the ruling: touching the cone along it (as a plane a cylinder; to the apex, the
+            // apex in pieces there: apex_parts).
             let Surf::Cyl { x, y, .. } = self.faces[fc].s else { unreachable!() };
             let rad = along - a * along.dot(a);
             return self.touch(fp, fc, rad.dot(y).atan2(rad.dot(x)));
@@ -2155,7 +2158,7 @@ impl Ctx<'_> {
     /// The pool vertices strictly inside `s`, in order from its start: of `lists` (each sorted by x), the
     /// ones not `own`'s (an argument's vertices never lie inside its own edges).
     fn split_among(&self, s: &Seg, lists: &ByOwner, own: Option<u32>) -> R<Vec<u32>> {
-        if s.g == Geo::Apex {
+        if matches!(s.g, Geo::Apex { .. }) {
             return Ok(vec![s.v[0], s.v[1]]);
         }
         let mut chain: Vec<(f64, u32)> = Vec::new();
@@ -2185,7 +2188,7 @@ impl Ctx<'_> {
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
             Geo::Ell { e, t0, sweep, .. } => e.piece_box(t0, sweep),
             Geo::Nurbs { id, t0, t1 } => free::piece_box(&self.ncurves[id as usize].c, t0, t1),
-            Geo::Apex => return Ok(vec![s.v[0], s.v[1]]),
+            Geo::Apex { .. } => return Ok(vec![s.v[0], s.v[1]]),
         };
         let (lo, hi) = (lo - DVec3::splat(tol), hi + DVec3::splat(tol));
         let start = sorted_x.partition_point(|x| x.0 < lo.x);
@@ -2241,7 +2244,7 @@ impl Ctx<'_> {
             .map(|w| {
                 let g = match s.g {
                     Geo::Line => Geo::Line,
-                    Geo::Apex => Geo::Apex,
+                    Geo::Apex { a0, a1 } => Geo::Apex { a0, a1 },
                     Geo::Nurbs { id, t0, t1 } => {
                         let t = |v: u32, end: bool| {
                             if v == s.v[0] && !end {
@@ -2597,7 +2600,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                     if v[0] != v[1] {
                         return Err(Decline("a degenerate edge between two vertices"));
                     }
-                    Geo::Apex
+                    Geo::Apex { a0: f64::NAN, a1: f64::NAN }
                 }
                 Curve::Line => {
                     if v[0] == v[1] {
@@ -2703,7 +2706,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         for &(e, _) in &cx.faces[f].edges {
             let s = cx.edge_seg(e);
             let n = match s.g {
-                Geo::Line | Geo::Apex => 1,
+                Geo::Line | Geo::Apex { .. } => 1,
                 Geo::Arc { sweep, .. } | Geo::Ell { sweep, .. } => (sweep / (PI / 8.0)).ceil() as usize + 1,
                 Geo::Nurbs { id, t0, t1 } => {
                     let (blo, bhi) = free::piece_box(&cx.ncurves[id as usize].c, t0, t1);
@@ -3349,7 +3352,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         let list = sedge_of.entry(key).or_default();
         for &i in list.iter() {
             let o = &sedges[i].seg;
-            if std::mem::discriminant(&o.g) == std::mem::discriminant(&s.g) && (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * cx.tol {
+            // (Pieces of an apex: by their angles.)
+            let apart = matches!((o.g, s.g), (Geo::Apex { a0, a1 }, Geo::Apex { a0: b0, a1: b1 }) if a0.to_bits() != b0.to_bits() || a1.to_bits() != b1.to_bits());
+            if std::mem::discriminant(&o.g) == std::mem::discriminant(&s.g) && !apart && (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * cx.tol {
                 let rev = match (o.g, s.g) {
                     (Geo::Arc { k: k1, .. }, Geo::Arc { k: k2, .. }) => k1.n.dot(k2.n) < 0.0,
                     (Geo::Ell { e: e1, t0: a1, sweep: s1, .. }, Geo::Ell { e: e2, t0: a2, sweep: s2, .. }) => e1.deriv(a1 + 0.5 * s1).dot(e2.deriv(a2 + 0.5 * s2)) < 0.0,
@@ -3380,7 +3385,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         let es = edge_solid[e];
         let s = cx.edge_seg(e);
         let (lo, hi) = match s.g {
-            Geo::Line | Geo::Apex => (cx.p(s.v[0]).min(cx.p(s.v[1])), cx.p(s.v[0]).max(cx.p(s.v[1]))),
+            Geo::Line | Geo::Apex { .. } => (cx.p(s.v[0]).min(cx.p(s.v[1])), cx.p(s.v[0]).max(cx.p(s.v[1]))),
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
             Geo::Ell { e, t0, sweep, .. } => e.piece_box(t0, sweep),
             Geo::Nurbs { id, t0, t1 } => free::piece_box(&cx.ncurves[id as usize].c, t0, t1),
@@ -3420,6 +3425,49 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         let rest = par_map(n, &|k| first[k].is_none().then(|| turned(k).map_or_else(|| find(k), Ok)));
         first.into_iter().zip(rest).map(|(a, b)| a.or(b).expect("a curve's split points")).collect()
     };
+    // A whole cone's apex where curves on the cone come to it (a plane through its axis and apex: two rulings): in
+    // pieces between their angles and its seam's, each its own degenerate edge, as OCCT's.
+    let apex_parts = |cx: &Ctx, e: usize| -> R<Vec<Seg>> {
+        let s = cx.edge_seg(e);
+        let w = s.v[0];
+        let Some(f) = (0..cx.faces.len()).find(|&f| cx.faces[f].edges.iter().any(|x| x.0 == e)) else { return Ok(vec![s]) };
+        let g = &cx.faces[f];
+        let Surf::Cyl { r, th0, full, .. } = g.s else { return Ok(vec![s]) };
+        let angle = |w: u32| g.to2(cx.p(w)).x / r;
+        let mut at: Vec<f64> = Vec::new();
+        for c in &cx.face_segs[f] {
+            if matches!(c.g, Geo::Apex { .. }) || !c.v.contains(&w) || c.v[0] == c.v[1] {
+                continue;
+            }
+            at.push(angle(if c.v[0] == w { c.v[1] } else { c.v[0] }));
+        }
+        if at.is_empty() {
+            return Ok(vec![s]);
+        }
+        // Its own way: a whole cone's from its seam round; a part's from the angle of the face's ruling that comes
+        // to the apex to that of the one that leaves it (the face's way along the edge), as c2_of has it.
+        let (from, to) = if full {
+            (th0, th0 + TAU)
+        } else {
+            let k = g.edges.iter().position(|x| x.0 == e).ok_or(Decline("an apex on a part of a cone"))?;
+            let ends = |&(e, rev): &(usize, bool)| if rev { [cx.edges[e].v[1], cx.edges[e].v[0]] } else { cx.edges[e].v };
+            let rulings = |end: usize| g.edges.iter().filter(|x| cx.edges[x.0].g == Geo::Line && ends(x)[end] == w).map(|x| ends(x)[1 - end]).collect::<Vec<u32>>();
+            let (&[a], &[b]) = (rulings(1).as_slice(), rulings(0).as_slice()) else { return Err(Decline("an apex on a part of a cone")) };
+            if g.edges[k].1 { (angle(b), angle(a)) } else { (angle(a), angle(b)) }
+        };
+        let (lo, hi) = (from.min(to), from.max(to));
+        at.retain(|&t| t - lo > 1e-9 && hi - t > 1e-9);
+        if at.is_empty() {
+            return Ok(vec![s]);
+        }
+        at.sort_by(f64::total_cmp);
+        at.dedup_by(|x, y| *x - *y <= 1e-9);
+        if to < from {
+            at.reverse();
+        }
+        let ends: Vec<f64> = std::iter::once(from).chain(at).chain(std::iter::once(to)).collect();
+        Ok(ends.windows(2).map(|x| Seg { v: s.v, g: Geo::Apex { a0: x[0], a1: x[1] } }).collect())
+    };
     let edge_chains = by_period(edge_solid.len(), &|e| cx.edge_seg(e), &edge_chain);
     for (e, chain) in edge_chains.into_iter().enumerate() {
         let s = cx.edge_seg(e);
@@ -3434,7 +3482,8 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
         edge_inner.push(chain[1..chain.len() - 1].to_vec());
         let mut pieces = Vec::with_capacity(chain.len() - 1);
-        for piece in cx.pieces_of(&s, &chain) {
+        let parts = if matches!(s.g, Geo::Apex { .. }) { apex_parts(&cx, e)? } else { cx.pieces_of(&s, &chain) };
+        for piece in parts {
             let (si, rev) = get_sedge(&cx, &mut sedges, piece);
             if !sedges[si].origins.contains(&e) {
                 sedges[si].origins.push(e);
@@ -3542,7 +3591,13 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         let mut local: HashMap<(u32, bool), u32> = HashMap::default();
         // The apex of a part of a cone: a point per place too.
         let apex_part: Vec<u32> = match cx.faces[f].s {
-            Surf::Cyl { full: false, .. } => cx.faces[f].edges.iter().filter(|&&(e, _)| cx.edges[e].g == Geo::Apex).map(|&(e, _)| cx.edges[e].v[0]).collect(),
+            // (A whole cone's apex split into pieces too.)
+            Surf::Cyl { full, .. } => cx.faces[f]
+                .edges
+                .iter()
+                .filter(|&&(e, _)| matches!(cx.edges[e].g, Geo::Apex { .. }) && (!full || edge_pieces[e].len() > 1))
+                .map(|&(e, _)| sedges[edge_pieces[e][0].0].seg.v[0])
+                .collect(),
             _ => Vec::new(),
         };
         // (On a free-form face a vertex is a point per place it is at, both sides of a seam: its curves' ends there
@@ -3928,12 +3983,12 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
     }
     // (A cone's apex is used once; a sheet's edges any way.)
-    if !sheets && uses.iter().any(|(&s, u)| sedges[s].seg.g != Geo::Apex && (u[0] != u[1] || u[0] == 0)) {
+    if !sheets && uses.iter().any(|(&s, u)| !matches!(sedges[s].seg.g, Geo::Apex { .. }) && (u[0] != u[1] || u[0] == 0)) {
         return Err(Decline("a non-manifold result"));
     }
     // Seams: an edge one face uses both ways; any other edge two faces once each.
     for (&s, u) in &uses {
-        if !sheets && u[0] > 1 && sedges[s].seg.g != Geo::Apex {
+        if !sheets && u[0] > 1 && !matches!(sedges[s].seg.g, Geo::Apex { .. }) {
             let users = kept.iter().filter(|&&p| pieces[p].loops.iter().flatten().any(|x| x.0 == s)).count();
             if users != 1 || u[0] != 1 {
                 return Err(Decline("a non-manifold result"));
@@ -3997,8 +4052,13 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         sedge_flip[s] = flip;
         let seg = x.seg;
         let (v, curve) = match seg.g {
-            // (Its vertex made anew, another argument through the apex: a new degenerate edge there, as OCCT's.)
-            Geo::Apex => (seg.v, Curve::Degenerate),
+            // (Its vertex made anew, another argument through the apex: a new degenerate edge there, as OCCT's; a
+            // piece of it, a cone split through its apex, its angles.)
+            Geo::Apex { a0, a1 } => {
+                out.edge_apex.resize(out.body.edges.len(), [f64::NAN; 2]);
+                out.edge_apex.push([a0, a1]);
+                (seg.v, Curve::Degenerate)
+            }
             Geo::Line => (if flip { [seg.v[1], seg.v[0]] } else { seg.v }, Curve::Line),
             Geo::Arc { k, .. } => {
                 let (v, n) = if flip { ([seg.v[1], seg.v[0]], -k.n) } else { (seg.v, k.n) };

@@ -230,6 +230,9 @@ pub struct Output {
     pub face_u0: Vec<f64>,
     /// Per edge, the [`SectionCurve::id`] of the section it is a piece of (`u32::MAX`: none).
     pub edge_section: Vec<u32>,
+    /// Per degenerate edge that is a piece of a cone's apex, its angles about the cone's axis (as its face's
+    /// parameter plane has them: `face_u0`'s); empty, or NaN for any other edge.
+    pub edge_apex: Vec<[f64; 2]>,
     pub history: Vec<Record>,
 }
 

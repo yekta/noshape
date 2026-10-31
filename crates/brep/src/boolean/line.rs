@@ -62,7 +62,7 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
         }
         let mut at: Vec<DVec3> = Vec::new();
         match g.g {
-            Geo::Apex => continue,
+            Geo::Apex { .. } => continue,
             Geo::Ell { .. } => return Err(Decline("an argument's ellipse")),
             Geo::Nurbs { .. } => return Err(Decline("a line and a curved edge")),
             Geo::Line => {

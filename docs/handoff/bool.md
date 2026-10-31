@@ -1052,12 +1052,19 @@ process 0.62 GB; straight 0.6 s. The knurl target is met: the regeneration and t
 - The 7 distinct cases (20 recorded): all taken, 0 differ incl. the unify check. Replays all 0 differ: main 782,
   corpus2 555, corpus3 558, corpus4 606 (+3), corpus5 727 (+7), corpus6 672 (+7), Shell's 81 (+3), direct 58.
   T1: e45f5fbf794b1d88 in tests/data/brep.
-- Next on apexes: a plane through a full cone's axis and its apex (11 cases, Shell's slab fuses on drilled parts,
-  0.5–5 s each in OCCT, ~17 s together) splits the cone into two halves that each need a piece of the degenerate
-  edge: the apex segment in the cone's parameter plane split where the two rulings end, the apex one vertex at two
-  places there (as `apex_part` does for parts of cones), Geo::Apex carrying its angles so the two pieces stay
-  apart (get_sedge keys by ends and middle: both are the apex), and the C++ build giving each its range. The 15
-  "plane along a ruling through the apex" cases are small (24–190 ms).
+- Then (10-31 15:27 UTC): planes through a cone's apex. A plane through the axis and the apex (its two rulings)
+  and a plane touching the cone along a ruling through the apex no longer decline: an input apex edge is split
+  where curves on its cone come to the apex (`apex_parts`: a whole cone's from its seam round, a part's between
+  the face's own rulings into and out of the apex), each piece `Geo::Apex { a0, a1 }` (its angles; NaN for an
+  input's whole edge) and its own degenerate edge in the result, the input's Modified into each, as OCCT's. The
+  C++ build gives a new degenerate edge on a cone its curve once its wire is made (`apex_pcurves`: along the
+  apex from where the edge into its vertex ends to where the one out starts, the way the wire runs it).
+  Public type change: `noshape_brep::Output::edge_apex` (per edge, a piece's angles; the bridge passes them in
+  the curve's slots); blend.rs's Output gets it empty. 19 of the 27 recorded cases taken, 0 differ; of the rest 6
+  stop at "a vertex inside coincident edges of two other arguments", 2 at a plane across the axis through the
+  apex. Replays all 0 differ: main 786 (+4), corpus2 559 (+4), corpus3 562 (+4), corpus4 610 (+4), corpus5 746
+  (+19), corpus6 676 (+4), Shell's 81, direct 58. T1: 079531266b0370d5 (a drilled hole's tip cut by two planes
+  through its axis), 2b1c8fd20fcce7d5 (a plane along a ruling) in tests/data/brep.
 
 ## What still declines, by OCCT's recorded time (replays 10-31 13:10 UTC, each case once over all corpora)
 An internal face 25.3 s (2: b2511301 a Shell slab fuse of 72 tools whose OCCT result is invalid, addb9a14), a

@@ -1157,7 +1157,7 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorn
     history.dedup();
     let solid_origin = vec![Origin::Piece { arg: 0, index: 0 }];
     let _ = Solid::default();
-    Ok(Output { body: b, vertex_origin: vo, edge_origin: eo, face_origin, solid_origin, face_u0, edge_section, history })
+    Ok(Output { body: b, vertex_origin: vo, edge_origin: eo, face_origin, solid_origin, face_u0, edge_section, edge_apex: Vec::new(), history })
 }
 
 /// The blend surface of link `x` (edge `e`).

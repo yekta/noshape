@@ -360,6 +360,12 @@ fn fill_result(r: noshape_brep::Output, out: &mut BrepResult) {
     out.solid_origin = origins(&r.solid_origin);
     out.face_u0 = r.face_u0;
     out.edge_section = r.edge_section;
+    // (A piece of a cone's apex: its angles in its curve's slots 2 and 3, slot 1 saying so.)
+    for (i, &[a0, a1]) in r.edge_apex.iter().enumerate() {
+        if !a0.is_nan() {
+            out.body.curves[11 * i + 1..11 * i + 4].copy_from_slice(&[1.0, a0, a1]);
+        }
+    }
     for e in &r.body.edges {
         let (minor, faces) = match e.curve {
             Curve::Ellipse { minor, faces, .. } | Curve::Hyperbola { minor, faces, .. } => (minor, [faces[0].0, faces[0].1, faces[1].0, faces[1].1]),

@@ -861,6 +861,58 @@ const char* ellipse_edge(const BrepResult& r, const std::vector<const OcShape*>&
 
 // A piece `e` of the argument's edge (r.edge_origin[k]) on the input's face `src`: the input edge's curves on that
 // face (one, or a seam's two), set on `e` (the same parameters).
+// The curves on a cone of wire `w`'s new degenerate edges (its apex made anew, or a piece of it where the cone is
+// split through its apex): along the apex from where the edge into its vertex ends to where the one out starts,
+// the way the wire runs it (its parameter the surface's angle, as OCCT's: OCCT's are lines along u).
+const char* apex_pcurves(const TopoDS_Wire& w, const occ::handle<Geom_Surface>& s, const TopLoc_Location& loc, BRep_Builder& bb)
+{
+  std::vector<TopoDS_Edge> es;
+  for (TopoDS_Iterator it(w, false, false); it.More(); it.Next())
+    es.push_back(TopoDS::Edge(it.Value()));
+  auto end2d = [&](const TopoDS_Edge& e, bool at_start, gp_Pnt2d& p) {
+    double                          f = 0, l = 0;
+    const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, s, loc, f, l);
+    if (c.IsNull())
+      return false;
+    p = c->Value((e.Orientation() == TopAbs_REVERSED) != at_start ? f : l);
+    return true;
+  };
+  for (size_t j = 0; j < es.size(); ++j)
+  {
+    const TopoDS_Edge& e = es[j];
+    double             f = 0, l = 0;
+    if (!BRep_Tool::Degenerated(e) || !BRep_Tool::CurveOnSurface(e, s, loc, f, l).IsNull())
+      continue;
+    // Its neighbours: the edge whose run ends at its vertex, the one whose run starts there (a reversed face's
+    // wire lists its edges the other way round).
+    const TopoDS_Vertex v = TopExp::FirstVertex(e);
+    const TopoDS_Edge*  into = nullptr;
+    const TopoDS_Edge*  from = nullptr;
+    int                 n_into = 0, n_from = 0;
+    for (const TopoDS_Edge& x : es)
+    {
+      if (BRep_Tool::Degenerated(x))
+        continue;
+      if (TopExp::LastVertex(x, true).IsSame(v))
+        into = &x, ++n_into;
+      if (TopExp::FirstVertex(x, true).IsSame(v))
+        from = &x, ++n_from;
+    }
+    gp_Pnt2d a, z;
+    if (n_into != 1 || n_from != 1 || !end2d(*into, false, a) || !end2d(*from, true, z))
+      return "a degenerate edge without its neighbours' curves";
+    if (std::abs(a.Y() - z.Y()) > 1e-9 || std::abs(a.X() - z.X()) < 1e-12)
+      return "a degenerate edge between its neighbours' curves";
+    // Its own way: from `a` to `z` run forwards, from `z` to `a` reversed.
+    const bool     fwd = e.Orientation() != TopAbs_REVERSED;
+    const gp_Pnt2d p0 = fwd ? a : z, p1 = fwd ? z : a;
+    const double   sg = p1.X() > p0.X() ? 1.0 : -1.0;
+    bb.UpdateEdge(e, new Geom2d_Line(gp_Pnt2d(0, p0.Y()), gp_Dir2d(sg, 0)), s, loc, BRep_Tool::Tolerance(e));
+    bb.Range(e, s, loc, sg * p0.X(), sg * p1.X());
+  }
+  return nullptr;
+}
+
 const char* piece_pcurve(const BrepResult& r, const std::vector<const OcShape*>& srcs, size_t k, const TopoDS_Face& src, const TopoDS_Edge& e,
                          const occ::handle<Geom_Surface>& s, const TopLoc_Location& loc, BRep_Builder& bb)
 {
@@ -1262,6 +1314,9 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         if (uses[k] == 0 || r.edge_origin[3 * k] == 0)
           continue;
         const TopoDS_Edge& e = es[k];
+        // (A new degenerate edge: once its wire is made, apex_pcurves.)
+        if (BRep_Tool::Degenerated(e))
+          continue;
         if (const std::optional<TopoDS_Edge> se = two_curves(k))
         {
           double                          a0 = 0, a1 = 0;
@@ -1394,6 +1449,9 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         const bool     back = (u % 2 == 1) != rev;
         bb.Add(w, es[u / 2].Oriented(back ? TopAbs_REVERSED : TopAbs_FORWARD));
       }
+      if (round)
+        if (const char* why = apex_pcurves(w, s, loc, bb))
+          return why;
       w.Closed(true);
       bb.Add(f, w);
     }
