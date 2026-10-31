@@ -503,6 +503,11 @@ pub struct DrawingView {
     /// is only the menu state.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub show_part_intersections: bool,
+    /// Assembly views: Show/hide › Show sketches, the assembly's inserted
+    /// sketches drawn over the parts (hidden by default; help
+    /// view_context_menu, live 1649's menu).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub show_asm_sketches: bool,
     /// Section views: Show/hide › Show offset cut lines (a thin line across
     /// the hatch where the cutting line jogs; live asb 10-23 views (6)).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -790,6 +795,7 @@ impl Default for DrawingView {
             hide_threads: false,
             show_faulty: false,
             show_part_intersections: false,
+            show_asm_sketches: false,
             show_offset_cut_lines: false,
             edge_styles: Vec::new(),
             hidden_edges: Vec::new(),

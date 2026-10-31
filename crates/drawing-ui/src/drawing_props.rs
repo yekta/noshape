@@ -174,6 +174,9 @@ impl DrawingEditor {
         if views::view_source(sheet, id).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly) {
             let pi = v.show_part_intersections;
             show.push(MenuEntry::item(if pi { "Hide part intersections" } else { "Show part intersections" }, move |t, _, cx| t.edit_view("Part intersections", id, cx, |v| v.show_part_intersections = !pi)));
+            // Then Show sketches (the inserted sketches; hidden by default).
+            let sk = v.show_asm_sketches;
+            show.push(MenuEntry::item(if sk { "Hide sketches" } else { "Show sketches" }, move |t, _, cx| t.edit_view("Sketches", id, cx, |v| v.show_asm_sketches = !sk)));
         }
         // Section views (live asb 10-23 views (6)): after Show faulty parts.
         if matches!(v.kind, ViewKind::Section { .. }) {

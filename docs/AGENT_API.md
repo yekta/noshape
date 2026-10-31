@@ -4529,6 +4529,7 @@ Examples:
 | `threads` | boolean |  | Show/Hide threads |
 | `faulty_parts` | boolean |  | Show/Hide faulty parts |
 | `part_intersections` | boolean |  | Show/Hide part intersections (assembly views; live draws nothing different) |
+| `sketches` | boolean |  | Show/Hide sketches (assembly views: the inserted sketches) |
 | `offset_cut_lines` | boolean |  | Show/Hide offset cut lines (section views: a line across the hatch where the cutting line steps) |
 | `sketch_points` | boolean |  | Show/Hide sketch points (views showing sketches) |
 | `auto_centermarks` | boolean |  | Show/Hide auto centermarks (showing them again brings back deleted ones) |

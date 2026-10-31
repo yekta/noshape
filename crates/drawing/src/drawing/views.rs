@@ -414,12 +414,19 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
     let mut parts = Vec::new();
     let mut occ_body: Vec<(usize, BodyId)> = Vec::new();
     for (i, o) in result.occurrences.iter().enumerate() {
-        if o.kind != BodyKind::Solid || hidden.is_some_and(|h| o.path.iter().any(|p| h.contains(p))) {
+        // Inserted sketches come as wire bodies (drawn only with Show
+        // sketches; views otherwise show the solids).
+        let wire = o.kind == BodyKind::Wire;
+        if (o.kind != BodyKind::Solid && !wire) || hidden.is_some_and(|h| o.path.iter().any(|p| h.contains(p))) {
             continue;
         }
         let Some(b) = o.context.body(&o.body) else { continue };
         let Ok(shape) = noshape_kernel::transform(&b.shape, &noshape_kernel::Transform::Matrix(o.transform), false).map(|r| r.shape) else { continue };
         let id = BodyId { feature: b.id.feature, index: ((i as u32 + 1) << 16) | (b.id.index & 0xFFFF) };
+        if wire {
+            ctx.bodies.push(Arc::new(Body::new(id, o.instance_name.clone(), BodyKind::Wire, shape, Vec::new(), b.color, b.id.feature)));
+            continue;
+        }
         let nb = Body::new(id.clone(), o.instance_name.clone(), BodyKind::Solid, shape, b.faces.clone(), b.color, b.id.feature);
         let mut info = match studio_of(doc, o.studio) {
             Some(ps) => part_info(ps, b),
@@ -1822,6 +1829,7 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
     v.hide_sketch_points.hash(&mut h);
     v.hidden_parts.hash(&mut h);
     v.show_com.hash(&mut h);
+    v.show_asm_sketches.hash(&mut h);
     v.flat.hash(&mut h);
     v.hide_threads.hash(&mut h);
     // Side-view cosmetic threads are drawn with hidden lines shown.
@@ -2038,6 +2046,19 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
             }
             g.side_threads.push((vec![at(len, big), at(len, -big)], in_section));
         }
+    }
+    // Assembly views › Show sketches: the inserted sketches' curves over the
+    // parts.
+    if v.show_asm_sketches {
+        for b in ctx.bodies.iter().filter(|b| b.kind == BodyKind::Wire) {
+            for e in b.shape.edges() {
+                let pts: Vec<[f64; 2]> = sample_edge(&e, 48).into_iter().map(|p| frame.project(p)).collect();
+                if pts.len() >= 2 {
+                    g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Outline, model: None, sketch: SketchEdge::Solid });
+                }
+            }
+        }
+        g.update_bounds();
     }
     // Shown source sketches, drawn over the model; their free points unless
     // hidden (live 10-26 c: line ends get no marker).

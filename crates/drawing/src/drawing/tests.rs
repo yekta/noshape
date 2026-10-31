@@ -2746,6 +2746,34 @@ fn hole_table_x_direction_turns_the_axes() {
     assert_eq!(tables::hole_axes(None), ([1.0, 0.0], [0.0, 1.0]));
 }
 
+/// Assembly views › Show sketches (help view_context_menu): the inserted
+/// sketches' curves, hidden by default.
+#[test]
+fn assembly_view_shows_inserted_sketches() {
+    use crate::assembly::{Instance, InstanceId, InstanceSource, Placement};
+    let (mut doc, _) = demo();
+    let asm = assembly_tab(&doc);
+    let (studio, sketch) = doc
+        .tabs
+        .iter()
+        .find_map(|t| match &t.content {
+            TabContent::PartStudio(ps) => ps.features.iter().find(|f| f.type_id == "sketch").map(|f| (t.id, f.id)),
+            _ => None,
+        })
+        .expect("a demo sketch");
+    if let Some(TabContent::Assembly(a)) = doc.tab_mut(asm).map(|t| &mut t.content) {
+        a.instances.push(Instance::new(InstanceId(900), "Sketch 1 <1>".into(), InstanceSource::Sketch { studio, sketch, config: Default::default() }, Placement { translation: [0.0, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] }));
+    }
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, asm, ViewOrientation::Top, [150.0, 150.0]));
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let sketch_edges = |d: &Drawing| compute_view(d, &d.sheets[0], ViewId(1), &sources, &cache, false).edges.iter().filter(|e| e.sketch == views::SketchEdge::Solid).count();
+    assert_eq!(sketch_edges(&drawing), 0, "hidden by default");
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().show_asm_sketches = true;
+    assert!(sketch_edges(&drawing) > 0);
+}
+
 #[test]
 fn datum_on_dimension_arrow_hides_it() {
     let (doc, mut drawing) = demo();
