@@ -634,7 +634,9 @@ impl Render for OsMenu {
             .rounded(px(if dropdown { 5.25 } else { 4. }))
             .when(dropdown, |d| d.py(px(4.)).min_w(px(253.)).text_color(gpui_kit::rgb(0x555555)))
             .when_some(self.min_width, |d, w| d.min_w(px(w)))
-            .when_some(select, |d, w| d.w(px(w)).rounded(px(0.)).p_0())
+            // At least the field's width, wider for a longer option (Chrome's
+            // lists; live ui-sm4-5f: "Butt joint - Direction 1" past its cell).
+            .when_some(select, |d, w| if truncate { d.w(px(w)) } else { d.min_w(px(w)) }.rounded(px(0.)).p_0())
             // 0 5px 10px rgba(0,0,0,.2); GPUI blurs twice as far as CSS.
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
             .when(native, |d| d.shadow(Vec::new()).py(px(1.)).border_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0x858585 } else { 0x767676 })))

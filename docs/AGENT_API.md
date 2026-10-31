@@ -326,7 +326,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **material**: [`material_list`](#material_list), [`material_library_update`](#material_library_update), [`material_library_export`](#material_library_export)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
-- **sheetmetal**: [`sheetmetal_table`](#sheetmetal_table), [`sheetmetal_edit_bend`](#sheetmetal_edit_bend), [`sheetmetal_move_bend`](#sheetmetal_move_bend), [`sheetmetal_convert_to_rip`](#sheetmetal_convert_to_rip), [`sheetmetal_export_flat`](#sheetmetal_export_flat)
+- **sheetmetal**: [`sheetmetal_table`](#sheetmetal_table), [`sheetmetal_edit_bend`](#sheetmetal_edit_bend), [`sheetmetal_move_bend`](#sheetmetal_move_bend), [`sheetmetal_convert_to_rip`](#sheetmetal_convert_to_rip), [`sheetmetal_edit_joint`](#sheetmetal_edit_joint), [`sheetmetal_export_flat`](#sheetmetal_export_flat)
 - **release**: [`release_create`](#release_create), [`release_revision_history`](#release_revision_history)
 - **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image)
 - **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
@@ -6019,6 +6019,28 @@ Examples:
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `model` | string |  | The sheet metal model: its feature (id or name, e.g. "Sheet metal model 1"). Default: the panel's, the first by name. |
 | `bend` | string or integer | required | The Bends row: its name ("Bend A", "Hem B") or its index in sheetmetal_table's `bends`. |
+
+#### sheetmetal_edit_joint
+
+Change an Other joints row's Type (Bend / Rip) or Style in the sheet metal table (a Modify joint) (edits the document (one undoable history entry)).
+
+An Other joints row's Type ▾ / Style ▾: a Modify joint of the rip set to Bend (the model's radius; the joint moves to the Bends table) or to Rip in the picked style. A rip a Modify joint made has that feature changed; another gets a new Modify joint at the rollback bar or before the model's Finish. One edit ("Modify joint").
+
+Examples:
+
+```json
+{"joint": "Joint C", "style": "Butt joint - Direction 1"}
+{"joint": "Joint C", "type": "Bend"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
+| `model` | string |  | The sheet metal model: its feature (id or name, e.g. "Sheet metal model 1"). Default: the panel's, the first by name. |
+| `joint` | string or integer | required | The Other joints row: its name ("Joint C") or its index in sheetmetal_table's `joints`. |
+| `type` | one of `Bend`, `Rip` |  | Type ▾: Bend turns the rip into a bend. |
+| `style` | one of `Edge joint`, `Butt joint - Direction 1`, `Butt joint - Direction 2` |  | Style ▾ of a rip. |
 
 #### sheetmetal_export_flat
 

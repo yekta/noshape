@@ -801,6 +801,30 @@ fn sheet_metal_table_ops() {
     assert_eq!(n, 2);
 }
 
+/// An Other joints row's Style ▾ / Type ▾ (live "ui (10-24 a)" (5e, 5f)): a plate with one flange, its bend
+/// converted to a rip; the style pick and then Bend change that rip's own Modify joint.
+#[test]
+fn sheet_metal_other_joint_ops() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "sheet-metal-joints.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalStart", "params": { "process": "THICKEN", "regions": [r["regions"][0]["id"]], "thickness": "2 mm", "radius": "2 mm" } }));
+    let e = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": [1, 0, 0], "near": [30, 0, 2], "limit": 1 }))["edges"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalFlange", "params": { "edges": [e], "distance": "20 mm" } }));
+    call(&mut ctx, "sheetmetal_convert_to_rip", json!({ "bend": "Bend A" }));
+    let joints = |ctx: &mut Ctx| call(ctx, "sheetmetal_table", json!({}));
+    let t = joints(&mut ctx);
+    assert_eq!((t["bends"].as_array().unwrap().len(), t["joints"][0]["name"].as_str(), t["joints"][0]["style"].as_str()), (0, Some("Joint A"), Some("Edge joint")), "{t}");
+    call(&mut ctx, "sheetmetal_edit_joint", json!({ "joint": "Joint A", "style": "Butt joint - Direction 1" }));
+    let t = joints(&mut ctx);
+    assert_eq!(t["joints"][0]["style"], "Butt joint - Direction 1", "{t}");
+    call(&mut ctx, "sheetmetal_edit_joint", json!({ "joint": "Joint A", "type": "Bend" }));
+    let t = joints(&mut ctx);
+    assert!(t["joints"].as_array().unwrap().is_empty() && t["bends"].as_array().unwrap().len() == 1, "back to a bend: {t}");
+    let n = call(&mut ctx, "feature_list", json!({}))["features"].as_array().unwrap().iter().filter(|f| f["type"] == "sheetMetalJoint").count();
+    assert_eq!(n, 1, "the same Modify joint");
+}
+
 /// A Part Studio created in context follows its assembly (live "dx
 /// (2026-10-26, P2) Modeling in context"): the plate made thicker shows the
 /// update dot, Update context moves the cover up, and the cover's own

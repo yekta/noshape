@@ -7,13 +7,14 @@
 use super::PartStudioView;
 use super::flat_view::{FlatPick, FlatView, FlatViewEvent};
 use crate::os_menu::{OsMenu, OsMenuItem};
+use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::reference::{BodyId, FeatureId, Reference};
 use noshape_model::sheetmetal::SheetMetalData;
-use noshape_ops::sheetmetal::{bend_faces, bend_row_order, insert_joint_edit, joint_edit_index, joint_rows, plain};
+use noshape_ops::sheetmetal::{RIP_STYLES, RipEdit, bend_faces, bend_row_order, insert_joint_edit, joint_edit_index, joint_rows, plain};
 use std::sync::Arc;
 
 /// os-splitter-container: the tables' default share and the two minimums
@@ -593,6 +594,20 @@ impl PartStudioView {
         cx.notify();
     }
 
+    /// An Other joints row's Type ▾ / Style ▾ pick: the rip's Modify joint
+    /// (noshape_ops::sheetmetal::edit_rip).
+    fn sm_edit_rip(&mut self, rip: usize, edit: RipEdit, cx: &mut Context<Self>) {
+        let models = self.sheet_metal_models(cx);
+        let Some(model) = self.sheet_metal_context(&models) else { return };
+        let Some(data) = self.context.as_ref().and_then(|c| c.sheet_metal.values().find(|d| d.model == model).cloned()) else { return };
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let Some(mut copy) = self.studio(cx).cloned() else { return };
+        if noshape_ops::sheetmetal::edit_rip(&mut copy, model, &data, rip, edit, &units) {
+            self.edit_config(noshape_ops::sheetmetal::MODIFY_JOINT, cx, |ps| *ps = copy);
+        }
+        cx.notify();
+    }
+
     pub(super) fn render_sheet_metal_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let models = self.sheet_metal_models(cx);
@@ -862,7 +877,36 @@ impl PartStudioView {
                 .child(crate::ui::glyph("ui-select-caret", 7., gpui_kit::rgb(0x333333)))
         };
         let joint_head = h_flex().border_l_1().border_color(grid).child(cell(140., head, true, "Name".into(), None)).child(cell(140., col_head(1, 1), true, "Type".into(), None)).child(cell(140., col_head(1, 2), true, "Style".into(), None));
-        let joint_rows_el = joints.iter().enumerate().map(|(i, r)| h_flex().border_l_1().border_color(grid).child(cell(140., head, true, r.name.clone().into(), Some((1, i, 0)))).child(select_cell("Rip")).child(select_cell(r.style)));
+        // Live (5e, 5f): custom lists, Type Bend | Rip, Style Edge joint |
+        // Butt joint - Direction 1 | 2, the current one highlighted; a pick
+        // is a Modify joint of the rip.
+        let view = cx.entity();
+        let joint_rows_el = joints.iter().enumerate().map(|(i, r)| {
+            let (v1, v2) = (view.clone(), view.clone());
+            let style = r.style;
+            h_flex()
+                .border_l_1()
+                .border_color(grid)
+                .child(cell(140., head, true, r.name.clone().into(), Some((1, i, 0))))
+                .child(select_cell("Rip").id(("sm-joint-type", i)).os_dropdown_menu(SharedString::from(format!("sm-joint-type-{i}")), true, move |mut m, _, _| {
+                    for (label, edit) in [("Bend", Some(RipEdit::Bend)), ("Rip", None)] {
+                        let v = v1.clone();
+                        m = m.item(OsMenuItem::new(label).checked(edit.is_none()).on_click(move |_, _, cx| {
+                            if let Some(edit) = edit {
+                                v.update(cx, |this, cx| this.sm_edit_rip(i, edit, cx));
+                            }
+                        }));
+                    }
+                    m
+                }))
+                .child(select_cell(style).id(("sm-joint-style", i)).os_dropdown_menu(SharedString::from(format!("sm-joint-style-{i}")), true, move |mut m, _, _| {
+                    for (label, key) in RIP_STYLES {
+                        let v = v2.clone();
+                        m = m.item(OsMenuItem::new(label).checked(label == style).on_click(move |_, _, cx| v.update(cx, |this, cx| this.sm_edit_rip(i, RipEdit::Style(key), cx))));
+                    }
+                    m
+                }))
+        });
         let joints_table = v_flex().items_start().child(joint_head).children(joint_rows_el).into_any_element();
         let tables_el = v_flex()
             .id("sm-tables")

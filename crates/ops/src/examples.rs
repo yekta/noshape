@@ -113,6 +113,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("sheetmetal_edit_bend", &[r##"{"bend": "Bend A", "radius": "3 mm"}"##, r##"{"bend": 0, "k_factor": 0.45}"##]),
     ("sheetmetal_move_bend", &[r##"{"bend": "Bend B", "by": -1}"##]),
     ("sheetmetal_convert_to_rip", &[r##"{"bend": "Bend A"}"##]),
+    ("sheetmetal_edit_joint", &[r##"{"joint": "Joint C", "style": "Butt joint - Direction 1"}"##, r##"{"joint": "Joint C", "type": "Bend"}"##]),
     ("sheetmetal_export_flat", &[r##"{"part": "Part 1", "file": "/tmp/flat.dxf"}"##]),
     ("document_update_workspace", &[r##"{}"##, r##"{"apply": true}"##]),
     ("variable_list", &[r##"{}"##]),

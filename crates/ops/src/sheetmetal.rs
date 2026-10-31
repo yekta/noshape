@@ -224,6 +224,66 @@ pub fn convert_to_rip(ps: &mut PartStudio, model: FeatureId, face: Reference, un
     true
 }
 
+/// The Other joints Style ▾ choices: (label, std's jointStyle) (live "ui
+/// (10-24 a)" (5f)).
+pub const RIP_STYLES: [(&str, &str); 3] = [("Edge joint", "EDGE"), ("Butt joint - Direction 1", "BUTT"), ("Butt joint - Direction 2", "BUTT2")];
+
+/// An Other joints row's pick: Type ▾ Bend, or a Style ▾ (std's jointStyle;
+/// Type ▾ Rip keeps the row a rip).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RipEdit {
+    Bend,
+    Style(&'static str),
+}
+
+/// An Other joints row's Type ▾ / Style ▾ pick (live "ui (10-24 a)" (5e,
+/// 5f)): the rip's Modify joint set to Bend (the model's radius) or to Rip in
+/// that style. A rip a Modify joint made (Convert to rip, an earlier pick)
+/// has that feature changed; another gets a new Modify joint of its cut face
+/// at the rollback bar or before the model's Finish. False when the pick is
+/// the row's current value.
+pub fn edit_rip(ps: &mut PartStudio, model: FeatureId, data: &SheetMetalData, rip: usize, edit: RipEdit, units: &UnitPrefs) -> bool {
+    let Some(r) = data.rips.get(rip) else { return false };
+    let current = if r.style.is_empty() { "EDGE" } else { r.style.as_str() };
+    if matches!(edit, RipEdit::Style(s) if s == current) {
+        return false;
+    }
+    let set = |p: &mut ParamValues| match edit {
+        RipEdit::Bend => {
+            p.set("jointType", ParamValue::Enum("BEND".into()));
+            p.set("useDefaultRadius", ParamValue::Bool(true));
+        }
+        RipEdit::Style(style) => {
+            p.set("jointType", ParamValue::Enum("RIP".into()));
+            p.set("hasStyle", ParamValue::Bool(true));
+            p.set("jointStyle", ParamValue::Enum(style.into()));
+        }
+    };
+    // Its own Modify joint: the one that made it (Convert to rip, an earlier
+    // pick). std keeps the bend's joint id ("F<feature>.<n>", the feature
+    // that made the bend), and that Modify joint names a face of it.
+    let at = joint_edit_index(ps, model);
+    let from = ps.features.iter().position(|f| f.id == model).map_or(0, |i| i + 1);
+    let maker = r.joint.as_deref().and_then(|j| j.strip_prefix('F')?.split('.').next()).and_then(|h| u64::from_str_radix(h, 16).ok()).map(FeatureId);
+    let own = |f: &Feature| {
+        f.type_id == "sheetMetalJoint"
+            && !f.suppressed
+            && (f.id == r.feature
+                || (matches!(f.params.0.get("jointType"), Some(ParamValue::Enum(t)) if t == "RIP")
+                    && matches!(f.params.0.get("entity"), Some(ParamValue::Query(q)) if q.iter().any(|x| x.depends_on().is_some() && x.depends_on() == maker || r.faces.iter().any(|n| matches!(x, Reference::Face(m) if m == &**n))))))
+    };
+    if let Some(i) = (from..at.min(ps.features.len())).rev().find(|&i| own(&ps.features[i])) {
+        set(&mut ps.features[i].params);
+        return true;
+    }
+    let Some(face) = r.faces.first().map(|n| Reference::Face((**n).clone())) else { return false };
+    let Some(mut f) = ps.new_feature("sheetMetalJoint", units) else { return false };
+    f.params.set("entity", ParamValue::Query(vec![face]));
+    set(&mut f.params);
+    insert_joint_edit(ps, f, at);
+    true
+}
+
 /// "Move up" / "Move down" (also the history text).
 pub fn move_description(delta: isize) -> &'static str {
     if delta < 0 { "Move up" } else { "Move down" }

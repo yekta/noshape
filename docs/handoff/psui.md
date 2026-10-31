@@ -243,6 +243,10 @@ switches; `switcher_next`, TabThumbs queues). SM4k: the flat view outlines only 
 (model-core flat_view_display names each edge; the assembly's pasted flat keeps its edges naming the part). Asked
 live: Shift+H / p semantics (REQUESTS psui 10-31 11:14; ours toggles a global show flag). Next: SM4i (Other joints
 Type ▾ Bend / Rip, Style ▾ Edge joint / Butt joint - Direction 1 / 2 → a Modify joint on the rip's wall-end edge).
+10-31 12:01: SM4i: Other joints Type ▾ / Style ▾ as live (ops::sheetmetal::edit_rip, API op sheetmetal_edit_joint, T1 e2e
+sheet_metal_other_joint_ops); select lists now grow to their longest option (os_menu, Chrome's lists). Under std a
+rip a Modify joint made has no `faces` (custom host sheetmetal.rs `named(Def::Edge(e))` empty); edit_rip finds its
+Modify joint through the rip's joint id instead (see Requests). Asked skasm via lead: the flake below.
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC
@@ -564,6 +568,10 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 5. p1-dialogs: checkbox label widths differ by font (Flama vs Roboto); nothing to do short of a font change.
 
 ## Requests to the lead
+- (10-31 12:01) For skasm: ops e2e `sheet_metal_table_ops` steps (Bend A radius 3 → Move up → Convert Bend B to rip) leave
+  the model, in about half the runs, with **no bends and only "Joint A"** (the other half: Bend A + Joint B). The test
+  didn't check the table there so it passes either way; ids are random per run, so std's joint matching looks
+  order-dependent. Also under std a converted rip's `Rip::faces` is empty (no entity for a new Modify joint).
 
 - (10-31) For skasm (sheet-metal model), from the chrome-sweep rows I own: **SM4i** the Other joints Type ▾ / Style ▾
   need Modify joint to restyle an existing rip (now "The joint is already a rip") and to turn a rip into a bend from

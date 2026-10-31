@@ -1,7 +1,7 @@
 //! The Part Studio's "Sheet metal table and flat view" panel (shared logic in
 //! `crate::sheetmetal`): the Bends and Other joints tables of a sheet metal
 //! model, a bend's Radius / K factor edit, Move up / Move down, Convert to
-//! rip, and Export DXF/DWG of Flat pattern.
+//! rip, an Other joint's Type / Style, and Export DXF/DWG of Flat pattern.
 
 use super::{doc_field, edit_studio, regen_report, s, studio_target, tab_field};
 use crate::error::OpError;
@@ -63,6 +63,23 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: convert_to_rip,
+        },
+        Op {
+            group: "sheetmetal",
+            verb: "edit_joint",
+            summary: "Change an Other joints row's Type (Bend / Rip) or Style in the sheet metal table (a Modify joint)",
+            description: "An Other joints row's Type ▾ / Style ▾: a Modify joint of the rip set to Bend (the model's radius; the joint moves to the Bends table) or to Rip in the picked style. A rip a Modify joint made has that feature changed; another gets a new Modify joint at the rollback bar or before the model's Finish. One edit (\"Modify joint\").",
+            fields: vec![
+                doc_field(),
+                tab_field(),
+                model_field(),
+                req("joint", json!({ "type": ["string", "integer"] }), "The Other joints row: its name (\"Joint C\") or its index in sheetmetal_table's `joints`."),
+                opt("type", json!({ "type": "string", "enum": ["Bend", "Rip"] }), "Type ▾: Bend turns the rip into a bend."),
+                opt("style", json!({ "type": "string", "enum": sm::RIP_STYLES.iter().map(|s| s.0).collect::<Vec<_>>() }), "Style ▾ of a rip."),
+            ],
+            mutates: true,
+            destructive: false,
+            run: edit_joint,
         },
         Op {
             group: "sheetmetal",
@@ -236,6 +253,36 @@ fn convert_to_rip(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let face = sm::bend_face(&data.bends[bend]).ok_or_else(|| OpError::invalid("the bend has no faces").with_param("bend"))?;
     edit_studio(od, tab, sm::CONVERT_TO_RIP, |ps| {
         sm::convert_to_rip(ps, model, face, &units);
+        Ok(())
+    })?;
+    Ok(json!({ "regeneration": regen_report(od, tab)? }).into())
+}
+
+fn edit_joint(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = studio_target(ctx, a)?;
+    let units = od.doc().settings.units;
+    let (list, r) = models(od, tab)?;
+    let m = pick_model(&list, a)?;
+    let (model, _, body, data) = list[m].clone();
+    let (_, joints) = rows(od, tab, &r, &body, &data)?;
+    let names = || joints.iter().map(|j| j.name.clone()).collect::<Vec<_>>().join(", ");
+    let joint = match a.get("joint") {
+        Some(Value::Number(n)) => n.as_u64().map(|n| n as usize).filter(|n| *n < joints.len()).ok_or_else(|| OpError::param("joint", &format!("no joint {n}; joints: {}", names())))?,
+        Some(Value::String(k)) => joints.iter().position(|j| j.name.eq_ignore_ascii_case(k.trim())).ok_or_else(|| OpError::not_found(format!("no joint `{k}`; joints: {}", names())).with_param("joint"))?,
+        _ => return Err(OpError::param("joint", "a joint name or index")),
+    };
+    let edit = match (a.opt_str("type")?, a.opt_str("style")?) {
+        (Some(t), _) if t.eq_ignore_ascii_case("bend") => sm::RipEdit::Bend,
+        (_, Some(st)) => sm::RIP_STYLES.iter().find(|x| x.0.eq_ignore_ascii_case(st)).map(|x| sm::RipEdit::Style(x.1)).ok_or_else(|| OpError::param("style", "Edge joint, Butt joint - Direction 1 or Butt joint - Direction 2"))?,
+        (Some(_), None) => return Ok(json!({ "note": "the joint is a rip already: nothing changed" }).into()),
+        (None, None) => return Err(OpError::invalid("give `type` or `style`")),
+    };
+    let mut copy = doc::studio(od.doc(), tab)?.clone();
+    if !sm::edit_rip(&mut copy, model, &data, joint, edit, &units) {
+        return Ok(json!({ "note": "the joint has that style already: nothing changed" }).into());
+    }
+    edit_studio(od, tab, sm::MODIFY_JOINT, |ps| {
+        *ps = copy;
         Ok(())
     })?;
     Ok(json!({ "regeneration": regen_report(od, tab)? }).into())
