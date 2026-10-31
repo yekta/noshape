@@ -54,7 +54,15 @@ rm -f "${TMPDIR:-/tmp}/noshape.desktop.$$"
 $sudo install -m 644 "$here/noshape.png" "$icons/512x512/apps/noshape.png"
 $sudo install -m 644 "$here/noshape.svg" "$icons/scalable/apps/noshape.svg"
 refresh
-echo "Installed noshape $("$bin/noshape" --version | cut -d' ' -f2) to $bin/noshape"
+# The app links the desktop's libraries (X11/Wayland keyboard, fonts, Vulkan): say which are missing.
+if ! version=$("$bin/noshape" --version 2>/dev/null); then
+  echo "noshape is installed to $bin/noshape but can't start: these libraries are missing:" >&2
+  ldd "$bin/noshape" | sed -n 's/^\s*\(\S*\) => not found/  \1/p' >&2
+  echo "Debian/Ubuntu: sudo apt install libxkbcommon0 libxkbcommon-x11-0 libxcb1 libx11-xcb1 libfreetype6 libfontconfig1 libwayland-client0 libvulkan1" >&2
+  echo "(or install noshape-<version>-linux-x86_64.deb, which pulls them in). Then run ./install.sh again." >&2
+  exit 1
+fi
+echo "Installed $version to $bin/noshape"
 case ":$PATH:" in
   *":$bin:"*) ;;
   *) echo "Note: $bin isn't on your PATH. Add this line to ~/.profile (or your shell's rc file), then open a new terminal:"

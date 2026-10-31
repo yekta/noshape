@@ -204,20 +204,32 @@ jobs:
           name: ${{ matrix.asset }}
           path: dl
 
-      - name: Linux (install.sh, .deb, CLI-only)
+      - name: Linux (CLI-only, .deb, install.sh)
         if: runner.os == 'Linux'
         run: |
           set -x
           check=.github/release/check_binary.py
+          # On the clean runner first: the CLI-only download needs no desktop libraries.
+          tar xzf dl/noshape-cli-*-linux-x86_64.tar.gz -C "$RUNNER_TEMP"
+          python3 $check "$(ls "$RUNNER_TEMP"/noshape-cli-*/noshape-cli)" noshape-cli
+          # The .deb: apt pulls in its dependencies (the desktop libraries the app links).
+          sudo apt-get update -q
+          sudo apt-get install -y ./dl/noshape-[0-9]*-linux-x86_64.deb
+          test -x /usr/bin/noshape
+          python3 $check /usr/bin/noshape
+          test -f /usr/share/applications/noshape.desktop
+          test -f /usr/share/icons/hicolor/512x512/apps/noshape.png
+          sudo apt-get remove -y noshape
+          test ! -e /usr/bin/noshape
+          # The tarball's install.sh (the libraries are there now, as on a desktop). A fake Claude Code on PATH:
+          # --agents registers noshape with it (`claude mcp add`).
           tar xzf dl/noshape-[0-9]*-linux-x86_64.tar.gz -C "$RUNNER_TEMP"
           dir=$(ls -d "$RUNNER_TEMP"/noshape-[0-9]*/)
-          # A fake Claude Code on PATH: install.sh --agents registers noshape with it (`claude mcp add`).
           mkdir -p "$RUNNER_TEMP/fake"
           printf '#!/bin/sh\necho "$*" >> "$HOME/claude-calls"\n' > "$RUNNER_TEMP/fake/claude"
           chmod +x "$RUNNER_TEMP/fake/claude"
           PATH="$RUNNER_TEMP/fake:$PATH" "$dir/install.sh" --agents
           grep -qx "mcp add --scope user noshape -- $HOME/.local/bin/noshape mcp" "$HOME/claude-calls"
-          test -f "$HOME/.local/share/applications/noshape.desktop"
           grep -q "^Exec=$HOME/.local/bin/noshape" "$HOME/.local/share/applications/noshape.desktop"
           test -f "$HOME/.local/share/icons/hicolor/512x512/apps/noshape.png"
           export PATH="$HOME/.local/bin:$PATH"
@@ -225,15 +237,6 @@ jobs:
           python3 $check noshape
           "$dir/install.sh" --uninstall --no-agents
           test ! -e "$HOME/.local/bin/noshape"
-          # The .deb (apt pulls its dependencies).
-          sudo apt-get update -q
-          sudo apt-get install -y ./dl/noshape-[0-9]*-linux-x86_64.deb
-          test "$(command -v noshape)" = /usr/bin/noshape || test -x /usr/bin/noshape
-          python3 $check /usr/bin/noshape
-          test -f /usr/share/applications/noshape.desktop
-          # The CLI-only download.
-          tar xzf dl/noshape-cli-*-linux-x86_64.tar.gz -C "$RUNNER_TEMP"
-          python3 $check "$(ls "$RUNNER_TEMP"/noshape-cli-*/noshape-cli)" noshape-cli
 
       - name: macOS (dmg, command line tool link, CLI-only)
         if: runner.os == 'macOS'
