@@ -42,9 +42,25 @@ fn demo_plate_views_have_expected_lines() {
             assert!(vis > 0);
             if exact && v.id == ViewId(1) {
                 // Front view of the filleted plate: bottom edge, two side
-                // edges, the two fillet silhouettes at the top corners, the
-                // top silhouette and the end arcs of the edge fillets.
-                assert_eq!(vis, 8, "front view visible lines");
+                // edges, the top silhouette and the end arcs of the edge
+                // fillets at the top corners. (The back corners' edges project
+                // onto the front ones: OCCT's hidden-line removal draws them
+                // visible over them for OCCT's fillets and leaves them out for
+                // noshape's, so count distinct lines.)
+                let mut lines: Vec<[i64; 4]> = g
+                    .edges
+                    .iter()
+                    .filter(|e| e.visible && matches!(e.class, EdgeClass::Sharp | EdgeClass::Outline))
+                    .map(|e| {
+                        let q = |p: [f64; 2]| [(p[0] * 1e6).round() as i64, (p[1] * 1e6).round() as i64];
+                        let (a, b) = (q(e.points[0]), q(e.points[e.points.len() - 1]));
+                        if a <= b { [a[0], a[1], b[0], b[1]] } else { [b[0], b[1], a[0], a[1]] }
+                    })
+                    .collect();
+                lines.sort();
+                lines.dedup();
+                assert_eq!(lines.len(), 6, "front view visible lines");
+                assert_eq!(tan, 1, "front view tangent lines");
             }
             if v.id == ViewId(2) {
                 // Top view: each of the 3 holes shows its bore circle and

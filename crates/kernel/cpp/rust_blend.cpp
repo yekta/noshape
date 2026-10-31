@@ -11,6 +11,7 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepCheck_Result.hxx>
 #include <TopAbs.hxx>
+#include <array>
 #include <sstream>
 #include <BRepLib.hxx>
 #include <BRep_Builder.hxx>
@@ -617,6 +618,29 @@ bool rust_blend(const OcShape& s, const std::vector<TopoDS_Edge>& es, const std:
       return false;
     }
     fo[i] = TopoDS::Face(f.Oriented(ori));
+  }
+  // Regularity as OCCT's fillet leaves it: a blend's edges along the faces it is tangent to G1, a new face's
+  // seam CN (the drawings' hidden-line views draw tangent edges from it: without, a fillet's edges were sharp
+  // lines). New edges and pieces only: the input's keep theirs.
+  {
+    std::vector<std::array<int64_t, 2>> faces_of(eo.size(), {-1, -1});
+    for (size_t i = 0; i < nf; ++i)
+      for (uint32_t l = o.face_loops[i]; l < o.face_loops[i + 1]; ++l)
+        for (uint32_t k = o.loop_uses[l]; k < o.loop_uses[l + 1]; ++k)
+        {
+          auto& fs = faces_of[o.uses[k] / 2];
+          (fs[0] < 0 ? fs[0] : fs[1]) = static_cast<int64_t>(i);
+        }
+    for (size_t e = 0; e < eo.size(); ++e)
+      if (out.edge_origin[3 * e] != 0 && faces_of[e][0] >= 0 && faces_of[e][1] >= 0
+          && (faces_of[e][0] != faces_of[e][1] || out.face_origin[3 * faces_of[e][0]] == 2))
+      {
+        const TopoDS_Face& a = fo[faces_of[e][0]];
+        const TopoDS_Face& b = fo[faces_of[e][1]];
+        const GeomAbs_Shape c = BRepLib::ContinuityOfFaces(eo[e], a, b, 1e-10);
+        if (c != GeomAbs_C0)
+          bb.Continuity(eo[e], a, b, c);
+      }
   }
   lap("shapes");
   // The solid.

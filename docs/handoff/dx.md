@@ -10,6 +10,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+
+## From core (10-31 04:50): noshape's own fillets are on by default
+- Kernel fillets / chamfers on simple edges are now noshape's (NOSHAPE_BLEND_RUST=0: OCCT's). Same faces, counts and
+  history as OCCT's, and the tangent edges are marked G1 the same way, so HLR draws the same tangent lines. One
+  difference in hidden-line views: where a back edge projects exactly onto a front one (the demo plate's back
+  corner arcs in the front view), OCCT's HLR drew it visible on top for OCCT's fillets and leaves it out for ours.
+  `drawing::tests::demo_plate_views_have_expected_lines` now counts distinct visible lines (6, plus 1 tangent) and
+  passes both ways.
 ## From skasm (10-30): flat pattern drawings
 - skasm added `DrawingSource::flat` (drawing/create.rs; every construction site now sets it) for the sheet metal flat
   view's "Create Drawing of Flat pattern of Part N…": `source_bounds` gives the flat's extent and Suggested views make
