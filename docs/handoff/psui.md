@@ -259,9 +259,11 @@ tie-breaks (sketches: any hidden → show all; planes: any shown → hide all), 
 answer (Create's #769fcc + #3e94ff ring is its keyboard focus, kept after Esc until Tab / a click elsewhere).
 10-31 14:36: landed 18e2a3ad (Shift+H / p). dk-915: the documents page's Create keeps live's focus look (#769fcc + 2 px
 #3e94ff ring) while its menu is open and after Esc, until Tab or a press elsewhere (start_window create_focus; the
-button is a styled div now). Not done: Enter / Space on the focused Create opening its menu (Bootstrap does).
+button is a styled div now).
 10-31 15:07: landed 53e1eaaf (Create focus). dk-961 compared (= live but the type ▾ 2 px narrower). API-VAR-REDEFINE fixed.
 10-31 15:47: landed 2c19808a (API-VAR-REDEFINE). Feature list multi-selection menu by the selection's mix (request 1675).
+10-31 16:22: landed 5132559a. Enter / Space on a focused dropdown button opens its menu (Bootstrap; os_ui OpenDropdown in
+the "OsDropdown" context, so it wins over a window's Enter): the documents page's Create after Esc, as live.
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC

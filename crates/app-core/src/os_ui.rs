@@ -604,6 +604,12 @@ pub const GLYPH_FS_IMPORT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" v
 pub const GLYPH_BRUSH: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M17.2 3.3 12.9 8" stroke="currentColor" stroke-width="2.9" stroke-linecap="round"/><path d="M6.05 5.45 7.15 4.35 15.9 13.1 14.8 14.2z"/><path d="M0.95 10.25 5.2 6 14.35 15.15 10.1 19.4z"/></svg>"#;
 pub const GLYPH_PULSE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor"><rect x="1.5" y="1.5" width="17" height="17" rx="1"/><path d="M2 11.5h3.1l1.1-3.5.9 4.6 1.5-9.6 1.6 13.8 2-7 .9 2 1.5-1.9.8 1.6H18" stroke-width="1.1" stroke-miterlimit="5"/></svg>"#;
 
+actions!(os_ui, [OpenDropdown]);
+
+/// The key context of an [`OsDropdownExt::os_dropdown_menu`] button (Enter /
+/// Space → [`OpenDropdown`], crate::actions::default_key_bindings).
+pub const DROPDOWN_CONTEXT: &str = "OsDropdown";
+
 /// Onshape menus on dropdown buttons (instead of the kit's `dropdown_menu`):
 /// wraps the button, and a click opens `f`'s menu under it, as a Bootstrap
 /// select list as wide as the button (`select`) or a dropdown.
@@ -614,27 +620,34 @@ pub trait OsDropdownExt: IntoElement + Sized {
         let f = Rc::new(f);
         let id: ElementId = id.into();
         let key = id.to_string();
+        let open = Rc::new(move |window: &mut Window, cx: &mut App| {
+            let (f, b) = (f.clone(), bounds.get());
+            let width = f32::from(b.size.width);
+            let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| {
+                let m = if select { m.select_list(width) } else { m.dropdown() };
+                f(m, window, cx)
+            });
+            OPEN_DROPDOWNS.with(|o| o.borrow_mut().insert(key.clone(), menu.downgrade()));
+            // Near the window's right edge the menu aligns to the button's right.
+            if b.right() + px(260.) > window.viewport_size().width {
+                crate::os_menu::open_anchored(point(b.right(), b.bottom()), Anchor::TopRight, menu, window, cx);
+            } else {
+                crate::os_menu::open_anchored(point(b.origin.x, b.bottom()), Anchor::TopLeft, menu, window, cx);
+            }
+        });
+        let on_key = open.clone();
         div()
             .id(id)
             .relative()
             .flex_none()
             .child(self)
             .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
-            .on_click(move |_, window, cx| {
-                let (f, b) = (f.clone(), bounds.get());
-                let width = f32::from(b.size.width);
-                let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| {
-                    let m = if select { m.select_list(width) } else { m.dropdown() };
-                    f(m, window, cx)
-                });
-                OPEN_DROPDOWNS.with(|o| o.borrow_mut().insert(key.clone(), menu.downgrade()));
-                // Near the window's right edge the menu aligns to the button's right.
-                if b.right() + px(260.) > window.viewport_size().width {
-                    crate::os_menu::open_anchored(point(b.right(), b.bottom()), Anchor::TopRight, menu, window, cx);
-                } else {
-                    crate::os_menu::open_anchored(point(b.origin.x, b.bottom()), Anchor::TopLeft, menu, window, cx);
-                }
-            })
+            .on_click(move |_, window, cx| open(window, cx))
+            // Enter or Space on the focused button opens it too (a Bootstrap
+            // dropdown toggle; live request 1669: Esc gives the focus back),
+            // bound in this context so it wins over the window's Enter.
+            .key_context(DROPDOWN_CONTEXT)
+            .on_action(move |_: &OpenDropdown, window, cx| on_key(window, cx))
     }
 }
 

@@ -167,6 +167,9 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("backspace", DeleteSelection, doc),
         KeyBinding::new("space", ClearSelection, doc),
         KeyBinding::new("escape", Cancel, doc),
+        // A focused dropdown button opens its menu (os_ui::os_dropdown_menu).
+        KeyBinding::new("enter", crate::os_ui::OpenDropdown, Some(crate::os_ui::DROPDOWN_CONTEXT)),
+        KeyBinding::new("space", crate::os_ui::OpenDropdown, Some(crate::os_ui::DROPDOWN_CONTEXT)),
         KeyBinding::new("enter", Accept, dlg),
         KeyBinding::new("shift-enter", AcceptAndRepeat, dlg),
         KeyBinding::new("escape", Cancel, dlg),
