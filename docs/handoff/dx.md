@@ -194,6 +194,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Then TB20: Holes to exclude in Hole table properties, X direction (edge pick; X / Y LOC and the indicator turn);
   V35 / TB15 / A44 rows marked done.
 - Then C11 "+" marks (done), EX17 image placement inference.
+- Then S18 field tooltip.
 - Open in my rows: V57 assembly Show sketches (assembly sources skip sketch wires), V35 (d) sections of broken views,
   D40 hatch / title red, C11 inference points, D9 ordinate jogs.
 

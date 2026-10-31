@@ -64,6 +64,39 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// Hovering a title block field: its property as a tooltip at the
+    /// pointer ("Sheet reference : Title 2"; live 1991-1995).
+    pub fn render_field_tip(&self) -> Option<AnyElement> {
+        use noshape_model::drawing::format::{DRAWING_FIELDS, OTHER_FIELDS, SHEET_REF_FIELDS};
+        if !matches!(self.tool, Tool::Select) || self.panel.is_some() {
+            return None;
+        }
+        let b = self.built.as_ref()?;
+        let Some(noshape_model::drawing::build::PickTarget::TitleField(key)) = b.picks.get(self.hover? as usize) else { return None };
+        let text = self.current_sheet().title_field(key)?;
+        let token = text.split('{').nth(1)?.split(['}', '|']).next()?.trim();
+        let label = SHEET_REF_FIELDS
+            .iter()
+            .find(|(k, _)| *k == token)
+            .map(|(_, l)| format!("Sheet reference : {l}"))
+            .or_else(|| DRAWING_FIELDS.iter().chain(OTHER_FIELDS).find(|(k, _)| *k == token).map(|(_, l)| l.to_string()))?;
+        let p = self.sheet_to_local(self.cursor);
+        Some(
+            div()
+                .absolute()
+                .left(px((p[0] + 12.0) as f32))
+                .top(px((p[1] + 18.0) as f32))
+                .px(px(6.))
+                .py(px(3.))
+                .rounded(px(3.))
+                .bg(gpui_kit::rgb(0x333333))
+                .text_color(gpui_kit::white())
+                .text_size(px(12.))
+                .child(label)
+                .into_any_element(),
+        )
+    }
+
     /// Sheet millimeters to canvas pixels (inverse of `to_sheet`).
     pub fn sheet_to_local(&self, p: [f64; 2]) -> [f64; 2] {
         let s = self.size_px();

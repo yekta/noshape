@@ -1679,6 +1679,7 @@ impl DrawingEditor {
             .children(sheet_chips)
             .child(status)
             .children(self.render_note_inplace(cx))
+            .children(self.render_field_tip())
             .children(self.render_sketch_dim_box(cx))
             .children(self.render_cell_inplace(cx))
             .children(self.render_rotate_label())
