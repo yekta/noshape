@@ -578,7 +578,10 @@ with 0003b and 0004 on Linux, macOS and Windows.
   paths), singles.
 - perf.sh (vibe3, 6b841bb6, `regen_profile::blend_rust_profile`, OCCT's blends → noshape's): live-30 full regen
   43.9 → 28.9 ms (its fillets + chamfers 25.4 → 9.8 ms, 2.6×), live-30 edit commit 55.8 → 33.7 ms; big-plate and
-  fins-400 have no blends (unchanged). The 100-hole plate's rims: a perf.sh case still to add.
+  fins-400 have no blends (unchanged). perf.sh (vibe3, f8f40927, model `perf::blend_rust_perforated_plate`): the
+  400-hole plate's fillet (400 rims + the outer loop, 0.5 mm) 8649.7 → 194.0 ms in a full regen (44.6×), a radius
+  edit 8805 → 436 ms (20×); volumes 2.969741988037e-4 vs 2.969741987143e-4 m³ (OCCT approximates the outer
+  corners).
 - Fixed for BLEND_RUST=1 (216a85d6): OCCT's fillet past a Rust chamfer (fillet_past_end_faces no longer removes end
   faces square to the edge: OCCT's defeaturing gave a sliver for a block's two sides in some face orders) and
   Shell's slabs over Rust fillet + chamfer (iso pcurves snapped exactly onto u / v). With it on, T1 and T2 of
