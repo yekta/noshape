@@ -1967,6 +1967,73 @@ export const noOpCut = defineFeature(function(context is Context, id is Id, defi
     let _ = &mut fx;
 }
 
+/// The B94.6 knurl on the 50 × 50 cylinder (as `knurl_feature_b94_on_a_cylinder`): `kind`, CP12, outer face, groove
+/// depth 100 %, the tooth and helix angles given: the regeneration, its seconds.
+fn knurl_b94(kind: &str, tooth_deg: f64, helix_deg: f64) -> (RegenResult, f64) {
+    const CYLINDER: &str = r#"
+annotation { "Feature Type Name" : "Test cylinder" }
+export const testCylinder = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 50) * millimeter, "radius" : 25 * millimeter });
+    });
+"#;
+    let src = format!("{}\n{CYLINDER}", include_str!("fs/knurl_b94.fs"));
+    let fx = Fixture::new(&src);
+    let opts = fx.opts();
+    let mut ps = PartStudio::new();
+    ps.features.push(ps.new_feature(&fx.ty("testCylinder"), &fx.units).unwrap());
+    let mut reg = Regenerator::new();
+    let r = reg.regenerate(&ps, &ConfigValues::default(), &fx.units, &opts);
+    assert_ok(&r);
+    let body = &r.context.bodies[0];
+    let circles: Vec<Reference> = (0..body.edges.len())
+        .filter(|&i| body.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).ok().and_then(|e| e.edge_info().ok()).is_some_and(|info| matches!(info.curve, noshape_kernel::Curve::Circle { .. })))
+        .map(|i| Reference::Edge((*body.edges[i]).clone()))
+        .collect();
+    let mut f = ps.new_feature(&fx.ty("myFeature"), &fx.units).unwrap();
+    f.params.set("edges", ParamValue::Query(circles));
+    f.params.set("knurlType", ParamValue::Enum(kind.into()));
+    f.params.set("knurlFace", ParamValue::Enum("OUTER".into()));
+    f.params.set("pitchType", ParamValue::Enum("CIRCULAR".into()));
+    f.params.set("circularPitch", ParamValue::Enum("CP12".into()));
+    f.params.set("toothAngle", expr(&format!("{tooth_deg} deg")));
+    f.params.set("toothHelixAngle", expr(&format!("{helix_deg} deg")));
+    f.params.set("grooveDepthPercent", expr("100"));
+    f.params.set("targets", ParamValue::Query(vec![Reference::Body(body.id.clone())]));
+    ps.features.push(f);
+    let t = std::time::Instant::now();
+    let r = reg.regenerate(&ps, &ConfigValues::default(), &fx.units, &opts);
+    (r, t.elapsed().as_secs_f64())
+}
+
+/// The B94.6 Diamond knurl at other tooth and helix angles: the user's 45° / 45° failed with
+/// BOOLEAN_NON_MANIFOLD_RESULT after a long run (live builds it). Each valid, one part (KNURL_ANGLES=tooth,helix: one
+/// pair).
+#[test]
+#[ignore = "T2: the B94.6 knurl at 14 angle pairs (minutes)"]
+fn knurl_feature_b94_tooth_and_helix_angles() {
+    let pairs: Vec<(f64, f64)> = match std::env::var("KNURL_ANGLES") {
+        Ok(v) => {
+            let x: Vec<f64> = v.split(',').map(|a| a.trim().parse().unwrap()).collect();
+            vec![(x[0], x[1])]
+        }
+        Err(_) => vec![(45.0, 45.0), (15.0, 15.0), (15.0, 45.0), (15.0, 60.0), (30.0, 15.0), (30.0, 45.0), (30.0, 60.0), (45.0, 15.0), (45.0, 30.0), (45.0, 60.0), (60.0, 15.0), (60.0, 30.0), (60.0, 45.0), (60.0, 60.0)],
+    };
+    let mut bad = Vec::new();
+    for (tooth, helix) in pairs {
+        let (r, took) = knurl_b94("DIAMOND", tooth, helix);
+        let errors: Vec<String> = r.display.features.iter().filter(|s| s.status == FeatureStatus::Error).map(|s| s.message.clone().unwrap_or_default()).collect();
+        let b = r.context.bodies.first();
+        let (v, faces, valid) = b.map_or((0.0, 0, false), |b| (b.shape.volume().unwrap_or(0.0) * 1e9, b.shape.count(noshape_kernel::ShapeType::Face), b.shape.is_valid()));
+        eprintln!("knurl tooth {tooth}° helix {helix}°: {v:.3} mm³, {faces} faces, valid {valid}, {} parts, {took:.1} s, errors {errors:?}", r.context.bodies.len());
+        if !errors.is_empty() || !valid || r.context.bodies.len() != 1 {
+            bad.push(format!("tooth {tooth}° helix {helix}°: {errors:?}, valid {valid}, {} parts", r.context.bodies.len()));
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
 /// The Feature Studio knurl "Printable ANSI/ASME B94.6 knurling" (the lead's
 /// user, tests/fs/knurl_b94.fs) on a 50 × 50 cylinder: circular pitch 12 TPI,
 /// tooth 80°, helix 30°, groove 100 %, Straight and Diamond. The Diamond's
