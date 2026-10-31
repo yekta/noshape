@@ -2537,6 +2537,13 @@ fn gdt_leader_runs_through_its_nodes() {
     assert_eq!((*i, path.head, path.points.len()), (0, 2, 4));
     assert_eq!(path.points[2], [70.0, 30.0]);
     assert_eq!(*path.points.last().unwrap(), [80.0, 20.0]);
+    // A weld symbol's added leader the same (its own arrow stays apart).
+    let wid = id + 1;
+    let spec = weld::WeldSpec { leaders: vec![Leader { point: [150.0, 20.0], nodes: vec![[140.0, 30.0]], ..Default::default() }], ..Default::default() };
+    drawing.sheets[0].annotations.push(Annotation { id: wid, kind: AnnotationKind::Weld { view: None, target: [100.0, 20.0], spec: Box::new(spec) }, position: [120.0, 40.0], ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let (_, i, path) = built.geometry.leader_paths.iter().find(|(a, ..)| *a == wid).expect("the weld leader's path");
+    assert_eq!((*i, path.points.clone()), (0, vec![[120.0, 40.0], [140.0, 30.0], [150.0, 20.0]]));
 }
 
 #[test]

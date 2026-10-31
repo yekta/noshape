@@ -1627,8 +1627,19 @@ impl SheetGeometry {
                         Some(v) => env.to_sheet(*v, *target),
                         None => *target,
                     };
-                    let tips: Vec<[f64; 2]> = std::iter::once(tip).chain(spec.leaders.iter().map(map)).collect();
-                    super::weld::render(self, spec, &tips, a.position, ah * 0.75, !env.weld_ansi(), pick);
+                    super::weld::render(self, spec, &[tip], a.position, ah * 0.75, !env.weld_ansi(), pick);
+                    // Added leaders, through their nodes (help A5); their
+                    // paths published for the leader menu and grips.
+                    for (li, l) in spec.leaders.iter().enumerate() {
+                        let t = map(l);
+                        let mut points = vec![a.position];
+                        points.extend(l.nodes.iter().copied());
+                        points.push(t);
+                        let last = points[points.len() - 2];
+                        self.lines.push(Polyline2 { points: points.clone(), style: LineStyle::Thin, closed: false, pick });
+                        self.arrow(t, [t[0] - last[0], t[1] - last[1]], 3.0);
+                        self.leader_paths.push((a.id, li, LeaderPath { points, head: 1 }));
+                    }
                 }
                 AnnotationKind::SurfaceFinish { anchor, value, leaders, on, spec, ext } => {
                     // On an edge: standing on it, turned square to it, on
