@@ -4058,6 +4058,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
         let in_obj = states.iter().any(|x| x.1 == State::In && cx.solids[x.0].arg == 0);
         let in_tool = states.iter().any(|x| x.1 == State::In && cx.solids[x.0].arg != 0);
+        if std::env::var("NOSHAPE_X_PIECE").is_ok_and(|v| v.split(',').any(|x| x == pi.to_string())) {
+            let nonout: Vec<_> = states.iter().filter(|x| x.1 != State::Out).map(|x| (cx.solids[x.0].arg, x.1)).collect();
+            eprintln!("PIECE {pi} face arg {arg} index {} inside {:?} states not out {nonout:?} in_obj {in_obj} in_tool {in_tool}", cx.faces[f].index, pieces[pi].inside);
+        }
         let on = if ons.len() > 1 && op == Op::Cut {
             if arg != 0 { ons.iter().find(|&&(t, _)| cx.solids[t].arg == 0) } else { ons.iter().find(|x| x.1 == State::OnSame) }.or(ons.first()).copied()
         } else {
