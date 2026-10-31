@@ -213,6 +213,19 @@ models, featurescript, configurations, variable studios, dark mode). Nearly ever
 later pass had fixed; marked so with the evidence (9b1b9b47). Re-checked in the app: KB1, KB3, FS1/FS2/FS4/FS5, ADV3,
 VC8. Fixed: ME8 (assembly Measure panel as the Part Studio's, opened on the selection). Fonts (VC7/RP7/MP3) accepted
 (Flama is commercial). Open: core-workflow (d) parts-1000 orbit fps (perf 41179398098 running), SM4i / SM4k (skasm).
+10-31 11:30: **selection-field auto-advance** (user priority; live request 1650, behaviours "psui (2026-10-31, PRIORITY)
+selection-field auto-advance", dom/advance-all-modes.txt; Onshape's bundle autoAdvanceToNextControl / processItemAdd):
+FeatureDialog::add_picks (every Part Studio dialog: built-in, sheet metal, surfacing, custom FeatureScript): a field
+reaching its MaxNumberOfPicks passes the focus to the next visible query field (non-query controls skipped, a filled
+one still takes it, array items within their item); a full field replaces / drops its oldest and advances again;
+the last keeps the focus (Sketch lets go); × on a chip focuses its field; after a removal the refill doesn't advance
+until the user clicks another field and back (advance_disarmed / user_focus_query); a box selection is one edit;
+a preselection filling a limit moves on. Assembly: the mate dialog by fields (Tangent ≤1 ⇒ ≤1, Width tab ≤2 ⇒ width
+≤2, others one ≤2 field that keeps the focus, FIFO), the assembly mate connector (Origin ⇒ Between ⇒ axes, last
+keeps), Pattern Direction ⇒ second Direction. Limits: T1 query_pick_limits_follow_std (std's 112 MaxNumberOfPicks;
+Variable's measure-between was unlimited, now 2); chains in our order = live's table except fields we lack (Fillet
+variable Vertices, Routing curve hidden references, Tag base plane: their owners). T1: mate connector, Bend, knurl
+(rule 6 included), Tangent, Fastened FIFO. In the app (:102, small knurl doc): three clicks, no manual focusing.
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC

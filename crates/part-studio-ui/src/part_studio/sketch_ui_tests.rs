@@ -714,73 +714,83 @@ fn active(cx: &mut TestAppContext, d: &Entity<crate::feature_dialog::FeatureDial
     cx.update(|cx| d.read(cx).active_query.clone())
 }
 
-/// Auto-advance (user, 10-31; Onshape `autoAdvanceToNextControl`): a selection field with a pick limit keeps the
-/// focus until it holds its maximum, then passes it to the next selection field. Bridging curve's Start takes two
-/// (std bridgingCurve.fs): the first pick keeps it, the second moves on to End; picked again when full, the oldest
-/// pick goes (Onshape's `processItemAdd`).
-#[gpui::test]
-fn a_two_pick_field_passes_the_focus_on_at_its_second_pick(cx: &mut TestAppContext) {
-    let (_, view) = part_studio(cx, "advance-two");
-    let d = dialog_of(cx, &view, "bridgingCurve", |_| {});
-    cx.update(|cx| d.update(cx, |d, _| d.active_query = Some("side1".into())));
-    let (top, front, right) = (Reference::Plane(DatumPlane::Top), Reference::Plane(DatumPlane::Front), Reference::Plane(DatumPlane::Right));
-    pick(cx, &d, top.clone());
-    assert_eq!(active(cx, &d).as_deref(), Some("side1"), "one of two: the field keeps the focus");
-    pick(cx, &d, front.clone());
-    assert_eq!(active(cx, &d).as_deref(), Some("side2"), "full: on to End");
-    // Back in the full field, a third pick replaces the oldest and moves on again.
-    cx.update(|cx| d.update(cx, |d, _| d.active_query = Some("side1".into())));
-    pick(cx, &d, right.clone());
-    assert_eq!(cx.update(|cx| d.read(cx).feature.params.query("side1").to_vec()), vec![front, right]);
-    assert_eq!(active(cx, &d).as_deref(), Some("side2"));
+fn focus(cx: &mut TestAppContext, d: &Entity<crate::feature_dialog::FeatureDialog>, field: &str) {
+    cx.update(|cx| d.update(cx, |d, _| d.user_focus_query(field)));
 }
 
-/// The same for a one-pick field, over the fields between: Revolve's axis (std revolve.fs: 1) picked with Up to
-/// face set moves the focus past Full revolve, End type, Opposite direction to the Up to face field; the
-/// regions field (no limit) keeps the focus pick after pick.
-#[gpui::test]
-fn a_one_pick_field_skips_to_the_next_selection_field(cx: &mut TestAppContext) {
-    let (_, view) = part_studio(cx, "advance-one");
-    let d = dialog_of(cx, &view, "revolve", |p| {
-        p.set("fullRevolve", noshape_model::params::ParamValue::Bool(false));
-        p.set("endBound", noshape_model::params::ParamValue::Enum("UP_TO_SURFACE".into()));
-    });
-    cx.update(|cx| d.update(cx, |d, _| d.active_query = Some("entities".into())));
-    pick(cx, &d, Reference::Plane(DatumPlane::Top));
-    pick(cx, &d, Reference::Plane(DatumPlane::Front));
-    assert_eq!(active(cx, &d).as_deref(), Some("entities"), "no limit: the regions field keeps the focus");
-    cx.update(|cx| d.update(cx, |d, _| d.active_query = Some("axis".into())));
-    pick(cx, &d, Reference::Plane(DatumPlane::Right));
-    assert_eq!(active(cx, &d).as_deref(), Some("endBoundEntityFace"), "the axis filled: on to Up to face");
+fn picks(cx: &mut TestAppContext, d: &Entity<crate::feature_dialog::FeatureDialog>, field: &str) -> Vec<Reference> {
+    cx.update(|cx| d.read(cx).feature.params.query(field).to_vec())
 }
 
-/// Sweep's profiles and path have no limit (std sweep.fs): neither ever moves the focus on by itself.
+const P: [Reference; 3] = [Reference::Plane(DatumPlane::Top), Reference::Plane(DatumPlane::Front), Reference::Plane(DatumPlane::Right)];
+
+/// Auto-advance (user 10-31; live behaviours "psui (2026-10-31, PRIORITY) selection-field auto-advance", request
+/// 1650): Mate connector's Origin entity (≤1) passes the focus over Realign, Move and Owner entity to Select owner
+/// entity, filled already (rule 3); that one, full, replaces and moves on to Attach to; the last field keeps the
+/// focus and replaces (rule 5).
 #[gpui::test]
-fn unlimited_fields_keep_the_focus(cx: &mut TestAppContext) {
-    let (_, view) = part_studio(cx, "advance-none");
-    let d = dialog_of(cx, &view, "sweep", |_| {});
-    for field in ["profiles", "path"] {
-        cx.update(|cx| d.update(cx, |d, _| d.active_query = Some(field.into())));
-        for p in [DatumPlane::Top, DatumPlane::Front, DatumPlane::Right] {
-            pick(cx, &d, Reference::Plane(p));
-        }
-        assert_eq!(active(cx, &d).as_deref(), Some(field));
-    }
+fn mate_connector_fields_advance_over_their_checkboxes(cx: &mut TestAppContext) {
+    let (_, view) = part_studio(cx, "advance-mc");
+    let d = dialog_of(cx, &view, "mateConnector", |p| {
+        p.set("attachmentOption", noshape_model::params::ParamValue::Enum("TO_SELECTION".into()));
+        p.set("ownerPart", noshape_model::params::ParamValue::Query(vec![P[2].clone()]));
+    });
+    focus(cx, &d, "originQuery");
+    pick(cx, &d, P[0].clone());
+    assert_eq!(active(cx, &d).as_deref(), Some("ownerPart"), "Origin entity full: on to the (filled) owner");
+    pick(cx, &d, P[1].clone());
+    assert_eq!(picks(cx, &d, "ownerPart"), vec![P[1].clone()], "a full one-pick field replaces");
+    assert_eq!(active(cx, &d).as_deref(), Some("attachTo"));
+    pick(cx, &d, P[0].clone());
+    pick(cx, &d, P[2].clone());
+    assert_eq!(active(cx, &d).as_deref(), Some("attachTo"), "the last field keeps the focus");
+    assert_eq!(picks(cx, &d, "attachTo"), vec![P[2].clone()]);
 }
 
-/// A first field the preselection filled to its limit passes the focus on when the dialog opens (Onshape
-/// `autoAdvanceToNextControl(e, true)`), whatever the limit: Bridging curve with two preselected Start entities.
+/// Sheet metal Bend: Bend line (≤1) ⇒ Sheet metal face to bend (≤1) over Hold opposite side; back in the full
+/// Bend line (a click), a new pick replaces and moves on again (rule 4).
 #[gpui::test]
-fn a_preselection_that_fills_a_limit_moves_the_focus_on(cx: &mut TestAppContext) {
-    let (_, view) = part_studio(cx, "advance-pre");
-    let d = dialog_of(cx, &view, "bridgingCurve", |p| {
-        p.set("side1", noshape_model::params::ParamValue::Query(vec![Reference::Plane(DatumPlane::Top), Reference::Plane(DatumPlane::Front)]));
-    });
-    cx.update(|cx| {
-        d.update(cx, |d, _| {
-            d.active_query = Some("side1".into());
-            d.release_prefilled_single_pick();
-        })
-    });
-    assert_eq!(active(cx, &d).as_deref(), Some("side2"));
+fn bend_line_advances_and_a_full_one_replaces_and_advances_again(cx: &mut TestAppContext) {
+    let (_, view) = part_studio(cx, "advance-bend");
+    let d = dialog_of(cx, &view, "sheetMetalBend", |_| {});
+    focus(cx, &d, "bendReference");
+    pick(cx, &d, P[0].clone());
+    assert_eq!(active(cx, &d).as_deref(), Some("face"));
+    focus(cx, &d, "bendReference");
+    pick(cx, &d, P[1].clone());
+    assert_eq!(picks(cx, &d, "bendReference"), vec![P[1].clone()]);
+    assert_eq!(active(cx, &d).as_deref(), Some("face"), "refilled: on again");
+}
+
+/// The printable knurl (the user's custom feature, tests/fs/knurl_b94.fs): Start and end edges (MaxNumberOfPicks
+/// 2) keeps the focus after one edge and jumps over its six controls to Targets after the second. Rule 6: after a
+/// chip's ×, refilling to two doesn't advance; once the user clicked Targets and back, the next pick (a full field:
+/// the oldest goes) advances again. A third edge into the full field drops the oldest (rule 4).
+#[gpui::test]
+fn knurl_edges_take_two_then_targets_and_rearm_after_a_removal(cx: &mut TestAppContext) {
+    let (_, view) = part_studio(cx, "advance-knurl");
+    let mut doc = noshape_model::Document::new();
+    let fs = doc.add_tab("Feature Studio 1", noshape_model::TabContent::FeatureStudio(noshape_model::custom::FeatureStudio::new(include_str!("../../../model/tests/fs/knurl_b94.fs"))));
+    let _ = noshape_model::custom::DocumentScripts::from_document(&doc);
+    let d = dialog_of(cx, &view, &noshape_model::custom::type_id(fs, "myFeature"), |_| {});
+    focus(cx, &d, "edges");
+    pick(cx, &d, P[0].clone());
+    assert_eq!(active(cx, &d).as_deref(), Some("edges"), "one of two");
+    pick(cx, &d, P[1].clone());
+    assert_eq!(active(cx, &d).as_deref(), Some("targets"), "two: on to Targets");
+    // A third edge into the full field: the oldest goes, and it moves on.
+    focus(cx, &d, "edges");
+    pick(cx, &d, P[2].clone());
+    assert_eq!(picks(cx, &d, "edges"), vec![P[1].clone(), P[2].clone()]);
+    assert_eq!(active(cx, &d).as_deref(), Some("targets"));
+    // × on the first chip (Targets active): Start and end edges takes the focus; refilled, it stays.
+    cx.update(|cx| d.update(cx, |d, _| d.remove_picks("edges", &[0])));
+    assert_eq!(active(cx, &d).as_deref(), Some("edges"));
+    pick(cx, &d, P[0].clone());
+    assert_eq!(active(cx, &d).as_deref(), Some("edges"), "after a removal the refill doesn't advance");
+    // Leave and come back: re-armed.
+    focus(cx, &d, "targets");
+    focus(cx, &d, "edges");
+    pick(cx, &d, P[1].clone());
+    assert_eq!(active(cx, &d).as_deref(), Some("targets"));
 }

@@ -147,6 +147,10 @@ pub struct FeatureDialog {
     units: UnitPrefs,
     inputs: HashMap<String, Entity<InputState>>,
     pub active_query: Option<String>,
+    /// The field a removal (a chip's ×, an entity toggled off) left without its auto-advance: refilled to its limit
+    /// it keeps the focus until the user leaves it and clicks back in (live behaviours "psui (2026-10-31,
+    /// PRIORITY) selection-field auto-advance", rule 6).
+    pub advance_disarmed: Option<String>,
     /// The field the open Create selection dialog fills (white with a blue
     /// border while it is open, live part-studio/395).
     pub cs_target: Option<String>,
@@ -343,6 +347,7 @@ impl FeatureDialog {
             configured: Default::default(),
             configurable_inputs: false,
             active_query: None,
+            advance_disarmed: None,
             cs_target: None,
             subs: Vec::new(),
             parse_errors: HashMap::new(),
@@ -676,10 +681,12 @@ impl FeatureDialog {
         let Some((vals, id)) = self.values_for_path_mut(&path) else { return false };
         let q = vals.query_mut(&id);
         let mut added = false;
+        let mut removed = false;
         for r in refs {
             if let Some(pos) = q.iter().position(|x| *x == r) {
                 // Clicking a selected entity again toggles it off (Onshape behavior).
                 q.remove(pos);
+                removed = true;
             } else {
                 if let Some(n) = max
                     && n > 0
@@ -692,7 +699,10 @@ impl FeatureDialog {
             }
         }
         let full = max.is_some_and(|n| q.len() >= n);
-        if added && full {
+        if removed {
+            self.advance_disarmed = Some(path.clone());
+        }
+        if added && full && self.advance_disarmed.as_deref() != Some(path.as_str()) {
             self.advance_query_focus(&path);
         }
         self.changed(cx);
@@ -1016,6 +1026,32 @@ impl FeatureDialog {
                     this.move_pick(&p2, d.index, index, cx);
                 }
             }))
+    }
+
+    /// A chip's ×: its entries (`indices`, ascending) out of the field `path`, which becomes the active one, even
+    /// with another active, and doesn't advance on its refill until the user leaves it and clicks back in (live
+    /// auto-advance rule 6). The caller notifies the change.
+    pub fn remove_picks(&mut self, path: &str, indices: &[usize]) {
+        self.user_set.insert(path.to_string());
+        if let Some((vals, id)) = self.values_for_path_mut(path) {
+            let q = vals.query_mut(&id);
+            for i in indices.iter().rev() {
+                if *i < q.len() {
+                    q.remove(*i);
+                }
+            }
+        }
+        self.active_query = Some(path.to_string());
+        self.advance_disarmed = Some(path.to_string());
+    }
+
+    /// The user made `path` the active field (a click, Tab): coming to it from another field re-arms a disarmed
+    /// field's auto-advance (live rule 6: ×, click elsewhere, click back, pick ⇒ advances).
+    pub fn user_focus_query(&mut self, path: &str) {
+        if self.active_query.as_deref() != Some(path) {
+            self.advance_disarmed = None;
+        }
+        self.active_query = Some(path.to_string());
     }
 
     fn advance_query_focus(&mut self, from: &str) {
@@ -2648,15 +2684,7 @@ impl FeatureDialog {
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                         cx.stop_propagation();
                                         cx.emit(DialogEvent::HoverRef(None));
-                                        this.user_set.insert(p2.clone());
-                                        if let Some((vals, id)) = this.values_for_path_mut(&p2) {
-                                            let q = vals.query_mut(&id);
-                                            for i in indices.iter().rev() {
-                                                if *i < q.len() {
-                                                    q.remove(*i);
-                                                }
-                                            }
-                                        }
+                                        this.remove_picks(&p2, &indices);
                                         this.changed(cx);
                                         cx.notify();
                                     })),
@@ -2725,7 +2753,7 @@ impl FeatureDialog {
                 // the focus moves on).
                 let q_focus = self.tab_stop(&format!("q:{path}"), cx);
                 if q_focus.is_focused(window) && self.active_query.as_deref() != Some(path) {
-                    self.active_query = Some(path.to_string());
+                    self.user_focus_query(path);
                     cx.emit(DialogEvent::QueryFocused);
                     cx.notify();
                 }
@@ -2774,7 +2802,7 @@ impl FeatureDialog {
                             .children(chips)
                             .when(can_reorder, |d| d.child(self.reorder_button(path, cx)))
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                                this.active_query = Some(path_s.clone());
+                                this.user_focus_query(&path_s);
                                 window.focus(&q_focus2, cx);
                                 cx.emit(DialogEvent::QueryFocused);
                                 cx.notify();

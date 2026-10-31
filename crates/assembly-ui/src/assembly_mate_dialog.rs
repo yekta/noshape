@@ -77,6 +77,9 @@ pub struct MateDialog {
     pub d: Option<MateConnectorRef>,
     /// Connector field receiving viewport picks (0 = a, 1 = b, 2 = c, 3 = d).
     pub active: Option<usize>,
+    /// The field (its slots) a removal left without auto-advance: refilled, it keeps the focus until the user
+    /// clicks another field and back (live auto-advance rule 6, as the Part Studio's dialogs).
+    advance_disarmed: Option<Vec<usize>>,
     pub flip_primary: bool,
     /// The connector field the Mate connector panel is editing (its chip is
     /// bold, live 578).
@@ -285,6 +288,7 @@ impl MateDialog {
             c,
             d,
             active,
+            advance_disarmed: None,
             flip_primary: mate.flip_primary,
             editing_field: None,
             reorient: mate.reorient_secondary,
@@ -375,9 +379,46 @@ impl MateDialog {
         required.iter().copied().find(|i| self.slot(*i).is_none())
     }
 
-    /// Fill the active connector field; returns true when accepted.
+    /// The dialog's selection fields as their slots, in order (live behaviours "auto-advance" request 1650):
+    /// Tangent's two "Face, edge or vertex" (≤1 each), Width's "Tab mate connector(s)" (≤2) then "Width mate
+    /// connectors" (≤2), every other mate's one "Mate connectors" (≤2).
+    fn query_fields(&self) -> Vec<Vec<usize>> {
+        match self.mate_type {
+            MateType::Tangent => vec![vec![0], vec![1]],
+            MateType::Width => vec![vec![0, 3], vec![1, 2]],
+            _ => vec![vec![0, 1]],
+        }
+    }
+
+    /// The field `slot` is in.
+    fn field_of(&self, slot: usize) -> Vec<usize> {
+        self.query_fields().into_iter().find(|f| f.contains(&slot)).unwrap_or_else(|| vec![slot])
+    }
+
+    /// Where a field takes its next pick: its first empty slot, else (full) its first.
+    fn entry_slot(&self, field: &[usize]) -> usize {
+        field.iter().copied().find(|f| self.slot(*f).is_none()).unwrap_or(field[0])
+    }
+
+    /// The user clicked a field: it takes the next pick; coming from another field re-arms its auto-advance.
+    fn user_focus_field(&mut self, field: &[usize]) {
+        if !self.active.is_some_and(|a| field.contains(&a)) {
+            self.advance_disarmed = None;
+        }
+        self.active = Some(self.entry_slot(field));
+    }
+
+    /// Fill the active connector field; returns true when accepted. As Onshape's query fields (live rules,
+    /// request 1650): a field with room takes the pick in its next slot; a full one replaces (one slot) or drops
+    /// its oldest (two: the second moves up, the new pick comes last). Full, the focus moves on to the next field,
+    /// filled or not; the last field keeps it.
     pub fn set_connector(&mut self, c: MateConnectorRef, cx: &mut Context<Self>) -> bool {
-        let Some(field) = self.active else { return false };
+        let Some(active) = self.active else { return false };
+        let fields = self.query_fields();
+        let field_slots = self.field_of(active);
+        let full = field_slots.iter().all(|f| self.slot(*f).is_some());
+        // The slot the pick lands in; a full field shifts first (FIFO).
+        let field = if full { *field_slots.last().unwrap() } else { self.entry_slot(&field_slots) };
         let same = |o: &Option<MateConnectorRef>| o.as_ref().is_some_and(|o| o.instance == c.instance && o.path == c.path);
         if self.mate_type == MateType::Width {
             // Tab and width connectors must not share instances.
@@ -387,14 +428,30 @@ impl MateDialog {
             }
         } else {
             // Live (E1): a second pick on the same instance is not accepted;
-            // the title keeps "Mate needs two mate connectors.".
-            let other = if field == 0 { &self.b } else { &self.a };
+            // the title keeps "Mate needs two mate connectors.". (A full
+            // field's new pick sits next to its newest, which moves up.)
+            let other = if field == 1 && !full { &self.a } else { &self.b };
             if same(other) {
                 return false;
             }
         }
+        if full && field_slots.len() > 1 {
+            for w in 0..field_slots.len() - 1 {
+                let next = self.slot(field_slots[w + 1]).clone();
+                *self.slot_mut(field_slots[w]) = next;
+            }
+        }
         *self.slot_mut(field) = Some(c);
-        self.active = self.next_active();
+        let now_full = field_slots.iter().all(|f| self.slot(*f).is_some());
+        let at = fields.iter().position(|f| *f == field_slots).unwrap_or(0);
+        self.active = if now_full && self.advance_disarmed.as_ref() != Some(&field_slots) {
+            match fields.get(at + 1) {
+                Some(next) => Some(self.entry_slot(next)),
+                None => Some(self.entry_slot(&field_slots)),
+            }
+        } else {
+            Some(self.entry_slot(&field_slots))
+        };
         cx.emit(MateDialogEvent::Changed);
         cx.notify();
         true
@@ -572,7 +629,9 @@ impl MateDialog {
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     cx.stop_propagation();
                                     *this.slot_mut(field) = None;
+                                    // Live rule 6: × makes that field the active one, its refill not advancing.
                                     this.active = Some(field);
+                                    this.advance_disarmed = Some(this.field_of(field));
                                     cx.emit(MateDialogEvent::Changed);
                                     cx.notify();
                                 })),
@@ -584,7 +643,7 @@ impl MateDialog {
         let swap = fields == [0, 1] && self.a.is_some() && self.b.is_some() && self.mate_type != MateType::Tangent;
         let fields = fields.to_vec();
         let qbox = os::query_box(id, label, active, rows).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-            this.active = fields.iter().copied().find(|f| this.slot(*f).is_none()).or(fields.first().copied());
+            this.user_focus_field(&fields);
             cx.notify();
         }));
         // Onshape's ⇅ in the box header swaps the two connectors (which one
@@ -1020,13 +1079,9 @@ mod advance_tests {
         MateConnectorRef { instance: InstanceId(i), path: Vec::new(), reference: Reference::Plane(DatumPlane::Top), flip: false, rotate_quarters: 0, connector: None, align: None, moved: None }
     }
 
-    /// Auto-advance for mates (user, 10-31): the Mate connectors box takes two picks, keeping the focus after
-    /// the first (the second connector's row) and letting it go at the second, the box full (Onshape's mate
-    /// query has two picks; no later selection field). A third pick finds no field.
-    #[gpui::test]
-    fn mate_connectors_take_two_picks_then_let_the_focus_go(cx: &mut TestAppContext) {
+    fn dialog(cx: &mut TestAppContext, t: MateType) -> gpui_kit::Entity<MateDialog> {
         cx.update(gpui_kit::init);
-        let mate = Mate::new(MateId(1), "Fastened 1".into(), MateType::Fastened, connector(1), connector(2));
+        let mate = Mate::new(MateId(1), format!("{} 1", t.name()), t, connector(1), connector(2));
         let mut dialog = None;
         cx.update(|cx| {
             let bounds = Bounds { origin: Point::default(), size: size(px(800.), px(600.)) };
@@ -1038,12 +1093,44 @@ mod advance_tests {
             })
             .unwrap();
         });
-        let d = dialog.unwrap();
-        assert_eq!(cx.update(|cx| d.read(cx).active), Some(0), "a new mate starts on its first connector");
-        assert!(cx.update(|cx| d.update(cx, |d, cx| d.set_connector(connector(1), cx))));
-        assert_eq!(cx.update(|cx| d.read(cx).active), Some(1), "one of two: the box keeps the focus, on its second row");
-        assert!(cx.update(|cx| d.update(cx, |d, cx| d.set_connector(connector(2), cx))));
-        assert_eq!(cx.update(|cx| d.read(cx).active), None, "full: the focus goes");
-        assert!(!cx.update(|cx| d.update(cx, |d, cx| d.set_connector(connector(3), cx))), "no field takes a third pick");
+        dialog.unwrap()
+    }
+
+    fn set(cx: &mut TestAppContext, d: &gpui_kit::Entity<MateDialog>, i: u64) -> bool {
+        cx.update(|cx| d.update(cx, |d, cx| d.set_connector(connector(i), cx)))
+    }
+
+    fn state(cx: &mut TestAppContext, d: &gpui_kit::Entity<MateDialog>) -> (Option<usize>, Option<u64>, Option<u64>) {
+        cx.update(|cx| {
+            let d = d.read(cx);
+            (d.active, d.a.as_ref().map(|c| c.instance.0), d.b.as_ref().map(|c| c.instance.0))
+        })
+    }
+
+    /// Auto-advance in mates (live behaviours "psui (2026-10-31, PRIORITY) selection-field auto-advance", request
+    /// 1650): Tangent's first "Face, edge or vertex" (≤1) passes the focus to the second; the second, the last field,
+    /// keeps it and a new pick replaces its entity.
+    #[gpui::test]
+    fn tangent_mate_first_entity_advances_and_the_second_keeps_the_focus(cx: &mut TestAppContext) {
+        let d = dialog(cx, MateType::Tangent);
+        assert_eq!(state(cx, &d).0, Some(0));
+        assert!(set(cx, &d, 1));
+        assert_eq!(state(cx, &d), (Some(1), Some(1), None), "first field full: on to the second");
+        assert!(set(cx, &d, 2));
+        assert_eq!(state(cx, &d), (Some(1), Some(1), Some(2)), "the last field keeps the focus");
+        assert!(set(cx, &d, 3));
+        assert_eq!(state(cx, &d), (Some(1), Some(1), Some(3)), "a new pick replaces");
+    }
+
+    /// Fastened's one "Mate connectors" field (≤2) takes two and keeps the focus (no field after it); a third pick
+    /// drops the oldest (FIFO).
+    #[gpui::test]
+    fn mate_connectors_keep_the_focus_full_and_drop_the_oldest(cx: &mut TestAppContext) {
+        let d = dialog(cx, MateType::Fastened);
+        assert!(set(cx, &d, 1));
+        assert!(set(cx, &d, 2));
+        assert_eq!(state(cx, &d), (Some(0), Some(1), Some(2)));
+        assert!(set(cx, &d, 3));
+        assert_eq!(state(cx, &d), (Some(0), Some(2), Some(3)), "the oldest went");
     }
 }

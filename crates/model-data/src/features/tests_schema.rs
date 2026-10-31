@@ -447,3 +447,30 @@ fn query_pick_limits_follow_std() {
     }
     assert!(wrong.is_empty(), "{} pick limits differ:\n{}", wrong.len(), wrong.join("\n"));
 }
+
+/// Prints the auto-advance chains in live's dom/advance-all-modes.txt format (a review aid).
+#[test]
+#[ignore = "review aid"]
+fn print_advance_chains() {
+    for t in all() {
+        // Query fields in order, an array's item fields as "Array › Field".
+        let mut qs: Vec<(String, Option<usize>)> = Vec::new();
+        for p in t.params.iter().filter(|p| !p.hints.has(Hints::ALWAYS_HIDDEN)) {
+            match &p.kind {
+                ParamKind::Query { max_picks, .. } => qs.push((p.label.to_string(), *max_picks)),
+                ParamKind::Array { item, .. } => {
+                    for i in item.iter().filter(|i| !i.hints.has(Hints::ALWAYS_HIDDEN)) {
+                        if let ParamKind::Query { max_picks, .. } = i.kind {
+                            qs.push((format!("{} › {}", p.label, i.label), max_picks));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        let parts: Vec<String> = qs.iter().enumerate().filter_map(|(k, (l, m))| m.map(|n| format!("{l} (≤{n}) ⇒ {}", qs.get(k + 1).map_or("— (last)".to_string(), |x| x.0.clone())))).collect();
+        if !parts.is_empty() {
+            println!("OURS | {} | {}", t.name, parts.join("; "));
+        }
+    }
+}

@@ -69,6 +69,9 @@ pub struct McSession {
     /// Field receiving picks while `active`: 0 origin entity, 1 between
     /// entity, 2 primary axis entity, 3 secondary axis entity.
     pub slot: usize,
+    /// The field a chip's × left without auto-advance until the user clicks another field and back (live
+    /// auto-advance rule 6, request 1650).
+    pub no_advance: Option<usize>,
     /// Origin type Between entities, and Realign.
     pub between: bool,
     pub realign: bool,
@@ -358,6 +361,7 @@ impl AssemblyView {
             inputs,
             for_mate,
             slot: 0,
+            no_advance: None,
             between: existing.as_ref().is_some_and(|c| c.between.is_some()),
             realign: existing.as_ref().is_some_and(|c| c.primary_axis.is_some() || c.secondary_axis.is_some()),
             extra: existing.as_ref().map(|c| [c.between.clone(), c.primary_axis.clone(), c.secondary_axis.clone()]).unwrap_or_default(),
@@ -498,6 +502,7 @@ impl AssemblyView {
                                         }
                                         m.active = true;
                                         m.slot = slot;
+                                        m.no_advance = Some(slot);
                                     }
                                     this.update_capture(cx);
                                     this.schedule_eval(window, cx);
@@ -513,6 +518,9 @@ impl AssemblyView {
                 .pt(px(5.))
                 .child(os::query_box(SharedString::from(id.to_string()), label, active, rows).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(m) = &mut this.mc {
+                        if !(m.active && m.slot == slot) {
+                            m.no_advance = None;
+                        }
                         m.active = true;
                         m.slot = slot;
                     }

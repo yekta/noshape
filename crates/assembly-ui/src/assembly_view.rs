@@ -2229,8 +2229,14 @@ impl AssemblyView {
                 0 => m.on = Some(c),
                 s => m.extra[s - 1] = Some(c),
             }
-            m.active = false;
-            m.slot = 0;
+            // Live (auto-advance, request 1650): each field takes one pick and passes the focus to the next shown
+            // one (Between entity, the Realign axes); the last keeps it, a new pick replacing.
+            let shown = [Some(0), m.between.then_some(1), m.realign.then_some(2), m.realign.then_some(3)];
+            if m.no_advance != Some(m.slot)
+                && let Some(next) = shown.into_iter().flatten().find(|s| *s > m.slot)
+            {
+                m.slot = next;
+            }
             self.schedule_eval(window, cx);
             return;
         }
@@ -2255,12 +2261,14 @@ impl AssemblyView {
             }
             // A linear pattern's direction on an edge runs along the edge (live).
             let c = if p.kind == PatternDialogKind::Linear { c.linear_direction() } else { c };
+            // Live (auto-advance, request 1650): Direction (≤1) moves the focus on to the second Direction when it
+            // shows, filled or not; the last direction field keeps it (a new pick replaces).
             if slot == 0 {
                 p.axis = Some(c);
-                p.active = if p.second && p.axis2.is_none() { Some(1) } else { None };
+                p.active = if p.second { Some(1) } else { Some(0) };
             } else {
                 p.axis2 = Some(c);
-                p.active = None;
+                p.active = Some(1);
             }
             return;
         }
