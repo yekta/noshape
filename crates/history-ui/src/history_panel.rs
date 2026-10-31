@@ -1177,6 +1177,9 @@ impl Render for HistoryPanel {
             // "Merging": "merge a version from another branch").
             let other_version = r.kind == RowKind::Version && graph.microversions.iter().find(|m| m.id == mv).is_some_and(|m| m.branch != current_branch);
             let row = row.on_click(open).os_context_menu(move |m, window, cx| {
+                // Live (menus/rmb-version-v1, dk-9a1): a Bootstrap dropdown's
+                // 27 px rows and 14 px text, ~222 px wide.
+                let m = m.row_height(27.).text_px(14.).text_inset(20.).min_width(222.);
                 // Live menus/rmb-version-v1: Open, Branch to create workspace…,
                 // Compare, Restore to <ws>…, Properties…, Releases ▸, Publish
                 // FeatureScript… (browser tab / copy link are cloud-only).

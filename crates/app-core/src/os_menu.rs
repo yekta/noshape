@@ -185,6 +185,8 @@ pub struct OsMenu {
     min_width: Option<f32>,
     row_height: Option<f32>,
     text_inset: Option<f32>,
+    /// Item text size in px (default per style).
+    text_px: Option<f32>,
     /// The camera and render options menu (live dom/menu-camera-render):
     /// 222 px rows of 22 px, 12 px `#555` text 27 px in, 16 px icons 6 px in.
     camera: bool,
@@ -213,7 +215,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, camera: false, on_escape: None, ring: None, truncate: false }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, text_px: None, camera: false, on_escape: None, ring: None, truncate: false }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -272,6 +274,12 @@ impl OsMenu {
     /// This menu's row height instead of its style's.
     pub fn row_height(mut self, h: f32) -> Self {
         self.row_height = Some(h);
+        self
+    }
+
+    /// Item text `px` high.
+    pub fn text_px(mut self, px: f32) -> Self {
+        self.text_px = Some(px);
         self
     }
 
@@ -462,6 +470,7 @@ impl Render for OsMenu {
         };
         let row_h = self.row_height.unwrap_or(row_h);
         let text_x = self.text_inset.unwrap_or(text_x);
+        let text_sz = self.text_px.unwrap_or(text_sz);
         let plain_menu = !dropdown && !snippets && select.is_none() && !self.toolbar;
         let camera = self.camera;
         let truncate = self.truncate;
