@@ -66,7 +66,7 @@ pub fn showcase_document() -> Document {
         add(s, AnnotationKind::SurfaceFinish { anchor: [95.0, 156.2], value: "Ra 1.6".into(), leaders: Vec::new(), on: None, spec: Default::default(), ext: None }, [95.0, 156.2]);
         // A grouped ordinate dimension along the bottom of the top view.
         let o = [-0.05, -0.03];
-        add(s, AnnotationKind::OrdinateGroup { view: ViewId(2), origin: o, points: vec![o, [-0.038, -0.018], [-0.0332, -0.018], [0.0, 0.0], [0.038, 0.018], [0.05, 0.03]], horizontal: true }, [110.0, 168.0]);
+        add(s, AnnotationKind::OrdinateGroup { view: ViewId(2), origin: o, points: vec![o, [-0.038, -0.018], [-0.0332, -0.018], [0.0, 0.0], [0.038, 0.018], [0.05, 0.03]], horizontal: true, shifts: Vec::new() }, [110.0, 168.0]);
         s.tables.push(Table { corner: TableCorner::BottomLeft, ..Table::new(1, TableKind::Hole { view: ViewId(2), origin: [-0.05, -0.03], origin_ref: None, precision: Some(1), flip_x: false, flip_y: false, show_location: true, bottom_to_top: false }, [150.0, 46.0]) });
         // Ordinates now carry the bottom-left location: move the front view's notes down.
         if let Some(n) = s.annotations.iter_mut().find(|a| matches!(a.kind, AnnotationKind::Note { .. })) {

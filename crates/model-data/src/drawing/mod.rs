@@ -987,7 +987,16 @@ pub enum AnnotationKind {
     /// share one line through the annotation position; leaders jog when
     /// neighboring values would overlap. Reference slots: 0 = origin,
     /// `i + 1` = `points[i]`.
-    OrdinateGroup { view: ViewId, origin: [f64; 2], points: Vec<[f64; 2]>, horizontal: bool },
+    OrdinateGroup {
+        view: ViewId,
+        origin: [f64; 2],
+        points: Vec<[f64; 2]>,
+        horizontal: bool,
+        /// A value dragged sideways (sheet mm along the measured axis, per
+        /// point): its extension line jogs over to it (live request 1603).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        shifts: Vec<f64>,
+    },
     /// Maximum / minimum (arc condition) dimension between `a` and `b`
     /// (view coordinates). An end with a radius (`ra` / `rb` > 0) is a
     /// circle center; its condition picks the center, the near side (Min)

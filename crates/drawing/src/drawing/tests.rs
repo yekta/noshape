@@ -1091,7 +1091,7 @@ fn grouped_ordinate_dimensions() {
         }
     }
     let id = drawing.sheets[0].next_annotation_id();
-    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::OrdinateGroup { view: ViewId(2), origin, points: pts.clone(), horizontal: true }, position: [100.0, 262.0], refs, ..Default::default() });
+    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::OrdinateGroup { view: ViewId(2), origin, points: pts.clone(), horizontal: true, shifts: Vec::new() }, position: [100.0, 262.0], refs, ..Default::default() });
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     assert!(built.dangling.is_empty(), "{:?}", built.dangling);
     let pick = pick_of(&built, PickTarget::Annotation(id));
@@ -1106,6 +1106,18 @@ fn grouped_ordinate_dimensions() {
     sorted.sort_by(f64::total_cmp);
     assert!(sorted.windows(2).all(|w| w[1] - w[0] >= 5.0 - 1e-6), "{sorted:?}");
     assert!(ts.iter().all(|t| (t.pos[1] - ts[0].pos[1]).abs() < 1e-6 || t.angle.abs() > 1.0));
+    // A value dragged sideways (live request 1603): it moves alone and its
+    // extension line jogs over to it.
+    let x50 = |b: &super::build::BuiltSheet| b.geometry.texts.iter().find(|t| t.pick == pick && t.text == "50").unwrap().pos[0];
+    let before = x50(&built);
+    if let AnnotationKind::OrdinateGroup { shifts, .. } = &mut drawing.sheets[0].annotations.last_mut().unwrap().kind {
+        *shifts = vec![0.0, 0.0, 0.0, 12.0];
+    }
+    let after = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!((x50(&after) - before - 12.0).abs() < 1e-6, "{before} -> {}", x50(&after));
+    let jogged = after.geometry.lines.iter().filter(|l| l.pick == pick && l.points.len() == 4).count();
+    let jogged_before = built.geometry.lines.iter().filter(|l| l.pick == pick && l.points.len() == 4).count();
+    assert_eq!(jogged, jogged_before + 1);
 }
 
 #[test]
@@ -1826,7 +1838,7 @@ fn ordinate_group_with_a_lost_point_is_red_as_a_whole() {
     let id = drawing.sheets[0].next_annotation_id();
     drawing.sheets[0].annotations.push(Annotation {
         id,
-        kind: AnnotationKind::OrdinateGroup { view, origin: snaps[0].p, points: vec![snaps[0].p, snaps[1].p, snaps[2].p], horizontal: true },
+        kind: AnnotationKind::OrdinateGroup { view, origin: snaps[0].p, points: vec![snaps[0].p, snaps[1].p, snaps[2].p], horizontal: true, shifts: Vec::new() },
         position: [100.0, 100.0],
         refs: vec![AnnotationRef { slot: 0, point: snaps[0].point.clone().unwrap() }, AnnotationRef { slot: 1, point: snaps[0].point.clone().unwrap() }, AnnotationRef { slot: 2, point: snaps[1].point.clone().unwrap() }, AnnotationRef { slot: 3, point: lost }],
         ..Default::default()

@@ -352,6 +352,27 @@ impl SheetPick<'_> {
     }
 
     /// The annotation `orig` (resolved) dragged from `start` to the cursor.
+    /// The ordinate group member whose value is at sheet point `s` (near
+    /// the group's level, `position`), with the measured axis on the sheet.
+    fn ordinate_member_at(&self, view: noshape_model::drawing::ViewId, points: &[[f64; 2]], horizontal: bool, shifts: &[f64], position: [f64; 2], s: [f64; 2]) -> Option<(usize, [f64; 2])> {
+        let pl = self.placement(view)?;
+        let rot = noshape_model::drawing::views::view_rotation(self.current_sheet(), view);
+        let u = noshape_model::drawing::views::rotate2(if horizontal { [1.0, 0.0] } else { [0.0, 1.0] }, rot);
+        let n = noshape_model::drawing::views::rotate2(if horizontal { [0.0, 1.0] } else { [1.0, 0.0] }, rot);
+        let dh = self.drawing.props.dim_text_height;
+        if (dot(s, n) - dot(position, n)).abs() > 3.0 * dh {
+            return None;
+        }
+        let along: Vec<f64> = points.iter().map(|p| dot(pl.to_sheet(*p), u)).collect();
+        let at = noshape_model::drawing::sheet::ordinate_text_positions(&along, dh + 1.5);
+        at.iter()
+            .enumerate()
+            .map(|(i, t)| (i, (t + shifts.get(i).copied().unwrap_or(0.0) - dot(s, u)).abs()))
+            .filter(|(_, d)| *d < dh)
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(i, _)| (i, u))
+    }
+
     pub fn dragged_annotation(&self, orig: &Annotation, start: [f64; 2]) -> Annotation {
         let c = self.cursor;
         let d = sub(c, start);
@@ -440,6 +461,14 @@ impl SheetPick<'_> {
                     *pb = pl.to_view(add2(pl.to_sheet(*pb), d));
                 }
             }
+            // A value under the pointer moves sideways alone, its extension
+            // line jogging over to it (live request 1603); elsewhere the
+            // group moves.
+            AnnotationKind::OrdinateGroup { view, points, horizontal, shifts, .. } if self.ordinate_member_at(*view, points, *horizontal, shifts, orig.position, start).is_some() => {
+                let (i, u) = self.ordinate_member_at(*view, points, *horizontal, shifts, orig.position, start).expect("checked");
+                shifts.resize(points.len(), 0.0);
+                shifts[i] += dot(d, u);
+            }
             _ => a.position = [orig.position[0] + d[0], orig.position[1] + d[1]],
         }
         // An angular dimension's label goes where it is dragged (the arc
@@ -491,6 +520,7 @@ impl SheetPick<'_> {
                 }
                 (AnnotationKind::RevisionCallout { anchor, .. }, AnnotationKind::RevisionCallout { anchor: n, .. }) => *anchor = *n,
                 (AnnotationKind::MaxMinDimension { offset, .. }, AnnotationKind::MaxMinDimension { offset: o, .. }) => *offset = *o,
+                (AnnotationKind::OrdinateGroup { shifts, .. }, AnnotationKind::OrdinateGroup { shifts: s, .. }) => shifts.clone_from(s),
                 (AnnotationKind::ArcLengthDimension { mid, offset, .. }, AnnotationKind::ArcLengthDimension { mid: m, offset: o, .. }) => {
                     *mid = *m;
                     *offset = *o;

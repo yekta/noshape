@@ -1970,7 +1970,7 @@ impl SheetGeometry {
                     let t = env.text(a, radius * sweep.abs(), false, "⌒");
                     self.dim_label([c[0] + (rr + 4.0) * tm.cos(), c[1] + (rr + 4.0) * tm.sin()], 0.0, 0.5, true, &t, dh, pick);
                 }
-                AnnotationKind::OrdinateGroup { view, origin, points, horizontal } => {
+                AnnotationKind::OrdinateGroup { view, origin, points, horizontal, shifts } => {
                     for p in std::iter::once(origin).chain(points.iter()) {
                         self.grips.push(Grip { pick, pos: env.to_sheet(*view, *p), kind: GripKind::Origin });
                     }
@@ -1998,7 +1998,7 @@ impl SheetGeometry {
                     for (i, p) in points.iter().enumerate() {
                         let value = if *horizontal { (p[0] - origin[0]).abs() } else { (p[1] - origin[1]).abs() };
                         let t = env.text(a, value, false, "");
-                        let (s0, s1) = (along[i], text_pos[i]);
+                        let (s0, s1) = (along[i], text_pos[i] + shifts.get(i).copied().unwrap_or(0.0));
                         let l0 = dot(sheet_pts[i], n) + sg * 1.0;
                         let pts = if (s1 - s0).abs() < 1e-6 {
                             vec![at(s0, l0), at(s0, level)]
