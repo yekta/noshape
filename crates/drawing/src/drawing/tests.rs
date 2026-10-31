@@ -2513,6 +2513,13 @@ fn synchronized_breaks_come_from_the_parent() {
     assert_eq!(p.nbreaks, 1, "the vertical break only");
     assert!(p.breaks()[0].inherited && p.breaks()[0].axis == 0);
     assert!(!built.picks.contains(&PickTarget::BreakLine { view: child, index: 0 }));
+    // A section view of the broken parent (live 1630 (d)): broken too, along
+    // the axis it shares with the parent (a horizontal cut keeps x).
+    let id = drawing.sheets[0].next_view_id();
+    drawing.sheets[0].views.push(DrawingView { id, kind: ViewKind::Section { parent, line: vec![[-0.2, 0.0], [0.2, 0.0]], label: "S".into(), cuts: Vec::new() }, position: [300.0, 250.0], ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let p = built.placements.iter().find(|p| p.id == id).unwrap();
+    assert!(p.breaks().iter().any(|b| b.inherited && b.axis == 0 && (b.b - b.a - 0.02).abs() < 1e-9), "{:?}", p.breaks());
 }
 
 #[test]

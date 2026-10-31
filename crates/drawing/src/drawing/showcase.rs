@@ -195,7 +195,7 @@ pub fn showcase_document() -> Document {
     if let Some(src) = sources.get(&SourceKey::studio(asm)) {
         let mut placed: Vec<usize> = Vec::new();
         let mut next = 2;
-        let pl = super::build::placement_of(&drawing.sheets[s2], ViewId(1), &g);
+        let pl = super::build::placement_of(&drawing.sheets[s2], ViewId(1), &g, &|_| None);
         // Topmost vertex of each part (visible in the isometric view).
         let mut snaps = g.snaps.clone();
         snaps.sort_by(|a, b| b.p[1].total_cmp(&a.p[1]));

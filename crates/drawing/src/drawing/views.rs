@@ -626,18 +626,35 @@ pub fn auxiliary_toward(sheet: &Sheet, id: ViewId) -> Option<[f64; 2]> {
 /// The direction from parent to child (in the parent's view frame) used
 /// for projected views.
 /// The breaks a view shows (live request 1630): its own (with their
-/// index), or with Synchronize breaks from parent its parent's along the
-/// axis they share (a view above / below takes the vertical ones, one
-/// beside the horizontal ones), which only the parent edits.
-pub fn effective_breaks(sheet: &Sheet, id: ViewId) -> Vec<(super::ViewBreak, Option<usize>)> {
+/// index); with Synchronize breaks from parent (projected views) its
+/// parent's instead, and a section view of a broken view its parent's too,
+/// each along the axis the two views share (`frame_of`: the views'
+/// frames). Inherited breaks are the parent's to edit.
+pub fn effective_breaks(sheet: &Sheet, id: ViewId, frame_of: &dyn Fn(ViewId) -> Option<ViewFrame>) -> Vec<(super::ViewBreak, Option<usize>)> {
     let Some(v) = sheet.view(id) else { return Vec::new() };
-    if v.sync_breaks
-        && let (Some(p), Some(d)) = (sheet.parent_of(id), projected_direction(sheet, id))
-    {
-        let vertical = d[0].abs() < 1e-9;
-        return effective_breaks(sheet, p).into_iter().filter(|(b, _)| b.vertical == vertical).map(|(b, _)| (b, None)).collect();
+    let own = || v.breaks.iter().cloned().enumerate().map(|(i, b)| (b, Some(i))).collect::<Vec<_>>();
+    let section = matches!(v.kind, ViewKind::Section { .. });
+    if !(section || v.sync_breaks && matches!(v.kind, ViewKind::Projected { .. })) {
+        return own();
     }
-    v.breaks.iter().cloned().enumerate().map(|(i, b)| (b, Some(i))).collect()
+    let (Some(p), Some(fc)) = (sheet.parent_of(id), frame_of(id)) else { return own() };
+    let Some(fp) = frame_of(p) else { return own() };
+    // View coordinates are projections on the frame axes: a parent break
+    // across its axis `ap` is a break across the child's axis along ±ap.
+    let mapped = effective_breaks(sheet, p, frame_of).into_iter().filter_map(|(b, _)| {
+        let ap = if b.vertical { fp.right } else { fp.up };
+        let (vertical, s) = if fc.right.dot(ap).abs() > 1.0 - 1e-6 {
+            (true, fc.right.dot(ap).signum())
+        } else if fc.up.dot(ap).abs() > 1.0 - 1e-6 {
+            (false, fc.up.dot(ap).signum())
+        } else {
+            return None;
+        };
+        let (a, z) = (b.a * s, b.b * s);
+        Some((super::ViewBreak { vertical, a: a.min(z), b: a.max(z), ..b }, None))
+    });
+    // A section keeps its own breaks as well.
+    if section { own().into_iter().chain(mapped).collect() } else { mapped.collect() }
 }
 
 pub fn projected_direction(sheet: &Sheet, id: ViewId) -> Option<[f64; 2]> {

@@ -458,13 +458,14 @@ pub fn aux_indicator(sheet: &Sheet, id: ViewId, ppl: &ViewPlacement, parent: Opt
     Some(AuxIndicator { anchor: c, es, ns, offset, ext, elbows, tips, mid: at((ext[1] - ext[0]) / 2.0), letters })
 }
 
-pub fn placement_of(sheet: &Sheet, id: ViewId, g: &ViewGeometry) -> Option<ViewPlacement> {
+/// `frame_of`: the views' frames (breaks inherited from a parent).
+pub fn placement_of(sheet: &Sheet, id: ViewId, g: &ViewGeometry, frame_of: &dyn Fn(ViewId) -> Option<views::ViewFrame>) -> Option<ViewPlacement> {
     let v = sheet.view(id)?;
     let scale = views::view_scale(sheet, id);
     let mut p = ViewPlacement::new(id, g.origin, v.position, scale);
     p.rotation = views::view_rotation(sheet, id);
     let k = scale * 1000.0;
-    let eff = views::effective_breaks(sheet, id);
+    let eff = views::effective_breaks(sheet, id, frame_of);
     let mut brs: Vec<(Option<usize>, &super::ViewBreak)> = eff.iter().map(|(b, i)| (*i, b)).filter(|(_, b)| b.b > b.a).collect();
     brs.sort_by(|x, y| x.1.a.total_cmp(&y.1.a));
     let mut n = 0usize;
@@ -1307,7 +1308,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     // Parent mirrors of linked views have no place on this sheet.
     for v in sheet.views.iter().filter(|v| !v.id.is_ghost() || v.id.is_child_ghost()) {
         let Some(geo) = views.get(&v.id) else { continue };
-        let Some(pl) = placement_of(sheet, v.id, geo) else { continue };
+        let Some(pl) = placement_of(sheet, v.id, geo, &|id| views.get(&id).and_then(|g| g.frame)) else { continue };
         placements.push(pl);
     }
     // The sheet itself, for dimensions on drawing sketch geometry.
@@ -1326,6 +1327,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             if v.id.is_ghost() {
                 break 'own;
             }
+            let own_mark = g.mark();
             // Projected edges: visible ones, then tangent and hidden ones (each
             // a run, so Drawing properties › Views colors them with one span).
             let vt = &drawing.props.view_tab;
@@ -1477,10 +1479,6 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 }
             }
             g.view_edges.push((v.id, edges0..g.lines.len()));
-            // Its cutting line's point lost: the section view red (live 1625).
-            if v.cut_lost {
-                g.colors.push(super::sheet::ColorSpan { lines: edges0..g.lines.len(), texts: 0..0, fills: 0..0, rgb: LOST_RED });
-            }
             // Section hatching: computed on the unbroken view, then cropped and
             // broken in view coordinates.
             let cad_mark = g.mark();
@@ -1983,6 +1981,11 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }
             if let Some(rgb) = vt.view_label_color {
                 g.color_since((g.lines.len(), label_mark, g.fills.len()), rgb);
+            }
+            // Its cutting line's point lost: the whole section view red, its
+            // outline, hatch and title (live request 1625).
+            if v.cut_lost {
+                g.color_since(own_mark, LOST_RED);
             }
         }
         // A linked view's parent is on another sheet: its indicator is drawn there.
