@@ -848,12 +848,23 @@ pub fn body_draft(ev: &mut EvalCtx) -> FResult<()> {
             // parting (the top face with the pull up) is left as it is.
             ev.infos.push(BODY_DRAFT_NO_EFFECT.into());
             continue;
+        } else if body.shape.vertices().iter().filter_map(|v| v.vertex_point().ok()).any(|p| height(p) < -1e-9) {
+            // Live 1672: parted across the body, only the pull side is
+            // drafted (about its far end); the other side stays as it was,
+            // a ledge between them at the parting plane.
+            let cut = k::split_by_plane(&body.shape, &k::Plane::new(parting.origin, pull, parting.x)).map_err(|_| fe(BODY_DRAFT_FAILED))?;
+            cut.shape.solids().into_iter().map(|s| { let up = s.centroid().map(|c| height(c) >= 0.0).unwrap_or(true); (s, if up { 1.0 } else { 0.0 }) }).collect()
         } else {
             vec![(body.shape.clone(), 1.0)]
         };
         let mut drafted: Vec<Shape> = Vec::new();
         let mut history = None;
+        let split = sides.len() > 1;
         for (piece, sign) in sides {
+            if sign == 0.0 {
+                drafted.push(piece);
+                continue;
+            }
             let dir = pull * sign;
             let pf = piece.faces();
             // This piece's faces from the selection: same surface, overlapping.
@@ -878,7 +889,7 @@ pub fn body_draft(ev: &mut EvalCtx) -> FResult<()> {
             };
             let neutral = k::Plane::new(parting.origin + dir * far, dir, parting.x);
             let res = draft_robust(&piece, &mine, dir, &neutral, angle).map_err(|_| fe(BODY_DRAFT_FAILED))?;
-            if !both && !plane_corners {
+            if !both && !plane_corners && !split {
                 history = Some(res.history.clone());
             }
             let mut shape = res.shape;

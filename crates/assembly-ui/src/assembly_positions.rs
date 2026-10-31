@@ -81,6 +81,8 @@ impl AssemblyView {
         self.edit(&format!("Insert : {name}"), cx, |a| a.named_positions.push(NamedPosition { name, placements, mate_values }));
         self.panel = Some(SidePanel::Positions);
         self.ui.np_editing = Some(n);
+        // Live 1671: the new position is the current one (blue, no Apply).
+        self.ui.np_applied = Some(n);
         cx.notify();
     }
 
@@ -166,8 +168,24 @@ impl AssemblyView {
         self.apply_solved(solved, cx);
         self.edit(&format!("Apply named position : {}", np.name), cx, |_| {});
         self.ui.np_applied = Some(i);
-        self.ui.np_toast = Some(format!("{} is applied.", np.name));
+        self.np_toast(format!("{} is applied.", np.name), 4400, cx);
         cx.notify();
+    }
+
+    /// A named position's green toast; it goes by itself (live 1671: Apply
+    /// after ≈4.4 s, Update ≈3.9 s), ✕ closes it sooner.
+    fn np_toast(&mut self, text: String, ms: u64, cx: &mut Context<Self>) {
+        self.ui.np_toast = Some(text.clone());
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(std::time::Duration::from_millis(ms)).await;
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                if this.ui.np_toast.as_ref() == Some(&text) {
+                    this.ui.np_toast = None;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
     }
 
     fn duplicate_np(&mut self, i: usize, cx: &mut Context<Self>) {
@@ -298,7 +316,12 @@ impl AssemblyView {
             cx.notify();
         }));
         m.push(item("Duplicate named position", move |t, _, cx| t.duplicate_np(i, cx)));
-        m.push(item("Update named position", move |t, _, cx| t.store_np_state(i, cx)));
+        m.push(item("Update named position", move |t, _, cx| {
+            t.store_np_state(i, cx);
+            // Live 1671: "<name> has been updated" (no period).
+            let name = t.assembly(cx).and_then(|a| a.named_positions.get(i)).map(|n| n.name.clone()).unwrap_or_default();
+            t.np_toast(format!("{name} has been updated"), 3900, cx);
+        }));
         if i + 1 < n {
             m.push(item("Move down", move |t, _, cx| t.move_np(i, true, cx)));
         }

@@ -368,9 +368,8 @@ pub struct AssemblyView {
     pattern: Option<PatternSession>,
     /// Snap mode (Shift+S): `Some(source)` once the first connector is picked.
     snap: Option<Option<MateConnectorRef>>,
-    /// Show mates mode (H): hovered (or pinned) instance shows its mates.
+    /// Show mates mode (H): the hovered (else the selected) instance shows its mates.
     show_mates_mode: bool,
-    mates_pinned: Option<InstanceId>,
     /// Inserted instances following the cursor until a click places them.
     placing: Option<Vec<InstanceId>>,
     placing_point: Option<DVec3>,
@@ -573,7 +572,6 @@ impl AssemblyView {
             pattern: None,
             snap: None,
             show_mates_mode: false,
-            mates_pinned: None,
             placing: None,
             placing_point: None,
             manip_value: None,
@@ -1054,16 +1052,15 @@ impl AssemblyView {
         if let Some((_, ids)) = &self.ui.group {
             h.selected_tops = ids.clone();
         }
-        // Show mates mode: the hovered (or pinned) instance's mates.
-        if self.show_mates_mode {
-            let focus = self.mates_pinned.or_else(|| self.hover.as_ref().map(|t| t.path[0]));
-            if let (Some(top), Some(asm)) = (focus, self.assembly(cx)) {
-                h.accent_tops.push(top);
-                for m in asm.mates.iter().filter(|m| m.uses_instance(top)) {
-                    h.accent_tops.extend(m.instances());
-                    if let Some(ms) = self.result.mates.iter().find(|x| x.id == m.id) {
-                        mate_glyph(&mut h, ms, true, 0.9);
-                    }
+        // Show mates mode (live 1667): hovering an instance shows only its
+        // mates' indicators (below) besides the usual outline, no tint; a
+        // selected instance's mates also draw their connector triads (b3).
+        if self.show_mates_mode
+            && let (Some(top), Some(asm)) = (self.selected.first().copied(), self.assembly(cx))
+        {
+            for m in asm.mates.iter().filter(|m| m.uses_instance(top)) {
+                if let Some(ms) = self.result.mates.iter().find(|x| x.id == m.id) {
+                    mate_glyph(&mut h, ms, true, 0.9);
                 }
             }
         }
@@ -1114,7 +1111,7 @@ impl AssemblyView {
         // focus, live R5) but shows its mate's indicator (live 2220).
         let mate_full = self.mate.as_ref().is_some_and(|s| s.dialog.read(cx).connectors_complete());
         if (!picking || mate_full) && let Some(asm) = self.assembly(cx) {
-            let shown_mode: Vec<MateId> = match (self.show_mates_mode, self.mates_pinned.or_else(|| self.hover.as_ref().map(|t| t.path[0]))) {
+            let shown_mode: Vec<MateId> = match (self.show_mates_mode, self.hover.as_ref().map(|t| t.path[0]).or_else(|| self.selected.first().copied())) {
                 (true, Some(top)) => asm.mates.iter().filter(|m| m.uses_instance(top)).map(|m| m.id).collect(),
                 _ => Vec::new(),
             };
@@ -2455,10 +2452,6 @@ impl AssemblyView {
                     if let Some(c) = self.chosen_connector(*pick, cx) {
                         self.deliver_connector(c, window, cx);
                     }
-                } else if self.show_mates_mode {
-                    let top = self.pick(*pick).map(|t| t.path[0]);
-                    self.mates_pinned = if top == self.mates_pinned { None } else { top };
-                    self.selected = top.into_iter().collect();
                 } else if let Some(OverlayPick::Mate(i)) = self.overlay(*pick) {
                     // Clicking a mate indicator selects the mate (highlighted in the
                     // list), or fills the relation dialog's next mate field.
@@ -4864,13 +4857,9 @@ impl AssemblyView {
                     .border_color(gpui_kit::rgb(0xd7d7d7))
                     .text_size(px(12.))
                     .text_color(gpui_kit::rgb(0x666666))
-                    .child(
-                        div()
-                            .id("ins-undo")
-                            .cursor_pointer()
-                            .child(crate::ui::glyph("undo", 16., gpui_kit::rgb(0x666666)))
-                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.undo_last_insert(cx))),
-                    )
+                    // Live 1667: a hint only (Ctrl+Z / the toolbar's Undo
+                    // take the last insert out); clicking it does nothing.
+                    .child(crate::ui::glyph("undo", 16., gpui_kit::rgb(0x666666)))
                     .child(div().flex_1().child("Undo to remove instances"))
                     // Live dialog-assembly-insert: the 14 px help 4 px from the bottom right.
                     .relative()
@@ -5941,12 +5930,6 @@ impl AssemblyView {
             cx.notify();
         } else if self.ui.dynamic_suppression.is_some() {
             self.ui.dynamic_suppression = None;
-            cx.notify();
-        } else if self.show_mates_mode {
-            self.show_mates_mode = false;
-            self.mates_pinned = None;
-            self.update_capture(cx);
-            self.refresh_scene(false, cx);
             cx.notify();
         } else if self.explode_edit {
             // Live (qa5 P2-A3, behaviours "qa5 (10-26 p6)" (3)): Esc leaves

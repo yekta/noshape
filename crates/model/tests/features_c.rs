@@ -2066,6 +2066,18 @@ fn body_draft_as_live() {
         8535.137669482947,
         6,
     );
+    // Live 1672: parted at Plane z5, not symmetric: only the half on the pull
+    // side is drafted, a ledge at z5 (8132.508706 mm³, 11 faces), either way.
+    for flip in [false, true] {
+        ok(
+            run(false, &|p, _, _, z5| {
+                p.set("partingObject", q(Reference::FeaturePlane(z5)));
+                p.set("flipPullDirection", ParamValue::Bool(flip));
+            }),
+            8132.508706,
+            11,
+        );
+    }
     let fails = |r: Result<(f64, usize), (String, Vec<String>)>, text: &str, field: &str| {
         let (msg, faulty) = r.unwrap_err();
         assert_eq!((msg.as_str(), faulty), (text, vec![field.to_string()]));

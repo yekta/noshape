@@ -2082,9 +2082,9 @@ impl AssemblyView {
             return None;
         } else if let Some(s) = &self.snap {
             (if s.is_some() { "Snap mode: click the target face or mate connector".into() } else { "Snap mode: click a face or mate connector on the instance to move".into() }, Some(1))
-        } else if self.show_mates_mode {
-            ("Show mates mode: hover an instance to see its mates, click to pin (H to exit)".into(), Some(2))
         } else {
+            // Show mates mode has no banner either (live 1667: only the
+            // toolbar button shows it).
             return None;
         };
         Some(
@@ -2119,7 +2119,6 @@ impl AssemblyView {
                                     1 => this.toggle_snap(window, cx),
                                     _ => {
                                         this.show_mates_mode = false;
-                                        this.mates_pinned = None;
                                         this.update_capture(cx);
                                         this.refresh_scene(false, cx);
                                     }

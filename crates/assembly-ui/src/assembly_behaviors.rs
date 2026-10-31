@@ -2272,36 +2272,6 @@ impl AssemblyView {
         self.ui.insert_inserted.iter().filter(|id| a.instance(**id).is_some()).count()
     }
 
-    /// The Insert dialog's undo icon: undo the last insert (an instance
-    /// still following the cursor is dropped first).
-    pub(super) fn undo_last_insert(&mut self, cx: &mut Context<Self>) {
-        if self.inserted_count(cx) == 0 && self.placing.is_none() {
-            return;
-        }
-        // The Insert session is one pending step: take the last instance
-        // out of it; once committed, undo until that instance is gone.
-        let targets: Vec<InstanceId> = match self.placing.take() {
-            Some(ids) => {
-                self.placing_point = None;
-                self.message = None;
-                ids
-            }
-            None => self.assembly(cx).and_then(|a| self.ui.insert_inserted.iter().rev().find(|id| a.instance(**id).is_some()).copied()).into_iter().collect(),
-        };
-        if self.doc.read(cx).has_pending() {
-            self.edit_insert("Insert", cx, |a| noshape_ops::assembly::delete_instances(a, &targets));
-            cx.notify();
-            return;
-        }
-        for _ in 0..targets.len() + 2 {
-            self.doc.update(cx, |d, cx| d.undo(cx));
-            if self.assembly(cx).is_none_or(|a| targets.iter().all(|id| a.instance(*id).is_none())) {
-                break;
-            }
-        }
-        cx.notify();
-    }
-
     /// Cancel the Insert dialog (✕ / Esc): its instances go, the one
     /// following the cursor too (live: nothing is committed before ✓;
     /// "✕ / Esc cancels and removes the inserted instances", behaviours
@@ -3083,7 +3053,6 @@ impl AssemblyView {
     /// h / toolbar: Show mates mode (hovered instance shows its mates, click pins).
     pub(super) fn toggle_show_mates_mode(&mut self, cx: &mut Context<Self>) {
         self.show_mates_mode = !self.show_mates_mode;
-        self.mates_pinned = None;
         self.update_capture(cx);
         self.refresh_scene(false, cx);
         cx.notify();
