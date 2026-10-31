@@ -203,7 +203,7 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   - Tab ops aren't undoable, as live (CLI).
   - The app clears undo / redo on reopen; the CLI keeps them on purpose.
   - UNDO3 (a drawing note takes two undo steps in live) goes to dx.
-- On :103, xdotool digits don't reach the sketch's value box, though letters and text fields work. qa typed values on other displays, so I used Enter-in-chain instead.
+- GUI tip: a Line's value box exists only after the segment's second click (click, click, then type 6 Enter), as qa's flow. Typing after the first click does nothing, and that isn't a display problem.
 
 ## Part Studio feature parity (lead 10-30 21:00), 10-31
 - workflow-feature-sweep.md: 136 of 141 main rows ✅ (errors, dialogs, std-routed features; Fill / Decal now run their
