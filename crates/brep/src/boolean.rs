@@ -4218,6 +4218,17 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     }
     // (A cone's apex is used once; a sheet's edges any way.)
     if !sheets && uses.iter().any(|(&s, u)| !matches!(sedges[s].seg.g, Geo::Apex { .. }) && (u[0] != u[1] || u[0] == 0)) {
+        if std::env::var_os("NOSHAPE_X_NM").is_some() {
+            for (&s, u) in &uses {
+                if !matches!(sedges[s].seg.g, Geo::Apex { .. }) && (u[0] != u[1] || u[0] == 0) {
+                    let users: Vec<(usize, u32, u32, bool, Option<usize>, Vec<usize>)> = (0..pieces.len())
+                        .filter(|&p| pieces[p].loops.iter().flatten().any(|x| x.0 == s))
+                        .map(|p| (p, cx.faces[pieces[p].face].arg, cx.faces[pieces[p].face].index, keep[p].is_some(), partner[p], pieces[p].loops.iter().map(|l| l.len()).collect()))
+                        .collect();
+                    eprintln!("NM sedge {s} {:?} from {:?} to {:?} mid {:?} uses {u:?} pieces (piece, arg, face, kept, partner, loops) {users:?}", sedges[s].seg.g, cx.p(sedges[s].seg.v[0]), cx.p(sedges[s].seg.v[1]), cx.seg_at(&sedges[s].seg, 0.5));
+                }
+            }
+        }
         return Err(Decline("a non-manifold result"));
     }
     // Seams: an edge one face uses both ways; any other edge two faces once each.
