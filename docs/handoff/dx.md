@@ -177,6 +177,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   drawing), V27 Exclude from cut and V28 Exclude from cut (need an assembly drawing), V35 sync breaks.
 - Then D6 (side-view cosmetic threads, live 1644; ee163823) and V3 (a named view's section planes: stored on the
   view when placed, cut + hatch + Edit hatch section..., kept when the named view is deleted; live 3121-3127).
+- Then A19 (a leader inside a face region lights the region's boundary), V38 / A59 rows were stale (done). Asked
+  live: V42 typed scale label text, V49 BOM / cut list table references.
 - Open in my rows: V57 assembly Show sketches (assembly sources skip sketch wires), V35 (d) sections of broken views,
   D40 hatch / title red, C11 inference points, D9 ordinate jogs.
 
