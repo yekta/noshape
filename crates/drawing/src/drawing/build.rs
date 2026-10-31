@@ -2346,7 +2346,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }
             g.layers.push(span);
         }
-        if let (TableKind::Hole { flip_x, flip_y, .. }, Some(geo), Some(pl), Some(o)) = (&t.kind, geo, view.and_then(place), origin) {
+        if let (TableKind::Hole { flip_x, flip_y, exclude, .. }, Some(geo), Some(pl), Some(o)) = (&t.kind, geo, view.and_then(place), origin) {
             let os = pl.to_sheet(o);
             let origin_mark = g.mark();
             // The tag axis: X and Y arrows in the table's directions, picked
@@ -2397,7 +2397,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             g.cad_since(origin_mark, CadLayer::OriginIndicators);
             let tag_mark = g.texts.len();
             let tags = &ts.hole_tags;
-            for hrow in tables::hole_rows(geo, o) {
+            for hrow in tables::hole_rows(geo, o, exclude) {
                 let c = pl.to_sheet(hrow.center);
                 let r = pl.len_to_sheet(hrow.diameter / 2.0);
                 g.texts.push(Text2 { pos: [c[0] + r * 0.75 + 0.8, c[1] + r * 0.75 + 0.8], height: tags.height.unwrap_or(drawing.props.ann_text_height), text: hrow.tag, angle: 0.0, anchor: Anchor::BottomLeft, pick });

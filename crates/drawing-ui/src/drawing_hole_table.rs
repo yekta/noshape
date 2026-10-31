@@ -27,11 +27,18 @@ pub struct HoleTableDlg {
     pub corner: TableCorner,
     /// Hole table properties… of this table (None: inserting one).
     pub table: Option<u64>,
+    /// The X / Y flip buttons.
+    pub flip_x: bool,
+    pub flip_y: bool,
+    /// Holes to exclude (view coordinates); `picking`: its field takes
+    /// clicks on hole circles.
+    pub exclude: Vec<[f64; 2]>,
+    pub picking: bool,
 }
 
 impl Default for HoleTableDlg {
     fn default() -> Self {
-        Self { show_location: true, precision: None, bottom_to_top: false, corner: TableCorner::TopRight, table: None }
+        Self { show_location: true, precision: None, bottom_to_top: false, corner: TableCorner::TopRight, table: None, flip_x: false, flip_y: false, exclude: Vec::new(), picking: false }
     }
 }
 
@@ -54,8 +61,8 @@ impl DrawingEditor {
     /// choices; ✓ applies them (one edit), ✕ leaves the table as it was.
     pub fn open_hole_table_props(&mut self, id: u64, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(id) else { return };
-        let TableKind::Hole { show_location, precision, bottom_to_top, .. } = t.kind else { return };
-        self.hole_dlg = Some(HoleTableDlg { show_location, precision, bottom_to_top, corner: t.corner, table: Some(id) });
+        let TableKind::Hole { show_location, precision, bottom_to_top, flip_x, flip_y, ref exclude, .. } = t.kind else { return };
+        self.hole_dlg = Some(HoleTableDlg { show_location, precision, bottom_to_top, corner: t.corner, table: Some(id), flip_x, flip_y, exclude: exclude.clone(), picking: false });
         cx.notify();
     }
 
@@ -65,10 +72,10 @@ impl DrawingEditor {
         // HOLE-TABLE-MENU (2)).
         self.cell_sel = None;
         if let (true, Some(id)) = (accept, d.table) {
-            let (sl, pr, bt, corner) = (d.show_location, d.precision, d.bottom_to_top, d.corner);
+            let (sl, pr, bt, corner, fx, fy) = (d.show_location, d.precision, d.bottom_to_top, d.corner, d.flip_x, d.flip_y);
             self.edit_table(id, "Hole table properties", cx, move |t| {
-                if let TableKind::Hole { show_location, precision, bottom_to_top, .. } = &mut t.kind {
-                    (*show_location, *precision, *bottom_to_top) = (sl, pr, bt);
+                if let TableKind::Hole { show_location, precision, bottom_to_top, flip_x, flip_y, .. } = &mut t.kind {
+                    (*show_location, *precision, *bottom_to_top, *flip_x, *flip_y) = (sl, pr, bt, fx, fy);
                 }
                 t.corner = corner;
             });
@@ -79,10 +86,33 @@ impl DrawingEditor {
     /// A hole table just made by the tool takes the dialog's choices.
     pub fn apply_hole_table_dlg(&self, table: &mut noshape_model::drawing::Table) {
         let Some(d) = &self.hole_dlg else { return };
-        if let TableKind::Hole { show_location, precision, bottom_to_top, .. } = &mut table.kind {
-            (*show_location, *precision, *bottom_to_top) = (d.show_location, d.precision, d.bottom_to_top);
+        if let TableKind::Hole { show_location, precision, bottom_to_top, flip_x, flip_y, exclude, .. } = &mut table.kind {
+            (*show_location, *precision, *bottom_to_top, *flip_x, *flip_y) = (d.show_location, d.precision, d.bottom_to_top, d.flip_x, d.flip_y);
+            exclude.clone_from(&d.exclude);
         }
         table.corner = d.corner;
+    }
+
+    /// A click while Holes to exclude takes picks (inserting): a hole
+    /// circle of the table's view toggles. True when used.
+    pub fn hole_exclude_click(&mut self, cx: &mut Context<Self>) -> bool {
+        let Tool::Table { kind: TableTool::Hole, view: Some(v), .. } = self.tool.clone() else { return false };
+        if !self.hole_dlg.as_ref().is_some_and(|d| d.picking) {
+            return false;
+        }
+        if let Some(noshape_scene::drawing_tools::Pick::Circle { view, center, .. }) = self.pk().circle_pick(self.cursor)
+            && view == v
+            && let Some(d) = &mut self.hole_dlg
+        {
+            match d.exclude.iter().position(|e| (e[0] - center[0]).hypot(e[1] - center[1]) < 1e-7) {
+                Some(i) => {
+                    d.exclude.remove(i);
+                }
+                None => d.exclude.push(center),
+            }
+        }
+        cx.notify();
+        true
     }
 
     pub fn render_hole_table_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -204,6 +234,55 @@ impl DrawingEditor {
                 .when(show, |v| v.child(row("Location precision", select("hole-table-precision", precision_label, 112., precisions).into_any_element())))
                 .child(field(view_name.clone().unwrap_or_else(|| "Views".into()), view.is_none()))
                 .when(view.is_some(), |v| v.child(field(if origin { "Origin ✓".into() } else { "Origin: a vertex or circle center".into() }, !origin)))
+                // Live 1609: the X / Y flip icons and Holes to exclude.
+                .when(view.is_some(), |v| {
+                    let flip = |id: &'static str, label: &'static str, on: bool, f: fn(&mut HoleTableDlg), cx: &mut Context<Self>| {
+                        div()
+                            .id(id)
+                            .px(px(6.))
+                            .h(px(22.))
+                            .flex()
+                            .items_center()
+                            .border_1()
+                            .border_color(gpui_kit::rgb(0xd3d7d9))
+                            .when(on, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
+                            .cursor_pointer()
+                            .child(label)
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                if let Some(d) = &mut this.hole_dlg {
+                                    f(d);
+                                }
+                                cx.notify();
+                            }))
+                    };
+                    v.child(h_flex().px(px(8.)).h(px(28.)).gap(px(6.)).child(flip("hole-table-flip-x", "Flip X", d.flip_x, |d| d.flip_x = !d.flip_x, cx)).child(flip("hole-table-flip-y", "Flip Y", d.flip_y, |d| d.flip_y = !d.flip_y, cx)))
+                })
+                .when(view.is_some() && editing.is_none(), |v| {
+                    let n = d.exclude.len();
+                    let on = d.picking;
+                    v.child(
+                        div()
+                            .id("hole-table-exclude")
+                            .mx(px(8.))
+                            .my(px(2.))
+                            .px(px(6.))
+                            .h(px(24.))
+                            .flex()
+                            .items_center()
+                            .text_size(px(12.))
+                            .border_1()
+                            .border_color(if on { pal.accent } else { gpui_kit::rgb(0xd3d7d9) })
+                            .when(on, |d| d.bg(gpui_kit::rgb(0xdbf1fa)))
+                            .cursor_pointer()
+                            .child(if n == 0 { "Holes to exclude".to_string() } else { format!("Holes to exclude: {n}") })
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                if let Some(d) = &mut this.hole_dlg {
+                                    d.picking = !d.picking;
+                                }
+                                cx.notify();
+                            })),
+                    )
+                })
                 .child(row("Sheet", div().text_size(px(12.)).child(self.current_sheet().name.clone()).into_any_element()))
                 .child(row("Order", select("hole-table-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, 112., orders).into_any_element()))
                 .child(div().px(px(8.)).pt(px(4.)).text_size(px(11.)).child("Select fixed corner"))

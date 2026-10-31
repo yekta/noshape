@@ -296,8 +296,10 @@ pub struct HoleRow {
 
 /// Holes of a view grouped by size: tags A1, A2... for the largest size,
 /// B1... for the next; sorted top-to-bottom, left-to-right within a size.
-pub fn hole_rows(g: &ViewGeometry, origin: [f64; 2]) -> Vec<HoleRow> {
+/// `exclude`: centers of holes left out (Holes to exclude).
+pub fn hole_rows(g: &ViewGeometry, origin: [f64; 2], exclude: &[[f64; 2]]) -> Vec<HoleRow> {
     let mut bores = g.bores();
+    bores.retain(|(c, ..)| !exclude.iter().any(|e| (e[0] - c[0]).hypot(e[1] - c[1]) < 1e-7));
     // Concentric bores of different size (e.g. counterbores): keep the
     // smallest per center as the hole size.
     bores.sort_by(|a, b| a.1.total_cmp(&b.1));
@@ -431,7 +433,7 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
             }
             TableData { title: None, header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden, ..Default::default() }
         }
-        TableKind::Hole { precision, origin: stored, flip_x, flip_y, show_location, bottom_to_top, .. } => {
+        TableKind::Hole { precision, origin: stored, flip_x, flip_y, show_location, bottom_to_top, exclude, .. } => {
             // Live (behaviours 1983): TAG | X LOC | Y LOC | SIZE | QTY, a
             // size's SIZE and QTY cells merged down its rows; ☐ Show
             // location data drops X / Y LOC.
@@ -444,7 +446,7 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
             let f = DimFormat { precision: *precision, ..Default::default() };
             let u = length_units(drawing, &f);
             let num = |m: f64| format_number(m / u.meters(), f.precision, default_digits(u));
-            let holes = view_geo.map(|g| hole_rows(g, origin.unwrap_or(*stored))).unwrap_or_default();
+            let holes = view_geo.map(|g| hole_rows(g, origin.unwrap_or(*stored), exclude)).unwrap_or_default();
             // Groups of one size: consecutive rows (hole_rows keeps a size together).
             let mut groups: Vec<(usize, usize)> = Vec::new();
             for (i, h) in holes.iter().enumerate() {
