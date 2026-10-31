@@ -1815,6 +1815,9 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
         }
         _ => 0u8.hash(&mut h),
     }
+    for x in v.named_section.iter().flatten() {
+        fx(*x, &mut h);
+    }
     v.partial.hash(&mut h);
     v.cut_only.hash(&mut h);
     format!("{:?}", sketch_of(sheet, id)).hash(&mut h);
@@ -1904,6 +1907,7 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
             };
             section_geometry(id, &ctx, part.as_ref(), &frame, &sf, &pf, &cut, None, exact)
         }
+        ViewKind::Base { .. } if !v.named_section.is_empty() => named_section_geometry(id, &ctx, part.as_ref(), &frame, &v.named_section),
         _ => {
             let cuts = broken_out_cuts(drawing, sheet, id);
             if cuts.is_empty() {
@@ -2439,6 +2443,11 @@ fn cut_bodies<'a>(bodies: &[&'a Arc<Body>], tool: &noshape_kernel::Result<Shape>
 }
 
 fn cut_pieces<'a>(pieces: Vec<CutPiece<'a>>, tool: &noshape_kernel::Result<Shape>, sight: DVec3) -> (Vec<ProjBody<'a>>, Vec<Shape>, Option<String>) {
+    cut_pieces_with(pieces, tool, &|n| n.normalize().dot(sight).abs() > 1.0 - 1e-6)
+}
+
+/// [`cut_pieces`] keeping the planar tool faces whose normal `hatch` takes.
+fn cut_pieces_with<'a>(pieces: Vec<CutPiece<'a>>, tool: &noshape_kernel::Result<Shape>, hatch: &dyn Fn(DVec3) -> bool) -> (Vec<ProjBody<'a>>, Vec<Shape>, Option<String>) {
     let mut pbs: Vec<ProjBody> = Vec::new();
     let mut faces: Vec<Shape> = Vec::new();
     let mut error = None;
@@ -2467,7 +2476,7 @@ fn cut_pieces<'a>(pieces: Vec<CutPiece<'a>>, tool: &noshape_kernel::Result<Shape
                 }
                 for (fi, f) in r.shape.faces().iter().enumerate() {
                     let from_tool = r.history.of_output(ShapeType::Face, fi as u32).any(|h| h.arg == 1);
-                    if from_tool && f.face_plane().ok().flatten().is_some_and(|p| p.normal.normalize().dot(sight).abs() > 1.0 - 1e-6) {
+                    if from_tool && f.face_plane().ok().flatten().is_some_and(|p| hatch(p.normal)) {
                         faces.push(f.clone());
                     }
                 }
@@ -2578,6 +2587,49 @@ fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &Vi
         let near = diag * 1e-5 + 1e-9;
         g.edges.retain(|e| e.visible && e.points.iter().all(|p| segs.iter().any(|s| dist_to_segment(*p, s[0], s[1]) < near)));
     }
+    g.origin = frame.project(center);
+    g.update_bounds();
+    g
+}
+
+/// A base view of a named view with section planes (live 3121-3127): the
+/// bodies cut as the Part Studio's Section view shows them (the material
+/// on the far side of every plane removed), the cut faces facing the
+/// viewer hatched.
+fn named_section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, planes: &[[f64; 4]]) -> ViewGeometry {
+    let bodies = view_bodies(ctx, part);
+    let diag = bodies_diagonal(&bodies);
+    let center = bodies_center(&bodies);
+    let big = diag * 4.0 + 1.0;
+    let normal = |q: &[f64; 4]| DVec3::new(q[0], q[1], q[2]).normalize_or_zero();
+    // One plane's removed side: a slab from the plane outward.
+    let half = |q: &[f64; 4]| -> noshape_kernel::Result<Shape> {
+        let n = normal(q);
+        let x = n.any_orthonormal_vector();
+        let c = center - n * (center.dot(n) - q[3]);
+        let sq = [DVec2::new(-big, -big), DVec2::new(big, -big), DVec2::new(big, big), DVec2::new(-big, big)];
+        let segs: Vec<Segment2d> = (0..4).map(|i| Segment2d::Line { a: sq[i], b: sq[(i + 1) % 4] }).collect();
+        let face = noshape_kernel::make_face_2d(&Plane::new(c, n, x), &segs, &[])?;
+        Ok(noshape_kernel::extrude(&face, n * big)?.shape)
+    };
+    // Several planes remove where their sides meet.
+    let mut tool = half(&planes[0]);
+    for q in &planes[1..] {
+        tool = match (tool, half(q)) {
+            (Ok(a), Ok(b)) => noshape_kernel::common(&a, &b).map(|r| r.shape),
+            (Err(e), _) | (_, Err(e)) => Err(e),
+        };
+    }
+    let pieces: Vec<CutPiece> = bodies.iter().map(|b| CutPiece { body: b, shape: b.shape.clone(), map: None }).collect();
+    // A cut face looks along its plane's normal (into the removed side).
+    let facing = |n: DVec3| planes.iter().any(|q| normal(q).dot(n.normalize()).abs() > 1.0 - 1e-6 && normal(q).dot(frame.dir) < -1e-3);
+    let (pbs, faces, error) = cut_pieces_with(pieces, &tool, &facing);
+    // Exact HLR on cut solids (see section_geometry).
+    let mut g = project_bodies(id, &pbs, frame, true, &|_, _| true);
+    if g.error.is_none() {
+        g.error = error;
+    }
+    g.section_segments = section_segments_of(&faces, frame);
     g.origin = frame.project(center);
     g.update_bounds();
     g

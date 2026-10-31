@@ -576,6 +576,12 @@ pub struct DrawingView {
     /// named view is deleted from the source.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub named_view: Option<String>,
+    /// The named view's section planes when placed (normal xyz, offset; the
+    /// material where dot(normal, p) > offset for every plane is cut away
+    /// and the cut faces hatched). Kept when the named view is deleted
+    /// (live 3121-3127).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub named_section: Vec<[f64; 4]>,
     /// Assembly views › Explode/Position › a named position (index into the
     /// assembly's named positions; exclusive with `explode`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -794,6 +800,7 @@ impl Default for DrawingView {
             section_hatches: Vec::new(),
             custom_frame: None,
             named_view: None,
+            named_section: Vec::new(),
             named_position: None,
             display_state: None,
             own_position: None,

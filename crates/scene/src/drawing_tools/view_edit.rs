@@ -53,6 +53,7 @@ pub fn set_standard_orientation(v: &mut DrawingView, o: ViewOrientation) {
     if let ViewKind::Base { orientation, .. } = &mut v.kind {
         *orientation = o;
     }
+    v.named_section.clear();
     if v.named_view.take().is_some() || v.sketch.is_none() {
         v.custom_frame = None;
     }

@@ -227,14 +227,15 @@ impl DrawingEditor {
             let doc = &self.doc.read(cx).session.doc;
             let named = crate::drawing_insert::named_views(doc, source);
             for nv in named {
-                let (name, frame) = (nv.name.clone(), views::named_view_frame(nv));
+                let (name, frame, section) = (nv.name.clone(), views::named_view_frame(nv), nv.section.clone());
                 let same = cur_named.as_ref() == Some(&nv.name);
                 entries.push(MenuEntry::check(nv.name.clone(), same, move |t, _, cx| {
                     if !same {
-                        let name = name.clone();
+                        let (name, section) = (name.clone(), section.clone());
                         t.edit_view("View orientation", id, cx, move |v| {
                             v.custom_frame = Some(frame);
                             v.named_view = Some(name);
+                            v.named_section = section;
                         })
                     }
                 }));

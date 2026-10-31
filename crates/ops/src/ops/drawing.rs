@@ -884,7 +884,7 @@ fn insert_panel(od: &mut OpenDoc, a: &Args, source: TabId, o: &mut noshape_scene
         if a.get("orientation").is_some() {
             return Err(OpError::param("named_view", "give `orientation` or `named_view`, not both"));
         }
-        o.named = Some((n.to_string(), frame));
+        o.named = Some((n.to_string(), frame, dr::named_view_section(doc, source, n)));
     }
     o.flat = a.bool_or("flat", false)?;
     if o.flat && !is_studio {

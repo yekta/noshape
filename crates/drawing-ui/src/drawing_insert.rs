@@ -45,7 +45,7 @@ pub struct InsertViewState {
     pub replace_part: Option<Option<noshape_model::BodyId>>,
     /// View orientation › one of the source's named views and its frame
     /// (replaces the standard orientation while set).
-    pub named: Option<(String, [[f64; 3]; 2])>,
+    pub named: Option<(String, [[f64; 3]; 2], Vec<[f64; 4]>)>,
     /// Assemblies: Explode/Position and Display state (None: Show all) of
     /// new views (prefilled from the assembly's last applied ones).
     pub asm_position: AsmPosition,
@@ -64,7 +64,7 @@ impl Default for InsertViewState {
 
 
 
-pub use noshape_ops::drawing::{asm_position_name, asm_positions, named_view_frame, named_views, parse_simplification, simplification_choices, simplification_text};
+pub use noshape_ops::drawing::{asm_position_name, asm_positions, named_view_frame, named_view_section, named_views, parse_simplification, simplification_choices, simplification_text};
 
 type Act = std::rc::Rc<dyn Fn(&mut DrawingEditor, &mut Context<DrawingEditor>)>;
 
@@ -186,7 +186,8 @@ impl DrawingEditor {
     /// View orientation › a named view of the source.
     fn set_insert_named(&mut self, name: String, cx: &mut Context<Self>) {
         let Tool::InsertView { source, .. } = &self.tool else { return };
-        self.insert.named = named_view_frame(&self.doc.read(cx).session.doc, *source, &name).map(|f| (name, f));
+        let doc = &self.doc.read(cx).session.doc;
+        self.insert.named = named_view_frame(doc, *source, &name).map(|f| (name.clone(), f, named_view_section(doc, *source, &name)));
         self.update_preview(cx);
         cx.notify();
     }

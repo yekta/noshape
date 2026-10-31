@@ -480,6 +480,12 @@ pub fn named_view_frame(doc: &noshape_model::document::Document, source: TabId, 
     named_views(doc, source).iter().find(|v| v.name == name).map(noshape_model::drawing::views::named_view_frame)
 }
 
+/// The section planes of the source's named view `name` (empty: none or
+/// deleted).
+pub fn named_view_section(doc: &noshape_model::document::Document, source: TabId, name: &str) -> Vec<[f64; 4]> {
+    named_views(doc, source).iter().find(|v| v.name == name).map(|v| v.section.clone()).unwrap_or_default()
+}
+
 // ------------------------------------------------------------ View properties
 
 /// A typed scale: "1:2", "2/1" or a number.
@@ -644,6 +650,7 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
                 Some(frame) => {
                     v.custom_frame = Some(frame);
                     v.named_view = p.named.clone();
+                    v.named_section = p.named.as_deref().map(|n| named_view_section(doc, source, n)).unwrap_or_default();
                 }
                 None => set_standard_orientation(v, n),
             }

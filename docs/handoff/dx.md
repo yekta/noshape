@@ -175,6 +175,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   menu with Edit note…, its cell text hidden while edited). Landed through e640df77 (06:20 UTC).
 - Asked live: D6 side-view cosmetic threads (06:05). Not checked in the app yet: TB15 / TB27 (need a frame
   drawing), V27 Exclude from cut and V28 Exclude from cut (need an assembly drawing), V35 sync breaks.
+- Then D6 (side-view cosmetic threads, live 1644; ee163823) and V3 (a named view's section planes: stored on the
+  view when placed, cut + hatch + Edit hatch section..., kept when the named view is deleted; live 3121-3127).
 - Open in my rows: V57 assembly Show sketches (assembly sources skip sketch wires), V35 (d) sections of broken views,
   D40 hatch / title red, C11 inference points, D9 ordinate jogs.
 

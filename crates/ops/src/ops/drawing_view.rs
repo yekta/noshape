@@ -198,11 +198,13 @@ fn view_display(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                     OpError::param("orientation", &format!("one of {}", names.join(", ")))
                 })?;
                 let n = name.to_string();
+                let section = dr::named_view_section(doc, source, name);
                 edits.push((
                     "View orientation",
                     Box::new(move |v| {
                         v.custom_frame = Some(frame);
                         v.named_view = Some(n.clone());
+                        v.named_section.clone_from(&section);
                     }),
                 ));
             }

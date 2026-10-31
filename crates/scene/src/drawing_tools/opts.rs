@@ -24,8 +24,9 @@ pub struct InsertOpts {
     /// Assemblies: Explode/Position and Display state (None: Show all).
     pub asm_position: AsmPosition,
     pub display_state: Option<String>,
-    /// View orientation › a named view of the source and its frame.
-    pub named: Option<(String, [[f64; 3]; 2])>,
+    /// View orientation › a named view of the source, its frame and
+    /// section planes.
+    pub named: Option<(String, [[f64; 3]; 2], Vec<[f64; 4]>)>,
     /// Insert a sketch of the source (a sketch view).
     pub sketch: Option<noshape_model::FeatureId>,
     /// Another document's Part Studio / assembly (Other documents): the
@@ -140,9 +141,10 @@ impl SheetPick<'_> {
                 // reference pins the new view too.
                 v.pinned = o.insert.pinned.clone().or_else(|| self.drawing.sheets.iter().flat_map(|s| &s.views).find(|o| matches!(&o.kind, ViewKind::Base { source: s2, part: p2, .. } if s2 == source && p2 == part) && o.pinned.is_some()).and_then(|o| o.pinned.clone()));
                 // View orientation › a named view: its camera.
-                if let Some((name, frame)) = &o.insert.named {
+                if let Some((name, frame, section)) = &o.insert.named {
                     v.custom_frame = Some(*frame);
                     v.named_view = Some(name.clone());
+                    v.named_section.clone_from(section);
                 }
                 // A sketch view faces its sketch plane.
                 if let Some(f) = &o.insert.sketch {

@@ -2650,6 +2650,33 @@ fn tapped_hole_threads_from_the_side() {
     assert!(((lines[0][0][0] - lines[1][0][0]).abs() - 0.006).abs() < 1e-9, "{lines:?}");
 }
 
+/// A view of a named view with a section plane (live 3121-3127): the
+/// material beyond the plane cut away, the cut face hatched.
+#[test]
+fn named_view_section_cuts_and_hatches() {
+    let mut doc = crate::Document::new();
+    if let TabContent::PartStudio(ps) = &mut doc.tabs[0].content {
+        *ps = crate::demo::plate_studio();
+    }
+    let ps = doc.tabs[0].id;
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, ps, ViewOrientation::Top, [150.0, 150.0]));
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let g0 = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    assert!(g0.section_segments.is_empty());
+    // Cut at the plate's mid-height, the top half removed (seen from the top).
+    let (lo, hi) = sources.values().flat_map(|s| s.context.bodies.iter()).filter_map(|b| b.shape.bounding_box(true).ok()).fold((f64::MAX, f64::MIN), |(lo, hi), b| (lo.min(b.min.z), hi.max(b.max.z)));
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().named_section = vec![[0.0, 0.0, 1.0, (lo + hi) / 2.0]];
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    assert!(g.error.is_none(), "{:?}", g.error);
+    assert!(!g.section_segments.is_empty(), "the cut face is hatched");
+    // Facing away from the viewer: no hatch.
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().named_section = vec![[0.0, 0.0, -1.0, -(lo + hi) / 2.0]];
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    assert!(g.section_segments.is_empty());
+}
+
 #[test]
 fn datum_on_dimension_arrow_hides_it() {
     let (doc, mut drawing) = demo();
