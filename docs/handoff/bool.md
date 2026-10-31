@@ -1072,13 +1072,20 @@ NOSHAPE_KERNEL_PROFILE, the machine held): the regeneration 8.8 s (live 49 s), t
 7.24 s (noshape's Boolean 4.93 s: its brep part 4.35, the build 0.57, OCCT's sections ahead 0.57; unify.usd 2.0 s:
 USD 1.32, its copy 0.35) + op_unify 0.1 s; the rest of the test (its volume, meshing, the straight knurl) ~6.5 s.
 
-## What still declines, by OCCT's recorded time (replays 10-31 13:10 UTC, each case once over all corpora)
-An internal face 25.3 s (2: b2511301 a Shell slab fuse of 72 tools whose OCCT result is invalid, addb9a14), a
-tolerant input 23.9 s (18), edges of two arguments crossing on a third's face 22.2 s (14), a plane through a
-cone's apex 18.6 s (27), a vertex inside coincident edges of two other arguments 16.3 s (11), two vertices nearly
-coincide 9.7 s (10), a curve nearly along a face's boundary 5.5 s (5), an edge on another argument's free-form face
-4.9 s (4), an internal edge 4.0 s (11), the rest under 4 s each. Flat: no one reason is worth much now.
-(/root/bool-scratch/why19.tsv: corpus, case, recorded ms, reason.)
+## qa's documents, Rust on against off (10-31 16:51 UTC)
+A release CLI of main (ede3be15, /root/bool-scratch/noshape-cli-main), every part's volume and face count of qa's
+sweep documents (/root/bool-scratch/sweep.sh: live-30, big-plate, fins-400, the qa-1026 and ticket documents,
+mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BOOL_RUST=1 and =0 but
+cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
+halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
+
+## What still declines, by OCCT's recorded time (replays 10-31 17:20 UTC on main with the apex work, each case once)
+A vertex inside coincident edges of two other arguments 32.3 s (17), an internal face 25.3 s (2: b2511301 a Shell
+slab fuse of 72 tools whose OCCT result is invalid, addb9a14), a tolerant input 23.9 s (18), edges of two arguments
+crossing on a third's face 22.2 s (14), two vertices nearly coincide 9.7 s (10), a curve nearly along a face's
+boundary 5.5 s (5), an edge on another argument's free-form face 4.9 s (4), an internal edge 4.0 s (11), the rest
+under 4 s each.
+(/root/bool-scratch/why20.tsv: corpus, case, recorded ms, reason.)
 
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
