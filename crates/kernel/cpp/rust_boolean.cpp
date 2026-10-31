@@ -1348,9 +1348,29 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       TopoDS_Wire w;
       bb.MakeWire(w);
       const uint32_t u0 = b.loop_uses[l], u1 = b.loop_uses[l + 1];
+      // (A loop through one vertex twice, no edge twice (a hole touching the boundary at a point): on a reversed
+      // face its edges in the other order too, so that each starts where the one before ends, as OCCT's; a
+      // simple loop either way.)
+      bool pinched = false;
+      if (rev && u1 - u0 <= 256)
+      {
+        std::vector<TopoDS_Vertex> starts;
+        std::vector<uint32_t>      seen;
+        for (uint32_t k = u0; k < u1; ++k)
+        {
+          const TopoDS_Edge& e = es[b.uses[k] / 2];
+          starts.push_back(TopExp::FirstVertex(TopoDS::Edge(e.Oriented(b.uses[k] % 2 == 1 ? TopAbs_REVERSED : TopAbs_FORWARD)), true));
+          seen.push_back(b.uses[k] / 2);
+        }
+        std::sort(seen.begin(), seen.end());
+        const bool twice = std::adjacent_find(seen.begin(), seen.end()) != seen.end();
+        for (size_t x = 0; x < starts.size() && !twice && !pinched; ++x)
+          for (size_t y = x + 1; y < starts.size() && !pinched; ++y)
+            pinched = starts[x].IsSame(starts[y]);
+      }
       for (uint32_t k = 0; k < u1 - u0; ++k)
       {
-        const uint32_t u    = b.uses[mirrored ? u1 - 1 - k : u0 + k];
+        const uint32_t u    = b.uses[mirrored || pinched ? u1 - 1 - k : u0 + k];
         const bool     back = (u % 2 == 1) != rev;
         bb.Add(w, es[u / 2].Oriented(back ? TopAbs_REVERSED : TopAbs_FORWARD));
       }

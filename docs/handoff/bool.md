@@ -984,6 +984,24 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   ones, found directly).
 - The same result (9.427289e-5 m³, 10362 faces, valid); replays all 0 differ, the counts unchanged.
 
+## Unions with coplanar neighbouring faces (skasm's rows 141, 142, 144; 10-31 UTC)
+- RUST-UNION-MERGES-DISJOINT-FACES: on boolgrid 15 #42 the cylinder's bottom circle touches the block top's edges
+  at (5, 0) and (15, 10); the line/arc discriminant came out a hair below zero, so no vertex there and the three
+  bits of the top stayed one face (a loop touching itself, not valid): Rust 12 faces after the unify, OCCT 14.
+  Now a straight and a round 2D curve within the tolerance of touching meet where they are nearest (two round
+  ones likewise), a vertex as OCCT's. Two more found on the way, in the same recorded grid cases: a loop through one
+  vertex twice (a hole touching the boundary) built on a reversed face in an order that chains (BRepCheck
+  rejected it), and a new vertex on an edge lying on a face is one of that face's vertices "on" it, not one it
+  generated (OCCT's history; a Cut's history differed too).
+- qa's seeds recorded on the OCCT path (boolgrid 15 × 43, 38 × 13, 68 × 26: 54 Booleans): before 41 taken, 4
+  differ; now 42 taken, 0 differ. The five cases in kernel tests/data/bool (T1 bool_corpus_small_cases).
+- Replays, all 0 differ, one more taken in six corpora (main 777, corpus2 554, corpus3 557, corpus4 601, corpus5
+  718, corpus6 663; Shell's 78, direct 58).
+- boolrand 17 #0 (OCCT's "no geometry change"): rebuilt by hand from Rust's exact volume (r5 cylinders 1 mm apart,
+  heights 20 / 10, bottoms on Top, and variants): both paths agree on main; not reproduced.
+- vibe3 (perf.sh, steps 1–8): the knurl's Rust Boolean 4.8 s (38 s before step 3), op_boolean 15.75 s of which
+  unify.usd 10.7 s (Requests).
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|
@@ -999,10 +1017,6 @@ Medians are 10–20× faster; totals 2.6–3.4× in the corpora, held down by a 
 ~2 s each against OCCT's 3–4 s). (OCCT's are the recorded times, parallel, on a loaded machine; ours serial.)
 
 ## Next
-- After the knurl (lead 10-31): skasm's three union rows in docs/parity/workflow-booleans.md: boolgrid 15 #42 and
-  boolgrid 38 #12 (the Rust union gives 12 / 9 faces where OCCT and live give 14 / 10: coplanar neighbouring faces
-  merged, RUST-UNION-MERGES-DISJOINT-FACES) and boolrand 17 #0 (OCCT's path "no geometry change" on a union of two
-  r5 cylinders 1 mm apart; qa's script no longer draws that case: rebuild it by hand).
 Free-form, the lead's four steps (13:35) where they stand (10-29 20:45 UTC): (1) profiled (above); (2) the hybrid
 (OCCT's IntTools_FaceFace curves, everything else ours) takes B-spline, torus, sphere, extruded and revolved faces;
 (3) tori / spheres / sweeps through the same hybrid: returns flat (spheres and tori mostly decline at poles and

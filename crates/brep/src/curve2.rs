@@ -708,6 +708,17 @@ impl C2 {
                             out.push((t, u));
                         }
                     }
+                } else if qa > 0.0 {
+                    // (Touching within the tolerance, the line clear of the circle by less: where it is nearest, as
+                    // OCCT makes a vertex there.)
+                    let t = -qb / qa;
+                    let p = w + e * t;
+                    if (p.length() - r).abs() <= tol
+                        && (0.0..=1.0).contains(&t)
+                        && let Some(u) = C2::arc_t(a0, sweep, p.y.atan2(p.x))
+                    {
+                        out.push((t, u));
+                    }
                 }
             }
             (C2::Arc { .. }, C2::Seg { .. }) => out = o.intersections(self, tol).into_iter().map(|(u, t)| (t, u)).collect(),
@@ -718,7 +729,8 @@ impl C2 {
                 if dl <= tol && (r1 - r2).abs() <= tol {
                     return out;
                 }
-                if dl > 1e-300 && dl <= r1 + r2 && dl >= (r1 - r2).abs() {
+                // (Touching within the tolerance, apart or inside by less: where they are nearest.)
+                if dl > 1e-300 && dl <= r1 + r2 + tol && dl >= (r1 - r2).abs() - tol {
                     let x = (dl * dl + r1 * r1 - r2 * r2) / (2.0 * dl);
                     let h = (r1 * r1 - x * x).max(0.0).sqrt();
                     let base = c1 + d * (x / dl);

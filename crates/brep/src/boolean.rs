@@ -4235,14 +4235,17 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             if !cx.pool.inputs[w as usize].is_empty() || vmap.get(w as usize).is_none() {
                 continue;
             }
+            // (On an edge lying on the face it is one of the face's vertices on it, not one it made: OCCT's.)
             let through = edges_through.get(&w).map_or(&[][..], |v| &v[..]);
-            let mut across = false;
+            let (mut across, mut on) = (false, false);
             for &e in through {
-                if !cx.edge_on_surface(e, f)? {
+                if cx.edge_on_surface(e, f)? {
+                    on = true;
+                } else {
                     across = true;
                 }
             }
-            if across {
+            if across && !on {
                 makers.entry(w).or_default().push(f);
             }
         }
