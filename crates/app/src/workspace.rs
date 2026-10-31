@@ -599,9 +599,8 @@ impl Workspace {
             .px(px(6.))
             .rounded(px(0.))
             .os_dropdown_menu("help-menu-dd", false, |menu, _, _| {
-                menu.item(crate::os_menu::OsMenuItem::new("Keyboard shortcuts").on_click(|_, window, cx| window.dispatch_action(Box::new(ToggleShortcutHelp), cx)))
-                    .separator()
-                    .item(crate::os_menu::OsMenuItem::new("About noshape").disabled(true))
+                let menu = menu.item(crate::os_menu::OsMenuItem::new("Keyboard shortcuts").on_click(|_, window, cx| window.dispatch_action(Box::new(ToggleShortcutHelp), cx))).separator();
+                crate::agent_setup::help_items(menu).separator().item(crate::os_menu::OsMenuItem::new("About noshape").disabled(true))
             })
             .into_any_element()
     }

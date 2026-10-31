@@ -25,6 +25,7 @@ use noshape_feature_studio_ui::{feature_studio, fs_notices, fs_search, std_sourc
 use noshape_history_ui::{compare_mode, history_panel};
 // The documents page (docs/CRATES.md), under its old path; what it needs of the app: `register_start_hooks`.
 use noshape_start_ui::start_window;
+mod agent_setup;
 mod cli_mode;
 mod live_server;
 mod doc_dialogs;
@@ -433,6 +434,8 @@ fn main() {
         noshape_render::perf::milestone("preferences and keys set");
 
         files::init(cx);
+        // Help › Install command line tool… / Connect to coding agents… (and the macOS app menu).
+        agent_setup::init(cx);
         noshape_render::perf::milestone("app initialized");
         if path.is_some() || args.iter().any(|a| a.starts_with("--demo")) {
             let path = path.clone().unwrap_or_else(files::new_document_path);
@@ -453,6 +456,7 @@ fn main() {
         } else {
             files::show_start_window(cx);
         }
+        agent_setup::first_launch(cx);
         let g2 = gpu.clone();
         cx.on_action(move |_: &actions::NewDocument, cx| {
             let _ = &g2;
