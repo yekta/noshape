@@ -217,10 +217,13 @@ pub const SHORTCUTS: &[(&str, Cover)] = &[
 
 /// Context and dropdown menu items of the Part Studio (with the sketch and
 /// feature dialogs), assembly, drawing and document panels (variables,
-/// history) and the shared camera menu ("view"), as `<area>:<label>`: every `item("…")`, `icon_item("…")` and
+/// history), the shared camera menu ("view") and the app's setup items in Help
+/// ("app", `agent_setup.rs`), as `<area>:<label>`: every `item("…")`, `icon_item("…")` and
 /// `OsMenuItem::new("…")` label in those sources (`tests/coverage.rs`
 /// collects them). Labels built at run time ("Delete Part 1") aren't listed.
 pub const MENUS: &[(&str, Cover)] = &[
+    ("app:Connect to coding agents…", Op("agents_connect")),
+    ("app:Install command line tool…", Op("cli_install")),
     ("assembly:Add exploded view…", Op("assembly_exploded_view")),
     ("assembly:Add expression…", Op("assembly_dynamic_suppression")),
     ("assembly:Add mate connector to instance origin…", Op("assembly_mate_connector")),
