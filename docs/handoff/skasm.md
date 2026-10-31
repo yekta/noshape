@@ -184,6 +184,23 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
 (none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
 "tools/tiers/land.sh".)
 
+## Part Studio feature parity (lead 10-30 21:00), 10-31
+- workflow-feature-sweep.md: 136 of 141 main rows ✅ (errors, dialogs, std-routed features; Fill / Decal now run their
+  editing logic: FILL-MERGE-WITH-ALL, 333f6a69). Left:
+  - Loft 8 ◐: a thin loft's Trim ends is ticketed to core as THIN-LOFT-TRIM-ENDS. Our thicken of a creased sheet already
+    self-intersects. My extension attempt is parked in /root/skasm-scratch/thinloft-trim.patch.
+  - Loft 8 ◐ also: Show isocurves, drawn by no feature yet. Waiting for the live picture (REQUESTS "skasm (2026-10-31 03:40)" (e)).
+  - Draft 10 🔧: hint faces. These are std's protection against upstream changes; P3, left.
+  - Body draft 7: no live case.
+  - Thicken 4: L17 join, core's.
+- workflow-advanced-part-studio.md: every main-table row ✅ except 1.7 (a click on the circle's centre: point or
+  region?), live request "skasm (2026-10-31 03:10)".
+  - ADV2 withdrawn: live's evVolume HIGH 5927.754323 = ours; 5927.728 was /massproperties.
+  - HOLE-MISS-MSG withdrawn: live auto-flips a bottom-face hole too.
+  - ADV12: live's row is the whole callout.
+- Sketch: SKETCH-DEGENERATE-SOLVE (P3). Live solves a fillet R6 → R20 on a 20 × 10 rectangle with the top line shrunk to a
+  point; ours stalls at 4e-10. Needs degenerate-line equations or a revised `collapsed_lines` rule.
+
 ## 10-30 evening batch (lead 16:55: Copy Flat pattern, Form ▾ pictures, perf.sh figures, then the rows left)
 - Landed: Copy Flat pattern (flat body ids `noshape_model::sheetmetal::flat_body_id`; the assembly evaluates such a
   Part instance to the flat view's solid, "Flat pattern of <part>"; T1 a_flat_pattern_instance_is_the_flat; GUI: pasted
