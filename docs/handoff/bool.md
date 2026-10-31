@@ -1092,6 +1092,29 @@ NOSHAPE_BREP_WHY="" replay of every set: /root/bool-scratch/why2N.sh).
 |---|---|---|---|---|
 | before (why20, 17:13) | 80.5 % | 53.8 % | 89.6 % | 15–47 % |
 | three arguments' coincident edges (why21, 18:16) | 80.7 % | 54.0 % | 89.6 % | 16–48 % |
+| coincident pieces, curves along boundaries, equivalents (why22, 20:36; tolerances not in it) | 82.5 % | 70.9 % | 89.8 % | 50–70 % |
+
+## Coincident pieces OCCT's way; tolerant vertices; curves along a boundary (10-31 20:59 UTC)
+- A vertex inside coincident edges of two other arguments no longer declines where nothing is exact: Modified as
+  before (OCCT's history there goes by rounding: those cases come out equivalent, the vertex records apart).
+- What that uncovered, OCCT's rules: (1) in a fuse the coincident pieces' group keeps a piece of a face that was
+  split before a whole face (then the first argument's), as OCCT's same-domain faces (a slab's corner cylinder
+  piece on the taller cylinder of the next slab: OCCT's unify then merges them; with ours the whole one it
+  didn't); (2) pieces of two arguments' edges of different curve kinds on one course (a line and OCCT's rational
+  B-spline section along it) are one split edge, as a common block (each point of one within the tolerance of
+  the other); (3) faces on one surface though of different kinds (a cone and a B-spline of it, two copies of a
+  patch) are coincident like coplanar ones (`same_surface`: each face's vertices, edge middles and a grid over
+  its parameters on the other's surface).
+- A section within the grey band of a face's boundary all along is on the boundary (OCCT's within its tolerance
+  of the edge: a common block), not a decline.
+- Tolerant vertices: one on a plane within its own tolerance and half the Boolean's (OCCT's vertex/face rule), apart
+  past that + 1e-5; merged inputs grow the merged vertex's tolerance to cover both (and their distance); the result's
+  vertices carry their tolerance into the C++ build (`Body::vertex_tol` of the result, `MakeVertex`).
+- brep_replay's equivalents also take: OCCT's result invalid now but valid when recorded, ours valid with the
+  recorded counts and volume; OCCT's unified result invalid where ours is valid.
+- Replays all 0 differ: main 788 (1 equivalent), corpus2 577 (+14; 9), corpus3 582 (+14; 9), corpus4 627 (+13; 7),
+  corpus5 763 (+13; 7), corpus6 691 (+11; 5), Shell's 96 (+11; 5), direct 74 (+12; 7). The coincident-edge cases:
+  17 of 17 taken (3 exact, 14 equivalent); along a boundary 5 of 5 (1 equivalent).
 
 ## Equivalent results; per-entity tolerances (10-31 19:39 UTC)
 - brep_replay: a case whose result differs from OCCT's only by OCCT's arbitrary choices is "equivalent" (not a

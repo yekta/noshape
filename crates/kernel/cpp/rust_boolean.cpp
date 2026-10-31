@@ -975,7 +975,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     if (r.vertex_origin[3 * i] == 0)
       vs[i] = TopoDS::Vertex(input(srcs, r.vertex_origin[3 * i + 1], TopAbs_VERTEX, r.vertex_origin[3 * i + 2]).Oriented(TopAbs_FORWARD));
     else
-      bb.MakeVertex(vs[i], point_of(b, static_cast<uint32_t>(i)), tol);
+      bb.MakeVertex(vs[i], point_of(b, static_cast<uint32_t>(i)), i < b.vertex_tol.size() ? std::max(tol, b.vertex_tol[i]) : tol);
   }
   // Edges: the input's own, a piece on its curve, or new on a line, circle or ellipse.
   std::vector<TopoDS_Edge> es(ne);

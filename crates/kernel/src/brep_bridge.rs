@@ -175,6 +175,8 @@ fn push_curve(nurbs: &mut Vec<f64>, c: &NurbsCurve) -> f64 {
 fn flat(b: &Body, out: &mut BrepBody) {
     let xyz = |p: glam::DVec3| [p.x, p.y, p.z];
     out.vertices = b.vertices.iter().flat_map(|&p| xyz(p)).collect();
+    out.vertex_tol = b.vertex_tol.clone();
+    out.edge_tol = b.edge_tol.clone();
     out.edges = b.edges.iter().flat_map(|e| e.v).collect();
     out.ellipse_minor = b.edges.iter().map(|e| if let Curve::Ellipse { minor, .. } = e.curve { minor } else { 0.0 }).collect();
     for e in &b.edges {

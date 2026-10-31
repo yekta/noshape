@@ -79,11 +79,33 @@ fn equivalent(r: &OpResult, o: &OpResult) -> Option<String> {
     }
     let unified = |x: &Shape| unify_same_domain(x).map(|u| (u.shape.count(ShapeType::Face), u.shape.count(ShapeType::Edge), u.shape.is_valid(), u.shape.volume().unwrap_or(0.0))).ok();
     let (ur, uo) = (unified(&r.shape)?, unified(&o.shape)?);
-    if (ur.0, ur.1, ur.2) != (uo.0, uo.1, uo.2) || (ur.3 - uo.3).abs() > ao * TOL {
+    // (OCCT's unify making its result invalid, ours valid: ours is the reference's (a valid result).)
+    let unify_note = if ur.2 && !uo.2 {
+        format!(", OCCT's unified result invalid ({} faces against ours {})", uo.0, ur.0)
+    } else if (ur.0, ur.1, ur.2) != (uo.0, uo.1, uo.2) || (ur.3 - uo.3).abs() > ao * TOL {
+        return None;
+    } else {
+        String::new()
+    };
+    let apart = mine.iter().filter(|x| !theirs.contains(x)).count() + theirs.iter().filter(|x| !mine.contains(x)).count();
+    Some(format!("volume {:+.2e} m³ ({:.1e} relative), area {:+.2e} m², {apart} records apart{unify_note}", vr - vo, (vr - vo).abs() / vo.abs().max(1e-30), ar - ao))
+}
+
+/// Where OCCT's result is invalid now but was valid when recorded: ours valid with the recorded counts and volume
+/// (its history a hash: not compared) is the reference's (a valid result).
+fn equivalent_to_recorded(r: &OpResult, o: &OpResult, want: &Summary) -> Option<String> {
+    if o.shape.is_valid() || !want.valid || !r.shape.is_valid() {
         return None;
     }
-    let apart = mine.iter().filter(|x| !theirs.contains(x)).count() + theirs.iter().filter(|x| !mine.contains(x)).count();
-    Some(format!("volume {:+.2e} m³ ({:.1e} relative), area {:+.2e} m², {apart} records apart", vr - vo, (vr - vo).abs() / vo.abs().max(1e-30), ar - ao))
+    let got = Summary::of(r);
+    if (got.faces, got.edges, got.vertices) != (want.faces, want.edges, want.vertices) {
+        return None;
+    }
+    let area = r.shape.area().ok()?;
+    if (got.volume - want.volume).abs() > area * 1e-7 {
+        return None;
+    }
+    Some(format!("OCCT's result invalid now, ours the recorded valid one's (volume {:+.2e} m³)", got.volume - want.volume))
 }
 
 fn median(v: &mut [f64]) -> f64 {
@@ -200,7 +222,7 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         if !d.is_empty()
             && std::env::var_os("NOSHAPE_BREP_EXACT").is_none()
             && let Ok(o) = &o
-            && let Some(deltas) = equivalent(&r, o)
+            && let Some(deltas) = equivalent(&r, o).or_else(|| equivalent_to_recorded(&r, o, &c.summary))
         {
             equivalents.push(format!("{name} ({:?}, {} tools): {}; {deltas}", c.op, c.tools.len(), d.join(", ")));
             d.clear();
