@@ -693,3 +693,94 @@ fn an_escaped_folder_rename_records_nothing(cx: &mut TestAppContext) {
     assert_eq!(name.as_deref(), Some("F1"));
     assert_eq!(undo, undo_before, "no rename recorded");
 }
+
+/// A feature dialog of `type_id` (its defaults, `set` applied) in the test window's app, with no field active yet.
+fn dialog_of(cx: &mut TestAppContext, view: &Entity<PartStudioView>, type_id: &str, set: impl FnOnce(&mut noshape_model::params::ParamValues)) -> Entity<crate::feature_dialog::FeatureDialog> {
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let units = v.doc.read(cx).session.doc.settings.units;
+        let mut f = v.studio(cx).expect("studio").new_feature(type_id, &units).expect("feature type");
+        set(&mut f.params);
+        let labeler: crate::feature_dialog::RefLabeler = std::sync::Arc::new(|r: &Reference| format!("{r:?}"));
+        cx.new(|cx| crate::feature_dialog::FeatureDialog::new(f, units, labeler, cx))
+    })
+}
+
+fn pick(cx: &mut TestAppContext, d: &Entity<crate::feature_dialog::FeatureDialog>, r: Reference) {
+    cx.update(|cx| d.update(cx, |d, cx| d.add_pick(r, cx)));
+}
+
+fn active(cx: &mut TestAppContext, d: &Entity<crate::feature_dialog::FeatureDialog>) -> Option<String> {
+    cx.update(|cx| d.read(cx).active_query.clone())
+}
+
+/// Auto-advance (user, 10-31; Onshape `autoAdvanceToNextControl`): a selection field with a pick limit keeps the
+/// focus until it holds its maximum, then passes it to the next selection field. Bridging curve's Start takes two
+/// (std bridgingCurve.fs): the first pick keeps it, the second moves on to End; picked again when full, the oldest
+/// pick goes (Onshape's `processItemAdd`).
+#[gpui::test]
+fn a_two_pick_field_passes_the_focus_on_at_its_second_pick(cx: &mut TestAppContext) {
+    let (_, view) = part_studio(cx, "advance-two");
+    let d = dialog_of(cx, &view, "bridgingCurve", |_| {});
+    cx.update(|cx| d.update(cx, |d, _| d.active_query = Some("side1".into())));
+    let (top, front, right) = (Reference::Plane(DatumPlane::Top), Reference::Plane(DatumPlane::Front), Reference::Plane(DatumPlane::Right));
+    pick(cx, &d, top.clone());
+    assert_eq!(active(cx, &d).as_deref(), Some("side1"), "one of two: the field keeps the focus");
+    pick(cx, &d, front.clone());
+    assert_eq!(active(cx, &d).as_deref(), Some("side2"), "full: on to End");
+    // Back in the full field, a third pick replaces the oldest and moves on again.
+    cx.update(|cx| d.update(cx, |d, _| d.active_query = Some("side1".into())));
+    pick(cx, &d, right.clone());
+    assert_eq!(cx.update(|cx| d.read(cx).feature.params.query("side1").to_vec()), vec![front, right]);
+    assert_eq!(active(cx, &d).as_deref(), Some("side2"));
+}
+
+/// The same for a one-pick field, over the fields between: Revolve's axis (std revolve.fs: 1) picked with Up to
+/// face set moves the focus past Full revolve, End type, Opposite direction to the Up to face field; the
+/// regions field (no limit) keeps the focus pick after pick.
+#[gpui::test]
+fn a_one_pick_field_skips_to_the_next_selection_field(cx: &mut TestAppContext) {
+    let (_, view) = part_studio(cx, "advance-one");
+    let d = dialog_of(cx, &view, "revolve", |p| {
+        p.set("fullRevolve", noshape_model::params::ParamValue::Bool(false));
+        p.set("endBound", noshape_model::params::ParamValue::Enum("UP_TO_SURFACE".into()));
+    });
+    cx.update(|cx| d.update(cx, |d, _| d.active_query = Some("entities".into())));
+    pick(cx, &d, Reference::Plane(DatumPlane::Top));
+    pick(cx, &d, Reference::Plane(DatumPlane::Front));
+    assert_eq!(active(cx, &d).as_deref(), Some("entities"), "no limit: the regions field keeps the focus");
+    cx.update(|cx| d.update(cx, |d, _| d.active_query = Some("axis".into())));
+    pick(cx, &d, Reference::Plane(DatumPlane::Right));
+    assert_eq!(active(cx, &d).as_deref(), Some("endBoundEntityFace"), "the axis filled: on to Up to face");
+}
+
+/// Sweep's profiles and path have no limit (std sweep.fs): neither ever moves the focus on by itself.
+#[gpui::test]
+fn unlimited_fields_keep_the_focus(cx: &mut TestAppContext) {
+    let (_, view) = part_studio(cx, "advance-none");
+    let d = dialog_of(cx, &view, "sweep", |_| {});
+    for field in ["profiles", "path"] {
+        cx.update(|cx| d.update(cx, |d, _| d.active_query = Some(field.into())));
+        for p in [DatumPlane::Top, DatumPlane::Front, DatumPlane::Right] {
+            pick(cx, &d, Reference::Plane(p));
+        }
+        assert_eq!(active(cx, &d).as_deref(), Some(field));
+    }
+}
+
+/// A first field the preselection filled to its limit passes the focus on when the dialog opens (Onshape
+/// `autoAdvanceToNextControl(e, true)`), whatever the limit: Bridging curve with two preselected Start entities.
+#[gpui::test]
+fn a_preselection_that_fills_a_limit_moves_the_focus_on(cx: &mut TestAppContext) {
+    let (_, view) = part_studio(cx, "advance-pre");
+    let d = dialog_of(cx, &view, "bridgingCurve", |p| {
+        p.set("side1", noshape_model::params::ParamValue::Query(vec![Reference::Plane(DatumPlane::Top), Reference::Plane(DatumPlane::Front)]));
+    });
+    cx.update(|cx| {
+        d.update(cx, |d, _| {
+            d.active_query = Some("side1".into());
+            d.release_prefilled_single_pick();
+        })
+    });
+    assert_eq!(active(cx, &d).as_deref(), Some("side2"));
+}

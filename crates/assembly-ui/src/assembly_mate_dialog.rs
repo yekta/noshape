@@ -1008,3 +1008,42 @@ mod limit_enter_tests {
         assert!(limit_enter_accepts(Some(""), ""));
     }
 }
+
+#[cfg(test)]
+mod advance_tests {
+    use super::{ConnectorLabeler, MateDialog};
+    use gpui_kit::{AppContext as _, Bounds, Point, TestAppContext, WindowBounds, WindowOptions, px, size};
+    use noshape_model::assembly::{InstanceId, Mate, MateConnectorRef, MateId, MateType};
+    use noshape_model::reference::{DatumPlane, Reference};
+
+    fn connector(i: u64) -> MateConnectorRef {
+        MateConnectorRef { instance: InstanceId(i), path: Vec::new(), reference: Reference::Plane(DatumPlane::Top), flip: false, rotate_quarters: 0, connector: None, align: None, moved: None }
+    }
+
+    /// Auto-advance for mates (user, 10-31): the Mate connectors box takes two picks, keeping the focus after
+    /// the first (the second connector's row) and letting it go at the second, the box full (Onshape's mate
+    /// query has two picks; no later selection field). A third pick finds no field.
+    #[gpui::test]
+    fn mate_connectors_take_two_picks_then_let_the_focus_go(cx: &mut TestAppContext) {
+        cx.update(gpui_kit::init);
+        let mate = Mate::new(MateId(1), "Fastened 1".into(), MateType::Fastened, connector(1), connector(2));
+        let mut dialog = None;
+        cx.update(|cx| {
+            let bounds = Bounds { origin: Point::default(), size: size(px(800.), px(600.)) };
+            gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+                let labeler: ConnectorLabeler = std::sync::Arc::new(|c: &MateConnectorRef| format!("{:?}", c.instance));
+                let d = cx.new(|cx| MateDialog::new(mate, true, labeler, noshape_units::UnitPrefs::default(), Default::default(), window, cx));
+                dialog = Some(d.clone());
+                d
+            })
+            .unwrap();
+        });
+        let d = dialog.unwrap();
+        assert_eq!(cx.update(|cx| d.read(cx).active), Some(0), "a new mate starts on its first connector");
+        assert!(cx.update(|cx| d.update(cx, |d, cx| d.set_connector(connector(1), cx))));
+        assert_eq!(cx.update(|cx| d.read(cx).active), Some(1), "one of two: the box keeps the focus, on its second row");
+        assert!(cx.update(|cx| d.update(cx, |d, cx| d.set_connector(connector(2), cx))));
+        assert_eq!(cx.update(|cx| d.read(cx).active), None, "full: the focus goes");
+        assert!(!cx.update(|cx| d.update(cx, |d, cx| d.set_connector(connector(3), cx))), "no field takes a third pick");
+    }
+}

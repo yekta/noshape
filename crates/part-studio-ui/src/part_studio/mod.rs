@@ -1526,9 +1526,7 @@ impl PartStudioView {
         let missing: Vec<Reference> = refs.iter().filter(|r| !current.contains(r)).cloned().collect();
         let toggle = if missing.is_empty() { refs } else { missing };
         dialog.update(cx, |d, cx| {
-            for r in toggle {
-                d.add_pick(r, cx);
-            }
+            d.add_picks(toggle, cx);
         });
         self.refresh_scene(false, cx);
         true

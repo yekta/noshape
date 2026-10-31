@@ -358,3 +358,92 @@ fn draft_focus_on_edit_as_draft_fs() {
     let focused: Vec<&str> = ty.params.iter().filter(|s| s.hints.has(Hints::INITIAL_FOCUS_ON_EDIT)).map(|s| s.id).collect();
     assert_eq!(focused, ["draftFaces", "partingEdges"]);
 }
+
+/// Onshape's std library's pick limits: (feature, parameter id, MaxNumberOfPicks), read from
+/// `crates/featurescript/std/*.fs` (`annotation { …, "MaxNumberOfPicks" : N, … } definition.<id> is Query` or a
+/// FeatureList).
+fn std_pick_limits() -> Vec<(String, String, usize)> {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../featurescript/std");
+    let mut out = Vec::new();
+    let mut files: Vec<_> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "fs")).collect();
+    files.sort();
+    for f in files {
+        let s = std::fs::read_to_string(&f).unwrap();
+        let mut at = 0;
+        while let Some(i) = s[at..].find("MaxNumberOfPicks") {
+            let k = at + i;
+            at = k + 1;
+            let open = s[..k].rfind('{').unwrap_or(0);
+            let Some(close) = s[k..].find('}').map(|c| k + c) else { continue };
+            if s[open + 1..close].contains('{') {
+                continue;
+            }
+            // `"MaxNumberOfPicks" : N` or unquoted (variable.fs).
+            let n: usize = s[k + 16..close].trim_start_matches(['"', ' ', ':']).chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse().unwrap_or(0);
+            // `definition.<id> is Query` (or a FeatureList; `flangeDefinition.<id>` in a predicate).
+            let rest = s[close + 1..].trim_start();
+            let Some((_, def)) = rest.split_once('.').filter(|(owner, _)| owner.chars().all(|c| c.is_ascii_alphanumeric())) else { continue };
+            let id: String = def.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+            let kind = def[id.len()..].trim_start();
+            if !(kind.starts_with("is Query") || kind.starts_with("is FeatureList")) || n == 0 {
+                continue;
+            }
+            // The feature defined last before it (`export const X = defineFeature(` / `defineSheetMetalFeature(` …),
+            // else the file's own (a predicate file: hole.fs, sheetMetalFlange.fs …).
+            let stem = f.file_stem().unwrap().to_string_lossy().to_string();
+            let feature = s[..k]
+                .match_indices("export const ")
+                .filter_map(|(e, _)| {
+                    let line = &s[e + 13..];
+                    let (name, tail) = line.split_once('=')?;
+                    tail.trim_start().starts_with("define").then(|| name.trim().to_string())
+                })
+                .last()
+                .unwrap_or(stem);
+            out.push((feature, id, n));
+        }
+    }
+    out
+}
+
+/// Auto-advance (selection fields pass the focus on at their pick limit) follows each field's limit: every query
+/// parameter of ours that std limits has std's limit.
+#[test]
+fn query_pick_limits_follow_std() {
+    let limits = std_pick_limits();
+    assert!(limits.len() > 80, "std read: {}", limits.len());
+    let mut wrong = Vec::new();
+    for (feature, id, n) in &limits {
+        // Helper files' parameters belong to the features built on them.
+        let owners: Vec<&str> = match feature.as_str() {
+            "extrudeCommon" => vec!["extrude"],
+            "sheetMetalBendUtils" => vec!["sheetMetalBend"],
+            "transformCopy" => vec!["transform"],
+            f => vec![f],
+        };
+        let types: Vec<&FeatureType> = owners.iter().filter_map(|f| get(f)).collect();
+        for t in types {
+            for p in t.params.iter().filter(|p| p.id == id.as_str()) {
+                if let ParamKind::Query { max_picks, .. } = p.kind
+                    && max_picks != Some(*n)
+                {
+                    wrong.push(format!("{} {}: ours {:?}, std {n}", t.id, id, max_picks));
+                }
+            }
+        }
+    }
+    // And no limit std doesn't set, except where our model takes one entity only (std takes sets: the surfaces
+    // owner's mutualTrim, the Tag's flat view sketch) and the sketch's plane (sketch isn't a std feature).
+    const OURS_ONLY: &[(&str, &str)] = &[("sketch", "sketchPlane"), ("mutualTrim", "body1"), ("mutualTrim", "body2"), ("tag", "flatFormSketch")];
+    for t in all() {
+        for p in t.params.iter() {
+            if let ParamKind::Query { max_picks: Some(n), .. } = p.kind
+                && !limits.iter().any(|(_, id, _)| id == p.id)
+                && !OURS_ONLY.contains(&(t.id, p.id))
+            {
+                wrong.push(format!("{} {}: ours {n}, std none", t.id, p.id));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{} pick limits differ:\n{}", wrong.len(), wrong.join("\n"));
+}

@@ -412,8 +412,13 @@ impl FeatureDialog {
     /// field).
     pub fn release_prefilled_single_pick(&mut self) {
         let Some(id) = self.active_query.clone() else { return };
-        let single = self.ty.params.iter().any(|s| s.id == id && matches!(s.kind, ParamKind::Query { max_picks: Some(1), .. }));
-        if single && !self.feature.params.query(&id).is_empty() {
+        // Onshape (`autoAdvanceToNextControl(e, true)` on opening): a first field the preselection filled to its
+        // limit, whatever the limit, passes the focus on.
+        let limit = self.ty.params.iter().find(|s| s.id == id).and_then(|s| match s.kind {
+            ParamKind::Query { max_picks, .. } => max_picks,
+            _ => None,
+        });
+        if limit.is_some_and(|n| self.feature.params.query(&id).len() >= n) {
             self.advance_query_focus(&id);
         }
     }
@@ -647,30 +652,47 @@ impl FeatureDialog {
     /// Add a picked reference to the active selection field. Returns false if
     /// no field is active.
     pub fn add_pick(&mut self, r: Reference, cx: &mut Context<Self>) -> bool {
+        self.add_picks([r], cx)
+    }
+
+    /// Picks into the active selection field as one edit (a box selection, a list row's entities): each toggles
+    /// off when already there; a field at its pick limit drops its oldest entry for the new one (Onshape's
+    /// `processItemAdd`: a full list loses its first item). Then, the field holding its maximum, the focus moves on
+    /// to the next selection field (`autoAdvanceToNextControl` on the confirmed edit: any limit, not only 1).
+    /// Returns false if no field is active.
+    pub fn add_picks(&mut self, refs: impl IntoIterator<Item = Reference>, cx: &mut Context<Self>) -> bool {
         let Some((path, _filter, max)) = self.active_filter() else { return false };
         self.user_set.insert(path.clone());
         if let Some(spec) = self.spec_for_path(&path)
             && let ParamKind::Array { item, .. } = &spec.kind
         {
-            self.toggle_driven_item(spec.id, item_slice(item), r);
+            for r in refs {
+                self.toggle_driven_item(spec.id, item_slice(item), r);
+            }
             self.changed(cx);
             cx.notify();
             return true;
         }
         let Some((vals, id)) = self.values_for_path_mut(&path) else { return false };
         let q = vals.query_mut(&id);
-        if let Some(pos) = q.iter().position(|x| *x == r) {
-            // Clicking a selected entity again toggles it off (Onshape behavior).
-            q.remove(pos);
-        } else if max == Some(1) {
-            q.clear();
-            q.push(r);
-        } else {
-            q.push(r);
+        let mut added = false;
+        for r in refs {
+            if let Some(pos) = q.iter().position(|x| *x == r) {
+                // Clicking a selected entity again toggles it off (Onshape behavior).
+                q.remove(pos);
+            } else {
+                if let Some(n) = max
+                    && n > 0
+                    && q.len() >= n
+                {
+                    q.remove(0);
+                }
+                q.push(r);
+                added = true;
+            }
         }
-        // A single-pick field that got its pick passes the focus on
-        // (Onshape: autoAdvanceToNextControl when the maximum is selected).
-        if max == Some(1) && !q.is_empty() {
+        let full = max.is_some_and(|n| q.len() >= n);
+        if added && full {
             self.advance_query_focus(&path);
         }
         self.changed(cx);
@@ -998,8 +1020,25 @@ impl FeatureDialog {
 
     fn advance_query_focus(&mut self, from: &str) {
         // Onshape (getNextFocusableParameter): the next visible selection
-        // field or selection-driven array, filled or not (live qa4 r5 s7:
-        // Extrude direction picked → Merge scope "Part 1" active).
+        // field, selection-driven array or ALLOW_ARRAY_FOCUS array, filled or
+        // not, other fields skipped (live qa4 r5 s7: Extrude direction picked
+        // → Merge scope "Part 1" active).
+        let focusable = |s: &ParamSpec| matches!(s.kind, ParamKind::Query { .. }) || s.hints.has(Hints::DRIVEN_QUERY) || s.hints.has(Hints::ALLOW_ARRAY_FOCUS);
+        // A field of an array item: the item's own next selection field (an
+        // item's parameters are a list of their own).
+        if let [arr, index, id] = from.split('.').collect::<Vec<_>>().as_slice() {
+            let next = self.ty.params.iter().find(|s| s.id == *arr).and_then(|a| match &a.kind {
+                ParamKind::Array { item, .. } => {
+                    let item_vals = self.feature.params.array(arr).get(index.parse::<usize>().ok()?)?;
+                    item.iter().filter(|s| s.is_visible(item_vals) && !s.hints.has(Hints::ALWAYS_HIDDEN)).skip_while(|s| s.id != *id).skip(1).find(|s| focusable(s)).map(|s| format!("{arr}.{index}.{}", s.id))
+                }
+                _ => None,
+            });
+            if let Some(next) = next {
+                self.active_query = Some(next);
+            }
+            return;
+        }
         let params = &self.feature.params;
         let next = self
             .ty
@@ -1008,7 +1047,7 @@ impl FeatureDialog {
             .filter(|s| s.is_visible(params) && !s.hints.has(Hints::ALWAYS_HIDDEN))
             .skip_while(|s| s.id != from)
             .skip(1)
-            .find(|s| matches!(s.kind, ParamKind::Query { .. }) || s.hints.has(Hints::DRIVEN_QUERY));
+            .find(|s| focusable(s));
         match next {
             Some(s) => self.active_query = Some(s.id.to_string()),
             // Sketch lets its filled plane field go (defocusFilledSketchPlaneQLV;

@@ -314,7 +314,8 @@ pub fn variable() -> FeatureType {
         ParamSpec::bool("useConversionFactor", "Conversion factor", false).hints(Hints::DISPLAY_SHORT | Hints::FIRST_IN_ROW).visible(table),
         ParamSpec::text("conversionFactor", "Conversion factor", "1").hints(Hints::DISPLAY_SHORT).visible(move |v| table(v) && v.bool("useConversionFactor")),
         // Measured.
-        ParamSpec::query("entityCouple", "Entities to measure between", QueryFilter::ANY_FACE | QueryFilter::ANY_EDGE | QueryFilter::POINT_LIKE | QueryFilter::BODY | QueryFilter::PLANE).visible(distance),
+        // std variable.fs: two picks (then the focus moves on).
+        query_n("entityCouple", "Entities to measure between", QueryFilter::ANY_FACE | QueryFilter::ANY_EDGE | QueryFilter::POINT_LIKE | QueryFilter::BODY | QueryFilter::PLANE, 2).visible(distance),
         ParamSpec::enum_("minmax", "Minimum/Maximum", MINMAX).hints(Hints::HORIZONTAL_ENUM).visible(distance),
         ParamSpec::bool("extendEntities", "Extend entities", false).visible(move |v| distance(v) && !v.is("minmax", "MAXIMUM")),
         ParamSpec::bool("measureFromAxis", "Use axis", false).visible(move |v| distance(v) && !v.is("minmax", "MAXIMUM")),

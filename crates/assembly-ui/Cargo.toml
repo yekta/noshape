@@ -24,3 +24,8 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 serde_json.workspace = true
 serde.workspace = true
 noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
+
+[dev-dependencies]
+# UI tests on GPUI's test platform (docs/TESTS.md "UI keystroke tests"), as part-studio-ui's.
+noshape-ui-test-support = { path = "../ui-test-support" }
+gpui = { package = "gpui-pre", version = "=0.3.9" }

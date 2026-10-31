@@ -1126,12 +1126,10 @@ impl PartStudioView {
                 // update panics (BOX-DIALOG-PANIC).
                 let own = dialog.read(cx).feature.id;
                 let fitting: Vec<PickTarget> = targets.iter().filter(|t| self.face_fits(&t.reference, filter) && !made_by(&t.reference, own)).cloned().collect();
+                // One edit: the field fills (its limit's newest picks), then the focus moves on once.
+                let picks: Vec<Reference> = box_field_picks(&fitting, filter).into_iter().filter(|r| current.contains(r) == deselect).cloned().collect();
                 dialog.update(cx, |d, cx| {
-                    for r in box_field_picks(&fitting, filter) {
-                        if current.contains(r) == deselect {
-                            d.add_pick(r.clone(), cx);
-                        }
-                    }
+                    d.add_picks(picks, cx);
                 });
             }
         } else {
