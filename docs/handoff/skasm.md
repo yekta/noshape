@@ -184,6 +184,20 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
 (none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
 "tools/tiers/land.sh".)
 
+## 10-31 evening (after the never-checked rows)
+- **Landed:** e7562f23 SKETCH-DEGENERATE-SOLVE (a fillet R6 → R20 that shrinks the next line to a point solves as live:
+  Parallel / Perpendicular / point-on-line normalise by max(length, 1 µm); dimension edits may collapse a line,
+  `SolveOptions::allow_collapse`, constraint edits keep CON-HV-COLLAPSE's refusal). 69ee2fc6 live 1668: thin loft of
+  closed planar profiles = offsets lofted (outer less inner), Delete face whose Heal leaves the faces fails, Offset
+  surface past a cylinder's axis fails, crossing Boundary surface profiles fail. 80ed96d6 live 1667 / 1671 / 1672:
+  one-sided Body draft at a mid plane (only the pull side, a ledge), Show mates mode as live (no banner / pin, Esc stays,
+  click = selection), Insert footer hint, named position toasts close by themselves, a new position is current.
+- **Fuzz:** sketch seeds 400..480 × 150 steps clean (673 s); assembly seeds 300..400 × 120 clean (424 s); sketch 1..40
+  after the solver change clean.
+- **Open:** SM-CLOSED-BUTT (P3, live's x(θ) table in the ticket, no closed form found). THIN-LOFT-TRIM-ENDS (P2, core):
+  tapered closed lofts 0.15–0.3 % over live (live offsets the sheet along its normal), Trim ends ☐ ends; open profiles
+  still use k::thicken. MODAL-HELP-MARK (psui).
+
 ## Lead 10-31 (4): never-checked rows (resumed 10:50 on a new account)
 - **Landed:** aaa85f6a, 2ce42c21, ba8472f0 (and this handoff).
   - Move face through the far side of a part now fails with live's texts (Offset left an empty 0 mm³ part, Translate an
