@@ -201,6 +201,13 @@ numbers: use tools/tiers/perf.sh (vibe3, machine to itself) once it's back on ma
 2.61–2.80 (1.4–1.6×). Steps (`rust_mesh::bench_profile_fin`, per copy): brep's mesh 5.3, box 1.6 (faces in parallel,
 a solid skips the outside-edge walks), reading in 1.8, out 0.7 (polylines in parallel), edge cache 0.55 (16 maps
 bound in parallel), fill 0.7. Next if more is wanted: the box's per-face BRepBndLib (1.5), brep's per-face Vecs.
+10-31 05:30: live-30 on the perf server (new benches: ops `regen_profile::bench_live30_display_mesh`, cold = scaled
+copies so brep's CDT cache has none, as on open, and warm; `bench_profile_live30_display_mesh` by step, the profile
+switched on after the regeneration with `set_kernel_profile`). b947eff0: **cold 3.2–3.5 ms against BRepMesh 11.2–11.7:
+3.2–3.7×** (was 2.9–3.2× before the parallel output copy), warm 3.0–3.3 against 10.8–11.4: 3.5–3.8×; fin plate still
+10.4–10.6×. Per cold mesh: brep's faces 1.25 ms (the tori), its output copy 0.63, mesh_fill 0.77, edges 0.2, box 0.2.
+10× would be ~1.1 ms in all, below our face meshing alone: live-30 stays ~3.5× short of a faster strip/torus mesher
+(the filleted boss is 1.4× BRepMesh: 1.85 against 2.64 ms). Not pursued further unless the lead asks.
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC
