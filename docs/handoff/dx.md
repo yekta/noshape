@@ -199,6 +199,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   datum's triangle grip dropped anywhere on a view edge re-attaches (nearest edge point by geometry).
 - Then V28 (✓ ✕ panel, first-point close), TB20 hole table preview, BOM / cut list previews, D24 ISO narrow
   dimensions (live 1679).
+- Then V57 assembly Show sketches (inserted sketches; assembly sources now keep the sketch wire bodies, views
+  still project solids only); TB13 / EX18 / S20 / workflow-drawing 4.4 rechecked done.
+- Asked live 18:29-18:30 (open): TB20 ✓ placement + Y direction, A28 reorder gesture, SK12 hatch colours, V44
+  point-to-point dimensions over a rotation (ours stay horizontal / vertical, values swap), V25 hatch vs
+  annotations.
 - Left in drawing.md 🔧 (as of 10-31 evening): MBD dimensions (CR5 / CR18 / V5, need Part Studio MBD dims), V1
   "view released items", V27 aligned Cut from section (edge names after a pre-cut), V57 assembly sketches (assembly
   sources carry no sketch wires), V68 spinner, D6 thread lines as dimension picks, D16 (live couldn't start one),
