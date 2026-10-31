@@ -936,6 +936,24 @@ fn move_face_offset_and_translate() {
     assert_eq!(res.display.features[2].status, FeatureStatus::Error);
 }
 
+/// A face moved through the far side of the part fails with Onshape's
+/// texts (was: Ok with an empty part, or an inverted 1333 mm³ one).
+#[test]
+fn move_face_through_the_part_fails() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let res = t.ok();
+    let top = face_with_normal(&res.context.bodies[0], DVec3::Z);
+    let m = t.add("moveFace", &[("moveFaces", q(vec![top])), ("offsetDistance", e("15 mm")), ("oppositeDirection", b(true))]);
+    let res = t.regen();
+    assert_eq!((&res.display.features[2].status, res.display.features[2].message.as_deref()), (&FeatureStatus::Error, Some("Could not offset selected faces as requested.")), "{} m³", total_volume(&res.context));
+    t.set(m, "moveFaceType", en("TRANSLATE"));
+    t.set(m, "direction", q(vec![edge_axis_z()]));
+    t.set(m, "translationDistance", e("15 mm"));
+    let res = t.regen();
+    assert_eq!((&res.display.features[2].status, res.display.features[2].message.as_deref()), (&FeatureStatus::Error, Some("Could not transform selected faces as requested.")), "{} m³", total_volume(&res.context));
+}
+
 #[test]
 fn sweep_along_line_and_arc() {
     let mut t = T::new();

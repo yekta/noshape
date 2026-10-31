@@ -383,7 +383,16 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
                     move_rigid(ev, bi, &faces, &DMat4::from_translation(d * dist)).map_err(|_| fe(failed_msg))?;
                     continue;
                 }
-                k::offset_faces_each(&body.shape, &shapes, &each).map_err(|_| fe(failed_msg))?
+                match k::offset_faces_each(&body.shape, &shapes, &each) {
+                    Ok(r) if r.shape.is_valid() && r.shape.count(ShapeType::Solid) > 0 => r,
+                    // As Offset: booleans when every face moves the same way
+                    // (else a face moved through the far side came out invalid).
+                    _ if each.iter().all(|e| (e - each[0]).abs() < 1e-12) => {
+                        offset_by_booleans(ev, bi, &faces, each[0]).map_err(|_| fe(failed_msg))?;
+                        continue;
+                    }
+                    _ => return err(failed_msg),
+                }
             }
         };
         let offset_role = |n: &Name| Role::Offset(n.clone());
@@ -446,12 +455,14 @@ fn offset_by_booleans(ev: &mut EvalCtx, bi: usize, faces: &[usize], dist: f64) -
     let (shape, names) = bool_named(ev, op, &body_named(&body), &tools)?;
     let un = k::unify_same_domain(&shape)?;
     let names = ev.name_result(&[&crate::regen::eval::names_for(&shape, names)], &un.history, &un.shape, &BTreeMap::new(), None);
-    let mut pieces = crate::regen::eval::split_solids(&un.shape, &names);
+    let volume = |s: &Shape| k::volume_properties(s).map(|m| m.mass).unwrap_or(0.0);
+    // The face moved through the far side: the cut leaves an empty solid.
+    let mut pieces: Vec<_> = crate::regen::eval::split_solids(&un.shape, &names).into_iter().filter(|p| volume(&p.shape) > 0.0).collect();
     if pieces.is_empty() {
         return err("Nothing is left of the part");
     }
     let key = |p: &crate::regen::eval::NamedShape| -> (f64, [f64; 3]) {
-        let v = k::volume_properties(&p.shape).map(|m| m.mass).unwrap_or(0.0);
+        let v = volume(&p.shape);
         let c = p.shape.bounding_box(false).map(|b| b.center()).unwrap_or_default();
         (v, [c.x, c.y, c.z])
     };
