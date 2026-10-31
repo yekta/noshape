@@ -168,7 +168,7 @@ and closes again with ✕/Esc/Cancel. Expected results follow live (behaviours.m
 | 8.3.3 | Suppress | both struck-through | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 | 8.3.4 | Dynamic suppression ▸ | submenu | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 | 8.3.5 | Clear selection | rows unselected | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
-| 8.3.6 | Edit sketch appearance… / Add appearance to feature… | appearance editor | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.3.6 | Edit sketch appearance… / Add appearance to feature… | appearance editor | ✅ the menu by the selection's mix as live (request 1675): sketch + feature: Hide other / Hide all sketches, Section view…, Edit sketch appearance… + Add appearance to feature…; features only: no Section view, "Add appearance to 2 features…"; sketches only: Hide, Section view…, "Edit appearance of 2 sketches…" | psui 10-31 (:102 cm3: Sketch 1 + Extrude 1; blk: Extrude 1 + Linear pattern 1) |
 | 8.3.7 | Delete | both deleted (Ctrl+Z restores) | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 
 **8.4 Default geometry: plane (Top) and Origin**
@@ -381,8 +381,7 @@ Open items (not blocking): F31 (Fillet ▾ scrollbar, ui) not re-checked; drawin
 find, ui fixing). The other 72 open what they should (screenshots /tmp/qa4/cm/aa-*.png). Notes:
 - 8.1.4 / 8.2.4 Show dimensions: the part turns see-through (live too), but the demo's Sketch 1 has no dimensions: check
   the labels on the gate document (live: the sketch's dimensions drawn in 3D on its plane).
-- 8.3.6: with Sketch 1 + Extrude 1 selected ours lists only "Add appearance to feature…"; live lists "Edit sketch
-  appearance…, Add appearance to feature…" (psb, minor).
+- 8.3.6: fixed psui 10-31 (live request 1675: the multi-selection menu by what is selected).
 - Dynamic suppression ▸ is a submenu: hover it, then click "Add expression…" (opens the "Dynamic suppression" dialog).
 Re-run the whole section on the build with ui's fix (`menurun.sh BIN menus-ps.txt TAG`, then menus-fm.txt).
 

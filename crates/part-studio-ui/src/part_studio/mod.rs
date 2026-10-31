@@ -4689,7 +4689,21 @@ impl PartStudioView {
                 this.open_folder_prompt(t, window, cx);
             }));
             if multi {
-                // Section view… through the selected features' planes (live order).
+                // Live (request 1675): what the selection holds decides the
+                // menu: sketches add their hide items and Section view…, each
+                // kind its own appearance item.
+                let (sketches, others): (Vec<FeatureId>, Vec<FeatureId>) = {
+                    let this = view.read(cx);
+                    this.selected_features.iter().copied().partition(|f| this.display.sketches.iter().any(|s| s.feature == *f))
+                };
+                let (sketches_shown, planes, sketch_swatch) = {
+                    let this = view.read(cx);
+                    (
+                        this.display.sketches.iter().any(|s| sketches.contains(&s.feature) && !s.hidden),
+                        others.iter().any(|f| this.display.planes.iter().any(|p| p.reference == Reference::FeaturePlane(*f))),
+                        sketches.first().map(|s| this.sketch_swatch(*s, cx)),
+                    )
+                };
                 let section = item("Section view…", Box::new(move |this, w, cx| {
                     let refs: Vec<Reference> = targets(this)
                         .into_iter()
@@ -4704,22 +4718,52 @@ impl PartStudioView {
                         })
                         .collect();
                     this.section_through_all(&refs, w, cx);
-                }));
-                let m = menu.item(folder).separator().item(section).item(suppress);
-                let m = dynamic(m, window, cx).separator().item(item("Clear selection", Box::new(|this, _, cx| {
+                }))
+                .icon_name("menu-section-view");
+                let mut m = menu.item(folder).separator();
+                if !sketches.is_empty() && others.is_empty() {
+                    // Sketches alone: Hide (or Show) them.
+                    let refs: Vec<Reference> = sketches.iter().map(|f| Reference::Feature(*f)).collect();
+                    m = m.item(item(if sketches_shown { "Hide" } else { "Show" }, Box::new(move |this, _, cx| this.set_visibility(&refs, sketches_shown, cx))));
+                } else if let Some(&keep) = sketches.first() {
+                    // A sketch with other features: Hide other / all sketches.
+                    m = m.item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(Some(keep), cx)))).item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
+                }
+                if !sketches.is_empty() || planes {
+                    m = m.item(section);
+                }
+                let m = m.item(suppress);
+                let mut m = dynamic(m, window, cx).separator().item(item("Clear selection", Box::new(|this, _, cx| {
                     this.selection.clear();
                     this.selected_features.clear();
                     this.refresh_scene(false, cx);
                     cx.notify();
-                })));
-                // Live (ui 10-25 b (1)): "Add appearance to 2 features…".
-                let n = view.read(cx).selected_features.len();
-                let add = item(&format!("Add appearance to {n} features…"), Box::new(move |this, w, cx| {
-                    let t = targets(this);
-                    this.edit_appearance(appearance::EditTarget::Features(t), w, cx);
-                }))
-                .icon_name("add-appearance");
-                return m.separator().item(add).separator().item(delete);
+                }))).separator();
+                // "Edit sketch appearance…" / "Edit appearance of 2 sketches…",
+                // "Add appearance to feature…" / "Add appearance to 2 features…".
+                match sketches.as_slice() {
+                    [] => {}
+                    [one] => {
+                        let one = *one;
+                        m = m.item(item("Edit sketch appearance…", Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Feature(one, None), w, cx))).swatch(sketch_swatch.unwrap_or(swatch)));
+                    }
+                    all => {
+                        let all = all.to_vec();
+                        m = m.item(item(&format!("Edit appearance of {} sketches…", all.len()), Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Features(all.clone()), w, cx))));
+                    }
+                }
+                match others.as_slice() {
+                    [] => {}
+                    [one] => {
+                        let one = *one;
+                        m = m.item(item("Add appearance to feature…", Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Feature(one, None), w, cx))).icon_name("add-appearance"));
+                    }
+                    all => {
+                        let all = all.to_vec();
+                        m = m.item(item(&format!("Add appearance to {} features…", all.len()), Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Features(all.clone()), w, cx))).icon_name("add-appearance"));
+                    }
+                }
+                return m.separator().item(delete);
             }
             // Roll to here unless the bar is right after the feature; Roll to
             // end while the bar isn't at the end (live qa4 r5 s2 rollback

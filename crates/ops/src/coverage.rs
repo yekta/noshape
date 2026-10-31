@@ -474,6 +474,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Zoom to fit", Op("view_camera")),
     ("drawing:Zoom to sheet", Op("view_camera")),
     ("drawing:Zoom to window", Op("view_camera")),
+    ("partStudio:Add appearance to feature…", Op("part_set_appearance")),
     ("partStudio:Add expression…", Op("feature_dynamic_suppression")),
     ("partStudio:Add selection to folder…", Op("feature_add_folder")),
     ("partStudio:Align view with vertical axis", Op("view_camera")),
