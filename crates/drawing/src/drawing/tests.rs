@@ -2473,6 +2473,36 @@ fn section_line_follows_its_point() {
     assert!(built.geometry.colors.iter().any(|c| c.rgb == [0xdd, 0x52, 0x28]));
 }
 
+/// Synchronize breaks from parent (live request 1630): a projected view
+/// takes its parent's breaks along the shared axis, as drawn and not
+/// picked on its own; without it, none.
+#[test]
+fn synchronized_breaks_come_from_the_parent() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let sheet = &drawing.sheets[0];
+    let (parent, child) = sheet
+        .views
+        .iter()
+        .find_map(|v| match v.kind {
+            ViewKind::Projected { parent, .. } if super::views::projected_direction(sheet, v.id).is_some_and(|d| d[0].abs() < 1e-9) => Some((parent, v.id)),
+            _ => None,
+        })
+        .expect("a view projected above or below its parent");
+    drawing.sheets[0].view_mut(parent).unwrap().breaks.push(ViewBreak { vertical: true, a: -0.01, b: 0.01, gap_mm: 6.0, style: BreakStyle::ZigZag });
+    drawing.sheets[0].view_mut(parent).unwrap().breaks.push(ViewBreak { vertical: false, a: -0.002, b: 0.002, gap_mm: 6.0, style: BreakStyle::Straight });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let pl = |b: &super::build::BuiltSheet| b.placements.iter().find(|p| p.id == child).unwrap().nbreaks;
+    assert_eq!(pl(&built), 0, "not synchronized: none");
+    drawing.sheets[0].view_mut(child).unwrap().sync_breaks = true;
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let p = built.placements.iter().find(|p| p.id == child).unwrap();
+    assert_eq!(p.nbreaks, 1, "the vertical break only");
+    assert!(p.breaks()[0].inherited && p.breaks()[0].axis == 0);
+    assert!(!built.picks.contains(&PickTarget::BreakLine { view: child, index: 0 }));
+}
+
 #[test]
 fn datum_on_dimension_arrow_hides_it() {
     let (doc, mut drawing) = demo();

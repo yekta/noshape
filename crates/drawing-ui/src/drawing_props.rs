@@ -94,6 +94,8 @@ pub struct ViewProps {
     unaligned: bool,
     /// Apply parent view section cut (projected views of section views).
     parent_cut: bool,
+    /// Synchronize breaks from parent (projected views).
+    sync_breaks: bool,
     /// Show sketch appearances, Show annotations from model.
     sketch_appearances: bool,
     model_annotations: bool,
@@ -552,6 +554,7 @@ impl DrawingEditor {
             rot_reverse: false,
             unaligned: v.unaligned,
             parent_cut: v.cut_from_section,
+            sync_breaks: v.sync_breaks,
             sketch_appearances: v.sketch_appearances,
             model_annotations: v.model_annotations,
             tangent: TangentMode::of(&v),
@@ -697,6 +700,7 @@ impl DrawingEditor {
             display: p.display.clone(),
             unaligned: p.unaligned,
             cut_from_section: p.parent_cut,
+            sync_breaks: p.sync_breaks,
             sketch_appearances: p.sketch_appearances,
             model_annotations: p.model_annotations,
             simplification,
@@ -967,6 +971,10 @@ impl DrawingEditor {
         // section view: Apply parent view section cut (help H:views).
         if has_parent && multi.is_none() && !matches!(v.kind, ViewKind::Detail { .. }) {
             rows.push(check("vp-unaligned", "Suppress alignment with parent", props.unaligned, |p, on| p.unaligned = on, cx));
+        }
+        // Live request 1630: under Suppress alignment, projected views only.
+        if multi.is_none() && matches!(v.kind, ViewKind::Projected { .. }) {
+            rows.push(check("vp-sync-breaks", "Synchronize breaks from parent", props.sync_breaks, |p, on| p.sync_breaks = on, cx));
         }
         if parent_is_section && multi.is_none() && matches!(v.kind, ViewKind::Projected { .. }) {
             rows.push(check("vp-parent-cut", "Apply parent view section cut", props.parent_cut, |p, on| p.parent_cut = on, cx));

@@ -149,6 +149,23 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Still open in my rows: A41 drag-off-dimension (frame slides along the dimension axis with a leader extension);
   D40 section lines (not associative: needs a model-point anchor on the cutting line, red line + view when lost);
   V35 related views sharing breaks (ask live which views); V57 assembly Show sketches.
+- Landed c59e86eb (DWT templates), 160b9daf (V28 Exclude from cut), then A44 (the extension line carried on to a
+  surface finish on it) + D40 (GD&T leaders on model points are associative: refs slot 100 + leader; lost → that
+  leader red with a red dot; end grip re-attaches). Next batch: SK5 (dragging a spline's own point reshapes it),
+  V27 flip button (Viewing plane location; preview follows).
+- Still open in my rows: A41 drag-off-dimension (frame slides along the dimension axis with a leader extension);
+  D40 section lines (not associative: needs a model-point anchor on the cutting line, red line + view when lost);
+  V35 related views sharing breaks (ask live which views); V57 assembly Show sketches.
+
+## Night 10-31 (landed through c8bd8f01)
+- Landed: 4760e41a A44 extension line + D40 GD&T leaders; 77e3df39 V27 flip + SK5; 100550a8 A41 drag-off (frame
+  slides along the dimension line, leader to the extension line); c8bd8f01 D40 section lines (anchored on the first
+  click's model point: follows it, red + red dot when lost, a drag onto a model point re-attaches; resolution runs in
+  `views::compute_sheet_views` and `build::assemble_sheet`, the drag compares with a snapshot taken at drag start,
+  `DrawingEditor.cut_drag`).
+- Then V35 from live 1630: Synchronize breaks from parent (projected views; parent → child only).
+- Open in my rows: V57 assembly Show sketches (assembly sources skip sketch wires), V35 (d) sections of broken views,
+  D40 hatch / title red, C11 inference points, D9 ordinate jogs.
 
 ## Afternoon 10-30 (landed through b76761b6, 16:49 UTC)
 - From live 1613: TB5 grid-line drags (the fixed-corner side's row / column, the table grows) ✅; EX18 image menu

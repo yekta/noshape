@@ -442,6 +442,11 @@ pub struct DrawingView {
     /// the view are drawn red.
     #[serde(skip)]
     pub cut_lost: bool,
+    /// View properties › Synchronize breaks from parent (projected views;
+    /// live request 1630): the view shows its parent's breaks, which only
+    /// the parent edits.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sync_breaks: bool,
     /// Section views: "Show cut geometry only" (just the cut faces).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub cut_only: bool,
@@ -752,6 +757,7 @@ impl Default for DrawingView {
             partial: false,
             cut_anchor: None,
             cut_lost: false,
+            sync_breaks: false,
             cut_only: false,
             section_depth: None,
             flip: false,

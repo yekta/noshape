@@ -513,6 +513,8 @@ pub struct ViewPropValues {
     pub display: Option<noshape_model::drawing::DisplayChoice>,
     pub unaligned: bool,
     pub cut_from_section: bool,
+    /// Synchronize breaks from parent (projected views).
+    pub sync_breaks: bool,
     pub sketch_appearances: bool,
     pub model_annotations: bool,
     pub simplification: Option<Simplification>,
@@ -558,6 +560,7 @@ impl ViewPropValues {
             asm_position: if base { Some(v.asm_position()) } else { v.own_position },
             display: if base { Some(v.display_state.clone().map_or(DisplayChoice::ShowAll, DisplayChoice::State)) } else { v.own_display.clone() },
             unaligned: v.unaligned,
+            sync_breaks: v.sync_breaks,
             cut_from_section: v.cut_from_section,
             sketch_appearances: v.sketch_appearances,
             model_annotations: v.model_annotations,
@@ -601,6 +604,7 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
         v.own_display = p.display.clone();
     }
     v.unaligned = p.unaligned;
+    v.sync_breaks = p.sync_breaks && matches!(v.kind, ViewKind::Projected { .. });
     v.cut_from_section = p.cut_from_section;
     v.sketch_appearances = p.sketch_appearances;
     v.model_annotations = p.model_annotations;

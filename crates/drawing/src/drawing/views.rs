@@ -625,6 +625,21 @@ pub fn auxiliary_toward(sheet: &Sheet, id: ViewId) -> Option<[f64; 2]> {
 
 /// The direction from parent to child (in the parent's view frame) used
 /// for projected views.
+/// The breaks a view shows (live request 1630): its own (with their
+/// index), or with Synchronize breaks from parent its parent's along the
+/// axis they share (a view above / below takes the vertical ones, one
+/// beside the horizontal ones), which only the parent edits.
+pub fn effective_breaks(sheet: &Sheet, id: ViewId) -> Vec<(super::ViewBreak, Option<usize>)> {
+    let Some(v) = sheet.view(id) else { return Vec::new() };
+    if v.sync_breaks
+        && let (Some(p), Some(d)) = (sheet.parent_of(id), projected_direction(sheet, id))
+    {
+        let vertical = d[0].abs() < 1e-9;
+        return effective_breaks(sheet, p).into_iter().filter(|(b, _)| b.vertical == vertical).map(|(b, _)| (b, None)).collect();
+    }
+    v.breaks.iter().cloned().enumerate().map(|(i, b)| (b, Some(i))).collect()
+}
+
 pub fn projected_direction(sheet: &Sheet, id: ViewId) -> Option<[f64; 2]> {
     let v = sheet.view(id)?;
     let ViewKind::Projected { parent, direction } = &v.kind else { return None };

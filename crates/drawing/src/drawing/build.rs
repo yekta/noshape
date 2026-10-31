@@ -84,6 +84,9 @@ pub struct BreakMap {
     pub band: f64,
     /// Index in the view's `breaks`.
     pub index: u8,
+    /// The parent's (Synchronize breaks from parent): drawn, not picked.
+    pub inherited: bool,
+    pub style: BreakStyle,
 }
 
 pub const MAX_BREAKS: usize = 4;
@@ -461,7 +464,8 @@ pub fn placement_of(sheet: &Sheet, id: ViewId, g: &ViewGeometry) -> Option<ViewP
     let mut p = ViewPlacement::new(id, g.origin, v.position, scale);
     p.rotation = views::view_rotation(sheet, id);
     let k = scale * 1000.0;
-    let mut brs: Vec<(usize, &super::ViewBreak)> = v.breaks.iter().enumerate().filter(|(_, b)| b.b > b.a).collect();
+    let eff = views::effective_breaks(sheet, id);
+    let mut brs: Vec<(Option<usize>, &super::ViewBreak)> = eff.iter().map(|(b, i)| (*i, b)).filter(|(_, b)| b.b > b.a).collect();
     brs.sort_by(|x, y| x.1.a.total_cmp(&y.1.a));
     let mut n = 0usize;
     for (i, b) in brs {
@@ -471,7 +475,7 @@ pub fn placement_of(sheet: &Sheet, id: ViewId, g: &ViewGeometry) -> Option<ViewP
             continue;
         }
         let band = (b.gap_mm.max(0.5) / k).min(b.b - b.a);
-        p.breaks[n] = BreakMap { axis, a: b.a, b: b.b, band, index: i as u8 };
+        p.breaks[n] = BreakMap { axis, a: b.a, b: b.b, band, index: i.unwrap_or(0) as u8, inherited: i.is_none(), style: b.style };
         n += 1;
     }
     p.nbreaks = n as u8;
@@ -1853,8 +1857,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             let cad_mark = g.mark();
             let break_mark = g.mark();
             for br in pl.breaks() {
-                let pick = picks.id(PickTarget::BreakLine { view: v.id, index: br.index as usize });
-                let style = v.breaks.get(br.index as usize).map(|b| b.style).unwrap_or_default();
+                // A synchronized break is the parent's: picking it picks the view.
+                let pick = if br.inherited { view_pick } else { picks.id(PickTarget::BreakLine { view: v.id, index: br.index as usize }) };
+                let style = br.style;
                 let other = 1 - br.axis as usize;
                 let margin = 3.0 / (pl.scale * 1000.0);
                 let (o0, o1) = (geo.min[other] - margin, geo.max[other] + margin);
