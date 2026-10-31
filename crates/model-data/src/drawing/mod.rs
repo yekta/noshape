@@ -498,6 +498,11 @@ pub struct DrawingView {
     /// Show/hide › Show faulty parts (parts whose features failed).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub show_faulty: bool,
+    /// Assembly views: Show/hide › Show part intersections, per view. Live
+    /// (request 1649) draws nothing different for interfering parts, so it
+    /// is only the menu state.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub show_part_intersections: bool,
     /// Section views: Show/hide › Show offset cut lines (a thin line across
     /// the hatch where the cutting line jogs; live asb 10-23 views (6)).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -784,6 +789,7 @@ impl Default for DrawingView {
             hide_bend_notes: false,
             hide_threads: false,
             show_faulty: false,
+            show_part_intersections: false,
             show_offset_cut_lines: false,
             edge_styles: Vec::new(),
             hidden_edges: Vec::new(),

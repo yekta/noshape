@@ -3594,6 +3594,51 @@ fn ansi_dimension_text_sits_inline() {
     assert!(vertical.iter().all(|l| l.points.iter().all(|p| (p[1] - 80.0).abs() > h / 2.0)));
 }
 
+/// ISO radial (live request 1649): no shoulder; the value turned to the
+/// leader (read left to right) and sitting on its outer end.
+#[test]
+fn iso_radial_value_inline_along_the_leader() {
+    use super::format::DimText;
+    struct Iso<'a>(sheet::PlainEnv<'a>);
+    impl sheet::AnnotationEnv for Iso<'_> {
+        fn to_sheet(&self, v: ViewId, p: [f64; 2]) -> [f64; 2] {
+            self.0.to_sheet(v, p)
+        }
+        fn scale(&self, v: ViewId) -> f64 {
+            self.0.scale(v)
+        }
+        fn rotation(&self, v: ViewId) -> f64 {
+            self.0.rotation(v)
+        }
+        fn text(&self, a: &Annotation, value: f64, angular: bool, symbol: &str) -> DimText {
+            self.0.text(a, value, angular, symbol)
+        }
+        fn expand(&self, s: &str) -> String {
+            self.0.expand(s)
+        }
+        fn balloon_text(&self, a: &Annotation, t: &str) -> String {
+            self.0.balloon_text(a, t)
+        }
+        fn sheet_style(&self) -> sheet::SheetStyle {
+            sheet::SheetStyle { iso: true, ..Default::default() }
+        }
+    }
+    let drawing = Drawing::default();
+    let env = Iso(sheet::PlainEnv { drawing: &drawing, scale: 1000.0 });
+    for angle in [0.6f64, 2.5] {
+        let mut s = Sheet::default();
+        s.annotations.push(Annotation { id: 1, kind: AnnotationKind::RadialDimension { view: ViewId(1), center: [0.1, 0.1], radius: 0.005, diameter: false, angle, dim_line: false, knee: Some(10.0) }, ..Default::default() });
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        g.add_annotations(&s, &env);
+        let t = g.texts.iter().find(|t| t.text.starts_with('R')).unwrap();
+        let want = if angle.cos() < 0.0 { angle + std::f64::consts::PI } else { angle };
+        assert!((t.angle - want).abs() < 1e-9, "{} vs {want}", t.angle);
+        let knee = [100.0 + 15.0 * angle.cos(), 100.0 + 15.0 * angle.sin()];
+        let horizontal_from_knee = g.lines.iter().any(|l| l.points.len() == 2 && (l.points[0][0] - knee[0]).abs() < 1e-9 && (l.points[0][1] - knee[1]).abs() < 1e-9 && (l.points[1][1] - knee[1]).abs() < 1e-9);
+        assert!(!horizontal_from_knee, "no shoulder");
+    }
+}
+
 /// ANSI radial and diameter dimensions (live asbdt-3, drawing/368): the
 /// arrow outside the circle pointing in, the leader to the dropped knee, a
 /// horizontal shoulder an arrow long on the circle's side, the value inline

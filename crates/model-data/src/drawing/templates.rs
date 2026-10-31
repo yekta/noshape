@@ -43,7 +43,9 @@ pub fn standard_templates() -> Vec<DrawingTemplate> {
     let iso = [("ISO A4", SheetSize::A4), ("ISO A3", SheetSize::A3), ("ISO A2", SheetSize::A2), ("ISO A1", SheetSize::A1), ("ISO A0", SheetSize::A0)];
     let ansi = [("ANSI A", SheetSize::AnsiA), ("ANSI B", SheetSize::AnsiB), ("ANSI C", SheetSize::AnsiC), ("ANSI D", SheetSize::AnsiD), ("ANSI E", SheetSize::AnsiE)];
     iso.into_iter()
-        .map(|(name, size)| DrawingTemplate::standard(name, size, TitleBlockStyle::Iso, false, Projection::FirstAngle))
+        // Live ISO_A*.dwt drawings use a decimal comma ("R2,5"; live
+        // requests 1649, angdim 10-28).
+        .map(|(name, size)| DrawingTemplate { decimal_comma: true, ..DrawingTemplate::standard(name, size, TitleBlockStyle::Iso, false, Projection::FirstAngle) })
         .chain(ansi.into_iter().map(|(name, size)| DrawingTemplate::standard(name, size, TitleBlockStyle::Ansi, true, Projection::ThirdAngle)))
         .collect()
 }
@@ -196,9 +198,8 @@ pub fn apply_template(drawing: &mut Drawing, sheet: usize, t: &DrawingTemplate) 
     if t.units.is_some() {
         drawing.props.units = Some(units);
     }
-    if t.decimal_comma {
-        drawing.props.decimal_comma = true;
-    }
+    // The template's decimal separator (ISO comma, ANSI period).
+    drawing.props.decimal_comma = t.decimal_comma;
     drawing.projection = t.projection;
     drawing.sheets[sheet].size = t.size;
     drawing.sheets[sheet].format = t.format;

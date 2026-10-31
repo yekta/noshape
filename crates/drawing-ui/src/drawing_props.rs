@@ -170,6 +170,11 @@ impl DrawingEditor {
         show.push(MenuEntry::item(if threads { "Hide threads" } else { "Show threads" }, move |t, _, cx| t.edit_view("Threads", id, cx, |v| v.hide_threads = threads)));
         let faulty = v.show_faulty;
         show.push(MenuEntry::item(if faulty { "Hide faulty parts" } else { "Show faulty parts" }, move |t, _, cx| t.edit_view("Faulty parts", id, cx, |v| v.show_faulty = !faulty)));
+        // Assembly views (live request 1649): after faulty parts, per view.
+        if views::view_source(sheet, id).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly) {
+            let pi = v.show_part_intersections;
+            show.push(MenuEntry::item(if pi { "Hide part intersections" } else { "Show part intersections" }, move |t, _, cx| t.edit_view("Part intersections", id, cx, |v| v.show_part_intersections = !pi)));
+        }
         // Section views (live asb 10-23 views (6)): after Show faulty parts.
         if matches!(v.kind, ViewKind::Section { .. }) {
             let oc = v.show_offset_cut_lines;

@@ -1407,13 +1407,16 @@ impl SheetGeometry {
                     }
                     // The flip node near the arrow.
                     self.grips.push(Grip { pick, pos: [tip[0] - dir[0] * 4.0, tip[1] - dir[1] * 4.0], kind: GripKind::Handle });
-                    // Text on a short horizontal shoulder.
-                    let left = dir[0] < 0.0;
+                    // ISO (live request 1649): no shoulder; the value inline
+                    // along the leader, turned to it (read left to right) and
+                    // sitting on its outer end, the leader running on under it.
                     let w = self.dim_label_width(&t, dh);
-                    let sh = [out[0] + if left { -w - 2.0 } else { w + 2.0 }, out[1]];
-                    self.lines.push(Polyline2 { points: vec![out, sh], style: LineStyle::Thin, closed: false, pick });
-                    let at = [out[0] + if left { -1.0 } else { 1.0 }, out[1] + 0.8];
-                    self.dim_label(at, 0.0, if left { 1.0 } else { 0.0 }, false, &t, dh, pick);
+                    let end = [out[0] + dir[0] * (w + 1.0), out[1] + dir[1] * (w + 1.0)];
+                    self.lines.push(Polyline2 { points: vec![out, end], style: LineStyle::Thin, closed: false, pick });
+                    let ang = if dir[0] < -1e-9 || (dir[0].abs() <= 1e-9 && dir[1] < 0.0) { angle + std::f64::consts::PI } else { *angle };
+                    let up = [-ang.sin(), ang.cos()];
+                    let mid = [(out[0] + end[0]) / 2.0 + up[0] * 0.8, (out[1] + end[1]) / 2.0 + up[1] * 0.8];
+                    self.dim_label(mid, ang, 0.5, false, &t, dh, pick);
                 }
                 AnnotationKind::AngularDimension { view, radius, flip_a, flip_b, three_point, text_angle, .. } => {
                     let (vertex, pa, pb) = a.kind.angular_legs().expect("angular");

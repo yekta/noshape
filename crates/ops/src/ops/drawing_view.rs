@@ -22,11 +22,12 @@ use serde_json::{Value, json};
 const TANGENTS: [(&str, TangentMode); 3] = [("hidden", TangentMode::Hidden), ("solid", TangentMode::Solid), ("phantom", TangentMode::Phantom)];
 
 /// Show/hide ▸ toggles: (field, menu text, edit text).
-const SHOW_HIDE: [(&str, &str, &str); 11] = [
+const SHOW_HIDE: [(&str, &str, &str); 12] = [
     ("hidden_lines", "Show/Hide hidden lines", "Hidden lines"),
     ("shaded", "Show/Hide shaded view", "Shaded view"),
     ("threads", "Show/Hide threads", "Threads"),
     ("faulty_parts", "Show/Hide faulty parts", "Faulty parts"),
+    ("part_intersections", "Show/Hide part intersections (assembly views; live draws nothing different)", "Part intersections"),
     ("offset_cut_lines", "Show/Hide offset cut lines (section views: a line across the hatch where the cutting line steps)", "Offset cut lines"),
     ("sketch_points", "Show/Hide sketch points (views showing sketches)", "Sketch points"),
     ("auto_centermarks", "Show/Hide auto centermarks (showing them again brings back deleted ones)", "Centermarks"),
@@ -222,6 +223,8 @@ fn view_display(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             "shaded" => Box::new(move |v| v.style = if on { RenderStyle::Shaded } else { RenderStyle::HiddenLinesRemoved }),
             "threads" => Box::new(move |v| v.hide_threads = !on),
             "faulty_parts" => Box::new(move |v| v.show_faulty = on),
+            "part_intersections" if !views::view_source(&t.d.sheets[t.sheet], id).and_then(|(k, _)| t.m.sources.get(&k)).is_some_and(|s| s.assembly) => return refuse("assembly views only"),
+            "part_intersections" => Box::new(move |v| v.show_part_intersections = on),
             "sketch_points" if v.shown_sketches.is_empty() => return refuse("the view shows no sketches (drawing_view_show_hide shown_sketches)"),
             "sketch_points" => Box::new(move |v| v.hide_sketch_points = !on),
             "auto_centermarks" => Box::new(move |v| {
