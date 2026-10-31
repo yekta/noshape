@@ -14,6 +14,26 @@ a Simple Hole cuts such parts through std's booleanBodies (features/hole.rs `cut
 rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studios saved with sheet metal before std
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
+## 10-31 (core, new account from 10:50)
+- Unify's kept-volume check (boolean.cpp `usd_kept_volume`): integrates only the faces USD changed, not the whole
+  result (the knurl: 14 of ~10k faces merged; two whole-solid integrals of B-spline faces were most of unify.usd's
+  10.7 s). `usd_volume_change`: the faces of the input whose images USD removed or changed, reversed, plus the faces
+  of the result that took their place, in ONE VolumeProperties call (OCCT integrates about the shape's rough
+  barycentre, so open face sets integrated in separate calls don't subtract: the first try failed 8 assembly
+  standard-content tests that way). A face counts as unchanged only if its `face_share` (orientation, surface
+  handle, each edge use with its range and curve-on-face end points) is the same as before USD: USD edits its input
+  in place (the notched cylinder fused with its mirror: same face TShape and edges, another volume share).
+- THIN-LOFT-TRIM-ENDS probes (/root/core-scratch/thick/probe.cpp, built with build.sh against /root/occt, g++ 15 as
+  OCCT was): square 20 → Ø16 loft sheet (4 B-spline faces as live), outward 1 mm. MakeThickSolidBySimple (ours)
+  1081.08 (live untrimmed 1368.57, 16 faces); BRepOffset_MakeOffset thickening with GeomAbs_Arc 1363.62 valid but 28
+  faces (rounded creases; the 5 mm³ gap is the arc vs live's mitre); GeomAbs_Intersection invalid (offset faces
+  run off to ±16, z −5..25); MakeThickSolidByJoin of the capped loft with both caps removed (the "supplied side
+  faces" idea) arc 1365.12 invalid, intersection returns the input; PerformByJoin of the capped solid intersection
+  gives garbage. Inward (−1) all invalid but simple. So OCCT's intersection join can't do creases whose angle goes
+  to 0 (the square's corners run into the circle tangentially); live's (a) is 4 loft faces + 4 offset faces + 2
+  planar rings: a direct build is needed (each face's offset surface of its extended surface, bounded by its
+  neighbours' offsets along the creases and by the cap planes). Parked (P2) behind the knurl and P0s.
+
 ## Tonight (10-29, before the 05:00 release)
 - 5ac53b95 P0 CLI-SUPPRESS-SEGV: a crash guard that recovers past a budgeted op ends that budget (details under OCCT
   patches). qa's fuzz seeds 171 (4 / 4) and 174 run to the end on the fixed CLI.
