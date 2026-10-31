@@ -247,6 +247,20 @@ impl DrawingEditor {
             let c = row.center;
             return edge_picks(*view, &|me| matches!(me.geom, noshape_model::drawing::views::EdgeGeom::Circle { center, .. } if (center[0] - c[0]).hypot(center[1] - c[1]) < 1e-7));
         }
+        // A cut list row: its frame members' edges in every view of the
+        // table's source (as a BOM row's part; help TB15).
+        if let TableKind::CutList { view, .. } = &t.kind {
+            let Ok(n) = self.cell_text(*id, r, 0).parse::<usize>() else { return Vec::new() };
+            let sheet = self.current_sheet();
+            let key = noshape_model::drawing::views::view_source(sheet, *view).map(|(k, _)| k);
+            let rows = noshape_model::drawing::tables::cut_list_rows(self.geoms.get(view).map(|g| g.as_ref()), key.as_ref().and_then(|k| self.sources.get(k)));
+            let bodies = rows.into_iter().find(|row| row.item == n).map(|row| row.bodies).unwrap_or_default();
+            let mut out = Vec::new();
+            for v in sheet.views.iter().filter(|v| noshape_model::drawing::views::view_source(sheet, v.id).map(|(k, _)| k) == key) {
+                out.extend(edge_picks(v.id, &|me| bodies.contains(&me.body)));
+            }
+            return out;
+        }
         let TableKind::Bom { view: bom_view, .. } = &t.kind else { return Vec::new() };
         let item = self.cell_text(*id, r, 0);
         if item.is_empty() || item == "Item" {
