@@ -1178,7 +1178,8 @@ std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, con
 TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
 {
   // The volume of `s` only when the check needs it (one integral of every face: 14 s of the knurl's unify):
-  // a change past 1e-9 of the box's volume is past 1e-9 of the solid's, one under 1e-14 of it is noise.
+  // a change past 1e-9 of the box's volume is past 1e-9 of the solid's, one under 1e-12 of it is the integrals'
+  // noise (the knurl's 14 merged faces: 1.0e-14 of its box).
   std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("usd.box");
   Bnd_Box                      box;
   BRepBndLib::Add(s, box, false);
@@ -1230,7 +1231,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
       d = *change;
       if (std::abs(d) > 1e-9 * bv)
         return false;
-      if (std::abs(d) <= 1e-14 * bv)
+      if (std::abs(d) <= 1e-12 * bv)
         return true;
     }
     else
