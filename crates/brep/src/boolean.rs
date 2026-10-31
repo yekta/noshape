@@ -4232,7 +4232,8 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                         }
                     }
                     for (k, o) in sedges.iter().enumerate() {
-                        if k != s && (o.seg.v.contains(&sedges[s].seg.v[0]) || o.seg.v.contains(&sedges[s].seg.v[1])) {
+                        let close = |w: u32| sedges[s].seg.v.iter().any(|&x| (cx.p(x) - cx.p(w)).length() < 3e-5);
+                        if k != s && (close(o.seg.v[0]) || close(o.seg.v[1])) {
                             let us: Vec<(u32, u32, bool)> = (0..pieces.len()).filter(|&p| pieces[p].loops.iter().flatten().any(|x| x.0 == k)).map(|p| (cx.faces[pieces[p].face].arg, cx.faces[pieces[p].face].index, keep[p].is_some())).collect();
                             eprintln!("  neighbour {k} {:?} v {:?} (ours {:?}) to {:?} mid {:?} pieces {us:?}", o.seg.g, o.seg.v, sedges[s].seg.v, cx.p(o.seg.v[1]), cx.seg_at(&o.seg, 0.5));
                         }
