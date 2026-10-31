@@ -181,8 +181,19 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   their std-named references; only scratch documents were made in that window as far as I know.
 
 ## WIP on agent/skasm
-(none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
+(none after the 19:30 land. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
 "tools/tiers/land.sh".)
+
+## 10-31 19:30 (resumed on a new account)
+- 15109d5b (SM-CLOSED-BUTT flat) passed its land checks but the final rebase hit the uncommitted Group work; it lands
+  together with: **Group holds patterns** (live 1681): a pick on a pattern's copy, in the graphics or the list, takes the
+  pattern ("Linear pattern 1" chip, no message; the copies drawn selected); ✓ with only a pattern is valid. Stored as
+  `Group::patterns` (model-data), members = `Assembly::group_members` (own instances + the patterns' copies) in the
+  solve, connectivity and the same-group error; a group goes with its pattern when nothing else is left in it.
+  assembly_group takes a copy the same way. LA55's Near connector confirmed by live 1639.
+- The never-checked rows the lead listed at 18:50 were already settled by the 10-31 (4) pass (counts from before it).
+- Next: core's forward-oriented edges (below, "From core"): find what the three sheet metal tests read from the
+  stored edge orientation, then land with core's patch.
 
 ## 10-31 evening (after the never-checked rows)
 - **Landed:** e7562f23 SKETCH-DEGENERATE-SOLVE (a fillet R6 → R20 that shrinks the next line to a point solves as live:

@@ -486,6 +486,8 @@ pub struct AsmUi {
     pub ds_renaming: Option<Entity<InputState>>,
     /// Group dialog: (group being edited, instances).
     pub group: Option<(Option<MateId>, Vec<InstanceId>)>,
+    /// The Group dialog's patterns (a pick on a pattern's copy, live 1681).
+    pub group_patterns: Vec<MateId>,
     /// Mate indicators in overlay pick order.
     pub overlay_mates: Vec<MateId>,
     /// Select other (`): its rows (the entity under the cursor, then the
@@ -3208,15 +3210,20 @@ impl AssemblyView {
 // ---------------------------------------------------------------- Group dialog
 
 impl AssemblyView {
-    pub(super) fn open_group(&mut self, editing: Option<MateId>, ids: Vec<InstanceId>, cx: &mut Context<Self>) {
+    pub(super) fn open_group(&mut self, editing: Option<MateId>, ids: Vec<InstanceId>, patterns: Vec<MateId>, cx: &mut Context<Self>) {
+        self.ui.group_patterns = patterns;
         self.ui.group = Some((editing, ids));
         self.insert_open = false;
         self.update_capture(cx);
+        self.refresh_scene(false, cx);
         cx.notify();
     }
 
     pub(super) fn toggle_group_member(&mut self, id: InstanceId, cx: &mut Context<Self>) {
-        if self.assembly(cx).is_some_and(|a| a.generated_by(id).is_some()) {
+        // Live 1681: a pattern's copy is taken as its pattern ("Linear
+        // pattern 1"), no message.
+        if let Some(pid) = self.assembly(cx).and_then(|a| a.generated_by(id)).map(|p| p.id) {
+            self.toggle_group_pattern(pid, cx);
             return;
         }
         if let Some((_, ids)) = &mut self.ui.group {
@@ -3226,6 +3233,17 @@ impl AssemblyView {
                 }
                 None => ids.push(id),
             }
+        }
+        self.refresh_scene(false, cx);
+        cx.notify();
+    }
+
+    fn toggle_group_pattern(&mut self, pid: MateId, cx: &mut Context<Self>) {
+        match self.ui.group_patterns.iter().position(|x| *x == pid) {
+            Some(i) => {
+                self.ui.group_patterns.remove(i);
+            }
+            None => self.ui.group_patterns.push(pid),
         }
         self.refresh_scene(false, cx);
         cx.notify();
@@ -3244,7 +3262,8 @@ impl AssemblyView {
         // Live: empty → "Nothing selected."; members already mated together (E2) →
         // "Mate cannot be added between member of same group.".
         let mated = asm.is_some_and(|a| a.mates.iter().any(|m| !m.suppressed && ids.contains(&m.a.instance) && ids.contains(&m.b.instance)));
-        let error = if ids.is_empty() {
+        let patterns = self.ui.group_patterns.clone();
+        let error = if ids.is_empty() && patterns.is_empty() {
             Some("Nothing selected.")
         } else if mated {
             Some("Mate cannot be added between member of same group.")
@@ -3267,8 +3286,23 @@ impl AssemblyView {
                     )
                     .into_any_element()
             })
+            .chain(patterns.iter().map(|&pid| {
+                let name = asm.and_then(|a| a.patterns.iter().find(|p| p.id == pid).map(|p| p.name.clone())).unwrap_or_default();
+                crate::os_ui::query_row(SharedString::from(format!("grp-pat-{}", pid.0)), name)
+                    .child(
+                        div()
+                            .id(SharedString::from(format!("grp-pat-x-{}", pid.0)))
+                            .px(px(5.))
+                            .text_size(px(16.67))
+                            .text_color(crate::theme::p().icon_tertiary)
+                            .cursor_pointer()
+                            .child("×")
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle_group_pattern(pid, cx))),
+                    )
+                    .into_any_element()
+            }))
             .collect();
-        let ok = !ids.is_empty();
+        let ok = !ids.is_empty() || !patterns.is_empty();
         let body = v_flex()
             .pb(px(2.))
             // The Instances field is active while the dialog is open.
@@ -3328,6 +3362,7 @@ impl AssemblyView {
                             .child(crate::assets::icon("dialog-cancel", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.ui.group = None;
+                                this.ui.group_patterns.clear();
                                 this.update_capture(cx);
                                 cx.notify();
                             })),

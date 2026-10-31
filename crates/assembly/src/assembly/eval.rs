@@ -2404,7 +2404,7 @@ impl AssemblyEvaluator {
         prepared.instances = active.iter().map(|i| (i.id, i.placement)).collect();
         let mut assigned: HashMap<InstanceId, (usize, Frame)> = HashMap::new();
         for g in asm.groups.iter().filter(|g| !g.suppressed) {
-            let members: Vec<&&super::Instance> = g.instances.iter().filter_map(|id| active.iter().find(|i| i.id == *id)).filter(|i| !assigned.contains_key(&i.id)).collect();
+            let members: Vec<&&super::Instance> = asm.group_members(g).iter().filter_map(|id| active.iter().find(|i| i.id == *id)).filter(|i| !assigned.contains_key(&i.id)).collect();
             let Some(rep) = members.first() else { continue };
             let bi = prepared.reps.len();
             prepared.reps.push(rep.id);
@@ -2431,7 +2431,7 @@ impl AssemblyEvaluator {
             let sub_active: Vec<&super::Instance> = sub.instances.iter().filter(|i| !i.suppressed && q.contains_key(&i.id)).collect();
             let mut done: HashSet<InstanceId> = HashSet::new();
             for g in sub.groups.iter().filter(|g| !g.suppressed) {
-                let members: Vec<&&super::Instance> = g.instances.iter().filter_map(|id| sub_active.iter().find(|i| i.id == *id)).filter(|i| !done.contains(&i.id)).collect();
+                let members: Vec<&&super::Instance> = sub.group_members(g).iter().filter_map(|id| sub_active.iter().find(|i| i.id == *id)).filter(|i| !done.contains(&i.id)).collect();
                 let Some(rep) = members.first() else { continue };
                 let on_sub = members.iter().any(|m| m.fixed);
                 let rep_q = q[&rep.id];

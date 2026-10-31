@@ -323,16 +323,18 @@ pub const GROUP_TOO_FEW: &str = "Select at least two instances to group.";
 
 /// Accept the Group dialog: a new group ("Group 1"...) or the edited
 /// group's instances. Returns the group's id.
-pub fn commit_group(a: &mut Assembly, editing: Option<MateId>, ids: Vec<InstanceId>) -> MateId {
+/// A pattern's copy picked is taken as its pattern (live 1681).
+pub fn commit_group(a: &mut Assembly, editing: Option<MateId>, ids: Vec<InstanceId>, patterns: Vec<MateId>) -> MateId {
     if let Some(gid) = editing {
         if let Some(g) = a.groups.iter_mut().find(|g| g.id == gid) {
             g.instances = ids;
+            g.patterns = patterns;
         }
         return gid;
     }
     let id = MateId(a.next_id());
     let name = a.next_feature_name("Group");
-    a.groups.push(Group { id, name, instances: ids, suppressed: false });
+    a.groups.push(Group { id, name, instances: ids, suppressed: false, patterns });
     id
 }
 

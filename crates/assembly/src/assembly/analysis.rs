@@ -826,7 +826,7 @@ pub fn isolate_expansion(result: &AssemblyResult, asm: &Assembly, seeds: &[Insta
     if connectivity {
         let mut links: Vec<(InstanceId, InstanceId)> = asm.mates.iter().filter(|m| !m.suppressed).map(|m| (m.a.instance, m.b.instance)).collect();
         for g in asm.groups.iter().filter(|g| !g.suppressed) {
-            for w in g.instances.windows(2) {
+            for w in asm.group_members(g).windows(2) {
                 links.push((w[0], w[1]));
             }
         }

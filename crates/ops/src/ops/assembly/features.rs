@@ -22,8 +22,8 @@ pub fn ops() -> Vec<Op> {
             group: "assembly",
             verb: "group",
             summary: "Group instances so they move as one rigid body",
-            description: "The Group dialog (at least two instances). Give `edit` to change an existing group's instances. One edit (\"Insert : Group\" / \"Edit : Group\").",
-            fields: vec![doc_field(), asm_field(), req("instances", strings(), "Instance ids or names (two or more)."), opt("edit", s(), "An existing group to edit (id or name).")],
+            description: "The Group dialog (at least two instances, or a pattern: a pattern's copy stands for its pattern, whose copies all join). Give `edit` to change an existing group's instances. One edit (\"Insert : Group\" / \"Edit : Group\").",
+            fields: vec![doc_field(), asm_field(), req("instances", strings(), "Instance ids or names (two or more, or a pattern's copy)."), opt("edit", s(), "An existing group to edit (id or name).")],
             mutates: true,
             destructive: false,
             run: group,
@@ -117,9 +117,18 @@ fn instances(asm: &noshape_model::assembly::Assembly, a: &Args, key: &str) -> Re
 fn group(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = target(ctx, a)?;
     let asm = assembly(od, tab)?.clone();
-    // Pattern copies can't be grouped (the dialog drops them).
-    let ids: Vec<_> = instances(&asm, a, "instances")?.into_iter().filter(|id| asm.generated_by(*id).is_none()).collect();
-    if ids.len() < 2 {
+    // A pattern's copy stands for its pattern (live 1681, as the dialog).
+    let mut ids = Vec::new();
+    let mut patterns = Vec::new();
+    for id in instances(&asm, a, "instances")? {
+        match asm.generated_by(id) {
+            Some(p) if !patterns.contains(&p.id) => patterns.push(p.id),
+            Some(_) => {}
+            None if !ids.contains(&id) => ids.push(id),
+            None => {}
+        }
+    }
+    if ids.len() < 2 && patterns.is_empty() {
         return Err(OpError::param("instances", sa::GROUP_TOO_FEW));
     }
     let editing = match a.opt_str("edit")? {
@@ -127,7 +136,7 @@ fn group(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => None,
     };
     let result = solve(od, tab, &SolveOptions::default())?;
-    let id = commit(od, tab, sa::group_description(editing.is_some()), &result, |a| sa::commit_group(a, editing, ids))?;
+    let id = commit(od, tab, sa::group_description(editing.is_some()), &result, |a| sa::commit_group(a, editing, ids, patterns))?;
     let name = assembly(od, tab)?.groups.iter().find(|g| g.id == id).map(|g| g.name.clone()).unwrap_or_default();
     let mut v = describe(od, tab)?;
     v["group"] = json!(format!("group:{}", id.0));

@@ -924,7 +924,7 @@ impl AssemblyView {
             return p.seeds.iter().copied().chain(p.generated.iter().map(|g| g.instance)).collect();
         }
         if let Some(g) = a.groups.iter().find(|g| g.id == id) {
-            return g.instances.clone();
+            return a.group_members(g);
         }
         a.connector(id).map(|c| vec![c.owner()]).unwrap_or_default()
     }
@@ -1051,6 +1051,10 @@ impl AssemblyView {
         // Group dialog: its instances are shown selected.
         if let Some((_, ids)) = &self.ui.group {
             h.selected_tops = ids.clone();
+            // Its patterns' copies too (live 1681: the copy drawn selected).
+            if let Some(a) = self.assembly(cx) {
+                h.selected_tops.extend(a.patterns.iter().filter(|p| self.ui.group_patterns.contains(&p.id)).flat_map(|p| p.generated.iter().map(|g| g.instance)));
+            }
         }
         // Show mates mode (live 1667): hovering an instance shows only its
         // mates' indicators (below) besides the usual outline, no tint; a
@@ -1616,18 +1620,25 @@ impl AssemblyView {
     /// Group tool: opens the Group dialog with the selection as preselection.
     fn create_group(&mut self, cx: &mut Context<Self>) {
         let ids: Vec<InstanceId> = self.assembly(cx).map(|a| self.selected.iter().copied().filter(|id| a.generated_by(*id).is_none()).collect()).unwrap_or_default();
-        self.open_group(None, ids, cx);
+        let patterns: Vec<MateId> = self.assembly(cx).map(|a| {
+            let mut v: Vec<MateId> = self.selected.iter().filter_map(|id| a.generated_by(*id).map(|p| p.id)).collect();
+            v.dedup();
+            v
+        }).unwrap_or_default();
+        self.open_group(None, ids, patterns, cx);
     }
 
     fn accept_group(&mut self, cx: &mut Context<Self>) {
         let Some((editing, ids)) = self.ui.group.take() else { return };
-        if ids.len() < 2 {
+        let patterns = self.ui.group_patterns.clone();
+        if ids.len() < 2 && patterns.is_empty() {
             self.message = Some((false, noshape_ops::assembly::GROUP_TOO_FEW.into()));
             self.ui.group = Some((editing, ids));
             cx.notify();
             return;
         }
-        self.edit(noshape_ops::assembly::group_description(editing.is_some()), cx, |a| noshape_ops::assembly::commit_group(a, editing, ids));
+        self.ui.group_patterns.clear();
+        self.edit(noshape_ops::assembly::group_description(editing.is_some()), cx, |a| noshape_ops::assembly::commit_group(a, editing, ids, patterns));
         self.update_capture(cx);
         cx.notify();
     }
@@ -1698,7 +1709,7 @@ impl AssemblyView {
             return;
         }
         if let Some(g) = self.assembly(cx).and_then(|a| a.groups.iter().find(|g| g.id == id).cloned()) {
-            self.open_group(Some(g.id), g.instances, cx);
+            self.open_group(Some(g.id), g.instances, g.patterns, cx);
             return;
         }
         if let Some(r) = self.assembly(cx).and_then(|a| a.relations.iter().find(|r| r.id == id).cloned()) {
@@ -4166,9 +4177,10 @@ impl AssemblyView {
         // a group over mated members is red with the mates' error.
         const SAME_GROUP: &str = "Mate cannot be added between member of same group.";
         for g in &asm.groups {
+            let members = asm.group_members(g);
             let err = asm.mates.iter().any(|m| {
                 let i = m.instances();
-                i.len() >= 2 && i.iter().all(|x| g.instances.contains(x)) && result.mates.iter().any(|s| s.id == m.id && s.message.as_deref() == Some(SAME_GROUP))
+                i.len() >= 2 && i.iter().all(|x| members.contains(x)) && result.mates.iter().any(|s| s.id == m.id && s.message.as_deref() == Some(SAME_GROUP))
             });
             if !self.feature_passes(noshape_model::assembly::ops::RowKind::Group, &g.name, err, g.suppressed, false, false) {
                 continue;
@@ -5919,6 +5931,7 @@ impl AssemblyView {
             cx.notify();
         } else if self.ui.group.is_some() {
             self.ui.group = None;
+            self.ui.group_patterns.clear();
             self.update_capture(cx);
             cx.notify();
         } else if self.ui.np_driver.is_some() {

@@ -513,6 +513,17 @@ pub struct Group {
     pub instances: Vec<InstanceId>,
     #[serde(default)]
     pub suppressed: bool,
+    /// Patterns in the group (live 1681: a pick on a pattern's copy takes
+    /// the pattern): their copies are members.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub patterns: Vec<MateId>,
+}
+
+impl Group {
+    /// No member left (a group goes away with its last one, as Onshape's).
+    pub fn is_empty(&self) -> bool {
+        self.instances.is_empty() && self.patterns.is_empty()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -999,6 +1010,18 @@ impl Assembly {
     pub fn pattern(&self, id: MateId) -> Option<&InstancePattern> {
         self.patterns.iter().find(|p| p.id == id)
     }
+    /// A group's member instances: its own and its patterns' copies.
+    pub fn group_members(&self, g: &Group) -> Vec<InstanceId> {
+        let mut out = g.instances.clone();
+        for p in self.patterns.iter().filter(|p| g.patterns.contains(&p.id)) {
+            for x in &p.generated {
+                if !out.contains(&x.instance) {
+                    out.push(x.instance);
+                }
+            }
+        }
+        out
+    }
     /// Pattern that generated an instance.
     pub fn generated_by(&self, id: InstanceId) -> Option<&InstancePattern> {
         self.patterns.iter().find(|p| p.generated.iter().any(|g| g.instance == id))
@@ -1125,7 +1148,7 @@ impl Assembly {
             g.instances.retain(|i| *i != id);
         }
         // Like Onshape, a group goes away with its last member.
-        self.groups.retain(|g| !g.instances.is_empty());
+        self.groups.retain(|g| !g.is_empty());
         for np in &mut self.named_positions {
             np.placements.retain(|(i, _)| *i != id);
         }
@@ -1143,6 +1166,10 @@ impl Assembly {
         }
         if let Some(p) = self.patterns.iter().find(|p| p.id == id).cloned() {
             self.patterns.retain(|x| x.id != id);
+            for g in &mut self.groups {
+                g.patterns.retain(|x| *x != id);
+            }
+            self.groups.retain(|g| !g.is_empty());
             for g in &p.generated {
                 if let Some(m) = g.mate {
                     self.remove_mate(m);

@@ -1167,6 +1167,7 @@ fn assembly_patterns_bom_interference() {
     // The copy sits 60 mm from the seed along X, clear of the block.
     let list = call(&mut ctx, "assembly_list", json!({}));
     let copy = pat["created"][0].as_str().unwrap();
+    let copy_id = copy.to_string();
     let at = |id: &str| list["instances"].as_array().unwrap().iter().find(|i| i["id"] == id).unwrap()["translation"].clone();
     assert!(((num(&at(copy)[0]) - num(&at(&pin_i)[0])).abs() - 60.0).abs() < 1e-6, "{list}");
     assert_eq!(call(&mut ctx, "assembly_interference", json!({}))["count"], 1);
@@ -1193,9 +1194,17 @@ fn assembly_patterns_bom_interference() {
     let descs: Vec<&str> = hist["history"].as_array().unwrap().iter().map(|h| h["description"].as_str().unwrap()).collect();
     assert!(descs.contains(&"Assembly 1 :: Add column Material"), "{descs:?}");
 
-    // Deleting the pattern takes its instances with it.
+    // A pattern's copy stands for its pattern in a group (live 1681): the
+    // copy alone is enough.
+    let g = call(&mut ctx, "assembly_group", json!({ "instances": [copy_id] }));
+    assert_eq!(g["name"], "Group 1", "{g}");
+
+    // Deleting the pattern takes its instances with it, and the group it
+    // was all of.
     let d = call(&mut ctx, "assembly_delete", json!({ "mates": ["Linear pattern 1"] }));
     assert_eq!(d["instances"].as_array().unwrap().len(), 2, "{d}");
+    let e = try_call(&mut ctx, "assembly_group", json!({ "instances": [pin_i, block_i], "edit": "Group 1" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("edit"), "{e:?}");
     let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
     assert_eq!(hist["history"][0]["description"], "Assembly 1 :: Delete : Linear pattern 1");
 }

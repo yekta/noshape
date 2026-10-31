@@ -2572,7 +2572,7 @@ Examples:
 
 Group instances so they move as one rigid body (edits the document (one undoable history entry)).
 
-The Group dialog (at least two instances). Give `edit` to change an existing group's instances. One edit ("Insert : Group" / "Edit : Group").
+The Group dialog (at least two instances, or a pattern: a pattern's copy stands for its pattern, whose copies all join). Give `edit` to change an existing group's instances. One edit ("Insert : Group" / "Edit : Group").
 
 Examples:
 
@@ -2584,7 +2584,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
-| `instances` | array of string | required | Instance ids or names (two or more). |
+| `instances` | array of string | required | Instance ids or names (two or more, or a pattern's copy). |
 | `edit` | string |  | An existing group to edit (id or name). |
 
 #### assembly_relation

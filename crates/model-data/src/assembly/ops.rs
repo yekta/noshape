@@ -434,7 +434,7 @@ impl Assembly {
         sub.connectors = self.connectors.iter().filter(|c| moved_conns.contains(&c.id)).cloned().collect();
         sub.patterns = self.patterns.iter().filter(|p| moved_pats.contains(&p.id)).cloned().collect();
         sub.relations = self.relations.iter().filter(|r| r.mates.iter().all(|m| internal.contains(m))).cloned().collect();
-        sub.groups = self.groups.iter().filter(|g| g.instances.iter().all(|i| moved.contains(i))).cloned().collect();
+        sub.groups = self.groups.iter().filter(|g| g.instances.iter().all(|i| moved.contains(i)) && g.patterns.iter().all(|p| moved_pats.contains(p))).cloned().collect();
         let moved_groups: Vec<MateId> = sub.groups.iter().map(|g| g.id).collect();
         let moved_rels: Vec<MateId> = sub.relations.iter().map(|r| r.id).collect();
         self.patterns.retain(|p| !moved_pats.contains(&p.id));
@@ -446,7 +446,7 @@ impl Assembly {
         for g in &mut self.groups {
             g.instances.retain(|i| !moved.contains(i));
         }
-        self.groups.retain(|g| !g.instances.is_empty());
+        self.groups.retain(|g| !g.is_empty());
         for m in &mut self.mates {
             repath_into(&mut m.a, &moved, sub_id);
             repath_into(&mut m.b, &moved, sub_id);
@@ -557,6 +557,7 @@ impl Assembly {
             let mut n = g.clone();
             n.id = feat_map[&g.id];
             n.instances = g.instances.iter().filter_map(|i| inst_map.get(i).copied()).collect();
+            n.patterns = g.patterns.iter().filter_map(|p| feat_map.get(p).copied()).collect();
             self.groups.push(n);
         }
         // Patterns come back with their seeds and copies (live request 1564).
@@ -604,7 +605,7 @@ impl Assembly {
         for g in &mut self.groups {
             g.instances.retain(|i| *i != sub_inst);
         }
-        self.groups.retain(|g| !g.instances.is_empty());
+        self.groups.retain(|g| !g.is_empty());
         ids
     }
 }
@@ -857,7 +858,7 @@ impl Assembly {
         for g in &mut self.groups {
             g.instances.retain(|i| !moved.contains(i));
         }
-        self.groups.retain(|g| !g.instances.is_empty());
+        self.groups.retain(|g| !g.is_empty());
         // A flexible subassembly keeps them where they are.
         if let Some(s) = self.instance_mut(sub_inst) {
             for (old, new) in &inst_map {
