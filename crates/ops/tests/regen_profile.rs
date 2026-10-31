@@ -282,7 +282,9 @@ fn blend_rust_profile() {
 
 /// live-30-features' display meshes, noshape's mesher against BRepMesh: its parts as a regeneration leaves
 /// them, meshed on fresh copies (the mesh cache has none, as on open) at the display's deflections, median of 5
-/// each. For tools/tiers/perf.sh (no environment needed). `cargo test --release -p noshape-ops --test all
+/// each. Cold: each round's copies scaled by 1 + k·10⁻⁶, so the CDT's result cache (a face met again in its own
+/// frame) has none of them either, as on open; warm: the same copies again (a regeneration that moved faces). For
+/// tools/tiers/perf.sh (no environment needed). `cargo test --release -p noshape-ops --test all
 /// regen_profile::bench_live30_display_mesh -- --ignored --nocapture --test-threads=1`
 #[test]
 #[ignore = "bench"]
@@ -297,10 +299,13 @@ fn bench_live30_display_mesh() {
     let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
     let parts: Vec<noshape_kernel::Shape> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.shape.clone()).collect();
     let faces: usize = parts.iter().map(|p| p.faces().len()).sum();
-    let times = |rust: bool| {
+    let round = std::cell::Cell::new(0);
+    let times = |rust: bool, cold: bool| {
         let mut v: Vec<f64> = (0..5)
             .map(|_| {
-                let copies: Vec<_> = parts.iter().map(|p| transform(p, &Transform::Translate(DVec3::ZERO), true).unwrap().shape).collect();
+                round.set(round.get() + 1);
+                let to = if cold { Transform::Scale { center: DVec3::ZERO, factor: 1.0 + round.get() as f64 * 1e-6 } } else { Transform::Translate(DVec3::ZERO) };
+                let copies: Vec<_> = parts.iter().map(|p| transform(p, &to, true).unwrap().shape).collect();
                 for c in &copies {
                     let _ = c.ancestor_map(ShapeType::Edge, ShapeType::Face).unwrap();
                 }
@@ -317,7 +322,9 @@ fn bench_live30_display_mesh() {
         v.sort_by(|a, b| a.total_cmp(b));
         v[2]
     };
-    let (ours, occt) = (times(true), times(false));
-    eprintln!("live-30 ({} parts, {faces} faces) display mesh: ours {ours:.1} ms, BRepMesh {occt:.1} ms: {:.1}×", parts.len(), occt / ours);
+    let (ours, occt) = (times(true, true), times(false, true));
+    eprintln!("live-30 ({} parts, {faces} faces) display mesh, cold: ours {ours:.1} ms, BRepMesh {occt:.1} ms: {:.1}×", parts.len(), occt / ours);
+    let (ours, occt) = (times(true, false), times(false, false));
+    eprintln!("live-30 display mesh, warm: ours {ours:.1} ms, BRepMesh {occt:.1} ms: {:.1}×", occt / ours);
     let _ = std::fs::remove_file(&tmp);
 }
