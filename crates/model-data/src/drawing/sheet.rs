@@ -2717,18 +2717,24 @@ impl SheetGeometry {
         // the line broken around it; past an extension line (live asbdt-1b/c)
         // the line runs unbroken between the arrows and on to just before it.
         let mid = [(dp[0] + dq[0]) / 2.0, (dp[1] + dq[1]) / 2.0];
-        let s_along = self.text_along.unwrap_or(0.0);
-        let c = [mid[0] + dir[0] * s_along, mid[1] + dir[1] * s_along];
         let half_line = dl / 2.0;
-        let outside = s_along.abs() > half_line && self.text_along.is_some();
-        let squeezed = inline && !self.flip_arrows && !outside && gap.is_some_and(|g| 2.0 * g + 2.0 * a_len > dl);
+        // ISO (live request 1679): arrows that don't fit go outside, pointing
+        // in with their tails, a line joining the extension lines, wherever
+        // the value is; the value, until dragged, right of the right arrow's
+        // tail, above the line carried on to its far end.
+        let iso_squeezed = !inline && !self.flip_arrows && 2.0 * a_len > dl;
+        let iso_out = iso_squeezed && self.text_along.is_none();
+        let s_along = if iso_out { half_line + 2.0 * a_len + font::text_width(&text.main, h) / 2.0 } else { self.text_along.unwrap_or(0.0) };
+        let c = [mid[0] + dir[0] * s_along, mid[1] + dir[1] * s_along];
+        let outside = (s_along.abs() > half_line && self.text_along.is_some()) || iso_out;
+        let squeezed = iso_squeezed || (inline && !self.flip_arrows && !outside && gap.is_some_and(|g| 2.0 * g + 2.0 * a_len > dl));
         if outside {
             // From the extension line on the value's side to its gap.
             let g = gap.unwrap_or(font::text_width(&text.main, h) / 2.0 + 0.65 * h);
             let sign = s_along.signum();
             let from = [mid[0] + dir[0] * sign * half_line, mid[1] + dir[1] * sign * half_line];
             // ISO (text above the line): under the value to its far end
-            // (ISO's dragged placement not checked live yet, request asb 10-25 a).
+            // (live request 1679).
             let reach = if inline { -g } else { font::text_width(&text.main, h) / 2.0 };
             let to = [c[0] + dir[0] * sign * reach, c[1] + dir[1] * sign * reach];
             if (to[0] - from[0]) * dir[0] * sign + (to[1] - from[1]) * dir[1] * sign > 0.0 {
@@ -2751,6 +2757,9 @@ impl SheetGeometry {
             out
         };
         if squeezed {
+            if iso_squeezed {
+                self.lines.push(Polyline2 { points: vec![dp, dq], style: LineStyle::Thin, closed: false, pick });
+            }
             for (end, out) in [(dp, [-du[0], -du[1]]), (dq, du)] {
                 let base = [end[0] + out[0] * a_len, end[1] + out[1] * a_len];
                 self.lines.push(Polyline2 { points: vec![base, [base[0] + out[0] * a_len, base[1] + out[1] * a_len]], style: LineStyle::Thin, closed: false, pick });

@@ -3575,6 +3575,18 @@ fn ansi_dimension_text_sits_inline() {
     let half = font::text_width("60", h) / 2.0 + 0.65 * h;
     assert!((pieces[0][1] - (80.0 - half)).abs() < 1e-9 && (pieces[1][0] - (80.0 + half)).abs() < 1e-9);
     assert!((pieces[0][0] - 50.0).abs() < 1e-9 && (pieces[1][1] - 110.0).abs() < 1e-9);
+    // ISO too narrow (live request 1679, "2,95"): arrows outside pointing in
+    // with their tails, a line joining the extension lines; the value right
+    // of the right tail, above the line carried on to its far end.
+    let g = dim(true, 50.0, 52.95);
+    let a = g.style.dim_arrow;
+    let t = g.texts.iter().find(|t| t.text == "60").unwrap();
+    let w = font::text_width("60", h);
+    assert!((t.pos[0] - (52.95 + 2.0 * a + w / 2.0)).abs() < 1e-9, "{:?}", t.pos);
+    let ly = g.lines.iter().find(|l| l.points.len() == 2 && (l.points[0][0] - 50.0).abs() < 1e-9 && (l.points[1][0] - 52.95).abs() < 1e-9).expect("joining line").points[0][1];
+    let pieces = horizontal(&g, ly);
+    assert!(pieces.iter().any(|p| (p[0] - 52.95).abs() < 1e-9 && (p[1] - (t.pos[0] + w / 2.0)).abs() < 1e-9), "carried on: {pieces:?}");
+    assert!(pieces.iter().any(|p| (p[0] - (50.0 - 2.0 * a)).abs() < 1e-9 && (p[1] - (50.0 - a)).abs() < 1e-9), "left tail: {pieces:?}");
     // Too narrow (0.100 in): arrows outside with their tails, nothing between.
     let g = dim(false, 50.0, 52.54);
     let a = g.style.dim_arrow;
