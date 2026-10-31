@@ -492,6 +492,15 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   35 s; scene edit → `cargo test -p noshape-scene --lib` 92 s (first after a sketch change). Clippy of model-core +
   model after an edit 53 s. T0 after a sketch/scene edit 830 s total chain (incl. the tests above).
 
+## From core (10-31 18:10): forward-oriented edges and sheet metal
+- core tried handing every edge out FORWARD (kernel common.cpp; /root/core-scratch/forward-edges-1031.patch: an
+  edge's start / end then always match its parameters, tangents and curve, Parasolid's direction). Everything passed
+  but three sheet metal tests, which read the stored edge orientation: model features_c::
+  counterbore_head_shows_in_flat, form_adds_and_cuts_and_shows_in_flat ("form direction vs the flat's viewing side")
+  and ops e2e::sheet_metal_table_ops (Flange 2 "Collision in sheet metal model."). Not landed. If you get to it,
+  apply the patch, look at what those three take from EdgeInfo.start / end or `edges()`' orientation, and land both
+  together (or tell core it should stay as it is).
+
 ## Requests to the lead
 - perf.sh (10-30 ~21:00–22:10): two runs of `regen_profile::sheet_metal_profile` failed to *build* on vibe3 in
   noshape-drawing (first `BrokenOut` missing `offset`, then `TableKind::Bom` has no `default_template`) at commits
