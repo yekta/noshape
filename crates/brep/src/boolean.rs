@@ -795,10 +795,10 @@ impl Ctx<'_> {
             let k = es.iter().position(|x| x.0 == e).ok_or(Decline("an apex on a part of a cone"))?;
             let w = s.v[0];
             let ends = |&(e, rev): &(usize, bool)| if rev { [self.edges[e].v[1], self.edges[e].v[0]] } else { self.edges[e].v };
-            let rulings = |at: usize| es.iter().filter(|x| self.edges[x.0].g == Geo::Line && ends(x)[at] == w).map(|x| ends(x)[1 - at]).collect::<Vec<u32>>();
+            // (A ruling as a line, or as OCCT's section of it (a B-spline): its angle at its middle.)
+            let rulings = |at: usize| es.iter().filter(|x| !matches!(self.edges[x.0].g, Geo::Apex { .. }) && ends(x)[at] == w).map(|x| self.seg_at(&self.edge_seg(x.0), 0.5)).collect::<Vec<DVec3>>();
             let (into, out) = (rulings(1), rulings(0));
             let (&[from], &[to]) = (into.as_slice(), out.as_slice()) else { return Err(Decline("an apex on a part of a cone")) };
-            let (from, to) = (self.p(from), self.p(to));
             let y = g.to2(self.p(s.v[0])).y;
             let (a, b) = (DVec2::new(g.to2(from).x, y), DVec2::new(g.to2(to).x, y));
             return Ok(if es[k].1 { C2::Seg { a: b, b: a } } else { C2::Seg { a, b } });
@@ -3600,9 +3600,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         } else {
             let k = g.edges.iter().position(|x| x.0 == e).ok_or(Decline("an apex on a part of a cone"))?;
             let ends = |&(e, rev): &(usize, bool)| if rev { [cx.edges[e].v[1], cx.edges[e].v[0]] } else { cx.edges[e].v };
-            let rulings = |end: usize| g.edges.iter().filter(|x| cx.edges[x.0].g == Geo::Line && ends(x)[end] == w).map(|x| ends(x)[1 - end]).collect::<Vec<u32>>();
+            let rulings = |end: usize| g.edges.iter().filter(|x| !matches!(cx.edges[x.0].g, Geo::Apex { .. }) && ends(x)[end] == w).map(|x| g.to2(cx.seg_at(&cx.edge_seg(x.0), 0.5)).x / r).collect::<Vec<f64>>();
             let (&[a], &[b]) = (rulings(1).as_slice(), rulings(0).as_slice()) else { return Err(Decline("an apex on a part of a cone")) };
-            if g.edges[k].1 { (angle(b), angle(a)) } else { (angle(a), angle(b)) }
+            if g.edges[k].1 { (b, a) } else { (a, b) }
         };
         let (lo, hi) = (from.min(to), from.max(to));
         at.retain(|&t| t - lo > 1e-9 && hi - t > 1e-9);
@@ -3930,6 +3930,11 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 } else {
                     continue;
                 };
+                // (A free-form face: past its patch the point's parameters are clamped to its edge; off it there,
+                // not on that face.)
+                if matches!(cx.faces[g].s, Surf::Nurbs { .. }) && free::surface_distance(&cx.faces[g], pieces[pi].inside) > tol {
+                    continue;
+                }
                 let q = cx.faces[g].to2(pieces[pi].inside);
                 let d = distance2(q, cx.bound(g)?);
                 if d <= GREY * tol {
