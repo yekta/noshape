@@ -1023,7 +1023,9 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
     are 11 µm apart along them (ours on the plane, OCCT's 2e-9 m off it): edge ends within 20 µm there. The volume
     differs by 1.1e-8 relative (OCCT's own moved 3.6e-9 between the recording and now): to 1e-7. The pattern bench
     `the_b94_diamond_knurl` compares the knurl's volume to 1e-7 too.
-- Seen, not looked into yet: our result's vertices carry tolerance 5e-6 where OCCT's carry ~1e-7.
+- Vertex tolerances: ours 5e-6 on the free-form sections' vertices (OCCT's pave-filler floor for free-form
+  sections, as our section_tol), OCCT's ~1e-7 there only because op_boolean ran it scaled to mm (5e-6 mm). So it
+  differs only on 64+-tool cuts at the working scale, which used to go to OCCT's scaled path. Not changed.
 
 ## The whole knurl test on vibe3, where the time goes (10-31 12:45 UTC)
 - perf.sh at 909faec5 (the lift, = main bbbf7e82): the test 42.96 s (hourly baseline ~162 s before); the diamond's
@@ -1036,6 +1038,19 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   ~24 s of the 43 s is the test's volume check, not the feature.
 - Then: volume_props' faces on OCCT's pool, summed in order (bit-identical on both knurl results; 56 → 8.3 s
   here).
+
+## The knurl at main (vibe3, perf.sh at 88c82e6f, 10-31 13:59 UTC)
+The whole test **21.40 s** (162 s this morning); the diamond's regeneration **14.3 s** (live 49 s), growing the
+process 0.62 GB; straight 0.6 s. The knurl target is met: the regeneration and the whole test are both under live's
+49 s.
+
+## What still declines, by OCCT's recorded time (replays 10-31 13:10 UTC, each case once over all corpora)
+An internal face 25.3 s (2: b2511301 a Shell slab fuse of 72 tools whose OCCT result is invalid, addb9a14), a
+tolerant input 23.9 s (18), edges of two arguments crossing on a third's face 22.2 s (14), a plane through a
+cone's apex 18.6 s (27), a vertex inside coincident edges of two other arguments 16.3 s (11), two vertices nearly
+coincide 9.7 s (10), a curve nearly along a face's boundary 5.5 s (5), an edge on another argument's free-form face
+4.9 s (4), an internal edge 4.0 s (11), the rest under 4 s each. Flat: no one reason is worth much now.
+(/root/bool-scratch/why19.tsv: corpus, case, recorded ms, reason.)
 
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
@@ -1081,6 +1096,14 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   solid as Modified into the result's? Then noshape's Boolean can take those cuts (the B94.6 knurl's is one: it now
   declines "tools coincide" on that account) with the same history as today. If anything (names, bodies) relies on
   the Deleted, tell me and I'll mirror it instead.
+- core / lead (10-31 14:10 UTC): pattern fuses of 128+ touching instances go through fuse_slabs (OCCT, slabs glued
+  and unified). noshape's Boolean takes all nine recorded from the pattern tests (999-fin fuses 2.1–2.5 s against
+  fuse_slabs' 3.1–4.9 s here, loaded), and with fuse_slabs' unify after it the same faces, edges and volume as
+  fuse_slabs. But not the same history: fuse_slabs' composition through the slab cuts records the block's faces
+  and edges both Deleted and Modified (an artefact), where ours, as a plain Boolean, says Kept. So I haven't
+  switched them over (patch: /root/bool-scratch/rust-before-slabs.patch: ours first where fuse_slabs' gaps
+  apply, unified as fuse_slabs, fuse_slabs and the trimmed path after). If the naming would take the plain
+  Boolean's history for these (Kept), say so and I'll land it with the corpus rebased.
 - core (10-31 UTC; core on it): the unify after a patterned cut: on the knurl, unify.usd takes 10.7 s of op_boolean's 18.3 s
   (vibe3, step 5; the Rust Boolean 7.3 s, less since), and all it merges is 14 of 10376 faces (cylinder-side pieces split at the
   seam; OCCT's raw result has them too) plus those faces' edge halves. Most of it is usd_kept_volume: two
