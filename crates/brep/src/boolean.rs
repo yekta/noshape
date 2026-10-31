@@ -624,6 +624,8 @@ struct Ctx<'a> {
     in_face_done: HashSet<(usize, usize)>,
     /// Curves added to each face.
     face_segs: Vec<Vec<Seg>>,
+    /// For each of a face's curves, the section it is (its index in `sections`), or `usize::MAX`.
+    seg_section: Vec<Vec<usize>>,
     coplanar: Vec<(usize, usize)>,
     /// Where two faces cross (the curve, the faces).
     sections: Vec<(Seg, usize, usize)>,
@@ -1178,6 +1180,8 @@ impl Ctx<'_> {
                 }
                 self.face_segs[fs].push(seg);
                 self.face_segs[ft].push(seg);
+                self.seg_section[fs].push(self.sections.len());
+                self.seg_section[ft].push(self.sections.len());
                 self.sections.push((seg, fs, ft));
             }
         }
@@ -1259,6 +1263,7 @@ impl Ctx<'_> {
                 continue;
             }
             self.face_segs[f].push(Seg { v: [a, b], g });
+            self.seg_section[f].push(usize::MAX);
         }
         Ok(())
     }
@@ -2478,6 +2483,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         side_cache: HashMap::default(),
         in_face_done: Default::default(),
         face_segs: Vec::new(),
+        seg_section: Vec::new(),
         coplanar: Vec::new(),
         sections: Vec::new(),
         pending: Vec::new(),
@@ -2768,6 +2774,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         return line::line_common(&cx, tol);
     }
     cx.face_segs = vec![Vec::new(); cx.faces.len()];
+    cx.seg_section = vec![Vec::new(); cx.faces.len()];
     // A pattern's instances that must only touch: one with a vertex inside another argument's solid overlaps it,
     // told before any section (the classification would tell it at the end).
     if touching_only {
@@ -3059,21 +3066,62 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // below.)
     // (A face's curves and their boxes.)
     type FaceCurves = (Vec<C2>, Vec<Option<(DVec2, DVec2)>>);
+    // (A copied tool's face: its family's first member's face and the steps from it.)
+    let copy_step = |f: usize| -> Option<(usize, usize)> {
+        let sym = sym.as_ref()?;
+        let (k, r) = cx.copies.get(cx.faces[f].arg as usize).copied().flatten()?;
+        let (_, ax, th) = r.rotation()?;
+        let steps = (if ax.dot(sym.a) > 0.0 { th } else { TAU - th }) * sym.n as f64 / TAU;
+        let j = steps.round() as usize % sym.n;
+        if j == 0 || (steps - steps.round()).abs() > 1e-6 {
+            return None;
+        }
+        let f0 = sym.face_back[j - 1][f];
+        (f0 != usize::MAX && cx.faces[f0].arg as usize == cx.families[k][0].0).then_some((f0, j))
+    };
+    // (With the arrangement the same under a rotation: a copied tool's face whose curves are its family's first
+    // member's face's turned, one for one (by each of its curves, that face's), crosses where that one does.)
+    let like_first = |f: usize| -> Option<(usize, Vec<usize>)> {
+        let sym = sym.as_ref()?;
+        let (f0, j) = copy_step(f)?;
+        if cx.face_segs[f].len() != cx.face_segs[f0].len() {
+            return None;
+        }
+        let back = sym.turn(-(j as f64));
+        let mut at: HashMap<[u32; 2], Vec<usize>> = HashMap::default();
+        for (i, s0) in cx.face_segs[f0].iter().enumerate() {
+            at.entry(s0.v).or_default().push(i);
+        }
+        let mut used = vec![false; cx.face_segs[f0].len()];
+        let mut to = Vec::with_capacity(used.len());
+        for s1 in &cx.face_segs[f] {
+            let v = [cx.pool.find(back.point(cx.p(s1.v[0]))).ok()??, cx.pool.find(back.point(cx.p(s1.v[1]))).ok()??];
+            let mid = back.point(cx.seg_at(s1, 0.5));
+            let i = *at.get(&v)?.iter().find(|&&i| !used[i] && std::mem::discriminant(&cx.face_segs[f0][i].g) == std::mem::discriminant(&s1.g) && (cx.seg_at(&cx.face_segs[f0][i], 0.5) - mid).length() <= tol)?;
+            used[i] = true;
+            to.push(i);
+        }
+        Some((f0, to))
+    };
+    let firsts: Vec<Option<(usize, Vec<usize>)>> = par_map(cx.faces.len(), &like_first);
     let curves_of = |f: usize| -> R<FaceCurves> {
         let c2: Vec<C2> = if cx.face_segs[f].len() < 2 { Vec::new() } else { cx.face_segs[f].iter().map(|s| cx.c2_of(f, s, 0, None)).collect::<R<_>>()? };
         // (Curves whose control points' boxes are apart don't cross.)
         let boxes = c2.iter().map(|c| c.quick_box()).collect();
         Ok((c2, boxes))
     };
-    let curves = par_map(cx.faces.len(), &curves_of);
+    let curves = par_map(cx.faces.len(), &|f| if firsts[f].is_some() { Ok((Vec::new(), Vec::new())) } else { curves_of(f) });
+    // (Each face's curves' lengths, found once when asked.)
+    let lengths: Vec<Vec<std::sync::OnceLock<f64>>> = curves.iter().map(|c| c.as_ref().map_or(Vec::new(), |x| (0..x.0.len()).map(|_| Default::default()).collect())).collect();
     let mut items: Vec<(usize, usize)> = Vec::new();
     for (f, c) in curves.iter().enumerate() {
-        if let Ok((c2, _)) = c {
+        if let Ok((c2, ..)) = c {
             items.extend((0..c2.len()).map(|i| (f, i)));
         }
     }
-    let crossings_of = |k: usize| -> Vec<(usize, f64)> {
-        let (f, i) = items[k];
+    // (Both curves and both parameters of each.)
+    type Crossings = Vec<(usize, usize, f64, f64)>;
+    let crossings_in = |f: usize, i: usize, curves: &[R<FaceCurves>]| -> Crossings {
         let Ok((c2, boxes)) = &curves[f] else { return Vec::new() };
         let segs = &cx.face_segs[f];
         let mut out = Vec::new();
@@ -3084,21 +3132,39 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 continue;
             }
             for (t, u) in c2[i].intersections(&c2[j], tol) {
-                let (li, lj) = (cx.seg_length(&segs[i]), cx.seg_length(&segs[j]));
+                let (li, lj) = (*lengths[f][i].get_or_init(|| cx.seg_length(&segs[i])), *lengths[f][j].get_or_init(|| cx.seg_length(&segs[j])));
                 if t * li > tol && (1.0 - t) * li > tol && u * lj > tol && (1.0 - u) * lj > tol {
-                    out.push((i, t));
+                    out.push((i, j, t, u));
                 }
             }
         }
         out
     };
-    let found = par_map(items.len(), &crossings_of);
-    let mut all_crossings: Vec<R<Vec<(usize, f64)>>> = curves.iter().map(|c| c.as_ref().map(|_| Vec::new()).map_err(|e| *e)).collect();
+    let found = par_map(items.len(), &|k| crossings_in(items[k].0, items[k].1, &curves));
+    let mut full: Vec<R<Crossings>> = curves.iter().map(|c| c.as_ref().map(|_| Vec::new()).map_err(|e| *e)).collect();
     for (k, x) in found.into_iter().enumerate() {
-        if let Ok(v) = &mut all_crossings[items[k].0] {
+        if let Ok(v) = &mut full[items[k].0] {
             v.extend(x);
         }
     }
+    // (A face like its first member's: that one's crossings by its own curves, each where the lower of the two in
+    // its order has it, in the order its own pairs come.)
+    for (f, x) in firsts.iter().enumerate() {
+        let Some((f0, to)) = x else { continue };
+        let mut from = vec![0; to.len()];
+        for (i, &i0) in to.iter().enumerate() {
+            from[i0] = i;
+        }
+        full[f] = match &full[*f0] {
+            Ok(v) => {
+                let mut m: Crossings = v.iter().map(|&(i0, j0, t, u)| if from[i0] < from[j0] { (from[i0], from[j0], t, u) } else { (from[j0], from[i0], u, t) }).collect();
+                m.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)).then(a.2.total_cmp(&b.2)).then(a.3.total_cmp(&b.3)));
+                Ok(m)
+            }
+            Err(e) => Err(*e),
+        };
+    }
+    let all_crossings: Vec<R<Vec<(usize, f64)>>> = full.into_iter().map(|x| x.map(|v| v.into_iter().map(|c| (c.0, c.2)).collect())).collect();
     for (f, crossings) in all_crossings.into_iter().enumerate() {
         let segs = cx.face_segs[f].clone();
         for (i, t) in crossings? {
@@ -3243,9 +3309,15 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
     }
     // (Where the curves added to faces and the sections are split, on all threads; taken in order.)
+    // (A section's split once, for both faces' curves it is.)
     let extra_segs: Vec<(usize, Seg)> = (0..cx.faces.len()).flat_map(|f| cx.face_segs[f].iter().map(move |&s| (f, s))).collect();
-    let extra_chains = par_map(extra_segs.len(), &|k| cx.split(&extra_segs[k].1, &by_x));
+    let extra_of: Vec<usize> = (0..cx.faces.len()).flat_map(|f| cx.seg_section[f].iter().copied()).collect();
     let section_chains = par_map(cx.sections.len(), &|k| cx.split(&cx.sections[k].0, &by_x));
+    let extra_chains: Vec<R<Vec<u32>>> = par_map(extra_segs.len(), &|k| if extra_of[k] == usize::MAX { Some(cx.split(&extra_segs[k].1, &by_x)) } else { None })
+        .into_iter()
+        .enumerate()
+        .map(|(k, x)| x.unwrap_or_else(|| section_chains[extra_of[k]].clone()))
+        .collect();
     let mut face_extra: Vec<Vec<usize>> = vec![Vec::new(); cx.faces.len()];
     for (&(f, s), chain) in extra_segs.iter().zip(extra_chains) {
         let chain = chain?;
@@ -3272,7 +3344,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     let mut face_split: Vec<bool> = vec![false; cx.faces.len()];
     let mut face_inner: Vec<Vec<u32>> = vec![Vec::new(); cx.faces.len()];
     // (Each face's on all threads, applied in order: its pieces, whether it is split, the vertices inside it.)
-    let of_face = |f: usize| -> R<(bool, Vec<u32>, Vec<Piece>)> {
+    // A face's split curves (in order) and whether it is split; its pieces: whether split, its vertices inside, the
+    // pieces.
+    type FacePieces = (bool, Vec<u32>, Vec<Piece>);
+    let face_curves = |f: usize| -> (Vec<usize>, bool) {
         let mut segs: Vec<usize> = cx.faces[f].edges.iter().flat_map(|&(e, _)| edge_pieces[e].iter().map(|x| x.0)).collect();
         segs.sort_unstable();
         segs.dedup();
@@ -3282,6 +3357,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         segs.sort_unstable();
         segs.dedup();
         let split = boundary_split || segs.len() != n_boundary;
+        (segs, split)
+    };
+    let of_face = |f: usize| -> R<FacePieces> {
+        let (segs, split) = face_curves(f);
         // A face nothing reaches is one piece as it was (out of every other solid).
         let fs = cx.faces[f].solid;
         let near = involved[fs]
@@ -3373,7 +3452,71 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
         Ok((split, inner, out))
     };
-    for (f, x) in par_map(cx.faces.len(), &of_face).into_iter().enumerate() {
+    // (With the arrangement the same under a rotation: a copied tool's face whose split curves are its first
+    // member's face's turned, one for one in the same order, has that face's pieces, their curves the ones here,
+    // their points turned; its vertices inside likewise. Any other found itself.)
+    let first_pieces = par_map(cx.faces.len(), &|f| copy_step(f).is_none().then(|| of_face(f)));
+    let turned_pieces = |f: usize| -> Option<FacePieces> {
+        let sym = sym.as_ref()?;
+        let (f0, j) = copy_step(f)?;
+        let Some(Ok((split0, inner0, pieces0))) = &first_pieces[f0] else { return None };
+        let ((segs, split), (segs0, _)) = (face_curves(f), face_curves(f0));
+        if split != *split0 || segs.len() != segs0.len() {
+            return None;
+        }
+        let g = sym.turn(j as f64);
+        let back = sym.turn(-(j as f64));
+        // (Each curve here the one of that face its ends and middle turn back to; no seams, so a curve's place in
+        // the face's list numbers its half-edges.)
+        let mut seen = HashSet::default();
+        if cx.faces[f].edges.iter().any(|&(e, _)| !seen.insert(e)) {
+            return None;
+        }
+        let mut at0: HashMap<[u32; 2], Vec<usize>> = HashMap::default();
+        for &s0 in &segs0 {
+            at0.entry(sedges[s0].seg.v).or_default().push(s0);
+        }
+        let mut to: HashMap<usize, usize> = HashMap::default();
+        for &si in &segs {
+            let a = &sedges[si].seg;
+            let v = [cx.pool.find(back.point(cx.p(a.v[0]))).ok()??, cx.pool.find(back.point(cx.p(a.v[1]))).ok()??];
+            let mid = back.point(cx.seg_at(a, 0.5));
+            let s0 = *at0.get(&v)?.iter().find(|&&s0| std::mem::discriminant(&a.g) == std::mem::discriminant(&sedges[s0].seg.g) && (cx.seg_at(&sedges[s0].seg, 0.5) - mid).length() <= tol)?;
+            if to.insert(s0, si).is_some() {
+                return None;
+            }
+        }
+        let place: HashMap<usize, usize> = segs.iter().enumerate().map(|(k, &si)| (si, k)).collect();
+        let half = |&(si, rev): &(usize, bool)| 2 * place[&si] + usize::from(rev);
+        let inner = inner0.iter().map(|&w| cx.pool.find(g.point(cx.p(w))).ok().flatten()).collect::<Option<Vec<u32>>>()?;
+        // (As the arrangement here would give them: each loop from its least half-edge, the holes and the pieces in
+        // the order of theirs.)
+        let mut pieces = pieces0
+            .iter()
+            .map(|p| {
+                let mut loops = p
+                    .loops
+                    .iter()
+                    .map(|l| {
+                        let mut l = l.iter().map(|&(s0, rev)| Some((*to.get(&s0)?, rev))).collect::<Option<Vec<_>>>()?;
+                        let k = (0..l.len()).min_by_key(|&k| half(&l[k]))?;
+                        l.rotate_left(k);
+                        Some(l)
+                    })
+                    .collect::<Option<Vec<_>>>()?;
+                loops[1..].sort_by_key(|l| half(&l[0]));
+                Some(Piece { face: f, loops, inside: if p.inside.is_nan() { p.inside } else { g.point(p.inside) }, dangling: p.dangling })
+            })
+            .collect::<Option<Vec<Piece>>>()?;
+        if pieces.iter().any(|p| p.inside.is_nan()) {
+            return None;
+        }
+        pieces.sort_by_key(|p| half(&p.loops[0][0]));
+        Some((split, inner, pieces))
+    };
+    let rest_pieces = par_map(cx.faces.len(), &|f| first_pieces[f].is_none().then(|| turned_pieces(f).map_or_else(|| of_face(f), Ok)));
+    let all_pieces: Vec<R<FacePieces>> = first_pieces.into_iter().zip(rest_pieces).map(|(a, b)| a.or(b).expect("a face's pieces")).collect();
+    for (f, x) in all_pieces.into_iter().enumerate() {
         let (split, inner, out) = x?;
         face_split[f] = split;
         for &w in &inner {

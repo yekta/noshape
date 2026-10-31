@@ -936,6 +936,28 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   corpus6 662, Shell's 78, direct 58).
 - psui: nothing public changed.
 
+## Patterned tools, step 6 (10-31 UTC): crossings, splits and faces' pieces by the period too
+- vibe3 (perf.sh, e2e43802 = step 5 plus scratch timers; the knurl with the "tools coincide" declines lifted):
+  op_boolean 18.3 s, of which the Rust Boolean 7.3 s (27.7 s at step 3, 38 s before step 3) and unify.usd 10.7 s
+  (Requests). Phases: pairs 2.0 s, crossings 1.3, splits 1.1, faces' pieces 1.7, classification 0.3, the result's
+  faces and build 0.8.
+- With the rotation found (step 5):
+  - Crossings of curves on a face: a copied tool's face whose curves are its family's first member's face's turned,
+    one for one, crosses where that one does: its crossings mapped by curve (each recorded on the earlier of the
+    two in this face's order, in the order its own pairs come); each curve's length found once when asked.
+  - Faces' pieces: such a face whose split curves are the first member's face's turned has that face's pieces, the
+    curves the ones here, their points turned, its vertices inside likewise, in the order its own arrangement gives
+    (each loop from its least half-edge, holes and pieces in the order of theirs: the arrangement finds a cycle
+    first at its least half-edge); faces with seams found themselves.
+  - A section's curve is split once for its two faces' lists and the sections' list (it was split three times).
+- Knurl, local (loaded): Rust Boolean 10.9 → 9.3 s (faces' pieces 2.3 → 1.05 s, splits 2.8 → 1.7 s, all 874
+  copied faces' pieces turned); the same result (9.427289e-5 m³, 10362 faces, valid).
+- bool_patterns all as OCCT's (local: pocket grid 86 ms / 779, helical grooves 190 / 765, radial holes 222 / 504,
+  gear slots 48 / 450; holes on a circle 2.3 / 2.5 by the through-holes path; crossing grooves still OCCT's).
+- Replays, all 0 differ, the counts unchanged (main 776, corpus2 553, corpus3 556, corpus4 600, corpus5 717,
+  corpus6 662, Shell's 78, direct 58).
+- psui: nothing public changed.
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|
@@ -976,8 +998,8 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   solid as Modified into the result's? Then noshape's Boolean can take those cuts (the B94.6 knurl's is one: it now
   declines "tools coincide" on that account) with the same history as today. If anything (names, bodies) relies on
   the Deleted, tell me and I'll mirror it instead.
-- core (10-31 UTC): the unify after a patterned cut: on the knurl, unify.usd takes 10.7 s of 38.6 s (vibe3; now
-  more than the Rust Boolean itself), and all it merges is 14 of 10376 faces (cylinder-side pieces split at the
+- core (10-31 UTC): the unify after a patterned cut: on the knurl, unify.usd takes 10.7 s of op_boolean's 18.3 s
+  (vibe3, step 5; the Rust Boolean 7.3 s, less since), and all it merges is 14 of 10376 faces (cylinder-side pieces split at the
   seam; OCCT's raw result has them too) plus those faces' edge halves. Most of it is usd_kept_volume: two
   BRepGProp::VolumeProperties of the whole 10k-face result (B-spline faces) and a copy, around one USD. Could the
   volume check compare only the merged faces' share (the volume is a sum over faces: the faces USD replaced
