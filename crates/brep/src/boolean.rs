@@ -3175,11 +3175,11 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     }
     // (Both curves and both parameters of each.)
     type Crossings = Vec<(usize, usize, f64, f64)>;
-    let crossings_in = |f: usize, i: usize, curves: &[R<FaceCurves>]| -> Crossings {
+    let crossings_with = |f: usize, i: usize, js: &mut dyn Iterator<Item = usize>, curves: &[R<FaceCurves>]| -> Crossings {
         let Ok((c2, boxes)) = &curves[f] else { return Vec::new() };
         let segs = &cx.face_segs[f];
         let mut out = Vec::new();
-        for j in i + 1..segs.len() {
+        for j in js {
             if let (Some((li, hi)), Some((lj, hj))) = (boxes[i], boxes[j])
                 && ((li - hj).max_element() > tol || (lj - hi).max_element() > tol)
             {
@@ -3194,7 +3194,103 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
         out
     };
-    let found = par_map(items.len(), &|k| crossings_in(items[k].0, items[k].1, &curves));
+    let crossings_in = |f: usize, i: usize, curves: &[R<FaceCurves>]| -> Crossings { crossings_with(f, i, &mut (i + 1..cx.face_segs[f].len()), curves) };
+    // (With the rotation: a curve whose ends and middle turn back onto a curve in the first period (on a copied
+    // tool's face, onto its first member's face; on a face the rotation keeps, onto the face's own) crosses where
+    // that one does, the curves it crosses turned onto this face's (each pair kept by the earlier of its two, in
+    // the order found); those first curves are crossed with all their face's others for that. The rest as
+    // before.)
+    let seg_map = |f: usize| -> HashMap<[u32; 2], Vec<usize>> {
+        let mut m: HashMap<[u32; 2], Vec<usize>> = HashMap::default();
+        for (i, s1) in cx.face_segs[f].iter().enumerate() {
+            m.entry(s1.v).or_default().push(i);
+        }
+        m
+    };
+    let maps: Vec<HashMap<[u32; 2], Vec<usize>>> = par_map(cx.faces.len(), &|f| if matches!(&curves[f], Ok((c2, _)) if !c2.is_empty()) && sym.is_some() { seg_map(f) } else { HashMap::default() });
+    // The curve of face `to` that face `from`'s curve `i` turns into by `g` (its ends and middle), if any.
+    let turn_seg = |to: usize, from: usize, i: usize, g: &Rigid| -> Option<usize> {
+        let s1 = &cx.face_segs[from][i];
+        let v = [cx.pool.find(g.point(cx.p(s1.v[0]))).ok()??, cx.pool.find(g.point(cx.p(s1.v[1]))).ok()??];
+        let mid = g.point(cx.seg_at(s1, 0.5));
+        maps[to].get(&v)?.iter().copied().find(|&k| std::mem::discriminant(&cx.face_segs[to][k].g) == std::mem::discriminant(&s1.g) && (cx.seg_at(&cx.face_segs[to][k], 0.5) - mid).length() <= tol)
+    };
+    let period_of = |f: usize, i: usize| sym.as_ref().and_then(|sym| sym.period(cx.seg_at(&cx.face_segs[f][i], 0.5), size));
+    // (A family's first member's face: any of its curves may be another's image.)
+    let first_face = |f: usize| sym.is_some() && cx.copies.get(cx.faces[f].arg as usize).copied().flatten().is_some_and(|(k, _)| cx.families[k][0].0 == cx.faces[f].arg as usize);
+    // Where a curve's crossings come from: found with all its face's curves (an image), from an image (the face
+    // and the steps), or found as before.
+    enum From {
+        All,
+        Image(usize, usize),
+        Own,
+    }
+    let from_of = |f: usize, i: usize| -> From {
+        if let Some((f0, j)) = copy_step(f) {
+            return From::Image(f0, j);
+        }
+        if first_face(f) {
+            return From::All;
+        }
+        match period_of(f, i) {
+            Some(0) => From::All,
+            Some(j) => From::Image(f, j),
+            None => From::Own,
+        }
+    };
+    let found_first = par_map(items.len(), &|k| {
+        let (f, i) = items[k];
+        match from_of(f, i) {
+            From::All => Some(crossings_with(f, i, &mut (0..cx.face_segs[f].len()).filter(|&j| j != i), &curves)),
+            From::Image(..) => None,
+            From::Own => Some(crossings_in(f, i, &curves)),
+        }
+    });
+    let mut item_of: HashMap<(usize, usize), usize> = HashMap::default();
+    for (k, &x) in items.iter().enumerate() {
+        item_of.insert(x, k);
+    }
+    let turned_crossings = |k: usize| -> Option<Crossings> {
+        let sym = sym.as_ref()?;
+        let (f, i) = items[k];
+        let From::Image(f0, j) = from_of(f, i) else { return None };
+        let i0 = turn_seg(f0, f, i, &sym.turn(-(j as f64)))?;
+        let k0 = *item_of.get(&(f0, i0))?;
+        if !matches!(from_of(f0, i0), From::All) {
+            return None;
+        }
+        let all0 = found_first[k0].as_ref()?;
+        let g = sym.turn(j as f64);
+        let mut out = Vec::new();
+        for &(_, k0, t, u) in all0 {
+            // (A curve there split here: the one of the curves at its turned ends the crossing lies on.)
+            let (k1, u) = match turn_seg(f, f0, k0, &g) {
+                Some(k1) => (k1, u),
+                None => {
+                    let s0 = &cx.face_segs[f0][k0];
+                    let q = g.point(cx.seg_at(s0, u));
+                    let ends: Vec<u32> = s0.v.iter().filter_map(|&w| cx.pool.find(g.point(cx.p(w))).ok().flatten()).collect();
+                    let (k1, (u1, _)) = (0..cx.face_segs[f].len()).filter(|&k| cx.face_segs[f][k].v.iter().any(|w| ends.contains(w))).map(|k| (k, cx.seg_param(&cx.face_segs[f][k], q))).find(|x| x.1.1 <= tol && x.1.0 > 0.0 && x.1.0 < 1.0)?;
+                    (k1, u1)
+                }
+            };
+            if k1 > i {
+                out.push((i, k1, t, u));
+            }
+        }
+        out.sort_by(|a, b| a.1.cmp(&b.1).then(a.2.total_cmp(&b.2)).then(a.3.total_cmp(&b.3)));
+        Some(out)
+    };
+    let found_rest = par_map(items.len(), &|k| found_first[k].is_none().then(|| turned_crossings(k).unwrap_or_else(|| crossings_in(items[k].0, items[k].1, &curves))));
+    let found: Vec<Crossings> = found_first
+        .iter()
+        .zip(found_rest)
+        .enumerate()
+        .map(|(k, (a, b))| match a {
+            Some(v) => v.iter().copied().filter(|x| x.1 > items[k].1).collect(),
+            None => b.expect("a curve's crossings"),
+        })
+        .collect();
     let mut full: Vec<R<Crossings>> = curves.iter().map(|c| c.as_ref().map(|_| Vec::new()).map_err(|e| *e)).collect();
     for (k, x) in found.into_iter().enumerate() {
         if let Ok(v) = &mut full[items[k].0] {
@@ -3307,7 +3403,36 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         let near = es != usize::MAX && (0..ns).any(|t| meets[es * ns + t] && boxes_meet(lo, hi, cx.solids[t].lo, cx.solids[t].hi, GREY * tol));
         if near { cx.split_among(&s, &lists, Some(cx.edges[e].arg)) } else { Ok(vec![s.v[0], s.v[1]]) }
     };
-    let edge_chains = par_map(edge_solid.len(), &edge_chain);
+    // (With the arrangement the same under a rotation: a curve in a later period whose ends and middle turn back
+    // onto a curve's in the first has that one's split points turned, the vertices there; any other found.)
+    let by_period = |n: usize, seg_of: &(dyn Fn(usize) -> Seg + Sync), find: &(dyn Fn(usize) -> R<Vec<u32>> + Sync)| -> Vec<R<Vec<u32>>> {
+        let Some(sym) = sym.as_ref() else { return par_map(n, find) };
+        let period: Vec<Option<usize>> = (0..n).map(|k| sym.period(cx.seg_at(&seg_of(k), 0.5), size)).collect();
+        let mut at: HashMap<[u32; 2], Vec<usize>> = HashMap::default();
+        for (k, &p) in period.iter().enumerate() {
+            if p == Some(0) {
+                at.entry(seg_of(k).v).or_default().push(k);
+            }
+        }
+        let first = par_map(n, &|k| period[k].is_none_or(|j| j == 0).then(|| find(k)));
+        let turned = |k: usize| -> Option<Vec<u32>> {
+            let j = period[k]?;
+            let (back, g) = (sym.turn(-(j as f64)), sym.turn(j as f64));
+            let s = seg_of(k);
+            let v = [cx.pool.find(back.point(cx.p(s.v[0]))).ok()??, cx.pool.find(back.point(cx.p(s.v[1]))).ok()??];
+            let mid = back.point(cx.seg_at(&s, 0.5));
+            let k0 = *at.get(&v)?.iter().find(|&&k0| {
+                let s0 = seg_of(k0);
+                std::mem::discriminant(&s0.g) == std::mem::discriminant(&s.g) && (cx.seg_at(&s0, 0.5) - mid).length() <= tol
+            })?;
+            let Some(Ok(chain0)) = &first[k0] else { return None };
+            let chain = chain0.iter().map(|&w| cx.pool.find(g.point(cx.p(w))).ok().flatten()).collect::<Option<Vec<u32>>>()?;
+            (chain.first() == Some(&s.v[0]) && chain.last() == Some(&s.v[1])).then_some(chain)
+        };
+        let rest = par_map(n, &|k| first[k].is_none().then(|| turned(k).map_or_else(|| find(k), Ok)));
+        first.into_iter().zip(rest).map(|(a, b)| a.or(b).expect("a curve's split points")).collect()
+    };
+    let edge_chains = by_period(edge_solid.len(), &|e| cx.edge_seg(e), &edge_chain);
     for (e, chain) in edge_chains.into_iter().enumerate() {
         let s = cx.edge_seg(e);
         let chain = chain?;
@@ -3366,12 +3491,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // (A section's split once, for both faces' curves it is.)
     let extra_segs: Vec<(usize, Seg)> = (0..cx.faces.len()).flat_map(|f| cx.face_segs[f].iter().map(move |&s| (f, s))).collect();
     let extra_of: Vec<usize> = (0..cx.faces.len()).flat_map(|f| cx.seg_section[f].iter().copied()).collect();
-    let section_chains = par_map(cx.sections.len(), &|k| cx.split(&cx.sections[k].0, &by_x));
-    let extra_chains: Vec<R<Vec<u32>>> = par_map(extra_segs.len(), &|k| if extra_of[k] == usize::MAX { Some(cx.split(&extra_segs[k].1, &by_x)) } else { None })
-        .into_iter()
-        .enumerate()
-        .map(|(k, x)| x.unwrap_or_else(|| section_chains[extra_of[k]].clone()))
-        .collect();
+    let section_chains = by_period(cx.sections.len(), &|k| cx.sections[k].0, &|k| cx.split(&cx.sections[k].0, &by_x));
+    let own: Vec<usize> = (0..extra_segs.len()).filter(|&k| extra_of[k] == usize::MAX).collect();
+    let mut own_chains = by_period(own.len(), &|i| extra_segs[own[i]].1, &|i| cx.split(&extra_segs[own[i]].1, &by_x)).into_iter();
+    let extra_chains: Vec<R<Vec<u32>>> = (0..extra_segs.len()).map(|k| if extra_of[k] == usize::MAX { own_chains.next().expect("a curve's split points") } else { section_chains[extra_of[k]].clone() }).collect();
     let mut face_extra: Vec<Vec<usize>> = vec![Vec::new(); cx.faces.len()];
     for (&(f, s), chain) in extra_segs.iter().zip(extra_chains) {
         let chain = chain?;

@@ -970,6 +970,20 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   local), 2006 faces, the same volume (no rotation there: the Rust Boolean's generic path).
 - Replays, all 0 differ, the counts unchanged.
 
+## Patterned tools, step 8 (10-31 UTC)
+- vibe3 at step 6 (perf.sh, 9f3e0b21): the knurl's Rust Boolean 5.7 s (pairs 2.0, crossings 0.92, splits 0.91,
+  pieces 0.7, classification 0.29, build 0.69); op_boolean 16.7 s, unify.usd 10.75 s of it.
+- Split points by the period: an input edge, section or curve on a face in a later period whose ends and middle
+  turn back onto one in the first takes that one's split points turned (the vertices there; its own ends checked);
+  any other found. Knurl local: 4.6 → 1.7 CPU-s.
+- Crossings by the period, curve by curve: a curve on a copied tool's face (onto its first member's face) or on a
+  face the rotation keeps (onto the face's own, first period) takes its image's crossings, the curves it crosses
+  turned onto this face (one split here by the cylinder's seam line: the curve at its turned ends the crossing lies
+  on); the images are crossed with all their face's curves for that; each pair kept by the earlier of its two, in
+  the order the direct loop gives. Knurl: 3854 of 4074 curves left after step 6 turned (the rest are the seam-split
+  ones, found directly).
+- The same result (9.427289e-5 m³, 10362 faces, valid); replays all 0 differ, the counts unchanged.
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|
