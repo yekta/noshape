@@ -317,7 +317,8 @@ that touches the model: ~12 min.
 N10. (10-31 20:36) Open after today: dark-mode dk-994 (custom table panel: needs a FeatureScript custom table) and
      dk-9a1 (history row menu); residuals: the Flange dialog's Partial flange group chevron (live has none; std
      puts an "Overall parameters" group under it once ticked: asked live, REQUESTS psui 10-31 20:36), the Variable
-     type ▾ 2 px narrower. Every row of core-workflow 8, keyboard-mouse,
+     type ▾ 2 px narrower; the Versions and history row menu's metrics (live: 27 px rows, 14 px text, ~222 px, a
+     Bootstrap dropdown; ours the 22 px context-menu rows: an OsMenu style option, history-ui's os_context_menu). Every row of core-workflow 8, keyboard-mouse,
      chrome-sweep, configurations, large-models, part-studio, interaction and cursors is checked; no live request
      of mine is open but the Partial flange one.
 
