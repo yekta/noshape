@@ -1818,12 +1818,28 @@ impl DrawingEditor {
         let target = pick.and_then(|p| self.built.as_ref()?.picks.get(p as usize).cloned());
         let circle = target.as_ref().and_then(|t| if let PickTarget::DetailCircle(v) = t { Some(*v) } else { None });
         let cut_line = target.as_ref().and_then(|t| if let PickTarget::SectionLine(v) = t { Some(*v) } else { None });
+        // A title block field is a note (live qa4 round 5 s11 (2)): its menu
+        // starts with Edit note….
+        let field = target.as_ref().and_then(|t| if let PickTarget::TitleField(k) = t { Some(k.clone()) } else { None });
         self.menu_broken_out = target.and_then(|t| if let PickTarget::BrokenOut { view, index } = t { Some((view, index)) } else { None });
-        let entries = match (self.leader_hit(self.cursor), circle, cut_line) {
-            (Some(hit), _, _) => self.leader_entries(hit, cx),
-            (None, Some(v), _) => self.detail_circle_entries(v, cx),
-            (None, None, Some(v)) => self.section_line_entries(v, cx),
-            (None, None, None) => self.context_entries(sel, cx),
+        let entries = match (self.leader_hit(self.cursor), circle, cut_line, field) {
+            (Some(hit), ..) => self.leader_entries(hit, cx),
+            (None, Some(v), ..) => self.detail_circle_entries(v, cx),
+            (None, None, Some(v), _) => self.section_line_entries(v, cx),
+            (None, None, None, Some(key)) => vec![
+                MenuEntry::item("Edit note...", move |t, w, cx| t.open_title_field(key.clone(), w, cx)),
+                crate::drawing_props::paste_always(),
+                MenuEntry::item("Paste as table", |t, _, cx| {
+                    t.start_paste_table(cx);
+                }),
+                MenuEntry::Separator,
+                MenuEntry::item("Clear selection", |t, _, cx| {
+                    t.selection.clear();
+                    t.redraw(cx);
+                }),
+                MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
+            ],
+            (None, None, None, None) => self.context_entries(sel, cx),
         };
         let ed = cx.entity();
         // Onshape's right-click menu (os_menu: 12 px, 22 px rows).
