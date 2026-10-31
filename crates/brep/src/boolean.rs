@@ -4153,6 +4153,17 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                         .map(|p| (p, cx.faces[pieces[p].face].arg, cx.faces[pieces[p].face].index, if pieces[p].inside.is_nan() { 0.0 } else { 1.0 }, keep[p].is_some()))
                         .collect();
                     eprintln!("NM sedge {s} {:?} from {:?} to {:?} mid {:?} uses {u:?} origins {:?} pieces (piece, arg, face, -, kept) {users:?}", std::mem::discriminant(&sedges[s].seg.g), cx.p(sedges[s].seg.v[0]), cx.p(sedges[s].seg.v[1]), cx.seg_at(&sedges[s].seg, 0.5), sedges[s].origins);
+                    let v = sedges[s].seg.v;
+                    for (o, x) in sedges.iter().enumerate() {
+                        if o != s && (x.seg.v == v || x.seg.v == [v[1], v[0]] || x.seg.v.contains(&v[0]) && x.seg.v.contains(&v[1])) {
+                            eprintln!("   twin {o} {:?} v {:?} mid {:?} d(mid, ours) {:e}", std::mem::discriminant(&x.seg.g), x.seg.v, cx.seg_at(&x.seg, 0.5), cx.seg_param(&sedges[s].seg, cx.seg_at(&x.seg, 0.5)).1);
+                        }
+                    }
+                    for (o, x) in sedges.iter().enumerate() {
+                        if o != s && x.seg.v.contains(&v[0]) != x.seg.v.contains(&v[1]) && cx.seg_param(&sedges[s].seg, cx.seg_at(&x.seg, 0.5)).1 < 1e-6 {
+                            eprintln!("   overlapping {o} {:?} v {:?} {:?}->{:?}", std::mem::discriminant(&x.seg.g), x.seg.v, cx.p(x.seg.v[0]), cx.p(x.seg.v[1]));
+                        }
+                    }
                 }
             }
         }
