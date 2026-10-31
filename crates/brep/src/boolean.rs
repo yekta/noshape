@@ -3306,18 +3306,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     for (f, crossings) in all_crossings.into_iter().enumerate() {
         let segs = cx.face_segs[f].clone();
         for (i, t) in crossings? {
-            let n = cx.pool.p.len();
             cx.pool.add(cx.seg_at(&segs[i], t))?;
-            // (With a vertex of three arguments or more on this face, or of four anywhere, OCCT's choices differ:
-            // not done.)
-            let three = |w: u32| cx.pool.inputs[w as usize].len() >= 3;
-            if cx.pool.p.len() > n
-                && (segs.iter().any(|s| s.v.iter().any(|&w| three(w)))
-                    || cx.faces[f].edges.iter().any(|&(e, _)| cx.edges[e].v.iter().any(|&w| three(w)))
-                    || cx.pool.inputs.iter().any(|ins| ins.len() >= 4))
-            {
-                return Err(Decline("edges of two arguments crossing on a third's face"));
-            }
         }
     }
     // Split edges.
@@ -3495,7 +3484,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // An input vertex inside edges of two other arguments (coincident there: a common block): OCCT
     // (non-destructive) replaces it for each edge, and again when the block's tolerance grows past the new
     // vertex's, which rounding decides (4e-16 off: grows), and then its history says Deleted, not Modified.
-    // Taken only where nothing can be rounded: straight edges along an axis, exactly through it.
+    // Taken only where nothing can be rounded: straight edges along an axis, exactly through it. Inside coincident
+    // edges of three other arguments OCCT's history says Deleted (Shell's slabs meeting: four arguments at a line).
+    let mut deleted_v: HashSet<u32> = HashSet::default();
     for (&w, es) in &inside_edges {
         let mut args: Vec<u32> = es.iter().map(|&e| cx.edges[e].arg).collect();
         args.sort_unstable();
@@ -3522,6 +3513,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         };
         if !es.iter().all(|&e| exact(e)) {
             return Err(Decline("a vertex inside coincident edges of two other arguments"));
+        }
+        // (One argument's vertex alone: one already two arguments' (merged with another's first) stays Modified.)
+        if args.len() >= 3 && cx.pool.inputs[w as usize].len() == 1 && es.iter().all(|&e| at(e) == at(es[0])) {
+            deleted_v.insert(w);
         }
     }
     // (Where the curves added to faces and the sections are split, on all threads; taken in order.)
@@ -4259,6 +4254,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         for &(a, i) in &cx.pool.inputs[w as usize] {
             match o {
                 None => h.push(rec(Kind::Vertex, a, i, Relation::Deleted, Kind::Vertex, u32::MAX)),
+                Some(_) if deleted_v.contains(&w) => h.push(rec(Kind::Vertex, a, i, Relation::Deleted, Kind::Vertex, u32::MAX)),
                 Some(o) if !vertex_same(w) => h.push(rec(Kind::Vertex, a, i, Relation::Modified, Kind::Vertex, o)),
                 _ => {}
             }

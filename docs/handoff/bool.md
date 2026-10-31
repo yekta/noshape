@@ -1079,6 +1079,16 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Vertices inside coincident edges of three other arguments; the crossing guard gone (10-31 18:16 UTC)
+- Shell's slab fuses: slabs meeting along a line put an argument's vertex inside the coincident edges of three
+  others. OCCT's history then says that vertex was Deleted (not Modified) when it is that one argument's alone;
+  one already shared with another argument's vertex stays Modified (checked on the 8 cases of each kind). Ours
+  does the same (exact straight edges along an axis, as before for two).
+- The "edges of two arguments crossing on a third's face" decline (any vertex of three arguments on the face, or of
+  four anywhere) is gone: what differed under it was that history alone.
+- Replays all 0 differ: main 786, corpus2 561 (+2), corpus3 564 (+2), corpus4 612 (+2), corpus5 748 (+2), corpus6
+  678 (+2), Shell's 83 (+2), direct 60 (+2). T1: 0456f872a355cd83 in tests/data/brep.
+
 ## What still declines, by OCCT's recorded time (replays 10-31 17:13 UTC on main with the apex work, each case once)
 A vertex inside coincident edges of two other arguments 32.3 s (17), an internal face 25.3 s (2: b2511301 a Shell
 slab fuse of 72 tools whose OCCT result is invalid, addb9a14), a tolerant input 23.9 s (18), edges of two arguments
