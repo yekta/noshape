@@ -4169,6 +4169,17 @@ impl SketchEditor {
             let ids: Vec<EntityId> = self.picks.iter().map(|x| x.0).collect();
             // Arc length: both end points, then the arc.
             let arc_length = ids.len() == 2 && data.sketch.endpoints(e).is_some_and(|(s, en)| data.sketch.kind(e) == Some(EntityKind::Arc) && ids.contains(&s) && ids.contains(&en));
+            // Live (behaviours "qa (2026-10-28) sketch.md 7.22"): two conics /
+            // Beziers / splines that don't touch can't be dimensioned; the
+            // second pick is refused with the warning bubble, the picks clear
+            // and the tool stays on.
+            if let [first] = ids.as_slice()
+                && unmeasurable_curve_pair(&data.sketch, *first, e)
+            {
+                self.picks.clear();
+                self.toast = Some(DIMENSION_FAILED.into());
+                return EditOutcome::redraw();
+            }
             if self.picks.len() < 2 || arc_length {
                 self.picks.push((e, p));
                 return EditOutcome::redraw();
@@ -4206,6 +4217,13 @@ impl SketchEditor {
         }
         let c = self.cursor?;
         let ids: Vec<EntityId> = self.picks.iter().map(|x| x.0).collect();
+        // Over a second curve that can't be dimensioned to the first, the
+        // first one's own dimension (a conic's Rho) doesn't follow the pointer.
+        if let ([first], Some(h)) = (ids.as_slice(), self.hover)
+            && unmeasurable_curve_pair(&data.sketch, *first, h)
+        {
+            return None;
+        }
         let kind = circle_mode(&data.sketch, smart_dimension(&data.sketch, &ids, c)?, &self.picks, self.world_per_px);
         let v = data.sketch.measure_new(&kind)? * dim_display_scale(&kind);
         Some((kind, c, v))
@@ -6497,6 +6515,17 @@ pub fn smart_dimension(sk: &Sketch, ids: &[EntityId], cursor: DVec2) -> Option<C
     }
 }
 
+/// Two conics, Beziers or splines that don't share an end point: Onshape
+/// makes no dimension between them.
+fn unmeasurable_curve_pair(sk: &Sketch, a: EntityId, b: EntityId) -> bool {
+    let spline = |e: EntityId| sk.kind(e).is_some_and(|k| k.is_spline());
+    if a == b || !spline(a) || !spline(b) {
+        return false;
+    }
+    let ends = |e: EntityId| sk.endpoints(e).map(|(s, t)| vec![s, t]).unwrap_or_default();
+    !ends(a).iter().any(|p| ends(b).contains(p))
+}
+
 /// Distances to circles / arcs picked on their rim measure to the nearest
 /// (minimum) or farthest (maximum) point instead of the center.
 fn circle_mode(sk: &Sketch, k: ConstraintKind, picks: &[(EntityId, DVec2)], wpp: f64) -> ConstraintKind {
@@ -8343,6 +8372,34 @@ mod tests {
         assert!((value - PI / 4.0).abs() < 1e-9);
         let Some(ConstraintKind::Angle { value, .. }) = smart_dimension(&sk, &[l1, l2], v(-5.0, 1.0)) else { panic!() };
         assert!((value - 3.0 * PI / 4.0).abs() < 1e-9, "obtuse quadrant");
+    }
+
+    /// Live (behaviours "qa (2026-10-28) sketch.md 7.22"): a conic, then a
+    /// spline that doesn't touch it: the second pick is refused with the
+    /// warning, the picks clear and the tool stays on; hovering the spline
+    /// doesn't drag the conic's Rho along.
+    #[test]
+    fn dimension_between_free_splines_is_refused_at_the_second_pick() {
+        let (mut ed, mut d) = editor(Tool::Dimension);
+        let conic = d.sketch.add_conic(v(0.0, 0.0), v(0.01, 0.02), v(0.02, 0.0), 0.5).unwrap();
+        let spline = d.sketch.add_fit_spline(&[v(0.04, 0.0), v(0.05, 0.01), v(0.06, 0.0)]).unwrap();
+        let on = |e: EntityId, d: &SketchData| {
+            let c = d.sketch.curve(e).unwrap();
+            let (a, b) = c.domain();
+            c.point(a + (b - a) * 0.3)
+        };
+        let (pc, ps) = (on(conic, &d), on(spline, &d));
+        click(&mut ed, &mut d, pc);
+        assert_eq!(ed.picked(None), vec![conic]);
+        ed.pointer_move(&mut d, ps, false, false);
+        ed.hover = d.sketch.pick(ps, PX * 4.0);
+        assert_eq!(ed.hover, Some(spline));
+        assert!(ed.dimension_preview(&d).is_none(), "no Rho preview over the spline");
+        click(&mut ed, &mut d, ps);
+        assert_eq!(ed.toast.as_deref(), Some(DIMENSION_FAILED));
+        assert!(ed.picked(None).is_empty(), "the picks clear");
+        assert_eq!(ed.tool, Tool::Dimension, "the tool stays on");
+        assert!(ed.dim_edit.is_none());
     }
 
     #[test]
