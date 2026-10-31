@@ -3,8 +3,9 @@
 //! here. Prints the cases it takes, why it declines the others, and the times by size.
 //!
 //! `NOSHAPE_BOOL_CORPUS=/root/core-scratch/bool-corpus cargo test -p noshape-kernel --test all
-//! brep_replay::brep_corpus_replay -- --ignored --nocapture` (NOSHAPE_BREP_DIFF=1 prints each mismatch's
-//! history records that differ; NOSHAPE_BREP_ONLY=<name> runs one case; NOSHAPE_BREP_SHOW_OCCT=<name>,... prints
+//! brep_replay::brep_corpus_replay -- --ignored --nocapture` (a result that differs from OCCT's only by OCCT's
+//! arbitrary choices is reported equivalent with its deltas (`equivalent`), NOSHAPE_BREP_EXACT=1: as differing;
+//! NOSHAPE_BREP_DIFF=1 prints each mismatch's history records that differ; NOSHAPE_BREP_ONLY=<name> runs one case; NOSHAPE_BREP_SHOW_OCCT=<name>,... prints
 //! OCCT's result and history records for those cases, taken or not; NOSHAPE_BREP_VS_OCCT=1 compares with OCCT run
 //! here instead of the recorded result: for a corpus recorded with this Boolean on; NOSHAPE_BREP_ALWAYS=<dir> writes
 //! every taken case's two results there).
