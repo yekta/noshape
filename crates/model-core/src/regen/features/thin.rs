@@ -315,6 +315,43 @@ fn offset_side(w: &Shape, d: f64, m: DVec3, left: DVec3) -> FResult<Shape> {
     err("The wall offset failed (thickness too large?)")
 }
 
+/// A thin loft's wall loop around an open planar chain: its offsets `t1` to
+/// the left of its first edge about `normal` (flipped to agree with
+/// `reference`, the first profile's) and `t2` to the right, joined by end
+/// caps; with the loop's corner at the chain's start on the `t1` side, so the
+/// loops of several profiles loft corner to corner. None for a chain with no
+/// plane (a straight line).
+pub fn open_wall_loop(w: &Shape, reference: Option<DVec3>, t1: f64, t2: f64) -> FResult<Option<(Shape, DVec3, DVec3)>> {
+    if closed_chain(w) {
+        return Ok(None);
+    }
+    let Ok(frame) = wire_frame(w) else { return Ok(None) };
+    let normal = match reference {
+        Some(r) if r.dot(frame.normal) < 0.0 => -frame.normal,
+        _ => frame.normal,
+    };
+    let first = w.edges()[0].clone();
+    let (m, left) = left_of(&first, normal)?;
+    let o1 = offset_side(w, t1, m, left)?;
+    let o2 = offset_side(w, t2, m, -left)?;
+    let (ws, we) = ends(w).ok_or_else(|| fe("The wall chain is not open"))?;
+    let pair = |o: &Shape| -> FResult<(DVec3, DVec3)> {
+        let (a, b) = ends(o).ok_or_else(|| fe("The wall offset is not an open chain"))?;
+        Ok(if a.distance(ws) + b.distance(we) <= a.distance(we) + b.distance(ws) { (a, b) } else { (b, a) })
+    };
+    let (o1s, o1e) = pair(&o1)?;
+    let (o2s, o2e) = pair(&o2)?;
+    let mut edges: Vec<Shape> = o1.edges();
+    edges.extend(o2.edges());
+    edges.push(k::make_line(o1s, o2s)?);
+    edges.push(k::make_line(o1e, o2e)?);
+    let wires = k::edges_to_wires(&Shape::compound(&edges), 1e-6)?;
+    match wires.as_slice() {
+        [one] => Ok(Some((one.clone(), o1s, normal))),
+        _ => err("Could not build the thin wall (self-intersecting offset?)"),
+    }
+}
+
 /// Thin wall along an open chain: two offsets joined by end caps.
 fn open_wall(frame: &PlaneFrame, w: &Shape, sources: &[SourcedEdge], t1: f64, t2: f64, key: Source) -> FResult<Profile> {
     let first = sources.first().map(|s| s.shape.clone()).unwrap_or_else(|| w.edges()[0].clone());

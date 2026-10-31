@@ -839,6 +839,37 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
             let scope = super::extrude::scope(ev);
             return ev.apply_operation(tools, &op, scope, BodyKind::Solid);
         }
+        // Open planar profiles: each profile's wall loop (its offsets and
+        // end caps, as a thin extrude), the loops lofted as solids corner to
+        // corner (an L-shaped chain's creased sheet thickened wrongly).
+        if shapes.len() >= 2 && shapes.iter().all(|s| s.shape_type() == ShapeType::Wire) {
+            let failed = || fe("Failed to thicken lofted body, check thickness.");
+            let mut loops = Vec::new();
+            let mut starts = Vec::new();
+            let mut reference = None;
+            for s in &shapes {
+                match super::thin::open_wall_loop(s, reference, t1, t2).map_err(|_| failed())? {
+                    Some((l, start, n)) => {
+                        reference.get_or_insert(n);
+                        loops.push(l);
+                        starts.push(start);
+                    }
+                    None => break,
+                }
+            }
+            if loops.len() == shapes.len() {
+                let solid_opts = k::LoftOptions { solid: true, start_points: Some(starts), ..opts.clone() };
+                let wall = k::loft(&loops, &solid_opts).map_err(|_| failed())?.shape;
+                if wall.count(ShapeType::Solid) == 0 || !wall.is_valid() {
+                    return Err(failed());
+                }
+                let names = super::helpers_a::name_new(ev, &wall);
+                let tools = vec![NamedShape::new(wall, names)];
+                let op = ev.enum_("operationType").to_string();
+                let scope = super::extrude::scope(ev);
+                return ev.apply_operation(tools, &op, scope, BodyKind::Solid);
+            }
+        }
         let inp = ThickenInput {
             shape: res.shape.clone(),
             face_sources: names.iter().map(|n| Source::Topo(n.clone())).collect(),

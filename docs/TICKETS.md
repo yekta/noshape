@@ -182,7 +182,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   loft), as a thin extrude: (a) 1372.2075 / 10 faces vs live 1370.1047, (c) 2004.5970 vs 2000.2502, (d) 2592.0629 vs
   2584.5331 (0.15–0.3 % over: live offsets the lofted sheet along its normal), equal profiles exact (live 1668 (i):
   3600 / 81600 mm³, 10 faces). Left: (b) Trim ends ☐ (live 16 faces, ends normal to the sheet, z to 20.29; ours = (a))
-  and the normal-offset volumes; open profiles still go through k::thicken.
+  and the normal-offset volumes. Open planar profiles now too: each chain's wall loop (offsets + end caps, as a thin
+  extrude) lofted corner to corner (an L of 10 + 10 mm, 20 mm, 1 mm: 380 / 420 mm³, 8 faces; was 343 / 330); which side
+  the default takes is asked of live (REQUESTS "skasm (2026-10-31 16:10)"); straight single lines keep k::thicken (exact).
 - [ ] P0 BLEND-RUST (core, lead 10-30 20:50) noshape's own fillets and chamfers for simple edges, OCCT as fallback
   (crates/brep blend.rs; kernel cpp/rust_blend.cpp in front of op_fillet / op_chamfer behind NOSHAPE_BLEND_RUST, off
   until correct; corpus NOSHAPE_RECORD_BLENDS + kernel `blend_replay`). 10-30 22:00, step 1: closed tangent chains

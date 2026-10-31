@@ -472,6 +472,41 @@ fn thin_loft_of_squares_walls_them_as_live() {
     }
 }
 
+/// A thin loft between two open L-shaped chains (10 + 10 mm legs, 20 mm
+/// apart, 1 mm) is the wall of each chain offset in its plane, lofted: 380
+/// mm³ on the L's inside (the mitred corner overlaps), 420 outside, 8 faces;
+/// thickening the creased sheet gave 343 / 330. Which side the default takes
+/// is asked of live (REQUESTS "skasm (2026-10-31 16:10)").
+#[test]
+fn thin_loft_of_open_l_chains_walls_them() {
+    let l_chain = || {
+        let mut sk = noshape_sketch::Sketch::new();
+        let (a, b, c) = (sk.add_point(DVec2::new(0.0, 0.0)), sk.add_point(DVec2::new(0.01, 0.0)), sk.add_point(DVec2::new(0.01, 0.01)));
+        sk.add_line_between(a, b).unwrap();
+        sk.add_line_between(b, c).unwrap();
+        sk
+    };
+    let item = |s: FeatureId| {
+        let mut v = ParamValues::default();
+        v.set("wireProfileEntities", q(vec![Reference::Sketch(s)]));
+        v
+    };
+    let mut got = Vec::new();
+    for flip in [false, true] {
+        let mut t = T::new();
+        let a = t.sketch(Reference::Plane(DatumPlane::Top), l_chain());
+        let p20 = t.top_plane("20 mm");
+        let b2 = t.sketch(Reference::FeaturePlane(p20), l_chain());
+        t.add("loft", &[("bodyType", en("THIN")), ("wireProfilesArray", ParamValue::Array(vec![item(a), item(b2)])), ("thickness1", e("1 mm")), ("flipWall", b(flip))]);
+        let res = t.ok();
+        let body = res.context.bodies.iter().find(|b| b.kind == BodyKind::Solid).unwrap();
+        assert_eq!(body.shape.faces().len(), 8, "flip {flip}");
+        got.push((total_volume(&res.context) * 1e9 * 1e6).round() / 1e6);
+    }
+    got.sort_by(f64::total_cmp);
+    assert_eq!(got, [380.0, 420.0]);
+}
+
 /// Live (behaviours "skasm (2026-10-31, P2 feature-sweep Loft 8)"): a thin
 /// loft's Trim ends fails ("Failed to trim result body, try deselecting
 /// "Trim ends" option.") with a wall on both sides or through three profiles;
