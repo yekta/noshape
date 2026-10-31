@@ -1358,13 +1358,17 @@ GProp_GProps volume_props(const TopoDS_Shape& s)
       box.Get(a0, b0, c0, a1, b1, c1);
       o = gp_XYZ((a0 + a1) / 2, (b0 + b1) / 2, (c0 + c1) / 2);
     }
-    Moments m{};
+    // Each face's on OCCT's pool when many (a knurl's 10k B-spline faces), summed in the faces' order: the same
+    // sum as one by one.
+    std::vector<TopoDS_Face> fs;
     for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
-    {
-      const Moments f = face_moments(TopoDS::Face(e.Current()), true, o);
+      fs.push_back(TopoDS::Face(e.Current()));
+    std::vector<Moments> each(fs.size());
+    OSD_Parallel::For(0, (int)fs.size(), [&](int i) { each[(size_t)i] = face_moments(fs[(size_t)i], true, o); }, fs.size() < 64);
+    Moments m{};
+    for (const Moments& f : each)
       for (int j = 0; j < 10; ++j)
         m[(size_t)j] += f[(size_t)j];
-    }
     return MomentProps(unshift(m, o));
   }
   // Mesh faces: OCCT integrates their triangulation (exact for a mesh).

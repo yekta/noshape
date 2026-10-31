@@ -683,6 +683,12 @@ Knurl Phase 1 stopped at 246 s (its steps left are 10–40 s each); REGEN-SPEED 
 - kernel C++ .cpp edit → `cargo test -p noshape-kernel --test all <file>::`: ~25 s (ccache); a header edit ~3–10 min.
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
+## From bool (10-31 12:45 UTC): volume_props' faces on the pool
+- common.cpp `volume_props` (the segmented Gauss integral for free-form parts): each face's moments now on OCCT's
+  pool when there are 64+ faces, summed in the faces' order, so the result is bit-identical (the knurl's two
+  results checked: same bits). The knurl's 10k-face volume 56 s → 8.3 s on this loaded box; the knurl feature
+  test spends most of its time outside the regeneration there. Only that loop changed.
+
 ## From skasm (10-31 05:40): G46 shell numbers (core-workflow 3.6)
 
 Live "kern G46" (behaviours ~5683): 50 × 30 × 30 block, R3 on the two top edges at (50, 0, 30), Chamfer 2 mm on the vertical edge between them, Shell with the top face removed. Main CLI, /root/skasm-scratch/feat/g46.py:

@@ -1025,6 +1025,18 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
     `the_b94_diamond_knurl` compares the knurl's volume to 1e-7 too.
 - Seen, not looked into yet: our result's vertices carry tolerance 5e-6 where OCCT's carry ~1e-7.
 
+## The whole knurl test on vibe3, where the time goes (10-31 12:45 UTC)
+- perf.sh at 909faec5 (the lift, = main bbbf7e82): the test 42.96 s (hourly baseline ~162 s before); the diamond's
+  regeneration **18.3 s** against live's 49 s, the process growing 0.61 GB (4.45 GB before); straight 0.6 s.
+- Breakdown (local, loaded, NOSHAPE_KERNEL_PROFILE + NOSHAPE_FS_PROFILE=1; proportions only): the regeneration
+  37.8 s = op_boolean 33.1 s (unify.usd 25.4 s, core's guard, being made cheaper by core; noshape's Boolean
+  8.8 s, of it the brep part 7.4 s, the build 1.4 s) + op_unify 1.9 s + everything else < 1 s (FeatureScript, the
+  148 groove sweeps, transforms, helix: ~0.3 s together). After the regeneration the test's own checks:
+  `volume()` 54 s (the segmented Gauss integral over 10k B-spline faces, one thread), meshing 1.4 s. So on vibe3
+  ~24 s of the 43 s is the test's volume check, not the feature.
+- Then: volume_props' faces on OCCT's pool, summed in order (bit-identical on both knurl results; 56 → 8.3 s
+  here).
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|
