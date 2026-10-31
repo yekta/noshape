@@ -196,6 +196,10 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   as live 1681 (copy click → "Linear pattern 1" chip, copy drawn selected, ✓ with only the pattern, Edit shows it).
   Then: the open Group dialog highlights its instances' and patterns' rows in the list (live 1681: the pattern row);
   the assembly fuzz makes and deletes groups (seeds 1..60 × 120 clean; 400..480 before it clean).
+- 8e85b590 landed (group rows, fuzz). T2 `butt_joint_plate_point_follows_gap_radius_and_thickness`: live 1680's (b) gap
+  0.1, (c) R 4, (d) T 1 — the flat's plate cut at P = R + (K T + gap)/√2 exactly, volumes within 0.2 of live's Mass
+  properties figures (their HIGH evVolumes are still pending at live). Live request 22:20: which list rows a Group
+  dialog highlights (ours: its instances and patterns).
 - **Forward-oriented edges landed with core's patch** (kernel common.cpp `handed_out`: every edge FORWARD). What sheet
   metal read from the stored orientation, now explicit: (1) `wall_loop` chained a wall's outer loop from its edges' start
   / end, so it ran the face's way only while edges came stored that way: now turned counter-clockwise about the face

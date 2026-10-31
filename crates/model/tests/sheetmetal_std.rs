@@ -391,6 +391,62 @@ fn butt_joint_after_a_closed_corner_matches_live() {
     }
 }
 
+/// Live 1680: the butt joint after a Closed corner at another minimal gap,
+/// bend radius and thickness. The flat's 45° plate-corner cut runs from
+/// (P, R) to (R, P) with P = R + (K T + gap) / √2 (live's DXFs), and the
+/// volume is live's Mass properties figure (its /massproperties accuracy:
+/// 0.1 under its evVolume in the default case).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn butt_joint_plate_point_follows_gap_radius_and_thickness() {
+    for (t, r_bend, gap, p_live, v_live) in [(2.0, 2.0, 0.1, 2.707107, 8598.152), (2.0, 4.0, 0.02, 4.650538, 8413.152), (1.0, 2.0, 0.02, 2.332340, 4307.62)] {
+        let mut s = Studio::new();
+        let region = s.rectangle(60.0, 40.0);
+        s.add("sheetMetalStart", |p| {
+            p.set("process", en("THICKEN"));
+            p.set("regions", ParamValue::Query(vec![region]));
+            p.set("thickness", expr(&format!("{t} mm")));
+            p.set("radius", expr(&format!("{r_bend} mm")));
+            p.set("minimalClearance", expr(&format!("{gap} mm")));
+        });
+        let r = s.ok();
+        let edges = vec![edge_at(&r, DVec3::new(30.0, 0.0, t)), edge_at(&r, DVec3::new(0.0, 20.0, t))];
+        s.add("sheetMetalFlange", |p| {
+            p.set("edges", ParamValue::Query(edges));
+            p.set("distance", expr("20 mm"));
+        });
+        let r = s.ok();
+        // The inner bend corner: the vertex nearest (R, R, T).
+        let b = &r.context.bodies[part(&r)];
+        let corner = DVec3::new(r_bend, r_bend, t) * 1e-3;
+        let i = (0..b.vertices.len()).min_by(|x, y| {
+            let d = |k: usize| b.shape.vertices()[k].vertex_point().map_or(f64::INFINITY, |q| q.distance(corner));
+            d(*x).total_cmp(&d(*y))
+        });
+        let v = Reference::Vertex((*b.vertices[i.unwrap()]).clone());
+        s.add("sheetMetalCorner", |p| {
+            p.set("corner", ParamValue::Query(vec![v]));
+            p.set("cornerStyle", en("CLOSED"));
+        });
+        let r = s.ok();
+        let end = edge_at(&r, DVec3::new(gap, 0.0, 12.0));
+        s.add("sheetMetalJoint", |p| {
+            p.set("entity", ParamValue::Query(vec![end]));
+            p.set("jointType", en("RIP"));
+            p.set("hasStyle", ParamValue::Bool(true));
+            p.set("jointStyle", en("BUTT"));
+        });
+        let r = s.ok();
+        let case = format!("T {t} R {r_bend} gap {gap}");
+        assert!((volume_mm3(&r) - v_live).abs() < 0.2, "{case}: {} mm³ (live {v_live})", volume_mm3(&r));
+        let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
+        let pts: Vec<glam::DVec2> = flat.loops.iter().flatten().map(|p| *p * 1e3).collect();
+        for want in [glam::DVec2::new(p_live, r_bend), glam::DVec2::new(r_bend, p_live)] {
+            assert!(pts.iter().any(|q| q.distance(want) < 1e-5), "{case}: {want:?} not on the flat's outline");
+        }
+    }
+}
+
 /// The part's faces: type, area (mm²) and a point on each (mm), for failures.
 fn face_report(r: &RegenResult) -> Vec<String> {
     r.context.bodies[part(r)]
