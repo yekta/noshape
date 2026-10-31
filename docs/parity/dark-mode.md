@@ -51,7 +51,7 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-950-drawing | dkdraw | shell dark (navbar, rail, tab bar), toolbar, sheet surround and sheet light | ☑ |
 | dk-951-drawing-properties | qa c82818b7 | selects light = live; unticked checkboxes solid #333 and their labels #ccc (live white box, #333 label); Sheet properties select values white on white (DARK-DRAWING-PANEL-CONTROLS) | ☑ fixed dx, verified fbd2536c (qa 10-30 15:07: Sheet properties values dark on white with ▾; Drawing properties checkboxes white boxes, #333-like labels) |
 | dk-960-feature-studio | dkfs2 | Ace twilight on #333: tokens, gutter #232323, numbers #e2e2e2 = live computed | ☑ |
-| dk-961-variable-studio |  | title bar and headers #555, cells #1c1c1c (shared cell code) | ◐ not captured |
+| dk-961-variable-studio | psui-scratch v2 | layout, title bar / headers #555, cells #1c1c1c, Insert buttons = live (the capture exists: dark/dk-961); residual: live's ▾ in Variable type is 8 px wide, 6 px from the cell's right, ours 6 px wide a little further in | ☑ psui 10-31 |
 | dk-990-restored-light | | | ☐ |
 
 ## Plan notes

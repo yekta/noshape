@@ -1740,7 +1740,7 @@ Examples:
 
 Create a variable (#name) in a Part Studio or a Variable Studio (edits the document (one undoable history entry)).
 
-Part Studio: the Variable table's add row, a Variable feature at the rollback bar. Variable Studio: the table's last row ("Add variable", a Length variable), then its type, value and description cells, one edit each, as typed in the table. Use it in any expression as #name.
+Part Studio: the Variable table's add row, a Variable feature at the rollback bar; a name an earlier Variable feature assigns is redefined from there on (a second `#name = …`, as the Variable dialog allows). Variable Studio: the table's last row ("Add variable", a Length variable), then its type, value and description cells, one edit each, as typed in the table. Use it in any expression as #name.
 
 Examples:
 

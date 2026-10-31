@@ -129,11 +129,24 @@ fn taken(ps: &PartStudio, name: &str, except: Option<FeatureId>) -> bool {
 /// inline popup: before the feature being edited) or, with `None`, at the
 /// rollback bar (the table).
 pub fn create(ps: &mut PartStudio, name: &str, kind: &str, value: &str, description: &str, at: Option<usize>, units: &UnitPrefs) -> Result<FeatureId, NameError> {
+    create_feature(ps, name, kind, value, description, at, units, false)
+}
+
+/// [`create`] for a name an earlier Variable feature already assigns: the
+/// new `#name = value` redefines it from there on, as the Variable dialog
+/// allows (live, parity workflow-variable-studios 13; the agent API's
+/// variable_create).
+pub fn redefine(ps: &mut PartStudio, name: &str, kind: &str, value: &str, description: &str, units: &UnitPrefs) -> Result<FeatureId, NameError> {
+    create_feature(ps, name, kind, value, description, None, units, true)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn create_feature(ps: &mut PartStudio, name: &str, kind: &str, value: &str, description: &str, at: Option<usize>, units: &UnitPrefs, redefine: bool) -> Result<FeatureId, NameError> {
     let name = name.trim().trim_start_matches('#');
     if !is_identifier(name) {
         return Err(NameError::Invalid);
     }
-    if taken(ps, name, None) {
+    if !redefine && taken(ps, name, None) {
         return Err(NameError::Duplicate);
     }
     let Some(mut f) = ps.new_feature("assignVariable", units) else { return Err(NameError::Invalid) };
@@ -342,6 +355,10 @@ mod tests {
         assert_eq!(ps.features[0].id, b);
         assert_eq!(ps.features[1].id, a);
         assert_eq!(create(&mut ps, "width", "LENGTH", "1 mm", "", None, &mm()), Err(NameError::Duplicate));
+        // API-VAR-REDEFINE: a later `#width = …` is a second Variable feature.
+        let again = redefine(&mut ps, "width", "LENGTH", "30 mm", "", &mm()).expect("redefined");
+        assert_eq!(rows(&ps).iter().filter(|r| r.name == "width").count(), 2);
+        assert_eq!(ps.features.last().map(|f| f.id), Some(again));
         assert_eq!(create(&mut ps, "2wide", "LENGTH", "1 mm", "", None, &mm()), Err(NameError::Invalid));
         assert_eq!(create(&mut ps, "my var", "LENGTH", "1 mm", "", None, &mm()), Err(NameError::Invalid));
         assert_eq!(create(&mut ps, "default", "LENGTH", "1 mm", "", None, &mm()), Err(NameError::Invalid));

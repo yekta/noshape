@@ -141,7 +141,7 @@ pub fn ops() -> Vec<Op> {
             group: "variable",
             verb: "create",
             summary: "Create a variable (#name) in a Part Studio or a Variable Studio",
-            description: "Part Studio: the Variable table's add row, a Variable feature at the rollback bar. Variable Studio: the table's last row (\"Add variable\", a Length variable), then its type, value and description cells, one edit each, as typed in the table. Use it in any expression as #name.",
+            description: "Part Studio: the Variable table's add row, a Variable feature at the rollback bar; a name an earlier Variable feature assigns is redefined from there on (a second `#name = …`, as the Variable dialog allows). Variable Studio: the table's last row (\"Add variable\", a Length variable), then its type, value and description cells, one edit each, as typed in the table. Use it in any expression as #name.",
             fields: vec![
                 doc_field(),
                 var_tab(),
@@ -584,7 +584,13 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     let value = value_text(a.get("value").expect("required"))?;
     let description = a.opt_str("description")?.unwrap_or("").to_string();
-    let (_, repaired) = edit_table(od, tab, "Create variable", |ps| vt::create(ps, &name, &kind, &value, &description, None, &units).map_err(|e| name_error(e, &name)))?;
+    // A name an earlier Variable feature uses: a later `#w = …` redefining
+    // it from there on, as the Variable dialog allows (API-VAR-REDEFINE).
+    let (_, repaired) = edit_table(od, tab, "Create variable", |ps| match vt::create(ps, &name, &kind, &value, &description, None, &units) {
+        Err(NameError::Duplicate) => vt::redefine(ps, &name, &kind, &value, &description, &units),
+        r => r,
+    }
+    .map_err(|e| name_error(e, &name)))?;
     reply(od, tab, repaired)
 }
 
