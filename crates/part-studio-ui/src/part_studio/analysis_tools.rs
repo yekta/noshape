@@ -166,6 +166,9 @@ const DIHEDRAL_IN: [u8; 4] = [0x4d, 0xa7, 0xa3, 255];
 const DIHEDRAL_HIGH: [u8; 4] = [0xfd, 0xec, 0x51, 255];
 const DIHEDRAL_LOW: [u8; 4] = [0x69, 0x34, 0x76, 255];
 const ENVELOPE: [u8; 4] = [210, 40, 200, 255];
+/// The open dialog's Show isocurves / Show ruled lines: (context, feature,
+/// count, ruled) and the lines.
+pub(super) type IsocurveCache = ((usize, noshape_model::FeatureId, usize, bool), Vec<Vec<DVec3>>);
 /// Show isocurves / Show ruled lines (help "colors": vivid magenta #d403f9).
 const ISOCURVE: [u8; 4] = [0xd4, 0x03, 0xf9, 255];
 const U_CURVES: [u8; 4] = [220, 50, 40, 255];
@@ -630,23 +633,27 @@ impl PartStudioView {
     }
 
     /// Combs, envelopes, control polygons and markers over the model.
-    /// Show isocurves (Loft, Boundary surface, Fill, Fillet, …): while the
-    /// dialog is open, `Count` isocurves each way on the faces the feature
-    /// makes, vivid magenta #d403f9 (help "colors": Show isocurves; the
-    /// loft / fill help pictures).
+    /// Show isocurves (Loft, Boundary surface, Fill, Fillet, …) and Show
+    /// ruled lines (Ruled surface): while the dialog is open, `Count`
+    /// isocurves each way on the faces the feature makes, or `Count` rulings
+    /// along its path; vivid magenta #d403f9 (help "colors"; the loft / fill
+    /// / ruled surface help pictures).
     pub(super) fn isocurve_overlay(&self, cx: &App) -> Vec<Instance> {
         let Some(e) = &self.edit else { return Vec::new() };
         let d = e.dialog.read(cx);
         let p = &d.feature.params;
-        if !p.bool("showIsocurves") {
+        let ruled = p.bool("showRuledLines");
+        if !ruled && !p.bool("showIsocurves") {
             return Vec::new();
         }
         let Some(ctx) = &self.context else { return Vec::new() };
-        let count = p.expr("curveCount").and_then(|x| x.cached.map(|q| q.value).or_else(|| x.text.trim().parse().ok())).unwrap_or(10.0).round().clamp(1.0, 50.0) as usize;
-        let key = (Arc::as_ptr(ctx) as usize, d.feature.id, count);
+        let (id, default, max) = if ruled { ("ruledLineCount", 40.0, 100.0) } else { ("curveCount", 10.0, 50.0) };
+        let count = p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| x.text.trim().parse().ok())).unwrap_or(default).round().clamp(1.0, max) as usize;
+        let key = (Arc::as_ptr(ctx) as usize, d.feature.id, count, ruled);
         let mut cache = self.ui.isocurves.borrow_mut();
         if cache.as_ref().is_none_or(|(k, _)| *k != key) {
-            *cache = Some((key, noshape_model::analysis::feature_isocurves(ctx, d.feature.id, count, 32)));
+            let lines = if ruled { noshape_model::analysis::feature_ruled_lines(ctx, d.feature.id, count, 8) } else { noshape_model::analysis::feature_isocurves(ctx, d.feature.id, count, 32) };
+            *cache = Some((key, lines));
         }
         let Some((_, curves)) = cache.as_ref() else { return Vec::new() };
         if curves.is_empty() {

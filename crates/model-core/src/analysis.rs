@@ -157,6 +157,65 @@ pub fn feature_isocurves(ctx: &Context, feature: crate::reference::FeatureId, co
     out
 }
 
+/// Show ruled lines (ruledSurface.fs; help: "set per continuous path", 1 to
+/// 100, default 40): `count` rulings spread over the faces `feature` made
+/// in proportion to their length along the path. A face's rulings are its
+/// straight isocurves.
+pub fn feature_ruled_lines(ctx: &Context, feature: crate::reference::FeatureId, count: usize, samples: usize) -> Vec<Vec<DVec3>> {
+    use crate::reference::{Role, TopoName};
+    let lerp = |a: f64, b: f64, t: f64| a + (b - a) * t;
+    // Per face: the face, its uv bounds, whether the rulings run in v (u
+    // constant), and its length along the path.
+    let mut faces = Vec::new();
+    for b in &ctx.bodies {
+        for (fi, name) in b.faces.iter().enumerate() {
+            let TopoName::Face { feature: f, role } = name.root() else { continue };
+            if *f != feature || matches!(role, Role::CapStart(_) | Role::CapEnd(_) | Role::Profile(_)) {
+                continue;
+            }
+            let Ok(s) = b.shape.sub_shape(ShapeType::Face, fi) else { continue };
+            let Ok([u0, u1, v0, v1]) = s.uv_bounds() else { continue };
+            let straight = |a: DVec3, m: DVec3, c: DVec3| (c - a).length() > 1e-12 && (m - a).cross((c - a).normalize()).length() < 1e-9_f64.max((c - a).length() * 1e-7);
+            let at = |u: f64, v: f64| s.point_at_uv(u, v).ok();
+            let (um, vm) = ((u0 + u1) * 0.5, (v0 + v1) * 0.5);
+            let in_v = matches!((at(um, v0), at(um, vm), at(um, v1)), (Some(a), Some(m), Some(c)) if straight(a, m, c));
+            let in_u = matches!((at(u0, vm), at(um, vm), at(u1, vm)), (Some(a), Some(m), Some(c)) if straight(a, m, c));
+            if !in_v && !in_u {
+                continue;
+            }
+            // Length along the path: across the rulings, at mid-ruling.
+            let n = 16;
+            let path: Vec<DVec3> = (0..=n).filter_map(|i| if in_v { at(lerp(u0, u1, i as f64 / n as f64), vm) } else { at(um, lerp(v0, v1, i as f64 / n as f64)) }).collect();
+            let len: f64 = path.windows(2).map(|w| w[0].distance(w[1])).sum();
+            faces.push((s, [u0, u1, v0, v1], in_v, len));
+        }
+    }
+    let total: f64 = faces.iter().map(|f| f.3).sum();
+    let mut out = Vec::new();
+    if total <= 0.0 {
+        return out;
+    }
+    let n = samples.max(2);
+    for (s, [u0, u1, v0, v1], in_v, len) in &faces {
+        let k = ((count.max(1) as f64) * len / total).round().max(1.0) as usize;
+        let on_face = |p: DVec3| s.project_point(p).map(|q| q.point.distance(p) < 1e-7_f64.max(p.length() * 1e-7)).unwrap_or(false);
+        for j in 0..k {
+            let t = (j as f64 + 0.5) / k as f64;
+            let pts: Vec<DVec3> = (0..=n)
+                .filter_map(|i| {
+                    let w = i as f64 / n as f64;
+                    if *in_v { s.point_at_uv(lerp(*u0, *u1, t), lerp(*v0, *v1, w)).ok() } else { s.point_at_uv(lerp(*u0, *u1, w), lerp(*v0, *v1, t)).ok() }
+                })
+                .filter(|p| on_face(*p))
+                .collect();
+            if pts.len() > 1 {
+                out.push(pts);
+            }
+        }
+    }
+    out
+}
+
 /// Dihedral comb of an edge between two faces: at each sample the tooth
 /// length is the angle (radians) between the faces' normals there, pointing
 /// out of the material; returns the comb and the min / max angle in degrees.

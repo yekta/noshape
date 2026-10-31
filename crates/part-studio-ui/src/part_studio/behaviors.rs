@@ -512,9 +512,9 @@ pub struct UiState {
     /// Open analysis tool dialog (Curve/surface, Dihedral…) and what each
     /// tool had selected last time.
     pub analysis_tool: Option<super::analysis_tools::AnalysisTool>,
-    /// Show isocurves of the open dialog's feature: (context, feature,
-    /// count) and its lines, kept while the preview is the same.
-    pub isocurves: std::cell::RefCell<Option<((usize, FeatureId, usize), Vec<Vec<glam::DVec3>>)>>,
+    /// Show isocurves / ruled lines of the open dialog's feature, kept while
+    /// the preview is the same.
+    pub isocurves: std::cell::RefCell<Option<super::analysis_tools::IsocurveCache>>,
     pub tool_memory: super::analysis_tools::ToolMemory,
     /// Zebra stripes left on after their dialog was accepted.
     pub zebra: Option<super::analysis_tools::ZebraSettings>,
