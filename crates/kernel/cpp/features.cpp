@@ -570,7 +570,7 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   sp.SetTools(single(until.shape));
   sp.SetRunParallel(bop_parallel());
   sp.SetNonDestructive(true);
-  sp.Build();
+  sp.Build(new_cancel_indicator()->Start());
   if (sp.HasErrors())
     fail_op("up-to extrude: split failed: " + algo_errors(sp));
   HHist spH = history_of({longPrism, until.shape}, sp);
@@ -2042,7 +2042,7 @@ static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& sp
       return false;
     BRepAlgoAPI_Section sec(carried, gp_Pln(P, gp_Dir(T)), false);
     sec.Approximation(true);
-    sec.Build();
+    sec.Build(new_cancel_indicator()->Start());
     if (!sec.IsDone())
       return false;
     occ::handle<TopTools_HSequenceOfShape> edges = new TopTools_HSequenceOfShape;
@@ -4404,7 +4404,7 @@ static std::optional<std::pair<TopoDS_Shape, HHist>> draft_sloped_plane(const To
   fl.Append(f);
   df.AddFacesToRemove(fl);
   df.SetToFillHistory(true);
-  df.Build();
+  df.Build(new_cancel_indicator()->Start());
   if (!df.IsDone() || df.HasErrors())
     return std::nullopt;
   const TopoDS_Shape healed = df.Shape();

@@ -1,0 +1,115 @@
+--- a/src/FoundationClasses/TKMath/math/math_PSO.cxx
++++ b/src/FoundationClasses/TKMath/math/math_PSO.cxx
+@@ -17,6 +17,19 @@
+ 
+ #include <math_BullardGenerator.hxx>
+ #include <math_PSOParticlesPool.hxx>
++#include <Standard_Failure.hxx>
++
++// noshape: whether the caller's budget or cancel says stop (defined in
++// noshape's kernel, boolean.cpp); a long search here checks no other hook.
++extern "C" int noshape_should_break();
++#if defined(__GNUC__) && !defined(NOSHAPE_BREAK_HOOK_DEFAULT)
++  #define NOSHAPE_BREAK_HOOK_DEFAULT
++// The default for a program that doesn't define the hook: never stop.
++extern "C" __attribute__((weak)) int noshape_should_break()
++{
++  return 0;
++}
++#endif
+ 
+ const double aBorderDivisor = 1.0e+4;
+ 
+@@ -77,9 +90,12 @@
+ 
+   PSO_Particle* aParticle = aPool.GetWorstParticle();
+   aCurrPoint              = aMinUV;
++  int aNbVisited = 0;
+   do
+   {
+     myFunc->Value(aCurrPoint, aCurrValue);
++    if ((++aNbVisited & 63) == 0 && noshape_should_break() != 0)
++      throw Standard_Failure("noshape: stopped");
+ 
+     if (aCurrValue < aParticle->Distance)
+     {
+@@ -168,6 +184,8 @@
+   // Run PSO iterations
+   for (int aStep = 1; aStep < myNbIter; ++aStep)
+   {
++    if (noshape_should_break() != 0)
++      throw Standard_Failure("noshape: stopped");
+     aMinimalVelocity.Init(RealLast());
+ 
+     for (int aPartIdx = 1; aPartIdx <= myNbParticles; ++aPartIdx)
+--- a/src/FoundationClasses/TKMath/math/math_FunctionAllRoots.cxx
++++ b/src/FoundationClasses/TKMath/math/math_FunctionAllRoots.cxx
+@@ -24,6 +24,19 @@
+ #include <math_FunctionSample.hxx>
+ #include <math_FunctionWithDerivative.hxx>
+ #include <Standard_NumericError.hxx>
++#include <Standard_Failure.hxx>
++
++// noshape: whether the caller's budget or cancel says stop (defined in
++// noshape's kernel, boolean.cpp); a long search here checks no other hook.
++extern "C" int noshape_should_break();
++#if defined(__GNUC__) && !defined(NOSHAPE_BREAK_HOOK_DEFAULT)
++  #define NOSHAPE_BREAK_HOOK_DEFAULT
++// The default for a program that doesn't define the hook: never stop.
++extern "C" __attribute__((weak)) int noshape_should_break()
++{
++  return 0;
++}
++#endif
+ 
+ math_FunctionAllRoots::math_FunctionAllRoots(math_FunctionWithDerivative& F,
+                                              const math_FunctionSample&   S,
+@@ -57,6 +70,8 @@
+ 
+   while (!fini)
+   {
++    if ((i & 63) == 0 && noshape_should_break() != 0)
++      throw Standard_Failure("noshape: stopped");
+ 
+     F.Value(S.GetParameter(i), val);
+     Nul = std::abs(val) <= EpsNul;
+--- a/src/ModelingAlgorithms/TKGeomAlgo/IntStart/IntStart_SearchOnBoundaries.gxx
++++ b/src/ModelingAlgorithms/TKGeomAlgo/IntStart/IntStart_SearchOnBoundaries.gxx
+@@ -64,6 +64,19 @@
+   #include <Geom_BSplineCurve.hxx>
+   #include <GeomLib.hxx>
+ #endif
++#include <Standard_Failure.hxx>
++
++// noshape: whether the caller's budget or cancel says stop (defined in
++// noshape's kernel, boolean.cpp); a long search here checks no other hook.
++extern "C" int noshape_should_break();
++#if defined(__GNUC__) && !defined(NOSHAPE_BREAK_HOOK_DEFAULT)
++  #define NOSHAPE_BREAK_HOOK_DEFAULT
++// The default for a program that doesn't define the hook: never stop.
++extern "C" __attribute__((weak)) int noshape_should_break()
++{
++  return 0;
++}
++#endif
+ 
+ static bool IsDegenerated(const occ::handle<Adaptor3d_CurveOnSurface>& theCurve);
+ static bool IsDegenerated(const IntSurf_Quadric& theQuadric);
+@@ -357,6 +370,8 @@
+     // modified by NIZNHY-PKV Thu Apr 12 09:25:23 2001 t
+     for (i = 1; i <= NbEchant && aelargir; i++)
+     {
++      if ((i & 63) == 0 && noshape_should_break() != 0)
++        throw Standard_Failure("noshape: stopped");
+       double u = Echant.GetParameter(i);
+       if (Func.Value(u, dist))
+       {
+@@ -1161,6 +1176,8 @@
+ 
+   while (Domain->More())
+   {
++    if (noshape_should_break() != 0)
++      throw Standard_Failure("noshape: stopped");
+     TheArc A = Domain->Value();
+     if (!TheSOBTool::HasBeenSeen(A))
+     {

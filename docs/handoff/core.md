@@ -303,6 +303,15 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
   min_distance (~140 calls, ~0.8 ms each, BRepExtrema rebuilt per call).
 
 ## OCCT patches (patches/occt)
+- 0009 (10-31) the break hook where MEM-RUNAWAY-508's last 9 budget jumps were (qa's seed 685 trace): math_PSO (its
+  grid and each step: Extrema_GenExtCS::GlobMinCQuadric), math_FunctionAllRoots (every 64 samples) and
+  IntStart_SearchOnBoundaries (each arc and every 64 samples: Draft_Modification's IntPatch_ImpImpIntersection arc
+  search; the .gxx is also Contap_TheSearch in TKHLR). Weak defaults as 0007 / 0008. Libs (only those objects
+  differ): /root/core-scratch/occt0009/libTKMath.a.0009, libTKGeomAlgo.a.0009, libTKHLR.a.0009, in /root/occt since
+  10-31 15:00 (backups occt-lib-backup/*.pre0009). With it: the kernel's Splitters, Sections and Defeaturings that
+  ran without our progress indicator now have it (up-to extrude's split, the plane section, the sweep frames'
+  section, the fillet-past-end-faces and draft defeaturings, Draft's split): a budget's deadline stops them by
+  unwinding, not by the jump (the third Boolean jump was in PerformVV, which only checks the indicator).
 - 0007 (10-30) TKFillet BRepBlend_Walking (walking loop), ChFi3d_Builder::Compute (each stripe and vertex), TKOffset
   Draft_Modification::Perform (each face): `noshape_should_break()` (boolean.cpp: a budget's deadline off Linux, or
   the thread's cancel flag) throws Standard_Failure("noshape: stopped"); these builds ignore their progress range.
@@ -834,6 +843,9 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- 10-31 15:45: OCCT patch 0009 (break hooks): please let the sync carry /root/occt/lib/libTKMath.a, libTKGeomAlgo.a and
+  libTKHLR.a to vibe2 / vibe3 (also in /root/core-scratch/occt0009/*.0009). Nothing breaks without them (weak hooks,
+  only budget stops jump more there); CI builds them from patches/occt.
 - 10-30 17:20, MEM-RUNAWAY-508 (P1): budget jumps leaked the cut-off op's memory (details in TICKETS). The fix
   (26074458, branch core-mem508, CI run 41097497981) needs OCCT libs with patches 0007 (weak default) and 0008 in
   /root/occt here and on vibe2 / vibe3: libTKFillet, libTKOffset (0007) and libTKMath (0008). **Done here 19:10, landed

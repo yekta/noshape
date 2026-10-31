@@ -3030,7 +3030,7 @@ OpOut op_draft_parting_curve(const OcShape& solid_in, const OcShapeList& faces_i
     sp.SetArguments(sp_args);
     sp.SetTools(sp_tools);
     sp.SetRunParallel(bop_parallel());
-    sp.Build();
+    sp.Build(new_cancel_indicator()->Start());
     if (sp.HasErrors())
       fail_op("draft: split failed");
     tool_chain.push_back(sp.History());

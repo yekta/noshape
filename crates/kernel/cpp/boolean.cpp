@@ -4645,7 +4645,7 @@ OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts
   sp.SetArguments(to_list(a));
   sp.SetTools(to_list(t));
   apply_opts(sp, opts);
-  sp.Build();
+  build_cancellable(sp);
   if (sp.HasErrors() || !sp.IsDone())
     fail_op("split failed: " + algo_errors(sp));
   HHist        hist = new BRepTools_History(to_list(concat(a, t)), sp);
@@ -4929,7 +4929,7 @@ std::unique_ptr<OcShape> section_plane(const OcShape& s, const PlaneF& plane)
   BRepAlgoAPI_Section sec(s.shape, to_pln(plane), false);
   sec.Approximation(true);
   sec.SetRunParallel(bop_parallel());
-  sec.Build();
+  build_cancellable(sec);
   if (sec.HasErrors() || !sec.IsDone())
     fail_op("plane section failed: " + algo_errors(sec));
   return wrap(sec.Shape());
