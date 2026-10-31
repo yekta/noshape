@@ -262,7 +262,9 @@ impl AssemblyView {
                         .child(crate::ui::os_checkbox("atool-highlight", "Highlight tool in toolbar", !self.ui.tool_no_highlight).text_size(px(12.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.ui.tool_no_highlight = !this.ui.tool_no_highlight;
                             cx.notify();
-                        }))),
+                        })))
+                        // Live tool-search-01: the help mark after the checkbox, as the Part Studio's.
+                        .child(div().size(px(14.)).ml(px(6.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)))),
                 )
                 .into_any_element(),
         )

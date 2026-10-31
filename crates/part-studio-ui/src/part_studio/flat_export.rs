@@ -38,6 +38,22 @@ const CHECKS: [(&str, &str, bool); 8] = [
     ("fx-sketches", "Include visible sketches", true),
 ];
 const CENTERLINES: usize = 2;
+const DEFAULT_CHECKS: [bool; 8] = {
+    let mut a = [false; 8];
+    let mut i = 0;
+    while i < 8 {
+        a[i] = CHECKS[i].2;
+        i += 1;
+    }
+    a
+};
+
+thread_local! {
+    /// The checkboxes as last exported: live opens the dialog with them
+    /// (behaviours 25383 / 25698 / 26916: form outlines and centermarks,
+    /// off by default, stayed on after an export with them on).
+    static LAST_CHECKS: std::cell::Cell<[bool; 8]> = const { std::cell::Cell::new(DEFAULT_CHECKS) };
+}
 
 #[derive(Clone)]
 struct Settings {
@@ -65,7 +81,7 @@ impl PartStudioView {
             _ => 4,
         };
         let file = cx.new(|cx| InputState::new(window, cx).default_value(base));
-        let st = Rc::new(RefCell::new(Settings { dwg: false, version: DEFAULT_DXF, scope: 0, workspace_units: true, units: workspace, options: 0, checks: CHECKS.map(|c| c.2) }));
+        let st = Rc::new(RefCell::new(Settings { dwg: false, version: DEFAULT_DXF, scope: 0, workspace_units: true, units: workspace, options: 0, checks: LAST_CHECKS.with(|c| c.get()) }));
         let (view, part_id) = (cx.entity(), body);
         window.open_dialog(cx, move |dialog, _, cx| {
             let s = st.borrow().clone();
@@ -124,6 +140,7 @@ impl PartStudioView {
                 .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export"))).child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
                     let s = st2.borrow().clone();
+                    LAST_CHECKS.with(|c| c.set(s.checks));
                     let name = file2.read(cx).value().trim().to_string();
                     let (view, part) = (view2.clone(), body_id.clone());
                     window.defer(cx, move |window, cx| view.update(cx, |this, cx| this.run_flat_export(s, name, part, window, cx)));
@@ -157,30 +174,26 @@ impl PartStudioView {
         let name = if name.is_empty() { "Flat pattern".to_string() } else { name };
         let ext = if s.dwg { "dwg" } else { "dxf" };
         let file = format!("{name}.{ext}");
-        // Options › Store file in a new tab: no download.
+        // Options › Store file in a new tab: no download. Live (request
+        // 1665 (b)): no notice after either; the new tab or the file is all.
         if s.options == 2 {
-            let msg = match store_export(&self.doc, self.tab, &file, |p| {
+            if let Err(e) = store_export(&self.doc, self.tab, &file, |p| {
                 std::fs::write(p, &bytes)?;
                 Ok(p.to_path_buf())
             }, cx) {
-                Ok(f) => format!("Stored {f}"),
-                Err(e) => format!("Export failed: {e:#}"),
-            };
-            return self.flash_info(msg, cx);
+                self.flash_info(format!("Export failed: {e:#}"), cx);
+            }
+            return;
         }
         let view = cx.entity();
         crate::file_dialogs::request_save_path("Export as DXF/DWG", file, ext, window, cx, move |path, cx| {
-            view.update(cx, |this, cx| {
-                let msg = match std::fs::write(&path, &bytes) {
-                    Ok(()) => {
-                        if s.options == 1 {
-                            store_written(&this.doc, this.tab, &path, cx);
-                        }
-                        format!("Exported {}", path.display())
+            view.update(cx, |this, cx| match std::fs::write(&path, &bytes) {
+                Ok(()) => {
+                    if s.options == 1 {
+                        store_written(&this.doc, this.tab, &path, cx);
                     }
-                    Err(e) => format!("Export failed: {e}"),
-                };
-                this.flash_info(msg, cx);
+                }
+                Err(e) => this.flash_info(format!("Export failed: {e}"), cx),
             });
         });
     }

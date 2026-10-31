@@ -2054,6 +2054,18 @@ fn body_draft_as_live() {
         6,
     );
     ok(run(true, &none), 3424.4619250637747, 3);
+    // Live request 1664 (c): parted at the top face with the pull up, nothing
+    // lies on the pull side: an info, the part as it was; flipped, drafted.
+    let top_face = |p: &mut ParamValues, r: &RegenResult| p.set("partingObject", q(face_at(r, 0, DVec3::new(mm(20.0), mm(10.0), mm(10.0)))));
+    assert_eq!(run(false, &|p, r, _, _| top_face(p, r)).unwrap_err().0, "The draft has no effect for the given angle.");
+    ok(
+        run(false, &|p, r, _, _| {
+            top_face(p, r);
+            p.set("flipPullDirection", ParamValue::Bool(true));
+        }),
+        8535.137669482947,
+        6,
+    );
     let fails = |r: Result<(f64, usize), (String, Vec<String>)>, text: &str, field: &str| {
         let (msg, faulty) = r.unwrap_err();
         assert_eq!((msg.as_str(), faulty), (text, vec![field.to_string()]));

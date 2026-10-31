@@ -843,6 +843,11 @@ pub fn body_draft(ev: &mut EvalCtx) -> FResult<()> {
         let sides: Vec<(Shape, f64)> = if both {
             let cut = k::split_by_plane(&body.shape, &k::Plane::new(parting.origin, pull, parting.x)).map_err(|_| fe(BODY_DRAFT_FAILED))?;
             cut.shape.solids().into_iter().map(|s| { let up = s.centroid().map(|c| height(c) >= 0.0).unwrap_or(true); (s, if up { 1.0 } else { -1.0 }) }).collect()
+        } else if body.shape.vertices().iter().filter_map(|v| v.vertex_point().ok()).all(|p| height(p) < 1e-9) {
+            // Live (request 1664 (c)): nothing on the pull side of the
+            // parting (the top face with the pull up) is left as it is.
+            ev.infos.push(BODY_DRAFT_NO_EFFECT.into());
+            continue;
         } else {
             vec![(body.shape.clone(), 1.0)]
         };
@@ -898,6 +903,9 @@ pub fn body_draft(ev: &mut EvalCtx) -> FResult<()> {
 
 /// Onshape's text when a body draft can't be built.
 const BODY_DRAFT_FAILED: &str = "Selected parts could not be drafted.";
+
+/// Onshape's info when the part lies wholly behind the parting entity.
+const BODY_DRAFT_NO_EFFECT: &str = "The draft has no effect for the given angle.";
 
 /// Corner type Plane: each straight corner edge along the pull between two
 /// drafted planes gets a planar bevel from its far end to the two drafted

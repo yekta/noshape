@@ -5866,7 +5866,9 @@ impl AssemblyView {
     fn render_overlay_slice(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let overlay = self.render_overlay(cx);
         let rail = self.render_panel_rail(cx);
-        div().size_full().relative().children(overlay).child(rail).into_any_element()
+        // The strip first: the tool search, menus and notices reaching the
+        // right edge are drawn over it (live: Alt+C's ten results pass it).
+        div().size_full().relative().child(rail).children(overlay).into_any_element()
     }
 }
 
