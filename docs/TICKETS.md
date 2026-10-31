@@ -247,6 +247,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 08:04: **new with 0785c154 / 4498e6b8 (blends ending on caps at an angle, distance-angle chamfers)**: tickets/cli-draft-die.noshape Part 1 in the app **90440.868 mm³ / 15766.139 mm²** on green 0785c154 vs **90439.156 / 15738.992** on 19a1164b and on 0785c154 with NOSHAPE_BLEND_RUST=0 (+1.712 mm³, +27.1 mm²; qa-scratch gm-b78cli-draft-die-*.png). The earlier ones (cli-72L-died, cli-delete-gpf, bop-pairs-cli-segv-152, cli-chamfer-hang-pre, cli-delete-crash) unchanged between 19a1164b and 0785c154.
   qa 08:41: also tickets/cli-shell-gpf.noshape on 0785c154: **66313.675 mm³ / 54759.608 mm²** vs 19a1164b and NOSHAPE_BLEND_RUST=0 **66314.087 / 54759.690** (−0.412 mm³). core 4bfc7bf5 turned the blends off by default again; this ticket is now about the flag-on path.
   qa 09:52: default path checked after 4bfc7bf5: green 3b5450e0, default settings, all 10 documents above = OCCT's blends exactly (Mass properties crops). Open for NOSHAPE_BLEND_RUST=1 only.
+  core 10-31 20:20: qa 08:04's cli-draft-die explained: the first difference is Draft 5 (a 0.1 mm chamfer face
+  drafted 30°, which OCCT's draft can't do, so the draft wedges run). Its input is the same solid in both modes
+  (volume, faces), but OCCT's chamfer frames that face's plane elsewhere and its vertices sit at 0.1 mm tolerances:
+  OCCT's common of the face's prism with the drafted half-space lost the wedge there (no change, 21 faces) and
+  kept it on noshape's (+1.66 mm³, 25 faces, the wedge's size). Not a blend difference: the wedges now prism a
+  clean polygon through a line-bounded face's vertices (shell.cpp op_draft_wedges), both give +1.663 mm³ / 25
+  faces. T1 kernel crash_inputs::draft_wedges_of_a_chamfer_sliver_are_the_same_on_both_inputs.
   core 10-31 18:30: noshape's blends close arcs the blend's reach equals (a top loop blended at its corner fillets'
   radius, live request 1646): a fillet's sphere octants, a chamfer's 45° cones with their apex on the top face, a
   degenerate edge at each pole; live's 60 x 40 x 20 block: 46581.4892869 / 45308.9969392 mm³ (live 46581.4892865 /

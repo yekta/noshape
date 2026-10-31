@@ -2698,10 +2698,48 @@ OpOut op_draft_wedges(const OcShape& solid_in, const OcShapeList& faces_in, P3 p
       const double D = std::max(std::abs(hmin), std::abs(hmax)) * std::abs(ta) * 1.001 + tol;
       const gp_Pnt Q0 = q.Translated(gp_Vec(P) * -height(q));
       const gp_Dir n2(gp_Vec(n) * ca + gp_Vec(P) * sa);
-      TopoDS_Shape in  = BRepPrimAPI_MakePrism(f, gp_Vec(n) * -D).Shape();
-      TopoDS_Shape out = BRepPrimAPI_MakePrism(f, gp_Vec(n) * D).Shape();
-      TopoDS_Shape wr = common_of(in, half_box(Q0, n2, size));
-      TopoDS_Shape wa = common_of(out, half_box(Q0, n2.Reversed(), size));
+      // A face bounded by lines: the prisms of a clean polygon through its vertices, on its plane (a 0.1 mm wide
+      // chamfer face with 0.1 mm vertex tolerances made OCCT's common of its prism lose or double the wedge,
+      // cli-draft-die).
+      TopoDS_Shape base = f;
+      {
+        std::vector<gp_Pnt> pts;
+        int                 wires = 0;
+        bool                lines = true;
+        for (TopExp_Explorer w(f, TopAbs_WIRE); w.More(); w.Next())
+          ++wires;
+        for (TopExp_Explorer x(f, TopAbs_EDGE); x.More() && lines; x.Next())
+          lines = BRepAdaptor_Curve(TopoDS::Edge(x.Current())).GetType() == GeomAbs_Line;
+        if (wires == 1 && lines)
+          for (BRepTools_WireExplorer wx(BRepTools::OuterWire(f), f); wx.More(); wx.Next())
+          {
+            const gp_Pnt v = BRep_Tool::Pnt(wx.CurrentVertex());
+            pts.push_back(v.Translated(gp_Vec(n) * -gp_Vec(q, v).Dot(gp_Vec(n))));
+          }
+        const TopoDS_Face poly = pts.size() >= 3 ? polygon_face(pts) : TopoDS_Face();
+        if (!poly.IsNull())
+          base = poly;
+      }
+      TopoDS_Shape in  = BRepPrimAPI_MakePrism(base, gp_Vec(n) * -D).Shape();
+      TopoDS_Shape out = BRepPrimAPI_MakePrism(base, gp_Vec(n) * D).Shape();
+      // The drafted plane's half-space as a box just big enough for the prisms (one the part's size and more
+      // left a small face's wedge out: its common with a sliver's prism came back without a solid, cli-draft-die).
+      Bnd_Box pb;
+      BRepBndLib::Add(in, pb);
+      BRepBndLib::Add(out, pb);
+      double reach = 0;
+      if (!pb.IsVoid())
+      {
+        double x0, y0, z0, x1, y1, z1;
+        pb.Get(x0, y0, z0, x1, y1, z1);
+        for (const double x : {x0, x1})
+          for (const double y : {y0, y1})
+            for (const double z : {z0, z1})
+              reach = std::max(reach, Q0.Distance(gp_Pnt(x, y, z)));
+      }
+      const double hs = 2 * reach + tol;
+      TopoDS_Shape wr = common_of(in, half_box(Q0, n2, hs));
+      TopoDS_Shape wa = common_of(out, half_box(Q0, n2.Reversed(), hs));
       for (auto [w, list] : {std::pair{wr, &removal}, std::pair{wa, &addition}})
         if (!w.IsNull() && volume_of(w) > tol * tol * tol)
         {

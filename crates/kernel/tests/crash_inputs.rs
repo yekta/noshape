@@ -111,3 +111,24 @@ fn replay_one() {
     let r = replay(&name);
     eprintln!("{name}: {r} in {:.1} ms", t.elapsed().as_secs_f64() * 1e3);
 }
+
+/// qa's cli-draft-die Draft 5 (BLEND-RUST-DEFAULT-REGEN): a 0.1 mm chamfer face drafted 30° that OCCT's draft
+/// can't do, so the draft wedges do it. The same solid with OCCT's blends and with noshape's (another frame for
+/// the face's plane, other vertices at its 0.1 mm tolerance) gave no wedge on the first and +1.66 mm³ on the
+/// second; the wedge (the face, 0.204 mm², times ~8.1 mm between its plane and the drafted one) is the same on
+/// both now.
+#[test]
+fn draft_wedges_of_a_chamfer_sliver_are_the_same_on_both_inputs() {
+    let _ = set_working_scale(1000.0);
+    let mut got = Vec::new();
+    for name in ["draft-die-occt-blends", "draft-die-noshape-blends"] {
+        let (s, subs, p) = load(name);
+        let plane = Plane::new(v3(&after(&p, "origin", 3)), v3(&after(&p, "normal", 3)), v3(&after(&p, "xdir", 3)));
+        let r = draft_wedges(&s, &subs, v3(&after(&p, "pull", 3)), &plane, after(&p, "angle", 1)[0]).unwrap();
+        assert!(r.shape.is_valid(), "{name}");
+        let grown = (volume_properties(&r.shape).unwrap().mass - volume_properties(&s).unwrap().mass) * 1e9;
+        got.push((grown, r.shape.count(ShapeType::Face)));
+    }
+    assert!((got[0].0 - got[1].0).abs() < 1e-6 && (got[0].0 - 1.6629).abs() < 1e-3, "{got:?}");
+    assert_eq!((got[0].1, got[1].1), (25, 25));
+}
