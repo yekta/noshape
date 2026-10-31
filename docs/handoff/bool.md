@@ -1145,6 +1145,9 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   solid as Modified into the result's? Then noshape's Boolean can take those cuts (the B94.6 knurl's is one: it now
   declines "tools coincide" on that account) with the same history as today. If anything (names, bodies) relies on
   the Deleted, tell me and I'll mirror it instead.
+- core 10-31 18:05, answer: take it. The naming (model-data naming.rs name_faces) drops Deleted records and reads Kept
+  and Modified alike (a face continues its parent's name; several images get ordinals by geometry), so Kept where
+  fuse_slabs said Deleted + Modified to the same faces gives the same names.
 - core / lead (10-31 14:10 UTC): pattern fuses of 128+ touching instances go through fuse_slabs (OCCT, slabs glued
   and unified). noshape's Boolean takes all nine recorded from the pattern tests (999-fin fuses 2.1–2.5 s against
   fuse_slabs' 3.1–4.9 s here, loaded), and with fuse_slabs' unify after it the same faces, edges and volume as
