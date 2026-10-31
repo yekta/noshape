@@ -156,7 +156,11 @@ impl DrawingEditor {
     pub fn edge_body_at(&self, c: [f64; 2]) -> Option<noshape_model::BodyId> {
         use noshape_model::drawing::build::PickTarget;
         let b = self.built.as_ref()?;
-        let PickTarget::Edge { view, edge } = b.picks.get(b.hit(c, self.tol_mm(5.0))? as usize)?.clone() else { return None };
+        // Edges of the sheet's views only: a pending view's preview follows
+        // the pointer and would cover the click.
+        let sheet = self.current_sheet();
+        let h = b.hit_where(c, self.tol_mm(5.0), &|t: &PickTarget| matches!(t, PickTarget::Edge { view, .. } if sheet.view(*view).is_some()))?;
+        let PickTarget::Edge { view, edge } = b.picks.get(h as usize)?.clone() else { return None };
         let g = self.geoms.get(&view)?;
         let m = g.edges.get(edge as usize)?.model?;
         Some(g.model_edges.get(m as usize)?.body.clone())
