@@ -84,6 +84,8 @@ pub struct FaceMesh {
 pub struct BodyMesh {
     pub edges: Vec<Option<EdgeNodes>>,
     pub faces: Vec<Option<FaceMesh>>,
+    /// How long its edges' nodes and its faces took (the kernel's profile shows them).
+    pub took: [std::time::Duration; 2],
 }
 
 /// The nodes of `edge` under `defl`, if it is a curve meshed here.
@@ -160,7 +162,8 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
     let mut ok: Vec<bool> = faces.iter().map(|f| !matches!(f.surface, MeshSurface::Other) && !f.loops.is_empty() && f.loops.iter().all(|l| !l.is_empty())).collect();
     settle(&mut ok);
     // Each edge's nodes once, shared by the faces on it.
-    let mut out = BodyMesh { edges: vec![None; edges.len()], faces: vec![None; faces.len()] };
+    let mut out = BodyMesh { edges: vec![None; edges.len()], faces: vec![None; faces.len()], took: Default::default() };
+    let t = std::time::Instant::now();
     let mut used = vec![false; edges.len()];
     for (f, _) in faces.iter().zip(&ok).filter(|(_, ok)| **ok) {
         for u in f.loops.iter().flatten() {
@@ -175,6 +178,8 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
     for (e, n) in in_parallel(used.len(), run, |k| edge_nodes(vertices, &edges[used[k]], defl)) {
         out.edges[used[e]] = n;
     }
+    out.took[0] = t.elapsed();
+    let t = std::time::Instant::now();
     // The faces on their own, in parallel (as BRepMesh meshes them), the costliest first, one at a time: a
     // part's few tori and its plate's face round many holes can be most of the time, and started last they
     // kept the others' threads waiting. Cost by the boundary's nodes: a plane's triangulation ~1 µs a node,
@@ -194,7 +199,9 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
     let mut order: Vec<(f64, usize)> = (0..faces.len()).filter(|&i| ok[i]).map(|i| (cost(&faces[i]), i)).collect();
     order.sort_by(|a, b| b.0.total_cmp(&a.0));
     let mesh = |k: usize| mesh_face(vertices, edges, &faces[order[k].1], edge_nodes, defl);
-    for (k, m) in in_parallel(order.len(), 1, mesh) {
+    let meshed = in_parallel(order.len(), 1, mesh);
+    out.took[1] = t.elapsed();
+    for (k, m) in meshed {
         out.faces[order[k].1] = m;
     }
     for (ok, m) in ok.iter_mut().zip(&out.faces) {

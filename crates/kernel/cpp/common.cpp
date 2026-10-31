@@ -2012,6 +2012,12 @@ void set_kernel_profile(bool on)
   g_kernel_profile.store(on ? 1 : 0);
 }
 
+void kernel_profile_note(rust::Str name, double ms)
+{
+  if (kernel_profile_on())
+    kernel_profile_add_named(std::string(name).c_str(), std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double, std::milli>(ms)));
+}
+
 std::chrono::steady_clock::duration kernel_profile_now()
 {
 #ifdef __linux__

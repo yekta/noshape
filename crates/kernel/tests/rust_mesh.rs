@@ -177,6 +177,20 @@ fn fillets_round_a_boss_mesh_as_brepmesh_meshes_them() {
 }
 
 #[test]
+fn a_big_bodys_mesh_copied_out_in_parallel_is_brepmeshs() {
+    // Three filleted bosses on a plate: over 20k nodes, so the bridge copies the faces' meshes out in groups on
+    // threads (mesh_bridge.rs); the same faces, edges and normals as BRepMesh's, watertight.
+    let plate = make_box_corners(DVec3::new(-30.0, -10.0, 0.0) * MM, DVec3::new(30.0, 10.0, 5.0) * MM).unwrap();
+    let bosses: Vec<Shape> = [-18.0, 0.0, 18.0].iter().map(|&x| make_cylinder(&Plane::new(DVec3::new(x, 0.0, 5.0) * MM, DVec3::Z, DVec3::X), 4.0 * MM, 4.0 * MM, TAU).unwrap()).collect();
+    let s = boolean(BooleanOp::Fuse, &[plate], &bosses, &BooleanOptions { unify: true, ..Default::default() }).unwrap().shape;
+    let round: Vec<Shape> = s.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| i.closed && !i.degenerated && i.start.z > 4.9 * MM)).collect();
+    assert_eq!(round.len(), 6);
+    let s = fillet(&s, &round, 1.0 * MM).unwrap().shape;
+    assert!(mesh(&s, true).positions.len() >= 20_000, "the parallel copy");
+    assert_eq!(same_as_brepmesh(&s), s.faces().len(), "every face");
+}
+
+#[test]
 fn a_cone_to_its_apex_and_a_sphere_mesh_as_brepmesh_meshes_them() {
     // An apex and two poles: degenerate edges, one node each.
     let cone = make_cone(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 3.0 * MM, 0.0, 5.0 * MM, TAU).unwrap();

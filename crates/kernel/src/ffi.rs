@@ -659,6 +659,8 @@ pub(crate) mod ffi {
         fn kernel_profile_mark(label: &str);
         /// The kernel profile on or off from now on (NOSHAPE_KERNEL_PROFILE's switch; its clock stays the env's).
         fn set_kernel_profile(on: bool);
+        /// With the kernel profile on: `ms` of the step `name` (a step timed on the Rust side, e.g. the mesher's).
+        fn kernel_profile_note(name: &str, ms: f64);
         /// OCCT's thread pool size (once, before any parallel work).
         fn set_occt_threads(n: i32);
         fn op_boolean(

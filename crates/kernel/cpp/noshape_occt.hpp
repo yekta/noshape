@@ -809,6 +809,7 @@ OpOut                    op_unify_whole(const OcShape& s);
 rust::String             last_boolean_path();
 void                     kernel_profile_mark(rust::Str label);
 void                     set_kernel_profile(bool on);
+void                     kernel_profile_note(rust::Str name, double ms);
 void                     set_occt_threads(int32_t n);
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts);

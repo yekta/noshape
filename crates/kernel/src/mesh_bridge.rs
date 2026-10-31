@@ -4,6 +4,7 @@
 
 use crate::ffi::ffi::MeshOut;
 use glam::DVec3;
+use std::mem::MaybeUninit;
 use noshape_brep::mesh::{mesh_body, Deflection, MeshEdge, MeshFace, MeshSurface};
 use noshape_brep::{Curve, Use};
 
@@ -65,6 +66,7 @@ pub(crate) fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surface
 
 #[allow(clippy::too_many_arguments)]
 fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], linear: f64, angular: f64, out: &mut MeshOut) -> bool {
+    let t = std::time::Instant::now();
     let input = &MeshIn { vertices, edges, curves, surfaces, face_loops, loop_uses, uses, linear, angular };
     let vertices: Vec<DVec3> = input.vertices.as_chunks::<3>().0.iter().map(|c| DVec3::new(c[0], c[1], c[2])).collect();
     let ne = input.edges.len() / 2;
@@ -113,36 +115,101 @@ fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], 
         }
         faces.push(MeshFace { surface, loops });
     }
+    // Its steps in the kernel's profile (NOSHAPE_KERNEL_PROFILE).
+    let note = |name: &str, d: std::time::Duration| crate::ffi::ffi::kernel_profile_note(name, d.as_secs_f64() * 1e3);
+    note("mesh.rust.mesh.in", t.elapsed());
     let m = mesh_body(&vertices, &edges, &faces, Deflection { linear: input.linear, angular: input.angular });
-    // Sized once (a fillet's tori are tens of thousands of nodes).
-    let (nn, nt, nu) = m.faces.iter().flatten().fold((0, 0, 0), |(n, t, u), f| (n + f.points.len(), t + f.triangles.len(), u + f.edge_nodes.iter().flatten().map(|e| 1 + e.len()).sum::<usize>()));
+    note("mesh.rust.mesh.edges", m.took[0]);
+    note("mesh.rust.mesh.faces", m.took[1]);
+    let t = std::time::Instant::now();
+    // Per face its first node, triangle and use entry; then the faces copied in groups of about as many nodes, on
+    // scoped threads for a big body, each into its own part of the arrays (serially it was as long as meshing the
+    // faces on live-30's ~60k nodes, writing fresh pages one thread at a time).
+    let nf = m.faces.len();
+    let (mut n_at, mut t_at, mut u_at) = (Vec::with_capacity(nf + 1), Vec::with_capacity(nf + 1), Vec::with_capacity(nf + 1));
+    let (mut nn, mut nt, mut nu) = (0usize, 0usize, 0usize);
+    out.face_ok.reserve(nf);
+    for f in &m.faces {
+        out.face_ok.push(f.is_some() as u8);
+        n_at.push(nn);
+        t_at.push(nt);
+        u_at.push(nu);
+        if let Some(f) = f {
+            nn += f.points.len();
+            nt += f.triangles.len();
+            nu += f.edge_nodes.iter().flatten().map(|e| 1 + e.len()).sum::<usize>();
+        }
+    }
+    n_at.push(nn);
+    t_at.push(nt);
+    u_at.push(nu);
+    out.face_nodes.extend(n_at.iter().map(|&n| n as u32));
+    out.face_tris.extend(t_at.iter().map(|&t| t as u32));
     out.nodes.reserve(3 * nn);
     out.normals.reserve(3 * nn);
     out.tris.reserve(3 * nt);
     out.use_nodes.reserve(nu);
-    out.face_ok.reserve(m.faces.len());
-    out.face_nodes.reserve(m.faces.len() + 1);
-    out.face_tris.reserve(m.faces.len() + 1);
-    out.face_nodes.push(0);
-    out.face_tris.push(0);
-    for f in &m.faces {
-        out.face_ok.push(f.is_some() as u8);
-        if let Some(f) = f {
+    let threads = if nn < 20_000 { 1 } else { std::thread::available_parallelism().map_or(1, |n| n.get()).min(8) };
+    let mut bounds: Vec<usize> = (0..threads).map(|g| n_at.partition_point(|&n| n < nn * g / threads).min(nf)).collect();
+    bounds.push(nf);
+    bounds.dedup();
+    type Part<'a> = (std::ops::Range<usize>, &'a mut [MaybeUninit<f64>], &'a mut [MaybeUninit<f64>], &'a mut [MaybeUninit<u32>], &'a mut [MaybeUninit<u32>]);
+    let (mut nodes, mut normals, mut tris, mut uses) = (&mut out.nodes.spare_capacity_mut()[..3 * nn], &mut out.normals.spare_capacity_mut()[..3 * nn], &mut out.tris.spare_capacity_mut()[..3 * nt], &mut out.use_nodes.spare_capacity_mut()[..nu]);
+    let mut parts: Vec<Part> = Vec::new();
+    for w in bounds.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let (n, rest) = std::mem::take(&mut nodes).split_at_mut(3 * (n_at[b] - n_at[a]));
+        nodes = rest;
+        let (nm, rest) = std::mem::take(&mut normals).split_at_mut(3 * (n_at[b] - n_at[a]));
+        normals = rest;
+        let (tr, rest) = std::mem::take(&mut tris).split_at_mut(3 * (t_at[b] - t_at[a]));
+        tris = rest;
+        let (us, rest) = std::mem::take(&mut uses).split_at_mut(u_at[b] - u_at[a]);
+        uses = rest;
+        parts.push((a..b, n, nm, tr, us));
+    }
+    let fill = |(range, nodes, normals, tris, uses): Part| {
+        let (mut i, mut k, mut u) = (0, 0, 0);
+        for f in m.faces[range].iter().flatten() {
             for (p, n) in f.points.iter().zip(&f.normals) {
-                out.nodes.extend([p.x, p.y, p.z]);
-                out.normals.extend([n.x, n.y, n.z]);
+                for (j, (a, b)) in [(p.x, n.x), (p.y, n.y), (p.z, n.z)].into_iter().enumerate() {
+                    nodes[i + j].write(a);
+                    normals[i + j].write(b);
+                }
+                i += 3;
             }
-            out.tris.extend(f.triangles.iter().flatten().copied());
+            for &x in f.triangles.iter().flatten() {
+                tris[k].write(x);
+                k += 1;
+            }
             // Per loop, per use: its node count, then its nodes (face-local).
-            for l in &f.edge_nodes {
-                for nodes in l {
-                    out.use_nodes.push(nodes.len() as u32);
-                    out.use_nodes.extend(nodes.iter().copied());
+            for un in f.edge_nodes.iter().flatten() {
+                uses[u].write(un.len() as u32);
+                u += 1;
+                for &x in un {
+                    uses[u].write(x);
+                    u += 1;
                 }
             }
         }
-        out.face_nodes.push((out.nodes.len() / 3) as u32);
-        out.face_tris.push((out.tris.len() / 3) as u32);
+    };
+    let mut parts = parts.into_iter();
+    let here = parts.next();
+    std::thread::scope(|sc| {
+        for p in parts {
+            sc.spawn(move || fill(p));
+        }
+        if let Some(p) = here {
+            fill(p);
+        }
+    });
+    // SAFETY: every slot up to these lengths was written above (the parts cover the reserved ranges exactly: the
+    // sizes they were cut to are the faces' own counts).
+    unsafe {
+        out.nodes.set_len(out.nodes.len() + 3 * nn);
+        out.normals.set_len(out.normals.len() + 3 * nn);
+        out.tris.set_len(out.tris.len() + 3 * nt);
+        out.use_nodes.set_len(out.use_nodes.len() + nu);
     }
     // Per edge, its nodes' parameters (from its start).
     out.edge_params.push(0);
@@ -152,5 +219,6 @@ fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], 
         }
         out.edge_params.push(out.params.len() as u32);
     }
+    note("mesh.rust.mesh.out", t.elapsed());
     true
 }
