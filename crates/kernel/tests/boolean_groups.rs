@@ -361,8 +361,11 @@ fn a_fillet_under_a_short_budget_gives_up() {
     // The holes' top circles.
     let edges: Vec<Shape> = plate.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, Curve::Circle { .. }) && e.point_at(i.first_param).is_ok_and(|p| p.z > 9.9))).collect();
     assert_eq!(edges.len(), 100);
+    // (OCCT's fillet: noshape's own takes these rims without a budget.)
+    set_rust_blend(Some(false));
     let t = std::time::Instant::now();
     let r = with_blend_budget(1e-9, || fillet(&plate, &edges, 1.0));
+    set_rust_blend(None);
     let e = r.err().map(|e| e.to_string()).unwrap_or_default();
     assert!(e.contains("took too long"), "{e:?} after {:?}", t.elapsed());
     let full = fillet(&plate, &edges, 1.0).unwrap().shape;

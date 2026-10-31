@@ -401,3 +401,31 @@ fn rust_blends_round_corners_are_occts() {
         assert!((a.volume - exact).abs() <= 1e-9 * exact, "{spec}: {} vs exact {exact}", a.volume);
     }
 }
+
+// Live G46's chamfer first, then the fillets ending on it: OCCT's fillet
+// can't run them into the chamfer face, so the fallback fillets the part
+// without it. With noshape's chamfer the block's faces come in another order,
+// and removing its sides (square to the fillet edges) too made OCCT's
+// defeaturing return a sliver.
+#[test]
+fn fillets_after_a_rust_chamfer_are_occts() {
+    setup();
+    let b = bx([0.0; 3], [50.0, 30.0, 30.0]);
+    let corner = edges_where(&b, |i| (i.start.x - 50.0 * MM).abs() < 1e-12 && i.start.y.abs() < 1e-12 && (i.end.x - 50.0 * MM).abs() < 1e-12 && i.end.y.abs() < 1e-12);
+    assert_eq!(corner.len(), 1);
+    let mut got = vec![];
+    for rust in [false, true] {
+        set_rust_blend(Some(rust));
+        reset_blend_decline();
+        let c = chamfer_checked(&b, &corner, ChamferSpec::Equal(5.0 * MM), &[]).unwrap();
+        assert_eq!(last_blend_decline().is_empty(), rust, "{}", last_blend_decline());
+        let top = edges_where(&c.shape, |i| (i.start.z - 30.0 * MM).abs() < 1e-12 && (i.end.z - 30.0 * MM).abs() < 1e-12 && ((i.start.y.abs() < 1e-12 && i.end.y.abs() < 1e-12) || ((i.start.x - 50.0 * MM).abs() < 1e-12 && (i.end.x - 50.0 * MM).abs() < 1e-12)));
+        assert_eq!(top.len(), 2);
+        let f = fillet_checked(&c.shape, &top, &[3.0 * MM]);
+        set_rust_blend(None);
+        let f = f.unwrap_or_else(|e| panic!("rust {rust}: {e}"));
+        got.push((vol_mm3(&f.shape), f.shape.count(ShapeType::Face), f.shape.count(ShapeType::Edge)));
+    }
+    assert!((got[0].0 - got[1].0).abs() < 1e-6 * got[0].0, "{got:?}");
+    assert_eq!((got[0].1, got[0].2), (got[1].1, got[1].2), "{got:?}");
+}

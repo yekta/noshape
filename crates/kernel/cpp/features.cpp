@@ -2739,11 +2739,15 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
   for (const TopoDS_Edge& e : es)
   {
     const ShapeList* own = e2f.Seek(e);
+    BRepAdaptor_Curve c(e);
     for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More(); v.Next())
     {
       const ShapeList* at = v2f.Seek(v.Current());
       if (at == nullptr)
         continue;
+      gp_Pnt p;
+      gp_Vec t;
+      c.D1(BRep_Tool::Parameter(TopoDS::Vertex(v.Current()), e), p, t);
       for (ShapeList::Iterator it(*at); it.More(); it.Next())
       {
         bool mine = false;
@@ -2751,8 +2755,15 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
           for (ShapeList::Iterator o(*own); o.More(); o.Next())
             mine = mine || o.Value().IsSame(it.Value());
         BRepAdaptor_Surface a(TopoDS::Face(it.Value()), false);
-        if (!mine && a.GetType() == GeomAbs_Plane)
-          ends.Add(it.Value());
+        if (mine || a.GetType() != GeomAbs_Plane)
+          continue;
+        // An end face square to the edge is where OCCT runs a fillet out
+        // itself; removing it can't help, and some sets of them (a block's
+        // two sides) make the removal return a sliver, depending on the
+        // order of the faces.
+        if (t.Magnitude() > 1e-12 && t.Normalized().IsParallel(a.Plane().Axis().Direction(), 1e-9))
+          continue;
+        ends.Add(it.Value());
       }
     }
   }

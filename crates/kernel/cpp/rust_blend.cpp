@@ -183,8 +183,14 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
             uv[s].SetCoord(uv[s - 1].X() + du, uv[s - 1].Y() + dv);
           }
         }
-        const gp_Vec2d d((uv[n].X() - uv[0].X()) / (c.t1 - c.t0), (uv[n].Y() - uv[0].Y()) / (c.t1 - c.t0));
+        gp_Vec2d d((uv[n].X() - uv[0].X()) / (c.t1 - c.t0), (uv[n].Y() - uv[0].Y()) / (c.t1 - c.t0));
         bool iso = std::abs(d.Magnitude() - 1) <= 1e-9;
+        // Exactly along u or v when it is to rounding (a frame 1e-15 off its axes left a cone's ruling 1e-14
+        // off a constant u, and Shell's slabs take only exact iso-lines).
+        if (iso && std::abs(d.X()) <= 1e-9)
+          d = gp_Vec2d(0.0, d.Y() > 0 ? 1.0 : -1.0);
+        else if (iso && std::abs(d.Y()) <= 1e-9)
+          d = gp_Vec2d(d.X() > 0 ? 1.0 : -1.0, 0.0);
         for (int s2 = 0; s2 <= n && iso; ++s2)
         {
           const gp_Pnt2d q(uv[0].X() + d.X() * (c.t1 - c.t0) * s2 / n, uv[0].Y() + d.Y() * (c.t1 - c.t0) * s2 / n);
