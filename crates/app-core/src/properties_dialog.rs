@@ -597,11 +597,14 @@ impl Render for MetaForm {
                             .child(undo_button("meta-undo", "undo", "Undo", can_undo).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.undo(false, window, cx))))
                             .child(undo_button("meta-redo", "redo", "Redo", can_redo).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.undo(true, window, cx))))
                             .when(self.reset_to.is_some(), |d| {
+                                // Live (dk-999, part-studio/1840): disabled while
+                                // every value is the one it would restore.
+                                let can_reset = self.reset_to.as_ref().is_some_and(|r| *r != self.values(cx));
                                 d.child(
-                                    footer_button("meta-reset", "Reset all", true, true)
+                                    footer_button("meta-reset", "Reset all", true, can_reset)
                                         .tooltip(crate::ui::tooltip("Reset all properties"))
-                                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                                            if let Some(v) = this.reset_to.clone() {
+                                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                            if let Some(v) = this.reset_to.clone().filter(|_| can_reset) {
                                                 this.restore(v, window, cx);
                                                 cx.notify();
                                             }

@@ -69,7 +69,7 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-993-panel-appearances |  | live's studio has a sketch, no parts: "No parts or surfaces in this document" (ours hides the button only with neither parts nor sketches) | ◐ |
 | dk-994-panel-custom-tables / dk-995-panel-configuration |  |  | ☐ |
 | dk-996-left-document-notes / dk-997-left-where-used / dk-998-left-performance |  |  | ☐ |
-| dk-999-properties-dialog |  |  | ☐ |
+| dk-999-properties-dialog | psui-scratch pr / rs1 | modal, header, fields, footer = live; "Reset all" disabled while nothing differs from what it restores (was always enabled; light too, part-studio/1840). Live's 1172 px width is a resized modal (it resizes and keeps its size; default 800 × 542 as dom/dialog-partstudio-part-properties.txt); our release-create icon is local release management (live's Free account has none) | ☑ psui 10-31 |
 | dk-9a0-versions-history-branch / dk-9a1-history-branch-rowmenu |  |  | ☐ |
 | dk-990-restored-light | psui-scratch t8 | Preferences › Theming › Light mode › Save theme, no restart: chrome, panels, viewport and planes light at once; the view cube kept its dark faces and axis letters until a hover (fixed: the viewport re-sends it on the theme change; = a fresh light start) | ☑ psui 10-31 |
 
