@@ -3997,7 +3997,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         sedge_flip[s] = flip;
         let seg = x.seg;
         let (v, curve) = match seg.g {
-            Geo::Apex if !edge_same[s] => return Err(Decline("a cone's apex changed")),
+            // (Its vertex made anew, another argument through the apex: a new degenerate edge there, as OCCT's.)
             Geo::Apex => (seg.v, Curve::Degenerate),
             Geo::Line => (if flip { [seg.v[1], seg.v[0]] } else { seg.v }, Curve::Line),
             Geo::Arc { k, .. } => {

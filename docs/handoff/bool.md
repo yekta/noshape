@@ -1044,6 +1044,21 @@ The whole test **21.40 s** (162 s this morning); the diamond's regeneration **14
 process 0.62 GB; straight 0.6 s. The knurl target is met: the regeneration and the whole test are both under live's
 49 s.
 
+## A cone's (or a free-form surface's) apex made anew (10-31 UTC)
+- Where another argument passes through a degenerate edge's vertex (a cone's apex, a corner patch's pole), OCCT
+  makes a new vertex and a new degenerate edge there, the input's Modified into them. Ours now does too (it
+  declined "a cone's apex changed"): the C++ build makes the degenerate edge (no curve of its own), its curve on
+  the face the input's, its range that curve's (piece_pcurve and the free-form faces' loop).
+- The 7 distinct cases (20 recorded): all taken, 0 differ incl. the unify check. Replays all 0 differ: main 782,
+  corpus2 555, corpus3 558, corpus4 606 (+3), corpus5 727 (+7), corpus6 672 (+7), Shell's 81 (+3), direct 58.
+  T1: e45f5fbf794b1d88 in tests/data/brep.
+- Next on apexes: a plane through a full cone's axis and its apex (11 cases, Shell's slab fuses on drilled parts,
+  0.5–5 s each in OCCT, ~17 s together) splits the cone into two halves that each need a piece of the degenerate
+  edge: the apex segment in the cone's parameter plane split where the two rulings end, the apex one vertex at two
+  places there (as `apex_part` does for parts of cones), Geo::Apex carrying its angles so the two pieces stay
+  apart (get_sedge keys by ends and middle: both are the apex), and the C++ build giving each its range. The 15
+  "plane along a ruling through the apex" cases are small (24–190 ms).
+
 ## What still declines, by OCCT's recorded time (replays 10-31 13:10 UTC, each case once over all corpora)
 An internal face 25.3 s (2: b2511301 a Shell slab fuse of 72 tools whose OCCT result is invalid, addb9a14), a
 tolerant input 23.9 s (18), edges of two arguments crossing on a third's face 22.2 s (14), a plane through a

@@ -884,6 +884,9 @@ const char* piece_pcurve(const BrepResult& r, const std::vector<const OcShape*>&
     bb.UpdateEdge(e, pf, BRep_Tool::CurveOnSurface(TopoDS::Edge(se.Reversed()), sf, a, z), s, loc, BRep_Tool::Tolerance(e));
   else
     bb.UpdateEdge(e, pf, s, loc, BRep_Tool::Tolerance(e));
+  // (A new degenerate edge has no curve of its own: its range is its curve's on the face.)
+  if (BRep_Tool::Degenerated(e))
+    bb.Range(e, s, loc, a, z);
   return nullptr;
 }
 
@@ -942,7 +945,21 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     if (kind == 1)
     {
       const TopoDS_Edge src = TopoDS::Edge(input(srcs, r.edge_origin[3 * i + 1], TopAbs_EDGE, r.edge_origin[3 * i + 2]).Oriented(TopAbs_FORWARD));
-      c                     = BRep_Tool::Curve(src, loc, f, l);
+      if (BRep_Tool::Degenerated(src))
+      {
+        // A cone's apex OCCT makes anew (another argument through it): a new degenerate edge at the new vertex,
+        // its curve on the cone the input's (piece_pcurve).
+        if (v0 != v1)
+          return "a degenerate edge between two vertices";
+        TopoDS_Edge e;
+        bb.MakeEdge(e);
+        bb.Degenerated(e, true);
+        bb.Add(e, vs[v0].Oriented(TopAbs_FORWARD));
+        bb.Add(e, vs[v1].Oriented(TopAbs_REVERSED));
+        es[i] = e;
+        continue;
+      }
+      c = BRep_Tool::Curve(src, loc, f, l);
       tol_e                 = BRep_Tool::Tolerance(src);
       TopoDS_Vertex a, z;
       TopExp::Vertices(src, a, z);
@@ -1173,6 +1190,9 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           bb.UpdateEdge(es[k], pf, BRep_Tool::CurveOnSurface(TopoDS::Edge(se.Reversed()), sf, a, z), s, loc, BRep_Tool::Tolerance(es[k]));
         else
           bb.UpdateEdge(es[k], pf, s, loc, BRep_Tool::Tolerance(es[k]));
+        // (A new degenerate edge has no curve of its own: its range is its curve's on the face.)
+        if (BRep_Tool::Degenerated(es[k]))
+          bb.Range(es[k], s, loc, a, z);
       }
     }
     // Its edges' curves on a cylinder or cone (a plane's are made below).
