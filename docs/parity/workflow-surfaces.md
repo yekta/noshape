@@ -27,9 +27,9 @@ Status: ✅ matches expected/live, ✗ differs (finding #), ? live data pending.
 | 15 | Transform: type list | Translate by line, by distance, by XYZ, Transform by mate connectors, Rotate, Copy in place, Scale | same | ✅ | 0.4.10+ / dd1b5037 10-27 (Translate by line / by distance / by XYZ / Transform by mate connector / Rotate / Copy in place / Scale) |
 | 16 | Transform XYZ x 20, ☑ Copy part | copy | Part 4 at x 80..120 | ✅ | 0.4.10+ / dd1b5037 10-27 (bracket: XYZ x 10 + Copy part → Part 2 overlapping) |
 | 17 | Boolean Subtract: tools Part 4, targets Part 3 | 4000 mm³, 6 faces | 4000.0, 6 faces | ✅ | v0.4.12 CLI 10-28 (bin/boolmir.py: blocks 60..100 / 80..120, Subtract tools Part 2 targets Part 1 → 4000.000 mm³, 6 faces, x 60..80) |
-| 18 | Split Part 3 by Plane 1 (Right + 70) | two parts | Part 3 (x 70..80) + **Part 5** (x 60..70), 2000 each | ? (names) |  |
+| 18 | Split Part 3 by Plane 1 (Right + 70) | two parts | Part 3 (x 70..80) + **Part 5** (x 60..70), 2000 each | ✅ live renumbers: the split part goes, its halves are the last two parts (+X first), the others move up (behaviours "Split renames and re-identifies", qa5 split); ours the same since | skasm 10-31 (CLI split.py: Part 2 split → Part 1, 2, 3 = old 1, 3, 4; Part 4 = +X half, Part 5) |
 | 19 | Mirror Part 5 about Right | Part 6 | Part 6 at x −70..−60 | ✅ | v0.4.12 CLI 10-28 (bin/boolmir.py: Mirror of that part about Right → new part 4000.000, 6 faces, x −80..−60) |
-| 20 | Part colours after Split/Mirror | rotation #9dcfed, #a5a5a5, #3b61b4, #eaeaea, #c4e2f3, #f88701, #7f7f7f, #fab601 | Part 3 and Part 5 orange, Part 6 gold (persist after tab switch) | ? SF4 |  |
+| 20 | Part colours after Split/Mirror | rotation #9dcfed, #a5a5a5, #3b61b4, #eaeaea, #c4e2f3, #f88701, #7f7f7f, #fab601 | Part 3 and Part 5 orange, Part 6 gold (persist after tab switch) | ? SF4 (main: the split halves keep the split part's colour; live request "skasm (2026-10-31 04:50)") |  |
 | 21 | Move boundary on one straight edge of the planar boundary surface, 25 mm | surface extended | **Error with raw kernel text** "Geometry operation failed: operation failed: wire offset failed (offset too large or non-planar wire?)" | ✅ (SF5 fixed) | v0.4.12 CLI 10-28 (bin/sfcheck25.py: straight side of the arcs boundary surface, 25 mm → 1950 mm² = 1200 + 30×25, 1 face) |
 | 22 | (CLI) Move boundary on one edge of the planar Fill surface, 10 mm | 800 + 200 mm² | Error "Move boundary currently supports single planar surfaces only (all boundary edges moved)" | ✅ (SF5 fixed) | v0.4.12 CLI 10-28 (bin/sfcheck.py on a 40×20 extruded-line surface: one edge 10 mm → 1000 mm², x 0..50, 1 face) |
 | 23 | (CLI) Move boundary on the boundary surface's bspline edge, 10 mm | 1200 + 300 mm² | **Status OK, surface area −514.305 mm²** (corrupt body) | ✅ (SF6 fixed) | v0.4.12 CLI 10-28 (bin/sfcheck.py: boundary surface between two 3-point arcs 30 apart = 1200 mm²; its straight side 10 mm → 1500 mm², 1 face) |
@@ -104,3 +104,11 @@ SF2 8000 / 10 faces, SF5 2400 mm² (all edges move), SF6 −514.304543 → ✗ s
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app /root/target-lead/debug/noshape)
 | I2 | face-only fields pick the face when clicking on its edge | ✅ fixed |
 | I4 | row tooltip after picking a plane from the list hides | ✅ fixed |
+
+## Re-check (skasm, 2026-10-31, main CLI, qa-scratch/bin/sfcheck25.py)
+| Row | Ours now | Status | Verified |
+|---|---|---|---|
+| SF2 two adjacent regions | 8000 mm³, **6 faces** | ✅ fixed | skasm 10-31 (CLI) |
+| SF5 Move boundary one edge 10 mm | 1000 mm², x 0…50, 1 face (only that edge moves) | ✅ fixed | skasm 10-31 (CLI) |
+| SF6 Move boundary the B-spline side 25 mm | OK, 1950 mm² = 1200 + 25 × 30, 1 face. The arcs run on along their tangents (z −23.81 at x −25). No more negative area | ✅ fixed (corrupt area gone; live's exact figure not measured) | skasm 10-31 (CLI) |
+| SF1 Fill preview while editing | editing Fill 1 (4 rim edges of the open box) shows the knit result, Parts (1) Part 1, as when creating | ✅ fixed | skasm 10-31 (GUI :103, sf7 doc) |
