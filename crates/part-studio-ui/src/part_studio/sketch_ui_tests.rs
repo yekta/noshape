@@ -8,7 +8,7 @@ use crate::gpu::Gpu;
 use crate::sketch_mode::Tool;
 use crate::viewport::ViewportEvent;
 use glam::DVec2;
-use gpui_kit::{AnyWindowHandle, AppContext as _, Bounds, Entity, IntoElement, Keystroke, Modifiers, InteractiveElement as _, ParentElement as _, Point, Render, Styled as _, TestAppContext, Window, WindowBounds, WindowOptions, div, px, size};
+use gpui_kit::{AnyWindowHandle, AppContext as _, Bounds, Entity, Focusable as _, IntoElement, Keystroke, Modifiers, InteractiveElement as _, ParentElement as _, Point, Render, Styled as _, TestAppContext, Window, WindowBounds, WindowOptions, div, px, size};
 use noshape_model::reference::{DatumPlane, Reference};
 
 /// The app's workspace as far as keys go: the "Workspace" key context the
@@ -692,6 +692,56 @@ fn an_escaped_folder_rename_records_nothing(cx: &mut TestAppContext) {
     });
     assert_eq!(name.as_deref(), Some("F1"));
     assert_eq!(undo, undo_before, "no rename recorded");
+}
+
+/// core-workflow 8.1.15 / 8.6.4: one Esc cancels the appearance editor, its hex field focused (live request 1663 (a)).
+#[gpui::test]
+fn escape_cancels_the_appearance_editor(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "appearance-esc");
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_appearance(super::super::appearance::EditTarget::Faces(vec![], None), w, cx))).unwrap();
+    draw(cx, window);
+    let hex_focused = cx.update_window(window, |_, w, cx| view.read(cx).ui.appearance_edit.as_ref().is_some_and(|e| e.hex.read(cx).focus_handle(cx).is_focused(w))).unwrap();
+    assert!(hex_focused, "the editor opens with its hex field focused");
+    keys(cx, window, &["escape"]);
+    assert!(cx.update(|cx| view.read(cx).ui.appearance_edit.is_none()), "Esc closed the editor");
+}
+
+/// core-workflow 8.2.11: Extrude 1 › Add appearance to feature… opens "Face appearance 1" with "Extrude 1" in its
+/// Faces or features field, black, the focus on the body; Sketch 1's editor is "Appearance" at #999 (live 1663).
+#[gpui::test]
+fn a_features_appearance_opens_as_live(cx: &mut TestAppContext) {
+    use super::super::appearance::EditTarget;
+    use noshape_model::reference::FeatureId;
+    let (window, view) = part_studio(cx, "appearance-feature");
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let tab = v.tab;
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_studio(tab, "Add features", cx, |ps| {
+                    for (id, ty, name) in [(9001, "sketch", "Sketch 1"), (9002, "extrude", "Extrude 1")] {
+                        ps.features.push(noshape_model::partstudio::Feature { id: FeatureId(id), type_id: ty.into(), name: name.into(), suppressed: false, params: Default::default(), folder: None, custom_name: false, hidden: false, suppression_expr: None });
+                    }
+                })
+            });
+        })
+    });
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    let open = |cx: &mut TestAppContext, target: EditTarget| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_appearance(target, w, cx))).unwrap();
+        draw(cx, window);
+        cx.update_window(window, |_, w, cx| {
+            let v = view.read(cx);
+            let e = v.ui.appearance_edit.as_ref().expect("the editor");
+            let (title, faces) = v.appearance_heading(&e.target, cx);
+            (title.to_string(), faces, e.rgb, e.hex.read(cx).focus_handle(cx).is_focused(w))
+        })
+        .unwrap()
+    };
+    assert_eq!(open(cx, EditTarget::Feature(FeatureId(9002), None)), ("Face appearance 1".into(), Some("Extrude 1".into()), [0, 0, 0], false));
+    keys(cx, window, &["escape"]);
+    assert!(cx.update(|cx| view.read(cx).ui.appearance_edit.is_none()), "Esc cancelled the face appearance");
+    assert_eq!(open(cx, EditTarget::Feature(FeatureId(9001), None)), ("Appearance".into(), None, [0x99, 0x99, 0x99], true));
 }
 
 /// A feature dialog of `type_id` (its defaults, `set` applied) in the test window's app, with no field active yet.

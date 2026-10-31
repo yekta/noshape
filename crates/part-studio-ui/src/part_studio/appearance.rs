@@ -70,7 +70,7 @@ pub struct AppearanceEdit {
     /// Colour, transparency and quality at opening: ✓ stays at 20 % until
     /// one changes (live).
     initial: ([u8; 3], f32, TessQuality),
-    hex: Entity<InputState>,
+    pub(super) hex: Entity<InputState>,
     /// R, G, B.
     channels: [Entity<InputState>; 3],
     alpha: Entity<InputState>,
@@ -205,6 +205,14 @@ impl PartStudioView {
                 (c, props.and_then(|p| p.tessellation).unwrap_or(TessQuality::Auto))
             }
             (EditTarget::Faces(_, Some(i)) | EditTarget::Feature(_, Some(i)), Some(s)) => (s.appearances.get(*i).map(|a| a.color).unwrap_or([0.8, 0.3, 0.2, 1.0]), TessQuality::Auto),
+            // A feature's own appearance, else a sketch's #999 and a new face
+            // appearance's black (live request 1663: Sketch 1 999999, Extrude 1 000000).
+            (EditTarget::Feature(f, None), Some(s)) => {
+                let target = AppearanceTarget::Feature(*f);
+                let own = s.appearances.iter().find(|a| a.target == target).map(|a| a.color);
+                let sketch = s.feature(*f).is_some_and(|x| x.type_id == "sketch");
+                (own.unwrap_or(if sketch { [srgb_to_lin(0x99), srgb_to_lin(0x99), srgb_to_lin(0x99), 1.0] } else { [0.0, 0.0, 0.0, 1.0] }), TessQuality::Auto)
+            }
             // The cell's color, else the part's current one.
             (EditTarget::ConfiguredCell(b, row), Some(s)) => {
                 let cell = noshape_model::configured_properties::table(s, b).and_then(|t| t.rows.get(*row)).and_then(|r| r.values.get("Appearance")).and_then(|v| noshape_model::configured_properties::parse_color(v));
@@ -244,11 +252,16 @@ impl PartStudioView {
                 cx.notify();
             }
         }));
-        // Live 173: the hex field has the focus, its text selected.
-        hex.update(cx, |s, cx| {
-            s.focus(window, cx);
-            s.select_all(window, cx);
-        });
+        // Live 173: the hex field has the focus, its text selected; a
+        // feature's face appearance leaves it on the body (request 1663).
+        if matches!(&target, EditTarget::Feature(f, _) if studio.as_ref().and_then(|s| s.feature(*f)).is_some_and(|x| x.type_id != "sketch")) {
+            window.focus(&self.focus, cx);
+        } else {
+            hex.update(cx, |s, cx| {
+                s.focus(window, cx);
+                s.select_all(window, cx);
+            });
+        }
         self.ui.appearance_edit = Some(AppearanceEdit { target, rgb, transparency, tessellation: tess, mixer: false, mix: crate::color_mixer::MixerState::from_rgb(rgb), alpha_drag: false, initial: (rgb, transparency, tess), hex, channels, alpha, _subs: subs });
         cx.notify();
     }
@@ -371,19 +384,41 @@ impl PartStudioView {
     /// part-studio/173–174): 220 x 400; header (title, ✓ ✕); tabs Palette |
     /// Mixer; the swatches or the mixer (162 px); the current colour, the A
     /// slider and field; # R G B; Custom colors; Tessellation quality; ?.
+    /// The appearance editor's title and its "Faces or features" text. Live
+    /// 175 / request 1663: a face appearance, or a feature's (not a
+    /// sketch's), is titled "Face appearance N" and starts with that field
+    /// (the faces, or the feature's name); a part's or sketch's "Appearance".
+    pub(super) fn appearance_heading(&self, target: &EditTarget, cx: &App) -> (SharedString, Option<String>) {
+        let studio = self.studio(cx);
+        let is_sketch = |f: FeatureId| studio.and_then(|s| s.feature(f)).is_some_and(|x| x.type_id == "sketch");
+        let faces = match target {
+            EditTarget::Faces(f, _) => Some(format!("{} face{}", f.len(), if f.len() == 1 { "" } else { "s" })),
+            EditTarget::Feature(f, _) if !is_sketch(*f) => studio.and_then(|s| s.feature(*f)).map(|x| x.name.clone()),
+            _ => None,
+        };
+        let title: SharedString = match (target, &faces, studio) {
+            (EditTarget::Faces(_, index) | EditTarget::Feature(_, index), Some(_), Some(s)) => {
+                let face_like = |a: &FaceAppearance| match a.target {
+                    AppearanceTarget::Faces(_) => true,
+                    AppearanceTarget::Feature(f) => !is_sketch(f),
+                };
+                let own = match target {
+                    EditTarget::Feature(f, None) => s.appearances.iter().position(|a| a.target == AppearanceTarget::Feature(*f)),
+                    _ => *index,
+                };
+                let before = own.map_or(s.appearances.len(), |i| i.min(s.appearances.len()));
+                format!("Face appearance {}", s.appearances[..before].iter().filter(|a| face_like(a)).count() + 1).into()
+            }
+            _ => "Appearance".into(),
+        };
+        (title, faces)
+    }
+
     pub(super) fn render_appearance_editor(&mut self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let e = self.ui.appearance_edit.as_ref()?;
         let pal = p();
-        let title = match &e.target {
-            EditTarget::Faces(..) => "Face appearance",
-            _ => "Appearance",
-        };
         let is_part = matches!(e.target, EditTarget::Parts(..));
-        // Live 175: a face appearance starts with its "Faces or features" field.
-        let faces = match &e.target {
-            EditTarget::Faces(f, _) => Some(f.len()),
-            _ => None,
-        };
+        let (title, faces) = self.appearance_heading(&e.target, cx);
         let changed = e.initial != (e.rgb, e.transparency, e.tessellation);
         let rgb = e.rgb;
         let alpha = 1.0 - e.transparency;
@@ -547,6 +582,8 @@ impl PartStudioView {
         Some(
             v_flex()
                 .id("appearance-editor")
+                // Esc in its fields cancels it (actions.rs).
+                .key_context("AppearanceEditor")
                 .occlude()
                 .child(crate::ui::panel_probe("ps-appearance"))
                 .absolute()
@@ -587,7 +624,7 @@ impl PartStudioView {
                                 })),
                         ),
                 )
-                .when_some(faces, |d, n| {
+                .when_some(faces, |d, label| {
                     d.child(
                         div().px(px(3.)).pt(px(5.)).child(
                             v_flex()
@@ -601,7 +638,7 @@ impl PartStudioView {
                                 .bg(pal.row_hover)
                                 .cursor_pointer()
                                 .child(div().pt(px(7.)).text_size(px(10.)).line_height(px(9.)).text_color(pal.text_muted).child("Faces or features"))
-                                .child(div().text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).child(format!("{n} face{}", if n == 1 { "" } else { "s" })))
+                                .child(div().text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).child(label))
                                 // A click takes the selected faces.
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     let sel = this.selected_faces();

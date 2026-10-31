@@ -623,10 +623,20 @@ pub fn features_using(features: &[Feature], r: &Reference) -> Vec<FeatureId> {
         values.0.values().any(|v| match v {
             ParamValue::Query(refs) => refs.contains(r),
             ParamValue::Array(items) => items.iter().any(|i| uses(i, r)),
+            // A sketch uses what it projects, and the Origin when a constraint
+            // holds it there (live: "Dependencies of Origin" lists the sketch,
+            // behaviours request 1663 (b)).
+            ParamValue::Sketch(s) => s.external_refs.values().any(|x| x == r) || (matches!(r, Reference::Origin) && constrained_to_origin(s)),
             _ => false,
         })
     }
     features.iter().filter(|f| uses(&f.params, r)).map(|f| f.id).collect()
+}
+
+/// A constraint holds the sketch's fixed point at its origin (where the
+/// origin's inferences put their constraints, `sketch_mode::origin_point`).
+fn constrained_to_origin(s: &crate::sketch_feature::SketchData) -> bool {
+    s.sketch.entities().any(|e| e.external && !s.external_refs.contains_key(&e.id.0) && matches!(e.geometry, noshape_sketch::Geometry::Point { pos } if pos.length() < 1e-12) && !s.sketch.constraints_on(e.id).is_empty())
 }
 
 /// The sketch a feature was built from (Onshape's "Edit Sketch 1…" entry
@@ -1125,6 +1135,24 @@ mod tests {
         ps.features[0].params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(crate::reference::DatumPlane::Top)]));
         assert_eq!(features_using(&ps.features, &Reference::Plane(crate::reference::DatumPlane::Top)), vec![FeatureId(1001)]);
         assert!(features_using(&ps.features, &Reference::Plane(crate::reference::DatumPlane::Front)).is_empty());
+    }
+
+    /// core-workflow 8.4.11: a sketch whose corner is coincident with the origin is a dependent of Origin (live
+    /// request 1663 (b)); one whose origin point carries no constraint is not.
+    #[test]
+    fn features_using_the_origin() {
+        use noshape_sketch::{ConstraintKind, Geometry};
+        let mut ps = studio();
+        let mut data = crate::sketch_feature::SketchData::default();
+        let line = data.sketch.add_line(glam::DVec2::new(0.0, 0.0), glam::DVec2::new(40.0, 0.0));
+        let o = data.sketch.use_external_point(glam::DVec2::ZERO);
+        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        assert!(features_using(&ps.features, &Reference::Origin).is_empty(), "no constraint on the origin point");
+        let Some(Geometry::Line { start, .. }) = data.sketch.entity(line).map(|e| e.geometry.clone()) else { panic!("a line") };
+        data.sketch.add_constraint(ConstraintKind::Coincident { a: start, b: o }).unwrap();
+        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data)));
+        assert_eq!(features_using(&ps.features, &Reference::Origin), vec![FeatureId(1001)]);
+        assert!(features_using(&ps.features, &Reference::Plane(crate::reference::DatumPlane::Top)).is_empty());
     }
 
     #[test]

@@ -141,7 +141,7 @@ and closes again with ✕/Esc/Cancel. Expected results follow live (behaviours.m
 | 8.1.12 | View normal to | view turns normal to its plane | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 | 8.1.13 | Show dependencies… | "Dependencies of Sketch 1" panel | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 | 8.1.14 | Roll to here | rollback bar moves under Sketch 1 | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
-| 8.1.15 | Edit sketch appearance… | appearance editor | ❌ appearance editor opens; Esc keeps it open, live: one Esc cancels it (behaviours request 1663 (a)) | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.1.15 | Edit sketch appearance… | appearance editor | ✅ "Appearance" at #999999, hex selected; one Esc cancels it, also from the hex field (live request 1663 (a)) | psui 10-31 (:102, blk; T1 escape_cancels_the_appearance_editor, a_features_appearance_opens_as_live) |
 | 8.1.16 | Delete | deleted (Ctrl+Z restores) | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 
 **8.2 Feature row, other feature (Extrude 1)**
@@ -157,7 +157,7 @@ and closes again with ✕/Esc/Cancel. Expected results follow live (behaviours.m
 | 8.2.8 | Zoom to selection | zooms | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 | 8.2.9 | Show dependencies… | dependencies panel | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 | 8.2.10 | Roll to here | bar under Extrude 1 | ✅ on a rolled-back Extrude 1 (Roll to here / Roll to end); hidden when the bar is already under it | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
-| 8.2.11 | Add appearance to feature… | appearance editor | ❌ ours opens the appearance panel; live opens a feature dialog "Face appearance 1" (Faces or features = Extrude 1, palette / mixer, ✓ ✕) and Esc cancels it (request 1663 (a)) | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.2.11 | Add appearance to feature… | appearance editor | ✅ "Face appearance 1" with Faces or features = Extrude 1, #000000, the focus on the body; Esc cancels it (live request 1663 (a)) | psui 10-31 (:102, blk; T1 escape_cancels_the_appearance_editor, a_features_appearance_opens_as_live) |
 | 8.2.12 | Delete | deleted (Ctrl+Z restores) | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 
 **8.3 Several feature rows (Shift-click two)**
@@ -184,7 +184,7 @@ and closes again with ✕/Esc/Cancel. Expected results follow live (behaviours.m
 | 8.4.8 | Top › Zoom to selection | zooms | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 | 8.4.9 | Top › View normal to | view normal to Top | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 | 8.4.10 | Top › Show dependencies… | dependencies panel | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
-| 8.4.11 | Origin › Rename / Hide / Show dependencies… | as above | ❌ Rename / Hide / Show dependencies ✅; "Dependencies of Origin" lists nothing, live lists Sketch 1 when a sketch point is coincident with the origin (request 1663 (b)) | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.4.11 | Origin › Rename / Hide / Show dependencies… | as above | ✅ Rename / Hide / Show dependencies; "Dependencies of Origin" lists a sketch with a corner on the origin (live request 1663 (b); live's menu also has Add comment, cloud) | psui 10-31 (:102, blk: a rectangle from the origin listed Sketch 2; T1 features_using_the_origin) |
 
 **8.5 Folder row**
 | # | Item | Expected | Status | Verified |
@@ -201,7 +201,7 @@ and closes again with ✕/Esc/Cancel. Expected results follow live (behaviours.m
 | 8.6.1 | Rename | inline white field; Esc reverts (**crashed on aa75fdf**, qa5) | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 | 8.6.2 | Properties… | Properties dialog (Name focused) | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 | 8.6.3 | Assign material… | material panel | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
-| 8.6.4 | Edit appearance… | appearance editor | ◐ opens; live: one Esc cancels it (request 1663 (a)) | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
+| 8.6.4 | Edit appearance… | appearance editor | ✅ opens with its hex selected; one Esc cancels it (live request 1663 (a)) | psui 10-31 (:102, blk; T1 escape_cancels_the_appearance_editor, a_features_appearance_opens_as_live) |
 | 8.6.5 | Copy here… | Transform dialog, Translate by XYZ, ☑ Copy part | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 | 8.6.6 | Copy Part 1 | copied (no toast) | ✅ copied, no toast (skasm 09714588) | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |
 | 8.6.7 | Create Drawing of Part 1… | Create Drawing dialog | ✅ | psui 2821d5ba 10-31 (:102, cm3 / blk docs) |

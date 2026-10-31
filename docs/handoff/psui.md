@@ -226,6 +226,14 @@ keeps), Pattern Direction ⇒ second Direction. Limits: T1 query_pick_limits_fol
 Variable's measure-between was unlimited, now 2); chains in our order = live's table except fields we lack (Fillet
 variable Vertices, Routing curve hidden references, Tag base plane: their owners). T1: mate connector, Bend, knurl
 (rule 6 included), Tangent, Fastened FIFO. In the app (:102, small knurl doc): three clicks, no manual focusing.
+10-31 10:38: landed f6b3af7d (947b7c66 / cce0086e / 2821d5ba auto-advance + 8.x renames, 959ce1d9 dark chrome: Create
+#769fcc while its menu is open (os_ui::dropdown_open), wordmark white, the right strip's open button #333). Then (live
+request 1663): one Esc cancels every appearance editor, also typing in its fields ("AppearanceEditor > Input" binding,
+as FeatureDialog's); Add appearance to feature… opens "Face appearance N" with Faces or features = the feature, black,
+the focus on the body (`appearance_heading`); a sketch's editor starts at its #999; "Dependencies of Origin" lists a
+sketch constrained to the origin (model-core `features_using`: a sketch's external_refs and its origin point).
+Checked on :102 (blk). Residual: live shows the dependent row selected (light blue, also in the feature list); ours
+plain. core-workflow section 8: every row checked; no unchecked rows left in the sheet (2.21 / F2 / F16 are notes).
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC

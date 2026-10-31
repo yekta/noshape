@@ -174,6 +174,8 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("escape", Cancel, Some("CreateDrawing")),
         // Esc while typing in a dialog field still cancels the dialog (Onshape).
         KeyBinding::new("escape", Cancel, Some("FeatureDialog > Input")),
+        // And typing in the appearance editor's fields (live request 1663 (a)).
+        KeyBinding::new("escape", Cancel, Some("AppearanceEditor > Input")),
         KeyBinding::new("tab", DialogTab, Some("FeatureDialog")),
         KeyBinding::new("shift-tab", DialogTabPrev, Some("FeatureDialog")),
         KeyBinding::new("shift-tab", StudioTabPrev, Some("PartStudio")),

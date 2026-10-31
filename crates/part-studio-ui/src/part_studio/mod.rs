@@ -5559,6 +5559,13 @@ impl Render for PartStudioView {
                     this.close_section_dialog(false, window, cx);
                     return;
                 }
+                // Live (behaviours request 1663 (a)): one Esc cancels every
+                // appearance editor, even typing in its hex field.
+                if this.ui.appearance_edit.take().is_some() {
+                    window.focus(&this.focus, cx);
+                    cx.notify();
+                    return;
+                }
                 if this.ui.env_picker.take().is_some() {
                     cx.notify();
                     return;
