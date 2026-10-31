@@ -2114,6 +2114,17 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
             std::thread::sleep(std::time::Duration::from_secs_f64(t));
             let aborted_at = std::time::Instant::now();
             cancel.abort();
+            // NOSHAPE_CANCEL_STACKS=1: every thread's stack while the run is still going 150 ms after the abort.
+            if std::env::var_os("NOSHAPE_CANCEL_STACKS").is_some() {
+                for _ in 0..3 {
+                    std::thread::sleep(std::time::Duration::from_millis(150));
+                    if h.is_finished() {
+                        break;
+                    }
+                    eprintln!("--- {:.0} ms after the abort:", aborted_at.elapsed().as_secs_f64() * 1e3);
+                    dump_stacks();
+                }
+            }
             let (done, cancelled) = h.join().unwrap();
             (done.saturating_duration_since(aborted_at), cancelled)
         });
@@ -2180,4 +2191,31 @@ export const spin = defineFeature(function(context is Context, id is Id, definit
     assert_ok(&after);
     assert_eq!(after.context.bodies.len(), 1);
     assert!((after.context.bodies[0].shape.volume().unwrap() - v0).abs() < 1e-15);
+}
+
+/// Every thread's backtrace (frames of noshape / OCCT), from a signal handler (a probe tool: not async-signal-safe).
+fn dump_stacks() {
+    unsafe extern "C" {
+        fn signal(sig: i32, handler: usize) -> usize;
+        fn syscall(n: i64, ...) -> i64;
+        fn getpid() -> i32;
+    }
+    extern "C" fn on_signal(_: i32) {
+        let bt = std::backtrace::Backtrace::force_capture().to_string();
+        let keep: Vec<&str> = bt.lines().filter(|l| l.trim_start().chars().next().is_some_and(|c| c.is_ascii_digit()) && !l.contains("std::") && !l.contains("core::") && !l.contains("backtrace") && !l.contains("on_signal") && !l.contains("__restore_rt")).take(18).collect();
+        let tid = unsafe { syscall(186) };
+        if keep.iter().any(|l| !l.contains("__GI___") && !l.contains("syscall") && !l.contains("futex") && !l.contains("pthread_cond") && !l.contains("park")) {
+            eprintln!("thread {tid}:\n{}", keep.join("\n"));
+        }
+    }
+    unsafe {
+        signal(12, on_signal as *const () as usize);
+        let pid = getpid();
+        for e in std::fs::read_dir("/proc/self/task").unwrap().flatten() {
+            if let Ok(tid) = e.file_name().to_string_lossy().parse::<i64>() {
+                syscall(234, pid as i64, tid, 12i64);
+                std::thread::sleep(std::time::Duration::from_millis(2));
+            }
+        }
+    }
 }

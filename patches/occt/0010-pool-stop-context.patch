@@ -1,0 +1,148 @@
+--- a/src/FoundationClasses/TKernel/OSD/OSD_ThreadPool.cxx
++++ b/src/FoundationClasses/TKernel/OSD/OSD_ThreadPool.cxx
+@@ -211,6 +211,68 @@
+   return THE_NOSHAPE_POOL_DEPTH;
+ }
+ 
++// noshape: the launching thread's stop context (its cancel flag and CPU
++// deadline, in noshape's kernel) taken by the pool's workers for the job, so
++// the break hooks (patches 0007-0009) stop a cancelled Boolean's parallel
++// face / face intersections there too: they ran on for 100s of ms after the
++// user's cancel. Null: nothing to hand on.
++extern "C" void* noshape_pool_capture();
++extern "C" void* noshape_pool_enter(void* theContext);
++extern "C" void  noshape_pool_leave(void* thePrevious);
++#if defined(__GNUC__)
++// The defaults for a program that doesn't define the hooks: nothing.
++extern "C" __attribute__((weak)) void* noshape_pool_capture()
++{
++  return nullptr;
++}
++
++extern "C" __attribute__((weak)) void* noshape_pool_enter(void*)
++{
++  return nullptr;
++}
++
++extern "C" __attribute__((weak)) void noshape_pool_leave(void*) {}
++#endif
++
++namespace
++{
++// (The pool's job interface is protected: named through a subclass.)
++struct NoshapePoolAccess : OSD_ThreadPool
++{
++  using Job = OSD_ThreadPool::JobInterface;
++};
++
++// A job run under the launching thread's stop context on every thread.
++class NoshapeJob : public NoshapePoolAccess::Job
++{
++public:
++  NoshapeJob(NoshapePoolAccess::Job& theJob, void* theContext)
++      : myJob(theJob),
++        myContext(theContext)
++  {
++  }
++
++  void Perform(int theThreadIndex) override
++  {
++    void* aPrevious = noshape_pool_enter(myContext);
++    try
++    {
++      myJob.Perform(theThreadIndex);
++    }
++    catch (...)
++    {
++      noshape_pool_leave(aPrevious);
++      throw;
++    }
++    noshape_pool_leave(aPrevious);
++  }
++
++private:
++  NoshapePoolAccess::Job& myJob;
++  void*                   myContext;
++};
++} // namespace
++
+ void OSD_ThreadPool::Launcher::perform(JobInterface& theJob)
+ {
+   std::optional<NoshapePoolDepth> aDepth;
+@@ -218,6 +280,14 @@
+   {
+     aDepth.emplace();
+   }
++  void* aContext = myNbThreads > 1 ? noshape_pool_capture() : nullptr;
++  if (aContext != nullptr)
++  {
++    NoshapeJob aJob(theJob, aContext);
++    run(aJob);
++    wait();
++    return;
++  }
+   run(theJob);
+   wait();
+ }
+--- a/src/ModelingAlgorithms/TKGeomAlgo/IntPolyh/IntPolyh_MaillageAffinage.cxx
++++ b/src/ModelingAlgorithms/TKGeomAlgo/IntPolyh/IntPolyh_MaillageAffinage.cxx
+@@ -44,6 +44,24 @@
+ #include <NCollection_List.hxx>
+ #include <algorithm>
+ #include <NCollection_IndexedDataMap.hxx>
++#include <Standard_Failure.hxx>
++
++// noshape (patch 0010): whether the caller's budget or cancel says stop (noshape's kernel, boolean.cpp; weak
++// default as 0008). The triangle refinements of a face / face intersection ran on for 100s of ms after the user's
++// cancel: checked every 64 triangles.
++extern "C" int noshape_should_break();
++#if defined(__GNUC__)
++extern "C" __attribute__((weak)) int noshape_should_break()
++{
++  return 0;
++}
++#endif
++
++static inline void noshapeCheck(const int theI)
++{
++  if ((theI & 63) == 0 && noshape_should_break() != 0)
++    throw Standard_Failure("noshape: stopped");
++}
+ 
+ typedef NCollection_IndexedDataMap<int, NCollection_List<int>>
+   IntPolyh_IndexedDataMapOfIntegerListOfInteger;
+@@ -236,6 +254,7 @@
+ 
+   for (int i = 0; i < aNbPairs; ++i)
+   {
++    noshapeCheck(i);
+     const IntPolyh_BoxBndTreeSelector::PairIDs& aPair       = aPairs[i];
+     NCollection_List<int>*                      pTriangles2 = theCouples.ChangeSeek(aPair.ID1);
+     if (!pTriangles2)
+@@ -1099,6 +1118,7 @@
+ 
+   for (int i = 0; i < FinTT; i++)
+   {
++    noshapeCheck(i);
+     IntPolyh_Triangle& aTriangle = TTriangles[i];
+     double             Fleche    = aTriangle.ComputeDeflection(aSurface, TPoints);
+     if (Fleche > FlecheMax)
+@@ -1141,6 +1161,7 @@
+   // Analyze interfering triangles
+   for (int i_S1 = 0; i_S1 < FinTT1; i_S1++)
+   {
++    noshapeCheck(i_S1);
+     IntPolyh_Triangle& aTriangle1 = theTriangles1[i_S1];
+     if (!aTriangle1.IsIntersectionPossible())
+     {
+@@ -1254,8 +1275,9 @@
+   //
+   // The deflection of the greater is compared to the size of the smaller
+   NCollection_List<int>::Iterator Iter(aLIT);
+-  for (; Iter.More(); Iter.Next())
++  for (int aCount = 0; Iter.More(); Iter.Next(), ++aCount)
+   {
++    noshapeCheck(aCount);
+     i                            = Iter.Value();
+     IntPolyh_Triangle& aTriangle = theTriangles[i];
+     if (aTriangle.Deflection() > CritereAffinage)

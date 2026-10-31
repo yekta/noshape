@@ -3332,6 +3332,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         let segs = &cx.face_segs[f];
         let mut out = Vec::new();
         for j in js {
+            // (A cancelled run's: what's found so far is dropped with it, par_map / the next phase decline.)
+            if crate::cancelled() {
+                break;
+            }
             if let (Some((li, hi)), Some((lj, hj))) = (boxes[i], boxes[j])
                 && ((li - hj).max_element() > tol || (lj - hi).max_element() > tol)
             {

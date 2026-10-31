@@ -1741,7 +1741,15 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
   {
     IntTools_FaceFace ff;
     ff.SetParameters(true, true, true, 1e-7);
-    ff.Perform(fa, fb);
+    // (Called from Rust: an OCCT exception, a cancelled run's break hook's, must not get out.)
+    try
+    {
+      ff.Perform(fa, fb);
+    }
+    catch (const Standard_Failure&)
+    {
+      return rust::String("OCCT's section failed");
+    }
     if (!ff.IsDone())
       return rust::String("OCCT's section failed");
     for (const IntTools_Curve& ic : ff.Lines())

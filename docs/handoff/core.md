@@ -14,6 +14,26 @@ a Simple Hole cuts such parts through std's booleanBodies (features/hole.rs `cut
 rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studios saved with sheet metal before std
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
+## P1 CANCEL-LATENCY (user 11-01 00:24 local; core 10-31 21:20 UTC on)
+Cancel must free the regeneration's worker within ~100 ms (psui does the UI). The 45° / 45° B94 knurl (a custom
+feature) is the case: T2 `custom_features::knurl_cancel_latency_probe` (NOSHAPE_CANCEL_AT=seconds list; run it on
+vibe2, release, < 16 GB: ~/agents/probe.sh with a private OCCT root ~/agents/occt holding the new libs;
+NOSHAPE_CANCEL_STACKS=1 prints every thread's stack while the run goes on after the abort, a probe hack that can
+deadlock in malloc).
+- cfb21072: the FeatureScript thread runs in the regeneration's cancel scope (`RegenCancel::scope`: the kernel's and
+  brep's flags are per thread; before, a custom feature's Booleans never saw a cancel), the interpreter checks the
+  cancel every 16k steps and in `check_deadline`, brep's par_map / phases / pair loop decline "cancelled" and
+  rust_boolean.cpp stops there instead of running OCCT, the budget timer's cancel grace 1 s → one tick.
+- Round 2 (this commit): OCCT patch 0010: OSD_ThreadPool::Launcher::perform runs each job under the launching
+  thread's stop context (weak hooks `noshape_pool_capture / enter / leave`, defined in boolean.cpp: t_cancel and
+  t_deadline), so the break hooks stop BOP's parallel face / face intersections on the pool's threads; IntPolyh's
+  refinement loops check the hook (every 64 triangles); brep's crossings loop bails out; brep_occt_sections catches
+  OCCT's throw (a "noshape: stopped" through a Rust-called C++ function was std::terminate). Libs:
+  /root/core-scratch/occt0010/libTKernel.a.0010, libTKGeomAlgo.a.0010 (backups occt-lib-backup/*.pre0010), in
+  /root/occt here; vibe2 / vibe3 / CI need them (lead).
+- Latency on vibe2 (release), cancel at 0.7-15 s: before 14-1083 ms; after round 1 14-839; round 2: 13-207 ms with
+  one 886 ms (7 s), most under 120 ms. Left: see below.
+
 ## 10-31 evening (core, moved account from 18:45)
 - 76cd8d31 BLEND-RUST: corners between drafted walls (details under "noshape's own blends"); the corpus's remaining
   declines are all non-elementary corner patches or face-consuming blends: returns flatten there.
@@ -909,6 +929,9 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20�
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- (10-31 23:45) OCCT patch 0010 (CANCEL-LATENCY): please sync /root/occt/lib/libTKernel.a and libTKGeomAlgo.a
+  (also /root/core-scratch/occt0010/*.0010) to vibe2 / vibe3. Weak hook defaults: nothing breaks without them, the
+  cancel is just slower there.
 - 10-31 15:45: OCCT patch 0009 (break hooks): please let the sync carry /root/occt/lib/libTKMath.a, libTKGeomAlgo.a and
   libTKHLR.a to vibe2 / vibe3 (also in /root/core-scratch/occt0009/*.0009). Nothing breaks without them (weak hooks,
   only budget stops jump more there); CI builds them from patches/occt.

@@ -316,6 +316,47 @@ TopoDS_Shape ScaledInputs::unscale(const TopoDS_Shape& r, occ::handle<BRepTools_
   return tr.Shape();
 }
 
+namespace {
+// What a pool job's workers take from the thread that launched it (OCCT patch 0010): its cancel flag and CPU
+// deadline, so the break hooks stop OCCT's parallel face / face intersections of a cancelled Boolean on the
+// pool's threads too.
+struct PoolContext
+{
+  const std::atomic<bool>* cancel;
+  Deadline*                deadline;
+};
+thread_local PoolContext t_pool_context{nullptr, nullptr};
+} // namespace
+
+extern "C" void* noshape_pool_capture()
+{
+  if (t_cancel == nullptr && t_deadline == nullptr)
+    return nullptr;
+  t_pool_context = {t_cancel, t_deadline};
+  return &t_pool_context;
+}
+
+extern "C" void* noshape_pool_enter(void* context)
+{
+  if (context == nullptr)
+    return nullptr;
+  PoolContext* previous = new PoolContext{t_cancel, t_deadline};
+  const PoolContext* c  = static_cast<const PoolContext*>(context);
+  t_cancel              = c->cancel;
+  t_deadline            = c->deadline;
+  return previous;
+}
+
+extern "C" void noshape_pool_leave(void* previous)
+{
+  if (previous == nullptr)
+    return;
+  const PoolContext* p = static_cast<const PoolContext*>(previous);
+  t_cancel             = p->cancel;
+  t_deadline           = p->deadline;
+  delete p;
+}
+
 extern "C" int noshape_should_break()
 {
   Deadline* const d = t_deadline;

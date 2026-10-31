@@ -201,6 +201,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   extrude) lofted corner to corner (an L of 10 + 10 mm, 20 mm, 1 mm: 380 / 420 mm³, 8 faces; was 343 / 330); Flip wall
   off grows to the right of the drawing direction as live 1677 (420 / 2500 at 1 / 5 mm, 380 / 1500 flipped, its boxes);
   straight single lines keep k::thicken (exact, live's side).
+- [ ] P1 CANCEL-LATENCY (user 11-01 00:24, core; psui the UI side) cancelling a long regeneration (the printable
+  knurl at 45° / 45°, which runs long and fails) took seconds to take effect (the spinner went on): cancel must free
+  the worker within ~100 ms. core 10-31 23:30: the custom feature's FeatureScript thread ran outside the
+  regeneration's cancel scope (the kernel's flag is per thread), so neither its interpreter nor its Booleans saw the
+  cancel (cfb21072: scope + the interpreter's check, brep's thread flag in par_map and each phase, rust_boolean.cpp
+  stops instead of falling back to OCCT, the budget timer's cancel grace 1 s → one tick; T1
+  custom_features::a_cancelled_custom_feature_stops_soon_and_the_studio_is_as_before, brep a_cancelled_boolean_
+  declines). Then OCCT's parallel face / face intersections on the pool's threads, which don't have the caller's
+  flag: OCCT patch 0010 (OSD_ThreadPool: each job runs under the launching thread's stop context through weak hooks
+  the kernel defines; IntPolyh's triangle refinement checks the break hook). Measured with T2
+  custom_features::knurl_cancel_latency_probe (release, vibe2; NOSHAPE_CANCEL_STACKS=1 prints what still runs):
+  before 14-1083 ms, now see the handoff. Libs: /root/core-scratch/occt0010/libTKernel.a.0010, libTKGeomAlgo.a.0010.
 - [ ] P0 BLEND-RUST (core, lead 10-30 20:50) noshape's own fillets and chamfers for simple edges, OCCT as fallback
   (crates/brep blend.rs; kernel cpp/rust_blend.cpp in front of op_fillet / op_chamfer behind NOSHAPE_BLEND_RUST, off
   until correct; corpus NOSHAPE_RECORD_BLENDS + kernel `blend_replay`). 10-30 22:00, step 1: closed tangent chains
