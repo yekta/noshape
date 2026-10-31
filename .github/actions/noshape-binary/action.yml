@@ -25,7 +25,7 @@ runs:
         tag="${{ inputs.tag }}"
         [[ -n "$tag" ]] || tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
         echo "BUILD=$tag" >> "$GITHUB_ENV"
-        gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "*-${{ inputs.asset }}" --dir "$RUNNER_TEMP/release"
+        gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "noshape-[0-9]*-${{ inputs.asset }}" --dir "$RUNNER_TEMP/release"
         case "$RUNNER_OS" in
           macOS)
             hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg" "$RUNNER_TEMP"/release/*.dmg

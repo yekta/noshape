@@ -1,36 +1,43 @@
 # noshape agent API: CLI and MCP server
 
-Everything a person does in noshape can be done by a script or an AI agent through `noshape-cli`, which is
-both a command line tool and an MCP (Model Context Protocol) server. Both are generated from one operation
+Everything a person does in noshape can be done by a script or an AI agent through `noshape` (the app binary) or `noshape-cli` (the same without the GUI), each
+is both a command line tool and an MCP (Model Context Protocol) server. Both are generated from one operation
 registry (`crates/ops`), and every operation calls the same model code as the app's UI: the same feature
 parameters, regeneration, sketch tools and document history. An edit made through the API is one undoable
 history entry, described exactly as the UI describes it (`Part Studio 1 :: Insert feature : Extrude 1`).
 
 ## Quick start
 
-`noshape-cli` ships in every release bundle next to the app (macOS: inside the app and loose in the dmg;
-Linux tarball and Windows zip: next to `noshape` / `noshape.exe`). To build it yourself:
-`OCCT_ROOT=/path/to/occt cargo build --release -p noshape-cli` (no GUI dependencies).
+The app binary is the CLI and the MCP server: `noshape <command>` and `noshape mcp` run without opening a window.
+Installing the app puts `noshape` on PATH (macOS: the first-launch prompt or Help › Install command line tool…;
+Windows: the installer; Linux: `./install.sh` or the .deb) and connects it to the coding agents found, with the
+user's OK (README "Installing"). `noshape-cli` is the same front end without the GUI, for servers (its own download,
+`noshape-cli-<version>-<platform>`); to build it: `OCCT_ROOT=/path/to/occt cargo build --release -p noshape-cli`.
+Everything below works the same with `noshape-cli` in place of `noshape`.
 
-### Claude Code
+### Claude Code, Codex, Claude Desktop
 
 ```sh
-# macOS (noshape.app in Applications)
-claude mcp add noshape -- /Applications/noshape.app/Contents/MacOS/noshape-cli mcp
-# Linux (the tarball unpacked to ~/noshape-<version>-linux-x86_64)
-claude mcp add noshape -- ~/noshape-<version>-linux-x86_64/noshape-cli mcp
-# Windows (the zip unpacked to C:\noshape-<version>-windows-x86_64)
-claude mcp add noshape -- C:\noshape-<version>-windows-x86_64\noshape-cli.exe mcp
+noshape agents connect                         # every agent found: Claude Code, Codex CLI, Claude Desktop
+noshape agents status                          # what is installed and connected
 ```
 
-On macOS the downloaded app and CLI are ad-hoc signed, not notarized: clear the download flag once with
-`xattr -dr com.apple.quarantine /Applications/noshape.app` (and `xattr -d com.apple.quarantine <path>` for a
-loose `noshape-cli` copied from the dmg), else macOS refuses to run them.
+or by hand (any platform, `noshape` on PATH):
 
-or in a project's `.mcp.json` (any MCP client takes the same entry):
+```sh
+claude mcp add noshape -- noshape mcp          # --scope user: in every project
+codex mcp add noshape -- noshape mcp
+```
+
+Without an install (the Windows zip or the Linux tarball unpacked anywhere), the full path:
+`claude mcp add noshape -- ~/noshape-<version>-linux-x86_64/noshape mcp`,
+`claude mcp add noshape -- C:\noshape-<version>-windows-x86_64\noshape.exe mcp`. On macOS the downloaded app is
+ad-hoc signed, not notarized: clear the download flag once with `xattr -dr com.apple.quarantine /Applications/noshape.app`.
+
+In a project's `.mcp.json`, Claude Desktop's `claude_desktop_config.json` or any MCP client's configuration:
 
 ```json
-{ "mcpServers": { "noshape": { "command": "/path/to/noshape-cli", "args": ["mcp"] } } }
+{ "mcpServers": { "noshape": { "command": "noshape", "args": ["mcp"] } } }
 ```
 
 Then ask for a part: *"Use noshape to model a 60 x 40 x 6 mm plate with four Ø5 corner holes in
@@ -41,27 +48,27 @@ The server's tool list is abridged so it fits an agent's context (about 35k char
 instructions, instead of 340k): the ~45 common tools (`crates/cli/src/core_tools.rs`) with short descriptions
 and their main fields. Nothing is lost: those tools accept every field, `ops_list` lists every tool by
 group, `ops_describe` returns any tool's full description, examples and schema, and `ops_call` runs any tool.
-`noshape-cli mcp --all-tools` lists every tool in full (for clients that defer tool loading); the CLI's
+`noshape mcp --all-tools` lists every tool in full (for clients that defer tool loading); the CLI's
 `--help` is always complete.
 
 ### Command line
 
 ```sh
-noshape-cli document create --path /tmp/plate.noshape
-noshape-cli sketch create --doc /tmp/plate.noshape --plane plane:top
-noshape-cli sketch draw --doc /tmp/plate.noshape --sketch "Sketch 1" --tool corner_rectangle --points '[[-30,-20],[30,20]]'
-noshape-cli sketch get --doc /tmp/plate.noshape --sketch "Sketch 1"          # regions: [{"id": "region:…"}]
-noshape-cli feature add --doc /tmp/plate.noshape --type extrude --params '{"entities":["region:…"],"depth":"6 mm"}'
-noshape-cli export parts --doc /tmp/plate.noshape --format STEP --file /tmp/plate.step
-noshape-cli render image --doc /tmp/plate.noshape --view isometric --file /tmp/plate.png
+noshape document create --path /tmp/plate.noshape
+noshape sketch create --doc /tmp/plate.noshape --plane plane:top
+noshape sketch draw --doc /tmp/plate.noshape --sketch "Sketch 1" --tool corner_rectangle --points '[[-30,-20],[30,20]]'
+noshape sketch get --doc /tmp/plate.noshape --sketch "Sketch 1"          # regions: [{"id": "region:…"}]
+noshape feature add --doc /tmp/plate.noshape --type extrude --params '{"entities":["region:…"],"depth":"6 mm"}'
+noshape export parts --doc /tmp/plate.noshape --format STEP --file /tmp/plate.step
+noshape render image --doc /tmp/plate.noshape --view isometric --file /tmp/plate.png
 ```
 
 - Every command prints JSON. Failures print `{"error", "message", "param"}` and exit with status 2.
 - Field values are JSON when they parse (numbers, arrays, objects, booleans) and strings otherwise;
   `--json '{...}'` passes all arguments at once.
-- `noshape-cli call <tool> '<json>'` runs an operation by its MCP tool name.
-- `noshape-cli batch file.jsonl` runs `{"tool": ..., "args": {...}}` lines in one session.
-- `noshape-cli tools` prints the MCP tool list with schemas; `noshape-cli <group> <verb> --help` documents one.
+- `noshape call <tool> '<json>'` runs an operation by its MCP tool name.
+- `noshape batch file.jsonl` runs `{"tool": ..., "args": {...}}` lines in one session.
+- `noshape tools` prints the MCP tool list with schemas; `noshape <group> <verb> --help` documents one.
 
 ### Lessons from agent runs
 
@@ -172,7 +179,7 @@ This sequence is the end-to-end test `crates/ops/tests/e2e.rs`, which also build
 ## Operations
 
 Every operation is listed with its fields in the [reference](#reference) at the end of this document, generated
-from the registry (`noshape-cli docs`; `noshape-cli tools` gives the same as MCP JSON schemas). The groups:
+from the registry (`noshape docs`; `noshape tools` gives the same as MCP JSON schemas). The groups:
 document, tab, feature, sketch, variable, config, part, assembly, drawing, query, analysis, render, export,
 import, history.
 
