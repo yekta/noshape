@@ -266,6 +266,9 @@ button is a styled div now).
 the "OsDropdown" context, so it wins over a window's Enter): the documents page's Create after Esc, as live.
 10-31 16:41: landed badf80bd. dk-990: after Save theme the view cube (faces, frames, X/Y/Z letters) follows at once
 (viewport observes GraphicsGlobal). Dark-mode sheet: every row checked.
+10-31 16:58: landed 3c365d12 (Hole level names #999 in dark). Dark sheet now lists dk-971…9a1 (Part Studio captures
+not in it before); checked dk-974, 977, 978, 979, 980, 981; open: 971–973 (sheet metal), 975, 976, 982, tab manager,
+panels 992–999, history.
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC

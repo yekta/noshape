@@ -60,9 +60,9 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-976-ctx-sketch-line |  |  | ☐ |
 | dk-977-dialog-hole | psui-scratch h2 | dialog, tabs, query boxes, selects, value rows = live; the hole table's level names (Hole type, Drill size…) stay #999 in dark as live (they were #d7d7d7) | ☑ psui 10-31 |
 | dk-978-dialog-fillet | psui-scratch o978 | dialog, tabs, query box, selects, value row, checkboxes, slider = live (222 px wide with a fresh config; darkcfg holds a widened dialog) | ☑ psui 10-31 |
-| dk-979-dialog-linear-pattern |  |  | ☐ |
-| dk-980-dialog-mirror |  |  | ☐ |
-| dk-981-dialog-sweep |  |  | ☐ |
+| dk-979-dialog-linear-pattern | psui-scratch cdlg | title red, ✓ / ✕, type select, New / Add / Remove / Intersect, active query #142434 + #3e94ff, other fields, rows, slider and ? = live | ☑ psui 10-31 |
+| dk-980-dialog-mirror | psui-scratch cdlg | title red, ✓ / ✕, type select, New / Add / Remove / Intersect, active query #142434 + #3e94ff, other fields, rows, slider and ? = live | ☑ psui 10-31 |
+| dk-981-dialog-sweep | psui-scratch cdlg | title red, ✓ / ✕, type select, New / Add / Remove / Intersect, active query #142434 + #3e94ff, other fields, rows, slider and ? = live | ☑ psui 10-31 |
 | dk-982-dialog-sm-flange |  |  | ☐ |
 | dk-989-tab-manager-open / dk-990-tab-manager-detailed / dk-991-tab-manager-sort-open |  |  | ☐ |
 | dk-992-panel-variable-table |  |  | ☐ |
