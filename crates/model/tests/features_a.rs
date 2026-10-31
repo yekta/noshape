@@ -1895,6 +1895,30 @@ fn remove_that_misses_the_part_reports_the_info() {
     }
 }
 
+/// qa5 boolean set (workflow-booleans "Extrude Remove, Merge with all"): a
+/// Remove going down from Top, under a block and a cylinder whose bottom
+/// circle the tool's sides touch tangentially, misses everything: live's info
+/// "Selected tools and targets do not intersect.", and the cylinder keeps its
+/// edges (the touching tool doesn't split its rim).
+#[test]
+fn remove_touching_a_part_tangentially_reports_the_miss() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), circle(DVec2::new(0.04, 0.01), 0.005));
+    let r = t.regions(s)[0].clone();
+    let cyl = t.extrude(r, "20 mm", "NEW");
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.03, 0.005, 0.07, 0.015));
+    let r = t.regions(s)[0].clone();
+    let x = t.extrude(r, "10 mm", "REMOVE");
+    t.set(x, "defaultScope", b(true));
+    t.set(x, "oppositeDirection", b(true));
+    let res = t.regen();
+    let st = res.display.features.iter().find(|f| f.id == x).unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Info, Some("Selected tools and targets do not intersect.")));
+    let c = res.context.bodies.iter().find(|b| b.id.feature == cyl).unwrap();
+    assert_eq!((c.shape.count(noshape_kernel::ShapeType::Face), c.shape.count(noshape_kernel::ShapeType::Edge)), (3, 3));
+}
+
 /// Live "psb (10-26 c)": surface lofts along guides. Arcs in x = 0 and
 /// x = 30; the guide a 40 long block edge (LG1/LG2: Trim guides on stops at
 /// the profiles, off runs on to x = 40), a 50 long sheet edge (LG4) or an

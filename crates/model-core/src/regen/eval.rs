@@ -844,19 +844,18 @@ impl<'a> EvalCtx<'a> {
                 // and box, then the same volume (measured only then: comparing
                 // volumes for every boolean measured each body twice per
                 // feature, REGEN-SPEED).
-                let before: Vec<(BodyId, Shape)> = if kind == BodyKind::Solid && op != "INTERSECT" {
-                    targets.iter().map(|&i| (self.ctx.bodies[i].id.clone(), self.ctx.bodies[i].shape.clone())).collect()
-                } else {
-                    Vec::new()
-                };
+                let before: Vec<Arc<Body>> = if kind == BodyKind::Solid && op != "INTERSECT" { targets.iter().map(|&i| self.ctx.bodies[i].clone()).collect() } else { Vec::new() };
                 self.boolean_into_with(&targets, tools, bop, &opts)?;
                 // Every part in the merge scope as it was: Onshape's infos
                 // (live oracle_p1 E9/E11/E12: a tool inside the part or apart
                 // from it, the latter kept as its own part; E13: a cut that
                 // misses).
+                // Faces, box and volume: a tool that only touches a part can
+                // split its edges where they meet (a cylinder tangent to the
+                // tool's sides) without changing it; live reports that as a
+                // miss too.
                 let same = |a: &Shape, b: &Shape| -> bool {
-                    let counts = |s: &Shape| [ShapeType::Face, ShapeType::Edge, ShapeType::Vertex].map(|k| s.count(k));
-                    if counts(a) != counts(b) {
+                    if a.count(ShapeType::Face) != b.count(ShapeType::Face) {
                         return false;
                     }
                     let (Ok(ba), Ok(bb)) = (a.bounding_box(false), b.bounding_box(false)) else { return false };
@@ -869,7 +868,15 @@ impl<'a> EvalCtx<'a> {
                         _ => false,
                     }
                 };
-                let unchanged = !before.is_empty() && before.iter().all(|(id, old)| self.ctx.bodies.iter().find(|b| &b.id == id).is_some_and(|b| same(old, &b.shape)));
+                let mut unchanged = !before.is_empty();
+                for old in &before {
+                    match self.ctx.bodies.iter().position(|b| b.id == old.id) {
+                        // The part as it was, without the touching tool's
+                        // imprint.
+                        Some(i) if same(&old.shape, &self.ctx.bodies[i].shape) => self.ctx.bodies[i] = old.clone(),
+                        _ => unchanged = false,
+                    }
+                }
                 if unchanged {
                     self.infos.push(if op == "ADD" { NO_GEOMETRY_CHANGE } else { TOOLS_MISS_TARGETS }.into());
                 }
