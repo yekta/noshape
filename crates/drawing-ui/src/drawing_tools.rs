@@ -30,6 +30,7 @@ impl DrawingEditor {
         }
         self.woken_centers.clear();
         self.woken_points.clear();
+        self.woken_plus.clear();
         self.datum_on = None;
         self.datum_at = None;
         self.sketch_dim_pick = None;
@@ -467,6 +468,31 @@ impl DrawingEditor {
             && !self.woken_centers.contains(&(view, center))
         {
             self.woken_centers.push((view, center));
+        }
+        // Approaching a straight edge (live request 1662 (b)): "+" marks at
+        // its near end and its midpoint, kept while the tool is active.
+        if matches!(self.tool, Tool::Dimension { .. })
+            && let Some((view, me)) = self.hovered_edge()
+            && let views::EdgeGeom::Line { a, b } = me.geom
+            && let Some(pl) = self.placement(view)
+        {
+            let (sa, sb) = (pl.to_sheet(a), pl.to_sheet(b));
+            let near = if (sa[0] - c[0]).hypot(sa[1] - c[1]) <= (sb[0] - c[0]).hypot(sb[1] - c[1]) { sa } else { sb };
+            for p in [near, [(sa[0] + sb[0]) / 2.0, (sa[1] + sb[1]) / 2.0]] {
+                if !self.woken_plus.iter().any(|w| (w[0] - p[0]).abs() < 1e-9 && (w[1] - p[1]).abs() < 1e-9) {
+                    self.woken_plus.push(p);
+                }
+            }
+        }
+        if matches!(self.tool, Tool::Dimension { .. }) {
+            // Orange, about 11 px tall, a red centre (live 1662 (b)).
+            const ORANGE: [u8; 4] = [255, 130, 63, 255];
+            let h = self.tol_mm(5.5);
+            for p in &self.woken_plus {
+                overlay.tinted.push((vec![[p[0] - h * 0.7, p[1]], [p[0] + h * 0.7, p[1]]], ORANGE, 2.0));
+                overlay.tinted.push((vec![[p[0], p[1] - h], [p[0], p[1] + h]], ORANGE, 2.0));
+                overlay.tinted.push((vec![[p[0] - h * 0.1, p[1]], [p[0] + h * 0.1, p[1]]], [255, 0, 0, 255], 2.0));
+            }
         }
         // Sketch tools: hovering an endpoint wakes it (SK8).
         if matches!(self.tool, Tool::Sketch { .. })
@@ -1336,10 +1362,10 @@ impl DrawingEditor {
     /// and circle centers (help D23: lines near other entities), shown as
     /// red dashed lines.
     /// The Note tool with its "NOTE" preview at the pointer (no leader
-    /// pending, no note being typed): it infers placement too (live request
-    /// 1662).
+    /// pending, no note being typed), and Insert image's corners: they infer
+    /// placement too (live request 1662; EX17).
     fn placing_note(&self) -> bool {
-        matches!(self.tool, Tool::Note) && self.note_leader.is_none() && !matches!(self.panel, Some(Panel::Note { .. }))
+        (matches!(self.tool, Tool::Note) && self.note_leader.is_none() && !matches!(self.panel, Some(Panel::Note { .. }))) || matches!(self.tool, Tool::PlaceImage { .. })
     }
 
     pub fn infer_placement(&mut self, skip: Option<u64>) {

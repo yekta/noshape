@@ -344,6 +344,10 @@ pub struct DrawingEditor {
     /// Dimension tool: circle centers woken by hovering their edges (view,
     /// view point); shown until the tool changes (help drawing_dimensions).
     pub woken_centers: Vec<(ViewId, [f64; 2])>,
+    /// Dimension tool: the "+" marks at straight edges' near ends and
+    /// midpoints, woken by approaching the edge and kept while the tool is
+    /// active (live request 1662 (b); sheet mm).
+    pub woken_plus: Vec<[f64; 2]>,
     /// Sketch tools: endpoints hovered so far (SK8: the cursor aligns with
     /// them along red dotted inference lines).
     pub woken_points: Vec<[f64; 2]>,
@@ -601,6 +605,7 @@ impl DrawingEditor {
             gdt_dlg: None,
             custom_tables: Default::default(),
             woken_centers: Vec::new(),
+            woken_plus: Vec::new(),
             woken_points: Vec::new(),
             datum_on: None,
             datum_at: None,

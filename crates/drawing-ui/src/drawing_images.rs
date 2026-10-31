@@ -57,6 +57,11 @@ impl DrawingEditor {
     /// Mouse down while placing: the first click sets a corner, the second
     /// the opposite one (live request 1613: two clicks). True when used.
     pub fn image_mouse_down(&mut self, cx: &mut Context<Self>) -> bool {
+        // The corners take the placement inference (EX17).
+        if matches!(self.tool, Tool::PlaceImage { .. }) {
+            self.infer_placement(None);
+            self.infer_lines.clear();
+        }
         match &mut self.tool {
             Tool::PlaceImage { start: start @ None, .. } => {
                 *start = Some(self.cursor);
