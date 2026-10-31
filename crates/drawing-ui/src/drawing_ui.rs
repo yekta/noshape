@@ -66,6 +66,10 @@ impl DrawingEditor {
             return self.render_note_panel(cx);
         }
         let pal = p();
+        // Broken-out section before its profile closes (live 12604).
+        if self.panel.is_none() && matches!(self.tool, Tool::BrokenOut { done: false, .. }) {
+            return Some(self.render_broken_out_start(cx));
+        }
         let panel = self.panel.as_ref()?;
         // Live's feature-style dialogs confirm with ✓ ✕ in the title row
         // (Broken-out section, live 6132 / 12604), the rest with OK / Cancel.

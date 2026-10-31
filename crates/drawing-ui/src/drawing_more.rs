@@ -11,7 +11,7 @@ use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::Input;
 use crate::os_ui::OsDropdownExt as _;
-use gpui_kit::component::{Sizable as _, h_flex};
+use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::drawing::views;
@@ -527,6 +527,62 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// Broken-out section's profile rows (live 12604): the profile tool
+    /// (Spline; Spline point in its list) and the closed profile box,
+    /// "Create closed profile" (active) until it closes, then the "Profile"
+    /// chip.
+    fn broken_out_profile_rows(&self, closed: bool) -> Vec<AnyElement> {
+        let pal = p();
+        let tool = Button::new("dr-bo-spline").label("Spline").xsmall().outline().dropdown_caret(true);
+        let field = div()
+            .h(px(24.))
+            .px(px(6.))
+            .flex()
+            .items_center()
+            .gap_1()
+            .text_xs()
+            .border_1()
+            .border_color(if closed { gpui_kit::rgb(0xd3d7d9) } else { pal.accent })
+            .when(!closed, |d| d.bg(gpui_kit::rgb(0xdbf1fa)).child("Create closed profile"))
+            .when(closed, |d| d.child(div().text_color(pal.text_faint).child("Edit closed profile")).child(div().px(px(4.)).bg(gpui_kit::rgb(0xe4e4e4)).child("Profile")));
+        vec![tool.into_any_element(), field.into_any_element()]
+    }
+
+    /// Broken-out section before its profile closes (live 12604: the panel
+    /// is up from the start, ✓ greyed, Blind with its 25 mm depth).
+    pub fn render_broken_out_start(&self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let u = format::length_units(&self.drawing, &DimFormat::default());
+        let depth = format::format_number(noshape_scene::drawing_tools::broken_out_blind_default(u) / u.meters(), None, 3);
+        v_flex()
+            .id("dr-bo-start")
+            .absolute()
+            .top(px(DIALOG_TOP))
+            .left(px(self.dialog_left()))
+            .p_3()
+            .gap_2()
+            .bg(pal.panel_raised)
+            .border_1()
+            .border_color(pal.border_strong)
+            .rounded_md()
+            .shadow_md()
+            .text_sm()
+            .text_color(pal.text)
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .child(
+                h_flex()
+                    .gap_1()
+                    .child(div().flex_1().font_weight(FontWeight::SEMIBOLD).child("Broken-out section"))
+                    .child(div().w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).opacity(0.3).child(crate::ui::glyph("check", 16., gpui_kit::white())))
+                    .child(div().id("dr-bo-start-x").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_tool(Tool::Select, cx)))),
+            )
+            .children(self.broken_out_profile_rows(false))
+            .child(h_flex().gap_1().child(Button::new("dr-bo-start-upto").label("Up to entity").xsmall().outline()).child(Button::new("dr-bo-start-blind").label("Blind").xsmall().primary()))
+            .child(Self::label_row("Depth", h_flex().gap_2().child(div().text_xs().child(depth)).child(div().text_xs().text_color(pal.text_faint).child(u.symbol())).into_any_element()))
+            .into_any_element()
+    }
+
     pub fn more_panel_rows(&mut self, cx: &mut Context<Self>) -> Option<(&'static str, Vec<AnyElement>)> {
         let ed = cx.entity();
         let pal = p();
@@ -548,7 +604,8 @@ impl DrawingEditor {
                         cx.notify();
                     }))
                 };
-                let mut rows = vec![h_flex().gap_1().child(mode("dr-bo-upto", "Up to entity", true, cx)).child(mode("dr-bo-blind", "Blind", false, cx)).into_any_element()];
+                let mut rows = self.broken_out_profile_rows(true);
+                rows.push(h_flex().gap_1().child(mode("dr-bo-upto", "Up to entity", true, cx)).child(mode("dr-bo-blind", "Blind", false, cx)).into_any_element());
                 if up {
                     let what = if depth_ref.is_some() { "1 entity" } else { "Select a vertex" };
                     rows.push(Self::label_row("Depth of section cut", div().text_xs().text_color(if depth_ref.is_some() { pal.text } else { pal.text_faint }).child(what).into_any_element()));
