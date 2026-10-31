@@ -2,7 +2,7 @@
 // blend's result back as shapes, and the history OCCT's fillet builder gives (BRepTools_History of
 // BRepFilletAPI_MakeFillet / MakeChamfer: the faces it trims Modified, each blended edge Generated its blend
 // face, the edges it shortens Modified; every other edge and vertex of the input reported deleted). op_fillet and
-// op_chamfer try it first (NOSHAPE_BLEND_RUST=0: they don't); it declines anything it doesn't build exactly, and OCCT's
+// op_chamfer try it first with NOSHAPE_BLEND_RUST=1 (off by default again: BLEND-RUST-DEFAULT-REGEN); it declines anything it doesn't build exactly, and OCCT's
 // blend runs.
 
 #include "internal.hpp"
