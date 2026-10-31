@@ -22,6 +22,11 @@ pub struct AlignedDlg {
     pub flip: bool,
     /// Edit aligned section...: the view edited (the tool stays Select).
     pub edit: Option<ViewId>,
+    /// Editing: its center and the two legs' points (parent view
+    /// coordinates), and which of them a click on the parent re-picks (a
+    /// query row clicked).
+    pub points: Option<([f64; 2], [f64; 2], [f64; 2])>,
+    pub repick: Option<usize>,
 }
 
 impl DrawingEditor {
@@ -30,12 +35,12 @@ impl DrawingEditor {
     pub fn sync_aligned_dlg(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(view) = self.aligned_edit_request.take()
             && let Some(v) = self.current_sheet().view(view)
-            && let ViewKind::AlignedSection { label, .. } = &v.kind
+            && let ViewKind::AlignedSection { label, center, a, b, .. } = &v.kind
         {
-            let (label, cut_only, flip) = (label.clone(), v.cut_only, v.flip);
+            let (label, cut_only, flip, points) = (label.clone(), v.cut_only, v.flip, (*center, *a, *b));
             let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(label));
             self.tool = Tool::Select;
-            self.aligned_dlg = Some(AlignedDlg { label: st, cut_only, flip, edit: Some(view) });
+            self.aligned_dlg = Some(AlignedDlg { label: st, cut_only, flip, edit: Some(view), points: Some(points), repick: None });
             return;
         }
         let active = matches!(self.tool, Tool::AlignedSection { .. });
@@ -44,11 +49,41 @@ impl DrawingEditor {
             (None, true) => {
                 let next = self.current_sheet().next_label();
                 let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(next));
-                self.aligned_dlg = Some(AlignedDlg { label: st, cut_only: false, flip: false, edit: None });
+                self.aligned_dlg = Some(AlignedDlg { label: st, cut_only: false, flip: false, edit: None, points: None, repick: None });
             }
             (Some(_), false) if !editing => self.aligned_dlg = None,
             _ => {}
         }
+    }
+
+    /// Editing, a query row clicked: the next click on the parent view
+    /// re-picks that point (the legs run on past the part as when placed).
+    /// True when used.
+    pub fn aligned_repick_click(&mut self, cx: &mut Context<Self>) -> bool {
+        let Some(d) = &self.aligned_dlg else { return false };
+        let (Some(k), Some(view), Some((c, a, b))) = (d.repick, d.edit, d.points) else { return false };
+        let Some(parent) = self.current_sheet().parent_of(view) else { return false };
+        let Some(pp) = self.view_point(Some(parent)) else { return true };
+        let far = |p: [f64; 2], q: [f64; 2]| (p[0] - q[0]).hypot(p[1] - q[1]) > 1e-7;
+        let leg = |this: &Self, p: [f64; 2]| this.pk().extend_line_ends(parent, &[p, c])[0];
+        let points = match k {
+            0 => (pp.p, a, b),
+            1 if far(pp.p, c) => (c, leg(self, pp.p), b),
+            2 if far(pp.p, c) => (c, a, leg(self, pp.p)),
+            _ => return true,
+        };
+        if let Some(d) = &mut self.aligned_dlg {
+            d.points = Some(points);
+            d.repick = None;
+        }
+        // The edited view as it will be.
+        let mut dr = self.drawing.clone();
+        if let Some(ViewKind::AlignedSection { center, a, b, .. }) = dr.sheets[self.sheet].view_mut(view).map(|v| &mut v.kind) {
+            (*center, *a, *b) = points;
+        }
+        self.set_preview(Some(dr), cx);
+        cx.notify();
+        true
     }
 
     /// Edit aligned section... (the cutting line's and the view's menus).
@@ -68,8 +103,13 @@ impl DrawingEditor {
     fn aligned_ok(&mut self, cx: &mut Context<Self>) {
         let Some((label, cut_only, flip)) = self.aligned_values(cx) else { return };
         if let Some(view) = self.aligned_dlg.as_ref().and_then(|d| d.edit) {
+            let points = self.aligned_dlg.as_ref().and_then(|d| d.points);
             self.aligned_dlg = None;
+            self.set_preview(None, cx);
             self.edit_view("Edit aligned section", view, cx, |v| {
+                if let (ViewKind::AlignedSection { center, a, b, .. }, Some(p)) = (&mut v.kind, points) {
+                    (*center, *a, *b) = p;
+                }
                 if let ViewKind::AlignedSection { label: l, .. } = &mut v.kind
                     && !label.is_empty()
                 {
@@ -120,10 +160,20 @@ impl DrawingEditor {
         let caption = gpui_kit::rgb(0x616b73);
         // A query row: its caption, then "Point ×" once picked; the next one
         // to pick is active (blue underline), later ones disabled.
-        let query = |id: &'static str, title: &'static str, k: usize| {
-            let (done, active) = (picked > k, picked == k && !editing);
+        let repick = d.repick;
+        let query = |id: &'static str, title: &'static str, k: usize, cx: &mut Context<Self>| {
+            // Editing: a click re-picks the point (the row turns active).
+            let (done, active) = (picked > k, if editing { repick == Some(k) } else { picked == k });
             v_flex()
                 .id(id)
+                .when(editing, |e| {
+                    e.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if let Some(d) = &mut this.aligned_dlg {
+                            d.repick = Some(k);
+                        }
+                        cx.notify();
+                    }))
+                })
                 .mt(px(4.))
                 .px(px(4.))
                 .pb(px(3.))
@@ -188,10 +238,10 @@ impl DrawingEditor {
                     v_flex()
                         .p(px(3.))
                         .child(div().mt(px(1.)).h(px(25.)).flex().items_end().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()))
-                        .child(query("da-center", "Center", 0))
+                        .child(query("da-center", "Center", 0, cx))
                         .child(
                             h_flex()
-                                .child(div().flex_1().child(query("da-viewing", "Viewing plane location", 1)))
+                                .child(div().flex_1().child(query("da-viewing", "Viewing plane location", 1, cx)))
                                 // Flip: the view looks the other way (help
                                 // aligned_section_view).
                                 .child(
@@ -217,7 +267,7 @@ impl DrawingEditor {
                                         })),
                                 ),
                         )
-                        .child(query("da-revolved", "Revolved plane location", 2))
+                        .child(query("da-revolved", "Revolved plane location", 2, cx))
                         .child(
                             div().h(px(30.)).px(px(4.)).flex().items_center().child(
                                 crate::drawing_chrome::DrCheckbox::new("da-cut-only").native().label("Show cut geometry only").checked(check_on).on_click(cx.listener(|this, v: &bool, _, cx| {

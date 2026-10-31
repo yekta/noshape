@@ -1046,6 +1046,9 @@ impl DrawingEditor {
         if e.button == MouseButton::Left && self.align_views.is_some() && self.align_views_click(cx) {
             return;
         }
+        if e.button == MouseButton::Left && self.aligned_dlg.as_ref().is_some_and(|d| d.repick.is_some()) && self.aligned_repick_click(cx) {
+            return;
+        }
         if e.button == MouseButton::Left && e.click_count >= 2 && matches!(self.tool, Tool::Select) {
             self.double_click(e.click_count >= 3, window, cx);
             return;
