@@ -5,7 +5,6 @@
 #                                                          pushing the branch runs CI (T1 on Linux, macOS, Windows).
 #   cut-release.sh tag <version>                           after that CI run passed: tag v<version> on the branch head;
 #                                                          release.yml builds the bundles and publishes the release.
-# Twice a day (user, 10-31): 05:00 and 17:00 UTC, each from the newest commit that passed the 3-platform CI.
 #   cut-release.sh now <version> <sha>                     <sha> already passed the scheduled 3-platform CI (a last-green):
 #                                                          branch + tag at once (the version bump can't break tests).
 # Release notes first, always: /root/lead-scratch/notes/v<version>.md, a short list a user understands (Faster / Fixed /
@@ -40,8 +39,21 @@ tag)
   V=$2; git checkout -q --detach origin/release/v$V
   git tag -f v$V; git push -q origin v$V
   echo "tagged v$V at $(git rev-parse --short HEAD); release.yml publishes"
-  # main stays at version 0.0.0-dev (10-31): the release workflow stamps the tag's version (NOSHAPE_VERSION), dev and
-  # green builds show 0.0.0-dev.<sha>, and no version commit lands on main (it made every agent rebuild every crate).
+  # main's own version follows the releases, so green / CI builds don't report an old one (qa VERSION-FOOTER-STALE, 10-29).
+  # Version fields only: safe to push without land.sh (the watcher still tests it).
+  git fetch -q origin; git checkout -q --detach origin/main
+  old=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+  if [ "$old" != "$V" ]; then
+    sed -i "0,/^version = \"$old\"/s//version = \"$V\"/" Cargo.toml
+    python3 - "$old" "$V" <<'P'
+import re,sys
+old,new=sys.argv[1],sys.argv[2]; p='Cargo.lock'; s=open(p).read()
+s=re.sub(r'(name = "noshape[^"]*"\nversion = )"'+re.escape(old)+'"', r'\1"'+new+'"', s)
+open(p,'w').write(s)
+P
+    git add Cargo.toml Cargo.lock && $G commit -q -m "lead: main's version follows the release: $old -> $V" && git push -q origin HEAD:main \
+      && echo "main's version $old -> $V" || echo "main's version bump failed: do it by hand"
+  fi
   git checkout -q --detach origin/main;;
 now)
   "$0" branch "$2" "$3" && "$0" tag "$2";;
