@@ -22,14 +22,18 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
     let from = |h: usize| segs[h / 2].0[h % 2] as usize;
     let to = |h: usize| segs[h / 2].0[1 - h % 2] as usize;
     let curve = |h: usize| if h.is_multiple_of(2) { segs[h / 2].1.clone() } else { segs[h / 2].1.reversed() };
-    // Half-edges leaving each point, counter-clockwise by direction, then by how much they turn left.
+    // Half-edges leaving each point, counter-clockwise by direction, then by how much they turn left (each one's
+    // on all threads).
     let mut out: Vec<Vec<(f64, f64, usize)>> = vec![Vec::new(); pts.len()];
-    for h in 0..n_h {
+    let leaving = crate::boolean::par_map(n_h, &|h| {
         let c = curve(h);
         let d = c.tangent(0.0);
         // -π is π (one direction).
         let a = d.y.atan2(d.x);
-        out[from(h)].push((if a < 1e-9 - PI { a + TAU } else { a }, c.curvature(), h));
+        (if a < 1e-9 - PI { a + TAU } else { a }, c.curvature())
+    });
+    for (h, (a, k)) in leaving.into_iter().enumerate() {
+        out[from(h)].push((a, k, h));
     }
     let mut pos = vec![0usize; n_h];
     for list in &mut out {
@@ -78,7 +82,7 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         cycles.push(cyc);
     }
     let curves_of = |c: &[usize]| -> Vec<C2> { c.iter().map(|&h| curve(h)).collect() };
-    let areas: Vec<f64> = cycles.iter().map(|c| c.iter().map(|&h| curve(h).area_term()).sum()).collect();
+    let areas: Vec<f64> = crate::boolean::par_map(cycles.len(), &|i| cycles[i].iter().map(|&h| curve(h).area_term()).sum());
     // Connected components (a hole is never inside a cycle of its own component).
     let mut comp: Vec<usize> = (0..pts.len()).collect();
     fn find(c: &mut [usize], mut i: usize) -> usize {
@@ -102,7 +106,7 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
             regions.push(Region { outer: loop_of(c), holes: Vec::new(), inside: DVec2::ZERO, dangling: false });
         }
     }
-    let cycle_curves: Vec<Vec<C2>> = cycles.iter().map(|c| curves_of(c)).collect();
+    let cycle_curves: Vec<Vec<C2>> = crate::boolean::par_map(cycles.len(), &|i| curves_of(&cycles[i]));
     // Each cycle's box (its curves' control points'; None where one has none): a point outside isn't inside.
     let cycle_box: Vec<Option<(DVec2, DVec2)>> = cycle_curves
         .iter()

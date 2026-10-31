@@ -907,6 +907,35 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   threads). Next: one period's classification for the rest (the arrangement the same under the pattern's rotation),
   then the same for the sections' places and the faces' pieces.
 
+## Patterned tools, step 5 (10-31 UTC): one period's work for the rest
+- Where the whole arrangement is the same under a rotation (`Ctx::symmetry`: the largest family of copies'
+  motions are rotations about one axis by whole steps of a turn; every member of every family taken onto another
+  member by each power, checked with the copy tolerance; every other argument kept: its faces' planes or cylinders
+  kept, its edges whole circles about the axis or seams), found from geometry alone:
+  - Classification: only the pieces whose point lies in the first period (by angle about the axis) are cast rays;
+    any other piece takes the states of the piece its point turns back into (on the face its face turns back to;
+    the same loop lengths, its vertices' middle where this one's turns back to, within 10 tol), the solids mapped
+    the same way. A piece's state against a solid is a property of a point and that solid, and every point inside
+    a piece has the same states. Not found: rays as before.
+  - Places of sections' parts and of edges on faces: a part of a section moved from the same OCCT section (the
+    curve records the id it is moved from) as one in the first period, on the faces those turn into, with the same
+    range, or an edge on a face that is the turned image of one in the first period with the same parts, takes
+    that one's intervals: the parameters as they are, its points turned, its vertices the face's (or edge's) at the
+    turned place. Anything not matched, or whose turned ends don't fall on vertices there, is found as before.
+- Also: a 3D B-spline's nearest point skips samples on spans whose box is farther than the nearest yet (the same
+  sample, the first of equals); an edge's length found only when a vertex near it asks; section ends: equal
+  parameters and a polynomial curve's control polygon shorter than the tolerance decide "the same point" without
+  the quadrature; `free::apart` for all pairs on all threads before the pairing; the arrangement's half-edge
+  directions and cycle areas on all threads.
+- Knurl, local (loaded; Rust Boolean with the "tools coincide" declines lifted): 18.7 → 10.9 s: places 5.3 → 0.6 s
+  (63k of 70k parts turned), classification 3.3 → 0.4 s (57.9k of 59.1k pieces turned, 1.1k by rays again), the
+  cylinder's side face's arrangement 3.4 → 0.9 s. Same result (9.427289e-5 m³, 10362 faces, valid).
+- bool_patterns (each still compared with OCCT): the symmetry is found in helical grooves (12 steps), radial holes
+  (24), gear slots (40), not in the pocket grid (a linear pattern); results as OCCT's.
+- Replays, all 0 differ, the counts unchanged (main 776, corpus2 553, corpus3 556, corpus4 600, corpus5 717,
+  corpus6 662, Shell's 78, direct 58).
+- psui: nothing public changed.
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|

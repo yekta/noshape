@@ -373,6 +373,42 @@ impl NurbsCurve {
         (out.0.x <= out.1.x).then_some(out)
     }
 
+    /// A length its part from `lo` to `hi` is no longer than: its spans' pieces there cut out by de Casteljau, their
+    /// control polygons' (None for a rational curve).
+    pub(crate) fn part_polygon(&self, lo: f64, hi: f64) -> Option<f64> {
+        if self.weights.iter().any(|&w| w != self.weights[0]) {
+            return None;
+        }
+        let (lo, hi) = (lo.min(hi), lo.max(hi));
+        let mut out = 0.0;
+        for (a, b, q) in self.spans() {
+            if *b < lo || *a > hi {
+                continue;
+            }
+            let h = b - a;
+            let (u0, u1) = (((lo - a) / h).clamp(0.0, 1.0), ((hi - a) / h).clamp(0.0, 1.0));
+            let mut v = q.clone();
+            let m = v.len();
+            let mut left = Vec::with_capacity(m);
+            for r in 0..m {
+                left.push(v[0]);
+                for i in 0..m - 1 - r {
+                    v[i] = v[i] * (1.0 - u1) + v[i + 1] * u1;
+                }
+            }
+            let s = if u1 > 0.0 { u0 / u1 } else { 0.0 };
+            let mut right = vec![DVec4::ZERO; m];
+            for r in 0..m {
+                right[m - 1 - r] = left[m - 1 - r];
+                for i in 0..m - 1 - r {
+                    left[i] = left[i] * (1.0 - s) + left[i + 1] * s;
+                }
+            }
+            out += right.windows(2).map(|w| (w[1].truncate() / w[1].w - w[0].truncate() / w[0].w).length()).sum::<f64>();
+        }
+        Some(out)
+    }
+
     /// The span (of `spans`) the point at `t` is found on.
     pub(crate) fn span_of(&self, t: f64) -> usize {
         let spans = self.spans();
@@ -459,15 +495,45 @@ impl NurbsCurve {
     pub fn param_of(&self, p: DVec3) -> (f64, f64) {
         let (t0, t1) = self.range();
         let n = 16 * (self.poles.len() - self.degree).max(1);
-        let mut best = (t0, f64::INFINITY);
-        for k in 0..=n {
-            let t = t0 + (t1 - t0) * k as f64 / n as f64;
-            let d = (self.at(t) - p).length_squared();
-            if d < best.1 {
-                best = (t, d);
+        // The nearest sample, the first of equals: by the spans the samples are found on, the nearest span's box
+        // first, none on a span whose box is farther than the nearest yet (rounding allowed for).
+        let mut best = (0, f64::INFINITY);
+        let look = |k: usize, best: &mut (usize, f64)| {
+            let d = (self.at(t0 + (t1 - t0) * k as f64 / n as f64) - p).length_squared();
+            if d < best.1 || (d == best.1 && k < best.0) {
+                *best = (k, d);
+            }
+        };
+        let boxes = self.span_boxes();
+        if boxes.is_empty() {
+            for k in 0..=n {
+                look(k, &mut best);
+            }
+        } else {
+            let mut runs: Vec<(f64, usize, usize)> = Vec::new();
+            let (mut from, mut span) = (0, self.span_of(t0));
+            for k in 1..=n + 1 {
+                let next = if k <= n { self.span_of(t0 + (t1 - t0) * k as f64 / n as f64) } else { usize::MAX };
+                if next != span {
+                    let (lo, hi) = boxes[span];
+                    let scale = lo.abs().max(hi.abs()).max(p.abs()).max_element();
+                    let away = ((lo - p).max(p - hi).max(DVec3::ZERO).length() - 1e-12 * scale).max(0.0);
+                    runs.push((away * away, from, k));
+                    from = k;
+                    span = next;
+                }
+            }
+            runs.sort_by(|a, b| a.0.total_cmp(&b.0));
+            for (away, k0, k1) in runs {
+                if away > best.1 {
+                    break;
+                }
+                for k in k0..k1 {
+                    look(k, &mut best);
+                }
             }
         }
-        let mut t = best.0;
+        let mut t = t0 + (t1 - t0) * best.0 as f64 / n as f64;
         for _ in 0..50 {
             let [c, d1, d2] = self.derivs(t);
             let q = c - p;

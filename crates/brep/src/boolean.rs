@@ -207,6 +207,8 @@ enum Surf {
 struct NCurve {
     c: Arc<NurbsCurve>,
     sec: Option<([usize; 2], [Arc<NurbsCurve>; 2], u32)>,
+    /// A section moved from a copied pair's (or that pair's own): the id of the section it is moved from.
+    from: Option<u32>,
     /// OCCT's tolerance for a section (0 for an input's curve).
     tol: f64,
     /// Boxes holding it (`NurbsCurve::piece_boxes`).
@@ -221,8 +223,8 @@ type PCurves = HashMap<(usize, bool), (Arc<NurbsCurve>, f64, f64)>;
 enum Pending {
     /// The two faces, the path, its range and ends.
     Section(usize, usize, Path, f64, f64, [End; 2]),
-    /// The face, the edge's path, its parts (ends), its curve on a free-form face.
-    InFace(usize, Path, Vec<(f64, End, f64, End)>, Option<(usize, Arc<NurbsCurve>)>),
+    /// The face, the edge's path, its parts (ends), its curve on a free-form face, the edge.
+    InFace(usize, Path, Vec<(f64, End, f64, End)>, Option<(usize, Arc<NurbsCurve>)>, usize),
 }
 
 struct GFace {
@@ -575,6 +577,42 @@ type ByOwner = Vec<(Option<u32>, Vec<(f64, u32)>)>;
 
 /// An interval of a path inside a face: its ends (parameter, end).
 type Ival = [(f64, End); 2];
+
+/// A rotation the whole arrangement is the same under: every tool in a family of copies taken onto another member,
+/// every other argument's solid onto itself. Its axis (a point, the direction, a frame across it), a whole turn in
+/// `n` steps, and by each power j (1..n) of its inverse, where each solid and face goes (faces: `usize::MAX` where
+/// none).
+struct Sym {
+    o: DVec3,
+    a: DVec3,
+    x: DVec3,
+    y: DVec3,
+    n: usize,
+    solid_back: Vec<Vec<usize>>,
+    face_back: Vec<Vec<usize>>,
+    arg_back: Vec<Vec<usize>>,
+}
+
+impl Sym {
+    /// The rotation by `j` steps.
+    fn turn(&self, j: f64) -> Rigid {
+        let m = glam::DMat3::from_axis_angle(self.a, TAU * j / self.n as f64);
+        Rigid { m, t: self.o - m * self.o }
+    }
+
+    /// The steps `p` is from the first period (its angle about the axis from `x`, in steps), unless it is on the
+    /// axis or at a period's start (within rounding).
+    fn period(&self, p: DVec3, size: f64) -> Option<usize> {
+        let w = p - self.o;
+        let (u, v) = (w.dot(self.x), w.dot(self.y));
+        if u.hypot(v) <= 1e-6 * size {
+            return None;
+        }
+        let k = v.atan2(u).rem_euclid(TAU) * self.n as f64 / TAU;
+        let j = k.floor();
+        (k - j > 1e-6 && j + 1.0 - k > 1e-6).then_some(j as usize % self.n)
+    }
+}
 
 struct Ctx<'a> {
     tol: f64,
@@ -1075,12 +1113,19 @@ impl Ctx<'_> {
     fn section_from(&mut self, fs: usize, ft: usize, path: Path, ia: Vec<Ival>, ib: Vec<Ival>) -> R<()> {
         let tol = self.tol;
         // Whether the length along it between two parameters is within the tolerance (a B-spline's, the length
-        // either way: clearly not where the chord is longer).
+        // either way: clearly not where the chord is longer, clearly so where its control polygon there is
+        // shorter).
         let near = |x: f64, y: f64| {
-            if let Path::Nurbs { c, .. } = &path
-                && (c.at(y) - c.at(x)).length() > tol * (1.0 + 1e-6)
-            {
-                return false;
+            if let Path::Nurbs { c, .. } = &path {
+                if x == y {
+                    return true;
+                }
+                if (c.at(y) - c.at(x)).length() > tol * (1.0 + 1e-6) {
+                    return false;
+                }
+                if c.part_polygon(x, y).is_some_and(|l| l < tol * (1.0 - 1e-6)) {
+                    return true;
+                }
             }
             path.length(x, y) <= tol
         };
@@ -1193,7 +1238,7 @@ impl Ctx<'_> {
             self.faces[f].pcurves.insert((e, false), (c.clone(), t0, t1));
             on_free = Some((f, c));
         }
-        self.pending.push(Pending::InFace(f, path, parts, on_free));
+        self.pending.push(Pending::InFace(f, path, parts, on_free, e));
         Ok(())
     }
 
@@ -1380,8 +1425,13 @@ impl Ctx<'_> {
         }
         let (a, b) = ((self.faces[fs].arg, self.faces[fs].index), (self.faces[ft].arg, self.faces[ft].index));
         let moved = self.moved_pair(fs, ft);
+        let mut froms: Vec<Option<u32>> = Vec::new();
         let mut secs = match moved {
-            Some(m) => self.moved_sections(src, a, b, &m)?,
+            Some(m) => {
+                let x = self.moved_sections(src, a, b, &m)?;
+                froms = x.1;
+                x.0
+            }
             None => src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect(),
         };
         // (Moved onto a face of another argument: only where they stay inside it (and the curves they were moved
@@ -1400,6 +1450,7 @@ impl Ctx<'_> {
                 if !moved_clear {
                     // (These reach the face's boundary: made for themselves.)
                     secs = src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect();
+                    froms.clear();
                     break;
                 }
                 let k = self.canonical.get(&key).copied().unwrap_or(0) + 1;
@@ -1407,24 +1458,26 @@ impl Ctx<'_> {
                 match self.moved_pair(fs, ft) {
                     Some(m) if k < 3 => {
                         r = m.1;
-                        secs = self.moved_sections(src, a, b, &m)?;
+                        (secs, froms) = self.moved_sections(src, a, b, &m)?;
                     }
                     _ => {
                         secs = src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect();
+                        froms.clear();
                         break;
                     }
                 }
             }
         }
+        froms.resize(secs.len(), None);
         // (An end of one where another of them ends: OCCT's curves of one loop in parts; a vertex there.)
         let ends: Vec<[DVec3; 2]> = secs.iter().map(|c| [c.curve.at(c.t0), c.curve.at(c.t1)]).collect();
         let joined = |i: usize, k: usize| ends.iter().enumerate().any(|(j, e)| j != i && e.iter().any(|q| (*q - ends[i][k]).length() <= self.tol));
         let joins: Vec<[bool; 2]> = (0..secs.len()).map(|i| [joined(i, 0), joined(i, 1)]).collect();
-        for (c, join) in secs.into_iter().zip(joins) {
+        for ((c, join), from) in secs.into_iter().zip(joins).zip(froms) {
             let id = self.ncurves.len() as u32;
             let cc = Arc::new(c.curve);
             let [on0, on1] = c.on;
-            self.ncurves.push(NCurve { c: cc.clone(), sec: Some(([fs, ft], [Arc::new(on0), Arc::new(on1)], c.id)), tol: c.tol, boxes: Default::default() });
+            self.ncurves.push(NCurve { c: cc.clone(), sec: Some(([fs, ft], [Arc::new(on0), Arc::new(on1)], c.id)), from, tol: c.tol, boxes: Default::default() });
             let cuts = free::seam_cuts(self, [fs, ft], &cc, c.t0, c.t1);
             self.section_nurbs(fs, ft, Path::Nurbs { id, c: cc }, (c.t0, c.t1), &cuts, join)?;
         }
@@ -1433,17 +1486,18 @@ impl Ctx<'_> {
 
     /// OCCT's sections of faces `a` and `b` as pair `m.0`'s (made once) moved by `m.1`: the curves moved here, their
     /// ids from the source.
-    fn moved_sections(&mut self, src: &dyn SectionSource, a: (u32, u32), b: (u32, u32), m: &crate::MovedPair) -> R<Vec<SectionCurve>> {
+    fn moved_sections(&mut self, src: &dyn SectionSource, a: (u32, u32), b: (u32, u32), m: &crate::MovedPair) -> R<(Vec<SectionCurve>, Vec<Option<u32>>)> {
         let (canon, r) = *m;
         if let std::collections::hash_map::Entry::Vacant(e) = self.canon_secs.entry(canon) {
             e.insert(src.sections(canon.0, canon.1)?.into_iter().filter(|c| c.t1 > c.t0).collect());
         }
         let made = &self.canon_secs[&canon];
+        let from = made.iter().map(|c| Some(c.id)).collect();
         if made.is_empty() || canon == (a, b) {
-            return Ok(made.clone());
+            return Ok((made.clone(), from));
         }
         let ids = src.moved(&made.iter().map(|c| c.id).collect::<Vec<_>>(), a, b, m)?;
-        Ok(made
+        let moved = made
             .iter()
             .zip(ids)
             .map(|(c, id)| {
@@ -1453,7 +1507,8 @@ impl Ctx<'_> {
                 }
                 SectionCurve { curve, t0: c.t0, t1: c.t1, on: c.on.clone(), id, tol: c.tol }
             })
-            .collect())
+            .collect();
+        Ok((moved, from))
     }
 
     /// Faces `fs` and `ft` of two tools that are rigid copies of another pair (each tool a member of a family of
@@ -1485,6 +1540,85 @@ impl Ctx<'_> {
     }
 
     /// Whether motion `r` takes face `f`'s surface onto itself (a plane or a cylinder; a cone's apex kept).
+    /// The rotation the arrangement is the same under, if one: its step from the largest family of copies whose
+    /// motions are rotations about one axis (a whole turn in whole steps), checked on every argument.
+    fn symmetry(&self) -> Option<Sym> {
+        let fam = self.families.iter().filter(|f| f.len() >= 3).max_by_key(|f| f.len())?;
+        let (o, a, _) = fam.iter().find_map(|x| x.1.rotation())?;
+        // The members' angles about that axis; the least is the step.
+        let mut step = f64::INFINITY;
+        for (_, r) in &fam[1..] {
+            let (ro, ra, th) = r.rotation()?;
+            if ra.cross(a).length() > 1e-9 || (ro - o).cross(a).length() > self.tol {
+                return None;
+            }
+            step = step.min(if ra.dot(a) > 0.0 { th } else { TAU - th });
+        }
+        let n = (TAU / step).round();
+        if n < 3.0 || (n * step - TAU).abs() > 1e-6 {
+            return None;
+        }
+        let (x, y) = a.any_orthonormal_pair();
+        let mut sym = Sym { o, a, x, y, n: n as usize, solid_back: Vec::new(), face_back: Vec::new(), arg_back: Vec::new() };
+        // Arguments in no family of several: kept by it (their faces' surfaces, their edges whole circles about the
+        // axis or seams).
+        let g = sym.turn(1.0);
+        let kept_arg = |b: u32| {
+            (0..self.faces.len()).filter(|&i| self.faces[i].arg == b).all(|i| {
+                let f = &self.faces[i];
+                self.kept_by(i, &g)
+                    && f.edges.iter().all(|&(e, _)| {
+                        f.edges.iter().filter(|x| x.0 == e).count() == 2
+                            || matches!(self.edges[e].g, Geo::Arc { k, sweep, .. } if (sweep.abs() - TAU).abs() <= 1e-12 && (k.c - o).cross(a).length() <= self.tol && k.n.cross(a).length() <= 1e-9)
+                    })
+            })
+        };
+        let nargs = self.solids.iter().map(|x| x.arg as usize + 1).max().unwrap_or(0);
+        let mut kept = vec![false; nargs];
+        for (b, k) in kept.iter_mut().enumerate() {
+            if self.copies.get(b).copied().flatten().is_none() {
+                if !kept_arg(b as u32) {
+                    return None;
+                }
+                *k = true;
+            }
+        }
+        // Each argument by each power of the inverse: itself where kept, else the member its motion goes to.
+        let mut face_at: HashMap<(u32, u32), usize> = HashMap::default();
+        for (i, f) in self.faces.iter().enumerate() {
+            face_at.insert((f.arg, f.index), i);
+        }
+        let solids_of: Vec<Vec<usize>> = (0..nargs).map(|b| (0..self.solids.len()).filter(|&t| self.solids[t].arg as usize == b).collect()).collect();
+        for j in 1..sym.n {
+            let back = sym.turn(-(j as f64));
+            let mut arg_back = vec![usize::MAX; nargs];
+            for b in 0..nargs {
+                if kept[b] {
+                    arg_back[b] = b;
+                    continue;
+                }
+                let (k, r) = self.copies[b]?;
+                let want = back.after(&r);
+                let c = self.families[k].iter().find(|x| x.1.near(&want, self.tol, self.size))?.0;
+                if solids_of[c].len() != solids_of[b].len() {
+                    return None;
+                }
+                arg_back[b] = c;
+            }
+            let mut sb = vec![usize::MAX; self.solids.len()];
+            for b in 0..nargs {
+                for (k, &t) in solids_of[b].iter().enumerate() {
+                    sb[t] = solids_of[arg_back[b]][k];
+                }
+            }
+            let fb = self.faces.iter().map(|f| *face_at.get(&(arg_back[f.arg as usize] as u32, f.index)).unwrap_or(&usize::MAX)).collect();
+            sym.solid_back.push(sb);
+            sym.face_back.push(fb);
+            sym.arg_back.push(arg_back);
+        }
+        Some(sym)
+    }
+
     fn kept_by(&self, f: usize, r: &Rigid) -> bool {
         match self.faces[f].s {
             Surf::Plane { n, d, origin, .. } => (r.dir(n) - n).length() <= 1e-9 && (n.dot(r.point(origin)) - d).abs() <= self.tol,
@@ -2035,7 +2169,8 @@ impl Ctx<'_> {
         };
         let (lo, hi) = (lo - DVec3::splat(tol), hi + DVec3::splat(tol));
         let start = sorted_x.partition_point(|x| x.0 < lo.x);
-        let len = self.seg_length(s);
+        // (Its length found when a vertex near it asks.)
+        let len = std::cell::OnceCell::new();
         let mut on: Vec<(f64, u32)> = Vec::new();
         for &(px, w) in &sorted_x[start..] {
             if px > hi.x {
@@ -2059,7 +2194,11 @@ impl Ctx<'_> {
                 }
             }
             let (t, off) = self.seg_param(s, p);
-            if t <= 0.0 || t >= 1.0 || t * len <= tol || (1.0 - t) * len <= tol {
+            if t <= 0.0 || t >= 1.0 {
+                continue;
+            }
+            let len = *len.get_or_init(|| self.seg_length(s));
+            if t * len <= tol || (1.0 - t) * len <= tol {
                 continue;
             }
             if off <= tol {
@@ -2429,7 +2568,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 Curve::Hyperbola { .. } | Curve::Parabola { .. } => return Err(Decline("an argument's hyperbola")),
                 Curve::Nurbs { .. } if cx.src.is_none() => return Err(Decline("a curved edge")),
                 Curve::Nurbs { index, t0, t1 } => {
-                    cx.ncurves.push(NCurve { c: Arc::new(body.nurbs_curves[index as usize].clone()), sec: None, tol: 0.0, boxes: Default::default() });
+                    cx.ncurves.push(NCurve { c: Arc::new(body.nurbs_curves[index as usize].clone()), sec: None, from: None, tol: 0.0, boxes: Default::default() });
                     Geo::Nurbs { id: cx.ncurves.len() as u32 - 1, t0, t1 }
                 }
                 Curve::Degenerate => {
@@ -2704,33 +2843,44 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
         }
     }
+    // The rotation the arrangement is the same under, if any (below: one period's work for the rest).
+    let sym = cx.symmetry();
+    let size = cx.size.max(cx.pool.p.iter().fold(0.0, |m: f64, p| m.max(p.abs().max_element())));
     // Pairs of solids that may meet, and their faces.
     let ns = cx.solids.len();
     // (OCCT's sections free-form faces' pairs below will ask for, a copied pair's the pair it is moved from, made
     // ahead on all threads; any other as asked.)
     if let Some(src) = cx.src {
-        let mut ahead: Vec<FacePair> = Vec::new();
-        let mut seen: HashSet<FacePair> = HashSet::default();
+        let mut pairs: Vec<(usize, usize)> = Vec::new();
         for s in 0..ns {
             for t in s + 1..ns {
                 let (a, b) = (&cx.solids[s], &cx.solids[t]);
                 if a.arg == b.arg || !boxes_meet(a.lo, a.hi, b.lo, b.hi, GREY * tol) {
                     continue;
                 }
-                for i in 0..cx.solids[s].faces.len() {
-                    for j in 0..cx.solids[t].faces.len() {
-                        let (fs, ft) = (cx.solids[s].faces[i], cx.solids[t].faces[j]);
+                for &fs in &a.faces {
+                    for &ft in &b.faces {
                         let (x, y) = (&cx.faces[fs], &cx.faces[ft]);
-                        if !boxes_meet(x.lo, x.hi, y.lo, y.hi, GREY * tol) || !matches!((&x.s, &y.s), (Surf::Nurbs { .. }, _) | (_, Surf::Nurbs { .. })) || cx.faces_apart(fs, ft) {
-                            continue;
-                        }
-                        let (x, y) = (&cx.faces[fs], &cx.faces[ft]);
-                        let pair = cx.moved_pair(fs, ft).map_or(((x.arg, x.index), (y.arg, y.index)), |m| m.0);
-                        if seen.insert(pair) {
-                            ahead.push(pair);
+                        if boxes_meet(x.lo, x.hi, y.lo, y.hi, GREY * tol) && matches!((&x.s, &y.s), (Surf::Nurbs { .. }, _) | (_, Surf::Nurbs { .. })) {
+                            pairs.push((fs, ft));
                         }
                     }
                 }
+            }
+        }
+        // (Which are clearly apart, on all threads, kept for the pairing.)
+        let apart = par_map(pairs.len(), &|k| free::apart(&cx.faces[pairs[k].0], &cx.faces[pairs[k].1], GREY * tol.max(5e-6)));
+        let mut ahead: Vec<FacePair> = Vec::new();
+        let mut seen: HashSet<FacePair> = HashSet::default();
+        for (&(fs, ft), x) in pairs.iter().zip(apart) {
+            cx.apart.insert((fs, ft), x);
+            if x {
+                continue;
+            }
+            let (x, y) = (&cx.faces[fs], &cx.faces[ft]);
+            let pair = cx.moved_pair(fs, ft).map_or(((x.arg, x.index), (y.arg, y.index)), |m| m.0);
+            if seen.insert(pair) {
+                ahead.push(pair);
             }
         }
         src.ahead(&ahead);
@@ -2759,7 +2909,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // The sections' parts and the edges lying on faces: their places in the faces on all threads, their edges in
     // the order the faces were paired.
     let pending = std::mem::take(&mut cx.pending);
-    let places = par_map(pending.len(), &|k| -> R<(Vec<Ival>, Vec<Ival>)> {
+    let place = |k: usize| -> R<(Vec<Ival>, Vec<Ival>)> {
         match pending[k] {
             Pending::Section(fs, ft, ref path, t0, t1, ends) => {
                 let ia = cx.intervals(fs, path, t0, t1, ends, false)?;
@@ -2768,7 +2918,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 }
                 Ok((ia, cx.intervals(ft, path, t0, t1, ends, false)?))
             }
-            Pending::InFace(f, ref path, ref parts, ref on_free) => {
+            Pending::InFace(f, ref path, ref parts, ref on_free, _) => {
                 let mut ivs = Vec::new();
                 for &(a0, e0, a1, e1) in parts {
                     ivs.extend(cx.intervals_on(f, path, (a0, a1), [e0, e1], true, on_free.as_ref())?);
@@ -2776,7 +2926,101 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 Ok((ivs, Vec::new()))
             }
         }
-    });
+    };
+    // (With the arrangement the same under a rotation: a part of a section moved from the same OCCT section as one
+    // in the first period, on the faces those turn into, or an edge on a face the turned image of one there, takes
+    // its places there: the parameters as they are, its points turned, the vertices the ones there. The rest found
+    // as they are. A part's key: a section's faces turned back, the section it is moved from and its range; an
+    // edge on a face: the face and edge turned back; then the steps.)
+    let mut edge_at: HashMap<(u32, u32), usize> = HashMap::default();
+    for (i, e) in cx.edges.iter().enumerate() {
+        edge_at.insert((e.arg, e.index), i);
+    }
+    let from_of = |k: usize| -> Option<(usize, usize, u32, u64, u64, usize)> {
+        let sym = sym.as_ref()?;
+        match pending[k] {
+            Pending::Section(fs, ft, Path::Nurbs { id, ref c }, t0, t1, _) => {
+                let from = cx.ncurves[id as usize].from?;
+                let j = sym.period(c.at(0.5 * (t0 + t1)), size)?;
+                let (fs0, ft0) = if j == 0 { (fs, ft) } else { (sym.face_back[j - 1][fs], sym.face_back[j - 1][ft]) };
+                (fs0 != usize::MAX && ft0 != usize::MAX).then_some((fs0, ft0, from, t0.to_bits(), t1.to_bits(), j))
+            }
+            Pending::InFace(f, ref path, ref parts, _, e) => {
+                let (a0, _, a1, _) = *parts.first()?;
+                let j = sym.period(path.at(0.5 * (a0 + a1)), size)?;
+                let (f0, e0) = if j == 0 {
+                    (f, e)
+                } else {
+                    let ed = &cx.edges[e];
+                    (sym.face_back[j - 1][f], *edge_at.get(&(sym.arg_back[j - 1][ed.arg as usize] as u32, ed.index))?)
+                };
+                (f0 != usize::MAX).then_some((f0, e0, u32::MAX, 0, 0, j))
+            }
+            _ => None,
+        }
+    };
+    let mut firsts: HashMap<(usize, usize, u32, u64, u64), usize> = HashMap::default();
+    let mut source: Vec<Option<(usize, usize)>> = vec![None; pending.len()];
+    for k in 0..pending.len() {
+        if let Some((fs0, ft0, from, a, b, 0)) = from_of(k) {
+            firsts.entry((fs0, ft0, from, a, b)).or_insert(k);
+        }
+    }
+    for (k, x) in source.iter_mut().enumerate() {
+        if let Some((fs0, ft0, from, a, b, j)) = from_of(k)
+            && j > 0
+        {
+            *x = firsts.get(&(fs0, ft0, from, a, b)).map(|&k0| (k0, j));
+        }
+    }
+    let first = par_map(pending.len(), &|k| source[k].is_none().then(|| place(k)));
+    // A place turned by `j` steps from face `f0` onto face `f` (its vertex the one of `f` there), if it can be.
+    let turn_end = |e: End, f: usize, also: Option<usize>, g: &Rigid| -> Option<End> {
+        Some(match e {
+            End::Open => End::Open,
+            End::Point(p) => End::Point(g.point(p)),
+            End::Vertex(w) => {
+                let q = g.point(cx.p(w));
+                End::Vertex(cx.faces[f].edges.iter().map(|x| x.0).chain(also).flat_map(|e| cx.edges[e].v).find(|&v| (cx.p(v) - q).length() <= tol)?)
+            }
+        })
+    };
+    let turned = |k: usize| -> Option<(Vec<Ival>, Vec<Ival>)> {
+        let sym = sym.as_ref()?;
+        let (k0, j) = source[k]?;
+        let Some(Ok((ia0, ib0))) = &first[k0] else { return None };
+        let g = sym.turn(j as f64);
+        if let (Pending::InFace(f, path, parts, _, e), Pending::InFace(_, path0, parts0, _, _)) = (&pending[k], &pending[k0]) {
+            let (f, e) = (*f, *e);
+            // (The same edge turned: its parts at the same parameters, their points and ends turned.)
+            if parts.len() != parts0.len() {
+                return None;
+            }
+            for (x, y) in parts.iter().zip(parts0) {
+                let same = |a: f64, b: f64| (a - b).abs() <= 1e-12 * (1.0 + a.abs());
+                if !same(x.0, y.0) || !same(x.2, y.2) || (g.point(path0.at(y.0)) - path.at(x.0)).length() > tol || (g.point(path0.at(y.2)) - path.at(x.2)).length() > tol {
+                    return None;
+                }
+            }
+            let ivs = ia0.iter().map(|iv| Some([(iv[0].0, turn_end(iv[0].1, f, Some(e), &g)?), (iv[1].0, turn_end(iv[1].1, f, Some(e), &g)?)])).collect::<Option<Vec<Ival>>>()?;
+            return Some((ivs, Vec::new()));
+        }
+        let Pending::Section(fs, ft, Path::Nurbs { ref c, .. }, t0, t1, ends) = pending[k] else { return None };
+        let Pending::Section(_, _, Path::Nurbs { c: ref c0, .. }, _, _, ends0) = pending[k0] else { return None };
+        // (The same curve turned, its ends likewise.)
+        let mid = 0.5 * (t0 + t1);
+        if (g.point(c0.at(mid)) - c.at(mid)).length() > tol || (0..2).any(|i| turn_end(ends0[i], fs, None, &g).is_none_or(|e| match (e, ends[i]) {
+            (End::Open, End::Open) => false,
+            (End::Point(p), End::Point(q)) => (p - q).length() > tol,
+            _ => true,
+        })) {
+            return None;
+        }
+        let ivs = |x: &[Ival], f: usize| -> Option<Vec<Ival>> { x.iter().map(|iv| Some([(iv[0].0, turn_end(iv[0].1, f, None, &g)?), (iv[1].0, turn_end(iv[1].1, f, None, &g)?)])).collect() };
+        Some((ivs(ia0, fs)?, ivs(ib0, ft)?))
+    };
+    let rest = par_map(pending.len(), &|k| first[k].is_none().then(|| turned(k).map_or_else(|| place(k), Ok)));
+    let places: Vec<R<(Vec<Ival>, Vec<Ival>)>> = first.into_iter().zip(rest).map(|(a, b)| a.or(b).expect("a part's places")).collect();
     for (p, x) in pending.into_iter().zip(places) {
         let (ia, ib) = x?;
         match p {
@@ -3196,7 +3440,77 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
         Ok(states)
     };
-    let all_states = par_map(pieces.len(), &state_of);
+    // (With the arrangement the same under a rotation: the pieces of one period by rays, every other piece as the
+    // one its point turns back into (on the face its face turns back to, the solids likewise); any not found by
+    // rays too.)
+    let later = |pi: usize| -> Option<usize> {
+        let sym = sym.as_ref()?;
+        let p = pieces[pi].inside;
+        if p.is_nan() {
+            return None;
+        }
+        sym.period(p, size).filter(|&j| j > 0)
+    };
+    let first = par_map(pieces.len(), &|pi| if later(pi).is_some() { None } else { Some(state_of(pi)) });
+    let cell = 1e-6 * size;
+    let key = |f: usize, p: DVec3| (f, (p.x / cell).round() as i64, (p.y / cell).round() as i64, (p.z / cell).round() as i64);
+    let mut by_place: HashMap<(usize, i64, i64, i64), Vec<usize>> = HashMap::default();
+    for (pi, x) in first.iter().enumerate() {
+        if matches!(x, Some(Ok(_))) {
+            by_place.entry(key(pieces[pi].face, pieces[pi].inside)).or_default().push(pi);
+        }
+    }
+    // A piece's loops' lengths and its vertices' middle.
+    let shape = |pi: usize| -> (Vec<usize>, DVec3) {
+        let vs: Vec<u32> = pieces[pi].loops.iter().flatten().map(|&(s, rev)| sedges[s].seg.v[usize::from(rev)]).collect();
+        (pieces[pi].loops.iter().map(|l| l.len()).collect(), vs.iter().fold(DVec3::ZERO, |m, &w| m + cx.p(w)) / vs.len().max(1) as f64)
+    };
+    let turned = |pi: usize| -> Option<Vec<(usize, State)>> {
+        let sym = sym.as_ref()?;
+        let j = later(pi)?;
+        let f0 = sym.face_back[j - 1][pieces[pi].face];
+        if f0 == usize::MAX {
+            return None;
+        }
+        let back = sym.turn(-(j as f64));
+        let q = back.point(pieces[pi].inside);
+        let (_, kx, ky, kz) = key(f0, q);
+        let mut found = None;
+        'look: for dx in -1..=1 {
+            for dy in -1..=1 {
+                for dz in -1..=1 {
+                    for &p0 in by_place.get(&(f0, kx + dx, ky + dy, kz + dz)).map_or(&[][..], |v| v.as_slice()) {
+                        // (The same piece turned: its point near, its loops as long, its vertices' middle where
+                        // this one's turns back to.)
+                        if (pieces[p0].inside - q).length() <= cell && shape(p0).0 == shape(pi).0 && (back.point(shape(pi).1) - shape(p0).1).length() <= 10.0 * tol {
+                            found = Some(p0);
+                            break 'look;
+                        }
+                    }
+                }
+            }
+        }
+        let Some(Ok(st0)) = &first[found?] else { return None };
+        let back = &sym.solid_back[j - 1];
+        let arg = cx.faces[pieces[pi].face].arg;
+        let mut out = Vec::with_capacity(st0.len());
+        for (t, &t0) in back.iter().enumerate() {
+            if cx.solids[t].arg == arg {
+                continue;
+            }
+            let i = st0.binary_search_by_key(&t0, |x| x.0).ok()?;
+            out.push((t, st0[i].1));
+        }
+        Some(out)
+    };
+    let rest = par_map(pieces.len(), &|pi| {
+        if first[pi].is_some() {
+            None
+        } else {
+            Some(turned(pi).map_or_else(|| state_of(pi), Ok))
+        }
+    });
+    let all_states: Vec<R<Vec<(usize, State)>>> = first.into_iter().zip(rest).map(|(a, b)| a.or(b).expect("a piece's states")).collect();
     for (pi, states) in all_states.into_iter().enumerate() {
         let states = states?;
         let f = pieces[pi].face;
