@@ -125,8 +125,8 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | 3 | Empty Parts | "Select parts where the rib will be fitted into." | all solids used | ✅ (was 🔧 L22 (no field); older ribs keep using every part) | skasm 10-31 56277472 (CLI errsweep2.py: text and the field it marks); no field, as live L22 |
 | 4 | Parts / direction auto-fill | edit logic fills Parts and picks the side | none | 🔧 L22 Parts filled with the studio's parts on open |  |
 | 5 | Closed profile, Parallel | "Only open sketch profiles can be used when rib direction is parallel to sketch plane." | no check | ✅ (was 🔧 ? L23) | core 82580226 10-29 (qa: the text); skasm 10-31 re-read |
-| 6 | Draft, Extend profiles to part | supported | "not supported yet" / ignored | Extend 🔧 L22: parallel ribs are built as rib.fs does (swept past the part, split by it, excess removed; ends extended with the checkbox or when they sit on a face they point into), all five live rows match (3692, 3932, 4112, 4562, error). Draft 🔧 rib.fs applyDraft: the sides drafted about the rib's top (wider into the part, narrower with Opposite), split by the part again; live G33c 27048.155585660817 matched (test `rib_draft_as_live`), Normal to sketch plane drafted the same way (no live number). Extend with Normal to sketch plane (L24: error) stays ✗ |  |
-| 7 | Errors | "Failed to create a rib from a selected profile.", "None of the ribs intersected a part.", "Failed to merge ribs into parts." | own texts | 🔧 |  |
+| 6 | Draft, Extend profiles to part | supported | "not supported yet" / ignored | ✅ (Extend was 🔧 L22: parallel ribs are built as rib.fs does (swept past the part, split by it, excess removed; ends extended with the checkbox or when they sit on a face they point into), all five live rows match (3692, 3932, 4112, 4562, error). Draft was 🔧 rib.fs applyDraft: the sides drafted about the rib's top (wider into the part, narrower with Opposite), split by the part again; live G33c 27048.155585660817 matched (test `rib_draft_as_live`), Normal to sketch plane drafted the same way (no live number). Extend with Normal to sketch plane (L24: error) stays ✗) | skasm 10-31 56277472 (T rib_extend_profiles_as_live, rib_draft_as_live, rib_of_an_l_normal_to_its_plane_as_live) |
+| 7 | Errors | "Failed to create a rib from a selected profile.", "None of the ribs intersected a part.", "Failed to merge ribs into parts." | own texts | ✅ (was 🔧) | skasm 10-31 (code: the texts) |
 | 8 | One rib per edge | yes (Merge ribs off: one body per edge) | one per chain | ✅ L24: one body per profile chain (live: the L rib is one body); parallel needs one straight edge 🔧; Extend profiles see row 6 | v0.4.12 CLI 10-28 (bin/ribchain.py: two separate profiles, Merge off → Part 2 600 + Part 3 260, on → one part 10610; the L profile Normal fails → RIB-CHAIN-NORMAL, so live's L24 one-body case can't be checked) |
 
 ## Offset surface
@@ -134,7 +134,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 |---|---|---|---|---|---|
 | 1 | Fields | order, labels, 5 mm (0 allowed), Create selection, flip | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Nothing resolves | "Select faces, surfaces, or sketch regions to offset from." on surfacesAndFaces | "Nothing to offset"; one missing face fails the feature | ✅ (was 🔧) | skasm 10-31 56277472 (CLI errsweep2.py: text and the field it marks) |
-| 3 | Kernel failure | — | raw kernel text | 🔧 L25 "Could not offset selected faces as requested."; L26 one surface per picked face |  |
+| 3 | Kernel failure | — | raw kernel text | ✅ (was 🔧 L25 "Could not offset selected faces as requested."; L26 one surface per picked face) | skasm 10-31 (code: the texts) |
 
 ## Fill
 | # | Area | Onshape | Ours | Status | Verified |
@@ -142,8 +142,8 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | 1 | Fields | order, Guides group, Sample size 5, isocurves 10, Merge with all ☑ | same | ✅ | 67f88fd1 10-28 (New / Add, Guides group (Vertices or curves, Precise), Show isocurves Count 10, Add: Merge with all ☑) |
 | 2 | Empty edges | "Select laminar edges or curves as fill surface boundary." on edges | own text, no field | ✅ (was 🔧) | skasm 10-31 56277472 (CLI errsweep2.py: text and the field it marks) |
 | 3 | Continuity label | "Continuity [Position]" label shown (SHOW_LABEL) | no label | 🔧 SHOW_LABEL |  |
-| 4 | Loop errors | "A boundary edge can have only one type of continuity constraint.", "Cannot create fill surface between multiple loops.", "Boundary edges selected do not form a closed loop.", "Cannot create tangency or curvature constraint for a curve selection." | own texts | 🔧 ? L27 (internal-edge variant) |  |
-| 5 | Guides | live "psb (10-24 d)": Guides on with nothing picked is the plain fill; Precise passes through the guides (≤1.1e-4 mm), each touching the boundary at one end at least, else "Guide entities cannot be used as selected." (no field); arc + vertex: warning "Guide curves and vertices cannot be used in combination in Precise mode. Vertex selections are not used."; Sampled only approximates | not checked; always sampled | 🔧 all those rules (Precise curves as free MakeFilling constraints); test `fill_guides_as_fs`; our surface is OCCT's, so areas differ slightly (live arc 1845.4473) |  |
+| 4 | Loop errors | "A boundary edge can have only one type of continuity constraint.", "Cannot create fill surface between multiple loops.", "Boundary edges selected do not form a closed loop.", "Cannot create tangency or curvature constraint for a curve selection." | own texts | ✅ (was 🔧 ? L27 (internal-edge variant)) | skasm 10-31 (code: the texts) |
+| 5 | Guides | live "psb (10-24 d)": Guides on with nothing picked is the plain fill; Precise passes through the guides (≤1.1e-4 mm), each touching the boundary at one end at least, else "Guide entities cannot be used as selected." (no field); arc + vertex: warning "Guide curves and vertices cannot be used in combination in Precise mode. Vertex selections are not used."; Sampled only approximates | not checked; always sampled | ✅ (was 🔧 all those rules (Precise curves as free MakeFilling constraints); test `fill_guides_as_fs`; our surface is OCCT's, so areas differ slightly (live arc 1845.4473)) | skasm 10-31 56277472 (T fill_guides_as_fs) |
 | 6 | Add when the edges are surface edges | automatic (SF7) | no | ✗ (SF7) |  |
 
 ## Boundary surface
@@ -152,30 +152,30 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | 1 | Fields | order, items, seven conditions (None), magnitude 1 | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Profile arrays | driven-query rows "[None] Edges of Curve U1" (live L28: no limit, a third row is taken) | "Add Profile" UI | ✅ driven query with the "[#uCondition] #uProfileEntities" item label | da18f886 10-28 (Boundary surface U profiles: rows "[None] Edge of Arcs sketch" ×2, a driven-query row per pick; see workflow-surfaces 11) |
 | 3 | Boundary condition label | SHOW_LABEL | no label | 🔧 SHOW_LABEL |  |
-| 4 | Too few profiles | "Select edges to specify at least two profiles." on both arrays | own text, no field | 🔧 L28; a third profile / mid-span crossing fail with live's texts 🔧; 1U+1V 🔧 builds the sheet the U sweeps along the V (the other two sides are the profiles moved to each other's far end; live 2099) |  |
-| 5 | Boundary conditions | applied, with their errors | warning only | 🔧 rows in one direction: the first / last row's condition is the loft end condition (same rule as Loft 4); live L28's "Only planar profiles are valid for Normal/Tangent to profile start condition." on a part edge (test `boundary_condition_needs_a_planar_profile`); U+V networks still warn |  |
-| 6 | Failure | "Could not create boundary surface with given information. Check profile order, intersections or end conditions." | own text | 🔧 |  |
+| 4 | Too few profiles | "Select edges to specify at least two profiles." on both arrays | own text, no field | ✅ (was 🔧 L28; a third profile / mid-span crossing fail with live's texts was 🔧; 1U+1V was 🔧 builds the sheet the U sweeps along the V (the other two sides are the profiles moved to each other's far end; live 2099)) | skasm 10-31 56277472 (CLI err3.py: text and field) |
+| 5 | Boundary conditions | applied, with their errors | warning only | ✅ (was 🔧 rows in one direction: the first / last row's condition is the loft end condition (same rule as Loft 4); live L28's "Only planar profiles are valid for Normal/Tangent to profile start condition." on a part edge (test `boundary_condition_needs_a_planar_profile`); U+V networks still warn) | skasm 10-31 (code: solid_a.rs's planar-profile text; loft end rule T loft_end_conditions_as_live) |
+| 6 | Failure | "Could not create boundary surface with given information. Check profile order, intersections or end conditions." | own text | ✅ (was 🔧) | skasm 10-31 (code: the texts) |
 
 ## Enclose
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1 | Fields | Result body operation, Entities, Merge with all ☐, merge scope, Keep tools ☐ | same | ✅ | f9185639 10-28 (dialog fields) |
-| 2 | Empty | "Select faces, parts, or planes to form a solid." | own text | 🔧 L29 Entities marked | b504234e 10-28 (GUI: empty → title tooltip "Enclose 1 did not regenerate properly: Select faces, parts, or planes to form a solid.", ✓ disabled) |
-| 3 | No region | "Selections do not enclose a region." | own text | 🔧 ❌ (ENCLOSE-NO-REGION-MSG) L30 | b504234e 10-28: ✗ Top+Front+Right → "Failed to create a part from enclosed region." |
-| 4 | Failure | "Failed to create a part from enclosed region." | "Enclose failed: …" | 🔧 |  |
-| 5 | Sketch regions | allowed | filtered out | 🔧 L31 accepted; enclosed regions make one part |  |
+| 2 | Empty | "Select faces, parts, or planes to form a solid." | own text | ✅ (was 🔧 L29 Entities marked) | skasm 10-31 56277472 (CLI err3.py: text and field) |
+| 3 | No region | "Selections do not enclose a region." | own text | ✅ (was 🔧 ❌ (ENCLOSE-NO-REGION-MSG) L30) | skasm 10-31 56277472 (CLI err3.py: text and field); qa 58810bd9 |
+| 4 | Failure | "Failed to create a part from enclosed region." | "Enclose failed: …" | ✅ (was 🔧) | skasm 10-31 (code: the texts) |
+| 5 | Sketch regions | allowed | filtered out | ✅ (was 🔧 L31 accepted; enclosed regions make one part) | skasm 10-31 56277472 (CLI enclose.py: 7 planes → one part 2000; region + plane z10 → no region, as L31) |
 
 ## Helix
 | # | Area | Onshape | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1 | Fields | order, labels, defaults (dialog-helix.txt) | same | ✅ | f9185639 10-28 (dialog fields) |
-| 2 | Axis empty | "Select an object with an axis." on axis | own text, no field | 🔧 |  |
-| 3 | Circle empty | "Select a circle or arc." on edge | own text, no field | 🔧 |  |
-| 4 | Height | 1e-5–500 m (0 out of range) | 0 allowed, flat spiral | 🔧 L32 "A parameter value is not valid." (any out-of-range value, all features) |  |
-| 5 | Zero radius | error only when both are 0 ("Start or end radius should be greater than 0."), else swapped | error when the start is 0 | 🔧 L33 start 0 with an end radius makes the conical spiral; both 0 fails |  |
-| 6 | Start / end point | must be coplanar with the axis start / end (errors on startPoint / endPoint), snapped onto the radius | moves the plane, own errors | 🔧 helix.fs texts on startPoint / endPoint (end point only checked on a face: on an axis it sets the height); a point on a face or circle is moved onto the radius |  |
-| 7 | Computed revolutions / pitch | filled | never | 🔧 filled when the end type is End point (helix.fs) |  |
-| 8 | Show start and end profiles | magenta circles | nothing | 🔧 magenta debug circles (#ff2bc1) and centre dots (#e224e3) at both ends while the dialog is open (helix.fs drawConstructionEnds) |  |
+| 2 | Axis empty | "Select an object with an axis." on axis | own text, no field | ✅ (was 🔧) | skasm 10-31 56277472 (CLI err3.py: text and field) |
+| 3 | Circle empty | "Select a circle or arc." on edge | own text, no field | ✅ (was 🔧) | skasm 10-31 56277472 (CLI err3.py: text and field) |
+| 4 | Height | 1e-5–500 m (0 out of range) | 0 allowed, flat spiral | ✅ (was 🔧 L32 "A parameter value is not valid." (any out-of-range value, all features)) | skasm 10-31 (code: eval.rs / feature_dialog.rs "A parameter value is not valid."; the CLI refuses the range first) |
+| 5 | Zero radius | error only when both are 0 ("Start or end radius should be greater than 0."), else swapped | error when the start is 0 | ✅ (was 🔧 L33 start 0 with an end radius makes the conical spiral; both 0 fails) | skasm 10-31 56277472 (CLI err3.py: text and field): both 0 → the text; start 0, end 5 → OK |
+| 6 | Start / end point | must be coplanar with the axis start / end (errors on startPoint / endPoint), snapped onto the radius | moves the plane, own errors | ✅ (was 🔧 helix.fs texts on startPoint / endPoint (end point only checked on a face: on an axis it sets the height); a point on a face or circle is moved onto the radius) | skasm 10-31 56277472 (T helix_points_as_fs) |
+| 7 | Computed revolutions / pitch | filled | never | ✅ (was 🔧 filled when the end type is End point (helix.fs)) | skasm 10-31 56277472 (T helix_points_as_fs) |
+| 8 | Show start and end profiles | magenta circles | nothing | ✅ (was 🔧 magenta debug circles (#ff2bc1) and centre dots (#e224e3) at both ends while the dialog is open (helix.fs drawConstructionEnds)) | skasm 10-31 56277472 (T helix_start_end_profiles: the circles and centres as debug geometry) |
 | 9 | Preselection, start angle 0 | type from the preselection; canonical start angle | no; surface x direction | 🔧 L34 the preselection picks the tab (face → Surface, line edge / connector / sketch line → Axis, circle → Circle). L35 won't be matched: live's start angle follows Parasolid's own surface frames (a Z or X cylinder starts at the extrude's end, a tilted one at its base), which OCCT doesn't share |  |
 
 ## Composite part
