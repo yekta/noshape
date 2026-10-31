@@ -3864,6 +3864,17 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         let mut inner: Vec<u32> = local.keys().map(|k| k.0).filter(|w| !boundary.contains(w)).collect();
         inner.sort_unstable();
         inner.dedup();
+        if std::env::var("NOSHAPE_X_FACE").is_ok_and(|v| v == format!("{},{}", cx.faces[f].arg, cx.faces[f].index)) {
+            for (k, (e, c)) in lsegs.iter().enumerate() {
+                let (d0, d1) = (c.tangent(0.0), c.reversed().tangent(0.0));
+                eprintln!("FACE seg {k} sedge {} ends {e:?} {:?} -> {:?} out {:.6} back {:.6} len {:e} area {:e} curv {:e} v {:?}", lsrc[k], c.start(), c.end(), d0.y.atan2(d0.x), d1.y.atan2(d1.x), c.length(), c.area_term(), c.curvature(), sedges[lsrc[k]].seg.v);
+            }
+            if let Ok(rs) = regions(&pts, &lsegs) {
+                for r in rs {
+                    eprintln!("FACE region outer {:?} holes {:?} inside {:?}", r.outer, r.holes, r.inside);
+                }
+            }
+        }
         let mut out = Vec::new();
         for mut r in regions(&pts, &lsegs)? {
             let mut dist = distance2(r.inside, cx.bound(f)?);
