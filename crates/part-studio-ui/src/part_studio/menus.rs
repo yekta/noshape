@@ -652,7 +652,7 @@ impl PartStudioView {
             // Live 10-27: the Esc that closes the menu also ends an isolate
             // or make transparent (the menu itself closes on it).
             Some((pos, menu, _)) => vec![deferred(
-                anchored().position(*pos).snap_to_window_with_margin(px(8.)).child(div().capture_action(cx.listener(|this, _: &crate::os_menu::MenuDismiss, window, cx| {
+                anchored().position(*pos).switch_anchor_or_snap().child(div().capture_action(cx.listener(|this, _: &crate::os_menu::MenuDismiss, window, cx| {
                     if this.ui.isolate.is_some() {
                         this.exit_isolate(window, cx);
                     }

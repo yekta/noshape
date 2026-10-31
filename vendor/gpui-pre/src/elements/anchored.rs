@@ -75,6 +75,14 @@ impl Anchored {
         self.fit_mode = AnchoredFitMode::SnapToWindowWithMargin(edges.into());
         self
     }
+
+    /// NOSHAPE PATCH: open on the side with more room when it doesn't fit,
+    /// then snap to the window (a web context menu: one taller than the room
+    /// below the pointer opens above it, its top clamped to the window).
+    pub fn switch_anchor_or_snap(mut self) -> Self {
+        self.fit_mode = AnchoredFitMode::SwitchAnchorOrSnap;
+        self
+    }
 }
 
 impl ParentElement for Anchored {
@@ -151,6 +159,26 @@ impl Element for Anchored {
             origin: Point::default(),
             size: window.viewport_size(),
         };
+
+        if self.fit_mode == AnchoredFitMode::SwitchAnchorOrSnap {
+            // The side with more room, along each axis (no partial fit test).
+            let mut anchor = self.anchor;
+            if desired.right() > limits.right() || desired.left() < limits.left() {
+                let switched = Bounds::from_anchor_and_size(anchor.other_side_along(Axis::Horizontal), origin, children_bounds.size);
+                let over = |b: &Bounds<Pixels>| (b.right() - limits.right()).max(px(0.)) + (limits.left() - b.left()).max(px(0.));
+                if over(&switched) < over(&desired) {
+                    anchor = anchor.other_side_along(Axis::Horizontal);
+                    desired = switched;
+                }
+            }
+            if desired.bottom() > limits.bottom() || desired.top() < limits.top() {
+                let switched = Bounds::from_anchor_and_size(anchor.other_side_along(Axis::Vertical), origin, children_bounds.size);
+                let over = |b: &Bounds<Pixels>| (b.bottom() - limits.bottom()).max(px(0.)) + (limits.top() - b.top()).max(px(0.));
+                if over(&switched) < over(&desired) {
+                    desired = switched;
+                }
+            }
+        }
 
         if self.fit_mode == AnchoredFitMode::SwitchAnchor {
             let mut anchor = self.anchor;
@@ -247,6 +275,8 @@ pub enum AnchoredFitMode {
     SnapToWindowWithMargin(Edges<Pixels>),
     /// Switch which corner anchor this anchored element is attached to.
     SwitchAnchor,
+    /// NOSHAPE PATCH: the side with more room, then snap to the window.
+    SwitchAnchorOrSnap,
 }
 
 /// Which algorithm to use when positioning the anchored element.

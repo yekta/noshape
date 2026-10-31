@@ -2137,7 +2137,7 @@ impl AssemblyView {
 
     pub(super) fn render_graphics_menu(&self) -> Option<AnyElement> {
         let (pos, menu, _) = self.ui.ctx_menu.as_ref()?;
-        Some(deferred(anchored().position(*pos).snap_to_window_with_margin(px(8.)).child(menu.clone())).with_priority(3).into_any_element())
+        Some(deferred(anchored().position(*pos).switch_anchor_or_snap().child(menu.clone())).with_priority(3).into_any_element())
     }
 
     pub(super) fn expand_all(&mut self, expand: bool, cx: &mut Context<Self>) {

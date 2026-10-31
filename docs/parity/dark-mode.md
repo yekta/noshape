@@ -56,7 +56,7 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-972-sheetmetal-dropdown-open |  |  | ☐ |
 | dk-973-sheetmetal-table-flatview |  |  | ☐ |
 | dk-974-ctx-part-in-parts-list | psui-scratch pm1 | menu #333, #ccc outline, white items, icons and separators = live; ours has no Add comment / Release Upgrade badge (cloud), so it fits under the click where live's flips above | ☑ psui 10-31 |
-| dk-975-ctx-face-graphics |  |  | ☐ |
+| dk-975-ctx-face-graphics | psui-scratch fm3 | items, icons, colours = live (Add comment is cloud); a menu taller than the room under the pointer now opens above it, clamped to the window, as live (it shifted up just enough before; vendor gpui-pre `switch_anchor_or_snap`) | ☑ psui 10-31 |
 | dk-976-ctx-sketch-line |  |  | ☐ |
 | dk-977-dialog-hole | psui-scratch h2 | dialog, tabs, query boxes, selects, value rows = live; the hole table's level names (Hole type, Drill size…) stay #999 in dark as live (they were #d7d7d7) | ☑ psui 10-31 |
 | dk-978-dialog-fillet | psui-scratch o978 | dialog, tabs, query box, selects, value row, checkboxes, slider = live (222 px wide with a fresh config; darkcfg holds a widened dialog) | ☑ psui 10-31 |

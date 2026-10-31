@@ -735,8 +735,9 @@ fn render_host(window: &Window, cx: &App) -> Vec<AnyElement> {
         };
         out.push(deferred(anchored().position(at).child(ring)).with_priority(POPUP_PRIORITY).into_any_element());
     }
-    // Live: a menu that doesn't fit below the pointer opens above it.
-    out.push(deferred(anchored().anchor(*anchor).position(*pos).child(menu.clone())).with_priority(POPUP_PRIORITY).into_any_element());
+    // Live: a menu that doesn't fit below the pointer opens above it when
+    // there is more room there, its top clamped to the window (dk-974, dk-975).
+    out.push(deferred(anchored().anchor(*anchor).position(*pos).switch_anchor_or_snap().child(menu.clone())).with_priority(POPUP_PRIORITY).into_any_element());
     out
 }
 
