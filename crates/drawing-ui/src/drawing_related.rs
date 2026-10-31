@@ -89,11 +89,29 @@ impl DrawingEditor {
                 continue;
             }
             // Leaders snap onto the edge (view units, meters).
+            let n0 = edges.len();
             for (i, e) in g.edges.iter().enumerate() {
                 if e.points.windows(2).any(|w| noshape_scene::drawing_tools::seg_dist(p, w[0], w[1]) < 1e-5)
                     && let Some(k) = b.picks.iter().position(|t| *t == PickTarget::Edge { view: v, edge: i as u32 })
                 {
                     edges.push(k as u32);
+                }
+            }
+            // A leader inside a face region: the region's whole boundary,
+            // its holes too (live drawing/427-428).
+            if edges.len() == n0
+                && let Some((outer, holes)) = self.pk().view_region_at(v, pl.to_sheet(p))
+            {
+                let loops: Vec<&Vec<[f64; 2]>> = std::iter::once(&outer).chain(holes.iter()).collect();
+                // Loops are tessellated to 1e-5; the edges' points lie on the curves.
+                let on_loop = |q: [f64; 2]| loops.iter().any(|l| (0..l.len()).any(|i| noshape_scene::drawing_tools::seg_dist(q, l[i], l[(i + 1) % l.len()]) < 2e-5));
+                for (i, e) in g.edges.iter().enumerate() {
+                    if e.visible
+                        && e.points.iter().all(|q| on_loop(*q))
+                        && let Some(k) = b.picks.iter().position(|t| *t == PickTarget::Edge { view: v, edge: i as u32 })
+                    {
+                        edges.push(k as u32);
+                    }
                 }
             }
         }
