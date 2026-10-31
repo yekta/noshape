@@ -88,7 +88,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | TAB1 | copy of the qa5 import doc: switching to the g48-two tab shows Parts (2) at once | ✅ fixed | 6acf6b94 (qa 10:28, our holeblock.step imported + g48-two.step: first visit of g48-two shows Parts (0) while it regenerates, Parts (2) after ~2 s with no input) |
 | I2 | Delete face field, click right on a block's top edge: "Face of Extrude 3" (face picked) | ✅ | 6acf6b94 (qa 10:28, our holeblock.step imported: Delete face, click exactly on the top front edge pixel → "Face of Import 1") |
 | I4 | Plane dialog, click Top in the list, move into the dialog: no row tooltip left | ✅ | 6acf6b94 (qa 10:28, our holeblock.step imported: same as 2.9, no row tooltip left after the click) |
-| API1 / API2 | fixed on agent/qa5 (CLI exits quietly on a closed pipe; tab_create takes "Part Studio" and lists the kinds in its error) | 🔧 |  |
+| API1 / API2 | fixed on agent/qa5 (CLI exits quietly on a closed pipe; tab_create takes "Part Studio" and lists the kinds in its error) | 🔧 → ✅ | skasm 10-31 CLI: tab_create kind "Part Studio" → "Part Studio 2"; a bad kind lists partstudio, assembly, drawing, featurestudio, materiallibrary, variablestudio; `noshape-cli tools \| head -1` exits 0, no panic |
 
 ## Re-run pass 22 (qa5, 2026-10-24, CLI built from main c59c5af9 after the api import/export batch; /root/qa5-scratch/pass21/impmatrix21.*)
 | I1 | unchanged (three volumes) | ✗ kern → now ✅ SAT 7582.989336, X_T 7583.000866, STEP 7582.977753 (skasm 10-31 main CLI, samples/g25-b.*; live 7582.912205 ± 4.22, all inside) |
