@@ -279,5 +279,45 @@ fn blend_rust_profile() {
         eprintln!("blend profile: live-30 edit commit {}: median {:.1} ms (min {:.1})", if rust { "noshape" } else { "OCCT" }, totals[2], totals[0]);
     }
     noshape_kernel::set_rust_blend(None);
+
+/// live-30-features' display meshes, noshape's mesher against BRepMesh: its parts as a regeneration leaves
+/// them, meshed on fresh copies (the mesh cache has none, as on open) at the display's deflections, median of 5
+/// each. For tools/tiers/perf.sh (no environment needed). `cargo test --release -p noshape-ops --test all
+/// regen_profile::bench_live30_display_mesh -- --ignored --nocapture --test-threads=1`
+#[test]
+#[ignore = "bench"]
+fn bench_live30_display_mesh() {
+    use noshape_kernel::{ShapeType, Transform, set_rust_mesh, tessellate, transform};
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf");
+    let tmp = std::env::temp_dir().join(format!("noshape-mesh-bench-{}.noshape", std::process::id()));
+    std::fs::copy(dir.join("live-30-features.noshape"), &tmp).unwrap();
+    let s = noshape_ops::session::Session::open(&tmp).unwrap();
+    let units = s.doc.settings.units;
+    let ps = s.doc.tabs.iter().find_map(|t| if let TabContent::PartStudio(ps) = &t.content { Some(ps.clone()) } else { None }).unwrap();
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let parts: Vec<noshape_kernel::Shape> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.shape.clone()).collect();
+    let faces: usize = parts.iter().map(|p| p.faces().len()).sum();
+    let times = |rust: bool| {
+        let mut v: Vec<f64> = (0..5)
+            .map(|_| {
+                let copies: Vec<_> = parts.iter().map(|p| transform(p, &Transform::Translate(DVec3::ZERO), true).unwrap().shape).collect();
+                for c in &copies {
+                    let _ = c.ancestor_map(ShapeType::Edge, ShapeType::Face).unwrap();
+                }
+                set_rust_mesh(rust);
+                let t = Instant::now();
+                for c in &copies {
+                    // The display's angle-based deflections (display.rs display_deflection).
+                    tessellate(c, c.bounding_box(false).unwrap().diagonal(), 2.0 * std::f64::consts::TAU / 144.0, true).unwrap();
+                }
+                set_rust_mesh(true);
+                t.elapsed().as_secs_f64() * 1e3
+            })
+            .collect();
+        v.sort_by(|a, b| a.total_cmp(b));
+        v[2]
+    };
+    let (ours, occt) = (times(true), times(false));
+    eprintln!("live-30 ({} parts, {faces} faces) display mesh: ours {ours:.1} ms, BRepMesh {occt:.1} ms: {:.1}×", parts.len(), occt / ours);
     let _ = std::fs::remove_file(&tmp);
 }
