@@ -4030,8 +4030,16 @@ impl AssemblyView {
     /// `[`: Measure tool on / off. While on, clicked faces, edges and vertices
     /// are measured (click again to drop one).
     pub(super) fn toggle_measure(&mut self, cx: &mut Context<Self>) {
-        self.ui.measure = if self.ui.measure.is_some() { None } else { Some(Vec::new()) };
-        self.ui.measure_result.clear();
+        // Opened, it measures the selected faces, edges and vertices (as the Part Studio's, live part-studio/82).
+        self.ui.measure = if self.ui.measure.is_some() {
+            None
+        } else {
+            Some(self.ui.entity_sel.iter().filter(|(_, r)| matches!(r, Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_))).cloned().collect())
+        };
+        self.ui.measure_result = match &self.ui.measure {
+            Some(picks) if !picks.is_empty() => noshape_model::assembly::analysis::measure_entities(&self.result, picks),
+            _ => Vec::new(),
+        };
         self.update_capture(cx);
         self.refresh_scene(false, cx);
         cx.notify();
@@ -4077,7 +4085,7 @@ impl AssemblyView {
         let units = self.units(cx);
         let settings = self.ui.measure_settings;
         let rows = crate::measure_panel::rows(&self.ui.measure_result, &settings, &units);
-        let (v1, v2) = (cx.entity(), cx.entity());
+        let (v1, v2, v3) = (cx.entity(), cx.entity(), cx.entity());
         let panel = crate::measure_panel::panel(
             selected,
             rows,
@@ -4089,10 +4097,26 @@ impl AssemblyView {
                     cx.notify();
                 })
             }),
+            // A chip's ×: that entity out of the measure.
+            std::rc::Rc::new(move |i, cx| {
+                v3.update(cx, |this, cx| {
+                    let Some(list) = &mut this.ui.measure else { return };
+                    if i >= list.len() {
+                        return;
+                    }
+                    list.remove(i);
+                    let picks = list.clone();
+                    this.ui.measure_result = if picks.is_empty() { Vec::new() } else { noshape_model::assembly::analysis::measure_entities(&this.result, &picks) };
+                    this.refresh_scene(false, cx);
+                    cx.notify();
+                })
+            }),
             std::rc::Rc::new(move |_, cx| v2.update(cx, |this, cx| this.toggle_measure(cx))),
             cx,
         );
-        Some(div().absolute().bottom(px(36.)).right(px(40.)).child(panel).into_any_element())
+        // As the Part Studio's (live part-studio/82): 2 px over the graphics area's bottom, flush right, over the
+        // evaluation tools (ME1).
+        Some(div().absolute().bottom(px(2.)).right_0().child(panel).into_any_element())
     }
 
     /// Shift+X / Section view…: open the dialog (from the hovered face or the

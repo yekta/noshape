@@ -19,7 +19,7 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | VC5 | Camera menu border | 1 px `#d7d7d7` (215) | `#ccc` (204), the right-click menu colour | ✅ `#d7d7d7` for the camera menu and its submenus | f9185639 10-28 |
 | VC6 | Submenus (Shaded…, Hidden edges…, Tangent edges…) | ✓ at +14, text at +29 from the border, like the main menu | ✓ +17, text +36 (right-click menu insets) | ✅ submenus inherit the camera menu's insets | f9185639 10-28 |
 | VC7 | Menu font | Flama 12 px `#555` | our UI font 12 px | – accepted: Flama is commercial; the app bundles Roboto, the closest freely licensed match (crates/app/assets/fonts/README.md, docs/ONSHAPE_UI_SPEC.md 2.1) |  |
-| VC8 | Assembly camera menu | (not compared yet) | a shorter dropdown (`assembly_view::render_camera_menu`, chevron caret) | ✗ to compare (assembly) |  |
+| VC8 | Assembly camera menu | (not compared yet) | a shorter dropdown (`assembly_view::render_camera_menu`, chevron caret) | ✅ psui 9b1b9b47 10-31 (asm5 copy, Assembly 1 ▾: Isometric, Dimetric, Trimetric | Graphics preferences… | Named views…, Previous view (grey) | Zoom to fit, Zoom to window | Perspective view | Shaded with edges ▸, Hidden edges removed ▸, Tangent edges visible ▸ | View in high quality | Section view… = live "qa5 assembly camera menu") |  |
 | VC9 | Esc with the camera menu open | closes it | did nothing: the viewport under the ▾ button took the click and the focus back from the menu | ✅ the button's container occludes the viewport | f9185639 10-28 |
 
 ## Feature-row tooltips (lead 10-22; live behaviours "Feature-row hover tooltips: Fillet / Chamfer / Shell")
@@ -97,7 +97,7 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | ME5 | Results | first row 31 px under the checkbox text; labels, values and units `#666` | 26 px; `#333` | ✅ | f9185639 10-28 |
 | ME6 | Footer | 1 px `#d7d7d7` line, 21 px `#eee` band, 12 px ? | the band only, hidden under the buttons | ✅ | f9185639 10-28 |
 | ME7 | Chip × | removes that entry from the selection | no action | ✅ | f9185639 10-28 |
-| ME8 | Assembly Measure panel (`measure_panel.rs`, shared code from icons2 Round 14) | as the Part Studio's | docked 36 px up / 40 px in, the old field, selects and colours | ✗ assembly (reported to the lead) |  |
+| ME8 | Assembly Measure panel (`measure_panel.rs`, shared code from icons2 Round 14) | as the Part Studio's | docked 36 px up / 40 px in, the old field, selects and colours | ✅ psui 10-31: drawn as the Part Studio's (grey ×, captioned chip field whose × drops the entity, full-row selects with the 7 px ▼, `#666` rows, "No measurements available…" box, footer band with ?), docked 2 px up over the evaluation tools; opened with a selection it measures the selected faces / edges / vertices | psui 9b1b9b47+ 10-31 (asm5 copy, Assembly 1, top face, [ → "Face of Part 1 <1>", Area 720.000 mm²; × → empty) |
 | ME9 | Nothing to measure (a lone plane; live part-studio/2244) | a 202 px info box (`#def1fb`, 1 px `#b2ddf6`) 5 px in, 14 px `#094174` on 21 px lines, two lines | a 12 px grey line, cut off at the panel edge | ✅ box exact (x/y to the pixel); the line breaks before "for" instead of after it because our UI font is wider (VC7) | f9185639 10-28 |
 
 ## qa5 re-run pass 21 (2026-10-23, app = target-lead 17:10, main 88fbf8f)
@@ -105,7 +105,7 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 |---|---|---|---|
 | VC8 Assembly camera menu | Isometric, Dimetric, Trimetric \| Zoom to fit \| Perspective view, Show mates; larger rows, chevron caret; the Part Studio menu (v01) has the full live list | ? live capture requested ("qa5 (10-23 pass 21, ui VC8)") |  |
 | VC7 menu font, KS1 shortcuts pop-out page | not local (app-wide font / new window) | – VC7 accepted (Flama is commercial, Roboto bundled); ✅ KS1 (row KS1 above) |  |
-| VC8 (live answered, behaviours "qa5 assembly camera menu") | live = Part Studio menu minus "Orient normal to sketch on edit" / "Highlight boundary edges", no "Show mates". qa5: "Show mates" removed, "Section view…" added; the rest needs assembly features (render modes, named / previous views, graphics prefs, zoom to window, high quality) → qa5-routing ui | 🔧 partly / ✗ ui |  |
+| VC8 (live answered, behaviours "qa5 assembly camera menu") | live = Part Studio menu minus "Orient normal to sketch on edit" / "Highlight boundary edges", no "Show mates". qa5: "Show mates" removed, "Section view…" added; the rest needs assembly features (render modes, named / previous views, graphics prefs, zoom to window, high quality) → qa5-routing ui | ✅ (the shared camera menu, Part Studio items off) | psui 10-31 |  |
 
 ## 10. Sheet metal table and flat view (SM4; live "qa5 sm" (8), qa5/sm-091…105, dark/dk-973, behaviours "ui (10-24 a)")
 

@@ -208,6 +208,11 @@ switched on after the regeneration with `set_kernel_profile`). b947eff0: **cold 
 10.4–10.6×. Per cold mesh: brep's faces 1.25 ms (the tori), its output copy 0.63, mesh_fill 0.77, edges 0.2, box 0.2.
 10× would be ~1.1 ms in all, below our face meshing alone: live-30 stays ~3.5× short of a faster strip/torus mesher
 (the filleted boss is 1.4× BRepMesh: 1.85 against 2.64 ms). Not pursued further unless the lead asks.
+10-31 07:00–09:30: lead's parity sweep (core-workflow, chrome sweep, part-studio, keyboard-mouse, interaction, large
+models, featurescript, configurations, variable studios, dark mode). Nearly every open row was a stale log row that a
+later pass had fixed; marked so with the evidence (9b1b9b47). Re-checked in the app: KB1, KB3, FS1/FS2/FS4/FS5, ADV3,
+VC8. Fixed: ME8 (assembly Measure panel as the Part Studio's, opened on the selection). Fonts (VC7/RP7/MP3) accepted
+(Flama is commercial). Open: core-workflow (d) parts-1000 orbit fps (perf 41179398098 running), SM4i / SM4k (skasm).
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC
@@ -530,6 +535,10 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- (10-31) For skasm (sheet-metal model), from the chrome-sweep rows I own: **SM4i** the Other joints Type ▾ / Style ▾
+  need Modify joint to restyle an existing rip (now "The joint is already a rip") and to turn a rip into a bend from
+  the table; **SM4k** the flat pattern is one face (live: a face per wall and per bend zone, with the zone edges), so
+  hovering lights the whole flat. psui adds the table dropdowns once the model takes them.
 - (10-30 20:40) tools/tiers/perf-remote.sh: the checkout of the shared ~/perf/wt happens before `flock 7` (one perf
   run at a time), so a run waiting on the lock gets its tree replaced by the next run's checkout and builds / times
   that commit while printing its own sha. Seen twice: psui 3494042f's `rust_mesh::bench_profile_fin` ran 0 tests (175

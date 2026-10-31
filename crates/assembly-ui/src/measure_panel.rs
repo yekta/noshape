@@ -3,9 +3,8 @@
 //! "Measure" and a close button, the "Select entities to measure" field,
 //! Measure type, Length unit and Angle unit selects, the Reference coordinate
 //! system checkbox, and one row per result (distances with signed X / Y / Z
-//! sub-rows). Shared by the Assembly (icons2 Round 14: its panel lacked these
-//! fields); the Part Studio has its own copy in part_studio/menus.rs with the
-//! (x) variable buttons.
+//! sub-rows). The Assembly's (icons2 Round 14), drawn as the Part Studio's
+//! own copy in part_studio/menus.rs, which adds the (x) variable buttons.
 
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
@@ -137,22 +136,28 @@ pub fn rows(results: &[(String, Measurement)], settings: &MeasureSettings, doc_u
 
 type Set = Rc<dyn Fn(MeasureSettings, &mut App)>;
 type Close = Rc<dyn Fn(&mut Window, &mut App)>;
+type Remove = Rc<dyn Fn(usize, &mut App)>;
 
-/// The panel (positioned by the caller). `selected`: the picked entities'
-/// names for the field; `set`: a choice changed; `close`: the ×.
-pub fn panel(selected: Vec<String>, rows: Vec<Row>, settings: MeasureSettings, doc_units: UnitPrefs, set: Set, close: Close, cx: &App) -> Stateful<Div> {
+/// The panel, docked by the caller as the Part Studio's (2 px over the graphics area's bottom, flush right, over
+/// the evaluation tools). `selected`: the picked entities' names for the field; `set`: a choice changed;
+/// `remove`: a chip's × (its index); `close`: the ×. Drawn as the Part Studio's (part_studio/menus.rs, live
+/// part-studio/82 and 2244; chrome sweep ME2–ME9).
+#[allow(clippy::too_many_arguments)]
+pub fn panel(selected: Vec<String>, rows: Vec<Row>, settings: MeasureSettings, doc_units: UnitPrefs, set: Set, remove: Remove, close: Close, cx: &App) -> Stateful<Div> {
     let pal = p();
     let units = settings.units(&doc_units);
     let plain = |cx: &App| ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.row_hover.into()).active(pal.accent_soft.into()).shadow(false);
-    // A row's select: the value on an underline with a caret, its list below.
+    // Live (part-studio/82, at 1×): the select over the rest of the row, 14 px black text and a 7 px `#777` ▼ 7 px
+    // in from the end of its `#d7d7d7` underline (5 px from the panel's edge).
     let select = |id: &'static str, value: String, items: Vec<(String, MeasureSettings)>, cx: &App| {
         let set = set.clone();
         Button::new(id)
             .custom(plain(cx))
-            .child(h_flex().w_full().child(div().flex_1().text_size(px(13.33)).child(value.clone())).child(crate::ui::glyph("ui-caret-down", 10., pal.text)))
-            .flex_1()
-            .h(px(22.))
-            .px(px(4.))
+            .child(h_flex().w_full().child(div().flex_1().text_size(px(14.)).text_color(rgb(0x000000)).child(value.clone())).child(crate::ui::glyph("ui-select-caret", 7., rgb(0x777777))))
+            .w_full()
+            .h(px(24.))
+            .pl(px(4.))
+            .pr(px(7.))
             .rounded(px(0.))
             .border_b_1()
             .border_color(pal.border)
@@ -171,19 +176,49 @@ pub fn panel(selected: Vec<String>, rows: Vec<Row>, settings: MeasureSettings, d
     let angle_items = ANGLE_UNITS.iter().map(|(n, u)| (n.to_string(), MeasureSettings { angle: Some(*u), ..settings })).collect();
     let length_name = LENGTH_UNITS.iter().find(|(_, u)| *u == units.length).map(|(n, _)| n.to_string()).unwrap_or_default();
     let angle_name = ANGLE_UNITS.iter().find(|(_, u)| *u == units.angle).map(|(n, _)| n.to_string()).unwrap_or_default();
-    let select_row = |label: &'static str, menu: AnyElement| h_flex().h(px(26.)).px(px(5.)).gap(px(4.)).child(div().text_size(px(12.)).text_color(pal.text).child(label)).child(menu);
-    // Onshape's selection box: `#def1fb` with a 1 px blue border (active),
-    // the caption small on top once something is listed.
+    // A 12 px `#666` label, then the select.
+    let select_row = |label: &'static str, menu: AnyElement| h_flex().h(px(26.)).px(px(5.)).gap(px(4.)).child(div().text_size(px(12.)).text_color(pal.text_muted).child(label)).child(div().flex_1().mt(px(2.)).child(menu));
+    // Onshape's selection box: `#def1fb` with a 1 px blue border (active), the caption small on top once something
+    // is listed; a 20 × 24 × cell per chip (`#666` ink, red on hover) that drops it; every second chip 35 % lighter.
+    let nothing = rows.is_empty() && !selected.is_empty();
     let empty = selected.is_empty();
     let field = v_flex()
         .mx(px(3.))
-        .my(px(2.))
+        .mt(px(5.))
+        .mb(px(5.))
         .rounded(px(2.))
         .border_1()
         .border_color(pal.accent)
         .bg(pal.row_hover)
-        .child(div().px(px(6.)).flex().items_center().when(empty, |d| d.h(px(24.)).text_size(px(12.))).when(!empty, |d| d.h(px(16.)).pt(px(2.)).text_size(px(10.))).text_color(rgb(0x555555)).child("Select entities to measure"))
-        .children(selected.into_iter().map(|t| h_flex().h(px(24.)).px(px(6.)).text_size(px(13.33)).text_color(rgb(0x555555)).child(div().flex_1().truncate().child(t)).child(div().text_color(pal.text_muted).child("×"))));
+        .child(div().px(px(6.)).flex().items_center().when(empty, |d| d.h(px(25.)).pt(px(2.)).text_size(px(12.))).when(!empty, |d| d.h(px(16.)).pt(px(2.)).text_size(px(10.))).text_color(rgb(0x555555)).child("Select entities to measure"))
+        .children(selected.into_iter().enumerate().map(|(i, t)| {
+            let remove = remove.clone();
+            h_flex()
+                .id(SharedString::from(format!("measure-chip-{i}")))
+                .h(px(24.))
+                .pl(px(6.))
+                .pr(px(5.))
+                .text_size(px(13.33))
+                .text_color(rgb(0x555555))
+                .when(i % 2 == 1, |d| d.bg(hsla(0., 0., 1., 0.35)))
+                .child(div().flex_1().truncate().child(t))
+                .child(
+                    div()
+                        .id("x")
+                        .group("measure-x")
+                        .w(px(20.))
+                        .h(px(24.))
+                        .pl(px(5.))
+                        .flex()
+                        .items_center()
+                        .cursor_pointer()
+                        .child(crate::ui::glyph("ui-clear", 9., pal.icon_tertiary).group_hover("measure-x", |s| s.text_color(pal.error)))
+                        .on_click(move |_, _, cx| {
+                            cx.stop_propagation();
+                            remove(i, cx);
+                        }),
+                )
+        }));
     // The distance row an X / Y / Z row belongs to (picks its glyph).
     let mut parent = String::new();
     let result_rows: Vec<AnyElement> = rows
@@ -195,7 +230,8 @@ pub fn panel(selected: Vec<String>, rows: Vec<Row>, settings: MeasureSettings, d
             // "12.5 in" -> monospace number on an underline and the unit.
             let (num, unit) = r.value.split_once(' ').map(|(n, u)| (n.to_string(), u.to_string())).unwrap_or((r.value.clone(), String::new()));
             let value = h_flex().gap(px(2.)).child(crate::ui::measure_value(num)).child(div().text_size(px(12.)).child(unit));
-            let row = h_flex().min_h(px(26.)).px(px(4.)).gap(px(4.)).text_size(px(12.)).text_color(pal.text);
+            // Live (part-studio/82): labels, values and units all `#666`.
+            let row = h_flex().min_h(px(26.)).pl(px(4.)).pr(px(9.)).gap(px(4.)).text_size(px(12.)).text_color(pal.text_muted);
             match r.axis {
                 // Live (part-studio/495): the letter, then a glyph in the axis
                 // colour: arrows under a distance, converging arrows under Min
@@ -216,6 +252,7 @@ pub fn panel(selected: Vec<String>, rows: Vec<Row>, settings: MeasureSettings, d
             .into_any_element()
         })
         .collect();
+    let help = div().size(px(14.)).rounded_full().flex().items_center().justify_center().child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)));
     v_flex()
         .id("measure-panel")
         .occlude()
@@ -225,6 +262,7 @@ pub fn panel(selected: Vec<String>, rows: Vec<Row>, settings: MeasureSettings, d
         .text_color(pal.text)
         .child(
             h_flex().h(px(29.)).pl(px(6.)).border_b_1().border_color(pal.border).child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Measure")).child(
+                // Live (part-studio/82): a thin `#999` ×, not the dialogs' red ✕.
                 div()
                     .id("measure-close")
                     .size(px(28.))
@@ -233,7 +271,7 @@ pub fn panel(selected: Vec<String>, rows: Vec<Row>, settings: MeasureSettings, d
                     .justify_center()
                     .cursor(CursorStyle::Arrow)
                     .hover(|d| d.bg(pal.panel_hover))
-                    .child(crate::assets::icon("dialog-cancel", 24., cx))
+                    .child(crate::ui::glyph("panel-close", 20., rgb(0x999999)))
                     .on_click(move |_, window, cx| close(window, cx)),
             ),
         )
@@ -242,7 +280,16 @@ pub fn panel(selected: Vec<String>, rows: Vec<Row>, settings: MeasureSettings, d
         .child(select_row("Length unit:", select("measure-length-unit", length_name, length_items, cx)))
         .child(select_row("Angle unit:", select("measure-angle-unit", angle_name, angle_items, cx)))
         .child(crate::ui::os_checkbox("measure-ref", "Reference coordinate system", false))
+        .child(div().h(px(5.)))
+        // Live (part-studio/2244): a selection with nothing to measure says so in a 202 px info box.
+        .when(nothing, |d| {
+            let (fill, outline, text) = crate::ui::alert_colors(crate::ui::AlertKind::Info);
+            d.child(div().mt(px(6.)).mb(px(9.)).ml(px(5.)).w(px(202.)).rounded(px(2.)).border_1().border_color(outline).bg(fill).pt(px(4.)).pb(px(7.)).px(px(11.)).text_size(px(14.)).line_height(px(21.)).text_color(text).child("No measurements available for current selection."))
+        })
         .children(result_rows)
+        // Live: a 1 px `#d7d7d7` line over a 21 px `#eee` band with the ?.
+        .child(div().h(px(6.)))
+        .child(h_flex().h(px(22.)).px(px(4.)).justify_end().border_t_1().border_color(pal.border).bg(rgb(0xeeeeee)).child(help))
 }
 
 #[cfg(test)]
