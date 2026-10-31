@@ -484,6 +484,7 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
         }
     }
     loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
+    let shape = shape.map(|s| split_bend_zones(&s, &frame, &lines));
     Ok(FlatPattern { frame, loops, bend_lines: lines, forms, heads, shape, thickness: t, warnings, built_for: None })
 }
 
@@ -517,7 +518,34 @@ pub fn flat_from_pieces(frame: k::Plane, pieces: &[Shape], bend_lines: Vec<FlatB
         }
     }
     loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
+    let shape = shape.map(|s| split_bend_zones(&s, &frame, &bend_lines));
     Ok(FlatPattern { frame, loops, bend_lines, forms: Vec::new(), heads: Vec::new(), shape, thickness, warnings, built_for: None })
+}
+
+/// The flat region split along both sides of every bend zone (the strip
+/// `allowance` wide centred on its bend line): live's flat has a face per
+/// wall and per bend zone, with solid edges between them (qa5 sm-091, psui
+/// SM4k). The outline loops are taken before, from the merged region.
+fn split_bend_zones(shape: &Shape, frame: &k::Plane, lines: &[FlatBendLine]) -> Shape {
+    let mut edges = Vec::new();
+    for l in lines.iter().filter(|l| l.allowance > 1e-9) {
+        let d = l.b - l.a;
+        let Some(u) = d.try_normalize() else { continue };
+        // A hair past both ends, so each edge crosses the outline.
+        let (n, ext) = (DVec2::new(-u.y, u.x) * (l.allowance * 0.5), u * 1e-6);
+        for side in [1.0, -1.0] {
+            if let Ok(e) = k::make_line(frame.to_world(l.a + n * side - ext), frame.to_world(l.b + n * side + ext)) {
+                edges.push(e);
+            }
+        }
+    }
+    if edges.is_empty() {
+        return shape.clone();
+    }
+    match k::imprint(shape, &edges) {
+        Ok(r) if r.shape.count(ShapeType::Face) > shape.count(ShapeType::Face) => r.shape,
+        _ => shape.clone(),
+    }
 }
 
 fn extent(l: &[DVec2]) -> f64 {

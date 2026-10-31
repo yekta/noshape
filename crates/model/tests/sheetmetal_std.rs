@@ -657,6 +657,8 @@ fn a_shallow_flange_unfolds_flat() {
     let r = s.ok();
     let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
     let n = flat.frame.normal.normalize();
+    // Live (qa5 sm-091, psui SM4k): a face per wall and per bend zone.
+    assert_eq!(flat.shape.as_ref().expect("flat shape").faces().len(), 3, "plate, bend zone, flange");
     for f in flat.shape.as_ref().expect("flat shape").faces() {
         let p = f.face_plane().ok().flatten().expect("a planar flat face");
         assert!(p.unit_normal().cross(n).length() < 1e-9, "a flat face off the flat's plane: {:?}", p.unit_normal());
@@ -730,6 +732,40 @@ fn butt_joint_direction_follows_the_first_picked_flange_edge() {
         assert!((volume_mm3(&r) - 8576.138684233867).abs() < 1e-3 && areas.len() == 24, "{case}: {} mm³, {} faces", volume_mm3(&r), areas.len());
         assert_eq!((has(992.0), has(672.0)), (front_through, !front_through), "{case}: {:#?}", face_report(&r));
     }
+}
+
+/// psui SM4i (the sheet metal table's Other joints Type / Style): Modify
+/// joint on G34's corner rip restyles it and turns it into a bend, the rip
+/// gone from the model data either way it ends up.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn modify_joint_restyles_a_rip_and_turns_it_into_a_bend() {
+    use noshape_model::sheetmetal::BendKind;
+    let joints = |r: &RegenResult| {
+        let data = r.context.sheet_metal.get(&r.context.bodies[part(r)].id).expect("data");
+        (data.rips.iter().map(|x| x.style.clone()).collect::<Vec<_>>(), data.bends.iter().filter(|b| matches!(b.kind, BendKind::Bend)).count())
+    };
+    let mut s = g34();
+    let r = s.ok();
+    assert_eq!(joints(&r), (vec!["EDGE".to_string()], 2));
+    let end = edge_at(&r, DVec3::new(0.02, 0.0, 12.0));
+    s.add("sheetMetalJoint", |p| {
+        p.set("entity", ParamValue::Query(vec![end.clone()]));
+        p.set("jointType", en("RIP"));
+        p.set("hasStyle", ParamValue::Bool(true));
+        p.set("jointStyle", en("BUTT"));
+    });
+    let r = s.ok();
+    assert_eq!(joints(&r), (vec!["BUTT".to_string()], 2));
+    s.ps.features.pop();
+    s.add("sheetMetalJoint", |p| {
+        p.set("entity", ParamValue::Query(vec![end]));
+        p.set("jointType", en("BEND"));
+        p.set("useDefaultRadius", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let (rips, bends) = joints(&r);
+    assert!(rips.is_empty() && bends == 3, "rips {rips:?}, {bends} bends: {} mm³, {:#?}", volume_mm3(&r), face_report(&r));
 }
 
 /// A cut after the flanges keeps their bends (std cuts the definition sheet;

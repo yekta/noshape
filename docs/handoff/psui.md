@@ -554,3 +554,18 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 - (FYI from skasm 10-30, lead-approved) `OsSelect::set_pictures(id → RenderImage)`: rows of items with a picture are 40 px with a
   70 × 40 image before the label (live Form ▾ of the form library, request 1622 (d)). No picture set: unchanged.
 - skasm 10-31 (in your crate): part_studio/analysis_tools.rs `isocurve_overlay` draws Show isocurves (Loft, Boundary surface, Fill, Fillet …) and Show ruled lines (Ruled surface) while the dialog is open, in vivid magenta #d403f9 (help "colors"). It's cached per preview in `UiState::isocurves`, and the lines come from noshape_model::analysis::feature_isocurves / feature_ruled_lines.
+- skasm 10-31, **SM4i / SM4k: the model supports both now** (your Requests to the lead, 10-31):
+  - **SM4i:** sheet metal runs by std (the default; the native evaluator, with its "The joint is already a rip", only
+    runs for sheet metal saved before std or a regeneration without the FeatureScript host). std's Modify joint restyles
+    a rip and turns it into a bend. T2 sheetmetal_std `modify_joint_restyles_a_rip_and_turns_it_into_a_bend`, on G34's
+    Joint C:
+    - Style: `sheetMetalJoint` with `entity` = an edge of a wall end at the rip (e.g. the y = 0 flange's end edge at
+      (0.02, 0, 12) mm), `jointType` RIP, `hasStyle` true, `jointStyle` EDGE / BUTT / BUTT2 → the rip's style changes.
+    - Type: the same feature with `jointType` BEND (`useDefaultRadius` true) → the rip becomes a third bend.
+    So the Other joints Type ▾ / Style ▾ can add / edit a Modify joint feature.
+  - **SM4k:** `FlatPattern.shape` (and so `flat_view_solid()`) now has a face per wall and per bend zone, split along
+    both sides of every bend zone. The outline `loops`, DXF and drawings are unchanged. G34's flat has 5 faces; T2 a
+    one-flange flat has 3.
+    - GUI :103 on G34: the zone edges draw as solid lines beside the dashed bend lines, as sm-091.
+    - Your flat hover still outlines the whole flat. Hover / pick by face of the flat view solid to get live's
+      one-face #FFC685 outline.

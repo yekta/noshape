@@ -18,8 +18,8 @@ Status: ✅ matches live/expected, ✗ differs, ? live data pending.
 | 6 | Wall hole + Linear pattern 25×3 | 63671.3275 | 63671.3275, 16 | 0.33 + 0.44 | ✅ | 0.4.10+ / 8602df0d 10-27 (app: every feature Ok, final 67191.328 = live; pattern flipped per live's edge rule) |
 | 7 | Gusset 5 Add | 65431.3275 | 65431.3275, 18 | 0.52 | ✅ | 0.4.10+ / 8602df0d 10-27 (app: every feature Ok, final 67191.328 = live; pattern flipped per live's edge rule) |
 | 8 | Feature mirror of the gusset about Plane 1 (Reapply features off, the default) | 67191.3275 (live result ?) | **Error "Could not create all instances as entered. Try selecting "Reapply features" option."**; with Reapply ☑: **67191.3275, 20 faces** | 0.41 | ✅ ADV9 fixed: the feature mirror (Reapply off) is OK on main (CLI mkbracket.py step 8); live OK | skasm 10-31 (main CLI; app 8602df0d 10-27: every feature Ok, final 67191.328 = live) |
-| 9 | App: Features header stopwatch | live: "Show regeneration times" (per-feature times; Performance panel total) | floating "Regeneration times" popup: total **438.4 ms** on open (Extrude 2 74 ms, Extrude 5 75 ms, Mirror 92 ms) | – | ? (look + live times pending) |  |
-| 10 | Edit Extrude 1 depth 8 → 10 (later features roll back while the dialog is open) | 73262.5555 by hand | **73262.555**, total regen **278.9 ms**, no errors | – | ✅ / ? time | 0.4.10+ / 8602df0d 10-27 (73262.555 = live; commit 342 ms: REGEN-SPEED) |
+| 9 | App: Features header stopwatch | live: "Show regeneration times" (per-feature times; Performance panel total) | floating "Regeneration times" popup: total **438.4 ms** on open (Extrude 2 74 ms, Extrude 5 75 ms, Mirror 92 ms) | – | ? (look + live times pending) → now ✅ look = live (REG1 below: # \| Feature name \| Time ▾, blue bars, "Total regen time"); times ✅ PERF2 (tools/tiers/perf.sh on vibe3, release, ce2a0926, T2 bracket_perf: open 26.5 / 26.7 / 28.8 ms, depth edit 27.4 / 27.7 / 28.0 ms (Onshape 77 / 70 ms; slowest Linear pattern 10.1 ms, Mirror 3.0 ms)) |  |
+| 10 | Edit Extrude 1 depth 8 → 10 (later features roll back while the dialog is open) | 73262.5555 by hand | **73262.555**, total regen **278.9 ms**, no errors | – | ✅ / ? time → now ✅ faster than live (tools/tiers/perf.sh on vibe3, release, ce2a0926, T2 bracket_perf: open 26.5 / 26.7 / 28.8 ms, depth edit 27.4 / 27.7 / 28.0 ms (Onshape 77 / 70 ms; slowest Linear pattern 10.1 ms, Mirror 3.0 ms)) | 0.4.10+ / 8602df0d 10-27 (73262.555 = live; commit 342 ms: REGEN-SPEED) |
 | 11 | Ctrl+Z | back to 8 | back to 8 | – | ✅ | 0.4.10+ / 8602df0d 10-27 (Ctrl+Z 3.3 ms) |
 
 Findings: **ADV9** feature mirror of an Add extrude that touches two faces fails without Reapply features (psb; confirm with live step 8).
@@ -29,11 +29,11 @@ Findings: **ADV9** feature mirror of an Add extrude that touches two faces fails
 | # | Row | Live | Ours | Verdict |
 |---|---|---|---|---|
 | 1–8 | Volumes / faces | 32000 / 65280 / 64475.7523 / 64389.9115 / 64349.9115 / 63671.3275 / 65431.3275 / **67191.3275328646, 20 faces** | identical at every step | ✅ |
-| 8 | Feature mirror, Reapply off | **OK** (Mirror 1 8 ms) | Error "Could not create all instances…" | ✗ **ADV9 confirmed** |
+| 8 | Feature mirror, Reapply off | **OK** (Mirror 1 8 ms) | Error "Could not create all instances…" | ✗ **ADV9 confirmed** → now ✅ ADV9 (853cf16b; T2 bracket_perf::bracket_regenerates_like_onshape: every feature Ok, 67191.3275 mm³ / 20 faces, 73262.555 after 8 → 10) |
 | 9 | Extrude 1 8 → 10 | 73262.5554193746 | 73262.555 | ✅ |
-| – | Total regen after step 8 | **77 ms** (slowest Mirror 1 8 ms) | 438.4 ms on open (debug build; Mirror 1 92 ms, Extrude 2/5 ≈ 75 ms) | ✗ **PERF2** (re-measure on a release build) |
-| – | After the 8 → 10 edit | 70 ms | 278.9 ms (debug) | ✗ PERF2 |
-| – | "Regeneration times" dialog | 350 px floating dialog next to the feature list: table **# \| Feature name \| Time**, a **blue bar under each time**, **sorted by Time ▾ (slowest first)**, footer **"Total regen time: N ms"** | popup with rows in feature order, no #, no bars, no sort, total as a header line "Total regeneration time: 438.4 ms" | ✗ **REG1** |
+| – | Total regen after step 8 | **77 ms** (slowest Mirror 1 8 ms) | 438.4 ms on open (debug build; Mirror 1 92 ms, Extrude 2/5 ≈ 75 ms) | ✗ **PERF2** (re-measure on a release build) → now ✅ (tools/tiers/perf.sh on vibe3, release, ce2a0926, T2 bracket_perf: open 26.5 / 26.7 / 28.8 ms, depth edit 27.4 / 27.7 / 28.0 ms (Onshape 77 / 70 ms; slowest Linear pattern 10.1 ms, Mirror 3.0 ms)) |
+| – | After the 8 → 10 edit | 70 ms | 278.9 ms (debug) | ✗ PERF2 → now ✅ (tools/tiers/perf.sh on vibe3, release, ce2a0926, T2 bracket_perf: open 26.5 / 26.7 / 28.8 ms, depth edit 27.4 / 27.7 / 28.0 ms (Onshape 77 / 70 ms; slowest Linear pattern 10.1 ms, Mirror 3.0 ms)) |
+| – | "Regeneration times" dialog | 350 px floating dialog next to the feature list: table **# \| Feature name \| Time**, a **blue bar under each time**, **sorted by Time ▾ (slowest first)**, footer **"Total regen time: N ms"** | popup with rows in feature order, no #, no bars, no sort, total as a header line "Total regeneration time: 438.4 ms" | ✗ **REG1** → now ✅ REG1 (pass 21 below) |
 
 ## Agent CLI vs UI build (pass 4, 2026-10-21; UI /tmp/qa5/noshape-1448 in qa5-bracket-ui.noshape, CLI = mkbracket.py)
 
@@ -63,7 +63,7 @@ UI findings while building:
 - Remove + Through all: Merge scope **auto-filled "Part 1"** (ours empty ✗ **EXT1**, minor), default direction into the material (ours ✅).
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
-| RD1 volume readout | stays 64475.752 after Extrude 1 8 → 10 (real 70994.690) | ✗ still |
+| RD1 volume readout | stays 64475.752 after Extrude 1 8 → 10 (real 70994.690) | ✗ still → now ✅ RD1: the readout shows no part volume (live: only Mass properties does) and every geometry change clears the measure cache (part_studio/mod.rs "qa5 RD1") |
 
 ## Re-run pass 21 (2026-10-23, CLI built from main 88fbf8f; /root/qa5-scratch/pass3/mkbracket2.py = mkbracket + Merge with all on Add/Remove, since an empty merge scope now errors as live)
 Steps 1–7 OK (65431.3275 after the gusset); step 8 feature mirror (Reapply off): still "Could not create all instances as entered. Try selecting "Reapply features" option." → ✗ ADV9, routed psb.
@@ -71,20 +71,20 @@ Steps 1–7 OK (65431.3275 after the gusset); step 8 feature mirror (Reapply off
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app)
 | REG1 | Regeneration times: floating dialog, # \| Feature name \| Time ▾ (slowest first), blue bar under each time, footer "Total regen time: 16ms" | ✅ fixed |
 | RD1 | no stale volume readout after the part goes | ✅ fixed |
-| PERF2 | debug build only here; re-measure on a release build | perf |
+| PERF2 | debug build only here; re-measure on a release build | perf → now ✅ (tools/tiers/perf.sh on vibe3, release, ce2a0926, T2 bracket_perf: open 26.5 / 26.7 / 28.8 ms, depth edit 27.4 / 27.7 / 28.0 ms (Onshape 77 / 70 ms; slowest Linear pattern 10.1 ms, Mirror 3.0 ms)) |
 
 ## Re-run pass 24 (qa5, 2026-10-24 23:5x, CLI target-engine 13:51, pass3/mkbracket2.py)
 | Step | Ours | Status | Verified |
 |---|---|---|---|
 | 1–7 (base, wall, holes, fillet R5, chamfer, wall hole, pattern 25×3, gusset) | all Ok; 32000 → 65280 → 64475.7523 → 64389.9115 → 64349.9115 → 64123.7169 → 63671.3275 → 65431.3275 mm³; each call ≤ 0.6 s | ✅ | 0.4.10+ / 8602df0d 10-27 (app: every feature Ok, final 67191.328 = live; pattern flipped per live's edge rule) |
-| 8 ADV9 Feature mirror of the gusset (Reapply off) | Error "Could not create all instances as entered. Try selecting "Reapply features" option." (live OK 67191.3275) | ✗ still on main; psb's fix 853cf16b is in ready/psb (FAILED in the queue 20:01) |  |
+| 8 ADV9 Feature mirror of the gusset (Reapply off) | Error "Could not create all instances as entered. Try selecting "Reapply features" option." (live OK 67191.3275) | ✗ still on main; psb's fix 853cf16b is in ready/psb (FAILED in the queue 20:01) → now ✅ ADV9 (T2 bracket_perf::bracket_regenerates_like_onshape: every feature Ok, 67191.3275 mm³ / 20 faces, 73262.555 after 8 → 10) |  |
 
 ## Release re-check v0.4.8 (qa5, 2026-10-25 02:15, release asset noshape-cli 0.4.8 linux-x86_64, pass3/mkbracket2.py)
 | Step | Ours | Status | Verified |
 |---|---|---|---|
 | 1–7 | same as pass 24: 32000 → … → 65431.3275 mm³, 18 faces; each step 0.1–0.3 s | ✅ | 0.4.10+ / 8602df0d 10-27 (app: every feature Ok, final 67191.328 = live; pattern flipped per live's edge rule) |
-| 8 ADV9 Feature mirror of the gusset | Error "Could not create all instances as entered…"; app tree shows Mirror 1 red | ✗ still in v0.4.8 (psb) |  |
-| 8 ADV9 on main 10195656 (target-engine CLI 06:17) | same Error | ✗ still; psb's fix 853cf16b sits in ready/psb, whose queue status is CONFLICT since 21:44 (not re-marked yet) |  |
+| 8 ADV9 Feature mirror of the gusset | Error "Could not create all instances as entered…"; app tree shows Mirror 1 red | ✗ still in v0.4.8 (psb) → now ✅ ADV9 (T2 bracket_perf::bracket_regenerates_like_onshape: every feature Ok, 67191.3275 mm³ / 20 faces, 73262.555 after 8 → 10) |  |
+| 8 ADV9 on main 10195656 (target-engine CLI 06:17) | same Error | ✗ still; psb's fix 853cf16b sits in ready/psb, whose queue status is CONFLICT since 21:44 (not re-marked yet) → now ✅ ADV9 (row "on green 461aefb0" below; T2 bracket_perf::bracket_regenerates_like_onshape: every feature Ok, 67191.3275 mm³ / 20 faces, 73262.555 after 8 → 10) |  |
 | 8 ADV9 on green 461aefb0 (app, psb 853cf16b) | Mirror 1 regenerates (row not red); the mirrored gusset sits at the wall's right end | ✅ **fixed** | 0.4.10+ / 8602df0d 10-27 (Mirror 1 Ok) |
 
 ## Re-run on green 8602df0d (qa, 2026-10-27 19:58, app, /root/qa5-scratch/run/docs/bracket24.noshape copy)

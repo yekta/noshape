@@ -184,6 +184,26 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
 (none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
 "tools/tiers/land.sh".)
 
+## Lead 10-31 (3): the view cube "Bottom"; the unowned sheets (import-edit, bracket, sheet-metal-joints, undo, document, derived, units, account)
+- **n twice / view cube:** the GUI already matched live: Bottom drawn mirrored, X to the left, labels mirrored (GUI :103, ui/nn12.png). Only the CLI's `standard_view` field was null. It now names the view cube face looked at square on (`bottom`), T e2e view_camera_menus.
+- **workflow-import-edit:** I1 = live within its bounds: SAT 7582.989, X_T 7583.001, STEP 7582.978 vs 7582.912 ± 4.22 (main CLI). Same-name imports "g25-b (1)", "(2)" = live. I4 / I6 / TAB1 / API1 / API2 point at their fixes.
+- **workflow-bracket:**
+  - ADV9: covered by T2 bracket_perf (every feature Ok, 67191.3275 / 20 faces, 73262.555 after the edit).
+  - REG1: live's dialog. RD1: no part volume in the readout, and the measure cache is cleared on every geometry change.
+  - PERF2: faster than live on vibe3 (perf.sh, release): open 26.5 ms, depth edit 27.4 ms (Onshape 77 / 70).
+- **workflow-sheet-metal-joints:** SML1, SM4, RIP1, BEND1 / 2, JOG1 and the dialogs are fixed by later passes. The tab volume is exact by construction.
+- **workflow-undo:** UNDO1 is fixed. **UNDO3** (live: a drawing note is two undo steps, the first invisible) stays with dx (drawing editor code).
+- **workflow-document:** DOC1 IGES and I5 Parasolid headers re-checked by CLI. The Parasolid header has live's schema and names noshape as the application. "B1" prefill = live.
+- **workflow-derived:**
+  - Rows 6 / 9 / 11 = live ("qa5 derived" (2), (3), (6)); the row menu's only difference is the cloud-only Add comment.
+  - Plane readout = live (none). DER4 / 13 / 14, CRASH1 fixed.
+  - Live request "skasm (2026-10-31 09:30)": (a) context icon on another part of the same studio, (b) Ctrl+C on a part.
+- **workflow-units:** an edited value shows converted, and as typed while focused, = live. Live's Pound units come from its imperial account Preferences, the same mechanism as ours.
+- **account.md:** every ❌ / ⏳ row is built now (preferences.md is the current sheet). Only Labs (cloud) is left.
+- **psui's SM4i / SM4k (lead 10-31), model side done; psui told (psui.md):**
+  - SM4i: std (the default) Modify joint restyles a rip and turns it into a bend (T2 `modify_joint_restyles_a_rip_and_turns_it_into_a_bend`). The native "already a rip" path is legacy only and was left as is.
+  - SM4k: the flat pattern's shape is split along both sides of every bend zone (`split_bend_zones`, flat.rs). The outline loops are untouched. GUI: the zone edges draw.
+
 ## Lead 10-31 (2): sheet metal / advanced / booleans / surfaces / p1-pass / analysis / tabs re-checked
 - **workflow-sheet-metal:** every row re-checked on main.
   - T2 sheetmetal_std passes 34/34.
