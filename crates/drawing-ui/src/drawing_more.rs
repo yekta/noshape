@@ -46,7 +46,7 @@ impl DrawingEditor {
                 1 => "Select the cylinder's silhouette edge or a point on it",
                 _ => "Click to place the dimension",
             },
-            Tool::BrokenOut { done: false, .. } => "Click the points of the closed profile in a view; Enter or double-click to close it",
+            Tool::BrokenOut { done: false, .. } => "Click the points of the closed profile in a view; click the first point (or Enter, double-click) to close it",
             Tool::BrokenOut { .. } => "Enter the depth in the panel, or click a point that sets the depth (up to entity)",
             Tool::CropPoly { .. } => "Click the points of the crop boundary in a view, then the first point again to close it",
             Tool::DatumTarget { anchor: None } => "Click the target point",
@@ -130,6 +130,14 @@ impl DrawingEditor {
         let c = self.cursor;
         match self.tool.clone() {
             Tool::BrokenOut { parent, mut points, done: false } => {
+                // A click on the first point closes the profile (live, as
+                // the crop profile's).
+                if let Some(view) = parent
+                    && points.len() >= 3
+                    && self.on_first_point(view, &points, c)
+                {
+                    return self.more_confirm(window, cx);
+                }
                 if let Some(pp) = self.view_point(parent) {
                     if let Some(why) = noshape_scene::drawing_tools::broken_out_refused(self.current_sheet(), pp.view) {
                         self.status = Some(why.into());
