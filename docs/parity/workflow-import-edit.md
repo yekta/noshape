@@ -30,7 +30,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 2.4 | … opposite direction | **2429.203673**, 1 part | 2429.203532, 1 part | ✅ | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported: 2429.20361, 1 part (live 2429.203673)) |
 | 2.5 | Feature row menu (last feature) | Rename, Edit…, Add selection to folder…, Suppress, Add comment, Zoom to selection, Show dependencies…, Add appearance…, Delete | same + Dynamic suppression | ✅ |  |
 | 2.6 | Delete face (hole), Heal | 8000, 6 faces | 8000.0, 6 faces | ✅ | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported: 8000.0, 6 faces) |
-| 2.7 | Replace face: top face, replace with Plane 1 (Top + 15) | ? (request) | plane refused, notice "Select faces." | ? I3 |  |
+| 2.7 | Replace face: top face, replace with Plane 1 (Top + 15) | ? (request) | plane refused, notice "Select faces." | ✅ I3 fixed: Plane 1 (Top + 15) as "Faces to replace with" → OK 12000 mm³ = live | skasm 10-31 (main CLI skasm-scratch/feat/repl.py) |
 | 2.8 | Fillet (Shift+F) top front edge R3 | 8000 − (1−π/4)·9·40 = 7922.743339 | 7922.743339 | ✅ | v0.4.12 CLI (qa 10:23, bin/impedit.py on our holeblock.step re-imported, hole healed, top front edge R3: 7922.743339, 7 faces) |
 | 2.9 | Feature-list row tooltip after clicking a row (Plane: Top) | hides | "Top" tooltip stays over the open dialog's first label | ✗ I4 |  |
 
