@@ -609,3 +609,87 @@ fn a_select_list_closes_on_a_wheel_outside_it(cx: &mut TestAppContext) {
     vcx.simulate_event(wheel(600., 500.));
     assert!(!vcx.update(|_, cx| crate::os_menu::is_open(cx)), "a wheel outside closes it");
 }
+
+/// core-workflow 8.1.4 / 8.2.4: a closed sketch's Show dimensions draws each dimension's value in the sketch plane
+/// (its glyph outlines among the viewport's in-plane fills), not only its lines and arrows.
+#[gpui::test]
+fn shown_dimensions_draw_their_values(cx: &mut TestAppContext) {
+    let (window, view) = line_then_dimension_tool(cx, "shown-dims");
+    click(cx, window, &view, (570., 380.));
+    click(cx, window, &view, (570., 330.));
+    keys(cx, window, &["2", "5", "enter"]);
+    assert!(near(&dimensions(cx, &view), &[0.025]), "{:?}", dimensions(cx, &view));
+    let sketch = cx.update(|cx| view.read(cx).sketch.as_ref().map(|s| s.feature)).expect("sketching");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.finish_sketch(w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.show_dimensions(sketch, w, cx))).unwrap();
+    draw(cx, window);
+    let (labels, fills) = cx.update(|cx| {
+        let v = view.read(cx);
+        (v.shown_dims_geometry(cx).map(|(l, _)| l.into_iter().map(|l| l.text).collect::<Vec<_>>()), v.shown_dims_fills(cx))
+    });
+    assert_eq!(labels, Some(vec!["25".to_string()]), "the dimension's label");
+    assert!(fills.iter().any(|f| f.contours.len() >= 2), "the label's digits as glyph outlines: {:?}", fills.iter().map(|f| f.contours.len()).collect::<Vec<_>>());
+}
+
+/// core-workflow 8.4.1: Top › Rename, Esc, then the focus elsewhere (a context menu taking it) records nothing: the
+/// field's late blur used to rename the plane to its own name (an undo step and a regeneration under the open menu,
+/// whose click it ate).
+#[gpui::test]
+fn an_escaped_plane_rename_records_nothing(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "plane-rename");
+    let top = Reference::Plane(DatumPlane::Top);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_default_rename(top.clone(), w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| {
+        let focus = view.read(cx).focus.clone();
+        w.focus(&focus, cx);
+    })
+    .unwrap();
+    draw(cx, window);
+    let (names, undo) = cx.update(|cx| {
+        let v = view.read(cx);
+        (v.studio(cx).map(|s| s.default_names.clone()).unwrap_or_default(), v.doc.read(cx).session.can_undo())
+    });
+    assert!(names.is_empty(), "no new name: {names:?}");
+    assert!(!undo, "nothing to undo in the fresh document");
+}
+
+/// core-workflow 8.5.2: the same for a folder's Rename (Esc, then the focus elsewhere): nothing recorded.
+#[gpui::test]
+fn an_escaped_folder_rename_records_nothing(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "folder-rename");
+    let folder = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let tab = v.tab;
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_studio(tab, "Add folder", cx, |ps| {
+                    noshape_ops::studio::add_folder(ps, &[], "F1");
+                })
+            });
+            v.studio(cx).and_then(|s| s.folders.first().map(|f| f.id)).expect("a folder")
+        })
+    });
+    let undo_before = cx.update(|cx| view.read(cx).doc.read(cx).session.last_redone().map(str::to_string));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_folder_rename(folder, w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| {
+        let focus = view.read(cx).focus.clone();
+        w.focus(&focus, cx);
+    })
+    .unwrap();
+    draw(cx, window);
+    let (name, undo) = cx.update(|cx| {
+        let v = view.read(cx);
+        (v.studio(cx).and_then(|s| s.folder(folder).map(|f| f.name.clone())), v.doc.read(cx).session.last_redone().map(str::to_string))
+    });
+    assert_eq!(name.as_deref(), Some("F1"));
+    assert_eq!(undo, undo_before, "no rename recorded");
+}

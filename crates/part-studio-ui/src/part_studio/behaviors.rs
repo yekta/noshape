@@ -1252,9 +1252,13 @@ impl PartStudioView {
         let r2 = r.clone();
         let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| match ev {
             InputEvent::PressEnter { .. } | InputEvent::Blur => {
+                // Once only: Esc already closed it (the field's late blur, when a menu takes the focus, renamed the
+                // plane to its own name: an undo step, and a regeneration that ate the menu's click; core-workflow 8.4).
+                if this.ui.dg_renaming.take().is_none() {
+                    return;
+                }
                 let text = st.read(cx).value().trim().to_string();
-                this.ui.dg_renaming = None;
-                if !text.is_empty() {
+                if !text.is_empty() && text != this.default_name(&r2, cx) {
                     let r = r2.clone();
                     this.doc.update(cx, |doc, cx| {
                         doc.edit_studio(this.tab, &format!("Rename : {text}"), cx, |ps| {
@@ -1288,7 +1292,9 @@ impl PartStudioView {
                     return;
                 }
                 let text = st.read(cx).value().trim().to_string();
-                if !text.is_empty() {
+                // Only a change (Esc then a click elsewhere recorded the unchanged name).
+                let old = this.display.body(&b2).map(|b| b.name.clone()).unwrap_or_default();
+                if !text.is_empty() && text != old {
                     let b = b2.clone();
                     this.doc.update(cx, |doc, cx| {
                         doc.edit_studio(this.tab, &noshape_ops::studio::rename_part_description(&text), cx, |ps| noshape_ops::studio::rename_part(ps, &b, &text));

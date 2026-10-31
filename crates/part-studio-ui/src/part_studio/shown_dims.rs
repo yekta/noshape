@@ -76,7 +76,7 @@ impl PartStudioView {
         noshape_model::interaction::source_sketch(&s.features, f)
     }
 
-    fn shown_dims_geometry(&self, cx: &App) -> Option<DimsGeometry> {
+    pub(super) fn shown_dims_geometry(&self, cx: &App) -> Option<DimsGeometry> {
         let shown = self.ui.shown_dims?;
         let f = self.studio(cx)?.feature(shown.sketch)?;
         let Some(noshape_model::ParamValue::Sketch(data)) = f.params.get("sketch") else { return None };

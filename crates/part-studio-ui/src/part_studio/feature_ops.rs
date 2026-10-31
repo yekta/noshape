@@ -18,10 +18,9 @@ impl PartStudioView {
         if features.is_empty() {
             return;
         }
-        let n = features.len();
+        // No toast, as live's Copy sketch / Copy Part (core-workflow 8.1.3, 8.6.6).
         if let Ok(text) = serde_json::to_string(&serde_json::json!({ CLIP_KEY: features })) {
             cx.write_to_clipboard(ClipboardItem::new_string(text));
-            self.flash_info(format!("Copied {n} feature{}", if n == 1 { "" } else { "s" }), cx);
         }
     }
 
@@ -147,9 +146,14 @@ impl PartStudioView {
         let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
         let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| {
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                // Once, and only a change (as the default geometry's rename: the late blur after Esc recorded the
+                // unchanged name and ate the next menu click; core-workflow 8.5.2).
+                if this.folder_renaming.take().is_none() {
+                    return;
+                }
                 let v = st.read(cx).value().trim().to_string();
-                this.folder_renaming = None;
-                if !v.is_empty() {
+                let old = this.studio(cx).and_then(|s| s.folder(folder)).map(|f| f.name.clone()).unwrap_or_default();
+                if !v.is_empty() && v != old {
                     this.doc.update(cx, |doc, cx| {
                         doc.edit_studio(this.tab, &noshape_ops::studio::rename_folder_description(&v), cx, |ps| noshape_ops::studio::rename_folder(ps, folder, &v));
                     });
