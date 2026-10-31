@@ -94,6 +94,9 @@ pub struct Fill2 {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SheetGeometry {
+    /// Each annotation's fills (annotation id, fill range): a dangling
+    /// one's arrowheads and triangles turn red with it.
+    pub annotation_fills: Vec<(u64, std::ops::Range<usize>)>,
     pub width: f64,
     pub height: f64,
     pub lines: Vec<Polyline2>,
@@ -2283,6 +2286,9 @@ impl SheetGeometry {
             let own = a.style.as_deref();
             let c = own.and_then(|s| s.color).or(if a.sketch_dim.is_some() { self.style.sketch_dim_color.or(self.style.dim_color) } else if a.kind.is_dimension() { self.style.dim_color } else if construction { None } else { ts.color.or(self.style.ann_color) });
             let (l1, t1, f1) = starts.get(k + 1).map(|s| (s.2, s.1, s.3)).unwrap_or(end);
+            if f1 > f0 {
+                self.annotation_fills.push((a.id, f0..f1));
+            }
             if !a.layer.is_drawing() {
                 self.layers.push(LayerSpan { lines: l0..l1, texts: t0..t1, fills: f0..f1, layer: a.layer });
             }

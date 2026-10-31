@@ -258,6 +258,30 @@ impl SheetPick<'_> {
         }
     }
 
+    /// The nearest point on a visible view edge within reach of sheet point
+    /// `s` (by geometry, not the hover).
+    fn edge_point_near(&self, s: [f64; 2]) -> Option<super::PickedPoint> {
+        let tol = self.tol_mm(5.0);
+        let mut best: Option<(f64, super::PickedPoint)> = None;
+        for (view, g) in self.geoms.iter() {
+            let Some(pl) = self.placement(*view) else { continue };
+            for e in g.edges.iter().filter(|e| e.visible) {
+                for w in e.points.windows(2) {
+                    let (a, b) = (pl.to_sheet(w[0]), pl.to_sheet(w[1]));
+                    let d = sub(b, a);
+                    let l2 = d[0] * d[0] + d[1] * d[1];
+                    let t = if l2 > 0.0 { (((s[0] - a[0]) * d[0] + (s[1] - a[1]) * d[1]) / l2).clamp(0.0, 1.0) } else { 0.0 };
+                    let q = [a[0] + d[0] * t, a[1] + d[1] * t];
+                    let dist = len(sub(s, q));
+                    if dist < tol && best.as_ref().is_none_or(|(bd, _)| dist < *bd) {
+                        best = Some((dist, super::PickedPoint { view: *view, p: pl.to_view(q), r: None }));
+                    }
+                }
+            }
+        }
+        best.map(|(_, p)| p)
+    }
+
     /// The dimension `orig` with end `k` re-attached to the snap point under
     /// the cursor (same view), keeping the other end (help: "dragging any of
     /// its grip points to another edge, point or center re-attaches that end").
@@ -291,8 +315,11 @@ impl SheetPick<'_> {
             return a;
         }
         // Midpoints and quadrants too (help D22: available when editing a
-        // placed dimension).
-        let Some(sp) = self.snap_at_with(self.cursor, true) else { return a };
+        // placed dimension). A datum's triangle also lands anywhere on a view
+        // edge (qa DWG-DATUM-PASTE-RED: during the drag the hover is the
+        // view, not the edge).
+        let datum = matches!(a.kind, AnnotationKind::Datum { on: None, .. });
+        let Some(sp) = self.snap_at_with(self.cursor, true).or_else(|| if datum { self.edge_point_near(self.cursor) } else { None }) else { return a };
         // A datum's triangle dropped on view geometry: attached there, the
         // box staying put (qa DWG-DATUM-PASTE-RED: a pasted one is red until then).
         if let AnnotationKind::Datum { anchor, on: None, at, .. } = &mut a.kind {

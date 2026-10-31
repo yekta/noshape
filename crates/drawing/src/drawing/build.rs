@@ -2207,6 +2207,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             dangling.push(id);
         }
     }
+    // A dangling annotation's fills (a datum's triangle, arrowheads) are red
+    // with its lines and texts (qa DWG-DATUM-PASTE-RED; live dp-3).
+    let red_fills: Vec<std::ops::Range<usize>> = g.annotation_fills.iter().filter(|(id, _)| dangling.contains(id)).map(|(_, r)| r.clone()).collect();
+    for fills in red_fills {
+        g.colors.push(super::sheet::ColorSpan { lines: 0..0, texts: 0..0, fills, rgb: LOST_RED });
+    }
     let mut remap: HashMap<u32, u32> = HashMap::new();
     for a in &resolved.annotations {
         remap.insert((a.id & 0xFFFF_FFFF) as u32, picks.id(PickTarget::Annotation(a.id)));

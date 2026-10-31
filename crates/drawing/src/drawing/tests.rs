@@ -4043,6 +4043,12 @@ fn a_pasted_datum_stands_free() {
     let sources = regenerate_sources(&doc, &drawing);
     let built = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
     assert!(built.dangling.contains(&pid) && !built.dangling.contains(&id), "{:?}", built.dangling);
+    // Its triangle too (live dp-3), not the original's.
+    let red = |b: &super::build::BuiltSheet, a: u64| {
+        let fills: Vec<usize> = b.geometry.annotation_fills.iter().filter(|(x, _)| *x == a).flat_map(|(_, r)| r.clone()).collect();
+        !fills.is_empty() && fills.iter().all(|f| b.geometry.fill_color(*f) == Some([0xdd, 0x52, 0x28]))
+    };
+    assert!(red(&built, pid) && !red(&built, id));
     drawing.sheets[0].annotations.last_mut().unwrap().loose = false;
     let built = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
     assert!(!built.dangling.contains(&pid));
