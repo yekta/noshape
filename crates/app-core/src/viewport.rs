@@ -405,6 +405,10 @@ pub struct Viewport {
     axis_tag: AxisTag,
     _frames: Task<()>,
     _picks: Task<()>,
+    /// Preferences › Theming re-sends the view cube in the new colours (it
+    /// kept the old theme's until the next hover or camera change, its axis
+    /// labels for good).
+    _theme: Subscription,
     /// Frames presented so far.
     frames_presented: u64,
     /// Frames the renderer reported failed.
@@ -620,6 +624,12 @@ impl Viewport {
             axis_tag: AxisTag::None,
             _frames: frames,
             _picks: picks,
+            _theme: cx.observe_global::<crate::graphics_prefs::GraphicsGlobal>(|this, cx| {
+                // The X / Y / Z labels are rasterized in the theme's colours: again on the next frame.
+                this.axis_masks = None;
+                this.sync_overlay(cx);
+                cx.notify();
+            }),
             frames_presented: 0,
             frames_failed: 0,
             presented_at: None,

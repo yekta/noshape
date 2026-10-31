@@ -52,7 +52,7 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-951-drawing-properties | qa c82818b7 | selects light = live; unticked checkboxes solid #333 and their labels #ccc (live white box, #333 label); Sheet properties select values white on white (DARK-DRAWING-PANEL-CONTROLS) | ☑ fixed dx, verified fbd2536c (qa 10-30 15:07: Sheet properties values dark on white with ▾; Drawing properties checkboxes white boxes, #333-like labels) |
 | dk-960-feature-studio | dkfs2 | Ace twilight on #333: tokens, gutter #232323, numbers #e2e2e2 = live computed | ☑ |
 | dk-961-variable-studio | psui-scratch v2 | layout, title bar / headers #555, cells #1c1c1c, Insert buttons = live (the capture exists: dark/dk-961); residual: live's ▾ in Variable type is 8 px wide, 6 px from the cell's right, ours 6 px wide a little further in | ☑ psui 10-31 |
-| dk-990-restored-light | | | ☐ |
+| dk-990-restored-light | psui-scratch t8 | Preferences › Theming › Light mode › Save theme, no restart: chrome, panels, viewport and planes light at once; the view cube kept its dark faces and axis letters until a hover (fixed: the viewport re-sends it on the theme change; = a fresh light start) | ☑ psui 10-31 |
 
 ## Plan notes
 # Dark mode (lead 10-22: ui2 owns it; coordinate in ui's handoff theme-layout.md)
