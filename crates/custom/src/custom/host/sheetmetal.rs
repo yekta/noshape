@@ -1050,6 +1050,10 @@ struct Strip {
     extent: (f64, f64),
     /// A rolled bend's definition face (else the bend is at `edge`).
     rolled: Option<usize>,
+    /// Corner cuts across the strip's ends (closed corners): per end at
+    /// the start (true) or the end, the cut's curve as (fraction along a→a'
+    /// from `a[0]`, fraction across from wall a), wall a's side first.
+    end_cuts: Vec<(bool, Vec<(f64, f64)>)>,
 }
 
 /// A rolled bend (definition face `fi`, a cylinder with a BEND joint such as
@@ -1109,6 +1113,7 @@ fn rolled_strip(topo: &Topo, fi: usize, radius: f64) -> Option<Strip> {
         radial_a: ra,
         extent: (s0.min(s1), s0.max(s1)),
         rolled: Some(fi),
+        end_cuts: Vec::new(),
     })
 }
 
@@ -1336,6 +1341,28 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         let (s0, s1) = (t0 * sign, t1 * sign);
         // A slanted end: each wall's side of the strip runs to that wall's end.
         let (ta, tb) = ([skew[0].map_or(t0, |x| x.0), skew[1].map_or(t1, |x| x.0)], [skew[0].map_or(t0, |x| x.1), skew[1].map_or(t1, |x| x.1)]);
+        // Closed corners' cuts in the flat (live 1676: the bend ends, not the
+        // bend zone's rectangle): each curve sampled across the strip.
+        let mut end_cuts = Vec::new();
+        for rc in wraps.iter().filter(|rc| rc.edge == e && t1 - t0 > TOL) {
+            let at_start = rc.v.distance(b.start) < TOL;
+            let x_of = |w_plate: f64| match rc.shape {
+                CutShape::Closed { plate_end, flange_end, angle } if angle <= std::f64::consts::FRAC_PI_2 + 1e-9 => Some(plate_end + (flange_end - plate_end) * (w_plate / rc.ba * angle).sin() / angle.sin()),
+                CutShape::Butt { plate_end, flange_end } => Some(butt_along(&butt_bezier(plate_end, flange_end, rc.ba), w_plate)),
+                _ => None,
+            };
+            let pts: Option<Vec<(f64, f64)>> = (0..=48)
+                .map(|i| {
+                    let w_a = i as f64 / 48.0;
+                    let x = x_of(rc.ba * if fa == rc.plate { w_a } else { 1.0 - w_a })?;
+                    let t = if at_start { x } else { b.len - x };
+                    Some(((t - t0) / (t1 - t0), w_a))
+                })
+                .collect();
+            if let Some(pts) = pts {
+                end_cuts.push((at_start, pts));
+            }
+        }
         strips.push(Strip {
             edge: e,
             wall_a: fa,
@@ -1352,6 +1379,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             radial_a: radial,
             extent: (s0.min(s1), s0.max(s1)),
             rolled: None,
+            end_cuts,
         });
         let mut bend = k::revolve(&face, b.axis_point, b.dir * sign, b.angle).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
         let (v0, v1) = (topo.nearest_vertex(b.start), topo.nearest_vertex(b.start + b.dir * b.len));
@@ -2318,14 +2346,28 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
             None if s.rolled.is_some() => s.a.map(|p| ma.transform_point3(p - s.dir_a * s.angle * (s.radius + def.k_factor * thickness))),
             None => continue,
         };
-        if let Ok(face) = k::make_polyline(&[a[0], a[1], b[1], b[0]], true).and_then(|w| k::make_face_from_wire(&w, true)) {
+        // The strip's outline, its ends along their corner cuts if any.
+        let at = |(f, w): (f64, f64)| a[0] + (a[1] - a[0]) * f + (b[0] - a[0]) * w;
+        let cut = |start: bool| s.end_cuts.iter().find(|c| c.0 == start).map(|c| c.1.iter().copied().map(at).collect::<Vec<DVec3>>());
+        let mut outline: Vec<DVec3> = cut(true).unwrap_or_else(|| vec![a[0], b[0]]);
+        outline.extend(cut(false).map(|mut pts| {
+            pts.reverse();
+            pts
+        }).unwrap_or_else(|| vec![b[1], a[1]]));
+        if let Ok(face) = k::make_polyline(&outline, true).and_then(|w| k::make_face_from_wire(&w, true)) {
             pieces.push(face);
         }
         // Wall b rises toward the viewer (+z) when it lies on the side wall a's
         // flat normal points away from.
         let flat_normal = ma.transform_vector3(s.normal_a);
         let up = (s.toward_b.dot(s.normal_a) < 0.0) == (flat_normal.z < 0.0);
-        let mid = |i: usize| glam::DVec2::new((a[i].x + b[i].x) * 0.5, (a[i].y + b[i].y) * 0.5);
+        // The centre line, from where a corner cut crosses it (live 1676:
+        // the front bend's line ends at x 0.171619, not the zone's end).
+        let mid = |i: usize| {
+            let start = i == 0;
+            let p = s.end_cuts.iter().find(|c| c.0 == start).and_then(|c| c.1.get(c.1.len() / 2).copied()).map_or((a[i] + b[i]) * 0.5, at);
+            glam::DVec2::new(p.x, p.y)
+        };
         lines.push(crate::sheetmetal::FlatBendLine {
             a: mid(0),
             b: mid(1),

@@ -379,6 +379,15 @@ fn butt_joint_after_a_closed_corner_matches_live() {
         let n = areas.iter().filter(|x| (*x - through).abs() < 1e-3).count();
         eprintln!("{style}: {} mm³ (live {live}), {} faces", volume_mm3(&r), areas.len());
         assert!((volume_mm3(&r) - live).abs() < 0.01 && n == 2 && areas.len() == 23 && has(13.3875875, 1e-3) && has(10.9812215, 1e-3), "{style}: {} mm³ (live {live}), {n} faces of {through} mm²: {:#?}", volume_mm3(&r), face_report(&r));
+        // The flat (live flat1676-butt-D1.dxf): the bend centre lines stop
+        // where the bend ends cross them.
+        if style == "BUTT" {
+            let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
+            let ends: Vec<glam::DVec2> = flat.bend_lines.iter().flat_map(|l| [l.a * 1e3, l.b * 1e3]).collect();
+            for want in [glam::DVec2::new(0.171619, -0.277655), glam::DVec2::new(-0.277655, 0.908308)] {
+                assert!(ends.iter().any(|e| e.distance(want) < 1e-3), "{want:?} not among {ends:?}");
+            }
+        }
     }
 }
 
