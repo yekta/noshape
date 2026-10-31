@@ -52,6 +52,25 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-951-drawing-properties | qa c82818b7 | selects light = live; unticked checkboxes solid #333 and their labels #ccc (live white box, #333 label); Sheet properties select values white on white (DARK-DRAWING-PANEL-CONTROLS) | ☑ fixed dx, verified fbd2536c (qa 10-30 15:07: Sheet properties values dark on white with ▾; Drawing properties checkboxes white boxes, #333-like labels) |
 | dk-960-feature-studio | dkfs2 | Ace twilight on #333: tokens, gutter #232323, numbers #e2e2e2 = live computed | ☑ |
 | dk-961-variable-studio | psui-scratch v2 | layout, title bar / headers #555, cells #1c1c1c, Insert buttons = live (the capture exists: dark/dk-961); residual: live's ▾ in Variable type is 8 px wide, 6 px from the cell's right, ours 6 px wide a little further in | ☑ psui 10-31 |
+| dk-971-sheetmetal-partstudio-toolbar |  |  | ☐ |
+| dk-972-sheetmetal-dropdown-open |  |  | ☐ |
+| dk-973-sheetmetal-table-flatview |  |  | ☐ |
+| dk-974-ctx-part-in-parts-list | psui-scratch pm1 | menu #333, #ccc outline, white items, icons and separators = live; ours has no Add comment / Release Upgrade badge (cloud), so it fits under the click where live's flips above | ☑ psui 10-31 |
+| dk-975-ctx-face-graphics |  |  | ☐ |
+| dk-976-ctx-sketch-line |  |  | ☐ |
+| dk-977-dialog-hole |  |  | ☐ |
+| dk-978-dialog-fillet | psui-scratch o978 | dialog, tabs, query box, selects, value row, checkboxes, slider = live (222 px wide with a fresh config; darkcfg holds a widened dialog) | ☑ psui 10-31 |
+| dk-979-dialog-linear-pattern |  |  | ☐ |
+| dk-980-dialog-mirror |  |  | ☐ |
+| dk-981-dialog-sweep |  |  | ☐ |
+| dk-982-dialog-sm-flange |  |  | ☐ |
+| dk-989-tab-manager-open / dk-990-tab-manager-detailed / dk-991-tab-manager-sort-open |  |  | ☐ |
+| dk-992-panel-variable-table |  |  | ☐ |
+| dk-993-panel-appearances |  | live's studio has a sketch, no parts: "No parts or surfaces in this document" (ours hides the button only with neither parts nor sketches) | ◐ |
+| dk-994-panel-custom-tables / dk-995-panel-configuration |  |  | ☐ |
+| dk-996-left-document-notes / dk-997-left-where-used / dk-998-left-performance |  |  | ☐ |
+| dk-999-properties-dialog |  |  | ☐ |
+| dk-9a0-versions-history-branch / dk-9a1-history-branch-rowmenu |  |  | ☐ |
 | dk-990-restored-light | psui-scratch t8 | Preferences › Theming › Light mode › Save theme, no restart: chrome, panels, viewport and planes light at once; the view cube kept its dark faces and axis letters until a hover (fixed: the viewport re-sends it on the theme change; = a fresh light start) | ☑ psui 10-31 |
 
 ## Plan notes
