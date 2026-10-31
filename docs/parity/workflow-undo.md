@@ -5,15 +5,15 @@ Live behaviour pending (REQUESTS.md "qa5 undo across tabs"). Status: ✅ ok, ✗
 
 | # | Step | Ours | Status | Verified |
 |---|---|---|---|---|
-| 1 | Part Studio 1: Fillet (Shift+F, Enter with nothing picked) | "Fillet 1" added in red (error) | ? (live allows ✓ with errors) |  |
+| 1 | Part Studio 1: Fillet (Shift+F, Enter with nothing picked) | "Fillet 1" added in red (error) | ✅ live accepts ✓ with errors too (row's live note) | skasm 10-31 |
 | 2 | Assembly 1: i, insert Part 2, drop, ✓ | Part 2 <2> | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| 3 | Drawing 1: open it | views + BOM **updated by themselves** (quantity 2) without any "Update" prompt | ? |  |
-| 4 | Back in Part Studio 1, Ctrl+Z | removes Fillet 1 only (per-tab history; the newer assembly/drawing changes stay) | ? (live) |  |
-| 5 | Assembly 1, Ctrl+Z right after the tab switch | **nothing visible**, Undo stays enabled; the next Undo (button) removes Part 2 <2> → an invisible extra history step | ✗ **UNDO1** |  |
+| 3 | Drawing 1: open it | views + BOM **updated by themselves** (quantity 2) without any "Update" prompt | ✅ now: the drawing goes out of date (Update saturated) after an assembly change and back, as live (UNDO2 row below) | 77870dd4 10-28 |
+| 4 | Back in Part Studio 1, Ctrl+Z | removes Fillet 1 only (per-tab history; the newer assembly/drawing changes stay) | ✅ = live (per-tab stack, live answer below) | 0.4.10+ |
+| 5 | Assembly 1, Ctrl+Z right after the tab switch | **nothing visible**, Undo stays enabled; the next Undo (button) removes Part 2 <2> → an invisible extra history step | ✗ then → ✅ UNDO1 fixed (release re-check below; T app-core deferred_edits_are_one_undo_step) |  |
 | 6 | Redo, Ctrl+Z, Ctrl+Y after tab round trips | work by keyboard without clicking first | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| 7 | Second Ctrl+Z (nothing visible again) | Undo still enabled, no visible change | ✗ UNDO1 |  |
-| 8 | Drawing after the assembly undo | **"Out of date — Update (Ctrl+Q)"** now (step 3 updated silently); Ctrl+Q fixes it | ✗ **UNDO2** (inconsistent: one change auto-updates the drawing, the undo of it needs Update) |  |
-| 9 | Undo button tooltip | "Undo (cmd+z/ctrl+z)" | ? |  |
+| 7 | Second Ctrl+Z (nothing visible again) | Undo still enabled, no visible change | ✗ then → ✅ UNDO1 fixed |  |
+| 8 | Drawing after the assembly undo | **"Out of date — Update (Ctrl+Q)"** now (step 3 updated silently); Ctrl+Q fixes it | ✗ then → ✅ UNDO2 fixed 77870dd4 (both directions go out of date, as live) |  |
+| 9 | Undo button tooltip | "Undo (cmd+z/ctrl+z)" | ✅ = live | 0.4.10+ |
 | – | No crash, no hang in ~15 undo/redo operations across 3 tabs | | ✅ | 0.4.10+ / 1c853f78 10-27 |
 
 ## Update from live's answer (behaviours.md "qa5 undo across tabs", 10-21)
@@ -24,8 +24,8 @@ Live behaviour pending (REQUESTS.md "qa5 undo across tabs"). Status: ✅ ok, ✗
 | 5/7 | Assembly: Insert session + mate, Ctrl+Z | #1 removes the mate, #2 removes **all instances of one Insert session at once**, #3 nothing | after one insert (no mate): #1 **nothing visible** (Undo stays enabled), #2 (button) removes the instance | ✗ UNDO1 (an extra invisible step) |
 | – | Drawing note | **two** undo steps (1st leaves the note, enables Redo; 2nd removes it) | not checked | ? |
 | 9 | Undo tooltip | always "Undo (cmd+z/ctrl+z)" / "Redo (ctrl+y/shift+cmd+z)" | "Undo (cmd+z/ctrl+z)" | ✅ |
-| – | Stacks after a reload | cleared | not checked | ? |
-| – | Tab ops (rename, reorder, delete, duplicate) | not undoable | not checked | ? |
+| – | Stacks after a reload | cleared | cleared in the app (T app-core a_reopened_document_starts_with_nothing_to_undo; the CLI keeps history-based undo across its calls on purpose) | ✅ |
+| – | Tab ops (rename, reorder, delete, duplicate) | not undoable | not undoable: after tab_rename / tab_duplicate / tab_move, Undo reverts the previous feature edit and the tab change stays (skasm 10-31, main CLI skasm-scratch/feat/undo.py) | ✅ |
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
 
@@ -45,11 +45,11 @@ Live behaviour pending (REQUESTS.md "qa5 undo across tabs"). Status: ✅ ok, ✗
 ## Re-run pass 24 (qa5, 2026-10-24 ~00:10, main 538981d5, target-lead 23:22; d10 drawing copy)
 | Row | Live | Ours | Status | Verified |
 |---|---|---|---|---|
-| Drawing note, Ctrl+Z | **two** steps: the 1st leaves the note and enables Redo, the 2nd removes it (behaviours "qa5 undo across tabs") | one Ctrl+Z removes "hello" at once (Undo greys, Redo enabled); Ctrl+Y brings it back | ✗ **UNDO3** (asb, minor) |  |
+| Drawing note, Ctrl+Z | **two** steps: the 1st leaves the note and enables Redo, the 2nd removes it (behaviours "qa5 undo across tabs") | one Ctrl+Z removes "hello" at once (Undo greys, Redo enabled); Ctrl+Y brings it back | ✗ **UNDO3** (drawing side: routed to dx, docs/handoff/dx.md "From skasm (10-31)") |  |
 
 ## Release re-check v0.4.8 (qa5, 2026-10-25 02:30, release asset noshape 0.4.8 linux-x86_64)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | UNDO1 | Insert Part Studio 1 (2 parts) into Assembly 1, ✓, switch to the Part Studio tab and back, Ctrl+Z once: Instances (0); Ctrl+Y: both back | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | UNDO2 | Drawing of Assembly 1 (suggested views): Update button pale (disabled) when created; second insert in the assembly → saturated yellow (out of date); Ctrl+Q → pale; Ctrl+Z in the assembly (Instances 4 → 2) → saturated again. Both directions agree (live: pale / saturated, behaviours 6902) | ✅ | 77870dd4 10-28 |
-| UNDO3 | not re-run (asb) | — |  |
+| UNDO3 | routed to dx (drawing note = two history steps in live) | ✗ |  |

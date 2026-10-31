@@ -17,7 +17,7 @@ Live: behaviours.md "Drag cues … configured insert" item 6 (assembly/592–595
 | 8 | Insert Part 1 again (default configuration), ✓ without entering the graphics | repeat instance of the same part at **+⅛ of its bbox** (5, 2.5, 1.25 for a 40×20×10 block); a different part at (0,0,0) | Part 1 <2> at **(−2.119, −17.446, 0.0001)** (CLI assembly_list) | ✅ (code ops/assembly.rs insert_part: +⅛ of the box per earlier instance of the same part, skasm 10-27); was ✗ **A18** (skb) | 7e88e3ab 10-28 (blk40 Assembly 1: Insert › Part 1 › ✓ twice without entering the graphics → <1> (0,0,0), <2> (5, 2.5, 1.25) = +⅛ of the 40×20×10 box) |
 | 9 | BOM | Item / Quantity / Part number / Description; one row per part+configuration | 2 rows, Part 1 each | ✅ (? configuration shown nowhere, as live's default template) | 77870dd4 10-28 (2 parts → 2 rows, Item/Quantity/Part number/Description) |
 | 10 | Variable Studio: h 15 → "20" + Enter | "20 mm" | "20 mm" | ✅ | a6c56638 10-28 (Variable Studio h "15" Enter → 15 mm) |
-| – | Translucent white box behind the bottom-right Measure / Analysis / Mass icons when they sit over the model | ? | visible (p7-ca14) | ? |  |
+| – | Translucent white box behind the bottom-right Measure / Analysis / Mass icons when they sit over the model | always, also over the model (behaviours "spec: psui bottom-right … icon strip background") | visible (p7-ca14) | ✅ = live | skasm 10-31 (live 10-26 spec) |
 
 ## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
 Live answered "qa5 pass 7" (5): BOM 1 row Qty 2 → 2 rows after d = 25 → merged again after 10 mm; Reset to default resets d.
@@ -25,8 +25,8 @@ Live answered "qa5 pass 7" (5): BOM 1 row Qty 2 → 2 rows after d = 25 → merg
 |---|---|---|---|
 | CA1 configured icon | part icon with blue grid | ✅ **fixed** | a6c56638 10-28 |
 | CA2 instance menu | Select instances with same configuration, … same part and same configuration, Release… present | ✅ **fixed** | a6c56638 10-28 |
-| CA3 translucent dialog | Change configuration body still shows the model and origin triad through it | ✗ still |  |
-| CA4 unit / Tab | "25" + Tab → "25 mm" ✅; Tab still leaves the dialog (focus to the noshape logo) | ✗ still (partly) |  |
+| CA3 translucent dialog | Change configuration body still shows the model and origin triad through it | ✗ then → ✅ CA3 closed (live's dialogs are 95 % white too, below) |  |
+| CA4 unit / Tab | "25" + Tab → "25 mm" ✅; Tab still leaves the dialog (focus to the noshape logo) | ✗ then → ✅ CA4 fixed 77870dd4 (row below) |  |
 | CA5 Reset to default | d back to 10 mm | ✅ **fixed** | 7e88e3ab 10-28 (Change configuration… on a Large instance: [▦ ▾] › Reset to default → Size Default, h 8 mm, Generate enabled; Set to last viewed / Reset to default listed) |
 | CA6 BOM merge | 1 row Qty 2 (later Qty 3 with a third instance) | ✅ **fixed** | v0.4.12 CLI 10-28 (cfg.noshape Assembly 9: three default Part 1 + one Large → BOM rows Part 1 Qty 3, Part 1 Qty 1) |
 

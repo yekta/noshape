@@ -436,3 +436,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - RHINO-GREEN: please build the watcher / green app with `OPENNURBS_ROOT=/root/opennurbs` (release.yml builds with it,
   dx's builds too). Hiding RHINO in builds without it needs a kernel build.rs cfg, i.e. a C++ rebuild for everyone; not
   worth it unless you want it.
+
+## From skasm (10-31): UNDO3, a drawing note takes two undo steps in live
+
+workflow-undo.md UNDO3 / behaviours "qa5 undo across tabs".
+- Live: after placing a note, the 1st Ctrl+Z leaves the note and enables Redo; the 2nd removes it.
+- Ours removes it in one step.
+
+Live's note creation seems to be two history entries (place, then the text edit). Yours if you want to match it; I didn't touch the drawing code.

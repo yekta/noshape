@@ -17,7 +17,7 @@ Status: ✅ matches live/exact, ✗ differs (finding #), ? live data pending.
 | 1.4 | Select Plane 1 first, then Sketch | sketch on Plane 1 | works | ✅ | 7929b13a 10-28 (Plane 1 selected, Sketch → "Plane 1", field inactive) |
 | 1.5 | Circle Ø16 at (10,10) | – | ✅ | ✅ | 64997436 10-28 (GUI: Sketch 2 on Plane 1, Ø16 at (10,10)) |
 | 1.6 | Loft dialog | Solid/Surface/Thin, New/Add/Remove/Intersect, Profiles, End conditions, Guides and continuity, Path, Connections, Show isocurves | same | ✅ | f9185639 10-28 (dialog fields) |
-| 1.7 | Click the circle region | "Face of Sketch 2" | first click took the circle's **centre point** ("Sketch 2 point" → pyramid to a point); the region took a second click | ? (point vs region priority; live request "skasm (2026-10-31 03:10)") | 64997436 10-28 (GUI: a click on the centre picks 'Vertex of Sketch 2' (point first, as any point pick); a click inside the circle off the centre picks 'Face of Sketch 2') |
+| 1.7 | Click the circle region | "Face of Sketch 2" | first click took the circle's **centre point** ("Sketch 2 point" → pyramid to a point); the region took a second click | ✅ live = ours: a click on the centre takes the point ("Vertex of Sketch 2", pyramid preview), a click off it takes the region ("Face of Sketch 2") (behaviours "skasm (2026-10-31, P3 advanced Part Studio 1.7)") | 64997436 10-28 (GUI: a click on the centre picks 'Vertex of Sketch 2' (point first, as any point pick); a click inside the circle off the centre picks 'Face of Sketch 2') |
 | 1.8 | Result (square 20 → Ø16, 20 high) | **5927.728022 mm³**, side faces 324.6214685 mm² each | **5927.755 mm³** (+0.027), area 1899.548 (live 4×324.6215+400+201.0619 = 1899.548) | ✅ ADV2 withdrawn: live's evVolume HIGH is **5927.754323**, ours 5927.7546; 5927.728 is live's /massproperties | skasm 10-31 (behaviours "skasm (2026-10-31) loft evVolume (ADV2)") |
 
 ## 2. Sweep (Part Studio 2; live SW rows)
@@ -174,4 +174,4 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 | 2.3 / 4.7 Sketch row into a curve field | Rib: clicking the "Line sketch" row fills Sketch profiles with **"Edges of Line sketch"** (live "Edges of Rib sketch", behaviours ~983); Sweep path the same | ✅ fixed (qa5) | 64997436 10-28 (GUI: the Sketch 3 row fills 'Edges of Sketch 3') |
 | 3.6c Hole row named by the callout | hole.fs "Feature Name Template": "#featureName" → live names it by the callout too | ✅ | f9185639 10-28 (wf-block row "Ø 6.35 mm ↧ 12 mm") |
 | 4.9 Wrap default tab | wrap.fs Creation type Default SURFACE | ✅ | f9185639 10-28 (dialog fields) |
-| 1.7 point vs region priority | no live evidence yet | ? (live request "skasm (2026-10-31 03:10)") |  |
+| 1.7 point vs region priority | live = ours (behaviours "skasm (2026-10-31, P3 advanced Part Studio 1.7)") | ✅ | skasm 10-31 |

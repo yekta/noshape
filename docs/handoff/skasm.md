@@ -184,6 +184,27 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
 (none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
 "tools/tiers/land.sh".)
 
+## Own areas, lead 10-31: workflow-assembly / navigation / workflow-sketch-tools
+- **workflow-assembly.md: every row ✅.**
+  - A9b re-checked by CLI. Edge directions now follow live in the assembly and in the Part Studio Part pattern: (a) +X, (b) −X, (c) −Z.
+  - SV3, the coplanar section cap, matches live in the GUI.
+  - The rest point at their fixes.
+- **navigation.md: all ✅ except 2.9** (macOS only; needs a Mac).
+  - 3.3 / 3.9: new T `step_rotation_is_linear_and_view_animations_smootherstep`.
+  - 7.11 is n/a (mobile apps).
+- **workflow-sketch-tools.md: all ✅.** The sketch tool search matches live by CLI.
+- **sketch.md: all ✅.** 14.41 SKETCH-VDIM-SIDE-ARROWS, corner Coincident glyphs and the line highlight colours checked in the GUI.
+- **assembly.md: standard content settled against live's dumps.**
+  - All 333 components and their size lists are there, including failing sizes. All 2919 default Length lists match (skasm-scratch/sc/cmp3.py; compare.py over-reports).
+  - LA54: the #8 Type VI mouth fillet builds (T `flat_countersunk_type_vi_mouth_fillet`).
+  - T11: the assembly toolbar order matches live.
+  - LA55's NAS Near connector is asked of live: REQUESTS "skasm (2026-10-31 04:10)".
+- **workflow-configured-assembly and workflow-undo rows settled.**
+  - Tab ops aren't undoable, as live (CLI).
+  - The app clears undo / redo on reopen; the CLI keeps them on purpose.
+  - UNDO3 (a drawing note takes two undo steps in live) goes to dx.
+- On :103, xdotool digits don't reach the sketch's value box, though letters and text fields work. qa typed values on other displays, so I used Enter-in-chain instead.
+
 ## Part Studio feature parity (lead 10-30 21:00), 10-31
 - workflow-feature-sweep.md: 136 of 141 main rows ✅ (errors, dialogs, std-routed features; Fill / Decal now run their
   editing logic: FILL-MERGE-WITH-ALL, 333f6a69). Left:
@@ -208,11 +229,10 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   - import-edit I3;
   - assembly K27 / D21.
   PATTERN-REAPPLY-CUT-ONLY closed (live = ours). Landed SKETCH-DIM-CURVE-PAIR-PREVIEW (640f0c7c).
+- Live answered 10-31: advanced 1.7 (centre click = point, region off it) and the search ranking ("Fill" lists Fillet first, Enter opens Fillet): both = ours.
 - Live requests open:
-  - "skasm (2026-10-31 03:10)": advanced 1.7.
   - "03:40": thin loft + the Show isocurves picture. Show isocurves is done from the help's colour (#d403f9) and pictures; compare with live's (e) when it's answered.
   - "04:50": part colours after Split / Mirror / pattern, SF4.
-  - "05:10": search ranking ("Fill" + Enter opens Fillet in ours).
 - Sketch: SKETCH-DEGENERATE-SOLVE (P3). Live solves a fillet R6 → R20 on a 20 × 10 rectangle with the top line shrunk to a
   point; ours stalls at 4e-10. Needs degenerate-line equations or a revised `collapsed_lines` rule.
 
