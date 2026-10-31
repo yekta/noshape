@@ -713,6 +713,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (120, 0, 25)) gives 7409.693222 / 6 faces, live 7409.706328752699 (−0.013 mm³, −1.8e-6): same direction as ADV2.
   qa 2026-10-28 05:06, green b504234e: still open. GUI Mass properties 5927.755 mm³ (doc qa-scratch/adv2.noshape); v0.4.11 CLI 5927.754578.
   qa 2026-10-29 09:16: unchanged on the published v0.4.14 CLI (bin/adv2loft.py): 5927.754578 mm³, 6 faces (live 5927.728022).
+  skasm 10-31: ours is the exact ruled loft (each square edge to its quarter arc, uniform: 5927.7531 by numeric
+  integration); other matchings are far off (radial 5887.34, rational-quadratic arcs 5918.80). Live's 5927.728022 is a
+  /massproperties figure, which was 0.15 mm³ off on curved faces for the Louver (1623 (c)): evVolume HIGH requested
+  (live REQUESTS "skasm (2026-10-31 00:10) two lofts").
 - [ ] P2 HOLE-MISS-MSG a Hole whose points are on the part's Top-plane face but drilled away from the part (sketch on
   Top at z 0 under a 40×30×20 block, default direction): ours "No target parts selected for hole."; live "None of the holes
   intersected a part." with Merge scope flagged (behaviours L56/L57 and "H1 flipped"); live keeps "No target parts…" for
