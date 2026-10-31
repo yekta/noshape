@@ -168,7 +168,17 @@ pub(crate) struct Eq {
 #[inline]
 fn pld<T: Num>(p: V2<T>, a: V2<T>, b: V2<T>) -> T {
     let d = b.sub(a);
-    d.cross(p.sub(a)) / d.norm()
+    d.cross(p.sub(a)) / floor_len(d.norm())
+}
+
+/// Below this a line's length no longer normalises its direction equations
+/// (Parallel, Perpendicular, point-on-line): as a line collapses to a point
+/// (a fillet dimension edit, live: SKETCH-DEGENERATE-SOLVE) their gradients
+/// would grow like 1 / length and the solve stall.
+const MIN_LEN: f64 = 1e-6;
+
+fn floor_len<T: Num>(n: T) -> T {
+    if n.val() < MIN_LEN { T::cst(MIN_LEN) } else { n }
 }
 
 fn ellipse_eval<T: Num>(x: &[T], t: T) -> (V2<T>, V2<T>) {
@@ -222,8 +232,8 @@ fn kernel<T: Num>(kind: &EqKind, x: &[T]) -> T {
             let u = V2::at(x, 2).sub(V2::at(x, 0));
             let v = V2::at(x, 6).sub(V2::at(x, 4));
             match kind {
-                EqKind::Parallel => u.cross(v) / (u.norm() * v.norm()),
-                EqKind::Perpendicular => u.dot(v) / (u.norm() * v.norm()),
+                EqKind::Parallel => u.cross(v) / (floor_len(u.norm()) * floor_len(v.norm())),
+                EqKind::Perpendicular => u.dot(v) / (floor_len(u.norm()) * floor_len(v.norm())),
                 EqKind::Angle { cos, sin } => {
                     let cr = u.cross(v);
                     let d = u.dot(v);

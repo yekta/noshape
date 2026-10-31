@@ -430,3 +430,33 @@ fn used_circle_centre_is_construction() {
     let (a, b) = sk.endpoints(line).unwrap();
     assert!(!sk.entity(a).unwrap().construction && !sk.entity(b).unwrap().construction);
 }
+
+/// SKETCH-DEGENERATE-SOLVE (live behaviours "skasm (2026-10-31) hole row
+/// name, unsolvable dimension colours" (b)): a 20 × 10 corner rectangle from
+/// the origin (bottom 20, left 10), the top-right corner filleted R6, then
+/// R20: live solves it with the arc's centre at (0, −10), the right edge
+/// running down to y −10 and the top line shrunk to a point.
+#[test]
+fn fillet_radius_past_the_rectangle_collapses_the_top_line() {
+    let mut sk = Sketch::new();
+    let r = sk.corner_rectangle(v(0.0, 0.0), v(0.020, 0.010));
+    // The corner on the origin (live: Coincident with it).
+    sk.add_constraint(ConstraintKind::Fix { entity: r.points[0] }).unwrap();
+    sk.add_constraint(ConstraintKind::Length { curve: r.curves[0], value: 0.020 }).unwrap();
+    sk.add_constraint(ConstraintKind::Length { curve: r.curves[3], value: 0.010 }).unwrap();
+    let res = sk.fillet_corner(r.points[2], 0.006).unwrap();
+    let arc = res.created.iter().copied().find(|e| sk.kind(*e) == Some(EntityKind::Arc)).unwrap();
+    assert!(sk.solve().is_solved());
+    let dim = sk.constraints().find(|c| matches!(c.kind, ConstraintKind::Radius { curve, .. } if curve == arc)).unwrap().id;
+    sk.set_dimension_value(dim, 0.020).unwrap();
+    let opts = sk.dimension_edit_options(dim);
+    let rep = sk.solve_with(&opts);
+    let Curve2::Arc { center, .. } = sk.curve(arc).unwrap() else { panic!() };
+    let right = sk.curve(r.curves[1]).unwrap();
+    let top = sk.curve(r.curves[2]).unwrap();
+    eprintln!("{rep:?}\ncentre {center:?} right {:?}–{:?} top {:?}–{:?}", right.start_point(), right.end_point(), top.start_point(), top.end_point());
+    assert!(rep.is_solved(), "{rep:?}");
+    assert!((center - v(0.0, -0.010)).length() < 1e-9, "{center:?}");
+    assert!((top.end_point() - top.start_point()).length() < 1e-9);
+    assert!(right.start_point().y.min(right.end_point().y) < -0.010 + 1e-9);
+}

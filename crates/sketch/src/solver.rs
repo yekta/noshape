@@ -104,11 +104,16 @@ pub struct SolveOptions {
     pub light: Vec<EntityId>,
     /// Points of `light` entities that are held all the same.
     pub still: Vec<EntityId>,
+    /// A line may collapse to a point (a dimension value edit: live solves a
+    /// fillet radius that shrinks the next line to nothing, or a length set
+    /// to 0). Off, a solve collapsing a line is refused (CON-HV-COLLAPSE:
+    /// Vertical added to a Horizontal line).
+    pub allow_collapse: bool,
 }
 
 impl Default for SolveOptions {
     fn default() -> Self {
-        SolveOptions { tolerance: 1e-10, max_iterations: 100, analyze: true, light: Vec::new(), still: Vec::new() }
+        SolveOptions { tolerance: 1e-10, max_iterations: 100, analyze: true, light: Vec::new(), still: Vec::new(), allow_collapse: false }
     }
 }
 
@@ -1075,7 +1080,7 @@ impl Sketch {
     /// length; the line at the arc's start moves with it, along with points
     /// on it (the virtual sharp).
     pub fn dimension_edit_options(&self, cid: ConstraintId) -> SolveOptions {
-        let mut opts = SolveOptions::default();
+        let mut opts = SolveOptions { allow_collapse: true, ..Default::default() };
         let Some(c) = self.constraint(cid) else { return opts };
         let (ConstraintKind::Radius { curve, .. } | ConstraintKind::Diameter { curve, .. }) = c.kind else { return opts };
         let Some(Geometry::Arc { start, end, .. }) = self.entity(curve).map(|e| &e.geometry) else { return opts };
@@ -1114,7 +1119,7 @@ impl Sketch {
         // collapse a line to a point (Vertical on a Horizontal line) don't
         // solve: the line stays, its constraints are the conflicting ones
         // ("Sketch could not be solved.", red).
-        let collapsed = self.collapsed_lines(&snapshot);
+        let collapsed = if opts.allow_collapse { Vec::new() } else { self.collapsed_lines(&snapshot) };
         if collapsed.is_empty() {
             return rep;
         }
