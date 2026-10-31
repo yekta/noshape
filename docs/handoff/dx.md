@@ -201,9 +201,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   dimensions (live 1679).
 - Then V57 assembly Show sketches (inserted sketches; assembly sources now keep the sketch wire bodies, views
   still project solids only); TB13 / EX18 / S20 / workflow-drawing 4.4 rechecked done.
-- Asked live 18:29-18:30 (open): TB20 ✓ placement + Y direction, A28 reorder gesture, SK12 hatch colours, V44
-  point-to-point dimensions over a rotation (ours stay horizontal / vertical, values swap), V25 hatch vs
-  annotations.
+- Live 1682-1684 answered and done: TB20 Y direction + ✓ placement (edge picks by geometry: with the table tool
+  the hover is the view), A28 (the callout menu lacked Add stacked callouts…, the panel's picks never reached
+  stack_click under the Select tool; ⇅ is a reorder mode), SK12 yellow surround, V44 (ours = live), V25 (only
+  dimensions clear the hatch; DXF HATCH holes still to do). A56 rechecked done. drawing.md 🔧 left: 24.
+- Slip 10-31 ~21:40: committed during a running land (SK12); caught before the push, the commit was saved as a
+  patch, the branch reset to the tested commit, and the patch re-applied after the land.
 - Left in drawing.md 🔧 (as of 10-31 evening): MBD dimensions (CR5 / CR18 / V5, need Part Studio MBD dims), V1
   "view released items", V27 aligned Cut from section (edge names after a pre-cut), V57 assembly sketches (assembly
   sources carry no sketch wires), V68 spinner, D6 thread lines as dimension picks, D16 (live couldn't start one),
