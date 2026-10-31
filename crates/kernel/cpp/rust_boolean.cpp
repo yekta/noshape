@@ -43,6 +43,8 @@
 #include <BSplCLib.hxx>
 #include <IntTools_Curve.hxx>
 #include <IntTools_FaceFace.hxx>
+#include <OSD_Parallel.hxx>
+#include <Standard_Failure.hxx>
 #include <array>
 #include <algorithm>
 #include <map>
@@ -624,6 +626,8 @@ struct FreeSections
   std::vector<std::optional<Moved>> moved;
   // The section `id`, built if it is a moved one.
   const std::pair<std::array<TopoDS_Face, 2>, IntTools_Curve>& curve(uint32_t id);
+  // OCCT's sections made ahead (brep_occt_ahead), by pair (the earlier argument's face first) until asked for.
+  std::map<std::array<uint32_t, 4>, std::vector<IntTools_Curve>> ahead;
 };
 
 // Edge `e`'s curve on face `f` (over its own 3D curve's parameters) from the face's own edge lying along it (an
@@ -1568,6 +1572,53 @@ rust::Vec<uint32_t> brep_occt_moved(rust::Slice<const uint32_t> ids, uint32_t a_
   return out;
 }
 
+void brep_occt_ahead(rust::Slice<const uint32_t> pairs)
+{
+  if (t_free == nullptr || t_free->srcs == nullptr)
+    return;
+  const KernelTimer timer("boolean.rust.sections_ahead");
+  // The faces found here (the arguments' maps made as they are first asked for); each pair's section on its own
+  // thread, kept where it is done (else made again when asked for, failing or throwing there as before).
+  struct Job
+  {
+    std::array<uint32_t, 4>     key;
+    TopoDS_Face                 fa, fb;
+    bool                        done = false;
+    std::vector<IntTools_Curve> lines;
+  };
+  std::vector<Job> jobs;
+  for (size_t i = 0; i + 3 < pairs.size(); i += 4)
+  {
+    std::pair<uint32_t, uint32_t> a{pairs[i], pairs[i + 1]}, b{pairs[i + 2], pairs[i + 3]};
+    if (b < a)
+      std::swap(a, b);
+    const std::array<uint32_t, 4> key{a.first, a.second, b.first, b.second};
+    if (t_free->ahead.count(key) != 0)
+      continue;
+    jobs.push_back(Job{key, TopoDS::Face(input(*t_free->srcs, a.first, TopAbs_FACE, a.second)), TopoDS::Face(input(*t_free->srcs, b.first, TopAbs_FACE, b.second)), false, {}});
+  }
+  OSD_Parallel::For(0, static_cast<int>(jobs.size()), [&](int k) {
+    try
+    {
+      IntTools_FaceFace ff;
+      ff.SetParameters(true, true, true, 1e-7);
+      ff.Perform(jobs[k].fa, jobs[k].fb);
+      if (!ff.IsDone())
+        return;
+      for (const IntTools_Curve& ic : ff.Lines())
+        jobs[k].lines.push_back(ic);
+      jobs[k].done = true;
+    }
+    catch (const Standard_Failure&)
+    {
+      jobs[k].lines.clear();
+    }
+  });
+  for (Job& j : jobs)
+    if (j.done)
+      t_free->ahead.emplace(j.key, std::move(j.lines));
+}
+
 rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, BrepSections& out)
 {
   if (t_free == nullptr || t_free->srcs == nullptr)
@@ -1578,14 +1629,23 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
   const TopoDS_Face fa   = TopoDS::Face(input(*t_free->srcs, swap ? b_arg : a_arg, TopAbs_FACE, swap ? b_face : a_face));
   const TopoDS_Face fb   = TopoDS::Face(input(*t_free->srcs, swap ? a_arg : b_arg, TopAbs_FACE, swap ? a_face : b_face));
   const KernelTimer timer("boolean.rust.sections");
-  IntTools_FaceFace ff;
-  ff.SetParameters(true, true, true, 1e-7);
-  ff.Perform(fa, fb);
-  if (!ff.IsDone())
-    return rust::String("OCCT's section failed");
   std::vector<IntTools_Curve> lines;
-  for (const IntTools_Curve& ic : ff.Lines())
-    lines.push_back(ic);
+  const auto made = t_free->ahead.find(swap ? std::array<uint32_t, 4>{b_arg, b_face, a_arg, a_face} : std::array<uint32_t, 4>{a_arg, a_face, b_arg, b_face});
+  if (made != t_free->ahead.end())
+  {
+    lines = std::move(made->second);
+    t_free->ahead.erase(made);
+  }
+  else
+  {
+    IntTools_FaceFace ff;
+    ff.SetParameters(true, true, true, 1e-7);
+    ff.Perform(fa, fb);
+    if (!ff.IsDone())
+      return rust::String("OCCT's section failed");
+    for (const IntTools_Curve& ic : ff.Lines())
+      lines.push_back(ic);
+  }
   for (const IntTools_Curve& ic : lines)
   {
     const occ::handle<Geom_Curve> c = ic.Curve();

@@ -19,7 +19,7 @@ use crate::curve2::{distance as distance2, inside as inside2, Map, C2};
 use crate::freeform::FreeSurface;
 use crate::nurbs::NurbsCurve;
 use crate::pattern::Rigid;
-use crate::{Body, Curve, Decline, Edge, Face, Kind, Origin, Output, Record, Relation, SectionCurve, SectionSource, Solid, Surface, Use, GREY};
+use crate::{Body, Curve, Decline, Edge, Face, FacePair, Kind, Origin, Output, Record, Relation, SectionCurve, SectionSource, Solid, Surface, Use, GREY};
 use std::sync::Arc;
 use glam::{DVec2, DVec3};
 use crate::fxhash::{HashMap, HashSet};
@@ -216,8 +216,6 @@ struct NCurve {
 /// A free-form face's edges' curves on it: by (edge, a seam's second), the curve and its range.
 type PCurves = HashMap<(usize, bool), (Arc<NurbsCurve>, f64, f64)>;
 
-/// Two faces, each (argument, face).
-type FacePair = ((u32, u32), (u32, u32));
 
 /// A section's part or an edge lying on a face, its places there to be found.
 enum Pending {
@@ -245,7 +243,7 @@ struct GFace {
     uvbox: [f64; 4],
     pcurves: PCurves,
     grid: std::sync::OnceLock<Vec<(DVec2, DVec3)>>,
-    patches: std::sync::OnceLock<Vec<free::Patch>>,
+    patches: std::sync::OnceLock<free::Patches>,
     /// A Bézier face's surface in pieces, each its control points (holding it).
     hulls: std::sync::OnceLock<Option<Vec<free::Hull>>>,
 }
@@ -605,6 +603,8 @@ struct Ctx<'a> {
     canonical: HashMap<(usize, usize, u32), usize>,
     /// OCCT's sections of pairs copies are moved from (by the pair, its roles as asked).
     canon_secs: HashMap<FacePair, Vec<SectionCurve>>,
+    /// Pairs of faces found clearly apart or not (`free::apart`), by the two faces as paired.
+    apart: HashMap<(usize, usize), bool>,
     /// NURBS curves (`Geo::Nurbs`), and where OCCT's sections of free-form faces come from.
     ncurves: Vec<NCurve>,
     src: Option<&'a dyn SectionSource>,
@@ -948,6 +948,15 @@ impl Ctx<'_> {
                     if ds[k] > ds[k - 1] || ds[k] > ds[k + 1] {
                         continue;
                     }
+                    // (Its part there clearly farther than the band all over: the box it lies in, about the
+                    // point here, reaches less far than it is from the boundary.)
+                    let u = |t: f64| (t - t0) / (t1 - t0);
+                    if let Some((lo, hi)) = c2.part_box(u(ts[k - 1]), u(ts[k + 1])) {
+                        let q = c2.at(u(ts[k]));
+                        if ds[k] - (q - lo).abs().max((hi - q).abs()).length() > 2.0 * GREY * tol {
+                            continue;
+                        }
+                    }
                     let (mut lo, mut hi) = (ts[k - 1], ts[k + 1]);
                     for _ in 0..50 {
                         let (m1, m2) = (lo + (hi - lo) / 3.0, hi - (hi - lo) / 3.0);
@@ -1065,12 +1074,20 @@ impl Ctx<'_> {
     /// Where both faces' intervals of a section overlap: its edges, in both faces.
     fn section_from(&mut self, fs: usize, ft: usize, path: Path, ia: Vec<Ival>, ib: Vec<Ival>) -> R<()> {
         let tol = self.tol;
-        // The length along it between two parameters.
-        let apart = |x: f64, y: f64| path.length(x, y);
+        // Whether the length along it between two parameters is within the tolerance (a B-spline's, the length
+        // either way: clearly not where the chord is longer).
+        let near = |x: f64, y: f64| {
+            if let Path::Nurbs { c, .. } = &path
+                && (c.at(y) - c.at(x)).length() > tol * (1.0 + 1e-6)
+            {
+                return false;
+            }
+            path.length(x, y) <= tol
+        };
         // The end of a section: the tighter of the two faces' ends, made a vertex.
         let pick = |cx: &mut Ctx, x: (f64, End), y: (f64, End), lo: bool| -> R<Option<u32>> {
             let (later, earlier) = if x.0 > y.0 { (x, y) } else { (y, x) };
-            let end = if apart(earlier.0, later.0) > tol {
+            let end = if !near(earlier.0, later.0) {
                 if lo { later.1 } else { earlier.1 }
             } else if x.1.rank() >= y.1.rank() {
                 x.1
@@ -1083,7 +1100,7 @@ impl Ctx<'_> {
                 End::Point(p) => cx.pool.add(p)?,
             };
             // Both faces end there: the same vertex.
-            if apart(earlier.0, later.0) <= tol {
+            if near(earlier.0, later.0) {
                 for o in [x.1, y.1] {
                     let w = match o {
                         End::Vertex(w) => w,
@@ -1101,7 +1118,7 @@ impl Ctx<'_> {
             for y in &ib {
                 let lo = x[0].0.max(y[0].0);
                 let hi = x[1].0.min(y[1].0);
-                if apart(lo, hi) <= tol {
+                if near(lo, hi) {
                     continue;
                 }
                 let vlo = pick(self, x[0], y[0], true)?;
@@ -1344,11 +1361,21 @@ impl Ctx<'_> {
         }
     }
 
+    /// Whether faces `fs` and `ft` are clearly apart (`free::apart`; found once).
+    fn faces_apart(&mut self, fs: usize, ft: usize) -> bool {
+        if let Some(&x) = self.apart.get(&(fs, ft)) {
+            return x;
+        }
+        let x = free::apart(&self.faces[fs], &self.faces[ft], GREY * self.tol.max(5e-6));
+        self.apart.insert((fs, ft), x);
+        x
+    }
+
     /// Faces `fs` and `ft` (one free-form) meet where OCCT's section says (its curves, its curves on them).
     fn nurbs_pair(&mut self, fs: usize, ft: usize) -> R<()> {
         let Some(src) = self.src else { return Err(Decline("a curved face")) };
         // (Clearly apart, their control points tell: no section, without asking.)
-        if free::apart(&self.faces[fs], &self.faces[ft], GREY * self.tol.max(5e-6)) {
+        if self.faces_apart(fs, ft) {
             return Ok(());
         }
         let (a, b) = ((self.faces[fs].arg, self.faces[fs].index), (self.faces[ft].arg, self.faces[ft].index));
@@ -1529,7 +1556,7 @@ impl Ctx<'_> {
 
     fn face_pair(&mut self, fs: usize, ft: usize) -> R<()> {
         // (Clearly apart: no section, and no edge of one in the other.)
-        if free::apart(&self.faces[fs], &self.faces[ft], GREY * self.tol.max(5e-6)) {
+        if self.faces_apart(fs, ft) {
             return Ok(());
         }
         for (f, g) in [(fs, ft), (ft, fs)] {
@@ -2162,7 +2189,7 @@ impl Ctx<'_> {
                         if !free::ray_meets(p, r, g.lo, g.hi) {
                             continue;
                         }
-                        for (uv, t) in free::ray_hits(ns, g.patches.get_or_init(|| free::patches(g)), g.uvbox, p, r) {
+                        for (uv, t) in free::ray_hits(ns, g.patches.get_or_init(|| free::grouped(g)), g.uvbox, p, r) {
                             // Grazing it: another ray.
                             let d = ns.derivs(uv.x, uv.y);
                             if d[1].cross(d[2]).normalize_or_zero().dot(r).abs() < 1e-3 {
@@ -2320,6 +2347,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         size: 0.0,
         canonical: HashMap::default(),
         canon_secs: HashMap::default(),
+        apart: HashMap::default(),
         ncurves: Vec::new(),
         src,
     };
@@ -2678,6 +2706,35 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     }
     // Pairs of solids that may meet, and their faces.
     let ns = cx.solids.len();
+    // (OCCT's sections free-form faces' pairs below will ask for, a copied pair's the pair it is moved from, made
+    // ahead on all threads; any other as asked.)
+    if let Some(src) = cx.src {
+        let mut ahead: Vec<FacePair> = Vec::new();
+        let mut seen: HashSet<FacePair> = HashSet::default();
+        for s in 0..ns {
+            for t in s + 1..ns {
+                let (a, b) = (&cx.solids[s], &cx.solids[t]);
+                if a.arg == b.arg || !boxes_meet(a.lo, a.hi, b.lo, b.hi, GREY * tol) {
+                    continue;
+                }
+                for i in 0..cx.solids[s].faces.len() {
+                    for j in 0..cx.solids[t].faces.len() {
+                        let (fs, ft) = (cx.solids[s].faces[i], cx.solids[t].faces[j]);
+                        let (x, y) = (&cx.faces[fs], &cx.faces[ft]);
+                        if !boxes_meet(x.lo, x.hi, y.lo, y.hi, GREY * tol) || !matches!((&x.s, &y.s), (Surf::Nurbs { .. }, _) | (_, Surf::Nurbs { .. })) || cx.faces_apart(fs, ft) {
+                            continue;
+                        }
+                        let (x, y) = (&cx.faces[fs], &cx.faces[ft]);
+                        let pair = cx.moved_pair(fs, ft).map_or(((x.arg, x.index), (y.arg, y.index)), |m| m.0);
+                        if seen.insert(pair) {
+                            ahead.push(pair);
+                        }
+                    }
+                }
+            }
+        }
+        src.ahead(&ahead);
+    }
     let mut meets = vec![false; ns * ns];
     for s in 0..ns {
         for t in s + 1..ns {
@@ -2970,7 +3027,8 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     let mut face_pieces: Vec<Vec<usize>> = vec![Vec::new(); cx.faces.len()];
     let mut face_split: Vec<bool> = vec![false; cx.faces.len()];
     let mut face_inner: Vec<Vec<u32>> = vec![Vec::new(); cx.faces.len()];
-    for f in 0..cx.faces.len() {
+    // (Each face's on all threads, applied in order: its pieces, whether it is split, the vertices inside it.)
+    let of_face = |f: usize| -> R<(bool, Vec<u32>, Vec<Piece>)> {
         let mut segs: Vec<usize> = cx.faces[f].edges.iter().flat_map(|&(e, _)| edge_pieces[e].iter().map(|x| x.0)).collect();
         segs.sort_unstable();
         segs.dedup();
@@ -2979,16 +3037,14 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         segs.extend(face_extra[f].iter().copied());
         segs.sort_unstable();
         segs.dedup();
-        face_split[f] = boundary_split || segs.len() != n_boundary;
+        let split = boundary_split || segs.len() != n_boundary;
         // A face nothing reaches is one piece as it was (out of every other solid).
         let fs = cx.faces[f].solid;
         let near = involved[fs]
             && (0..ns).any(|t| meets[fs * ns + t] && boxes_meet(cx.faces[f].lo, cx.faces[f].hi, cx.solids[t].lo, cx.solids[t].hi, GREY * tol));
-        if !near && !face_split[f] {
+        if !near && !split {
             let loops = vec![cx.faces[f].edges.iter().map(|&(e, r)| (edge_pieces[e][0].0, r ^ edge_pieces[e][0].1)).collect()];
-            face_pieces[f].push(pieces.len());
-            pieces.push(Piece { face: f, loops, inside: DVec3::NAN, dangling: false });
-            continue;
+            return Ok((split, Vec::new(), vec![Piece { face: f, loops, inside: DVec3::NAN, dangling: false }]));
         }
         // The curves in the face's parameter plane (a seam's pieces on both sides).
         let seams: HashSet<usize> = {
@@ -3048,10 +3104,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         let mut inner: Vec<u32> = local.keys().map(|k| k.0).filter(|w| !boundary.contains(w)).collect();
         inner.sort_unstable();
         inner.dedup();
-        for &w in &inner {
-            note(&mut touched, &cx.pool, w, cx.faces[f].arg);
-        }
-        face_inner[f] = inner;
+        let mut out = Vec::new();
         for mut r in regions(&pts, &lsegs)? {
             let mut dist = distance2(r.inside, cx.bound(f)?);
             if dist <= GREY * tol {
@@ -3069,11 +3122,23 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             let mut loops = vec![r.outer];
             loops.extend(r.holes);
             let loops = loops.into_iter().map(|l| l.into_iter().map(|(s, rev)| (lsrc[s as usize], rev)).collect()).collect();
-            face_pieces[f].push(pieces.len());
-            pieces.push(Piece { face: f, loops, inside: inside3, dangling: r.dangling });
+            out.push(Piece { face: f, loops, inside: inside3, dangling: r.dangling });
         }
-        if face_pieces[f].is_empty() {
+        if out.is_empty() {
             return Err(Decline("a face lost"));
+        }
+        Ok((split, inner, out))
+    };
+    for (f, x) in par_map(cx.faces.len(), &of_face).into_iter().enumerate() {
+        let (split, inner, out) = x?;
+        face_split[f] = split;
+        for &w in &inner {
+            note(&mut touched, &cx.pool, w, cx.faces[f].arg);
+        }
+        face_inner[f] = inner;
+        for p in out {
+            face_pieces[f].push(pieces.len());
+            pieces.push(p);
         }
     }
     // Where each piece is against the other arguments' solids.

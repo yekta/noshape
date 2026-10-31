@@ -677,6 +677,9 @@ pub(crate) mod ffi {
         /// Sections `ids` (of the pair `moved` names first) moved onto faces `a`, `b` (`moved`: that pair, then the
         /// motion's matrix by rows and translation): their ids (built when an edge takes one); empty if not.
         fn brep_occt_moved(ids: &[u32], a_arg: u32, a_face: u32, b_arg: u32, b_face: u32, moved: &[f64]) -> Vec<u32>;
+        /// Makes OCCT's sections of these pairs (a_arg, a_face, b_arg, b_face each) ahead, on all threads, for
+        /// `brep_occt_sections` to give.
+        fn brep_occt_ahead(pairs: &[u32]);
         fn op_enclose(shapes: &OcShapeList) -> Result<OpOut>;
         fn op_transform(s: &OcShape, m: &[f64], copy: bool) -> Result<OpOut>;
         fn op_gtransform(s: &OcShape, m: &[f64]) -> Result<OpOut>;

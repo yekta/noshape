@@ -109,6 +109,21 @@ pub(super) struct Patch {
     pts: Vec<DVec3>,
 }
 
+/// A free-form face's patches and, for each run of [`GROUP`] of them in order, a box holding theirs.
+pub(super) struct Patches {
+    all: Vec<Patch>,
+    groups: Vec<(DVec3, DVec3)>,
+}
+
+const GROUP: usize = 16;
+
+/// [`patches`] with their runs' boxes.
+pub(super) fn grouped(g: &GFace) -> Patches {
+    let all = patches(g);
+    let groups = all.chunks(GROUP).map(|c| c.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(l, h), x| (l.min(x.lo), h.max(x.hi)))).collect();
+    Patches { all, groups }
+}
+
 /// A free-form face's patches over its box (each span between the surface's breaks in 4, at least 8 a side),
 /// boxes from a 5 × 5 grid of points grown by their chords' sag.
 pub(super) fn patches(g: &GFace) -> Vec<Patch> {
@@ -145,10 +160,12 @@ pub(super) fn patches(g: &GFace) -> Vec<Patch> {
 
 /// Where the ray `p + t r` crosses a NURBS surface: from the middle of each of its patches whose box the ray
 /// passes, Newton's method on (u, v, t); each hit's (u, v) and t (distinct ones).
-pub(super) fn ray_hits(ns: &FreeSurface, patches: &[Patch], uv: [f64; 4], p: DVec3, r: DVec3) -> Vec<(DVec2, f64)> {
+pub(super) fn ray_hits(ns: &FreeSurface, patches: &Patches, uv: [f64; 4], p: DVec3, r: DVec3) -> Vec<(DVec2, f64)> {
     let mut out: Vec<(DVec2, f64)> = Vec::new();
     let [u0, u1, v0, v1] = uv;
-    for pa in patches {
+    // (A run whose box the ray misses: so does each of its patches'.)
+    let met = patches.groups.iter().enumerate().filter(|x| ray_meets_box(p, r, x.1.0, x.1.1)).flat_map(|(k, _)| &patches.all[k * GROUP..((k + 1) * GROUP).min(patches.all.len())]);
+    for pa in met {
         if !ray_meets_box(p, r, pa.lo, pa.hi) {
             continue;
         }

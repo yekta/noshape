@@ -17,9 +17,10 @@ pub struct NurbsCurve {
 }
 
 /// A NURBS curve's non-empty knot spans as Bézier pieces of its homogeneous form (w x, w y, w z, w): (start, end,
-/// control points). Evaluated by de Casteljau's algorithm instead of the basis functions each time.
+/// control points). Evaluated by de Casteljau's algorithm instead of the basis functions each time. Then their
+/// control points' boxes.
 #[derive(Debug, Default)]
-pub struct Spans(OnceLock<Vec<(f64, f64, Vec<DVec4>)>>);
+pub struct Spans(OnceLock<Vec<(f64, f64, Vec<DVec4>)>>, OnceLock<Vec<(DVec3, DVec3)>>);
 
 impl Clone for Spans {
     /// (Empty: a copy's poles may be changed, scaled.)
@@ -75,10 +76,33 @@ pub const MAX_DEGREE: usize = 25;
 const M: usize = MAX_DEGREE + 1;
 
 /// The non-zero basis functions at `t` and their derivatives up to `nd` (≤ 2) (A2.3): `ders[k][j]` is the k-th
-/// derivative of N(s - p + j). On the stack.
+/// derivative of N(s - p + j). On the stack (low degrees on short arrays: less to clear).
 fn basis_derivs(knots: &[f64], s: usize, t: f64, p: usize, nd: usize) -> [[f64; M]; 3] {
-    let mut ndu = [[0.0; M]; M];
-    let (mut left, mut right) = ([0.0; M], [0.0; M]);
+    if p >= 8 {
+        return basis_derivs_n::<M>(knots, s, t, p, nd);
+    }
+    let short = basis_derivs_n::<8>(knots, s, t, p, nd);
+    let mut out = [[0.0; M]; 3];
+    for (o, x) in out.iter_mut().zip(short) {
+        o[..8].copy_from_slice(&x);
+    }
+    out
+}
+
+/// The non-zero basis functions at `t` alone (A2.2), on the stack.
+fn basis(knots: &[f64], s: usize, t: f64, p: usize) -> [f64; M] {
+    if p >= 8 {
+        return basis_n::<M>(knots, s, t, p);
+    }
+    let mut out = [0.0; M];
+    out[..8].copy_from_slice(&basis_n::<8>(knots, s, t, p));
+    out
+}
+
+/// [`basis_derivs`] on arrays `N` long (more than the degree).
+fn basis_derivs_n<const N: usize>(knots: &[f64], s: usize, t: f64, p: usize, nd: usize) -> [[f64; N]; 3] {
+    let mut ndu = [[0.0; N]; N];
+    let (mut left, mut right) = ([0.0; N], [0.0; N]);
     ndu[0][0] = 1.0;
     for j in 1..=p {
         left[j] = t - knots[s + 1 - j];
@@ -93,11 +117,11 @@ fn basis_derivs(knots: &[f64], s: usize, t: f64, p: usize, nd: usize) -> [[f64; 
         ndu[j][j] = saved;
     }
     let nd = nd.min(p).min(2);
-    let mut ders = [[0.0; M]; 3];
+    let mut ders = [[0.0; N]; 3];
     for j in 0..=p {
         ders[0][j] = ndu[j][p];
     }
-    let mut a = [[0.0; M]; 2];
+    let mut a = [[0.0; N]; 2];
     for r in 0..=p {
         let (mut s1, mut s2) = (0usize, 1usize);
         a[0][0] = 1.0;
@@ -134,10 +158,10 @@ fn basis_derivs(knots: &[f64], s: usize, t: f64, p: usize, nd: usize) -> [[f64; 
     ders
 }
 
-/// The non-zero basis functions at `t` alone (A2.2), on the stack.
-fn basis(knots: &[f64], s: usize, t: f64, p: usize) -> [f64; M] {
-    let mut n = [0.0; M];
-    let (mut left, mut right) = ([0.0; M], [0.0; M]);
+/// [`basis`] likewise.
+fn basis_n<const N: usize>(knots: &[f64], s: usize, t: f64, p: usize) -> [f64; N] {
+    let mut n = [0.0; N];
+    let (mut left, mut right) = ([0.0; N], [0.0; N]);
     n[0] = 1.0;
     for j in 1..=p {
         left[j] = t - knots[s + 1 - j];
@@ -156,6 +180,40 @@ fn basis(knots: &[f64], s: usize, t: f64, p: usize) -> [f64; M] {
 /// Binomial coefficient.
 fn binom(n: usize, k: usize) -> f64 {
     (0..k).fold(1.0, |acc, i| acc * (n - i) as f64 / (i + 1) as f64)
+}
+
+/// De Casteljau's point of the Bézier piece with control points `q` at `s` (0..1).
+fn casteljau<const N: usize>(q: &[DVec4], s: f64) -> DVec4 {
+    let p = q.len() - 1;
+    let mut v = [DVec4::ZERO; N];
+    v[..=p].copy_from_slice(q);
+    for level in 1..=p {
+        for i in 0..=p - level {
+            v[i] = v[i] * (1.0 - s) + v[i + 1] * s;
+        }
+    }
+    v[0]
+}
+
+/// The same with its first and second derivatives (over a span `h` long).
+fn casteljau_derivs<const N: usize>(q: &[DVec4], s: f64, h: f64) -> [DVec4; 3] {
+    let p = q.len() - 1;
+    let mut v = [DVec4::ZERO; N];
+    v[..=p].copy_from_slice(q);
+    let (mut d1, mut d2) = (DVec4::ZERO, DVec4::ZERO);
+    for level in 1..=p {
+        if level == p - 1 && p >= 2 {
+            // The last three points: the second derivative.
+            d2 = (v[2] - v[1] * 2.0 + v[0]) * ((p * (p - 1)) as f64 / (h * h));
+        }
+        if level == p {
+            d1 = (v[1] - v[0]) * (p as f64 / h);
+        }
+        for i in 0..=p - level {
+            v[i] = v[i] * (1.0 - s) + v[i + 1] * s;
+        }
+    }
+    [v[0], d1, d2]
 }
 
 impl NurbsCurve {
@@ -204,7 +262,7 @@ impl NurbsCurve {
         out
     }
 
-    fn spans(&self) -> &[(f64, f64, Vec<DVec4>)] {
+    pub(crate) fn spans(&self) -> &[(f64, f64, Vec<DVec4>)] {
         self.spans.0.get_or_init(|| {
             let (p, np) = (self.degree, self.poles.len());
             let u = &self.knots;
@@ -263,6 +321,76 @@ impl NurbsCurve {
         })
     }
 
+    /// Its spans' boxes (by span as `spans`; made once; empty where it has none or a weight isn't positive): each
+    /// span's part of the curve lies in its box (its control points').
+    pub(crate) fn span_boxes(&self) -> &[(DVec3, DVec3)] {
+        self.spans.1.get_or_init(|| {
+            let spans = self.spans();
+            if spans.iter().any(|x| x.2.iter().any(|h| h.w <= 0.0)) {
+                return Vec::new();
+            }
+            spans.iter().map(|x| x.2.iter().map(|h| h.truncate() / h.w).fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(l, h), q| (l.min(q), h.max(q)))).collect()
+        })
+    }
+
+    /// A box its part from `lo` to `hi` lies in: its spans' pieces there cut out by de Casteljau, their control
+    /// points' box (None where it has no spans or a weight there isn't positive).
+    pub(crate) fn part_box(&self, lo: f64, hi: f64) -> Option<(DVec3, DVec3)> {
+        let (lo, hi) = (lo.min(hi), lo.max(hi));
+        let mut out = (DVec3::INFINITY, DVec3::NEG_INFINITY);
+        for (a, b, q) in self.spans() {
+            if *b < lo || *a > hi {
+                continue;
+            }
+            let h = b - a;
+            let (u0, u1) = (((lo - a) / h).clamp(0.0, 1.0), ((hi - a) / h).clamp(0.0, 1.0));
+            // The piece before u1, then its part after u0 (in its own parameter).
+            let mut v = q.clone();
+            let m = v.len();
+            let mut left = Vec::with_capacity(m);
+            for r in 0..m {
+                left.push(v[0]);
+                for i in 0..m - 1 - r {
+                    v[i] = v[i] * (1.0 - u1) + v[i + 1] * u1;
+                }
+            }
+            let s = if u1 > 0.0 { u0 / u1 } else { 0.0 };
+            let mut right = vec![DVec4::ZERO; m];
+            for r in 0..m {
+                right[m - 1 - r] = left[m - 1 - r];
+                for i in 0..m - 1 - r {
+                    left[i] = left[i] * (1.0 - s) + left[i + 1] * s;
+                }
+            }
+            for h in right {
+                if h.w <= 0.0 {
+                    return None;
+                }
+                let x = h.truncate() / h.w;
+                out = (out.0.min(x), out.1.max(x));
+            }
+        }
+        (out.0.x <= out.1.x).then_some(out)
+    }
+
+    /// The span (of `spans`) the point at `t` is found on.
+    pub(crate) fn span_of(&self, t: f64) -> usize {
+        let spans = self.spans();
+        spans.partition_point(|x| x.0 <= t).saturating_sub(1).min(spans.len().max(1) - 1)
+    }
+
+    /// The homogeneous point at `t`: de Casteljau on its span's Bézier piece (None: no pieces).
+    fn point_h(&self, t: f64) -> Option<DVec4> {
+        let spans = self.spans();
+        if spans.is_empty() {
+            return None;
+        }
+        let (a, b, ref q) = spans[self.span_of(t)];
+        let s = (t - a) / (b - a);
+        // (Low degrees on a short array: less to clear.)
+        Some(if q.len() <= 8 { casteljau::<8>(q, s) } else { casteljau::<M>(q, s) })
+    }
+
     /// The homogeneous point at `t` and its first and second derivatives: de Casteljau on its span's Bézier
     /// piece (None: no pieces).
     fn homogeneous(&self, t: f64) -> Option<[DVec4; 3]> {
@@ -270,27 +398,10 @@ impl NurbsCurve {
         if spans.is_empty() {
             return None;
         }
-        let k = spans.partition_point(|x| x.0 <= t).saturating_sub(1).min(spans.len() - 1);
-        let (a, b, ref q) = spans[k];
-        let p = q.len() - 1;
+        let (a, b, ref q) = spans[self.span_of(t)];
         let h = b - a;
         let s = (t - a) / h;
-        let mut v = [DVec4::ZERO; M];
-        v[..=p].copy_from_slice(q);
-        let (mut d1, mut d2) = (DVec4::ZERO, DVec4::ZERO);
-        for level in 1..=p {
-            if level == p - 1 && p >= 2 {
-                // The last three points: the second derivative.
-                d2 = (v[2] - v[1] * 2.0 + v[0]) * ((p * (p - 1)) as f64 / (h * h));
-            }
-            if level == p {
-                d1 = (v[1] - v[0]) * (p as f64 / h);
-            }
-            for i in 0..=p - level {
-                v[i] = v[i] * (1.0 - s) + v[i + 1] * s;
-            }
-        }
-        Some([v[0], d1, d2])
+        Some(if q.len() <= 8 { casteljau_derivs::<8>(q, s, h) } else { casteljau_derivs::<M>(q, s, h) })
     }
 
     /// The point at `t` and its first and second derivatives.
@@ -327,7 +438,7 @@ impl NurbsCurve {
     }
 
     pub fn at(&self, t: f64) -> DVec3 {
-        if let Some([h, _, _]) = self.homogeneous(t) {
+        if let Some(h) = self.point_h(t) {
             return h.truncate() / h.w;
         }
         let (p, n) = (self.degree, self.poles.len());

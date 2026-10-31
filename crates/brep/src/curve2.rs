@@ -283,16 +283,17 @@ impl C2 {
     }
 
     /// The roots in 0..1 of `f` along it (sign changes between samples, then bisection; exact zeros too).
-    fn roots(&self, f: impl Fn(f64) -> f64) -> Vec<f64> {
+    /// `known`: the sign of `f` at a sample (by its index) where it is certain without finding `f` there.
+    fn roots(&self, f: impl Fn(f64) -> f64, known: impl Fn(usize, usize) -> Option<f64>) -> Vec<f64> {
         let n = self.samples();
         let mut out: Vec<f64> = Vec::new();
-        let mut prev = f(0.0);
+        let mut prev = known(0, n).unwrap_or_else(|| f(0.0));
         if prev == 0.0 {
             out.push(0.0);
         }
         for k in 1..=n {
             let t1 = k as f64 / n as f64;
-            let cur = f(t1);
+            let cur = known(k, n).unwrap_or_else(|| f(t1));
             if cur == 0.0 {
                 out.push(t1);
             } else if prev != 0.0 && (prev < 0.0) != (cur < 0.0) {
@@ -352,7 +353,33 @@ impl C2 {
                 }
             }
             C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => {
-                for t in self.roots(|t| (self.at(t) - m).perp_dot(d)) {
+                // (Which side of the ray's line a box is on, if clearly one: then so is all of it.)
+                let side = |b: (DVec2, DVec2)| -> Option<f64> {
+                    let ends = [b.0, DVec2::new(b.0.x, b.1.y), DVec2::new(b.1.x, b.0.y), b.1].map(|q| (q - m).perp_dot(d));
+                    let (lo, hi) = (ends.iter().copied().fold(f64::INFINITY, f64::min), ends.iter().copied().fold(f64::NEG_INFINITY, f64::max));
+                    let margin = 1e-12 * (b.0.abs().max(b.1.abs()).max(m.abs()).max_element() * d.length() + 1e-300);
+                    if lo > margin {
+                        Some(1.0)
+                    } else if hi < -margin {
+                        Some(-1.0)
+                    } else {
+                        None
+                    }
+                };
+                // (All of it on one side: it doesn't meet the line.)
+                if self.quick_box().and_then(side).is_some() {
+                    return;
+                }
+                // (A NURBS part's sample on a span clearly on one side: that side.)
+                // (Each span's side found once.)
+                let spans = self.spans2();
+                let sides: Vec<std::cell::OnceCell<Option<f64>>> = spans.as_ref().map_or(Vec::new(), |x| (0..x.0.spans().len()).map(|_| Default::default()).collect());
+                let known = |k: usize, n: usize| -> Option<f64> {
+                    let (c, t0, t1, m) = spans?;
+                    let j = c.span_of(t0 + (t1 - t0) * (k as f64 / n as f64));
+                    *sides[j].get_or_init(|| side(span_box2(c, j, m)))
+                };
+                for t in self.roots(|t| (self.at(t) - m).perp_dot(d), known) {
                     let s = (self.at(t) - m).dot(d);
                     if s > 0.0 {
                         out.push(s);
@@ -379,16 +406,7 @@ impl C2 {
             }
             C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => {
                 // The nearest sample, then Newton on (q - p)·q' (within 0..1).
-                let mut best = (0.0, f64::INFINITY);
-                let n = self.samples();
-                for k in 0..=n {
-                    let t = k as f64 / n as f64;
-                    let d = (self.at(t) - p).length();
-                    if d < best.1 {
-                        best = (t, d);
-                    }
-                }
-                let mut t = best.0;
+                let mut t = self.nearest_sample(p).0;
                 for _ in 0..30 {
                     let (d1, d2) = self.derivs(t);
                     let q = self.at(t) - p;
@@ -407,6 +425,83 @@ impl C2 {
                 (t, (self.at(t) - p).length())
             }
         }
+    }
+
+    /// A NURBS part's curve, range and map (a part seen in a plane or on a cylinder), for [`span_box2`]; None for
+    /// other curves or where a weight isn't positive.
+    fn spans2(&self) -> Option<(&NurbsCurve, f64, f64, Option<Map>)> {
+        let (c, t0, t1, m) = match self {
+            C2::Nurbs { c, t0, t1 } => (c, *t0, *t1, None),
+            C2::Mapped { c, t0, t1, m } => (c, *t0, *t1, Some(*m)),
+            _ => return None,
+        };
+        (!c.span_boxes().is_empty()).then_some((c.as_ref(), t0, t1, m))
+    }
+
+    /// A box its part from `u0` to `u1` (0..1) lies in on the parameter plane, where one comes cheaply.
+    pub(crate) fn part_box(&self, u0: f64, u1: f64) -> Option<(DVec2, DVec2)> {
+        match *self {
+            C2::Nurbs { ref c, t0, t1 } => c.part_box(t0 + (t1 - t0) * u0, t0 + (t1 - t0) * u1).map(|(lo, hi)| (lo.truncate(), hi.truncate())),
+            C2::Mapped { ref c, t0, t1, m: Map::Plane { origin, u, v } } => c.part_box(t0 + (t1 - t0) * u0, t0 + (t1 - t0) * u1).map(|(lo, hi)| plane_box(lo, hi, origin, u, v)),
+            C2::Mapped { ref c, t0, t1, m } => C2::Mapped { c: c.clone(), t0: t0 + (t1 - t0) * u0, t1: t0 + (t1 - t0) * u1, m }.quick_box(),
+            _ => self.quick_box(),
+        }
+    }
+
+    /// How far `p` is at least from it: 0 where that doesn't come cheaply (rounding allowed for).
+    fn distance_at_least(&self, p: DVec2) -> f64 {
+        let Some((c, t0, t1, m)) = self.spans2() else { return 0.0 };
+        let (lo, hi) = (t0.min(t1), t0.max(t1));
+        let mut least = f64::INFINITY;
+        for (k, x) in c.spans().iter().enumerate() {
+            if x.1 < lo || x.0 > hi {
+                continue;
+            }
+            least = least.min(away(span_box2(c, k, m), p));
+        }
+        least.max(0.0)
+    }
+
+    /// The sample (of [`Self::samples`]' evenly along it) nearest `p`, the first of equals: its parameter and
+    /// distance.
+    fn nearest_sample(&self, p: DVec2) -> (f64, f64) {
+        let n = self.samples();
+        let mut best = (0, f64::INFINITY);
+        let look = |k: usize, best: &mut (usize, f64)| {
+            let d = (self.at(k as f64 / n as f64) - p).length();
+            if d < best.1 || (d == best.1 && k < best.0) {
+                *best = (k, d);
+            }
+        };
+        // A NURBS part's samples by the spans they are found on, the nearest span's box first; none on a span
+        // whose box is farther than the nearest sample yet.
+        let Some((c, t0, t1, m)) = self.spans2() else {
+            for k in 0..=n {
+                look(k, &mut best);
+            }
+            return (best.0 as f64 / n as f64, best.1);
+        };
+        let mut runs: Vec<(f64, usize, usize)> = Vec::new();
+        let mut from = 0;
+        let mut span = c.span_of(t0);
+        for k in 1..=n + 1 {
+            let next = if k <= n { c.span_of(t0 + (t1 - t0) * (k as f64 / n as f64)) } else { usize::MAX };
+            if next != span {
+                runs.push((away(span_box2(c, span, m), p), from, k));
+                from = k;
+                span = next;
+            }
+        }
+        runs.sort_by(|a, b| a.0.total_cmp(&b.0));
+        for (away, k0, k1) in runs {
+            if away > best.1 {
+                break;
+            }
+            for k in k0..k1 {
+                look(k, &mut best);
+            }
+        }
+        (best.0 as f64 / n as f64, best.1)
     }
 
     pub fn distance(&self, p: DVec2) -> f64 {
@@ -440,27 +535,37 @@ impl C2 {
             C2::Seg { a, b } => Some((a.min(b), a.max(b))),
             C2::Arc { c, r, .. } => Some((c - DVec2::splat(r), c + DVec2::splat(r))),
             C2::Nurbs { ref c, t0, t1 } => Some(hull(&mut c.poles_of(t0, t1).iter().map(|p| p.truncate()))),
-            C2::Mapped { ref c, t0, t1, m: Map::Plane { origin, u, v } } => Some(hull(&mut c.poles_of(t0, t1).iter().map(|p| DVec2::new((*p - origin).dot(u), (*p - origin).dot(v))))),
-            C2::Mapped { ref c, t0, t1, m: Map::Cyl { o, a, x, y, r, flip, th0, .. } } => {
-                let s = if flip { -1.0 } else { 1.0 };
-                let poles = c.poles_of(t0, t1);
-                let (lo, hi) = hull(&mut poles.iter().map(|p| DVec2::splat(s * (*p - o).dot(a))));
-                // Its angles: within its poles' where they span less than half a turn clear of the seam (the
-                // sector holds their hull), else the whole turn.
-                let (mut amin, mut amax) = (f64::INFINITY, f64::NEG_INFINITY);
-                for p in poles {
-                    let w = *p - o;
-                    let th = th0 + (w.dot(y).atan2(w.dot(x)) - th0).rem_euclid(TAU);
-                    amin = amin.min(th);
-                    amax = amax.max(th);
-                }
-                let (amin, amax) = if amax - amin < 3.0 && amin > th0 + 1e-6 && amax < th0 + TAU - 1e-6 { (amin, amax) } else { (th0, th0 + TAU) };
-                Some((DVec2::new(r * amin, lo.y), DVec2::new(r * amax, hi.y)))
-            }
+            C2::Mapped { ref c, t0, t1, m } => Some(mapped_box(c, t0, t1, &m)),
             C2::Trig { .. } | C2::Hyp { .. } | C2::Conic { .. } => None,
         }
     }
+}
 
+/// A box a 3D NURBS curve's part from `t0` to `t1` seen in a plane's or cylinder's parameter plane lies in: its
+/// poles' (a cylinder's: their heights, their angles where they span less than half a turn clear of the seam, else
+/// all its angles).
+fn mapped_box(c: &NurbsCurve, t0: f64, t1: f64, m: &Map) -> (DVec2, DVec2) {
+    let hull = |q: &mut dyn Iterator<Item = DVec2>| q.fold((DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY)), |(l, h), x| (l.min(x), h.max(x)));
+    match *m {
+        Map::Plane { origin, u, v } => hull(&mut c.poles_of(t0, t1).iter().map(|p| DVec2::new((*p - origin).dot(u), (*p - origin).dot(v)))),
+        Map::Cyl { o, a, x, y, r, flip, th0, .. } => {
+            let s = if flip { -1.0 } else { 1.0 };
+            let poles = c.poles_of(t0, t1);
+            let (lo, hi) = hull(&mut poles.iter().map(|p| DVec2::splat(s * (*p - o).dot(a))));
+            let (mut amin, mut amax) = (f64::INFINITY, f64::NEG_INFINITY);
+            for p in poles {
+                let w = *p - o;
+                let th = th0 + (w.dot(y).atan2(w.dot(x)) - th0).rem_euclid(TAU);
+                amin = amin.min(th);
+                amax = amax.max(th);
+            }
+            let (amin, amax) = if amax - amin < 3.0 && amin > th0 + 1e-6 && amax < th0 + TAU - 1e-6 { (amin, amax) } else { (th0, th0 + TAU) };
+            (DVec2::new(r * amin, lo.y), DVec2::new(r * amax, hi.y))
+        }
+    }
+}
+
+impl C2 {
     fn numeric_intersections(&self, o: &C2, tol: f64) -> Vec<(f64, f64)> {
         // (Boxes apart: none.)
         if let (Some(a), Some(b)) = (self.quick_box(), o.quick_box()) {
@@ -469,7 +574,22 @@ impl C2 {
                 return Vec::new();
             }
         }
-        let together = |a: &C2, b: &C2| (0..=8).filter(|&k| b.distance(a.at(k as f64 / 8.0)) <= tol).count() >= 5;
+        // (Decided once 5 of the 9 are within or 5 aren't; a point clearly farther than its box first.)
+        let together = |a: &C2, b: &C2| {
+            let (mut yes, mut no) = (0, 0);
+            for k in 0..=8 {
+                let q = a.at(k as f64 / 8.0);
+                if b.distance_at_least(q) <= tol && b.distance(q) <= tol {
+                    yes += 1;
+                } else {
+                    no += 1;
+                }
+                if yes >= 5 || no >= 5 {
+                    break;
+                }
+            }
+            yes >= 5
+        };
         if together(self, o) || together(o, self) {
             return Vec::new();
         }
@@ -641,6 +761,34 @@ pub(crate) fn inside(p: DVec2, edges: &[C2]) -> bool {
         }
     }
     odd
+}
+
+/// The box span `k` of `c` lies in on the parameter plane: its control points' (seen in a plane), or as
+/// `quick_box` does on a cylinder (`m` as [`C2::spans2`] gives it).
+fn span_box2(c: &NurbsCurve, k: usize, m: Option<Map>) -> (DVec2, DVec2) {
+    let (lo, hi) = c.span_boxes()[k];
+    match m {
+        Some(Map::Plane { origin, u, v }) => plane_box(lo, hi, origin, u, v),
+        Some(m) => {
+            let x = &c.spans()[k];
+            mapped_box(c, x.0, x.1, &m)
+        }
+        None => (lo.truncate(), hi.truncate()),
+    }
+}
+
+/// The box of a 3D box's corners seen in a plane (holding what the box holds, seen so).
+fn plane_box(lo: DVec3, hi: DVec3, origin: DVec3, u: DVec3, v: DVec3) -> (DVec2, DVec2) {
+    (0..8).map(|i| DVec3::new(if i & 1 == 0 { lo.x } else { hi.x }, if i & 2 == 0 { lo.y } else { hi.y }, if i & 4 == 0 { lo.z } else { hi.z })).fold((DVec2::INFINITY, DVec2::NEG_INFINITY), |(l, h), q| {
+        let q = DVec2::new((q - origin).dot(u), (q - origin).dot(v));
+        (l.min(q), h.max(q))
+    })
+}
+
+/// How far `p` is at least from box `b` (less a rounding's worth).
+fn away(b: (DVec2, DVec2), p: DVec2) -> f64 {
+    let scale = b.0.abs().max(b.1.abs()).max(p.abs()).max_element();
+    (b.0 - p).max(p - b.1).max(DVec2::ZERO).length() - 1e-12 * scale
 }
 
 /// The distance from `p` to the nearest of `edges`.

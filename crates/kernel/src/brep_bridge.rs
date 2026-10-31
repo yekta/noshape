@@ -324,6 +324,11 @@ impl SectionSource for Occt {
         }
         Ok(out)
     }
+
+    fn ahead(&self, pairs: &[noshape_brep::FacePair]) {
+        let flat: Vec<u32> = pairs.iter().flat_map(|&(a, b)| [a.0, a.1, b.0, b.1]).collect();
+        raw::brep_occt_ahead(&flat);
+    }
 }
 
 pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: bool, out: &mut BrepResult) -> bool {

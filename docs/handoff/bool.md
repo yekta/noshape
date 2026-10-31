@@ -877,6 +877,32 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   5.4 s, then the unify's USD 10.7 s (Requests). Next: one period's crossings / classification reused for its
   copies, exact sections of helix-swept faces.
 
+## Patterned tools, step 4 (10-31 UTC): the Rust Boolean's own time on many free-form faces
+- Profiled on the knurl (local, perf): after step 3 the time was ours, not OCCT's. Changes, each giving the same
+  results (bounds only skip work whose outcome they decide; replays below):
+  - OCCT's sections the pairs will ask for (a copied pair's: the pair it is moved from) made ahead on all threads
+    (`SectionSource::ahead`, `brep_occt_ahead`); asked for in the same order as before, so ids and curves are the
+    same. Knurl: 5.1 s serial → 0.6 s.
+  - A 2D curve's nearest sample (`param_of`): samples on spans whose box is farther than the nearest yet skipped;
+    whether two curves run together decided after 5 of 9 points (and a point clearly farther than the other's span
+    boxes not measured); a ray against a curve: samples on spans clearly on one side of its line not evaluated, a
+    curve wholly on one side not sampled.
+  - A section clear of a face's boundary: the 50-step search near a sampled minimum skipped where the curve's part
+    there (its box, de Casteljau) can't come within the band.
+  - Section ends' lengths: a B-spline's chord longer than the tolerance decides it (no 400-point quadrature).
+  - Faces' pieces on all threads (applied in face order); `free::apart` found once per pair; patches' boxes in runs
+    of 16 for rays; NURBS evaluation on short arrays (no 26 × 26 table cleared per call), points without the
+    derivatives.
+- Knurl, local (loaded machine; Rust Boolean, the "tools coincide" declines lifted as in step 3): 48 → 18.7 s
+  (pairs 16 → 6.5 s, crossings 5.5 → 1.6 s, regions 14.7 → 2.4 s, classification 6.9 → 3.3 s); the same result
+  (9.427289e-5 m³, 10362 faces, valid). vibe3 numbers below once measured.
+- psui: `SectionSource` has a new provided method `ahead(&self, pairs)` (default: nothing). Nothing else public.
+- Replays, all 0 differ, the counts unchanged (main 776, corpus2 553, corpus3 556, corpus4 600, corpus5 717,
+  corpus6 662, Shell's 78, direct 58).
+- Exact sections of helix-swept faces: not worth it for time now (OCCT's sections are 0.6 s of the knurl on all
+  threads). Next: one period's classification for the rest (the arrangement the same under the pattern's rotation),
+  then the same for the sections' places and the faces' pieces.
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|
@@ -917,11 +943,13 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   solid as Modified into the result's? Then noshape's Boolean can take those cuts (the B94.6 knurl's is one: it now
   declines "tools coincide" on that account) with the same history as today. If anything (names, bodies) relies on
   the Deleted, tell me and I'll mirror it instead.
-- core (10-31 UTC): the unify after a patterned cut: on the knurl, ShapeUpgrade_UnifySameDomain takes 10.7 s of
-  38.6 s, and all it merges is 14 of 10376 faces (cylinder-side pieces split at the seam; OCCT's raw result has
-  them too) plus those faces' edge halves. Could the unify run on just the faces that share a surface with a
-  neighbour (found from the result's faces' surfaces, cheap) and leave the rest as they are? Same result, ~10 s
-  less there.
+- core (10-31 UTC): the unify after a patterned cut: on the knurl, unify.usd takes 10.7 s of 38.6 s (vibe3; now
+  more than the Rust Boolean itself), and all it merges is 14 of 10376 faces (cylinder-side pieces split at the
+  seam; OCCT's raw result has them too) plus those faces' edge halves. Most of it is usd_kept_volume: two
+  BRepGProp::VolumeProperties of the whole 10k-face result (B-spline faces) and a copy, around one USD. Could the
+  volume check compare only the merged faces' share (the volume is a sum over faces: the faces USD replaced
+  before, their replacements after), or the unify run on just the faces that share a surface with a neighbour?
+  Same result, most of the 10 s less there.
 - core (10-30 06:15 UTC): `boolean_groups::a_section_under_a_call_budget_gives_up` (fd65effd, 04:39) fails on
   Windows and macOS in my branch CI (run 41008061871: "" after 0.48 s, the section ran to the end under a 1e-4 s
   budget); Linux passes. It hasn't been on a scheduled run yet (main's last, 03:27, predates it). The budget is CPU

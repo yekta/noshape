@@ -157,8 +157,11 @@ pub struct SectionCurve {
 
 /// Where the Boolean gets the sections of free-form faces: the curves where face `a` (argument, face) and face `b`
 /// meet, curves on them in that order.
+/// Two faces, each (argument, face).
+pub type FacePair = ((u32, u32), (u32, u32));
+
 /// A pair of faces (argument, face) another pair is a rigid copy of, and the motion from it onto the other.
-pub type MovedPair = (((u32, u32), (u32, u32)), pattern::Rigid);
+pub type MovedPair = (FacePair, pattern::Rigid);
 
 pub trait SectionSource: Sync {
     fn sections(&self, a: (u32, u32), b: (u32, u32)) -> Result<Vec<SectionCurve>, Decline>;
@@ -166,6 +169,8 @@ pub trait SectionSource: Sync {
     /// by `pattern::copy_of`): that pair's sections `ids` moved by the motion (the caller moves the curves; curves
     /// on the copies' faces the same): their ids for these.
     fn moved(&self, ids: &[u32], a: (u32, u32), b: (u32, u32), moved: &MovedPair) -> Result<Vec<u32>, Decline>;
+    /// Makes the sections of these pairs ahead (on all threads) for `sections` to give; nothing by default.
+    fn ahead(&self, _pairs: &[FacePair]) {}
 }
 
 /// Why a Boolean declined.
