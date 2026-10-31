@@ -1079,7 +1079,7 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
-## What still declines, by OCCT's recorded time (replays 10-31 17:20 UTC on main with the apex work, each case once)
+## What still declines, by OCCT's recorded time (replays 10-31 17:13 UTC on main with the apex work, each case once)
 A vertex inside coincident edges of two other arguments 32.3 s (17), an internal face 25.3 s (2: b2511301 a Shell
 slab fuse of 72 tools whose OCCT result is invalid, addb9a14), a tolerant input 23.9 s (18), edges of two arguments
 crossing on a third's face 22.2 s (14), two vertices nearly coincide 9.7 s (10), a curve nearly along a face's
@@ -1102,9 +1102,14 @@ Medians are 10–20× faster; totals 2.6–3.4× in the corpora, held down by a 
 ~2 s each against OCCT's 3–4 s). (OCCT's are the recorded times, parallel, on a loaded machine; ours serial.)
 
 ## Next
-- The knurl (lead 10-31): the whole test's time on vibe3 with the lift, where the time goes outside op_boolean
-  (FeatureScript, groove sweeps, meshing, validity checks), then the gap to live's 49 s, biggest first. The unify
-  guard (usd_kept_volume) is core's (core had it nearly done; my attempt dropped, lead 10-31).
+- The knurl is done (lead 10-31): 8.8 s regeneration on vibe3 at 8d4cf857 against live's 49 s, the test 15.96 s.
+  What's left in it: noshape's Boolean 4.9 s (its brep part 4.35), core's unify 2.0 s.
+- Pattern fuses of 128+ touching instances (fuse_slabs): waiting on core / lead (Requests): ours first would take
+  them faster with the same shapes, but the plain Boolean's history.
+- The declines are flat now (above): the top ones are OCCT's tolerance and rounding choices (coincident edges of
+  three arguments, tolerant inputs, points 1–3 tolerances apart: checked 10-31, OCCT goes by each new vertex's own
+  tolerance there), not geometry we lack. Looked at and left: fuse_slabs' inner fuses through ours (2.5 s against
+  ~2.1 s on 1000 fins: little), a parallel BRepCheck in is_valid (the model checks small shapes).
 - skasm's three union rows: done 10-31 (above, "Unions with coplanar neighbouring faces").
 Free-form, the lead's four steps (13:35) where they stand (10-29 20:45 UTC): (1) profiled (above); (2) the hybrid
 (OCCT's IntTools_FaceFace curves, everything else ours) takes B-spline, torus, sphere, extruded and revolved faces;
