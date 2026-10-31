@@ -1002,6 +1002,29 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
 - vibe3 (perf.sh, steps 1–8): the knurl's Rust Boolean 4.8 s (38 s before step 3), op_boolean 15.75 s of which
   unify.usd 10.7 s (Requests).
 
+## The knurl's cut through noshape's Boolean (10-31 11:20 UTC)
+- The "tools coincide" declines on a patterned cut are lifted: the planar-cap check is gone, and in a cut a piece on
+  the object and a tool, or an object's piece on two tools sharing a cap there, is taken as on one (the object's, or
+  the one facing its way). core's CutByFaces Modified fix (2c6e89c2) made the history agree.
+- Found on the way: the period work turned a curve's split points and a copied tool's face's inside vertices from
+  the first period, so an input vertex the rotation doesn't keep (the cylinder's seam vertex at its bottom rim) was
+  missed by curves and faces in a later period. Now such vertices (input vertices whose turned point is no vertex)
+  make any curve through them and any copied tool's face whose box holds them be worked out directly.
+- Against OCCT (T2 `bool_patterns::the_b94_knurl_by_noshapes_boolean`, both ways, minutes): the same solids,
+  faces, edges, vertices, validity, every history record. Two kinds of difference, neither ours to fix:
+  - OCCT through op_boolean (64+ tools at the working scale) runs on scaled inputs and scales back, so the vertices
+    it keeps come back new and its history says Modified (the seam vertex; after the unify that also showed as 27
+    records of the seam edge's vertices). With NOSHAPE_BOOL_NO_SCALE=1 OCCT says Kept, as ours: the test compares
+    with that.
+  - Section edges: OCCT computes each groove's sections apart, ours turns one period's. Every OCCT section edge
+    lies on ours within 2e-8 m (sampled 3000), but their curves are parameterized otherwise, so the replay's
+    parameter-midpoint signature differs by 3–5 µm on 8200 records. The test places an edge by its ends and length
+    instead. 22 crossings of the two groove families on the mirror planes, where the curves meet nearly tangent,
+    are 11 µm apart along them (ours on the plane, OCCT's 2e-9 m off it): edge ends within 20 µm there. The volume
+    differs by 1.1e-8 relative (OCCT's own moved 3.6e-9 between the recording and now): to 1e-7. The pattern bench
+    `the_b94_diamond_knurl` compares the knurl's volume to 1e-7 too.
+- Seen, not looked into yet: our result's vertices carry tolerance 5e-6 where OCCT's carry ~1e-7.
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|
@@ -1017,6 +1040,10 @@ Medians are 10–20× faster; totals 2.6–3.4× in the corpora, held down by a 
 ~2 s each against OCCT's 3–4 s). (OCCT's are the recorded times, parallel, on a loaded machine; ours serial.)
 
 ## Next
+- The knurl (lead 10-31): the whole test's time on vibe3 with the lift, where the time goes outside op_boolean
+  (FeatureScript, groove sweeps, meshing, validity checks), then the gap to live's 49 s, biggest first. The unify
+  guard (usd_kept_volume) is core's (core had it nearly done; my attempt dropped, lead 10-31).
+- skasm's three union rows: done 10-31 (above, "Unions with coplanar neighbouring faces").
 Free-form, the lead's four steps (13:35) where they stand (10-29 20:45 UTC): (1) profiled (above); (2) the hybrid
 (OCCT's IntTools_FaceFace curves, everything else ours) takes B-spline, torus, sphere, extruded and revolved faces;
 (3) tori / spheres / sweeps through the same hybrid: returns flat (spheres and tori mostly decline at poles and
@@ -1036,13 +1063,13 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   profiles and make it cheaper (only the merged faces' share of the volume) if it shows.
 
 ## Requests
-- core (10-30 23:45 UTC): op_boolean's CutByFaces build (a cut by 8+ tools in 2+ disjoint groups) leaves the
+- Done (core 2c6e89c2; the knurl's cut taken 10-31): core (10-30 23:45 UTC): op_boolean's CutByFaces build (a cut by 8+ tools in 2+ disjoint groups) leaves the
   target's solid without a record (history: Deleted), where every other path (OCCT's usual build, its fallback when
   CutByFaces fails, noshape's Boolean) says Modified into the result's solid. Could CutByFaces record the target's
   solid as Modified into the result's? Then noshape's Boolean can take those cuts (the B94.6 knurl's is one: it now
   declines "tools coincide" on that account) with the same history as today. If anything (names, bodies) relies on
   the Deleted, tell me and I'll mirror it instead.
-- core (10-31 UTC): the unify after a patterned cut: on the knurl, unify.usd takes 10.7 s of op_boolean's 18.3 s
+- core (10-31 UTC; core on it): the unify after a patterned cut: on the knurl, unify.usd takes 10.7 s of op_boolean's 18.3 s
   (vibe3, step 5; the Rust Boolean 7.3 s, less since), and all it merges is 14 of 10376 faces (cylinder-side pieces split at the
   seam; OCCT's raw result has them too) plus those faces' edge halves. Most of it is usd_kept_volume: two
   BRepGProp::VolumeProperties of the whole 10k-face result (B-spline faces) and a copy, around one USD. Could the

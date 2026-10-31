@@ -2821,36 +2821,6 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
         }
     }
-    // Two tools' planar faces on one plane facing one way, overlapping (a pattern's instances sharing end caps): in
-    // a cut OCCT may build the object's solid anew (its history Deleted), as the classification would find
-    // ("tools coincide"); told before any section.
-    if op == Op::Cut && args.len() > 2 {
-        let planar: Vec<usize> = (0..cx.faces.len()).filter(|&f| cx.faces[f].arg != 0 && matches!(cx.faces[f].s, Surf::Plane { .. })).collect();
-        for (i, &f) in planar.iter().enumerate() {
-            let Surf::Plane { n, d, .. } = cx.faces[f].s else { continue };
-            for &g in &planar[i + 1..] {
-                let Surf::Plane { n: m, d: e, .. } = cx.faces[g].s else { continue };
-                if cx.faces[f].arg == cx.faces[g].arg || (n - m).length() > 1e-9 || (d - e).abs() > tol {
-                    continue;
-                }
-                if !boxes_meet(cx.faces[f].lo, cx.faces[f].hi, cx.faces[g].lo, cx.faces[g].hi, tol) {
-                    continue;
-                }
-                // (One's middle (its vertices') clearly inside the other: they overlap; else the classification
-                // tells.)
-                let inside = |a: usize, b: usize| -> R<bool> {
-                    let vs: HashSet<u32> = cx.faces[a].edges.iter().flat_map(|&(e, _)| cx.edges[e].v).collect();
-                    let c = vs.iter().fold(DVec3::ZERO, |acc, &w| acc + cx.p(w)) / vs.len().max(1) as f64;
-                    let q = cx.faces[b].to2(c);
-                    let bound = cx.bound(b)?;
-                    Ok(distance2(q, bound) > GREY * tol && inside2(q, bound))
-                };
-                if inside(f, g)? || inside(g, f)? {
-                    return Err(Decline("tools coincide"));
-                }
-            }
-        }
-    }
     // Tools that are rigid copies of each other (a pattern's): a pair of their faces a copy of another pair has
     // OCCT's sections of that one, moved.
     if cx.src.is_some() && args.len() > 2 {
@@ -2869,6 +2839,21 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // The rotation the arrangement is the same under, if any (below: one period's work for the rest).
     let sym = cx.symmetry();
     let size = cx.size.max(cx.pool.p.iter().fold(0.0, |m: f64, p| m.max(p.abs().max_element())));
+    // Input vertices the rotation doesn't take onto another's (a cylinder's seam's, on its whole circles), by x: a
+    // curve or a copied tool's face near one is worked out itself, not turned from the first period (where another
+    // argument's edge or face passes such a vertex OCCT makes it anew: the knurl's seam at its bottom rim).
+    let lone: Vec<(f64, u32)> = match &sym {
+        Some(sym) => {
+            let g = sym.turn(1.0);
+            let mut v: Vec<(f64, u32)> =
+                (0..cx.pool.p.len() as u32).filter(|&w| !cx.pool.inputs[w as usize].is_empty() && !matches!(cx.pool.find(g.point(cx.p(w))), Ok(Some(_)))).map(|w| (cx.p(w).x, w)).collect();
+            v.sort_by(|a, b| a.0.total_cmp(&b.0));
+            v
+        }
+        None => Vec::new(),
+    };
+    let lone_at: Vec<DVec3> = lone.iter().map(|&(_, w)| cx.p(w)).collect();
+    let near_lone = |lo: DVec3, hi: DVec3| lone_at.iter().any(|&p| p.cmpge(lo - DVec3::splat(GREY * tol)).all() && p.cmple(hi + DVec3::splat(GREY * tol)).all());
     // Pairs of solids that may meet, and their faces.
     let ns = cx.solids.len();
     // (OCCT's sections free-form faces' pairs below will ask for, a copied pair's the pair it is moved from, made
@@ -3131,7 +3116,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             return None;
         }
         let f0 = sym.face_back[j - 1][f];
-        (f0 != usize::MAX && cx.faces[f0].arg as usize == cx.families[k][0].0).then_some((f0, j))
+        (f0 != usize::MAX && cx.faces[f0].arg as usize == cx.families[k][0].0 && !near_lone(cx.faces[f].lo, cx.faces[f].hi)).then_some((f0, j))
     };
     // (With the arrangement the same under a rotation: a copied tool's face whose curves are its family's first
     // member's face's turned, one for one (by each of its curves, that face's), crosses where that one does.)
@@ -3419,6 +3404,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             let j = period[k]?;
             let (back, g) = (sym.turn(-(j as f64)), sym.turn(j as f64));
             let s = seg_of(k);
+            if !matches!(cx.split(&s, &lone), Ok(c) if c.len() == 2) {
+                return None;
+            }
             let v = [cx.pool.find(back.point(cx.p(s.v[0]))).ok()??, cx.pool.find(back.point(cx.p(s.v[1]))).ok()??];
             let mid = back.point(cx.seg_at(&s, 0.5));
             let k0 = *at.get(&v)?.iter().find(|&&k0| {
@@ -3846,7 +3834,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         if !ons.is_empty() && (cx.solids[s].sheet || ons.iter().any(|&(t, _)| cx.solids[t].sheet)) {
             return Err(Decline("sheets coincident"));
         }
-        if ons.len() > 1 && op != Op::Fuse {
+        // (In a cut, a piece on the object and a tool, or an object's piece on two tools sharing a face there (a
+        // pattern's end caps on the object's end face): as on one, the object's or the one facing its way.)
+        let several_ok = op == Op::Cut && (arg == 0 || ons.iter().any(|&(t, _)| cx.solids[t].arg == 0));
+        if ons.len() > 1 && op != Op::Fuse && !several_ok {
             return Err(Decline("a piece on two solids"));
         }
         let in_any = states.iter().any(|x| x.1 == State::In);
@@ -3855,12 +3846,17 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
         let in_obj = states.iter().any(|x| x.1 == State::In && cx.solids[x.0].arg == 0);
         let in_tool = states.iter().any(|x| x.1 == State::In && cx.solids[x.0].arg != 0);
-        let on = ons.first().copied();
+        let on = if ons.len() > 1 && op == Op::Cut {
+            if arg != 0 { ons.iter().find(|&&(t, _)| cx.solids[t].arg == 0) } else { ons.iter().find(|x| x.1 == State::OnSame) }.or(ons.first()).copied()
+        } else {
+            ons.first().copied()
+        };
         // Two tools' pieces coinciding (a cut), facing each other: inside the tools.
         let tools_on = op == Op::Cut && arg != 0 && on.is_some_and(|(t, _)| cx.solids[t].arg != 0);
-        if let Some((t, st)) = on {
-            // (Facing one way OCCT may build the object's solid anew: its history says it's deleted.)
-            if op != Op::Fuse && arg != 0 && cx.solids[t].arg != 0 && (op == Op::Common || st == State::OnSame) {
+        if let Some((t, _)) = on {
+            // (In a common two tools' pieces coinciding: not taken. In a cut OCCT's record of the object's solid is
+            // Modified on every path now, CutByFaces's too (core 2c6e89c2), as ours.)
+            if op == Op::Common && arg != 0 && cx.solids[t].arg != 0 {
                 return Err(Decline("tools coincide"));
             }
             on_pairs.push((pi, t));

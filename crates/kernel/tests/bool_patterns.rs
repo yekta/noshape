@@ -10,6 +10,11 @@ use std::time::Instant;
 
 /// Cuts (or fuses) `tools` from `object` both ways; prints and compares.
 fn bench(name: &str, op: k::BooleanOp, object: &k::Shape, tools: &[k::Shape], opts: &k::BooleanOptions) {
+    bench_within(name, op, object, tools, opts, 1e-9);
+}
+
+/// `bench`, the volumes the same to `volume_tol` relative.
+fn bench_within(name: &str, op: k::BooleanOp, object: &k::Shape, tools: &[k::Shape], opts: &k::BooleanOptions, volume_tol: f64) {
     let run = |rust: Option<bool>| {
         k::set_rust_boolean(rust);
         let t = Instant::now();
@@ -36,7 +41,7 @@ fn bench(name: &str, op: k::BooleanOp, object: &k::Shape, tools: &[k::Shape], op
     assert!(ours.4 || !occt.4, "{name}: not valid");
     if occt.4 {
         assert_eq!(ours.3, occt.3, "{name}: faces");
-        assert!((ours.2 - occt.2).abs() <= 1e-9 * occt.2.abs(), "{name}: volume {} against OCCT's {}", ours.2, occt.2);
+        assert!((ours.2 - occt.2).abs() <= volume_tol * occt.2.abs(), "{name}: volume {} against OCCT's {}", ours.2, occt.2);
     }
 }
 
@@ -159,7 +164,85 @@ fn the_b94_diamond_knurl() {
     let _ = k::set_working_scale(1000.0);
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/patterns");
     let c = k::bool_corpus::load(&dir, "d14b48a8ddf91647").expect("the recorded knurl");
-    bench("B94.6 diamond knurl", c.op, &c.objects[0], &c.tools, &c.opts);
+    // (The volume to 1e-7: the_b94_knurl_by_noshapes_boolean.)
+    bench_within("B94.6 diamond knurl", c.op, &c.objects[0], &c.tools, &c.opts, 1e-7);
+}
+
+/// A result's history records, each output by where it lies (a face by its centroid and area, an edge by its ends
+/// and length, a vertex by its point: none by a curve's parameters), grouped by what they say.
+fn placed_records(r: &k::OpResult) -> std::collections::BTreeMap<String, Vec<Vec<f64>>> {
+    let mut out: std::collections::BTreeMap<String, Vec<Vec<f64>>> = Default::default();
+    for h in &r.history.records {
+        let x = r.shape.sub_shape(h.output_kind, h.output_index as usize).ok();
+        let at = match (h.output_kind, &x) {
+            (k::ShapeType::Face, Some(x)) => {
+                let c = x.centroid().unwrap_or_default();
+                vec![c.x, c.y, c.z, x.area().unwrap_or(0.0)]
+            }
+            (k::ShapeType::Edge, Some(x)) => {
+                let i = x.edge_info().unwrap();
+                vec![i.start.x, i.start.y, i.start.z, i.end.x, i.end.y, i.end.z, x.length().unwrap_or(0.0)]
+            }
+            (k::ShapeType::Vertex, Some(x)) => x.vertex_point().unwrap_or_default().to_array().to_vec(),
+            _ => Vec::new(),
+        };
+        out.entry(format!("arg{} {:?}{} {:?} {:?}", h.arg, h.input_kind, h.input_index, h.relation, h.output_kind)).or_default().push(at);
+    }
+    out
+}
+
+/// The B94.6 knurl's cut through noshape's Boolean (its grooves' end caps share the cylinder's end planes and each
+/// other's: a piece on the object and a tool, or on two tools, taken), as OCCT's: faces, edges, vertices, validity,
+/// every history record (each output where OCCT's is, within 2 µm; an edge's ends within 20 µm, below), the volume
+/// to 1e-7 (OCCT computes each groove's sections apart, ours turns one period's: OCCT's edges lie on ours within
+/// 2e-8 m, their curves parameterized otherwise). OCCT unscaled (NOSHAPE_BOOL_NO_SCALE): op_boolean's scaled path
+/// for 64+ tools makes the vertices it keeps anew, its history then saying Modified (the cylinder's seam vertex).
+#[test]
+#[ignore = "T2: the knurl's cut both ways (minutes)"]
+fn the_b94_knurl_by_noshapes_boolean() {
+    // SAFETY: read by each Boolean of this thread; these tests run one at a time (--test-threads=1).
+    unsafe {
+        std::env::set_var("NOSHAPE_BOOLEAN_MEMORY_MB", "16000");
+    }
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/patterns");
+    let c = k::bool_corpus::load(&dir, "d14b48a8ddf91647").expect("the recorded knurl");
+    let ours = k::boolean(c.op, &c.objects, &c.tools, &c.opts).unwrap();
+    assert_eq!(k::last_boolean_path(), "rust", "declined: {}", k::last_rust_decline());
+    k::set_rust_boolean(Some(false));
+    // SAFETY: as above.
+    unsafe { std::env::set_var("NOSHAPE_BOOL_NO_SCALE", "1") };
+    let occt = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    // SAFETY: as above.
+    unsafe { std::env::remove_var("NOSHAPE_BOOL_NO_SCALE") };
+    k::set_rust_boolean(None);
+    let occt = occt.unwrap();
+    for kind in [k::ShapeType::Solid, k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex] {
+        assert_eq!(ours.shape.count(kind), occt.shape.count(kind), "{kind:?}");
+    }
+    assert!(ours.shape.is_valid() && occt.shape.is_valid());
+    let (v, w) = (ours.shape.volume().unwrap(), occt.shape.volume().unwrap());
+    assert!((v - w).abs() <= 1e-7 * w, "volume {v} against OCCT's {w}");
+    let (a, b) = (placed_records(&ours), placed_records(&occt));
+    let mut differ = Vec::new();
+    for key in a.keys().chain(b.keys()).collect::<std::collections::BTreeSet<_>>() {
+        let (xs, ys) = (a.get(key).cloned().unwrap_or_default(), b.get(key).cloned().unwrap_or_default());
+        let mut used = vec![false; ys.len()];
+        for x in &xs {
+            // (An edge's ends within 20 µm: where the two families of grooves cross on the pattern's mirror planes
+            // their curves meet nearly tangent, and OCCT's crossing lies 11 µm along them from ours (ours on the
+            // plane, OCCT's 2e-9 m off it); its length, and everything else, within 2 µm.)
+            let close = |y: &[f64]| x.iter().zip(y).enumerate().all(|(i, (p, q))| (p - q).abs() <= if x.len() == 7 && i < 6 { 2e-5 } else { 2e-6 });
+            // (Its ends either way round.)
+            let near = |y: &Vec<f64>| y.len() == x.len() && (close(y) || (y.len() == 7 && close(&[&y[3..6], &y[0..3], &y[6..]].concat())));
+            match (0..ys.len()).find(|&j| !used[j] && near(&ys[j])) {
+                Some(j) => used[j] = true,
+                None => differ.push(format!("ours only: {key} {x:?}")),
+            }
+        }
+        differ.extend((0..ys.len()).filter(|&j| !used[j]).map(|j| format!("OCCT's only: {key} {:?}", ys[j])));
+    }
+    assert!(differ.is_empty(), "{} records differ:\n{}", differ.len(), differ[..differ.len().min(40)].join("\n"));
 }
 
 /// Tools that are rigid copies are found from their geometry (noshape_brep::pattern): a circle of holes is one
