@@ -181,6 +181,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   live: V49 BOM / cut list table references (open).
 - Then V42 from live 1645 (typed scales kept: "2:4", "0.5" → "0.5:1"; family scale labels while they differ from
   the sheet; title block SCALE as typed).
+- Live 1647 (V49): callouts read BOM items only (a Part Studio drawing's callout is a red "----", cut list or not),
+  so A24's cut list item default is gone; View properties shows the table references as live. For core: live's
+  Cut list feature makes "Composite part 1" (ours none; the reference row falls back to "Cut list").
+  TB15 / TB27 / A24 app-checked on a frame drawing (/root/dx-scratch/w3/frm.noshape, built by CLI).
 - Open in my rows: V57 assembly Show sketches (assembly sources skip sketch wires), V35 (d) sections of broken views,
   D40 hatch / title red, C11 inference points, D9 ordinate jogs.
 

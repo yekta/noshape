@@ -1086,6 +1086,9 @@ struct Env<'a> {
     /// Lines of expanded texts that hold property fields (for their grey
     /// background on screen).
     used: &'a std::cell::RefCell<Vec<String>>,
+    /// Callouts showing a BOM item number their part has none of: drawn
+    /// red (live request 1647).
+    unresolved: &'a std::cell::RefCell<Vec<u64>>,
 }
 
 impl AnnotationEnv for Env<'_> {
@@ -1179,24 +1182,22 @@ impl Env<'_> {
             .map(|(_, b)| b)
     }
 
-    /// A callout's text: its own (empty: the BOM item number, or the cut
-    /// list's when the sheet has a cut list and the part no BOM row; help
+    /// A callout's text: its own (empty: the BOM item number; help
     /// callout_balloon, drawing.md A24), with the properties of its part
     /// `body` (`{part.*}`), its BOM row (`{bom.*}`) and cut list row
-    /// (`{cut.*}`) filled in; "----" when there is none.
+    /// (`{cut.*}`) filled in; "----" when there is none. Item numbers come
+    /// from a BOM only: without a BOM row the item reads "----" and the
+    /// callout is drawn red, a cut list or not (live request 1647).
     fn callout_text(&self, a: &Annotation, body: Option<&crate::reference::BodyId>, text: &str) -> String {
         let src = a.kind.view().and_then(|v| views::view_source(self.sheet, v)).and_then(|(key, _)| self.sources.get(&key));
         let part = src.zip(body).and_then(|(s, b)| s.part(Some(b)));
         let row = src.zip(body).and_then(|(s, b)| s.bom.iter().find(|r| r.bodies.contains(b)));
-        let cut_table = self.sheet.tables.iter().any(|t| matches!(t.kind, TableKind::CutList { .. }));
+        let cut = if text.contains("{cut.") { src.zip(body).and_then(|(s, b)| crate::regen::features::frames::cut_list(&s.context, None).into_iter().find(|r| r.bodies.contains(b))) } else { None };
         let t = text.trim();
-        let wants_cut = text.contains("{cut.") || ((t.is_empty() || t == "#") && row.is_none() && cut_table);
-        let cut = if wants_cut { src.zip(body).and_then(|(s, b)| crate::regen::features::frames::cut_list(&s.context, None).into_iter().find(|r| r.bodies.contains(b))) } else { None };
-        let text = if t.is_empty() || t == "#" {
-            if row.is_none() && cut_table { "{cut.item}" } else { "{bom.item}" }
-        } else {
-            text
-        };
+        let text = if t.is_empty() || t == "#" { "{bom.item}" } else { text };
+        if row.is_none() && text.contains("{bom.item}") {
+            self.unresolved.borrow_mut().push(a.id);
+        }
         let lookup = |k: &str| -> Option<String> {
             Some(match k {
                 "part.name" => part.map(|p| p.name.clone()).unwrap_or_default(),
@@ -2191,15 +2192,21 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     }
 
     // Annotations with resolved references.
-    let (mut resolved, dangling, lost) = resolve_annotations(drawing, sheet, views, sources);
+    let (mut resolved, mut dangling, lost) = resolve_annotations(drawing, sheet, views, sources);
     // MBD datums from the Part Studio: anchored on their face in their view.
     let to_sheet_in = |id: ViewId, p: [f64; 2]| placements.iter().find(|pl| pl.id == id).map(|pl| pl.to_sheet(p)).unwrap_or(p);
     super::mbd::resolve_model_annotations(&mut resolved, views, sources, &to_sheet_in);
     let (ml, mt, mg) = (g.lines.len(), g.texts.len(), g.grips.len());
     // Note fields are matched only against annotation texts.
     let used_notes = std::cell::RefCell::new(Vec::<String>::new());
-    let env = Env { drawing, sheet, placements: &placements, views, sources, fields: &fields, revisions: &info.revisions, used: &used_notes };
+    let unresolved = std::cell::RefCell::new(Vec::<u64>::new());
+    let env = Env { drawing, sheet, placements: &placements, views, sources, fields: &fields, revisions: &info.revisions, used: &used_notes, unresolved: &unresolved };
     g.add_annotations(&resolved, &env);
+    for id in unresolved.into_inner() {
+        if !dangling.contains(&id) {
+            dangling.push(id);
+        }
+    }
     let mut remap: HashMap<u32, u32> = HashMap::new();
     for a in &resolved.annotations {
         remap.insert((a.id & 0xFFFF_FFFF) as u32, picks.id(PickTarget::Annotation(a.id)));

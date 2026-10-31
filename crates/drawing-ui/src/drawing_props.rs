@@ -1103,21 +1103,37 @@ impl DrawingEditor {
             }
         }
         rows.push(check("vp-scale-label", "Scale label", sl, |p, on| p.scale_label = on, cx));
-        // BOM / cut list table references: the table listing this view's parts.
-        let root_id = root.as_ref().map(|r| r.id);
-        let table_of = |bom: bool| {
-            sheet.tables.iter().any(|t| match &t.kind {
-                TableKind::Bom { view, .. } => bom && views::root_view(sheet, *view) == root_id,
-                TableKind::CutList { view, .. } => !bom && views::root_view(sheet, *view) == root_id,
-                _ => false,
-            })
+        // BOM / cut list table references (live request 1647): every view of
+        // a source is assigned the sheet's table of it, "BOM : <assembly>
+        // (<type>)" / "Cut list : <composite part>", and can't go back to
+        // Unassigned (greyed until there is a table). Assembly views have no
+        // cut list row; a Part Studio's BOM stays Unassigned.
+        let src_key = views::view_source(sheet, props.view).map(|(k, _)| k);
+        let of_source = |tv: ViewId| views::view_source(sheet, tv).map(|(k, _)| k) == src_key;
+        let tab_name = source_tab.and_then(|t| self.doc.read(cx).session.doc.tab(t).map(|t| t.name.clone())).unwrap_or_default();
+        let composite = src_key.as_ref().and_then(|k| self.sources.get(k)).and_then(|s| s.context.bodies.iter().find(|b| b.composite.is_some()).map(|b| b.name.clone()));
+        let bom = sheet.tables.iter().find_map(|t| match &t.kind {
+            TableKind::Bom { view, structured, .. } if is_asm && of_source(*view) => Some(format!("BOM : {tab_name} ({})", if *structured { "Structured" } else { "Flattened" })),
+            _ => None,
+        });
+        let cut = sheet.tables.iter().find_map(|t| match &t.kind {
+            TableKind::CutList { view, .. } if !is_asm && of_source(*view) => Some(format!("Cut list : {}", composite.clone().unwrap_or_else(|| "Cut list".into()))),
+            _ => None,
+        });
+        let assigned = |name: Option<String>| -> (String, Vec<(String, bool, PropsAct)>, bool) {
+            match name {
+                Some(n) => (n.clone(), vec![(n, true, std::rc::Rc::new(|_: &mut ViewProps| {}) as PropsAct)], true),
+                None => ("Unassigned".into(), Vec::new(), false),
+            }
         };
-        let bom = if table_of(true) { "Bill of materials" } else { "Unassigned" };
-        let cut = if table_of(false) { "Cut list" } else { "Unassigned" };
+        let (bom, bom_items, bom_on) = assigned(bom);
+        let (cut, cut_items, cut_on) = assigned(cut);
         rows.push(check("vp-sketch-app", "Show sketch appearances", props.sketch_appearances, |p, on| p.sketch_appearances = on, cx));
         rows.push(check("vp-model-ann", "Show annotations from model", props.model_annotations, |p, on| p.model_annotations = on, cx));
-        rows.push(row("BOM table reference", select("vp-bom", bom.into(), Vec::new(), false)));
-        rows.push(row("Cut list table reference", select("vp-cut", cut.into(), Vec::new(), false)));
+        rows.push(row("BOM table reference", select("vp-bom", bom, bom_items, bom_on && multi.is_none())));
+        if !is_asm {
+            rows.push(row("Cut list table reference", select("vp-cut", cut, cut_items, cut_on && multi.is_none())));
+        }
         Some(
             v_flex()
                 .id("dr-view-props")

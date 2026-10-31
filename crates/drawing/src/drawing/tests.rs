@@ -3014,6 +3014,31 @@ fn callout_on_an_edge_shows_its_parts_bom_item() {
     assert_eq!(t, vec![row.item.to_string().as_str()]);
 }
 
+/// Item numbers come from a BOM only (live request 1647): a callout on a
+/// Part Studio part (no BOM) reads "----" and is drawn red.
+#[test]
+fn callout_without_a_bom_row_is_unresolved() {
+    let mut doc = crate::Document::new();
+    if let TabContent::PartStudio(ps) = &mut doc.tabs[0].content {
+        *ps = crate::demo::plate_studio();
+    }
+    let ps = doc.tabs[0].id;
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, ps, ViewOrientation::Top, [150.0, 150.0]));
+    let sources = regenerate_sources(&doc, &drawing);
+    let body = sources.values().next().unwrap().context.bodies[0].id.clone();
+    let mut kind = AnnotationKind::balloon(ViewId(1), [0.0, 0.0], "");
+    if let AnnotationKind::Balloon { callout, .. } = &mut kind {
+        callout.part = Some(body);
+    }
+    drawing.sheets[0].annotations.push(Annotation { id: 1, kind, position: [200.0, 220.0], ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+    let pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(1)).unwrap() as u32;
+    let t: Vec<&str> = built.geometry.texts.iter().filter(|t| t.pick == pick).map(|t| t.text.as_str()).collect();
+    assert_eq!(t, vec!["----"]);
+    assert!(built.dangling.contains(&1), "{:?}", built.dangling);
+}
+
 #[test]
 fn exact_export_clips_detail_views_to_their_circle() {
     // qa5 D10: the PDF (exact HLR) must clip a detail view like the screen.
