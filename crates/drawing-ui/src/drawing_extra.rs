@@ -2199,6 +2199,7 @@ impl DrawingEditor {
             return;
         }
         let mut sf = noshape_scene::drawing_tools::surface_finish(id, at, value, spec);
+        let had_leader = pending.is_some();
         if let AnnotationKind::SurfaceFinish { on: o, leaders, ext: e, .. } = &mut sf.kind {
             *o = on;
             *e = ext;
@@ -2207,6 +2208,10 @@ impl DrawingEditor {
         self.edit_sheet("Surface finish", cx, |s| s.annotations.push(sf));
         if let Some(Panel::SurfaceFinish { placed, .. }) = &mut self.panel {
             placed.push(id);
+        }
+        // The leader's rubber band goes with the pending leader.
+        if had_leader {
+            self.update_preview(cx);
         }
     }
 

@@ -157,8 +157,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Then V35 from live 1630: Synchronize breaks from parent (projected views; parent → child only).
 - Then D9 (a dragged ordinate value jogs), V35 (d) (sections of broken views; breaks map through the frames), D40
   (the lost section view red as a whole), A5 (GD&T / surface finish leaders publish their paths: menu, nodes, end
-  grip; the D40 GD&T re-attach by end grip needed this). Seen: after placing a GD&T with a snap leader, a stale
-  dashed rubber band stays drawn until the next preview rebuild (gone after a reload).
+  grip; the D40 GD&T re-attach by end grip needed this). A stale dashed rubber band after placing a GD&T or
+  surface finish with a leader is fixed (the preview is rebuilt). Asked live: V70 messages, TB28 Change
+  configuration.
 - Open in my rows: V57 assembly Show sketches (assembly sources skip sketch wires), V35 (d) sections of broken views,
   D40 hatch / title red, C11 inference points, D9 ordinate jogs.
 

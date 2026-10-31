@@ -216,7 +216,8 @@ impl DrawingEditor {
                 a.refs.push(noshape_model::drawing::AnnotationRef { slot: 100, point: r });
             }
             self.edit_sheet("Geometric tolerance", cx, |s| s.annotations.push(a));
-            cx.notify();
+            // The leader's rubber band goes with the pending leader.
+            self.update_preview(cx);
             return true;
         }
         // On a dimension's value: centred under it; on its lines (an
