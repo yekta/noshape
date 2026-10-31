@@ -195,6 +195,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   V35 / TB15 / A44 rows marked done.
 - Then C11 "+" marks (done), EX17 image placement inference.
 - Then S18 field tooltip.
+- Then qa DWG-DATUM-PASTE-RED fixed (d2ee678f): a dangling annotation's fills are red (the datum's triangle), and a
+  datum's triangle grip dropped anywhere on a view edge re-attaches (nearest edge point by geometry).
+- Left in drawing.md 🔧 (as of 10-31 evening): MBD dimensions (CR5 / CR18 / V5, need Part Studio MBD dims), V1
+  "view released items", V27 aligned Cut from section (edge names after a pre-cut), V57 assembly sketches (assembly
+  sources carry no sketch wires), V68 spinner, D6 thread lines as dimension picks, D16 (live couldn't start one),
+  D24 ISO placement, D40 anchor grip look, A15 custom properties, A23 chips, A28 (needs a multi-instance assembly
+  with BOM), A34 datum target details, A56 / A58 per-value overrides, TB12 rich paste, TB14 other sources, TB20
+  Y direction / pointer preview / place on ✓, S13 flyout, S15 (app), S18 note menu / editor chips, SK12, EX4, EX11,
+  EX17 other documents, V55 decals, CR10, TB13, V25, V28, S20, EX18 (check their notes; several may be done).
 - Open in my rows: V57 assembly Show sketches (assembly sources skip sketch wires), V35 (d) sections of broken views,
   D40 hatch / title red, C11 inference points, D9 ordinate jogs.
 
