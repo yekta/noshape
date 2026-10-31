@@ -10,7 +10,7 @@ export CC="ccache gcc-13" CXX="ccache g++-13"  # ccache: only changed C++ files 
 REPO=/root/projects/noshape; WT=/root/projects/noshape-wt/watch; ST=/tmp/lead/main-status; LOG=/tmp/lead/watch.log
 G="git -c user.name=yekta -c user.email=ngyekta@gmail.com"
 log() { echo "$(date -u "+%F %T") $*" >> $LOG; }
-fails() { grep -vE "^warning: [a-z0-9_-]+@[0-9.]+:" | grep -E "FAILED|panicked|^error|signal:|SIGSEGV|SIGABRT|stack overflow|Caused by|process didn.t exit" | head -14; }
+fails() { grep -vE "^warning: [a-z0-9_-]+@[0-9][^: ]*:" | grep -E "FAILED|panicked|^error|signal:|SIGSEGV|SIGABRT|stack overflow|Caused by|process didn.t exit" | head -14; }
 check() {
   cd $WT; local t0=$SECONDS o
   o=$(nice -n -5 tools/tiers/t0.sh 2>&1) || { echo "T0:"; echo "$o" | fails; [ -z "$(echo "$o" | fails)" ] && echo "$o" | tail -5; return; }
@@ -33,7 +33,7 @@ check() {
   log "  T1 $((SECONDS-t0)) s"; t0=$SECONDS
   [ $rc -ne 0 ] && { echo "T1:"; echo "$o" | fails; [ -z "$(echo "$o" | fails)" ] && echo "$o" | tail -5; }
   # Build-script output ("warning: <crate>@<ver>: ..." from OCCT headers) isn't a lint; clippy's own errors are.
-  nice -n -5 cargo clippy --locked --workspace --all-targets -- -D warnings 2>&1 | grep -vE "^warning: [a-z0-9_-]+@[0-9.]+:" | grep -E "^(error|warning)" -A3 | head -8
+  nice -n -5 cargo clippy --locked --workspace --all-targets -- -D warnings 2>&1 | grep -vE "^warning: [a-z0-9_-]+@[0-9][^: ]*:" | grep -E "^(error|warning)" -A3 | head -8
   log "  clippy $((SECONDS-t0)) s"
 }
 nightly() { # T2 on last-green, once a day after 01:00 UTC
