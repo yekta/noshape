@@ -194,7 +194,7 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   click = selection), Insert footer hint, named position toasts close by themselves, a new position is current.
 - **Fuzz:** sketch seeds 400..480 × 150 steps clean (673 s); assembly seeds 300..400 × 120 clean (424 s); sketch 1..40
   after the solver change clean.
-- **Open:** SM-CLOSED-BUTT (P3, live's x(θ) table in the ticket, no closed form found). THIN-LOFT-TRIM-ENDS (P2, core):
+- **Open:** SM-CLOSED-BUTT (P3): live's flat rule is known (one cubic Bézier per bend end, handles 0.5 / 0.1 × chord, see the ticket), the plate point P isn't (a 3D clearance rule gives ~2.63 vs live 2.650538); a WIP cutter is parked in skasm-scratch/sm-closed-butt-wip.patch; live asked for P at other clearances / radii / thicknesses (REQUESTS 17:00). Thin loft of open / closed planar profiles = live 1668 / 1677 (69ee2fc6, c30d87d8). THIN-LOFT-TRIM-ENDS (P2, core):
   tapered closed lofts 0.15–0.3 % over live (live offsets the sheet along its normal), Trim ends ☐ ends; open profiles
   still use k::thicken. MODAL-HELP-MARK (psui).
 
