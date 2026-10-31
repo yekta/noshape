@@ -1,0 +1,16 @@
+Package: noshape
+Version: @VERSION@
+Architecture: amd64
+Maintainer: noshape <noshape@users.noreply.github.com>
+Installed-Size: @SIZE@
+Depends: libc6 (>= 2.39), libstdc++6, libgcc-s1, libxcb1, libx11-xcb1, libxkbcommon0, libxkbcommon-x11-0, libfreetype6, libfontconfig1, libwayland-client0, libvulkan1
+Recommends: mesa-vulkan-drivers
+Section: graphics
+Priority: optional
+Homepage: https://github.com/yekta/noshape
+Description: fast, fully local, parametric CAD
+ noshape works like Onshape: Part Studios, sketches, assemblies, drawings,
+ FeatureScript, versions and import/export, offline. The noshape command is
+ also the command line tool and the MCP server for coding agents
+ (`noshape mcp`); `noshape agents connect` registers it with Claude Code,
+ the Codex CLI and Claude Desktop.

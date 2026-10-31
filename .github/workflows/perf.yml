@@ -70,6 +70,8 @@ env:
   GPU_P95_MS: '6'
   MAX_REGRESSION: '0.10'
   CARGO_TERM_COLOR: always
+  # A release's first launch offers to set up the command line tool and coding agents (crates/app agent_setup.rs).
+  NOSHAPE_NO_SETUP_PROMPT: '1'
   CARGO_INCREMENTAL: 0
 
 jobs:
