@@ -3169,7 +3169,7 @@ impl FeatureDialog {
                 let path_s = path.to_string();
                 let table: &'static str = table;
                 // Live (dialogs/hole-01): no header row; each level is a 22 px row
-                // with its name right-aligned (12 px #999) in an 88 px column and an
+                // with its name right-aligned (12 px #999, dark too: dk-977) in an 88 px column and an
                 // underline select ("Hole type ▾ Drilled", "Drill size ▾ 1/4"); the
                 // first underline 27 px under the field above.
                 let mut row = v_flex().w_full();
@@ -3203,7 +3203,7 @@ impl FeatureDialog {
                         h_flex()
                             .w_full()
                             .pr(px(4.))
-                            .child(div().w(px(88.)).flex_none().pr(px(6.)).flex().justify_end().text_size(px(12.)).text_color(gpui_kit::rgb(0x999999)).truncate().child(name))
+                            .child(div().w(px(88.)).flex_none().pr(px(6.)).flex().justify_end().text_size(px(12.)).text_color(gpui_kit::rgb_static(0x999999)).truncate().child(name))
                             .child(div().flex_1().min_w_0().child(sel)),
                     );
                     prefix_path.push(chosen);
