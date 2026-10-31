@@ -759,7 +759,100 @@ fn label_since(g: &mut SheetGeometry, t0: usize, label: &super::LabelProps) {
     }
 }
 
-fn push_hatch_line(g: &mut SheetGeometry, pl: &ViewPlacement, geo: &ViewGeometry, l: [[f64; 2]; 2], pick: u32) {
+/// What section hatching keeps clear of (live request 1684): the views'
+/// dimensions, their values' boxes + 1 mm (rounded corners) and their lines
+/// + 1.06 mm (sheet mm). Notes and view labels don't cut the hatch.
+#[derive(Default)]
+struct HatchClear {
+    boxes: Vec<[[f64; 2]; 4]>,
+    segs: Vec<[[f64; 2]; 2]>,
+    /// Their overall extent (expanded), for a quick miss.
+    bounds: Option<([f64; 2], [f64; 2])>,
+}
+
+impl HatchClear {
+    /// The dimensions of `resolved` laid out as the sheet will draw them.
+    fn of(resolved: &Sheet, env: &Env, w: f64, h: f64) -> HatchClear {
+        let dims: Vec<Annotation> = resolved.annotations.iter().filter(|a| a.kind.is_dimension()).cloned().collect();
+        if dims.is_empty() {
+            return HatchClear::default();
+        }
+        let only = Sheet { annotations: dims, ..resolved.clone() };
+        let mut g = SheetGeometry::new(w, h);
+        g.add_annotations(&only, env);
+        let boxes: Vec<[[f64; 2]; 4]> = g.texts.iter().filter(|t| !t.text.trim().is_empty()).map(super::font::text_box).collect();
+        let segs: Vec<[[f64; 2]; 2]> = g.lines.iter().flat_map(|l| l.points.windows(2).map(|w| [w[0], w[1]]).collect::<Vec<_>>()).collect();
+        let pts = boxes.iter().flatten().chain(segs.iter().flatten());
+        let bounds = pts.fold(None, |acc: Option<([f64; 2], [f64; 2])>, p| {
+            Some(match acc {
+                None => (*p, *p),
+                Some((lo, hi)) => ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]),
+            })
+        });
+        let bounds = bounds.map(|(lo, hi)| ([lo[0] - 1.1, lo[1] - 1.1], [hi[0] + 1.1, hi[1] + 1.1]));
+        HatchClear { boxes, segs, bounds }
+    }
+
+    fn inside(&self, p: [f64; 2]) -> bool {
+        self.segs.iter().any(|s| views::dist_to_segment(p, s[0], s[1]) <= 1.06)
+            || self.boxes.iter().any(|b| views::point_in_polygon(p, b) || (0..4).any(|i| views::dist_to_segment(p, b[i], b[(i + 1) % 4]) <= 1.0))
+    }
+
+    /// The parts of hatch line `pts` (sheet mm) outside.
+    fn cut(&self, pts: Vec<[f64; 2]>) -> Vec<Vec<[f64; 2]>> {
+        let Some((lo, hi)) = self.bounds else { return vec![pts] };
+        if pts.len() != 2 {
+            return vec![pts];
+        }
+        let (a, b) = (pts[0], pts[1]);
+        if a[0].max(b[0]) < lo[0] || a[0].min(b[0]) > hi[0] || a[1].max(b[1]) < lo[1] || a[1].min(b[1]) > hi[1] {
+            return vec![pts];
+        }
+        let at = |t: f64| [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+        let n = (((b[0] - a[0]).hypot(b[1] - a[1]) / 0.2).ceil() as usize).clamp(1, 4000);
+        let ins: Vec<bool> = (0..=n).map(|i| self.inside(at(i as f64 / n as f64))).collect();
+        if !ins.iter().any(|x| *x) {
+            return vec![pts];
+        }
+        // The crossing between two samples, by halving.
+        let edge = |mut t0: f64, mut t1: f64, from_in: bool| {
+            for _ in 0..12 {
+                let m = (t0 + t1) / 2.0;
+                if self.inside(at(m)) == from_in {
+                    t0 = m;
+                } else {
+                    t1 = m;
+                }
+            }
+            (t0 + t1) / 2.0
+        };
+        let mut out = Vec::new();
+        let mut start = (!ins[0]).then_some(0.0);
+        for i in 1..=n {
+            let (t0, t1) = ((i - 1) as f64 / n as f64, i as f64 / n as f64);
+            match (ins[i - 1], ins[i]) {
+                (false, true) => {
+                    let e = edge(t0, t1, false);
+                    if let Some(s) = start.take()
+                        && e - s > 1e-9
+                    {
+                        out.push(vec![at(s), at(e)]);
+                    }
+                }
+                (true, false) => start = Some(edge(t0, t1, true)),
+                _ => {}
+            }
+        }
+        if let Some(s) = start
+            && 1.0 - s > 1e-9
+        {
+            out.push(vec![at(s), b]);
+        }
+        out
+    }
+}
+
+fn push_hatch_line(g: &mut SheetGeometry, pl: &ViewPlacement, geo: &ViewGeometry, l: [[f64; 2]; 2], pick: u32, clear: &HatchClear) {
     let ub = pl.unbroken();
     let mut pieces = vec![vec![ub.to_view(l[0]), ub.to_view(l[1])]];
     if let Some(poly) = &geo.clip_poly {
@@ -771,7 +864,7 @@ fn push_hatch_line(g: &mut SheetGeometry, pl: &ViewPlacement, geo: &ViewGeometry
         pieces = pieces.into_iter().flat_map(|p| views::clip_to_crop(&p, crop)).collect();
     }
     for p in pieces {
-        for q in map_polyline(pl, &p) {
+        for q in map_polyline(pl, &p).into_iter().flat_map(|q| clear.cut(q)) {
             g.lines.push(Polyline2 { points: q, style: LineStyle::Thin, closed: false, pick });
         }
     }
@@ -1315,6 +1408,16 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     // The sheet itself, for dimensions on drawing sketch geometry.
     placements.push(ViewPlacement::new(super::SHEET_VIEW, [0.0, 0.0], [0.0, 0.0], 1.0));
     let place = |id: ViewId| placements.iter().find(|p| p.id == id).copied();
+    // Section hatching clears the views' dimensions (live request 1684):
+    // they are laid out once more here, before the views are drawn.
+    let hatch_clear = if sheet.views.iter().any(|v| views.get(&v.id).is_some_and(|g| !g.section_segments.is_empty())) && sheet.annotations.iter().any(|a| a.kind.is_dimension()) {
+        let (resolved, _, _) = resolve_annotations(drawing, sheet, views, sources);
+        let (used, unresolved) = (std::cell::RefCell::new(Vec::new()), std::cell::RefCell::new(Vec::new()));
+        let env = Env { drawing, sheet, placements: &placements, views, sources, fields: &fields, revisions: &info.revisions, used: &used, unresolved: &unresolved };
+        HatchClear::of(&resolved, &env, w, h)
+    } else {
+        HatchClear::default()
+    };
 
     for v in &sheet.views {
         if v.id.is_ghost() && !v.id.is_child_ghost() {
@@ -1502,7 +1605,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     for (outer, holes) in regions {
                         let hs: Vec<Vec<[f64; 2]>> = holes.iter().map(|x| ring(x)).collect();
                         for l in super::sheet_sketch::hatch_pattern_holes(&ring(outer), &hs, hstd, hpat, 1.0, 0.0) {
-                            push_hatch_line(&mut g, &pl, geo, l, view_pick);
+                            push_hatch_line(&mut g, &pl, geo, l, view_pick, &hatch_clear);
                         }
                     }
                 }
@@ -1510,7 +1613,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     None if patterned.is_some() => {}
                     None => {
                         for l in hatch(&segs, vt.hatch_spacing.max(0.3)) {
-                            push_hatch_line(&mut g, &pl, geo, l, view_pick);
+                            push_hatch_line(&mut g, &pl, geo, l, view_pick, &hatch_clear);
                         }
                         // An uncut, unbroken section: the boundary for the HATCH entity.
                         if whole && let Some(loops) = super::cad_layers::chain_loops(&segs, 1e-6) {
@@ -1531,7 +1634,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                             let o: Vec<[f64; 2]> = outer.iter().map(|q| ub.to_sheet(*q)).collect();
                             let hs: Vec<Vec<[f64; 2]>> = holes.iter().map(|x| x.iter().map(|q| ub.to_sheet(*q)).collect()).collect();
                             for l in super::sheet_sketch::hatch_pattern_holes(&o, &hs, h.standard, pattern, h.scale, h.angle) {
-                                push_hatch_line(&mut g, &pl, geo, l, view_pick);
+                                push_hatch_line(&mut g, &pl, geo, l, view_pick, &hatch_clear);
                             }
                             // Solid: filled (the whole region only; not cut by
                             // crops, clips or breaks).
@@ -1545,7 +1648,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                             }
                         }
                         for l in hatch(&plain, vt.hatch_spacing.max(0.3)) {
-                            push_hatch_line(&mut g, &pl, geo, l, view_pick);
+                            push_hatch_line(&mut g, &pl, geo, l, view_pick, &hatch_clear);
                         }
                     }
                 }
@@ -1557,7 +1660,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             {
                 let ub = pl.unbroken();
                 for l in views::offset_cut_lines(&cut, pf, frame, &geo.section_segments) {
-                    push_hatch_line(&mut g, &pl, geo, [ub.to_sheet(l[0]), ub.to_sheet(l[1])], view_pick);
+                    push_hatch_line(&mut g, &pl, geo, [ub.to_sheet(l[0]), ub.to_sheet(l[1])], view_pick, &hatch_clear);
                 }
             }
             // Drawing properties › Views › View and region hatches' pen and

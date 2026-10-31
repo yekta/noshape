@@ -321,6 +321,44 @@ fn edit_hatch_section_restyles_one_region() {
     assert!(red > 0);
 }
 
+/// Section hatching keeps clear of the views' dimensions (live request
+/// 1684): no hatch line runs through a value laid over the hatch.
+#[test]
+fn section_hatch_clears_dimensions() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let hatch_of = |b: &super::build::BuiltSheet| -> Vec<sheet::Polyline2> {
+        let vp = b.picks.iter().position(|p| *p == PickTarget::View(ViewId(5))).unwrap() as u32;
+        b.geometry.lines.iter().filter(|l| l.pick == vp && l.style == sheet::LineStyle::Thin).cloned().collect()
+    };
+    // The value on the middle of the longest hatch line.
+    let before = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let len = |l: &sheet::Polyline2| (l.points[1][0] - l.points[0][0]).hypot(l.points[1][1] - l.points[0][1]);
+    let longest = hatch_of(&before).into_iter().max_by(|a, b| len(a).total_cmp(&len(b))).expect("hatched");
+    let m = [(longest.points[0][0] + longest.points[1][0]) / 2.0, (longest.points[0][1] + longest.points[1][1]) / 2.0];
+    let mv = before.placements.iter().find(|p| p.id == ViewId(5)).unwrap().to_view(m);
+    let id = drawing.sheets[0].next_annotation_id();
+    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::LinearDimension { view: ViewId(5), a: [mv[0] - 0.004, mv[1]], b: [mv[0] + 0.004, mv[1]], offset: 0.0, orientation: DimOrientation::Horizontal, override_text: None }, ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let dim_pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(id)).unwrap() as u32;
+    let text = built.geometry.texts.iter().find(|t| t.pick == dim_pick && !t.text.trim().is_empty()).unwrap();
+    let bx = font::text_box(text);
+    let hatch = hatch_of(&built);
+    for l in &hatch {
+        for w in l.points.windows(2) {
+            for k in 0..=20 {
+                let t = k as f64 / 20.0;
+                let p = [w[0][0] + (w[1][0] - w[0][0]) * t, w[0][1] + (w[1][1] - w[0][1]) * t];
+                assert!(!views::point_in_polygon(p, &bx), "hatch through the value at {p:?}");
+            }
+        }
+    }
+    // The lines that crossed it now stop about the clearance away (1 mm
+    // from the value's box, 1.06 mm from the dimension's lines).
+    assert!(hatch.len() > hatch_of(&before).len(), "the crossing lines are split");
+}
+
 /// Live asb 10-23 views (6): Show offset cut lines draws a line across the
 /// hatch where a jogged cutting line steps (off by default).
 #[test]
