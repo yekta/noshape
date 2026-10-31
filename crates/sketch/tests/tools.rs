@@ -460,3 +460,23 @@ fn fillet_radius_past_the_rectangle_collapses_the_top_line() {
     assert!((top.end_point() - top.start_point()).length() < 1e-9);
     assert!(right.start_point().y.min(right.end_point().y) < -0.010 + 1e-9);
 }
+
+/// Live (the same request, (b)): a distance dimension set to 0 between a
+/// rectangle's top and bottom solves, the lines coincident and the sides
+/// shrunk to points (a dimension edit may collapse lines; CON-HV-COLLAPSE
+/// only refuses constraints doing it).
+#[test]
+fn distance_set_to_zero_collapses_the_sides() {
+    let mut sk = Sketch::new();
+    let r = sk.corner_rectangle(v(0.0, 0.0), v(0.020, 0.010));
+    sk.add_constraint(ConstraintKind::Fix { entity: r.points[0] }).unwrap();
+    sk.add_constraint(ConstraintKind::Length { curve: r.curves[0], value: 0.020 }).unwrap();
+    let d = sk.add_constraint(ConstraintKind::Distance { a: r.curves[0], b: r.curves[2], value: 0.010, mode: DistanceMode::default() }).unwrap();
+    assert!(sk.solve().is_solved());
+    sk.set_dimension_value(d, 0.0).unwrap();
+    let opts = sk.dimension_edit_options(d);
+    let rep = sk.solve_with(&opts);
+    assert!(rep.is_solved(), "{rep:?}");
+    let side = sk.curve(r.curves[1]).unwrap();
+    assert!((side.end_point() - side.start_point()).length() < 1e-9, "{side:?}");
+}
