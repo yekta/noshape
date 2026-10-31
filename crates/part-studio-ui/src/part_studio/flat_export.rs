@@ -135,7 +135,7 @@ impl PartStudioView {
             }
             let (st2, file2, view2) = (st.clone(), file.clone(), view.clone());
             let body_id = part_id.clone();
-            crate::os_ui::modal(dialog, "Export as DXF/DWG", 600.)
+            crate::os_ui::modal_help(dialog, "Export as DXF/DWG", 600.)
                 .child(body)
                 .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export"))).child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {

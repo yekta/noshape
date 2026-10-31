@@ -123,7 +123,7 @@ impl DrawingEditor {
                 body = body.child(check("ex-offsheet", "Exclude off-sheet content", s.exclude_off_sheet, |s, v| s.exclude_off_sheet = v));
             }
             let (st2, file2, custom2, ed2) = (st.clone(), file.clone(), custom.clone(), ed.clone());
-            crate::os_ui::modal(dialog, "Export Drawing", 600.)
+            crate::os_ui::modal_help(dialog, "Export Drawing", 600.)
                 .child(body)
                 .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export"))).child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {

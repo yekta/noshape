@@ -835,7 +835,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
-- [ ] P3 MODAL-HELP-MARK (skasm → psui, app-core os_ui::modal) live's "Export as DXF/DWG" modal (flat pattern, behaviours
+- [x] (psui 10-31 13:03: `os_ui::modal_help`, a filled #888 "?" 5 px before the ✕ as live's drawing/90, on Export Drawing and
+  Export as DXF/DWG; the Part Studio / assembly Export keeps its "?" beside File name (live document/80), confirmations
+  and Import to Onshape have none. Checked on :102 against drawing/90 within 1 px.)
+  P3 MODAL-HELP-MARK (skasm → psui, app-core os_ui::modal) live's "Export as DXF/DWG" modal (flat pattern, behaviours
   "skasm (2026-10-31, P3 workflow-sheet-metal 5.9 / 6.8)" (b)) has a "?" before the ✕ in its header; our `os_ui::modal`
   draws only the ✕. Check which other live modals carry the "?" (Export, Import…) before adding it to the shared header.
 - [x] P3 MEASURE-PARTIAL-CYLINDER (psui; from skasm) a 90° sheet metal bend face (a quarter cylinder, R 2) selected reads **"Diameter: 4.000 mm"** in the 3D status readout; live reads **"Radius: 2.000 mm"** (behaviours "skasm (2026-10-30, P3) bend line Select other / Curve analysis, form picker preview" (a), request 1622, Select other › Face of Flange 1). Likely rule: live's quick readout gives Radius for a partial cylinder and Diameter for a full one (live psb 10-20 m had full cylinders). Repro: any flanged sheet metal part, click the bend's inner face. (skasm 2026-10-30) skasm 10-30 (lead: in the sheet metal rows): a partial cylinder face reads Radius, Area (a full one Diameter, Area, Radius as before); model-core measure test cylinders_measure_axes_and_join_distances_on_the_line.
