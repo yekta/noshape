@@ -605,7 +605,7 @@ fn bom_hole_table_and_linked_balloons() {
     drawing.sheets[si].tables.push(Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: Vec::new(), default_template: false }, [410.0, 287.0]));
     // Hole table of the plate's top view on sheet 1.
     let origin = [-0.05, -0.03];
-    drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, bottom_to_top: false, exclude: Vec::new() }, [410.0, 120.0]));
+    drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, bottom_to_top: false, exclude: Vec::new(), x_dir: None }, [410.0, 120.0]));
     let sources = regenerate_sources(&doc, &drawing);
     let src = &sources[&SourceKey::studio(asm)];
     assert!(src.assembly);
@@ -2736,6 +2736,14 @@ fn cut_list_table_reads_its_own_configuration() {
     assert_ne!(view_key, key);
     let keys = views::referenced_sources(&drawing);
     assert!(keys.contains(&key) && keys.contains(&view_key), "{keys:?}");
+}
+
+/// Hole table X direction (live 1985): X along the picked edge, Y a quarter
+/// turn counter-clockwise; none: the view's axes.
+#[test]
+fn hole_table_x_direction_turns_the_axes() {
+    assert_eq!(tables::hole_axes(Some([0.0, 2.0])), ([0.0, 1.0], [-1.0, 0.0]));
+    assert_eq!(tables::hole_axes(None), ([1.0, 0.0], [0.0, 1.0]));
 }
 
 #[test]

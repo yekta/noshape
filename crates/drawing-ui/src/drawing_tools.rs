@@ -1061,6 +1061,9 @@ impl DrawingEditor {
         if e.button == MouseButton::Left && self.hole_dlg.as_ref().is_some_and(|d| d.picking && d.table.is_some()) && self.hole_exclude_click(cx) {
             return;
         }
+        if e.button == MouseButton::Left && self.hole_dlg.as_ref().is_some_and(|d| d.x_picking && d.table.is_some()) && self.hole_x_dir_click(cx) {
+            return;
+        }
         if e.button == MouseButton::Left && e.click_count >= 2 && matches!(self.tool, Tool::Select) {
             self.double_click(e.click_count >= 3, window, cx);
             return;

@@ -296,8 +296,10 @@ pub struct HoleRow {
 
 /// Holes of a view grouped by size: tags A1, A2... for the largest size,
 /// B1... for the next; sorted top-to-bottom, left-to-right within a size.
-/// `exclude`: centers of holes left out (Holes to exclude).
-pub fn hole_rows(g: &ViewGeometry, origin: [f64; 2], exclude: &[[f64; 2]]) -> Vec<HoleRow> {
+/// `exclude`: centers of holes left out (Holes to exclude); `x_dir`: the
+/// table's X direction (view coordinates; Y square to it), else the view's.
+pub fn hole_rows(g: &ViewGeometry, origin: [f64; 2], exclude: &[[f64; 2]], x_dir: Option<[f64; 2]>) -> Vec<HoleRow> {
+    let (ux, uy) = hole_axes(x_dir);
     let mut bores = g.bores();
     bores.retain(|(c, ..)| !exclude.iter().any(|e| (e[0] - c[0]).hypot(e[1] - c[1]) < 1e-7));
     // Concentric bores of different size (e.g. counterbores): keep the
@@ -322,10 +324,24 @@ pub fn hole_rows(g: &ViewGeometry, origin: [f64; 2], exclude: &[[f64; 2]]) -> Ve
         group.sort_by(|a, b| b.0[1].total_cmp(&a.0[1]).then(a.0[0].total_cmp(&b.0[0])));
         let letter = tag_letters(si);
         for (k, (c, r, p)) in group.into_iter().enumerate() {
-            out.push(HoleRow { tag: format!("{letter}{}", k + 1), center: *c, x: c[0] - origin[0], y: c[1] - origin[1], diameter: r * 2.0, point: p.clone() });
+            let d = [c[0] - origin[0], c[1] - origin[1]];
+            out.push(HoleRow { tag: format!("{letter}{}", k + 1), center: *c, x: d[0] * ux[0] + d[1] * ux[1], y: d[0] * uy[0] + d[1] * uy[1], diameter: r * 2.0, point: p.clone() });
         }
     }
     out
+}
+
+/// A hole table's X and Y axes (view coordinates): X along `x_dir`, Y a
+/// quarter turn counter-clockwise from it.
+pub fn hole_axes(x_dir: Option<[f64; 2]>) -> ([f64; 2], [f64; 2]) {
+    match x_dir {
+        Some(d) if d[0].hypot(d[1]) > 1e-12 => {
+            let l = d[0].hypot(d[1]);
+            let u = [d[0] / l, d[1] / l];
+            (u, [-u[1], u[0]])
+        }
+        _ => ([1.0, 0.0], [0.0, 1.0]),
+    }
 }
 
 /// A, B, ... Z, AA, AB...
@@ -433,7 +449,7 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
             }
             TableData { title: None, header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden, ..Default::default() }
         }
-        TableKind::Hole { precision, origin: stored, flip_x, flip_y, show_location, bottom_to_top, exclude, .. } => {
+        TableKind::Hole { precision, origin: stored, flip_x, flip_y, show_location, bottom_to_top, exclude, x_dir, .. } => {
             // Live (behaviours 1983): TAG | X LOC | Y LOC | SIZE | QTY, a
             // size's SIZE and QTY cells merged down its rows; ☐ Show
             // location data drops X / Y LOC.
@@ -446,7 +462,7 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
             let f = DimFormat { precision: *precision, ..Default::default() };
             let u = length_units(drawing, &f);
             let num = |m: f64| format_number(m / u.meters(), f.precision, default_digits(u));
-            let holes = view_geo.map(|g| hole_rows(g, origin.unwrap_or(*stored), exclude)).unwrap_or_default();
+            let holes = view_geo.map(|g| hole_rows(g, origin.unwrap_or(*stored), exclude, *x_dir)).unwrap_or_default();
             // Groups of one size: consecutive rows (hole_rows keeps a size together).
             let mut groups: Vec<(usize, usize)> = Vec::new();
             for (i, h) in holes.iter().enumerate() {

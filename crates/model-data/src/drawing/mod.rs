@@ -1500,6 +1500,10 @@ pub enum TableKind {
         /// Holes to exclude: their centers (view coordinates).
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         exclude: Vec<[f64; 2]>,
+        /// X direction: a picked straight edge's direction (view
+        /// coordinates, unit; Y square to it); None: the view's axes.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        x_dir: Option<[f64; 2]>,
     },
     /// Cut list of the frame members of the Part Studio shown by `view`
     /// (the Cut list feature's rows); Order "Bottom to top" reverses it.

@@ -2360,7 +2360,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }
             g.layers.push(span);
         }
-        if let (TableKind::Hole { flip_x, flip_y, exclude, .. }, Some(geo), Some(pl), Some(o)) = (&t.kind, geo, view.and_then(place), origin) {
+        if let (TableKind::Hole { flip_x, flip_y, exclude, x_dir, .. }, Some(geo), Some(pl), Some(o)) = (&t.kind, geo, view.and_then(place), origin) {
             let os = pl.to_sheet(o);
             let origin_mark = g.mark();
             // The tag axis: X and Y arrows in the table's directions, picked
@@ -2377,8 +2377,17 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             let ts = &drawing.props.table_styles;
             let head = ts.hole_indicator_arrow.unwrap_or(0.18 * IN);
             let at = |p: [f64; 2], d: [f64; 2], k: f64| [p[0] + d[0] * k, p[1] + d[1] * k];
-            let (ex, ey) = ([sx, 0.0], [0.0, sy]);
-            let (back_x, back_y) = ([-sx, 0.0], [0.0, -sy]);
+            // The table's X direction turns the indicator (on the sheet).
+            let (ux, uy) = tables::hole_axes(*x_dir);
+            let on_sheet = |d: [f64; 2]| {
+                let (a, b) = (pl.to_sheet(o), pl.to_sheet([o[0] + d[0] * 1e-3, o[1] + d[1] * 1e-3]));
+                let l = (b[0] - a[0]).hypot(b[1] - a[1]).max(1e-12);
+                [(b[0] - a[0]) / l, (b[1] - a[1]) / l]
+            };
+            let turned = x_dir.is_some();
+            let (ux, uy) = if turned { (on_sheet(ux), on_sheet(uy)) } else { (ux, uy) };
+            let (ex, ey) = ([ux[0] * sx, ux[1] * sx], [uy[0] * sy, uy[1] * sy]);
+            let (back_x, back_y) = ([-ex[0], -ex[1]], [-ey[0], -ey[1]]);
             let xs = at(os, back_y, 0.7375 * IN);
             let ys = at(os, back_x, 0.7375 * IN);
             let (xt, yt) = (at(xs, ex, 0.5 * IN), at(ys, ey, 0.5 * IN));
@@ -2402,16 +2411,23 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // Top-left anchors as live's MTEXT (a letter's width ≈ 0.65 h
             // when it goes to the left).
             let w = 0.65 * h;
-            g.texts.push(Text2 { pos: [xt[0] + if sx > 0.0 { 1.8354 } else { -1.8354 - w }, xt[1] + 1.5302], height: h, text: "X".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
-            g.texts.push(Text2 { pos: [yt[0] - 1.2032, yt[1] + if sy > 0.0 { 4.5782 } else { -1.6 }], height: h, text: "Y".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
-            if ts.hole_indicator_iso {
+            if turned {
+                // Past the tips along the turned axes.
+                for (tip, d, l) in [(xt, ex, "X"), (yt, ey, "Y")] {
+                    g.texts.push(Text2 { pos: at(tip, d, 0.4 * h + w / 2.0), height: h, text: l.into(), angle: 0.0, anchor: Anchor::Center, pick });
+                }
+            } else {
+                g.texts.push(Text2 { pos: [xt[0] + if sx > 0.0 { 1.8354 } else { -1.8354 - w }, xt[1] + 1.5302], height: h, text: "X".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
+                g.texts.push(Text2 { pos: [yt[0] - 1.2032, yt[1] + if sy > 0.0 { 4.5782 } else { -1.6 }], height: h, text: "Y".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
+            }
+            if ts.hole_indicator_iso && !turned {
                 g.texts.push(Text2 { pos: [xs[0] + if sx > 0.0 { -3.8484 } else { 1.6 }, xs[1] + 1.5209], height: h, text: "0".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
                 g.texts.push(Text2 { pos: [ys[0] - 0.8004, ys[1] + if sy > 0.0 { -1.5271 } else { 4.4 }], height: h, text: "0".into(), angle: 0.0, anchor: Anchor::TopLeft, pick });
             }
             g.cad_since(origin_mark, CadLayer::OriginIndicators);
             let tag_mark = g.texts.len();
             let tags = &ts.hole_tags;
-            for hrow in tables::hole_rows(geo, o, exclude) {
+            for hrow in tables::hole_rows(geo, o, exclude, *x_dir) {
                 let c = pl.to_sheet(hrow.center);
                 let r = pl.len_to_sheet(hrow.diameter / 2.0);
                 g.texts.push(Text2 { pos: [c[0] + r * 0.75 + 0.8, c[1] + r * 0.75 + 0.8], height: tags.height.unwrap_or(drawing.props.ann_text_height), text: hrow.tag, angle: 0.0, anchor: Anchor::BottomLeft, pick });
