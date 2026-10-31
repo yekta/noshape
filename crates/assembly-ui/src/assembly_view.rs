@@ -3326,7 +3326,8 @@ impl AssemblyView {
         let versioned = ext_key.as_ref().and_then(|k| crate::derived::ExternalRef::parse(k)).map(|r| r.path == own_path);
         let newer_badge = update.is_some() && versioned == Some(false);
         let dof = if is_top { node.and_then(|n| n.dof) } else { None };
-        let selected = is_top && (self.selected.contains(&top) || self.chip_mc_owner() == Some(top));
+        // An open Group dialog's instances are highlighted (live 1681).
+        let selected = is_top && (self.selected.contains(&top) || self.chip_mc_owner() == Some(top) || self.ui.group.as_ref().is_some_and(|(_, ids)| ids.contains(&top)));
         let has_children = node.is_some_and(|n| !n.children.is_empty());
         let expanded = self.expanded.contains(&path);
         let icon = match kind {

@@ -22,7 +22,7 @@ Live answered "qa5 pass 7" (5)–(6): BOM merges; after a change the only sign i
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | CA5 / CA6 | fixed (see workflow-configured-assembly.md) | ✅ |  |
-| D17 out-of-date hint | no "Out of date" text now ✅; but after inserting a third instance the drawing **regenerated on its own** at the tab switch (Update stayed pale) | ✗ **D17** (asb) |  |
+| D17 out-of-date hint | no "Out of date" text now ✅; but after inserting a third instance the drawing **regenerated on its own** at the tab switch (Update stayed pale) | ✗ **D17** (asb) → now ✅ fixed (row "D17 drawing after a new instance" below) |  |
 | D18 (new) drawing BOM table | shows **2 rows (Qty 1, Qty 2)** while the assembly BOM shows **1 row Qty 3**; Ctrl+Q doesn't change it | ✗ **D18** (asb) → fixed later: D18 ✅ fixed (row below) |  |
 
 ## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)

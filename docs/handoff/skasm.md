@@ -192,6 +192,10 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   solve, connectivity and the same-group error; a group goes with its pattern when nothing else is left in it.
   assembly_group takes a copy the same way. LA55's Near connector confirmed by live 1639.
 - The never-checked rows the lead listed at 18:50 were already settled by the 10-31 (4) pass (counts from before it).
+- Landed df144507 (Group holds patterns, + 15109d5b) and 4e9b054e (forward edges). GUI :103 checked the Group dialog
+  as live 1681 (copy click → "Linear pattern 1" chip, copy drawn selected, ✓ with only the pattern, Edit shows it).
+  Then: the open Group dialog highlights its instances' and patterns' rows in the list (live 1681: the pattern row);
+  the assembly fuzz makes and deletes groups (seeds 1..60 × 120 clean; 400..480 before it clean).
 - **Forward-oriented edges landed with core's patch** (kernel common.cpp `handed_out`: every edge FORWARD). What sheet
   metal read from the stored orientation, now explicit: (1) `wall_loop` chained a wall's outer loop from its edges' start
   / end, so it ran the face's way only while edges came stored that way: now turned counter-clockwise about the face
