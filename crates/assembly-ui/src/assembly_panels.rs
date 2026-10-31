@@ -872,7 +872,8 @@ impl AssemblyView {
             PatternKind::Mirror { .. } => "mirror",
             PatternKind::Replicate { .. } => "replicate",
         };
-        let selected = self.selected_mate == Some(id) || self.ui.range_patterns.contains(&id);
+        // An open Group dialog's patterns are highlighted too (live 1681).
+        let selected = self.selected_mate == Some(id) || self.ui.range_patterns.contains(&id) || (self.ui.group.is_some() && self.ui.group_patterns.contains(&id));
         let suppressed = pat.suppressed;
         let row = h_flex()
             .id(SharedString::from(format!("pat-{}", id.0)))

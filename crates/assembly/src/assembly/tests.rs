@@ -4457,6 +4457,20 @@ fn random_assembly_edits_never_panic() {
                     asm.instances[k].suppressed = rnd(3) == 0;
                     log.push(format!("suppress {}", asm.instances[k].id.0));
                 }
+                // Groups: two instances (maybe already grouped or mated), or one gone.
+                8 => {
+                    let (a, b) = (asm.instances[rnd(n)].id, asm.instances[rnd(n)].id);
+                    if a != b {
+                        asm.groups.push(Group { id: MateId(next), name: format!("Group {next}"), instances: vec![a, b], suppressed: rnd(4) == 0, patterns: Vec::new() });
+                        log.push(format!("group {next} {} {}", a.0, b.0));
+                        next += 1;
+                    }
+                }
+                9 if !asm.groups.is_empty() => {
+                    let k = rnd(asm.groups.len());
+                    log.push(format!("delete group {}", asm.groups[k].id.0));
+                    asm.groups.remove(k);
+                }
                 _ => {}
             }
             let mut opts = SolveOptions::default();
