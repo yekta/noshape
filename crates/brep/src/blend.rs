@@ -207,12 +207,18 @@ struct Link {
     t: DVec3,
 }
 
-/// An open chain's end: P's next edge there (not blended), the edge down the wall, the cap face they bound.
+/// An open chain's end: P's next edge there (not blended), the edge down the wall, the cap face they bound, and
+/// where the blend meets the cap on P and on the wall (from the chain's end vertex: a cap at an angle to a line
+/// moves them along it).
 #[derive(Clone, Copy, Debug)]
 struct End {
     g: u32,
     s: u32,
     cap: u32,
+    w1: DVec3,
+    w2: DVec3,
+    /// How far that moves them along the line, past the edge's end.
+    ext: f64,
 }
 
 /// A chain: a run of tangent blended edges of a loop of the planar face P.
@@ -524,27 +530,37 @@ fn chain(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdge
                 return no("a corner between blended edges");
             }
             let q = into_p_at(b, x, p);
-            for (o, dir, len) in [(g, q, d1), (s, x.t, d2)] {
-                let oe = &b.edges[o as usize];
-                if oe.curve != Curve::Line {
-                    return no("a chain end's edge not a line");
-                }
-                let far = if oe.v[0] == v { oe.v[1] } else { oe.v[0] };
-                let d = b.vertices[far as usize] - p;
-                if d.normalize().dot(dir) < 1.0 - 1e-9 || d.length() <= len + margin {
-                    return no("a chain end's edge not along the blend's side or too short");
-                }
-            }
             let fs = |o: u32| uses[o as usize].iter().map(|u| u.0).collect::<Vec<u32>>();
             let (gf, sf) = (fs(g), fs(s));
             let caps: Vec<u32> = gf.iter().copied().filter(|cf| sf.contains(cf) && *cf != f && *cf != x.wall).collect();
             let [cap] = caps[..] else { return no("a chain end without one cap face") };
             let Some(nc) = plane_normal(&b.faces[cap as usize]) else { return no("a cap face not planar") };
             let Some(te) = tangent(b, e, j != 0 && !x.rev || j == 0 && x.rev) else { return no("an edge not a line or an arc") };
-            if nc.cross(te).length() > 1e-9 {
-                return no("a cap face not square to the chain");
+            // A cap square to the chain takes the blend's section as it is; one at an angle to a line cuts it
+            // obliquely (P's and the wall's offset lines meet it along the line).
+            let cn = nc.dot(te);
+            let square = nc.cross(te).length() <= 1e-9;
+            if !square && e.curve != Curve::Line {
+                return no("a cap face not square to the chain's arc");
             }
-            c.ends[side] = Some(End { g, s, cap });
+            if !square && cn.abs() < 0.2 {
+                return no("a cap face nearly along the chain");
+            }
+            let on_cap = |w: DVec3| if square { w } else { w - te * (w.dot(nc) / cn) };
+            let (w1, w2) = (on_cap(q * d1), on_cap(x.t * d2));
+            for (o, w) in [(g, w1), (s, w2)] {
+                let oe = &b.edges[o as usize];
+                if oe.curve != Curve::Line {
+                    return no("a chain end's edge not a line");
+                }
+                let far = if oe.v[0] == v { oe.v[1] } else { oe.v[0] };
+                let d = b.vertices[far as usize] - p;
+                if d.normalize().dot(w.normalize()) < 1.0 - 1e-9 || d.length() <= w.length() + margin {
+                    return no("a chain end's edge not along the blend's side or too short");
+                }
+            }
+            let ext = (w1 - q * d1).length().max((w2 - x.t * d2).length());
+            c.ends[side] = Some(End { g, s, cap, w1, w2, ext });
         }
     }
     Ok(c)
@@ -616,6 +632,8 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
         skip.extend([e.g, e.s]);
     }
     let reach = c.d1.max(c.d2).max(c.centre);
+    // How far a cap at an angle moves the blend's ends along the line, past the edge's end.
+    let ext = c.ends.iter().flatten().map(|e| e.ext).fold(0.0, f64::max);
     // Edge `e` of the chain more than `d` from edge `o` (boxes apart by more are).
     let far = |e: u32, o: u32, d: f64| -> Result<bool, Decline> {
         if !boxes_meet(boxes[e as usize], boxes[o as usize], d + 2.0 * margin) {
@@ -633,7 +651,7 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
                 continue;
             }
             for x in &c.links {
-                if !far(x.edge, u.edge, c.d1)? {
+                if !far(x.edge, u.edge, c.d1 + ext)? {
                     return no("another edge of P within the blend");
                 }
             }
@@ -642,7 +660,7 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
     for x in &c.links {
         for lp in &b.faces[x.wall as usize].loops {
             for u in lp {
-                if !skip.contains(&u.edge) && !far(x.edge, u.edge, c.d2)? {
+                if !skip.contains(&u.edge) && !far(x.edge, u.edge, c.d2 + ext)? {
                     return no("another edge of a wall within the blend");
                 }
             }
@@ -659,7 +677,7 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
                     continue;
                 }
                 match point_edge_distance(b, &b.edges[u.edge as usize], p) {
-                    Some(d) if d > reach + margin => {}
+                    Some(d) if d > reach.max(end.w1.length()).max(end.w2.length()) + margin => {}
                     Some(_) => return no("another edge of a cap within the blend"),
                     None => return no("an edge near the blend whose distance isn't known"),
                 }
@@ -730,7 +748,17 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<
             } else {
                 q * c.d1
             };
-            let (p1, p2) = (p + w, p + x.t * c.d2);
+            let end = if c.closed { None } else if j == 0 { c.ends[0] } else if j == k { c.ends[1] } else { None };
+            let (p1, p2) = match end {
+                Some(end) => (p + end.w1, p + end.w2),
+                None => (p + w, p + x.t * c.d2),
+            };
+            // A cap at an angle to the line: its normal and the line's direction.
+            let oblique = end.and_then(|end| {
+                let nc = plane_normal(&body.faces[end.cap as usize])?;
+                let te = (body.vertices[body.edges[x.edge as usize].v[1] as usize] - body.vertices[body.edges[x.edge as usize].v[0] as usize]).normalize();
+                (nc.cross(te).length() > 1e-9).then_some((nc, te))
+            });
             b.vertices.extend([p1, p2]);
             vertex_origin.extend([Origin::New, Origin::New]);
             let (i1, i2) = (b.vertices.len() as u32 - 2, b.vertices.len() as u32 - 1);
@@ -747,6 +775,18 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<
                     let normal = xdir.cross(x.t).normalize();
                     let n = (u32::MAX, u32::MAX);
                     Curve::Ellipse { center: ctr, normal, xdir, major: major.length(), minor: radius, faces: [n, n] }
+                }
+                Spec::Fillet { radius } if oblique.is_some() => {
+                    // The cylinder cut by the cap: an ellipse about where its axis meets the cap, its minor axis R
+                    // square to the line, its major R / cos along the line's direction in the cap.
+                    let (nc, te) = oblique.unwrap();
+                    let cn = nc.dot(te);
+                    let axis = p + (q + x.t).normalize() * c.centre;
+                    let ctr = axis - te * ((axis - p).dot(nc) / cn);
+                    let xdir = (te - nc * cn).normalize();
+                    let normal = (p1 - ctr).cross(p2 - ctr).normalize();
+                    let n = (u32::MAX, u32::MAX);
+                    Curve::Ellipse { center: ctr, normal, xdir, major: radius / cn.abs(), minor: radius, faces: [n, n] }
                 }
                 Spec::Fillet { radius } => {
                     let ctr = p + (q + x.t).normalize() * c.centre;
@@ -783,7 +823,6 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<
             if let Some(s) = downs[j] {
                 cut_short(s, i2, &mut b);
             }
-            let end = if c.closed { None } else if j == 0 { c.ends[0] } else if j == k { c.ends[1] } else { None };
             if let Some(end) = end {
                 cut_short(end.s, i2, &mut b);
                 cut_short(end.g, i1, &mut b);

@@ -429,3 +429,42 @@ fn fillets_after_a_rust_chamfer_are_occts() {
     assert!((got[0].0 - got[1].0).abs() < 1e-6 * got[0].0, "{got:?}");
     assert_eq!((got[0].1, got[0].2), (got[1].1, got[1].2), "{got:?}");
 }
+
+/// noshape's own blends of straight edges ending on caps at an angle to them: a drafted block's slanted vertical
+/// edges (the top and bottom tilted against them) and a block's top edges ending on a corner chamfer (a cap at 45°
+/// along them), filleted (the cylinder cut by the cap: an ellipse) and chamfered: OCCT's counts and volume (1e-9;
+/// OCCT approximates the ellipses).
+#[test]
+fn rust_blends_on_oblique_caps_are_occts() {
+    let block = make_box_corners(DVec3::ZERO, DVec3::new(40.0, 20.0, 10.0)).unwrap();
+    let sides: Vec<Shape> = block.faces().into_iter().filter(|f| f.centroid().is_ok_and(|c| c.z > 1.0 && c.z < 9.0)).collect();
+    assert_eq!(sides.len(), 4);
+    let drafted = draft(&block, &sides, DVec3::Z, &Plane::from_normal(DVec3::ZERO, DVec3::Z), 8f64.to_radians()).unwrap().shape;
+    let slanted: Vec<Shape> = drafted.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| (i.start.z - i.end.z).abs() > 9.9)).collect();
+    assert_eq!(slanted.len(), 4);
+    let corner: Vec<Shape> = block.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| (i.start.x - 40.0).abs() < 1e-9 && i.start.y.abs() < 1e-9 && (i.end.x - 40.0).abs() < 1e-9 && i.end.y.abs() < 1e-9)).collect();
+    let cut = chamfer(&block, &corner, ChamferSpec::Equal(6.0), &[]).unwrap().shape;
+    let top: Vec<Shape> = cut.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| i.start.z > 9.9 && i.end.z > 9.9 && ((i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9) || ((i.start.x - 40.0).abs() < 1e-9 && (i.end.x - 40.0).abs() < 1e-9)))).collect();
+    assert_eq!(top.len(), 2);
+    for (what, part, edges) in [("drafted block's edges", &drafted, slanted), ("top edges to a chamfer", &cut, top)] {
+        for spec in ["fillet", "chamfer"] {
+            let run = || match spec {
+                "fillet" => fillet(part, &edges, 2.0),
+                _ => chamfer(part, &edges, ChamferSpec::Equal(1.5), &[]),
+            };
+            set_rust_blend(Some(false));
+            let occt = run().unwrap();
+            set_rust_blend(Some(true));
+            reset_blend_decline();
+            let ours = run();
+            set_rust_blend(None);
+            let why = last_blend_decline();
+            let ours = ours.unwrap();
+            assert_eq!(why, "", "{what} {spec}: declined");
+            assert!(ours.shape.is_valid(), "{what} {spec}: invalid");
+            let (a, b) = (bool_corpus::Summary::of(&ours), bool_corpus::Summary::of(&occt));
+            assert_eq!((a.faces, a.edges, a.vertices), (b.faces, b.edges, b.vertices), "{what} {spec}");
+            assert!((a.volume - b.volume).abs() <= 1e-9 * b.volume, "{what} {spec}: {} vs {}", a.volume, b.volume);
+        }
+    }
+}

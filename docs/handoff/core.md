@@ -583,7 +583,11 @@ with 0003b and 0004 on Linux, macOS and Windows.
   faces square to the edge: OCCT's defeaturing gave a sliver for a block's two sides in some face orders) and
   Shell's slabs over Rust fillet + chamfer (iso pcurves snapped exactly onto u / v). With it on, T1 and T2 of
   kernel / model / model-core / ops were green (the T2 bool corpus's 3 CutByFaces cases rebased, bool.md), so it is
-  on by default since 10-31 03:50 (NOSHAPE_BLEND_RUST=0: OCCT's only).
+  on by default since 10-31 03:50 (NOSHAPE_BLEND_RUST=0: OCCT's only). Its tangent edges are marked G1 and new
+  seams CN like OCCT's (BRepLib::ContinuityOfFaces, set only when smooth): HLR draws tangent lines from them.
+- Caps at an angle (10-31 06:00): an open chain's straight end may meet a planar cap at any angle (not within ~78°
+  of along it): End.w1 / w2 are where P's and the wall's offset lines meet the cap, a fillet's section the ellipse
+  (minor R, major R / cos along the line in the cap); clearance checks widen by the shift along the line.
 
 ## Next, in order
 (lead 10-29: big structural wins, land small and often, stop when returns flatten.)
