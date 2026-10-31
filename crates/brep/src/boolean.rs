@@ -3750,8 +3750,16 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     for (&(f, s), chain) in extra_segs.iter().zip(extra_chains) {
         crate::check_cancel()?;
         let chain = chain?;
+        let watch = std::env::var("NOSHAPE_X_FACE").is_ok_and(|v| v == format!("{},{}", cx.faces[f].arg, cx.faces[f].index));
+        if watch {
+            eprintln!("EXTRA face {f} seg {:?} v {:?} chain {chain:?}", s.g, s.v);
+        }
         for piece in cx.pieces_of(&s, &chain) {
-            face_extra[f].push(get_sedge(&cx, &mut sedges, piece).0);
+            let (si, rev) = get_sedge(&cx, &mut sedges, piece);
+            if watch {
+                eprintln!("EXTRA   piece {:?} v {:?} -> sedge {si} rev {rev} ({:?} v {:?})", piece.g, piece.v, sedges[si].seg.g, sedges[si].seg.v);
+            }
+            face_extra[f].push(si);
         }
     }
     // The faces each section edge was made by (OCCT: they generated it).
