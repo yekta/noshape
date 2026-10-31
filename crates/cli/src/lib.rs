@@ -50,7 +50,7 @@ pub fn command_named(name: &str) -> Command {
     let mut cmd = Command::new(name.to_string())
         .version(noshape_ops::VERSION)
         .about(about)
-        .after_help(format!("Values are JSON when they parse (numbers, arrays, objects, true/false), strings otherwise.\nExamples:\n  {name} document create --path /tmp/a.noshape\n  {name} sketch create --doc /tmp/a.noshape --plane plane:top\n  {name} call feature_add '{{\"doc\":\"/tmp/a.noshape\",\"type\":\"extrude\",\"params\":{{\"depth\":\"10 mm\"}}}}'\n  {name} mcp   # MCP server on stdio"))
+        .after_help(format!("Values are JSON when they parse (numbers, arrays, objects, true/false), strings otherwise.\nExamples:\n  {name} document create --path /tmp/a.noshape\n  {name} sketch create --doc /tmp/a.noshape --plane plane:top\n  {name} call feature_add '{{\"doc\":\"/tmp/a.noshape\",\"type\":\"extrude\",\"params\":{{\"depth\":\"10 mm\"}}}}'\n  {name} mcp   # MCP server on stdio\n  {name} agents connect   # register it with Claude Code, Codex, Claude Desktop"))
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommand(Command::new("mcp").about("Run the MCP server (stdio, JSON-RPC 2.0, one message per line)").arg(all_tools_arg()))

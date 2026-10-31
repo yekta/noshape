@@ -333,6 +333,8 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **export**: [`export_parts`](#export_parts)
 - **import**: [`import_files`](#import_files)
 - **featurestudio**: [`featurestudio_get`](#featurestudio_get), [`featurestudio_edit`](#featurestudio_edit), [`featurestudio_commit`](#featurestudio_commit), [`featurestudio_monitor`](#featurestudio_monitor)
+- **agents**: [`agents_status`](#agents_status), [`agents_connect`](#agents_connect), [`agents_disconnect`](#agents_disconnect)
+- **cli**: [`cli_status`](#cli_status), [`cli_install`](#cli_install)
 
 ### ops
 
@@ -6366,4 +6368,92 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `part_studio` | string |  | Part Studio tab (name or id); default: the first. |
+
+### agents
+
+#### agents_status
+
+The coding agents on this computer and whether noshape is connected to them.
+
+Claude Code (`claude` on PATH or where its installers put it), the Codex CLI (`codex`) and Claude Desktop (its folder: macOS ~/Library/Application Support/Claude, Windows %APPDATA%\Claude): for each, `found`, its configuration file and `state`: missing (not installed), not_connected, connected (noshape's MCP server starts this binary) or elsewhere (`connected_command`: another noshape binary). `found_names` lists the ones installed.
+
+Examples:
+
+```json
+{}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `command` | string |  | The noshape binary agents start (`<command> mcp`). Default: this one (the app, or noshape-cli). |
+
+#### agents_connect
+
+Register noshape's MCP server with the coding agents installed (Help › Connect to coding agents…).
+
+Adds `noshape` (`<command> mcp`) to each agent's MCP servers, user-wide: Claude Code with `claude mcp add --scope user`, the Codex CLI with `codex mcp add` (older versions: a [mcp_servers.noshape] table in ~/.codex/config.toml), Claude Desktop in claude_desktop_config.json (other servers kept). A file is backed up first (`<file>.noshape-backup`). An entry already starting this binary is left as it is; one starting another binary is updated. Restart Claude Desktop to load it.
+
+Examples:
+
+```json
+{}
+{"agents": ["claude_code", "codex"]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `agents` | array of one of `claude_code`, `codex`, `claude_desktop` |  | Agents to connect (claude_code, codex, claude_desktop). Default: every one installed. |
+| `command` | string |  | The noshape binary agents start (`<command> mcp`). Default: this one (the app, or noshape-cli). |
+
+#### agents_disconnect
+
+Remove noshape's MCP server from the coding agents (deletes or overwrites).
+
+Removes the `noshape` entry from each agent's MCP servers (with its own command where it has one, else from its configuration file, backed up first). Other servers are kept.
+
+Examples:
+
+```json
+{"agents": ["claude_desktop"]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `agents` | array of one of `claude_code`, `codex`, `claude_desktop` |  | Agents to disconnect. Default: every one connected. |
+
+### cli
+
+#### cli_status
+
+Whether the `noshape` command is on PATH.
+
+`installed` and `path`: a `noshape` on PATH (or in /usr/local/bin, ~/.local/bin) that starts this binary; `on_path`: its folder is on PATH; `other`: a `noshape` on PATH that starts another binary.
+
+Examples:
+
+```json
+{}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `command` | string |  | The noshape binary agents start (`<command> mcp`). Default: this one (the app, or noshape-cli). |
+
+#### cli_install
+
+Put the `noshape` command on PATH (Help › Install command line tool…).
+
+macOS and Linux: a link `noshape` to this binary in `dir`, default /usr/local/bin (macOS asks for an administrator's password through the system prompt when needed), else ~/.local/bin, with a note when that folder isn't on PATH. An existing link is replaced. Windows: the app's folder is added to the user's PATH (the installer does this already).
+
+Examples:
+
+```json
+{}
+{"dir": "~/.local/bin"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `dir` | string |  | Folder for the link (macOS, Linux). Default: /usr/local/bin, else ~/.local/bin. |
+| `command` | string |  | The noshape binary agents start (`<command> mcp`). Default: this one (the app, or noshape-cli). |
 <!-- END GENERATED REFERENCE -->

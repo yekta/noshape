@@ -232,6 +232,8 @@ pub(crate) fn forward(ctx: &mut crate::Ctx, op: &crate::registry::Op, args: &Val
     let named = |k: &str| args.get(k).and_then(Value::as_str).map(PathBuf::from);
     let target = match name.as_str() {
         "document_create" => return None,
+        // This machine's setup, not a document's.
+        n if n.starts_with("agents_") || n.starts_with("cli_") => return None,
         "document_open" => named("path")?,
         _ => named("doc").or_else(|| ctx.current_path().map(Path::to_path_buf))?,
     };
