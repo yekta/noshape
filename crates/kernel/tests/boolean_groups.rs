@@ -28,6 +28,14 @@ fn cut_with_many_tools_some_crossing() {
     // Two through slots crossing each other in the middle (a plus).
     tools.push(make_box_corners(DVec3::new(20.0, 48.0, -1.0), DVec3::new(80.0, 52.0, 11.0)).unwrap());
     tools.push(make_box_corners(DVec3::new(48.0, 30.0, -1.0), DVec3::new(52.0, 70.0, 11.0)).unwrap());
+    // OCCT's build from the faces (patch 0001's CutByFaces: 14 tools, the slots one group of crossing ones):
+    // the plate's solid Modified as in the usual build, not deleted (bool's replays compare the two).
+    set_rust_boolean(Some(false));
+    let by_faces = boolean(BooleanOp::Cut, std::slice::from_ref(&plate), &tools, &BooleanOptions::default());
+    set_rust_boolean(None);
+    let h = by_faces.unwrap().history;
+    let solid = |rel: Relation| h.records.iter().any(|x| x.arg == 0 && x.input_kind == ShapeType::Solid && x.input_index == 0 && x.relation == rel);
+    assert!(solid(Relation::Modified) && !solid(Relation::Deleted), "{:?}", h.records.iter().filter(|x| x.input_kind == ShapeType::Solid).collect::<Vec<_>>());
     let res = boolean(BooleanOp::Cut, &[plate], &tools, &BooleanOptions::default()).unwrap().shape;
     let want = 100.0 * 100.0 * 10.0 - holes as f64 * PI * r * r * 10.0 - (60.0 * 4.0 + 40.0 * 4.0 - 4.0 * 4.0) * 10.0;
     let v = res.volume().unwrap();

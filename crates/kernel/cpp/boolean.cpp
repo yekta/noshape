@@ -4263,7 +4263,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   // classification. OCCT's split solids of the target and of every tool
   // (each cut up by the crossing ones) took minutes and gigabytes, and a cut
   // keeps none of the tools'.
-  const bool by_faces = op == 1 && n_tools >= 8 && t.size() >= 2 && t.size() < n_tools;
+  bool by_faces = op == 1 && n_tools >= 8 && t.size() >= 2 && t.size() < n_tools;
   {
     const KernelTimer timer("boolean.build");
     const CutByFaces scope(by_faces);
@@ -4272,6 +4272,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   fail_if_cancelled();
   if (by_faces && (b->HasErrors() || !b->IsDone()))
   {
+    by_faces = false;
     // As usual, with the split solids.
     b = make();
     b->SetArguments(to_list(a));
@@ -4314,6 +4315,33 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   {
     const KernelTimer timer("boolean.history");
     hist = new BRepTools_History(to_list(concat(a, t)), *b);
+    // Built from the faces (patch 0001's CutByFaces), the result's solids are none of the target's images, and
+    // the history says the target was deleted; the usual build (and noshape's Boolean) says Modified, which the
+    // Rust Boolean's replay and the naming go by: each target solid Modified to the result's solids holding
+    // its faces or their pieces.
+    if (by_faces)
+      for (const TopoDS_Shape& arg : a)
+        for (TopExp_Explorer sx(arg, TopAbs_SOLID); sx.More(); sx.Next())
+        {
+          const TopoDS_Shape& S = sx.Current();
+          if (!hist->IsRemoved(S))
+            continue;
+          ShapeIMap own;
+          for (TopExp_Explorer fx(S, TopAbs_FACE); fx.More(); fx.Next())
+          {
+            own.Add(fx.Current());
+            for (const TopoDS_Shape& m : hist->Modified(fx.Current()))
+              own.Add(m);
+          }
+          for (TopExp_Explorer rx(b->Shape(), TopAbs_SOLID); rx.More(); rx.Next())
+          {
+            bool holds = false;
+            for (TopExp_Explorer fx(rx.Current(), TopAbs_FACE); fx.More() && !holds; fx.Next())
+              holds = own.Contains(fx.Current());
+            if (holds)
+              hist->AddModified(S, rx.Current());
+          }
+        }
   }
   res = b->Shape();
   // The builder's data (its pave filler: most of a big Boolean's memory)

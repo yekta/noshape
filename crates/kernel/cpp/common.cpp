@@ -485,13 +485,25 @@ void HistoryBuilder::add_history(const BRepTools_History* h)
             push(ai, (uint8_t)k, (uint32_t)(i - 1), REL_DELETED, TopoDS_Shape());
             found = true;
           }
+          // Each input's images by their index in the output: the history's lists may come in another
+          // order run to run (unify's maps; the same records), and records in a stable order make the result
+          // reproducible (bool's replays compare them).
+          const auto by_output = [this](size_t from) {
+            std::stable_sort(myRecs.begin() + static_cast<std::ptrdiff_t>(from), myRecs.end(), [](const HistRec& x, const HistRec& y) {
+              return std::make_pair(x.out_kind, x.out_index) < std::make_pair(y.out_kind, y.out_index);
+            });
+          };
+          const size_t mod_from = myRecs.size();
           for (NCollection_List<TopoDS_Shape>::Iterator it(h->Modified(s)); it.More(); it.Next())
           {
             push(ai, (uint8_t)k, (uint32_t)(i - 1), REL_MODIFIED, it.Value());
             found = true;
           }
+          by_output(mod_from);
+          const size_t gen_from = myRecs.size();
           for (NCollection_List<TopoDS_Shape>::Iterator it(h->Generated(s)); it.More(); it.Next())
             push(ai, (uint8_t)k, (uint32_t)(i - 1), REL_GENERATED, it.Value());
+          by_output(gen_from);
         }
         if (!found)
         {

@@ -3,6 +3,17 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## From core (10-31 00:20): CutByFaces history, record order
+- op_boolean's CutByFaces build (patch 0001: a cut by 8+ tools in 2+ groups, crossing ones) now records each target
+  solid Modified to the result's solids holding its faces or their pieces, as OCCT's usual build and the Rust
+  Boolean do (it said Deleted: the result's solids are none of the target's images). T1
+  `boolean_groups::cut_with_many_tools_some_crossing` asserts it (fails without the fix). The naming never read
+  solid records (name_result keeps faces, edges, vertices), so nothing relied on Deleted. Boolean corpus cases
+  recorded through CutByFaces (knurl-like cuts) now replay with the solid Modified: rebase those summaries.
+- Records are in a stable order: each input's Modified and Generated images by their index in the output
+  (HistoryBuilder::add_history; unify's lists came in another order run to run, the same records). The naming
+  sorts what it reads, so names don't change.
+
 ## What it is
 - `crates/brep` (`noshape-brep`, pure Rust, below the kernel): `Body` (vertices, edges, faces, solids in index
   arenas; one forward direction per edge) and `boolean(op, args, tol)`: fuse / cut / common of solids bounded by
