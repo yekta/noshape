@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "A fast, fully local, parametric CAD application."
+autotests = false
 
 [[bin]]
 name = "noshape"
@@ -30,6 +31,7 @@ noshape-units.workspace = true
 noshape-sketch.workspace = true
 noshape-kernel.workspace = true
 noshape-ops.workspace = true
+noshape-cli.workspace = true
 noshape-scene.workspace = true
 gpui-kit.workspace = true
 anyhow.workspace = true
@@ -46,3 +48,8 @@ noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [target.'cfg(windows)'.dependencies]
 gpui-pre-windows = "0.3.9"
+
+# Integration tests (tools/tiers/merge-tests.py): tests/all.rs holds every file but the standalone ones.
+[[test]]
+name = "all"
+path = "tests/all.rs"

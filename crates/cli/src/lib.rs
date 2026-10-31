@@ -1,6 +1,7 @@
 //! noshape-cli: the command line and the MCP server, both generated from
 //! the operation registry of `noshape-ops` (see `docs/AGENT_API.md`). The
-//! app binary forwards `noshape mcp` / `noshape <group> <verb>` here.
+//! app binary runs them too: `noshape mcp` / `noshape <group> <verb>` come
+//! here before any window starts ([`is_command`]).
 
 pub mod core_tools;
 pub mod mcp;
@@ -9,8 +10,8 @@ use clap::{Arg, ArgAction, Command};
 use noshape_ops::Ctx;
 use noshape_ops::registry::{self, OpOutput};
 use serde_json::{Value, json};
-use std::ffi::OsString;
-use std::io::{BufRead, Read};
+use std::ffi::{OsStr, OsString};
+use std::io::{BufRead, Read, Write};
 
 /// `--all-tools`: the MCP tool list with every tool in full, instead of the
 /// common ones with short descriptions (the rest through ops_list /
@@ -19,11 +20,37 @@ fn all_tools_arg() -> Arg {
     Arg::new("all-tools").long("all-tools").action(ArgAction::SetTrue).help("List every tool with its full description and schema (about 340k characters) instead of the common ones in short")
 }
 
+/// The commands besides the operation groups.
+const COMMANDS: [&str; 5] = ["mcp", "call", "batch", "tools", "docs"];
+
+/// Whether the app binary's first argument is a CLI command (or --help,
+/// --version) rather than a document to open or a `--demo` flag.
+pub fn is_command(arg: &OsStr) -> bool {
+    let Some(a) = arg.to_str() else { return false };
+    if COMMANDS.contains(&a) || matches!(a, "help" | "--help" | "-h" | "--version" | "-V") {
+        return true;
+    }
+    // A path or a flag: the app (without building the registry).
+    a.bytes().all(|b| b.is_ascii_lowercase() || b == b'_') && registry::groups().contains(&a)
+}
+
 /// The clap command tree: one subcommand per group, one per operation.
 pub fn command() -> Command {
-    let mut cmd = Command::new("noshape-cli")
-        .about("noshape CAD for scripts and agents: every operation of the app, JSON in and out")
-        .after_help("Values are JSON when they parse (numbers, arrays, objects, true/false), strings otherwise.\nExamples:\n  noshape-cli document create --path /tmp/a.noshape\n  noshape-cli sketch create --doc /tmp/a.noshape --plane plane:top\n  noshape-cli call feature_add '{\"doc\":\"/tmp/a.noshape\",\"type\":\"extrude\",\"params\":{\"depth\":\"10 mm\"}}'\n  noshape-cli mcp   # MCP server on stdio")
+    command_named("noshape-cli")
+}
+
+/// The command tree under the program's name: `noshape-cli`, or `noshape`
+/// for the app binary (which opens the app when given no command).
+pub fn command_named(name: &str) -> Command {
+    let about = if name == "noshape" {
+        "noshape CAD. With no command (or a .noshape file) it opens the app; with a command it runs it for scripts and agents, JSON in and out"
+    } else {
+        "noshape CAD for scripts and agents: every operation of the app, JSON in and out"
+    };
+    let mut cmd = Command::new(name.to_string())
+        .version(noshape_ops::VERSION)
+        .about(about)
+        .after_help(format!("Values are JSON when they parse (numbers, arrays, objects, true/false), strings otherwise.\nExamples:\n  {name} document create --path /tmp/a.noshape\n  {name} sketch create --doc /tmp/a.noshape --plane plane:top\n  {name} call feature_add '{{\"doc\":\"/tmp/a.noshape\",\"type\":\"extrude\",\"params\":{{\"depth\":\"10 mm\"}}}}'\n  {name} mcp   # MCP server on stdio"))
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommand(Command::new("mcp").about("Run the MCP server (stdio, JSON-RPC 2.0, one message per line)").arg(all_tools_arg()))
@@ -46,18 +73,16 @@ pub fn command() -> Command {
     cmd
 }
 
-/// Write to stdout; a reader that went away (`| head`) ends the output
-/// quietly instead of a panic.
-fn emit(text: &str) {
-    use std::io::Write;
-    let mut out = std::io::stdout().lock();
+/// Write the output; a reader that went away (`| head`) ends it quietly
+/// instead of a panic.
+fn emit(out: &mut dyn Write, text: &str) {
     if out.write_all(text.as_bytes()).and_then(|_| out.flush()).is_err() {
         std::process::exit(0);
     }
 }
 
-fn print(v: &Value) {
-    emit(&format!("{}\n", serde_json::to_string_pretty(v).unwrap_or_default()));
+fn print(out: &mut dyn Write, v: &Value) {
+    emit(out, &format!("{}\n", serde_json::to_string_pretty(v).unwrap_or_default()));
 }
 
 fn output_json(out: &OpOutput) -> Value {
@@ -78,9 +103,16 @@ fn run_tool(ctx: &mut Ctx, tool: &str, args: &Value) -> Result<Value, Value> {
     registry::run(ctx, op, args).map(|o| output_json(&o)).map_err(|e| e.to_json())
 }
 
-/// Run the CLI; returns the exit code.
+/// Run the CLI (`args[0]` the program); returns the exit code.
 pub fn run(args: Vec<OsString>) -> i32 {
-    let m = match command().try_get_matches_from(args) {
+    run_to(args, &mut std::io::stdout().lock())
+}
+
+/// [`run`] with the results written to `out` (help, usage errors and the
+/// MCP server still use stdout / stderr).
+pub fn run_to(args: Vec<OsString>, out: &mut dyn Write) -> i32 {
+    let name = args.first().map(std::path::Path::new).and_then(|p| p.file_stem()).and_then(OsStr::to_str).filter(|n| *n == "noshape").unwrap_or("noshape-cli");
+    let m = match command_named(name).try_get_matches_from(args) {
         Ok(m) => m,
         Err(e) => {
             let _ = e.print();
@@ -100,7 +132,7 @@ pub fn run(args: Vec<OsString>) -> i32 {
         }
         Some(("tools", sub)) => Ok(json!({ "tools": mcp::tool_list(sub.get_flag("all-tools")) })),
         Some(("docs", _)) => {
-            emit(&noshape_ops::reference::markdown());
+            emit(out, &noshape_ops::reference::markdown());
             return 0;
         }
         Some(("call", sm)) => {
@@ -124,7 +156,7 @@ pub fn run(args: Vec<OsString>) -> i32 {
                 Some(f) if f != "-" => match std::fs::File::open(f) {
                     Ok(file) => Box::new(std::io::BufReader::new(file)),
                     Err(e) => {
-                        print(&json!({ "error": "io", "message": format!("{f}: {e}") }));
+                        print(out, &json!({ "error": "io", "message": format!("{f}: {e}") }));
                         return 2;
                     }
                 },
@@ -140,7 +172,7 @@ pub fn run(args: Vec<OsString>) -> i32 {
                     Err(e) => Err(json!({ "error": "invalid_argument", "message": format!("not JSON: {e}") })),
                 };
                 failed |= r.is_err();
-                emit(&format!("{}\n", serde_json::to_string(&r.unwrap_or_else(|e| e)).unwrap_or_default()));
+                emit(out, &format!("{}\n", serde_json::to_string(&r.unwrap_or_else(|e| e)).unwrap_or_default()));
             }
             return if failed { 2 } else { 0 };
         }
@@ -152,7 +184,7 @@ pub fn run(args: Vec<OsString>) -> i32 {
                 Some(j) => match serde_json::from_str::<Value>(j) {
                     Ok(v @ Value::Object(_)) => v,
                     _ => {
-                        print(&json!({ "error": "invalid_argument", "param": "json", "message": "--json takes a JSON object" }));
+                        print(out, &json!({ "error": "invalid_argument", "param": "json", "message": "--json takes a JSON object" }));
                         return 2;
                     }
                 },
@@ -170,11 +202,11 @@ pub fn run(args: Vec<OsString>) -> i32 {
     };
     match result {
         Ok(v) => {
-            print(&v);
+            print(out, &v);
             0
         }
         Err(e) => {
-            print(&e);
+            print(out, &e);
             2
         }
     }
@@ -187,5 +219,19 @@ mod tests {
     #[test]
     fn command_tree_is_valid() {
         super::command().debug_assert();
+        super::command_named("noshape").debug_assert();
+    }
+
+    /// The app binary hands these to the CLI; a document path or a --demo
+    /// flag opens the app.
+    #[test]
+    fn app_arguments_that_are_commands() {
+        use std::ffi::OsStr;
+        for a in ["mcp", "tools", "docs", "call", "batch", "document", "feature", "--version", "--help", "-h"] {
+            assert!(super::is_command(OsStr::new(a)), "{a}");
+        }
+        for a in ["/tmp/a.noshape", "a.noshape", "--demo", "--demo-drawing", "Documents"] {
+            assert!(!super::is_command(OsStr::new(a)), "{a}");
+        }
     }
 }

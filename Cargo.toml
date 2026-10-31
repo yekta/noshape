@@ -27,6 +27,7 @@ noshape-store = { path = "crates/store" }
 noshape-render = { path = "crates/render" }
 noshape-featurescript = { path = "crates/featurescript" }
 noshape-ops = { path = "crates/ops" }
+noshape-cli = { path = "crates/cli" }
 noshape-scene = { path = "crates/scene" }
 noshape-app-core = { path = "crates/app-core" }
 noshape-drawing-ui = { path = "crates/drawing-ui" }

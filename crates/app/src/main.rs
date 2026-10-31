@@ -25,6 +25,7 @@ use noshape_feature_studio_ui::{feature_studio, fs_notices, fs_search, std_sourc
 use noshape_history_ui::{compare_mode, history_panel};
 // The documents page (docs/CRATES.md), under its old path; what it needs of the app: `register_start_hooks`.
 use noshape_start_ui::start_window;
+mod cli_mode;
 mod live_server;
 mod doc_dialogs;
 mod shortcuts_page;
@@ -366,6 +367,14 @@ fn register_start_hooks() {
 }
 
 fn main() {
+    // `noshape mcp`, `noshape <command> …`: the CLI, no window.
+    let os_args: Vec<std::ffi::OsString> = std::env::args_os().collect();
+    if let Some(code) = cli_mode::run(&os_args) {
+        std::process::exit(code);
+    }
+    if cfg!(target_os = "macos") && cli_mode::reopen_as_bundle(&os_args) {
+        return;
+    }
     noshape_render::perf::process_start();
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
     // Initializes the GPU on a background thread; the first use waits for it.
