@@ -657,6 +657,8 @@ pub(crate) mod ffi {
         /// NOSHAPE_KERNEL_PROFILE: prints the calls since the last mark under `label` and starts again (an empty
         /// label: only starts again).
         fn kernel_profile_mark(label: &str);
+        /// The kernel profile on or off from now on (NOSHAPE_KERNEL_PROFILE's switch; its clock stays the env's).
+        fn set_kernel_profile(on: bool);
         /// OCCT's thread pool size (once, before any parallel work).
         fn set_occt_threads(n: i32);
         fn op_boolean(

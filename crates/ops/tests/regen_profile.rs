@@ -331,13 +331,11 @@ fn bench_live30_display_mesh() {
 
 /// live-30's display mesh by step (the kernel profile, wall time), ours, cold, three rounds: for
 /// tools/tiers/perf.sh. `cargo test --release -p noshape-ops --test all regen_profile::bench_profile_live30 --
-/// --ignored --nocapture --test-threads=1` (alone: the profile switch is read once).
+/// --ignored --nocapture --test-threads=1`.
 #[test]
 #[ignore = "bench"]
 fn bench_profile_live30_display_mesh() {
-    use noshape_kernel::{ShapeType, Transform, kernel_profile_mark, tessellate, transform};
-    // SAFETY: set before any kernel call of this test process (run alone), read by the kernel once.
-    unsafe { std::env::set_var("NOSHAPE_KERNEL_PROFILE", "1") };
+    use noshape_kernel::{ShapeType, Transform, kernel_profile_mark, set_kernel_profile, tessellate, transform};
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf");
     let tmp = std::env::temp_dir().join(format!("noshape-mesh-profile-{}.noshape", std::process::id()));
     std::fs::copy(dir.join("live-30-features.noshape"), &tmp).unwrap();
@@ -352,6 +350,7 @@ fn bench_profile_live30_display_mesh() {
     for c in &copies {
         let _ = c.ancestor_map(ShapeType::Edge, ShapeType::Face).unwrap();
     }
+    set_kernel_profile(true);
     kernel_profile_mark("");
     let t = Instant::now();
     for c in &copies {

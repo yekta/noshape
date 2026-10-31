@@ -307,15 +307,17 @@ void kernel_profile_add_named(const char* name, std::chrono::steady_clock::durat
 struct KernelTimer
 {
   const char*                           what;
+  bool                                  on; // as when it started (the profile can be switched on meanwhile)
   std::chrono::steady_clock::duration    t0;
   explicit KernelTimer(const char* w)
       : what(w),
-        t0(kernel_profile_on() ? kernel_profile_now() : std::chrono::steady_clock::duration{})
+        on(kernel_profile_on()),
+        t0(on ? kernel_profile_now() : std::chrono::steady_clock::duration{})
   {
   }
   ~KernelTimer()
   {
-    if (kernel_profile_on())
+    if (on)
       kernel_profile_add_named(what, kernel_profile_now() - t0);
   }
 };
@@ -806,6 +808,7 @@ rust::String             last_shell_path();
 OpOut                    op_unify_whole(const OcShape& s);
 rust::String             last_boolean_path();
 void                     kernel_profile_mark(rust::Str label);
+void                     set_kernel_profile(bool on);
 void                     set_occt_threads(int32_t n);
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts);

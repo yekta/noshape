@@ -184,6 +184,12 @@ pub fn kernel_profile_mark(label: &str) {
     ffi::kernel_profile_mark(label)
 }
 
+/// The kernel profile on or off from now on, as NOSHAPE_KERNEL_PROFILE=1 sets it (a bench profiling only its
+/// timed part).
+pub fn set_kernel_profile(on: bool) {
+    ffi::set_kernel_profile(on)
+}
+
 /// Run `f` with `flag` as this thread's boolean cancel flag: once it is set,
 /// a running [`boolean`] stops inside OCCT and fails with "cancelled" (a
 /// stale regeneration releases its thread quickly).

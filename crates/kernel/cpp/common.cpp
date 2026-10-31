@@ -1989,10 +1989,27 @@ std::string bridge_name(const char* mangled)
 }
 } // namespace
 
+namespace {
+// -1: not read yet (NOSHAPE_KERNEL_PROFILE decides), else off / on (set_kernel_profile).
+std::atomic<int> g_kernel_profile{-1};
+} // namespace
+
 bool kernel_profile_on()
 {
-  static const bool on = std::getenv("NOSHAPE_KERNEL_PROFILE") != nullptr;
-  return on;
+  int on = g_kernel_profile.load(std::memory_order_relaxed);
+  if (on < 0)
+  {
+    int unread = -1;
+    on         = std::getenv("NOSHAPE_KERNEL_PROFILE") != nullptr ? 1 : 0;
+    if (!g_kernel_profile.compare_exchange_strong(unread, on))
+      on = unread;
+  }
+  return on == 1;
+}
+
+void set_kernel_profile(bool on)
+{
+  g_kernel_profile.store(on ? 1 : 0);
 }
 
 std::chrono::steady_clock::duration kernel_profile_now()
