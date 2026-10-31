@@ -230,23 +230,33 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
     let cell = cell.clone();
     let counters = noshape_featurescript::value::shown_counters();
     let derived = ev.derived.clone();
+    let cancel = ev.cancel.clone();
 
-    // Run on a thread with a large stack (FeatureScript recursion).
+    // Run on a thread with a large stack (FeatureScript recursion), in the regeneration's cancel scope (the kernel's
+    // cancel flag is per thread: without it a cancelled custom feature's Booleans ran to their end) and with the
+    // interpreter stopping at it too.
     let run = std::thread::scope(|s| {
         std::thread::Builder::new()
             .stack_size(STACK_SIZE)
             .spawn_scoped(s, || {
-                noshape_featurescript::value::set_shown_counters(counters);
-                host::set_derived(derived);
-                let mut i = Interp::new();
-                i.set_deadline(Some(Instant::now() + TIME_LIMIT));
-                if profiling() {
-                    i.profile = Some(Default::default());
+                let go = || {
+                    noshape_featurescript::value::set_shown_counters(counters);
+                    host::set_derived(derived);
+                    let mut i = Interp::new();
+                    i.set_deadline(Some(Instant::now() + TIME_LIMIT));
+                    i.set_cancel(cancel.clone().map(|c| Box::new(move || c.aborted()) as Box<dyn Fn() -> bool + Send>));
+                    if profiling() {
+                        i.profile = Some(Default::default());
+                    }
+                    let f = i.global(&cell);
+                    let r = f.and_then(|f| i.call_value(&f, vec![ctx_value, host::id_value(&feature_id), definition]));
+                    let lines = i.profile.take().map(|p| p.times.into_iter().map(|((m, l), t)| (m, l, t)).collect()).unwrap_or_default();
+                    (r.map(|_| ()).map_err(|e| e.message()), std::mem::take(&mut i.notices), std::mem::take(&mut i.output), lines)
+                };
+                match &cancel {
+                    Some(c) => c.scope(go),
+                    None => go(),
                 }
-                let f = i.global(&cell);
-                let r = f.and_then(|f| i.call_value(&f, vec![ctx_value, host::id_value(&feature_id), definition]));
-                let lines = i.profile.take().map(|p| p.times.into_iter().map(|((m, l), t)| (m, l, t)).collect()).unwrap_or_default();
-                (r.map(|_| ()).map_err(|e| e.message()), std::mem::take(&mut i.notices), std::mem::take(&mut i.output), lines)
             })
             .map(|h| h.join())
     });

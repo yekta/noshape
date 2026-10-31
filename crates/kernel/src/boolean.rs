@@ -191,8 +191,10 @@ pub fn set_kernel_profile(on: bool) {
 }
 
 /// Run `f` with `flag` as this thread's boolean cancel flag: once it is set,
-/// a running [`boolean`] stops inside OCCT and fails with "cancelled" (a
-/// stale regeneration releases its thread quickly).
+/// a running [`boolean`] stops inside OCCT or noshape's Boolean and fails
+/// with "cancelled", as do the budgeted ops (blends, shells) and OCCT's math
+/// through the break hook (a stale regeneration releases its thread within
+/// ~100 ms).
 pub fn with_cancel<R>(flag: &std::sync::atomic::AtomicBool, f: impl FnOnce() -> R) -> R {
     thread_local!(static CURRENT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) });
     // Restores the previous flag, also when `f` panics.
@@ -201,11 +203,13 @@ pub fn with_cancel<R>(flag: &std::sync::atomic::AtomicBool, f: impl FnOnce() -> 
         fn drop(&mut self) {
             CURRENT.with(|c| c.set(self.0));
             ffi::set_thread_cancel(self.0);
+            noshape_brep::set_thread_cancel(self.0);
         }
     }
     let addr = flag.as_ptr() as usize;
     let _restore = Restore(CURRENT.with(|c| c.replace(addr)));
     ffi::set_thread_cancel(addr);
+    noshape_brep::set_thread_cancel(addr);
     f()
 }
 

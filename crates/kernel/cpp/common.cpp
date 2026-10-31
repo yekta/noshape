@@ -2147,14 +2147,15 @@ void on_budget_tick(int, siginfo_t*, void* uctx)
   // OCCT patch 0005 counts them. The next tick after.
   if (env == nullptr || budget_hold > 0 || mutex_holds > 0 || noshape_osd_pool_depth() > 0 || !in_own_code(uctx))
     return;
-  // A cancel waits a grace too: the deadline's indicator and hook see the
-  // flag as well and stop the build by throwing.
+  // A cancel waits a grace too, the next tick (the user's cancel must free
+  // the worker within ~100 ms): the deadline's indicator and hook see the
+  // flag as well and stop the build by throwing, freeing what it built.
   const double now    = thread_cpu_seconds();
   const bool   over   = now > budget_limit;
   bool         cancel = budget_cancel != nullptr && budget_cancel->load(std::memory_order_relaxed);
   if (cancel && budget_cancel_seen < 0)
     budget_cancel_seen = now;
-  cancel = cancel && now - budget_cancel_seen > 1.0;
+  cancel = cancel && now - budget_cancel_seen > 0.05;
   if (!over && !cancel)
     return;
   budget_jmp    = nullptr;

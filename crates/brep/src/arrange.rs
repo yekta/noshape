@@ -31,7 +31,7 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         // -π is π (one direction).
         let a = d.y.atan2(d.x);
         (if a < 1e-9 - PI { a + TAU } else { a }, c.curvature())
-    });
+    })?;
     for (h, (a, k)) in leaving.into_iter().enumerate() {
         out[from(h)].push((a, k, h));
     }
@@ -82,7 +82,7 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         cycles.push(cyc);
     }
     let curves_of = |c: &[usize]| -> Vec<C2> { c.iter().map(|&h| curve(h)).collect() };
-    let areas: Vec<f64> = crate::boolean::par_map(cycles.len(), &|i| cycles[i].iter().map(|&h| curve(h).area_term()).sum());
+    let areas: Vec<f64> = crate::boolean::par_map(cycles.len(), &|i| cycles[i].iter().map(|&h| curve(h).area_term()).sum())?;
     // Connected components (a hole is never inside a cycle of its own component).
     let mut comp: Vec<usize> = (0..pts.len()).collect();
     fn find(c: &mut [usize], mut i: usize) -> usize {
@@ -106,7 +106,7 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
             regions.push(Region { outer: loop_of(c), holes: Vec::new(), inside: DVec2::ZERO, dangling: false });
         }
     }
-    let cycle_curves: Vec<Vec<C2>> = crate::boolean::par_map(cycles.len(), &|i| curves_of(&cycles[i]));
+    let cycle_curves: Vec<Vec<C2>> = crate::boolean::par_map(cycles.len(), &|i| curves_of(&cycles[i]))?;
     // Each cycle's box (its curves' control points'; None where one has none): a point outside isn't inside.
     let cycle_box: Vec<Option<(DVec2, DVec2)>> = cycle_curves
         .iter()
@@ -164,7 +164,7 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         }
         (dangling, None)
     };
-    let found = crate::boolean::par_map(regions.len(), &inside_of);
+    let found = crate::boolean::par_map(regions.len(), &inside_of)?;
     for (r, (dangling, inside)) in regions.iter_mut().zip(found) {
         r.dangling = dangling;
         let Some(inside) = inside else { return Err(Decline("no point inside a face piece")) };

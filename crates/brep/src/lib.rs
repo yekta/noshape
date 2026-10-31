@@ -28,6 +28,32 @@ pub mod pattern;
 pub mod mesh;
 
 pub use boolean::{boolean, boolean_touching, boolean_with, Op};
+
+std::thread_local!(static CANCEL: std::cell::Cell<usize> = const { std::cell::Cell::new(0) });
+
+/// This thread's cancel flag (the address of an `AtomicBool`, 0 none; the kernel's `with_cancel` sets it): once
+/// set, a running Boolean stops at its next check and declines "cancelled" (a stale regeneration's worker is free
+/// within ~100 ms). The Boolean's worker threads take their caller's.
+pub fn set_thread_cancel(flag: usize) {
+    CANCEL.with(|c| c.set(flag));
+}
+
+/// This thread's cancel flag's address (0 none).
+pub fn thread_cancel() -> usize {
+    CANCEL.with(|c| c.get())
+}
+
+/// Whether this thread's cancel flag is set.
+pub fn cancelled() -> bool {
+    let f = thread_cancel();
+    // SAFETY: the flag outlives every Boolean run under it (`with_cancel` holds it for the call).
+    f != 0 && unsafe { &*(f as *const std::sync::atomic::AtomicBool) }.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Declines "cancelled" once this thread's cancel flag is set.
+pub(crate) fn check_cancel() -> Result<(), Decline> {
+    if cancelled() { Err(Decline("cancelled")) } else { Ok(()) }
+}
 use glam::DVec3;
 
 /// Distances in (tol, GREY × tol] are ambiguous: the Boolean declines. (50 until 10-29; 10 took 9 more of the

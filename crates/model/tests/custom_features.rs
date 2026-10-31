@@ -2061,3 +2061,123 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
         assert!((v - live_v).abs() < tol * live_v, "knurl {kind}: {v} mm³, live {live_v}");
     }
 }
+
+/// How long a cancelled regeneration keeps its worker: the B94.6 knurl at 45° / 45° (the user's long one),
+/// aborted after each of NOSHAPE_CANCEL_AT (seconds, default "0.5,1,2,4,8"); prints the time from the abort to
+/// the regeneration's return.
+#[test]
+#[ignore = "T2 tool: cancel latency on the 45 / 45 knurl"]
+fn knurl_cancel_latency_probe() {
+    const CYLINDER: &str = r#"
+annotation { "Feature Type Name" : "Test cylinder" }
+export const testCylinder = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 50) * millimeter, "radius" : 25 * millimeter });
+    });
+"#;
+    let src = format!("{}\n{CYLINDER}", include_str!("fs/knurl_b94.fs"));
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    ps.features.push(ps.new_feature(&fx.ty("testCylinder"), &fx.units).unwrap());
+    let mut reg = Regenerator::new();
+    let r = reg.regenerate(&ps, &ConfigValues::default(), &fx.units, &fx.opts());
+    assert_ok(&r);
+    let body = &r.context.bodies[0];
+    let circles: Vec<Reference> = (0..body.edges.len())
+        .filter(|&i| body.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).ok().and_then(|e| e.edge_info().ok()).is_some_and(|info| matches!(info.curve, noshape_kernel::Curve::Circle { .. })))
+        .map(|i| Reference::Edge((*body.edges[i]).clone()))
+        .collect();
+    let mut f = ps.new_feature(&fx.ty("myFeature"), &fx.units).unwrap();
+    f.params.set("edges", ParamValue::Query(circles));
+    f.params.set("knurlType", ParamValue::Enum(std::env::var("KNURL").unwrap_or("DIAMOND".into())));
+    f.params.set("knurlFace", ParamValue::Enum("OUTER".into()));
+    f.params.set("pitchType", ParamValue::Enum("CIRCULAR".into()));
+    f.params.set("circularPitch", ParamValue::Enum("CP12".into()));
+    f.params.set("toothAngle", expr("45 deg"));
+    f.params.set("toothHelixAngle", expr("45 deg"));
+    f.params.set("grooveDepthPercent", expr("100"));
+    f.params.set("targets", ParamValue::Query(vec![Reference::Body(body.id.clone())]));
+    ps.features.push(f);
+    let at: Vec<f64> = std::env::var("NOSHAPE_CANCEL_AT").unwrap_or("0.5,1,2,4,8".into()).split(',').filter_map(|x| x.trim().parse().ok()).collect();
+    for t in at {
+        let cancel = noshape_model::regen::RegenCancel::default();
+        let mut opts = fx.opts();
+        opts.cancel = Some(cancel.clone());
+        let mut reg2 = Regenerator::new();
+        let start = std::time::Instant::now();
+        let (latency, cancelled) = std::thread::scope(|s| {
+            let h = s.spawn(|| {
+                let r = reg2.regenerate(&ps, &ConfigValues::default(), &fx.units, &opts);
+                (std::time::Instant::now(), r.cancelled)
+            });
+            std::thread::sleep(std::time::Duration::from_secs_f64(t));
+            let aborted_at = std::time::Instant::now();
+            cancel.abort();
+            let (done, cancelled) = h.join().unwrap();
+            (done.saturating_duration_since(aborted_at), cancelled)
+        });
+        eprintln!("cancel at {t:.2} s: stopped {:.0} ms later (cancelled {cancelled}, total {:.2} s)", latency.as_secs_f64() * 1e3, start.elapsed().as_secs_f64());
+    }
+}
+
+/// A cancelled regeneration (the user's cancel, or a newer edit) stops a custom feature that runs long: the
+/// interpreter and the feature's kernel calls see the cancel on the FeatureScript thread (the kernel's flag is
+/// per thread; before, only the 60 s deadline stopped them). The run returns cancelled soon after the abort, and the
+/// studio as it was before the edit regenerates as before.
+#[test]
+fn a_cancelled_custom_feature_stops_soon_and_the_studio_is_as_before() {
+    const SRC: &str = r#"
+annotation { "Feature Type Name" : "Test cylinder" }
+export const testCylinder = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 10) * millimeter, "radius" : 5 * millimeter });
+    });
+
+annotation { "Feature Type Name" : "Spin" }
+export const spin = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCylinder(context, id + "c", { "bottomCenter" : vector(20, 0, 0) * millimeter, "topCenter" : vector(20, 0, 10) * millimeter, "radius" : 5 * millimeter });
+        var n = 0;
+        while (true)
+        {
+            n += 1;
+        }
+    });
+"#;
+    use std::time::{Duration, Instant};
+    let fx = Fixture::new(&studio(SRC));
+    let mut ps = PartStudio::new();
+    ps.features.push(ps.new_feature(&fx.ty("testCylinder"), &fx.units).unwrap());
+    let mut reg = Regenerator::new();
+    let before = fx.regen(&mut reg, &ps);
+    assert_ok(&before);
+    let v0 = before.context.bodies[0].shape.volume().unwrap();
+    // The edit: a feature that never ends.
+    let mut edited = ps.clone();
+    edited.features.push(edited.new_feature(&fx.ty("spin"), &fx.units).unwrap());
+    let cancel = noshape_model::regen::RegenCancel::default();
+    let mut opts = fx.opts();
+    opts.cancel = Some(cancel.clone());
+    let (latency, r) = std::thread::scope(|s| {
+        let reg = &mut reg;
+        let run = s.spawn(|| {
+            let r = reg.regenerate(&edited, &ConfigValues::default(), &fx.units, &opts);
+            (Instant::now(), r)
+        });
+        std::thread::sleep(Duration::from_millis(300));
+        let at = Instant::now();
+        cancel.abort();
+        let (end, r) = run.join().unwrap();
+        (end.saturating_duration_since(at), r)
+    });
+    assert!(r.cancelled && r.display.features.is_empty() && r.context.bodies.is_empty());
+    // (~1 ms here; a generous bound for loaded CI machines. Timed: custom_features::knurl_cancel_latency_probe.)
+    assert!(latency < Duration::from_secs(2), "stopped {latency:?} after the abort");
+    let after = fx.regen(&mut reg, &ps);
+    assert_ok(&after);
+    assert_eq!(after.context.bodies.len(), 1);
+    assert!((after.context.bodies[0].shape.volume().unwrap() - v0).abs() < 1e-15);
+}
