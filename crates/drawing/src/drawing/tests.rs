@@ -1118,6 +1118,13 @@ fn grouped_ordinate_dimensions() {
     let jogged = after.geometry.lines.iter().filter(|l| l.pick == pick && l.points.len() == 4).count();
     let jogged_before = built.geometry.lines.iter().filter(|l| l.pick == pick && l.points.len() == 4).count();
     assert_eq!(jogged, jogged_before + 1);
+    // Dragged onto its neighbour, it pushes the neighbour on (live 1603).
+    let mut pos = vec![0.0, 10.0, 20.0];
+    sheet::ordinate_push_apart(&mut pos, &[0.0, 8.0, 0.0], 5.0);
+    assert_eq!(pos, vec![0.0, 10.0, 20.0]);
+    let mut pos = vec![0.0, 18.0, 20.0];
+    sheet::ordinate_push_apart(&mut pos, &[0.0, 8.0, 0.0], 5.0);
+    assert_eq!(pos, vec![0.0, 18.0, 23.0]);
 }
 
 #[test]

@@ -2017,7 +2017,13 @@ impl SheetGeometry {
                     let mean = sheet_pts.iter().map(|p| dot(*p, n)).sum::<f64>() / sheet_pts.len() as f64;
                     let sg = if level >= mean { 1.0 } else { -1.0 };
                     let along: Vec<f64> = sheet_pts.iter().map(|p| dot(*p, u)).collect();
-                    let text_pos = ordinate_text_positions(&along, dh + 1.5);
+                    let mut text_pos = ordinate_text_positions(&along, dh + 1.5);
+                    // A value dragged sideways pushes on the ones it reaches,
+                    // which jog away too (live request 1603).
+                    for (t, s) in text_pos.iter_mut().zip(shifts.iter()) {
+                        *t += s;
+                    }
+                    ordinate_push_apart(&mut text_pos, shifts, dh + 1.5);
                     let mut ang = n[1].atan2(n[0]);
                     let mut halign = if sg > 0.0 { 0.0 } else { 1.0 };
                     if ang > std::f64::consts::FRAC_PI_2 + 1e-9 || ang < -std::f64::consts::FRAC_PI_2 - 1e-9 {
@@ -2027,7 +2033,7 @@ impl SheetGeometry {
                     for (i, p) in points.iter().enumerate() {
                         let value = if *horizontal { (p[0] - origin[0]).abs() } else { (p[1] - origin[1]).abs() };
                         let t = env.text(a, value, false, "");
-                        let (s0, s1) = (along[i], text_pos[i] + shifts.get(i).copied().unwrap_or(0.0));
+                        let (s0, s1) = (along[i], text_pos[i]);
                         let l0 = dot(sheet_pts[i], n) + sg * 1.0;
                         let pts = if (s1 - s0).abs() < 1e-6 {
                             vec![at(s0, l0), at(s0, level)]
@@ -2935,6 +2941,34 @@ fn crossing(a: [[f64; 2]; 2], b: [[f64; 2]; 2]) -> Option<[f64; 2]> {
 
 /// Text positions (along the measured axis) of ordinate values at `along`,
 /// at least `gap` apart: overlapping runs are spread around their mean.
+/// Ordinate values pushed apart from the ones dragged sideways (`shifts`
+/// non-zero): going outward from each, a value closer than `gap` to the
+/// previous one moves on to `gap` (live request 1603: the neighbour a dragged
+/// value would cover is jogged away).
+pub fn ordinate_push_apart(pos: &mut [f64], shifts: &[f64], gap: f64) {
+    let mut order: Vec<usize> = (0..pos.len()).collect();
+    order.sort_by(|a, b| pos[*a].total_cmp(&pos[*b]));
+    for k in 0..order.len() {
+        if shifts.get(order[k]).is_none_or(|s| s.abs() < 1e-9) {
+            continue;
+        }
+        let mut last = pos[order[k]];
+        for &j in &order[k + 1..] {
+            if pos[j] - last < gap {
+                pos[j] = last + gap;
+            }
+            last = pos[j];
+        }
+        let mut last = pos[order[k]];
+        for &j in order[..k].iter().rev() {
+            if last - pos[j] < gap {
+                pos[j] = last - gap;
+            }
+            last = pos[j];
+        }
+    }
+}
+
 pub fn ordinate_text_positions(along: &[f64], gap: f64) -> Vec<f64> {
     let mut order: Vec<usize> = (0..along.len()).collect();
     order.sort_by(|a, b| along[*a].total_cmp(&along[*b]));

@@ -364,10 +364,14 @@ impl SheetPick<'_> {
             return None;
         }
         let along: Vec<f64> = points.iter().map(|p| dot(pl.to_sheet(*p), u)).collect();
-        let at = noshape_model::drawing::sheet::ordinate_text_positions(&along, dh + 1.5);
+        let mut at = noshape_model::drawing::sheet::ordinate_text_positions(&along, dh + 1.5);
+        for (t, sh) in at.iter_mut().zip(shifts.iter()) {
+            *t += sh;
+        }
+        noshape_model::drawing::sheet::ordinate_push_apart(&mut at, shifts, dh + 1.5);
         at.iter()
             .enumerate()
-            .map(|(i, t)| (i, (t + shifts.get(i).copied().unwrap_or(0.0) - dot(s, u)).abs()))
+            .map(|(i, t)| (i, (t - dot(s, u)).abs()))
             .filter(|(_, d)| *d < dh)
             .min_by(|a, b| a.1.total_cmp(&b.1))
             .map(|(i, _)| (i, u))
