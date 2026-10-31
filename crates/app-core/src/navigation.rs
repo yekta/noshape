@@ -1372,6 +1372,27 @@ mod tests {
         assert!(!early.below_threshold());
     }
 
+    /// Arrow-key steps (`animateRotation`) turn linearly over 250 ms; the
+    /// other view animations (`animateTo`) ease with smootherstep.
+    #[test]
+    fn step_rotation_is_linear_and_view_animations_smootherstep() {
+        let mut c = Camera::default();
+        let start = c.rotation;
+        let mut s = StepRotation::new(DVec3::Z, 15f64.to_radians(), c.target);
+        assert!(s.advance(&mut c, Duration::from_millis(125)));
+        assert!((s.applied - 7.5f64.to_radians()).abs() < 1e-12, "half the time, half the angle");
+        assert!(s.advance(&mut c, Duration::from_millis(62)));
+        assert!((s.applied - 15f64.to_radians() * 187.0 / 250.0).abs() < 1e-12);
+        assert!(!s.advance(&mut c, Duration::from_millis(100)), "done at 250 ms");
+        assert!((s.applied - 15f64.to_radians()).abs() < 1e-12);
+        assert!((start.angle_between(c.rotation) - 15f64.to_radians()).abs() < 1e-9);
+        // Smootherstep: 6t^5 - 15t^4 + 10t^3, flat at both ends.
+        assert_eq!((ease(0.0), ease(0.5), ease(1.0)), (0.0, 0.5, 1.0));
+        assert!((ease(0.25) - 0.103515625).abs() < 1e-15);
+        assert!(ease(1e-3) < 1e-8 && 1.0 - ease(1.0 - 1e-3) < 1e-8);
+        assert_eq!((CAMERA_SHORT_ANIMATION.as_millis(), CAMERA_LONG_ANIMATION.as_millis()), (250, 500));
+    }
+
     #[test]
     fn detail_step_count_follows_decrease() {
         let mut d = DetailSettings::default();

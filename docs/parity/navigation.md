@@ -113,7 +113,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 2.6 | Windows precision touchpad: two-finger scroll zooms (100 px = one notch, ×3) | Chrome DirectManipulation wheel | ✅ 10-24: wheelDelta = whole DIP pixels ×3 (Chromium DirectManipulation handler; vendor/gpui-pre-windows now truncates like it); U. Touchpads can't be injected on Windows (InjectSyntheticPointerInput: PT_TOUCH/PT_PEN only) | needs platform (touchpad / touch / macOS / Windows; skipped on Linux Xvfb) |
 | 2.7 | Touchpad pinch (macOS, Windows precision touchpad, Wayland) zooms one wheel notch per pinch update about the pointer, whatever the step size: Chrome hands each update to Onshape as a Ctrl+`mousewheel` of ±120; on X11 Chrome has no touchpad pinch | `touchpad_pinch_event_queue.cc`, `zoomOnMouseWheelScroll`; live nav2 (2) | ✅ fixed 10-24: one wheel notch per pinch update (×1.06, ×1.19 on Windows), not the finger ratio. L: synthesizePinchGesture ×2 → 5 Ctrl+wheel events of ±120 → 2^(−5/12); R Wayland: 40 updates = 40 notches; X11: none (Chromium has no X11 touchpad pinch); U `pinch_updates_zoom_one_notch_each`. Also fixed: gpui delivered every Wayland pinch update twice | needs platform (touchpad / touch / macOS / Windows; skipped on Linux Xvfb) |
 | 2.8 | Linux touchpads: two-finger scroll zooms (X11 smooth scroll in notches, Wayland pixels at 45 px per notch), pinch as 2.7 | Chrome on Linux | ✅ R: Wayland finger scroll −12 × axis value, X11 120 × valuator / increment, matching the protocol log event for event | needs platform (touchpad / touch / macOS / Windows; skipped on Linux Xvfb) |
-| 2.9 | macOS one-finger Ctrl+click: a click opens the context menu, a drag does nothing (Chrome reports a left button with Ctrl, which never navigates) | Chrome on macOS | 🔧 (vendor/gpui-pre-macos marks the converted press) |  |
+| 2.9 | macOS one-finger Ctrl+click: a click opens the context menu, a drag does nothing (Chrome reports a left button with Ctrl, which never navigates) | Chrome on macOS | 🔧 (vendor/gpui-pre-macos marks the converted press); macOS only, can't be run on the Linux boxes here: needs a check on a Mac |  |
 
 ## 3. Keyboard
 
@@ -121,13 +121,13 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 |---|---|---|---|---|
 | 3.1 | Arrow keys rotate 15° about the camera's up (←/→) or right (↑/↓) axis through the camera target; ← from Front brings the Right face in, ↑ the Bottom (= dragging that way) | help; `rotateInDirection`; live navigation/75–80 | ✅ R: ← turns exactly 15.000°, ↑ 15.000° (Wayland and X11); live navigation/75–80 directions, qa4 in-app | 0.4.10+ / 2a6d0167 10-27 |
 | 3.2 | Shift+arrows 90°, Ctrl+arrows 5° | help | ✅ angles / 🔧 axes | 0.4.10+ / fa61ba6f 10-27 |
-| 3.3 | Each step animates linearly over 250 ms | `animateRotation`, `CAMERA_SHORT_ANIMATION_TIME_MS` | 🔧 (was 500 ms, eased) |  |
+| 3.3 | Each step animates linearly over 250 ms | `animateRotation`, `CAMERA_SHORT_ANIMATION_TIME_MS` | ✅ linear over 250 ms (`StepRotation::advance`; was 500 ms, eased) | skasm 10-31 (T app-core navigation `step_rotation_is_linear_and_view_animations_smootherstep`; qa 10-29: an arrow step ends 267 ms after the first change) |
 | 3.4 | Holding an arrow rotates continuously: every key repeat starts another step that runs alongside the earlier ones (they add up) | help; `setAllowRepeat` for ROTATE_*, `startAnimation`; live navigation/910–921: a 1 s hold (X repeat 660 ms / 25 Hz, 11 keydowns) turns 165° | ✅ nav 10-19: a 1 s held ← turns 165°, as live navigation/910–921 | 8627322e 10-28 (wf-block: one Left press turns the view one step (cube ~15°); Left held 1.5 s keeps turning (several steps, Right face now in front); step overlap not measured) |
 | 3.5 | Ctrl+Shift+arrows pan: the model moves 150 px toward the arrow (measured at the scene centre), 250 ms smootherstep; ignored while the camera animates | help; `animatePan`, `animateTo` | ✅ R: Ctrl+Shift+→ moves the model exactly 150 px, no rotation | 0.4.10+ / 2a6d0167 10-27 |
 | 3.6 | Z zooms out ×1.75, Shift+Z in ×1.75, about the view centre, 250 ms, clamped to the zoom limits | help; `animateZoom`, `adjustCameraToValidZoom` | ✅ R: Z ×1.75 out, Shift+Z ×1/1.75 in (world per pixel, exact) | 0.4.10+ / 2a6d0167 10-27 |
 | 3.7 | All of 3.1–3.6 work in Assemblies too | `getIsInPartStudio() \|\| getIsInAssembly()` | ✅ (was: Assembly had none) | f42c3330 10-29 (qa, asm5 Assembly 1: Shift+Right turns the view 90°, Ctrl+Right a small step; tickets/asm-nav-arrows-f42c.png) |
 | 3.8 | Up/Down with the rollback bar selected move the bar instead | `handleRotateUp` | ✅ (FeatureList context) | 0.4.10+ / fa61ba6f 10-27 |
-| 3.9 | View animations (standard views, fit, N) use Onshape's smootherstep easing | `animateTo` | 🔧 (was smoothstep) |  |
+| 3.9 | View animations (standard views, fit, N) use Onshape's smootherstep easing | `animateTo` | ✅ smootherstep 6t⁵ − 15t⁴ + 10t³ (`nav::ease`, every `animate_to`) | skasm 10-31 (T `step_rotation_is_linear_and_view_animations_smootherstep`) |
 
 ## 4. View cube
 
@@ -163,7 +163,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 6.5 | Z zooms out ×½, Shift+Z in ×2, about the view centre | live navigation/50–51 | ✅ (was ×0.8/×1.25) | 2bd06bb3 10-29 (qa, boltdwg drawing: Z ×½ and Shift+Z ×2 about the view centre; tickets/dwg-nav-2bd0.png) |
 | 6.6 | Ctrl+Shift+arrows move the sheet 10 % of the canvas width toward the arrow | live navigation/54–55 | ✅ (was missing) | 2bd06bb3 10-29 (qa, boltdwg drawing: Ctrl+Shift+Right moves the sheet ≈10 % of the canvas width to the right; tickets/dwg-nav-2bd0.png) |
 | 6.7 | Double middle click and F zoom to fit the sheet | live navigation/45–46, 56 | ✅ (double middle was missing) | 2bd06bb3 10-29 (qa, boltdwg drawing: double middle click fits the sheet again; tickets/dwg-nav-2bd0.png) |
-| 6.8 | Left-drag on empty sheet: box select | live navigation/44 | 🔧 dx 10-28 (after qa DRAWING-BOX-SELECT): the window box (#1651B0 20 % / 60 %) and what it wholly encloses selected, Shift adds (`Drag::SelectBox`, `select_in_box`); to verify on green | 867a7720 10-28 (wf-block drawing: drag from empty sheet → window box #1651B0 20 % fill, the enclosed view selected) |
+| 6.8 | Left-drag on empty sheet: box select | live navigation/44 | 🔧 dx 10-28 (after qa DRAWING-BOX-SELECT): the window box (#1651B0 20 % / 60 %) and what it wholly encloses selected, Shift adds (`Drag::SelectBox`, `select_in_box`); ✅ verified | 867a7720 10-28 (wf-block drawing: drag from empty sheet → window box #1651B0 20 % fill, the enclosed view selected) |
 
 ## 7. Touchscreen (iOS, Android and browser table)
 
@@ -185,7 +185,7 @@ Wayland (`wl_touch`). Gestures are `touch.rs` (Onshape's recognizers).
 | 7.8 | Taps: lifted within 200 ms; reported 200 ms after the last (double tap); fingers overlapping in time are one multi-finger tap | tap recognizer | ✅ fixed 10-24: a tap is reported 200 ms after the lift even while the long-press timer runs (it waited 750 ms after the touch); R | needs platform (touchpad / touch / macOS / Windows; skipped on Linux Xvfb) |
 | 7.9 | Touches on overlays above the graphics area (view cube, dialogs) stay normal taps | — | ✅ R: a tap on the view cube turns the view to a standard view; the viewport recognizer sees nothing | needs platform (touchpad / touch / macOS / Windows; skipped on Linux Xvfb) |
 | 7.10 | Pen acts as a finger unless "Use pen input as mouse" | Preferences | ✅ 10-25: Onshape sends `pointerType` "pen" to its touch recognizers unless "Use pen input as mouse" (`handlesEvent`). Windows (WM_POINTER PT_PEN), macOS (tablet-point mouse events), X11 (stylus devices: an "Abs Pressure" valuator) and Wayland (`zwp_tablet_v2`, new) now deliver pen contacts as touches; hovering moves the mouse. R: a pen drag of 200 px turns 190 px at 2 turns/diagonal, a pen tap is a one-finger tap, hovering moves nothing (Wayland and X11) | needs platform (touchpad / touch / macOS / Windows; skipped on Linux Xvfb) |
-| 7.11 | Trimetric / plane views from the view cube menu, 3D Rotate Lock | help (mobile apps) | ❌ mobile apps only |  |
+| 7.11 | Trimetric / plane views from the view cube menu, 3D Rotate Lock | help (mobile apps) | n/a: mobile apps only (live's desktop client has no such menu) |  |
 
 ## Re-check of the 🔧 rows (qa4, 2026-10-23 23:30–00:30, app /root/qa4-scratch/bin/noshape-a0e = main a0e360a3, Xvfb 1600×1000, demo plate; screenshots /tmp/qa4/cw)
 Method: xdotool input on X11, model extents measured from pixels (front face colour).
