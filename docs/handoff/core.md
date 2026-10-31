@@ -753,7 +753,8 @@ with 0003b and 0004 on Linux, macOS and Windows.
    common.cpp `handed_out` + T1 `kernel_core::edges_run_their_curves_way`): the two drawing e2e flows pass now, but
    land failed on sheet metal (skasm's): model features_c::counterbore_head_shows_in_flat, form_adds_and_cuts_and_
    shows_in_flat ("form direction vs the flat's viewing side") and ops e2e::sheet_metal_table_ops (Flange 2
-   "Collision in sheet metal model."): that code reads the stored edge orientation. Not landed; with skasm next.
+   "Collision in sheet metal model."): that code reads the stored edge orientation. Landed by skasm 10-31 evening
+   together with the sheet metal fixes (see skasm.md "Forward-oriented edges").
 6. dx's I1 done 10-30 (d475d490), in io.cpp (dx's file; the integrator was right): the STEP file has no pcurves and
    OCCT's projection drifts next to a B-spline patch's pole (v = 0.9958 instead of 1, edge tolerance 0.0043), so the
    blend lost a sliver. `fix_pole_pcurves` in read_step / read_step_tree re-projects the edges meeting a degenerate

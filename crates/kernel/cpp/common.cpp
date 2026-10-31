@@ -669,12 +669,22 @@ uint32_t sub_count(const OcShape& s, uint8_t kind)
   return static_cast<uint32_t>(s.map(to_kind(kind)).Extent());
 }
 
+// A sub-shape as handed out: an edge FORWARD, so its start and end, its
+// parameters, tangents and curve all run the curve's way (Parasolid's
+// edge direction, live "fs (10-26 b)"); stored as the first face using it
+// happened to orient it, a reversed edge gave start = curve(last). Other
+// kinds as stored.
+static TopoDS_Shape handed_out(const TopoDS_Shape& x)
+{
+  return x.ShapeType() == TopAbs_EDGE ? x.Oriented(TopAbs_FORWARD) : x;
+}
+
 std::unique_ptr<OcShape> sub_shape(const OcShape& s, uint8_t kind, uint32_t index)
 {
   const ShapeIMap& m = s.map(to_kind(kind));
   if (index >= static_cast<uint32_t>(m.Extent()))
     fail_invalid("sub-shape index out of range");
-  return wrap(m(static_cast<int>(index) + 1));
+  return wrap(handed_out(m(static_cast<int>(index) + 1)));
 }
 
 std::unique_ptr<OcShapeList> sub_shapes(const OcShape& s, uint8_t kind)
@@ -683,7 +693,7 @@ std::unique_ptr<OcShapeList> sub_shapes(const OcShape& s, uint8_t kind)
   auto             l = std::make_unique<OcShapeList>();
   l->items.reserve(m.Extent());
   for (int i = 1; i <= m.Extent(); ++i)
-    l->items.push_back(m(i));
+    l->items.push_back(handed_out(m(i)));
   return l;
 }
 

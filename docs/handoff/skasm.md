@@ -192,8 +192,16 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   solve, connectivity and the same-group error; a group goes with its pattern when nothing else is left in it.
   assembly_group takes a copy the same way. LA55's Near connector confirmed by live 1639.
 - The never-checked rows the lead listed at 18:50 were already settled by the 10-31 (4) pass (counts from before it).
-- Next: core's forward-oriented edges (below, "From core"): find what the three sheet metal tests read from the
-  stored edge orientation, then land with core's patch.
+- **Forward-oriented edges landed with core's patch** (kernel common.cpp `handed_out`: every edge FORWARD). What sheet
+  metal read from the stored orientation, now explicit: (1) `wall_loop` chained a wall's outer loop from its edges' start
+  / end, so it ran the face's way only while edges came stored that way: now turned counter-clockwise about the face
+  normal (the plate's flat face, so the counterbore head's sections, sat on the wrong side); (2) the host's
+  evEdgeTangentLines with a `face`: parameter 0 is the end the edge starts from running round that face (Parasolid's
+  coedge; std's getOrderedEdgeVertices pairs vertices with it), decided once at mid-edge; before, only the tangent
+  flipped (Flange 2 on the adjacent edge collided: its wall ran past the first flange); (3) flat bend lines run as
+  their edge runs round wall a (live's DXF), not the edge's stored way; (4) a form's up / down from its added tools'
+  reach (the cut + added reaches tie on a symmetric form, so rounding decided). T1 features_c / e2e sheet metal and all
+  36 T2 sheetmetal_std pass with the patch and without it.
 
 ## 10-31 evening (after the never-checked rows)
 - **Landed:** e7562f23 SKETCH-DEGENERATE-SOLVE (a fillet R6 → R20 that shrinks the next line to a point solves as live:
@@ -503,7 +511,7 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   35 s; scene edit → `cargo test -p noshape-scene --lib` 92 s (first after a sketch change). Clippy of model-core +
   model after an edit 53 s. T0 after a sketch/scene edit 830 s total chain (incl. the tests above).
 
-## From core (10-31 18:10): forward-oriented edges and sheet metal
+## From core (10-31 18:10): forward-oriented edges and sheet metal (done 10-31 evening, above)
 - core tried handing every edge out FORWARD (kernel common.cpp; /root/core-scratch/forward-edges-1031.patch: an
   edge's start / end then always match its parameters, tangents and curve, Parasolid's direction). Everything passed
   but three sheet metal tests, which read the stored edge orientation: model features_c::

@@ -512,3 +512,24 @@ fn step_blends_closing_to_a_point_keep_their_area() {
     let v = s.volume().unwrap();
     assert!((v - 7582.977).abs() < 2e-3, "{v}");
 }
+
+/// Every edge is handed out FORWARD (Parasolid's edge direction, live "fs (10-26 b)"): its start and end are its
+/// curve at its first and last parameters, whichever way the first face using it ran (a box's and a filleted
+/// cylinder's edges; stored reversed, `start` was the curve's end while the parameters and tangents were not).
+#[test]
+fn edges_run_their_curves_way() {
+    let b = make_box_corners(DVec3::ZERO, DVec3::new(0.04, 0.02, 0.01)).unwrap();
+    let c = make_cylinder(&Plane::xy(), 0.01, 0.02, std::f64::consts::TAU).unwrap();
+    let rims: Vec<Shape> = c.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, Curve::Circle { .. }))).collect();
+    let f = fillet(&c, &rims[..1], 0.002).unwrap().shape;
+    for s in [b, f] {
+        for (i, e) in s.edges().iter().enumerate() {
+            let info = e.edge_info().unwrap();
+            if info.degenerated {
+                continue;
+            }
+            let (p0, p1) = (e.point_at(info.first_param).unwrap(), e.point_at(info.last_param).unwrap());
+            assert!((p0 - info.start).length() < 1e-9 && (p1 - info.end).length() < 1e-9, "edge {i}: {:?} .. {:?} vs {p0:?} .. {p1:?}", info.start, info.end);
+        }
+    }
+}

@@ -417,6 +417,17 @@ fn wall_loop(face: &Shape, topo: &Topo) -> FResult<Loop> {
         curved.push(c);
         at = next;
     }
+    // Counter-clockwise about the face's outward normal, as the face's own
+    // loop runs (the edges come out each its curve's way, so the chain can
+    // start backwards).
+    let (_, n) = face_normal(face)?;
+    let m = pts.len();
+    let turn: DVec3 = (0..m).map(|k| pts[k].cross(pts[(k + 1) % m])).sum();
+    if turn.dot(n) < 0.0 {
+        pts[1..].reverse();
+        side.reverse();
+        curved.reverse();
+    }
     Ok(Loop { pts, side, curved })
 }
 
@@ -1788,6 +1799,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 if !adds.is_empty() {
                     part = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&part), &adds, &k::BooleanOptions::default()).map_err(|e| fe(format!("The form failed: {e}")))?.shape;
                 }
+                let n_removes = removes.len();
                 let tools: Vec<Shape> = removes.into_iter().chain(adds).collect();
                 pieces.extend(tools.iter().flat_map(|t| t.faces()).map(|face| Piece { face, from: Def::Face(ft.face) }));
                 if ft.cut {
@@ -1795,7 +1807,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 } else {
                     let sketches: Vec<_> = ft.sketches.iter().filter_map(|f| ev.ctx.sketches.iter().find(|s| s.feature == *f)).collect();
                     let sketch = FormSketch { curves: sketches.iter().flat_map(|s| sketch_curves(s)).collect(), origin: sketches.first().map(|s| s.frame.origin) };
-                    form_shapes.push((ft.face, tools, sketch));
+                    form_shapes.push((ft.face, tools, sketch, n_removes));
                 }
             }
             // The definition body's own topology order (references are by index).
@@ -2200,8 +2212,9 @@ fn wall_faces(topo: &Topo, fi: usize, part_faces: &[Shape], named: &[(usize, cra
 /// definition plane at z = 0, seen from +z; dom/qa5-sm-flat.dxf): walls and
 /// bend strips unfolded, bend lines on the strips' centres, up when the bend
 /// rises toward the viewer.
-/// A form on wall `.0`: its tools, and its flat sketch.
-type FormShapes = (usize, Vec<Shape>, FormSketch);
+/// A form on wall `.0`: its tools (the first `.3` cut, the rest added),
+/// and its flat sketch.
+type FormShapes = (usize, Vec<Shape>, FormSketch, usize);
 
 /// A form's flat sketch in model space (live 1623): its curves (`true` a
 /// tear: the sketch's own geometry; else an outline: its construction
@@ -2264,10 +2277,11 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
     }
     // Forms: their footprint fills the flat, outlined with a center mark (as the native route).
     let mut flat_forms = Vec::new();
-    for (fi, tools, sketched) in forms {
+    for (fi, tools, sketched, n_removes) in forms {
         let (Some(m), Some((_, wall))) = (unfolded.walls.get(fi), wall_flats.iter().find(|w| w.0 == *fi)) else { continue };
         let Ok(Some(plane)) = wall.face_plane() else { continue };
         let (o, n, x) = (plane.origin, plane.normal.normalize(), plane.x_dir);
+        let tools_in = tools;
         let tools = if tools.len() == 1 { tools[0].clone() } else { Shape::compound(tools) };
         let to_plane = |p: DVec3| p - n * (p - o).dot(n);
         let extent = |l: &Vec<DVec3>| {
@@ -2319,8 +2333,11 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
         // Up: the tools stand out of the wall toward the flat's viewer (+z).
         // The side they reach furthest past the sheet ([-back, front] along
         // n): a form's cut tool runs through the sheet, its added material
-        // stands out on one side.
-        let side = tools
+        // stands out on one side, so that decides when there is any (a cut
+        // reaching as far the other way left it to rounding).
+        let added = &tools_in[(*n_removes).min(tools_in.len())..];
+        let reach = if added.is_empty() { tools.clone() } else if added.len() == 1 { added[0].clone() } else { Shape::compound(added) };
+        let side = reach
             .bounding_box(false)
             .map(|b| {
                 let ds: Vec<f64> = (0..8).map(|i| DVec3::new([b.min.x, b.max.x][i & 1], [b.min.y, b.max.y][(i >> 1) & 1], [b.min.z, b.max.z][(i >> 2) & 1])).map(|c| (c - o).dot(n)).collect();
@@ -2368,9 +2385,12 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
             let p = s.end_cuts.iter().find(|c| c.0 == start).and_then(|c| c.1.get(c.1.len() / 2).copied()).map_or((a[i] + b[i]) * 0.5, at);
             glam::DVec2::new(p.x, p.y)
         };
+        // Running as the bend's edge runs round wall a (wall a on its left
+        // seen against its normal), as live's DXF (dom/qa5-sm-flat.dxf).
+        let (i0, i1) = if s.normal_a.cross(s.a[1] - s.a[0]).dot(s.dir_a) >= 0.0 { (0, 1) } else { (1, 0) };
         lines.push(crate::sheetmetal::FlatBendLine {
-            a: mid(0),
-            b: mid(1),
+            a: mid(i0),
+            b: mid(i1),
             up,
             angle: s.angle,
             radius: s.radius,

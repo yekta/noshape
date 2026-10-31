@@ -172,26 +172,28 @@ fn ev_edge_tangent_lines(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let params: Vec<f64> = field(&a, "parameters").as_array().map(|v| v.iter().filter_map(|x| x.as_number()).collect()).unwrap_or_default();
     let arc = field(&a, "arcLengthParameterization").as_bool().unwrap_or(true);
-    // With a face: directions as the edge runs around that face, the face on
-    // the left of the direction seen against its normal (std flange relies on
-    // it: `cross(direction, face normal)` points out of the wall).
+    // With a face: parameters and directions as the edge runs around that
+    // face (Parasolid's coedge), the face on the left of the direction seen
+    // against its normal (std flange relies on it: `cross(direction, face
+    // normal)` points out of the wall, and parameter 0 is the end its
+    // vertices are ordered by).
     let face_query = field(&a, "face");
     let face: Option<k::Shape> = if face_query.is_undefined() { None } else { with_ents(i, &cx, &face_query, |_, q, ents| Ok(ents.first().and_then(|e| q.shape(e))))? };
     let lines = on_first(i, &cx, &a, "edge", "NO_TANGENT_LINE", |q, e| {
         let s = q.shape(e)?;
         let info = s.edge_info().ok()?;
+        let at = |t: f64| -> Option<(DVec3, DVec3)> {
+            let u = edge_param(&s, &info, t, arc);
+            Some((s.point_at(u).ok()?, s.tangent_at(u).ok()?.normalize_or_zero()))
+        };
+        // The edge runs backwards around the face: from its other end.
+        let backwards = face.as_ref().is_some_and(|f| {
+            at(0.5).is_some_and(|(p, d)| f.normal_at_point(p).is_ok_and(|n| !face_on_left(f, &info, p, n, d)))
+        });
         let mut out = Vec::new();
         for t in &params {
-            let u = edge_param(&s, &info, *t, arc);
-            let p = s.point_at(u).ok()?;
-            let mut d = s.tangent_at(u).ok()?.normalize_or_zero();
-            if let Some(f) = &face
-                && let Ok(n) = f.normal_at_point(p)
-                && !face_on_left(f, &info, p, n, d)
-            {
-                d = -d;
-            }
-            out.push(line_value(p, d));
+            let (p, d) = at(if backwards { 1.0 - *t } else { *t })?;
+            out.push(line_value(p, if backwards { -d } else { d }));
         }
         Some(out)
     })?;
