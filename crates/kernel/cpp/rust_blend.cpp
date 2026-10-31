@@ -83,10 +83,13 @@ occ::handle<Geom_Surface> new_surface(const BrepBody& b, size_t f)
     }
     case 5:
     {
-      if (s[10] < 0)
-        return nullptr;
+      // (A negative radius: a left-handed frame, its axis -(x × y), as OCCT's vertex blends' spheres.)
       const gp_Dir x = dir3(s + 4), y = dir3(s + 7);
-      return new Geom_SphericalSurface(gp_Ax3(o, x.Crossed(y), x), s[10]);
+      if (s[10] >= 0)
+        return new Geom_SphericalSurface(gp_Ax3(o, x.Crossed(y), x), s[10]);
+      gp_Ax3 ax(o, x.Crossed(y).Reversed(), x);
+      ax.YReverse();
+      return new Geom_SphericalSurface(ax, -s[10]);
     }
     default:
       return nullptr;
@@ -136,6 +139,7 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
     gp_Pnt2d p0, p1;   // where the use starts and ends
     occ::handle<Geom2d_Curve> pc; // a new edge's curve on the face (in its own parameter), before shifting
     gp_Vec2d shift;               // the whole periods it moved by
+    bool     degen = false;       // a degenerate edge (a sphere's pole): its curve from its neighbours'
     double   t0, t1;
     uint32_t v0, v1;   // the use's start and end vertices
   };
@@ -154,7 +158,16 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
       c.v1   = o.edges[2 * c.edge + (c.rev ? 0 : 1)];
       const TopoDS_Edge E = TopoDS::Edge(eo[c.edge].Oriented(c.rev ? TopAbs_REVERSED : TopAbs_FORWARD));
       BRep_Tool::Range(eo[c.edge], c.t0, c.t1);
-      if (!made[c.edge])
+      if (made[c.edge] && BRep_Tool::Degenerated(eo[c.edge]))
+      {
+        gp_Pnt2d q;
+        if (!uv_of(a, loc, BRep_Tool::Pnt(TopExp::FirstVertex(eo[c.edge])), q))
+          return "a blend face not elementary";
+        c.degen = true;
+        c.fixed = false;
+        c.p0 = c.p1 = q;
+      }
+      else if (!made[c.edge])
       {
         double f, l2;
         const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(E, fwd, f, l2);
@@ -184,6 +197,11 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
             uv[s].SetCoord(uv[s - 1].X() + du, uv[s - 1].Y() + dv);
           }
         }
+        // (At a sphere's pole any u is the point: the neighbouring sample's.)
+        if (a.GetType() == GeomAbs_Sphere)
+          for (int s2 = 0; s2 <= n; ++s2)
+            if (std::abs(uv[s2].Y()) > M_PI_2 - 1e-9)
+              uv[s2].SetX(uv[s2 == 0 ? 1 : s2 - 1].X());
         gp_Vec2d d((uv[n].X() - uv[0].X()) / (c.t1 - c.t0), (uv[n].Y() - uv[0].Y()) / (c.t1 - c.t0));
         bool iso = std::abs(d.Magnitude() - 1) <= 1e-9;
         // Exactly along u or v when it is to rounding (a frame 1e-15 off its axes left a cone's ruling 1e-14
@@ -250,6 +268,8 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
   // Each loop in its order round (the body's loops may list their uses in any order), the new curves shifted
   // by whole periods onto the end of the one before.
   auto gap = [&](const UseCurve& c, const gp_Pnt2d& at) {
+    if (c.degen)
+      return std::abs(c.p0.Y() - at.Y());
     double du = c.p0.X() - at.X(), dv = c.p0.Y() - at.Y();
     if (!c.fixed)
     {
@@ -268,13 +288,15 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
       ++first;
     if (first == n)
       first = 0;
+    if (lp[first].degen)
+      first = (first + 1) % n;
     std::vector<UseCurve> order{lp[first]};
     order[0].fixed = true;
     std::vector<bool> used(n, false);
     used[first] = true;
     while (order.size() < n)
     {
-      const UseCurve& cur = order.back();
+      UseCurve& cur = order.back();
       size_t best = n;
       double bg   = 0;
       bool   bnew = false;
@@ -284,7 +306,8 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
           continue;
         // Prefer an edge not placed yet (a seam's second use last).
         const bool fresh = std::none_of(order.begin(), order.end(), [&](const UseCurve& x) { return x.edge == lp[k].edge; });
-        const double g   = gap(lp[k], cur.p1);
+        // (After a pole any u: the gap in v.)
+        const double g   = cur.degen ? std::abs(lp[k].p0.Y() - cur.p1.Y()) : gap(lp[k], cur.p1);
         if (best == n || (fresh && !bnew) || (fresh == bnew && g < bg))
         {
           best = k;
@@ -296,16 +319,25 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
         return "a blend face's loop not closed in its parameters";
       UseCurve c = lp[best];
       used[best] = true;
-      if (!c.fixed)
+      if (c.degen)
+        c.p0 = c.p1 = cur.p1;
+      else if (!c.fixed)
       {
-        const gp_Vec2d sh(c.p0, cur.p1);
+        gp_Vec2d sh(c.p0, cur.p1);
+        // After a pole: whole periods along u, as near as may be.
+        if (cur.degen && up > 0)
+          sh.SetX(up * std::round(sh.X() / up));
         c.p0.Translate(sh);
         c.p1.Translate(sh);
         c.shift += sh;
-        c.fixed = true;
       }
+      c.fixed = true;
+      if (cur.degen)
+        cur.p1 = c.p0;
       order.push_back(c);
     }
+    if (order.back().degen && std::abs(order.back().p1.Y() - order.front().p0.Y()) <= 1e-7)
+      order.back().p1 = order.front().p0;
     if (order.back().p1.Distance(order.front().p0) > 1e-7)
     {
       if (std::getenv("NOSHAPE_BLEND_DEBUG"))
@@ -348,6 +380,18 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
         per_edge[c.edge].push_back(&c);
   for (const auto& [e, cs] : per_edge)
   {
+    if (cs[0]->degen)
+    {
+      // Along u at the pole, at unit speed in the edge's own direction (from its use's end back when reversed).
+      const UseCurve& c = *cs[0];
+      gp_Pnt2d a0 = c.rev ? c.p1 : c.p0, a1 = c.rev ? c.p0 : c.p1;
+      const double len = std::abs(a1.X() - a0.X());
+      if (cs.size() != 1 || len < 1e-9 || std::abs(a1.Y() - a0.Y()) > 1e-9)
+        return "a blend face's pole not along u";
+      bb.UpdateEdge(eo[e], new Geom2d_Line(a0, gp_Dir2d(a1.X() > a0.X() ? 1 : -1, 0)), S, loc, tol);
+      bb.Range(eo[e], 0, len);
+      continue;
+    }
     auto curve = [](const UseCurve& c) -> occ::handle<Geom2d_Curve> {
       return occ::down_cast<Geom2d_Curve>(c.pc->Translated(c.shift));
     };
@@ -496,6 +540,16 @@ bool rust_blend(const OcShape& s, const std::vector<TopoDS_Edge>& es, const std:
           d = 2 * M_PI;
         t1 = t0 + d;
       }
+      else if (cv[0] == 2)
+      {
+        // A degenerate edge (a sphere's pole): no curve, its range set with its curve on the face.
+        bb.MakeEdge(e);
+        bb.Degenerated(e, true);
+        bb.Add(e, vs[v0].Oriented(TopAbs_FORWARD));
+        bb.Add(e, vs[v1].Oriented(TopAbs_REVERSED));
+        eo[i] = e;
+        continue;
+      }
       else if (cv[0] == 3)
       {
         const gp_Pnt ctr(cv[1], cv[2], cv[3]);
@@ -632,7 +686,7 @@ bool rust_blend(const OcShape& s, const std::vector<TopoDS_Edge>& es, const std:
           (fs[0] < 0 ? fs[0] : fs[1]) = static_cast<int64_t>(i);
         }
     for (size_t e = 0; e < eo.size(); ++e)
-      if (out.edge_origin[3 * e] != 0 && faces_of[e][0] >= 0 && faces_of[e][1] >= 0
+      if (out.edge_origin[3 * e] != 0 && faces_of[e][0] >= 0 && faces_of[e][1] >= 0 && !BRep_Tool::Degenerated(eo[e])
           && (faces_of[e][0] != faces_of[e][1] || out.face_origin[3 * faces_of[e][0]] == 2))
       {
         const TopoDS_Face& a = fo[faces_of[e][0]];

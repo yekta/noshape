@@ -588,6 +588,13 @@ with 0003b and 0004 on Linux, macOS and Windows.
   kernel / model / model-core / ops were green (the T2 bool corpus's 3 CutByFaces cases rebased, bool.md), so it is
   on by default since 10-31 03:50 (NOSHAPE_BLEND_RUST=0: OCCT's only). Its tangent edges are marked G1 and new
   seams CN like OCCT's (BRepLib::ContinuityOfFaces, set only when smooth): HLR draws tangent lines from them.
+- Vertex blends (10-31 08:20): blend.rs VCorner (three blended lines at a square convex corner, equal spec): loop
+  runs end there, each edge's chain end is a corner End at the reach r along it whose section points are shared
+  (by corner and edge pair); the corner's face is a left-handed sphere (OCCT's frame from the edges' order, so the
+  history's places match) with a Curve::Degenerate edge at its pole, or a triangle. rust_blend.cpp: left-handed
+  spheres (a negative radius), degenerate edges (kind 2; their curve on the face along u at the pole, from the
+  uses round them), pole samples take their neighbour's u.
+- Distance-angle chamfers (10-31 06:50): Spec::ChamferAngle, the other face's distance by the law of sines.
 - Caps at an angle (10-31 06:00): an open chain's straight end may meet a planar cap at any angle (not within ~78°
   of along it): End.w1 / w2 are where P's and the wall's offset lines meet the cap, a fillet's section the ellipse
   (minor R, major R / cos along the line in the cap); clearance checks widen by the shift along the line.

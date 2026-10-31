@@ -499,3 +499,36 @@ fn rust_distance_angle_chamfers_are_occts() {
         }
     }
 }
+
+/// noshape's own vertex blends: three blended edges at a block's corner (each order: OCCT's sphere takes its
+/// frame from it) and all twelve of its edges, filleted (a sphere's octant, a degenerate edge at its pole) and
+/// chamfered (a triangle): OCCT's result and history.
+#[test]
+fn rust_vertex_blends_are_occts() {
+    let block = make_box_corners(DVec3::ZERO, DVec3::new(60.0, 40.0, 20.0)).unwrap();
+    let corner = DVec3::new(60.0, 40.0, 20.0);
+    let at: Vec<Shape> = block.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| i.start.distance(corner) < 1e-9 || i.end.distance(corner) < 1e-9)).collect();
+    assert_eq!(at.len(), 3);
+    let mut cases: Vec<(String, Vec<Shape>)> = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]].iter().map(|o| (format!("corner {o:?}"), o.iter().map(|&i| at[i].clone()).collect())).collect();
+    cases.push(("all edges".into(), block.edges()));
+    for (what, edges) in &cases {
+        for spec in ["fillet", "chamfer"] {
+            let run = || match spec {
+                "fillet" => fillet(&block, edges, 3.0),
+                _ => chamfer(&block, edges, ChamferSpec::Equal(2.0), &[]),
+            };
+            set_rust_blend(Some(false));
+            let occt = run().unwrap();
+            set_rust_blend(Some(true));
+            reset_blend_decline();
+            let ours = run();
+            set_rust_blend(None);
+            let why = last_blend_decline();
+            let ours = ours.unwrap();
+            assert_eq!(why, "", "{what} {spec}: declined");
+            assert!(ours.shape.is_valid(), "{what} {spec}: invalid");
+            let d = bool_corpus::Summary::of(&ours).differences(&bool_corpus::Summary::of(&occt));
+            assert!(d.is_empty(), "{what} {spec}: {}", d.join(", "));
+        }
+    }
+}

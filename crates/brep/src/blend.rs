@@ -221,6 +221,63 @@ struct End {
     w2: DVec3,
     /// How far that moves them along the line, past the edge's end.
     ext: f64,
+    /// At a vertex blend (`VCorner`): the corner's vertex, and the edges the points at w1 and w2 lie towards
+    /// (g, s and cap unused there).
+    corner: Option<u32>,
+    towards: [u32; 2],
+}
+
+/// A vertex where three blended lines meet, square to each other, on a convex corner, the same round or equal
+/// chamfer on all three: their blends end at the reach `r` from it, where a sphere's octant about the corner (a
+/// chamfer's triangle) closes them.
+#[derive(Clone, Copy, Debug)]
+struct VCorner {
+    /// Its edges in the order they were given (OCCT's sphere frame goes by it), each one's direction from it.
+    edges: [u32; 3],
+    a: [DVec3; 3],
+    r: f64,
+    fillet: bool,
+}
+
+/// The vertex blends `spec_of` makes, by vertex (`order`: the blended edges as given).
+fn vertex_corners(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdge>], order: &[u32]) -> Vec<Option<VCorner>> {
+    let mut out = vec![None; b.vertices.len()];
+    for (v, es) in ve.iter().enumerate() {
+        let [e0, e1, e2] = es[..] else { continue };
+        let Some(s0) = spec_of[e0 as usize] else { continue };
+        if [e1, e2].iter().any(|&e| spec_of[e as usize].map(|s| s.spec) != Some(s0.spec)) {
+            continue;
+        }
+        let r = match s0.spec {
+            Spec::Fillet { radius } => radius,
+            Spec::Chamfer { d1, d2 } if d1 == d2 => d1,
+            _ => continue,
+        };
+        if [e0, e1, e2].iter().any(|&e| b.edges[e as usize].curve != Curve::Line) {
+            continue;
+        }
+        let mut es3 = [e0, e1, e2];
+        es3.sort_by_key(|e| order.iter().position(|x| x == e).unwrap_or(usize::MAX));
+        let p = b.vertices[v];
+        let a = es3.map(|e| {
+            let ed = &b.edges[e as usize];
+            let far = if ed.v[0] as usize == v { ed.v[1] } else { ed.v[0] };
+            (b.vertices[far as usize] - p).normalize()
+        });
+        if a[0].dot(a[1]).abs() > 1e-9 || a[0].dot(a[2]).abs() > 1e-9 || a[1].dot(a[2]).abs() > 1e-9 {
+            continue;
+        }
+        // Convex: the face of each two edges planar, its outward normal against the third edge.
+        let convex = (0..3).all(|k| {
+            let (i, j) = (es3[(k + 1) % 3], es3[(k + 2) % 3]);
+            let fi: Vec<u32> = uses[i as usize].iter().map(|u| u.0).collect();
+            uses[j as usize].iter().map(|u| u.0).find(|f| fi.contains(f)).and_then(|f| plane_normal(&b.faces[f as usize])).is_some_and(|n| n.dot(a[k]) < -1.0 + 1e-9)
+        });
+        if convex {
+            out[v] = Some(VCorner { edges: es3, a, r, fillet: matches!(s0.spec, Spec::Fillet { .. }) });
+        }
+    }
+    out
 }
 
 /// A chain: a run of tangent blended edges of a loop of the planar face P.
@@ -291,12 +348,14 @@ pub fn blend(body: &Body, edges: &[BlendEdge], tol: f64) -> Result<Output, Decli
         spec_of[e.edge as usize] = Some(*e);
     }
     let ve = vertex_edges(body);
-    let chains = chains(body, &uses, &ve, &spec_of, margin)?;
+    let order: Vec<u32> = edges.iter().map(|e| e.edge).collect();
+    let corners = vertex_corners(body, &uses, &ve, &spec_of, &order);
+    let chains = chains(body, &uses, &ve, &spec_of, &corners, margin)?;
     let boxes: Vec<(DVec3, DVec3)> = body.edges.iter().map(|e| edge_box(body, e)).collect();
     for c in &chains {
-        check_clearance(body, &ve, &boxes, c, &chains, margin)?;
+        check_clearance(body, &ve, &boxes, c, &chains, &corners, margin)?;
     }
-    build(body, &ve, &chains, margin)
+    build(body, &ve, &chains, &corners, margin)
 }
 
 /// A loop's uses in their order round (the body's loops may list them in any order); None when a vertex has
@@ -318,7 +377,7 @@ fn ordered(b: &Body, lp: &[Use]) -> Option<Vec<Use>> {
 /// The chains `spec_of` makes: runs of tangent blended edges along loops of planar faces (an edge between two
 /// planar faces goes with the first of them), each edge's wall a plane (a line) or a cylinder about an axis
 /// square to P (an arc), an open run ending at cap faces square to it. Declines anything else.
-fn chains(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdge>], margin: f64) -> Result<Vec<Chain>, Decline> {
+fn chains(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdge>], corners: &[Option<VCorner>], margin: f64) -> Result<Vec<Chain>, Decline> {
     let mut owner: Vec<Option<usize>> = vec![None; b.edges.len()];
     let mut out: Vec<Chain> = Vec::new();
     let mut candidates: Vec<(u32, u32, DVec3, Vec<Use>, bool)> = Vec::new();
@@ -330,17 +389,21 @@ fn chains(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdg
             }
             // Runs of blended edges, tangent at the vertices between.
             let Some(mut lp) = ordered(b, lp) else { return no("a loop not a simple round") };
+            // (Runs end at vertex blends too.)
+            let at_corner = |u: &Use| corners[b.edges[u.edge as usize].v[u.reversed as usize] as usize].is_some();
             if let Some(i) = lp.iter().position(|u| spec_of[u.edge as usize].is_none()) {
                 lp.rotate_left(i);
+            } else if let Some(i) = lp.iter().position(at_corner) {
+                lp.rotate_left(i);
             }
-            let closed_all = lp.iter().all(|u| spec_of[u.edge as usize].is_some());
+            let closed_all = lp.iter().all(|u| spec_of[u.edge as usize].is_some()) && !lp.iter().any(at_corner);
             let mut runs: Vec<Vec<Use>> = Vec::new();
             for u in &lp {
                 if spec_of[u.edge as usize].is_none() {
                     runs.push(Vec::new());
                     continue;
                 }
-                if runs.is_empty() {
+                if runs.is_empty() || at_corner(u) {
                     runs.push(Vec::new());
                 }
                 let r = runs.last_mut().unwrap();
@@ -391,7 +454,7 @@ fn chains(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdg
         if claimed > 0 {
             return no("an edge in two chains");
         }
-        let c = chain(b, uses, ve, spec_of, f, l, n, &run, closed, margin)?;
+        let c = chain(b, uses, ve, spec_of, corners, f, l, n, &run, closed, margin)?;
         for x in &c.links {
             owner[x.edge as usize] = Some(out.len());
         }
@@ -405,7 +468,19 @@ fn chains(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdg
 
 /// One chain along P (face `f`, its outward normal `n`): its links, walls, ends; why not.
 #[allow(clippy::too_many_arguments)]
-fn chain(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdge>], f: u32, l: u32, n: DVec3, run: &[Use], closed: bool, margin: f64) -> Result<Chain, Decline> {
+fn chain(
+    b: &Body,
+    uses: &EdgeUses,
+    ve: &[Vec<u32>],
+    spec_of: &[Option<BlendEdge>],
+    corners: &[Option<VCorner>],
+    f: u32,
+    l: u32,
+    n: DVec3,
+    run: &[Use],
+    closed: bool,
+    margin: f64,
+) -> Result<Chain, Decline> {
     let mut links = Vec::new();
     let mut verts = Vec::new();
     for u in run {
@@ -544,6 +619,17 @@ fn chain(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdge
             let x = &c.links[before.or(after).unwrap()];
             let e = &b.edges[x.edge as usize];
             let p = b.vertices[v as usize];
+            if let Some(vc) = corners[v as usize] {
+                // A vertex blend: the section at the reach along the edge, between the points towards the
+                // corner's other two edges (P's along q, the wall's along t).
+                let Some(i) = vc.edges.iter().position(|&o| o == x.edge) else { return no("a vertex blend not of the chain's edge") };
+                let q = into_p_at(b, x, p);
+                let toward = |d: DVec3| (0..3).find(|&k| k != i && vc.a[k].dot(d) > 1.0 - 1e-9).map(|k| vc.edges[k]);
+                let (Some(t1), Some(t2)) = (toward(q), toward(x.t)) else { return no("a vertex blend whose faces aren't the chain's") };
+                let (w1, w2) = (vc.a[i] * vc.r + q * d1, vc.a[i] * vc.r + x.t * d2);
+                c.ends[side] = Some(End { g: u32::MAX, s: u32::MAX, cap: u32::MAX, w1, w2, ext: vc.r, corner: Some(v), towards: [t1, t2] });
+                continue;
+            }
             let others: Vec<u32> = ve[v as usize].iter().copied().filter(|&o| o != x.edge).collect();
             let [o1, o2] = others[..] else { return no("a chain end with more than three edges") };
             let in_p = |o: u32| b.faces[f as usize].loops[l as usize].iter().any(|u| u.edge == o);
@@ -585,7 +671,17 @@ fn chain(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdge
                 }
             }
             let ext = (w1 - q * d1).length().max((w2 - x.t * d2).length());
-            c.ends[side] = Some(End { g, s, cap, w1, w2, ext });
+            c.ends[side] = Some(End { g, s, cap, w1, w2, ext, corner: None, towards: [u32::MAX; 2] });
+        }
+    }
+    // The ends' sections moved along the end links (a vertex blend's reach, a cap at an angle): within them.
+    if !closed {
+        let ext = |side: usize| c.ends[side].map_or(0.0, |e| e.ext);
+        let len = |x: &Link| (b.vertices[b.edges[x.edge as usize].v[1] as usize] - b.vertices[b.edges[x.edge as usize].v[0] as usize]).length();
+        let k = c.k();
+        let short = if k == 1 { len(&c.links[0]) <= ext(0) + ext(1) + margin } else { len(&c.links[0]) <= ext(0) + margin || len(&c.links[k - 1]) <= ext(1) + margin };
+        if short {
+            return no("an edge shorter than its blend's ends");
         }
     }
     Ok(c)
@@ -649,12 +745,20 @@ fn down_edges(b: &Body, c: &Chain, ve: &[Vec<u32>], margin: f64) -> Result<Vec<O
 
 /// The blend's strips on P, the walls and the caps are clear of every other edge of those faces, and of any
 /// other chain's.
-fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chain, all: &[Chain], margin: f64) -> Result<(), Decline> {
+fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chain, all: &[Chain], corners: &[Option<VCorner>], margin: f64) -> Result<(), Decline> {
     let downs = down_edges(b, c, ve, margin)?;
     let mut skip: Vec<u32> = c.links.iter().map(|x| x.edge).collect();
     skip.extend(downs.iter().flatten());
+    // (A vertex blend's other edges meet the chain there: its own blend closes them.)
+    let mut corner_vs: Vec<u32> = Vec::new();
     for e in c.ends.iter().flatten() {
-        skip.extend([e.g, e.s]);
+        match e.corner {
+            Some(v) => {
+                skip.extend(corners[v as usize].unwrap().edges);
+                corner_vs.push(v);
+            }
+            None => skip.extend([e.g, e.s]),
+        }
     }
     let reach = c.d1.max(c.d2).max(c.centre);
     // How far a cap at an angle moves the blend's ends along the line, past the edge's end.
@@ -693,7 +797,7 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
     }
     // The caps' other edges, from the chain's ends.
     for (side, end) in c.ends.iter().enumerate() {
-        let Some(end) = end else { continue };
+        let Some(end) = end.filter(|e| e.corner.is_none()) else { continue };
         let v = c.verts[if side == 0 { 0 } else { c.k() }];
         let p = b.vertices[v as usize];
         for lp in &b.faces[end.cap as usize].loops {
@@ -727,6 +831,10 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
         }
         for y in &o.links {
             for x in &c.links {
+                let (ex, ey) = (&b.edges[x.edge as usize], &b.edges[y.edge as usize]);
+                if corner_vs.iter().any(|v| ex.v.contains(v) && ey.v.contains(v)) {
+                    continue;
+                }
                 if !far(x.edge, y.edge, 2.0 * reach)? {
                     return no("two chains' blends close");
                 }
@@ -737,7 +845,7 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
 }
 
 /// The result: P, the walls and the caps trimmed, the blend faces between.
-fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<Output, Decline> {
+fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorner>], margin: f64) -> Result<Output, Decline> {
     let mut b = body.clone();
     let (nv, ne, nf) = (body.vertices.len(), body.edges.len(), body.faces.len());
     let mut vertex_origin: Vec<Origin> = (0..nv as u32).map(|i| Origin::Same { arg: 0, index: i }).collect();
@@ -756,6 +864,10 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<
     };
     let mut new_faces: Vec<(u32, Face)> = Vec::new();
     let mut extra_uses: Vec<(u32, u32, Use)> = Vec::new();
+    // Vertex blends: the points their edges' blends share (by corner and the two edges whose face they're on),
+    // each blend's section there (the way the corner's face takes it).
+    let mut tpoints: std::collections::HashMap<(u32, u32, u32), u32> = std::collections::HashMap::new();
+    let mut corner_cross: Vec<(u32, Use)> = Vec::new();
     for c in chains {
         let k = c.k();
         let downs = down_edges(body, c, ve, margin)?;
@@ -779,14 +891,26 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<
                 None => (p + w, p + x.t * c.d2),
             };
             // A cap at an angle to the line: its normal and the line's direction.
-            let oblique = end.and_then(|end| {
+            let oblique = end.filter(|e| e.corner.is_none()).and_then(|end| {
                 let nc = plane_normal(&body.faces[end.cap as usize])?;
                 let te = (body.vertices[body.edges[x.edge as usize].v[1] as usize] - body.vertices[body.edges[x.edge as usize].v[0] as usize]).normalize();
                 (nc.cross(te).length() > 1e-9).then_some((nc, te))
             });
-            b.vertices.extend([p1, p2]);
-            vertex_origin.extend([Origin::New, Origin::New]);
-            let (i1, i2) = (b.vertices.len() as u32 - 2, b.vertices.len() as u32 - 1);
+            let key = |t: u32| end.and_then(|e| e.corner.map(|v| (v, x.edge.min(t), x.edge.max(t))));
+            let mut ids = [0u32; 2];
+            for (n, (pt, k)) in [(p1, end.and_then(|e| key(e.towards[0]))), (p2, end.and_then(|e| key(e.towards[1])))].into_iter().enumerate() {
+                if let Some(&i) = k.and_then(|k| tpoints.get(&k)) {
+                    ids[n] = i;
+                    continue;
+                }
+                b.vertices.push(pt);
+                vertex_origin.push(Origin::New);
+                ids[n] = b.vertices.len() as u32 - 1;
+                if let Some(k) = k {
+                    tpoints.insert(k, ids[n]);
+                }
+            }
+            let (i1, i2) = (ids[0], ids[1]);
             v1.push(i1);
             v2.push(i2);
             dead_v[v as usize] = true;
@@ -814,7 +938,8 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<
                     Curve::Ellipse { center: ctr, normal, xdir, major: radius / cn.abs(), minor: radius, faces: [n, n] }
                 }
                 Spec::Fillet { radius } => {
-                    let ctr = p + (q + x.t).normalize() * c.centre;
+                    // (About the point on the edge the section is at: a vertex blend's is its reach along it.)
+                    let ctr = p1 - q * c.d1 + (q + x.t).normalize() * c.centre;
                     let normal = (p1 - ctr).cross(p2 - ctr).normalize();
                     Curve::Circle { center: ctr, normal, xdir: (p1 - ctr) / radius, radius }
                 }
@@ -848,7 +973,9 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<
             if let Some(s) = downs[j] {
                 cut_short(s, i2, &mut b);
             }
-            if let Some(end) = end {
+            if let Some(end) = end.filter(|e| e.corner.is_some()) {
+                corner_cross.push((end.corner.unwrap(), Use { edge: *cross.last().unwrap(), reversed: j == 0 }));
+            } else if let Some(end) = end {
                 cut_short(end.s, i2, &mut b);
                 cut_short(end.g, i1, &mut b);
                 // The cap takes the cross-section the other way from the blend face beside it.
@@ -909,6 +1036,36 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<
     for (f, l, u) in extra_uses {
         b.faces[f as usize].loops[l as usize].push(u);
     }
+    // Each vertex blend's face: a fillet's sphere about the corner (OCCT's frame: its axis along the first edge
+    // given, x against the third, y against the second: left-handed; a degenerate edge at its pole, the point
+    // between the second and third edges' blends), a chamfer's triangle.
+    let mut corner_faces: Vec<(u32, Face)> = Vec::new();
+    for (v, vc) in corners.iter().enumerate() {
+        let Some(vc) = vc else { continue };
+        let mut lp: Vec<Use> = corner_cross.iter().filter(|x| x.0 == v as u32).map(|x| x.1).collect();
+        if lp.is_empty() {
+            continue;
+        }
+        if lp.len() != 3 {
+            return no("a vertex blend not closed by its three edges' blends");
+        }
+        let p = body.vertices[v];
+        let t = |i: usize, j: usize| tpoints.get(&(v as u32, vc.edges[i].min(vc.edges[j]), vc.edges[i].max(vc.edges[j]))).copied();
+        let (surface, reversed) = if vc.fillet {
+            let ctr = p + (vc.a[0] + vc.a[1] + vc.a[2]) * vc.r;
+            let surface = Surface::Sphere { origin: ctr, xdir: -vc.a[2], ydir: -vc.a[1], zdir: vc.a[0], radius: vc.r };
+            let Some(pole) = t(1, 2) else { return no("a vertex blend without its pole") };
+            b.edges.push(Edge { v: [pole, pole], curve: Curve::Degenerate });
+            edge_origin.push(Origin::New);
+            lp.push(Use { edge: b.edges.len() as u32 - 1, reversed: false });
+            let probe = ctr + (p - ctr).normalize() * vc.r;
+            (surface, surface_normal(&surface, probe).dot(p - probe) < 0.0)
+        } else {
+            let Some(t01) = t(0, 1) else { return no("a vertex blend without its points") };
+            (Surface::Plane { origin: b.vertices[t01 as usize], normal: -(vc.a[0] + vc.a[1] + vc.a[2]).normalize() }, false)
+        };
+        corner_faces.push((v as u32, Face { surface, reversed, loops: vec![lp] }));
+    }
     // Pieces of the edges cut short in every face that uses them.
     for f in &mut b.faces {
         for lp in &mut f.loops {
@@ -930,6 +1087,13 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], margin: f64) -> Result<
         b.solids[0].shells[0].push(fi);
         history.push(Record { kind: Kind::Edge, arg: 0, index: e, relation: Relation::Generated, out_kind: Kind::Face, out: fi });
         history.push(Record { kind: Kind::Edge, arg: 0, index: e, relation: Relation::Deleted, out_kind: Kind::Edge, out: u32::MAX });
+    }
+    for (v, face) in corner_faces {
+        b.faces.push(face);
+        face_origin.push(Origin::New);
+        let fi = b.faces.len() as u32 - 1;
+        b.solids[0].shells[0].push(fi);
+        history.push(Record { kind: Kind::Vertex, arg: 0, index: v, relation: Relation::Generated, out_kind: Kind::Face, out: fi });
     }
     for (v, &d) in dead_v.iter().enumerate() {
         if d {
@@ -1054,6 +1218,8 @@ fn surface_normal(s: &Surface, p: DVec3) -> DVec3 {
             let _ = radius;
             (radial * angle.cos() - axis * angle.sin()).normalize()
         }
+        // (Its parameters' normal: away from the centre in a right-handed frame, towards it in a left-handed one.)
+        Surface::Sphere { origin, xdir, ydir, zdir, .. } => (p - origin).normalize() * xdir.cross(ydir).dot(zdir).signum(),
         _ => DVec3::ZERO,
     }
 }
