@@ -147,6 +147,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P3 THIN-LOFT-TRIM-ENDS (skasm → core, kernel thicken) a thin loft ignores Trim ends (default ☑): live's loft.fs
+  thinLoft thickens with the first / last profiles' planes as the side faces (opThicken sideGeometryRule SUPPLIED), so
+  the wall ends lie on those planes. Ours thickens the sheet with ends normal to it: the ADV2 square → Ø16 loft, Thin 1 mm
+  runs z 0 … 20.29 and falls short of z 0 on its other side (main CLI, skasm-scratch/feat/thinloft.py). Two kernel
+  blockers. (1) `k::thicken` of a creased sheet (the square's corners) is self-intersecting (`self_intersects()` true,
+  also the plain wall today), the same join as Thicken 4 / L17, and Booleans on it don't cut (a box cut leaves the
+  volume unchanged). (2) Extending the sheet past the ends (its B-spline faces' end spans continued, built with
+  make_bspline_surface) gives faces OCCT's Booleans can't cut, and the rebuilt periodic face of a circle → circle loft
+  self-intersects. Past a tangent end, neighbouring faces fold. A parked patch (blossom extension, per-side walls
+  continued only where short, box cuts, fuse): /root/skasm-scratch/thinloft-trim.patch. Live figures requested
+  (REQUESTS "skasm (2026-10-31 03:40)") (skasm 2026-10-31)
 - [ ] P0 BLEND-RUST (core, lead 10-30 20:50) noshape's own fillets and chamfers for simple edges, OCCT as fallback
   (crates/brep blend.rs; kernel cpp/rust_blend.cpp in front of op_fillet / op_chamfer behind NOSHAPE_BLEND_RUST, off
   until correct; corpus NOSHAPE_RECORD_BLENDS + kernel `blend_replay`). 10-30 22:00, step 1: closed tangent chains

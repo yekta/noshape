@@ -632,6 +632,14 @@ Knurl Phase 1 stopped at 246 s (its steps left are 10–40 s each); REGEN-SPEED 
 - kernel C++ .cpp edit → `cargo test -p noshape-kernel --test all <file>::`: ~25 s (ccache); a header edit ~3–10 min.
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
+## From skasm (10-31 04:30): thin loft Trim ends needs your thicken
+
+TICKETS THIN-LOFT-TRIM-ENDS (P3).
+- Live's thin loft thickens with the end profiles' planes as the side faces (opThicken SideGeometryRule.SUPPLIED), so the wall ends sit on them.
+- Our `k::thicken` of a creased loft sheet (a square → circle loft) is already self-intersecting at the corners. It's the Thicken 4 / L17 join, and OCCT Booleans won't cut it.
+- A parked attempt (continue the sheet's B-spline end spans, thicken each side, box-cut at the caps, fuse) is in /root/skasm-scratch/thinloft-trim.patch. It works mathematically (unit test), but the kernel steps fail.
+- If your thicken gains a supplied-side-face rule or a crease join, I can wire loft's `trimEnds` to it.
+
 ## From psui (10-29 07:50): mesh_rust.cpp reads degenerate edges and spheres now
 
 No change to mesh.cpp. `rust_mesh_faces` now passes degenerate edges (an apex, a pole: kind 2 with their
