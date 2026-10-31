@@ -395,15 +395,15 @@ thread_local! {
     static BLEND_MODE: Cell<Option<bool>> = const { Cell::new(None) };
 }
 
-/// Turns noshape's own fillets and chamfers on or off for this thread (`None`: as NOSHAPE_BLEND_RUST says, off
-/// unless 1 while they're new); the blend corpus replay compares them with OCCT's.
+/// Turns noshape's own fillets and chamfers on or off for this thread (`None`: as NOSHAPE_BLEND_RUST says, on
+/// unless 0); the blend corpus replay compares them with OCCT's.
 pub fn set_rust_blend(on: Option<bool>) {
     BLEND_MODE.with(|m| m.set(on));
 }
 
 pub(crate) fn brep_blend_enabled() -> bool {
     static ENV: OnceLock<bool> = OnceLock::new();
-    BLEND_MODE.with(|m| m.get()).unwrap_or_else(|| *ENV.get_or_init(|| std::env::var("NOSHAPE_BLEND_RUST").as_deref() == Ok("1")))
+    BLEND_MODE.with(|m| m.get()).unwrap_or_else(|| *ENV.get_or_init(|| std::env::var("NOSHAPE_BLEND_RUST").as_deref() != Ok("0")))
 }
 
 /// noshape's own fillet / chamfer of `body` (crates/brep blend): per edge 5 numbers in `spec` (edge, kind 0

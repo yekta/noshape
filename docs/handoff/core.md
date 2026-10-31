@@ -560,7 +560,7 @@ with 0003b and 0004 on Linux, macOS and Windows.
   (NOSHAPE_BLEND_CHECK=1: 100 ms of the 100-hole plate); the corpus replay checks every result's validity.
 - Corpus: NOSHAPE_RECORD_BLENDS=<dir> (kernel blend_corpus.rs; records the working scale), 310 cases in
   /root/core-scratch/blend-corpus (kernel + model tests, T1 and the oracle T2s). Replay:
-  `NOSHAPE_BLEND_RUST=1 cargo test -p noshape-kernel --test all blend_replay::blend_corpus_replay -- --ignored
+  `cargo test -p noshape-kernel --test all blend_replay::blend_corpus_replay -- --ignored
   --nocapture` (paths per decline reason; NOSHAPE_BLEND_LIST=<reason> lists cases); one case both ways with
   timings and its history diff: NOSHAPE_BLEND_CASE=<name> blend_replay::blend_case_diff (NOSHAPE_BLEND_FACES=1/2).
 - Corners (step 3, 10-31): at a vertex where two blended lines meet at an angle with the edge down the walls
@@ -571,8 +571,19 @@ with 0003b and 0004 on Linux, macOS and Windows.
   volumes are off the exact ones by up to ~5e-9 where ours are exact (TICKETS); the replay accepts volume and
   history to 1e-7 there. Guards: a result with any non-finite vertex or curve declines (a wrong corner test made
   NaN vertices that only BRepCheck, off in production, would have caught; BRepCheck of such a solid ran minutes).
-- Declines left in the corpus (10-30 22:00): edges not in a whole loop 174, corners between blended edges 70,
-  not tried 21 (variable radius, distance-angle), edges in two chains 9, walls not square 6.
+- Corpus with NOSHAPE_BLEND_RUST=1 (10-31 02:10): 172 of 310 taken, all as OCCT (142 identical, 30 to 1e-7 at
+  corners); declines: chain ends not along the blend's side or too short 27, arcs the blend closes up (sphere
+  corners) 19, edges in two chains 18, two chains' blends close 16, other edges within a cap's blend 8, ends with
+  more than three edges 6, walls turning at a corner 6, not tried 55 (variable radius, distance-angle, OCCT-first
+  paths), singles.
+- perf.sh (vibe3, 6b841bb6, `regen_profile::blend_rust_profile`, OCCT's blends → noshape's): live-30 full regen
+  43.9 → 28.9 ms (its fillets + chamfers 25.4 → 9.8 ms, 2.6×), live-30 edit commit 55.8 → 33.7 ms; big-plate and
+  fins-400 have no blends (unchanged). The 100-hole plate's rims: a perf.sh case still to add.
+- Fixed for BLEND_RUST=1 (216a85d6): OCCT's fillet past a Rust chamfer (fillet_past_end_faces no longer removes end
+  faces square to the edge: OCCT's defeaturing gave a sliver for a block's two sides in some face orders) and
+  Shell's slabs over Rust fillet + chamfer (iso pcurves snapped exactly onto u / v). With it on, T1 and T2 of
+  kernel / model / model-core / ops were green (the T2 bool corpus's 3 CutByFaces cases rebased, bool.md), so it is
+  on by default since 10-31 03:50 (NOSHAPE_BLEND_RUST=0: OCCT's only).
 
 ## Next, in order
 (lead 10-29: big structural wins, land small and often, stop when returns flatten.)

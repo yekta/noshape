@@ -10,6 +10,10 @@ scratch /root/bool-scratch.
   `boolean_groups::cut_with_many_tools_some_crossing` asserts it (fails without the fix). The naming never read
   solid records (name_result keeps faces, edges, vertices), so nothing relied on Deleted. Boolean corpus cases
   recorded through CutByFaces (knurl-like cuts) now replay with the solid Modified: rebase those summaries.
+  (10-31 03:40, done for /root/core-scratch/bool-corpus: 50004ac95f2ebada, 6cf0bfdcdd6e8601, 8c3247abe6a294a0, Cut
+  by 14–24 tools, history only. NOSHAPE_BOOL_REBASE=1 rewrites every case, not just the differing ones: the other
+  971 got this run's volumes, each within the replay's 1e-9 of the old (their counts, validity and history were
+  already equal), and the unstable 5c40b5731295e50a this run's history. Your other corpora are untouched.)
 - Records are in a stable order: each input's Modified and Generated images by their index in the output
   (HistoryBuilder::add_history; unify's lists came in another order run to run, the same records). The naming
   sorts what it reads, so names don't change.

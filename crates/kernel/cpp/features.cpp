@@ -3581,7 +3581,7 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     if (done)
       return make_result({s.shape}, r, h.get());
   }
-  // noshape's own (NOSHAPE_BLEND_RUST=1), where it builds the blend exactly (after the square corner, which
+  // noshape's own (NOSHAPE_BLEND_RUST=0: off), where it builds the blend exactly (after the square corner, which
   // takes its single edges with a history of its own).
   {
     std::vector<std::array<double, 3>> sp;
@@ -4233,7 +4233,7 @@ static OpOut op_chamfer_unbudgeted(const OcShape& s, const OcShapeList& edges, c
       return true;
     };
   };
-  // noshape's own (NOSHAPE_BLEND_RUST=1), where it builds the blend exactly.
+  // noshape's own (NOSHAPE_BLEND_RUST=0: off), where it builds the blend exactly.
   if (mode != 2)
   {
     std::vector<std::array<double, 3>> sp;
