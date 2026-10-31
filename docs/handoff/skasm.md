@@ -184,6 +184,28 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
 (none: the branch equals main. Land only with tools/tiers/land.sh, run detached: /root/skasm-scratch/run.sh landsh.log
 "tools/tiers/land.sh".)
 
+## Lead 10-31 (4): never-checked rows (resumed 10:50 on a new account)
+- **Landed:** aaa85f6a, 2ce42c21, ba8472f0 (and this handoff).
+  - Move face through the far side of a part now fails with live's texts (Offset left an empty 0 mm³ part, Translate an
+    inverted 1333 mm³ one, both "Ok"). core's direct.rs, T features_a::move_face_through_the_part_fails.
+  - Body draft parted at the top face with the pull up: live's info "The draft has no effect for the given angle.", part
+    unchanged (live 1664 (c)); every other case of live's matrix = ours (CLI skasm-scratch/feat/bdraft.py).
+  - Flat pattern Export as DXF/DWG: no notice after Export (live 1665 (b)); the checkboxes come back as last exported.
+  - Assembly: Alt+C popover and menus over the right strip; the popover footer's "?".
+  - **Mate dialog regression (from psui's auto-advance 9f288920 / 720ef464, 10-31 morning):** the full last field keeps
+    the focus (live R5), so `awaiting_pick()` stays true; the HUD, the default flip on the 2nd pick, the mate indicator
+    and the X / Y / Z letters had all stopped. Now keyed on `MateDialog::connectors_complete()`. Anything else that
+    reads "no field takes picks" as "dialog complete" may have the same problem (Part Studio dialogs are psui's).
+- **Sheets:** sheet-metal-joints row 5 (T2 butt_joint_after_a_closed_corner_matches_live; SM-CLOSED-BUTT P3, 1.92 mm³
+  short: live re-closes both bends against the through wall; REQUESTS 11:40 asks for the end curves). feature-sweep
+  failure rows run by CLI (errsweep4/5.py): Pattern Reapply and Enclose texts = live; Draft / Delete / Offset surface /
+  Replace / thin Loft / Boundary surface edge cases asked of live (REQUESTS 11:10 (a)–(k)): ours returns Ok for an 80°
+  inward draft (a 5-face roof), a cylinder offset inwards past its axis (r 1), a thin loft of 4 × 4 squares (226.67 mm³
+  at 1 mm: suspicious), crossing / coincident boundary profiles. assembly.md LA10, LA22, LA23, LA28, LA31, LA35–37,
+  LA45, LA47 checked in the GUI. p2-look AL7 fixed (above). navigation 3.7 was already verified.
+- **Open live requests (mine):** 10:05 (show mates mode), 11:10 (direct edits / loft / boundary), 11:40 (SM-CLOSED-BUTT
+  curves), 12:00 (named position toast), 12:20 (one-sided body draft at a mid plane).
+
 ## Lead 10-31 (3): the view cube "Bottom"; the unowned sheets (import-edit, bracket, sheet-metal-joints, undo, document, derived, units, account)
 - **n twice / view cube:** the GUI already matched live: Bottom drawn mirrored, X to the left, labels mirrored (GUI :103, ui/nn12.png). Only the CLI's `standard_view` field was null. It now names the view cube face looked at square on (`bottom`), T e2e view_camera_menus.
 - **workflow-import-edit:** I1 = live within its bounds: SAT 7582.989, X_T 7583.001, STEP 7582.978 vs 7582.912 ± 4.22 (main CLI). Same-name imports "g25-b (1)", "(2)" = live. I4 / I6 / TAB1 / API1 / API2 point at their fixes.
