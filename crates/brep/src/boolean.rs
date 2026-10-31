@@ -3499,12 +3499,17 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             // on the other, as OCCT's common block.)
             let kind = std::mem::discriminant(&o.g) == std::mem::discriminant(&s.g);
             let near_mid = (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * cx.tol;
+            // (Within the sum of the two's own tolerances (an OCCT section's: its curve's distance from the faces'
+            // section), OCCT's rule for a common block: three faces meeting along one line, a sharp knurl's tooth
+            // tip on its cylinder, give curves that far apart.)
+            let ctol = |g: &Geo| if let Geo::Nurbs { id, .. } = g { cx.ncurves[*id as usize].tol } else { 0.0 };
+            let reach = cx.tol.max(ctol(&o.g) + ctol(&s.g));
             let one_course = || {
                 s.v[0] != s.v[1]
                     && !matches!(o.g, Geo::Apex { .. })
                     && !matches!(s.g, Geo::Apex { .. })
-                    && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(o, cx.seg_at(&s, t)).1 <= cx.tol)
-                    && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(&s, cx.seg_at(o, t)).1 <= cx.tol)
+                    && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(o, cx.seg_at(&s, t)).1 <= reach)
+                    && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(&s, cx.seg_at(o, t)).1 <= reach)
             };
             if !apart && ((kind && near_mid) || one_course()) {
                 let rev = match (o.g, s.g) {
