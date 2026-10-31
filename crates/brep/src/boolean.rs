@@ -448,7 +448,12 @@ struct Pool {
     /// Per vertex its own tolerance (an input's, OCCT's; 0 for a new one), and those over half the Boolean's
     /// (tolerant ones: within the sum of the two's tolerances another is the same vertex, OCCT's rule).
     t: Vec<f64>,
+    /// Every vertex again in cells 64 times as wide (the tolerant ones are found there), and those whose tolerance
+    /// is past a quarter of such a cell (checked one by one).
+    coarse: HashMap<(i64, i64, i64), Vec<u32>>,
     loose: Vec<u32>,
+    /// The largest of the vertices' own tolerances.
+    tmax: f64,
 }
 
 impl Pool {
@@ -465,6 +470,7 @@ impl Pool {
     /// two's own where that's more (OCCT's rule for tolerant vertices); none in the grey band past that.
     fn find_tol(&self, p: DVec3, tp: f64) -> R<Option<u32>> {
         let half = 0.5 * self.tol;
+        let wide = 64.0 * self.cell;
         let mut found: Option<u32> = None;
         let mut take = |i: u32| -> R<()> {
             let ti = self.t[i as usize];
@@ -490,20 +496,36 @@ impl Pool {
             }
             Ok(())
         };
-        if tp > half {
-            // (A tolerant point: against every vertex.)
+        if tp > 0.25 * wide {
             for i in 0..self.p.len() as u32 {
                 take(i)?;
             }
             return Ok(found);
         }
-        let k = self.key(p);
+        if tp <= half {
+            let k = self.key(p);
+            for dx in -1..=1 {
+                for dy in -1..=1 {
+                    for dz in -1..=1 {
+                        let Some(list) = self.grid.get(&(k.0 + dx, k.1 + dy, k.2 + dz)) else { continue };
+                        for &i in list {
+                            if self.t[i as usize] <= half {
+                                take(i)?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // (Tolerant ones, or every one for a tolerant point: the wide cells round it.)
+        let k = ((p.x / wide).floor() as i64, (p.y / wide).floor() as i64, (p.z / wide).floor() as i64);
         for dx in -1..=1 {
             for dy in -1..=1 {
                 for dz in -1..=1 {
-                    let Some(list) = self.grid.get(&(k.0 + dx, k.1 + dy, k.2 + dz)) else { continue };
+                    let Some(list) = self.coarse.get(&(k.0 + dx, k.1 + dy, k.2 + dz)) else { continue };
                     for &i in list {
-                        if self.t[i as usize] <= half {
+                        let ti = self.t[i as usize];
+                        if (tp > half || ti > half) && ti <= 0.25 * wide {
                             take(i)?;
                         }
                     }
@@ -522,8 +544,10 @@ impl Pool {
 
     /// Vertex `w`'s tolerance at least `t` (another merged into it, as OCCT's merged vertex covers both).
     fn grow(&mut self, w: u32, t: f64) {
+        let quarter = 16.0 * self.cell;
+        self.tmax = self.tmax.max(t);
         if t > self.t[w as usize] {
-            if t > 0.5 * self.tol && self.t[w as usize] <= 0.5 * self.tol {
+            if t > quarter && self.t[w as usize] <= quarter {
                 self.loose.push(w);
             }
             self.t[w as usize] = t;
@@ -534,13 +558,29 @@ impl Pool {
         let i = self.p.len() as u32;
         self.p.push(p);
         self.t.push(t);
-        if t > 0.5 * self.tol {
+        self.tmax = self.tmax.max(t);
+        let wide = 64.0 * self.cell;
+        self.coarse.entry(((p.x / wide).floor() as i64, (p.y / wide).floor() as i64, (p.z / wide).floor() as i64)).or_default().push(i);
+        if t > 0.25 * wide {
             self.loose.push(i);
         }
         self.inputs.push(Vec::new());
         let k = self.key(p);
         self.grid.entry(k).or_default().push(i);
         i
+    }
+
+    /// `add`, the point with its own tolerance `t` (a section's): one within the sum of the two's with another is
+    /// that one, its tolerance grown to cover both.
+    fn add_tol(&mut self, p: DVec3, t: f64) -> R<u32> {
+        if let Some(i) = self.find_tol(p, t)? {
+            if t > 0.0 {
+                let d = (self.p[i as usize] - p).length();
+                self.grow(i, t + d);
+            }
+            return Ok(i);
+        }
+        Ok(self.push_tol(p, t))
     }
 
     fn add(&mut self, p: DVec3) -> R<u32> {
@@ -1206,6 +1246,8 @@ impl Ctx<'_> {
             }
             path.length(x, y) <= tol
         };
+        // (Its points with its own tolerance: an OCCT section's.)
+        let ptol = if let Path::Nurbs { id, .. } = &path { self.ncurves[*id as usize].tol } else { 0.0 };
         // The end of a section: the tighter of the two faces' ends, made a vertex.
         let pick = |cx: &mut Ctx, x: (f64, End), y: (f64, End), lo: bool| -> R<Option<u32>> {
             let (later, earlier) = if x.0 > y.0 { (x, y) } else { (y, x) };
@@ -1219,14 +1261,14 @@ impl Ctx<'_> {
             let v = match end {
                 End::Open => return Ok(None),
                 End::Vertex(v) => v,
-                End::Point(p) => cx.pool.add(p)?,
+                End::Point(p) => cx.pool.add_tol(p, ptol)?,
             };
             // Both faces end there: the same vertex.
             if near(earlier.0, later.0) {
                 for o in [x.1, y.1] {
                     let w = match o {
                         End::Vertex(w) => w,
-                        End::Point(p) => cx.pool.add(p)?,
+                        End::Point(p) => cx.pool.add_tol(p, ptol)?,
                         End::Open => continue,
                     };
                     if w != v {
@@ -2324,7 +2366,7 @@ impl Ctx<'_> {
     fn split_tol(&self, s: &Seg, sorted_x: &[(f64, u32)], te: f64) -> R<Vec<u32>> {
         let tol = self.tol;
         let reach = |w: u32| tol.max(te + self.pool.t[w as usize]);
-        let tol_far = self.pool.loose.iter().fold(tol, |m, &w| m.max(reach(w))).max(tol.max(te));
+        let tol_far = tol.max(te + self.pool.tmax);
         let (lo, hi) = match s.g {
             Geo::Line => {
                 let (a, b) = (self.p(s.v[0]), self.p(s.v[1]));
@@ -2640,7 +2682,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     }
     let mut cx = Ctx {
         tol,
-        pool: Pool { p: Vec::new(), inputs: Vec::new(), grid: HashMap::default(), cell: GREY * tol * 1.01, tol, t: Vec::new(), loose: Vec::new() },
+        pool: Pool { p: Vec::new(), inputs: Vec::new(), grid: HashMap::default(), cell: GREY * tol * 1.01, tol, t: Vec::new(), coarse: HashMap::default(), loose: Vec::new(), tmax: 0.0 },
         faces: Vec::new(),
         edges: Vec::new(),
         solids: Vec::new(),
