@@ -190,7 +190,7 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   - Loft 8 ◐: a thin loft's Trim ends is ticketed to core as THIN-LOFT-TRIM-ENDS. Our thicken of a creased sheet already
     self-intersects. My extension attempt is parked in /root/skasm-scratch/thinloft-trim.patch.
   - Loft 8 ◐ also: Show isocurves, drawn by no feature yet. Waiting for the live picture (REQUESTS "skasm (2026-10-31 03:40)" (e)).
-  - Draft 10 🔧: hint faces. These are std's protection against upstream changes; P3, left.
+  - Draft 10 ✅: our sides come from the geometry, so std's hint faces aren't needed.
   - Body draft 7: no live case.
   - Thicken 4: L17 join, core's.
 - workflow-advanced-part-studio.md: every main-table row ✅ except 1.7 (a click on the circle's centre: point or
@@ -198,6 +198,21 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   - ADV2 withdrawn: live's evVolume HIGH 5927.754323 = ours; 5927.728 was /massproperties.
   - HOLE-MISS-MSG withdrawn: live auto-flips a bottom-face hole too.
   - ADV12: live's row is the whole callout.
+- Later 10-31, other sheets re-checked against live answers / main CLI and marked:
+  - surfaces SF1 / SF2 / SF5 / SF6, Split naming;
+  - booleans NAME2 / COPY1;
+  - core-workflow 3.5 ✅ / 3.6 ◐ (G46 shell 1 mm +1.19 mm³ → core);
+  - p1-pass P1-6 / P1-16;
+  - bracket ADV9;
+  - derived 7 / 10 / 15 / 18 / 19;
+  - import-edit I3;
+  - assembly K27 / D21.
+  PATTERN-REAPPLY-CUT-ONLY closed (live = ours). Landed SKETCH-DIM-CURVE-PAIR-PREVIEW (640f0c7c).
+- Live requests open:
+  - "skasm (2026-10-31 03:10)": advanced 1.7.
+  - "03:40": thin loft + Show isocurves picture. Implement Show isocurves (Loft, Boundary, Fill, …) once it's answered.
+  - "04:50": part colours after Split / Mirror / pattern, SF4.
+  - "05:10": search ranking ("Fill" + Enter opens Fillet in ours).
 - Sketch: SKETCH-DEGENERATE-SOLVE (P3). Live solves a fillet R6 → R20 on a 20 × 10 rectangle with the top line shrunk to a
   point; ours stalls at 4e-10. Needs degenerate-line equations or a revised `collapsed_lines` rule.
 
