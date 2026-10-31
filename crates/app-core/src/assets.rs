@@ -67,13 +67,17 @@ pub fn set_scale_factor(scale: f32) {
 }
 
 fn icon_image(name: &str, size: f32, cx: &App) -> Option<Arc<RenderImage>> {
+    icon_image_inked(name, size, None, cx)
+}
+
+fn icon_image_inked(name: &str, size: f32, ink: Option<u32>, cx: &App) -> Option<Arc<RenderImage>> {
     // Accept both "extrude" and the asset path "icons/extrude.svg".
     let name = name.trim_start_matches("icons/").trim_end_matches(".svg");
     let scale = SCALE_X100.load(Ordering::Relaxed) as f32 / 100.0;
     let device_px = (size * scale).round().max(1.0) as u32;
     // Theming › Dark mode (not inside the drawing editor, which stays light).
     let dark = gpui_kit::hex_theme_active();
-    let key = (name.to_string(), device_px, dark);
+    let key = (ink.map_or_else(|| name.to_string(), |c| format!("{name}@{c:06x}")), device_px, dark);
     if let Some(img) = ICON_CACHE.lock().ok()?.get(&key) {
         return Some(img.clone());
     }
@@ -81,7 +85,12 @@ fn icon_image(name: &str, size: f32, cx: &App) -> Option<Arc<RenderImage>> {
         Some(f) => (name, f),
         None => ("part", AppIcons::get("icons/part.svg")?),
     };
-    let data = if dark { dark_icon(name, file.data) } else { file.data };
+    let data = match ink {
+        // The light art's ink and accent in one colour (masks keep theirs).
+        Some(c) => Cow::Owned(recolor(&file.data, |hex| matches!(hex, b"333" | b"333333" | b"000" | b"000000" | b"1651b0").then(|| format!("{c:06x}").into_bytes()))),
+        None if dark => dark_icon(name, file.data),
+        None => file.data,
+    };
     // The icons are drawn on a 24-unit canvas; render it at the target size.
     let image = cx.svg_renderer().render_single_frame(&data, device_px as f32 / 24.0).ok()?;
     ICON_CACHE.lock().ok()?.insert(key, image.clone());
@@ -104,6 +113,16 @@ fn dark_icon(name: &str, light: Cow<'static, [u8]>) -> Cow<'static, [u8]> {
 /// `svg` with the hex colours Onshape themes replaced by their dark values.
 /// `<mask>` contents keep theirs: their black is "cut out", not ink.
 fn flip_themed_colors(svg: &[u8]) -> Vec<u8> {
+    recolor(svg, |hex| match hex {
+        b"333" | b"333333" | b"000" | b"000000" => Some(b"ffffff".to_vec()),
+        b"1651b0" => Some(b"3e94ff".to_vec()),
+        _ => None,
+    })
+}
+
+/// `svg` with each hex colour `to` maps (lower case, without `#`) replaced,
+/// outside `<mask>` contents.
+fn recolor(svg: &[u8], to: impl Fn(&[u8]) -> Option<Vec<u8>>) -> Vec<u8> {
     let mut out = Vec::with_capacity(svg.len());
     let mut i = 0;
     let mut in_mask = false;
@@ -115,14 +134,9 @@ fn flip_themed_colors(svg: &[u8]) -> Vec<u8> {
         }
         if svg[i] == b'#' && !in_mask {
             let n = svg[i + 1..].iter().take_while(|c| c.is_ascii_hexdigit()).count();
-            let to: Option<&[u8]> = match svg[i + 1..i + 1 + n].to_ascii_lowercase().as_slice() {
-                b"333" | b"333333" | b"000" | b"000000" => Some(b"ffffff"),
-                b"1651b0" => Some(b"3e94ff"),
-                _ => None,
-            };
-            if let Some(to) = to {
+            if let Some(to) = to(svg[i + 1..i + 1 + n].to_ascii_lowercase().as_slice()) {
                 out.push(b'#');
-                out.extend_from_slice(to);
+                out.extend_from_slice(&to);
                 i += 1 + n;
                 continue;
             }
@@ -137,6 +151,15 @@ fn flip_themed_colors(svg: &[u8]) -> Vec<u8> {
 /// ("extrude") or an asset path from [`icon_path`].
 pub fn icon(name: &str, size: f32, cx: &App) -> gpui_kit::AnyElement {
     match icon_image(name, size, cx) {
+        Some(image) => img(ImageSource::Render(image)).size(px(size)).flex_none().into_any_element(),
+        None => gpui_kit::div().size(px(size)).flex_none().into_any_element(),
+    }
+}
+
+/// [`icon`] with its ink (#333 / #000) and accent (#1651b0) drawn in `ink`
+/// (`0xrrggbb`): an active rail button's icon (live: blue, #90cef1 in dark).
+pub fn icon_inked(name: &str, size: f32, ink: u32, cx: &App) -> gpui_kit::AnyElement {
+    match icon_image_inked(name, size, Some(ink), cx) {
         Some(image) => img(ImageSource::Render(image)).size(px(size)).flex_none().into_any_element(),
         None => gpui_kit::div().size(px(size)).flex_none().into_any_element(),
     }

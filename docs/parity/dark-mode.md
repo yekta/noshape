@@ -64,12 +64,13 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-980-dialog-mirror | psui-scratch cdlg | title red, ✓ / ✕, type select, New / Add / Remove / Intersect, active query #142434 + #3e94ff, other fields, rows, slider and ? = live | ☑ psui 10-31 |
 | dk-981-dialog-sweep | psui-scratch cdlg | title red, ✓ / ✕, type select, New / Add / Remove / Intersect, active query #142434 + #3e94ff, other fields, rows, slider and ? = live | ☑ psui 10-31 |
 | dk-982-dialog-sm-flange |  |  | ☐ |
-| dk-989-tab-manager-open / dk-990-tab-manager-detailed / dk-991-tab-manager-sort-open |  |  | ☐ |
+| dk-989-tab-manager-open / dk-990-tab-manager-detailed / dk-991-tab-manager-sort-open | psui-scratch c989 / c990 / c991 | header icons, search, type filters, Clear, detailed rows with thumbnails (live's default; dk-989 is its persisted list view), sort menu = live | ☑ psui 10-31 |
 | dk-992-panel-variable-table | psui-scratch vt | title, section bar, headers #555, cells #1c1c1c, add row = live (live's document has Variable Studios inserted, ours none) | ☑ psui 10-31 |
 | dk-993-panel-appearances |  | live's studio has a sketch, no parts: "No parts or surfaces in this document" (ours hides the button only with neither parts nor sketches) | ◐ |
 | dk-994-panel-custom-tables | | needs a studio with a FeatureScript custom table | ☐ |
 | dk-995-panel-configuration | dkcfg | the same empty state as dk-928 (checked) | ☑ psui 10-31 |
-| dk-996-left-document-notes / dk-997-left-where-used / dk-998-left-performance |  |  | ☐ |
+| dk-996-left-document-notes | psui-scratch dn / rail-* | panel, header icons, empty state = live; the active rail button now as live in both themes: icon and bar #1651b0 on #eaeaea (light, document/rail-panel-document-notes), #90cef1 on the rail's #2c2c2c (dark); it was a blue-tinted cell with the icon unchanged | ☑ psui 10-31 |
+| dk-997-left-where-used / dk-998-left-performance |  |  | ☐ |
 | dk-999-properties-dialog | psui-scratch pr / rs1 | modal, header, fields, footer = live; "Reset all" disabled while nothing differs from what it restores (was always enabled; light too, part-studio/1840). Live's 1172 px width is a resized modal (it resizes and keeps its size; default 800 × 542 as dom/dialog-partstudio-part-properties.txt); our release-create icon is local release management (live's Free account has none) | ☑ psui 10-31 |
 | dk-9a0-versions-history-branch / dk-9a1-history-branch-rowmenu |  |  | ☐ |
 | dk-990-restored-light | psui-scratch t8 | Preferences › Theming › Light mode › Save theme, no restart: chrome, panels, viewport and planes light at once; the view cube kept its dark faces and axis letters until a hover (fixed: the viewport re-sends it on the theme change; = a fresh light start) | ☑ psui 10-31 |

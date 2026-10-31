@@ -3,7 +3,7 @@
 //! tooltips. Measurements and colors follow docs/ONSHAPE_UI_SPEC.md.
 
 use crate::assets;
-use crate::theme::{p, with_alpha};
+use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
@@ -901,10 +901,16 @@ pub fn rail_button(id: impl Into<ElementId>, icon: &str, active: bool, indicator
         .justify_center()
         .cursor_pointer()
         .hover(|d| d.bg(pal.panel_hover))
-        .child(assets::icon(icon, TOOL_ICON, cx))
-        .when(active, |d| {
-            let bar = div().absolute().top_0().bottom_0().w(px(4.)).bg(pal.accent);
-            d.bg(with_alpha(pal.accent, 0.08)).child(if indicator_left { bar.left_0() } else { bar.right_0() })
+        // Live (document/rail-panel-*, dk-996): the active one's icon and bar
+        // #1651b0 on #eaeaea; dark #90cef1 on the rail's own #2c2c2c.
+        .map(|d| {
+            let dark = noshape_scene::palette::is_dark();
+            if !active {
+                return d.child(assets::icon(icon, TOOL_ICON, cx));
+            }
+            let ink = if dark { 0x90cef1 } else { 0x1651b0 };
+            let bar = div().absolute().top_0().bottom_0().w(px(4.)).bg(gpui_kit::rgb_static(ink));
+            d.when(!dark, |d| d.bg(gpui_kit::rgb_static(0xeaeaea))).child(assets::icon_inked(icon, TOOL_ICON, ink, cx)).child(if indicator_left { bar.left_0() } else { bar.right_0() })
         })
 }
 
