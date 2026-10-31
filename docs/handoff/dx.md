@@ -171,6 +171,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Then TB15 (cut list row hover lights its members), D9 push-apart, A5 node drags (any leader), TB20 (hole table
   Flip X / Y, Holes to exclude), V70 (deleted display state / explode: blank views + info notice; live 1638).
   Live 1638 (b) TB28 Change configuration still open.
+- Then V27 (Edit aligned section re-picks its points; Exclude from cut on assembly views), S18 (a field's right-click
+  menu with Edit note…, its cell text hidden while edited). Landed through e640df77 (06:20 UTC).
+- Asked live: D6 side-view cosmetic threads (06:05). Not checked in the app yet: TB15 / TB27 (need a frame
+  drawing), V27 Exclude from cut and V28 Exclude from cut (need an assembly drawing), V35 sync breaks.
 - Open in my rows: V57 assembly Show sketches (assembly sources skip sketch wires), V35 (d) sections of broken views,
   D40 hatch / title red, C11 inference points, D9 ordinate jogs.
 
