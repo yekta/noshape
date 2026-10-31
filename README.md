@@ -55,29 +55,47 @@ window lists recent documents and folders with thumbnails.
 
 **Import and export.** Import STEP, IGES and BREP; export STEP, IGES, STL, OBJ and BREP.
 
+## Installing
+
+Download the file for your system from the [releases](https://github.com/yekta/noshape/releases):
+
+| System | Download | What the install does |
+|---|---|---|
+| macOS (Apple Silicon) | `noshape-<version>-macos-arm64.dmg` | Drag noshape to Applications. On first launch it offers to install the `noshape` command (a link in `/usr/local/bin`, else `~/.local/bin`) and to connect your coding agents; later: Help › Install command line tool… / Connect to coding agents… (also in the noshape menu). |
+| Windows | `noshape-<version>-windows-x86_64-setup.exe` | Installs to Program Files with a Start menu entry, puts `noshape` on your PATH (removed on uninstall), and the last page offers to connect your coding agents. `noshape-<version>-windows-x86_64.zip` is the portable version (nothing installed). |
+| Linux (x86_64) | `noshape-<version>-linux-x86_64.tar.gz` | Unpack and run `./install.sh` (for you: `~/.local/bin` and your menu; `--system` for everyone, `--agents` to connect your coding agents without asking). Debian and Ubuntu: `sudo apt install ./noshape-<version>-linux-x86_64.deb`. |
+| Servers (no GUI) | `noshape-cli-<version>-<system>` | The headless command line tool and MCP server alone, `noshape-cli`. |
+
+**macOS:** the app is signed ad hoc, not notarized, so macOS blocks it when it comes from a download ("cannot be
+opened" / "developer cannot be verified"). After copying it to Applications, clear the download flag once:
+`xattr -dr com.apple.quarantine /Applications/noshape.app`.
+
 ## Using noshape from Claude Code and other agents
 
-Every release bundle ships `noshape-cli` next to the app: a command line tool and an MCP server that can do
-everything the app does (see [docs/AGENT_API.md](docs/AGENT_API.md)). Add it to Claude Code with the path for
-your system:
-
-| Download | Command |
-|---|---|
-| macOS (`.dmg`, app dragged to Applications) | `claude mcp add noshape -- /Applications/noshape.app/Contents/MacOS/noshape-cli mcp` |
-| Linux (`.tar.gz`, unpacked to `~/noshape-<version>-linux-x86_64`) | `claude mcp add noshape -- ~/noshape-<version>-linux-x86_64/noshape-cli mcp` |
-| Windows (`.zip`, unpacked to `C:\noshape-<version>-windows-x86_64`) | `claude mcp add noshape -- C:\noshape-<version>-windows-x86_64\noshape-cli.exe mcp` |
-
-Use the folder you actually unpacked to. The dmg also holds a loose `noshape-cli` next to `noshape.app` if you
-prefer to put it on your `PATH`. When the app has a document open, the CLI edits it live in the window.
-
-**macOS:** the app and the CLI are signed ad hoc, not notarized, so macOS blocks them when they come from a
-download ("cannot be opened" / "developer cannot be verified"). After copying the app to Applications, clear the
-download flag once (this covers the CLI inside the app too):
+The app is also a command line tool and an MCP server that can do everything the app does (see
+[docs/AGENT_API.md](docs/AGENT_API.md)): `noshape <command>` from a terminal, `noshape mcp` for agents. Installing it
+connects it to the coding agents it finds, with your OK: Claude Code (`claude mcp add --scope user`), the Codex CLI
+(`codex mcp add`, or `~/.codex/config.toml`) and Claude Desktop (`claude_desktop_config.json`, backed up first).
+From a terminal:
 
 ```sh
-xattr -dr com.apple.quarantine /Applications/noshape.app
-xattr -d com.apple.quarantine /path/to/noshape-cli    # only for a loose copy taken from the dmg
+noshape agents status       # which agents are installed and connected
+noshape agents connect      # connect every one found (--agents claude_code,codex,claude_desktop to choose)
+noshape agents disconnect
 ```
+
+To do it by hand, with `noshape` on your PATH (any platform):
+
+```sh
+claude mcp add noshape -- noshape mcp          # add --scope user to use it in every project
+codex mcp add noshape -- noshape mcp
+```
+
+Without the install (the Windows zip, the Linux tarball unpacked anywhere), give the full path instead:
+`claude mcp add noshape -- ~/noshape-<version>-linux-x86_64/noshape mcp`, or
+`claude mcp add noshape -- C:\noshape-<version>-windows-x86_64\noshape.exe mcp`. Claude Desktop and other MCP clients
+take the same in their JSON configuration: `{"mcpServers": {"noshape": {"command": "/path/to/noshape", "args": ["mcp"]}}}`.
+When the app has a document open, agents edit it live in the window.
 
 ## Building
 

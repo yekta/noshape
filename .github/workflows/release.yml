@@ -3,7 +3,14 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # A dry run builds, bundles and checks every platform's downloads without publishing: on a branch,
+  # `gh workflow run release.yml --ref <branch>` (docs/handoff/cliapp.md). On a tag, dry_run=false publishes.
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build and check the bundles only (no GitHub release)'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -82,67 +89,220 @@ jobs:
           key: occt-V8_0_1
 
       - name: Build (release)
-        # The app and the agent CLI / MCP server (noshape-cli), shipped side by side.
+        # The app (which is also the CLI and the MCP server: `noshape mcp`) and the headless CLI for servers.
         run: cargo build --release --locked -p noshape -p noshape-cli
 
       - name: Bundle (macOS .app in .dmg)
         if: runner.os == 'macOS'
         run: |
+          mkdir -p out
           app=dist/noshape.app
           mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
           cp target/release/noshape "$app/Contents/MacOS/noshape"
-          cp target/release/noshape-cli "$app/Contents/MacOS/noshape-cli"
           cp packaging/icons/noshape.icns "$app/Contents/Resources/noshape.icns"
           packaging/macos/metallibs.sh "$app"
           sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
           plutil -lint "$app/Contents/Info.plist"
           strip -x "$app/Contents/MacOS/noshape"
-          strip -x "$app/Contents/MacOS/noshape-cli"
-          # Ad-hoc signatures so Apple Silicon will launch them (not notarized):
-          # the CLI first (nested code), then the bundle.
-          codesign --force --sign - "$app/Contents/MacOS/noshape-cli"
+          # Ad-hoc signature so Apple Silicon will launch it (not notarized).
           codesign --force --deep --sign - "$app"
-          # The CLI also loose in the dmg, next to noshape.app (same signed binary).
-          cp "$app/Contents/MacOS/noshape-cli" dist/noshape-cli
           ln -s /Applications dist/Applications
           # hdiutil underestimates the image size for large binaries; size it explicitly.
           size_mb=$(( $(du -sm dist | cut -f1) * 2 + 64 ))
           hdiutil create -volname noshape -srcfolder dist -ov -fs HFS+ -size "${size_mb}m" -format UDZO \
-            "noshape-$VERSION-${{ matrix.asset }}.dmg"
-          echo "ASSET=noshape-$VERSION-${{ matrix.asset }}.dmg" >> "$GITHUB_ENV"
+            "out/noshape-$VERSION-${{ matrix.asset }}.dmg"
 
-      - name: Bundle (Linux tar.gz)
+      - name: Bundle (Linux tar.gz and .deb)
         if: runner.os == 'Linux'
         run: |
+          mkdir -p out
           d="noshape-$VERSION-${{ matrix.asset }}"
           mkdir -p "$d"
-          cp target/release/noshape target/release/noshape-cli "$d/"
-          strip "$d/noshape" "$d/noshape-cli"
-          cp packaging/linux/noshape.desktop README.md "$d/"
+          cp target/release/noshape "$d/"
+          strip "$d/noshape"
+          cp packaging/linux/noshape.desktop packaging/linux/install.sh README.md "$d/"
           cp packaging/icons/noshape-512.png "$d/noshape.png"
           cp packaging/icons/noshape.svg "$d/noshape.svg"
-          tar czf "$d.tar.gz" "$d"
-          echo "ASSET=$d.tar.gz" >> "$GITHUB_ENV"
+          tar czf "out/$d.tar.gz" "$d"
+          # The .deb: /usr/bin/noshape, the menu entry and icons.
+          pkg=deb/noshape
+          mkdir -p "$pkg/DEBIAN" "$pkg/usr/bin" "$pkg/usr/share/applications" "$pkg/usr/share/icons/hicolor/512x512/apps" \
+            "$pkg/usr/share/icons/hicolor/scalable/apps" "$pkg/usr/share/doc/noshape"
+          cp "$d/noshape" "$pkg/usr/bin/noshape"
+          cp packaging/linux/noshape.desktop "$pkg/usr/share/applications/"
+          cp "$d/noshape.png" "$pkg/usr/share/icons/hicolor/512x512/apps/noshape.png"
+          cp "$d/noshape.svg" "$pkg/usr/share/icons/hicolor/scalable/apps/noshape.svg"
+          cp README.md "$pkg/usr/share/doc/noshape/"
+          sed -e "s/@VERSION@/$VERSION/" -e "s/@SIZE@/$(du -sk "$pkg/usr" | cut -f1)/" packaging/linux/deb-control > "$pkg/DEBIAN/control"
+          dpkg-deb --build --root-owner-group "$pkg" "out/noshape-$VERSION-${{ matrix.asset }}.deb"
 
-      - name: Bundle (Windows zip)
+      - name: Bundle (Windows installer and zip)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Force -Path out | Out-Null
           $d = "noshape-$env:VERSION-${{ matrix.asset }}"
           New-Item -ItemType Directory -Force -Path $d | Out-Null
-          Copy-Item target/release/noshape.exe, target/release/noshape-cli.exe, README.md $d
-          Compress-Archive -Path $d -DestinationPath "$d.zip"
-          "ASSET=$d.zip" >> $env:GITHUB_ENV
+          Copy-Item target/release/noshape.exe, README.md $d
+          Compress-Archive -Path $d -DestinationPath "out/$d.zip"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc /Q "/DVersion=$env:VERSION" "/DSource=$PWD\target\release" "/DOutput=$PWD\out" packaging\windows\noshape.iss
+          if ($LASTEXITCODE -ne 0) { throw "iscc failed ($LASTEXITCODE)" }
+
+      - name: CLI-only download (headless noshape-cli, for servers)
+        shell: bash
+        run: |
+          c="noshape-cli-$VERSION-${{ matrix.asset }}"
+          mkdir -p "$c"
+          cp README.md "$c/"
+          case "$RUNNER_OS" in
+            Windows)
+              cp target/release/noshape-cli.exe "$c/"
+              pwsh -NoProfile -Command "Compress-Archive -Path '$c' -DestinationPath 'out/$c.zip'" ;;
+            macOS)
+              cp target/release/noshape-cli "$c/" && strip -x "$c/noshape-cli" && codesign --force --sign - "$c/noshape-cli"
+              tar czf "out/$c.tar.gz" "$c" ;;
+            Linux)
+              cp target/release/noshape-cli "$c/" && strip "$c/noshape-cli"
+              tar czf "out/$c.tar.gz" "$c" ;;
+          esac
+          ls -la out
 
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.asset }}
-          path: ${{ env.ASSET }}
+          path: out/*
           if-no-files-found: error
 
-  publish:
+  # Every platform's downloads on a fresh runner: installed as a user would, then `noshape --version` and
+  # `noshape mcp` (initialize + tools/list over pipes) through the PATH entry the install made.
+  verify:
+    name: Check ${{ matrix.name }}
     needs: bundle
-    if: github.ref_type == 'tag'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-24.04
+            asset: linux-x86_64
+          - name: macOS arm64
+            os: macos-latest
+            asset: macos-arm64
+          - name: Windows x86_64
+            os: windows-latest
+            asset: windows-x86_64
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/release
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.asset }}
+          path: dl
+
+      - name: Linux (CLI-only, .deb, install.sh)
+        if: runner.os == 'Linux'
+        run: |
+          set -x
+          check=.github/release/check_binary.py
+          # On the clean runner first: the CLI-only download needs no desktop libraries.
+          tar xzf dl/noshape-cli-*-linux-x86_64.tar.gz -C "$RUNNER_TEMP"
+          python3 $check "$(ls "$RUNNER_TEMP"/noshape-cli-*/noshape-cli)" noshape-cli
+          # The .deb: apt pulls in its dependencies (the desktop libraries the app links).
+          sudo apt-get update -q
+          sudo apt-get install -y ./dl/noshape-[0-9]*-linux-x86_64.deb
+          test -x /usr/bin/noshape
+          python3 $check /usr/bin/noshape
+          test -f /usr/share/applications/noshape.desktop
+          test -f /usr/share/icons/hicolor/512x512/apps/noshape.png
+          sudo apt-get remove -y noshape
+          test ! -e /usr/bin/noshape
+          # The tarball's install.sh (the libraries are there now, as on a desktop). A fake Claude Code on PATH:
+          # --agents registers noshape with it (`claude mcp add`).
+          tar xzf dl/noshape-[0-9]*-linux-x86_64.tar.gz -C "$RUNNER_TEMP"
+          dir=$(ls -d "$RUNNER_TEMP"/noshape-[0-9]*/)
+          mkdir -p "$RUNNER_TEMP/fake"
+          printf '#!/bin/sh\necho "$*" >> "$HOME/claude-calls"\n' > "$RUNNER_TEMP/fake/claude"
+          chmod +x "$RUNNER_TEMP/fake/claude"
+          PATH="$RUNNER_TEMP/fake:$PATH" "$dir/install.sh" --agents
+          grep -qx "mcp add --scope user noshape -- $HOME/.local/bin/noshape mcp" "$HOME/claude-calls"
+          grep -q "^Exec=$HOME/.local/bin/noshape" "$HOME/.local/share/applications/noshape.desktop"
+          test -f "$HOME/.local/share/icons/hicolor/512x512/apps/noshape.png"
+          export PATH="$HOME/.local/bin:$PATH"
+          test "$(command -v noshape)" = "$HOME/.local/bin/noshape"
+          python3 $check noshape
+          "$dir/install.sh" --uninstall --no-agents
+          test ! -e "$HOME/.local/bin/noshape"
+
+      - name: macOS (dmg, command line tool link, CLI-only)
+        if: runner.os == 'macOS'
+        run: |
+          set -x
+          check=.github/release/check_binary.py
+          hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg" dl/noshape-*-macos-arm64.dmg
+          test ! -e "$RUNNER_TEMP/dmg/noshape-cli"
+          cp -R "$RUNNER_TEMP/dmg/noshape.app" /Applications/noshape.app
+          hdiutil detach "$RUNNER_TEMP/dmg"
+          test "$(ls /Applications/noshape.app/Contents/MacOS)" = noshape
+          app=/Applications/noshape.app/Contents/MacOS/noshape
+          python3 $check "$app"
+          # What Help › Install command line tool… does (the admin prompt aside): /usr/local/bin/noshape → the app.
+          sudo mkdir -p /usr/local/bin && sudo chown "$(id -u)" /usr/local/bin
+          "$app" cli install --dir /usr/local/bin
+          test "$(readlink /usr/local/bin/noshape)" = "$app"
+          export PATH="/usr/local/bin:$PATH"
+          test "$(command -v noshape)" = /usr/local/bin/noshape
+          python3 $check noshape
+          noshape cli status | grep -q '"on_path": true'
+          tar xzf dl/noshape-cli-*-macos-arm64.tar.gz -C "$RUNNER_TEMP"
+          python3 $check "$(ls "$RUNNER_TEMP"/noshape-cli-*/noshape-cli)" noshape-cli
+
+      - name: Windows (installer, PATH, uninstall, zip, CLI-only)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $check = ".github/release/check_binary.py"
+          $setup = (Get-ChildItem dl\noshape-*-windows-x86_64-setup.exe).FullName
+          $p = Start-Process $setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$env:RUNNER_TEMP\setup.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content "$env:RUNNER_TEMP\setup.log"; throw "setup exit $($p.ExitCode)" }
+          $dir = "$env:ProgramFiles\noshape"
+          if (-not (Test-Path "$dir\noshape.exe")) { throw "not installed to $dir" }
+          if (-not (Test-Path "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\noshape.lnk")) { throw "no Start menu entry" }
+          $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+          if (($userPath -split ';') -notcontains $dir) { throw "$dir not on the user PATH: $userPath" }
+          # A new terminal's PATH: `noshape` resolves to the installed exe.
+          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + $userPath
+          $found = (Get-Command noshape).Source
+          if ($found -ne "$dir\noshape.exe") { throw "noshape resolves to $found" }
+          python $check noshape
+          if ($LASTEXITCODE -ne 0) { throw "check failed" }
+          # The GUI-subsystem exe prints into a redirect from cmd and into PowerShell's pipe.
+          cmd /c "noshape --version > `"$env:RUNNER_TEMP\v.txt`""
+          if (-not ((Get-Content "$env:RUNNER_TEMP\v.txt") -match '^noshape ')) { throw "cmd redirect: $(Get-Content "$env:RUNNER_TEMP\v.txt")" }
+          $v = noshape --version | Out-String
+          if ($v -notmatch '^noshape ') { throw "pipe: $v" }
+          # Uninstall: the files and the PATH entry go.
+          $u = Start-Process "$dir\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
+          if ($u.ExitCode -ne 0) { throw "uninstall exit $($u.ExitCode)" }
+          # The uninstaller finishes from a copy of itself: wait for the files to go.
+          for ($i = 0; $i -lt 60 -and (Test-Path "$dir\noshape.exe"); $i++) { Start-Sleep -Seconds 1 }
+          if (Test-Path "$dir\noshape.exe") { throw "uninstall left noshape.exe" }
+          if (([Environment]::GetEnvironmentVariable('Path', 'User') -split ';') -contains $dir) { throw "uninstall left the PATH entry" }
+          # The portable zip and the CLI-only download.
+          Expand-Archive (Get-ChildItem dl\noshape-[0-9]*-windows-x86_64.zip).FullName -DestinationPath "$env:RUNNER_TEMP\zip"
+          python $check (Get-ChildItem "$env:RUNNER_TEMP\zip\noshape-*\noshape.exe").FullName
+          if ($LASTEXITCODE -ne 0) { throw "zip check failed" }
+          Expand-Archive (Get-ChildItem dl\noshape-cli-*-windows-x86_64.zip).FullName -DestinationPath "$env:RUNNER_TEMP\cli"
+          python $check (Get-ChildItem "$env:RUNNER_TEMP\cli\noshape-cli-*\noshape-cli.exe").FullName noshape-cli
+          if ($LASTEXITCODE -ne 0) { throw "CLI check failed" }
+
+  publish:
+    needs: [bundle, verify]
+    if: github.ref_type == 'tag' && !inputs.dry_run
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v8
