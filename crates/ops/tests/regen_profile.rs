@@ -328,3 +328,36 @@ fn bench_live30_display_mesh() {
     eprintln!("live-30 display mesh, warm: ours {ours:.1} ms, BRepMesh {occt:.1} ms: {:.1}×", occt / ours);
     let _ = std::fs::remove_file(&tmp);
 }
+
+/// live-30's display mesh by step (the kernel profile, wall time), ours, cold, three rounds: for
+/// tools/tiers/perf.sh. `cargo test --release -p noshape-ops --test all regen_profile::bench_profile_live30 --
+/// --ignored --nocapture --test-threads=1` (alone: the profile switch is read once).
+#[test]
+#[ignore = "bench"]
+fn bench_profile_live30_display_mesh() {
+    use noshape_kernel::{ShapeType, Transform, kernel_profile_mark, tessellate, transform};
+    // SAFETY: set before any kernel call of this test process (run alone), read by the kernel once.
+    unsafe { std::env::set_var("NOSHAPE_KERNEL_PROFILE", "1") };
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf");
+    let tmp = std::env::temp_dir().join(format!("noshape-mesh-profile-{}.noshape", std::process::id()));
+    std::fs::copy(dir.join("live-30-features.noshape"), &tmp).unwrap();
+    let s = noshape_ops::session::Session::open(&tmp).unwrap();
+    let units = s.doc.settings.units;
+    let ps = s.doc.tabs.iter().find_map(|t| if let TabContent::PartStudio(ps) = &t.content { Some(ps.clone()) } else { None }).unwrap();
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let parts: Vec<noshape_kernel::Shape> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.shape.clone()).collect();
+    let copies: Vec<_> = (1..=3)
+        .flat_map(|k| parts.iter().map(move |p| transform(p, &Transform::Scale { center: DVec3::ZERO, factor: 1.0 + k as f64 * 1e-6 }, true).unwrap().shape))
+        .collect();
+    for c in &copies {
+        let _ = c.ancestor_map(ShapeType::Edge, ShapeType::Face).unwrap();
+    }
+    kernel_profile_mark("");
+    let t = Instant::now();
+    for c in &copies {
+        tessellate(c, c.bounding_box(false).unwrap().diagonal(), 2.0 * std::f64::consts::TAU / 144.0, true).unwrap();
+    }
+    eprintln!("live-30, ours, cold: {:.2} ms each (profiled)", t.elapsed().as_secs_f64() * 1e3 / 3.0);
+    kernel_profile_mark("ours, three rounds");
+    let _ = std::fs::remove_file(&tmp);
+}
