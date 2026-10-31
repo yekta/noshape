@@ -43,8 +43,9 @@ T1, no GPU, no display: the real view in a test window, its `Gpu` a no-op stand-
 worker on wgpu's no-op backend), keys through GPUI's dispatch. Example: part-studio-ui
 `part_studio/sketch_ui_tests.rs` (Line, click, click, `5 0 Enter` → a 50 mm dimension).
 - The crate dev-depends on `noshape-ui-test-support` (turns on GPUI's `test-support` and wgpu's `noop`) and on
-  `gpui = { package = "gpui-pre", version = "=0.3.9" }` (for `#[gpui::test]`). Only part-studio-ui does so far; others
-  opt in the same way. Never put those features on a normal dependency: `.config/hakari.toml` doesn't traverse
+  `gpui = { package = "gpui-pre", version = "=0.3.9" }` (for `#[gpui::test]`). part-studio-ui and assembly-ui do so
+  far (assembly-ui: `assembly_ui_tests.rs`, a document made through the agent API in a temp dir, then the real
+  AssemblyView, `assembly_hooks::register_for_tests()`); others opt in the same way. Never put those features on a normal dependency: `.config/hakari.toml` doesn't traverse
   noshape-ui-test-support, so `cargo hakari generate --diff` stays empty, and
   `cargo tree -p noshape -e features -e normal | grep -c test-support` must print 0.
 - Write the test inside the module whose private state it reads (`#[cfg(test)] #[path = "…_ui_tests.rs"] mod

@@ -151,6 +151,9 @@ mod reflection;
 mod config_panel;
 #[path = "assembly_toolbar.rs"]
 mod toolbar;
+#[cfg(test)]
+#[path = "assembly_ui_tests.rs"]
+mod ui_tests;
 pub use toolbar::{AsmToolbarPrefs, shortcut_catalog};
 pub use standard_content::*;
 

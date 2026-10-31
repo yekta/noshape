@@ -183,3 +183,32 @@ pub fn readonly_variable_table(doc: &Entity<DocModel>, element: TabId, r: &Studi
 pub fn variable_panel_footer(doc: Entity<DocModel>, element: TabId, cx: &App) -> AnyElement {
     (hooks().variable_panel_footer)(doc, element, cx)
 }
+
+/// Inert hooks for UI tests on GPUI's test platform (docs/TESTS.md "UI keystroke tests"): nothing above the
+/// Assembly studio exists there.
+#[cfg(test)]
+pub fn register_for_tests() {
+    register(Hooks {
+        open_document_window: |_, _, _| Ok(()),
+        open_version_window: |_, _, _, _| Err(anyhow::anyhow!("no version windows in UI tests")),
+        library_docs: Vec::new,
+        watched_folders: Vec::new,
+        subfolders: |_| Vec::new(),
+        file_thumbnail: |_| None,
+        release_part_items: |_, _, _, _, _| Vec::new(),
+        release_tab_items: |_, _| Vec::new(),
+        open_release_candidate: |_, _, _, _| {},
+        last_viewed_config: |_| None,
+        create_version: |_, _, _| {},
+        tab_properties: |_, _, _, _| {},
+        instance_list_properties: || false,
+        set_instance_list_properties: |_| {},
+        open_export_modal: |_, _, _, _, _| {},
+        store_export: |_, _, _, _, _| Err(anyhow::anyhow!("no stored exports in UI tests")),
+        store_written: |_, _, _, _| String::new(),
+        open_propagation_dialog: |_, _, _, _, _, _, _| {},
+        variable_table: |_, _, _, _, cx| cx.new(|_| gpui_kit::Empty).into(),
+        readonly_variable_table: |_, _, _, _, _, _| None,
+        variable_panel_footer: |_, _, _| div().into_any_element(),
+    });
+}
