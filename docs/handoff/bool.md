@@ -958,6 +958,18 @@ VF 0.07, FF 0.16); ours 0.67 s with OCCT's FF.
   corpus6 662, Shell's 78, direct 58).
 - psui: nothing public changed.
 
+## Patterned tools, step 7 (10-31 UTC)
+- The periods start at 0.382 of a step from the frame's x axis: on the knurl the axis frame lined up with the
+  pattern's mirror planes and 4144 section parts had their middles exactly on a period's start (no period, found
+  directly); now none: parts found directly 6868 → 2747 of 70k, pieces cast rays 1174 → 798 of 59k.
+- Whether an edge lies on another argument's face, where that takes points along it (free-form faces, B-spline and
+  elliptic edges), found for all candidate pairs on all threads before the pairing (`on_free_surface`); the
+  pairing takes the answers in its own order. The pairing's serial loop: edge_on_surface 79 → 35 samples.
+- New T1 test `bool_patterns::radial_holes_by_one_period` (12 radial holes; the rotation found; as OCCT's, 0.85 s).
+  New T2 bench `four_hundred_fins_on_a_plate`: 400 box fins fused onto a plate: ours 0.54 s / OCCT 5.3 s (9.8×,
+  local), 2006 faces, the same volume (no rotation there: the Rust Boolean's generic path).
+- Replays, all 0 differ, the counts unchanged.
+
 ## Times, the cases taken (replays 10-29 23:30 UTC, ours measured here against OCCT's recorded time)
 | corpus | taken | median ours / OCCT | total ours / OCCT |
 |---|---|---|---|
@@ -973,6 +985,10 @@ Medians are 10–20× faster; totals 2.6–3.4× in the corpora, held down by a 
 ~2 s each against OCCT's 3–4 s). (OCCT's are the recorded times, parallel, on a loaded machine; ours serial.)
 
 ## Next
+- After the knurl (lead 10-31): skasm's three union rows in docs/parity/workflow-booleans.md: boolgrid 15 #42 and
+  boolgrid 38 #12 (the Rust union gives 12 / 9 faces where OCCT and live give 14 / 10: coplanar neighbouring faces
+  merged, RUST-UNION-MERGES-DISJOINT-FACES) and boolrand 17 #0 (OCCT's path "no geometry change" on a union of two
+  r5 cylinders 1 mm apart; qa's script no longer draws that case: rebuild it by hand).
 Free-form, the lead's four steps (13:35) where they stand (10-29 20:45 UTC): (1) profiled (above); (2) the hybrid
 (OCCT's IntTools_FaceFace curves, everything else ours) takes B-spline, torus, sphere, extruded and revolved faces;
 (3) tori / spheres / sweeps through the same hybrid: returns flat (spheres and tori mostly decline at poles and

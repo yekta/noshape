@@ -66,6 +66,25 @@ fn radial_holes_in_a_cylinder() {
     bench("radial holes", k::BooleanOp::Cut, &cyl, &rotated(&hole, DVec3::ZERO, DVec3::Z, 24), &k::BooleanOptions::default());
 }
 
+/// 12 radial holes into a cylinder: the pattern's rotation found, one period's places, crossings, pieces and
+/// classification for the rest; as OCCT's.
+#[test]
+fn radial_holes_by_one_period() {
+    let cyl = k::make_cylinder(&z_frame(DVec3::ZERO), 0.025, 0.05, TAU).unwrap();
+    let hole = k::make_cylinder(&k::Plane::new(DVec3::new(0.015, 0.0, 0.025), DVec3::X, DVec3::Y), 0.002, 0.015, TAU).unwrap();
+    bench("radial holes, 12", k::BooleanOp::Cut, &cyl, &rotated(&hole, DVec3::ZERO, DVec3::Z, 12), &k::BooleanOptions::default());
+}
+
+/// 400 fins (a 20 × 20 grid of thin boxes) fused onto a plate's top, each reaching into it.
+#[test]
+#[ignore = "T2: timed pattern Booleans"]
+fn four_hundred_fins_on_a_plate() {
+    let plate = k::make_box_corners(DVec3::ZERO, DVec3::new(0.2, 0.2, 0.01)).unwrap();
+    let fin = k::make_box_corners(DVec3::new(0.004, 0.002, 0.008), DVec3::new(0.006, 0.008, 0.03)).unwrap();
+    let tools: Vec<k::Shape> = (0..400).map(|i| k::transform(&fin, &k::Transform::Translate(DVec3::new(0.01 * (i % 20) as f64, 0.01 * (i / 20) as f64, 0.0)), true).unwrap().shape).collect();
+    bench("400 fins", k::BooleanOp::Fuse, &plate, &tools, &k::BooleanOptions::default());
+}
+
 /// A 10 × 10 grid of pockets in a plate's top.
 #[test]
 #[ignore = "T2: timed pattern Booleans"]

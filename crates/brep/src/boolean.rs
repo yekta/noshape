@@ -600,15 +600,16 @@ impl Sym {
         Rigid { m, t: self.o - m * self.o }
     }
 
-    /// The steps `p` is from the first period (its angle about the axis from `x`, in steps), unless it is on the
-    /// axis or at a period's start (within rounding).
+    /// The steps `p` is from the first period (its angle about the axis from `x`, in steps, the periods starting
+    /// at an odd fraction of a step: a pattern's features lie on whole and half steps), unless it is on the axis or
+    /// at a period's start (within rounding).
     fn period(&self, p: DVec3, size: f64) -> Option<usize> {
         let w = p - self.o;
         let (u, v) = (w.dot(self.x), w.dot(self.y));
         if u.hypot(v) <= 1e-6 * size {
             return None;
         }
-        let k = v.atan2(u).rem_euclid(TAU) * self.n as f64 / TAU;
+        let k = v.atan2(u).rem_euclid(TAU) * self.n as f64 / TAU + 0.381_966;
         let j = k.floor();
         (k - j > 1e-6 && j + 1.0 - k > 1e-6).then_some(j as usize % self.n)
     }
@@ -645,6 +646,8 @@ struct Ctx<'a> {
     canon_secs: HashMap<FacePair, Vec<SectionCurve>>,
     /// Pairs of faces found clearly apart or not (`free::apart`), by the two faces as paired.
     apart: HashMap<(usize, usize), bool>,
+    /// Whether an edge lies on a face, where that takes points along it (`on_free_surface`), found ahead.
+    on_surface: HashMap<(usize, usize), R<bool>>,
     /// NURBS curves (`Geo::Nurbs`), and where OCCT's sections of free-form faces come from.
     ncurves: Vec<NCurve>,
     src: Option<&'a dyn SectionSource>,
@@ -1354,61 +1357,73 @@ impl Ctx<'_> {
                 Ok(k.n.cross(*ax).length() <= 1e-9 && (w - *ax * h).length() <= tol && (k.r - (r0 + slope * h)).abs() <= tol)
             }
             (_, Geo::Apex) => Ok(false),
-            (Surf::Nurbs { .. }, _) | (_, Geo::Nurbs { .. } | Geo::Ell { .. }) => {
-                // Points along it: all on the surface, it lies on it (not yet taken); within the grey band
-                // without being clearly off, ambiguous.
-                let s = self.edge_seg(e);
-                let (mut on, mut near) = (0, 0);
-                // (The middle first: one point clearly off, it isn't on it.)
-                for k in [3, 0, 6, 1, 2, 4, 5] {
-                    let p = self.seg_at(&s, k as f64 / 6.0);
-                    if free::clearly_off(&self.faces[f], p, GREY * tol) {
-                        return Ok(false);
-                    }
-                    let d = free::surface_distance(&self.faces[f], p);
-                    if d <= tol {
-                        on += 1;
-                    } else if d <= GREY * tol {
-                        near += 1;
-                    } else {
-                        return Ok(false);
-                    }
-                }
-                if on == 7 {
-                    // (On a plane, cylinder or cone: its pieces there go into the face, as a straight or round
-                    // edge's.)
-                    if let (Geo::Nurbs { .. }, Surf::Plane { .. } | Surf::Cyl { .. }) = (self.edges[e].g, &self.faces[f].s) {
-                        return Ok(true);
-                    }
-                    if let (Geo::Ell { e: el, .. }, s @ (Surf::Plane { .. } | Surf::Cyl { .. })) = (self.edges[e].g, &self.faces[f].s)
-                        && !el.hyp
-                        && (!el.par || matches!(s, Surf::Plane { .. }))
-                    {
-                        return Ok(true);
-                    }
-                    // (An ellipse on a free-form face: its curve there projected, edge_in_face.)
-                    if let (Geo::Ell { e: el, .. }, Surf::Nurbs { .. }) = (self.edges[e].g, &self.faces[f].s)
-                        && !el.open()
-                        && self.src.is_some()
-                    {
-                        return Ok(true);
-                    }
-                    if let Geo::Ell { .. } = self.edges[e].g {
-                        return Err(Decline("an argument's ellipse on another's face"));
-                    }
-                    // (A straight, round or B-spline edge on a free-form face: its curve there projected,
-                    // edge_in_face.)
-                    if matches!(self.edges[e].g, Geo::Line | Geo::Arc { .. } | Geo::Nurbs { .. }) && self.src.is_some() {
-                        return Ok(true);
-                    }
-                    return Err(Decline("an edge on another argument's free-form face"));
-                }
-                if near > 0 && on + near == 7 {
-                    return Err(Decline("an edge nearly on another argument's face"));
-                }
-                Ok(false)
+            (Surf::Nurbs { .. }, _) | (_, Geo::Nurbs { .. } | Geo::Ell { .. }) => match self.on_surface.get(&(e, f)) {
+                Some(&x) => x,
+                None => self.on_free_surface(e, f),
+            },
+        }
+    }
+
+    /// Whether edge `e` takes points along it to tell whether it lies on face `f`'s surface.
+    fn by_points(&self, e: usize, f: usize) -> bool {
+        !matches!(self.edges[e].g, Geo::Apex) && (matches!(self.faces[f].s, Surf::Nurbs { .. }) || matches!(self.edges[e].g, Geo::Nurbs { .. } | Geo::Ell { .. }))
+    }
+
+    /// [`Self::edge_on_surface`] by points along the edge.
+    fn on_free_surface(&self, e: usize, f: usize) -> R<bool> {
+        let tol = self.tol;
+        // Points along it: all on the surface, it lies on it (not yet taken); within the grey band
+        // without being clearly off, ambiguous.
+        let s = self.edge_seg(e);
+        let (mut on, mut near) = (0, 0);
+        // (The middle first: one point clearly off, it isn't on it.)
+        for k in [3, 0, 6, 1, 2, 4, 5] {
+            let p = self.seg_at(&s, k as f64 / 6.0);
+            if free::clearly_off(&self.faces[f], p, GREY * tol) {
+                return Ok(false);
+            }
+            let d = free::surface_distance(&self.faces[f], p);
+            if d <= tol {
+                on += 1;
+            } else if d <= GREY * tol {
+                near += 1;
+            } else {
+                return Ok(false);
             }
         }
+        if on == 7 {
+            // (On a plane, cylinder or cone: its pieces there go into the face, as a straight or round
+            // edge's.)
+            if let (Geo::Nurbs { .. }, Surf::Plane { .. } | Surf::Cyl { .. }) = (self.edges[e].g, &self.faces[f].s) {
+                return Ok(true);
+            }
+            if let (Geo::Ell { e: el, .. }, s @ (Surf::Plane { .. } | Surf::Cyl { .. })) = (self.edges[e].g, &self.faces[f].s)
+                && !el.hyp
+                && (!el.par || matches!(s, Surf::Plane { .. }))
+            {
+                return Ok(true);
+            }
+            // (An ellipse on a free-form face: its curve there projected, edge_in_face.)
+            if let (Geo::Ell { e: el, .. }, Surf::Nurbs { .. }) = (self.edges[e].g, &self.faces[f].s)
+                && !el.open()
+                && self.src.is_some()
+            {
+                return Ok(true);
+            }
+            if let Geo::Ell { .. } = self.edges[e].g {
+                return Err(Decline("an argument's ellipse on another's face"));
+            }
+            // (A straight, round or B-spline edge on a free-form face: its curve there projected,
+            // edge_in_face.)
+            if matches!(self.edges[e].g, Geo::Line | Geo::Arc { .. } | Geo::Nurbs { .. }) && self.src.is_some() {
+                return Ok(true);
+            }
+            return Err(Decline("an edge on another argument's free-form face"));
+        }
+        if near > 0 && on + near == 7 {
+            return Err(Decline("an edge nearly on another argument's face"));
+        }
+        Ok(false)
     }
 
     /// Whether faces `fs` and `ft` are clearly apart (`free::apart`; found once).
@@ -2493,6 +2508,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         canonical: HashMap::default(),
         canon_secs: HashMap::default(),
         apart: HashMap::default(),
+        on_surface: HashMap::default(),
         ncurves: Vec::new(),
         src,
     };
@@ -2857,6 +2873,44 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     let ns = cx.solids.len();
     // (OCCT's sections free-form faces' pairs below will ask for, a copied pair's the pair it is moved from, made
     // ahead on all threads; any other as asked.)
+    // (Whether edges lie on other arguments' faces, where that takes points along them, on all threads ahead for
+    // the pairing below: each edge of either face of a pair that reaches the other's box.)
+    {
+        let mut ahead: Vec<(usize, usize)> = Vec::new();
+        let mut seen: HashSet<(usize, usize)> = HashSet::default();
+        for s in 0..ns {
+            for t in s + 1..ns {
+                let (a, b) = (&cx.solids[s], &cx.solids[t]);
+                if a.arg == b.arg || !boxes_meet(a.lo, a.hi, b.lo, b.hi, GREY * tol) {
+                    continue;
+                }
+                for &fs in &a.faces {
+                    for &ft in &b.faces {
+                        let (x, y) = (&cx.faces[fs], &cx.faces[ft]);
+                        if !boxes_meet(x.lo, x.hi, y.lo, y.hi, GREY * tol) {
+                            continue;
+                        }
+                        for (f, g) in [(fs, ft), (ft, fs)] {
+                            let (lo, hi) = (cx.faces[g].lo, cx.faces[g].hi);
+                            for &(e, _) in &cx.faces[f].edges {
+                                let [p, q] = cx.edges[e].v;
+                                if let Geo::Line = cx.edges[e].g
+                                    && !boxes_meet(cx.p(p).min(cx.p(q)), cx.p(p).max(cx.p(q)), lo, hi, GREY * tol)
+                                {
+                                    continue;
+                                }
+                                if cx.by_points(e, g) && seen.insert((e, g)) {
+                                    ahead.push((e, g));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let found = par_map(ahead.len(), &|k| cx.on_free_surface(ahead[k].0, ahead[k].1));
+        cx.on_surface = ahead.into_iter().zip(found).collect();
+    }
     if let Some(src) = cx.src {
         let mut pairs: Vec<(usize, usize)> = Vec::new();
         for s in 0..ns {
