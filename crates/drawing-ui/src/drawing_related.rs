@@ -122,13 +122,30 @@ impl DrawingEditor {
     /// annotations to the scene.
     pub fn push_related_highlights(&self, scene: &mut Scene) {
         let Some(b) = &self.built else { return };
-        // The Hatch region dialog's closed profiles (live drawing/469).
-        let outlines = self.hatch_profile_outlines();
+        // The Hatch region dialog's closed profiles and the selected hatch
+        // regions: a yellow outline with a pale halo (live request 1682,
+        // "the yellow surround").
+        let mut outlines = self.hatch_profile_outlines();
+        let sheet = self.current_sheet();
+        for h in self.selection.iter().filter_map(|s| if let Sel::Hatch(id) = s { sheet.sketch.hatches.iter().find(|h| h.id == *id) } else { None }) {
+            let pl = h.view.and_then(|v| self.placement(v));
+            for l in std::iter::once(&h.boundary).chain(h.holes.iter()) {
+                let mut v: Vec<[f64; 2]> = l.iter().map(|p| pl.as_ref().map_or(*p, |pl| pl.to_sheet(*p))).collect();
+                if let Some(f) = v.first().copied() {
+                    v.push(f);
+                }
+                outlines.push(v);
+            }
+        }
         if !outlines.is_empty() {
+            const CORE: [u8; 4] = [235, 235, 146, 255];
+            const HALO: [u8; 4] = [245, 245, 201, 255];
             let mut lines = LineData::default();
-            for l in &outlines {
-                for w in l.windows(2) {
-                    lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width: 4.0, style: LineSegment::ON_TOP });
+            for (color, width) in [(HALO, 6.0), (CORE, 2.0)] {
+                for l in &outlines {
+                    for w in l.windows(2) {
+                        lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color, pick_id: 0, width, style: LineSegment::ON_TOP });
+                    }
                 }
             }
             let up = self.gpu.uploader();
