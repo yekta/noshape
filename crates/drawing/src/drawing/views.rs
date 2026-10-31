@@ -351,6 +351,10 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
                 Some(name) => Some(asm.display_states.iter().find(|d| &d.name == name)?.hidden_instances.clone()),
                 None => None,
             };
+            // An exploded view deleted from the assembly (live request 1638).
+            if key.explode.is_some_and(|i| i >= asm.exploded_views.len()) {
+                return None;
+            }
             let result = assemblies.evaluate(doc, asm, &opts, key.explode);
             let mut s = assembly_source(doc, &result, hash, tab.name.clone(), hidden.as_deref());
             s.bom_structured = structured_bom(doc, key.tab, &result);
@@ -1845,6 +1849,11 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
     let exact = exact || sheet.view(id).is_some_and(|v| v.best_quality);
     let fail = |msg: &str| Arc::new(ViewGeometry { id, error: Some(msg.to_string()), ..Default::default() });
     let Some(key) = view_key(drawing, sheet, id, sources, exact) else {
+        // Its display state or exploded view deleted from the assembly: the
+        // view goes blank, not red (live request 1638; the UI says why).
+        if view_source(sheet, id).is_some_and(|(k, _)| k.display.is_some() || k.explode.is_some()) {
+            return Arc::new(ViewGeometry { id, ..Default::default() });
+        }
         return fail("The view's source is not available");
     };
     if let Some(g) = cache.get(key) {

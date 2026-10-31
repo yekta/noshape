@@ -2563,6 +2563,27 @@ fn gdt_leader_runs_through_its_nodes() {
     assert_eq!((*i, path.points.clone()), (0, vec![[120.0, 40.0], [140.0, 30.0], [150.0, 20.0]]));
 }
 
+/// An assembly view whose exploded view or display state was deleted goes
+/// blank, not red (live request 1638; the app shows "Failed to resolve …").
+#[test]
+fn a_view_of_a_deleted_explode_or_display_state_is_blank() {
+    let (doc, mut drawing) = demo();
+    let asm = assembly_tab(&doc);
+    let si = drawing.add_sheet(0);
+    let mut v = base_view(1, asm, ViewOrientation::Isometric, [150.0, 160.0]);
+    v.explode = Some(7);
+    drawing.sheets[si].views.push(v);
+    let mut w = base_view(2, asm, ViewOrientation::Front, [300.0, 160.0]);
+    w.display_state = Some("Gone".into());
+    drawing.sheets[si].views.push(w);
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    for id in [ViewId(1), ViewId(2)] {
+        let g = compute_view(&drawing, &drawing.sheets[si], id, &sources, &cache, false);
+        assert!(g.error.is_none() && g.edges.is_empty(), "{id:?}: {:?}", g.error);
+    }
+}
+
 #[test]
 fn datum_on_dimension_arrow_hides_it() {
     let (doc, mut drawing) = demo();

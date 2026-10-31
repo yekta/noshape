@@ -915,11 +915,19 @@ impl DrawingEditor {
                             this.failed_sources.remove(&key);
                             this.sources.insert(key, src);
                         }
-                        // A display state deleted from the assembly: its views
-                        // go blank, with Onshape's info toast (live drawing/1112).
+                        // A display state or exploded view deleted from the
+                        // assembly: its views go blank, with Onshape's blue
+                        // info notice (live drawing/1112, request 1638).
                         None => {
-                            if key.display.is_some() {
-                                this.status = Some("Failed to resolve display state.".into());
+                            let why = if key.explode.is_some() {
+                                Some("Failed to resolve exploded view.")
+                            } else if key.display.is_some() {
+                                Some("Failed to resolve display state.")
+                            } else {
+                                None
+                            };
+                            if let Some(why) = why {
+                                this.show_message(why, crate::os_ui::BubbleKind::Info, None, cx);
                             }
                             this.sources.remove(&key);
                             this.failed_sources.insert(key);

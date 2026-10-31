@@ -160,6 +160,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   grip; the D40 GD&T re-attach by end grip needed this). A stale dashed rubber band after placing a GD&T or
   surface finish with a leader is fixed (the preview is rebuilt). Asked live: V70 messages, TB28 Change
   configuration.
+- Then TB15 (cut list row hover lights its members), D9 push-apart, A5 node drags (any leader), TB20 (hole table
+  Flip X / Y, Holes to exclude), V70 (deleted display state / explode: blank views + info notice; live 1638).
+  Live 1638 (b) TB28 Change configuration still open.
 - Open in my rows: V57 assembly Show sketches (assembly sources skip sketch wires), V35 (d) sections of broken views,
   D40 hatch / title red, C11 inference points, D9 ordinate jogs.
 
