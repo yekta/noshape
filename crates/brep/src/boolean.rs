@@ -4226,6 +4226,17 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                         .map(|p| (p, cx.faces[pieces[p].face].arg, cx.faces[pieces[p].face].index, keep[p].is_some(), partner[p], pieces[p].loops.iter().map(|l| l.len()).collect()))
                         .collect();
                     eprintln!("NM sedge {s} {:?} from {:?} to {:?} mid {:?} uses {u:?} pieces (piece, arg, face, kept, partner, loops) {users:?}", sedges[s].seg.g, cx.p(sedges[s].seg.v[0]), cx.p(sedges[s].seg.v[1]), cx.seg_at(&sedges[s].seg, 0.5));
+                    if let Geo::Nurbs { id, .. } = sedges[s].seg.g {
+                        if let Some((fs, _, _)) = &cx.ncurves[id as usize].sec {
+                            eprintln!("  section of faces {:?} (arg, index) {:?} acc {:e}", fs, fs.iter().map(|&f| (cx.faces[f].arg, cx.faces[f].index)).collect::<Vec<_>>(), cx.ncurves[id as usize].acc);
+                        }
+                    }
+                    for (k, o) in sedges.iter().enumerate() {
+                        if k != s && (o.seg.v.contains(&sedges[s].seg.v[0]) || o.seg.v.contains(&sedges[s].seg.v[1])) {
+                            let us: Vec<(u32, u32, bool)> = (0..pieces.len()).filter(|&p| pieces[p].loops.iter().flatten().any(|x| x.0 == k)).map(|p| (cx.faces[pieces[p].face].arg, cx.faces[pieces[p].face].index, keep[p].is_some())).collect();
+                            eprintln!("  neighbour {k} {:?} v {:?} (ours {:?}) to {:?} mid {:?} pieces {us:?}", o.seg.g, o.seg.v, sedges[s].seg.v, cx.p(o.seg.v[1]), cx.seg_at(&o.seg, 0.5));
+                        }
+                    }
                 }
             }
         }
