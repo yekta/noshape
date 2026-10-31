@@ -1817,7 +1817,14 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     }
                 }
             }
-            if g.lines.len() > thread_mark.0 {
+            // From the side (live request 1644): hidden / dashed thin lines,
+            // a section's thread end and ticks thin solid.
+            for (pts, solid) in &geo.side_threads {
+                for piece in map_polyline(&pl, pts) {
+                    g.lines.push(Polyline2 { points: piece, style: if *solid { LineStyle::Thin } else { LineStyle::Hidden }, closed: false, pick: view_pick });
+                }
+            }
+            if g.lines.len() > thread_mark.0 && geo.side_threads.is_empty() {
                 let lines = thread_mark.0..g.lines.len();
                 let st = g.lines[lines.start].style;
                 g.pens.push(super::sheet::PenSpan { centered: false, lines, width_mm: vt.thread_line.thickness, dashes: st.dashes().iter().map(|d| d * vt.thread_dashes.max(0.01)).collect() });

@@ -1049,6 +1049,10 @@ pub struct ViewGeometry {
     /// Cosmetic threads of tapped holes seen end-on: center and major
     /// radius (view coordinates).
     pub threads: Vec<([f64; 2], f64)>,
+    /// Cosmetic threads seen from the side (live request 1644): polylines
+    /// (view coordinates), solid (a section's thread end and ticks) or not
+    /// (hidden / dashed).
+    pub side_threads: Vec<(Vec<[f64; 2]>, bool)>,
     pub form_marks: Vec<[f64; 2]>,
     /// Flat pattern views: form outlines (closed, view coordinates) and
     /// whether the form points up (toward the viewer).
@@ -1772,6 +1776,8 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
     v.show_com.hash(&mut h);
     v.flat.hash(&mut h);
     v.hide_threads.hash(&mut h);
+    // Side-view cosmetic threads are drawn with hidden lines shown.
+    (v.style == super::RenderStyle::HiddenLinesVisible).hash(&mut h);
     let fx = |x: f64, h: &mut std::collections::hash_map::DefaultHasher| ((x * 1e9).round() as i64).hash(h);
     match &v.kind {
         ViewKind::Section { parent, .. } | ViewKind::AlignedSection { parent, .. } => {
@@ -1943,6 +1949,42 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
             if (along > 0.999 || (hole.through && along < -0.999)) && inside(hole.start) {
                 g.threads.push((frame.project(hole.start), major / 2.0));
             }
+        }
+        // Seen from the side (live request 1644): two lines at the major
+        // diameter along the tapped depth, a line across it at the end and
+        // 0.5 mm run-out ticks in to the minor diameter. Hidden lines (drawn
+        // with Show hidden lines); in a section through the hole the lines
+        // thin dashed, the end and ticks thin solid.
+        let cut = match &v.kind {
+            ViewKind::Section { parent, .. } => section_cut(sheet, id).zip(view_frame(drawing, sheet, *parent)),
+            _ => None,
+        };
+        for hole in &ctx.holes {
+            let (Some(major), Some(len)) = (hole.thread.as_deref().and_then(thread_major_diameter), hole.tapped_depth) else { continue };
+            let d = hole.dir.normalize();
+            if d.dot(frame.dir).abs() > 1e-3 {
+                continue;
+            }
+            let in_section = cut.as_ref().is_some_and(|(c, pf)| {
+                let (q, a, b) = (pf.project(hole.start), c.points[0], c.points[1]);
+                let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+                let l = dx.hypot(dy).max(1e-12);
+                ((q[0] - a[0]) * dy - (q[1] - a[1]) * dx).abs() / l < major / 2.0
+            });
+            if !in_section && v.style != super::RenderStyle::HiddenLinesVisible {
+                continue;
+            }
+            let (a, u) = (frame.project(hole.start), frame.project(d));
+            let ul = u[0].hypot(u[1]).max(1e-12);
+            let u = [u[0] / ul, u[1] / ul];
+            let n = [-u[1], u[0]];
+            let (big, small) = (major / 2.0, hole.tap_drill.unwrap_or(hole.diameter) / 2.0);
+            let at = |s: f64, t: f64| [a[0] + u[0] * s + n[0] * t, a[1] + u[1] * s + n[1] * t];
+            for side in [1.0, -1.0] {
+                g.side_threads.push((vec![at(0.0, side * big), at(len, side * big)], false));
+                g.side_threads.push((vec![at(len, side * big), at(len + 0.0005, side * small)], in_section));
+            }
+            g.side_threads.push((vec![at(len, big), at(len, -big)], in_section));
         }
     }
     // Shown source sketches, drawn over the model; their free points unless

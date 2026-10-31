@@ -2600,6 +2600,56 @@ fn a_view_of_a_deleted_explode_or_display_state_is_blank() {
     }
 }
 
+/// Cosmetic threads from the side (live request 1644): none with hidden
+/// lines removed; with hidden lines shown, the major-diameter lines along
+/// the tapped depth, the end line and two ticks.
+#[test]
+fn tapped_hole_threads_from_the_side() {
+    let mut doc = crate::Document::new();
+    if let TabContent::PartStudio(ps) = &mut doc.tabs[0].content {
+        *ps = crate::demo::plate_studio();
+    }
+    let ps = doc.tabs[0].id;
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, ps, ViewOrientation::Front, [150.0, 150.0]));
+    let mut sources = regenerate_sources(&doc, &drawing);
+    // An M6 tapped hole 10 mm deep down from the plate's top center.
+    for src in sources.values_mut() {
+        let mut ctx = (*src.context).clone();
+        let top = ctx.bodies.iter().filter_map(|b| b.shape.bounding_box(true).ok()).map(|b| b.max.z).fold(f64::MIN, f64::max);
+        ctx.holes.push(crate::regen::context::HoleRecord {
+            feature: crate::reference::FeatureId(1),
+            start: glam::DVec3::new(0.03, 0.0, top),
+            dir: glam::DVec3::new(0.0, 0.0, -1.0),
+            diameter: 0.005,
+            depth: Some(0.015),
+            through: false,
+            tap_drill: Some(0.005),
+            tapped_depth: Some(0.01),
+            thread: Some("M6x1".into()),
+            thread_class: None,
+            cbore: None,
+            csink: None,
+            inch: false,
+            diameter_fit: None,
+            exits: false,
+            parts: Vec::new(),
+            tip_angle: None,
+        });
+        src.context = std::sync::Arc::new(ctx);
+    }
+    let cache = ViewCache::new();
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    assert!(g.side_threads.is_empty());
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().style = RenderStyle::HiddenLinesVisible;
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    assert_eq!(g.side_threads.len(), 5, "two lines, two ticks, the end");
+    // The lines 6 mm apart, 10 mm long.
+    let lines: Vec<&Vec<[f64; 2]>> = g.side_threads.iter().map(|(p, _)| p).filter(|p| ((p[1][0] - p[0][0]).hypot(p[1][1] - p[0][1]) - 0.01).abs() < 1e-9).collect();
+    assert_eq!(lines.len(), 2);
+    assert!(((lines[0][0][0] - lines[1][0][0]).abs() - 0.006).abs() < 1e-9, "{lines:?}");
+}
+
 #[test]
 fn datum_on_dimension_arrow_hides_it() {
     let (doc, mut drawing) = demo();
