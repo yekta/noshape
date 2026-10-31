@@ -314,6 +314,12 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N10. (10-31 20:36) Open after today: dark-mode dk-994 (custom table panel: needs a FeatureScript custom table) and
+     dk-9a1 (history row menu); residuals: the Flange dialog's Partial flange group chevron (live has none), the flat
+     view's fit margin (live wider), the Variable type ▾ 2 px narrower. Every row of core-workflow 8, keyboard-mouse,
+     chrome-sweep, configurations, large-models, part-studio, interaction and cursors is checked; no live request
+     of mine is open.
+
 N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes bounded by lines; crates/brep
      `mesh`, cpp/mesh_rust.cpp after core's cache, NOSHAPE_MESH_RUST=0 off); step 2 (this commit): circles split as
      BRepMesh splits them, planes with holes, cylinders and cones between two rims (zipped as the kernel's strips),

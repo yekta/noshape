@@ -52,8 +52,8 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-951-drawing-properties | qa c82818b7 | selects light = live; unticked checkboxes solid #333 and their labels #ccc (live white box, #333 label); Sheet properties select values white on white (DARK-DRAWING-PANEL-CONTROLS) | ☑ fixed dx, verified fbd2536c (qa 10-30 15:07: Sheet properties values dark on white with ▾; Drawing properties checkboxes white boxes, #333-like labels) |
 | dk-960-feature-studio | dkfs2 | Ace twilight on #333: tokens, gutter #232323, numbers #e2e2e2 = live computed | ☑ |
 | dk-961-variable-studio | psui-scratch v2 | layout, title bar / headers #555, cells #1c1c1c, Insert buttons = live (the capture exists: dark/dk-961); residual: live's ▾ in Variable type is 8 px wide, 6 px from the cell's right, ours 6 px wide a little further in | ☑ psui 10-31 |
-| dk-971-sheetmetal-partstudio-toolbar |  |  | ☐ |
-| dk-972-sheetmetal-dropdown-open |  |  | ☐ |
+| dk-971-sheetmetal-partstudio-toolbar | psui-scratch c972 | sheet metal tool button and caret in the toolbar = live | ☑ psui 10-31 |
+| dk-972-sheetmetal-dropdown-open | psui-scratch c972 | the dropdown: items, icons, separators-free list, colours = live | ☑ psui 10-31 |
 | dk-973-sheetmetal-table-flatview | psui-scratch sm9 | context select, Bends / Other joints tables (headers #555, editable cells #1c1c1c), flat view and its cube = live; the flat now fits when the panel opens wide (it stayed over-zoomed: the panel's settling resize cancelled the pending fit); residual: live's fit leaves a wider margin | ◐ psui 10-31 |
 | dk-974-ctx-part-in-parts-list | psui-scratch pm1 | menu #333, #ccc outline, white items, icons and separators = live; ours has no Add comment / Release Upgrade badge (cloud), so it fits under the click where live's flips above | ☑ psui 10-31 |
 | dk-975-ctx-face-graphics | psui-scratch fm3 | items, icons, colours = live (Add comment is cloud); a menu taller than the room under the pointer now opens above it, clamped to the window, as live (it shifted up just enough before; vendor gpui-pre `switch_anchor_or_snap`) | ☑ psui 10-31 |
