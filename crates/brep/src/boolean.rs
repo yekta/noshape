@@ -2365,7 +2365,11 @@ impl Ctx<'_> {
     /// `split`, a vertex on `s` within the Boolean's tolerance or the sum of its own and `te` where that's more.
     fn split_tol(&self, s: &Seg, sorted_x: &[(f64, u32)], te: f64) -> R<Vec<u32>> {
         let tol = self.tol;
+        // (An OCCT section's own tolerance as the edge's.)
+        let te = te.max(if let Geo::Nurbs { id, .. } = s.g { self.ncurves[id as usize].tol } else { 0.0 });
         let reach = |w: u32| tol.max(te + self.pool.t[w as usize]);
+        // (Both tolerances known past the Boolean's: OCCT's rule, nothing grey but rounding.)
+        let band = |w: u32| if te + self.pool.t[w as usize] > tol { reach(w) * (1.0 + 1e-9) } else { GREY * reach(w) };
         let tol_far = tol.max(te + self.pool.tmax);
         let (lo, hi) = match s.g {
             Geo::Line => {
@@ -2414,7 +2418,7 @@ impl Ctx<'_> {
             }
             if off <= r {
                 on.push((t, w));
-            } else if off <= GREY * r {
+            } else if off <= band(w) {
                 return Err(Decline("a vertex nearly on an edge"));
             }
         }
