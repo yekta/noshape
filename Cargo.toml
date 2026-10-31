@@ -6,7 +6,7 @@ exclude = ["vendor"]
 default-members = ["crates/app"]
 
 [workspace.package]
-version = "0.4.16"
+version = "0.0.0-dev"
 edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/yekta/noshape"
