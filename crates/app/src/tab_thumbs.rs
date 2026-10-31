@@ -18,12 +18,15 @@ pub struct TabThumbs {
     images: HashMap<TabId, Option<Arc<RenderImage>>>,
     made_for: HashMap<TabId, u64>,
     busy: bool,
+    /// Tabs asked for while another picture was being made (the Ctrl+Space
+    /// switcher asks for several at once), made in turn.
+    queued: Vec<TabId>,
     evaluator: Arc<parking_lot::Mutex<noshape_model::assembly::eval::AssemblyEvaluator>>,
 }
 
 impl TabThumbs {
     pub fn new(doc: Entity<DocModel>) -> Self {
-        Self { doc, images: HashMap::new(), made_for: HashMap::new(), busy: false, evaluator: Default::default() }
+        Self { doc, images: HashMap::new(), made_for: HashMap::new(), busy: false, queued: Vec::new(), evaluator: Default::default() }
     }
 
     /// The tab's picture: `None` while it is being made, `Some(None)` when
@@ -32,7 +35,7 @@ impl TabThumbs {
         self.images.get(&tab).cloned()
     }
 
-    fn is_assembly(&self, tab: TabId, cx: &App) -> bool {
+    pub(crate) fn is_assembly(&self, tab: TabId, cx: &App) -> bool {
         matches!(self.doc.read(cx).session.doc.tab(tab).map(|t| &t.content), Some(TabContent::Assembly(_)))
     }
 
@@ -40,6 +43,9 @@ impl TabThumbs {
     pub fn request(&mut self, tab: TabId, cx: &mut Context<Self>) {
         use std::hash::{Hash as _, Hasher as _};
         if self.busy {
+            if !self.queued.contains(&tab) {
+                self.queued.push(tab);
+            }
             return;
         }
         let doc = self.doc.read(cx).session.doc.clone();
@@ -91,6 +97,12 @@ impl TabThumbs {
                 this.busy = false;
                 this.made_for.insert(tab, hash);
                 this.images.insert(tab, picture);
+                // The next queued tab that needs a picture (an unchanged one
+                // or one without any returns at once).
+                while !this.busy && !this.queued.is_empty() {
+                    let next = this.queued.remove(0);
+                    this.request(next, cx);
+                }
                 cx.notify();
             });
         })
@@ -153,7 +165,7 @@ impl Render for TabCard {
     }
 }
 
-fn img_element(image: Arc<RenderImage>) -> AnyElement {
+pub(crate) fn img_element(image: Arc<RenderImage>) -> AnyElement {
     let (w, h) = CARD_PICTURE;
     img(ImageSource::Render(image)).w(px(w as f32 * 0.5)).h(px(h as f32 * 0.5)).into_any_element()
 }

@@ -23,7 +23,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | Shift+N | Rename selection | feature row and part row: inline rename, the name selected | ✅ (KB1 fixed, pass 7) | psui 042e254a 10-31 (blk, Parts › Part 1, Shift+N → inline field, "Part 1" selected) |
 | Ctrl+M | Mate connector | not tested in assembly | ? |  |
 | [ | Measure | opens the Measure panel | ✅ | 0.4.10+ / dd1b5037 10-27 (measure panel, workflow-analysis row 4) |
-| Ctrl+Space | Quick tab switching | not tested | ? |  |
+| Ctrl+Space | Quick tab switching | the switcher card while Ctrl is held (MRU thumbnails, first Space = previous tab, wraps, hover selects, Ctrl release / click switches; live spec "Ctrl+Space quick tab switcher") | ✅ | psui 10-31 (:102 cm3; T1 ctrl_space_walks_the_recent_tabs) |
 | Ctrl+Y / Ctrl+Z | redo / undo | ✅ (earlier workflows) | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | ` | Select other | list of faces/edges under the cursor | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | s | Shortcut toolbar (Part Studio: Sketch, Extrude, Revolve, Sweep, Loft / Fillet, Chamfer, Hole, Boolean, Transform) | 5×2 toolbar at the cursor | ✅ | 0.4.10+ / dd1b5037 10-27 |
@@ -46,9 +46,9 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | p | hide/show planes | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Shift+I | Make isolate | Isolate dialog (Transparency / Component controls) | ✅ dialog; **planes stay visible** (live: other parts and planes/origin go translucent) | ✗ KB3 |  |
 | Shift+T | Make transparent | "Make transparent" dialog | ✅ | 0.4.10+ / dd1b5037 10-27 (dialog: Transparency / Component controls) |
-| Shift+V | Named views | panel "Named views": New view name, +, "No views created" | ✅; **Esc does not close it** (stays through several Esc + clicks) | ? KB2 |  |
+| Shift+V | Named views | panel "Named views": New view name, +, "No views created" | ✅; one Esc closes it (live spec "Named views panel": first Esc) | ✅ KB2 | psui 10-31 (:102 cm3) |
 | Shift+X | Section view | ✅ (see workflow-analysis AN3) | ✅ | 0.4.10+ / dd1b5037 10-27 |
-| Shift+R | view in high quality | not checked visually | ? |  |
+| Shift+R | view in high quality | toggles the "Viewing in high quality. Performance can decrease. [Disable]" banner (live spec "Shift+R") | ✅ | psui 10-31 (:102 cm3) |
 | n | view normal to; second n flips | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | z / Shift+Z | zoom out / in about the view centre | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | f | zoom to fit | ✅ (a press during a view animation is ignored: workflow-surfaces) | ✅ / ? | 0.4.10+ / dd1b5037 10-27 |
@@ -81,7 +81,7 @@ d / n (workflow 3) ✅; p Projected view ✅; Shift+D, Shift+R, Ctrl+M, Shift+H 
 | Middle-drag | pan | pan | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Ctrl+right-drag | pan | pan | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | View cube face hover | light-blue fill | ✅ | ✅ | 77870dd4 10-28 |
-| View cube ▶ / ▲ | ? (step) | 15° per click | ? |  |
+| View cube ▶ / ▲ | 15° per click (behaviours "View navigation": Left arrow 15°, Up 15°) | 15° per click | ✅ | psui 10-31 (live data) |
 | Camera menu | Isometric … Section view… | same; "Turn off section view" while sectioned | ✅ / ? | 0.4.10+ / dd1b5037 10-27 (Isometric … Section view…) |
 
 ## Other observations in this run

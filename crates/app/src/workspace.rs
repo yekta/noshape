@@ -57,6 +57,9 @@ pub struct Workspace {
     release_drafts: Option<Entity<crate::release_dialog::ReleaseDraftsPanel>>,
     /// Previously active tabs, most recent first (Ctrl+Space).
     recent: Vec<TabId>,
+    /// The Ctrl+Space tab switcher while Ctrl is held: the session's tabs,
+    /// most recently used first (the active one), and the selected one.
+    switcher: Option<(Vec<TabId>, usize)>,
     /// Tab manager (Alt+T), docked left like Onshape's.
     tab_manager: Option<(Entity<crate::tab_manager::TabManager>, Subscription)>,
     /// Pictures for the tab hover card.
@@ -126,7 +129,7 @@ impl Workspace {
         let _ = doc.read(cx).custom_features();
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
         let tab_thumbs = cx.new(|_| crate::tab_thumbs::TabThumbs::new(doc.clone()));
-        let mut this = Self { tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), tab_manager: None, doc_panel: None, renaming_tab: None, tab_gap: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
+        let mut this = Self { tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), switcher: None, tab_manager: None, doc_panel: None, renaming_tab: None, tab_gap: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
         this._subs.push(focus_lost);
         this.sync_tabs(window, cx);
         // Focus the active tab view so its shortcuts work immediately.
@@ -1507,6 +1510,22 @@ fn file_tab_menu(menu: crate::os_menu::OsMenu, view: &Entity<Workspace>, id: Tab
         }))
 }
 
+/// The switcher after one more Ctrl+Space: opened on the session's tabs
+/// (the active one, then the previously used, most recent first) with the
+/// previous one selected, else moved one on, wrapping to the first.
+fn switcher_next(open: Option<(Vec<TabId>, usize)>, active: Option<TabId>, recent: &[TabId], tabs: &[TabId]) -> Option<(Vec<TabId>, usize)> {
+    match open {
+        Some((list, i)) => {
+            let n = list.len();
+            Some((list, (i + 1) % n))
+        }
+        None => {
+            let list: Vec<TabId> = active.into_iter().chain(recent.iter().copied()).filter(|t| tabs.contains(t)).collect();
+            (!list.is_empty()).then(|| (list.clone(), 1.min(list.len() - 1)))
+        }
+    }
+}
+
 fn tab_icon(kind: &'static str) -> &'static str {
     match kind {
         // Live (tabbar captures): the tab icons are white inside.
@@ -1653,12 +1672,13 @@ impl Render for Workspace {
                     s.update(cx, |s, cx| s.open_palette(window, cx));
                 }
             }))
-            // Ctrl+Space: back to the previously active tab (Onshape).
-            .on_action(cx.listener(|this, _: &SwitchRecentTab, window, cx| {
-                let tabs: Vec<TabId> = this.doc.read(cx).session.doc.ordered_tabs().iter().map(|t| t.id).collect();
-                if let Some(t) = this.recent.iter().copied().find(|t| tabs.contains(t)) {
-                    this.activate(t, window, cx);
-                    cx.notify();
+            // Ctrl+Space: the tab switcher (live spec "Ctrl+Space quick tab
+            // switcher"): the first Space selects the previous tab, each
+            // further one the next (wrapping); releasing Ctrl switches.
+            .on_action(cx.listener(|this, _: &SwitchRecentTab, _, cx| this.switcher_step(cx)))
+            .on_modifiers_changed(cx.listener(|this, ev: &ModifiersChangedEvent, window, cx| {
+                if !ev.modifiers.control {
+                    this.switcher_commit(window, cx);
                 }
             }))
             // Alt+T: Tab manager (search and open tabs).
@@ -1720,6 +1740,7 @@ impl Render for Workspace {
                                     div().absolute().top_0().left_0().right_0().h(px(crate::ui::TOOLBAR_H)).bg(crate::theme::p().panel).occlude().flex().justify_center().child(banner)
                                 }))
                                 .children(self.render_toast(cx))
+                                .children(self.render_switcher(cx))
                                 // Onshape: at the feature dialog's place (below the toolbar, right of the list).
                                 .children(self.units_panel.as_ref().map(|(p, _)| div().absolute().top(px(39.)).left(px(crate::ui::left_panel_w())).child(p.clone()))),
                         )
@@ -1736,6 +1757,110 @@ impl Render for Workspace {
 }
 
 impl Workspace {
+    /// Ctrl+Space: opens the switcher on the previously used tab, or moves it
+    /// one tab on (back to the first after the last).
+    fn switcher_step(&mut self, cx: &mut Context<Self>) {
+        let opening = self.switcher.is_none();
+        let tabs: Vec<TabId> = self.doc.read(cx).session.doc.ordered_tabs().iter().map(|t| t.id).collect();
+        self.switcher = switcher_next(self.switcher.take(), self.active, &self.recent, &tabs);
+        if let Some((list, _)) = self.switcher.as_ref().filter(|_| opening) {
+            let list = list.clone();
+            self.tab_thumbs.update(cx, |th, cx| list.iter().for_each(|t| th.request(*t, cx)));
+        }
+        cx.notify();
+    }
+
+    /// Ctrl released (or a thumbnail clicked): the selected tab becomes active.
+    fn switcher_commit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((list, i)) = self.switcher.take() else { return };
+        if let Some(t) = list.get(i).copied().filter(|t| Some(*t) != self.active) {
+            self.activate(t, window, cx);
+        }
+        cx.notify();
+    }
+
+    /// The Ctrl+Space card (live part-studio/ks-switch-1, -2,
+    /// ks-ctrlspace-held): white, 1 px `#ccc`, rounded, centred 10 px above
+    /// the tab bar; 180 x 121 thumbnails 20 px apart, the selected one on
+    /// `#cedbe5` with its tab's icon and name under it; ‹ › at the ends, a
+    /// bar where there is nothing more that way. Hovering a thumbnail selects
+    /// it, a click on it switches.
+    fn render_switcher(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (list, sel) = self.switcher.as_ref()?;
+        let sel = *sel;
+        let pal = p();
+        let doc = self.doc.read(cx).session.doc.clone();
+        let thumbs = self.tab_thumbs.clone();
+        let end = |more: bool, left: bool, cx: &mut Context<Self>| -> AnyElement {
+            if more {
+                div().w(px(30.)).flex().justify_center().opacity(0.45).child(crate::assets::icon(if left { "ui-chevron-left" } else { "ui-chevron-right" }, 22., cx)).into_any_element()
+            } else {
+                div().w(px(30.)).flex().justify_center().child(div().w(px(3.)).h(px(16.)).bg(gpui_kit::rgb(0x777777))).into_any_element()
+            }
+        };
+        let items: Vec<AnyElement> = list
+            .iter()
+            .enumerate()
+            .filter_map(|(n, t)| {
+                let tab = doc.tab(*t)?;
+                let on = n == sel;
+                let picture: AnyElement = match thumbs.read(cx).picture(*t) {
+                    Some(Some(image)) => img(ImageSource::Render(image)).w(px(178.)).h(px(104.)).into_any_element(),
+                    Some(None) if thumbs.read(cx).is_assembly(*t, cx) => crate::assets::icon("tab-card-empty-assembly", 80., cx).into_any_element(),
+                    _ => div().into_any_element(),
+                };
+                let label = on.then(|| h_flex().h(px(29.)).gap(px(3.)).items_center().text_size(px(11.)).text_color(pal.text_muted).child(crate::assets::icon(tab_icon(kind_of(&tab.content)), 16., cx)).child(crate::ui::user_text(tab.name.clone())));
+                Some(
+                    v_flex()
+                        .w(px(180.))
+                        .flex_none()
+                        .items_center()
+                        .child(
+                            div()
+                                .id(("tab-switch", n))
+                                .w(px(180.))
+                                .h(px(121.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .rounded(px(4.))
+                                .border_1()
+                                .border_color(if on { gpui_kit::rgb(0xaaaaaa) } else { gpui_kit::transparent_white().into() })
+                                .when(on, |d| d.bg(crate::theme::themed(0xcedbe5, 0x4b5761)))
+                                .child(picture)
+                                .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                                    if let Some((_, i)) = this.switcher.as_mut().filter(|_| *h) {
+                                        *i = n;
+                                        cx.notify();
+                                    }
+                                }))
+                                .on_mouse_up(MouseButton::Left, cx.listener(move |this, _: &MouseUpEvent, window, cx| {
+                                    if let Some((_, i)) = &mut this.switcher {
+                                        *i = n;
+                                    }
+                                    this.switcher_commit(window, cx);
+                                })),
+                        )
+                        .child(div().h(px(29.)).children(label))
+                        .into_any_element(),
+                )
+            })
+            .collect();
+        let card = h_flex()
+            .occlude()
+            .pt(px(11.))
+            .items_start()
+            .bg(pal.panel)
+            .border_1()
+            .border_color(crate::theme::themed(0xcccccc, 0x666666))
+            .rounded(px(4.))
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.15), offset: point(px(0.), px(1.)), blur_radius: px(4.), spread_radius: px(0.), inset: false }])
+            .child(div().h(px(121.)).flex().items_center().child(end(sel > 0, true, cx)))
+            .child(h_flex().gap(px(20.)).items_start().children(items))
+            .child(div().h(px(121.)).flex().items_center().child(end(sel + 1 < list.len(), false, cx)));
+        Some(div().absolute().left_0().right_0().bottom(px(10.)).flex().justify_center().child(card).into_any_element())
+    }
+
     /// Runs a customized shortcut (Preferences › Keyboard shortcuts) in the
     /// active tab.
     fn run_shortcut(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) {
@@ -2340,3 +2465,23 @@ trait TabContextMenuExt: InteractiveElement + Sized {
 }
 
 impl<E: InteractiveElement + Sized> TabContextMenuExt for E {}
+
+#[cfg(test)]
+mod switcher_tests {
+    use super::{TabId, switcher_next};
+
+    /// Live (spec "Ctrl+Space quick tab switcher"): the first Space selects the previous tab, each further one the
+    /// next, wrapping to the current tab; closed tabs drop out; one tab selects itself.
+    #[test]
+    fn ctrl_space_walks_the_recent_tabs() {
+        let (a, b, c, gone) = (TabId(1), TabId(2), TabId(3), TabId(9));
+        let tabs = [a, b, c];
+        let s = switcher_next(None, Some(c), &[gone, a, b], &tabs);
+        assert_eq!(s, Some((vec![c, a, b], 1)));
+        let s = switcher_next(s, Some(c), &[], &tabs);
+        assert_eq!(s.as_ref().map(|s| s.1), Some(2));
+        assert_eq!(switcher_next(s, Some(c), &[], &tabs).map(|s| s.1), Some(0));
+        assert_eq!(switcher_next(None, Some(a), &[], &tabs), Some((vec![a], 0)));
+        assert_eq!(switcher_next(None, None, &[], &tabs), None);
+    }
+}
