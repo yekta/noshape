@@ -1382,33 +1382,19 @@ impl PartStudioView {
         });
     }
 
-    /// "Copy Part 1": the part goes to the clipboard; Ctrl+V in another
-    /// Part Studio derives it (in this one, it copies it in place).
+    /// "Copy Part 1" / Ctrl+C on a part: the part goes to the clipboard
+    /// silently (live: no toast); an Assembly's Ctrl+V inserts it.
     pub(super) fn copy_part(&mut self, b: BodyId, cx: &mut Context<Self>) {
         let v = serde_json::json!({ "noshape_part": { "tab": self.tab.to_string(), "body": b } });
         cx.write_to_clipboard(ClipboardItem::new_string(v.to_string()));
-        let name = self.display.body(&b).map(|d| d.name.clone()).unwrap_or_else(|| "part".into());
-        self.flash_info(format!("Copied {name}"), cx);
     }
 
-    /// Ctrl+V of a copied part: returns false when the clipboard holds none.
-    pub(super) fn paste_part(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+    /// Ctrl+V of a copied part in a Part Studio does nothing: no Derived
+    /// dialog, no message (live, behaviours "skasm (2026-10-31, P3
+    /// workflow-derived rows 29 / 30)" (b)). True when the clipboard holds one.
+    pub(super) fn paste_part(&self, cx: &App) -> bool {
         let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else { return false };
-        let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) else { return false };
-        let Some(p) = v.get("noshape_part") else { return false };
-        let (Some(tab), Some(Ok(body))) = (p.get("tab").and_then(|t| t.as_str()).map(str::to_string), p.get("body").map(|b| serde_json::from_value::<BodyId>(b.clone()))) else { return false };
-        if tab == self.tab.to_string() {
-            self.copy_here(vec![body], window, cx);
-            return true;
-        }
-        self.start_feature("importDerived", window, cx);
-        if let Some(e) = &self.edit {
-            e.dialog.update(cx, |d, cx| {
-                d.set_value("partStudio", ParamValue::Text(tab.clone()), cx);
-                d.set_value("parts", ParamValue::Query(vec![Reference::Body(body.clone())]), cx);
-            });
-        }
-        true
+        serde_json::from_str::<serde_json::Value>(&text).is_ok_and(|v| v.get("noshape_part").is_some())
     }
 
     // ------------------------------------------------------------ dynamic suppression

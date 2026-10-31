@@ -348,14 +348,14 @@ impl AssemblyView {
     }
 
     /// The Assembly contexts an instance takes part in: (studio, context
-    /// id, name, primary instance?, update available?). An instance of the
-    /// primary instance's part that is not the primary is listed too
-    /// (dashed arrow, live 517).
+    /// id, name, primary instance?, update available?). Every other
+    /// instance of the context's Part Studio is listed too, whichever part
+    /// (dashed arrow, live 517; behaviours "skasm (2026-10-31, P3
+    /// workflow-derived rows 29 / 30)": Part 2 <1> beside the edited Part 1 <1>).
     pub(super) fn instance_contexts(&self, top: InstanceId, cx: &App) -> Vec<(TabId, u32, String, bool, bool)> {
         let Some(inst) = self.assembly(cx).and_then(|a| a.instance(top)) else { return Vec::new() };
-        let (studio, body) = match &inst.source {
-            InstanceSource::Part { studio, body, .. } => (*studio, Some(body.clone())),
-            InstanceSource::PartStudio { studio, .. } => (*studio, None),
+        let studio = match &inst.source {
+            InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } => *studio,
             _ => return Vec::new(),
         };
         let Some(TabContent::PartStudio(ps)) = self.doc.read(cx).session.doc.tab(studio).map(|t| &t.content) else { return Vec::new() };
@@ -365,15 +365,12 @@ impl AssemblyView {
         ps.contexts
             .iter()
             .filter(|c| c.assembly == self.tab && referenced.contains(&c.id))
-            .filter_map(|c| {
+            .map(|c| {
                 let primary = c.primary == vec![top.0];
-                if !primary && (body.is_none() || c.primary_body != body) {
-                    return None;
-                }
                 let path: Vec<InstanceId> = c.primary.iter().map(|i| InstanceId(*i)).collect();
                 let current = noshape_model::in_context::state_hash(&self.result, &path);
                 let out_of_date = c.state != 0 && current.is_some_and(|h| h != c.state);
-                Some((studio, c.id, c.name.clone(), primary, out_of_date))
+                (studio, c.id, c.name.clone(), primary, out_of_date)
             })
             .collect()
     }

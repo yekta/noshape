@@ -812,6 +812,22 @@ impl AssemblyView {
     pub(super) fn paste_instances(&mut self, cx: &mut Context<Self>) {
         let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else { return };
         let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) else { return };
+        // A part copied in a Part Studio (Ctrl+C or "Copy Part N"): inserted
+        // at once, no dialog, where Insert puts it (live, behaviours "skasm
+        // (2026-10-31, P3 workflow-derived rows 29 / 30)" b-8).
+        if let Some(p) = v.get("noshape_part") {
+            let studio = p.get("tab").and_then(|t| t.as_str()).and_then(|t| u64::from_str_radix(t, 16).ok()).map(TabId);
+            let body = p.get("body").and_then(|b| serde_json::from_value::<BodyId>(b.clone()).ok());
+            let part = studio.zip(body).and_then(|(t, b)| Some((t, self.catalog.studios.iter().find(|s| s.tab == t)?.parts.iter().find(|p| p.0 == b)?.clone())));
+            if let Some((studio, part)) = part
+                && self.insert_part(studio, Some(part), cx).is_some()
+            {
+                self.end_insert_step(cx);
+                self.refresh_scene(false, cx);
+                cx.notify();
+            }
+            return;
+        }
         let Some(clip) = v.get("noshape_instances").and_then(|c| serde_json::from_value::<InstanceClipboard>(c.clone()).ok()) else {
             self.message = Some((false, "Nothing to paste: copy instances first.".into()));
             cx.notify();

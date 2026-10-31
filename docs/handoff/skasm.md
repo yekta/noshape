@@ -200,6 +200,9 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   - Live request "skasm (2026-10-31 09:30)": (a) context icon on another part of the same studio, (b) Ctrl+C on a part.
 - **workflow-units:** an edited value shows converted, and as typed while focused, = live. Live's Pound units come from its imperial account Preferences, the same mechanism as ours.
 - **account.md:** every ❌ / ⏳ row is built now (preferences.md is the current sheet). Only Labs (cloud) is left.
+- **Live's derived answer (request 1648):**
+  - (a) Every other instance of the context's studio gets the dashed ⇦; ours now too (assembly_props.rs).
+  - (b) A part's Ctrl+V does nothing in a Part Studio and inserts it in an Assembly. The DOC3 paste → Derived is removed, and the Copy toast too. psui told.
 - **psui's SM4i / SM4k (lead 10-31), model side done; psui told (psui.md):**
   - SM4i: std (the default) Modify joint restyles a rip and turns it into a bend (T2 `modify_joint_restyles_a_rip_and_turns_it_into_a_bend`). The native "already a rip" path is legacy only and was left as is.
   - SM4k: the flat pattern's shape is split along both sides of every bend zone (`split_bend_zones`, flat.rs). The outline loops are untouched. GUI: the zone edges draw.

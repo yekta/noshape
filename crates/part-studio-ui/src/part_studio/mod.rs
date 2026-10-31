@@ -5517,8 +5517,8 @@ impl Render for PartStudioView {
                     }
                 }
             }))
-            .on_action(cx.listener(|this, _: &Paste, window, cx| {
-                if this.sketch.is_none() && this.edit.is_none() && !this.paste_part(window, cx) {
+            .on_action(cx.listener(|this, _: &Paste, _, cx| {
+                if this.sketch.is_none() && this.edit.is_none() && !this.paste_part(cx) {
                     this.paste_features(cx);
                 }
             }))

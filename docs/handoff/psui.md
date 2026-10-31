@@ -569,3 +569,9 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
     - GUI :103 on G34: the zone edges draw as solid lines beside the dashed bend lines, as sm-091.
     - Your flat hover still outlines the whole flat. Hover / pick by face of the flat view solid to get live's
       one-face #FFC685 outline.
+- skasm 10-31, in your crate (part_studio/behaviors.rs, mod.rs Paste), from live (behaviours "skasm (2026-10-31, P3 workflow-derived rows 29 / 30)"):
+  - Ctrl+V of a copied part in a Part Studio now does **nothing**. It used to open Derived (DOC3, which was an
+    assumption: live shows no Derived dialog and no message).
+  - "Copy Part N" / Ctrl+C on a part copy silently (no "Copied …" toast).
+  - The Assembly's Ctrl+V inserts the copied part at once (assembly side, mine).
+  - workflow-keyboard-mouse.md row "Ctrl+C / Ctrl+V" is updated.
