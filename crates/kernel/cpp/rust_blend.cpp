@@ -97,6 +97,102 @@ occ::handle<Geom_Surface> new_surface(const BrepBody& b, size_t f)
 }
 
 
+// A chamfer's plane framed as OCCT's (ChFiKPart_ComputeData_ChPlnPln; sketches on the face take their axes from
+// it): x along the edge it was generated from (its own direction), the origin half way between the two faces'
+// contact lines at the edge's start, y from the first face's line to the second's (the first: the chamfer's
+// reference face, else the edge's first face in the input), z (P1 P2) x the faces' intersection line as OCCT's
+// IntAna gives it (the planes' normals' cross product): right-handed when that line runs against the edge. The
+// face's orientation then from its outward normal. Null when the face isn't a chamfer between two planes
+// generated from one edge.
+occ::handle<Geom_Plane> chamfer_frame(const BrepBody& o, const BrepResult& out, size_t i, const occ::handle<Geom_Plane>& pl,
+                                      const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es,
+                                      const std::vector<TopoDS_Shape>& refs, const ShapeIMap& em,
+                                      const std::vector<TopoDS_Edge>& eo)
+{
+  int from = -1;
+  for (size_t k = 0; k + 6 <= out.history.size(); k += 6)
+  {
+    const uint32_t* h = &out.history[k];
+    if (h[0] == 2 && h[3] == 1 && h[4] == 1 && h[5] == i)
+    {
+      if (from >= 0)
+        return nullptr;
+      from = static_cast<int>(h[2]);
+    }
+  }
+  if (from < 0)
+    return nullptr;
+  const TopoDS_Edge E = TopoDS::Edge(em(from + 1).Oriented(TopAbs_FORWARD));
+  TopoDS_Shape      f1;
+  for (size_t k = 0; k < es.size() && f1.IsNull(); ++k)
+    if (es[k].IsSame(E) && k < refs.size() && !refs[k].IsNull())
+      f1 = refs[k];
+  ShapeAncMap e2f;
+  TopExp::MapShapesAndAncestors(input, TopAbs_EDGE, TopAbs_FACE, e2f);
+  const ShapeList* fl = e2f.Seek(E);
+  if (fl == nullptr || fl->Extent() != 2)
+    return nullptr;
+  if (f1.IsNull())
+    f1 = fl->First();
+  const TopoDS_Shape f2 = fl->First().IsSame(f1) ? fl->Last() : fl->First();
+  auto plane_of = [](const TopoDS_Shape& f, gp_Pln& g) {
+    TopLoc_Location               l;
+    const occ::handle<Geom_Plane> p = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(TopoDS::Face(f), l));
+    if (p.IsNull())
+      return false;
+    g = p->Pln().Transformed(l.Transformation());
+    return true;
+  };
+  gp_Pln            g1, g2;
+  BRepAdaptor_Curve ce(E);
+  if (!plane_of(f1, g1) || !plane_of(f2, g2) || ce.GetType() != GeomAbs_Line)
+    return nullptr;
+  const gp_Pnt   start = ce.Value(ce.FirstParameter());
+  const gp_Dir   x = ce.Line().Direction();
+  // The face's two lines along the edge: on the first face, on the second.
+  gp_Pnt c1, c2;
+  int    n1 = 0, n2 = 0;
+  for (uint32_t l = o.face_loops[i]; l < o.face_loops[i + 1]; ++l)
+    for (uint32_t k = o.loop_uses[l]; k < o.loop_uses[l + 1]; ++k)
+    {
+      BRepAdaptor_Curve c(eo[o.uses[k] / 2]);
+      if (c.GetType() != GeomAbs_Line || std::abs(c.Line().Direction().Dot(x)) < 1 - 1e-9)
+        continue;
+      const gp_Pnt at = ElCLib::Value(ElCLib::Parameter(c.Line(), start), c.Line());
+      if (g1.Distance(at) <= 1e-9 * (1 + start.XYZ().Modulus()) + BRep_Tool::Tolerance(eo[o.uses[k] / 2]))
+        c1 = at, ++n1;
+      else
+        c2 = at, ++n2;
+    }
+  if (n1 != 1 || n2 != 1)
+  {
+    if (std::getenv("NOSHAPE_BLEND_DEBUG"))
+      std::fprintf(stderr, "blend: chamfer frame of face %zu: %d / %d lines on its faces\n", i, n1, n2);
+    return nullptr;
+  }
+  double a1, b1, k1, d1, a2, b2, k2, d2;
+  g1.Coefficients(a1, b1, k1, d1);
+  g2.Coefficients(a2, b2, k2, d2);
+  const gp_Vec line = gp_Vec(a1, b1, k1).Crossed(gp_Vec(a2, b2, k2));
+  const gp_Vec c12(c1, c2);
+  const gp_Vec zv = c12.Crossed(line);
+  if (zv.Magnitude() < 1e-12 || c12.Magnitude() < 1e-12)
+    return nullptr;
+  const gp_Dir z(zv);
+  if (std::abs(z.Dot(x)) > 1e-9)
+    return nullptr;
+  gp_Ax3 ax(gp_Pnt(0.5 * (c1.XYZ() + c2.XYZ())), z, x);
+  if (gp_Vec(ax.YDirection()).Dot(c12) < 0)
+    ax.YReverse();
+  if (std::getenv("NOSHAPE_BLEND_DEBUG"))
+  {
+    const gp_Dir n1 = g1.Axis().Direction();
+    std::fprintf(stderr, "blend: chamfer frame of face %zu: edge %d x (%g %g %g) f1 plane n (%g %g %g) c1 (%g %g %g) c2 (%g %g %g) direct %d\n", i, from,
+                 x.X(), x.Y(), x.Z(), n1.X(), n1.Y(), n1.Z(), c1.X(), c1.Y(), c1.Z(), c2.X(), c2.Y(), c2.Z(), (int)ax.Direct());
+  }
+  return new Geom_Plane(ax);
+}
+
 // The parameters of `p` (world) on elementary surface `S` (located by `loc`).
 bool uv_of(const GeomAdaptor_Surface& a, const TopLoc_Location& loc, const gp_Pnt& p0, gp_Pnt2d& uv)
 {
@@ -614,6 +710,17 @@ bool rust_blend(const OcShape& s, const std::vector<TopoDS_Edge>& es, const std:
         brep_decline("a blend surface not made");
         return false;
       }
+      if (const occ::handle<Geom_Plane> pl = occ::down_cast<Geom_Plane>(S))
+        if (const occ::handle<Geom_Plane> framed = chamfer_frame(o, out, i, pl, s.shape, es, refs, em, eo))
+        {
+          // (The outward normal: the body's, the other way on a reversed face; the plane's own, x × y.)
+          gp_Dir outward = pl->Position().Direction();
+          if (o.reversed[i])
+            outward.Reverse();
+          const gp_Ax3& fa = framed->Position();
+          S   = framed;
+          ori = fa.XDirection().Crossed(fa.YDirection()).Dot(outward) > 0 ? TopAbs_FORWARD : TopAbs_REVERSED;
+        }
     }
     TopoDS_Face f;
     bb.MakeFace(f, S, loc, ftol);

@@ -540,3 +540,51 @@ fn rust_vertex_blends_are_occts() {
         }
     }
 }
+
+/// noshape's own chamfers' planes framed as OCCT's (a sketch on the face takes its axes from them: qa's
+/// BLEND-RUST-DEFAULT-REGEN, a sketch on a chamfer turned a quarter): every planar face's origin, x and normal,
+/// and its outward normal, the same as OCCT's, for single edges with and without a reference face and a top loop
+/// with corners.
+#[test]
+fn rust_chamfer_planes_are_framed_as_occts() {
+    let block = make_box_corners(DVec3::ZERO, DVec3::new(60.0, 40.0, 20.0)).unwrap();
+    let mut cases: Vec<(String, Vec<Shape>, Vec<Shape>, ChamferSpec)> = Vec::new();
+    for (i, e) in block.edges().into_iter().enumerate() {
+        cases.push((format!("edge {i}"), vec![e.clone()], vec![], ChamferSpec::Equal(2.0)));
+        let faces: Vec<Shape> = block.faces().into_iter().filter(|f| f.edges().iter().any(|x| x.is_same(&e))).collect();
+        for (k, f) in faces.iter().enumerate() {
+            cases.push((format!("edge {i} ref {k}"), vec![e.clone()], vec![f.clone()], ChamferSpec::TwoDistances(2.0, 3.0)));
+            cases.push((format!("edge {i} ref {k} angle"), vec![e.clone()], vec![f.clone()], ChamferSpec::DistanceAngle(2.0, 0.6)));
+        }
+    }
+    let top: Vec<Shape> = block.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| i.start.z > 19.9 && i.end.z > 19.9)).collect();
+    cases.push(("top loop".into(), top, vec![], ChamferSpec::Equal(2.0)));
+    let frames = |s: &Shape| -> Vec<String> {
+        let mut v: Vec<String> = s
+            .faces()
+            .into_iter()
+            .filter_map(|f| {
+                let Ok(Surface::Plane(p)) = f.face_surface() else { return None };
+                let o = f.face_plane().ok()??;
+                let k = |x: f64| (x * 1e6).round() / 1e6 + 0.0;
+                let r = |v: DVec3| format!("({:.6} {:.6} {:.6})", k(v.x), k(v.y), k(v.z));
+                Some(format!("{} x {} n {} out {}", r(p.origin), r(p.x_dir), r(p.normal), r(o.normal)))
+            })
+            .collect();
+        v.sort();
+        v
+    };
+    for (what, edges, refs, spec) in &cases {
+        let refs = if refs.is_empty() { vec![] } else { vec![refs[0].clone(); edges.len()] };
+        set_rust_blend(Some(false));
+        let occt = chamfer(&block, edges, *spec, &refs).unwrap();
+        set_rust_blend(Some(true));
+        reset_blend_decline();
+        let ours = chamfer(&block, edges, *spec, &refs);
+        set_rust_blend(None);
+        let why = last_blend_decline();
+        let ours = ours.unwrap();
+        assert_eq!(why, "", "{what}: declined");
+        assert_eq!(frames(&ours.shape), frames(&occt.shape), "{what}");
+    }
+}
