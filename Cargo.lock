@@ -4403,6 +4403,7 @@ dependencies = [
  "log",
  "noshape-app-core",
  "noshape-assembly-ui",
+ "noshape-cli",
  "noshape-drawing-ui",
  "noshape-feature-studio-ui",
  "noshape-history-ui",
