@@ -42,6 +42,7 @@
 #include <BRepGProp.hxx>
 #include <OSD_Parallel.hxx>
 #include <BRep_Tool.hxx>
+#include <Geom2d_Curve.hxx>
 #include <GProp_GProps.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Line.hxx>
@@ -1054,11 +1055,143 @@ TopoDS_Shape faces_reversed(const TopoDS_Shape& s)
   return r;
 }
 
+// The volume of faces `fs`, each as its solid uses it: a solid's volume is the sum of its faces' shares (one
+// integral per face), so two solids sharing all but a few faces differ by those faces' shares, the ones of one
+// reversed (in one call: OCCT integrates about the shape's rough centre, so separate calls don't add up).
+double faces_volume(const std::vector<TopoDS_Shape>& fs)
+{
+  if (fs.empty())
+    return 0;
+  TopoDS_Compound c;
+  BRep_Builder    B;
+  B.MakeCompound(c);
+  for (const TopoDS_Shape& f : fs)
+    B.Add(c, f);
+  GProp_GProps g;
+  BRepGProp::VolumeProperties(c, g);
+  return g.Mass();
+}
+
+// What a face's volume share depends on, as a value: its orientation, surface and, for each edge use in order, the
+// edge, its orientation, range and curve on the face at both ends. USD edits its input in place (a notched cylinder
+// fused with its mirror: the same face, the same edges, another share), so a face of its result is the input's own
+// only if this didn't change.
+struct FaceShare
+{
+  TopAbs_Orientation    orientation = TopAbs_FORWARD;
+  const Standard_Transient* surface = nullptr;
+  std::vector<double>       uses;
+  std::vector<const void*>  edges;
+  bool operator==(const FaceShare& o) const
+  {
+    return orientation == o.orientation && surface == o.surface && uses == o.uses && edges == o.edges;
+  }
+};
+
+FaceShare face_share(const TopoDS_Shape& f)
+{
+  FaceShare       r;
+  const TopoDS_Face face = TopoDS::Face(f);
+  TopLoc_Location l;
+  r.orientation = f.Orientation();
+  r.surface     = BRep_Tool::Surface(face, l).get();
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+    r.edges.push_back(e.TShape().get());
+    r.uses.push_back((double)e.Orientation());
+    double a, b;
+    const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, face, a, b);
+    r.uses.push_back(a);
+    r.uses.push_back(b);
+    if (c.IsNull())
+      continue;
+    for (double t : {a, b})
+    {
+      const gp_Pnt2d p = c->Value(t);
+      r.uses.push_back(p.X());
+      r.uses.push_back(p.Y());
+    }
+  }
+  return r;
+}
+
+// How much USD's result `out` changed the volume of `s`, on the faces it changed only (the knurl: 14 of its
+// 10,376 faces merged, two whole-solid integrals of B-spline faces were most of op_boolean's unify): the faces
+// of `s` whose images in its input it removed or changed, against the faces of `out` that took their place.
+// `image`: a face of `s` in USD's input as the input uses it (null: not found); `share`: its face_share before
+// USD ran. Null when a face of `s` has no image: the whole volumes then.
+std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, const std::vector<TopoDS_Shape>& image,
+                                        const std::vector<FaceShare>& share, const TopoDS_Shape& out)
+{
+  ShapeIMap outf;
+  for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
+    outf.Add(x.Current());
+  std::vector<TopoDS_Shape> before, after;
+  ShapeIMap                 kept;
+  for (size_t i = 0; i < sf.size(); ++i)
+  {
+    if (image[i].IsNull())
+      return std::nullopt;
+    const int k = outf.FindIndex(image[i]);
+    if (k > 0 && face_share(outf.FindKey(k)) == share[i])
+      kept.Add(image[i]);
+    else
+      before.push_back(sf[i]);
+  }
+  for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
+    if (!kept.Contains(x.Current()))
+      after.push_back(x.Current());
+  for (const TopoDS_Shape& f : before)
+    after.push_back(f.Reversed());
+  return faces_volume(after);
+}
+
 TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
 {
   GProp_GProps g0;
   BRepGProp::VolumeProperties(s, g0);
   const double v0 = g0.Mass();
+  std::vector<TopoDS_Shape> sf;
+  for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
+    sf.push_back(x.Current());
+  // Each face of `s` in the copy USD gets (through `rotated`, the wires' rotation, when given) as `in` uses it,
+  // and its face_share.
+  auto images = [&](const BRepBuilderAPI_Copy& cp, const HHist& rotated, const TopoDS_Shape& in,
+                    std::vector<TopoDS_Shape>& image, std::vector<FaceShare>& share) {
+    ShapeIMap inf;
+    for (TopExp_Explorer x(in, TopAbs_FACE); x.More(); x.Next())
+      inf.Add(x.Current());
+    image.assign(sf.size(), TopoDS_Shape());
+    share.assign(sf.size(), FaceShare());
+    for (size_t i = 0; i < sf.size(); ++i)
+    {
+      TopoDS_Shape f = cp.ModifiedShape(sf[i]);
+      if (!rotated.IsNull() && !f.IsNull())
+      {
+        const ShapeList& m = rotated->Modified(f);
+        if (!m.IsEmpty())
+          f = m.First();
+      }
+      const int k = f.IsNull() ? 0 : inf.FindIndex(f);
+      if (k == 0)
+        continue;
+      image[i] = inf.FindKey(k);
+      share[i] = face_share(image[i]);
+    }
+  };
+  auto keeps_volume = [&](const std::optional<double>& change, const TopoDS_Shape& out) {
+    double d;
+    if (change)
+      d = *change;
+    else
+    {
+      GProp_GProps g1;
+      BRepGProp::VolumeProperties(out, g1);
+      d = g1.Mass() - v0;
+    }
+    return std::abs(d) <= 1e-9 * std::abs(v0);
+  };
   // USD's result depends on the order of the faces too (a notched cylinder
   // fused with its mirror, qa OCCT-MIRROR-OVERCOUNT: one order of the same
   // faces merged to 4, the other gave 4/3 the volume from every start).
@@ -1081,11 +1214,12 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
         continue;
       }
     }
+    std::vector<TopoDS_Shape> image;
+    std::vector<FaceShare>    share;
+    images(cp, hr, in, image, share);
     ShapeUpgrade_UnifySameDomain u(in, true, true, false);
     u.Build();
-    GProp_GProps g1;
-    BRepGProp::VolumeProperties(u.Shape(), g1);
-    if (std::abs(g1.Mass() - v0) > 1e-9 * std::abs(v0))
+    if (!keeps_volume(usd_volume_change(sf, image, share, u.Shape()), u.Shape()))
       continue;
     if (hist.IsNull())
       hist = new BRepTools_History();
@@ -1133,10 +1267,11 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     }
     if (!kept)
       continue;
+    std::vector<TopoDS_Shape> image;
+    std::vector<FaceShare>    share;
+    images(cp, HHist(), in, image, share);
     u.Build();
-    GProp_GProps g1;
-    BRepGProp::VolumeProperties(u.Shape(), g1);
-    if (std::abs(g1.Mass() - v0) > 1e-9 * std::abs(v0))
+    if (!keeps_volume(usd_volume_change(sf, image, share, u.Shape()), u.Shape()))
       continue;
     if (hist.IsNull())
       hist = new BRepTools_History();
