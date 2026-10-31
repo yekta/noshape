@@ -111,8 +111,9 @@ impl SheetPick<'_> {
             let mut v = DrawingView { id, kind, position, scale: None, label: None, ..Default::default() };
             match parent {
                 Some(p) => {
-                    // Live: child views don't inherit shading.
-                    v.style = if p.style == RenderStyle::Shaded { RenderStyle::HiddenLinesRemoved } else { p.style };
+                    // Live: child views don't inherit shading, except details
+                    // (live request 1649).
+                    v.style = if p.style == RenderStyle::Shaded && !matches!(v.kind, ViewKind::Detail { .. }) { RenderStyle::HiddenLinesRemoved } else { p.style };
                     v.show_tangent_edges = p.show_tangent_edges;
                     v.tangent_phantom = p.tangent_phantom;
                     v.show_centerlines = p.show_centerlines;

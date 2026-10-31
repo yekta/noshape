@@ -5,9 +5,11 @@
 //! hovered (plain) or selected (selection colour); the background stays
 //! transparent. A flat pattern view shows its flat plate, with the bend
 //! lines and notes on top. PDF embeds the picture (at most 1024 px), DXF
-//! keeps the edges only. Children don't inherit it. Base, projected and
-//! auxiliary views without crops or breaks for now (sections and details
-//! need their cut / clipped bodies).
+//! keeps the edges only. Children don't inherit it, except details (live
+//! request 1649). Sections render their cut bodies (the cut face shaded,
+//! the hatch drawn on top), details their parent's picture within the
+//! circle. Views with crops or breaks, and polygon details, stay unshaded
+//! for now.
 
 use crate::drawing_view::*;
 use gpui_kit::*;
@@ -52,7 +54,8 @@ impl DrawingEditor {
         let wanted: Vec<ViewId> = sheet
             .views
             .iter()
-            .filter(|v| v.style == RenderStyle::Shaded && v.crop.is_none() && v.breaks.is_empty() && matches!(v.kind, ViewKind::Base { .. } | ViewKind::Projected { .. } | ViewKind::Auxiliary { .. }))
+            .filter(|v| v.style == RenderStyle::Shaded && v.crop.is_none() && v.breaks.is_empty() && v.detail_profile.is_none())
+            .filter(|v| matches!(v.kind, ViewKind::Base { .. } | ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } | ViewKind::Section { .. } | ViewKind::AlignedSection { .. } | ViewKind::Detail { .. }))
             .map(|v| v.id)
             .collect();
         self.shaded.images.retain(|id, _| wanted.contains(id));
@@ -70,6 +73,8 @@ impl DrawingEditor {
             let mut h = std::collections::hash_map::DefaultHasher::new();
             src.hash.hash(&mut h);
             format!("{:?}{:?}{lo:?}{hi:?}{part:?}{}{flat}", frame.dir, frame.up, pl.scale).hash(&mut h);
+            // Cuts and detail circles.
+            views::view_key(&d, sheet, id, &self.sources, false).hash(&mut h);
             let k = h.finish();
             if self.shaded.images.get(&id).is_some_and(|i| i.key == k) || self.shaded.busy.contains(&id) {
                 continue;
@@ -78,10 +83,19 @@ impl DrawingEditor {
             let (w_mm, h_mm) = ((hi[0] - lo[0]) * pl.scale * 1000.0, (hi[1] - lo[1]) * pl.scale * 1000.0);
             let f = (MAX_PX / (w_mm.max(h_mm) * PX_PER_MM)).min(1.0) * PX_PER_MM;
             let (wp, hp) = (((w_mm * f).round() as u32).max(8), ((h_mm * f).round() as u32).max(8));
+            // A detail keeps the part of the picture inside its circle.
+            let circle = g.clip;
+            let keep = move |u: f64, v: f64| {
+                circle.is_none_or(|(c, r)| {
+                    let (x, y) = (lo[0] + u * (hi[0] - lo[0]), hi[1] - v * (hi[1] - lo[1]));
+                    (x - c[0]).powi(2) + (y - c[1]).powi(2) <= r * r
+                })
+            };
             let job = Job {
                 gpu: self.gpu.clone(),
                 src,
                 part,
+                shapes: g.cut_shapes.clone(),
                 flat,
                 frame,
                 lo,
@@ -92,7 +106,7 @@ impl DrawingEditor {
                 let png = job.render().await;
                 let _ = this.update(cx, |this: &mut Self, cx| {
                     this.shaded.busy.remove(&id);
-                    if let Some((img, png)) = png.as_deref().and_then(decode) {
+                    if let Some((img, png)) = png.as_deref().and_then(|p| decode(p, &keep)) {
                         let handle = this.gpu.uploader().upload_image(&img);
                         this.shaded.images.insert(id, ShadedImage { key: k, handle, png: Arc::new(png) });
                         this.geometry_dirty = true;
@@ -174,6 +188,8 @@ struct Job {
     gpu: crate::gpu::Gpu,
     src: views::SourceModel,
     part: Option<noshape_model::BodyId>,
+    /// A cut view's bodies as cut (else the source's).
+    shapes: Vec<(noshape_model::BodyId, noshape_kernel::Shape)>,
     flat: bool,
     frame: ViewFrame,
     lo: [f64; 2],
@@ -188,6 +204,7 @@ impl Job {
             gpu,
             src,
             part,
+            shapes,
             flat,
             mut frame,
             lo,
@@ -207,8 +224,12 @@ impl Job {
         }
         let mut display = StudioDisplay::default();
         let (mut d0, mut d1) = (f64::MAX, f64::MIN);
-        for b in src.context.bodies.iter().filter(|b| matches!(b.kind, BodyKind::Solid | BodyKind::Surface) && part.is_none_or(|p| *p == b.id) && (part.is_some() || b.kind == BodyKind::Solid)) {
-            let shape = plate.as_ref().unwrap_or(&b.shape);
+        let items: Vec<(_, noshape_kernel::Shape)> = if shapes.is_empty() {
+            src.context.bodies.iter().filter(|b| matches!(b.kind, BodyKind::Solid | BodyKind::Surface) && part.is_none_or(|p| *p == b.id) && (part.is_some() || b.kind == BodyKind::Solid)).map(|b| (b, plate.clone().unwrap_or_else(|| b.shape.clone()))).collect()
+        } else {
+            shapes.iter().filter_map(|(id, s)| src.context.bodies.iter().find(|b| &b.id == id).map(|b| (b, s.clone()))).collect()
+        };
+        for (b, shape) in &items {
             let Some(mesh) = noshape_model::regen::tessellate_shape(shape, 0.5) else { continue };
             if let Ok(bb) = shape.bounding_box(false) {
                 for c in [bb.min, bb.max] {
@@ -263,12 +284,14 @@ impl Job {
 }
 
 /// PNG → RGBA image for the scene, and the PNG again with the white
-/// background transparent (live: the picture covers only the part).
-fn decode(png: &[u8]) -> Option<(ImageData, Vec<u8>)> {
+/// background transparent (live: the picture covers only the part), and
+/// the pixels `keep` rejects (at their (0..1, 0..1 from the top) position).
+fn decode(png: &[u8], keep: &dyn Fn(f64, f64) -> bool) -> Option<(ImageData, Vec<u8>)> {
     let mut rgba = image::load_from_memory_with_format(png, image::ImageFormat::Png).ok()?.to_rgba8();
-    for px in rgba.as_chunks_mut::<4>().0 {
-        if px[0] >= 250 && px[1] >= 250 && px[2] >= 250 {
-            *px = [0; 4];
+    let (w, h) = rgba.dimensions();
+    for (x, y, px) in rgba.enumerate_pixels_mut() {
+        if (px[0] >= 250 && px[1] >= 250 && px[2] >= 250) || !keep((x as f64 + 0.5) / w as f64, (y as f64 + 0.5) / h as f64) {
+            px.0 = [0; 4];
         }
     }
     let mut out = std::io::Cursor::new(Vec::new());

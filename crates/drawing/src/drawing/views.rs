@@ -1066,6 +1066,11 @@ pub struct Snap {
 /// Projected geometry of one view, in view coordinates (meters).
 #[derive(Clone, Debug, Default)]
 pub struct ViewGeometry {
+    /// Cut views (sections, aligned sections, named view sections,
+    /// broken-out sections): the bodies as cut, which a shaded view renders
+    /// (live request 1649: the cut face shaded, the hatch on top); details
+    /// carry their parent's.
+    pub cut_shapes: Vec<(BodyId, Shape)>,
     pub id: ViewId,
     pub frame: Option<ViewFrame>,
     /// View coordinates that sit at the view's sheet position.
@@ -2612,6 +2617,7 @@ fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &Vi
     // (HLRBRep_PolyAlgo::InsertOnOutLine) segfaults on some cuts, e.g.
     // through a cylinder axis. A cut is computed once; dragging only moves it.
     let mut g = project_bodies(id, &pbs, frame, true, &|_, p| !full || plane.signed_distance(p) >= -tol);
+    g.cut_shapes = pbs.iter().map(|p| (p.body.id.clone(), p.shape.clone())).collect();
     if g.error.is_none() {
         g.error = error;
     }
@@ -2669,6 +2675,7 @@ fn named_section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, fram
     let (pbs, faces, error) = cut_pieces_with(pieces, &tool, &facing);
     // Exact HLR on cut solids (see section_geometry).
     let mut g = project_bodies(id, &pbs, frame, true, &|_, _| true);
+    g.cut_shapes = pbs.iter().map(|p| (p.body.id.clone(), p.shape.clone())).collect();
     if g.error.is_none() {
         g.error = error;
     }
@@ -2776,6 +2783,7 @@ fn aligned_section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, fr
     };
     // Exact HLR on cut solids (see `section_geometry`).
     let mut g = project_bodies(id, &pbs, frame, true, &keep);
+    g.cut_shapes = pbs.iter().map(|p| (p.body.id.clone(), p.shape.clone())).collect();
     if g.error.is_none() {
         g.error = error.or(err2);
     }
@@ -2912,6 +2920,7 @@ fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, view: &
     let keep = |_: usize, p: DVec3| !regions.iter().any(|(poly, floor, f)| p.dot(f.dir) < floor - tol && point_in_polygon(f.project(p), poly));
     // Exact HLR on cut solids (see `section_geometry`).
     let mut g = project_bodies(id, &pbs, frame, true, &keep);
+    g.cut_shapes = pbs.iter().map(|p| (p.body.id.clone(), p.shape.clone())).collect();
     if g.error.is_none() {
         g.error = error.or(err2);
     }
@@ -2978,7 +2987,7 @@ mod arc_span_tests {
 
 /// Crop a parent view's geometry to a circle.
 fn detail_geometry(id: ViewId, parent: &ViewGeometry, center: [f64; 2], radius: f64, poly: Option<&[[f64; 2]]>) -> ViewGeometry {
-    let mut g = ViewGeometry { id, frame: parent.frame, origin: center, exact: parent.exact, error: parent.error.clone(), clip: Some((center, radius)), aligned: parent.aligned, ..Default::default() };
+    let mut g = ViewGeometry { id, frame: parent.frame, origin: center, exact: parent.exact, error: parent.error.clone(), clip: Some((center, radius)), aligned: parent.aligned, cut_shapes: parent.cut_shapes.clone(), ..Default::default() };
     // A polygon profile (rectangle, polygon, spline) replaces the circle.
     let poly = poly.filter(|p| p.len() >= 3);
     if let Some(p) = poly {

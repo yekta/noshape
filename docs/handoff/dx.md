@@ -190,6 +190,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   D13 needs no guide line (ISO inline radial still open); V56 part intersections draw nothing in live (toggle
   only); V55 shaded section / detail (cut face shaded, hatch on top) open.
 - Then V56 (part intersections toggle), D13 ISO inline radial + ISO templates' decimal comma.
+- Then V55 (shaded sections / details, live 1649).
 - Open in my rows: V57 assembly Show sketches (assembly sources skip sketch wires), V35 (d) sections of broken views,
   D40 hatch / title red, C11 inference points, D9 ordinate jogs.
 
