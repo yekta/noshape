@@ -285,7 +285,10 @@ impl DrawingEditor {
         type Set = std::rc::Rc<dyn Fn(&mut TableDlg)>;
         let select = |id: &'static str, label: String, w: f32, items: Vec<(String, bool, Set)>| {
             let ed = ed.clone();
-            Button::new(id).label(label).ghost().xsmall().w(px(w)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+            // "Onshape Default BOM" is wider than the button: that list
+            // takes its own width.
+            let as_select = id != "table-dlg-template";
+            Button::new(id).label(label).ghost().xsmall().w(px(w)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), as_select, move |mut m, _, _| {
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| {
