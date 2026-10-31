@@ -7,7 +7,7 @@ use super::CadTables;
 use super::cad_layers::{CadLayer, CadTextStyle};
 use super::font;
 use super::format::{self, DimText};
-use super::sheet::{Anchor, AnnotationEnv, Fill2, LineStyle, Polyline2, SheetGeometry, Text2, format_scale};
+use super::sheet::{Anchor, AnnotationEnv, Fill2, LineStyle, Polyline2, SheetGeometry, Text2};
 use super::tables::{self, TableLayout};
 use super::views::{self, Sources, ViewCache, ViewGeometry, dist_to_segment, resolve_in_view, rotate2};
 use super::sheet::LayerSpan;
@@ -910,7 +910,7 @@ pub fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sou
         "sheet.name" => sheet.name.clone(),
         "sheet.number" => (si + 1).to_string(),
         "sheet.count" => drawing.sheets.len().to_string(),
-        "sheet.scale" => if sheet.views.is_empty() && !sheet.scale_shown { String::new() } else { format_scale(sheet.scale) },
+        "sheet.scale" => if sheet.views.is_empty() && !sheet.scale_shown { String::new() } else { super::sheet::scale_text(sheet.scale, sheet.scale_text.as_deref()) },
         "sheet.size" => sheet.size.label().to_string(),
         "date" => format::today(),
         "units" => if drawing.units_mm { "mm".into() } else { "in".into() },
@@ -1950,7 +1950,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         label_lines.extend(affixed(&vt.detail_prefix, label.clone()));
                     }
                     if v.scale_label_shown() {
-                        label_lines.push((format!("SCALE {}", format_scale(pl.scale)), lh));
+                        label_lines.push((format!("SCALE {}", views::view_scale_text(sheet, v.id)), lh));
                     }
                 }
                 ViewKind::Auxiliary { .. } if shown => {
@@ -1969,7 +1969,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // Scale label: View properties › Scale label, else with a view label
             // when the view has its own scale.
             if !matches!(v.kind, ViewKind::Detail { .. }) && v.scale_label.unwrap_or(user_label.is_some() && v.scale.is_some()) {
-                label_lines.push((format!("SCALE {}", format_scale(pl.scale)), lh));
+                label_lines.push((format!("SCALE {}", views::view_scale_text(sheet, v.id)), lh));
             }
             // Live (behaviours "view labels", asb 10-20 u): the label is its
             // own selectable item, moved freely by `label_at`.

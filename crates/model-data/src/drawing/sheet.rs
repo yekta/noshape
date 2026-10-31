@@ -3137,6 +3137,29 @@ pub fn format_scale(s: f64) -> String {
     }
 }
 
+/// A typed scale as live keeps it (request 1645): a ratio "a:b" or "a/b"
+/// stays unreduced ("2:4"), a bare number n reads "n:1". Its value and the
+/// text to keep (None: `format_scale` reads the same).
+pub fn typed_scale(s: &str) -> Option<(f64, Option<String>)> {
+    let s = s.trim();
+    let (a, b) = s.split_once([':', '/']).map_or((s, "1"), |(a, b)| (a.trim(), b.trim()));
+    let v = a.parse::<f64>().ok()? / b.parse::<f64>().ok()?;
+    if !(v.is_finite() && v > 0.0) {
+        return None;
+    }
+    let text = format!("{a}:{b}");
+    Some((v, (text != format_scale(v)).then_some(text)))
+}
+
+/// A scale's text: as typed while that still gives the scale, else
+/// [`format_scale`]'s.
+pub fn scale_text(s: f64, typed: Option<&str>) -> String {
+    match typed.and_then(typed_scale) {
+        Some((v, Some(t))) if (v - s).abs() <= 1e-12 * s.max(1.0) => t,
+        _ => format_scale(s),
+    }
+}
+
 fn trim(x: f64) -> String {
     let s = format!("{x:.3}");
     s.trim_end_matches('0').trim_end_matches('.').to_string()

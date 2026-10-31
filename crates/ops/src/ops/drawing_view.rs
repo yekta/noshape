@@ -451,8 +451,8 @@ fn props_json(od: &OpenDoc, t: &Target, id: ViewId, p: &dr::ViewPropValues) -> V
         _ => None,
     });
     let mut j = json!({
-        "scale": p.scale.map(noshape_model::drawing::sheet::format_scale),
-        "scale_shown": noshape_model::drawing::sheet::format_scale(views::view_scale(sheet, id)),
+        "scale": p.scale.map(|s| noshape_model::drawing::sheet::scale_text(s, p.scale_text.as_deref())),
+        "scale_shown": views::view_scale_text(sheet, id),
         "sheet_scale": p.sheet_scale,
         "rotation": ((t.d.sheets[t.sheet].view(id).map_or(0.0, |v| v.rotation).to_degrees().rem_euclid(360.0)) * 1000.0).round() / 1000.0,
         "tangent_edges": TANGENTS.iter().find(|x| x.1 == p.tangent).map(|x| x.0),
@@ -515,9 +515,12 @@ fn view_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         let k = k.as_str();
         match k {
             "scale" => {
+                // Typed text is kept as live does ("2:4", "0.5" → "0.5:1").
+                let typed = x.as_str().and_then(noshape_model::drawing::sheet::typed_scale);
+                p.scale_text = typed.as_ref().and_then(|t| t.1.clone());
                 p.scale = match x {
                     Value::Null => None,
-                    _ => Some(x.as_str().and_then(dr::parse_scale).or(x.as_f64()).filter(|s| *s > 0.0).ok_or_else(|| err(k, "a scale (\"1:2\", \"2:1\") or null to inherit"))?),
+                    _ => Some(typed.map(|t| t.0).or(x.as_f64()).filter(|s| *s > 0.0).ok_or_else(|| err(k, "a scale (\"1:2\", \"2:1\") or null to inherit"))?),
                 }
             }
             "sheet_scale" => p.sheet_scale = boolean(k, x)?,
@@ -732,7 +735,7 @@ fn sheet_props_json(d: &noshape_model::drawing::Drawing, i: usize) -> Value {
     let (w, h) = s.size.size_mm();
     let mut j = json!({
         "name": s.name,
-        "scale": noshape_model::drawing::sheet::format_scale(s.scale),
+        "scale": noshape_model::drawing::sheet::scale_text(s.scale, s.scale_text.as_deref()),
         "size": s.size.list_name(),
         "width": (w * 1000.0).round() / 1000.0,
         "height": (h * 1000.0).round() / 1000.0,
@@ -784,8 +787,16 @@ fn sheet_prop_steps(od: &OpenDoc, d: &noshape_model::drawing::Drawing, i: usize,
                 steps.push(("Select a DWT", Box::new(move |d| d.apply_dwt(i, &file_name, &templates))));
             }
             "scale" => {
-                let sc = x.as_str().and_then(dr::parse_scale).or(x.as_f64().filter(|v| *v > 0.0)).ok_or_else(|| err(k, "a scale (\"1:2\")"))?;
-                steps.push(("Sheet scale", Box::new(move |d| d.sheets[i].scale = sc)));
+                let typed = x.as_str().and_then(noshape_model::drawing::sheet::typed_scale);
+                let text = typed.as_ref().and_then(|t| t.1.clone());
+                let sc = typed.map(|t| t.0).or(x.as_f64().filter(|v| *v > 0.0)).ok_or_else(|| err(k, "a scale (\"1:2\")"))?;
+                steps.push((
+                    "Sheet scale",
+                    Box::new(move |d| {
+                        d.sheets[i].scale = sc;
+                        d.sheets[i].scale_text.clone_from(&text);
+                    }),
+                ));
             }
             "size" if dwt.is_some() => return Err(err(k, "the sheet's format is a DWT's (set dwt: null first)")),
             "size" if x.as_str() == Some("Custom") => {

@@ -614,6 +614,11 @@ pub struct DrawingView {
     /// neither slides along its alignment axis nor follows its parent).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub unaligned: bool,
+    /// The scale as typed when it doesn't read as `format_scale` does
+    /// ("2:4" kept unreduced, "0.5" → "0.5:1"; live request 1645): the
+    /// field and the scale labels show it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scale_text: Option<String>,
     /// Scale › Sheet scale (child views, help H:views): with no scale of its
     /// own the view follows the sheet's scale, not its parent's.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -747,6 +752,7 @@ impl Default for DrawingView {
             kind: ViewKind::Projected { parent: ViewId(0), direction: None },
             position: [0.0, 0.0],
             scale: None,
+            scale_text: None,
             sheet_scale: false,
             style: RenderStyle::HiddenLinesRemoved,
             show_tangent_edges: true,
@@ -2521,6 +2527,10 @@ pub struct Sheet {
     /// before the first view, live 820).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub scale_shown: bool,
+    /// The scale as typed (see `DrawingView::scale_text`): the title
+    /// block's SCALE shows it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scale_text: Option<String>,
 }
 
 /// Where zone labelling starts (Custom template › Start zones): numbers
@@ -2773,7 +2783,7 @@ impl Sheet {
 
 impl Default for Sheet {
     fn default() -> Self {
-        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default(), title_language: Default::default(), imported: None, sketch_dim_constraints: vec![], uid: 0, dwt: None, scale_shown: false }
+        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default(), title_language: Default::default(), imported: None, sketch_dim_constraints: vec![], uid: 0, dwt: None, scale_shown: false, scale_text: None }
     }
 }
 

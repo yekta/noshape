@@ -507,8 +507,10 @@ pub struct ViewPropValues {
     pub orientation: Option<noshape_model::drawing::ViewOrientation>,
     /// … or a named view of the source.
     pub named: Option<String>,
-    /// The view's own scale (None: inherited).
+    /// The view's own scale (None: inherited) and its text as typed
+    /// (`sheet::typed_scale`).
     pub scale: Option<f64>,
+    pub scale_text: Option<String>,
     /// Inherited from the sheet ("(Sheet)") rather than the parent.
     pub sheet_scale: bool,
     /// Rotation angle, degrees counter-clockwise (None: unchanged).
@@ -559,6 +561,7 @@ impl ViewPropValues {
             },
             named: v.named_view.clone(),
             scale: v.scale,
+            scale_text: v.scale_text.clone(),
             sheet_scale: v.sheet_scale,
             rotation_deg: None,
             tangent: noshape_scene::drawing_tools::view_edit::TangentMode::of(v),
@@ -596,6 +599,7 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
     }
     let Some(v) = d.sheets[sheet].view_mut(id) else { return };
     v.scale = p.scale;
+    v.scale_text = p.scale.and(p.scale_text.clone());
     v.sheet_scale = p.sheet_scale && p.scale.is_none();
     p.tangent.apply(v);
     v.best_quality = p.best_quality;
@@ -617,11 +621,13 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
     v.simplification = p.simplification;
     let name = p.name.trim();
     v.name = (!name.is_empty() && name != default_name).then(|| name.to_string());
-    // Live (request 1603 (d)): setting a view's own scale ticks its Scale
-    // label (unless the checkbox was changed too), whatever the drawing's
-    // Insert view default.
-    let scale_set = p.scale.is_some() && p.scale != old.scale;
-    v.scale_label = Some(p.scale_label || (scale_set && !old.scale_label_shown()));
+    // Live (requests 1603 (d), 1645): a changed scale shows the Scale label
+    // on the view and every view following its scale while it differs from
+    // the sheet's, hides it when it matches again (unless the checkbox was
+    // changed too), whatever the drawing's Insert view default.
+    let rescaled = p.scale != old.scale || (p.scale.is_none() && p.sheet_scale != old.sheet_scale);
+    let toggled = p.scale_label != old.scale_label_shown();
+    v.scale_label = Some(p.scale_label);
     let label = p.label.trim().to_string();
     // ☐ View label hides a section / detail / auxiliary label.
     let auto = old.auto_label();
@@ -656,6 +662,33 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
             }
         } else if *o != n {
             set_standard_orientation(v, n);
+        }
+    }
+    if rescaled && !toggled {
+        let sh = &mut d.sheets[sheet];
+        // The view and the views whose scale comes from it.
+        let follows = |sh: &noshape_model::drawing::Sheet, w: ViewId| {
+            let mut cur = w;
+            for _ in 0..64 {
+                if cur == id {
+                    return true;
+                }
+                match sh.view(cur) {
+                    Some(x) if x.scale.is_none() && !x.sheet_scale => match sh.parent_of(cur) {
+                        Some(p) => cur = p,
+                        None => return false,
+                    },
+                    _ => return false,
+                }
+            }
+            false
+        };
+        let family: Vec<ViewId> = sh.views.iter().map(|w| w.id).filter(|w| follows(sh, *w)).collect();
+        for w in family {
+            let differs = (views::view_scale(sh, w) - sh.scale).abs() > 1e-12;
+            if let Some(x) = sh.view_mut(w) {
+                x.scale_label = Some(differs);
+            }
         }
     }
 }

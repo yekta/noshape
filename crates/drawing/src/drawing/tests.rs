@@ -2677,6 +2677,33 @@ fn named_view_section_cuts_and_hatches() {
     assert!(g.section_segments.is_empty());
 }
 
+/// Typed scales as live keeps them (request 1645): "2:4" unreduced, a bare
+/// number "n:1"; children following the view show its text.
+#[test]
+fn typed_scales_keep_their_text() {
+    use super::sheet::{scale_text, typed_scale};
+    assert_eq!(typed_scale("2:4"), Some((0.5, Some("2:4".into()))));
+    assert_eq!(typed_scale("0.5"), Some((0.5, Some("0.5:1".into()))));
+    assert_eq!(typed_scale("1:2"), Some((0.5, None)));
+    assert_eq!(typed_scale(" 3 / 6 "), Some((0.5, Some("3:6".into()))));
+    assert_eq!(typed_scale("2"), Some((2.0, None)));
+    assert_eq!(typed_scale(":2"), None);
+    assert_eq!(scale_text(0.5, Some("2:4")), "2:4");
+    assert_eq!(scale_text(1.0, Some("2:4")), "1:1", "a stale text gives way");
+    let mut sheet = Sheet::default();
+    let ps = crate::document::TabId(1);
+    let mut base = base_view(1, ps, ViewOrientation::Front, [100.0, 100.0]);
+    (base.scale, base.scale_text) = (Some(0.5), Some("2:4".into()));
+    sheet.views.push(base);
+    let mut top = base_view(2, ps, ViewOrientation::Top, [100.0, 50.0]);
+    top.kind = ViewKind::Projected { parent: ViewId(1), direction: None };
+    sheet.views.push(top);
+    assert_eq!(super::views::view_scale_text(&sheet, ViewId(2)), "2:4");
+    sheet.scale_text = Some("1:1".into());
+    sheet.view_mut(ViewId(1)).unwrap().scale = None;
+    assert_eq!(super::views::view_scale_text(&sheet, ViewId(2)), "1:1");
+}
+
 #[test]
 fn datum_on_dimension_arrow_hides_it() {
     let (doc, mut drawing) = demo();

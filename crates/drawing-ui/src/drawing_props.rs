@@ -531,8 +531,8 @@ impl DrawingEditor {
         // The Scale combo shows "1:1 (Sheet)" / "1:2 (Parent)" or the view's own scale.
         let inherit = if self.current_sheet().parent_of(id).is_some() && !v.sheet_scale { "Parent" } else { "Sheet" };
         let scale_text = match v.scale {
-            Some(s) => noshape_model::drawing::sheet::format_scale(s),
-            None => format!("{} ({inherit})", noshape_model::drawing::sheet::format_scale(views::view_scale(self.current_sheet(), id))),
+            Some(s) => noshape_model::drawing::sheet::scale_text(s, v.scale_text.as_deref()),
+            None => format!("{} ({inherit})", views::view_scale_text(self.current_sheet(), id)),
         };
         let name = v.name.clone().unwrap_or_else(|| default_view_name(&self.drawing, self.current_sheet(), &v));
         let auto_label = matches!(v.kind, ViewKind::Section { .. } | ViewKind::Detail { .. } | ViewKind::AlignedSection { .. });
@@ -619,13 +619,15 @@ impl DrawingEditor {
     fn apply_view_props_multi(&mut self, p: ViewProps, m: MultiInit, cx: &mut Context<Self>) {
         let ids: Vec<ViewId> = std::iter::once(p.view).chain(p.others.iter().copied()).collect();
         let typed = p.scale_input.read(cx).value().trim().to_string();
-        // None: unchanged; Some(None): the inherited scale.
+        // None: unchanged; Some(None): the inherited scale. The text as typed
+        // is kept (live request 1645).
+        let typed_s = noshape_model::drawing::sheet::typed_scale(&typed);
         let scale: Option<Option<f64>> = if typed.is_empty() || typed == m.scale_text.trim() {
             None
         } else if typed.ends_with("(Sheet)") || typed.ends_with("(Parent)") {
             Some(None)
         } else {
-            crate::drawing_ui::parse_scale(&typed).map(Some)
+            typed_s.as_ref().map(|t| Some(t.0))
         };
         let simplification = p.simplification.map(|k| crate::drawing_insert::parse_simplification(k, &p.simp_value.read(cx).value(), self.drawing.units_mm).unwrap_or(k));
         let mut d = self.drawing.clone();
@@ -634,6 +636,7 @@ impl DrawingEditor {
             let Some(v) = d.sheets[self.sheet].view_mut(*id) else { continue };
             if let Some(s) = scale {
                 v.scale = s;
+                v.scale_text = s.and(typed_s.as_ref().and_then(|t| t.1.clone()));
                 v.sheet_scale = s.is_none() && typed.ends_with("(Sheet)");
             }
             if p.tangent_pick {
@@ -683,7 +686,10 @@ impl DrawingEditor {
         // Scale: "(Sheet)" / "(Parent)" keep the inherited scale; a typed N:N
         // or N/N sets the view's own.
         let typed = p.scale_input.read(cx).value().trim().to_string();
-        let scale = if typed.is_empty() || typed.ends_with("(Sheet)") || typed.ends_with("(Parent)") { p.scale } else { crate::drawing_ui::parse_scale(&typed).or(p.scale) };
+        let inherit = typed.is_empty() || typed.ends_with("(Sheet)") || typed.ends_with("(Parent)");
+        // The text as typed is kept: "2:4", "0.5" → "0.5:1" (live request 1645).
+        let typed_s = if inherit { None } else { noshape_model::drawing::sheet::typed_scale(&typed) };
+        let scale = if inherit { p.scale } else { typed_s.as_ref().map(|t| t.0).or(p.scale) };
         // Child views: "(Sheet)" links to the sheet's scale, "(Parent)" to the parent's.
         let sheet_scale = if typed.ends_with("(Sheet)") { true } else if typed.ends_with("(Parent)") { false } else { p.sheet_scale && scale.is_none() };
         // Rotation angle: 0–360; the reverse button turns it clockwise.
@@ -693,6 +699,7 @@ impl DrawingEditor {
             orientation: p.orientation,
             named: p.named.clone(),
             scale,
+            scale_text: typed_s.and_then(|t| t.1),
             sheet_scale,
             rotation_deg: rotation,
             tangent: p.tangent,

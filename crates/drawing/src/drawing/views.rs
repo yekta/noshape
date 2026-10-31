@@ -869,6 +869,28 @@ pub fn view_scale(sheet: &Sheet, id: ViewId) -> f64 {
     if sheet.scale > 0.0 { sheet.scale } else { 1.0 }
 }
 
+/// [`view_scale`]'s text: as typed on the view, or on the parent or sheet
+/// it follows (live request 1645).
+pub fn view_scale_text(sheet: &Sheet, id: ViewId) -> String {
+    let mut cur = id;
+    for _ in 0..64 {
+        let Some(v) = sheet.view(cur) else { break };
+        if let Some(s) = v.scale
+            && s > 0.0
+        {
+            return super::sheet::scale_text(s, v.scale_text.as_deref());
+        }
+        if v.sheet_scale {
+            break;
+        }
+        match sheet.parent_of(cur) {
+            Some(p) => cur = p,
+            None => break,
+        }
+    }
+    super::sheet::scale_text(if sheet.scale > 0.0 { sheet.scale } else { 1.0 }, sheet.scale_text.as_deref())
+}
+
 /// The bodies a view shows.
 pub fn view_bodies<'a>(ctx: &'a Context, part: Option<&BodyId>) -> Vec<&'a Arc<Body>> {
     match part {

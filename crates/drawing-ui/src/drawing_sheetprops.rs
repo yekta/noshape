@@ -115,7 +115,7 @@ impl DrawingEditor {
         let Some(s) = self.drawing.sheets.get(sheet) else { return };
         self.view_props = None;
         self.panel = None;
-        let text = format_scale(s.scale);
+        let text = noshape_model::drawing::sheet::scale_text(s.scale, s.scale_text.as_deref());
         let (w, h) = s.size.size_mm();
         let inches = !self.drawing.units_mm;
         // Live (Wt widgets): the scale combo puts the caret at the click; the
@@ -155,11 +155,15 @@ impl DrawingEditor {
     /// ✓: apply the typed scale and close.
     fn accept_sheet_props(&mut self, cx: &mut Context<Self>) {
         let Some(st) = self.sheet_props.take() else { return };
-        if let Some(s) = crate::drawing_ui::parse_scale(&st.scale.read(cx).value())
-            && self.drawing.sheets.get(st.sheet).is_some_and(|x| (x.scale - s).abs() > 1e-12)
+        // The text as typed is kept: "2:4", "0.5" → "0.5:1" (live request 1645).
+        if let Some((s, text)) = noshape_model::drawing::sheet::typed_scale(&st.scale.read(cx).value())
+            && self.drawing.sheets.get(st.sheet).is_some_and(|x| (x.scale - s).abs() > 1e-12 || x.scale_text != text)
         {
             let i = st.sheet;
-            self.edit("Sheet scale", cx, |d| d.sheets[i].scale = s);
+            self.edit("Sheet scale", cx, |d| {
+                d.sheets[i].scale = s;
+                d.sheets[i].scale_text = text;
+            });
         }
         // Size › Custom: the typed width and height.
         let inches = !self.drawing.units_mm;
@@ -224,7 +228,10 @@ impl DrawingEditor {
             .iter()
             .map(|&s| {
                 let act: Act = std::rc::Rc::new(move |t: &mut DrawingEditor, w: &mut Window, cx: &mut Context<DrawingEditor>| {
-                    t.edit("Sheet scale", cx, |d| d.sheets[si].scale = s);
+                    t.edit("Sheet scale", cx, |d| {
+                        d.sheets[si].scale = s;
+                        d.sheets[si].scale_text = None;
+                    });
                     if let Some(p) = &t.sheet_props {
                         p.scale.update(cx, |i, cx| i.set_value(format_scale(s), w, cx));
                     }

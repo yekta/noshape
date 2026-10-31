@@ -2948,6 +2948,18 @@ fn drawing_insert_view_options() {
     assert_eq!(label(&mut ctx), json!(["VIEW Z (ROTATED)", "SEE NOTE 2", "SCALE 3:1"]));
     let e = try_call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": base["id"], "set": { "prefix": "X" } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("set.prefix"), "{e:?}");
+    // A typed scale is kept as typed and labels the view while it differs
+    // from the sheet's (live request 1645); inheriting again hides it.
+    let base_label = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["views"].as_array().unwrap().iter().find(|v| v["id"] == base["id"]).unwrap()["label_text"].clone();
+    call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": base["id"], "set": { "scale": "2:4" } }));
+    assert_eq!(base_label(&mut ctx), json!(["SCALE 2:4"]));
+    let p = call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": base["id"] }));
+    assert_eq!(p["properties"]["scale"], json!("2:4"), "{p}");
+    call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": base["id"], "set": { "scale": null } }));
+    assert!(base_label(&mut ctx).is_null());
+    call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "action": "properties", "set": { "scale": "0.5" } }));
+    let sp = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "action": "properties" }));
+    assert_eq!(sp["properties"]["scale"], json!("0.5:1"), "{sp}");
     let e = try_call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": base["id"], "radius": 5 })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_detail_view", json!({ "drawing": tab, "parent": base["id"], "profile": "polygon", "points": [[90, 140], [110, 160]], "position": [200, 260] })).unwrap_err();
