@@ -724,6 +724,38 @@ enum CutShape {
     /// `flange_end` at the flange's, by the sine of the angle bent so far
     /// (live's bend cylinder areas: 186.1572 / 372.3144 mm²).
     Closed { plate_end: f64, flange_end: f64, angle: f64 },
+    /// A closed corner whose rip is a butt joint (live 1670 / 1676): in the
+    /// flat, one cubic Bézier from `plate_end` on the plate's side (45°,
+    /// handle half the chord) to `flange_end` on the flange's (along the
+    /// wall's end, handle a tenth of the chord).
+    Butt { plate_end: f64, flange_end: f64 },
+}
+
+/// The flat Bézier of [`CutShape::Butt`] in (along the bend from the
+/// corner, across it from the plate) for a bend allowance `ba`.
+fn butt_bezier(plate_end: f64, flange_end: f64, ba: f64) -> [glam::DVec2; 4] {
+    use glam::DVec2;
+    let (p0, p3) = (DVec2::new(plate_end, 0.0), DVec2::new(flange_end, ba));
+    let chord = (p3 - p0).length();
+    [p0, p0 + DVec2::new(-1.0, 1.0).normalize() * 0.5 * chord, p3 - DVec2::Y * 0.1 * chord, p3]
+}
+
+/// Where a [`butt_bezier`] runs `w` across the bend (along the bend).
+fn butt_along(c: &[glam::DVec2; 4], w: f64) -> f64 {
+    let at = |t: f64| {
+        let u = 1.0 - t;
+        c[0] * (u * u * u) + c[1] * (3.0 * u * u * t) + c[2] * (3.0 * u * t * t) + c[3] * (t * t * t)
+    };
+    let (mut lo, mut hi) = (0.0, 1.0);
+    for _ in 0..60 {
+        let mid = 0.5 * (lo + hi);
+        if at(mid).y < w {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    at(0.5 * (lo + hi)).x
 }
 
 impl WrappedCut {
@@ -738,6 +770,7 @@ impl WrappedCut {
                 let f = if angle <= std::f64::consts::FRAC_PI_2 + 1e-9 { (t * angle).sin() / angle.sin() } else { t };
                 (-reach, plate_end + (flange_end - plate_end) * f)
             }
+            CutShape::Butt { plate_end, flange_end } => (-reach - plate_end.abs() - flange_end.abs(), butt_along(&butt_bezier(plate_end, flange_end, self.ba), w.clamp(0.0, self.ba))),
         }
     }
 }
@@ -802,9 +835,36 @@ fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &B
                 // the two kept `clearance` apart across it; the wall loses
                 // the sliver at its corner (live G34a: 0.02 × 2 mm face).
                 let gap = def.clearance * std::f64::consts::FRAC_1_SQRT_2;
+                let angle = |e: usize| bend_of(e).map_or(std::f64::consts::FRAC_PI_2, |b| b.3.angle);
+                // A butt joint on the corner's rip (live 1670 / 1676): the
+                // through wall's bend runs to its wall's end, both bends end
+                // in flat Béziers from a plate point that keeps them a
+                // clearance apart. Two 90° bends of one radius only.
+                let corner_rip = def.rip_styles.keys().copied().find(|&r| r < topo.edge_ends.len() && [topo.edge_ends[r].0, topo.edge_ends[r].1].iter().any(|q| q.distance(topo.vertices[vi]) < TOL));
+                let flange_of = |e: usize| bend_of(e).map(|&(_, fa, fb, _)| if fa == p { fb } else { fa });
+                let right = |e: usize| (angle(e) - std::f64::consts::FRAC_PI_2).abs() < 1e-9;
+                if let (Some(rip), Some(f1), Some(f2), Some(&r1), Some(&r2)) = (corner_rip, flange_of(e1), flange_of(e2), def.bends.get(&e1), def.bends.get(&e2))
+                    && right(e1)
+                    && right(e2)
+                    && (r1 - r2).abs() < TOL
+                    && (b1 - b2).abs() < TOL
+                {
+                    let thickness = def.front + def.back;
+                    let (fe1, fe2) = (rip_offset(def, topo, rip, f1), rip_offset(def, topo, rip, f2));
+                    // The corner's frame: bend e1 measured from e2's setback.
+                    let (o1, o2) = (s2 - r1, s1 - r1);
+                    // Live 1680: P = R + (K T + gap) / √2 (G34 b: 2.650538).
+                    let p_model = r1 + (def.k_factor * thickness + def.clearance) * std::f64::consts::FRAC_1_SQRT_2;
+                    extends.push((e1, v, fe1));
+                    extends.push((e2, v, fe2));
+                    wraps.push(WrappedCut { edge: e1, v, plate: p, ba: b1, shape: CutShape::Butt { plate_end: p_model + o1, flange_end: fe1 } });
+                    wraps.push(WrappedCut { edge: e2, v, plate: p, ba: b2, shape: CutShape::Butt { plate_end: p_model + o2, flange_end: fe2 } });
+                    let reach = p_model + o1 + s1;
+                    prism(&mut cuts, p, &[v - (d1 + d2) * reach, v + d1 * (2.0 * reach) - d2 * reach, v - d1 * reach + d2 * (2.0 * reach)], vi)?;
+                    continue;
+                }
                 extends.push((e1, v, def.clearance));
                 extends.push((e2, v, def.clearance));
-                let angle = |e: usize| bend_of(e).map_or(std::f64::consts::FRAC_PI_2, |b| b.3.angle);
                 wraps.push(WrappedCut { edge: e1, v, plate: p, ba: b1, shape: CutShape::Closed { plate_end: s2 + gap, flange_end: def.clearance, angle: angle(e1) } });
                 wraps.push(WrappedCut { edge: e2, v, plate: p, ba: b2, shape: CutShape::Closed { plate_end: s1 + gap, flange_end: def.clearance, angle: angle(e2) } });
                 let reach = s1 + s2 + gap;
@@ -900,6 +960,58 @@ fn closed_cutter(b: &Bend, sign: f64, base: DVec3, n1: DVec3, span: [f64; 2], at
     let surface = k::BSplineSurfaceData { poles, nu: 2, nv: 3, weights: Some(weights), u_knots: vec![0.0, 0.0, 1.0, 1.0], v_knots: vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0], u_degree: 1, v_degree: 2, u_periodic: false, v_periodic: false };
     let face = k::make_bspline_surface(&surface, &[], false).map_err(|e| fe(format!("Sheet metal corner relief failed: {e}")))?;
     let back = plate_end.max(flange_end) + 2.0 * (hi - lo) + 1e-3;
+    let push = if at_start { -b.dir * back } else { b.dir * back };
+    Ok(k::extrude(&face, push).map_err(|e| fe(format!("Sheet metal corner relief failed: {e}")))?.shape)
+}
+
+/// [`closed_cutter`] for a [`CutShape::Butt`] end (live 1676): the flat
+/// Bézier wrapped onto the bend, its rulings radial and exact, sampled every
+/// 0.75° around (the chord sags 1e-4 mm), pushed back past the vertex.
+#[allow(clippy::too_many_arguments)]
+fn butt_cutter(b: &Bend, sign: f64, base: DVec3, n1: DVec3, span: [f64; 2], at_start: bool, from_plate: bool, ba: f64, ends: [f64; 2], angle: f64) -> FResult<Shape> {
+    let [plate_end, flange_end] = ends;
+    let curve = butt_bezier(plate_end, flange_end, ba);
+    // Along the bend at angle θ from wall a; past the bend's sides on along
+    // the curve's end tangents (a smooth surface: a kink there left the
+    // plate a 0.011 mm sliver).
+    let slope = |a: glam::DVec2, b: glam::DVec2| (b.x - a.x) / (b.y - a.y);
+    let x_at = |th: f64| {
+        let th_plate = if from_plate { th } else { angle - th };
+        let w = th_plate / angle * ba;
+        let x = if w < 0.0 {
+            curve[0].x + slope(curve[0], curve[1]) * w
+        } else if w > ba {
+            curve[3].x + slope(curve[2], curve[3]) * (w - ba)
+        } else {
+            butt_along(&curve, w)
+        };
+        if at_start { x } else { b.len - x }
+    };
+    let perp = |p: DVec3| {
+        let r = p - b.axis_point;
+        r - b.dir * r.dot(b.dir)
+    };
+    let e0 = perp(base).normalize();
+    let e1 = b.dir.cross(e0) * sign;
+    let (ra, rb) = (perp(base + n1 * span[0]).length(), perp(base + n1 * span[1]).length());
+    let (lo, hi) = (ra.min(rb), ra.max(rb));
+    let margin = (0.25 * (hi - lo)).min(0.5 * lo);
+    let n = 120;
+    let mut poles = Vec::new();
+    for r in [lo - margin, hi + margin] {
+        for j in 0..=n {
+            let th = angle * (-0.05 + 1.1 * j as f64 / n as f64);
+            poles.push(b.axis_point + b.dir * x_at(th) + (e0 * th.cos() + e1 * th.sin()) * r);
+        }
+    }
+    // Cubic around the bend (the samples as its poles: smooth for the
+    // booleans; at 0.75° apart they stray well under a micron).
+    let mut v_knots = vec![0.0; 4];
+    v_knots.extend((1..n - 2).map(|j| j as f64 / (n - 2) as f64));
+    v_knots.extend([1.0; 4]);
+    let surface = k::BSplineSurfaceData { poles, nu: 2, nv: n + 1, weights: None, u_knots: vec![0.0, 0.0, 1.0, 1.0], v_knots, u_degree: 1, v_degree: 3, u_periodic: false, v_periodic: false };
+    let face = k::make_bspline_surface(&surface, &[], false).map_err(|e| fe(format!("Sheet metal corner relief failed: {e}")))?;
+    let back = 2.0 * (plate_end.abs() + flange_end.abs()) + 4.0 * (hi - lo) + 1e-3;
     let push = if at_start { -b.dir * back } else { b.dir * back };
     Ok(k::extrude(&face, push).map_err(|e| fe(format!("Sheet metal corner relief failed: {e}")))?.shape)
 }
@@ -1193,7 +1305,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         // A closed corner's end is its cut alone: the solid starts a
         // thickness before it (the cut's end face meets the bend's start
         // plane tangentially at the flange side, live G34a).
-        let closed_at = |start: bool| wraps.iter().any(|rc| rc.edge == e && matches!(rc.shape, CutShape::Closed { angle, .. } if angle <= std::f64::consts::FRAC_PI_2 + 1e-9) && (rc.v.distance(b.start) < TOL) == start);
+        let closed_at = |start: bool| wraps.iter().any(|rc| rc.edge == e && (matches!(rc.shape, CutShape::Closed { angle, .. } if angle <= std::f64::consts::FRAC_PI_2 + 1e-9) || matches!(rc.shape, CutShape::Butt { .. })) && (rc.v.distance(b.start) < TOL) == start);
         // A slanted end: on past both walls' ends (its arc can bulge past
         // them), cut back below.
         let margin = |i: usize| skew[i].map_or(0.0, |(ta, tb, _, _)| b.angle.abs() * ((b.axis_point - b.start).length() + front + back) + 2.0 * (front + back) + (ta - tb).abs());
@@ -1283,6 +1395,11 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         for rc in wraps.iter().filter(|rc| rc.edge == e) {
             let at_start = rc.v.distance(b.start) < TOL;
             let base = b.start + a1 * b.setback;
+            if let CutShape::Butt { plate_end, flange_end } = rc.shape {
+                let cutter = butt_cutter(&b, sign, base, n1, [-back, front], at_start, fa == rc.plate, rc.ba, [plate_end, flange_end], b.angle)?;
+                bend = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&bend), &[cutter], &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal corner relief failed: {e}")))?.shape;
+                continue;
+            }
             if let CutShape::Closed { plate_end, flange_end, angle } = rc.shape
                 && angle <= std::f64::consts::FRAC_PI_2 + 1e-9
             {

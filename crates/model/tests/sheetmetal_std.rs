@@ -349,16 +349,15 @@ fn closed_corner_matches_live() {
 
 /// Live G34 (b): after (a)'s Closed corner, a Joint on the corner rip picked
 /// as the front wall's end edge, Rip, Butt joint - Direction 1: the front
-/// wall runs through to x = −2 (its faces 992 mm²), 8601.722190307968 mm³;
-/// Direction 2: the left wall does (672 mm²), 8601.61413803641 mm³.
-/// Live also re-closes both bends at the corner (plate ends 2.653 from the
-/// corner, end faces 13.3876 / 10.9812 mm²); ours keep the Closed corner's
-/// ends, 1.92 mm³ short (TICKETS SM-CLOSED-BUTT), so the volume is held to
-/// 0.05 % here.
+/// wall runs through to x = −2 (its faces 992 mm²), Direction 2 the left one
+/// (672 mm²); both bends are re-closed against the through wall, each end
+/// one Bézier in the flat (live 1670 / 1676 / 1680): regen evVolume HIGH
+/// 8601.820762 / 8601.821483 mm³, 23 faces, the through bend's end face
+/// 13.3875875 mm², the other's 10.9812215.
 #[test]
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn butt_joint_after_a_closed_corner_matches_live() {
-    for (style, live, through) in [("BUTT", 8601.722190307968, 992.0), ("BUTT2", 8601.61413803641, 672.0)] {
+    for (style, live, through) in [("BUTT", 8601.820762198602, 992.0), ("BUTT2", 8601.821482534566, 672.0)] {
         let mut s = g34();
         let r = s.ok();
         let v = vertex_at(&r, DVec3::new(2.0, 2.0, 2.0));
@@ -376,8 +375,10 @@ fn butt_joint_after_a_closed_corner_matches_live() {
         });
         let r = s.ok();
         let areas: Vec<f64> = r.context.bodies[part(&r)].shape.faces().iter().map(|f| f.area().unwrap_or(0.0) * 1e6).collect();
+        let has = |a: f64, tol: f64| areas.iter().any(|x| (x - a).abs() < tol);
         let n = areas.iter().filter(|x| (*x - through).abs() < 1e-3).count();
-        assert!((volume_mm3(&r) - live).abs() < 5e-4 * live && n == 2, "{style}: {} mm³ (live {live}), {n} faces of {through} mm²: {:#?}", volume_mm3(&r), face_report(&r));
+        eprintln!("{style}: {} mm³ (live {live}), {} faces", volume_mm3(&r), areas.len());
+        assert!((volume_mm3(&r) - live).abs() < 0.01 && n == 2 && areas.len() == 23 && has(13.3875875, 1e-3) && has(10.9812215, 1e-3), "{style}: {} mm³ (live {live}), {n} faces of {through} mm²: {:#?}", volume_mm3(&r), face_report(&r));
     }
 }
 
