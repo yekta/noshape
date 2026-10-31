@@ -8,8 +8,8 @@
 //! keeps the edges only. Children don't inherit it, except details (live
 //! request 1649). Sections render their cut bodies (the cut face shaded,
 //! the hatch drawn on top), details their parent's picture within the
-//! circle. Views with crops or breaks, and polygon details, stay unshaded
-//! for now.
+//! circle or profile, cropped views inside their crop. Views with breaks
+//! stay unshaded for now.
 
 use crate::drawing_view::*;
 use gpui_kit::*;
@@ -54,7 +54,7 @@ impl DrawingEditor {
         let wanted: Vec<ViewId> = sheet
             .views
             .iter()
-            .filter(|v| v.style == RenderStyle::Shaded && v.crop.is_none() && v.breaks.is_empty() && v.detail_profile.is_none())
+            .filter(|v| v.style == RenderStyle::Shaded && v.breaks.is_empty())
             .filter(|v| matches!(v.kind, ViewKind::Base { .. } | ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } | ViewKind::Section { .. } | ViewKind::AlignedSection { .. } | ViewKind::Detail { .. }))
             .map(|v| v.id)
             .collect();
@@ -83,13 +83,16 @@ impl DrawingEditor {
             let (w_mm, h_mm) = ((hi[0] - lo[0]) * pl.scale * 1000.0, (hi[1] - lo[1]) * pl.scale * 1000.0);
             let f = (MAX_PX / (w_mm.max(h_mm) * PX_PER_MM)).min(1.0) * PX_PER_MM;
             let (wp, hp) = (((w_mm * f).round() as u32).max(8), ((h_mm * f).round() as u32).max(8));
-            // A detail keeps the part of the picture inside its circle.
-            let circle = g.clip;
+            // A detail keeps the part of the picture inside its circle or
+            // profile, a cropped view inside its crop.
+            let circle = g.clip.or(match &g.crop {
+                Some(noshape_model::drawing::Crop::Circle { center, radius }) => Some((*center, *radius)),
+                _ => None,
+            });
+            let poly: Option<Vec<[f64; 2]>> = g.clip_poly.clone().or_else(|| g.crop.as_ref().filter(|c| !matches!(c, noshape_model::drawing::Crop::Circle { .. })).and_then(views::crop_polygon));
             let keep = move |u: f64, v: f64| {
-                circle.is_none_or(|(c, r)| {
-                    let (x, y) = (lo[0] + u * (hi[0] - lo[0]), hi[1] - v * (hi[1] - lo[1]));
-                    (x - c[0]).powi(2) + (y - c[1]).powi(2) <= r * r
-                })
+                let (x, y) = (lo[0] + u * (hi[0] - lo[0]), hi[1] - v * (hi[1] - lo[1]));
+                circle.is_none_or(|(c, r)| (x - c[0]).powi(2) + (y - c[1]).powi(2) <= r * r) && poly.as_ref().is_none_or(|p| views::point_in_polygon([x, y], p))
             };
             let job = Job {
                 gpu: self.gpu.clone(),
