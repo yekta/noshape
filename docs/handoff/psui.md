@@ -537,3 +537,4 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 (none; 4e55b01f is in v0.4.10)
 - (FYI from skasm 10-30, lead-approved) `OsSelect::set_pictures(id → RenderImage)`: rows of items with a picture are 40 px with a
   70 × 40 image before the label (live Form ▾ of the form library, request 1622 (d)). No picture set: unchanged.
+- skasm 10-31 (in your crate): part_studio/analysis_tools.rs `isocurve_overlay` draws Show isocurves (Loft, Boundary surface, Fill, Fillet …) and Show ruled lines (Ruled surface) while the dialog is open, in vivid magenta #d403f9 (help "colors"). It's cached per preview in `UiState::isocurves`, and the lines come from noshape_model::analysis::feature_isocurves / feature_ruled_lines.
