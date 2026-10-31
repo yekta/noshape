@@ -208,6 +208,7 @@ impl Regenerator {
     pub fn regenerate(&mut self, studio: &PartStudio, config: &ConfigValues, units: &UnitPrefs, opts: &RegenOptions) -> RegenResult {
         let t0 = Instant::now();
         let _sheet_metal = std_route::LegacySheetMetal::set(studio.legacy_sheet_metal);
+        let _blends = std_route::BlendKernel::set(!studio.legacy_blends);
         // Model lengths are metres; OCCT's blends are tuned for millimetre-sized parts.
         let _ = noshape_kernel::set_working_scale(1000.0);
         let upto = opts.upto.unwrap_or_else(|| studio.rollback_index()).min(studio.features.len());

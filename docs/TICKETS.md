@@ -237,6 +237,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 08:04: **new with 0785c154 / 4498e6b8 (blends ending on caps at an angle, distance-angle chamfers)**: tickets/cli-draft-die.noshape Part 1 in the app **90440.868 mm³ / 15766.139 mm²** on green 0785c154 vs **90439.156 / 15738.992** on 19a1164b and on 0785c154 with NOSHAPE_BLEND_RUST=0 (+1.712 mm³, +27.1 mm²; qa-scratch gm-b78cli-draft-die-*.png). The earlier ones (cli-72L-died, cli-delete-gpf, bop-pairs-cli-segv-152, cli-chamfer-hang-pre, cli-delete-crash) unchanged between 19a1164b and 0785c154.
   qa 08:41: also tickets/cli-shell-gpf.noshape on 0785c154: **66313.675 mm³ / 54759.608 mm²** vs 19a1164b and NOSHAPE_BLEND_RUST=0 **66314.087 / 54759.690** (−0.412 mm³). core 4bfc7bf5 turned the blends off by default again; this ticket is now about the flag-on path.
   qa 09:52: default path checked after 4bfc7bf5: green 3b5450e0, default settings, all 10 documents above = OCCT's blends exactly (Mass properties crops). Open for NOSHAPE_BLEND_RUST=1 only.
+  core 10-31 17:35: versioned per studio, as Onshape versions features: ScopeRule 6 = noshape's own blends;
+  studios saved with features before it get `legacy_blends` on load and keep OCCT's fillets and chamfers (so the 7
+  documents above regenerate exactly as before, references included); new studios blend with noshape's where it
+  builds them exactly (NOSHAPE_BLEND_RUST=0 / 1 still forces either). T1 features_a::blends_saved_with_occt_stay_occt.
   core 10-31 12:10: (b) cli-fillet2-segv explained: Fillet 1 (R0.1 on 2 edges ending at Chamfer 1's corner) is OCCT's
   in both modes (ours declines: "a chain end with more than three edges"); what differs is its input, Chamfer 1, the
   same solid (volume, faces, edges to 1e-12) with the faces in another order (ours keeps the input's order, OCCT's

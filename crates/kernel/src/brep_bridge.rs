@@ -402,9 +402,10 @@ thread_local! {
 }
 
 /// Turns noshape's own fillets and chamfers on or off for this thread (`None`: as NOSHAPE_BLEND_RUST says, off
-/// unless 1 until BLEND-RUST-DEFAULT-REGEN is understood); the blend corpus replay compares them with OCCT's.
-pub fn set_rust_blend(on: Option<bool>) {
-    BLEND_MODE.with(|m| m.set(on));
+/// unless 1); the regeneration sets it per Part Studio (studios saved before noshape's blends keep OCCT's), the
+/// blend corpus replay to compare them with OCCT's. Returns the thread's mode before.
+pub fn set_rust_blend(on: Option<bool>) -> Option<bool> {
+    BLEND_MODE.with(|m| m.replace(on))
 }
 
 pub(crate) fn brep_blend_enabled() -> bool {

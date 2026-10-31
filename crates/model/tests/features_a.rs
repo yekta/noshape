@@ -2087,3 +2087,36 @@ fn loft_guides_trims_and_continuity_as_live() {
     near_area(on, 608.2762530, 1e-4, "LG3on");
     assert!(planar_off && planar_on, "LG3: live's loft face is a plane");
 }
+
+/// Studios saved before noshape's own blends (ScopeRule < 6) keep OCCT's fillets and chamfers on load, so they
+/// regenerate as they did (BLEND-RUST-DEFAULT-REGEN); new ones blend with noshape's where it builds them exactly.
+#[test]
+fn blends_saved_with_occt_stay_occt() {
+    use noshape_model::partstudio::{PartStudio, ScopeRule};
+    if std::env::var_os("NOSHAPE_BLEND_RUST").is_some() {
+        return;
+    }
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.03, "20 mm");
+    let res = t.ok();
+    let b0 = res.context.bodies[0].clone();
+    let top: Vec<Reference> = [DVec3::new(0.02, 0.0, 0.02), DVec3::new(0.04, 0.015, 0.02), DVec3::new(0.02, 0.03, 0.02), DVec3::new(0.0, 0.015, 0.02)].iter().map(|p| edge_near(&b0, *p)).collect();
+    t.add("fillet", &[("entities", q(top)), ("radius", e("2 mm"))]);
+    noshape_kernel::reset_blend_decline();
+    let new_res = t.ok();
+    assert_eq!(noshape_kernel::last_blend_decline(), "", "a new studio: noshape's fillet");
+    let mut old = t.ps.clone();
+    old.scope_rule = ScopeRule(5);
+    old.upgrade_saved_params();
+    assert!(old.legacy_blends);
+    let again: PartStudio = serde_json::from_slice(&serde_json::to_vec(&old).unwrap()).unwrap();
+    assert!(again.legacy_blends, "kept when saved again");
+    t.ps = old;
+    noshape_kernel::reset_blend_decline();
+    let old_res = t.ok();
+    assert_eq!(noshape_kernel::last_blend_decline(), "not tried", "a studio saved before: OCCT's fillet");
+    assert!(near(total_volume(&new_res.context), total_volume(&old_res.context), 1e-9));
+    let mut fresh = PartStudio::new();
+    fresh.upgrade_saved_params();
+    assert!(!fresh.legacy_blends, "nothing to keep");
+}

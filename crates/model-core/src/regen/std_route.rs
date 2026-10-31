@@ -43,6 +43,29 @@ impl Drop for LegacySheetMetal {
     }
 }
 
+/// noshape's own fillets and chamfers for the studio regenerating on this thread
+/// ([`crate::partstudio::PartStudio::legacy_blends`]: OCCT's for studios saved before them), unless
+/// NOSHAPE_BLEND_RUST says otherwise; the thread's mode before comes back when dropped (a Derived studio inside
+/// another).
+pub struct BlendKernel(Option<Option<bool>>);
+
+impl BlendKernel {
+    pub fn set(ours: bool) -> Self {
+        if std::env::var_os("NOSHAPE_BLEND_RUST").is_some() {
+            return Self(None);
+        }
+        Self(Some(noshape_kernel::set_rust_blend(Some(ours))))
+    }
+}
+
+impl Drop for BlendKernel {
+    fn drop(&mut self) {
+        if let Some(before) = self.0 {
+            noshape_kernel::set_rust_blend(before);
+        }
+    }
+}
+
 thread_local! {
     /// Core features (Extrude, Fillet, ...) run natively; [`set_std_route`]
     /// makes std run them instead, the oracle the native ones are tested

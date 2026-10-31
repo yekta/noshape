@@ -44,13 +44,15 @@ impl Feature {
 /// unless "Merge with all" is on; 2, a Rib with no Parts is an error (live
 /// L22); 3, a Mate connector needs an owner (live L37); 4, a Hole needs a
 /// Merge scope (live L56); 5, sheet metal runs by std, Onshape's own sheet
-/// metal FeatureScript ([`PartStudio::legacy_sheet_metal`]); 0, older studios.
+/// metal FeatureScript ([`PartStudio::legacy_sheet_metal`]); 6, fillets and
+/// chamfers by noshape's own blends where they build them exactly
+/// ([`PartStudio::legacy_blends`]); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(5)
+        ScopeRule(6)
     }
 }
 
@@ -226,6 +228,12 @@ pub struct PartStudio {
     /// native features' faces.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_sheet_metal: bool,
+    /// Saved with features before noshape's own blends (ScopeRule < 6): its
+    /// fillets and chamfers stay OCCT's, so it regenerates as it did (later
+    /// OCCT operations depend on a blend result's face order, and a part
+    /// split later could take another body id: BLEND-RUST-DEFAULT-REGEN).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_blends: bool,
     /// Rollback bar position: number of features evaluated (None = all).
     #[serde(default)]
     pub rollback: Option<usize>,
@@ -362,6 +370,10 @@ impl PartStudio {
         // Sheet metal made by the native features stays native.
         if self.scope_rule.0 < 5 && self.features.iter().any(|f| f.type_id.starts_with("sheetMetal")) {
             self.legacy_sheet_metal = true;
+        }
+        // Blends made by OCCT stay OCCT's (any feature: custom ones may blend too).
+        if self.scope_rule.0 < 6 && !self.features.is_empty() {
+            self.legacy_blends = true;
         }
         self.scope_rule = ScopeRule::default();
     }
