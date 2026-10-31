@@ -279,6 +279,8 @@ fn blend_rust_profile() {
         eprintln!("blend profile: live-30 edit commit {}: median {:.1} ms (min {:.1})", if rust { "noshape" } else { "OCCT" }, totals[2], totals[0]);
     }
     noshape_kernel::set_rust_blend(None);
+    let _ = std::fs::remove_file(&tmp);
+}
 
 /// live-30-features' display meshes, noshape's mesher against BRepMesh: its parts as a regeneration leaves
 /// them, meshed on fresh copies (the mesh cache has none, as on open) at the display's deflections, median of 5
