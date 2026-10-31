@@ -985,6 +985,9 @@ impl PartStudioView {
                 ToolKind::Connection => "Entities",
                 ToolKind::Thickness => "Parts to analyze",
                 ToolKind::Interference => "Parts to analyze",
+                // Live (behaviours "spec: interaction Draft analysis direction and
+                // Curve/surface analysis defaults" (18)).
+                ToolKind::CurveSurface => "Edges and faces to analyze",
                 _ => "Entities to analyze",
             };
             body = body.child(field("at-sel", caption, &t.selection, false, true, cx));
@@ -1205,17 +1208,26 @@ impl PartStudioView {
         if kind == ToolKind::Dihedral {
             body = body.child(div().pt(px(6.)).text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child("Scale")).child(div().w_full().child(Slider::new(&t.slider)));
         } else if !matches!(kind, ToolKind::Connection | ToolKind::Flatten | ToolKind::Interference) && !kind.is_view_mode() {
-            body = body.child(h_flex().gap_2().text_size(px(12.)).text_color(pal.text_muted).child("Scale").child(div().flex_1().child(Slider::new(&t.slider))));
+            // Live (18): Curve/surface analysis calls its slider "Comb size".
+            let label = if kind == ToolKind::CurveSurface { "Comb size" } else { "Scale" };
+            body = body.child(h_flex().gap_2().text_size(px(12.)).text_color(pal.text_muted).child(label).child(div().flex_1().child(Slider::new(&t.slider))));
         }
         // Live (psb 10-19 i): Interference detection's panel is a 600 × 80
         // rect snapped to the viewport's right edge, left = W − 600, top =
         // H − 401, the 220 px dialog at its top-left; a later resize keeps the
-        // right offset and the top. The other analysis dialogs open at the top
-        // left like feature dialogs.
+        // right offset and the top. Draft analysis opens at the bottom right
+        // too; the other analysis dialogs open at the top left like feature
+        // dialogs.
         let (left, top) = if kind == ToolKind::Interference {
             let size = self.viewport.read(cx).size();
             let top = t.anchor_top.unwrap_or(((size.y as f32) - 401.).max(0.));
             (((size.x as f32) - 600.).max(0.), top)
+        } else if kind == ToolKind::Draft {
+            // Live (part-studio/spec-an-21, 22): Draft analysis opens at the
+            // bottom right of the graphics, its top-left at (W − 441, H − 202)
+            // whatever its height.
+            let size = self.viewport.read(cx).size();
+            (((size.x as f32) - 441.).max(0.), ((size.y as f32) - 202.).max(0.))
         } else {
             (0., 0.)
         };

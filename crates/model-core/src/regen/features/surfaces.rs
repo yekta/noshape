@@ -535,7 +535,9 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
         let mut all: Vec<Shape> = u.iter().chain(v.iter()).flatten().cloned().collect();
         if let ([pu], [pv]) = (u.as_slice(), v.as_slice()) {
             let (Some(eu), Some(ev_)) = (chain_ends(pu), chain_ends(pv)) else { return err(BSURF_ENDS) };
-            let Some((cu, cv)) = [eu.0, eu.1].into_iter().flat_map(|a| [(a, ev_.0), (a, ev_.1)]).find(|(a, b)| a.distance(*b) < 1e-7) else { return err(BSURF_ENDS) };
+            // Live (behaviours "skasm (2026-10-31, P3 surfaces row 12)"): one U
+            // and one V profile that don't meet mark U profiles (pink).
+            let Some((cu, cv)) = [eu.0, eu.1].into_iter().flat_map(|a| [(a, ev_.0), (a, ev_.1)]).find(|(a, b)| a.distance(*b) < 1e-7) else { return crate::regen::eval::err_at(&["uProfilesArray"], BSURF_ENDS) };
             let far = |ends: (DVec3, DVec3), c: DVec3| if ends.0.distance(c) < 1e-7 { ends.1 } else { ends.0 };
             let moved = |edges: &[Shape], by: DVec3| -> FResult<Vec<Shape>> { edges.iter().map(|e| Ok(k::transform(e, &k::Transform::Translate(by), true)?.shape)).collect() };
             all.extend(moved(pu, far(ev_, cv) - cv)?);

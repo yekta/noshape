@@ -51,10 +51,12 @@ impl PartStudioView {
                 this.sync_draft(cx);
             }
         });
-        // A preselected plane, face or edge is the mold split direction;
-        // every part is checked.
+        // A preselected plane, face or edge is the mold split direction.
+        // Entities to check starts empty (live part-studio/spec-an-21, 22:
+        // nothing is coloured until parts are picked) but for preselected
+        // parts.
         let direction = self.selection.iter().find(|r| self.frame_of_ref(r).is_some() || matches!(r, Reference::Edge(_))).cloned();
-        let parts = self.display.bodies.iter().filter(|b| !b.hidden).map(|b| Reference::Body(b.id.clone())).collect();
+        let parts = self.selection.iter().filter(|r| matches!(r, Reference::Body(_))).cloned().collect();
         self.ui.draft = Some(DraftState { active: if direction.is_some() { 1 } else { 0 }, direction, flipped: false, angle_deg: 3.0, parts, undercut: true, angle_input: st, _sub: sub });
         self.sync_draft(cx);
     }
@@ -71,7 +73,8 @@ impl PartStudioView {
 
     /// Show the dialog's settings on the parts.
     pub(super) fn sync_draft(&mut self, cx: &mut Context<Self>) {
-        let analysis = self.ui.draft.as_ref().and_then(|d| {
+        // Nothing is coloured until parts are picked (live spec-an-22).
+        let analysis = self.ui.draft.as_ref().filter(|d| !d.parts.is_empty()).and_then(|d| {
             let pull = self.draft_pull(d)?;
             let parts = d.parts.iter().filter_map(|r| if let Reference::Body(b) = r { Some(b.clone()) } else { None }).collect();
             Some(Analysis::Draft { pull: pull.to_array(), angle_deg: d.angle_deg, undercut: d.undercut, parts })

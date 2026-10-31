@@ -6,18 +6,18 @@ then edits, undo/redo, rollback and suppress.
 
 | Step | Ours | Live | Status | Verified |
 |---|---|---|---|---|
-| Sketch on Top (Sketch → Top row) | dialog Top plane, ☑ Show constraints, view stays iso, header "Features (4)" | same, header "Features (5)" (sketch/501) | ✗ P1-1 (ui); header icons grey ✗ P1-2 (ui) |  |
+| Sketch on Top (Sketch → Top row) | dialog Top plane, ☑ Show constraints, view stays iso, header "Features (4)" | same, header "Features (5)" (sketch/501) | ✗ P1-1 (ui); header icons grey ✗ P1-2 (ui) → now ✅ P1-1 "Features (12)" with the new sketch counted (11 before); P1-2 folder and pause icons greyed, stopwatch black, = live sketch/501 (skasm 10-31 GUI :103) |  |
 | Corner rectangle | width/height values stay while the tool is active | same (sketch/06) | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | Extrude right after ✓ | field empty and active, 25 mm, ✓ disabled | same (part-studio/1290) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Enter in Depth | applies, dialog stays; 2nd Enter commits | same (behaviours 252) | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| Fillet (Shift+F), 3 vertical edges, R2 | chips "Edge of Extrude 1" ×3, preview, 15270.061 mm³ | radius arrow on the **last** pick | ✗ P1-3 (psb): ours on the first pick |  |
+| Fillet (Shift+F), 3 vertical edges, R2 | chips "Edge of Extrude 1" ×3, preview, 15270.061 mm³ | radius arrow on the **last** pick | ✗ P1-3 (psb): ours on the first pick → now ✅ P1-3 fixed (44927ecb, re-check table below) |  |
 | Chamfer (tool search), 1 mm, tangent propagation | 7-edge chain chamfered (faces 9 → 16) | — | ✅ | 0.4.10+ / fa61ba6f 10-27 (wf-block, bottom chain) |
 | Sketch on a preselected face | "Face of Extrude 1" in Sketch plane | same | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Points aligned with the origin | a 3rd point entity at (0,0) + Horizontal constraints | no entity; a Horizontal constraint from each point to the **external** Origin | ✅ P1-4 (5c94bb51: an external reference-only Origin entity, never drawn or listed; sketch_get names "origin"; e2e `sketch_get_names_the_origin_not_a_hidden_point`) | 0.4.10+ / 203c4d6f 10-27 |
 | Hole on 2 picked points | "Vertices of Sketch 2" (one chip); 2 holes, −633.385 mm³; title "Ø 6.35 mm ↧ 12 mm" ✅ | **two chips "Vertex of Sketch 1"** (one per click; "Vertices of …" only when the sketch row is picked) | ✗ **P1-8** (ui) |  |
 | Linear pattern › Feature pattern | order Part / Feature / Face ✅; chip **"Hole 1"**; Direction pink until picked ✅ | chip **"Ø 6.35 mm ↧ 12 mm"** (the feature's shown name) | ✗ **P1-9** (ui) |  |
 | Shell 2.5 mm (top face) | 8960 mm³, 59 faces | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
-| Edit Extrude 1 10 → 15 mm | everything regenerates Ok but Shell returns 4 slivers, status Ok | **Shell 1 ERROR "Could not shell part with selections."**, part stays unshelled (behaviours "qa5 (10-25 p1)" (5)) | ✗ **P1-5** (psb + kern) |  |
+| Edit Extrude 1 10 → 15 mm | everything regenerates Ok but Shell returns 4 slivers, status Ok | **Shell 1 ERROR "Could not shell part with selections."**, part stays unshelled (behaviours "qa5 (10-25 p1)" (5)) | ✗ **P1-5** (psb + kern) → now ✅ P1-5 fixed (a52d1e44, re-check table below) |  |
 | Undo / Redo / Undo | 8960 ↔ slivers ↔ 8960 | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | Rollback bar above Shell 1 | Shell greyed italic, part unshelled (14220.74) | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Suppress Fillet 1 (row menu) | italic strike-through, sharp corners, rest Ok (8446.23) | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
@@ -27,9 +27,9 @@ then edits, undo/redo, rollback and suppress.
 | Undo the R1 edit | back to 8801.649 mm³ | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | Rename (row menu) "Edge break" | stored "Edge break" | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
 | Row menus of Fillet / Chamfer | no "Show dimensions" (Extrude has it) | same | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
-| Delete Extrude 1 (dependents) | Fillet, Chamfer, Sketch 2, Hole, Pattern, Shell, Mirror error, Parts (0); errored rows red, **but hidden Sketch 2 stays grey** | failing sketch row red (behaviours 6432, 6491) | ✗ **P1-7** (ui) |  |
+| Delete Extrude 1 (dependents) | Fillet, Chamfer, Sketch 2, Hole, Pattern, Shell, Mirror error, Parts (0); errored rows red, **but hidden Sketch 2 stays grey** | failing sketch row red (behaviours 6432, 6491) | ✗ **P1-7** (ui) → now ✅ P1-7 fixed (9bc26682, re-check table below) |  |
 | Undo the delete | back to 8801.649 mm³ | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (qa-scratch/wf-block.noshape) |
-| Extrude › Remove from a sketch under the part (default flips away, as live) | tool grey, no message | red translucent tool + toast "Selected tools and targets do not intersect." (part-studio/234) | ✗ **P1-10** (psb + icons2) |  |
+| Extrude › Remove from a sketch under the part (default flips away, as live) | tool grey, no message | red translucent tool + toast "Selected tools and targets do not intersect." (part-studio/234) | ✗ **P1-10** (psb + icons2) → now ✅ P1-10 fixed (verified 41f60e47; the miss info also when the tool only touches a part: skasm 10-31) |  |
 
 ## P2 assembly core (same session, /root/green/noshape ee654502; plate 60×20×5 with 3 Ø10 holes + Ø10×30 pin from Part Studio 1)
 | Step | Ours | Live | Status | Verified |
@@ -64,9 +64,9 @@ then edits, undo/redo, rollback and suppress.
 | Step | Ours | Live | Status | Verified |
 |---|---|---|---|---|
 | Revolve dialog | Solid / Surface / Thin, New … Intersect, Faces and sketch regions to revolve, Revolve axis (pink until set), ☑ Full revolve | same (behaviours 338, 13863) | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| Revolve about a profile line | full cylinder; axis chip "Sketch 4 line" | chip text? ("Edge of Sketch N" in live lists; request p3 (a)) | ? |  |
+| Revolve about a profile line | full cylinder; axis chip "Sketch 4 line" | chip text? ("Edge of Sketch N" in live lists; request p3 (a)) | ? → now ✅ P1-12 "Edge of Sketch N" (9bc26682) |  |
 | Circular pattern dialog | Axis of pattern, Angle 360 deg, Instance count 4 + ↻, ☑ Equal spacing, ☐ Centered, › ☐ Skip instances | same (behaviours 331) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
-| Circular pattern of Part 3 about a hole rim | 3 copies around the hole axis; each copy gets a new palette colour | copies' colour? (request p3 (b)) | ? |  |
+| Circular pattern of Part 3 about a hole rim | 3 copies around the hole axis; each copy gets a new palette colour | copies' colour? (request p3 (b)) | ? → now ✅ P1-13: copies keep the seed colour (44927ecb) |  |
 | P1-4 re-check on green 62524c30 (skb 7b972911) | points snapped to the origin's horizontal: no visible point at the origin; Hole on "Vertices of Sketch 6" previews only the 2 real points. Data still holds a hidden construction "Origin stand-in" point at (0,0) with the Horizontal constraints on it (sketch_get lists it) | ✅ UI / minor data note for skb (live: no entity, constraint to the external Origin) | 0.4.10+ / 203c4d6f 10-27 |
 | SEL1 on green 62524c30 | Fillet: a sketch line adds nothing, a plate edge adds "Edge of Extrude 1" | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Instance right-click (Part 1 <1>, mated) | Properties…, Instance properties… / Hide … Fix, Use best available tessellation, Show mates, Hide mates / Edit in context … Switch to Part Studio 1 / Copy Part 1 <1> / Move to new subassembly, Change to version…, Export…, Release… / Zoom to selection … | same order (behaviours 1259, 1357; Add comment out of scope) | ✅ | 0.4.10+ / 1c853f78 10-27 |
@@ -75,7 +75,7 @@ then edits, undo/redo, rollback and suppress.
 | Plane (tool search; "Did you mean: Mate connector") | Entities "Top plane", type Offset, Offset distance 25 mm + flip, ☐ Flip normal; type list Offset, Plane point, Line angle, Point normal, Three point, Mid plane, Curve point, Tangent | same (behaviours 332) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Split (Part tab) of the plate by Plane 1 at 2.5 mm | dialog Part / Face, Parts, surfaces, or curves to split, Entity to split with, ☐ Keep tools, ☐ Trim to face boundaries, ☑ Keep both sides; result Parts 6 → 7 | same (behaviours 329) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Transform dialog | Entities to transform or copy, ▾ Translate by line (+ flip), Line or points, ☐ Copy part | same first type (behaviours 226) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
-| Mass and section properties (bottom-right icon), part without material | dialog Part / Face, red "Part 2" chip, blank mass / CoM / inertia, volume 21005.949 mm³, area 4401.292 mm²; inertia header "(mm² kg)"; yellow no-material toast | header "(lb mm²)"; toast: notes disagree | ✗ **P1-14** (ui) / ? |  |
+| Mass and section properties (bottom-right icon), part without material | dialog Part / Face, red "Part 2" chip, blank mass / CoM / inertia, volume 21005.949 mm³, area 4401.292 mm²; inertia header "(mm² kg)"; yellow no-material toast | header "(lb mm²)"; toast: notes disagree | ✗ **P1-14** (ui) / ? → now ✅ P1-14 fixed (2a85db38) |  |
 | Section view (Shift+X), Front plane | dialog Exclude / Include, Section planes (+ plane button), Items to exclude, info "Select a plane, planar face, cylinder, cone, or mate connector."; chip "Section plane 1 (Front)", manipulator arrow + rotate glyph + ring, tan preview cut faces | same (behaviours 359) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Draft dialog | Neutral plane / Parting line; Neutral plane (+MC); Entities to draft; Draft angle 3 deg + ↻; ☑ Tangent propagation; ☐ Reapply fillet | same (behaviours 327) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Sweep dialog | Solid / Surface / Thin, New … Intersect; Faces and sketch regions to sweep; Sweep path (pink) + flip; ☐ Extend to full path; Profile control ▾ None; › ☐ Twist; ☐ Scale | same (behaviours 339) | ✅ | 0.4.10+ / 1c853f78 10-27 |
@@ -83,15 +83,15 @@ then edits, undo/redo, rollback and suppress.
 | Sketch Trim (m) on a crossing line | the clicked segment past the crossing is removed; the new end is coincident with the other line | — | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Sketch Offset (o) on a line | light-blue offset preview with a hollow arrow manipulator, side not following the cursor | same (behaviours 172: preview + arrow, click the arrow to flip) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Sketch Use (u) on a plate edge | prompt "Click edges, faces or sketch entities to use (project) them"; a black projected line with use glyphs | — | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
-| n twice | the second n flips the view to the plane's back (Bottom, mirrored labels) | Onshape flips too (as far as known; not in behaviours) | ? |  |
-| View cube face hover | fill #b1d9f1 | #bce2f7 (behaviours 403) | ✗ **P1-15** (ui, minor) |  |
+| n twice | the second n flips the view to the plane's back (Bottom, mirrored labels) | Onshape flips too (as far as known; not in behaviours) | ? → now ? live request "skasm (2026-10-31 06:30)" (b) |  |
+| View cube face hover | fill #b1d9f1 | #bce2f7 (behaviours 403) | ✗ **P1-15** (ui, minor) → now ✅ P1-15 fixed (76da6649) |  |
 | Drawing (Part 1) after Split in the Part Studio | Update button saturated (out of date) | same rule | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Drawing Section view tool: one point picked | a vertical cutting line through it ("A–A" arrows), preview "SECTION A - A" follows the cursor | live default tab Vertical (behaviours 1492) | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Group dialog (assembly) | one "Instances" field | same (behaviours 1333) | ✅ | 0.4.10+ / f16b31c6 10-27 |
 | Split of an inserted part in the Part Studio | the halves are new parts (ids from Split, renamed Part 6 / 7, others renumbered); the assembly instance of the old part fails "Failed to resolve instance." and its mate / pattern error | live Split re-identifies the same way (old id gone, halves new, renumbered; behaviours "qa5 (10-25 p3)" Split) | ✅ (consistent) | 0.4.10+ / 965d3f56 10-27 (pin: Plane 1 offset 20 + Split Part 1 → Parts (3), Part 1 <1> 'Failed to resolve instance.') |
 | P2-D1 on green af9f1e4c (fix 817d9cb1) | assembly drawing, tilted plate: d on the middle hole rim → "Ø.394" preview, prompt "Click to place the dimension, or select a second entity" | — | ✅ **fixed** | 0.4.10+ / 965d3f56 10-27 (prompt now prefixed 'Linear dimension:') |
 | STEP import ("+" › Import…, bracket.step) | "Import to Onshape" options; Import → tab "bracket" + folder "CAD Imports" | same dialog (behaviours 1051) | ✅ | 0.4.10+ / f16b31c6 10-27 (imported our own STEP export) |
-| Assembly drawing after the unrelated import | Update ⟳ turns saturated (out of date) | unrelated changes? (request 10-26 p5) | ? |  |
+| Assembly drawing after the unrelated import | Update ⟳ turns saturated (out of date) | unrelated changes? (request 10-26 p5) | ? → now ✅ = live: stays current after an unrelated STEP import, out of date after a real assembly change (skasm 10-31 main CLI drawing_get out_of_date) |  |
 | Part Studio tab menu (green af9f1e4c) | Delete / Open in new browser tab, Rename, Properties…, Show code / Duplicate, Copy to clipboard / Select as document thumbnail / Move to document… (no Export…) | the newer live captures (behaviours 6561, 7153) list exactly these; the older one (280) also had Export… | ✅ | superseded by row 49 (TAB-EXPORT-MISSING verified f16b31c6) |
 
 ## Pass 28, green af9f1e4c (assembly limits, live answers p2/p4/p5)
@@ -100,10 +100,10 @@ then edits, undo/redo, rollback and suppress.
 | Cylindrical mate dialog | Limits only (no Offset), 4 limit rows Z ≑ / Z ⌶ / rotation min / max, "No minimum" / "No maximum" | same (behaviours 5942, 5959); Simulation connection excluded (simulation) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Limits Z max `5` + Enter | applies and closes the dialog | 1st Enter applies, 2nd accepts | ✅ P2-A2 (skasm 10-27 GUI: "30" + Enter → "30 deg" selected, dialog open; 2nd Enter accepts) | 0.4.10+ / 1c853f78 10-27 |
 | Drag the pin past the limit | stops at 5.0 mm along the hole connector's Z (it points down); the unfixed plate is pulled along | — | ✅ | 0.4.10+ / fa61ba6f 10-27 (asm5, plate fixed: pin stops ~5 mm down the hole connector's Z, the copy follows) |
-| Shell 1 mm, live's p2 model (depth 10, R1, 4 through holes) | "Could not shell part with selections." | OK 3998.627 mm³, 33 faces | ✗ **P1-16** (kern) |  |
-| Shell 2.5 mm, same | OK 8487.861 mm³, 53 faces | OK 8503.961 mm³, 47 faces | ✗ **P1-16** |  |
+| Shell 1 mm, live's p2 model (depth 10, R1, 4 through holes) | "Could not shell part with selections." | OK 3998.627 mm³, 33 faces | ✗ **P1-16** (kern) → now ✅ P1-16 fixed (1 mm 3998.630 / 33 = live) |  |
+| Shell 2.5 mm, same | OK 8487.861 mm³, 53 faces | OK 8503.961 mm³, 47 faces | ✗ **P1-16** → now ✅ P1-16 fixed (8503.961 / 47 = live) |  |
 | Mass properties, nothing selected | all parts measured (7178.097 mm³), toast after 3.6 s, hides by itself | field empty, values blank, no toast | ✅ P1-17 fixed: Parts to measure empty and active, values blank, no toast = live | 60ca6465 10-29 (qa, tickets/massprops-empty-60ca.png) |
-| Assembly drawing after an unrelated STEP import | Update ⟳ bright | stays dim (only referenced elements count) | ✗ **P2-D2** (ui2) |  |
+| Assembly drawing after an unrelated STEP import | Update ⟳ bright | stays dim (only referenced elements count) | ✗ **P2-D2** (ui2) → now ✅ P2-D2: stays current (skasm 10-31 main CLI drawing_get out_of_date false; true after a real change) |  |
 | Exploded views panel, Add exploded view | 712 px panel; "Editing Explode 1 [Done]", toolbar reduced to undo/redo, active row + rollback bar, "Build steps by dragging components" box, footer Add exploded view | same (behaviours 1834) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Drag the triad's Z arrow (pin) | "Explode step" dialog: Translation ▾, Instances, ☐ Specify direction, Distance 18.3 mm, ☑ Explode lines, edges field; row "↗ Explode step 1"; info box gone | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Distance `25` + Enter, Enter | 1st applies (pin moves), 2nd accepts | Onshape number fields | ✅ | 0.4.10+ / 1c853f78 10-27 |
@@ -127,10 +127,10 @@ then edits, undo/redo, rollback and suppress.
 | Mate connector (Ctrl+M) | "Mate connector 1": On entity ▾, Origin entity, ☐ Realign, ☐ Move, flip / reorient; Realign adds Primary / Secondary axis entity; Move adds X / Y / Z 0 mm, Rotate about Z ▾, Rotation angle 0 deg | same (behaviours 5960–5965) | ✅ | 0.4.10+ / 6cbb24e0 10-27 (Part Studio dialog: + Owner entity / Attachment, as live behaviours 333, 8445) |
 | Feature row drag (Extrude 3 up) | pill #1651B0 with white text at the pointer; 2 px #1651B0 drop line across the list with a hollow ring at its left end; hovered row (224,240,251) | same (live (222,241,251); "qa5 (10-25 p2)" (7)) | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Drop above the feature's own sketch | accepted, no message; row red (170,37,45), "Features …" + red badge, tooltip "… did not regenerate properly: …" / "1 missing selection" | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
-| … row icon | plain extrude icon | ⚠ warning triangle on the row | ✗ **P1-18** (ui) |  |
+| … row icon | plain extrude icon | ⚠ warning triangle on the row | ✗ **P1-18** (ui) → now ✅ P1-18: a failing reordered Extrude shows the ⚠ badge on its icon (skasm 10-31 GUI :103) |  |
 | Ctrl+Z | one step restores the order | same | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | Assembly mirror dialog | Instances to mirror, Mirror plane (+ connector button), [Mirror strategy…] | same (behaviours 8704) | ✅ | 0.4.10+ / 6cbb24e0 10-27 |
-| Drawing Note tool (n), hover | prompt only, no preview | "NOTE" preview at the pointer | ✗ **P2-D3** (ui2) |  |
+| Drawing Note tool (n), hover | prompt only, no preview | "NOTE" preview at the pointer | ✗ **P2-D3** (ui2) → now ✅ P2-D3: "NOTE" placeholder at the cursor (dx 10-29) |  |
 | Click, type "QA NOTE" | Note panel next to the note: Noto Sans ( Note ), 0.1200, B I U S colour, spacing, align, list, … ☐ Flag notes (greyed Flag (Drawing), 2 Characters); ruler bar over the text | same (drawing/225, behaviours 3277) | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Drawing Detail view tool | panel: 4 shapes (circle pressed), "Create circle", View scale ▾, View label A, Profile style In line, ☑ Show detail view profile, ☐ Clip border to geometry | same (behaviours 1404, 1795) | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |
 | Circle drawn on the Top view | field "Profile created", shape buttons un-pressed, View scale **2:1**, label A; preview follows the pointer; click places "DETAIL A / SCALE 2:1" | live: "2:1" with the parent at 1:1 (qa5 live check, drawing/qa5-p6d-2.png) | ✅ | 0.4.10+ / 203c4d6f 10-27 (wf-block) |

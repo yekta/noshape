@@ -6,49 +6,49 @@ the rest pending (REQUESTS.md "qa5 tabs"). Status: ✅ ok, ✗ differs, ? live p
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 1 | Double-click a tab | inline rename | inline rename, text selected | ✅ | a6c56638 10-28 |
-| 2 | Type "Part Studio 1" + Enter | name with spaces | **"PartStudio1": spaces are swallowed** (also "a b" → "ab"); Space works in other text fields | ✗ **DOC6** |  |
-| 3 | Rename to an existing tab's name | ? | allowed (became "PartStudio1" because of DOC6) | ? |  |
+| 2 | Type "Part Studio 1" + Enter | name with spaces | **"PartStudio1": spaces are swallowed** (also "a b" → "ab"); Space works in other text fields | ✗ **DOC6** → now ✅ DOC6 fixed (a6c56638; qa4 re-check "r t x" kept) |  |
+| 3 | Rename to an existing tab's name | ? | allowed (became "PartStudio1" because of DOC6) | ? → now ✅ DOC6 fixed (a6c56638; qa4 re-check "r t x" kept) |  |
 | 4 | Part Studio tab right-click | Delete \| Open in new browser tab, Rename, Properties…, Show code \| Duplicate, Copy to clipboard \| Select as document thumbnail \| Move to document…, Export… | same minus "Open in new browser tab" (browser-only) | ✅ | a6c56638 10-28 (+ Export… last, live rmb-tab-partstudio-2 / TAB-EXPORT-MISSING) |
-| 5 | Duplicate | ? | "Part Studio 1 (copy)", inserted right after the source, not activated | ? |  |
+| 5 | Duplicate | ? | "Part Studio 1 (copy)", inserted right after the source, not activated | ? → now ✅ TABS2 fixed ("<name> Copy 1") |  |
 | 6 | Drag a tab 2 slots right | ? | ghost label follows the cursor, blue drop line; a tab hover-preview card pops up during the drag; drop moves the tab | ✅ / ? (preview card) | a6c56638 10-28 |
-| 7 | + › Create folder | ? | "Folder 1" right after the active tab, in rename mode | ? |  |
-| 8 | Drag a tab onto the folder | ? | folder highlights light blue; tab moves into it | ? |  |
+| 7 | + › Create folder | ? | "Folder 1" right after the active tab, in rename mode | ? → now ✅ = live ("Folder 1" right after the active tab, in rename mode; behaviours "qa5 tabs" (c)) |  |
+| 8 | Drag a tab onto the folder | ? | folder highlights light blue; tab moves into it | ? → now ✅ = live (the folder highlights light blue, the tab moves in; behaviours "qa5 tabs" (c)) |  |
 | 9 | Open the folder | breadcrumb 🏠 › 📁 CAD Imports › tabs (live, line 34) | 🏠 › Folder 1 › PartStudio1 | ✅ | a6c56638 10-28 |
-| 10 | New tab via + while a middle tab is active | inserted after the active tab | inserted there, **later shown at the end** (qa5 assembly "Assembly 2", also after reopening) | ✗ DOC5 |  |
+| 10 | New tab via + while a middle tab is active | inserted after the active tab | inserted there, **later shown at the end** (qa5 assembly "Assembly 2", also after reopening) | ✗ DOC5 → now ✅ DOC5 fixed (stays after reopen; qa4 re-check) |  |
 
 ## Update from live's answer (behaviours.md "qa5 tabs", 10-21)
 
 | # | Row | Live | Ours | Verdict |
 |---|---|---|---|---|
 | 2/3 | Rename (duplicate name) | allowed silently | allowed; but spaces are swallowed | ✅ / ✗ DOC6 |
-| 5 | Duplicate | "**<name> Copy 1**", right after the source, not activated | "Part Studio 1 (copy)", after the source, not activated | ✗ **TABS2** (name) |
+| 5 | Duplicate | "**<name> Copy 1**", right after the source, not activated | "Part Studio 1 (copy)", after the source, not activated | ✗ **TABS2** (name) → now ✅ TABS2 fixed ("<name> Copy 1") |
 | 6 | Drag | 100 px **ghost** (bg #eaeaea, shadow 0 5px 10px rgba(0,0,0,.2), label truncated), horizontal only; the other tabs close up and a **gap placeholder** (tab width) shows the drop place; **no line indicator**; dropping past the last tab does nothing | ghost label, a **blue drop line**, tabs don't open a gap; a **tab hover-preview card** pops up during the drag | ✗ **TABS1** |
 | 7 | Create folder | "Folder 1" right after the active tab, inline rename, not activated | same | ✅ |
 | 8 | Drop on folder | folder light-blue highlight, ghost translucent over it, tab leaves the bar | same highlight; tab moves in | ✅ |
 | 9 | Open folder | breadcrumbs 🏠 › 📁 Folder 1 › tabs; 🏠 returns | same | ✅ |
-| – | Folder right-click | **Rename, Unpack, Move to document…** only; Unpack moves its tabs to the end, no dialog; no Delete | not checked | ? (next pass) |
-| 10 | New tab from + while a middle tab is active | right after the active tab, **activated**, **stays there after reload** | inserted after the active tab and activated, later shown at the end (also after reopening) | ✗ DOC5 confirmed |
-| – | Tab Delete | immediate, no confirmation, no undo | not checked | ? |
-| – | Tab rename / reorder / delete / duplicate undoable? | **not undoable** | not checked | ? |
+| – | Folder right-click | **Rename, Unpack, Move to document…** only; Unpack moves its tabs to the end, no dialog; no Delete | not checked | ? (next pass) → now ✅ TABS3 fixed (Rename, Unpack, Move to document…) |
+| 10 | New tab from + while a middle tab is active | right after the active tab, **activated**, **stays there after reload** | inserted after the active tab and activated, later shown at the end (also after reopening) | ✗ DOC5 confirmed → now ✅ DOC5 fixed (stays after reopen; qa4 re-check) |
+| – | Tab Delete | immediate, no confirmation, no undo | not checked | ? → now ✅ immediate, no confirmation (row "Tab › Delete" below) |
+| – | Tab rename / reorder / delete / duplicate undoable? | **not undoable** | not checked | ? → now ✅ TABS5 fixed (rename / duplicate not undoable; skasm 10-31 CLI: tab_rename / tab_duplicate / tab_move leave the undo stack alone) |
 
 ### Follow-up checks (pass 4, 2026-10-21 16:35, /tmp/qa5/noshape-1448)
 | Row | Live | Ours | Verdict |
 |---|---|---|---|
-| Folder right-click | Rename, Unpack, Move to document… | Rename, **Move to parent folder** (disabled), **Unpack folder**, Move to document… | ✗ **TABS3** |
-| Unpack | no dialog; the folder's tabs go to the **end of the tab list** | no dialog; tab placed where the folder was | ✗ **TABS4** |
-| Rename, then Ctrl+Z | not undoable | **Ctrl+Z reverts the rename** | ✗ **TABS5** |
+| Folder right-click | Rename, Unpack, Move to document… | Rename, **Move to parent folder** (disabled), **Unpack folder**, Move to document… | ✗ **TABS3** → now ✅ TABS3 fixed (Rename, Unpack, Move to document…) |
+| Unpack | no dialog; the folder's tabs go to the **end of the tab list** | no dialog; tab placed where the folder was | ✗ **TABS4** → now ✅ TABS4 fixed (Unpack → end of the tab list) |
+| Rename, then Ctrl+Z | not undoable | **Ctrl+Z reverts the rename** | ✗ **TABS5** → now ✅ TABS5 fixed (rename / duplicate not undoable; skasm 10-31 CLI: tab_rename / tab_duplicate / tab_move leave the undo stack alone) |
 | Tab › Delete | immediate, no confirmation, no toast | immediate, no confirmation | ✅ |
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
-| DOC6 rename spaces | "r t" → "rt" | ✗ still |
-| TABS5 rename undoable | Ctrl+Z reverts it | ✗ still |
+| DOC6 rename spaces | "r t" → "rt" | ✗ still → now ✅ DOC6 fixed (a6c56638; qa4 re-check "r t x" kept) |
+| TABS5 rename undoable | Ctrl+Z reverts it | ✗ still → now ✅ TABS5 fixed (rename / duplicate not undoable; skasm 10-31 CLI: tab_rename / tab_duplicate / tab_move leave the undo stack alone) |
 | DOC5 new tab position | Assembly 3 after Part Studio 1, **stays there after reopening** (the old Assembly 2 remains at the end) | ✅ **fixed** for new tabs |
 
 ## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | DOC6 rename with spaces | "r t" kept | ✅ **fixed** | a6c56638 10-28 |
-| TABS5 rename undoable | Ctrl+Z still reverts the rename | ✗ still |  |
+| TABS5 rename undoable | Ctrl+Z still reverts the rename | ✗ still → now ✅ TABS5 fixed (rename / duplicate not undoable; skasm 10-31 CLI: tab_rename / tab_duplicate / tab_move leave the undo stack alone) |  |
 | TABS2 Duplicate name | "Part Studio 4 Copy 1", right after the source, not activated | ✅ **fixed** | a6c56638 10-28 |
 | TABS1 drag | ghost "Part St…" follows, gap placeholder opens, no line, no preview card | ✅ **fixed** | a6c56638 10-28 |
 | TABS3 folder menu | Rename · Unpack · Move to document… | ✅ **fixed** | a6c56638 10-28 |
