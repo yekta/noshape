@@ -237,6 +237,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 08:04: **new with 0785c154 / 4498e6b8 (blends ending on caps at an angle, distance-angle chamfers)**: tickets/cli-draft-die.noshape Part 1 in the app **90440.868 mm³ / 15766.139 mm²** on green 0785c154 vs **90439.156 / 15738.992** on 19a1164b and on 0785c154 with NOSHAPE_BLEND_RUST=0 (+1.712 mm³, +27.1 mm²; qa-scratch gm-b78cli-draft-die-*.png). The earlier ones (cli-72L-died, cli-delete-gpf, bop-pairs-cli-segv-152, cli-chamfer-hang-pre, cli-delete-crash) unchanged between 19a1164b and 0785c154.
   qa 08:41: also tickets/cli-shell-gpf.noshape on 0785c154: **66313.675 mm³ / 54759.608 mm²** vs 19a1164b and NOSHAPE_BLEND_RUST=0 **66314.087 / 54759.690** (−0.412 mm³). core 4bfc7bf5 turned the blends off by default again; this ticket is now about the flag-on path.
   qa 09:52: default path checked after 4bfc7bf5: green 3b5450e0, default settings, all 10 documents above = OCCT's blends exactly (Mass properties crops). Open for NOSHAPE_BLEND_RUST=1 only.
+  core 10-31 18:30: noshape's blends close arcs the blend's reach equals (a top loop blended at its corner fillets'
+  radius, live request 1646): a fillet's sphere octants, a chamfer's 45° cones with their apex on the top face, a
+  degenerate edge at each pole; live's 60 x 40 x 20 block: 46581.4892869 / 45308.9969392 mm³ (live 46581.4892865 /
+  45308.9969390), 18 / 36 / 20 as live (OCCT: B-spline patches; its chamfer at the corner fillets' width went a hair
+  smaller, 1e-4 off with 4 more vertices). T1 kernel blend::rust_blends_close_arcs_like_onshape; blend corpus
+  <dir>/live lists the 3 such cases.
   core 10-31 17:35: versioned per studio, as Onshape versions features: ScopeRule 6 = noshape's own blends;
   studios saved with features before it get `legacy_blends` on load and keep OCCT's fillets and chamfers (so the 7
   documents above regenerate exactly as before, references included); new studios blend with noshape's where it

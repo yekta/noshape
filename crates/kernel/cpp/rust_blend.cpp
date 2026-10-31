@@ -293,11 +293,19 @@ const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<Topo
             uv[s].SetCoord(uv[s - 1].X() + du, uv[s - 1].Y() + dv);
           }
         }
-        // (At a sphere's pole any u is the point: the neighbouring sample's.)
+        // (At a sphere's pole or a cone's apex any u is the point: the neighbouring sample's.)
         if (a.GetType() == GeomAbs_Sphere)
           for (int s2 = 0; s2 <= n; ++s2)
             if (std::abs(uv[s2].Y()) > M_PI_2 - 1e-9)
               uv[s2].SetX(uv[s2 == 0 ? 1 : s2 - 1].X());
+        if (a.GetType() == GeomAbs_Cone)
+        {
+          const gp_Cone cone = a.Cone();
+          const double  v_apex = -cone.RefRadius() / std::sin(cone.SemiAngle());
+          for (int s2 = 0; s2 <= n; ++s2)
+            if (std::abs(uv[s2].Y() - v_apex) <= 1e-9 * std::max(1.0, std::abs(v_apex)))
+              uv[s2].SetX(uv[s2 == 0 ? 1 : s2 - 1].X());
+        }
         gp_Vec2d d((uv[n].X() - uv[0].X()) / (c.t1 - c.t0), (uv[n].Y() - uv[0].Y()) / (c.t1 - c.t0));
         bool iso = std::abs(d.Magnitude() - 1) <= 1e-9;
         // Exactly along u or v when it is to rounding (a frame 1e-15 off its axes left a cone's ruling 1e-14

@@ -298,6 +298,10 @@ struct Chain {
     centre: f64,
     /// Convex (+1: the blend takes material) or concave (−1: it adds some).
     sigma: f64,
+    /// Per link: an arc whose offset into P closes to its centre (its radius the blend's reach there): its
+    /// blend face is a sphere (a fillet) or a cone with its apex on P (a chamfer) about the centre, P keeps a
+    /// corner there (live request 1646: a block's top loop blended at its vertical fillets' radius).
+    closes: Vec<bool>,
 }
 
 impl Chain {
@@ -574,7 +578,8 @@ fn chain(
         }
     }
     let corner = vec![false; verts.len()];
-    let mut c = Chain { face: f, links, verts, corner, closed, ends: [None, None], d1, d2, centre, sigma };
+    let closes = vec![false; links.len()];
+    let mut c = Chain { face: f, links, verts, corner, closed, ends: [None, None], d1, d2, centre, sigma, closes };
     // Corners: where two links (lines) meet at an angle. A fillet's two cylinders meet along an ellipse in the
     // corner's bisector plane only with walls square to P.
     for j in 0..c.verts.len() {
@@ -595,11 +600,19 @@ fn chain(
             c.corner[j] = true;
         }
     }
-    // Arcs whose radius the blend takes away.
-    for x in &c.links {
+    // Arcs whose radius the blend takes away: exactly (to its centre, between two links going on from it), or
+    // past it.
+    let mut closes = vec![false; c.k()];
+    for (i, x) in c.links.iter().enumerate() {
         if let Curve::Circle { center, radius, .. } = b.edges[x.edge as usize].curve {
             let ps = b.vertices[b.edges[x.edge as usize].v[x.rev as usize] as usize];
             let into_p = x.q0.dot((ps - center).normalize());
+            let between = c.closed || (i > 0 && i + 1 < c.k());
+            let j1 = if c.closed { (i + 1) % c.k() } else { i + 1 };
+            if (radius + into_p * d1).abs() <= margin && into_p < 0.0 && between && !c.corner[i] && !c.corner[j1] {
+                closes[i] = true;
+                continue;
+            }
             if radius + into_p * d1 <= 100.0 * margin {
                 return no("an arc the blend closes up");
             }
@@ -611,6 +624,11 @@ fn chain(
             }
         }
     }
+    // (Two closing arcs side by side: one centre, a pole between them: not built.)
+    if (0..c.k()).any(|i| closes[i] && closes[(i + 1) % c.k()] && (c.closed || i + 1 < c.k())) {
+        return no("an arc the blend closes up next to another");
+    }
+    c.closes = closes;
     // The ends: P's next edge into P, the edge down the wall, the cap square to the chain between them.
     if !closed {
         for (side, j) in [(0usize, 0usize), (1, c.k())] {
@@ -820,6 +838,10 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
             if c.closed && i == 0 && j == k - 1 {
                 continue;
             }
+            // (Either side of a closing arc: their blends meet at its centre, as they should.)
+            if (j == i + 2 && c.closes[i + 1]) || (c.closed && i + k == j + 2 && c.closes[(j + 1) % k]) {
+                continue;
+            }
             if !far(c.links[i].edge, c.links[j].edge, 2.0 * reach)? {
                 return no("a chain whose blend meets itself");
             }
@@ -853,6 +875,8 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorn
     let mut face_origin: Vec<Origin> = (0..nf as u32).map(|i| Origin::Same { arg: 0, index: i }).collect();
     let mut history = vec![Record { kind: Kind::Solid, arg: 0, index: 0, relation: Relation::Modified, out_kind: Kind::Solid, out: 0 }];
     let mut dead_v = vec![false; nv];
+    // New vertices merged into others (a closing arc's second point on P).
+    let mut dead_new_v: Vec<u32> = Vec::new();
     let mut dead_e = vec![false; ne];
     // Edge replaced by edge (a piece), in every loop.
     let mut replace: Vec<Option<u32>> = vec![None; ne];
@@ -984,6 +1008,18 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorn
                 touch(end.cap, &mut touched_faces);
             }
         }
+        // A closing arc's two points on P are its centre: one vertex (the next link's end there moved onto it),
+        // where its blend face's pole is.
+        for i in 0..k {
+            if !c.closes[i] {
+                continue;
+            }
+            let j = if c.closed { (i + 1) % k } else { i + 1 };
+            let (keep, gone) = (v1[i], v1[j]);
+            v1[j] = keep;
+            b.edges[cross[j] as usize].v[0] = keep;
+            dead_new_v.push(gone);
+        }
         // Each link: its edge on P, on its wall, its blend face.
         for (i, x) in c.links.iter().enumerate() {
             let e = body.edges[x.edge as usize];
@@ -1000,15 +1036,48 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorn
                 }
                 _ => return no("an edge not a line or an arc"),
             };
+            dead_e[x.edge as usize] = true;
+            touch(c.face, &mut touched_faces);
+            touch(x.wall, &mut touched_faces);
+            if c.closes[i] {
+                // P's loop goes on from the link before to the one after at the arc's centre; the blend face, a
+                // sphere or a cone about it: the cross-sections from the pole, the wall's arc, a degenerate edge
+                // at the pole.
+                b.edges.push(Edge { v: [v2[s0], v2[s1]], curve: c2 });
+                b.edges.push(Edge { v: [v1[i], v1[i]], curve: Curve::Degenerate });
+                edge_origin.extend([Origin::New, Origin::New]);
+                let (e2, pole) = (b.edges.len() as u32 - 2, b.edges.len() as u32 - 1);
+                for lp in &mut b.faces[c.face as usize].loops {
+                    lp.retain(|u| u.edge != x.edge);
+                }
+                replace_in(&mut b.faces[x.wall as usize], x.edge, e2);
+                let lp = vec![
+                    Use { edge: cross[i], reversed: false },
+                    Use { edge: e2, reversed: x.rev },
+                    Use { edge: cross[j], reversed: true },
+                    Use { edge: pole, reversed: false },
+                ];
+                let Curve::Circle { center, .. } = e.curve else { return no("a closing link not an arc") };
+                let surface = closing_surface(body, c, x, &e)?;
+                let probe = match x.spec {
+                    Spec::Fillet { radius } => {
+                        let ctr = center + x.t * radius;
+                        let pm = body.vertices[e.v[0] as usize];
+                        ctr + ((pm - ctr).normalize() + (center - ctr).normalize()).normalize() * radius
+                    }
+                    _ => 0.5 * (center + body.vertices[e.v[0] as usize] + x.t * c.d2),
+                };
+                let pm = body.vertices[e.v[0] as usize];
+                let reversed = surface_normal(&surface, probe).dot(pm - probe) * c.sigma < 0.0;
+                new_faces.push((x.edge, Face { surface, reversed, loops: vec![lp] }));
+                continue;
+            }
             b.edges.push(Edge { v: [v1[s0], v1[s1]], curve: c1 });
             b.edges.push(Edge { v: [v2[s0], v2[s1]], curve: c2 });
             edge_origin.extend([Origin::New, Origin::New]);
             let (e1, e2) = (b.edges.len() as u32 - 2, b.edges.len() as u32 - 1);
-            dead_e[x.edge as usize] = true;
             replace_in(&mut b.faces[c.face as usize], x.edge, e1);
             replace_in(&mut b.faces[x.wall as usize], x.edge, e2);
-            touch(c.face, &mut touched_faces);
-            touch(x.wall, &mut touched_faces);
             // The blend face: e1 the other way from P, the cross-section at the use's start, e2 the other way
             // from the wall (P's way), the cross-section at its end back.
             let lp = vec![
@@ -1104,7 +1173,7 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorn
     let mut vmap = vec![u32::MAX; b.vertices.len()];
     let (mut vs, mut vo) = (Vec::new(), Vec::new());
     for (i, p) in b.vertices.iter().enumerate() {
-        if i < nv && dead_v[i] {
+        if (i < nv && dead_v[i]) || dead_new_v.contains(&(i as u32)) {
             continue;
         }
         vmap[i] = vs.len() as u32;
@@ -1195,6 +1264,22 @@ fn blend_surface(b: &Body, c: &Chain, x: &Link, e: &Edge) -> Result<Surface, Dec
             Ok(Surface::Cone { origin: center + x.t * c.d2, axis: x.t, xdir: out, radius: rho, angle: ((rho - r_p) / c.d2).atan() })
         }
         _ => no("an edge not a line or an arc"),
+    }
+}
+
+/// A closing arc's blend surface (link `x`, edge `e`): a fillet's sphere about the point below the arc's centre
+/// (its pole on P, at the centre), a chamfer's cone with its apex there.
+fn closing_surface(b: &Body, c: &Chain, x: &Link, e: &Edge) -> Result<Surface, Decline> {
+    let Curve::Circle { center, radius: rho, .. } = e.curve else { return no("a closing link not an arc") };
+    let p0 = b.vertices[e.v[0] as usize];
+    let out = (p0 - center).normalize();
+    match x.spec {
+        Spec::Fillet { radius } => {
+            let zdir = -x.t;
+            Ok(Surface::Sphere { origin: center + x.t * radius, xdir: out, ydir: zdir.cross(out), zdir, radius })
+        }
+        Spec::Chamfer { .. } => Ok(Surface::Cone { origin: center + x.t * c.d2, axis: x.t, xdir: out, radius: rho, angle: (rho / c.d2).atan() }),
+        Spec::ChamferAngle { .. } => no("a chamfer's angle not made a distance"),
     }
 }
 

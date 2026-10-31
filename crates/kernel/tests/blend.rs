@@ -588,3 +588,35 @@ fn rust_chamfer_planes_are_framed_as_occts() {
         assert_eq!(frames(&ours.shape), frames(&occt.shape), "{what}");
     }
 }
+
+/// Live request 1646: a 60 x 40 x 20 block, R5 on its vertical edges, then the whole top loop (4 lines, 4 arcs)
+/// blended by as much: the arcs' offsets close to their centres. Live: a fillet's corners are sphere octants
+/// (R5 about the point 5 below each arc's centre), a chamfer's 45° cones with their apex on the top face; both
+/// 18 / 36 / 20. noshape's blends build those (OCCT's are B-spline patches).
+#[test]
+fn rust_blends_close_arcs_like_onshape() {
+    setup();
+    let b = bx([0.0; 3], [60.0, 40.0, 20.0]);
+    let v = edges_where(&b, |i| (i.start.z - i.end.z).abs() > 1e-9);
+    let s = fillet_checked(&b, &v, &[5.0 * MM]).unwrap().shape;
+    let top = edges_where(&s, |i| i.start.z > 19.99 * MM && i.end.z > 19.99 * MM);
+    assert_eq!(top.len(), 8);
+    let count = |s: &Shape, want: fn(&Surface) -> bool| s.sub_shapes(ShapeType::Face).iter().filter(|f| f.face_surface().is_ok_and(|x| want(&x))).count();
+    set_rust_blend(Some(true));
+    let f = fillet_checked(&s, &top, &[5.0 * MM]);
+    let fd = last_blend_decline();
+    let c = chamfer_checked(&s, &top, ChamferSpec::Equal(5.0 * MM), &[]);
+    let cd = last_blend_decline();
+    set_rust_blend(None);
+    let (f, c) = (f.unwrap().shape, c.unwrap().shape);
+    assert_eq!(fd, "", "fillet declined");
+    assert_eq!(cd, "", "chamfer declined");
+    for (s, want, what) in [(&f, 46581.48928648512, "fillet"), (&c, 45308.99693899578, "chamfer")] {
+        assert!(s.is_valid(), "{what}: invalid");
+        assert!((vol_mm3(s) - want).abs() < 1e-5, "{what}: {} vs live {want}", vol_mm3(s));
+        // (Live's counts; ours have a degenerate edge at each pole besides.)
+        assert_eq!((s.count(ShapeType::Face), edges_where(s, |_| true).len(), s.count(ShapeType::Vertex)), (18, 36, 20), "{what}");
+    }
+    assert_eq!(count(&f, |x| matches!(x, Surface::Sphere { .. })), 4);
+    assert_eq!(count(&c, |x| matches!(x, Surface::Cone { .. })), 4);
+}

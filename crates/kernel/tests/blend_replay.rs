@@ -8,6 +8,9 @@ use std::path::Path;
 
 /// Replays every case of `dir`: (cases, differences, a timing line).
 fn replay(dir: &Path) -> (usize, Vec<String>, String) {
+    // Cases where noshape's blend is live's and OCCT's isn't (`<dir>/live`, a name a line, why after a space: a
+    // chamfer as wide as the corner fillets, live request 1646): not failed, counted.
+    let live: Vec<String> = std::fs::read_to_string(dir.join("live")).unwrap_or_default().lines().filter_map(|l| l.split_whitespace().next()).map(str::to_string).collect();
     let mut diffs = Vec::new();
     let mut paths: std::collections::BTreeMap<String, usize> = Default::default();
     let (mut n, mut was_ms, mut now_ms) = (0, 0.0, 0.0);
@@ -47,6 +50,10 @@ fn replay(dir: &Path) -> (usize, Vec<String>, String) {
                         d.clear();
                         *paths.entry("rust (as OCCT to 1e-7: its corners approximated)".into()).or_insert(0) += 1;
                     }
+                }
+                if !d.is_empty() && live.contains(&name) {
+                    d.clear();
+                    *paths.entry("rust (live's, OCCT's differs)".into()).or_insert(0) += 1;
                 }
                 if !d.is_empty() {
                     diffs.push(format!("{name} [{path}] ({:?}, {} edges): {}", case.blend, case.edges.len(), d.join(", ")));
