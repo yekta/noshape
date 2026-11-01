@@ -428,6 +428,8 @@ template <class P> void free_elsewhere(P& p)
   }
 }
 
+} // namespace
+
 void fail_if_cancelled()
 {
   if (cancelled(t_cancel))
@@ -473,7 +475,6 @@ HHist cancellable_history(const std::vector<TopoDS_Shape>& args, Algo& algo)
   }
   return h;
 }
-} // namespace
 
 void apply_opts(BRepAlgoAPI_BuilderAlgo& a, const BoolOpts& o)
 {
