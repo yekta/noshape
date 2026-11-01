@@ -11,7 +11,7 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 
 | | |
 |---|---|
-| Surfaces audited | 19 |
+| Surfaces audited | 22 |
 | Gaps found | 29 |
 | Gaps fixed | 29 |
 
@@ -38,6 +38,9 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 | S17 | Profile inspector and Constraint manager | sk-tool-profile-inspector-and-constraint-manager.txt | G14, G15 |
 | S18 | Assembly error tooltips, mate HUD, standard content, interference, mass | asm-E15-tooltips.json, mate-hud.txt, dialog-insert-standard-content.txt, dialog-interference-assembly-*.txt, dialog-mass-assembly-*.txt | 0 |
 | S19 | Remaining assembly menus (live 1723): pattern / mirror / replicate rows and copies, mate connector row and glyph, relation, mate folder, mate indicators, nested rows, headers | dom/skasm-asm-menus-*.txt, behaviours "remaining assembly right-click menus" | G20–G28 |
+| S20 | Sheet metal toolbar dropdown (13 tools + Flex PCB, order) | dropdowns-partstudio.json | 0 |
+| S21 | Sheet metal dialogs field by field (model, flange, hem, tab, bend relief, corner, bend, jog, loft, finish; data-parameter-id order against feature_schema; script skasm-scratch/audit/dlgcmp.py) | qa5-sm-*.html | 0 (live's DOM also lists collapsed groups' parameters) |
+| S22 | Assembly tool dialogs field labels in order (linear / circular / part pattern, mirror, replicate, group, interference, mass, mate connector, mates with offset / limits) | dialog-asm-*, dialog-mate-*, dialog-interference-*, dialog-mass-* | 0 |
 
 Live requests answered: 1715 (tool options), 1716 (Flow), 1720 (exploded views / named positions menus, subassembly fix icons).
 

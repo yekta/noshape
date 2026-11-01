@@ -55,13 +55,18 @@ impl Studio {
 
     /// A rectangle (0,0)–(w,h) mm on Top as a sketch; its region.
     fn rectangle(&mut self, w: f64, h: f64) -> Reference {
+        self.rectangle_on(DatumPlane::Top, w, h)
+    }
+
+    /// A rectangle (0,0)–(w,h) mm on a default plane as a sketch; its region.
+    fn rectangle_on(&mut self, plane: DatumPlane, w: f64, h: f64) -> Reference {
         let mut sk = noshape_sketch::Sketch::new();
         let p = [(0.0, 0.0), (w, 0.0), (w, h), (0.0, h)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
         for i in 0..4 {
             sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
         }
         let sketch = self.add("sketch", |pv| {
-            pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+            pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(plane)]));
             pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
         });
         let r = self.ok();
@@ -1460,4 +1465,34 @@ fn joint_births_follow_live_letters() {
             assert!(data.rips.len() == 1 && data.rips[0].birth > along_y, "{case}: rips {:?}", data.rips.iter().map(|r| r.birth).collect::<Vec<_>>());
         }
     }
+}
+
+/// SM-MAKE-JOINT-ONE-EDGE (live G34 c2): two walls thickened from regions
+/// on Top and Front meet along x; each wall's part names its faces and edges
+/// on its own (they were named alike, so the junction edge carried both
+/// walls' association attributes), and Make joint on one junction edge says
+/// what live says.
+#[test]
+fn two_thickened_walls_name_their_parts_apart() {
+    let mut s = Studio::new();
+    let top = s.rectangle_on(DatumPlane::Top, 60.0, 40.0);
+    let front = s.rectangle_on(DatumPlane::Front, 60.0, 30.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![top, front]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).collect();
+    assert_eq!(solids.len(), 2);
+    let names: std::collections::HashSet<_> = solids.iter().flat_map(|b| b.edges.iter()).collect();
+    assert_eq!(names.len(), solids.iter().map(|b| b.edges.len()).sum::<usize>(), "edge names shared between the two parts");
+    let b = solids.iter().find(|b| b.shape.edges().iter().any(|e| noshape_kernel::distance(&noshape_kernel::make_vertex(DVec3::new(30.0, -2.0, 0.0) * 1e-3).unwrap(), e).is_ok_and(|d| d.distance < 1e-9))).expect("the front wall's part");
+    let i = b.shape.edges().iter().position(|e| noshape_kernel::distance(&noshape_kernel::make_vertex(DVec3::new(30.0, -2.0, 0.0) * 1e-3).unwrap(), e).is_ok_and(|d| d.distance < 1e-9)).unwrap();
+    let edge = Reference::Edge((*b.edges[i]).clone());
+    s.add("sheetMetalMakeJoint", |p| p.set("entities", ParamValue::Query(vec![edge])));
+    let r = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions::default());
+    let st = r.display.features.last().unwrap();
+    assert_eq!(st.message.as_deref(), Some("Cannot add joint joining selected entities."), "{:?}", st.status);
 }

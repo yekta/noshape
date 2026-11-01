@@ -1834,11 +1834,24 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 .collect();
             parts.sort_by_key(|p| p.members.first().copied().unwrap_or(usize::MAX));
             let mut others = BTreeMap::new();
+            let mut taken: std::collections::HashSet<crate::naming::Name> = ev.ctx.bodies.iter().flat_map(|b| b.faces.iter().cloned()).collect();
             for (k, p) in parts.iter_mut().enumerate() {
                 p.names = super::ops::fresh_names(ev, &p.solid);
+                // Fresh faces are named by their order in the solid, so the
+                // part of another model (or a second part of this one) built
+                // in the same feature named its faces as the first did: their
+                // edges shared names, and every attribute std put on one
+                // part's entity was on the other's too (two association
+                // attributes per edge; SM-MAKE-JOINT-ONE-EDGE). Names taken
+                // already get this part's own (a lone part keeps its names).
+                if p.names.iter().any(|x| taken.contains(x)) {
+                    let instance = def.body.index << 8 | k as u32;
+                    p.names = p.names.iter().map(|x| Arc::new(crate::reference::TopoName::face(ev.feature, crate::reference::Role::Copy { instance, of: x.clone() }))).collect();
+                }
                 if let Some(Some(b)) = before.get(k) {
                     keep_names(&p.solid, &mut p.names, &b.shape, &b.faces, ev.feature);
                 }
+                taken.extend(p.names.iter().cloned());
                 let part_faces = p.solid.faces();
                 for &fi in &p.members {
                     if let Some(n) = wall_faces(&topo, fi, &part_faces, &p.named(Def::Face(fi))).0.first() {

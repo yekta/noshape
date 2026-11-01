@@ -1604,7 +1604,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ours). Cause: the FS host's qModifiableEntityFilter drops sketch regions / curves / points, so std's thicken counts
   them as in-context faces. Fixed: host query.rs `is_modifiable` takes regions, curves and points (sketch bodies
   still only when loaded for a derive); T1 features_c::thickening_two_sketches_regions_reports_nothing.
-- [ ] P3 SM-MAKE-JOINT-ONE-EDGE (skasm 11-01, live G34 c2, workflow-sheet-metal-joints row 4) Make joint on the
+- [x] (skasm 11-01: fixed, see the end of this entry) P3 SM-MAKE-JOINT-ONE-EDGE (skasm 11-01, live G34 c2, workflow-sheet-metal-joints row 4) Make joint on the
   junction edge of that model: live "Make joint 1 did not regenerate properly: Cannot add joint joining selected
   entities." (std's first check: the one picked edge is one definition edge on one wall); ours "Cannot connect
   multiple parts to create a joint." (std reached the two-body check, so our getSMDefinitionEntities mapped the one
@@ -1619,6 +1619,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   junction edge [JAG, JAN]), where std's assignSMAssociationAttributes gives each entity one; the second is the
   other sheet's. Suspect: std's assign-to-new-or-split pass sees the entities as new again (our qAttributeQuery /
   qSubtraction of already-associated entities) and assigns a second id. Check that pass next.
+  Root cause (11-01): not that pass. Each model's part names its new faces New(0..n) by order, so the parts of the
+  two models (Thicken of two regions) had the same face names, hence the same edge names; attributes are kept by
+  name, so std's association on one part's edge sat on the other's too. Fix: custom host sheetmetal.rs gives a
+  part whose fresh names are taken already its own (Role::Copy with the definition / part index); a lone part keeps
+  its names. Make joint on the junction edge now says live's "Cannot add joint joining selected entities."; T1
+  sheetmetal_std::two_thickened_walls_name_their_parts_apart.
 - [x] verified 131b6f34 (qa 10-31 20:12, green a2c5b09f as CLI (`noshape mcp`, /tmp/qa-smbutt2.py): smdocs/g34 + Corner CLOSED at (2, 2, 2) → 8535.161626 / 23 faces (live 8535.0418; the +0.12 is SM3's residual), then sheetmetal_edit_joint Joint C **Butt joint - Direction 1 → 8601.815265 / 23 faces**, **Direction 2 → 8601.815679 / 23** (live evVolume HIGH 8601.820762 / 8601.821483, 23 faces: −0.0055 mm³, 6e-7; was 8599.80); the joint adds +66.654 here vs live's +66.779) P3 SM-CLOSED-BUTT a Joint › Rip › Butt joint on the corner rip of a Closed corner (G34 b; workflow-sheet-metal-joints
   row 5): ours runs the right wall through (992 / 672 mm² faces as live) but keeps the Closed corner's bend ends, 8599.80
   mm³ vs live 8601.722190 (Direction 1), 1.92 mm³ short. Live re-closes both bends against the through wall: plate ends
