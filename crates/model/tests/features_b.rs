@@ -274,6 +274,27 @@ fn helix_about_axis_length_and_turns() {
     assert!(!mesh.edges.is_empty() && mesh.edges.iter().any(|e| e.len() > 10), "helix has no edge polyline");
 }
 
+/// Helix › Circle takes a sketch circle as well as a model edge (its field
+/// accepts both; a sketch circle failed "Select a circle or arc.").
+#[test]
+fn helix_on_a_sketch_circle() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let ring = sk.add_circle(DVec2::ZERO, 0.02);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    s.add("helix", move |p| {
+        p.set("axisType", ParamValue::Enum("CIRCLE".into()));
+        p.set("edge", ParamValue::Query(vec![Reference::SketchEntity { sketch: sid, entity: ring.0 }]));
+        p.set("height", expr("30 mm"));
+        p.set("revolutions", expr("3"));
+    });
+    let r = s.ok();
+    let i = r.context.bodies.iter().position(|b| b.kind == BodyKind::Wire).expect("the helix");
+    let expected = 3.0 * ((2.0 * PI * 0.02f64).powi(2) + 0.01f64.powi(2)).sqrt();
+    let len = wire_length(&r, i);
+    assert!(near(len, expected, expected * 1e-6), "length {len} vs {expected}");
+}
+
 #[test]
 fn helix_on_cylinder_face_uses_face_height() {
     let mut s = Studio::new();

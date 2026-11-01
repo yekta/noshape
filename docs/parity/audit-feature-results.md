@@ -20,13 +20,57 @@ and behaviours.md requests; ours from the T1 / T2 tests named. Status: ✅ match
 | Linear / circular / curve pattern, Mirror | 5 + 2 + 1 + 3 | ✅ | oracle_p1 batch 8 |
 | Boolean, Split, Transform | 5 + 4 + 5 | ✅ | oracle_p1 batch 9 |
 | Plane | 7 | ✅ | oracle_p1 batch 10 |
-| Move face, Replace face, Delete face, Offset surface, Thicken, Enclose | 12 | ⏳ | batch 11 (REQUESTS core 11-01 20:30) |
-| Fill, Boundary, Rib, Wrap, Helix | 9 | ⏳ | batch 12 |
+| Move face, Replace face, Delete face, Offset surface, Thicken, Enclose | 12 | ⏳ (ours below) | batch 11 (REQUESTS core 11-01 20:30) |
+| Fill, Boundary, Rib, Wrap, Helix | 9 | ⏳ (ours below; Helix on a sketch circle fixed) | batch 12 |
 | Custom feature sweeps along a helix (knurl) | 14 pairs | ≈ (below) | custom_features::knurl_* |
 | Mass properties › calculation variance | 6 | ✅ | measure::tests::mass_property_variance_is_lives (live 1731) |
 | Sheet metal results | — | skasm's area (docs/handoff/skasm.md) | — |
 
-Counts (11-01 20:40): oracle_p1 91 cases, 91 as live; kernel_robustness's live cases 33 of 34 (G46).
+Counts (11-01 21:30): oracle_p1 91 cases, 91 as live; kernel_robustness's live cases 33 of 34 (G46); batches 11-13
+30 cases built (29 OK, FI2 declines), live's figures asked; 1 bug found and fixed (Helix on a sketch circle).
+
+## Batches 11-13: ours, waiting for live's
+
+`oracle_p1::audit_feature_results` (T2, `--ignored --nocapture`) builds them and prints each case's solids (volume mm³,
+area mm², faces, edges, count), sheets (area, faces, count) and wire length; live's go into its AUDIT_LIVE as they
+come. Hand checks: MF1 / MF2 / RF1 exact boxes; MF3 the wedge 20 × 20 tan 10° × 40; OS2 2π·13·20; HX1 / HX2
+5·√((20π)² + 6²); SW5 π·2²·(30 + 5π); SW6 24 × 2π·20 × 3 (a screw sweep of a profile in a plane through the axis:
+Pappus); RV5 48000 + π·40²/4·60; EN1 30 × 20 × 20.
+
+| Case | Status | Solids: volume / area / faces / edges (parts) | Sheets: area (faces) | Wire |
+|---|---|---|---|---|
+| MF1 offset top 5 | OK | 60000 / 9800 / 6 / 12 | | |
+| MF2 translate right 5 | OK | 52000 / 9400 / 6 / 12 | | |
+| MF3 rotate right 10° | OK | 46589.3842 / 8600.7489 / 6 / 12 | | |
+| MF4 hole wall offset 2 | OK | 47434.5133 / 9120.4425 / 7 / 15 (the hole shrinks to Ø6) | | |
+| RF1 top → plane z 25 | OK | 60000 / 9800 / 6 / 12 | | |
+| DF1 delete hole wall | OK | 48000 / 8800 / 6 / 12 | | |
+| DF2 delete fillet face | OK | 48000 / 8800 / 6 / 12 | | |
+| OS1 offset top 5 | OK | (BLOCK) | 2400 (1) | |
+| OS2 offset CYL side 3 | OK | (CYL) | 1633.6282 (1) | |
+| TH1 thicken OS1 2 | OK | 52800 / 14000 / 12 / 24 (2) | | |
+| TH2 thicken OS1 mid-plane 4 | OK | 57600 / 14400 / 12 / 24 (2) | | |
+| EN1 enclose | OK | 12000 / 3200 / 6 / 12 | | |
+| FI1 fill, Position | OK | (shell) | 2400 (1) | |
+| FI2 fill, Tangency to the sides | ERROR "Cannot create fill surface with selected boundary conditions. Continuity requirement might be too high." | | | |
+| BD1 boundary line / arc | OK | | 896.8500 (1) | |
+| BD2 boundary square / Ø16 | OK | | 1298.4862 (4) | |
+| RB1 rib, parallel | OK | 12608 / 12976 / 15 / 36 | | |
+| RB2 rib, normal | OK | 13728 / 14056 / 15 / 36 | | |
+| WR1 wrap emboss 1 (New) | OK | 6335.6854 / 2020.9557 / 9 / 15 (2) | | |
+| HX1 / HX2 | OK | | | 315.5884 |
+| SW5 | OK | 574.3832 / 599.5159 / 4 / 5 | | |
+| SW6 rectangle along a helix | OK | 9047.7834 / 7602.2293 / 6 / 12 | | 378.1829 |
+| LF5 square / Ø16 / square | OK | 10888.0469 / 3260.8985 / 6 / 12 | | |
+| RV5 top face 90° about its front edge | OK | 123398.2237 / 19883.1853 / 11 / 21 (2) | | |
+| SH6 | OK | 11421.8583 / 11804.6902 / 19 / 48 | | |
+| SH7 | OK | 11147.4191 / 11543.0009 / 19 / 40 | | |
+| DR5 | OK | 50125.6080 / 9103.4825 / 6 / 12 | | |
+| CH7 | OK | 47722.8719 / 8689.3265 / 7 / 15 | | |
+| FL7 conic ρ 0.5 width 6, 12 edges | OK | 46659.2778 / 8039.0526 / 18 / 48 | | |
+
+Found while writing them: **Helix › Circle failed on a sketch circle** ("Select a circle or arc."; the field takes
+sketch edges, as live's): fixed, T1 features_b::helix_on_a_sketch_circle.
 
 ## Mismatches, biggest first
 

@@ -49,8 +49,8 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
         }
         "CIRCLE" => {
             let no_circle = || crate::regen::eval::err_at(&["edge"], "Select a circle or arc.");
-            let Some(&(bi, ei)) = ev.resolve_edges(ev.query("edge")).first() else { return no_circle() };
-            let e = ev.edge_shape(bi, ei)?;
+            // A model edge or a sketch circle / arc (the field takes both, as live).
+            let Some(e) = curve_edges(ev, ev.query("edge")).ok().and_then(|v| v.into_iter().next()) else { return no_circle() };
             let k::Curve::Circle { center, axis, x_dir, radius } = e.edge_curve()? else { return no_circle() };
             let z = if opposite { -axis } else { axis };
             (center, z.normalize(), x_dir, radius, 0.0, None)

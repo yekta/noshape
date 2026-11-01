@@ -366,12 +366,15 @@ impl Studio {
         (sketch, out, regions.into_iter().map(|g| Reference::SketchRegion { sketch, key: g.key.clone() }).collect())
     }
 
-    /// A plane offset `d` from `from`.
+    /// A plane offset `d` from `from` (negative: Opposite direction).
     fn offset_plane(&mut self, from: Reference, d: f64) -> Reference {
         let plane = self.add("cPlane", |p| {
             p.set("entities", q(from));
             p.set("cplaneType", en("OFFSET"));
-            p.set("offset", mm(d));
+            p.set("offset", mm(d.abs()));
+            if d < 0.0 {
+                p.set("oppositeDirection", ParamValue::Bool(true));
+            }
         });
         Reference::FeaturePlane(plane)
     }
@@ -1225,4 +1228,388 @@ fn feature_pattern_off_the_part_as_live() {
     });
     let got = outcome(&s.regen());
     assert_eq!((got.status, got.text.as_str()), ("ERROR", "Could not create all instances as entered. Try selecting \"Reapply features\" option."));
+}
+
+/// One case's bodies for the feature-results audit (docs/parity/audit-feature-results.md):
+/// solids' volume, area, faces and edges, sheets' area and faces, wires' length (mm).
+#[derive(Debug, Default, PartialEq)]
+struct Audit {
+    status: &'static str,
+    solids: (f64, f64, usize, usize, usize),
+    sheets: (f64, usize, usize),
+    wire: f64,
+}
+
+fn audit(r: &RegenResult) -> Audit {
+    let o = outcome(r);
+    let mut a = Audit { status: o.status, ..Default::default() };
+    for b in &r.context.bodies {
+        match b.kind {
+            BodyKind::Solid => {
+                a.solids.0 += b.shape.volume().unwrap_or(0.0).abs() * 1e9;
+                a.solids.1 += b.shape.area().unwrap_or(0.0) * 1e6;
+                a.solids.2 += b.shape.faces().len();
+                a.solids.3 += b.shape.edges().len();
+                a.solids.4 += 1;
+            }
+            BodyKind::Surface => {
+                a.sheets.0 += b.shape.area().unwrap_or(0.0) * 1e6;
+                a.sheets.1 += b.shape.faces().len();
+                a.sheets.2 += 1;
+            }
+            BodyKind::Wire => a.wire += b.shape.edges().iter().map(|e| e.length().unwrap_or(0.0)).sum::<f64>() * 1e3,
+            BodyKind::Point => {}
+        }
+    }
+    a
+}
+
+/// CYL: a circle Ø20 at (100, 0) on Top extruded 20 mm (New).
+fn cylinder(s: &mut Studio) {
+    let c = s.sketch(top(), |sk| circle(sk, (100.0, 0.0), 20.0));
+    s.add("extrude", |p| {
+        p.set("entities", q(c[0].clone()));
+        p.set("depth", mm(20.0));
+    });
+}
+
+/// BLOCK with the CIRC hole (Ø10 at (20, 20) on the top face, Remove, Through all).
+fn block_with_hole() -> (Studio, RegenResult) {
+    let mut s = Studio::block();
+    let r = s.regen();
+    let c = s.sketch(face_at(&r, TOP), |sk| circle(sk, (20.0, 20.0), 10.0));
+    s.add("extrude", |p| {
+        p.set("entities", q(c[0].clone()));
+        p.set("operationType", en("REMOVE"));
+        p.set("booleanScope", q(body(&r, 0)));
+        p.set("endBound", en("THROUGH_ALL"));
+        p.set("oppositeDirection", ParamValue::Bool(true));
+    });
+    let r = s.regen();
+    (s, r)
+}
+
+const HOLE_WALL: DVec3 = DVec3::new(25.0, 20.0, 10.0);
+
+/// Batches 11-13 (core 11-01 audit): face and surface operations, Rib, Wrap,
+/// Helix and more options of the main features.
+fn audit_cases() -> Vec<(&'static str, Studio)> {
+    let mut cases = Vec::new();
+    let move_face = |set: &dyn Fn(&mut ParamValues, &RegenResult)| on_block("moveFace", |p, r| set(p, r));
+    cases.push(("MF1", move_face(&|p, r| {
+        p.set("moveFaces", q(face_at(r, TOP)));
+        p.set("moveFaceType", en("OFFSET"));
+        p.set("offsetDistance", mm(5.0));
+    })));
+    cases.push(("MF2", move_face(&|p, r| {
+        p.set("moveFaces", q(face_at(r, SIDES[3])));
+        p.set("moveFaceType", en("TRANSLATE"));
+        p.set("direction", q(edge_at(r, FRONT_TOP)));
+        p.set("translationDistance", mm(5.0));
+    })));
+    cases.push(("MF3", move_face(&|p, r| {
+        p.set("moveFaces", q(face_at(r, SIDES[3])));
+        p.set("moveFaceType", en("ROTATE"));
+        p.set("axis", q(edge_at(r, RIGHT_TOP)));
+        p.set("angle", deg(10.0));
+    })));
+    let (mut s, r) = block_with_hole();
+    s.add("moveFace", |p| {
+        p.set("moveFaces", q(face_at(&r, HOLE_WALL)));
+        p.set("moveFaceType", en("OFFSET"));
+        p.set("offsetDistance", mm(2.0));
+    });
+    cases.push(("MF4", s));
+    let mut s = Studio::block();
+    let plane = s.offset_plane(top(), 25.0);
+    let r = s.regen();
+    s.add("replaceFace", |p| {
+        p.set("replaceFaces", q(face_at(&r, TOP)));
+        p.set("templateFace", q(plane));
+    });
+    cases.push(("RF1", s));
+    let (mut s, r) = block_with_hole();
+    s.add("deleteFace", |p| p.set("deleteFaces", q(face_at(&r, HOLE_WALL))));
+    cases.push(("DF1", s));
+    let mut s = on_block("fillet", |p, r| {
+        p.set("entities", edges(r, &[FRONT_LEFT]));
+        p.set("radius", mm(5.0));
+    });
+    let r = s.regen();
+    let fillet_face = face_at(&r, DVec3::new(5.0 - 5.0 * std::f64::consts::FRAC_1_SQRT_2, 5.0 - 5.0 * std::f64::consts::FRAC_1_SQRT_2, 10.0));
+    s.add("deleteFace", |p| p.set("deleteFaces", q(fillet_face.clone())));
+    cases.push(("DF2", s));
+    let os1 = || {
+        on_block("offsetSurface", |p, r| {
+            p.set("surfacesAndFaces", q(face_at(r, TOP)));
+            p.set("offset", mm(5.0));
+        })
+    };
+    cases.push(("OS1", os1()));
+    let mut s = Studio::new();
+    cylinder(&mut s);
+    let r = s.regen();
+    s.add("offsetSurface", |p| {
+        p.set("surfacesAndFaces", q(face_at(&r, DVec3::new(110.0, 0.0, 10.0))));
+        p.set("offset", mm(3.0));
+    });
+    cases.push(("OS2", s));
+    for (name, mid) in [("TH1", false), ("TH2", true)] {
+        let mut s = os1();
+        let r = s.regen();
+        let sheet = r.context.bodies.iter().find(|b| b.kind == BodyKind::Surface).map(|b| Reference::Body(b.id.clone())).expect("OS1's sheet");
+        s.add("thicken", |p| {
+            p.set("entities", q(sheet.clone()));
+            if mid {
+                p.set("midplane", ParamValue::Bool(true));
+                p.set("thickness", mm(4.0));
+            } else {
+                p.set("thickness1", mm(2.0));
+            }
+        });
+        cases.push((name, s));
+    }
+    let mut s = Studio::new();
+    let upper = s.offset_plane(top(), 20.0);
+    let lower = s.offset_plane(top(), -10.0);
+    let wall = s.sketch_with(lower, |sk| {
+        let p = [(0.0, 0.0), (30.0, 0.0), (30.0, 20.0), (0.0, 20.0)].map(|(x, y)| sk.add_point(pt(x, y)));
+        (0..4).map(|i| sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap()).collect::<Vec<_>>()
+    });
+    s.add("extrude", |p| {
+        p.set("bodyType", en("SURFACE"));
+        p.set("surfaceEntities", ParamValue::Query(wall.1.iter().map(|e| Reference::SketchEntity { sketch: wall.0, entity: e.0 }).collect()));
+        p.set("depth", mm(40.0));
+    });
+    let r = s.regen();
+    s.add("enclose", |p| p.set("entities", ParamValue::Query(vec![top(), upper.clone(), body(&r, 0)])));
+    cases.push(("EN1", s));
+
+    // Batch 12.
+    for (name, continuity) in [("FI1", "G0"), ("FI2", "G1")] {
+        let mut s = on_block("shell", |p, r| {
+            p.set("entities", q(face_at(r, TOP)));
+            p.set("thickness", mm(2.0));
+        });
+        let r = s.regen();
+        s.add("fill", |p| {
+            let mut row = ParamValues::default();
+            row.set("entities", edges(&r, &[FRONT_TOP, BACK_TOP, LEFT_TOP, RIGHT_TOP]));
+            row.set("continuity", en(continuity));
+            if continuity != "G0" {
+                row.set("adjacentFaces", ParamValue::Query(SIDES.iter().map(|x| face_at(&r, *x)).collect()));
+            }
+            p.set("edges", ParamValue::Array(vec![row]));
+        });
+        cases.push((name, s));
+    }
+    let mut s = Studio::new();
+    let (line_sketch, line, _) = s.sketch_with(top(), |sk| {
+        let (a, b) = (sk.add_point(pt(0.0, 0.0)), sk.add_point(pt(40.0, 0.0)));
+        sk.add_line_between(a, b).unwrap()
+    });
+    let plane = s.offset_plane(Reference::Plane(DatumPlane::Front), -20.0);
+    let (arc_sketch, arc, _) = s.sketch_with(plane, |sk| sk.add_arc(pt(20.0, -15.0), pt(40.0, 0.0), pt(0.0, 0.0)));
+    s.add("boundarySurface", |p| {
+        let profile = |r: Reference| {
+            let mut v = ParamValues::default();
+            v.set("uProfileEntities", q(r));
+            v
+        };
+        p.set("uProfilesArray", ParamValue::Array(vec![profile(Reference::SketchEntity { sketch: line_sketch, entity: line.0 }), profile(Reference::SketchEntity { sketch: arc_sketch, entity: arc.0 })]));
+    });
+    cases.push(("BD1", s));
+    let mut s = Studio::new();
+    let (square, lines, _) = s.sketch_with(top(), |sk| {
+        let p = [(-10.0, -10.0), (10.0, -10.0), (10.0, 10.0), (-10.0, 10.0)].map(|(x, y)| sk.add_point(pt(x, y)));
+        (0..4).map(|i| sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap()).collect::<Vec<_>>()
+    });
+    let plane = s.offset_plane(top(), 20.0);
+    let (disc, ring, _) = s.sketch_with(plane, |sk| sk.add_circle(pt(0.0, 0.0), 8e-3));
+    s.add("boundarySurface", |p| {
+        p.set("bodyType", en("SOLID"));
+        let profile = |r: Vec<Reference>| {
+            let mut v = ParamValues::default();
+            v.set("uProfileEntities", ParamValue::Query(r));
+            v
+        };
+        let square = lines.iter().map(|e| Reference::SketchEntity { sketch: square, entity: e.0 }).collect();
+        p.set("uProfilesArray", ParamValue::Array(vec![profile(square), profile(vec![Reference::SketchEntity { sketch: disc, entity: ring.0 }])]));
+    });
+    cases.push(("BD2", s));
+    for (name, normal) in [("RB1", false), ("RB2", true)] {
+        let mut s = on_block("shell", |p, r| {
+            p.set("entities", q(face_at(r, TOP)));
+            p.set("thickness", mm(2.0));
+        });
+        let r = s.regen();
+        let plane = s.offset_plane(Reference::Plane(DatumPlane::Front), -20.0);
+        let (sketch, line, _) = s.sketch_with(plane, |sk| {
+            let (a, b) = (sk.add_point(pt(2.0, 10.0)), sk.add_point(pt(58.0, 10.0)));
+            sk.add_line_between(a, b).unwrap()
+        });
+        s.add("rib", |p| {
+            p.set("profiles", q(Reference::SketchEntity { sketch, entity: line.0 }));
+            p.set("parts", q(body(&r, 0)));
+            p.set("thickness", mm(2.0));
+            p.set("extendProfilesUpToPart", ParamValue::Bool(true));
+            if normal {
+                p.set("ribExtrusionDirection", en("NORMAL_TO_SKETCH_PLANE"));
+            }
+        });
+        cases.push((name, s));
+    }
+    let mut s = Studio::new();
+    cylinder(&mut s);
+    let r = s.regen();
+    let label = s.sketch(Reference::Plane(DatumPlane::Front), |sk| rect(sk, (95.0, 8.0), (105.0, 13.0)));
+    s.add("wrap", |p| {
+        p.set("source", q(label[0].clone()));
+        p.set("destination", q(face_at(&r, DVec3::new(110.0, 0.0, 10.0))));
+        p.set("resultType", en("SOLID"));
+        p.set("thickness", mm(1.0));
+    });
+    cases.push(("WR1", s));
+    for (name, pitch) in [("HX1", false), ("HX2", true)] {
+        let mut s = Studio::new();
+        cylinder(&mut s);
+        let r = s.regen();
+        s.add("helix", |p| {
+            p.set("axisType", en("CIRCLE"));
+            p.set("edge", q(edge_at(&r, DVec3::new(110.0, 0.0, 0.0))));
+            p.set("height", mm(30.0));
+            if pitch {
+                p.set("pathType", en("PITCH"));
+                p.set("helicalPitch", mm(6.0));
+                p.set("handedness", en("CCW"));
+            } else {
+                p.set("pathType", en("TURNS"));
+                p.set("revolutions", ParamValue::Expr(ExprValue::new("5")));
+            }
+        });
+        cases.push((name, s));
+    }
+
+    // Batch 13.
+    let mut s = Studio::new();
+    let (path, (line, arc), _) = s.sketch_with(Reference::Plane(DatumPlane::Front), |sk| {
+        let (a, b) = (sk.add_point(pt(0.0, 0.0)), sk.add_point(pt(0.0, 30.0)));
+        let line = sk.add_line_between(a, b).unwrap();
+        (line, sk.add_arc(pt(10.0, 30.0), pt(10.0, 40.0), pt(0.0, 30.0)))
+    });
+    let prof = s.sketch(top(), |sk| circle(sk, (0.0, 0.0), 4.0));
+    s.add("sweep", |p| {
+        p.set("profiles", q(prof[0].clone()));
+        p.set("path", ParamValue::Query(vec![Reference::SketchEntity { sketch: path, entity: line.0 }, Reference::SketchEntity { sketch: path, entity: arc.0 }]));
+    });
+    cases.push(("SW5", s));
+    let mut s = Studio::new();
+    let (base, ring, _) = s.sketch_with(top(), |sk| sk.add_circle(pt(0.0, 0.0), 20e-3));
+    s.add("helix", |p| {
+        p.set("axisType", en("CIRCLE"));
+        p.set("edge", q(Reference::SketchEntity { sketch: base, entity: ring.0 }));
+        p.set("pathType", en("TURNS"));
+        p.set("revolutions", ParamValue::Expr(ExprValue::new("3")));
+        p.set("height", mm(30.0));
+    });
+    let prof = s.sketch(Reference::Plane(DatumPlane::Front), |sk| rect(sk, (17.0, -2.0), (23.0, 2.0)));
+    let r = s.regen();
+    let helix_body = r.context.bodies.iter().find(|b| b.kind == BodyKind::Wire).map(|b| Reference::Body(b.id.clone()));
+    let helix_body = helix_body.unwrap_or_else(|| panic!("no helix: {:?}", r.display.features.iter().map(|f| (f.status, f.message.clone())).collect::<Vec<_>>()));
+    s.add("sweep", |p| {
+        p.set("profiles", q(prof[0].clone()));
+        p.set("path", q(helix_body.clone()));
+    });
+    cases.push(("SW6", s));
+    let mut s = Studio::new();
+    let mut profiles = Vec::new();
+    for (z, square) in [(0.0, true), (20.0, false), (40.0, true)] {
+        let plane = if z == 0.0 { top() } else { s.offset_plane(top(), z) };
+        profiles.push(s.sketch(plane, |sk| if square { rect(sk, (-10.0, -10.0), (10.0, 10.0)) } else { circle(sk, (0.0, 0.0), 16.0) })[0].clone());
+    }
+    s.add("loft", |p| {
+        p.set("sheetProfilesArray", ParamValue::Array(profiles.iter().map(|r| {
+            let mut v = ParamValues::default();
+            v.set("sheetProfileEntities", q(r.clone()));
+            v
+        }).collect()));
+    });
+    cases.push(("LF5", s));
+    cases.push(("RV5", on_block("revolve", |p, r| {
+        p.set("entities", q(face_at(r, TOP)));
+        p.set("axis", q(edge_at(r, FRONT_TOP)));
+        p.set("fullRevolve", ParamValue::Bool(false));
+        p.set("angle", deg(90.0));
+        p.set("operationType", en("NEW"));
+    })));
+    let verticals = [DVec3::new(0.0, 0.0, 10.0), DVec3::new(60.0, 0.0, 10.0), DVec3::new(0.0, 40.0, 10.0), DVec3::new(60.0, 40.0, 10.0)];
+    let mut s = on_block("fillet", |p, r| {
+        p.set("entities", edges(r, &verticals));
+        p.set("radius", mm(5.0));
+    });
+    let r = s.regen();
+    s.add("shell", |p| {
+        p.set("entities", q(face_at(&r, TOP)));
+        p.set("thickness", mm(2.0));
+    });
+    cases.push(("SH6", s));
+    let mut s = on_block("chamfer", |p, r| {
+        p.set("entities", edges(r, &[FRONT_TOP, BACK_TOP, LEFT_TOP, RIGHT_TOP]));
+        p.set("chamferType", en("EQUAL_OFFSETS"));
+        p.set("width", mm(3.0));
+    });
+    let r = s.regen();
+    s.add("shell", |p| {
+        p.set("entities", q(face_at(&r, BOTTOM)));
+        p.set("thickness", mm(2.0));
+    });
+    cases.push(("SH7", s));
+    cases.push(("DR5", on_block("draft", |p, r| {
+        p.set("neutralPlane", q(face_at(r, BOTTOM)));
+        p.set("draftFaces", ParamValue::Query(SIDES.iter().map(|x| face_at(r, *x)).collect()));
+        p.set("angle", deg(3.0));
+    })));
+    cases.push(("CH7", on_block("chamfer", |p, r| {
+        p.set("entities", edges(r, &[FRONT_TOP]));
+        p.set("chamferType", en("OFFSET_ANGLE"));
+        p.set("width", mm(4.0));
+        p.set("angle", deg(30.0));
+    })));
+    let all: Vec<DVec3> = [FRONT_TOP, BACK_TOP, LEFT_TOP, RIGHT_TOP].into_iter().chain(verticals).chain([DVec3::new(30.0, 0.0, 0.0), DVec3::new(30.0, 40.0, 0.0), DVec3::new(0.0, 20.0, 0.0), DVec3::new(60.0, 20.0, 0.0)]).collect();
+    cases.push(("FL7", on_block("fillet", |p, r| {
+        p.set("entities", edges(r, &all));
+        p.set("crossSection", en("CONIC"));
+        p.set("blendControlType", en("WIDTH"));
+        p.set("width", mm(6.0));
+        p.set("rho", ParamValue::Expr(ExprValue::new("0.5")));
+    })));
+    cases
+}
+
+/// Live's figures for the audit cases as they come (results-11..13.jsonl).
+const AUDIT_LIVE: &[(&str, Audit)] = &[];
+
+#[test]
+#[ignore = "T2: the feature-results audit's cases (prints ours; checks those live has answered)"]
+fn audit_feature_results() {
+    let mut report = String::new();
+    for (name, s) in audit_cases() {
+        let r = s.regen();
+        let got = audit(&r);
+        let msg = r.display.features.last().and_then(|f| f.message.clone()).unwrap_or_default();
+        eprintln!("{name}: {got:?} {msg}");
+        if let Some((_, live)) = AUDIT_LIVE.iter().find(|l| l.0 == name) {
+            let near = |a: f64, b: f64| (a - b).abs() <= 1e-6 * b.abs().max(1.0);
+            let ok = got.status == live.status
+                && near(got.solids.0, live.solids.0)
+                && near(got.solids.1, live.solids.1)
+                && got.solids.2 == live.solids.2
+                && near(got.sheets.0, live.sheets.0)
+                && near(got.wire, live.wire);
+            if !ok {
+                report += &format!("{name}: ours {got:?}\n      live {live:?}\n");
+            }
+        }
+    }
+    assert!(report.is_empty(), "differences from live:\n{report}");
 }
