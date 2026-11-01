@@ -119,6 +119,72 @@ pub(super) struct ConstraintManager {
     collapsed: bool,
 }
 
+/// The Constraint manager's Type filters, in live's order with their icons
+/// (sk-tool-profile-inspector-and-constraint-manager, live 1715).
+const CM_TYPES: [(&str, &str); 22] = [
+    ("Coincident", "coincident"),
+    ("Concentric", "concentric"),
+    ("Parallel", "parallel"),
+    ("Tangent", "tangent"),
+    ("Horizontal", "horizontal"),
+    ("Vertical", "vertical"),
+    ("Perpendicular", "perpendicular"),
+    ("Equal", "equal"),
+    ("Midpoint", "midpoint"),
+    ("Normal", "normal"),
+    ("Pierce", "pierce"),
+    ("Symmetric", "symmetric"),
+    ("Fix", "fix"),
+    ("Curvature", "curvature"),
+    ("Flow", "flow"),
+    ("Quadrant", "quadrant"),
+    ("Intersection", "intersection"),
+    ("Offset", "offset"),
+    ("Linear pattern", "sketch-linear-pattern"),
+    ("Circular pattern", "sketch-circular-pattern"),
+    ("Projected", "use"),
+    ("Dimension", "dimension"),
+];
+const CM_MODES: [(&str, &str); 3] = [("Internal", "cm-internal"), ("External", "cm-external"), ("In context", "cm-in-context")];
+const CM_STATUS: [(&str, &str); 3] = [("Driven", "cm-driven"), ("Solved", "cm-solved"), ("Errors", "cm-errors")];
+
+/// A constraint's Type filter in the Constraint manager: dimensions are one
+/// type, a Collinear is a Coincident between lines.
+fn cm_type(c: &noshape_sketch::Constraint) -> &'static str {
+    match c.kind {
+        _ if c.is_dimension() => "Dimension",
+        noshape_sketch::ConstraintKind::Collinear { .. } => "Coincident",
+        _ => c.kind.name(),
+    }
+}
+
+/// Live's 220 px tool dialog (Profile inspector, Constraint manager): the
+/// feature dialog's frame and 29 px header with a title and a grey ✕.
+fn diag_dialog(id: &'static str, title: &'static str, on_close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    v_flex()
+        .id(id)
+        .absolute()
+        .w(px(220.))
+        .occlude()
+        .bg(gpui_kit::rgba(0xfffffff2))
+        .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+        .text_color(gpui_kit::rgb(0x333333))
+        .child(
+            h_flex()
+                .h(px(29.))
+                .bg(crate::theme::p().panel)
+                .border_b_1()
+                .border_color(gpui_kit::rgb(0xd7d7d7))
+                .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title))
+                .child(div().id(SharedString::from(format!("{id}-close"))).size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(icon_px("close", 13.0, gpui_kit::rgb(0x777777))).on_click(on_close)),
+        )
+}
+
+/// The dialogs' ? in the bottom right corner.
+fn diag_help() -> Div {
+    h_flex().justify_end().px(px(4.)).pb(px(4.)).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))
+}
+
 /// Display name of a sketch entity in the constraint manager ("Line 4").
 fn entity_name(sk: &noshape_sketch::Sketch, e: noshape_sketch::EntityId) -> String {
     use noshape_sketch::EntityKind as K;
@@ -158,7 +224,6 @@ enum TextStyle {
 /// Kind of value an option field holds.
 #[derive(Clone, Copy, PartialEq)]
 enum OptKind {
-    Length,
     Text,
 }
 
@@ -170,18 +235,6 @@ fn pattern_value_dim(h: crate::sketch_mode::PatternHandle) -> Option<Dim> {
         H::CircularAngle | H::Rotate => Some(Dim::ANGLE),
         H::Scale => Some(Dim::UNITLESS),
         _ => None,
-    }
-}
-
-/// Option fields shown in the floating options box for a tool. Live
-/// Onshape has none for fillet (arrow manipulator + radius box), polygon
-/// (on-canvas side spinner), conic (rho box), patterns (on-canvas `Nx`
-/// counts, spacing / angle values, arrows) or transform (triad with
-/// rotation / scale values), so those have none.
-fn tool_options(tool: Tool) -> &'static [(&'static str, &'static str, OptKind)] {
-    match tool {
-        Tool::Text => &[("text.text", "Text", OptKind::Text), ("text.height", "Height (click)", OptKind::Length)],
-        _ => &[],
     }
 }
 
@@ -1557,12 +1610,10 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ tool option fields
 
-    fn option_text(&self, key: &str, cx: &App) -> String {
-        let units = self.doc.read(cx).session.doc.settings.units;
+    fn option_text(&self, key: &str) -> String {
         let Some(ed) = &self.sketch else { return String::new() };
         match key {
             "text.text" => ed.text_string.clone(),
-            "text.height" => noshape_units::format_quantity(Quantity::new(ed.text_height, Dim::LENGTH), &units),
             _ => String::new(),
         }
     }
@@ -1571,7 +1622,7 @@ impl PartStudioView {
         if let Some(st) = self.ui_ref().and_then(|u| u.opts.get(key).cloned()) {
             return Some(st);
         }
-        let text = self.option_text(key, cx);
+        let text = self.option_text(key);
         let state = cx.new(|cx| InputState::new(window, cx).default_value(text));
         let sub = cx.subscribe_in(&state, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
             InputEvent::Change => {
@@ -1598,30 +1649,12 @@ impl PartStudioView {
         Some(state)
     }
 
-    fn set_option(&mut self, key: &str, kind: OptKind, text: &str, cx: &mut Context<Self>) {
-        let units = self.doc.read(cx).session.doc.settings.units;
-        let vars = self.sketch_variables(cx);
-        let t = text.trim();
-        let val = match kind {
-            OptKind::Length => noshape_units::evaluate_as(t, Dim::LENGTH, &units, &vars).ok().map(|q| q.value),
-            OptKind::Text => Some(0.0),
-        }
-        .filter(|v| v.is_finite());
+    fn set_option(&mut self, key: &str, _kind: OptKind, text: &str, cx: &mut Context<Self>) {
         let Some(ed) = &mut self.sketch else { return };
-        let Some(v) = val else {
-            ed.message = Some(format!("Invalid value \"{t}\""));
-            cx.notify();
+        if key != "text.text" {
             return;
-        };
-        match key {
-            "text.text" => ed.text_string = text.to_string(),
-            "text.height" if v > 0.0 => ed.text_height = v,
-            _ => {
-                ed.message = Some("Value out of range".into());
-                cx.notify();
-                return;
-            }
         }
+        ed.text_string = text.to_string();
         self.refresh_scene(false, cx);
         cx.notify();
     }
@@ -1801,7 +1834,7 @@ impl PartStudioView {
         let mut rows: Vec<(noshape_sketch::ConstraintId, &'static str, Vec<noshape_sketch::EntityId>)> = sk
             .constraints()
             .filter(|c| !matches!(c.kind, noshape_sketch::ConstraintKind::LengthRatio { .. }) && !cm.removed.contains(&c.id.0))
-            .filter(|c| cm.types.is_empty() || cm.types.contains(c.kind.name()))
+            .filter(|c| cm.types.is_empty() || cm.types.contains(cm_type(c)))
             .filter(|c| {
                 let external = c.kind.entities().iter().any(|e| sk.entity(*e).is_some_and(|x| x.external));
                 cm.modes.is_empty() || cm.modes.contains(if external { "External" } else { "Internal" })
@@ -1816,8 +1849,13 @@ impl PartStudioView {
                 };
                 cm.status.is_empty() || cm.status.contains(st)
             })
-            // Without automatic selection the list follows the entity selection.
-            .filter(|c| cm.auto_select || ed.selection.is_empty() || c.kind.entities().iter().any(|e| ed.selection.contains(e)))
+            // The list follows the selection (live 1716: with automatic
+            // selection it is empty until something is selected; without
+            // it, nothing selected lists every constraint).
+            .filter(|c| {
+                let picked = c.kind.entities().iter().any(|e| ed.selection.contains(e)) || ed.selected_constraints.contains(&c.id);
+                picked || (!cm.auto_select && ed.selection.is_empty())
+            })
             .map(|c| (c.id, c.kind.name(), c.kind.entities().to_vec()))
             .collect();
         if cm.by_entity {
@@ -1844,175 +1882,231 @@ impl PartStudioView {
         cx.notify();
     }
 
+    /// Live (sk-tool-profile-inspector-and-constraint-manager, 1715): a 220 px
+    /// dialog right of the Sketch dialog: Filters ▾ with the "Automatically
+    /// select constraints" slider, Type (22 icon toggles), Mode and Status,
+    /// Sort by constraint | Sort by entity, the "Entities and constraints"
+    /// list ("Flow 1" over its entities) and a red Delete all.
     fn render_constraint_manager(&self, data: &SketchData, cx: &mut Context<Self>) -> Option<AnyElement> {
         let cm = self.ui_ref()?.cm.as_ref()?;
-        let pal = p();
-        let chip = |id: String, label: &'static str, on: bool, cx: &mut Context<Self>, f: Box<dyn Fn(&mut ConstraintManager)>| {
-            Button::new(SharedString::from(id)).label(label).xsmall().selected(on).when(!on, |b| b.ghost()).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.cm_update(cx, |c| f(c))))
+        let ed = self.sketch.as_ref()?;
+        let blue = gpui_kit::rgb(0x1651b0);
+        let toggle = |id: String, tip: &'static str, icon: &'static str, on: bool, cx: &mut Context<Self>, f: Box<dyn Fn(&mut ConstraintManager)>| {
+            div()
+                .id(SharedString::from(id))
+                // Live: six to a row, 37 px apart.
+                .w(px(34.))
+                .h(px(37.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(3.))
+                .cursor_pointer()
+                .hover(|d| d.bg(gpui_kit::rgb(0xeaeaea)))
+                .when(on, |d| d.bg(gpui_kit::rgb(0xdcdcdc)))
+                .child(crate::assets::icon(icon, 20., cx))
+                .tooltip(crate::ui::tooltip(tip))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.cm_update(cx, |c| f(c))))
         };
-        let types_present: std::collections::BTreeSet<&'static str> = data.sketch.constraints().filter(|c| !matches!(c.kind, noshape_sketch::ConstraintKind::LengthRatio { .. })).map(|c| c.kind.name()).collect();
-        let mut col = v_flex().absolute().top(px(230.)).right(px(12.)).w(px(300.)).occlude().p_2().gap_1p5().rounded_md().bg(with_alpha(pal.panel_raised, 0.98)).border_1().border_color(pal.border_strong).shadow_lg();
-        col = col.child(
-            h_flex()
-                .justify_between()
-                .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Constraint manager"))
-                .child(Button::new("cm-close").icon(icon_px("close", 13.0, pal.text)).ghost().xsmall().tooltip("Turn constraint manager off").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_constraint_manager(cx)))),
-        );
+        let heading = |t: &'static str| div().pt(px(4.)).text_size(px(13.33)).font_weight(FontWeight::SEMIBOLD).child(t);
+        let mut body = v_flex().px(px(5.)).gap(px(2.));
         let collapsed = cm.collapsed;
-        col = col.child(
+        body = body.child(
             h_flex()
-                .gap_1()
-                .child(Button::new("cm-filters").label(if collapsed { "▸ Filters" } else { "▾ Filters" }).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cm_update(cx, |c| c.collapsed = !c.collapsed))))
-                .child(Button::new("cm-auto").label("Automatically select constraints").xsmall().selected(cm.auto_select).when(!cm.auto_select, |b| b.ghost()).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cm_update(cx, |c| c.auto_select = !c.auto_select)))),
+                .id("cm-filters")
+                .h(px(30.))
+                .justify_between()
+                .cursor_pointer()
+                .border_b_1()
+                .border_color(gpui_kit::rgb(0xd7d7d7))
+                .child(div().text_size(px(13.33)).font_weight(FontWeight::SEMIBOLD).child("Filters"))
+                .child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., gpui_kit::rgb(0x333333)))
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cm_update(cx, |c| c.collapsed = !c.collapsed))),
+        );
+        // The slider: a blue pill with its knob right when on.
+        let auto = cm.auto_select;
+        body = body.child(
+            h_flex()
+                .id("cm-auto")
+                .py(px(4.))
+                .gap(px(8.))
+                .cursor_pointer()
+                .tooltip(crate::ui::tooltip("Automatically select constraints"))
+                .child(
+                    div()
+                        .w(px(34.))
+                        .h(px(18.))
+                        .flex_none()
+                        .rounded_full()
+                        .bg(if auto { blue } else { gpui_kit::rgb(0xbbbbbb) })
+                        .flex()
+                        .items_center()
+                        .when(auto, |d| d.justify_end())
+                        .px(px(2.))
+                        .child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xffffff))),
+                )
+                .child(div().text_size(px(13.33)).child("Automatically select constraints"))
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cm_update(cx, |c| c.auto_select = !c.auto_select))),
         );
         if !collapsed {
-            let mut types = h_flex().flex_wrap().gap_0p5();
-            for t in types_present {
-                let on = cm.types.contains(t);
-                types = types.child(chip(format!("cm-t-{t}"), t, on, cx, Box::new(move |c| {
+            let mut types = h_flex().flex_wrap();
+            for (t, icon) in CM_TYPES {
+                types = types.child(toggle(format!("cm-t-{t}"), t, icon, cm.types.contains(t), cx, Box::new(move |c| {
                     if !c.types.remove(t) {
                         c.types.insert(t);
                     }
                 })));
             }
-            col = col.child(div().text_xs().text_color(pal.text_muted).child("Type")).child(types);
-            let mut modes = h_flex().gap_0p5();
-            for m in ["Internal", "External"] {
-                let on = cm.modes.contains(m);
-                modes = modes.child(chip(format!("cm-m-{m}"), m, on, cx, Box::new(move |c| {
+            let mut modes = h_flex();
+            for (m, icon) in CM_MODES {
+                modes = modes.child(toggle(format!("cm-m-{m}"), m, icon, cm.modes.contains(m), cx, Box::new(move |c| {
                     if !c.modes.remove(m) {
                         c.modes.insert(m);
                     }
                 })));
             }
-            col = col.child(div().text_xs().text_color(pal.text_muted).child("Mode")).child(modes);
-            let mut status = h_flex().gap_0p5();
-            for st in ["Driven", "Solved", "Errors"] {
-                let on = cm.status.contains(st);
-                status = status.child(chip(format!("cm-s-{st}"), st, on, cx, Box::new(move |c| {
+            let mut status = h_flex();
+            for (st, icon) in CM_STATUS {
+                status = status.child(toggle(format!("cm-s-{st}"), st, icon, cm.status.contains(st), cx, Box::new(move |c| {
                     if !c.status.remove(st) {
                         c.status.insert(st);
                     }
                 })));
             }
-            col = col.child(div().text_xs().text_color(pal.text_muted).child("Status")).child(status);
+            body = body.child(heading("Type")).child(types).child(heading("Mode")).child(modes).child(heading("Status")).child(status);
         }
+        // Sort by constraint | Sort by entity: tabs, the active one blue
+        // with a 2 px blue underline.
         let by_entity = cm.by_entity;
-        col = col.child(
-            h_flex()
-                .gap_0p5()
-                .child(chip("cm-sort-c".into(), "Sort by constraint", !by_entity, cx, Box::new(|c| c.by_entity = false)))
-                .child(chip("cm-sort-e".into(), "Sort by entity", by_entity, cx, Box::new(|c| c.by_entity = true))),
-        );
+        let tab = |id: &'static str, label: &'static str, on: bool, entity: bool, cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .flex_1()
+                .h(px(28.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .text_size(px(13.33))
+                .when(on, |d| d.text_color(blue).font_weight(FontWeight::MEDIUM).border_b_2().border_color(blue))
+                .when(!on, |d| d.border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)))
+                .child(label)
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.cm_update(cx, |c| c.by_entity = entity)))
+        };
+        body = body.child(h_flex().mt(px(4.)).child(tab("cm-sort-c", "Sort by constraint", !by_entity, false, cx)).child(tab("cm-sort-e", "Sort by entity", by_entity, true, cx)));
+        // "Flow 1": the constraint's type and its number among that type's.
+        let mut seen: std::collections::HashMap<&'static str, usize> = std::collections::HashMap::new();
+        let numbers: std::collections::HashMap<noshape_sketch::ConstraintId, usize> = data
+            .sketch
+            .constraints()
+            .map(|c| {
+                let n = seen.entry(c.kind.name()).or_insert(0);
+                *n += 1;
+                (c.id, *n)
+            })
+            .collect();
         let rows = self.cm_rows(data);
-        let ed = self.sketch.as_ref()?;
-        let mut list = v_flex().id("cm-list").gap_0p5().max_h(px(260.)).overflow_y_scroll();
-        for (cid, name, ents) in &rows {
-            let cid = *cid;
+        let mut list: Vec<AnyElement> = Vec::new();
+        let constraint_row = |cid: noshape_sketch::ConstraintId, name: &str, indent: bool, cx: &mut Context<Self>| -> AnyElement {
             let conflict = ed.conflicting.contains(&cid);
             let selected = ed.selected_constraints.contains(&cid);
-            let label = format!("{name}  ·  {}", ents.iter().map(|e| entity_name(&data.sketch, *e)).collect::<Vec<_>>().join(", "));
-            list = list.child(
-                h_flex()
-                    .id(SharedString::from(format!("cm-row-{}", cid.0)))
-                    .justify_between()
-                    .px_1()
-                    .rounded(px(3.))
-                    .when(selected, |d| d.bg(rgb(0xf2ff80)))
-                    .hover(|d| d.bg(pal.row_hover))
-                    .on_hover(cx.listener(move |this, h: &bool, _, cx| {
-                        if let Some(ed) = &mut this.sketch {
-                            let new = if *h { Some(cid) } else if ed.hover_constraint == Some(cid) { None } else { ed.hover_constraint };
-                            if new != ed.hover_constraint {
-                                ed.hover_constraint = new;
-                                this.refresh_scene(false, cx);
-                                cx.notify();
-                            }
+            let label = format!("{name} {}", numbers.get(&cid).copied().unwrap_or(0));
+            crate::os_ui::row_states(crate::os_ui::query_row(SharedString::from(format!("cm-row-{}-{}", cid.0, indent)), label), selected)
+                .when(indent, |d| d.pl(px(18.)))
+                .when(conflict, |d| d.text_color(gpui_kit::rgb(0xbd3039)))
+                .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                    if let Some(ed) = &mut this.sketch {
+                        let new = if *h { Some(cid) } else if ed.hover_constraint == Some(cid) { None } else { ed.hover_constraint };
+                        if new != ed.hover_constraint {
+                            ed.hover_constraint = new;
+                            this.refresh_scene(false, cx);
+                            cx.notify();
                         }
-                    }))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        if let Some(ed) = &mut this.sketch {
-                            if let Some(i) = ed.selected_constraints.iter().position(|c| *c == cid) {
-                                ed.selected_constraints.remove(i);
-                            } else {
-                                ed.selected_constraints.push(cid);
-                            }
+                    }
+                }))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if let Some(ed) = &mut this.sketch {
+                        if let Some(i) = ed.selected_constraints.iter().position(|c| *c == cid) {
+                            ed.selected_constraints.remove(i);
+                        } else {
+                            ed.selected_constraints.push(cid);
                         }
-                        this.refresh_scene(false, cx);
-                        cx.notify();
-                    }))
-                    .child(div().text_xs().text_color(if conflict { rgb(0xbd3039) } else { pal.text }).truncate().child(label))
-                    .child(
-                        h_flex()
-                            .child(Button::new(SharedString::from(format!("cm-del-{}", cid.0))).icon(icon_px("delete", 12.0, pal.text_muted)).ghost().xsmall().tooltip("Delete constraint").on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                                if this.with_sketch(cx, |ed, data| ed.delete_constraint(data, cid)) == Some(true) {
-                                    this.regen_sync(window, cx);
-                                }
-                            })))
-                            .child(Button::new(SharedString::from(format!("cm-rm-{}", cid.0))).icon(icon_px("close", 11.0, pal.text_muted)).ghost().xsmall().tooltip("Remove selection").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                this.cm_update(cx, |c| {
-                                    c.removed.insert(cid.0);
-                                })
-                            }))),
-                    ),
-            );
+                    }
+                    this.refresh_scene(false, cx);
+                    cx.notify();
+                }))
+                .into_any_element()
+        };
+        let entity_row = |id: String, name: String, indent: bool| -> AnyElement {
+            crate::os_ui::query_row(SharedString::from(id), name).when(indent, |d| d.pl(px(18.))).text_color(gpui_kit::rgb(0x666666)).into_any_element()
+        };
+        if by_entity {
+            let mut order: Vec<noshape_sketch::EntityId> = Vec::new();
+            for (_, _, ents) in &rows {
+                for e in ents {
+                    if !order.contains(e) {
+                        order.push(*e);
+                    }
+                }
+            }
+            for e in order {
+                list.push(entity_row(format!("cm-ent-{}", e.0), entity_name(&data.sketch, e), false));
+                for (cid, name, _) in rows.iter().filter(|r| r.2.contains(&e)) {
+                    list.push(constraint_row(*cid, name, true, cx));
+                }
+            }
+        } else {
+            for (cid, name, ents) in &rows {
+                list.push(constraint_row(*cid, name, false, cx));
+                for e in ents {
+                    list.push(entity_row(format!("cm-ent-{}-{}", cid.0, e.0), entity_name(&data.sketch, *e), true));
+                }
+            }
         }
-        let ids: Vec<noshape_sketch::ConstraintId> = rows.iter().map(|r| r.0).collect();
-        col = col
-            .child(div().text_xs().text_color(pal.text_muted).child(format!("Entities and constraints ({})", rows.len())))
-            .child(list)
-            .child(
-                h_flex()
-                    .gap_1()
-                    .child(Button::new("cm-clear").label("Clear all").ghost().xsmall().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        let all: Vec<u32> = this.sketch_data(cx).map(|d| d.sketch.constraints().map(|c| c.id.0).collect()).unwrap_or_default();
-                        this.cm_update(cx, |c| c.removed.extend(all));
-                    })))
-                    .child(Button::new("cm-delete-all").label("Delete all").ghost().xsmall().on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                        let ids = ids.clone();
+        body = body.child(div().mt(px(6.)).child(crate::os_ui::query_box("cm-list", "Entities and constraints", true, list)));
+        // With automatic selection the listed constraints are the selected ones.
+        let listed: Vec<noshape_sketch::ConstraintId> = rows.iter().map(|r| r.0).filter(|c| cm.auto_select || ed.selected_constraints.contains(c)).collect();
+        let none = listed.is_empty();
+        body = body.child(
+            h_flex().justify_center().py(px(6.)).child(
+                crate::os_ui::danger_button("cm-delete-all", "Delete all", cx)
+                    .disabled(none)
+                    .when(none, |b| b.opacity(0.4))
+                    .tooltip("Delete all selected constraints")
+                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        let ids = listed.clone();
                         let changed = this.with_sketch(cx, |ed, data| ids.iter().map(|c| ed.delete_constraint(data, *c)).filter(|d| *d).count() > 0);
                         if changed == Some(true) {
                             this.regen_sync(window, cx);
                         }
-                    }))),
-            );
-        Some(col.into_any_element())
+                    })),
+            ),
+        );
+        // Live: right of the Sketch dialog, level with its top.
+        Some(diag_dialog("cm-dialog", "Constraint manager", cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_constraint_manager(cx))).top(px(3.)).left(px(221.)).child(body).child(diag_help()).into_any_element())
     }
 
+    /// Live (1715): a 220 px dialog under the Sketch dialog's diagnostics
+    /// button: a "Loose ends" list ("No loose ends found"), Previous / Next.
     fn render_profile_inspector(&self, data: &SketchData, cx: &mut Context<Self>) -> Option<AnyElement> {
         let focus = self.ui_ref()?.pi?;
-        let pal = p();
         let issues = data.sketch.profile_issues();
-        let mut col = v_flex().absolute().top(px(230.)).right(px(12.)).w(px(260.)).occlude().p_2().gap_1().rounded_md().bg(with_alpha(pal.panel_raised, 0.98)).border_1().border_color(pal.border_strong).shadow_lg();
-        col = col.child(
-            h_flex()
-                .justify_between()
-                .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Profile inspector"))
-                .child(Button::new("pi-close").icon(icon_px("close", 13.0, pal.text)).ghost().xsmall().tooltip("Turn profile inspector off").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_profile_inspector(cx)))),
-        );
+        let mut rows: Vec<AnyElement> = Vec::new();
         if issues.is_empty() {
-            col = col.child(div().text_xs().text_color(pal.text_muted).child("No issues: every profile is closed."));
+            rows.push(crate::os_ui::query_row("pi-none", "No loose ends found").text_color(gpui_kit::rgb(0x666666)).into_any_element());
         }
         for (i, issue) in issues.iter().enumerate() {
             let names = issue.entities.iter().map(|e| entity_name(&data.sketch, *e)).collect::<Vec<_>>().join(", ");
-            col = col.child(
-                div()
-                    .id(SharedString::from(format!("pi-{i}")))
-                    .px_1()
-                    .rounded(px(3.))
-                    .cursor_pointer()
-                    .when(i == focus, |d| d.bg(rgb(0xf2ff80)))
-                    .hover(|d| d.bg(pal.row_hover))
-                    .text_xs()
-                    .text_color(pal.text)
-                    .child(format!("{}: {names}", issue.message))
+            rows.push(
+                crate::os_ui::row_states(crate::os_ui::query_row(SharedString::from(format!("pi-{i}")), format!("{}: {names}", issue.message)), i == focus)
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(ui) = this.ui_mut() {
                             ui.pi = Some(i);
                         }
                         this.update_profile_issues(cx);
                         cx.notify();
-                    })),
+                    }))
+                    .into_any_element(),
             );
         }
         let n = issues.len();
@@ -2028,13 +2122,13 @@ impl PartStudioView {
                 cx.notify();
             }
         };
-        col = col.child(
-            h_flex()
-                .gap_1()
-                .child(Button::new("pi-prev").label("Previous").ghost().xsmall().disabled(n == 0).on_click(cx.listener(step(-1))))
-                .child(Button::new("pi-next").label("Next").ghost().xsmall().disabled(n == 0).on_click(cx.listener(step(1)))),
-        );
-        Some(col.into_any_element())
+        let button = |id: &'static str, label: &'static str| crate::os_ui::primary_button(id, label).disabled(n == 0).when(n == 0, |b| b.opacity(0.45)).h(px(28.)).px(px(8.));
+        let body = v_flex()
+            .p(px(5.))
+            .gap(px(6.))
+            .child(crate::os_ui::query_box("pi-list", "Loose ends", false, rows))
+            .child(h_flex().justify_end().gap(px(4.)).child(button("pi-prev", "Previous").on_click(cx.listener(step(-1)))).child(button("pi-next", "Next").on_click(cx.listener(step(1)))));
+        Some(diag_dialog("pi-dialog", "Profile inspector", cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_profile_inspector(cx))).top(px(217.)).left(px(172.)).child(body).child(diag_help()).into_any_element())
     }
 
     // ------------------------------------------------------------ offset distance box
@@ -2788,7 +2882,8 @@ impl PartStudioView {
 
         // Tool options box (creates inputs lazily, needs &mut self).
         let tool = self.sketch.as_ref().map(|s| s.tool).unwrap_or(Tool::Select);
-        let fields = tool_options(tool);
+        // Live (1715): no tool shows an option box; Text is edited in its
+        // dialog once its box is drawn.
         let mut rows: Vec<AnyElement> = Vec::new();
         // Text is edited in the Text dialog (double-click), as in Onshape.
         if tool == Tool::InsertDxf {
@@ -2796,20 +2891,6 @@ impl PartStudioView {
         } else if tool == Tool::InsertImage {
             rows.extend(self.insert_image_rows(cx));
         }
-        for (key, label, kind) in fields {
-            if let Some(st) = self.option_input(key, *kind, window, cx) {
-                let w = if *kind == OptKind::Text { 150.0 } else { 90.0 };
-                rows.push(
-                    h_flex()
-                        .gap_2()
-                        .justify_between()
-                        .child(div().text_xs().text_color(pal.text_muted).child(*label))
-                        .child(div().w(px(w)).child(Input::new(&st).xsmall()))
-                        .into_any_element(),
-                );
-            }
-        }
-
         // Tolerance / precision panel of the dimension being edited.
         let tol_panel = self.dimension_tolerance_panel(&data, window, cx);
         let mut tol_panel = tol_panel;

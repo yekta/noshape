@@ -1,6 +1,6 @@
 # noshape icons
 
-290 icons.
+297 icons.
 
 > **Rendering (read this first).** Icons are **multi-color** and the app renders them
 > in full color through GPUI `img()` (helper `assets::icon(name, size_px, cx)`), not
@@ -30,9 +30,13 @@ Usage: `assets/icons/<name>.svg`.
 
 `line`, `polyline`, `midpoint-line`, `corner-rectangle`, `center-rectangle`, `three-point-rectangle`, `aligned-rectangle`, `polygon-inscribed`, `polygon-circumscribed`, `circle`, `three-point-circle`, `center-point-arc`, `three-point-arc`, `tangent-arc`, `ellipse`, `elliptical-arc`, `conic`, `spline`, `bezier`, `slot`, `point-sketch`, `construction`, `text`, `image`, `sketch-fillet`, `sketch-chamfer`, `trim`, `extend`, `split-sketch`, `offset`, `sketch-mirror`, `sketch-linear-pattern`, `sketch-circular-pattern`, `transform-sketch`, `use`, `intersection`, `dimension`
 
-## Sketch constraints (17)
+## Sketch constraints (18)
 
-`coincident`, `concentric`, `parallel`, `tangent`, `horizontal`, `vertical`, `midpoint`, `normal`, `pierce`, `perpendicular`, `equal`, `symmetric`, `fix`, `curvature`, `flow`, `collinear`, `driven-dimension`
+`coincident`, `concentric`, `parallel`, `tangent`, `horizontal`, `vertical`, `midpoint`, `normal`, `pierce`, `perpendicular`, `equal`, `symmetric`, `fix`, `curvature`, `flow`, `quadrant`, `collinear`, `driven-dimension`
+
+## Constraint manager filters (6)
+
+`cm-internal`, `cm-external`, `cm-in-context`, `cm-driven`, `cm-solved`, `cm-errors`
 
 ## Assembly (24)
 
