@@ -49,6 +49,32 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | A19 | Variable dialog | From import (CSV) | P1 | ours failed every From import variable ("Importing variables from a table is not available yet") and its CSV file was a plain text field | ✅ (audit 10): std's variable.fs runs the From import mode (rows / columns by index, range or label, conversion factor) on the CSV tab; std features read reference parameters through the document; the CSV file is a reference field with live's picker (test custom_features::variable_from_import_reads_the_csv_tab) |
 | A20 | Routing curve dialog | std's buttons (Process, Reset triad, Previous / Next / Confirm of the orthogonal path) | P2 | ours had none (the CSV and curve inputs could never become points); the oracle didn't list them (the custom reader ignored `isButton`) | ✅ (audit 10): `isButton` is a button kind (Hints::BUTTON); a click runs std's editing logic with `clickedButton`; editing logic reads reference parameters (CSV) through the document; Table is a CSV reference field (test custom_features::routing_curve_process_reads_csv_points) |
 
+## Manipulators (std's addManipulators)
+
+The graphics handles a feature dialog shows are what its std feature adds with `addManipulators` (39 std files; their
+"Manipulator Change Function"s turn a drag into parameter values). Live psb 10-24 (behaviours "psb (10-24 i) feature
+manipulators") confirmed the std reading for seven dialogs: only Revolve and Extrude of them have handles. Ours are
+drawn natively (part_studio/manipulators.rs, triad.rs, section_manip.rs): our FeatureScript host ignores
+`addManipulators`, and most of these features regenerate natively, so std's own calls don't run for them.
+
+| # | Feature | std's manipulators | Ours | P | Status |
+|---|---|---|---|---|---|
+| M1 | Shell, Chamfer | none (live: "no thickness arrow", "no arrow") | a thickness arrow, a distance arrow | P2 | ✅ (audit 11): removed |
+| M2 | Extrude | depth (linear) or flip; second end: depth (SECONDARY) or flip | depth / direction arrow; no second end | P2 | ✅ (audit 11) second end's depth: the double chevron at the second cap (live ex2), dragged on its own; ✗ second end's flip (non-Blind second end) |
+| M3 | Revolve | angle (angular) or flip; second end: start angle (SECONDARY) or flip | an arc in dark blue with a dot, whole degrees, never past 0 | P2 | ✅ (audit 11) live's look (white in a grey halo, open head along the turn, blue on hover), snap to 5° within 2°, four decimals, dragged back past 0 flips the direction; the start angle's double chevron arc; ✗ flips for non-Blind ends |
+| M4 | Move face | offset / translate (linear), rotate (angular) | = std, but the rotate arc never went past 0 | P3 | ✅ (audit 11): dragged back past 0 it flips the direction as std's moveFaceManipulatorChange |
+| M5 | Fillet | radius (linear); partial fillet: a point-on-edge (linear) per bound | radius | P2 | ✗ partial fillet's points |
+| M6 | Plane | offset (linear), Line angle (angular) | offset | P2 | ✗ angle |
+| M7 | Transform | triad (translate by XYZ), angle (rotate about axis), distance (translate by distance) | triad | P2 | ✗ angle, distance |
+| M8 | Draft | angle (angular, two for a parting line), pull direction flip | none | P2 | ✗ |
+| M9 | Helix | height (linear), direction flip | none | P2 | ✗ |
+| M10 | Offset surface, Replace face, Move boundary, Move curve boundary | distance (linear) | none | P2 | ✗ |
+| M11 | Split, Projected curve, Mutual trim, Body draft, Frame trim, Face blend | flips | none | P3 | ✗ |
+| M12 | Loft, Wrap, Ruled surface, Bridging curve, Fit spline, Edit curve, Offset curve on face | lengths / angles / points | none | P3 | ✗ |
+| M13 | Routing curve | full triads, points | triad, points | – | = std (audit 9) |
+| M14 | Linear / Circular / Curve pattern | instance points (Skip instances) | points | – | = std (p1 dialogs) |
+| M15 | Sheet metal: Flange (length), Sheet metal model (flip), Corner break; End cap, Gusset, Frame, Decal, Derived (points) | std's | none | P3 | ✗ (std runs the sheet metal ones: catching std's `addManipulators` would draw them as std adds them) |
+
 ## Editing logic (std's dialog reactions)
 
 std's 48 "Editing Logic Function"s (36 run std's, 10 native, 1 no-op, 1 open) change a dialog's fields as the user edits (Add into the touched part, the flip, a type

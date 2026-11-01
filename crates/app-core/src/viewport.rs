@@ -687,16 +687,27 @@ impl Viewport {
 
     /// Whether a viewport-local position is on a manipulator handle.
     pub fn manipulator_at(&self, p: DVec2) -> bool {
-        self.manipulators.iter().any(|&(a, b, glyph_px)| {
-            let (Some(a), Some(mut b)) = (self.project(a), self.project(b)) else { return false };
+        self.manipulator_index_at(p).is_some()
+    }
+
+    /// The handle of [`Self::manipulators`] under a viewport-local position
+    /// (the nearest when two overlap: an extrude's two depth arrows).
+    pub fn manipulator_index_at(&self, p: DVec2) -> Option<usize> {
+        let mut best: Option<(usize, f64)> = None;
+        for (i, &(a, b, glyph_px)) in self.manipulators.iter().enumerate() {
+            let (Some(a), Some(mut b)) = (self.project(a), self.project(b)) else { continue };
             // A screen-sized glyph: `glyph_px` long from `a` towards `b`.
             if glyph_px > 0.0 {
                 b = a + (b - a).normalize_or_zero() * glyph_px;
             }
             let d = b - a;
             let u = ((p - a).dot(d) / d.length_squared().max(1e-9)).clamp(0.0, 1.0);
-            (a + d * u - p).length() < 8.0 || (b - p).length() < 14.0
-        })
+            let (line, end) = ((a + d * u - p).length(), (b - p).length());
+            if (line < 8.0 || end < 14.0) && best.is_none_or(|(_, x)| line.min(end) < x) {
+                best = Some((i, line.min(end)));
+            }
+        }
+        best.map(|(i, _)| i)
     }
 
     /// Project a world point to viewport-local logical pixels.

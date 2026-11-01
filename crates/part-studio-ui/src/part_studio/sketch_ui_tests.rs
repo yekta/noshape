@@ -940,3 +940,81 @@ fn knurl_edges_take_two_then_targets_and_rearm_after_a_removal(cx: &mut TestAppC
     pick(cx, &d, P[1].clone());
     assert_eq!(active(cx, &d).as_deref(), Some("targets"));
 }
+
+/// Revolve's angle handle snaps as live (psb 10-24 rev, 1 px steps: 45 → 47.5365 → 50 → 52.2405 → 52.8758 → 55 →
+/// 57.3507 → 57.9137 → 60 → 62.1854 → 62.5070 → 62.9932 → 65): to a multiple of 5° within 2° of it.
+#[test]
+fn revolve_angles_snap_to_five_degrees_as_live() {
+    use super::super::manipulators::snap_degrees;
+    for (dragged, shown) in [(47.5365, 47.5365), (48.1, 50.0), (52.2405, 52.2405), (52.8758, 52.8758), (53.2, 55.0), (62.9932, 62.9932), (63.5, 65.0), (359.0, 360.0), (365.0, 360.0)] {
+        assert!((snap_degrees(dragged) - shown).abs() < 1e-9, "{dragged} → {}", snap_degrees(dragged));
+    }
+}
+
+/// Extrude's Second end position (std addExtrudeManipulator, live psb 10-24 ex2): a second arrow at the second cap,
+/// hit as the second handle; dragging it sets only the second end's Depth (the first stays). Shell and
+/// Chamfer show no manipulator (std adds none; live psb 10-24).
+#[gpui::test]
+fn extrude_second_end_has_its_own_arrow(cx: &mut TestAppContext) {
+    use super::super::manipulators::Manip;
+    let (window, view) = sketch_with(cx, "second-end", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.finish_sketch(w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let sk = v.display.sketches.first().expect("the sketch");
+            v.selection = vec![Reference::SketchRegion { sketch: sk.feature, key: sk.regions.first().expect("a region").key.clone() }];
+            v.start_feature("extrude", w, cx);
+            let d = v.edit.as_ref().expect("the dialog").dialog.clone();
+            d.update(cx, |d, _| {
+                d.feature.params.set("hasSecondDirection", noshape_model::ParamValue::Bool(true));
+                d.feature.params.set("secondDirectionBound", noshape_model::ParamValue::Enum("BLIND".into()));
+                d.feature.params.set("secondDirectionDepth", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("10 mm")));
+            });
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let (at, to) = view.update(cx, |v, cx| {
+        v.sync_manipulator(cx);
+        let Some(Manip::Arrow(a, Some(b))) = v.current_manip(cx) else { panic!("two arrows") };
+        assert!(b.secondary && a.dir.dot(b.dir) < 0.0, "the second end's double chevron, the other way");
+        let vp = v.viewport.read(cx);
+        let tip = b.base + b.dir * b.length;
+        let (p0, p1) = (vp.project(tip).unwrap(), vp.project(tip + b.dir * 1e-3).unwrap());
+        let along = (p1 - p0).normalize();
+        let at = p0 + along * 20.0;
+        assert_eq!(vp.manipulator_index_at(at), Some(1), "the second arrow's glyph");
+        let to = at + along * 40.0;
+        ((at.x, at.y), (to.x, to.y))
+    });
+    let depths = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let p = &v.edit.as_ref().expect("still editing").dialog.read(cx).feature.params;
+            (p.expr("depth").map(|x| x.text.clone()), p.expr("secondDirectionDepth").map(|x| x.text.clone()))
+        })
+    };
+    let (first, _) = depths(cx);
+    drag(cx, window, &view, at, to, 4);
+    let (depth, second) = depths(cx);
+    assert_eq!(depth, first, "the first depth unchanged");
+    let second = second.expect("second depth");
+    assert!(second != "10 mm" && second.ends_with("mm"), "the second depth dragged: {second}");
+    for ty in ["shell", "chamfer"] {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            v.cancel_edit(w, cx);
+            v.start_feature(ty, w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+        assert!(cx.update(|cx| view.read(cx).current_manip(cx).is_none()), "{ty} has no manipulator");
+    }
+}

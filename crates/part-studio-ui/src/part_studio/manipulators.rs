@@ -7,7 +7,7 @@ use crate::viewport::ViewportEvent;
 use glam::{DVec2, DVec3};
 use noshape_model::params::ParamValue;
 use noshape_model::reference::Reference;
-use noshape_render::{Drawable, Instance, LineData, LineSegment, PointData, PointSprite};
+use noshape_render::{Drawable, Instance, LineData, LineSegment};
 use noshape_units::{Dim, Quantity};
 use gpui_kit::*;
 
@@ -22,6 +22,8 @@ pub(super) struct Arrow {
     /// Boolean flipped when the arrow is dragged past zero (None: the
     /// value stays positive).
     pub flip: Option<&'static str>,
+    /// std's SECONDARY style (a second end's depth): a double chevron.
+    pub secondary: bool,
 }
 
 /// The arrow glyph (pixels at the arrow, drawn in 3D like live's): shaft
@@ -40,6 +42,13 @@ pub(super) struct ArcHandle {
     /// Vector from the axis to the profile anchor (perpendicular to `axis`).
     pub radial: DVec3,
     pub angle: f64,
+    /// Angle parameter the arc drives.
+    pub param: &'static str,
+    /// Boolean flipped when the arc is dragged back past zero (std's
+    /// revolveManipulatorChange: a negative angle is the opposite direction).
+    pub flip: Option<&'static str>,
+    /// std's SECONDARY style (Revolve's start angle): a double chevron.
+    pub secondary: bool,
 }
 
 impl ArcHandle {
@@ -50,8 +59,10 @@ impl ArcHandle {
 
 #[derive(Clone, Copy, Debug)]
 pub(super) enum Manip {
-    Arrow(Arrow),
-    Arc(ArcHandle),
+    /// A length arrow, and a second end's (Extrude's second depth).
+    Arrow(Arrow, Option<Arrow>),
+    /// An angle arc, and a second end's (Revolve's start angle).
+    Arc(ArcHandle, Option<ArcHandle>),
     /// Transform ▸ Translate by XYZ (see `triad.rs`).
     Triad(super::triad::Triad),
     /// Section view: base circle, offset arrow, rotate rings (`section_manip.rs`).
@@ -60,8 +71,11 @@ pub(super) enum Manip {
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct ManipDrag {
-    /// Axis parameter at the grab point minus the current length.
+    /// Axis parameter at the grab point minus the current length (arcs: the
+    /// dragged angle so far, unwrapped).
     pub grab_offset: f64,
+    /// The dragged handle: 0 the first, 1 the second end's.
+    pub which: usize,
 }
 
 impl PartStudioView {
@@ -73,10 +87,11 @@ impl PartStudioView {
             return None;
         }
         match e.dialog.read(cx).feature.type_id.as_str() {
-            "extrude" => self.current_arrow(cx).map(Manip::Arrow),
-            "moveFace" if e.dialog.read(cx).feature.params.is("moveFaceType", "ROTATE") => self.current_arc(cx).map(Manip::Arc),
-            "cPlane" | "shell" | "fillet" | "chamfer" | "moveFace" => self.param_arrow(cx).map(Manip::Arrow),
-            "revolve" => self.current_arc(cx).map(Manip::Arc),
+            "extrude" => self.current_arrow(cx).map(|a| Manip::Arrow(a, self.second_arrow(&a, cx))),
+            "moveFace" if e.dialog.read(cx).feature.params.is("moveFaceType", "ROTATE") => self.current_arc(cx).map(|h| Manip::Arc(h, None)),
+            // Shell and Chamfer have none (std adds no manipulator; live psb 10-24).
+            "cPlane" | "fillet" | "moveFace" => self.param_arrow(cx).map(|a| Manip::Arrow(a, None)),
+            "revolve" => self.current_arc(cx).map(|h| Manip::Arc(h, self.second_arc(&h, cx))),
             "transform" => self.current_triad(cx).map(Manip::Triad),
             "routingCurve" => self.routing_triad(cx).map(Manip::Triad),
             _ => None,
@@ -117,7 +132,21 @@ impl PartStudioView {
             return None;
         }
         let symmetric = p.bool("symmetric");
-        Some(ArcHandle { origin: origin + axis * axis.dot(rel), axis, radial, angle: if symmetric { angle * 0.5 } else { angle } })
+        Some(ArcHandle { origin: origin + axis * axis.dot(rel), axis, radial, angle: if symmetric { angle * 0.5 } else { angle }, param: "angle", flip: Some("oppositeDirection"), secondary: false })
+    }
+
+    /// Revolve's second end (std addRevolveManipulator, live psb 10-24
+    /// rev-10): with Second end position and a Blind start, an arc to the
+    /// start angle about the same axis, a double chevron at its end.
+    fn second_arc(&self, first: &ArcHandle, cx: &App) -> Option<ArcHandle> {
+        let d = self.edit.as_ref()?.dialog.read(cx);
+        let p = &d.feature.params;
+        if d.feature.type_id != "revolve" || p.bool("symmetric") || !p.bool("hasStartBound") || !p.is("startBound", "BLIND") {
+            return None;
+        }
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let angle = p.expr("angleBack").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.display.variables).ok().map(|q| q.value)))?;
+        Some(ArcHandle { angle, param: "angleBack", flip: None, secondary: true, ..*first })
     }
 
     /// World axis (point, unit direction) of a sketch line or straight/circular edge.
@@ -176,7 +205,24 @@ impl PartStudioView {
             dir = -dir;
         }
         let symmetric = d.feature.params.bool("symmetric");
-        Some(Arrow { base, dir, length: if symmetric { depth * 0.5 } else { depth }, param: if blind { "depth" } else { "" }, flip: Some("oppositeDirection") })
+        Some(Arrow { base, dir, length: if symmetric { depth * 0.5 } else { depth }, param: if blind { "depth" } else { "" }, flip: Some("oppositeDirection"), secondary: false })
+    }
+
+    /// Extrude's second end (std addExtrudeManipulator, live psb 10-24 ex2):
+    /// with Second end position, not symmetric and Blind, a double chevron
+    /// at the second cap driving Depth of the second end; other end types
+    /// show nothing to drag there.
+    fn second_arrow(&self, first: &Arrow, cx: &App) -> Option<Arrow> {
+        let d = self.edit.as_ref()?.dialog.read(cx);
+        let p = &d.feature.params;
+        if !p.bool("hasSecondDirection") || p.bool("symmetric") || !p.is("secondDirectionBound", "BLIND") {
+            return None;
+        }
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let depth = p.expr("secondDirectionDepth").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value)))?;
+        // regen extrude: the second side runs along the first's direction, reversed by its own flip.
+        let dir = if p.bool("secondDirectionOppositeDirection") { -first.dir } else { first.dir };
+        Some(Arrow { base: first.base, dir, length: depth, param: "secondDirectionDepth", flip: Some("secondDirectionOppositeDirection"), secondary: true })
     }
 
     /// A blended Extrude preview's end cap (live 10-27, psui-prv-05a/b): the
@@ -228,8 +274,8 @@ impl PartStudioView {
         Some(noshape_render::Instance::new(noshape_render::Drawable::Mesh(self.gpu.uploader().upload_mesh(&mesh))).with_color([grey[0], grey[1], grey[2], 0.46]).unlit().unpickable().ignore_clip().layer(crate::scene_builder::HIGHLIGHT_FILL_LAYER))
     }
 
-    /// Drag handles of other features (Onshape): plane offset, shell
-    /// thickness, fillet radius, chamfer distance.
+    /// Drag handles of other features (Onshape): plane offset, fillet
+    /// radius, Move face's distance.
     fn param_arrow(&self, cx: &App) -> Option<Arrow> {
         let d = self.edit.as_ref()?.dialog.read(cx);
         let p = &d.feature.params;
@@ -242,12 +288,7 @@ impl PartStudioView {
                 // A plane, or a circular / elliptical edge (offset from its plane).
                 let f = p.query("entities").iter().find_map(|r| noshape_model::regen::features::cplane::circular_edge_frame(ctx, r).or_else(|| self.frame_of_ref(r)))?;
                 let dir = if p.bool("oppositeDirection") { -f.normal } else { f.normal };
-                Some(Arrow { base: f.origin, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection") })
-            }
-            "shell" if !p.bool("isHollow") => {
-                let (base, n) = p.query("entities").iter().find_map(|r| noshape_model::select::face_anchor(ctx, r))?;
-                let dir = if p.bool("oppositeDirection") { n } else { -n };
-                Some(Arrow { base, dir, length: value("thickness")?, param: "thickness", flip: Some("oppositeDirection") })
+                Some(Arrow { base: f.origin, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false })
             }
             // moveFace.fs: Offset drives offsetDistance along the first
             // face's normal, Translate drives translationDistance along the
@@ -256,17 +297,16 @@ impl PartStudioView {
                 let (base, n) = p.query("moveFaces").iter().find_map(|r| noshape_model::select::face_anchor(ctx, r))?;
                 let sign = if p.bool("oppositeDirection") { -1.0 } else { 1.0 };
                 if p.is("moveFaceType", "OFFSET") {
-                    return Some(Arrow { base, dir: n * sign, length: value("offsetDistance")?, param: "offsetDistance", flip: Some("oppositeDirection") });
+                    return Some(Arrow { base, dir: n * sign, length: value("offsetDistance")?, param: "offsetDistance", flip: Some("oppositeDirection"), secondary: false });
                 }
                 let r = p.query("direction").first()?;
                 let dir = self.axis_of(r).map(|(_, d)| d).or_else(|| self.frame_of_ref(r).map(|f| f.normal))?;
-                Some(Arrow { base, dir: dir * sign, length: value("translationDistance")?, param: "translationDistance", flip: Some("oppositeDirection") })
+                Some(Arrow { base, dir: dir * sign, length: value("translationDistance")?, param: "translationDistance", flip: Some("oppositeDirection"), secondary: false })
             }
-            "fillet" | "chamfer" => {
-                let param = if d.feature.type_id == "fillet" { "radius" } else { "width" };
+            "fillet" => {
                 // Live (behaviours "Fillet", qa5 P1-3): on the last picked edge.
                 let (base, dir) = p.query("entities").iter().rev().find_map(|r| noshape_model::select::edge_inward(ctx, r))?;
-                Some(Arrow { base, dir, length: value(param)?, param, flip: None })
+                Some(Arrow { base, dir, length: value("radius")?, param: "radius", flip: None, secondary: false })
             }
             _ => None,
         }
@@ -274,14 +314,17 @@ impl PartStudioView {
 
     /// Publish the current arrow's handle to the viewport hit test.
     pub(super) fn sync_manipulator(&mut self, cx: &mut Context<Self>) {
+        let arrow = |a: &Arrow| {
+            let tip = a.base + a.dir * a.length;
+            (tip, tip + a.dir * a.length.signum() * 1e-3, ARROW_SHAFT_PX + ARROW_HEAD_PX)
+        };
+        // The handle end of the arc (last few degrees) is grabbable.
+        let arc = |h: &ArcHandle| (h.point(h.angle * 0.85), h.point(h.angle), 0.0);
+        // In handle order (Viewport::manipulator_index_at: 0 the first, 1 the second end's).
         let handles: Vec<(DVec3, DVec3, f64)> = match self.current_manip(cx) {
             // The arrow glyph at the end of the length (see manipulator_overlay).
-            Some(Manip::Arrow(a)) => {
-                let tip = a.base + a.dir * a.length;
-                vec![(tip, tip + a.dir * a.length.signum() * 1e-3, ARROW_SHAFT_PX + ARROW_HEAD_PX)]
-            }
-            // The handle end of the arc (last few degrees) is grabbable.
-            Some(Manip::Arc(h)) => vec![(h.point(h.angle * 0.85), h.point(h.angle), 0.0)],
+            Some(Manip::Arrow(a, b)) => std::iter::once(arrow(&a)).chain(b.as_ref().map(arrow)).collect(),
+            Some(Manip::Arc(h, g)) => std::iter::once(arc(&h)).chain(g.as_ref().map(arc)).collect(),
             Some(Manip::Triad(t)) => {
                 // Routing curve's other points can be clicked (made active).
                 let mut h = self.triad_hit_segments(&t, cx);
@@ -304,7 +347,7 @@ impl PartStudioView {
         Some(std::sync::Arc::new(ManipGeometry {
             manip,
             arrow_hover: self.ui.manip_hover,
-            arrow_dragging: self.manip_drag.is_some(),
+            arrow_dragging: self.manip_drag.map(|d| d.which),
             triad_hover: self.ui.triad_drag.as_ref().map(|d| d.handle).or(self.ui.triad_hover),
             triad_dragging: self.ui.triad_drag.is_some(),
             section_hover: self.ui.section_hover,
@@ -333,9 +376,23 @@ impl PartStudioView {
 
     /// Handle tool events for a manipulator drag. Returns true if consumed.
     pub(super) fn manipulator_event(&mut self, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        // The handle grabbed (the nearer of two), kept for the drag.
+        let which = match ev {
+            ViewportEvent::ToolDown { position, .. } => self.viewport.read(cx).manipulator_index_at(*position).filter(|&i| i == 1).unwrap_or(0),
+            _ => self.manip_drag.map_or(0, |d| d.which),
+        };
         let a = match self.current_manip(cx) {
-            Some(Manip::Arrow(a)) => a,
-            Some(Manip::Arc(h)) => return self.arc_event(h, ev, window, cx),
+            Some(Manip::Arrow(a, b)) => match b {
+                Some(b) if which == 1 => b,
+                _ => a,
+            },
+            Some(Manip::Arc(h, g)) => {
+                let h = match g {
+                    Some(g) if which == 1 => g,
+                    _ => h,
+                };
+                return self.arc_event(h, which, ev, window, cx);
+            }
             Some(Manip::Triad(t)) => return self.triad_event(t, ev, window, cx),
             // Rings and the base circle first; the arrow as any other.
             Some(Manip::Section(s)) => match self.section_manip_event(&s, ev, window, cx) {
@@ -352,7 +409,7 @@ impl PartStudioView {
             ViewportEvent::ToolDown { position, .. } => {
                 let (o, d) = ray(self, *position, cx);
                 let t = Self::axis_param(&a, o, d).unwrap_or(a.length);
-                self.manip_drag = Some(ManipDrag { grab_offset: t - a.length });
+                self.manip_drag = Some(ManipDrag { grab_offset: t - a.length, which });
                 true
             }
             ViewportEvent::ToolDrag { position, .. } => {
@@ -394,7 +451,7 @@ impl PartStudioView {
                 }
                 if flip {
                     // Keep grabbing the same point after the flip.
-                    self.manip_drag = Some(ManipDrag { grab_offset: -m.grab_offset });
+                    self.manip_drag = Some(ManipDrag { grab_offset: -m.grab_offset, which: m.which });
                 }
                 true
             }
@@ -418,8 +475,15 @@ impl PartStudioView {
         dragged
     }
 
-    fn arc_event(&mut self, h: ArcHandle, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        // Angle of the cursor around the axis (ray ∩ plane through the arc).
+    /// An angle arc's drag (std angularManipulator, live psb 10-24 rev-*):
+    /// the angle follows the cursor around the axis, continuous and snapping
+    /// to a multiple of 5° within 2° of it (live's 45 → 47.5365 → 50 →
+    /// 52.2405 → 52.8758 → 55), up to a whole turn either way; dragged back
+    /// past zero the first arc flips the direction (std's change functions:
+    /// `oppositeDirection = angle < 0`, the angle its magnitude). The field
+    /// shows up to four decimals.
+    fn arc_event(&mut self, h: ArcHandle, which: usize, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        // Angle of the cursor around the axis (ray ∩ plane through the arc), in (−π, π].
         let angle_at = |this: &Self, p: DVec2, cx: &App| -> Option<f64> {
             let (o, d) = this.viewport.read(cx).ray(p);
             let denom = d.dot(h.axis);
@@ -429,37 +493,61 @@ impl PartStudioView {
             let hit = o + d * ((h.origin - o).dot(h.axis) / denom);
             let v = hit - h.origin;
             let (x, y) = (h.radial.normalize(), h.axis.cross(h.radial).normalize());
-            let a = v.dot(y).atan2(v.dot(x));
-            // Continue past 180° from the current angle (0..360 range).
-            Some(if a < 0.0 { a + std::f64::consts::TAU } else { a })
+            Some(v.dot(y).atan2(v.dot(x)))
         };
+        let symmetric = h.param == "angle" && self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.params.bool("symmetric"));
         match ev {
             ViewportEvent::ToolDown { .. } => {
-                self.manip_drag = Some(ManipDrag { grab_offset: 0.0 });
+                // The handle's own angle: the drag unwraps from it.
+                self.manip_drag = Some(ManipDrag { grab_offset: h.angle, which });
                 true
             }
             ViewportEvent::ToolDrag { position, .. } => {
-                if self.manip_drag.is_none() {
-                    return false;
-                }
-                let Some(mut a) = angle_at(self, *position, cx) else { return true };
-                let symmetric = self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.params.bool("symmetric"));
-                if symmetric {
-                    a = (a * 2.0).min(std::f64::consts::TAU);
-                }
-                // Whole degrees, never zero.
-                let deg = a.to_degrees().round().clamp(1.0, 360.0);
+                let Some(m) = self.manip_drag else { return false };
+                let Some(raw) = angle_at(self, *position, cx) else { return true };
+                // Unwrapped next to the last angle, within a whole turn.
+                let tau = std::f64::consts::TAU;
+                let a = (m.grab_offset + (raw - m.grab_offset + std::f64::consts::PI).rem_euclid(tau) - std::f64::consts::PI).clamp(-tau, tau);
+                self.manip_drag = Some(ManipDrag { grab_offset: a, which });
+                let mut value = if symmetric { (a * 2.0).clamp(-tau, tau) } else { a };
+                // Only the first arc flips; the second keeps its magnitude (std angleBack = abs).
+                let flip = value < 0.0 && h.flip.is_some();
+                let deg = snap_degrees(value.abs().to_degrees());
+                value = deg.to_radians();
                 let units = self.doc.read(cx).session.doc.settings.units;
-                let text = noshape_units::format_quantity(Quantity::new(deg.to_radians(), Dim::ANGLE), &units);
+                let text = if matches!(units.angle, noshape_units::AngleUnit::Degree) {
+                    format!("{} deg", format!("{deg:.4}").trim_end_matches('0').trim_end_matches('.'))
+                } else {
+                    noshape_units::format_quantity(Quantity::new(value, Dim::ANGLE), &units)
+                };
                 if let Some(e) = &self.edit {
-                    e.dialog.update(cx, |dlg, cx| dlg.set_expr_text("angle", &text, window, cx));
+                    e.dialog.update(cx, |dlg, cx| {
+                        if flip && let Some(f) = h.flip {
+                            let cur = dlg.feature.params.bool(f);
+                            dlg.feature.params.set(f, ParamValue::Bool(!cur));
+                        }
+                        dlg.set_expr_text(h.param, &text, window, cx);
+                        // Live: the field shows the value selected while dragging.
+                        dlg.focus_field_selected(h.param, window, cx);
+                    });
+                }
+                if flip {
+                    // The axis turned over: the same cursor angle is the negated one.
+                    self.manip_drag = Some(ManipDrag { grab_offset: -a, which });
                 }
                 true
             }
-            ViewportEvent::ToolUp { .. } => self.end_manip_drag("angle", window, cx),
+            ViewportEvent::ToolUp { .. } => self.end_manip_drag(h.param, window, cx),
             _ => false,
         }
     }
+}
+
+/// A dragged angle (degrees, ≥ 0) as live sets it: a multiple of 5° within
+/// 2° of one, else as dragged; at most a whole turn.
+pub(super) fn snap_degrees(deg: f64) -> f64 {
+    let near = (deg / 5.0).round() * 5.0;
+    (if (deg - near).abs() < 2.0 { near } else { deg }).min(360.0)
 }
 
 /// A point on a triangulated region near its area centroid (the centroid of
@@ -486,8 +574,10 @@ fn region_anchor(positions: &[[f32; 3]], indices: &[u32]) -> Option<DVec3> {
 /// A manipulator's glyph for the renderer (`noshape_render::camera_geometry`).
 pub(super) struct ManipGeometry {
     manip: Manip,
-    arrow_hover: bool,
-    arrow_dragging: bool,
+    /// The arrow / arc handle under the cursor and the one dragged (0 the
+    /// first, 1 the second end's).
+    arrow_hover: Option<usize>,
+    arrow_dragging: Option<usize>,
     triad_hover: Option<usize>,
     triad_dragging: bool,
     section_hover: Option<super::section_manip::SectionHandle>,
@@ -496,11 +586,22 @@ pub(super) struct ManipGeometry {
     section_face: Option<super::section_manip::FaceMarks>,
 }
 
+impl ManipGeometry {
+    /// A feature's handles' glyphs, the hovered or dragged one last (on top).
+    fn lit_last<T>(&self, handles: [Option<T>; 2], glyph: impl Fn(&T, bool, bool) -> Vec<Instance>) -> Vec<Instance> {
+        let lit = self.arrow_dragging.or(self.arrow_hover);
+        let mut order: Vec<usize> = (0..2).filter(|&i| Some(i) != lit).collect();
+        order.extend(lit.filter(|&i| i < 2));
+        order.into_iter().filter_map(|i| handles[i].as_ref().map(|h| glyph(h, self.arrow_hover == Some(i), self.arrow_dragging == Some(i)))).flatten().collect()
+    }
+}
+
 impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
     fn build(&self, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
         match self.manip {
-            Manip::Arrow(a) => arrow_glyph(&a, self.arrow_hover, self.arrow_dragging, view, up),
-            Manip::Arc(h) => arc_glyph(&h, up),
+            // The hovered or dragged handle drawn last: Revolve's start angle arc runs over the first's.
+            Manip::Arrow(a, b) => self.lit_last([Some(a), b], |a, hover, drag| arrow_glyph(a, hover, drag, view, up)),
+            Manip::Arc(h, g) => self.lit_last([Some(h), g], |h, hover, drag| arc_glyph(h, hover, drag, view, up)),
             Manip::Triad(t) => super::triad::triad_glyph(&t, self.triad_hover, self.triad_dragging, view, up),
             Manip::Section(s) => {
                 use super::section_manip::SectionHandle;
@@ -512,23 +613,70 @@ impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
     }
 }
 
-// Onshape manipulators: dark blue (`--os-color-charles-600`).
-const MANIP_COLOR: u32 = 0x134e96;
+/// A handle's stroke colours and widths (outline, core): idle a white core
+/// in a grey halo, hovered the halo blue, dragged one solid blue stroke
+/// (live psb 10-24: arrows and arcs alike).
+fn handle_style(hover: bool, dragging: bool) -> ([u8; 4], [u8; 4], f32, f32) {
+    // Idle: live "psui (2026-10-27, P2) interaction 6.2" measured the halo
+    // at #6A767D 0.75 (145–158 over white, darker than a face over one); hovered
+    // as icons2; while dragged, one solid blue stroke (≈ #2c61a3,
+    // dialogs/extrude-06).
+    if dragging {
+        (crate::theme::rgb8(0x2c61a3), crate::theme::rgb8(0x2c61a3), 2.0, 2.0)
+    } else {
+        (if hover { crate::theme::rgb8(0x3e6eb0) } else { [0x6a, 0x76, 0x7d, 191] }, crate::theme::rgb8(0xffffff), if hover { 4.0 } else { 3.0 }, 1.5)
+    }
+}
 
-fn arc_glyph(h: &ArcHandle, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
+/// An open triangular head (std SECONDARY: two stacked, half as long) with
+/// its base at `base`, pointing along `dir`, `side` across the view; the
+/// polylines in world space.
+fn head_polylines(base: DVec3, dir: DVec3, side: DVec3, len: f64, width: f64, secondary: bool) -> Vec<Vec<DVec3>> {
+    let tri = |b: DVec3, l: f64| vec![b + side * width * 0.5, b + dir * l, b - side * width * 0.5, b + side * width * 0.5];
+    if secondary {
+        // Live ex2 (3x): each chevron ~11 px long, the second right behind the first.
+        let l = len * 0.45;
+        vec![tri(base, l), tri(base + dir * (l * 1.1), l)]
+    } else {
+        vec![tri(base, len)]
+    }
+}
+
+/// Revolve / Move face's angle handle (live psb 10-24 rev-1, rev-10): thin
+/// radial lines from the axis to the profile and to the swept end, the arc
+/// between them, an open head at the end along the turn, in the arrows'
+/// white-in-grey style (blue when hovered); a second end's has a double
+/// chevron.
+fn arc_glyph(h: &ArcHandle, hover: bool, dragging: bool, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
     let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
-    let color = crate::theme::rgb8(MANIP_COLOR);
-    let mut lines = LineData::default();
+    let (outline, core, outline_px, core_px) = handle_style(hover, dragging);
+    let end = h.point(h.angle);
+    let Some(wpp) = view.world_per_px(end) else { return Vec::new() };
+    // The head along the turn at the end, its width across the view.
+    let tangent = (h.axis.cross(end - h.origin) * h.angle.signum()).try_normalize().unwrap_or(h.axis);
+    let side = tangent.cross(view.direction()).try_normalize().unwrap_or_else(|| tangent.any_orthonormal_vector());
+    let (len, width) = (16.0 * wpp, 14.0 * wpp);
+    // The arc stops where the head starts.
+    let back = if h.secondary { len * 0.45 * 2.1 } else { len };
+    let radius = h.radial.length().max(1e-12);
+    let cut = (back / radius).min(h.angle.abs() * 0.5) * h.angle.signum();
     let n = ((h.angle.abs().to_degrees() / 4.0).ceil() as usize).clamp(2, 90);
-    let pts: Vec<[f32; 3]> = (0..=n).map(|i| f(h.point(h.angle * i as f64 / n as f64))).collect();
-    lines.push_polyline(&pts, color, 0, 2.5, LineSegment::ON_TOP);
-    // Spokes from the axis to both ends.
-    lines.push_polyline(&[f(h.origin), f(h.point(0.0))], color, 0, 1.0, LineSegment::ON_TOP | LineSegment::DASHED);
-    lines.push_polyline(&[f(h.origin), f(h.point(h.angle))], color, 0, 1.0, LineSegment::ON_TOP | LineSegment::DASHED);
-    let pts = PointData { points: vec![PointSprite { position: f(h.point(h.angle)), color, pick_id: 0, size: 11.0, style: LineSegment::ON_TOP, _pad: 0 }] };
+    let arc: Vec<[f32; 3]> = (0..=n).map(|i| f(h.point((h.angle - cut) * i as f64 / n as f64))).collect();
+    let head_base = h.point(h.angle - cut);
+    let heads = head_polylines(head_base, tangent, side, len, width, h.secondary);
+    let mut back_lines = LineData::default();
+    let mut front = LineData::default();
+    for (data, color, w) in [(&mut back_lines, outline, outline_px), (&mut front, core, core_px)] {
+        data.push_polyline(&arc, color, 0, w, LineSegment::ON_TOP);
+        data.push_polyline(&[f(h.origin), f(h.point(0.0))], color, 0, w * 0.75, LineSegment::ON_TOP);
+        data.push_polyline(&[f(h.origin), f(end)], color, 0, w * 0.75, LineSegment::ON_TOP);
+        for p in &heads {
+            data.push_polyline(&p.iter().map(|v| f(*v)).collect::<Vec<_>>(), color, 0, w, LineSegment::ON_TOP);
+        }
+    }
     vec![
-        Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(40),
-        Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(41),
+        Instance::new(Drawable::Lines(up.upload_lines(&back_lines))).per_primitive_color().unpickable().ignore_clip().layer(40),
+        Instance::new(Drawable::Lines(up.upload_lines(&front))).per_primitive_color().unpickable().ignore_clip().layer(41),
     ]
 }
 
@@ -542,23 +690,17 @@ fn arrow_glyph(a: &Arrow, hover: bool, dragging: bool, view: &noshape_render::ca
     let Some(wpp) = view.world_per_px(tip) else { return Vec::new() };
     // The head's width runs across the view.
     let side = dir.cross(view.direction()).try_normalize().unwrap_or_else(|| dir.any_orthonormal_vector());
-    let base = tip + dir * ARROW_SHAFT_PX * wpp;
-    let apex = base + dir * ARROW_HEAD_PX * wpp;
-    let (l, r) = (base + side * ARROW_HEAD_W_PX * 0.5 * wpp, base - side * ARROW_HEAD_W_PX * 0.5 * wpp);
-    // Idle: live "psui (2026-10-27, P2) interaction 6.2" measured the halo
-    // at #6A767D 0.75 (145–158 over white, darker than a face over one); hovered
-    // as icons2; while dragged, one solid blue stroke (≈ #2c61a3,
-    // dialogs/extrude-06).
-    let (outline, core, outline_px, core_px) = if dragging {
-        (crate::theme::rgb8(0x2c61a3), crate::theme::rgb8(0x2c61a3), 2.0, 2.0)
-    } else {
-        (if hover { crate::theme::rgb8(0x3e6eb0) } else { [0x6a, 0x76, 0x7d, 191] }, crate::theme::rgb8(0xffffff), if hover { 4.0 } else { 3.0 }, 1.5)
-    };
+    // Live ex2 (3x): a second end's stem is half as long, then two chevrons.
+    let base = tip + dir * ARROW_SHAFT_PX * if a.secondary { 0.5 } else { 1.0 } * wpp;
+    let heads = head_polylines(base, dir, side, ARROW_HEAD_PX * wpp, ARROW_HEAD_W_PX * wpp, a.secondary);
+    let (outline, core, outline_px, core_px) = handle_style(hover, dragging);
     let mut back = LineData::default();
     let mut front = LineData::default();
     for (data, color, width) in [(&mut back, outline, outline_px), (&mut front, core, core_px)] {
         data.push_polyline(&[f(tip), f(base)], color, 0, width, LineSegment::ON_TOP);
-        data.push_polyline(&[f(l), f(apex), f(r), f(l)], color, 0, width, LineSegment::ON_TOP);
+        for p in &heads {
+            data.push_polyline(&p.iter().map(|v| f(*v)).collect::<Vec<_>>(), color, 0, width, LineSegment::ON_TOP);
+        }
     }
     vec![
         Instance::new(Drawable::Lines(up.upload_lines(&back))).per_primitive_color().unpickable().ignore_clip().layer(40),

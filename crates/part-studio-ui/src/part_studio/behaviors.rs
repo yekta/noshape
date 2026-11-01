@@ -463,7 +463,9 @@ pub struct UiState {
     /// Entity of the hovered dialog selection row.
     pub query_hover: Option<Reference>,
     /// The pointer is over the manipulator arrow (drawn outlined).
-    pub manip_hover: bool,
+    /// The manipulator handle under the cursor (`Viewport::manipulators`'
+    /// index: a feature's first / second handle, then datum boxes).
+    pub manip_hover: Option<usize>,
     /// The view's world length per pixel when the screen-sized geometry the
     /// Part Studio builds itself (hole callouts, triad hit areas, datum
     /// boxes) was last sized (perf: rebuilt on zoom, not on render).
@@ -691,7 +693,7 @@ impl UiState {
             planes_picked_in_graphics: Vec::new(),
             sketch_follows_camera: false,
             query_hover: None,
-            manip_hover: false,
+            manip_hover: None,
             sized_for_wpp: 0.0,
             dim_box_offset: Point::default(),
             dim_invalid: false,

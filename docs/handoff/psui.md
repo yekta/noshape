@@ -355,6 +355,15 @@ N12. (11-01) Part Studio audit (user 11-01): docs/parity/audit-part-studio.md. D
      "Routing curve (30 mm)" name, Point N rows, Single mode with the triad on the active point), configured columns
      in parameter order, out-of-range lengths / reals as live (A18). 64 of 75 dialogs equal std; editing logic 36 std /
      10 native / 1 open (Unfold: std's leaves the hold face empty on our part). Open: A10 (core), 5 reference pickers.
+     11-01 16:30 G31 (lead): Show calculation variance wired in the Part Studio and the assembly (A21), checked on :102
+     against live 1731 (block 48000 ± 1.328 mm³ vs live 1.321, centre ± 1.000e-3, one inertia bound, the Face tab's).
+     The commit sits on a LOCAL ONLY copy of core's G31 kernel commits (42f6da10 + 8f8cee6f, queued by core with
+     46b9bd43): land it once core's are on main (rebase drops the local copy; check `git log origin/main..HEAD`).
+     audit 11: manipulators (section "Manipulators", M1–M15: every std addManipulators against ours). Done: Shell /
+     Chamfer arrows removed (std and live have none), Extrude's second end double chevron, Revolve's arc as live
+     (white in a grey halo, open head, 5° snap within 2°, past 0 flips, the start angle's arc), Move face's rotate
+     flips. Next: M6 Plane angle, M7 Transform angle / distance, M8 Draft, M9 Helix, M10 distance arrows, M5 partial
+     fillet points, the non-Blind ends' flip arrows (M2 / M3); M15 by catching std's addManipulators in the host.
 
 N11. (11-01 04:54) Drawing sheets taken from dx (user 11-01): docs/parity/workflow-drawing.md and
      workflow-drawing-sheet-metal.md. dx keeps drawing.md and the import sheets; notes to dx in docs/handoff/dx.md
