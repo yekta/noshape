@@ -1200,6 +1200,18 @@ impl DrawingEditor {
     /// squares (#cc925c, #e6c9ae edge) at the text ends; free notes add a
     /// round grip at the bottom centre and the rotate grip (a circle with two
     /// arrowheads on a short stem) above the text.
+    /// A selected format line's grips at its ends and middle (live
+    /// behaviours "title block clicks" (2): "orange, with end/mid grips").
+    pub fn format_line_grip_overlay(&self, o: &mut crate::drawing_scene::Overlay) {
+        let [Sel::FormatLine(k)] = self.selection.as_slice() else { return };
+        let (a, b) = ([k[0] as f64 / 100.0, k[1] as f64 / 100.0], [k[2] as f64 / 100.0, k[3] as f64 / 100.0]);
+        let h = 4.0 / self.zoom.max(1e-6);
+        const TAN: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
+        for p in [a, b, [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0]] {
+            o.tinted.push((vec![[p[0] - h, p[1]], [p[0] + h, p[1]]], TAN, 8.0));
+        }
+    }
+
     pub fn note_grip_overlay(&self, o: &mut crate::drawing_scene::Overlay) {
         // Rotating: the note inside a dotted outline (live 235 / 236).
         if let Drag::NoteGrip { id, grip: 2, .. } = &self.drag

@@ -100,6 +100,9 @@ pub struct CreateDrawingDialog {
     source_filter: usize,
     /// Recently opened: indices into `rows`, most recent first.
     recent: Vec<usize>,
+    /// ☐ Show noshape drawing templates (live "Show Onshape drawing
+    /// templates": the recent list gains the built-in ones).
+    show_builtin: bool,
     /// Standard filter: "All", "ANSI", "ISO", "JIS".
     standard: &'static str,
     selected: usize,
@@ -158,6 +161,7 @@ impl CreateDrawingDialog {
             rows,
             source_filter,
             recent,
+            show_builtin: false,
             standard: "All",
             selected,
             custom: false,
@@ -202,6 +206,9 @@ impl CreateDrawingDialog {
     fn visible_rows(&self) -> Vec<usize> {
         let all: Vec<usize> = match self.source_filter {
             0 => (0..self.rows.len()).collect(),
+            // Live (behaviours "Create Drawing … templates"): only the
+            // recently used until "Show Onshape drawing templates".
+            RECENT if self.show_builtin => self.recent.iter().copied().chain((0..self.rows.len()).filter(|i| !self.recent.contains(i))).collect(),
             RECENT => self.recent.clone(),
             _ => Vec::new(),
         };
@@ -351,7 +358,13 @@ impl CreateDrawingDialog {
                     .min_h_0()
                     .pl_3()
                     .child(h_flex().h(px(42.)).flex_none().border_b_1().border_color(pal.border).child(std_tab("All", cur, cx)).child(std_tab("ANSI", cur, cx)).child(std_tab("ISO", cur, cx)).child(std_tab("JIS", cur, cx)))
-                    .child(list),
+                    .child(list)
+                    .when(self.source_filter == RECENT, |e| {
+                        e.child(div().flex_none().py(px(6.)).child(crate::drawing_chrome::DrCheckbox::new("cd-show-builtin").label("Show noshape drawing templates").checked(self.show_builtin).on_click(cx.listener(|this, v: &bool, _, cx| {
+                            this.show_builtin = *v;
+                            cx.notify();
+                        }))))
+                    }),
             )
             .into_any_element()
     }

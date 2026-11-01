@@ -1200,6 +1200,7 @@ impl DrawingEditor {
         let mut overlay = self.overlay.clone();
         overlay.points.extend(self.selection_handles());
         self.note_grip_overlay(&mut overlay);
+        self.format_line_grip_overlay(&mut overlay);
         self.leader_overlay(&mut overlay);
         self.detail_circle_overlay(&mut overlay);
         self.table_grip_overlay(&mut overlay);

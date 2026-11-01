@@ -6,6 +6,8 @@
 
 use crate::drawing_view::*;
 use crate::theme::p;
+use crate::os_ui::OsDropdownExt as _;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -182,7 +184,11 @@ impl DrawingEditor {
         if !on {
             d.depth = None;
         } else if d.depth.is_none() {
-            let text = if mm { "10 mm" } else { "0.5 in" };
+            // Live request 1737: Up to entity first; Blind's depth the
+            // document's default length (1 in; 25 mm assumed for mm).
+            d.up_to = true;
+            d.picking = if d.depth_ref.is_none() { 1 } else { 0 };
+            let text = if mm { "25 mm" } else { "1 in" };
             d.depth_value = parse_depth(text, mm);
             let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
             let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
@@ -200,15 +206,15 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    /// Up to entity › ☑ Offset: its field (0 in the drawing's unit, as live).
+    /// Up to entity › ☑ Offset: its field (live: the default length, 1 in).
     fn toggle_section_offset(&mut self, on: bool, window: &mut Window, cx: &mut Context<Self>) {
         let mm = self.drawing.units_mm;
         let Some(d) = &mut self.section_dlg else { return };
         if !on {
             d.offset = None;
         } else if d.offset.is_none() {
-            let text = if mm { "0 mm" } else { "0 in" };
-            d.offset_value = Some(0.0);
+            let text = if mm { "25 mm" } else { "1 in" };
+            d.offset_value = parse_depth(text, mm);
             let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
             let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
                 if matches!(ev, InputEvent::Change) {
@@ -248,6 +254,7 @@ impl DrawingEditor {
             _ => self.current_sheet().views.iter().any(|v| noshape_model::drawing::views::view_source(self.current_sheet(), v.id).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly)),
         };
         let line_done = matches!(self.tool, Tool::Section { line: Some(_), .. });
+        let jogged = matches!(&self.tool, Tool::Section { jogs, .. } if !jogs.is_empty());
         // "Cut from section": sectioning a section view (not a broken-out one).
         let of_section = match &self.tool {
             Tool::Section { parent: Some(p), .. } => self.current_sheet().view(*p).is_some_and(|v| matches!(v.kind, noshape_model::drawing::ViewKind::Section { .. }) && v.broken_out.is_empty()),
@@ -411,35 +418,48 @@ impl DrawingEditor {
                                 cx.notify();
                             }))))
                         })
-                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-depth").label("Section depth").checked(d.depth.is_some()).on_click(cx.listener(|this, v: &bool, w, cx| this.toggle_section_depth(*v, w, cx)))))
-                        .when(d.depth.is_some(), |e| {
-                            let tab = |id: &'static str, label: &'static str, on: bool, v: bool, cx: &mut Context<Self>| {
-                                div()
-                                    .id(id)
-                                    .h(px(24.))
-                                    .px(px(7.))
-                                    .flex()
-                                    .items_center()
-                                    .text_size(px(12.))
-                                    .cursor_pointer()
-                                    .border_b_1()
-                                    .when(on, |d| d.border_b_2().border_color(pal.accent).text_color(pal.emphasis))
-                                    .when(!on, |d| d.border_color(gpui_kit::rgb(0xdddddd)))
-                                    .child(label)
-                                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                        if let Some(d) = &mut this.section_dlg {
-                                            d.up_to = v;
-                                            d.picking = if v && d.depth_ref.is_none() { 1 } else { 0 };
-                                        }
-                                        this.update_preview(cx);
-                                        cx.notify();
-                                    }))
-                            };
-                            e.child(h_flex().px(px(4.)).child(tab("ds-blind", "Blind", !d.up_to, false, cx)).child(tab("ds-upto", "Up to entity", d.up_to, true, cx)))
+                        // Live (behaviours "Section view, Vertical"): Section depth
+                        // goes once the cut has a jog.
+                        .when(!jogged, |e| e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-depth").label("Section depth").checked(d.depth.is_some()).on_click(cx.listener(|this, v: &bool, w, cx| this.toggle_section_depth(*v, w, cx))))))
+                        .when(d.depth.is_some() && !jogged, |e| {
+                            let up_to = d.up_to;
+                            // Live request 1737: an End type select [Up to entity | Blind].
+                            let ed = cx.entity();
+                            e.child(
+                                div().px(px(6.)).py(px(2.)).child(
+                                    Button::new("ds-end-type")
+                                        .ghost()
+                                        .w_full()
+                                        .h(px(26.))
+                                        .border_1()
+                                        .border_color(gpui_kit::rgb(0xcccccc))
+                                        .rounded(px(4.))
+                                        .dropdown_caret(true)
+                                        .tooltip("End type")
+                                        .child(div().flex_1().text_size(px(12.)).child(if d.up_to { "Up to entity" } else { "Blind" }))
+                                        .os_dropdown_menu("ds-end-type-dd", true, move |mut m, _, _| {
+                                            for (label, v) in [("Up to entity", true), ("Blind", false)] {
+                                                let e = ed.clone();
+                                                m = m.item(crate::os_menu::OsMenuItem::new(label).checked(up_to == v).on_click(move |_, _, cx| {
+                                                    e.update(cx, |this, cx| {
+                                                        if let Some(d) = &mut this.section_dlg {
+                                                            d.up_to = v;
+                                                            d.picking = if v && d.depth_ref.is_none() { 1 } else { 0 };
+                                                        }
+                                                        this.update_preview(cx);
+                                                        cx.notify();
+                                                    })
+                                                }));
+                                            }
+                                            m
+                                        }),
+                                ),
+                            )
                         })
                         .when_some(d.depth.as_ref().map(|x| x.0.clone()).filter(|_| !d.up_to), |e, st| e.child(h_flex().h(px(30.)).px(px(6.)).gap(px(6.)).child(div().text_size(px(12.)).text_color(pal.text_muted).child("Depth")).child(div().flex_1().child(Input::new(&st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).small()))))
                         .when(d.depth.is_some() && d.up_to, |e| {
-                            let label = if d.depth_ref.is_some() { "1 entity" } else { "Select a vertex" };
+                            // Live: the field reads "Depth of section cut", a pick a "Point" chip.
+                            let label = if d.depth_ref.is_some() { "Point" } else { "Depth of section cut" };
                             let on = d.picking == 1;
                             e.child(
                                 div()
@@ -463,18 +483,17 @@ impl DrawingEditor {
                                         cx.notify();
                                     })),
                             )
-                            // Live request 1737: ☐ Offset → [0] and its Opposite
-                            // direction, only with Up to entity.
-                            .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-offset").label("Offset").checked(d.offset.is_some()).on_click(cx.listener(|this, v: &bool, w, cx| this.toggle_section_offset(*v, w, cx)))))
-                            .when_some(d.offset.as_ref().map(|x| x.0.clone()), |e, st| {
+                            // Live request 1737: ☐ Offset [1 in] and its Opposite
+                            // direction on one row, only with Up to entity.
+                            .child({
                                 let flip = d.offset_flip;
-                                e.child(
-                                    h_flex()
-                                        .h(px(30.))
-                                        .px(px(6.))
-                                        .gap(px(6.))
-                                        .child(div().flex_1().child(Input::new(&st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).small()))
-                                        .child(
+                                h_flex()
+                                    .h(px(30.))
+                                    .px(px(4.))
+                                    .gap(px(6.))
+                                    .child(crate::drawing_chrome::DrCheckbox::new("ds-offset").label("Offset").checked(d.offset.is_some()).on_click(cx.listener(|this, v: &bool, w, cx| this.toggle_section_offset(*v, w, cx))))
+                                    .when_some(d.offset.as_ref().map(|x| x.0.clone()), |e, st| {
+                                        e.child(div().flex_1().child(Input::new(&st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).small())).child(
                                             div()
                                                 .id("ds-offset-flip")
                                                 .size(px(24.))
@@ -494,8 +513,8 @@ impl DrawingEditor {
                                                     this.update_preview(cx);
                                                     cx.notify();
                                                 })),
-                                        ),
-                                )
+                                        )
+                                    })
                             })
                         })
                         .when(assembly, |e| {

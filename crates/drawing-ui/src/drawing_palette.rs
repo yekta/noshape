@@ -676,7 +676,9 @@ impl DrawingEditor {
             // D36 / A58): a toggle beside the stacking list shows or hides the
             // hole class (dimensions) or the shaft class (hole callouts).
             let (tip, shown, flip): (&'static str, bool, fn(&mut PaletteDlg)) = if hole {
-                ("Toggle shaft class visibility", !fo.hide_shaft, |d| d.cur.format.fit.hide_shaft = !d.cur.format.fit.hide_shaft)
+                // Live's hole callout panel (dom drawing-hole-callout-panel,
+                // btnShaftOption) names it "Toggle stacked visibility".
+                ("Toggle stacked visibility", !fo.hide_shaft, |d| d.cur.format.fit.hide_shaft = !d.cur.format.fit.hide_shaft)
             } else {
                 ("Toggle hole class visibility", !fo.hide_hole, |d| d.cur.format.fit.hide_hole = !d.cur.format.fit.hide_hole)
             };

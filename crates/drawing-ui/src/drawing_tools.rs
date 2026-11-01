@@ -388,7 +388,7 @@ impl DrawingEditor {
         ViewOptions {
             insert: InsertOpts { scale: i.scale, simplification: i.simplification, flat: i.flat, sketch_appearances: i.sketch_appearances, model_annotations: i.model_annotations, asm_position: i.asm_position, display_state: i.display_state.clone(), named: i.named.clone(), sketch: i.sketch, pinned: i.pinned.clone() },
             aux: self.aux_dlg.as_ref().map(|d| AuxOpts { reverse: d.reverse, show_ref: d.show_ref, anchor: d.anchor, letter: self.aux_letter.clone() }),
-            section: self.section_dlg.as_ref().map(|d| SectionOpts { cut_only: d.cut_only, flip: d.flip, depth_on: d.depth.is_some(), depth_value: d.depth_value, up_to: d.up_to, depth_ref: d.depth_ref.clone(), offset: d.offset.as_ref().and(d.offset_value), offset_flip: d.offset_flip, exclude: d.exclude.clone(), cut_from: d.cut_from, anchor: d.anchor.clone() }),
+            section: self.section_dlg.as_ref().map(|d| SectionOpts { cut_only: d.cut_only, flip: d.flip, depth_on: d.depth.is_some() && !matches!(&self.tool, Tool::Section { jogs, .. } if !jogs.is_empty()), depth_value: d.depth_value, up_to: d.up_to, depth_ref: d.depth_ref.clone(), offset: d.offset.as_ref().and(d.offset_value), offset_flip: d.offset_flip, exclude: d.exclude.clone(), cut_from: d.cut_from, anchor: d.anchor.clone() }),
             detail: self.detail_dlg.as_ref().map(|d| DetailOpts { scale: d.scale, profile: d.profile.clone(), style: d.style, show_profile: d.show_profile, clip_border: d.clip_border, label: self.detail_label.clone() }),
         }
     }

@@ -438,7 +438,20 @@ impl DrawingEditor {
         };
         let mut body = v_flex();
         if tab == 0 {
-            body = body.child(h_flex().h(px(30.)).px(px(8.)).gap(px(6.)).child(div().text_size(px(12.)).child("Label")).child(div().flex_1().border_b_1().border_color(blue).child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())));
+            // Live (dom drawing-datum*): an emptied label is an error, "This
+            // field cannot be empty".
+            let empty = d.label_text.is_empty();
+            body = body.child(
+                h_flex().h(px(30.)).px(px(8.)).gap(px(6.)).child(div().text_size(px(12.)).child("Label")).child(
+                    div()
+                        .id("dt-label")
+                        .flex_1()
+                        .border_b_1()
+                        .border_color(if empty { gpui_kit::rgb(0xd9534f) } else { blue })
+                        .when(empty, |e| e.tooltip(crate::ui::tooltip("This field cannot be empty")))
+                        .child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall()),
+                ),
+            );
         } else {
             let areas: Vec<(String, String, bool, Act)> = AREAS.iter().enumerate().map(|(i, (n, g))| (g.to_string(), n.to_string(), d.area == i, std::rc::Rc::new(move |d: &mut DatumDlg| d.area = i) as Act)).collect();
             let styles: Vec<(String, String, bool, Act)> = TargetStyle::ALL
@@ -451,7 +464,7 @@ impl DrawingEditor {
             let sized = matches!(d.area, 2 | 3);
             body = body
                 .child(row("Target area:", icon_menu("dt-area", AREAS[d.area].1.to_string(), areas)))
-                .child(row("Style:", icon_menu("dt-style", style_glyph(d.style).into(), styles)))
+                .child(row("Style:", div().id("dt-style-tip").tooltip(crate::ui::tooltip("Datum style")).child(icon_menu("dt-style", style_glyph(d.style).into(), styles)).into_any_element()))
                 .child(
                     h_flex()
                         .h(px(30.))
