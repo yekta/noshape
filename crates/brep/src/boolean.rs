@@ -3949,6 +3949,11 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 } else {
                     continue;
                 };
+                // (A free-form face: past its patch the point's parameters are clamped to its edge; off it there,
+                // not on that face (a knurl's grooves: their faces on one surface, each groove's its own part of it).)
+                if matches!(cx.faces[g].s, Surf::Nurbs { .. }) && free::surface_distance(&cx.faces[g], pieces[pi].inside) > tol {
+                    continue;
+                }
                 let q = cx.faces[g].to2(pieces[pi].inside);
                 let d = distance2(q, cx.bound(g)?);
                 if d <= GREY * tol {
