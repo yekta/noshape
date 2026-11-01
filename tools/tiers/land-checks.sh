@@ -15,6 +15,10 @@ phase() { [ -z "${LAND_TIMES:-}" ] || echo "$1 $(( $(date +%s) - $2 ))" >> "$LAN
 args=$(for p in $pkgs; do printf -- '-p %s ' "$p"; done)
 # Decide on cargo's exit code (with pipefail a grep can't decide it), then show the relevant lines.
 show() { echo "$1" | grep -vE '^warning: [a-z0-9_-]+@' | grep -E "$2" -A"$3" | head -60; }
+# All of a failure's error locations and failing test targets, in full: the land daemon blames the change at fault
+# from them (tools/tiers/land-daemon.sh).
+at() { echo "$1" | grep -vE '^warning: [a-z0-9_-]+@' | sed -n 's/^ *--> \([^ ]*\)$/== at \1/p' | sort -u | head -100; }
+targets() { echo "$1" | grep -oE 'rerun pass `-p [^`]*`' | sort -u | sed 's/^rerun pass /== failing /'; }
 # The crates the change edits ("all" when a manifest changed).
 edited=$(python3 - "$changed" <<'P'
 import json, subprocess, sys, os
@@ -30,21 +34,21 @@ P
 # type-checked (rustc's warnings still fail) and clippy lints the edited crates, their dependencies checked once.
 if [ "$edited" = all ]; then
   echo "== clippy (workspace: a manifest changed)"; s=$(date +%s); out=$(cargo clippy --workspace --all-targets -- -D warnings 2>&1); rc=$?; phase clippy "$s"
-  [ $rc -eq 0 ] || { show "$out" '^(error|warning)' 6; fail "clippy"; }
+  [ $rc -eq 0 ] || { show "$out" '^(error|warning)' 6; at "$out"; fail "clippy"; }
 else
   echo "== check (workspace)"; s=$(date +%s); out=$(cargo check --workspace --all-targets 2>&1); rc=$?; phase check "$s"
   warns=$(echo "$out" | grep -vE '^warning: [a-z0-9_-]+@' | grep -cE '^warning(\[|:)')
-  [ $rc -eq 0 ] && [ "$warns" = 0 ] || { show "$out" '^(error|warning)' 6; fail "cargo check (errors or warnings)"; }
+  [ $rc -eq 0 ] && [ "$warns" = 0 ] || { show "$out" '^(error|warning)' 6; at "$out"; fail "cargo check (errors or warnings)"; }
   if [ -n "$edited" ]; then
     echo "== clippy ($edited)"; s=$(date +%s)
     out=$(cargo clippy --no-deps $(for p in $edited; do printf -- '-p %s ' "$p"; done) --all-targets -- -D warnings 2>&1); rc=$?; phase clippy "$s"
-    [ $rc -eq 0 ] || { show "$out" '^(error|warning)' 6; fail "clippy"; }
+    [ $rc -eq 0 ] || { show "$out" '^(error|warning)' 6; at "$out"; fail "clippy"; }
   fi
 fi
 echo "== tests (build)"; s=$(date +%s); out=$(cargo test $args --no-run 2>&1); rc=$?; phase tests_build "$s"
-[ $rc -eq 0 ] || { show "$out" '^error|Caused by' 6; fail "tests (build)"; }
+[ $rc -eq 0 ] || { show "$out" '^error|Caused by' 6; at "$out"; fail "tests (build)"; }
 echo "== tests"; s=$(date +%s); out=$(cargo test $args --no-fail-fast 2>&1); rc=$?; phase tests_run "$s"
-[ $rc -eq 0 ] || { show "$out" 'FAILED|panicked|^error|SIGSEGV|signal:|Caused by' 2; fail "tests"; }
+[ $rc -eq 0 ] || { show "$out" 'FAILED|panicked|^error|SIGSEGV|signal:|Caused by' 2; targets "$out"; fail "tests"; }
 # (Whole names: grep -w took noshape-brep for noshape, and every land ran T0 (11-01).)
 if echo " $pkgs " | grep -qE ' (noshape|noshape-ops|noshape-cli) '; then
   echo "== T0"; s=$(date +%s); tools/tiers/t0.sh > /tmp/land-t0-$$.log 2>&1; rc=$?; phase t0 "$s"

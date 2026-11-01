@@ -77,6 +77,68 @@ print(' '.join(sorted({crate(c) for c in moved if crate(c) in ours})))
 P
 }
 
+# The change at fault in a red batch, from the error (11-01, the user): compile, clippy and warning locations name
+# files: a file only one change edited is that change's; a file none edited, the change(s) that edited its crate or a
+# crate it uses. Failing tests name their crate: the change(s) that edited it or a crate it uses. Certain only when it
+# comes to exactly one change (or changes of one worktree), the batch under it (landed, but its changes are in this tree) not among them; else
+# (two candidates, T0, menu coverage, a timeout, a failure without a location) nothing, and the batch is split.
+# Edits outside crates count as touching every crate, but docs (docs/AGENT_API.md: ops' coverage test).
+# Prints "<key>…<TAB><why>".
+blame() {   # blame <reason> <check log> <files the batches under it changed> <keys…>
+  python3 - "$LD" "$@" <<'P'
+import json, subprocess, sys, os, re
+LD, reason, logf, depf, keys = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5:]
+log = open(logf, errors='replace').read()
+meta = json.loads(subprocess.run(['cargo', 'metadata', '--format-version', '1', '--no-deps'], capture_output=True, text=True).stdout)
+root = meta['workspace_root']
+pk = {p['name']: os.path.dirname(os.path.relpath(p['manifest_path'], root)) for p in meta['packages']}
+deps = {p['name']: {d['name'] for d in p['dependencies'] if d['name'] in pk} for p in meta['packages']}
+def closure(c):
+    seen, todo = set(), [c]
+    while todo:
+        x = todo.pop()
+        if x not in seen: seen.add(x); todo += deps.get(x, ())
+    return seen
+def crate_of(f): return next((n for n, d in sorted(pk.items(), key=lambda kv: -len(kv[1])) if f.startswith(d + '/')), None)
+def files(path):
+    try: ls = open(path).read().split('\n')
+    except OSError: return []
+    return [l for l in (ls[ls.index('--') + 1:] if '--' in ls else ls) if l]
+def touches(fs, crates):
+    for f in fs:
+        c = crate_of(f)
+        if c in crates or (f == 'docs/AGENT_API.md' and 'noshape-ops' in crates): return True
+        if c is None and not f.startswith('docs/') and not f.endswith('.md'): return True
+    return False
+UNDER = '(under)'
+jobs = {k: files(os.path.join(LD, 'jobs', k + '.job')) for k in keys}
+jobs[UNDER] = files(depf)
+cands, why = set(), ''
+if reason.startswith(('cargo check', 'clippy', 'tests (build)')):
+    locs = sorted(set(re.findall(r'^== at (\S+?):\d+:\d+$', log, re.M)))
+    if not locs: sys.exit()
+    for f in locs:
+        t = {k for k, fs in jobs.items() if f in fs}
+        if not t:
+            c = crate_of(f)
+            if c is None: sys.exit()
+            t = {k for k, fs in jobs.items() if touches(fs, closure(c))}
+        cands |= t
+    why = f'the error{"s are" if len(locs) > 1 else " is"} in {", ".join(locs[:3])}{" …" if len(locs) > 3 else ""}'
+elif reason == 'tests':
+    failing = sorted(set(re.findall(r'^== failing `-p ([\w-]+)', log, re.M)))
+    if not failing or any(p not in pk for p in failing): sys.exit()
+    for p in failing: cands |= {k for k, fs in jobs.items() if touches(fs, closure(p))}
+    why = f'{", ".join(failing)} failed: no other change in the batch edited {"them" if len(failing) > 1 else "it"} or a crate {"they use" if len(failing) > 1 else "it uses"}'
+# (One worktree's queued changes include its earlier ones: candidates all from one worktree are that agent's chain.)
+def name(k):
+    try: return next((l[5:] for l in open(os.path.join(LD, 'jobs', k + '.job')) if l.startswith('name=')), k)
+    except OSError: return k
+if cands and UNDER not in cands and len({name(k) for k in cands}) == 1:
+    print(f'{" ".join(sorted(cands))}\t{why}')
+P
+}
+
 # Whether a batch can be stacked on (by its run dir name): it and every batch under it are checking or green, or
 # landed. Not a half of a red batch: one of two halves is likely red, and halves are checked side by side.
 can_land() {
@@ -121,6 +183,7 @@ run_batch() {
   done
   # (On main: as it is now, not as fetched before the lock; a batch may have just landed.)
   [ -n "$dep" ] || git -C "$repo" fetch -q origin "+refs/heads/$TARGET:refs/landq/$inst/target"
+  if [ -n "$dep" ]; then cat "$LD/run/$dep/changed" "$LD/run/$dep/dep.changed" > "$d/dep.changed" 2>/dev/null; else : > "$d/dep.changed"; fi
   git checkout -q -f --detach "$start" && git clean -fdq || { exec 6>&-; log "$bid: checkout failed"; sleep 30; front resume "${keys[@]}"; return; }
   base=$(git rev-parse HEAD); : > "$d/changed"; : > "$d/counts"; local pkgs=""
   for key in "${keys[@]}"; do
@@ -213,14 +276,25 @@ run_batch() {
   else
     reason=$(sed -n 's/^LAND FAILED: //p' "$d/check.log" | tail -1); [ $rc -eq 124 ] && reason="timeout (checks over 90 min)"
     reason=${reason:-"checks exited $rc"}
+    local bl=""; [ $n -gt 1 ] && bl=$(blame "$reason" "$d/check.log" "$d/dep.changed" "${applied[@]}" 2>>"$LD/daemon.log")
     if [ $n -eq 1 ]; then
       res_word=failed
       grep -vE '^(== |CHECKS PASSED)' "$d/check.log" | grep -v '^LAND FAILED' | tail -60 > "$d/detail"
       result "${applied[0]}" FAILED "$reason"
+    elif [ -n "$bl" ]; then
+      # Blamed from the error: failed at once; the others are checked again without it (a second failure may hide
+      # behind the first; nothing unchecked goes to main).
+      local culprits=" ${bl%%$'\t'*} " why=${bl#*$'\t'} rest=() who
+      for k in "${applied[@]}"; do [[ "$culprits" == *" $k "* ]] || rest+=("$k"); done
+      res_word=blamed; who=$(for k in $culprits; do printf '%s ' "$(field name "$k") ${k##*-}"; done)
+      { echo "(found in a batch of $n from the error: $why)"; grep -vE '^(== |CHECKS PASSED)' "$d/check.log" | grep -v '^LAND FAILED' | tail -60; } > "$d/detail"
+      for k in $culprits; do result "$k" FAILED "$reason"; done
+      log "$bid: red ($reason): blamed ${who% } ($why); the other ${#rest[@]} again without it"
+      [ ${#rest[@]} -eq 0 ] || front rest "${rest[@]}"; reason="$reason; blamed ${who% }: $why"
     else
       # Red: halves go first (stacked like any batch); the one at fault is the half that stays red, down to one.
       res_word=split; local h=$(( (n + 1) / 2 ))
-      log "$bid: red ($reason): splitting $n into $h + $(( n - h ))"
+      log "$bid: red ($reason): no single change from the error: splitting $n into $h + $(( n - h ))"
       front split "${applied[@]:0:$h}"; front split "${applied[@]:$h}"
     fi
   fi

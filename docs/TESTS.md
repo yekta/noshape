@@ -19,8 +19,11 @@ fill), stacks them on main, or on the batch being checked before it (it lands ri
 if that one doesn't land, it goes back to be checked again), and checks the stack once: `cargo check` over the workspace (type errors and warnings
 anywhere fail), clippy on the crates the changes edit, the full tests of those crates and of the crates that use them
 directly, T0 when the app, ops or cli is affected, ops' menu coverage when a UI crate changed. Green: the stack goes to
-main. Red: the batch is split in halves that are checked next (in parallel slots), down to the change at fault, which
-is reported; the others land. A change that doesn't apply on main or on the changes queued before it is reported as a
+main. Red: when the error names the change at fault for certain (a compile, clippy or warning location in a file
+only one change edited, or in a crate only one change edited or uses; a failing test's crate, the same way), that
+change is reported at once and the others are checked again without it; otherwise (two candidates, T0, menu coverage,
+a panic without a crate) the batch is split in halves that are checked next (in parallel slots), down to the change
+at fault, which is reported; the others land. A change that doesn't apply on main or on the changes queued before it is reported as a
 rebase conflict. Deeper dependents' tests run in the watcher after the push. Docs-only changes push at once, no build.
 - `tools/tiers/land.sh --status`: your queued, checking, landed and failed changes, with the failing output. The lead
   also tells you when one fails (`LAND FAILED <worktree> <sha> <reason>`). Each land.sh run also prints the results
