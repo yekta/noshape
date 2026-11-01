@@ -47,7 +47,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 
 ## Editing logic (std's dialog reactions)
 
-std's 48 "Editing Logic Function"s (29 run std's, 10 native, 1 no-op, 8 open) change a dialog's fields as the user edits (Add into the touched part, the flip, a type
+std's 48 "Editing Logic Function"s (31 run std's, 10 native, 1 no-op, 6 open) change a dialog's fields as the user edits (Add into the touched part, the flip, a type
 from the picks). The dialog runs std's own function where `std_feature::has_editing_logic` says so (std runs the feature, or it is in
 `STD_EDITING_LOGIC`; T2 tests in std_oracle), or ours does the same natively (`behaviors::direct_edit_logic`, `boolean_edit_logic`).
 
@@ -86,7 +86,7 @@ from the picks). The dialog runs std's own function where `std_feature::has_edit
 | E31 | onDecalFeatureChange | Decal | ✅ native: width / height from the image |
 | E32 | bodyDraftEditLogic | Body draft | ✗ (parting object / pull direction / faces from the selection) |
 | E33 | bridgingCurveEditingLogic | Bridging curve | ✗ (side face / vertex flags from the picks) |
-| E34 | bsurfEditLogic | Boundary surface | ✗ (surface operation (Add next to a surface)) |
+| E34 | bsurfEditLogic | Boundary surface | ✅ std's runs (audit 8): Add when a profile is a surface's open edge (T2 surface_operation_editing_logic_runs_std) |
 | E35 | cutlistEditLogic | Cut list | ✅ std's runs (audit 8): only the first override hides "Same frames as previous" (T2 cutlist_and_delete_part_editing_logic_runs_std) |
 | E36 | deletePartEditLogic | Delete part | ✅ std's runs (audit 8): Entities and the composite-free list in step (same T2) |
 | E37 | editCurveEditLogic | Edit curve | ✗ (control point edits kept in step) |
@@ -97,10 +97,10 @@ from the picks). The dialog runs std's own function where `std_feature::has_edit
 | E42 | helixEditingLogic | Helix | ✅ native: the tab follows the preselection (live L34, checked 11-01) |
 | E43 | projectCurvesEditLogic | Projected curve | ✗ (sketch / direction from the picks) |
 | E44 | routingCurveEditLogic | Routing curve | ✗ (manipulator state, target length) |
-| E45 | ruledSurfaceEditingLogic | Ruled surface | ✗ (surface operation, vertex overrides cleaned) |
+| E45 | ruledSurfaceEditingLogic | Ruled surface | ✅ std's runs (audit 8): Add on a surface's open edge, reference faces, vertex overrides cleaned (same T2) |
 | E46 | unfoldEditLogic | Unfold | ✗ (hold entity) |
 | E47 | variableEditLogic | Variable | ✅ native: a preselection in Measured mode fills the visible field std's would (Entities to measure between / Entities / Entity); Assigned ignores it as std |
-| E48 | wrapEditLogic | Wrap | ✗ (operation / merge scope / flip, like Thicken) |
+| E48 | wrapEditLogic | Wrap | ✅ std's runs (audit 8): Merge scope = the target's part, Add / Remove from the thickness direction, the flip; default anchors found (T2 wrap_editing_logic_runs_std) |
 
 ## Feature dialogs against std
 

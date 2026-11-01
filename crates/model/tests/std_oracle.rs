@@ -1759,6 +1759,75 @@ fn cutlist_and_delete_part_editing_logic_runs_std() {
     assert!(got.contains(&format!("nonCompositeEntities={cube:?}")), "{got:?}");
 }
 
+/// std's wrapEditLogic: a sketch region wrapped onto a cylinder adds to it
+/// (Merge scope = the cylinder), and std finds the default anchors (no
+/// "Specify anchor points").
+#[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
+fn wrap_editing_logic_runs_std() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, 0.01);
+    let circle = s.add("sketch", |pv| {
+        pv.set("sketchPlane", q(Reference::Plane(DatumPlane::Top)));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.regen();
+    let key = r.display.sketches.iter().find(|x| x.feature == circle).expect("sketch").regions[0].key.clone();
+    s.add("extrude", |p| {
+        p.set("entities", q(Reference::SketchRegion { sketch: circle, key }));
+        p.set("depth", expr("40 mm"));
+    });
+    let (_, regions) = s.sketch(Reference::Plane(DatumPlane::Front), &[&[(-3.0, 15.0), (3.0, 15.0), (3.0, 25.0), (-3.0, 25.0)]]);
+    let r = s.regen();
+    let side = face_at(&r, DVec3::new(10.0, 0.0, 20.0));
+    let cylinder = q(body_ref(&r, 0));
+    s.add("wrap", |p| {
+        p.set("source", q(regions[0].clone()));
+        p.set("destination", q(side));
+    });
+    let got = edit_logic(&s, &ParamValues::default(), &["source", "destination"]);
+    assert!(got.contains(&format!("booleanScope={cylinder:?}")), "{got:?}");
+    assert!(got.contains(&"operationType=Enum(\"ADD\")".to_string()), "{got:?}");
+    assert!(!got.iter().any(|x| x.starts_with("customAnchors=")), "{got:?}");
+}
+
+/// std's surfaceOperationTypeEditLogic in Boundary surface and Ruled
+/// surface: a profile / path on an open edge of a surface adds to it.
+#[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
+fn surface_operation_editing_logic_runs_std() {
+    let tube = || {
+        let mut s = Studio::new();
+        let (sk, _) = s.sketch(Reference::Plane(DatumPlane::Top), &[SQUARE]);
+        let edges = s.sketch_edges(sk);
+        s.add("extrude", |p| {
+            p.set("bodyType", en("SURFACE"));
+            p.set("surfaceEntities", ParamValue::Query(edges));
+            p.set("depth", expr("20 mm"));
+        });
+        let r = s.regen();
+        let top = r.context.bodies[0].shape.edges().iter().enumerate().find_map(|(i, e)| {
+            let b = e.bounding_box(false).ok()?;
+            (b.min.z > 0.0199 && b.max.z < 0.0201).then(|| Reference::Edge((*r.context.bodies[0].edges[i]).clone()))
+        });
+        (s, top.expect("a top edge"))
+    };
+    let (mut s, edge) = tube();
+    s.add("boundarySurface", |p| {
+        let mut item = ParamValues::default();
+        item.set("uProfileEntities", q(edge.clone()));
+        p.set("uProfilesArray", ParamValue::Array(vec![item]));
+    });
+    let got = edit_logic(&s, &ParamValues::default(), &["uProfilesArray"]);
+    assert!(got.contains(&"surfaceOperationType=Enum(\"ADD\")".to_string()), "{got:?}");
+
+    let (mut s, edge) = tube();
+    s.add("ruledSurface", |p| p.set("edges", q(edge)));
+    let got = edit_logic(&s, &ParamValues::default(), &["edges"]);
+    assert!(got.contains(&"surfaceOperationType=Enum(\"ADD\")".to_string()), "{got:?}");
+}
+
 /// std's holeEditLogic through the host natives: a new hole's Merge scope is
 /// the part it reaches, and one sketched below the part flips into it
 /// (holeScopeFlipHeuristics: an opHole probe and evCollision containment,
