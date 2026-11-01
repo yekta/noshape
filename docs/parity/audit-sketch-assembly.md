@@ -11,8 +11,8 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 
 | | |
 |---|---|
-| Surfaces audited | 25 |
-| Gaps found | 30 |
+| Surfaces audited | 26 |
+| Gaps found | 31 |
 | Gaps fixed | 30 |
 
 ## Surfaces
@@ -44,6 +44,7 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 | S23 | Assembly toolbar (no curve pattern in live), Create Part Studio in context, Display states | toolbar-assembly.txt, dialog-create-part-studio-in-context.txt, behaviours "Display states tool" | G30 |
 | S24 | Every mate type's dialog field by field: type select, Mate connectors (Tangent: Face, edge or vertex + Tangent propagation; Width: its two connector lists), Offset / Limits / Simulation connection per type, the Solve button (skasm-scratch/audit/labelseq2.py against offset_axes / limit_keys / has_simulation_connection) | dialog-mate-*-filled.txt, -limits, -offset | 0 |
 | S25 | Sketch Text dialog's font list (32, in order) and the Interference detection dialog's fields in order | sk-tool-text.txt, dialog-interference-assembly-*.txt | 0 |
+| S26 | Assembly Mass and section properties panel: Part / Face tabs, queries, rows, overrides, blank values without material, red entries (live 1730) | dom/skasm-asm-mass-*.txt | G31 |
 
 Live requests answered: 1715 (tool options), 1716 (Flow), 1720 (exploded views / named positions menus, subassembly fix icons).
 
@@ -81,3 +82,4 @@ Live requests answered: 1715 (tool options), 1716 (Flow), 1720 (exploded views /
 | G28 | P3 | Two mates selected | Reset | Show · Show all mates · Isolate… · Make transparent… · Edit named position driver mate… · Suppress · Dynamic suppression ▸ | Clear selection | Add selection to folder… · Expand ▸ · Collapse ▸ | Delete | the clicked mate's menu | fixed (11-01): Ctrl / Cmd+click adds mates to the selection (highlighted), their menu as live\'s, Delete removes them in one step (UI test two_selected_mates_have_lives_menu); no Dynamic suppression or driver item for several yet |
 | G29 | P3 | Preferences › Customize keyboard shortcuts and Shortcut toolbars (Sketch) | Flow listed (unassigned; after Curvature, unticked; live 1724) | missing | fixed (11-01) |
 | G30 | P3 | Display states dialog | input "New display state name" + [+]; a select "Select a display state" with ⟳ (update), ✎ (rename), ⊗ (delete, no confirmation) | a list of the states with an "Update" text button | fixed (11-01, live 1729): 265 px panel, name box + [+] (enabled when empty), "No display states created" or a select (placeholder "Select a display state", states sorted, picking applies) with ⟳ (greyed while the visibility matches the state; Assembly::matches_display_state), ✎ (in place, Enter / Esc), ⊗ (at once); a taken name keeps the box and shows "There is already a display state with this name."; reopened, the select is on its placeholder; no toasts |
+| G31 | P3 | Mass and section properties | ☑ Show calculation variance appends "± <variance>" to every value (live 1730: Mass "0.395 lb ± 1.774e-9 lb", Volume "± 2.100e+0 mm³") | the box does nothing | open: our kernel gives no integration error estimate to show (OCCT GProp's error would need exposing in the kernel, core's area) |
