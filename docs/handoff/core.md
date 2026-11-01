@@ -43,6 +43,19 @@ deadlock in malloc).
 - Round 4: op_boolean hands a cancelled build's OCCT builder (the pave filler) to a detached thread to free. vibe2 at
   load 11-17, cancel at 0.7-50 s: 15-336 ms, one 1.86 s at 24 s that didn't repeat (613 / 149 ms on reruns).
 
+## THIN-LOFT-TRIM-ENDS (P2), parked 11-01 02:40 (branch wip/core-thinloft2, local only)
+- Live (a) (Trim ends, outward 1 mm, square 20 → Ø16): the loft sheet offset along its normals, the offset faces
+  meeting (mitre) along their intersections, cut by the profile planes: 1370.1047 mm³, 10 faces. Ours (in-plane
+  offsets lofted, skasm): 1372.21. Kernel op `op_thicken_loft_out` (shell.cpp, on the branch): the slab between the
+  profile planes, common with a prism from each face's extended offset surface towards the profiles' axis, less the
+  loft solid; works at the working scale only (metres: OCCT's commons fail): 1370.1069 mm³, 10 faces. Two blockers:
+  6.3 s (OCCT's Booleans on Geom_OffsetSurface of B-splines; try approximating them as B-splines first, or a direct
+  build: the faces are ruled), and GeomLib::ExtendSurfByLength changes the surface (the volume moves with the
+  extension: 1370.107 / 1370.052 / 1370.000 at 0.3 / 0.15 / 0.1 of the size): extend exactly (ruled between the
+  extended section curves) instead. Inward (Flip wall) needs the cut of outward-side prisms, which fails on the
+  square→circle loft (a straight prism crosses back over a strongly curved extended face). Probes:
+  /root/core-scratch/tl (hs.cpp in mm; examples-thinloft).
+
 ## 10-31 evening (core, moved account from 18:45)
 - 76cd8d31 BLEND-RUST: corners between drafted walls (details under "noshape's own blends"); the corpus's remaining
   declines are all non-elementary corner patches or face-consuming blends: returns flatten there.
