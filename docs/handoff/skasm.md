@@ -454,7 +454,9 @@ Done and queued: G26 per-occurrence state (Assembly::occurrences; isolate / tran
 scene, picking and ops; nested row menu; agent API paths "Sub <1>/Part 1 <1>"), G29 Flow in the Preferences lists,
 G13 Insert image Libraries (our generated environment maps), SM-MAKE-JOINT-ONE-EDGE (root cause: two models' parts
 named their fresh faces alike; a part whose names are taken now gets its own). Audit: 25 surfaces, 30 gaps, 29 fixed.
-G30 Display states fixed (25f9e103 queued). Audit 25 surfaces, 30 gaps, 30 fixed. Waiting: live request 13:45
+G30 Display states fixed (25f9e103 queued). Audit 26 surfaces, 31 gaps, 30 fixed (G31 variance: request to the
+lead). a409fa87 failed land (registry_matches_onshape_lists counted 54 sketch shortcuts; fixed in 1b7767e2, which
+re-queues everything after it). Waiting: live request 13:45
 (assembly Mass and section properties panel whole dump). Not done in G26: Move to new subassembly from a nested row.
 
 ## Next, in order
@@ -620,6 +622,9 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   together (or tell core it should stay as it is).
 
 ## Requests to the lead
+- (11-01) Audit G31: the assembly (and Part Studio) Mass and section properties "Show calculation variance" needs an
+  integration error estimate per value (live shows "± 1.774e-9 lb", "± 2.100e+0 mm³"). The kernel's mass properties
+  don't return one (OCCT BRepGProp gives an error with Eps): core's area; once exposed the panel can show it.
 - perf.sh (10-30 ~21:00–22:10): two runs of `regen_profile::sheet_metal_profile` failed to *build* on vibe3 in
   noshape-drawing (first `BrokenOut` missing `offset`, then `TableKind::Bom` has no `default_template`) at commits
   that compiled in their lands (8fd55b58 landed just before). The shared ~/perf/wt looks like it builds stale or mixed
