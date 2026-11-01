@@ -3957,7 +3957,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 r.inside = deeper(&lsegs, &r);
                 dist = distance2(r.inside, cx.bound(f)?);
             }
-            if dist <= GREY * tol {
+            if dist <= if std::env::var_os("NOSHAPE_X_NOBAND").is_some() { tol } else { GREY * tol } {
                 return Err(Decline("a piece's point near its face's boundary"));
             }
             if !inside2(r.inside, cx.bound(f)?) {
