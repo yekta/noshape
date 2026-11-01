@@ -364,6 +364,15 @@ N12. (11-01) Part Studio audit (user 11-01): docs/parity/audit-part-studio.md. D
      a click flips a flip arrow (live 11-01), non-Blind ends' flip arrows. Next: M7 Transform angle / distance, M6 Plane
      angle, M5 partial fillet points, M11 flips (Split, Projected curve, …), Helix flip, Move curve boundary; M15 by
      catching std's addManipulators in the host for the features std runs (sheet metal).
+     17:30: landed M6 / M7 (Plane Line angle, Transform rotate / distance), M11 Split's flip; queued 55802817: M15
+     (FeatureState::manipulators from the host's addManipulators, drawn as arrows / arcs, a drag or click runs the
+     feature's Manipulator Change Function via std_feature::manipulator_change_in; checked on :102 with Sheet metal
+     model's flip) and RUST-EXTRUDE-SCOPE-SLOW's psui part (dialog FS functions under the kernel cancel flag after
+     15 s: repro 418 s -> 33 s). Note: a CLI binary older than scope rule 5 makes legacy (native) sheet metal studios;
+     rebuild the CLI (`rb.sh --get noshape-cli cargo build -p noshape-cli`) before making test docs.
+     Open in this line: custom (Feature Studio) features' editing logic is parsed (CustomFeatureDef::editing_logic) but
+     never run in dialogs, nor their manipulator change functions (P2); M5 partial fillet points; Helix flip; points
+     manipulators.
 
 N11. (11-01 04:54) Drawing sheets taken from dx (user 11-01): docs/parity/workflow-drawing.md and
      workflow-drawing-sheet-metal.md. dx keeps drawing.md and the import sheets; notes to dx in docs/handoff/dx.md
