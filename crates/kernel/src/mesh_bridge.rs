@@ -5,7 +5,7 @@
 use crate::ffi::ffi::MeshOut;
 use glam::DVec3;
 use std::mem::MaybeUninit;
-use noshape_brep::mesh::{mesh_body, Deflection, MeshEdge, MeshFace, MeshSurface};
+use noshape_brep::mesh::{mesh_body_with, Deflection, MeshEdge, MeshFace, MeshNurbs, MeshSurface};
 use noshape_brep::{Curve, Use};
 
 fn v3(s: &[f64], i: usize) -> DVec3 {
@@ -50,11 +50,11 @@ struct MeshIn<'a> {
 
 /// Meshes the faces noshape's mesher takes into `out`; false when the input is malformed.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], linear: f64, angular: f64, out: &mut MeshOut) -> bool {
+pub(crate) fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], nurbs: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], linear: f64, angular: f64, out: &mut MeshOut) -> bool {
     // A panic here would abort the process (it can't cross the bridge): declined instead, BRepMesh meshes every face
     // (MESH-EMPTY-LOOP-PANIC hung the app on open).
     let mut made = MeshOut::default();
-    let ok = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| mesh_into(vertices, edges, curves, surfaces, face_loops, loop_uses, uses, linear, angular, &mut made))).unwrap_or_else(|_| {
+    let ok = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| mesh_into(vertices, edges, curves, surfaces, nurbs, face_loops, loop_uses, uses, linear, angular, &mut made))).unwrap_or_else(|_| {
         log::error!("noshape's mesher panicked: the body goes to BRepMesh");
         false
     });
@@ -65,7 +65,7 @@ pub(crate) fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surface
 }
 
 #[allow(clippy::too_many_arguments)]
-fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], linear: f64, angular: f64, out: &mut MeshOut) -> bool {
+fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], nurbs: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], linear: f64, angular: f64, out: &mut MeshOut) -> bool {
     let t = std::time::Instant::now();
     let input = &MeshIn { vertices, edges, curves, surfaces, face_loops, loop_uses, uses, linear, angular };
     let vertices: Vec<DVec3> = input.vertices.as_chunks::<3>().0.iter().map(|c| DVec3::new(c[0], c[1], c[2])).collect();
@@ -74,6 +74,25 @@ fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], 
     if input.curves.len() != 13 * ne || input.surfaces.len() != 13 * nf || input.edges.iter().any(|&v| v as usize >= vertices.len()) {
         return false;
     }
+    // B-spline curves and surfaces (kind 5, at c[1] in `nurbs`), each parsed once.
+    let (mut nurbs_curves, mut nurbs_surfaces) = (Vec::new(), Vec::new());
+    let mut nurbs_at = |at: f64, surface: bool| -> Option<u32> {
+        let at = at as usize;
+        if !(at < nurbs.len()) {
+            return None;
+        }
+        match (crate::brep_bridge::nurbs_at(nurbs, at), surface) {
+            (crate::brep_bridge::Nurbs::Curve(c), false) => {
+                nurbs_curves.push(c);
+                Some(nurbs_curves.len() as u32 - 1)
+            }
+            (crate::brep_bridge::Nurbs::Surface(s), true) => {
+                nurbs_surfaces.push(s);
+                Some(nurbs_surfaces.len() as u32 - 1)
+            }
+            _ => None,
+        }
+    };
     let edges: Vec<MeshEdge> = (0..ne)
         .map(|i| {
             let c = &input.curves[13 * i..13 * i + 13];
@@ -81,6 +100,7 @@ fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], 
                 0 => Some(Curve::Line),
                 1 => Some(Curve::Circle { center: v3(c, 1), normal: v3(c, 4), xdir: v3(c, 7), radius: c[10] }),
                 2 => Some(Curve::Degenerate),
+                5 => nurbs_at(c[1], false).map(|index| Curve::Nurbs { index, t0: c[11], t1: c[12] }),
                 _ => None,
             };
             MeshEdge { curve, v: [input.edges[2 * i], input.edges[2 * i + 1]], t0: c[11], t1: c[12] }
@@ -95,6 +115,7 @@ fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], 
             2 => MeshSurface::Cone { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], angle: s[11], direct: s[12] > 0.5 },
             4 => MeshSurface::Sphere { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], direct: s[12] > 0.5 },
             3 => MeshSurface::Torus { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], minor: s[11], direct: s[12] > 0.5 },
+            5 => nurbs_at(s[1], true).map_or(MeshSurface::Other, |index| MeshSurface::Nurbs { index }),
             _ => MeshSurface::Other,
         };
         let (l0, l1) = (input.face_loops[f] as usize, input.face_loops[f + 1] as usize);
@@ -118,7 +139,7 @@ fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], 
     // Its steps in the kernel's profile (NOSHAPE_KERNEL_PROFILE).
     let note = |name: &str, d: std::time::Duration| crate::ffi::ffi::kernel_profile_note(name, d.as_secs_f64() * 1e3);
     note("mesh.rust.mesh.in", t.elapsed());
-    let m = mesh_body(&vertices, &edges, &faces, Deflection { linear: input.linear, angular: input.angular });
+    let m = mesh_body_with(&vertices, &edges, &faces, Deflection { linear: input.linear, angular: input.angular }, MeshNurbs { curves: &nurbs_curves, surfaces: &nurbs_surfaces });
     note("mesh.rust.mesh.edges", m.took[0]);
     note("mesh.rust.mesh.faces", m.took[1]);
     let t = std::time::Instant::now();

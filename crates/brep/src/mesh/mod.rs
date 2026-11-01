@@ -13,8 +13,10 @@
 
 pub mod cdt;
 
+use crate::nurbs::{NurbsCurve, NurbsSurface};
 use crate::{Curve, Use};
 use glam::{DVec2, DVec3};
+use std::f64::consts::{FRAC_PI_2, TAU};
 
 /// A face's surface (the kernel reads it from OCCT's geometry).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -30,8 +32,17 @@ pub enum MeshSurface {
     Torus { origin: DVec3, axis: DVec3, xdir: DVec3, direct: bool, radius: f64, minor: f64 },
     /// OCCT's sphere `origin + radius cos v (cos u x + sin u y) + radius sin v axis` (a torus with no hole).
     Sphere { origin: DVec3, axis: DVec3, xdir: DVec3, direct: bool, radius: f64 },
+    /// A B-spline (made non-periodic): [`MeshNurbs::surfaces`]`[index]`.
+    Nurbs { index: u32 },
     /// Any other surface: the face is declined (BRepMesh meshes it), its loops tell which edges it is on.
     Other,
+}
+
+/// The B-spline curves (edges' [`Curve::Nurbs`]) and surfaces ([`MeshSurface::Nurbs`]) of a body.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct MeshNurbs<'a> {
+    pub curves: &'a [NurbsCurve],
+    pub surfaces: &'a [NurbsSurface],
 }
 
 /// An edge: its curve (`None`: one not meshed here) between vertices `v[0]` (at parameter `t0`) and `v[1]`
@@ -90,8 +101,14 @@ pub struct BodyMesh {
 
 /// The nodes of `edge` under `defl`, if it is a curve meshed here.
 pub fn edge_nodes(vertices: &[DVec3], edge: &MeshEdge, defl: Deflection) -> Option<EdgeNodes> {
+    edge_nodes_with(vertices, edge, defl, MeshNurbs::default())
+}
+
+/// [`edge_nodes`] with the body's B-spline curves.
+pub fn edge_nodes_with(vertices: &[DVec3], edge: &MeshEdge, defl: Deflection, nurbs: MeshNurbs) -> Option<EdgeNodes> {
     let (a, b) = (*vertices.get(edge.v[0] as usize)?, *vertices.get(edge.v[1] as usize)?);
     match edge.curve {
+        Some(Curve::Nurbs { index, t0, t1 }) => nurbs_edge_nodes(nurbs.curves.get(index as usize)?, a, b, t0, t1, defl),
         Some(Curve::Line) => Some(EdgeNodes { points: vec![a, b], params: vec![edge.t0, edge.t1] }),
         // A cone's apex or a sphere's pole: its point at both ends (its parameters are the surface's u there).
         Some(Curve::Degenerate) if edge.v[0] == edge.v[1] => Some(EdgeNodes { points: vec![a, a], params: vec![edge.t0, edge.t1] }),
@@ -121,6 +138,92 @@ pub fn edge_nodes(vertices: &[DVec3], edge: &MeshEdge, defl: Deflection) -> Opti
     }
 }
 
+/// A B-spline edge's nodes from `t0` (vertex `a`) to `t1` (vertex `b`): each knot span split in halves until a
+/// piece's chord is within half the linear deflection of the curve at its middle and its ends' tangents turn less
+/// than half the angular one (BRepMesh's tangential deflection takes half of each too).
+fn nurbs_edge_nodes(c: &NurbsCurve, a: DVec3, b: DVec3, t0: f64, t1: f64, defl: Deflection) -> Option<EdgeNodes> {
+    let (lo, hi) = c.range();
+    if !(t0.is_finite() && t1.is_finite()) || t0.min(t1) < lo - 1e-9 * (hi - lo).abs().max(1.0) || t0.max(t1) > hi + 1e-9 * (hi - lo).abs().max(1.0) || (t1 - t0).abs() <= 0.0 {
+        return None;
+    }
+    let (lin, ang) = (0.5 * defl.linear, 0.5 * defl.angular);
+    // Breaks: the ends and the knots between them.
+    let mut breaks = vec![t0];
+    let (s0, s1) = (t0.min(t1), t0.max(t1));
+    let mut inner: Vec<f64> = c.knots.iter().copied().filter(|&k| k > s0 + 1e-12 * (s1 - s0) && k < s1 - 1e-12 * (s1 - s0)).collect();
+    inner.dedup_by(|x, y| (*x - *y).abs() <= 1e-12 * (s1 - s0));
+    if t1 < t0 {
+        inner.reverse();
+    }
+    breaks.extend(inner);
+    breaks.push(t1);
+    let mut params = vec![t0];
+    let mut points = vec![a];
+    let ok = |x: f64, y: f64| -> bool {
+        let (px, py, pm) = (c.derivs(x), c.derivs(y), c.at(0.5 * (x + y)));
+        let chord = (pm - 0.5 * (px[0] + py[0])).length();
+        let turn = px[1].angle_between(py[1]);
+        chord <= lin && (turn.is_nan() || turn <= ang)
+    };
+    for w in breaks.windows(2) {
+        // Depth-first halving, at least two pieces a span of a curved (degree > 1) curve.
+        let mut stack = vec![(w[0], w[1], 0u32)];
+        while let Some((x, y, depth)) = stack.pop() {
+            if depth < 30 && ((depth == 0 && c.degree > 1) || !ok(x, y)) {
+                let m = 0.5 * (x + y);
+                stack.push((m, y, depth + 1));
+                stack.push((x, m, depth + 1));
+                continue;
+            }
+            params.push(y);
+            points.push(c.at(y));
+            if params.len() > 100_000 {
+                return None;
+            }
+        }
+    }
+    // Merged where the deflections allow (a curve fitted through many knots splits each span in two above, far
+    // finer than it needs): from each kept node as far on as every node and mid-span point skipped stays within
+    // the chord deflection of the chord, and every tangent there within half the angle of it (the turn along
+    // it within the angle, as the halving's). A knot where the curve may kink (as often as the degree) is kept.
+    let kinks: Vec<f64> = c.knots.chunk_by(|x, y| x == y).filter(|k| k.len() >= c.degree.max(1)).map(|k| k[0]).collect();
+    let mids: Vec<DVec3> = params.windows(2).map(|w| c.at(0.5 * (w[0] + w[1]))).collect();
+    let tangents: Vec<DVec3> = params.iter().map(|&t| c.derivs(t)[1]).collect();
+    let fits = |i: usize, k: usize| -> bool {
+        let (p, q) = (points[i], points[k]);
+        let d = q - p;
+        let len2 = d.length_squared();
+        if len2 <= 0.0 {
+            return false;
+        }
+        let off = |x: DVec3| (x - p - d * ((x - p).dot(d) / len2).clamp(0.0, 1.0)).length();
+        let skew = |t: DVec3| {
+            let a = t.angle_between(d);
+            // The curve may run either way along its edge.
+            a.is_nan() || a.min(std::f64::consts::PI - a) <= 0.5 * ang
+        };
+        (i + 1..k).all(|m| off(points[m]) <= lin && skew(tangents[m]) && !kinks.iter().any(|&kn| (kn - params[m]).abs() <= 1e-12 * (s1 - s0)))
+            && (i..k).all(|m| off(mids[m]) <= lin)
+            && skew(tangents[i])
+            && skew(tangents[k])
+    };
+    let mut keep = vec![0];
+    let mut i = 0;
+    while i + 1 < params.len() {
+        let mut k = i + 1;
+        while k + 1 < params.len() && k + 1 - i <= 64 && fits(i, k + 1) {
+            k += 1;
+        }
+        keep.push(k);
+        i = k;
+    }
+    let mut points: Vec<DVec3> = keep.iter().map(|&k| points[k]).collect();
+    let params: Vec<f64> = keep.iter().map(|&k| params[k]).collect();
+    // The ends are the vertices (within the edge's tolerance of the curve's).
+    *points.last_mut()? = b;
+    Some(EdgeNodes { points, params })
+}
+
 /// How many equal steps an arc of `arc` radians on a circle of `radius` takes under `defl`: BRepMesh's split
 /// (BRepMesh_CurveTessellator, GCPnts_TangentialDeflection's circle): half the deflections, at least 3.
 fn arc_steps(arc: f64, radius: f64, defl: Deflection) -> usize {
@@ -132,6 +235,11 @@ fn arc_steps(arc: f64, radius: f64, defl: Deflection) -> usize {
 
 /// Meshes the faces of a body (`vertices`, `edges`, `faces`) that are meshed here.
 pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], defl: Deflection) -> BodyMesh {
+    mesh_body_with(vertices, edges, faces, defl, MeshNurbs::default())
+}
+
+/// [`mesh_body`] with the body's B-spline curves and surfaces.
+pub fn mesh_body_with(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], defl: Deflection, nurbs: MeshNurbs) -> BodyMesh {
     // A circle on a face declined here is split by BRepMesh for that face: the faces meshed here on it would
     // not share its nodes. Declined in turn, until none is left (before meshing, so none is meshed for
     // nothing; again after, for the faces that failed). Lines are split the same either way: only the other
@@ -160,7 +268,14 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
     // A face with no loop, or a loop with no edge (a part a mirror left inverted, CLI fuzz seed 355), is BRepMesh's
     // (MESH-EMPTY-LOOP-PANIC).
     let mut ok: Vec<bool> = faces.iter().map(|f| !matches!(f.surface, MeshSurface::Other) && !f.loops.is_empty() && f.loops.iter().all(|l| !l.is_empty())).collect();
+    let before = ok.iter().filter(|o| **o).count();
     settle(&mut ok);
+    if std::env::var_os("NOSHAPE_MESH_DEBUG").is_some() {
+        let other = faces.iter().filter(|f| matches!(f.surface, MeshSurface::Other)).count();
+        let nurbs_faces = faces.iter().filter(|f| matches!(f.surface, MeshSurface::Nurbs { .. })).count();
+        let no_curve = edges.iter().filter(|e| e.curve.is_none()).count();
+        eprintln!("mesh: {} faces ({other} other, {nurbs_faces} B-spline), {before} meshable, {} after their neighbours; {no_curve} of {} edges without a curve here", faces.len(), ok.iter().filter(|o| **o).count(), edges.len());
+    }
     // Each edge's nodes once, shared by the faces on it.
     let mut out = BodyMesh { edges: vec![None; edges.len()], faces: vec![None; faces.len()], took: Default::default() };
     let t = std::time::Instant::now();
@@ -175,10 +290,18 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
     let used: Vec<usize> = (0..edges.len()).filter(|&e| used[e]).collect();
     // In parallel only for many (a small part's edges sample in microseconds, less than starting threads).
     let run = if used.len() < 512 { used.len().max(1) } else { 64 };
-    for (e, n) in in_parallel(used.len(), run, |k| edge_nodes(vertices, &edges[used[k]], defl)) {
+    for (e, n) in in_parallel(used.len(), run, |k| edge_nodes_with(vertices, &edges[used[k]], defl, nurbs)) {
         out.edges[used[e]] = n;
     }
     out.took[0] = t.elapsed();
+    // A face on an edge not split here (a curve it doesn't take) is BRepMesh's: settled before any is meshed
+    // for nothing.
+    for (f, ok) in faces.iter().zip(ok.iter_mut()) {
+        if *ok && f.loops.iter().flatten().any(|u| out.edges.get(u.edge as usize).is_none_or(|n| n.is_none())) {
+            *ok = false;
+        }
+    }
+    settle(&mut ok);
     let t = std::time::Instant::now();
     // The faces on their own, in parallel (as BRepMesh meshes them), the costliest first, one at a time: a
     // part's few tori and its plate's face round many holes can be most of the time, and started last they
@@ -196,13 +319,42 @@ pub fn mesh_body(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace], def
             }
         }
     };
-    let mut order: Vec<(f64, usize)> = (0..faces.len()).filter(|&i| ok[i]).map(|i| (cost(&faces[i]), i)).collect();
-    order.sort_by(|a, b| b.0.total_cmp(&a.0));
-    let mesh = |k: usize| mesh_face(vertices, edges, &faces[order[k].1], edge_nodes, defl);
-    let meshed = in_parallel(order.len(), 1, mesh);
+    // B-spline faces after the others (settled): a part's thread or text, many times the rest, isn't meshed
+    // for nothing when a face beside it declines.
+    let mut order: Vec<(f64, usize)> = Vec::new();
+    for later in [false, true] {
+        if later {
+            for &(_, i) in &order {
+                ok[i] = out.faces[i].is_some();
+            }
+            settle(&mut ok);
+        }
+        let run: Vec<(f64, usize)> = {
+            let mut run: Vec<(f64, usize)> = (0..faces.len()).filter(|&i| ok[i] && matches!(faces[i].surface, MeshSurface::Nurbs { .. }) == later).map(|i| (cost(&faces[i]), i)).collect();
+            run.sort_by(|a, b| b.0.total_cmp(&a.0));
+            run
+        };
+        let mesh = |k: usize| mesh_face(vertices, edges, &faces[run[k].1], edge_nodes, defl, nurbs);
+        for (k, m) in in_parallel(run.len(), 1, mesh) {
+            out.faces[run[k].1] = m;
+        }
+        order.extend(run);
+    }
     out.took[1] = t.elapsed();
-    for (k, m) in meshed {
-        out.faces[order[k].1] = m;
+    if std::env::var_os("NOSHAPE_MESH_DEBUG").is_some() {
+        let mut failed = std::collections::BTreeMap::<&str, usize>::new();
+        for &(_, i) in &order {
+            if out.faces[i].is_none() {
+                let kind = match faces[i].surface {
+                    MeshSurface::Plane { .. } => "plane",
+                    MeshSurface::Cylinder { .. } => "cylinder",
+                    MeshSurface::Nurbs { .. } => "B-spline",
+                    _ => "other",
+                };
+                *failed.entry(kind).or_default() += 1;
+            }
+        }
+        eprintln!("mesh: failed here: {failed:?}");
     }
     for (ok, m) in ok.iter_mut().zip(&out.faces) {
         *ok = m.is_some();
@@ -246,18 +398,24 @@ fn in_parallel<T: Send>(n: usize, run: usize, f: impl Fn(usize) -> T + Sync) -> 
 }
 
 /// One face, its edges' nodes from `nodes`.
-fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &[Option<EdgeNodes>], defl: Deflection) -> Option<FaceMesh> {
+fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &[Option<EdgeNodes>], defl: Deflection, nurbs: MeshNurbs) -> Option<FaceMesh> {
     match face.surface {
+        MeshSurface::Nurbs { index } => mesh_grid(edges, face, nurbs.surfaces.get(index as usize)?, nodes, defl),
         MeshSurface::Plane { origin, normal, xdir } => mesh_plane(vertices, edges, face, origin, normal, xdir, nodes),
-        MeshSurface::Cylinder { origin, axis, xdir, direct, radius } => mesh_strip(edges, face, &Revolved::new(origin, axis, xdir, direct, radius, 0.0, 0.0), nodes, defl),
-        MeshSurface::Cone { origin, axis, xdir, direct, radius, angle } => mesh_strip(edges, face, &Revolved::new(origin, axis, xdir, direct, radius, angle, 0.0), nodes, defl),
+        // A strip's rows, else (a piece bounded by other curves: a knurl's lands) a grid as a B-spline's.
+        MeshSurface::Cylinder { origin, axis, xdir, direct, radius } => mesh_revolved(edges, face, &Revolved::new(origin, axis, xdir, direct, radius, 0.0, 0.0), nodes, defl),
+        MeshSurface::Cone { origin, axis, xdir, direct, radius, angle } => mesh_revolved(edges, face, &Revolved::new(origin, axis, xdir, direct, radius, angle, 0.0), nodes, defl),
         // A spindle or horn torus (the tube through its axis) isn't meshed here.
-        MeshSurface::Torus { origin, axis, xdir, direct, radius, minor } if minor > 0.0 && radius > minor => mesh_strip(edges, face, &Revolved::new(origin, axis, xdir, direct, radius, 0.0, minor), nodes, defl),
+        MeshSurface::Torus { origin, axis, xdir, direct, radius, minor } if minor > 0.0 && radius > minor => mesh_revolved(edges, face, &Revolved::new(origin, axis, xdir, direct, radius, 0.0, minor), nodes, defl),
         MeshSurface::Torus { .. } => None,
-        MeshSurface::Sphere { origin, axis, xdir, direct, radius } if radius > 0.0 => mesh_strip(edges, face, &Revolved::new(origin, axis, xdir, direct, 0.0, 0.0, radius), nodes, defl),
+        MeshSurface::Sphere { origin, axis, xdir, direct, radius } if radius > 0.0 => mesh_revolved(edges, face, &Revolved::new(origin, axis, xdir, direct, 0.0, 0.0, radius), nodes, defl),
         MeshSurface::Sphere { .. } => None,
         MeshSurface::Other => None,
     }
+}
+
+fn mesh_revolved(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option<EdgeNodes>], defl: Deflection) -> Option<FaceMesh> {
+    mesh_strip(edges, face, s, nodes, defl).or_else(|| mesh_grid(edges, face, s, nodes, defl))
 }
 
 /// A cylinder (`angle` 0), cone or torus (`minor` > 0, `radius` the major one; a sphere's 0) in OCCT's
@@ -334,7 +492,6 @@ impl Revolved {
 /// constant u (seams; a cylinder's or cone's straight, a torus's arcs round its tube): rows of nodes at the
 /// rims and at the sides' nodes in between, each zipped to the next by u, as the kernel's strips.
 fn mesh_strip(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option<EdgeNodes>], defl: Deflection) -> Option<FaceMesh> {
-    use std::f64::consts::TAU;
     if face.loops.len() > 2 {
         return None;
     }
@@ -647,6 +804,338 @@ fn mesh_plane(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, origin: D
         .collect();
     let triangles = cdt::triangulate(&uv, &rings)?;
     Some(FaceMesh { normals: vec![normal; points.len()], points, triangles, edge_nodes })
+}
+
+/// A B-spline face: its boundary nodes (its edges', shared with its neighbours) put on the surface's parameter
+/// plane, a grid of nodes inside it fine enough for the deflections (each knot span cut into as many steps as its
+/// second derivative over its first asks: chord `|S''| h² / 8` within the linear deflection, turn `|S''| h / |S'|`
+/// within the angular), then all triangulated by [`cdt::triangulate_with`] on the plane scaled by the surface's
+/// mean first derivatives (near isotropic). Declined: a seam (an edge twice in the face), a boundary node off the
+/// surface, a degenerate parameterisation.
+fn mesh_grid(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, nodes: &[Option<EdgeNodes>], defl: Deflection) -> Option<FaceMesh> {
+    let r = mesh_grid_why(edges, face, s, nodes, defl);
+    if let Err(why) = &r
+        && std::env::var_os("NOSHAPE_MESH_DEBUG").is_some()
+    {
+        eprintln!("mesh: {} face declined: {why}", s.name());
+    }
+    r.ok()
+}
+
+/// A surface [`mesh_grid`] meshes: its parameters' box, its derivatives, a point's parameters.
+trait GridSurface {
+    fn name(&self) -> &'static str;
+    /// Closed round u (a seam's two uses at u and a period on, from [`GridSurface::param_of`]'s seed).
+    fn closed(&self) -> bool;
+    fn range(&self) -> ((f64, f64), (f64, f64));
+    /// The parameters along u (v) where the second derivatives may jump (a B-spline's knots).
+    fn breaks(&self, along_u: bool) -> &[f64];
+    /// [S, Su, Sv, Suu, Suv, Svv] at (u, v).
+    fn derivs(&self, u: f64, v: f64) -> [DVec3; 6];
+    fn at(&self, u: f64, v: f64) -> DVec3;
+    /// The parameters of a point near the surface (the nearest to `seed`'s where the surface closes) and its
+    /// distance from there.
+    fn param_of(&self, p: DVec3, seed: Option<DVec2>) -> (DVec2, f64);
+}
+
+impl GridSurface for NurbsSurface {
+    fn name(&self) -> &'static str {
+        "B-spline"
+    }
+    fn closed(&self) -> bool {
+        false
+    }
+    fn range(&self) -> ((f64, f64), (f64, f64)) {
+        NurbsSurface::range(self)
+    }
+    fn breaks(&self, along_u: bool) -> &[f64] {
+        if along_u { &self.uknots } else { &self.vknots }
+    }
+    fn derivs(&self, u: f64, v: f64) -> [DVec3; 6] {
+        NurbsSurface::derivs(self, u, v)
+    }
+    fn at(&self, u: f64, v: f64) -> DVec3 {
+        NurbsSurface::at(self, u, v)
+    }
+    fn param_of(&self, p: DVec3, seed: Option<DVec2>) -> (DVec2, f64) {
+        NurbsSurface::param_of(self, p, seed)
+    }
+}
+
+impl GridSurface for Revolved {
+    fn name(&self) -> &'static str {
+        "revolved"
+    }
+    fn closed(&self) -> bool {
+        true
+    }
+    fn range(&self) -> ((f64, f64), (f64, f64)) {
+        let v = if self.torus() && self.radius == 0.0 { (-FRAC_PI_2, FRAC_PI_2) } else { (f64::NEG_INFINITY, f64::INFINITY) };
+        ((f64::NEG_INFINITY, f64::INFINITY), v)
+    }
+    fn breaks(&self, _: bool) -> &[f64] {
+        &[]
+    }
+    fn derivs(&self, u: f64, v: f64) -> [DVec3; 6] {
+        let (su, cu) = u.sin_cos();
+        let radial = cu * self.xdir + su * self.ydir;
+        let tangent = -su * self.xdir + cu * self.ydir;
+        if self.torus() {
+            let (sv, cv) = v.sin_cos();
+            let ring = self.radius + self.minor * cv;
+            let m = self.minor;
+            [
+                self.origin + ring * radial + m * sv * self.axis,
+                ring * tangent,
+                m * (-sv * radial + cv * self.axis),
+                -ring * radial,
+                -m * sv * tangent,
+                -m * (cv * radial + sv * self.axis),
+            ]
+        } else {
+            let (s, c) = self.angle;
+            let ring = self.radius + v * s;
+            [self.origin + ring * radial + v * c * self.axis, ring * tangent, s * radial + c * self.axis, -ring * radial, s * tangent, DVec3::ZERO]
+        }
+    }
+    fn at(&self, u: f64, v: f64) -> DVec3 {
+        self.at(u.sin_cos(), v, self.v_trig(v)).0
+    }
+    fn param_of(&self, p: DVec3, seed: Option<DVec2>) -> (DVec2, f64) {
+        let wrap = |d: f64| d - (d / TAU).round() * TAU;
+        let mut q = self.uv(p);
+        if let Some(s) = seed {
+            q.x = s.x + wrap(q.x - s.x);
+            if self.torus() && self.radius > 0.0 {
+                q.y = s.y + wrap(q.y - s.y);
+            }
+        }
+        (q, (GridSurface::at(self, q.x, q.y) - p).length())
+    }
+}
+
+/// [`mesh_grid`], or why it declines.
+fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, nodes: &[Option<EdgeNodes>], defl: Deflection) -> Result<FaceMesh, &'static str> {
+    let mut seen = std::collections::HashSet::new();
+    if !s.closed() && !face.loops.iter().flatten().all(|u| seen.insert(u.edge)) {
+        return Err("a seam");
+    }
+    // An apex or pole has no parameters of its own.
+    if face.loops.iter().flatten().any(|u| edges.get(u.edge as usize).is_none_or(|e| e.curve == Some(Curve::Degenerate))) {
+        return Err("a degenerate edge");
+    }
+    let mut points: Vec<DVec3> = Vec::new();
+    let mut rings: Vec<Vec<usize>> = Vec::with_capacity(face.loops.len());
+    let mut edge_nodes = Vec::with_capacity(face.loops.len());
+    for l in &face.loops {
+        let (pts, per_use) = loop_nodes(edges, l, nodes).ok_or("an edge not meshed here")?;
+        let base = points.len();
+        rings.push((base..base + pts.len()).collect());
+        edge_nodes.push(per_use.into_iter().map(|idx| idx.into_iter().map(|i| (base + i) as u32).collect()).collect());
+        points.extend(pts);
+    }
+    // The boundary on the parameter plane, each node from the last's parameters.
+    let ((u0, u1), (v0, v1)) = s.range();
+    let off = (defl.linear * 0.25).max(1e-7);
+    let mut uv: Vec<DVec2> = Vec::with_capacity(points.len());
+    let mut seed = None;
+    for p in &points {
+        let (q, d) = s.param_of(*p, seed);
+        if d.is_nan() || d > off || !q.is_finite() {
+            return Err("a boundary node off the surface");
+        }
+        uv.push(q);
+        seed = Some(q);
+    }
+    // Each loop closes on the parameter plane (none round a closed surface's period).
+    for r in &rings {
+        let (q, _) = s.param_of(points[r[0]], Some(uv[r[r.len() - 1]]));
+        if (q - uv[r[0]]).length() > 1e-6 * (1.0 + q.length()) {
+            return Err("a loop round the surface");
+        }
+    }
+    let (lo, hi) = uv.iter().fold((DVec2::splat(f64::MAX), DVec2::splat(f64::MIN)), |(a, b), q| (a.min(*q), b.max(*q)));
+    if !(hi.x > lo.x && hi.y > lo.y) {
+        return Err("a flat parameter box");
+    }
+    // The steps along u (v): the knots inside the box, each span cut for its largest second derivative.
+    let samples = 5;
+    let steps = |along_u: bool| -> Result<Vec<f64>, &'static str> {
+        let (a, b, knots) = if along_u { (lo.x, hi.x, s.breaks(true)) } else { (lo.y, hi.y, s.breaks(false)) };
+        let (c0, c1) = if along_u { (lo.y, hi.y) } else { (lo.x, hi.x) };
+        let mut br = vec![a];
+        br.extend(knots.iter().copied().filter(|&k| k > a && k < b));
+        br.push(b);
+        br.dedup_by(|x, y| (*x - *y).abs() <= 1e-12 * (b - a));
+        // Each span's largest step; the nodes then spread by the steps' density over the whole range (not
+        // one at every knot: a thread's flank, flat across but for its knots, took a row of nodes there).
+        let mut hs: Vec<f64> = Vec::with_capacity(br.len());
+        for w in br.windows(2) {
+            let (mut d2, mut d1) = (0.0f64, f64::MAX);
+            for i in 0..samples {
+                for j in 0..samples {
+                    let t = w[0] + (w[1] - w[0]) * i as f64 / (samples - 1) as f64;
+                    let c = c0 + (c1 - c0) * j as f64 / (samples - 1) as f64;
+                    let d = if along_u { s.derivs(t, c) } else { s.derivs(c, t) };
+                    let (first, second) = if along_u { (d[1], d[3]) } else { (d[2], d[5]) };
+                    d2 = d2.max(second.length());
+                    d1 = d1.min(first.length());
+                }
+            }
+            let span = w[1] - w[0];
+            let mut h = span;
+            if d2 > 0.0 {
+                h = h.min((8.0 * defl.linear / d2).sqrt());
+                if d1 > 0.0 {
+                    h = h.min(defl.angular * d1 / d2);
+                }
+            }
+            hs.push(h.max(span * 1e-4));
+        }
+        // How many steps up to each break, and in all.
+        let mut at = vec![0.0];
+        for (w, h) in br.windows(2).zip(&hs) {
+            at.push(at[at.len() - 1] + (w[1] - w[0]) / h);
+        }
+        let total = at[at.len() - 1];
+        let n = total.ceil().clamp(1.0, 1e5) as usize;
+        let mut out = vec![a];
+        let mut k = 0;
+        for i in 1..n {
+            let c = total * i as f64 / n as f64;
+            while k + 2 < at.len() && at[k + 1] < c {
+                k += 1;
+            }
+            let f = ((c - at[k]) / (at[k + 1] - at[k]).max(1e-300)).clamp(0.0, 1.0);
+            out.push(br[k] + (br[k + 1] - br[k]) * f);
+        }
+        out.push(b);
+        Ok(out)
+    };
+    let (mut us, mut vs) = (steps(true)?, steps(false)?);
+    // Scale: the mean first derivatives over the box.
+    let (mut su, mut sv, mut n) = (0.0, 0.0, 0.0);
+    for i in 0..samples {
+        for j in 0..samples {
+            let d = s.derivs(lo.x + (hi.x - lo.x) * i as f64 / (samples - 1) as f64, lo.y + (hi.y - lo.y) * j as f64 / (samples - 1) as f64);
+            su += d[1].length();
+            sv += d[2].length();
+            n += 1.0;
+        }
+    }
+    let (su, sv) = (su / n, sv / n);
+    if su.is_nan() || sv.is_nan() || su <= 0.0 || sv <= 0.0 {
+        return Err("no derivatives");
+    }
+    // No step more than ten times the other way's smallest (on the surface): no long slivers across a flat way
+    // (three times put a row of nodes along a thread's flank, its 0.5 mm across flat, twice BRepMesh's
+    // triangles).
+    let smallest = |t: &[f64], scale: f64| t.windows(2).map(|w| (w[1] - w[0]) * scale).fold(f64::MAX, f64::min);
+    let refine = |t: &mut Vec<f64>, scale: f64, cap: f64| {
+        let mut out = vec![t[0]];
+        for w in t.windows(2) {
+            let n = ((w[1] - w[0]) * scale / cap).ceil().clamp(1.0, 4096.0) as usize;
+            out.extend((1..=n).map(|k| w[0] + (w[1] - w[0]) * k as f64 / n as f64));
+        }
+        *t = out;
+    };
+    let (mu, mv) = (smallest(&us, su), smallest(&vs, sv));
+    refine(&mut us, su, 10.0 * mv);
+    refine(&mut vs, sv, 10.0 * mu);
+    if us.len() * vs.len() > 400_000 {
+        return Err("too many grid nodes");
+    }
+    let scaled = |q: DVec2| DVec2::new(q.x * su, q.y * sv);
+    // Interior grid nodes: inside the boundary (even-odd), at least a third of the local step from it. Each
+    // row's crossings of the boundary once, and the boundary's segments in cells (as wide as the largest such
+    // distance) to look for one close by: not every segment for every node.
+    let segs: Vec<(DVec2, DVec2)> = rings.iter().flat_map(|r| (0..r.len()).map(|k| (scaled(uv[r[k]]), scaled(uv[r[(k + 1) % r.len()]])))).collect();
+    let gap = |t: &[f64], i: usize, scale: f64| (t[i + 1] - t[i - 1]) * 0.5 * scale;
+    let du: Vec<f64> = (1..us.len().saturating_sub(1)).map(|i| gap(&us, i, su)).collect();
+    let dv: Vec<f64> = (1..vs.len().saturating_sub(1)).map(|j| gap(&vs, j, sv)).collect();
+    let cell = du.iter().chain(&dv).fold(0.0f64, |m, d| m.max(*d)) / 3.0;
+    let mut cells: std::collections::HashMap<(i64, i64), Vec<u32>> = std::collections::HashMap::new();
+    if cell > 0.0 {
+        let key = |q: DVec2| ((q.x / cell).floor() as i64, (q.y / cell).floor() as i64);
+        for (k, &(a, b)) in segs.iter().enumerate() {
+            // Samples half a cell apart: a node within a cell of the segment is within two cells of one.
+            let n = ((b - a).length() / (0.5 * cell)).ceil().min(1e6) as usize;
+            let mut last = None;
+            for i in 0..=n {
+                let c = key(a + (b - a) * (i as f64 / n.max(1) as f64));
+                if last != Some(c) {
+                    cells.entry(c).or_default().push(k as u32);
+                    last = Some(c);
+                }
+            }
+        }
+        for l in cells.values_mut() {
+            l.dedup();
+        }
+    }
+    let close = |q: DVec2, r: f64| -> bool {
+        let (cx, cy) = ((q.x / cell).floor() as i64, (q.y / cell).floor() as i64);
+        (cx - 2..=cx + 2).any(|x| {
+            (cy - 2..=cy + 2).any(|y| {
+                cells.get(&(x, y)).is_some_and(|l| {
+                    l.iter().any(|&k| {
+                        let (a, b) = segs[k as usize];
+                        let d = b - a;
+                        let t = ((q - a).dot(d) / d.length_squared().max(1e-300)).clamp(0.0, 1.0);
+                        (a + d * t - q).length() < r
+                    })
+                })
+            })
+        })
+    };
+    let mut interior = Vec::new();
+    let mut crossings: Vec<f64> = Vec::new();
+    for (j, &v) in vs.iter().enumerate().skip(1).take(vs.len().saturating_sub(2)) {
+        if v <= v0 || v >= v1 {
+            continue;
+        }
+        let y = v * sv;
+        crossings.clear();
+        crossings.extend(segs.iter().filter(|(a, b)| (a.y > y) != (b.y > y)).map(|(a, b)| a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y)));
+        crossings.sort_by(f64::total_cmp);
+        for (i, &u) in us.iter().enumerate().skip(1).take(us.len().saturating_sub(2)) {
+            if u <= u0 || u >= u1 {
+                continue;
+            }
+            let sq = DVec2::new(u * su, y);
+            // Inside: an odd number of crossings past it.
+            let past = crossings.len() - crossings.partition_point(|&x| x <= sq.x);
+            if past % 2 == 1 && !close(sq, du[i - 1].min(dv[j - 1]) / 3.0) {
+                interior.push(DVec2::new(u, v));
+            }
+        }
+    }
+    let nb = uv.len();
+    let all: Vec<cdt::Pt> = uv.iter().chain(&interior).map(|q| scaled(*q)).map(|q| cdt::Pt { x: q.x, y: q.y }).collect();
+    let inner: Vec<usize> = (nb..nb + interior.len()).collect();
+    let triangles = cdt::triangulate_with(&all, &rings, &inner).ok_or("the triangulation failed")?;
+    points.extend(interior.iter().map(|q| s.at(q.x, q.y)));
+    // Normals ∂u × ∂v (at a degenerate point, its triangles').
+    let mut normals: Vec<DVec3> = uv.iter().chain(&interior).map(|q| {
+        let d = s.derivs(q.x, q.y);
+        d[1].cross(d[2]).normalize_or_zero()
+    }).collect();
+    if normals.contains(&DVec3::ZERO) {
+        let mut acc = vec![DVec3::ZERO; normals.len()];
+        for t in &triangles {
+            let (a, b, c) = (points[t[0] as usize], points[t[1] as usize], points[t[2] as usize]);
+            let n = (b - a).cross(c - a);
+            for &k in t {
+                acc[k as usize] += n;
+            }
+        }
+        for (n, a) in normals.iter_mut().zip(acc) {
+            if *n == DVec3::ZERO {
+                *n = a.normalize_or_zero();
+            }
+        }
+    }
+    Ok(FaceMesh { points, normals, triangles, edge_nodes })
 }
 
 #[cfg(test)]

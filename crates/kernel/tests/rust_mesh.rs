@@ -353,3 +353,22 @@ fn a_big_shapes_box_is_its_faces_boxes() {
     // Within the faces' tolerance gaps (one box keeps the largest gap all round).
     assert!((b.min - lo).abs().max_element() < 1e-6 && (b.max - hi).abs().max_element() < 1e-6, "{b:?} against {lo} {hi}");
 }
+
+#[test]
+fn a_lofts_bspline_sides_mesh_here_within_brepmeshs_area() {
+    // Three squares lofted smooth: four B-spline sides (no seam) between B-spline edges, and the two square caps.
+    // Its B-spline edges are split here (not as BRepMesh splits them), so the faces and their area against
+    // BRepMesh's, not the polylines.
+    let square = |z: f64, h: f64| make_polyline(&[DVec3::new(-h, -h, z) * MM, DVec3::new(h, -h, z) * MM, DVec3::new(h, h, z) * MM, DVec3::new(-h, h, z) * MM], true).unwrap();
+    let s = loft(&[square(0.0, 10.0), square(15.0, 6.0), square(30.0, 10.0)], &LoftOptions { solid: true, ..Default::default() }).unwrap().shape;
+    assert_eq!(s.faces().len(), 6);
+    let rust = mesh(&s, true);
+    let copy = transform(&s, &Transform::Translate(DVec3::ZERO), true).unwrap().shape;
+    let occt = mesh(&copy, false);
+    assert_eq!(rust.rust_faces, 6, "every face");
+    for (i, (a, b)) in faces(&rust).into_iter().zip(faces(&occt)).enumerate() {
+        assert!((a.0 - b.0).abs() <= 2e-3 * b.0, "face {i}: area {} against BRepMesh's {}", a.0, b.0);
+    }
+    assert_watertight(&rust);
+    assert_normals(&s, &rust, &occt);
+}

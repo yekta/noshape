@@ -17,9 +17,29 @@ the parts one at a time); knurl 13.7 s, the feature 12.7 s, the display mesh ~1 
 runs BRepMesh on a topology copy of the faces it meshes with the lock released (cache entries copied out first, the
 set re-fetched after; NOSHAPE_MESH_LOCKED=1 the old way for A/B), at most NOSHAPE_MESH_CONCURRENT parts at once
 (default: no limit, measured best). NIST regeneration on idle vibe5: locked 3.19-3.20 s -> 0.61-0.64 s (loaded vibe4
-8.5 -> 2.4 s). Landed / queued with this commit. Next: B-spline faces in brep::mesh (nurbs.rs evaluates; cdt.rs
-triangulates in 2D; the bridge: share rust_boolean.cpp's push_nurbs / push_nurbs_surface flat layout, which
-brep_bridge's nurbs_at reads).
+8.5 -> 2.4 s). Landed 57f2f512.
+
+B-spline faces in brep::mesh (11-01 21:30, this commit; NOSHAPE_MESH_BSPLINE=0 BRepMesh's as before): mesh_rust.cpp
+flattens B-spline curves and surfaces (rust_boolean.cpp's push_nurbs layout, trims unwrapped) into `brep_mesh`'s
+`nurbs`; mod.rs `mesh_grid` (generic `GridSurface`: B-splines, and cylinders / cones / tori / spheres a strip
+declines, e.g. a knurl's lands bounded by helices, with seams) puts the boundary on the parameter plane
+(`param_of` from the last node's), steps each way by the curvature (|S''|, |S'|; the deflections) spread over the
+knot spans, no step over 10x the other way's smallest, interior grid nodes inside (even-odd per row, a cell hash for
+the boundary distance), cdt::triangulate_with; normals Su x Sv. B-spline edges: knot breaks, halving, then merged
+greedily where the deflections allow. Faces with an edge not split here are declined before any is meshed, and the
+B-spline faces mesh after the others (settled), so a part's thread isn't meshed for nothing. Our mesher's own work
+runs with the mesh lock released too (rust_mesh_faces `unlocked`). Results (release regen_profile, vibe5 loaded
+~5-8 by others, same runs A/B):
+- knurl 45/45: display mesh 0.88-1.35 s (BRepMesh) -> 0.22 s, our mesher takes all 17762 faces; 64k -> 50k triangles.
+- NIST: 1.09-1.14 s -> 0.67-0.70 s regeneration; fasteners 26 of 32 faces ours (was 13); 909k -> 1.11M triangles
+  (B-spline edges split ~18% finer than BRepMesh's GCPnts; tori 192k -> 301k).
+- Accuracy: every grid face within the deflections (worst normal turn 0.53 of the angle; NIST's linear deflection is
+  19 mm, so the angle rules). CLI renders (render image, 1400x1000 and NIST front 4096x3072) against BRepMesh's: no
+  pixel more than 10% apart on the knurl, 478 of 12.6M on NIST (the threads' tangent-edge dashes).
+T1: brep mesh::tests a_bspline_face_is_meshed_within_the_deflection (a dome), a_cylinder_piece_under_a_slanted_cut_*,
+a_whole_cylinder_under_a_slanted_cut_*; kernel rust_mesh::a_lofts_bspline_sides_mesh_here_within_brepmeshs_area.
+Left: B-spline faces with a seam (periodic B-splines) decline; B-spline edge split could follow GCPnts closer (fewer
+triangles); SurfaceOfLinearExtrusion / revolution faces stay BRepMesh's.
 
 ## From core (11-01 17:00): the NIST import's display mesh is BRepMesh, one part at a time
 Regeneration profile of the perf documents (core, NOSHAPE_KERNEL_PROFILE, release, vibe4; logs

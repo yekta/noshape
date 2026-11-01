@@ -68,13 +68,13 @@ fn v3(s: &[f64], i: usize) -> glam::DVec3 {
     glam::DVec3::new(s[i], s[i + 1], s[i + 2])
 }
 
-/// The NURBS curve or surface at `at` in `nurbs` (ffi::BrepBody::nurbs).
-enum Nurbs {
+/// The NURBS curve or surface at `at` in `nurbs` (ffi::BrepBody::nurbs; the display mesher's too).
+pub(crate) enum Nurbs {
     Curve(NurbsCurve),
     Surface(NurbsSurface),
 }
 
-fn nurbs_at(nurbs: &[f64], at: usize) -> Nurbs {
+pub(crate) fn nurbs_at(nurbs: &[f64], at: usize) -> Nurbs {
     let n = |i: usize| nurbs[at + i] as usize;
     let pts = |from: usize, count: usize| (0..count).map(|i| v3(nurbs, from + 3 * i)).collect::<Vec<_>>();
     if nurbs[at] == 0.0 {

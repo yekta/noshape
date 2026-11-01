@@ -6,7 +6,10 @@
 #include <BRepMesh_ShapeTool.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
+#include <Geom_BSplineCurve.hxx>
+#include <Geom_BSplineSurface.hxx>
 #include <Geom_Circle.hxx>
+#include <Geom_RectangularTrimmedSurface.hxx>
 #include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Line.hxx>
@@ -43,7 +46,7 @@ occ::handle<Geom_Curve> basis(occ::handle<Geom_Curve> c)
 // The input of `brep_mesh` (its slices).
 struct MeshIn
 {
-  std::vector<double>   vertices, curves, surfaces;
+  std::vector<double>   vertices, curves, surfaces, nurbs;
   std::vector<uint32_t> edges, face_loops, loop_uses, uses;
   double                linear = 0, angular = 0;
 };
@@ -77,7 +80,80 @@ void in_chunks(int n, bool parallel, const F& f)
     !parallel || n < 1024);
 }
 
+// B-splines for `brep_mesh` (`in.nurbs`, back to back; returns where it starts), in the layout of rust_boolean.cpp's
+// push_nurbs / push_nurbs_surface (brep_bridge.rs nurbs_at reads it): a curve as 0, 3, degree, knot count (each
+// knot as often as its multiplicity), pole count, rational, knots, poles, weights; a surface as 1, degrees, knot
+// counts, pole counts, rational, knots (u, v), poles (row by row, u first), weights. Periodic ones made
+// non-periodic (the same curve, the same parameters), moved by `loc`.
+double push_bspline(std::vector<double>& out, const occ::handle<Geom_BSplineCurve>& c0, const TopLoc_Location& loc)
+{
+  occ::handle<Geom_BSplineCurve> c = occ::down_cast<Geom_BSplineCurve>(c0->Copy());
+  if (c->IsPeriodic())
+    c->SetNotPeriodic();
+  if (!loc.IsIdentity())
+    c->Transform(loc.Transformation());
+  const double                      at = static_cast<double>(out.size());
+  const NCollection_Array1<double>& k  = c->KnotSequence();
+  for (const double x : {0.0, 3.0, (double)c->Degree(), (double)k.Length(), (double)c->NbPoles(), c->IsRational() ? 1.0 : 0.0})
+    out.push_back(x);
+  for (int i = k.Lower(); i <= k.Upper(); ++i)
+    out.push_back(k(i));
+  for (int i = 1; i <= c->NbPoles(); ++i)
+    push3(out, c->Pole(i).XYZ());
+  if (c->IsRational())
+    for (int i = 1; i <= c->NbPoles(); ++i)
+      out.push_back(c->Weight(i));
+  return at;
+}
+
+double push_bspline_surface(std::vector<double>& out, const occ::handle<Geom_BSplineSurface>& s0, const TopLoc_Location& loc)
+{
+  occ::handle<Geom_BSplineSurface> s = occ::down_cast<Geom_BSplineSurface>(s0->Copy());
+  if (s->IsUPeriodic())
+    s->SetUNotPeriodic();
+  if (s->IsVPeriodic())
+    s->SetVNotPeriodic();
+  if (!loc.IsIdentity())
+    s->Transform(loc.Transformation());
+  const double                      at       = static_cast<double>(out.size());
+  const NCollection_Array1<double>& ku       = s->UKnotSequence();
+  const NCollection_Array1<double>& kv       = s->VKnotSequence();
+  const bool                        rational = s->IsURational() || s->IsVRational();
+  for (const double x : {1.0, (double)s->UDegree(), (double)s->VDegree(), (double)ku.Length(), (double)kv.Length(), (double)s->NbUPoles(), (double)s->NbVPoles(), rational ? 1.0 : 0.0})
+    out.push_back(x);
+  for (int i = ku.Lower(); i <= ku.Upper(); ++i)
+    out.push_back(ku(i));
+  for (int i = kv.Lower(); i <= kv.Upper(); ++i)
+    out.push_back(kv(i));
+  for (int i = 1; i <= s->NbUPoles(); ++i)
+    for (int j = 1; j <= s->NbVPoles(); ++j)
+      push3(out, s->Pole(i, j).XYZ());
+  if (rational)
+    for (int i = 1; i <= s->NbUPoles(); ++i)
+      for (int j = 1; j <= s->NbVPoles(); ++j)
+        out.push_back(s->Weight(i, j));
+  return at;
+}
+
+// A face's B-spline surface (under a rectangular trim too), or null.
+occ::handle<Geom_BSplineSurface> bspline_of(occ::handle<Geom_Surface> s)
+{
+  while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(s))
+    s = t->BasisSurface();
+  return occ::down_cast<Geom_BSplineSurface>(s);
+}
+
 } // namespace
+
+// B-spline faces in noshape's mesher (NOSHAPE_MESH_BSPLINE=0: BRepMesh's, as before).
+static bool bspline_faces_on()
+{
+  static const bool on = [] {
+    const char* v = std::getenv("NOSHAPE_MESH_BSPLINE");
+    return v == nullptr || std::string(v) != "0";
+  }();
+  return on;
+}
 
 bool rust_mesh_on()
 {
@@ -89,7 +165,8 @@ bool rust_mesh_on()
 }
 
 int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeIMap& vertices, const std::vector<char>& fresh, double lin, double ang,
-                    bool parallel, std::vector<char>& taken, std::vector<RustFace>& meshes, std::vector<std::vector<std::array<float, 3>>>& polys)
+                    bool parallel, std::vector<char>& taken, std::vector<RustFace>& meshes, std::vector<std::vector<std::array<float, 3>>>& polys,
+                    const std::function<void(bool)>& unlocked)
 {
   const KernelTimer timer("mesh.rust");
   auto              lap = std::make_unique<KernelTimer>("mesh.rust.in");
@@ -138,11 +215,24 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
       put3(cv + 7, g.XAxis().Direction().XYZ());
       cv[10] = g.Radius();
     }
+    else if (!bc.IsNull() && !occ::down_cast<Geom_BSplineCurve>(bc).IsNull())
+      cv[0] = 5; // a B-spline: flattened below, in turn
     else
       cv[0] = 3;
     cv[11] = f;
     cv[12] = l;
   });
+  // The B-spline edges' curves (cv[1]: where in in.nurbs).
+  for (int i = 1; i <= ne; ++i)
+  {
+    double* cv = &in.curves[13 * (size_t)(i - 1)];
+    if (cv[0] != 5)
+      continue;
+    TopLoc_Location loc;
+    double          f = 0, l = 0;
+    const occ::handle<Geom_Curve> c = BRep_Tool::Curve(TopoDS::Edge(edges(i).Oriented(TopAbs_FORWARD)), loc, f, l);
+    cv[1] = push_bspline(in.nurbs, occ::down_cast<Geom_BSplineCurve>(basis(c)), loc);
+  }
   // Faces: kind (0 plane, 1 cylinder, 2 cone, 3 torus, 4 sphere, 255 not meshed here) and 12 numbers of geometry (below);
   // their wires' edge uses. One face per TFace: the others (a pattern's instances) take its triangulation.
   sub = std::make_unique<KernelTimer>("mesh.rust.in.faces");
@@ -173,14 +263,18 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     FaceIn&                         r = read[(size_t)j1 - 1];
     const TopoDS_Face&              f = TopoDS::Face(faces(face_of[(size_t)j1 - 1]));
     TopLoc_Location                 loc;
-    const occ::handle<Geom_Surface> s  = BRep_Tool::Surface(f, loc);
+    occ::handle<Geom_Surface>       s  = BRep_Tool::Surface(f, loc);
+    // A rectangular trim keeps its basis's parametrisation.
+    while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(s))
+      s = t->BasisSurface();
     const bool                      mf = s.IsNull() || is_mesh_face(f);
     const occ::handle<Geom_Plane>   pl = mf ? occ::handle<Geom_Plane>() : occ::down_cast<Geom_Plane>(s);
     const occ::handle<Geom_CylindricalSurface> cyl = mf ? occ::handle<Geom_CylindricalSurface>() : occ::down_cast<Geom_CylindricalSurface>(s);
     const occ::handle<Geom_ConicalSurface>     con = mf ? occ::handle<Geom_ConicalSurface>() : occ::down_cast<Geom_ConicalSurface>(s);
     const occ::handle<Geom_ToroidalSurface>    tor = mf ? occ::handle<Geom_ToroidalSurface>() : occ::down_cast<Geom_ToroidalSurface>(s);
     const occ::handle<Geom_SphericalSurface>   sph = mf ? occ::handle<Geom_SphericalSurface>() : occ::down_cast<Geom_SphericalSurface>(s);
-    bool ok = (!pl.IsNull() || !cyl.IsNull() || !con.IsNull() || !tor.IsNull() || !sph.IsNull()) && (f.Orientation() == TopAbs_FORWARD || f.Orientation() == TopAbs_REVERSED);
+    const occ::handle<Geom_BSplineSurface>     bss = mf ? occ::handle<Geom_BSplineSurface>() : bspline_of(s);
+    bool ok = (!pl.IsNull() || !cyl.IsNull() || !con.IsNull() || !tor.IsNull() || !sph.IsNull() || (!bss.IsNull() && bspline_faces_on())) && (f.Orientation() == TopAbs_FORWARD || f.Orientation() == TopAbs_REVERSED);
     // Its loops, meshed here or not (a face BRepMesh meshes tells which edges it splits its own way).
     for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
     {
@@ -233,6 +327,8 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
       sv[11] = tor->MinorRadius();
       sv[12] = a.Direct() ? 1.0 : 0.0;
     }
+    else if (ok && !bss.IsNull())
+      sv[0] = 5; // a B-spline: flattened below, in turn (sv[1]: where in in.nurbs)
     else if (ok)
     {
       // Kind, origin, axis, x direction, radius, half-angle, whether the frame is right-handed.
@@ -248,6 +344,13 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     else
       sv[0] = 255; // meshed by BRepMesh
   });
+  for (size_t j = 0; j < read.size(); ++j)
+    if (read[j].surface[0] == 5)
+    {
+      TopLoc_Location loc;
+      const occ::handle<Geom_Surface> s = BRep_Tool::Surface(TopoDS::Face(faces(face_of[j])), loc);
+      read[j].surface[1]                = push_bspline_surface(in.nurbs, bspline_of(s), loc);
+    }
   in.face_loops.push_back(0);
   in.loop_uses.push_back(0);
   for (const FaceIn& r : read)
@@ -266,7 +369,12 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
   lap = std::make_unique<KernelTimer>("mesh.rust.mesh");
   auto f64s = [](const std::vector<double>& v) { return rust::Slice<const double>(v.data(), v.size()); };
   auto u32s = [](const std::vector<uint32_t>& v) { return rust::Slice<const uint32_t>(v.data(), v.size()); };
-  if (!brep_mesh(f64s(in.vertices), u32s(in.edges), f64s(in.curves), f64s(in.surfaces), u32s(in.face_loops), u32s(in.loop_uses), u32s(in.uses), in.linear, in.angular, *out))
+  if (unlocked)
+    unlocked(true);
+  const bool meshed = brep_mesh(f64s(in.vertices), u32s(in.edges), f64s(in.curves), f64s(in.surfaces), f64s(in.nurbs), u32s(in.face_loops), u32s(in.loop_uses), u32s(in.uses), in.linear, in.angular, *out);
+  if (unlocked)
+    unlocked(false);
+  if (!meshed)
     return 0;
   // The output through plain pointers (a rust::Vec's [] asks Rust for its data each time).
   const uint8_t*  face_ok    = out->face_ok.data();

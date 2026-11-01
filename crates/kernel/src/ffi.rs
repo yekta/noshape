@@ -397,7 +397,7 @@ pub(crate) mod ffi {
         /// meshed here) and its geometry (13 numbers); per face its first loop (faces + 1), per loop its first
         /// use (loops + 1), edge × 2 + reversed per use; the display's deflections.
         #[allow(clippy::too_many_arguments)]
-        fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], linear: f64, angular: f64, out: &mut MeshOut) -> bool;
+        fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], nurbs: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], linear: f64, angular: f64, out: &mut MeshOut) -> bool;
         /// Whether this thread meshes with it (`set_rust_mesh`).
         fn brep_mesh_on() -> bool;
         /// noshape's own Boolean (op 0 fuse, 1 cut, 2 common) of `args` (the object first): false when it

@@ -264,3 +264,132 @@ fn a_loop_with_no_edges_is_declined() {
     let out = mesh_body(&v, &e, &faces, DEFL);
     assert!(out.faces.iter().all(Option::is_none));
 }
+
+/// A B-spline face (lead 11-01: the imports' and the knurl's faces in noshape's mesher): a 100 × 50 mm patch arched
+/// 20 mm high along x (quadratic in u, linear in v), its long sides B-spline edges, its ends lines. It is meshed with
+/// interior nodes, every triangle's centre within the linear deflection (plus the chord's own share) of the
+/// surface, every normal up, each edge's nodes its loop's.
+#[test]
+fn a_bspline_face_is_meshed_within_the_deflection() {
+    use crate::nurbs::{NurbsCurve, NurbsSurface};
+    // A dome over 100 x 50 mm: quadratic both ways, its four sides the surface's boundary curves.
+    let (x, y, zu, zv) = ([0.0, 0.05, 0.1], [0.0, 0.025, 0.05], [0.0, 0.02, 0.0], [0.0, 0.01, 0.0]);
+    let pole = |i: usize, j: usize| DVec3::new(x[i], y[j], zu[i] + zv[j]);
+    let q = vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0];
+    let surface = NurbsSurface { udegree: 2, vdegree: 2, uknots: q.clone(), vknots: q.clone(), nu: 3, nv: 3, poles: (0..3).flat_map(|i| (0..3).map(move |j| pole(i, j))).collect(), weights: Vec::new() };
+    let curve = |poles: Vec<DVec3>| NurbsCurve { degree: 2, knots: q.clone(), poles, weights: Vec::new(), spans: Default::default() };
+    let along_u = |j: usize| curve((0..3).map(|i| pole(i, j)).collect());
+    let along_v = |i: usize| curve((0..3).map(|j| pole(i, j)).collect());
+    let curves = [along_u(0), along_v(2), along_u(2), along_v(0)];
+    let surfaces = [surface.clone()];
+    let v = vec![pole(0, 0), pole(2, 0), pole(2, 2), pole(0, 2)];
+    let nurbs = |index: u32, a: u32, b: u32| MeshEdge { curve: Some(Curve::Nurbs { index, t0: 0.0, t1: 1.0 }), v: [a, b], t0: 0.0, t1: 1.0 };
+    let e = vec![nurbs(0, 0, 1), nurbs(1, 1, 2), nurbs(2, 3, 2), nurbs(3, 0, 3)];
+    let face = MeshFace { surface: MeshSurface::Nurbs { index: 0 }, loops: vec![vec![Use { edge: 0, reversed: false }, Use { edge: 1, reversed: false }, Use { edge: 2, reversed: true }, Use { edge: 3, reversed: true }]] };
+    let defl = Deflection { linear: 1e-4, angular: 0.5 };
+    let out = mesh_body_with(&v, &e, std::slice::from_ref(&face), defl, MeshNurbs { curves: &curves, surfaces: &surfaces });
+    let m = out.faces[0].as_ref().expect("meshed");
+    let boundary: usize = out.edges.iter().flatten().map(|n| n.points.len()).sum::<usize>() - 4;
+    assert!(m.points.len() > boundary, "interior nodes: {} of {}", m.points.len(), boundary);
+    let mut worst: f64 = 0.0;
+    for t in &m.triangles {
+        let c = (m.points[t[0] as usize] + m.points[t[1] as usize] + m.points[t[2] as usize]) / 3.0;
+        worst = worst.max(surface.param_of(c, None).1);
+    }
+    assert!(worst <= 2.0 * defl.linear, "a triangle {worst} m off the surface");
+    assert!(m.normals.iter().all(|n| n.z > 0.0), "normals up");
+    for t in &m.triangles {
+        let (a, b, c) = (m.points[t[0] as usize], m.points[t[1] as usize], m.points[t[2] as usize]);
+        assert!((b - a).cross(c - a).z > 0.0, "counter-clockwise about the surface normal");
+    }
+    let (n0, n2) = (out.edges[0].as_ref().unwrap(), out.edges[2].as_ref().unwrap());
+    assert_eq!(m.edge_nodes[0][0].len(), n0.points.len());
+    assert_eq!(m.edge_nodes[0][2].len(), n2.points.len());
+}
+
+#[test]
+fn a_cylinder_piece_under_a_slanted_cut_is_meshed_as_a_grid() {
+    use crate::nurbs::NurbsCurve;
+    // A cylinder's piece from u 0 to 1.2 above z 0, under the plane z = 0.005 + 0.3 x: its top an ellipse's arc
+    // (the circle's arc as a rational quadratic, lifted onto the plane), not a rim, so not a strip.
+    let (r, th) = (0.01f64, 1.2f64);
+    let lift = |p: DVec3| DVec3::new(p.x, p.y, 0.005 + 0.3 * p.x);
+    let arc = [DVec3::new(r, 0.0, 0.0), DVec3::new(r, r * (th / 2.0).tan(), 0.0), DVec3::new(r * th.cos(), r * th.sin(), 0.0)];
+    let top = NurbsCurve { degree: 2, knots: vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0], poles: arc.iter().map(|&p| lift(p)).collect(), weights: vec![1.0, (th / 2.0).cos(), 1.0], spans: Default::default() };
+    let v = vec![arc[0], arc[2], lift(arc[2]), lift(arc[0])];
+    let e = vec![
+        MeshEdge { curve: Some(Curve::Circle { center: DVec3::ZERO, normal: DVec3::Z, xdir: DVec3::X, radius: r }), v: [0, 1], t0: 0.0, t1: th },
+        MeshEdge { curve: Some(Curve::Line), v: [1, 2], t0: 0.0, t1: v[2].z },
+        MeshEdge { curve: Some(Curve::Nurbs { index: 0, t0: 0.0, t1: 1.0 }), v: [3, 2], t0: 0.0, t1: 1.0 },
+        MeshEdge { curve: Some(Curve::Line), v: [3, 0], t0: 0.0, t1: v[3].z },
+    ];
+    let face = MeshFace {
+        surface: MeshSurface::Cylinder { origin: DVec3::ZERO, axis: DVec3::Z, xdir: DVec3::X, direct: true, radius: r },
+        loops: vec![vec![Use { edge: 0, reversed: false }, Use { edge: 1, reversed: false }, Use { edge: 2, reversed: true }, Use { edge: 3, reversed: false }]],
+    };
+    let defl = Deflection { linear: 1e-5, angular: 0.5 };
+    let curves = [top];
+    let out = mesh_body_with(&v, &e, std::slice::from_ref(&face), defl, MeshNurbs { curves: &curves, surfaces: &[] });
+    let m = out.faces[0].as_ref().expect("meshed");
+    for t in &m.triangles {
+        let (a, b, c) = (m.points[t[0] as usize], m.points[t[1] as usize], m.points[t[2] as usize]);
+        let mid = (a + b + c) / 3.0;
+        assert!(r - mid.truncate().length() <= 2.0 * defl.linear, "a triangle {} m inside the surface", r - mid.truncate().length());
+        let tn = (b - a).cross(c - a);
+        assert!(tn.dot(DVec3::new(mid.x, mid.y, 0.0)) > 0.0, "a triangle turned inward");
+        assert!(tn.dot(m.normals[t[0] as usize]) > 0.0, "a triangle against its normal");
+    }
+    for (p, n) in m.points.iter().zip(&m.normals) {
+        assert!((r - p.truncate().length()).abs() < 1e-9, "a node off the cylinder");
+        assert!((n.dot(DVec3::new(p.x, p.y, 0.0).normalize()) - 1.0).abs() < 1e-9, "a normal not the cylinder's");
+    }
+    assert_eq!(m.edge_nodes[0][2].len(), out.edges[2].as_ref().unwrap().points.len());
+}
+
+#[test]
+fn a_whole_cylinder_under_a_slanted_cut_is_meshed_across_its_seam() {
+    use crate::nurbs::NurbsCurve;
+    // The whole turn under z = 0.005 + 0.3 x: its top a whole ellipse (the circle as nine rational poles,
+    // lifted), its seam at u 0 used both ways.
+    let r = 0.01f64;
+    let lift = |x: f64, y: f64| DVec3::new(x, y, 0.005 + 0.3 * x);
+    let corners = [(1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (-1.0, 1.0), (-1.0, 0.0), (-1.0, -1.0), (0.0, -1.0), (1.0, -1.0), (1.0, 0.0)];
+    let w = std::f64::consts::FRAC_1_SQRT_2;
+    let top = NurbsCurve {
+        degree: 2,
+        knots: vec![0.0, 0.0, 0.0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1.0, 1.0, 1.0],
+        poles: corners.iter().map(|&(x, y)| lift(r * x, r * y)).collect(),
+        weights: (0..9).map(|k| if k % 2 == 1 { w } else { 1.0 }).collect(),
+        spans: Default::default(),
+    };
+    let v = vec![DVec3::new(r, 0.0, 0.0), lift(r, 0.0)];
+    let e = vec![
+        MeshEdge { curve: Some(Curve::Circle { center: DVec3::ZERO, normal: DVec3::Z, xdir: DVec3::X, radius: r }), v: [0, 0], t0: 0.0, t1: std::f64::consts::TAU },
+        MeshEdge { curve: Some(Curve::Nurbs { index: 0, t0: 0.0, t1: 1.0 }), v: [1, 1], t0: 0.0, t1: 1.0 },
+        MeshEdge { curve: Some(Curve::Line), v: [0, 1], t0: 0.0, t1: v[1].z },
+    ];
+    let face = MeshFace {
+        surface: MeshSurface::Cylinder { origin: DVec3::ZERO, axis: DVec3::Z, xdir: DVec3::X, direct: true, radius: r },
+        loops: vec![vec![Use { edge: 0, reversed: false }, Use { edge: 2, reversed: false }, Use { edge: 1, reversed: true }, Use { edge: 2, reversed: true }]],
+    };
+    let defl = Deflection { linear: 1e-5, angular: 0.5 };
+    let curves = [top];
+    let out = mesh_body_with(&v, &e, std::slice::from_ref(&face), defl, MeshNurbs { curves: &curves, surfaces: &[] });
+    let m = out.faces[0].as_ref().expect("meshed");
+    let mut area = 0.0;
+    for t in &m.triangles {
+        let (a, b, c) = (m.points[t[0] as usize], m.points[t[1] as usize], m.points[t[2] as usize]);
+        let mid = (a + b + c) / 3.0;
+        assert!(r - mid.truncate().length() <= 2.0 * defl.linear, "a triangle {} m inside the surface", r - mid.truncate().length());
+        let tn = (b - a).cross(c - a);
+        assert!(tn.dot(DVec3::new(mid.x, mid.y, 0.0)) > 0.0, "a triangle turned inward");
+        area += tn.length() / 2.0;
+    }
+    // The side's area: the mean height (0.005) round the whole turn, less the chords' share.
+    let whole = std::f64::consts::TAU * r * 0.005;
+    assert!(area < whole && area > whole * (1.0 - 1e-2), "area {area} of {whole}");
+    // The seam's two uses: the same points, different nodes.
+    let (up, down) = (&m.edge_nodes[0][1], &m.edge_nodes[0][3]);
+    assert_eq!(up.len(), 2);
+    assert_ne!(up, down);
+}

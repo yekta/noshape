@@ -169,9 +169,11 @@ struct RustFace
 };
 // Meshes the `fresh` faces it takes (analytic ones): each is marked in `taken` with its mesh in `meshes` (per
 // face index), and their edges' polylines go to `polys` (per edge index, the FORWARD edge's way). Returns how
-// many.
+// many. `unlocked(true)` before the meshing itself (on its own copies of the faces' geometry) and
+// `unlocked(false)` after, when given: the caller's lock released meanwhile.
 int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeIMap& vertices, const std::vector<char>& fresh, double lin, double ang,
-                    bool parallel, std::vector<char>& taken, std::vector<RustFace>& meshes, std::vector<std::vector<std::array<float, 3>>>& polys);
+                    bool parallel, std::vector<char>& taken, std::vector<RustFace>& meshes, std::vector<std::vector<std::array<float, 3>>>& polys,
+                    const std::function<void(bool)>& unlocked = {});
 // Notes why it wasn't tried (false; the replay's strict mode fails).
 bool rust_decline(const char* why);
 // While one lives, this thread's declines of noshape's Boolean return instead of failing in the replay's strict

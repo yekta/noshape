@@ -38,6 +38,7 @@
 
 #include <algorithm>
 #include <BRepAdaptor_Surface.hxx>
+#include <chrono>
 #include <functional>
 #include <atomic>
 #include <NCollection_DataMap.hxx>
@@ -856,12 +857,44 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     TopoDS_Shape meshed = s.shape;
     if (!partial)
       std::fill(fresh.begin(), fresh.end(), 1);
-    // Faces noshape's own mesher takes (psui, mesh_rust.cpp) aren't BRepMesh's.
+    // The cached faces' meshes, taken now: the cache set may go while the lock is released (another part's
+    // deflections push it out).
+    std::vector<occ::handle<Poly_Triangulation>> cached_tri((size_t)m->faces.Extent() + 1);
+    std::vector<std::optional<RustFace>>         cached_rust((size_t)m->faces.Extent() + 1);
+    for (int i = 1; i <= m->faces.Extent() && set != nullptr; ++i)
+      if (!fresh[(size_t)i])
+      {
+        const TopoDS_Shape& f = m->faces(i);
+        if (const RustFace* r = set->rust.Seek(f))
+          cached_rust[(size_t)i] = *r;
+        else if (const occ::handle<Poly_Triangulation>* t = set->faces.Seek(f))
+          cached_tri[(size_t)i] = *t;
+      }
+    // NOSHAPE_MESH_LOCKED=1: both meshers under the lock, BRepMesh's in place, as before (for comparisons).
+    static const bool locked = std::getenv("NOSHAPE_MESH_LOCKED") != nullptr;
+    // Faces noshape's own mesher takes (psui, mesh_rust.cpp) aren't BRepMesh's. It meshes its copy of their
+    // geometry with the lock released too.
     std::vector<char>                              taken((size_t)m->faces.Extent() + 1, 0);
     std::vector<RustFace>                          rust_meshes((size_t)m->faces.Extent() + 1);
     std::vector<std::vector<std::array<float, 3>>> rust_polys((size_t)m->edges.Extent());
-    const int ntaken = !relative && !mesh_faces && rust_mesh_on() ? rust_mesh_faces(m->faces, m->edges, m->vertices, fresh, lin, ang, parallel, taken, rust_meshes, rust_polys) : 0;
+    const std::function<void(bool)> unlocked = [&](bool out) {
+      if (out)
+      {
+        lock.unlock();
+        locked_section_721.reset();
+        return;
+      }
+      locked_section_721.emplace();
+      lock.lock();
+      // The same set, or a new one if it went meanwhile.
+      if (set != nullptr)
+        set = mesh_set(lin, ang);
+    };
+    const auto rust_t0 = std::chrono::steady_clock::now();
+    const int ntaken = !relative && !mesh_faces && rust_mesh_on() ? rust_mesh_faces(m->faces, m->edges, m->vertices, fresh, lin, ang, parallel, taken, rust_meshes, rust_polys, locked ? std::function<void(bool)>() : unlocked) : 0;
     m->rust_faces            = (size_t)ntaken;
+    if (std::getenv("NOSHAPE_MESH_DEBUG"))
+      std::fprintf(stderr, "mesh: noshape's mesher took %d of %d faces in %.1f ms\n", ntaken, nfresh, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - rust_t0).count());
     // Their cache entries go in below one by one: room for them at once (not grown as they come).
     if (set != nullptr && ntaken > 0)
     {
@@ -877,26 +910,11 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
           B.Add(c, m->faces(i));
       meshed = c;
     }
-    // The cached faces' meshes, taken now: the cache set may go while the lock is released (another part's
-    // deflections push it out).
-    std::vector<occ::handle<Poly_Triangulation>> cached_tri((size_t)m->faces.Extent() + 1);
-    std::vector<std::optional<RustFace>>         cached_rust((size_t)m->faces.Extent() + 1);
-    for (int i = 1; i <= m->faces.Extent() && set != nullptr; ++i)
-      if (!fresh[(size_t)i])
-      {
-        const TopoDS_Shape& f = m->faces(i);
-        if (const RustFace* r = set->rust.Seek(f))
-          cached_rust[(size_t)i] = *r;
-        else if (const occ::handle<Poly_Triangulation>* t = set->faces.Seek(f))
-          cached_tri[(size_t)i] = *t;
-      }
     // BRepMesh's faces on a copy (not on the model's faces, which other parts and threads may share), the lock
     // released meanwhile; a mesh body's faces (their triangulation is their geometry) as before, in place.
     std::optional<BRepBuilderAPI_Copy> copy;
     if (meshed.ShapeType() != TopAbs_COMPOUND || meshed.NbChildren() > 0)
     {
-      // NOSHAPE_MESH_LOCKED=1: in place, under the lock, as before (for comparisons).
-      static const bool locked = std::getenv("NOSHAPE_MESH_LOCKED") != nullptr;
       if (!mesh_faces && !locked)
         copy.emplace(meshed, false, false);
       BRepMesh_IncrementalMesh mesher;
@@ -912,8 +930,11 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
         slot.emplace();
       const KernelTimer timer("mesh.brepmesh");
       const size_t      fallbacks = g_planar_fallbacks.load();
+      const auto brep_t0 = std::chrono::steady_clock::now();
       mesher.Perform(ctx);
       slot.reset();
+      if (std::getenv("NOSHAPE_MESH_DEBUG"))
+        std::fprintf(stderr, "mesh: BRepMesh meshed %d faces in %.1f ms\n", meshed.ShapeType() == TopAbs_COMPOUND ? meshed.NbChildren() : m->faces.Extent(), std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - brep_t0).count());
       m->planar_fallbacks = g_planar_fallbacks.load() - fallbacks;
       if (std::getenv("NOSHAPE_MESH_DEBUG"))
         std::fprintf(stderr, "mesh: %zu planar faces to BRepMesh's algorithm\n", m->planar_fallbacks);

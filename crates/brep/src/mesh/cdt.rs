@@ -373,6 +373,12 @@ impl Mesh {
 /// Triangulates the polygon of `rings` (indices into `pts`, each ring once round, either direction; the outer one
 /// the largest, the others its holes): triangles counter-clockwise, as point indices. Every point a vertex, no others.
 pub fn triangulate(pts: &[Pt], rings: &[Vec<usize>]) -> Option<Vec<[u32; 3]>> {
+    triangulate_with(pts, rings, &[])
+}
+
+/// [`triangulate`] with `interior` points inside the polygon as vertices too (a curved face's nodes inside its
+/// boundary); each must be clearly inside (one outside, or on a ring, fails the whole).
+pub fn triangulate_with(pts: &[Pt], rings: &[Vec<usize>], interior: &[usize]) -> Option<Vec<[u32; 3]>> {
     if rings.is_empty() {
         return None;
     }
@@ -395,6 +401,12 @@ pub fn triangulate(pts: &[Pt], rings: &[Vec<usize>]) -> Option<Vec<[u32; 3]>> {
             min_y = min_y.min(pts[i].y);
             max_y = max_y.max(pts[i].y);
         }
+    }
+    for &i in interior {
+        if i >= pts.len() || used[i] {
+            return None;
+        }
+        used[i] = true;
     }
     let size = (max_x - min_x).max(max_y - min_y);
     if size.is_nan() || size <= 0.0 || !size.is_finite() {
@@ -444,6 +456,7 @@ pub fn triangulate(pts: &[Pt], rings: &[Vec<usize>]) -> Option<Vec<[u32; 3]>> {
     let mut order: Vec<(u32, usize)> = rr
         .iter()
         .flatten()
+        .chain(interior)
         .map(|&i| (spread(((pts[i].x - min_x) * s).clamp(0.0, 65535.0) as u32) | (spread(((pts[i].y - min_y) * s).clamp(0.0, 65535.0) as u32) << 1), i))
         .collect();
     let mut seed: u64 = 0x9E37_79B9_7F4A_7C15;
@@ -466,9 +479,10 @@ pub fn triangulate(pts: &[Pt], rings: &[Vec<usize>]) -> Option<Vec<[u32; 3]>> {
     if let Some(k) = &key
         && let Some(tris) = cached(k)
     {
-        return checked(pts, tris, nv, rr.len(), want, size);
+        return checked(pts, tris, nv + 2 * interior.len(), rr.len(), want, size);
     }
-    let mut m = Mesh { p, v: Vec::with_capacity(6 * nv + 12), tw: Vec::with_capacity(6 * nv + 12), vedge: vec![NONE; np + 3], fixed: Vec::with_capacity(6 * nv + 12), recovered: Vec::new(), st: Vec::new() };
+    let nall = nv + interior.len();
+    let mut m = Mesh { p, v: Vec::with_capacity(6 * nall + 12), tw: Vec::with_capacity(6 * nall + 12), vedge: vec![NONE; np + 3], fixed: Vec::with_capacity(6 * nall + 12), recovered: Vec::new(), st: Vec::new() };
     m.add_tri(np, np + 1, np + 2);
     let mut start = 0;
     for &(_, i) in &order {
@@ -532,14 +546,15 @@ pub fn triangulate(pts: &[Pt], rings: &[Vec<usize>]) -> Option<Vec<[u32; 3]>> {
         }
         tris.push([a as u32, b as u32, c as u32]);
     }
-    let tris = checked(pts, tris, nv, rr.len(), want, size)?;
+    let tris = checked(pts, tris, nv + 2 * interior.len(), rr.len(), want, size)?;
     if let Some(k) = key {
         keep(k, &tris);
     }
     Some(tris)
 }
 
-/// `tris` if they are counter-clockwise and every point is used: V + 2 H − 2 triangles covering the polygon.
+/// `tris` if they are counter-clockwise and every point is used: V + 2 H − 2 triangles covering the polygon (`nv`
+/// counts an interior point twice: B + 2 I + 2 H − 2).
 fn checked(pts: &[Pt], tris: Vec<[u32; 3]>, nv: usize, rings: usize, want: f64, size: f64) -> Option<Vec<[u32; 3]>> {
     let mut sum = 0.0;
     for t in &tris {
