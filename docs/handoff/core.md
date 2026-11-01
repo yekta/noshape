@@ -101,6 +101,14 @@ their corners merged (union-find). T1 quadrics_and_slabs_agree: SHELL-SLOW's pla
 spheres 32, removed curved faces 24, not one shell 21, offset edges vanishing 18, non-strip collapses 10); profile
 documents unchanged (shell-hang: vertices of more faces, a non-manifold edge, two shells; draft-hang Shell 3: a removed
 curved face). Then (user 11-02): vertices of more than three faces, removed curved faces, multi-shell inputs.
+Step 2c (11-02): vertices of more faces when all their offsets meet in a point (Gauss-Newton `quad::solve_all`, every
+residual within 1e-12 of the size; a pyramid's apex, two equal chamfers meeting a corner); quadrics also takes planar
+parts the planes path declines. T1: two chamfers meeting (the slabs' corner filler imprints an edge on each side face
+there, two edges and two vertices more than ours); the planar declines also decline in quadrics (walls invalid).
+Share: corpus 0 (vertex reasons 8 → 5); shell-hang's Shells 2 / 3 now stop at a 1 mm chamfer strip whose offset
+vanishes at 5 mm (next after the removed curved faces and multi-shell inputs: faces whose offset vanishes, the planar
+form of 2b). Real parts mostly shell by regions / offset already (SHELL-SLOW's R2 plate: regions, 30-74 ms); the slab
+time left is in fuzz bodies, the slowest of which fail either way.
 Was: next (step 2b): collapsing fillets (their offset vanishes: the neighbours' offsets meet; contract the face to an
 edge, its end arcs to points), vertices of more faces, removed curved faces.
 Release note for the lead: "Shell: a pocket's floor corners are now mitred as Onshape does (the wall used to thin to

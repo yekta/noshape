@@ -565,7 +565,14 @@ fn planes_and_slabs_agree() {
     // Both tops of the step removed: the step's riser hangs over the cavity, its foot past the removed step face.
     let rm = faces_where(&stepped, |c| ((c.z - 10.0).abs() < 1e-9 && c.x > 30.0) || (c.z - 20.0).abs() < 1e-9);
     assert!(shell_solid(&stepped, &rm, 1.5, ShellSide::Inside, ShellMethod::Planes).is_err(), "a rim past its removed face");
+    assert!(shell_solid(&stepped, &rm, 1.5, ShellSide::Inside, ShellMethod::Quadrics).is_err(), "a rim past its removed face (quadrics)");
+    let rm = top(&pockets, 20.0);
+    assert!(shell_solid(&pockets, &rm, 2.0, ShellSide::Inside, ShellMethod::Quadrics).is_err(), "offsets meeting across the 3 mm wall (quadrics)");
 }
+
+/// A shell case: name, part, faces removed, thickness, and how many shown edges and vertices the slabs have more
+/// than the direct wall (their documented artefacts).
+type Case = (&'static str, Shape, Vec<Shape>, f64, (usize, usize));
 
 /// Solids of planes, cylinders and cones: the direct wall (ShellMethod::Quadrics) against the slabs'.
 #[test]
@@ -588,17 +595,27 @@ fn quadrics_and_slabs_agree() {
         let v = edges_where(&p, |i| (i.start.z - i.end.z).abs() > 1e-6 && matches!(i.curve, Curve::Line { .. }) && (i.start.x.abs() < 1e-9 || (i.start.x - 80.0).abs() < 1e-9));
         fillet(&p, &v, 2.0).unwrap().shape
     };
+    // Chamfers on two top edges meeting at a corner: below their mitre a vertex of four faces (both chamfers, both
+    // sides), whose offsets meet in a point. (The slabs' corner filler imprints an edge on each side face there, at
+    // (0, 0.707, 7.293) and (0.707, 0, 7.293): two edges and two vertices more than ours, whose outside is the part's.)
+    let chamfered = {
+        let p = bx([0.0; 3], [40.0, 20.0, 10.0]);
+        let es = edges_where(&p, |i| i.start.z > 9.99 && i.end.z > 9.99 && (i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9 || i.start.x.abs() < 1e-9 && i.end.x.abs() < 1e-9));
+        let p = chamfer(&p, &es, ChamferSpec::Equal(2.0), &[]).unwrap().shape;
+        unified(cut(&p, &bx([15.0, 5.0, 4.0], [25.0, 15.0, 11.0])).unwrap().shape)
+    };
     // (The countersunk plate: the slabs' offset cone has its seam opposite the offset hole's, splitting the circle
     // they share in two (one more shown edge, two more vertices); ours keep the faces' frames, the circle whole, its
     // corners only shown, as live's.)
-    let cases: Vec<(&str, Shape, Vec<Shape>, f64, bool)> = vec![
-        ("plate with a hole, top removed", plate_hole.clone(), top(&plate_hole, 12.0), 2.0, false),
-        ("plate with a hole, bottom removed", plate_hole.clone(), bottom(&plate_hole), 2.0, false),
-        ("filleted block, top removed", filleted.clone(), top(&filleted, 10.0), 1.0, false),
-        ("L with a filleted inner corner, top removed", l_fillet.clone(), top(&l_fillet, 10.0), 2.0, false),
-        ("countersunk plate, bottom removed", sunk.clone(), bottom(&sunk), 2.0, true),
-        ("qa plate R2, top removed, 1.5", qa_plate.clone(), top(&qa_plate, 10.0), 1.5, false),
-        ("qa plate R2, top removed, 3 (the fillets collapse)", qa_plate.clone(), top(&qa_plate, 10.0), 3.0, false),
+    let cases: Vec<Case> = vec![
+        ("plate with a hole, top removed", plate_hole.clone(), top(&plate_hole, 12.0), 2.0, (0, 0)),
+        ("plate with a hole, bottom removed", plate_hole.clone(), bottom(&plate_hole), 2.0, (0, 0)),
+        ("filleted block, top removed", filleted.clone(), top(&filleted, 10.0), 1.0, (0, 0)),
+        ("L with a filleted inner corner, top removed", l_fillet.clone(), top(&l_fillet, 10.0), 2.0, (0, 0)),
+        ("countersunk plate, bottom removed", sunk.clone(), bottom(&sunk), 2.0, (1, 2)),
+        ("two chamfers meeting (a vertex of four faces), bottom removed", chamfered.clone(), bottom(&chamfered), 1.0, (2, 2)),
+        ("qa plate R2, top removed, 1.5", qa_plate.clone(), top(&qa_plate, 10.0), 1.5, (0, 0)),
+        ("qa plate R2, top removed, 3 (the fillets collapse)", qa_plate.clone(), top(&qa_plate, 10.0), 3.0, (0, 0)),
     ];
     let images = |r: &OpResult, s: &Shape| -> Vec<(usize, usize)> {
         (0..s.faces().len()).map(|i| (r.history.modified(0, ShapeType::Face, i as u32).len(), r.history.generated(0, ShapeType::Face, i as u32).len())).collect()
@@ -608,19 +625,40 @@ fn quadrics_and_slabs_agree() {
         let st = x.shown_topology().unwrap();
         [x.count(ShapeType::Face), st.edges.iter().filter(|b| **b).count(), st.vertices.iter().filter(|b| **b).count()]
     };
-    for (name, s, rm, t, seams) in cases {
+    for (name, s, rm, t, (de, dv)) in cases {
         let q = shell_solid(&s, &rm, t, ShellSide::Inside, ShellMethod::Slabs).unwrap();
         match shell_solid(&s, &rm, t, ShellSide::Inside, ShellMethod::Quadrics) {
             Err(e) => report += &format!("{name}: quadrics declined: {e}\n"),
             Ok(p) => {
                 let counts = shown;
                 let (a, b) = (shown(&p.shape), shown(&q.shape));
-                let counts_ok = if seams { a[0] == b[0] && a[1] + 1 == b[1] && a[2] + 2 == b[2] } else { a == b };
+                let counts_ok = a[0] == b[0] && a[1] + de == b[1] && a[2] + dv == b[2];
                 if !p.shape.is_valid() || !close(vol(&p.shape), vol(&q.shape)) || !counts_ok || images(&p, &s) != images(&q, &s) {
                     report += &format!("{name}: quadrics {} {:?} vs slabs {} {:?}; images {:?} vs {:?}\n", vol(&p.shape), counts(&p.shape), vol(&q.shape), counts(&q.shape), images(&p, &s), images(&q, &s));
+                    let mine: Vec<DVec3> = p.shape.vertices().iter().map(|v| v.vertex_point().unwrap()).collect();
+                    for v in q.shape.vertices() {
+                        let x = v.vertex_point().unwrap();
+                        if mine.iter().all(|m| m.distance(x) > 1e-6) {
+                            eprintln!("  slabs' extra vertex at {x:.4?}");
+                        }
+                    }
                 }
             }
         }
     }
     assert!(report.is_empty(), "{report}");
+}
+
+/// SHELL-SLOW's plate (80 × 50 × 10, a Ø20 hole, R2 vertical outer fillets): the automatic path and its time.
+#[test]
+#[ignore = "T2 probe"]
+fn qa_plate_shell_path() {
+    let p = unify_same_domain(&cut(&bx([0.0; 3], [80.0, 50.0, 10.0]), &cyl_z(40.0, 25.0, -1.0, 10.0, 12.0)).unwrap().shape).unwrap().shape;
+    let v = edges_where(&p, |i| (i.start.z - i.end.z).abs() > 1e-6 && matches!(i.curve, Curve::Line { .. }) && (i.start.x.abs() < 1e-9 || (i.start.x - 80.0).abs() < 1e-9));
+    let p = fillet(&p, &v, 2.0).unwrap().shape;
+    for t in [1.5, 2.5, 3.0] {
+        let t0 = std::time::Instant::now();
+        let r = shell_solid(&p, &top(&p, 10.0), t, ShellSide::Inside, ShellMethod::Auto).map(|r| vol(&r.shape));
+        println!("qa plate t {t}: {r:?} by {} in {:.0} ms", last_shell_path(), t0.elapsed().as_secs_f64() * 1e3);
+    }
 }

@@ -2626,6 +2626,42 @@ bool solve3(const Surf* s[3], gp_XYZ& x, double scale)
   return false;
 }
 
+// Gauss-Newton over several offsets (a vertex of more than three faces): their common point, if they have one (every
+// residual within 1e-12 of the size).
+bool solve_all(const std::vector<const Surf*>& s, gp_XYZ& x, double scale)
+{
+  for (int it = 0; it < 80; ++it)
+  {
+    gp_Mat       JtJ(0, 0, 0, 0, 0, 0, 0, 0, 0);
+    gp_XYZ       Jtf(0, 0, 0);
+    double       worst = 0;
+    const double h     = 1e-7 * scale;
+    for (const Surf* q : s)
+    {
+      const double f = eval(*q, x);
+      worst          = std::max(worst, std::abs(f));
+      gp_XYZ g;
+      for (int c = 1; c <= 3; ++c)
+      {
+        gp_XYZ a = x, b = x;
+        a.SetCoord(c, a.Coord(c) + h);
+        b.SetCoord(c, b.Coord(c) - h);
+        g.SetCoord(c, (eval(*q, a) - eval(*q, b)) / (2 * h));
+      }
+      for (int r = 1; r <= 3; ++r)
+        for (int c = 1; c <= 3; ++c)
+          JtJ(r, c) += g.Coord(r) * g.Coord(c);
+      Jtf += g * f;
+    }
+    if (worst < 1e-12 * scale)
+      return true;
+    if (std::abs(JtJ.Determinant()) < 1e-18)
+      return false;
+    x -= JtJ.Inverted() * Jtf;
+  }
+  return false;
+}
+
 bool solve_line(const Surf& s, const gp_XYZ& o, const gp_XYZ& d, gp_XYZ& x, double scale)
 {
   double l = 0;
@@ -2785,8 +2821,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     else
       q.off = new Geom_ConicalSurface(q.ax, q.ang, q.r);
   }
-  if (!curved)
-    return no("planes only");
+  (void)curved; // (planes too: those by_planes declines, e.g. a corner of four faces)
   ShapeAncMap ef, vf, ve;
   TopExp::MapShapesAndUniqueAncestors(so, TopAbs_EDGE, TopAbs_FACE, ef);
   TopExp::MapShapesAndUniqueAncestors(so, TopAbs_VERTEX, TopAbs_FACE, vf);
@@ -2936,6 +2971,20 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           return no("a corner's offsets don't meet");
       }
     }
+    else if (fs.size() > 3 && es.size() == fs.size() && std::none_of(es.begin(), es.end(), [&](int e) { return tangent[(size_t)e] != 0 || seam[(size_t)e] != 0; }))
+    {
+      // More faces: one corner only where all their offsets meet in a point (a pyramid's apex); else the cavity
+      // would need an edge or a face there.
+      std::vector<const quad::Surf*> all;
+      x = V.XYZ();
+      for (int f : fs)
+      {
+        all.push_back(&sf[(size_t)f]);
+        x -= n_at(f) * (kept[(size_t)f] ? t / (double)fs.size() * 3.0 : 0.0);
+      }
+      if (!quad::solve_all(all, x, size))
+        return no("a corner of more faces whose offsets don't meet in a point");
+    }
     else if (fs.size() == 2 && std::any_of(es.begin(), es.end(), [&](int e) { return seam[(size_t)e] != 0; }))
     {
       const int sm = *std::find_if(es.begin(), es.end(), [&](int e) { return seam[(size_t)e] != 0; });
@@ -3000,7 +3049,14 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     if (seam[(size_t)i] || (tangent[(size_t)i] && group[(size_t)i] == 0) || (sf[(size_t)fa].kind == GeomAbs_Plane && sf[(size_t)fb].kind == GeomAbs_Plane))
     {
       if (A.Distance(B) <= 10 * tol || gp_Vec(A, B).Dot(t0) <= 0)
+      {
+        if (dbg)
+        {
+          const gp_Pnt m = oc.Value(0.5 * (oc.FirstParameter() + oc.LastParameter()));
+          std::fprintf(stderr, "quadrics: edge %d (faces %d kind %d, %d kind %d) at %g %g %g, length %g, offset %g\n", i, fa, (int)sf[(size_t)fa].kind, fb, (int)sf[(size_t)fb].kind, m.X(), m.Y(), m.Z(), oc.LastParameter() - oc.FirstParameter(), gp_Vec(A, B).Dot(t0.Normalized()));
+        }
         return no("an offset edge vanishes or turns round");
+      }
       c  = new Geom_Line(A, gp_Dir(gp_Vec(A, B)));
       p1 = A.Distance(B);
     }
