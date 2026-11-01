@@ -1,0 +1,17 @@
+--- a/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder_6.cxx
++++ b/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder_6.cxx
+@@ -942,9 +942,12 @@
+ 
+     if (Du1.Magnitude() <= tolget3d || Du2.Magnitude() <= tolget3d)
+     {
+-      aDenom++;
++      // noshape (patch 0014): one step closer to VFirst each time, then (past 64) half the way: a corner patch
++      // whose normal is degenerate along its whole first edge walked aDelta / tolget2d steps (a drafted block's
++      // reapplied R3 / R2 fillet: 5.5 s of its 5.6).
++      aDenom = aDenom < 64 ? aDenom + 1 : 2 * aDenom;
+ 
+-      if (std::abs(aDeltav) <= tolget2d)
++      if (std::abs(aDeltav) <= tolget2d || aDenom > (1 << 29))
+       {
+         return false;
+       }

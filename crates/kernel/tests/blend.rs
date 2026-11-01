@@ -755,3 +755,24 @@ fn a_fillet_over_smaller_blends_is_as_with_it_first() {
         }
     }
 }
+
+/// Live 1686 (c): a 60 x 40 x 20 block drafted 5° (narrowing upward), R3 on its four slanted edges and R2 round its
+/// top in one fillet (Draft's reapply makes this call): live 44304.933893372094 mm³, 18 faces, each corner one
+/// OTHER face. OCCT's corner patches are within 0.02 mm³; their orientation search walked ~1e5 steps per corner
+/// (5.5 s of the call) until OCCT patch 0014 (80 ms).
+#[test]
+fn a_drafted_blocks_mixed_radius_corners_are_lives() {
+    setup();
+    let b = bx([0.0; 3], [60.0, 40.0, 20.0]);
+    let sides: Vec<Shape> = b.faces().into_iter().filter(|f| f.bounding_box(false).is_ok_and(|bb| bb.max.z - bb.min.z > 1.0 * MM)).collect();
+    let d = draft(&b, &sides, DVec3::Z, &Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 5f64.to_radians()).unwrap().shape;
+    let mut es = edges_where(&d, |i| (i.start.z - i.end.z).abs() > 1.0 * MM);
+    let n = es.len();
+    es.extend(edges_where(&d, |i| i.start.z > 19.99 * MM && i.end.z > 19.99 * MM));
+    assert_eq!((n, es.len()), (4, 8));
+    let radii: Vec<f64> = (0..es.len()).map(|i| if i < n { 3.0 * MM } else { 2.0 * MM }).collect();
+    let r = fillet_checked(&d, &es, &radii).unwrap().shape;
+    assert!(r.is_valid());
+    assert!((vol_mm3(&r) - 44304.933893372094).abs() < 0.05, "{}", vol_mm3(&r));
+    assert_eq!(r.faces().len(), 18);
+}

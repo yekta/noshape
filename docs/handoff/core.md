@@ -76,6 +76,11 @@ deadlock in malloc).
   build() (noshape's Boolean result into OCCT topology: ellipse pcurves) without checks; now fail_if_cancelled every
   256 edges / faces. vibe4 at load 64-75 (16 cores), cancel at 0.5-20 s: 27-128 ms at every point (12 points).
   ~/agents/symbolize.py (vibe4) runs one addr2line for the whole log (5 s instead of 20+ min).
+- (08:45) OCCT patch 0014 (TKFillet, ChFi3d_Builder_6.cxx StoreData's orientation search: 1/n steps, past 64 halving):
+  D3 / live (c)'s one-call mixed-radius fillet 5.5 s → 80 ms, same result. Found with a SIGPROF sampler (no perf /
+  gdb on vibe4): the untracked crates/kernel/examples/core_scratch.rs `sampler::sample(|| ...)` writes raw stacks
+  every 5 ms to stderr; ~/agents/profile.py <log> (vibe4; /root/core-scratch/profile.py) prints inclusive / self
+  shares. Lib /root/core-scratch/occt0013/libTKFillet.a (backup occt-lib-backup/libTKFillet.a.pre0014), in /root/occt.
 
 ## Mixed-radius corners (live 1686, 11-01 04:50): the next blend step
 - Live's Fillet holds one radius, so its mixed corners come from two Fillet features; the order doesn't matter. Each
