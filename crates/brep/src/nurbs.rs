@@ -819,3 +819,5 @@ mod tests {
         assert!((q - foot).dot(su).abs() < 1e-12 && (q - foot).dot(sv).abs() < 1e-12 && (d - (q - foot).length()).abs() < 1e-15);
     }
 }
+
+// s1 2
