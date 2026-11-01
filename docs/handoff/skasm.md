@@ -228,6 +228,10 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   goes to the worktree's target/), and the vibe4 binary reads icons from /home/ngyekta/agents/skasm/src/crates/app/assets
   (copied there). Open next: SNAP-INSERT-FACE leftovers (face-centroid target; Part Studio circle-edge connector frame
   vs live, request 07:15), assembly.md K9 / K11 (snap-mode q / Ctrl), SM-MAKE-JOINT-ONE-EDGE, RUST-SM-CUT-VOLUME (bool).
+- 11-01 ~08:00: b88b7699 (a snap drag's Ctrl cycles only explicit connectors, live 570; K9 / K11 checked). **The nine
+  sheets the lead listed have no unverified row left** (feature-sweep, navigation, sheet-metal, import-edit, assembly,
+  sketch, workflow-assembly, advanced, sheet-metal-joints). Open: SNAP-INSERT-FACE leftovers (live 07:15),
+  SM-MAKE-JOINT-ONE-EDGE (P3), RUST-SM-CUT-VOLUME (bool).
 - **End-of-day walk 11-01 03:40, green b6ba4390:** line chain 40 / 25 typed; rectangle boxes (Tab on a typed value
   stays, as live); Revolute via tool search, both picks → HUD ✓ commits and starts Revolute 2 (= live), the pattern
   copy follows its seed; dragging the mated pin keeps it seated. No regressions.
