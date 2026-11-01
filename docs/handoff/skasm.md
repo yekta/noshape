@@ -440,6 +440,10 @@ Later 11-01: queued 17a951a9 (Flow glyph two-thirds along), f9137d7b (G7 Clear s
 request "remaining assembly right-click menus" (REQUESTS 12:30): connector / relation / pattern / mirror / replicate
 rows, mate folders, graphics mate indicators, nested rows, empty list space. Then: whether live's Customize shortcuts
 and Shortcut toolbars lists now include Flow.
+11-01 afternoon: live 1723 (remaining assembly menus) done: G20-G25, G27 fixed and queued (f363df06, 27efdc47).
+Audit now 19 surfaces, 28 gaps, 26 fixed. Open, in order: G26 nested instance rows' menu (needs occurrence-level
+hide / isolate / fix in the model: Instance has only `nested` placements), G28 a menu for several selected mates
+(needs multi-select of mates: `selected_mate` is one id), G13 Insert image's Libraries tab (no image library).
 
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
