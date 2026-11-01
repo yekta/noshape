@@ -318,7 +318,7 @@ pub fn place_model_datums(drawing: &mut Drawing, doc: &Document) {
     // Each one goes to one view, in live's priority (help creating_a_drawing:
     // "top, right, front, then parent views over children, then insertion
     // order").
-    let mut views_by_priority: Vec<((u8, u8, usize, usize), usize, ViewId)> = Vec::new();
+    let mut views_by_priority: Vec<(Priority, usize, ViewId)> = Vec::new();
     for (si, sheet) in drawing.sheets.iter().enumerate() {
         for (vi, v) in sheet.views.iter().enumerate().filter(|(_, v)| v.model_annotations) {
             let Some(frame) = views::view_frame(drawing, sheet, v.id) else { continue };
@@ -352,6 +352,9 @@ pub fn place_model_datums(drawing: &mut Drawing, doc: &Document) {
         sheet.annotations.push(a);
     }
 }
+
+/// A view's rank for model annotations: direction, derived, sheet, index.
+type Priority = (u8, u8, usize, usize);
 
 /// A view's place in the model-annotation priority by its direction: Top,
 /// Right, Front, then the others.
