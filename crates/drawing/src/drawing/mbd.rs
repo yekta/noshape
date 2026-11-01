@@ -280,34 +280,76 @@ fn dimension_format(m: &ModelAnnotation, base: &super::DimFormat) -> super::DimF
     super::DimFormat { tolerance, precision: t.precision.or(base.precision), ..base.clone() }
 }
 
-/// Suggested views of a part with MBD data (live behaviours "MBD datums
-/// in drawings": "Suggested views provide only necessary views when MBD
-/// data is present"; datums on the top and front faces gave Top and Front
-/// only): the Front view, plus the Top, else the Right view for each datum
-/// the views kept so far don't show edge-on. Without MBD data, or on a
-/// layout other than the suggested one, nothing changes.
+/// Suggested views of a part with MBD data (live: "Suggested views provide
+/// only necessary views when MBD data is present"; behaviours "MBD datums
+/// in drawings", requests 1721, 1734): each MBD item goes to the first
+/// standard view that shows it (third angle: Front, Top, Right; first
+/// angle: Front, Left, Top), unless a view chosen already does; only those
+/// views stay. Live: a datum on the top face and one on the front face gave
+/// Front and Top (ANSI); one on the back face the Left view alone, one on
+/// the bottom or left face the Front view alone, dimensions in the top
+/// plane the Top view alone (ISO). Without the Front view, the views are
+/// base views, one alone centred at the largest scale whose view fits a
+/// quarter of the sheet (live: 60 × 20 at 1:1, 40 × 20 at 2:1). Without MBD
+/// data, or on a layout other than the suggested one, nothing changes.
 pub fn trim_suggested_views(drawing: &mut Drawing, doc: &Document) {
+    use super::{Projection, ViewKind, ViewOrientation as O};
     let Some(sheet) = drawing.sheets.first() else { return };
     if sheet.views.len() != 4 || !sheet.views.iter().map(|v| v.id.0).eq(1..=4) {
         return;
     }
-    let Some((key, _)) = views::view_source(sheet, ViewId(1)) else { return };
-    let Some(TabContent::PartStudio(ps)) = doc.tab(key.tab).map(|t| &t.content) else { return };
+    let Some(ViewKind::Base { source, config, part, .. }) = sheet.view(ViewId(1)).map(|v| v.kind.clone()) else { return };
+    let Some(TabContent::PartStudio(ps)) = doc.tab(source).map(|t| &t.content) else { return };
     if ps.annotations.is_empty() {
         return;
     }
-    let frames: Vec<Option<ViewFrame>> = (1..=3).map(|i| views::view_frame(drawing, sheet, ViewId(i))).collect();
-    let mut keep = vec![1u64];
+    let candidates = if drawing.projection == Projection::ThirdAngle { [O::Front, O::Top, O::Right] } else { [O::Front, O::Left, O::Top] };
+    let mut chosen: Vec<O> = Vec::new();
     for m in &ps.annotations {
-        let shown = |id: u64| frames[id as usize - 1].as_ref().is_some_and(|f| shows(m, f));
-        if keep.iter().any(|&id| shown(id)) {
+        let shown = |o: O| shows(m, &views::orientation_frame(o));
+        if chosen.iter().any(|&o| shown(o)) {
             continue;
         }
-        if let Some(id) = [2, 3].into_iter().find(|&id| shown(id)) {
-            keep.push(id);
+        if let Some(o) = candidates.into_iter().find(|&o| shown(o)) {
+            chosen.push(o);
         }
     }
-    drawing.sheets[0].views.retain(|v| keep.contains(&v.id.0));
+    if chosen.is_empty() {
+        return;
+    }
+    let frames: Vec<Option<ViewFrame>> = (1..=4).map(|i| views::view_frame(drawing, sheet, ViewId(i))).collect();
+    let same = |f: &Option<ViewFrame>, o: O| f.as_ref().is_some_and(|f| f.dir.dot(views::orientation_frame(o).dir) > 0.999);
+    if chosen.contains(&O::Front) && chosen.iter().all(|&o| (1..=3).any(|i| same(&frames[i - 1], o))) {
+        // The suggested layout's views that are chosen.
+        let keep: Vec<u64> = (1..=3u64).filter(|&i| chosen.iter().any(|&o| same(&frames[i as usize - 1], o))).collect();
+        drawing.sheets[0].views.retain(|v| keep.contains(&v.id.0));
+        return;
+    }
+    // Base views of the chosen orientations, side by side, centred.
+    let (w, h) = drawing.sheets[0].size.size_mm();
+    let src = super::create::DrawingSource { tab: source, part: part.clone(), config: config.clone(), sketch: None, flat: false };
+    let (lo, hi) = super::create::source_bounds(doc, &src).unwrap_or((DVec3::splat(-0.05), DVec3::splat(0.05)));
+    let size = |o: O| {
+        let f = views::orientation_frame(o);
+        let e = (hi - lo) * 1000.0;
+        let span = |d: DVec3| (d.x * e.x).abs() + (d.y * e.y).abs() + (d.z * e.z).abs();
+        [span(f.right), span(f.up)]
+    };
+    let gap = 25.0;
+    let (sum_w, max_h) = chosen.iter().fold((gap * (chosen.len() as f64 - 1.0), 0.0f64), |(sw, mh), &o| (sw + size(o)[0], mh.max(size(o)[1])));
+    let scale = super::create::SCALES.iter().copied().find(|s| (sum_w - gap * (chosen.len() as f64 - 1.0)) * s <= w * 0.25 * chosen.len() as f64 && max_h * s <= h * 0.25).unwrap_or(1.0);
+    let total = chosen.iter().map(|&o| size(o)[0] * scale).sum::<f64>() + gap * (chosen.len() as f64 - 1.0);
+    let template = drawing.sheets[0].view(ViewId(1)).cloned().expect("front view");
+    let mut x = (w - total) / 2.0;
+    let mut out = Vec::new();
+    for (i, &o) in chosen.iter().enumerate() {
+        let vw = size(o)[0] * scale;
+        out.push(super::DrawingView { id: ViewId(i as u64 + 1), kind: ViewKind::Base { source, config: config.clone(), orientation: o, part: part.clone() }, position: [x + vw / 2.0, h / 2.0], ..template.clone() });
+        x += vw + gap;
+    }
+    let sheet = &mut drawing.sheets[0];
+    sheet.scale = scale;
+    sheet.views = out;
 }
 
 /// Place the source Part Studios' datums in a new drawing (Suggested views):

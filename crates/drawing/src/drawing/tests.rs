@@ -3118,31 +3118,35 @@ fn assembly_views_display_state_and_follow_parent() {
     assert!(!sources.contains_key(&k));
 }
 
-/// Suggested views with MBD data (live: datums on the top and front faces
-/// gave Top and Front only): the views the datums need; without, all four.
+/// Suggested views with MBD data: each item in the first standard view
+/// that shows it (live: datums on the top and front faces gave Front and
+/// Top in ANSI; on the back face the Left view alone, on the bottom or left
+/// face the Front view alone, top-plane dimensions the Top view alone in
+/// ISO; requests 1721, 1734); without MBD data, all four.
 #[test]
 fn suggested_views_follow_mbd_datums() {
     use super::create::{DrawingSource, create_drawing, source_bounds};
     let (mut doc, _) = demo();
     let ps = doc.tabs.iter().find(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap().id;
     let src = DrawingSource { tab: ps, part: None, config: Default::default(), sketch: None, flat: false };
-    let t = templates::template_by_name("ISO A3").unwrap();
-    let make = |doc: &crate::Document| {
+    let make = |doc: &crate::Document, template: &str| {
+        let t = templates::template_by_name(template).unwrap();
         let mut d = create_drawing(&t, Some(&src), source_bounds(doc, &src), true, None);
         mbd::trim_suggested_views(&mut d, doc);
         mbd::place_model_datums(&mut d, doc);
         d
     };
-    assert_eq!(make(&doc).sheets[0].views.len(), 4);
+    let orientations = |d: &Drawing| d.sheets[0].views.iter().map(|v| views::view_frame(d, &d.sheets[0], v.id).map(|f| f.dir.to_array().map(|x| x.round() as i32))).collect::<Vec<_>>();
+    assert_eq!(make(&doc, "ISO A3").sheets[0].views.len(), 4);
     let datum = |id: u32, letter: &str, normal: [f64; 3]| crate::annotations::Annotation { id, kind: crate::annotations::AnnotationKind::Datum { letter: letter.into() }, face: crate::reference::Reference::Origin, at: [0.0; 3], normal, up: [0.0, 1.0, 0.0], offset: None };
     let set = |doc: &mut crate::Document, list: Vec<crate::annotations::Annotation>| {
         if let Some(TabContent::PartStudio(p)) = doc.tabs.iter_mut().find(|t| t.id == ps).map(|t| &mut t.content) {
             p.annotations = list;
         }
     };
-    // A on the top face, B on the front face: Front (A) and Top (B).
+    // ANSI: A on the top face, B on the front face: Front (A) and Top (B).
     set(&mut doc, vec![datum(1, "A", [0.0, 0.0, 1.0]), datum(2, "B", [0.0, -1.0, 0.0])]);
-    let d = make(&doc);
+    let d = make(&doc, "ANSI B");
     let ids: Vec<u64> = d.sheets[0].views.iter().map(|v| v.id.0).collect();
     assert_eq!(ids, vec![1, 2], "Front and Top");
     let mut on: Vec<(String, ViewId)> = d.sheets[0].annotations.iter().filter_map(|a| match &a.kind {
@@ -3151,9 +3155,20 @@ fn suggested_views_follow_mbd_datums() {
     }).collect();
     on.sort();
     assert_eq!(on, vec![("A".to_string(), ViewId(1)), ("B".to_string(), ViewId(2))]);
-    // Only the top face: the Front view alone.
-    set(&mut doc, vec![datum(1, "A", [0.0, 0.0, 1.0])]);
-    assert_eq!(make(&doc).sheets[0].views.len(), 1);
+    // ISO: the bottom face (Front alone), the left face (Front alone), the
+    // back face (the Left view alone, centred).
+    let front = views::orientation_frame(ViewOrientation::Front).dir.to_array().map(|x| x.round() as i32);
+    let left = views::orientation_frame(ViewOrientation::Left).dir.to_array().map(|x| x.round() as i32);
+    for normal in [[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0]] {
+        set(&mut doc, vec![datum(1, "A", normal)]);
+        assert_eq!(orientations(&make(&doc, "ISO A3")), vec![Some(front)], "{normal:?}");
+    }
+    set(&mut doc, vec![datum(1, "B", [0.0, 1.0, 0.0])]);
+    let d = make(&doc, "ISO A3");
+    assert_eq!(orientations(&d), vec![Some(left)]);
+    let (w, h) = d.sheets[0].size.size_mm();
+    assert!((d.sheets[0].views[0].position[0] - w / 2.0).abs() < 1.0 && (d.sheets[0].views[0].position[1] - h / 2.0).abs() < 1.0, "centred");
+    assert!(d.sheets[0].annotations.iter().any(|a| a.model.as_ref().is_some_and(|m| m.view == d.sheets[0].views[0].id)), "B shows in it");
 }
 
 #[test]
