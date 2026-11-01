@@ -47,7 +47,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 
 ## Editing logic (std's dialog reactions)
 
-std's 48 "Editing Logic Function"s change a dialog's fields as the user edits (Add into the touched part, the flip, a type
+std's 48 "Editing Logic Function"s (26 run std's, 8 native, 14 open) change a dialog's fields as the user edits (Add into the touched part, the flip, a type
 from the picks). The dialog runs std's own function where `std_feature::has_editing_logic` says so (std runs the feature, or it is in
 `STD_EDITING_LOGIC`; T2 tests in std_oracle), or ours does the same natively (`behaviors::direct_edit_logic`, `boolean_edit_logic`).
 
@@ -91,10 +91,10 @@ from the picks). The dialog runs std's own function where `std_feature::has_edit
 | E36 | deletePartEditLogic | Delete part | ✗ (composite members) |
 | E37 | editCurveEditLogic | Edit curve | ✗ (control point edits kept in step) |
 | E38 | editFeatureLogicExternalThread | External thread | ✗ (standard sizes fill chamfer and undercut) |
-| E39 | fitSplineEditLogic | 3D fit spline | ✗ (fit type, start / end directions from the picks) |
+| E39 | fitSplineEditLogic | 3D fit spline | ✅ std\'s runs (audit 8): a preselected edge opens on Edges with it; the preselection goes to std\'s hidden initEntities wherever std\'s logic runs (Hole, Sheet metal model, Flex PCB too) |
 | E40 | frameEditLogicFunction | Frame | ✗ ((only prewarms)) |
 | E41 | gussetEditLogic | Gusset | ✗ (swept faces) |
-| E42 | helixEditingLogic | Helix | ✗ (axis type from the pick) |
+| E42 | helixEditingLogic | Helix | ✅ native: the tab follows the preselection (live L34, checked 11-01) |
 | E43 | projectCurvesEditLogic | Projected curve | ✗ (sketch / direction from the picks) |
 | E44 | routingCurveEditLogic | Routing curve | ✗ (manipulator state, target length) |
 | E45 | ruledSurfaceEditingLogic | Ruled surface | ✗ (surface operation, vertex overrides cleaned) |

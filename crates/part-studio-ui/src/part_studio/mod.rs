@@ -1907,7 +1907,11 @@ impl PartStudioView {
                 {
                     feature.params.set("axisType", ParamValue::Enum(t.into()));
                 }
-                preselect(ty, &mut feature, &sel, self.built.as_ref(), &|r, f| self.face_fits(r, f));
+                // Where std's editing logic runs, the preselection goes to its
+                // hidden `initEntities`, which the logic sorts into the
+                // fields (3D fit spline: Edges; Sheet metal model: the part).
+                let std_init = noshape_model::custom::std_feature::has_editing_logic(type_id);
+                preselect(ty, &mut feature, &sel, self.built.as_ref(), &|r, f| self.face_fits(r, f), std_init);
                 // Plane: the type follows the preselection (Onshape's cPlaneLogic).
                 if type_id == "cPlane"
                     && let Some(ctx) = self.context.as_ref()
@@ -5306,9 +5310,10 @@ impl PartStudioView {
 }
 
 /// Fill the first compatible query parameter(s) with preselected references.
-fn preselect(ty: &FeatureType, feature: &mut Feature, selection: &[Reference], built: Option<&BuiltScene>, fits: &dyn Fn(&Reference, QueryFilter) -> bool) {
+/// `std_init`: a hidden `initEntities` takes them (std's editing logic reads it).
+fn preselect(ty: &FeatureType, feature: &mut Feature, selection: &[Reference], built: Option<&BuiltScene>, fits: &dyn Fn(&Reference, QueryFilter) -> bool, std_init: bool) {
     for s in &ty.params {
-        if !s.is_visible(&feature.params) {
+        if !s.is_visible(&feature.params) && !(std_init && s.id == "initEntities") {
             continue;
         }
         if let ParamKind::Query { filter, max_picks } = s.kind {

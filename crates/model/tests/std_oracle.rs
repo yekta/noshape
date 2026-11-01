@@ -1635,7 +1635,7 @@ fn more_editing_logic_runs_std() {
     assert!(got.contains(&"operationType=Enum(\"ADD\")".to_string()), "{got:?}");
 }
 
-/// std's editing logic of Thicken and Modify fillet (audit E rows).
+/// std's editing logic of Thicken, Modify fillet and 3D fit spline (audit E rows).
 #[test]
 #[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn thicken_and_modify_fillet_editing_logic_runs_std() {
@@ -1663,6 +1663,16 @@ fn thicken_and_modify_fillet_editing_logic_runs_std() {
     let got = edit_logic(&s, &ParamValues::default(), &["faces"]);
     let radius = got.iter().find(|x| x.starts_with("radius=")).unwrap_or_else(|| panic!("{got:?}"));
     assert!(radius.contains("0.003"), "{radius}");
+
+    // 3D fit spline: a preselected edge (initEntities) switches it to Edges.
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    let edge = edge_at(&r, DVec3::new(20.0, 0.0, 40.0));
+    s.add("fitSpline", |p| p.set("initEntities", q(edge.clone())));
+    let got = edit_logic(&s, &ParamValues::default(), &[]);
+    assert!(got.contains(&"fitType=Enum(\"EDGES\")".to_string()), "{got:?}");
+    assert!(got.contains(&format!("edges={:?}", ParamValue::Query(vec![edge]))), "{got:?}");
 }
 
 /// std's holeEditLogic through the host natives: a new hole's Merge scope is
