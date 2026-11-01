@@ -226,7 +226,7 @@ impl PartStudioView {
                 // Routing curve: a click on another point makes it the active one.
                 if let Some(k) = self.routing_point_at(*position, cx) {
                     if let Some(e) = &self.edit {
-                        e.dialog.update(cx, |dlg, cx| dlg.set_value("pointIndex", ParamValue::Expr(noshape_units::ExprValue::new(&k.to_string())), cx));
+                        e.dialog.update(cx, |dlg, cx| dlg.set_value("pointIndex", ParamValue::Expr(noshape_units::ExprValue::new(k.to_string())), cx));
                     }
                     self.rebuild_scene(cx);
                     return true;
