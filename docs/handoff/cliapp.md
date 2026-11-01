@@ -72,8 +72,12 @@ a tag with dry_run=false).
 - 94403ef6 `agents_*` / `cli_*` ops (landed 10-31).
 - d7df1ce4 Help › Install command line tool… / Connect to coding agents…, macOS app menu, first-launch prompt (landed
   10-31).
-- The release commit (release.yml, installers, install.sh, .deb, CLI-only downloads, README, AGENT_API quick start,
-  this file): landed after the dry run on `agent/cliapp-dry` passed on all three platforms.
+- 5e62371f the release commit (release.yml, installers, install.sh, .deb, CLI-only downloads, README, AGENT_API quick
+  start, this file), landed 10-31 after dry run 41239498082 on `agent/cliapp-dry` passed on all three platforms.
+- dfb5c385 help and usage name the command (`noshape`, `noshape-cli`) via clap's `bin_name`, not argv[0]'s file
+  name: Windows CI run 41243150421 failed `cli_mode::version_and_help_name_the_app` ("Usage: noshape.exe"); the
+  cli unit test `usage_names_the_command_not_the_file` reproduces it on any OS. CI run 41254317096 on dfb5c385:
+  T1 green on Linux, macOS and Windows (cli_mode tests included).
 
 Dry runs: 41228366250 (Windows: `Out` is reserved in Inno's Pascal Script), 41234738521 (Windows and macOS checks
 green; Linux: a clean Ubuntu lacks libxkbcommon-x11, so install.sh now names missing libraries and the check tests
