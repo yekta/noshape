@@ -468,8 +468,8 @@ re-queues everything after it). Waiting: live request 13:45
   - D8 (P1): part / tab search results get a row each. Each workspace keeps an index of its parts, written with the thumbnail (`app-core/search_index.rs`).
   - D6: Documents › Versions and history (graph, Show changes…, tooltip).
   - D9 and D11: tooltips.
-- Open: D2, the Create version dialog's drawings warning ("These drawings should be updated before creating a version:" + "Update drawings."). It needs a drawing staleness query from dx (request below).
-- Later: D12 tab out-of-date icon; D13 the search box takes the query as text (`type:part name:pvz`). Audit at 19 surfaces, 10 gaps, 9 fixed.
+- D2 fixed later with ops' `drawing::old_state`, and so was D15 (the Workspace protection notice).
+- Later: D12 tab out-of-date icon; D13 the search box takes the query as text (`type:part name:pvz`). Audit at 22 surfaces, 12 gaps, 12 fixed. Live request 15:00 asks for Tab › Properties…, Document details…, Copy workspace / version dialogs.
 
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
@@ -634,7 +634,7 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   together (or tell core it should stay as it is).
 
 ## Requests to the lead
-- (11-01) Document audit D2 (for dx): live's Create version dialog lists the drawings that should be updated before the version, with "Update drawings.". history-ui's create version dialog can show it if dx exposes "which drawings of this document are out of date", e.g. `noshape_ops::drawing::stale_drawings(&Document) -> Vec<TabId>`. Today drawing_view's `sources_stale` compares the UI's cached hashes.
+- (11-01) Document audit D2: done without dx after all. ops' `drawing::old_state` (the drawing update icon's check) gives the out-of-date drawings; dx FYI: history-ui's Create version and the Workspace protection dialog now call it.
 - (11-01) Audit G31: the assembly (and Part Studio) Mass and section properties "Show calculation variance" needs an
   integration error estimate per value (live shows "± 1.774e-9 lb", "± 2.100e+0 mm³"). The kernel's mass properties
   don't return one (OCCT BRepGProp gives an error with Eps): core's area; once exposed the panel can show it.

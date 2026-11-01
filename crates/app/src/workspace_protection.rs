@@ -23,13 +23,14 @@ use std::rc::Rc;
 /// dom/ui2-workspace-protection-dialog.html): a 600 px modal "Workspace
 /// protection for [name]" (the name in a yellow-outlined chip), ☐ Enable
 /// workspace protection, the blue "Workspace protection restrictions" box
-/// and [Apply] (enabled once changed) [Cancel]. Live's yellow "These tabs
-/// should be updated: …" notice (which disables the checkbox) needs a check
-/// for out-of-date drawings we don't have yet.
+/// and [Apply] (enabled once changed) [Cancel]. Drawings out of date in the
+/// current workspace give live's yellow "These tabs should be updated: …"
+/// notice above the checkbox, which is then disabled.
 pub fn open_dialog(doc: Entity<DocModel>, branch: BranchId, window: &mut Window, cx: &mut App) {
     let saved = doc.read(cx).session.branch_protected(branch);
     let name = doc.read(cx).session.store.branch(branch).map(|b| b.name).unwrap_or_default();
     let on = Rc::new(Cell::new(saved));
+    let stale: Vec<String> = if branch == doc.read(cx).session.branch { crate::history_panel::stale_drawings(&doc.read(cx).session).into_iter().map(|(_, n)| n).collect() } else { Vec::new() };
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
         let (doc, on2) = (doc.clone(), on.clone());
@@ -58,16 +59,34 @@ pub fn open_dialog(doc: Entity<DocModel>, branch: BranchId, window: &mut Window,
                     .gap(px(10.))
                     .text_size(px(14.))
                     .text_color(pal.text)
+                    .when(!stale.is_empty(), |d| {
+                        d.child(
+                            h_flex()
+                                .p(px(14.))
+                                .gap(px(6.))
+                                .rounded(px(5.25))
+                                .border_1()
+                                .border_color(rgb(0xfcda7f))
+                                .bg(rgb(0xfff8e6))
+                                .child("These tabs should be updated:")
+                                .child(div().text_color(rgb(0x094174)).child(stale.join(", "))),
+                        )
+                    })
                     .child({
                         let on = on.clone();
+                        let blocked = !stale.is_empty();
                         h_flex()
                             .id("ws-protect")
+                            .when(blocked, |d| d.opacity(0.5))
                             .h(px(26.))
                             .gap(px(6.))
                             .cursor_pointer()
                             .child(div().size(px(13.)).flex_none().flex().items_center().justify_center().rounded(px(2.)).border_1().border_color(if on.get() { rgb(0x0075ff) } else { rgb(0x767676) }).bg(if on.get() { rgb(0x0075ff) } else { rgb(0xffffff) }).when(on.get(), |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)))))
                             .child(div().font_weight(FontWeight::SEMIBOLD).child("Enable workspace protection"))
                             .on_click(move |_, window, _| {
+                                if blocked {
+                                    return;
+                                }
                                 on.set(!on.get());
                                 window.refresh();
                             })

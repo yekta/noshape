@@ -528,6 +528,9 @@ fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, at: Option<Mi
     };
     let name = cx.new(|cx| InputState::new(window, cx).placeholder("Name").default_value(format!("V{n}")));
     let desc = cx.new(|cx| TextareaState::new(window, cx).rows(4).placeholder("Description"));
+    // Live dialog-create-version: drawings out of date with the workspace
+    // are listed above the footer (a version of the current state only).
+    let stale: Rc<std::cell::RefCell<Vec<(TabId, String)>>> = Rc::new(std::cell::RefCell::new(if at.is_none() { stale_drawings(&doc.read(cx).session) } else { Vec::new() }));
     let create: CreateFn = {
         let (doc, name, desc, publish, edit_after) = (doc.clone(), name.clone(), desc.clone(), publish.clone(), edit_after.clone());
         let done = std::cell::Cell::new(false);
@@ -585,6 +588,7 @@ fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, at: Option<Mi
             .title(title)
             .child(version_dialog_body(&name, &desc, None))
             .when(has_fs, |d| d.child(publish_row(publish.clone(), cx)))
+            .children(stale_drawings_warning(&doc, &stale, cx))
             .footer(
                 os::modal_footer()
                     .child(os::modal_ok(os::primary_button("ok", "Create")))
@@ -812,6 +816,77 @@ fn open_publish_dialog(doc: Entity<DocModel>, id: noshape_store::VersionId, wind
     });
 }
 
+
+/// The drawings whose views are out of date with the workspace (a source
+/// changed since they were made).
+pub fn stale_drawings(session: &crate::session::Session) -> Vec<(TabId, String)> {
+    session
+        .doc
+        .ordered_tabs()
+        .into_iter()
+        .filter_map(|t| match &t.content {
+            TabContent::Drawing(d) if noshape_ops::drawing::old_state(session, d).is_some() => Some((t.id, t.name.clone())),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Live dialog-create-version: the yellow "These drawings should be
+/// updated before creating a version:" box, its drawing-update button
+/// (tooltip "Update drawings.", updating them all) and the drawings' names.
+fn stale_drawings_warning(doc: &Entity<DocModel>, stale: &Rc<std::cell::RefCell<Vec<(TabId, String)>>>, cx: &App) -> Option<AnyElement> {
+    let names: Vec<String> = stale.borrow().iter().map(|(_, n)| n.clone()).collect();
+    if names.is_empty() {
+        return None;
+    }
+    let (doc, stale) = (doc.clone(), stale.clone());
+    let button = div()
+        .id("update-drawings")
+        .size(px(30.))
+        .flex_none()
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(3.))
+        .border_1()
+        .border_color(rgb(0xaaaaaa))
+        .bg(rgb(0xffffff))
+        .cursor_pointer()
+        .tooltip(crate::ui::tooltip("Update drawings."))
+        .child(crate::assets::icon("drawing-update", 20., cx))
+        .on_click(move |_, window, cx| {
+            let tabs: Vec<TabId> = stale.borrow().iter().map(|(t, _)| *t).collect();
+            doc.update(cx, |d, cx| {
+                let Ok(head) = d.session.head() else { return };
+                d.edit_document("Update drawings", cx, |doc| {
+                    for t in &tabs {
+                        if let Some(TabContent::Drawing(dr)) = doc.tab_mut(*t).map(|t| &mut t.content) {
+                            dr.sources_at = Some(head.to_string());
+                        }
+                    }
+                });
+            });
+            *stale.borrow_mut() = stale_drawings(&doc.read(cx).session);
+            window.refresh();
+        });
+    Some(
+        h_flex()
+            .mx(px(10.))
+            .mt(px(10.))
+            .p(px(14.))
+            .gap(px(8.))
+            .items_center()
+            .rounded(px(5.25))
+            .border_1()
+            .border_color(rgb(0xfcda7f))
+            .bg(rgb(0xfff8e6))
+            .text_size(px(14.))
+            .child(button)
+            .child(div().child("These drawings should be updated before creating a version:"))
+            .child(div().text_color(rgb(0x094174)).child(names.join(", ")))
+            .into_any_element(),
+    )
+}
 
 fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, open: Option<Rc<std::cell::Cell<bool>>>) -> AnyElement {
     let pal = p();

@@ -28,16 +28,16 @@ Priorities:
 
 | | |
 |---|---|
-| Surfaces audited | 21 |
-| Gaps found | 11 |
-| Gaps fixed | 10 |
+| Surfaces audited | 22 |
+| Gaps found | 12 |
+| Gaps fixed | 12 |
 
 ## Surfaces
 
 | # | Surface | Live source | Gaps |
 |---|---|---|---|
 | S1 | In-document + (create) menu | menu-plus-tab.txt | 0 (CAM / PCB / Render Studio are paid apps) |
-| S2 | Create version dialog | dialog-create-version.txt, behaviours (c) | D2 |
+| S2 | Create version dialog | dialog-create-version.txt, behaviours (c) | D2 | P2 | Create version: live warns "These drawings should be updated before creating a version:" with the drawings' names and a drawing-update button (tooltip "Update drawings."). Ours had no warning. | fixed: `history_panel::stale_drawings` (ops' `drawing::old_state`, which the drawing's own update icon uses); the button marks them updated as the drawing's Update does, and the box goes away |
 | S3 | ☰ document menu on a workspace | behaviours "☰ document menu" | 0 |
 | S4 | ☰ document menu on a version | navbar-version-v1.txt | D3 |
 | S5 | Version / workspace Properties modal | version-properties-dialog.txt, branch-edit-properties.txt, create-version-edit-properties.txt | D10 |
@@ -57,12 +57,13 @@ Priorities:
 | S19 | Configured part properties panel (tables, menus, cell editors) | cp-*.json\|html | D11 |
 | S20 | In-document Versions and history: row menus (workspace, version, change), Create version / Branch dialogs, Restore | behaviours 68, 1733, 2625, 3317-3351 | D14 |
 | S21 | Insert dialog: other documents, configured, versions banner ("N changes since the last version.") | assembly-insert-*.txt | 0 |
+| S22 | Workspace protection dialog, banner, blocked edits, merge | ui2-workspace-protection-*.json\|html | D15 |
 
 ## Gaps
 
 | # | P | Gap | State |
 |---|---|---|---|
-| D2 | P2 | Create version: live warns "These drawings should be updated before creating a version:" with drawing links and an "Update drawings." button. Ours has no warning. It needs a drawing staleness query from the drawings side (dx). | open: asked dx in the handoff |
+| D2 | P2 | Create version: live warns "These drawings should be updated before creating a version:" with the drawings' names and a drawing-update button (tooltip "Update drawings."). Ours had no warning. | fixed: `history_panel::stale_drawings` (ops' `drawing::old_state`, which the drawing's own update icon uses); the button marks them updated as the drawing's Update does, and the box goes away | P2 | Create version: live warns "These drawings should be updated before creating a version:" with drawing links and an "Update drawings." button. Ours has no warning. It needs a drawing staleness query from the drawings side (dx). | open: asked dx in the handoff |
 | D3 | P1 | ☰ on a version (a version window): live shows Rename document, Move to…, Restore deleted workspaces… · Copy version…, Version properties… · Print… · Close document. Ours showed the workspace items (Copy workspace…, Update workspace…, Workspace units…, Workspace properties…, Switch to view only mode). | fixed: the version variant; Copy version… makes a new document from the version's state (`start_library::copy_version_named`) |
 | D6 | P2 | Documents page › Versions and history: live rows have a 140 px graph column (white workspace ring, blue version dots), "Show changes…" under Main and the versions, a selected row (light blue) and the tooltip "No description" / "Description: …". Ours listed Name / Modified only, without the search box, the toggles or the legend. | fixed: graph column (a lane per workspace, a branch drawn from the version it was made from), Show / Hide changes… with the changes since the version before (description, author, time), the selected row, the description tooltip (`start_library::HistoryRow`); the panel's name row, Search history box, Hide merges / Hide automatic versions toggles and legend |
 | D7 | P3 | Documents page while searching: live's header is "Search results in" with the place in blue / 600. With no results it shows "No results found that match this search. Try other search terms or refine the search by clicking the arrow in the search box." Ours kept the place header and said "No documents match …". | fixed |
@@ -73,3 +74,4 @@ Priorities:
 | D12 | P2 | Tab bar: a tab that references an older version of another document has a blue out-of-date icon, tooltip "Newer versions of linked documents available". The references can be Derived, an inserted Variable Studio, Assembly instances or Drawing views. Ours had none. | fixed: `workspace_update::version_refs` / `behind_tabs`, checked off the UI thread when the references change and when the window comes back |
 | D13 | P2 | Documents search box: running an advanced search writes the query into the box as text (`type:part name:pvz`, `type:part,document`). Enter on such a text runs it, and clearing the box ends the search. Ours kept the box and the panel apart. | fixed: `Query::to_text` / `Query::parse_text` (type, name, description, partNumber, revision, state) |
 | D14 | P1 | Versions and history row menus: live has "Open in new browser tab" on version, change and workspace rows. Ours left it out as web-only, though the tab menu's already opens another window. | fixed: version and change rows open a read-only window at that point; the current workspace's row opens another window on it. Other workspaces' rows still have none, because a second editable session on another branch isn't supported. Copy link stays out (web-only). |
+| D15 | P2 | Workspace protection dialog: with drawings out of date, live shows "These tabs should be updated: <drawings>" above the checkbox and disables the checkbox. | fixed (for the current workspace) |
