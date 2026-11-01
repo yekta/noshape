@@ -974,11 +974,13 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
 /// turned), which live keeps in place.
 fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) -> Vec<usize> {
     let mut stays = Vec::new();
+    // The bodies' poses, kept in step with the turns below (a copy per mate
+    // was 5 ms of every a1000 drag step).
+    let mut poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
     for m in mates {
         if m.follow.is_some() || !matches!(m.kind, MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Planar | MateType::Parallel) {
             continue;
         }
-        let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         let z_rel = (relative(&poses, m).rotation * DVec3::Z).z;
         if z_rel >= 0.0 {
             continue;
@@ -1006,6 +1008,7 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) -> Vec<us
         let turn = DQuat::from_axis_angle(axis, std::f64::consts::PI);
         let p = bodies[moving].pose;
         bodies[moving].pose = Frame { origin: c.origin + turn * (p.origin - c.origin), rotation: (turn * p.rotation).normalize() };
+        poses[moving] = bodies[moving].pose;
     }
     stays
 }
