@@ -827,10 +827,22 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
             // outward about the profiles' axis; anything else is built as before.
             // (With Thickness 2 (no Trim ends), the inside moved in along the normals as well: live (c).)
             let trim = ev.bool("trimEnds");
-            // (Flipped, the wall all inside (t1 0): Trim ends can't trim it, live 1728 (a); without, the loft's
-            // faces are the outside, the inside offset in.)
-            if trim && t1 == 0.0 && t2 > 0.0 {
-                return err(THIN_TRIM_FAILED);
+            // (Flipped, the wall all inside (t1 0): Trim ends can't trim it where it pokes past a profile's plane,
+            // live 1728 (a), square → Ø16; between two equal squares it doesn't, live 1668 (i): built as below. Without
+            // Trim ends, the loft's faces are the outside, the inside offset in.)
+            if trim
+                && t1 == 0.0
+                && t2 > 0.0
+                && let (Ok(Some(p0)), Ok(Some(p1))) = (shapes[0].find_plane(1e-6), shapes[shapes.len() - 1].find_plane(1e-6))
+                && let Ok(wall) = k::thicken_loft_out(&res.shape, 0.0, t2, &p0, &p1, false)
+            {
+                // Past the planes: below the first (away from the last) or above the last.
+                let up = p0.normal * p0.normal.dot(p1.origin - p0.origin).signum();
+                let tol = 1e-9 + 1e-9 * (p1.origin - p0.origin).length();
+                let out = wall.shape.vertices().iter().filter_map(|v| v.vertex_point().ok()).any(|p| (p - p0.origin).dot(up) < -tol || (p - p1.origin).dot(up) > tol);
+                if out {
+                    return err(THIN_TRIM_FAILED);
+                }
             }
             // (Through more profiles, without Trim ends: live (d).)
             if (t1 > 0.0 || t2 > 0.0) && (t2 == 0.0 || !trim) && (shapes.len() == 2 || !trim)

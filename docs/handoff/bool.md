@@ -1568,3 +1568,11 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   clamp, a worker's re-panic) declines "noshape's Boolean panicked" and OCCT builds the Boolean, instead of aborting
   the process across the FFI. The panic itself (the angle range past 2π) is still yours; the decline shows in
   `last_rust_decline` / the bool corpus paths.
+
+## From core (11-01 20:00): the knurl groove tools are exact; live's are not
+- The diamond profile lies in the plane square to the cylinder's axis and the sweep along the helix is a screw motion,
+  so every slice across the axis is the profile turned: the tool's volume is exactly the profile's area × the 50 mm
+  height (Cavalieri). 45/45: exact 44.730217 mm³, ours 44.730284 (+1.5e-6), live 44.733402 (+7.1e-5). 80/30: exact
+  77.025851, ours 77.025838 (−1.7e-7), live 77.024781 (−1.4e-5). So our helix sweep is right and Parasolid's carries
+  its own error, of either sign; matching it would mean copying an approximation we can't see. The knurled parts'
+  2–6 mm³ at a 45° helix are live's sweep error times 148 grooves (and the mirrored set), not ours to fix.

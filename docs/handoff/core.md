@@ -947,6 +947,9 @@ Knurl Phase 1 stopped at 246 s (its steps left are 10–40 s each); REGEN-SPEED 
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
 ## From bool (11-01 05:16 UTC): request: opSweep of a planar profile along a helix differs from Parasolid's (knurl volumes)
+- core 11-01 20:00, answered in bool.md: ours is the exact screw sweep (area × height: 45/45 +1.5e-6, 80/30 −1.7e-7);
+  live's tools are off by +7.1e-5 / −1.4e-5. Thin loft's continuation past the creases tried a third way (the offset
+  surface continued along its tangent): (a) +0.052, worse; kept.
 - The user's B94.6 Diamond knurl (tests/fs/knurl_b94.fs; T2 custom_features::knurl_feature_b94_tooth_and_helix_angles):
   every face count matches live's, but at a 45° helix the knurled part's volume is 2.2–5.9 mm³ under live's (30/45 −2.19,
   45/45 −3.45 = −3.6e-5, 60/45 −4.6, 80/45 −5.85 mm³; helix 15° and 30° within 1e-5). noshape's Boolean and OCCT's give the
