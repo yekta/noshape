@@ -318,6 +318,9 @@ pub enum ReferenceKind {
     VariableStudio,
     /// An imported CAD file tab (`CADImportData`).
     CadImport,
+    /// A DXF or DWG file tab (the sketch's Insert DXF or DWG; no
+    /// FeatureScript parameter has it).
+    Drawing2d,
 }
 
 #[derive(Clone)]

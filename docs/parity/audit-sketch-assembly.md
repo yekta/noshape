@@ -12,8 +12,8 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 | | |
 |---|---|
 | Surfaces audited | 18 |
-| Gaps found | 17 |
-| Gaps fixed | 13 |
+| Gaps found | 18 |
+| Gaps fixed | 17 |
 
 ## Surfaces
 
@@ -38,7 +38,7 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 | S17 | Profile inspector and Constraint manager | sk-tool-profile-inspector-and-constraint-manager.txt | G14, G15 |
 | S18 | Assembly error tooltips, mate HUD, standard content, interference, mass | asm-E15-tooltips.json, mate-hud.txt, dialog-insert-standard-content.txt, dialog-interference-assembly-*.txt, dialog-mass-assembly-*.txt | 0 |
 
-Next live request: the exploded views / named positions menus in each state (G6).
+Live requests answered: 1715 (tool options), 1716 (Flow), 1720 (exploded views / named positions menus, subassembly fix icons).
 
 ## Gaps
 
@@ -49,15 +49,16 @@ Next live request: the exploded views / named positions menus in each state (G6)
 | G3 | P3 | Instance list header | new folder button tooltip "Create new folder" | "New folder" | fixed (11-01) |
 | G4 | P2 | Instance list top row | fix-within icon tooltip "Part(s) inside are fixed" / "More than one part inside is fixed" / "Contains both fixed part(s) and part(s) fastened to origin" (locale table; behaviours 1222, 13414) | "Assembly is grounded" (not a live text) | fixed (11-01) |
 | G5 | P3 | Sheet metal table | header tooltips "#", "Name", "Radius (mm)", "Angle (deg)", "Bend direction", "K Factor"; joints "Name", "Type", "Style" | no header tooltips | fixed (11-01) |
-| G6 | P1? | Exploded views panel | a view row that is not active: Activate Explode 1 · Rename · Reset starting position · Duplicate · Delete (asb 10-20, behaviours 3139; the active view's menu 814 matches ours) | the active view's menu in every state | to confirm with live |
+| G6 | P1? | Exploded views panel | a view row that is not active: Activate Explode 1 · Rename · Reset starting position · Duplicate · Delete (asb 10-20, behaviours 3139; the active view's menu 814 matches ours) | the active view's menu in every state | fixed (11-01, live 1720 confirmed it): an inactive view: Activate <view> (into editing) · Rename · Reset starting position | Duplicate ("Explode 1 (1)") | Delete; Reset is a no-op (our views always start from the solved assembly) |
 | G7 | P3 | Insert dialog | search box clear button tooltip "Clear search" | no tooltip (the vendored gpui-component input draws the clear button) | deferred: needs a vendor change |
 | G8 | P3 | Configuration panel | "Configure Assembly" tooltip "Add configuration input to create multiple variants of this assembly" | none | fixed (11-01) |
 | G9 | P3 | Explode step dialog | step type dropdown tooltip "Explode step type" | none | fixed (11-01) |
 | G10 | P3 | BOM | an excluded row (Show excluded/suppressed) has the tooltip "Excluded from all BOMs" | none | fixed (11-01) |
-| G11 | P2 | Insert DXF or DWG | a select-item dialog "Insert a DXF or DWG file" ✓ (disabled until a pick) ✕: Current document / Other documents, the document's DXF and DWG files with search "Search DXF or DWG files", Import…; Units select Centimeter · Foot · Inch · Meter · **Millimeter** · Yard; ☐ Use file origin position | rows in the Sketch dialog and the system file chooser; Units has "From file" (not live's) and defaults to it | open |
+| G11 | P2 | Insert DXF or DWG | a select-item dialog "Insert a DXF or DWG file" ✓ (disabled until a pick) ✕: Current document / Other documents, the document's DXF and DWG files with search "Search DXF or DWG files", Import…; Units select Centimeter · Foot · Inch · Meter · **Millimeter** · Yard; ☐ Use file origin position | rows in the Sketch dialog and the system file chooser; Units has "From file" (not live's) and defaults to it | fixed (11-01): the select-item dialog in the Sketch dialog\'s place (Current / Other documents, DXF and DWG file tabs, search, Import… adds the file as a tab), ✓ greyed until a pick, Units (Millimeter default) and Use file origin position under it. Live\'s dialog sat at x 898; ours in the Sketch dialog\'s place like Insert image |
 | G12 | P1 | Sketch constraints | a 15th constraint **Flow** (G3, "Create flow continuous transitions between sketch splines or conics and surrounding geometry.", icon flow-continuity, EQUAL_CURVATURE_G3) after Curvature in the toolbar, the Constraint manager and the search | missing | fixed (11-01): ConstraintKind::Flow (tangent + G2 + equal dκ/ds at the joint, numeric FlowSide for lines, arcs, control-point curves incl. conics, fit splines), the toolbar button after Curvature (live's icon), tool search text, sketch_constrain "flow", FS EQUAL_CURVATURE_G3; one glyph on the curve. Open: the glyph's spot (live two-thirds along the curve on a leader) |
-| G13 | P2 | Insert image | "Insert an image" dialog: Current document / Other documents / **Libraries** (Onshape images: Environment maps, …) | the system file chooser | open |
+| G13 | P2 | Insert image | "Insert an image" dialog: Current document / Other documents / **Libraries** (Onshape images: Environment maps, …) | the system file chooser | partly fixed (11-01): the same dialog, titled "Insert an image", with Current / Other documents and Import…; a pick goes straight to drawing the rectangle. Open: live\'s title "Insert an image" and the Libraries tab (Onshape images: environment maps; not in our data) |
 | G14 | P2 | Constraint manager | Type filter: all 22 types as icon toggles with tooltips (… Curvature, Flow, Quadrant, Intersection, Offset, Linear pattern, Circular pattern, Projected, Dimension); Mode adds **In context**; list label "Entities and constraints"; Delete all tooltip "Delete all selected constraints" | text chips of the types present only; no In context; label with a count | fixed (11-01): live\'s 220 px dialog right of the Sketch dialog, the 22 type / 3 mode / 3 status icon toggles with tooltips (new icons quadrant, cm-*), the slider, tabs, the "Entities and constraints" list ("Horizontal 1" over "Line 2"; empty until something is selected while automatic selection is on), red Delete all with its tooltip. "In context" lists nothing: our sketches don\'t mark in-context references |
 | G15 | P3 | Profile inspector | a "Loose ends" list ("No loose ends found" when none), Previous / Next | a free list of issues, "No issues: every profile is closed." | fixed (11-01): live\'s dialog under the diagnostics button, the "Loose ends" list, "No loose ends found", blue Previous / Next |
 | G16 | P2 | Curvature / Flow | a fit spline far from G2 with a 3 point arc solves by moving everything (live 1716 (b): the arc's radius 10 → 26.866) | Curvature and Flow reported the sketch as over-constrained from such a start | fixed (11-01): the G2 / G3 residuals are scaled to lengths (κ·L², dκ/ds·L³, L the curves' size when built); live's case (b) with a drawn spline (handles) now solves, Curvature to an arc solves at 4, 40 and 400 mm (solver_basic::curvature_to_an_arc_solves_at_sketch_size). A spline without end handles (from FeatureScript) still can't take G2 with an arc: its natural ends have no curvature (live gives it end derivatives) |
 | G17 | P2 | Text tool | no option UI before its box is drawn (live 1715: no tool shows an option box) | a floating "Text / Height (click)" box while the tool was active | fixed (11-01) |
+| G18 | P3 | Instances list | parts fixed inside a subassembly show no fix icon in the parent (live 1720) | the nested rows showed it | fixed (11-01) |

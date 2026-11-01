@@ -103,6 +103,7 @@ pub fn accepts(kind: ReferenceKind, s: &RefSource) -> bool {
         (RefSourceKind::File(_, ext), ReferenceKind::Json) => ext == "json",
         (RefSourceKind::File(_, ext), ReferenceKind::Text) => ext == "txt",
         (RefSourceKind::File(k, _), ReferenceKind::CadImport) => *k == FileKind::Cad,
+        (RefSourceKind::File(k, _), ReferenceKind::Drawing2d) => *k == FileKind::Drawing2d,
         (RefSourceKind::PartStudio(_), ReferenceKind::PartStudio) => true,
         (RefSourceKind::VariableStudio, ReferenceKind::VariableStudio) => true,
         _ => false,
@@ -119,6 +120,7 @@ fn texts(kind: ReferenceKind) -> (&'static str, &'static str) {
         ReferenceKind::PartStudio => ("part-studio", "Select Part Studio…"),
         ReferenceKind::VariableStudio => ("variable-studio", "Select Variable Studio…"),
         ReferenceKind::CadImport => ("file-cad", "Select CAD file…"),
+        ReferenceKind::Drawing2d => ("file", "Select DXF or DWG file…"),
     }
 }
 
@@ -240,6 +242,7 @@ impl FeatureDialog {
             }
             SelectItemEvent::CreateVersion(p) => cx.emit(DialogEvent::CreateVersion(p.clone())),
             SelectItemEvent::ImportFile => this.ref_import = Some(kind),
+            SelectItemEvent::Confirm => {}
         });
         self.ref_picker = Some(RefPicker { path, panel, _sub: sub });
     }

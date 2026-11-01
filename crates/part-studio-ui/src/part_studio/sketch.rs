@@ -103,6 +103,10 @@ pub(super) struct SketchUi {
     /// The dimension box's `#` variable autofill list (live, qa4
     /// DIM-AUTOCOMPLETE: "(x) #var 10 mm", then "(x) New variable…").
     dim_completion: Option<crate::var_complete::VarCompletion>,
+    /// Insert DXF or DWG / Insert image: the select-item dialog, and the
+    /// DXF or DWG picked for its ✓.
+    insert_panel: Option<(Entity<crate::select_item::SelectItemPanel>, Subscription)>,
+    insert_pick: Option<String>,
 }
 
 /// Constraint manager filters and list state.
@@ -2338,61 +2342,174 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ insert DXF / image
 
-    /// Insert DXF or DWG options: units, file origin, file.
-    fn insert_dxf_rows(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        let pal = p();
-        let Some(ed) = self.sketch.as_ref() else { return Vec::new() };
-        let (scale, use_origin) = (ed.dxf_unit_scale, ed.dxf_use_origin);
-        const UNITS: &[(&str, Option<f64>)] = &[("From file", None), ("Millimeter", Some(0.001)), ("Centimeter", Some(0.01)), ("Meter", Some(1.0)), ("Inch", Some(0.0254)), ("Foot", Some(0.3048)), ("Yard", Some(0.9144))];
-        let label = UNITS.iter().find(|u| u.1 == scale).map(|u| u.0).unwrap_or("From file");
-        let view = cx.entity();
-        let units = Button::new("sk-dxf-units").label(label).ghost().xsmall().dropdown_caret(true).dropdown_menu(move |mut m, _, _| {
-            for (name, sc) in UNITS {
-                let (v, sc) = (view.clone(), *sc);
-                m = m.item(PopupMenuItem::new(*name).checked(sc == scale).on_click(move |_, _, cx| {
-                    v.update(cx, |this, cx| {
-                        if let Some(ed) = &mut this.sketch {
-                            ed.dxf_unit_scale = sc;
-                        }
-                        cx.notify();
-                    })
-                }));
-            }
-            m
-        });
-        vec![
-            h_flex().gap_2().justify_between().child(div().text_xs().text_color(pal.text_muted).child("Units")).child(units).into_any_element(),
-            Button::new("sk-dxf-origin")
-                .label("Use file origin position")
-                .ghost()
-                .xsmall()
-                .selected(use_origin)
-                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    if let Some(ed) = &mut this.sketch {
-                        ed.dxf_use_origin = !ed.dxf_use_origin;
-                    }
-                    cx.notify();
-                }))
-                .into_any_element(),
-            Button::new("sk-dxf-file").label("Choose a DXF or DWG file…").icon(icon_px("import", 13.0, pal.text)).primary().xsmall().on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.choose_dxf(window, cx))).into_any_element(),
-        ]
+    /// Live (sk-tool-insert-dxf-dwg, sk-tool-insert-image, 1715): Insert DXF
+    /// or DWG and Insert image open the select-item dialog in the Sketch
+    /// dialog's place: Current document | Other documents, the matching file
+    /// tabs, Import…. A picked image is inserted at once (then its rectangle
+    /// is drawn); a DXF / DWG is picked, then ✓ inserts it with the Units and
+    /// Use file origin position below the list.
+    pub(super) fn insert_dialog_open(&self) -> bool {
+        self.sketch.as_ref().is_some_and(|e| matches!(e.tool, Tool::InsertDxf | Tool::InsertImage) && e.pending_image.is_none())
     }
 
-    fn choose_dxf(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn render_insert_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let image = self.sketch.as_ref()?.tool == Tool::InsertImage;
+        if !self.insert_dialog_open() {
+            if let Some(ui) = self.ui_mut() {
+                ui.insert_panel = None;
+                ui.insert_pick = None;
+            }
+            return None;
+        }
+        if self.ui_ref().is_some_and(|u| u.insert_panel.is_none()) {
+            let doc = self.doc.read(cx);
+            let setup = crate::select_item::PanelSetup {
+                mode: crate::select_item::PanelMode::Reference(if image { noshape_model::params::ReferenceKind::Image } else { noshape_model::params::ReferenceKind::Drawing2d }),
+                sources: crate::fs_reference::sources(&doc.session.doc, "", |_| Vec::new()),
+                doc_name: doc.name(),
+                doc_path: Some(doc.session.path.clone()),
+                except: String::new(),
+                gpu: None,
+                value: String::new(),
+                libraries: false,
+            };
+            let panel = cx.new(|cx| {
+                let mut p = crate::select_item::SelectItemPanel::new(setup, window, cx);
+                if image {
+                    p.title = Some("Insert an image");
+                } else {
+                    p.ok = Some(false);
+                }
+                p
+            });
+            let sub = cx.subscribe_in(&panel, window, move |this: &mut Self, panel, ev: &crate::select_item::SelectItemEvent, window, cx| {
+                use crate::select_item::SelectItemEvent as E;
+                match ev {
+                    E::Picked(v) if image => this.insert_file_tab(v, window, cx),
+                    E::Picked(v) => {
+                        let v = v.clone();
+                        panel.update(cx, |p, cx| {
+                            p.ok = Some(!v.is_empty());
+                            cx.notify();
+                        });
+                        if let Some(ui) = this.ui_mut() {
+                            ui.insert_pick = Some(v).filter(|v| !v.is_empty());
+                        }
+                    }
+                    E::Confirm => {
+                        if let Some(v) = this.ui_ref().and_then(|u| u.insert_pick.clone()) {
+                            this.insert_file_tab(&v, window, cx);
+                        }
+                    }
+                    E::Close => this.set_tool(Tool::Select, cx),
+                    E::ImportFile => this.import_insert_file(image, window, cx),
+                    E::CreateVersion(None) => crate::part_studio_hooks::create_version(this.doc.clone(), window, cx),
+                    E::CreateVersion(Some(path)) => {
+                        let _ = crate::part_studio_hooks::open_document_window(path.clone(), this.gpu.clone(), cx);
+                    }
+                }
+                cx.notify();
+            });
+            if let Some(ui) = self.ui_mut() {
+                ui.insert_panel = Some((panel, sub));
+            }
+        }
+        let panel = self.ui_ref()?.insert_panel.as_ref()?.0.clone();
+        let mut col = v_flex().absolute().top(px(3.)).left(px(0.)).child(panel);
+        if !image {
+            let ed = self.sketch.as_ref()?;
+            // Live: Centimeter · Foot · Inch · Meter · Millimeter (the default) · Yard.
+            const UNITS: [(&str, f64); 6] = [("Centimeter", 0.01), ("Foot", 0.3048), ("Inch", 0.0254), ("Meter", 1.0), ("Millimeter", 0.001), ("Yard", 0.9144)];
+            let scale = ed.dxf_unit_scale.unwrap_or(0.001);
+            let current = UNITS.iter().position(|u| u.1 == scale).unwrap_or(4);
+            let view = cx.entity();
+            let units = crate::os_ui::select_field("sk-dxf-units", UNITS.iter().map(|u| u.0.to_string()).collect(), current, move |i, _, cx| {
+                view.update(cx, |this, cx| {
+                    if let Some(ed) = &mut this.sketch {
+                        ed.dxf_unit_scale = Some(UNITS[i].1);
+                    }
+                    cx.notify();
+                })
+            });
+            let origin = crate::os_ui::checkbox("sk-dxf-origin", "Use file origin position", ed.dxf_use_origin).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                if let Some(ed) = &mut this.sketch {
+                    ed.dxf_use_origin = !ed.dxf_use_origin;
+                }
+                cx.notify();
+            }));
+            col = col.child(
+                v_flex()
+                    .w(px(300.))
+                    .occlude()
+                    .bg(p().dialog_bg)
+                    .px(px(6.))
+                    .pt(px(4.))
+                    .gap(px(4.))
+                    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
+                    .child(crate::os_ui::param_row("Units", units))
+                    .child(origin)
+                    .child(diag_help()),
+            );
+        }
+        Some(col.into_any_element())
+    }
+
+    /// The file tab `key` names (this document's tab id, or an `ext:` key of
+    /// another document at a version).
+    fn insert_source(&self, key: &str, cx: &App) -> Option<noshape_model::file_tab::FileTab> {
+        let file = |doc: &noshape_model::Document, tab: &str| {
+            doc.tabs.iter().find(|t| t.id.to_string() == tab).and_then(|t| match &t.content {
+                noshape_model::document::TabContent::File(f) => Some(f.clone()),
+                _ => None,
+            })
+        };
+        match crate::derived::ExternalRef::parse(key) {
+            Some(r) => file(&*crate::derived::external_snapshot(&r.path, r.microversion).ok()?, &r.tab),
+            None => file(&self.doc.read(cx).session.doc, key),
+        }
+    }
+
+    fn insert_file_tab(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(f) = self.insert_source(key, cx) else { return };
+        let Some(bytes) = f.bytes() else { return };
+        if self.sketch.as_ref().is_some_and(|e| e.tool == Tool::InsertImage) {
+            self.load_image_bytes(f.file_name.clone(), bytes, cx);
+        } else {
+            self.insert_dxf_bytes(&f.file_name, &bytes, window, cx);
+        }
+    }
+
+    /// Import…: a file from this computer becomes a tab of the document
+    /// (live: an upload) and is inserted.
+    fn import_insert_file(&mut self, image: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let exts: &'static [&'static str] = if image { &["png", "jpg", "jpeg", "gif", "bmp", "PNG", "JPG", "JPEG"] } else { &["dxf", "DXF", "dwg", "DWG"] };
         let view = cx.entity();
         let win = window.window_handle();
-        crate::file_dialogs::request_open_path("Insert DXF or DWG", "DXF or DWG drawing", &["dxf", "DXF", "dwg", "DWG"], window, cx, move |path, cx| {
+        crate::file_dialogs::request_open_path("Import", "Files", exts, window, cx, move |path, cx| {
             // The fallback chooser confirms inside a window update. Defer so
             // the same window is available when regeneration needs it.
             cx.defer(move |cx| {
-                let _ = win.update(cx, |_, window, cx| view.update(cx, |this, cx| this.insert_dxf_file(&path, window, cx)));
+                let _ = win.update(cx, |_, window, cx| {
+                    view.update(cx, |this, cx| {
+                        let Ok(bytes) = std::fs::read(&path) else { return };
+                        let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
+                        let tab = noshape_model::file_tab::FileTab::new(&name, &bytes, noshape_model::file_tab::now());
+                        this.doc.update(cx, |d, cx| d.edit_document(&format!("Import {name}"), cx, |d| {
+                            noshape_ops::import::add_file_tab(d, tab, None, None);
+                        }));
+                        if image {
+                            this.load_image_bytes(name, bytes, cx);
+                        } else {
+                            this.insert_dxf_bytes(&name, &bytes, window, cx);
+                        }
+                    })
+                });
             });
         });
     }
 
-    pub(super) fn insert_dxf_file(&mut self, path: &std::path::Path, window: &mut Window, cx: &mut Context<Self>) {
-        let parsed = std::fs::read(path).map_err(|e| e.to_string()).and_then(|b| noshape_sketch::dwg::parse_cad(&b).map_err(|e| e.to_string()));
-        let drawing = match parsed {
+    fn insert_dxf_bytes(&mut self, name: &str, bytes: &[u8], window: &mut Window, cx: &mut Context<Self>) {
+        let drawing = match noshape_sketch::dwg::parse_cad(bytes) {
             Ok(d) => d,
             Err(e) => {
                 self.message = Some((FeatureStatus::Error, format!("Could not insert the drawing: {e}")));
@@ -2401,7 +2518,7 @@ impl PartStudioView {
             }
         };
         let Some(ed) = self.sketch.as_ref() else { return };
-        let scale = ed.dxf_unit_scale.or(drawing.unit_scale).unwrap_or(0.001);
+        let scale = ed.dxf_unit_scale.unwrap_or(0.001);
         let use_origin = ed.dxf_use_origin;
         let n = self.with_sketch(cx, |ed, data| {
             let ids = crate::sketch_mode::insert_dxf(data, &drawing, scale, use_origin);
@@ -2411,37 +2528,17 @@ impl PartStudioView {
         if n.unwrap_or(0) > 0 {
             if let Some(ed) = &mut self.sketch {
                 ed.set_tool(Tool::Select);
-                ed.message = Some(format!("Inserted {} entities from {}", n.unwrap_or(0), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default()));
+                ed.message = Some(format!("Inserted {} entities from {name}", n.unwrap_or(0)));
             }
             self.regen_sync(window, cx);
         }
         cx.notify();
     }
 
-    fn insert_image_rows(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        let pal = p();
-        let pending = self.sketch.as_ref().and_then(|e| e.pending_image.as_ref().map(|p| p.0.clone()));
-        let mut rows = vec![Button::new("sk-image-file").label("Choose an image…").icon(icon_px("image", 13.0, pal.text)).primary().xsmall().on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.choose_image(window, cx))).into_any_element()];
-        rows.push(div().text_xs().text_color(pal.text_faint).child(match pending {
-            Some(n) => format!("{n}: draw the image rectangle (the aspect ratio is locked)"),
-            None => "PNG, JPEG, GIF or BMP".to_string(),
-        }).into_any_element());
-        rows
-    }
-
-    fn choose_image(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let view = cx.entity();
-        crate::file_dialogs::request_open_path("Insert image", "Image", &["png", "jpg", "jpeg", "gif", "bmp", "PNG", "JPG", "JPEG"], window, cx, move |path, cx| {
-            view.update(cx, |this, cx| this.load_image_file(&path, cx));
-        });
-    }
-
-    pub(super) fn load_image_file(&mut self, path: &std::path::Path, cx: &mut Context<Self>) {
-        let loaded = std::fs::read(path).map_err(|e| e.to_string()).and_then(|b| image::load_from_memory(&b).map(|img| (b, img.width(), img.height())).map_err(|e| e.to_string()));
-        match loaded {
-            Ok((bytes, w, h)) if w > 0 && h > 0 => {
+    fn load_image_bytes(&mut self, name: String, bytes: Vec<u8>, cx: &mut Context<Self>) {
+        match image::load_from_memory(&bytes).map(|img| (img.width(), img.height())) {
+            Ok((w, h)) if w > 0 && h > 0 => {
                 if let Some(ed) = &mut self.sketch {
-                    let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_else(|| "image".into());
                     ed.pending_image = Some((name, bytes, w as f64 / h as f64));
                     ed.message = Some("Draw image rectangle.".into());
                 }
@@ -2881,16 +2978,9 @@ impl PartStudioView {
         let mut out = Vec::new();
 
         // Tool options box (creates inputs lazily, needs &mut self).
-        let tool = self.sketch.as_ref().map(|s| s.tool).unwrap_or(Tool::Select);
         // Live (1715): no tool shows an option box; Text is edited in its
-        // dialog once its box is drawn.
-        let mut rows: Vec<AnyElement> = Vec::new();
-        // Text is edited in the Text dialog (double-click), as in Onshape.
-        if tool == Tool::InsertDxf {
-            rows.extend(self.insert_dxf_rows(cx));
-        } else if tool == Tool::InsertImage {
-            rows.extend(self.insert_image_rows(cx));
-        }
+        // dialog once its box is drawn, Insert DXF / image in theirs.
+        let insert_dialog = self.render_insert_dialog(window, cx);
         // Tolerance / precision panel of the dimension being edited.
         let tol_panel = self.dimension_tolerance_panel(&data, window, cx);
         let mut tol_panel = tol_panel;
@@ -3788,29 +3878,7 @@ impl PartStudioView {
 
         // ---- tool options box: a small floating panel at the top of the
         // viewport, right of the feature dialog (clear of the view toggles).
-        if !rows.is_empty() && !ed.text_dialog_open() {
-            let (icon, title) = (tool.icon(), tool.label());
-            let mut panel = v_flex()
-                .absolute()
-                .top(px(12.))
-                .left(px(342.))
-                .occlude()
-                .w(px(260.))
-                .p_2()
-                .gap_1p5()
-                .rounded_md()
-                .bg(with_alpha(pal.panel_raised, 0.96))
-                .border_1()
-                .border_color(pal.border)
-                .child(h_flex().gap_1p5().child(icon_px(icon, 14.0, pal.text)).child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(title)))
-                .children(rows);
-            if tool.is_pattern() {
-                let n = ed.selection.len();
-                let hint = if n == 0 { "Select the entities".to_string() } else { format!("{n} entit{} · click in empty space or press Enter to accept, Esc to cancel", if n == 1 { "y" } else { "ies" }) };
-                panel = panel.child(div().text_xs().text_color(pal.text_faint).child(hint));
-            }
-            out.push(panel.into_any_element());
-        }
+        out.extend(insert_dialog);
 
         out.extend(tol_popup);
         if let Some(panel) = self.render_text_dialog(window, cx) {

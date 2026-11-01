@@ -5000,9 +5000,9 @@ impl PartStudioView {
     /// cached.
     fn render_dialog_layer(&self) -> Option<AnyElement> {
         let e = self.edit.as_ref()?;
-        // Live (dom/dialog-sketch-text): the Text dialog takes the sketch
-        // dialog's place while open.
-        if self.sketch.as_ref().is_some_and(|s| s.text_dialog_open()) {
+        // Live (dom/dialog-sketch-text, sk-tool-insert-image): the Text and
+        // Insert dialogs take the sketch dialog's place while open.
+        if self.sketch.as_ref().is_some_and(|s| s.text_dialog_open()) || self.insert_dialog_open() {
             return None;
         }
         // Moved dialogs keep their place (Onshape lets you drag them).

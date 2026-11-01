@@ -54,6 +54,7 @@ pub fn reference_value(kind: ReferenceKind, file: Option<&FileTab>) -> Value {
             ReferenceKind::PartStudio => "PartStudioData",
             ReferenceKind::VariableStudio => "VariableStudioData",
             ReferenceKind::CadImport => "CADImportData",
+            ReferenceKind::Drawing2d => "BlobData",
         },
     );
     untagged(kind, file).with_tag(tag)
@@ -111,7 +112,7 @@ fn untagged(kind: ReferenceKind, file: Option<&FileTab>) -> Value {
             put("mediaType", Value::str("text/plain"));
             put("textData", Value::str(text()));
         }
-        ReferenceKind::PartStudio | ReferenceKind::VariableStudio | ReferenceKind::CadImport => return Value::map(Map::new()),
+        ReferenceKind::PartStudio | ReferenceKind::VariableStudio | ReferenceKind::CadImport | ReferenceKind::Drawing2d => return Value::map(Map::new()),
     }
     Value::map(m)
 }

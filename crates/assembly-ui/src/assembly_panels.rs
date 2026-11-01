@@ -2310,11 +2310,33 @@ impl AssemblyView {
                             }
                             cx.notify();
                         }))
-                        // Live 814: Collapse / Expand <view> | Rename | Show all
-                        // explode lines | Hide all explode lines | ⊗ Delete.
+                        // Live 814, 1720: the view being edited: Collapse /
+                        // Expand <view> | Rename | Show all explode lines | Hide
+                        // all explode lines | ⊗ Delete; the others: Activate
+                        // <view> (straight into editing) · Rename · Reset
+                        // starting position | Duplicate | Delete.
                         .os_context_menu({
                             let view = cx.entity();
                             move |m, _, _| {
+                                if !active {
+                                    let (v0, v1, v2, v3, v4, n) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), name.clone());
+                                    return m
+                                        .item(crate::os_menu::OsMenuItem::new(format!("Activate {n}")).on_click(move |_, _, cx| {
+                                            v0.update(cx, |this, cx| {
+                                                this.ui.explode_sel = Some((i, None));
+                                                this.explode_edit = true;
+                                                this.activate_explode(Some(i), cx);
+                                            })
+                                        }))
+                                        .item(crate::os_menu::OsMenuItem::new("Rename").on_click(move |_, window, cx| v1.update(cx, |this, cx| this.start_rename(RenameTarget::Explode(i), n.clone(), window, cx))))
+                                        // Our views start from the assembly as it is
+                                        // whenever they're shown: nothing to reset.
+                                        .item(crate::os_menu::OsMenuItem::new("Reset starting position").on_click(move |_, _, cx| v2.update(cx, |this, cx| this.reapply_display(cx))))
+                                        .separator()
+                                        .item(crate::os_menu::OsMenuItem::new("Duplicate").on_click(move |_, _, cx| v3.update(cx, |this, cx| this.duplicate_exploded_view(i, cx))))
+                                        .separator()
+                                        .item(crate::os_menu::OsMenuItem::new("Delete").icon_name("remove-circle").on_click(move |_, _, cx| v4.update(cx, |this, cx| this.delete_exploded_view(i, cx))));
+                                }
                                 let (v0, v1, v2, v3, v4, n) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), name.clone());
                                 let all_lines = move |v: Entity<AssemblyView>, on: bool| {
                                     move |_: &ClickEvent, _: &mut Window, cx: &mut App| {

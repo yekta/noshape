@@ -1950,6 +1950,23 @@ impl AssemblyView {
         self.activate_explode(Some(n), cx);
     }
 
+    /// An inactive view's "Duplicate" (live 1720): a copy after it, named
+    /// as a duplicated named position ("Explode 1 (1)").
+    fn duplicate_exploded_view(&mut self, i: usize, cx: &mut Context<Self>) {
+        let Some(asm) = self.assembly(cx) else { return };
+        let Some(mut v) = asm.exploded_views.get(i).cloned() else { return };
+        let mut k = 1;
+        while asm.exploded_views.iter().any(|e| e.name == format!("{} ({k})", v.name)) {
+            k += 1;
+        }
+        v.name = format!("{} ({k})", v.name);
+        let name = v.name.clone();
+        self.edit(&format!("Duplicate : {name}"), cx, |a| a.exploded_views.insert(i + 1, v));
+        if let Some(e) = self.explode.filter(|e| *e > i) {
+            self.explode = Some(e + 1);
+        }
+    }
+
     fn delete_exploded_view(&mut self, i: usize, cx: &mut Context<Self>) {
         let name = self.assembly(cx).and_then(|a| a.exploded_views.get(i).map(|v| v.name.clone())).unwrap_or_default();
         self.edit(&format!("Delete : {name}"), cx, |a| {
@@ -3317,7 +3334,9 @@ impl AssemblyView {
             Some(InstanceSource::PartStudio { .. }) => NodeKind::PartStudio,
             _ => NodeKind::Part,
         });
-        let fixed = inst.map(|i| i.fixed).unwrap_or_else(|| node.is_some_and(|n| n.fixed));
+        // Live 1720: parts fixed inside a subassembly show no fix icon in the
+        // parent's list (fixing is per assembly level).
+        let fixed = is_top && inst.map(|i| i.fixed).unwrap_or_else(|| node.is_some_and(|n| n.fixed));
         let hidden = inst.map(|i| i.hidden).unwrap_or_else(|| node.is_some_and(|n| n.hidden));
         // Dynamic suppression shows through the evaluated node.
         let suppressed = inst.is_some_and(|i| i.suppressed) || node.is_some_and(|n| n.suppressed);

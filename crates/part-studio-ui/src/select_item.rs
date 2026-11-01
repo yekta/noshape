@@ -37,6 +37,8 @@ pub enum SelectItemEvent {
     CreateVersion(Option<PathBuf>),
     /// The footer's "Import…" (CSV and image references).
     ImportFile,
+    /// The header's ✓ (a panel with [`SelectItemPanel::ok`]).
+    Confirm,
 }
 
 impl EventEmitter<SelectItemEvent> for SelectItemPanel {}
@@ -110,6 +112,11 @@ pub struct SelectItemPanel {
     pub thumbs: HashMap<String, Arc<RenderImage>>,
     /// The current value (highlighted row).
     pub value: String,
+    /// A ✓ in the header, enabled or not (the sketch's Insert DXF or DWG:
+    /// greyed until a file is picked); `None`: only the ✕.
+    pub ok: Option<bool>,
+    /// A title of its own (the sketch's "Insert an image").
+    pub title: Option<&'static str>,
     other_documents: bool,
     /// The Libraries tab is offered / shown.
     libraries: bool,
@@ -193,6 +200,8 @@ fn texts(PanelMode::Reference(kind): PanelMode) -> (&'static str, &'static str, 
         ReferenceKind::PartStudio => ("Select Part Studio", "Search entities or features", "No Part Studios available."),
         ReferenceKind::VariableStudio => ("Select Variable Studio", "Search Variable Studios", "No Variable Studios available."),
         ReferenceKind::CadImport => ("Select CAD file", "Search CAD files", "No CAD files available."),
+        // The sketch's Insert DXF or DWG (live sk-tool-insert-dxf-dwg).
+        ReferenceKind::Drawing2d => ("Insert a DXF or DWG file", "Search DXF or DWG files", "No DXF or DWG files available."),
     }
 }
 
@@ -229,6 +238,8 @@ impl SelectItemPanel {
             gpu,
             thumbs: HashMap::new(),
             value,
+            ok: None,
+            title: None,
             other_documents: false,
             libraries,
             in_libraries,
@@ -1095,7 +1106,9 @@ impl Render for SelectItemPanel {
         let search = self.search.clone();
         let query = search.read(cx).value().trim().to_lowercase();
         let (title, search_placeholder, none) = texts(mode);
-        let import_file = matches!(mode, PanelMode::Reference(ReferenceKind::Csv | ReferenceKind::Image));
+        let title = self.title.unwrap_or(title);
+        let import_file = matches!(mode, PanelMode::Reference(ReferenceKind::Csv | ReferenceKind::Image | ReferenceKind::Drawing2d));
+        let ok = self.ok;
         let blue = gpui_kit::rgb(BLUE);
         let line = gpui_kit::rgb(0xeeeeee);
         let tab_w = if self.libraries { 100. } else { 150. };
@@ -1240,6 +1253,20 @@ impl Render for SelectItemPanel {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd7d7d7))
                         .child(div().flex_1().pl(px(6.)).text_size(px(13.)).line_height(px(28.)).font_weight(FontWeight::MEDIUM).child(title))
+                        .when_some(ok, |d, enabled| {
+                            d.child(
+                                div()
+                                    .id("sel-ok")
+                                    .size(px(28.))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .bg(gpui_kit::rgb(0x009400))
+                                    .when(!enabled, |d| d.opacity(0.4))
+                                    .when(enabled, |d| d.cursor_pointer().on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(SelectItemEvent::Confirm))))
+                                    .child(crate::assets::icon("dialog-ok", 24., cx)),
+                            )
+                        })
                         .child(
                             div()
                                 .id("sel-close")

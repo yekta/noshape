@@ -428,6 +428,14 @@ from a far start with an arc don't converge; live moves the arc), G11 Insert DXF
 G14 Constraint manager types / In context, G6 (live request posted 10:00), G15, G7. Flow isn't in Preferences ›
 Shortcut toolbars (SKETCH_PREFS_LIST, from an older live dump): check when live's list is re-dumped.
 
+## 11-01 midday: audit 18 surfaces, 18 gaps, 17 fixed (docs/parity/audit-sketch-assembly.md)
+Landed: 660bd350 Flow constraint, ec909181 G2/G3 residual scaling (G16), 67cb2d16 Constraint manager / Profile
+inspector / no Text option box. This commit: G6 inactive exploded-view menu (Activate / Reset starting position /
+Duplicate), G18 no fix icon on parts inside subassemblies, G11 Insert DXF or DWG and G13 Insert image as live's
+select-item dialog (ReferenceKind::Drawing2d; SelectItemPanel gained `ok` (✓) and `title`). Open: G7 (vendor input's
+clear-button tooltip), G13 Libraries tab (no image library), Flow glyph position, "In context" constraint mode.
+Landing now queues (land.sh returns QUEUED; `land.sh --status`); while iterating run single tests only.
+
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
 (standard content) → mates/assembly workflow gaps (all ✅, UNCONFIRMED all answered 10-27) → standard content.
