@@ -92,53 +92,11 @@ impl AssemblyView {
     /// Top row (or subassembly) › Properties…: the assembly's metadata,
     /// with "Subassembly BOM behavior" and no Material / Mass.
     pub(super) fn open_assembly_properties(&mut self, tab: noshape_model::document::TabId, window: &mut Window, cx: &mut Context<Self>) {
-        let (name, props) = {
-            let doc = &self.doc.read(cx).session.doc;
-            let Some(t) = doc.tab(tab) else { return };
-            let TabContent::Assembly(a) = &t.content else { return };
-            (t.name.clone(), a.properties.clone())
-        };
         // This assembly's own row: its computed mass and Mass override
         // (live assembly/726: "Mass ƒ ☑ Override 2 lb").
         let computed = (tab == self.tab).then(|| self.assembly_total_mass(cx)).flatten();
-        let spec = MetaSpec {
-            category: "Onshape Assembly",
-            material: None,
-            computed_mass: (tab == self.tab).then(|| computed.map(|m| format!("{} kg", noshape_units::to_fixed(m, 4))).unwrap_or_default()),
-            bom_options: Some(BomBehavior::ALL.iter().map(|b| b.label().to_string()).collect()),
-            values: MetaValues {
-                name,
-                description: props.description.clone().unwrap_or_default(),
-                part_number: props.part_number.clone().unwrap_or_default(),
-                revision: props.revision.clone().unwrap_or_default(),
-                meta: props.meta.clone(),
-                mass_override: props.mass_override.map(|m| format!("{m} kg")),
-                bom: BomBehavior::ALL.iter().position(|b| *b == props.bom_behavior).unwrap_or(0),
-            },
-        };
-        let doc = self.doc.clone();
-        crate::properties_dialog::open_properties(
-            spec,
-            move |v, _, cx| {
-                doc.update(cx, |d, cx| {
-                    d.edit_document(&format!("Properties : {}", v.name), cx, |document| {
-                        if let Some(t) = document.tab_mut(tab) {
-                            t.name = v.name.clone();
-                            if let TabContent::Assembly(a) = &mut t.content {
-                                a.properties.description = Some(v.description.clone()).filter(|s| !s.is_empty());
-                                a.properties.part_number = Some(v.part_number.clone()).filter(|s| !s.is_empty());
-                                a.properties.revision = Some(v.revision.clone()).filter(|s| !s.is_empty());
-                                a.properties.meta = v.meta.clone();
-                                a.properties.bom_behavior = BomBehavior::ALL.get(v.bom).copied().unwrap_or_default();
-                                a.properties.mass_override = v.mass_override.as_deref().and_then(parse_mass);
-                            }
-                        }
-                    })
-                });
-            },
-            window,
-            cx,
-        );
+        let computed = (tab == self.tab).then(|| computed.map(|m| format!("{} kg", noshape_units::to_fixed(m, 4))).unwrap_or_default());
+        open_assembly_metadata(self.doc.clone(), tab, computed, window, cx);
     }
 
     /// Instance row › Instance properties…: the Reference designator.
@@ -1034,6 +992,55 @@ impl AssemblyView {
 }
 
 pub use crate::assembly_context::StaleContexts;
+
+/// An assembly tab's metadata modal (its top row's Properties…, Tab ›
+/// Properties…; live 1738): `computed` is the Mass row's computed value,
+/// when the assembly is the one shown.
+pub fn open_assembly_metadata(doc: Entity<crate::doc_model::DocModel>, tab: noshape_model::document::TabId, computed: Option<String>, window: &mut Window, cx: &mut App) {
+    let (name, props) = {
+        let doc = &doc.read(cx).session.doc;
+        let Some(t) = doc.tab(tab) else { return };
+        let TabContent::Assembly(a) = &t.content else { return };
+        (t.name.clone(), a.properties.clone())
+    };
+    let spec = MetaSpec {
+        category: "Onshape Assembly",
+        material: None,
+        computed_mass: computed,
+        bom_options: Some(BomBehavior::ALL.iter().map(|b| b.label().to_string()).collect()),
+        values: MetaValues {
+            name,
+            description: props.description.clone().unwrap_or_default(),
+            part_number: props.part_number.clone().unwrap_or_default(),
+            revision: props.revision.clone().unwrap_or_default(),
+            meta: props.meta.clone(),
+            mass_override: props.mass_override.map(|m| format!("{m} kg")),
+            bom: BomBehavior::ALL.iter().position(|b| *b == props.bom_behavior).unwrap_or(0),
+        },
+    };
+    crate::properties_dialog::open_properties(
+        spec,
+        move |v, _, cx| {
+            doc.update(cx, |d, cx| {
+                d.edit_document(&format!("Properties : {}", v.name), cx, |document| {
+                    if let Some(t) = document.tab_mut(tab) {
+                        t.name = v.name.clone();
+                        if let TabContent::Assembly(a) = &mut t.content {
+                            a.properties.description = Some(v.description.clone()).filter(|s| !s.is_empty());
+                            a.properties.part_number = Some(v.part_number.clone()).filter(|s| !s.is_empty());
+                            a.properties.revision = Some(v.revision.clone()).filter(|s| !s.is_empty());
+                            a.properties.meta = v.meta.clone();
+                            a.properties.bom_behavior = BomBehavior::ALL.get(v.bom).copied().unwrap_or_default();
+                            a.properties.mass_override = v.mass_override.as_deref().and_then(parse_mass);
+                        }
+                    }
+                })
+            });
+        },
+        window,
+        cx,
+    );
+}
 
 #[cfg(test)]
 mod tests {

@@ -66,44 +66,48 @@ pub fn rename_document(doc: Entity<DocModel>, window: &mut Window, cx: &mut App)
     });
 }
 
-/// ☰ › Document details…: name and description (stored with the document),
-/// owner and history stamps.
+/// The document's "Not revision managed" (store meta).
+pub const DOC_NOT_REVISION_MANAGED: &str = "doc_not_revision_managed";
+
+/// ☰ › Document details… (live 1738, 600 px): "Enter a document
+/// description:" (Maximum of 10000 characters), the textarea, ☐ Not
+/// revision managed; [Update] (pale until something changes) [Cancel].
 pub fn document_details(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
     let path = doc.read(cx).session.path.clone();
     let details = crate::start_library::doc_details(&path).unwrap_or_default();
-    let name = doc.read(cx).name();
-    let name_st = cx.new(|cx| InputState::new(window, cx).default_value(name));
-    let desc_st = cx.new(|cx| TextareaState::new(window, cx).rows(4).placeholder("Description").default_value(details.description.clone()));
+    let nrm_saved = doc.read(cx).session.store.get_meta(DOC_NOT_REVISION_MANAGED).ok().flatten().is_some_and(|b| b == b"1");
+    let nrm = Rc::new(std::cell::Cell::new(nrm_saved));
+    let desc_saved = details.description.clone();
+    let desc_st = cx.new(|cx| TextareaState::new(window, cx).rows(4).default_value(details.description.clone()));
+    // Typing re-renders the dialog (Update turns on).
+    window.subscribe(&desc_st, cx, |_, _: &gpui_kit::component::input::InputEvent, window, _| window.refresh()).detach();
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
-        let (n, d, doc) = (name_st.clone(), desc_st.clone(), doc.clone());
-        let stamp = |label: &'static str, who: &str, at: i64| {
-            v_flex()
-                .pt(px(6.))
-                .child(os::field_label(label))
-                .child(div().text_size(px(13.33)).text_color(pal.text).child(format!("{who} · {}", crate::start_library::format_onshape_time(at))))
-        };
-        os::modal(dialog, "Document details", 520.)
+        let (d, doc, nrm2, saved) = (desc_st.clone(), doc.clone(), nrm.clone(), desc_saved.clone());
+        let changed = desc_st.read(cx).value().as_ref() != desc_saved.as_str() || nrm.get() != nrm_saved;
+        os::modal(dialog, "Document details", 600.)
             .child(
                 os::modal_body()
-                    .child(os::field_label("Name"))
-                    .child(os::input_h(Input::new(&name_st), 32.).text_size(px(14.)))
-                    .child(os::field_label("Description"))
+                    .child(h_flex().gap(px(6.)).child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Enter a document description:")).child(div().text_size(px(12.)).text_color(pal.text_muted).child("Maximum of 10000 characters")))
                     .child(Textarea::new(&desc_st).h(px(96.)).text_size(px(14.)))
-                    .child(v_flex().pt(px(6.)).child(os::field_label("Owner")).child(div().text_size(px(13.33)).child("me")))
-                    .child(stamp("Created by", &details.created_by, details.created))
-                    .child(stamp("Last modified by", &details.modified_by, details.modified)),
+                    .child({
+                        let nrm = nrm.clone();
+                        os::checkbox("doc-nrm", "Not revision managed", nrm.get()).on_click(move |_, window, _| {
+                            nrm.set(!nrm.get());
+                            window.refresh();
+                        })
+                    }),
             )
-            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Save"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .footer(os::modal_footer().child(os::modal_ok(div().when(!changed, |d| d.opacity(0.4)).child(os::primary_button("ok", "Update")))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, _, cx| {
-                let name = n.read(cx).value().trim().to_string();
                 let desc = d.read(cx).value().to_string();
-                if name.is_empty() {
+                if desc == saved && nrm2.get() == nrm_saved {
                     return false;
                 }
+                let on = nrm2.get();
                 let r = doc.update(cx, |dm, _| -> anyhow::Result<()> {
-                    dm.session.store.set_name(&name)?;
                     dm.session.store.set_description(&desc)?;
+                    dm.session.store.set_meta(DOC_NOT_REVISION_MANAGED, on.then_some(&b"1"[..]))?;
                     Ok(())
                 });
                 report(&doc, r, cx)
@@ -145,48 +149,70 @@ pub fn restore_deleted_workspaces(doc: Entity<DocModel>, window: &mut Window, cx
 
 /// ☰ › Copy workspace…: a new document from this workspace's state, opened.
 pub fn copy_workspace(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
-    let (path, name) = {
-        let d = doc.read(cx);
-        (d.session.path.clone(), d.name())
-    };
-    name_modal("Copy workspace", "Copy", format!("Copy of {name}"), None, window, cx, move |new_name, _, window, cx| {
-        let _ = doc.update(cx, |d, _| d.session.store.checkpoint());
-        match crate::start_library::copy_document_named(&path, &new_name) {
-            Ok(dest) => {
-                let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
-                if let Err(e) = crate::files::open_document_window(dest, None, gpu, cx) {
-                    doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
-                }
-                let _ = window;
-                true
-            }
-            Err(e) => {
-                doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
-                false
-            }
-        }
-    });
+    copy_dialog(doc, None, window, cx);
 }
 
 /// ☰ › Copy version… (a window on a version): a new document holding the
 /// version's state, opened.
 pub fn copy_version(doc: Entity<DocModel>, mv: noshape_store::MicroversionId, window: &mut Window, cx: &mut App) {
+    copy_dialog(doc, Some(mv), window, cx);
+}
+
+/// Live 1738: "Copy the active workspace (version) to a new document":
+/// Document name ("<name> - Copy", selected), "Copy document to" with the
+/// folder browser, [Create document] [Cancel].
+fn copy_dialog(doc: Entity<DocModel>, mv: Option<noshape_store::MicroversionId>, window: &mut Window, cx: &mut App) {
     let (path, name) = {
         let d = doc.read(cx);
         (d.session.path.clone(), d.name())
     };
-    name_modal("Copy version", "Copy", format!("Copy of {name}"), None, window, cx, move |new_name, _, _, cx| match crate::start_library::copy_version_named(&path, mv, &new_name) {
-        Ok(dest) => {
-            let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
-            if let Err(e) = crate::files::open_document_window(dest, None, gpu, cx) {
-                doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
-            }
-            true
-        }
-        Err(e) => {
-            doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
-            false
-        }
+    let start = path.parent().map(|p| p.to_path_buf()).unwrap_or_else(crate::files::documents_dir);
+    let location = Rc::new(crate::start_window::Location::new(start));
+    let name_st = cx.new(|cx| InputState::new(window, cx).default_value(format!("{name} - Copy")));
+    let focus = name_st.clone();
+    let title = if mv.is_some() { "Copy the active version to a new document" } else { "Copy the active workspace to a new document" };
+    window.open_dialog(cx, move |dialog, _, cx| {
+        let (loc, path, n, doc) = (location.clone(), path.clone(), name_st.clone(), doc.clone());
+        os::modal(dialog, title, 598.)
+            .child(
+                os::modal_body()
+                    .child(os::field_label("Document name"))
+                    .child(os::input_h(Input::new(&name_st), 32.).text_size(px(14.)))
+                    .child(os::field_label("Copy document to"))
+                    .child(location.render()),
+            )
+            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Create document"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .on_ok(move |_, _, cx| {
+                let new_name = n.read(cx).value().trim().to_string();
+                if new_name.is_empty() {
+                    return false;
+                }
+                let dir = loc.chosen.borrow().clone();
+                let _ = doc.update(cx, |d, _| d.session.store.checkpoint());
+                let r = match mv {
+                    Some(mv) => crate::start_library::copy_version_named(&path, mv, &dir, &new_name),
+                    None => crate::start_library::copy_document_named(&path, &dir, &new_name),
+                };
+                match r {
+                    Ok(dest) => {
+                        let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
+                        if let Err(e) = crate::files::open_document_window(dest, None, gpu, cx) {
+                            doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
+                        }
+                        true
+                    }
+                    Err(e) => {
+                        doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
+                        false
+                    }
+                }
+            })
+    });
+    window.defer(cx, move |window, cx| {
+        focus.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        })
     });
 }
 
@@ -590,23 +616,58 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
         );
         return;
     }
-    let (name, desc) = {
-        let s = &doc.read(cx).session;
-        let name = s.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
-        let desc = s.store.get_meta(&format!("tab_description:{}", tab.0)).ok().flatten().map(|b| String::from_utf8_lossy(&b).to_string()).unwrap_or_default();
-        (name, desc)
+    // Live 1738: every tab kind has the metadata modal, with its own fields
+    // (properties_dialog picks them by the category).
+    let (name, category) = {
+        let d = &doc.read(cx).session.doc;
+        let Some(t) = d.tab(tab) else { return };
+        let category = match &t.content {
+            TabContent::Assembly(_) => return crate::assembly_view::open_assembly_metadata(doc, tab, None, window, cx),
+            TabContent::PartStudio(_) => "Onshape Part Studio",
+            TabContent::VariableStudio(_) => "Onshape Variable Studio",
+            TabContent::FeatureStudio(_) => "Onshape Feature Studio",
+            _ => "Onshape File",
+        };
+        (t.name.clone(), category)
     };
-    name_modal("Properties", "Save", name, Some(desc), window, cx, move |name, desc, _, cx| {
-        let ok = doc.update(cx, |d, _| d.session.store.set_meta(&format!("tab_description:{}", tab.0), desc.as_deref().map(str::as_bytes)));
-        doc.update(cx, |d, cx| {
-            d.edit_document(&format!("Rename tab : {name}"), cx, |document| {
-                if let Some(t) = document.tab_mut(tab) {
-                    t.name = name.clone();
-                }
-            })
-        });
-        report(&doc, ok.map_err(Into::into), cx)
-    });
+    // Other tabs keep their metadata in the store, beside the history (the
+    // keys release management reads too).
+    let values = {
+        let store = &doc.read(cx).session.store;
+        let text = |k: &str| store.get_meta(&format!("{k}:{}", tab.0)).ok().flatten().map(|b| String::from_utf8_lossy(&b).to_string()).unwrap_or_default();
+        let mut meta: noshape_model::partstudio::ItemMeta = serde_json::from_str(&text("tab_item_meta")).unwrap_or_default();
+        meta.not_revision_managed = text("tab_not_revision_managed") == "1";
+        noshape_app_core::properties_dialog::MetaValues { name, description: text("tab_description"), part_number: text("tab_part_number"), revision: text("tab_revision"), meta, ..Default::default() }
+    };
+    let spec = noshape_app_core::properties_dialog::MetaSpec { category, material: None, computed_mass: None, bom_options: None, values };
+    noshape_app_core::properties_dialog::open_properties(
+        spec,
+        move |v, _, cx| {
+            let r = doc.update(cx, |d, _| -> anyhow::Result<()> {
+                let store = &mut d.session.store;
+                let mut set = |k: &str, v: &str| store.set_meta(&format!("{k}:{}", tab.0), Some(v.as_bytes()).filter(|b| !b.is_empty()));
+                set("tab_description", &v.description)?;
+                set("tab_part_number", &v.part_number)?;
+                set("tab_revision", &v.revision)?;
+                set("tab_not_revision_managed", if v.meta.not_revision_managed { "1" } else { "" })?;
+                set("tab_item_meta", &serde_json::to_string(&v.meta).unwrap_or_default())?;
+                Ok(())
+            });
+            report(&doc, r, cx);
+            let renamed = doc.read(cx).session.doc.tab(tab).is_some_and(|t| t.name != v.name);
+            if renamed {
+                doc.update(cx, |d, cx| {
+                    d.edit_document(&noshape_ops::docedit::rename_tab_description(&v.name), cx, |document| {
+                        if let Some(t) = document.tab_mut(tab) {
+                            t.name = v.name.clone();
+                        }
+                    })
+                });
+            }
+        },
+        window,
+        cx,
+    );
 }
 
 /// Tab › Show code: the element as FeatureScript-style code (read-only).

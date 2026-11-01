@@ -483,6 +483,13 @@ impl Render for MetaForm {
                     }),
             )
         });
+        // Live 1738 (Tab › Properties…): the fields a tab kind has, by its
+        // category. Parts, assemblies and drawings have them all.
+        let kind = self.spec_category;
+        let numbered = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio");
+        let sourced = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio" | "Onshape Variable Studio");
+        let titled = kind != "Onshape Feature Studio";
+        let item = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio" | "Onshape Variable Studio" | "Onshape File");
         let mut form = v_flex()
             .w_full()
             .gap(px(15.))
@@ -496,25 +503,35 @@ impl Render for MetaForm {
                     Textarea::new(&self.description).h(px(56.)).text_size(px(14.)).into_any_element()
                 },
             ))
-            .child(group(label("Category", false), gray_box(self.spec_category.to_string(), true).into_any_element()))
-            .child(group(label("Part number", false), self.field("Part number", &self.part_number, cx)))
-            .child(group(label("Revision", false), self.field("Revision", &self.revision, cx)))
-            // State is set by the release workflow (a greyed select).
-            .child(group(label("State", true), gray_box(RELEASE_STATES[state_ix].to_string(), true).into_any_element()))
-            .child(group(label("Vendor", false), self.field("Vendor", &self.vendor, cx)))
-            .child(group(label("Project", false), self.field("Project", &self.project, cx)))
-            .child(group(label("Product line", false), self.field("Product line", &self.product_line, cx)));
+            .child(group(label("Category", false), gray_box(self.spec_category.to_string(), true).into_any_element()));
+        if numbered {
+            form = form
+                .child(group(label("Part number", false), self.field("Part number", &self.part_number, cx)))
+                .child(group(label("Revision", false), self.field("Revision", &self.revision, cx)))
+                // State is set by the release workflow (a greyed select).
+                .child(group(label("State", true), gray_box(RELEASE_STATES[state_ix].to_string(), true).into_any_element()));
+        }
+        if sourced {
+            form = form
+                .child(group(label("Vendor", false), self.field("Vendor", &self.vendor, cx)))
+                .child(group(label("Project", false), self.field("Project", &self.project, cx)))
+                .child(group(label("Product line", false), self.field("Product line", &self.product_line, cx)));
+        }
         if let Some(m) = self.material.clone() {
             form = form.child(group(label("Material", false), gray_box(m, false).into_any_element()));
         }
+        if titled {
+            form = form
+                .child(group(label("Title 1", false), self.field("Title 1", &self.titles[0], cx)))
+                .child(group(label("Title 2", false), self.field("Title 2", &self.titles[1], cx)))
+                .child(group(label("Title 3", false), self.field("Title 3", &self.titles[2], cx)))
+                .child(check_row("meta-nrm", "Not revision managed", self.not_revision_managed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.not_revision_managed = !this.not_revision_managed;
+                    this.changed(cx);
+                })));
+        }
+        if item {
         form = form
-            .child(group(label("Title 1", false), self.field("Title 1", &self.titles[0], cx)))
-            .child(group(label("Title 2", false), self.field("Title 2", &self.titles[1], cx)))
-            .child(group(label("Title 3", false), self.field("Title 3", &self.titles[2], cx)))
-            .child(check_row("meta-nrm", "Not revision managed", self.not_revision_managed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                this.not_revision_managed = !this.not_revision_managed;
-                this.changed(cx);
-            })))
             .child(check_row("meta-bom", "Exclude from all BOMs", self.exclude_from_bom).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.exclude_from_bom = !this.exclude_from_bom;
                 this.changed(cx);
@@ -613,6 +630,7 @@ impl Render for MetaForm {
                 })
                 .into_any_element(),
             ));
+        }
         }
         // Custom properties at the bottom (help Properties: "Custom
         // properties are shown at the bottom of the dialog").

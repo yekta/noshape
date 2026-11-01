@@ -457,9 +457,8 @@ pub fn duplicate_document(path: &Path, name: &str) -> anyhow::Result<PathBuf> {
     Ok(dest)
 }
 
-/// Copy a document under `name` next to it (☰ › Copy workspace…).
-pub fn copy_document_named(path: &Path, name: &str) -> anyhow::Result<PathBuf> {
-    let dir = path.parent().context("document has no folder")?;
+/// Copy a document under `name` into `dir` (☰ › Copy workspace…).
+pub fn copy_document_named(path: &Path, dir: &Path, name: &str) -> anyhow::Result<PathBuf> {
     let clean = sanitize_name(name);
     if clean.is_empty() {
         bail!("Enter a name");
@@ -473,11 +472,10 @@ pub fn copy_document_named(path: &Path, name: &str) -> anyhow::Result<PathBuf> {
     Ok(dest)
 }
 
-/// A new document under `name` next to `path` holding the document as it
-/// was at `mv` (☰ › Copy version… on a version: the copy starts its own
-/// history at that state).
-pub fn copy_version_named(path: &Path, mv: noshape_store::MicroversionId, name: &str) -> anyhow::Result<PathBuf> {
-    let dir = path.parent().context("document has no folder")?;
+/// A new document under `name` in `dir` holding the document as it was at
+/// `mv` (☰ › Copy version… on a version: the copy starts its own history at
+/// that state).
+pub fn copy_version_named(path: &Path, mv: noshape_store::MicroversionId, dir: &Path, name: &str) -> anyhow::Result<PathBuf> {
     let clean = sanitize_name(name);
     if clean.is_empty() {
         bail!("Enter a name");
@@ -558,7 +556,7 @@ mod tests {
         let v1 = store.head(branch).unwrap();
         store.commit(branch, &[("a", Some(b"two"))], "edit").unwrap();
         drop(store);
-        let dest = copy_version_named(&path, v1, "At V1").unwrap();
+        let dest = copy_version_named(&path, v1, &dir, "At V1").unwrap();
         let copy = noshape_store::Document::open_read_only(&dest).unwrap();
         let head = copy.head(copy.default_branch().unwrap()).unwrap();
         assert_eq!(copy.read(head, "a").unwrap().as_deref(), Some(&b"one"[..]));

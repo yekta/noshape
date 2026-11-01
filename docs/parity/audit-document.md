@@ -28,9 +28,9 @@ Priorities:
 
 | | |
 |---|---|
-| Surfaces audited | 22 |
-| Gaps found | 12 |
-| Gaps fixed | 12 |
+| Surfaces audited | 25 |
+| Gaps found | 15 |
+| Gaps fixed | 15 |
 
 ## Surfaces
 
@@ -58,6 +58,9 @@ Priorities:
 | S20 | In-document Versions and history: row menus (workspace, version, change), Create version / Branch dialogs, Restore | behaviours 68, 1733, 2625, 3317-3351 | D14 |
 | S21 | Insert dialog: other documents, configured, versions banner ("N changes since the last version.") | assembly-insert-*.txt | 0 |
 | S22 | Workspace protection dialog, banner, blocked edits, merge | ui2-workspace-protection-*.json\|html | D15 |
+| S23 | Tab › Properties… on every tab kind | live 1738, dom/skasm-1738-tab-properties.txt | D16 |
+| S24 | ☰ › Document details… | live 1738, dom/skasm-1738-document-details.txt | D17 |
+| S25 | ☰ › Copy workspace… / Copy version… | live 1738, dom/skasm-1738-copy-dialogs.txt | D18 |
 
 ## Gaps
 
@@ -75,3 +78,6 @@ Priorities:
 | D13 | P2 | Documents search box: running an advanced search writes the query into the box as text (`type:part name:pvz`, `type:part,document`). Enter on such a text runs it, and clearing the box ends the search. Ours kept the box and the panel apart. | fixed: `Query::to_text` / `Query::parse_text` (type, name, description, partNumber, revision, state) |
 | D14 | P1 | Versions and history row menus: live has "Open in new browser tab" on version, change and workspace rows. Ours left it out as web-only, though the tab menu's already opens another window. | fixed: version and change rows open a read-only window at that point; the current workspace's row opens another window on it. Other workspaces' rows still have none, because a second editable session on another branch isn't supported. Copy link stays out (web-only). |
 | D15 | P2 | Workspace protection dialog: with drawings out of date, live shows "These tabs should be updated: <drawings>" above the checkbox and disables the checkbox. | fixed (for the current workspace) |
+| D16 | P2 | Tab › Properties…: live opens the metadata modal on every tab kind, each with its own fields. Part Studio has Name, Description, Category "Onshape Part Studio", Title 1-3 and Not revision managed. Variable Studio adds Part number, Revision and State. Feature Studio has only Name, Description and Category. Files have the Vendor / Project / Product line rows. Assembly has the full set. Ours showed a name / description modal (drawings already had the modal). | fixed: properties_dialog picks the rows by category. An Assembly tab opens the assembly's own modal (`assembly_view::open_assembly_metadata`). Other tabs keep their metadata in store meta (tab_description / tab_part_number / tab_revision / tab_not_revision_managed / tab_item_meta). The Part Studio's left tree (P3) is still open. |
+| D17 | P2 | ☰ › Document details…: live has "Enter a document description:" (Maximum of 10000 characters), a textarea and ☐ Not revision managed, with [Update] pale until changed and [Cancel]. Ours had Name, Owner and Created / Modified rows and [Save]. | fixed |
+| D18 | P3 | Copy workspace… / Copy version…: live's titles are "Copy the active workspace (version) to a new document". Document name defaults to "<name> - Copy" (selected), with "Copy document to" and a folder browser. Ours was a "Copy of <name>" name box copied next to the document. | fixed (the button says "Create document"; live's "Create public document" is the Free plan's) |
