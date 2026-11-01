@@ -205,6 +205,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   the hover is the view), A28 (the callout menu lacked Add stacked callouts…, the panel's picks never reached
   stack_click under the Select tool; ⇅ is a reorder mode), SK12 yellow surround, V44 (ours = live), V25 (only
   dimensions clear the hatch; DXF HATCH holes still to do). A56 rechecked done. drawing.md 🔧 left: 24.
+- V55 decals (not done, 11-01 ~01:00): a shaded drawing view would need (1) the drawing's Part Studio regen to get
+  the document provider when the document has file tabs (views::regenerate_source passes DocumentScripts only with
+  Feature Studios; a decal's image is a file tab, so the Decal feature fails there), (2) the shaded job's bodies to
+  carry face_refs (decals find their face by name) and display.decals. With both, the CLI's sheet build got the
+  decal record, but the app's shaded picture still showed none (w3/dcl.noshape: Decal 1 on the plate's top face,
+  Iso view shaded, after Update). Changes reverted; worth a closer look (is the out-of-date path still used?).
 - Slip 10-31 ~21:40: committed during a running land (SK12); caught before the push, the commit was saved as a
   patch, the branch reset to the tested commit, and the patch re-applied after the land.
 - Left in drawing.md 🔧 (as of 10-31 evening): MBD dimensions (CR5 / CR18 / V5, need Part Studio MBD dims), V1
