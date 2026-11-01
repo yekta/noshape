@@ -2856,13 +2856,48 @@ impl PartStudioView {
     /// selection color where they were (live dialogs/fillet-02…04: the
     /// sharp edges orange over the rounded preview). Taken from the model
     /// before the feature; faces by their boundary edges.
-    pub(super) fn consumed_picks_overlay(&mut self, selection: &[Reference], accent: &[Reference]) -> Vec<noshape_render::Instance> {
+    /// A dialog's picked faces the feature changes (a Shell's removed face,
+    /// whose name the rim keeps; a Draft's faces): live highlights a pick
+    /// as it was before the feature (Shell: the removed face's outline, the
+    /// rim unlit; behaviours "psui (11-01) preview audit"), so these go to
+    /// [`Self::consumed_picks_overlay`] instead of the result's face.
+    pub(super) fn changed_picks(&self, selection: &[Reference]) -> Vec<Reference> {
+        let (Some(_), Some(before)) = (&self.edit, &self.ui.preview_before) else { return Vec::new() };
+        // A face's triangle area and box in a display (a shell's rim keeps the removed face's outer box).
+        let face_shape = |d: &noshape_model::display::StudioDisplay, r: &Reference| -> Option<(f32, glam::Vec3, glam::Vec3)> {
+            d.bodies.iter().filter(|b| !b.hidden).find_map(|b| {
+                let fi = b.face_refs.iter().position(|f| f == r)?;
+                let &(first, count) = b.mesh.face_ranges.get(fi)?;
+                let idx = b.mesh.indices.get(first as usize..(first + count) as usize)?;
+                let p = |i: u32| b.mesh.positions.get(i as usize).map(|p| glam::Vec3::from(*p));
+                let (mut area, mut lo, mut hi) = (0.0, glam::Vec3::splat(f32::MAX), glam::Vec3::splat(f32::MIN));
+                for t in idx.as_chunks::<3>().0 {
+                    let (a, b, c) = (p(t[0])?, p(t[1])?, p(t[2])?);
+                    area += (b - a).cross(c - a).length() * 0.5;
+                    lo = lo.min(a.min(b).min(c));
+                    hi = hi.max(a.max(b).max(c));
+                }
+                Some((area, lo, hi))
+            })
+        };
+        selection
+            .iter()
+            .filter(|r| matches!(r, Reference::Face(_)))
+            .filter(|r| match (face_shape(before, r), face_shape(&self.display, r)) {
+                (Some((a, a0, a1)), Some((b, b0, b1))) => (a - b).abs() > 1e-4 * a.max(b) || (a0 - b0).length() > 1e-6 || (a1 - b1).length() > 1e-6,
+                _ => false,
+            })
+            .cloned()
+            .collect()
+    }
+
+    pub(super) fn consumed_picks_overlay(&mut self, selection: &[Reference], accent: &[Reference], changed: &[Reference]) -> Vec<noshape_render::Instance> {
         use noshape_render::{Drawable, Instance, LineData};
         let (Some(_), Some(before), Some(built)) = (&self.edit, self.ui.preview_before.clone(), &self.built) else {
             self.ui.consumed_lines = None;
             return Vec::new();
         };
-        let missing = |refs: &[Reference]| -> Vec<Reference> { refs.iter().filter(|r| matches!(r, Reference::Edge(_) | Reference::Face(_)) && built.picks.ids_for(r).is_empty()).cloned().collect() };
+        let missing = |refs: &[Reference]| -> Vec<Reference> { refs.iter().filter(|r| matches!(r, Reference::Edge(_) | Reference::Face(_)) && (built.picks.ids_for(r).is_empty() || changed.contains(r))).cloned().collect() };
         let (mut sel, mut acc) = (missing(selection), missing(accent));
         // Hovering its chip lights the pick the query-hover yellow-green
         // #f2ff80, consumed or not (live: qa4 round 5 s7, CHIP-HOVER).
@@ -2897,7 +2932,15 @@ impl PartStudioView {
                 }
             }
         }
-        let inst = (!lines.segments.is_empty()).then(|| Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(12));
+        // Whole over the preview blend, as the other highlights (live psui-prv-05a/b).
+        let post = self.built_base.is_some();
+        let inst = (!lines.segments.is_empty()).then(|| {
+            let mut i = Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(12);
+            if post {
+                i.compare = noshape_render::scene::compare::POST;
+            }
+            i
+        });
         self.ui.consumed_lines = Some((sel, acc, hov, key, inst.clone()));
         inst.into_iter().collect()
     }

@@ -1037,3 +1037,71 @@ fn extrude_second_end_has_its_own_arrow(cx: &mut TestAppContext) {
         assert!(cx.update(|cx| view.read(cx).current_manip(cx).is_none()), "{ty} has no manipulator");
     }
 }
+
+/// Preview audit (live 11-01): a Shell's removed face shows as it was before the feature, not on the rim the shell
+/// leaves (which keeps the face's name): the open Shell dialog counts the picked top face as changed, a face it
+/// leaves alone (the bottom) as not.
+#[gpui::test]
+fn a_shelled_face_is_highlighted_as_before(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "shell-pick", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.finish_sketch(w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let sk = v.display.sketches.first().expect("the sketch");
+            v.selection = vec![Reference::SketchRegion { sketch: sk.feature, key: sk.regions.first().expect("a region").key.clone() }];
+            v.start_feature("extrude", w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    // (A commit's regeneration waits out a burst's 12 ms first.)
+    cx.executor().advance_clock(std::time::Duration::from_millis(50));
+    draw(cx, window);
+    // The part's flat faces at its top and bottom.
+    let (top, bottom) = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        let flat_at = |want_top: bool| {
+            let zs: Vec<(Reference, f32, f32)> = b
+                .face_refs
+                .iter()
+                .enumerate()
+                .filter_map(|(i, r)| {
+                    let &(first, count) = b.mesh.face_ranges.get(i)?;
+                    let z: Vec<f32> = b.mesh.indices[first as usize..(first + count) as usize].iter().map(|&k| b.mesh.positions[k as usize][2]).collect();
+                    let (lo, hi) = z.iter().fold((f32::MAX, f32::MIN), |(a, c), x| (a.min(*x), c.max(*x)));
+                    ((hi - lo).abs() < 1e-7).then(|| (r.clone(), lo, hi))
+                })
+                .collect();
+            zs.into_iter().max_by(|a, b| if want_top { a.1.total_cmp(&b.1) } else { b.1.total_cmp(&a.1) }).expect("a flat face").0
+        };
+        (flat_at(true), flat_at(false))
+    });
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_feature("shell", w, cx);
+            let d = v.edit.as_ref().expect("the Shell dialog").dialog.clone();
+            d.update(cx, |d, cx| d.set_value("entities", noshape_model::ParamValue::Query(vec![top.clone()]), cx));
+        })
+    })
+    .unwrap();
+    cx.executor().advance_clock(std::time::Duration::from_millis(50));
+    draw(cx, window);
+    cx.executor().advance_clock(std::time::Duration::from_millis(50));
+    draw(cx, window);
+    let state = cx.update(|cx| {
+        let v = view.read(cx);
+        let id = v.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
+        (v.ui.preview_before.is_some(), id.and_then(|id| v.display.feature_state(id)).map(|s| (s.status, s.message.clone())), v.edit.as_ref().map(|e| e.dialog.read(cx).feature.params.query("entities").to_vec()))
+    });
+    assert!(state.0 && matches!(state.1, Some((noshape_model::display::FeatureStatus::Ok, _))), "the shell previewed over the model before it: {state:?}");
+    let changed = cx.update(|cx| view.read(cx).changed_picks(&[top.clone(), bottom.clone()]));
+    assert_eq!(changed, vec![top], "the removed top face, not the bottom");
+}

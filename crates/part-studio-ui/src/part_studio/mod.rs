@@ -1065,7 +1065,9 @@ impl PartStudioView {
         manip.extend(mc_glyphs.map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>));
         extra.extend(mc_owners);
         self.viewport.update(cx, |vp, cx| vp.set_camera_geometry(manip, cx));
-        extra.extend(self.consumed_picks_overlay(&selection, &accent));
+        let changed = self.changed_picks(&selection);
+        extra.extend(self.consumed_picks_overlay(&selection, &accent, &changed));
+        selection.retain(|r| !changed.contains(r));
         extra.extend(self.select_other_overlay());
         extra.extend(self.measure_overlay(cx));
         if !on_handle {

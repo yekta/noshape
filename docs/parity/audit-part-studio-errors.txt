@@ -1,0 +1,408 @@
+total 529 not std 378
+61 curves.rs
+49 sheetmetal_ops.rs
+29 sheetmetal_flange.rs
+21 frames.rs
+19 hole.rs
+18 sheetmetal.rs
+18 sheetmetal_unfold.rs
+16 blend_section.rs
+16 surfaces.rs
+15 pattern.rs
+14 sheetmetal_form.rs
+12 surfacing_c.rs
+12 detail_a.rs
+11 sheetmetal_loft.rs
+11 solid_a.rs
+10 importing.rs
+8 revolve.rs
+8 sheetmetal_jog.rs
+7 bshared.rs
+7 direct.rs
+6 extrude.rs
+6 thin.rs
+5 basic.rs
+4 detail.rs
+3 sheetmetal_util.rs
+3 split.rs
+2 refgeom.rs
+1 sketch.rs
+
+A bend inside a closed loop of walls cannot be refolded 	 sheetmetal_unfold.rs
+A bend inside a closed loop of walls cannot be unfolded (add a rip) 	 sheetmetal_unfold.rs
+A bend or arc radius is smaller than the sheet thickness 	 sheetmetal.rs
+A closed spline needs at least three points 	 curves.rs
+A control point reference no longer exists 	 curves.rs
+A face can't be in both groups 	 curves.rs
+A flat spiral (height 0) needs an end radius or end point 	 curves.rs
+A flat spiral needs revolutions and different start and end radii 	 curves.rs
+A frame segment was fully trimmed away 	 frames.rs
+A hole location no longer exists 	 hole.rs
+A hole location sketch no longer exists 	 hole.rs
+A point's vertex no longer exists 	 curves.rs
+A profile has too few points 	 sheetmetal_loft.rs
+A profile is degenerate 	 sheetmetal_loft.rs
+A selected body no longer exists 	 bshared.rs
+A selected edge no longer exists 	 curves.rs,frames.rs,sheetmetal_flange.rs
+A selected entity no longer exists 	 sheetmetal_ops.rs
+A selected face no longer exists 	 bshared.rs,curves.rs,frames.rs
+A selected feature no longer exists 	 pattern.rs
+A selected form location no longer exists 	 sheetmetal_form.rs
+A selected location no longer exists 	 importing.rs
+A selected mate connector no longer exists 	 curves.rs
+A selected normal no longer exists 	 surfacing_c.rs
+A selected plane no longer exists 	 bshared.rs
+A selected sketch curve no longer exists 	 sheetmetal.rs
+A selected vertex no longer exists 	 curves.rs,detail.rs,surfacing_c.rs
+A vertex override no longer exists 	 surfaces.rs
+Add positions for the curves 	 curves.rs
+Adding a sheet metal loft needs two straight profiles 	 sheetmetal_loft.rs
+Adding material for the jog failed 	 sheetmetal_jog.rs
+All thread edges must have the same diameter 	 hole.rs
+Anchor points could not be automatically chosen. Select \"Specify anchor points\" option to choose them manually. 	 surfacing_c.rs
+Bend radius is too large for the routing curve segments 	 curves.rs
+Bend radius is too large for the wall lengths 	 sheetmetal.rs
+Bend radius must be positive 	 sheetmetal_flange.rs,sheetmetal_ops.rs,sheetmetal_util.rs
+Bends of 180° or more cannot be unfolded yet 	 sheetmetal_unfold.rs
+Both edges must belong to the same corner 	 sheetmetal_ops.rs
+Both profiles must be open, or both closed 	 sheetmetal_loft.rs
+Bounding entity must be a plane or vertex 	 sheetmetal_flange.rs
+Cancelled 	 pattern.rs
+Cannot attach blended face. Select \"Detach\" to create a separate surface. 	 detail_a.rs
+Cannot fit a gusset at the selected edge (two adjacent frame faces are needed) 	 frames.rs
+Closed corners are not supported yet 	 sheetmetal_form.rs
+Control point weights must be positive 	 curves.rs
+Corners between arcs and other curves must be tangent 	 sheetmetal.rs
+Could not build the thin wall 	 thin.rs
+Could not build the thin wall (self-intersecting offset?) 	 thin.rs
+Could not evaluate the end direction 	 curves.rs
+Could not find a best fit plane 	 curves.rs
+Could not find the edges to re-fillet 	 detail_a.rs
+Could not measure between the selections 	 basic.rs
+Could not measure the selected face 	 bshared.rs
+Could not resolve the custom direction 	 basic.rs
+Could not resolve the reference plane 	 curves.rs
+Countersink angle must be between 0 and 180 degrees 	 hole.rs
+Curve reference could not be resolved 	 curves.rs
+Degenerate tool geometry 	 sheetmetal_util.rs
+Derived parts are not available in this context 	 importing.rs
+Each profile must be planar 	 sheetmetal_loft.rs
+Each selection must come from a single sketch 	 curves.rs
+Editing control points needs a single curve (use Approximate for several edges) 	 curves.rs
+Editing several curves requires Approximate 	 curves.rs
+Empty curve 	 curves.rs
+End cap faces must be planar 	 frames.rs
+End magnitude can't be zero 	 curves.rs
+Face blend between faces that don't share an edge is not supported yet 	 detail_a.rs
+Fillet failed (radius may be too large) 	 detail_a.rs
+Fillet radius must be positive 	 detail.rs,detail_a.rs
+Flange and hem edges must be linear 	 sheetmetal_flange.rs
+Form locations must lie on sheet metal wall faces 	 sheetmetal_form.rs
+Form tools are not available in this context 	 sheetmetal_form.rs
+Frame paths must not branch 	 frames.rs
+Gusset edges must be linear 	 frames.rs
+Gusset length and thickness must be positive 	 frames.rs
+Hem radius must be positive 	 sheetmetal_flange.rs
+Hems and rolled walls cannot be modified 	 sheetmetal_ops.rs
+Hole diameter must be positive 	 hole.rs
+Hole failed 	 hole.rs
+Import failed 	 importing.rs
+Inserted image exceeds 4k x 4k size limit 	 importing.rs
+Internal end caps need a hollow profile with exactly one inner boundary 	 frames.rs
+Joining walls by side faces is not supported; select the sharp edge where the walls meet 	 sheetmetal_ops.rs
+Loft guides with more than two profiles are not supported yet 	 solid_a.rs
+Loft path with more than two profiles is not supported yet 	 solid_a.rs
+Missing reference face 	 surfaces.rs
+Move boundary currently supports only the Blind end condition 	 surfaces.rs
+Move boundary currently supports single planar surfaces only (all boundary edges moved) 	 surfaces.rs
+Move boundary currently supports straight edges of planar surfaces only 	 surfaces.rs
+Move boundary works on surfaces only 	 surfaces.rs
+Move face failed (the faces could not be removed from the part) 	 direct.rs
+Mutual trim works on surfaces only 	 surfaces.rs
+No curves were created 	 bshared.rs
+No folded bends to unfold in the selection 	 sheetmetal_unfold.rs
+No isocline at this angle on the selected faces 	 surfacing_c.rs
+No unfolded bends in the selection 	 sheetmetal_unfold.rs
+No valid curves to extrude 	 extrude.rs
+No valid profiles to sweep 	 solid_a.rs
+No valid regions to extrude 	 extrude.rs
+No valid tab profiles 	 sheetmetal_ops.rs
+None of the selected features can be re-applied 	 pattern.rs
+Normal and tangent overrides need a reference face 	 surfaces.rs
+Nothing is left of the part 	 direct.rs
+Nothing to revolve up to 	 revolve.rs
+Nothing to thicken 	 sheetmetal.rs
+Offset curve currently supports only the Offset scope 	 curves.rs
+Offset curve currently supports planar faces only 	 curves.rs
+Offset distance must be positive 	 curves.rs
+Only bends between two walls can be unfolded 	 sheetmetal_unfold.rs
+Only features before the pattern can be patterned 	 pattern.rs
+Only fillets between two tangent faces can be modified 	 detail_a.rs
+Only parts and surfaces can be converted to sheet metal 	 sheetmetal.rs
+Only planar faces, planes and mate connectors can be used to trim 	 frames.rs
+Only regular bends can be unfolded (not hems or rolled walls) 	 sheetmetal_unfold.rs
+Only solid parts can be recognized as sheet metal 	 sheetmetal_unfold.rs
+Partial flange bounds are outside the edge 	 sheetmetal_flange.rs
+Pattern failed 	 pattern.rs
+Pattern failed: could not tell whether the faces add or remove material 	 pattern.rs
+Pitch must be positive 	 curves.rs
+Profile 1 must be one edge of the merge scope 	 sheetmetal_loft.rs
+Profile 1 must bound a wall of the merge scope 	 sheetmetal_loft.rs
+Profiles must be edges, sketch curves, regions or faces 	 sheetmetal_loft.rs
+Projecting the split curves failed 	 split.rs
+Radius must be positive 	 solid_a.rs
+Removing the fillet failed 	 detail_a.rs
+Replacing the face removed the whole part 	 direct.rs
+Revolutions must be positive 	 curves.rs
+Rib thickness must be positive 	 solid_a.rs
+Rip edges must be linear 	 sheetmetal_ops.rs
+Rip walls must be planar 	 sheetmetal_ops.rs
+Rolled hem angle must be between 180 and 360 degrees 	 sheetmetal_flange.rs
+Scale factors must be positive 	 pattern.rs
+Scale must be positive 	 pattern.rs
+Segments fold back on themselves; a miter is not possible 	 frames.rs
+Select a Part Studio to derive from 	 importing.rs
+Select a bend face or a joint edge 	 sheetmetal_ops.rs
+Select a bend line 	 sheetmetal_ops.rs
+Select a bend or rip 	 sheetmetal_ops.rs
+Select a center point 	 solid_a.rs
+Select a circular edge, cylinder or sphere 	 basic.rs
+Select a curve for each curve-referenced point 	 curves.rs
+Select a curve to edit 	 curves.rs
+Select a derivative direction 	 curves.rs
+Select a direction 	 surfaces.rs,surfacing_c.rs
+Select a face 	 curves.rs
+Select a face or plane 	 extrude.rs
+Select a face or plane to trim to 	 frames.rs
+Select a face to revolve up to 	 revolve.rs
+Select a frame profile (for example \"SHS 40x40x3\" or the name of a profile sketch) 	 frames.rs
+Select a part to revolve up to 	 revolve.rs
+Select a path 	 pattern.rs
+Select a planar face of a sheet metal wall 	 sheetmetal_jog.rs,sheetmetal_ops.rs
+Select a projection direction 	 curves.rs
+Select a reference plane 	 curves.rs
+Select a sharp edge between two walls (walls that do not touch cannot be joined yet) 	 sheetmetal_ops.rs
+Select a surface or its boundary edges 	 surfaces.rs
+Select a thread standard and size 	 hole.rs
+Select a vertex for each vertex-referenced point 	 curves.rs
+Select a vertex or edge at the end of a bend 	 sheetmetal_ops.rs
+Select a vertex or edge of a corner where two bends meet 	 sheetmetal_form.rs
+Select a vertex or edge together with the face 	 curves.rs
+Select a vertex to revolve up to 	 revolve.rs
+Select a vertex, edge or mate connector for the end 	 curves.rs
+Select a vertex, edge or mate connector for the start 	 curves.rs
+Select a vertex, edge, face or mate connector for the origin 	 refgeom.rs
+Select an edge 	 refgeom.rs
+Select an edge of a sheet metal wall 	 sheetmetal_flange.rs
+Select an edge on the boundary of a sheet metal wall 	 sheetmetal_flange.rs
+Select an end point 	 curves.rs
+Select at least three points (vertices) to fit a surface 	 surfacing_c.rs
+Select at least two groups of frames to trim against each other 	 frames.rs
+Select at least two points 	 curves.rs
+Select circular edges of cylinders to thread 	 hole.rs
+Select corners (vertices or edges through the thickness) to fillet or chamfer 	 sheetmetal_ops.rs
+Select curves from a single sketch 	 sheetmetal.rs
+Select curves to adjust 	 curves.rs
+Select edges 	 bshared.rs
+Select edges at frame junctions for the gussets 	 frames.rs
+Select edges for the ruled surface 	 surfaces.rs
+Select edges of two sketches 	 curves.rs
+Select edges or curves 	 curves.rs
+Select edges or side faces to flange 	 sheetmetal_flange.rs
+Select edges or side faces to hem 	 sheetmetal_flange.rs
+Select edges or sketch curves to revolve 	 revolve.rs
+Select edges to fit 	 curves.rs
+Select edges to measure 	 basic.rs
+Select edges to offset 	 curves.rs
+Select edges to project 	 curves.rs
+Select edges, curves or vertices defining the frame path 	 frames.rs
+Select entities to trim to 	 curves.rs
+Select faces for the isocline 	 surfacing_c.rs
+Select faces or sketch regions to thicken 	 sheetmetal.rs
+Select faces, surfaces or parts in both groups 	 curves.rs
+Select faces, surfaces or sketch regions 	 direct.rs
+Select fillet faces to modify 	 detail_a.rs
+Select form locations (sketch points or mate connectors on a sheet metal face) 	 sheetmetal_form.rs
+Select frames for the cut list 	 frames.rs
+Select mesh faces or bodies 	 surfacing_c.rs
+Select non-planar fillet faces 	 detail_a.rs
+Select open end faces of frame segments 	 frames.rs
+Select parts to copy 	 pattern.rs
+Select parts to trim 	 frames.rs
+Select reference faces for normal or tangent ruled surfaces 	 surfaces.rs
+Select sheet metal parts to finish 	 sheetmetal.rs
+Select sketch curves 	 curves.rs
+Select sketch curves to extrude 	 sheetmetal.rs
+Select tab profile regions or faces 	 sheetmetal_ops.rs
+Select target faces 	 curves.rs
+Select the Part Studio of the form tool 	 sheetmetal_form.rs
+Select the end of the bridging curve 	 curves.rs
+Select the entity to jog up to 	 sheetmetal_jog.rs
+Select the override direction 	 surfaces.rs
+Select the parts to recognize as sheet metal 	 sheetmetal_unfold.rs
+Select the sharp edge between two walls 	 sheetmetal_ops.rs
+Select the sheet metal face to bend 	 sheetmetal_ops.rs
+Select the spine of the swept profile 	 detail_a.rs
+Select the start of the bridging curve 	 curves.rs
+Select the unfolded parts or bends to refold 	 sheetmetal_unfold.rs
+Select the vertex to rule up to 	 surfaces.rs
+Select two entities to measure between 	 basic.rs
+Selected corners no longer exist 	 sheetmetal_ops.rs
+Selected edge is too short 	 sheetmetal_flange.rs
+Selected edges must form one connected chain 	 bshared.rs
+Selected edges no longer exist 	 sheetmetal_flange.rs
+Selected side face is not on the free edge of a sheet metal wall 	 sheetmetal_util.rs
+Sheet metal extrude currently supports only the Blind end type 	 sheetmetal.rs
+Sheet metal extrude supports lines and arcs only 	 sheetmetal.rs
+Sheet metal model missing 	 sheetmetal.rs
+Shell thickness must be positive 	 detail.rs
+Side length must be positive 	 solid_a.rs
+Sketch curves fold back on themselves 	 sheetmetal.rs
+Sketch curves must form one connected chain 	 sheetmetal.rs
+Sketch no longer exists 	 curves.rs
+Sketch planes can't be parallel 	 curves.rs
+Split failed 	 split.rs
+Split needs a target face of a part 	 surfacing_c.rs
+Split with a surface, face, plane or mate connector 	 split.rs
+Start and end positions are identical 	 curves.rs
+Surface has no boundary 	 surfaces.rs
+Swept profile blends are supported when the spine is parallel to straight blended edges 	 detail_a.rs
+Tangent joints are only possible between rolled walls 	 sheetmetal_ops.rs
+The bend angle is too small 	 sheetmetal_ops.rs
+The bend could not be removed 	 sheetmetal_ops.rs
+The bend faces no longer exist 	 sheetmetal_ops.rs
+The bend faces were not created 	 sheetmetal_ops.rs
+The bend is not cylindrical 	 sheetmetal_ops.rs
+The bend line does not cross the face 	 sheetmetal_ops.rs
+The bend line is not a line 	 sheetmetal_ops.rs
+The bend line is perpendicular to the face 	 sheetmetal_ops.rs
+The bend line must split the face into two parts 	 sheetmetal_ops.rs
+The bend region could not be found 	 sheetmetal_unfold.rs
+The bend region could not be separated from its walls 	 sheetmetal_unfold.rs
+The bend region crosses other walls; only flat regions can be bent 	 sheetmetal_ops.rs
+The bend's end section could not be found 	 sheetmetal_unfold.rs
+The bends of the corner are parallel 	 sheetmetal_form.rs
+The bent part is not connected 	 sheetmetal_ops.rs
+The bounding entity is parallel to the edge 	 sheetmetal_flange.rs
+The bounding entity no longer exists 	 detail.rs
+The chamfer size exceeds the gusset size 	 frames.rs
+The corner relief size must be positive 	 sheetmetal_form.rs
+The corner relief would split the part 	 sheetmetal_form.rs
+The curve does not intersect the trim entities 	 curves.rs
+The direction is parallel to the bend line 	 sheetmetal_ops.rs
+The direction is parallel to the edge 	 sheetmetal_flange.rs
+The edge is a joint between two walls (use Make joint) 	 sheetmetal_flange.rs
+The edge is next to a bend; select a free edge of a wall 	 sheetmetal_flange.rs
+The edge must be on a planar side face 	 sheetmetal_flange.rs
+The edges do not project onto the targets 	 curves.rs
+The extended curve does not reach the selected entity 	 curves.rs
+The face could not be extended to the template (it must cover the whole face) 	 direct.rs
+The face could not be offset 	 direct.rs
+The face is too short to add material for the jog 	 sheetmetal_jog.rs
+The face to bend must be planar 	 sheetmetal_ops.rs
+The face to bend no longer exists 	 sheetmetal_ops.rs
+The feature list is not available 	 pattern.rs
+The flange angle must be between 0 and 180 degrees 	 sheetmetal_flange.rs
+The flange cannot be parallel to the selected entity 	 sheetmetal_flange.rs
+The flange does not connect to the part 	 sheetmetal_flange.rs
+The flange has no width (adjacent corners overlap) 	 sheetmetal_flange.rs
+The flange is too short for its bend 	 sheetmetal_flange.rs
+The form Part Studio could not be regenerated (deleted, or a circular reference) 	 sheetmetal_form.rs
+The form splits the part or does not touch it 	 sheetmetal_form.rs
+The hem is too short; increase the total length 	 sheetmetal_flange.rs
+The hole doesn't reach the end face 	 hole.rs
+The hole end entity could not be resolved 	 hole.rs
+The hole end face is parallel to the hole 	 hole.rs
+The hole has zero depth (check the termination and direction) 	 hole.rs
+The imported file contains no parts or surfaces 	 importing.rs
+The imported file's data is missing from this document 	 importing.rs
+The jog angle must be smaller than 180° 	 sheetmetal_jog.rs
+The jog bends away from the selected entity; use Opposite angle 	 sheetmetal_jog.rs
+The jog limit no longer exists 	 sheetmetal_jog.rs
+The jogged wall is too short for the second bend 	 sheetmetal_jog.rs
+The joint is already a rip 	 sheetmetal_ops.rs
+The override direction no longer exists 	 surfaces.rs
+The part could not be copied 	 sheetmetal_unfold.rs
+The pattern path is degenerate 	 pattern.rs
+The pattern path must be a connected chain of edges 	 pattern.rs
+The profiles need at least one segment 	 sheetmetal_loft.rs
+The refolded part is not connected 	 sheetmetal_unfold.rs
+The relief would split the part 	 sheetmetal_ops.rs
+The revolve axis could not be resolved 	 revolve.rs
+The revolve does not reach the bounding entity 	 revolve.rs
+The revolve offset is larger than the angle to the vertex 	 revolve.rs
+The rib profiles no longer exist 	 solid_a.rs
+The rip corner is degenerate 	 sheetmetal_ops.rs
+The rip could not be made 	 sheetmetal_ops.rs
+The rip walls could not be found 	 sheetmetal_ops.rs
+The selected bend relief corner no longer exists 	 sheetmetal_ops.rs
+The selected corner no longer exists 	 sheetmetal_form.rs
+The selected direction no longer exists 	 surfacing_c.rs
+The selected edges no longer exist 	 curves.rs,hole.rs
+The selected faces don't bound a region that can be moved 	 direct.rs
+The selected faces no longer exist 	 detail_a.rs
+The selected joint no longer exists 	 sheetmetal_ops.rs
+The selected parts are not active sheet metal models 	 sheetmetal.rs
+The selected parts no longer exist in the source Part Studio 	 importing.rs
+The selected vertex is not a sheet metal corner 	 sheetmetal_ops.rs
+The selection contains no frame parts 	 frames.rs
+The selection is not a corner between two bends of one wall (use Bend relief at a single bend end) 	 sheetmetal_form.rs
+The selection is not a sheet metal joint 	 sheetmetal_ops.rs
+The selection is not at the end of a bend 	 sheetmetal_ops.rs
+The selection no longer exists 	 sheetmetal_unfold.rs
+The selections do not intersect 	 curves.rs
+The sheet metal loft produced no part 	 sheetmetal_loft.rs
+The side face at the edge must be perpendicular to the wall 	 sheetmetal_flange.rs
+The sketch no longer exists 	 sheetmetal.rs
+The sketch plane could not be found 	 sketch.rs
+The sketch projections do not intersect 	 curves.rs
+The source Part Studio could not be regenerated (a circular reference) 	 importing.rs
+The source Part Studio has no mate connectors to place by 	 importing.rs
+The start point lies on the helix axis 	 curves.rs
+The tab does not touch the wall 	 sheetmetal_ops.rs
+The tab must lie in the plane of a sheet metal wall 	 sheetmetal_ops.rs
+The tear drop gap is too large for the inner radius 	 sheetmetal_flange.rs
+The unfolded part is not connected 	 sheetmetal_unfold.rs
+The unfolded strip's start section could not be found 	 sheetmetal_unfold.rs
+The up to entity is parallel to the flange 	 sheetmetal_flange.rs
+The wall curves must lie in the wall plane 	 thin.rs
+The wall face must be planar 	 sheetmetal_flange.rs
+The wall is too thick for the profile 	 thin.rs
+The wall offset failed (thickness too large?) 	 thin.rs
+The wall thickness must be positive 	 thin.rs
+The walls must meet in a sharp corner to rip 	 sheetmetal_ops.rs
+The walls must meet in one sharp corner to make a bend 	 sheetmetal_ops.rs
+The walls of the bend could not be found 	 sheetmetal_ops.rs
+There are no parts to cut holes in 	 hole.rs
+These faces can't be patterned (they don't bound a closed volume) 	 pattern.rs
+Thicken did not produce a solid 	 solid_a.rs
+Thicken failed 	 solid_a.rs
+Thickness must be positive 	 sheetmetal.rs,sheetmetal_loft.rs,surfacing_c.rs
+Thin loft did not produce a solid 	 solid_a.rs
+Thread edges must be circular 	 hole.rs
+Thread edges must be edges of a solid 	 hole.rs
+Thread edges must bound a cylindrical face 	 hole.rs
+Thread failed 	 hole.rs
+Thread length must be positive 	 hole.rs
+Transform failed 	 pattern.rs
+Up to entity must be a face, plane or vertex 	 sheetmetal_flange.rs
+Up to face no longer exists 	 extrude.rs
+Up to part no longer exists 	 extrude.rs
+Up to vertex no longer exists 	 extrude.rs
+Wrap produced an unexpected result 	 surfacing_c.rs
+could not orient a face at the edge 	 blend_section.rs
+curvature magnitude out of range 	 blend_section.rs
+degenerate conic 	 blend_section.rs
+empty chain 	 blend_section.rs
+empty partial range 	 blend_section.rs
+faces whose closest points are tangent or touch 	 blend_section.rs
+no cliff fillet fits 	 blend_section.rs
+only lines and arcs 	 blend_section.rs
+the blend would run all round 	 blend_section.rs
+the edge doesn't have two faces 	 blend_section.rs
+the faces at the edge are tangent 	 blend_section.rs
+the faces don't overlap along the blend 	 blend_section.rs
+the fillet is wider than a face 	 blend_section.rs
+the fillet is wider than both faces 	 blend_section.rs
+the result is not one valid solid 	 blend_section.rs
+the wrong side's touch point is short of its face 	 blend_section.rs

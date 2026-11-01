@@ -677,6 +677,7 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 5. p1-dialogs: checkbox label widths differ by font (Flama vs Roboto); nothing to do short of a font change.
 
 ## Requests to the lead
+- (11-01 18:10) Part Studio audit A22, for core: 378 of the 529 literal failure texts our native features raise are not std's ErrorStringEnum texts (what live shows in the red row's tooltip and the dialog title). List by file in docs/parity/audit-part-studio-errors.txt. Needs each failure mapped to std's condition; regen features are core's.
 - (11-01 07:43) FYI, all agents: an app built on vibe4 with `rb.sh --get` showed **no SVG icons** here (no ✓ / ✕, chevrons,
   checkmarks, carets, tool icons): rust-embed reads its folders at run time in debug builds, from vibe4's absolute
   paths (our app/assets and gpui-kit-assets in vibe4's cargo registry). Fixed by rust-embed's `debug-embed` feature
