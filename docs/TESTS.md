@@ -12,8 +12,9 @@ All scripts take extra cargo args (`--locked`, `-p <crate>`, `--release`). Set `
 
 ## Landing: `tools/tiers/land.sh` (lead, 10-27; queued 11-01)
 
-The only way to put work on main. `land.sh` rebases on origin/main, queues HEAD on the land server vibe4 and returns
-at once with `QUEUED <sha>`: **keep working, don't wait for it.** The land daemon there (`tools/tiers/land-daemon.sh`)
+The only way to put work on main. `land.sh` rebases on origin/main, runs clippy on the crates the change edits
+through rb.sh in your warm vibe4 dir (seconds to a minute; a clippy error refuses the queue and shows the error;
+`--no-precheck` skips it in an emergency), queues HEAD on the land server vibe4 and returns at once with `QUEUED <sha>`: **keep working, don't wait for it.** The land daemon there (`tools/tiers/land-daemon.sh`)
 takes whatever is queued whenever one of its three slots frees, in arrival order (no batch waits to fill): one place
 per worktree (its newest queued change carries its older ones: one check, one result for all), 4 worktrees, 8 above
 12 queued changes, 12 above 24. It stacks them on the batches still being checked (a merge train: it lands right

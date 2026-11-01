@@ -99,8 +99,8 @@ Describe the work in the body only when needed, concisely, in simple language.
 - Incremental compilation is on (machine config); mold links. Test the crate you changed:
   `cargo test -p <crate> --test all <file>::<name>` or `--lib <module>::`. Build the app only to look at it.
 - Tiers (docs/TESTS.md): T0 `tools/tiers/t0.sh`, T1 `tools/tiers/t1.sh`, T2 `tools/tiers/t2.sh`.
-- Land only with `tools/tiers/land.sh`: it rebases and queues your change on the land server, then returns at once
-  (`QUEUED <sha>`). Keep working. The queue checks it (cargo check over the workspace, clippy on the crates you edit,
+- Land only with `tools/tiers/land.sh`: it rebases, runs clippy on the crates you edit (on vibe4, refusing to queue
+  on a clippy error) and queues your change on the land server, then returns at once (`QUEUED <sha>`). Keep working. The queue checks it (cargo check over the workspace, clippy on the crates you edit,
   the full tests of those crates and of the crates that use them, T0 when the app, ops or cli is affected) and pushes
   it only if green. `tools/tiers/land.sh --status` shows your queued, landed and failed changes; the lead also tells
   you when one fails. A failed land is your next task: fix forward (work stacked on it stays in your worktree), then

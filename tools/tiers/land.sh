@@ -6,7 +6,9 @@
 # green ones to main and finds the change at fault in a red batch (11-01: agents spent ~25 h a day waiting on their
 # own lands). Your results: `land.sh --status`, or the lead's message. A failed land is your next task: fix forward
 # (work you stacked on it stays in your worktree; the next land.sh queues all of it). Docs-only changes push at once.
-#   tools/tiers/land.sh            queue HEAD
+#   tools/tiers/land.sh            queue HEAD, once clippy is clean on the crates it edits (run through rb.sh in your
+#                                  warm vibe4 dir, ~1 min; a clippy error refuses the queue, with the error)
+#   tools/tiers/land.sh --no-precheck   queue without that clippy run (emergencies)
 #   tools/tiers/land.sh --status   this worktree's queued, landed and failed changes
 #   tools/tiers/land.sh --wait     land now and wait (the lead, scripts; also when vibe4 is unreachable): this change's
 #                                  checks alone on vibe4, else vibe3, else here (env: OCCT_ROOT, CARGO_TARGET_DIR,
@@ -15,8 +17,10 @@
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 fail() { echo "LAND FAILED: $*"; exit 1; }
-mode=queue
-case "${1:-}" in "") ;; --wait) mode=wait;; --status) mode=status;; *) sed -n '2,/^set /p' "$0" | grep '^#'; exit 2;; esac
+mode=queue; precheck=1
+for a in "$@"; do
+  case "$a" in --wait) mode=wait;; --status) mode=status;; --no-precheck) precheck=0;; *) sed -n '2,/^set /p' "$0" | grep '^#'; exit 2;; esac
+done
 name=$(basename "$PWD"); target=${NOSHAPE_LAND_TARGET:-main}
 qhost=${NOSHAPE_LAND_QUEUE_HOST:-vibe4}; qdir=${NOSHAPE_LAND_DIR:-land}
 results=/tmp/lead/land-results/$name.log; [ "$qdir" = land ] || results=/tmp/lead/$qdir-results/$name.log
@@ -82,6 +86,31 @@ P
 
 if [ $mode = queue ] && ! "${SSH[@]}" "$qhost" true 2>/dev/null; then
   echo "== $qhost unreachable: landing now and waiting (--wait)"; mode=wait
+fi
+# Before queuing: clippy on the crates the change edits, in this worktree's warm dir on vibe4 (tools/tiers/rb.sh). Most
+# failed queued changes on 11-01 (~60; dx 23 failed, 6 landed) were one clippy error or failing test carried through an
+# agent's next commits; now a stack queues only once its newest commit is clippy-clean.
+if [ $mode = queue ] && [ $precheck = 1 ]; then
+  edited=$(python3 - "$changed" <<'P'
+import json, subprocess, sys, os
+changed = sys.argv[1].split('\n')
+meta = json.loads(subprocess.run(['cargo', 'metadata', '--format-version', '1', '--no-deps'], capture_output=True, text=True).stdout)
+root = meta['workspace_root']
+pk = {p['name']: os.path.dirname(os.path.relpath(p['manifest_path'], root)) for p in meta['packages']}
+if any(c in ('Cargo.toml', 'Cargo.lock') or c.startswith('.cargo/') for c in changed): print('all'); sys.exit()
+print(' '.join(sorted(n for n, d in pk.items() if n != 'noshape-workspace-hack' and any(c.startswith(d + '/') for c in changed))))
+P
+)
+  if [ -n "$edited" ]; then
+    if [ "$edited" = all ]; then cl=(cargo clippy --workspace --all-targets -- -D warnings); else cl=(cargo clippy --no-deps $(for p in $edited; do printf -- '-p %s ' "$p"; done) --all-targets -- -D warnings); fi
+    echo "== precheck: clippy on ${edited} (vibe4, your warm dir)"; s=$(date +%s)
+    out=$(NOSHAPE_RB_HOST=$qhost tools/tiers/rb.sh "${cl[@]}" 2>&1); rc=$?
+    if [ $rc -ne 0 ]; then
+      echo "$out" | grep -vE '^warning: [a-z0-9_-]+@' | grep -E '^(error|warning)' -A6 | head -60
+      fail "precheck: clippy (not queued; fix it and land again, or --no-precheck in an emergency)"
+    fi
+    echo "== precheck passed ($(( $(date +%s) - s )) s)"
+  fi
 fi
 if [ $mode = queue ]; then
   sha=$(git rev-parse HEAD); short=${sha:0:8}; ref="queue/$name-$short"; key="$(date +%s%N)-$name-$short"
