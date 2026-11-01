@@ -37,6 +37,11 @@ fn info_path(path: &Path) -> PathBuf {
     dir().join(format!("{}.json", key(path)))
 }
 
+/// The discovery file of document `path` (tests, tools).
+pub fn discovery_file(path: &Path) -> PathBuf {
+    info_path(path)
+}
+
 /// A random token (std only: the hasher's random keys, the time, the pid).
 fn token() -> String {
     use std::hash::{BuildHasher, Hasher};
@@ -102,14 +107,70 @@ fn error_from_json(e: &Value) -> OpError {
     err
 }
 
-/// The app serving `path`, if one is running: its port and token.
+/// The app serving `path`, if one is running: its port and token. The
+/// discovery file is the readiness signal (renamed into place once the port
+/// listens); only a file whose app is gone is skipped ([`stale`]): on a busy
+/// machine a slow connect is not a dead server.
 pub fn server_for(path: &Path) -> Option<(u16, String)> {
     let info: Value = serde_json::from_slice(&std::fs::read(info_path(path)).ok()?).ok()?;
     let port = info.get("port")?.as_u64()? as u16;
     let token = info.get("token")?.as_str()?.to_string();
-    // A stale file (the app quit without removing it) doesn't connect.
-    TcpStream::connect_timeout(&([127, 0, 0, 1], port).into(), Duration::from_millis(300)).ok()?;
+    let pid = info.get("pid")?.as_u64()? as u32;
+    if stale(pid, port) {
+        return None;
+    }
     Some((port, token))
+}
+
+/// A discovery file is stale when its process is gone or nothing listens on
+/// its port (refused at once). A connection that is only slow (a loaded
+/// machine) counts as alive.
+fn stale(pid: u32, port: u16) -> bool {
+    if !process_alive(pid) {
+        return true;
+    }
+    if pid == std::process::id() {
+        return false;
+    }
+    matches!(TcpStream::connect_timeout(&([127, 0, 0, 1], port).into(), Duration::from_millis(500)), Err(e) if e.kind() == std::io::ErrorKind::ConnectionRefused)
+}
+
+/// Whether process `pid` is running.
+fn process_alive(pid: u32) -> bool {
+    #[cfg(unix)]
+    {
+        unsafe extern "C" {
+            fn kill(pid: i32, sig: i32) -> i32;
+        }
+        // Signal 0: only the check. EPERM: it exists, owned by someone else.
+        let signalled = unsafe { kill(pid as i32, 0) } == 0;
+        signalled || std::io::Error::last_os_error().raw_os_error() == Some(1)
+    }
+    #[cfg(windows)]
+    {
+        use std::ffi::c_void;
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn OpenProcess(access: u32, inherit: i32, pid: u32) -> *mut c_void;
+            fn GetExitCodeProcess(process: *mut c_void, code: *mut u32) -> i32;
+            fn CloseHandle(handle: *mut c_void) -> i32;
+        }
+        const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+        const STILL_ACTIVE: u32 = 259;
+        let h = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+        if h.is_null() {
+            return false;
+        }
+        let mut code = 0u32;
+        let ok = unsafe { GetExitCodeProcess(h, &mut code) } != 0;
+        unsafe { CloseHandle(h) };
+        ok && code == STILL_ACTIVE
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = pid;
+        true
+    }
 }
 
 /// Run `tool` in the app serving `path`.
@@ -160,26 +221,23 @@ pub fn spare_path() -> PathBuf {
 }
 
 /// Remove what apps that are gone left behind (killed, so no destructor
-/// ran): discovery files that don't connect, and those apps' spare sessions.
+/// ran): discovery files whose app is gone ([`stale`]), and those apps'
+/// spare sessions. Files being written are never seen half-done (they are
+/// renamed into place).
 fn clean_stale() {
     let Ok(entries) = std::fs::read_dir(dir()) else { return };
     let files: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
-    let mut alive = vec![std::process::id()];
     for f in files.iter().filter(|f| f.extension().is_some_and(|e| e == "json")) {
         let info: Option<Value> = std::fs::read(f).ok().and_then(|b| serde_json::from_slice(&b).ok());
-        let port = info.as_ref().and_then(|i| i.get("port")?.as_u64());
-        let up = port.is_some_and(|p| TcpStream::connect_timeout(&([127, 0, 0, 1], p as u16).into(), Duration::from_millis(200)).is_ok());
-        match info.as_ref().and_then(|i| i.get("pid")?.as_u64()) {
-            Some(pid) if up => alive.push(pid as u32),
-            _ => {
-                let _ = std::fs::remove_file(f);
-            }
+        let pid_port = info.as_ref().and_then(|i| Some((i.get("pid")?.as_u64()? as u32, i.get("port")?.as_u64()? as u16)));
+        if pid_port.is_none_or(|(pid, port)| stale(pid, port)) {
+            let _ = std::fs::remove_file(f);
         }
     }
     for f in &files {
         let name = f.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         let pid = name.split_once('-').and_then(|(p, _)| p.parse::<u32>().ok());
-        if name.contains(".noshape") && pid.is_some_and(|p| !alive.contains(&p)) {
+        if (name.contains(".noshape") || name.ends_with(".tmp")) && pid.is_some_and(|p| !process_alive(p)) {
             let _ = std::fs::remove_file(f);
         }
     }
@@ -194,7 +252,11 @@ pub fn serve(path: &Path, requests: impl Fn(Request) + Send + 'static) -> std::i
     let tok = token();
     std::fs::create_dir_all(dir())?;
     let info = info_path(path);
-    std::fs::write(&info, serde_json::to_vec(&json!({ "port": port, "token": tok, "pid": std::process::id(), "path": path.to_string_lossy() })).expect("json"))?;
+    // Written beside and renamed into place: a reader (another process's
+    // clean_stale, a CLI) sees the whole file or none.
+    let tmp = dir().join(format!("{}-{}.tmp", std::process::id(), &token()[..12]));
+    std::fs::write(&tmp, serde_json::to_vec(&json!({ "port": port, "token": tok, "pid": std::process::id(), "path": path.to_string_lossy() })).expect("json"))?;
+    std::fs::rename(&tmp, &info)?;
     std::thread::Builder::new().name("noshape-live".into()).spawn(move || {
         for stream in listener.incoming().flatten() {
             let mut line = String::new();

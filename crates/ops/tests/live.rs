@@ -105,3 +105,41 @@ fn switch_to_reference_switches_the_apps_tab() {
     assert!(matches!(&shown[0], noshape_ops::UiRequest::ActivateTab(t) if t.to_string() == r["target"]["id"].as_str().unwrap()), "{shown:?}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Servers starting at once (each cleans up stale discovery files first) never
+/// hide one another: a file is renamed into place whole, and only an app that
+/// is gone makes it stale, never a slow connect on a loaded machine (an ops
+/// land run failed with "the CLI didn't open the file itself" when another
+/// server's cleanup deleted a live discovery file). A stale file of a finished
+/// process is removed.
+#[test]
+fn servers_starting_together_stay_discoverable_and_stale_files_go() {
+    let dir = std::env::temp_dir().join(format!("noshape-live-together-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    // A stale discovery file: a process that has finished, a port nobody listens on.
+    let mut child = std::process::Command::new(std::env::current_exe().unwrap()).arg("--list").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn().unwrap();
+    let dead_pid = child.id();
+    child.wait().unwrap();
+    let dead_port = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap().local_addr().unwrap().port();
+    let stale_doc = dir.join("stale.noshape");
+    let stale_file = noshape_ops::live::discovery_file(&stale_doc);
+    std::fs::create_dir_all(stale_file.parent().unwrap()).unwrap();
+    std::fs::write(&stale_file, json!({ "port": dead_port, "token": "x", "pid": dead_pid, "path": stale_doc.to_string_lossy() }).to_string()).unwrap();
+    assert!(noshape_ops::live::server_for(&stale_doc).is_none(), "a finished process's file is stale");
+    std::thread::scope(|s| {
+        for t in 0..6 {
+            let dir = &dir;
+            s.spawn(move || {
+                for k in 0..8 {
+                    let path = dir.join(format!("t{t}-{k}.noshape"));
+                    let server = noshape_ops::live::serve(&path, |_| {}).unwrap();
+                    assert!(noshape_ops::live::server_for(&path).is_some(), "{} isn't discoverable right after serve", path.display());
+                    drop(server);
+                    assert!(noshape_ops::live::server_for(&path).is_none());
+                }
+            });
+        }
+    });
+    assert!(!stale_file.exists(), "the stale discovery file was cleaned up");
+    let _ = std::fs::remove_dir_all(&dir);
+}
