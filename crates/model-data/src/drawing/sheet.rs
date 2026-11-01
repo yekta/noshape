@@ -2196,6 +2196,14 @@ impl SheetGeometry {
                         }
                         None => q,
                     };
+                    // Custom: the picked region, cross-hatched dashed.
+                    if matches!(area, DatumTargetArea::Custom) && opts.region.len() > 2 {
+                        let pts: Vec<[f64; 2]> = opts.region.iter().map(|q| env.to_sheet(*view, *q)).collect();
+                        let (std, pat) = self.style.target_hatch;
+                        for l in super::sheet_sketch::hatch_pattern(&pts, std, pat, 0.6, 0.0) {
+                            self.lines.push(Polyline2 { points: l.to_vec(), style: LineStyle::Hidden, closed: false, pick });
+                        }
+                    }
                     for (i, t) in turns.iter().enumerate() {
                         let (pi, ci) = (turn(p, *t), turn(a.position, *t));
                         self.target_symbol(area, pi, k, rot, pick);

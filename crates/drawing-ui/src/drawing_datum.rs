@@ -138,6 +138,22 @@ impl DrawingEditor {
             *ar = area;
         }
         a.target = (style != TargetStyle::Inside).then(|| Box::new(DatumTargetOpts { style, ..Default::default() }));
+        // Custom (live 1699 (e)): the closed region of the view around the
+        // pick; the leader ends on its edge.
+        if custom
+            && let AnnotationKind::DatumTarget { view, anchor, .. } = &mut a.kind
+            && let Some(pl) = self.placement(*view)
+            && let Some((outer, _)) = self.pk().view_region_at(*view, pl.to_sheet(*anchor))
+            && outer.len() > 2
+        {
+            let n = outer.len();
+            let p = *anchor;
+            if let Some(q) = (0..n).map(|i| foot(p, outer[i], outer[(i + 1) % n])).min_by(|x, y| dist2(*x, p).total_cmp(&dist2(*y, p))) {
+                *anchor = q;
+            }
+            a.refs.retain(|r| r.slot != 0);
+            a.target.get_or_insert_with(Default::default).region = outer;
+        }
         // The size's precision (Area size ▾).
         a.format.precision = self.datum_dlg.as_ref().and_then(|d| d.size_precision);
         let label = match &a.kind {
@@ -691,6 +707,18 @@ impl DrawingEditor {
                 .into_any_element(),
         )
     }
+}
+
+/// The point of segment `a`-`b` nearest `p`.
+fn foot(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
+    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+    let l2 = dx * dx + dy * dy;
+    let t = if l2 > 0.0 { (((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2).clamp(0.0, 1.0) } else { 0.0 };
+    [a[0] + dx * t, a[1] + dy * t]
+}
+
+fn dist2(a: [f64; 2], b: [f64; 2]) -> f64 {
+    (a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)
 }
 
 /// A selected datum's fill (live drawing/1073: rgb 204,146,92).

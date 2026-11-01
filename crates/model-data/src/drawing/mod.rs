@@ -2076,11 +2076,15 @@ pub struct DatumTargetOpts {
     pub angle_flip: bool,
     pub angle_rotate: bool,
     pub instances: u32,
+    /// Target area Custom: the picked region's outline (view coordinates),
+    /// cross-hatched dashed (live 1699 (e)).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub region: Vec<[f64; 2]>,
 }
 
 impl Default for DatumTargetOpts {
     fn default() -> Self {
-        Self { style: TargetStyle::default(), origin: None, origin_ref: None, angular: false, flip_x: false, flip_y: false, hide_dims: true, x_dir: None, radial_lines: false, ref_dir: None, angle_flip: false, angle_rotate: false, instances: 1 }
+        Self { style: TargetStyle::default(), origin: None, origin_ref: None, angular: false, flip_x: false, flip_y: false, hide_dims: true, x_dir: None, radial_lines: false, ref_dir: None, angle_flip: false, angle_rotate: false, instances: 1, region: Vec::new() }
     }
 }
 
