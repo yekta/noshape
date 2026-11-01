@@ -2066,11 +2066,21 @@ pub struct DatumTargetOpts {
     /// X direction (an edge's, view coordinates; None: the view's x): the
     /// X / Y distances measure along it and across it (live 1699).
     pub x_dir: Option<[f64; 2]>,
+    /// Angle mode (live 1699): Radial lines, the Reference line's direction
+    /// (an edge's, view coordinates; None: the view's x), Flip (the angle
+    /// measured the other way round from the reference, the targets
+    /// mirrored), Rotate (measured from the reference's other end) and the
+    /// Instance count (targets spaced equally round the origin).
+    pub radial_lines: bool,
+    pub ref_dir: Option<[f64; 2]>,
+    pub angle_flip: bool,
+    pub angle_rotate: bool,
+    pub instances: u32,
 }
 
 impl Default for DatumTargetOpts {
     fn default() -> Self {
-        Self { style: TargetStyle::default(), origin: None, origin_ref: None, angular: false, flip_x: false, flip_y: false, hide_dims: true, x_dir: None }
+        Self { style: TargetStyle::default(), origin: None, origin_ref: None, angular: false, flip_x: false, flip_y: false, hide_dims: true, x_dir: None, radial_lines: false, ref_dir: None, angle_flip: false, angle_rotate: false, instances: 1 }
     }
 }
 
@@ -2079,6 +2089,40 @@ impl DatumTargetOpts {
     pub fn axes(&self) -> ([f64; 2], [f64; 2]) {
         let u = self.x_dir.unwrap_or([1.0, 0.0]);
         (u, [-u[1], u[0]])
+    }
+
+    /// Angle mode: the reference line's direction (view coordinates).
+    pub fn reference(&self) -> [f64; 2] {
+        self.ref_dir.unwrap_or([1.0, 0.0])
+    }
+
+    /// Angle mode: the instances' turns about the origin (radians, the
+    /// first 0), clockwise when flipped.
+    pub fn instance_turns(&self) -> Vec<f64> {
+        let n = self.instances.max(1);
+        let s = if self.angle_flip { -1.0 } else { 1.0 };
+        (0..n).map(|k| s * std::f64::consts::TAU * f64::from(k) / f64::from(n)).collect()
+    }
+
+    /// Angle mode: the angle a target at `anchor` shows from its origin `o`
+    /// (radians, 0..π): from the reference (its other end with Rotate),
+    /// counter-clockwise (clockwise when flipped).
+    pub fn measured_angle(&self, anchor: [f64; 2], o: [f64; 2]) -> f64 {
+        let (r, d) = (self.reference(), [anchor[0] - o[0], anchor[1] - o[1]]);
+        let t = (r[0] * d[1] - r[1] * d[0]).atan2(r[0] * d[0] + r[1] * d[1]);
+        let t = if self.angle_flip { -t } else { t };
+        if self.angle_rotate { std::f64::consts::PI - t.abs() } else { t.abs() }
+    }
+
+    /// The label of instance `i` (from 0): "A1" → "A2", "A3"…; a label
+    /// without a number gets one.
+    pub fn instance_label(label: &str, i: usize) -> String {
+        let digits = label.chars().rev().take_while(|c| c.is_ascii_digit()).count();
+        let (stem, num) = label.split_at(label.len() - digits);
+        match num.parse::<usize>() {
+            Ok(n) => format!("{stem}{}", n + i),
+            Err(_) => format!("{stem}{}", i + 1),
+        }
     }
 }
 

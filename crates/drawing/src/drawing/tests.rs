@@ -2797,6 +2797,49 @@ fn datum_target_dimensions_from_its_origin() {
     assert_eq!(built.dangling, vec![1]);
 }
 
+/// Datum target Angle mode (live 1699): the angle from the reference
+/// (36.9° to a target 4 across and 3 up; Rotate: 143.1°), instances spaced
+/// equally (A1-A4, 90° apart), and an origin that isn't an arc or circle
+/// center makes the target red.
+#[test]
+fn datum_target_angle_mode() {
+    let o = DatumTargetOpts { angular: true, ..Default::default() };
+    assert!((o.measured_angle([0.004, 0.003], [0.0, 0.0]).to_degrees() - 36.87).abs() < 0.01);
+    let r = DatumTargetOpts { angle_rotate: true, ..o.clone() };
+    assert!((r.measured_angle([0.004, 0.003], [0.0, 0.0]).to_degrees() - 143.13).abs() < 0.01);
+    let f = DatumTargetOpts { angle_flip: true, ..o.clone() };
+    assert!((f.measured_angle([0.004, -0.003], [0.0, 0.0]).to_degrees() - 36.87).abs() < 0.01);
+    let four = DatumTargetOpts { instances: 4, ..o.clone() };
+    let turns: Vec<f64> = four.instance_turns().iter().map(|t| t.to_degrees().round()).collect();
+    assert_eq!(turns, [0.0, 90.0, 180.0, 270.0]);
+    assert_eq!((DatumTargetOpts::instance_label("A1", 3), DatumTargetOpts::instance_label("B", 1)), ("A4".to_string(), "B2".to_string()));
+    // An origin on a vertex (no circle center): red.
+    let mut doc = crate::Document::new();
+    if let TabContent::PartStudio(ps) = &mut doc.tabs[0].content {
+        *ps = crate::demo::plate_studio();
+    }
+    let ps = doc.tabs[0].id;
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, ps, ViewOrientation::Top, [150.0, 150.0]));
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    let (c, t) = ([(g.min[0] + g.max[0]) / 2.0, (g.min[1] + g.max[1]) / 2.0], [g.max[0] - 0.002, g.max[1] - 0.002]);
+    drawing.sheets[0].annotations.push(Annotation {
+        id: 1,
+        kind: AnnotationKind::DatumTarget { view: ViewId(1), anchor: t, label: "A1".into(), area: DatumTargetArea::Point },
+        position: [250.0, 250.0],
+        target: Some(Box::new(DatumTargetOpts { origin: Some(c), hide_dims: false, instances: 4, radial_lines: true, ..o })),
+        ..Default::default()
+    });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert_eq!(built.dangling, vec![1]);
+    // Its four callouts are drawn all the same.
+    let pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(1)).unwrap() as u32;
+    let labels: Vec<&str> = built.geometry.texts.iter().filter(|x| x.pick == pick && x.text.starts_with('A')).map(|x| x.text.as_str()).collect();
+    assert_eq!(labels, ["A1", "A2", "A3", "A4"]);
+}
+
 /// A view of a named view with a section plane (live 3121-3127): the
 /// material beyond the plane cut away, the cut face hatched.
 #[test]

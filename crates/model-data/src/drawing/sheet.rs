@@ -2175,93 +2175,89 @@ impl SheetGeometry {
                     let p = env.to_sheet(*view, *anchor);
                     let k = env.scale(*view);
                     let rot = env.rotation(*view);
-                    let size = match area {
-                        DatumTargetArea::Point | DatumTargetArea::Custom => {
-                            for d in [[1.0, 1.0], [1.0, -1.0]] {
-                                self.lines.push(Polyline2 { points: vec![[p[0] - d[0] * 1.6, p[1] - d[1] * 1.6], [p[0] + d[0] * 1.6, p[1] + d[1] * 1.6]], style: LineStyle::Visible, closed: false, pick });
-                            }
-                            String::new()
-                        }
-                        DatumTargetArea::Dot => {
-                            let pts: Vec<[f64; 2]> = (0..16).map(|i| {
-                                let t = i as f64 / 16.0 * std::f64::consts::TAU;
-                                [p[0] + 0.7 * t.cos(), p[1] + 0.7 * t.sin()]
-                            }).collect();
-                            for i in 1..pts.len() - 1 {
-                                self.fills.push(Fill2 { points: vec![pts[0], pts[i], pts[i + 1]] });
-                            }
-                            String::new()
-                        }
-                        DatumTargetArea::Circle { diameter } => {
-                            let r = diameter / 2.0 * k;
-                            let pts = (0..48).map(|i| {
-                                let t = i as f64 / 48.0 * std::f64::consts::TAU;
-                                [p[0] + r * t.cos(), p[1] + r * t.sin()]
-                            });
-                            let pts: Vec<[f64; 2]> = pts.collect();
-                            self.target_hatch(&pts, pick);
-                            self.lines.push(Polyline2 { points: pts, style: LineStyle::Centerline, closed: true, pick });
-                            env.text(a, *diameter, false, "Ø").flat()
-                        }
-                        DatumTargetArea::Rectangle { width, height } => {
-                            let (hx, hy) = (rotate2([width / 2.0 * k, 0.0], rot), rotate2([0.0, height / 2.0 * k], rot));
-                            let c = |sx: f64, sy: f64| [p[0] + hx[0] * sx + hy[0] * sy, p[1] + hx[1] * sx + hy[1] * sy];
-                            let pts = vec![c(-1.0, -1.0), c(1.0, -1.0), c(1.0, 1.0), c(-1.0, 1.0)];
-                            self.target_hatch(&pts, pick);
-                            self.lines.push(Polyline2 { points: pts, style: LineStyle::Centerline, closed: true, pick });
-                            format!("{}×{}", env.text(a, *width, false, "").flat(), env.text(a, *height, false, "").flat())
-                        }
-                    };
-                    // Callout bubble: size above, label below the divider.
-                    let c = a.position;
-                    let r = 5.5;
-                    let pts = (0..40).map(|i| {
-                        let t = i as f64 / 40.0 * std::f64::consts::TAU;
-                        [c[0] + r * t.cos(), c[1] + r * t.sin()]
-                    });
-                    self.lines.push(Polyline2 { points: pts.collect(), style: LineStyle::Thin, closed: true, pick });
-                    self.lines.push(Polyline2 { points: vec![[c[0] - r, c[1]], [c[0] + r, c[1]]], style: LineStyle::Thin, closed: false, pick });
-                    self.texts.push(Text2 { pos: [c[0], c[1] - 2.6], height: 2.8, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
-                    if !size.is_empty() {
-                        let h = (2.4f64).min(8.5 / font::text_width(&size, 1.0).max(1e-9));
-                        self.texts.push(Text2 { pos: [c[0], c[1] + 2.6], height: h, text: size, angle: 0.0, anchor: Anchor::Center, pick });
-                    }
-                    let d = [p[0] - c[0], p[1] - c[1]];
-                    let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
-                    if l > r + 0.5 {
-                        self.lines.push(Polyline2 { points: vec![[c[0] + d[0] / l * r, c[1] + d[1] / l * r], p], style: LineStyle::Thin, closed: false, pick });
-                    }
                     let opts = a.target.as_deref().cloned().unwrap_or_default();
-                    // Moveable styles: a pointer on the bubble (horizontal, or
-                    // turned toward the target).
-                    if opts.style != super::TargetStyle::Inside && l > 1e-9 {
-                        let u = if opts.style == super::TargetStyle::MoveableHorizontal { [if d[0] < 0.0 { -1.0 } else { 1.0 }, 0.0] } else { [d[0] / l, d[1] / l] };
-                        let n = [-u[1], u[0]];
-                        let tip = [c[0] + u[0] * (r + 2.5), c[1] + u[1] * (r + 2.5)];
-                        let s1 = [c[0] + u[0] * r * 0.6 + n[0] * r * 0.8, c[1] + u[1] * r * 0.6 + n[1] * r * 0.8];
-                        let s2 = [c[0] + u[0] * r * 0.6 - n[0] * r * 0.8, c[1] + u[1] * r * 0.6 - n[1] * r * 0.8];
-                        self.lines.push(Polyline2 { points: vec![s1, tip, s2], style: LineStyle::Thin, closed: false, pick });
+                    let size = match area {
+                        DatumTargetArea::Point | DatumTargetArea::Custom | DatumTargetArea::Dot => String::new(),
+                        DatumTargetArea::Circle { diameter } => env.text(a, *diameter, false, "Ø").flat(),
+                        DatumTargetArea::Rectangle { width, height } => format!("{}×{}", env.text(a, *width, false, "").flat(), env.text(a, *height, false, "").flat()),
+                    };
+                    // Angle mode: Instance count targets spaced equally round
+                    // the origin (live 1699: 4 gives A1-A4, 90° apart), each
+                    // with its symbol and callout turned with it.
+                    let os = opts.origin.map(|o| env.to_sheet(*view, o));
+                    let turns = match os {
+                        Some(_) if opts.angular => opts.instance_turns(),
+                        _ => vec![0.0],
+                    };
+                    let turn = |q: [f64; 2], t: f64| match os {
+                        Some(o) => {
+                            let r = rotate2([q[0] - o[0], q[1] - o[1]], t);
+                            [o[0] + r[0], o[1] + r[1]]
+                        }
+                        None => q,
+                    };
+                    for (i, t) in turns.iter().enumerate() {
+                        let (pi, ci) = (turn(p, *t), turn(a.position, *t));
+                        self.target_symbol(area, pi, k, rot, pick);
+                        let li = if i == 0 { label.clone() } else { super::DatumTargetOpts::instance_label(label, i) };
+                        self.target_callout(ci, pi, &li, &size, opts.style, pick);
                     }
-                    // The target's position dimensions from its origin (X and
-                    // Y; hidden with "Hide dimension").
-                    // Both from the origin to the target, on the origin's
-                    // sides (live 1699: a target up and right of its origin
-                    // gets "40" along the bottom and "30" on the left).
-                    if let (Some(o), false) = (opts.origin, opts.hide_dims) {
-                        let os = env.to_sheet(*view, o);
-                        let (dx, dy) = ((anchor[0] - o[0]).abs(), (anchor[1] - o[1]).abs());
-                        // Basic (boxed) dimensions, as live draws them.
-                        let basic = |v: f64| DimText { boxed: true, ..env.text(a, v, false, "") };
-                        if dx > 1e-9 {
-                            let t = basic(dx);
-                            let level = if p[1] >= os[1] { os[1] - 8.0 } else { os[1] + 8.0 };
-                            self.linear_dimension_text(os, p, level - os[1].max(p[1]), DimOrientation::Horizontal, &t, pick);
+                    // Radial lines from the origin to each target.
+                    if let (Some(o), true, true) = (os, opts.angular, opts.radial_lines) {
+                        for t in &turns {
+                            self.lines.push(Polyline2 { points: vec![o, turn(p, *t)], style: LineStyle::Thin, closed: false, pick });
                         }
-                        if dy > 1e-9 {
-                            let t = basic(dy);
-                            let level = if p[0] >= os[0] { os[0] - 8.0 } else { os[0] + 8.0 };
-                            self.linear_dimension_text(os, p, level - os[0].max(p[0]), DimOrientation::Vertical, &t, pick);
+                    }
+                    let basic = |v: f64, angular: bool, symbol: &str| DimText { boxed: true, ..env.text(a, v, angular, symbol) };
+                    match (opts.origin, os, opts.hide_dims) {
+                        // Angle (live 1699): a dashed circle through the
+                        // target, its diameter across it through the target,
+                        // the angle from the reference line (and with
+                        // instances, their spacing "4 X 90°"), all basic.
+                        (Some(o), Some(os), false) if opts.angular => {
+                            let r = ((p[0] - os[0]).powi(2) + (p[1] - os[1]).powi(2)).sqrt();
+                            if r > 1e-6 {
+                                let circle: Vec<[f64; 2]> = (0..=72).map(|i| {
+                                    let t = i as f64 / 72.0 * std::f64::consts::TAU;
+                                    [os[0] + r * t.cos(), os[1] + r * t.sin()]
+                                }).collect();
+                                self.lines.push(Polyline2 { points: circle, style: LineStyle::Hidden, closed: false, pick });
+                                let model_r = ((anchor[0] - o[0]).powi(2) + (anchor[1] - o[1]).powi(2)).sqrt();
+                                self.linear_dimension_text([2.0 * os[0] - p[0], 2.0 * os[1] - p[1]], p, 0.0, DimOrientation::Aligned, &basic(model_r * 2.0, false, "Ø"), pick);
+                                let rd = rotate2(opts.reference(), rot);
+                                let mut from = rd[1].atan2(rd[0]);
+                                if opts.angle_rotate {
+                                    from += std::f64::consts::PI;
+                                }
+                                let to = (p[1] - os[1]).atan2(p[0] - os[0]);
+                                let ra = r * 0.6;
+                                self.lines.push(Polyline2 { points: vec![os, [os[0] + (ra + 3.0) * from.cos(), os[1] + (ra + 3.0) * from.sin()]], style: LineStyle::Thin, closed: false, pick });
+                                self.target_angle(os, ra, from, to, &basic(opts.measured_angle(*anchor, o), true, ""), pick);
+                                if turns.len() > 1 {
+                                    let step = std::f64::consts::TAU / turns.len() as f64;
+                                    let one = env.text(a, step, true, "");
+                                    let t = DimText { main: format!("{} X {}", turns.len(), one.main), boxed: true, ..one };
+                                    let t1 = to + turns[1];
+                                    self.target_angle(os, r * 0.85, to.min(t1), to.max(t1), &t, pick);
+                                }
+                            }
                         }
+                        // Length: both from the origin to the target, on the
+                        // origin's sides (live 1699: a target up and right of
+                        // its origin gets "40" along the bottom and "30" on
+                        // the left).
+                        (Some(o), Some(os), false) => {
+                            let (dx, dy) = ((anchor[0] - o[0]).abs(), (anchor[1] - o[1]).abs());
+                            if dx > 1e-9 {
+                                let level = if p[1] >= os[1] { os[1] - 8.0 } else { os[1] + 8.0 };
+                                self.linear_dimension_text(os, p, level - os[1].max(p[1]), DimOrientation::Horizontal, &basic(dx, false, ""), pick);
+                            }
+                            if dy > 1e-9 {
+                                let level = if p[0] >= os[0] { os[0] - 8.0 } else { os[0] + 8.0 };
+                                self.linear_dimension_text(os, p, level - os[0].max(p[0]), DimOrientation::Vertical, &basic(dy, false, ""), pick);
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -2540,6 +2536,105 @@ impl SheetGeometry {
                 self.arrow(p, [p[0] - last[0], p[1] - last[1]], self.style.ann_arrow);
             }
         }
+    }
+
+    /// A datum target's symbol at `p` (sheet): ✕ (Point), a filled dot (Dot;
+    /// Custom: a small one where its leader ends, live 1699), or the
+    /// hatched circle / rectangle of its size (`k` sheet mm per view unit,
+    /// the view turned `rot`).
+    fn target_symbol(&mut self, area: &DatumTargetArea, p: [f64; 2], k: f64, rot: f64, pick: u32) {
+        let dot = |me: &mut Self, r: f64| {
+            let pts: Vec<[f64; 2]> = (0..16).map(|i| {
+                let t = i as f64 / 16.0 * std::f64::consts::TAU;
+                [p[0] + r * t.cos(), p[1] + r * t.sin()]
+            }).collect();
+            for i in 1..pts.len() - 1 {
+                me.fills.push(Fill2 { points: vec![pts[0], pts[i], pts[i + 1]] });
+            }
+        };
+        match area {
+            DatumTargetArea::Point => {
+                for d in [[1.0, 1.0], [1.0, -1.0]] {
+                    self.lines.push(Polyline2 { points: vec![[p[0] - d[0] * 1.6, p[1] - d[1] * 1.6], [p[0] + d[0] * 1.6, p[1] + d[1] * 1.6]], style: LineStyle::Visible, closed: false, pick });
+                }
+            }
+            DatumTargetArea::Dot => dot(self, 0.7),
+            DatumTargetArea::Custom => dot(self, 0.45),
+            DatumTargetArea::Circle { diameter } => {
+                let r = diameter / 2.0 * k;
+                let pts: Vec<[f64; 2]> = (0..48).map(|i| {
+                    let t = i as f64 / 48.0 * std::f64::consts::TAU;
+                    [p[0] + r * t.cos(), p[1] + r * t.sin()]
+                }).collect();
+                self.target_hatch(&pts, pick);
+                self.lines.push(Polyline2 { points: pts, style: LineStyle::Centerline, closed: true, pick });
+            }
+            DatumTargetArea::Rectangle { width, height } => {
+                let (hx, hy) = (rotate2([width / 2.0 * k, 0.0], rot), rotate2([0.0, height / 2.0 * k], rot));
+                let c = |sx: f64, sy: f64| [p[0] + hx[0] * sx + hy[0] * sy, p[1] + hx[1] * sx + hy[1] * sy];
+                let pts = vec![c(-1.0, -1.0), c(1.0, -1.0), c(1.0, 1.0), c(-1.0, 1.0)];
+                self.target_hatch(&pts, pick);
+                self.lines.push(Polyline2 { points: pts, style: LineStyle::Centerline, closed: true, pick });
+            }
+        }
+    }
+
+    /// A datum target's callout bubble at `c` (size above the divider, the
+    /// label below) with its leader to the target at `p`, and the pointer
+    /// of the moveable styles.
+    fn target_callout(&mut self, c: [f64; 2], p: [f64; 2], label: &str, size: &str, style: super::TargetStyle, pick: u32) {
+        let r = 5.5;
+        let pts = (0..40).map(|i| {
+            let t = i as f64 / 40.0 * std::f64::consts::TAU;
+            [c[0] + r * t.cos(), c[1] + r * t.sin()]
+        });
+        self.lines.push(Polyline2 { points: pts.collect(), style: LineStyle::Thin, closed: true, pick });
+        self.lines.push(Polyline2 { points: vec![[c[0] - r, c[1]], [c[0] + r, c[1]]], style: LineStyle::Thin, closed: false, pick });
+        self.texts.push(Text2 { pos: [c[0], c[1] - 2.6], height: 2.8, text: label.to_string(), angle: 0.0, anchor: Anchor::Center, pick });
+        if !size.is_empty() {
+            let h = (2.4f64).min(8.5 / font::text_width(size, 1.0).max(1e-9));
+            self.texts.push(Text2 { pos: [c[0], c[1] + 2.6], height: h, text: size.to_string(), angle: 0.0, anchor: Anchor::Center, pick });
+        }
+        let d = [p[0] - c[0], p[1] - c[1]];
+        let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
+        if l > r + 0.5 {
+            self.lines.push(Polyline2 { points: vec![[c[0] + d[0] / l * r, c[1] + d[1] / l * r], p], style: LineStyle::Thin, closed: false, pick });
+        }
+        // Moveable styles: a pointer on the bubble (horizontal, or turned
+        // toward the target).
+        if style != super::TargetStyle::Inside && l > 1e-9 {
+            let u = if style == super::TargetStyle::MoveableHorizontal { [if d[0] < 0.0 { -1.0 } else { 1.0 }, 0.0] } else { [d[0] / l, d[1] / l] };
+            let n = [-u[1], u[0]];
+            let tip = [c[0] + u[0] * (r + 2.5), c[1] + u[1] * (r + 2.5)];
+            let s1 = [c[0] + u[0] * r * 0.6 + n[0] * r * 0.8, c[1] + u[1] * r * 0.6 + n[1] * r * 0.8];
+            let s2 = [c[0] + u[0] * r * 0.6 - n[0] * r * 0.8, c[1] + u[1] * r * 0.6 - n[1] * r * 0.8];
+            self.lines.push(Polyline2 { points: vec![s1, tip, s2], style: LineStyle::Thin, closed: false, pick });
+        }
+    }
+
+    /// A datum target's angle (Angle mode): the arc of radius `r` round
+    /// `c` from angle `from` to `to` (the shorter way), arrows at both ends
+    /// when there is room, and the value `t` outside its middle.
+    fn target_angle(&mut self, c: [f64; 2], r: f64, from: f64, to: f64, t: &DimText, pick: u32) {
+        let tau = std::f64::consts::TAU;
+        let mut sweep = (to - from).rem_euclid(tau);
+        let (mut a0, mut a1) = (from, from + sweep);
+        if sweep > std::f64::consts::PI {
+            sweep = tau - sweep;
+            (a0, a1) = (to, to + sweep);
+        }
+        let pts: Vec<[f64; 2]> = (0..=24).map(|i| {
+            let t = a0 + (a1 - a0) * i as f64 / 24.0;
+            [c[0] + r * t.cos(), c[1] + r * t.sin()]
+        }).collect();
+        self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
+        if sweep * r > 7.0 {
+            self.arrow([c[0] + r * a0.cos(), c[1] + r * a0.sin()], [a0.sin(), -a0.cos()], 3.0);
+            self.arrow([c[0] + r * a1.cos(), c[1] + r * a1.sin()], [-a1.sin(), a1.cos()], 3.0);
+        }
+        let mid = (a0 + a1) / 2.0;
+        let h = self.style.dim_text;
+        self.dim_label([c[0] + (r + 3.0) * mid.cos(), c[1] + (r + 3.0) * mid.sin()], 0.0, 0.5, true, t, h, pick);
     }
 
     /// A datum target area's hatch (Drawing properties › Datums › Target

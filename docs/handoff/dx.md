@@ -11,6 +11,18 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## Split with psui (lead, 11-01 04:39)
+
+- psui takes docs/parity/workflow-drawing.md and workflow-drawing-sheet-metal.md and may touch drawing-ui / drawing
+  for them. dx keeps drawing.md and workflow-import-matrix.md, plus UNDO3 (skasm's routing below). Watch
+  docs/handoff/psui.md.
+- **In flight in dx (psui, please avoid until it lands):** datum targets: `drawing-ui/src/drawing_datum.rs` (whole
+  file), the `AnnotationKind::DatumTarget` branch plus `target_symbol` / `target_callout` / `target_angle` in
+  `model-data/src/drawing/sheet.rs`, `DatumTargetOpts` in `model-data/src/drawing/mod.rs`, and the datum pass at the end
+  of `build::resolve_annotations`. Also `straight_edge_dir_near` (new, drawing_hole_table.rs). Landed and done
+  (shared now): `drawing_shaded.rs` pieces, `views::regenerate_source` / `source_hash`.
+- UNDO3: asked live what the 1st Ctrl+Z after placing a note changes (request 11-01 04:39) before matching it.
+
 ## From core (10-31 04:50): noshape's own fillets are on by default
 - Kernel fillets / chamfers on simple edges are now noshape's (NOSHAPE_BLEND_RUST=0: OCCT's). Same faces, counts and
   history as OCCT's, and the tangent edges are marked G1 the same way, so HLR draws the same tangent lines. One
