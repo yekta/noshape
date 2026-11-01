@@ -332,6 +332,12 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N11. (11-01 04:54) Drawing sheets taken from dx (user 11-01): docs/parity/workflow-drawing.md and
+     workflow-drawing-sheet-metal.md. dx keeps drawing.md and the import sheets; notes to dx in docs/handoff/dx.md
+     "From psui". workflow-drawing.md: every row re-checked or carried with evidence; the scale lists are live's
+     (model-data drawing::sheet::SCALE_LIST). Open: Create Drawing's option / template memory (live request 04:40).
+     Next: workflow-drawing-sheet-metal.md rows 1 and 8, then the stale re-run rows there.
+
 N10. (11-01 01:13) Unchecked rows (user 11-01): keyboard-mouse a / q / k, Ctrl+M, w and the empty Verified cells done;
      cursors 53 (count cursor with a dialog), 70 (Isolate / Replace instance / Interference titles), 78, 81, 82 ✅,
      74 ✅ (the Variable Studio pill is live's 60 % #1651b0 with white text, ui::name_pill_on); 46 ✅ (live 1697 + Onshape's bundle: only

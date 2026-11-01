@@ -943,7 +943,8 @@ impl DrawingEditor {
                 p.sheet_scale = true;
             })));
         }
-        for s in [10.0, 5.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.2, 0.1, 0.05] {
+        // Live (asb dd callouts, qa-scale-06): 1:1 … 1:100, then 2:1 … 100:1.
+        for s in noshape_model::drawing::sheet::SCALE_LIST {
             scale_items.push((fmt(s), props.scale == Some(s), std::rc::Rc::new(move |p: &mut ViewProps| {
                 p.scale = Some(s);
                 p.sheet_scale = false;

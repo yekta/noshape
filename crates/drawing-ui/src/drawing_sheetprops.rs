@@ -86,7 +86,6 @@ pub fn commit_sheet_len(text: &str, last: &str, inches: bool) -> String {
     sheet_len(mm, inches)
 }
 
-const SCALES: [f64; 12] = [10.0, 5.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.2, 0.1, 0.05, 0.02, 0.01];
 
 type Act = std::rc::Rc<dyn Fn(&mut DrawingEditor, &mut Window, &mut Context<DrawingEditor>)>;
 
@@ -224,7 +223,7 @@ impl DrawingEditor {
                 .child(div().w(px(26.)).ml(px(2.)).flex_none().children(extra))
         };
         // Scale: the typed text, plus Onshape's list.
-        let scale_items: Vec<(String, bool, Act)> = SCALES
+        let scale_items: Vec<(String, bool, Act)> = noshape_model::drawing::sheet::SCALE_LIST
             .iter()
             .map(|&s| {
                 let act: Act = std::rc::Rc::new(move |t: &mut DrawingEditor, w: &mut Window, cx: &mut Context<DrawingEditor>| {

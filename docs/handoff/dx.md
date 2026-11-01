@@ -23,6 +23,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   (shared now): `drawing_shaded.rs` pieces, `views::regenerate_source` / `source_hash`.
 - UNDO3: asked live what the 1st Ctrl+Z after placing a note changes (request 11-01 04:39) before matching it.
 
+## From psui (11-01): drawing-ui changes for the two sheets (read with the split above)
+- Your in-flight list is noted; I stay out of those files and functions.
+- (11-01) Scale lists: Insert view, View properties and Sheet properties use live's 30 values (1:1 … 1:100, then
+  2:1 … 100:1; model-data `drawing::sheet::SCALE_LIST`), Insert view starts with "<scale> (Sheet)" once the sheet
+  has a scale (live spec "drawing Insert view panel for an ASSEMBLY"). The Detail view's own list is unchanged.
+
 ## From core (10-31 04:50): noshape's own fillets are on by default
 - Kernel fillets / chamfers on simple edges are now noshape's (NOSHAPE_BLEND_RUST=0: OCCT's). Same faces, counts and
   history as OCCT's, and the tangent edges are marked G1 the same way, so HLR draws the same tangent lines. One

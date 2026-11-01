@@ -13,7 +13,7 @@ use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::document::{TabContent, TabId};
-use noshape_model::drawing::sheet::format_scale;
+use noshape_model::drawing::sheet::{SCALE_LIST, format_scale};
 use noshape_model::drawing::views::{self, SourceKey};
 use noshape_model::drawing::*;
 
@@ -73,7 +73,6 @@ type Act = std::rc::Rc<dyn Fn(&mut DrawingEditor, &mut Context<DrawingEditor>)>;
 
 
 const ORIENTATIONS: [ViewOrientation; 7] = [ViewOrientation::Top, ViewOrientation::Left, ViewOrientation::Right, ViewOrientation::Front, ViewOrientation::Back, ViewOrientation::Bottom, ViewOrientation::Isometric];
-const SCALES: [f64; 12] = [10.0, 5.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.2, 0.1, 0.05, 0.02, 0.01];
 
 impl DrawingEditor {
     /// The Insert view panel's simplification value field (made from render).
@@ -211,7 +210,7 @@ impl DrawingEditor {
         let Tool::InsertView { source, orientation, part } = self.tool.clone() else { return None };
         let pal = p();
         let ed = cx.entity();
-        let sheet_scale = self.current_sheet().scale;
+        let (sheet_scale, scale_shown) = (self.current_sheet().scale, self.current_sheet().scale_shown);
         let label = |text: &'static str| div().w(px(105.)).flex_none().text_size(px(12.)).text_color(pal.text).child(text);
         // Items from `user_from` on are user content (parts, named views,
         // positions, display states): never translated.
@@ -262,21 +261,36 @@ impl DrawingEditor {
         }
         let orient_label = named.clone().unwrap_or_else(|| format!("{orientation:?}"));
         let cur_scale = self.insert.scale;
-        let scale_items: Vec<(String, bool, Act)> = SCALES
-            .iter()
-            .map(|&s| {
-                let on = cur_scale.unwrap_or(sheet_scale) == s;
+        // Live (spec "drawing Insert view panel for an ASSEMBLY"): once the
+        // sheet has a scale (from its first view) the list starts with
+        // "<scale> (Sheet)"; a new sheet has none.
+        let sheet_item = scale_shown.then(|| {
+            (
+                format!("{} (Sheet)", format_scale(sheet_scale)),
+                cur_scale.is_none(),
+                std::rc::Rc::new(move |t: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| {
+                    t.insert.scale = None;
+                    t.update_preview(cx);
+                    cx.notify();
+                }) as Act,
+            )
+        });
+        let scale_items: Vec<(String, bool, Act)> = sheet_item
+            .into_iter()
+            .chain(SCALE_LIST.iter().map(|&s| {
+                let on = if scale_shown { cur_scale == Some(s) } else { cur_scale.unwrap_or(sheet_scale) == s };
                 (
                     format_scale(s),
                     on,
                     std::rc::Rc::new(move |t: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| {
-                        // The sheet scale itself means "follow the sheet".
-                        t.insert.scale = (s != t.current_sheet().scale).then_some(s);
+                        // Before the sheet has a scale, its own value means
+                        // "follow the sheet"; after, "(Sheet)" does.
+                        t.insert.scale = (t.current_sheet().scale_shown || s != t.current_sheet().scale).then_some(s);
                         t.update_preview(cx);
                         cx.notify();
                     }) as Act,
                 )
-            })
+            }))
             .collect();
         let simp = self.insert.simplification;
         let simp_items: Vec<(String, bool, Act)> = simplification_choices(simp)
@@ -361,7 +375,7 @@ impl DrawingEditor {
                 )
                 .child(row("View orientation", select("div-orient", orient_label, orient_items, ORIENTATIONS.len())))
                 .children(asm_rows)
-                .child(row("View scale", select("div-scale", format_scale(cur_scale.unwrap_or(sheet_scale)), scale_items, usize::MAX)))
+                .child(row("View scale", select("div-scale", match cur_scale { None if scale_shown => format!("{} (Sheet)", format_scale(sheet_scale)), c => format_scale(c.unwrap_or(sheet_scale)) }, scale_items, usize::MAX)))
                 .child(row("View simplification", select("div-simp", simp.name().to_string(), simp_items, usize::MAX)))
                 .children(self.insert.simp_value.as_ref().filter(|_| !simplification_text(simp, true).is_empty()).map(|(st, _)| row("", Input::new(st).small().into_any_element())))
                 .child(

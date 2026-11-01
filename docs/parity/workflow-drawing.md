@@ -6,19 +6,19 @@ Live reference: behaviours.md "Drawing" (Create drawing, Insert view, toolbar, C
 Auxiliary view reference indicator, Sheet properties, Export Drawing modal), live DXF samples/drw2-*.dxf.
 Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 
-**Last run: 2026-10-21 (session 12:05–13:35), qa5**, binary /tmp/qa5/noshape-1206.
+**Last run: 2026-10-21 (session 12:05–13:35), qa5**, binary /tmp/qa5/noshape-1206. Rows re-checked by psui 2026-11-01 (owner since 11-01) on :102 with a copy of asm5.
 
 ## 1. Create, insert views
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 1.1 | Assembly tab › Create Drawing of Assembly 1… | modal "Create Drawing: … Drawing 1", Existing templates / Custom template, filter All/ANSI/ISO/JIS, **ANSI_A_INCH.dwt selected by default** | same layout; **no template row selected** | ✗ D1 |  |
+| 1.1 | Assembly tab › Create Drawing of Assembly 1… | modal "Create Drawing: … Drawing 1", Existing templates / Custom template, filter All/ANSI/ISO/JIS, **ANSI_A_INCH.dwt selected by default** | same layout; **no template row selected** | ✅ (D1 fixed: ANSI_A_INCH.dwt selected; live preselects Suggested views and remembers the last choice, ours always No views: asked live, REQUESTS psui 2026-11-01 04:40) | psui 11-01 (:102 asm5 copy, Assembly 1 › Create Drawing) |
 | 1.2 | ANSI_A_MM, No views, OK | new tab right after the source, A sheet, Insert view panel, view follows the cursor | same | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) |
-| 1.3 | Insert view panel (assembly) | Insert + reference, View orientation, View scale, View simplification, ☐ Show sketch appearances | + Explode/Position, Display state; scale list without "(Sheet)" marker | ? |  |
-| 1.4 | Insert › picker "Select a part or assembly" | filter icons **Part Studios / Parts / Sketches / Flat patterns**, thumbnails, "Flat pattern of Part 1" rows | tabs Part Studios / Assemblies, **no filter icons, no thumbnails, sketches always listed, no flat patterns** | ✗ D2 |  |
+| 1.3 | Insert view panel (assembly) | Insert + reference, View orientation, View scale, View simplification, ☐ Show sketch appearances | + Explode/Position, Display state; scale list without "(Sheet)" marker | ✅ Explode/Position, Display state as live (spec "drawing Insert view panel for an ASSEMBLY"); scale list = live's since 11-01: 1:1 … 1:100, 2:1 … 100:1, "1:1 (Sheet)" first once the sheet has a scale (also View properties, Sheet properties); no reference: orientation greyed, scale empty, as live | psui 11-01 (:102 asm5 copy) |
+| 1.4 | Insert › picker "Select a part or assembly" | filter icons **Part Studios / Parts / Sketches / Flat patterns**, thumbnails, "Flat pattern of Part 1" rows | tabs Part Studios / Assemblies, **no filter icons, no thumbnails, sketches always listed, no flat patterns** | ✅ D2 fixed (rows below: filter icons, thumbnails) | c38eb9cf (qa 10:54) |
 | 1.5 | First view, projected Top/Right/iso by moving away | third-angle placement, iso by diagonal | same | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) (front, right, top, iso) |
-| 1.6 | Undo ×3 (views) | views removed | removed, but an **"Out of date — Update (Ctrl+Q)"** notice appears though nothing changed | ✗ D3 |  |
-| 1.7 | Title block DWG NO. of the assembly drawing | the assembly's part number ("----" when empty) | **"PN-001" = Part 1's part number** (CLI: only Part 1 has PN-001) | ✗ D4 |  |
+| 1.6 | Undo ×3 (views) | views removed | removed, but an **"Out of date — Update (Ctrl+Q)"** notice appears though nothing changed | ✅ D3 fixed: views removed, no Out of date notice | psui 11-01 (:102 asm5 copy: 4 views, Ctrl+Z ×3) |
+| 1.7 | Title block DWG NO. of the assembly drawing | the assembly's part number ("----" when empty) | **"PN-001" = Part 1's part number** (CLI: only Part 1 has PN-001) | ✅ D4 fixed: "----" | psui 11-01 (:102 asm5 copy, new Assembly 1 Drawing 2) |
 | 1.8 | Section view (Horizontal), click a hole centre, drag down, place, ✓ | "SECTION A-A", arrows, hatching | same | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) ("SECTION A - A", arrows, hatch; Vertical tab) |
 | 1.9 | Detail view: circle centre + radius, place | "DETAIL B / SCALE 1:1" (2× parent), circle + label on the parent | same | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) ("DETAIL A / SCALE 2:1", circle + label on the parent) |
 | 1.10 | Auxiliary view on a straight edge, place | "Auxiliary C - C", indicator arrows at the parent | same | ✅ | c38eb9cf (qa 10:55: Auxiliary view on the front view's top edge, placed above → "Auxiliary A - A" (first aux view), A–A indicator arrows at the parent) |
@@ -27,12 +27,12 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 2.1 | **d** after closing the Auxiliary view with Esc | Dimension tool | **nothing**; later (after clicking the sheet) d works | ✗ D5 |  |
-| 2.2 | Dimension: click an edge 7 px from its midpoint, place | ? (in the Part Studio live picks the midpoint near it, behaviours.md line 258) | picks the **midpoint** and waits for a second entity | ? D6 |  |
+| 2.1 | **d** after closing the Auxiliary view with Esc | Dimension tool | **nothing**; later (after clicking the sheet) d works | ✅ D5 fixed: d starts Dimension at once | psui 11-01 (:102: Auxiliary view tool, Esc, d → Dimension active) |
+| 2.2 | Dimension: click an edge 7 px from its midpoint, place | ? (in the Part Studio live picks the midpoint near it, behaviours.md line 258) | picks the **midpoint** and waits for a second entity | ✅ D6: the edge is picked (= live asb (b)) | c38eb9cf (qa 10:52, pass 24 row below) |
 | 2.3 | Click the edge away from the midpoint, place | "100" | "100"; tool stays | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) ("60") |
 | 2.4 | Circle in the top view, place | Ø10 with leader | same | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) (Ø10 with leader) |
 | 2.5 | Datum on an edge | filled triangle + leader + framed "A" | same; next label "B" | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) (A then B) |
-| 2.6 | GTol dialog | Upper text, Prefix, Type ⌖▾, Tolerance, 3 Datums, Suffix, + / Ø, Lower text; **✓ enabled once something is entered** | same fields; **typing right after opening is lost** although Tolerance shows focus (needs a click); ✓ stays dimmed with content | ✗ D7 |  |
+| 2.6 | GTol dialog | Upper text, Prefix, Type ⌖▾, Tolerance, 3 Datums, Suffix, + / Ø, Lower text; **✓ enabled once something is entered** | same fields; **typing right after opening is lost** although Tolerance shows focus (needs a click); ✓ stays dimmed with content | ✅ D7 fixed | c38eb9cf (qa 10:54) |
 | 2.7 | Each click places another frame, Esc ends | yes | yes | ✅ | c38eb9cf (qa 10:55: Callout, three clicks → three "----" frames, Esc ends the tool) |
 | 2.8 | Note (n), click, type, ✓ | in-place editor with ruler, formatting toolbar | same | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) (editor with ruler + formatting toolbar) |
 
@@ -41,19 +41,21 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
 | 3.1 | BOM table, place top right | Item / Quantity / Part number / Description, rows from the assembly BOM | same; quantities 1/1/6/1/1, PN-001 | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) (Item / Quantity / Part number / Description: 1 / 1, 2 / 2) |
-| 3.2 | Callout on a part edge in the assembly view (BOM table present) | balloon shows the **BOM item number** | balloon shows **"----"** | ✗ D8 |  |
+| 3.2 | Callout on a part edge in the assembly view (BOM table present) | balloon shows the **BOM item number** | balloon shows **"----"** | ✅ D8 fixed: the BOM item number | 78958d0f 10-28 · 6444d892 10-28 (rows below) |
 | 3.3 | Right-click sheet › Sheet properties… | Scale / Format / Size / Reference | same; scale "1:2" Enter + ✓ updates the title block SCALE | ✅ | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) (1:2 + ✓: SCALE 1:2, views shrink; datums stay put: DATUM-SCALE-DETACHED) |
 
 ## 4. Export
 
 | # | Step | Live | Ours | Status | Verified |
 |---|---|---|---|---|---|
-| 4.1 | Tab › Export…, PDF | File name + **"View export rules" link**, Format, Version 1.5, Overridden dimensions, Text, Color, Options, ☐ Hide inspection items | same, without the "View export rules" link | ✗ D9 (minor) |  |
-| 4.2 | PDF content | as on screen | letter landscape, 1 page; **iso view exported shaded** (on screen: hidden-line); **Detail B circle border lost / content not clipped** | ✗ D10 |  |
-| 4.3 | DXF options | **Version default Release 14** (+ "Model space only" line), **Sheets ▾ All/Current/Custom** | Version default **2018**, no Sheets ▾ | ✗ D11 |  |
-| 4.4 | DXF content | CIRCLE/ARC/ELLIPSE, HATCH, MTEXT, DIMENSION, ACAD_TABLE, INSERT; layers Visible, TANGENT_LINES, VIEW_HATCHES, CENTERMARKS, ANNOTATION_TEXT, ANNOTATION_LINES, SECTION_CUTTING_LINE, TABLES, BORDER_*, TITLE_BLOCK | drw2 10-21 (vs live drw2-k-dxf2018 / R14 / R12): CIRCLE / ARC / ELLIPSE / SPLINE / POLYLINE, HATCH, MTEXT, DIMENSION over *D blocks, TOLERANCE, hole callouts as INSERT *U, ACAD_TABLE (INSERT before 2004), OLE2FRAME; live layer names, case and order, Defpoints with dimensions; Release 11-12 view geometry only. All sheets in one file: the first in model space, the others in layouts "Sheet2"… (`cad_export::to_dxf_sheets`; R13/14 strips layouts, R11-12 side by side as live); per-kind text styles Onshape-Standard-Fields / -View-Label / -NoteStyle / hole tags (`CadTextStyle`) | ✅ D12 (dx 10-31: rechecked, both landed earlier) |  |
+| 4.1 | Tab › Export…, PDF | File name + **"View export rules" link**, Format, Version 1.5, Overridden dimensions, Text, Color, Options, ☐ Hide inspection items | same, without the "View export rules" link | ✅ D9 fixed: View export rules link, fields as live | psui 11-01 (:102 Assembly 1 Drawing 2 › Export…) |
+| 4.2 | PDF content | as on screen | letter landscape, 1 page; **iso view exported shaded** (on screen: hidden-line); **Detail B circle border lost / content not clipped** | ✅ D10 fixed (api, pass 23 below) | pass 23 (qa5 10-24) · 0.4.10+ / daf1f50c 10-27 |
+| 4.3 | DXF options | **Version default Release 14** (+ "Model space only" line), **Sheets ▾ All/Current/Custom** | Version default **2018**, no Sheets ▾ | ✅ D11 / D15 fixed: Release 14 + Model space only, Sheets ▾ All sheets, Use drawing units, ☑ Set z-height to zero | psui 11-01 (:102 Export… › DXF) |
+| 4.4 | DXF content | CIRCLE/ARC/ELLIPSE, HATCH, MTEXT, DIMENSION, ACAD_TABLE, INSERT; layers Visible, TANGENT_LINES, VIEW_HATCHES, CENTERMARKS, ANNOTATION_TEXT, ANNOTATION_LINES, SECTION_CUTTING_LINE, TABLES, BORDER_*, TITLE_BLOCK | drw2 10-21 (vs live drw2-k-dxf2018 / R14 / R12): CIRCLE / ARC / ELLIPSE / SPLINE / POLYLINE, HATCH, MTEXT, DIMENSION over *D blocks, TOLERANCE, hole callouts as INSERT *U, ACAD_TABLE (INSERT before 2004), OLE2FRAME; live layer names, case and order, Defpoints with dimensions; Release 11-12 view geometry only. All sheets in one file: the first in model space, the others in layouts "Sheet2"… (`cad_export::to_dxf_sheets`; R13/14 strips layouts, R11-12 side by side as live); per-kind text styles Onshape-Standard-Fields / -View-Label / -NoteStyle / hole tags (`CadTextStyle`) | ✅ D12 (dx 10-31: rechecked, both landed earlier) | dx 10-31 (rechecked) · dbc12611 10-27 (row below) |
 
 ## Findings (2026-10-21 run)
+
+All fixed since (psui 11-01: the rows above carry the current status and evidence).
 
 | # | Finding | Repro | Owner |
 |---|---|---|---|
@@ -79,11 +81,11 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 1.6 | Place a view, Ctrl+Z | view removed, no "Out of date" notice ✅; **title-block SCALE changes from "1:1" (before the view) to "----" after the undo** | ✅ D3 fixed / ✗ **D14** (minor) | c38eb9cf (qa 10:52, wf-block Part 1 › Create Drawing, No views: place a Front view (SCALE 1:1), Ctrl+Z → view gone, SCALE "----", no Out of date notice; Ctrl+Y brings it back at 1:1) |
 | 1.7 | DWG NO. of an assembly drawing | "----" (both drawings) | ✅ D4 fixed | 0.4.10+ / daf1f50c 10-27 (asm5 Assembly 1 › Create Drawing) ("----") |
 | 2.6 | GTol: type right after opening | "0.1" lands in Tolerance, ✓ enabled | ✅ D7 fixed | c38eb9cf (qa 10:54: GTol tool, type 0.1 at once → "0.1" in Tolerance, ✓ green) |
-| 3.2 | Callout balloons in the existing drawing | still "----" with a BOM table present | ✗ D8 |  |
+| 3.2 | Callout balloons in the existing drawing | still "----" with a BOM table present | ✅ later (pass 14 / dx 10-27 rows below) | 78958d0f 10-28 |
 | 4.1 | Export dialog | "View export rules" link present | ✅ D9 fixed | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) |
 | 4.3 | DXF options | Release 14 + "Model space only", Sheets ▾ "All sheets" ✅; **Units "Drawing units"** (live "Use drawing units"), **☐ Set z-height to zero…** (live ☑ by default, behaviours.md D12 answer) | ✅ D11 fixed / ✗ **D15** | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) (Release 14, Model space only, All sheets, Use drawing units) |
-| – | Tab menus (assembly / drawing tab) | no "Open in new browser tab" (browser-only, ok), no "Show code" | ? |  |
-| 2.1, 4.2, 4.4 | D5, D10, D13 | not re-run this pass | – |  |
+| – | Tab menus (assembly / drawing tab) | no "Open in new browser tab" (browser-only, ok), no "Show code" | ✅ = live (behaviours 1457, 21454: Assembly tab … Create Drawing of …, Export…, Release…; Drawing tab … Change to version…; Show code only on the Part Studio tab) | psui 11-01 (:102 asm5 copy) |
+| 2.1, 4.2, 4.4 | D5, D10, D13 | not re-run this pass | – superseded: 2.1 ✅ (psui 11-01), 4.2 ✅ (pass 23), D13 ✅ (pass 24) | rows above |
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
 | D8 balloons | "----" | ✗ still |
@@ -94,10 +96,10 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 Pass 6 (17:11) had found D5 fixed (d starts Dimension after Esc).
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| D8 balloons | the old front-view balloon now shows **3**; a new balloon on a cylinder in the isometric view still shows "----" | ✗ still (partly) |  |
+| D8 balloons | the old front-view balloon now shows **3**; a new balloon on a cylinder in the isometric view still shows "----" | ✅ later (pass 14 / dx 10-27) | 78958d0f 10-28 |
 | D15 DXF defaults | ☑ Set z-height to zero…, Units "Use drawing units" | ✅ **fixed** | 0.4.10+ / daf1f50c 10-27 (asm5 drawing) (☑ z-height to zero) |
 | D14 SCALE after undo | "----" on the empty sheet, "1:1" with a view, "----" after Ctrl+Z (consistent) | ✅ **fixed** (live value on an empty sheet ?) | c38eb9cf (qa 10:52, wf-block Part 1 › Create Drawing, No views: "----" after the undo, "1:1" with the view (and while the Insert-view preview follows the cursor)) |
-| D16 (new) | the "Sheet1" chip draws over the Insert view dialog's title ("Sheet1 ew") | ✗ **D16** (asb / ui) |  |
+| D16 (new) | the "Sheet1" chip draws over the Insert view dialog's title ("Sheet1 ew") | ✅ later (pass 8: gone) | pass 8 (qa5 10-21) |
 
 ## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
 Live answered "qa5 pass 7" (3): SCALE "----" before any view, 1:1 after → D14 ✅ confirmed.

@@ -3254,6 +3254,14 @@ pub fn rotate2(v: [f64; 2], a: f64) -> [f64; 2] {
     super::rotate2(v, a)
 }
 
+/// The drawing scale lists' values in live's order (Insert view, View
+/// properties, Sheet properties; live behaviours "spec: drawing Insert view
+/// panel for an ASSEMBLY", qa-scale-06): 1:1 … 1:100, then 2:1 … 100:1.
+pub const SCALE_LIST: [f64; 30] = [
+    1.0, 1.0 / 2.0, 1.0 / 3.0, 1.0 / 4.0, 1.0 / 5.0, 1.0 / 6.0, 1.0 / 8.0, 1.0 / 10.0, 1.0 / 12.0, 1.0 / 16.0, 1.0 / 20.0, 1.0 / 25.0, 1.0 / 32.0, 1.0 / 40.0, 1.0 / 50.0, 1.0 / 80.0, 1.0 / 100.0,
+    2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 16.0, 20.0, 32.0, 50.0, 100.0,
+];
+
 pub fn format_scale(s: f64) -> String {
     if s >= 1.0 {
         format!("{}:1", trim(s))
