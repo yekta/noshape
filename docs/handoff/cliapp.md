@@ -78,6 +78,9 @@ a tag with dry_run=false).
   name: Windows CI run 41243150421 failed `cli_mode::version_and_help_name_the_app` ("Usage: noshape.exe"); the
   cli unit test `usage_names_the_command_not_the_file` reproduces it on any OS. CI run 41254317096 on dfb5c385:
   T1 green on Linux, macOS and Windows (cli_mode tests included).
+- 90f9c7d0 (not cliapp's code) the model test probe `custom_features::dump_stacks` (core d77728ea) only on Linux:
+  its `syscall` / /proc didn't link on Windows, so scheduled CI 41258265400 built no Windows tests. CI 41267393153
+  on that fix: T1 green on all three (70 Windows test binaries ok).
 
 Dry runs: 41228366250 (Windows: `Out` is reserved in Inno's Pascal Script), 41234738521 (Windows and macOS checks
 green; Linux: a clean Ubuntu lacks libxkbcommon-x11, so install.sh now names missing libraries and the check tests
