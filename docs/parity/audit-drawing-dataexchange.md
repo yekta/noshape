@@ -23,8 +23,8 @@ message, P3 tooltip / prompt / look. Status: ✗ open, ✅ fixed (commit), – a
 **Counts (11-01 18:15 UTC):** surfaces audited 6 (drawing dialogs and panels with dumps 55, more drawing and export
 dumps 50, import / export dialogs 16, right-click menus 25 entity types in the app, Notifications, configurations /
 Variable Studio / Derived 44 dumps). 5275 live texts and options scanned, 3804 found as is. Gap rows 34: fixed 25 (P1
-3, P2 10, P3 12), same as live after asking 4 (P1 D3, D4, D5; P2 D17), already ours 1 (P3 D15), asked live 3 (P1 X2;
-P2 D19, D20), open 1 (P2 X3 STEP MBD); leftovers of fixed rows: X1 Split's subassemblies (asked live 17:55). P0:
+3, P2 10, P3 12), same as live after asking 4 (P1 D3, D4, D5; P2 D17), already ours 1 (P3 D15), asked live 4 (P1 X2;
+P2 D19, D20, X3), open 0; leftovers of fixed rows: X1 Split's subassemblies (asked live 17:55). P0:
 none found.
 
 ## Gaps
@@ -58,7 +58,7 @@ none found.
 | C1 | Part Studio configuration panel | Add configuration input | P3 | live's tooltip "Add configuration input to create multiple variants of this Part Studio" (the assembly panel had it) | ✅ |
 | C2 | Configuration visibility conditions | preview controls | P3 | live: each preview control's tooltip "Size: (Default: Small)" | ✅ (`ConfigInput::default_text`, shared with the panel's "Default: …") |
 | X2 | Export (Part Studio / Assembly) | Resolution › Custom | P1 | live: Custom shows Chordal tolerance (mm) · Angular deviation (deg) · Minimum facet width (mm) (STL / OBJ / 3MF), or Distance tolerance (m) · Angular tolerance (deg) · Maximum chord length (m) for the tessellated formats; ours lists Custom with no fields (meshes as Fine) | ? (formats, defaults, presets asked live 18:13) |
-| X3 | Export STEP | MBD | P2 | live: ☐ Use custom annotation text height for MBD export opens "Annotations text height (millimeter)" (0.0001–50, "Valid annotations text height in range from 0.0001 to 50 is required."); our STEP writes no MBD (PMI) at all, so the checkbox has no field and no effect | ✗ (needs PMI in the STEP writer: kern) |
+| X3 | Export STEP | MBD | P2 | live: ☐ Use custom annotation text height for MBD export opens "Annotations text height (millimeter)" (0.0001–50, "Valid annotations text height in range from 0.0001 to 50 is required."); our STEP writes no MBD (PMI) at all, so the checkbox has no field and no effect | ? (our STEP writer, step_out.rs, needs semantic PMI; live AP242 samples asked 18:18) |
 | X4 | Export dialogs | file name | P2 | live: an empty name shows "Valid file name is required." and Export does nothing; OBJ adds "(OBJ names using spaces may not be supported by other systems)" | ✅ Part Studio / Assembly and Export Drawing dialogs |
 | A2 | View properties | tooltips | P3 | live: the Reference link "Switch to the tab containing Part 1", View simplification's "Threshold" field "Simplification threshold: Features below this value will be simplified" | ✅ |
 | W1 | Weld symbol dialog | tooltips | P3 | live: "Upper weld type" / "Lower weld type" on the joint pickers, "Upper flag symbol" / "Lower flag symbol" on the flags | ✅ |
