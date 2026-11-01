@@ -31,6 +31,9 @@ pub struct AlignedDlg {
     /// field takes clicks on parts.
     pub exclude: Vec<noshape_model::BodyId>,
     pub picking: bool,
+    /// Cut from section: on a section view's section, its cut applies
+    /// first (live: ticked by default, help H:aligned_section_view).
+    pub cut_from: bool,
 }
 
 impl DrawingEditor {
@@ -41,10 +44,10 @@ impl DrawingEditor {
             && let Some(v) = self.current_sheet().view(view)
             && let ViewKind::AlignedSection { label, center, a, b, .. } = &v.kind
         {
-            let (label, cut_only, flip, points, exclude) = (label.clone(), v.cut_only, v.flip, (*center, *a, *b), v.exclude_from_cut.clone());
+            let (label, cut_only, flip, points, exclude, cut_from) = (label.clone(), v.cut_only, v.flip, (*center, *a, *b), v.exclude_from_cut.clone(), v.cut_from_section);
             let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(label));
             self.tool = Tool::Select;
-            self.aligned_dlg = Some(AlignedDlg { label: st, cut_only, flip, edit: Some(view), points: Some(points), repick: None, exclude, picking: false });
+            self.aligned_dlg = Some(AlignedDlg { label: st, cut_only, flip, edit: Some(view), points: Some(points), repick: None, exclude, picking: false, cut_from });
             return;
         }
         let active = matches!(self.tool, Tool::AlignedSection { .. });
@@ -53,7 +56,7 @@ impl DrawingEditor {
             (None, true) => {
                 let next = self.current_sheet().next_label();
                 let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(next));
-                self.aligned_dlg = Some(AlignedDlg { label: st, cut_only: false, flip: false, edit: None, points: None, repick: None, exclude: Vec::new(), picking: false });
+                self.aligned_dlg = Some(AlignedDlg { label: st, cut_only: false, flip: false, edit: None, points: None, repick: None, exclude: Vec::new(), picking: false, cut_from: true });
             }
             (Some(_), false) if !editing => self.aligned_dlg = None,
             _ => {}
@@ -128,6 +131,7 @@ impl DrawingEditor {
     fn aligned_ok(&mut self, cx: &mut Context<Self>) {
         let Some((label, cut_only, flip)) = self.aligned_values(cx) else { return };
         let exclude = self.aligned_dlg.as_ref().map(|d| d.exclude.clone()).unwrap_or_default();
+        let cut_from = self.aligned_dlg.as_ref().is_some_and(|d| d.cut_from);
         if let Some(view) = self.aligned_dlg.as_ref().and_then(|d| d.edit) {
             let points = self.aligned_dlg.as_ref().and_then(|d| d.points);
             self.aligned_dlg = None;
@@ -144,6 +148,7 @@ impl DrawingEditor {
                 v.cut_only = cut_only;
                 v.flip = flip;
                 v.exclude_from_cut = exclude;
+                v.cut_from_section = cut_from;
             });
             return;
         }
@@ -166,6 +171,7 @@ impl DrawingEditor {
         }
         if let Some(d) = &self.aligned_dlg {
             v.exclude_from_cut = d.exclude.clone();
+            v.cut_from_section = d.cut_from;
         }
         let id = v.id;
         self.edit_sheet("Aligned section view", cx, |s| s.views.push(v));
@@ -176,6 +182,13 @@ impl DrawingEditor {
 
     pub fn render_aligned_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.aligned_dlg.as_ref()?;
+        let parent = match (&self.tool, d.edit.and_then(|v| self.current_sheet().view(v))) {
+            (_, Some(v)) => self.current_sheet().parent_of(v.id),
+            (Tool::AlignedSection { parent, .. }, None) => *parent,
+            _ => None,
+        };
+        let section_parent = parent.and_then(|p| self.current_sheet().view(p)).is_some_and(|p| matches!(p.kind, ViewKind::Section { .. }));
+        let cut_from = d.cut_from;
         let pal = p();
         let editing = d.edit.is_some();
         // Picked so far: 0 none, 1 center, 2 + viewing, 3 + revolved.
@@ -328,6 +341,15 @@ impl DrawingEditor {
                                         cx.notify();
                                     })),
                             )
+                        })
+                        // Cut from section: the parent is a section view.
+                        .when(section_parent, |e| {
+                            e.child(div().h(px(30.)).px(px(4.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("da-cut-from").native().label("Cut from section").checked(cut_from).on_click(cx.listener(|this, v: &bool, _, cx| {
+                                if let Some(d) = &mut this.aligned_dlg {
+                                    d.cut_from = *v;
+                                }
+                                this.update_preview(cx);
+                            }))))
                         })
                         .child(
                             div().h(px(30.)).px(px(4.)).flex().items_center().child(

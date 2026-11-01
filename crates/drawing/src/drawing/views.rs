@@ -2033,7 +2033,8 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
         ViewKind::AlignedSection { parent, .. } => {
             let cut = section_cut(sheet, id).expect("cut exists (key computed)");
             let pf = view_frame(drawing, sheet, *parent).expect("parent frame");
-            aligned_section_geometry(id, &ctx, part.as_ref(), &frame, &pf, &cut, exact)
+            let pre = pre_cut(sheet, id).and_then(|s| Some((section_cut(sheet, s)?, view_frame(drawing, sheet, sheet.parent_of(s)?)?)));
+            aligned_section_geometry(id, &ctx, part.as_ref(), &frame, &pf, &cut, pre.as_ref(), exact)
         }
         ViewKind::Base { .. } if v.flat => flat_geometry(id, &ctx, part.as_ref(), &frame),
         // Sketch views (and views projected from them): the sketch's curves.
@@ -2665,7 +2666,7 @@ fn section_segments_of(faces: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]>
 /// base geometry).
 pub fn pre_cut(sheet: &Sheet, id: ViewId) -> Option<ViewId> {
     let v = sheet.view(id)?;
-    let ViewKind::Section { parent, .. } = v.kind else { return None };
+    let (ViewKind::Section { parent, .. } | ViewKind::AlignedSection { parent, .. }) = v.kind else { return None };
     let p = sheet.view(parent)?;
     (v.cut_from_section && matches!(p.kind, ViewKind::Section { .. }) && p.broken_out.is_empty()).then_some(parent)
 }
@@ -2801,7 +2802,11 @@ fn named_section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, fram
 /// halves are then cut along the straight line through the center. Edge
 /// names are carried through, so dimensions stay associative (see
 /// [`AlignedMap`]).
-fn aligned_section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, parent: &ViewFrame, cut: &SectionCut, exact: bool) -> ViewGeometry {
+/// A body as its parent section cut it, with its edge map back to the body.
+type PreCut = (Shape, Option<HashMap<usize, usize>>);
+
+#[allow(clippy::too_many_arguments)]
+fn aligned_section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, parent: &ViewFrame, cut: &SectionCut, pre: Option<&(SectionCut, ViewFrame)>, exact: bool) -> ViewGeometry {
     let bodies = view_bodies(ctx, part);
     let diag = bodies_diagonal(&bodies);
     let center3 = bodies_center(&bodies);
@@ -2857,23 +2862,46 @@ fn aligned_section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, fr
     };
     let mut pieces: Vec<CutPiece> = Vec::new();
     let mut error = None;
+    // Cut from section (a section of a section view): the parent's cut
+    // first, its edges mapped back to the bodies' (the names survive).
+    let first: Option<HashMap<BodyId, PreCut>> = pre.map(|(pc, pf)| {
+        let pre_tool = removal_tool(pf, &pc.points, pc.toward_view, center3, big, pc.partial);
+        let (cut, _, e0) = cut_bodies(&bodies, &pre_tool, pf.dir);
+        if e0.is_some() {
+            error = e0;
+        }
+        cut.into_iter().map(|pb| (pb.body.id.clone(), (pb.shape, pb.edge_map))).collect()
+    });
     for (body, rb) in bodies.iter().zip(&rotated) {
-        let ne = body.shape.count(ShapeType::Edge);
-        match noshape_kernel::common(&body.shape, &ha) {
+        let (src, m0) = match &first {
+            Some(f) => match f.get(&body.id) {
+                Some((s, m)) => (s.clone(), m.clone()),
+                None => continue,
+            },
+            None => (body.shape.clone(), None),
+        };
+        let back = |m: HashMap<usize, usize>| -> HashMap<usize, usize> {
+            match &m0 {
+                Some(m0) => m.into_iter().filter_map(|(o, i)| m0.get(&i).map(|j| (o, *j))).collect(),
+                None => m,
+            }
+        };
+        let ne = src.count(ShapeType::Edge);
+        match noshape_kernel::common(&src, &ha) {
             Ok(r) if r.shape.count(ShapeType::Face) > 0 => {
-                let m = edge_map(&r, ne);
+                let m = back(edge_map(&r, ne));
                 pieces.push(CutPiece { body, shape: r.shape, map: Some(m) });
             }
             Ok(_) => {}
             Err(e) => error = Some(format!("Aligned section failed: {e}")),
         }
         let Some(rb) = rb else { continue };
-        if let Ok(r) = noshape_kernel::common(&body.shape, &hb)
+        if let Ok(r) = noshape_kernel::common(&src, &hb)
             && r.shape.count(ShapeType::Face) > 0
             && let Ok(t) = noshape_kernel::transform(&r.shape, &rot, false)
         {
             // A located copy keeps the sub-shape order of `r`.
-            let m = edge_map(&r, ne);
+            let m = back(edge_map(&r, ne));
             pieces.push(CutPiece { body: rb, shape: t.shape, map: Some(m) });
         }
     }
