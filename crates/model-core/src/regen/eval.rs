@@ -924,13 +924,13 @@ impl<'a> EvalCtx<'a> {
         if unified.shape.count(ShapeType::Face) < res.shape.count(ShapeType::Face) {
             let before = unify_input_names(face_names);
             let names = self.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
-            return Ok(split_solids(&unified.shape, &names));
+            return Ok(split_solids(&unified.shape, &names, Some(self.feature)));
         }
-        Ok(split_solids(&res.shape, &face_names))
+        Ok(split_solids(&res.shape, &face_names, Some(self.feature)))
     }
 
     pub(crate) fn add_new_bodies(&mut self, t: NamedShape, kind: BodyKind, base_index: u32) -> FResult<()> {
-        let pieces = if kind == BodyKind::Solid && t.shape.count(ShapeType::Solid) > 1 { split_solids(&t.shape, &t.names.faces) } else { vec![t] };
+        let pieces = if kind == BodyKind::Solid && t.shape.count(ShapeType::Solid) > 1 { split_solids(&t.shape, &t.names.faces, Some(self.feature)) } else { vec![t] };
         for (j, p) in pieces.into_iter().enumerate() {
             let name = self.ctx.alloc_part_name(kind);
             let color = self.ctx.alloc_color();
@@ -1064,7 +1064,7 @@ impl<'a> EvalCtx<'a> {
                 return Err(FeatureError::new("Boolean operation would result in non-manifold body.".to_string()));
             }
             let t_named = t0.elapsed();
-            let pieces = split_solids(&res.shape, &face_names);
+            let pieces = split_solids(&res.shape, &face_names, Some(self.feature));
             if perf {
                 log::info!(target: "perf", "boolean_into {:?} × {} tools: kernel {:.1} ms, naming + unify {:.1} ms, split {:.1} ms", op, near.len(), t_bool.as_secs_f64() * 1e3, (t_named - t_bool).as_secs_f64() * 1e3, (t0.elapsed() - t_named).as_secs_f64() * 1e3);
             }
@@ -1130,7 +1130,7 @@ impl<'a> EvalCtx<'a> {
         } else {
             (res.shape, face_names)
         };
-        let pieces = split_solids(&shape, &face_names);
+        let pieces = split_solids(&shape, &face_names, Some(self.feature));
         // Which target each piece holds first (by its faces' original names).
         let roots: Vec<std::collections::HashSet<&TopoName>> = bodies.iter().map(|b| b.faces.iter().map(|n| n.root()).collect()).collect();
         let mut owned: Vec<(usize, NamedShape)> = Vec::new();
@@ -1174,7 +1174,7 @@ impl<'a> EvalCtx<'a> {
     /// Replace a body's shape after a local operation (fillet, shell...).
     pub fn replace_body(&mut self, bi: usize, shape: Shape, faces: Vec<Name>) {
         let old = self.ctx.bodies[bi].clone();
-        let pieces = split_solids(&shape, &faces);
+        let pieces = split_solids(&shape, &faces, Some(self.feature));
         let mut iter = pieces.into_iter();
         if let Some(first) = iter.next() {
             self.ctx.bodies[bi] = Arc::new(Body::named(old.id.clone(), old.name.clone(), old.kind, first.shape, first.names, old.color, self.feature));
@@ -1224,7 +1224,12 @@ pub fn names_for(shape: &Shape, faces: Vec<Name>) -> ShapeNames {
 }
 
 /// Split a (compound) result into solids (or shells/faces for sheets), carrying face names.
-pub fn split_solids(shape: &Shape, face_names: &[Name]) -> Vec<NamedShape> {
+/// `apart`: the feature whose result is divided into separate bodies; a face the pieces share (a split's cut face,
+/// one face in both solids) is named apart per piece (`TopoName::Split` under it, by piece) so that a reference
+/// picked on one piece resolves on that piece only, as Parasolid's ids (user P0 11-02: a Chamfer of one Split
+/// piece's face chamfered all three). A reference made before (the shared name) still finds every piece's face
+/// through `descends_from`. None: the pieces don't become bodies (the largest is kept), the names as they are.
+pub fn split_solids(shape: &Shape, face_names: &[Name], apart: Option<FeatureId>) -> Vec<NamedShape> {
     let solids = shape.solids();
     let parts: Vec<Shape> = if !solids.is_empty() {
         solids
@@ -1245,7 +1250,7 @@ pub fn split_solids(shape: &Shape, face_names: &[Name]) -> Vec<NamedShape> {
     if parts.len() == 1 && parts[0].is_same(shape) {
         return vec![NamedShape::new(shape.clone(), face_names.to_vec())];
     }
-    parts
+    let mut pieces: Vec<NamedShape> = parts
         .into_iter()
         .map(|p| {
             let names: Vec<Name> = p
@@ -1255,8 +1260,34 @@ pub fn split_solids(shape: &Shape, face_names: &[Name]) -> Vec<NamedShape> {
                 .collect();
             NamedShape::new(p, names)
         })
-        .collect()
+        .collect();
+    if let Some(by) = apart {
+        name_pieces_apart(&mut pieces, by);
+    }
+    pieces
 }
+
+/// Faces named alike on several pieces, named apart per piece (see [`split_solids`]).
+pub fn name_pieces_apart(pieces: &mut [NamedShape], by: FeatureId) {
+    let mut owners: std::collections::HashMap<Name, Vec<usize>> = std::collections::HashMap::new();
+    for (pi, p) in pieces.iter().enumerate() {
+        for n in &p.names.faces {
+            let o = owners.entry(n.clone()).or_default();
+            if o.last() != Some(&pi) {
+                o.push(pi);
+            }
+        }
+    }
+    let shared: std::collections::HashSet<Name> = owners.into_iter().filter(|(_, o)| o.len() > 1).map(|(n, _)| n).collect();
+    if shared.is_empty() {
+        return;
+    }
+    for (pi, p) in pieces.iter_mut().enumerate() {
+        let faces: Vec<Name> = p.names.faces.iter().map(|n| if shared.contains(n) { Arc::new(TopoName::Split { parent: n.clone(), by, ordinal: pi as u16 }) } else { n.clone() }).collect();
+        *p = NamedShape::new(p.shape.clone(), faces);
+    }
+}
+
 
 /// A profile face for extrude/revolve with names for its edges.
 pub struct Profile {

@@ -462,7 +462,7 @@ fn offset_by_booleans(ev: &mut EvalCtx, bi: usize, faces: &[usize], dist: f64) -
     let names = ev.name_result(&[&crate::regen::eval::names_for(&shape, names)], &un.history, &un.shape, &BTreeMap::new(), None);
     let volume = |s: &Shape| k::volume_properties(s).map(|m| m.mass).unwrap_or(0.0);
     // The face moved through the far side: the cut leaves an empty solid.
-    let mut pieces: Vec<_> = crate::regen::eval::split_solids(&un.shape, &names).into_iter().filter(|p| volume(&p.shape) > 0.0).collect();
+    let mut pieces: Vec<_> = crate::regen::eval::split_solids(&un.shape, &names, Some(ev.feature)).into_iter().filter(|p| volume(&p.shape) > 0.0).collect();
     if pieces.is_empty() {
         return err("Nothing is left of the part");
     }

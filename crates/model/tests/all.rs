@@ -30,4 +30,5 @@ mod sheetmetal_frames;
 mod sheetmetal_std;
 mod sketch_assoc;
 mod sketch_fillet_regen;
+mod split_names;
 mod std_oracle;

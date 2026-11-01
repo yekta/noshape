@@ -82,7 +82,7 @@ fn add_bodies(ev: &mut EvalCtx, tools: Vec<NamedShape>, kind: BodyKind) -> FResu
     }
     let mut n = ev.ctx.bodies.iter().filter(|b| b.id.feature == ev.feature).count() as u32;
     for t in tools {
-        for p in split_solids(&t.shape, &t.names.faces) {
+        for p in split_solids(&t.shape, &t.names.faces, Some(ev.feature)) {
             let id = BodyId { feature: ev.feature, index: n };
             n += 1;
             push_body(ev, id, kind, p.shape, p.names.faces);

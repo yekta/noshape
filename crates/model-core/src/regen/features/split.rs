@@ -93,9 +93,9 @@ fn side_of(tool: &Tool, p: DVec3) -> f64 {
 }
 
 /// Connected pieces of a split result with their face names.
-fn pieces_of(shape: &Shape, names: &[Name], kind: BodyKind) -> Vec<NamedShape> {
+fn pieces_of(shape: &Shape, names: &[Name], kind: BodyKind, by: crate::reference::FeatureId) -> Vec<NamedShape> {
     match kind {
-        BodyKind::Solid => crate::regen::eval::split_solids(shape, names),
+        BodyKind::Solid => crate::regen::eval::split_solids(shape, names, Some(by)),
         BodyKind::Surface => {
             let mut parts: Vec<Shape> = shape.shells();
             let in_shell: Vec<Shape> = parts.iter().flat_map(|s| s.faces()).collect();
@@ -104,13 +104,15 @@ fn pieces_of(shape: &Shape, names: &[Name], kind: BodyKind) -> Vec<NamedShape> {
                     parts.push(f);
                 }
             }
-            parts
+            let mut pieces: Vec<NamedShape> = parts
                 .into_iter()
                 .map(|p| {
                     let n = p.faces().iter().map(|f| shape.index_of(f, ShapeType::Face).and_then(|i| names.get(i).cloned()).unwrap_or_else(|| Arc::new(TopoName::face(crate::reference::FeatureId(0), Role::New(0))))).collect();
                     NamedShape::new(p, n)
                 })
-                .collect()
+                .collect();
+            crate::regen::eval::name_pieces_apart(&mut pieces, by);
+            pieces
         }
         _ => {
             let edges = shape.edges();
@@ -171,7 +173,7 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
         let target = ev.ctx.bodies[ti].clone();
         let res = k::split(std::slice::from_ref(&target.shape), std::slice::from_ref(&tool.shape), &k::BooleanOptions::default()).map_err(kerr("Split failed"))?;
         let face_names = if target.kind == BodyKind::Wire { Vec::new() } else { ev.name_result(&[&target.shape_names(), &tool.names], &res.history, &res.shape, &BTreeMap::new(), None) };
-        let mut pieces: Vec<(f64, DVec3, NamedShape)> = pieces_of(&res.shape, &face_names, target.kind)
+        let mut pieces: Vec<(f64, DVec3, NamedShape)> = pieces_of(&res.shape, &face_names, target.kind, ev.feature)
             .into_iter()
             .filter(|p| !p.shape.is_null())
             .map(|p| {

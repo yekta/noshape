@@ -5,6 +5,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## From the user, 2026-11-02 (v0.4.19, macOS)
+- [x] P0 SPLIT-PIECE-NAMES (core): a revolved body split by two planes into 3 parts; Chamfer "Face of Split 1" (one
+  face picked on one part, 0.8 mm, tangent propagation) chamfered the matching face of all three. Cause: OCCT's
+  splitter leaves a cut face shared by the two pieces (one face in both solids), so both pieces' faces got one name and
+  the reference resolved on every part carrying it. Fixed: `split_solids(.., apart)` / `name_pieces_apart` name a face
+  the pieces share apart per piece (`TopoName::Split` under the dividing feature) for every op whose result becomes
+  several bodies (Split, booleans into pieces, new bodies, surface results, rips, ribs, the FS host's bodies); a name
+  saved before still finds every piece's face through `descends_from` (old documents regenerate as they did: 150 of
+  qa's / qa5's / the profile documents identical before and after: part volumes, face / edge counts, statuses). T1
+  `split_names::*` (7, five fail on the previous main): pieces name apart (side by side and stacked), Chamfer /
+  Fillet / sketch plane / Shell / mate connector / Draft / Extrude up to face on one piece's face change or take
+  that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
+  both faces.
+
 ## Release blockers for the 2026-11-01 17:00 release (qa list 16:01, newest green 177193f8)
 - **qa 20:33: v0.4.19 CLI fuzz 1211–1230: 3 of 20 die (1215, 1221, 1222 — REL419-BUILD-CRASH), all clean on green and v0.4.18. New today from the user: P1 KNURL-25X25-SLOW (Ø25 × 25 Diamond knurl, 49 min then a non-manifold error on the green CLI; Ø25 × 50 30 s).**
 - **qa 18:57: P0 in the published v0.4.19 — REL419-BUILD-CRASH.** The release binary dies in 3 of its first 12 fuzz seeds (greens: 0 of 20; v0.4.18 ~1 in 50) and on tickets/cli-suppress-segv.noshape; seed 1215 dies on v0.4.19 even with the Rust Boolean off but runs clean on green b271f9ec and on v0.4.18. The cut differs from the greens qa tested by 6e20f745, 4976f492 and **259c589a's CI change (OCCT through ccache)**. Suggest pulling or re-cutting v0.4.19, and checking that the 05:00 Release run's binary matches a green before it publishes.

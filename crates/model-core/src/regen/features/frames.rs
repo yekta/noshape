@@ -672,7 +672,7 @@ pub fn frame(ev: &mut EvalCtx) -> FResult<()> {
 
 /// Largest solid of a result (with its face names).
 fn largest_piece(shape: &Shape, names: &[Name]) -> Option<NamedShape> {
-    let pieces = crate::regen::eval::split_solids(shape, names);
+    let pieces = crate::regen::eval::split_solids(shape, names, None);
     pieces.into_iter().filter(|p| p.shape.count(ShapeType::Solid) > 0).max_by(|a, b| a.shape.volume().unwrap_or(0.0).total_cmp(&b.shape.volume().unwrap_or(0.0)))
 }
 

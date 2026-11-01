@@ -236,7 +236,7 @@ pub fn surface_result(ev: &mut EvalCtx, tool: NamedShape) -> FResult<()> {
     let names = ev.name_result(&arg_refs, &res.history, &res.shape, &BTreeMap::new(), None);
     let first = ev.ctx.bodies[targets[0]].clone();
     let kind = if res.shape.count(ShapeType::Solid) > 0 { BodyKind::Solid } else { BodyKind::Surface };
-    let pieces = split_solids(&res.shape, &names);
+    let pieces = split_solids(&res.shape, &names, Some(ev.feature));
     let ids: Vec<BodyId> = targets.iter().map(|&i| ev.ctx.bodies[i].id.clone()).collect();
     let pos = targets[0];
     ev.ctx.bodies.retain(|b| !ids.contains(&b.id));

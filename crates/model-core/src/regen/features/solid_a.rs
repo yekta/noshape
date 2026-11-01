@@ -1361,7 +1361,7 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
     }
     if !new_ribs.is_empty() {
         for (i, t) in new_ribs.into_iter().enumerate() {
-            for (j, p) in crate::regen::eval::split_solids(&t.shape, &t.names.faces).into_iter().enumerate() {
+            for (j, p) in crate::regen::eval::split_solids(&t.shape, &t.names.faces, Some(ev.feature)).into_iter().enumerate() {
                 push_body(ev, BodyId { feature: ev.feature, index: (i * 64 + j) as u32 }, BodyKind::Solid, p.shape, p.names.faces);
             }
         }

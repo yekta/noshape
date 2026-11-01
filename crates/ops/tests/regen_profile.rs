@@ -453,3 +453,39 @@ fn bench_profdocs() {
     }
     let _ = std::fs::remove_dir_all(&tmp);
 }
+
+/// Each document of NOSHAPE_PROFILE_DIR regenerated: a line per part (volume, faces, edges) and per feature not OK,
+/// to compare two builds' results (`diff` the outputs).
+#[test]
+#[ignore = "T2 tool: NOSHAPE_PROFILE_DIR"]
+fn regen_summary() {
+    let Some(dir) = std::env::var_os("NOSHAPE_PROFILE_DIR") else { return };
+    let mut files: Vec<_> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape")).collect();
+    files.sort();
+    let tmp = std::env::temp_dir().join(format!("noshape-summary-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+    for path in files {
+        let copy = tmp.join(path.file_name().unwrap());
+        std::fs::copy(&path, &copy).unwrap();
+        let Ok(s) = noshape_ops::session::Session::open(&copy) else {
+            println!("{}: does not open", path.display());
+            continue;
+        };
+        let units = s.doc.settings.units;
+        for tab in &s.doc.tabs {
+            if let TabContent::PartStudio(ps) = &tab.content {
+                let r = Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+                let doc = format!("{} / {}", path.file_stem().unwrap().to_string_lossy(), tab.name);
+                for (f, st) in ps.features.iter().zip(&r.display.features) {
+                    if st.status != noshape_model::display::FeatureStatus::Ok {
+                        println!("{doc}: {} {:?} {}", f.name, st.status, st.message.as_deref().unwrap_or(""));
+                    }
+                }
+                for b in &r.context.bodies {
+                    println!("{doc}: {} vol {:.6} faces {} edges {}", b.name, b.shape.volume().unwrap_or(0.0) * 1e9, b.shape.faces().len(), b.shape.edges().len());
+                }
+            }
+        }
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+}

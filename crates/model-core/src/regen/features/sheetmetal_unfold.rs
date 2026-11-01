@@ -308,7 +308,7 @@ fn split_by(ev: &EvalCtx, bi: usize, data: &SheetMetalData, region: Shape, far_w
     let feature = ev.feature;
     let tool = tool_named(region, |i| side_name(feature, key, slot + i as u16));
     let (rest, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(&body), &[tool])?;
-    let pieces = crate::regen::eval::split_solids(&rest, &names);
+    let pieces = crate::regen::eval::split_solids(&rest, &names, Some(ev.feature));
     let far_names: Vec<Name> = far_walls.iter().flat_map(|&w| data.walls[w].faces.iter().chain(data.walls[w].back.iter()).cloned()).collect();
     let (mut near, mut far) = (Vec::new(), Vec::new());
     for p in pieces {
