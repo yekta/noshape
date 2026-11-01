@@ -23,7 +23,7 @@ inst=$(basename "$LD")   # refs/landq/<inst>/… in the shared repo
 export LAND_SLOTS=$(( $(nproc) / 5 > 2 ? $(nproc) / 5 : 2 ))
 export CARGO_BUILD_JOBS=$(( $(nproc) / LAND_SLOTS + 1 ))
 export GIT_COMMITTER_NAME=yekta GIT_COMMITTER_EMAIL=ngyekta@gmail.com
-mkdir -p "$LD"/{jobs,pending,splits,run,results,outbox,done,bin} || { echo "land-daemon: can't make its dirs in $LD"; exit 1; }
+mkdir -p "$LD"/{jobs,pending,splits,run,results,outbox,done,bin,outcome} || { echo "land-daemon: can't make its dirs in $LD"; exit 1; }
 log() { echo "$(date -u '+%F %T') $*"; }
 alive() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null; }
 field() { local f="$LD/jobs/$2.job"; [ -f "$f" ] || f="$LD/done/$2.job"; sed -n "s/^$1=//p" "$f" 2>/dev/null | head -1; }
@@ -77,9 +77,20 @@ print(' '.join(sorted({crate(c) for c in moved if crate(c) in ours})))
 P
 }
 
+# Whether a batch can be stacked on (by its run dir name): it and every batch under it are checking or green, or
+# landed. Not a half of a red batch: one of two halves is likely red, and halves are checked side by side.
+can_land() {
+  local b=$1
+  while [ -n "$b" ]; do
+    [ -e "$LD/outcome/$b" ] && { [ "$(cat "$LD/outcome/$b")" = landed ]; return; }
+    [ -s "$LD/run/$b/stack" ] && ! grep -qx 'kind=split' "$LD/run/$b/jobs" 2>/dev/null || return 1
+    b=$(cat "$LD/run/$b/dep" 2>/dev/null)
+  done
+}
+
 # A batch, on a slot: stack, check, push or split.
 run_batch() {
-  local slot=$1 wt key keys=() applied=() conflict files other before commits c tip i k rc reason res moved hit t0 s
+  local slot=$1 wt key keys=() applied=() conflict files other before commits c tip i k rc reason="" res moved hit t0 s
   d="$LD/run/$bid"; mapfile -t keys < <(grep -v '^kind=' "$d/jobs"); kind=$(sed -n 's/^kind=//p' "$d/jobs"); kind=${kind:-batch}
   n=${#keys[@]}; t0=$(date +%s)
   wt="$HOME/land/wt-slot$slot"; export CARGO_TARGET_DIR="$HOME/target-land-slot$slot"
@@ -96,7 +107,21 @@ run_batch() {
   # (A slot's checkout may be left mid cherry-pick or rebase by a killed batch.)
   cd "$wt" || { log "$bid: no checkout $wt"; sleep 30; front resume "${keys[@]}"; return; }
   { git cherry-pick --quit; git rebase --quit; } 2>/dev/null
-  git checkout -q -f --detach "refs/landq/$inst/target" && git clean -fdq || { log "$bid: checkout failed"; sleep 30; front resume "${keys[@]}"; return; }
+  # Stacked on the batch being checked before it, if any, not on main (11-01: batches side by side on main all edit
+  # crates/ops, so each one that landed sent the others back to be checked again: half the checks were thrown away).
+  # It lands right after that one, as checked; if that one doesn't land, this one goes back to the front.
+  # Only on a batch that can still land: not red, and every batch under it the same (11-01: stacking on doomed
+  # batches sent them round as re-checks for minutes). A red batch drops its stack file at once.
+  exec 6>"$LD/stack.lock"; flock 6
+  local dep="" r start="refs/landq/$inst/target"
+  for r in $(ls -t "$LD"/run/*/stack 2>/dev/null); do
+    r=$(basename "$(dirname "$r")"); [ "$LD/run/$r" = "$d" ] && continue
+    [ -e "$LD/outcome/$r" ] && continue
+    can_land "$r" && { dep=$r; start=$(cat "$LD/run/$r/stack"); break; }
+  done
+  # (On main: as it is now, not as fetched before the lock; a batch may have just landed.)
+  [ -n "$dep" ] || git -C "$repo" fetch -q origin "+refs/heads/$TARGET:refs/landq/$inst/target"
+  git checkout -q -f --detach "$start" && git clean -fdq || { exec 6>&-; log "$bid: checkout failed"; sleep 30; front resume "${keys[@]}"; return; }
   base=$(git rev-parse HEAD); : > "$d/changed"; : > "$d/counts"; local pkgs=""
   for key in "${keys[@]}"; do
     [ -f "$LD/jobs/$key.job" ] || continue
@@ -105,7 +130,7 @@ run_batch() {
     # Its commits not yet on the stack (by content: a change already landed by --wait or with an earlier job drops out).
     commits=$(git rev-list --reverse --cherry-pick --right-only HEAD..."$jref")
     # None: on main already (landed), or all in an earlier change of this batch (it lands or fails with them).
-    if [ -z "$commits" ] && [ "$(git rev-parse HEAD)" = "$base" ]; then : > "$d/detail"; result "$key" LANDED "$base"; continue; fi
+    if [ -z "$commits" ] && [ "$(git rev-parse HEAD)" = "$base" ] && [ -z "$dep" ]; then : > "$d/detail"; result "$key" LANDED "$base"; continue; fi
     before=$(git rev-parse HEAD)
     if [ -z "$commits" ]; then
       :
@@ -119,21 +144,38 @@ run_batch() {
       done
       echo "$files" > "$d/detail"
       if [ -n "$other" ]; then reason="rebase conflict with$other, queued before it (in $(echo $files)): rebase on origin/$TARGET once that lands, then re-run land.sh"
+      elif [ -n "$dep" ]; then reason="rebase conflict with $TARGET or a change being checked before it (in $(echo $files)): rebase on origin/$TARGET once that lands, then re-run land.sh"
       else reason="rebase conflict with $TARGET (in $(echo $files)): rebase on origin/$TARGET by hand, then re-run land.sh"; fi
       result "$key" FAILED "$reason"; continue
     fi
     applied+=("$key"); echo "$key $(git rev-list --count "$before"..HEAD)" >> "$d/counts"
     sed -n '/^--$/,$p' "$LD/jobs/$key.job" | tail -n +2 >> "$d/changed"; pkgs="$pkgs $(field pkgs "$key")"
   done
-  n=${#applied[@]}; local t_stack=$(( $(date +%s) - t0 ))
-  [ $n -gt 0 ] || return
+  n=${#applied[@]}; local t_stack=$(( $(date +%s) - t0 )); reason=""
+  # (Nothing applied: no stack, so nothing stacks on this batch.)
+  [ $n -gt 0 ] || { exec 6>&-; res_word=landed; return; }
+  git rev-parse HEAD > "$d/stack"; echo "$dep" > "$d/dep"; git update-ref "refs/landq/$inst/stack/$bid" HEAD; exec 6>&-
   pkgs=$(echo $pkgs | tr ' ' '\n' | sort -u | tr '\n' ' '); sort -u -o "$d/changed" "$d/changed"
-  echo "checking" > "$d/state"; log "$bid: $kind of $n on ${base:0:8} in slot $slot: $(for k in "${applied[@]}"; do printf '%s ' "$(field name "$k"):${k##*-}"; done)"
+  echo "checking" > "$d/state"; log "$bid: $kind of $n on ${base:0:8}${dep:+ (on $dep)} in slot $slot: $(for k in "${applied[@]}"; do printf '%s ' "$(field name "$k"):${k##*-}"; done)"
   prune_land_target "$CARGO_TARGET_DIR" > /dev/null
   : > "$d/times"; s=$(date +%s)
   LAND_TIMES="$d/times" timeout 90m ${LAND_CHECKS:-tools/tiers/land-checks.sh} "$pkgs" "$d/changed" > "$d/check.log" 2>&1; rc=$?
-  local t_check=$(( $(date +%s) - s )) t_push=0 res_word
-  if [ $rc -eq 0 ]; then
+  local t_check=$(( $(date +%s) - s )) t_push=0 depres=landed
+  [ $rc -eq 0 ] || rm -f "$d/stack"   # (red: nothing stacks on it any more)
+  if [ -n "$dep" ]; then
+    # Green, it can land only once the batch under it has (its commits are in this stack); red, it is only to blame
+    # if that one landed (else its bad change may be what failed here).
+    echo "waiting for $dep" > "$d/state"
+    while [ ! -e "$LD/outcome/$dep" ] && [ -d "$LD/run/$dep" ]; do sleep 3; done
+    depres=$(cat "$LD/outcome/$dep" 2>/dev/null); depres=${depres:-gone}
+    if [ "$depres" != landed ]; then
+      rm -f "$d/stack"; reason="$dep under it: $depres"; log "$bid: again from the front ($dep, under it, didn't land: $depres)"
+      front retest "${applied[@]}"; res_word=retest
+    fi
+  fi
+  if [ "$depres" != landed ]; then
+    :
+  elif [ $rc -eq 0 ]; then
     echo "pushing" > "$d/state"; s=$(date +%s)
     while true; do
       git update-ref "refs/landq/$inst/push/$bid" HEAD
@@ -146,12 +188,14 @@ run_batch() {
       # a crate this batch edits (10-27: a `far` landed in kernel beside the kernel change that made it illegal).
       git -C "$repo" fetch -q origin "+refs/heads/$TARGET:refs/landq/$inst/target"
       git merge-base --is-ancestor HEAD "refs/landq/$inst/target" && { res=ok; break; }   # (it got there after all)
-      moved=$(git diff --name-only "$base" "refs/landq/$inst/target")
+      # (Only commits that weren't in the checked stack: the batch under it, landed, was checked with this one.)
+      moved=$(for c in $(git rev-list --cherry-pick --left-only "refs/landq/$inst/target"...HEAD); do git show --name-only --format= "$c"; done | sort -u)
       [ -n "$moved" ] || sleep 10   # (rejected though main didn't move: GitHub or the relay; try again shortly)
       hit=$(overlap "$moved" "$(cat "$d/changed")")
       if [ -n "$hit" ] || ! git rebase -q "refs/landq/$inst/target" > /dev/null 2>&1; then
         git rebase --abort 2>/dev/null
-        if [ -n "$hit" ]; then log "$bid: again from the front ($TARGET changed $hit while checking)"; else log "$bid: again from the front (rebase conflict after checking)"; fi
+        reason="${hit:-rebase conflict after checking}"; [ -z "$hit" ] || reason="$TARGET changed $hit while checking"
+        log "$bid: again from the front ($reason)"
         front retest "${applied[@]}"; res_word=retest; break
       fi
       base=$(git rev-parse "refs/landq/$inst/target")
@@ -162,7 +206,7 @@ run_batch() {
       # Each change's own tip on main (a rebase that dropped a commit leaves HEAD for all).
       mapfile -t c < <(git rev-list --reverse "$base"..HEAD); i=0
       while read -r k cnt; do
-        i=$(( i + cnt )); tip=${c[$((i - 1))]:-}; [ ${#c[@]} -eq "$(awk '{s+=$2} END {print s}' "$d/counts")" ] || tip=$(git rev-parse HEAD)
+        i=$(( i + cnt )); tip=${c[$((i - 1))]:-}; [ $i -gt 0 ] || tip=$(git rev-parse HEAD); [ ${#c[@]} -eq "$(awk '{s+=$2} END {print s}' "$d/counts")" ] || tip=$(git rev-parse HEAD)
         : > "$d/detail"; result "$k" LANDED "$tip"
       done < "$d/counts"
     fi
@@ -174,7 +218,7 @@ run_batch() {
       grep -vE '^(== |CHECKS PASSED)' "$d/check.log" | grep -v '^LAND FAILED' | tail -60 > "$d/detail"
       result "${applied[0]}" FAILED "$reason"
     else
-      # Red: halves go first, each on main as it is then; the one at fault is the half that stays red, down to one.
+      # Red: halves go first (stacked like any batch); the one at fault is the half that stays red, down to one.
       res_word=split; local h=$(( (n + 1) / 2 ))
       log "$bid: red ($reason): splitting $n into $h + $(( n - h ))"
       front split "${applied[@]:0:$h}"; front split "${applied[@]:$h}"
@@ -186,7 +230,7 @@ run_batch() {
   tm() { awk -v p="$1" '$1 == p {print $2}' "$d/times"; }
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -u '+%F %T')" "$(hostname -s)" "$bid" "$kind" "$n" \
     "$res_word" "$qw" "$SLOT_WAITED" "$t_stack" "$t_check" "$(tm check)" "$(tm clippy)" "$(tm tests_build)" "$(tm tests_run)" "$(tm t0)" "$(tm menu)" \
-    "$t_push" "$( [ $rc -eq 0 ] || echo "$reason")" "$(echo $pkgs | wc -w)" >> "$LD/history.tsv"
+    "$t_push" "$reason" "$(echo $pkgs | wc -w)" >> "$LD/history.tsv"
 }
 
 # A worker: waits for a slot in arrival order with perf runs and --wait lands (slots.sh), then claims what is queued.
@@ -211,8 +255,10 @@ worker() {
   } 5>"$LD/claim.lock"
   rm -f "$tok"
   [ -n "$bid" ] || return 0
-  t_claim=$(date +%s)
+  t_claim=$(date +%s); res_word=retest
   run_batch "$slot"
+  # What the batches stacked on this one wait for: landed, or not (they go back to the front).
+  echo "$res_word" > "$LD/outcome/$bid"; git -C "$repo" update-ref -d "refs/landq/$inst/stack/$bid" 2>/dev/null
 }
 
 # Batches whose worker died (a reboot, a kill -9) go first again; busy = the batches being checked.
@@ -235,7 +281,7 @@ log "land daemon $$ for $LD → $TARGET, batches up to $MAXB, $LAND_SLOTS slots 
 rm -f "$LD"/waiting.*
 last_update=0
 while [ ! -e "$LD/stop" ]; do
-  recover; waiting=0
+  recover; waiting=0; find "$LD/outcome" -type f -mmin +1440 -delete 2>/dev/null
   for w in "$LD"/waiting.*; do
     [ -e "$w" ] || continue
     p=$(cat "$w" 2>/dev/null); if [ -z "$p" ] || alive "$p"; then waiting=$((waiting + 1)); else rm -f "$w"; fi

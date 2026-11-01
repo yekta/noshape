@@ -15,7 +15,8 @@ All scripts take extra cargo args (`--locked`, `-p <crate>`, `--release`). Set `
 The only way to put work on main. `land.sh` rebases on origin/main, queues HEAD on the land server vibe4 and returns
 at once with `QUEUED <sha>`: **keep working, don't wait for it.** The land daemon there (`tools/tiers/land-daemon.sh`)
 takes whatever is queued whenever one of its three slots frees, up to 4 changes in arrival order (no batch waits to
-fill), stacks them on main and checks the stack once: `cargo check` over the workspace (type errors and warnings
+fill), stacks them on main, or on the batch being checked before it (it lands right after that one, as checked;
+if that one doesn't land, it goes back to be checked again), and checks the stack once: `cargo check` over the workspace (type errors and warnings
 anywhere fail), clippy on the crates the changes edit, the full tests of those crates and of the crates that use them
 directly, T0 when the app, ops or cli is affected, ops' menu coverage when a UI crate changed. Green: the stack goes to
 main. Red: the batch is split in halves that are checked next (in parallel slots), down to the change at fault, which
