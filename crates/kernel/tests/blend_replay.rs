@@ -273,3 +273,30 @@ fn blend_corpus_shapes() {
         println!("{n:4} {k}");
     }
 }
+
+/// OCCT's blends over the whole corpus, each case's best of 3, one line (the corpus at NOSHAPE_BLEND_CORPUS, else
+/// ~/agents/blend-corpus, the perf hosts' copy): `tools/tiers/perf.sh -p noshape-kernel --test all --
+/// blend_replay::occt_blend_corpus_time --ignored --nocapture --test-threads=1`.
+#[test]
+#[ignore = "T2 bench: the blend corpus through OCCT"]
+fn occt_blend_corpus_time() {
+    let dir = std::env::var("NOSHAPE_BLEND_CORPUS").unwrap_or_else(|_| format!("{}/agents/blend-corpus", std::env::var("HOME").unwrap_or_default()));
+    let dir = Path::new(&dir);
+    noshape_kernel::set_rust_blend(Some(false));
+    let (mut n, mut total, mut failed) = (0, 0.0, 0);
+    for name in blend_corpus::cases(dir) {
+        let Some(case) = blend_corpus::load(dir, &name) else { continue };
+        n += 1;
+        let mut best = f64::MAX;
+        for _ in 0..3 {
+            let t = std::time::Instant::now();
+            let r = blend_corpus::run(&case);
+            best = best.min(t.elapsed().as_secs_f64() * 1e3);
+            failed += usize::from(r.is_err());
+        }
+        total += best;
+    }
+    noshape_kernel::set_rust_blend(None);
+    assert!(n > 0, "no corpus at {}", dir.display());
+    println!("occt blend corpus: {n} cases, {total:.0} ms (best of 3 each), {} failed", failed / 3);
+}
