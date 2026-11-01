@@ -240,3 +240,14 @@ fn big_assembly_1000_evaluate_profile() {
     let again = stats((0..300).map(|_| evaluate(&mut b.ctx, &b.path, |_| {})).collect());
     println!("a1000 evaluate again: median {:.1} ms", ms(again.median));
 }
+
+/// A1000 opened again and again in fresh sessions (to profile opening:
+/// `perf record` this test).
+#[test]
+#[ignore]
+fn big_assembly_1000_open_profile() {
+    let mut b = build(A1000);
+    fold_solved(&mut b.ctx, &b.path);
+    let firsts: Vec<Duration> = (0..20).map(|_| open(&b.path).1).collect();
+    println!("a1000 open, first evaluation: median {:.1} ms", ms(stats(firsts).median));
+}
