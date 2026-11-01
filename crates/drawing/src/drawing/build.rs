@@ -1050,9 +1050,53 @@ pub fn hole_callout_lines(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a
     hole_callout_marked(drawing, sheet, sources, a).map(|lines| lines.iter().map(|l| format::flatten_stacked(l)).collect())
 }
 
+/// A run of a hole callout preview line: its text and, for a value, which.
+pub type PreviewRun = (String, Option<super::HoleValue>);
+
+/// The palette's preview of a hole callout: each line as text runs, the
+/// values with their [`super::HoleValue`] (a click selects one for
+/// Override precision/tolerance, live 1707).
+pub fn hole_callout_preview(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &Annotation) -> Option<Vec<Vec<PreviewRun>>> {
+    let lines = hole_callout_marked_with(drawing, sheet, sources, a, true)?;
+    Some(
+        lines
+            .iter()
+            .map(|l| {
+                let flat = format::flatten_stacked(l);
+                let mut runs: Vec<PreviewRun> = Vec::new();
+                let mut rest = flat.as_str();
+                while let Some(i) = rest.find(VALUE_START) {
+                    if i > 0 {
+                        runs.push((rest[..i].to_string(), None));
+                    }
+                    let after = &rest[i + VALUE_START.len_utf8()..];
+                    let mut chars = after.chars();
+                    let k = chars.next().and_then(|c| super::HoleValue::ALL.get((c as u32).saturating_sub('a' as u32) as usize).copied());
+                    let body = chars.as_str();
+                    let end = body.find(VALUE_END).unwrap_or(body.len());
+                    runs.push((body[..end].to_string(), k));
+                    rest = body.get(end + VALUE_END.len_utf8()..).unwrap_or("");
+                }
+                if !rest.is_empty() {
+                    runs.push((rest.to_string(), None));
+                }
+                runs
+            })
+            .collect(),
+    )
+}
+
+/// Marks around a hole callout value in [`hole_callout_preview`]'s text.
+const VALUE_START: char = '\u{E010}';
+const VALUE_END: char = '\u{E011}';
+
 /// Hole callout lines with the fit deviations of a diameter marked as
 /// stacked text (see [`format::stacked`]).
 fn hole_callout_marked(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &Annotation) -> Option<Vec<String>> {
+    hole_callout_marked_with(drawing, sheet, sources, a, false)
+}
+
+fn hole_callout_marked_with(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &Annotation, marks: bool) -> Option<Vec<String>> {
     let view = a.kind.view()?;
     let (key, _) = views::view_source(sheet, view)?;
     let ctx = &sources.get(&key)?.context;
@@ -1066,29 +1110,36 @@ fn hole_callout_marked(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &
     // Without "Override precision/tolerance" the hole feature's precision
     // applies (the callout's units always do).
     let format = if opts.override_tol { a.format.clone() } else { super::DimFormat { precision: None, tolerance: super::Tolerance::None, ..a.format.clone() } };
-    Some(hole_callout_text(drawing, hole, n, &Annotation { format, ..a.clone() }))
+    Some(hole_callout_text_with(drawing, hole, n, &Annotation { format, ..a.clone() }, marks))
 }
 
 /// A hole's callout lines ("⌀6.6 ↧ 12", "⌴ ⌀11 ↧ 4" …) for `n` holes
 /// with annotation `a`'s format (hole callouts; hole tables' SIZE).
 pub fn hole_callout_text(drawing: &Drawing, hole: &crate::regen::context::HoleRecord, n: usize, a: &Annotation) -> Vec<String> {
-    // The callout's lines with lengths written by `len`; `dual`: the dual
+    hole_callout_text_with(drawing, hole, n, a, false)
+}
+
+/// [`hole_callout_text`]; `marks`: each primary value wrapped in the
+/// preview's value marks.
+fn hole_callout_text_with(drawing: &Drawing, hole: &crate::regen::context::HoleRecord, n: usize, a: &Annotation, marks: bool) -> Vec<String> {
+    use super::HoleValue as V;
+    // The callout's lines with values written by `len`; `dual`: the dual
     // block (fit classes and deviations stay on the primary, as live's
     // dimensions).
-    let build = |len: &dyn Fn(f64) -> String, dual: bool| -> Vec<String> {
+    let build = |len: &dyn Fn(V, f64) -> String, dual: bool| -> Vec<String> {
         let count = if n > 1 { format!("{n}{} ", drawing.props.hole_indicator) } else { String::new() };
-        let depth = |d: Option<f64>| match (hole.through, d) {
+        let depth = |k: V, d: Option<f64>| match (hole.through, d) {
             (true, _) => " THRU".to_string(),
-            (false, Some(d)) => format!(" ↧ {}", len(d)),
+            (false, Some(d)) => format!(" ↧ {}", len(k, d)),
             _ => String::new(),
         };
         let mut out = Vec::new();
         match &hole.thread {
             Some(t) => {
                 let class = hole.thread_class.as_ref().map(|c| format!(" - {c}")).unwrap_or_default();
-                out.push(format!("{count}{t}{class}{}", depth(hole.tapped_depth.or(hole.depth))));
+                out.push(format!("{count}{t}{class}{}", depth(V::Depth, hole.tapped_depth.or(hole.depth))));
                 if let Some(td) = hole.tap_drill {
-                    out.push(format!("⌀{}{}", len(td), depth(hole.depth)));
+                    out.push(format!("⌀{}{}", len(V::Diameter, td), depth(V::DrillDepth, hole.depth)));
                 }
             }
             None => match &hole.diameter_fit {
@@ -1101,16 +1152,16 @@ pub fn hole_callout_text(drawing: &Drawing, hole: &crate::regen::context::HoleRe
                     let class = fit.class.as_ref().map(|c| format!(" {c}")).unwrap_or_default();
                     let dev = fit.deviations.map(|(u, l)| format!(" {}", format::stacked(&format::format_deviation(drawing, &f, u, false), &format::format_deviation(drawing, &f, l, true)))).unwrap_or_default();
                     if dual {
-                        out.push(format!("{count}⌀{}{}", len(hole.diameter), depth(hole.depth)));
+                        out.push(format!("{count}⌀{}{}", len(V::Diameter, hole.diameter), depth(V::Depth, hole.depth)));
                     } else {
-                        out.push(format!("{count}⌀{}{class}{dev}{}", format::format_len(drawing, &f, hole.diameter), depth(hole.depth)));
+                        out.push(format!("{count}⌀{}{class}{dev}{}", format::format_len(drawing, &f, hole.diameter), depth(V::Depth, hole.depth)));
                     }
                 }
                 None => {
                     // An overridden tolerance on the diameter (live drawing/465).
                     let dev = |v: f64, lower: bool| format::format_deviation(drawing, &a.format, v, lower);
                     let tol = match &a.format.tolerance {
-                        super::Tolerance::Symmetric { value } => format!(" ±{}", len(*value)),
+                        super::Tolerance::Symmetric { value } => format!(" ±{}", len(V::Diameter, *value)),
                         super::Tolerance::Deviation { upper, lower } => format!(" {}", format::stacked(&dev(*upper, false), &dev(*lower, true))),
                         super::Tolerance::Min => " MIN".into(),
                         super::Tolerance::Max => " MAX".into(),
@@ -1118,31 +1169,63 @@ pub fn hole_callout_text(drawing: &Drawing, hole: &crate::regen::context::HoleRe
                         _ => String::new(),
                     };
                     let size = match &a.format.tolerance {
-                        super::Tolerance::Limits { upper, lower } => format::stacked(&len(hole.diameter + upper), &len(hole.diameter + lower)),
-                        _ => len(hole.diameter),
+                        super::Tolerance::Limits { upper, lower } => format::stacked(&len(V::Diameter, hole.diameter + upper), &len(V::Diameter, hole.diameter + lower)),
+                        _ => len(V::Diameter, hole.diameter),
                     };
-                    out.push(format!("{count}⌀{size}{tol}{}", depth(hole.depth)))
+                    // The hole Ø (its tolerance included) is one value.
+                    let size = if marks && !dual { format!("{VALUE_START}a{size}{tol}{VALUE_END}") } else { format!("{size}{tol}") };
+                    out.push(format!("{count}⌀{size}{}", depth(V::Depth, hole.depth)))
                 }
             },
         }
         if let Some((d, dd)) = hole.cbore {
-            out.push(format!("⌴ ⌀{} ↧ {}", len(d), len(dd)));
+            out.push(format!("⌴ ⌀{} ↧ {}", len(V::CboreDiameter, d), len(V::CboreDepth, dd)));
         }
         if let Some((d, ang)) = hole.csink {
-            out.push(format!("⌵ ⌀{} X {}°", len(d), format::format_number(ang.to_degrees(), None, 1)));
+            out.push(format!("⌵ ⌀{} X {}°", len(V::CsinkDiameter, d), format::format_number(ang.to_degrees(), None, 1)));
         }
         out
     };
-    let primary = |m: f64| format::format_len(drawing, &a.format, m);
+    // Each value's format: the hole Ø's is the callout's own; the others
+    // take their own override (live 1707), else the hole feature's.
+    let opts = a.hole.as_deref().cloned().unwrap_or_default();
+    let own = |k: V| -> super::DimFormat {
+        let o = opts.value(k).filter(|_| opts.override_tol);
+        super::DimFormat { precision: o.and_then(|o| o.precision), tolerance: o.map(|o| o.tolerance.clone()).unwrap_or_default(), ..a.format.clone() }
+    };
+    let plain = |m: f64| format::format_len(drawing, &a.format, m);
+    let primary = |k: V, m: f64| -> String {
+        // The non-fit hole Ø writes its own tolerance (above).
+        let text = if k == V::Diameter && hole.thread.is_none() {
+            plain(m)
+        } else {
+            let f = if k == V::Diameter { a.format.clone() } else { own(k) };
+            let dev = |v: f64, lower: bool| format::format_deviation(drawing, &f, v, lower);
+            match &f.tolerance {
+                super::Tolerance::Symmetric { value } => format!("{}±{}", format::format_len(drawing, &f, m), format::format_len(drawing, &f, *value)),
+                super::Tolerance::Deviation { upper, lower } => format!("{} {}", format::format_len(drawing, &f, m), format::stacked(&dev(*upper, false), &dev(*lower, true))),
+                super::Tolerance::Limits { upper, lower } => format::stacked(&format::format_len(drawing, &f, m + upper), &format::format_len(drawing, &f, m + lower)),
+                super::Tolerance::Min => format!("{} MIN", format::format_len(drawing, &f, m)),
+                super::Tolerance::Max => format!("{} MAX", format::format_len(drawing, &f, m)),
+                _ => format::format_len(drawing, &f, m),
+            }
+        };
+        if marks && !(k == V::Diameter && hole.thread.is_none()) {
+            let i = V::ALL.iter().position(|x| *x == k).unwrap_or(0) as u8;
+            format!("{VALUE_START}{}{text}{VALUE_END}", (b'a' + i) as char)
+        } else {
+            text
+        }
+    };
     // Dual (live asb 10-24 (3)): Top / Bottom, the bracketed dual block above
     // / below the primary; Left / Right, each value's bracketed dual before /
     // after it.
     let dual = |m: f64| format::dual_len(drawing, &a.format, m);
     let mut out = match (dual(0.0).is_some(), drawing.props.dual.hole_location) {
         (false, _) => build(&primary, false),
-        (true, loc @ (super::DualLocation::Top | super::DualLocation::Bottom)) => dual_block(build(&primary, false), build(&|m| dual(m).unwrap_or_default(), true), loc == super::DualLocation::Top),
-        (true, super::DualLocation::Left) => build(&|m| format!("[{}] {}", dual(m).unwrap_or_default(), primary(m)), false),
-        (true, super::DualLocation::Right) => build(&|m| format!("{} [{}]", primary(m), dual(m).unwrap_or_default()), false),
+        (true, loc @ (super::DualLocation::Top | super::DualLocation::Bottom)) => dual_block(build(&primary, false), build(&|_, m| dual(m).unwrap_or_default(), true), loc == super::DualLocation::Top),
+        (true, super::DualLocation::Left) => build(&|k, m| format!("[{}] {}", dual(m).unwrap_or_default(), primary(k, m)), false),
+        (true, super::DualLocation::Right) => build(&|k, m| format!("{} [{}]", primary(k, m), dual(m).unwrap_or_default()), false),
     };
     // Prefix / suffix around the callout, reference parentheses, the
     // lines above and below.

@@ -28,7 +28,7 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::{Annotation, AnnotationKind, DimUnits, FitMode, FitStacking, FitType, HoleCount, Tolerance};
+use noshape_model::drawing::{Annotation, AnnotationKind, DimUnits, FitMode, FitStacking, FitType, HoleCount, HoleValue, Tolerance};
 
 /// The symbols list (live drawing/461; D32).
 pub const SYMBOLS: [&str; 14] = ["°", "Ø", "℄", "⌵", "↧", "⌴", "▢", "⌒", "±", "Ⓤ", "Ⓘ", "✟", "✝", "▷"];
@@ -66,8 +66,32 @@ pub struct PaletteDlg {
     /// Where it opened (editor px); it stays there while the text changes.
     at: Option<[f32; 2]>,
     pub orig: Annotation,
+    /// The edited annotation; on a hole callout its format's precision /
+    /// tolerance are the selected value's (`hole_sel`), the hole Ø's kept in
+    /// `diam` meanwhile (see [`PaletteDlg::annotation`]).
     pub cur: Annotation,
+    /// Hole callouts: the value Override precision/tolerance edits (live
+    /// 1707: the hole Ø at first, a click in the preview selects another).
+    pub hole_sel: HoleValue,
+    diam: (Option<u8>, Tolerance),
     _subs: Vec<Subscription>,
+}
+
+impl PaletteDlg {
+    /// The annotation as edited: on a hole callout with another value
+    /// selected, the fields' precision / tolerance go to that value.
+    pub fn annotation(&self) -> Annotation {
+        let mut a = self.cur.clone();
+        if self.hole && self.hole_sel != HoleValue::Diameter {
+            let (p, t) = (a.format.precision, a.format.tolerance.clone());
+            a.hole.get_or_insert_with(Default::default).set_value(self.hole_sel, p, t);
+            (a.format.precision, a.format.tolerance) = self.diam.clone();
+        }
+        if a.hole.as_deref().is_some_and(|o| *o == Default::default()) {
+            a.hole = None;
+        }
+        a
+    }
 }
 
 use noshape_ops::drawing::tolerance_name as tol_name;
@@ -126,7 +150,8 @@ impl DrawingEditor {
             }));
         }
         let tol = tol_name(&a);
-        self.palette = Some(PaletteDlg { id, hole, above, prefix, value, suffix, below, tol_a, tol_b, target: 1, tol, at: None, orig: a.clone(), cur: a, _subs: subs });
+        let diam = (a.format.precision, a.format.tolerance.clone());
+        self.palette = Some(PaletteDlg { id, hole, above, prefix, value, suffix, below, tol_a, tol_b, target: 1, tol, at: None, orig: a.clone(), cur: a, hole_sel: HoleValue::Diameter, diam, _subs: subs });
         self.tool = Tool::Select;
         cx.notify();
     }
@@ -158,10 +183,39 @@ impl DrawingEditor {
             AnnotationKind::HoleCallout { .. } => {}
             _ => d.cur.format.value = over,
         }
-        if d.cur.hole.as_deref().is_some_and(|o| *o == Default::default()) {
-            d.cur.hole = None;
-        }
         self.palette_preview(cx);
+    }
+
+    /// A click on a value of the hole callout preview (Override
+    /// precision/tolerance, live 1707): the fields switch to that value's
+    /// own precision and tolerance; the one left keeps its settings.
+    fn select_hole_value(&mut self, k: HoleValue, window: &mut Window, cx: &mut Context<Self>) {
+        let u = self.palette.as_ref().map(|d| noshape_model::drawing::format::length_units(&self.drawing, &d.cur.format));
+        let Some(d) = &mut self.palette else { return };
+        let Some(u) = u else { return };
+        if d.hole_sel == k {
+            return;
+        }
+        let a = d.annotation();
+        let (p, t) = match k {
+            HoleValue::Diameter => (a.format.precision, a.format.tolerance.clone()),
+            _ => a.hole.as_deref().and_then(|o| o.value(k)).map(|o| (o.precision, o.tolerance.clone())).unwrap_or((None, Tolerance::None)),
+        };
+        d.diam = (a.format.precision, a.format.tolerance.clone());
+        d.cur = a;
+        (d.cur.format.precision, d.cur.format.tolerance) = (p, t);
+        d.hole_sel = k;
+        d.tol = tol_name(&d.cur);
+        let num = |m: f64| noshape_model::drawing::format::format_number(m / u.meters(), None, 4);
+        let (ta, tb) = match &d.cur.format.tolerance {
+            Tolerance::Symmetric { value } => (num(*value), String::new()),
+            Tolerance::Deviation { upper, lower } | Tolerance::Limits { upper, lower } => (num(*upper), num(*lower)),
+            _ => (String::new(), String::new()),
+        };
+        let (sa, sb) = (d.tol_a.clone(), d.tol_b.clone());
+        sa.update(cx, |s, cx| s.set_value(ta, window, cx));
+        sb.update(cx, |s, cx| s.set_value(tb, window, cx));
+        self.palette_from_inputs(cx);
     }
 
     /// Change the edited annotation (dropdowns, toggles) and preview it.
@@ -176,7 +230,7 @@ impl DrawingEditor {
         let Some(d) = &self.palette else { return };
         let mut dr = self.drawing.clone();
         if let Some(a) = dr.sheets[self.sheet].annotations.iter_mut().find(|a| a.id == d.id) {
-            *a = d.cur.clone();
+            *a = d.annotation();
         }
         self.set_preview(Some(dr), cx);
         cx.notify();
@@ -186,8 +240,9 @@ impl DrawingEditor {
         self.launcher.opened = false;
         let Some(d) = self.palette.take() else { return };
         self.set_preview(None, cx);
-        if accept && d.cur != d.orig {
-            let (id, cur) = (d.id, d.cur);
+        let cur = d.annotation();
+        if accept && cur != d.orig {
+            let id = d.id;
             self.edit_sheet(if d.hole { "Edit hole callout" } else { "Edit dimension" }, cx, |s| {
                 if let Some(a) = s.annotations.iter_mut().find(|a| a.id == id) {
                     *a = cur;
@@ -335,7 +390,13 @@ impl DrawingEditor {
         let prec_items: Vec<(String, bool, Act)> = PRECISIONS.iter().map(|&(l, v)| (l.to_string(), precision == v, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.precision = v) as Act)).collect();
         let prec_label = PRECISIONS.iter().find(|x| x.1 == precision).map(|x| x.0).unwrap_or("(Drawing)");
         let tol = d.tol;
-        let tol_list: &'static [&'static str] = if hole { &HOLE_TOLERANCES } else { &DIM_TOLERANCES };
+        // A hole callout's values other than the hole Ø take no fits (live
+        // 1707: None … MAX).
+        let tol_list: &'static [&'static str] = match (hole, d.hole_sel) {
+            (true, HoleValue::Diameter) => &HOLE_TOLERANCES,
+            (true, _) => &HOLE_TOLERANCES[..6],
+            _ => &DIM_TOLERANCES,
+        };
         let tol_items: Vec<(String, bool, Act)> = tol_list.iter().map(|&l| (l.to_string(), tol == l, std::rc::Rc::new(move |d: &mut PaletteDlg| d.tol = l) as Act)).collect();
         let symbols = {
             let ed = ed.clone();
@@ -409,15 +470,32 @@ impl DrawingEditor {
         // The middle row.
         let middle = if hole {
             let n = noshape_model::drawing::build::hole_callout_count(sheet, &self.sources, &d.cur).unwrap_or(1);
-            let core = Annotation { format: noshape_model::drawing::DimFormat { prefix: String::new(), suffix: String::new(), above: String::new(), below: String::new(), reference: false, ..fmt.clone() }, ..d.cur.clone() };
-            let preview = noshape_model::drawing::build::hole_callout_lines(&self.drawing, sheet, &self.sources, &core).unwrap_or_default();
+            let eff = d.annotation();
+            let core = Annotation { format: noshape_model::drawing::DimFormat { prefix: String::new(), suffix: String::new(), above: String::new(), below: String::new(), reference: false, ..eff.format.clone() }, ..eff };
+            // Its values: with Override, a click selects one (orange).
+            let sel = opts.override_tol.then_some(d.hole_sel);
+            let mut preview = Vec::new();
+            for (li, runs) in noshape_model::drawing::build::hole_callout_preview(&self.drawing, sheet, &self.sources, &core).unwrap_or_default().into_iter().enumerate() {
+                let mut line = h_flex();
+                for (ri, (text, k)) in runs.into_iter().enumerate() {
+                    let mut run = div().id(SharedString::from(format!("dp-hv-{li}-{ri}"))).child(text);
+                    if let (Some(k), Some(s)) = (k, sel) {
+                        run = run.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.select_hole_value(k, window, cx)));
+                        if k == s {
+                            run = run.bg(gpui_kit::rgb(0xf7a35c)).text_color(gpui_kit::rgb(0x333333));
+                        }
+                    }
+                    line = line.child(run);
+                }
+                preview.push(line);
+            }
             let counts: Vec<(String, bool, Act)> = HoleCount::ALL.iter().map(|&c| (c.name().to_string(), opts.count == c, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.hole.get_or_insert_with(Default::default).count = c) as Act)).collect();
             h_flex()
                 .gap(px(4.))
                 .h(px(54.))
                 .child(field(&d.prefix, Some(80.), 54.))
                 .child(menu_tall("dp-count", small(format!("{n}{}", self.drawing.props.hole_indicator)), 104., counts))
-                .child(v_flex().w(px(145.)).h(px(54.)).px(px(10.)).justify_center().rounded(px(2.)).bg(gpui_kit::rgb(0xe8e8e8)).text_size(px(12.)).text_color(gpui_kit::rgb(0x8a8a8a)).children(preview.into_iter().map(|l| div().child(l))))
+                .child(v_flex().w(px(145.)).h(px(54.)).px(px(10.)).justify_center().rounded(px(2.)).bg(gpui_kit::rgb(0xe8e8e8)).text_size(px(12.)).text_color(gpui_kit::rgb(0x8a8a8a)).children(preview))
                 .child(menu_tall("dp-units", small(unit_label), 58., unit_items))
                 .child(field(&d.suffix, Some(80.), 54.))
         } else {

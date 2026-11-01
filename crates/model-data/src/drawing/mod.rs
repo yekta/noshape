@@ -2214,6 +2214,55 @@ impl HoleCount {
 pub struct HoleCalloutOpts {
     pub count: HoleCount,
     pub override_tol: bool,
+    /// Override precision/tolerance is per value (live 1707): the hole Ø's
+    /// are the callout's own (`Annotation::format`), the other values'
+    /// here. Unticking Override hides them all but keeps them.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub values: Vec<HoleValueOverride>,
+}
+
+impl HoleCalloutOpts {
+    /// Value `k`'s own precision / tolerance (not the hole Ø's).
+    pub fn value(&self, k: HoleValue) -> Option<&HoleValueOverride> {
+        self.values.iter().find(|v| v.value == k)
+    }
+
+    /// Set value `k`'s precision / tolerance (dropped when both are the
+    /// defaults).
+    pub fn set_value(&mut self, k: HoleValue, precision: Option<u8>, tolerance: Tolerance) {
+        self.values.retain(|v| v.value != k);
+        if precision.is_some() || tolerance != Tolerance::None {
+            self.values.push(HoleValueOverride { value: k, precision, tolerance });
+        }
+    }
+}
+
+/// A number of a hole callout ("⌀5 THRU / ⌴⌀10 ↧5": the hole Ø, the
+/// counterbore Ø and depth); on tapped holes Diameter is the tap drill Ø,
+/// Depth the tapped depth and DrillDepth the drill's.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HoleValue {
+    #[default]
+    Diameter,
+    Depth,
+    DrillDepth,
+    CboreDiameter,
+    CboreDepth,
+    CsinkDiameter,
+}
+
+impl HoleValue {
+    pub const ALL: [HoleValue; 6] = [HoleValue::Diameter, HoleValue::Depth, HoleValue::DrillDepth, HoleValue::CboreDiameter, HoleValue::CboreDepth, HoleValue::CsinkDiameter];
+}
+
+/// One hole callout value's own precision and tolerance.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HoleValueOverride {
+    pub value: HoleValue,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub precision: Option<u8>,
+    #[serde(default)]
+    pub tolerance: Tolerance,
 }
 
 /// An annotation's own style from the Styles panel (live drawing/474–477):

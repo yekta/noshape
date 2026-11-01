@@ -2840,6 +2840,45 @@ fn datum_target_angle_mode() {
     assert_eq!(labels, ["A1", "A2", "A3", "A4"]);
 }
 
+/// Hole callout Override precision/tolerance is per value (live 1707): a
+/// tolerance on the counterbore depth changes only it; unticking Override
+/// hides it but keeps it.
+#[test]
+fn hole_callout_overrides_are_per_value() {
+    let hole = crate::regen::context::HoleRecord {
+        feature: crate::reference::FeatureId(1),
+        start: glam::DVec3::ZERO,
+        dir: glam::DVec3::NEG_Z,
+        diameter: 0.005,
+        depth: None,
+        through: true,
+        tap_drill: None,
+        tapped_depth: None,
+        thread: None,
+        thread_class: None,
+        cbore: Some((0.010, 0.005)),
+        csink: None,
+        inch: false,
+        diameter_fit: None,
+        exits: true,
+        parts: Vec::new(),
+        tip_angle: None,
+    };
+    let drawing = Drawing::default();
+    let text = |a: &Annotation| build::hole_callout_text(&drawing, &hole, 1, a).join(" / ");
+    let mut a = Annotation::default();
+    let plain = text(&a);
+    let mut o = HoleCalloutOpts { override_tol: true, ..Default::default() };
+    o.set_value(HoleValue::CboreDepth, None, Tolerance::Symmetric { value: 0.00005 });
+    a.hole = Some(Box::new(o));
+    let with = text(&a);
+    assert!(with.ends_with("5±0.05"), "{with}");
+    assert_eq!(with.split(" / ").next(), plain.split(" / ").next(), "the hole Ø unchanged");
+    a.hole.as_mut().unwrap().override_tol = false;
+    assert_eq!(text(&a), plain);
+    assert!(a.hole.as_ref().unwrap().value(HoleValue::CboreDepth).is_some(), "kept");
+}
+
 /// A view of a named view with a section plane (live 3121-3127): the
 /// material beyond the plane cut away, the cut face hatched.
 #[test]
