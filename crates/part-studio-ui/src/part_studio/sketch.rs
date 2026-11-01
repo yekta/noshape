@@ -1841,7 +1841,10 @@ impl PartStudioView {
             .filter(|c| cm.types.is_empty() || cm.types.contains(cm_type(c)))
             .filter(|c| {
                 let external = c.kind.entities().iter().any(|e| sk.entity(*e).is_some_and(|x| x.external));
-                cm.modes.is_empty() || cm.modes.contains(if external { "External" } else { "Internal" })
+                // External geometry used from an in-context snapshot.
+                let in_context = c.kind.entities().iter().any(|e| data.external_refs.get(&e.0).is_some_and(|r| noshape_model::in_context::reference_uses_context(r, None)));
+                let mode = if in_context { "In context" } else if external { "External" } else { "Internal" };
+                cm.modes.is_empty() || cm.modes.contains(mode)
             })
             .filter(|c| {
                 let st = if ed.conflicting.contains(&c.id) {

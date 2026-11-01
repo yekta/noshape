@@ -70,7 +70,9 @@ pub fn next_context(contexts: &[AssemblyContext]) -> (u32, String) {
     (id, format!("Context {n}"))
 }
 
-fn reference_uses_context(r: &Reference, ctx: Option<u32>) -> bool {
+/// Whether `r` names geometry of an in-context snapshot (of context `ctx`,
+/// or of any).
+pub fn reference_uses_context(r: &Reference, ctx: Option<u32>) -> bool {
     let hit = |f: Option<FeatureId>| f.is_some_and(|f| is_context_feature(f) && ctx.is_none_or(|c| context_of(f) == Some(c)));
     match r {
         Reference::Face(n) | Reference::Edge(n) | Reference::Vertex(n) => topo_uses_context(n, &hit),
