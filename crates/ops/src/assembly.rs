@@ -537,14 +537,14 @@ pub fn anim_defaults(m: &Mate, dof: usize, units: &noshape_units::UnitPrefs) -> 
 /// Select other… in an assembly: the instances (top level) the ray from
 /// `o` along `d` passes through, nearest first; with Isolate on, only the
 /// isolated ones.
-pub fn instances_under(result: &AssemblyResult, isolate: Option<&std::collections::HashSet<InstanceId>>, o: glam::DVec3, d: glam::DVec3) -> Vec<InstanceId> {
+pub fn instances_under(result: &AssemblyResult, isolate: Option<&noshape_model::assembly::OccurrenceSet>, o: glam::DVec3, d: glam::DVec3) -> Vec<InstanceId> {
     use noshape_model::display::BodyKind;
     let mut hits: Vec<(f64, InstanceId)> = Vec::new();
     for occ in &result.occurrences {
         if occ.hidden || !matches!(occ.kind, BodyKind::Solid | BodyKind::Surface) {
             continue;
         }
-        if isolate.is_some_and(|s| !s.contains(&occ.top())) {
+        if isolate.is_some_and(|s| !noshape_model::assembly::occurrence_in(s, &occ.path)) {
             continue;
         }
         let inv = occ.transform.inverse();

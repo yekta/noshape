@@ -270,7 +270,7 @@ pub struct AsmUi {
     /// it starts with Move to origin (live ~14029; ASM-TRIAD-MENU).
     pub menu_move_origin: bool,
     /// Make transparent (Shift+T): instances drawn transparent.
-    pub transparent: Option<HashSet<InstanceId>>,
+    pub transparent: Option<noshape_model::assembly::OccurrenceSet>,
     /// S shortcut toolbar position (viewport-local).
     pub mini_toolbar: Option<DVec2>,
     /// Graphics area context menu.
@@ -598,6 +598,12 @@ impl AssemblyView {
     /// Shift+I / Shift+T (and the menus): cumulative while the mode is on,
     /// like Onshape (hover + key repeatedly adds instances).
     pub(super) fn isolate_cmd(&mut self, transparent: bool, ids: Vec<InstanceId>, cx: &mut Context<Self>) {
+        self.isolate_occurrences(transparent, ids.into_iter().map(|i| vec![i]).collect(), cx);
+    }
+
+    /// Isolate / Make transparent occurrences (paths from a top-level
+    /// instance; live 1723: a nested row's too).
+    pub(super) fn isolate_occurrences(&mut self, transparent: bool, ids: Vec<Vec<InstanceId>>, cx: &mut Context<Self>) {
         if ids.is_empty() {
             self.message = Some((false, "Select or hover over an instance first.".into()));
             cx.notify();
@@ -642,7 +648,7 @@ impl AssemblyView {
         let max_steps = {
             let seeds: Vec<InstanceId> = match self.ui.iso_expand.as_ref() {
                 Some(e) => e.2.clone(),
-                None => self.isolate.clone().or_else(|| self.ui.transparent.clone()).map(|s| s.into_iter().collect()).unwrap_or_default(),
+                None => self.isolate.clone().or_else(|| self.ui.transparent.clone()).map(|s| s.into_iter().filter(|p| p.len() == 1).map(|p| p[0]).collect()).unwrap_or_default(),
             };
             self.assembly(cx).map(|a| analysis::isolate_expansion(&self.result, a, &seeds, connectivity).len()).unwrap_or(0)
         };
@@ -1377,9 +1383,14 @@ impl AssemblyView {
     /// instances' parts (in their configurations), as the Part Studio's.
     fn release_instances(&mut self, ids: Vec<InstanceId>, window: &mut Window, cx: &mut Context<Self>) {
         let Some(asm) = self.assembly(cx) else { return };
+        let insts: Vec<Instance> = ids.iter().filter_map(|id| asm.instance(*id).cloned()).collect();
+        self.release_of(insts, window, cx);
+    }
+
+    /// Release… of instances' parts (a nested occurrence's too).
+    fn release_of(&mut self, insts: Vec<Instance>, window: &mut Window, cx: &mut Context<Self>) {
         let mut items = Vec::new();
-        for id in &ids {
-            let Some(inst) = asm.instance(*id) else { continue };
+        for inst in &insts {
             let InstanceSource::Part { studio, body, config } = &inst.source else { continue };
             // The part's name: the instance name without its " <n>".
             let name = inst.name.rsplit_once(" <").map_or(inst.name.as_str(), |(n, _)| n).to_string();
@@ -2212,6 +2223,127 @@ impl AssemblyView {
         m.push(MenuEntry::Sep);
         m.push(icon_item("Delete", "delete", move |t, _, cx| t.delete_mates(ids.clone(), cx)));
         m
+    }
+
+    /// A row inside an expanded subassembly (live 1723): Properties… | Hide ·
+    /// Hide other instances · Hide all instances · Isolate… · Make
+    /// transparent… · Fix · Use best available tessellation | Edit in
+    /// context · Add mate connector to instance origin… · Switch to <source>
+    /// | Copy <name> | Export… · Release… | Zoom to selection | Create Drawing
+    /// of <part>… | Create empty subassembly. Its state is kept on this
+    /// assembly's occurrence (`Assembly::occurrences`).
+    pub(super) fn nested_instance_menu(&self, path: Vec<InstanceId>, cx: &App) -> Vec<MenuEntry> {
+        let (Some(asm), Some(inst)) = (self.assembly(cx), self.occurrence_instance(&path, cx)) else { return vec![] };
+        let state = asm.occurrence(&path);
+        let hidden = asm.occurrence_hidden(&path);
+        let name = inst.name.clone();
+        let mut m = Vec::new();
+        if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::Assembly { .. } | InstanceSource::PartStudio { .. }) {
+            let (i, p) = (inst.clone(), path.clone());
+            m.push(item("Properties…", move |t, w, cx| t.open_metadata_of(i.clone(), p.clone(), w, cx)));
+            m.push(MenuEntry::Sep);
+        }
+        let p = path.clone();
+        m.push(icon_item(if hidden { "Show" } else { "Hide" }, if hidden { "eye" } else { "eye-off" }, move |t, _, cx| {
+            t.edit(if hidden { "Show" } else { "Hide" }, cx, |a| a.set_occurrence(&p, |s| s.hidden = !hidden));
+            t.refresh_scene(false, cx);
+        }));
+        let p = path.clone();
+        m.push(item(crate::i18n::template("Hide other __label__", &[("label", "instances")]), move |t, _, cx| t.hide_other_occurrences(p.clone(), cx)));
+        m.push(item(crate::i18n::template("Hide all __label__", &[("label", "instances")]), |t, _, cx| t.hide_all_instances(cx)));
+        let p = path.clone();
+        m.push(item("Isolate…", move |t, _, cx| t.isolate_occurrences(false, vec![p.clone()], cx)));
+        let p = path.clone();
+        m.push(item("Make transparent…", move |t, _, cx| t.isolate_occurrences(true, vec![p.clone()], cx)));
+        let (p, fixed) = (path.clone(), state.fixed);
+        m.push(icon_item(if fixed { "Unfix" } else { "Fix" }, "fix-instance", move |t, _, cx| {
+            t.edit(if fixed { "Unfix" } else { "Fix" }, cx, |a| a.set_occurrence(&p, |s| s.fixed = !fixed));
+        }));
+        let (p, best) = (path.clone(), state.best_tessellation);
+        m.push(item(if best { "Use automatic tessellation setting" } else { "Use best available tessellation" }, move |t, _, cx| {
+            t.edit("Use best available tessellation", cx, |a| a.set_occurrence(&p, |s| s.best_tessellation = !best));
+        }));
+        m.push(MenuEntry::Sep);
+        if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. }) {
+            let p = path.clone();
+            m.push(item("Edit in context", move |t, _, cx| t.edit_in_context_at(p.clone(), None, cx)));
+        }
+        let p = path.clone();
+        m.push(icon_item("Add mate connector to instance origin…", "add-mate-connector", move |t, w, cx| t.mc_at_occurrence_origin(p.clone(), w, cx)));
+        let tab = match &inst.source {
+            InstanceSource::Assembly { assembly, .. } => Some(*assembly),
+            s => s.studio(),
+        };
+        if let Some(tab) = tab {
+            let tname = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+            let is_asm = matches!(inst.source, InstanceSource::Assembly { .. });
+            m.push(icon_item(format!("Switch to {tname}"), if is_asm { "assembly" } else { "part-studio" }, move |_, _, cx| cx.emit(AssemblyViewEvent::ActivateTab(tab))));
+        }
+        m.push(MenuEntry::Sep);
+        let p = path.clone();
+        m.push(icon_item(format!("Copy {name}"), "copy", move |t, _, cx| t.copy_occurrence(p.clone(), cx)));
+        m.push(MenuEntry::Sep);
+        let p = path.clone();
+        m.push(item("Export…", move |t, w, cx| t.open_occurrence_export(Some(vec![p.clone()]), w, cx)));
+        if matches!(inst.source, InstanceSource::Part { .. }) {
+            let i = inst.clone();
+            m.push(item("Release…", move |t, w, cx| t.release_of(vec![i.clone()], w, cx)));
+        }
+        m.push(MenuEntry::Sep);
+        let p = path.clone();
+        m.push(item("Zoom to selection", move |t, _, cx| t.zoom_to_occurrence(&p, cx)));
+        m.push(MenuEntry::Sep);
+        m.extend(self.instance_drawing_entry(&inst, false));
+        m.push(MenuEntry::Sep);
+        m.push(item("Create empty subassembly", |t, _, cx| t.create_empty_subassembly(cx)));
+        m
+    }
+
+    /// Nested row › Hide other instances: everything but this occurrence
+    /// (the other top-level instances, and its siblings at each level).
+    pub(super) fn hide_other_occurrences(&mut self, path: Vec<InstanceId>, cx: &mut Context<Self>) {
+        let mut siblings: Vec<Vec<InstanceId>> = Vec::new();
+        for k in 1..path.len() {
+            let Some(sub) = self.node_assembly(&path[..k], cx) else { continue };
+            for i in sub.instances.iter().filter(|i| i.id != path[k]) {
+                let mut p = path[..k].to_vec();
+                p.push(i.id);
+                siblings.push(p);
+            }
+        }
+        let keep = path[0];
+        self.edit("Hide other instances", cx, |a| {
+            for i in a.instances.iter_mut().filter(|i| i.id != keep) {
+                i.hidden = true;
+            }
+            for p in &siblings {
+                a.set_occurrence(p, |s| s.hidden = true);
+            }
+        });
+        self.refresh_scene(false, cx);
+    }
+
+    pub(super) fn zoom_to_occurrence(&mut self, path: &[InstanceId], cx: &mut Context<Self>) {
+        let bb = self.result.occurrences.iter().filter(|o| o.path.starts_with(path)).filter_map(|o| o.world_bounds()).fold(None, |acc: Option<(DVec3, DVec3)>, (a, b)| Some(acc.map(|(x, y)| (x.min(a), y.max(b))).unwrap_or((a, b))));
+        let Some((lo, hi)) = bb else { return };
+        self.viewport.update(cx, |vp, cx| {
+            let to = noshape_scene::camera_ops::fit_instances(&vp.camera, lo, hi, vp.size());
+            vp.animate_to(to, cx);
+        });
+    }
+
+    /// Copy of a nested occurrence: its instance (as copied in its own
+    /// subassembly), pasted into this assembly.
+    pub(super) fn copy_occurrence(&mut self, path: Vec<InstanceId>, cx: &mut Context<Self>) {
+        let Some((last, parent)) = path.split_last() else { return };
+        let Some(sub) = self.node_assembly(parent, cx) else { return };
+        let clip = InstanceClipboard::copy(&sub, &[*last]);
+        let Some(name) = clip.instances.first().map(|i| i.name.clone()) else { return };
+        if let Ok(json) = serde_json::to_string(&serde_json::json!({ "noshape_instances": clip })) {
+            cx.write_to_clipboard(ClipboardItem::new_string(json));
+            self.message = Some((false, format!("Copied {name}")));
+            cx.notify();
+        }
     }
 
     /// "Create Drawing of <assembly>…" of the graphics menus.
@@ -5136,7 +5268,7 @@ impl AssemblyView {
         let transparent = self.isolate.is_none();
         let Some(current) = (if transparent { self.ui.transparent.clone() } else { self.isolate.clone() }) else { return };
         let (mut by_conn, mut steps, seeds) = self.ui.iso_expand.clone().unwrap_or_else(|| {
-            let mut seeds: Vec<InstanceId> = current.iter().copied().collect();
+            let mut seeds: Vec<InstanceId> = current.iter().filter(|p| p.len() == 1).map(|p| p[0]).collect();
             seeds.sort();
             // Live default: "Expand: connectivity".
             (true, 0, seeds)
@@ -5148,9 +5280,12 @@ impl AssemblyView {
         let Some(asm) = self.assembly(cx) else { return };
         let order = analysis::isolate_expansion(&self.result, asm, &seeds, by_conn);
         steps = (steps as i32 + delta).clamp(0, order.len() as i32) as usize;
-        let mut set: HashSet<InstanceId> = seeds.iter().copied().collect();
+        // Expanding works on top-level instances; isolated nested
+        // occurrences stay as they are.
+        let mut set: noshape_model::assembly::OccurrenceSet = current.iter().filter(|p| p.len() > 1).cloned().collect();
+        set.extend(seeds.iter().map(|i| vec![*i]));
         for s in order.iter().take(steps) {
-            set.extend(s.iter().copied());
+            set.extend(s.iter().map(|i| vec![*i]));
         }
         if transparent {
             self.ui.transparent = Some(set);
@@ -5171,9 +5306,14 @@ impl AssemblyView {
     /// assembly): Onshape's Export modal with the assembly format list
     /// (part_studio/export.rs); parts are written at their assembly positions.
     pub(super) fn open_asm_export(&mut self, ids: Option<Vec<InstanceId>>, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_occurrence_export(ids.map(|ids| ids.into_iter().map(|i| vec![i]).collect()), window, cx);
+    }
+
+    /// Export… of occurrences by path (all: `None`).
+    pub(super) fn open_occurrence_export(&mut self, ids: Option<Vec<Vec<InstanceId>>>, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity();
         let base = match ids.as_deref() {
-            Some([one]) => self.assembly(cx).and_then(|a| a.instance(*one).map(|i| i.name.clone())).unwrap_or_default(),
+            Some([one]) => self.occurrence_instance(one, cx).map(|i| i.name.clone()).unwrap_or_default(),
             _ => self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Assembly".into()),
         };
         // Through the user's export rules (Preferences › User export rules).
@@ -5232,9 +5372,9 @@ impl AssemblyView {
     /// What to export: instances `ids` (None: all), hidden ones only with
     /// "Include hidden instances in export"; STEP keeps the assembly
     /// (`noshape_ops::export::write_assembly_export`).
-    fn export_assembly(&self, ids: Option<&[InstanceId]>, include_hidden: bool, cx: &App) -> noshape_ops::export::AssemblyExport {
+    fn export_assembly(&self, ids: Option<&[Vec<InstanceId>]>, include_hidden: bool, cx: &App) -> noshape_ops::export::AssemblyExport {
         let root = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Assembly".into());
-        noshape_ops::export::AssemblyExport::of(&root, &self.result, ids, include_hidden)
+        noshape_ops::export::AssemblyExport::of_occurrences(&root, &self.result, ids, include_hidden)
     }
 }
 

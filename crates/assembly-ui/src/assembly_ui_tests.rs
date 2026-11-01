@@ -39,8 +39,14 @@ fn pattern_assembly(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, En
         let e = call(&mut ctx, "assembly_entities", json!({ "instance": "Part 1 <1>", "kind": "edges", "direction": [1, 0, 0] }))["edges"][0]["id"].clone();
         call(&mut ctx, "assembly_pattern", json!({ "kind": "linear", "seeds": ["Part 2 <1>"], "direction": { "instance": "Part 1 <1>", "entity": e }, "distance": "30 mm" }));
     }
-    let session = crate::session::Session::open(&path).unwrap();
-    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::Assembly(_))).unwrap().id;
+    open_assembly(cx, &path)
+}
+
+/// Assembly 1 of the document at `path` in a test window, evaluated.
+fn open_assembly(cx: &mut TestAppContext, path: &std::path::Path) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    let session = crate::session::Session::open(path).unwrap();
+    let asm = |t: &&noshape_model::document::Tab| matches!(t.content, noshape_model::TabContent::Assembly(_));
+    let tab = session.doc.tabs.iter().filter(asm).find(|t| t.name == "Assembly 1").or_else(|| session.doc.tabs.iter().find(asm)).unwrap().id;
     let gpu = Gpu::headless().unwrap();
     let (window, view) = cx.update(|cx| {
         let doc = cx.new(|_| DocModel::new(session));
@@ -59,6 +65,32 @@ fn pattern_assembly(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, En
     cx.executor().advance_clock(std::time::Duration::from_millis(100));
     cx.run_until_parked();
     (window, view)
+}
+
+/// A block (Part 1) and a pin (Part 2) in "Sub", whose instance "Sub <1>"
+/// is Assembly 1's only instance.
+fn sub_assembly(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    cx.update(gpui_kit::init);
+    crate::assembly_hooks::register_for_tests();
+    let dir = std::env::temp_dir().join(format!("noshape-asm-ui-{name}-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("asm.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+        let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }, { "tool": "circle", "points": [[70, 10], [75, 10]] }] }));
+        let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+        call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Sub" }));
+        call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 1" }));
+        call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 2" }));
+        call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Sub" }));
+    }
+    open_assembly(cx, &path)
 }
 
 fn instance(v: &AssemblyView, name: &str, cx: &gpui_kit::App) -> InstanceId {
@@ -269,6 +301,39 @@ fn two_selected_mates_have_lives_menu(cx: &mut TestAppContext) {
             );
             v.delete_mates(ids, cx);
             assert!(v.assembly(cx).unwrap().mates.is_empty());
+        });
+    })
+    .unwrap();
+}
+
+/// Live 1723: a part's row inside an expanded subassembly has its own menu
+/// (less "Add comment"; Move to new subassembly is not offered here yet);
+/// its Hide and Fix are kept on Assembly 1's occurrence.
+#[gpui::test]
+fn a_nested_rows_menu_is_lives(cx: &mut TestAppContext) {
+    let (window, view) = sub_assembly(cx, "nested-menu");
+    let sep = "—";
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let sub = instance(v, "Sub <1>", cx);
+            let inner = v.node_assembly(&[sub], cx).unwrap().instances.iter().find(|i| i.name == "Part 1 <1>").unwrap().id;
+            let path = vec![sub, inner];
+            assert_eq!(
+                labels(&v.nested_instance_menu(path.clone(), cx)),
+                [
+                    "Properties…", sep,
+                    "Hide", "Hide other instances", "Hide all instances", "Isolate…", "Make transparent…", "Fix", "Use best available tessellation", sep,
+                    "Edit in context", "Add mate connector to instance origin…", "Switch to Part Studio 1", sep,
+                    "Copy Part 1 <1>", sep,
+                    "Export…", "Release…", sep,
+                    "Zoom to selection", sep,
+                    "Create Drawing of Part 1…", sep,
+                    "Create empty subassembly",
+                ]
+            );
+            v.edit("Hide", cx, |a| a.set_occurrence(&path, |s| s.hidden = true));
+            assert!(v.assembly(cx).unwrap().occurrence_hidden(&path));
+            assert_eq!(labels(&v.nested_instance_menu(path.clone(), cx))[2], "Show");
         });
     })
     .unwrap();

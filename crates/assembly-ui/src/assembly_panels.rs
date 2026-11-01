@@ -439,9 +439,16 @@ impl AssemblyView {
     }
 
     pub(super) fn mc_at_instance_origin(&mut self, top: InstanceId, window: &mut Window, cx: &mut Context<Self>) {
+        self.mc_at_occurrence_origin(vec![top], window, cx);
+    }
+
+    /// A mate connector at an occurrence's origin (a part inside a
+    /// subassembly too).
+    pub(super) fn mc_at_occurrence_origin(&mut self, path: Vec<InstanceId>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((&top, rest)) = path.split_first() else { return };
         self.open_mc(None, window, cx);
         if let Some(m) = &mut self.mc {
-            m.on = Some(MateConnectorRef::on(top, vec![], Reference::Origin));
+            m.on = Some(MateConnectorRef::on(top, rest.to_vec(), Reference::Origin));
             m.active = false;
         }
         self.update_capture(cx);
@@ -3168,7 +3175,7 @@ impl AssemblyView {
             if occ.hidden || exclude.contains(&occ.top()) || !matches!(occ.kind, BodyKind::Solid | BodyKind::Surface) {
                 continue;
             }
-            if self.isolate.as_ref().is_some_and(|s| !s.contains(&occ.top())) {
+            if self.isolate.as_ref().is_some_and(|s| !noshape_model::assembly::occurrence_in(s, &occ.path)) {
                 continue;
             }
             if let Some((lo, hi)) = occ.world_bounds()

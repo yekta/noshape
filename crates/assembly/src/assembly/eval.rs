@@ -2001,6 +2001,7 @@ impl AssemblyEvaluator {
         let solved = prepared.solve(opts);
         let mut occurrences = Vec::new();
         let best: std::collections::HashSet<InstanceId> = assembly.instances.iter().filter(|i| i.best_tessellation).map(|i| i.id).collect();
+        let best_occ = |path: &[InstanceId]| assembly.occurrences.iter().any(|(p, s)| s.best_tessellation && path.starts_with(p));
         let mut used_fine = std::collections::HashSet::new();
         for leaf in &leaves {
             for b in &leaf.regen.display.bodies {
@@ -2024,7 +2025,7 @@ impl AssemblyEvaluator {
                     body_name: b.name.clone(),
                     kind: b.kind,
                     color: b.color,
-                    mesh: match leaf.path.first().filter(|p| best.contains(p) || open_composite).and_then(|_| leaf.regen.context.body(&b.id)) {
+                    mesh: match leaf.path.first().filter(|p| best.contains(p) || open_composite || best_occ(&leaf.path)).and_then(|_| leaf.regen.context.body(&b.id)) {
                         Some(body) => {
                             let key = body.shape.hash_code();
                             used_fine.insert(key);
@@ -2042,7 +2043,7 @@ impl AssemblyEvaluator {
                         }
                         None => b.mesh.clone(),
                     },
-                    coarser: if leaf.path.first().is_some_and(|p| best.contains(p) || open_composite) { Vec::new() } else { b.coarser.clone() },
+                    coarser: if leaf.path.first().is_some_and(|p| best.contains(p) || open_composite) || best_occ(&leaf.path) { Vec::new() } else { b.coarser.clone() },
                     levels_from: b.levels_from,
                     inner: leaf.inner,
                     transform: leaf.inner,
@@ -2443,7 +2444,8 @@ impl AssemblyEvaluator {
             }
             let bi = prepared.reps.len();
             prepared.reps.push(i.id);
-            prepared.fixed.push(i.fixed);
+            // A part fixed inside a (rigid) subassembly from here fixes it.
+            prepared.fixed.push(i.fixed || asm.fixed_inside(i.id));
             assigned.insert(i.id, (bi, Frame::default()));
         }
         // Flexible subassembly children: own bodies, except those fixed in the
@@ -2481,7 +2483,7 @@ impl AssemblyEvaluator {
                 } else {
                     let b = prepared.reps.len();
                     prepared.reps.push(*sid);
-                    prepared.fixed.push(false);
+                    prepared.fixed.push(asm.occurrence(&[*sid, i.id]).fixed);
                     prepared.nested_bodies.push((b, *sid, i.id, q[&i.id]));
                     prepared.nested_body_of.insert((*sid, i.id), (b, Frame::default()));
                 }
@@ -2936,6 +2938,23 @@ impl AssemblyEvaluator {
             match self.prepare_relation(asm, r, &prepared, &units) {
                 Ok(pr) => prepared.relations.push(pr),
                 Err(e) => prepared.failed_relations.push((r.id, e)),
+            }
+        }
+        // Occurrences inside subassemblies hidden at this level (live 1723).
+        let mut leaves = leaves;
+        let mut nodes = nodes;
+        if asm.occurrences.iter().any(|(_, s)| s.hidden) {
+            for l in &mut leaves {
+                l.hidden |= asm.occurrence_hidden(&l.path);
+            }
+            fn mark(n: &mut InstanceNode, asm: &Assembly) {
+                n.hidden |= asm.occurrence_hidden(&n.path);
+                for c in &mut n.children {
+                    mark(c, asm);
+                }
+            }
+            for n in &mut nodes {
+                mark(n, asm);
             }
         }
         (leaves, nodes, prepared)

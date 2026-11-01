@@ -59,7 +59,7 @@ pub fn ops() -> Vec<Op> {
             opt("tangent_edges", json!({ "type": "string", "enum": ["visible", "phantom", "hidden"], "default": "visible" }), "Tangent edges visible / phantom / hidden."),
             opt("hidden_edges", json!({ "type": "boolean", "default": false }), "Hide/show hidden edges: draw the hidden ones."),
             opt("boundary_edges", json!({ "type": "boolean", "default": false }), "Part Studios: Highlight boundary edges."),
-            opt("isolate", json!({ "type": "array", "items": { "type": "string" } }), "Make isolate: these parts (Part Studio ids or names) or instances (Assembly), the rest as ghosts."),
+            opt("isolate", json!({ "type": "array", "items": { "type": "string" } }), "Make isolate: these parts (Part Studio ids or names) or instances (Assembly; one inside a subassembly instance by its path, \"Sub <1>/Part 1 <1>\"), the rest as ghosts."),
             opt("transparent", json!({ "type": "array", "items": { "type": "string" } }), "Make transparent: these parts or instances as ghosts."),
             opt("normal_to", s(), "Part Studios: View normal to a planar face, plane, sketch or mate connector (replaces `view`)."),
             opt("high_quality", json!({ "type": "boolean", "default": false }), "View in high quality (finer tessellation)."),
@@ -280,12 +280,13 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, vo: ViewOpti
     let eff = crate::assembly::effective(asm, &values);
     let mut opts = AsmSceneOptions { display_mode: mode, tangent_edges: vo.tangent, hidden_edges_visible: vo.hidden_edges, zebra: vo.zebra, hide_edges: vo.hide_edges(), ..Default::default() };
     // Make isolate / Make transparent (instances).
-    let tops = |k: &str| -> Result<Option<std::collections::HashSet<noshape_model::assembly::InstanceId>>, OpError> {
+    // Instances, or ones inside subassemblies by path ("Sub <1>/Part 1 <1>").
+    let occs = |k: &str| -> Result<Option<noshape_model::assembly::OccurrenceSet>, OpError> {
         let Some(list) = a.opt_array(k)? else { return Ok(None) };
-        list.iter().enumerate().map(|(i, v)| super::assembly::find_instance(asm, v.as_str().unwrap_or_default(), &format!("{k}[{i}]"))).collect::<Result<_, _>>().map(Some)
+        list.iter().enumerate().map(|(i, v)| super::assembly::find_occurrence(od.doc(), asm, v.as_str().unwrap_or_default(), &format!("{k}[{i}]"))).collect::<Result<_, _>>().map(Some)
     };
-    opts.isolate = tops("isolate")?;
-    opts.ghost_tops = tops("transparent")?.unwrap_or_default();
+    opts.isolate = occs("isolate")?;
+    opts.ghost_paths = occs("transparent")?.unwrap_or_default();
     // Section view: the default planes (an assembly's own planes).
     let units = od.doc().settings.units;
     for (i, p) in a.opt_array("section")?.cloned().unwrap_or_default().iter().enumerate() {

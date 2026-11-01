@@ -96,7 +96,8 @@ pub enum DisplaySet {
     /// Isolate… / Make transparent… on these parts (Part Studio).
     IsolateParts { transparent: bool, parts: Vec<noshape_model::BodyId> },
     /// Isolate… / Make transparent… on these instances (Assembly).
-    IsolateInstances { transparent: bool, instances: Vec<noshape_model::assembly::InstanceId> },
+    /// Occurrences by path (a top-level instance: its one-id path).
+    IsolateInstances { transparent: bool, instances: Vec<Vec<noshape_model::assembly::InstanceId>> },
     /// Exit isolate.
     ExitIsolate,
     /// View › Highlight boundary edges.

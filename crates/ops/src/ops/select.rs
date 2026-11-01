@@ -153,7 +153,8 @@ fn select(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let at = a.opt_array("at")?.and_then(|v| Some(DVec2::new(v.first()?.as_f64()?, v.get(1)?.as_f64()?))).ok_or_else(|| OpError::param("at", "[x, y] in graphics-area pixels"))?;
             let vc = od.window.cameras.get(&tab).cloned().ok_or_else(|| OpError::invalid("the window has no camera for this tab yet: set it with view_camera").with_param("at"))?;
             // Isolate on: only the isolated instances.
-            let isolate: Option<std::collections::HashSet<noshape_model::assembly::InstanceId>> = od.window.display.get(&tab).and_then(|d| d.isolate.as_ref()).filter(|i| !i.transparent).map(|i| i.ids.iter().filter_map(|k| k.strip_prefix("inst:")?.parse().ok().map(noshape_model::assembly::InstanceId)).collect());
+            // "inst:<id>", or "inst:<id>/<id>…" for an occurrence inside a subassembly.
+            let isolate: Option<noshape_model::assembly::OccurrenceSet> = od.window.display.get(&tab).and_then(|d| d.isolate.as_ref()).filter(|i| !i.transparent).map(|i| i.ids.iter().filter_map(|k| k.strip_prefix("inst:")?.split('/').map(|x| x.parse().ok().map(noshape_model::assembly::InstanceId)).collect::<Option<Vec<_>>>()).collect());
             let asm = super::assembly::assembly(od, tab)?.clone();
             let result = super::assembly::solve_assembly(od, tab, &asm, &Default::default());
             let (origin, dir) = vc.camera.ray(at, vc.viewport);

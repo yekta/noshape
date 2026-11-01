@@ -909,6 +909,59 @@ pub struct Assembly {
     /// instances, mates and folders keep theirs on themselves).
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub unsuppressed_if: std::collections::BTreeMap<MateId, String>,
+    /// State set here on occurrences inside subassembly instances, by path
+    /// from a top-level instance (live 1723: a nested row's Hide, Fix, Use
+    /// best available tessellation). A hidden occurrence hides what's in it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub occurrences: Vec<(Vec<InstanceId>, OccurrenceState)>,
+}
+
+/// Isolated / transparent occurrences: paths from a top-level instance (a
+/// top-level instance is its one-id path).
+pub type OccurrenceSet = std::collections::HashSet<Vec<InstanceId>>;
+
+/// Whether the occurrence at `path` is in `set` (itself or one it's inside).
+pub fn occurrence_in(set: &OccurrenceSet, path: &[InstanceId]) -> bool {
+    set.iter().any(|p| path.starts_with(p))
+}
+
+/// See [`Assembly::occurrences`].
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct OccurrenceState {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hidden: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub fixed: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub best_tessellation: bool,
+}
+
+impl Assembly {
+    /// The state set on the occurrence at `path` (default when none).
+    pub fn occurrence(&self, path: &[InstanceId]) -> OccurrenceState {
+        self.occurrences.iter().find(|(p, _)| p == path).map(|(_, s)| s.clone()).unwrap_or_default()
+    }
+
+    /// Change the state of the occurrence at `path` (entries back at the
+    /// default are dropped).
+    pub fn set_occurrence(&mut self, path: &[InstanceId], f: impl FnOnce(&mut OccurrenceState)) {
+        let mut s = self.occurrence(path);
+        f(&mut s);
+        self.occurrences.retain(|(p, _)| p != path);
+        if s != OccurrenceState::default() {
+            self.occurrences.push((path.to_vec(), s));
+        }
+    }
+
+    /// Whether an occurrence at or above `path` is hidden here.
+    pub fn occurrence_hidden(&self, path: &[InstanceId]) -> bool {
+        self.occurrences.iter().any(|(p, s)| s.hidden && path.starts_with(p))
+    }
+
+    /// Whether an occurrence inside top-level instance `top` is fixed here.
+    pub fn fixed_inside(&self, top: InstanceId) -> bool {
+        self.occurrences.iter().any(|(p, s)| s.fixed && p.first() == Some(&top))
+    }
 }
 
 fn properties_empty(p: &AssemblyProperties) -> bool {

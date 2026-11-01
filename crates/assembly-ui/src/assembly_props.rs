@@ -22,6 +22,12 @@ impl AssemblyView {
     /// subassembly) the instance shows.
     pub(super) fn open_instance_metadata(&mut self, top: InstanceId, window: &mut Window, cx: &mut Context<Self>) {
         let Some(inst) = self.assembly(cx).and_then(|a| a.instance(top).cloned()) else { return };
+        self.open_metadata_of(inst, vec![top], window, cx);
+    }
+
+    /// Properties… of an instance's source (a nested occurrence's too, at
+    /// `path`).
+    pub(super) fn open_metadata_of(&mut self, inst: Instance, path: Vec<InstanceId>, window: &mut Window, cx: &mut Context<Self>) {
         match inst.source.clone() {
             InstanceSource::Assembly { assembly, .. } => self.open_assembly_properties(assembly, window, cx),
             InstanceSource::Part { studio, body, .. } => {
@@ -31,10 +37,10 @@ impl AssemblyView {
                         Some(TabContent::PartStudio(ps)) => ps.part_properties.get(&body).cloned().unwrap_or_default(),
                         _ => Default::default(),
                     };
-                    let name = self.result.occurrences.iter().find(|o| o.top() == top && o.body == body).map(|o| o.body_name.clone()).unwrap_or_else(|| inst.name.rsplit_once(" <").map(|(b, _)| b.to_string()).unwrap_or(inst.name.clone()));
+                    let name = self.result.occurrences.iter().find(|o| o.path.starts_with(&path) && o.body == body).map(|o| o.body_name.clone()).unwrap_or_else(|| inst.name.rsplit_once(" <").map(|(b, _)| b.to_string()).unwrap_or(inst.name.clone()));
                     (props, name)
                 };
-                let computed = self.result.occurrences.iter().find(|o| o.top() == top).filter(|_| props.material.is_some()).and_then(|o| {
+                let computed = self.result.occurrences.iter().find(|o| o.path.starts_with(&path)).filter(|_| props.material.is_some()).and_then(|o| {
                     let density = |_: &BodyId| props.density;
                     noshape_model::regen::measure::mass_properties(&o.context, std::slice::from_ref(&o.body), &density)?.mass
                 });
@@ -453,15 +459,21 @@ impl AssemblyView {
 
     /// Edit in context in an existing context (`Some`) or a new one.
     pub(super) fn edit_in_context_with(&mut self, top: InstanceId, existing: Option<u32>, cx: &mut Context<Self>) {
-        let Some(inst) = self.assembly(cx).and_then(|a| a.instance(top).cloned()) else { return };
+        self.edit_in_context_at(vec![top], existing, cx);
+    }
+
+    /// Edit in context of the occurrence at `path` (a part inside a
+    /// subassembly too, live 1723).
+    pub(super) fn edit_in_context_at(&mut self, path: Vec<InstanceId>, existing: Option<u32>, cx: &mut Context<Self>) {
+        let Some(inst) = self.occurrence_instance(&path, cx) else { return };
         let Some(studio) = inst.source.studio() else { return };
-        let Some(own) = self.result.occurrences.iter().find(|o| o.top() == top) else { return };
+        let Some(own) = self.result.occurrences.iter().find(|o| o.path.starts_with(&path)) else { return };
         let to_studio = own.transform.inverse();
         let occurrences = self
             .result
             .occurrences
             .iter()
-            .filter(|o| o.top() != top && !o.hidden && matches!(o.kind, BodyKind::Solid | BodyKind::Surface))
+            .filter(|o| !o.path.starts_with(&path) && !o.hidden && matches!(o.kind, BodyKind::Solid | BodyKind::Surface))
             .map(|o| crate::assembly_context::ContextOccurrence {
                 top: o.top(),
                 name: self.assembly(cx).and_then(|a| a.instance(o.top())).map(|i| i.name.clone()).unwrap_or_else(|| o.instance_name.clone()),
@@ -476,7 +488,7 @@ impl AssemblyView {
             _ => None,
         };
         let camera = Some(self.camera_in(to_studio, cx));
-        let context = self.add_assembly_context(studio, Some(top), existing, to_studio, None, cx);
+        let context = self.add_assembly_context(studio, Some(path), existing, to_studio, None, cx);
         cx.emit(AssemblyViewEvent::EditInContext(studio, Box::new(crate::assembly_context::AssemblyContext { assembly: self.tab, assembly_name, part, occurrences, insert_at: None, camera, context })));
     }
 
@@ -484,10 +496,10 @@ impl AssemblyView {
     /// context: the one of this assembly with the same primary instance, or
     /// a new "Context N". Not undoable (Onshape keeps it only once a
     /// feature references it, see `PartStudioView::exit_context`).
-    fn add_assembly_context(&mut self, studio: TabId, primary: Option<InstanceId>, existing: Option<u32>, to_studio: glam::DMat4, origin: Option<Placement>, cx: &mut Context<Self>) -> Option<u32> {
+    fn add_assembly_context(&mut self, studio: TabId, primary: Option<Vec<InstanceId>>, existing: Option<u32>, to_studio: glam::DMat4, origin: Option<Placement>, cx: &mut Context<Self>) -> Option<u32> {
         let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
         let name_of = |p: &noshape_model::assembly::eval::InstancePath| names.get(&p[0]).cloned().unwrap_or_default();
-        let primary_path = primary.map(|p| vec![p]);
+        let primary_path = primary;
         let Some(TabContent::PartStudio(ps)) = self.doc.read(cx).session.doc.tab(studio).map(|t| &t.content) else { return None };
         let (id, mut new_context) = noshape_ops::in_context::context_for(ps, &self.result, self.tab, primary_path.as_ref(), existing, to_studio, &name_of)?;
         if let Some(c) = &mut new_context {

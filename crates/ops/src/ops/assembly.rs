@@ -151,7 +151,7 @@ pub fn ops() -> Vec<Op> {
             fields: vec![
                 doc_field(),
                 asm_field(),
-                req("instances", strings(), "Instance ids or names."),
+                req("instances", strings(), "Instance ids or names; an instance inside a subassembly instance by its path, \"Sub <1>/Part 1 <1>\" (fixed and hidden only: kept on this assembly)."),
                 opt("fixed", json!({ "type": "boolean" }), "Fix or unfix."),
                 opt("hidden", json!({ "type": "boolean" }), "Hide or show."),
                 opt("suppressed", json!({ "type": "boolean" }), "Suppress or unsuppress."),
@@ -871,10 +871,32 @@ fn transform(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     Ok(describe(od, tab)?.into())
 }
 
+/// An occurrence by path ("Sub <1>/Part 1 <1>", ids or names at each level
+/// through same-document subassemblies).
+pub(crate) fn find_occurrence(d: &noshape_model::Document, a: &Assembly, key: &str, field: &str) -> Result<Vec<InstanceId>, OpError> {
+    let mut asm = a.clone();
+    let mut out = Vec::new();
+    for (k, part) in key.split('/').enumerate() {
+        if k > 0 {
+            let Some(InstanceSource::Assembly { assembly, .. }) = asm.instance(out[k - 1]).map(|i| i.source.clone()) else {
+                return Err(OpError::not_found(format!("`{key}`: its part {k} is not a subassembly instance")).with_param(field));
+            };
+            asm = match d.tab(assembly).map(|t| &t.content) {
+                Some(TabContent::Assembly(x)) => (**x).clone(),
+                _ => return Err(OpError::not_found(format!("`{key}`: no subassembly")).with_param(field)),
+            };
+        }
+        out.push(find_instance(&asm, part, field)?);
+    }
+    Ok(out)
+}
+
 fn set_state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = target(ctx, a)?;
     let asm = assembly(od, tab)?;
-    let ids = a.array("instances")?.iter().enumerate().map(|(i, v)| find_instance(asm, v.as_str().unwrap_or_default(), &format!("instances[{i}]"))).collect::<Result<Vec<_>, _>>()?;
+    let paths = a.array("instances")?.iter().enumerate().map(|(i, v)| find_occurrence(od.doc(), asm, v.as_str().unwrap_or_default(), &format!("instances[{i}]"))).collect::<Result<Vec<_>, _>>()?;
+    let ids: Vec<InstanceId> = paths.iter().filter(|p| p.len() == 1).map(|p| p[0]).collect();
+    let nested: Vec<Vec<InstanceId>> = paths.into_iter().filter(|p| p.len() > 1).collect();
     let values = super::configuration::asm::values(od, tab, asm);
     // `state` names one of them ("fixed", "unfixed", "hidden", "shown",
     // "suppressed", "unsuppressed"): what agents try first.
@@ -886,15 +908,28 @@ fn set_state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut changed = false;
     if let Some(f) = flag("fixed") {
         let r = solve(od, tab, &SolveOptions::default())?;
-        commit(od, tab, sa::fix_description(f), &r, |a| sa::set_fixed(a, &ids, f))?;
+        commit(od, tab, sa::fix_description(f), &r, |a| {
+            sa::set_fixed(a, &ids, f);
+            for p in &nested {
+                a.set_occurrence(p, |s| s.fixed = f);
+            }
+        })?;
         changed = true;
     }
     if let Some(h) = flag("hidden") {
         let r = solve(od, tab, &SolveOptions::default())?;
-        commit(od, tab, sa::hide_description(h), &r, |a| sa::set_hidden(a, &ids, h))?;
+        commit(od, tab, sa::hide_description(h), &r, |a| {
+            sa::set_hidden(a, &ids, h);
+            for p in &nested {
+                a.set_occurrence(p, |s| s.hidden = h);
+            }
+        })?;
         changed = true;
     }
     if let Some(s) = flag("suppressed") {
+        if !nested.is_empty() {
+            return Err(OpError::param("instances", "an instance inside a subassembly is suppressed in the subassembly itself"));
+        }
         let r = solve(od, tab, &SolveOptions::default())?;
         commit(od, tab, sa::suppress_description(s), &r, |a| sa::set_suppressed(a, &ids, s, &values))?;
         changed = true;

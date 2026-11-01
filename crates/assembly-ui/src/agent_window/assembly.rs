@@ -10,7 +10,7 @@ impl AssemblyView {
     /// A display setting (view_display).
     pub fn agent_display(&mut self, set: DisplaySet, window: &mut Window, cx: &mut Context<Self>) {
         match set {
-            DisplaySet::IsolateInstances { transparent, instances } => self.isolate_cmd(transparent, instances, cx),
+            DisplaySet::IsolateInstances { transparent, instances } => self.isolate_occurrences(transparent, instances, cx),
             DisplaySet::ExitIsolate => {
                 self.exit_isolate(cx);
             }

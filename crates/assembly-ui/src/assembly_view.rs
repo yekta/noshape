@@ -358,7 +358,7 @@ pub struct AssemblyView {
     anim: Option<AnimState>,
     panel: Option<SidePanel>,
     explode: Option<usize>,
-    isolate: Option<HashSet<InstanceId>>,
+    isolate: Option<noshape_model::assembly::OccurrenceSet>,
     show_mates: bool,
     show_connectors: bool,
     /// Onshape behaviours state (menus, filter, rename, transparency...).
@@ -847,7 +847,7 @@ impl AssemblyView {
             o.reflection = self.scene_reflection();
         }
         if let Some(t) = &self.ui.transparent {
-            o.ghost_tops.extend(t.iter().copied());
+            o.ghost_paths = t.clone();
         }
         if let Some(s) = &self.ui.section {
             o.section = s.planes.iter().map(|p| p.clip()).collect();
@@ -3563,7 +3563,15 @@ impl AssemblyView {
                 cx.notify();
             }));
         if !is_top {
-            return row.into_any_element();
+            // Live 1723: a row inside an expanded subassembly has its own menu.
+            let view = cx.entity();
+            let p4 = path.clone();
+            return row
+                .os_context_menu(move |menu, window, cx| {
+                    let entries = view.read(cx).nested_instance_menu(p4.clone(), cx);
+                    fill_menu(menu, entries, view.clone(), window, cx)
+                })
+                .into_any_element();
         }
         // Drag and drop: reorder (drives BOM order), joining the target's folder.
         let accent = pal.accent;
@@ -3686,7 +3694,13 @@ impl AssemblyView {
     }
 
     /// The content of the subassembly at `path` (top-level instance first).
-    fn node_assembly(&self, path: &[InstanceId], cx: &App) -> Option<Assembly> {
+    /// The instance an occurrence path ends at (in its own subassembly).
+    pub(super) fn occurrence_instance(&self, path: &[InstanceId], cx: &App) -> Option<Instance> {
+        let (last, parent) = path.split_last()?;
+        self.node_assembly(parent, cx)?.instance(*last).cloned()
+    }
+
+    pub(super) fn node_assembly(&self, path: &[InstanceId], cx: &App) -> Option<Assembly> {
         let doc = &self.doc.read(cx).session.doc;
         let mut asm = self.assembly(cx)?.clone();
         for id in path {

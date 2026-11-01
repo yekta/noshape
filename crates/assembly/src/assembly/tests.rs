@@ -2920,6 +2920,41 @@ fn dynamic_suppression_applies_to_relations() {
     assert!(!super::eval::dynamically_suppressed(&f.doc, &asm).relations[0].suppressed);
 }
 
+/// Live 1723: a part inside a subassembly instance hidden from the parent
+/// (its nested row's Hide) is hidden there only, its sibling stays; the
+/// state is kept on the parent's occurrence.
+#[test]
+fn a_nested_occurrence_is_hidden_from_the_parent() {
+    let mut f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let sub = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.1, 0.0, 0.0), true),
+        ],
+        ..Default::default()
+    };
+    let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(Box::new(sub)));
+    let mut top_asm = Assembly {
+        instances: vec![Instance::new(InstanceId(5), "Sub <1>".into(), InstanceSource::Assembly { assembly: sub_tab, config: ConfigValues::default() }, Placement::default())],
+        ..Default::default()
+    };
+    let hidden = |ev: &mut AssemblyEvaluator, a: &Assembly, id: u64| {
+        let r = ev.evaluate(&f.doc, a, &SolveOptions::default(), None);
+        let occ = r.occurrences.iter().find(|o| o.path == vec![InstanceId(5), InstanceId(id)]).unwrap().hidden;
+        let node = r.nodes[0].children.iter().find(|n| n.path == vec![InstanceId(5), InstanceId(id)]).unwrap().hidden;
+        assert_eq!(occ, node);
+        occ
+    };
+    assert!(!hidden(&mut ev, &top_asm, 1));
+    top_asm.set_occurrence(&[InstanceId(5), InstanceId(1)], |s| s.hidden = true);
+    assert!(hidden(&mut ev, &top_asm, 1), "the occurrence is hidden");
+    assert!(!hidden(&mut ev, &top_asm, 2), "its sibling is not");
+    top_asm.set_occurrence(&[InstanceId(5), InstanceId(1)], |s| s.hidden = false);
+    assert!(top_asm.occurrences.is_empty(), "back to the default: no entry kept");
+}
+
 #[test]
 fn bom_flattened_structured_exclusion_and_cell_edits() {
     use super::bom::{self, BomColumn, BomSettings, BomType};

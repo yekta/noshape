@@ -149,11 +149,14 @@ pub fn retransform(built: &mut AsmBuilt, result: &AssemblyResult) -> bool {
 #[derive(Clone, Default)]
 pub struct AsmSceneOptions {
     /// Instances drawn transparent (isolate mode shows the rest dimmed).
-    pub isolate: Option<HashSet<noshape_model::assembly::InstanceId>>,
+    pub isolate: Option<noshape_model::assembly::OccurrenceSet>,
     /// Instances shown with the interference / error tint.
     pub error_tops: HashSet<noshape_model::assembly::InstanceId>,
     /// Instances drawn transparent and not pickable (being dragged in snap mode).
     pub ghost_tops: HashSet<noshape_model::assembly::InstanceId>,
+    /// Occurrences drawn transparent (Make transparent, also inside
+    /// subassemblies).
+    pub ghost_paths: noshape_model::assembly::OccurrenceSet,
     /// Section view planes (normal, d): geometry with dot(normal, p) > d is cut away.
     pub section: Vec<(DVec3, f64)>,
     /// Instances the section planes don't cut (Section view › Items to exclude).
@@ -213,8 +216,9 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         let t = to_mat4(&o.transform);
         let first_instance = scene.instances.len();
         let mut color = o.color;
-        let dimmed = opts.isolate.as_ref().is_some_and(|s| !s.contains(&o.top())) || opts.ghost_tops.contains(&o.top());
-        if opts.ghost_tops.contains(&o.top()) {
+        let ghost = opts.ghost_tops.contains(&o.top()) || noshape_model::assembly::occurrence_in(&opts.ghost_paths, &o.path);
+        let dimmed = opts.isolate.as_ref().is_some_and(|s| !noshape_model::assembly::occurrence_in(s, &o.path)) || ghost;
+        if ghost {
             color[3] = opts.dim_alpha.unwrap_or(0.35);
         } else if dimmed {
             color[3] = opts.dim_alpha.unwrap_or(0.12);

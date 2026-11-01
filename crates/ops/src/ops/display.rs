@@ -23,7 +23,7 @@ pub fn ops() -> Vec<Op> {
         fields: vec![
             doc_field(),
             opt("tab", s(), "Part Studio or Assembly tab, by name or id. Default: the window's tab."),
-            opt("isolate", strings(), "Isolate…: parts (ids or names) or, in an assembly, instances."),
+            opt("isolate", strings(), "Isolate…: parts (ids or names) or, in an assembly, instances (one inside a subassembly instance by its path, \"Sub <1>/Part 1 <1>\")."),
             opt("transparent", strings(), "Make transparent…: parts or instances."),
             opt("exit_isolate", b(), "Exit isolate."),
             opt("highlight_boundary", b(), "Part Studio: Highlight boundary edges."),
@@ -109,8 +109,9 @@ fn display(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         let names = |i: usize| list[i].as_str().unwrap_or_default().to_string();
         if assembly {
             let asm = super::assembly::assembly(od, tab)?;
-            let ids = (0..list.len()).map(|i| super::assembly::find_instance(asm, &names(i), &format!("{field}[{i}]"))).collect::<Result<Vec<_>, _>>()?;
-            d.isolate = Some(Isolation { transparent, ids: ids.iter().map(|i| format!("inst:{}", i.0)).collect() });
+            // An instance inside a subassembly by its path ("Sub <1>/Part 1 <1>").
+            let ids = (0..list.len()).map(|i| super::assembly::find_occurrence(od.doc(), asm, &names(i), &format!("{field}[{i}]"))).collect::<Result<Vec<_>, _>>()?;
+            d.isolate = Some(Isolation { transparent, ids: ids.iter().map(|p| format!("inst:{}", p.iter().map(|i| i.0.to_string()).collect::<Vec<_>>().join("/"))).collect() });
             sets.push(DisplaySet::ExitIsolate);
             sets.push(DisplaySet::IsolateInstances { transparent, instances: ids });
         } else {

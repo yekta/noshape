@@ -305,9 +305,16 @@ impl AssemblyExport {
     /// The solved assembly's part occurrences (`ids`: those instances, None:
     /// all; hidden ones only with "Include hidden instances in export").
     pub fn of(root: &str, result: &noshape_model::assembly::eval::AssemblyResult, ids: Option<&[noshape_model::assembly::InstanceId]>, include_hidden: bool) -> Self {
+        let paths: Option<Vec<Vec<noshape_model::assembly::InstanceId>>> = ids.map(|ids| ids.iter().map(|i| vec![*i]).collect());
+        Self::of_occurrences(root, result, paths.as_deref(), include_hidden)
+    }
+
+    /// [`Self::of`] for occurrences given by path (a part inside a
+    /// subassembly: its path from the top-level instance).
+    pub fn of_occurrences(root: &str, result: &noshape_model::assembly::eval::AssemblyResult, paths: Option<&[Vec<noshape_model::assembly::InstanceId>]>, include_hidden: bool) -> Self {
         let mut keys: Vec<(noshape_model::document::TabId, noshape_model::BodyId, noshape_model::configuration::ConfigValues)> = Vec::new();
         let mut out = AssemblyExport { root: root.to_string(), parts: Vec::new(), instances: Vec::new() };
-        for o in result.occurrences.iter().filter(|o| (include_hidden || !o.hidden) && ids.is_none_or(|ids| ids.contains(&o.top()))) {
+        for o in result.occurrences.iter().filter(|o| (include_hidden || !o.hidden) && paths.is_none_or(|ps| ps.iter().any(|p| o.path.starts_with(p)))) {
             let key = (o.studio, o.body.clone(), o.config.clone());
             let part = match keys.iter().position(|k| *k == key) {
                 Some(i) => i,

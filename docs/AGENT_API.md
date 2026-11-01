@@ -2417,7 +2417,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
-| `instances` | array of string | required | Instance ids or names. |
+| `instances` | array of string | required | Instance ids or names; an instance inside a subassembly instance by its path, "Sub <1>/Part 1 <1>" (fixed and hidden only: kept on this assembly). |
 | `fixed` | boolean |  | Fix or unfix. |
 | `hidden` | boolean |  | Hide or show. |
 | `suppressed` | boolean |  | Suppress or unsuppress. |
@@ -6203,7 +6203,7 @@ Examples:
 | `tangent_edges` | one of `visible`, `phantom`, `hidden` |  | Tangent edges visible / phantom / hidden. |
 | `hidden_edges` | boolean |  | Hide/show hidden edges: draw the hidden ones. |
 | `boundary_edges` | boolean |  | Part Studios: Highlight boundary edges. |
-| `isolate` | array of string |  | Make isolate: these parts (Part Studio ids or names) or instances (Assembly), the rest as ghosts. |
+| `isolate` | array of string |  | Make isolate: these parts (Part Studio ids or names) or instances (Assembly; one inside a subassembly instance by its path, "Sub <1>/Part 1 <1>"), the rest as ghosts. |
 | `transparent` | array of string |  | Make transparent: these parts or instances as ghosts. |
 | `normal_to` | string |  | Part Studios: View normal to a planar face, plane, sketch or mate connector (replaces `view`). |
 | `high_quality` | boolean |  | View in high quality (finer tessellation). |
@@ -6256,7 +6256,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the window's tab. |
-| `isolate` | array of string |  | Isolate…: parts (ids or names) or, in an assembly, instances. |
+| `isolate` | array of string |  | Isolate…: parts (ids or names) or, in an assembly, instances (one inside a subassembly instance by its path, "Sub <1>/Part 1 <1>"). |
 | `transparent` | array of string |  | Make transparent…: parts or instances. |
 | `exit_isolate` | boolean |  | Exit isolate. |
 | `highlight_boundary` | boolean |  | Part Studio: Highlight boundary edges. |
