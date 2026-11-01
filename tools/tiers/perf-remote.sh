@@ -15,6 +15,7 @@ exec 7>"$HOME/perf/lock"; flock 7
 wt="$HOME/perf/wt"; [ -d "$wt" ] || git -C "$HOME/projects/noshape" worktree add -q --detach "$wt" origin/main
 cd "$wt" && git fetch -q origin "$ref" 2>/dev/null; git checkout -q -f --detach FETCH_HEAD 2>/dev/null || git checkout -q -f --detach "$ref" || { echo "PERF FAILED: checkout"; exit 1; }
 git clean -fdq
+. tools/tiers/slots.sh
 export CARGO_TARGET_DIR="$HOME/target-perf" NOSHAPE_CONFIG_DIR=$(mktemp -d -t noshape-config-XXXXXX)
 sha=$(git rev-parse --short HEAD)
 echo "== perf on $(hostname -s) at $sha: cargo test --release $*"
@@ -22,7 +23,7 @@ echo "== perf on $(hostname -s) at $sha: cargo test --release $*"
 cargo test --release --locked --no-run "$@" > /tmp/perf-build-$$.log 2>&1 || { tail -20 /tmp/perf-build-$$.log; echo "PERF FAILED: build"; exit 1; }
 times=()
 for i in $(seq "$runs"); do
-  exec 8>"$HOME/land/slot1"; flock 8; exec 9>"$HOME/land/slot2"; flock 9   # the machine to ourselves
+  take_slots 2   # the machine to ourselves, in arrival order with the lands (tools/tiers/slots.sh)
   t0=$(date +%s.%N)
   out=$(cargo test --release --locked "$@" 2>&1); rc=$?
   wall=$(echo "$(date +%s.%N) - $t0" | bc)

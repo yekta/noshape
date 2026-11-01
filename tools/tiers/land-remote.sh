@@ -27,16 +27,8 @@ for t in $(ls -dtr "$HOME"/target-land-* 2>/dev/null); do
   busy=0; for p in $(pgrep -x cargo); do tr '\0' '\n' < /proc/$p/environ 2>/dev/null | grep -qx "CARGO_TARGET_DIR=$t" && busy=1; done
   [ $busy = 0 ] && rm -rf "$t" && echo "== removed $t (idle; disk below 60 GB free)"
 done
-# Two slots: the third concurrent land waits for one.
-waited=0
-while true; do
-  for s in 1 2; do
-    exec 9>"$HOME/land/slot$s"
-    if flock -n 9; then
-      [ $waited -gt 0 ] && echo "== waited $((waited * 5)) s for a slot"
-      tools/tiers/land-checks.sh "$pkgs" "$changed"; exit $?
-    fi
-    exec 9>&-
-  done
-  waited=$((waited + 1)); sleep 5
-done
+# Two slots: the third concurrent land waits for one, in arrival order (tools/tiers/slots.sh).
+. tools/tiers/slots.sh
+take_slots 1
+[ "$SLOT_WAITED" -gt 0 ] && echo "== waited $SLOT_WAITED s for a slot"
+tools/tiers/land-checks.sh "$pkgs" "$changed"; exit $?
