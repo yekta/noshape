@@ -830,7 +830,9 @@ impl DrawingEditor {
         } else {
             vec![
                 info_row("Document", text(doc_name)),
-                info_row("Workspace", text("Main".into())),
+                // Live (dom asb-d-view-properties): a version of a drawing that
+                // was out of date when the version was made says so.
+                info_row("Workspace", text(if self.out_of_date && self.doc.read(cx).session.viewing.is_some() { "Main (Drawing needed update when version was created)".into() } else { "Main".into() })),
                 info_row("Type", text(if is_asm { "Assembly".into() } else { "Part".into() })),
                 info_row("Reference", reference),
                 h_flex().child(badge).into_any_element(),
