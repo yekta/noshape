@@ -459,6 +459,18 @@ lead). a409fa87 failed land (registry_matches_onshape_lists counted 54 sketch sh
 re-queues everything after it). Waiting: live request 13:45
 (assembly Mass and section properties panel whole dump). Not done in G26: Move to new subassembly from a nested row.
 
+## 11-01 late afternoon (user: G26 remainder, then the document-level audit)
+- G26 remainder done: a nested row's Move to new subassembly (6a810b33). All of G26 is fixed.
+- New audit area: the document-level surfaces, in docs/parity/audit-document.md. 19 surfaces, 8 gaps, 7 fixed. Queued as 3aa350f6, which carries the whole stack.
+  - D3: the version window's ☰ menu (Copy version…, Version properties…).
+  - D10: ☰ › Workspace properties… opens the metadata modal.
+  - D7: the Documents search header and empty text.
+  - D8 (P1): part / tab search results get a row each. Each workspace keeps an index of its parts, written with the thumbnail (`app-core/search_index.rs`).
+  - D6: Documents › Versions and history (graph, Show changes…, tooltip).
+  - D9 and D11: tooltips.
+- Open: D2, the Create version dialog's drawings warning ("These drawings should be updated before creating a version:" + "Update drawings."). It needs a drawing staleness query from dx (request below).
+- Next: the Documents page's typed search (live writes advanced queries into the box as text, `type:part name:…`). Ours keeps the box and the panel apart.
+
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
 (standard content) → mates/assembly workflow gaps (all ✅, UNCONFIRMED all answered 10-27) → standard content.
@@ -622,6 +634,7 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   together (or tell core it should stay as it is).
 
 ## Requests to the lead
+- (11-01) Document audit D2 (for dx): live's Create version dialog lists the drawings that should be updated before the version, with "Update drawings.". history-ui's create version dialog can show it if dx exposes "which drawings of this document are out of date", e.g. `noshape_ops::drawing::stale_drawings(&Document) -> Vec<TabId>`. Today drawing_view's `sources_stale` compares the UI's cached hashes.
 - (11-01) Audit G31: the assembly (and Part Studio) Mass and section properties "Show calculation variance" needs an
   integration error estimate per value (live shows "± 1.774e-9 lb", "± 2.100e+0 mm³"). The kernel's mass properties
   don't return one (OCCT BRepGProp gives an error with Eps): core's area; once exposed the panel can show it.
