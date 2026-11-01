@@ -205,6 +205,9 @@ impl DrawingEditor {
         };
         let prompt = if placing { "Place rectangle" } else { "Create rectangle" };
         let field = div()
+            .id("rr-field")
+            // Live drawing-replicate-region-dialog: the field's tooltip.
+            .when(!profile, |d| d.tooltip(crate::ui::tooltip("No closed profile selected")))
             .mx(px(3.))
             .mb(px(3.))
             .px(px(6.))

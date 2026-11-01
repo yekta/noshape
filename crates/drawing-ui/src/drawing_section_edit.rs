@@ -196,7 +196,7 @@ impl DrawingEditor {
                             .border_1()
                             .border_color(gpui_kit::rgb(0x9aa5af))
                             .bg(gpui_kit::rgb(0xcfdbe5))
-                            .tooltip(crate::ui::tooltip("Cutting line"))
+                            .tooltip(crate::ui::tooltip("Edit cutting line"))
                             .child(crate::assets::icon("section-cut-line", 20., cx)),
                     ),
                 )

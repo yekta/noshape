@@ -159,6 +159,9 @@ impl DrawingEditor {
                 .child(div().px(px(10.)).pt(px(4.)).text_size(px(12.)).child("Edges"))
                 .child(
                     div()
+                        .id("ls-edges")
+                        // Live drawing-adjust-linestyle: the field's tooltip.
+                        .tooltip(crate::ui::tooltip("Select required edges to change their style"))
                         .mx(px(10.))
                         .min_h(px(30.))
                         .p(px(4.))

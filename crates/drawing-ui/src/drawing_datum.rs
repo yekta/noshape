@@ -479,6 +479,8 @@ impl DrawingEditor {
                 );
             // The Targets list.
             let mut list = v_flex()
+                .id("dt-targets")
+                .when(d.rows.is_empty(), |e| e.tooltip(crate::ui::tooltip("Click in space to add a target")))
                 .mx(px(4.))
                 .my(px(3.))
                 .px(px(6.))
@@ -504,8 +506,8 @@ impl DrawingEditor {
                         .gap(px(4.))
                         .cursor_pointer()
                         .child(crate::ui::caret(open))
-                        .child(div().flex_1().text_size(px(13.)).child(crate::ui::user_text(name)))
-                        .child(div().id(("dt-row-x", k)).px(px(4.)).text_color(gpui_kit::rgb(0x9a9a9a)).child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        .child(div().flex_1().text_size(px(13.)).child(crate::ui::user_text(name.clone())))
+                        .child(div().id(("dt-row-x", k)).tooltip(crate::ui::tooltip(format!("Delete {name}"))).px(px(4.)).text_color(gpui_kit::rgb(0x9a9a9a)).child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             this.edit_datum(
                                 |d| {
                                     if k < d.rows.len() {
@@ -547,8 +549,16 @@ impl DrawingEditor {
                         })
                     };
                     let field_box = |id: (&'static str, usize), caption: &'static str, value: Option<String>, active: bool| {
+                        // Live dom/drawing-datum-target-after: the fields' tooltips.
+                        let tip = match caption {
+                            "Origin" => "Select an origin location for datum target",
+                            "Target location" => "Select target location for datum target",
+                            "X direction" => "Select an edge to define the X direction for this datum target",
+                            _ => "Select an edge to define the Y direction for this datum target",
+                        };
                         div()
                             .id(id)
+                            .tooltip(crate::ui::tooltip(tip))
                             .my(px(2.))
                             .px(px(6.))
                             .py(px(3.))
@@ -632,7 +642,7 @@ impl DrawingEditor {
                             .when(opts.angular, |e| {
                                 let invalid = opts.origin.is_some() && !matches!(opts.origin_ref, Some(noshape_model::drawing::PointRef::Center { .. }));
                                 let input_row = |label: &'static str, st: &Entity<InputState>| h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child(label)).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall()));
-                                let toggle = |id: (&'static str, usize), label: &'static str, on: bool| div().id(id).px(px(6.)).h(px(22.)).flex().items_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).when(on, |e| e.bg(gpui_kit::rgb(0xdfe7ee))).cursor_pointer().text_size(px(12.)).child(label);
+                                let toggle = |id: (&'static str, usize), label: &'static str, on: bool| div().id(id).tooltip(crate::ui::tooltip(if label == "Flip" { "Flip measurement from reference line" } else { "Rotate angle measurement" })).px(px(6.)).h(px(22.)).flex().items_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).when(on, |e| e.bg(gpui_kit::rgb(0xdfe7ee))).cursor_pointer().text_size(px(12.)).child(label);
                                 e.when(invalid, |e| e.child(div().text_size(px(11.)).text_color(gpui_kit::rgb(0xd0021b)).child("Invalid origin selected. Angle datum target origin must be an arc or circle center.")))
                                     .child(input_row("Diameter distance:", &r.x))
                                     .child(h_flex().h(px(26.)).child(crate::drawing_chrome::DrCheckbox::new(("dt-radial", k)).label("Radial lines").checked(opts.radial_lines).on_click(cx.listener(move |this, v: &bool, _, cx| {

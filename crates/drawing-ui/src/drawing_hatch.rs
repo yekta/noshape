@@ -376,7 +376,7 @@ impl DrawingEditor {
                     .h(px(20.))
                     .text_size(px(13.))
                     .child(div().flex_1().child(format!("Hatch {}", i + 1)))
-                    .child(div().id(("hd-profile-x", i)).px(px(4.)).text_color(gpui_kit::rgb(0x9a9a9a)).cursor_pointer().child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    .child(div().id(("hd-profile-x", i)).tooltip(crate::ui::tooltip(format!("Delete hatch {}", i + 1))).px(px(4.)).text_color(gpui_kit::rgb(0x9a9a9a)).cursor_pointer().child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         this.set_hatch(
                             |d| {
                                 if i < d.profiles.len() {
@@ -421,6 +421,8 @@ impl DrawingEditor {
             None => rows,
         };
         let profiles = v_flex()
+            .id("hd-profiles")
+            .when(!section_mode, |d| d.tooltip(crate::ui::tooltip("Select or create closed profile for hatch region")))
             .mx(px(9.))
             .my(px(3.))
             .px(px(6.))

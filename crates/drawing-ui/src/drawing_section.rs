@@ -232,6 +232,8 @@ impl DrawingEditor {
                 .when(on, |d| d.border_b_2().border_color(pal.accent).text_color(pal.emphasis).font_weight(FontWeight::MEDIUM))
                 .when(!on, |d| d.border_color(gpui_kit::rgb(0xdddddd)).text_color(pal.text))
                 .child(label)
+                // Live dom/drawing-edit-section: each mode's tooltip.
+                .tooltip(crate::ui::tooltip(["Vertical cut line", "Horizontal cut line", "Angular cut line"][m as usize % 3]))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_section_mode(m, cx)))
         };
         Some(
@@ -297,7 +299,7 @@ impl DrawingEditor {
                                         .border_color(gpui_kit::rgb(0x9aa5af))
                                         .when(!line_done, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
                                         .cursor_pointer()
-                                        .tooltip(crate::ui::tooltip("Cutting line"))
+                                        .tooltip(crate::ui::tooltip("Edit cutting line"))
                                         .child(crate::assets::icon("section-cut-line", 20., cx))
                                         .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                             let m = this.section_dlg.as_ref().map(|d| d.mode).unwrap_or(0);
@@ -316,7 +318,7 @@ impl DrawingEditor {
                                         .border_color(gpui_kit::rgb(0xd3d7d9))
                                         .when(flip, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
                                         .cursor_pointer()
-                                        .tooltip(crate::ui::tooltip("Flip direction"))
+                                        .tooltip(crate::ui::tooltip("Opposite direction"))
                                         .child(crate::assets::icon("section-flip", 20., cx))
                                         .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                             if let Some(d) = &mut this.section_dlg {
