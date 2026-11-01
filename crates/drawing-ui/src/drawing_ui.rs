@@ -274,9 +274,9 @@ impl DrawingEditor {
             style.leaders.push(l);
         }
         // Properties show as their values (live, qa DWG-PROPERTY-FIELD).
-        let (text, fields) = self.note_shown(&text);
+        let content = self.note_content(&text);
         let input = self.textarea(&text, 5, window, cx);
-        self.attach_note_fields(&input, fields, cx);
+        input.update(cx, |s, cx| s.set_value(content, window, cx));
         // Tab moves the text to the next tab stop of the ruler.
         input.update(cx, |s, cx| s.set_tab_size(gpui_kit::component::input::TabSize { tab_size: 4, hard_tabs: true }, cx));
         let height = self.input(&crate::drawing_note::note_height_text(h, self.drawing.units_mm), window, cx);
@@ -293,7 +293,10 @@ impl DrawingEditor {
         let Some(&(pick, r)) = b.title_cells.iter().find(|(p, _)| b.picks.get(*p as usize) == Some(&target)) else { return };
         let h = b.geometry.texts.iter().find(|t| t.pick == pick).map(|t| t.height).unwrap_or(self.drawing.props.ann_text_height);
         let text = self.drawing.sheets[self.sheet].title_field(&key).unwrap_or("").to_string();
+        // Its properties as fields (live S18: grey "----" while empty).
+        let content = self.note_content(&text);
         let input = self.textarea(&text, 5, window, cx);
+        input.update(cx, |s, cx| s.set_value(content, window, cx));
         input.update(cx, |s, cx| s.set_tab_size(gpui_kit::component::input::TabSize { tab_size: 4, hard_tabs: true }, cx));
         let height = self.input(&crate::drawing_note::note_height_text(h, self.drawing.units_mm), window, cx);
         let pos = [r[0] + 1.0, r[3] - 1.0];

@@ -1423,7 +1423,7 @@ impl Env<'_> {
                 "bom.number" => row.map(|r| r.number.clone()).unwrap_or_default(),
                 "bom.name" => row.map(|r| r.name.clone()).unwrap_or_default(),
                 "bom.material" => row.map(|r| r.material.clone()).unwrap_or_default(),
-                "instance.designator" => String::new(),
+                "instance.designator" => src.zip(body).and_then(|(s, b)| s.designators.get(b).cloned()).unwrap_or_default(),
                 "cut.item" => cut.as_ref().map(|r| r.item.to_string()).unwrap_or_default(),
                 "cut.quantity" => cut.as_ref().map(|r| r.qty.to_string()).unwrap_or_default(),
                 "cut.description" => cut.as_ref().map(|r| if r.standard.is_empty() { r.description.clone() } else { format!("{} {}", r.standard, r.description) }).unwrap_or_default(),

@@ -3311,6 +3311,34 @@ fn callout_on_an_edge_shows_its_parts_bom_item() {
     assert_eq!(t, vec![row.item.to_string().as_str()]);
 }
 
+/// A callout's Instance property (A23): the Reference designator of the
+/// instance its part belongs to.
+#[test]
+fn callout_shows_the_instance_designator() {
+    let (mut doc, _) = demo();
+    let asm = assembly_tab(&doc);
+    if let Some(TabContent::Assembly(a)) = doc.tabs.iter_mut().find(|t| t.id == asm).map(|t| &mut t.content) {
+        for (i, inst) in a.instances.iter_mut().enumerate() {
+            inst.reference_designator = Some(format!("R{}", i + 1));
+        }
+    }
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, asm, ViewOrientation::Front, [120.0, 150.0]));
+    let sources = regenerate_sources(&doc, &drawing);
+    let src = &sources[&views::SourceKey::studio(asm)];
+    let body = src.parts[0].body.clone().unwrap();
+    let want = src.designators.get(&body).cloned().expect("a designator");
+    let mut kind = AnnotationKind::balloon(ViewId(1), [0.0, 0.0], "{instance.designator}");
+    if let AnnotationKind::Balloon { callout, .. } = &mut kind {
+        callout.part = Some(body);
+    }
+    drawing.sheets[0].annotations.push(Annotation { id: 1, kind, position: [200.0, 220.0], ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+    let pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(1)).unwrap() as u32;
+    let t: Vec<&str> = built.geometry.texts.iter().filter(|t| t.pick == pick).map(|t| t.text.as_str()).collect();
+    assert_eq!(t, vec![want.as_str()]);
+}
+
 /// Item numbers come from a BOM only (live request 1647): a callout on a
 /// Part Studio part (no BOM) reads "----" and is drawn red.
 #[test]

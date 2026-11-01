@@ -31,6 +31,12 @@ fn metrics(family: &str) -> (f64, f64, f64) {
     }
 }
 
+/// A property field in an in-place editor: its value (or "----") as a
+/// light-grey highlighted run in the note's type (live drw2 10-21 h).
+fn field_run(t: &gpui_kit::component::input::InlineTokenContext, _: &mut Window, _: &mut App) -> Div {
+    div().bg(gpui_kit::rgb(if t.is_selected() { 0xb4d5fe } else { 0xe6e6e6 })).child(t.token().label().clone())
+}
+
 /// Where the in-place editor goes (canvas pixels) and its type metrics.
 pub struct InplaceBox {
     pub left: f64,
@@ -149,7 +155,8 @@ impl DrawingEditor {
             .text_size(px(b.font_px as f32))
             .line_height(px(b.pitch_px as f32))
             .font_family(SharedString::from(b.family.clone()))
-            .text_color(ink);
+            .text_color(ink)
+            .token(field_run);
         if b.bold {
             text = text.font_weight(FontWeight::BOLD);
         }
@@ -334,7 +341,8 @@ impl DrawingEditor {
             .text_size(px(b.font_px as f32))
             .line_height(px(b.pitch_px as f32))
             .font_family(SharedString::from(b.family.clone()))
-            .text_color(gpui_kit::rgb(0x000000));
+            .text_color(gpui_kit::rgb(0x000000))
+            .token(field_run);
         if b.bold {
             text = text.font_weight(FontWeight::BOLD);
         }

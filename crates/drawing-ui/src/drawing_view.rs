@@ -316,7 +316,6 @@ pub struct DrawingEditor {
     /// lost and where it was drawn when the drag started.
     pub cut_drag: Option<(ViewId, bool, Vec<[f64; 2]>)>,
     /// The open note editor's property fields (shown as their values).
-    pub note_fields: crate::drawing_note::NoteFields,
     /// Add leader on a note: where the new leader starts (`drawing_leaders`).
     pub leader_from: Option<noshape_model::drawing::LeaderStart>,
     /// The selected note leader (note, leader): drawn amber with its nodes
@@ -627,7 +626,6 @@ impl DrawingEditor {
             note_leader: None,
             leader_ref: None,
             cut_drag: None,
-            note_fields: Default::default(),
             leader_from: None,
             leader_sel: None,
             menu_broken_out: None,

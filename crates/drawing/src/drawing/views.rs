@@ -121,6 +121,9 @@ pub struct SourceModel {
     pub sketch_colors: Vec<(crate::FeatureId, [u8; 3])>,
     /// Assemblies shown exploded: the explode lines (model space).
     pub explode_trails: Vec<(DVec3, DVec3)>,
+    /// Assemblies: the Reference designator (Instance properties) of each
+    /// body's top-level instance (callouts' `{instance.designator}`).
+    pub designators: HashMap<BodyId, String>,
 }
 
 /// One row of a Structured BOM.
@@ -388,7 +391,7 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
                     _ => None,
                 })
                 .collect();
-            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![], bom_structured: vec![], bom_columns: vec![], bom_cells: vec![], model_annotations: ps.annotations.clone(), own: None, sketch_colors, explode_trails: Vec::new() })
+            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![], bom_structured: vec![], bom_columns: vec![], bom_cells: vec![], model_annotations: ps.annotations.clone(), own: None, sketch_colors, explode_trails: Vec::new(), designators: HashMap::new() })
         }
         TabContent::Assembly(asm) => {
             // A named position: its placements and mate values; a display
@@ -432,6 +435,15 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
     }
 }
 
+/// The Reference designator of top-level instance `id` (any assembly of
+/// the document; instance ids are unique).
+fn designator_of(doc: &Document, id: crate::assembly::InstanceId) -> Option<String> {
+    doc.tabs.iter().find_map(|t| match &t.content {
+        TabContent::Assembly(a) => a.instances.iter().find(|i| i.id == id).and_then(|i| i.reference_designator.clone()).filter(|s| !s.is_empty()),
+        _ => None,
+    })
+}
+
 /// Flatten an evaluated assembly into a context of transformed bodies.
 /// Occurrence `i` gets the body id `{feature: original feature, index:
 /// (i + 1) << 16 | original index}` and keeps the original face, edge and
@@ -442,6 +454,7 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
     let mut ctx = Context::default();
     let mut parts = Vec::new();
     let mut occ_body: Vec<(usize, BodyId)> = Vec::new();
+    let mut designators = HashMap::new();
     for (i, o) in result.occurrences.iter().enumerate() {
         // Inserted sketches come as wire bodies (drawn only with Show
         // sketches; views otherwise show the solids).
@@ -463,6 +476,9 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
         };
         info.body = Some(id.clone());
         parts.push(info);
+        if let Some(d) = o.path.first().and_then(|top| designator_of(doc, *top)) {
+            designators.insert(id.clone(), d);
+        }
         occ_body.push((i, id));
         ctx.bodies.push(Arc::new(nb));
     }
@@ -509,7 +525,7 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
             row.name = r.name.clone();
         }
     }
-    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new(), bom_columns: Vec::new(), bom_cells: Vec::new(), model_annotations: Vec::new(), own: None, sketch_colors: Vec::new(), explode_trails: result.explode_trails.clone() }
+    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new(), bom_columns: Vec::new(), bom_cells: Vec::new(), model_annotations: Vec::new(), own: None, sketch_colors: Vec::new(), explode_trails: result.explode_trails.clone(), designators }
 }
 
 /// Regenerate every source a drawing references (headless helper for

@@ -45,13 +45,71 @@ pub struct CalloutDlg {
     cached: (String, CalloutStyle),
 }
 
+/// The callout dialog's property tokens: group (its button and the token's
+/// label prefix), name, code. Live shows them as "<group>: <name>" tokens
+/// ("Table: Item No.", drawing.md A23).
+const CALLOUT_TOKENS: [(&str, &str, &str); 12] = [
+    ("Part", "Name", "{part.name}"),
+    ("Part", "Part number", "{part.number}"),
+    ("Part", "Material", "{part.material}"),
+    ("Part", "Description", "{part.description}"),
+    ("Table", "Item No.", "{bom.item}"),
+    ("Table", "Quantity", "{bom.quantity}"),
+    ("Table", "Part number", "{bom.number}"),
+    ("Table", "Name", "{bom.name}"),
+    ("Table", "Material", "{bom.material}"),
+    ("Instance", "Reference designator", "{instance.designator}"),
+    ("Cut list", "Item", "{cut.item}"),
+    ("Cut list", "Quantity", "{cut.quantity}"),
+];
+
+/// A callout property code as its token ("Table: Item No.").
+fn callout_token(code: &str) -> Option<gpui_kit::component::input::InlineToken> {
+    let (g, l, c) = CALLOUT_TOKENS.iter().find(|(_, _, c)| *c == code)?;
+    Some(gpui_kit::component::input::InlineToken::new(c.to_string(), c.to_string()).with_label(format!("{g}: {l}")))
+}
+
+/// The byte ranges of the callout codes in `text` (BOM, instance and cut
+/// list codes aren't sheet fields).
+fn callout_codes(text: &str) -> Vec<std::ops::Range<usize>> {
+    let mut out = Vec::new();
+    for (_, _, c) in CALLOUT_TOKENS.iter().filter(|(g, _, _)| *g != "Part") {
+        let mut at = 0;
+        while let Some(i) = text[at..].find(c).map(|i| at + i) {
+            out.push(i..i + c.len());
+            at = i + c.len();
+        }
+    }
+    out.sort_by_key(|r| r.start);
+    out
+}
+
 impl DrawingEditor {
     fn new_callout_dlg(&mut self, edit: Option<u64>, text: &str, style: CalloutStyle, window: &mut Window, cx: &mut Context<Self>) -> CalloutDlg {
         let h = style.height.unwrap_or(self.drawing.props.ann_type(noshape_model::drawing::sheet::AnnType::Callouts).height.unwrap_or(self.drawing.props.ann_text_height));
         let height = if self.drawing.units_mm { noshape_model::drawing::format::format_number(h, None, 2).to_string() } else { format!("{:.4}", h / 25.4) };
         let vals = [style.above.clone(), style.left.clone(), text.to_string(), style.right.clone(), style.below.clone(), height];
         let phs = ["", "", "Table: Item No.", "", "", ""];
-        let inputs = vals.into_iter().zip(phs).map(|(v, ph)| cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder(ph).default_value(v))).collect();
+        let inputs = vals
+            .into_iter()
+            .zip(phs)
+            .map(|(v, ph)| {
+                let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder(ph).default_value(v.clone()));
+                // Its properties as tokens.
+                let mut c = gpui_kit::component::input::InputContent::new(v.clone());
+                for r in crate::drawing_note::field_codes(&v).into_iter().chain(callout_codes(&v)) {
+                    if let Some(t) = callout_token(&v[r.clone()])
+                        && let Ok(next) = c.clone().with_token(r, t)
+                    {
+                        c = next;
+                    }
+                }
+                if !c.tokens().is_empty() {
+                    st.update(cx, |s, cx| s.set_value(c, window, cx));
+                }
+                st
+            })
+            .collect();
         CalloutDlg { edit, cached: (text.to_string(), style.clone()), style, inputs, target: CENTRE }
     }
 
@@ -128,14 +186,15 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    /// Insert a token or symbol into the target box.
+    /// Insert a property (as a token: live's grey "Table: Item No." button)
+    /// or a symbol into the target box, at its caret.
     fn callout_insert(&mut self, token: &str, window: &mut Window, cx: &mut Context<Self>) {
         let Some(d) = &self.callout_dlg else { return };
         let input = d.inputs[d.target].clone();
         let token = token.to_string();
-        input.update(cx, |s, cx| {
-            let v = format!("{}{token}", s.value());
-            s.set_value(v, window, cx);
+        input.update(cx, |s, cx| match callout_token(&token) {
+            Some(t) if s.replace_with_token(t.clone(), window, cx).is_ok() => {}
+            _ => s.insert(token.clone(), window, cx),
         });
         cx.notify();
     }
@@ -170,9 +229,8 @@ impl DrawingEditor {
             })
             .into_any_element()
         };
-        let part_props: Vec<(&str, String)> = vec![("Name", "{part.name}".into()), ("Part number", "{part.number}".into()), ("Material", "{part.material}".into()), ("Description", "{part.description}".into())];
-        let bom_props: Vec<(&str, String)> = vec![("Item No.", "{bom.item}".into()), ("Quantity", "{bom.quantity}".into()), ("Part number", "{bom.number}".into()), ("Name", "{bom.name}".into()), ("Material", "{bom.material}".into())];
-        let inst_props: Vec<(&str, String)> = vec![("Reference designator", "{instance.designator}".into())];
+        let tokens_of = |group: &str| CALLOUT_TOKENS.iter().filter(|(g, _, _)| *g == group).map(|(_, l, c)| (*l, c.to_string())).collect::<Vec<(&str, String)>>();
+        let (part_props, bom_props, inst_props) = (tokens_of("Part"), tokens_of("Table"), tokens_of("Instance"));
         // A text box that becomes the token target when clicked.
         let boxed = |i: usize, w: f32, h: f32, cx: &mut Context<Self>| {
             div()
@@ -252,7 +310,7 @@ impl DrawingEditor {
                                 .child(prop("callout-bom", "bom", "BOM table property", true, bom_props))
                                 .child(prop("callout-inst", "instance", "Instance property", true, inst_props))
                                 .child(prop("callout-flag", "note", "Flag note", has_flags, vec![]))
-                                .child(prop("callout-cut", "cut-list", "Cut list table property", has_cut_list, vec![("Item", "{cut.item}".into()), ("Quantity", "{cut.quantity}".into())])),
+                                .child(prop("callout-cut", "cut-list", "Cut list table property", has_cut_list, tokens_of("Cut list"))),
                         )
                         .child(boxed(ABOVE, 356., 24., cx))
                         .child(h_flex().gap(px(8.)).child(boxed(LEFT, 82., 66., cx)).child(boxed(CENTRE, 172., 66., cx)).child(boxed(RIGHT, 82., 66., cx)))
