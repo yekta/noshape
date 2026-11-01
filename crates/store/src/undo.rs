@@ -175,6 +175,17 @@ impl UndoStack {
         self.redo.last().map(|e| e.description.as_str())
     }
 
+    /// The state the newest undo entry produced (identifies that entry
+    /// across undo / redo, which keep it).
+    pub fn undo_top(&self) -> Option<MicroversionId> {
+        self.undo.last().map(|e| e.after)
+    }
+
+    /// The state the newest redo entry produces.
+    pub fn redo_top(&self) -> Option<MicroversionId> {
+        self.redo.last().map(|e| e.after)
+    }
+
     pub fn undo_len(&self) -> usize {
         self.undo.len()
     }

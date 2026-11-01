@@ -339,6 +339,9 @@ impl DrawingEditor {
                     let sheet = self.sheet;
                     if let Some(note) = noshape_scene::drawing_tools::new_note(&mut self.drawing, sheet, text, h, style, pos) {
                         self.edit_sheet("Note", cx, |s| s.annotations.push(note));
+                        // Live (UNDO3): a new note takes two undo steps, the
+                        // 1st a client-only text-editing entry.
+                        self.doc.update(cx, |d, cx| d.push_client_step(cx));
                     }
                     self.tool = Tool::Select;
                 }

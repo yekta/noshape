@@ -521,6 +521,12 @@ impl Session {
             None => self.undo.can_undo(),
         }
     }
+    /// The newest undo / redo entries (the states they produce): see
+    /// [`noshape_store::UndoStack::undo_top`].
+    pub fn undo_tops(&self) -> (Option<MicroversionId>, Option<MicroversionId>) {
+        (self.undo.undo_top(), self.undo.redo_top())
+    }
+
     pub fn can_redo(&self) -> bool {
         match self.tab_scope() {
             Some(scope) => self.undo.can_redo_in(&self.store, &scope),

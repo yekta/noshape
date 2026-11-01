@@ -22,7 +22,7 @@ Live behaviour pending (REQUESTS.md "qa5 undo across tabs"). Status: ✅ ok, ✗
 |---|---|---|---|---|
 | 4 | Ctrl+Z in a Part Studio | per-tab stack: only that tab's last change; no toast, no tab switch | same | ✅ |
 | 5/7 | Assembly: Insert session + mate, Ctrl+Z | #1 removes the mate, #2 removes **all instances of one Insert session at once**, #3 nothing | after one insert (no mate): #1 **nothing visible** (Undo stays enabled), #2 (button) removes the instance | ✗ UNDO1 (an extra invisible step) → now ✅ UNDO1 (1c853f78; v0.4.8 re-check below: one Ctrl+Z removes the Insert session) |
-| – | Drawing note | **two** undo steps (1st leaves the note, enables Redo; 2nd removes it) | not checked | ? → ✗ UNDO3 (ours one step; drawing code, with dx: docs/handoff/dx.md "From skasm (10-31)") |
+| – | Drawing note | **two** undo steps (1st leaves the note, enables Redo; 2nd removes it) | two steps (dx 11-01) | ✅ UNDO3 (live request 1705: the 1st is a client-only text-editing entry; `DocModel::push_client_step`) |
 | 9 | Undo tooltip | always "Undo (cmd+z/ctrl+z)" / "Redo (ctrl+y/shift+cmd+z)" | "Undo (cmd+z/ctrl+z)" | ✅ |
 | – | Stacks after a reload | cleared | cleared in the app (T app-core a_reopened_document_starts_with_nothing_to_undo; the CLI keeps history-based undo across its calls on purpose) | ✅ |
 | – | Tab ops (rename, reorder, delete, duplicate) | not undoable | not undoable: after tab_rename / tab_duplicate / tab_move, Undo reverts the previous feature edit and the tab change stays (skasm 10-31, main CLI skasm-scratch/feat/undo.py) | ✅ |
@@ -45,11 +45,11 @@ Live behaviour pending (REQUESTS.md "qa5 undo across tabs"). Status: ✅ ok, ✗
 ## Re-run pass 24 (qa5, 2026-10-24 ~00:10, main 538981d5, target-lead 23:22; d10 drawing copy)
 | Row | Live | Ours | Status | Verified |
 |---|---|---|---|---|
-| Drawing note, Ctrl+Z | **two** steps: the 1st leaves the note and enables Redo, the 2nd removes it (behaviours "qa5 undo across tabs") | one Ctrl+Z removes "hello" at once (Undo greys, Redo enabled); Ctrl+Y brings it back | ✗ **UNDO3** (drawing side: routed to dx, docs/handoff/dx.md "From skasm (10-31)") |  |
+| Drawing note, Ctrl+Z | **two** steps: the 1st leaves the note and enables Redo, the 2nd removes it (behaviours "qa5 undo across tabs") | one Ctrl+Z removes "hello" at once (Undo greys, Redo enabled); Ctrl+Y brings it back | ✅ UNDO3 (dx 11-01, app-checked on :147: Ctrl+Z ×1 keeps the note with Redo enabled, ×2 removes it, Ctrl+Y ×2 brings back the note then the step; a dimension stays one step, live 1705) |  |
 
 ## Release re-check v0.4.8 (qa5, 2026-10-25 02:30, release asset noshape 0.4.8 linux-x86_64)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | UNDO1 | Insert Part Studio 1 (2 parts) into Assembly 1, ✓, switch to the Part Studio tab and back, Ctrl+Z once: Instances (0); Ctrl+Y: both back | ✅ | 0.4.10+ / 1c853f78 10-27 |
 | UNDO2 | Drawing of Assembly 1 (suggested views): Update button pale (disabled) when created; second insert in the assembly → saturated yellow (out of date); Ctrl+Q → pale; Ctrl+Z in the assembly (Instances 4 → 2) → saturated again. Both directions agree (live: pale / saturated, behaviours 6902) | ✅ | 77870dd4 10-28 |
-| UNDO3 | routed to dx (drawing note = two history steps in live) | ✗ |  |
+| UNDO3 | a new note pushes a client-only step over its "Note" commit (dx 11-01) | ✅ |  |

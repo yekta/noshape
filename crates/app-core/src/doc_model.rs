@@ -34,6 +34,19 @@ pub struct DocModel {
     /// assembly Insert session (live undoes all its instances in one step).
     /// Any other edit, undo or redo commits it first.
     pending: PendingEdit,
+    /// A client-only undo step just above the history entry that produced
+    /// `at` (live: a new drawing note's text-editing session, UNDO3): while
+    /// that entry is the newest one applied, Undo first pops the step (no
+    /// model change, Redo enabled) and Redo puts it back. `undone`: popped,
+    /// with the redo list's top at that moment (a later edit replaces it,
+    /// dropping the step as live's redo list does).
+    client_step: Option<ClientStep>,
+}
+
+#[derive(Clone, Copy)]
+struct ClientStep {
+    at: noshape_store::MicroversionId,
+    undone: Option<Option<noshape_store::MicroversionId>>,
 }
 
 /// An applied, uncommitted tab edit and its description (see
@@ -70,7 +83,7 @@ impl DocModel {
     /// undo/redo stacks (Onshape's page load; the history stays).
     pub fn new(mut session: Session) -> Self {
         session.forget_undo();
-        Self { session, studio_cache: Default::default(), pending: PendingEdit::default() }
+        Self { session, studio_cache: Default::default(), pending: PendingEdit::default(), client_step: None }
     }
 
     /// Provider giving Derived features access to the other Part Studios.
@@ -167,12 +180,34 @@ impl DocModel {
 
     /// Undo is possible (a pending edit counts: Undo commits then reverts it).
     pub fn can_undo(&self) -> bool {
-        self.pending.0.is_some() || self.session.can_undo()
+        self.pending.0.is_some() || self.client_step_here(false) || self.session.can_undo()
     }
 
     /// Redo is possible (not over a pending edit, whose commit clears it).
     pub fn can_redo(&self) -> bool {
-        self.pending.0.is_none() && self.session.can_redo()
+        self.pending.0.is_none() && (self.client_step_here(true) || self.session.can_redo())
+    }
+
+    /// Push a client-only undo step over the last commit (see
+    /// `client_step`; live UNDO3: placing a drawing note takes two undo
+    /// steps, the 1st changes nothing in the model).
+    pub fn push_client_step(&mut self, cx: &mut Context<Self>) {
+        self.flush_pending(cx);
+        self.client_step = self.session.undo_tops().0.map(|at| ClientStep { at, undone: None });
+        cx.notify();
+    }
+
+    /// The client step is next for Undo (`undone` false) or for Redo (true).
+    fn client_step_here(&self, undone: bool) -> bool {
+        let (top, redo_top) = self.session.undo_tops();
+        self.pending.0.is_none()
+            && self.client_step.is_some_and(|c| {
+                top == Some(c.at)
+                    && match c.undone {
+                        None => !undone,
+                        Some(r) => undone && r == redo_top,
+                    }
+            })
     }
 
     /// Structural document edit (tabs added/removed/renamed).
@@ -206,6 +241,14 @@ impl DocModel {
 
     pub fn undo(&mut self, cx: &mut Context<Self>) {
         self.flush_pending(cx);
+        if self.client_step_here(false) {
+            let redo_top = self.session.undo_tops().1;
+            if let Some(c) = &mut self.client_step {
+                c.undone = Some(redo_top);
+            }
+            cx.notify();
+            return;
+        }
         match self.session.undo() {
             Ok(true) => cx.emit(DocEvent::Reloaded),
             Ok(false) => {}
@@ -216,6 +259,13 @@ impl DocModel {
 
     pub fn redo(&mut self, cx: &mut Context<Self>) {
         self.flush_pending(cx);
+        if self.client_step_here(true) {
+            if let Some(c) = &mut self.client_step {
+                c.undone = None;
+            }
+            cx.notify();
+            return;
+        }
         match self.session.redo() {
             Ok(true) => cx.emit(DocEvent::Reloaded),
             Ok(false) => {}
