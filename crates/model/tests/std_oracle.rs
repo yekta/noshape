@@ -1828,6 +1828,59 @@ fn surface_operation_editing_logic_runs_std() {
     assert!(got.contains(&"surfaceOperationType=Enum(\"ADD\")".to_string()), "{got:?}");
 }
 
+/// std's editing logic of Bridging curve (the hidden side flags the fields'
+/// visibility reads), Edit curve (a control point edit's offsets reset
+/// when its reference changes) and Projected curve (the preselection).
+#[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
+fn bridging_and_edit_curve_editing_logic_runs_std() {
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    s.add("bridgingCurve", |p| {
+        p.set("side1", q(vertex_at(&r, DVec3::ZERO)));
+        p.set("side2", q(face_at(&r, TOP_FACE)));
+    });
+    let mut old = ParamValues::default();
+    old.set("side1", ParamValue::Query(Vec::new()));
+    let got = edit_logic(&s, &old, &["side1", "side2"]);
+    for want in ["side1HasVertex=Bool(true)", "side2HasFace=Bool(true)"] {
+        assert!(got.contains(&want.to_string()), "{want}: {got:?}");
+    }
+
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    let item = |v: DVec3| {
+        let mut it = ParamValues::default();
+        it.set("reference", q(vertex_at(&r, v)));
+        it.set("x", expr("5 mm"));
+        it
+    };
+    let mut old = ParamValues::default();
+    old.set("editControlPoints", ParamValue::Bool(true));
+    old.set("controlPointEdits", ParamValue::Array(vec![item(DVec3::ZERO)]));
+    s.add("editCurve", |p| {
+        p.set("editControlPoints", ParamValue::Bool(true));
+        p.set("controlPointEdits", ParamValue::Array(vec![item(DVec3::new(40.0, 0.0, 0.0))]));
+    });
+    let got = edit_logic(&s, &old, &["editControlPoints", "controlPointEdits"]);
+    let edits = got.iter().find(|x| x.starts_with("controlPointEdits=")).unwrap_or_else(|| panic!("{got:?}"));
+    assert!(edits.contains("\"x\": Expr(ExprValue { text: \"0 mm\""), "{edits}");
+
+    // Projected curve: a preselected edge becomes its Edges to project.
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    let edge = edge_at(&r, DVec3::new(20.0, 0.0, 40.0));
+    s.add("projectCurves", |p| {
+        p.set("curveProjectionType", en("CURVE_TO_FACE"));
+        p.set("preselectedEntities", q(edge.clone()));
+    });
+    let got = edit_logic(&s, &ParamValues::default(), &[]);
+    assert!(got.contains(&format!("dropTools={:?}", q(edge))), "{got:?}");
+}
+
 /// std's holeEditLogic through the host natives: a new hole's Merge scope is
 /// the part it reaches, and one sketched below the part flips into it
 /// (holeScopeFlipHeuristics: an opHole probe and evCollision containment,
