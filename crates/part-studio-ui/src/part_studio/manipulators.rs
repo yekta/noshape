@@ -32,6 +32,10 @@ pub(super) struct Arrow {
 pub(super) const ARROW_SHAFT_PX: f64 = 29.;
 pub(super) const ARROW_HEAD_PX: f64 = 30.;
 const ARROW_HEAD_W_PX: f64 = 20.;
+/// An angle handle's stem past the arc's end and its head (live 11-01 Draft,
+/// 4x crop: a 26 px stem, a 16 × 16 px head).
+const ARC_STEM_PX: f64 = 26.;
+const ARC_HEAD_PX: f64 = 16.;
 
 /// An angular manipulator: an arc around an axis bound to an angle parameter.
 #[derive(Clone, Copy, Debug)]
@@ -49,6 +53,8 @@ pub(super) struct ArcHandle {
     pub flip: Option<&'static str>,
     /// std's SECONDARY style (Revolve's start angle): a double chevron.
     pub secondary: bool,
+    /// The largest angle the drag sets (std's maxValue: a turn, Draft's 89.9°).
+    pub max: f64,
 }
 
 impl ArcHandle {
@@ -76,6 +82,9 @@ pub(super) struct ManipDrag {
     pub grab_offset: f64,
     /// The dragged handle: 0 the first, 1 the second end's.
     pub which: usize,
+    /// Arcs: the cursor's angle at the grab minus the handle's (its stem
+    /// and head sit past the arc's end).
+    pub delta: f64,
 }
 
 impl PartStudioView {
@@ -90,8 +99,9 @@ impl PartStudioView {
             "extrude" => self.current_arrow(cx).map(|a| Manip::Arrow(a, self.second_arrow(&a, cx))),
             "moveFace" if e.dialog.read(cx).feature.params.is("moveFaceType", "ROTATE") => self.current_arc(cx).map(|h| Manip::Arc(h, None)),
             // Shell and Chamfer have none (std adds no manipulator; live psb 10-24).
-            "cPlane" | "fillet" | "moveFace" => self.param_arrow(cx).map(|a| Manip::Arrow(a, None)),
+            "cPlane" | "fillet" | "moveFace" | "offsetSurface" | "replaceFace" | "extendSurface" | "helix" => self.param_arrow(cx).map(|a| Manip::Arrow(a, None)),
             "revolve" => self.current_arc(cx).map(|h| Manip::Arc(h, self.second_arc(&h, cx))),
+            "draft" => self.draft_arc(cx).map(|h| Manip::Arc(h, None)),
             "transform" => self.current_triad(cx).map(Manip::Triad),
             "routingCurve" => self.routing_triad(cx).map(Manip::Triad),
             _ => None,
@@ -132,7 +142,7 @@ impl PartStudioView {
             return None;
         }
         let symmetric = p.bool("symmetric");
-        Some(ArcHandle { origin: origin + axis * axis.dot(rel), axis, radial, angle: if symmetric { angle * 0.5 } else { angle }, param: "angle", flip: Some("oppositeDirection"), secondary: false })
+        Some(ArcHandle { origin: origin + axis * axis.dot(rel), axis, radial, angle: if symmetric { angle * 0.5 } else { angle }, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU })
     }
 
     /// Revolve's second end (std addRevolveManipulator, live psb 10-24
@@ -147,6 +157,32 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let angle = p.expr("angleBack").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.display.variables).ok().map(|q| q.value)))?;
         Some(ArcHandle { angle, param: "angleBack", flip: None, secondary: true, ..*first })
+    }
+
+    /// Draft's angle (std addNeutralPlaneDraftAngularManipulator, Neutral
+    /// plane): about the line where the first face's tangent plane at its
+    /// middle meets the neutral plane, from that face point, by the draft
+    /// angle (Opposite direction: the other way), up to std's 89.9°.
+    fn draft_arc(&self, cx: &App) -> Option<ArcHandle> {
+        let d = self.edit.as_ref()?.dialog.read(cx);
+        let p = &d.feature.params;
+        if !p.is("draftFeatureType", "NEUTRAL_PLANE") {
+            return None;
+        }
+        let ctx = self.ui.before_context.as_ref().or(self.context.as_ref())?;
+        let r = p.query("neutralPlane").first()?;
+        let (o, nn) = self.frame_of_ref(r).map(|f| (f.origin, f.normal)).or_else(|| noshape_model::select::face_anchor(ctx, r))?;
+        let (pt, nf) = noshape_model::select::face_anchor(ctx, p.query("draftFaces").first()?)?;
+        let origin = pt - nn * nn.dot(pt - o);
+        let axis = nf.cross(nn).try_normalize()?;
+        let radial = pt - origin;
+        if radial.length() < 1e-9 {
+            return None;
+        }
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.display.variables).ok().map(|q| q.value)))?;
+        let axis = if p.bool("pullDirection") { -axis } else { axis };
+        Some(ArcHandle { origin, axis, radial, angle, param: "angle", flip: Some("pullDirection"), secondary: false, max: 89.9f64.to_radians() })
     }
 
     /// World axis (point, unit direction) of a sketch line or straight/circular edge.
@@ -303,6 +339,58 @@ impl PartStudioView {
                 let dir = self.axis_of(r).map(|(_, d)| d).or_else(|| self.frame_of_ref(r).map(|f| f.normal))?;
                 Some(Arrow { base, dir: dir * sign, length: value("translationDistance")?, param: "translationDistance", flip: Some("oppositeDirection"), secondary: false })
             }
+            // offsetSurface.fs: on the last face (a sketch region: its
+            // plane), along its normal, the offset signed by the flip.
+            "offsetSurface" => {
+                let (base, n) = p.query("surfacesAndFaces").iter().rev().find_map(|r| match r {
+                    Reference::SketchRegion { sketch, key } => {
+                        let sk = self.display.sketches.iter().find(|s| s.feature == *sketch)?;
+                        let reg = sk.regions.iter().find(|g| &g.key == key)?;
+                        Some((region_anchor(&reg.positions, &reg.indices)?, sk.frame.normal))
+                    }
+                    r => noshape_model::select::face_anchor(ctx, r),
+                })?;
+                let dir = if p.bool("oppositeDirection") { -n } else { n };
+                Some(Arrow { base, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false })
+            }
+            // replaceFace.fs: on the face to replace with, along its normal
+            // (Flip alignment turns it twice there: not at all).
+            "replaceFace" => {
+                let (base, n) = p.query("templateFace").iter().find_map(|r| noshape_model::select::face_anchor(ctx, r).or_else(|| self.frame_of_ref(r).map(|f| (f.origin, f.normal))))?;
+                let dir = if p.bool("oppositeDirection") { -n } else { n };
+                Some(Arrow { base, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false })
+            }
+            // extend.fs (Move boundary, Blind): on the last edge, out of its face.
+            "extendSurface" if p.is("endCondition", "BLIND") => {
+                let (base, out) = p.query("entities").iter().rev().find_map(|r| noshape_model::select::edge_extend(ctx, r))?;
+                let dir = if p.bool("oppositeDirection") { -out } else { out };
+                Some(Arrow { base, dir, length: value("extendDistance")?, param: "extendDistance", flip: Some("oppositeDirection"), secondary: false })
+            }
+            // helix.fs addHelixHeightManipulator (Axis or Circle, Height,
+            // not Turns and pitch): from the helix's start along its axis to
+            // its end; base and direction as regen's helix takes them.
+            "helix" if p.is("endType", "HEIGHT") && !p.is("pathType", "TURNS_PITCH") => {
+                let opposite = p.bool("oppositeDirection");
+                let (base, dir) = match p.enum_("axisType") {
+                    "AXIS" => {
+                        let r = p.query("axis").first()?;
+                        let line = noshape_model::regen::measure::resolve_shapes(ctx, r).into_iter().next().filter(|e| matches!(e.edge_curve(), Ok(noshape_kernel::Curve::Line { .. }))).and_then(|e| e.endpoints().ok());
+                        let (o, d) = match line {
+                            Some((a, b)) if p.bool("oppositeOrigin") => (b, (a - b).normalize()),
+                            Some((a, b)) => (a, (b - a).normalize()),
+                            None => self.axis_of(r).map(|(o, d)| if p.bool("oppositeOrigin") { (o, -d) } else { (o, d) })?,
+                        };
+                        (o, if opposite { -d } else { d })
+                    }
+                    "CIRCLE" => {
+                        let e = noshape_model::regen::measure::resolve_shapes(ctx, p.query("edge").first()?).into_iter().next()?;
+                        let noshape_kernel::Curve::Circle { center, axis, .. } = e.edge_curve().ok()? else { return None };
+                        (center, if opposite { -axis.normalize() } else { axis.normalize() })
+                    }
+                    _ => return None,
+                };
+                Some(Arrow { base, dir, length: value("height")?, param: "height", flip: Some("oppositeDirection"), secondary: false })
+            }
             "fillet" => {
                 // Live (behaviours "Fillet", qa5 P1-3): on the last picked edge.
                 let (base, dir) = p.query("entities").iter().rev().find_map(|r| noshape_model::select::edge_inward(ctx, r))?;
@@ -319,7 +407,12 @@ impl PartStudioView {
             (tip, tip + a.dir * a.length.signum() * 1e-3, ARROW_SHAFT_PX + ARROW_HEAD_PX)
         };
         // The handle end of the arc (last few degrees) is grabbable.
-        let arc = |h: &ArcHandle| (h.point(h.angle * 0.85), h.point(h.angle), 0.0);
+        // The arc's last stretch, then the stem and head past its end (screen-sized).
+        let arc = |h: &ArcHandle| {
+            let end = h.point(h.angle);
+            let tangent = (h.axis.cross(end - h.origin) * if h.angle < 0.0 { -1.0 } else { 1.0 }).normalize_or_zero();
+            (end, end + tangent * 1e-3, ARC_STEM_PX + ARC_HEAD_PX)
+        };
         // In handle order (Viewport::manipulator_index_at: 0 the first, 1 the second end's).
         let handles: Vec<(DVec3, DVec3, f64)> = match self.current_manip(cx) {
             // The arrow glyph at the end of the length (see manipulator_overlay).
@@ -409,7 +502,7 @@ impl PartStudioView {
             ViewportEvent::ToolDown { position, .. } => {
                 let (o, d) = ray(self, *position, cx);
                 let t = Self::axis_param(&a, o, d).unwrap_or(a.length);
-                self.manip_drag = Some(ManipDrag { grab_offset: t - a.length, which });
+                self.manip_drag = Some(ManipDrag { grab_offset: t - a.length, which, delta: 0.0 });
                 true
             }
             ViewportEvent::ToolDrag { position, .. } => {
@@ -451,7 +544,7 @@ impl PartStudioView {
                 }
                 if flip {
                     // Keep grabbing the same point after the flip.
-                    self.manip_drag = Some(ManipDrag { grab_offset: -m.grab_offset, which: m.which });
+                    self.manip_drag = Some(ManipDrag { grab_offset: -m.grab_offset, ..m });
                 }
                 true
             }
@@ -497,9 +590,11 @@ impl PartStudioView {
         };
         let symmetric = h.param == "angle" && self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.params.bool("symmetric"));
         match ev {
-            ViewportEvent::ToolDown { .. } => {
-                // The handle's own angle: the drag unwraps from it.
-                self.manip_drag = Some(ManipDrag { grab_offset: h.angle, which });
+            ViewportEvent::ToolDown { position, .. } => {
+                // The cursor's angle next to the handle's: the drag unwraps from it.
+                let tau = std::f64::consts::TAU;
+                let a0 = angle_at(self, *position, cx).map_or(h.angle, |raw| h.angle + (raw - h.angle + std::f64::consts::PI).rem_euclid(tau) - std::f64::consts::PI);
+                self.manip_drag = Some(ManipDrag { grab_offset: a0, which, delta: a0 - h.angle });
                 true
             }
             ViewportEvent::ToolDrag { position, .. } => {
@@ -507,12 +602,14 @@ impl PartStudioView {
                 let Some(raw) = angle_at(self, *position, cx) else { return true };
                 // Unwrapped next to the last angle, within a whole turn.
                 let tau = std::f64::consts::TAU;
-                let a = (m.grab_offset + (raw - m.grab_offset + std::f64::consts::PI).rem_euclid(tau) - std::f64::consts::PI).clamp(-tau, tau);
-                self.manip_drag = Some(ManipDrag { grab_offset: a, which });
-                let mut value = if symmetric { (a * 2.0).clamp(-tau, tau) } else { a };
+                let a = m.grab_offset + (raw - m.grab_offset + std::f64::consts::PI).rem_euclid(tau) - std::f64::consts::PI;
+                self.manip_drag = Some(ManipDrag { grab_offset: a, ..m });
+                let handle = (a - m.delta).clamp(-tau, tau);
+                let mut value = if symmetric { (handle * 2.0).clamp(-tau, tau) } else { handle };
                 // Only the first arc flips; the second keeps its magnitude (std angleBack = abs).
                 let flip = value < 0.0 && h.flip.is_some();
-                let deg = snap_degrees(value.abs().to_degrees());
+                // Draft (not checked on live): no 5° snap, tenths of a degree.
+                let deg = if h.max < std::f64::consts::TAU { ((value.abs().to_degrees() * 10.0).round() / 10.0).min(h.max.to_degrees()) } else { snap_degrees(value.abs().to_degrees()) };
                 value = deg.to_radians();
                 let units = self.doc.read(cx).session.doc.settings.units;
                 let text = if matches!(units.angle, noshape_units::AngleUnit::Degree) {
@@ -533,7 +630,7 @@ impl PartStudioView {
                 }
                 if flip {
                     // The axis turned over: the same cursor angle is the negated one.
-                    self.manip_drag = Some(ManipDrag { grab_offset: -a, which });
+                    self.manip_drag = Some(ManipDrag { grab_offset: -a, which, delta: -m.delta });
                 }
                 true
             }
@@ -642,32 +739,31 @@ fn head_polylines(base: DVec3, dir: DVec3, side: DVec3, len: f64, width: f64, se
     }
 }
 
-/// Revolve / Move face's angle handle (live psb 10-24 rev-1, rev-10): thin
-/// radial lines from the axis to the profile and to the swept end, the arc
-/// between them, an open head at the end along the turn, in the arrows'
+/// An angle handle (Revolve, Move face, Draft; live psb 10-24 rev-1, rev-10
+/// and live 11-01 Draft): thin radial lines from the axis to the start and
+/// to the swept end, the arc between them, then past the end a straight stem
+/// along the turn (~26 px) and an open head (~16 px), in the arrows'
 /// white-in-grey style (blue when hovered); a second end's has a double
-/// chevron.
+/// chevron on half the stem.
 fn arc_glyph(h: &ArcHandle, hover: bool, dragging: bool, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
     let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
     let (outline, core, outline_px, core_px) = handle_style(hover, dragging);
     let end = h.point(h.angle);
     let Some(wpp) = view.world_per_px(end) else { return Vec::new() };
-    // The head along the turn at the end, its width across the view.
-    let tangent = (h.axis.cross(end - h.origin) * h.angle.signum()).try_normalize().unwrap_or(h.axis);
+    // The stem and head along the turn at the end, the head's width across the view.
+    let sign = if h.angle < 0.0 { -1.0 } else { 1.0 };
+    let tangent = (h.axis.cross(end - h.origin) * sign).try_normalize().unwrap_or(h.axis);
     let side = tangent.cross(view.direction()).try_normalize().unwrap_or_else(|| tangent.any_orthonormal_vector());
-    let (len, width) = (16.0 * wpp, 14.0 * wpp);
-    // The arc stops where the head starts.
-    let back = if h.secondary { len * 0.45 * 2.1 } else { len };
-    let radius = h.radial.length().max(1e-12);
-    let cut = (back / radius).min(h.angle.abs() * 0.5) * h.angle.signum();
+    let stem = ARC_STEM_PX * if h.secondary { 0.5 } else { 1.0 } * wpp;
+    let head_base = end + tangent * stem;
+    let heads = head_polylines(head_base, tangent, side, ARC_HEAD_PX * wpp, ARC_HEAD_PX * wpp, h.secondary);
     let n = ((h.angle.abs().to_degrees() / 4.0).ceil() as usize).clamp(2, 90);
-    let arc: Vec<[f32; 3]> = (0..=n).map(|i| f(h.point((h.angle - cut) * i as f64 / n as f64))).collect();
-    let head_base = h.point(h.angle - cut);
-    let heads = head_polylines(head_base, tangent, side, len, width, h.secondary);
+    let arc: Vec<[f32; 3]> = (0..=n).map(|i| f(h.point(h.angle * i as f64 / n as f64))).collect();
     let mut back_lines = LineData::default();
     let mut front = LineData::default();
     for (data, color, w) in [(&mut back_lines, outline, outline_px), (&mut front, core, core_px)] {
         data.push_polyline(&arc, color, 0, w, LineSegment::ON_TOP);
+        data.push_polyline(&[f(end), f(head_base)], color, 0, w, LineSegment::ON_TOP);
         data.push_polyline(&[f(h.origin), f(h.point(0.0))], color, 0, w * 0.75, LineSegment::ON_TOP);
         data.push_polyline(&[f(h.origin), f(end)], color, 0, w * 0.75, LineSegment::ON_TOP);
         for p in &heads {

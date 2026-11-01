@@ -509,6 +509,29 @@ pub fn edge_inward(ctx: &Context, edge: &Reference) -> Option<(DVec3, DVec3)> {
     (dir.length() > 0.5).then_some((m, dir))
 }
 
+/// Midpoint of a laminar edge and the direction out of its face, in the
+/// face's tangent plane (std extend.fs getExtendDirection: the edge's
+/// tangent across the face normal), for Move boundary's drag handle.
+pub fn edge_extend(ctx: &Context, edge: &Reference) -> Option<(DVec3, DVec3)> {
+    let (b, kind, e) = body_of(ctx, edge)?;
+    if kind != ShapeType::Edge {
+        return None;
+    }
+    let s = b.shape.sub_shape(ShapeType::Edge, e).ok()?;
+    let info = s.edge_info().ok()?;
+    let t = (info.first_param + info.last_param) * 0.5;
+    let (m, tangent) = (s.point_at(t).ok()?, s.tangent_at(t).ok()?);
+    let faces = b.shape.edge_faces().ok()?.get(e)?.clone();
+    let [f] = faces.as_slice() else { return None };
+    let face = b.shape.sub_shape(ShapeType::Face, *f as usize).ok()?;
+    let n = face.normal_at_point(m).ok()?;
+    let dir = tangent.cross(n).normalize_or_zero();
+    // Out of the face: away from its centre.
+    let c = face.centroid().ok()?;
+    let dir = if dir.dot(m - c) < 0.0 { -dir } else { dir };
+    (dir.length() > 0.5).then_some((m, dir))
+}
+
 /// Centroid of a face and its outward normal there.
 pub fn face_anchor(ctx: &Context, face: &Reference) -> Option<(DVec3, DVec3)> {
     let (b, kind, f) = body_of(ctx, face)?;

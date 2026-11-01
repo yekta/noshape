@@ -66,9 +66,9 @@ drawn natively (part_studio/manipulators.rs, triad.rs, section_manip.rs): our Fe
 | M5 | Fillet | radius (linear); partial fillet: a point-on-edge (linear) per bound | radius | P2 | ✗ partial fillet's points |
 | M6 | Plane | offset (linear), Line angle (angular) | offset | P2 | ✗ angle |
 | M7 | Transform | triad (translate by XYZ), angle (rotate about axis), distance (translate by distance) | triad | P2 | ✗ angle, distance |
-| M8 | Draft | angle (angular, two for a parting line), pull direction flip | none | P2 | ✗ |
-| M9 | Helix | height (linear), direction flip | none | P2 | ✗ |
-| M10 | Offset surface, Replace face, Move boundary, Move curve boundary | distance (linear) | none | P2 | ✗ |
+| M8 | Draft | angle (angular, two for a parting line), pull direction flip | none | P2 | ✅ (audit 11) Neutral plane: std's arc (about the first face's line on the neutral plane, from its middle; live 11-01: radial line, a 26 px stem past the arc, a 16 px open head; every angle handle now draws that stem); its drag in tenths of a degree up to 89.9°, past 0 flips Opposite direction (live's snapping not measured); ✗ Parting line's arcs and flip |
+| M9 | Helix | height (linear), direction flip | none | P2 | ✅ (audit 11) height arrow for Axis and Circle with Height (not Turns and pitch), from the start along the axis as regen's helix (look not checked on live); ✗ the direction flip |
+| M10 | Offset surface, Replace face, Move boundary, Move curve boundary | distance (linear) | none | P2 | ✅ (audit 11) Offset surface (= live 11-01: the arrow at the offset face's middle), Replace face (on the face to replace with), Move boundary Blind (on the last edge, out of its face; `select::edge_extend`); ✗ Move curve boundary |
 | M11 | Split, Projected curve, Mutual trim, Body draft, Frame trim, Face blend | flips | none | P3 | ✗ |
 | M12 | Loft, Wrap, Ruled surface, Bridging curve, Fit spline, Edit curve, Offset curve on face | lengths / angles / points | none | P3 | ✗ |
 | M13 | Routing curve | full triads, points | triad, points | – | = std (audit 9) |
