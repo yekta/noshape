@@ -84,10 +84,10 @@ jobs:
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      # main's release-build dependencies (ci.yml `release`); a tag's own cache could never be read again.
+      # Read only: a tag's cache could never be read again, and the quota keeps main's (ci.yml).
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: release-occt-V8_0_1
+          key: occt-V8_0_1
           save-if: false
 
       - name: Build (release)
