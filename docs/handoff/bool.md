@@ -1109,6 +1109,29 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Knurl sweep: three more causes fixed (11-02 01:00 UTC)
+- The boundary crossings for the seeded sections are now the curves' own closest points (Gauss-Newton on the two
+  edges from each chord pair within reach), merged within 10 tol: chords of a 48 mm helix edge reach ~12 um, and
+  merging within ten reaches made two crossings 70 um apart one (Ø25 × 34 45/45: tools 30, 51 cross 37 um above the
+  end face, mirror images there; their flanks' 70 um sections down to the end plane weren't asked for).
+- A piece a few tolerances across (8 GREY tol, its loop's box) gets `deeper`'s point (Ø25 × 43 45/45: two tools' end
+  caps' corners overlapping in a 3 um diamond, its first point 0.64 um from the other cap's edge: "a piece's point
+  near a coincident face's boundary").
+- Rays: `free::ray_hits` tries every start on a Bézier piece (it stopped at the first crossing; a twisted helical
+  flank's piece is crossed twice: Ø10 × 25 80/30, a cylinder sliver by the end face taken as in a groove,
+  non-manifold), and `ray_state` takes another direction when the nearest crossing's side disagrees with the count.
+  The Ø50 diamond knurl: 12.5 s on loaded vibe4, live's faces and volume.
+- Ø25 heights 10–60 at 45/45 and 45/30: all taken but 45/30 at 24 mm. Corpora: bool-corpus 820 (+1), the rest
+  unchanged, 0 differ. T1 grooves_crossing_37_um_above_the_end (OCCT's cut of the two leaves 29 mm³; against the
+  grooves' own cuts and OCCT's (object ∩ one) ∩ other 0.088501 mm³), a_piece_a_few_tolerances_across (OCCT's volume;
+  OCCT splits the cylinder's face at its seam where ours keeps one face: 16 faces vs 13), a_ray_crossing_a_twisted_flank_twice.
+- Still declining in the size × TPI × angle grid (vibe4 ~/agents/sweep/grid2.tsv, before these fixes: 90 taken, 29
+  not), causes found so far: (1) tool caps tilted 2.3e-8 rad from the end plane (Ø100 × 10): past plane_plane's
+  1e-9 parallel test, so not coplanar and the end face's pieces over a cap ray-classified on it ("a piece's point on
+  another solid's face"); next: planes within the tolerance of each other over both faces taken as coplanar. (2) Two
+  grooves crossing at the cylinder's seam just above the end face (Ø25 × 24 45/30, Ø25 × 10 CP20 80/30):
+  non-manifold, not yet understood. Recorded: vibe4 ~/agents/bool-corpora/kg-<Ø>-<h>-<pitch>-<tooth>-<helix>.
+
 ## The Ø25 × 25 knurl taken: short sections walked from where the faces' edges cross (11-02 00:10 UTC, user's P0)
 - The missing curve: tools 28 and 61's ridges (flank 0 / flank 1 edges) cross at z = 44 µm at the same radius; below
   that each ridge is inside the other tool. Flank 28:0 meets 61:0 (and 28:1 meets 61:1) in a 94 µm curve from the

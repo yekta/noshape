@@ -1,0 +1,17 @@
+op cut
+fuzzy 0e0
+glue off
+unify 1
+parallel 1
+obb 0
+objects 1
+tools 2
+target_faces 3
+valid 1
+volume 2.10704429062929365e-5
+faces 13
+edges 32
+vertices 21
+history cb75d605ba36a068
+ms 430.279
+path rust

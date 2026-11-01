@@ -1790,43 +1790,71 @@ impl Ctx<'_> {
         p
     }
 
-    /// Where an edge of face `fa` and one of face `fb` meet (their polylines within the two's distance from
-    /// their curves and the tolerance), points apart by more than ten times that.
+    /// Where an edge of face `fa` and one of face `fb` meet: their polylines' chords within the two's distance from
+    /// their curves and the tolerance, the curves' closest points from there (Gauss-Newton on the two curves)
+    /// within the tolerance, points apart by more than ten times that.
     fn boundaries_meet(&mut self, fa: usize, fb: usize) -> Vec<DVec3> {
         let (ea, eb): (Vec<usize>, Vec<usize>) = (self.faces[fa].edges.iter().map(|x| x.0).collect(), self.faces[fb].edges.iter().map(|x| x.0).collect());
-        let mut out: Vec<(DVec3, f64)> = Vec::new();
+        let bx = |p: &[DVec3]| p.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), q| (lo.min(*q), hi.max(*q)));
+        let tol = self.tol;
+        let mut out: Vec<DVec3> = Vec::new();
         for &x in &ea {
             let px = self.edge_polyline(x);
+            let (xlo, xhi) = bx(&px.0);
             for &y in &eb {
                 let py = self.edge_polyline(y);
-                let reach = px.1 + py.1 + self.tol;
-                let bx = |p: &[DVec3]| p.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), q| (lo.min(*q), hi.max(*q)));
-                let ((xlo, xhi), (ylo, yhi)) = (bx(&px.0), bx(&py.0));
+                let reach = px.1 + py.1 + tol;
+                let (ylo, yhi) = bx(&py.0);
                 if !boxes_meet(xlo, xhi, ylo, yhi, reach) {
                     continue;
                 }
-                for s in px.0.windows(2) {
+                let (n, m) = ((px.0.len() - 1) as f64, (py.0.len() - 1) as f64);
+                let (sx, sy) = (self.edge_seg(x), self.edge_seg(y));
+                for (i, s) in px.0.windows(2).enumerate() {
                     if !boxes_meet(s[0].min(s[1]), s[0].max(s[1]), ylo, yhi, reach) {
                         continue;
                     }
-                    for t in py.0.windows(2) {
-                        if !boxes_meet(s[0].min(s[1]), s[0].max(s[1]), t[0].min(t[1]), t[1].max(t[0]), reach) {
+                    for (j, t) in py.0.windows(2).enumerate() {
+                        if !boxes_meet(s[0].min(s[1]), s[0].max(s[1]), t[0].min(t[1]), t[0].max(t[1]), reach) {
                             continue;
                         }
                         let (p, q) = crate::blend::segment_closest(s[0], s[1], t[0], t[1]);
                         if (p - q).length() > reach {
                             continue;
                         }
-                        let m = p.lerp(q, 0.5);
-                        match out.iter_mut().find(|o| (o.0 - m).length() <= 10.0 * reach.max(o.1)) {
-                            Some(o) => o.1 = o.1.max(reach),
-                            None => out.push((m, reach)),
+                        let along = |a: DVec3, b: DVec3, p: DVec3| ((p - a).dot(b - a) / (b - a).length_squared().max(1e-300)).clamp(0.0, 1.0);
+                        let (mut u, mut v) = ((i as f64 + along(s[0], s[1], p)) / n, (j as f64 + along(t[0], t[1], q)) / m);
+                        let (h, mut d) = (1e-7, f64::INFINITY);
+                        for _ in 0..12 {
+                            let (a, b) = (self.seg_at(&sx, u), self.seg_at(&sy, v));
+                            let w = a - b;
+                            d = w.length();
+                            if d <= 1e-3 * tol {
+                                break;
+                            }
+                            let ta = (self.seg_at(&sx, (u + h).min(1.0)) - self.seg_at(&sx, (u - h).max(0.0))) / ((u + h).min(1.0) - (u - h).max(0.0));
+                            let tb = (self.seg_at(&sy, (v + h).min(1.0)) - self.seg_at(&sy, (v - h).max(0.0))) / ((v + h).min(1.0) - (v - h).max(0.0));
+                            let (aa, ab, bb) = (ta.dot(ta), ta.dot(tb), tb.dot(tb));
+                            let det = aa * bb - ab * ab;
+                            if det <= 1e-12 * aa * bb {
+                                break;
+                            }
+                            let (ra, rb) = (-ta.dot(w), tb.dot(w));
+                            u = (u + (bb * ra + ab * rb) / det).clamp(0.0, 1.0);
+                            v = (v + (ab * ra + aa * rb) / det).clamp(0.0, 1.0);
+                        }
+                        if d > tol {
+                            continue;
+                        }
+                        let c = self.seg_at(&sx, u).lerp(self.seg_at(&sy, v), 0.5);
+                        if out.iter().all(|o| (*o - c).length() > 10.0 * tol) {
+                            out.push(c);
                         }
                     }
                 }
             }
         }
-        out.into_iter().map(|o| o.0).collect()
+        out
     }
 
     /// OCCT's sections of faces `a` and `b` as pair `m.0`'s (made once) moved by `m.1`: the curves moved here, their
@@ -2630,6 +2658,8 @@ impl Ctx<'_> {
         }
         'dirs: for r in DIRS {
             let mut odd = false;
+            // (The nearest crossing: its face's outward normal along the ray says in too.)
+            let mut nearest: Option<(f64, usize, DVec3)> = None;
             for &f in &sol.faces {
                 let g = &self.faces[f];
                 // (Each crossing's t, and on a free-form face where on it (its parameters found with it).)
@@ -2707,8 +2737,16 @@ impl Ctx<'_> {
                     }
                     if inside2(q, gb) {
                         odd = !odd;
+                        if nearest.is_none_or(|x| t < x.0) {
+                            nearest = Some((t, f, p + r * t));
+                        }
                     }
                 }
+            }
+            // (A crossing missed (two of a twisted helical knurl flank in one of its Bézier pieces, one found): the
+            // count and the nearest crossing's side disagree; another ray.)
+            if nearest.is_some_and(|(_, f, q)| (self.normal_at(f, q).dot(r) > 0.0) != odd) {
+                continue 'dirs;
             }
             return Ok(if odd { State::In } else { State::Out });
         }
@@ -4050,7 +4088,11 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         let mut shapes: Vec<(Vec<C2>, Vec<Vec<C2>>)> = Vec::new();
         for mut r in regions(&pts, &lsegs)? {
             let mut dist = distance2(r.inside, cx.bound(f)?);
-            if dist <= GREY * tol {
+            // (A piece a few tolerances across (two coplanar knurl tool caps' corners overlapping in 3 um): its
+            // first point can be in the grey band of a side that is another face's boundary.)
+            let (lo, hi) = r.outer.iter().flat_map(|&(sg, _)| lsegs[sg as usize].0).fold((DVec2::INFINITY, DVec2::NEG_INFINITY), |(lo, hi), w| (lo.min(pts[w as usize]), hi.max(pts[w as usize])));
+            let small = (hi - lo).min_element() <= 8.0 * GREY * tol;
+            if dist <= GREY * tol || small {
                 // (A thin piece: a point farther in.)
                 r.inside = deeper(&lsegs, &r);
                 dist = distance2(r.inside, cx.bound(f)?);

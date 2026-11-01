@@ -220,9 +220,10 @@ pub(super) fn ray_hits(ns: &FreeSurface, patches: &Patches, uv: [f64; 4], p: DVe
             if !out.iter().any(|h| (h.1 - t).abs() < 1e-9) {
                 out.push((uv, t));
             }
-            // (The crossing in this piece found: no more starts.)
+            // (The crossing in this piece found: no more starts, but on a piece the ray may cross twice (a twisted
+            // helical knurl flank's): its other starts too.)
             let m = 1e-9 * (1.0 + (ub - ua).abs() + (vb - va).abs());
-            if uv.x >= ua - m && uv.x <= ub + m && uv.y >= va - m && uv.y <= vb + m {
+            if !pa.piece && uv.x >= ua - m && uv.x <= ub + m && uv.y >= va - m && uv.y <= vb + m {
                 break;
             }
         }

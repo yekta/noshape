@@ -480,6 +480,60 @@ fn grooves_crossing_just_above_the_end() {
     assert_eq!(r.shape.count(k::ShapeType::Face), 9);
 }
 
+/// Two grooves of the Ø25 × 34 knurl at 45° / 45° (its tools 30 and 51; recorded) crossing 37 µm above the end face,
+/// mirror images there: their flanks' sections from the bottom edges' crossing to the end plane are 70 µm from the
+/// ones at the crossing height, and were taken for one place (merged within ten chords' reach) and not asked for
+/// ("a non-manifold result"). OCCT's cut of the two leaves 29 mm³ here; against each groove's own cut and their
+/// overlap in the cylinder by OCCT ((object ∩ one) ∩ the other: 0.088501 mm³).
+#[test]
+fn grooves_crossing_37_um_above_the_end() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "ddaa5365e6d5f85e").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    let one: Vec<f64> = c.tools.iter().map(|t| k::boolean(c.op, &c.objects, std::slice::from_ref(t), &c.opts).expect("one groove's cut").shape.volume().unwrap()).collect();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let v0 = c.objects[0].volume().unwrap();
+    let want = v0 - one.iter().map(|v| v0 - v).sum::<f64>() + 0.088501e-9;
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid());
+    // (OCCT's overlap to 1e-6 mm³, the single cuts ours: within 1e-4 mm³, 6e-9 of the part.)
+    assert!((v - want).abs() <= 1e-4 * 1e-9, "volume {v}, the grooves' own and their overlap {want}");
+}
+
+/// A piece a few tolerances across (recorded: the Ø25 × 43 knurl at 45° / 45°, its tools 17 and 55): their end caps'
+/// corners overlap in a 3 µm diamond on the end plane, whose first point was 0.64 µm from the other cap's edge ("a
+/// piece's point near a coincident face's boundary"); a point farther in. OCCT's volume (it splits the cylinder's
+/// face at its seam where ours keeps one face, so not its counts).
+#[test]
+fn a_piece_a_few_tolerances_across() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "83c6823917494739").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
+    k::set_rust_boolean(None);
+    let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
+    assert!(r.shape.is_valid() && (v - w).abs() <= 1e-9 * w, "valid {}, volume {v} against OCCT's {w}", r.shape.is_valid());
+}
+
+/// A ray crossing a groove's twisted helical flank twice in one of its Bézier pieces (recorded: the Ø10 × 25 knurl
+/// at 80° / 30°, its tools 3 and 16): the crossings' search stopped at the first, the count came out odd and a
+/// sliver of the cylinder by the end face was taken as inside a groove ("a non-manifold result"). Every start in
+/// such a piece now, and the nearest crossing's side has to agree with the count.
+#[test]
+fn a_ray_crossing_a_twisted_flank_twice() {
+    valid_as_occt("5074542e7423ed66", 1e-8);
+}
+
 /// A mirror fuse whose face has a hole touching its outer boundary at one vertex (fuzz seed 1144): a wire each side of
 /// that vertex, as OCCT's builder makes them (one wire through it twice was invalid: BadOrientationOfSubshape).
 #[test]
