@@ -1108,6 +1108,31 @@ fn analysis_tools() {
     assert!((num(&d["min_deg"]) - 90.0).abs() < 0.5 && (num(&d["max_deg"]) - 90.0).abs() < 0.5, "{d}");
 }
 
+/// A STEP assembly with a subassembly (live request 1742 (A), live's own
+/// file): Sub keeps its Assembly tab, instanced in the root one, all parts
+/// from the one Part Studio; tabs Assembly 1, Sub, the parts.
+#[test]
+fn import_step_assembly_keeps_its_subassembly() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "import_nested.noshape");
+    let file = concat!(env!("CARGO_MANIFEST_DIR"), "/../kernel/tests/data/step/nested-asm.step");
+    let r = call(&mut ctx, "import_files", json!({ "files": [file] }));
+    let info = call(&mut ctx, "document_info", json!({}));
+    let tabs: Vec<String> = info["tabs"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
+    let at = |n: &str| tabs.iter().position(|t| t.starts_with(n)).unwrap_or_else(|| panic!("{n} in {tabs:?}"));
+    assert!(at("Assembly 1 (1)") < at("Sub") && at("Sub") < at("nested-asm parts"), "{tabs:?}");
+    let names = |ctx: &mut Ctx, tab: &str| {
+        let a = call(ctx, "assembly_list", json!({ "tab": tab }));
+        let mut v: Vec<String> = a["instances"].as_array().unwrap().iter().map(|i| i["name"].as_str().unwrap().to_string()).collect();
+        v.sort();
+        v
+    };
+    let root = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Assembly" && t["name"] != "Sub").and_then(|t| t["name"].as_str()).unwrap().to_string();
+    assert_eq!(names(&mut ctx, &root), ["Part 1 <1>", "Sub <1>"]);
+    assert_eq!(names(&mut ctx, "Sub"), ["Part 2 <1>", "Part 3 <1>"]);
+    assert_eq!(r["parts"].as_array().unwrap().len(), 3, "{r}");
+}
+
 #[test]
 fn import_step_round_trip() {
     let mut ctx = Ctx::new();

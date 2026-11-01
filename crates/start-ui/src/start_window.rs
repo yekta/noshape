@@ -770,7 +770,8 @@ impl StartView {
     }
 
     /// A new document for CAD files with the modal's options, named after the
-    /// first file: its Part Studios / Assemblies first, then "CAD Imports".
+    /// first file (with its extension, as live): its Part Studios / Assemblies
+    /// first, then "CAD Imports"; V1 made at once.
     fn import_cad(paths: &[PathBuf], choice: &noshape_ops::import::ImportChoice, place: &Path, gpu: crate::gpu::Gpu, cx: &mut App) -> anyhow::Result<()> {
         use noshape_ops::import as imp;
         let mut doc = crate::user_units::new_document();
@@ -786,8 +787,14 @@ impl StartView {
         let models: Vec<_> = doc.ordered_tabs().iter().filter(|t| !matches!(t.content, noshape_model::TabContent::File(_))).map(|t| t.id).collect();
         let rest: Vec<_> = doc.settings.tab_order.iter().copied().filter(|id| !models.contains(id)).collect();
         doc.settings.tab_order = models.into_iter().chain(rest).collect();
-        let (name, _) = imp::import_names(&paths[0]);
-        crate::start_hooks::open_document_window(Self::free_target(place, &name), Some(doc), gpu, cx)?;
+        // Live request 1742: the document is named after the whole file
+        // name ("nested-asm-A.step") and has V1 at once (Start → V1 → Main).
+        let (_, name) = imp::import_names(&paths[0]);
+        let target = Self::free_target(place, &name);
+        let mut session = noshape_ops::session::Session::create(&target, doc)?;
+        session.create_version("V1", "")?;
+        drop(session);
+        crate::start_hooks::open_document_window(target, None, gpu, cx)?;
         // A file that didn't translate next to ones that did: the reason.
         if !errors.is_empty() {
             anyhow::bail!("{}", errors.join("\n"));

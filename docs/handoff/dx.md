@@ -11,6 +11,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## Late 11-01 (21:11 UTC)
+- D19 multi-selection palette, D20 hole tables over several views, X1 (A) nested STEP subassemblies + V1 on
+  documents-page imports: done and checked, waiting to land (part-studio-ui test red on main, below).
+- To skasm / lead: live 1742 (B) "Split into multiple documents" needs an Assembly instance of another document's
+  assembly at a version ("Versioned assembly from other document"); InstanceSource::External is Part Studios only.
+  With it, Split = a folder named after the file, a document per (sub)assembly (one Part Studio per part), each V1,
+  the top instancing the subdocuments' V1.
+
 ## Audit continued (to 11-01 18:24 UTC)
 - M1 format lines (stored per-line edits, live's menu, grips; API drawing_format_line), D18 End type select, D10 D11
   D14 leftovers; more surfaces audited: configurations / Variable Studio / Derived (44 dumps; C1 C2), 50 more

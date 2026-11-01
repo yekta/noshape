@@ -523,20 +523,38 @@ struct TreeWalk
   std::vector<Leaf>              parts;
   rust::Vec<PvzInstance>         instances;
   std::string                    root;
+  // Subassembly definitions and the tree's direct children (StepTree::nest).
+  std::vector<TDF_Label>         subProtos;
+  rust::Vec<rust::String>        subNames;
+  rust::Vec<StepChild>           nest;
 };
 
+// Row-major 3 x 4 of a location, translation in metres (OCCT works in mm).
+void push_trsf(rust::Vec<double>& out, const TopLoc_Location& l)
+{
+  const gp_Trsf t = l.Transformation();
+  for (int r = 1; r <= 3; ++r)
+    for (int k = 1; k <= 4; ++k)
+      out.push_back(k == 4 ? t.Value(r, k) * 1e-3 : t.Value(r, k));
+}
+
+// `owner`: the subassembly definition holding `label` (-1 the root);
+// `record`: the owner is walked for the first time (its children go in
+// `nest` once).
 void walk_tree(TreeWalk& w, const TDF_Label& label, const TopLoc_Location& loc,
                const std::string& inheritedName, bool inheritedHasColor,
-               const Quantity_Color& inheritedColor, int depth)
+               const Quantity_Color& inheritedColor, int depth, int owner, bool record)
 {
   if (depth > 64)
     return;
   TDF_Label       ref  = label;
   TopLoc_Location here = loc;
+  TopLoc_Location local;
   if (XCAFDoc_ShapeTool::IsReference(label))
   {
     XCAFDoc_ShapeTool::GetReferredShape(label, ref);
-    here = loc * XCAFDoc_ShapeTool::GetLocation(label);
+    local = XCAFDoc_ShapeTool::GetLocation(label);
+    here  = loc * local;
   }
   std::string name = label_name(label);
   if (name.empty())
@@ -555,10 +573,32 @@ void walk_tree(TreeWalk& w, const TDF_Label& label, const TopLoc_Location& loc,
   }
   if (XCAFDoc_ShapeTool::IsAssembly(ref))
   {
+    int def = -1;
+    for (size_t i = 0; i < w.subProtos.size(); ++i)
+      if (w.subProtos[i].IsEqual(ref))
+        def = (int)i;
+    const bool first = def < 0;
+    if (first)
+    {
+      def = (int)w.subProtos.size();
+      w.subProtos.push_back(ref);
+      const std::string defName = label_name(ref).empty() ? name : label_name(ref);
+      w.subNames.push_back(rust::String(defName));
+    }
+    if (record)
+    {
+      StepChild ch;
+      ch.owner = owner;
+      ch.part  = -1;
+      ch.sub   = def;
+      ch.name  = rust::String(name);
+      push_trsf(ch.transform, local);
+      w.nest.push_back(std::move(ch));
+    }
     NCollection_Sequence<TDF_Label> comps;
     XCAFDoc_ShapeTool::GetComponents(ref, comps, false);
     for (int i = 1; i <= comps.Length(); ++i)
-      walk_tree(w, comps(i), here, name, hasColor, c, depth + 1);
+      walk_tree(w, comps(i), here, name, hasColor, c, depth + 1, def, first);
     return;
   }
   TopoDS_Shape s = XCAFDoc_ShapeTool::GetShape(ref);
@@ -603,6 +643,16 @@ void walk_tree(TreeWalk& w, const TDF_Label& label, const TopLoc_Location& loc,
     for (int k = 1; k <= 4; ++k)
       inst.transform.push_back(k == 4 ? t.Value(r, k) * 1e-3 : t.Value(r, k));
   w.instances.push_back(std::move(inst));
+  if (record)
+  {
+    StepChild ch;
+    ch.owner = owner;
+    ch.part  = (int)part;
+    ch.sub   = -1;
+    ch.name  = rust::String(name);
+    push_trsf(ch.transform, local);
+    w.nest.push_back(std::move(ch));
+  }
 }
 } // namespace
 
@@ -643,7 +693,7 @@ StepTree read_step_tree(rust::Str path)
     Quantity_Color c;
     const bool     has = label_color(w.ct, roots(1), TopoDS_Shape(), c);
     for (int i = 1; i <= comps.Length(); ++i)
-      walk_tree(w, comps(i), TopLoc_Location(), w.root, has, c, 1);
+      walk_tree(w, comps(i), TopLoc_Location(), w.root, has, c, 1, -1, true);
   }
   for (const auto& l : w.parts)
   {
@@ -667,6 +717,8 @@ StepTree read_step_tree(rust::Str path)
     }
   }
   out.instances = std::move(w.instances);
+  out.sub_names = std::move(w.subNames);
+  out.nest      = std::move(w.nest);
   app->Close(doc);
   fix_pole_pcurves(out.parts.shapes->items);
   return out;

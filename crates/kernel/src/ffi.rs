@@ -253,6 +253,22 @@ pub(crate) mod ffi {
         root: String,
         parts: StepImport,
         instances: Vec<PvzInstance>,
+        /// Subassembly definitions' names (live request 1742: each its own
+        /// Assembly), and the direct children of the root (`owner` -1) and of
+        /// each definition (from its first occurrence).
+        sub_names: Vec<String>,
+        nest: Vec<StepChild>,
+    }
+
+    /// A direct child in a STEP assembly tree: a part (`part` ≥ 0) or a
+    /// subassembly (`sub` ≥ 0), placed in its owner (row-major 3 x 4,
+    /// metres).
+    struct StepChild {
+        owner: i32,
+        part: i32,
+        sub: i32,
+        name: String,
+        transform: Vec<f64>,
     }
 
     #[derive(Debug, Clone, Copy)]

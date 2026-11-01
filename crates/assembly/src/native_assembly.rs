@@ -445,6 +445,9 @@ pub struct PvzImport {
     pub step: bool,
     /// The Import dialog's boolean choices (Import feature parameter ids).
     pub options: Vec<(&'static str, bool)>,
+    /// A STEP assembly's subassemblies (live request 1742): each its own
+    /// Assembly tab, instanced where used.
+    pub nesting: Option<k::StepNesting>,
 }
 
 /// A PVZ (Creo View) file of several part instances, as Onshape imports it
@@ -456,7 +459,7 @@ pub struct PvzImport {
 /// Assembly tab comes first. `brep` / `info` are the Import feature's data
 /// (the parts in their own coordinates, see `noshape_kernel::read_pvz_parts`).
 pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) -> Result<(TabId, TabId), String> {
-    let PvzImport { stem, root, brep, info, foreign_id, instances, names: _, step, options } = pvz;
+    let PvzImport { stem, root, brep, info, foreign_id, instances, names: _, step, options, nesting } = pvz;
     let (brep, info) = (brep.clone(), info.clone());
     let mut ps = PartStudio::new();
     let mut f = ps.new_feature("importForeign", units).ok_or("no Import feature")?;
@@ -483,6 +486,9 @@ pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) 
     // its name on a repeat import (no " (1)"); the Assembly is numbered.
     let studio_name = if *step { format!("{stem} parts") } else { unique_name(doc, &format!("{stem} parts")) };
     let studio = doc.add_tab(&studio_name, TabContent::PartStudio(ps));
+    if let Some(n) = nesting.as_ref().filter(|n| !n.subs.is_empty()) {
+        return Ok(nested_assemblies(doc, n, studio, &bodies, &part_names, if root.is_empty() { stem } else { root }));
+    }
     let mut asm = Assembly::default();
     // Numbered per name, as instance names are (two parts both named
     // "Part 1" give "Part 1 <1>" and "Part 1 <2>").
@@ -506,6 +512,55 @@ pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) 
         order.insert(s, id);
     }
     Ok((studio, assembly))
+}
+
+/// A STEP assembly with subassemblies (live request 1742 (A)): the root
+/// Assembly, then one Assembly per subassembly ("Sub": its parts and nested
+/// subassemblies, placed in it), all parts from the one Part Studio; a
+/// subassembly is instanced where used ("Sub <1>"). The Assemblies come
+/// before the Part Studio. Returns (studio, root assembly).
+fn nested_assemblies(doc: &mut Document, n: &k::StepNesting, studio: TabId, bodies: &[Option<BodyId>], part_names: &std::collections::HashMap<BodyId, String>, root: &str) -> (TabId, TabId) {
+    let root_tab = doc.add_tab(&unique_name(doc, root), TabContent::Assembly(Box::default()));
+    let subs: Vec<TabId> = n.subs.iter().map(|name| doc.add_tab(&unique_name(doc, name), TabContent::Assembly(Box::default()))).collect();
+    for (owner, tab) in std::iter::once((None, root_tab)).chain(subs.iter().enumerate().map(|(i, t)| (Some(i), *t))) {
+        let mut asm = Assembly::default();
+        let mut count: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+        // The reverse of the file's order, as the flat import.
+        for (_, c) in n.children.iter().rev().filter(|(o, _)| *o == owner) {
+            let source = match (c.part, c.sub) {
+                (Some(p), _) => match bodies.get(p).cloned().flatten() {
+                    Some(body) => InstanceSource::Part { studio, body, config: ConfigValues::default() },
+                    None => continue,
+                },
+                (None, Some(s)) => match subs.get(s) {
+                    Some(&assembly) => InstanceSource::Assembly { assembly, config: ConfigValues::default() },
+                    None => continue,
+                },
+                _ => continue,
+            };
+            let name = match (&source, c.name.trim().is_empty()) {
+                (InstanceSource::Part { body, .. }, true) => part_names.get(body).cloned().unwrap_or_default(),
+                (InstanceSource::Assembly { .. }, true) => c.sub.and_then(|s| n.subs.get(s)).cloned().unwrap_or_default(),
+                _ => c.name.clone(),
+            };
+            let k = count.entry(name.clone()).or_insert(0);
+            *k += 1;
+            let id = InstanceId(asm.next_id());
+            asm.instances.push(Instance::new(id, format!("{name} <{k}>"), source, Placement::from_dmat4(&c.transform)));
+        }
+        if let Some(t) = doc.tab_mut(tab) {
+            t.content = TabContent::Assembly(Box::new(asm));
+        }
+    }
+    // Live: Assembly 1, Sub, …, then the parts' Part Studio.
+    let order = &mut doc.settings.tab_order;
+    let moved: Vec<TabId> = std::iter::once(root_tab).chain(subs.iter().copied()).collect();
+    order.retain(|t| !moved.contains(t));
+    let at = order.iter().position(|t| *t == studio).unwrap_or(order.len());
+    for (i, t) in moved.into_iter().enumerate() {
+        order.insert(at + i, t);
+    }
+    (studio, root_tab)
 }
 
 /// The Assembly's name from the product tree's root name (live: "pvz rot

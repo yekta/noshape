@@ -176,6 +176,10 @@ struct PvzAssembly {
     instances: Vec<noshape_kernel::PvzInstance>,
     /// From a STEP assembly (else a .pvz).
     step: bool,
+    /// A STEP assembly's subassemblies (live request 1742).
+    nesting: Option<noshape_kernel::StepNesting>,
+    /// The file's part index of each part here (`pvz_of_tree`'s order).
+    order: Vec<usize>,
 }
 
 /// Read a .pvz of several instances for [`PvzAssembly`]; `None` for one
@@ -192,7 +196,7 @@ fn read_pvz_assembly(path: &Path) -> anyhow::Result<Option<PvzAssembly>> {
     let shape = k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>());
     let foreign = Foreign { brep: String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string(), parts: serde_json::to_string(&info)? };
     let (name, file) = import_names(path);
-    Ok(Some(PvzAssembly { name, file, root: if root.is_empty() { "RootAssembly".into() } else { root }, foreign, names, instances, step: false }))
+    Ok(Some(PvzAssembly { name, file, root: if root.is_empty() { "RootAssembly".into() } else { root }, foreign, names, instances, step: false, nesting: None, order: Vec::new() }))
 }
 
 /// A STEP file whose root product is an assembly: an Assembly named after
@@ -211,8 +215,18 @@ fn read_step_assembly(path: &Path) -> anyhow::Result<Option<PvzAssembly>> {
     if !std::fs::read(path)?.windows(NAUO.len()).any(|w| w.eq_ignore_ascii_case(NAUO)) {
         return Ok(None);
     }
-    let Some(a) = k::read_step_assembly(path, k::LengthUnit::Meter)? else { return Ok(None) };
-    pvz_of_tree(path, a).map(Some)
+    let Some((a, nesting)) = k::read_step_assembly_nested(path, k::LengthUnit::Meter)? else { return Ok(None) };
+    let mut p = pvz_of_tree(path, a)?;
+    // Subassemblies keep their own Assembly tabs (live request 1742 (A)),
+    // their parts numbered as the Part Studio's.
+    if !nesting.subs.is_empty() {
+        let mut nesting = nesting;
+        for (_, c) in &mut nesting.children {
+            c.part = c.part.and_then(|f| p.order.iter().position(|&o| o == f));
+        }
+        p.nesting = Some(nesting);
+    }
+    Ok(Some(p))
 }
 
 /// A Parasolid file holding an assembly: imported as a STEP assembly is
@@ -241,12 +255,13 @@ fn pvz_of_tree(path: &Path, (root, parts, mut instances): noshape_kernel::StepAs
     for i in &mut instances {
         i.part = order.iter().position(|&p| p == i.part).unwrap_or(usize::MAX);
     }
+
     let info: Vec<noshape_model::features::importing::ImportPartInfo> = parts.iter().map(|p| noshape_model::features::importing::ImportPartInfo { name: p.name.clone(), color: p.color, opacity: p.opacity, faces: p.face_colors.clone() }).collect();
     let names = parts.iter().map(|p| p.name.clone()).collect();
     let shape = k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>());
     let foreign = Foreign { brep: String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string(), parts: serde_json::to_string(&info)? };
     let (name, file) = import_names(path);
-    Ok(PvzAssembly { name, file, root, foreign, names, instances, step: true })
+    Ok(PvzAssembly { name, file, root, foreign, names, instances, step: true, nesting: None, order })
 }
 
 /// Files read for an import (before the document edit).
@@ -378,11 +393,28 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
         if p.step {
             options.push(("joinAdjacentSurfaces", c.join));
         }
-        let pvz = noshape_model::native_assembly::PvzImport { stem: p.name.clone(), root: p.root.clone(), brep: p.foreign.brep.clone(), info: p.foreign.parts.clone(), foreign_id: p.file.clone(), instances: p.instances.clone(), names: p.names.clone(), step: p.step, options };
+        let pvz = noshape_model::native_assembly::PvzImport { stem: p.name.clone(), root: p.root.clone(), brep: p.foreign.brep.clone(), info: p.foreign.parts.clone(), foreign_id: p.file.clone(), instances: p.instances.clone(), names: p.names.clone(), step: p.step, options, nesting: p.nesting.clone() };
         match noshape_model::native_assembly::add_pvz_assembly(d, &pvz, units) {
             Ok((studio, assembly)) => {
                 crate::docedit::place_after(d, assembly, at);
-                crate::docedit::place_after(d, studio, Some(assembly));
+                // Its subassemblies' Assemblies next, as they are used (live
+                // request 1742: Assembly 1, Sub, the parts' Part Studio).
+                let mut last = assembly;
+                let mut queue = vec![assembly];
+                let mut seen = vec![assembly];
+                while let Some(t) = queue.pop() {
+                    let Some(noshape_model::TabContent::Assembly(a)) = d.tab(t).map(|t| &t.content) else { continue };
+                    let subs: Vec<TabId> = a.instances.iter().filter_map(|i| if let noshape_model::assembly::InstanceSource::Assembly { assembly, .. } = &i.source { Some(*assembly) } else { None }).collect();
+                    for s in subs.into_iter().rev() {
+                        if !seen.contains(&s) {
+                            seen.push(s);
+                            crate::docedit::place_after(d, s, Some(last));
+                            last = s;
+                            queue.insert(0, s);
+                        }
+                    }
+                }
+                crate::docedit::place_after(d, studio, Some(last));
                 at = Some(studio);
                 first.get_or_insert(assembly);
             }

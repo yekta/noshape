@@ -106,12 +106,47 @@ pub type StepAssembly = (String, Vec<ImportedShape>, Vec<PvzInstance>);
 /// leaf instance (file order, metres). `None` for any other STEP file
 /// (single parts, several top-level products).
 pub fn read_step_assembly(path: &Path, unit: LengthUnit) -> Result<Option<StepAssembly>> {
+    Ok(read_step_assembly_nested(path, unit)?.map(|(a, _)| a))
+}
+
+/// A STEP assembly's subassemblies (live request 1742): each definition's
+/// name and direct children, and the root's direct children.
+#[derive(Clone, Debug, Default)]
+pub struct StepNesting {
+    pub subs: Vec<String>,
+    /// (owner: None the root, else a `subs` index; the child).
+    pub children: Vec<(Option<usize>, NestChild)>,
+}
+
+/// A direct child of an assembly: a part ([`StepAssembly`]'s index) or a
+/// subassembly (a [`StepNesting::subs`] index), placed in its owner.
+#[derive(Clone, Debug)]
+pub struct NestChild {
+    pub part: Option<usize>,
+    pub sub: Option<usize>,
+    pub name: String,
+    pub transform: glam::DMat4,
+}
+
+/// [`read_step_assembly`] with its subassembly tree (empty `subs` when it
+/// has none).
+pub fn read_step_assembly_nested(path: &Path, unit: LengthUnit) -> Result<Option<(StepAssembly, StepNesting)>> {
     let t = ck(ffi::read_step_tree(path_str(path)?))?;
     if t.instances.is_empty() {
         return Ok(None);
     }
+    let at = |t: &[f64]| glam::DMat4::from_cols_array(&[t[0], t[4], t[8], 0.0, t[1], t[5], t[9], 0.0, t[2], t[6], t[10], 0.0, t[3], t[7], t[11], 1.0]);
+    let nesting = StepNesting {
+        subs: t.sub_names.iter().map(|n| n.to_string()).collect(),
+        children: t
+            .nest
+            .iter()
+            .filter(|c| c.transform.len() == 12)
+            .map(|c| (usize::try_from(c.owner).ok(), NestChild { part: usize::try_from(c.part).ok(), sub: usize::try_from(c.sub).ok(), name: c.name.clone(), transform: at(&c.transform) }))
+            .collect(),
+    };
     // OCCT reads STEP in millimetres.
-    Ok(Some((t.root.clone(), step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?, pvz_instances_of(&t.instances))))
+    Ok(Some(((t.root.clone(), step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?, pvz_instances_of(&t.instances)), nesting)))
 }
 
 /// A Parasolid transmit file (.x_t / .x_b) holding an assembly: the top
