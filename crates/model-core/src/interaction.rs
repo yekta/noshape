@@ -787,6 +787,35 @@ pub fn draft_switch_face(ctx: &crate::regen::context::Context, params: &ParamVal
     Some(along > against + 1e-9)
 }
 
+/// Helix's manipulators as std's helix.fs adds them, keyed for its
+/// helixManipulatorChange: Axis or Circle with Height (not Turns and pitch),
+/// the height arrow from the helix's start along its axis as picked, its
+/// offset the height (negative: Opposite direction); Cylinder / Cone, the
+/// direction flip on the axis halfway along the face; Turns and pitch (any
+/// axis), the direction flip at the helix's end (its start plus turns ×
+/// pitch its way), the last std adds. Empty while the dialog can't place it.
+pub fn helix_manipulators(ctx: &crate::regen::context::Context, params: &ParamValues, units: &noshape_units::UnitPrefs, vars: &std::collections::BTreeMap<String, noshape_units::Quantity>) -> Vec<(String, crate::display::FeatureManipulator)> {
+    use crate::display::FeatureManipulator as M;
+    let ev = crate::regen::eval::EvalCtx::new(FeatureId(0), "", params, units, ctx.clone(), vars);
+    let Ok((start, way, _, _, _, face_height)) = crate::regen::features::curves::helix_frame(&ev) else { return Vec::new() };
+    let opposite = params.bool("oppositeDirection");
+    // std's axis: the way before Opposite direction.
+    let axis = if opposite { -way } else { way };
+    let flip = |base: DVec3| vec![("directionManipulator".to_string(), M::Flip { base, direction: axis, flipped: opposite, other_direction: None, secondary: false })];
+    if params.is("pathType", "TURNS_PITCH") {
+        let (Ok(pitch), Ok(turns)) = (ev.length("helicalPitch"), ev.real("revolutions")) else { return Vec::new() };
+        return flip(start + way * pitch * turns);
+    }
+    if let Some(h) = face_height {
+        return flip(start + way * h * 0.5);
+    }
+    if !params.is("endType", "HEIGHT") {
+        return Vec::new();
+    }
+    let Ok(height) = ev.length("height") else { return Vec::new() };
+    vec![("heightManipulator".to_string(), M::Linear { base: start, direction: axis, offset: if opposite { -height } else { height }, min: -500.0, max: 500.0, secondary: false, primary: Some("height".into()) })]
+}
+
 /// A partial fillet's bound manipulators as std's fillet.fs adds them
 /// (addPartialFilletManipulators), keyed as std keys them for its
 /// filletManipulatorChange: for each Position or Offset bound, an arrow

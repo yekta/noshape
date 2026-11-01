@@ -816,72 +816,16 @@ impl PartStudioView {
                 let Some(ctx) = self.ui.before_context.as_ref().or(self.context.as_ref()) else { return Vec::new() };
                 noshape_model::interaction::draft_parting_manipulators(ctx, p, &self.doc.read(cx).session.doc.settings.units)
             }
-            "helix" => self.helix_manipulators(cx).unwrap_or_default(),
+            "helix" => {
+                let Some(ctx) = self.ui.before_context.as_ref().or(self.context.as_ref()) else { return Vec::new() };
+                noshape_model::interaction::helix_manipulators(ctx, p, &self.doc.read(cx).session.doc.settings.units, &self.display.variables)
+            }
             "fillet" if p.bool("isPartial") => {
                 let Some(ctx) = self.ui.before_context.as_ref().or(self.context.as_ref()) else { return Vec::new() };
                 noshape_model::interaction::partial_fillet_manipulators(ctx, p, &self.doc.read(cx).session.doc.settings.units)
             }
             _ => Vec::new(),
         }
-    }
-
-    /// Helix's manipulators as std's helix.fs adds them, for its
-    /// helixManipulatorChange: Axis or Circle with Height (not Turns and
-    /// pitch), the height arrow from the helix's start along its axis as
-    /// picked, its offset the height (negative: Opposite direction); Cylinder
-    /// / Cone, the direction flip arrow on the axis halfway along the face.
-    fn helix_manipulators(&self, cx: &App) -> Option<Vec<(String, noshape_model::display::FeatureManipulator)>> {
-        use noshape_model::display::FeatureManipulator as M;
-        let d = self.edit.as_ref()?.dialog.read(cx);
-        let p = &d.feature.params;
-        let ctx = self.ui.before_context.as_ref().or(self.context.as_ref())?;
-        let opposite = p.bool("oppositeDirection");
-        if p.is("axisType", "SURFACE") {
-            let face = noshape_model::regen::measure::resolve_shapes(ctx, p.query("entities").first()?).into_iter().next()?;
-            let (origin, axis) = match face.face_surface().ok()? {
-                noshape_kernel::Surface::Cylinder { origin, axis, .. } | noshape_kernel::Surface::Cone { origin, axis, .. } => (origin, axis.try_normalize()?),
-                _ => return None,
-            };
-            // The face's extent along the axis, from its edges' ends and middles.
-            let ts: Vec<f64> = face
-                .edges()
-                .iter()
-                .filter_map(|e| {
-                    let i = e.edge_info().ok()?;
-                    Some([i.start, i.end, e.point_at((i.first_param + i.last_param) * 0.5).ok()?])
-                })
-                .flatten()
-                .map(|q| (q - origin).dot(axis))
-                .collect();
-            let (lo, hi) = ts.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), t| (a.min(*t), b.max(*t)));
-            if lo > hi {
-                return None;
-            }
-            return Some(vec![("directionManipulator".into(), M::Flip { base: origin + axis * (lo + hi) * 0.5, direction: axis, flipped: opposite, other_direction: None, secondary: false })]);
-        }
-        if !p.is("endType", "HEIGHT") || p.is("pathType", "TURNS_PITCH") {
-            return None;
-        }
-        let (base, dir) = match p.enum_("axisType") {
-            "AXIS" => {
-                let r = p.query("axis").first()?;
-                let line = noshape_model::regen::measure::resolve_shapes(ctx, r).into_iter().next().filter(|e| matches!(e.edge_curve(), Ok(noshape_kernel::Curve::Line { .. }))).and_then(|e| e.endpoints().ok());
-                match line {
-                    Some((a, b)) if p.bool("oppositeOrigin") => (b, (a - b).normalize()),
-                    Some((a, b)) => (a, (b - a).normalize()),
-                    None => self.axis_of(r).map(|(o, d)| if p.bool("oppositeOrigin") { (o, -d) } else { (o, d) })?,
-                }
-            }
-            "CIRCLE" => {
-                let e = noshape_model::regen::measure::resolve_shapes(ctx, p.query("edge").first()?).into_iter().next()?;
-                let noshape_kernel::Curve::Circle { center, axis, .. } = e.edge_curve().ok()? else { return None };
-                (center, axis.normalize())
-            }
-            _ => return None,
-        };
-        let units = self.doc.read(cx).session.doc.settings.units;
-        let height = p.expr("height").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value)))?;
-        Some(vec![("heightManipulator".into(), M::Linear { base, direction: dir, offset: if opposite { -height } else { height }, min: -500.0, max: 500.0, secondary: false, primary: Some("height".into()) })])
     }
 
     /// The FeatureScript manipulator `i` as it stands (dragged or as the preview added it), with its key.

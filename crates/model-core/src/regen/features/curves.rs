@@ -14,12 +14,12 @@ use std::f64::consts::{PI, TAU};
 
 // ------------------------------------------------------------------ helix
 
-pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
+/// A helix's frame as helix.fs's local coordinate system: where it starts (on its axis), its way (Opposite
+/// direction applied), its start direction and radius, its taper, and the face's height for Cylinder / Cone.
+pub(crate) fn helix_frame(ev: &EvalCtx) -> FResult<(DVec3, DVec3, DVec3, f64, f64, Option<f64>)> {
     let axis_type = ev.enum_("axisType").to_string();
     let opposite = ev.bool("oppositeDirection");
-    // Base frame: start-plane origin, helix axis, start direction, start radius,
-    // taper from geometry, height from geometry.
-    let (mut base, mut z, mut x, mut r0, mut taper, geom_height) = match axis_type.as_str() {
+    Ok(match axis_type.as_str() {
         "AXIS" => {
             // helix.fs: "Select an object with an axis." on the axis field.
             let no_axis = || crate::regen::eval::err_at(&["axis"], "Select an object with an axis.");
@@ -77,7 +77,12 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
                 _ => return crate::regen::eval::err_at(&["entities"], "Select a cone or cylinder."),
             }
         }
-    };
+    })
+}
+
+pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
+    let axis_type = ev.enum_("axisType").to_string();
+    let (mut base, mut z, mut x, mut r0, mut taper, geom_height) = helix_frame(ev)?;
     let left_handed = ev.is("handedness", "CCW");
     // Start condition.
     if ev.is("startType", "START_POINT") {

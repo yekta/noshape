@@ -2906,3 +2906,38 @@ fn counterbore_head_shows_in_flat() {
         assert_eq!(fp.heads[0].up, from_top == (fp.frame.normal.z > 0.0), "from top {from_top}: {:?} {:?}", fp.heads, fp.frame.normal);
     }
 }
+
+/// Helix › Turns and pitch's direction flip as std's (audit-part-studio M9): about the Top plane's normal, 4 turns
+/// of 5 mm, the flip sits at the helix's end (z 20 mm) along +Z; std's helixManipulatorChange turns a click on it
+/// into Opposite direction, and the flip then sits at z −20 mm, still along +Z, flipped.
+#[test]
+fn helix_turns_and_pitch_flip_as_std() {
+    let mut s = Studio::new();
+    s.add("helix", |p| {
+        p.set("axisType", en("AXIS"));
+        p.set("axis", q(Reference::Plane(DatumPlane::Top)));
+        p.set("pathType", en("TURNS_PITCH"));
+        p.set("startRadius", expr("10 mm"));
+        p.set("revolutions", expr("4"));
+        p.set("helicalPitch", expr("5 mm"));
+    });
+    let r = s.ok();
+    let helix = s.ps.features.last().unwrap().clone();
+    let vars = std::collections::BTreeMap::new();
+    let m = noshape_model::interaction::helix_manipulators(&r.context, &helix.params, &s.units, &vars);
+    use noshape_model::display::FeatureManipulator as M;
+    let [(key, M::Flip { base, direction, flipped, .. })] = m.as_slice() else { panic!("{m:?}") };
+    assert_eq!(key, "directionManipulator");
+    assert!((*base - DVec3::new(0.0, 0.0, mm(20.0))).length() < 1e-9 && direction.z > 0.999 && !flipped, "{m:?}");
+    let mut moved = m[0].1.clone();
+    if let M::Flip { flipped, .. } = &mut moved {
+        *flipped = true;
+    }
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*r.context).clone(), "helix", helix.id, &helix.name, &s.units, &helix.params, key, &moved).expect("std's change function ran");
+    assert_eq!(changed.get("oppositeDirection"), Some(&ParamValue::Bool(true)), "{changed:?}");
+    let mut params = helix.params.clone();
+    params.set("oppositeDirection", ParamValue::Bool(true));
+    let m = noshape_model::interaction::helix_manipulators(&r.context, &params, &s.units, &vars);
+    let [(_, M::Flip { base, direction, flipped, .. })] = m.as_slice() else { panic!("{m:?}") };
+    assert!((*base - DVec3::new(0.0, 0.0, mm(-20.0))).length() < 1e-9 && direction.z > 0.999 && *flipped, "{m:?}");
+}
