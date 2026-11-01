@@ -1,5 +1,6 @@
 // Booleans, split, unify, enclose, transforms, sections, projections.
 #include <thread>
+#include <tuple>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -420,7 +421,7 @@ template <class P> void free_elsewhere(P& p)
 {
   try
   {
-    std::thread([q = std::move(p)]() mutable { q.reset(); }).detach();
+    std::thread([q = std::move(p)]() mutable { [[maybe_unused]] P r = std::move(q); }).detach();
   }
   catch (...)
   {
@@ -428,12 +429,65 @@ template <class P> void free_elsewhere(P& p)
   }
 }
 
+// Hands what it holds to free_elsewhere when its scope is left after a cancel (the unwinding freed a whole knurl's
+// copy, history and unify maps on the worker: half a second after the cancel). Declared after them.
+template <class... P> struct FreeIfCancelled
+{
+  std::tuple<P&...> held;
+  explicit FreeIfCancelled(P&... p) : held(p...) {}
+  ~FreeIfCancelled()
+  {
+    if (cancelled(t_cancel))
+      std::apply([](auto&... p) { (free_elsewhere(p), ...); }, held);
+  }
+};
+
+} // namespace
+
 void fail_if_cancelled()
 {
   if (cancelled(t_cancel))
     fail_op("cancelled");
   if (g_over_budget.load())
     fail_op("operation stopped: it needed more than " + std::to_string(memory_budget() >> 20) + " MB of memory");
+}
+
+namespace {
+// BRepTools_History's constructor from an algorithm, stopping on a cancel: on the 45 / 45 knurl's cut it ran
+// for seconds over the 50 k argument shapes after the build (each AddGenerated also searches the shape's list
+// of modifications), past a cancel.
+template <class Algo>
+HHist cancellable_history(const std::vector<TopoDS_Shape>& args, Algo& algo)
+{
+  ShapeIMap all;
+  for (const TopoDS_Shape& x : args)
+    if (!x.IsNull())
+      TopExp::MapShapes(x, all);
+  HHist h = new BRepTools_History();
+  for (int i = 1; i <= all.Extent(); ++i)
+  {
+    if ((i & 0xFF) == 0)
+      fail_if_cancelled();
+    const TopoDS_Shape& s = all(i);
+    if (!BRepTools_History::IsSupportedType(s))
+      continue;
+    if (algo.IsDeleted(s))
+      h->Remove(s);
+    int k = 0;
+    for (const TopoDS_Shape& m : algo.Modified(s))
+    {
+      if ((++k & 0xFF) == 0)
+        fail_if_cancelled();
+      h->AddModified(s, m);
+    }
+    for (const TopoDS_Shape& g : algo.Generated(s))
+    {
+      if ((++k & 0xFF) == 0)
+        fail_if_cancelled();
+      h->AddGenerated(s, g);
+    }
+  }
+  return h;
 }
 
 void apply_opts(BRepAlgoAPI_BuilderAlgo& a, const BoolOpts& o)
@@ -628,7 +682,11 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
   std::vector<char>   planar((size_t)nf + 1, 0);
   std::vector<gp_Pln> pl((size_t)nf + 1);
   for (int i = 1; i <= nf; ++i)
+  {
+    if ((i & 0xFF) == 0)
+      fail_if_cancelled();
     planar[(size_t)i] = outer_plane(TopoDS::Face(faces(i)), pl[(size_t)i]);
+  }
   ShapeAncMap ef;
   unique_ancestors(where, TopAbs_EDGE, TopAbs_FACE, ef);
   std::vector<int> up((size_t)nf + 1);
@@ -650,6 +708,7 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
   std::map<int, std::vector<int>> groups;
   for (int i = 1; i <= nf; ++i)
     groups[root(i)].push_back(i);
+  fail_if_cancelled();
   lap = std::make_unique<KernelTimer>("merge.groups");
   occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape();
   // As UnifySameDomain records it: every merged face modified into the new
@@ -664,6 +723,7 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
   {
     if (g.size() < 2)
       continue;
+    fail_if_cancelled();
     // The group's edges as the faces use them (orientations composed with
     // the faces': all face the same way), and how often.
     ShapeIMap        em;
@@ -828,6 +888,7 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
       }
     any = true;
   }
+  fail_if_cancelled();
   lap            = std::make_unique<KernelTimer>("merge.rebuild");
   TopoDS_Shape r = s;
   // One solid of one shell: the shell rebuilt with the merged faces (ReShape
@@ -901,6 +962,7 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
     }
   }
   // Collinear straight edges through vertices of only those two.
+  fail_if_cancelled();
   lap = std::make_unique<KernelTimer>("merge.edges");
   if (sc != nullptr && std::getenv("NOSHAPE_BOOL_DEBUG"))
   {
@@ -1303,11 +1365,15 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
   // faces merged to 4, the other gave 4/3 the volume from every start).
   for (int k = 0; k < 16; ++k)
   {
+    fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.copy");
-    BRepBuilderAPI_Copy cp(s, false, false);
-    TopoDS_Shape        in = cp.Shape();
-    HHist               hc = new BRepTools_History(to_list(std::vector<TopoDS_Shape>{s}), cp);
-    HHist               hr;
+    auto                 cpp = std::make_unique<BRepBuilderAPI_Copy>(s, false, false);
+    BRepBuilderAPI_Copy& cp  = *cpp;
+    TopoDS_Shape         in  = cp.Shape();
+    HHist                hc;
+    HHist                hr;
+    const FreeIfCancelled<std::unique_ptr<BRepBuilderAPI_Copy>, TopoDS_Shape, HHist, HHist> held(cpp, in, hc, hr);
+    hc = cancellable_history(std::vector<TopoDS_Shape>{s}, cp);
     if (k >= 8)
       in = faces_reversed(in);
     if (k % 8 > 0)
@@ -1321,16 +1387,22 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
         continue;
       }
     }
+    fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.shares");
     std::vector<TopoDS_Shape> image;
     std::vector<FaceShare>    share;
     images(cp, hr, in, image, share);
+    fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.build");
-    ShapeUpgrade_UnifySameDomain u(in, true, true, false);
+    auto                          up = std::make_unique<ShapeUpgrade_UnifySameDomain>(in, true, true, false);
+    ShapeUpgrade_UnifySameDomain& u  = *up;
+    const FreeIfCancelled<std::unique_ptr<ShapeUpgrade_UnifySameDomain>> held_u(up);
     u.Build();
+    fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.check");
     if (!keeps_volume(usd_volume_change(sf, image, share, u.Shape()), u.Shape()))
       continue;
+    fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.history");
     if (hist.IsNull())
       hist = new BRepTools_History();
@@ -2064,9 +2136,11 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
       *clean = true;
     return s0;
   }
+  fail_if_cancelled();
   lap = std::make_unique<KernelTimer>("unify.merge_planar");
   UnifyScope         next;
   const TopoDS_Shape s = merge_planar(s0, hist, sc, &next);
+  fail_if_cancelled();
   lap                  = std::make_unique<KernelTimer>("unify.candidates_again");
   if (!same_domain_candidates(s, sc != nullptr ? &next : nullptr))
   {
@@ -2076,17 +2150,22 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
       *clean = true;
     return s;
   }
+  fail_if_cancelled();
   lap = std::make_unique<KernelTimer>("unify.bands");
   const TopoDS_Shape s1 = merge_apex_cones(merge_cylinder_bands(s, hist), hist);
+  fail_if_cancelled();
   lap                   = std::make_unique<KernelTimer>("unify.usd");
   if (TopExp_Explorer(s1, TopAbs_SOLID).More() && round_candidates(s1, sc != nullptr ? &next : nullptr))
   {
     const TopoDS_Shape s2 = usd_kept_volume(s1, hist);
+    fail_if_cancelled();
     lap                   = std::make_unique<KernelTimer>("unify.patches");
     return merge_cylinder_patches(s2, hist);
   }
+  fail_if_cancelled();
   ShapeUpgrade_UnifySameDomain u(s1, true, true, false);
   u.Build();
+  fail_if_cancelled();
   if (!u.History().IsNull())
   {
     if (hist.IsNull())
@@ -4225,6 +4304,7 @@ bool volume_possible(uint8_t op, const std::vector<TopoDS_Shape>& a, const std::
   double va = 0, vt = 0, big = 0;
   for (const TopoDS_Shape& x : a)
   {
+    fail_if_cancelled();
     const double v = volume_of(x);
     va += v;
     big = std::max(big, v);
@@ -4259,11 +4339,19 @@ bool all_solids(const std::vector<TopoDS_Shape>& l)
 // union of their volume together, a cut of the target's, an empty common.
 bool no_interaction(uint8_t op, const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_Shape>& t, const TopoDS_Shape& r)
 {
+  // (Volumes of big parts take seconds: a cancel is looked at between them.)
   double va = 0, vt = 0;
   for (const TopoDS_Shape& x : a)
+  {
+    fail_if_cancelled();
     va += volume_of(x);
+  }
   for (const TopoDS_Shape& x : t)
+  {
+    fail_if_cancelled();
     vt += volume_of(x);
+  }
+  fail_if_cancelled();
   const double v = volume_of(r), tol = 1e-9 * std::max(va + vt, 1e-12);
   switch (op)
   {
@@ -4287,6 +4375,8 @@ bool tools_reach_in(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS
     const double eps = 1e-6 * std::sqrt(bx.SquareExtent());
     for (TopExp_Explorer fx(x, TopAbs_FACE); fx.More(); fx.Next())
     {
+      // (Each face classifies against whole solids: seconds on a knurl's 10k faces, so a cancel looks here.)
+      fail_if_cancelled();
       const TopoDS_Face& f = TopoDS::Face(fx.Current());
       double             u0, u1, v0, v1;
       BRepTools::UVBounds(f, u0, u1, v0, v1);
@@ -4622,6 +4712,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   // cut, overlapping tools) the boolean runs again without glue.
   HHist        hist = tree_hist;
   TopoDS_Shape res  = tree;
+  const FreeIfCancelled<HHist, TopoDS_Shape> held(hist, res);
   if (!by_tree && first.glue == 3 && (b->HasErrors() || !b->IsDone() || !volumes_add_up(concat(a, t), b->Shape())))
   {
     const bool trimmed = t.size() > 1 && fuse_trimmed(a, t, opts, res, hist);
@@ -4650,7 +4741,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   if (!by_tree)
   {
     const KernelTimer timer("boolean.history");
-    hist = new BRepTools_History(to_list(concat(a, t)), *b);
+    hist = cancellable_history(concat(a, t), *b);
     // Built from the faces (patch 0001's CutByFaces), the result's solids are none of the target's images, and
     // the history says the target was deleted; the usual build (and noshape's Boolean) says Modified, which the
     // Rust Boolean's replay and the naming go by: each target solid Modified to the result's solids holding
@@ -4719,7 +4810,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
       {
         t_bool_path = "occt_baked";
         inputs      = concat(a2, t2);
-        hist        = new BRepTools_History(to_list(inputs), *b2);
+        hist        = cancellable_history(inputs, *b2);
         res         = b2->Shape();
       }
     }
@@ -4746,7 +4837,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
         continue;
       t_bool_path = "occt_fuzzy";
       inputs      = concat(args.items, tools.items);
-      hist        = new BRepTools_History(to_list(inputs), *b2);
+      hist        = cancellable_history(inputs, *b2);
       res         = b2->Shape();
       break;
     }

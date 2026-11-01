@@ -246,6 +246,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   6826d5f1 (also when the dialog opened while an earlier regeneration was still running: the last finished result
   is shown, both runs' late results dropped). T1 cancel_shows_the_document_before_the_edit_at_once,
   cancel_during_an_earlier_regeneration_shows_the_last_result. What remains is core's worker stop time.
+  core 11-01 06:55, rounds 5-7 (patch 0012 the BOPDS pair sort; 0013 TKShHealing + TKBRep: UnifySameDomain's
+  loops, ShapeFix_Shell's GetShells, ShapeBuild_ReShape, BRepTools_Modifier; op_boolean's history built with checks,
+  the unify steps checked, a cancelled run's big objects and shapes freed on other threads, the custom host fails a
+  cancelled operation before naming its result): vibe2 quiet, cancel at 0.5-14 s 16-243 ms (most under 80), 16 s
+  788 ms, 18 s 320 ms; vibe4 at load 38: 37-169 ms but 15 / 16 s 1.8 / 1.3 s. Still on it (stacks in
+  docs/handoff/core.md).
 - [ ] P0 BLEND-RUST (core, lead 10-30 20:50) noshape's own fillets and chamfers for simple edges, OCCT as fallback
   (crates/brep blend.rs; kernel cpp/rust_blend.cpp in front of op_fillet / op_chamfer behind NOSHAPE_BLEND_RUST, off
   until correct; corpus NOSHAPE_RECORD_BLENDS + kernel `blend_replay`). 10-30 22:00, step 1: closed tangent chains
@@ -287,6 +293,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the second, left-handed; a degenerated edge at its pole) or a chamfer's triangle, identical to OCCT with history:
   192 of 310 taken (T1 rust_vertex_blends_are_occts: every order, a block's 12 edges). Declines left: sphere
   corners (19, live asked), close chains (17), blends as wide as their faces, unequal radii at a vertex.
+  11-01 06:55, unequal radii at a vertex (live 1686: two Fillet features, either order gives the same corner): a
+  fillet whose edges end at smaller round blends (R4 verticals after an R2 top loop) failed in OCCT's and ours; now
+  those blends come off (Defeaturing), the fillet is made, the blends are made again (features.cpp
+  fillet_over_smaller_blends): 8759.3663 mm³, 18 faces, 4 tori = live (T1 blend::a_fillet_over_smaller_blends_is_as_
+  with_it_first). Left: drafted walls ((c), Draft's reapply D3, 4-sided patches).
 - [x] P1 BLEND-RUST-DEFAULT-REGEN (core; watch item for v0.4.16) **core 10-31 07:55: off by default again (NOSHAPE_BLEND_RUST=1 turns them on) until these 7 documents are understood; on it.** with noshape's blends **on by default** (0400418f) existing documents regenerate differently from NOSHAPE_BLEND_RUST=0, and later features' **part references move**: qa's fuzz ticket documents on dx's debug CLI 06:21 (main with 0400418f; qa-scratch/rel/k/dx/0621), default vs NOSHAPE_BLEND_RUST=0, per part (/tmp/qa-vols.py): (a) **targets change**: tickets/cli-shell-hang-pre.noshape **Extrude 4** (Remove, Blind 0.1 mm, booleanScope `body:Fc57916f03614.2`) → default: **Info "Selected tools and targets do not intersect."**, Part 6 348134.843 / 22 faces; OCCT: Ok, cuts **Part 6 to 348128.141 / 24** (bin/rbbisect.py both ways identical up to Extrude 4, cli/blb-shp-*.txt) — the scope's body id resolves to another part once the earlier fillets / chamfers are ours; also cli-suppress-stall Part 6 91042.93 vs OCCT **93510.60**, cli-fillet2-segv Part 6 45580.45 vs **50047.63** and Part 2 44489.69 vs 43411.10. (b) **volumes**: cli-fillet2-segv / cli-suppress-stall ~0.14 mm³ on most parts (45580.642 vs 45580.502), cli-delete-gpf 0.005, cli-72L-died 0.005. (c) **face counts**: cli-chamfer-hang-pre 52 vs 43 on 9 of 11 parts (same volumes), cli-72L-died 25 vs 29. cli-delete-crash identical. In the app (green fbc8573c vs 5af3c48d, 101 documents): 60 blend documents equal but the known 0.001 corner cases; the 7 above differ. Which side is live's is open (the moved references matter most: an old document's later Boolean changing target). (qa 2026-10-31 07:29, main 0400418f)
   qa 07:30: (b) located: tickets/cli-fillet2-segv.noshape, bin/rbbisect.py both ways (cli/blb-f2s-*.txt) equal through Shell 1 (thin shelled bodies); **Fillet 1** (Ok both) is the first difference: Part 1 **45580.64188 ours vs 45580.50215 OCCT**, Part 2 **44489.6878 vs 44489.85433**, faces 11 / 16 both, bounding boxes identical — the same fillet built with a different shape (+0.140 / −0.167 mm³). Everything later inherits it.
   qa 08:04: **new with 0785c154 / 4498e6b8 (blends ending on caps at an angle, distance-angle chamfers)**: tickets/cli-draft-die.noshape Part 1 in the app **90440.868 mm³ / 15766.139 mm²** on green 0785c154 vs **90439.156 / 15738.992** on 19a1164b and on 0785c154 with NOSHAPE_BLEND_RUST=0 (+1.712 mm³, +27.1 mm²; qa-scratch gm-b78cli-draft-die-*.png). The earlier ones (cli-72L-died, cli-delete-gpf, bop-pairs-cli-segv-152, cli-chamfer-hang-pre, cli-delete-crash) unchanged between 19a1164b and 0785c154.

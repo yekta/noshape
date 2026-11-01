@@ -992,6 +992,9 @@ impl<'a> EvalCtx<'a> {
             // below anyway (big plate PERF1).
             let opts = &if op == k::BooleanOp::Cut && near_shapes.len() >= 64 { k::BooleanOptions { unify: true, ..*opts } } else { *opts };
             let mut res = run(opts)?;
+            if k::thread_cancelled() {
+                return Err(FeatureError::new("cancelled"));
+            }
             // OCCT sometimes returns an empty cut, with no error, for a valid
             // one (a hole running into a fillet, qa4 F12): never let a part
             // vanish that way. Retry with a small fuzzy tolerance; if it still

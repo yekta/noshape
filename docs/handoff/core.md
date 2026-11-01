@@ -45,6 +45,58 @@ deadlock in malloc).
   destructors).
 - Round 4: op_boolean hands a cancelled build's OCCT builder (the pave filler) to a detached thread to free. vibe2 at
   load 11-17, cancel at 0.7-50 s: 15-336 ms, one 1.86 s at 24 s that didn't repeat (613 / 149 ms on reruns).
+- Round 5 (11-01 04:40, WIP): checks per face in tools_reach_in / no_interaction / volume_possible, volume_props
+  skips faces once cancelled; a signal-safe raw stack dump (BASE line, ~/agents/symbolize.py offline). vibe2 then
+  still showed 3-5.5 s stalls at 12-18 s, all after the build: BRepTools_History's constructor (AddGenerated also
+  searches the shape's Modified list), merge_planar's unique_ancestors, UnifySameDomain's UnifyEdges / MergeEdges
+  and ShapeBuild_ReShape's rebuild.
+- Round 6: op_boolean builds its history with `cancellable_history` (the constructor's loop, checked every 256
+  shapes), unique_ancestors checks every 1024 ancestors, merge_planar / usd_kept_volume / unify_in check between
+  steps and per group; OCCT patch 0013 (TKShHealing): the break hook in UnifySameDomain's MergeEdges / MergeSeq
+  loops, each changed face's fix, IntUnifyFaces every 64 faces, and ShapeBuild_ReShape::applyImpl every 4096
+  shapes. Lib: /root/kern-scratch/occt-build/build/lin64/gcc/lib/libTKShHealing.a; vibe2 probe with
+  ~/agents/occt-priv (OCCT_ROOT_PRIV, ~/agents/quiet-probe.sh waits for the watcher to be idle).
+  vibe2 quiet (load 3), cancel at 0.5-12 s: 18-114 ms; 14 s: 1079 ms (ShapeFix_Shell's GetShells in UnifyEdges'
+  orientation fix), 16 s: 620 ms (the custom host naming the cut's result: edge_faces, name_vertices; then freeing
+  the 50 k-face shapes on the worker), 18 s: 8 ms.
+- Round 7: patch 0013 also checks in ShapeFix_Shell's GetShells (every 1024 faces: its passes start over after
+  each shell); the custom host's run_op fails "cancelled" when the thread is cancelled as an operation comes back
+  (nothing named), as does EvalCtx::boolean_into_with; a cancelled thread's shapes are freed on a "shape-freer"
+  thread (kernel `ShapeInner`'s Drop; `thread_cancelled()`).
+  vibe2 (load 4 → 15 during the run): 0.5-14 s 16-243 ms, 16 s 788 ms (unify_in's whole-shape BRepBuilderAPI_Copy in
+  usd_kept_volume, then freeing op_boolean's history), 18 s 320 ms (freeing that copy while unwinding).
+- Round 8: patch 0013 also checks in BRepTools_Modifier (TKBRep: between Perform's steps, every 4096 shapes rebuilt);
+  `FreeIfCancelled` hands op_boolean's history / result and usd_kept_volume's copy, history and UnifySameDomain to
+  free_elsewhere when a cancel leaves their scope; usd_kept_volume's copy history is cancellable_history. vibe4 at
+  load 38: 37-169 ms except 15 s 1842 ms, 16 s 1332 ms (stacks: ~/agents/logs/cancel28.log on vibe4).
+- OCCT on vibe4 (11-01, builds moved there): ~/agents/core-occt/OCCT-8_0_1 (patched through 0013) and
+  `build.sh TK...` (ninja, build-occt.sh's options; the first build took 10.5 min); private root ~/agents/occt-priv.
+  Libs: /root/core-scratch/occt0013 (TKBRep, TKShHealing; backups occt-lib-backup/*.pre0013), in /root/occt.
+
+## Mixed-radius corners (live 1686, 11-01 04:50): the next blend step
+- Live's Fillet holds one radius, so its mixed corners come from two Fillet features; the order doesn't matter. Each
+  corner is ONE face: big radius over a small one ((a) R4 top over R2 verticals, (d) R8 over R3) a 3-sided patch
+  (the small arc, two planar ellipses where vertical planes through the top face's corner and the small arc's ends
+  cut the big cylinders, apex at that corner); small over big ((b)) the exact torus (R2 ball round the R4 arc, the top
+  face's corner rounded R2); drafted ((c)) a 4-sided OTHER patch. Samples and boundaries: behaviours "core
+  (2026-11-01 ...) Mixed-radius vertex blends", dom/core-1686-*.json.
+- (d) (top loop R8 over R3 corners, our "an arc the blend closes up" declines): OCCT's faces already match live's to
+  ~1e-6 mm² (corner patch 40.081053 vs 40.081054), volume 8077.5097 vs live 8077.5490.
+- Draft's Reapply fillet passes all radii in one fillet (D3: R3 slanted + R2 top; 6-11 s in OCCT's 3-radius corner
+  patches). Tried 11-01 04:45: one fillet per radius, the largest first: D3 7335.6695 vs live 7335.5928 (one call:
+  within 0.05), and live's (c) built as two features in our model: 44305.088 mm³ / 22 faces vs live 44304.934 / 18
+  (OCCT splits the corner): not landed. The fix is noshape's own corner patches (b) torus first (exact), then the
+  3- / 4-sided patches.
+- Where we stood (kernel, 45 x 20 x 10 block): (a) both orders 8548.6645 (live 8548.5639: its procedural corner, as
+  in blend::vertex_blends_match_onshape); (b) R4 verticals first: exact (8759.3663, 4 tori); (b) R2 top first, then
+  R4: "fillet failed" (OCCT's and noshape's).
+- (b) fixed 11-01 05:35: features.cpp `fillet_over_smaller_blends` (op_fillet's checked fallbacks, after the closed
+  edge split): when a fillet's edges end at round blends of a smaller radius, those blends and the ones of their
+  radius they touch are taken off (Defeaturing: the block's top edges back), the edges filleted, the blends made
+  again on the edges where their two tangent faces' images meet; each blend face taken off is Modified to the ones
+  made again. (b) R2 then R4: 8759.3663, 18 faces, 4 tori, ~130 ms; T1 kernel
+  blend::a_fillet_over_smaller_blends_is_as_with_it_first (also one vertical edge). Left: (c) drafted and D3 (one
+  fillet, all radii: Draft's reapply), noshape's own 3- / 4-sided corner patches.
 
 ## THIN-LOFT-TRIM-ENDS (P2): (a) landed 11-01 04:20
 - shell.cpp `op_thicken_loft_out` (kernel `thicken_loft_out`, model solid_a.rs thin loft, Trim ends + outward + two

@@ -213,6 +213,14 @@ pub fn with_cancel<R>(flag: &std::sync::atomic::AtomicBool, f: impl FnOnce() -> 
     f()
 }
 
+/// Whether this thread runs under a [`with_cancel`] flag that is set (a cancelled regeneration: what's left of an
+/// operation that came back just before is skipped).
+pub fn thread_cancelled() -> bool {
+    let f = noshape_brep::thread_cancel();
+    // SAFETY: the flag outlives the `with_cancel` call that set it on this thread.
+    f != 0 && unsafe { &*(f as *const std::sync::atomic::AtomicBool) }.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 /// `a ∪ b`.
 pub fn fuse(a: &Shape, b: &Shape) -> Result<OpResult> {
     boolean(BooleanOp::Fuse, std::slice::from_ref(a), std::slice::from_ref(b), &BooleanOptions::default())
