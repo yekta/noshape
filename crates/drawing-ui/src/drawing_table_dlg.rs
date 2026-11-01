@@ -30,6 +30,12 @@ pub struct TableDlg {
     pub corner: TableCorner,
     /// Template: "Onshape Default BOM" (else "Follow assembly").
     pub default_template: bool,
+    /// A BOM of an assembly no view of the sheet shows (this document's or
+    /// another one's; drawing.md TB14), instead of `view`'s.
+    pub bom_source: Option<noshape_model::drawing::BomSource>,
+    /// BOM data: an uploaded file's rows (the first the header), placed as a
+    /// static table (help bom_table: "BOM data (an uploaded file)").
+    pub bom_data: Option<Vec<Vec<String>>>,
 }
 
 impl DrawingEditor {
@@ -70,7 +76,7 @@ impl DrawingEditor {
                     _ => None,
                 };
                 let view = preferred.or_else(|| sources.first().map(|s| s.0));
-                self.table_dlg = Some(TableDlg { kind: k, table: None, original: None, view, structured: false, bottom_to_top: false, corner: TableCorner::TopRight, default_template: false });
+                self.table_dlg = Some(TableDlg { kind: k, table: None, original: None, view, structured: false, bottom_to_top: false, corner: TableCorner::TopRight, default_template: false, bom_source: None, bom_data: None });
             }
             Some(_) => {}
             // The properties dialog of a placed table stays.
@@ -83,13 +89,17 @@ impl DrawingEditor {
     pub fn open_table_props(&mut self, id: u64, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(id).cloned() else { return };
         let default_template = matches!(t.kind, TableKind::Bom { default_template: true, .. });
+        let bom_source = match &t.kind {
+            TableKind::Bom { source, .. } => source.clone(),
+            _ => None,
+        };
         let (kind, view, structured, bottom_to_top) = match t.kind {
             TableKind::Bom { view, structured, bottom_to_top, .. } => (TableTool::Bom, view, structured, bottom_to_top),
             TableKind::CutList { view, bottom_to_top, .. } => (TableTool::CutList, view, false, bottom_to_top),
             _ => return,
         };
         self.tool = Tool::Select;
-        self.table_dlg = Some(TableDlg { kind, table: Some(id), original: Some((t.kind.clone(), t.corner)), view: Some(view), structured, bottom_to_top, corner: t.corner, default_template });
+        self.table_dlg = Some(TableDlg { kind, table: Some(id), original: Some((t.kind.clone(), t.corner)), view: Some(view), structured, bottom_to_top, corner: t.corner, default_template, bom_source, bom_data: None });
         cx.notify();
     }
 
@@ -98,10 +108,10 @@ impl DrawingEditor {
         if let Some(d) = &self.table_dlg
             && let Some(id) = d.table
         {
-            let (structured_v, bottom, corner, template) = (d.structured, d.bottom_to_top, d.corner, d.default_template);
+            let (structured_v, bottom, corner, template, src) = (d.structured, d.bottom_to_top, d.corner, d.default_template, d.bom_source.clone());
             self.edit_table(id, if d.kind == TableTool::Bom { "BOM table properties" } else { "Cut list table properties" }, cx, |t| {
                 match &mut t.kind {
-                    TableKind::Bom { structured, bottom_to_top, default_template, .. } => (*structured, *bottom_to_top, *default_template) = (structured_v, bottom, template),
+                    TableKind::Bom { structured, bottom_to_top, default_template, source, .. } => (*structured, *bottom_to_top, *default_template, *source) = (structured_v, bottom, template, src),
                     TableKind::CutList { bottom_to_top, .. } => *bottom_to_top = bottom,
                     _ => {}
                 }
@@ -109,6 +119,129 @@ impl DrawingEditor {
             });
         }
         cx.notify();
+    }
+
+    /// BOM data…: a CSV file (this document's, another one's or imported)
+    /// as the table's rows.
+    fn pick_bom_data(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let ed = cx.entity().downgrade();
+        crate::drawing_hooks::pick_file(self.doc.clone(), "BOM data", &[noshape_model::file_tab::FileKind::Csv], &["csv"], window, cx, move |file, _, cx| {
+            let text = file.bytes().map(|b| String::from_utf8_lossy(&b).to_string()).unwrap_or_default();
+            let rows = parse_csv(&text);
+            let _ = ed.update(cx, |t, cx| {
+                if let Some(d) = &mut t.table_dlg
+                    && !rows.is_empty()
+                {
+                    d.bom_data = Some(rows);
+                    d.bom_source = None;
+                }
+                t.update_preview(cx);
+                cx.notify();
+            });
+        });
+    }
+
+    /// Other documents…: an assembly of another document (its latest
+    /// version, else its workspace as it is now).
+    fn pick_other_assembly(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        use gpui_kit::component::WindowExt as _;
+        let here = self.doc.read(cx).session.path.clone();
+        // The library scan reads every document: off the UI thread.
+        let docs: Entity<Option<Vec<crate::library::DocEntry>>> = cx.new(|_| None);
+        let scan = docs.clone();
+        cx.spawn(async move |_, cx| {
+            let found = cx
+                .background_spawn(async move {
+                    // The window's path may be relative (opened from a shell).
+                    let canon = |p: &std::path::Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+                    let here = canon(&here);
+                    crate::drawing_hooks::library_docs().into_iter().filter(|d| !d.broken && !d.trashed && canon(&d.path) != here).collect::<Vec<_>>()
+                })
+                .await;
+            scan.update(cx, |d, cx| {
+                *d = Some(found);
+                cx.notify();
+            });
+        })
+        .detach();
+        let opened: Entity<Option<OpenedDoc>> = cx.new(|_| None);
+        let search = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search documents"));
+        let ed = cx.entity().downgrade();
+        window.open_dialog(cx, move |dialog, _, cx| {
+            let pal = p();
+            let q = search.read(cx).value().to_lowercase();
+            let mut list = v_flex().id("bom-other-list").h(px(260.)).overflow_y_scroll().border_1().border_color(gpui_kit::rgb(0xd3d7d9));
+            let row = |id: SharedString| h_flex().id(id).h(px(30.)).px(px(8.)).gap(px(8.)).text_size(px(13.)).cursor_pointer().hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)));
+            match opened.read(cx).clone() {
+                Some((name, items)) => {
+                    let (back, search) = (opened.clone(), search.clone());
+                    list = list.child(row("bom-other-back".into()).child("‹").child(div().font_weight(FontWeight::SEMIBOLD).child(name)).on_click(move |_, window, cx| {
+                        search.update(cx, |s, cx| s.set_value("", window, cx));
+                        back.update(cx, |o, cx| {
+                            *o = None;
+                            cx.notify();
+                        })
+                    }));
+                    if items.is_empty() {
+                        list = list.child(div().p(px(10.)).text_size(px(13.)).text_color(pal.text_muted).child("No assemblies in this document."));
+                    }
+                    for (i, (src, label)) in items.into_iter().filter(|(_, l)| l.to_lowercase().contains(&q)).enumerate() {
+                        let ed = ed.clone();
+                        list = list.child(row(SharedString::from(format!("bom-other-asm-{i}"))).child(crate::assets::icon("assembly", 16., cx)).child(label).on_click(move |_, window, cx| {
+                            window.close_dialog(cx);
+                            let src = src.clone();
+                            let _ = ed.update(cx, |t, cx| {
+                                if let Some(d) = &mut t.table_dlg {
+                                    d.bom_source = Some(src);
+                                    d.bom_data = None;
+                                }
+                                t.ensure_sources(false, cx);
+                                t.update_preview(cx);
+                                cx.notify();
+                            });
+                        }));
+                    }
+                }
+                None => {
+                    let docs = docs.read(cx).clone();
+                    if docs.is_none() {
+                        list = list.child(div().p(px(10.)).text_size(px(13.)).text_color(pal.text_muted).child("Loading documents…"));
+                    }
+                    for (i, doc) in docs.iter().flatten().filter(|d| d.name.to_lowercase().contains(&q)).enumerate() {
+                        let (open, doc, search) = (opened.clone(), doc.clone(), search.clone());
+                        list = list.child(row(SharedString::from(format!("bom-other-doc-{i}"))).child(crate::assets::icon("document", 16., cx)).child(div().flex_1().truncate().child(doc.name.clone())).on_click(move |_, window, cx| {
+                            search.update(cx, |s, cx| s.set_value("", window, cx));
+                            let items = (|| {
+                                let store = noshape_store::Document::open_read_only(&doc.path).ok()?;
+                                let graph = store.graph().ok()?;
+                                let (mv, vname) = match graph.versions.last() {
+                                    Some(v) => (v.microversion, v.name.clone()),
+                                    None => (store.head(store.default_branch().ok()?).ok()?, "Main".to_string()),
+                                };
+                                let snap = crate::derived::external_snapshot(&doc.path, mv).ok()?;
+                                Some(
+                                    snap.ordered_tabs()
+                                        .into_iter()
+                                        .filter(|t| matches!(t.content, noshape_model::document::TabContent::Assembly(_)))
+                                        .map(|t| {
+                                            let key = crate::derived::ExternalRef { path: doc.path.clone(), microversion: mv, tab: t.id.to_string() }.key();
+                                            let label = format!("{} ({} {vname})", t.name, doc.name);
+                                            (noshape_model::drawing::BomSource { tab: t.id, version: Some(key), label: label.clone() }, label)
+                                        })
+                                        .collect::<Vec<_>>(),
+                                )
+                            })()
+                            .unwrap_or_default();
+                            open.update(cx, |o, cx| {
+                                *o = Some((doc.name.clone(), items));
+                                cx.notify();
+                            });
+                        }));
+                    }
+                }
+            }
+            crate::os_ui::modal(dialog, "Other documents", 520.).child(crate::os_ui::modal_body().gap(px(8.)).child(gpui_kit::component::input::Input::new(&search).h(px(30.)).text_size(px(13.))).child(list)).footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("bom-other-cancel", "Cancel", cx))))
+        });
     }
 
     pub fn close_table_dlg(&mut self, accept: bool, cx: &mut Context<Self>) {
@@ -251,10 +384,15 @@ impl DrawingEditor {
     /// (inserting, a source chosen), and its edit's name.
     fn table_dlg_table(&self, at: [f64; 2]) -> Option<(noshape_model::drawing::Table, &'static str)> {
         let d = self.table_dlg.as_ref().filter(|d| d.table.is_none())?;
-        let view = d.view?;
         let id = self.current_sheet().next_table_id();
+        if let Some(rows) = &d.bom_data {
+            let mut t = noshape_model::drawing::Table::new(id, TableKind::General { cells: rows.clone(), title: None, header: true }, at);
+            t.corner = d.corner;
+            return Some((t, "BOM table"));
+        }
+        let view = if d.bom_source.is_some() { ViewId(0) } else { d.view? };
         let (kind, name) = match d.kind {
-            TableTool::Bom => (TableKind::Bom { view, structured: d.structured, bottom_to_top: d.bottom_to_top, overrides: Vec::new(), default_template: d.default_template }, "BOM table"),
+            TableTool::Bom => (TableKind::Bom { view, structured: d.structured, bottom_to_top: d.bottom_to_top, overrides: Vec::new(), default_template: d.default_template, source: d.bom_source.clone() }, "BOM table"),
             _ => (TableKind::CutList { view, bottom_to_top: d.bottom_to_top, config: None }, "Cut list table"),
         };
         let mut t = noshape_model::drawing::Table::new(id, kind, at);
@@ -295,7 +433,11 @@ impl DrawingEditor {
         // The listed view of the table's source (one per source; the table's
         // own view may not be the one listed).
         let key_of = |v: ViewId| views::view_source(self.current_sheet(), v).map(|(k, _)| k);
-        let source_label = sources.iter().find(|s| Some(s.0) == d.view || (d.view.is_some() && key_of(s.0) == d.view.and_then(key_of))).map(|s| s.1.clone()).unwrap_or_default();
+        let source_label = match &d.bom_source {
+            _ if d.bom_data.is_some() => "BOM data".to_string(),
+            Some(s) => s.label.clone(),
+            None => sources.iter().find(|s| Some(s.0) == d.view || (d.view.is_some() && key_of(s.0) == d.view.and_then(key_of))).map(|s| s.1.clone()).unwrap_or_default(),
+        };
         // Cut list table properties › Configurations (live request 1638 (b)).
         let config_line = d
             .table
@@ -318,6 +460,8 @@ impl DrawingEditor {
                             if let Some(d) = &mut t.table_dlg {
                                 f(d);
                             }
+                            // Another assembly: its source for the preview.
+                            t.ensure_sources(false, cx);
                             t.apply_table_dlg(cx);
                         })
                     }));
@@ -325,10 +469,26 @@ impl DrawingEditor {
                 m
             })
         };
-        let source_items: Vec<(String, bool, Set)> = sources.iter().map(|(v, n)| {
+        let mut source_items: Vec<(String, bool, Set)> = sources.iter().map(|(v, n)| {
             let v = *v;
-            (n.clone(), Some(v) == d.view, std::rc::Rc::new(move |d: &mut TableDlg| d.view = Some(v)) as Set)
+            (n.clone(), Some(v) == d.view && d.bom_source.is_none(), std::rc::Rc::new(move |d: &mut TableDlg| {
+                d.view = Some(v);
+                (d.bom_source, d.bom_data) = (None, None);
+            }) as Set)
         }).collect();
+        // BOMs: this document's other assemblies too (help bom_table:
+        // Current document › Assemblies; drawing.md TB14).
+        if bom {
+            let shown: Vec<noshape_model::document::TabId> = sources.iter().filter_map(|(v, _)| key_of(*v).map(|k| k.tab)).collect();
+            for t in self.doc.read(cx).session.doc.ordered_tabs() {
+                if !matches!(t.content, noshape_model::document::TabContent::Assembly(_)) || shown.contains(&t.id) {
+                    continue;
+                }
+                let s = noshape_model::drawing::BomSource { tab: t.id, version: None, label: t.name.clone() };
+                let on = d.bom_source.as_ref() == Some(&s);
+                source_items.push((t.name.clone(), on, std::rc::Rc::new(move |d: &mut TableDlg| (d.bom_source, d.bom_data) = (Some(s.clone()), None)) as Set));
+            }
+        }
         let types: Vec<(String, bool, Set)> = vec![
             ("Flattened".into(), !d.structured, std::rc::Rc::new(|d: &mut TableDlg| d.structured = false) as Set),
             ("Structured".into(), d.structured, std::rc::Rc::new(|d: &mut TableDlg| d.structured = true) as Set),
@@ -423,6 +583,19 @@ impl DrawingEditor {
                             .child(select("table-dlg-insert", "Insert".into(), 64., source_items.clone()))
                             .child(select("table-dlg-source", source_label.clone(), 120., source_items)),
                     )
+                    // Other documents' assemblies and BOM data files (help
+                    // bom_table; drawing.md TB14).
+                    .when(bom, |v| {
+                        let link = |id: &'static str, label: &'static str| div().id(id).text_size(px(12.)).text_color(gpui_kit::rgb(0x1651b0)).cursor_pointer().child(label);
+                        v.child(
+                            h_flex()
+                                .px(px(8.))
+                                .py(px(2.))
+                                .gap(px(12.))
+                                .child(link("table-dlg-other", "Other documents…").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.pick_other_assembly(window, cx))))
+                                .child(link("table-dlg-data", "BOM data…").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.pick_bom_data(window, cx)))),
+                        )
+                    })
                 })
                 .when(bom, |v| v.child(row("Template", select("table-dlg-template", if d.default_template { "Onshape Default BOM".into() } else { "Follow assembly".into() }, 120., templates).into_any_element())).child(row("BOM type", select("table-dlg-type", if d.structured { "Structured".into() } else { "Flattened".into() }, 120., types).into_any_element())))
                 .when_some(d.table.filter(|_| editing && !bom), |v, id| {
@@ -452,3 +625,42 @@ impl DrawingEditor {
         )
     }
 }
+
+/// Other documents…: the opened document's name and its assemblies (with
+/// their labels).
+type OpenedDoc = (String, Vec<(noshape_model::drawing::BomSource, String)>);
+
+/// Rows of a CSV file (quoted fields, "" inside quotes; blank lines dropped).
+fn parse_csv(text: &str) -> Vec<Vec<String>> {
+    let mut rows = Vec::new();
+    for line in text.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let (mut cells, mut cur, mut quoted) = (Vec::new(), String::new(), false);
+        let mut chars = line.chars().peekable();
+        while let Some(c) = chars.next() {
+            match c {
+                '"' if quoted && chars.peek() == Some(&'"') => {
+                    cur.push('"');
+                    chars.next();
+                }
+                '"' => quoted = !quoted,
+                ',' if !quoted => cells.push(std::mem::take(&mut cur).trim().to_string()),
+                _ => cur.push(c),
+            }
+        }
+        cells.push(cur.trim().to_string());
+        rows.push(cells);
+    }
+    rows
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn csv_rows_keep_quoted_commas() {
+        assert_eq!(super::parse_csv("Item,Name\n1,\"Bolt, M6\"\n\n2,\"Nut \"\"A\"\"\"\n"), vec![vec!["Item", "Name"], vec!["1", "Bolt, M6"], vec!["2", "Nut \"A\""]]);
+    }
+}
+

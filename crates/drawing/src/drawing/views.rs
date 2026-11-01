@@ -314,6 +314,10 @@ pub fn referenced_sources(drawing: &Drawing) -> Vec<SourceKey> {
 /// list's own configuration when it has one (Change configuration..., live
 /// request 1638 (b)).
 pub fn table_source(sheet: &Sheet, t: &super::Table) -> Option<SourceKey> {
+    // A BOM of an assembly no view shows (drawing.md TB14).
+    if let super::TableKind::Bom { source: Some(s), .. } = &t.kind {
+        return Some(SourceKey { version: s.version.clone(), ..SourceKey::studio(s.tab) });
+    }
     let (mut k, _) = view_source(sheet, t.view()?)?;
     if let super::TableKind::CutList { config: Some(c), .. } = &t.kind {
         k.config = c.clone();

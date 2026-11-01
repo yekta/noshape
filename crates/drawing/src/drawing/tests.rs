@@ -640,7 +640,7 @@ fn bom_hole_table_and_linked_balloons() {
     // Sheet 2: the assembly with a BOM and a callout on the pin.
     let si = drawing.add_sheet(0);
     drawing.sheets[si].views.push(base_view(1, asm, ViewOrientation::Isometric, [150.0, 160.0]));
-    drawing.sheets[si].tables.push(Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: Vec::new(), default_template: false }, [410.0, 287.0]));
+    drawing.sheets[si].tables.push(Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: Vec::new(), default_template: false, source: None }, [410.0, 287.0]));
     // Hole table of the plate's top view on sheet 1.
     let origin = [-0.05, -0.03];
     drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, bottom_to_top: false, exclude: Vec::new(), x_dir: None }, [410.0, 120.0]));
@@ -1641,7 +1641,7 @@ fn bom_split_order_and_structured_rows() {
         t.rows = rows;
         tables::table_data(&drawing, &t, None, Some(src), None, &[], &|s| s.to_string())
     };
-    let bom = |structured, bottom_to_top| TableKind::Bom { view: ViewId(1), structured, bottom_to_top, overrides: Vec::new(), default_template: false };
+    let bom = |structured, bottom_to_top| TableKind::Bom { view: ViewId(1), structured, bottom_to_top, overrides: Vec::new(), default_template: false, source: None };
     let all = data(bom(false, false), None);
     assert!(all.rows.len() >= 2);
     // A split part shows its rows only.
@@ -1654,7 +1654,7 @@ fn bom_split_order_and_structured_rows() {
     assert!(!data(bom(true, false), None).rows.is_empty());
     // An override replaces the cell's value and is marked.
     let item = all.rows[0][0].clone();
-    let over = data(TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: vec![(item, 2, "BRACKET".into())], default_template: false }, None);
+    let over = data(TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: vec![(item, 2, "BRACKET".into())], default_template: false, source: None }, None);
     assert_eq!(over.rows[0][2], "BRACKET");
     assert_eq!(over.overridden, vec![(0, 2)]);
     // Template (live request 1627): Follow assembly takes a column added to
@@ -1666,7 +1666,7 @@ fn bom_split_order_and_structured_rows() {
     let sources = regenerate_sources(&doc, &drawing);
     let src = &sources[&SourceKey::studio(asm)];
     let data = |default_template| {
-        let t = Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: Vec::new(), default_template }, [410.0, 287.0]);
+        let t = Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: Vec::new(), default_template, source: None }, [410.0, 287.0]);
         tables::table_data(&drawing, &t, None, Some(src), None, &[], &|s| s.to_string())
     };
     let follow = data(false);
@@ -2963,6 +2963,22 @@ fn cut_list_table_reads_its_own_configuration() {
     assert_ne!(view_key, key);
     let keys = views::referenced_sources(&drawing);
     assert!(keys.contains(&key) && keys.contains(&view_key), "{keys:?}");
+}
+
+/// A BOM table of an assembly no view shows (Insert ▾ another assembly or
+/// Other documents…; drawing.md TB14): the table reads that source, pinned
+/// to the other document's version.
+#[test]
+fn bom_table_reads_its_own_assembly() {
+    let doc = crate::Document::new();
+    let tab = doc.tabs[0].id;
+    let mut drawing = Drawing::default();
+    let source = Some(super::BomSource { tab, version: Some("ext:1|a|/x.noshape".into()), label: "Assembly 1 (x Main)".into() });
+    let t = Table::new(1, TableKind::Bom { view: ViewId(0), structured: false, bottom_to_top: false, overrides: Vec::new(), default_template: false, source }, [410.0, 287.0]);
+    drawing.sheets[0].tables.push(t.clone());
+    let key = views::table_source(&drawing.sheets[0], &t).unwrap();
+    assert_eq!((key.tab, key.version.as_deref()), (tab, Some("ext:1|a|/x.noshape")));
+    assert!(views::referenced_sources(&drawing).contains(&key));
 }
 
 /// Hole table X direction (live 1985): X along the picked edge, Y a quarter

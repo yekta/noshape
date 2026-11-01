@@ -1488,6 +1488,10 @@ pub enum TableKind {
         /// (live request 1627).
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         default_template: bool,
+        /// Its own source (Insert ▾ another assembly of this document or of
+        /// another one; help bom_table, drawing.md TB14); None: `view`'s.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        source: Option<BomSource>,
     },
     /// Holes (face-on circular bores) of `view`, located from `origin`
     /// (view coordinates, associative through `origin_ref`).
@@ -2044,6 +2048,16 @@ impl TargetStyle {
             TargetStyle::MoveableRotational => "Moveable rotational inside",
         }
     }
+}
+
+/// A BOM table's own assembly: its tab, pinned version (another document's
+/// reference key) and the name the table dialog shows.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BomSource {
+    pub tab: crate::document::TabId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    pub label: String,
 }
 
 /// Datum target options (live drawing/507–518, help datum): the symbol

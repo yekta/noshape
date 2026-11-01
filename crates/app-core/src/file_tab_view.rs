@@ -199,6 +199,10 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
     let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search files"));
     let state = cx.new(|_| PickState::default());
     let on_pick = std::rc::Rc::new(on_pick);
+    // This document isn't one of the others (its path may be relative,
+    // opened from a shell).
+    let here = doc.read(cx).session.path.clone();
+    let here = std::fs::canonicalize(&here).unwrap_or(here);
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
         let q = search.read(cx).value().to_lowercase();
@@ -252,7 +256,6 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
                     files.iter().filter(|(n, _)| n.to_lowercase().contains(&q)).map(|(n, f)| (TabId(0), n.clone(), f.clone())).collect()
                 }
                 None => {
-                    let here = doc.read(cx).session.path.clone();
                     let docs: Vec<_> = st.docs.iter().flatten().filter(|d| !d.broken && !d.trashed && d.path != here && d.name.to_lowercase().contains(&q)).cloned().collect();
                     if st.docs.as_ref().is_some_and(|d| d.is_empty()) {
                         list = list.child(div().p(px(12.)).text_size(px(13.)).text_color(pal.text_muted).child("Loading documents…"));
@@ -334,7 +337,10 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
                     .child(
                         Button::new("pick-import").label("Import").outline().on_click(move |_, window, cx| {
                             window.close_dialog(cx);
-                            let (doc, pick) = (doc2.clone(), pick2.clone());
+                            // This window, not the active one (none while
+                            // the path prompt closes, or without a window
+                            // manager focusing it).
+                            let (doc, pick, here) = (doc2.clone(), pick2.clone(), window.window_handle());
                             crate::file_dialogs::request_open_path(title, "Files", exts, window, cx, move |path, cx| {
                                 let Ok(bytes) = std::fs::read(&path) else { return };
                                 let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
@@ -343,9 +349,11 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
                                 doc.update(cx, |d, cx| d.edit_document(&format!("Import {name}"), cx, |d| {
                                     add_file_tab(d, f2, None, None);
                                 }));
-                                if let Some(w) = cx.active_window() {
-                                    let _ = w.update(cx, |_, window, cx| pick(file, window, cx));
-                                }
+                                // After the prompt's own click (its window
+                                // can't be updated from inside it).
+                                cx.defer(move |cx| {
+                                    let _ = here.update(cx, |_, window, cx| pick(file, window, cx));
+                                });
                             });
                         }),
                     )

@@ -884,6 +884,14 @@ impl DrawingEditor {
                 }
             }
         }
+        // The BOM table dialog's own assembly (Insert ▾, Other documents…;
+        // drawing.md TB14): its preview reads it.
+        if let Some(s) = self.table_dlg.as_ref().and_then(|d| d.bom_source.as_ref()) {
+            let k = SourceKey { version: s.version.clone(), ..SourceKey::studio(s.tab) };
+            if !wanted.contains(&k) {
+                wanted.push(k);
+            }
+        }
         // The Insert view chooser lists the parts of every Part Studio.
         for k in self.chooser_sources(cx) {
             if !wanted.contains(&k) {
