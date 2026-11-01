@@ -11,6 +11,21 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## Morning 11-01 (landed through 0407a620, 08:07 UTC)
+- 4cd6262c D6 thread lines as dimension picks ("M6x1"); HoleRecord.thread is "M6x1.00" (was the pitch label).
+- a97a740e drawing sources regenerate with the Part Studio's Variable Studio values and Derived provider (views of a
+  Part Studio using #names were empty); V55 decals on shaded views. e7418243 V55 shaded broken views (pieces).
+- 0517e44b A34 datum targets: X / Y direction edges, dims from the origin's sides, off-model red, Angle mode
+  (diameter, angle, reference line, radial lines, instances "A1-A4", flip, rotate), Custom rows label only.
+- c86da853 S15 a drawing's Tab › Properties = the metadata dialog. d0e6a9b1 CR10 other documents' DWTs under Created
+  by me; import matrix re-run (STEP I1 now 7582.977753, live 7582.976771). ce6d6f53 EX17 / S13 Other documents in
+  the insert-from-file picker. 4941ec1b UNDO3 (a note = two undo steps; `DocModel::push_client_step`, anchored on
+  the note's undo entry via `UndoStack::undo_top`). 0407a620 A58 per-value hole callout overrides.
+- drawing.md 🔧 left: CR5 / CR18 / V5 (MBD dims), V1 (released items), V27 (Cut from section), V68 (spinner), D16,
+  A15 (part custom properties), A23 (chips), A34 (Custom region hatch), S13 (flyout placement), S18 (fields as full
+  notes: Explode / Add leader / Move to), TB12 (rich paste), TB14 (other documents / BOM data), EX4 (Reference
+  manager), EX11 (notification bell).
+
 ## vibe4 builds (lead, 11-01)
 
 - Builds and tests go through `tools/tiers/rb.sh` (GUI: `rb.sh --get noshape cargo build -p noshape`). A fetched debug
