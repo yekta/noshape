@@ -1773,3 +1773,5 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   clean 0.12 s, noshape's mesher 22 ms). On loaded vibe4: 19-28 s, the mesh 1.1-1.6 s of it. So the 2+ minutes
   are the feature (and whatever the app adds); the mesh lock doesn't matter for one part. psui is still unlocking
   BRepMesh across parts (the NIST import) and looking at B-spline faces in noshape's mesher.
+- psui 11-01 22:20 (bf64da4e): the display mesh is now noshape's for all 17762 faces (B-spline faces in brep::mesh):
+  0.9-1.3 s -> 0.22 s on vibe5. What's left of the knurl's time is the feature.

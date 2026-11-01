@@ -201,9 +201,11 @@ document's display mesh is under 0.5 s.
 
 ## In progress
 
-11-01 21:45: queued 4935f5e7 (B-spline faces in our mesher, above), 42c306d8 (audit 12: Helix Turns and pitch flip,
+11-01 22:25: landed bf64da4e (B-spline faces in our mesher). Queued 42c306d8 (audit 12: Helix Turns and pitch flip,
 interaction::helix_manipulators), c92c5408 (audit 12: Move curve boundary's arrow, interaction::
-move_curve_boundary_anchor). Next: A23's translucent tint over a Shell's opening (live), then M11 / M12 (P3).
+move_curve_boundary_anchor), 10a94ee6 (audit 12: a Shell preview fills the removed face khaki, as live 11-01; and
+a_shelled_face_is_highlighted_as_before made to wait for the regenerations: it raced them and failed on main).
+Next: M11 / M12 (P3).
 
 (nothing unlanded) Landed 10-29: 60ca6465 MC-SELECT-NO-READOUT; 6f411558 / edf5dda5 / 5f3d7b20 mesher steps 5–5c
 (N06: fins-400's display mesh ≥ 10× BRepMesh's on GitHub's Linux and macOS runners, live-30's 3.3–6×);

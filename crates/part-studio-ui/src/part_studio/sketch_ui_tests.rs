@@ -1048,12 +1048,9 @@ fn extrude_second_end_has_its_own_arrow(cx: &mut TestAppContext) {
     }
 }
 
-/// Preview audit (live 11-01): a Shell's removed face shows as it was before the feature, not on the rim the shell
-/// leaves (which keeps the face's name): the open Shell dialog counts the picked top face as changed, a face it
-/// leaves alone (the bottom) as not.
-#[gpui::test]
-fn a_shelled_face_is_highlighted_as_before(cx: &mut TestAppContext) {
-    let (window, view) = sketch_with(cx, "shell-pick", Tool::CornerRect);
+/// A part from a corner rectangle extruded (the dialog's preview and the commit waited for), its top and bottom faces.
+fn block_part(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>, Reference, Reference) {
+    let (window, view) = sketch_with(cx, name, Tool::CornerRect);
     click(cx, window, &view, (500., 300.));
     click(cx, window, &view, (650., 400.));
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
@@ -1095,6 +1092,15 @@ fn a_shelled_face_is_highlighted_as_before(cx: &mut TestAppContext) {
         };
         (flat_at(true), flat_at(false))
     });
+    (window, view, top, bottom)
+}
+
+/// Preview audit (live 11-01): a Shell's removed face shows as it was before the feature, not on the rim the shell
+/// leaves (which keeps the face's name): the open Shell dialog counts the picked top face as changed, a face it
+/// leaves alone (the bottom) as not.
+#[gpui::test]
+fn a_shelled_face_is_highlighted_as_before(cx: &mut TestAppContext) {
+    let (window, view, top, bottom) = block_part(cx, "shell-pick");
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
             v.start_feature("shell", w, cx);
@@ -1119,4 +1125,59 @@ fn a_shelled_face_is_highlighted_as_before(cx: &mut TestAppContext) {
     // Live 11-01: the removed face filled khaki at half (the opening and the rim) under its outline.
     let drawn = cx.update(|cx| view.read(cx).ui.consumed_lines.as_ref().map(|c| c.4.iter().map(|i| (matches!(i.drawable, noshape_render::Drawable::Mesh(_)), i.color[3])).collect::<Vec<_>>()));
     assert_eq!(drawn, Some(vec![(true, 0.47), (false, 1.0)]), "the removed face's fill, then its outline");
+}
+
+/// Projected curve's direction flip (audit-part-studio M11; projectCurves.fs addDropCurveManipulator): Curve to face
+/// with a Direction, the Top plane: a flip arrow at its origin along +Z, along −Z with Opposite direction; none for
+/// Normal to target.
+#[gpui::test]
+fn projected_curve_direction_flip_as_std(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "proj-flip");
+    let arrow = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).param_arrow(cx).map(|a| (a.base, a.dir, a.flip)));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("projectCurves", w, cx))).unwrap();
+    let d = cx.update(|cx| view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    let set = |cx: &mut TestAppContext, k: &str, v: noshape_model::ParamValue| cx.update(|cx| d.update(cx, |d, cx| d.set_value(k, v, cx)));
+    set(cx, "curveProjectionType", noshape_model::ParamValue::Enum("CURVE_TO_FACE".into()));
+    set(cx, "projectionType", noshape_model::ParamValue::Enum("DIRECTION".into()));
+    set(cx, "directionQuery", noshape_model::ParamValue::Query(vec![P[0].clone()]));
+    let a = arrow(cx).expect("a flip arrow");
+    assert!(a.0.length() < 1e-12 && a.1.z > 0.999 && a.2 == Some("oppositeDirection"), "{a:?}");
+    set(cx, "oppositeDirection", noshape_model::ParamValue::Bool(true));
+    assert!(arrow(cx).is_some_and(|a| a.1.z < -0.999), "flipped");
+    set(cx, "projectionType", noshape_model::ParamValue::Enum("NORMAL_TO_TARGET".into()));
+    assert!(arrow(cx).is_none());
+}
+
+/// Body draft's pull direction flip (audit-part-studio M11; bodyDraft.fs createManipulators), pulled along Top's
+/// normal: with the Top plane as the parting object, at its origin along +Z (−Z flipped); with the block's top face,
+/// at the face's middle; Draft on self on the top face, at its point nearest the Top plane (z of the face).
+#[gpui::test]
+fn body_draft_flip_as_std(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "body-draft-flip");
+    let arrow = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).param_arrow(cx).map(|a| (a.base, a.dir, a.flip)));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("bodyDraft", w, cx))).unwrap();
+    let d = cx.update(|cx| view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    let set = |cx: &mut TestAppContext, k: &str, v: noshape_model::ParamValue| cx.update(|cx| d.update(cx, |d, cx| d.set_value(k, v, cx)));
+    set(cx, "pullDirection", noshape_model::ParamValue::Query(vec![P[0].clone()]));
+    set(cx, "partingObject", noshape_model::ParamValue::Query(vec![P[0].clone()]));
+    let a = arrow(cx).expect("a flip arrow");
+    assert!(a.0.length() < 1e-12 && a.1.z > 0.999 && a.2 == Some("flipPullDirection"), "{a:?}");
+    set(cx, "flipPullDirection", noshape_model::ParamValue::Bool(true));
+    assert!(arrow(cx).is_some_and(|a| a.1.z < -0.999), "flipped");
+    // The top face's middle: the middle of its box.
+    let (lo, hi) = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        let fi = b.face_refs.iter().position(|r| *r == top).expect("the top face");
+        let &(first, count) = &b.mesh.face_ranges[fi];
+        b.mesh.indices[first as usize..(first + count) as usize].iter().map(|&k| glam::DVec3::from(b.mesh.positions[k as usize].map(|x| x as f64))).fold((glam::DVec3::MAX, glam::DVec3::MIN), |(l, h), q| (l.min(q), h.max(q)))
+    });
+    set(cx, "partingObject", noshape_model::ParamValue::Query(vec![top.clone()]));
+    let a = arrow(cx).expect("a flip arrow");
+    assert!((a.0 - (lo + hi) * 0.5).length() < 1e-6, "{a:?} against {:?}", (lo + hi) * 0.5);
+    set(cx, "draftOnSelf", noshape_model::ParamValue::Bool(true));
+    set(cx, "selectionType", noshape_model::ParamValue::Enum("FACES".into()));
+    set(cx, "faces", noshape_model::ParamValue::Query(vec![top]));
+    let a = arrow(cx).expect("a flip arrow");
+    assert!((a.0.z - hi.z).abs() < 1e-6, "{a:?}");
 }

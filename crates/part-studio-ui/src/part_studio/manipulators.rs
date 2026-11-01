@@ -443,7 +443,7 @@ impl PartStudioView {
 
     /// Drag handles of other features (Onshape): plane offset, fillet
     /// radius, Move face's distance.
-    fn param_arrow(&self, cx: &App) -> Option<Arrow> {
+    pub(super) fn param_arrow(&self, cx: &App) -> Option<Arrow> {
         let d = self.edit.as_ref()?.dialog.read(cx);
         let p = &d.feature.params;
         let units = self.doc.read(cx).session.doc.settings.units;
@@ -496,6 +496,46 @@ impl PartStudioView {
                 let (base, out) = p.query("entities").iter().rev().find_map(|r| noshape_model::select::edge_extend(ctx, r))?;
                 let dir = if p.bool("oppositeDirection") { -out } else { out };
                 Some(Arrow { base, dir, length: value("extendDistance")?, param: "extendDistance", flip: Some("oppositeDirection"), secondary: false })
+            }
+            // projectCurves.fs addDropCurveManipulator (Curve to face,
+            // Direction): a flip arrow at the direction's plane (or axis)
+            // origin along its normal.
+            "projectCurves" if !p.is("curveProjectionType", "TWO_SKETCHES") && p.is("projectionType", "DIRECTION") => {
+                let r = p.query("directionQuery").first()?;
+                let (base, n) = self.frame_of_ref(r).map(|f| (f.origin, f.normal)).or_else(|| self.axis_of(r))?;
+                Some(Arrow { base, dir: if p.bool("oppositeDirection") { -n } else { n }, length: 0.0, param: "", flip: Some("oppositeDirection"), secondary: false })
+            }
+            // bodyDraft.fs createManipulators: a flip arrow along the pull
+            // direction, at the first drafted entity's point nearest the
+            // pull direction's entity (Draft on self), else on the parting
+            // object (a face's middle by its parameters, a mate connector's
+            // or plane's origin).
+            "bodyDraft" => {
+                let pull = p.query("pullDirection").first()?;
+                let dir = self.axis_of(pull).map(|(_, d)| d).or_else(|| self.frame_of_ref(pull).map(|f| f.normal))?;
+                let base = if p.bool("draftOnSelf") {
+                    let key = if p.is("selectionType", "EDGES") { "topEdges" } else if p.is("selectionType", "FACES") { "faces" } else { "bodies" };
+                    let first = noshape_model::regen::measure::resolve_shapes(ctx, p.query(key).first()?).into_iter().next()?;
+                    let other = match noshape_model::regen::measure::resolve_shapes(ctx, pull).into_iter().next() {
+                        Some(s) => s,
+                        None => {
+                            let f = self.frame_of_ref(pull)?;
+                            noshape_kernel::make_plane_face(&noshape_kernel::Plane::new(f.origin, f.normal, f.x), -1e3, 1e3, -1e3, 1e3).ok()?
+                        }
+                    };
+                    noshape_kernel::distance(&first, &other).ok()?.point_a
+                } else {
+                    let r = p.query("partingObject").first()?;
+                    match r {
+                        Reference::Face(_) => {
+                            let f = noshape_model::regen::measure::resolve_shapes(ctx, r).into_iter().next()?;
+                            let [u0, u1, v0, v1] = f.uv_bounds().ok()?;
+                            f.point_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).ok()?
+                        }
+                        r => self.frame_of_ref(r)?.origin,
+                    }
+                };
+                Some(Arrow { base, dir: if p.bool("flipPullDirection") { -dir } else { dir }, length: 0.0, param: "", flip: Some("flipPullDirection"), secondary: false })
             }
             // moveCurveBoundary.fs (Extend, Blind, with a help point): from
             // the first curve's end that grows, along its tangent.
