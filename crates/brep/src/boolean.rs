@@ -1253,6 +1253,10 @@ impl Ctx<'_> {
     /// Where both faces' intervals of a section overlap: its edges, in both faces.
     fn section_from(&mut self, fs: usize, ft: usize, path: Path, ia: Vec<Ival>, ib: Vec<Ival>) -> R<()> {
         let tol = self.tol;
+        if std::env::var_os("NOSHAPE_X_NEAR").is_some() {
+            let kind = match &path { Path::Nurbs { id, .. } => format!("nurbs acc {:e} tol {:e}", self.ncurves[*id as usize].acc, self.ncurves[*id as usize].tol), _ => "analytic".into() };
+            eprintln!("SECFROM faces {fs} ({:?}) {ft} ({:?}) {kind}: ia {:?} ib {:?}", (self.faces[fs].arg, self.faces[fs].index), (self.faces[ft].arg, self.faces[ft].index), ia, ib);
+        }
         // Whether the length along it between two parameters is within the tolerance (a B-spline's, the length
         // either way: clearly not where the chord is longer, clearly so where its control polygon there is
         // shorter).
