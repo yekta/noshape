@@ -245,6 +245,25 @@ fn a_sheet_metal_enclosure_fuse_as_occt() {
     assert_eq!(counts(&r.shape), [c.summary.faces, c.summary.edges, c.summary.vertices]);
 }
 
+/// An argument with an edge inside a face (INTERNAL, recorded cut): noshape's Boolean takes it (the edge kept inside the
+/// face's piece it lies in, splitting nothing; here in a piece the cut removes), as OCCT's: faces, edges, vertices.
+#[test]
+fn an_input_edge_inside_a_face_stays_in_it() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "818552c996311f5e").expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&r.shape), [c.summary.faces, c.summary.edges, c.summary.vertices]);
+    assert!(r.shape.is_valid());
+    let internal = |s: &k::Shape| s.sub_shapes(k::ShapeType::Face).iter().flat_map(|f| f.children()).flat_map(|w| w.children()).any(|e| matches!(e.orientation(), k::Orientation::Internal));
+    assert!(c.objects.iter().chain(&c.tools).any(internal), "no INTERNAL edge in the arguments");
+}
+
 /// The B94.6 knurl's cut through noshape's Boolean (its grooves' end caps share the cylinder's end planes and each
 /// other's: a piece on the object and a tool, or on two tools, taken), as OCCT's: faces, edges, vertices, validity,
 /// every history record (each output where OCCT's is, within 2 µm; an edge's ends within 20 µm, below), the volume

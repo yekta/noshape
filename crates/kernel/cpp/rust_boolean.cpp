@@ -450,15 +450,26 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       {
         const TopoDS_Shape& e = ei.Value();
         const int           k = em.FindIndex(e);
-        if (k <= 0 || (e.Orientation() != TopAbs_FORWARD && e.Orientation() != TopAbs_REVERSED))
+        if (k <= 0)
           return "an internal edge";
+        // An edge inside the face (INTERNAL): noshape's Boolean keeps it inside the face's piece it lies in.
+        if (e.Orientation() != TopAbs_FORWARD && e.Orientation() != TopAbs_REVERSED)
+        {
+          if (e.Orientation() == TopAbs_EXTERNAL)
+            return "an external edge";
+          b.face_inner_edges.push_back(static_cast<uint32_t>(i - 1));
+          b.face_inner_edges.push_back(static_cast<uint32_t>(k - 1));
+          continue;
+        }
         // A seam (twice in a cylinder's or cone's face) once each way.
         if (seen[k] == i && ((cyl.IsNull() && con.IsNull() && !free) || BRep_Tool::IsClosed(TopoDS::Edge(e), f) == false))
           return "an edge twice in a face";
         seen[k] = i;
         b.uses.push_back(static_cast<uint32_t>(2 * (k - 1) + (e.Orientation() == TopAbs_REVERSED ? 1 : 0)));
       }
-      b.loop_uses.push_back(static_cast<uint32_t>(b.uses.size()));
+      // (A wire of edges inside it alone: no loop.)
+      if (b.loop_uses.back() != static_cast<uint32_t>(b.uses.size()))
+        b.loop_uses.push_back(static_cast<uint32_t>(b.uses.size()));
     }
     b.face_loops.push_back(static_cast<uint32_t>(b.loop_uses.size() - 1));
     if (free)
@@ -1254,8 +1265,13 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         // (Another argument's edge coincident with one of this face's: that one's curve on it.)
         if (pf.IsNull() && !BRep_Tool::IsClosed(se, sf))
           pf = coincident_pcurve(es[k], sf, 1e-7 + BRep_Tool::Tolerance(es[k]));
+        // (An edge without its curve on it (another argument's edge inside or along it, an INTERNAL one): projected,
+        // as OCCT's builder makes it.)
         if (pf.IsNull())
-          return "an input edge without its curve on a free-form face";
+        {
+          BOPTools_AlgoTools2D::BuildPCurveForEdgeOnFace(es[k], sf);
+          continue;
+        }
         if (BRep_Tool::IsClosed(se, sf))
           bb.UpdateEdge(es[k], pf, BRep_Tool::CurveOnSurface(TopoDS::Edge(se.Reversed()), sf, a, z), s, loc, BRep_Tool::Tolerance(es[k]));
         else

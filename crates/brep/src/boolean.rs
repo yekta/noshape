@@ -251,6 +251,8 @@ struct GFace {
     patches: std::sync::OnceLock<free::Patches>,
     /// A Bézier face's surface in pieces, each its control points (holding it).
     hulls: std::sync::OnceLock<Option<Vec<free::Hull>>>,
+    /// Edges inside it (an input's INTERNAL edges): kept inside the piece they lie in, splitting nothing.
+    inner: Vec<usize>,
 }
 
 impl GFace {
@@ -2779,10 +2781,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             let near = arg_box.iter().enumerate().any(|(k, b)| k != ai && boxes_meet(p, p, b.0, b.1, GREY * tol.max(2.0 * tv)));
             let found = if near { cx.pool.find_tol(p, tv)? } else { None };
             let w = match found {
+                // (Two of one argument's: OCCT doesn't intersect an argument with itself, both kept.)
+                Some(w) if cx.pool.inputs[w as usize].iter().any(|x| x.0 == a) => cx.pool.push_tol(p, tv),
                 Some(w) => {
-                    if cx.pool.inputs[w as usize].iter().any(|x| x.0 == a) {
-                        return Err(Decline("two vertices of one argument coincide"));
-                    }
                     if tv > 0.0 {
                         let d = (cx.p(w) - p).length();
                         cx.pool.grow(w, tv + d);
@@ -2878,7 +2879,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 Some(fs) => free::nurbs_surf(fs, uvbox, f.reversed),
                 None => s,
             };
-            cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default() });
+            cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
         }
         for (i, s) in body.solids.iter().enumerate() {
             let si = cx.solids.len();
@@ -3553,7 +3554,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // Each edge's solid, and whether anything of another argument comes near it.
     let mut edge_solid = vec![usize::MAX; cx.edges.len()];
     for f in &cx.faces {
-        for &(e, _) in &f.edges {
+        for &e in f.edges.iter().map(|x| &x.0).chain(&f.inner) {
             edge_solid[e] = f.solid;
         }
     }
@@ -3882,6 +3883,8 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         inner.sort_unstable();
         inner.dedup();
         let mut out = Vec::new();
+        // (Each piece's loops, where the face has edges inside it.)
+        let mut shapes: Vec<(Vec<C2>, Vec<Vec<C2>>)> = Vec::new();
         for mut r in regions(&pts, &lsegs)? {
             let mut dist = distance2(r.inside, cx.bound(f)?);
             if dist <= GREY * tol {
@@ -3896,6 +3899,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 continue;
             }
             let inside3 = cx.faces[f].to3(r.inside);
+            if !cx.faces[f].inner.is_empty() {
+                let curves = |l: &[(u32, bool)]| l.iter().map(|&(s, rev)| if rev { lsegs[s as usize].1.reversed() } else { lsegs[s as usize].1.clone() }).collect::<Vec<C2>>();
+                shapes.push((curves(&r.outer), r.holes.iter().map(|h| curves(h)).collect::<Vec<_>>()));
+            }
             let mut loops = vec![r.outer];
             loops.extend(r.holes);
             let loops = loops.into_iter().map(|l| l.into_iter().map(|(s, rev)| (lsrc[s as usize], rev)).collect()).collect();
@@ -3905,6 +3912,15 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         if out.is_empty() {
             return Err(Decline("a face lost"));
         }
+        // (Its edges inside it (an input's INTERNAL ones), split nothing: each piece of them in the piece it lies in.)
+        for &e in &cx.faces[f].inner {
+            for &(si, _) in &edge_pieces[e] {
+                let q = cx.faces[f].to2(cx.seg_at(&sedges[si].seg, 0.5));
+                let k = shapes.iter().position(|(o, hs)| inside2(q, o) && !hs.iter().any(|h| inside2(q, h))).ok_or(Decline("an edge inside a face outside its pieces"))?;
+                out[k].inner.push(si);
+                out[k].dangling = true;
+            }
+        }
         Ok((split, inner, out))
     };
     // (With the arrangement the same under a rotation: a copied tool's face whose split curves are its first
@@ -3913,6 +3929,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     let first_pieces = par_map(cx.faces.len(), &|f| copy_step(f).is_none().then(|| of_face(f)))?;
     let turned_pieces = |f: usize| -> Option<FacePieces> {
         let sym = sym.as_ref()?;
+        if !cx.faces[f].inner.is_empty() {
+            return None;
+        }
         let (f0, j) = copy_step(f)?;
         let Some(Ok((split0, inner0, pieces0))) = &first_pieces[f0] else { return None };
         let ((segs, split), (segs0, _)) = (face_curves(f), face_curves(f0));
@@ -4247,9 +4266,16 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
     }
     // (A piece an edge ends in: only where it goes, as OCCT's builder leaves such an edge in the face.)
-    // (Kept: the edges into the result's face as OCCT's INTERNAL ones; coincident pieces split alike, the kept one's.)
-    if pieces.iter().enumerate().any(|(p, x)| x.dangling && partner[p].is_some_and(|o| pieces[o].inner.len() != x.inner.len())) {
-        return Err(Decline("an edge ends inside a face"));
+    // (Kept: the edges into the result's face as OCCT's INTERNAL ones; of coincident pieces, all of theirs in the
+    // kept one.)
+    for pi in 0..pieces.len() {
+        if let Some(o) = partner[pi]
+            && !pieces[pi].inner.is_empty()
+        {
+            let more: Vec<usize> = pieces[pi].inner.iter().copied().filter(|s| !pieces[o].inner.contains(s)).collect();
+            pieces[o].inner.extend(more);
+            pieces[o].dangling = true;
+        }
     }
     crate::check_cancel()?;
     // The result's faces and their edges.
@@ -4403,7 +4429,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         let f = pieces[p].face;
         let flip = keep[p] == Some(true);
         let g = &cx.faces[f];
-        let same = !face_split[f] && pieces[p].loops.iter().flatten().all(|&(s, _)| edge_same[s]);
+        let same = !face_split[f] && pieces[p].loops.iter().flatten().map(|x| x.0).chain(pieces[p].inner.iter().copied()).all(|s| edge_same[s]);
         face_same[f] = same;
         let src = &args[g.arg as usize].faces[g.index as usize];
         // Each loop from where the input face's starts (its first edge's first piece), as OCCT's pieces.
@@ -4458,7 +4484,8 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             (s, _) => s,
         };
         out.body.faces.push(Face { surface, reversed: src.reversed ^ flip, loops });
-        out.face_internal.push(pieces[p].inner.iter().map(|&s| Use { edge: emap[s], reversed: false }).collect());
+        // (An unchanged face is the input's own, its edges inside it with it.)
+        out.face_internal.push(if same { Vec::new() } else { pieces[p].inner.iter().map(|&s| Use { edge: emap[s], reversed: false }).collect() });
         out.face_origin.push(if same { Origin::Same { arg: g.arg, index: g.index } } else { Origin::Piece { arg: g.arg, index: g.index } });
     }
     // Solids, one per shell, outward (a sheet's result: faces alone).

@@ -1079,6 +1079,23 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Inputs with INTERNAL edges, two vertices of one argument (11-01 09:21 UTC)
+- An input face's INTERNAL edges ("an internal edge", 39 cases) are no longer declined.
+  - to_body passes them as (face, edge) pairs (`Body::face_inner_edges`). Each face keeps them (`GFace::inner`),
+    out of its arrangement: as in OCCT's builder they split nothing.
+  - Each piece of them goes to the face's piece it lies in, as that piece's inner edges, and comes out INTERNAL. A
+    face unchanged keeps the input's own.
+  - Coincident pieces: the kept one takes the others' inner edges.
+  - Faces with them skip the turned (patterned) copy.
+- An edge without its curve on a free-form face in the result's build (another argument's edge inside or along it):
+  projected (BOPTools_AlgoTools2D::BuildPCurveForEdgeOnFace), as OCCT's builder makes one.
+- Two input vertices of one argument within the tolerance: both kept (OCCT doesn't intersect an argument with
+  itself), not declined.
+- T1 bool_patterns::an_input_edge_inside_a_face_stays_in_it (tests/data/booleans/818552c996311f5e, a cut).
+  Replays why32: 2–5 more taken per set (corpus2/3 +3, corpus4/5/6 +5, Shell's +2), 0 differ.
+- Still declined among the internal-edge inputs: "a tiny arc" (4: degenerate arcs between those coincident
+  vertices), "a face's vertex off its plane", "a vertex in a face".
+
 ## RUST-SM-CUT-VOLUME fixed (11-01 08:30 UTC; skasm via lead): a face on a trimmed left-handed cylinder the other way round
 - qa4_s1_enclosure_as_live cut 7 mm³ more than live with noshape's Boolean on. The cause, found by recording the
   test's Booleans with OCCT (NOSHAPE_BOOL_RUST=0) and replaying them with ours: one of 17, the fuse of the
