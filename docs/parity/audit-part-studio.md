@@ -47,7 +47,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 
 ## Editing logic (std's dialog reactions)
 
-std's 48 "Editing Logic Function"s (34 run std's, 10 native, 1 no-op, 3 open) change a dialog's fields as the user edits (Add into the touched part, the flip, a type
+std's 48 "Editing Logic Function"s (35 run std's, 10 native, 1 no-op, 2 open) change a dialog's fields as the user edits (Add into the touched part, the flip, a type
 from the picks). The dialog runs std's own function where `std_feature::has_editing_logic` says so (std runs the feature, or it is in
 `STD_EDITING_LOGIC`; T2 tests in std_oracle), or ours does the same natively (`behaviors::direct_edit_logic`, `boolean_edit_logic`).
 
@@ -84,7 +84,7 @@ from the picks). The dialog runs std's own function where `std_feature::has_edit
 | E29 | moveFaceEditingLogic | Move face | ✅ native: direction / offset |
 | E30 | fillEditLogic | Fill | ✅ native: edges from the preselection, surface operation (live SF7) |
 | E31 | onDecalFeatureChange | Decal | ✅ native: width / height from the image |
-| E32 | bodyDraftEditLogic | Body draft | ✗ (parting object / pull direction / faces from the selection) |
+| E32 | bodyDraftEditLogic | Body draft | ✅ std's runs (audit 8): the draft scope from the preselection (a part: Parts), a parting plane is the pull direction too (T2 body_draft_editing_logic_runs_std) |
 | E33 | bridgingCurveEditingLogic | Bridging curve | ✅ std's runs (audit 8): the hidden side flags its fields show by (Start edge position hidden for a vertex, tangency fields for faces; ours never set them), sides from the preselection (T2 bridging_and_edit_curve_editing_logic_runs_std) |
 | E34 | bsurfEditLogic | Boundary surface | ✅ std's runs (audit 8): Add when a profile is a surface's open edge (T2 surface_operation_editing_logic_runs_std) |
 | E35 | cutlistEditLogic | Cut list | ✅ std's runs (audit 8): only the first override hides "Same frames as previous" (T2 cutlist_and_delete_part_editing_logic_runs_std) |

@@ -1881,6 +1881,30 @@ fn bridging_and_edit_curve_editing_logic_runs_std() {
     assert!(got.contains(&format!("dropTools={:?}", q(edge))), "{got:?}");
 }
 
+/// std's bodyDraftEditLogic: a preselected part drafts Parts, and a plane
+/// picked as the parting object is the pull direction too.
+#[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
+fn body_draft_editing_logic_runs_std() {
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    let cube = q(body_ref(&r, 0));
+    s.add("bodyDraft", |p| {
+        p.set("selectionType", en("FACES"));
+        p.set("preselection", cube.clone());
+    });
+    let got = edit_logic(&s, &ParamValues::default(), &[]);
+    assert!(got.contains(&"selectionType=Enum(\"PARTS\")".to_string()) && got.contains(&format!("bodies={cube:?}")), "{got:?}");
+
+    let mut old = ParamValues::default();
+    old.set("partingObject", ParamValue::Query(Vec::new()));
+    s.ps.features.pop();
+    s.add("bodyDraft", |p| p.set("partingObject", q(Reference::Plane(DatumPlane::Top))));
+    let got = edit_logic(&s, &old, &["partingObject"]);
+    assert!(got.contains(&format!("pullDirection={:?}", q(Reference::Plane(DatumPlane::Top)))), "{got:?}");
+}
+
 /// std's holeEditLogic through the host natives: a new hole's Merge scope is
 /// the part it reaches, and one sketched below the part flips into it
 /// (holeScopeFlipHeuristics: an opHole probe and evCollision containment,

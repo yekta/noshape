@@ -5310,11 +5310,11 @@ impl PartStudioView {
 }
 
 /// Fill the first compatible query parameter(s) with preselected references.
-/// `std_init`: a hidden `initEntities` / `preselectedEntities` takes them
+/// `std_init`: a hidden `initEntities` / `preselectedEntities` / `preselection` takes them
 /// (std's editing logic reads it).
 fn preselect(ty: &FeatureType, feature: &mut Feature, selection: &[Reference], built: Option<&BuiltScene>, fits: &dyn Fn(&Reference, QueryFilter) -> bool, std_init: bool) {
     for s in &ty.params {
-        if !s.is_visible(&feature.params) && !(std_init && matches!(s.id, "initEntities" | "preselectedEntities")) {
+        if !s.is_visible(&feature.params) && !(std_init && matches!(s.id, "initEntities" | "preselectedEntities" | "preselection")) {
             continue;
         }
         if let ParamKind::Query { filter, max_picks } = s.kind {
