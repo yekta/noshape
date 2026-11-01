@@ -143,7 +143,7 @@ const SELECT_OTHER_MAX: usize = 20;
 pub(super) const SELECT_OTHER_SIZE: (f32, f32) = (220., 149.);
 
 /// Consumed dialog picks: (picks, accent picks, before-model, lines).
-pub type ConsumedLines = (Vec<Reference>, Vec<Reference>, Vec<Reference>, usize, Option<noshape_render::Instance>);
+pub type ConsumedLines = (Vec<Reference>, Vec<Reference>, Vec<Reference>, usize, Vec<noshape_render::Instance>);
 
 /// View state for the behaviors above.
 pub struct UiState {
@@ -2911,7 +2911,7 @@ impl PartStudioView {
             && *h == hov
             && *k == key
         {
-            return inst.iter().cloned().collect();
+            return inst.to_vec();
         }
         let mut lines = LineData::default();
         for (refs, color) in [(&acc, crate::theme::viewport::PREHIGHLIGHT), (&sel, crate::theme::viewport::SELECTION), (&hov, 0xf2ff80)] {
@@ -2934,15 +2934,48 @@ impl PartStudioView {
         }
         // Whole over the preview blend, as the other highlights (live psui-prv-05a/b).
         let post = self.built_base.is_some();
-        let inst = (!lines.segments.is_empty()).then(|| {
+        let mut inst: Vec<Instance> = Vec::new();
+        // A Shell's removed face: filled as well, a khaki at half over what's under it (live 11-01 on the 40 × 20 × 10
+        // block: the rim, the walls and the floor through the opening at (173,187,174), (167,179,164) and
+        // (146,151,132), live's sRGB blend of (191,180,129) at 0.5; #bcb36e at 0.47 here, within 5 of each).
+        let shell = self.edit.as_ref().is_some_and(|e| e.history.last.type_id == "shell");
+        let removed: Vec<&Reference> = if shell { sel.iter().chain(&acc).filter(|r| changed.contains(r) && matches!(r, Reference::Face(_))).collect() } else { Vec::new() };
+        let mut mesh = noshape_render::MeshData::default();
+        for r in removed {
+            for b in before.bodies.iter().filter(|b| !b.hidden) {
+                let Some(fi) = b.face_refs.iter().position(|f| f == r) else { continue };
+                let Some(&(first, count)) = b.mesh.face_ranges.get(fi) else { continue };
+                let Some(idx) = b.mesh.indices.get(first as usize..(first + count) as usize) else { continue };
+                let base = mesh.positions.len() as u32;
+                let mut map = std::collections::HashMap::new();
+                for &i in idx {
+                    let k = *map.entry(i).or_insert_with(|| {
+                        mesh.positions.push(b.mesh.positions[i as usize]);
+                        mesh.normals.push(b.mesh.normals.get(i as usize).copied().unwrap_or([0.0, 0.0, 1.0]));
+                        mesh.pick_ids.push(0);
+                        mesh.positions.len() as u32 - 1 - base
+                    });
+                    mesh.indices.push(base + k);
+                }
+            }
+        }
+        if !mesh.indices.is_empty() {
+            let khaki = crate::theme::lin(0xbcb36e);
+            let mut i = Instance::new(Drawable::Mesh(self.gpu.uploader().upload_mesh(&mesh))).with_color([khaki[0], khaki[1], khaki[2], 0.47]).unlit().unpickable().ignore_clip().layer(crate::scene_builder::HIGHLIGHT_FILL_LAYER);
+            if post {
+                i.compare = noshape_render::scene::compare::POST;
+            }
+            inst.push(i);
+        }
+        if !lines.segments.is_empty() {
             let mut i = Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(12);
             if post {
                 i.compare = noshape_render::scene::compare::POST;
             }
-            i
-        });
+            inst.push(i);
+        }
         self.ui.consumed_lines = Some((sel, acc, hov, key, inst.clone()));
-        inst.into_iter().collect()
+        inst
     }
 
     /// Measure graphics (Onshape): a dotted line between the closest points

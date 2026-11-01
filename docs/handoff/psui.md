@@ -201,6 +201,10 @@ document's display mesh is under 0.5 s.
 
 ## In progress
 
+11-01 21:45: queued 4935f5e7 (B-spline faces in our mesher, above), 42c306d8 (audit 12: Helix Turns and pitch flip,
+interaction::helix_manipulators), c92c5408 (audit 12: Move curve boundary's arrow, interaction::
+move_curve_boundary_anchor). Next: A23's translucent tint over a Shell's opening (live), then M11 / M12 (P3).
+
 (nothing unlanded) Landed 10-29: 60ca6465 MC-SELECT-NO-READOUT; 6f411558 / edf5dda5 / 5f3d7b20 mesher steps 5–5c
 (N06: fins-400's display mesh ≥ 10× BRepMesh's on GitHub's Linux and macOS runners, live-30's 3.3–6×);
 32d87597 / 5a695829 / 3cb447c2 perf.yml "Display mesher (release)" step (model job; per run mesher-N.log in the

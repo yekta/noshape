@@ -91,6 +91,16 @@ fn draw(cx: &mut TestAppContext, window: AnyWindowHandle) {
     cx.run_until_parked();
 }
 
+/// Draws until `done` holds (a regeneration on the background threads), at most 5 s.
+fn wait_until(cx: &mut TestAppContext, window: AnyWindowHandle, done: impl Fn(&gpui_kit::App) -> bool) {
+    let t = std::time::Instant::now();
+    while !cx.update(|cx| done(cx)) && t.elapsed() < std::time::Duration::from_secs(5) {
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(20));
+        draw(cx, window);
+    }
+}
+
 /// A click of the tool at viewport pixel `at` (what the viewport sends for a
 /// press and release without a drag).
 fn click(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>, at: (f64, f64)) {
@@ -1060,10 +1070,11 @@ fn a_shelled_face_is_highlighted_as_before(cx: &mut TestAppContext) {
     })
     .unwrap();
     draw(cx, window);
+    // ✓ once the preview has regenerated (a regeneration without an error makes the dialog dirty).
+    wait_until(cx, window, |cx| view.read(cx).edit.as_ref().is_some_and(|e| e.dialog.read(cx).can_submit()));
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
-    // (A commit's regeneration waits out a burst's 12 ms first.)
-    cx.executor().advance_clock(std::time::Duration::from_millis(50));
-    draw(cx, window);
+    // The commit's regeneration (it waits out a burst's 12 ms first).
+    wait_until(cx, window, |cx| view.read(cx).context.as_ref().is_some_and(|c| !c.bodies.is_empty()));
     // The part's flat faces at its top and bottom.
     let (top, bottom) = cx.update(|cx| {
         let v = view.read(cx);
@@ -1092,10 +1103,11 @@ fn a_shelled_face_is_highlighted_as_before(cx: &mut TestAppContext) {
         })
     })
     .unwrap();
-    cx.executor().advance_clock(std::time::Duration::from_millis(50));
-    draw(cx, window);
-    cx.executor().advance_clock(std::time::Duration::from_millis(50));
-    draw(cx, window);
+    // The preview over the model before it.
+    wait_until(cx, window, |cx| {
+        let v = view.read(cx);
+        v.ui.preview_before.is_some() && v.edit.as_ref().and_then(|e| v.display.feature_state(e.dialog.read(cx).feature.id)).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Ok)
+    });
     let state = cx.update(|cx| {
         let v = view.read(cx);
         let id = v.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
@@ -1104,4 +1116,7 @@ fn a_shelled_face_is_highlighted_as_before(cx: &mut TestAppContext) {
     assert!(state.0 && matches!(state.1, Some((noshape_model::display::FeatureStatus::Ok, _))), "the shell previewed over the model before it: {state:?}");
     let changed = cx.update(|cx| view.read(cx).changed_picks(&[top.clone(), bottom.clone()]));
     assert_eq!(changed, vec![top], "the removed top face, not the bottom");
+    // Live 11-01: the removed face filled khaki at half (the opening and the rim) under its outline.
+    let drawn = cx.update(|cx| view.read(cx).ui.consumed_lines.as_ref().map(|c| c.4.iter().map(|i| (matches!(i.drawable, noshape_render::Drawable::Mesh(_)), i.color[3])).collect::<Vec<_>>()));
+    assert_eq!(drawn, Some(vec![(true, 0.47), (false, 1.0)]), "the removed face's fill, then its outline");
 }
