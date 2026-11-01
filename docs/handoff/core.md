@@ -4,8 +4,15 @@ Area: features, regeneration, the kernel (crates/kernel incl. the OCCT bridge an
 STEP/Parasolid/Rhino/JT/PVZ import-export files), crates/model-core/src/regen, behaviors.rs / manipulators.rs feature
 behaviour, crates/featurescript, the FeatureScript host (crates/custom), the Onshape oracle tests. Worktree
 /root/projects/noshape-wt/core (branch agent/core), target dir /root/target-core, scratch /root/core-scratch.
-Build env: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-core CC="ccache gcc-13" CXX="ccache g++-13"`
-(/root/core-scratch/env.sh; long jobs via /root/core-scratch/job.sh <log> "<cmd>").
+Builds and tests (11-01): on vibe4 only, `tools/tiers/rb.sh <cmd>` from the worktree, one test filter at a time
+(land.sh runs the full set); long probes detached on vibe4 with a log. OCCT patches build on vibe4 in
+~/agents/core-occt (`build.sh TK...`); a private root ~/agents/occt-priv; libs go to /root/occt (synced everywhere).
+
+**State 11-01 12:00:** landed today: CANCEL-LATENCY rounds 5-9 (27-128 ms at every cancel point on the 45 / 45
+knurl, vibe4 at load 64-75), OCCT patches 0013 (unify / shell fix / modifier break hooks) and 0014 (TKFillet:
+Draft reapply 5.6 → 0.1 s), mixed-radius fillet (b), BLEND-RUST clearance (+1 case), thin loft (b) / (c) / (d).
+Next: SHELL-SLOW (profiling wf-block's Shell), the blends exactly as wide as their face (live W1: one half-
+cylinder), thin loft inward walls.
 **Sheet metal moved to skasm (lead 10-29 19:40):** model-core's sheet metal (crates/model-core/src/sheetmetal,
 regen/features/sheetmetal*.rs, the FS host's custom/host/sheetmetal.rs) and its Part Studio dialogs / table are
 skasm's now; see docs/handoff/skasm.md. skasm 10-30, touching core's files for sheet metal: Extrude / Revolve /

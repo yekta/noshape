@@ -33,7 +33,8 @@ fn profile(model: &str, ps: &PartStudio, units: &UnitPrefs, rows: &mut Vec<Row>)
 }
 
 fn fixtures(rows: &mut Vec<Row>) {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf");
+    // NOSHAPE_PROFILE_DIR=<dir>: its documents instead of tests/perf's.
+    let dir = std::env::var_os("NOSHAPE_PROFILE_DIR").map_or_else(|| std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf"), std::path::PathBuf::from);
     let tmp = std::env::temp_dir().join(format!("noshape-profile-{}", std::process::id()));
     std::fs::create_dir_all(&tmp).unwrap();
     let mut files: Vec<_> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape")).collect();
@@ -50,7 +51,13 @@ fn fixtures(rows: &mut Vec<Row>) {
         for tab in &s.doc.tabs {
             if let TabContent::PartStudio(ps) = &tab.content {
                 let name = format!("{} / {}", path.file_stem().unwrap().to_string_lossy(), tab.name);
-                profile(&name, ps, &units, rows);
+                let r = profile(&name, ps, &units, rows);
+                // NOSHAPE_PROFILE_BREP=<dir>: the regenerated solids written there (<file> <tab> <n>.brep), for kernel probes.
+                if let Some(out) = std::env::var_os("NOSHAPE_PROFILE_BREP") {
+                    for (i, b) in r.context.bodies.iter().enumerate() {
+                        let _ = noshape_kernel::write_brep(&b.shape, &std::path::Path::new(&out).join(format!("{} {} {i}.brep", path.file_stem().unwrap().to_string_lossy(), tab.name)));
+                    }
+                }
             }
         }
     }
