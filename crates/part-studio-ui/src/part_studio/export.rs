@@ -198,9 +198,6 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
             }
             rows.push(chk("ex-hidden", "Include hidden instances in export", s.hidden, |s, v| s.hidden = v));
         }
-        // Live (dom g39-export-*): an empty name is an error under the field;
-        // OBJ adds a note on spaces in names.
-        let empty = file.read(cx).value().trim().is_empty();
         let mut body = crate::os_ui::modal_body()
             .pt(px(BODY_PT))
             .pb(px(22.))
@@ -222,13 +219,11 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
                     .flex()
                     .items_center()
                     .border_1()
-                    .border_color(gpui_kit::rgb(if empty { 0xdc3545 } else { 0xaaaaaa }))
+                    .border_color(gpui_kit::rgb(0xaaaaaa))
                     .rounded(px(4.))
                     .bg(pal.panel)
                     .child(Input::new(&file).appearance(false).text_size(px(14.))),
-            )
-            .when(empty, |d| d.child(div().mt(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0xdc3545)).child("Valid file name is required.")))
-            .when(f == PartFormat::Obj, |d| d.child(div().mt(px(4.)).text_size(px(12.)).text_color(pal.text_muted).child("(OBJ names using spaces may not be supported by other systems)")));
+            );
         let mut prev_check = false;
         for row in rows {
             let st = st.clone();
@@ -268,9 +263,6 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
             .on_ok(move |_, window, cx| {
                 let s = st2.borrow().clone();
                 let name = file2.read(cx).value().trim().to_string();
-                if name.is_empty() {
-                    return false;
-                }
                 let run = run2.clone();
                 window.defer(cx, move |window, cx| run(s, name, window, cx));
                 true
