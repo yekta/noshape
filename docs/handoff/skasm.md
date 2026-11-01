@@ -222,6 +222,12 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   a new group's pending row bold grey), 1695 (the sheet metal table over both parts = the a5ab5f91 fix). Navigation
   1.18 answered (1701): the planes don't grow, the zoom bounds grow by Mate connector 1's constant-pixel glyph
   (disc 18 px, triad +33 px x / y, +23 px z) — next.
+- 11-01 ~07:20: landed d4e4a52f (navigation 1.18: connector glyph extent in the zoom bounds), e85234b8 (snap
+  insert click places with a Fastened mate, live 1704). **Builds now run on vibe4 via tools/tiers/rb.sh** (lead):
+  `export CARGO_TARGET_DIR=/root/target-skasm` before `rb.sh --get noshape cargo build -p noshape` (else the binary
+  goes to the worktree's target/), and the vibe4 binary reads icons from /home/ngyekta/agents/skasm/src/crates/app/assets
+  (copied there). Open next: SNAP-INSERT-FACE leftovers (face-centroid target; Part Studio circle-edge connector frame
+  vs live, request 07:15), assembly.md K9 / K11 (snap-mode q / Ctrl), SM-MAKE-JOINT-ONE-EDGE, RUST-SM-CUT-VOLUME (bool).
 - **End-of-day walk 11-01 03:40, green b6ba4390:** line chain 40 / 25 typed; rectangle boxes (Tab on a typed value
   stays, as live); Revolute via tool search, both picks → HUD ✓ commits and starts Revolute 2 (= live), the pattern
   copy follows its seed; dragging the mated pin keeps it seated. No regressions.
