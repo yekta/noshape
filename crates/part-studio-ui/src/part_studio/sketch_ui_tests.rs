@@ -952,11 +952,11 @@ fn revolve_angles_snap_to_five_degrees_as_live() {
 }
 
 /// Extrude's Second end position (std addExtrudeManipulator, live psb 10-24 ex2): a second arrow at the second cap,
-/// hit as the second handle; dragging it sets only the second end's Depth (the first stays). Shell and
-/// Chamfer show no manipulator (std adds none; live psb 10-24).
+/// hit as the second handle; dragging it sets only the second end's Depth (the first stays). Through all's direction
+/// arrow flips on a click (live 11-01). Shell and Chamfer show no manipulator (std adds none; live psb 10-24).
 #[gpui::test]
 fn extrude_second_end_has_its_own_arrow(cx: &mut TestAppContext) {
-    use super::super::manipulators::Manip;
+    use super::super::manipulators::{Handle, Manip};
     let (window, view) = sketch_with(cx, "second-end", Tool::CornerRect);
     click(cx, window, &view, (500., 300.));
     click(cx, window, &view, (650., 400.));
@@ -984,7 +984,7 @@ fn extrude_second_end_has_its_own_arrow(cx: &mut TestAppContext) {
     draw(cx, window);
     let (at, to) = view.update(cx, |v, cx| {
         v.sync_manipulator(cx);
-        let Some(Manip::Arrow(a, Some(b))) = v.current_manip(cx) else { panic!("two arrows") };
+        let Some(Manip::Handles(Handle::Arrow(a), Some(Handle::Arrow(b)))) = v.current_manip(cx) else { panic!("two arrows") };
         assert!(b.secondary && a.dir.dot(b.dir) < 0.0, "the second end's double chevron, the other way");
         let vp = v.viewport.read(cx);
         let tip = b.base + b.dir * b.length;
@@ -1008,6 +1008,25 @@ fn extrude_second_end_has_its_own_arrow(cx: &mut TestAppContext) {
     assert_eq!(depth, first, "the first depth unchanged");
     let second = second.expect("second depth");
     assert!(second != "10 mm" && second.ends_with("mm"), "the second depth dragged: {second}");
+    // Through all: a direction arrow on the region; a click on it flips the direction (live 11-01).
+    let flipped = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).edit.as_ref().expect("editing").dialog.read(cx).feature.params.bool("oppositeDirection"));
+    cx.update(|cx| {
+        let d = view.read(cx).edit.as_ref().expect("editing").dialog.clone();
+        d.update(cx, |d, _| d.feature.params.set("endBound", noshape_model::ParamValue::Enum("THROUGH_ALL".into())));
+    });
+    draw(cx, window);
+    let before = flipped(cx);
+    let at = view.update(cx, |v, cx| {
+        v.sync_manipulator(cx);
+        let Some(Manip::Handles(Handle::Arrow(a), _)) = v.current_manip(cx) else { panic!("the direction arrow") };
+        assert!(a.param.is_empty(), "nothing to drag");
+        let vp = v.viewport.read(cx);
+        let (p0, p1) = (vp.project(a.base).unwrap(), vp.project(a.base + a.dir * 1e-3).unwrap());
+        let at = p0 + (p1 - p0).normalize() * 30.0;
+        (at.x, at.y)
+    });
+    click(cx, window, &view, at);
+    assert_eq!(flipped(cx), !before, "a click flips it");
     for ty in ["shell", "chamfer"] {
         cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
             v.cancel_edit(w, cx);

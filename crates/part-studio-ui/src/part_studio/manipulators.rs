@@ -65,14 +65,21 @@ impl ArcHandle {
 
 #[derive(Clone, Copy, Debug)]
 pub(super) enum Manip {
-    /// A length arrow, and a second end's (Extrude's second depth).
-    Arrow(Arrow, Option<Arrow>),
-    /// An angle arc, and a second end's (Revolve's start angle).
-    Arc(ArcHandle, Option<ArcHandle>),
+    /// A feature's handle, and a second end's (Extrude's second depth,
+    /// Revolve's start angle or its flip arrow).
+    Handles(Handle, Option<Handle>),
     /// Transform ▸ Translate by XYZ (see `triad.rs`).
     Triad(super::triad::Triad),
     /// Section view: base circle, offset arrow, rotate rings (`section_manip.rs`).
     Section(super::section_manip::SectionManip),
+}
+
+/// One of a feature's handles: a length arrow (a flip arrow when it drives
+/// no length) or an angle arc.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum Handle {
+    Arrow(Arrow),
+    Arc(ArcHandle),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -96,25 +103,24 @@ impl PartStudioView {
             return None;
         }
         match e.dialog.read(cx).feature.type_id.as_str() {
-            "extrude" => self.current_arrow(cx).map(|a| Manip::Arrow(a, self.second_arrow(&a, cx))),
-            "moveFace" if e.dialog.read(cx).feature.params.is("moveFaceType", "ROTATE") => self.current_arc(cx).map(|h| Manip::Arc(h, None)),
+            "extrude" => self.current_arrow(cx).map(|a| Manip::Handles(Handle::Arrow(a), self.second_arrow(&a, cx).map(Handle::Arrow))),
+            "moveFace" if e.dialog.read(cx).feature.params.is("moveFaceType", "ROTATE") => self.revolve_arc(cx).map(|h| Manip::Handles(Handle::Arc(h), None)),
             // Shell and Chamfer have none (std adds no manipulator; live psb 10-24).
-            "cPlane" | "fillet" | "moveFace" | "offsetSurface" | "replaceFace" | "extendSurface" | "helix" => self.param_arrow(cx).map(|a| Manip::Arrow(a, None)),
-            "revolve" => self.current_arc(cx).map(|h| Manip::Arc(h, self.second_arc(&h, cx))),
-            "draft" => self.draft_arc(cx).map(|h| Manip::Arc(h, None)),
+            "cPlane" | "fillet" | "moveFace" | "offsetSurface" | "replaceFace" | "extendSurface" | "helix" => self.param_arrow(cx).map(|a| Manip::Handles(Handle::Arrow(a), None)),
+            "revolve" => self.revolve_handles(cx),
+            "draft" => self.draft_arc(cx).map(|h| Manip::Handles(Handle::Arc(h), None)),
             "transform" => self.current_triad(cx).map(Manip::Triad),
             "routingCurve" => self.routing_triad(cx).map(Manip::Triad),
             _ => None,
         }
     }
 
-    fn current_arc(&self, cx: &App) -> Option<ArcHandle> {
+    /// The angle arc of Move face's Rotate or a revolve (whatever its end type:
+    /// [`Self::revolve_handles`] also places its flip arrows by it).
+    fn revolve_arc(&self, cx: &App) -> Option<ArcHandle> {
         let d = self.edit.as_ref()?.dialog.read(cx);
         let p = &d.feature.params;
         let move_face = d.feature.type_id == "moveFace";
-        if !move_face && (p.bool("fullRevolve") || !p.is("endBound", "BLIND")) {
-            return None;
-        }
         let units = self.doc.read(cx).session.doc.settings.units;
         let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.display.variables).ok().map(|q| q.value)))?;
         // moveFace.fs: the rotate manipulator turns the first face about
@@ -145,18 +151,37 @@ impl PartStudioView {
         Some(ArcHandle { origin: origin + axis * axis.dot(rel), axis, radial, angle: if symmetric { angle * 0.5 } else { angle }, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU })
     }
 
-    /// Revolve's second end (std addRevolveManipulator, live psb 10-24
-    /// rev-10): with Second end position and a Blind start, an arc to the
-    /// start angle about the same axis, a double chevron at its end.
-    fn second_arc(&self, first: &ArcHandle, cx: &App) -> Option<ArcHandle> {
+    /// Revolve's handles (std addRevolveManipulator, live psb 10-24 rev-*):
+    /// a Blind end's angle arc, other ends a flip arrow at the profile across
+    /// the turn; with Second end position the start's the same (a Blind
+    /// start: an arc to the start angle about the same axis), double
+    /// chevrons. None with Full revolve or Symmetric's start.
+    fn revolve_handles(&self, cx: &App) -> Option<Manip> {
         let d = self.edit.as_ref()?.dialog.read(cx);
         let p = &d.feature.params;
-        if d.feature.type_id != "revolve" || p.bool("symmetric") || !p.bool("hasStartBound") || !p.is("startBound", "BLIND") {
+        if p.bool("fullRevolve") {
             return None;
         }
+        // The arc as for a Blind end: its anchor and axis serve the flips too.
         let units = self.doc.read(cx).session.doc.settings.units;
-        let angle = p.expr("angleBack").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.display.variables).ok().map(|q| q.value)))?;
-        Some(ArcHandle { angle, param: "angleBack", flip: None, secondary: true, ..*first })
+        let angle_of = |id: &str| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.display.variables).ok().map(|q| q.value)));
+        let arc = self.revolve_arc(cx)?;
+        // flipManipulator: at the profile, across the turn (the arc's start direction).
+        let flip = |flip: &'static str, opposite: bool, secondary: bool| {
+            let dir = arc.axis.cross(arc.radial).normalize_or_zero();
+            Handle::Arrow(Arrow { base: arc.point(0.0), dir: if opposite { -dir } else { dir }, length: 0.0, param: "", flip: Some(flip), secondary })
+        };
+        let first = if p.is("endBound", "BLIND") { Handle::Arc(arc) } else { flip("oppositeDirection", false, false) };
+        let second = if p.bool("symmetric") || !p.bool("hasStartBound") {
+            None
+        } else if p.is("startBound", "BLIND") {
+            angle_of("angleBack").map(|angle| Handle::Arc(ArcHandle { angle, param: "angleBack", flip: None, secondary: true, ..arc }))
+        } else {
+            // std: the start's flip arrow is startOppositeDirection about the axis as picked (the arc's
+            // axis is turned by oppositeDirection already).
+            Some(flip("startOppositeDirection", p.bool("startOppositeDirection") != p.bool("oppositeDirection"), true))
+        };
+        Some(Manip::Handles(first, second))
     }
 
     /// Draft's angle (std addNeutralPlaneDraftAngularManipulator, Neutral
@@ -246,18 +271,22 @@ impl PartStudioView {
 
     /// Extrude's second end (std addExtrudeManipulator, live psb 10-24 ex2):
     /// with Second end position, not symmetric and Blind, a double chevron
-    /// at the second cap driving Depth of the second end; other end types
-    /// show nothing to drag there.
+    /// at the second cap driving Depth of the second end; other end types a
+    /// double-chevron flip arrow at the profile.
     fn second_arrow(&self, first: &Arrow, cx: &App) -> Option<Arrow> {
         let d = self.edit.as_ref()?.dialog.read(cx);
         let p = &d.feature.params;
-        if !p.bool("hasSecondDirection") || p.bool("symmetric") || !p.is("secondDirectionBound", "BLIND") {
+        if !p.bool("hasSecondDirection") || p.bool("symmetric") {
             return None;
+        }
+        // regen extrude: the second side runs along the first's direction, reversed by its own flip.
+        let dir = if p.bool("secondDirectionOppositeDirection") { -first.dir } else { first.dir };
+        // Other end types: std's SECONDARY flip arrow at the profile.
+        if !p.is("secondDirectionBound", "BLIND") {
+            return Some(Arrow { base: first.base, dir, length: 0.0, param: "", flip: Some("secondDirectionOppositeDirection"), secondary: true });
         }
         let units = self.doc.read(cx).session.doc.settings.units;
         let depth = p.expr("secondDirectionDepth").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value)))?;
-        // regen extrude: the second side runs along the first's direction, reversed by its own flip.
-        let dir = if p.bool("secondDirectionOppositeDirection") { -first.dir } else { first.dir };
         Some(Arrow { base: first.base, dir, length: depth, param: "secondDirectionDepth", flip: Some("secondDirectionOppositeDirection"), secondary: true })
     }
 
@@ -416,8 +445,14 @@ impl PartStudioView {
         // In handle order (Viewport::manipulator_index_at: 0 the first, 1 the second end's).
         let handles: Vec<(DVec3, DVec3, f64)> = match self.current_manip(cx) {
             // The arrow glyph at the end of the length (see manipulator_overlay).
-            Some(Manip::Arrow(a, b)) => std::iter::once(arrow(&a)).chain(b.as_ref().map(arrow)).collect(),
-            Some(Manip::Arc(h, g)) => std::iter::once(arc(&h)).chain(g.as_ref().map(arc)).collect(),
+            Some(Manip::Handles(a, b)) => [Some(a), b]
+                .into_iter()
+                .flatten()
+                .map(|h| match h {
+                    Handle::Arrow(a) => arrow(&a),
+                    Handle::Arc(h) => arc(&h),
+                })
+                .collect(),
             Some(Manip::Triad(t)) => {
                 // Routing curve's other points can be clicked (made active).
                 let mut h = self.triad_hit_segments(&t, cx);
@@ -475,17 +510,10 @@ impl PartStudioView {
             _ => self.manip_drag.map_or(0, |d| d.which),
         };
         let a = match self.current_manip(cx) {
-            Some(Manip::Arrow(a, b)) => match b {
-                Some(b) if which == 1 => b,
-                _ => a,
+            Some(Manip::Handles(a, b)) => match (b.filter(|_| which == 1).unwrap_or(a), if b.is_some() { which } else { 0 }) {
+                (Handle::Arrow(a), _) => a,
+                (Handle::Arc(h), which) => return self.arc_event(h, which, ev, window, cx),
             },
-            Some(Manip::Arc(h, g)) => {
-                let h = match g {
-                    Some(g) if which == 1 => g,
-                    _ => h,
-                };
-                return self.arc_event(h, which, ev, window, cx);
-            }
             Some(Manip::Triad(t)) => return self.triad_event(t, ev, window, cx),
             // Rings and the base circle first; the arrow as any other.
             Some(Manip::Section(s)) => match self.section_manip_event(&s, ev, window, cx) {
@@ -507,8 +535,9 @@ impl PartStudioView {
             }
             ViewportEvent::ToolDrag { position, .. } => {
                 let Some(m) = self.manip_drag else { return false };
-                // A direction-only arrow (Up to …) has nothing to drag.
+                // A direction-only arrow (Up to …) has nothing to drag (moved: no click).
                 if a.param.is_empty() {
+                    self.manip_drag = Some(ManipDrag { delta: 1.0, ..m });
                     return true;
                 }
                 let (o, d) = ray(self, *position, cx);
@@ -548,8 +577,18 @@ impl PartStudioView {
                 }
                 true
             }
+            // std's flipManipulator (live 11-01, Extrude Through all): a
+            // click on a direction-only arrow flips it.
             ViewportEvent::ToolUp { .. } if a.param.is_empty() => {
-                self.manip_drag = None;
+                let clicked = self.manip_drag.take().is_some_and(|m| m.delta == 0.0);
+                if clicked
+                    && let (Some(f), Some(e)) = (a.flip, &self.edit)
+                {
+                    e.dialog.update(cx, |dlg, cx| {
+                        let cur = dlg.feature.params.bool(f);
+                        dlg.set_value(f, ParamValue::Bool(!cur), cx);
+                    });
+                }
                 true
             }
             ViewportEvent::ToolUp { .. } => self.end_manip_drag(a.param, window, cx),
@@ -697,8 +736,10 @@ impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
     fn build(&self, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
         match self.manip {
             // The hovered or dragged handle drawn last: Revolve's start angle arc runs over the first's.
-            Manip::Arrow(a, b) => self.lit_last([Some(a), b], |a, hover, drag| arrow_glyph(a, hover, drag, view, up)),
-            Manip::Arc(h, g) => self.lit_last([Some(h), g], |h, hover, drag| arc_glyph(h, hover, drag, view, up)),
+            Manip::Handles(a, b) => self.lit_last([Some(a), b], |h, hover, drag| match h {
+                Handle::Arrow(a) => arrow_glyph(a, hover, drag, view, up),
+                Handle::Arc(h) => arc_glyph(h, hover, drag, view, up),
+            }),
             Manip::Triad(t) => super::triad::triad_glyph(&t, self.triad_hover, self.triad_dragging, view, up),
             Manip::Section(s) => {
                 use super::section_manip::SectionHandle;
