@@ -186,7 +186,8 @@ fn view_cache() -> Arc<ViewCache> {
 /// hash is unchanged.
 fn cached_sources(doc: &Document, drawing: &Drawing, versions: &dyn Fn(&str) -> Option<Document>) -> Sources {
     let mut out = Sources::new();
-    let mut assemblies = noshape_model::assembly::eval::AssemblyEvaluator::new();
+    // Derived parts and custom features find their sources.
+    let mut assemblies = crate::derived::assembly_evaluator(Default::default());
     let mut cache = SOURCES.lock();
     if cache.len() > 64 {
         cache.clear();

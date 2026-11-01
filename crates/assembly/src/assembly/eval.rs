@@ -1828,10 +1828,13 @@ impl AssemblyEvaluator {
         // a Part Studio of derived parts listed nothing in Insert); the
         // sources' versions are part of the cache key.
         let needs_sources = ps.features.iter().any(|f| crate::features::importing::is_derived(&f.type_id) || crate::custom::is_custom(&f.type_id));
-        let opts = match self.studio_options.as_ref().filter(|_| needs_sources) {
+        let mut opts = match self.studio_options.as_ref().filter(|_| needs_sources) {
             Some(make) => make(doc),
             None => RegenOptions::default(),
         };
+        // The Variable Studio tables the Part Studio shows (its #names).
+        opts.document_variables = crate::variables::element_variables(doc, tab);
+        hash = hash.rotate_left(5) ^ hash_of(&serde_json::to_string(&opts.document_variables).unwrap_or_default());
         if let Some(p) = &opts.derived {
             for f in ps.features.iter().filter(|f| crate::features::importing::is_derived(&f.type_id)) {
                 hash = hash.rotate_left(5) ^ p.version(f.params.text("partStudio").trim());
@@ -1859,6 +1862,12 @@ impl AssemblyEvaluator {
     /// Regenerate a standard content part (cached per spec).
     pub fn standard_part(&mut self, spec: &super::standard::StandardSpec) -> Result<Arc<RegenResult>, String> {
         self.standard.entry(spec.clone()).or_insert_with(|| super::standard::regenerate(spec).map(Arc::new)).clone()
+    }
+
+    /// The regeneration options [`Self::set_studio_options`] gives for
+    /// `doc`'s Part Studios (None: not set).
+    pub fn studio_options_for(&self, doc: &Document) -> Option<RegenOptions> {
+        self.studio_options.as_ref().map(|make| make(doc))
     }
 
     /// Set how Part Studios with Derived or custom features find their

@@ -2726,6 +2726,38 @@ fn tapped_hole_threads_from_the_side() {
     assert_eq!(built.geometry.texts.iter().find(|t| t.pick == pick).map(|t| t.text.as_str()), Some("M6x1"));
 }
 
+/// A Part Studio using a Variable Studio's variables draws as it
+/// regenerates (its views were empty: the drawing regenerated it without
+/// the document's variables); changing the variable changes the source.
+#[test]
+fn drawing_of_a_part_studio_using_document_variables() {
+    use crate::variables::{VariableDef, VariableStudio, VsConfiguration};
+    use noshape_units::ExprValue;
+    let mut doc = crate::Document::new();
+    if let TabContent::PartStudio(ps) = &mut doc.tabs[0].content {
+        *ps = crate::demo::plate_studio();
+        let ex = ps.features.iter_mut().find(|f| f.type_id == "extrude").unwrap();
+        ex.params.set("depth", crate::params::ParamValue::Expr(ExprValue::new("#plate")));
+    }
+    let def = |e: &str| VariableStudio { variables: vec![VariableDef { name: "plate".into(), expr: ExprValue::new(e), kind: None, description: String::new(), description_expr: false, import: None }], insert_into_all: true, inserted: Vec::new(), configuration: VsConfiguration::default() };
+    let vs = doc.add_tab("Variable Studio 1", TabContent::VariableStudio(def("20 mm")));
+    let ps = doc.tabs[0].id;
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, ps, ViewOrientation::Front, [150.0, 150.0]));
+    let height = |doc: &crate::Document| {
+        let sources = regenerate_sources(doc, &drawing);
+        let src = sources.values().next().unwrap();
+        let (lo, hi) = src.context.bodies.iter().filter_map(|b| b.shape.bounding_box(true).ok()).fold((f64::MAX, f64::MIN), |(lo, hi), b| (lo.min(b.min.z), hi.max(b.max.z)));
+        (hi - lo, src.hash)
+    };
+    let (h, hash) = height(&doc);
+    assert!((h - 0.020).abs() < 1e-6, "{h}");
+    doc.tab_mut(vs).unwrap().content = TabContent::VariableStudio(def("12 mm"));
+    let (h2, hash2) = height(&doc);
+    assert!((h2 - 0.012).abs() < 1e-6, "{h2}");
+    assert_ne!(hash, hash2, "the source changes with the variable");
+}
+
 /// A view of a named view with a section plane (live 3121-3127): the
 /// material beyond the plane cut away, the cut face hatched.
 #[test]

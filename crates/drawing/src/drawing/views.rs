@@ -17,7 +17,7 @@ use crate::naming::Name;
 use crate::partstudio::PartStudio;
 use crate::reference::BodyId;
 use crate::regen::context::{Body, Context};
-use crate::regen::{RegenOptions, Regenerator};
+use crate::regen::Regenerator;
 use glam::{DQuat, DVec2, DVec3};
 use noshape_kernel::{Curve, EdgeClass, Plane, Segment2d, Shape, ShapeType, Surface, Visibility};
 use parking_lot::Mutex;
@@ -210,7 +210,28 @@ pub fn assembly_source_tabs(doc: &Document, assembly: TabId) -> std::collections
 /// feature in an unused Part Studio (behaviours "qa5 (10-26 p5)", P2-D2).
 pub fn source_hash(doc: &Document, key: &SourceKey) -> Option<u64> {
     match &doc.tab(key.tab)?.content {
-        TabContent::PartStudio(ps) => Some(studio_hash(ps, &key.config)),
+        TabContent::PartStudio(ps) => {
+            // Its Variable Studio values and the document's other Part
+            // Studios, Feature Studios and files (Derived, custom features,
+            // decal images) change it too.
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            studio_hash(ps, &key.config).hash(&mut h);
+            serde_json::to_vec(&crate::variables::element_variables(doc, key.tab)).unwrap_or_default().hash(&mut h);
+            let reads_others = ps.features.iter().any(|f| crate::features::importing::is_derived(&f.type_id) || crate::custom::is_custom(&f.type_id) || f.type_id == "decal");
+            if reads_others {
+                for t in doc.tabs.iter().filter(|t| t.id != key.tab) {
+                    match &t.content {
+                        TabContent::PartStudio(_) | TabContent::FeatureStudio(_) => {
+                            t.id.hash(&mut h);
+                            serde_json::to_vec(&t.content).unwrap_or_default().hash(&mut h);
+                        }
+                        TabContent::File(f) => (t.id, &f.file_name, f.size, f.uploaded).hash(&mut h),
+                        _ => {}
+                    }
+                }
+            }
+            Some(h.finish())
+        }
         TabContent::Assembly(asm) => {
             let mut h = std::collections::hash_map::DefaultHasher::new();
             serde_json::to_vec(asm).unwrap_or_default().hash(&mut h);
@@ -347,8 +368,16 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
     let hash = source_hash(doc, key)?;
     match &tab.content {
         TabContent::PartStudio(ps) => {
-            let has_scripts = doc.tabs.iter().any(|t| matches!(t.content, TabContent::FeatureStudio(_)));
-            let opts = RegenOptions { custom_features: has_scripts.then(|| crate::custom::DocumentScripts::from_document(doc) as Arc<dyn crate::custom::CustomFeatureProvider>), ..Default::default() };
+            // As the Part Studio regenerates: its Derived features' sources
+            // (the evaluator's options, set by the app and the agent API),
+            // Feature Studios and file tabs (a Decal's image), and the
+            // Variable Studio tables it shows (#names; without them a
+            // drawing of a Part Studio using them was empty).
+            let mut opts = assemblies.studio_options_for(doc).unwrap_or_default();
+            if opts.custom_features.is_none() && doc.tabs.iter().any(|t| matches!(t.content, TabContent::FeatureStudio(_) | TabContent::File(_))) {
+                opts.custom_features = Some(crate::custom::DocumentScripts::from_document(doc) as Arc<dyn crate::custom::CustomFeatureProvider>);
+            }
+            opts.document_variables = crate::variables::element_variables(doc, key.tab);
             let r = regen.regenerate(ps, &key.config, &doc.settings.units, &opts);
             let parts = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| part_info(ps, b)).collect();
             let sketch_colors = ps
