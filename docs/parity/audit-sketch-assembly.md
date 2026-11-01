@@ -13,7 +13,7 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 |---|---|
 | Surfaces audited | 25 |
 | Gaps found | 30 |
-| Gaps fixed | 29 |
+| Gaps fixed | 30 |
 
 ## Surfaces
 
@@ -80,4 +80,4 @@ Live requests answered: 1715 (tool options), 1716 (Flow), 1720 (exploded views /
 | G27 | P2 | Dynamic suppression ▸ on patterns, relations and assembly mate connectors | offered | not modelled (instances, mates and folders only) | fixed (11-01): Assembly::unsuppressed_if keeps their expressions by id; evaluation suppresses them, the menus offer Dynamic suppression ▸ / Unsuppress · Edit dynamic suppression (T1 assembly dynamic_suppression_applies_to_relations) |
 | G28 | P3 | Two mates selected | Reset | Show · Show all mates · Isolate… · Make transparent… · Edit named position driver mate… · Suppress · Dynamic suppression ▸ | Clear selection | Add selection to folder… · Expand ▸ · Collapse ▸ | Delete | the clicked mate's menu | fixed (11-01): Ctrl / Cmd+click adds mates to the selection (highlighted), their menu as live\'s, Delete removes them in one step (UI test two_selected_mates_have_lives_menu); no Dynamic suppression or driver item for several yet |
 | G29 | P3 | Preferences › Customize keyboard shortcuts and Shortcut toolbars (Sketch) | Flow listed (unassigned; after Curvature, unticked; live 1724) | missing | fixed (11-01) |
-| G30 | P3 | Display states dialog | input "New display state name" + [+]; a select "Select a display state" with ⟳ (update), ✎ (rename), ⊗ (delete, no confirmation) | a list of the states with an "Update" text button | open: live dump asked (REQUESTS 13:15) |
+| G30 | P3 | Display states dialog | input "New display state name" + [+]; a select "Select a display state" with ⟳ (update), ✎ (rename), ⊗ (delete, no confirmation) | a list of the states with an "Update" text button | fixed (11-01, live 1729): 265 px panel, name box + [+] (enabled when empty), "No display states created" or a select (placeholder "Select a display state", states sorted, picking applies) with ⟳ (greyed while the visibility matches the state; Assembly::matches_display_state), ✎ (in place, Enter / Esc), ⊗ (at once); a taken name keeps the box and shows "There is already a display state with this name."; reopened, the select is on its placeholder; no toasts |

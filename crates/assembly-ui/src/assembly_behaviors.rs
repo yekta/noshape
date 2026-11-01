@@ -7,7 +7,6 @@
 
 use super::*;
 use gpui_kit::component::input::InputEvent;
-use gpui_kit::component::Disableable as _;
 use crate::os_menu::{OsMenu, OsMenuItem};
 use noshape_model::assembly::ops::{FilterCommand, InstanceClipboard, ListFilter, RowInfo, RowKind};
 use std::rc::Rc;
@@ -487,6 +486,8 @@ pub struct AsmUi {
     pub ds_name: Option<Entity<InputState>>,
     pub ds_selected: Option<usize>,
     pub ds_renaming: Option<Entity<InputState>>,
+    /// The name typed is taken (live 1729: a red line under the select).
+    pub ds_duplicate: bool,
     /// Group dialog: (group being edited, instances).
     pub group: Option<(Option<MateId>, Vec<InstanceId>)>,
     /// The Group dialog's patterns (a pick on a pattern's copy, live 1681).
@@ -3614,6 +3615,10 @@ impl AssemblyView {
 
     pub(super) fn toggle_display_states(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.ui.display_states = !self.ui.display_states;
+        // Live 1729: reopened, the select is back on its placeholder.
+        self.ui.ds_selected = None;
+        self.ui.ds_renaming = None;
+        self.ui.ds_duplicate = false;
         if self.ui.ds_name.is_none() {
             self.ui.ds_name = Some(cx.new(|cx| InputState::new(window, cx).placeholder("New display state name")));
         }
@@ -3626,129 +3631,155 @@ impl AssemblyView {
         if name.is_empty() {
             return;
         }
+        // Live 1729: refused, the name stays in the box and a red line says why.
         if self.assembly(cx).is_some_and(|a| a.display_states.iter().any(|d| d.name == name)) {
-            self.message = Some((true, "There is already a display state with this name.".into()));
+            self.ui.ds_duplicate = true;
             cx.notify();
             return;
         }
+        self.ui.ds_duplicate = false;
         self.edit(&format!("Add display state : {name}"), cx, |a| a.save_display_state(&name));
         self.ui.ds_selected = self.assembly(cx).map(|a| a.display_states.len().saturating_sub(1));
         st.update(cx, |s, cx| s.set_value("", window, cx));
         cx.notify();
     }
 
+    /// Live (dom/skasm-g30-display-states, 1729): a 265 px panel "Display
+    /// states" ✕: the name box and [+]; then "No display states created", or
+    /// a select ("Select a display state", the states sorted by name; picking
+    /// one applies it) with ⟳ (enabled only while the visibility differs from
+    /// the state), ✎ (rename in place: Enter commits, Esc cancels) and ⊗
+    /// (removes it at once).
     pub(super) fn render_display_states(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let states: Vec<String> = self.assembly(cx).map(|a| a.display_states.iter().map(|d| d.name.clone()).collect()).unwrap_or_default();
         let sel = self.ui.ds_selected.filter(|i| *i < states.len());
-        let mut body = v_flex().p_2().gap_1();
-        if states.is_empty() {
-            body = body.child(div().px_1().text_xs().text_color(pal.text_faint).child("No display states created"));
-        }
-        for (i, name) in states.iter().enumerate() {
-            let renaming = sel == Some(i) && self.ui.ds_renaming.is_some();
-            body = body.child(
-                h_flex()
-                    .id(SharedString::from(format!("ds-{i}")))
-                    .h(px(24.))
-                    .px_1()
-                    .gap_1()
-                    .rounded_sm()
-                    .text_sm()
-                    .cursor_pointer()
-                    .when(sel == Some(i), |d| d.bg(pal.accent_soft))
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(match (renaming, &self.ui.ds_renaming) {
-                        (true, Some(st)) => div().flex_1().child(Input::new(st).xsmall()).into_any_element(),
-                        _ => div().flex_1().truncate().child(crate::ui::user_text(name.clone())).into_any_element(),
-                    })
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        // Selecting a display state applies it.
-                        this.ui.ds_selected = Some(i);
-                        this.ui.ds_renaming = None;
-                        let name = this.assembly(cx).and_then(|a| a.display_states.get(i).map(|d| d.name.clone())).unwrap_or_default();
-                        this.edit(&format!("Apply display state : {name}"), cx, |a| a.apply_display_state(i));
-                        cx.notify();
-                    })),
-            );
-        }
-        let actions = h_flex()
-            .gap_1()
-            .child(Button::new("ds-update").label("Update").xsmall().ghost().tooltip("Update this display state").disabled(sel.is_none()).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                let Some(i) = sel else { return };
-                let name = this.assembly(cx).and_then(|a| a.display_states.get(i).map(|d| d.name.clone())).unwrap_or_default();
-                this.edit(&format!("Update display state : {name}"), cx, |a| a.save_display_state(&name));
-                this.message = Some((false, "Display state updated.".into()));
-                cx.notify();
-            })))
-            .child(Button::new("ds-rename").icon(Icon::empty().path(icon_path("edit"))).xsmall().ghost().tooltip("Rename display state").disabled(sel.is_none()).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                let Some(i) = sel else { return };
-                let name = this.assembly(cx).and_then(|a| a.display_states.get(i).map(|d| d.name.clone())).unwrap_or_default();
-                let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
-                st.update(cx, |s, cx| s.focus(window, cx));
-                let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
-                    if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
-                        let new = st.read(cx).value().trim().to_string();
-                        this.ui.ds_renaming = None;
-                        if !new.is_empty() {
-                            this.edit(&format!("Rename display state : {new}"), cx, |a| {
-                                if let Some(d) = a.display_states.get_mut(i) {
-                                    d.name = new.clone();
-                                }
-                            });
-                        }
-                        window.focus(&this.focus, cx);
-                        cx.notify();
-                    }
-                });
-                this.transient_sub = Some(sub);
-                this.ui.ds_renaming = Some(st);
-                cx.notify();
-            })))
-            .child(Button::new("ds-delete").icon(Icon::empty().path(icon_path("delete"))).xsmall().ghost().tooltip("Remove display state").disabled(sel.is_none()).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                let Some(i) = sel else { return };
-                this.edit("Remove display state", cx, |a| {
-                    if i < a.display_states.len() {
-                        a.display_states.remove(i);
-                    }
-                });
-                this.ui.ds_selected = None;
-                this.message = Some((false, "Display state deleted.".into()));
-                cx.notify();
-            })));
-        body = body.child(actions);
+        let differs = sel.is_some_and(|i| self.assembly(cx).is_some_and(|a| !a.matches_display_state(i)));
+        let icon_button = |id: &'static str, icon: &'static str, tip: &'static str, enabled: bool, cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .w(px(30.))
+                .h(px(31.))
+                .flex_none()
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(3.))
+                .when(enabled, |d| d.cursor_pointer().hover(|d| d.bg(p().panel_hover)))
+                .child(div().opacity(if enabled { 1. } else { 0.4 }).child(crate::assets::icon(icon, 20., cx)))
+                .tooltip(crate::ui::tooltip(tip))
+        };
+        let mut body = v_flex().p(px(6.)).gap(px(4.));
         if let Some(st) = self.ui.ds_name.clone() {
             body = body.child(
                 h_flex()
-                    .gap_1()
-                    .child(div().flex_1().child(Input::new(&st).xsmall()))
-                    // Live (assembly/nv-904): a bordered 28 px box with Onshape's 12 px "+",
-                    // #aaa (disabled) until a name is typed.
-                    .child({
-                        let empty = st.read(cx).value().trim().is_empty();
-                        div()
-                            .id("ds-add")
-                            .size(px(28.))
-                            .flex_none()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .rounded(px(3.))
-                            .border_1()
-                            .border_color(gpui_kit::rgb(0xdddddd))
-                            .when(!empty, |d| d.cursor_pointer().hover(|d| d.bg(p().panel_hover)))
-                            .child(div().opacity(if empty { 0.42 } else { 1. }).child(crate::assets::icon("add-button", 20., cx)))
-                            .tooltip(crate::ui::tooltip("Add display state"))
-                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.add_display_state(window, cx)))
-                    }),
+                    .gap(px(4.))
+                    .child(div().w(px(220.)).child(Input::new(&st).xsmall()))
+                    .child(icon_button("ds-add", "add-button", "Add display state", true, cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.add_display_state(window, cx)))),
             );
         }
-        // Live (assembly/nv-904): the plain ns-dialog × (no ✓).
-        Self::panel_frame_with("Display states", body, cx.listener(|this, _: &ClickEvent, _, cx| {
+        if states.is_empty() {
+            body = body.child(div().px_1().text_size(px(13.33)).text_color(pal.text).child("No display states created"));
+        } else {
+            // Sorted by name; the select's indices map back to the states'.
+            let mut order: Vec<usize> = (0..states.len()).collect();
+            order.sort_by(|a, b| states[*a].cmp(&states[*b]));
+            let field: AnyElement = match &self.ui.ds_renaming {
+                Some(st) => div()
+                    .w(px(165.))
+                    .on_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                        // Esc cancels the rename; the dialog stays.
+                        if e.keystroke.key == "escape" {
+                            cx.stop_propagation();
+                            this.ui.ds_renaming = None;
+                            window.focus(&this.focus, cx);
+                            cx.notify();
+                        }
+                    }))
+                    .child(Input::new(st).xsmall())
+                    .into_any_element(),
+                None => {
+                    let options: Vec<String> = std::iter::once("Select a display state".to_string()).chain(order.iter().map(|i| states[*i].clone())).collect();
+                    let current = sel.and_then(|s| order.iter().position(|i| *i == s)).map_or(0, |k| k + 1);
+                    let view = cx.entity();
+                    let order2 = order.clone();
+                    div()
+                        .w(px(160.))
+                        .child(crate::os_ui::select_field_flat("ds-select", options, vec![0], 1, current, move |k, _, cx| {
+                            let Some(&i) = k.checked_sub(1).and_then(|k| order2.get(k)) else { return };
+                            view.update(cx, |this, cx| {
+                                // Choosing a state applies it at once.
+                                this.ui.ds_selected = Some(i);
+                                let name = this.assembly(cx).and_then(|a| a.display_states.get(i).map(|d| d.name.clone())).unwrap_or_default();
+                                this.edit(&format!("Apply display state : {name}"), cx, |a| a.apply_display_state(i));
+                                cx.notify();
+                            })
+                        }))
+                        .into_any_element()
+                }
+            };
+            body = body.child(
+                h_flex()
+                    .gap(px(2.))
+                    .child(field)
+                    .child(icon_button("ds-update", "refresh", "Update this display state", differs, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        let Some(i) = sel.filter(|_| differs) else { return };
+                        let name = this.assembly(cx).and_then(|a| a.display_states.get(i).map(|d| d.name.clone())).unwrap_or_default();
+                        this.edit(&format!("Update display state : {name}"), cx, |a| a.save_display_state(&name));
+                        cx.notify();
+                    })))
+                    .child(icon_button("ds-rename", "edit", "Rename display state", sel.is_some(), cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.start_display_state_rename(sel, window, cx))))
+                    .child(icon_button("ds-delete", "remove-circle", "Remove display state", sel.is_some(), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        let Some(i) = sel else { return };
+                        this.edit("Remove display state", cx, |a| {
+                            if i < a.display_states.len() {
+                                a.display_states.remove(i);
+                            }
+                        });
+                        this.ui.ds_selected = None;
+                        cx.notify();
+                    }))),
+            );
+        }
+        if self.ui.ds_duplicate {
+            body = body.child(div().w(px(255.)).p(px(6.)).text_size(px(13.33)).text_color(gpui_kit::rgb(0xbd3039)).child("There is already a display state with this name."));
+        }
+        // Live: the plain ns-dialog × (no ✓), 265 px wide.
+        Self::panel_frame_with("Display states", div().w(px(265.)).child(body), cx.listener(|this, _: &ClickEvent, _, cx| {
             this.ui.display_states = false;
             cx.notify();
         }), "ds-close", true)
         .into_any_element()
+    }
+
+    /// ✎: the select becomes a box with the name, all selected; Enter
+    /// renames (the list re-sorts, the state stays selected), Esc cancels.
+    fn start_display_state_rename(&mut self, sel: Option<usize>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(i) = sel else { return };
+        let name = self.assembly(cx).and_then(|a| a.display_states.get(i).map(|d| d.name.clone())).unwrap_or_default();
+        let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
+        st.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            if let InputEvent::PressEnter { .. } = ev {
+                let new = st.read(cx).value().trim().to_string();
+                this.ui.ds_renaming = None;
+                if !new.is_empty() {
+                    this.edit(&format!("Rename display state : {new}"), cx, |a| {
+                        if let Some(d) = a.display_states.get_mut(i) {
+                            d.name = new.clone();
+                        }
+                    });
+                }
+                window.focus(&this.focus, cx);
+                cx.notify();
+            }
+        });
+        self.transient_sub = Some(sub);
+        self.ui.ds_renaming = Some(st);
+        cx.notify();
     }
 }
 

@@ -2346,8 +2346,11 @@ fn folders_and_display_states() {
     asm.instances[1].hidden = true;
     assert!(asm.save_display_state("Without block 2"));
     asm.set_all_hidden(false);
+    // Live 1729: ⟳ only while the visibility differs from the state.
+    assert!(!asm.matches_display_state(0));
     assert!(asm.apply_display_state(0));
     assert!(asm.instances[1].hidden && !asm.instances[0].hidden);
+    assert!(asm.matches_display_state(0));
     // Drag and drop: reorder, joining the target's folder.
     asm.move_instance(InstanceId(1), Some(InstanceId(3)));
     assert_eq!(asm.instances.iter().map(|i| i.id.0).collect::<Vec<_>>(), vec![2, 1, 3]);

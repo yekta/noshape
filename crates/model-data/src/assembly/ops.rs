@@ -770,6 +770,16 @@ impl Assembly {
         }
         true
     }
+
+    /// Whether the visibility now is what display state `index` sets (live
+    /// 1729: its ⟳ is enabled only when they differ).
+    pub fn matches_display_state(&self, index: usize) -> bool {
+        let mut applied = self.clone();
+        applied.apply_display_state(index)
+            && applied.instances.iter().zip(&self.instances).all(|(a, b)| a.hidden == b.hidden)
+            && applied.mates.iter().zip(&self.mates).all(|(a, b)| a.hidden == b.hidden)
+            && applied.connectors.iter().zip(&self.connectors).all(|(a, b)| a.hidden == b.hidden)
+    }
 }
 
 impl Assembly {
