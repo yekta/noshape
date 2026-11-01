@@ -115,12 +115,6 @@ jobs:
         with:
           components: clippy
 
-      # LLVM's linker for the ~30 test executables (each with OCCT): faster than link.exe.
-      - name: Linker (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: '"CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=rust-lld" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8'
-
       - uses: Swatinem/rust-cache@v2
         with:
           key: occt-V8_0_1
