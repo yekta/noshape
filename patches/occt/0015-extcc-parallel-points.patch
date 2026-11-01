@@ -1,0 +1,25 @@
+--- a/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder_C1.cxx
++++ b/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder_C1.cxx
+@@ -1506,7 +1506,8 @@
+       BRepLib_MakeEdge  Bedge(zob3d);
+       TopoDS_Edge       edg = Bedge.Edge();
+       BRepExtrema_ExtCC extCC(edgecouture, edg);
+-      if (extCC.IsDone() && extCC.NbExt() != 0)
++      // noshape (patch 0015): parallel curves have no points to take (qa CRASH-1052).
++      if (extCC.IsDone() && extCC.NbExt() != 0 && !extCC.IsParallel())
+       {
+         for (int i = 1; i <= extCC.NbExt() && !intcouture; i++)
+         {
+--- a/src/ModelingData/TKGeomBase/Extrema/Extrema_ExtCC.cxx
++++ b/src/ModelingData/TKGeomBase/Extrema/Extrema_ExtCC.cxx
+@@ -361,7 +361,9 @@
+ 
+ void Extrema_ExtCC::Points(const int N, Extrema_POnCurv& P1, Extrema_POnCurv& P2) const
+ {
+-  if (N < 1 || N > NbExt())
++  // noshape (patch 0015): parallel curves have a distance but no points (NbExt 1, none stored): a fillet corner read
++  // past the empty sequence (qa CRASH-1052, "stack smashing detected").
++  if (N < 1 || N > NbExt() || 2 * N > mypoints.Length())
+   {
+     throw Standard_OutOfRange();
+   }

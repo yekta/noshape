@@ -11,8 +11,13 @@ Builds and tests (11-01): on vibe4 only, `tools/tiers/rb.sh <cmd>` from the work
 **State 11-01 12:00:** landed today: CANCEL-LATENCY rounds 5-9 (27-128 ms at every cancel point on the 45 / 45
 knurl, vibe4 at load 64-75), OCCT patches 0013 (unify / shell fix / modifier break hooks) and 0014 (TKFillet:
 Draft reapply 5.6 → 0.1 s), mixed-radius fillet (b), BLEND-RUST clearance (+1 case), thin loft (b) / (c) / (d).
-Next: SHELL-SLOW (profiling wf-block's Shell), the blends exactly as wide as their face (live W1: one half-
-cylinder), thin loft inward walls.
+Afternoon: full round as live W1 (merge_full_rounds), P1 PATTERN-HOLE-NOREAPPLY fixed (edges are handed out
+FORWARD since 4e9b054e: ask `Shape::edge_orientation_in` for a face's use of an edge), regen_profile tools
+(NOSHAPE_PROFILE_DIR / _BREP, prints failing features). In progress: P1 CRASH-1052 (OCCT patch 0015: Extrema_ExtCC
+parallel curves have no points; ChFi3d corner skips them; repro ~/agents/fuzz/run1052.sh on vibe4, log
+~/agents/logs/fuzz1052.log), MEM-RUNAWAY patch 0016 (Extrema_GenExtPS::BuildGrid break hook; seed 1002 repro next).
+SHELL-SLOW: wf-block's top-face Shell is 76 / 112 ms now (2.5 / 1.5 mm); cli-shell-hang-pre's Shells 4 / 5 take 20 s /
+30 s (the budget) in 170+ OCCT slab Booleans: waits on bool's slab union. Next: thin loft inward walls.
 **Sheet metal moved to skasm (lead 10-29 19:40):** model-core's sheet metal (crates/model-core/src/sheetmetal,
 regen/features/sheetmetal*.rs, the FS host's custom/host/sheetmetal.rs) and its Part Studio dialogs / table are
 skasm's now; see docs/handoff/skasm.md. skasm 10-30, touching core's files for sheet metal: Extrude / Revolve /
