@@ -252,6 +252,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cancelled operation before naming its result): vibe2 quiet, cancel at 0.5-14 s 16-243 ms (most under 80), 16 s
   788 ms, 18 s 320 ms; vibe4 at load 38: 37-169 ms but 15 / 16 s 1.8 / 1.3 s. Still on it (stacks in
   docs/handoff/core.md).
+  core 11-01 08:10, round 9 (rust_boolean.cpp's build of noshape's result checks the cancel): vibe4 at load 64-75
+  on 16 cores, cancel at 0.5-20 s: **27-128 ms at every point** (12 points), from 10-19 s before round 1.
 - [ ] P0 BLEND-RUST (core, lead 10-30 20:50) noshape's own fillets and chamfers for simple edges, OCCT as fallback
   (crates/brep blend.rs; kernel cpp/rust_blend.cpp in front of op_fillet / op_chamfer behind NOSHAPE_BLEND_RUST, off
   until correct; corpus NOSHAPE_RECORD_BLENDS + kernel `blend_replay`). 10-30 22:00, step 1: closed tangent chains

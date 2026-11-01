@@ -981,8 +981,11 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
   std::vector<TopoDS_Edge> es(ne);
   std::vector<EllEdge>     ells(ne);
   Sections                 sections;
+  // (Each loop checks the cancel every 256: the 45 / 45 knurl's result took over a second to build after it.)
   for (size_t i = 0; i < ne; ++i)
   {
+    if ((i & 0xFF) == 0xFF)
+      fail_if_cancelled();
     const uint32_t kind = r.edge_origin[3 * i];
     if (kind == 0)
     {
@@ -1190,6 +1193,8 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
   std::vector<TopoDS_Face> fs(nf);
   for (size_t i = 0; i < nf; ++i)
   {
+    if ((i & 0xFF) == 0xFF)
+      fail_if_cancelled();
     const uint32_t kind = r.face_origin[3 * i];
     const TopoDS_Face& src = TopoDS::Face(input(srcs, r.face_origin[3 * i + 1], TopAbs_FACE, r.face_origin[3 * i + 2]));
     TopLoc_Location                 loc;
@@ -1500,6 +1505,8 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
   // reversed face); so does one whose curves span more than a turn (an invalid face).
   for (size_t i = 0; i < nf; ++i)
   {
+    if ((i & 0xFF) == 0xFF)
+      fail_if_cancelled();
     if (r.face_origin[3 * i] == 0)
       continue;
     TopLoc_Location loc;

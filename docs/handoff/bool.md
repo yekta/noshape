@@ -1287,6 +1287,10 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
 - (11-01 02:30) `set_stop_hook(fn() -> bool)`: `cancelled()` also asks it; the kernel installs its
   `noshape_should_break` (the thread's cancel flag or its budget's deadline), so a budgeted op's Boolean (Shell's
   slabs, the blend fallbacks) declines at the deadline instead of the budget's timer jumping out of Rust code.
+- (11-01 08:10) rust_boolean.cpp `build()` (your result into OCCT topology) checks `fail_if_cancelled()` every 256
+  edges / faces in its three loops: the 45 / 45 knurl's took 1.3-1.8 s after a cancel there. op_boolean's
+  history is `cancellable_history`, its unify steps check too, and a cancelled run's big objects are freed on
+  other threads (FreeIfCancelled, kernel Shape drops): nothing changes unless the thread is cancelled.
 
 ## Requests
 - core (10-31 16:40 UTC, P0 SHELL-SLOW): Shell's slab union is OCCT's for concave parts, 1.5-2.3 s of a 2.6-3.4 s

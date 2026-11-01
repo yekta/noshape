@@ -72,6 +72,10 @@ deadlock in malloc).
 - OCCT on vibe4 (11-01, builds moved there): ~/agents/core-occt/OCCT-8_0_1 (patched through 0013) and
   `build.sh TK...` (ninja, build-occt.sh's options; the first build took 10.5 min); private root ~/agents/occt-priv.
   Libs: /root/core-scratch/occt0013 (TKBRep, TKShHealing; backups occt-lib-backup/*.pre0013), in /root/occt.
+- Rounds 5-8 landed 9d7c9bc9 (with the mixed-radius fillet). Round 9: the 15-16 s stalls were rust_boolean.cpp's
+  build() (noshape's Boolean result into OCCT topology: ellipse pcurves) without checks; now fail_if_cancelled every
+  256 edges / faces. vibe4 at load 64-75 (16 cores), cancel at 0.5-20 s: 27-128 ms at every point (12 points).
+  ~/agents/symbolize.py (vibe4) runs one addr2line for the whole log (5 s instead of 20+ min).
 
 ## Mixed-radius corners (live 1686, 11-01 04:50): the next blend step
 - Live's Fillet holds one radius, so its mixed corners come from two Fillet features; the order doesn't matter. Each
