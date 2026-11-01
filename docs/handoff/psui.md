@@ -289,8 +289,10 @@ is no cancel button.
 no toast, the old geometry stays drawn and input works, but Onshape's spinner runs until the model has rebuilt the old
 values (~18 s on the knurl) and a committed regeneration can't be cancelled at all (Esc does nothing, no Stop button).
 Ours now: dialog, list, geometry and spinner back in the same update (the user's request beats live's slower spinner).
-Gap: a dialog opened while a regeneration was still pending keeps no snapshot, so its cancel regenerates as before
-(the regenerator lock waits on the cancelled run until core's ~100 ms stop lands). Checked on :102 with kn.noshape
+Gap closed 11-01 00:58: the view keeps the last finished result of the committed document (`last_done`, recorded
+whenever a result is shown with no dialog open); a cancel always shows it at once and drops both runs' late
+results; when an earlier edit was still regenerating, its document then regenerates afresh behind it. T1
+cancel_during_an_earlier_regeneration_shows_the_last_result. Checked on :102 with kn.noshape
 (Diamond knurl 45 / 45): spinner and dialog gone in the first frame after Esc.
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.

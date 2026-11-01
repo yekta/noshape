@@ -797,6 +797,49 @@ fn cancel_shows_the_document_before_the_edit_at_once(cx: &mut TestAppContext) {
     assert_eq!(settled, (false, true), "no late result, no spinner");
 }
 
+/// User P1 (11-01): a dialog opened while an earlier edit still regenerates cancels at once too: Esc shows the last
+/// finished result (no dialog, the new feature not drawn) in the same update; neither run's late result is shown, and
+/// the earlier edit's document then regenerates afresh (its new variable drawn, the cancelled extrude never).
+#[gpui::test]
+fn cancel_during_an_earlier_regeneration_shows_the_last_result(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "cancel-earlier");
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    draw(cx, window);
+    let before = cx.update(|cx| view.read(cx).display.clone());
+    let after_esc = cx
+        .update_window(window, |_, w, cx| {
+            // A committed edit (a Variable) starts regenerating; before it finishes, a dialog opens and is cancelled.
+            let var = view.update(cx, |v, cx| {
+                let (tab, units) = (v.tab, v.doc.read(cx).session.doc.settings.units);
+                let var = v.doc.update(cx, |doc, cx| {
+                    let mut id = None;
+                    doc.edit_studio(tab, "Create variable", cx, |ps| id = noshape_model::variable_table::create(ps, "w", "LENGTH", "1 mm", "", None, &units).ok());
+                    id.expect("a variable")
+                });
+                v.start_feature("extrude", w, cx);
+                var
+            });
+            let extrude = view.read(cx).edit.as_ref().map(|e| e.dialog.read(cx).feature.id).expect("the dialog");
+            assert!(view.read(cx).pending.is_some(), "both regenerating");
+            let focus = view.read(cx).focus.clone();
+            w.focus(&focus, cx);
+            w.dispatch_keystroke(Keystroke::parse("escape").unwrap(), cx);
+            let v = view.read(cx);
+            ((v.edit.is_some(), std::sync::Arc::ptr_eq(&v.display, &before)), var, extrude)
+        })
+        .unwrap();
+    let (state, var, extrude) = after_esc;
+    assert_eq!(state, (false, true), "(dialog open, other display) right after Esc");
+    // (The fresh run coalesces with the burst of requests: its 12 ms wait.)
+    cx.executor().advance_clock(std::time::Duration::from_millis(50));
+    draw(cx, window);
+    let settled = cx.update(|cx| {
+        let v = view.read(cx);
+        (v.pending.is_some(), v.display.feature_state(var).is_some(), v.display.feature_state(extrude).is_some())
+    });
+    assert_eq!(settled, (false, true, false), "(spinner, variable drawn, cancelled extrude drawn) once settled");
+}
+
 /// A feature dialog of `type_id` (its defaults, `set` applied) in the test window's app, with no field active yet.
 fn dialog_of(cx: &mut TestAppContext, view: &Entity<PartStudioView>, type_id: &str, set: impl FnOnce(&mut noshape_model::params::ParamValues)) -> Entity<crate::feature_dialog::FeatureDialog> {
     cx.update(|cx| {

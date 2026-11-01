@@ -181,10 +181,11 @@ pub fn feature_icon(type_id: &str) -> SharedString {
 /// A menu entry's action on the Part Studio view.
 type ViewAction = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
 
-/// The committed document's regeneration result kept while a dialog is open
-/// (`PartStudioView::before_edit`), with what it was computed from.
-struct BeforeEdit {
-    studio: PartStudio,
+/// The last finished regeneration of the committed document (no dialog
+/// open), with what it was computed from (`PartStudioView::last_done`).
+#[derive(Clone)]
+struct ShownResult {
+    studio: Arc<PartStudio>,
     upto: Option<usize>,
     config: noshape_model::configuration::ConfigValues,
     display: Arc<StudioDisplay>,
@@ -284,10 +285,10 @@ pub struct PartStudioView {
     /// The running regenerations (model regen::runs: a newer request
     /// aborts or supersedes each).
     regen_runs: noshape_model::regen::runs::Runs,
-    /// The document as shown when the dialog opened (its regeneration done):
-    /// cancelling the dialog shows it again at once, without waiting for the
-    /// preview's regeneration to stop (user P1, 10-31).
-    before_edit: Option<BeforeEdit>,
+    /// The last finished result of the committed document: cancelling a
+    /// dialog shows it again at once, without waiting for the preview's (or an
+    /// earlier, still running) regeneration to stop (user P1, 10-31 / 11-01).
+    last_done: Option<ShownResult>,
     /// A regeneration whose result isn't shown yet, its overlay timer and
     /// spinner.
     pending: Option<pending::Pending>,
@@ -442,7 +443,7 @@ impl PartStudioView {
             regen_seq: 0,
             regen_task: None,
             regen_runs: Default::default(),
-            before_edit: None,
+            last_done: None,
             pending: None,
             pending_timer: None,
             pending_spinner: None,
@@ -640,6 +641,8 @@ impl PartStudioView {
                 return;
             }
             let refine = result.needs_refine;
+            let done_config = config.clone();
+            let done_studio = studio.clone();
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 if seq != this.regen_seq {
                     return;
@@ -659,6 +662,7 @@ impl PartStudioView {
                     crate::start_thumbnail::regen_done(&path, this.tab, made, cx);
                 }
                 this.apply_display(display, window, cx);
+                this.note_done(done_studio, upto, done_config);
                 this.perf_script_note("display applied");
                 if !refine {
                     this.perf_script_step(cx);
@@ -673,10 +677,10 @@ impl PartStudioView {
                     .background_spawn(async move {
                         let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, relative_deflection: deflection, derived: Some(derived2), custom_features: Some(custom2), cancel: Some(cancel2), ..Default::default() };
                         let r = regen2.lock().regenerate(&studio, &config, &units, &opts);
-                        (r, studio)
+                        (r, studio, config)
                     })
                     .await;
-                let (fine, studio) = fine;
+                let (fine, studio, config) = fine;
                 if fine.cancelled {
                     return;
                 }
@@ -690,11 +694,20 @@ impl PartStudioView {
                     let display = Arc::new(fine.display);
                     crate::start_thumbnail::regen_done(&path, this.tab, head.then(|| (studio.clone(), shown_vars, display.clone())), cx);
                     this.apply_display(display, window, cx);
+                    this.note_done(studio, upto, config);
                     this.perf_script_step(cx);
                 });
             }
         }));
         cx.notify();
+    }
+
+    /// A result just shown: with no dialog open it is the committed
+    /// document's, what a later cancel goes back to (`last_done`).
+    fn note_done(&mut self, studio: Arc<PartStudio>, upto: Option<usize>, config: noshape_model::configuration::ConfigValues) {
+        if self.edit.is_none() {
+            self.last_done = Some(ShownResult { studio, upto, config, display: self.display.clone(), context: self.context.clone() });
+        }
     }
 
     /// Configuration values to evaluate: defaults overridden by the user's choice.
@@ -2139,13 +2152,6 @@ impl PartStudioView {
         // A new feature's first change runs std's editing logic with an
         // empty old definition; an edited one starts from its values.
         self.ui.std_edit_old = (!is_new).then(|| dialog.read(cx).feature.params.clone());
-        // What a cancel goes back to: the shown result, when it is the
-        // committed document's (no regeneration pending).
-        self.before_edit = if self.edit.is_none() && self.pending.is_none() {
-            self.effective_studio(cx).map(|(studio, upto)| BeforeEdit { config: self.current_config(&studio), studio, upto, display: self.display.clone(), context: self.context.clone() })
-        } else {
-            None
-        };
         self.edit = Some(EditSession { dialog, index, is_new, _sub: sub, history });
         // Live ("Panels vs feature dialogs"): opening a feature dialog closes
         // the tool panels (Mass and section properties, Named views) for good;
@@ -2237,26 +2243,29 @@ impl PartStudioView {
         if self.edit.take().is_some() {
             self.sync_manipulator(cx);
             window.focus(&self.focus, cx);
-            if !self.restore_before_edit(window, cx) {
+            if !self.restore_last_done(window, cx) {
                 self.schedule_regen(window, cx);
             }
             cx.notify();
         }
     }
 
-    /// A cancelled dialog: the document as it was before the edit, at once
-    /// (user P1 10-31: the spinner went on until the cancelled preview's
-    /// regeneration stopped). Its result was kept when the dialog opened; the
-    /// running regenerations are aborted and a late result is dropped
-    /// (`regen_seq`). False when the document changed since (then it
-    /// regenerates).
-    fn restore_before_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        let Some(b) = self.before_edit.take() else { return false };
-        let same = self.ui.regen_paused.is_none()
-            && self.effective_studio(cx).is_some_and(|(studio, upto)| upto == b.upto && self.current_config(&studio) == b.config && studio == b.studio);
-        if !same {
+    /// A cancelled dialog: the last finished result of the committed
+    /// document, at once (user P1: the spinner went on until the cancelled
+    /// preview's regeneration stopped). The running regenerations are aborted
+    /// and their late results dropped (`regen_seq`): the preview's, and an
+    /// earlier one still running when the dialog opened. That earlier edit's
+    /// document then regenerates afresh behind the shown result. False with
+    /// no finished result yet, or while regeneration is paused.
+    fn restore_last_done(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(b) = self.last_done.clone() else { return false };
+        if self.ui.regen_paused.is_some() {
             return false;
         }
+        let current = self.effective_studio(cx).map(|(studio, upto)| {
+            let config = self.current_config(&studio);
+            (studio, upto, config)
+        });
         self.regen_seq += 1;
         self.regen_runs.abort_all();
         self.regen_task = None;
@@ -2264,6 +2273,9 @@ impl PartStudioView {
         self.pending_timer = None;
         self.context = b.context;
         self.apply_display(b.display, window, cx);
+        if !current.is_some_and(|(studio, upto, config)| upto == b.upto && config == b.config && studio == *b.studio) {
+            self.schedule_regen(window, cx);
+        }
         true
     }
 
