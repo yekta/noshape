@@ -3945,6 +3945,14 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 return None;
             }
         }
+        if std::env::var("NOSHAPE_X_FACE").is_ok_and(|v| v == format!("{},{}", cx.faces[f].arg, cx.faces[f].index)) {
+            for (s0, si) in &to {
+                eprintln!("TO {si} <- {s0}");
+            }
+            for (k, p) in pieces0.iter().enumerate() {
+                eprintln!("TO piece0 {k} loops {:?}", p.loops);
+            }
+        }
         let place: HashMap<usize, usize> = segs.iter().enumerate().map(|(k, &si)| (si, k)).collect();
         let half = |&(si, rev): &(usize, bool)| 2 * place[&si] + usize::from(rev);
         let inner = inner0.iter().map(|&w| cx.pool.find(g.point(cx.p(w))).ok().flatten()).collect::<Option<Vec<u32>>>()?;
