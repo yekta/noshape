@@ -1978,7 +1978,10 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
         fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 50) * millimeter, "radius" : 25 * millimeter });
     });
 "#;
-    let src = format!("{}\n{CYLINDER}", include_str!("fs/knurl_b94.fs"));
+    let mut src = format!("{}\n{CYLINDER}", include_str!("fs/knurl_b94.fs"));
+    if std::env::var_os("NOSHAPE_X_NOBOOL").is_some() {
+        src = src.replace("booleanBodies(context, id + \"boolean\", {", "const unusedBoolean = ({");
+    }
     let fx = Fixture::new(&src);
     let opts = fx.opts();
     let mut ps = PartStudio::new();
@@ -2026,6 +2029,12 @@ fn knurl_feature_b94_tooth_and_helix_angles() {
     let mut bad = Vec::new();
     for (tooth, helix) in pairs {
         let (r, took) = knurl_b94("DIAMOND", tooth, helix);
+        if std::env::var_os("NOSHAPE_X_NOBOOL").is_some() {
+            let vs: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.volume().unwrap_or(0.0) * 1e9).collect();
+            let areas: Vec<f64> = r.context.bodies.iter().map(|b| noshape_kernel::surface_properties(&b.shape).map(|p| p.mass * 1e6).unwrap_or(0.0)).collect();
+            eprintln!("TOOLS tooth {tooth} helix {helix}: {} bodies; volumes {:?}; areas {:?}", vs.len(), &vs[..vs.len().min(4)], &areas[..areas.len().min(4)]);
+            continue;
+        }
         let errors: Vec<String> = r.display.features.iter().filter(|s| s.status == FeatureStatus::Error).map(|s| s.message.clone().unwrap_or_default()).collect();
         let b = r.context.bodies.first();
         let (v, faces, valid) = b.map_or((0.0, 0, false), |b| (b.shape.volume().unwrap_or(0.0) * 1e9, b.shape.count(noshape_kernel::ShapeType::Face), b.shape.is_valid()));
