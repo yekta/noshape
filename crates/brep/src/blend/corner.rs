@@ -75,7 +75,7 @@ impl RollCorner {
         let (mut poles, mut weights) = (Vec::with_capacity(solved.len() * 3), Vec::with_capacity(solved.len() * 3));
         for row in &solved {
             for p in row {
-                if !(p.w > 1e-6) {
+                if p.w.is_nan() || p.w <= 1e-6 {
                     return None;
                 }
                 poles.push(p.truncate() / p.w);
@@ -169,8 +169,9 @@ fn interpolate(t: &[f64], knots: &[f64], p: usize, rows: &[[DVec4; 3]]) -> Optio
             if f == 0.0 {
                 continue;
             }
-            for c in col..n {
-                a[r][c] -= f * a[col][c];
+            let (top, rest) = a.split_at_mut(r);
+            for (x, y) in rest[0][col..n].iter_mut().zip(&top[col][col..n]) {
+                *x -= f * y;
             }
             let bc = b[col];
             for k in 0..3 {
