@@ -78,7 +78,7 @@ supersede() {   # supersede <failed key>
   for q in $(ls "$LD/pending"; cat "$LD"/splits/*.batch 2>/dev/null | grep -v '^kind='); do
     [ "$q" != "$f" ] && [ "$(field name "$q")" = "$name" ] || continue
     git -C "$repo" fetch -q origin "+refs/heads/$(field ref "$q"):refs/landq/$inst/job/$q" 2>/dev/null || continue
-    [ -z "$(git -C "$repo" rev-list --cherry-pick --right-only "refs/landq/$inst/job/$q...$fref")" ] && ok+=("$q")
+    contains "refs/landq/$inst/job/$q" "$fref" && ok+=("$q")
   done
   [ ${#ok[@]} -gt 0 ] || return 0
   {
@@ -172,6 +172,16 @@ if cands and UNDER not in cands and len({name(k) for k in cands}) == 1:
 P
 }
 
+# Whether every commit of <ref2> not on main is in <ref> (by content, or rebased since: same author time and subject;
+# land.sh rebases a worktree's commits each time it queues).
+contains() {   # contains <ref> <ref2>
+  local miss have c
+  miss=$(git -C "$repo" rev-list --cherry-pick --right-only "$1...$2" "^refs/landq/$inst/target" 2>/dev/null) || return 1
+  [ -n "$miss" ] || return 0
+  have=$(git -C "$repo" log --format='%at %s' "refs/landq/$inst/target..$1")
+  for c in $miss; do grep -qxF "$(git -C "$repo" log -1 --format='%at %s' "$c")" <<< "$have" || return 1; done
+}
+
 # Whether the batch under this one (if any) has ended without landing.
 dep_failed() {
   [ -n "$1" ] || return 1
@@ -205,6 +215,20 @@ run_batch() {
     for key in "${keys[@]}"; do git -C "$repo" fetch -q origin "+refs/heads/$(field ref "$key"):refs/landq/$inst/job/$key" 2>/dev/null \
       || { : > "$d/detail"; result "$key" FAILED "queue branch $(field ref "$key") is gone: re-run land.sh"; }; done
   }
+  # A change whose worktree has queued a later one that contains it (still queued, or being checked) goes with that
+  # one: one check, its result (11-01: older changes of re-checked batches failed as conflicts with their own later
+  # versions, rebased since).
+  local nk k2 left=()
+  for key in "${keys[@]}"; do
+    left+=("$key"); [ -f "$LD/jobs/$key.job" ] && [ ! -e "$LD/jobs/$key.solo" ] || continue
+    nk=""; for k2 in $(ls "$LD/jobs" | sed -n 's/\.job$//p' | sort); do [[ "$k2" > "$key" ]] && [ "$(field name "$k2")" = "$(field name "$key")" ] && nk=$k2; done
+    [ -n "$nk" ] || continue
+    git -C "$repo" fetch -q origin "+refs/heads/$(field ref "$nk"):refs/landq/$inst/job/$nk" 2>/dev/null || continue
+    contains "refs/landq/$inst/job/$nk" "refs/landq/$inst/job/$key" || continue
+    { echo "$key"; cat "$LD/jobs/$key.carry" 2>/dev/null; } >> "$LD/jobs/$nk.carry"; rm -f "$LD/jobs/$key.carry"
+    log "$bid: $(field name "$key") ${key##*-} goes with its later ${nk##*-}"; unset 'left[-1]'
+  done
+  keys=("${left[@]}")
   # A change queued before an earlier one of its worktree failed, and containing it, fails with it unchecked (it was
   # being checked, or on a batch being checked, when that one failed; supersede() above takes the waiting ones).
   local fk fs ft
@@ -213,7 +237,7 @@ run_batch() {
     while read -r fk fs ft; do
       [ "$fk" != "$key" ] && [ "$ft" -gt "$(field queued "$key")" ] || continue
       git -C "$repo" cat-file -e "$fs^{commit}" 2>/dev/null || continue
-      if [ -z "$(git -C "$repo" rev-list --cherry-pick --right-only "refs/landq/$inst/job/$key...$fs")" ]; then
+      if contains "refs/landq/$inst/job/$key" "$fs"; then
         : > "$d/detail"; result "$key" FAILED "superseded: contains failed ${fs:0:8} (fix it on top, then land.sh)"; break
       fi
     done < "$LD/failed/$(field name "$key")"
@@ -225,7 +249,7 @@ run_batch() {
     keep=()
     for o in $(cat "$LD/jobs/$key.carry"); do
       if git -C "$repo" fetch -q origin "+refs/heads/$(field ref "$o"):refs/landq/$inst/job/$o" 2>/dev/null \
-          && [ -z "$(git -C "$repo" rev-list --cherry-pick --right-only "refs/landq/$inst/job/$key...refs/landq/$inst/job/$o")" ]; then keep+=("$o")
+          && contains "refs/landq/$inst/job/$key" "refs/landq/$inst/job/$o"; then keep+=("$o")
       else : > "$LD/jobs/$o.solo"; : > "$LD/pending/$o"; log "$bid: $(field name "$o") ${o##*-} isn't in ${key##*-}: queued on its own again"; fi
     done
     if [ ${#keep[@]} -gt 0 ]; then printf '%s\n' "${keep[@]}" > "$LD/jobs/$key.carry"; else rm -f "$LD/jobs/$key.carry"; fi
