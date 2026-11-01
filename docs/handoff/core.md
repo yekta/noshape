@@ -81,6 +81,24 @@ Shells (vibe4 ~/agents/shellcorpus/cases, NOSHAPE_DUMP_OPS dumps of seeds 3000-3
 (113 curved faces, 21 not one shell): the share comes with step 2. Step 2 (cylinders, cones) next: offsets coaxial
 (R ∓ t, cones same half-angle), line / circle edges whose offsets stay lines / circles, corners by Newton, seams,
 pcurves; collapsing fillets (R ≤ t) declined; the crossing test needs a curved-face replacement first.
+Step 2 (11-02, quadrics): shell.cpp `by_quadrics` after planes (ShellMethod::Quadrics = 4; NOSHAPE_SHELL_NO_QUADRICS):
+planes, cylinders, cones kept; removed faces planes. Offsets in the faces' own frames (cylinder radius, cone reference
+radius from an offset generator), corners by Newton (two tangent faces: along their offset tangent line; a seam's
+vertex: along the offset seam), edges by GeomAPI_IntSS through both corners in the edge's direction (tangent and
+seam edges translated), pcurves projected then moved by whole turns to start where the original's do
+(`quad::add_pcurve`), the wall checked by BRepCheck + BOPAlgo_ArgumentAnalyzer self-interference + volume. T1
+`shell::quadrics_and_slabs_agree` (plate with a hole either side, filleted block, filleted L, countersunk plate:
+volume, shown counts, every face's images as the slabs'; the countersunk one shows one edge and two vertices fewer
+than the slabs, whose offset cone's seam sits opposite the hole's and splits the circle they share: ours is live's
+count). Live 1747 answered: the pocket's floor corners are mitred, so the slabs' corner filler is fixed (its cone
+`* sg`) and the corner declines are gone. Corpus: quadrics takes 0 of the 134 shells reaching it (38 collapsing
+fillets R ≤ t, 22 other face kinds, 21 not one shell, 16 offset edges vanishing, 15 removed faces not planar, ...);
+the profile documents: draft-hang's Shell 2 (same as the slabs; their history lists two generated faces twice).
+Next (step 2b): collapsing fillets (their offset vanishes: the neighbours' offsets meet; contract the face to an
+edge, its end arcs to points), vertices of more faces, removed curved faces.
+Release note for the lead: "Shell: a pocket's floor corners are now mitred as Onshape does (the wall used to thin to
+a point at each corner when the fallback construction built the shell); some shells of complex parts change volume
+slightly."
 G31 tuned to live 1731 (19:00): measure.rs LIVE_* floors (Parasolid's magnitudes from the block, its ×10 copy and its
 top face; freeform bounds live are ~20× those: its loft volume is 11 mm³ off, ours exact, so ours stay at the floors);
 face_property_variance for the Face tab. Inch units and REST /massproperties still to compare when live's REST is back.
@@ -1163,6 +1181,9 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20�
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- (11-02 00:40) Release note (SHELL-SLOW step 2): "Shell: a pocket's floor corners are now mitred as Onshape does (the
+  wall used to thin to a point at each corner where the fallback construction built the shell); some shells of complex
+  parts change volume slightly." (live 1747; 20 of 211 fuzz-corpus slab results change.)
 - (11-01 15:55) OCCT patch 0017 (fillets on planar faces ~22 % faster): please let the sync carry
   /root/occt/lib/libTKFillet.a to vibe2 / vibe3 / vibe4 (/opt/occt). Same results without it, only slower.
 - (10-31 23:45, 11-01 01:10) OCCT patches 0010 + 0011 (CANCEL-LATENCY): please sync /root/occt/lib/libTKernel.a,

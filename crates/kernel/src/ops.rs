@@ -357,6 +357,8 @@ pub enum ShellMethod {
     Slabs,
     /// Only the direct wall of a solid bounded by planes (the slabs' wall without Booleans).
     Planes,
+    /// Only the direct wall of a solid of planes, cylinders and cones.
+    Quadrics,
 }
 
 /// Which way this thread's last [`shell_solid`] was built: "regions" (cuts
@@ -381,6 +383,7 @@ pub fn shell_solid(solid: &Shape, faces: &[Shape], thickness: f64, side: ShellSi
         ShellMethod::Offset => 1,
         ShellMethod::Slabs => 2,
         ShellMethod::Planes => 3,
+        ShellMethod::Quadrics => 4,
     };
     op(ffi::op_shell_solid(solid.raw(), &l, thickness, side == ShellSide::Outside, m))
 }

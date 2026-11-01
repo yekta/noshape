@@ -98,6 +98,14 @@
 
 #include <cmath>
 #include <map>
+#include <GeomProjLib.hxx>
+#include <Geom_Plane.hxx>
+#include <GeomAPI_ProjectPointOnCurve.hxx>
+#include <BOPAlgo_ArgumentAnalyzer.hxx>
+#include <Geom_ConicalSurface.hxx>
+#include <Geom_CylindricalSurface.hxx>
+#include <ShapeFix_Edge.hxx>
+#include <GeomAPI_IntSS.hxx>
 #include <TopAbs.hxx>
 #include <Geom_Surface.hxx>
 #include <TopoDS_Iterator.hxx>
@@ -2542,23 +2550,6 @@ bool by_planes(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
     const double det = m.Determinant();
     if (std::abs(det) < 1e-9)
       return no("a corner's planes nearly meet in a line");
-    // A corner where the three kept faces' edges are all concave (a pocket's floor corner): the slabs leave it out
-    // (their filler's cone there is the void's; the offset path mitres it); not ours until they agree.
-    if (kept[(size_t)k[0]] && kept[(size_t)k[1]] && kept[(size_t)k[2]])
-    {
-      const gp_Pnt V = BRep_Tool::Pnt(v);
-      bool         all_concave = true;
-      for (int p = 0; p < 3 && all_concave; ++p)
-        for (int q = 0; q < 3 && all_concave; ++q)
-          if (p != q)
-          {
-            GProp_GProps g;
-            BRepGProp::SurfaceProperties(faces(k[q]), g);
-            all_concave = gp_Vec(V, g.CentreOfMass()).XYZ().Dot(fn[(size_t)k[p]]) > 1e-9;
-          }
-      if (all_concave)
-        return no("an all-concave corner (the slabs leave it out)");
-    }
     pts[(size_t)i]      = BRep_Tool::Pnt(v).XYZ();
     pts[(size_t)(nv + i)] = m.Inverted() * gp_XYZ(oc[k[0]], oc[k[1]], oc[k[2]]);
   }
@@ -2574,6 +2565,486 @@ bool by_planes(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
       return no("an offset edge vanishes or turns round");
   }
   return by_planes_build(so, faces, edges, verts, efi, kept, fn, fc, pts, nv, t, tol, removed, solid, out, dbg);
+}
+
+// ------------------------------------------------------------------ quadrics
+
+// Path 2b (SHELL-SLOW step 2, core 11-01): by_planes for solids of planes, cylinders and cones (the removed faces
+// planes). Each kept face's offset is its own kind (a cylinder's radius, a cone's reference radius moved by t); each
+// vertex's offset where its faces' offsets meet (Newton; two tangent faces: along their offset tangent line; a seam's
+// vertex: along the offset seam); each edge's offset the two offsets' intersection through its ends (GeomAPI_IntSS,
+// exact for these), tangent faces' edges moved along their normal. The wall as by_planes builds it, then checked:
+// valid, free of self-interference (BOPAlgo_ArgumentAnalyzer: the offsets crossing each other or the part), its
+// volume inside the part's.
+namespace quad {
+struct Surf
+{
+  GeomAbs_SurfaceType       kind;
+  occ::handle<Geom_Surface> off;    // the offset (world coordinates)
+  gp_Ax3                    ax;     // the offset's frame (cylinders, cones)
+  double                    r = 0;  // the offset's radius (cylinder) / reference radius (cone)
+  double                    ang = 0;
+  gp_XYZ                    n;      // planes: outward normal, n.x = c
+  double                    c = 0;
+};
+
+// Signed distance-like value of x from s's offset (zero on it).
+double eval(const Surf& s, const gp_XYZ& x)
+{
+  if (s.kind == GeomAbs_Plane)
+    return s.n.Dot(x) - s.c;
+  const gp_XYZ w   = x - s.ax.Location().XYZ();
+  const double h   = w.Dot(s.ax.Direction().XYZ());
+  const double rho = (w - s.ax.Direction().XYZ() * h).Modulus();
+  if (s.kind == GeomAbs_Cylinder)
+    return rho - s.r;
+  return (rho - (s.r + h * std::tan(s.ang))) * std::cos(s.ang);
+}
+
+// Newton on `fs` (as many unknowns as functions: 3 for a point, 1 along a line).
+bool solve3(const Surf* s[3], gp_XYZ& x, double scale)
+{
+  for (int it = 0; it < 60; ++it)
+  {
+    const gp_XYZ F(eval(*s[0], x), eval(*s[1], x), eval(*s[2], x));
+    if (std::max({std::abs(F.X()), std::abs(F.Y()), std::abs(F.Z())}) < 1e-13 * scale)
+      return true;
+    gp_Mat       J;
+    const double h = 1e-7 * scale;
+    for (int c = 1; c <= 3; ++c)
+    {
+      gp_XYZ a = x, b = x;
+      a.SetCoord(c, a.Coord(c) + h);
+      b.SetCoord(c, b.Coord(c) - h);
+      J.SetCol(c, (gp_XYZ(eval(*s[0], a), eval(*s[1], a), eval(*s[2], a)) - gp_XYZ(eval(*s[0], b), eval(*s[1], b), eval(*s[2], b))) / (2 * h));
+    }
+    if (std::abs(J.Determinant()) < 1e-12)
+      return false;
+    x -= J.Inverted() * F;
+  }
+  return false;
+}
+
+bool solve_line(const Surf& s, const gp_XYZ& o, const gp_XYZ& d, gp_XYZ& x, double scale)
+{
+  double l = 0;
+  for (int it = 0; it < 60; ++it)
+  {
+    const double f = eval(s, o + d * l);
+    if (std::abs(f) < 1e-13 * scale)
+    {
+      x = o + d * l;
+      return true;
+    }
+    const double h = 1e-7 * scale, df = (eval(s, o + d * (l + h)) - eval(s, o + d * (l - h))) / (2 * h);
+    if (std::abs(df) < 1e-12)
+      return false;
+    l -= f / df;
+  }
+  return false;
+}
+} // namespace quad
+
+namespace quad {
+// Edge `ne`'s curve on face `nf` (an offset of `of`, its surface the offset of `of`'s in the same frame): projected,
+// then moved by whole turns in u to start where `oe`'s curve on `of` starts (a seam: both of its curves, in `oe`'s
+// order).
+bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge& oe, const TopoDS_Face& of, bool seam_edge, double tol)
+{
+  double                          a, b;
+  const occ::handle<Geom_Curve>   c3 = BRep_Tool::Curve(ne, a, b);
+  const occ::handle<Geom_Surface> sn = BRep_Tool::Surface(nf);
+  const bool                      per = sn->IsUPeriodic();
+  auto one = [&](TopAbs_Orientation o) -> occ::handle<Geom2d_Curve> {
+    double                           f0, f1;
+    const occ::handle<Geom2d_Curve>  co = BRep_Tool::CurveOnSurface(TopoDS::Edge(oe.Oriented(o)), of, f0, f1);
+    occ::handle<Geom2d_Curve>        cn = GeomProjLib::Curve2d(c3, a, b, sn);
+    if (co.IsNull() || cn.IsNull())
+      return nullptr;
+    if (per)
+    {
+      // Original start (in oe's own direction) against the new curve's start.
+      const double uo = co->Value(o == TopAbs_REVERSED ? f0 : f0).X();
+      const double un = cn->Value(a).X();
+      const double P  = sn->UPeriod();
+      const double du = std::round((uo - un) / P) * P;
+      if (du != 0)
+        cn->Translate(gp_Vec2d(du, 0));
+    }
+    return cn;
+  };
+  BRep_Builder bld;
+  if (seam_edge)
+  {
+    // The seam's two curves: oe FORWARD's and REVERSED's on `of`, each placed at its own u.
+    const occ::handle<Geom2d_Curve> c1 = one(TopAbs_FORWARD), c2 = one(TopAbs_REVERSED);
+    if (c1.IsNull() || c2.IsNull())
+      return false;
+    bld.UpdateEdge(ne, c1, c2, nf, tol);
+  }
+  else
+  {
+    const occ::handle<Geom2d_Curve> c1 = one(TopAbs_FORWARD);
+    if (c1.IsNull())
+      return false;
+    bld.UpdateEdge(ne, c1, nf, tol);
+  }
+  bld.Range(ne, nf, a, b);
+  return true;
+}
+} // namespace quad
+
+bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t, double sign, Built& out)
+{
+  const bool dbg = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
+  auto       no  = [&](const char* why) {
+    if (dbg)
+      std::fprintf(stderr, "quadrics: %s\n", why);
+    return false;
+  };
+  if (sign > 0)
+    return no("outward");
+  TopoDS_Shape so, old_shell;
+  int          nso = 0, nsh = 0;
+  for (TopExp_Explorer x(solid, TopAbs_SOLID); x.More(); x.Next(), ++nso)
+    so = x.Current();
+  if (nso != 1)
+    return no("not one solid");
+  for (TopExp_Explorer x(so, TopAbs_SHELL); x.More(); x.Next(), ++nsh)
+    old_shell = x.Current();
+  if (nsh != 1)
+    return no("not one shell");
+  ShapeIMap faces, edges, verts, rm;
+  TopExp::MapShapes(so, TopAbs_FACE, faces);
+  TopExp::MapShapes(so, TopAbs_EDGE, edges);
+  TopExp::MapShapes(so, TopAbs_VERTEX, verts);
+  for (const TopoDS_Shape& f : removed)
+    rm.Add(f);
+  Bnd_Box bb;
+  BRepBndLib::Add(so, bb, false);
+  const double size = std::sqrt(bb.SquareExtent());
+  const double tol  = 1e-9 * size + 1e-12;
+  const int    nf = faces.Extent(), ne = edges.Extent(), nv = verts.Extent();
+  // The faces' offsets.
+  std::vector<quad::Surf> sf(nf + 1);
+  std::vector<char>       kept(nf + 1);
+  bool                    curved = false;
+  for (int i = 1; i <= nf; ++i)
+  {
+    const TopoDS_Face&  f = TopoDS::Face(faces(i));
+    BRepAdaptor_Surface s(f);
+    kept[(size_t)i] = !rm.Contains(f);
+    const double d  = kept[(size_t)i] ? (f.Orientation() == TopAbs_REVERSED ? t : -t) : 0.0; // along the natural normal
+    quad::Surf&  q  = sf[(size_t)i];
+    q.kind          = s.GetType();
+    if (q.kind == GeomAbs_Plane)
+    {
+      const gp_Ax3 ax = s.Plane().Position();
+      gp_XYZ       n  = ax.XDirection().XYZ().Crossed(ax.YDirection().XYZ());
+      q.off           = new Geom_Plane(gp_Pln(ax).Translated(gp_Vec(n * d)));
+      if (f.Orientation() == TopAbs_REVERSED)
+        n.Reverse();
+      q.n = n;
+      q.c = n.Dot(ax.Location().XYZ()) - (kept[(size_t)i] ? t : 0.0);
+      continue;
+    }
+    if (!kept[(size_t)i])
+      return no("a removed face isn't planar");
+    curved = true;
+    if (q.kind != GeomAbs_Cylinder && q.kind != GeomAbs_Cone)
+      return no("a face neither a plane, a cylinder nor a cone");
+    // The point at (0, 0) moved along the natural normal; the offset's reference radius where its generator crosses
+    // the frame's plane.
+    gp_Pnt P;
+    gp_Vec Du, Dv;
+    s.D1(0, 0, P, Du, Dv);
+    const gp_Vec N = Du.Crossed(Dv);
+    if (N.Magnitude() < 1e-12)
+      return no("a face's normal undefined at its frame");
+    q.ax            = q.kind == GeomAbs_Cylinder ? s.Cylinder().Position() : s.Cone().Position();
+    q.ang           = q.kind == GeomAbs_Cone ? s.Cone().SemiAngle() : 0.0;
+    const gp_XYZ O  = q.ax.Location().XYZ(), Z = q.ax.Direction().XYZ(), X = q.ax.XDirection().XYZ();
+    const gp_XYZ P1 = P.XYZ() + N.Normalized().XYZ() * d;
+    const gp_XYZ G  = Dv.Normalized().XYZ();
+    const double gz = G.Dot(Z);
+    if (std::abs(gz) < 1e-9)
+      return no("a cone's generator square to its axis");
+    const gp_XYZ at0 = P1 - G * ((P1 - O).Dot(Z) / gz);
+    q.r              = (at0 - O).Dot(X);
+    if (q.r <= 10 * tol)
+      return no("a curved face's offset collapses (radius within the wall)");
+    if (q.kind == GeomAbs_Cylinder)
+      q.off = new Geom_CylindricalSurface(q.ax, q.r);
+    else
+      q.off = new Geom_ConicalSurface(q.ax, q.ang, q.r);
+  }
+  if (!curved)
+    return no("planes only");
+  ShapeAncMap ef, vf, ve;
+  TopExp::MapShapesAndUniqueAncestors(so, TopAbs_EDGE, TopAbs_FACE, ef);
+  TopExp::MapShapesAndUniqueAncestors(so, TopAbs_VERTEX, TopAbs_FACE, vf);
+  TopExp::MapShapesAndUniqueAncestors(so, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  // Edges: their faces (a seam: the same twice), whether tangent there.
+  std::vector<std::array<int, 2>> efi(ne + 1);
+  std::vector<char>               seam(ne + 1), tangent(ne + 1);
+  for (int i = 1; i <= ne; ++i)
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(edges(i));
+    if (BRep_Tool::Degenerated(e))
+      return no("a degenerate edge");
+    const ShapeList& fl = ef.FindFromKey(e);
+    if (fl.Extent() == 1 && BRep_Tool::IsClosed(e, TopoDS::Face(fl.First())))
+    {
+      const int a     = faces.FindIndex(fl.First());
+      efi[(size_t)i]  = {a, a};
+      seam[(size_t)i] = 1;
+      if (BRepAdaptor_Curve(e).GetType() != GeomAbs_Line || !kept[(size_t)a])
+        return no("a seam not a kept face's generator");
+      continue;
+    }
+    if (fl.Extent() != 2)
+      return no("an edge not between two faces");
+    const int a = faces.FindIndex(fl.First()), b = faces.FindIndex(fl.Last());
+    if (!kept[(size_t)a] && !kept[(size_t)b])
+      return no("two removed faces meet");
+    efi[(size_t)i] = {a, b};
+    BRepAdaptor_Curve c(e);
+    const gp_Pnt      m = c.Value(0.5 * (c.FirstParameter() + c.LastParameter()));
+    const gp_Dir      na = normal_at(TopoDS::Face(faces(a)), m), nb = normal_at(TopoDS::Face(faces(b)), m);
+    if (na.Dot(nb) > 1 - 1e-9)
+    {
+      if (!kept[(size_t)a] || !kept[(size_t)b])
+        return no("a kept face tangent to a removed one");
+      if (c.GetType() != GeomAbs_Line)
+        return no("faces tangent along a curve");
+      tangent[(size_t)i] = 1;
+    }
+  }
+  // Vertices: three faces (two tangent: along their offset tangent line), or a closed face's seam and one face.
+  std::vector<gp_XYZ> pts(nv + 1);
+  for (int i = 1; i <= nv; ++i)
+  {
+    const TopoDS_Vertex& v  = TopoDS::Vertex(verts(i));
+    const gp_Pnt         V  = BRep_Tool::Pnt(v);
+    const ShapeList&     fl = vf.FindFromKey(v);
+    std::vector<int>     fs;
+    for (ShapeList::Iterator it(fl); it.More(); it.Next())
+      fs.push_back(faces.FindIndex(it.Value()));
+    std::vector<int> es;
+    for (ShapeList::Iterator it(ve.FindFromKey(v)); it.More(); it.Next())
+      es.push_back(edges.FindIndex(it.Value()));
+    auto n_at = [&](int f) { return gp_Vec(normal_at(TopoDS::Face(faces(f)), V)).XYZ(); };
+    gp_XYZ x;
+    if (fs.size() == 3 && es.size() == 3)
+    {
+      int tp = -1;
+      for (int e : es)
+        if (tangent[(size_t)e])
+          tp = tp < 0 ? e : -2;
+      if (tp == -2)
+        return no("a corner of two tangent edges");
+      if (tp > 0)
+      {
+        const int a = efi[(size_t)tp][0], b = efi[(size_t)tp][1];
+        int       third = -1;
+        for (int f : fs)
+          if (f != a && f != b)
+            third = f;
+        BRepAdaptor_Curve c(TopoDS::Edge(edges(tp)));
+        gp_Pnt            p0;
+        gp_Vec            d0;
+        c.D1(c.FirstParameter(), p0, d0);
+        const gp_XYZ o = V.XYZ() - n_at(a) * t;
+        if (third < 0 || !quad::solve_line(sf[(size_t)third], o, d0.Normalized().XYZ(), x, size))
+          return no("a tangent line's corner not found");
+      }
+      else
+      {
+        const quad::Surf* s3[3] = {&sf[(size_t)fs[0]], &sf[(size_t)fs[1]], &sf[(size_t)fs[2]]};
+        x = V.XYZ() - (n_at(fs[0]) * (kept[(size_t)fs[0]] ? t : 0.0) + n_at(fs[1]) * (kept[(size_t)fs[1]] ? t : 0.0) + n_at(fs[2]) * (kept[(size_t)fs[2]] ? t : 0.0));
+        if (!quad::solve3(s3, x, size))
+          return no("a corner's offsets don't meet");
+      }
+    }
+    else if (fs.size() == 2 && std::any_of(es.begin(), es.end(), [&](int e) { return seam[(size_t)e] != 0; }))
+    {
+      const int sm = *std::find_if(es.begin(), es.end(), [&](int e) { return seam[(size_t)e] != 0; });
+      const int a  = efi[(size_t)sm][0], b = fs[0] == a ? fs[1] : fs[0];
+      BRepAdaptor_Curve c(TopoDS::Edge(edges(sm)));
+      gp_Pnt            p0;
+      gp_Vec            d0;
+      c.D1(c.FirstParameter(), p0, d0);
+      if (!quad::solve_line(sf[(size_t)b], V.XYZ() - n_at(a) * t, d0.Normalized().XYZ(), x, size))
+        return no("a seam's corner not found");
+    }
+    else
+      return no("a vertex not of three faces (or a seam and one)");
+    if ((x - V.XYZ()).Modulus() > 10 * t + 1e3 * tol)
+      return no("a corner's offset far from it");
+    pts[(size_t)i] = x;
+  }
+  // The edges' offsets.
+  BRep_Builder               bld;
+  std::vector<TopoDS_Vertex> vx(nv + 1);
+  for (int i = 1; i <= nv; ++i)
+    bld.MakeVertex(vx[(size_t)i], gp_Pnt(pts[(size_t)i]), 1e3 * tol);
+  std::vector<TopoDS_Edge> ex(ne + 1);
+  for (int i = 1; i <= ne; ++i)
+  {
+    const TopoDS_Edge e = TopoDS::Edge(edges(i).Oriented(TopAbs_FORWARD));
+    TopoDS_Vertex     a, b;
+    TopExp::Vertices(e, a, b);
+    const int         ia = verts.FindIndex(a), ib = verts.FindIndex(b);
+    const gp_Pnt      A = gp_Pnt(pts[(size_t)ia]), B = gp_Pnt(pts[(size_t)ib]);
+    BRepAdaptor_Curve oc(e);
+    gp_Pnt            o0;
+    gp_Vec            t0;
+    oc.D1(oc.FirstParameter(), o0, t0);
+    occ::handle<Geom_Curve> c;
+    double                  p0 = 0, p1 = 0;
+    if (seam[(size_t)i] || tangent[(size_t)i] || (sf[(size_t)efi[(size_t)i][0]].kind == GeomAbs_Plane && sf[(size_t)efi[(size_t)i][1]].kind == GeomAbs_Plane))
+    {
+      if (A.Distance(B) <= 10 * tol || gp_Vec(A, B).Dot(t0) <= 0)
+        return no("an offset edge vanishes or turns round");
+      c  = new Geom_Line(A, gp_Dir(gp_Vec(A, B)));
+      p1 = A.Distance(B);
+    }
+    else
+    {
+      GeomAPI_IntSS is(sf[(size_t)efi[(size_t)i][0]].off, sf[(size_t)efi[(size_t)i][1]].off, 1e-9 * size);
+      if (!is.IsDone())
+        return no("two offsets don't intersect");
+      for (int k = 1; k <= is.NbLines() && c.IsNull(); ++k)
+      {
+        occ::handle<Geom_Curve>     cand = is.Line(k);
+        GeomAPI_ProjectPointOnCurve pa(A, cand), pb(B, cand);
+        if (pa.NbPoints() == 0 || pb.NbPoints() == 0 || pa.LowerDistance() > 1e3 * tol || pb.LowerDistance() > 1e3 * tol)
+          continue;
+        double  u0 = pa.LowerDistanceParameter(), u1 = pb.LowerDistanceParameter();
+        gp_Pnt  q;
+        gp_Vec  d;
+        cand->D1(u0, q, d);
+        if (d.Dot(t0) < 0)
+        {
+          cand = cand->Reversed();
+          u0   = cand->ReversedParameter(u0);
+          u1   = cand->ReversedParameter(u1);
+        }
+        if (cand->IsPeriodic())
+        {
+          const double per = cand->Period();
+          while (u1 <= u0 + 1e-12)
+            u1 += per;
+          if (!(a.IsSame(b)) && u1 - u0 >= per - 1e-9)
+            u1 -= per;
+        }
+        if (!(u1 > u0))
+          continue;
+        c  = cand;
+        p0 = u0;
+        p1 = u1;
+      }
+      if (c.IsNull())
+        return no("no intersection of two offsets through an edge's ends");
+    }
+    BRepBuilderAPI_MakeEdge mk(c, vx[(size_t)ia], vx[(size_t)ib], p0, p1);
+    if (!mk.IsDone())
+      return no("an offset edge failed");
+    ex[(size_t)i] = mk.Edge();
+  }
+  auto offset_wire = [&](const TopoDS_Shape& w) {
+    TopoDS_Wire ow;
+    bld.MakeWire(ow);
+    for (TopoDS_Iterator it(w, false); it.More(); it.Next())
+      bld.Add(ow, ex[(size_t)edges.FindIndex(it.Value())].Oriented(it.Value().Orientation()));
+    ow.Closed(true);
+    return ow;
+  };
+  SourceMap    sources;
+  HHist        h = new BRepTools_History();
+  TopoDS_Shell shell;
+  bld.MakeShell(shell);
+  for (TopoDS_Iterator it(old_shell, false); it.More(); it.Next())
+  {
+    const TopoDS_Face& f  = TopoDS::Face(it.Value());
+    const int          i  = faces.FindIndex(f);
+    const TopoDS_Face  ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
+    if (kept[(size_t)i])
+    {
+      bld.Add(shell, f);
+      TopoDS_Face of;
+      bld.MakeFace(of, sf[(size_t)i].off, 1e3 * tol);
+      for (TopoDS_Iterator w(ff, false); w.More(); w.Next())
+        bld.Add(of, offset_wire(w.Value()).Oriented(w.Value().Orientation()));
+      if (sf[(size_t)i].kind != GeomAbs_Plane)
+      {
+        ShapeIMap done;
+        for (TopExp_Explorer x(ff, TopAbs_EDGE); x.More(); x.Next())
+        {
+          const int k = edges.FindIndex(x.Current());
+          if (done.Contains(edges(k)))
+            continue;
+          done.Add(edges(k));
+          if (!quad::add_pcurve(ex[(size_t)k], of, TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD)), ff, seam[(size_t)k] != 0, 1e3 * tol))
+            return no("an offset edge's curve on its face failed");
+        }
+      }
+      const TopoDS_Face inner = TopoDS::Face(of.Oriented(TopAbs::Reverse(f.Orientation())));
+      bld.Add(shell, inner);
+      sources.Bind(inner, Source{f, (uint8_t)REL_GENERATED});
+    }
+    else
+    {
+      TopLoc_Location                 loc;
+      const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(ff, loc);
+      for (TopoDS_Iterator w(ff, false); w.More(); w.Next())
+      {
+        TopoDS_Face rim;
+        bld.MakeFace(rim, surf, loc, BRep_Tool::Tolerance(ff));
+        bld.Add(rim, w.Value());
+        bld.Add(rim, offset_wire(w.Value()).Oriented(TopAbs::Reverse(w.Value().Orientation())));
+        const TopoDS_Face r = TopoDS::Face(rim.Oriented(f.Orientation()));
+        bld.Add(shell, r);
+        h->AddModified(f, r);
+      }
+    }
+  }
+  for (int i = 1; i <= ne; ++i)
+    BRepLib::SameParameter(ex[(size_t)i], 1e3 * tol);
+  shell.Closed(true);
+  TopoDS_Solid wall;
+  bld.MakeSolid(wall);
+  bld.Add(wall, shell.Oriented(old_shell.Orientation()));
+  if (!BRepCheck_Analyzer(wall).IsValid())
+  {
+    if (const char* dir = std::getenv("NOSHAPE_SHELL_DUMP"))
+      BRepTools::Write(wall, (std::string(dir) + "/quadrics-invalid.brep").c_str());
+    return no("the wall is invalid");
+  }
+  {
+    BOPAlgo_ArgumentAnalyzer an;
+    an.SetShape1(wall);
+    an.ArgumentTypeMode()   = false;
+    an.SelfInterMode()      = true;
+    an.SmallEdgeMode()      = false;
+    an.RebuildFaceMode()    = false;
+    an.TangentMode()        = false;
+    an.MergeVertexMode()    = false;
+    an.MergeEdgeMode()      = false;
+    an.ContinuityMode()     = false;
+    an.CurveOnSurfaceMode() = false;
+    an.Perform();
+    if (an.HasFaulty())
+      return no("the offsets cross each other or the part");
+  }
+  const double vw = volume_of(wall), vs = volume_of(so);
+  if (dbg)
+    std::fprintf(stderr, "quadrics: wall volume %.17g solid %.17g\n", vw, vs);
+  if (!(vw > 0) || !(vw <= vs * (1 + 1e-9)))
+    return no("the wall's volume is off");
+  out.result  = wall;
+  out.history = shell_history(solid, wall, {h}, {}, sources, removed);
+  return true;
 }
 
 bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t,
@@ -2820,7 +3291,10 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
       gp_Vec m = n[a].Crossed(n[b]);
       if (m.Magnitude() < 1e-9)
         continue;
-      if (m.Dot(mean) > 0)
+      // The cone round the normals the wall grows along: outward round their mean, inward round its opposite (the
+      // mean's is the void's: a pocket's floor corners were left out, the wall thinning to a point; live 1747
+      // mitres them, 13472 mm³).
+      if (m.Dot(mean) * sg > 0)
         m.Reverse();
       hs.push_back({V, m});
     }
@@ -2987,7 +3461,7 @@ void compare_with_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shap
   Built slabs;
   if (!by_slabs(solid, removed, t, sign, slabs))
   {
-    std::fprintf(stderr, "planes-compare: slabs failed, planes built\n");
+    std::fprintf(stderr, "shell-compare: slabs failed, ours built\n");
     return;
   }
   auto counts = [](const TopoDS_Shape& s) {
@@ -3015,7 +3489,9 @@ void compare_with_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shap
           BRepGProp::SurfaceProperties(it.Value(), g);
           const gp_Pnt c = g.CentreOfMass();
           char buf[200];
-          std::snprintf(buf, sizeof buf, "f%d %s a%.6e c(%.6e %.6e %.6e)", i, rel, g.Mass(), c.X(), c.Y(), c.Z());
+          // (Rounded at 1e-12 of the part: 6.5e-34 against 0.)
+          auto r = [&](double x) { return std::abs(x) < 1e-12 ? 0.0 : x; };
+          std::snprintf(buf, sizeof buf, "f%d %s a%.6e c(%.6e %.6e %.6e)", i, rel, g.Mass(), r(c.X()), r(c.Y()), r(c.Z()));
           v.push_back(buf);
         }
       };
@@ -3033,14 +3509,16 @@ void compare_with_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shap
         one("mod", self);
       }
     }
+    // (A face listed twice among one face's images is one image.)
     std::sort(v.begin(), v.end());
+    v.erase(std::unique(v.begin(), v.end()), v.end());
     return v;
   };
   const double va = volume_of(mine.result), vb = volume_of(slabs.result);
   const auto   ca = counts(mine.result), cb = counts(slabs.result);
   auto         sa = sig(mine), sb = sig(slabs);
   const bool vol_ok = std::abs(va - vb) <= 1e-9 * std::abs(vb);
-  std::fprintf(stderr, "planes-compare: %s volume %.17g / %.17g counts %d %d %d / %d %d %d history %s\n", vol_ok && ca == cb ? "same" : "DIFFERENT", va, vb, ca[0], ca[1], ca[2], cb[0], cb[1], cb[2], sa == sb ? "same" : "differs");
+  std::fprintf(stderr, "shell-compare: %s volume %.17g / %.17g counts %d %d %d / %d %d %d history %s\n", vol_ok && ca == cb ? "same" : "DIFFERENT", va, vb, ca[0], ca[1], ca[2], cb[0], cb[1], cb[2], sa == sb ? "same" : "differs");
   if (sa != sb && std::getenv("NOSHAPE_SHELL_COMPARE_HISTORY"))
   {
     for (const std::string& x : sa)
@@ -3100,7 +3578,7 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
   const bool offset_ok = gap > 1e-5 && !collapses;
   Built      b;
   t_shell_path = "";
-  // method: 0 = automatic, 1 = offset only, 2 = slabs only, 3 = planes only (tests).
+  // method: 0 = automatic, 1 = offset only, 2 = slabs only, 3 = planes only, 4 = quadrics only (tests).
   const bool dbg = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
   auto       timed = [&](const char* what, auto&& run) {
     // (Also when it starts: a path the budget stops never reports its end.)
@@ -3119,6 +3597,12 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
                     ((method == 0 || method == 1) && (offset_ok || method == 1) && timed("offset", [&] { return by_offset(solid.shape, removed, thickness, sign, b); })) ||
                     ((method == 0 || method == 3) && !std::getenv("NOSHAPE_SHELL_NO_PLANES") && timed("planes", [&] {
                        const bool ok = by_planes(solid.shape, removed, thickness, sign, b);
+                       if (ok && std::getenv("NOSHAPE_SHELL_COMPARE"))
+                         compare_with_slabs(solid.shape, removed, thickness, sign, b);
+                       return ok;
+                     })) ||
+                    ((method == 0 || method == 4) && !std::getenv("NOSHAPE_SHELL_NO_QUADRICS") && timed("quadrics", [&] {
+                       const bool ok = by_quadrics(solid.shape, removed, thickness, sign, b);
                        if (ok && std::getenv("NOSHAPE_SHELL_COMPARE"))
                          compare_with_slabs(solid.shape, removed, thickness, sign, b);
                        return ok;

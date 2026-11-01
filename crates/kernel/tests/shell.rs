@@ -541,6 +541,7 @@ fn planes_and_slabs_agree() {
     let bottom = |s: &Shape| faces_where(s, |c| c.z.abs() < 1e-9);
     let cases: Vec<(&str, Shape, Vec<Shape>, f64)> = vec![
         ("L, top removed", l_block.clone(), top(&l_block, 10.0), 2.0),
+        ("pocket, bottom removed", pocket.clone(), bottom(&pocket), 2.0),
         ("stepped, bottom removed", stepped.clone(), bottom(&stepped), 1.5),
     ];
     let images = |r: &OpResult, s: &Shape| -> Vec<(usize, usize)> {
@@ -556,12 +557,62 @@ fn planes_and_slabs_agree() {
         }
         assert_eq!(images(&p, &s), images(&q, &s), "{name}: each face's images (modified, generated)");
     }
-    // A pocket's floor corners (all three edges concave): the slabs leave them out (13440 mm³; the offset path's and
-    // Parasolid's mitre is 13472): declined until the two agree.
-    assert!(shell_solid(&pocket, &bottom(&pocket), 2.0, ShellSide::Inside, ShellMethod::Planes).is_err(), "a pocket's floor corners");
+    // A pocket's floor corners (all three edges concave) mitred, as live 1747: 13472 mm³, 21 faces, all planes.
+    let w = shell_solid(&pocket, &bottom(&pocket), 2.0, ShellSide::Inside, ShellMethod::Planes).unwrap().shape;
+    assert!((vol(&w) - 13472.0).abs() < 1e-6 && w.count(ShapeType::Face) == 21, "{} mm³, {} faces", vol(&w), w.count(ShapeType::Face));
     let rm = top(&pockets, 20.0);
     assert!(shell_solid(&pockets, &rm, 2.0, ShellSide::Inside, ShellMethod::Planes).is_err(), "offsets meeting across the 3 mm wall");
     // Both tops of the step removed: the step's riser hangs over the cavity, its foot past the removed step face.
     let rm = faces_where(&stepped, |c| ((c.z - 10.0).abs() < 1e-9 && c.x > 30.0) || (c.z - 20.0).abs() < 1e-9);
     assert!(shell_solid(&stepped, &rm, 1.5, ShellSide::Inside, ShellMethod::Planes).is_err(), "a rim past its removed face");
+}
+
+/// Solids of planes, cylinders and cones: the direct wall (ShellMethod::Quadrics) against the slabs'.
+#[test]
+fn quadrics_and_slabs_agree() {
+    let unified = |s: Shape| unify_same_domain(&s).unwrap().shape;
+    let plate_hole = unified(cut(&bx([0.0; 3], [100.0, 40.0, 12.0]), &cyl_z(50.0, 20.0, -1.0, 5.0, 14.0)).unwrap().shape);
+    let filleted = block(true, false);
+    let l_block = unified(fuse(&bx([0.0; 3], [40.0, 20.0, 10.0]), &bx([0.0, 0.0, 0.0], [10.0, 40.0, 10.0])).unwrap().shape);
+    let inner = edges_where(&l_block, |i| (i.start.z - i.end.z).abs() > 1e-6 && (i.start.x - 10.0).abs() < 1e-9 && (i.start.y - 20.0).abs() < 1e-9);
+    let l_fillet = fillet(&l_block, &inner, 4.0).unwrap().shape;
+    let sunk = {
+        let p = unified(cut(&bx([0.0; 3], [60.0, 40.0, 12.0]), &cyl_z(30.0, 20.0, -1.0, 4.0, 14.0)).unwrap().shape);
+        let rim = edges_where(&p, |i| i.start.z > 11.99 && i.end.z > 11.99 && i.start.distance(DVec3::new(30.0, 20.0, 12.0)) < 4.1);
+        chamfer(&p, &rim, ChamferSpec::Equal(1.5), &[]).unwrap().shape
+    };
+    let bottom = |s: &Shape| faces_where(s, |c| c.z.abs() < 1e-9);
+    // (The countersunk plate: the slabs' offset cone has its seam opposite the offset hole's, splitting the circle
+    // they share in two (one more shown edge, two more vertices); ours keep the faces' frames, the circle whole, its
+    // corners only shown, as live's.)
+    let cases: Vec<(&str, Shape, Vec<Shape>, f64, bool)> = vec![
+        ("plate with a hole, top removed", plate_hole.clone(), top(&plate_hole, 12.0), 2.0, false),
+        ("plate with a hole, bottom removed", plate_hole.clone(), bottom(&plate_hole), 2.0, false),
+        ("filleted block, top removed", filleted.clone(), top(&filleted, 10.0), 1.0, false),
+        ("L with a filleted inner corner, top removed", l_fillet.clone(), top(&l_fillet, 10.0), 2.0, false),
+        ("countersunk plate, bottom removed", sunk.clone(), bottom(&sunk), 2.0, true),
+    ];
+    let images = |r: &OpResult, s: &Shape| -> Vec<(usize, usize)> {
+        (0..s.faces().len()).map(|i| (r.history.modified(0, ShapeType::Face, i as u32).len(), r.history.generated(0, ShapeType::Face, i as u32).len())).collect()
+    };
+    let mut report = String::new();
+    let shown = |x: &Shape| {
+        let st = x.shown_topology().unwrap();
+        [x.count(ShapeType::Face), st.edges.iter().filter(|b| **b).count(), st.vertices.iter().filter(|b| **b).count()]
+    };
+    for (name, s, rm, t, seams) in cases {
+        let q = shell_solid(&s, &rm, t, ShellSide::Inside, ShellMethod::Slabs).unwrap();
+        match shell_solid(&s, &rm, t, ShellSide::Inside, ShellMethod::Quadrics) {
+            Err(e) => report += &format!("{name}: quadrics declined: {e}\n"),
+            Ok(p) => {
+                let counts = shown;
+                let (a, b) = (shown(&p.shape), shown(&q.shape));
+                let counts_ok = if seams { a[0] == b[0] && a[1] + 1 == b[1] && a[2] + 2 == b[2] } else { a == b };
+                if !p.shape.is_valid() || !close(vol(&p.shape), vol(&q.shape)) || !counts_ok || images(&p, &s) != images(&q, &s) {
+                    report += &format!("{name}: quadrics {} {:?} vs slabs {} {:?}; images {:?} vs {:?}\n", vol(&p.shape), counts(&p.shape), vol(&q.shape), counts(&q.shape), images(&p, &s), images(&q, &s));
+                }
+            }
+        }
+    }
+    assert!(report.is_empty(), "{report}");
 }
