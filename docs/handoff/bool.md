@@ -1106,6 +1106,22 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   plane past the cylinder's end) and OCCT's path stopped at the 16 GB budget after 482 s ("needed more than 16043 MB").
   A tool's piece on two other tools outside every object is never kept (as any tool's piece on another tool's): taken.
   Now valid, 1 part, 93782.726 mm³, 17762 faces, 20.5 s on vibe2 (OCCT gives none to compare; live asked).
+- Tooth 30° (11-01 05:13 UTC): 30/15 and 30/30 declined "a non-manifold result". The cylinder's section with each inner flank
+  runs 3.5 µm inside the flank's side edge (that edge 3.4 µm outside the cylinder). With the section's tolerance
+  (OCCT's, at least 5e-6) the interval test called the whole section "along the boundary", and the sliver between
+  them was lost. OCCT keeps it: its paves of a section are only the vertices on both faces. Now, in `intervals_on`
+  for OCCT's sections: along the boundary or not by the curve's own accuracy (IntTools_Curve::Tolerance); cuts at one
+  place merged within the section's tolerance; a face vertex taken onto it (inside or at an end) within that
+  tolerance only where it also lies on the other face. And an edge whose seven sample points are all past the
+  tolerance is off the face (OCCT's rule), not "nearly on". Taken: 30/15 in 3.8 s (OCCT 42–81 s), 30/30 in 8.7 s (OCCT
+  127–178 s), both equivalent to OCCT. Replays why28: the same cases taken in every set, 0 differ.
+- Still declined: 15/15 and 15/30 "two vertices nearly coincide", 15/45 "a piece's point near its face's boundary".
+  At a 15° tooth the side edge is under a micron outside the cylinder: the same slivers, inside our grey band.
+- Live's numbers for the rest (request 1696): every face count as ours (15/30 is 10436 there too). Volumes within 1e-5
+  at helix 15° and 30°. At helix 45° ours is 2.2–5.9 mm³ low, more as the tooth angle rises (30/45 −2.19, 45/45 −3.45,
+  60/45 −4.6, 80/45 −5.85); our Boolean equals OCCT's there, so the gap is the tools'. One live groove tool (cut1,
+  HIGH): 44.73340 mm³ at 45/45, 77.02478 at 80/30; ours to compare (the knurl with its Boolean commented out),
+  then a request to core if the sweep differs.
 - Recording Booleans (NOSHAPE_RECORD_BOOLEANS) adds per-face props for the summary: 45/45 took 128 s recorded, 19.5 s not.
 
 ## The knurl back on OCCT's path, fixed (11-01 01:44 UTC; lead's P0)

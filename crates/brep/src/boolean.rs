@@ -957,13 +957,20 @@ impl Ctx<'_> {
 
     /// The same, `on_free` the curve on a free-form face `path` lies on (projected there).
     fn intervals_on(&self, f: usize, path: &Path, (t0, t1): (f64, f64), ends: [End; 2], closed: bool, on_free: Option<&(usize, Arc<NurbsCurve>)>) -> R<Vec<Ival>> {
-        // (OCCT's section of a free-form face: within its own tolerance of where the faces meet.)
-        let tol = match path {
-            Path::Nurbs { id, .. } => self.tol.max(self.ncurves[*id as usize].tol),
-            _ => self.tol,
+        // (OCCT's section of a free-form face: within its curve's own accuracy of where the faces meet (a sharp knurl
+        // tooth's section runs 3.5 µm inside its side edge, a sliver apart, as OCCT's); its paves (cuts at one
+        // place, a vertex of the face on it) within the tolerance OCCT gives it (5e-6 at least), a vertex only where
+        // it is on the other face too (OCCT's paves of a section: the vertices on both faces).)
+        let (tol, vtol, other) = match path {
+            Path::Nurbs { id, .. } => {
+                let nc = &self.ncurves[*id as usize];
+                let other = nc.sec.as_ref().and_then(|x| x.0.into_iter().find(|&g| g != f));
+                (self.tol.max(nc.acc), self.tol.max(nc.tol), other)
+            }
+            _ => (self.tol, self.tol, None),
         };
         let len = path.length(t0, t1);
-        if len <= tol {
+        if len <= vtol {
             return Ok(Vec::new());
         }
         // A circle or ellipse about a face that doesn't go round: in parts either side of the face's gap.
@@ -1029,14 +1036,29 @@ impl Ctx<'_> {
             let (e, _) = self.faces[f].edges[k];
             for w in self.edges[e].v {
                 if let Some((lo, hi)) = near
-                    && !boxes_meet(self.p(w), self.p(w), lo, hi, GREY * tol)
+                    && !boxes_meet(self.p(w), self.p(w), lo, hi, GREY * vtol)
                 {
                     continue;
                 }
                 let q = self.faces[f].to2(self.p(w));
                 let (u, dist) = c2.param_of(q);
-                if dist <= tol && u > 0.0 && u < 1.0 {
+                let on_other = || other.is_none_or(|g| free::surface_distance(&self.faces[g], self.p(w)) <= self.tol.max(self.pool.t[w as usize] + self.tol));
+                if (dist <= tol || (dist <= vtol && on_other())) && u > 0.0 && u < 1.0 {
                     cuts.push((t0 + (t1 - t0) * u, End::Vertex(w)));
+                }
+            }
+        }
+        // (A point made on it at a vertex of the face on the other face too, within the section's tolerance: that
+        // vertex, as OCCT's pave there.)
+        if vtol > tol {
+            for cut in cuts.iter_mut() {
+                if let End::Point(q) = cut.1 {
+                    let near = self.faces[f].edges.iter().flat_map(|&(e, _)| self.edges[e].v).filter(|&w| (self.p(w) - q).length() <= vtol).min_by(|&a, &b| (self.p(a) - q).length().total_cmp(&(self.p(b) - q).length()));
+                    if let Some(w) = near
+                        && other.is_some_and(|g| free::surface_distance(&self.faces[g], self.p(w)) <= self.tol.max(self.pool.t[w as usize] + self.tol))
+                    {
+                        cut.1 = End::Vertex(w);
+                    }
                 }
             }
         }
@@ -1047,11 +1069,11 @@ impl Ctx<'_> {
             Path::Ellipse(e) => e.length(x, y),
             _ => (y - x) * scale,
         };
-        // Cuts at one place are one, a vertex if any of them is.
+        // Cuts at one place (within the section's tolerance, OCCT's paves on it) are one, a vertex if any of them is.
         let mut merged: Vec<(f64, End)> = Vec::with_capacity(cuts.len());
         for c in cuts {
             match merged.last_mut() {
-                Some(last) if apart(last.0, c.0) <= tol => {
+                Some(last) if apart(last.0, c.0) <= vtol => {
                     if c.1.rank() > last.1.rank() {
                         *last = c;
                     }
@@ -1066,7 +1088,7 @@ impl Ctx<'_> {
         let mut out: Vec<Ival> = Vec::new();
         for k in 0..cuts.len() - 1 {
             let (a, b) = (cuts[k], cuts[k + 1]);
-            if apart(a.0, b.0) <= tol {
+            if apart(a.0, b.0) <= vtol {
                 continue;
             }
             // (OCCT's curve clear of the boundary but touching it between its crossings: OCCT may put a vertex
@@ -1530,6 +1552,11 @@ impl Ctx<'_> {
                 return Ok(true);
             }
             return Err(Decline("an edge on another argument's free-form face"));
+        }
+        // (Every point past the tolerance: apart, OCCT's rule (an edge on a face within the two's tolerances), as a
+        // sharp knurl tooth's side edge a micrometre outside the cylinder; some on, some not: ambiguous.)
+        if on == 0 {
+            return Ok(false);
         }
         if near > 0 && on + near == 7 {
             return Err(Decline("an edge nearly on another argument's face"));
