@@ -1079,6 +1079,83 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## P0s from core (11-01 15:30 UTC): RUST-BOOL-CLAMP-ABORT, CRASH-1092
+- RUST-BOOL-CLAMP-ABORT (qa's fuzz seeds 979, 1112, 1036: "min > max, min = 8.302416520637978, max =
+  6.283185307179586" in a Shell; core now catches our panics and falls back). The cause: a free-form face's parameter
+  box (free::uv_box) is its edges' curves' box cut to the surface's own range; OCCT's curves on a periodic B-spline
+  surface can lie a period on (u from 8.3 on a 0..2π surface), so the box came out inside out (8.3..2π) and
+  FreeSurface::param_of's Newton clamp panicked. Now such a face declines ("a face's curves outside its surface's
+  range"), and the clamps in freeform.rs / nurbs.rs take their bounds either way round (a B-spline piece may run
+  backwards). T1 brep boolean::free::tests::curves_past_the_surface_range_give_no_box. Not reproduced from the seeds
+  themselves (qa's CLI fuzz); qa to re-run 979 / 1036 / 1112.
+- CRASH-1092 (OCCT's ProjLib_ComputeApproxOnPolarSurface inside BOPAlgo_FillIn3DParts of a Shell's slab Boolean, on
+  our result: an edge without its curve on a cone or sphere face, which OCCT then projects onto the pole). The build
+  now checks every made face off a plane after all faces are built: an edge without its curve on it declines ("an
+  edge without its curve on a curved face"), so OCCT never has to project one of ours. Which path left it out isn't
+  known (qa's runs since 9903a7e0 are clean); the check shows it as a decline if it happens again (replays: why45).
+
+## The knurl and straight B-splines on a cone (11-01 15:00 UTC)
+- The 13:30 change (queued as 09f4554f / 495d8020) passed every replay set but broke T1
+  the_b94_knurl_is_cut_by_noshapes_boolean ("two edges leave a vertex in one direction"): its rule mapping a straight
+  B-spline on a cylinder or cone as a line (a ruling, vertical in the parameter plane) also took short pieces of the
+  knurl's sections, straight within the tolerance but not rulings. Now only a ruling (its middle at the angle of its end
+  off the axis) is mapped so. The knurl's recorded case isn't in the replay sets: run bool_patterns before landing.
+  Landed again with the parallel-plane rule below and the notes, as one change.
+- Also: a piece of OCCT's hyperbola or parabola section (the conic branch of the build) took both ends' parameters as
+  the start's (its parameter lookup knew circles and ellipses only: "an edge against its curve"); now by the curve's
+  own parameter, not wrapped by a turn. And two coaxial cones one within the tolerance, apart past it (OCCT's rule).
+
+## Parallel planes by OCCT's rule (11-01 14:30 UTC)
+- Two parallel planes are one within the tolerance and apart past it (OCCT's rule), no grey band ("faces nearly
+  coplanar"): 91a99c7c and 717092f3 taken as equivalents (volume 1.7e-6 relative, within the replay's area x 0.1 um),
+  main corpus 797 (+2), the other sets unchanged, 0 differ (why42).
+- "A tiny arc" (8 cases): the inputs have circle edges of radius 1e-10 m (quarter arcs, a zero-size corner round, in
+  03d0da47, 91923f72, b70f339a, 63bd60d0): degenerate input, left declined; which feature makes them is for core.
+- "An edge on another argument's free-form face" (d0e4644e, 2284dd9c): a whole circle lying on a closed B-spline face
+  across its seam; projecting it jumps at the seam. OCCT splits it there; ours splits curves at seams of cylinders and
+  B-spline paths only, and keeps one curve on a face per edge, so it needs a split at a free-form seam first.
+
+## Looked at, not landed (11-01 14:00 UTC)
+- "One cylinder in faces of two inputs, their seams apart" (8 cases, 10 s; 38b2cd00, fd7ef128 and their copies: a
+  boss through a plate, Fuse of 1): with the check off, ours unifies to the same counts as OCCT's but invalid (and its
+  volume 4e-9 relative off), OCCT's valid. Before unify the faces and their curves match; the two walls' loops list
+  the seam's uses in another order than OCCT's (OCCT: circle, -seam, circle, +seam; ours -seam, circle, +seam,
+  circle), but reversing ours (as for a left-handed cylinder) changed nothing, so the order isn't it. Next: compare
+  the curves of the edges each wall shares with the plate (the circle where the seams' frames differ by half a turn).
+- Single-tool cuts declined "a non-manifold result" (419e648e, 4a71ecd0, 83147dc0, 29fa521a, 49de1c1d: a rounded rod
+  1-2 m from the origin cut by a swept square tube with flat caps, ~1.5 s each in OCCT): the rod's pieces past the
+  cut are classified by rays, and their middles lie on the tool's symmetry plane. (1) The first ray met both caps at
+  one place (where their planes cross) and counted both: a ray crossing two faces at one t is now taken as unclean
+  in /root/bool-scratch/ray-twice.patch (piece 1 then comes out In, right). (2) The next ray crosses both caps and
+  none of the four B-spline sides for pieces 0 and 4: either the tool's caps cross each other or free::ray_hits
+  misses a crossing on the swept sides (one Newton start per patch there). To look at with the shape.
+- "Arguments share vertices" (59 cases, mostly fuses of one tool: a body and one made from its faces, sharing
+  vertices, edges and up to 7 faces). Without the decline, 4 of 20 (main corpus) come out as OCCT's and 13 differ in
+  history only. OCCT keeps some shared sub-shapes as they are (no record: the outer faces of a pocketed box fused with
+  the same box ribbed) and rebuilds others (Modified: the pocket walls the ribbed one's faces lie along, their edges
+  and vertices). Taking several inputs that are one shape as one (unchanged, the earliest argument's) matched 1 of
+  20; taking only results that keep no shared vertex took none. OCCT's DS holds a shared sub-shape once; its rule for
+  which it rebuilds is to be read from BOPAlgo_PaveFiller / Builder before trying again. (The plumbing for it,
+  per-argument shared [argument, index] lists from rust_boolean.cpp to Body, was simple; not kept.)
+- (Land queue: `land.sh --status` lists the worktree it runs in only; 09f4554f was queued from bool-d and was
+  re-queued by mistake as 495d8020, the same change: if it fails as already applied, nothing to do.)
+## Arc pieces from their start, closed edges on free-form faces, apex fixes (11-01 13:30 UTC)
+- A piece of an argument's circle or ellipse starting at its edge's start: its angle a rounding below the start made
+  t0 a turn on, the end measured from there, then t0 reset to the start: the edge ran a turn past ("an edge outside
+  its face's range", ac2ca18a in five sets, 967be48f, 2e30111c). Now t0 is the edge's start first.
+- A piece of a closed edge (a whole circle on a torus) ending where the edge closes: its end on the edge's curve on
+  the free-form face at whichever end keeps the piece's middle between its ends (both halves were mapped onto one:
+  "two edges leave a vertex in one direction", 9f434299).
+- A plane square to a cone's axis exactly through its apex: no section (the apex a vertex the plane holds); in the
+  grey band still declined (068c67bd, an equivalent: the known vertex-in-coincident-edges records).
+- The general fixes from the apex chain (below, 12:20): rulings of any curve kind at a cone's apex, gap points on a
+  part of a cone (halves not joined across the gap), the nearest of two vertices where clearly on one, stricter arc /
+  ellipse / B-spline merges (two curves between the same ends one edge only on one course), OCCT's section along
+  another curve within its own error, straight B-splines on cones and cylinders as lines.
+- T1 bool_patterns::a_piece_of_an_arc_from_its_start, halves_of_a_closed_edge_on_a_torus (0.3 s together, dev).
+- Replays why41: main 795, corpus2 589, corpus3 594, corpus4 641, corpus5 785, corpus6 718, direct 78, Shell's 105
+  (+23 in all), 0 differ. Share of all sets: 84.9 % of cases, 80.7 % of OCCT time (why36: 84.1 % / 74.7 %).
+
 ## Looked at, not landed (11-01 12:20 UTC)
 - "An apex on a part of a cone" (b0c36850, 9f262529, d5cd8b8d: fuses of 13 sector bodies around drilled cones,
   ~19 s recorded). Each fix moved them to the next fault; the general fixes found on the way are in
@@ -1090,8 +1167,8 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   the grey band (was 100 tol = 2 mm: a hole's circle and another part's crossing it at both ends were merged); two
   B-splines one edge by each one's points on the other's piece (pieces of one curve by their ranges); OCCT's section
   along another curve within its own error; a straight B-spline on a cone or cylinder mapped as its line (its apex end
-  at the ruling's angle, its side of a seam). Full replay (why39): every set exactly main's counts, 0 differ: safe,
-  but no case gained yet, so not landed. Where they stop now: b0c36850 / 9f262529 "two edges leave a vertex in one
+  at the ruling's angle, its side of a seam). Full replay (why39): every set exactly main's counts, 0 differ; landed
+  13:30 with the fixes above. Where they stop now: b0c36850 / 9f262529 "two edges leave a vertex in one
   direction" (the apex's pieces), d5cd8b8d "coincident pieces differ": a section of face 10:0 with a face of argument
   9 (an argument isn't intersected with itself) splits 10:0 but not the coincident 9:0; OCCT splits same-domain faces
   by each other's edges. That (same-domain faces sharing their splits) is the next step for these.

@@ -118,7 +118,7 @@ impl FreeSurface {
                 break;
             }
             let step = DVec2::new((d * f - b * g) / det, (a * g - b * f) / det);
-            let next = DVec2::new((q.x - step.x).clamp(uv[0], uv[1]), (q.y - step.y).clamp(uv[2], uv[3]));
+            let next = DVec2::new((q.x - step.x).clamp(uv[0].min(uv[1]), uv[0].max(uv[1])), (q.y - step.y).clamp(uv[2].min(uv[3]), uv[2].max(uv[3])));
             let moved = (next - q).abs();
             q = next;
             if moved.x <= 1e-15 * (1.0 + q.x.abs()) && moved.y <= 1e-15 * (1.0 + q.y.abs()) {

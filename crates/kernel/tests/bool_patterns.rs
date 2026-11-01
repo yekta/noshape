@@ -402,3 +402,34 @@ fn crossing_grooves_with_one_floor() {
     let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
     assert_eq!(counts(&r.shape), [c.summary.faces, c.summary.edges, c.summary.vertices]);
 }
+
+/// noshape's Boolean alone on a recorded case: valid, OCCT's volume and counts.
+fn as_recorded(name: &str) {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, name).expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
+    let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&r.shape), [c.summary.faces, c.summary.edges, c.summary.vertices]);
+}
+
+/// A common keeping a piece of an argument's half circle from its start (recorded): the piece's range from the
+/// edge's own start (its angle a rounding below it went a turn on: "an edge outside its face's range").
+#[test]
+fn a_piece_of_an_arc_from_its_start() {
+    as_recorded("2e30111c66d9ea88");
+}
+
+/// A common through a fillet's torus whose closed edge (a whole circle) is cut in two (recorded): each half's ends on
+/// the torus at their own ends of the circle's curve there (both halves were mapped onto one: "two edges leave a
+/// vertex in one direction").
+#[test]
+fn halves_of_a_closed_edge_on_a_torus() {
+    as_recorded("9f434299c9a0048f");
+}

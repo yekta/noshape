@@ -1136,11 +1136,17 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           return ElCLib::Parameter(ci->Circ(), p);
         if (const occ::handle<Geom_Ellipse> el = occ::down_cast<Geom_Ellipse>(cn))
           return ElCLib::Parameter(el->Elips(), p);
+        if (const occ::handle<Geom_Hyperbola> hy = occ::down_cast<Geom_Hyperbola>(cn))
+          return ElCLib::Parameter(hy->Hypr(), p);
+        if (const occ::handle<Geom_Parabola> pa = occ::down_cast<Geom_Parabola>(cn))
+          return ElCLib::Parameter(pa->Parab(), p);
         return cv[2];
       };
-      t0       = cv[2] + std::remainder(par(p0) - cv[2], 2 * M_PI);
-      t1       = cv[3] + std::remainder(par(p1) - cv[3], 2 * M_PI);
-      if (v0 == v1)
+      // (A hyperbola's or parabola's parameter goes on, not round.)
+      const bool open = !occ::down_cast<Geom_Hyperbola>(cn).IsNull() || !occ::down_cast<Geom_Parabola>(cn).IsNull();
+      t0       = open ? par(p0) : cv[2] + std::remainder(par(p0) - cv[2], 2 * M_PI);
+      t1       = open ? par(p1) : cv[3] + std::remainder(par(p1) - cv[3], 2 * M_PI);
+      if (v0 == v1 && !open)
         t1 = t0 + 2 * M_PI;
       ells[i].t0 = t0;
       ells[i].t1 = t1;
@@ -1155,7 +1161,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     {
       // A piece of an argument's ellipse: as a circle's, from its start through the turn to its end.
       const gp_Elips g = el->Elips().Transformed(loc.Transformation());
-      t0               = f + std::fmod(std::fmod(ElCLib::Parameter(g, p0) - f, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
+      t0               = at0 ? *at0 : f + std::fmod(std::fmod(ElCLib::Parameter(g, p0) - f, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
       double d         = std::fmod(std::fmod(ElCLib::Parameter(g, p1) - t0, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
       if (v0 == v1 || d < 1e-12)
         d = 2 * M_PI;
@@ -1179,7 +1185,8 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     else if (const occ::handle<Geom_Circle> circ = occ::down_cast<Geom_Circle>(bc); !circ.IsNull())
     {
       const gp_Circ g = circ->Circ().Transformed(loc.Transformation());
-      t0              = f + std::fmod(std::fmod(ElCLib::Parameter(g, p0) - f, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
+      // (At its edge's start: from there (its angle a rounding below the start went a turn on).)
+      t0              = at0 ? *at0 : f + std::fmod(std::fmod(ElCLib::Parameter(g, p0) - f, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
       double d        = std::fmod(std::fmod(ElCLib::Parameter(g, p1) - t0, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
       if (v0 == v1 || d < 1e-12)
         d = 2 * M_PI;
@@ -1544,6 +1551,16 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       continue;
     TopLoc_Location loc;
     const occ::handle<Geom_Surface> sf = BRep_Tool::Surface(fs[i], loc);
+    // Every edge of a made face off a plane with its curve on it: OCCT projects a missing one when it meets it, and
+    // its projection onto a cone's or sphere's pole crashed inside its threaded builder (CRASH-1092, a Shell's slab
+    // Boolean after ours). Declined instead.
+    if (occ::down_cast<Geom_Plane>(sf).IsNull())
+      for (TopExp_Explorer x(fs[i], TopAbs_EDGE); x.More(); x.Next())
+      {
+        double f0 = 0, f1 = 0;
+        if (BRep_Tool::CurveOnSurface(TopoDS::Edge(x.Current()), fs[i], f0, f1).IsNull())
+          return "an edge without its curve on a curved face";
+      }
     if (occ::down_cast<Geom_CylindricalSurface>(sf).IsNull() && occ::down_cast<Geom_ConicalSurface>(sf).IsNull())
       continue;
     double a = 0, z = 0, v1 = 0, v2 = 0;

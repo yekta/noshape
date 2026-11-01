@@ -469,45 +469,52 @@ impl Pool {
     /// two's own where that's more (OCCT's rule for tolerant vertices); none past that.
     fn find_tol(&self, p: DVec3, tp: f64) -> R<Option<u32>> {
         let half = 0.5 * self.tol;
-        let mut found: Option<u32> = None;
-        let mut take = |i: u32| -> R<()> {
+        // (Each vertex within reach: its distance and reach.)
+        let mut near: Vec<(u32, f64, f64)> = Vec::new();
+        let mut take = |i: u32| {
             let ti = self.t[i as usize];
             let reach = self.tol.max(tp + ti);
             // (OCCT's rule: together within the sum of the two's tolerances, apart past it, nothing in between; a
             // sharp knurl tooth's sub-micrometre slivers kept as live keeps them.)
             let d = (self.p[i as usize] - p).length();
-            if d <= reach {
-                if found.is_some_and(|f| f != i) {
-                    return Err(Decline("a point near two vertices"));
-                }
-                found = Some(i);
+            if d <= reach && !near.iter().any(|x| x.0 == i) {
+                near.push((i, d, reach));
             }
-            Ok(())
         };
         if tp > half {
             // (A tolerant point: against every vertex.)
             for i in 0..self.p.len() as u32 {
-                take(i)?;
+                take(i);
             }
-            return Ok(found);
-        }
-        let k = self.key(p);
-        for dx in -1..=1 {
-            for dy in -1..=1 {
-                for dz in -1..=1 {
-                    let Some(list) = self.grid.get(&(k.0 + dx, k.1 + dy, k.2 + dz)) else { continue };
-                    for &i in list {
-                        if self.t[i as usize] <= half {
-                            take(i)?;
+        } else {
+            let k = self.key(p);
+            for dx in -1..=1 {
+                for dy in -1..=1 {
+                    for dz in -1..=1 {
+                        let Some(list) = self.grid.get(&(k.0 + dx, k.1 + dy, k.2 + dz)) else { continue };
+                        for &i in list {
+                            if self.t[i as usize] <= half {
+                                take(i);
+                            }
                         }
                     }
                 }
             }
+            for &i in &self.loose {
+                take(i);
+            }
         }
-        for &i in &self.loose {
-            take(i)?;
+        if near.len() <= 1 {
+            return Ok(near.first().map(|x| x.0));
         }
-        Ok(found)
+        // Within reach of two: the one it is on (within a tenth of its reach) where the others are past half of
+        // theirs (a point a rounding off a vertex, another vertex a tolerance away); else unclear (OCCT merges all
+        // three where it is within a third of one and at the edge of another's).
+        near.sort_by(|x, y| (x.1 / x.2).total_cmp(&(y.1 / y.2)));
+        if near[0].1 <= 0.1 * near[0].2 && near[1..].iter().all(|x| x.1 > 0.5 * x.2) {
+            return Ok(Some(near[0].0));
+        }
+        Err(Decline("a point near two vertices"))
     }
 
     fn push(&mut self, p: DVec3) -> u32 {
@@ -809,10 +816,10 @@ impl Ctx<'_> {
             let k = es.iter().position(|x| x.0 == e).ok_or(Decline("an apex on a part of a cone"))?;
             let w = s.v[0];
             let ends = |&(e, rev): &(usize, bool)| if rev { [self.edges[e].v[1], self.edges[e].v[0]] } else { self.edges[e].v };
-            let rulings = |at: usize| es.iter().filter(|x| self.edges[x.0].g == Geo::Line && ends(x)[at] == w).map(|x| ends(x)[1 - at]).collect::<Vec<u32>>();
+            // (A ruling as a line, or as OCCT's section of it (a B-spline): its angle at its middle.)
+            let rulings = |at: usize| es.iter().filter(|x| !matches!(self.edges[x.0].g, Geo::Apex { .. }) && ends(x)[at] == w).map(|x| self.seg_at(&self.edge_seg(x.0), 0.5)).collect::<Vec<DVec3>>();
             let (into, out) = (rulings(1), rulings(0));
             let (&[from], &[to]) = (into.as_slice(), out.as_slice()) else { return Err(Decline("an apex on a part of a cone")) };
-            let (from, to) = (self.p(from), self.p(to));
             let y = g.to2(self.p(s.v[0])).y;
             let (a, b) = (DVec2::new(g.to2(from).x, y), DVec2::new(g.to2(to).x, y));
             return Ok(if es[k].1 { C2::Seg { a: b, b: a } } else { C2::Seg { a, b } });
@@ -843,12 +850,48 @@ impl Ctx<'_> {
                         let (t, _) = whole.param_of(g.to2(p));
                         pt0 + (pt1 - pt0) * t
                     };
-                    (at(self.p(s.v[0])), at(self.p(s.v[1])))
+                    let (mut a, mut b) = (at(self.p(s.v[0])), at(self.p(s.v[1])));
+                    // (A piece of a closed edge ending where it closes: that end at whichever of its curve's ends has
+                    // the piece's middle between its two ends.)
+                    if self.edges[e].v[0] == self.edges[e].v[1] {
+                        let m = at(self.seg_at(s, 0.5));
+                        let other = |x: f64| if (x - pt0).abs() <= 1e-9 * (1.0 + x.abs()) { *pt1 } else if (x - pt1).abs() <= 1e-9 * (1.0 + x.abs()) { *pt0 } else { x };
+                        let between = |a: f64, b: f64| (a.min(b)..=a.max(b)).contains(&m);
+                        if !between(a, b) {
+                            if between(other(a), b) {
+                                a = other(a);
+                            } else if between(a, other(b)) {
+                                b = other(b);
+                            }
+                        }
+                    }
+                    (a, b)
                 }
             };
             return Ok(C2::Nurbs { c, t0: a, t1: b });
         }
         if let Geo::Nurbs { id, t0, t1 } = s.g {
+            // (Straight (a ruling, the face's seam: another argument's B-spline on its course): as that line, on its
+            // side of the seam, its end at a cone's apex at the ruling's angle.)
+            // (A part without vertices (a section's, placed): by its curve's ends.)
+            let (a, b) = (self.seg_at(s, 0.0), self.seg_at(s, 1.0));
+            let straight = (b - a).length() > self.tol
+                && [0.25, 0.5, 0.75].iter().all(|&t| {
+                    let q = self.seg_at(s, t);
+                    let d = (b - a).normalize_or_zero();
+                    (q - a - d * (q - a).dot(d)).length() <= self.tol
+                });
+            // (A ruling: its middle at the angle of its end off the axis (a short piece of a knurl's section is
+            // straight within the tolerance, not a ruling).)
+            let ruling = || {
+                let Surf::Cyl { o, a: ax, .. } = g.s else { return false };
+                let off = |p: DVec3| (p - o).cross(ax).length();
+                let far = if off(a) > off(b) { a } else { b };
+                (g.to2(self.seg_at(s, 0.5)).x - g.to2(far).x).abs() <= self.tol
+            };
+            if matches!(g.s, Surf::Cyl { .. }) && ((straight && ruling()) || edge.is_some_and(|e| self.edges[e].g == Geo::Line)) {
+                return g.curve2(a, b, &Geo::Line, copy);
+            }
             return free::mapped(g, &self.ncurves[id as usize].c, t0, t1);
         }
         g.curve2(self.p(s.v[0]), self.p(s.v[1]), &s.g, copy)
@@ -983,10 +1026,14 @@ impl Ctx<'_> {
         };
         if let Some((t, true)) = gap {
             let mut out = self.intervals_on(f, path, (t0, t), [ends[0], End::Open], closed, on_free)?;
-            for iv in self.intervals_on(f, path, (t, t1), [End::Open, ends[1]], closed, on_free)? {
-                match out.last_mut() {
-                    Some(last) if last[1].0 == iv[0].0 && last[1].1 == End::Open => last[1] = iv[1],
-                    _ => out.push(iv),
+            out.extend(self.intervals_on(f, path, (t, t1), [End::Open, ends[1]], closed, on_free)?);
+            // (A piece inside the face from or to its gap: the face's boundary is there (its side at that angle; a
+            // face going round with two sides there has a piece each side), a point on it.)
+            for iv in &mut out {
+                for x in iv.iter_mut() {
+                    if x.1 == End::Open && x.0 == t {
+                        x.1 = End::Point(path.at(t));
+                    }
                 }
             }
             return Ok(out);
@@ -1945,11 +1992,9 @@ impl Ctx<'_> {
         let dir = n1.cross(n2);
         if dir.length() <= 1e-9 {
             let off = (n1.dot(o2) - d1).abs();
-            if off > GREY * self.tol {
-                return Ok(());
-            }
+            // (Apart past the tolerance, OCCT's rule: no grey band.)
             if off > self.tol {
-                return Err(Decline("faces nearly coplanar"));
+                return Ok(());
             }
             self.coplanar.push((fs, ft));
             return Ok(());
@@ -1982,6 +2027,10 @@ impl Ctx<'_> {
             let rc = r0 + slope * h;
             let (lo, hi) = (self.faces[fc].lo, self.faces[fc].hi);
             if !boxes_meet(c, c, lo, hi, GREY * tol + rc.abs()) {
+                return Ok(());
+            }
+            // (Through the apex exactly: only the apex in common, a vertex the plane holds; no section.)
+            if rc.abs() <= tol {
                 return Ok(());
             }
             if rc <= GREY * tol {
@@ -2263,12 +2312,9 @@ impl Ctx<'_> {
             let c2 = (o1 - o2).dot(a2);
             let (c0, c1) = (r01 - r02 - k2 * c2, k1 - k2 * sg);
             if c1.abs() < 1e-12 {
+                // (One within the tolerance, apart past it: OCCT's rule.)
                 if c0.abs() <= tol {
                     self.coplanar.push((f1, f2));
-                    return Ok(());
-                }
-                if c0.abs() <= GREY * tol {
-                    return Err(Decline("cones nearly coincident"));
                 }
                 return Ok(());
             }
@@ -2874,7 +2920,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 }
                 None => (None, HashMap::default()),
             };
-            let uvbox = free::uv_box(ns.as_deref(), &pcurves);
+            let uvbox = free::uv_box(ns.as_deref(), &pcurves).ok_or(Decline("a face's curves outside its surface's range"))?;
             let s = match &ns {
                 Some(fs) => free::nurbs_surf(fs, uvbox, f.reversed),
                 None => s,
@@ -3571,12 +3617,18 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             let apart = matches!((o.g, s.g), (Geo::Apex { a0, a1 }, Geo::Apex { a0: b0, a1: b1 }) if a0.to_bits() != b0.to_bits() || a1.to_bits() != b1.to_bits());
             // (Of two curve kinds, one course (a line and a B-spline of it): one, its ends apart and the two's points
             // along it together, as OCCT's common block.)
+            // (OCCT's section within its own error of the curve it runs along.)
+            let acc = |g: &Geo| match *g {
+                Geo::Nurbs { id, .. } if cx.ncurves[id as usize].sec.is_some() => cx.ncurves[id as usize].acc,
+                _ => 0.0,
+            };
+            let reach = cx.tol.max(acc(&o.g) + acc(&s.g));
             let alike = std::mem::discriminant(&o.g) == std::mem::discriminant(&s.g)
                 || (s.v[0] != s.v[1]
                     && !matches!(o.g, Geo::Apex { .. })
                     && !matches!(s.g, Geo::Apex { .. })
-                    && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(o, cx.seg_at(&s, t)).1 <= cx.tol)
-                    && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(&s, cx.seg_at(o, t)).1 <= cx.tol));
+                    && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(o, cx.seg_at(&s, t)).1 <= reach)
+                    && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(&s, cx.seg_at(o, t)).1 <= reach));
             // (Two of one kind: their middles together; two sections (OCCT's curves, parametrized each its own way):
             // each one's points on the other within the curves' own error, as a sharp tooth's land between two of
             // them is narrower than 100 tol.)
@@ -3585,6 +3637,25 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                     let reach = cx.tol.max(cx.ncurves[a as usize].acc + cx.ncurves[b as usize].acc);
                     [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(o, cx.seg_at(&s, t)).1 <= reach)
                         && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(&s, cx.seg_at(o, t)).1 <= reach)
+                }
+                // (Two arcs or ellipses between the same ends: one only on one course (a hole's circle and another
+                // part's crossing it at both ends bulge apart).)
+                (Geo::Arc { .. }, Geo::Arc { .. }) | (Geo::Ell { .. }, Geo::Ell { .. }) => (cx.seg_at(o, 0.5) - mid).length() <= GREY * cx.tol,
+                // (Pieces of one curve: by their ranges, either way round.)
+                (Geo::Nurbs { id: a, t0: a0, t1: a1 }, Geo::Nurbs { id: b, t0: b0, t1: b1 }) if a == b => {
+                    let near = |x: f64, y: f64| (x - y).abs() <= 1e-9 * (1.0 + x.abs());
+                    (near(a0, b0) && near(a1, b1)) || (near(a0, b1) && near(a1, b0))
+                }
+                // (Two B-splines otherwise (an input edge and a section, parametrized each its own way): each one's
+                // points on the other's piece, within the grey band of their error.)
+                (Geo::Nurbs { .. }, Geo::Nurbs { .. }) => {
+                    let on = |a: &Seg, b: &Seg| {
+                        [0.25, 0.5, 0.75].iter().all(|&t| {
+                            let (u, d) = cx.seg_param(a, cx.seg_at(b, t));
+                            d <= GREY * reach && (-1e-3..=1.0 + 1e-3).contains(&u)
+                        })
+                    };
+                    on(o, &s) && on(&s, o)
                 }
                 _ => (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * cx.tol,
             };
@@ -3685,9 +3756,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         } else {
             let k = g.edges.iter().position(|x| x.0 == e).ok_or(Decline("an apex on a part of a cone"))?;
             let ends = |&(e, rev): &(usize, bool)| if rev { [cx.edges[e].v[1], cx.edges[e].v[0]] } else { cx.edges[e].v };
-            let rulings = |end: usize| g.edges.iter().filter(|x| cx.edges[x.0].g == Geo::Line && ends(x)[end] == w).map(|x| ends(x)[1 - end]).collect::<Vec<u32>>();
+            let rulings = |end: usize| g.edges.iter().filter(|x| !matches!(cx.edges[x.0].g, Geo::Apex { .. }) && ends(x)[end] == w).map(|x| g.to2(cx.seg_at(&cx.edge_seg(x.0), 0.5)).x / r).collect::<Vec<f64>>();
             let (&[a], &[b]) = (rulings(1).as_slice(), rulings(0).as_slice()) else { return Err(Decline("an apex on a part of a cone")) };
-            if g.edges[k].1 { (angle(b), angle(a)) } else { (angle(a), angle(b)) }
+            if g.edges[k].1 { (b, a) } else { (a, b) }
         };
         let (lo, hi) = (from.min(to), from.max(to));
         at.retain(|&t| t - lo > 1e-9 && hi - t > 1e-9);

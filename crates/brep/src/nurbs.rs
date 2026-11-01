@@ -542,7 +542,8 @@ impl NurbsCurve {
             if gp.abs() < 1e-300 {
                 break;
             }
-            let nt = (t - g / gp).clamp(t0, t1);
+            // (A piece may run either way: its range low to high.)
+            let nt = (t - g / gp).clamp(t0.min(t1), t0.max(t1));
             if (nt - t).abs() <= 1e-15 * (1.0 + t.abs()) {
                 t = nt;
                 break;
@@ -656,7 +657,7 @@ impl NurbsSurface {
                 break;
             }
             let step = DVec2::new((d * f - b * g) / det, (a * g - b * f) / det);
-            let next = DVec2::new((uv.x - step.x).clamp(u0, u1), (uv.y - step.y).clamp(v0, v1));
+            let next = DVec2::new((uv.x - step.x).clamp(u0.min(u1), u0.max(u1)), (uv.y - step.y).clamp(v0.min(v1), v0.max(v1)));
             let moved = (next - uv).abs();
             uv = next;
             if moved.x <= 1e-15 * (1.0 + uv.x.abs()) && moved.y <= 1e-15 * (1.0 + uv.y.abs()) {

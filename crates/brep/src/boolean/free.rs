@@ -8,8 +8,10 @@ use glam::DVec4;
 
 /// A free-form face's parameter box: what its edges' curves on it span (within the surface's own range), grown by
 /// a hundredth.
-pub(super) fn uv_box(ns: Option<&FreeSurface>, pcurves: &PCurves) -> [f64; 4] {
-    let Some(ns) = ns else { return [0.0; 4] };
+/// (None where its curves lie outside the surface's own range (OCCT's curves on a periodic surface a period on): the
+/// box would be inside out.)
+pub(super) fn uv_box(ns: Option<&FreeSurface>, pcurves: &PCurves) -> Option<[f64; 4]> {
+    let Some(ns) = ns else { return Some([0.0; 4]) };
     let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
     for (c, t0, t1) in pcurves.values() {
         for k in 0..=32 {
@@ -26,7 +28,7 @@ pub(super) fn uv_box(ns: Option<&FreeSurface>, pcurves: &PCurves) -> [f64; 4] {
             hi[k] = hi[k].min(b);
         }
     }
-    [lo.x, hi.x, lo.y, hi.y]
+    (lo.x <= hi.x && lo.y <= hi.y && lo.is_finite() && hi.is_finite()).then_some([lo.x, hi.x, lo.y, hi.y])
 }
 
 /// A free-form face's `Surf`: its parameters scaled by the surface's mean speeds along u and v over its box (so
@@ -508,4 +510,27 @@ pub(super) fn apart(f: &GFace, g: &GFace, gap: f64) -> bool {
 pub(super) fn clearly_off(g: &GFace, p: DVec3, gap: f64) -> bool {
     let Some(ns) = g.ns.as_deref() else { return false };
     g.hulls.get_or_init(|| hulls(ns)).as_deref().is_some_and(|hs| hs.iter().all(|h| (h.lo - p).max_element() > gap || (p - h.hi).max_element() > gap))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A face's curves a period past its B-spline surface's own range (OCCT's on a periodic surface; fuzz seeds 979,
+    /// 1036: RUST-BOOL-CLAMP-ABORT, f64::clamp with min 8.3 > max 2π): no box, so the face declines, not a panic.
+    #[test]
+    fn curves_past_the_surface_range_give_no_box() {
+        let tau = std::f64::consts::TAU;
+        let s = crate::nurbs::NurbsSurface { udegree: 1, vdegree: 1, uknots: vec![0.0, 0.0, tau, tau], vknots: vec![0.0, 0.0, 1.0, 1.0], nu: 2, nv: 2, poles: vec![DVec3::ZERO, DVec3::Y, DVec3::X, DVec3::X + DVec3::Y], weights: Vec::new() };
+        let ns = FreeSurface::Nurbs(s);
+        let line = |a: DVec2, b: DVec2| Arc::new(NurbsCurve { degree: 1, knots: vec![0.0, 0.0, 1.0, 1.0], poles: vec![a.extend(0.0), b.extend(0.0)], weights: Vec::new(), spans: Default::default() });
+        let mut pc: PCurves = HashMap::default();
+        pc.insert((0, false), (line(DVec2::new(8.3, 0.2), DVec2::new(9.0, 0.5)), 0.0, 1.0));
+        assert!(uv_box(Some(&ns), &pc).is_none());
+        pc.insert((0, false), (line(DVec2::new(1.0, 0.2), DVec2::new(2.0, 0.5)), 0.0, 1.0));
+        let b = uv_box(Some(&ns), &pc).expect("a box inside the range");
+        assert!(b[0] <= b[1] && b[2] <= b[3]);
+        // (The Newton steps clamp to a box either way round.)
+        let _ = ns.param_of(DVec3::new(0.5, 0.5, 0.0), DVec2::new(1.0, 0.5), [tau, 0.0, 1.0, 0.0]);
+    }
 }
