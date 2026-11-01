@@ -13,6 +13,7 @@
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
+#include <BRepCheck_Analyzer.hxx>
 #include <BRepLib.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
@@ -2152,6 +2153,11 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   stop();
   if (const char* why = build(r, srcs, max_tol > 0 ? max_tol : 1e-7, out, hist))
     return decline(why);
+  // The result as OCCT's checker sees it, up to 2000 faces (a bigger one's check costs seconds: the knurl's 2 s): an
+  // invalid one declines and OCCT builds the Boolean (invalid results of ours, fed into later OCCT operations, crashed
+  // them: fuzz seed 1144's mirror fuse and Shell common).
+  if (r.face_origin.size() / 3 <= 2000 && !BRepCheck_Analyzer(out).IsValid())
+    return decline("an invalid result");
   // (A result with free-form faces isn't kept as a body: the next Boolean converts it, curves on faces and all;
   // nor one with ellipses, hyperbolas or parabolas: converted, they are OCCT's curves, frame and parameters.)
   for (size_t i = 0; i < r.body.surfaces.size(); i += 12)

@@ -1079,6 +1079,13 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## A validity guard on noshape's results (11-01 17:40 UTC)
+- rust_boolean.cpp checks every result up to 2000 faces with BRepCheck_Analyzer; an invalid one declines ("an invalid
+  result") and OCCT builds the Boolean. Invalid results of ours had gone on into later OCCT operations and crashed
+  them (fuzz seed 1144's mirror fuse and Shell common, both fixed at their cause too). Cost on the main corpus: the
+  median small Boolean 2.46 → 2.93 ms, the total 4062 → 4230 ms (+4 %); bigger results (the knurl's 17762 faces,
+  ~2 s to check) skip it. Replays (why48): counts unchanged, 0 differ, no recorded case declines by it.
+
 ## RUST-MIRROR-GPF-DELTA looked at (11-01 17:10 UTC)
 - qa's tickets/cli-shell-gpf.noshape recorded with OCCT and replayed through ours (vibe4 bool-corpora gpf): the
   Part mirror's fuse (49eaef95) is where the volume parts: ours 3.252513298621e-5 m³, OCCT's 3.252511742304e-5
