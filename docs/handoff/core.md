@@ -45,7 +45,10 @@ for their UV bounds), so OCCT patch 0017 answers it for two planes in closed for
 normal test): every OCCT fillet on planar faces gains: the corpus OCCT-only 5.0-5.3 → 3.8-4.1 s on vibe4, same
 results (lib in /root/occt; lead asked to sync).
 Audit: oracle_p1::audit_feature_results builds live batches 11-13 (30 cases, ours in docs/parity/
-audit-feature-results.md); found and fixed Helix › Circle on a sketch circle.
+audit-feature-results.md); found and fixed Helix › Circle on a sketch circle. Thin loft: our faces equal live 1728's
+to ~1e-4 mm² (total area 1e-5), our integral tight; the fit density and the caps' ruling ruled out; live's volume
+suspected (the knurl gap's size): live asked for the bodies as .x_t (REQUESTS 21:40) to integrate them here.
+Waiting on live: batches 11-13 (results-11..13.jsonl → oracle_p1 AUDIT_LIVE) and those .x_t.
 G31 tuned to live 1731 (19:00): measure.rs LIVE_* floors (Parasolid's magnitudes from the block, its ×10 copy and its
 top face; freeform bounds live are ~20× those: its loft volume is 11 mm³ off, ours exact, so ours stay at the floors);
 face_property_variance for the Face tab. Inch units and REST /massproperties still to compare when live's REST is back.
