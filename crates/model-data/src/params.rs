@@ -335,11 +335,22 @@ pub struct ParamSpec {
     /// `#param` stands for an item parameter's value, `#index` for its
     /// 1-based position ("[#continuity] #entities").
     pub item_template: Option<&'static str>,
+    /// FeatureScript "Column Name": the parameter's name in the
+    /// configuration table when it differs from its label ("Second depth").
+    pub column: &'static str,
 }
 
 impl ParamSpec {
     fn new(id: &'static str, label: &'static str, kind: ParamKind) -> Self {
-        Self { id, label, kind, hints: Hints::NONE, visible: None, description: "", item_template: None }
+        Self { id, label, kind, hints: Hints::NONE, visible: None, description: "", item_template: None, column: "" }
+    }
+    pub fn column(mut self, c: &'static str) -> Self {
+        self.column = c;
+        self
+    }
+    /// The name the configuration table and configure lists show.
+    pub fn column_label(&self) -> &'static str {
+        if self.column.is_empty() { self.label } else { self.column }
     }
     pub fn item_template(mut self, t: &'static str) -> Self {
         self.item_template = Some(t);

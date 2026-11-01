@@ -364,6 +364,7 @@ fn collect_in(module: &Arc<CompiledModule>, s: &ast::Stmt, conds: &[Arc<Compiled
                         // "Driven query": one selection field, a pick per item.
                         hints: if a.str("Driven query").is_some() { hints(&a) | Hints::DRIVEN_QUERY } else { hints(&a) },
                         description: a.str("Description").unwrap_or("").to_string(),
+                        column: a.str("Column Name").unwrap_or("").to_string(),
                         conditions: conds.to_vec(),
                     });
                     k += 1;
@@ -399,6 +400,7 @@ fn collect_in(module: &Arc<CompiledModule>, s: &ast::Stmt, conds: &[Arc<Compiled
                     kind: ParamKindFs::Group { open },
                     hints: Hints::GROUP_HEADER | Hints::GROUP_LABEL | Hints::UNCONFIGURABLE,
                     description: String::new(),
+                    column: String::new(),
                     conditions: conds.to_vec(),
                 });
                 let r = roots.first().copied().unwrap_or(root);
@@ -666,7 +668,7 @@ fn param_decl(module: &Arc<CompiledModule>, e: &ast::Expr, a: &Ann, ann_expr: &a
                 "isAngle" => NumKind::Angle,
                 "isInteger" => NumKind::Integer,
                 "isReal" => NumKind::Real,
-                "isAnything" => return Some(ParamDecl { label: a.str("Name").unwrap_or(&id).to_string(), id, kind: ParamKindFs::Anything, hints: hints(a), description: String::new(), conditions: Vec::new() }),
+                "isAnything" => return Some(ParamDecl { label: a.str("Name").unwrap_or(&id).to_string(), id, kind: ParamKindFs::Anything, hints: hints(a), description: String::new(), column: a.str("Column Name").unwrap_or("").to_string(), conditions: Vec::new() }),
                 _ => return None,
             };
             let spec = match args.get(1) {
@@ -680,7 +682,7 @@ fn param_decl(module: &Arc<CompiledModule>, e: &ast::Expr, a: &Ann, ann_expr: &a
         }
         _ => return None,
     };
-    Some(ParamDecl { label: a.str("Name").unwrap_or(&id).to_string(), id, kind, hints: hints(a), description: a.str("Description").unwrap_or("").to_string(), conditions: Vec::new() })
+    Some(ParamDecl { label: a.str("Name").unwrap_or(&id).to_string(), id, kind, hints: hints(a), description: a.str("Description").unwrap_or("").to_string(), column: a.str("Column Name").unwrap_or("").to_string(), conditions: Vec::new() })
 }
 
 /// Our selection filter for an Onshape "Filter" expression.
@@ -857,6 +859,9 @@ fn param_spec(d: &ParamDecl, siblings: Arc<Vec<ParamDecl>>) -> ParamSpec {
     spec = spec.hints(h);
     if !d.description.is_empty() {
         spec = spec.describe(intern(&d.description));
+    }
+    if !d.column.is_empty() {
+        spec = spec.column(intern(&d.column));
     }
     if !d.conditions.is_empty() {
         let conds = d.conditions.clone();

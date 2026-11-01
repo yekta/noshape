@@ -1280,7 +1280,7 @@ impl PartStudioView {
                         // Input propagation: the source input's name ("Size").
                         return self.derived_input_name(c.feature, id, cx);
                     }
-                    studio.feature(c.feature).and_then(|f| f.feature_type()).and_then(|t| t.param(&c.param)).map(|p| p.label.to_string()).unwrap_or_else(|| if c.param == noshape_model::configuration::SUPPRESSED_PARAM { "Suppressed".into() } else { "?".into() })
+                    studio.feature(c.feature).and_then(|f| f.feature_type()).and_then(|t| t.param(&c.param)).map(|p| p.column_label().to_string()).unwrap_or_else(|| if c.param == noshape_model::configuration::SUPPRESSED_PARAM { "Suppressed".into() } else { "?".into() })
                 };
                 if columns.is_empty() {
                     section = section.child(h_flex().border_l_1().border_color(grid).child(head(name_w).relative().child(first).child(crate::ui::col_grip(&table, "name", NAME_W))));

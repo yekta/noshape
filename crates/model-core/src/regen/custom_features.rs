@@ -74,6 +74,8 @@ pub struct ParamDecl {
     pub kind: ParamKindFs,
     pub hints: Hints,
     pub description: String,
+    /// "Column Name" (the configuration table's name for it), or empty.
+    pub column: String,
     /// Visibility conditions (`if (definition.x) { ... }`): all must hold.
     pub conditions: Vec<Arc<CompiledFn>>,
 }

@@ -2,11 +2,12 @@
 //! feature. Evaluation lives in `crate::eval`; schemas are pure data so the
 //! UI can render any feature dialog generically.
 
-use crate::params::ParamSpec;
+use crate::params::{ParamKind, ParamSpec};
 use indexmap::IndexMap;
 use std::sync::LazyLock;
 
 pub mod boolean;
+pub mod columns;
 pub mod common;
 pub mod core;
 pub mod curve;
@@ -79,7 +80,8 @@ pub struct FeatureType {
 }
 
 impl FeatureType {
-    pub fn new(id: &'static str, name: &'static str, category: Category, params: Vec<ParamSpec>) -> Self {
+    pub fn new(id: &'static str, name: &'static str, category: Category, mut params: Vec<ParamSpec>) -> Self {
+        apply_columns(id, &mut params);
         Self { id, name, category, shortcut: None, icon: id, description: "", params, in_toolbar: true }
     }
     pub fn shortcut(mut self, s: &'static str) -> Self {
@@ -100,6 +102,21 @@ impl FeatureType {
     }
     pub fn param(&self, id: &str) -> Option<&ParamSpec> {
         find_param(&self.params, id)
+    }
+}
+
+/// std's column names (`columns::COLUMNS`) on the feature's parameters
+/// and array items.
+fn apply_columns(feature: &str, params: &mut [ParamSpec]) {
+    for p in params {
+        if p.column.is_empty()
+            && let Some(c) = columns::column(feature, p.id)
+        {
+            p.column = c;
+        }
+        if let ParamKind::Array { item, .. } = &mut p.kind {
+            apply_columns(feature, std::sync::Arc::make_mut(item).as_mut_slice());
+        }
     }
 }
 

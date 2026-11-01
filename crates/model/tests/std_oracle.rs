@@ -107,7 +107,8 @@ fn describe(p: &ParamSpec) -> String {
     if hints.has(Hints::READ_ONLY) {
         hints = Hints(hints.0 & !Hints::UNCONFIGURABLE.0);
     }
-    format!("{} {:?} {kind} hints {:#x} {:?} {:?}", p.id, p.label, hints.0, p.description, p.item_template)
+    let column = if p.column.is_empty() { String::new() } else { format!(" column {:?}", p.column) };
+    format!("{} {:?}{column} {kind} hints {:#x} {:?} {:?}", p.id, p.label, hints.0, p.description, p.item_template)
 }
 
 fn shown(t: &[ParamSpec], v: &ParamValues) -> Vec<&'static str> {
