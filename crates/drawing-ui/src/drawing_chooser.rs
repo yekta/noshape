@@ -1141,7 +1141,7 @@ fn decode(png: &[u8]) -> Option<Arc<RenderImage>> {
 mod released_tests {
     use noshape_model::release::{ItemKind, Package, PackageKind, ReleaseItem, ReleaseLog};
 
-    fn item(name: &str, kind: ItemKind, pn: &str, rev: &str) -> ReleaseItem {
+    fn released_item(name: &str, kind: ItemKind, pn: &str, rev: &str) -> ReleaseItem {
         ReleaseItem { tab: noshape_model::document::TabId(7), part: None, name: name.into(), kind, part_number: pn.into(), revision: rev.into(), not_revision_managed: false, reverted: false, config: Default::default(), document: None }
     }
 
@@ -1154,10 +1154,10 @@ mod released_tests {
     #[test]
     fn released_items_newest_first_without_obsolete() {
         let mut log = ReleaseLog::default();
-        log.packages.push(package(1, PackageKind::Release, Some("00000000-0000-0000-0000-000000000001"), vec![item("Bracket", ItemKind::Part, "PN-1", "A"), item("Drawing", ItemKind::Drawing, "PN-9", "A")]));
-        log.packages.push(package(2, PackageKind::Release, Some("00000000-0000-0000-0000-000000000002"), vec![item("Bracket", ItemKind::Part, "PN-1", "B"), item("Gearbox", ItemKind::Assembly, "PN-2", "A")]));
-        log.packages.push(package(3, PackageKind::Obsoletion, None, vec![item("Bracket", ItemKind::Part, "PN-1", "A")]));
-        log.packages.push(package(4, PackageKind::Release, None, vec![item("Lost", ItemKind::Part, "PN-3", "A")]));
+        log.packages.push(package(1, PackageKind::Release, Some("00000000-0000-0000-0000-000000000001"), vec![released_item("Bracket", ItemKind::Part, "PN-1", "A"), released_item("Drawing", ItemKind::Drawing, "PN-9", "A")]));
+        log.packages.push(package(2, PackageKind::Release, Some("00000000-0000-0000-0000-000000000002"), vec![released_item("Bracket", ItemKind::Part, "PN-1", "B"), released_item("Gearbox", ItemKind::Assembly, "PN-2", "A")]));
+        log.packages.push(package(3, PackageKind::Obsoletion, None, vec![released_item("Bracket", ItemKind::Part, "PN-1", "A")]));
+        log.packages.push(package(4, PackageKind::Release, None, vec![released_item("Lost", ItemKind::Part, "PN-3", "A")]));
         let r: Vec<(String, String, bool)> = super::released_items(&log, &|s| s.parse().ok()).into_iter().map(|r| (r.name, r.revision, r.assembly)).collect();
         assert_eq!(r, vec![("Bracket".into(), "B".into(), false), ("Gearbox".into(), "A".into(), true)]);
     }

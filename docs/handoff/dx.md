@@ -11,7 +11,18 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
-## Evening 11-01 (11-01 16:36 UTC)
+## Land loop fixed (11-01 17:08 UTC)
+- My lands failed 23 times on 11-01 (lead's /tmp/lead/land-results/dx.log): clippy type_complexity in mbd.rs (fixed
+  3c4be3ac, but every commit stacked after the bad one failed with it), coverage::every_menu_item_is_listed (my V1
+  test helper `item("Bracket", …)` read as a menu item: renamed `released_item`; the S18 field menu's "Explode note"
+  had no op: drawing_title_field `explode`), then rebase conflicts with skasm's out-of-date tab icon in workspace.rs
+  (merged: skasm's `self.behind` for other documents, my `drawing_behind` for a drawing pinned to an older version
+  of its own document; one icon).
+- Rule now: before queuing, clippy `-p <every touched crate> --all-targets -D warnings` plus the named tests changed,
+  and one queue per finished piece.
+- X1 done: the documents page's Import files… opens live's 590 px "Import to Onshape" modal (three tiles; split =
+  a document per file; an assembly's subassemblies into documents of their own is still open).
+
 - User 11-01: S18 model change, CR5, CR18 (asked live), TB12 on Windows, then an audit of my surfaces like psui's /
   skasm's. Done and queued: S18 (title fields become notes on Explode / Add leader / Move to / order:
   `promote_title_field`, `Annotation::title_field`), CR5 + CR18 (live 1733 / 1734: one standard view per MBD item),
@@ -22,7 +33,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   prompts, Create Drawing's MBD note, import steps in Notifications, a note's leader on an edge (A1). Waiting on live
   (REQUESTS 14:24, 14:39, 14:42): datum target Outside styles, hole table Collapse tags / Title row, hatch Apply to,
   inspection type names, Formulas, Notifications ⋯, menus of weld / GD&T / centerline / revision table / datum target
-  / leader line, section depth Offset distance. Open: M1 format lines selectable, X1 the start page's Import modal.
+  / leader line, section depth Offset distance. Open: M1 format lines selectable (X1 done since).
 
 ## Afternoon 11-01 (13:10–14:08 UTC; queued lands: land.sh returns QUEUED, `land.sh --status`)
 - Landed: 9b100b79 A15 part custom properties; cc1a4a9b A23 / S18 property chips; a49cffca CR5 / CR18 / V5 MBD

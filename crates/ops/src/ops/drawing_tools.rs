@@ -278,12 +278,13 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "title_field",
             summary: "Edit a title block field: its cell's note",
-            description: "Double-click a title block cell (live qa4 round 5 s11 (4)): each field's cell is a note, editable while the formats are locked. `text` replaces field `field` (as drawing_get's `title_fields`, e.g. \"Title\", \"Drawn by\"; a key the layout lacks is added). Lines split on \\n; property codes like {part.name} expand. One edit (\"Edit title block\").",
+            description: "Double-click a title block cell (live qa4 round 5 s11 (4)): each field's cell is a note, editable while the formats are locked. `text` replaces field `field` (as drawing_get's `title_fields`, e.g. \"Title\", \"Drawn by\"; a key the layout lacks is added). Lines split on \\n; property codes like {part.name} expand. `explode` (the field's right-click › Explode note): the field becomes a note of its own in its cell (drawing_get's annotations; the format stops drawing it) drawn as lines in DWG / DXF exports. One edit (\"Edit title block\", or \"Explode note\" without `text`).",
             fields: with(
                 common(),
                 vec![
                     req("field", json!({ "type": "string" }), "The field (drawing_get `title_fields`)."),
-                    req("text", json!({ "type": "string" }), "Its text."),
+                    opt("text", json!({ "type": "string" }), "Its text."),
+                    opt("explode", json!({ "type": "boolean" }), "Explode note: the field as a note of its own, exploded in DWG / DXF exports."),
                 ],
             ),
             mutates: true,
@@ -1504,13 +1505,31 @@ fn element_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn title_field(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let mut t = target(od, a)?;
-    let (key, text) = (a.str("field")?.to_string(), a.str("text")?.to_string());
+    let (key, text) = (a.str("field")?.to_string(), a.opt_str("text")?.map(str::to_string));
+    let explode = a.get("explode").and_then(|v| v.as_bool()).unwrap_or(false);
     if key.trim().is_empty() {
         return Err(OpError::param("field", "empty"));
     }
+    if text.is_none() && !explode {
+        return Err(OpError::param("text", "give text, explode or both"));
+    }
     let si = t.sheet;
-    dt::set_title_field(&mut t.d.sheets[si], &key, &text);
-    commit(od, t.tab, si, t.d, "Edit title block")?;
+    if let Some(text) = &text {
+        dt::set_title_field(&mut t.d.sheets[si], &key, text);
+    }
+    if explode {
+        // The cell and text height the format draws the field with (as the app's menu).
+        let b = t.m.built.as_ref().ok_or_else(|| OpError::param("field", "the sheet isn't drawn"))?;
+        let target = noshape_model::drawing::build::PickTarget::TitleField(key.clone());
+        let &(pick, cell) = b.title_cells.iter().find(|(p, _)| b.picks.get(*p as usize) == Some(&target)).ok_or_else(|| OpError::param("field", "the title block has no cell for it"))?;
+        let h = b.geometry.texts.iter().find(|x| x.pick == pick).map(|x| x.height).unwrap_or(t.d.props.ann_text_height);
+        let s = &mut t.d.sheets[si];
+        let id = dt::promote_title_field(s, &key, cell, h);
+        if let Some(AnnotationKind::Note { style, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
+            style.explode = true;
+        }
+    }
+    commit(od, t.tab, si, t.d, if text.is_none() { "Explode note" } else { "Edit title block" })?;
     Ok(reply(od, t.tab, si, false)?.into())
 }
 

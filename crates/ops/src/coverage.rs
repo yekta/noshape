@@ -387,6 +387,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Edit hatch", Op("drawing_hatch_region")),
     ("drawing:Edit hatch section...", Op("drawing_edit_hatch")),
     ("drawing:Edit note...", Op("drawing_note")),
+    ("drawing:Explode note", Op("drawing_title_field")),
     ("drawing:Edit section", Op("drawing_broken_out_section")),
     ("drawing:Edit section...", Op("drawing_section_view")),
     ("drawing:Edit", Op("drawing_inspection")),

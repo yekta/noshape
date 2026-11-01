@@ -3871,7 +3871,7 @@ Examples:
 
 Edit a title block field: its cell's note (edits the document (one undoable history entry)).
 
-Double-click a title block cell (live qa4 round 5 s11 (4)): each field's cell is a note, editable while the formats are locked. `text` replaces field `field` (as drawing_get's `title_fields`, e.g. "Title", "Drawn by"; a key the layout lacks is added). Lines split on \n; property codes like {part.name} expand. One edit ("Edit title block").
+Double-click a title block cell (live qa4 round 5 s11 (4)): each field's cell is a note, editable while the formats are locked. `text` replaces field `field` (as drawing_get's `title_fields`, e.g. "Title", "Drawn by"; a key the layout lacks is added). Lines split on \n; property codes like {part.name} expand. `explode` (the field's right-click › Explode note): the field becomes a note of its own in its cell (drawing_get's annotations; the format stops drawing it) drawn as lines in DWG / DXF exports. One edit ("Edit title block", or "Explode note" without `text`).
 
 Examples:
 
@@ -3886,7 +3886,8 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `field` | string | required | The field (drawing_get `title_fields`). |
-| `text` | string | required | Its text. |
+| `text` | string |  | Its text. |
+| `explode` | boolean |  | Explode note: the field as a note of its own, exploded in DWG / DXF exports. |
 
 #### drawing_hatch_region
 

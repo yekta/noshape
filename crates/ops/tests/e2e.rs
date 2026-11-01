@@ -2068,6 +2068,15 @@ fn drawing_title_block_fields() {
     let t = title(&mut ctx);
     assert_eq!(t["value"].as_str().unwrap(), typed);
     assert!(t["shown"].as_array().unwrap().iter().any(|l| l == "QA4 PLATE"), "{t}");
+    // Explode note (the field's menu): the field becomes a note of its own in its cell.
+    call(&mut ctx, "drawing_title_field", json!({ "drawing": tab, "field": "Title", "explode": true }));
+    assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Explode note"));
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
+    let note = g["annotations"].as_array().unwrap().iter().find(|a| a["text"].as_str().is_some_and(|t| t.contains("QA4 PLATE"))).cloned().expect("the field's note");
+    let p = [num(&note["position"][0]), num(&note["position"][1])];
+    assert!(p[0] > cell[0] && p[0] < cell[2] && p[1] > cell[1] && p[1] < cell[3], "{note} in {cell:?}");
+    // The format no longer draws it: the note does.
+    assert!(!g["title_fields"].as_array().unwrap().iter().any(|f| f["field"] == "Title"), "{}", g["title_fields"]);
 }
 
 #[test]
