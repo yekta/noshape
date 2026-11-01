@@ -1079,6 +1079,19 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Where the declines stand, and the next step (11-01 19:10 UTC)
+- By OCCT time the rest is mostly bad inputs (self-intersecting Shell tools: e40bb5a1, 419e648e's family; Shell slabs
+  of 0.7 mm tolerance: b2511301 / addb9a14; radius-1e-10 arcs: "a tiny arc"; zero-width cylinder strips: "a cylinder
+  face without curved edges"), OCCT's choices we can't read off yet (same-domain faces of shared or coincident
+  arguments: b7eb72a8, "arguments share vertices"; the seam order unify wants: "seams apart"), and the apex chain
+  (b0c36850 / 9f262529 / d5cd8b8d: same-domain faces sharing their splits).
+- By count the biggest open group is sheets: "sheets that meet" (77 cases), "coplanar sheets" (38), "a sheet of shells"
+  (19): mostly model-core's face-overlap tests, a common of two single planar faces on one plane (OCCT's result: the
+  overlap as faces, or nothing; ~10 ms each). Next: coplanar planar sheets in a common: each face split by the other's
+  edges in their plane (edge_in_face), a piece kept where it lies inside the other face (2D, as coincident pieces
+  are), the kept one the object's as OCCT's same-domain choice, the history as for solids' coincident pieces; then
+  the fuse / cut of such sheets, then shells of faces.
+
 ## "A non-manifold result": the 30 left, surveyed (11-01 18:50 UTC)
 - Debug summary per case (which edges end up used once or twice one way): most leave one piece's whole boundary
   open, i.e. one piece classified or split differently from its neighbours, each for its own reason; the rule "a ray
