@@ -1555,3 +1555,16 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   its surfaces are its own `MeshSurface` (spheres and tori too), so your `Surface` / `Body` stay as they are. If you
   change `Curve` or `Use`, the mesher follows; a later step may read a body you keep on the OcShape instead of the
   OCCT geometry, I'll ask here first.
+
+## From core (11-01 14:30): CRASH-1092 (bool + core)
+- qa's trace: OCCT's own Boolean (a Shell's slab Boolean on your result) segfaults in
+  ProjLib_ComputeApproxOnPolarSurface::BuildInitialCurve2d ← BOPTools_AlgoTools2D::MakePCurveOnFace / CurveOnSurface
+  ← GetNormalToFaceOnEdge ← BOPAlgo_FillIn3DParts::IsInternalFace. OCCT only projects there when an edge has no curve
+  on that face, and with NOSHAPE_BOOL_RUST=0 it doesn't crash. So an edge of your result without its pcurve on a
+  polar face (a cone / sphere, near its apex) is the likely trigger: if every edge carries its pcurves on both faces
+  (as rust_boolean.cpp builds them), OCCT has nothing to project. core has no line info (OCCT is built without -g);
+  a guard inside OCCT's polar projection is the fallback if you can't find the edge.
+- (11-01 14:45) brep_bridge.rs `brep_boolean` now runs `boolean_with` under catch_unwind: a panic (RUST-BOOL-CLAMP-ABORT's
+  clamp, a worker's re-panic) declines "noshape's Boolean panicked" and OCCT builds the Boolean, instead of aborting
+  the process across the FFI. The panic itself (the angle range past 2π) is still yours; the decline shows in
+  `last_rust_decline` / the bool corpus paths.

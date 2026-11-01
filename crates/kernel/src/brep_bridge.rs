@@ -352,7 +352,10 @@ pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: b
     };
     let bodies: Vec<Body> = args.iter().map(body_of).collect();
     let refs: Vec<&Body> = bodies.iter().collect();
-    let r = match noshape_brep::boolean_with(op, &refs, tol, touching_only, Some(&Occt)) {
+    // (A panic here crossed into the C++ call and aborted the process, qa RUST-BOOL-CLAMP-ABORT / CRASH-1036: a
+    // decline instead, so OCCT's Boolean builds it.)
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| noshape_brep::boolean_with(op, &refs, tol, touching_only, Some(&Occt)))).unwrap_or(Err(Decline("noshape's Boolean panicked")));
+    let r = match r {
         Ok(r) => r,
         Err(d) => {
             brep_decline(d.0);
