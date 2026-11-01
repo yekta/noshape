@@ -8,8 +8,9 @@
 //! keeps the edges only. Children don't inherit it, except details (live
 //! request 1649). Sections render their cut bodies (the cut face shaded,
 //! the hatch drawn on top), details their parent's picture within the
-//! circle or profile, cropped views inside their crop. Views with breaks
-//! stay unshaded for now.
+//! circle or profile, cropped views inside their crop. A view with breaks
+//! shows its picture in pieces between the break bands, each placed as the
+//! edges are.
 
 use crate::drawing_view::*;
 use gpui_kit::*;
@@ -29,11 +30,17 @@ const PX_PER_MM: f64 = 8.0;
 /// sheet, PNG (with alpha).
 pub type ShadedExport = (ViewId, [f64; 2], [f64; 2], Arc<Vec<u8>>);
 
-/// One view's picture: what it was made for, its texture and PNG.
+/// A piece of a view's picture: its view box, texture and PNG.
+pub type ShadedPiece = ([f64; 2], [f64; 2], ImageHandle, Arc<Vec<u8>>);
+
+/// A decoded piece: its view box, image and PNG.
+type DecodedPiece = ([f64; 2], [f64; 2], ImageData, Vec<u8>);
+
+/// One view's picture: what it was made for, and its pieces between the
+/// view's breaks (one without breaks).
 pub struct ShadedImage {
     key: u64,
-    pub handle: ImageHandle,
-    pub png: Arc<Vec<u8>>,
+    pub pieces: Vec<ShadedPiece>,
 }
 
 #[derive(Default)]
@@ -54,7 +61,7 @@ impl DrawingEditor {
         let wanted: Vec<ViewId> = sheet
             .views
             .iter()
-            .filter(|v| v.style == RenderStyle::Shaded && v.breaks.is_empty())
+            .filter(|v| v.style == RenderStyle::Shaded)
             .filter(|v| matches!(v.kind, ViewKind::Base { .. } | ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } | ViewKind::Section { .. } | ViewKind::AlignedSection { .. } | ViewKind::Detail { .. }))
             .map(|v| v.id)
             .collect();
@@ -70,9 +77,13 @@ impl DrawingEditor {
             if !(hi[0] > lo[0] && hi[1] > lo[1]) {
                 continue;
             }
+            // The picture's pieces: the boxes between the break bands.
+            let bands = |ax: u8| pl.breaks().iter().filter(|b| b.axis == ax).map(|b| (b.a, b.b)).collect::<Vec<_>>();
+            let (xs, ys) = (kept(lo[0], hi[0], bands(0)), kept(lo[1], hi[1], bands(1)));
+            let cells: Vec<([f64; 2], [f64; 2])> = xs.iter().flat_map(|x| ys.iter().map(move |y| ([x.0, y.0], [x.1, y.1]))).collect();
             let mut h = std::collections::hash_map::DefaultHasher::new();
             src.hash.hash(&mut h);
-            format!("{:?}{:?}{lo:?}{hi:?}{part:?}{}{flat}", frame.dir, frame.up, pl.scale).hash(&mut h);
+            format!("{:?}{:?}{lo:?}{hi:?}{part:?}{}{flat}{cells:?}", frame.dir, frame.up, pl.scale).hash(&mut h);
             // Cuts and detail circles.
             views::view_key(&d, sheet, id, &self.sources, false).hash(&mut h);
             let k = h.finish();
@@ -80,8 +91,12 @@ impl DrawingEditor {
                 continue;
             }
             self.shaded.busy.insert(id);
+            // The cap on the size shown (a broken view's whole picture is
+            // longer), at most 4096 px a side.
             let (w_mm, h_mm) = ((hi[0] - lo[0]) * pl.scale * 1000.0, (hi[1] - lo[1]) * pl.scale * 1000.0);
-            let f = (MAX_PX / (w_mm.max(h_mm) * PX_PER_MM)).min(1.0) * PX_PER_MM;
+            let shown = |v: &[(f64, f64)]| v.iter().map(|(a, b)| b - a).sum::<f64>() * pl.scale * 1000.0;
+            let f = (MAX_PX / (shown(&xs).max(shown(&ys)) * PX_PER_MM)).min(1.0) * PX_PER_MM;
+            let f = f.min(4096.0 / w_mm.max(h_mm));
             let (wp, hp) = (((w_mm * f).round() as u32).max(8), ((h_mm * f).round() as u32).max(8));
             // A detail keeps the part of the picture inside its circle or
             // profile, a cropped view inside its crop.
@@ -109,9 +124,9 @@ impl DrawingEditor {
                 let png = job.render().await;
                 let _ = this.update(cx, |this: &mut Self, cx| {
                     this.shaded.busy.remove(&id);
-                    if let Some((img, png)) = png.as_deref().and_then(|p| decode(p, &keep)) {
-                        let handle = this.gpu.uploader().upload_image(&img);
-                        this.shaded.images.insert(id, ShadedImage { key: k, handle, png: Arc::new(png) });
+                    if let Some(pieces) = png.as_deref().and_then(|p| decode(p, &keep, lo, hi, &cells)) {
+                        let pieces = pieces.into_iter().map(|(a, b, img, png)| (a, b, this.gpu.uploader().upload_image(&img), Arc::new(png))).collect();
+                        this.shaded.images.insert(id, ShadedImage { key: k, pieces });
                         this.geometry_dirty = true;
                         cx.notify();
                     }
@@ -129,15 +144,16 @@ impl DrawingEditor {
         self.shaded
             .images
             .iter()
-            .filter_map(|(id, img)| {
-                let (o, x, y) = self.shaded_frame(*id)?;
+            .flat_map(|(id, img)| img.pieces.iter().map(move |p| (*id, p)))
+            .filter_map(|(id, (lo, hi, handle, _))| {
+                let (o, x, y) = self.shaded_frame(id, *lo, *hi)?;
                 let m = glam::Mat4::from_cols(
                     glam::Vec4::new(x[0] as f32, x[1] as f32, 0.0, 0.0),
                     glam::Vec4::new(y[0] as f32, y[1] as f32, 0.0, 0.0),
                     glam::Vec4::Z,
                     glam::Vec4::new(o[0] as f32, o[1] as f32, -0.5, 1.0),
                 );
-                Some(Instance::new(Drawable::Image(img.handle.clone())).with_transform(m).layer(-2))
+                Some(Instance::new(Drawable::Image(handle.clone())).with_transform(m).layer(-2))
             })
             .collect()
     }
@@ -164,18 +180,18 @@ impl DrawingEditor {
         self.shaded
             .images
             .iter()
-            .filter_map(|(id, img)| {
-                let (o, x, y) = self.shaded_frame(*id)?;
-                Some((*id, o, [x[0] + y[0], x[1] + y[1]], img.png.clone()))
+            .flat_map(|(id, img)| img.pieces.iter().map(move |p| (*id, p)))
+            .filter_map(|(id, (lo, hi, _, png))| {
+                let (o, x, y) = self.shaded_frame(id, *lo, *hi)?;
+                Some((id, o, [x[0] + y[0], x[1] + y[1]], png.clone()))
             })
             .collect()
     }
 
-    /// Sheet corner and edge vectors of view `id`'s picture (its geometry box).
-    fn shaded_frame(&self, id: ViewId) -> Option<([f64; 2], [f64; 2], [f64; 2])> {
-        let g = self.geoms.get(&id)?;
+    /// Sheet corner and edge vectors of a piece `lo`..`hi` (view
+    /// coordinates, between breaks) of view `id`'s picture.
+    fn shaded_frame(&self, id: ViewId, lo: [f64; 2], hi: [f64; 2]) -> Option<([f64; 2], [f64; 2], [f64; 2])> {
         let pl = self.placement(id)?;
-        let (lo, hi) = (g.min, g.max);
         let o = pl.to_sheet(lo);
         let a = pl.to_sheet([hi[0], lo[1]]);
         let b = pl.to_sheet([lo[0], hi[1]]);
@@ -290,10 +306,29 @@ impl Job {
     }
 }
 
-/// PNG → RGBA image for the scene, and the PNG again with the white
-/// background transparent (live: the picture covers only the part), and
-/// the pixels `keep` rejects (at their (0..1, 0..1 from the top) position).
-fn decode(png: &[u8], keep: &dyn Fn(f64, f64) -> bool) -> Option<(ImageData, Vec<u8>)> {
+/// The stretches of `lo..hi` outside the break `bands` (one axis).
+fn kept(lo: f64, hi: f64, mut bands: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
+    bands.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut out = Vec::new();
+    let mut at = lo;
+    for (a, b) in bands {
+        if a.min(hi) > at {
+            out.push((at, a.min(hi)));
+        }
+        at = at.max(b);
+    }
+    if hi > at {
+        out.push((at, hi));
+    }
+    out
+}
+
+/// PNG of the view box `lo`..`hi` → its pieces `cells` (view boxes; the
+/// whole box without breaks): view box (on whole pixels), RGBA image for
+/// the scene and PNG, the white background transparent (live: the picture
+/// covers only the part), as are the pixels `keep` rejects (at their (0..1,
+/// 0..1 from the top) position in the whole picture).
+fn decode(png: &[u8], keep: &dyn Fn(f64, f64) -> bool, lo: [f64; 2], hi: [f64; 2], cells: &[([f64; 2], [f64; 2])]) -> Option<Vec<DecodedPiece>> {
     let mut rgba = image::load_from_memory_with_format(png, image::ImageFormat::Png).ok()?.to_rgba8();
     let (w, h) = rgba.dimensions();
     for (x, y, px) in rgba.enumerate_pixels_mut() {
@@ -301,16 +336,22 @@ fn decode(png: &[u8], keep: &dyn Fn(f64, f64) -> bool) -> Option<(ImageData, Vec
             px.0 = [0; 4];
         }
     }
-    let mut out = std::io::Cursor::new(Vec::new());
-    rgba.write_to(&mut out, image::ImageFormat::Png).ok()?;
-    let (width, height) = rgba.dimensions();
-    Some((
-        ImageData {
-            corners: [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]],
-            width,
-            height,
-            rgba: rgba.into_raw(),
-        },
-        out.into_inner(),
-    ))
+    let (sx, sy) = ((hi[0] - lo[0]) / w as f64, (hi[1] - lo[1]) / h as f64);
+    let mut out = Vec::new();
+    for (a, b) in cells {
+        // Pixel columns and rows (rows from the top).
+        let col = |x: f64| (((x - lo[0]) / sx).round().max(0.0) as u32).min(w);
+        let row = |y: f64| (((hi[1] - y) / sy).round().max(0.0) as u32).min(h);
+        let (x0, x1, y0, y1) = (col(a[0]), col(b[0]), row(b[1]), row(a[1]));
+        if x1 <= x0 || y1 <= y0 {
+            continue;
+        }
+        let piece = image::imageops::crop_imm(&rgba, x0, y0, x1 - x0, y1 - y0).to_image();
+        let mut png = std::io::Cursor::new(Vec::new());
+        piece.write_to(&mut png, image::ImageFormat::Png).ok()?;
+        let (width, height) = piece.dimensions();
+        let img = ImageData { corners: [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]], width, height, rgba: piece.into_raw() };
+        out.push(([lo[0] + x0 as f64 * sx, hi[1] - y1 as f64 * sy], [lo[0] + x1 as f64 * sx, hi[1] - y0 as f64 * sy], img, png.into_inner()));
+    }
+    Some(out)
 }
