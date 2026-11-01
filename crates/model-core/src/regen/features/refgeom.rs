@@ -185,7 +185,23 @@ fn origin_csys(ev: &EvalCtx, r: &Reference, inference: &str, secondary: &[Refere
                 let t = e.tangent_at(if at_start { info.first_param } else { info.last_param })?;
                 return Ok(Csys::new(p, t.normalize_or(DVec3::Z), None));
             }
-            edge_csys(&e, inference)
+            let c = edge_csys(&e, inference)?;
+            // Live 1708: a circular edge's CENTER connector points out of the
+            // material through the planar face the edge bounds (top rims +z,
+            // bottom rims −z, pins and holes alike), its X the sketch's x
+            // direction whichever way the circle was drawn (here: world X on
+            // the circle's plane, world Y for planes facing X, as the default
+            // planes' sketch axes).
+            if inference == "CENTER" && matches!(e.edge_info()?.curve, k::Curve::Circle { .. }) {
+                let shape = &ev.ctx.bodies[bi].shape;
+                let faces = shape.edge_faces()?.get(ei).cloned().unwrap_or_default();
+                if let Some(n) = faces.iter().find_map(|&fi| shape.sub_shape(k::ShapeType::Face, fi as usize).ok()?.face_plane().ok()?.map(|p| p.unit_normal())) {
+                    let x = DVec3::X - n * n.x;
+                    let x = if x.length() > 1e-6 { x } else { DVec3::Y - n * n.y };
+                    return Ok(Csys::new(c.origin, n, Some(x.normalize())));
+                }
+            }
+            Ok(c)
         }
         Reference::Face(_) => {
             let &(bi, fi) = ev.resolve_faces(one).first().ok_or_else(|| not_found("face"))?;

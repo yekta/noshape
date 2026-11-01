@@ -189,6 +189,46 @@ fn mate_connector_on_edge_origin_and_flips() {
     assert!(c1.x.dot(c1.z).abs() < 1e-12);
 }
 
+/// Live 1708: a mate connector at the CENTER of a circular edge points out of
+/// the material through the planar face the edge bounds (+z on top rims, −z
+/// on bottom rims, a pin's and a hole's alike), its X along the sketch's x.
+#[test]
+fn mate_connectors_on_circular_edges_face_out_of_the_material() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    rect(&mut sk, 0.0, 0.0, 0.04, 0.02);
+    sk.add_circle(DVec2::new(0.02, 0.01), 0.004);
+    let id = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    s.extrude_largest(id, "10 mm");
+    let mut pin = noshape_sketch::Sketch::new();
+    pin.add_circle(DVec2::new(0.07, 0.01), 0.005);
+    let id = s.sketch(Reference::Plane(DatumPlane::Top), pin);
+    s.extrude_largest(id, "10 mm");
+    let r = s.ok();
+    let cases = [(DVec3::new(0.07, 0.01, 0.0), -1.0), (DVec3::new(0.07, 0.01, 0.01), 1.0), (DVec3::new(0.02, 0.01, 0.0), -1.0), (DVec3::new(0.02, 0.01, 0.01), 1.0)];
+    for (centre, _) in cases {
+        let (bi, ei) = r
+            .context
+            .bodies
+            .iter()
+            .enumerate()
+            .find_map(|(bi, b)| {
+                b.shape.edges().iter().position(|e| matches!(e.edge_info().map(|i| i.curve), Ok(noshape_kernel::Curve::Circle { center, .. }) if vnear(center, centre))).map(|ei| (bi, ei))
+            })
+            .unwrap_or_else(|| panic!("no circle at {centre:?}"));
+        let edge = Reference::Edge((*r.context.bodies[bi].edges[ei]).clone());
+        s.add("mateConnector", move |p| {
+            p.set("originQuery", ParamValue::Query(vec![edge]));
+            p.set("entityInferenceType", ParamValue::Enum("CENTER".into()));
+        });
+    }
+    let r = s.ok();
+    for (k, (centre, zsign)) in cases.iter().enumerate() {
+        let c = &r.context.connectors[k];
+        assert!(vnear(c.origin, *centre) && vnear(c.z, DVec3::Z * *zsign) && vnear(c.x, DVec3::X), "{k}: {:?} z {:?} x {:?}", c.origin, c.z, c.x);
+    }
+}
+
 /// Live ("ui (10-25 d)", ui-mass/04): a mate connector on a block's corner
 /// vertex is world-aligned (Z up, X along world X), whichever faces meet
 /// there.
