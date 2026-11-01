@@ -1548,7 +1548,10 @@ impl AssemblyView {
                     self.edit(&format!("Insert : Fastened ({name})"), cx, |a| {
                         let id = MateId(a.next_id());
                         let n = a.next_feature_name("Fastened");
-                        a.mates.push(Mate::new(id, n, MateType::Fastened, src, dst));
+                        // Live 1704: the frames coincide (Z axes equal).
+                        let mut m = Mate::new(id, n, MateType::Fastened, src, dst);
+                        m.flip_primary = true;
+                        a.mates.push(m);
                     });
                 }
                 // The drop joins the insert's undo step (live: one step).

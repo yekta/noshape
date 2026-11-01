@@ -4053,7 +4053,11 @@ impl AssemblyView {
         };
         let units = self.units(cx);
         let (Some(fs), Some(fd), Some(pose)) = (self.result.connector_world(&src, &units), self.result.connector_world(&dst, &units), self.result.solved.placement(id)) else { return false };
-        let np = noshape_model::assembly::eval::snap_placement(&pose, &fs, &fd);
+        // Live 1704: the inserted instance's connector frame coincides with
+        // the target's (Z axes equal, as its Fastened mate), unlike a snap
+        // drag's face to face.
+        use noshape_model::assembly::eval::{frame_to_placement, placement_to_frame};
+        let np = frame_to_placement(&fd.mul(&fs.inverse()).mul(&placement_to_frame(&pose)));
         let mut solved = self.result.solved.clone();
         for (i, pl) in &mut solved.placements {
             if *i == id {
