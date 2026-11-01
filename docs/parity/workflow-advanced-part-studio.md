@@ -28,7 +28,7 @@ Status: ✅ matches live/exact, ✗ differs (finding #), ? live data pending.
 | 2.2 | Sweep dialog | Faces and sketch regions to sweep, Sweep path, ☐ Extend to full path, Profile control None, ☐ Twist, ☐ Scale | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2.3 | Path field: click the Sketch 2 row | ? | notice "Select edges, sketch curves or curves."; viewport picks work (two chips "Sketch 2 line", "Sketch 2 arc") | ✅ live fills a curve field from a sketch row as "Edges of <sketch>" (behaviours ~983, Rib); ours the same since qa5's fix (pass 22 below) | 64997436 10-28 (GUI: the Sketch 3 row fills 'Edges of Sketch 3') |
 | 2.4 | Arc R3 | **981.4696759** | **981.47** | ✅ | main CLI 12:08 (bin/advmatrix.py): 981.469676, 4 faces |
-| 2.5 | Arc R2 | ERROR "Sweep R2 did not regenerate properly: Could not create valid swept body, check input." | row tooltip "Could not create valid swept body, check input." (**no "Sweep 1 did not regenerate properly:" prefix**) | ✅ ADV3 fixed: tooltips carry "<feature> did not regenerate properly:" (see the re-run tables; v0.4.14 10-29 "Fillet 1 did not regenerate properly: Failed to fillet selections.") |  |
+| 2.5 | Arc R2 | ERROR "Sweep R2 did not regenerate properly: Could not create valid swept body, check input." | row tooltip "Could not create valid swept body, check input." (**no "Sweep 1 did not regenerate properly:" prefix**) | ✅ ADV3 fixed: tooltips carry "<feature> did not regenerate properly:" (see the re-run tables; v0.4.14 10-29 "Fillet 1 did not regenerate properly: Failed to fillet selections.") | skasm 11-01 GUI :103 (a5ab5f91 build): Fillet 1 R30 on the block's vertical edges, row tooltip "Fillet 1 did not regenerate properly: End boundary intersects unfilleted edge." (a3c.png) |
 | 2.6 | Arc R6 | **1114.7093353** | **1114.709** | ✅ | main CLI 12:08 (bin/advmatrix.py): 1114.709335 |
 
 ## 3. Fillet, draft, holes, mirror (Part Studio 3)
@@ -41,7 +41,7 @@ Status: ✅ matches live/exact, ✗ differs (finding #), ? live data pending.
 | 3.4 | Shift+S twice in the Part Studio (sketch, then Point) | Shift+S = Create new sketch in the Part Studio, Point in a sketch (behaviours "Every tool has…", "Point (Shift+S in sketch)") | worked as Sketch then Point | ✅ | skasm 10-31 (live shortcut table) |
 | 3.5 | Hole dialog | Inch/Metric, Simple/Counterbore/Countersink, Sketch points, Merge scope, Hole type Drilled, Drill size 1/4 (0.25), Ø, Start plane, Termination Blind, depth, 118 deg | same (Simple matches hole-01 screenshot) | ✅ | f9185639 10-28 (dialog fields) |
 | 3.6 | Counterbore defaults | Ø10 × 5 mm, 12 mm deep (psb f) | same; 6877.312 mm³ = exact | ✅ | 41f60e47 10-28 (Ø10 × 5, 12 deep) |
-| 3.7 | Counterbore / countersink rows | (live look pending) | text labels **truncate the values** ("Counterbore diamet… 1(", "Countersink angle 82 de") and with Tapped the **"Countersink diameter" label overlaps "12.878 mm"** | ✅ ADV4 fixed (64997436 10-28 rows fit, see below) |  |
+| 3.7 | Counterbore / countersink rows | (live look pending) | text labels **truncate the values** ("Counterbore diamet… 1(", "Countersink angle 82 de") and with Tapped the **"Countersink diameter" label overlaps "12.878 mm"** | ✅ ADV4 fixed (64997436 10-28 rows fit, see below) | 64997436 10-28 / skasm 10-31 GUI (Status) |
 | 3.8 | Hole type list | Drilled, Clearance, Tapped | same; Tapped adds Tap type, Size, Threads/inch, Fastener fit, ☐ Thread class, Tapped depth | ✅ (live behaviours ~8515: Tapped → Tap type Straight tap, Size, Threads/inch, Fastener fit None, ☐ Thread class) | 64997436 10-28 (GUI: Drilled / Clearance / Tapped; Tapped shows Tap type, Size 1/4, Threads/inch 20 tpi (UNC), Fastener fit None, ☐ Thread class, tap drill 5.105 mm, tapped depth) |
 | 3.9 | Mirror › Part mirror about Right | Part 2 | Part 2 | ✅ | 64997436 10-28 (GUI: Part 1 + Right row → Part 2) |
 | 3.10 | Mirror › Feature mirror of the hole about Plane 1 (Right + 20) | dialog: Features to mirror, Mirror plane, ☐ Reapply features | same; **Plane 1 row doesn't fill Mirror plane** (ADV1); viewport pick works; 6326.267 mm³ = exact | ✅ mirror plane row fills (64997436) | 64997436 10-28 (GUI: the Plane 1 row fills Mirror plane: ADV1 fixed for mirror; tickets/adv1-mirror-plane-row-6499.png) |
@@ -81,10 +81,10 @@ rebuilt exactly to live's spec in /tmp/qa5/home/Documents/noshape/qa5-livecheck.
 
 | # | Row | Live | Ours (pass 3) | Status | Verified |
 |---|---|---|---|---|---|
-| 1.3 | Plane 1 into Sketch plane | row or viewport fills "Plane 1" | **viewport pick now fills it**; the feature-list **row still does nothing** | ✗ ADV1 (partly fixed) → now ADV1 ✅ skasm 10-31 GUI (Sketch › the Plane 1 row → "Plane 1") |  |
+| 1.3 | Plane 1 into Sketch plane | row or viewport fills "Plane 1" | **viewport pick now fills it**; the feature-list **row still does nothing** | ✗ ADV1 (partly fixed) → now ADV1 ✅ skasm 10-31 GUI (Sketch › the Plane 1 row → "Plane 1") | skasm 10-31 GUI (Status) |
 | 1.8 | Loft volume | 5927.728022 | 5927.755 | ✅ ADV2 withdrawn (live evVolume HIGH 5927.754323) | skasm 10-31 |
-| 2.5 | Sweep error tooltip | "Sweep 1 did not regenerate properly: …" | still "Could not create valid swept body, check input."; Helix error tooltip also bare ("Select a cone or cylinder.") | ✗ ADV3 → now ADV3 ✅ skasm 10-31 GUI (row tooltips "Sweep 1 did not regenerate properly: Could not create valid swept body, check input.", "Helix 1 did not regenerate properly: Select a cone or cylinder.") |  |
-| 3.7 | Hole countersink rows | – | "Countersink diameter" label still overlaps "12.878 mm", "82 de" cut | ✗ ADV4 → now ADV4 ✅ skasm 10-31 GUI (Inch › Countersink › Tapped: icon rows 13.487 mm / 82 deg / 12 mm, no overlap) |  |
+| 2.5 | Sweep error tooltip | "Sweep 1 did not regenerate properly: …" | still "Could not create valid swept body, check input."; Helix error tooltip also bare ("Select a cone or cylinder.") | ✗ ADV3 → now ADV3 ✅ skasm 10-31 GUI (row tooltips "Sweep 1 did not regenerate properly: Could not create valid swept body, check input.", "Helix 1 did not regenerate properly: Select a cone or cylinder.") | skasm 11-01 GUI :103 (a5ab5f91 build): Fillet 1 R30 on the block's vertical edges, row tooltip "Fillet 1 did not regenerate properly: End boundary intersects unfilleted edge." (a3c.png) |
+| 3.7 | Hole countersink rows | – | "Countersink diameter" label still overlaps "12.878 mm", "82 de" cut | ✗ ADV4 → now ADV4 ✅ skasm 10-31 GUI (Inch › Countersink › Tapped: icon rows 13.487 mm / 82 deg / 12 mm, no overlap) | 64997436 10-28 / skasm 10-31 GUI (Status) |
 | 4.1 | Helix handedness label | live DOM (qa5-adv-helix): the Clockwise select has **no label** | no label | ✅ **ADV5 withdrawn** | f8014efa 10-28 (GUI: new Helix: "Clockwise" select spans the row with no label) |
 | 4.5 | External thread edge pick | picks the edge | **hovers + picks "Edge of Sweep 1"** | ✅ ADV6 fixed | 349290dc 10-29 (qa: cyl6.noshape Ø6 × 20; External thread › hovering the top end edge highlights it, the click takes "Edge of Extrude 1", title black; tickets/adv6-adv-rib-3492.png) |
 | 4.5b | Thread dialog "Threads/inch" value | "20 tpi" (dom qa5-adv-thread) | "20 tpi (UNC)" | ✅ (ADV8 fixed) | 64997436 10-28 (GUI: '20 tpi'; ADV8 fixed) |
@@ -97,8 +97,8 @@ rebuilt exactly to live's spec in /tmp/qa5/home/Documents/noshape/qa5-livecheck.
 | 3.6c | Hole dialog title | the live callout ("Ø 6.35 mm ↧ 12 mm \| ⌴Ø 10 mm ↧ 5 mm") | callout title + the feature row also named by callout ("1/4-20 ↧ 12 mm \| ⌵Ø 12…") | ✅ live names the row by the whole callout, cut with "…" (behaviours "skasm (2026-10-31) hole row name…" (a)) | skasm 10-31 |
 | 6 | Boolean intersect two blocks | Part 1, 4000.0000 | Part 1, 4000.0 | ✅ | b504234e 10-28 (GUI: Intersect tab, 40×20×10 ∩ offset 40×20×10 → Parts (1) Part 1, Mass props 4000 mm³) |
 | 3.10b | Feature mirror of a 10×10×5 boss about Right+20 | no New/Add tabs; 9000.0000, 16 planar faces | 9000.0, 16 faces (CLI) | ✅ FEATURE-MIRROR-COPY-FULL-DEPTH fixed in v0.4.15 (qa verified 031394bc: 9000 mm³) | b504234e 10-28: ✗ GUI Feature mirror (Reapply off) 9500 / 15 faces, copy spans the part's full y |
-| – | Switch to another Part Studio tab | parts list shows the tab's parts | **"Parts (0)", Curves group missing, right strip one icon short** until a body is clicked (Part Studio 2/4 here, holeblock in qa5 import; also on the 14:48 build) | ✗ **TAB1** → now TAB1 ✅ skasm 10-31 GUI (Part Studio 2 opens with Parts (1) Part 1, full right strip) |  |
-| – | Sketch dimension edit to an unsolvable value, Enter | ? (live request filed) | box stays open, Esc ignored, its ✕ keeps the new value; red toast "The sketch could not be solved with that value" stays after the sketch closes | ? → now SK1 ✅ f8014efa (box closes, red title / row, ⚠ toast as live) |  |
+| – | Switch to another Part Studio tab | parts list shows the tab's parts | **"Parts (0)", Curves group missing, right strip one icon short** until a body is clicked (Part Studio 2/4 here, holeblock in qa5 import; also on the 14:48 build) | ✗ **TAB1** → now TAB1 ✅ skasm 10-31 GUI (Part Studio 2 opens with Parts (1) Part 1, full right strip) | skasm 11-01 GUI :103 (a5ab5f91 build): Part Studio 2 (a cylinder) on first open: Parts (1) Part 1, full right strip (t1s.png) |
+| – | Sketch dimension edit to an unsolvable value, Enter | ? (live request filed) | box stays open, Esc ignored, its ✕ keeps the new value; red toast "The sketch could not be solved with that value" stays after the sketch closes | ? → now SK1 ✅ f8014efa (box closes, red title / row, ⚠ toast as live) | f8014efa (Status) |
 
 ## Update from live's answers ("qa5 advanced, addendum: Hole row name", "qa5 dim conflict", 10-21)
 
@@ -110,28 +110,28 @@ rebuilt exactly to live's spec in /tmp/qa5/home/Documents/noshape/qa5-livecheck.
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| ADV1 Plane 1 row → Sketch plane | nothing | ✗ still → now ADV1 ✅ skasm 10-31 GUI (Sketch › the Plane 1 row → "Plane 1") |  |
+| ADV1 Plane 1 row → Sketch plane | nothing | ✗ still → now ADV1 ✅ skasm 10-31 GUI (Sketch › the Plane 1 row → "Plane 1") | skasm 10-31 GUI (Status) |
 | ADV2 loft | 5927.755 | ✗ still → now ✅ ADV2 withdrawn 10-31 (live evVolume HIGH 5927.754323 = ours) | skasm 11-01 CLI a5ab5f91 (feat/adv2.py): 5927.754578 mm³, 6 faces; live evVolume HIGH 5927.754323 |
-| ADV3 / SK1 dim conflict | box stays open, red "The sketch could not be solved with that value" | ✗ still → now ADV3 ✅ skasm 10-31 GUI (row tooltips "Sweep 1 did not regenerate properly: Could not create valid swept body, check input.", "Helix 1 did not regenerate properly: Select a cone or cylinder."); SK1 ✅ f8014efa (box closes, red title / row, ⚠ toast as live) |  |
+| ADV3 / SK1 dim conflict | box stays open, red "The sketch could not be solved with that value" | ✗ still → now ADV3 ✅ skasm 10-31 GUI (row tooltips "Sweep 1 did not regenerate properly: Could not create valid swept body, check input.", "Helix 1 did not regenerate properly: Select a cone or cylinder."); SK1 ✅ f8014efa (box closes, red title / row, ⚠ toast as live) | skasm 11-01 GUI :103 (a5ab5f91 build): Fillet 1 R30 on the block's vertical edges, row tooltip "Fillet 1 did not regenerate properly: End boundary intersects unfilleted edge." (a3c.png) |
 | ADV4 countersink rows | icon rows, values fit, no overlap | ✅ **fixed** | 64997436 10-28 (GUI: Inch › Countersink › Tapped: icon rows, 13.487 mm / 82 deg / 12 mm / 12 mm / 3 all fit, no overlap; 20 tpi (UNC), ☐ Thread class = live dom qa5-adv-hole-tapped) |
 | ADV7 thread split face | whole cylinder highlights as one face | ✗ still → now ADV7 ✅ skasm 10-31 CLI (Ø6 × 30, thread: 4 faces, area unchanged) | skasm 11-01 CLI a5ab5f91 (feat/adv.py): Ø6 × 30 + External thread on the top edge → 4 faces, 622.0353 mm² (as before the thread) |
-| ADV8 "20 tpi (UNC)" | unchanged | ✗ still → now ADV8 ✅ 64997436 |  |
+| ADV8 "20 tpi (UNC)" | unchanged | ✗ still → now ADV8 ✅ 64997436 | 64997436 (Status) |
 | ADV12 hole row name | both callout lines | ✗ still → now ✅ ADV12 withdrawn (live: the whole callout, = ours) | live 1632 (behaviours "hole row name": the whole callout) |
-| TAB1 tab switch Parts (0) | PS2 still "Parts (0)" on open (holeblock in qa5 import OK) | ✗ still (partly) → now TAB1 ✅ skasm 10-31 GUI (Part Studio 2 opens with Parts (1) Part 1, full right strip) |  |
+| TAB1 tab switch Parts (0) | PS2 still "Parts (0)" on open (holeblock in qa5 import OK) | ✗ still (partly) → now TAB1 ✅ skasm 10-31 GUI (Part Studio 2 opens with Parts (1) Part 1, full right strip) | skasm 11-01 GUI :103 (a5ab5f91 build): Part Studio 2 (a cylinder) on first open: Parts (1) Part 1, full right strip (t1s.png) |
 | SK2 F in a sketch | fits the far rectangle (tight margin) | ✅ **fixed** (no "Sketch N" outline yet) | ff379982 10-28: ✗ regressed: F in the sketch leaves the far rectangle half off-screen → SKETCH-F-FIT |
 
 ## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
 Pass 6 (17:11 build, d5745c9) had already found ADV8 fixed ("20 tpi"); not re-checked here.
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| ADV1 Plane 1 row → Sketch plane | field stays empty | ✗ still → now ADV1 ✅ skasm 10-31 GUI (Sketch › the Plane 1 row → "Plane 1") |  |
+| ADV1 Plane 1 row → Sketch plane | field stays empty | ✗ still → now ADV1 ✅ skasm 10-31 GUI (Sketch › the Plane 1 row → "Plane 1") | skasm 10-31 GUI (Status) |
 | ADV2 loft | 5927.754632 (CLI) | ✗ still (live 5927.728) → now ✅ ADV2 withdrawn 10-31 (live evVolume HIGH 5927.754323 = ours) | skasm 11-01 CLI a5ab5f91 (feat/adv2.py): 5927.754578 mm³, 6 faces; live evVolume HIGH 5927.754323 |
 | ADV3 error tooltip prefix | "Helix 1 did not regenerate properly: Select a cone or cylinder." | ✅ **fixed** | 64997436 10-28 (GUI: empty Hole committed → row tooltip '1/4-20 ↧ 12 mm | ⌵Ø 13.487 mm X 82° [Hole] did not regenerate properly: No hole points selected.') |
 | SK1 dim set to an unsolvable value | Enter closes the box, value R2 kept, geometry red, **yellow "⚠ Sketch could not be solved."** toast, gone when the sketch closes ✅; **dialog title "Sketch 2" and the feature row text stay black** (live red) | ✗ still (mostly fixed) | f8014efa 10-28 (title / row now red: see SK1 row below) → now SK1 ✅ f8014efa (box closes, red title / row, ⚠ toast as live) |
 | SK2 | the "Sketch 2" plane outline now shows while editing | ✅ | ff379982 10-28 (editing Sketch 1 shows its frame labelled "Sketch 1" in the plane, top-left corner) |
 | ADV7 thread splits face | still one cylindrical face, 565.487 mm² (whole 30 mm) (CLI) | ✗ still → now ADV7 ✅ skasm 10-31 CLI (Ø6 × 30, thread: 4 faces, area unchanged) | skasm 11-01 CLI a5ab5f91 (feat/adv.py): Ø6 × 30 + External thread on the top edge → 4 faces, 622.0353 mm² (as before the thread) |
 | ADV12 hole row name | both callout lines; tooltip "Hole 1 <- Sketch 2" | ✗ still → now ✅ ADV12 withdrawn (live: the whole callout, = ours) | live 1632 (the whole callout) |
-| TAB1 tab switch | Part Studio 2 and 3 open with "Parts (0)" and 4 right-strip icons until a body is clicked | ✗ still → now TAB1 ✅ skasm 10-31 GUI (Part Studio 2 opens with Parts (1) Part 1, full right strip) |  |
+| TAB1 tab switch | Part Studio 2 and 3 open with "Parts (0)" and 4 right-strip icons until a body is clicked | ✗ still → now TAB1 ✅ skasm 10-31 GUI (Part Studio 2 opens with Parts (1) Part 1, full right strip) | skasm 11-01 GUI :103 (a5ab5f91 build): Part Studio 2 (a cylinder) on first open: Parts (1) Part 1, full right strip (t1s.png) |
 | RD1 stale Volume readout | **readout gone**: nothing at the bottom right with a part selected (live has none) | ✅ **fixed** | 0.4.10+ / dd1b5037 10-27 (no readout with a part selected) |
 
 ## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
@@ -142,14 +142,14 @@ Pass 6 (17:11 build, d5745c9) had already found ADV8 fixed ("20 tpi"); not re-ch
 | ADV7 thread splits face | hover shows two cylinder faces, split ~10 mm up | ✅ **fixed** | skasm 11-01 CLI a5ab5f91 (feat/adv.py): Ø6 × 30 + External thread on the top edge → 4 faces, 622.0353 mm² (as before the thread) |
 | SK1 unsolvable dimension | dialog title and row now red, ✓ disabled | ✅ **fixed** | f8014efa 10-28 (GUI, qa-scratch/tri.noshape (bin/tri.py): base 10 → 30 → box closes, 30 kept, geometry stays, all red, title / row red, header badge, ⚠ "Sketch could not be solved."; ✓ stays enabled = live (behaviours 14346: after ✓ WARNING)) |
 | ADV12 hole row | tooltip "1/4-20 ↧ 12 mm \| ⌵Ø 12.878 mm X 82° [Hole]" ✅; row still shows both callout lines | ✗ still (partly) → now ✅ ADV12 withdrawn (live: the whole callout, = ours) | live 1632 (the whole callout) |
-| TAB1 | Part Studio 2 still opens with "Parts (0)" (Part Studio 3 listed its parts) | ✗ still → now TAB1 ✅ skasm 10-31 GUI (Part Studio 2 opens with Parts (1) Part 1, full right strip) |  |
+| TAB1 | Part Studio 2 still opens with "Parts (0)" (Part Studio 3 listed its parts) | ✗ still → now TAB1 ✅ skasm 10-31 GUI (Part Studio 2 opens with Parts (1) Part 1, full right strip) | skasm 11-01 GUI :103 (a5ab5f91 build): Part Studio 2 (a cylinder) on first open: Parts (1) Part 1, full right strip (t1s.png) |
 
 ## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | ADV2 loft (CLI) | 5927.754632 | ✗ still (live 5927.728022) → now ✅ ADV2 withdrawn 10-31 (live evVolume HIGH 5927.754323 = ours) | skasm 11-01 CLI a5ab5f91 (feat/adv2.py): 5927.754578 mm³, 6 faces; live evVolume HIGH 5927.754323 |
 | ADV12 hole row name | "1/4-20 ↧ 12 mm \| ⌵Ø 12…" (both parts, ellipsis); tooltip "… [Hole] <- Sketch 2" | ✅ — **withdrawn**: live psb 10-21 p (behaviours ~7448) shows both callout parts; "first only" was a Simple hole (a04, a05) | f8014efa 10-28 (GUI, counterbore on cbd.noshape, default panel: row "Ø 6.35 mm ↧ 12 mm | ⌴…", tooltip "Ø 6.35 mm ↧ 12 mm | ⌴Ø 10 mm ↧ 5 mm [Hole] <- Sketch 2") |
-| TAB1 Part Studio 2 on first open | Parts (1), 5 strip buttons | ✅ **fixed** (a01) |  |
+| TAB1 Part Studio 2 on first open | Parts (1), 5 strip buttons | ✅ **fixed** (a01) | skasm 11-01 GUI :103 (a5ab5f91 build): Part Studio 2 (a cylinder) on first open: Parts (1) Part 1, full right strip (t1s.png) |
 
 ## Re-run pass 15 (2026-10-22, CLI /tmp/qa5/noshape-cli-0521 = target-engine 05:21; main still aa75fdf)
 CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 8383.1217/20, hem 9254.2367/30, SM3 "Closed corners are not supported yet"; ADV2 5927.754632; EXP1 openNURBS. ✗ still.
@@ -163,7 +163,7 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 | ADV2 loft | 5927.754632 | ✅ withdrawn: live evVolume HIGH 5927.754323 (5927.728 was /massproperties) | skasm 10-31 |
 | ADV4 Hole countersink rows | icon rows, values readable ("12.878 mm", "82 deg") (a12) | ✅ **fixed** | 64997436 10-28 (GUI: Inch › Countersink › Tapped: icon rows, 13.487 mm / 82 deg / 12 mm / 12 mm / 3 all fit, no overlap; 20 tpi (UNC), ☐ Thread class = live dom qa5-adv-hole-tapped) |
 | Hole Tapped defaults | Straight tap, 1/4, **20 tpi (UNC)**, Fastener fit None, ☐ Thread class (live ~8515 ☐) (a15); an old doc's stored Threads/inch shows blank (legacy value) | ✅ | f8014efa 10-28 (GUI, new Hole on cbd.noshape › Hole type Tapped: Straight tap, 1/4, 20 tpi (UNC), Fastener fit None, ☐ Thread class, title "1/4-20 ↧ 12 mm") |
-| ADV1, ADV3, ADV6, ADV7, ADV8, TAB1 | fixed in earlier passes; ADV5, ADV12 withdrawn | ✅ |  |
+| ADV1, ADV3, ADV6, ADV7, ADV8, TAB1 | fixed in earlier passes; ADV5, ADV12 withdrawn | ✅ | rows above |
 
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app /root/target-lead/debug/noshape)
 | PS2 / TAB1 | imported tab shows its parts as soon as it opens | ✅ fixed |

@@ -102,7 +102,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 4.30 | Point: click to place | H:point | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 4.31 | Text: drag a box, lower-left corner and height set the first line; horizontal constraint on the bottom edge | H:text | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 4.32 | Text: font, bold, italic, flip; edit later; drag by its box | H:text | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 4.33 | Text: Convert to expression | H:text | ✅ (GUI :103 Convert to expression evaluates `"A" ~ (2 + 3)` to A5; text-expression.png) |  |
+| 4.33 | Text: Convert to expression | H:text | ✅ (GUI :103 Convert to expression evaluates `"A" ~ (2 + 3)` to A5; text-expression.png) | skasm 11-01 GUI :103: Text tool, edit box › Convert to expression, `"A" ~ (2 + 3)` ✓ → the sketch shows "A5" (ui/tx10c.png) |
 | 4.34 | Slot: select centerline curves (before or after the tool); one shared width dimension | H:slot | ✅ (T:ux) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.35 | Slot: a connected chain gives one slot following the chain | H:slot | ✅ (T:ux; GUI :103 selected L-shaped line chain makes one continuous slot with shared width input; chained-slot.png) | 0.4.10+ / 965d3f56 10-27 (L chain selected → one slot) |
 | 4.36 | Construction toggle: q with a selection toggles it, without one draws construction geometry | H:construction | ✅ | 0.4.10+ / 2d9a275c 10-27 |
@@ -270,7 +270,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 12.6 | Spline in progress: Confirm spline; Bezier: Escape bezier | H:spline, H:bezier | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
 | 12.7 | Dimension: Change to driving / driven dimension, Delete | H:dimension | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 12.8 | Constraint glyph: Delete | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 12.9 | Add comment, Configure dimension | H:dimension | ✅ Configure dimension. Add comment belongs to Onshape comments, a cloud-only feature excluded by TEAM-RULES |  |
+| 12.9 | Add comment, Configure dimension | H:dimension | ✅ Configure dimension. Add comment belongs to Onshape comments, a cloud-only feature excluded by TEAM-RULES | skasm 11-01 GUI :103: with a list input Size, a dimension's menu starts Configure dimension, Change to driven dimension (= live; was second, "Configure dimension with Size"), toast "Sketch 1 length added to Size"; without an input no Configure item, = live (cd4c / cd5s.png) |
 
 ## 13. Messages and errors
 

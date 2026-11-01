@@ -2569,11 +2569,16 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let Some(text) = self.sketch_data(cx).and_then(|d| noshape_ops::studio::dimension_text(&d, cid.0, &units)) else { return };
         let (input, tab) = (input.to_string(), self.tab);
+        // Live: the toast "Sketch 1 length added to Size".
+        let names = self.studio(cx).map(|s| (s.feature(feature).map(|f| f.name.clone()).unwrap_or_default(), s.configuration.inputs.iter().find(|i| i.id == input).map(|i| i.name.clone()).unwrap_or_default()));
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(tab, noshape_ops::studio::CONFIGURE_DIMENSION, cx, |ps| {
                 noshape_ops::studio::configure_dimension(ps, feature, cid.0, &input, &text);
             });
         });
+        if let Some((sketch, input_name)) = names {
+            self.flash_for(noshape_model::display::FeatureStatus::Info, format!("{sketch} length added to {input_name}"), std::time::Duration::from_millis(6700), cx);
+        }
     }
 
     /// The configuration input and option a configured dimension currently
@@ -2594,17 +2599,23 @@ impl PartStudioView {
     /// driven dims" (2)): tolerances are set from the value box's ±.
     fn dimension_menu_items(&self, cid: noshape_sketch::ConstraintId, cx: &App) -> Vec<(String, String)> {
         let Some(driving) = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| c.driving)) else { return Vec::new() };
-        let mut out = vec![((if driving { "Change to driven dimension" } else { "Change to driving dimension" }).to_string(), "driving".to_string())];
+        // Live (behaviours "(3) Right-click a sketch dimension"): with a
+        // configuration input the menu starts "Configure dimension", then
+        // Change to driven dimension.
+        let mut out = Vec::new();
         if self.dimension_configuration(cid, cx).is_some() {
             out.push(("Unconfigure dimension".into(), "unconfigure".into()));
         } else {
             use noshape_model::configuration::ConfigInputKind;
             if let Some(st) = self.studio(cx) {
-                for i in st.configuration.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })) {
-                    out.push((format!("Configure dimension with {}", i.name), format!("configure:{}", i.id)));
+                let inputs: Vec<_> = st.configuration.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })).collect();
+                for i in &inputs {
+                    let label = if inputs.len() == 1 { "Configure dimension".to_string() } else { format!("Configure dimension with {}", i.name) };
+                    out.push((label, format!("configure:{}", i.id)));
                 }
             }
         }
+        out.push(((if driving { "Change to driven dimension" } else { "Change to driving dimension" }).to_string(), "driving".to_string()));
         out
     }
 
