@@ -2194,6 +2194,14 @@ export const spin = defineFeature(function(context is Context, id is Id, definit
 }
 
 /// Every thread's backtrace (frames of noshape / OCCT), from a signal handler (a probe tool: not async-signal-safe).
+/// Linux only (`syscall`, /proc): Windows doesn't link it.
+#[cfg(not(target_os = "linux"))]
+fn dump_stacks() {
+    eprintln!("(thread stacks: Linux only)");
+}
+
+/// Every thread's backtrace (frames of noshape / OCCT), from a signal handler (a probe tool: not async-signal-safe).
+#[cfg(target_os = "linux")]
 fn dump_stacks() {
     unsafe extern "C" {
         fn signal(sig: i32, handler: usize) -> usize;
