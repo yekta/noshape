@@ -212,6 +212,8 @@ struct NCurve {
     from: Option<u32>,
     /// OCCT's tolerance for a section (0 for an input's curve).
     tol: f64,
+    /// Its curve's own error from the faces' section (OCCT's approximation's; 0 for an input's curve).
+    acc: f64,
     /// Boxes holding it (`NurbsCurve::piece_boxes`).
     boxes: std::sync::OnceLock<Vec<(f64, f64, DVec3, DVec3)>>,
 }
@@ -1069,7 +1071,24 @@ impl Ctx<'_> {
             }
             // (OCCT's curve clear of the boundary but touching it between its crossings: OCCT may put a vertex
             // there.)
-            let mid = c2.at(((a.0 + b.0) * 0.5 - t0) / (t1 - t0));
+            // (Its middle by length: OCCT's curve's parameter crowds where it turns.)
+            let mid = if let Path::Nurbs { .. } = path {
+                let u = |k: usize| (a.0 + (b.0 - a.0) * k as f64 / 64.0 - t0) / (t1 - t0);
+                let lens: Vec<f64> = (0..64).map(|k| (c2.at(u(k + 1)) - c2.at(u(k))).length()).collect();
+                let half = 0.5 * lens.iter().sum::<f64>();
+                let mut run = 0.0;
+                let mut at = 0.5;
+                for (k, &l) in lens.iter().enumerate() {
+                    if run + l >= half && l > 0.0 {
+                        at = (k as f64 + (half - run) / l) / 64.0;
+                        break;
+                    }
+                    run += l;
+                }
+                c2.at((a.0 + (b.0 - a.0) * at - t0) / (t1 - t0))
+            } else {
+                c2.at(((a.0 + b.0) * 0.5 - t0) / (t1 - t0))
+            };
             let dist = distance2(mid, &bound);
             if let (Path::Nurbs { .. }, true) = (path, dist > GREY * tol) {
                 // (The distance's local minima along it, each narrowed down.)
@@ -1658,7 +1677,7 @@ impl Ctx<'_> {
             let id = self.ncurves.len() as u32;
             let cc = Arc::new(c.curve);
             let [on0, on1] = c.on;
-            self.ncurves.push(NCurve { c: cc.clone(), sec: Some(([fs, ft], [Arc::new(on0), Arc::new(on1)], c.id)), from, tol: c.tol, boxes: Default::default() });
+            self.ncurves.push(NCurve { c: cc.clone(), sec: Some(([fs, ft], [Arc::new(on0), Arc::new(on1)], c.id)), from, tol: c.tol, acc: c.accuracy, boxes: Default::default() });
             let cuts = free::seam_cuts(self, [fs, ft], &cc, c.t0, c.t1);
             self.section_nurbs(fs, ft, Path::Nurbs { id, c: cc }, (c.t0, c.t1), &cuts, join)?;
         }
@@ -1686,7 +1705,7 @@ impl Ctx<'_> {
                 for p in &mut curve.poles {
                     *p = r.point(*p);
                 }
-                SectionCurve { curve, t0: c.t0, t1: c.t1, on: c.on.clone(), id, tol: c.tol }
+                SectionCurve { curve, t0: c.t0, t1: c.t1, on: c.on.clone(), id, tol: c.tol, accuracy: c.accuracy }
             })
             .collect();
         Ok((moved, from))
@@ -2773,7 +2792,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 Curve::Hyperbola { .. } | Curve::Parabola { .. } => return Err(Decline("an argument's hyperbola")),
                 Curve::Nurbs { .. } if cx.src.is_none() => return Err(Decline("a curved edge")),
                 Curve::Nurbs { index, t0, t1 } => {
-                    cx.ncurves.push(NCurve { c: Arc::new(body.nurbs_curves[index as usize].clone()), sec: None, from: None, tol: 0.0, boxes: Default::default() });
+                    cx.ncurves.push(NCurve { c: Arc::new(body.nurbs_curves[index as usize].clone()), sec: None, from: None, tol: 0.0, acc: 0.0, boxes: Default::default() });
                     Geo::Nurbs { id: cx.ncurves.len() as u32 - 1, t0, t1 }
                 }
                 Curve::Degenerate => {
@@ -3540,7 +3559,18 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                     && !matches!(s.g, Geo::Apex { .. })
                     && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(o, cx.seg_at(&s, t)).1 <= cx.tol)
                     && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(&s, cx.seg_at(o, t)).1 <= cx.tol));
-            if alike && !apart && (std::mem::discriminant(&o.g) != std::mem::discriminant(&s.g) || (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * cx.tol) {
+            // (Two of one kind: their middles together; two sections (OCCT's curves, parametrized each its own way):
+            // each one's points on the other within the curves' own error, as a sharp tooth's land between two of
+            // them is narrower than 100 tol.)
+            let together = match (o.g, s.g) {
+                (Geo::Nurbs { id: a, .. }, Geo::Nurbs { id: b, .. }) if a != b && cx.ncurves[a as usize].sec.is_some() && cx.ncurves[b as usize].sec.is_some() => {
+                    let reach = cx.tol.max(cx.ncurves[a as usize].acc + cx.ncurves[b as usize].acc);
+                    [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(o, cx.seg_at(&s, t)).1 <= reach)
+                        && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(&s, cx.seg_at(o, t)).1 <= reach)
+                }
+                _ => (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * cx.tol,
+            };
+            if alike && !apart && (std::mem::discriminant(&o.g) != std::mem::discriminant(&s.g) || together) {
                 let rev = match (o.g, s.g) {
                     (Geo::Arc { k: k1, .. }, Geo::Arc { k: k2, .. }) => k1.n.dot(k2.n) < 0.0,
                     (Geo::Ell { e: e1, t0: a1, sweep: s1, .. }, Geo::Ell { e: e2, t0: a2, sweep: s2, .. }) => e1.deriv(a1 + 0.5 * s1).dot(e2.deriv(a2 + 0.5 * s2)) < 0.0,

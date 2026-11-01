@@ -1079,6 +1079,32 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## The user's P0: the B94.6 Diamond knurl at 45° / 45° (11-01 02:25 UTC)
+- Live (request 1687): OK, 95473.389 mm³, 17762 faces, 114 s. Ours failed "non-manifold": noshape's Boolean declined
+  (a non-manifold result) and OCCT's path took 324–391 s and came out non-manifold on the user's machine.
+- At 45° the teeth are sharp: the profile reaches 10 µm past the cylinder, leaving lands ~8 µm wide at the tooth tips,
+  and OCCT's section curves crowd their parameters (and knots) there. Four faults, each found in that order:
+  1. Split edges: two sections with the same ends were one edge if their parametric middles lay within 100 tol
+     (2e-5 m), which merged a land's two sides. Now two different sections are one edge when each one's points lie
+     on the other within the curves' own accuracy (OCCT's IntTools_Curve::Tolerance(), passed as the eighth number
+     of each section, SectionCurve::accuracy).
+  2. Area: C2::area_term / length integrated in 8 even parts of the parameter, which turned a triangle's area
+     negative (dropping it from the arrangement); now also split at the B-spline's knots (exact per span).
+  3. Middles by length, not parameter: the interval test in `intervals` (a section judged inside a face at its
+     middle, which sat at a corner) and the arrangement's point inside a region (curve2 at_fraction).
+  4. The direction a curve leaves a vertex: OCCT's 2D curve hooked back 0.1 µm at its start, so its derivative there
+     pointed the other way and sorted it outside its face. C2::leaving: the way to its point 1 µm on where that
+     differs from the tangent by more than ~6°.
+- Now: valid, 1 part, 17762 faces as live, 19.5 s on a loaded vibe2 (vibe3 time to come). Volume 95469.936 mm³, 3.45 mm³
+  (3.6e-5) under live's; OCCT's Boolean on the same tools gives the same as ours (2.3e-8 apart), so the gap is the
+  groove tools' (opSweep of the diamond along the helix; live asked for one tool's volume, REQUESTS 11-01 01:04).
+- T2 custom_features::knurl_feature_b94_tooth_and_helix_angles, 14 pairs (tooth 15–80°, helix 15–45°: the feature
+  takes helix angles up to 45°), volume and faces against live's where given (45/30, 15/15, 80/15 within 9e-6; 45/45
+  at 4e-5 for the tools' gap), and noshape's decline printed. On vibe2 all valid, one part. Ours (fast): 45/x, 60/x,
+  80/15, 80/30, 30/45. Still declined to OCCT (83–428 s): 15/15, 15/30, 15/45, 30/15, 30/30. 80/45 (left out of the
+  test for now): OCCT's path past the 16 GB budget after 482 s; next.
+- Recording Booleans (NOSHAPE_RECORD_BOOLEANS) adds per-face props for the summary: 45/45 took 128 s recorded, 19.5 s not.
+
 ## The knurl back on OCCT's path, fixed (11-01 01:44 UTC; lead's P0)
 - vibe3's hourly baseline: knurl_feature_b94_on_a_cylinder 16.07 s at d7df1ce4, 138.2 s at 6628462c. Reproduced on
   vibe2 at 6628462c: noshape's Boolean ran 8.1 s, then declined "a piece's point near a coincident face's boundary",
@@ -1105,6 +1131,7 @@ NOSHAPE_BREP_WHY="" replay of every set: /root/bool-scratch/why2N.sh).
 | before (why20, 17:13) | 80.5 % | 53.8 % | 89.6 % | 15–47 % |
 | three arguments' coincident edges (why21, 18:16) | 80.7 % | 54.0 % | 89.6 % | 16–48 % |
 | coincident pieces, curves along boundaries, equivalents (why22, 20:36; tolerances not in it) | 82.5 % | 70.9 % | 89.8 % | 50–70 % |
+| per-vertex and per-edge tolerances (why23, 21:17) | 82.8 % | 71.3 % | 89.8 % | 51–72 % |
 
 ## Coincident pieces OCCT's way; tolerant vertices; curves along a boundary (10-31 20:59 UTC)
 - A vertex inside coincident edges of two other arguments no longer declines where nothing is exact: Modified as

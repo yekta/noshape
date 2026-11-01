@@ -183,6 +183,9 @@ pub struct SectionCurve {
     pub id: u32,
     /// OCCT's tolerance for it (how far it may be from where the faces meet).
     pub tol: f64,
+    /// How far its curve may be from the faces' section (OCCT's approximation's own error, not the pave filler's
+    /// floor of `tol`).
+    pub accuracy: f64,
 }
 
 /// Where the Boolean gets the sections of free-form faces: the curves where face `a` (argument, face) and face `b`

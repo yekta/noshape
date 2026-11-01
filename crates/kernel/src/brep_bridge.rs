@@ -313,7 +313,7 @@ impl SectionSource for Occt {
             Nurbs::Curve(c) => c,
             Nurbs::Surface(_) => unreachable!(),
         };
-        Ok(out.curves.chunks(7).map(|c| SectionCurve { curve: curve(c[3]), t0: c[1], t1: c[2], on: [curve(c[4]), curve(c[5])], id: c[0] as u32, tol: c[6] }).collect())
+        Ok(out.curves.chunks(8).map(|c| SectionCurve { curve: curve(c[3]), t0: c[1], t1: c[2], on: [curve(c[4]), curve(c[5])], id: c[0] as u32, tol: c[6], accuracy: c[7] }).collect())
     }
 
     fn moved(&self, ids: &[u32], a: (u32, u32), b: (u32, u32), moved: &noshape_brep::MovedPair) -> Result<Vec<u32>, Decline> {

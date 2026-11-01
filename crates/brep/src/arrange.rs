@@ -27,7 +27,7 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
     let mut out: Vec<Vec<(f64, f64, usize)>> = vec![Vec::new(); pts.len()];
     let leaving = crate::boolean::par_map(n_h, &|h| {
         let c = curve(h);
-        let d = c.tangent(0.0);
+        let d = c.leaving();
         // -π is π (one direction).
         let a = d.y.atan2(d.x);
         (if a < 1e-9 - PI { a + TAU } else { a }, c.curvature())
@@ -149,7 +149,8 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         by_length.sort_by(|a, b| b.0.total_cmp(&a.0));
         for &(len, h) in &by_length {
             let c = curve(h);
-            for t in [0.5, 0.381_966, 0.618_034] {
+            for f in [0.5, 0.381_966, 0.618_034] {
+                let t = c.at_fraction(f);
                 let m = c.at(t);
                 let dir = c.tangent(t).perp();
                 let mut hits = Vec::new();
