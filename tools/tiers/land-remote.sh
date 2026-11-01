@@ -24,20 +24,7 @@ wt="$HOME/land/wt-slot$slot"
 cd "$wt" && git checkout -q -f --detach "refs/land/$name" && git clean -fdq || { echo "LAND FAILED: checkout on $(hostname -s)"; exit 1; }
 export CARGO_TARGET_DIR="$HOME/target-land-slot$slot"
 echo "== on $(hostname -s), slot $slot ($wt)"
-# Disk: this target dir's old builds and stale incremental sessions go before each land.
-python3 tools/tiers/prune-target.py "$CARGO_TARGET_DIR" > /dev/null 2>&1
-for d in "$CARGO_TARGET_DIR"/debug/incremental/*/; do
-  [ -n "$(find "$d" -maxdepth 1 -name '*-working' -print -quit 2>/dev/null)" ] && continue
-  [ -n "$(find "$d" -maxdepth 0 -mmin +120 -print 2>/dev/null)" ] && rm -rf "$d"
-done
-# Below 60 GB free, other idle land target dirs go, least recently used first (older per-worktree ones included).
-free_gb() { df -BG --output=avail / | tail -1 | tr -dc 0-9; }
-for t in $(ls -dtr "$HOME"/target-land-* 2>/dev/null); do
-  [ "$(free_gb)" -ge 60 ] && break
-  [ "$t" = "$CARGO_TARGET_DIR" ] && continue
-  busy=0; for p in $(pgrep -x cargo); do tr '\0' '\n' < /proc/$p/environ 2>/dev/null | grep -qx "CARGO_TARGET_DIR=$t" && busy=1; done
-  [ $busy = 0 ] && rm -rf "$t" && echo "== removed $t (idle; disk below 60 GB free)"
-done
+prune_land_target "$CARGO_TARGET_DIR"
 tools/tiers/land-checks.sh "$pkgs" "$changed"; rc=$?
 git -C "$repo" update-ref -d "refs/land/$name" 2>/dev/null
 exit $rc

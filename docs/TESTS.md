@@ -10,13 +10,36 @@ From 2026-10-26 (docs/PLAN.md 2.1). Every test is in exactly one tier. Scripts a
 
 All scripts take extra cargo args (`--locked`, `-p <crate>`, `--release`). Set `CARGO_TARGET_DIR` to your own dir.
 
-## Landing: `tools/tiers/land.sh` (lead, 10-27)
+## Landing: `tools/tiers/land.sh` (lead, 10-27; queued 11-01)
 
-The only way to put work on main. It rebases on origin/main, runs clippy over the whole workspace and the full tests
-of every crate the change touches plus the crates that use them directly (T0 too when the app, ops or cli is
-affected), and pushes only if all of it is green. Deeper dependents' tests run in the watcher right after (11-01). The
-checks run on the land server vibe4 (16 cores, three lands at a time, in arrival order), else vibe3. Docs-only changes push without a build. Main red from a pushed change means land.sh wasn't used.
-A flaky test (passes alone, fails in parallel, or fails now and then) goes to T2 at once with a ticket for its owner.
+The only way to put work on main. `land.sh` rebases on origin/main, queues HEAD on the land server vibe4 and returns
+at once with `QUEUED <sha>`: **keep working, don't wait for it.** The land daemon there (`tools/tiers/land-daemon.sh`)
+takes whatever is queued whenever one of its three slots frees, up to 4 changes in arrival order (no batch waits to
+fill), stacks them on main and checks the stack once: `cargo check` over the workspace (type errors and warnings
+anywhere fail), clippy on the crates the changes edit, the full tests of those crates and of the crates that use them
+directly, T0 when the app, ops or cli is affected, ops' menu coverage when a UI crate changed. Green: the stack goes to
+main. Red: the batch is split in halves that are checked next (in parallel slots), down to the change at fault, which
+is reported; the others land. A change that doesn't apply on main or on the changes queued before it is reported as a
+rebase conflict. Deeper dependents' tests run in the watcher after the push. Docs-only changes push at once, no build.
+- `tools/tiers/land.sh --status`: your queued, checking, landed and failed changes, with the failing output. The lead
+  also tells you when one fails (`LAND FAILED <worktree> <sha> <reason>`). Each land.sh run also prints the results
+  since your last one.
+- **A failed land is your next task.** Work you stacked on it in your worktree stays there: fix forward with a new
+  commit and run land.sh again (it queues everything not yet on main). A rebase conflict: rebase on origin/main by hand
+  (once the change it conflicts with has landed), then land.sh.
+- `tools/tiers/land.sh --wait`: the old blocking land (this change's checks alone, then the push), for the lead and
+  scripts; land.sh falls back to it when vibe4 is unreachable.
+- Pushes go through `tools/tiers/land-relay.sh` on this machine (vibe4 has no GitHub credentials), which also syncs
+  the results to `/tmp/lead/land-results/<worktree>.log`; land.sh starts the relay and the daemon when they aren't
+  running. On vibe4: `~/land/results.tsv` (every change), `~/land/history.tsv` (every check: queue wait, slot wait,
+  phase times, batch size), `~/land/daemon.log`.
+- Measured 11-01 on vibe4 (busy with agents' lands): workspace clippy after a model-core edit 98 s / 53 s, against
+  `cargo check --workspace` + clippy on model-core 53 s / 28 s. A queued brep change's check: cargo check 30–190 s,
+  clippy 1–5 s, test build 7–37 s, tests 33–74 s. T0 had run on every land (`grep -w` took `noshape-brep` for
+  `noshape`): 233–313 s saved on lands that don't touch the app, ops or cli or a crate they use directly.
+
+Main red from a pushed change means land.sh wasn't used. A flaky test (passes alone, fails in parallel, or fails now
+and then) goes to T2 at once with a ticket for its owner.
 
 ## Building and testing on vibe4: `tools/tiers/rb.sh` (lead, 11-01)
 

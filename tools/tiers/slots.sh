@@ -1,4 +1,4 @@
-# The land server's slots (~/land/slot1..slot$LAND_SLOTS, default 2), taken in arrival order. Sourced by land-remote.sh (one slot)
+# The land server's slots (~/land/slot1..slot$LAND_SLOTS, default 2), taken in arrival order. Sourced by land-daemon.sh and land-remote.sh (one slot)
 # and perf-remote.sh (both: the machine to itself). Before 10-31 lands polled the slots every 5 s and perf runs
 # waited in flock, so whoever looked at the right moment went first: one land waited 70 min while later ones went.
 # Now each waiter appends itself to ~/land/queue and only the first live entry may take slots; it leaves the queue
@@ -32,3 +32,19 @@ take_slots() {
   done
 }
 release_slots() { local fd; for fd in "${SLOT_FDS[@]}"; do exec {fd}>&-; done; SLOT_FDS=(); }
+# Before a land uses a slot's target dir: its old builds and stale incremental sessions go; below 60 GB free, other idle
+# land target dirs go, least recently used first (older per-worktree ones included). Run from the checkout.
+prune_land_target() {
+  local t=$1 d p busy
+  python3 tools/tiers/prune-target.py "$t" > /dev/null 2>&1
+  for d in "$t"/debug/incremental/*/; do
+    [ -n "$(find "$d" -maxdepth 1 -name '*-working' -print -quit 2>/dev/null)" ] && continue
+    [ -n "$(find "$d" -maxdepth 0 -mmin +120 -print 2>/dev/null)" ] && rm -rf "$d"
+  done
+  for d in $(ls -dtr "$HOME"/target-land-* 2>/dev/null); do
+    [ "$(df -BG --output=avail / | tail -1 | tr -dc 0-9)" -ge 60 ] && break
+    [ "$d" = "$t" ] && continue
+    busy=0; for p in $(pgrep -x cargo); do tr '\0' '\n' < /proc/$p/environ 2>/dev/null | grep -qx "CARGO_TARGET_DIR=$d" && busy=1; done
+    [ $busy = 0 ] && rm -rf "$d" && echo "== removed $d (idle; disk below 60 GB free)"
+  done
+}
