@@ -1882,6 +1882,35 @@ impl AssemblyView {
         }
     }
 
+    /// A nested row's Move to new subassembly (live 1723): the instance moves
+    /// into a new subassembly inside its own (parent) subassembly, edited in
+    /// that subassembly's tab; state this assembly kept on occurrences under
+    /// it no longer applies.
+    pub(super) fn move_occurrence_to_new_subassembly(&mut self, path: Vec<InstanceId>, cx: &mut Context<Self>) {
+        let Some((&last, parent)) = path.split_last() else { return };
+        let Some(sub_tab) = self.occurrence_tab(parent, cx) else { return };
+        self.edit_doc(noshape_ops::assembly::MOVE_TO_NEW_SUBASSEMBLY, cx, |doc, tab| {
+            noshape_ops::assembly::move_to_new_subassembly(doc, sub_tab, &[last]);
+            if let Some(TabContent::Assembly(a)) = doc.tab_mut(tab).map(|t| &mut t.content) {
+                a.occurrences.retain(|(p, _)| !p.starts_with(&path));
+            }
+        });
+        self.expanded.insert(parent.to_vec());
+    }
+
+    /// The Assembly tab of the subassembly occurrence at `path` (this tab
+    /// for an empty path).
+    fn occurrence_tab(&self, path: &[InstanceId], cx: &App) -> Option<TabId> {
+        let doc = &self.doc.read(cx).session.doc;
+        let mut tab = self.tab;
+        for id in path {
+            let TabContent::Assembly(a) = &doc.tab(tab)?.content else { return None };
+            let InstanceSource::Assembly { assembly, .. } = &a.instance(*id)?.source else { return None };
+            tab = *assembly;
+        }
+        Some(tab)
+    }
+
     /// Drag and drop onto a subassembly row: the instances move into it.
     pub(super) fn move_into_subassembly(&mut self, ids: Vec<InstanceId>, sub_inst: InstanceId, cx: &mut Context<Self>) {
         let Some(InstanceSource::Assembly { assembly: sub_tab, .. }) = self.assembly(cx).and_then(|a| a.instance(sub_inst)).map(|i| i.source.clone()) else { return };
@@ -2230,7 +2259,8 @@ impl AssemblyView {
     /// Hide other instances · Hide all instances · Isolate… · Make
     /// transparent… · Fix · Use best available tessellation | Edit in
     /// context · Add mate connector to instance origin… · Switch to <source>
-    /// | Copy <name> | Export… · Release… | Zoom to selection | Create Drawing
+    /// | Copy <name> | Move to new subassembly · Export… · Release… | Zoom to
+    /// selection | Create Drawing
     /// of <part>… | Create empty subassembly. Its state is kept on this
     /// assembly's occurrence (`Assembly::occurrences`).
     pub(super) fn nested_instance_menu(&self, path: Vec<InstanceId>, cx: &App) -> Vec<MenuEntry> {
@@ -2284,6 +2314,8 @@ impl AssemblyView {
         let p = path.clone();
         m.push(icon_item(format!("Copy {name}"), "copy", move |t, _, cx| t.copy_occurrence(p.clone(), cx)));
         m.push(MenuEntry::Sep);
+        let p = path.clone();
+        m.push(item("Move to new subassembly", move |t, _, cx| t.move_occurrence_to_new_subassembly(p.clone(), cx)));
         let p = path.clone();
         m.push(item("Export…", move |t, w, cx| t.open_occurrence_export(Some(vec![p.clone()]), w, cx)));
         if matches!(inst.source, InstanceSource::Part { .. }) {

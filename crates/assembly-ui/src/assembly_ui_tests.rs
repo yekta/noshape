@@ -307,7 +307,8 @@ fn two_selected_mates_have_lives_menu(cx: &mut TestAppContext) {
 }
 
 /// Live 1723: a part's row inside an expanded subassembly has its own menu
-/// (less "Add comment"; Move to new subassembly is not offered here yet);
+/// (less "Add comment"); Move to new subassembly makes a new subassembly in
+/// "Sub" around it;
 /// its Hide and Fix are kept on Assembly 1's occurrence.
 #[gpui::test]
 fn a_nested_rows_menu_is_lives(cx: &mut TestAppContext) {
@@ -325,7 +326,7 @@ fn a_nested_rows_menu_is_lives(cx: &mut TestAppContext) {
                     "Hide", "Hide other instances", "Hide all instances", "Isolate…", "Make transparent…", "Fix", "Use best available tessellation", sep,
                     "Edit in context", "Add mate connector to instance origin…", "Switch to Part Studio 1", sep,
                     "Copy Part 1 <1>", sep,
-                    "Export…", "Release…", sep,
+                    "Move to new subassembly", "Export…", "Release…", sep,
                     "Zoom to selection", sep,
                     "Create Drawing of Part 1…", sep,
                     "Create empty subassembly",
@@ -334,6 +335,10 @@ fn a_nested_rows_menu_is_lives(cx: &mut TestAppContext) {
             v.edit("Hide", cx, |a| a.set_occurrence(&path, |s| s.hidden = true));
             assert!(v.assembly(cx).unwrap().occurrence_hidden(&path));
             assert_eq!(labels(&v.nested_instance_menu(path.clone(), cx))[2], "Show");
+            v.move_occurrence_to_new_subassembly(path.clone(), cx);
+            let sub_now = v.node_assembly(&[sub], cx).unwrap();
+            assert!(sub_now.instance(inner).is_none() && sub_now.instances.iter().any(|i| matches!(i.source, noshape_model::assembly::InstanceSource::Assembly { .. })), "Part 1 <1> went into a new subassembly in Sub");
+            assert!(v.assembly(cx).unwrap().occurrences.is_empty(), "its old occurrence state is dropped");
         });
     })
     .unwrap();
