@@ -20,8 +20,13 @@ use std::time::Instant;
 type Row = (String, String, String, f64);
 
 fn profile(model: &str, ps: &PartStudio, units: &UnitPrefs, rows: &mut Vec<Row>) -> RegenResult {
+    profile_with(model, ps, units, rows, &RegenOptions::default())
+}
+
+/// [`profile`] with `opts` (a document's Feature Studios for its custom features).
+fn profile_with(model: &str, ps: &PartStudio, units: &UnitPrefs, rows: &mut Vec<Row>, opts: &RegenOptions) -> RegenResult {
     let t = Instant::now();
-    let r = Regenerator::new().regenerate(ps, &ConfigValues::default(), units, &RegenOptions::default());
+    let r = Regenerator::new().regenerate(ps, &ConfigValues::default(), units, opts);
     let total = t.elapsed().as_secs_f64() * 1e3;
     let d = &r.display;
     eprintln!("profile: {model}: {total:.0} ms total, features {:.0} ms, display {:.0} ms, {} features", d.regen_ms, total - d.regen_ms as f64, ps.features.len());
@@ -51,10 +56,12 @@ fn fixtures(rows: &mut Vec<Row>) {
         std::fs::copy(&path, &copy).unwrap();
         let s = noshape_ops::session::Session::open(&copy).unwrap();
         let units = s.doc.settings.units;
+        // Its custom features (the printable knurl) from its own Feature Studios.
+        let opts = RegenOptions { custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&s.doc)), ..Default::default() };
         for tab in &s.doc.tabs {
             if let TabContent::PartStudio(ps) = &tab.content {
                 let name = format!("{} / {}", path.file_stem().unwrap().to_string_lossy(), tab.name);
-                let r = profile(&name, ps, &units, rows);
+                let r = profile_with(&name, ps, &units, rows, &opts);
                 // NOSHAPE_PROFILE_BREP=<dir>: the regenerated solids written there (<file> <tab> <n>.brep), for kernel probes.
                 if let Some(out) = std::env::var_os("NOSHAPE_PROFILE_BREP") {
                     for (i, b) in r.context.bodies.iter().enumerate() {

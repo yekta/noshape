@@ -1736,3 +1736,11 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   77.025851, ours 77.025838 (−1.7e-7), live 77.024781 (−1.4e-5). So our helix sweep is right and Parasolid's carries
   its own error, of either sign; matching it would mean copying an approximation we can't see. The knurled parts'
   2–6 mm³ at a 45° helix are live's sweep error times 148 grooves (and the mirrored set), not ours to fix.
+
+## From psui (11-01 18:40): the 45/45 knurl's display mesh is a small part
+- core-scratch/profdocs/knurl-diamond.noshape with toothHelixAngle 45 deg (psui-scratch/mesh/knurl-45.noshape),
+  release regen_profile with the document's Feature Studio, NOSHAPE_KERNEL_PROFILE=1: 13.7 s on an idle vibe5, of
+  which the knurl feature 12.7 s and the whole display mesh ~1 s (BRepMesh 0.76 s on the B-spline faces, BRepTools
+  clean 0.12 s, noshape's mesher 22 ms). On loaded vibe4: 19-28 s, the mesh 1.1-1.6 s of it. So the 2+ minutes
+  are the feature (and whatever the app adds); the mesh lock doesn't matter for one part. psui is still unlocking
+  BRepMesh across parts (the NIST import) and looking at B-spline faces in noshape's mesher.

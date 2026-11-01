@@ -9,6 +9,18 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## Mesher (user 11-01 18:30: before the rest of the audit): NIST and the 45/45 knurl
+Baselines (release regen_profile with the document's Feature Studios, NOSHAPE_KERNEL_PROFILE=1; docs in the
+worktree's untracked .psui-prof/: nist-mtc-crada-assembly.noshape, knurl-45.noshape = core-scratch/profdocs/
+knurl-diamond with toothHelixAngle 45 deg): NIST 9.86 s (BRepMesh 9.1 s summed, 104 s summed waits on the mesh lock:
+the parts one at a time); knurl 13.7 s, the feature 12.7 s, the display mesh ~1 s (note in bool.md). Work: mesh.cpp
+runs BRepMesh on a topology copy of the faces it meshes with the lock released (cache entries copied out first, the
+set re-fetched after; NOSHAPE_MESH_LOCKED=1 the old way for A/B), at most NOSHAPE_MESH_CONCURRENT parts at once
+(default: no limit, measured best). NIST regeneration on idle vibe5: locked 3.19-3.20 s -> 0.61-0.64 s (loaded vibe4
+8.5 -> 2.4 s). Landed / queued with this commit. Next: B-spline faces in brep::mesh (nurbs.rs evaluates; cdt.rs
+triangulates in 2D; the bridge: share rust_boolean.cpp's push_nurbs / push_nurbs_surface flat layout, which
+brep_bridge's nurbs_at reads).
+
 ## From core (11-01 17:00): the NIST import's display mesh is BRepMesh, one part at a time
 Regeneration profile of the perf documents (core, NOSHAPE_KERNEL_PROFILE, release, vibe4; logs
 ~/agents/logs/prof-*.txt there): opening tests/perf/nist-mtc-crada-assembly.noshape spends ~6.3 s of its 6.5 s in

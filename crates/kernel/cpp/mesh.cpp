@@ -1,4 +1,7 @@
 // Tessellation: one BRepMesh call, then flat buffers filled in a single pass.
+#include <condition_variable>
+#include <BRepBuilderAPI_Copy.hxx>
+#include <optional>
 #include "internal.hpp"
 #include "planar_cdt.hpp"
 
@@ -729,6 +732,44 @@ MeshSet* mesh_set(double lin, double ang)
 }
 } // namespace
 
+// How many parts BRepMesh meshes at once outside the mesh lock (each in parallel inside: 36 NIST parts at once
+// summed 45 s of BRepMesh against 9 s one at a time, yet sooner). NOSHAPE_MESH_CONCURRENT=<n>; by default no
+// limit (the NIST import's regeneration on 16 threads: idle vibe5 one at a time 3.19-3.20 s, 8 at once
+// 0.77-0.83, no limit 0.61-0.64; loaded vibe4 8.5-8.6, 2 at once 4.9, 4 3.3-4.0, 8 2.0-2.6, no limit 2.4-2.5).
+struct MeshSlots
+{
+  std::mutex              m;
+  std::condition_variable cv;
+  int                     free = [] {
+    const char* v = std::getenv("NOSHAPE_MESH_CONCURRENT");
+    return v != nullptr && std::atoi(v) > 0 ? std::atoi(v) : 1 << 20;
+  }();
+};
+MeshSlots& mesh_slots()
+{
+  static MeshSlots s;
+  return s;
+}
+struct MeshSlot
+{
+  MeshSlot()
+  {
+    std::unique_lock<std::mutex> l(mesh_slots().m);
+    mesh_slots().cv.wait(l, [] { return mesh_slots().free > 0; });
+    --mesh_slots().free;
+  }
+  ~MeshSlot()
+  {
+    {
+      std::lock_guard<std::mutex> l(mesh_slots().m);
+      ++mesh_slots().free;
+    }
+    mesh_slots().cv.notify_one();
+  }
+  MeshSlot(const MeshSlot&)            = delete;
+  MeshSlot& operator=(const MeshSlot&) = delete;
+};
+
 struct OcMeshFaces
 {
   std::vector<FaceTri> faces;
@@ -754,8 +795,13 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
   const auto& ef        = ancestors_cached(s, TopAbs_EDGE, TopAbs_FACE);
   auto        faces_of  = [&](int e) { return std::make_pair(ef.second.data() + ef.first[(size_t)e - 1], ef.second.data() + ef.first[(size_t)e]); };
   {
-    const LockedSection locked_section_721;
-    std::lock_guard<std::mutex> lock(mesh_mutex());
+    // The mesh lock guards the mesh cache and the model's shapes (BRepMesh, the HLR and exports write
+    // triangulations and polygons onto them). BRepMesh itself runs on a copy of the faces it meshes with the
+    // lock released (core's profile 11-01: the NIST import's 36 parts meshed one at a time, 9.1 s of BRepMesh
+    // behind 104 s of summed waits).
+    std::optional<LockedSection>   locked_section_721;
+    locked_section_721.emplace();
+    std::unique_lock<std::mutex> lock(mesh_mutex());
     IMeshTools_Parameters prm;
     prm.Deflection               = lin;
     prm.Angle                    = ang;
@@ -831,28 +877,67 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
           B.Add(c, m->faces(i));
       meshed = c;
     }
+    // The cached faces' meshes, taken now: the cache set may go while the lock is released (another part's
+    // deflections push it out).
+    std::vector<occ::handle<Poly_Triangulation>> cached_tri((size_t)m->faces.Extent() + 1);
+    std::vector<std::optional<RustFace>>         cached_rust((size_t)m->faces.Extent() + 1);
+    for (int i = 1; i <= m->faces.Extent() && set != nullptr; ++i)
+      if (!fresh[(size_t)i])
+      {
+        const TopoDS_Shape& f = m->faces(i);
+        if (const RustFace* r = set->rust.Seek(f))
+          cached_rust[(size_t)i] = *r;
+        else if (const occ::handle<Poly_Triangulation>* t = set->faces.Seek(f))
+          cached_tri[(size_t)i] = *t;
+      }
+    // BRepMesh's faces on a copy (not on the model's faces, which other parts and threads may share), the lock
+    // released meanwhile; a mesh body's faces (their triangulation is their geometry) as before, in place.
+    std::optional<BRepBuilderAPI_Copy> copy;
     if (meshed.ShapeType() != TopAbs_COMPOUND || meshed.NbChildren() > 0)
     {
+      // NOSHAPE_MESH_LOCKED=1: in place, under the lock, as before (for comparisons).
+      static const bool locked = std::getenv("NOSHAPE_MESH_LOCKED") != nullptr;
+      if (!mesh_faces && !locked)
+        copy.emplace(meshed, false, false);
       BRepMesh_IncrementalMesh mesher;
-      mesher.SetShape(meshed);
+      mesher.SetShape(copy ? copy->Shape() : meshed);
       mesher.ChangeParameters() = prm;
+      if (copy)
+      {
+        lock.unlock();
+        locked_section_721.reset();
+      }
+      std::optional<MeshSlot> slot;
+      if (copy)
+        slot.emplace();
       const KernelTimer timer("mesh.brepmesh");
       const size_t      fallbacks = g_planar_fallbacks.load();
       mesher.Perform(ctx);
+      slot.reset();
       m->planar_fallbacks = g_planar_fallbacks.load() - fallbacks;
       if (std::getenv("NOSHAPE_MESH_DEBUG"))
         std::fprintf(stderr, "mesh: %zu planar faces to BRepMesh's algorithm\n", m->planar_fallbacks);
+      if (copy)
+      {
+        locked_section_721.emplace();
+        lock.lock();
+        // The same set, or a new one if it went meanwhile.
+        if (set != nullptr)
+          set = mesh_set(lin, ang);
+      }
     }
+    // A face's or edge's own shape BRepMesh meshed (the copy's).
+    auto meshed_of = [&](const TopoDS_Shape& x) -> TopoDS_Shape { return copy ? copy->ModifiedShape(x) : x; };
     for (int i = 1; i <= m->faces.Extent(); ++i)
     {
       const TopoDS_Face& f = TopoDS::Face(m->faces(i));
       TopLoc_Location    loc;
-      if (!fresh[(size_t)i] && set->rust.IsBound(f))
+      if (cached_rust[(size_t)i])
       {
         // noshape's mesher's, from the cache.
         FaceTri& ft = side->faces[i - 1];
         ft.reversed = f.Orientation() == TopAbs_REVERSED;
-        ft.rust     = set->rust.Find(f);
+        ft.rust     = *cached_rust[(size_t)i];
         m->nodes += ft.rust.n1 - ft.rust.n0;
         m->indices += 3 * (size_t)(ft.rust.t1 - ft.rust.t0);
         continue;
@@ -860,7 +945,9 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
       if (!fresh[(size_t)i])
       {
         // From the cache, in the face's frame.
-        const occ::handle<Poly_Triangulation>& tri = set->faces.Find(f);
+        const occ::handle<Poly_Triangulation>& tri = cached_tri[(size_t)i];
+        if (tri.IsNull())
+          continue;
         FaceTri&                               ft  = side->faces[i - 1];
         ft.reversed                                = f.Orientation() == TopAbs_REVERSED;
         ft.tri                                     = tri;
@@ -889,7 +976,7 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
         continue;
       }
       // BRepMesh's.
-      const occ::handle<Poly_Triangulation> tri = BRep_Tool::Triangulation(f, loc);
+      const occ::handle<Poly_Triangulation> tri = BRep_Tool::Triangulation(TopoDS::Face(meshed_of(f)), loc);
       if (tri.IsNull())
         continue;
       if (is_mesh_face(f))
@@ -974,14 +1061,16 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
       }
       for (const uint32_t* fi = f0; fi != f1; ++fi)
       {
-        const TopoDS_Face& f = TopoDS::Face(m->faces((int)*fi + 1));
+        // BRepMesh's faces were meshed on the copy: their polygons are its edge's.
+        const bool         on_copy = copy && fresh[(size_t)*fi + 1] && !taken[(size_t)*fi + 1];
+        const TopoDS_Shape fs      = on_copy ? meshed_of(m->faces((int)*fi + 1)) : m->faces((int)*fi + 1);
+        const TopoDS_Shape es      = on_copy ? meshed_of(e) : TopoDS_Shape(e);
         TopLoc_Location    floc;
-        const occ::handle<Poly_Triangulation>& tri = BRep_Tool::Triangulation(f, floc);
+        const occ::handle<Poly_Triangulation> tri = BRep_Tool::Triangulation(TopoDS::Face(fs), floc);
         if (tri.IsNull())
           continue;
         TopLoc_Location eloc;
-        const occ::handle<Poly_PolygonOnTriangulation>& pot =
-          BRep_Tool::PolygonOnTriangulation(e, tri, eloc);
+        const occ::handle<Poly_PolygonOnTriangulation> pot = BRep_Tool::PolygonOnTriangulation(TopoDS::Edge(es), tri, eloc);
         if (pot.IsNull())
           continue;
         const bool ident = eloc.IsIdentity();
@@ -1063,7 +1152,8 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     // abort for seconds (400 fins: 2.4 s -> 14 s; v0.4.8 delete-while-
     // regenerating gate). Mesh faces (no surface) keep theirs.
     lap = std::make_unique<KernelTimer>("mesh.clean");
-    BRepTools::Clean(meshed);
+    if (!copy)
+      BRepTools::Clean(meshed);
   }
   m->cleaned  = true;
   m->faceData = side;
