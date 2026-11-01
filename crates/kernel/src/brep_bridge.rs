@@ -301,26 +301,36 @@ fn origins(o: &[Origin]) -> Vec<u32> {
         .collect()
 }
 
+/// OCCT's sections of faces `a` and `b`, walked from between `ends` (x y z each) if any.
+fn occt_sections(a: (u32, u32), b: (u32, u32), ends: &[f64]) -> Result<Vec<SectionCurve>, Decline> {
+    let mut out = BrepSections::default();
+    let why = raw::brep_occt_sections(a.0, a.1, b.0, b.1, ends, &mut out);
+    if !why.is_empty() {
+        // (Reasons are static strings on the Rust side.)
+        return Err(Decline(match why.as_str() {
+            "a section OCCT makes as a conic" => "a section OCCT makes as a conic",
+            "a section without its curves on the faces" => "a section without its curves on the faces",
+            _ => "OCCT's section failed",
+        }));
+    }
+    let curve = |at: f64| match nurbs_at(&out.nurbs, at as usize) {
+        Nurbs::Curve(c) => c,
+        Nurbs::Surface(_) => unreachable!(),
+    };
+    Ok(out.curves.chunks(8).map(|c| SectionCurve { curve: curve(c[3]), t0: c[1], t1: c[2], on: [curve(c[4]), curve(c[5])], id: c[0] as u32, tol: c[6], accuracy: c[7] }).collect())
+}
+
 /// Free-form faces' sections from OCCT (rust_boolean.cpp keeps its curves for building the result's edges).
 struct Occt;
 
 impl SectionSource for Occt {
     fn sections(&self, a: (u32, u32), b: (u32, u32)) -> Result<Vec<SectionCurve>, Decline> {
-        let mut out = BrepSections::default();
-        let why = raw::brep_occt_sections(a.0, a.1, b.0, b.1, &mut out);
-        if !why.is_empty() {
-            // (Reasons are static strings on the Rust side.)
-            return Err(Decline(match why.as_str() {
-                "a section OCCT makes as a conic" => "a section OCCT makes as a conic",
-                "a section without its curves on the faces" => "a section without its curves on the faces",
-                _ => "OCCT's section failed",
-            }));
-        }
-        let curve = |at: f64| match nurbs_at(&out.nurbs, at as usize) {
-            Nurbs::Curve(c) => c,
-            Nurbs::Surface(_) => unreachable!(),
-        };
-        Ok(out.curves.chunks(8).map(|c| SectionCurve { curve: curve(c[3]), t0: c[1], t1: c[2], on: [curve(c[4]), curve(c[5])], id: c[0] as u32, tol: c[6], accuracy: c[7] }).collect())
+        occt_sections(a, b, &[])
+    }
+
+    fn seeded(&self, a: (u32, u32), b: (u32, u32), ends: &[glam::DVec3]) -> Result<Vec<SectionCurve>, Decline> {
+        let flat: Vec<f64> = ends.iter().flat_map(|p| p.to_array()).collect();
+        occt_sections(a, b, &flat)
     }
 
     fn moved(&self, ids: &[u32], a: (u32, u32), b: (u32, u32), moved: &noshape_brep::MovedPair) -> Result<Vec<u32>, Decline> {

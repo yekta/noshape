@@ -153,6 +153,46 @@ fn regen_profile() {
     }
 }
 
+/// The user's knurl (P0 11-01, v0.4.19): tests/perf/knurl-d25x25-45-45.noshape, the B94.6 Diamond knurl (12 TPI,
+/// depth 100 %, tooth 45°, helix 45°) on a Ø25 × 25 cylinder, built through the CLI. Opened and regenerated as the
+/// app and the CLI do (its Feature Studio's custom feature, then the display meshes, which the regeneration makes),
+/// 3 runs. noshape's Boolean declined its subtract at this height (two grooves crossing 44 µm above the end face)
+/// and OCCT's took minutes in the app; live: 16.8 s, 11597.649 mm³, 4479 faces (behaviours request 1743).
+#[test]
+#[ignore]
+fn timed_knurl_d25() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf/knurl-d25x25-45-45.noshape");
+    let mut runs = Vec::new();
+    for i in 0..3 {
+        let tmp = std::env::temp_dir().join(format!("noshape-knurl-d25-{}-{i}.noshape", std::process::id()));
+        std::fs::copy(&path, &tmp).unwrap();
+        let t = Instant::now();
+        let s = noshape_ops::session::Session::open(&tmp).unwrap();
+        let units = s.doc.settings.units;
+        let opts = RegenOptions { custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&s.doc)), ..Default::default() };
+        let ps = s.doc.tabs.iter().find_map(|t| if let TabContent::PartStudio(ps) = &t.content { Some(ps.clone()) } else { None }).unwrap();
+        let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        let secs = t.elapsed().as_secs_f64();
+        let _ = std::fs::remove_file(&tmp);
+        let bad: Vec<String> = ps.features.iter().zip(&r.display.features).filter(|(_, st)| st.status != noshape_model::display::FeatureStatus::Ok).map(|(f, st)| format!("{} {:?} {:?}", f.name, st.status, st.message)).collect();
+        assert!(bad.is_empty(), "{bad:?}");
+        assert_eq!(r.context.bodies.len(), 1);
+        let b = &r.context.bodies[0];
+        let (v, faces) = (b.shape.volume().unwrap() * 1e9, b.shape.count(noshape_kernel::ShapeType::Face));
+        // (The regeneration's time includes the display meshes, made after the features.)
+        let features: f64 = r.display.features.iter().map(|st| st.time_ms as f64 / 1e3).sum();
+        eprintln!("timed knurl Ø25 × 25 45/45 run {}: {secs:.2} s (features {features:.2} s, the rest (opening, display meshes) {:.2} s), {v:.3} mm³, {faces} faces", i + 1, secs - features);
+        // (At a 45° helix our groove tools are within 7e-5 of live's: live's sweep's own error.)
+        assert_eq!(faces, 4479);
+        assert!((v - 11597.648791535885).abs() < 7e-5 * v, "{v} mm³, live 11597.649");
+        runs.push(secs);
+    }
+    runs.sort_by(|a, b| a.total_cmp(b));
+    eprintln!("timed knurl Ø25 × 25 45/45: median {:.2} s, best {:.2} s (live 16.8 s)", runs[1], runs[0]);
+    // (OCCT's subtract, where noshape's Boolean declines, takes minutes.)
+    assert!(runs[1] < 60.0, "median {:.1} s", runs[1]);
+}
+
 /// The sheet metal model alone (cold: the Hem's std module loads; then
 /// warm), for `tools/tiers/perf.sh -p noshape-ops --test all
 /// regen_profile::sheet_metal_profile -- --ignored --nocapture`.

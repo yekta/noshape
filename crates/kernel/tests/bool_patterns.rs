@@ -455,6 +455,31 @@ fn valid_as_occt(name: &str, rel: f64) {
     assert!((v - w).abs() <= rel * w, "volume {v} against OCCT's {w}");
 }
 
+/// Two knurl grooves of opposite hands crossing 44 µm above the cylinder's end face, where both tools' caps lie (the
+/// user's Ø25 × 25 B94.6 knurl at 45° / 45°, its tools 28 and 61; recorded): their flanks meet in 94 µm curves from
+/// the ridges' crossing to the bottom edges', which OCCT's face/face misses; asked again from between where the
+/// faces' edges cross, they are found (none: "a non-manifold result"). OCCT's cut of the two removes nothing here,
+/// so the result is against each groove's own cut: the two remove their volumes but for where they cross.
+#[test]
+fn grooves_crossing_just_above_the_end() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "cd1c58431ab4a62c").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    let one: Vec<f64> = c.tools.iter().map(|t| k::boolean(c.op, &c.objects, std::slice::from_ref(t), &c.opts).expect("one groove's cut").shape.volume().unwrap()).collect();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let v0 = c.objects[0].volume().unwrap();
+    let want = v0 - one.iter().map(|v| v0 - v).sum::<f64>();
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid());
+    // (Where they cross: a sliver of ~1e-4 mm³.)
+    assert!(v >= want && v - want <= 1e-3 * 1e-9, "volume {v}, the two grooves' own {want}");
+    assert_eq!(r.shape.count(k::ShapeType::Face), 9);
+}
+
 /// A mirror fuse whose face has a hole touching its outer boundary at one vertex (fuzz seed 1144): a wire each side of
 /// that vertex, as OCCT's builder makes them (one wire through it twice was invalid: BadOrientationOfSubshape).
 #[test]

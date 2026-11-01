@@ -1109,6 +1109,32 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## The Ø25 × 25 knurl taken: short sections walked from where the faces' edges cross (11-02 00:10 UTC, user's P0)
+- The missing curve: tools 28 and 61's ridges (flank 0 / flank 1 edges) cross at z = 44 µm at the same radius; below
+  that each ridge is inside the other tool. Flank 28:0 meets 61:0 (and 28:1 meets 61:1) in a 94 µm curve from the
+  ridges' crossing down to where their bottom edges cross on z = 0. OCCT's IntTools_FaceFace finds none (its start
+  points come from sampling); given a start point on the curve (IntTools_FaceFace::SetList) it walks it at once.
+- Fix: `occt_sections` (boolean.rs): where OCCT gives a free-form pair no section, the faces' edges as 64-chord
+  polylines (made once per edge) are checked against each other; where they cross at 2–4 places (within the chords'
+  sag and the tolerance), `SectionSource::seeded` asks OCCT again with start points: each two crossings' middle
+  brought onto both surfaces by alternating projection (brep_occt_sections' new `ends`). Cheap: a first try doing
+  OCCT's edge/edge and edge/face on every empty pair cost minutes on the knurl. Moved sections (patterned tools) go
+  through it too (the canonical pair's are made by it).
+- Results (NOSHAPE_BOOL_FALLBACK=0): Ø25 × 25 45/45 2.8 s in the T2 sweep, 11598.041 mm³, 4479 faces; live 16.8 s,
+  11597.649 mm³, 4479 faces (+3.4e-5: live's 45° sweep error, see core's 11-01 20:00 note). Heights 10–60 at 45/45
+  and 45/30: all taken but 45/45 at 34, 43 and 45/30 at 24, 46, 57, 60 (was 10 heights; the user's 25 taken).
+  Corpora: more taken in every set (bool-corpus 793 → 819, corpus2 587 → 597, corpus3 592 → 602, corpus4 638 → 649,
+  corpus5 782 → 793, corpus6 712 → 726, sh-new2 104 → 105), 0 differ from OCCT.
+- The two tools alone (T1 bool_patterns::grooves_crossing_just_above_the_end): OCCT's cut of the cylinder by them
+  removes nothing (12271.846 mm³ standalone, 12174.95 at the working scale); each alone removes 10.837 mm³, ours
+  12250.172 mm³ = the two grooves' own less a 5e-5 mm³ sliver where they cross.
+- App-level timed check: tests/perf/knurl-d25x25-45-45.noshape (built with the CLI), ops
+  `regen_profile::timed_knurl_d25`: opened and regenerated with its Feature Studio and display meshes, 3 runs, live's
+  faces and volume (7e-5), median < 60 s: 5.9 s on loaded vibe4. In perf.yml's timed checks; lead: add it to vibe3's
+  hourly baseline (Requests).
+- Recorded for the next step (vibe4 ~/agents/bool-corpora/kh<h>-<tooth>-<helix>, NOSHAPE_RECORD_FAILED): kh34-45-45
+  fac6ef04, kh43-45-45 8c60693b, kh24-45-30 3c8b7215, kh46-45-30 324c79d1.
+
 ## The knurl on a Ø25 cylinder; NOSHAPE_BOOL_FALLBACK=0 (11-01 23:30 UTC, user's P0)
 - User (v0.4.19 app, macOS): the B94.6 Diamond knurl, 12 TPI, 100 %, on a Ø25 × 25 cylinder: 45/30 and 80/30 ~3 s, 45/45
   still running after 2 min. Reproduced on Linux (not a platform difference): at Ø25 × 25 noshape's Boolean declines
@@ -1652,6 +1678,9 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   other threads (FreeIfCancelled, kernel Shape drops): nothing changes unless the thread is cancelled.
 
 ## Requests
+- lead (11-02 00:10, perf baseline): add the user's Ø25 × 25 knurl to vibe3's ~/lead/perf-baseline.sh CASES:
+  `"knurl_d25|3|-p noshape-ops --test all -- regen_profile::timed_knurl_d25 --ignored --nocapture --test-threads=1"`
+  (opens tests/perf/knurl-d25x25-45-45.noshape and regenerates it with its display meshes; 5.9 s median on vibe4).
 - qa (11-01 23:30 UTC, user's decision): run the CLI fuzz with NOSHAPE_BOOL_FALLBACK=0 (and NOSHAPE_RECORD_BOOLEANS=<dir>
   NOSHAPE_RECORD_FAILED=1 to keep each decline's inputs): every remaining decline then shows as a feature error
   "noshape's Boolean declined: <reason>" instead of minutes in OCCT; report the reasons and counts (and the recorded

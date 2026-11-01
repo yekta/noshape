@@ -158,6 +158,12 @@ fn edge_distance(b: &Body, a: &Edge, o: &Edge) -> Option<f64> {
 
 /// The distance between segments p0 p1 and q0 q1.
 fn segment_distance(p0: DVec3, p1: DVec3, q0: DVec3, q1: DVec3) -> f64 {
+    let (a, b) = segment_closest(p0, p1, q0, q1);
+    (a - b).length()
+}
+
+/// The closest points of segments p0 p1 and q0 q1, on each.
+pub(crate) fn segment_closest(p0: DVec3, p1: DVec3, q0: DVec3, q1: DVec3) -> (DVec3, DVec3) {
     let (d1, d2, r) = (p1 - p0, q1 - q0, p0 - q0);
     let (a, e, f) = (d1.length_squared(), d2.length_squared(), d2.dot(r));
     let (s, t) = if a <= f64::EPSILON && e <= f64::EPSILON {
@@ -183,7 +189,7 @@ fn segment_distance(p0: DVec3, p1: DVec3, q0: DVec3, q1: DVec3) -> f64 {
             (s, t)
         }
     };
-    ((p0 + d1 * s) - (q0 + d2 * t)).length()
+    (p0 + d1 * s, q0 + d2 * t)
 }
 
 /// A box round edge `e` (an arc's whole circle; a NURBS edge's poles).

@@ -689,8 +689,9 @@ pub(crate) mod ffi {
         /// The flat body noshape's own Boolean would get for `s` (tests): "" or why it can't.
         fn brep_body_of(s: &OcShape, out: &mut BrepBody) -> String;
         /// During noshape's own Boolean: OCCT's sections of face `a_face` of argument `a_arg` and face `b_face`
-        /// of `b_arg`: "" or why it can't give them.
-        fn brep_occt_sections(a_arg: u32, a_face: u32, b_arg: u32, b_face: u32, out: &mut BrepSections) -> String;
+        /// of `b_arg`: "" or why it can't give them. `ends` (x y z each, else empty): where the faces' boundaries
+        /// meet; the sections walked from between them.
+        fn brep_occt_sections(a_arg: u32, a_face: u32, b_arg: u32, b_face: u32, ends: &[f64], out: &mut BrepSections) -> String;
         /// Sections `ids` (of the pair `moved` names first) moved onto faces `a`, `b` (`moved`: that pair, then the
         /// motion's matrix by rows and translation): their ids (built when an edge takes one); empty if not.
         fn brep_occt_moved(ids: &[u32], a_arg: u32, a_face: u32, b_arg: u32, b_face: u32, moved: &[f64]) -> Vec<u32>;

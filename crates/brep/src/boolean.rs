@@ -713,6 +713,8 @@ struct Ctx<'a> {
     canon_secs: HashMap<FacePair, Vec<SectionCurve>>,
     /// Pairs of faces found clearly apart or not (`free::apart`), by the two faces as paired.
     apart: HashMap<(usize, usize), bool>,
+    /// Edges as polylines (`edge_polyline`), made as asked.
+    polylines: HashMap<usize, Arc<(Vec<DVec3>, f64)>>,
     /// Whether an edge lies on a face, where that takes points along it (`on_free_surface`), found ahead.
     on_surface: HashMap<(usize, usize), R<bool>>,
     /// NURBS curves (`Geo::Nurbs`), and where OCCT's sections of free-form faces come from.
@@ -733,7 +735,7 @@ impl Drop for Ctx<'_> {
             (take(&mut self.faces), take(&mut self.edges), take(&mut self.solids), take(&mut self.side_cache), take(&mut self.in_face_done)),
             (take(&mut self.face_segs), take(&mut self.seg_section), take(&mut self.coplanar), take(&mut self.sections), take(&mut self.pending)),
             (take(&mut self.copies), take(&mut self.families), take(&mut self.canonical), take(&mut self.canon_secs), take(&mut self.apart)),
-            (take(&mut self.on_surface), take(&mut self.ncurves)),
+            (take(&mut self.on_surface), take(&mut self.ncurves), take(&mut self.polylines)),
         );
         // (No thread: freed here, with the closure.)
         let _ = std::thread::Builder::new().name("brep-free".into()).spawn(move || drop(heavy));
@@ -1700,7 +1702,7 @@ impl Ctx<'_> {
                 froms = x.1;
                 x.0
             }
-            None => src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect(),
+            None => self.occt_sections(src, a, b)?,
         };
         // (Moved onto a face of another argument: only where they stay inside it (and the curves they were moved
         // from); else from another member (up to the third), else made for these.)
@@ -1717,7 +1719,7 @@ impl Ctx<'_> {
                 }
                 if !moved_clear {
                     // (These reach the face's boundary: made for themselves.)
-                    secs = src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect();
+                    secs = self.occt_sections(src, a, b)?;
                     froms.clear();
                     break;
                 }
@@ -1729,7 +1731,7 @@ impl Ctx<'_> {
                         (secs, froms) = self.moved_sections(src, a, b, &m)?;
                     }
                     _ => {
-                        secs = src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect();
+                        secs = self.occt_sections(src, a, b)?;
                         froms.clear();
                         break;
                     }
@@ -1752,12 +1754,88 @@ impl Ctx<'_> {
         Ok(())
     }
 
+    /// OCCT's sections of faces `a` and `b` (argument, face), the empty ones dropped. None where their edges cross
+    /// at two places or more: asked again from between those (a short section OCCT's sampling misses: two knurl
+    /// grooves crossing 44 um above the cylinder's end, where both tools' caps are, their flanks meeting in a 94 um
+    /// curve from the ridges' crossing to the bottom edges').
+    fn occt_sections(&mut self, src: &dyn SectionSource, a: (u32, u32), b: (u32, u32)) -> R<Vec<SectionCurve>> {
+        let secs: Vec<SectionCurve> = src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect();
+        if !secs.is_empty() {
+            return Ok(secs);
+        }
+        let face = |(arg, index): (u32, u32)| {
+            let k = self.faces.partition_point(|g| (g.arg, g.index) < (arg, index));
+            (k < self.faces.len() && (self.faces[k].arg, self.faces[k].index) == (arg, index)).then_some(k)
+        };
+        let (Some(fa), Some(fb)) = (face(a), face(b)) else { return Ok(secs) };
+        let ends = self.boundaries_meet(fa, fb);
+        if ends.len() < 2 || ends.len() > 4 {
+            return Ok(secs);
+        }
+        Ok(src.seeded(a, b, &ends)?.into_iter().filter(|c| c.t1 > c.t0).collect())
+    }
+
+    /// Edge `e` as a polyline of 64 chords, and how far the curve may be from it (the largest of the chords'
+    /// middles' distances from the curve's, twice).
+    fn edge_polyline(&mut self, e: usize) -> Arc<(Vec<DVec3>, f64)> {
+        if let Some(p) = self.polylines.get(&e) {
+            return p.clone();
+        }
+        const N: usize = 64;
+        let s = self.edge_seg(e);
+        let pts: Vec<DVec3> = (0..=N).map(|k| self.seg_at(&s, k as f64 / N as f64)).collect();
+        let sag = (0..N).map(|k| (self.seg_at(&s, (k as f64 + 0.5) / N as f64) - pts[k].lerp(pts[k + 1], 0.5)).length()).fold(0.0, f64::max);
+        let p = Arc::new((pts, 2.0 * sag));
+        self.polylines.insert(e, p.clone());
+        p
+    }
+
+    /// Where an edge of face `fa` and one of face `fb` meet (their polylines within the two's distance from
+    /// their curves and the tolerance), points apart by more than ten times that.
+    fn boundaries_meet(&mut self, fa: usize, fb: usize) -> Vec<DVec3> {
+        let (ea, eb): (Vec<usize>, Vec<usize>) = (self.faces[fa].edges.iter().map(|x| x.0).collect(), self.faces[fb].edges.iter().map(|x| x.0).collect());
+        let mut out: Vec<(DVec3, f64)> = Vec::new();
+        for &x in &ea {
+            let px = self.edge_polyline(x);
+            for &y in &eb {
+                let py = self.edge_polyline(y);
+                let reach = px.1 + py.1 + self.tol;
+                let bx = |p: &[DVec3]| p.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), q| (lo.min(*q), hi.max(*q)));
+                let ((xlo, xhi), (ylo, yhi)) = (bx(&px.0), bx(&py.0));
+                if !boxes_meet(xlo, xhi, ylo, yhi, reach) {
+                    continue;
+                }
+                for s in px.0.windows(2) {
+                    if !boxes_meet(s[0].min(s[1]), s[0].max(s[1]), ylo, yhi, reach) {
+                        continue;
+                    }
+                    for t in py.0.windows(2) {
+                        if !boxes_meet(s[0].min(s[1]), s[0].max(s[1]), t[0].min(t[1]), t[1].max(t[0]), reach) {
+                            continue;
+                        }
+                        let (p, q) = crate::blend::segment_closest(s[0], s[1], t[0], t[1]);
+                        if (p - q).length() > reach {
+                            continue;
+                        }
+                        let m = p.lerp(q, 0.5);
+                        match out.iter_mut().find(|o| (o.0 - m).length() <= 10.0 * reach.max(o.1)) {
+                            Some(o) => o.1 = o.1.max(reach),
+                            None => out.push((m, reach)),
+                        }
+                    }
+                }
+            }
+        }
+        out.into_iter().map(|o| o.0).collect()
+    }
+
     /// OCCT's sections of faces `a` and `b` as pair `m.0`'s (made once) moved by `m.1`: the curves moved here, their
     /// ids from the source.
     fn moved_sections(&mut self, src: &dyn SectionSource, a: (u32, u32), b: (u32, u32), m: &crate::MovedPair) -> R<(Vec<SectionCurve>, Vec<Option<u32>>)> {
         let (canon, r) = *m;
-        if let std::collections::hash_map::Entry::Vacant(e) = self.canon_secs.entry(canon) {
-            e.insert(src.sections(canon.0, canon.1)?.into_iter().filter(|c| c.t1 > c.t0).collect());
+        if !self.canon_secs.contains_key(&canon) {
+            let made = self.occt_sections(src, canon.0, canon.1)?;
+            self.canon_secs.insert(canon, made);
         }
         let made = &self.canon_secs[&canon];
         let from = made.iter().map(|c| Some(c.id)).collect();
@@ -2770,6 +2848,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         canonical: HashMap::default(),
         canon_secs: HashMap::default(),
         apart: HashMap::default(),
+        polylines: HashMap::default(),
         on_surface: HashMap::default(),
         ncurves: Vec::new(),
         src,

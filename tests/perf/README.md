@@ -34,3 +34,9 @@ chord-based mesh. To compare both in one run: `variants` = `chord:NOSHAPE_DISPLA
 Feature pattern of Boss 6 and two edge chamfers; 60779.484 mm³, 48 faces. Built by qa4's `r5/v3s2.py` through the CLI.
 Onshape's server regenerates it in 171 ms (bosses ≤ 9 ms each, Hole 18 ms); `crates/ops/tests/regen_profile.rs`
 profiles it per feature in release (perf.yml `model` job).
+
+`knurl-d25x25-45-45.noshape`: the user's knurl (P0 11-01, v0.4.19): the Feature Studio "Printable ANSI/ASME B94.6
+knurling" (`crates/model/tests/fs/knurl_b94.fs`), Diamond, outer face, circular pitch 12 TPI, depth 100 %, tooth 45°,
+helix 45°, on a Ø25 × 25 mm cylinder (Top circle, Extrude 25), built through the CLI. Live: 16.8 s, 11597.649 mm³,
+4479 faces (behaviours request 1743). `crates/ops/tests/regen_profile.rs` `timed_knurl_d25` opens and regenerates it
+with its display meshes (perf.yml timed checks); it hung for minutes in the app while noshape's Boolean declined it.

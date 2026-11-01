@@ -214,6 +214,11 @@ pub trait SectionSource: Sync {
     fn moved(&self, ids: &[u32], a: (u32, u32), b: (u32, u32), moved: &MovedPair) -> Result<Vec<u32>, Decline>;
     /// Makes the sections of these pairs ahead (on all threads) for `sections` to give; nothing by default.
     fn ahead(&self, _pairs: &[FacePair]) {}
+    /// The sections of faces `a` and `b` where `sections` gave none, walked from between `ends` (points where
+    /// their boundaries meet, two at least): a short section the source's sampling misses. None by default.
+    fn seeded(&self, _a: (u32, u32), _b: (u32, u32), _ends: &[DVec3]) -> Result<Vec<SectionCurve>, Decline> {
+        Ok(Vec::new())
+    }
 }
 
 /// Why a Boolean declined.

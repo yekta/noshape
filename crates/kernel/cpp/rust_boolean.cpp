@@ -16,6 +16,9 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepLib.hxx>
 #include <BRepBndLib.hxx>
+#include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <IntSurf_PntOn2S.hxx>
+#include <NCollection_List.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
 #include <BRepTools.hxx>
 #include <TopExp_Explorer.hxx>
@@ -1865,7 +1868,64 @@ void brep_occt_ahead(rust::Slice<const uint32_t> pairs)
       t_free->ahead.emplace(j.key, std::move(j.lines));
 }
 
-rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, BrepSections& out)
+// OCCT's face/face section of `fa` and `fb` walked from start points between `ends` (where the faces' boundaries
+// meet): each two's middle brought onto both surfaces (alternately projected until on both within 1e-7; else
+// none from there). A curve whose middle lies on one found before is dropped.
+static std::vector<IntTools_Curve> seeded_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, rust::Slice<const double> ends)
+{
+  std::vector<IntTools_Curve> out;
+  const occ::handle<Geom_Surface> sa = BRep_Tool::Surface(fa), sb = BRep_Tool::Surface(fb);
+  NCollection_List<IntSurf_PntOn2S> seeds;
+  const size_t                      n = ends.size() / 3;
+  for (size_t i = 0; i < n; ++i)
+    for (size_t j = i + 1; j < n; ++j)
+    {
+      gp_Pnt m((ends[3 * i] + ends[3 * j]) / 2, (ends[3 * i + 1] + ends[3 * j + 1]) / 2, (ends[3 * i + 2] + ends[3 * j + 2]) / 2);
+      double ua = 0, va = 0, ub = 0, vb = 0, gap = 1;
+      for (int k = 0; k < 50 && gap > 1e-9; ++k)
+      {
+        GeomAPI_ProjectPointOnSurf pa(m, sa);
+        if (pa.NbPoints() == 0)
+          break;
+        pa.LowerDistanceParameters(ua, va);
+        GeomAPI_ProjectPointOnSurf pb(pa.NearestPoint(), sb);
+        if (pb.NbPoints() == 0)
+          break;
+        pb.LowerDistanceParameters(ub, vb);
+        gap = pa.NearestPoint().Distance(pb.NearestPoint());
+        m   = gp_Pnt((pa.NearestPoint().XYZ() + pb.NearestPoint().XYZ()) / 2);
+      }
+      if (gap > 1e-7)
+        continue;
+      IntSurf_PntOn2S p;
+      p.SetValue(m, ua, va, ub, vb);
+      seeds.Append(p);
+    }
+  if (seeds.IsEmpty())
+    return out;
+  IntTools_FaceFace ff;
+  ff.SetParameters(true, true, true, 1e-7);
+  ff.SetList(seeds);
+  ff.Perform(fa, fb);
+  if (!ff.IsDone())
+    return out;
+  for (const IntTools_Curve& ic : ff.Lines())
+  {
+    const occ::handle<Geom_Curve> c = ic.Curve();
+    if (c.IsNull())
+      continue;
+    const gp_Pnt mid = c->Value((c->FirstParameter() + c->LastParameter()) / 2);
+    const bool   seen = std::any_of(out.begin(), out.end(), [&](const IntTools_Curve& o) {
+      GeomAPI_ProjectPointOnCurve pc(mid, o.Curve());
+      return pc.NbPoints() > 0 && pc.LowerDistance() <= 1e-7;
+    });
+    if (!seen)
+      out.push_back(ic);
+  }
+  return out;
+}
+
+rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> ends, BrepSections& out)
 {
   if (t_free == nullptr || t_free->srcs == nullptr)
     return rust::String("no Boolean running");
@@ -1877,7 +1937,18 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
   const KernelTimer timer("boolean.rust.sections");
   std::vector<IntTools_Curve> lines;
   const auto made = t_free->ahead.find(swap ? std::array<uint32_t, 4>{b_arg, b_face, a_arg, a_face} : std::array<uint32_t, 4>{a_arg, a_face, b_arg, b_face});
-  if (made != t_free->ahead.end())
+  if (ends.size() >= 6)
+  {
+    try
+    {
+      lines = seeded_sections(fa, fb, ends);
+    }
+    catch (const Standard_Failure&)
+    {
+      return rust::String("OCCT's section failed");
+    }
+  }
+  else if (made != t_free->ahead.end())
   {
     lines = std::move(made->second);
     t_free->ahead.erase(made);
