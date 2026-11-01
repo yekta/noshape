@@ -27,8 +27,14 @@ ssh -q -tt -o BatchMode=yes "$host" ". ~/noshape-env.sh; export CARGO_TARGET_DIR
   [ -n \"\${NOSHAPE_CONFIG_DIR:-}\" ] || export NOSHAPE_CONFIG_DIR=\$(mktemp -d -t noshape-config-XXXXXX); \
   cd ~/$dir/src && nice -n 5 $cmd" 2>&1 | tr -d '\r'
 rc=${PIPESTATUS[0]}
+# A binary built there has that build's source paths compiled in (the app's icons and assets): make the same path
+# here point at this worktree, so the copied app finds them (skasm 11-01).
+if [ ${#get[@]} -gt 0 ]; then
+  rhome=$(ssh -o BatchMode=yes "$host" 'echo $HOME'); mkdir -p "$rhome/$dir"; ln -sfn "$PWD" "$rhome/$dir/src"
+fi
+out="${CARGO_TARGET_DIR:-$PWD/target}/debug"
 for b in "${get[@]}"; do
-  mkdir -p "${CARGO_TARGET_DIR:-target}/debug"
-  rsync -a -e "ssh -o BatchMode=yes" "$host:$dir/target/debug/$b" "${CARGO_TARGET_DIR:-target}/debug/$b" && echo "== rb: copied $b here" >&2
+  mkdir -p "$out"
+  rsync -a -e "ssh -o BatchMode=yes" "$host:$dir/target/debug/$b" "$out/$b" && echo "== rb: copied $b to $out/$b" >&2
 done
 exit $rc
