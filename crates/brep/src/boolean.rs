@@ -466,6 +466,11 @@ impl Pool {
     /// The vertex `p` (its own tolerance `tp`) is: one within the Boolean's tolerance, or within the sum of the
     /// two's own where that's more (OCCT's rule for tolerant vertices); none in the grey band past that.
     fn find_tol(&self, p: DVec3, tp: f64) -> R<Option<u32>> {
+        self.find_with(p, tp, &|_, _| false)
+    }
+
+    /// [`Self::find_tol`], a vertex in the grey band apart where `apart` says so (its point and tolerance).
+    fn find_with(&self, p: DVec3, tp: f64, apart: &dyn Fn(DVec3, f64) -> bool) -> R<Option<u32>> {
         let half = 0.5 * self.tol;
         let mut found: Option<u32> = None;
         let mut take = |i: u32| -> R<()> {
@@ -487,7 +492,7 @@ impl Pool {
                     return Err(Decline("a point near two vertices"));
                 }
                 found = Some(i);
-            } else if d <= band {
+            } else if d <= band && !apart(self.p[i as usize], ti) {
                 if std::env::var_os("NOSHAPE_X_NEAR").is_some() {
                     eprintln!("NEAR {:?} vs {i} {:?}: d {d:e} reach {reach:e} band {band:e} tp {tp:e} ti {ti:e}\n{}", p, self.p[i as usize], std::backtrace::Backtrace::force_capture());
                 }
@@ -550,6 +555,14 @@ impl Pool {
 
     fn add(&mut self, p: DVec3) -> R<u32> {
         if let Some(i) = self.find(p)? {
+            return Ok(i);
+        }
+        Ok(self.push(p))
+    }
+
+    /// [`Self::add`], a vertex in the grey band apart where `apart` says so.
+    fn add_apart(&mut self, p: DVec3, apart: &dyn Fn(DVec3, f64) -> bool) -> R<u32> {
+        if let Some(i) = self.find_with(p, 0.0, apart)? {
             return Ok(i);
         }
         Ok(self.push(p))
@@ -1274,6 +1287,10 @@ impl Ctx<'_> {
             }
             path.length(x, y) <= tol
         };
+        // (A vertex near a point made on it but off one of its two faces: apart, a vertex of its own; OCCT's paves of
+        // a section are the vertices on both faces (a sharp knurl tooth's side edge under a micrometre outside the
+        // cylinder, the section's end beside its vertex there).)
+        let on_both = |faces: &[GFace], q: DVec3, t: f64| [fs, ft].iter().all(|&g| free::surface_distance(&faces[g], q) <= tol.max(t + tol));
         // The end of a section: the tighter of the two faces' ends, made a vertex.
         let pick = |cx: &mut Ctx, x: (f64, End), y: (f64, End), lo: bool| -> R<Option<u32>> {
             let (later, earlier) = if x.0 > y.0 { (x, y) } else { (y, x) };
@@ -1287,14 +1304,14 @@ impl Ctx<'_> {
             let v = match end {
                 End::Open => return Ok(None),
                 End::Vertex(v) => v,
-                End::Point(p) => cx.pool.add(p)?,
+                End::Point(p) => cx.pool.add_apart(p, &|q, t| !on_both(&cx.faces, q, t))?,
             };
             // Both faces end there: the same vertex.
             if near(earlier.0, later.0) {
                 for o in [x.1, y.1] {
                     let w = match o {
                         End::Vertex(w) => w,
-                        End::Point(p) => cx.pool.add(p)?,
+                        End::Point(p) => cx.pool.add_apart(p, &|q, t| !on_both(&cx.faces, q, t))?,
                         End::Open => continue,
                     };
                     if w != v {
