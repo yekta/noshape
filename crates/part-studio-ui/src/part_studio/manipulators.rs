@@ -107,7 +107,7 @@ impl PartStudioView {
             "moveFace" if e.dialog.read(cx).feature.params.is("moveFaceType", "ROTATE") => self.revolve_arc(cx).map(|h| Manip::Handles(Handle::Arc(h), None)),
             // Shell and Chamfer have none (std adds no manipulator; live psb 10-24).
             "cPlane" if e.dialog.read(cx).feature.params.is("cplaneType", "LINE_ANGLE") => self.plane_angle_arc(cx).map(|h| Manip::Handles(Handle::Arc(h), None)),
-            "cPlane" | "fillet" | "moveFace" | "offsetSurface" | "replaceFace" | "extendSurface" | "helix" => self.param_arrow(cx).map(|a| Manip::Handles(Handle::Arrow(a), None)),
+            "cPlane" | "fillet" | "moveFace" | "offsetSurface" | "replaceFace" | "extendSurface" | "helix" | "splitPart" => self.param_arrow(cx).map(|a| Manip::Handles(Handle::Arrow(a), None)),
             "revolve" => self.revolve_handles(cx),
             "draft" => self.draft_arc(cx).map(|h| Manip::Handles(Handle::Arc(h), None)),
             "transform" => self.current_triad(cx).map(Manip::Triad).or_else(|| self.transform_handle(cx)),
@@ -250,7 +250,7 @@ impl PartStudioView {
     fn transform_handle(&self, cx: &App) -> Option<Manip> {
         let d = self.edit.as_ref()?.dialog.read(cx);
         let p = &d.feature.params;
-        let (lo, hi) = self.transform_box(cx)?;
+        let (lo, hi) = self.parts_box("entities", cx)?;
         let c = (lo + hi) * 0.5;
         let units = self.doc.read(cx).session.doc.settings.units;
         let value = |id: &str, dim: Dim| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, dim, &units, &self.display.variables).ok().map(|q| q.value)));
@@ -493,6 +493,18 @@ impl PartStudioView {
                     _ => return None,
                 };
                 Some(Arrow { base, dir, length: value("height")?, param: "height", flip: Some("oppositeDirection"), secondary: false })
+            }
+            // splitpart.fs addKeepSideManipulator (Part, not Keep both
+            // sides): a flip arrow on the tool where it is nearest the parts
+            // (here: the parts' box centre dropped onto the tool's plane),
+            // along its normal for the front.
+            "splitPart" if p.is("splitType", "PART") && !p.bool("keepBothSides") => {
+                let r = p.query("tool").first()?;
+                let (o, n) = self.frame_of_ref(r).map(|f| (f.origin, f.normal)).or_else(|| noshape_model::select::face_anchor(ctx, r))?;
+                let (lo, hi) = self.parts_box("targets", cx)?;
+                let c = (lo + hi) * 0.5;
+                let base = c - n * n.dot(c - o);
+                Some(Arrow { base, dir: if p.bool("keepFront") { n } else { -n }, length: 0.0, param: "", flip: Some("keepFront"), secondary: false })
             }
             "fillet" => {
                 // Live (behaviours "Fillet", qa5 P1-3): on the last picked edge.

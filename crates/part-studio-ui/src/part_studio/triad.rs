@@ -65,14 +65,14 @@ fn plane_axes(h: usize) -> (usize, usize) {
 }
 
 impl PartStudioView {
-    /// The box of the parts a Transform dialog moves (std findCenter takes
-    /// its centre), before the feature.
-    pub(super) fn transform_box(&self, cx: &App) -> Option<(DVec3, DVec3)> {
+    /// The box of the parts a dialog's `field` holds (Transform's: std
+    /// findCenter takes its centre), before the feature.
+    pub(super) fn parts_box(&self, field: &str, cx: &App) -> Option<(DVec3, DVec3)> {
         let d = self.edit.as_ref()?.dialog.read(cx);
         let ctx = self.ui.before_context.as_ref().or(self.context.as_ref())?;
         let mut lo = DVec3::splat(f64::MAX);
         let mut hi = DVec3::splat(f64::MIN);
-        for r in d.feature.params.query("entities") {
+        for r in d.feature.params.query(field) {
             let id = match r {
                 Reference::Body(b) => Some(b.clone()),
                 r => self.body_of(r),
@@ -92,7 +92,7 @@ impl PartStudioView {
         if d.feature.type_id != "transform" || !p.is("transformType", "TRANSLATION_3D") {
             return None;
         }
-        let (lo, hi) = self.transform_box(cx)?;
+        let (lo, hi) = self.parts_box("entities", cx)?;
         let units = self.doc.read(cx).session.doc.settings.units;
         let value = |id: &str| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value))).unwrap_or(0.0);
         let offset = DVec3::new(value("dx"), value("dy"), value("dz"));
