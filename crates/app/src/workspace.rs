@@ -760,15 +760,12 @@ impl Workspace {
         }
     }
 
-    /// Drawing tab › Change to version…: the versions at the pointer.
+    /// Drawing tab › Change to version…: the drawing's Reference manager
+    /// (live drawing/293).
     fn change_drawing_version(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
         self.activate(tab, window, cx);
         let Some(TabView::Drawing(v)) = self.views.get(&tab) else { return };
-        let v = v.clone();
-        let entries = v.read(cx).version_menu(cx);
-        let at = window.mouse_position();
-        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| crate::drawing_view::fill_os_menu(m, &entries, &v, window, cx));
-        crate::os_menu::open(at, menu, window, cx);
+        v.update(cx, |v, cx| v.open_ref_manager(cx));
     }
 
     /// Tab › Export…: Onshape's Export modal (live, drawing/40 layout): File
@@ -1161,6 +1158,9 @@ impl Workspace {
             let compare = crate::compare_mode::tab_status(&self.doc, id, cx);
             let compare_off = compare.is_some_and(|s| s.disabled());
             let compare_dot = compare.map(|s| crate::compare_mode::tab_dot(SharedString::from(format!("tab-dot-{id}")), s, &crate::compare_mode::base_label(&self.doc, cx).unwrap_or_default()));
+            // A drawing pinned to an older version of this document: live's
+            // blue out-of-date icon before its own (drawing/297–300).
+            let newer = kind == "drawing" && drawing_behind(&self.doc, id, cx);
             let view = cx.entity();
             let tab_name = name.clone();
             let bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
@@ -1191,8 +1191,10 @@ impl Workspace {
                     .when(!active, |d| d.cursor_pointer())
                     .bg(if active { pal.panel } else if compare_off { gpui_kit::rgb(0xe1e1e1) } else { pal.tab_inactive })
                     .text_color(if active { pal.text } else { pal.text_muted })
-                    // Live tabbar: the blue out-of-date icon left of the tab's.
-                    .when(self.behind.contains(&id), |d| {
+                    // Live tabbar: the blue out-of-date icon left of the tab's
+                    // (a linked document's newer version, or a drawing pinned to an
+                    // older version of this one).
+                    .when(self.behind.contains(&id) || newer, |d| {
                         d.child(div().id(SharedString::from(format!("tab-behind-{id}"))).flex_none().tooltip(crate::ui::tooltip("Newer versions of linked documents available")).child(crate::assets::icon("inserted-version-update", 16., cx)))
                     })
                     .child(div().flex_none().when(compare_off, |d| d.opacity(0.5)).child(crate::assets::icon(tab_icon(kind), 20., cx)))
@@ -1599,6 +1601,19 @@ fn switcher_next(open: Option<(Vec<TabId>, usize)>, active: Option<TabId>, recen
             (!list.is_empty()).then(|| (list.clone(), 1.min(list.len() - 1)))
         }
     }
+}
+
+/// A drawing whose views are pinned to a version of this document older
+/// than its latest one.
+fn drawing_behind(doc: &Entity<crate::doc_model::DocModel>, tab: TabId, cx: &App) -> bool {
+    let d = doc.read(cx);
+    let Some(TabContent::Drawing(dr)) = d.session.doc.tab(tab).map(|t| &t.content) else { return false };
+    let pins: Vec<&str> = dr.sheets.iter().flat_map(|s| &s.views).filter_map(|v| v.pinned.as_ref()).map(|p| p.id.as_str()).filter(|id| !id.starts_with("ext:")).collect();
+    if pins.is_empty() {
+        return false;
+    }
+    let latest = d.session.store.list_versions().ok().and_then(|v| v.last().map(|v| v.id.to_string()));
+    latest.is_some_and(|l| pins.iter().any(|p| *p != l))
 }
 
 fn tab_icon(kind: &'static str) -> &'static str {

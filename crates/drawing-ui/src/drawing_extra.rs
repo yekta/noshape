@@ -320,19 +320,6 @@ impl DrawingEditor {
         self.ensure_sources(false, cx);
     }
 
-    /// The versions menu of Change to version…: the workspace, then each
-    /// version (the current one checked).
-    pub fn version_menu(&self, cx: &App) -> Vec<MenuEntry> {
-        let cur = self.drawing.sheets.iter().flat_map(|s| &s.views).find_map(|v| v.pinned.clone());
-        let mut out = vec![MenuEntry::check("Main (workspace)", cur.is_none(), |t, _, cx| t.pin_drawing(None, cx))];
-        for v in self.doc.read(cx).session.store.list_versions().unwrap_or_default() {
-            let pin = noshape_model::drawing::PinnedVersion { id: v.id.to_string(), name: v.name.clone() };
-            let on = cur.as_ref().is_some_and(|c| c.id == pin.id);
-            out.push(MenuEntry::check(v.name, on, move |t, _, cx| t.pin_drawing(Some(pin.clone()), cx)));
-        }
-        out
-    }
-
     /// The reference row's menu (live dom/context-menus-drawing-sheets.txt):
     /// Switch to reference | Replace... (on every sheet; the chooser) |
     /// Change configuration... (configured sources), then Pin view
