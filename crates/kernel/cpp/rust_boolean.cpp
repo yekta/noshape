@@ -1581,9 +1581,9 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     fs[i] = rev ? TopoDS::Face(f.Reversed()) : f;
   }
   // A new edge on a made plane whose ends lie off it by more than its tolerance (a tolerant vertex the section runs
-  // through, off a slightly tilted plane): its tolerance to cover that, as OCCT's edges there (else its curve on the
-  // plane is off its curve: BRepCheck_InvalidCurveOnSurface, and later operations on it failed: fuzz seed 1144).
-  // Its vertices' to at least that; an argument's own vertex isn't changed: declined.
+  // through, off a slightly tilted plane): declined. OCCT runs its section on the planes' exact intersection and
+  // its result there differs (fuzz seed 1144's Shell common b997c4c3: ours, its edge's tolerance raised to cover it,
+  // was valid but 0.036 % in volume off, and a later sheet metal extrude crashed on it; on OCCT's result it doesn't).
   {
     ShapeIMap made;
     for (size_t k = 0; k < ne; ++k)
@@ -1593,8 +1593,8 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     {
       if (r.face_origin[3 * i] == 0)
         continue;
-      TopLoc_Location                 loc;
-      const occ::handle<Geom_Plane>   pl = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(fs[i], loc));
+      TopLoc_Location               loc;
+      const occ::handle<Geom_Plane> pl = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(fs[i], loc));
       if (pl.IsNull())
         continue;
       const gp_Pln p = pl->Pln().Transformed(loc.Transformation());
@@ -1605,22 +1605,9 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           continue;
         TopoDS_Vertex a, z;
         TopExp::Vertices(e, a, z);
-        double dev = 0;
         for (const TopoDS_Vertex& v : {a, z})
-          if (!v.IsNull())
-            dev = std::max(dev, p.Distance(BRep_Tool::Pnt(v)));
-        if (dev <= BRep_Tool::Tolerance(e))
-          continue;
-        const double need = dev * (1 + 1e-6) + 1e-12;
-        for (const TopoDS_Vertex& v : {a, z})
-          if (!v.IsNull() && BRep_Tool::Tolerance(v) < need)
-          {
-            const int q = [&] { for (size_t w = 0; w < vs.size(); ++w) if (vs[w].IsSame(v)) return static_cast<int>(w); return -1; }();
-            if (q < 0 || r.vertex_origin[3 * q] == 0)
-              return "an edge off a plane past its tolerance";
-            bb.UpdateVertex(v, need);
-          }
-        bb.UpdateEdge(e, need);
+          if (!v.IsNull() && p.Distance(BRep_Tool::Pnt(v)) > BRep_Tool::Tolerance(e))
+            return "an edge off a plane past its tolerance";
       }
     }
   }

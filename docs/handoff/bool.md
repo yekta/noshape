@@ -1079,6 +1079,19 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Fuzz seed 1144 diagnosed (11-01 18:20 UTC)
+- With Shell's direct Booleans kept on OCCT (a diagnostic switch, not landed) the run is clean; with b997c4c3 (the one
+  of those still differing) declined it still dies. The runs part at step 2 already: the first Shell's face ids differ
+  between the paths (the naming reads the history, and our history differs from OCCT's in the known rounding records:
+  a vertex inside coincident edges of three or more arguments, Deleted where OCCT says Modified, fe9670f8), so the
+  fuzz picks other faces and builds another model, valid, on which OCCT's own op_prism (a sheet metal extrude) smashes
+  its stack at step 51. That is OCCT's fault on a legitimate input (core: Requests); the rounding records are a
+  known equivalence (OCCT's choice there depends on rounding), not a wrong result.
+- b997c4c3 (the edge through a tolerant vertex off a tilted plane) now declines instead of raising the edge's
+  tolerance: OCCT's result there is the exact one (ours was valid but 0.036 % off in volume). T1
+  an_edge_through_a_tolerant_vertex_off_a_plane_declines.
+- Seeds re-run on a CLI with today's fixes: 979, 1036, 1112, 1092 (twice), 1102 all clean.
+
 ## A validity guard on noshape's results (11-01 17:40 UTC)
 - rust_boolean.cpp checks every result up to 2000 faces with BRepCheck_Analyzer; an invalid one declines ("an invalid
   result") and OCCT builds the Boolean. Invalid results of ours had gone on into later OCCT operations and crashed
@@ -1526,8 +1539,8 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   Boolean of ours in the run is valid: "stack smashing detected" in op_prism (features.cpp, a sheet metal extrude's
   prism during the regeneration), trace on vibe4 ~/bool-fuzz/cli/err-1144tr.log (NOSHAPE_GUARD_TRACE=1), binary
   ~/bool-fuzz/noshape-cli-fix3 (symbols), runner ~/bool-fuzz/clifuzz_time.py (`python3 clifuzz_time.py 1144 62` with
-  NSCLI set). Clean with NOSHAPE_BOOL_RUST=0. Its profile likely comes from a result of ours that is valid but
-  differs from OCCT's (b997c4c3, 0.036 % in volume); the stack smash itself is in OCCT's prism code.
+  NSCLI set). Clean with NOSHAPE_BOOL_RUST=0 only because that run builds another model (face ids part at step 2,
+  see "Fuzz seed 1144 diagnosed"); the stack smash itself is in OCCT's prism code on a valid model.
 - core (10-31 16:40 UTC, P0 SHELL-SLOW): Shell's slab union is OCCT's for concave parts, 1.5-2.3 s of a 2.6-3.4 s
   Shell: a 60 x 40 x 20 block, a 40 x 20 x 10 pocket from the top with R2 on its 4 floor edges, shell with the
   bottom removed, 1 / 2 mm (18 slabs: planes' boxes, the fillets' cylinder shells, filler prisms at the concave

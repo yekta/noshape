@@ -463,9 +463,16 @@ fn a_hole_touching_the_boundary_is_its_own_wire() {
 }
 
 /// A Shell's common whose new edge on a slightly tilted plane runs through a tolerant vertex off it (fuzz seed 1144):
-/// the edge's tolerance covers it (its curve on the plane was off its curve: InvalidCurveOnSurface). Its volume is
-/// still 0.036 % off OCCT's (OCCT's edge on the planes' exact intersection).
+/// declined to OCCT, whose section runs on the planes' exact intersection (ours, its tolerance raised, was valid but
+/// 0.036 % off in volume, and a later sheet metal extrude crashed on it).
 #[test]
-fn an_edge_through_a_tolerant_vertex_off_a_plane() {
-    valid_as_occt("b997c4c389ff7abe", 1e-3);
+fn an_edge_through_a_tolerant_vertex_off_a_plane_declines() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "b997c4c389ff7abe").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    assert!(r.is_err() && why == "an edge off a plane past its tolerance", "taken, or declined otherwise: {why}");
 }
