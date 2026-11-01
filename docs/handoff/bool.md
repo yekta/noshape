@@ -1079,6 +1079,33 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Looked at, not landed (11-01 12:20 UTC)
+- "An apex on a part of a cone" (b0c36850, 9f262529, d5cd8b8d: fuses of 13 sector bodies around drilled cones,
+  ~19 s recorded). Each fix moved them to the next fault; the general fixes found on the way are in
+  /root/bool-scratch/apex-wip2.patch (worktree bool-c, branch bool-apex, commit 06797001 with debug prints under
+  NOSHAPE_BREP_NM): rulings of any curve kind at the apex (apex-any-kind.patch); a piece of a curve inside a part of a
+  cone from or to its gap angle gets a point there, and the two halves aren't joined across the gap (a face going round
+  with two sides there); a point within reach of two vertices is the one it is on (within a tenth of its reach) where
+  the others are past half theirs; two arcs or ellipses between the same ends one edge only with their middles within
+  the grey band (was 100 tol = 2 mm: a hole's circle and another part's crossing it at both ends were merged); two
+  B-splines one edge by each one's points on the other's piece (pieces of one curve by their ranges); OCCT's section
+  along another curve within its own error; a straight B-spline on a cone or cylinder mapped as its line (its apex end
+  at the ruling's angle, its side of a seam). Full replay (why39): every set exactly main's counts, 0 differ: safe,
+  but no case gained yet, so not landed. Where they stop now: b0c36850 / 9f262529 "two edges leave a vertex in one
+  direction" (the apex's pieces), d5cd8b8d "coincident pieces differ": a section of face 10:0 with a face of argument
+  9 (an argument isn't intersected with itself) splits 10:0 but not the coincident 9:0; OCCT splits same-domain faces
+  by each other's edges. That (same-domain faces sharing their splits) is the next step for these.
+- "A new edge on a free-form face" (763e60bc, d33e88ff, b7eb72a8, ~15 s): projecting the edge's curve onto the face
+  (BuildPCurveForEdgeOnFace, as for input edges; /root/bool-scratch/proj-newedge.patch) takes 763e60bc and d33e88ff
+  as equivalents (2 vertex records apart, volume 1e-13), but b7eb72a8 (a Shell slab fuse of 17) then differs: after
+  unify ours has 14 faces, OCCT's 18. Before unify the faces are the same; the coincident cylinder pieces at the boss
+  (arg 4's cylinder and arg 11's reversed half cylinder, r 10 mm) are kept on arg 4's surface by ours and on arg 11's
+  by OCCT (opposite axes: OCCT's unify then doesn't merge them). OCCT's FillSameDomainFaces says the original face
+  with the least DS index, else the group's first (the least index's piece), which would be arg 4's: so its choice
+  comes from how its pairs group, to be found with an instrumented TKBO. Trying "original faces first" (OCCT's rule,
+  original = not split, its edges and vertices unchanged) changed nothing here. Not landed.
+- "An internal face" (b2511301, addb9a14): see below, not worth it.
+
 ## Crossing grooves with one floor; a vertex on a plane by OCCT's rule (11-01 11:30 UTC)
 - A cut's tool piece lying on other tools was never kept (right where they face each other: inside the tools). Grooves
   crossing in pairs (a 24-tool knurl-like cut, 50004ac9 and 8c3247ab, in every set: ~25 s recorded) have their floors on
