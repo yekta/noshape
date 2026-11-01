@@ -25,6 +25,7 @@ pub mod material_libraries;
 pub mod library;
 pub mod named_views_dialog;
 pub mod nav_trace;
+pub mod notifications;
 pub mod navigation;
 pub mod os_menu;
 pub mod os_select;

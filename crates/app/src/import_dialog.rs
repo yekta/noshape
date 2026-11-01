@@ -219,6 +219,8 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
     let choice = imp::ImportChoice { combine: c.combine, appearances: c.appearances, density: c.density, y_up: c.y_up, unit: c.unit, composite: c.composite, join: c.join };
     let (inputs, errors) = imp::read_inputs(paths, &choice, keep_files, &units);
     for e in errors {
+        // The toast, and the reason in the Notifications bell (live IM3).
+        crate::notifications::push(cx, format!("Import {} failed", import_name(&e).unwrap_or_default()), e.clone(), true);
         doc.update(cx, |_, cx| cx.emit(DocEvent::Error(failed_toast(&e))));
     }
     // A file Onshape couldn't translate still gets its file tab.
@@ -232,7 +234,15 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
         doc.edit_document(&description, cx, |d| (first, errors) = imp::apply(d, inputs, &choice, after, &units));
         let ok = errors.is_empty();
         for e in errors {
+            crate::notifications::push(cx, format!("Import {} failed", import_name(&e).unwrap_or_default()), e.clone(), true);
             cx.emit(DocEvent::Error(failed_toast(&e)));
+        }
+        // Live's bell entry: "Import <file>" with its steps done.
+        if ok && first.is_some() {
+            for p in paths {
+                let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                crate::notifications::push(cx, format!("Import {name}"), format!("Uploaded · Translated · Post-processing done · Created {name}"), false);
+            }
         }
         // Live: "onshape-cone.sat has been imported. Open document ×".
         if let ([p], true, Some(_)) = (paths, ok, first) {
@@ -247,15 +257,22 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
 /// uploaded but failed to translate."; the reason goes to its Notifications
 /// bell, behaviours "qa5 zip import"); the agent API keeps the reason.
 fn failed_toast(e: &str) -> String {
-    let name = if let Some((n, _)) = e.split_once(" was not translated.") {
-        n.to_string()
+    match import_name(e) {
+        Some(name) => format!("{name} uploaded but failed to translate."),
+        None => e.to_string(),
+    }
+}
+
+/// The file an import error is about.
+fn import_name(e: &str) -> Option<String> {
+    if let Some((n, _)) = e.split_once(" was not translated.") {
+        Some(n.to_string())
     } else if let Some(rest) = e.strip_prefix("Import failed: ") {
         let path = rest.split_once(": ").map_or(rest, |(p, _)| p);
-        std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string())
+        Some(std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string()))
     } else {
-        return e.to_string();
-    };
-    format!("{name} uploaded but failed to translate.")
+        None
+    }
 }
 
 #[cfg(test)]

@@ -6,7 +6,7 @@
 #![recursion_limit = "256"]
 
 // The app's base layer (docs/CRATES.md), under its old paths.
-use noshape_app_core::{actions, assets, cached_slice, camera_menu, cursor, derived, doc_files, doc_model, file_tab_view, gpu, graphics_prefs, i18n, navigation, os_menu, os_ui, repair_mode, scene_builder, session, start_library, start_thumbnail, theme, ui, viewport};
+use noshape_app_core::{actions, assets, cached_slice, camera_menu, cursor, derived, doc_files, doc_model, file_tab_view, gpu, graphics_prefs, i18n, navigation, notifications, os_menu, os_ui, repair_mode, scene_builder, session, start_library, start_thumbnail, theme, ui, viewport};
 // The Drawing studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_drawing_hooks`.
 use noshape_drawing_ui::{drawing_create, drawing_view};
 // The Assembly studio UI (docs/CRATES.md), under its old paths; what it needs of the app: `register_assembly_hooks`.

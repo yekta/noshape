@@ -91,6 +91,8 @@ pub struct Workspace {
     open_folder: Option<TabId>,
     /// Onshape's "FeatureScript notices" panel, under the tab bar.
     fs_notices: Option<(Entity<crate::fs_notices::FsNoticesPanel>, Subscription)>,
+    /// The Notifications bell's panel is open.
+    notifications_open: bool,
     /// Onshape's "Search Feature Studios" pane, under the tab bar.
     fs_search: Option<(Entity<crate::fs_search::FsSearchPane>, Subscription)>,
     /// Create Drawing dialog (see `drawing_create`).
@@ -139,7 +141,7 @@ impl Workspace {
         let _ = doc.read(cx).custom_features();
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
         let tab_thumbs = cx.new(|_| crate::tab_thumbs::TabThumbs::new(doc.clone()));
-        let mut this = Self { behind: Default::default(), behind_refs: Vec::new(), behind_task: None, tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), switcher: None, tab_manager: None, doc_panel: None, renaming_tab: None, tab_gap: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
+        let mut this = Self { behind: Default::default(), behind_refs: Vec::new(), behind_task: None, tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), switcher: None, tab_manager: None, doc_panel: None, renaming_tab: None, tab_gap: None, units_panel: None, open_folder: None, fs_notices: None, notifications_open: false, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
         this._subs.push(focus_lost);
         // Another document may have a new version when the window comes back.
         this._subs.push(cx.observe_window_activation(window, |this: &mut Self, window, cx| {
@@ -591,6 +593,7 @@ impl Workspace {
                     .when(read_only && viewing_version.is_none(), |d| d.child(div().ml_2().px_2().rounded(px(2.)).bg(pal.warning).text_xs().text_color(pal.text).child("VIEWING HISTORY")))
                     .child(div().flex_1())
                     .children(self.render_notices_button(cx))
+                    .child(self.render_bell(cx))
                     .child(self.render_help_menu(cx)),
             )
             .into_any_element()
@@ -603,6 +606,32 @@ impl Workspace {
             Some(TabView::Assembly(v)) => v.read(cx).selection_cursor_count(cx),
             _ => 0,
         }
+    }
+
+    /// The Notifications bell (live: right of the navbar, a blue unread
+    /// count; EX11): its panel lists export and import results.
+    fn render_bell(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let count = crate::notifications::unread(cx);
+        h_flex()
+            .id("notifications-bell")
+            .relative()
+            .h(px(32.))
+            .px(px(6.))
+            .rounded(px(3.))
+            .items_center()
+            .cursor_pointer()
+            .hover(|d| d.bg(p().border))
+            .when(self.notifications_open, |d| d.bg(p().border))
+            .tooltip(crate::ui::tooltip("Notifications"))
+            .child(crate::assets::icon("bell", 20., cx))
+            .children(crate::notifications::badge(count).map(|b| {
+                div().absolute().top(px(2.)).right(px(0.)).min_w(px(15.)).h(px(15.)).px(px(3.)).rounded_full().bg(gpui_kit::rgb(0x1651b0)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child(b)
+            }))
+            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.notifications_open = !this.notifications_open;
+                cx.notify();
+            }))
+            .into_any_element()
     }
 
     /// Help ▾ at the right of the navbar (Onshape's `?▾`).
@@ -1842,6 +1871,19 @@ impl Render for Workspace {
             )
             .children(self.fs_search.as_ref().map(|(p, _)| p.clone()))
             .children(self.create_drawing.as_ref().map(|(d, _)| d.clone()))
+            // The bell's panel under the navbar's right end.
+            .children(self.notifications_open.then(|| {
+                let ws = cx.entity();
+                div().absolute().top(px(crate::ui::NAVBAR_H)).right(px(40.)).child(crate::notifications::panel(
+                    move |_, cx| {
+                        ws.update(cx, |w, cx| {
+                            w.notifications_open = false;
+                            cx.notify();
+                        })
+                    },
+                    cx,
+                ))
+            }))
             // Onshape right-click menus opened with `os_context_menu`.
     }
 }

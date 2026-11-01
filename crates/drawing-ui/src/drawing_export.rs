@@ -251,6 +251,11 @@ impl DrawingEditor {
                     cx.notify();
                     return;
                 }
+                // Live: the result goes to the Notifications bell (EX11).
+                match &done {
+                    Ok(_) => crate::notifications::push(cx, "Export completed", format!("{file_name} was exported successfully."), false),
+                    Err(e) => crate::notifications::push(cx, "Export failed", format!("{file_name} could not be exported: {e}"), true),
+                }
                 this.status = Some(done.unwrap_or_else(|e| format!("Export failed: {e}")).into());
                 cx.notify();
             })
