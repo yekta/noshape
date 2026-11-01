@@ -307,7 +307,7 @@ pub struct DrawingEditor {
     /// The Note panel's "Note color" panel.
     pub note_color: Option<crate::drawing_note_color::NoteColorDlg>,
     /// Paste as table: the cells waiting for the placing click.
-    pub paste_table: Option<Vec<Vec<String>>>,
+    pub paste_table: Option<noshape_scene::drawing_tools::paste_html::PastedTable>,
     /// Note tool: the leader anchored by the first click (on a snap point).
     pub note_leader: Option<Leader>,
     /// Geometric tolerance tool: the model point of `note_leader`.

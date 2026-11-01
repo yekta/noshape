@@ -246,10 +246,22 @@ pub fn parse_cells(text: &str) -> Option<Vec<Vec<String>>> {
     )
 }
 
-/// Paste as table: a general table of `cells` with its top-left corner at
-/// `at` (sheet mm), one edit "Paste as table".
-pub fn pasted_table(id: u64, cells: Vec<Vec<String>>, at: [f64; 2]) -> Table {
-    let mut t = Table::new(id, TableKind::General { cells, title: None, header: false }, at);
+/// Paste as table: a general table of the pasted cells with its top-left
+/// corner at `at` (sheet mm), one edit "Paste as table". Merges, cell
+/// formats and sizes come along (HTML); every cell is centred (live,
+/// drawing.md TB12).
+pub fn pasted_table(id: u64, p: super::paste_html::PastedTable, at: [f64; 2]) -> Table {
+    let (rows, cols) = (p.cells.len(), p.cells.iter().map(|r| r.len()).max().unwrap_or(0));
+    let mut t = Table::new(id, TableKind::General { cells: p.cells, title: None, header: false }, at);
     t.corner = TableCorner::TopLeft;
+    t.merges = p.merges;
+    t.col_widths = p.col_widths;
+    t.row_heights = p.row_heights;
+    for row in 0..rows {
+        for col in 0..cols {
+            let format = p.formats.iter().find(|s| s.row == row && s.col == col).map(|s| s.format.clone()).unwrap_or_default();
+            t.cell_formats.push(noshape_model::drawing::CellStyle { row, col, format });
+        }
+    }
     t
 }

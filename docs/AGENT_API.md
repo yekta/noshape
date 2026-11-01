@@ -4903,7 +4903,7 @@ Examples:
 
 Paste spreadsheet cells as a new table (edits the document (one undoable history entry)).
 
-Paste as table: spreadsheet text (rows of tab-separated cells, as a spreadsheet copies them) becomes a general table with its top-left corner at `position` (sheet mm); one edit "Paste as table". Returns the table id.
+Paste as table: spreadsheet cells (the HTML a spreadsheet copies, else its text: rows of tab-separated cells) become a general table with its top-left corner at `position` (sheet mm); one edit "Paste as table". From HTML the table keeps merged cells, text size, bold / italic / underline / strikethrough and cell widths and heights (background, text color and links are dropped; a partly-formatted cell loses its formatting); every cell is centred. Returns the table id.
 
 Examples:
 
@@ -4916,7 +4916,8 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
-| `text` | string | required | Rows separated by newlines, cells by tabs. |
+| `text` | string |  | Rows separated by newlines, cells by tabs. |
+| `html` | string |  | The clipboard's HTML (text/html) with a <table>: used when it has one. |
 | `position` | array of number | required | Top-left corner (sheet mm). |
 
 #### drawing_replace

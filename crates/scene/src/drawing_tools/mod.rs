@@ -17,6 +17,7 @@ mod smart;
 mod sketch;
 mod types;
 pub mod annotation_edit;
+pub mod paste_html;
 pub mod table_edit;
 pub mod replicate;
 pub mod view_edit;

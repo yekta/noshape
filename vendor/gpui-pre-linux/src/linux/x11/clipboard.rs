@@ -77,7 +77,7 @@ x11rb::atom_manager! {
         TEXT,
         TEXT_MIME_UNKNOWN: b"text/plain",
 
-        // HTML: b"text/html",
+        HTML: b"text/html",
         // URI_LIST: b"text/uri-list",
 
         PNG__MIME: ImageFormat::mime_type(ImageFormat::Png ).as_bytes(),
@@ -1069,7 +1069,16 @@ impl Clipboard {
         } else {
             String::from_utf8(result.bytes).map_err(|_| Error::ConversionFailure)?
         };
-        Ok(ClipboardItem::new_string(text))
+        // Spreadsheet cells (tab-separated or several lines): their HTML too,
+        // which keeps merged cells and formatting (noshape: Paste as table).
+        let mut item = ClipboardItem::new_string(text.clone());
+        if (text.contains('\t') || text.trim_end().contains('\n'))
+            && let Ok(html) = self.inner.read(&[self.inner.atoms.HTML], selection)
+            && let Ok(html) = String::from_utf8(html.bytes)
+        {
+            item.entries.push(gpui::ClipboardEntry::Html(html));
+        }
+        Ok(item)
     }
 
     pub fn is_owner(&self, selection: ClipboardKind) -> bool {

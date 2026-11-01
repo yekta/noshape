@@ -102,8 +102,8 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "paste_table",
             summary: "Paste spreadsheet cells as a new table",
-            description: "Paste as table: spreadsheet text (rows of tab-separated cells, as a spreadsheet copies them) becomes a general table with its top-left corner at `position` (sheet mm); one edit \"Paste as table\". Returns the table id.",
-            fields: with(common(), vec![req("text", s(), "Rows separated by newlines, cells by tabs."), req("position", point(), "Top-left corner (sheet mm).")]),
+            description: "Paste as table: spreadsheet cells (the HTML a spreadsheet copies, else its text: rows of tab-separated cells) become a general table with its top-left corner at `position` (sheet mm); one edit \"Paste as table\". From HTML the table keeps merged cells, text size, bold / italic / underline / strikethrough and cell widths and heights (background, text color and links are dropped; a partly-formatted cell loses its formatting); every cell is centred. Returns the table id.",
+            fields: with(common(), vec![opt("text", s(), "Rows separated by newlines, cells by tabs."), opt("html", s(), "The clipboard's HTML (text/html) with a <table>: used when it has one."), req("position", point(), "Top-left corner (sheet mm).")]),
             mutates: true,
             destructive: false,
             run: paste_table,
@@ -266,11 +266,19 @@ fn table_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn paste_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let mut t = target(od, a)?;
-    let cells = te::parse_cells(a.str("text")?).ok_or_else(|| OpError::param("text", "not a table: rows of tab-separated cells (a tab, or several lines)"))?;
+    // The clipboard's HTML when it holds a table, else its text.
+    let pasted = match a.opt_str("html")?.map(noshape_scene::drawing_tools::paste_html::parse_html_table) {
+        Some(Some(p)) => p,
+        html => match a.opt_str("text")? {
+            Some(text) => noshape_scene::drawing_tools::paste_html::PastedTable::plain(te::parse_cells(text).ok_or_else(|| OpError::param("text", "not a table: rows of tab-separated cells (a tab, or several lines)"))?),
+            None if html.is_some() => return Err(OpError::param("html", "no <table> with more than one cell")),
+            None => return Err(OpError::param("text", "give `text` (or `html`)")),
+        },
+    };
     let at = pt_arg(a, "position")?;
     let sheet = t.sheet;
     let id = t.d.sheets[sheet].next_table_id();
-    t.d.sheets[sheet].tables.push(te::pasted_table(id, cells, at));
+    t.d.sheets[sheet].tables.push(te::pasted_table(id, pasted, at));
     done(od, t, "Paste as table", "table", id)
 }
 

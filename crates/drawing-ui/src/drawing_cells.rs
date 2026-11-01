@@ -350,9 +350,12 @@ impl DrawingEditor {
         });
     }
 
-    /// Spreadsheet cells on the clipboard.
-    pub fn clipboard_cells(&self, cx: &App) -> Option<Vec<Vec<String>>> {
-        cx.read_from_clipboard().and_then(|c| c.text()).and_then(|t| parse_cells(&t))
+    /// Spreadsheet cells on the clipboard: its HTML table (merges, formats,
+    /// sizes; drawing.md TB12), else its tab-separated text.
+    pub fn clipboard_cells(&self, cx: &App) -> Option<noshape_scene::drawing_tools::paste_html::PastedTable> {
+        use noshape_scene::drawing_tools::paste_html::{PastedTable, parse_html_table};
+        let item = cx.read_from_clipboard()?;
+        item.html().and_then(parse_html_table).or_else(|| item.text().and_then(|t| parse_cells(&t)).map(PastedTable::plain))
     }
 
     /// Paste as table: the next click places the cells.

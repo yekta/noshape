@@ -3021,6 +3021,9 @@ pub enum ClipboardEntry {
     Image(Image),
     /// A file entry
     ExternalPaths(crate::ExternalPaths),
+    /// HTML (text/html) offered alongside the text: a spreadsheet's copied
+    /// cells as a <table> (noshape: Paste as table keeps merges and formats).
+    Html(String),
 }
 
 impl ClipboardItem {
@@ -3084,6 +3087,14 @@ impl ClipboardItem {
         } else {
             None
         }
+    }
+
+    /// The HTML (text/html) the clipboard offered with its text, if any.
+    pub fn html(&self) -> Option<&str> {
+        self.entries.iter().find_map(|e| match e {
+            ClipboardEntry::Html(h) => Some(h.as_str()),
+            _ => None,
+        })
     }
 
     /// If this item is one ClipboardEntry::String, returns its metadata.

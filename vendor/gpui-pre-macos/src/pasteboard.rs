@@ -75,9 +75,18 @@ impl Pasteboard {
 
             // Next, check for a plain string.
             if let Some(string_entry) = self.read_string_from_pasteboard() {
-                return Some(ClipboardItem {
-                    entries: vec![string_entry],
-                });
+                let mut entries = vec![string_entry];
+                // A spreadsheet's cells: their HTML too, which keeps merged
+                // cells and formatting (noshape: Paste as table).
+                let html_type: id = ns_string("public.html");
+                let types: id = self.inner.types();
+                let has_html: bool = msg_send![types, containsObject: html_type];
+                if has_html {
+                    if let Some(bytes) = self.data_for_type(html_type) {
+                        entries.push(ClipboardEntry::Html(String::from_utf8_lossy(&bytes).to_string()));
+                    }
+                }
+                return Some(ClipboardItem { entries });
             }
 
             // Finally, try the various supported image types.

@@ -4502,6 +4502,18 @@ fn drawing_replicate_copy_paste_replace_and_navigation() {
     }
     let e = try_call(&mut ctx, "drawing_table_properties", json!({ "drawing": tab, "table": tid, "structured": true })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("structured"), "{e:?}");
+    // Paste as table from a spreadsheet's HTML: merged cells and column
+    // widths come along (drawing.md TB12).
+    let html = r#"<table><colgroup><col width="100"><col width="60"></colgroup><tr style="height:30px"><td colspan="2" style="font-weight:bold">Parts</td></tr><tr style="height:21px"><td>Bolt</td><td>4</td></tr></table>"#;
+    let ph = call(&mut ctx, "drawing_paste_table", json!({ "drawing": tab, "html": html, "text": "Parts\nBolt\t4", "position": [60, 280] }));
+    let hid = ph["table"].clone();
+    let h = ph["tables"].as_array().unwrap().iter().find(|t| t["id"] == hid).unwrap().clone();
+    assert_eq!(h["rows"], json!([["Parts", ""], ["Bolt", "4"]]), "{h}");
+    assert_eq!(h["merges"], json!([{ "row": 0, "column": 0, "rows": 1, "columns": 2 }]), "{h}");
+    let widths: Vec<f64> = h["column_widths"].as_array().unwrap().iter().map(num).collect();
+    assert!((widths[0] - 100.0 * 25.4 / 96.0).abs() < 0.01 && (widths[1] - 60.0 * 25.4 / 96.0).abs() < 0.01, "{h}");
+    let e = try_call(&mut ctx, "drawing_paste_table", json!({ "drawing": tab, "html": "<p>x</p>", "position": [60, 280] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("html"), "{e:?}");
     // Revision table properties.
     let rid = call(&mut ctx, "drawing_revision_table", json!({ "drawing": tab, "position": [400, 290] }))["table"].clone();
     call(&mut ctx, "drawing_table_properties", json!({ "drawing": tab, "table": rid, "visible_rows": 8, "newest_top": true }));
