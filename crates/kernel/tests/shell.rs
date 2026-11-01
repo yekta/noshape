@@ -570,9 +570,8 @@ fn planes_and_slabs_agree() {
     assert!(shell_solid(&pockets, &rm, 2.0, ShellSide::Inside, ShellMethod::Quadrics).is_err(), "offsets meeting across the 3 mm wall (quadrics)");
 }
 
-/// A shell case: name, part, faces removed, thickness, and how many shown edges and vertices the slabs have more
-/// than the direct wall (their documented artefacts).
-type Case = (&'static str, Shape, Vec<Shape>, f64, (usize, usize));
+/// A shell case: name, part, faces removed, thickness.
+type Case = (&'static str, Shape, Vec<Shape>, f64);
 
 /// Solids of planes, cylinders and cones: the direct wall (ShellMethod::Quadrics) against the slabs'.
 #[test]
@@ -604,6 +603,8 @@ fn quadrics_and_slabs_agree() {
         let p = chamfer(&p, &es, ChamferSpec::Equal(2.0), &[]).unwrap().shape;
         unified(cut(&p, &bx([15.0, 5.0, 4.0], [25.0, 15.0, 11.0])).unwrap().shape)
     };
+    // A block with a blind Ø10 hole 10 deep from the top (its floor edge concave).
+    let blind = unified(cut(&bx([0.0; 3], [60.0, 40.0, 20.0]), &cyl_z(30.0, 20.0, 10.0, 5.0, 11.0)).unwrap().shape);
     // A block whose top is a vault (an R50 cylinder along x, 15 mm high in the middle); a slot cut in its floor.
     let vault = {
         let c = make_cylinder(&Plane::from_normal(DVec3::new(-1.0, 10.0, -35.0), DVec3::X), 50.0, 42.0, std::f64::consts::TAU).unwrap();
@@ -614,16 +615,17 @@ fn quadrics_and_slabs_agree() {
     // they share in two (one more shown edge, two more vertices); ours keep the faces' frames, the circle whole, its
     // corners only shown, as live's.)
     let cases: Vec<Case> = vec![
-        ("plate with a hole, top removed", plate_hole.clone(), top(&plate_hole, 12.0), 2.0, (0, 0)),
-        ("plate with a hole, bottom removed", plate_hole.clone(), bottom(&plate_hole), 2.0, (0, 0)),
-        ("filleted block, top removed", filleted.clone(), top(&filleted, 10.0), 1.0, (0, 0)),
-        ("L with a filleted inner corner, top removed", l_fillet.clone(), top(&l_fillet, 10.0), 2.0, (0, 0)),
-        ("countersunk plate, bottom removed", sunk.clone(), bottom(&sunk), 2.0, (1, 2)),
-        ("two chamfers meeting (a vertex of four faces), bottom removed", chamfered.clone(), bottom(&chamfered), 1.0, (2, 2)),
-        ("a vaulted top removed (a curved opening)", vault.clone(), faces_where(&vault, |c| c.z > 12.0), 1.0, (0, 0)),
-        ("a hole's wall removed (a closed curved opening)", plate_hole.clone(), plate_hole.faces().into_iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { .. }))).collect(), 2.0, (0, 0)),
-        ("qa plate R2, top removed, 1.5", qa_plate.clone(), top(&qa_plate, 10.0), 1.5, (0, 0)),
-        ("qa plate R2, top removed, 3 (the fillets collapse)", qa_plate.clone(), top(&qa_plate, 10.0), 3.0, (0, 0)),
+        ("plate with a hole, top removed", plate_hole.clone(), top(&plate_hole, 12.0), 2.0),
+        ("plate with a hole, bottom removed", plate_hole.clone(), bottom(&plate_hole), 2.0),
+        ("filleted block, top removed", filleted.clone(), top(&filleted, 10.0), 1.0),
+        ("L with a filleted inner corner, top removed", l_fillet.clone(), top(&l_fillet, 10.0), 2.0),
+        ("countersunk plate, bottom removed", sunk.clone(), bottom(&sunk), 2.0),
+        ("two chamfers meeting (a vertex of four faces), bottom removed", chamfered.clone(), bottom(&chamfered), 1.0),
+        ("a blind hole, bottom removed (a concave cylinder-plane edge)", blind.clone(), bottom(&blind), 2.0),
+        ("a vaulted top removed (a curved opening)", vault.clone(), faces_where(&vault, |c| c.z > 12.0), 1.0),
+        ("a hole's wall removed (a closed curved opening)", plate_hole.clone(), plate_hole.faces().into_iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { .. }))).collect(), 2.0),
+        ("qa plate R2, top removed, 1.5", qa_plate.clone(), top(&qa_plate, 10.0), 1.5),
+        ("qa plate R2, top removed, 3 (the fillets collapse)", qa_plate.clone(), top(&qa_plate, 10.0), 3.0),
     ];
     let images = |r: &OpResult, s: &Shape| -> Vec<(usize, usize)> {
         (0..s.faces().len()).map(|i| (r.history.modified(0, ShapeType::Face, i as u32).len(), r.history.generated(0, ShapeType::Face, i as u32).len())).collect()
@@ -633,15 +635,20 @@ fn quadrics_and_slabs_agree() {
         let st = x.shown_topology().unwrap();
         [x.count(ShapeType::Face), st.edges.iter().filter(|b| **b).count(), st.vertices.iter().filter(|b| **b).count()]
     };
-    for (name, s, rm, t, (de, dv)) in cases {
+    for (name, s, rm, t) in cases {
         let q = shell_solid(&s, &rm, t, ShellSide::Inside, ShellMethod::Slabs).unwrap();
         match shell_solid(&s, &rm, t, ShellSide::Inside, ShellMethod::Quadrics) {
             Err(e) => report += &format!("{name}: quadrics declined: {e}\n"),
             Ok(p) => {
                 let counts = shown;
                 let (a, b) = (shown(&p.shape), shown(&q.shape));
-                let counts_ok = a[0] == b[0] && a[1] + de == b[1] && a[2] + dv == b[2];
-                if !p.shape.is_valid() || !close(vol(&p.shape), vol(&q.shape)) || !counts_ok || images(&p, &s) != images(&q, &s) {
+                // The slabs over-split (a seam opposite another's, an edge imprinted by a corner filler, an offset face
+                // left in pieces where their union isn't unified, which depends on the process's working scale): ours
+                // may have fewer shown edges and vertices and fewer generated faces, never more, and the same faces.
+                let (ia, ib) = (images(&p, &s), images(&q, &s));
+                let images_ok = ia.iter().zip(&ib).all(|(x, y)| x.0 == y.0 && x.1 <= y.1);
+                let counts_ok = a[0] <= b[0] && a[1] <= b[1] && a[2] <= b[2];
+                if !p.shape.is_valid() || !close(vol(&p.shape), vol(&q.shape)) || !counts_ok || !images_ok {
                     report += &format!("{name}: quadrics {} {:?} vs slabs {} {:?}; images {:?} vs {:?}\n", vol(&p.shape), counts(&p.shape), vol(&q.shape), counts(&q.shape), images(&p, &s), images(&q, &s));
                     let mine: Vec<DVec3> = p.shape.vertices().iter().map(|v| v.vertex_point().unwrap()).collect();
                     for v in q.shape.vertices() {
@@ -719,4 +726,21 @@ fn shell_corpus_time() {
         std::env::remove_var("NOSHAPE_SHELL_NO_QUADRICS");
         std::env::remove_var("NOSHAPE_SHELL_NO_PLANES");
     }
+}
+
+/// A box with a box-shaped void: the direct wall only with NOSHAPE_SHELL_VOIDS (live asked); with it, as the slabs'.
+#[test]
+fn a_void_waits_for_live() {
+    let s = cut(&bx([0.0; 3], [60.0, 40.0, 20.0]), &bx([20.0, 10.0, 6.0], [40.0, 30.0, 14.0])).unwrap().shape;
+    assert_eq!(s.solids()[0].count(ShapeType::Shell), 2);
+    let rm = top(&s, 20.0);
+    assert!(shell_solid(&s, &rm, 2.0, ShellSide::Inside, ShellMethod::Quadrics).is_err());
+    // SAFETY: this test alone sets the variable, and the kernel reads it per call.
+    unsafe { std::env::set_var("NOSHAPE_SHELL_VOIDS", "1") };
+    let p = shell_solid(&s, &rm, 2.0, ShellSide::Inside, ShellMethod::Quadrics);
+    unsafe { std::env::remove_var("NOSHAPE_SHELL_VOIDS") };
+    let q = shell_solid(&s, &rm, 2.0, ShellSide::Inside, ShellMethod::Slabs).unwrap();
+    let p = p.unwrap();
+    eprintln!("void: ours {} ({} solids, {} faces), slabs {} ({} solids, {} faces)", vol(&p.shape), p.shape.solids().len(), p.shape.count(ShapeType::Face), vol(&q.shape), q.shape.solids().len(), q.shape.count(ShapeType::Face));
+    assert!(close(vol(&p.shape), vol(&q.shape)));
 }

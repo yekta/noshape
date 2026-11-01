@@ -2747,16 +2747,39 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     so = x.Current();
   if (nso != 1)
     return no("not one solid");
-  for (TopExp_Explorer x(so, TopAbs_SHELL); x.More(); x.Next(), ++nsh)
-    old_shell = x.Current();
-  if (nsh != 1)
-    return no("not one shell");
+  // Its shells: the one with the removed faces is the wall's outside; the others (voids) get walls of their own.
+  std::vector<TopoDS_Shape> olds;
+  for (TopoDS_Iterator x(so, false); x.More(); x.Next(), ++nsh)
+    if (x.Value().ShapeType() == TopAbs_SHELL)
+      olds.push_back(x.Value());
+    else
+      return no("a solid holding more than shells");
   ShapeIMap faces, edges, verts, rm;
   TopExp::MapShapes(so, TopAbs_FACE, faces);
   TopExp::MapShapes(so, TopAbs_EDGE, edges);
   TopExp::MapShapes(so, TopAbs_VERTEX, verts);
   for (const TopoDS_Shape& f : removed)
     rm.Add(f);
+  int outer = -1;
+  for (size_t k = 0; k < olds.size(); ++k)
+  {
+    bool has = false;
+    for (TopExp_Explorer x(olds[k], TopAbs_FACE); x.More() && !has; x.Next())
+      has = rm.Contains(x.Current());
+    if (has)
+    {
+      if (outer >= 0)
+        return no("removed faces on two shells");
+      outer = (int)k;
+    }
+  }
+  if (outer < 0)
+    return no("no face removed");
+  // Voids: built (each void's wall a solid of its own) only with NOSHAPE_SHELL_VOIDS until live says which of ours
+  // and the slabs' is Parasolid's (REQUESTS 11-02 04:00).
+  if (olds.size() > 1 && std::getenv("NOSHAPE_SHELL_VOIDS") == nullptr)
+    return no("a void (live asked)");
+  old_shell = olds[(size_t)outer];
   Bnd_Box bb;
   BRepBndLib::Add(so, bb, false);
   const double size = std::sqrt(bb.SquareExtent());
@@ -3196,16 +3219,28 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   HHist        h = new BRepTools_History();
   TopoDS_Shell shell;
   bld.MakeShell(shell);
-  for (TopoDS_Iterator it(old_shell, false); it.More(); it.Next())
+  // Per void shell, its offset (the void's wall: the void inside its offset).
+  std::vector<TopoDS_Shell> voids(olds.size());
+  for (size_t ks = 0; ks < olds.size(); ++ks)
+  {
+  const bool is_outer = (int)ks == outer;
+  if (!is_outer)
+    bld.MakeShell(voids[ks]);
+  TopoDS_Shell& into = is_outer ? shell : voids[ks];
+  for (TopoDS_Iterator it(olds[ks], false); it.More(); it.Next())
   {
     const TopoDS_Face& f  = TopoDS::Face(it.Value());
     const int          i  = faces.FindIndex(f);
     const TopoDS_Face  ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
     if (collapse[(size_t)i])
-      bld.Add(shell, f); // (no offset: the neighbours' offsets meet where it was)
+    {
+      if (is_outer)
+        bld.Add(shell, f); // (no offset: the neighbours' offsets meet where it was)
+    }
     else if (kept[(size_t)i])
     {
-      bld.Add(shell, f);
+      if (is_outer)
+        bld.Add(shell, f);
       TopoDS_Face of;
       bld.MakeFace(of, sf[(size_t)i].off, 1e3 * tol);
       for (TopoDS_Iterator w(ff, false); w.More(); w.Next())
@@ -3224,7 +3259,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         }
       }
       const TopoDS_Face inner = TopoDS::Face(of.Oriented(TopAbs::Reverse(f.Orientation())));
-      bld.Add(shell, inner);
+      bld.Add(into, inner);
       sources.Bind(inner, Source{f, (uint8_t)REL_GENERATED});
     }
     else
@@ -3326,15 +3361,35 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       }
     }
   }
+  }
   for (int i = 1; i <= ne; ++i)
     if (!ex[(size_t)i].IsNull())
       BRepLib::SameParameter(ex[(size_t)i], 1e3 * tol);
   if (!ok_wires)
     return no("an edge without its offset");
   shell.Closed(true);
-  TopoDS_Solid wall;
-  bld.MakeSolid(wall);
-  bld.Add(wall, shell.Oriented(old_shell.Orientation()));
+  TopoDS_Solid outer_wall;
+  bld.MakeSolid(outer_wall);
+  bld.Add(outer_wall, shell.Oriented(old_shell.Orientation()));
+  TopoDS_Shape wall = outer_wall;
+  if (olds.size() > 1)
+  {
+    // Each void's wall: its offset outside, the void (as the part had it) inside.
+    TopoDS_Compound all;
+    bld.MakeCompound(all);
+    bld.Add(all, outer_wall);
+    for (size_t ks = 0; ks < olds.size(); ++ks)
+      if ((int)ks != outer)
+      {
+        voids[ks].Closed(true);
+        TopoDS_Solid vw;
+        bld.MakeSolid(vw);
+        bld.Add(vw, voids[ks].Oriented(old_shell.Orientation()));
+        bld.Add(vw, olds[ks]);
+        bld.Add(all, vw);
+      }
+    wall = all;
+  }
   if (!BRepCheck_Analyzer(wall).IsValid())
   {
     if (const char* dir = std::getenv("NOSHAPE_SHELL_DUMP"))
@@ -3834,6 +3889,11 @@ void compare_with_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shap
     v.erase(std::unique(v.begin(), v.end()), v.end());
     return v;
   };
+  if (const char* dir = std::getenv("NOSHAPE_SHELL_DUMP"))
+  {
+    BRepTools::Write(mine.result, (std::string(dir) + "/compare-ours.brep").c_str());
+    BRepTools::Write(slabs.result, (std::string(dir) + "/compare-slabs.brep").c_str());
+  }
   const double va = volume_of(mine.result), vb = volume_of(slabs.result);
   const auto   ca = counts(mine.result), cb = counts(slabs.result);
   auto         sa = sig(mine), sb = sig(slabs);

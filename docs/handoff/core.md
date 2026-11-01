@@ -120,6 +120,13 @@ downward face's offset moving up: draft-hang Shell 3) is invalid → declined (a
 the plate's hole wall removed, as the slabs'. A corner may move up to 1000 t (a narrow corner moves t / sin(half
 angle); draft-hang's 0.1 mm wall moved one 1 mm). Share: corpus 1 of 134 (5f916ee4, as the slabs': volume, counts,
 history); bench `shell::shell_corpus_time` (~/agents/shellcorpus on vibe3 / vibe4, `taken` lists the cases).
+vibe3 (perf.sh 91628882): that case 64.5-66.2 ms by the slabs, 18.1-18.4 ms direct.
+Step 2e (11-02): solids with voids: the shell with the removed faces is the wall's outside; each void's wall a solid
+of its own (the void inside its offset), the result a compound. Gated by NOSHAPE_SHELL_VOIDS until live answers
+(REQUESTS 04:00): a box with a box void matches the slabs (15424 mm³, 2 solids, 23 faces; T1
+`shell::a_void_waits_for_live`), but on the corpus's two void parts ours and the slabs differ (3e53d79e: 1015.2221 /
+1015.2123 mm³, the slabs' void cylinder offset in its own frame plus four 1.5 mm² patches; c24afe9e: 1032.2176 /
+9.1467, the slabs' clearly wrong).
 Was: next (step 2b): collapsing fillets (their offset vanishes: the neighbours' offsets meet; contract the face to an
 edge, its end arcs to points), vertices of more faces, removed curved faces.
 Release note for the lead: "Shell: a pocket's floor corners are now mitred as Onshape does (the wall used to thin to
