@@ -330,9 +330,43 @@ pub fn move_row(ps: &mut PartStudio, feature: FeatureId, by: i32) {
     ps.features.swap(a, b);
 }
 
+/// A row dragged in the table (live 11-02: the Variable feature moves in the feature list): to just before
+/// `before`'s feature, or after the last row's (`None`).
+pub fn move_row_to(ps: &mut PartStudio, feature: FeatureId, before: Option<FeatureId>) {
+    if before == Some(feature) {
+        return;
+    }
+    let ids: Vec<FeatureId> = rows(ps).iter().map(|r| r.feature).collect();
+    let Some(from) = ps.index_of(feature) else { return };
+    let f = ps.features.remove(from);
+    let at = match before {
+        Some(b) => ps.index_of(b),
+        None => ids.iter().rev().find(|id| **id != feature).and_then(|id| ps.index_of(*id)).map(|i| i + 1),
+    };
+    let at = at.unwrap_or(from).min(ps.features.len());
+    ps.features.insert(at, f);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_dragged_row_moves_its_feature() {
+        let mut ps = PartStudio::default();
+        let mm = UnitPrefs::default();
+        let a = create(&mut ps, "a", "LENGTH", "1 mm", "", None, &mm).unwrap();
+        let b = create(&mut ps, "b", "LENGTH", "2 mm", "", None, &mm).unwrap();
+        let c = create(&mut ps, "c", "LENGTH", "3 mm", "", None, &mm).unwrap();
+        let names = |ps: &PartStudio| rows(ps).into_iter().map(|r| r.name).collect::<Vec<_>>();
+        move_row_to(&mut ps, c, Some(a));
+        assert_eq!(names(&ps), ["c", "a", "b"]);
+        move_row_to(&mut ps, c, None);
+        assert_eq!(names(&ps), ["a", "b", "c"]);
+        move_row_to(&mut ps, a, Some(c));
+        assert_eq!(names(&ps), ["b", "a", "c"]);
+        let _ = b;
+    }
 
     fn studio() -> PartStudio {
         PartStudio::default()

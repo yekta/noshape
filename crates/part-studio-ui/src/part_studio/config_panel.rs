@@ -12,6 +12,7 @@ use gpui_kit::*;
 use crate::ui::TipExt as _;
 use noshape_model::configuration::{ConfigInput, ConfigInputKind, ConfiguredParam, VariableKind};
 use noshape_model::params::ParamValue;
+use noshape_model::reference::FeatureId;
 use noshape_model::partstudio::PartStudio;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -129,6 +130,24 @@ impl PartStudioView {
         let st = cx.new(|cx| InputState::new(window, cx).default_value(value.clone()));
         let k = key.clone();
         let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            // A Value cell's autofill (live 11-02: `#` lists the variables above the row with their values).
+            if let Some((dim, vars)) = this.ui.var_scope.get(&k) {
+                match ev {
+                    InputEvent::Change => {
+                        this.ui.cell_completion = crate::var_complete::VarCompletion::compute(&k, st.read(cx), vars, *dim).map(|mut c| {
+                            // No "New variable…" in a table (live).
+                            c.new_variable = None;
+                            c
+                        });
+                        cx.notify();
+                    }
+                    InputEvent::Blur if this.ui.cell_completion.as_ref().is_some_and(|c| c.key == k) => {
+                        this.ui.cell_completion = None;
+                        cx.notify();
+                    }
+                    _ => {}
+                }
+            }
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
                 let v = st.read(cx).value().to_string();
                 // A refused value isn't committed and keeps the focus (live
@@ -164,6 +183,23 @@ impl PartStudioView {
         self.panel_subs.push(sub);
         self.panel_inputs.insert(key, (st.clone(), value));
         st
+    }
+
+    /// A Value cell's autofill entry `index` (the selected one when `None`) inserted; Enter commits the cell
+    /// with it as well (live 11-02: "(#" + Enter on "#h" committed "(#h").
+    pub(super) fn accept_cell_completion(&mut self, index: Option<usize>, commit: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(c) = self.ui.cell_completion.take() else { return };
+        let Some((st, last)) = self.panel_inputs.get(&c.key).cloned() else { return };
+        let Some(text) = c.accept(index, &st, window, cx) else { return };
+        if commit && text != last {
+            if let Some(e) = self.panel_inputs.get_mut(&c.key) {
+                e.1 = text.clone();
+            }
+            if let Some(f) = self.panel_commits.get(&c.key).cloned() {
+                f(self, text, cx);
+            }
+        }
+        cx.notify();
     }
 
     pub(super) fn render_right_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -348,10 +384,11 @@ impl PartStudioView {
         let tab_name = self.doc.read(cx).session.doc.tabs.iter().find(|t| t.id == self.tab).map(|t| t.name.clone()).unwrap_or_default();
         let grid = gpui_kit::rgb(0xaaaaaa);
         // Live (part-studio/77): 140 px columns, 34 px rows, like a Variable
-        // Studio table.
-        let cell = |text: SharedString, bold: bool| {
+        // Studio table; a header's right edge resizes its column (live 11-02).
+        let ws = crate::ui::var_col_widths();
+        let cell = |text: SharedString, bold: bool, w: f32| {
             div()
-                .w(px(140.))
+                .w(px(w))
                 .h(px(34.))
                 .flex_none()
                 .flex()
@@ -395,13 +432,62 @@ impl PartStudioView {
                     let v1 = v1.clone();
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                         let v1 = v1.clone();
+                        let v2 = v1.clone();
                         m.item(crate::os_menu::OsMenuItem::new("Copy table").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.copy_variable_table(cx))))
+                            // Live 11-02: "Collapse all tables".
+                            .item(crate::os_menu::OsMenuItem::new("Collapse all tables").on_click(move |_, _, cx| {
+                                v2.update(cx, |this, cx| {
+                                    this.ui.var_folded = true;
+                                    cx.notify();
+                                })
+                            }))
                     });
                     crate::os_menu::open(e.position(), menu, window, cx);
                 })
             });
         // Live (164): only the header cells are gray, not the rest of the row.
-        let columns = h_flex().border_l_1().border_color(grid).children(["Name", "Variable type", "Value", "Description"].map(|h| cell(h.into(), true).text_size(px(14.)).bg(pal.table_header)));
+        let header_cells: Vec<AnyElement> = ["Name", "Variable type", "Value", "Description"]
+            .into_iter()
+            .enumerate()
+            .map(|(c, h)| {
+                let dragging = self.ui.var_col_drag.is_some_and(|d| d.0 == c);
+                cell(h.into(), true, ws[c])
+                    .text_size(px(14.))
+                    .bg(pal.table_header)
+                    .relative()
+                    // Live: a 5 px col-resize handle inside the cell's right edge, grey while hovered or dragged.
+                    .child(
+                        div()
+                            .id(SharedString::from(format!("pvar-col-{c}")))
+                            .debug_selector(|| format!("pvar-col-{c}"))
+                            .absolute()
+                            .top_0()
+                            .bottom_0()
+                            .right_0()
+                            .w(px(5.))
+                            .cursor(CursorStyle::ResizeColumn)
+                            .when(dragging, |d| d.bg(gpui_kit::rgb(0xaaaaaa)))
+                            .hover(|d| d.bg(gpui_kit::rgb(0xaaaaaa)))
+                            .on_drag(VarColDrag(c), |d, _, _, cx| cx.new(|_| d.clone())),
+                    )
+                    .into_any_element()
+            })
+            .collect();
+        let columns = h_flex()
+            .id("pvar-columns")
+            .border_l_1()
+            .border_color(grid)
+            .children(header_cells)
+            // The guide follows the pointer (at least the minimum width); the width applies on release.
+            .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<VarColDrag>, _, cx| {
+                let c = e.drag(cx).0;
+                let left: f32 = 1. + ws[..c].iter().sum::<f32>();
+                let x = f32::from(e.event.position.x - e.bounds.left()).max(left + crate::ui::VAR_COL_MIN);
+                if this.ui.var_col_drag != Some((c, x)) {
+                    this.ui.var_col_drag = Some((c, x));
+                    cx.notify();
+                }
+            }));
         // The Part Studio's own variables are its Variable features (Help
         // PartStudio__variable_table); every cell edits them.
         // Only the variables before the rollback bar (live 10-20 o).
@@ -409,9 +495,9 @@ impl PartStudioView {
         let count = var_rows.len();
         // Configure is offered only with a List or Checkbox input (live 1717).
         let configurable = self.studio(cx).is_some_and(|s| s.configuration.inputs.iter().any(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })));
-        let input_cell_filled = move |st: &Entity<InputState>, size: f32, fill: Rgba| gpui_kit::base::input::input_frame(div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().px(px(2.)).bg(fill).border_r_1().border_b_1().border_color(grid).child(Input::new(st).appearance(false).text_size(px(size)).pl(px(4.))));
-        let input_cell_sized = move |st: &Entity<InputState>, size: f32| input_cell_filled(st, size, crate::theme::p().bg_senary);
-        let input_cell = move |st: &Entity<InputState>| input_cell_sized(st, 13.33);
+        let input_cell_filled = move |st: &Entity<InputState>, size: f32, fill: Rgba, w: f32| gpui_kit::base::input::input_frame(div().w(px(w)).h(px(34.)).flex_none().flex().items_center().px(px(2.)).bg(fill).border_r_1().border_b_1().border_color(grid).child(Input::new(st).appearance(false).text_size(px(size)).pl(px(4.))));
+        let input_cell_sized = move |st: &Entity<InputState>, size: f32, w: f32| input_cell_filled(st, size, crate::theme::p().bg_senary, w);
+        let input_cell = move |st: &Entity<InputState>, w: f32| input_cell_sized(st, 13.33, w);
         // A Name cell holding an invalid name: pink with a red border and the
         // reason as tooltip (live part-studio/554–555).
         let name_cell = |st: &Entity<InputState>, cx: &App| {
@@ -421,11 +507,42 @@ impl PartStudioView {
                 .id(SharedString::from(format!("pvar-cell-{}", st.entity_id())))
                 .when(bad, |d| d.border_1().border_color(gpui_kit::rgb(0xbd3039)).tooltip(crate::ui::tooltip("Variable name must be a letter followed by a string of letters or numbers.")))
                 // The cell itself fills pink (its white covered the pink under it, VAR-NAME-PINK).
-                .child(if bad { input_cell_filled(st, 13.33, gpui_kit::rgb(0xf9ebec)) } else { input_cell(st) })
+                .child(if bad { input_cell_filled(st, 13.33, gpui_kit::rgb(0xf9ebec), ws[0]) } else { input_cell(st, ws[0]) })
         };
         let mut rows: Vec<AnyElement> = Vec::new();
+        let row_names: Vec<String> = var_rows.iter().map(|r| r.name.clone()).collect();
+        let row_ids: Vec<FeatureId> = var_rows.iter().map(|r| r.feature).collect();
+        if !cx.has_active_drag() {
+            self.ui.var_row_drop = None;
+            // A resize released outside the table: its width as dragged.
+            if let Some((c, x)) = self.ui.var_col_drag.take() {
+                crate::ui::set_var_col_width(c, x - 1. - ws[..c].iter().sum::<f32>());
+            }
+        }
+        let row_drop = self.ui.var_row_drop;
+        let blue = gpui_kit::rgb(0x1651b0);
+        let drop_line = |top: bool| {
+            div()
+                .absolute()
+                .left_0()
+                .right_0()
+                .h(px(1.))
+                .bg(blue)
+                .map(|d| if top { d.top(px(-1.)) } else { d.bottom(px(0.)) })
+                .child(div().absolute().left(px(1.)).top(px(-3.)).size(px(7.)).rounded_full().border_1().border_color(blue).bg(gpui_kit::rgb(0xffffff)))
+        };
+        let units = self.doc.read(cx).session.doc.settings.units;
         for (k, r) in var_rows.into_iter().enumerate() {
             let fid = r.feature;
+            // The variables in scope for this row's value: all but this one and those below it.
+            let scope: std::collections::BTreeMap<String, noshape_units::Quantity> = self.display.variables.iter().filter(|(n, _)| !row_names[k..].contains(n)).map(|(n, q)| (n.clone(), *q)).collect();
+            let dim = match r.kind.as_str() {
+                "LENGTH" => Some(noshape_units::Dim::LENGTH),
+                "ANGLE" => Some(noshape_units::Dim::ANGLE),
+                "NUMBER" => Some(noshape_units::Dim::UNITLESS),
+                _ => None,
+            };
+            self.ui.var_scope.insert(format!("pvar-value-{fid}"), (dim, scope.clone()));
             // Renaming to a taken name silently reverts (live 556–557).
             let name_st = self.cell_input(format!("pvar-name-{fid}"), r.name.clone(), window, cx, move |this, v, cx| {
                 if v.trim().is_empty() {
@@ -463,7 +580,8 @@ impl PartStudioView {
                     this.edit_config("Edit variable", cx, |ps| noshape_model::variable_table::set_kind(ps, fid, kind, &units));
                     this.config_dirty(cx);
                 })
-            });
+            })
+            .w(px(ws[1]));
             let (n1, name, n2) = (r.name.clone(), r.name.clone(), r.name.clone());
             let view = cx.entity();
             // Measured / From import: the evaluated value, or "Not set", and
@@ -473,7 +591,7 @@ impl PartStudioView {
                 // Live ("psb (10-26 a)" V1): an angle reads "45 deg" here, as in fields.
                 let shown = self.display.variables.get(&r.name).map(|q| noshape_units::format_quantity(*q, &units).replace('°', " deg")).unwrap_or_else(|| "Not set".into());
                 h_flex()
-                    .w(px(140.))
+                    .w(px(ws[2]))
                     .h(px(34.))
                     .flex_none()
                     .px(px(5.))
@@ -490,14 +608,130 @@ impl PartStudioView {
                     )
                     .into_any_element()
             } else {
-                // The value at 14 px, as a Variable Studio's value cell (qa5 VS3).
-                input_cell_sized(&value_st, 14.).into_any_element()
+                // The value at 14 px, as a Variable Studio's value cell (qa5 VS3). Live 11-02: not being edited it
+                // shows the result ("2 * (#h + #w)" reads "120 mm", the expression its tooltip); a value that
+                // fails is pink, as typed, "Error regenerating.".
+                let key = format!("pvar-value-{fid}");
+                let focused = value_st.read(cx).focus_handle(cx).is_focused(window);
+                let failed = self.display.feature_state(fid).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Error);
+                let text = value_st.read(cx).value().to_string();
+                let result = self.display.variables.get(&r.name).map(|q| shown_value(*q, &units)).filter(|v| !failed && !focused && *v != text);
+                let fill = if failed { gpui_kit::rgb(0xf9ebec) } else { crate::theme::p().bg_senary };
+                let st = value_st.clone();
+                let completion = self.ui.cell_completion.as_ref().filter(|c| c.key == key).map(|c| {
+                    let view = cx.entity();
+                    c.render(&scope, &units, move |i, window, cx| view.update(cx, |this, cx| this.accept_cell_completion(Some(i), false, window, cx)))
+                });
+                let open = |this: &Self, key: &str| this.ui.cell_completion.as_ref().is_some_and(|c| c.key == key);
+                let (k1, k2, k3, k4, k5) = (key.clone(), key.clone(), key.clone(), key.clone(), key.clone());
+                use gpui_kit::component::input::{Enter, Escape, MoveDown, MoveUp};
+                div()
+                    .id(SharedString::from(format!("pvar-value-cell-{fid}")))
+                    .relative()
+                    .child(input_cell_filled(&value_st, 14., fill, ws[2]))
+                    .when_some(result, |d, v| {
+                        d.child(
+                            div()
+                                .id(SharedString::from(format!("pvar-result-{fid}")))
+                                .debug_selector(|| format!("pvar-result-{k}"))
+                                .absolute()
+                                .top_0()
+                                .left_0()
+                                .w(px(ws[2] - 1.))
+                                .h(px(33.))
+                                .flex()
+                                .items_center()
+                                .pl(px(6.))
+                                .bg(fill)
+                                .text_size(px(14.))
+                                .text_color(pal.text)
+                                .truncate()
+                                .child(v)
+                                .tooltip(crate::ui::tooltip(text.clone()))
+                                .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                                    st.update(cx, |s, cx| {
+                                        s.focus(window, cx);
+                                        s.select_all(window, cx);
+                                    });
+                                }),
+                        )
+                    })
+                    .when(failed, |d| d.tooltip(crate::ui::tooltip("Error regenerating.")))
+                    .children(completion)
+                    // The list open: ↑ / ↓ move, Enter inserts and commits, Tab inserts, Esc closes.
+                    .capture_action(cx.listener(move |this, _: &MoveUp, _, cx| {
+                        if open(this, &k1) {
+                            cx.stop_propagation();
+                            if let Some(c) = &mut this.ui.cell_completion {
+                                c.move_selection(-1);
+                            }
+                            cx.notify();
+                        }
+                    }))
+                    .capture_action(cx.listener(move |this, _: &MoveDown, _, cx| {
+                        if open(this, &k2) {
+                            cx.stop_propagation();
+                            if let Some(c) = &mut this.ui.cell_completion {
+                                c.move_selection(1);
+                            }
+                            cx.notify();
+                        }
+                    }))
+                    .capture_action(cx.listener(move |this, _: &Enter, window, cx| {
+                        if open(this, &k3) {
+                            cx.stop_propagation();
+                            this.accept_cell_completion(None, true, window, cx);
+                        }
+                    }))
+                    .capture_action(cx.listener(move |this, _: &Escape, _, cx| {
+                        if open(this, &k4) {
+                            cx.stop_propagation();
+                            this.ui.cell_completion = None;
+                            cx.notify();
+                        }
+                    }))
+                    .capture_action(cx.listener(move |this, _: &crate::actions::DialogTab, window, cx| {
+                        if open(this, &k5) {
+                            cx.stop_propagation();
+                            this.accept_cell_completion(None, false, window, cx);
+                        }
+                    }))
+                    .into_any_element()
             };
+            // Live 11-02: a row drags by its Name cell (a blue pill with the name; a blue line where it goes), its
+            // Variable feature moving in the feature list.
+            let name_el = div()
+                .id(SharedString::from(format!("pvar-name-drag-{fid}")))
+                .debug_selector(|| format!("pvar-name-drag-{k}"))
+                .child(name_cell(&name_st, cx))
+                .on_drag(VarRowDrag { feature: fid, name: r.name.clone().into(), offset: Point::default() }, |d, offset, _, cx| cx.new(|_| VarRowDrag { offset, ..d.clone() }));
+            let ids = row_ids.clone();
             rows.push(
                 h_flex()
                     .id(SharedString::from(format!("var-row-{fid}")))
+                    .relative()
                     .border_l_1()
                     .border_color(grid)
+                    .when(row_drop == Some(k), |d| d.child(drop_line(true)))
+                    .when(row_drop == Some(k + 1) && k + 1 == count, |d| d.child(drop_line(false)))
+                    // Over the upper half: before this row; the lower: after.
+                    .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<VarRowDrag>, _, cx| {
+                        if !e.bounds.contains(&e.event.position) {
+                            return;
+                        }
+                        let at = Some(if e.event.position.y > e.bounds.center().y { k + 1 } else { k });
+                        if this.ui.var_row_drop != at {
+                            this.ui.var_row_drop = at;
+                            cx.notify();
+                        }
+                    }))
+                    .on_drop(cx.listener(move |this, d: &VarRowDrag, _, cx| {
+                        let to = this.ui.var_row_drop.take().unwrap_or(k);
+                        let before = ids.get(to).copied();
+                        let feature = d.feature;
+                        this.edit_config("Move variable", cx, |ps| noshape_model::variable_table::move_row_to(ps, feature, before));
+                        this.config_dirty(cx);
+                    }))
                     // Onshape: hovering a variable highlights the features that use it.
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         let new = h.then(|| n1.clone());
@@ -511,7 +745,7 @@ impl PartStudioView {
                     // menu also over the cells' inputs (qa4 Fixed 11).
                     .child(
                         h_flex()
-                            .child(name_cell(&name_st, cx))
+                            .child(name_el)
                             .child(kind_select)
                             .child(value_cell)
                             .os_context_menu_over_inputs(move |menu, _, _| var_row_menu(menu, view.clone(), fid, &n2, k, count, configurable)),
@@ -523,7 +757,7 @@ impl PartStudioView {
                         let tip = if desc_error { Some("Error regenerating.".to_string()) } else { r.description_expr.then(|| r.description.clone()).filter(|d| !d.is_empty()) };
                         div()
                             .id(SharedString::from(format!("pvar-desc-cell-{fid}")))
-                            .child(input_cell(&desc_st))
+                            .child(input_cell(&desc_st, ws[3]))
                             .when_some(tip, |d, t| d.tooltip(crate::ui::tooltip(t)))
                             .os_context_menu_over_inputs(move |menu, _, _| {
                                 let (text, v) = (text.clone(), view.clone());
@@ -662,11 +896,19 @@ impl PartStudioView {
         // Live (164): the tables run flush with the pane (the body has 5 px
         // padding), the first header 2 px under the title's underline, and
         // every table ends with the italic "Name" row.
+        let guide = self.ui.var_col_drag.map(|(_, x)| div().absolute().top(px(35.)).bottom_0().left(px(x)).w(px(1.)).bg(gpui_kit::rgb(0x000000)));
         let own = v_flex()
             .id("var-own-table")
             .relative()
             .child(header)
             .when(!self.ui.var_folded, |d| d.child(columns).children(rows).child(new_row))
+            .children(guide)
+            .on_drop(cx.listener(move |this, d: &VarColDrag, _, cx| {
+                if let Some((c, x)) = this.ui.var_col_drag.take().filter(|x| x.0 == d.0) {
+                    crate::ui::set_var_col_width(c, x - 1. - ws[..c].iter().sum::<f32>());
+                }
+                cx.notify();
+            }))
             .when(refused, |d| d.child(line(gpui_kit::rgb(0xd52b1e), None)))
             .on_drag_move(cx.listener(|this, e: &DragMoveEvent<VarTableDrag>, _, cx| {
                 if e.bounds.contains(&e.event.position) && this.ui.var_drop != Some(usize::MAX) {
@@ -3021,6 +3263,36 @@ struct VarTableDrag {
 impl Render for VarTableDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         crate::ui::name_pill_on(self.name.clone(), self.offset, gpui_kit::rgba(0x1651b099))
+    }
+}
+
+/// A variable's value as the table shows it while not being edited (live 11-02: "2 * (#h + #w)" reads
+/// "120 mm", "40mm" reads "40 mm"; an angle "45 deg" as in fields).
+pub(super) fn shown_value(q: noshape_units::Quantity, units: &noshape_units::UnitPrefs) -> String {
+    noshape_units::format_quantity(q, units).replace('°', " deg")
+}
+
+/// A variable table column's resize handle being dragged.
+#[derive(Clone)]
+pub(super) struct VarColDrag(pub(super) usize);
+
+impl Render for VarColDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
+/// A Part Studio variable row being dragged.
+#[derive(Clone)]
+pub(super) struct VarRowDrag {
+    pub(super) feature: FeatureId,
+    name: SharedString,
+    offset: Point<Pixels>,
+}
+
+impl Render for VarRowDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        crate::ui::name_pill_on(self.name.clone(), self.offset, gpui_kit::rgb(0x1651b0))
     }
 }
 

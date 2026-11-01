@@ -90,6 +90,37 @@ pub fn drag_left_panel(e: &DragMoveEvent<LeftSplitDrag>) -> bool {
     true
 }
 
+/// A variable table's columns (Name, Variable type, Value, Description): 140 px each by default; dragging a
+/// header's right edge resizes one, at least 40 px (live 11-02: "Na…" at 40). One set for every table in the
+/// panel, kept (live: the inserted Variable Studio's table follows the Part Studio's).
+pub const VAR_COL_W: f32 = 140.;
+pub const VAR_COL_MIN: f32 = 40.;
+
+thread_local! {
+    static VAR_COLS: std::cell::Cell<[f32; 4]> = std::cell::Cell::new({
+        let t = std::fs::read_to_string(crate::paths::config_dir().join("variable_table_columns.txt")).unwrap_or_default();
+        let v: Vec<f32> = t.split_whitespace().filter_map(|x| x.parse::<f32>().ok()).filter(|w| w.is_finite()).collect();
+        if v.len() == 4 { [v[0], v[1], v[2], v[3]].map(|w| w.max(VAR_COL_MIN)) } else { [VAR_COL_W; 4] }
+    });
+}
+
+pub fn var_col_widths() -> [f32; 4] {
+    VAR_COLS.with(|c| c.get())
+}
+
+/// Column `col` at width `w` (at least [`VAR_COL_MIN`]), kept in the configuration.
+pub fn set_var_col_width(col: usize, w: f32) {
+    let mut ws = var_col_widths();
+    let Some(x) = ws.get_mut(col) else { return };
+    *x = w.round().max(VAR_COL_MIN);
+    VAR_COLS.with(|c| c.set(ws));
+    let p = crate::paths::config_dir().join("variable_table_columns.txt");
+    if let Some(dir) = p.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(p, ws.map(|w| w.to_string()).join(" "));
+}
+
 /// Onshape's simple tooltip: blue-gray `#d0dbe5`, 12 px / 500, square corners (§4.7).
 /// Width in pixels of `text` in the window's font at `size` px (layout
 /// decisions Onshape's browser makes by measuring, such as wrapping).

@@ -1181,3 +1181,128 @@ fn body_draft_flip_as_std(cx: &mut TestAppContext) {
     let a = arrow(cx).expect("a flip arrow");
     assert!((a.0.z - hi.z).abs() < 1e-6, "{a:?}");
 }
+
+/// A Part Studio with rib variables in its Variable table (the user's 11-02 table): rib_diameter 1.2 mm,
+/// rib_empty_space 0.4 mm, rib_count 3, depth = (#rib_diameter + #rib_empty_space) * #rib_count; the panel open.
+fn rib_variables(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>, Vec<noshape_model::FeatureId>) {
+    let (window, view) = part_studio(cx, name);
+    let ids = cx
+        .update_window(window, |_, _, cx| {
+            view.update(cx, |v, cx| {
+                let units = v.doc.read(cx).session.doc.settings.units;
+                let mut ids = Vec::new();
+                v.edit_config("Add variable", cx, |ps| {
+                    for (n, k, val) in [("rib_diameter", "LENGTH", "1.2 mm"), ("rib_empty_space", "LENGTH", "0.4 mm"), ("rib_count", "NUMBER", "3"), ("depth", "LENGTH", "(#rib_diameter + #rib_empty_space) * #rib_count")] {
+                        ids.push(noshape_model::variable_table::create(ps, n, k, val, "", None, &units).unwrap());
+                    }
+                });
+                v.config_dirty(cx);
+                v.right_panel = Some(super::super::config_panel::RightPanel::Variables);
+                cx.notify();
+                ids
+            })
+        })
+        .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).display.variables.len() == 4);
+    draw(cx, window);
+    (window, view, ids)
+}
+
+fn var_values(cx: &mut TestAppContext, view: &Entity<PartStudioView>) -> Vec<(String, String)> {
+    cx.update(|cx| view.read(cx).studio(cx).map(noshape_model::variable_table::rows).unwrap_or_default().into_iter().map(|r| (r.name, r.value)).collect())
+}
+
+/// Live 11-02: a Value holding an expression shows its result while not edited ("4.8 mm" for depth), the
+/// expression while edited (a click on the cell).
+#[gpui::test]
+fn a_variable_expression_shows_its_result_until_edited(cx: &mut TestAppContext) {
+    let (window, view, _) = rib_variables(cx, "vt-result");
+    let depth = cx.update(|cx| view.read(cx).display.variables.get("depth").copied()).expect("depth evaluated");
+    let units = noshape_units::UnitPrefs::default();
+    assert_eq!(super::super::config_panel::shown_value(depth, &units), "4.8 mm");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let b = vcx.debug_bounds("pvar-result-3").expect("depth's result over its cell");
+    assert!(vcx.debug_bounds("pvar-result-0").is_none(), "a plain value shows as typed");
+    vcx.simulate_click(b.center(), Modifiers::default());
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    assert!(vcx.debug_bounds("pvar-result-3").is_none(), "editing: the expression");
+}
+
+/// The user's 11-02: `#ri` in a Value cell lists the variables above it that match, with their values; ↓ and Enter
+/// insert one and commit the cell (live 11-02); Esc closes the list.
+#[gpui::test]
+fn a_value_cell_completes_a_variable(cx: &mut TestAppContext) {
+    let (window, view, ids) = rib_variables(cx, "vt-complete");
+    let key = format!("pvar-value-{}", ids[3]);
+    let st = cx.update(|cx| view.read(cx).panel_inputs.get(&key).map(|e| e.0.clone())).expect("depth's value input");
+    cx.update_window(window, |_, w, cx| {
+        st.update(cx, |s, cx| {
+            s.focus(w, cx);
+            s.set_value("", w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    keys(cx, window, &["#", "r", "i"]);
+    let entries = cx.update(|cx| view.read(cx).ui.cell_completion.as_ref().map(|c| c.entries.iter().map(|e| e.insertion().0).collect::<Vec<_>>()));
+    let entries = entries.expect("the list");
+    assert_eq!(entries.len(), 3, "the three rib variables: {entries:?}");
+    assert!(entries.iter().all(|e| e.starts_with("#rib_")), "{entries:?}");
+    let k = entries.iter().position(|e| e == "#rib_diameter").expect("rib_diameter listed");
+    keys(cx, window, &["escape"]);
+    assert!(cx.update(|cx| view.read(cx).ui.cell_completion.is_none()), "Esc closes it");
+    keys(cx, window, &["backspace", "i"]);
+    for _ in 0..k {
+        keys(cx, window, &["down"]);
+    }
+    keys(cx, window, &["enter"]);
+    assert!(cx.update(|cx| view.read(cx).ui.cell_completion.is_none()));
+    assert_eq!(var_values(cx, &view)[3], ("depth".to_string(), "#rib_diameter".to_string()), "inserted and committed");
+}
+
+/// Live 11-02: a header's right edge drags its column's width (all tables'), at least 40 px.
+#[gpui::test]
+fn variable_table_columns_resize(cx: &mut TestAppContext) {
+    let (window, _view, _) = rib_variables(cx, "vt-resize");
+    let before = crate::ui::var_col_widths();
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let h = vcx.debug_bounds("pvar-col-2").expect("the Value header's handle");
+    let drag = |vcx: &mut gpui_kit::VisualTestContext, from: Point<gpui_kit::Pixels>, dx: f32| {
+        vcx.simulate_mouse_down(from, gpui_kit::MouseButton::Left, Modifiers::default());
+        for k in 1..=4 {
+            vcx.simulate_mouse_move(gpui_kit::point(from.x + px(dx * k as f32 / 4.), from.y), gpui_kit::MouseButton::Left, Modifiers::default());
+        }
+        vcx.simulate_mouse_up(gpui_kit::point(from.x + px(dx), from.y), gpui_kit::MouseButton::Left, Modifiers::default());
+    };
+    drag(&mut vcx, h.center(), 60.);
+    draw(cx, window);
+    let after = crate::ui::var_col_widths();
+    assert!((after[2] - before[2] - 60.).abs() <= 3., "{before:?} -> {after:?}");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let h = vcx.debug_bounds("pvar-col-0").expect("the Name header's handle");
+    drag(&mut vcx, h.center(), -300.);
+    draw(cx, window);
+    assert_eq!(crate::ui::var_col_widths()[0], crate::ui::VAR_COL_MIN, "no narrower than 40 px");
+}
+
+/// Live 11-02: a row dragged by its Name cell moves its Variable feature (depth dropped over rib_diameter's
+/// upper half goes first, and fails: its variables come after it).
+#[gpui::test]
+fn a_variable_row_drags_to_reorder(cx: &mut TestAppContext) {
+    let (window, view, ids) = rib_variables(cx, "vt-drag");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let from = vcx.debug_bounds("pvar-name-drag-3").expect("depth's name").center();
+    let to = vcx.debug_bounds("pvar-name-drag-0").expect("rib_diameter's name");
+    let to = gpui_kit::point(to.center().x, to.top() + px(5.));
+    vcx.simulate_mouse_down(from, gpui_kit::MouseButton::Left, Modifiers::default());
+    for k in 1..=6 {
+        let t = k as f32 / 6.;
+        vcx.simulate_mouse_move(gpui_kit::point(from.x, from.y + (to.y - from.y) * t), gpui_kit::MouseButton::Left, Modifiers::default());
+    }
+    vcx.simulate_mouse_up(to, gpui_kit::MouseButton::Left, Modifiers::default());
+    draw(cx, window);
+    let names: Vec<String> = var_values(cx, &view).into_iter().map(|v| v.0).collect();
+    assert_eq!(names, ["depth", "rib_diameter", "rib_empty_space", "rib_count"]);
+    wait_until(cx, window, |cx| view.read(cx).display.feature_state(ids[3]).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Error));
+}

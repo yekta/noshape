@@ -250,6 +250,14 @@ pub struct UiState {
     /// Variable table: where a dragged Variable Studio table would drop
     /// (`usize::MAX`: over the Part Studio's own table, refused).
     pub var_drop: Option<usize>,
+    /// A variable table column being resized: (column, the guide's x from the table's left).
+    pub var_col_drag: Option<(usize, f32)>,
+    /// A variable row being dragged: the row it goes before (the row count: after the last).
+    pub var_row_drop: Option<usize>,
+    /// A Value cell's `#` / word autofill list (the cell's key).
+    pub cell_completion: Option<crate::var_complete::VarCompletion>,
+    /// Per Value cell key: its variable's kind (units offered) and the variables above it (in scope).
+    pub var_scope: std::collections::HashMap<String, (Option<noshape_units::Dim>, std::collections::BTreeMap<String, noshape_units::Quantity>)>,
     /// Inspection panel: the pressed tool (a pick mode until Esc) and the open ⋯.
     pub inspection_tool: Option<&'static str>,
     pub inspection_more: bool,
@@ -604,6 +612,10 @@ impl UiState {
             annotation_selected: None,
             annotation_drag: None,
             var_drop: None,
+            var_col_drag: None,
+            var_row_drop: None,
+            cell_completion: None,
+            var_scope: Default::default(),
             inspection_tool: None,
             inspection_more: false,
             insp: Default::default(),

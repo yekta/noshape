@@ -201,8 +201,8 @@ impl VarCompletion {
 
     /// The dropdown, drawn on top of everything below the field. `on_pick`
     /// gets the clicked index. Live: white, 1 px #d7d7d7, 5 px corners,
-    /// 31 px rows with a 15 px icon, 14 px text with grey placeholders, the
-    /// selected row #b2ddf6.
+    /// 31 px rows with a 15 px icon, 14 px text with grey placeholders (a
+    /// variable's value grey italic, live 11-02), the selected row #b2ddf6.
     pub fn render(&self, variables: &BTreeMap<String, noshape_units::Quantity>, units: &noshape_units::UnitPrefs, on_pick: impl Fn(usize, &mut Window, &mut App) + 'static) -> AnyElement {
         let pal = p();
         let (text, faint, active) = (rgb(0x333333), rgb(0x666666), rgb(0xb2ddf6));
@@ -230,7 +230,7 @@ impl VarCompletion {
             match e {
                 Entry::Variable(name) => {
                     let value = variables.get(name).map(|q| noshape_units::format_quantity(*q, units)).unwrap_or_default();
-                    row(id, i, "variable").justify_between().child(div().flex_1().child(format!("#{name}"))).child(div().px(px(4.)).text_color(faint).child(value))
+                    row(id, i, "variable").justify_between().child(div().flex_1().child(format!("#{name}"))).child(div().px(px(4.)).italic().text_color(faint).child(value))
                 }
                 Entry::Function(name, args) => {
                     let mut r = row(id, i, "function").child(format!("{name}("));
