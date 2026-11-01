@@ -342,6 +342,9 @@ N12. (11-01) Part Studio audit (user 11-01): docs/parity/audit-part-studio.md. D
      10:19 audit 5: A rows 12 of 14 fixed (live 1717: config row menus, Variable Configure gating, Edit healthy
      moment, Appearances row menu); open A1 (Tag base plane) and A10 (core ticket). Next: A1, then the open P2 D rows
      (array item names, routing points), helix rows (need live in Axis mode).
+     audit 6: std's ranges / hints on Variable, Helix, Routing curve, End cap, Hem, Corner, Corner break, Jog, Flex
+     PCB end, Mate connector, Ruled surface, Frame trim: 154 of 199 rows fixed, 56 of 75 dialogs equal std. Asked live
+     (1722): Tag Base plane prefill, Helix Axis layout, Routing curve point row titles.
 
 N11. (11-01 04:54) Drawing sheets taken from dx (user 11-01): docs/parity/workflow-drawing.md and
      workflow-drawing-sheet-metal.md. dx keeps drawing.md and the import sheets; notes to dx in docs/handoff/dx.md

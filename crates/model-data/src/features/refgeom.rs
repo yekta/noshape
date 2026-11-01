@@ -41,7 +41,7 @@ pub fn mate_connector() -> FeatureType {
             .hints(Hints::INITIAL_FOCUS | Hints::UNCONFIGURABLE | Hints::NO_MATE_CONNECTOR_BUTTON),
         hidden(ParamSpec::enum_("entityInferenceType", "Inference type", INFERENCE)),
         hidden(ParamSpec::query("secondaryOriginQuery", "Secondary origin", QueryFilter::ANY_EDGE | QueryFilter::POINT_LIKE | QueryFilter::ANY_FACE)),
-        ParamSpec::query1("originAdditionalQuery", "Between entity", QueryFilter::ANY_FACE).visible(|v| v.is("originType", "BETWEEN_ENTITIES")),
+        ParamSpec::query1("originAdditionalQuery", "Between entity", QueryFilter::ANY_FACE).hints(Hints::UNCONFIGURABLE).visible(|v| v.is("originType", "BETWEEN_ENTITIES")),
         ParamSpec::bool("realign", "Realign", false),
         ParamSpec::query1("primaryAxisQuery", "Primary axis entity", QueryFilter::ANY_FACE | QueryFilter::ANY_EDGE).visible(|v| v.bool("realign")),
         ParamSpec::query1("secondaryAxisQuery", "Secondary axis entity", QueryFilter::ANY_FACE | QueryFilter::ANY_EDGE).visible(|v| v.bool("realign")),

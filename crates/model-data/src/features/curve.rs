@@ -61,12 +61,12 @@ pub fn helix() -> FeatureType {
             .visible(move |v| height_end(v) && axis_ty(v, "AXIS") && v.bool("endRadToggle")),
         ParamSpec::query1("endPoint", "End point", QueryFilter::VERTEX | QueryFilter::SKETCH_POINT).visible(end_point),
         ParamSpec::num("revolutions", "Target revolutions", NumSpec::real(4.0, 1e-5, 1000.0)).visible(move |v| path(v, "TURNS") || path(v, "TURNS_PITCH")),
-        ParamSpec::num("actualRevolutions", "Computed revolutions", NumSpec::real(4.0, 0.0, 1e9))
+        ParamSpec::num("actualRevolutions", "Computed revolutions", NumSpec::real(4.0, 1e-5, 1000.0))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(move |v| path(v, "TURNS") && end_point(v)),
         ParamSpec::flip("roundUpTurns", "Flip rounding").visible(move |v| path(v, "TURNS") && end_point(v)),
         ParamSpec::num("helicalPitch", "Target pitch", NONNEGATIVE_LENGTH).visible(move |v| path(v, "PITCH") || path(v, "TURNS_PITCH")),
-        ParamSpec::num("actualPitch", "Computed pitch", NumSpec::positive_length(25.0, 1.0))
+        ParamSpec::num("actualPitch", "Computed pitch", NONNEGATIVE_LENGTH)
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(move |v| path(v, "PITCH") && end_point(v)),
         ParamSpec::flip("roundUpPitch", "Flip rounding").visible(move |v| path(v, "PITCH") && end_point(v)),
@@ -367,7 +367,7 @@ pub fn routing_curve() -> FeatureType {
         ParamSpec::enum_("curveType", "Curve type", &[("INTERPOLATED_SPLINE", "Interpolated spline"), ("POLYLINE", "Polyline")]),
         ParamSpec::num("bendRadius", "Bend radius", NONNEGATIVE_ZERO_DEFAULT).visible(move |v| !spline(v)),
         ParamSpec::bool("hasTargetLength", "Target length", false).hints(Hints::DISPLAY_SHORT | Hints::FIRST_IN_ROW).visible(spline),
-        ParamSpec::num("targetLength", "Target length", NONNEGATIVE_LENGTH)
+        ParamSpec::num("targetLength", "Target length", NumSpec::length(25.0, 1.0))
             .hints(Hints::DISPLAY_SHORT)
             .visible(move |v| spline(v) && v.bool("hasTargetLength")),
         ParamSpec::enum_("step", "Step", &[("POINTS", "Points"), ("SEGMENTS", "Segments")]).hints(Hints::HORIZONTAL_ENUM | Hints::UNCONFIGURABLE),
@@ -383,7 +383,7 @@ pub fn routing_curve() -> FeatureType {
         ParamSpec::bool("overwritePoints", "Overwrite points", true).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CURVE") || input(v, "CSV")),
         ParamSpec::bool("isPeriodic", "Closed", false).visible(points),
         ParamSpec::query1("curveBaseCSys", "Curve reference", QueryFilter::POINT_LIKE).describe("Point or mate connector used as reference for the curve. Defaults to origin.").visible(points),
-        ParamSpec::enum_("pointsEditType", "Point edit type", &[("SINGLE", "Single"), ("MULTI", "Multiple")]).hints(Hints::HORIZONTAL_ENUM).visible(points),
+        ParamSpec::enum_("pointsEditType", "Point edit type", &[("SINGLE", "Single"), ("MULTI", "Multiple")]).hints(Hints::HORIZONTAL_ENUM | Hints::UNCONFIGURABLE).visible(points),
         ParamSpec::query1("multiEditReference", "Edit reference", QueryFilter::POINT_LIKE).visible(move |v| points(v) && !single(v)),
         ParamSpec::array("selectedIndices", "Selected points", "Point", vec![ParamSpec::num("indexValue", "Point index", NumSpec::integer(0, 0, 10_000))])
             .visible(move |v| points(v) && !single(v)),
@@ -420,16 +420,18 @@ pub fn routing_curve() -> FeatureType {
             ],
         )
         .visible(single),
-        ParamSpec::bool("addPointOnAxisDrag", "Add point on axis drag", false).visible(single),
+        ParamSpec::bool("addPointOnAxisDrag", "Add point on axis drag", false).hints(Hints::UNCONFIGURABLE).visible(single),
         ParamSpec::bool("showCSys", "Show reference coordinate system", true).describe("Show coordinate system of the reference used by the current vertex.").visible(points),
         ParamSpec::bool("keepPoints", "Keep points", false).describe("Create points in addition to the curve.").visible(points),
         // Segments step.
         hidden(ParamSpec::num("segmentIndex", "Segment index", NumSpec::integer(-1, -1, 10_000))),
-        ParamSpec::enum_("segmentEditType", "Segment edit type", &[("ADD", "Add points"), ("ORTHOGONAL", "Orthogonal path")]).visible(segments),
+        ParamSpec::enum_("segmentEditType", "Segment edit type", &[("ADD", "Add points"), ("ORTHOGONAL", "Orthogonal path")]).hints(Hints::UNCONFIGURABLE).visible(segments),
         ParamSpec::num("numPointsToAdd", "Number of points to add", NumSpec::integer(1, 0, 10_000))
+            .hints(Hints::UNCONFIGURABLE)
             .visible(move |v| segments(v) && v.is("segmentEditType", "ADD")),
-        ParamSpec::enum_("orthoCsys", "Coordinate system", &[("WORLD", "World"), ("CURVE", "Curve"), ("OTHER", "Other")]).hints(Hints::SHOW_LABEL).visible(ortho),
+        ParamSpec::enum_("orthoCsys", "Coordinate system", &[("WORLD", "World"), ("CURVE", "Curve"), ("OTHER", "Other")]).hints(Hints::SHOW_LABEL | Hints::UNCONFIGURABLE).visible(ortho),
         ParamSpec::query1("orthoCsysMate", "Orthogonal path coordinate system", QueryFilter::POINT_LIKE)
+            .hints(Hints::UNCONFIGURABLE)
             .visible(move |v| ortho(v) && v.is("orthoCsys", "OTHER")),
         hidden(ParamSpec::num("solutionIndex", "Solution index", NumSpec::integer(0, 0, 5))),
     ];

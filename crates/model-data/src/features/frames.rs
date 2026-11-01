@@ -58,7 +58,7 @@ pub fn frame_trim() -> FeatureType {
     let p = vec![
         ParamSpec::enum_("trimType", "Trim Type", &[("GROUP", "Ordered groups"), ("FACE", "Face")])
             .hints(Hints::HORIZONTAL_ENUM | Hints::REMEMBER_PREVIOUS_VALUE),
-        ParamSpec::array("frameGroups", "Frame groups", "Group", vec![ParamSpec::query("frames", "Frames", QueryFilter::SOLID_BODY)]).describe("Frame segments in earlier groups are used as tools for later groups")
+        ParamSpec::array("frameGroups", "Frame groups", "Group", vec![ParamSpec::query("frames", "Frames", QueryFilter::SOLID_BODY).describe("Frame segments are trimmed against preceding groups and are used as tools for later groups")]).describe("Frame segments in earlier groups are used as tools for later groups")
         .item_template("#frames")
             .hints(Hints::COLLAPSE_ARRAY_ITEMS)
             .visible(move |v| !face(v)),
@@ -114,8 +114,10 @@ pub fn end_cap() -> FeatureType {
         ParamSpec::num("internalShiftDistance", "Inset", NONNEGATIVE_ZERO_DEFAULT).hints(rem).visible(internal),
         ParamSpec::enum_("cornersType", "Treatment type", &[("NONE", "None"), ("CHAMFER", "Chamfer"), ("FILLET", "Fillet")]).hints(rem | Hints::SHOW_LABEL).visible(rect),
         ParamSpec::num("cornerDistance", "Length", NumSpec::positive_length(5.0, 0.25).bounded(1e-3, 500.0))
+            .hints(rem)
             .visible(move |v| rect(v) && v.is("cornersType", "CHAMFER")),
         ParamSpec::num("cornerRadius", "Radius", NumSpec::positive_length(5.0, 0.25).bounded(1e-3, 500.0))
+            .hints(rem)
             .visible(move |v| rect(v) && v.is("cornersType", "FILLET")),
     ];
     FeatureType::new("endcap", "End cap", Category::Frame, p).icon("endCap").describe("Cap open frame segment ends")

@@ -189,7 +189,7 @@ pub fn pcb_end() -> FeatureType {
     let p = vec![
         hidden(ParamSpec::query("initEntities", "Entities", QueryFilter::ANY_FACE | QueryFilter::EDGE)),
         ParamSpec::enum_("unfoldType", "Unfold type", &[("UNFOLD_ALL", "Unfold all"), ("UNFOLD_SELECTED", "Unfold selected"), ("UNFOLD_NONE", "Unfold none")]),
-        ParamSpec::query("entitiesToUnfold", "Bend or non-planar faces to unfold", QueryFilter::ANY_FACE).visible(move |v| ty(v, "UNFOLD_SELECTED")),
+        ParamSpec::query("entitiesToUnfold", "Bend or non-planar faces to unfold", QueryFilter::ANY_FACE).hints(Hints::FOCUS_ON_VISIBLE).visible(move |v| ty(v, "UNFOLD_SELECTED")),
         ParamSpec::query1("holdEntity", "Wall face or bounding edge to hold", QueryFilter::ANY_FACE | QueryFilter::EDGE).visible(move |v| !ty(v, "UNFOLD_NONE")),
         ParamSpec::query1("pcbPart", "PCB part to finish", QueryFilter::SOLID_BODY),
     ];
@@ -337,12 +337,12 @@ pub fn hem() -> FeatureType {
         ParamSpec::enum_("hemType", "Hem type", &[("STRAIGHT", "Straight"), ("ROLLED", "Rolled"), ("TEAR_DROP", "Tear drop")])
             .hints(Hints::REMEMBER_PREVIOUS_VALUE),
         ParamSpec::flip("oppositeDirection", "Opposite direction"),
-        ParamSpec::bool("useMinimalGapForStraight", "Flattened", true).visible(move |v| ty(v, "STRAIGHT")),
-        ParamSpec::num("innerRadius", "Inner radius", SM_BEND_RADIUS).visible(move |v| !ty(v, "STRAIGHT") || !v.bool("useMinimalGapForStraight")),
-        ParamSpec::bool("useMinimalGapForTipGap", "Use minimal gap", true).visible(move |v| ty(v, "TEAR_DROP")),
-        ParamSpec::num("tipGap", "Gap", SM_MINIMAL_CLEARANCE).visible(move |v| ty(v, "TEAR_DROP") && !v.bool("useMinimalGapForTipGap")),
-        ParamSpec::num("angle", "Angle", NumSpec::angle(270.0, 180.0, 359.9)).visible(move |v| ty(v, "ROLLED")),
-        ParamSpec::num("length", "Total length", NumSpec::positive_length(12.5, 0.5).bounded(1e-5, 500.0)).visible(move |v| !ty(v, "ROLLED")),
+        ParamSpec::bool("useMinimalGapForStraight", "Flattened", true).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(move |v| ty(v, "STRAIGHT")),
+        ParamSpec::num("innerRadius", "Inner radius", SM_BEND_RADIUS).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(move |v| !ty(v, "STRAIGHT") || !v.bool("useMinimalGapForStraight")),
+        ParamSpec::bool("useMinimalGapForTipGap", "Use minimal gap", true).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(move |v| ty(v, "TEAR_DROP")),
+        ParamSpec::num("tipGap", "Gap", SM_MINIMAL_CLEARANCE).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(move |v| ty(v, "TEAR_DROP") && !v.bool("useMinimalGapForTipGap")),
+        ParamSpec::num("angle", "Angle", NumSpec::angle(270.0, 180.0, 359.9)).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(move |v| ty(v, "ROLLED")),
+        ParamSpec::num("length", "Total length", NumSpec::positive_length(12.5, 0.5).bounded(1e-5, 500.0)).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(move |v| !ty(v, "ROLLED")),
         ParamSpec::enum_("hemAlignment", "Hem alignment", &[("OUTER", "Outer"), ("IN_PLACE", "In place")]).hints(Hints::SHOW_LABEL | Hints::REMEMBER_PREVIOUS_VALUE),
         ParamSpec::enum_("hemCornerType", "Corner type", &[("SIMPLE", "Simple"), ("CLOSED", "Closed")]).hints(Hints::SHOW_LABEL | Hints::REMEMBER_PREVIOUS_VALUE),
     ];
@@ -405,7 +405,10 @@ pub fn bend() -> FeatureType {
 /// Jog (sheetMetalJog): two opposite bends offsetting part of a wall.
 pub fn jog() -> FeatureType {
     let bt = |v: &ParamValues, t: &str| v.is("offsetType", t);
-    let mut p = bend_top(179.0);
+    let mut p = bend_top(359.9);
+    if let Some(a) = p.iter_mut().find(|s| s.id == "bendAngle") {
+        a.hints = a.hints | Hints::UNCONFIGURABLE;
+    }
     p.push(hidden(ParamSpec::bool("bendAngleSetProgrammatically", "Bend angle set programmatically", false)));
     p.extend(bend_radius_override(always, "bendRadius"));
     p.extend(k_factor_override(always));
@@ -539,7 +542,6 @@ pub fn corner() -> FeatureType {
         ParamSpec::query1("corner", "Corner", SM_CORNER).hints(Hints::INITIAL_FOCUS),
         ParamSpec::enum_("cornerStyle", "Corner relief type", CORNER_RELIEF).hints(Hints::SHOW_LABEL),
         ParamSpec::num("cornerReliefScale", "Corner relief scale", NumSpec::real(1.5, 1.0, 2.0))
-            .hints(rem)
             .visible(move |v| st(v, "RECTANGLE") || st(v, "ROUND")),
         ParamSpec::num("roundReliefDiameter", "Corner relief diameter", SM_RELIEF_SIZE).hints(rem).visible(move |v| st(v, "SIZED_ROUND")),
         ParamSpec::num("squareReliefWidth", "Corner relief width", SM_RELIEF_SIZE).hints(rem).visible(move |v| st(v, "SIZED_RECTANGLE")),
@@ -598,11 +600,11 @@ pub fn corner_break() -> FeatureType {
             .hints(Hints::SHOW_LABEL | Hints::REMEMBER_PREVIOUS_VALUE)
             .visible(fillet),
         ParamSpec::num("radius", "Radius", BLEND_BOUNDS).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(radius),
-        ParamSpec::num("filletWidth", "Width", BLEND_BOUNDS).visible(move |v| fillet(v) && !radius(v)),
+        ParamSpec::num("filletWidth", "Width", BLEND_BOUNDS).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(move |v| fillet(v) && !radius(v)),
         ParamSpec::num("rho", "Rho", NumSpec::real(0.5, 0.0, 0.99999)).visible(move |v| cs(v, "CONIC")),
         ParamSpec::num("magnitude", "Magnitude", NumSpec::real(0.5, 0.0, 0.99999)).visible(move |v| cs(v, "CURVATURE")),
         ParamSpec::bool("isAsymmetric", "Asymmetric", false).visible(radius),
-        ParamSpec::num("otherRadius", "Second radius", BLEND_BOUNDS).visible(move |v| radius(v) && v.bool("isAsymmetric")),
+        ParamSpec::num("otherRadius", "Second radius", BLEND_BOUNDS).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(move |v| radius(v) && v.bool("isAsymmetric")),
         ParamSpec::flip("flipAsymmetric", "Flip asymmetric").visible(move |v| radius(v) && v.bool("isAsymmetric")),
         ParamSpec::bool("allowEdgeOverflow", "Allow edge overflow", false).hints(Hints::GROUP_HEADER).visible(move |v| fillet(v) && !cs(v, "CURVATURE")),
         ParamSpec::query("keepEdges", "Edges to keep", QueryFilter::EDGE).visible(move |v| fillet(v) && !cs(v, "CURVATURE") && v.bool("allowEdgeOverflow")),

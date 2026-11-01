@@ -163,7 +163,7 @@ pub fn ruled_surface() -> FeatureType {
                 ParamSpec::bool("oppositeAngleOverride", "Opposite direction", false)
                     .hints(Hints::OPPOSITE_DIRECTION_CIRCULAR)
                     .visible(move |v| ovr(v, "NORMAL") || ovr(v, "TANGENT")),
-                ParamSpec::query1("axisOverride", "Direction", QueryFilter::DIRECTION).visible(move |v| ovr(v, "ALIGNED_WITH_VECTOR")),
+                ParamSpec::query1("axisOverride", "Direction", QueryFilter::DIRECTION).hints(Hints::FOCUS_ON_VISIBLE).visible(move |v| ovr(v, "ALIGNED_WITH_VECTOR")),
                 ParamSpec::query1("boundaryOverride", "Up to vertex or mate connector", QueryFilter::POINT_LIKE).visible(move |v| ovr(v, "UP_TO_VERTEX")),
                 ParamSpec::length("distanceOverride", "Distance", 25.0, 1.0).visible(move |v| !ovr(v, "UP_TO_VERTEX")),
                 ParamSpec::flip("oppositeDirectionOverride", "Opposite direction").visible(move |v| !ovr(v, "UP_TO_VERTEX")),
