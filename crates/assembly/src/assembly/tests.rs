@@ -2905,6 +2905,21 @@ fn dynamic_suppression_applies_to_mates() {
     assert!(!inactive(&mut ev, &asm));
 }
 
+/// Live 1723: relations (and patterns, assembly mate connectors) have
+/// Dynamic suppression too; theirs is kept by id on the assembly.
+#[test]
+fn dynamic_suppression_applies_to_relations() {
+    let f = doc_with(vec![block_studio()]);
+    let mut asm = Assembly {
+        relations: vec![Relation { id: MateId(40), name: "Gear 1".into(), relation_type: RelationType::Gear, mates: [MateId(10), MateId(11)], ratio: ExprValue::new("2"), reverse: false, suppressed: false, base: None }],
+        ..Default::default()
+    };
+    asm.unsuppressed_if.insert(MateId(40), "0".into());
+    assert!(super::eval::dynamically_suppressed(&f.doc, &asm).relations[0].suppressed, "a false expression suppresses the relation");
+    asm.unsuppressed_if.insert(MateId(40), "1".into());
+    assert!(!super::eval::dynamically_suppressed(&f.doc, &asm).relations[0].suppressed);
+}
+
 #[test]
 fn bom_flattened_structured_exclusion_and_cell_edits() {
     use super::bom::{self, BomColumn, BomSettings, BomType};

@@ -199,7 +199,7 @@ impl AssemblyView {
             .assembly(cx)
             .and_then(|a| match target {
                 DynTarget::Instance(id) => a.instance(id).and_then(|i| i.unsuppressed_if.clone()),
-                DynTarget::Mate(id) => a.mate(id).and_then(|m| m.unsuppressed_if.clone()),
+                DynTarget::Mate(id) => a.mate(id).and_then(|m| m.unsuppressed_if.clone()).or_else(|| a.unsuppressed_if.get(&id).cloned()),
                 DynTarget::Folder(id) => a.folders.iter().find(|f| f.id == id).and_then(|f| f.unsuppressed_if.clone()),
             })
             .unwrap_or_default();

@@ -904,6 +904,11 @@ pub struct Assembly {
     /// Configuration inputs and configured instances / mates.
     #[serde(default, skip_serializing_if = "config::AsmConfiguration::is_empty")]
     pub configuration: config::AsmConfiguration,
+    /// Dynamic suppression ("Unsuppressed if") of patterns, relations and
+    /// assembly mate connectors, by id (live 1723 offers it on their rows;
+    /// instances, mates and folders keep theirs on themselves).
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub unsuppressed_if: std::collections::BTreeMap<MateId, String>,
 }
 
 fn properties_empty(p: &AssemblyProperties) -> bool {

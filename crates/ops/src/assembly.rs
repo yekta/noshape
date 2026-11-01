@@ -868,6 +868,11 @@ pub fn set_unsuppressed_if(a: &mut Assembly, target: DynTarget, text: Option<Str
         DynTarget::Mate(id) => {
             if let Some(m) = a.mates.iter_mut().find(|m| m.id == id) {
                 m.unsuppressed_if = text;
+            } else if a.patterns.iter().any(|p| p.id == id) || a.relations.iter().any(|r| r.id == id) || a.connector(id).is_some() {
+                match text {
+                    Some(t) => a.unsuppressed_if.insert(id, t),
+                    None => a.unsuppressed_if.remove(&id),
+                };
             }
         }
         DynTarget::Folder(id) => {

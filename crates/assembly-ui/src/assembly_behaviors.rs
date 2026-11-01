@@ -2053,9 +2053,10 @@ impl AssemblyView {
         match &mate {
             _ if np_editing => {}
             Some(mt) if mt.unsuppressed_if.is_some() => m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Mate(id), true)),
+            None if relation && asm.unsuppressed_if.contains_key(&id) => m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Mate(id), true)),
             _ => {
                 m.push(item(if suppressed { "Unsuppress" } else { "Suppress" }, move |t, _, cx| t.toggle_mate_suppressed(id, cx)));
-                if mate.is_some() {
+                if mate.is_some() || relation {
                     m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Mate(id), false));
                 }
             }
@@ -2156,13 +2157,18 @@ impl AssemblyView {
         m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, tg.clone(), cx)));
         let tg = copies.clone();
         m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, tg.clone(), cx)));
-        m.push(item(if suppressed { "Unsuppress" } else { "Suppress" }, move |t, _, cx| {
-            t.edit("Suppress pattern", cx, |a| {
-                if let Some(p) = a.patterns.iter_mut().find(|p| p.id == id) {
-                    p.suppressed = !p.suppressed;
-                }
-            });
-        }));
+        if asm.unsuppressed_if.contains_key(&id) {
+            m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Mate(id), true));
+        } else {
+            m.push(item(if suppressed { "Unsuppress" } else { "Suppress" }, move |t, _, cx| {
+                t.edit("Suppress pattern", cx, |a| {
+                    if let Some(p) = a.patterns.iter_mut().find(|p| p.id == id) {
+                        p.suppressed = !p.suppressed;
+                    }
+                });
+            }));
+            m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Mate(id), false));
+        }
         m.push(MenuEntry::Sep);
         if replicate {
             m.push(item(format!("Dissolve {}", p.name), move |t, _, cx| {
@@ -2320,14 +2326,22 @@ impl AssemblyView {
         m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, owner.clone(), cx)));
         m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, o2.clone(), cx)));
         m.push(icon_item("Section view…", "section-view-3d", |t, w, cx| t.toggle_section(w, cx)));
-        let sup = if c.suppressed { "Unsuppress" } else { "Suppress" };
-        m.push(item(if graphics { format!("{sup} {name}") } else { sup.to_string() }, move |t, _, cx| {
-            t.edit("Suppress mate connector", cx, |a| {
-                if let Some(x) = a.connectors.iter_mut().find(|x| x.id == id) {
-                    x.suppressed = !x.suppressed;
-                }
-            });
-        }));
+        let has_expr = self.assembly(cx).is_some_and(|a| a.unsuppressed_if.contains_key(&id));
+        if has_expr && !graphics {
+            m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Mate(id), true));
+        } else {
+            let sup = if c.suppressed { "Unsuppress" } else { "Suppress" };
+            m.push(item(if graphics { format!("{sup} {name}") } else { sup.to_string() }, move |t, _, cx| {
+                t.edit("Suppress mate connector", cx, |a| {
+                    if let Some(x) = a.connectors.iter_mut().find(|x| x.id == id) {
+                        x.suppressed = !x.suppressed;
+                    }
+                });
+            }));
+            if !graphics {
+                m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Mate(id), false));
+            }
+        }
         m.push(MenuEntry::Sep);
         if graphics {
             m.push(self.create_assembly_drawing_item(cx));

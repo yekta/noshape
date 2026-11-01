@@ -1216,6 +1216,19 @@ pub fn dynamically_suppressed(doc: &Document, asm: &Assembly) -> Assembly {
             }
         }
     }
+    // Patterns, relations and assembly mate connectors.
+    for (id, e) in &asm.unsuppressed_if {
+        if !is_false(Some(e)) {
+            continue;
+        }
+        if let Some(p) = out.patterns.iter_mut().find(|p| p.id == *id) {
+            p.suppressed = true;
+        } else if let Some(r) = out.relations.iter_mut().find(|r| r.id == *id) {
+            r.suppressed = true;
+        } else if let Some(c) = out.connectors.iter_mut().find(|c| c.id == *id) {
+            c.suppressed = true;
+        }
+    }
     out
 }
 
@@ -2181,7 +2194,7 @@ impl AssemblyEvaluator {
     fn prepare_inner(&mut self, doc: &Document, asm: &Assembly, visited: &mut Vec<u64>) -> (Vec<LeafInstance>, Vec<InstanceNode>, Prepared) {
         // Dynamic suppression: instances whose "Unsuppressed if" is false.
         let dynamic;
-        let asm = if asm.instances.iter().any(|i| i.unsuppressed_if.is_some()) || asm.mates.iter().any(|m| m.unsuppressed_if.is_some()) || asm.folders.iter().any(|f| f.unsuppressed_if.is_some()) {
+        let asm = if asm.instances.iter().any(|i| i.unsuppressed_if.is_some()) || asm.mates.iter().any(|m| m.unsuppressed_if.is_some()) || asm.folders.iter().any(|f| f.unsuppressed_if.is_some()) || !asm.unsuppressed_if.is_empty() {
             dynamic = dynamically_suppressed(doc, asm);
             &dynamic
         } else {
