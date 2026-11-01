@@ -3232,6 +3232,31 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
         }
     }
+    // A plane face of a tool a hair off another argument's plane face in angle, within the tolerance of its plane
+    // (a knurl groove's end caps 2.3e-8 to 2.8e-5 rad off the cylinder's end planes, the end faces' pieces over them
+    // taken as on the caps by the rays, past the parallel test): on that plane, so they are coplanar.
+    let planes: Vec<usize> = (0..cx.faces.len()).filter(|&f| matches!(cx.faces[f].s, Surf::Plane { .. })).collect();
+    for &f in &planes {
+        if cx.faces[f].arg == 0 {
+            continue;
+        }
+        let Surf::Plane { n, origin, u, flip, .. } = cx.faces[f].s else { continue };
+        let target = planes.iter().copied().find(|&g| {
+            let Surf::Plane { n: m, d, .. } = cx.faces[g].s else { return false };
+            let (x, y) = (&cx.faces[f], &cx.faces[g]);
+            y.arg == 0
+                && boxes_meet(x.lo, x.hi, y.lo, y.hi, GREY * tol)
+                && (1e-9..=1e-4).contains(&n.cross(m).length())
+                && x.edges.iter().all(|&(e, _)| (0..=8).all(|k| (m.dot(cx.seg_at(&cx.edge_seg(e), k as f64 / 8.0)) - d).abs() <= tol))
+        });
+        if let Some(g) = target {
+            let Surf::Plane { n: m, origin: og, .. } = cx.faces[g].s else { continue };
+            let m = if m.dot(n) > 0.0 { m } else { -m };
+            let o = origin - m * m.dot(origin - og);
+            let u = (u - m * u.dot(m)).normalize();
+            cx.faces[f].s = Surf::Plane { n: m, d: m.dot(o), origin: o, u, v: m.cross(u), flip };
+        }
+    }
     // The rotation the arrangement is the same under, if any (below: one period's work for the rest).
     let sym = cx.symmetry();
     let size = cx.size.max(cx.pool.p.iter().fold(0.0, |m: f64, p| m.max(p.abs().max_element())));
@@ -4252,12 +4277,28 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 }
                 let q = cx.faces[g].to2(pieces[pi].inside);
                 let d = distance2(q, cx.bound(g)?);
-                if d <= GREY * tol {
-                    return Err(Decline("a piece's point near a coincident face's boundary"));
-                }
-                if inside2(q, cx.bound(g)?) {
-                    let p = pieces[pi].inside;
-                    st = Some(if cx.normal_at(g, p).dot(cx.normal_at(f, p)) > 0.0 { State::OnSame } else { State::OnOpposite });
+                let p = pieces[pi].inside;
+                let same = cx.normal_at(g, p).dot(cx.normal_at(f, p)) > 0.0;
+                let inside = if d <= GREY * tol {
+                    // (A sliver along that face's boundary (two knurl caps' edges a micrometre apart for 330 um): on
+                    // its side by a curve of it that is a piece of that face's edge, the way each runs along it.)
+                    let side = pieces[pi].loops.iter().flatten().find_map(|&(sg, r)| {
+                        sedges[sg].origins.iter().find_map(|&e| {
+                            let &(_, rg) = cx.faces[g].edges.iter().find(|x| x.0 == e)?;
+                            let es = cx.edge_seg(e);
+                            let (ta, tb) = (cx.seg_param(&es, cx.p(sedges[sg].seg.v[0])).0, cx.seg_param(&es, cx.p(sedges[sg].seg.v[1])).0);
+                            ((ta - tb).abs() > 1e-9 && sedges[sg].seg.v[0] != sedges[sg].seg.v[1]).then_some(((tb > ta) != r) == !rg)
+                        })
+                    });
+                    match side {
+                        Some(along) => along == same,
+                        None => return Err(Decline("a piece's point near a coincident face's boundary")),
+                    }
+                } else {
+                    inside2(q, cx.bound(g)?)
+                };
+                if inside {
+                    st = Some(if same { State::OnSame } else { State::OnOpposite });
                     break;
                 }
             }

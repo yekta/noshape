@@ -534,6 +534,38 @@ fn a_ray_crossing_a_twisted_flank_twice() {
     valid_as_occt("5074542e7423ed66", 1e-8);
 }
 
+/// Slivers a micrometre wide between two end caps whose edges nearly meet for 330 µm (recorded: the Ø10 × 25 knurl
+/// at 45° / 30°, CP30, its tools 21 and 58): every point of one is in the grey band of the other cap's boundary ("a
+/// piece's point near a coincident face's boundary"); on the cap's side or not by a curve of it that is a piece of
+/// the cap's edge. OCCT's cut of the two keeps one groove; against each groove's own cut and their overlap in the
+/// cylinder by OCCT (0.004729 mm³).
+#[test]
+fn slivers_between_two_caps() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "92dea237e4b5764e").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    let one: Vec<f64> = c.tools.iter().map(|t| k::boolean(c.op, &c.objects, std::slice::from_ref(t), &c.opts).expect("one groove's cut").shape.volume().unwrap()).collect();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let v0 = c.objects[0].volume().unwrap();
+    let want = v0 - one.iter().map(|v| v0 - v).sum::<f64>() + 0.004729e-9;
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid());
+    assert!((v - want).abs() <= 1e-4 * 1e-9, "volume {v}, the grooves' own and their overlap {want}");
+}
+
+/// Knurl grooves whose end caps are a hair off the cylinder's end planes (recorded: the Ø100 × 10 knurl at 45° / 30°,
+/// its tools 1 and 146, caps 2.3e-8 and 2.8e-5 rad off, within 2.4e-8 of the planes): past the parallel test they
+/// weren't coplanar, and the end faces' pieces over the caps were taken as on them by the rays ("a piece's point on
+/// another solid's face"); the caps are put on the end planes.
+#[test]
+fn caps_a_hair_off_the_end_planes() {
+    valid_as_occt("9adf79ad7434d5d3", 1e-9);
+}
+
 /// A mirror fuse whose face has a hole touching its outer boundary at one vertex (fuzz seed 1144): a wire each side of
 /// that vertex, as OCCT's builder makes them (one wire through it twice was invalid: BadOrientationOfSubshape).
 #[test]

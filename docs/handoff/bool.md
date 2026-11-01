@@ -1109,6 +1109,27 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Knurl sweep: tilted caps, slivers between caps (11-02 02:00 UTC)
+- A tool's plane face 1e-9 to 1e-4 rad off an object's plane face, its edges within the tolerance of that plane, is
+  put on it before the pairing (boolean.rs, before `symmetry`): the knurl tools' end caps are 2.3e-8 to 2.8e-5 rad
+  off the cylinder's end planes (the sweep's end sections), past plane_plane's 1e-9 parallel test, so not coplanar,
+  and the end faces' pieces over them were ray-classified on them ("a piece's point on another solid's face", all
+  of Ø100 × 10). T1 caps_a_hair_off_the_end_planes (OCCT's result exactly). Corpora unchanged.
+- A piece whose point is in the grey band of a coplanar face's boundary (a sliver a micrometre wide between two caps'
+  edges for 330 um, Ø10 × 25 CP30): on that face or not by a curve of the piece that is a piece of that face's edge,
+  the way each runs along it (and the two normals), as OCCT's same-domain faces go by shared edges. T1
+  slivers_between_two_caps: OCCT's cut of the two keeps one groove (1962.198 mm³); ours 1960.905690, the grooves'
+  own cuts and OCCT's overlap 1960.905682.
+- Grid (size × TPI × angle, vibe4 ~/agents/sweep/grid3.tsv, 94 of 252 done before these two): 81 taken. Still
+  declining, by cause: (a) sections of the cylinder within a few um of a tool's corner edge that runs 3 um outside
+  the cylinder (CP30 and Ø10 at 30° helix, mid-height): merged into the edge by get_sedge (reach from OCCT's
+  accuracy), the strip between lost, non-manifold — next: merge a section with an edge only where the edge lies on
+  the section's other face; (b) two grooves crossing at the cylinder's seam just above the end face (Ø25 × 24 45/30,
+  Ø25 × 10 CP20 80/30): a cylinder piece holds both walls of one groove but its point is outside it; (c) two pool
+  vertices 4e-14 apart not merged, two 0.32 um curves from one point (Ø10 × 10 45/45: "two edges leave a vertex in
+  one direction"). Slow: Ø10 knurls 50-110 s (3600-8400 faces) on the loaded machine, against 2.8 s for Ø25 × 25;
+  to profile.
+
 ## Knurl sweep: three more causes fixed (11-02 01:00 UTC)
 - The boundary crossings for the seeded sections are now the curves' own closest points (Gauss-Newton on the two
   edges from each chord pair within reach), merged within 10 tol: chords of a 48 mm helix edge reach ~12 um, and
