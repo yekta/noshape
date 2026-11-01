@@ -31,7 +31,10 @@ if [ ! -d "$SRC" ]; then
 fi
 GEN=()
 command -v ninja >/dev/null && GEN=(-G Ninja)
-cmake -S "$SRC" -B build "${GEN[@]}" \
+# OCCT_COMPILER_LAUNCHER=ccache: each object through the compiler cache (CI: a patch change recompiles only what it touches).
+LAUNCH=()
+[ -n "${OCCT_COMPILER_LAUNCHER:-}" ] && LAUNCH=(-DCMAKE_C_COMPILER_LAUNCHER="$OCCT_COMPILER_LAUNCHER" -DCMAKE_CXX_COMPILER_LAUNCHER="$OCCT_COMPILER_LAUNCHER")
+cmake -S "$SRC" -B build "${GEN[@]}" ${LAUNCH[@]+"${LAUNCH[@]}"} \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$PREFIX" \
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON \

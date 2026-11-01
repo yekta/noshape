@@ -91,7 +91,9 @@ runs:
       if: inputs.ref != ''
       with:
         workspaces: src
-        key: occt-V8_0_1
+        # main's release-build dependencies (ci.yml `release`), read only (cache quota).
+        shared-key: release-occt-V8_0_1
+        save-if: false
 
     # PowerShell on Windows: under bash, Git's coreutils `link` shadows MSVC's link.exe.
     - name: Build (release, Windows)

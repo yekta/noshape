@@ -387,9 +387,11 @@ jobs:
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      # main's release-build dependencies (ci.yml `release`), read only (cache quota).
       - uses: Swatinem/rust-cache@v2
         with:
-          key: model-perf-occt-V8_0_1
+          shared-key: release-occt-V8_0_1
+          save-if: false
 
       - name: Big plate (release)
         if: runner.os != 'Windows'

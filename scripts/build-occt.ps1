@@ -39,8 +39,12 @@ if (-not (Test-Path $Src)) {
 
 $gen = @()
 if (Get-Command ninja -ErrorAction SilentlyContinue) { $gen = @("-G", "Ninja") }
+# $env:OCCT_COMPILER_LAUNCHER = "ccache": each object through the compiler cache (needs Ninja; CI: a patch change
+# recompiles only what it touches).
+$launch = @()
+if ($env:OCCT_COMPILER_LAUNCHER) { $launch = @("-DCMAKE_C_COMPILER_LAUNCHER=$env:OCCT_COMPILER_LAUNCHER", "-DCMAKE_CXX_COMPILER_LAUNCHER=$env:OCCT_COMPILER_LAUNCHER") }
 
-cmake -S $Src -B build @gen `
+cmake -S $Src -B build @gen @launch `
   -DCMAKE_BUILD_TYPE=Release `
   "-DCMAKE_INSTALL_PREFIX=$Prefix" `
   -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL `
