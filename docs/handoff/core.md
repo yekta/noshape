@@ -40,6 +40,9 @@ deadlock in malloc).
   late (the OCCT fuse of the grooves: BOPDS pairs and TreatVerticesEE); round 2: 13-207 ms early; round 3: 12-116 ms
   up to 20 s, 18-950 ms from 24-50 s. Left: BOPDS_SubIterator::Initialize's stable sort of millions of pairs (one
   call), and what the stack probe shows next; measure at a quiet time (the watcher's load doubles these).
+- (02:30) MEM-RUNAWAY follow-up: brep's stop check also asks the kernel's `noshape_should_break` (set_stop_hook), so a
+  budget's deadline stops noshape's Boolean by a decline (the budget timer's jump out of Rust code skipped its
+  destructors).
 - Round 4: op_boolean hands a cancelled build's OCCT builder (the pave filler) to a detached thread to free. vibe2 at
   load 11-17, cancel at 0.7-50 s: 15-336 ms, one 1.86 s at 24 s that didn't repeat (613 / 149 ms on reruns).
 

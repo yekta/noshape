@@ -43,11 +43,19 @@ pub fn thread_cancel() -> usize {
     CANCEL.with(|c| c.get())
 }
 
-/// Whether this thread's cancel flag is set.
+static STOP_HOOK: std::sync::OnceLock<fn() -> bool> = std::sync::OnceLock::new();
+
+/// A stop check asked with the thread's cancel flag (set once; the kernel's: its budgets' deadlines too, so a
+/// budgeted op's Boolean stops by declining instead of the budget's timer jumping out of it).
+pub fn set_stop_hook(hook: fn() -> bool) {
+    let _ = STOP_HOOK.set(hook);
+}
+
+/// Whether this thread's cancel flag is set (or the stop hook says stop).
 pub fn cancelled() -> bool {
     let f = thread_cancel();
     // SAFETY: the flag outlives every Boolean run under it (`with_cancel` holds it for the call).
-    f != 0 && unsafe { &*(f as *const std::sync::atomic::AtomicBool) }.load(std::sync::atomic::Ordering::Relaxed)
+    (f != 0 && unsafe { &*(f as *const std::sync::atomic::AtomicBool) }.load(std::sync::atomic::Ordering::Relaxed)) || STOP_HOOK.get().is_some_and(|h| h())
 }
 
 /// Declines "cancelled" once this thread's cancel flag is set.

@@ -1211,6 +1211,9 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   classification, the result) and per solid in the pairs loop. rust_boolean.cpp: a decline under a set flag stops
   ("cancelled") instead of handing the Boolean to OCCT. T1 brep `a_cancelled_boolean_declines`. If a loop of yours
   runs long without par_map, add `crate::check_cancel()?;` in it.
+- (11-01 02:30) `set_stop_hook(fn() -> bool)`: `cancelled()` also asks it; the kernel installs its
+  `noshape_should_break` (the thread's cancel flag or its budget's deadline), so a budgeted op's Boolean (Shell's
+  slabs, the blend fallbacks) declines at the deadline instead of the budget's timer jumping out of Rust code.
 
 ## Requests
 - core (10-31 16:40 UTC, P0 SHELL-SLOW): Shell's slab union is OCCT's for concave parts, 1.5-2.3 s of a 2.6-3.4 s

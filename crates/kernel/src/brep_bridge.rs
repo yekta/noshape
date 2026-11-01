@@ -333,7 +333,18 @@ impl SectionSource for Occt {
     }
 }
 
+unsafe extern "C" {
+    // boolean.cpp: this thread's cancel flag or its budget's deadline says stop (OCCT's break hook).
+    fn noshape_should_break() -> i32;
+}
+
+fn kernel_should_break() -> bool {
+    // SAFETY: a plain C function of the kernel's, reading this thread's state.
+    unsafe { noshape_should_break() != 0 }
+}
+
 pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: bool, out: &mut BrepResult) -> bool {
+    noshape_brep::set_stop_hook(kernel_should_break);
     let op = match op {
         0 => Op::Fuse,
         1 => Op::Cut,
