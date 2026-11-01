@@ -804,6 +804,13 @@ with 0003b and 0004 on Linux, macOS and Windows.
    13.20006), 7582.9778 mm³ (live STEP 7582.977). 56 STEP files swept: only the G24 part changes, none invalid.
 Knurl Phase 1 stopped at 246 s (its steps left are 10–40 s each); REGEN-SPEED met in release (qa to re-measure).
 
+## End-of-day walk (11-01 03:10, green 8763a6b1, CLI = the app binary)
+- qa's filletmatrix (32 fillet / chamfer boxes, all 12 edges): all Ok and exact to the formulas. shellmatrix (96
+  plates, holes, fillets, 4 thicknesses): all Ok, walls OK; against core's 10-29 run only the filleted cases moved,
+  by <= 0.003 mm³ (noshape's exact blend corners vs OCCT's approximated ones). G46 (skasm's g46.py): as before
+  (fillet 44848.075 vs live 44848.216, the chamfer-patch difference stands). halfmir: 7214.602, 7 faces, one 314.16
+  wall (live). No regressions in my area.
+
 ## End-of-day walk (10-27 03:45, green 8165fca6)
 - Opened qa's qa-1026-ps2-shell.noshape in the green app on :101: Part Studio 1 (live's 30 features) regenerates, Part
   Studio 2 (SHELL-WALLS + chamfer + holes) shells to an open box with full walls and tubes round the holes, Shell 1 OK,
