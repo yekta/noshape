@@ -13,7 +13,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 
 ## Late 11-01 (21:11 UTC)
 - D19 multi-selection palette, D20 hole tables over several views, X1 (A) nested STEP subassemblies + V1 on
-  documents-page imports: done and checked, waiting to land (part-studio-ui test red on main, below).
+  documents-page imports: landed 23:31 (751444a9) with everything queued since 18:47.
 - To skasm / lead: live 1742 (B) "Split into multiple documents" needs an Assembly instance of another document's
   assembly at a version ("Versioned assembly from other document"); InstanceSource::External is Part Studios only.
   With it, Split = a folder named after the file, a document per (sub)assembly (one Part Studio per part), each V1,
