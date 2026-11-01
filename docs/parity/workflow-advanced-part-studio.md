@@ -111,12 +111,12 @@ rebuilt exactly to live's spec in /tmp/qa5/home/Documents/noshape/qa5-livecheck.
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | ADV1 Plane 1 row → Sketch plane | nothing | ✗ still → now ADV1 ✅ skasm 10-31 GUI (Sketch › the Plane 1 row → "Plane 1") |  |
-| ADV2 loft | 5927.755 | ✗ still → now ✅ ADV2 withdrawn 10-31 (live evVolume HIGH 5927.754323 = ours) |  |
+| ADV2 loft | 5927.755 | ✗ still → now ✅ ADV2 withdrawn 10-31 (live evVolume HIGH 5927.754323 = ours) | skasm 11-01 CLI a5ab5f91 (feat/adv2.py): 5927.754578 mm³, 6 faces; live evVolume HIGH 5927.754323 |
 | ADV3 / SK1 dim conflict | box stays open, red "The sketch could not be solved with that value" | ✗ still → now ADV3 ✅ skasm 10-31 GUI (row tooltips "Sweep 1 did not regenerate properly: Could not create valid swept body, check input.", "Helix 1 did not regenerate properly: Select a cone or cylinder."); SK1 ✅ f8014efa (box closes, red title / row, ⚠ toast as live) |  |
 | ADV4 countersink rows | icon rows, values fit, no overlap | ✅ **fixed** | 64997436 10-28 (GUI: Inch › Countersink › Tapped: icon rows, 13.487 mm / 82 deg / 12 mm / 12 mm / 3 all fit, no overlap; 20 tpi (UNC), ☐ Thread class = live dom qa5-adv-hole-tapped) |
-| ADV7 thread split face | whole cylinder highlights as one face | ✗ still → now ADV7 ✅ skasm 10-31 CLI (Ø6 × 30, thread: 4 faces, area unchanged) |  |
+| ADV7 thread split face | whole cylinder highlights as one face | ✗ still → now ADV7 ✅ skasm 10-31 CLI (Ø6 × 30, thread: 4 faces, area unchanged) | skasm 11-01 CLI a5ab5f91 (feat/adv.py): Ø6 × 30 + External thread on the top edge → 4 faces, 622.0353 mm² (as before the thread) |
 | ADV8 "20 tpi (UNC)" | unchanged | ✗ still → now ADV8 ✅ 64997436 |  |
-| ADV12 hole row name | both callout lines | ✗ still → now ✅ ADV12 withdrawn (live: the whole callout, = ours) |  |
+| ADV12 hole row name | both callout lines | ✗ still → now ✅ ADV12 withdrawn (live: the whole callout, = ours) | live 1632 (behaviours "hole row name": the whole callout) |
 | TAB1 tab switch Parts (0) | PS2 still "Parts (0)" on open (holeblock in qa5 import OK) | ✗ still (partly) → now TAB1 ✅ skasm 10-31 GUI (Part Studio 2 opens with Parts (1) Part 1, full right strip) |  |
 | SK2 F in a sketch | fits the far rectangle (tight margin) | ✅ **fixed** (no "Sketch N" outline yet) | ff379982 10-28: ✗ regressed: F in the sketch leaves the far rectangle half off-screen → SKETCH-F-FIT |
 
@@ -125,12 +125,12 @@ Pass 6 (17:11 build, d5745c9) had already found ADV8 fixed ("20 tpi"); not re-ch
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | ADV1 Plane 1 row → Sketch plane | field stays empty | ✗ still → now ADV1 ✅ skasm 10-31 GUI (Sketch › the Plane 1 row → "Plane 1") |  |
-| ADV2 loft | 5927.754632 (CLI) | ✗ still (live 5927.728) → now ✅ ADV2 withdrawn 10-31 (live evVolume HIGH 5927.754323 = ours) |  |
+| ADV2 loft | 5927.754632 (CLI) | ✗ still (live 5927.728) → now ✅ ADV2 withdrawn 10-31 (live evVolume HIGH 5927.754323 = ours) | skasm 11-01 CLI a5ab5f91 (feat/adv2.py): 5927.754578 mm³, 6 faces; live evVolume HIGH 5927.754323 |
 | ADV3 error tooltip prefix | "Helix 1 did not regenerate properly: Select a cone or cylinder." | ✅ **fixed** | 64997436 10-28 (GUI: empty Hole committed → row tooltip '1/4-20 ↧ 12 mm | ⌵Ø 13.487 mm X 82° [Hole] did not regenerate properly: No hole points selected.') |
 | SK1 dim set to an unsolvable value | Enter closes the box, value R2 kept, geometry red, **yellow "⚠ Sketch could not be solved."** toast, gone when the sketch closes ✅; **dialog title "Sketch 2" and the feature row text stay black** (live red) | ✗ still (mostly fixed) | f8014efa 10-28 (title / row now red: see SK1 row below) → now SK1 ✅ f8014efa (box closes, red title / row, ⚠ toast as live) |
 | SK2 | the "Sketch 2" plane outline now shows while editing | ✅ | ff379982 10-28 (editing Sketch 1 shows its frame labelled "Sketch 1" in the plane, top-left corner) |
-| ADV7 thread splits face | still one cylindrical face, 565.487 mm² (whole 30 mm) (CLI) | ✗ still → now ADV7 ✅ skasm 10-31 CLI (Ø6 × 30, thread: 4 faces, area unchanged) |  |
-| ADV12 hole row name | both callout lines; tooltip "Hole 1 <- Sketch 2" | ✗ still → now ✅ ADV12 withdrawn (live: the whole callout, = ours) |  |
+| ADV7 thread splits face | still one cylindrical face, 565.487 mm² (whole 30 mm) (CLI) | ✗ still → now ADV7 ✅ skasm 10-31 CLI (Ø6 × 30, thread: 4 faces, area unchanged) | skasm 11-01 CLI a5ab5f91 (feat/adv.py): Ø6 × 30 + External thread on the top edge → 4 faces, 622.0353 mm² (as before the thread) |
+| ADV12 hole row name | both callout lines; tooltip "Hole 1 <- Sketch 2" | ✗ still → now ✅ ADV12 withdrawn (live: the whole callout, = ours) | live 1632 (the whole callout) |
 | TAB1 tab switch | Part Studio 2 and 3 open with "Parts (0)" and 4 right-strip icons until a body is clicked | ✗ still → now TAB1 ✅ skasm 10-31 GUI (Part Studio 2 opens with Parts (1) Part 1, full right strip) |  |
 | RD1 stale Volume readout | **readout gone**: nothing at the bottom right with a part selected (live has none) | ✅ **fixed** | 0.4.10+ / dd1b5037 10-27 (no readout with a part selected) |
 
@@ -138,16 +138,16 @@ Pass 6 (17:11 build, d5745c9) had already found ADV8 fixed ("20 tpi"); not re-ch
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | ADV1 Plane 1 row → Sketch plane | fills "Plane 1" | ✅ **fixed** | 0.4.10+ / dd1b5037 10-27 (Plane rows fill Sketch plane / Entities) |
-| ADV2 loft (Mass properties) | 5927.755 mm³ | ✗ still (live 5927.728) → now ✅ ADV2 withdrawn 10-31 (live evVolume HIGH 5927.754323 = ours) |  |
-| ADV7 thread splits face | hover shows two cylinder faces, split ~10 mm up | ✅ **fixed** |  |
+| ADV2 loft (Mass properties) | 5927.755 mm³ | ✗ still (live 5927.728) → now ✅ ADV2 withdrawn 10-31 (live evVolume HIGH 5927.754323 = ours) | skasm 11-01 CLI a5ab5f91 (feat/adv2.py): 5927.754578 mm³, 6 faces; live evVolume HIGH 5927.754323 |
+| ADV7 thread splits face | hover shows two cylinder faces, split ~10 mm up | ✅ **fixed** | skasm 11-01 CLI a5ab5f91 (feat/adv.py): Ø6 × 30 + External thread on the top edge → 4 faces, 622.0353 mm² (as before the thread) |
 | SK1 unsolvable dimension | dialog title and row now red, ✓ disabled | ✅ **fixed** | f8014efa 10-28 (GUI, qa-scratch/tri.noshape (bin/tri.py): base 10 → 30 → box closes, 30 kept, geometry stays, all red, title / row red, header badge, ⚠ "Sketch could not be solved."; ✓ stays enabled = live (behaviours 14346: after ✓ WARNING)) |
-| ADV12 hole row | tooltip "1/4-20 ↧ 12 mm \| ⌵Ø 12.878 mm X 82° [Hole]" ✅; row still shows both callout lines | ✗ still (partly) → now ✅ ADV12 withdrawn (live: the whole callout, = ours) |  |
+| ADV12 hole row | tooltip "1/4-20 ↧ 12 mm \| ⌵Ø 12.878 mm X 82° [Hole]" ✅; row still shows both callout lines | ✗ still (partly) → now ✅ ADV12 withdrawn (live: the whole callout, = ours) | live 1632 (the whole callout) |
 | TAB1 | Part Studio 2 still opens with "Parts (0)" (Part Studio 3 listed its parts) | ✗ still → now TAB1 ✅ skasm 10-31 GUI (Part Studio 2 opens with Parts (1) Part 1, full right strip) |  |
 
 ## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
 | Row | Ours | Status | Verified |
 |---|---|---|---|
-| ADV2 loft (CLI) | 5927.754632 | ✗ still (live 5927.728022) → now ✅ ADV2 withdrawn 10-31 (live evVolume HIGH 5927.754323 = ours) |  |
+| ADV2 loft (CLI) | 5927.754632 | ✗ still (live 5927.728022) → now ✅ ADV2 withdrawn 10-31 (live evVolume HIGH 5927.754323 = ours) | skasm 11-01 CLI a5ab5f91 (feat/adv2.py): 5927.754578 mm³, 6 faces; live evVolume HIGH 5927.754323 |
 | ADV12 hole row name | "1/4-20 ↧ 12 mm \| ⌵Ø 12…" (both parts, ellipsis); tooltip "… [Hole] <- Sketch 2" | ✅ — **withdrawn**: live psb 10-21 p (behaviours ~7448) shows both callout parts; "first only" was a Simple hole (a04, a05) | f8014efa 10-28 (GUI, counterbore on cbd.noshape, default panel: row "Ø 6.35 mm ↧ 12 mm | ⌴…", tooltip "Ø 6.35 mm ↧ 12 mm | ⌴Ø 10 mm ↧ 5 mm [Hole] <- Sketch 2") |
 | TAB1 Part Studio 2 on first open | Parts (1), 5 strip buttons | ✅ **fixed** (a01) |  |
 

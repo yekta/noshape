@@ -1457,6 +1457,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
+- [ ] P3 SM-THICKEN-SKETCH-INFO (skasm 11-01, live G34 c2) Sheet metal model › Thicken of two sketches' regions
+  (plate on Top, wall on Front touching it) shows the Info "In-context faces are not connected. To thicken multiple
+  in-context faces first copy the part then thicken faces of the copy."; live reports nothing (two parts, 8400 mm³ =
+  ours). Cause: the FS host's qModifiableEntityFilter drops sketch regions / curves / points, so std's thicken counts
+  them as in-context faces. Fix (host query.rs `is_modifiable`: regions, curves and points modifiable; sketch bodies
+  still only when loaded for a derive) waits for the knurl A/B run to finish (skasm-scratch/sheets/query.rs.new).
+- [ ] P3 SM-MAKE-JOINT-ONE-EDGE (skasm 11-01, live G34 c2, workflow-sheet-metal-joints row 4) Make joint on the
+  junction edge of that model: live "Make joint 1 did not regenerate properly: Cannot add joint joining selected
+  entities." (std's first check: the one picked edge is one definition edge on one wall); ours "Cannot connect
+  multiple parts to create a joint." (std reached the two-body check, so our getSMDefinitionEntities mapped the one
+  part edge to definition edges of both sheets, which coincide along that line). CLI repro skasm-scratch/feat/c2.py.
 - [x] verified 131b6f34 (qa 10-31 20:12, green a2c5b09f as CLI (`noshape mcp`, /tmp/qa-smbutt2.py): smdocs/g34 + Corner CLOSED at (2, 2, 2) → 8535.161626 / 23 faces (live 8535.0418; the +0.12 is SM3's residual), then sheetmetal_edit_joint Joint C **Butt joint - Direction 1 → 8601.815265 / 23 faces**, **Direction 2 → 8601.815679 / 23** (live evVolume HIGH 8601.820762 / 8601.821483, 23 faces: −0.0055 mm³, 6e-7; was 8599.80); the joint adds +66.654 here vs live's +66.779) P3 SM-CLOSED-BUTT a Joint › Rip › Butt joint on the corner rip of a Closed corner (G34 b; workflow-sheet-metal-joints
   row 5): ours runs the right wall through (992 / 672 mm² faces as live) but keeps the Closed corner's bend ends, 8599.80
   mm³ vs live 8601.722190 (Direction 1), 1.92 mm³ short. Live re-closes both bends against the through wall: plate ends

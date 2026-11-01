@@ -104,7 +104,7 @@ Live "psb (10-24 g) body draft" (block 40×20×10, pull +Z, parting Top, 5°).
 | 1 | Fields | order, labels, 5 mm, Thickness 2 = 0, Keep tools ☐, merge scope, Mid plane swap | same | ✅ | f9185639 10-28 (dialog fields) |
 | 2 | Empty | "Select surfaces or faces to thicken." on entities | same | ✅ | 67f88fd1 10-28 ("Select surfaces or faces to thicken.") |
 | 3 | Keep tools off, some faces of a surface | the surface is kept unless all its faces are picked | deleted when any face is picked | ✅ (was 🔧 L16) | skasm 10-31 56277472 (CLI: one face of a 2-face surface thickened, Keep tools off → the surface stays, L16) |
-| 4 | Adjacent faces | one operation: one body | each face separately | ✗ L17: one L-shaped part of 2560 mm³ (square corner); ours 2 slabs — needs the kernel's intersection join (kern); overlapping slabs of one body are fused |  |
+| 4 | Adjacent faces | one operation: one body | each face separately | ✅ (was ✗ L17: ours made 2 slabs) = live L17 (one L-shaped part, 2560 mm³, 8 faces) | skasm 11-01 CLI a5ab5f91 (feat/l17.py): 40×20×10 block, top + front, 2 mm New → Part 2 2560.000 mm³, 8 faces, one part; same with Keep tools on |
 | 5 | Auto Add from a surface face | only faces of solids count (thicken.fs) | surface faces count (opens on Add) | ✅ (was 🔧 L18 (surface face stays New); a user-picked Add / Remove sets the flip (canSetBooleanFlip)) | skasm 10-31 GUI :103 at 56277472 (a surface's face → stays New) |
 | 6 | Errors | "Failed to thicken all selections." (likely) | "Thickness must be positive", "Thicken failed: …" | ✅ (was 🔧 L19 "Invalid input selections." (no field)) | skasm 10-31 56277472 (T thicken_as_live, L19) |
 

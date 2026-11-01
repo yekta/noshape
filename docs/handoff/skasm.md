@@ -203,6 +203,12 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
 - c7fd2571 landed (1680 test). AssemblyView UI tests on GPUI's test platform (assembly_ui_tests.rs: a document made
   through the agent API, the real view, inert `assembly_hooks::register_for_tests`), first test the Group dialog's
   pattern pick (0.5 s). Add assembly dialog flows there as they are touched.
+- **11-01 night (lead: knurl, then the unchecked rows):** the knurl's 16 → 138 s was bool's 2afca924 (declined the
+  grooves), fixed by bool e9e0f8bc; not the forward edges. Sheets: the rows with an empty Verified cell re-checked and
+  stamped (CLI scripts in skasm-scratch/feat: l17.py, adv2.py, adv.py, c2.py, imp; T2 runs; GUI where noted).
+  Found: Thicken 4 (L17) now = live; navigation 1.18's zoom-out stop needs live's plane-size rule (REQUESTS 03:00);
+  SM-THICKEN-SKETCH-INFO and SM-MAKE-JOINT-ONE-EDGE (TICKETS, live G34 c2). assembly.md: ten rows had their evidence
+  one column late (moved into Verified), LA12's `||` split its row.
 - **SM-TABLE-PART-ORDER (psui's report, 11-01):** e2e `sheet_metal_table_ops` ended in a different table in ~half its
   runs. Once Convert to rip leaves Bend B's wall a part of its own, the model has two parts each with its own
   SheetMetalData, and the ops table (and the app's panel, psui's crate) took the model's "first" part from
