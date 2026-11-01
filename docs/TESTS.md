@@ -73,6 +73,33 @@ only and `prune-caches` keeps one of each kind, so the 10 GB cache quota holds; 
 measure warm runs on a branch: `gh workflow run ci.yml --ref <branch> -f save_caches=true` (delete the branch's
 caches afterwards: `gh cache list --ref refs/heads/<branch>`).
 
+What a warm run compiles (11-02, measured with `cargo --timings`): only noshape's own crates. Three caches make that
+so, and each is worth knowing about when a build gets slow again:
+- **Dependencies** (rust-cache, keyed on Cargo.lock, the toolchain and the CC/CXX environment).
+- **The vendored crates** (vendor/: gpui, wgpu-hal…). They are path dependencies, which rust-cache deletes from
+  target/ like the workspace's own, so every run rebuilt them (18 CPU-min on Windows, the chain the UI crates wait
+  for). `.github/ci/vendored_builds.py` moves their outputs beside target/ before rust-cache saves and back before
+  the build; their files get a fixed date after checkout (cargo decides freshness of path crates by file dates) and
+  the cache key includes `hashFiles('vendor/**')`, so a vendor change rebuilds them.
+- **The kernel's C++** (crates/kernel/cpp, 3-7 min): CC/CXX go through ccache (`setup-ccache`), keyed by content
+  and by the compiler's content (not its date: runner images of the same compiler differ in dates, which made OCCT's
+  cache miss every object on a newer Windows image).
+
+Warm run times (job, 11-02): Linux test 9-14 min, release 12; macOS test 16-19, release 17-19; Windows test 20
+(compile 15, tests 3.4), release 22-24. Before these three caches: Windows test 30.5, Linux 16.6, macOS 19.9.
+
+Splitting the tests into parallel jobs doesn't pay here: the test steps are 85-90 % compiling and 10-15 % running
+(Windows: 15 min building, 3.4 min running), so sharing built binaries across jobs saves at most the run; and
+splitting the compile makes each job rebuild most engine libraries (engine 24 CPU-min of libraries, 29 of test
+builds; UI 11 in all), for ~4 min at best on Windows, with a second rust cache per OS.
+
+release.yml (the shipped binaries) takes 40-50 min, all of it macOS's / Windows' `cargo build --release` with thin
+LTO and one codegen unit: the app's binary alone is 12-19 min of LTO at the end of the crate chain, on 2.7 of 4
+cores on average. Its jobs already run per OS side by side and bundling, installers and checks take about a minute.
+Neither a parallel layout nor the kernel's ccache (tried: 47.6 -> 46.9 min) changes that; only a warm cache of the
+shipped profile's dependencies would, which needs main to build that profile (a nightly release dry run on main
+saving it, ~3 GB of cache).
+
 ## T0 smoke
 
 - Builds the app (`-p noshape`) and the CLI.

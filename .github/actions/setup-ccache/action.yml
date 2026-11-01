@@ -1,0 +1,75 @@
+name: ccache for cargo's C/C++
+description: >
+  Puts ccache in front of the C and C++ compilers cargo's build scripts call
+  (CC / CXX, which the cc crate reads): the kernel's OCCT bridge
+  (crates/kernel/cpp, ~40k lines, 3-6 min) then recompiles only the files that
+  changed. Restores the cache of this job kind (newest first); save it at the
+  end of the job with actions/cache/save and the `key` output, from main only.
+inputs:
+  name:
+    description: The job kind (test, release); its objects differ by optimisation
+    required: true
+outputs:
+  key:
+    description: The key to save the cache under
+    value: ${{ steps.restore.outputs.cache-primary-key }}
+  hit:
+    description: "'true' when the exact key was restored (nothing to save)"
+    value: ${{ steps.restore.outputs.cache-hit }}
+  dir:
+    description: The cache directory
+    value: ${{ steps.env.outputs.dir }}
+runs:
+  using: composite
+  steps:
+    - name: Install ccache (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: command -v ccache || { sudo apt-get update -q && sudo apt-get install -y --no-install-recommends ccache; }
+
+    - name: Install ccache (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: command -v ccache || brew install ccache
+
+    - name: Install ccache (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        if (Get-Command ccache -ErrorAction SilentlyContinue) { exit 0 }
+        $v = '4.14.2'
+        $zip = "$env:RUNNER_TEMP\ccache.zip"
+        Invoke-WebRequest "https://github.com/ccache/ccache/releases/download/v$v/ccache-$v-windows-x86_64.zip" -OutFile $zip
+        if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne '6993CE645E53192CEC592EE23186200B574AC4C59097ECDE8D9CFD681B47AE84') { throw 'ccache download checksum mismatch' }
+        Expand-Archive $zip -DestinationPath "$env:RUNNER_TEMP\ccache-bin" -Force
+        "$env:RUNNER_TEMP\ccache-bin\ccache-$v-windows-x86_64" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+    - name: Compilers through ccache
+      id: env
+      shell: bash
+      run: |
+        dir="$RUNNER_TEMP/cargo-ccache"
+        if [ "$RUNNER_OS" = Windows ]; then dir="$(cygpath -m "$dir")"; fi
+        case "$RUNNER_OS" in
+          Linux) cc=gcc; cxx=g++ ;;
+          macOS) cc=clang; cxx=clang++ ;;
+          Windows) cc=cl.exe; cxx=cl.exe ;;
+        esac
+        {
+          echo "CC=ccache $cc"
+          echo "CXX=ccache $cxx"
+          echo "CCACHE_DIR=$dir"
+          echo "CCACHE_MAXSIZE=300M"
+          # Content, not dates: a fresh checkout's files and another runner image's compiler have new dates.
+          echo "CCACHE_COMPILERCHECK=content"
+          echo "CCACHE_SLOPPINESS=include_file_mtime,include_file_ctime,time_macros"
+        } >> "$GITHUB_ENV"
+        echo "dir=$dir" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the C/C++ cache
+      id: restore
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ steps.env.outputs.dir }}
+        key: cargo-ccache-${{ runner.os }}-${{ inputs.name }}-${{ hashFiles('crates/kernel/cpp/**', 'crates/kernel/build.rs') }}
+        restore-keys: cargo-ccache-${{ runner.os }}-${{ inputs.name }}-

@@ -77,6 +77,12 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      # Vendored crates (path dependencies) get a fixed file date, so cargo reuses their cached builds instead of
+      # rebuilding them after every fresh checkout; the rust cache is keyed on their content instead.
+      - name: Vendored crates' file dates
+        shell: bash
+        run: find vendor -type f -exec touch -t 202001010000 {} +
+
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -110,15 +116,27 @@ jobs:
       - name: openNURBS (Rhino export)
         uses: ./.github/actions/setup-opennurbs
 
+      - name: C/C++ through ccache
+        id: ccache
+        uses: ./.github/actions/setup-ccache
+        with:
+          name: test
+
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
 
+      # With the vendored crates' builds beside target/ (rust-cache keeps registry crates only), keyed on vendor/.
       - uses: Swatinem/rust-cache@v2
         with:
-          key: occt-V8_0_1
+          key: occt-V8_0_1-vendored-${{ hashFiles('vendor/**') }}
+          cache-directories: target-vendored
           save-if: ${{ env.NOSHAPE_SAVE_CACHES == 'true' }}
+
+      - name: Vendored crates' builds into target/
+        shell: bash
+        run: $(command -v python3 || command -v python) .github/ci/vendored_builds.py restore
 
       # Windows runs the tiers in PowerShell: in Git Bash, /usr/bin/link shadows MSVC's link.exe and every build script
       # fails to link (10-27).
@@ -151,6 +169,19 @@ jobs:
         if: runner.os == 'Linux'
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
 
+      - name: Save the C/C++ cache
+        if: always() && env.NOSHAPE_SAVE_CACHES == 'true' && steps.ccache.outputs.dir != '' && steps.ccache.outputs.hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ steps.ccache.outputs.dir }}
+          key: ${{ steps.ccache.outputs.key }}
+
+      # Out of target/ before rust-cache's cleanup (which would delete them), into its extra cached directory.
+      - name: Vendored crates' builds aside for the cache
+        if: always() && env.NOSHAPE_SAVE_CACHES == 'true'
+        shell: bash
+        run: $(command -v python3 || command -v python) .github/ci/vendored_builds.py save
+
   # The release build of the app and the CLI as a compile check (release-only code, the artifact): without LTO and with
   # parallel codegen, so it takes minutes, not the shipped binary's 30-45 (release.yml builds that, as shipped).
   release:
@@ -165,6 +196,12 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
+
+      # Vendored crates (path dependencies) get a fixed file date, so cargo reuses their cached builds instead of
+      # rebuilding them after every fresh checkout; the rust cache is keyed on their content instead.
+      - name: Vendored crates' file dates
+        shell: bash
+        run: find vendor -type f -exec touch -t 202001010000 {} +
 
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
@@ -195,13 +232,25 @@ jobs:
       - name: openNURBS (Rhino export)
         uses: ./.github/actions/setup-opennurbs
 
+      - name: C/C++ through ccache
+        id: ccache
+        uses: ./.github/actions/setup-ccache
+        with:
+          name: release
+
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      # With the vendored crates' builds beside target/ (rust-cache keeps registry crates only), keyed on vendor/.
       - uses: Swatinem/rust-cache@v2
         with:
-          key: occt-V8_0_1
+          key: occt-V8_0_1-vendored-${{ hashFiles('vendor/**') }}
+          cache-directories: target-vendored
           save-if: ${{ env.NOSHAPE_SAVE_CACHES == 'true' }}
+
+      - name: Vendored crates' builds into target/
+        shell: bash
+        run: $(command -v python3 || command -v python) .github/ci/vendored_builds.py restore
 
       - name: Build (release)
         run: cargo build --release --locked -p noshape -p noshape-cli
@@ -212,3 +261,16 @@ jobs:
           name: noshape-${{ runner.os }}-${{ runner.arch }}
           path: target/release/${{ inputs.exe }}
           if-no-files-found: error
+
+      - name: Save the C/C++ cache
+        if: always() && env.NOSHAPE_SAVE_CACHES == 'true' && steps.ccache.outputs.dir != '' && steps.ccache.outputs.hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ steps.ccache.outputs.dir }}
+          key: ${{ steps.ccache.outputs.key }}
+
+      # Out of target/ before rust-cache's cleanup (which would delete them), into its extra cached directory.
+      - name: Vendored crates' builds aside for the cache
+        if: always() && env.NOSHAPE_SAVE_CACHES == 'true'
+        shell: bash
+        run: $(command -v python3 || command -v python) .github/ci/vendored_builds.py save
