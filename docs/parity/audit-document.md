@@ -29,8 +29,8 @@ Priorities:
 | | |
 |---|---|
 | Surfaces audited | 19 |
-| Gaps found | 8 |
-| Gaps fixed | 7 |
+| Gaps found | 9 |
+| Gaps fixed | 8 |
 
 ## Surfaces
 
@@ -44,7 +44,7 @@ Priorities:
 | S6 | Merge dialog | ui2-merge-dialog.html | 0 ("Keep Main" is composed from Keep + the target chip) |
 | S7 | Documents page › Versions and history panel | documents-versions-history-panel.txt | D6 |
 | S8 | Tab right-click menus, 12 kinds × active / inactive | ui2-tab-menus.json | 0 (Export… is dx's) |
-| S9 | Tab manager panel, list view, sort menu, footer | panel-tab-manager*.txt, tab-manager-footer.json | 0 |
+| S9 | Tab bar, tab manager panel, list view, sort menu, footer | tabbar-1280.html, tabbar-scroll.json, panel-tab-manager*.txt, tab-manager-footer.json | D12 |
 | S10 | Delete tabs dialog | ticket-delete-tab-dialog.txt | 0 |
 | S11 | Documents page advanced search panel | documents-advanced-search.txt, documents-history-search-filter.txt | 0 |
 | S12 | Documents page search results | documents-adv-search*.json\|txt, behaviours "Advanced search: empty state and results" | D7, D8 |
@@ -68,3 +68,4 @@ Priorities:
 | D9 | P3 | Search boxes of the standard content browser and Insert › Other documents: tooltip "Type and press enter to search", and the clear button's tooltip "Clear search". | fixed (the clear button's tooltip landed with audit G7) |
 | D10 | P2 | ☰ › Workspace properties…: live runs the same command as the version's Version properties… (the metadata modal with the tab tree). Ours opened a plain name / description modal. | fixed: opens history-ui's Properties modal for the workspace |
 | D11 | P3 | Configured part properties: Add property ▾ has the tooltip "Configure a property of <part>". | fixed |
+| D12 | P2 | Tab bar: a tab that references an older version of another document has a blue out-of-date icon, tooltip "Newer versions of linked documents available". The references can be Derived, an inserted Variable Studio, Assembly instances or Drawing views. Ours had none. | fixed: `workspace_update::version_refs` / `behind_tabs`, checked off the UI thread when the references change and when the window comes back |

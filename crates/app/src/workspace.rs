@@ -36,6 +36,12 @@ enum TabView {
 }
 
 pub struct Workspace {
+    /// Tabs with a reference to an older version of another document (the
+    /// tab's "Newer versions of linked documents available" icon), the
+    /// references they were found from, and the check running.
+    behind: std::collections::HashSet<TabId>,
+    behind_refs: Vec<(TabId, crate::derived::ExternalRef)>,
+    behind_task: Option<Task<()>>,
     pub doc: Entity<DocModel>,
     gpu: Gpu,
     active: Option<TabId>,
@@ -109,6 +115,7 @@ impl Workspace {
                 // Register custom feature schemas of the (new) Feature Studios.
                 let _ = this.doc.read(cx).custom_features();
                 this.sync_tabs(window, cx);
+                this.refresh_behind(false, cx);
                 cx.notify();
             }
             // Tabs without their own message display show Onshape's bubble here.
@@ -120,7 +127,10 @@ impl Workspace {
             // An agent's Switch to reference / Open Feature Studio in linked
             // document (live mode), as the menu items do.
             DocEvent::Ui(req) => this.agent_request(req.clone(), window, cx),
-            _ => cx.notify(),
+            _ => {
+                this.refresh_behind(false, cx);
+                cx.notify()
+            }
         })];
         // When the focused element goes away (a menu, a prompt, a closed
         // panel), shortcuts keep working: focus returns to the active tab.
@@ -129,8 +139,15 @@ impl Workspace {
         let _ = doc.read(cx).custom_features();
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
         let tab_thumbs = cx.new(|_| crate::tab_thumbs::TabThumbs::new(doc.clone()));
-        let mut this = Self { tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), switcher: None, tab_manager: None, doc_panel: None, renaming_tab: None, tab_gap: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
+        let mut this = Self { behind: Default::default(), behind_refs: Vec::new(), behind_task: None, tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), switcher: None, tab_manager: None, doc_panel: None, renaming_tab: None, tab_gap: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
         this._subs.push(focus_lost);
+        // Another document may have a new version when the window comes back.
+        this._subs.push(cx.observe_window_activation(window, |this: &mut Self, window, cx| {
+            if window.is_window_active() {
+                this.refresh_behind(true, cx);
+            }
+        }));
+        this.refresh_behind(true, cx);
         this.sync_tabs(window, cx);
         // Focus the active tab view so its shortcuts work immediately.
         if let Some(a) = this.active {
@@ -680,6 +697,37 @@ impl Workspace {
             .into_any_element()
     }
 
+    /// Look again for tabs behind newer versions of linked documents: when
+    /// the references changed, or always (`force`). The other documents are
+    /// read off the UI thread.
+    fn refresh_behind(&mut self, force: bool, cx: &mut Context<Self>) {
+        let refs: Vec<(TabId, crate::derived::ExternalRef)> = {
+            let s = &self.doc.read(cx).session;
+            noshape_ops::workspace_update::version_refs(&s.doc).into_iter().filter(|(_, r)| r.path != s.path).collect()
+        };
+        if !force && refs == self.behind_refs {
+            return;
+        }
+        self.behind_refs = refs.clone();
+        if refs.is_empty() {
+            self.behind_task = None;
+            if !self.behind.is_empty() {
+                self.behind.clear();
+                cx.notify();
+            }
+            return;
+        }
+        self.behind_task = Some(cx.spawn(async move |this, cx| {
+            let behind = cx.background_spawn(async move { noshape_ops::workspace_update::behind_tabs(&refs) }).await;
+            let _ = this.update(cx, |t, cx| {
+                if t.behind != behind {
+                    t.behind = behind;
+                    cx.notify();
+                }
+            });
+        }));
+    }
+
     /// ☰ › Workspace units…: Onshape's panel at the feature dialog's place.
     /// Live (qa4 F24, "qa4 F17/F24 placement checks"): an open sketch or
     /// feature dialog is accepted at once and the panel takes its place
@@ -1143,6 +1191,10 @@ impl Workspace {
                     .when(!active, |d| d.cursor_pointer())
                     .bg(if active { pal.panel } else if compare_off { gpui_kit::rgb(0xe1e1e1) } else { pal.tab_inactive })
                     .text_color(if active { pal.text } else { pal.text_muted })
+                    // Live tabbar: the blue out-of-date icon left of the tab's.
+                    .when(self.behind.contains(&id), |d| {
+                        d.child(div().id(SharedString::from(format!("tab-behind-{id}"))).flex_none().tooltip(crate::ui::tooltip("Newer versions of linked documents available")).child(crate::assets::icon("inserted-version-update", 16., cx)))
+                    })
                     .child(div().flex_none().when(compare_off, |d| d.opacity(0.5)).child(crate::assets::icon(tab_icon(kind), 20., cx)))
                     .child(match self.renaming_tab.as_ref().filter(|r| r.0 == id) {
                         // Tab › Rename / double-click: the name becomes a field.
