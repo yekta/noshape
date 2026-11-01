@@ -156,7 +156,7 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
     // A single face, plane or mate connector stays (std reports which).
     if !ev.bool("keepTools") {
         match tool_ref {
-            Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::MateConnector { .. } | Reference::Implicit { .. } => ev.infos.push("Planes and mate connectors will be kept.".into()),
+            Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::MateConnector { .. } | Reference::Implicit { .. } => ev.infos.push("Planes and mate connectors will be kept.".into()),
             Reference::Face(_) => ev.infos.push("Faces selected as split tools must be kept.".into()),
             _ => {}
         }
@@ -266,7 +266,7 @@ fn split_faces(ev: &mut EvalCtx) -> FResult<()> {
                     }
                 }
             }
-            Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::MateConnector { .. } | Reference::Implicit { .. } => {
+            Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::MateConnector { .. } | Reference::Implicit { .. } => {
                 if let Some(f) = ev.resolve_plane(r) {
                     surf_tools.push(big_plane_face(ev, &kernel_plane(&f))?);
                 }

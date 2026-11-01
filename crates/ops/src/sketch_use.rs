@@ -46,7 +46,7 @@ impl Model<'_> {
     /// Plane frame of a plane-like reference (datum / feature plane, planar face).
     pub fn reference_plane(&self, r: &Reference) -> Option<PlaneFrame> {
         match r {
-            Reference::Plane(_) | Reference::FeaturePlane(_) => self.display.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
+            Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => self.display.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
             Reference::Face(_) => {
                 let f = self.shapes(r).into_iter().next()?;
                 let pl = f.face_plane().ok()??;

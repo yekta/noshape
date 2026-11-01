@@ -193,7 +193,8 @@ pub fn visibility_targets(targets: &[Reference], made_by: impl Fn(FeatureId) -> 
     let mut t = VisibilityTargets::default();
     for r in targets {
         match r {
-            Reference::Origin | Reference::Plane(_) => t.defaults.push(r.clone()),
+            // A FeatureScript feature's plane hides on its own (live 11-02), as the default planes.
+            Reference::Origin | Reference::Plane(_) | Reference::ConstructionPlane { .. } => t.defaults.push(r.clone()),
             Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::Sketch(sketch) => t.features.push(*sketch),
             Reference::FeaturePlane(f) | Reference::MateConnector { feature: f, .. } => t.features.push(*f),
             Reference::Feature(f) => {
@@ -577,7 +578,7 @@ pub fn change_size_description(plane: &str) -> String {
 pub fn frame_of_ref(display: &noshape_model::display::StudioDisplay, ctx: Option<&noshape_model::regen::context::Context>, r: &Reference) -> Option<noshape_model::display::PlaneFrame> {
     use noshape_model::display::PlaneFrame;
     match r {
-        Reference::Plane(_) | Reference::FeaturePlane(_) => display.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
+        Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => display.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
         Reference::SketchRegion { sketch, .. } | Reference::SketchEntity { sketch, .. } | Reference::Sketch(sketch) => display.sketches.iter().find(|s| s.feature == *sketch).map(|s| s.frame),
         Reference::MateConnector { .. } => display.connectors.iter().find(|c| &c.reference == r).map(|c| PlaneFrame { origin: c.origin, x: c.x, y: c.z.cross(c.x), normal: c.z }),
         Reference::Face(n) => ctx?.bodies.iter().find_map(|b| {

@@ -285,6 +285,7 @@ fn reference_label(r: &crate::reference::Reference, studio: &PartStudio) -> Stri
         Reference::Body(_) => "Part".into(),
         Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::Sketch(sketch) => fname(*sketch),
         Reference::FeaturePlane(f) | Reference::Feature(f) | Reference::MateConnector { feature: f, .. } => fname(*f),
+        Reference::ConstructionPlane { index, .. } => format!("Plane {}", index + 1),
         Reference::Implicit { .. } => "Mate connector".into(),
         Reference::QueryVariable(name) => format!("#{name}"),
     }

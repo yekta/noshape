@@ -202,6 +202,9 @@ pub enum Reference {
     FeaturePlane(FeatureId),
     /// Mate connector created by a feature (index for features creating several).
     MateConnector { feature: FeatureId, index: u32 },
+    /// A construction plane a FeatureScript feature made (`opPlane`), the `index`th of its feature: listed under the
+    /// feature as "Plane n" and hidden or shown on its own (live 11-02).
+    ConstructionPlane { feature: FeatureId, index: u32 },
     /// A feature (for feature patterns and "Up to" by feature).
     Feature(FeatureId),
     /// Implicit mate connector inferred on an entity.
@@ -223,7 +226,7 @@ impl Reference {
             Reference::Body(b) => Some(b.feature),
             Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::Sketch(sketch) => Some(*sketch),
             Reference::FeaturePlane(f) | Reference::Feature(f) => Some(*f),
-            Reference::MateConnector { feature, .. } => Some(*feature),
+            Reference::MateConnector { feature, .. } | Reference::ConstructionPlane { feature, .. } => Some(*feature),
             Reference::Implicit { on, .. } => on.depends_on(),
             // Depends on the defining Query variable feature, which is only
             // known by name here.
@@ -245,7 +248,7 @@ impl Reference {
             Reference::SketchEntity { .. } => "Sketch entity",
             Reference::SketchRegion { .. } => "Sketch region",
             Reference::Sketch(_) => "Sketch",
-            Reference::FeaturePlane(_) => "Plane",
+            Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => "Plane",
             Reference::MateConnector { .. } => "Mate connector",
             Reference::Feature(_) => "Feature",
             Reference::Implicit { .. } => "Mate connector",

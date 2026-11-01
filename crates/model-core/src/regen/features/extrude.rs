@@ -182,7 +182,7 @@ fn start_offset_point(ev: &EvalCtx, r: &Reference, n: DVec3) -> FResult<DVec3> {
             _ => err_at(&["startOffsetEntity"], NOT_PLANAR),
         };
     }
-    if matches!(r, Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_)) {
+    if matches!(r, Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }) {
         let Some(f) = ev.resolve_plane(r) else { return err_at(&["startOffsetEntity"], NOT_PLANAR) };
         return if parallel(f.normal) { Ok(f.origin) } else { err_at(&["startOffsetEntity"], NOT_PARALLEL) };
     }

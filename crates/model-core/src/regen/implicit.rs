@@ -18,7 +18,7 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
     };
     match on {
         Reference::Origin => Some(mk(DVec3::ZERO, DVec3::Z)),
-        Reference::Plane(_) | Reference::FeaturePlane(_) => {
+        Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => {
             let f = ev.raw_plane(on)?;
             Some(Connector { reference: Reference::Implicit { on: Box::new(on.clone()), inference }, name: "Mate connector".into(), origin: f.origin, x: f.x, z: f.normal })
         }

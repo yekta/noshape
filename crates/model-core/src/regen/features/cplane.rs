@@ -108,7 +108,7 @@ fn kind(ctx: &Context, r: &Reference) -> Kind {
         Reference::Vertex(_) | Reference::Origin => Kind::Vertex,
         Reference::MateConnector { .. } | Reference::Implicit { .. } => Kind::Connector,
         Reference::Edge(_) => Kind::Edge,
-        Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::SketchRegion { .. } => Kind::Face,
+        Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::SketchRegion { .. } => Kind::Face,
         Reference::SketchEntity { sketch, entity } => {
             let Some(s) = ctx.sketch(*sketch) else { return Kind::Other };
             let id = noshape_sketch::EntityId(*entity);
@@ -257,7 +257,7 @@ fn entity_box(ev: &EvalCtx, r: &Reference, frame: &PlaneFrame) -> Option<(DVec2,
             });
             Some(rect(f, DEFAULT_PLANE_SIZE * 0.5, DEFAULT_PLANE_SIZE * 0.5))
         }
-        Reference::FeaturePlane(_) => {
+        Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => {
             let p = ev.ctx.planes.iter().find(|p| &p.reference == r)?;
             let f = ev.resolve_plane(r)?;
             Some(rect(f, p.half_width, p.half_height))

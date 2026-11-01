@@ -1087,7 +1087,7 @@ impl PartStudioView {
     pub(super) fn list_target(&self, r: &Reference) -> PickTarget {
         let kind = match r {
             Reference::Origin => PickKind::Origin,
-            Reference::Plane(_) | Reference::FeaturePlane(_) => PickKind::Plane,
+            Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => PickKind::Plane,
             _ => PickKind::Face,
         };
         PickTarget { reference: r.clone(), kind, anchor: None }
@@ -1987,7 +1987,7 @@ impl PartStudioView {
         if !defaults.is_empty() || !feats.is_empty() {
             let display = std::sync::Arc::make_mut(&mut self.display);
             for p in &mut display.planes {
-                if defaults.contains(&p.reference) || matches!(&p.reference, Reference::FeaturePlane(f) if feats.contains(f)) {
+                if defaults.contains(&p.reference) || matches!(&p.reference, Reference::FeaturePlane(f) | Reference::ConstructionPlane { feature: f, .. } if feats.contains(f)) {
                     p.hidden = hidden;
                 }
             }

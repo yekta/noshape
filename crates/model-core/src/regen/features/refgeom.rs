@@ -142,7 +142,7 @@ fn origin_csys(ev: &EvalCtx, r: &Reference, inference: &str, secondary: &[Refere
             "ORIGIN_Y" => Csys::new(DVec3::ZERO, DVec3::Y, Some(DVec3::Z)),
             _ => Csys::new(DVec3::ZERO, DVec3::Z, Some(DVec3::X)),
         }),
-        Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::Sketch(_) => {
+        Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Sketch(_) => {
             let f = ev.resolve_plane(r).ok_or_else(|| not_found("plane"))?;
             Ok(Csys { origin: f.origin, x: f.x, z: f.normal })
         }
@@ -599,7 +599,7 @@ fn resolves(ev: &EvalCtx, r: &Reference) -> bool {
         Reference::Edge(_) => !ev.resolve_edges(one).is_empty(),
         Reference::Body(_) => !ev.resolve_bodies(one).is_empty(),
         Reference::Vertex(_) | Reference::SketchEntity { .. } => ev.resolve_vertex_point(r).is_some() || ev.resolve_axis(r).is_some(),
-        Reference::Plane(_) | Reference::FeaturePlane(_) => ev.resolve_plane(r).is_some(),
+        Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => ev.resolve_plane(r).is_some(),
         Reference::MateConnector { .. } | Reference::Implicit { .. } => ev.resolve_connector(r).is_some(),
         _ => true,
     }

@@ -841,7 +841,7 @@ fn unpack_folder(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 fn size_plane(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
-    let r = crate::refs::parse_str(a.str("plane")?).filter(|r| matches!(r, noshape_model::reference::Reference::Plane(_) | noshape_model::reference::Reference::FeaturePlane(_))).ok_or_else(|| OpError::param("plane", "`plane:top|front|right` or `fplane:…`"))?;
+    let r = crate::refs::parse_str(a.str("plane")?).filter(|r| matches!(r, noshape_model::reference::Reference::Plane(_) | noshape_model::reference::Reference::FeaturePlane(_) | noshape_model::reference::Reference::ConstructionPlane { .. })).ok_or_else(|| OpError::param("plane", "`plane:top|front|right` or `fplane:…`"))?;
     let shown = od.regenerate(tab, None)?;
     if !shown.display.planes.iter().any(|p| p.reference == r) {
         return Err(OpError::param("plane", "no such plane in this Part Studio"));

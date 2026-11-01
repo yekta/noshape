@@ -114,6 +114,8 @@ pub struct CtxState {
     pub merged_creators: HashMap<BodyId, Vec<FsId>>,
     /// The operation that created each body (exact, see `body_creator`).
     pub body_ops: HashMap<BodyId, FsId>,
+    /// The operation that made each construction plane (`ConstructionPlane` references; qCreatedBy).
+    pub plane_ops: HashMap<Reference, FsId>,
     /// Each operation's bits of its bodies' ids (unique in this feature).
     body_bits: BodyBits,
     /// The operation number after the last operation that made or changed
@@ -223,6 +225,7 @@ impl FsContext {
                 ops: HashMap::new(),
                 merged_creators: HashMap::new(),
                 body_ops: HashMap::new(),
+                plane_ops: HashMap::new(),
                 body_bits: BodyBits::default(),
                 touched: HashMap::new(),
                 used_ids: HashSet::new(),
@@ -747,6 +750,14 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
             let bits = st.op_bits(marker);
             let created: Vec<BodyId> = ctx.bodies.iter().filter(|b| b.id.feature == marker).map(|b| wrap_body_id(&b.id, marker, bits, st.feature)).collect();
             rename_created(&mut ctx, marker, bits, st.feature);
+            // Its construction planes: the feature's next ones (listed under it as "Plane n", live 11-02).
+            let feature = st.feature;
+            let first = ctx.planes.iter().filter(|p| matches!(p.reference, Reference::ConstructionPlane { feature: f, .. } if f == feature)).count() as u32;
+            for (index, p) in (first..).zip(ctx.planes.iter_mut().filter(|p| p.reference == Reference::FeaturePlane(marker))) {
+                p.reference = Reference::ConstructionPlane { feature, index };
+                p.name = format!("Plane {}", index + 1);
+                st.plane_ops.insert(p.reference.clone(), id.to_vec());
+            }
             let seq = st.next_seq;
             for b in created {
                 st.touched.insert(b.clone(), seq);

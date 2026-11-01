@@ -201,13 +201,13 @@ document's display mesh is under 0.5 s.
 
 ## In progress
 
-11-02: Variable table pass (user P1, audit A24) queued below; the user's "Y Ribs" planes P1 (construction planes
-left after opDeleteBodies) next: found the cause — the FS host's query types a construction plane (Ent::Plane) as a
-FACE only, so qCreatedBy(planeId, EntityType.BODY) misses it (custom host query.rs entity_type_of / all_with); a
-failing T1 is in the worktree (custom_features::op_plane_bodies_are_deleted_by_op_delete_bodies, uncommitted). Then
-part 2 (how live lists leftover construction bodies). Mesher WIP uncommitted too: brep nurbs_edge_nodes marching
-(NIST 909k -> 989k triangles, 486 ms; knurl doubled to 121k: drop the forced two steps a stretch), and a
-NOSHAPE_MESH_FACES debug block in mesh.cpp (not to land).
+11-02: queued e75450f5 (Variable table pass, A24; its MENUS line for "Collapse all tables" came in the next commit:
+e75450f5 alone fails ops coverage), the planes P1 part 1 (FS host Ent::PlaneBody) and part 2 (A25: a feature's
+planes as `Reference::ConstructionPlane`, listed under it with eyes; live 11-02 on "psui planes 1102 ps" in the mm
+test doc). Mesher WIP uncommitted: brep nurbs_edge_nodes marching (NIST 909k -> 989k triangles, 486 ms; knurl doubled
+to 121k: drop the forced two steps a stretch), and a NOSHAPE_MESH_FACES debug block in mesh.cpp (not to land).
+Open from these passes: inserted Variable Studio tables keep 140 px columns (live shares the widths); a child plane's
+eye while its feature is hidden (live unchecked).
 
 11-01 22:25: landed bf64da4e (B-spline faces in our mesher). Queued 42c306d8 (audit 12: Helix Turns and pitch flip,
 interaction::helix_manipulators), c92c5408 (audit 12: Move curve boundary's arrow, interaction::

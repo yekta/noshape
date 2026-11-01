@@ -100,6 +100,7 @@ pub fn to_id(r: &Reference) -> String {
         Reference::Sketch(f) => format!("sketch:{f}"),
         Reference::FeaturePlane(f) => format!("fplane:{f}"),
         Reference::MateConnector { feature, index } => format!("mc:{feature}.{index}"),
+        Reference::ConstructionPlane { feature, index } => format!("cplane:{feature}.{index}"),
         Reference::Feature(f) => format!("feature:{f}"),
         Reference::Implicit { on, inference } => format!("implicit:{}:{}", inference_name(*inference), to_id(on)),
         Reference::QueryVariable(n) => format!("qvar:{n}"),
@@ -147,6 +148,10 @@ pub fn parse_str(s: &str) -> Option<Reference> {
         "mc" => {
             let (feature, index) = parse_dotted(rest)?;
             Reference::MateConnector { feature, index }
+        }
+        "cplane" => {
+            let (feature, index) = parse_dotted(rest)?;
+            Reference::ConstructionPlane { feature, index }
         }
         "feature" => Reference::Feature(parse_feature_id(rest)?),
         "implicit" => {

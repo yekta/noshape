@@ -22,7 +22,7 @@ fn jog_offset(ev: &EvalCtx, t: f64, fc: DVec3, up: DVec3) -> FResult<f64> {
         "UP_TO_ENTITY" => {
             let Some(r) = ev.query("jogLimit").first() else { return err("Select the entity to jog up to") };
             let p = match r {
-                Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) => ev.resolve_plane(r).map(|f| f.origin).or_else(|| {
+                Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => ev.resolve_plane(r).map(|f| f.origin).or_else(|| {
                     let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(r)).first()?;
                     ev.face_shape(bi, fi).ok()?.centroid().ok()
                 }),

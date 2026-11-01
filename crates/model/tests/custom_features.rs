@@ -2523,3 +2523,41 @@ fn op_plane_bodies_are_deleted_by_op_delete_bodies() {
     assert_eq!(r.context.bodies.len(), 1, "the cylinder only (the cut curves deleted)");
     assert!(r.display.planes.iter().all(|p| !matches!(p.reference, Reference::FeaturePlane(_))), "no construction plane drawn");
 }
+
+const LEAVE_PLANES: &str = r#"
+annotation { "Feature Type Name" : "Leave planes" }
+export const leavePlanes = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        opPlane(context, id + "p1", { "plane" : plane(vector(0, 0, 10) * millimeter, vector(0, 0, 1)) });
+        opPlane(context, id + "p2", { "plane" : plane(vector(0, 0, 20) * millimeter, vector(0, 0, 1)) });
+        if (size(evaluateQuery(context, qCreatedBy(id + "p2", EntityType.BODY))) != 1)
+            throw regenError("qCreatedBy(p2, BODY) should find its plane");
+    });
+"#;
+
+/// Live 11-02: the planes a feature leaves are its own, "Plane 1" and "Plane 2" (listed under it), hidden with the
+/// feature or one by one.
+#[test]
+fn a_features_planes_are_its_own_and_hide_alone_or_with_it() {
+    let fx = Fixture::new(&studio(LEAVE_PLANES));
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("leavePlanes"), &fx.units).expect("custom feature type is registered");
+    let fid = f.id;
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let planes = |r: &RegenResult| r.display.planes.iter().filter(|p| matches!(p.reference, Reference::ConstructionPlane { .. })).map(|p| (p.reference.clone(), p.name.clone(), p.hidden)).collect::<Vec<_>>();
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+    let (p1, p2) = (Reference::ConstructionPlane { feature: fid, index: 0 }, Reference::ConstructionPlane { feature: fid, index: 1 });
+    assert_eq!(planes(&r), [(p1.clone(), "Plane 1".to_string(), false), (p2.clone(), "Plane 2".to_string(), false)]);
+    ps.hidden_defaults.push(p1.clone());
+    let r = fx.regen(&mut reg, &ps);
+    assert_eq!(planes(&r).iter().map(|p| p.2).collect::<Vec<_>>(), [true, false], "Plane 1 alone");
+    ps.hidden_defaults.clear();
+    ps.features[0].hidden = true;
+    let r = fx.regen(&mut reg, &ps);
+    assert_eq!(planes(&r).iter().map(|p| p.2).collect::<Vec<_>>(), [true, true], "with the feature");
+}

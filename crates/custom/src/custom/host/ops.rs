@@ -1039,7 +1039,7 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let mut tools: Vec<Shape> = Vec::new();
         let mut plane = None;
         for r in &tool_refs {
-            if let Some(p) = matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_)).then(|| ev.resolve_plane(r)).flatten() {
+            if let Some(p) = matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }).then(|| ev.resolve_plane(r)).flatten() {
                 plane.get_or_insert((p.origin, p.normal));
                 tools.push(k::make_plane_face(&kernel_plane(&p), -1e3, 1e3, -1e3, 1e3)?);
             }

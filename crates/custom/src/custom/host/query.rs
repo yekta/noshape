@@ -700,7 +700,11 @@ impl<'a> QueryCx<'a> {
             }
             .or_else(|| self.created_by(&Ent::Body(*b))),
             Ent::SketchBody(s) | Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) => feature_id(ctx.sketches[*s].feature),
-            Ent::Plane(_) | Ent::PlaneBody(_) | Ent::Connector(_) | Ent::Point(_) => self.to_ref(e).depends_on().and_then(feature_id),
+            Ent::Plane(_) | Ent::PlaneBody(_) => {
+                let r = self.to_ref(e);
+                self.st.plane_ops.get(&r).cloned().or_else(|| r.depends_on().and_then(feature_id))
+            }
+            Ent::Connector(_) | Ent::Point(_) => self.to_ref(e).depends_on().and_then(feature_id),
         }
     }
 

@@ -261,7 +261,7 @@ impl PartStudioView {
         match r {
             // Live (ui-snapv/25): a default (or feature) plane's base is at
             // its origin.
-            Reference::MateConnector { .. } | Reference::Plane(_) | Reference::FeaturePlane(_) => Some(f.origin),
+            Reference::MateConnector { .. } | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => Some(f.origin),
             Reference::Face(_) => self.display.bodies.iter().filter(|b| !b.hidden).find_map(|b| {
                 let fi = b.face_refs.iter().position(|x| x == r)?;
                 let &(first, count) = b.mesh.face_ranges.get(fi)?;

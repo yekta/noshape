@@ -752,7 +752,7 @@ impl PartStudioView {
                 let tool_now = self.sketch.as_ref().map(|s| s.tool);
                 let hovered = match (hovered, self.hover.clone(), tool_now) {
                     (None, Some(r), Some(t @ (Tool::Dimension | Tool::Constraint(_) | Tool::Mirror)))
-                        if matches!(r, Reference::Edge(_) | Reference::Vertex(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::Face(_))
+                        if matches!(r, Reference::Edge(_) | Reference::Vertex(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Face(_))
                             || matches!(&r, Reference::SketchEntity { sketch, .. } if Some(*sketch) != self.sketch.as_ref().map(|s| s.feature)) =>
                     {
                         let pierce = t == Tool::Constraint(ConstraintTool::Pierce) && matches!(r, Reference::Edge(_));
@@ -950,7 +950,7 @@ impl PartStudioView {
         if own.as_ref() == Some(r) {
             return true;
         }
-        if !matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_)) {
+        if !matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }) {
             return false;
         }
         self.reference_plane(r).is_some_and(|f| {

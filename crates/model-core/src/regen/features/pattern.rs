@@ -1710,7 +1710,7 @@ fn transform_of(ev: &EvalCtx) -> FResult<Option<k::Transform>> {
                 let Some(c) = resolve_curves(ev, std::slice::from_ref(*e))?.into_iter().next() else { return err_at(&[field], "Cannot resolve entities.") };
                 let (a, b) = c.shape.endpoints()?;
                 coincident(b - a)?
-            } else if by_distance && let Some(d) = refs.iter().find(|r| matches!(r, Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::MateConnector { .. } | Reference::Implicit { .. })).map(|r| ev.resolve_direction(r)) {
+            } else if by_distance && let Some(d) = refs.iter().find(|r| matches!(r, Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::MateConnector { .. } | Reference::Implicit { .. })).map(|r| ev.resolve_direction(r)) {
                 d.ok_or_else(|| FeatureError { faulty: vec![field], ..fe("Translation by distance requires two vertices, an edge, a plane, or a cylindrical face.") })?
             } else if by_distance {
                 return err_at(&[field], "Translation by distance requires two vertices, an edge, a plane, or a cylindrical face.");

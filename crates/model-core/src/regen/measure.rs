@@ -88,7 +88,7 @@ pub fn resolve_shapes(ctx: &Context, r: &Reference) -> Vec<Shape> {
             };
             out.extend(plane_face(&f));
         }
-        Reference::FeaturePlane(_) => {
+        Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => {
             if let Some(p) = ctx.planes.iter().find(|p| &p.reference == r) {
                 out.extend(plane_face(&p.frame));
             }
@@ -135,7 +135,7 @@ fn plane_face(f: &crate::display::PlaneFrame) -> Option<Shape> {
 pub fn measure(ctx: &Context, refs: &[Reference]) -> Vec<(String, Measurement)> {
     let shapes: Vec<Vec<Shape>> = refs.iter().map(|r| resolve_shapes(ctx, r)).collect();
     let rows = measure_shapes(&shapes);
-    let is_plane = |r: &Reference| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_));
+    let is_plane = |r: &Reference| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. });
     if !refs.iter().any(is_plane) {
         return rows;
     }

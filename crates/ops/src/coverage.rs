@@ -490,6 +490,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Clear all", Op("feature_edit")),
     ("partStudio:Clear missing references", Op("feature_clear_missing")),
     ("partStudio:Clear selection", Op("ui_select")),
+    ("partStudio:Collapse all tables", Op("ui_list")),
     ("partStudio:Collapse all", Op("ui_list")),
     ("partStudio:Configure", Op("config_configure")),
     ("partStudio:Configure appearance", Op("part_configured_properties")),

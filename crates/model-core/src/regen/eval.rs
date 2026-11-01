@@ -566,7 +566,7 @@ impl<'a> EvalCtx<'a> {
             Reference::Plane(DatumPlane::Top) => Some(PlaneFrame::TOP),
             Reference::Plane(DatumPlane::Front) => Some(PlaneFrame::FRONT),
             Reference::Plane(DatumPlane::Right) => Some(PlaneFrame::RIGHT),
-            Reference::FeaturePlane(_) => self.ctx.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
+            Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => self.ctx.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
             Reference::Face(_) => {
                 let (bi, fi) = *self.resolve_faces(std::slice::from_ref(r)).first()?;
                 let face = self.face_shape(bi, fi).ok()?;
@@ -669,7 +669,7 @@ impl<'a> EvalCtx<'a> {
                     _ => None,
                 }
             }
-            Reference::Plane(_) | Reference::FeaturePlane(_) => {
+            Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => {
                 let f = self.raw_plane(r)?;
                 Some((f.origin, f.normal))
             }
@@ -687,7 +687,7 @@ impl<'a> EvalCtx<'a> {
             return self.resolve_direction(&q);
         }
         if let Some(f) = self.resolve_plane(r)
-            && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::Face(_))
+            && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Face(_))
         {
             return Some(f.normal);
         }

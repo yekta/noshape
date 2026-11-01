@@ -631,7 +631,7 @@ fn wire_body_indices(ev: &EvalCtx) -> FResult<Vec<usize>> {
 /// Distance along the ray (p, t) to the first hit of `target`, if any.
 fn ray_hit(ev: &EvalCtx, r: &Reference, p: DVec3, t: DVec3) -> FResult<Option<f64>> {
     if let Some(f) = ev.resolve_plane(r)
-        && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::MateConnector { .. } | Reference::Implicit { .. })
+        && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::MateConnector { .. } | Reference::Implicit { .. })
     {
         let den = t.dot(f.normal);
         if den.abs() < 1e-12 {

@@ -310,7 +310,7 @@ pub(super) fn parse_entity(v: &Value, t: &mut SketchTarget, external: bool, pier
             let id = EntityId(entity);
             t.data.sketch.entity(id).map(|_| id).ok_or_else(|| OpError::not_found(format!("`{s}` is not in the sketch (deleted?)")))
         }
-        Some(r @ (Reference::SketchEntity { .. } | Reference::Edge(_) | Reference::Vertex(_) | Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_))) if external => {
+        Some(r @ (Reference::SketchEntity { .. } | Reference::Edge(_) | Reference::Vertex(_) | Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. })) if external => {
             let pierce = pierce && matches!(r, Reference::Edge(_));
             let bb = t.data.sketch.bbox();
             let cursor = if bb.is_empty() { DVec2::ZERO } else { bb.center() };

@@ -526,6 +526,8 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
     for p in &ctx.planes {
         let hidden = match &p.reference {
             Reference::FeaturePlane(f) => studio.feature(*f).is_some_and(|f| f.hidden),
+            // A FeatureScript feature's plane: with its feature, or on its own (live 11-02).
+            r @ Reference::ConstructionPlane { feature, .. } => studio.feature(*feature).is_some_and(|f| f.hidden) || studio.hidden_defaults.contains(r),
             r => studio.hidden_defaults.contains(r),
         };
         d.planes.push(PlaneDisplay { reference: p.reference.clone(), name: p.name.clone(), frame: p.frame, half_width: p.half_width, half_height: p.half_height, center: glam::DVec2::ZERO, hidden });

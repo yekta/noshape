@@ -301,7 +301,7 @@ fn flange_angle(ev: &EvalCtx, ef: &EdgeFrame) -> FResult<f64> {
         "ALIGN_GEOMETRY" => {
             let r = ev.query("parallelEntity").first().ok_or_else(|| fe("Select an entity the flange is parallel to"))?;
             let plane = match r {
-                Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::Face(_) => ev.resolve_plane(r).map(|p| p.normal),
+                Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Face(_) => ev.resolve_plane(r).map(|p| p.normal),
                 _ => None,
             };
             let f = match plane {

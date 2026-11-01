@@ -200,7 +200,7 @@ fn limit_point(ev: &EvalCtx, id: &str) -> FResult<(DVec3, Option<DVec3>)> {
     let unresolved = || crate::regen::eval::err_at(&["limitEntity"], "Cannot resolve entities.");
     let Some(r) = ev.query(id).first() else { return unresolved() };
     if let Some(f) = ev.resolve_plane(r)
-        && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::Face(_))
+        && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Face(_))
     {
         return Ok((f.origin, Some(f.normal)));
     }

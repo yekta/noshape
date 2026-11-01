@@ -1413,6 +1413,8 @@ impl PartStudioView {
                 Reference::Sketch(s) => fname(*s),
                 Reference::FeaturePlane(f) => fname(*f),
                 Reference::MateConnector { feature, .. } => fname(*feature),
+                // A FeatureScript feature's plane: its row under the feature (live 11-02 "Plane 1").
+                Reference::ConstructionPlane { index, .. } => format!("Plane {}", index + 1),
                 Reference::Feature(f) => fname(*f),
                 Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint } if matches!(**on, Reference::Edge(_)) => "Midpoint of edge".into(),
                 Reference::Implicit { .. } => "Mate connector".into(),
@@ -2437,7 +2439,7 @@ impl PartStudioView {
         // to be under the cursor, leaving the sketch plane edge-on).
         let frame_of = |this: &Self, r: &Reference| -> Option<noshape_model::display::PlaneFrame> {
             match r {
-                Reference::Plane(_) | Reference::FeaturePlane(_) => this.display.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
+                Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => this.display.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
                 Reference::SketchRegion { sketch, .. } | Reference::SketchEntity { sketch, .. } => this.display.sketches.iter().find(|s| s.feature == *sketch).map(|s| s.frame),
                 Reference::Face(n) => this.context.as_ref()?.bodies.iter().find_map(|b| {
                     let fi = *b.find_faces(n).first()?;
@@ -3037,6 +3039,10 @@ impl PartStudioView {
                 for (k, (_, sk)) in self.display.derived_sketches.iter().filter(|(d, _)| *d == f.id).enumerate() {
                     items.push(ListItem::DerivedSketch(FOLDER_INDENT * chain.len() as f32, *sk, k));
                 }
+                // Live 11-02: a FeatureScript feature's planes ("Plane 1", "Plane 2").
+                for pl in self.display.planes.iter().filter(|p| matches!(p.reference, Reference::ConstructionPlane { feature, .. } if feature == f.id)) {
+                    items.push(ListItem::ConstructionPlane(FOLDER_INDENT * chain.len() as f32, pl.reference.clone()));
+                }
             }
             if prompt_anchor == Some(Some(f.id)) {
                 items.push(ListItem::Prompt);
@@ -3077,7 +3083,7 @@ impl PartStudioView {
             makes_faces: d.bodies.iter().flat_map(|b| b.face_refs.iter().filter_map(|r| r.depends_on()).chain([b.id.feature])).collect(),
             sketches: d.sketches.iter().map(|s| s.feature).collect(),
             planes: d.planes.iter().filter_map(|p| match p.reference {
-                Reference::FeaturePlane(id) => Some(id),
+                Reference::FeaturePlane(id) | Reference::ConstructionPlane { feature: id, .. } => Some(id),
                 _ => None,
             }).collect(),
             appearances,
@@ -3311,7 +3317,7 @@ impl PartStudioView {
         };
         // Whether each item is the last of its folder: the next row (feature, folder, bar or "...") sits less deep.
         let depth_of = |item: &ListItem| match item {
-            ListItem::Feature(x, _) | ListItem::Folder(x, _) | ListItem::DerivedSketch(x, ..) | ListItem::Rollback(_, x) => Some(*x),
+            ListItem::Feature(x, _) | ListItem::Folder(x, _) | ListItem::DerivedSketch(x, ..) | ListItem::ConstructionPlane(x, _) | ListItem::Rollback(_, x) => Some(*x),
             ListItem::Ellipsis => Some(0.),
             ListItem::Placeholder | ListItem::Prompt => None,
         };
@@ -3345,7 +3351,7 @@ impl PartStudioView {
                 ListItem::Prompt => 60.,
                 _ => row_h,
             };
-            let off_view = matches!(item, ListItem::Ellipsis | ListItem::Folder(..) | ListItem::Feature(..) | ListItem::DerivedSketch(..)) && shown.is_some_and(|(top, bottom)| y + h < top || y > bottom);
+            let off_view = matches!(item, ListItem::Ellipsis | ListItem::Folder(..) | ListItem::Feature(..) | ListItem::DerivedSketch(..) | ListItem::ConstructionPlane(..)) && shown.is_some_and(|(top, bottom)| y + h < top || y > bottom);
             y += h;
             if off_view {
                 skipped += 1;
@@ -3365,6 +3371,7 @@ impl PartStudioView {
                 ListItem::Folder(x, fd) => indent(x, last, self.render_folder_row(&fd, slot, cx)),
                 ListItem::Feature(x, id) => indent(x, last, self.render_feature_row_view(id, slot, cx)),
                 ListItem::DerivedSketch(x, id, k) => indent(x, last, self.render_derived_sketch_row(id, k, cx)),
+                ListItem::ConstructionPlane(x, r) => indent(x, last, self.render_construction_plane_row(r, cx)),
                 ListItem::Prompt => self.render_folder_prompt(cx),
             });
         }
@@ -4081,6 +4088,93 @@ impl PartStudioView {
             .into_any_element()
     }
 
+    /// A FeatureScript feature's plane under its open row (live 11-02): grey, the plane icon and "Plane n"; the
+    /// eye on hover hides or shows it alone; its menu is a plane's (New sketch…, Size to Part Studio | Hide /
+    /// Show | Hide other planes, Hide all planes | Section view… | Zoom to selection, View normal to).
+    fn render_construction_plane_row(&self, r: Reference, cx: &mut Context<Self>) -> AnyElement {
+        let Some(pl) = self.display.planes.iter().find(|p| p.reference == r) else { return div().h(px(crate::ui::ROW_H)).into_any_element() };
+        let pal = p();
+        let hidden = pl.hidden;
+        let selected = self.selection.contains(&r);
+        let name = pl.name.clone();
+        let key = noshape_ops::refs::to_id(&r);
+        let view = cx.entity();
+        let (r_hover, r_click, r_eye) = (r.clone(), r.clone(), r.clone());
+        crate::ui::with_user_side_tooltip(crate::ui::tree_row(SharedString::from(format!("cpl-{key}")), selected), name.clone())
+            .pl(px(23.))
+            .mr(px(5.))
+            .pr(px(11.))
+            .group("cpl-row")
+            .when(!selected, |d| d.bg(gpui_kit::rgb(0xf0f0f0)))
+            .when(hidden, |d| d.text_color(pal.text_faint))
+            .child(div().flex_none().child(crate::ui::tree_icon("plane", hidden, cx)))
+            .child(div().flex_1().truncate().child(crate::ui::user_text(name)))
+            .child({
+                let v = view.clone();
+                let eye = div()
+                    .id(SharedString::from(format!("cpl-eye-{key}")))
+                    .cursor_pointer()
+                    .child(crate::assets::icon(if hidden { "eye-off" } else { "eye" }, 16., cx))
+                    .on_click(move |_, _, cx| {
+                        cx.stop_propagation();
+                        v.update(cx, |this, cx| this.set_visibility(std::slice::from_ref(&r_eye), !hidden, cx));
+                    });
+                crate::ui::hover_reveal(eye, "cpl-row")
+            })
+            .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                let new = if *h { Some(r_hover.clone()) } else { None };
+                if this.hover != new && (*h || this.hover.as_ref() == Some(&r_hover)) {
+                    this.hover = new;
+                    this.refresh_scene(false, cx);
+                }
+            }))
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                let t = this.list_target(&r_click);
+                this.pick(t, cx);
+            }))
+            .os_context_menu(move |menu, _, _| {
+                let (v1, v2, v3, v4, v5, v6, v7, v8) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
+                let (r1, r2, r3, r4, r5, r6, r7) = (r.clone(), r.clone(), r.clone(), r.clone(), r.clone(), r.clone(), r.clone());
+                let m = menu
+                    .item(crate::os_menu::OsMenuItem::new("New sketch…").icon_name("sketch").on_click(move |_, w, cx| {
+                        v1.update(cx, |this, cx| {
+                            this.selection = vec![r1.clone()];
+                            this.start_feature("sketch", w, cx);
+                        })
+                    }))
+                    .item(crate::os_menu::OsMenuItem::new("Size to Part Studio").on_click(move |_, _, cx| v2.update(cx, |this, cx| this.size_plane_to_studio(r2.clone(), cx))))
+                    .separator()
+                    .item(crate::os_menu::OsMenuItem::new(if hidden { "Show" } else { "Hide" }).icon_name(if hidden { "eye" } else { "eye-off" }).on_click(move |_, _, cx| v3.update(cx, |this, cx| this.set_visibility(std::slice::from_ref(&r3), !hidden, cx))));
+                let m = if hidden {
+                    m.item(crate::os_menu::OsMenuItem::new("Show all planes").on_click(move |_, _, cx| {
+                        v4.update(cx, |this, cx| {
+                            let planes: Vec<Reference> = this.display.planes.iter().map(|p| p.reference.clone()).collect();
+                            this.set_visibility(&planes, false, cx);
+                        })
+                    }))
+                } else {
+                    m.item(crate::os_menu::OsMenuItem::new("Hide other planes").on_click(move |_, _, cx| v4.update(cx, |this, cx| this.hide_planes(Some(&r4), cx))))
+                        .item(crate::os_menu::OsMenuItem::new("Hide all planes").on_click(move |_, _, cx| v5.update(cx, |this, cx| this.hide_planes(None, cx))))
+                };
+                m.separator()
+                    .item(crate::os_menu::OsMenuItem::new("Section view…").icon_name("menu-section-view").on_click(move |_, w, cx| v6.update(cx, |this, cx| this.section_through(r5.clone(), w, cx))))
+                    .separator()
+                    .item(crate::os_menu::OsMenuItem::new("Zoom to selection").on_click(move |_, _, cx| {
+                        v7.update(cx, |this, cx| {
+                            this.selection = vec![r6.clone()];
+                            this.zoom_to_selection(cx);
+                        })
+                    }))
+                    .item(crate::os_menu::OsMenuItem::new("View normal to").on_click(move |_, _, cx| {
+                        v8.update(cx, |this, cx| {
+                            this.selection = vec![r7.clone()];
+                            this.view_normal(cx);
+                        })
+                    }))
+            })
+            .into_any_element()
+    }
+
     /// Where a list row is on screen, for its side tooltip: painted at the
     /// list's scroll offset; an indented row sits in a wrapper as wide as
     /// the list, inset by the indent and its 5 px right margin.
@@ -4472,7 +4566,8 @@ impl PartStudioView {
         let hidden = f.hidden;
         // Sketches, planes and mate connectors can be hidden from the list.
         let rc = &self.row_ctx;
-        let hideable = matches!(f.type_id.as_str(), "sketch" | "cPlane" | "mateConnector") || rc.sketches.contains(&id);
+        // So is a FeatureScript feature that left planes (live 11-02: an eye on its row).
+        let hideable = matches!(f.type_id.as_str(), "sketch" | "cPlane" | "mateConnector") || rc.sketches.contains(&id) || rc.planes.contains(&id);
         let first_config_input = rc.first_config_input.clone();
         let dyn_expr = f.suppression_expr.clone();
         let makes_faces = rc.makes_faces.contains(&id);
@@ -4531,7 +4626,7 @@ impl PartStudioView {
             .when(self.row_ctx.pending.contains(&f.id), |d| d.font_weight(FontWeight::BOLD).italic())
             // Live (qa5 derived, 1580–1582): a Derived feature that brought
             // sketches has a ▸ before its icon; it lists them.
-            .when(self.display.derived_sketches.iter().any(|(d, _)| *d == f.id), |d| {
+            .when(self.display.derived_sketches.iter().any(|(d, _)| *d == f.id) || self.display.planes.iter().any(|p| matches!(p.reference, Reference::ConstructionPlane { feature, .. } if feature == f.id)), |d| {
                 let open = self.ui.derived_open.contains(&f.id);
                 let fid = f.id;
                 d.child(
@@ -5334,7 +5429,7 @@ fn preselect(ty: &FeatureType, feature: &mut Feature, selection: &[Reference], b
                             Reference::Feature(_) => filter.intersects(QueryFilter::FEATURE),
                             Reference::SketchRegion { .. } => filter.intersects(QueryFilter::SKETCH_REGION),
                             Reference::SketchEntity { .. } => filter.intersects(QueryFilter::SKETCH_EDGE),
-                            Reference::Plane(_) | Reference::FeaturePlane(_) => filter.intersects(QueryFilter::PLANE),
+                            Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => filter.intersects(QueryFilter::PLANE),
                             _ => false,
                         },
                     }
@@ -5415,6 +5510,8 @@ enum ListItem {
     /// Indent, a sketch a Derived feature brought in (its source id).
     /// Indent, sketch, which location's copy.
     DerivedSketch(f32, FeatureId, usize),
+    /// Indent, a FeatureScript feature's plane (`Reference::ConstructionPlane`).
+    ConstructionPlane(f32, Reference),
     Prompt,
 }
 

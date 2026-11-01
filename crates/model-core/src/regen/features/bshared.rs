@@ -152,7 +152,7 @@ pub fn face_shapes(ev: &EvalCtx, refs: &[Reference], with_planes: bool) -> FResu
                     out.extend(ev.ctx.bodies[bi].shape.faces());
                 }
             }
-            Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::MateConnector { .. } | Reference::Implicit { .. } if with_planes => {
+            Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::MateConnector { .. } | Reference::Implicit { .. } if with_planes => {
                 let Some(f) = ev.resolve_plane(r) else { return err("A selected plane no longer exists") };
                 let ext = ev.model_extent() * 2.0;
                 out.push(k::make_plane_face(&kernel_plane(&f), -ext, ext, -ext, ext)?);
