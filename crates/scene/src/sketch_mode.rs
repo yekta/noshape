@@ -4360,7 +4360,11 @@ impl SketchEditor {
                 continue;
             }
             for e in glyph_entities(sk, &c.kind) {
-                let Some(anchor) = glyph_anchor(sk, e) else { continue };
+                let anchor = match c.kind {
+                    ConstraintKind::Flow { a, b } if a == e => flow_anchor(sk, a, b),
+                    _ => glyph_anchor(sk, e),
+                };
+                let Some(anchor) = anchor else { continue };
                 let offset = data.glyph_offsets.get(&glyph_key(c.id, e)).map(|o| DVec2::new(o[0], o[1]));
                 // The Origin's glyphs are the usual grey on white (live).
                 let external = c.kind.entities().iter().any(|x| sk.entity(*x).is_some_and(|x| x.external) && !is_origin(sk, *x));
@@ -6454,6 +6458,16 @@ fn glyph_entities(sk: &Sketch, k: &ConstraintKind) -> Vec<EntityId> {
         Concentric { a, b } | Equal { a, b } | Collinear { a, b } | Curvature { a, b } => vec![a, b],
         _ => Vec::new(),
     }
+}
+
+/// Live 1716: a Flow's glyph sits two-thirds along its curve from the joint
+/// (the curve's end nearer the other entity).
+fn flow_anchor(sk: &Sketch, curve: EntityId, other: EntityId) -> Option<DVec2> {
+    let c = sk.curve(curve)?;
+    let (t0, t1) = c.domain();
+    let gap = |p: DVec2| sk.curve(other).map_or(f64::MAX, |o| o.distance(p));
+    let t = if gap(c.point(t0)) <= gap(c.point(t1)) { t0 + (t1 - t0) * 2.0 / 3.0 } else { t0 + (t1 - t0) / 3.0 };
+    Some(c.point(t))
 }
 
 fn glyph_anchor(sk: &Sketch, id: EntityId) -> Option<DVec2> {
@@ -8620,6 +8634,21 @@ mod tests {
         click(&mut ed, &mut d, end);
         click(&mut ed, &mut d, end + v(-s60, c60) * 0.015);
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Tangent { a, b } if a == arc || b == arc)), "{:?}", d.sketch.constraints().map(|c| c.kind.clone()).collect::<Vec<_>>());
+    }
+
+    /// Live 1716: one Flow glyph, on the spline, two-thirds along it from
+    /// the line it flows into.
+    #[test]
+    fn a_flow_glyph_sits_two_thirds_along_the_spline() {
+        let (ed, mut d) = editor(Tool::Select);
+        let l = d.sketch.add_line(v(-0.03, 0.0), v(0.0, 0.0));
+        let s = d.sketch.add_fit_spline_with_handles(&[v(0.0, 0.0), v(0.02, 0.01), v(0.04, 0.0)]).unwrap();
+        d.sketch.add_constraint(ConstraintKind::Flow { a: s, b: l }).unwrap();
+        let g: Vec<_> = ed.constraint_glyphs(&d).into_iter().filter(|g| g.icon == "flow").collect();
+        assert_eq!(g.len(), 1);
+        let c = d.sketch.curve(s).unwrap();
+        let (t0, t1) = c.domain();
+        assert!((g[0].anchor - c.point(t0 + (t1 - t0) * 2.0 / 3.0)).length() < 1e-12, "{:?}", g[0].anchor);
     }
 
     /// ORIGIN-COINCIDENT-GLYPH (live "qa4 r5 s6" (4)): a line drawn from the
