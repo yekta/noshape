@@ -12,6 +12,7 @@ use noshape_app_core::*;
 use noshape_preferences_ui::{preferences_window, prefs_general};
 
 pub mod company_settings;
+mod custom_props;
 mod numbering_prefs;
 mod release_conditions;
 pub mod release_dialog;

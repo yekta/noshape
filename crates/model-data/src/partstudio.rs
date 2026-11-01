@@ -136,6 +136,10 @@ pub struct ItemMeta {
     pub exclude_from_bom: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unit_of_measure: Option<String>,
+    /// Custom properties' values by property name (Company settings ›
+    /// Custom properties defines them; drawing.md A15).
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub custom: std::collections::BTreeMap<String, String>,
 }
 
 impl ItemMeta {

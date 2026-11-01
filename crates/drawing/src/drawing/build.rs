@@ -1039,6 +1039,12 @@ pub fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sou
         "sheet.size" => sheet.size.label().to_string(),
         "date" => format::today(),
         "units" => if drawing.units_mm { "mm".into() } else { "in".into() },
+        // Custom properties (drawing.md A15): the sheet's part's, the drawing's.
+        k if k.starts_with(format::PART_CUSTOM) => {
+            let name = &k[format::PART_CUSTOM.len()..];
+            part().and_then(|(_, p, _)| p).and_then(|p| p.meta.custom.get(name).cloned()).unwrap_or_default()
+        }
+        k if k.starts_with(format::DRAWING_CUSTOM) => drawing.meta.item.custom.get(&k[format::DRAWING_CUSTOM.len()..]).cloned().unwrap_or_default(),
         _ => return None,
     })
 }

@@ -330,6 +330,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **ui**: [`ui_state`](#ui_state), [`ui_preferences`](#ui_preferences), [`ui_toolbar`](#ui_toolbar), [`ui_search_tools`](#ui_search_tools), [`ui_shortcuts`](#ui_shortcuts), [`ui_select`](#ui_select), [`ui_list`](#ui_list)
 - **history**: [`history_view`](#history_view), [`history_compare`](#history_compare), [`history_repair_view`](#history_repair_view), [`history_undo`](#history_undo), [`history_redo`](#history_redo), [`history_list`](#history_list), [`history_create_version`](#history_create_version), [`history_version_properties`](#history_version_properties), [`history_publish`](#history_publish), [`history_create_branch`](#history_create_branch), [`history_switch_branch`](#history_switch_branch), [`history_merge`](#history_merge), [`history_restore`](#history_restore)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_configured_properties`](#part_configured_properties), [`part_annotation`](#part_annotation), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
+- **company**: [`company_custom_properties`](#company_custom_properties)
 - **material**: [`material_list`](#material_list), [`material_library_update`](#material_library_update), [`material_library_export`](#material_library_export)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
@@ -3863,6 +3864,7 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `set` | object |  | Properties to change: part_number, revision, description, title1, title2, title3. |
+| `custom` | object |  | Custom properties: name → value ("" or null clears); company_custom_properties defines them. |
 
 #### drawing_title_field
 
@@ -5466,6 +5468,7 @@ Examples:
 | `title2` | string |  | Title 2. |
 | `title3` | string |  | Title 3. |
 | `mass_override` | number or null |  | Mass override in kg (null: computed). |
+| `custom` | object |  | Custom properties: name → value ("" or null clears); company_custom_properties defines them. |
 
 #### part_configured_properties
 
@@ -5595,6 +5598,26 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
+
+### company
+
+#### company_custom_properties
+
+Company settings › Custom properties: list, create, edit, delete.
+
+Custom property definitions (kept for every document on this computer, as a company's are for its documents). Without `action`, lists them. `create` adds `name` with `type` (string, integer, double, boolean, date, enum with `values`), `applies` (part, assembly, drawing; default [part]), `state` (pending, active, inactive; default active), `default` and `description`; `edit` changes the fields given of property `name` (`new_name` renames it; items keep values under the old name); `delete` removes it. Active properties show at the bottom of the Properties dialogs of what they apply to and in drawings' Insert property lists (`{part.custom.<name>}`, `{drawing.custom.<name>}`); values are set with part_set_properties / drawing_element_properties `custom`.
+
+| field | type | | description |
+|---|---|---|---|
+| `action` | one of `create`, `edit`, `delete` |  | What to do (default: list). |
+| `name` | string |  | The property's name. |
+| `new_name` | string |  | edit: a new name. |
+| `type` | one of `string`, `integer`, `double`, `boolean`, `date`, `enum` |  | Value type. |
+| `values` | array of string |  | enum: the values. |
+| `applies` | array of one of `part`, `assembly`, `drawing` |  | What it applies to. |
+| `state` | one of `pending`, `active`, `inactive` |  | Publish state (only active ones show). |
+| `default` | string |  | Default value. |
+| `description` | string |  | Description. |
 
 ### material
 

@@ -410,9 +410,26 @@ pub const SHEET_REF_FIELDS: &[(&str, &str)] = &[
 /// Other property keys notes and title blocks use.
 pub const OTHER_FIELDS: &[(&str, &str)] = &[("model.name", "Source tab name"), ("doc.name", "Document name"), ("user.name", "User name"), ("sheet.name", "Sheet name"), ("date", "Today's date"), ("units", "Drawing units")];
 
+/// Custom properties' field keys: `part.custom.<name>` (the sheet's part)
+/// and `drawing.custom.<name>` (drawing.md A15).
+pub const PART_CUSTOM: &str = "part.custom.";
+pub const DRAWING_CUSTOM: &str = "drawing.custom.";
+
 /// Whether `key` is a property field.
 pub fn is_field(key: &str) -> bool {
-    DRAWING_FIELDS.iter().chain(SHEET_REF_FIELDS).chain(OTHER_FIELDS).any(|(k, _)| *k == key)
+    DRAWING_FIELDS.iter().chain(SHEET_REF_FIELDS).chain(OTHER_FIELDS).any(|(k, _)| *k == key) || key.strip_prefix(PART_CUSTOM).or_else(|| key.strip_prefix(DRAWING_CUSTOM)).is_some_and(|n| !n.is_empty())
+}
+
+/// A field's name as property lists show it, with whether it is a sheet
+/// reference (the sheet's part) property.
+pub fn field_label(key: &str) -> Option<(String, bool)> {
+    if let Some(n) = key.strip_prefix(PART_CUSTOM) {
+        return Some((n.to_string(), true));
+    }
+    if let Some(n) = key.strip_prefix(DRAWING_CUSTOM) {
+        return Some((n.to_string(), false));
+    }
+    SHEET_REF_FIELDS.iter().find(|(k, _)| *k == key).map(|(_, l)| (l.to_string(), true)).or_else(|| DRAWING_FIELDS.iter().chain(OTHER_FIELDS).find(|(k, _)| *k == key).map(|(_, l)| (l.to_string(), false)))
 }
 
 /// Whether a property field holds a date (Date time format applies).

@@ -62,5 +62,38 @@ fn graphics_preferences_toolbar_and_shortcuts_read_set_and_kept() {
     assert!(help["tabs"][0]["rows"].as_array().unwrap().iter().any(|r| r["name"] == "Keyboard shortcuts"), "{help}");
     let locked = call(&mut ctx, "ui_shortcuts", json!({ "tab": "General", "search": "accept command" })).unwrap();
     assert_eq!(locked["tabs"][0]["rows"][0]["locked"], true, "{locked}");
+
+    custom_properties(&mut ctx, &dir);
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Company settings › Custom properties (drawing.md A15): definitions kept
+/// per user, values on parts, `{part.custom.<name>}` in a drawing note.
+fn custom_properties(ctx: &mut Ctx, dir: &std::path::Path) {
+    let l = call(ctx, "company_custom_properties", json!({})).unwrap();
+    assert_eq!(l["custom_properties"], json!([]), "{l}");
+    call(ctx, "company_custom_properties", json!({ "action": "create", "name": "Finish code", "type": "enum", "values": ["A1", "B2"], "applies": ["part", "drawing"] })).unwrap();
+    call(ctx, "company_custom_properties", json!({ "action": "create", "name": "Weight class", "type": "integer" })).unwrap();
+    let e = call(ctx, "company_custom_properties", json!({ "action": "create", "name": "finish CODE" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("name"), "names are unique: {e:?}");
+    let l = call(&mut Ctx::new(), "company_custom_properties", json!({})).unwrap();
+    assert_eq!(l["custom_properties"][0]["values"], json!(["A1", "B2"]), "kept: {l}");
+    // A part's values, checked against the type.
+    let path = dir.join("cp.noshape");
+    call(ctx, "document_create", json!({ "path": path.to_str().unwrap() })).unwrap();
+    let sk = call(ctx, "sketch_create", json!({ "plane": "plane:top" })).unwrap()["sketch"].as_str().unwrap().to_string();
+    call(ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[-20, -15], [20, 15]] })).unwrap();
+    let region = call(ctx, "sketch_get", json!({ "sketch": sk })).unwrap()["regions"][0]["id"].as_str().unwrap().to_string();
+    call(ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } })).unwrap();
+    let e = call(ctx, "part_set_properties", json!({ "part": "Part 1", "custom": { "Weight class": "heavy" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("custom"), "{e:?}");
+    let e = call(ctx, "part_set_properties", json!({ "part": "Part 1", "custom": { "Nope": "x" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("custom"), "{e:?}");
+    call(ctx, "part_set_properties", json!({ "part": "Part 1", "custom": { "finish code": "b2", "Weight class": 3 } })).unwrap();
+    // A drawing note shows the sheet part's value.
+    let d = call(ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true })).unwrap();
+    let name = d["drawing"].as_str().unwrap().to_string();
+    call(ctx, "drawing_note", json!({ "drawing": name, "text": "FINISH {part.custom.Finish code}", "position": [60, 60] })).unwrap();
+    let g = call(ctx, "drawing_get", json!({ "drawing": name })).unwrap();
+    assert!(g["annotations"].as_array().unwrap().iter().any(|a| a["text"] == "FINISH B2"), "{}", g["annotations"]);
 }

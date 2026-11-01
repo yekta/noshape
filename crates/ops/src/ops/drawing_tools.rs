@@ -269,7 +269,7 @@ pub fn ops() -> Vec<Op> {
             verb: "element_properties",
             summary: "Read or set the drawing's own properties (Tab › Properties: part number, revision, description, titles)",
             description: "The drawing element's Properties (right-click its tab › Properties). Live (behaviours \"dx title block mappings\"): the title block's DWG NO. is the drawing's Part number and REV its Revision (\"-\" when unset), never the part's; TITLE shows the sheet reference part's Title 1–3; DRAWN's date is when the drawing was made (`created`). Without `set`, replies with them; `set` changes the ones it names (part_number, revision, description, title1, title2, title3; strings). One edit (\"Properties\").",
-            fields: with(common(), vec![opt("set", json!({ "type": "object" }), "Properties to change: part_number, revision, description, title1, title2, title3.")]),
+            fields: with(common(), vec![opt("set", json!({ "type": "object" }), "Properties to change: part_number, revision, description, title1, title2, title3."), opt("custom", json!({ "type": "object" }), "Custom properties: name → value (\"\" or null clears); company_custom_properties defines them.")]),
             mutates: true,
             destructive: false,
             run: element_properties,
@@ -1471,9 +1471,16 @@ fn edit_hatch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn element_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let mut t = target(od, a)?;
-    let json_of = |m: &noshape_model::drawing::DrawingMeta| json!({ "part_number": m.number, "revision": m.revision, "description": m.description, "title1": m.title1, "title2": m.title2, "title3": m.title3, "created": m.created });
-    let Some(set) = a.get("set") else { return Ok(json!({ "properties": json_of(&t.d.meta) }).into()) };
-    let set = set.as_object().ok_or_else(|| OpError::param("set", "an object"))?;
+    let json_of = |m: &noshape_model::drawing::DrawingMeta| json!({ "part_number": m.number, "revision": m.revision, "description": m.description, "title1": m.title1, "title2": m.title2, "title3": m.title3, "created": m.created, "custom": m.item.custom });
+    if a.get("set").is_none() && a.get("custom").is_none() {
+        return Ok(json!({ "properties": json_of(&t.d.meta) }).into());
+    }
+    super::custom_props::apply_custom(a, &mut t.d.meta.item.custom)?;
+    let empty = serde_json::Map::new();
+    let set = match a.get("set") {
+        Some(s) => s.as_object().ok_or_else(|| OpError::param("set", "an object"))?,
+        None => &empty,
+    };
     for (k, v) in set {
         let text = v.as_str().ok_or_else(|| OpError::param(&format!("set.{k}"), "a string"))?.to_string();
         let m = &mut t.d.meta;

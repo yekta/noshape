@@ -39,6 +39,7 @@ pub fn ops() -> Vec<Op> {
                 opt("title2", s(), "Title 2."),
                 opt("title3", s(), "Title 3."),
                 opt("mass_override", json!({ "type": ["number", "null"] }), "Mass override in kg (null: computed)."),
+                opt("custom", json!({ "type": "object" }), "Custom properties: name → value (\"\" or null clears); company_custom_properties defines them."),
             ],
             mutates: true,
             destructive: false,
@@ -146,6 +147,7 @@ fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             *f = Some(x).filter(|s| !s.is_empty());
         }
     }
+    super::custom_props::apply_custom(a, &mut v.meta.custom)?;
     match a.get("mass_override") {
         None => {}
         Some(serde_json::Value::Null) => v.mass_override = None,

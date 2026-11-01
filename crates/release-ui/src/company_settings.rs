@@ -2,7 +2,8 @@
 //! enterprise_settings and its images in research ui2-help): a breadcrumb bar
 //! "Company settings › <section>" over a left navigation and the section's
 //! page. The sections are the Company plan's that work on this computer:
-//! Numbering schemes, Release management and Revision tools (users, teams,
+//! Custom properties, Numbering schemes, Release management and Revision
+//! tools (users, teams,
 //! webhooks and the other cloud sections have no local counterpart).
 
 use crate::actions::CloseWindow;
@@ -14,16 +15,18 @@ use gpui_kit::*;
 /// The left navigation's sections, in Onshape's order.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Section {
+    CustomProperties,
     NumberingSchemes,
     ReleaseManagement,
     RevisionTools,
 }
 
 impl Section {
-    const ALL: [Section; 3] = [Section::NumberingSchemes, Section::ReleaseManagement, Section::RevisionTools];
+    const ALL: [Section; 4] = [Section::CustomProperties, Section::NumberingSchemes, Section::ReleaseManagement, Section::RevisionTools];
 
     fn label(self) -> &'static str {
         match self {
+            Section::CustomProperties => "Custom properties",
             Section::NumberingSchemes => "Numbering schemes",
             Section::ReleaseManagement => "Release management",
             Section::RevisionTools => "Revision tools",
@@ -94,6 +97,7 @@ pub struct CompanySettingsView {
     release: Entity<crate::release_prefs::ReleasePrefsView>,
     numbering: Entity<crate::numbering_prefs::NumberingPrefsView>,
     revision_tools: Entity<crate::revision_tools::RevisionToolsView>,
+    custom: Entity<crate::custom_props::CustomPropsView>,
 }
 
 impl CompanySettingsView {
@@ -105,6 +109,7 @@ impl CompanySettingsView {
             release: cx.new(|cx| crate::release_prefs::ReleasePrefsView::new(window, cx)),
             numbering: cx.new(|cx| crate::numbering_prefs::NumberingPrefsView::new(window, cx)),
             revision_tools: cx.new(|cx| crate::revision_tools::RevisionToolsView::new(window, cx)),
+            custom: cx.new(|cx| crate::custom_props::CustomPropsView::new(window, cx)),
         }
     }
 
@@ -167,6 +172,7 @@ impl Render for CompanySettingsView {
             Section::NumberingSchemes => self.numbering.clone().into_any_element(),
             Section::ReleaseManagement => self.release.clone().into_any_element(),
             Section::RevisionTools => self.revision_tools.clone().into_any_element(),
+            Section::CustomProperties => self.custom.clone().into_any_element(),
         };
         v_flex()
             .size_full()

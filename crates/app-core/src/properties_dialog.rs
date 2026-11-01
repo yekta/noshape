@@ -91,6 +91,14 @@ pub struct MetaSpec {
 }
 
 type SaveFn = Rc<dyn Fn(MetaValues, &mut Window, &mut App)>;
+
+/// A custom property's field: text (String, numbers, dates), a checkbox
+/// (Boolean) or a select (Enum).
+enum CustomInput {
+    Text(Entity<InputState>),
+    Bool(bool),
+    List(Option<String>),
+}
 /// Opens the Create Release candidate dialog for the item.
 type ReleaseFn = Rc<dyn Fn(&mut Window, &mut App)>;
 
@@ -128,6 +136,11 @@ pub struct MetaForm {
     mass_computed: bool,
     mass_failed: bool,
     bom: usize,
+    /// Custom properties (Company settings › Custom properties): the active
+    /// ones for the item's category, at the bottom of the dialog, and the
+    /// item's values of the others (kept as they are).
+    custom: Vec<(noshape_ops::custom_properties::CustomProperty, CustomInput)>,
+    custom_rest: std::collections::BTreeMap<String, String>,
     /// Saved values (Save / Apply enabled while the form differs).
     saved: MetaValues,
     /// Form undo history and the current position in it.
@@ -179,6 +192,27 @@ impl MetaForm {
         if !mass_on {
             mass.update(cx, |s, cx| s.set_disabled(true, cx));
         }
+        use noshape_ops::custom_properties::{self as cp, CustomKind};
+        let defs = cp::CustomTarget::of_category(spec.category).map(cp::active_for).unwrap_or_default();
+        let mut custom_rest = v.meta.custom.clone();
+        let mut custom = Vec::new();
+        for d in defs {
+            let value = custom_rest.remove(&d.name).unwrap_or_else(|| d.default.clone());
+            let input = match &d.kind {
+                CustomKind::Boolean => CustomInput::Bool(value.eq_ignore_ascii_case("true")),
+                CustomKind::List(_) => CustomInput::List(Some(value).filter(|s| !s.is_empty())),
+                _ => {
+                    let st = text(&value, window, cx);
+                    subs.push(cx.subscribe(&st, |this: &mut Self, _, ev: &InputEvent, cx| {
+                        if matches!(ev, InputEvent::Change) {
+                            this.changed(cx);
+                        }
+                    }));
+                    CustomInput::Text(st)
+                }
+            };
+            custom.push((d, input));
+        }
         Self {
             on_release: None,
             reset_to: None,
@@ -204,6 +238,8 @@ impl MetaForm {
             mass_computed: false,
             mass_failed: false,
             bom: v.bom,
+            custom,
+            custom_rest,
             saved: v.clone(),
             history: vec![v],
             at: 0,
@@ -234,6 +270,20 @@ impl MetaForm {
                 not_revision_managed: self.not_revision_managed,
                 exclude_from_bom: self.exclude_from_bom,
                 unit_of_measure: self.unit.clone(),
+                custom: {
+                    let mut m = self.custom_rest.clone();
+                    for (d, input) in &self.custom {
+                        let v = match input {
+                            CustomInput::Text(st) => st.read(cx).value().trim().to_string(),
+                            CustomInput::Bool(on) => if *on { "True".into() } else { "False".into() },
+                            CustomInput::List(v) => v.clone().unwrap_or_default(),
+                        };
+                        if !v.is_empty() {
+                            m.insert(d.name.clone(), v);
+                        }
+                    }
+                    m
+                },
             },
             mass_override: self.mass_on.then(|| t(&self.mass)),
             bom: self.bom,
@@ -276,6 +326,14 @@ impl MetaForm {
         let on = self.mass_on;
         self.mass.update(cx, |s, cx| s.set_disabled(!on, cx));
         self.bom = v.bom;
+        for (d, input) in &mut self.custom {
+            let value = v.meta.custom.get(&d.name).cloned().unwrap_or_default();
+            match input {
+                CustomInput::Text(st) => st.update(cx, |st, cx| st.set_value(value, window, cx)),
+                CustomInput::Bool(on) => *on = value.eq_ignore_ascii_case("true"),
+                CustomInput::List(cur) => *cur = Some(value).filter(|s| !s.is_empty()),
+            }
+        }
         self.restoring = false;
         cx.notify();
     }
@@ -308,7 +366,8 @@ impl MetaForm {
 }
 
 /// A bold 14 px label, with a red "*" for required fields.
-pub fn label(text: &'static str, required: bool) -> Div {
+pub fn label(text: impl Into<SharedString>, required: bool) -> Div {
+    let text: SharedString = text.into();
     h_flex()
         .h(px(21.))
         .gap(px(3.))
@@ -354,7 +413,8 @@ impl MetaForm {
 }
 
 /// A Bootstrap checkbox row ("☐ Not revision managed").
-fn check_row(id: &'static str, text: &'static str, on: bool) -> Stateful<Div> {
+fn check_row(id: impl Into<ElementId>, text: impl Into<SharedString>, on: bool) -> Stateful<Div> {
+    let text: SharedString = text.into();
     h_flex()
         .id(id)
         .h(px(21.))
@@ -553,6 +613,43 @@ impl Render for MetaForm {
                 })
                 .into_any_element(),
             ));
+        }
+        // Custom properties at the bottom (help Properties: "Custom
+        // properties are shown at the bottom of the dialog").
+        for (i, (d, input)) in self.custom.iter().enumerate() {
+            let field: AnyElement = match input {
+                CustomInput::Text(st) => text_field(st),
+                CustomInput::Bool(on) => check_row(("meta-custom-check", i), d.name.clone(), *on)
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if let Some((_, CustomInput::Bool(on))) = this.custom.get_mut(i) {
+                            *on = !*on;
+                        }
+                        this.changed(cx);
+                    }))
+                    .into_any_element(),
+                CustomInput::List(cur) => {
+                    let noshape_ops::custom_properties::CustomKind::List(options) = &d.kind else { continue };
+                    let mut items = vec![String::new()];
+                    items.extend(options.iter().cloned());
+                    let at = cur.as_ref().and_then(|c| items.iter().position(|o| o == c)).unwrap_or(0);
+                    let v = view.clone();
+                    let opts = items.clone();
+                    crate::os_ui::select_field(("meta-custom-list", i), items, at, move |k, _, cx| {
+                        let chosen = Some(opts[k].clone()).filter(|s| !s.is_empty());
+                        v.update(cx, |this, cx| {
+                            if let Some((_, CustomInput::List(c))) = this.custom.get_mut(i) {
+                                *c = chosen.clone();
+                            }
+                            this.changed(cx);
+                        })
+                    })
+                    .into_any_element()
+                }
+            };
+            form = match input {
+                CustomInput::Bool(_) => form.child(field),
+                _ => form.child(group(label(d.name.clone(), false), field)),
+            };
         }
         let (can_undo, can_redo) = (self.at > 0, self.at + 1 < self.history.len());
         let undo_button = |id: &'static str, icon: &'static str, tip: &'static str, on: bool| {

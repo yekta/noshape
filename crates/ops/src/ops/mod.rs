@@ -21,6 +21,7 @@ mod install;
 mod list;
 mod meta;
 mod parts;
+pub(crate) mod custom_props;
 mod query;
 mod camera;
 mod display;
@@ -59,6 +60,7 @@ pub fn all() -> Vec<Op> {
     v.extend(drawing_more::ops());
     v.extend(ui::ops());
     v.extend(parts::ops());
+    v.extend(custom_props::ops());
     v.extend(appearance::ops());
     v.extend(query::ops());
     v.extend(analysis::ops());

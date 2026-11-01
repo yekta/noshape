@@ -37,6 +37,7 @@ pub mod refs;
 pub mod release;
 pub mod release_conditions;
 pub mod release_settings;
+pub mod custom_properties;
 pub mod registry;
 pub mod session;
 pub mod sheetmetal;

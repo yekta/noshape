@@ -67,7 +67,6 @@ impl DrawingEditor {
     /// Hovering a title block field: its property as a tooltip at the
     /// pointer ("Sheet reference : Title 2"; live 1991-1995).
     pub fn render_field_tip(&self) -> Option<AnyElement> {
-        use noshape_model::drawing::format::{DRAWING_FIELDS, OTHER_FIELDS, SHEET_REF_FIELDS};
         if !matches!(self.tool, Tool::Select) || self.panel.is_some() {
             return None;
         }
@@ -75,11 +74,7 @@ impl DrawingEditor {
         let Some(noshape_model::drawing::build::PickTarget::TitleField(key)) = b.picks.get(self.hover? as usize) else { return None };
         let text = self.current_sheet().title_field(key)?;
         let token = text.split('{').nth(1)?.split(['}', '|']).next()?.trim();
-        let label = SHEET_REF_FIELDS
-            .iter()
-            .find(|(k, _)| *k == token)
-            .map(|(_, l)| format!("Sheet reference : {l}"))
-            .or_else(|| DRAWING_FIELDS.iter().chain(OTHER_FIELDS).find(|(k, _)| *k == token).map(|(_, l)| l.to_string()))?;
+        let label = noshape_model::drawing::format::field_label(token).map(|(l, sheet_ref)| if sheet_ref { format!("Sheet reference : {l}") } else { l })?;
         let p = self.sheet_to_local(self.cursor);
         Some(
             div()

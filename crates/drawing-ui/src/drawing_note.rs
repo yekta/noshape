@@ -423,8 +423,14 @@ impl DrawingEditor {
         // Live (behaviours request 1577): an inserted property's Text format
         // is All uppercase at first; a date keeps its date format.
         let token = |key: &str| if is_date_field(key) { format!("{{{key}}}") } else { format!("{{{key}|upper}}") };
-        let drawing_props: Vec<(String, String)> = DRAWING_FIELDS.iter().map(|(k, n)| (n.to_string(), token(k))).collect();
-        let sheet_props: Vec<(String, String)> = SHEET_REF_FIELDS.iter().map(|(k, n)| (n.to_string(), token(k))).collect();
+        // Then the active custom properties, by name (live: "then active
+        // custom properties in alphabetical order", drawing.md A15).
+        use noshape_ops::custom_properties::{CustomTarget, active_for};
+        let custom = |t: CustomTarget, prefix: &str| active_for(t).into_iter().map(|p| (p.name.clone(), token(&format!("{prefix}{}", p.name)))).collect::<Vec<_>>();
+        let mut drawing_props: Vec<(String, String)> = DRAWING_FIELDS.iter().map(|(k, n)| (n.to_string(), token(k))).collect();
+        drawing_props.extend(custom(CustomTarget::Drawing, noshape_model::drawing::format::DRAWING_CUSTOM));
+        let mut sheet_props: Vec<(String, String)> = SHEET_REF_FIELDS.iter().map(|(k, n)| (n.to_string(), token(k))).collect();
+        sheet_props.extend(custom(CustomTarget::Part, noshape_model::drawing::format::PART_CUSTOM));
         let symbol_btn = div()
             .id("note-symbol")
             .w(px(45.))
