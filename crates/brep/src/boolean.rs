@@ -488,6 +488,9 @@ impl Pool {
                 }
                 found = Some(i);
             } else if d <= band {
+                if std::env::var_os("NOSHAPE_X_NEAR").is_some() {
+                    eprintln!("NEAR {:?} vs {i} {:?}: d {d:e} reach {reach:e} band {band:e} tp {tp:e} ti {ti:e}\n{}", p, self.p[i as usize], std::backtrace::Backtrace::force_capture());
+                }
                 return Err(Decline("two vertices nearly coincide"));
             }
             Ok(())
