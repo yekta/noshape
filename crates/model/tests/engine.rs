@@ -487,19 +487,26 @@ fn thin_loft_square_to_circle_is_the_offset_surface_as_live() {
     // (Trim ends, live volume and our band, faces, top, x / y extent): (a) cut by the profile planes; (b) ruled
     // end caps, the top past its plane (1368.493: its outer faces 359.650 against live's 359.707 each, Parasolid
     // continuing the faces past the creases differently, its caps 20.9736 / 13.3413 against 20.9704 / 13.3412).
-    for (trim, want, band, faces, top, xy) in [(true, 1370.1046656, 0.03, 10, 0.02, 0.011028116), (false, 1368.5713598, 0.1, 16, 0.020293574, 0.010994825)] {
+    // (c) Thickness 2 = 0.5 (no Trim ends): the inside moved in along the normals as well, below z 0. Its faces are
+    // live's (inner 307.0511 / 307.0509, caps 30.7263 / 30.7258, outer as (b)); the volume 1999.930 is 0.32 under
+    // live's evVolume HIGH, which itself moves 0.73 between its accuracies there (default 2000.978).
+    for (trim, t2, want, band, faces, bottom, top, xy) in [
+        (true, "0 mm", 1370.1046656, 0.03, 10, 0.0, 0.02, 0.011028116),
+        (false, "0 mm", 1368.5713598, 0.1, 16, 0.0, 0.020293574, 0.010994825),
+        (false, "0.5 mm", 2000.2502190, 0.4, 16, -0.000101113, 0.020293574, 0.010994825),
+    ] {
         let mut t = T::new();
         let a = t.sketch(Reference::Plane(DatumPlane::Top), rect(-0.01, -0.01, 0.01, 0.01));
         let p20 = t.top_plane("20 mm");
         let b2 = t.sketch(Reference::FeaturePlane(p20), circle(DVec2::ZERO, 0.008));
-        t.add("loft", &[("bodyType", en("THIN")), ("wireProfilesArray", ParamValue::Array(vec![item(a), item(b2)])), ("thickness1", e("1 mm")), ("trimEnds", ParamValue::Bool(trim))]);
+        t.add("loft", &[("bodyType", en("THIN")), ("wireProfilesArray", ParamValue::Array(vec![item(a), item(b2)])), ("thickness1", e("1 mm")), ("thickness2", e(t2)), ("trimEnds", ParamValue::Bool(trim))]);
         let res = t.ok();
         let body = res.context.bodies.iter().find(|b| b.kind == BodyKind::Solid).unwrap();
         let v = total_volume(&res.context) * 1e9;
         let bb = body.shape.bounding_box(true).unwrap();
         assert!((v - want).abs() < band, "trim {trim}: {v} mm³");
         assert_eq!(body.shape.faces().len(), faces, "trim {trim}");
-        assert!(bb.min.z.abs() < 1e-7 && (bb.max.z - top).abs() < 2e-6, "trim {trim}: {bb:?}");
+        assert!((bb.min.z - bottom).abs() < 2e-6 && (bb.max.z - top).abs() < 2e-6, "trim {trim}: {bb:?}");
         assert!((bb.max.x - xy).abs() < 2e-6 && (bb.max.y - xy).abs() < 2e-6, "trim {trim}: {bb:?}");
     }
 }

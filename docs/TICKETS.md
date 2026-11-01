@@ -215,6 +215,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (live 359.707: Parasolid continues the faces past the creases between our polynomial and tangent continuations).
   T1 engine::thin_loft_square_to_circle_is_the_offset_surface_as_live covers both. Left: (c) Thickness 2, (d) three
   profiles, inward walls.
+  core 11-01 11:10: (c) Thickness 2 = 0.5 without Trim ends: the inside offset in along the normals too (concave
+  there: the offsets meet before the creases), the caps ruled between the two: 1999.930 mm³ (live evVolume HIGH
+  2000.250, default 2000.978), 16 faces, z −0.101113 … 20.293575 as live; faces as live's (inner 307.0511 / 307.0509,
+  caps 30.7263 / 30.7258). Left: (d) three profiles (cubic × cubic faces), inward walls.
   thinLoft thickens with the first / last profiles' planes as the side faces (opThicken sideGeometryRule SUPPLIED), so
   the wall ends lie on those planes. Ours thickens the sheet with ends normal to it: the ADV2 square → Ø16 loft, Thin 1 mm
   runs z 0 … 20.29 and falls short of z 0 on its other side (main CLI, skasm-scratch/feat/thinloft.py). Two kernel

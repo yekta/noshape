@@ -825,9 +825,11 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
             // offsets lofted below were 0.15 % over); without, ending at the profiles with caps ruled to the
             // offset (live (b): 1368.57, 16 faces, the top past its plane). The kernel takes ruled faces turning
             // outward about the profiles' axis; anything else is built as before.
-            if t1 > 0.0 && t2 == 0.0 && shapes.len() == 2
+            // (With Thickness 2 (no Trim ends), the inside moved in along the normals as well: live (c).)
+            let trim = ev.bool("trimEnds");
+            if t1 > 0.0 && (t2 == 0.0 || (t2 > 0.0 && !trim)) && shapes.len() == 2
                 && let (Ok(Some(p0)), Ok(Some(p1))) = (shapes[0].find_plane(1e-6), shapes[1].find_plane(1e-6))
-                && let Ok(wall) = k::thicken_loft_out(&res.shape, t1, &p0, &p1, ev.bool("trimEnds"))
+                && let Ok(wall) = k::thicken_loft_out(&res.shape, t1, t2, &p0, &p1, trim)
                 && wall.shape.count(ShapeType::Solid) == 1
             {
                 let names = super::helpers_a::name_new(ev, &wall.shape);

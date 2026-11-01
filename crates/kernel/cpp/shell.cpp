@@ -3220,11 +3220,13 @@ bool ruled_normal(const RuledFace& f, double s, double w, gp_Vec& n)
 // end at the profiles' rulings and each end is a cap ruled from the profile edge to its offset row (the wall's end
 // normal to it, the top past its plane). Two-profile ruled lofts whose faces turn outward about the profiles' axis
 // only; an error otherwise.
-OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, const PlaneF& p0, const PlaneF& p1, bool trim_ends)
+OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, double t_inner_in, const PlaneF& p0, const PlaneF& p1, bool trim_ends)
 {
   require_non_null(sheet_in.shape, "sheet");
   if (!(t_in > 0))
     fail_invalid("thicken loft: the wall must grow outward");
+  if (t_inner_in < 0 || (t_inner_in > 0 && trim_ends))
+    fail_invalid("thicken loft: an inner offset only without Trim ends");
   const bool dbg    = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
   auto       t_last = std::chrono::steady_clock::now();
   auto       lap    = [&](const char* what) {
@@ -3237,7 +3239,7 @@ OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, const PlaneF& p0
   const double k = working_scale();
   ScaledInputs sc(k);
   const TopoDS_Shape sheet = sc.scale(sheet_in.shape);
-  const double       t     = t_in * k;
+  const double       t     = t_in * k, t_inner = t_inner_in * k;
   gp_Pln             pl0 = to_pln(p0), pl1 = to_pln(p1);
   pl0.SetLocation(gp_Pnt(pl0.Location().XYZ() * k));
   pl1.SetLocation(gp_Pnt(pl1.Location().XYZ() * k));
@@ -3383,10 +3385,13 @@ OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, const PlaneF& p0
   // Where the faces' offsets, continued past their rulings (the profile curves' end spans continued), meet: for
   // face `f`'s row w, its s there and the other face's (s, w) (Newton from the tangent planes' mitre); faces
   // tangent at the crease meet on its offset.
-  auto offset_pt = [&](const RuledFace& f, double s, double w) {
+  // The offset being built: `d` along the normals (the inside's, Thickness 2: negative; the creases concave
+  // there, the offsets meet before them).
+  double d         = t;
+  auto   offset_pt = [&](const RuledFace& f, double s, double w) {
     gp_Vec n;
     ruled_normal(f, s, w, n);
-    return ruled_point(f, s, w).Translated(n * t);
+    return ruled_point(f, s, w).Translated(n * d);
   };
   // `f_end`: f's side at the crease (1: its s = 1 end), the other face's the opposite.
   auto meet = [&](const RuledFace& f, double f_end, const RuledFace& o, double w, double& sf) {
@@ -3403,7 +3408,7 @@ OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, const PlaneF& p0
       return false;
     // Start: the tangent planes' mitre, its distance along each face's profile direction.
     const gp_Pnt Q  = ruled_point(f, f_end, w);
-    const gp_Pnt M0 = Q.Translated((nf + no) * (t / (1 + c)));
+    const gp_Pnt M0 = Q.Translated((nf + no) * (d / (1 + c)));
     gp_Pnt       P;
     gp_Vec       Dsf, Dwf, Dso, Dwo;
     ruled_d1(f, f_end, w, P, Dsf, Dwf);
@@ -3437,83 +3442,91 @@ OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, const PlaneF& p0
     }
     return false;
   };
-  std::vector<std::vector<double>> s_lo(nf, std::vector<double>(J + 1)), s_hi(nf, std::vector<double>(J + 1));
-  for (int i = 0; i < nf; ++i)
-    for (int j = 0; j <= J; ++j)
-    {
-      const double w = wlo + (whi - wlo) * j / J;
-      gp_Pnt       m;
-      if (w >= 0 && w <= 1 && !mitre(fs[order[i]], fs[order[(i + 1) % nf]], w, m))
-        fail_op("thicken loft: a crease not convex");
-      if (!meet(fs[order[i]], 1, fs[order[(i + 1) % nf]], w, s_hi[i][j]) || !meet(fs[order[i]], 0, fs[order[(i + nf - 1) % nf]], w, s_lo[i][j]))
-        fail_op("thicken loft: the offsets' mitre not found");
-    }
-  std::vector<TopoDS_Face> outer;
-  for (int i = 0; i < nf; ++i)
-  {
-    const RuledFace&           f = fs[order[i]];
-    NCollection_Array2<gp_Pnt> grid(1, N + 1, 1, J + 1);
-    for (int j = 0; j <= J; ++j)
-    {
-      const double w = wlo + (whi - wlo) * j / J;
-      // The row: the face's offset from one mitre to the other, by length along it.
-      const double        a = s_lo[i][j], b = s_hi[i][j];
-      std::vector<gp_Pnt> dense;
-      for (int q = 0; q <= K; ++q)
-        dense.push_back(offset_pt(f, a + (b - a) * q / K, w));
-      std::vector<double> len(dense.size(), 0.0);
-      for (size_t q = 1; q < dense.size(); ++q)
-        len[q] = len[q - 1] + dense[q - 1].Distance(dense[q]);
-      for (int c = 0; c <= N; ++c)
+  // Face by face (in `order`), the offset `dist` between its mitres with its neighbours'.
+  auto offsets = [&](double dist) {
+    d = dist;
+    std::vector<std::vector<double>> s_lo(nf, std::vector<double>(J + 1)), s_hi(nf, std::vector<double>(J + 1));
+    for (int i = 0; i < nf; ++i)
+      for (int j = 0; j <= J; ++j)
       {
-        const double L = len.back() * c / N;
-        size_t       q = 1;
-        while (q + 1 < len.size() && len[q] < L)
-          ++q;
-        const double u = len[q] - len[q - 1] > 0 ? (L - len[q - 1]) / (len[q] - len[q - 1]) : 0.0;
-        grid(c + 1, j + 1) = offset_pt(f, a + (b - a) * (q - 1 + u) / K, w);
+        const double w = wlo + (whi - wlo) * j / J;
+        gp_Pnt       m;
+        if (w >= 0 && w <= 1 && !mitre(fs[order[i]], fs[order[(i + 1) % nf]], w, m))
+          fail_op("thicken loft: a crease not convex");
+        if (!meet(fs[order[i]], 1, fs[order[(i + 1) % nf]], w, s_hi[i][j]) || !meet(fs[order[i]], 0, fs[order[(i + nf - 1) % nf]], w, s_lo[i][j]))
+          fail_op("thicken loft: the offsets' mitre not found");
       }
-    }
-    GeomAPI_PointsToBSplineSurface fit;
-    fit.Interpolate(grid, Approx_IsoParametric);
-    if (!fit.IsDone())
-      fail_op("thicken loft: an outer face not fitted");
+    std::vector<TopoDS_Face> faces;
+    for (int i = 0; i < nf; ++i)
     {
-      // The fit against exact offset points half-way between the data rows (every third), along each.
-      double                     worst = 0;
-      double                     fu0, fu1, fv0, fv1;
-      fit.Surface()->Bounds(fu0, fu1, fv0, fv1);
-      // (A local search from the point's place in the iso-parametric grid: a global projector's set-up cost
-      // 100 ms a face.)
-      const GeomAdaptor_Surface ad(fit.Surface());
-      Extrema_GenLocateExtPS     loc(ad);
-      for (int j = 1; j < J; j += 3)
+      const RuledFace&           f = fs[order[i]];
+      NCollection_Array2<gp_Pnt> grid(1, N + 1, 1, J + 1);
+      for (int j = 0; j <= J; ++j)
       {
-        const double w = wlo + (whi - wlo) * (j + 0.5) / J;
-        const double a = 0.5 * (s_lo[i][j] + s_lo[i][j + 1]), b = 0.5 * (s_hi[i][j] + s_hi[i][j + 1]);
-        for (int q = 1; q < 8; ++q)
+        const double w = wlo + (whi - wlo) * j / J;
+        // The row: the face's offset from one mitre to the other, by length along it.
+        const double        a = s_lo[i][j], b = s_hi[i][j];
+        std::vector<gp_Pnt> dense;
+        for (int q = 0; q <= K; ++q)
+          dense.push_back(offset_pt(f, a + (b - a) * q / K, w));
+        std::vector<double> len(dense.size(), 0.0);
+        for (size_t q = 1; q < dense.size(); ++q)
+          len[q] = len[q - 1] + dense[q - 1].Distance(dense[q]);
+        for (int c = 0; c <= N; ++c)
         {
-          loc.Perform(offset_pt(f, a + (b - a) * q / 8.0, w), fu0 + (fu1 - fu0) * q / 8.0, fv0 + (fv1 - fv0) * (j + 0.5) / J);
-          worst = std::max(worst, loc.IsDone() ? std::sqrt(loc.SquareDistance()) : 1.0);
+          const double L = len.back() * c / N;
+          size_t       q = 1;
+          while (q + 1 < len.size() && len[q] < L)
+            ++q;
+          const double u = len[q] - len[q - 1] > 0 ? (L - len[q - 1]) / (len[q] - len[q - 1]) : 0.0;
+          grid(c + 1, j + 1) = offset_pt(f, a + (b - a) * (q - 1 + u) / K, w);
         }
       }
-      if (dbg)
-        std::fprintf(stderr, "thicken loft: face %d fit within %g\n", i, worst);
-      if (worst > 1e-5)
-        fail_op("thicken loft: an outer face not fitted closely");
+      GeomAPI_PointsToBSplineSurface fit;
+      fit.Interpolate(grid, Approx_IsoParametric);
+      if (!fit.IsDone())
+        fail_op("thicken loft: an outer face not fitted");
+      {
+        // The fit against exact offset points half-way between the data rows (every third), along each.
+        double                     worst = 0;
+        double                     fu0, fu1, fv0, fv1;
+        fit.Surface()->Bounds(fu0, fu1, fv0, fv1);
+        // (A local search from the point's place in the iso-parametric grid: a global projector's set-up cost
+        // 100 ms a face.)
+        const GeomAdaptor_Surface ad(fit.Surface());
+        Extrema_GenLocateExtPS     loc(ad);
+        for (int j = 1; j < J; j += 3)
+        {
+          const double w = wlo + (whi - wlo) * (j + 0.5) / J;
+          const double a = 0.5 * (s_lo[i][j] + s_lo[i][j + 1]), b = 0.5 * (s_hi[i][j] + s_hi[i][j + 1]);
+          for (int q = 1; q < 8; ++q)
+          {
+            loc.Perform(offset_pt(f, a + (b - a) * q / 8.0, w), fu0 + (fu1 - fu0) * q / 8.0, fv0 + (fv1 - fv0) * (j + 0.5) / J);
+            worst = std::max(worst, loc.IsDone() ? std::sqrt(loc.SquareDistance()) : 1.0);
+          }
+        }
+        if (dbg)
+          std::fprintf(stderr, "thicken loft: face %d fit within %g\n", i, worst);
+        if (worst > 1e-5)
+          fail_op("thicken loft: an outer face not fitted closely");
+      }
+      faces.push_back(BRepBuilderAPI_MakeFace(fit.Surface(), tol).Face());
     }
-    outer.push_back(BRepBuilderAPI_MakeFace(fit.Surface(), tol).Face());
-  }
+    return faces;
+  };
+  const std::vector<TopoDS_Face> outer = offsets(t);
+  const std::vector<TopoDS_Face> inner = t_inner > 0 ? offsets(-t_inner) : std::vector<TopoDS_Face>();
   lap("outer faces");
   if (!trim_ends)
   {
-    // The ends: per face and profile, ruled from the profile edge to the outer face's row there (their starts
-    // matched); neighbouring caps meet on the line from the profile's vertex to the mitre point.
+    // The ends: per face and profile, ruled from the profile edge (the inner offset's row) to the outer face's
+    // row there (their starts matched); neighbouring caps meet on the line from the profile's vertex (the inner
+    // mitre point) to the outer mitre point.
     BRepBuilderAPI_Sewing sew(1e-5);
     for (int i = 0; i < nf; ++i)
     {
       const RuledFace& f = fs[order[i]];
-      sew.Add(f.face);
+      sew.Add(inner.empty() ? f.face : inner[(size_t)i]);
       sew.Add(outer[(size_t)i]);
       const occ::handle<Geom_Surface> os = BRep_Tool::Surface(outer[(size_t)i]);
       double                          ou0, ou1, ov0, ov1;
@@ -3522,7 +3535,14 @@ OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, const PlaneF& p0
       {
         // The profile edge: the face's iso at the profile's ruling parameter (the edges' own curves carry the
         // working scale in their location, which OCCT applies to the curve but not to its parameters).
-        occ::handle<Geom_Curve> pc  = new Geom_TrimmedCurve(f.ruling_in_v ? f.s->VIso(r) : f.s->UIso(r), f.p0, f.p1);
+        occ::handle<Geom_Curve> pc = new Geom_TrimmedCurve(f.ruling_in_v ? f.s->VIso(r) : f.s->UIso(r), f.p0, f.p1);
+        if (!inner.empty())
+        {
+          const occ::handle<Geom_Surface> is = BRep_Tool::Surface(inner[(size_t)i]);
+          double                          iu0, iu1, iv0, iv1;
+          is->Bounds(iu0, iu1, iv0, iv1);
+          pc = new Geom_TrimmedCurve(is->VIso(v == ov0 ? iv0 : iv1), iu0, iu1);
+        }
         occ::handle<Geom_Curve> row = new Geom_TrimmedCurve(os->VIso(v), ou0, ou1);
         if (pc->Value(pc->FirstParameter()).Distance(row->Value(ou0)) > pc->Value(pc->LastParameter()).Distance(row->Value(ou0)))
           pc = pc->Reversed();
