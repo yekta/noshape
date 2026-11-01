@@ -487,15 +487,15 @@ sketch: `-p noshape-scene --test all sketch_perf::s300 -- --ignored --nocapture`
   stack's top pin (solve + scene retransform per pointer move), insert a pin; sketch: open for edit (solve with DOF,
   regions, regeneration), change a dimension, drag a corner, add a dimension.
 
-Numbers on vibe3 (release, 3 runs, medians), before → after:
+Numbers on vibe3 (release, 3 runs, medians), before → after (5bde395b solver, 6a4959bc connector frames):
 | | a200 | a1000 |
 |---|---|---|
-| open: first evaluation | 105 → 96 ms | 327 → 310 ms |
-| evaluate again | 32 ms | 103 ms |
-| regenerate | **621 → 241 ms** | **3693 → 1310 ms** |
-| add a mate | 42 ms | 120 ms |
-| drag frame | 2.0 ms (490 fps) | 20.7 ms (48 fps) |
-| insert a pin | 33 ms | 106 ms |
+| open: first evaluation | 105 → 78 ms | 327 → 243 ms |
+| evaluate again | 32 → 6.5 ms | 106 → 37 ms |
+| regenerate | **621 → 220 ms** | **3693 → 1247 ms** |
+| add a mate | 42 → 16 ms | 120 → 51 ms |
+| drag frame | 2.1 ms (483 fps) | 20.7 ms (48 fps) |
+| insert a pin | 33 → 6.6 ms | 107 → 37 ms |
 S300 (vibe4, loaded): open for edit 4.4 ms, change a dimension 3.5 ms, drag step 3.2 ms (≈ 300 fps), add a dimension 3.4 ms.
 Live: asked (REQUESTS 18:30, scripting allowed); the old figures (request 1501): an assembly drag step ≈ 1.2 s at 200
 instances, insert 1.3–2.2 s, sketch drag ≈ 400 ms a step at 188 entities.
@@ -509,7 +509,10 @@ Fixes so far (5bde395b / 34aa527a):
    first moved ~1e-13 back and forth). Live oracle (oracle_asm, T2) and the assembly unit tests unchanged.
 5. A subassembly's preparation and solve shared by all its instances within one evaluation (same tab, configuration,
    lock and stored positions).
-6. The bench folds nested positions as the app does (`ops::assembly::fold_solved`); without it every evaluation
+6. Mate connector frames kept by the evaluator across evaluations (by the part's regeneration `Arc`, held so its
+   address stays its own; dropped when nothing else holds it, all of them when the units change): an unchanged a1000
+   evaluation spent a quarter of its time integrating the same face centroids (OCCT BRepGProp).
+7. The bench folds nested positions as the app does (`ops::assembly::fold_solved`); without it every evaluation
    re-solved each flexible subassembly from its unsolved start.
 Tried and dropped: one SVD instead of the eigendecomposition + SVD per `least_change` round (changes which directions
 count as free near the threshold: the live oracle failed).
@@ -682,6 +685,9 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   together (or tell core it should stay as it is).
 
 ## Requests to the lead
+- (11-01 20:30) main is red since ~18:30: psui's `part_studio::sketch::ui_tests::a_shelled_face_is_highlighted_as_before`
+  fails on plain origin/main e568cb9f ("Select faces to remove." in the Shell preview); likely core's SHELL-SLOW
+  (df543bc8 / e568cb9f) or bool's 0f287978. dx's lands and my ca848ee0 failed on it; my speed stack waits for green.
 - (11-01) Document audit D2: done without dx after all. ops' `drawing::old_state` (the drawing update icon's check) gives the out-of-date drawings; dx FYI: history-ui's Create version and the Workspace protection dialog now call it.
 - (11-01) Audit G31: the assembly (and Part Studio) Mass and section properties "Show calculation variance" needs an
   integration error estimate per value (live shows "± 1.774e-9 lb", "± 2.100e+0 mm³"). The kernel's mass properties
