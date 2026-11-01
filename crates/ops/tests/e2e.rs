@@ -4511,7 +4511,8 @@ fn drawing_replicate_copy_paste_replace_and_navigation() {
     assert_eq!(h["rows"], json!([["Parts", ""], ["Bolt", "4"]]), "{h}");
     assert_eq!(h["merges"], json!([{ "row": 0, "column": 0, "rows": 1, "columns": 2 }]), "{h}");
     let widths: Vec<f64> = h["column_widths"].as_array().unwrap().iter().map(num).collect();
-    assert!((widths[0] - 100.0 * 25.4 / 96.0).abs() < 0.01 && (widths[1] - 60.0 * 25.4 / 96.0).abs() < 0.01, "{h}");
+    // Live 1727: px as mm, 1:1.
+    assert!((widths[0] - 100.0).abs() < 0.01 && (widths[1] - 60.0).abs() < 0.01, "{h}");
     let e = try_call(&mut ctx, "drawing_paste_table", json!({ "drawing": tab, "html": "<p>x</p>", "position": [60, 280] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("html"), "{e:?}");
     // Revision table properties.

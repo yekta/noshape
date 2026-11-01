@@ -55,7 +55,7 @@ impl DrawingEditor {
             t.copy_entities(cx);
         }));
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-            t.start_paste_table(cx);
+            t.paste_as_table(cx);
         }));
         if let LeaderHit::Node { node, .. } = hit {
             out.push(MenuEntry::item("Add leader", move |t, _, cx| t.start_branch(id, LeaderStart::Node(leader, node), cx)));
@@ -210,7 +210,7 @@ impl DrawingEditor {
             t.copy_entities(cx);
         }));
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-            t.start_paste_table(cx);
+            t.paste_as_table(cx);
         }));
         out.push(MenuEntry::item("Add leader", move |t, _, cx| t.note_add_leader(id, cx)));
         if !style.leaders.is_empty() {

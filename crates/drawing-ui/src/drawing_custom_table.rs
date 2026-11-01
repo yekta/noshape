@@ -275,7 +275,7 @@ impl DrawingEditor {
         }));
         // Live: always present, never greyed.
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-            t.start_paste_table(cx);
+            t.paste_as_table(cx);
         }));
         let cur = t.layer;
         let layers: Vec<MenuEntry> = SheetLayer::FORMAT

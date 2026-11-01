@@ -358,6 +358,14 @@ impl DrawingEditor {
         item.html().and_then(parse_html_table).or_else(|| item.text().and_then(|t| parse_cells(&t)).map(PastedTable::plain))
     }
 
+    /// Menu › Paste as table: the cells, else live's toast "Clipboard is
+    /// empty." (request 1727).
+    pub fn paste_as_table(&mut self, cx: &mut Context<Self>) {
+        if !self.start_paste_table(cx) {
+            self.show_message("Clipboard is empty.", crate::os_ui::BubbleKind::Info, Some(std::time::Duration::from_millis(2500)), cx);
+        }
+    }
+
     /// Paste as table: the next click places the cells.
     pub fn start_paste_table(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(cells) = self.clipboard_cells(cx) else { return false };

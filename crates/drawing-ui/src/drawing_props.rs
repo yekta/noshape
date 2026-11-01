@@ -37,7 +37,7 @@ impl DrawingEditor {
         out.push(MenuEntry::item("Flip direction", move |t, _, cx| t.flip_section(id, cx)));
         out.extend(paste_entry(cx));
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-            t.start_paste_table(cx);
+            t.paste_as_table(cx);
         }));
         out.push(MenuEntry::Separator);
         out.push(MenuEntry::item("Clear selection", |t, _, cx| {
@@ -388,7 +388,7 @@ impl DrawingEditor {
             out.push(MenuEntry::item("Copy", move |t, _, cx| t.copy_views(Some(id), cx)));
         }
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-            t.start_paste_table(cx);
+            t.paste_as_table(cx);
         }));
         out.extend(edits);
         out.extend(self.replication_entries(id));

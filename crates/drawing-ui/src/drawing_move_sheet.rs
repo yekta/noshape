@@ -70,7 +70,7 @@ impl DrawingEditor {
         out.extend([
             MenuEntry::item("Copy", |t, _, cx| t.copy_views(None, cx)),
             MenuEntry::item("Paste as table", |t, _, cx| {
-                t.start_paste_table(cx);
+                t.paste_as_table(cx);
             }),
             MenuEntry::Separator,
             MenuEntry::item("Clear selection", |t, _, cx| {
@@ -97,7 +97,7 @@ impl DrawingEditor {
             crate::drawing_props::paste_always(),
             MenuEntry::item("Copy", |t, _, cx| t.copy_entities(cx)),
             MenuEntry::item("Paste as table", |t, _, cx| {
-                t.start_paste_table(cx);
+                t.paste_as_table(cx);
             }),
             if matches!(first.kind, AnnotationKind::Note { .. }) {
                 MenuEntry::item("Add leader", move |t, _, cx| t.note_add_leader(fid, cx))
@@ -203,7 +203,7 @@ impl DrawingEditor {
         out.extend([
             MenuEntry::item("Copy", |t, _, cx| t.copy_views(None, cx)),
             MenuEntry::item("Paste as table", |t, _, cx| {
-                t.start_paste_table(cx);
+                t.paste_as_table(cx);
             }),
             MenuEntry::Separator,
             MenuEntry::item("Clear selection", |t, _, cx| {

@@ -267,7 +267,7 @@ impl DrawingEditor {
     pub fn detail_circle_entries(&self, v: ViewId, cx: &App) -> Vec<MenuEntry> {
         let mut out: Vec<MenuEntry> = crate::drawing_props::paste_entry(cx).into_iter().collect();
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-            t.start_paste_table(cx);
+            t.paste_as_table(cx);
         }));
         let leader = self.current_sheet().view(v).is_some_and(|x| x.detail_style == 2 || x.detail_label_at.is_some());
         if !leader && let Some((_, r, _)) = self.detail_grip_any(v) {

@@ -35,7 +35,7 @@ impl DrawingEditor {
         out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
         // Live: always present.
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-            t.start_paste_table(cx);
+            t.paste_as_table(cx);
         }));
         let unbroken = a.unbroken;
         out.push(MenuEntry::item(if unbroken { "Break dimension" } else { "Unbreak dimension" }, move |t, _, cx| {
@@ -79,7 +79,7 @@ impl DrawingEditor {
         out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
         out.extend(crate::drawing_props::paste_entry(cx));
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-            t.start_paste_table(cx);
+            t.paste_as_table(cx);
         }));
         // The values sit on the group's text line (no moved values to reset).
         out.push(MenuEntry::item("Reset ordinate", |_, _, _| {}));

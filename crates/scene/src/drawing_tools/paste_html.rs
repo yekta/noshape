@@ -36,8 +36,10 @@ struct Style {
     size: Option<f64>,
 }
 
-const PT: f64 = 25.4 / 72.0;
-const PX: f64 = 25.4 / 96.0;
+/// Live (request 1727): a pasted sheet's px and pt are taken as mm, 1:1
+/// (140 px → a 140 mm column, 10 pt → 10 mm text).
+const PT: f64 = 1.0;
+const PX: f64 = 1.0;
 
 /// A CSS / attribute length in mm (px without a unit).
 fn length(v: &str) -> Option<f64> {
@@ -54,6 +56,7 @@ fn length(v: &str) -> Option<f64> {
         "cm" => n * 10.0,
         "in" => n * 25.4,
         "em" | "rem" => n * 16.0 * PX,
+        // Physical units as given (no live data).
         _ => return None,
     };
     (mm > 0.0).then_some(mm)

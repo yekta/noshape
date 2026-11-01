@@ -234,7 +234,7 @@ impl DrawingEditor {
                 t.copy_entities(cx);
             }),
             MenuEntry::item("Paste as table", |t, _, cx| {
-                t.start_paste_table(cx);
+                t.paste_as_table(cx);
             }),
         ];
         let sheet = self.current_sheet();

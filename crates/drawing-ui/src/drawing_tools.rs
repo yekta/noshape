@@ -1897,7 +1897,7 @@ impl DrawingEditor {
                     // anywhere) and Delete (the cell left empty).
                     MenuEntry::item("Copy", move |t, _, cx| t.copy_title_field(&k2, cx)),
                     MenuEntry::item("Paste as table", |t, _, cx| {
-                        t.start_paste_table(cx);
+                        t.paste_as_table(cx);
                     }),
                     MenuEntry::Separator,
                     MenuEntry::item("Clear selection", |t, _, cx| {
@@ -1928,7 +1928,7 @@ impl DrawingEditor {
         out.extend(paste);
         out.extend([
             MenuEntry::item("Paste as table", |t, _, cx| {
-                t.start_paste_table(cx);
+                t.paste_as_table(cx);
             }),
             MenuEntry::Separator,
             MenuEntry::item("Clear selection", |t, _, cx| {
@@ -1960,7 +1960,7 @@ impl DrawingEditor {
             t.copy_entities(cx);
         }));
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-            t.start_paste_table(cx);
+            t.paste_as_table(cx);
         }));
         out.extend(own);
         if move_to {
@@ -2020,7 +2020,7 @@ impl DrawingEditor {
             t.copy_entities(cx);
         }));
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-            t.start_paste_table(cx);
+            t.paste_as_table(cx);
         }));
         out.push(Self::move_to_entry(a));
         out.extend([
@@ -2081,7 +2081,7 @@ impl DrawingEditor {
                 if self.current_sheet().annotations.iter().any(|a| a.id == id && matches!(a.kind, AnnotationKind::Centermark { .. })) {
                     return vec![
                         MenuEntry::item("Paste as table", |t, _, cx| {
-                            t.start_paste_table(cx);
+                            t.paste_as_table(cx);
                         }),
                         MenuEntry::item("Align centermark", move |t, _, cx| t.start_align_centermark(id, cx)),
                         MenuEntry::Separator,
@@ -2110,7 +2110,7 @@ impl DrawingEditor {
                         t.copy_entities(cx);
                     }));
                     out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-                        t.start_paste_table(cx);
+                        t.paste_as_table(cx);
                     }));
                     out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
                     if matches!(&a.kind, AnnotationKind::HoleCallout { leaders, .. } if !leaders.is_empty()) {
@@ -2244,7 +2244,7 @@ impl DrawingEditor {
                     }
                     // Paste as table is in every drawing menu (live drawing/290).
                     out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-                        t.start_paste_table(cx);
+                        t.paste_as_table(cx);
                     }));
                     out.push(MenuEntry::Separator);
                 }
@@ -2265,7 +2265,7 @@ impl DrawingEditor {
             // Live 483–493, ~1490: an automatic centermark's menu.
             Some(Sel::AutoCentermark(view, key)) => {
                 out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-                    t.start_paste_table(cx);
+                    t.paste_as_table(cx);
                 }));
                 out.push(MenuEntry::item("Align centermark", move |t, _, cx| {
                     t.align_auto_centermark = Some((view, key));
@@ -2295,7 +2295,7 @@ impl DrawingEditor {
                 // Live (A45): Paste is always there, also with nothing copied.
                 out.push(crate::drawing_props::paste_always());
                 out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-                    t.start_paste_table(cx);
+                    t.paste_as_table(cx);
                 }));
                 let si = self.sheet;
                 out.push(MenuEntry::item("Sheet properties...", move |t, w, cx| t.open_sheet_props(si, w, cx)));
