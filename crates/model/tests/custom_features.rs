@@ -2410,3 +2410,66 @@ fn dump_stacks() {
         }
     }
 }
+
+const HANDLES: &str = r#"
+annotation { "Feature Type Name" : "Handles", "Editing Logic Function" : "handlesLogic", "Manipulator Change Function" : "handlesManipulated" }
+export const handles = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Length" }
+        isLength(definition.len, LENGTH_BOUNDS);
+        annotation { "Name" : "Touched", "Default" : false }
+        definition.touched is boolean;
+    }
+    {
+        fCuboid(context, id + "box", { "corner1" : vector(0, 0, 0) * meter, "corner2" : vector(1, 1, 1) * definition.len });
+        addManipulators(context, id, { "lengthArrow" : linearManipulator({ "base" : vector(0, 0, 0) * meter, "direction" : vector(0, 0, 1), "offset" : definition.len, "primaryParameterId" : "len" }) });
+    });
+
+export function handlesLogic(context is Context, id is Id, oldDefinition is map, definition is map) returns map
+{
+    definition.touched = true;
+    return definition;
+}
+
+export function handlesManipulated(context is Context, definition is map, newManipulators is map) returns map
+{
+    definition.len = abs(newManipulators["lengthArrow"].offset);
+    return definition;
+}
+"#;
+
+/// A custom feature's own "Editing Logic Function" and "Manipulator Change Function" run as std's do (audit-part-
+/// studio M15): its `addManipulators` arrow reaches the feature state, a drag to 40 mm sets Length through its change
+/// function, and its editing logic answers a dialog edit.
+#[test]
+fn custom_feature_manipulators_and_editing_logic_run() {
+    let fx = Fixture::new(&studio(HANDLES));
+    let mut ps = PartStudio::new();
+    let mut f = ps.new_feature(&fx.ty("handles"), &fx.units).expect("custom feature type is registered");
+    f.params.set("len", expr("20 mm"));
+    ps.features.push(f);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    let f = &ps.features[0];
+    let state = r.display.feature_state(f.id).expect("state");
+    let [(key, m)] = state.manipulators.as_slice() else { panic!("one manipulator: {:?}", state.manipulators) };
+    let noshape_model::display::FeatureManipulator::Linear { offset, primary, .. } = m else { panic!("a length arrow: {m:?}") };
+    assert!((offset - 0.02).abs() < 1e-12 && primary.as_deref() == Some("len"), "{m:?}");
+    let mut moved = m.clone();
+    if let noshape_model::display::FeatureManipulator::Linear { offset, .. } = &mut moved {
+        *offset = 0.04;
+    }
+    let before = noshape_model::regen::context::Context::default();
+    let changed = custom::std_feature::manipulator_change_in(before.clone(), &f.type_id, f.id, &f.name, &fx.units, &f.params, key, &moved).expect("its change function ran");
+    let len = match changed.get("len") {
+        Some(ParamValue::Expr(e)) => noshape_units::evaluate_as(&e.text, noshape_units::Dim::LENGTH, &fx.units, &noshape_units::EmptyScope).unwrap().value,
+        other => panic!("len: {other:?}"),
+    };
+    assert!((len - 0.04).abs() < 1e-12, "{changed:?}");
+    assert!(custom::std_feature::has_editing_logic(&f.type_id));
+    let mut edited = f.params.clone();
+    edited.set("len", expr("30 mm"));
+    let logic = custom::std_feature::editing_logic_in(before, &f.type_id, f.id, &f.name, &fx.units, &f.params, &edited, &["len".to_string()], false).expect("its editing logic ran");
+    assert_eq!(logic.get("touched"), Some(&ParamValue::Bool(true)), "{logic:?}");
+}

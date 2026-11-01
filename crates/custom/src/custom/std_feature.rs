@@ -179,9 +179,20 @@ fn logic_std_name(type_id: &str) -> Option<(&'static str, &'static str)> {
 }
 
 /// Whether std has editing logic for built-in feature `type_id` and the
-/// dialog runs it (std runs the feature, or it is in STD_EDITING_LOGIC).
+/// dialog runs it (std runs the feature, or it is in STD_EDITING_LOGIC), or
+/// custom feature `type_id` declares one.
 pub fn has_editing_logic(type_id: &str) -> bool {
+    if let Some(d) = custom_def(type_id) {
+        return d.editing.is_some();
+    }
     (evaluator(type_id).is_some() || STD_EDITING_LOGIC.contains(&type_id)) && logic_std_name(type_id).and_then(|(module, name)| loaded(module, name)).is_some_and(|f| f.editing.is_some())
+}
+
+/// A custom feature type's definition, from the Feature Studios last
+/// compiled (the document's, in the app and the agent API).
+fn custom_def(type_id: &str) -> Option<super::CustomFeatureDef> {
+    let (tab, name) = super::parse_type_id(type_id)?;
+    super::fallback_provider().studio(tab)?.feature(name).cloned()
 }
 
 /// [`editing_logic`] in `ctx`, the Part Studio just before the feature (a
@@ -216,6 +227,9 @@ pub fn editing_logic_in_clicked(
     creating: bool,
     clicked: &str,
 ) -> Option<crate::params::ParamValues> {
+    if let Some(d) = custom_def(type_id) {
+        return super::run::run_editing_logic(ctx, feature, name, units, d.editing.as_ref()?, &d.params, &d.feature_type.params, old, new, specified, creating, clicked);
+    }
     let (module, std) = logic_std_name(type_id)?;
     let f = loaded(module, std)?;
     let editing = f.editing.as_ref()?;
@@ -238,6 +252,9 @@ pub fn manipulator_change_in(
     key: &str,
     manipulator: &crate::display::FeatureManipulator,
 ) -> Option<crate::params::ParamValues> {
+    if let Some(d) = custom_def(type_id) {
+        return super::run::run_manipulator_change(ctx, feature, name, units, d.manipulator_change.as_ref()?, &d.params, &d.feature_type.params, values, key, manipulator);
+    }
     let (module, std) = logic_std_name(type_id)?;
     let f = loaded(module, std)?;
     let change = f.manipulator_change.as_ref()?;

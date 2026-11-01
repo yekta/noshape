@@ -132,6 +132,8 @@ fn compile_uncached(tab: TabId, source: &str, hash: u64, resolver: &dyn Resolver
             feature_type,
             cell: cell.clone(),
             editing_logic: ann.str("Editing Logic Function").map(|s| s.to_string()),
+            editing: ann.str("Editing Logic Function").and_then(|f| module.functions(f)),
+            manipulator_change: ann.str("Manipulator Change Function").and_then(|f| module.functions(f)),
         });
     }
     // Live: "Importing geometry.fs when defining tables will likely hurt

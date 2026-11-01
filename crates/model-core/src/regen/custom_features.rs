@@ -11,7 +11,7 @@ use crate::params::{Hints, NumKind, NumSpec, QueryFilter};
 use crate::regen::eval::{EvalCtx, FResult, err};
 use crate::regen::features::EvalFn;
 use noshape_featurescript::compile::CompiledModule;
-use noshape_featurescript::ir::{CompiledFn, GlobalCell};
+use noshape_featurescript::ir::{CompiledFn, GlobalCell, OverloadSet};
 use noshape_featurescript::value::Tag;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
@@ -104,6 +104,10 @@ pub struct CustomFeatureDef {
     pub feature_type: &'static FeatureType,
     pub cell: Arc<GlobalCell>,
     pub editing_logic: Option<String>,
+    /// Its "Editing Logic Function" and "Manipulator Change Function", as
+    /// the studio compiled them (the dialog runs them as std's).
+    pub editing: Option<Arc<OverloadSet>>,
+    pub manipulator_change: Option<Arc<OverloadSet>>,
 }
 
 /// A custom table declared by a Feature Studio.
