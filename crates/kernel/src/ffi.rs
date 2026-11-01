@@ -414,6 +414,9 @@ pub(crate) mod ffi {
         fn brep_enabled() -> bool;
         /// Whether a decline fails the Boolean ([`crate::set_rust_boolean_only`]).
         fn brep_strict() -> bool;
+        /// Whether a decline fails the Boolean for the whole process, OCCT's Boolean never run after it
+        /// (NOSHAPE_BOOL_FALLBACK=0; the end state once noshape's takes every case).
+        fn brep_no_fallback() -> bool;
         /// Whether Booleans are recorded (NOSHAPE_RECORD_BOOLEANS).
         fn brep_recording() -> bool;
         /// Records a Boolean the kernel made outside op_boolean (quick_boolean, rust_boolean.cpp).
@@ -805,7 +808,7 @@ pub(crate) mod ffi {
 }
 
 use crate::mesh_bridge::{brep_mesh, brep_mesh_on};
-use crate::brep_bridge::{brep_blend, brep_blend_enabled, brep_boolean, brep_decline, brep_enabled, brep_last_decline, brep_record_direct, brep_recording, brep_strict};
+use crate::brep_bridge::{brep_blend, brep_blend_enabled, brep_boolean, brep_decline, brep_enabled, brep_last_decline, brep_no_fallback, brep_record_direct, brep_recording, brep_strict};
 
 // SAFETY: OcShape wraps an immutable TopoDS_Shape (handles with atomic
 // reference counts); its lazily-built maps are guarded by std::call_once.

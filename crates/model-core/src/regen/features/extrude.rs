@@ -19,7 +19,8 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     // Onshape's EXTRUDE_FAILED for a failing geometry operation (live
     // "Contrast: a failed EXTRUDE", 10-22): the kernel's reason isn't shown.
     eval_inner(ev).map_err(|e| {
-        if e.message.starts_with(crate::regen::eval::KERNEL_FAILURE) {
+        // (A Boolean noshape's declined with NOSHAPE_BOOL_FALLBACK=0: its reason kept.)
+        if e.message.starts_with(crate::regen::eval::KERNEL_FAILURE) && !e.message.contains("noshape's Boolean declined") {
             log::debug!("extrude: {}", e.message);
             crate::regen::eval::FeatureError { message: "Failed to extrude selections, check input.".into(), ..e }
         } else {

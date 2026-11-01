@@ -162,9 +162,42 @@ pub fn record(dir: &Path, op: BooleanOp, objects: &[Shape], tools: &[Shape], opt
     let t = std::time::Instant::now();
     let r = run();
     let ms = t.elapsed().as_secs_f64() * 1e3;
-    let Ok(res) = &r else { return r };
+    let res = match &r {
+        Ok(res) => res,
+        // (NOSHAPE_RECORD_FAILED=1: a failed call's inputs too, its error in place of a result: with
+        // NOSHAPE_BOOL_FALLBACK=0 every Boolean noshape's declines, for replaying against OCCT run there.)
+        Err(e) => {
+            if std::env::var_os("NOSHAPE_RECORD_FAILED").is_some() {
+                write_failed(dir, &name, &bytes, &Call { op, objects, tools, opts }, &e.to_string(), ms);
+            }
+            return r;
+        }
+    };
     write_case(dir, &name, &bytes, &Call { op, objects, tools, opts }, res, ms, &crate::last_boolean_path());
     r
+}
+
+/// A failed call's inputs and its error (no result: valid 0, volume and counts 0).
+fn write_failed(dir: &Path, name: &str, bytes: &[u8], call: &Call, error: &str, ms: f64) {
+    let (op, objects, tools, opts) = (call.op, call.objects, call.tools, call.opts);
+    let _ = std::fs::create_dir_all(dir);
+    if std::fs::write(dir.join(format!("{name}.brep")), bytes).is_ok() {
+        let text = format!(
+            "op {}\nfuzzy {:e}\nglue {}\nunify {}\nparallel {}\nobb {}\nobjects {}\ntools {}\ntarget_faces {}\nvalid 0\nvolume 0e0\nfaces 0\nedges 0\nvertices 0\nhistory 0000000000000000\nms {:.3}\npath failed\nerror {}\n",
+            op_name(op),
+            opts.fuzzy,
+            glue_name(opts.glue),
+            opts.unify as u8,
+            opts.parallel as u8,
+            opts.obb as u8,
+            objects.len(),
+            tools.len(),
+            objects.iter().map(|o| o.count(ShapeType::Face)).sum::<usize>(),
+            ms,
+            error.replace('\n', " "),
+        );
+        let _ = std::fs::write(dir.join(format!("{name}.txt")), text);
+    }
 }
 
 /// One Boolean call: op, arguments, options.

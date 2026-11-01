@@ -1109,6 +1109,29 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## The knurl on a Ø25 cylinder; NOSHAPE_BOOL_FALLBACK=0 (11-01 23:30 UTC, user's P0)
+- User (v0.4.19 app, macOS): the B94.6 Diamond knurl, 12 TPI, 100 %, on a Ø25 × 25 cylinder: 45/30 and 80/30 ~3 s, 45/45
+  still running after 2 min. Reproduced on Linux (not a platform difference): at Ø25 × 25 noshape's Boolean declines
+  45/45 ("a non-manifold result") and OCCT's path runs past 15 min; Ø50 × 50 (our tests, live's) is taken (CLI with the
+  app's sketch + extrude cylinder: 45/30 15 s, 45/45 32 s, live's faces).
+- Height sweep (Ø25, 10–60 mm in 1 mm steps, NOSHAPE_BOOL_FALLBACK=0, the T2 sweep with KNURL_SIZE): 45/45 declines at
+  17, 25, 34 ("a non-manifold result"), 43 mm ("a piece's point near a coincident face's boundary"); 45/30 at 14, 24, 35,
+  46, 57, 60 mm; every other height taken in 1–10 s. Ø50 × 50 taken at both.
+- Cause (recorded cut 0488ccf3, 74 tools, h25): at those heights a crossing of two opposite-hand grooves falls within
+  ~45 µm above the cylinder's bottom face, where every groove tool's end cap lies on the bottom plane. The two tools
+  (28 and 61) only meet in that sliver: OCCT gives a 44 µm section of their faces 1, nothing between their side faces 0
+  (moved from the first period or asked directly alike), so a side face's piece reaching into the other tool there
+  isn't split and is kept as outside (non-manifold). Next: the sliver's dividing curve (the side faces' section near
+  their common cap plane, or the tools' cap edges on each other's side faces), then the size × TPI sweep.
+- NOSHAPE_BOOL_FALLBACK=0 (user's decision, default stays 1): a Boolean noshape's declines fails at once, OCCT's not run:
+  op_boolean throws "noshape's Boolean declined: <reason>" (also on stderr), quick_boolean (Shell's) returns failure as
+  OCCT's failing would; the reason shows in the feature's error and FeatureScript's notices (custom host passes it
+  through as CUSTOM_ERROR, Extrude doesn't replace it). With it the Ø25 × 25 45/45 knurl fails in 3 s with the reason.
+  NOSHAPE_RECORD_FAILED=1 (with NOSHAPE_RECORD_BOOLEANS) records a failed call's inputs too (summary: path failed, its
+  error), so every decline becomes a replayable case (replay with NOSHAPE_BREP_VS_OCCT=1).
+- The T2 knurl sweep takes KNURL_SIZE=<Ø>,<h> and KNURL_PITCH=CP16 etc. (live's values compared only at Ø50 × 50, 12 TPI).
+- Live asked (REQUESTS, bool 11-01 22:00): Ø25 × 25 at 45/45, 45/30, 80/30 and Ø25 × 50 at 45/45.
+
 ## RUST-EXTRUDE-SCOPE-SLOW fixed (11-01 20:40 UTC)
 - psui's repro (qa's slow1151rep.py on tickets/slow1151-pre.noshape): the extrude's collision check took 237–435 s
   and the extrude failed with noshape's Boolean on. Its two commons (the extrude's tool against a part) went to OCCT
@@ -1618,6 +1641,10 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   other threads (FreeIfCancelled, kernel Shape drops): nothing changes unless the thread is cancelled.
 
 ## Requests
+- qa (11-01 23:30 UTC, user's decision): run the CLI fuzz with NOSHAPE_BOOL_FALLBACK=0 (and NOSHAPE_RECORD_BOOLEANS=<dir>
+  NOSHAPE_RECORD_FAILED=1 to keep each decline's inputs): every remaining decline then shows as a feature error
+  "noshape's Boolean declined: <reason>" instead of minutes in OCCT; report the reasons and counts (and the recorded
+  cases' directory) to bool.
 - core (11-01 17:10 UTC): fuzz seed 1144 dies at step 51 (a suppress) with noshape's Boolean on, after every recorded
   Boolean of ours in the run is valid: "stack smashing detected" in op_prism (features.cpp, a sheet metal extrude's
   prism during the regeneration), trace on vibe4 ~/bool-fuzz/cli/err-1144tr.log (NOSHAPE_GUARD_TRACE=1), binary

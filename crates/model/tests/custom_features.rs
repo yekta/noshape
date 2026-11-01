@@ -2024,7 +2024,15 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
         fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 50) * millimeter, "radius" : 25 * millimeter });
     });
 "#;
-    let src = format!("{}\n{CYLINDER}", include_str!("fs/knurl_b94.fs"));
+    // (KNURL_SIZE=<diameter mm>,<height mm>: another cylinder than live's Ø50 × 50; KNURL_PITCH=CP16 etc.)
+    let cylinder = match std::env::var("KNURL_SIZE") {
+        Ok(v) => {
+            let x: Vec<f64> = v.split(',').map(|a| a.trim().parse().unwrap()).collect();
+            CYLINDER.replace("vector(0, 0, 50)", &format!("vector(0, 0, {})", x[1])).replace("\"radius\" : 25 *", &format!("\"radius\" : {} *", x[0] / 2.0))
+        }
+        Err(_) => CYLINDER.to_string(),
+    };
+    let src = format!("{}\n{cylinder}", include_str!("fs/knurl_b94.fs"));
     let fx = Fixture::new(&src);
     let opts = fx.opts();
     let mut ps = PartStudio::new();
@@ -2042,7 +2050,7 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
     f.params.set("knurlType", ParamValue::Enum(kind.into()));
     f.params.set("knurlFace", ParamValue::Enum("OUTER".into()));
     f.params.set("pitchType", ParamValue::Enum("CIRCULAR".into()));
-    f.params.set("circularPitch", ParamValue::Enum("CP12".into()));
+    f.params.set("circularPitch", ParamValue::Enum(std::env::var("KNURL_PITCH").unwrap_or_else(|_| "CP12".into())));
     f.params.set("toothAngle", expr(&format!("{tooth_deg} deg")));
     f.params.set("toothHelixAngle", expr(&format!("{helix_deg} deg")));
     f.params.set("grooveDepthPercent", expr("100"));
@@ -2097,7 +2105,10 @@ fn knurl_feature_b94_tooth_and_helix_angles() {
             bad.push(format!("tooth {tooth}° helix {helix}°: {errors:?}, valid {valid}, {} parts", r.context.bodies.len()));
         }
         let vtol = if helix == 45.0 { 7e-5 } else { 2e-5 };
-        if let Some(&(_, live_v, live_faces)) = live.iter().find(|l| l.0 == (tooth, helix))
+        // (Live's values are Ø50 × 50's at 12 TPI: another size or pitch only has to be taken, valid, one part.)
+        if std::env::var_os("KNURL_SIZE").is_none()
+            && std::env::var_os("KNURL_PITCH").is_none()
+            && let Some(&(_, live_v, live_faces)) = live.iter().find(|l| l.0 == (tooth, helix))
             && ((v - live_v).abs() > vtol * live_v || faces != live_faces)
         {
             bad.push(format!("tooth {tooth}° helix {helix}°: {v} mm³, {faces} faces; live {live_v} mm³, {live_faces} faces"));

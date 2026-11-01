@@ -81,13 +81,18 @@ std::string rust_last_decline() { return std::string(brep_last_decline()); }
 
 namespace {
 
-// Declines (the replay's strict mode: fails).
+// Declines (the replay's strict mode, or NOSHAPE_BOOL_FALLBACK=0: fails at once, the reason in the error).
 bool decline(const char* why)
 {
   if (why != nullptr)
     brep_decline(why);
-  if (brep_strict() && t_lenient == 0)
-    fail_unsupported("noshape's Boolean declined");
+  if ((brep_strict() || brep_no_fallback()) && t_lenient == 0)
+  {
+    // (Also on stderr: a feature's FeatureScript may put its own message on the error.)
+    if (brep_no_fallback())
+      std::fprintf(stderr, "noshape's Boolean declined: %s\n", rust_last_decline().c_str());
+    fail_unsupported("noshape's Boolean declined: " + rust_last_decline());
+  }
   return false;
 }
 
@@ -2341,6 +2346,9 @@ bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bo
       path = "direct_rust";
     else if (std::getenv("NOSHAPE_SHELL_DEBUG"))
       std::fprintf(stderr, "quick_boolean: op %d of %d shapes: noshape's declined: %s\n", (int)op, (int)all.size(), rust_last_decline().c_str());
+    // (NOSHAPE_BOOL_FALLBACK=0: a failed Boolean, as OCCT's failing; its caller goes on as it does then.)
+    if (!done && brep_no_fallback())
+      return false;
   }
   if (!done)
   {

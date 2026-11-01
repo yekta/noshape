@@ -793,7 +793,8 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
                     // operation's own failure: its words, not the code's (a
                     // knurl's subtract past the memory budget read "Selected
                     // tools and targets do not intersect.", lead 10-30 11:30).
-                    None if stopped_by_a_limit(&e.message) => ("CUSTOM_ERROR".to_string(), e.message.clone(), Vec::new()),
+                    // (So is a Boolean noshape's declined with NOSHAPE_BOOL_FALLBACK=0: its reason shown.)
+                    None if stopped_by_a_limit(&e.message) || e.message.contains("noshape's Boolean declined") => ("CUSTOM_ERROR".to_string(), e.message.clone(), Vec::new()),
                     None => (failure.to_string(), e.message.clone(), Vec::new()),
                 },
             };

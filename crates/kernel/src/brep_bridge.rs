@@ -28,6 +28,13 @@ pub(crate) fn brep_strict() -> bool {
     STRICT.with(|s| s.get())
 }
 
+/// NOSHAPE_BOOL_FALLBACK=0: a Boolean noshape's own declines fails at once with the reason, OCCT's not run (with
+/// noshape's on; the end state once it takes every case).
+pub(crate) fn brep_no_fallback() -> bool {
+    static ENV: OnceLock<bool> = OnceLock::new();
+    brep_enabled() && *ENV.get_or_init(|| std::env::var("NOSHAPE_BOOL_FALLBACK").as_deref() == Ok("0"))
+}
+
 /// Turns noshape's own Boolean on or off for this thread's Booleans (`None`: as NOSHAPE_BOOL_RUST says,
 /// on unless 0); the corpus replay compares it with OCCT.
 pub fn set_rust_boolean(on: Option<bool>) {
