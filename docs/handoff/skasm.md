@@ -449,6 +449,14 @@ audit 19 surfaces, 28 gaps, 27 fixed; G26 planned in the audit doc (paths for hi
 two FS probes, see the ticket (each definition entity gets two association attributes). Live request "Preferences
 shortcut lists" posted 12:05 (does Flow appear there).
 
+## 11-01 afternoon (user: G26, G13, SM-MAKE-JOINT, keep auditing)
+Done and queued: G26 per-occurrence state (Assembly::occurrences; isolate / transparent as occurrence paths in
+scene, picking and ops; nested row menu; agent API paths "Sub <1>/Part 1 <1>"), G29 Flow in the Preferences lists,
+G13 Insert image Libraries (our generated environment maps), SM-MAKE-JOINT-ONE-EDGE (root cause: two models' parts
+named their fresh faces alike; a part whose names are taken now gets its own). Audit: 25 surfaces, 30 gaps, 29 fixed.
+Open: G30 Display states dialog (live request 13:15), then a whole dump of the assembly Mass and section properties
+panel (our dumps of it are empty). Not done in G26: Move to new subassembly from a nested row.
+
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
 (standard content) → mates/assembly workflow gaps (all ✅, UNCONFIRMED all answered 10-27) → standard content.

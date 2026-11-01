@@ -11,7 +11,7 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 
 | | |
 |---|---|
-| Surfaces audited | 24 |
+| Surfaces audited | 25 |
 | Gaps found | 30 |
 | Gaps fixed | 29 |
 
@@ -43,6 +43,7 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 | S22 | Assembly tool dialogs field labels in order (linear / circular / part pattern, mirror, replicate, group, interference, mass, mate connector, mates with offset / limits) | dialog-asm-*, dialog-mate-*, dialog-interference-*, dialog-mass-* | 0 |
 | S23 | Assembly toolbar (no curve pattern in live), Create Part Studio in context, Display states | toolbar-assembly.txt, dialog-create-part-studio-in-context.txt, behaviours "Display states tool" | G30 |
 | S24 | Every mate type's dialog field by field: type select, Mate connectors (Tangent: Face, edge or vertex + Tangent propagation; Width: its two connector lists), Offset / Limits / Simulation connection per type, the Solve button (skasm-scratch/audit/labelseq2.py against offset_axes / limit_keys / has_simulation_connection) | dialog-mate-*-filled.txt, -limits, -offset | 0 |
+| S25 | Sketch Text dialog's font list (32, in order) and the Interference detection dialog's fields in order | sk-tool-text.txt, dialog-interference-assembly-*.txt | 0 |
 
 Live requests answered: 1715 (tool options), 1716 (Flow), 1720 (exploded views / named positions menus, subassembly fix icons).
 
