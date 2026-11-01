@@ -3349,7 +3349,7 @@ impl AssemblyView {
         let Some(first) = self.connector_from_hover(cx) else { return };
         let units = self.units(cx);
         // Sources: the picked point, then explicit mate connectors on the
-        // instance, then the other inference points of the picked entity.
+        // instance (live 570: with none, Ctrl keeps the picked point).
         let mut sources = vec![first];
         for c in self.result.connectors.iter().filter(|c| c.owner == top) {
             sources.push(MateConnectorRef::assembly_connector(c.id, c.owner));
@@ -3361,11 +3361,6 @@ impl AssemblyView {
             }
             for c in &o.context.connectors {
                 sources.push(MateConnectorRef::on(top, o.path[1..].to_vec(), c.reference.clone()));
-            }
-        }
-        if let Some(o) = self.result.occurrences.get(t.occ) {
-            for p in inference_candidates(&o.context, Some(&o.body), &t.reference, &units) {
-                sources.push(p.connector(&t.path));
             }
         }
         let mut uniq: Vec<MateConnectorRef> = Vec::new();
