@@ -49,11 +49,12 @@ rebase conflict. Deeper dependents' tests run in the watcher after the push. Doc
 Main red from a pushed change means land.sh wasn't used. A flaky test (passes alone, fails in parallel, or fails now
 and then) goes to T2 at once with a ticket for its owner.
 
-## Building and testing on vibe4: `tools/tiers/rb.sh` (lead, 11-01)
+## Building and testing on vibe4 / vibe5: `tools/tiers/rb.sh` (lead, 11-01)
 
 Run builds and tests on vibe4, not on this machine (agents' builds kept it at 2–3× its cores and agents spent ~80 % of
 their day waiting on compiles). `tools/tiers/rb.sh <command>` syncs your worktree as it is (uncommitted changes too)
-to vibe4, runs the command there in your worktree's own warm target dir and streams the output; its exit code is the
+to your build server (tools/tiers/rb-hosts: vibe4 for the kernel agents and the land checks, vibe5 for the UI
+agents), runs the command there in your worktree's own warm target dir and streams the output; its exit code is the
 command's. `--get <bin>` copies a built binary back into `$CARGO_TARGET_DIR/debug/` to run the app here (GUI checks).
 Measured: noshape-model's test build cold 188 s, unchanged 7 s, after a one-line model-core change 11 s.
 ```
