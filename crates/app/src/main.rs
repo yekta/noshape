@@ -359,7 +359,26 @@ fn register_feature_studio_hooks() {
 /// What Versions and history (noshape-history-ui) need of the app: the Part Studio's feature icons, the Workspace
 /// protection dialog.
 fn register_history_hooks() {
-    noshape_history_ui::history_hooks::register(noshape_history_ui::history_hooks::Hooks { feature_icon: part_studio::feature_icon, workspace_protection: workspace_protection::open_dialog });
+    noshape_history_ui::history_hooks::register(noshape_history_ui::history_hooks::Hooks {
+        feature_icon: part_studio::feature_icon,
+        workspace_protection: workspace_protection::open_dialog,
+        open_new_window: |doc, at, cx| {
+            let gpu = cx.global::<gpu::GpuGlobal>().0.clone();
+            match at {
+                Some(mv) => {
+                    let path = doc.read(cx).session.path.clone();
+                    files::open_version_window(path, mv, gpu, cx).map(|_| ())
+                }
+                None => {
+                    let s = &doc.read(cx).session;
+                    match s.active_tab.or_else(|| s.doc.ordered_tabs().first().map(|t| t.id)) {
+                        Some(tab) => files::open_tab_window(doc, tab, gpu, cx),
+                        None => Ok(()),
+                    }
+                }
+            }
+        },
+    });
 }
 
 /// What the documents page (noshape-start-ui) needs of the app: a document's window, the build label.

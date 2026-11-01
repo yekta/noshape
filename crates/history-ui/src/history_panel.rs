@@ -499,6 +499,14 @@ pub fn open_create_version_in(doc: Entity<DocModel>, window: &mut Window, cx: &m
     create_version_dialog(doc, true, None, window, cx)
 }
 
+/// A row's Open in new browser tab (another window); a failure shows as
+/// the document's error.
+fn open_new_window(doc: &Entity<DocModel>, at: Option<noshape_store::MicroversionId>, cx: &mut App) {
+    if let Err(e) = crate::history_hooks::open_new_window(doc.clone(), at, cx) {
+        doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Error(format!("{e:#}"))));
+    }
+}
+
 /// Change row › Create version here… (live rp-904): the same dialog, the
 /// version made at that history entry.
 fn open_create_version_at(doc: Entity<DocModel>, at: MicroversionId, window: &mut Window, cx: &mut App) {
@@ -1180,9 +1188,9 @@ impl Render for HistoryPanel {
                 // Live (menus/rmb-version-v1, dk-9a1): a Bootstrap dropdown's
                 // 27 px rows and 14 px text, ~222 px wide.
                 let m = m.row_height(27.).text_px(14.).text_inset(20.).min_width(222.);
-                // Live menus/rmb-version-v1: Open, Branch to create workspace…,
-                // Compare, Restore to <ws>…, Properties…, Releases ▸, Publish
-                // FeatureScript… (browser tab / copy link are cloud-only).
+                // Live menus/rmb-version-v1: Open, Open in new browser tab, Branch
+                // to create workspace…, Compare, Restore to <ws>…, Properties…,
+                // Releases ▸, Publish FeatureScript… (Copy link is web-only).
                 let (dr0, row_packages) = (d.clone(), row_packages.clone());
                 let releases = move |m: crate::os_menu::OsMenu, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>| {
                     if row_packages.is_empty() {
@@ -1206,9 +1214,13 @@ impl Render for HistoryPanel {
                 match kind {
                     RowKind::Workspace(b) => {
                         let m = m.item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| if b == current_branch { t.view_mv(None, cx) } else { t.switch_branch(b, cx) })));
-                        // Live wp-901: Open · Compare · Merge into current workspace… ·
-                        // Workspace protection… · Properties… | Delete (browser tab /
-                        // copy link are web-only).
+                        // Live wp-901: Open · Open in new browser tab · Compare · Merge
+                        // into current workspace… · Workspace protection… · Properties…
+                        // | Delete. A new browser tab is another window here (as the tab
+                        // menu's); only on the current workspace, whose window shares
+                        // its edits. Copy link is web-only.
+                        let dn = d5.clone();
+                        let m = if b == current_branch { m.item(crate::os_menu::OsMenuItem::new("Open in new browser tab").on_click(move |_, _, cx| open_new_window(&dn, None, cx))) } else { m };
                         let m = if b != current_branch {
                             m.item(crate::os_menu::OsMenuItem::new("Compare").on_click(move |_, _, cx| v3.update(cx, |t, cx| t.compare_with_current(crate::compare_mode::Side::Workspace(b), name2.clone(), cx))))
                                 .item(crate::os_menu::OsMenuItem::new("Merge into current workspace…").on_click({
@@ -1228,6 +1240,10 @@ impl Render for HistoryPanel {
                     }
                     _ => {
                         let m = m.item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.view_mv(Some(mv), cx))));
+                        // Open in new browser tab: the version (or change) in a
+                        // window of its own, read-only.
+                        let dn = d.clone();
+                        let m = m.item(crate::os_menu::OsMenuItem::new("Open in new browser tab").on_click(move |_, _, cx| open_new_window(&dn, Some(mv), cx)));
                         // Live rp-904: change rows have no "Branch to create workspace…".
                         let m = if kind == RowKind::Change { m } else { m.item(crate::os_menu::OsMenuItem::new("Branch to create workspace…").on_click(move |_, window, cx| open_branch_dialog(d1.clone(), mv, name1.clone(), window, cx))) };
                         let m = m

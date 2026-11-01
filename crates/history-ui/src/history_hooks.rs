@@ -13,6 +13,9 @@ pub struct Hooks {
     pub feature_icon: fn(&str) -> SharedString,
     /// The Workspace protection dialog of a branch.
     pub workspace_protection: fn(Entity<DocModel>, BranchId, &mut Window, &mut App),
+    /// A row's Open in new browser tab: another window on the document, at a
+    /// version or change (read-only), or on the current workspace (None).
+    pub open_new_window: fn(Entity<DocModel>, Option<noshape_store::MicroversionId>, &mut App) -> anyhow::Result<()>,
 }
 
 static HOOKS: OnceLock<Hooks> = OnceLock::new();
@@ -32,4 +35,8 @@ pub fn feature_icon(type_id: &str) -> SharedString {
 
 pub fn workspace_protection(doc: Entity<DocModel>, branch: BranchId, window: &mut Window, cx: &mut App) {
     (hooks().workspace_protection)(doc, branch, window, cx)
+}
+
+pub fn open_new_window(doc: Entity<DocModel>, at: Option<noshape_store::MicroversionId>, cx: &mut App) -> anyhow::Result<()> {
+    (hooks().open_new_window)(doc, at, cx)
 }

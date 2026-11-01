@@ -28,9 +28,9 @@ Priorities:
 
 | | |
 |---|---|
-| Surfaces audited | 19 |
-| Gaps found | 10 |
-| Gaps fixed | 9 |
+| Surfaces audited | 21 |
+| Gaps found | 11 |
+| Gaps fixed | 10 |
 
 ## Surfaces
 
@@ -55,6 +55,8 @@ Priorities:
 | S17 | Compare (bar, tab states, feature and parameter rows, moved markers) | ui2-compare*.json\|html | 0 |
 | S18 | Release management | upsell-release-management-modal.txt (the free plan shows only the upsell), help enterprise_settings_release_management | not auditable on live; ours follows the help |
 | S19 | Configured part properties panel (tables, menus, cell editors) | cp-*.json\|html | D11 |
+| S20 | In-document Versions and history: row menus (workspace, version, change), Create version / Branch dialogs, Restore | behaviours 68, 1733, 2625, 3317-3351 | D14 |
+| S21 | Insert dialog: other documents, configured, versions banner ("N changes since the last version.") | assembly-insert-*.txt | 0 |
 
 ## Gaps
 
@@ -70,3 +72,4 @@ Priorities:
 | D11 | P3 | Configured part properties: Add property ▾ has the tooltip "Configure a property of <part>". | fixed |
 | D12 | P2 | Tab bar: a tab that references an older version of another document has a blue out-of-date icon, tooltip "Newer versions of linked documents available". The references can be Derived, an inserted Variable Studio, Assembly instances or Drawing views. Ours had none. | fixed: `workspace_update::version_refs` / `behind_tabs`, checked off the UI thread when the references change and when the window comes back |
 | D13 | P2 | Documents search box: running an advanced search writes the query into the box as text (`type:part name:pvz`, `type:part,document`). Enter on such a text runs it, and clearing the box ends the search. Ours kept the box and the panel apart. | fixed: `Query::to_text` / `Query::parse_text` (type, name, description, partNumber, revision, state) |
+| D14 | P1 | Versions and history row menus: live has "Open in new browser tab" on version, change and workspace rows. Ours left it out as web-only, though the tab menu's already opens another window. | fixed: version and change rows open a read-only window at that point; the current workspace's row opens another window on it. Other workspaces' rows still have none, because a second editable session on another branch isn't supported. Copy link stays out (web-only). |

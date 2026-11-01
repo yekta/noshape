@@ -333,6 +333,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("document:Move up", Op("variable_move_studio")),
     ("document:Open linked document", Op("document_open")),
     ("document:Open", Op("history_view")),
+    ("document:Open in new browser tab", Op("history_view")),
     ("document:Paste inputs", Op("config_copy_inputs")),
     ("document:Properties…", Op("history_version_properties")),
     ("document:Publish FeatureScript…", Op("history_publish")),
