@@ -168,23 +168,34 @@ pub fn copy_workspace(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) 
     });
 }
 
-/// ☰ › Workspace properties…: the workspace's (branch's) name and
-/// description.
-pub fn workspace_properties(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
-    let (branch, name, desc) = {
-        let s = &doc.read(cx).session;
-        let name = s.store.branch(s.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into());
-        let desc = s.store.get_meta(&format!("workspace_description:{}", s.branch.0)).ok().flatten().map(|b| String::from_utf8_lossy(&b).to_string()).unwrap_or_default();
-        (s.branch, name, desc)
+/// ☰ › Copy version… (a window on a version): a new document holding the
+/// version's state, opened.
+pub fn copy_version(doc: Entity<DocModel>, mv: noshape_store::MicroversionId, window: &mut Window, cx: &mut App) {
+    let (path, name) = {
+        let d = doc.read(cx);
+        (d.session.path.clone(), d.name())
     };
-    name_modal("Workspace properties", "Save", name, Some(desc), window, cx, move |name, desc, _, cx| {
-        let r = doc.update(cx, |d, _| -> anyhow::Result<()> {
-            d.session.store.rename_branch(branch, &name)?;
-            d.session.store.set_meta(&format!("workspace_description:{}", branch.0), desc.as_deref().map(str::as_bytes))?;
-            Ok(())
-        });
-        report(&doc, r, cx)
+    name_modal("Copy version", "Copy", format!("Copy of {name}"), None, window, cx, move |new_name, _, _, cx| match crate::start_library::copy_version_named(&path, mv, &new_name) {
+        Ok(dest) => {
+            let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
+            if let Err(e) = crate::files::open_document_window(dest, None, gpu, cx) {
+                doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
+            }
+            true
+        }
+        Err(e) => {
+            doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
+            false
+        }
     });
+}
+
+/// ☰ › Workspace properties…: the workspace's metadata modal, as the
+/// Versions and history panel's Properties… on the workspace row (live
+/// navbar-version-v1: the same edit-current-workspace-properties command).
+pub fn workspace_properties(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
+    let branch = doc.read(cx).session.branch;
+    noshape_history_ui::version_properties::open(doc, noshape_history_ui::version_properties::Item::Workspace(branch), window, cx);
 }
 
 /// ☰ › Move to…: the folder browser; the document closes, moves and reopens.

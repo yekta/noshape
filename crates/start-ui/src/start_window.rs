@@ -1984,6 +1984,25 @@ impl StartView {
             }
             _ => Vec::new(),
         };
+        // A search (typed or advanced; live documents/130-135): "Search
+        // results in" and the place in blue / 600 replace the header.
+        if !self.query.trim().is_empty() || self.adv_query.is_some() {
+            let place = match &self.source {
+                Source::Folder(f) => folder_label(f),
+                _ => root,
+            };
+            return h_flex()
+                .h(px(52.))
+                .flex_none()
+                .pl(px(20.))
+                .gap(px(5.))
+                .text_size(px(16.))
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(pal.text)
+                .child("Search results in")
+                .child(div().font_weight(FontWeight::SEMIBOLD).text_color(pal.accent).child(place))
+                .into_any_element();
+        }
         let in_folder = !crumbs.is_empty();
         let mut row = h_flex()
             .h(px(52.))
@@ -2737,11 +2756,9 @@ impl StartView {
         let searching = !self.query.trim().is_empty();
         let text: AnyElement = if !self.loaded {
             "Loading documents…".into_any_element()
-        } else if searching {
-            format!("No documents match \"{}\".", self.query.trim()).into_any_element()
-        } else if self.adv_query.is_some() {
-            // An advanced search with no results (exact Onshape wording requested).
-            "No documents match your search.".into_any_element()
+        } else if searching || self.adv_query.is_some() {
+            // Live documents/131: two centred lines.
+            div().max_w(px(560.)).text_center().child("No results found that match this search. Try other search terms or refine the search by clicking the arrow in the search box.").into_any_element()
         } else {
             match &self.source {
                 // Live documents/91: the Create / Learning Center line.

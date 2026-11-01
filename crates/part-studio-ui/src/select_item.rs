@@ -1004,6 +1004,8 @@ impl SelectItemPanel {
                 .child(div().id("sel-doc-filters").w(px(32.)).h(px(30.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph("filter", 20., blue)).tooltip(crate::ui::tooltip("Show advanced search options")))
                 .child(
                     div()
+                        .id("sel-doc-url")
+                        .tooltip(crate::ui::tooltip("Type and press enter to search"))
                         .ml(px(6.))
                         .flex_1()
                         .relative()

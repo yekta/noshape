@@ -16,4 +16,4 @@ pub mod compare_mode;
 pub mod history_hooks;
 pub mod history_panel;
 mod merge_dialog;
-mod version_properties;
+pub mod version_properties;

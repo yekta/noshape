@@ -613,6 +613,12 @@ impl Workspace {
     fn render_doc_menu(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let ws = cx.entity();
         let view_only = self.doc.read(cx).session.view_only;
+        // A window on a version (live navbar-version-v1): the workspace's
+        // items give way to Copy version… and Version properties….
+        let at_version = {
+            let s = &self.doc.read(cx).session;
+            s.viewing.map(|mv| (mv, s.store.list_versions().ok().and_then(|vs| vs.into_iter().find(|v| v.microversion == mv)).map(|v| v.id)))
+        };
         Button::new("doc-menu")
             .custom(navbar_variant(cx))
             // Live: the ☰ ink spans y 13–27.
@@ -630,6 +636,24 @@ impl Workspace {
                 let (d1, d2, d3, d4, d5, d6, d7, d8) = (doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone());
                 let (w, w2) = (ws.clone(), ws.clone());
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                    if let Some((mv, version)) = at_version {
+                        let m = m
+                            .dropdown()
+                            .item(I::new("Rename document").on_click(move |_, wi, cx| dd::rename_document(d1.clone(), wi, cx)))
+                            .item(I::new("Move to…").on_click(move |_, wi, cx| dd::move_to(d2.clone(), wi, cx)))
+                            .item(I::new("Restore deleted workspaces…").on_click(move |_, wi, cx| dd::restore_deleted_workspaces(d4.clone(), wi, cx)))
+                            .separator()
+                            .item(I::new("Copy version…").on_click(move |_, wi, cx| dd::copy_version(d5.clone(), mv, wi, cx)));
+                        let m = match version {
+                            Some(id) => m.item(I::new("Version properties…").on_click(move |_, wi, cx| noshape_history_ui::version_properties::open(d7.clone(), noshape_history_ui::version_properties::Item::Version(id), wi, cx))),
+                            None => m,
+                        };
+                        return m
+                            .separator()
+                            .item(I::new("Print…").on_click(move |_, _, cx| w2.update(cx, |t, cx| t.print_active(cx))))
+                            .separator()
+                            .item(I::new("Close document").on_click(|_, wi, _| wi.remove_window()));
+                    }
                     m.dropdown()
                         .item(I::new("Rename document").on_click(move |_, wi, cx| dd::rename_document(d1.clone(), wi, cx)))
                         .item(I::new("Move to…").on_click(move |_, wi, cx| dd::move_to(d2.clone(), wi, cx)))

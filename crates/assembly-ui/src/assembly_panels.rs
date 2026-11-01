@@ -4368,9 +4368,11 @@ impl AssemblyView {
                 .h(px(39.))
                 .pt(px(6.))
                 .px(px(6.))
-                .child(div().w(px(32.)).h(px(30.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph("filter", 20., if searching { blue } else { rgb(0x666666) })))
+                .child(div().id("ins-doc-filters").w(px(32.)).h(px(30.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph("filter", 20., if searching { blue } else { rgb(0x666666) })).tooltip(crate::ui::tooltip("Show advanced search options")))
                 .child(
                     div()
+                        .id("ins-doc-url")
+                        .tooltip(crate::ui::tooltip("Type and press enter to search"))
                         .ml(px(6.))
                         .flex_1()
                         .h(px(30.))

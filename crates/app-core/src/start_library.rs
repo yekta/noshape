@@ -422,6 +422,22 @@ pub fn copy_document_named(path: &Path, name: &str) -> anyhow::Result<PathBuf> {
     Ok(dest)
 }
 
+/// A new document under `name` next to `path` holding the document as it
+/// was at `mv` (☰ › Copy version… on a version: the copy starts its own
+/// history at that state).
+pub fn copy_version_named(path: &Path, mv: noshape_store::MicroversionId, name: &str) -> anyhow::Result<PathBuf> {
+    let dir = path.parent().context("document has no folder")?;
+    let clean = sanitize_name(name);
+    if clean.is_empty() {
+        bail!("Enter a name");
+    }
+    let dest = unique_path(dir, &clean);
+    let blobs: Vec<(String, Vec<u8>)> = noshape_store::Document::open_read_only(path)?.read_all(mv)?.into_iter().collect();
+    let mut copy = noshape_store::Document::create(&dest, &blobs)?;
+    copy.set_name(name.trim())?;
+    Ok(dest)
+}
+
 /// Onshape's time stamps (live documents list and versions panel): "1:15 PM
 /// Today", "9:02 AM Yesterday", "Oct 12", "Oct 12, 2024", in local time.
 pub fn format_onshape_time(ms: i64) -> String {
@@ -448,6 +464,26 @@ mod tests {
         let now = to_ms(SystemTime::now());
         assert!(format_onshape_time(now).ends_with(" Today"));
         assert!(format_onshape_time(now - 400 * 86_400_000).contains(", "));
+    }
+
+    /// ☰ › Copy version…: the copy holds the version's state, not the workspace's.
+    #[test]
+    fn copy_version_holds_the_versions_state() {
+        let dir = std::env::temp_dir().join(format!("noshape-copy-version-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("doc.noshape");
+        let mut store = noshape_store::Document::create(&path, &[("a", b"one")]).unwrap();
+        let branch = store.default_branch().unwrap();
+        let v1 = store.head(branch).unwrap();
+        store.commit(branch, &[("a", Some(b"two"))], "edit").unwrap();
+        drop(store);
+        let dest = copy_version_named(&path, v1, "At V1").unwrap();
+        let copy = noshape_store::Document::open_read_only(&dest).unwrap();
+        let head = copy.head(copy.default_branch().unwrap()).unwrap();
+        assert_eq!(copy.read(head, "a").unwrap().as_deref(), Some(&b"one"[..]));
+        assert_eq!(dest.file_stem().unwrap(), "At V1");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
 
