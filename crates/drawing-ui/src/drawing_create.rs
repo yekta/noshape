@@ -70,6 +70,25 @@ pub struct DwtTab {
 
 /// "Created by me" in [`SOURCES`].
 const CREATED_BY_ME: usize = 3;
+/// "Recently opened" in [`SOURCES`].
+const RECENT: usize = 2;
+
+/// The templates of the drawings created here, most recent first (live 1706:
+/// the dialog opens on Recently opened, ordered that way, its top row
+/// selected). Kept in the config dir as one file name per line.
+fn recent_templates() -> Vec<String> {
+    std::fs::read_to_string(crate::paths::config_dir().join("recent_drawing_templates.txt")).map(|s| s.lines().map(str::to_string).filter(|l| !l.is_empty()).collect()).unwrap_or_default()
+}
+
+fn remember_template(file: &str) {
+    let mut list = recent_templates();
+    list.retain(|f| f != file);
+    list.insert(0, file.to_string());
+    list.truncate(20);
+    let dir = crate::paths::config_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    let _ = std::fs::write(dir.join("recent_drawing_templates.txt"), list.join("\n") + "\n");
+}
 
 pub struct CreateDrawingDialog {
     source: Option<DrawingSource>,
@@ -79,6 +98,8 @@ pub struct CreateDrawingDialog {
     rows: Vec<TemplateRow>,
     /// Template source (index into [`SOURCES`]; 0 = the built-in templates, "noshape").
     source_filter: usize,
+    /// Recently opened: indices into `rows`, most recent first.
+    recent: Vec<usize>,
     /// Standard filter: "All", "ANSI", "ISO", "JIS".
     standard: &'static str,
     selected: usize,
@@ -119,15 +140,21 @@ impl CreateDrawingDialog {
     pub fn new(req: CreateRequest, default_name: String, metric: bool, dwts: Vec<DwtTab>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let name = cx.new(|cx| InputState::new(window, cx).default_value(default_name));
         let rows = template_rows();
-        // Live drawing/01, qa5 D1: ANSI_A_INCH.dwt whatever the units.
-        let selected = rows.iter().position(|r| r.file == "ANSI_A_INCH.dwt").unwrap_or(0);
+        // Live 1706: Recently opened with the last used template on top and
+        // selected; before any drawing (no history), the built-in list with
+        // ANSI_A_INCH.dwt whatever the units (live drawing/01, qa5 D1).
+        let recent: Vec<usize> = recent_templates().iter().filter_map(|f| rows.iter().position(|r| r.file == f)).collect();
+        let source_filter = if recent.is_empty() { 0 } else { RECENT };
+        let selected = recent.first().copied().unwrap_or_else(|| rows.iter().position(|r| r.file == "ANSI_A_INCH.dwt").unwrap_or(0));
+        let scroll_to = if recent.is_empty() { selected } else { 0 };
         Self {
             source: req.source,
             dwts,
             selected_dwt: None,
             name,
             rows,
-            source_filter: 0,
+            source_filter,
+            recent,
             standard: "All",
             selected,
             custom: false,
@@ -138,7 +165,7 @@ impl CreateDrawingDialog {
             list_scroll: {
                 // Item 0 is the header row.
                 let h = ScrollHandle::new();
-                h.scroll_to_item(selected + 1);
+                h.scroll_to_item(scroll_to + 1);
                 h
             },
         }
@@ -160,14 +187,21 @@ impl CreateDrawingDialog {
         if !self.custom && self.source_filter == CREATED_BY_ME && dwt.is_none() {
             return;
         }
+        if !self.custom && dwt.is_none()
+            && let Some(r) = self.rows.get(self.selected)
+        {
+            remember_template(r.file);
+        }
         cx.emit(CreateDrawingEvent::Create { name, template, source: self.source.clone(), suggested, dwt });
     }
 
     fn visible_rows(&self) -> Vec<usize> {
-        if self.source_filter != 0 {
-            return Vec::new();
-        }
-        (0..self.rows.len()).filter(|i| self.standard == "All" || self.rows[*i].standard == self.standard).collect()
+        let all: Vec<usize> = match self.source_filter {
+            0 => (0..self.rows.len()).collect(),
+            RECENT => self.recent.clone(),
+            _ => Vec::new(),
+        };
+        all.into_iter().filter(|i| self.standard == "All" || self.rows[*i].standard == self.standard).collect()
     }
 
     fn render_existing(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -294,6 +328,10 @@ impl CreateDrawingDialog {
                                 .child(*label)
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     this.source_filter = i;
+                                    // Live 1706: another list selects its first row.
+                                    if let Some(&first) = this.visible_rows().first() {
+                                        this.selected = first;
+                                    }
                                     cx.notify();
                                 })),
                         );

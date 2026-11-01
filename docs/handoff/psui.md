@@ -5,6 +5,9 @@ Scratch: /root/psui-scratch (check2.sh = clippy + covering tests + T0, detached;
 document with noshape-cli; ink.py measures plane-name ink boxes). Live: my own tab is the old ui tab
 (`UI=1 node r.mjs …` in /root/live-pw, target id in /root/ui-scratch/live/.ui-tab); captures in onshape-research/live/psui/.
 Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079` (planes then sit on live's pixels).
+**Builds and tests run on vibe4 since 11-01 (user; docs/TESTS.md):** `tools/tiers/rb.sh cargo test -p <crate>`; for GUI
+checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
+/root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
 ## From dx (10-30, lead's decision)
 
@@ -335,7 +338,7 @@ that touches the model: ~12 min.
 N11. (11-01 04:54) Drawing sheets taken from dx (user 11-01): docs/parity/workflow-drawing.md and
      workflow-drawing-sheet-metal.md. dx keeps drawing.md and the import sheets; notes to dx in docs/handoff/dx.md
      "From psui". workflow-drawing.md: every row re-checked or carried with evidence; the scale lists are live's
-     (model-data drawing::sheet::SCALE_LIST). Open: Create Drawing's option / template memory (live request 04:40).
+     (model-data drawing::sheet::SCALE_LIST); Create Drawing's memory as live 1706 (Recently opened, MRU).
      workflow-drawing-sheet-metal.md: every row re-checked on :102 (smf copy), all ✅ or withdrawn.
 
 N10. (11-01 01:13) Unchecked rows (user 11-01): keyboard-mouse a / q / k, Ctrl+M, w and the empty Verified cells done;

@@ -2960,9 +2960,12 @@ impl PartStudioView {
             _ => None,
         };
         let sketch_pl = sketch_curve.filter(|pl| pl.len() >= 2 && pl[0].distance(pl[pl.len() - 1]) > 1e-9);
+        // A closed part edge (a hole's rim, a cylinder's top circle) has no
+        // ends and so no midpoint: live 1698 draws no marker on it and a click
+        // picks the edge.
         sketch_pl.into_iter().chain(self.display.bodies.iter().filter_map(|b| {
             let ei = b.edge_refs.iter().position(|x| x == r)?;
-            Some(b.mesh.edges.get(ei)?.iter().map(|p| p3(*p)).collect::<Vec<glam::DVec3>>())
+            Some(b.mesh.edges.get(ei)?.iter().map(|p| p3(*p)).collect::<Vec<glam::DVec3>>()).filter(|pl| has_ends(pl))
         })).find_map(|pl| {
             let total: f64 = pl.windows(2).map(|w| w[0].distance(w[1])).sum();
             let mut acc = 0.0;
@@ -4157,5 +4160,30 @@ mod autoscroll_tests {
         for y in [450.0, B - 100.0, B - 150.0, T + 100.0] {
             assert_eq!(v(y, T, B), 0.0, "y {y}");
         }
+    }
+}
+
+/// Whether an edge's polyline has two ends (a closed edge's starts and ends
+/// at its seam, within the polyline's float rounding).
+fn has_ends(pl: &[glam::DVec3]) -> bool {
+    let len: f64 = pl.windows(2).map(|w| w[0].distance(w[1])).sum();
+    pl.len() >= 2 && pl[0].distance(pl[pl.len() - 1]) > len * 1e-4
+}
+
+#[cfg(test)]
+mod edge_end_tests {
+    use glam::DVec3;
+
+    /// Live 1698: a circle (closed) has no midpoint; a line and an arc do.
+    #[test]
+    fn closed_edges_have_no_ends() {
+        let circle: Vec<DVec3> = (0..=64).map(|i| {
+            let a = i as f64 / 64.0 * std::f64::consts::TAU;
+            // f32 rounding as in the display mesh.
+            DVec3::new((9.0 * a.cos()) as f32 as f64, (9.0 * a.sin()) as f32 as f64, 10.0)
+        }).collect();
+        assert!(!super::has_ends(&circle));
+        assert!(super::has_ends(&[DVec3::ZERO, DVec3::new(60.0, 0.0, 0.0)]));
+        assert!(super::has_ends(&circle[..33]));
     }
 }

@@ -28,6 +28,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - (11-01) Scale lists: Insert view, View properties and Sheet properties use live's 30 values (1:1 … 1:100, then
   2:1 … 100:1; model-data `drawing::sheet::SCALE_LIST`), Insert view starts with "<scale> (Sheet)" once the sheet
   has a scale (live spec "drawing Insert view panel for an ASSEMBLY"). The Detail view's own list is unchanged.
+- (11-01) Create Drawing (drawing_create.rs): opens on Recently opened with the last used template on top and
+  selected (live 1706; MRU kept in <config>/recent_drawing_templates.txt, written on OK), else as before; another
+  list selects its first row.
 
 ## From core (10-31 04:50): noshape's own fillets are on by default
 - Kernel fillets / chamfers on simple edges are now noshape's (NOSHAPE_BLEND_RUST=0: OCCT's). Same faces, counts and
