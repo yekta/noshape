@@ -1,0 +1,214 @@
+# One OS's CI (called by ci.yml for Linux, macOS and Windows): OpenCascade, then the tests and the release build side by
+# side. Each OS runs its own chain, so no OS waits on another's OCCT build.
+name: CI (one OS)
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        type: string
+        required: true
+      exe:
+        type: string
+        required: true
+      ref:
+        description: The commit to check out ('' = the event's)
+        type: string
+        default: ''
+      tier:
+        description: t1 or t2
+        type: string
+        default: t1
+      save-caches:
+        description: Save the rust and compiler caches (main)
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+  NOSHAPE_SAVE_CACHES: ${{ inputs.save-caches }}
+
+jobs:
+  # OpenCascade (restored when this patch set was built before, else built through ccache), for the jobs below, which
+  # restore it in seconds.
+  occt:
+    name: OCCT
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Build tools
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            # OCCT's Visualization module includes X11's headers.
+            Linux) sudo apt-get update -q && sudo apt-get install -y --no-install-recommends ninja-build libx11-dev ;;
+            macOS) command -v ninja || brew install ninja ;;
+          esac
+
+      - name: MSVC developer environment (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
+          }
+
+      - name: OpenCascade
+        uses: ./.github/actions/setup-occt
+
+      - name: openNURBS (Rhino export)
+        uses: ./.github/actions/setup-opennurbs
+
+  # T1 (or T2) and clippy. Beside `release`, not after it: the OS's wall time is OCCT + the slower of the two.
+  test:
+    name: Test
+    needs: occt
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev \
+            libx11-dev libx11-xcb-dev libxcb1-dev libxi-dev libxcursor-dev libxrandr-dev \
+            libfontconfig-dev libfreetype-dev libssl-dev libzstd-dev libasound2-dev \
+            mesa-vulkan-drivers # lavapipe: a software Vulkan adapter, so the offscreen render tests run without a GPU
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # GPUI compiles its Metal shaders at build time (xcrun metal).
+          xcrun -f metal || xcodebuild -downloadComponent MetalToolchain
+
+      - name: MSVC developer environment (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Load vcvars64 into the job environment (cl, link, INCLUDE, LIB...).
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
+          }
+
+      - name: OpenCascade
+        uses: ./.github/actions/setup-occt
+
+      - name: openNURBS (Rhino export)
+        uses: ./.github/actions/setup-opennurbs
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: occt-V8_0_1
+          save-if: ${{ env.NOSHAPE_SAVE_CACHES == 'true' }}
+
+      # Windows runs the tiers in PowerShell: in Git Bash, /usr/bin/link shadows MSVC's link.exe and every build script
+      # fails to link (10-27).
+      - name: Test (T1 core)
+        if: inputs.tier == 't1' && runner.os != 'Windows'
+        shell: bash
+        run: tools/tiers/t1.sh --locked --no-fail-fast
+
+      - name: Test (T1 core, Windows)
+        if: inputs.tier == 't1' && runner.os == 'Windows'
+        shell: pwsh
+        run: cargo test --locked --workspace --no-fail-fast
+
+      - name: Test (T2 deep; never blocks)
+        if: inputs.tier == 't2' && runner.os != 'Windows'
+        continue-on-error: true
+        shell: bash
+        run: tools/tiers/t2.sh --locked
+
+      - name: Test (T2 deep, Windows; never blocks)
+        if: inputs.tier == 't2' && runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $names = python tools/tiers/t2-names.py .
+          cargo test --locked --workspace --no-fail-fast -- --ignored --exact @names
+
+      # The whole workspace (app included, tests included) must be warning-free.
+      - name: Clippy (-D warnings)
+        if: runner.os == 'Linux'
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+
+  # The release build of the app and the CLI as a compile check (release-only code, the artifact): without LTO and with
+  # parallel codegen, so it takes minutes, not the shipped binary's 30-45 (release.yml builds that, as shipped).
+  release:
+    name: Release build
+    needs: occt
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 240
+    env:
+      CARGO_PROFILE_RELEASE_LTO: 'false'
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev \
+            libx11-dev libx11-xcb-dev libxcb1-dev libxi-dev libxcursor-dev libxrandr-dev \
+            libfontconfig-dev libfreetype-dev libssl-dev libzstd-dev libasound2-dev
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: xcrun -f metal || xcodebuild -downloadComponent MetalToolchain
+
+      - name: MSVC developer environment (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
+          }
+
+      - name: OpenCascade
+        uses: ./.github/actions/setup-occt
+
+      - name: openNURBS (Rhino export)
+        uses: ./.github/actions/setup-opennurbs
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: occt-V8_0_1
+          save-if: ${{ env.NOSHAPE_SAVE_CACHES == 'true' }}
+
+      - name: Build (release)
+        run: cargo build --release --locked -p noshape -p noshape-cli
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: noshape-${{ runner.os }}-${{ runner.arch }}
+          path: target/release/${{ inputs.exe }}
+          if-no-files-found: error

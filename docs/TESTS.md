@@ -55,6 +55,16 @@ tools/tiers/rb.sh --get noshape cargo build -p noshape   # then run $CARGO_TARGE
 ```
 Heavy jobs (replay corpora, long probes, sweeps) run there too: vibe4 has 62 GB of memory and 400 GB of disk.
 
+## CI on GitHub (`ci.yml`, cliapp 11-01)
+
+`ci.yml` runs one chain per OS (`ci-os.yml`): **OCCT** (the install of this exact patch set restored in under a
+minute; else built through ccache whose cache falls back to the previous patch set's, so a patch change rebuilds in
+1-3 minutes, not 22-43), then **Test** (T1 or T2, clippy on Linux) and **Release build** (a compile check without LTO;
+release.yml builds the shipped binary) side by side. The big caches (rust-cache, OCCT's ccache) are saved from main
+only and `prune-caches` keeps one of each kind, so the 10 GB cache quota holds; branches and tags restore main's. To
+measure warm runs on a branch: `gh workflow run ci.yml --ref <branch> -f save_caches=true` (delete the branch's
+caches afterwards: `gh cache list --ref refs/heads/<branch>`).
+
 ## T0 smoke
 
 - Builds the app (`-p noshape`) and the CLI.

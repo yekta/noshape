@@ -84,9 +84,11 @@ jobs:
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      # Read only: a tag's cache could never be read again, and the quota keeps main's (ci.yml).
       - uses: Swatinem/rust-cache@v2
         with:
           key: occt-V8_0_1
+          save-if: false
 
       - name: Build (release)
         # The app (which is also the CLI and the MCP server: `noshape mcp`), the headless CLI for servers, and (Windows)

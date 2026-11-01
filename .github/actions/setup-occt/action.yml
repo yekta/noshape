@@ -1,9 +1,13 @@
 name: Set up OCCT
 description: >
-  Restores a cached static, headless OpenCascade install (or builds it with
-  scripts/build-occt.sh / scripts/build-occt.ps1 and saves it to the cache
-  right away), then exports OCCT_ROOT. On Windows the MSVC developer
-  environment must already be active (ilammy/msvc-dev-cmd).
+  Restores the static, headless OpenCascade install built from exactly this
+  patch set (the fast path), or builds it with scripts/build-occt.sh /
+  scripts/build-occt.ps1 through ccache, whose cache falls back to the newest
+  one of an earlier patch set, so a patch change recompiles only the files it
+  touches. Saves the install (small) right away; the compiler cache (large)
+  only when the workflow sets NOSHAPE_SAVE_CACHES=true (main, or a dispatch
+  that asks for it). Exports OCCT_ROOT. On Windows the MSVC developer
+  environment must already be active.
 inputs:
   occt-tag:
     description: OCCT git tag to build
@@ -12,6 +16,9 @@ outputs:
   occt-root:
     description: OCCT install prefix
     value: ${{ steps.paths.outputs.prefix }}
+  built:
+    description: "'true' when this run built OCCT (no install of this patch set was cached)"
+    value: ${{ steps.cache.outputs.cache-hit != 'true' }}
 runs:
   using: composite
   steps:
@@ -24,6 +31,8 @@ runs:
         if [ "$RUNNER_OS" = "Windows" ]; then tmp="$(cygpath -m "$tmp")"; fi
         echo "prefix=$tmp/occt-${{ inputs.occt-tag }}" >> "$GITHUB_OUTPUT"
         echo "work=$tmp/ob" >> "$GITHUB_OUTPUT"
+        echo "ccache=$tmp/occt-ccache" >> "$GITHUB_OUTPUT"
+        echo "patches=${{ hashFiles('patches/occt/**') }}" >> "$GITHUB_OUTPUT"
 
     - name: Restore OCCT cache
       id: cache
@@ -32,13 +41,53 @@ runs:
         path: ${{ steps.paths.outputs.prefix }}
         key: occt-${{ runner.os }}-${{ runner.arch }}-${{ inputs.occt-tag }}-${{ hashFiles(runner.os == 'Windows' && 'scripts/build-occt.ps1' || 'scripts/build-occt.sh', 'patches/occt/**') }}
 
+    # ----------------------------------------------- a build: through ccache
+    - name: Install ccache (Linux)
+      if: steps.cache.outputs.cache-hit != 'true' && runner.os == 'Linux'
+      shell: bash
+      run: command -v ccache || { sudo apt-get update -q && sudo apt-get install -y --no-install-recommends ccache; }
+
+    - name: Install ccache (macOS)
+      if: steps.cache.outputs.cache-hit != 'true' && runner.os == 'macOS'
+      shell: bash
+      run: command -v ccache || brew install ccache
+
+    - name: Install ccache (Windows)
+      if: steps.cache.outputs.cache-hit != 'true' && runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $v = '4.14.2'
+        $zip = "$env:RUNNER_TEMP\ccache.zip"
+        Invoke-WebRequest "https://github.com/ccache/ccache/releases/download/v$v/ccache-$v-windows-x86_64.zip" -OutFile $zip
+        if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne '6993CE645E53192CEC592EE23186200B574AC4C59097ECDE8D9CFD681B47AE84') { throw 'ccache download checksum mismatch' }
+        Expand-Archive $zip -DestinationPath "$env:RUNNER_TEMP\ccache-bin"
+        "$env:RUNNER_TEMP\ccache-bin\ccache-$v-windows-x86_64" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+    # The newest compiler cache of this patch set, else of any earlier one (most objects still match).
+    - name: Restore the compiler cache
+      if: steps.cache.outputs.cache-hit != 'true'
+      id: ccache
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ steps.paths.outputs.ccache }}
+        key: occt-ccache-${{ runner.os }}-${{ runner.arch }}-${{ inputs.occt-tag }}-${{ steps.paths.outputs.patches }}
+        restore-keys: occt-ccache-${{ runner.os }}-${{ runner.arch }}-${{ inputs.occt-tag }}-
+
     - name: Build OCCT (Linux/macOS)
       if: steps.cache.outputs.cache-hit != 'true' && runner.os != 'Windows'
       shell: bash
       env:
         OCCT_TAG: ${{ inputs.occt-tag }}
         OCCT_WORK: ${{ steps.paths.outputs.work }}
-      run: scripts/build-occt.sh "${{ steps.paths.outputs.prefix }}"
+        OCCT_COMPILER_LAUNCHER: ccache
+        CCACHE_DIR: ${{ steps.paths.outputs.ccache }}
+        CCACHE_MAXSIZE: 700M
+        # Patched files are new on disk; their content decides, not their time.
+        CCACHE_SLOPPINESS: include_file_mtime,include_file_ctime,time_macros
+      run: |
+        ccache -z
+        scripts/build-occt.sh "${{ steps.paths.outputs.prefix }}"
+        ccache -s
 
     - name: Build OCCT (Windows)
       if: steps.cache.outputs.cache-hit != 'true' && runner.os == 'Windows'
@@ -46,16 +95,32 @@ runs:
       env:
         OCCT_TAG: ${{ inputs.occt-tag }}
         OCCT_WORK: ${{ steps.paths.outputs.work }}
-      run: scripts/build-occt.ps1 "${{ steps.paths.outputs.prefix }}"
+        OCCT_COMPILER_LAUNCHER: ccache
+        CCACHE_DIR: ${{ steps.paths.outputs.ccache }}
+        CCACHE_MAXSIZE: 700M
+        CCACHE_SLOPPINESS: include_file_mtime,include_file_ctime,time_macros
+      run: |
+        ccache -z
+        scripts/build-occt.ps1 "${{ steps.paths.outputs.prefix }}"
+        ccache -s
 
-    # Save immediately (not in a post step) so a later cargo failure does not
-    # throw away a 30-60 minute OCCT build.
+    # Save the install at once (not in a post step) so a later cargo failure doesn't throw the build away. It is small
+    # (40-130 MB), so any run may save it; the next jobs of this run restore it.
     - name: Save OCCT cache
       if: steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v6
       with:
         path: ${{ steps.paths.outputs.prefix }}
         key: ${{ steps.cache.outputs.cache-primary-key }}
+
+    # The compiler cache (up to 700 MB) only from main (NOSHAPE_SAVE_CACHES): other refs read main's, so the 10 GB
+    # quota holds one per OS.
+    - name: Save the compiler cache
+      if: steps.cache.outputs.cache-hit != 'true' && env.NOSHAPE_SAVE_CACHES == 'true' && steps.ccache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ steps.paths.outputs.ccache }}
+        key: ${{ steps.ccache.outputs.cache-primary-key }}
 
     - name: Export OCCT_ROOT
       shell: bash

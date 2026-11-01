@@ -91,7 +91,9 @@ runs:
       if: inputs.ref != ''
       with:
         workspaces: src
+        # Read only (cache quota: main's caches, ci.yml).
         key: occt-V8_0_1
+        save-if: false
 
     # PowerShell on Windows: under bash, Git's coreutils `link` shadows MSVC's link.exe.
     - name: Build (release, Windows)

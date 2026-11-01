@@ -19,6 +19,10 @@ on:
         type: choice
         options: [t1, t2]
         default: t1
+      save_caches:
+        description: 'Save the rust and compiler caches as main does (to measure warm runs on a branch)'
+        type: boolean
+        default: false
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -42,109 +46,51 @@ jobs:
           bad=$(git log --format='%H %B' | grep -iE 'co-authored-by:.*(claude|anthropic)|generated with \[?claude code' || true)
           if [ -n "$bad" ]; then echo "$bad"; echo "::error::AI attribution lines in commit messages"; exit 1; fi
 
-  build:
-    name: ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 240
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Linux x86_64
-            os: ubuntu-24.04 # validated image; ubuntu-latest moves to 26.04 from 2026-10-19
-            exe: noshape
-          - name: macOS arm64
-            os: macos-latest
-            exe: noshape
-          - name: Windows x86_64 (MSVC)
-            os: windows-latest
-            exe: noshape.exe
+  # Each OS's chain (ci-os.yml). Scheduled T1 runs test the current last-green (the watcher's newest green main commit).
+  linux:
+    name: Linux x86_64
+    uses: ./.github/workflows/ci-os.yml
+    with:
+      os: ubuntu-24.04 # validated image; ubuntu-latest moves to 26.04 from 2026-10-19
+      exe: noshape
+      ref: ${{ github.event.schedule == '17 */3 * * *' && 'refs/tags/last-green' || '' }}
+      tier: ${{ (github.event.schedule == '0 2 * * 0' || inputs.tier == 't2') && 't2' || 't1' }}
+      save-caches: ${{ github.ref == 'refs/heads/main' || inputs.save_caches == true }}
+
+  macos:
+    name: macOS arm64
+    uses: ./.github/workflows/ci-os.yml
+    with:
+      os: macos-latest
+      exe: noshape
+      ref: ${{ github.event.schedule == '17 */3 * * *' && 'refs/tags/last-green' || '' }}
+      tier: ${{ (github.event.schedule == '0 2 * * 0' || inputs.tier == 't2') && 't2' || 't1' }}
+      save-caches: ${{ github.ref == 'refs/heads/main' || inputs.save_caches == true }}
+
+  windows:
+    name: Windows x86_64 (MSVC)
+    uses: ./.github/workflows/ci-os.yml
+    with:
+      os: windows-latest
+      exe: noshape.exe
+      ref: ${{ github.event.schedule == '17 */3 * * *' && 'refs/tags/last-green' || '' }}
+      tier: ${{ (github.event.schedule == '0 2 * * 0' || inputs.tier == 't2') && 't2' || 't1' }}
+      save-caches: ${{ github.ref == 'refs/heads/main' || inputs.save_caches == true }}
+
+  # Main keeps one cache of each kind per OS: older ones it replaced, and release tags' (never reused), are deleted.
+  prune-caches:
+    name: Prune caches
+    needs: [linux, macos, windows]
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
-          # Scheduled T1 runs test the current last-green (the watcher's newest green main commit).
-          ref: ${{ github.event.schedule == '17 */3 * * *' && 'refs/tags/last-green' || '' }}
-
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build pkg-config \
-            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev \
-            libx11-dev libx11-xcb-dev libxcb1-dev libxi-dev libxcursor-dev libxrandr-dev \
-            libfontconfig-dev libfreetype-dev libssl-dev libzstd-dev libasound2-dev \
-            mesa-vulkan-drivers # lavapipe: a software Vulkan adapter, so the offscreen render tests run without a GPU
-
-      - name: Install system dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install ninja || true
-          # GPUI compiles its Metal shaders at build time (xcrun metal).
-          xcrun -f metal || xcodebuild -downloadComponent MetalToolchain
-
-      - name: MSVC developer environment (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          # Load vcvars64 into the job environment (cl, link, INCLUDE, LIB...).
-          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-          cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object {
-            if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
-          }
-
-      - name: OpenCascade
-        uses: ./.github/actions/setup-occt
-
-      - name: openNURBS (Rhino export)
-        uses: ./.github/actions/setup-opennurbs
-
-      - name: Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: occt-V8_0_1
-
-      - name: Build (release)
-        run: cargo build --release --locked -p noshape
-
-      - name: Upload binary
-        uses: actions/upload-artifact@v7
-        with:
-          name: noshape-${{ runner.os }}-${{ runner.arch }}
-          path: target/release/${{ matrix.exe }}
-          if-no-files-found: error
-
-      # Windows runs the tiers in PowerShell: in Git Bash, /usr/bin/link shadows MSVC's link.exe and every build script
-      # fails to link (10-27).
-      - name: Test (T1 core)
-        if: github.event.schedule != '0 2 * * 0' && inputs.tier != 't2' && runner.os != 'Windows'
-        shell: bash
-        run: tools/tiers/t1.sh --locked --no-fail-fast
-
-      - name: Test (T1 core, Windows)
-        if: github.event.schedule != '0 2 * * 0' && inputs.tier != 't2' && runner.os == 'Windows'
-        shell: pwsh
-        run: cargo test --locked --workspace --no-fail-fast
-
-      - name: Test (T2 deep; never blocks)
-        if: (github.event.schedule == '0 2 * * 0' || inputs.tier == 't2') && runner.os != 'Windows'
-        continue-on-error: true
-        shell: bash
-        run: tools/tiers/t2.sh --locked
-
-      - name: Test (T2 deep, Windows; never blocks)
-        if: (github.event.schedule == '0 2 * * 0' || inputs.tier == 't2') && runner.os == 'Windows'
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $names = python tools/tiers/t2-names.py .
-          cargo test --locked --workspace --no-fail-fast -- --ignored --exact @names
-
-      # The whole workspace (app included, tests included) must be warning-free.
-      - name: Clippy (-D warnings)
-        if: runner.os == 'Linux'
-        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+          sparse-checkout: .github/ci
+      - name: Delete superseded caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/ci/prune_caches.py
