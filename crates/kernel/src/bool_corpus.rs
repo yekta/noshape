@@ -162,7 +162,19 @@ pub fn record(dir: &Path, op: BooleanOp, objects: &[Shape], tools: &[Shape], opt
     let t = std::time::Instant::now();
     let r = run();
     let ms = t.elapsed().as_secs_f64() * 1e3;
-    let Ok(res) = &r else { return r };
+    let Ok(res) = &r else {
+        // (wip: a failed call's inputs too.)
+        let _ = std::fs::create_dir_all(dir);
+        if std::fs::write(dir.join(format!("{name}.brep")), &bytes).is_ok() {
+            let text = format!(
+                "op {}\nfuzzy {:e}\nglue {}\nunify {}\nparallel {}\nobb {}\nobjects {}\ntools {}\ntarget_faces {}\nvalid 0\nvolume 0\nfaces 0\nedges 0\nvertices 0\nhistory 0\nms {ms:.3}\npath failed\n",
+                op_name(op), opts.fuzzy, glue_name(opts.glue), opts.unify as u8, opts.parallel as u8, opts.obb as u8, objects.len(), tools.len(),
+                objects.iter().map(|o| o.count(ShapeType::Face)).sum::<usize>()
+            );
+            let _ = std::fs::write(dir.join(format!("{name}.txt")), text);
+        }
+        return r;
+    };
     write_case(dir, &name, &bytes, &Call { op, objects, tools, opts }, res, ms, &crate::last_boolean_path());
     r
 }
