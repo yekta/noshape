@@ -959,7 +959,7 @@ impl Ctx<'_> {
     fn intervals_on(&self, f: usize, path: &Path, (t0, t1): (f64, f64), ends: [End; 2], closed: bool, on_free: Option<&(usize, Arc<NurbsCurve>)>) -> R<Vec<Ival>> {
         // (OCCT's section of a free-form face: within its own tolerance of where the faces meet.)
         let tol = match path {
-            Path::Nurbs { id, .. } => self.tol.max(self.ncurves[*id as usize].tol),
+            Path::Nurbs { id, .. } => self.tol.max(self.ncurves[*id as usize].acc),
             _ => self.tol,
         };
         let len = path.length(t0, t1);
