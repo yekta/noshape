@@ -301,3 +301,12 @@ mod tests {
 
 // r1 A
 // r1 A amended
+
+#[cfg(test)]
+mod landq_precheck {
+    #[test]
+    fn landq_precheck() {
+        let x = std::hint::black_box(true);
+        assert!(x == true);
+    }
+}
