@@ -2,6 +2,7 @@
 //! instead of one per file. Run one file's tests with `cargo test -p <crate> --test all <file>::`.
 
 mod assembly_perf;
+mod big_assembly_perf;
 mod big_plate_perf;
 mod coverage;
 mod crop_fixtures;

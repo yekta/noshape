@@ -330,3 +330,96 @@ fn big_shape_sketch_drag_step_parts() {
     let ms = |s: Stats| format!("median {:.2} ms, worst {:.2} ms", s.median.as_secs_f64() * 1e3, s.worst.as_secs_f64() * 1e3);
     println!("{} entities: drag solve {}; regions {}; regeneration {}", data.sketch.entities().count(), ms(stats(solve)), ms(stats(regions)), ms(stats(regenerate)));
 }
+
+/// S300 against Onshape (user 11-01, live request "skasm speed"): 80 corner
+/// rectangles (4 × 20, 10 × 6 mm, 15 mm pitch), each with its width and
+/// height dimensioned: 320 lines. Timed as the app runs them: opening the
+/// sketch for edit (full solve with the DOF analysis, regions, the studio's
+/// regeneration), changing a dimension, a drag step (fps) and adding a
+/// dimension (a horizontal distance between two rectangles).
+#[test]
+#[ignore]
+fn s300_rectangle_grid() {
+    let ms = |d: Duration| d.as_secs_f64() * 1e3;
+    let mut sk = Sketch::new();
+    let mut corners = Vec::new();
+    let mut dims = Vec::new();
+    for i in 0..20 {
+        for j in 0..4 {
+            let (x, y) = (i as f64 * 0.015, j as f64 * 0.015);
+            let r = sk.corner_rectangle(v(x, y), v(x + 0.010, y + 0.006));
+            dims.push(sk.add_constraint(ConstraintKind::Length { curve: r.curves[0], value: 0.010 }).unwrap());
+            sk.add_constraint(ConstraintKind::Length { curve: r.curves[1], value: 0.006 }).unwrap();
+            corners.push(r.points[2]);
+        }
+    }
+    let lines = sk.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).count();
+    println!("S300: {} entities ({lines} lines), {} constraints", sk.entity_count(), sk.constraint_count());
+    assert!(lines >= 300);
+    let mut data = SketchData { sketch: sk, ..Default::default() };
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut f = ps.new_feature("sketch", &units).unwrap();
+    f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    f.params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+    let fid = f.id;
+    ps.features.push(f);
+    let opts = RegenOptions { editing_sketch: Some(fid), ..Default::default() };
+    // Open for edit: a fresh regenerator (nothing cached), the full solve.
+    let open = stats((0..5).map(|_| {
+        let mut regen = Regenerator::new();
+        let mut sk = data.sketch.clone();
+        let t = Instant::now();
+        sk.solve();
+        let _ = sk.regions();
+        regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        t.elapsed()
+    }).collect());
+    println!("  open for edit (solve with DOF, regions, regeneration): median {:.2} ms, worst {:.2} ms", ms(open.median), ms(open.worst));
+    let mut regen = Regenerator::new();
+    regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+    // Change one width (as the dimension box's Enter does): value, solve, regeneration.
+    let change = stats((0..9).map(|k| {
+        let t = Instant::now();
+        data.sketch.set_dimension_value(dims[7], 0.010 + 0.0005 * (k % 3) as f64).unwrap();
+        data.sketch.solve();
+        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        t.elapsed()
+    }).collect());
+    println!("  change a dimension: median {:.2} ms, worst {:.2} ms", ms(change.median), ms(change.worst));
+    // Drag a corner (pointer move, solve, regeneration per step).
+    let corner = corners[41];
+    let mut ed = editor();
+    ed.set_tool(Tool::Select);
+    let from = data.sketch.point(corner).unwrap();
+    ed.hover = Some(corner);
+    ed.pointer_move(&mut data, from, false, false);
+    ed.tool_down(&mut data, from, Some(corner), false, false);
+    let mut steps = Vec::new();
+    for i in 1..=100 {
+        let a = i as f64 * 0.05;
+        let p = from + v(0.002 * a.cos(), 0.002 * a.sin());
+        let t = Instant::now();
+        ed.pointer_move(&mut data, p, false, false);
+        ed.tool_drag(&mut data, p);
+        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        steps.push(t.elapsed());
+    }
+    ed.tool_up(&mut data, from);
+    let drag = stats(steps);
+    println!("  drag a corner: step median {:.2} ms = {:.0} fps, worst {:.2} ms", ms(drag.median), 1.0 / drag.median.as_secs_f64(), ms(drag.worst));
+    // Add a dimension: the horizontal distance between two neighbours' corners.
+    let add = stats((0..9).map(|k| {
+        let mut d = data.clone();
+        let t = Instant::now();
+        d.sketch.add_constraint(ConstraintKind::HorizontalDistance { a: corners[k * 4], b: corners[k * 4 + 4], value: 0.015 }).unwrap();
+        d.sketch.solve();
+        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(d.clone())));
+        regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        t.elapsed()
+    }).collect());
+    println!("  add a dimension: median {:.2} ms, worst {:.2} ms", ms(add.median), ms(add.worst));
+    assert!(drag.median < FRAME, "drag step median {:?}", drag.median);
+}

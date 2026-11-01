@@ -31,35 +31,35 @@ const EDIT: Duration = Duration::from_millis(100);
 /// PLAN 2.7: inserting into the 300-mate assembly.
 const INSERT: Duration = Duration::from_millis(20);
 
-fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Value {
+pub(crate) fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Value {
     let op = registry::by_tool_name(tool).unwrap_or_else(|| panic!("no tool {tool}"));
     registry::run(ctx, op, &args).unwrap_or_else(|e| panic!("{tool} failed: {}", e.to_json())).value
 }
 
 /// The face of `inst` whose world normal is `n`.
-fn face(ctx: &mut Ctx, inst: &str, n: [f64; 3]) -> String {
+pub(crate) fn face(ctx: &mut Ctx, inst: &str, n: [f64; 3]) -> String {
     let faces = call(ctx, "assembly_entities", json!({ "instance": inst, "kind": "faces" }));
     let f = faces["faces"].as_array().unwrap().iter().find(|f| (0..3).all(|k| (f["normal"][k].as_f64().unwrap_or(9.0) - n[k]).abs() < 1e-6)).expect("face");
     f["id"].as_str().unwrap().to_string()
 }
 
-struct Stats {
-    median: Duration,
-    worst: Duration,
+pub(crate) struct Stats {
+    pub(crate) median: Duration,
+    pub(crate) worst: Duration,
 }
 
-fn stats(mut t: Vec<Duration>) -> Stats {
+pub(crate) fn stats(mut t: Vec<Duration>) -> Stats {
     t.sort();
     Stats { median: t[t.len() / 2], worst: *t.last().unwrap() }
 }
 
-fn ms(d: Duration) -> f64 {
+pub(crate) fn ms(d: Duration) -> f64 {
     d.as_secs_f64() * 1e3
 }
 
 /// A document with a pin (r 2 mm, 10 mm) Part Studio and an Assembly built
 /// by `build` from two inserted pins and their Planar mate (bottom on top).
-fn assembly(name: &str, build: impl FnOnce(&mut Assembly)) -> (Ctx, String) {
+pub(crate) fn assembly(name: &str, build: impl FnOnce(&mut Assembly)) -> (Ctx, String) {
     let dir = std::env::temp_dir().join(format!("noshape-asm-perf-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let scratch = dir.join(format!("{name}-seed.noshape"));
@@ -88,7 +88,7 @@ fn assembly(name: &str, build: impl FnOnce(&mut Assembly)) -> (Ctx, String) {
 }
 
 /// `asm`'s seed pin (instance 2) copied to `at` (mm), fixed or not.
-fn pin_at(asm: &mut Assembly, seed: &noshape_model::assembly::Instance, at: DVec3, fixed: bool) -> InstanceId {
+pub(crate) fn pin_at(asm: &mut Assembly, seed: &noshape_model::assembly::Instance, at: DVec3, fixed: bool) -> InstanceId {
     let id = InstanceId(asm.next_id());
     // (Named directly: next_instance_name scans every name.)
     let name = format!("Part 1 <{}>", asm.instances.len() + 1);
@@ -97,7 +97,7 @@ fn pin_at(asm: &mut Assembly, seed: &noshape_model::assembly::Instance, at: DVec
 }
 
 /// A copy of the seed Planar mate between `a` (its bottom) and `b` (top).
-fn mate(asm: &mut Assembly, seed: &Mate, kind: MateType, a: InstanceId, b: InstanceId) {
+pub(crate) fn mate(asm: &mut Assembly, seed: &Mate, kind: MateType, a: InstanceId, b: InstanceId) {
     let id = MateId(asm.next_id());
     let mut m = seed.clone();
     m.id = id;
@@ -111,7 +111,7 @@ fn mate(asm: &mut Assembly, seed: &Mate, kind: MateType, a: InstanceId, b: Insta
 /// The assembly's scene as the app builds it on the UI thread after an
 /// evaluation (the GPU cache kept between builds) and its build time; `None`
 /// without a GPU adapter.
-fn scene(ctx: &mut Ctx, res: &AssemblyResult, cache: &mut AsmGpuCache) -> Option<(Duration, AsmBuilt)> {
+pub(crate) fn scene(ctx: &mut Ctx, res: &AssemblyResult, cache: &mut AsmGpuCache) -> Option<(Duration, AsmBuilt)> {
     let off = ctx.offscreen().ok()?;
     let up = off.renderer.uploader();
     let t = Instant::now();
@@ -121,24 +121,21 @@ fn scene(ctx: &mut Ctx, res: &AssemblyResult, cache: &mut AsmGpuCache) -> Option
 
 /// The solved placements kept in the document, as the app does after each
 /// edit: later evaluations start solved.
-fn fold_solved(ctx: &mut Ctx, path: &str) {
+pub(crate) fn fold_solved(ctx: &mut Ctx, path: &str) {
     let res = evaluated(ctx, path);
     let od = ctx.doc(Some(path)).unwrap();
     let tab = noshape_ops::doc::find_tab(od.doc(), "Assembly 1").unwrap();
     od.session
         .edit_tab(tab, "Solve", |c| {
             if let TabContent::Assembly(a) = c {
-                for i in &mut a.instances {
-                    if let Some(p) = res.solved.placement(i.id) {
-                        i.placement = p;
-                    }
-                }
+                // As the app does: placements and flexible subassemblies' nested positions.
+                noshape_ops::assembly::fold_solved(a, &res);
             }
         })
         .unwrap();
 }
 
-fn evaluated(ctx: &mut Ctx, path: &str) -> AssemblyResult {
+pub(crate) fn evaluated(ctx: &mut Ctx, path: &str) -> AssemblyResult {
     let od = ctx.doc(Some(path)).unwrap();
     let tab = noshape_ops::doc::find_tab(od.doc(), "Assembly 1").unwrap();
     let Some(TabContent::Assembly(asm)) = od.doc().tab(tab).map(|t| t.content.clone()) else { panic!() };
@@ -148,7 +145,7 @@ fn evaluated(ctx: &mut Ctx, path: &str) -> AssemblyResult {
 /// Drag `inst`'s top centre in `steps` pointer moves along `dir` (mm per
 /// step), each a solve as the app runs it (from the last step's poses, no
 /// DOF), then the placements applied and the scene rebuilt (the frame).
-fn drag(ctx: &mut Ctx, path: &str, inst: InstanceId, dir: DVec3, steps: usize) -> (Stats, Option<Stats>) {
+pub(crate) fn drag(ctx: &mut Ctx, path: &str, inst: InstanceId, dir: DVec3, steps: usize) -> (Stats, Option<Stats>) {
     let mut res = evaluated(ctx, path);
     let mut cache = AsmGpuCache::default();
     let mut built = scene(ctx, &res, &mut cache).map(|s| s.1);
@@ -181,7 +178,7 @@ fn drag(ctx: &mut Ctx, path: &str, inst: InstanceId, dir: DVec3, steps: usize) -
     (stats(solves), (!frames.is_empty()).then(|| stats(frames)))
 }
 
-fn evaluate(ctx: &mut Ctx, path: &str, edit: impl FnOnce(&mut Assembly)) -> Duration {
+pub(crate) fn evaluate(ctx: &mut Ctx, path: &str, edit: impl FnOnce(&mut Assembly)) -> Duration {
     let od = ctx.doc(Some(path)).unwrap();
     let tab = noshape_ops::doc::find_tab(od.doc(), "Assembly 1").unwrap();
     let Some(TabContent::Assembly(mut asm)) = od.doc().tab(tab).map(|t| t.content.clone()) else { panic!() };
