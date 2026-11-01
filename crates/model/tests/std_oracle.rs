@@ -1635,6 +1635,36 @@ fn more_editing_logic_runs_std() {
     assert!(got.contains(&"operationType=Enum(\"ADD\")".to_string()), "{got:?}");
 }
 
+/// std's editing logic of Thicken and Modify fillet (audit E rows).
+#[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
+fn thicken_and_modify_fillet_editing_logic_runs_std() {
+    // Thicken: a face of the cube thickened outwards adds to the cube.
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    let cube = vec![body_ref(&r, 0)];
+    s.add("thicken", |p| p.set("entities", q(face_at(&r, TOP_FACE))));
+    let got = edit_logic(&s, &ParamValues::default(), &["entities"]);
+    assert_eq!(got, [format!("booleanScope={:?}", ParamValue::Query(cube)), "operationType=Enum(\"ADD\")".to_string()]);
+
+    // Modify fillet: picking a 3 mm fillet's face fills Radius with 3 mm.
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    s.add("fillet", |p| {
+        p.set("entities", q(edge_at(&r, DVec3::new(20.0, 0.0, 40.0))));
+        p.set("radius", expr("3 mm"));
+    });
+    let r = s.regen();
+    let c = 3.0 / 2f64.sqrt();
+    let face = face_at(&r, DVec3::new(20.0, 3.0 - c, 37.0 + c));
+    s.add("modifyFillet", |p| p.set("faces", q(face)));
+    let got = edit_logic(&s, &ParamValues::default(), &["faces"]);
+    let radius = got.iter().find(|x| x.starts_with("radius=")).unwrap_or_else(|| panic!("{got:?}"));
+    assert!(radius.contains("0.003"), "{radius}");
+}
+
 /// std's holeEditLogic through the host natives: a new hole's Merge scope is
 /// the part it reaches, and one sketched below the part flips into it
 /// (holeScopeFlipHeuristics: an opHole probe and evCollision containment,

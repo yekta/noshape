@@ -49,7 +49,7 @@ pub fn prewarm() {
     STARTED.call_once(|| {
         let _ = std::thread::Builder::new().name("std prewarm".into()).spawn(|| {
             for ty in STD_EDITING_LOGIC {
-                if let Some((module, name)) = std_name(ty) {
+                if let Some((module, name)) = logic_std_name(ty) {
                     loaded(module, name);
                 }
             }
@@ -150,13 +150,24 @@ pub fn editing_logic(
 /// Hole: Merge scope and flip from an opHole probe, standard tables, tapped
 /// depths (holeEditLogic);
 /// Draft: parting-line hint faces and flips; Split: Keep tools for a face or
-/// plane tool, live "Split").
-const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet", "loft", "revolve", "sweep", "mirror", "cPlane", "draft", "splitPart", "hole"];
+/// plane tool, live "Split"; Thicken: Add into the part whose faces it
+/// thickens, the flip for Remove; Modify fillet: Radius from the picked
+/// fillet).
+const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet", "loft", "revolve", "sweep", "mirror", "cPlane", "draft", "splitPart", "hole", "thicken", "modifyFillet"];
+
+/// Built-in feature types std only runs the editing logic of (std's module
+/// and feature; they regenerate natively and std can't run them).
+const LOGIC_ONLY: &[(&str, &str, &str)] = &[("thicken", "thicken.fs", "thicken"), ("modifyFillet", "modifyFillet.fs", "modifyFillet")];
+
+/// [`std_name`], or the std feature whose editing logic a dialog runs.
+fn logic_std_name(type_id: &str) -> Option<(&'static str, &'static str)> {
+    std_name(type_id).or_else(|| LOGIC_ONLY.iter().find(|(t, ..)| *t == type_id).map(|&(_, m, n)| (m, n)))
+}
 
 /// Whether std has editing logic for built-in feature `type_id` and the
 /// dialog runs it (std runs the feature, or it is in STD_EDITING_LOGIC).
 pub fn has_editing_logic(type_id: &str) -> bool {
-    (evaluator(type_id).is_some() || STD_EDITING_LOGIC.contains(&type_id)) && std_name(type_id).and_then(|(module, name)| loaded(module, name)).is_some_and(|f| f.editing.is_some())
+    (evaluator(type_id).is_some() || STD_EDITING_LOGIC.contains(&type_id)) && logic_std_name(type_id).and_then(|(module, name)| loaded(module, name)).is_some_and(|f| f.editing.is_some())
 }
 
 /// [`editing_logic`] in `ctx`, the Part Studio just before the feature (a
@@ -173,7 +184,7 @@ pub fn editing_logic_in(
     specified: &[String],
     creating: bool,
 ) -> Option<crate::params::ParamValues> {
-    let (module, std) = std_name(type_id)?;
+    let (module, std) = logic_std_name(type_id)?;
     let f = loaded(module, std)?;
     let editing = f.editing.as_ref()?;
     super::run::run_editing_logic(ctx, feature, name, units, editing, &f.params, &f.specs, old, new, specified, creating)

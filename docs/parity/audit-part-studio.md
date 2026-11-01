@@ -12,7 +12,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 |---|---|---|---|
 | Toolbar, every group and overflow (75 tools + Add custom features) | behaviours "Toolbar" (Customize toolbar list), dom/toolbar-partstudio.txt | every live tool in live's group, in order (Move boundary = extendSurface) | 0 |
 | Toolbar right-click, Customize toolbar, narrow-window collapse | behaviours "Toolbar", "Narrow window" | checked earlier (cursors 81, part-studio 4.x, chrome-sweep) | 0 |
-| Feature dialogs, fields and options (75 toolbar features) | std preconditions via std_oracle::print_all | 58 same as std now (37 at first); the rest differ only in accepted rows or the 10 open below | rows below, A15 |
+| Feature dialogs, fields and options (75 toolbar features); their editing logic (48 std functions) | std preconditions via std_oracle::print_all | 58 same as std now (37 at first); the rest differ only in accepted rows or the 10 open below | rows below, A15 |
 | Keyboard shortcuts (live's Shift+/ list, 121 entries) | dom/keyboard-shortcuts.txt | every applicable entry in workflow-keyboard-mouse.md, all ✅ (11-01) | 0 |
 | View menu (camera / render ▾) | dom/menu-camera-render.txt | 16 items = live (part-studio 9.8) | 0 |
 | Context menus: face, edge, vertex, empty space, part, plane, origin, mate connector, sketch region / curve, feature rows (sketch, extrude, fillet, multi), parts-list part, tabs, Select ▸ submenus | dom/context-menus-partstudio.txt, -ps-*.txt | compared in core-workflow §8 and chrome-sweep CM1–CM5 (✅) | 0 |
@@ -44,6 +44,63 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | A14 | Appearances (live 1712) | part row right-click | P2 | live: Rename… · Edit appearance… · Configure appearance; ours has no menu on part rows | ✅ (audit 5): Rename… (the small "Rename" ✓ ✕ popup beside the row) · Edit appearance… · Configure appearance (Configured properties for the part, a row per configuration and an Appearance column; offered with configuration inputs); Remove appearance stays after them on a part with its own |
 | A15 | Feature dialogs | arrays std drives by a query | P2 | std's "Driven query" arrays are one selection field (a pick per item); Frame's Corner overrides, Frame trim's groups, Face blend's Caps and Edge limits, Constrained surface's Vertices, Ruled surface's Vertex overrides and Sheet metal loft's connections were item lists with an Add button; the oracle didn't see it (the custom-feature reader ignored "Driven query", the oracle masked the hint) | ✅ (audit 7): all 13 std driven arrays are driven queries; custom features read "Driven query"; the oracle compares the hint |
 | A16 | Configuration panel | configured parameter column headers | P2 | std names 99 parameters differently in the configuration table ("Column Name": the second direction's Depth is "Second depth", Variable's row Index "Row index (0-based)"); ours showed the dialog label, so two "Depth" columns; the oracle didn't read it | ✅ (audit 8): `features::columns` holds std's 99, the table header uses them, custom features read "Column Name", the oracle compares them; the Configure toast keeps the label until live answers (REQUESTS psui A16) |
+
+## Editing logic (std's dialog reactions)
+
+std's 48 "Editing Logic Function"s change a dialog's fields as the user edits (Add into the touched part, the flip, a type
+from the picks). The dialog runs std's own function where `std_feature::has_editing_logic` says so (std runs the feature, or it is in
+`STD_EDITING_LOGIC`; T2 tests in std_oracle), or ours does the same natively (`behaviors::direct_edit_logic`, `boolean_edit_logic`).
+
+| # | std function | Feature | Status |
+|---|---|---|---|
+| E1 | extrudeEditLogic | Extrude | ✅ std's runs |
+| E2 | filletEditLogic | Fillet | ✅ std's runs |
+| E3 | loftEditLogic | Loft | ✅ std's runs |
+| E4 | revolveEditLogic | Revolve | ✅ std's runs |
+| E5 | sweepEditLogic | Sweep | ✅ std's runs |
+| E6 | mirrorEditLogic | Mirror | ✅ std's runs |
+| E7 | cPlaneLogic | Plane | ✅ std's runs |
+| E8 | draftEditLogic | Draft | ✅ std's runs |
+| E9 | splitEditLogic | Split | ✅ std's runs |
+| E10 | holeEditLogic | Hole | ✅ std's runs |
+| E11 | thickenEditLogic | Thicken | ✅ std's runs (audit 8, T2 thicken_and_modify_fillet_editing_logic_runs_std) |
+| E12 | modifyFilletLogic | Modify fillet | ✅ std's runs (audit 8, T2 thicken_and_modify_fillet_editing_logic_runs_std) |
+| E13 | sheetMetalStartEditLogic | Sheet metal model | ✅ std's runs |
+| E14 | flangeEditLogic | Flange | ✅ std's runs |
+| E15 | hemEditLogic | Hem | ✅ std's runs |
+| E16 | sheetMetalTabEditingLogic | Tab | ✅ std's runs |
+| E17 | onBendChange | Bend | ✅ std's runs |
+| E18 | onJogChange | Jog | ✅ std's runs |
+| E19 | formedEditLogic | Form | ✅ std's runs |
+| E20 | tessLoftEditLogic | Sheet metal loft | ✅ std's runs |
+| E21 | makeJointEditLogic | Make joint | ✅ std's runs |
+| E22 | sheetMetalJointEditLogic | Joint | ✅ std's runs |
+| E23 | pcbStartEditLogic | Flex PCB model | ✅ std's runs |
+| E24 | pcbEndEditLogic | Finish flex PCB model | ✅ std's runs |
+| E25 | deleteFaceEditLogic | Delete face | ✅ native: Leave open for surface faces (live L10) |
+| E26 | replaceFaceEditLogic | Replace face | ✅ native: flip alignment (live L8) |
+| E27 | ribEditLogic | Rib | ✅ native: parts from the sketch |
+| E28 | connectorEditLogic | Mate connector | ✅ native: owner part |
+| E29 | moveFaceEditingLogic | Move face | ✅ native: direction / offset |
+| E30 | fillEditLogic | Fill | ✅ native: edges from the preselection, surface operation (live SF7) |
+| E31 | onDecalFeatureChange | Decal | ✅ native: width / height from the image |
+| E32 | bodyDraftEditLogic | Body draft | ✗ (parting object / pull direction / faces from the selection) |
+| E33 | bridgingCurveEditingLogic | Bridging curve | ✗ (side face / vertex flags from the picks) |
+| E34 | bsurfEditLogic | Boundary surface | ✗ (surface operation (Add next to a surface)) |
+| E35 | cutlistEditLogic | Cut list | ✗ (column overrides kept in step) |
+| E36 | deletePartEditLogic | Delete part | ✗ (composite members) |
+| E37 | editCurveEditLogic | Edit curve | ✗ (control point edits kept in step) |
+| E38 | editFeatureLogicExternalThread | External thread | ✗ (standard sizes fill chamfer and undercut) |
+| E39 | fitSplineEditLogic | 3D fit spline | ✗ (fit type, start / end directions from the picks) |
+| E40 | frameEditLogicFunction | Frame | ✗ ((only prewarms)) |
+| E41 | gussetEditLogic | Gusset | ✗ (swept faces) |
+| E42 | helixEditingLogic | Helix | ✗ (axis type from the pick) |
+| E43 | projectCurvesEditLogic | Projected curve | ✗ (sketch / direction from the picks) |
+| E44 | routingCurveEditLogic | Routing curve | ✗ (manipulator state, target length) |
+| E45 | ruledSurfaceEditingLogic | Ruled surface | ✗ (surface operation, vertex overrides cleaned) |
+| E46 | unfoldEditLogic | Unfold | ✗ (hold entity) |
+| E47 | variableEditLogic | Variable | ✗ (measured entities from the preselection) |
+| E48 | wrapEditLogic | Wrap | ✗ (operation / merge scope / flip, like Thicken) |
 
 ## Feature dialogs against std
 
