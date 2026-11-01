@@ -236,6 +236,36 @@ impl DrawingEditor {
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(28.)).px(px(8.)).child(div().w(px(98.)).flex_none().text_size(px(11.)).child(label)).child(body).into_any_element();
         let precisions: Vec<(String, bool, Set)> = PRECISIONS.iter().map(|&(l, p)| (l.to_string(), d.precision == p, std::rc::Rc::new(move |d: &mut HoleTableDlg| d.precision = p) as Set)).collect();
         let precision_label = PRECISIONS.iter().find(|(_, p)| *p == d.precision).map(|(l, _)| l.to_string()).unwrap_or_default();
+        // Sheet ▾ (live drawing-hole-table-dialog): a placed table moves to
+        // the sheet chosen (as Move to sheet…); a new one goes on this sheet.
+        let sheet_select = {
+            let names: Vec<String> = self.drawing.sheets.iter().map(|s| s.name.clone()).collect();
+            let (cur, table, ed) = (self.sheet, d.table, ed.clone());
+            Button::new("hole-table-sheet")
+                .label(names.get(cur).cloned().unwrap_or_default())
+                .ghost()
+                .xsmall()
+                .w(px(112.))
+                .dropdown_caret(true)
+                .border_b_1()
+                .border_color(gpui_kit::rgb(0xdddddd))
+                .rounded(px(0.))
+                .os_dropdown_menu("hole-table-sheet-dd", true, move |mut m, _, _| {
+                    for (i, n) in names.iter().enumerate() {
+                        let e = ed.clone();
+                        m = m.item(crate::os_menu::OsMenuItem::new(n.clone()).checked(i == cur).disabled(table.is_none() && i != cur).on_click(move |_, _, cx| {
+                            e.update(cx, |t, cx| {
+                                if let (Some(id), true) = (table, i != cur) {
+                                    t.close_hole_table_props(true, cx);
+                                    t.move_table_to_sheet(id, Some(i), cx);
+                                }
+                            })
+                        }));
+                    }
+                    m
+                })
+                .into_any_element()
+        };
         let orders: Vec<(String, bool, Set)> = vec![
             ("Top to bottom".into(), !d.bottom_to_top, std::rc::Rc::new(|d: &mut HoleTableDlg| d.bottom_to_top = false) as Set),
             ("Bottom to top".into(), d.bottom_to_top, std::rc::Rc::new(|d: &mut HoleTableDlg| d.bottom_to_top = true) as Set),
@@ -322,7 +352,8 @@ impl DrawingEditor {
                     }))),
                 )
                 .when(show, |v| v.child(row("Location precision", select("hole-table-precision", precision_label, 112., precisions).into_any_element())))
-                .child(field(view_name.clone().unwrap_or_else(|| "Views".into()), view.is_none()))
+                // Live drawing-hole-table-dialog: the Views field's tooltip.
+                .child(div().id("hole-table-views").tooltip(crate::ui::tooltip("Select views of a common singular part")).child(field(view_name.clone().unwrap_or_else(|| "Views".into()), view.is_none())))
                 .when(view.is_some(), |v| v.child(field(if origin { "Origin ✓".into() } else { "Origin: a vertex or circle center".into() }, !origin)))
                 // Live 1985 / 1682: X direction and Y direction, each a
                 // straight edge of the view; setting one hides the other (the
@@ -413,7 +444,7 @@ impl DrawingEditor {
                             })),
                     )
                 })
-                .child(row("Sheet", div().text_size(px(12.)).child(self.current_sheet().name.clone()).into_any_element()))
+                .child(row("Sheet", sheet_select))
                 .child(row("Order", select("hole-table-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, 112., orders).into_any_element()))
                 .child(div().px(px(8.)).pt(px(4.)).text_size(px(11.)).child("Select fixed corner"))
                 .child(h_flex().px(px(8.)).pt(px(4.)).gap(px(26.)).children(corners))
