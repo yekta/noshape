@@ -41,7 +41,7 @@ pub fn fill() -> FeatureType {
         ParamSpec::array(
             "edges",
             "Edges",
-            "Edge",
+            "edge",
             vec![
                 ParamSpec::query("entities", "Edges", CURVES).hints(Hints::ALWAYS_HIDDEN),
                 ParamSpec::enum_("continuity", "Continuity", &[("G0", "Position"), ("G1", "Tangency"), ("G2", "Curvature")])
@@ -94,7 +94,7 @@ fn bsurf_profiles(id: &'static str, label: &'static str, ids: [&'static str; 5])
     ParamSpec::array(
         id,
         label,
-        "Profile",
+        "profile",
         vec![
             ParamSpec::query(entities, "Edges, curves and sketches", CURVES),
             ParamSpec::enum_(cond, "Boundary condition", LOFT_END_CONDITION).hints(Hints::SHOW_LABEL),
@@ -150,7 +150,7 @@ pub fn ruled_surface() -> FeatureType {
         ParamSpec::array(
             "vertexOverrides",
             "Vertex overrides",
-            "Vertex",
+            "arrayItem",
             vec![
                 ParamSpec::query1("vertex", "Vertex", QueryFilter::VERTEX).hints(Hints::SHOW_LABEL),
                 ParamSpec::enum_(

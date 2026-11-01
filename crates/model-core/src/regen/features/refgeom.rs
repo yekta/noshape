@@ -439,6 +439,14 @@ pub fn query_variable(ev: &mut EvalCtx) -> FResult<()> {
         return err("Variable name must be a letter followed by a string of letters or numbers.");
     }
     let st = ev.enum_("selectionType").to_string();
+    // std sets each additional query's lowercase type for its row label
+    // ("Union of created by"; SelectionTypeToLowercaseName).
+    if ev.bool("addAdditionalQueries") {
+        for (i, item) in ev.params.array("additionalQueries").iter().enumerate() {
+            let t = lowercase_selection_type(item.enum_("addQselectionType"));
+            ev.computed.push((format!("additionalQueries.{i}.addQlowercaseSelectionType"), crate::display::ComputedValue::Text(t.into())));
+        }
+    }
     let mut refs = query_selection(ev, ev.params, &st, "")?;
     if ev.bool("addAdditionalQueries") {
         for item in ev.params.array("additionalQueries") {
@@ -463,6 +471,27 @@ pub fn query_variable(ev: &mut EvalCtx) -> FResult<()> {
     }
     ev.ctx.query_variables.insert(name, refs);
     Ok(())
+}
+
+/// std queryVariable.fs SelectionTypeToLowercaseName.
+fn lowercase_selection_type(t: &str) -> &'static str {
+    match t {
+        "CREATED_BY" => "created by",
+        "OWNED_BY" => "owned by",
+        "PROTRUSION" => "protrusion",
+        "POCKET" => "pocket",
+        "HOLE" => "hole",
+        "FILLETS" => "fillets",
+        "BOUNDED_FACES" => "bounded faces",
+        "LOOP_CHAIN_CONNECTED" => "loop/chain connected",
+        "PARALLEL" => "parallel",
+        "TANGENT_CONNECTED" => "tangent connected",
+        "MATCHING" => "matching",
+        "ALL_SOLID_BODIES" => "all solid bodies",
+        "EDGE_CONVEXITY" => "edge convexity",
+        "ADJACENT" => "adjacent",
+        _ => "selection",
+    }
 }
 
 /// Parameter id with the additional-query prefix ("selectionQuery" ->

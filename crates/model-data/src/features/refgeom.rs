@@ -193,7 +193,7 @@ pub fn query_variable() -> FeatureType {
         ParamSpec::array(
             "additionalQueries",
             "Additional queries",
-            "Additional query",
+            "additional query",
             // std queryVariable.fs additionalQueryPredicate: the main query's
             // fields again, "addQ"-prefixed.
             {
@@ -246,9 +246,8 @@ pub fn query_variable() -> FeatureType {
                 ]
             },
         )
-        // std's "#booleanOperation of #addQlowercaseSelectionType" reads a
-        // label its editing logic writes; the option label stands in for it.
-        .item_template("#booleanOperation of #addQselectionType")
+        // addQlowercaseSelectionType: the regeneration's computed value.
+        .item_template("#booleanOperation of #addQlowercaseSelectionType")
         .visible(|v| v.bool("addAdditionalQueries")),
         ParamSpec::bool("evaluateOnUse", "Evaluate on use", false),
         ParamSpec::bool("showSelection", "Show selection", true),

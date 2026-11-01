@@ -37,7 +37,7 @@ pub fn frame() -> FeatureType {
         ParamSpec::array(
             "cornerOverrides",
             "Corner overrides",
-            "Vertex",
+            "vertex",
             vec![
                 ParamSpec::query1("vertex", "Vertex", QueryFilter::VERTEX).hints(Hints::ALWAYS_HIDDEN),
                 ParamSpec::enum_("cornerType", "Corner type", FRAME_CORNER).hints(Hints::SHOW_LABEL),
@@ -60,7 +60,7 @@ pub fn frame_trim() -> FeatureType {
     let p = vec![
         ParamSpec::enum_("trimType", "Trim Type", &[("GROUP", "Ordered groups"), ("FACE", "Face")])
             .hints(Hints::HORIZONTAL_ENUM | Hints::REMEMBER_PREVIOUS_VALUE),
-        ParamSpec::array("frameGroups", "Frame groups", "Group", vec![ParamSpec::query("frames", "Frames", QueryFilter::SOLID_BODY).describe("Frame segments are trimmed against preceding groups and are used as tools for later groups")]).describe("Frame segments in earlier groups are used as tools for later groups")
+        ParamSpec::array("frameGroups", "Frame groups", "group", vec![ParamSpec::query("frames", "Frames", QueryFilter::SOLID_BODY).describe("Frame segments are trimmed against preceding groups and are used as tools for later groups")]).describe("Frame segments in earlier groups are used as tools for later groups")
         .item_template("#frames")
             .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::DRIVEN_QUERY)
             .visible(move |v| !face(v)),

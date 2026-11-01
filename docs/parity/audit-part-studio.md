@@ -12,7 +12,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 |---|---|---|---|
 | Toolbar, every group and overflow (75 tools + Add custom features) | behaviours "Toolbar" (Customize toolbar list), dom/toolbar-partstudio.txt | every live tool in live's group, in order (Move boundary = extendSurface) | 0 |
 | Toolbar right-click, Customize toolbar, narrow-window collapse | behaviours "Toolbar", "Narrow window" | checked earlier (cursors 81, part-studio 4.x, chrome-sweep) | 0 |
-| Feature dialogs, fields and options (75 toolbar features); their editing logic (48 std functions) | std preconditions via std_oracle::print_all | 58 same as std now (37 at first); the rest differ only in accepted rows or the 10 open below | rows below, A15 |
+| Feature dialogs, fields and options (75 toolbar features); their editing logic (48 std functions) | std preconditions via std_oracle::print_all | 63 same as std now (37 at first); the rest differ only in accepted rows or the 10 open below | rows below, A15 |
 | Keyboard shortcuts (live's Shift+/ list, 121 entries) | dom/keyboard-shortcuts.txt | every applicable entry in workflow-keyboard-mouse.md, all ✅ (11-01) | 0 |
 | View menu (camera / render ▾) | dom/menu-camera-render.txt | 16 items = live (part-studio 9.8) | 0 |
 | Context menus: face, edge, vertex, empty space, part, plane, origin, mate connector, sketch region / curve, feature rows (sketch, extrude, fillet, multi), parts-list part, tabs, Select ▸ submenus | dom/context-menus-partstudio.txt, -ps-*.txt | compared in core-workflow §8 and chrome-sweep CM1–CM5 (✅) | 0 |
@@ -22,7 +22,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | Render Studio / Display states (1713) | live | live: no Display states in a Part Studio; Render Studio only as an Upgrade-gated tab type (cloud plan) | 0 |
 | View cube (right-click, arrows, hover) | live 1714 | every face / edge / corner / arrow gives the empty-space menu, no tooltips: = ours | 0 |
 
-**Counts (11-01, audit 7):** surfaces audited 9 of 9. Dialogs: 199 field rows (+ 3 found in later runs) + 52 visibility states; fixed 166 rows and 39 states; accepted 23 (+ 2 later rows) and 13 states (fields std declares `isAnything`, which the oracle cannot read); open 10 (+ 1) rows, 0 states; 58 of 75 dialogs equal std (37 at first). Open: Helix End radius and Routing curve point titles (asked live, REQUESTS 1722), the four reference pickers (Variable CSV, Frame profile, Derived, Form), Ruled surface's item name, Query variable's row label. Found outside the oracle (A rows): 16; fixed 14, open 2 (A1 asked, REQUESTS 1722; A10 core).
+**Counts (11-01, audit 8):** surfaces audited 9 of 9. Dialogs: 199 field rows + 52 visibility states; fixed 178 rows and 39 states; accepted 12 rows and 13 states (fields std declares `isAnything`, which the oracle cannot read); open 9 rows (Helix End radius and Routing curve point titles asked live, REQUESTS 1722; the five reference pickers); 63 of 75 dialogs equal std (37 at first). Editing logic: 48 std functions, 35 run std's, 10 native, 1 no-op, 2 open. Found outside the oracle (A rows): 16; fixed 14, open 2 (A1 asked, REQUESTS 1722; A10 core).
 
 ## Found outside the oracle (in the app, std's code, live)
 
@@ -110,7 +110,7 @@ which fields show); P3: internal (option ids under the same labels, configurabil
 oracle reads std's annotations, not its feature defaults map: a default std sets there (Ruled surface's cubic interpolation)
 is checked by hand.
 
-Field rows: 199 (fixed 166, accepted 23, open 10); visibility states differing now: 13.
+Field rows: 199 (fixed 178, accepted 12, open 9); visibility states differing now: 13.
 
 | # | Feature | Field | P | Difference (std = live) | Status |
 |---|---|---|---|---|---|
@@ -229,29 +229,29 @@ Field rows: 199 (fixed 166, accepted 23, open 10); visibility states differing n
 | D113 | assignVariable | xOffset | P3 | value: std `Length 0..500 =0.000000000000 / 0.000000000000` / ours `Length -500..500 =0.000000000000 / 0.000000000000` | ✅ (audit 6) |
 | D114 | assignVariable | yOffset | P3 | value: std `Length 0..500 =0.000000000000 / 0.000000000000` / ours `Length -500..500 =0.000000000000 / 0.000000000000` | ✅ (audit 6) |
 | D115 | assignVariable | zOffset | P3 | value: std `Length 0..500 =0.000000000000 / 0.000000000000` / ours `Length -500..500 =0.000000000000 / 0.000000000000` | ✅ (audit 6) |
-| D116 | boundarySurface | uProfilesArray | P3 | array item "profile" (std) vs "Profile" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
-| D117 | boundarySurface | vProfilesArray | P3 | array item "profile" (std) vs "Profile" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
+| D116 | boundarySurface | uProfilesArray | P3 | array item "profile" (std) vs "Profile" (ours) | ✅ (audit 8) |
+| D117 | boundarySurface | vProfilesArray | P3 | array item "profile" (std) vs "Profile" (ours) | ✅ (audit 8) |
 | D118 | constrainedSurface | vertices | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✅ (audit 7) |
 | D119 | cutlist | columnOverrides | P3 | array item "Column Override" (std) vs "Column override" (ours) | ✅ (audit 7) |
 | D120 | cutlist | columnOverrides | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✅ (audit 7) |
-| D121 | editCurve | controlPointEdits | P3 | array item "point override" (std) vs "Point override" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
+| D121 | editCurve | controlPointEdits | P3 | array item "point override" (std) vs "Point override" (ours) | ✅ (audit 8) |
 | D122 | editCurve | controlPointEdits | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✅ (audit 7) |
 | D123 | editCurve | editPointMode | P3 | option ids: std ['XYZ', 'UVN_TANGENT', 'UVN_CONTROL_POLYGON'] / ours ['XYZ', 'UVN_TANGENT', 'UVN_POLYGON'] | ✅ (audit 1, 11-01) |
 | D124 | editCurve | planeReference | P3 | option ids: std ['BEST', 'YZPLANE', 'XZPLANE', 'XYPLANE', 'CUSTOM'] / ours ['BEST', 'YZ', 'XZ', 'XY', 'CUSTOM'] | ✅ (audit 1, 11-01) |
-| D125 | editCurve | selectedIndices | P3 | array item "index" (std) vs "Index" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
+| D125 | editCurve | selectedIndices | P3 | array item "index" (std) vs "Index" (ours) | ✅ (audit 8) |
 | D126 | editCurve | selectedIndices | P3 | hints: std adds ['PREVENT_ARRAY_REORDER', 'X25'], ours adds [] | ✅ (audit 7) |
 | D127 | endcap | cornerDistance | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✅ (audit 6) |
 | D128 | endcap | cornerRadius | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✅ (audit 6) |
-| D129 | faceBlend | caps | P3 | array item "cap" (std) vs "Cap" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
+| D129 | faceBlend | caps | P3 | array item "cap" (std) vs "Cap" (ours) | ✅ (audit 8) |
 | D130 | faceBlend | crossSectionShape | P3 | tooltip: std "Cross sectional control", ours "" | ✅ (audit 5, 11-01) |
-| D131 | faceBlend | edgeLimits | P3 | array item "edge limit" (std) vs "Edge limit" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
-| D132 | fill | edges | P3 | array item "edge" (std) vs "Edge" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
+| D131 | faceBlend | edgeLimits | P3 | array item "edge limit" (std) vs "Edge limit" (ours) | ✅ (audit 8) |
+| D132 | fill | edges | P3 | array item "edge" (std) vs "Edge" (ours) | ✅ (audit 8) |
 | D133 | frame | cornerOverrides | P3 | array item "vertex" (std) vs "Corner" (ours) | ✅ (audit 7) |
 | D134 | frame | profileSketch | P3 | kind: std `reference PartStudio` / ours `text=""` (our own picker) | ✗ |
 | D135 | frame | selections | P3 | tooltip: std "Faces, edges, and vertices that define sweep paths", ours "" | ✅ (audit 5, 11-01) |
 | D136 | frame | trimBodies | P3 | tooltip: std "Parts to use as trim tools", ours "" | ✅ (audit 5, 11-01) |
 | D137 | frame | trimPlanes | P3 | tooltip: std "Planes and planar faces to use as trim tools", ours "" | ✅ (audit 5, 11-01) |
-| D138 | frameTrim | frameGroups | P3 | array item "group" (std) vs "Group" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
+| D138 | frameTrim | frameGroups | P3 | array item "group" (std) vs "Group" (ours) | ✅ (audit 8) |
 | D139 | frameTrim | frameGroups | P3 | tooltip: std "Frame segments in earlier groups are used as tools for later groups", ours "" | ✅ (audit 5, 11-01) |
 | D140 | frameTrim | targets | P3 | tooltip: std "Parts to trim using trim tool", ours "" | ✅ (audit 5, 11-01) |
 | D141 | frameTrim | tool | P3 | tooltip: std "Face, plane, mate connector, or planar face to use as trim tool", ours "" | ✅ (audit 5, 11-01) |
@@ -264,7 +264,7 @@ Field rows: 199 (fixed 166, accepted 23, open 10); visibility states differing n
 | D148 | offsetCurveOnFace | scope | P3 | option ids: std ['OFFSET', 'OFFSET_AND_EXTEND', 'OFFSET_EXTEND_AND_SPLIT'] / ours ['OFFSET', 'OFFSET_EXTEND', 'OFFSET_EXTEND_SPLIT'] | ✅ (audit 1, 11-01) |
 | D149 | pcbEnd | entitiesToUnfold | P3 | hints: std adds ['FOCUS_ON_VISIBLE'], ours adds [] | ✅ (audit 6) |
 | D150 | pcbStart | bendsIncluded | P3 | tooltip: std "Check to include the clearance for bends", ours "" | ✅ (audit 5, 11-01) |
-| D151 | queryVariable | additionalQueries | P3 | array item "additional query" (std) vs "Additional query" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
+| D151 | queryVariable | additionalQueries | P3 | array item "additional query" (std) vs "Additional query" (ours) | ✅ (audit 8) |
 | D152 | queryVariable | edgeAdjacentEntityType | P3 | option ids: std ['ALL', 'EDGE', 'FACE'] / ours ['EDGES_AND_FACES', 'EDGES', 'FACES'] | ✅ (audit 1, 11-01) |
 | D153 | queryVariable | vertexAdjacentEntityType | P3 | option ids: std ['ALL', 'EDGE', 'VERTEX', 'FACE'] / ours ['ALL', 'EDGES', 'VERTICES', 'FACES'] | ✅ (audit 1, 11-01) |
 | D154 | routingCurve | addPointOnAxisDrag | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
@@ -280,7 +280,7 @@ Field rows: 199 (fixed 166, accepted 23, open 10); visibility states differing n
 | D164 | routingCurve | orthoCsys | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
 | D165 | routingCurve | orthoCsysMate | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
 | D166 | routingCurve | overwritePoints | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
-| D167 | routingCurve | points | P3 | array item "point" (std) vs "Point" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
+| D167 | routingCurve | points | P3 | array item "point" (std) vs "Point" (ours) | ✅ (audit 8) |
 | D168 | routingCurve | points | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✅ (audit 7) |
 | D169 | routingCurve | pointsEditType | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
 | D170 | routingCurve | pointsEditType | P3 | option ids: std ['SINGLE', 'MULTI'] / ours ['SINGLE', 'MULTIPLE'] | ✅ (audit 1, 11-01) |
@@ -293,7 +293,7 @@ Field rows: 199 (fixed 166, accepted 23, open 10); visibility states differing n
 | D177 | routingCurve | startColumn | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D178 | routingCurve | targetLength | P3 | value: std `Length -500..500 =0.025000000000 / 0.025400000000` / ours `Length 0.00001..500 =0.025000000000 / 0.025400000000` | ✅ (audit 6) |
 | D179 | ruledSurface | cornerType | P3 | option ids: std ['SPUN', 'EXTENDED', 'LOFTED', 'NO_CORNER'] / ours ['SPUN', 'EXTENDED', 'LOFTED', 'NONE'] | ✅ (audit 1, 11-01) |
-| D180 | ruledSurface | vertexOverrides | P3 | array item "arrayItem" (std) vs "Vertex" (ours) | ✗ |
+| D180 | ruledSurface | vertexOverrides | P3 | array item "arrayItem" (std) vs "Vertex" (ours) | ✅ (audit 8) |
 | D181 | sheetMetalCorner | cornerReliefScale | P3 | hints: std adds [], ours adds ['REMEMBER_PREVIOUS_VALUE'] | ✅ (audit 6) |
 | D182 | sheetMetalCornerBreak | crossSection | P3 | tooltip: std "Cross sectional control", ours "" | ✅ (audit 5, 11-01) |
 | D183 | sheetMetalCornerBreak | filletWidth | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✅ (audit 6) |
@@ -309,18 +309,10 @@ Field rows: 199 (fixed 166, accepted 23, open 10); visibility states differing n
 | D193 | sheetMetalHem | useMinimalGapForTipGap | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✅ (audit 6) |
 | D194 | sheetMetalJog | bendAngle | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
 | D195 | sheetMetalJog | bendAngle | P3 | value: std `Angle 0.017453292519943295..6.281439977927592 =1.570796326795 / 1.570796326795` / ours `Angle 0.017453292519943295..3.12413936106985 =1.570796326795 / 1.570796326795` | ✅ (audit 6) |
-| D196 | sheetMetalLoft | connections | P3 | array item "connection" (std) vs "Connection" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
+| D196 | sheetMetalLoft | connections | P3 | array item "connection" (std) vs "Connection" (ours) | ✅ (audit 8) |
 | D197 | sheetMetalStart | bendsIncluded | P3 | tooltip: std "Check to include the clearance for bends", ours "" | ✅ (audit 5, 11-01) |
 | D198 | tag | additionalColumns | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds ['UNCONFIGURABLE'] | ✅ (audit 1, 11-01) |
 | D199 | tag | cSysMateConnector | P3 | tooltip: std "If none selected, this feature will create one at Origin", ours "" | ✅ (audit 5, 11-01) |
-
-New rows since the first run:
-
-| # | Feature | Field | P | Difference | Status |
-|---|---|---|---|---|---|
-| N1 | routingCurve | selectedIndices | P3 | array item "index" (std) vs "Index" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
-| N2 | queryVariable | additionalQueries | P2 | array row label: std Some("#booleanOperation of #addQlowercaseSelectionType"), ours Some("#booleanOperation of #addQselectionType") | ✗ |
-| N3 | frame | cornerOverrides | P3 | array item "vertex" (std) vs "Vertex" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
 
 ### Visibility states that differ (current run)
 

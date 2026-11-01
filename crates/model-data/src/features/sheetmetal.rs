@@ -488,7 +488,7 @@ pub fn sheet_metal_loft() -> FeatureType {
         ParamSpec::array(
             "connections",
             "Match connections",
-            "Connection",
+            "connection",
             vec![ParamSpec::query("connectionEntities", "Vertices or edges", QueryFilter::EDGE | QueryFilter::VERTEX), ParamSpec::bool("isRip", "Rip", false)],
         )
         .item_template("#connectionEntities")

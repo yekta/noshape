@@ -99,7 +99,7 @@ pub fn face_blend() -> FeatureType {
         ParamSpec::array(
             "caps",
             "Caps",
-            "Cap",
+            "cap",
             vec![ParamSpec::query1("entity", "Cap entity", QueryFilter::ANY_FACE | QueryFilter::PLANE), ParamSpec::flip("capFlip", "Flip cap")],
         )
         .item_template("#entity")
@@ -114,7 +114,7 @@ pub fn face_blend() -> FeatureType {
         ParamSpec::array(
             "edgeLimits",
             "Edge limits",
-            "Edge limit",
+            "edge limit",
             vec![ParamSpec::query1("edge", "Edge limit", QueryFilter::ANY_EDGE), ParamSpec::query1("edgeLimitSide", "Side", QueryFilter::ANY_FACE)],
         )
         .item_template("#edge")

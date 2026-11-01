@@ -1097,7 +1097,9 @@ impl FeatureDialog {
     /// An array item's label from its template (FeatureScript "Item label
     /// template"): `#param` = the item's value of that parameter (a pick's
     /// name, an option's label, a value as typed), `#index` = its position.
-    fn item_label(&self, template: &str, item: &ParamValues, specs: &[ParamSpec], index: usize) -> String {
+    /// `arr`: the array's id; an empty text field reads the value the model
+    /// computed for it (`{arr}.{index}.{param}`, Query variable's row label).
+    fn item_label(&self, template: &str, item: &ParamValues, specs: &[ParamSpec], arr: &str, index: usize) -> String {
         let mut out = String::new();
         let mut rest = template;
         while let Some(at) = rest.find('#') {
@@ -1111,6 +1113,10 @@ impl FeatureDialog {
                     (ParamKind::Query { .. }, _) => item.query(name).first().map(|r| (self.labeler)(r)).unwrap_or_default(),
                     (ParamKind::Enum { options, default }, _) => options.iter().find(|(id, _)| item.is(name, id)).or_else(|| options.iter().find(|(id, _)| id == default)).map(|(_, l)| l.to_string()).unwrap_or_default(),
                     (_, Some(ParamValue::Expr(e))) => e.text.clone(),
+                    (ParamKind::Text { .. }, v) => match v {
+                        Some(ParamValue::Text(t)) if !t.is_empty() => t.clone(),
+                        _ => self.computed.get(&format!("{arr}.{index}.{name}")).cloned().unwrap_or_default(),
+                    },
                     (_, Some(ParamValue::Bool(b))) => b.to_string(),
                     _ => String::new(),
                 },
@@ -2926,7 +2932,7 @@ impl FeatureDialog {
                     for k in 0..items {
                         let r = q.and_then(|q| values.array(arr_id).get(k).and_then(|it| it.query(q.id).first().cloned()));
                         let label = match (s.item_template, values.array(arr_id).get(k)) {
-                            (Some(t), Some(it)) => self.item_label(t, it, item_specs, k),
+                            (Some(t), Some(it)) => self.item_label(t, it, item_specs, arr_id, k),
                             _ => r.as_ref().map(|r| (self.labeler)(r)).unwrap_or_default(),
                         };
                         let item_key = format!("{arr_id}.{k}");
@@ -3101,7 +3107,7 @@ impl FeatureDialog {
                                 h_flex()
                                     .justify_between()
                                     .child(div().text_size(px(13.33)).text_color(pal.text_muted).child(match (s.item_template, values.array(arr_id).get(k)) {
-                                        (Some(t), Some(it)) => self.item_label(t, it, item_specs, k),
+                                        (Some(t), Some(it)) => self.item_label(t, it, item_specs, arr_id, k),
                                         _ => format!("{} {}", capitalize(item_label), k + 1),
                                     }))
                                     .child(
