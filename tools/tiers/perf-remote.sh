@@ -23,11 +23,11 @@ echo "== perf on $(hostname -s) at $sha: cargo test --release $*"
 cargo test --release --locked --no-run "$@" > /tmp/perf-build-$$.log 2>&1 || { tail -20 /tmp/perf-build-$$.log; echo "PERF FAILED: build"; exit 1; }
 times=()
 for i in $(seq "$runs"); do
-  take_slots 2   # the machine to ourselves, in arrival order with the lands (tools/tiers/slots.sh)
+  take_slots all   # the machine to ourselves, in arrival order with the lands (tools/tiers/slots.sh)
   t0=$(date +%s.%N)
   out=$(cargo test --release --locked "$@" 2>&1); rc=$?
   wall=$(echo "$(date +%s.%N) - $t0" | bc)
-  exec 8>&- 9>&-
+  release_slots
   # The measure is the tests' own run time (libtest's "finished in", summed over test binaries), not cargo's wall
   # time: a rebuild cargo decides on between the build and the run (an OCCT library synced in meanwhile) once added
   # 395 s to a 161 s knurl (10-30).

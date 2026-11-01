@@ -12,10 +12,24 @@ All scripts take extra cargo args (`--locked`, `-p <crate>`, `--release`). Set `
 
 ## Landing: `tools/tiers/land.sh` (lead, 10-27)
 
-The only way to put work on main. It rebases on origin/main, runs clippy and the full tests of every crate the change
-touches plus every crate that depends on them (T0 too when the app, ops or cli is affected), and pushes only if all
-of it is green. Docs-only changes push without a build. Main red from a pushed change means land.sh wasn't used.
+The only way to put work on main. It rebases on origin/main, runs clippy over the whole workspace and the full tests
+of every crate the change touches plus the crates that use them directly (T0 too when the app, ops or cli is
+affected), and pushes only if all of it is green. Deeper dependents' tests run in the watcher right after (11-01). The
+checks run on the land server vibe4 (16 cores, three lands at a time, in arrival order), else vibe3. Docs-only changes push without a build. Main red from a pushed change means land.sh wasn't used.
 A flaky test (passes alone, fails in parallel, or fails now and then) goes to T2 at once with a ticket for its owner.
+
+## Building and testing on vibe4: `tools/tiers/rb.sh` (lead, 11-01)
+
+Run builds and tests on vibe4, not on this machine (agents' builds kept it at 2–3× its cores and agents spent ~80 % of
+their day waiting on compiles). `tools/tiers/rb.sh <command>` syncs your worktree as it is (uncommitted changes too)
+to vibe4, runs the command there in your worktree's own warm target dir and streams the output; its exit code is the
+command's. `--get <bin>` copies a built binary back into `$CARGO_TARGET_DIR/debug/` to run the app here (GUI checks).
+Measured: noshape-model's test build cold 188 s, unchanged 7 s, after a one-line model-core change 11 s.
+```
+tools/tiers/rb.sh cargo test -p noshape-brep --lib
+tools/tiers/rb.sh --get noshape cargo build -p noshape   # then run $CARGO_TARGET_DIR/debug/noshape here
+```
+Heavy jobs (replay corpora, long probes, sweeps) run there too: vibe4 has 62 GB of memory and 400 GB of disk.
 
 ## T0 smoke
 

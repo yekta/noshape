@@ -1,6 +1,6 @@
 #!/bin/bash
-# land.sh's checks for one change, run here or on the land server (tools/tiers/land-remote.sh): clippy and the full tests
-# of the given crates, T0 when the app / agent API is affected, ops' menu coverage when a UI crate changed.
+# land.sh's checks for one change, run here or on the land server (tools/tiers/land-remote.sh): clippy over the workspace,
+# the full tests of the given crates, T0 when the app / agent API is affected, ops' menu coverage when a UI crate changed.
 # Usage: land-checks.sh "<crates>" <file listing the changed paths>
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -11,7 +11,7 @@ fail() { echo "LAND FAILED: $*"; exit 1; }
 [ -n "${NOSHAPE_CONFIG_DIR:-}" ] || { NOSHAPE_CONFIG_DIR=$(mktemp -d -t noshape-config-XXXXXX); export NOSHAPE_CONFIG_DIR; }
 args=$(for p in $pkgs; do printf -- '-p %s ' "$p"; done)
 # Decide on cargo's exit code (with pipefail a grep can't decide it), then show the relevant lines.
-echo "== clippy"; out=$(cargo clippy $args --all-targets -- -D warnings 2>&1); rc=$?
+echo "== clippy (workspace)"; out=$(cargo clippy --workspace --all-targets -- -D warnings 2>&1); rc=$?
 [ $rc -eq 0 ] || { echo "$out" | grep -vE '^warning: [a-z0-9_-]+@' | grep -E '^(error|warning)' -A6 | head -60; fail "clippy"; }
 echo "== tests"; out=$(cargo test $args --no-fail-fast 2>&1); rc=$?
 [ $rc -eq 0 ] || { echo "$out" | grep -vE '^warning: [a-z0-9_-]+@' | grep -E 'FAILED|panicked|^error|SIGSEGV|signal:|Caused by' -A2 | head -60; fail "tests"; }
