@@ -454,8 +454,8 @@ Done and queued: G26 per-occurrence state (Assembly::occurrences; isolate / tran
 scene, picking and ops; nested row menu; agent API paths "Sub <1>/Part 1 <1>"), G29 Flow in the Preferences lists,
 G13 Insert image Libraries (our generated environment maps), SM-MAKE-JOINT-ONE-EDGE (root cause: two models' parts
 named their fresh faces alike; a part whose names are taken now gets its own). Audit: 25 surfaces, 30 gaps, 29 fixed.
-Open: G30 Display states dialog (live request 13:15), then a whole dump of the assembly Mass and section properties
-panel (our dumps of it are empty). Not done in G26: Move to new subassembly from a nested row.
+G30 Display states fixed (25f9e103 queued). Audit 25 surfaces, 30 gaps, 30 fixed. Waiting: live request 13:45
+(assembly Mass and section properties panel whole dump). Not done in G26: Move to new subassembly from a nested row.
 
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
