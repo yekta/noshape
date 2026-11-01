@@ -625,13 +625,8 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
   (2) The instance list's right-click on 2 selected instances (live behaviours "Multi-select (2 fixed instances) in
   the list", assembly/533) reads "Replace instances…" and ends "… Create empty subassembly · Clear selection ·
   Delete"; ours says "Replace 2 instances…" (live's graphics menu says that) and has no Clear selection.
-- (11-01 01:13) land72 (eb3aeaba, the cancel gap) was SIGTERMed during clippy on vibe3 after waiting 645 s for a slot; I
-  re-ran it with the cursor / sheet commit on top. If that was the slot ordering, nothing is needed from you.
-- (10-31 20:12) vibe3 land slots, again: land/psui-ca9568fe waited 3465 s (58 min) while lands started after it (cliapp,
-  core) took the slots: the 5 s `flock -n` poll has no queue order, and a perf baseline job (remote-baseline.sh) holds
-  slot 1's fd for its whole run. A FIFO (ticket file / flock on a queue) would stop the starvation.
-- (10-31 13:03) vibe3 land slots: dev4's perf job `perf/remote-dev4.sh` (pid 3945711, started ~11:12) held land slot 1
-  for over 80 min blocked in `flock 9`; with dev4's land on slot 2, my land waited 41 min (2450 s) for a slot.
+- (11-01 02:00) The land-slot requests (10-31 13:03, 20:12, 11-01 01:13) are resolved by 0abc635f (slots in arrival
+  order); land73–75 went through. The 10-31 12:01 note below was passed to skasm by the user.
 - (10-31 12:01) For skasm: ops e2e `sheet_metal_table_ops` steps (Bend A radius 3 → Move up → Convert Bend B to rip) leave
   the model, in about half the runs, with **no bends and only "Joint A"** (the other half: Bend A + Joint B). The test
   didn't check the table there so it passes either way; ids are random per run, so std's joint matching looks
