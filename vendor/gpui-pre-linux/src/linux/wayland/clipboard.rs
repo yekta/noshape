@@ -114,7 +114,16 @@ impl<T: ReceiveData> DataOffer<T> {
         // copying from eg: firefox inserts a lot of blank
         // lines, and that is super annoying.
         let result = text_content.replace("\r\n", "\n");
-        Some(ClipboardItem::new_string(result))
+        let mut item = ClipboardItem::new_string(result.clone());
+        // Spreadsheet cells (tab-separated or several lines): their HTML too,
+        // which keeps merged cells and formatting (noshape: Paste as table).
+        if (result.contains('\t') || result.trim_end().contains('\n'))
+            && self.has_mime_type("text/html")
+            && let Some(html) = self.read_bytes(connection, "text/html").and_then(|b| String::from_utf8(b).ok())
+        {
+            item.entries.push(ClipboardEntry::Html(html));
+        }
+        Some(item)
     }
 
     fn read_image(&self, connection: &Connection) -> Option<ClipboardItem> {
