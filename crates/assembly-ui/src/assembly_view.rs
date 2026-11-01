@@ -2115,7 +2115,9 @@ impl AssemblyView {
         if self.pattern.as_ref().is_some_and(|p| p.active == Some(2) || (matches!(p.kind, PatternDialogKind::Linear | PatternDialogKind::Circular) && p.active.is_some())) {
             return Some(PickMode::Entity);
         }
-        if self.mc.as_ref().is_some_and(|m| m.active) || self.pattern.as_ref().is_some_and(|p| p.active.is_some()) || self.snap.is_some() || self.mass_connector_picking() {
+        // Snap mode's own picks wait while an inserted instance is being
+        // placed: its click places it (snapped: with a Fastened mate).
+        if self.mc.as_ref().is_some_and(|m| m.active) || self.pattern.as_ref().is_some_and(|p| p.active.is_some()) || (self.snap.is_some() && self.placing.is_none()) || self.mass_connector_picking() {
             return Some(PickMode::Inference);
         }
         None
@@ -2531,6 +2533,18 @@ impl AssemblyView {
                         explode: self.explode_edit,
                         nested: None,
                     });
+                    return;
+                }
+                // An inserted instance being placed: its click places it
+                // (snapped: with a Fastened mate, live 1704), not snap
+                // mode's own drag of what is under the pointer.
+                // (In snap mode the viewport sends tool events, no Click.)
+                if self.placing.is_some() {
+                    if self.snap.is_some() && self.placing_point.is_some() {
+                        self.pointer = *position;
+                        self.update_placing(cx);
+                        self.finish_placing(true, window, cx);
+                    }
                     return;
                 }
                 if self.snap.is_some() {

@@ -1484,7 +1484,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
-- [ ] P2 SNAP-INSERT-FACE (skasm 11-01, assembly.md I14; also v0.4.16, not new) Snap mode on, Insert › a pin with an
+- [ ] P2 SNAP-INSERT-FACE (skasm 11-01, assembly.md I14; also v0.4.16, not new; **click fixed 11-01**: the press in snap mode placed nothing (tool events, no Click) and started snap mode's own drag; now it places with the Fastened mate, as live 1704. **Left:** live snaps a hovered face to its centroid connector (ours: the nearest inference point, e.g. an edge midpoint), and live's result is 180° about X with the explicit bottom-circle connector's Z out of the pin (−Z), ours 180° about Y: compare the circle-edge connector frame with live's evMateConnector (origin (70,10,0), Z (0,0,−1), X (1,0,0))) Snap mode on, Insert › a pin with an
   explicit mate connector on its bottom circle, hover the block's plain top face: the pin is placed with its connector on
   the face's connector, Z aligned, so it hangs inside the opaque block (only its bottom face shows, amber); a click
   then does not add a Fastened mate: the pin jumps away flipped (rotation 180° about Y, ui/i14b.noshape: Part 2 <3> at
