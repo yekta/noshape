@@ -386,7 +386,7 @@ pub fn routing_curve() -> FeatureType {
         ParamSpec::query1("curveBaseCSys", "Curve reference", QueryFilter::POINT_LIKE).describe("Point or mate connector used as reference for the curve. Defaults to origin.").visible(points),
         ParamSpec::enum_("pointsEditType", "Point edit type", &[("SINGLE", "Single"), ("MULTI", "Multiple")]).hints(Hints::HORIZONTAL_ENUM | Hints::UNCONFIGURABLE).visible(points),
         ParamSpec::query1("multiEditReference", "Edit reference", QueryFilter::POINT_LIKE).visible(move |v| points(v) && !single(v)),
-        ParamSpec::array("selectedIndices", "Selected points", "Point", vec![ParamSpec::num("indexValue", "Point index", NumSpec::integer(0, 0, 10_000))])
+        ParamSpec::array("selectedIndices", "Selected points", "Index", vec![ParamSpec::num("indexValue", "Point index", NumSpec::integer(0, 0, 10_000))])
             .item_template("Selected point #indexValue")
             .hints(Hints::PREVENT_ARRAY_REORDER | Hints::ALLOW_ARRAY_FOCUS)
             .visible(move |v| points(v) && !single(v)),

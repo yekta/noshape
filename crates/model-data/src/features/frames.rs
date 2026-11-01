@@ -132,7 +132,7 @@ pub fn cut_list() -> FeatureType {
         ParamSpec::array(
             "columnOverrides",
             "Overrides",
-            "Column override",
+            "Column Override",
             vec![
                 hidden(ParamSpec::bool("isFirst", "Is first", false)),
                 ParamSpec::bool("sameFramesAsPrevious", "Same frames as previous", true).visible(|v| !v.bool("isFirst")),

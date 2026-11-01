@@ -22,7 +22,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | Render Studio / Display states (1713) | live | live: no Display states in a Part Studio; Render Studio only as an Upgrade-gated tab type (cloud plan) | 0 |
 | View cube (right-click, arrows, hover) | live 1714 | every face / edge / corner / arrow gives the empty-space menu, no tooltips: = ours | 0 |
 
-**Counts (11-01, audit 7):** surfaces audited 9 of 9. Dialogs: 199 field rows (+ 2 found in later runs) + 52 visibility states; fixed 164 rows and 39 states; accepted 7; open 28 + 2 rows + 13 states; 57 of 75 dialogs equal std (37 at first). Found outside the oracle (A rows): 14; fixed 12, open 2 (A1 asked, REQUESTS 1722; A10 core).
+**Counts (11-01, audit 7):** surfaces audited 9 of 9. Dialogs: 199 field rows (+ 3 found in later runs) + 52 visibility states; fixed 166 rows and 39 states; accepted 23 (+ 2 later rows); open 10 (+ 1) rows + 13 states; 58 of 75 dialogs equal std (37 at first). Open: Helix End radius and Routing curve point titles (asked live, REQUESTS 1722), the four reference pickers (Variable CSV, Frame profile, Derived, Form), Ruled surface's item name, Query variable's row label. Found outside the oracle (A rows): 14; fixed 12, open 2 (A1 asked, REQUESTS 1722; A10 core).
 
 ## Found outside the oracle (in the app, std's code, live)
 
@@ -51,7 +51,7 @@ which fields show); P3: internal (option ids under the same labels, configurabil
 oracle reads std's annotations, not its feature defaults map: a default std sets there (Ruled surface's cubic interpolation)
 is checked by hand.
 
-Field rows: 199 (fixed 164, accepted 7, open 28); visibility states differing now: 13.
+Field rows: 199 (fixed 166, accepted 23, open 10); visibility states differing now: 13.
 
 | # | Feature | Field | P | Difference (std = live) | Status |
 |---|---|---|---|---|---|
@@ -95,13 +95,13 @@ Field rows: 199 (fixed 164, accepted 7, open 28); visibility states differing no
 | D38 | frame | selections | P2 | hints: std adds [], ours adds ['ALLOW_QUERY_ORDER'] | ✅ (audit 5, 11-01) |
 | D39 | frameTrim | frameGroups | P2 | array item fields differ: std [frames "Frames" query max None hints 0x0 "Frame segments are trimmed against preceding groups and are used as… ours [frames "Frames" query max None hints 0x0 "" None]… | ✅ (audit 6) |
 | D40 | frameTrim | frameGroups | P2 | array row label: std Some("#frames"), ours None | ✅ (audit 2, 11-01) |
-| D41 | gusset | chamfer | P2 | hints: std adds [], ours adds ['FIRST_IN_ROW'] | ✗ |
+| D41 | gusset | chamfer | P2 | hints: std adds [], ours adds ['FIRST_IN_ROW'] | – std pairs a DISPLAY_SHORT boolean with the DISPLAY_SHORT field after it; ours marks the pair's first field FIRST_IN_ROW for the same one row |
 | D42 | helix | endRadToggle | P2 | hints: std adds [], ours adds ['DISPLAY_SHORT', 'FIRST_IN_ROW'] | ✗ |
 | D43 | helix | endRadius | P2 | hints: std adds [], ours adds ['DISPLAY_SHORT'] | ✗ |
-| D44 | importDerived | mateConnectorId | P2 | extra: ours has "Base mate connector", std has no `mateConnectorId` | ✗ |
+| D44 | importDerived | mateConnectorId | P2 | extra: ours has "Base mate connector", std has no `mateConnectorId` | – std has it too, declared `isAnything` (importDerived.fs:98), which the oracle cannot read |
 | D45 | intersectionCurve | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
 | D46 | isoparametricCurve | directionType | P2 | default option: std U_DIRECTION / ours U | ✅ (audit 1, 11-01) |
-| D47 | mateConnector | flipPrimary | P2 | hints: std adds ['FIRST_IN_ROW', 'OPPOSITE_DIRECTION'], ours adds ['PRIMARY_AXIS'] | ✗ |
+| D47 | mateConnector | flipPrimary | P2 | hints: std adds ['FIRST_IN_ROW', 'OPPOSITE_DIRECTION'], ours adds ['PRIMARY_AXIS'] | – drawn as live draws it: the 26 px flip button in one row with Reorient secondary axis |
 | D48 | mutualTrim | body1 | P2 | label: std "First set of surfaces", ours "First surface" | ✅ (audit 3, 11-01) |
 | D49 | mutualTrim | body2 | P2 | label: std "Second set of surfaces", ours "Second surface" | ✅ (audit 3, 11-01) |
 | D50 | offsetCurveOnFace | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
@@ -114,7 +114,7 @@ Field rows: 199 (fixed 164, accepted 7, open 28); visibility states differing no
 | D57 | queryVariable | additionalQueries | P2 | array row label: std Some("#booleanOperation of #addQlowercaseSelectionType"), ours None | ✅ (audit 3, 11-01) |
 | D58 | queryVariable | edgeAdjacentEntityType | P2 | default option: std ALL / ours EDGES_AND_FACES | ✅ (audit 1, 11-01) |
 | D59 | routingCurve | csvUnit | P2 | options: std ['Centimeter', 'Foot', 'Inch', 'Millimeter', 'Meter', 'Yard'] / ours ['Meter', 'Centimeter', 'Millimeter', 'Inch', 'Foot', 'Yard'] | ✅ (audit 1, 11-01) |
-| D60 | routingCurve | hasTargetLength | P2 | hints: std adds [], ours adds ['FIRST_IN_ROW'] | ✗ |
+| D60 | routingCurve | hasTargetLength | P2 | hints: std adds [], ours adds ['FIRST_IN_ROW'] | – std pairs a DISPLAY_SHORT boolean with the DISPLAY_SHORT field after it; ours marks the pair's first field FIRST_IN_ROW for the same one row |
 | D61 | routingCurve | inputsGroup | P2 | missing: std has "Inputs" (a group) | ✅ (audit 2, 11-01) |
 | D62 | routingCurve | points | P2 | array item fields differ: std [index "Point index" Integer 0..10000 =0.000000000000 / 0.000000000000 hints 0x8000 "" None, referenceType "Re… ours [referenceType "Reference" enum[("ORIGIN", "Origin"), ("VERTEX", "Vertex"), ("CURVE", "Curve"), ("RELATIVE", "… | ✗ |
 | D63 | routingCurve | points | P2 | array row label: std Some("Point #index"), ours None | ✗ |
@@ -139,7 +139,7 @@ Field rows: 199 (fixed 164, accepted 7, open 28); visibility states differing no
 | D82 | sheetMetalHem | hemCornerType | P2 | hints: std adds ['REMEMBER_PREVIOUS_VALUE', 'SHOW_LABEL'], ours adds [] | ✅ (audit 2, 11-01) |
 | D83 | sheetMetalJog | oppositeAngleFromDirection | P2 | hints: std adds ['OPPOSITE_DIRECTION'], ours adds ['OPPOSITE_DIRECTION_CIRCULAR'] | ✅ (audit 2, 11-01) |
 | D84 | sheetMetalJog | oppositeAngleFromDirection | P2 | label: std "Opposite direction angle", ours "Opposite angle" | ✅ (audit 2, 11-01) |
-| D85 | sheetMetalLoft | connections | P2 | array item fields differ: std [connectionEntities "Vertices or edges" query max None hints 0x0 "" None, isRip "Rip" bool=false hints 0x0 "" … ours [connectionEntities "Vertices or edges" query max None hints 0x0 "" None, isRip "Rip" bool=false hints 0x0 "" … | ✗ |
+| D85 | sheetMetalLoft | connections | P2 | array item fields differ: std [connectionEntities "Vertices or edges" query max None hints 0x0 "" None, isRip "Rip" bool=false hints 0x0 "" … ours [connectionEntities "Vertices or edges" query max None hints 0x0 "" None, isRip "Rip" bool=false hints 0x0 "" … | – the two extra std fields (Edge queries, Edge parameters) are ALWAYS_HIDDEN storage std's editing logic fills; nothing is shown |
 | D86 | sheetMetalLoft | connections | P2 | array row label: std Some("#connectionEntities"), ours None | ✅ (audit 2, 11-01) |
 | D87 | sheetMetalStart | hasSecondDirection | P2 | hints: std adds [], ours adds ['GROUP_HEADER'] | ✅ (audit 2, 11-01) |
 | D88 | sheetMetalStart | offsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✅ (audit 5, 11-01) |
@@ -170,29 +170,29 @@ Field rows: 199 (fixed 164, accepted 7, open 28); visibility states differing no
 | D113 | assignVariable | xOffset | P3 | value: std `Length 0..500 =0.000000000000 / 0.000000000000` / ours `Length -500..500 =0.000000000000 / 0.000000000000` | ✅ (audit 6) |
 | D114 | assignVariable | yOffset | P3 | value: std `Length 0..500 =0.000000000000 / 0.000000000000` / ours `Length -500..500 =0.000000000000 / 0.000000000000` | ✅ (audit 6) |
 | D115 | assignVariable | zOffset | P3 | value: std `Length 0..500 =0.000000000000 / 0.000000000000` / ours `Length -500..500 =0.000000000000 / 0.000000000000` | ✅ (audit 6) |
-| D116 | boundarySurface | uProfilesArray | P3 | array item "profile" (std) vs "Profile" (ours) | ✗ |
-| D117 | boundarySurface | vProfilesArray | P3 | array item "profile" (std) vs "Profile" (ours) | ✗ |
+| D116 | boundarySurface | uProfilesArray | P3 | array item "profile" (std) vs "Profile" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
+| D117 | boundarySurface | vProfilesArray | P3 | array item "profile" (std) vs "Profile" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
 | D118 | constrainedSurface | vertices | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✅ (audit 7) |
-| D119 | cutlist | columnOverrides | P3 | array item "Column Override" (std) vs "Column override" (ours) | ✗ |
+| D119 | cutlist | columnOverrides | P3 | array item "Column Override" (std) vs "Column override" (ours) | ✅ (audit 7) |
 | D120 | cutlist | columnOverrides | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✅ (audit 7) |
-| D121 | editCurve | controlPointEdits | P3 | array item "point override" (std) vs "Point override" (ours) | ✗ |
+| D121 | editCurve | controlPointEdits | P3 | array item "point override" (std) vs "Point override" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
 | D122 | editCurve | controlPointEdits | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✅ (audit 7) |
 | D123 | editCurve | editPointMode | P3 | option ids: std ['XYZ', 'UVN_TANGENT', 'UVN_CONTROL_POLYGON'] / ours ['XYZ', 'UVN_TANGENT', 'UVN_POLYGON'] | ✅ (audit 1, 11-01) |
 | D124 | editCurve | planeReference | P3 | option ids: std ['BEST', 'YZPLANE', 'XZPLANE', 'XYPLANE', 'CUSTOM'] / ours ['BEST', 'YZ', 'XZ', 'XY', 'CUSTOM'] | ✅ (audit 1, 11-01) |
-| D125 | editCurve | selectedIndices | P3 | array item "index" (std) vs "Index" (ours) | ✗ |
+| D125 | editCurve | selectedIndices | P3 | array item "index" (std) vs "Index" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
 | D126 | editCurve | selectedIndices | P3 | hints: std adds ['PREVENT_ARRAY_REORDER', 'X25'], ours adds [] | ✅ (audit 7) |
 | D127 | endcap | cornerDistance | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✅ (audit 6) |
 | D128 | endcap | cornerRadius | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✅ (audit 6) |
-| D129 | faceBlend | caps | P3 | array item "cap" (std) vs "Cap" (ours) | ✗ |
+| D129 | faceBlend | caps | P3 | array item "cap" (std) vs "Cap" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
 | D130 | faceBlend | crossSectionShape | P3 | tooltip: std "Cross sectional control", ours "" | ✅ (audit 5, 11-01) |
-| D131 | faceBlend | edgeLimits | P3 | array item "edge limit" (std) vs "Edge limit" (ours) | ✗ |
-| D132 | fill | edges | P3 | array item "edge" (std) vs "Edge" (ours) | ✗ |
+| D131 | faceBlend | edgeLimits | P3 | array item "edge limit" (std) vs "Edge limit" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
+| D132 | fill | edges | P3 | array item "edge" (std) vs "Edge" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
 | D133 | frame | cornerOverrides | P3 | array item "vertex" (std) vs "Corner" (ours) | ✅ (audit 7) |
 | D134 | frame | profileSketch | P3 | kind: std `reference PartStudio` / ours `text=""` (our own picker) | ✗ |
 | D135 | frame | selections | P3 | tooltip: std "Faces, edges, and vertices that define sweep paths", ours "" | ✅ (audit 5, 11-01) |
 | D136 | frame | trimBodies | P3 | tooltip: std "Parts to use as trim tools", ours "" | ✅ (audit 5, 11-01) |
 | D137 | frame | trimPlanes | P3 | tooltip: std "Planes and planar faces to use as trim tools", ours "" | ✅ (audit 5, 11-01) |
-| D138 | frameTrim | frameGroups | P3 | array item "group" (std) vs "Group" (ours) | ✗ |
+| D138 | frameTrim | frameGroups | P3 | array item "group" (std) vs "Group" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
 | D139 | frameTrim | frameGroups | P3 | tooltip: std "Frame segments in earlier groups are used as tools for later groups", ours "" | ✅ (audit 5, 11-01) |
 | D140 | frameTrim | targets | P3 | tooltip: std "Parts to trim using trim tool", ours "" | ✅ (audit 5, 11-01) |
 | D141 | frameTrim | tool | P3 | tooltip: std "Face, plane, mate connector, or planar face to use as trim tool", ours "" | ✅ (audit 5, 11-01) |
@@ -205,7 +205,7 @@ Field rows: 199 (fixed 164, accepted 7, open 28); visibility states differing no
 | D148 | offsetCurveOnFace | scope | P3 | option ids: std ['OFFSET', 'OFFSET_AND_EXTEND', 'OFFSET_EXTEND_AND_SPLIT'] / ours ['OFFSET', 'OFFSET_EXTEND', 'OFFSET_EXTEND_SPLIT'] | ✅ (audit 1, 11-01) |
 | D149 | pcbEnd | entitiesToUnfold | P3 | hints: std adds ['FOCUS_ON_VISIBLE'], ours adds [] | ✅ (audit 6) |
 | D150 | pcbStart | bendsIncluded | P3 | tooltip: std "Check to include the clearance for bends", ours "" | ✅ (audit 5, 11-01) |
-| D151 | queryVariable | additionalQueries | P3 | array item "additional query" (std) vs "Additional query" (ours) | ✗ |
+| D151 | queryVariable | additionalQueries | P3 | array item "additional query" (std) vs "Additional query" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
 | D152 | queryVariable | edgeAdjacentEntityType | P3 | option ids: std ['ALL', 'EDGE', 'FACE'] / ours ['EDGES_AND_FACES', 'EDGES', 'FACES'] | ✅ (audit 1, 11-01) |
 | D153 | queryVariable | vertexAdjacentEntityType | P3 | option ids: std ['ALL', 'EDGE', 'VERTEX', 'FACE'] / ours ['ALL', 'EDGES', 'VERTICES', 'FACES'] | ✅ (audit 1, 11-01) |
 | D154 | routingCurve | addPointOnAxisDrag | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
@@ -221,14 +221,14 @@ Field rows: 199 (fixed 164, accepted 7, open 28); visibility states differing no
 | D164 | routingCurve | orthoCsys | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
 | D165 | routingCurve | orthoCsysMate | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
 | D166 | routingCurve | overwritePoints | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
-| D167 | routingCurve | points | P3 | array item "point" (std) vs "Point" (ours) | ✗ |
+| D167 | routingCurve | points | P3 | array item "point" (std) vs "Point" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
 | D168 | routingCurve | points | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✅ (audit 7) |
 | D169 | routingCurve | pointsEditType | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
 | D170 | routingCurve | pointsEditType | P3 | option ids: std ['SINGLE', 'MULTI'] / ours ['SINGLE', 'MULTIPLE'] | ✅ (audit 1, 11-01) |
 | D171 | routingCurve | samples | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D172 | routingCurve | segmentEditType | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
 | D173 | routingCurve | segmentEditType | P3 | option ids: std ['ADD', 'ORTHOGONAL'] / ours ['ADD_POINTS', 'ORTHOGONAL_PATH'] | ✅ (audit 1, 11-01) |
-| D174 | routingCurve | selectedIndices | P3 | array item "index" (std) vs "Point" (ours) | ✗ |
+| D174 | routingCurve | selectedIndices | P3 | array item "index" (std) vs "Point" (ours) | ✅ (audit 7) |
 | D175 | routingCurve | selectedIndices | P3 | hints: std adds ['PREVENT_ARRAY_REORDER', 'X25'], ours adds [] | ✅ (audit 7) |
 | D176 | routingCurve | showCSys | P3 | tooltip: std "Show coordinate system of the reference used by the current vertex.", ours "" | ✅ (audit 5, 11-01) |
 | D177 | routingCurve | startColumn | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
@@ -250,7 +250,7 @@ Field rows: 199 (fixed 164, accepted 7, open 28); visibility states differing no
 | D193 | sheetMetalHem | useMinimalGapForTipGap | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✅ (audit 6) |
 | D194 | sheetMetalJog | bendAngle | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
 | D195 | sheetMetalJog | bendAngle | P3 | value: std `Angle 0.017453292519943295..6.281439977927592 =1.570796326795 / 1.570796326795` / ours `Angle 0.017453292519943295..3.12413936106985 =1.570796326795 / 1.570796326795` | ✅ (audit 6) |
-| D196 | sheetMetalLoft | connections | P3 | array item "connection" (std) vs "Connection" (ours) | ✗ |
+| D196 | sheetMetalLoft | connections | P3 | array item "connection" (std) vs "Connection" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
 | D197 | sheetMetalStart | bendsIncluded | P3 | tooltip: std "Check to include the clearance for bends", ours "" | ✅ (audit 5, 11-01) |
 | D198 | tag | additionalColumns | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds ['UNCONFIGURABLE'] | ✅ (audit 1, 11-01) |
 | D199 | tag | cSysMateConnector | P3 | tooltip: std "If none selected, this feature will create one at Origin", ours "" | ✅ (audit 5, 11-01) |
@@ -259,8 +259,9 @@ New rows since the first run:
 
 | # | Feature | Field | P | Difference | Status |
 |---|---|---|---|---|---|
-| N1 | queryVariable | additionalQueries | P2 | array row label: std Some("#booleanOperation of #addQlowercaseSelectionType"), ours Some("#booleanOperation of #addQselectionType") | ✗ |
-| N2 | frame | cornerOverrides | P3 | array item "vertex" (std) vs "Vertex" (ours) | ✗ |
+| N1 | routingCurve | selectedIndices | P3 | array item "index" (std) vs "Index" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
+| N2 | queryVariable | additionalQueries | P2 | array row label: std Some("#booleanOperation of #addQlowercaseSelectionType"), ours Some("#booleanOperation of #addQselectionType") | ✗ |
+| N3 | frame | cornerOverrides | P3 | array item "vertex" (std) vs "Vertex" (ours) | – live shows the item names capitalized ("Profile 1", "Group 1"; behaviours 911, 8612, 9421): std's lowercase item name is not shown as is |
 
 ### Visibility states that differ (current run)
 
