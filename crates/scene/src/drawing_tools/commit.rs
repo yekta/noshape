@@ -207,12 +207,18 @@ impl SheetPick<'_> {
                     Pick::Line { a, .. } => a.view,
                     _ => return,
                 };
-                // A snap point, a model edge, any drawn line (silhouettes have no
-                // model edge), else the clicked point itself.
+                // A circle or arc: its centre (live request 1718: the value
+                // is always to the circle centre); a snap point, a model
+                // edge, any drawn line (silhouettes have no model edge),
+                // else the clicked point itself.
                 let e = self
-                    .snap_at(self.cursor)
-                    .filter(|p| p.view == view)
-                    .map(Pick::Point)
+                    .circle_pick(self.cursor)
+                    .or_else(|| self.arc_pick())
+                    .and_then(|c| match c {
+                        Pick::Circle { view: v, center, r, .. } | Pick::Arc { view: v, center, r, .. } if v == view => Some(Pick::Point(PickedPoint { view, p: center, r })),
+                        _ => None,
+                    })
+                    .or_else(|| self.snap_at(self.cursor).filter(|p| p.view == view).map(Pick::Point))
                     .or_else(|| self.line_pick().filter(|l| matches!(l, Pick::Line { a, .. } if a.view == view)))
                     .or_else(|| self.raw_line_pick().filter(|l| matches!(l, Pick::Line { a, .. } if a.view == view)))
                     .or_else(|| self.placement(view).filter(|pl| pl.contains(self.cursor, 2.0)).map(|pl| Pick::Point(PickedPoint { view, p: pl.to_view(self.cursor), r: None })));

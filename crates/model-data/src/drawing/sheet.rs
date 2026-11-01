@@ -2148,14 +2148,6 @@ impl SheetGeometry {
                         let w = [ev[0] / el, ev[1] / el];
                         self.lines.push(Polyline2 { points: vec![[e[0] + w[0], e[1] + w[1]], [pe[0] + w[0] * 2.0, pe[1] + w[1] * 2.0]], style: LineStyle::Thin, closed: false, pick });
                     }
-                    let far = if *direct { [on_axis[0] - n[0] * off, on_axis[1] - n[1] * off] } else { [on_axis[0] - n[0] * sg * 6.0, on_axis[1] - n[1] * sg * 6.0] };
-                    self.lines.push(Polyline2 { points: vec![pe, far], style: LineStyle::Thin, closed: false, pick });
-                    self.arrow(pe, [n[0] * sg, n[1] * sg], 3.0);
-                    // The flip node by the arrow.
-                    self.grips.push(Grip { pick, pos: [pe[0] - n[0] * sg * 4.0, pe[1] - n[1] * sg * 4.0], kind: GripKind::Handle });
-                    if *direct {
-                        self.arrow(far, [-n[0] * sg, -n[1] * sg], 3.0);
-                    }
                     let model_off = {
                         let (m0, m1) = (axis[0], axis[1]);
                         let md = [m1[0] - m0[0], m1[1] - m0[1]];
@@ -2163,13 +2155,43 @@ impl SheetGeometry {
                         ((edge[0] - m0[0]) * -md[1] / ml + (edge[1] - m0[1]) * md[0] / ml).abs()
                     };
                     let txt = env.text(a, model_off * 2.0, false, "Ø");
+                    // Read from below or the right (a vertical value reads
+                    // upwards: live request 1718).
                     let mut ang = n[1].atan2(n[0]);
-                    if ang > std::f64::consts::FRAC_PI_2 + 1e-9 || ang < -std::f64::consts::FRAC_PI_2 - 1e-9 {
+                    if ang > std::f64::consts::FRAC_PI_2 + 1e-9 || ang < -std::f64::consts::FRAC_PI_2 + 1e-9 {
                         ang += std::f64::consts::PI;
                     }
                     let up = [-ang.sin(), ang.cos()];
-                    let mid = [(pe[0] + on_axis[0]) / 2.0 + up[0] * 1.2, (pe[1] + on_axis[1]) / 2.0 + up[1] * 1.2];
-                    self.dim_label(mid, ang, 0.5, false, &txt, dh, pick);
+                    let tw = self.dim_label_width(&txt, dh);
+                    if *direct {
+                        // Display as regular diameter: across the axis to the
+                        // mirrored edge, both arrows, the value in the middle.
+                        let far = [on_axis[0] - n[0] * off, on_axis[1] - n[1] * off];
+                        self.lines.push(Polyline2 { points: vec![pe, far], style: LineStyle::Thin, closed: false, pick });
+                        self.arrow(pe, [n[0] * sg, n[1] * sg], 3.0);
+                        self.arrow(far, [-n[0] * sg, -n[1] * sg], 3.0);
+                        let mid = [(pe[0] + on_axis[0]) / 2.0 + up[0] * 1.2, (pe[1] + on_axis[1]) / 2.0 + up[1] * 1.2];
+                        self.dim_label(mid, ang, 0.5, false, &txt, dh, pick);
+                    } else {
+                        // Live (request 1718): one line from the edge's foot
+                        // to the pointer's side, at least the value long
+                        // (away from the axis when the pointer is level), one
+                        // arrow at the foot pointing away from the line, the
+                        // value along the line at its far end; no line to
+                        // the axis.
+                        let s = dot([a.position[0] - a0[0], a.position[1] - a0[1]], n);
+                        let min = tw + 2.0;
+                        let s_end = if (s - off).abs() >= min { s } else { off + sg * min };
+                        let end = [on_axis[0] + n[0] * s_end, on_axis[1] + n[1] * s_end];
+                        self.lines.push(Polyline2 { points: vec![pe, end], style: LineStyle::Thin, closed: false, pick });
+                        let back = if s_end > off { -1.0 } else { 1.0 };
+                        self.arrow(pe, [n[0] * back, n[1] * back], 3.0);
+                        let w = [-n[0] * back, -n[1] * back];
+                        let mid = [end[0] - w[0] * (tw / 2.0 + 0.5) + up[0] * 1.2, end[1] - w[1] * (tw / 2.0 + 0.5) + up[1] * 1.2];
+                        self.dim_label(mid, ang, 0.5, false, &txt, dh, pick);
+                    }
+                    // The flip node by the arrow.
+                    self.grips.push(Grip { pick, pos: [pe[0] - n[0] * sg * 4.0, pe[1] - n[1] * sg * 4.0], kind: GripKind::Handle });
                 }
                 AnnotationKind::DatumTarget { view, anchor, label, area } => {
                     let p = env.to_sheet(*view, *anchor);

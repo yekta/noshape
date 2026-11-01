@@ -1275,15 +1275,17 @@ fn foreshortened_dimensions() {
     let f = pl.to_sheet([0.03, 0.035]);
     let leader = built.geometry.lines.iter().find(|l| l.pick == p && l.points.len() == 4).expect("jogged leader");
     assert!((leader.points[0][0] - f[0]).abs() < 1e-9 && (leader.points[0][1] - f[1]).abs() < 1e-9);
-    // Half diameter: one dimension line crossing the axis; direct: both ends on the cylinder.
+    // Half diameter: one dimension line from the edge's foot to the
+    // pointer's side (live request 1718; not across the axis); direct: both
+    // ends on the cylinder.
     let fp = pl.to_sheet([0.0, 0.0]);
     let _ = fp;
     let p1 = pick_of(&built, PickTarget::Annotation(id + 1));
     let p2 = pick_of(&built, PickTarget::Annotation(id + 2));
     let fpl = built.placement(ViewId(1)).unwrap();
     let axis_x = fpl.to_sheet([0.0, 0.0])[0];
-    let half = built.geometry.lines.iter().filter(|l| l.pick == p1 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9).map(|l| l.points[1][0]).next().unwrap();
-    assert!((half - (axis_x - 6.0)).abs() < 1e-6, "overshoots the axis by 6 mm: {half} vs {axis_x}");
+    let half = built.geometry.lines.iter().find(|l| l.pick == p1 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9).map(|l| [l.points[0][0] - axis_x, l.points[1][0] - axis_x]).unwrap();
+    assert!((half[0].abs() - 12.0).abs() < 1e-6 && (half[1] - (110.0 - axis_x)).abs() < 1e-6, "from the edge's foot to the pointer: {half:?}");
     let full = built.geometry.lines.iter().filter(|l| l.pick == p2 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9).map(|l| l.points[1][0]).next().unwrap();
     assert!((full - (axis_x - 12.0)).abs() < 1e-6);
     // Its flip node (D17) puts it on the other side of the axis, the value kept.
@@ -1291,8 +1293,8 @@ fn foreshortened_dimensions() {
     drawing.sheets[0].annotations.iter_mut().find(|a| a.id == id + 1).unwrap().flip_arrows = true;
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let p1 = pick_of(&built, PickTarget::Annotation(id + 1));
-    let half = built.geometry.lines.iter().filter(|l| l.pick == p1 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9).map(|l| l.points[1][0]).next().unwrap();
-    assert!((half - (axis_x + 6.0)).abs() < 1e-6, "flipped: {half} vs {axis_x}");
+    let flipped = built.geometry.lines.iter().find(|l| l.pick == p1 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9).map(|l| [l.points[0][0] - axis_x, l.points[1][0] - axis_x]).unwrap();
+    assert!((flipped[0] + half[0]).abs() < 1e-6 && (flipped[1] - half[1]).abs() < 1e-6, "flipped: {flipped:?} vs {half:?}");
     assert_eq!(built.geometry.texts.iter().filter(|t| t.pick == p1).map(|t| t.text.clone()).collect::<Vec<_>>(), ["Ø24"]);
 }
 

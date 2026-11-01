@@ -43,7 +43,7 @@ impl DrawingEditor {
             },
             Tool::Dimension { kind: DimTool::Foreshorten, picks } => match picks.len() {
                 0 => "Select the axis: a centerline (or automatic centerline) or a straight edge",
-                1 => "Select the cylinder's silhouette edge or a point on it",
+                1 => "Select a circle, arc, edge or point to measure from the axis",
                 _ => "Click to place the dimension",
             },
             Tool::BrokenOut { done: false, .. } => "Click the points of the closed profile in a view; click the first point (or Enter, double-click) to close it",
@@ -396,7 +396,7 @@ impl DrawingEditor {
                 }
             }
             &AnnotationKind::ForeshortenedDiameter { view, axis, edge, direct } => {
-                let label = if direct { "Display as foreshorten diameter" } else { "Display as direct diameter" };
+                let label = if direct { "Display as foreshorten diameter" } else { "Display as regular diameter" };
                 out.push(MenuEntry::item(label, move |t, _, cx| set_kind(t, "Foreshortened diameter", AnnotationKind::ForeshortenedDiameter { view, axis, edge, direct: !direct }, cx)));
             }
             &AnnotationKind::OrdinateGroup { view, origin, horizontal, .. } => {
