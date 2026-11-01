@@ -1929,6 +1929,20 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
             tolerant.emplace_back(i, m(k));
         }
       }
+    if (std::getenv("NOSHAPE_X_TOL"))
+      for (const auto& [i, x] : tolerant)
+      {
+        bool inner = x.Orientation() != TopAbs_FORWARD && x.Orientation() != TopAbs_REVERSED;
+        if (x.ShapeType() == TopAbs_EDGE)
+          for (TopExp_Explorer fe(srcs[i]->shape, TopAbs_EDGE); fe.More(); fe.Next())
+            if (fe.Current().IsSame(x) && fe.Current().Orientation() != TopAbs_FORWARD && fe.Current().Orientation() != TopAbs_REVERSED)
+              inner = true;
+        if (x.ShapeType() == TopAbs_FACE)
+          for (TopExp_Explorer fe(srcs[i]->shape, TopAbs_FACE); fe.More(); fe.Next())
+            if (fe.Current().IsSame(x) && fe.Current().Orientation() != TopAbs_FORWARD && fe.Current().Orientation() != TopAbs_REVERSED)
+              inner = true;
+        fprintf(stderr, "TOLERANT arg %zu type %d tol %g internal %d\n", i, (int)x.ShapeType(), tol_of(x), (int)inner);
+      }
     const double exact   = 2 * std::max(rest, 1e-7);
     // (Tolerant vertices and edges alone: noshape's Boolean goes by each one's own tolerance, OCCT's rule, the
     // Boolean's by the rest.)
