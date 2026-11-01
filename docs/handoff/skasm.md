@@ -421,6 +421,12 @@ docs/parity/audit-sketch-assembly.md: every live surface of sketch / assembly / 
 <dump> lists a dump's labels missing from our sources. Waiting on live: REQUESTS "sketch tool options whole dump"
 (then ask the exploded-views / named-positions menus per state for G6). Next: the sketch tool options once answered,
 a UI test pinning the assembly menus to live's dumps, G7 (vendor input clear-button tooltip).
+11-01 later: audit 18 surfaces, 16 gaps, 9 fixed. Landed 1183f939 (tooltips); next commit: the **Flow** sketch constraint
+(G12, P1, live 1716: tangent + G2 + equal dκ/ds; sketch equations FlowSide / FlowNum, Nurbs::eval_ders3), the BOM
+excluded-row tooltip, assembly-ui UI test the_instance_and_top_row_menus_are_lives. Open in order: G16 (Curvature/Flow
+from a far start with an arc don't converge; live moves the arc), G11 Insert DXF dialog, G13 Insert image Libraries,
+G14 Constraint manager types / In context, G6 (live request posted 10:00), G15, G7. Flow isn't in Preferences ›
+Shortcut toolbars (SKETCH_PREFS_LIST, from an older live dump): check when live's list is re-dumped.
 
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows

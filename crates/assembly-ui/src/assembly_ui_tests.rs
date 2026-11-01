@@ -127,3 +127,79 @@ fn a_mate_gets_its_heads_up_check_after_the_second_pick(cx: &mut TestAppContext)
     })
     .unwrap();
 }
+
+/// A menu as its labels: "—" for a separator, "Label ▸" for a submenu;
+/// separators collapse as `fill_menu` draws them.
+fn labels(entries: &[super::MenuEntry]) -> Vec<String> {
+    use super::MenuEntry;
+    let mut out: Vec<String> = Vec::new();
+    for e in entries {
+        let l = match e {
+            MenuEntry::Item { label, .. } => label.clone(),
+            MenuEntry::Sub { label, .. } => format!("{label} ▸"),
+            MenuEntry::Sep if out.last().is_none_or(|l| l == "—") => continue,
+            MenuEntry::Sep => "—".into(),
+        };
+        out.push(l);
+    }
+    while out.last().is_some_and(|l| l == "—") {
+        out.pop();
+    }
+    out
+}
+
+/// Live's menus (dom/context-menus-assembly.txt, behaviours 1222) for a
+/// part instance in the list and in the graphics and for the top row, less
+/// "Add comment" (collaboration, cloud) and the separator it sits between.
+#[gpui::test]
+fn the_instance_and_top_row_menus_are_lives(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "menus");
+    let sep = "—";
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let p1 = instance(v, "Part 1 <1>", cx);
+            v.selected.clear();
+            // rmb-asm-list-instance.
+            assert_eq!(
+                labels(&v.instance_menu(p1, false, cx)),
+                [
+                    "Properties…", "Instance properties…", sep,
+                    "Hide", "Hide other instances", "Hide all instances", "Show center of mass", "Isolate…", "Make transparent…", "Suppress", "Dynamic suppression ▸", "Fix", "Use best available tessellation", sep,
+                    "Edit in context", "Add mate connector to instance origin…", "Replace instances…", "Switch to Part Studio 1", sep,
+                    "Copy Part 1 <1>", sep,
+                    "Move to new subassembly", "Change to version…", "Export…", "Release…", sep,
+                    "Zoom to selection", sep,
+                    "Create Drawing of Part 1…", sep,
+                    "Add selection to folder…", "Create empty subassembly", sep,
+                    "Delete",
+                ]
+            );
+            // rmb-asm-two-instances-selected (one instance, nothing selected
+            // before; "View normal to" needs a face under the pointer).
+            assert_eq!(
+                labels(&v.instance_menu(p1, true, cx)),
+                [
+                    "Hide", "Hide other instances", "Hide all instances", "Show center of mass", "Isolate…", "Make transparent…", "Section view…", "Suppress Part 1 <1>", "Fix", "Use best available tessellation", sep,
+                    "Copy Part 1 <1>", sep,
+                    "Create Drawing of Part 1…", "Create Drawing of Assembly 1…", "Export…", sep,
+                    "Edit in context", "Find in instance list", "Add mate connector to instance origin…", "Replace Part 1 <1>…", "Switch to Part Studio 1", sep,
+                    "Select other…", sep,
+                    "Zoom to fit", "Zoom to selection", sep,
+                    "Delete Part 1 <1>",
+                ]
+            );
+            // rmb-asm-list-top-assembly.
+            assert_eq!(
+                labels(&v.assembly_menu(cx)),
+                [
+                    "Properties…", "Show instance list properties", sep,
+                    "Rename", "Show center of mass", "Check interference…", sep,
+                    "Create Drawing of Assembly 1…", "Add exploded view…", sep,
+                    "Export…", "Release…", sep,
+                    "Expand all", "Collapse all",
+                ]
+            );
+        })
+    })
+    .unwrap();
+}

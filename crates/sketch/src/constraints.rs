@@ -53,6 +53,10 @@ pub enum ConstraintKind {
     Collinear { a: EntityId, b: EntityId },
     /// G2 continuity at a joint (spline/arc/line endpoints). Implies tangency.
     Curvature { a: EntityId, b: EntityId },
+    /// G3 ("Flow") continuity at a joint: G2 and the same rate of change of
+    /// curvature. Implies tangency and curvature (no Tangent / Curvature
+    /// beside it, live 1716).
+    Flow { a: EntityId, b: EntityId },
     /// A sketch point pinned to external (projected) geometry.
     Pierce { point: EntityId, target: EntityId },
     /// Line `a` is `ratio` times as long as line `b` (keeps the aspect of a
@@ -167,6 +171,7 @@ impl ConstraintKind {
             | Equal { a, b }
             | Collinear { a, b }
             | Curvature { a, b }
+            | Flow { a, b }
             | LengthRatio { a, b, .. }
             | Distance { a, b, .. }
             | HorizontalDistance { a, b, .. }
@@ -247,6 +252,7 @@ impl ConstraintKind {
             | Equal { a, b }
             | Collinear { a, b }
             | Curvature { a, b }
+            | Flow { a, b }
             | LengthRatio { a, b, .. }
             | Distance { a, b, .. }
             | HorizontalDistance { a, b, .. }
@@ -337,6 +343,7 @@ impl ConstraintKind {
             Normal { .. } => "Normal",
             Collinear { .. } => "Collinear",
             Curvature { .. } => "Curvature",
+            Flow { .. } => "Flow",
             Pierce { .. } => "Pierce",
             LengthRatio { .. } => "Length ratio",
             Distance { .. } => "Distance",
@@ -590,7 +597,7 @@ impl Sketch {
                             aux.push(cv.closest(pp).0);
                         }
             }
-            K::Tangent { a, b } | K::Curvature { a, b } => {
+            K::Tangent { a, b } | K::Curvature { a, b } | K::Flow { a, b } => {
                 let (Some(ka), Some(kb)) = (self.kind_of(*a), self.kind_of(*b)) else { return (h, aux) };
                 let (a, b, ka, kb) = if tangent_rank(ka) <= tangent_rank(kb) { (*a, *b, ka, kb) } else { (*b, *a, kb, ka) };
                 h.end_a = self.nearest_end(a, b);

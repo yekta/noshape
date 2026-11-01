@@ -1175,6 +1175,7 @@ Selects the entities and applies the constraint tool, as in the UI (select-first
 - normal: line normal to a curve
 - pierce: point pierces external geometry
 - curvature: curvature continuity at a joint
+- flow: flow (G3) continuity at a joint: tangent, equal curvature and equal rate of change of curvature (a spline, conic or Bezier with a line, arc or spline)
 
 Examples:
 
@@ -1188,7 +1189,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
-| `constraint` | one of `coincident`, `concentric`, `parallel`, `tangent`, `horizontal`, `vertical`, `midpoint`, `perpendicular`, `equal`, `symmetric`, `fix`, `normal`, `pierce`, `curvature` | required | Constraint. |
+| `constraint` | one of `coincident`, `concentric`, `parallel`, `tangent`, `horizontal`, `vertical`, `midpoint`, `perpendicular`, `equal`, `symmetric`, `fix`, `normal`, `pierce`, `curvature`, `flow` | required | Constraint. |
 | `entities` | array of string | required | Sketch entity ids, or the origin (`origin`) to constrain to it. |
 
 #### sketch_dimension

@@ -107,6 +107,64 @@ impl CurvSide {
     }
 }
 
+/// One side of a Flow (G3) joint, evaluated numerically: its curvature
+/// and its rate of change of curvature along the arc length, both oriented
+/// away from the joint.
+#[derive(Clone, Debug)]
+pub(crate) enum FlowSide {
+    /// Lines and arcs: their curvature from the arc's centre and end
+    /// (`sign` as [`CurvSpec::Arc`]), a line none; no change of curvature.
+    Const { arc: Option<f64> },
+    /// A control-point curve's end (B-spline, Bezier, conic): inputs its
+    /// first `k` control points from that end inward.
+    Ctrl { tmpl: Arc<Nurbs>, at_end: bool, k: usize },
+    /// A fit spline's end: inputs its points, then its handles.
+    Fit { n: usize, at_end: bool, handles: bool },
+}
+
+impl FlowSide {
+    fn arity(&self) -> usize {
+        match self {
+            FlowSide::Const { arc } => if arc.is_some() { 4 } else { 0 },
+            FlowSide::Ctrl { k, .. } => 2 * k,
+            FlowSide::Fit { n, handles, .. } => 2 * n + if *handles { 4 } else { 0 },
+        }
+    }
+
+    /// (curvature, d curvature / ds) at the joint, oriented away from it.
+    fn values(&self, x: &[f64]) -> (f64, f64) {
+        let (c, at_end) = match self {
+            FlowSide::Const { arc: None } => return (0.0, 0.0),
+            FlowSide::Const { arc: Some(sign) } => return (curv(&CurvSpec::Arc { sign: *sign }, x), 0.0),
+            FlowSide::Ctrl { tmpl, at_end, k } => {
+                let mut c = (**tmpl).clone();
+                let n = c.ctrl.len();
+                for j in 0..*k {
+                    c.ctrl[if *at_end { n - 1 - j } else { j }] = glam::DVec2::new(x[2 * j], x[2 * j + 1]);
+                }
+                (c, *at_end)
+            }
+            FlowSide::Fit { n, at_end, handles } => {
+                let c = if *handles { fit_curve_handles(x, *n) } else { fit_curve(x, *n) };
+                let Some(c) = c else { return (0.0, 0.0) };
+                (c, *at_end)
+            }
+        };
+        let (a, b) = c.domain();
+        let d = c.eval_ders3(if at_end { b } else { a });
+        // Away from the joint: the parameter reversed at the curve's end.
+        let s = if at_end { -1.0 } else { 1.0 };
+        let (d1, d2, d3) = (d[1] * s, d[2], d[3] * s);
+        let l = d1.length();
+        if l < 1e-300 {
+            return (0.0, 0.0);
+        }
+        let k = d1.perp_dot(d2) / (l * l * l);
+        let dk = (d1.perp_dot(d3) / (l * l * l) - 3.0 * d1.perp_dot(d2) * d1.dot(d2) / l.powi(5)) / l;
+        (k, dk)
+    }
+}
+
 impl CurvSpec {
     fn arity(&self) -> usize {
         match self {
@@ -157,6 +215,10 @@ pub(crate) enum EqKind {
     /// Sum of oriented end curvatures (G2) with a fit spline on either side:
     /// evaluated numerically.
     CurvatureNum { a: CurvSide, b: CurvSide },
+    /// A Flow joint: with `g3` the difference of the two sides' rates of
+    /// change of curvature (equal across a G3 joint when each is taken away
+    /// from it), else the sum of their curvatures (G2).
+    FlowNum { a: FlowSide, b: FlowSide, g3: bool },
 }
 
 #[derive(Clone, Debug)]
@@ -293,7 +355,7 @@ fn kernel<T: Num>(kind: &EqKind, x: &[T]) -> T {
             let na = a.arity();
             curv(a, &x[..na]) + curv(b, &x[na..])
         }
-        EqKind::SplinePoint { .. } | EqKind::FitPoint { .. } | EqKind::FitEndDir { .. } | EqKind::FitFitDir { .. } | EqKind::CurvatureNum { .. } => {
+        EqKind::SplinePoint { .. } | EqKind::FitPoint { .. } | EqKind::FitEndDir { .. } | EqKind::FitFitDir { .. } | EqKind::CurvatureNum { .. } | EqKind::FlowNum { .. } => {
             // only evaluated through `eval_f64`
             T::cst(f64::NAN)
         }
@@ -535,6 +597,12 @@ thread_local! {
     static FIT_POINT_LAST: std::cell::RefCell<Option<FitPointGrad>> = const { std::cell::RefCell::new(None) };
 }
 
+fn flow_residual(a: &FlowSide, b: &FlowSide, g3: bool, x: &[f64]) -> f64 {
+    let na = a.arity();
+    let (va, vb) = (a.values(&x[..na]), b.values(&x[na..]));
+    if g3 { va.1 - vb.1 } else { va.0 + vb.0 }
+}
+
 /// Gradient by central differences of a small closed-form `f`.
 fn small_grad(f: impl Fn(&[f64]) -> f64, x: &[f64], g: &mut [f64]) -> f64 {
     let mut xx: SmallVec<[f64; 16]> = SmallVec::from_slice(x);
@@ -619,6 +687,7 @@ impl Eq {
                 let na = a.arity();
                 a.curvature(&x[..na]) + b.curvature(&x[na..])
             }
+            EqKind::FlowNum { a, b, g3 } => flow_residual(a, b, *g3, x),
             EqKind::FitEndDir { at_end, perp, n } => {
                 let Some(c) = fit_curve(x, *n) else { return 0.0 };
                 let (a, b) = c.domain();
@@ -695,6 +764,10 @@ impl Eq {
                 fit_end_grad(&x[..2 * na], na, false, *end_a, false, |q| dir_rel(glam::DVec2::new(q[0], q[1]), tb, perp), ga);
                 fit_end_grad(&x[2 * na..], nb, false, *end_b, false, |q| dir_rel(ta, glam::DVec2::new(q[0], q[1]), perp), gb);
                 return dir_rel(ta, tb, perp);
+            }
+            EqKind::FlowNum { a, b, g3 } => {
+                let (a, b, g3) = (a.clone(), b.clone(), *g3);
+                return small_grad(|q| flow_residual(&a, &b, g3, q), x, g);
             }
             EqKind::CurvatureNum { a, b } => {
                 g.iter_mut().for_each(|v| *v = 0.0);
@@ -1241,6 +1314,35 @@ impl<'a, L: Lookup> Builder<'a, L> {
         Ok((CurvSide::Spec(s), inp))
     }
 
+    fn flow_side(&self, id: EntityId, at_end: bool) -> Result<(FlowSide, SmallVec<[u32; 8]>), String> {
+        match self.geom(id)? {
+            Geometry::Line { .. } => Ok((FlowSide::Const { arc: None }, SmallVec::new())),
+            Geometry::Arc { center, start, end } => {
+                let (sign, p) = if at_end { (-1.0, *end) } else { (1.0, *start) };
+                Ok((FlowSide::Const { arc: Some(sign) }, cat(&[&self.lk.point(*center), &self.lk.point(p)])))
+            }
+            Geometry::FitSpline { points, handles } => {
+                let mut inp = SmallVec::new();
+                for p in points.iter().chain(handles.iter().flat_map(|(a, b)| [a, b])) {
+                    inp.extend_from_slice(&self.lk.point(*p));
+                }
+                Ok((FlowSide::Fit { n: points.len(), at_end, handles: handles.is_some() }, inp))
+            }
+            Geometry::BSpline { .. } | Geometry::Conic { .. } => {
+                let tmpl = self.spline_template(id)?;
+                let pts = self.spline_points(id)?;
+                // Derivatives up to the third at a clamped end take its first four points.
+                let k = pts.len().min(4);
+                let mut inp = SmallVec::new();
+                for j in 0..k {
+                    inp.extend_from_slice(&self.lk.point(pts[if at_end { pts.len() - 1 - j } else { j }]));
+                }
+                Ok((FlowSide::Ctrl { tmpl: Arc::new(tmpl), at_end, k }, inp))
+            }
+            _ => Err(format!("flow constraint not supported for {id}")),
+        }
+    }
+
     fn curv_spec(&self, id: EntityId, at_end: bool) -> Result<(CurvSpec, SmallVec<[u32; 8]>), String> {
         match self.geom(id)? {
             Geometry::Line { .. } => Ok((CurvSpec::Line, SmallVec::new())),
@@ -1545,6 +1647,19 @@ impl<'a, L: Lookup> Builder<'a, L> {
                     (CurvSide::Spec(sa), CurvSide::Spec(sb)) => self.push(EqKind::Curvature { a: sa, b: sb }, cat(&[&ia, &ib])),
                     (sa, sb) => self.push(EqKind::CurvatureNum { a: sa, b: sb }, cat(&[&ia, &ib])),
                 }
+                Ok(())
+            }
+            // Live 1716: tangent, G2 and G3 at the joint; the curves meet
+            // there (a Flow between curves that don't touch can't be solved).
+            K::Flow { a, b } => {
+                self.tangent(*a, *b, c)?;
+                let (ka, kb) = (self.kind(*a)?, self.kind(*b)?);
+                let (a, b) = if tangent_rank(ka) <= tangent_rank(kb) { (*a, *b) } else { (*b, *a) };
+                let (sa, ia) = self.flow_side(a, c.hints.end_a)?;
+                let (sb, ib) = self.flow_side(b, c.hints.end_b)?;
+                let inputs = cat(&[&ia, &ib]);
+                self.push(EqKind::FlowNum { a: sa.clone(), b: sb.clone(), g3: false }, inputs.clone());
+                self.push(EqKind::FlowNum { a: sa, b: sb, g3: true }, inputs);
                 Ok(())
             }
             K::Distance { a, b, value, mode } => self.distance(*a, *b, *value, *mode, c),

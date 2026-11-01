@@ -46,7 +46,7 @@ const DRAW_TOOLS: [(&str, Tool, &str); 19] = [
     ("elliptical_arc", Tool::EllipticalArc, "[center, major axis end, start point (also sets the minor radius), end point] (counter-clockwise)."),
 ];
 
-const CONSTRAINTS: [(&str, ConstraintTool, &str); 14] = [
+const CONSTRAINTS: [(&str, ConstraintTool, &str); 15] = [
     ("coincident", ConstraintTool::Coincident, "points/curves coincide (point on curve, collinear lines, same circle)"),
     ("concentric", ConstraintTool::Concentric, "centers of circles/arcs coincide"),
     ("parallel", ConstraintTool::Parallel, "lines parallel"),
@@ -61,6 +61,7 @@ const CONSTRAINTS: [(&str, ConstraintTool, &str); 14] = [
     ("normal", ConstraintTool::Normal, "line normal to a curve"),
     ("pierce", ConstraintTool::Pierce, "point pierces external geometry"),
     ("curvature", ConstraintTool::Curvature, "curvature continuity at a joint"),
+    ("flow", ConstraintTool::Flow, "flow (G3) continuity at a joint: tangent, equal curvature and equal rate of change of curvature (a spline, conic or Bezier with a line, arc or spline)"),
 ];
 
 const DIMENSION_KINDS: &str = "auto (what the Dimension tool infers from the entities and `label` position), distance (point/line/circle to point/line/circle; `mode` center|minimum|maximum for circles), horizontal_distance, vertical_distance, length (line or arc), radius, diameter, angle (two lines), arc_angle, centerline (twice the distance to a line: revolve diameters).";

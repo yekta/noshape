@@ -177,6 +177,7 @@ pub const SKETCH_CONSTRAINT_TOOLS: &[ConstraintTool] = &[
     ConstraintTool::Symmetric,
     ConstraintTool::Fix,
     ConstraintTool::Curvature,
+    ConstraintTool::Flow,
 ];
 
 /// Every sketch toolbar tool, in toolbar order (tool search).

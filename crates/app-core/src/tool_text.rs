@@ -106,6 +106,7 @@ pub const SKETCH: &[(&str, &str)] = &[
     ("Construction", "Sketch new construction geometry or convert existing sketch entities into construction geometry."),
     ("Corner rectangle", "Sketch a rectangle, starting with a corner point and ending with the diagonal corner point."),
     ("Curvature", "Create curvature continuous transitions between sketch splines or conics and surrounding geometry."),
+    ("Flow", "Create flow continuous transitions between sketch splines or conics and surrounding geometry."),
     ("Dimension", "Add dimensions to and between sketch entities."),
     ("Ellipse", "Sketch an ellipse by defining its center point, major axis, and minor axis."),
     ("Elliptical arc", "Sketch an elliptical arc by defining its center point, major axis, minor axis, start and end points."),

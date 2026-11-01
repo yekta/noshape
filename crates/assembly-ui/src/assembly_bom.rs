@@ -459,7 +459,8 @@ impl AssemblyView {
                 row = row.child(el);
             }
             // Row right-click: Switch to Part Studio (this document's parts).
-            let row_el = div().id(SharedString::from(format!("bom-row-{r}"))).child(row);
+            // Live (dom/assembly-bom-extra-columns): an excluded row's tooltip.
+            let row_el = div().id(SharedString::from(format!("bom-row-{r}"))).child(row).when(line.excluded, |d| d.tooltip(crate::ui::tooltip("Excluded from all BOMs")));
             let row_el = match &line.source {
                 BomSource::Part { studio, .. } => {
                     let (studio, v) = (*studio, view.clone());

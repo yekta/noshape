@@ -482,6 +482,8 @@ fn sk_constraint(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             }
             "FIX" => ConstraintKind::Fix { entity: need(i, first)? },
             "NORMAL" => ConstraintKind::Normal { line: need(i, first)?, curve: need(i, second)? },
+            // Live 1716: the Flow constraint (localFirst the spline / conic).
+            "EQUAL_CURVATURE_G3" => ConstraintKind::Flow { a: need(i, first)?, b: need(i, second)? },
             "MIRROR" => ConstraintKind::Symmetric { a: need(i, first)?, b: need(i, second)?, axis: need(i, ent("localMirror"))? },
             "LENGTH" => ConstraintKind::Length { curve: need(i, first)?, value: len.unwrap_or(0.0) },
             // `direction` (DimensionDirection): along the sketch's x / y or

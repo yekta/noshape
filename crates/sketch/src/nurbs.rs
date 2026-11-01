@@ -264,6 +264,31 @@ impl Nurbs {
         [c0, c1, c2]
     }
 
+    /// Point and first three derivatives at `u` (the Flow constraint's G3).
+    pub fn eval_ders3(&self, u: f64) -> [DVec2; 4] {
+        let p = self.degree;
+        let span = self.find_span(u);
+        let d = self.basis_ders(span, u, 3);
+        let mut a = [DVec2::ZERO; 4];
+        let mut w = [0.0; 4];
+        for k in 0..4 {
+            for j in 0..=p {
+                let i = span - p + j;
+                let wi = self.weight(i);
+                a[k] += self.ctrl[i] * (d[k][j] * wi);
+                w[k] += d[k][j] * wi;
+            }
+        }
+        if self.weights.is_none() {
+            return a;
+        }
+        let c0 = a[0] / w[0];
+        let c1 = (a[1] - c0 * w[1]) / w[0];
+        let c2 = (a[2] - c1 * (2.0 * w[1]) - c0 * w[2]) / w[0];
+        let c3 = (a[3] - c2 * (3.0 * w[1]) - c1 * (3.0 * w[2]) - c0 * w[3]) / w[0];
+        [c0, c1, c2, c3]
+    }
+
     pub fn point(&self, u: f64) -> DVec2 {
         self.eval_ders(u)[0]
     }

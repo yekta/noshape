@@ -381,3 +381,75 @@ fn a_conflicting_line_does_not_collapse_on_drag() {
     let (a, b) = ends(&sk);
     assert!((b - a).length() > 1e-6, "dragging the line itself doesn't collapse it: {a:?} {b:?}");
 }
+
+/// Curvature and its rate of change along the arc length at a curve's end,
+/// both taken away from that end (finite differences of the curvature).
+fn end_flow(c: &Curve2, at_end: bool) -> (f64, f64) {
+    let (a, b) = c.domain();
+    let h = (b - a) * 1e-5;
+    let (t0, t1, s) = if at_end { (b, b - h, -1.0) } else { (a, a + h, 1.0) };
+    let ds = (c.point(t1) - c.point(t0)).length();
+    let (k0, k1) = (c.curvature(t0) * s, c.curvature(t1) * s);
+    (k0, (k1 - k0) / ds)
+}
+
+/// Live 1716: Flow between a spline and a line it starts on makes the
+/// spline leave the line flat (tangent, no curvature, no change of
+/// curvature); with an arc at its end the spline's curvature matches the
+/// arc's and stops changing; a conic flattens onto a line.
+#[test]
+fn flow_makes_a_g3_joint() {
+    // (a) fit spline + line, joined at the spline's start.
+    let mut sk = Sketch::new();
+    let l = sk.add_line(v(-30.0, 0.0), v(0.0, 0.0));
+    let s = sk.add_fit_spline(&[v(0.0, 0.0), v(20.0, 10.0), v(40.0, 0.0)]).unwrap();
+    let ((_, le), (s0, _)) = (sk.endpoints(l).unwrap(), sk.endpoints(s).unwrap());
+    sk.add_constraint(ConstraintKind::Coincident { a: le, b: s0 }).unwrap();
+    sk.add_constraint(ConstraintKind::Flow { a: s, b: l }).unwrap();
+    let r = sk.solve();
+    assert!(r.is_solved(), "{r:?}");
+    let (sc, lc) = (sk.curve(s).unwrap(), sk.curve(l).unwrap());
+    let (k, dk) = end_flow(&sc, false);
+    assert!(k.abs() < 1e-5 && dk.abs() < 1e-4, "spline start: k {k}, dk/ds {dk}");
+    assert!(sc.tangent(sc.domain().0).normalize().perp_dot(lc.tangent(0.0).normalize()).abs() < 1e-6);
+
+    // (b) cubic B-spline ending on an arc.
+    let mut sk = Sketch::new();
+    let s = sk.add_bspline(&[v(0.0, 0.0), v(1.0, 1.0), v(2.0, -1.0), v(3.0, 0.0)], 3).unwrap();
+    let arc = sk.add_arc(v(3.0, 1.0), v(3.1, 0.1), v(4.0, 1.0));
+    let ((_, se), (a0, _)) = (sk.endpoints(s).unwrap(), sk.endpoints(arc).unwrap());
+    sk.add_constraint(ConstraintKind::Coincident { a: se, b: a0 }).unwrap();
+    sk.add_constraint(ConstraintKind::Flow { a: s, b: arc }).unwrap();
+    let r = sk.solve();
+    assert!(r.is_solved(), "{r:?}");
+    let (sc, ac) = (sk.curve(s).unwrap(), sk.curve(arc).unwrap());
+    let (k, dk) = end_flow(&sc, true);
+    let (ka, _) = end_flow(&ac, false);
+    assert!((k + ka).abs() < 1e-6, "G2: spline {k}, arc {ka}");
+    assert!(dk.abs() < 1e-4, "G3: dk/ds {dk}");
+
+    // (c) two fit splines.
+    let mut sk = Sketch::new();
+    let s = sk.add_fit_spline(&[v(0.0, 0.0), v(20.0, 10.0), v(40.0, 0.0)]).unwrap();
+    let t = sk.add_fit_spline(&[v(40.0, 0.0), v(55.0, -10.0), v(70.0, 0.0)]).unwrap();
+    let ((_, se), (t0, _)) = (sk.endpoints(s).unwrap(), sk.endpoints(t).unwrap());
+    sk.add_constraint(ConstraintKind::Coincident { a: se, b: t0 }).unwrap();
+    sk.add_constraint(ConstraintKind::Flow { a: s, b: t }).unwrap();
+    let r = sk.solve();
+    assert!(r.is_solved(), "{r:?}");
+    let ((ka, dka), (kb, dkb)) = (end_flow(&sk.curve(s).unwrap(), true), end_flow(&sk.curve(t).unwrap(), false));
+    assert!((ka + kb).abs() < 1e-5 && (dka - dkb).abs() < 1e-4, "G2 {ka} {kb}, G3 {dka} {dkb}");
+
+    // (d) conic + line.
+    let mut sk = Sketch::new();
+    let l = sk.add_line(v(-30.0, -30.0), v(0.0, -30.0));
+    let c = sk.add_conic(v(0.0, -30.0), v(15.0, -22.0), v(30.0, -30.0), 0.5).unwrap();
+    let ((_, le), (c0, _)) = (sk.endpoints(l).unwrap(), sk.endpoints(c).unwrap());
+    sk.add_constraint(ConstraintKind::Coincident { a: le, b: c0 }).unwrap();
+    sk.add_constraint(ConstraintKind::Flow { a: c, b: l }).unwrap();
+    let r = sk.solve();
+    assert!(r.is_solved(), "{r:?}");
+    let (k, dk) = end_flow(&sk.curve(c).unwrap(), false);
+    assert!(k.abs() < 1e-5 && dk.abs() < 1e-4, "conic start: k {k}, dk/ds {dk}");
+}
+

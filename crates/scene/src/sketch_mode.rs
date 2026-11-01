@@ -36,6 +36,7 @@ pub enum ConstraintTool {
     Normal,
     Pierce,
     Curvature,
+    Flow,
 }
 
 impl ConstraintTool {
@@ -55,6 +56,7 @@ impl ConstraintTool {
             ConstraintTool::Normal => "Normal (Shift+K)",
             ConstraintTool::Pierce => "Pierce (Shift+G)",
             ConstraintTool::Curvature => "Curvature (Shift+U)",
+            ConstraintTool::Flow => "Flow",
         }
     }
     pub fn icon(self) -> &'static str {
@@ -73,6 +75,7 @@ impl ConstraintTool {
             ConstraintTool::Normal => "normal",
             ConstraintTool::Pierce => "pierce",
             ConstraintTool::Curvature => "curvature",
+            ConstraintTool::Flow => "flow",
         }
     }
     /// Entities needed before the constraint can be created.
@@ -1077,6 +1080,7 @@ pub fn constraint_icon(k: &ConstraintKind) -> Option<&'static str> {
         Normal { .. } => "normal",
         Collinear { .. } => "collinear",
         Curvature { .. } => "curvature",
+        Flow { .. } => "flow",
         Pierce { .. } => "pierce",
         Quadrant { .. } => "coincident",
         // Live (qa5 sketch tools): the slot's three offsets, an arch glyph.
@@ -6445,6 +6449,8 @@ fn glyph_entities(sk: &Sketch, k: &ConstraintKind) -> Vec<EntityId> {
         // Live (same behaviours): a Parallel or Perpendicular is drawn once, on
         // its first entity (a rectangle's on its bottom, left and top edges).
         Parallel { a, .. } | Perpendicular { a, .. } => vec![a],
+        // Live 1716: one glyph, on the curve.
+        Flow { a, .. } => vec![a],
         Concentric { a, b } | Equal { a, b } | Collinear { a, b } | Curvature { a, b } => vec![a, b],
         _ => Vec::new(),
     }
@@ -6620,6 +6626,12 @@ fn make_constraint(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> Option<C
         ConstraintTool::Tangent => ConstraintKind::Tangent { a, b: b? },
         ConstraintTool::Equal => ConstraintKind::Equal { a, b: b? },
         ConstraintTool::Curvature => ConstraintKind::Curvature { a, b: b? },
+        // Live 1716: the spline / conic / Bezier first, whatever the pick order.
+        ConstraintTool::Flow => {
+            let b = b?;
+            let curve = |e: EntityId| sk.kind(e).is_some_and(|k| k.is_spline());
+            if !curve(a) && curve(b) { ConstraintKind::Flow { a: b, b: a } } else { ConstraintKind::Flow { a, b } }
+        }
         ConstraintTool::Midpoint => {
             let b = b?;
             if is_point(sk, a) { ConstraintKind::Midpoint { point: a, curve: b } } else { ConstraintKind::Midpoint { point: b, curve: a } }
@@ -6673,7 +6685,9 @@ pub fn constraint_applicable(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -
         ConstraintTool::Pierce => n == 2 && ids.iter().filter(|e| sk.entity(**e).is_some_and(|x| x.external)).count() == 1 && ids.iter().any(|e| is_point(sk, *e) && !sk.entity(*e).is_some_and(|x| x.external)),
         ConstraintTool::Symmetric => n == 3 && count(&line) >= 1,
         ConstraintTool::Fix => true,
-        ConstraintTool::Curvature => n == 2 && all(&curve) && kinds.iter().any(|k| k.is_spline()),
+        // Live 1716: a line and an arc (no spline, conic or Bezier) take
+        // nothing, silently.
+        ConstraintTool::Curvature | ConstraintTool::Flow => n == 2 && all(&curve) && kinds.iter().any(|k| k.is_spline()),
     }
 }
 
@@ -6719,7 +6733,7 @@ pub fn pick_fits(sk: &Sketch, c: ConstraintTool, picks: &[EntityId], e: EntityId
         ConstraintTool::Coincident | ConstraintTool::Fix | ConstraintTool::Symmetric => true,
         ConstraintTool::Concentric => point || k.is_circular() || k.is_elliptical(),
         ConstraintTool::Parallel | ConstraintTool::Perpendicular => k == EntityKind::Line,
-        ConstraintTool::Tangent | ConstraintTool::Normal | ConstraintTool::Curvature => curve,
+        ConstraintTool::Tangent | ConstraintTool::Normal | ConstraintTool::Curvature | ConstraintTool::Flow => curve,
         ConstraintTool::Equal => k == EntityKind::Line || k.is_circular(),
         ConstraintTool::Midpoint => point || matches!(k, EntityKind::Line | EntityKind::Arc),
         ConstraintTool::Pierce => point || sk.entity(e).is_some_and(|x| x.external),
@@ -6753,7 +6767,7 @@ pub fn apply_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) ->
                 kinds.extend(make_constraint(sk, c, &[*e]));
             }
         }
-        ConstraintTool::Symmetric | ConstraintTool::Perpendicular | ConstraintTool::Normal | ConstraintTool::Pierce | ConstraintTool::Curvature => {
+        ConstraintTool::Symmetric | ConstraintTool::Perpendicular | ConstraintTool::Normal | ConstraintTool::Pierce | ConstraintTool::Curvature | ConstraintTool::Flow => {
             kinds.extend(make_constraint(sk, c, ids));
         }
         ConstraintTool::Midpoint if ids.len() == 3 => {
