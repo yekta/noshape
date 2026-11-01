@@ -250,7 +250,9 @@ impl Job {
                 mesh: Arc::new(mesh),
                 coarser: Vec::new(),
                 levels_from: 0,
-                face_refs: vec![],
+                // The body's own faces (decals find theirs; not on cut or
+                // flattened shapes).
+                face_refs: if shapes.is_empty() && plate.is_none() { b.faces.iter().map(|n| noshape_model::reference::Reference::Face((**n).clone())).collect() } else { vec![] },
                 edge_refs: vec![],
                 vertex_refs: vec![],
                 bounds: None,
@@ -262,6 +264,8 @@ impl Job {
         if display.bodies.is_empty() {
             return None;
         }
+        // Decals on the parts (help: shaded views show decals).
+        display.decals = src.context.decals.iter().filter(|d| display.bodies.iter().any(|b| b.id == d.body)).cloned().collect();
         let opts = crate::scene_builder::SceneOptions {
             show_planes: false,
             show_sketches: false,
