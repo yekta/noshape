@@ -99,7 +99,7 @@ from the picks). The dialog runs std's own function where `std_feature::has_edit
 | E43 | projectCurvesEditLogic | Projected curve | ✅ std's runs (audit 8): the preselection into the fields, the Curve to face flip (same T2) |
 | E44 | routingCurveEditLogic | Routing curve | ✅ std's runs (audit 9): Point 0 to start, new points copy the active one (std's copyParameter now honoured), indices in step (T2 routing_curve_editing_logic_runs_std) |
 | E45 | ruledSurfaceEditingLogic | Ruled surface | ✅ std's runs (audit 8): Add on a surface's open edge, reference faces, vertex overrides cleaned (same T2) |
-| E46 | unfoldEditLogic | Unfold | ✗ (hold entity) |
+| E46 | unfoldEditLogic | Unfold | ✗ (hold entity): std's runs on our model (11-01) but leaves Wall face to hold empty (getEntityHeldForUnfold finds no face pair on our sheet metal part); not enabled |
 | E47 | variableEditLogic | Variable | ✅ native: a preselection in Measured mode fills the visible field std's would (Entities to measure between / Entities / Entity); Assigned ignores it as std |
 | E48 | wrapEditLogic | Wrap | ✅ std's runs (audit 8): Merge scope = the target's part, Add / Remove from the thickness direction, the flip; default anchors found (T2 wrap_editing_logic_runs_std) |
 
