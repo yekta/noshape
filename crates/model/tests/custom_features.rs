@@ -2484,3 +2484,42 @@ fn custom_feature_manipulators_and_editing_logic_run() {
     let logic = custom::std_feature::editing_logic_in(before, &f.type_id, f.id, &f.name, &fx.units, &f.params, &edited, &["len".to_string()], false).expect("its editing logic ran");
     assert_eq!(logic.get("touched"), Some(&ParamValue::Bool(true)), "{logic:?}");
 }
+
+const PLANE_RIBS: &str = r#"
+annotation { "Feature Type Name" : "Plane ribs" }
+export const planeRibs = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        fCylinder(context, id + "cyl", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 30) * millimeter, "radius" : 10 * millimeter });
+        const side = qGeometry(qCreatedBy(id + "cyl", EntityType.FACE), GeometryType.CYLINDER);
+        for (var i = 0; i < 3; i += 1)
+        {
+            const sub = id + ("rib" ~ i);
+            const planeId = sub + "plane";
+            const cutId = sub + "cut";
+            opPlane(context, planeId, { "plane" : plane(vector(0, 0, 5 + 10 * i) * millimeter, vector(0, 0, 1)) });
+            opIntersectFaces(context, cutId, { "tools" : qCreatedBy(planeId, EntityType.FACE), "targets" : side });
+            if (size(evaluateQuery(context, qCreatedBy(planeId, EntityType.BODY))) != 1)
+                throw regenError("qCreatedBy(plane, BODY) should find the plane");
+            opDeleteBodies(context, sub + "delcut", { "entities" : qUnion([qCreatedBy(cutId, EntityType.BODY), qCreatedBy(planeId, EntityType.BODY)]) });
+        }
+    });
+"#;
+
+/// The user's "Y Ribs on Faces" (11-02): construction planes an operation makes (opPlane) are its bodies:
+/// qCreatedBy(plane id, BODY) finds each and opDeleteBodies deletes it, so none is left in the graphics (live: none).
+#[test]
+fn op_plane_bodies_are_deleted_by_op_delete_bodies() {
+    let fx = Fixture::new(&studio(PLANE_RIBS));
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("planeRibs"), &fx.units).expect("custom feature type is registered");
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+    assert!(r.context.planes.is_empty(), "planes left: {:?}", r.context.planes.iter().map(|p| (&p.reference, &p.name)).collect::<Vec<_>>());
+    assert_eq!(r.context.bodies.len(), 1, "the cylinder only (the cut curves deleted)");
+    assert!(r.display.planes.iter().all(|p| !matches!(p.reference, Reference::FeaturePlane(_))), "no construction plane drawn");
+}

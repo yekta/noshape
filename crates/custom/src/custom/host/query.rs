@@ -38,8 +38,11 @@ pub enum Ent {
     Vertex(usize, usize),
     Origin,
     Datum(DatumPlane),
-    /// `ctx.planes[i]` (construction planes).
+    /// `ctx.planes[i]` (construction planes): its face.
     Plane(usize),
+    /// `ctx.planes[i]`'s body (Onshape: a construction plane is a body owning one face; `qCreatedBy(id, BODY)`
+    /// and `opDeleteBodies` take it, the user's "Y Ribs on Faces" 11-02).
+    PlaneBody(usize),
     /// `ctx.connectors[i]` (mate connectors).
     Connector(usize),
     /// `ctx.points[i]`.
@@ -81,7 +84,7 @@ impl EType {
 
 pub fn entity_type_of(e: &Ent) -> EType {
     match e {
-        Ent::Body(_) | Ent::SketchBody(_) | Ent::Connector(_) => EType::Body,
+        Ent::Body(_) | Ent::SketchBody(_) | Ent::Connector(_) | Ent::PlaneBody(_) => EType::Body,
         Ent::Face(..) | Ent::Datum(_) | Ent::Plane(_) | Ent::SketchRegion(..) => EType::Face,
         Ent::Edge(..) | Ent::SketchEdge(..) => EType::Edge,
         Ent::Vertex(..) | Ent::Origin | Ent::Point(_) | Ent::SketchVertex(..) => EType::Vertex,
@@ -185,6 +188,7 @@ impl<'a> QueryCx<'a> {
             out.extend((0..ctx.bodies.len()).filter(shown).map(Ent::Body));
             out.extend((0..ctx.sketches.len()).map(Ent::SketchBody));
             out.extend((0..ctx.connectors.len()).map(Ent::Connector));
+            out.extend((0..ctx.planes.len()).map(Ent::PlaneBody));
         }
         if want(EType::Face) {
             out.extend([DatumPlane::Top, DatumPlane::Front, DatumPlane::Right].map(Ent::Datum));
@@ -265,7 +269,8 @@ impl<'a> QueryCx<'a> {
         match e {
             // Construction planes and points are bodies of their own in
             // Onshape (std draft splits by `qOwnerBody` of an `opPlane`).
-            Ent::Body(_) | Ent::SketchBody(_) | Ent::Connector(_) | Ent::Plane(_) | Ent::Point(_) | Ent::Datum(_) | Ent::Origin => Some(e.clone()),
+            Ent::Body(_) | Ent::SketchBody(_) | Ent::Connector(_) | Ent::PlaneBody(_) | Ent::Point(_) | Ent::Datum(_) | Ent::Origin => Some(e.clone()),
+            Ent::Plane(i) => Some(Ent::PlaneBody(*i)),
             Ent::Face(b, _) | Ent::Edge(b, _) | Ent::Vertex(b, _) => Some(Ent::Body(*b)),
             Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) => Some(Ent::SketchBody(*s)),
         }
@@ -282,7 +287,7 @@ impl<'a> QueryCx<'a> {
             Ent::Vertex(b, i) => Reference::Vertex((*ctx.bodies[*b].vertices[*i]).clone()),
             Ent::Origin => Reference::Origin,
             Ent::Datum(p) => Reference::Plane(*p),
-            Ent::Plane(i) => ctx.planes[*i].reference.clone(),
+            Ent::Plane(i) | Ent::PlaneBody(i) => ctx.planes[*i].reference.clone(),
             Ent::Connector(i) => ctx.connectors[*i].reference.clone(),
             Ent::Point(i) => ctx.points[*i].reference.clone(),
             Ent::SketchBody(s) => Reference::Sketch(ctx.sketches[*s].feature),
@@ -377,7 +382,7 @@ impl<'a> QueryCx<'a> {
                 let edges: Vec<Shape> = sk.sketch.entities().filter(|x| x.kind().is_curve()).filter_map(|x| sketch_edge_shape(sk, x.id.0)).collect();
                 Some(Shape::compound(&edges))
             }
-            Ent::Datum(_) | Ent::Plane(_) | Ent::Connector(_) => None,
+            Ent::Datum(_) | Ent::Plane(_) | Ent::PlaneBody(_) | Ent::Connector(_) => None,
         }
     }
 
@@ -389,7 +394,7 @@ impl<'a> QueryCx<'a> {
             Ent::Datum(DatumPlane::Top) => Some(PlaneFrame::TOP),
             Ent::Datum(DatumPlane::Front) => Some(PlaneFrame::FRONT),
             Ent::Datum(DatumPlane::Right) => Some(PlaneFrame::RIGHT),
-            Ent::Plane(i) => Some(ctx.planes[*i].frame),
+            Ent::Plane(i) | Ent::PlaneBody(i) => Some(ctx.planes[*i].frame),
             Ent::SketchRegion(s, _) | Ent::SketchBody(s) => Some(ctx.sketches[*s].frame),
             Ent::Connector(i) => {
                 let c = &ctx.connectors[*i];
@@ -460,7 +465,7 @@ impl<'a> QueryCx<'a> {
                 _ => "WIRE",
             },
             _ => match e {
-                Ent::Datum(_) | Ent::Plane(_) => "SHEET",
+                Ent::Datum(_) | Ent::Plane(_) | Ent::PlaneBody(_) => "SHEET",
                 _ => "POINT",
             },
         }
@@ -468,7 +473,7 @@ impl<'a> QueryCx<'a> {
 
     pub fn is_construction(&self, e: &Ent) -> bool {
         match e {
-            Ent::Datum(_) | Ent::Plane(_) | Ent::Origin | Ent::Point(_) => true,
+            Ent::Datum(_) | Ent::Plane(_) | Ent::PlaneBody(_) | Ent::Origin | Ent::Point(_) => true,
             Ent::SketchEdge(s, id) | Ent::SketchVertex(s, id) => self.st.ctx.sketches[*s].sketch.entity(noshape_sketch::EntityId(*id)).is_some_and(|x| x.construction),
             _ => false,
         }
@@ -497,7 +502,7 @@ impl<'a> QueryCx<'a> {
             Ent::Origin => Some(DVec3::ZERO),
             Ent::Point(i) => Some(self.st.ctx.points[*i].position),
             Ent::Connector(i) => Some(self.st.ctx.connectors[*i].origin),
-            Ent::Datum(_) | Ent::Plane(_) => self.plane(e).map(|p| p.origin),
+            Ent::Datum(_) | Ent::Plane(_) | Ent::PlaneBody(_) => self.plane(e).map(|p| p.origin),
             _ => {
                 let s = self.shape(e)?;
                 match entity_type_of(e) {
@@ -647,7 +652,7 @@ impl<'a> QueryCx<'a> {
     }
 
     pub fn distance_to_point(&self, e: &Ent, p: DVec3) -> Option<f64> {
-        if let Some(pl) = (matches!(e, Ent::Datum(_) | Ent::Plane(_))).then(|| self.plane(e)).flatten() {
+        if let Some(pl) = (matches!(e, Ent::Datum(_) | Ent::Plane(_) | Ent::PlaneBody(_))).then(|| self.plane(e)).flatten() {
             return Some((p - pl.origin).dot(pl.normal).abs());
         }
         let s = self.shape(e)?;
@@ -695,7 +700,7 @@ impl<'a> QueryCx<'a> {
             }
             .or_else(|| self.created_by(&Ent::Body(*b))),
             Ent::SketchBody(s) | Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) => feature_id(ctx.sketches[*s].feature),
-            Ent::Plane(_) | Ent::Connector(_) | Ent::Point(_) => self.to_ref(e).depends_on().and_then(feature_id),
+            Ent::Plane(_) | Ent::PlaneBody(_) | Ent::Connector(_) | Ent::Point(_) => self.to_ref(e).depends_on().and_then(feature_id),
         }
     }
 
@@ -1603,7 +1608,7 @@ fn contains_point(q: &QueryCx, e: &Ent, p: DVec3) -> bool {
     match entity_type_of(e) {
         EType::Body if q.body_type(e) == "SOLID" => q.shape(e).and_then(|s| s.classify_point(p, 1e-7).ok()).is_some_and(|c| !matches!(c, k::PointClass::Outside | k::PointClass::Unknown)),
         _ => {
-            if matches!(e, Ent::Datum(_) | Ent::Plane(_)) {
+            if matches!(e, Ent::Datum(_) | Ent::Plane(_) | Ent::PlaneBody(_)) {
                 return q.plane(e).is_some_and(|pl| (p - pl.origin).dot(pl.normal).abs() < 1e-8);
             }
             // OCCT entities carry ~1e-7 tolerances after booleans and blends.
