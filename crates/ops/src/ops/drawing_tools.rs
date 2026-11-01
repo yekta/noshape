@@ -1409,7 +1409,7 @@ fn note(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     // A first click on a snap point anchors a leader.
     if let Some(l) = a.get("leader") {
         let c = point_value(l, "leader")?;
-        let p = t.m.pick(&Tool::Note, &[], c).snap_at(c).ok_or_else(|| OpError::param("leader", "not a vertex, circle center or edge point of a view"))?;
+        let p = t.m.pick(&Tool::Note, &[], c).snap_or_edge_point(c).ok_or_else(|| OpError::param("leader", "not a vertex, circle center or edge point of a view"))?;
         style.leaders.push(noshape_model::drawing::Leader { view: Some(p.view), point: p.p, nodes: Vec::new(), ..Default::default() });
     }
     let sheet = t.sheet;

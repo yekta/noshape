@@ -66,7 +66,7 @@ impl<'a> SheetPick<'a> {
         let hover = match self.tool {
             Tool::Dimension { kind: DimTool::Point2, .. } => hover,
             Tool::Dimension { kind: DimTool::Linear, .. } | Tool::Sketch { .. } | Tool::Constrain { .. } => edges_only(true).or(hover),
-            Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } => edges_only(false).or(hover),
+            Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note => edges_only(false).or(hover),
             // A surface finish symbol stands on the edge under it (live A45);
             // both it and a geometric tolerance also take a dimension (live
             // request 1624), under whatever else is on top.
@@ -96,7 +96,8 @@ impl<'a> SheetPick<'a> {
             },
             // Dimension-like tools (and the surface finish symbol) only care
             // about view edges.
-            (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. }, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
+            // A note's leader attaches to a view edge too.
+            (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
                 Some(PickTarget::Edge { .. }) => Some(h),
                 _ => None,
             },
@@ -471,6 +472,17 @@ impl<'a> SheetPick<'a> {
     }
 
     pub fn any_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
+        if let Some(p) = self.snap_or_edge_point(s) {
+            return Some(p);
+        }
+        let view = self.view_at(s)?;
+        let pl = self.placement(view)?;
+        Some(PickedPoint { view, p: pl.to_view(s), r: None })
+    }
+
+    /// A snap point, else the point on the hovered edge nearest the click (a
+    /// note's leader attaches to an edge, live behaviours "Note leader").
+    pub fn snap_or_edge_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
         if let Some(p) = self.snap_at(s) {
             return Some(p);
         }
@@ -494,9 +506,17 @@ impl<'a> SheetPick<'a> {
             };
             return Some(PickedPoint { view, p, r: None });
         }
-        let view = self.view_at(s)?;
-        let pl = self.placement(view)?;
-        Some(PickedPoint { view, p: pl.to_view(s), r: None })
+        // A drawn line of a view (silhouettes have no model edge).
+        if let Some(Pick::Line { a, b }) = self.line_pick().or_else(|| self.raw_line_pick())
+            && let Some(pl) = self.placement(a.view)
+        {
+            let vp = pl.to_view(s);
+            let d = sub(b.p, a.p);
+            let l2 = d[0] * d[0] + d[1] * d[1];
+            let t = if l2 > 0.0 { (((vp[0] - a.p[0]) * d[0] + (vp[1] - a.p[1]) * d[1]) / l2).clamp(0.0, 1.0) } else { 0.0 };
+            return Some(PickedPoint { view: a.view, p: [a.p[0] + d[0] * t, a.p[1] + d[1] * t], r: None });
+        }
+        None
     }
 
     pub fn pick_sheet(&self, p: &PickedPoint) -> Option<[f64; 2]> {

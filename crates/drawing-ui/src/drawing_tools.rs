@@ -972,9 +972,9 @@ impl DrawingEditor {
                 }
             }
             Tool::Note => {
-                // A click on a snap point anchors a leader; the next click
-                // places the text.
-                match (self.note_leader.is_some(), self.snap_at(c)) {
+                // A click on a snap point or an edge anchors a leader; the
+                // next click places the text.
+                match (self.note_leader.is_some(), self.pk().snap_or_edge_point(c)) {
                     (false, Some(p)) => self.note_leader = Some(Leader { view: Some(p.view), point: p.p, nodes: Vec::new(), ..Default::default() }),
                     _ => self.open_note_panel(None, c, window, cx),
                 }

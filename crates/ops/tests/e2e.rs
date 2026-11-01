@@ -1902,6 +1902,12 @@ fn drawing_callouts_ordinates_and_datums() {
     let nt = call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "BREAK ALL EDGES", "position": [40, 40], "leader": a0 }));
     assert_eq!(kind_of(&mut ctx, nt["annotation"].as_u64().unwrap()), "Note");
     assert!(last(&mut ctx).ends_with(":: Note"));
+    // A leader to a point along an edge (not a snap point), as a click on
+    // the edge (live "Note leader"; audit A1).
+    let along = [a0[0] + (b0[0] - a0[0]) / 3.0, a0[1] + (b0[1] - a0[1]) / 3.0];
+    let ne = call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "ON EDGE", "position": [40, 50], "leader": along }));
+    assert_eq!(kind_of(&mut ctx, ne["annotation"].as_u64().unwrap()), "Note");
+    assert!(try_call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "AIR", "position": [40, 60], "leader": [5.0, 5.0] })).is_err(), "nothing there");
 
     let g = call(&mut ctx, "drawing_gdt", json!({ "drawing": tab, "position": [60, 60], "rows": [{ "symbol": "position", "before": "Ø", "tolerance": "0.1", "datums": ["A", "B"] }] }));
     assert_eq!(kind_of(&mut ctx, g["annotation"].as_u64().unwrap()), "Gdt");
