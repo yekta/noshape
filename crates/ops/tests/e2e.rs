@@ -763,42 +763,60 @@ fn update_workspace_moves_references_to_newer_versions() {
 
 /// The sheet metal table through the API: rows as the panel lists them, a
 /// bend's radius edit adding a Modify joint, Move up, Convert to rip, and
-/// the flat pattern's DXF.
+/// the flat pattern's DXF. The whole table is checked after every step: the
+/// rip leaves Bend B's wall a part of its own, and the table took whichever
+/// part's data came first (by random part ids), so in about half the runs it
+/// listed only that wall's rip, as "Joint A".
 #[test]
 fn sheet_metal_table_ops() {
     let mut ctx = Ctx::new();
+    // Bends as "name radius angle k direction", joints as "name style", in the table's order.
+    let table = |ctx: &mut Ctx| {
+        let t = call(ctx, "sheetmetal_table", json!({}));
+        let s = |v: &Value| v.as_str().unwrap_or("-").to_string();
+        let bends: Vec<String> = t["bends"].as_array().map(|a| a.iter().map(|b| format!("{} {} {} {} {}", s(&b["name"]), s(&b["radius"]), s(&b["angle_deg"]), s(&b["k_factor"]), s(&b["direction"]))).collect()).unwrap_or_default();
+        let joints: Vec<String> = t["joints"].as_array().map(|a| a.iter().map(|j| format!("{} {}", s(&j["name"]), s(&j["style"]))).collect()).unwrap_or_default();
+        (bends, joints)
+    };
     let sk = new_sketch(&mut ctx, "sheet-metal-table.noshape", "plane:top");
     let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
     call(&mut ctx, "feature_add", json!({ "type": "sheetMetalStart", "params": { "process": "THICKEN", "regions": [r["regions"][0]["id"]], "thickness": "2 mm", "radius": "2 mm" } }));
-    for (dir, near) in [([1, 0, 0], [30, 0, 2]), ([0, 1, 0], [0, 20, 2])] {
+    assert_eq!(table(&mut ctx), (vec![], vec![]));
+    let mut want: Vec<&str> = Vec::new();
+    for (dir, near, row) in [([1, 0, 0], [30, 0, 2], "Bend A 2 90 0.45 Up"), ([0, 1, 0], [0, 20, 2], "Bend B 2 90 0.45 Up")] {
         let e = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": dir, "near": near, "limit": 1 }))["edges"][0]["id"].clone();
         let f = call(&mut ctx, "feature_add", json!({ "type": "sheetMetalFlange", "params": { "edges": [e], "distance": "20 mm" } }));
         assert_eq!(f["feature_status"]["status"], "Ok", "{f}");
+        want.push(row);
+        assert_eq!(table(&mut ctx), (want.iter().map(|x| x.to_string()).collect(), vec![]));
     }
-    let t = call(&mut ctx, "sheetmetal_table", json!({}));
-    let names: Vec<&str> = t["bends"].as_array().unwrap().iter().map(|b| b["name"].as_str().unwrap()).collect();
-    assert_eq!(names, ["Bend A", "Bend B"], "{t}");
-    assert!(t["bends"].as_array().unwrap().iter().all(|b| b["radius"] == "2" && b["angle_deg"] == "90" && b["k_factor"] == "0.45"), "{t}");
     // A radius edit is a Modify joint of that bend.
     call(&mut ctx, "sheetmetal_edit_bend", json!({ "bend": "Bend A", "radius": 3 }));
     let list = call(&mut ctx, "feature_list", json!({}));
     let mj = list["features"].as_array().unwrap().iter().find(|f| f["type"] == "sheetMetalJoint").expect("a Modify joint").clone();
     let g = call(&mut ctx, "feature_get", json!({ "feature": mj["id"] }));
     assert_eq!((g["params"]["jointType"].as_str(), g["params"]["radius"].as_str(), g["params"]["useDefaultRadius"].as_bool()), (Some("BEND"), Some("3 mm"), Some(false)), "{g}");
+    assert_eq!(table(&mut ctx), (vec!["Bend A 3 90 0.45 Up".to_string(), "Bend B 2 90 0.45 Up".to_string()], vec![]));
     // Move up: Bend B first.
     let m = call(&mut ctx, "sheetmetal_move_bend", json!({ "bend": "Bend B", "by": -1 }));
     assert_eq!(m["bends"][0]["name"], "Bend B", "{m}");
+    let moved = (vec!["Bend B 2 90 0.45 Up".to_string(), "Bend A 3 90 0.45 Up".to_string()], vec![]);
+    assert_eq!(table(&mut ctx), moved);
     let e = try_call(&mut ctx, "sheetmetal_move_bend", json!({ "bend": "Bend B", "by": -1 })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("by"), "{e:?}");
+    assert_eq!(table(&mut ctx), moved);
     // The flat pattern's DXF with its two bend lines.
     let dxf = scratch("sheet-metal-flat.dxf");
     let x = call(&mut ctx, "sheetmetal_export_flat", json!({ "part": "Part 1", "file": dxf.to_str().unwrap() }));
     assert_eq!(x["bend_lines"], 2, "{x}");
     assert!(std::fs::read_to_string(&dxf).unwrap().contains("SHEETMETAL_BEND_LINES_"));
-    // Convert to rip: a Modify joint set to Rip.
+    // Convert to rip: a Modify joint set to Rip. Bend B's wall is then a
+    // part of its own; the table is still the model's: Bend A and the rip.
     call(&mut ctx, "sheetmetal_convert_to_rip", json!({ "bend": "Bend B" }));
     let n = call(&mut ctx, "feature_list", json!({}))["features"].as_array().unwrap().iter().filter(|f| f["type"] == "sheetMetalJoint").count();
     assert_eq!(n, 2);
+    assert_eq!(call(&mut ctx, "query_parts", json!({}))["parts"].as_array().unwrap().len(), 2);
+    assert_eq!(table(&mut ctx), (vec!["Bend A 3 90 0.45 Up".to_string()], vec!["Joint B Edge joint".to_string()]));
 }
 
 /// An Other joints row's Style ▾ / Type ▾ (live "ui (10-24 a)" (5e, 5f)): a plate with one flange, its bend

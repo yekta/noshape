@@ -203,6 +203,15 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
 - c7fd2571 landed (1680 test). AssemblyView UI tests on GPUI's test platform (assembly_ui_tests.rs: a document made
   through the agent API, the real view, inert `assembly_hooks::register_for_tests`), first test the Group dialog's
   pattern pick (0.5 s). Add assembly dialog flows there as they are touched.
+- **SM-TABLE-PART-ORDER (psui's report, 11-01):** e2e `sheet_metal_table_ops` ended in a different table in ~half its
+  runs. Once Convert to rip leaves Bend B's wall a part of its own, the model has two parts each with its own
+  SheetMetalData, and the ops table (and the app's panel, psui's crate) took the model's "first" part from
+  `context.sheet_metal`, a BTreeMap keyed by BodyId, whose ids carry random feature ids: half the runs got Part 2's
+  data (only the rip, lettered "Joint A", no Bend A). Now `sheetmetal::model_joints` (model-core) merges a model's parts
+  in part-list order (walls / bends offset, a rip between two parts once; `bend_of` maps rows back to each part's flat)
+  and `models_of` lists models in part order; ops and the panel use them. The test now checks the whole table after
+  every step (old code: 6/10 runs fail; new: 20/20 pass). Live asked whether its table lists both parts' joints
+  (REQUESTS 11-01 01:40); the letters already run over the whole model.
 - **Forward-oriented edges landed with core's patch** (kernel common.cpp `handed_out`: every edge FORWARD). What sheet
   metal read from the stored orientation, now explicit: (1) `wall_loop` chained a wall's outer loop from its edges' start
   / end, so it ran the face's way only while edges came stored that way: now turned counter-clockwise about the face

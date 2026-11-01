@@ -66,15 +66,23 @@ impl PartStudioView {
         let Some(ctx) = self.context.as_ref() else { return Vec::new() };
         let studio = self.studio(cx);
         let mut out: Vec<(FeatureId, String)> = Vec::new();
-        for d in ctx.sheet_metal.values() {
-            if out.iter().any(|(f, _)| *f == d.model) {
-                continue;
-            }
-            let name = studio.and_then(|s| s.feature(d.model)).map(|f| f.name.clone()).unwrap_or_else(|| "Sheet metal model".into());
-            out.push((d.model, name));
+        for model in noshape_model::sheetmetal::models_of(ctx) {
+            let name = studio.and_then(|s| s.feature(model)).map(|f| f.name.clone()).unwrap_or_else(|| "Sheet metal model".into());
+            out.push((model, name));
         }
         out.sort_by(|a, b| a.1.cmp(&b.1));
         out
+    }
+
+    /// A model's joints over all its parts (the table is the model's; a rip
+    /// can leave a wall a part of its own), parts in part-list order.
+    fn sm_joints(&self, model: FeatureId) -> Option<noshape_model::sheetmetal::ModelJoints> {
+        noshape_model::sheetmetal::model_joints(self.context.as_ref()?, model)
+    }
+
+    /// The table's data of a model (see [`Self::sm_joints`]).
+    fn sm_model_data(&self, model: FeatureId) -> Option<Arc<SheetMetalData>> {
+        self.sm_joints(model).map(|j| Arc::new(j.data))
     }
 
     /// The active context: the chosen model, else the first by name.
@@ -110,7 +118,7 @@ impl PartStudioView {
         let models = self.sheet_metal_models(cx);
         let Some(model) = self.sheet_metal_context(&models) else { return };
         let model_name = models.iter().find(|(f, _)| *f == model).map(|(_, n)| n.clone()).unwrap_or_default();
-        let Some(body) = self.context.as_ref().and_then(|c| c.sheet_metal.iter().find(|(_, d)| d.model == model).map(|(b, _)| b.clone())) else { return };
+        let Some(body) = self.sm_joints(model).map(|j| j.first) else { return };
         // New sketch…: on the base wall's face on the flat's side (live
         // request 1605: "Face of Sheet metal 1", while the model is active).
         let sketch_face = self.context.as_ref().and_then(|c| c.sheet_metal.get(&body)).filter(|d| d.active).and_then(|d| {
@@ -219,7 +227,7 @@ impl PartStudioView {
     fn flat_model_face(&self, side: bool) -> Option<noshape_model::reference::Reference> {
         let models = self.sheet_metal_models_ctx();
         let model = self.ui.sm_context.or(models)?;
-        let d = self.context.as_ref()?.sheet_metal.values().find(|d| d.model == model)?;
+        let d = self.sm_model_data(model)?;
         let w = d.walls.iter().find(|w| !w.is_virtual())?;
         let faces = if side != d.view_back { &w.faces } else { &w.back };
         faces.first().map(|n| noshape_model::reference::Reference::Face((**n).clone()))
@@ -230,7 +238,7 @@ impl PartStudioView {
     /// opens with "Edge" and draws nothing for the straight line).
     pub(super) fn bend_line_edge(&self, bend: usize) -> Option<Reference> {
         let ctx = self.context.as_ref()?;
-        let data = ctx.sheet_metal.values().find(|d| d.bends.len() > bend && Some(d.model) == self.ui.sm_context.or_else(|| self.sheet_metal_models_ctx()))?;
+        let data = self.sm_model_data(self.ui.sm_context.or_else(|| self.sheet_metal_models_ctx())?).filter(|d| d.bends.len() > bend)?;
         let b = &data.bends[bend];
         for name in b.inner_faces.iter().chain(&b.outer_faces) {
             let Some(body) = ctx.bodies.iter().find(|x| x.faces.iter().any(|n| n == name)) else { continue };
@@ -299,7 +307,7 @@ impl PartStudioView {
         let Some(bend) = self.flat_view.as_ref().and_then(|f| f.read(cx).bend_of_line(line)) else { return };
         let models = self.sheet_metal_models(cx);
         let Some(model) = self.sheet_metal_context(&models) else { return };
-        let Some(data) = self.context.as_ref().and_then(|c| c.sheet_metal.values().find(|d| d.model == model).cloned()) else { return };
+        let Some(data) = self.sm_model_data(model) else { return };
         let Some(b) = data.bends.get(bend) else { return };
         let model_name = models.iter().find(|(f, _)| *f == model).map(|(_, n)| n.clone()).unwrap_or_default();
         let feature_name = self.studio(cx).and_then(|s| s.feature(b.feature).map(|f| f.name.clone())).unwrap_or_else(|| model_name.clone());
@@ -422,7 +430,7 @@ impl PartStudioView {
 
     /// The first sheet metal model of the context by name (no `App` needed).
     fn sheet_metal_models_ctx(&self) -> Option<FeatureId> {
-        self.context.as_ref()?.sheet_metal.values().map(|d| d.model).next()
+        noshape_model::sheetmetal::models_of(self.context.as_ref()?).first().copied()
     }
 
     /// The flat's face selected in the flat view: the model face selected.
@@ -439,7 +447,7 @@ impl PartStudioView {
 
     /// Move up (`delta` -1) / Move down (+1) bend `bend` in the table.
     fn sm_move_bend(&mut self, model: FeatureId, bend: usize, delta: isize, cx: &mut Context<Self>) {
-        let Some(data) = self.context.as_ref().and_then(|c| c.sheet_metal.values().find(|d| d.model == model).cloned()) else { return };
+        let Some(data) = self.sm_model_data(model) else { return };
         let mut order = bend_row_order(&data, &self.sm_stored_order(model, cx));
         let Some(pos) = order.iter().position(|&i| i == bend) else { return };
         let to = pos as isize + delta;
@@ -458,8 +466,8 @@ impl PartStudioView {
     /// The faces of Bends row `row` of the active model.
     fn sm_bend_refs(&self, row: usize) -> Vec<noshape_model::reference::Reference> {
         let Some(ctx) = self.context.as_ref() else { return Vec::new() };
-        let model = self.ui.sm_context.filter(|m| ctx.sheet_metal.values().any(|d| d.model == *m)).or_else(|| ctx.sheet_metal.values().next().map(|d| d.model));
-        let Some(data) = ctx.sheet_metal.values().find(|d| Some(d.model) == model) else { return Vec::new() };
+        let model = self.ui.sm_context.filter(|m| ctx.sheet_metal.values().any(|d| d.model == *m)).or_else(|| noshape_model::sheetmetal::models_of(ctx).first().copied());
+        let Some(data) = model.and_then(|m| self.sm_model_data(m)) else { return Vec::new() };
         data.bends.get(row).map(|b| b.inner_faces.iter().chain(&b.outer_faces).map(|n| noshape_model::reference::Reference::Face((**n).clone())).collect()).unwrap_or_default()
     }
 
@@ -476,7 +484,7 @@ impl PartStudioView {
     fn open_bend_row_menu(&mut self, row: usize, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         let models = self.sheet_metal_models(cx);
         let Some(model) = self.sheet_metal_context(&models) else { return };
-        let Some(data) = self.context.as_ref().and_then(|c| c.sheet_metal.values().find(|d| d.model == model).cloned()) else { return };
+        let Some(data) = self.sm_model_data(model) else { return };
         let studio = self.studio(cx);
         let order = |f: FeatureId| studio.and_then(|s| s.features.iter().position(|x| x.id == f)).unwrap_or(usize::MAX);
         let up = |_: usize| None;
@@ -551,7 +559,7 @@ impl PartStudioView {
         let text = text.trim().to_string();
         let models = self.sheet_metal_models(cx);
         let Some(model) = self.sheet_metal_context(&models) else { return };
-        let Some(data) = self.context.as_ref().and_then(|c| c.sheet_metal.values().find(|d| d.model == model).cloned()) else { return };
+        let Some(data) = self.sm_model_data(model) else { return };
         let Some(face) = data.bends.get(row).and_then(|b| b.inner_faces.first().or(b.outer_faces.first())).map(|n| noshape_model::reference::Reference::Face((**n).clone())) else { return };
         let units = self.doc.read(cx).session.doc.settings.units;
         let current = if col == 2 { plain(data.bends[row].radius / units.si_factor(noshape_units::Dim::LENGTH)) } else { plain(data.bends[row].k_factor) };
@@ -599,7 +607,7 @@ impl PartStudioView {
     fn sm_edit_rip(&mut self, rip: usize, edit: RipEdit, cx: &mut Context<Self>) {
         let models = self.sheet_metal_models(cx);
         let Some(model) = self.sheet_metal_context(&models) else { return };
-        let Some(data) = self.context.as_ref().and_then(|c| c.sheet_metal.values().find(|d| d.model == model).cloned()) else { return };
+        let Some(data) = self.sm_model_data(model) else { return };
         let units = self.doc.read(cx).session.doc.settings.units;
         let Some(mut copy) = self.studio(cx).cloned() else { return };
         if noshape_ops::sheetmetal::edit_rip(&mut copy, model, &data, rip, edit, &units) {
@@ -613,9 +621,12 @@ impl PartStudioView {
         let models = self.sheet_metal_models(cx);
         let active = self.sheet_metal_context(&models);
         // The model's parts and data.
-        let bodies: Vec<(BodyId, Arc<SheetMetalData>)> = self.context.as_ref().map(|c| c.sheet_metal.iter().filter(|(_, d)| Some(d.model) == active).map(|(b, d)| (b.clone(), d.clone())).collect()).unwrap_or_default();
+        // The model's joints over its parts; the flat view shows its first part.
+        let joints = active.and_then(|m| self.sm_joints(m));
+        let bodies: Vec<(BodyId, Arc<SheetMetalData>)> = joints.as_ref().map(|j| vec![(j.first.clone(), Arc::new(j.data.clone()))]).unwrap_or_default();
         self.ensure_flats(cx);
-        let flat = bodies.first().and_then(|(b, _)| self.flat_cache.as_ref()?.parts.iter().find(|(id, _)| id == b).and_then(|(_, f)| f.as_ref().ok().cloned()));
+        let part_flat = |b: &BodyId| self.flat_cache.as_ref()?.parts.iter().find(|(id, _)| id == b).and_then(|(_, f)| f.as_ref().ok().cloned());
+        let flat = bodies.first().and_then(|(b, _)| part_flat(b));
         let color = bodies.first().and_then(|(b, _)| self.display.body(b)).map(|b| b.color).unwrap_or([0.6, 0.75, 0.85, 1.0]);
 
         // Sheet metal context: [model ▾] (os-table-selector-container: 4 px
@@ -649,10 +660,13 @@ impl PartStudioView {
                 .into_any_element()
             });
 
-        // The tables (data from the active model's first part).
-        let tables = bodies.first().map(|(b, d)| {
-            let flat_up = |i: usize| flat.as_ref().and_then(|f| f.bend_lines.iter().find(|l| l.bend == i)).map(|l| l.up);
-            let _ = b;
+        // The tables (the active model's joints over its parts; each bend's
+        // direction from its own part's flat).
+        let tables = bodies.first().map(|(_, d)| {
+            let flat_up = |i: usize| {
+                let (b, k) = joints.as_ref()?.bend_of.get(i)?;
+                part_flat(b)?.bend_lines.iter().find(|l| l.bend == *k).map(|l| l.up)
+            };
             let studio = self.studio(cx);
             let order = |f: FeatureId| studio.and_then(|s| s.features.iter().position(|x| x.id == f)).unwrap_or(usize::MAX);
             joint_rows(d, &flat_up, &order)

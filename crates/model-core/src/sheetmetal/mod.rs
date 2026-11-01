@@ -306,6 +306,71 @@ pub struct SheetMetalData {
     pub marks: Vec<FlatMark>,
 }
 
+/// A sheet metal model's joints over all its parts: the Sheet metal table
+/// is the model's, while each part keeps its own data (a rip can leave a
+/// wall a part of its own). `data` holds the parts' walls, bends and rips
+/// one part after another in part-list order, a rip between two of them
+/// once; `bend_of[i]`: the part and its own index of merged bend `i`.
+#[derive(Clone, Debug)]
+pub struct ModelJoints {
+    pub data: SheetMetalData,
+    pub bend_of: Vec<(crate::reference::BodyId, usize)>,
+    /// The model's first part.
+    pub first: crate::reference::BodyId,
+}
+
+/// The model `model`'s joints over its parts (see [`ModelJoints`]), `None`
+/// when no part of it exists. Parts go in the part list's order, so the
+/// table doesn't depend on the parts' ids (random per feature).
+pub fn model_joints(ctx: &crate::regen::context::Context, model: FeatureId) -> Option<ModelJoints> {
+    let parts: Vec<(&crate::reference::BodyId, &SheetMetalData)> = ctx.bodies.iter().filter_map(|b| ctx.sheet_metal.get(&b.id).filter(|d| d.model == model).map(|d| (&b.id, &**d))).collect();
+    let (first, d0) = *parts.first()?;
+    let mut data = d0.clone();
+    data.walls.clear();
+    data.bends.clear();
+    data.rips.clear();
+    let mut bend_of = Vec::new();
+    for (body, d) in parts {
+        let off = data.walls.len();
+        data.walls.extend(d.walls.iter().cloned());
+        for (i, b) in d.bends.iter().enumerate() {
+            let mut b = b.clone();
+            b.parent += off;
+            b.child = b.child.map(|c| c + off);
+            data.bends.push(b);
+            bend_of.push((body.clone(), i));
+        }
+        for r in &d.rips {
+            // A rip between two parts is in both parts' data.
+            let same = |x: &Rip| (r.joint.is_some() && x.joint == r.joint) || (r.birth != u64::MAX && x.birth == r.birth);
+            if data.rips.iter().any(same) {
+                continue;
+            }
+            let mut r = r.clone();
+            r.a += off;
+            if r.b != usize::MAX {
+                r.b += off;
+            }
+            data.rips.push(r);
+        }
+    }
+    Some(ModelJoints { data, bend_of, first: first.clone() })
+}
+
+/// The sheet metal models of a regeneration, each once, in feature order of
+/// their first part (part-list order).
+pub fn models_of(ctx: &crate::regen::context::Context) -> Vec<FeatureId> {
+    let mut out = Vec::new();
+    for b in &ctx.bodies {
+        if let Some(d) = ctx.sheet_metal.get(&b.id)
+            && !out.contains(&d.model)
+        {
+            out.push(d.model);
+        }
+    }
+    out
+}
+
 impl SheetMetalData {
     pub fn new(model: FeatureId, thickness: f64, radius: f64, k_factor: f64) -> Self {
         Self {

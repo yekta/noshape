@@ -10,7 +10,7 @@ use crate::sheetmetal as sm;
 use crate::{Ctx, OpenDoc, doc, refs};
 use noshape_model::document::TabId;
 use noshape_model::reference::{BodyId, FeatureId};
-use noshape_model::sheetmetal::SheetMetalData;
+use noshape_model::sheetmetal::ModelJoints;
 use serde_json::{Value, json};
 use std::sync::Arc;
 
@@ -94,21 +94,21 @@ pub fn ops() -> Vec<Op> {
     ]
 }
 
-/// A sheet metal model: its feature, name, first part and data.
-type Model = (FeatureId, String, BodyId, Arc<SheetMetalData>);
+/// A sheet metal model: its feature, name, and joints over all its parts.
+type Model = (FeatureId, String, Arc<ModelJoints>);
 
-/// The regenerated Part Studio's sheet metal models, by name.
+/// The regenerated Part Studio's sheet metal models, by name. Each model's
+/// table covers all its parts in part-list order (a rip can leave a wall a
+/// part of its own; taking whichever part's data came first made the
+/// table depend on the parts' random ids).
 fn models(od: &mut OpenDoc, tab: TabId) -> Result<(Vec<Model>, noshape_model::regen::RegenResult), OpError> {
     let r = od.regenerate(tab, None)?;
     let ps = doc::studio(od.doc(), tab)?;
     let mut out: Vec<Model> = Vec::new();
-    for (b, d) in &r.context.sheet_metal {
-        // (Only parts that exist: a std rebuild can leave an earlier part's entry.)
-        if out.iter().any(|m| m.0 == d.model) || r.context.body(b).is_none() {
-            continue;
-        }
-        let name = ps.feature(d.model).map(|f| f.name.clone()).unwrap_or_else(|| "Sheet metal model".into());
-        out.push((d.model, name, b.clone(), d.clone()));
+    for model in noshape_model::sheetmetal::models_of(&r.context) {
+        let Some(joints) = noshape_model::sheetmetal::model_joints(&r.context, model) else { continue };
+        let name = ps.feature(model).map(|f| f.name.clone()).unwrap_or_else(|| "Sheet metal model".into());
+        out.push((model, name, Arc::new(joints)));
     }
     out.sort_by(|a, b| a.1.cmp(&b.1));
     Ok((out, r))
@@ -125,13 +125,22 @@ fn pick_model(list: &[Model], a: &Args) -> Result<usize, OpError> {
         .ok_or_else(|| OpError::not_found(format!("no sheet metal model `{k}`; models: {}", list.iter().map(|m| m.1.clone()).collect::<Vec<_>>().join(", "))).with_param("model"))
 }
 
-/// The rows (model order) with each bend's flat-pattern direction.
-fn rows(od: &OpenDoc, tab: TabId, r: &noshape_model::regen::RegenResult, body: &BodyId, data: &SheetMetalData) -> Result<(Vec<sm::JointRow>, Vec<sm::JointRow>), OpError> {
+/// The rows (model order) with each bend's flat-pattern direction (its
+/// part's flat).
+fn rows(od: &OpenDoc, tab: TabId, r: &noshape_model::regen::RegenResult, joints: &ModelJoints) -> Result<(Vec<sm::JointRow>, Vec<sm::JointRow>), OpError> {
     let ps = doc::studio(od.doc(), tab)?;
-    let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, body).ok();
-    let up = |i: usize| flat.as_ref().and_then(|f| f.bend_lines.iter().find(|l| l.bend == i)).map(|l| l.up);
+    let mut flats: Vec<(BodyId, Option<noshape_model::sheetmetal::FlatPattern>)> = Vec::new();
+    for (b, _) in &joints.bend_of {
+        if !flats.iter().any(|f| &f.0 == b) {
+            flats.push((b.clone(), noshape_model::sheetmetal::flat_pattern_for(&r.context, b).ok()));
+        }
+    }
+    let up = |i: usize| {
+        let (b, k) = joints.bend_of.get(i)?;
+        flats.iter().find(|f| &f.0 == b)?.1.as_ref()?.bend_lines.iter().find(|l| l.bend == *k).map(|l| l.up)
+    };
     let order = |f: FeatureId| ps.features.iter().position(|x| x.id == f).unwrap_or(usize::MAX);
-    Ok(sm::joint_rows(data, &up, &order))
+    Ok(sm::joint_rows(&joints.data, &up, &order))
 }
 
 /// The bend a call names (model index).
@@ -151,8 +160,9 @@ fn table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Ok(json!({ "models": [], "note": "No sheet metal models." }).into());
     }
     let m = pick_model(&list, a)?;
-    let (model, name, body, data) = &list[m];
-    let (bends, joints) = rows(od, tab, &r, body, data)?;
+    let (model, name, mj) = &list[m];
+    let data = &mj.data;
+    let (bends, joints) = rows(od, tab, &r, mj)?;
     let units = od.doc().settings.units;
     let k = 1.0 / units.si_factor(noshape_units::Dim::LENGTH);
     let order = sm::bend_row_order(data, &sm::stored_order(doc::studio(od.doc(), tab)?, *model));
@@ -204,11 +214,12 @@ fn edit_bend(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         // Each cell is its own edit, on the model as the previous left it.
         let (list, r) = models(od, tab)?;
         let m = pick_model(&list, a)?;
-        let (model, _, body, data) = list[m].clone();
-        let (bends, _) = rows(od, tab, &r, &body, &data)?;
+        let (model, _, mj) = list[m].clone();
+        let data = &mj.data;
+        let (bends, _) = rows(od, tab, &r, &mj)?;
         let bend = pick_bend(&bends, a)?;
         let mut copy = doc::studio(od.doc(), tab)?.clone();
-        if sm::edit_bend(&mut copy, model, &data, bend, field, &value, &units) {
+        if sm::edit_bend(&mut copy, model, data, bend, field, &value, &units) {
             edit_studio(od, tab, sm::MODIFY_JOINT, |ps| {
                 *ps = copy;
                 Ok(())
@@ -227,12 +238,13 @@ fn move_bend(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let (list, r) = models(od, tab)?;
     let m = pick_model(&list, a)?;
-    let (model, _, body, data) = list[m].clone();
-    let (bends, _) = rows(od, tab, &r, &body, &data)?;
+    let (model, _, mj) = list[m].clone();
+    let data = &mj.data;
+    let (bends, _) = rows(od, tab, &r, &mj)?;
     let bend = pick_bend(&bends, a)?;
     let delta: isize = if a.get("by").and_then(Value::as_i64).ok_or_else(|| OpError::param("by", "-1 or 1"))? < 0 { -1 } else { 1 };
     let mut copy = doc::studio(od.doc(), tab)?.clone();
-    if !sm::move_bend(&mut copy, model, &data, bend, delta) {
+    if !sm::move_bend(&mut copy, model, data, bend, delta) {
         return Err(OpError::invalid(format!("{} is already the {} row", bends[bend].name, if delta < 0 { "first" } else { "last" })).with_param("by"));
     }
     edit_studio(od, tab, sm::move_description(delta), |ps| {
@@ -247,8 +259,9 @@ fn convert_to_rip(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let units = od.doc().settings.units;
     let (list, r) = models(od, tab)?;
     let m = pick_model(&list, a)?;
-    let (model, _, body, data) = list[m].clone();
-    let (bends, _) = rows(od, tab, &r, &body, &data)?;
+    let (model, _, mj) = list[m].clone();
+    let data = &mj.data;
+    let (bends, _) = rows(od, tab, &r, &mj)?;
     let bend = pick_bend(&bends, a)?;
     let face = sm::bend_face(&data.bends[bend]).ok_or_else(|| OpError::invalid("the bend has no faces").with_param("bend"))?;
     edit_studio(od, tab, sm::CONVERT_TO_RIP, |ps| {
@@ -263,8 +276,9 @@ fn edit_joint(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let units = od.doc().settings.units;
     let (list, r) = models(od, tab)?;
     let m = pick_model(&list, a)?;
-    let (model, _, body, data) = list[m].clone();
-    let (_, joints) = rows(od, tab, &r, &body, &data)?;
+    let (model, _, mj) = list[m].clone();
+    let data = &mj.data;
+    let (_, joints) = rows(od, tab, &r, &mj)?;
     let names = || joints.iter().map(|j| j.name.clone()).collect::<Vec<_>>().join(", ");
     let joint = match a.get("joint") {
         Some(Value::Number(n)) => n.as_u64().map(|n| n as usize).filter(|n| *n < joints.len()).ok_or_else(|| OpError::param("joint", &format!("no joint {n}; joints: {}", names())))?,
@@ -278,7 +292,7 @@ fn edit_joint(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         (None, None) => return Err(OpError::invalid("give `type` or `style`")),
     };
     let mut copy = doc::studio(od.doc(), tab)?.clone();
-    if !sm::edit_rip(&mut copy, model, &data, joint, edit, &units) {
+    if !sm::edit_rip(&mut copy, model, data, joint, edit, &units) {
         return Ok(json!({ "note": "the joint has that style already: nothing changed" }).into());
     }
     edit_studio(od, tab, sm::MODIFY_JOINT, |ps| {
