@@ -94,7 +94,14 @@ count). Live 1747 answered: the pocket's floor corners are mitred, so the slabs'
 `* sg`) and the corner declines are gone. Corpus: quadrics takes 0 of the 134 shells reaching it (38 collapsing
 fillets R ≤ t, 22 other face kinds, 21 not one shell, 16 offset edges vanishing, 15 removed faces not planar, ...);
 the profile documents: draft-hang's Shell 2 (same as the slabs; their history lists two generated faces twice).
-Next (step 2b): collapsing fillets (their offset vanishes: the neighbours' offsets meet; contract the face to an
+Step 2b (11-02, landed with this note): collapsing fillets (a convex cylinder strip with R ≤ t between two tangent
+faces and two caps): no offset, its tangent edges one mitre edge of its neighbours' offsets, its end arcs dropped and
+their corners merged (union-find). T1 quadrics_and_slabs_agree: SHELL-SLOW's plate (80 × 50 × 10, Ø20, R2) at 1.5 and
+3 mm as the slabs'. Share: corpus 0 of 134 (the parts that had only collapsing fillets in the way now stop at tori /
+spheres 32, removed curved faces 24, not one shell 21, offset edges vanishing 18, non-strip collapses 10); profile
+documents unchanged (shell-hang: vertices of more faces, a non-manifold edge, two shells; draft-hang Shell 3: a removed
+curved face). Then (user 11-02): vertices of more than three faces, removed curved faces, multi-shell inputs.
+Was: next (step 2b): collapsing fillets (their offset vanishes: the neighbours' offsets meet; contract the face to an
 edge, its end arcs to points), vertices of more faces, removed curved faces.
 Release note for the lead: "Shell: a pocket's floor corners are now mitred as Onshape does (the wall used to thin to
 a point at each corner when the fallback construction built the shell); some shells of complex parts change volume

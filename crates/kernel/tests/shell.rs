@@ -582,6 +582,12 @@ fn quadrics_and_slabs_agree() {
         chamfer(&p, &rim, ChamferSpec::Equal(1.5), &[]).unwrap().shape
     };
     let bottom = |s: &Shape| faces_where(s, |c| c.z.abs() < 1e-9);
+    // SHELL-SLOW's plate: 80 × 50 × 10, a Ø20 hole, R2 vertical outer fillets (t 1.5: the fillets stay; t 3: they collapse).
+    let qa_plate = {
+        let p = unified(cut(&bx([0.0; 3], [80.0, 50.0, 10.0]), &cyl_z(40.0, 25.0, -1.0, 10.0, 12.0)).unwrap().shape);
+        let v = edges_where(&p, |i| (i.start.z - i.end.z).abs() > 1e-6 && matches!(i.curve, Curve::Line { .. }) && (i.start.x.abs() < 1e-9 || (i.start.x - 80.0).abs() < 1e-9));
+        fillet(&p, &v, 2.0).unwrap().shape
+    };
     // (The countersunk plate: the slabs' offset cone has its seam opposite the offset hole's, splitting the circle
     // they share in two (one more shown edge, two more vertices); ours keep the faces' frames, the circle whole, its
     // corners only shown, as live's.)
@@ -591,6 +597,8 @@ fn quadrics_and_slabs_agree() {
         ("filleted block, top removed", filleted.clone(), top(&filleted, 10.0), 1.0, false),
         ("L with a filleted inner corner, top removed", l_fillet.clone(), top(&l_fillet, 10.0), 2.0, false),
         ("countersunk plate, bottom removed", sunk.clone(), bottom(&sunk), 2.0, true),
+        ("qa plate R2, top removed, 1.5", qa_plate.clone(), top(&qa_plate, 10.0), 1.5, false),
+        ("qa plate R2, top removed, 3 (the fillets collapse)", qa_plate.clone(), top(&qa_plate, 10.0), 3.0, false),
     ];
     let images = |r: &OpResult, s: &Shape| -> Vec<(usize, usize)> {
         (0..s.faces().len()).map(|i| (r.history.modified(0, ShapeType::Face, i as u32).len(), r.history.generated(0, ShapeType::Face, i as u32).len())).collect()

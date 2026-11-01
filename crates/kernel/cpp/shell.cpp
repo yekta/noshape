@@ -98,6 +98,7 @@
 
 #include <cmath>
 #include <map>
+#include <functional>
 #include <GeomProjLib.hxx>
 #include <Geom_Plane.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
@@ -2727,7 +2728,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   const int    nf = faces.Extent(), ne = edges.Extent(), nv = verts.Extent();
   // The faces' offsets.
   std::vector<quad::Surf> sf(nf + 1);
-  std::vector<char>       kept(nf + 1);
+  std::vector<char>       kept(nf + 1), collapse(nf + 1);
   bool                    curved = false;
   for (int i = 1; i <= nf; ++i)
   {
@@ -2772,7 +2773,13 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     const gp_XYZ at0 = P1 - G * ((P1 - O).Dot(Z) / gz);
     q.r              = (at0 - O).Dot(X);
     if (q.r <= 10 * tol)
-      return no("a curved face's offset collapses (radius within the wall)");
+    {
+      // A fillet no thicker than the wall: its offset vanishes, its neighbours' offsets meet (below).
+      if (q.kind != GeomAbs_Cylinder)
+        return no("a cone's offset collapses");
+      collapse[(size_t)i] = 1;
+      continue;
+    }
     if (q.kind == GeomAbs_Cylinder)
       q.off = new Geom_CylindricalSurface(q.ax, q.r);
     else
@@ -2820,6 +2827,52 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       tangent[(size_t)i] = 1;
     }
   }
+  // Collapsing fillets: a strip between two tangent faces a and b and two caps. In the wall's inside the strip is
+  // the edge where a's and b's offsets meet, its end arcs points (their two corners one).
+  std::vector<std::array<int, 2>> across(nf + 1, {0, 0}); // a collapsing face's two tangent neighbours
+  std::vector<int>                group(ne + 1, 0);       // a tangent edge of a collapsing face: that face
+  std::vector<char>               gone(ne + 1);           // an end arc of a collapsing face
+  std::vector<int>                vrep(nv + 1);
+  for (int i = 1; i <= nv; ++i)
+    vrep[(size_t)i] = i;
+  std::function<int(int)> find = [&](int i) { return vrep[(size_t)i] == i ? i : vrep[(size_t)i] = find(vrep[(size_t)i]); };
+  for (int c = 1; c <= nf; ++c)
+  {
+    if (!collapse[(size_t)c])
+      continue;
+    std::vector<int> es;
+    ShapeIMap        seen;
+    for (TopExp_Explorer x(faces(c), TopAbs_EDGE); x.More(); x.Next())
+      if (!seen.Contains(x.Current()))
+      {
+        seen.Add(x.Current());
+        es.push_back(edges.FindIndex(x.Current()));
+      }
+    std::vector<int> tan, ends;
+    for (int e : es)
+      (tangent[(size_t)e] ? tan : ends).push_back(e);
+    if (es.size() != 4 || tan.size() != 2 || ends.size() != 2)
+      return no("a collapsing fillet not a strip");
+    const int a = efi[(size_t)tan[0]][0] == c ? efi[(size_t)tan[0]][1] : efi[(size_t)tan[0]][0];
+    const int b = efi[(size_t)tan[1]][0] == c ? efi[(size_t)tan[1]][1] : efi[(size_t)tan[1]][0];
+    if (a == b || collapse[(size_t)a] || collapse[(size_t)b] || !kept[(size_t)a] || !kept[(size_t)b])
+      return no("a collapsing fillet's neighbours");
+    for (int e : ends)
+    {
+      const int cap = efi[(size_t)e][0] == c ? efi[(size_t)e][1] : efi[(size_t)e][0];
+      if (cap == a || cap == b || collapse[(size_t)cap])
+        return no("a collapsing fillet's caps");
+      gone[(size_t)e] = 1;
+      TopoDS_Vertex v0, v1;
+      TopExp::Vertices(TopoDS::Edge(edges(e)), v0, v1);
+      const int r0 = find(verts.FindIndex(v0)), r1 = find(verts.FindIndex(v1));
+      if (r0 == r1)
+        return no("a collapsing fillet's end arc closed");
+      vrep[(size_t)r1] = r0;
+    }
+    across[(size_t)c] = {a, b};
+    group[(size_t)tan[0]] = group[(size_t)tan[1]] = c;
+  }
   // Vertices: three faces (two tangent: along their offset tangent line), or a closed face's seam and one face.
   std::vector<gp_XYZ> pts(nv + 1);
   for (int i = 1; i <= nv; ++i)
@@ -2835,7 +2888,24 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       es.push_back(edges.FindIndex(it.Value()));
     auto n_at = [&](int f) { return gp_Vec(normal_at(TopoDS::Face(faces(f)), V)).XYZ(); };
     gp_XYZ x;
-    if (fs.size() == 3 && es.size() == 3)
+    const auto col = std::find_if(fs.begin(), fs.end(), [&](int f) { return collapse[(size_t)f] != 0; });
+    if (col != fs.end())
+    {
+      // A corner of a collapsing fillet: where its neighbours' offsets meet the cap's.
+      const int c = *col;
+      if (fs.size() != 3 || std::count_if(fs.begin(), fs.end(), [&](int f) { return collapse[(size_t)f] != 0; }) != 1)
+        return no("a collapsing fillet's corner not of three faces");
+      int cap = 0;
+      for (int f : fs)
+        if (f != c && f != across[(size_t)c][0] && f != across[(size_t)c][1])
+          cap = f;
+      const int         a = across[(size_t)c][0], b = across[(size_t)c][1];
+      const quad::Surf* s3[3] = {&sf[(size_t)a], &sf[(size_t)b], &sf[(size_t)cap]};
+      x = V.XYZ() - (n_at(a) + n_at(b)) * t - n_at(cap) * (kept[(size_t)cap] ? t : 0.0);
+      if (cap == 0 || !quad::solve3(s3, x, size))
+        return no("a collapsing fillet's corner not found");
+    }
+    else if (fs.size() == 3 && es.size() == 3)
     {
       int tp = -1;
       for (int e : es)
@@ -2887,14 +2957,36 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   BRep_Builder               bld;
   std::vector<TopoDS_Vertex> vx(nv + 1);
   for (int i = 1; i <= nv; ++i)
-    bld.MakeVertex(vx[(size_t)i], gp_Pnt(pts[(size_t)i]), 1e3 * tol);
+    if (find(i) == i)
+      bld.MakeVertex(vx[(size_t)i], gp_Pnt(pts[(size_t)i]), 1e3 * tol);
+  for (int i = 1; i <= nv; ++i)
+    if (find(i) != i)
+    {
+      if (gp_Pnt(pts[(size_t)i]).Distance(gp_Pnt(pts[(size_t)find(i)])) > 1e3 * tol)
+        return no("a collapsing fillet's end corners apart");
+      vx[(size_t)i] = vx[(size_t)find(i)];
+    }
   std::vector<TopoDS_Edge> ex(ne + 1);
+  std::vector<char>        flip(ne + 1);
+  std::vector<int>         group_edge(nf + 1, 0); // a collapsing face's edge (the first of its tangent edges)
   for (int i = 1; i <= ne; ++i)
   {
+    if (gone[(size_t)i])
+      continue;
     const TopoDS_Edge e = TopoDS::Edge(edges(i).Oriented(TopAbs_FORWARD));
     TopoDS_Vertex     a, b;
     TopExp::Vertices(e, a, b);
-    const int         ia = verts.FindIndex(a), ib = verts.FindIndex(b);
+    const int         ia = find(verts.FindIndex(a)), ib = find(verts.FindIndex(b));
+    if (const int c = group[(size_t)i]; c != 0 && group_edge[(size_t)c] != 0)
+    {
+      // The collapsing face's other tangent edge: the same mitre edge, maybe the other way round.
+      const int    k  = group_edge[(size_t)c];
+      TopoDS_Vertex ka, kb;
+      TopExp::Vertices(TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD)), ka, kb);
+      ex[(size_t)i]   = ex[(size_t)k];
+      flip[(size_t)i] = find(verts.FindIndex(ka)) != ia;
+      continue;
+    }
     const gp_Pnt      A = gp_Pnt(pts[(size_t)ia]), B = gp_Pnt(pts[(size_t)ib]);
     BRepAdaptor_Curve oc(e);
     gp_Pnt            o0;
@@ -2902,7 +2994,10 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     oc.D1(oc.FirstParameter(), o0, t0);
     occ::handle<Geom_Curve> c;
     double                  p0 = 0, p1 = 0;
-    if (seam[(size_t)i] || tangent[(size_t)i] || (sf[(size_t)efi[(size_t)i][0]].kind == GeomAbs_Plane && sf[(size_t)efi[(size_t)i][1]].kind == GeomAbs_Plane))
+    // (A collapsing face's tangent edge: the mitre of its two neighbours' offsets.)
+    const int fa = group[(size_t)i] != 0 ? across[(size_t)group[(size_t)i]][0] : efi[(size_t)i][0];
+    const int fb = group[(size_t)i] != 0 ? across[(size_t)group[(size_t)i]][1] : efi[(size_t)i][1];
+    if (seam[(size_t)i] || (tangent[(size_t)i] && group[(size_t)i] == 0) || (sf[(size_t)fa].kind == GeomAbs_Plane && sf[(size_t)fb].kind == GeomAbs_Plane))
     {
       if (A.Distance(B) <= 10 * tol || gp_Vec(A, B).Dot(t0) <= 0)
         return no("an offset edge vanishes or turns round");
@@ -2911,7 +3006,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     }
     else
     {
-      GeomAPI_IntSS is(sf[(size_t)efi[(size_t)i][0]].off, sf[(size_t)efi[(size_t)i][1]].off, 1e-9 * size);
+      GeomAPI_IntSS is(sf[(size_t)fa].off, sf[(size_t)fb].off, 1e-9 * size);
       if (!is.IsDone())
         return no("two offsets don't intersect");
       for (int k = 1; k <= is.NbLines() && c.IsNull(); ++k)
@@ -2951,12 +3046,31 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     if (!mk.IsDone())
       return no("an offset edge failed");
     ex[(size_t)i] = mk.Edge();
+    if (group[(size_t)i] != 0)
+      group_edge[(size_t)group[(size_t)i]] = i;
   }
+  bool ok_wires = true;
   auto offset_wire = [&](const TopoDS_Shape& w) {
     TopoDS_Wire ow;
     bld.MakeWire(ow);
     for (TopoDS_Iterator it(w, false); it.More(); it.Next())
-      bld.Add(ow, ex[(size_t)edges.FindIndex(it.Value())].Oriented(it.Value().Orientation()));
+    {
+      const int k = edges.FindIndex(it.Value());
+      if (gone[(size_t)k])
+        continue;
+      if (ex[(size_t)k].IsNull())
+      {
+        if (dbg)
+        {
+          BRepAdaptor_Curve oc(TopoDS::Edge(it.Value()));
+          const gp_Pnt      m = oc.Value(0.5 * (oc.FirstParameter() + oc.LastParameter()));
+          std::fprintf(stderr, "quadrics: no offset for edge %d (faces %d %d, tangent %d, group %d) at %g %g %g\n", k, efi[(size_t)k][0], efi[(size_t)k][1], (int)tangent[(size_t)k], group[(size_t)k], m.X(), m.Y(), m.Z());
+        }
+        ok_wires = false;
+        continue;
+      }
+      bld.Add(ow, ex[(size_t)k].Oriented(flip[(size_t)k] ? TopAbs::Reverse(it.Value().Orientation()) : it.Value().Orientation()));
+    }
     ow.Closed(true);
     return ow;
   };
@@ -2969,7 +3083,9 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     const TopoDS_Face& f  = TopoDS::Face(it.Value());
     const int          i  = faces.FindIndex(f);
     const TopoDS_Face  ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
-    if (kept[(size_t)i])
+    if (collapse[(size_t)i])
+      bld.Add(shell, f); // (no offset: the neighbours' offsets meet where it was)
+    else if (kept[(size_t)i])
     {
       bld.Add(shell, f);
       TopoDS_Face of;
@@ -2982,7 +3098,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         for (TopExp_Explorer x(ff, TopAbs_EDGE); x.More(); x.Next())
         {
           const int k = edges.FindIndex(x.Current());
-          if (done.Contains(edges(k)))
+          if (done.Contains(edges(k)) || gone[(size_t)k])
             continue;
           done.Add(edges(k));
           if (!quad::add_pcurve(ex[(size_t)k], of, TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD)), ff, seam[(size_t)k] != 0, 1e3 * tol))
@@ -3010,7 +3126,10 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     }
   }
   for (int i = 1; i <= ne; ++i)
-    BRepLib::SameParameter(ex[(size_t)i], 1e3 * tol);
+    if (!ex[(size_t)i].IsNull())
+      BRepLib::SameParameter(ex[(size_t)i], 1e3 * tol);
+  if (!ok_wires)
+    return no("an edge without its offset");
   shell.Closed(true);
   TopoDS_Solid wall;
   bld.MakeSolid(wall);
