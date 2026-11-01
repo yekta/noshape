@@ -3145,10 +3145,11 @@ fn suggested_views_follow_mbd_datums() {
     let d = make(&doc);
     let ids: Vec<u64> = d.sheets[0].views.iter().map(|v| v.id.0).collect();
     assert_eq!(ids, vec![1, 2], "Front and Top");
-    let on: Vec<(String, ViewId)> = d.sheets[0].annotations.iter().filter_map(|a| match &a.kind {
+    let mut on: Vec<(String, ViewId)> = d.sheets[0].annotations.iter().filter_map(|a| match &a.kind {
         AnnotationKind::Datum { label, .. } => Some((label.clone(), a.model.as_ref()?.view)),
         _ => None,
     }).collect();
+    on.sort();
     assert_eq!(on, vec![("A".to_string(), ViewId(1)), ("B".to_string(), ViewId(2))]);
     // Only the top face: the Front view alone.
     set(&mut doc, vec![datum(1, "A", [0.0, 0.0, 1.0])]);
@@ -4653,3 +4654,24 @@ fn bom_table_collapses_assembly_only_subassemblies() {
     let total: usize = parts.iter().map(|r| r.3).sum();
     assert_eq!(one, vec![(1, doc.tab(asm).unwrap().name.clone(), 1, total)], "one row with every body under it");
 }
+
+/// Each model annotation shows once, in live's priority (help
+/// creating_a_drawing): Top, Right, Front, then parent views over children,
+/// then insertion order. A datum on a vertical face seen edge-on in both the
+/// Front and Top views goes to the Top view even when the Front was first.
+#[test]
+fn model_annotations_go_to_the_top_view_first() {
+    let (mut doc, _) = demo();
+    let ps = doc.tabs.iter().find(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap().id;
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, ps, ViewOrientation::Front, [100.0, 100.0]));
+    drawing.sheets[0].views.push(base_view(2, ps, ViewOrientation::Top, [100.0, 200.0]));
+    // A face whose normal is +X: edge-on in Front and Top (and Right sees it face-on).
+    if let Some(TabContent::PartStudio(p)) = doc.tabs.iter_mut().find(|t| t.id == ps).map(|t| &mut t.content) {
+        p.annotations.push(crate::annotations::Annotation { id: 7, kind: crate::annotations::AnnotationKind::Datum { letter: "C".into() }, face: crate::reference::Reference::Origin, at: [0.0; 3], normal: [1.0, 0.0, 0.0], up: [0.0, 0.0, 1.0], offset: None });
+    }
+    mbd::place_model_datums(&mut drawing, &doc);
+    let views: Vec<ViewId> = drawing.sheets[0].annotations.iter().filter_map(|a| a.model.as_ref().filter(|m| m.id == 7).map(|m| m.view)).collect();
+    assert_eq!(views, vec![ViewId(2)], "the Top view, not the Front view inserted first");
+}
+

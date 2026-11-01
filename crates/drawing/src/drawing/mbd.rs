@@ -315,36 +315,56 @@ pub fn trim_suggested_views(drawing: &mut Drawing, doc: &Document) {
 /// shows annotations from the model.
 pub fn place_model_datums(drawing: &mut Drawing, doc: &Document) {
     let mut placed: Vec<(TabId, u32)> = drawing.sheets.iter().flat_map(|s| &s.annotations).filter_map(|a| a.model.as_ref().map(|m| (m.tab, m.id))).collect();
-    for si in 0..drawing.sheets.len() {
-        let mut add: Vec<Annotation> = Vec::new();
-        {
-            let sheet = &drawing.sheets[si];
-            for v in &sheet.views {
-                if !v.model_annotations {
-                    continue;
-                }
-                let Some((key, _)) = views::view_source(sheet, v.id) else { continue };
-                let Some(TabContent::PartStudio(ps)) = doc.tab(key.tab).map(|t| &t.content) else { continue };
-                let Some(frame) = views::view_frame(drawing, sheet, v.id) else { continue };
-                for m in &ps.annotations {
-                    if placed.contains(&(key.tab, m.id)) || !shows(m, &frame) {
-                        continue;
-                    }
-                    placed.push((key.tab, m.id));
-                    // Laid out on the sheet when it is built (`resolve_model_annotations`).
-                    let kind = match &m.kind {
-                        ModelKind::Datum { letter } => AnnotationKind::Datum { anchor: v.position, label: letter.clone(), on: None, at: None },
-                        ModelKind::Dimension { .. } => AnnotationKind::LinearDimension { view: v.id, a: [0.0; 2], b: [0.0; 2], offset: 0.0, orientation: super::DimOrientation::Aligned, override_text: None },
-                    };
-                    add.push(Annotation { kind, position: v.position, model: Some(ModelRef { tab: key.tab, id: m.id, view: v.id, offset: DEFAULT_OFFSET, hidden: false }), ..Default::default() });
-                }
+    // Each one goes to one view, in live's priority (help creating_a_drawing:
+    // "top, right, front, then parent views over children, then insertion
+    // order").
+    let mut views_by_priority: Vec<((u8, u8, usize, usize), usize, ViewId)> = Vec::new();
+    for (si, sheet) in drawing.sheets.iter().enumerate() {
+        for (vi, v) in sheet.views.iter().enumerate().filter(|(_, v)| v.model_annotations) {
+            let Some(frame) = views::view_frame(drawing, sheet, v.id) else { continue };
+            views_by_priority.push(((direction_rank(frame.dir), u8::from(!matches!(v.kind, super::ViewKind::Base { .. })), si, vi), si, v.id));
+        }
+    }
+    views_by_priority.sort_by_key(|(rank, _, _)| *rank);
+    let mut add: Vec<(usize, Annotation)> = Vec::new();
+    for (_, si, vid) in views_by_priority {
+        let sheet = &drawing.sheets[si];
+        let Some(v) = sheet.view(vid) else { continue };
+        let Some((key, _)) = views::view_source(sheet, v.id) else { continue };
+        let Some(TabContent::PartStudio(ps)) = doc.tab(key.tab).map(|t| &t.content) else { continue };
+        let Some(frame) = views::view_frame(drawing, sheet, v.id) else { continue };
+        for m in &ps.annotations {
+            if placed.contains(&(key.tab, m.id)) || !shows(m, &frame) {
+                continue;
             }
+            placed.push((key.tab, m.id));
+            // Laid out on the sheet when it is built (`resolve_model_annotations`).
+            let kind = match &m.kind {
+                ModelKind::Datum { letter } => AnnotationKind::Datum { anchor: v.position, label: letter.clone(), on: None, at: None },
+                ModelKind::Dimension { .. } => AnnotationKind::LinearDimension { view: v.id, a: [0.0; 2], b: [0.0; 2], offset: 0.0, orientation: super::DimOrientation::Aligned, override_text: None },
+            };
+            add.push((si, Annotation { kind, position: v.position, model: Some(ModelRef { tab: key.tab, id: m.id, view: v.id, offset: DEFAULT_OFFSET, hidden: false }), ..Default::default() }));
         }
+    }
+    for (si, mut a) in add {
         let sheet = &mut drawing.sheets[si];
-        for mut a in add {
-            a.id = sheet.next_annotation_id();
-            sheet.annotations.push(a);
-        }
+        a.id = sheet.next_annotation_id();
+        sheet.annotations.push(a);
+    }
+}
+
+/// A view's place in the model-annotation priority by its direction: Top,
+/// Right, Front, then the others.
+fn direction_rank(dir: DVec3) -> u8 {
+    let d = dir.normalize_or_zero();
+    if d.dot(DVec3::NEG_Z) > 0.999 {
+        0
+    } else if d.dot(DVec3::NEG_X) > 0.999 {
+        1
+    } else if d.dot(DVec3::Y) > 0.999 {
+        2
+    } else {
+        3
     }
 }
 
