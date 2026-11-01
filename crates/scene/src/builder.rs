@@ -1437,6 +1437,18 @@ const MC_RIM_REST: [u8; 4] = [40, 44, 46, 255];
 const MC_RIM_LIT: [u8; 4] = [0, 40, 71, 255];
 
 impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
+    /// Live 1701: a glyph is in the scene bounds the zoom limits use: the
+    /// disc ±18 px, the triad's arms out to +33 px in x / y and +23 px in z,
+    /// at the pixel size at its origin.
+    fn zoom_points(&self, view: &noshape_render::camera_geometry::View) -> Vec<DVec3> {
+        let mut out = Vec::new();
+        for &(o, x, y, z, _) in &self.items {
+            let Some(px) = view.world_per_px(o) else { continue };
+            out.extend([o - x * (MC_R_OUT_PX * px), o - y * (MC_R_OUT_PX * px), o + x * (33.0 * px), o + y * (33.0 * px), o + z * (23.0 * px)]);
+        }
+        out
+    }
+
     fn build(&self, view: &noshape_render::camera_geometry::View, up: &Uploader) -> Vec<Instance> {
         let mut out = Vec::new();
         let f = |p: DVec3| -> [f32; 3] { p.as_vec3().into() };
@@ -1613,4 +1625,27 @@ pub fn face_edges(display: &StudioDisplay, r: &Reference) -> Vec<Reference> {
 fn lin_to_u8(c: [f32; 4]) -> [u8; 4] {
     let f = |x: f32| (if x <= 0.0031308 { x * 12.92 } else { 1.055 * x.powf(1.0 / 2.4) - 0.055 } * 255.0).round().clamp(0.0, 255.0) as u8;
     [f(c[0]), f(c[1]), f(c[2]), 255]
+}
+
+#[cfg(test)]
+mod connector_zoom_tests {
+    use super::{ConnectorGlyphs, ConnectorLook};
+    use glam::{DVec2, DVec3};
+    use noshape_render::camera_geometry::{CameraGeometry, View};
+
+    /// Live 1701: a mate connector glyph reaches 18 px back along x / y, 33
+    /// px out along them and 23 px up z, at the pixel size at its origin.
+    #[test]
+    fn connector_glyph_extent_counts_for_the_zoom_limits() {
+        let o = DVec3::new(0.0, 0.0, 0.01);
+        let glyphs = ConnectorGlyphs { items: vec![(o, DVec3::X, DVec3::Y, DVec3::Z, ConnectorLook::Rest)] };
+        let view = View { camera: Default::default(), size: DVec2::new(1200.0, 800.0) };
+        let px = view.world_per_px(o).unwrap();
+        let pts = glyphs.zoom_points(&view);
+        let want = [o - DVec3::X * 18.0 * px, o - DVec3::Y * 18.0 * px, o + DVec3::X * 33.0 * px, o + DVec3::Y * 33.0 * px, o + DVec3::Z * 23.0 * px];
+        assert_eq!(pts.len(), want.len());
+        for (p, w) in pts.iter().zip(want) {
+            assert!(p.distance(w) < 1e-12, "{p:?} vs {w:?}");
+        }
+    }
 }

@@ -42,4 +42,10 @@ impl View {
 /// Camera-dependent geometry built on the render thread for every frame.
 pub trait CameraGeometry: Send + Sync {
     fn build(&self, view: &View, up: &Uploader) -> Vec<Instance>;
+    /// World points the geometry reaches in `view` that Onshape's zoom
+    /// limits count as scene (a mate connector glyph's constant-pixel
+    /// extent, live 1701); none by default.
+    fn zoom_points(&self, _view: &View) -> Vec<DVec3> {
+        Vec::new()
+    }
 }

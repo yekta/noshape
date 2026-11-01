@@ -1562,9 +1562,13 @@ impl Viewport {
 
     // ------------------------------------------------------------ input
 
-    /// The bounds Onshape's zoom limits are measured on (the scene).
+    /// The bounds Onshape's zoom limits are measured on (the scene, with
+    /// the constant-pixel extent of mate connector glyphs at this view: live
+    /// 1701, the zoom-out stop comes one wheel step later with one).
     fn zoom_bounds(&self) -> Option<(DVec3, DVec3)> {
-        self.scene_bounds.map(|(lo, hi)| (lo.as_dvec3(), hi.as_dvec3())).or(self.fit_bounds)
+        let scene = self.scene_bounds.map(|(lo, hi)| (lo.as_dvec3(), hi.as_dvec3())).or(self.fit_bounds);
+        let view = noshape_render::camera_geometry::View { camera: self.camera, size: self.size() };
+        self.camera_geometry.iter().flat_map(|g| g.zoom_points(&view)).fold(scene, |acc, p| Some(acc.map_or((p, p), |(lo, hi)| (lo.min(p), hi.max(p)))))
     }
 
     /// Rotate / pan centre for a drag starting at `at` (Onshape's
