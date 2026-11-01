@@ -689,7 +689,12 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
     let name = st.feature_name.clone();
     let mut ev = EvalCtx::new(marker, &name, params, &units, ctx, &outer);
     ev.xform = st.xform;
-    let r = f(&mut ev);
+    let mut r = f(&mut ev);
+    // A cancelled regeneration's operation fails at once, what it made not named (the 45 / 45 knurl's naming took
+    // a third of a second after the cancel).
+    if r.is_ok() && noshape_kernel::thread_cancelled() {
+        r = Err(FeatureError::new("cancelled"));
+    }
     if trace_ops() {
         // Operation trace for debugging std features (stderr).
         let faces = |c: &crate::regen::context::Context| {

@@ -64,6 +64,24 @@ pub(crate) struct ShapeInner {
     pub(crate) ptr: UniquePtr<ffi::OcShape>,
 }
 
+impl Drop for ShapeInner {
+    fn drop(&mut self) {
+        // Once the thread's regeneration is cancelled ([`crate::with_cancel`]'s flag set), its shapes are freed
+        // on a thread of their own: the 45 / 45 knurl's 50 k faces took half a second to free after the cancel.
+        if self.ptr.is_null() || !crate::boolean::thread_cancelled() {
+            return;
+        }
+        static FREER: std::sync::OnceLock<Option<std::sync::mpsc::Sender<UniquePtr<ffi::OcShape>>>> = std::sync::OnceLock::new();
+        let tx = FREER.get_or_init(|| {
+            let (tx, rx) = std::sync::mpsc::channel::<UniquePtr<ffi::OcShape>>();
+            std::thread::Builder::new().name("shape-freer".into()).spawn(move || rx.into_iter().for_each(drop)).ok().map(|_| tx)
+        });
+        if let Some(tx) = tx {
+            let _ = tx.send(std::mem::replace(&mut self.ptr, UniquePtr::null()));
+        }
+    }
+}
+
 /// A B-rep shape (wrapper around OCCT `TopoDS_Shape`).
 ///
 /// `Shape` is immutable and cheap to clone (an `Arc` bump). It is `Send` and

@@ -28,6 +28,61 @@
    myStatus = ShapeExtend::EncodeStatus(ShapeExtend_OK);
    if (theShape.IsNull())
    {
+--- a/src/ModelingAlgorithms/TKShHealing/ShapeFix/ShapeFix_Shell.cxx
++++ b/src/ModelingAlgorithms/TKShHealing/ShapeFix/ShapeFix_Shell.cxx
+@@ -49,6 +49,24 @@
+ 
+ #include <stack>
+ #include <algorithm>
++#include <Standard_Failure.hxx>
++
++// noshape (patch 0013): whether the caller's budget or cancel says stop (noshape's kernel, boolean.cpp; weak
++// default as 0008): GetShells every 1024 faces (its passes start over after each shell; a knurl's 50 k faces'
++// orientation fix in UnifySameDomain took a second after the user's cancel).
++extern "C" int noshape_should_break();
++#if defined(__GNUC__)
++extern "C" __attribute__((weak)) int noshape_should_break()
++{
++  return 0;
++}
++#endif
++
++static inline void noshapeShellCheck(unsigned& theCount)
++{
++  if ((++theCount & 1023) == 0 && noshape_should_break() != 0)
++    throw Standard_Failure("noshape: stopped");
++}
+ 
+ IMPLEMENT_STANDARD_RTTIEXT(ShapeFix_Shell, ShapeFix_Root)
+ 
+@@ -335,9 +353,11 @@
+   aFaceEdges.ReSize(theLfaces.Length());
+   size_t                                aNumberOfEdges = 0;
+   NCollection_DynamicArray<TopoDS_Edge> aTempEdges;
++  unsigned aNoshapeCount = 0;
+   for (NCollection_Sequence<TopoDS_Shape>::Iterator anFaceIter(theLfaces); anFaceIter.More();
+        anFaceIter.Next())
+   {
++    noshapeShellCheck(aNoshapeCount);
+     aTempEdges.Clear();
+     TopoDS_Face aFace = TopoDS::Face(anFaceIter.Value());
+     for (TopExp_Explorer anEdgeExp(aFace, TopAbs_EDGE); anEdgeExp.More(); anEdgeExp.Next())
+@@ -357,6 +377,7 @@
+ 
+   for (int aFaceInd = 1; aFaceInd <= aFaceEdges.Length(); ++aFaceInd)
+   {
++    noshapeShellCheck(aNoshapeCount);
+     const TopoDS_Face&                     aFace           = aFaceEdges.FindKey(aFaceInd);
+     const NCollection_Array1<TopoDS_Edge>& aFaceEdgesArray = aFaceEdges.FindFromIndex(aFaceInd);
+ 
+@@ -410,6 +431,7 @@
+   TempProcessedEdges aTempProcessedEdges(static_cast<int>(aNumberOfEdges));
+   for (; aFaceIdx <= aProcessingFaces.Length(); aFaceIdx++)
+   {
++    noshapeShellCheck(aNoshapeCount);
+     aTempProcessedEdges.Clear();
+ 
+     int         aBadOrientationCount = 0, aGoodOrientationCount = 0;
 --- a/src/ModelingAlgorithms/TKShHealing/ShapeUpgrade/ShapeUpgrade_UnifySameDomain.cxx
 +++ b/src/ModelingAlgorithms/TKShHealing/ShapeUpgrade/ShapeUpgrade_UnifySameDomain.cxx
 @@ -88,6 +88,24 @@
