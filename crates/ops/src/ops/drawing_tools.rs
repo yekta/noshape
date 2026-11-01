@@ -85,6 +85,7 @@ pub fn ops() -> Vec<Op> {
                     opt("flip", json!({ "type": "boolean", "default": false }), "Flip the view direction."),
                     opt("depth", json!({ "type": "number", "exclusiveMinimum": 0 }), "Section depth (model mm)."),
                     opt("depth_to", point(), "Section depth up to this vertex / circle center (sheet mm)."),
+                    opt("depth_offset", json!({ "type": "number" }), "With `depth_to`: Offset (model mm) past that point along the line of sight; negative is Opposite direction, back toward the cut (live: a limit on a face leaves the face out)."),
                     opt("exclude", json!({ "type": "array", "items": { "type": "string" } }), "Parts excluded from the cut (`body:…`)."),
                     opt("cut_from_section", json!({ "type": "boolean", "default": true }), "Sectioning a section view: cut from the section."),
                 ],
@@ -910,6 +911,11 @@ fn section_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         section.depth_on = true;
         section.up_to = true;
         section.depth_ref = Some(r);
+        if let Some(o) = a.opt_f64("depth_offset")? {
+            (section.offset, section.offset_flip) = (Some(o.abs() / 1000.0), o < 0.0);
+        }
+    } else if a.get("depth_offset").is_some() {
+        return Err(OpError::param("depth_offset", "only with depth_to (Up to entity), as live"));
     }
     if let Some(list) = a.opt_array("exclude")? {
         for (i, b) in list.iter().enumerate() {

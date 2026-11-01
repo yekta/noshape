@@ -11,6 +11,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## Audit answers implemented (11-01 17:33 UTC)
+- Landed 17:25: the whole stack (26 commits, da4a95c0) after the land-loop fixes below.
+- From live 1735 / 1736 / 1737: datum target Outside styles (D1), inspection Types by how a dimension was made
+  (D6, `Annotation::one_edge`), Section depth Up to entity › Offset with Opposite direction (D18,
+  `DrawingView::section_depth_offset`, API `depth_offset`), Notifications ⋯ (N1), weld / centerline / leader-line
+  menus and Paste in every menu (M2), Replicate annotations enabled. D3 D4 D5 D17: live has none of them (= ours).
+- Audit open: M1 (format lines selectable), D15 (note font label), and the leftovers listed at the sheet's top.
+
 ## Land loop fixed (11-01 17:08 UTC)
 - My lands failed 23 times on 11-01 (lead's /tmp/lead/land-results/dx.log): clippy type_complexity in mbd.rs (fixed
   3c4be3ac, but every commit stacked after the bad one failed with it), coverage::every_menu_item_is_listed (my V1

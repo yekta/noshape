@@ -388,7 +388,7 @@ impl DrawingEditor {
         ViewOptions {
             insert: InsertOpts { scale: i.scale, simplification: i.simplification, flat: i.flat, sketch_appearances: i.sketch_appearances, model_annotations: i.model_annotations, asm_position: i.asm_position, display_state: i.display_state.clone(), named: i.named.clone(), sketch: i.sketch, pinned: i.pinned.clone() },
             aux: self.aux_dlg.as_ref().map(|d| AuxOpts { reverse: d.reverse, show_ref: d.show_ref, anchor: d.anchor, letter: self.aux_letter.clone() }),
-            section: self.section_dlg.as_ref().map(|d| SectionOpts { cut_only: d.cut_only, flip: d.flip, depth_on: d.depth.is_some(), depth_value: d.depth_value, up_to: d.up_to, depth_ref: d.depth_ref.clone(), exclude: d.exclude.clone(), cut_from: d.cut_from, anchor: d.anchor.clone() }),
+            section: self.section_dlg.as_ref().map(|d| SectionOpts { cut_only: d.cut_only, flip: d.flip, depth_on: d.depth.is_some(), depth_value: d.depth_value, up_to: d.up_to, depth_ref: d.depth_ref.clone(), offset: d.offset.as_ref().and(d.offset_value), offset_flip: d.offset_flip, exclude: d.exclude.clone(), cut_from: d.cut_from, anchor: d.anchor.clone() }),
             detail: self.detail_dlg.as_ref().map(|d| DetailOpts { scale: d.scale, profile: d.profile.clone(), style: d.style, show_profile: d.show_profile, clip_border: d.clip_border, label: self.detail_label.clone() }),
         }
     }
@@ -2020,6 +2020,20 @@ impl DrawingEditor {
         out
     }
 
+    /// | Clear selection · Zoom to fit · Delete: the end of every
+    /// annotation menu.
+    fn selection_tail() -> [MenuEntry; 4] {
+        [
+            MenuEntry::Separator,
+            MenuEntry::item("Clear selection", |t, _, cx| {
+                t.selection.clear();
+                t.redraw(cx);
+            }),
+            MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
+            MenuEntry::item("Delete", |t, _, cx| t.delete_selection(cx)),
+        ]
+    }
+
     pub(crate) fn move_to_entry(a: &Annotation) -> MenuEntry {
         let (id, cur) = (a.id, a.layer);
         let layers = SheetLayer::FORMAT.iter().copied().chain((!cur.is_drawing()).then_some(SheetLayer::Drawing));
@@ -2210,6 +2224,34 @@ impl DrawingEditor {
                     let mut own = self.annotation_more_entries(a);
                     let edit = own.remove(0);
                     return self.live_order_entries(a, edit, own, false, cx);
+                }
+                // Weld symbols (live request 1736): Edit... · Copy · Paste ·
+                // Paste as table · Add leader | Clear selection · Zoom to fit ·
+                // Delete (Copy before Paste, unlike the other annotations; no
+                // Move to, no Remove leaders).
+                if let Some(a) = a.as_ref().filter(|a| matches!(a.kind, AnnotationKind::Weld { .. })) {
+                    let mut out = vec![MenuEntry::item("Edit...", move |t, w, cx| t.open_weld_edit(id, w, cx))];
+                    out.push(MenuEntry::item("Copy", move |t, _, cx| {
+                        if !t.selection.contains(&Sel::Annotation(id)) {
+                            t.selection = vec![Sel::Annotation(id)];
+                        }
+                        t.copy_entities(cx);
+                    }));
+                    out.push(crate::drawing_props::paste_always());
+                    out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+                        t.paste_as_table(cx);
+                    }));
+                    out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
+                    let _ = a;
+                    out.extend(Self::selection_tail());
+                    return out;
+                }
+                // A 2 point / edge to edge centerline (live request 1736):
+                // Paste | Clear selection · Zoom to fit · Delete.
+                if a.as_ref().is_some_and(|a| matches!(a.kind, AnnotationKind::Centerline { .. })) {
+                    let mut out = vec![crate::drawing_props::paste_always()];
+                    out.extend(Self::selection_tail());
+                    return out;
                 }
                 // Notes: their own menu in live's order (drawing_leaders).
                 if let Some(a) = a.as_ref().filter(|a| matches!(a.kind, AnnotationKind::Note { .. })) {

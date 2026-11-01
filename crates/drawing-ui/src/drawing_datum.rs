@@ -116,9 +116,9 @@ impl DrawingEditor {
         let len = |st: &Entity<InputState>| crate::drawing_section::parse_depth(&st.read(cx).value(), mm).unwrap_or(0.025).max(1e-4);
         match d.area {
             1 => DatumTargetArea::Dot,
-            2 if d.area_size => DatumTargetArea::Circle { diameter: len(&d.size_a) },
+            // Live request 1735: a circle always has its area size.
+            2 => DatumTargetArea::Circle { diameter: len(&d.size_a) },
             3 if d.area_size => DatumTargetArea::Rectangle { width: len(&d.size_a), height: len(&d.size_b) },
-            2 => DatumTargetArea::Circle { diameter: 0.01 },
             3 => DatumTargetArea::Rectangle { width: 0.01, height: 0.01 },
             4 => DatumTargetArea::Custom,
             _ => DatumTargetArea::Point,
@@ -443,22 +443,27 @@ impl DrawingEditor {
             let areas: Vec<(String, String, bool, Act)> = AREAS.iter().enumerate().map(|(i, (n, g))| (g.to_string(), n.to_string(), d.area == i, std::rc::Rc::new(move |d: &mut DatumDlg| d.area = i) as Act)).collect();
             let styles: Vec<(String, String, bool, Act)> = TargetStyle::ALL
                 .iter()
-                .map(|&s| ((if s == TargetStyle::Inside { "⊖" } else { "⊲" }).to_string(), s.name().to_string(), d.style == s, std::rc::Rc::new(move |d: &mut DatumDlg| d.style = s) as Act))
+                .map(|&s| (style_glyph(s).to_string(), s.name().to_string(), d.style == s, std::rc::Rc::new(move |d: &mut DatumDlg| d.style = s) as Act))
                 .collect();
-            let area_size = d.area_size;
+            // Live request 1735: Circle's "Area size: Ø [25 mm]" has no
+            // checkbox (always on); Point's and Rectangle's do.
+            let area_size = d.area_size || d.area == 2;
             let sized = matches!(d.area, 2 | 3);
             body = body
                 .child(row("Target area:", icon_menu("dt-area", AREAS[d.area].1.to_string(), areas)))
-                .child(row("Style:", icon_menu("dt-style", if d.style == TargetStyle::Inside { "⊖".into() } else { "⊲".into() }, styles)))
+                .child(row("Style:", icon_menu("dt-style", style_glyph(d.style).into(), styles)))
                 .child(
                     h_flex()
                         .h(px(30.))
                         .px(px(8.))
                         .gap(px(6.))
-                        .child(crate::drawing_chrome::DrCheckbox::new("dt-size").label("Area size:").checked(area_size).on_click(cx.listener(|this, v: &bool, _, cx| {
-                            let v = *v;
-                            this.edit_datum(|d| d.area_size = v, cx)
-                        })))
+                        .when(d.area == 2, |e| e.child(div().text_size(px(12.)).child("Area size:")))
+                        .when(d.area != 2, |e| {
+                            e.child(crate::drawing_chrome::DrCheckbox::new("dt-size").label("Area size:").checked(area_size).on_click(cx.listener(|this, v: &bool, _, cx| {
+                                let v = *v;
+                                this.edit_datum(|d| d.area_size = v, cx)
+                            })))
+                        })
                         .when(area_size && sized, |e| e.child(div().text_size(px(13.)).child(if d.area == 2 { "Ø" } else { "" })).child(div().w(px(80.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&d.size_a).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
                         .when(area_size && d.area == 3, |e| e.child(div().w(px(80.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&d.size_b).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
                         .when(area_size && sized, |e| {
@@ -845,4 +850,14 @@ fn bbox(p: &[[f64; 2]]) -> [f64; 4] {
 fn bbox_area(p: &[[f64; 2]]) -> f64 {
     let b = bbox(p);
     (b[2] - b[0]) * (b[3] - b[1])
+}
+
+/// The Style list's glyph: the bubble, its pointer, the size outside.
+fn style_glyph(s: TargetStyle) -> &'static str {
+    match (s.moveable().is_some(), s.outside()) {
+        (false, false) => "⊖",
+        (false, true) => "⊖↗",
+        (true, false) => "⊲",
+        (true, true) => "⊲↗",
+    }
 }

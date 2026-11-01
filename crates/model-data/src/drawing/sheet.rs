@@ -2642,7 +2642,25 @@ impl SheetGeometry {
         self.lines.push(Polyline2 { points: pts.collect(), style: LineStyle::Thin, closed: true, pick });
         self.lines.push(Polyline2 { points: vec![[c[0] - r, c[1]], [c[0] + r, c[1]]], style: LineStyle::Thin, closed: false, pick });
         self.texts.push(Text2 { pos: [c[0], c[1] - 2.6], height: 2.8, text: label.to_string(), angle: 0.0, anchor: Anchor::Center, pick });
-        if !size.is_empty() {
+        if !size.is_empty() && style.outside() {
+            // Live request 1735: a dot in the top half, the size outside on
+            // a short leader with a shoulder, up-right (rotational: up-left).
+            let dot = [c[0], c[1] + 2.6];
+            let pts: Vec<[f64; 2]> = (0..12).map(|i| {
+                let t = i as f64 / 12.0 * std::f64::consts::TAU;
+                [dot[0] + 0.45 * t.cos(), dot[1] + 0.45 * t.sin()]
+            }).collect();
+            for i in 1..pts.len() - 1 {
+                self.fills.push(Fill2 { points: vec![pts[0], pts[i], pts[i + 1]] });
+            }
+            let sx = if style.moveable() == Some(false) { -1.0 } else { 1.0 };
+            let knee = [c[0] + sx * (r + 1.0), c[1] + r + 1.0];
+            let end = [knee[0] + sx * 2.0, knee[1]];
+            self.lines.push(Polyline2 { points: vec![dot, knee, end], style: LineStyle::Thin, closed: false, pick });
+            let (h, w) = (2.8, font::text_width(size, 2.8));
+            let x = if sx > 0.0 { end[0] + 0.8 } else { end[0] - 0.8 - w };
+            self.texts.push(Text2 { pos: [x, knee[1] - 1.4], height: h, text: size.to_string(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+        } else if !size.is_empty() {
             let h = (2.4f64).min(8.5 / font::text_width(size, 1.0).max(1e-9));
             self.texts.push(Text2 { pos: [c[0], c[1] + 2.6], height: h, text: size.to_string(), angle: 0.0, anchor: Anchor::Center, pick });
         }
@@ -2653,8 +2671,8 @@ impl SheetGeometry {
         }
         // Moveable styles: a pointer on the bubble (horizontal, or turned
         // toward the target).
-        if style != super::TargetStyle::Inside && l > 1e-9 {
-            let u = if style == super::TargetStyle::MoveableHorizontal { [if d[0] < 0.0 { -1.0 } else { 1.0 }, 0.0] } else { [d[0] / l, d[1] / l] };
+        if let (Some(horizontal), true) = (style.moveable(), l > 1e-9) {
+            let u = if horizontal { [if d[0] < 0.0 { -1.0 } else { 1.0 }, 0.0] } else { [d[0] / l, d[1] / l] };
             let n = [-u[1], u[0]];
             let tip = [c[0] + u[0] * (r + 2.5), c[1] + u[1] * (r + 2.5)];
             let s1 = [c[0] + u[0] * r * 0.6 + n[0] * r * 0.8, c[1] + u[1] * r * 0.6 + n[1] * r * 0.8];

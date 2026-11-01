@@ -59,9 +59,6 @@ pub fn view_clipboard(cx: &App) -> Option<clipboard::ViewClipboard> {
     cx.read_from_clipboard().and_then(|c| c.text()).and_then(|t| clipboard::ViewClipboard::from_json(&t))
 }
 
-/// Paste, in the drawing's menus when the clipboard holds drawing content
-/// (live: u-906, u-944, 1074, 1108 have it; drawing/290, with nothing
-/// copied, doesn't).
 /// Paste as live lists it on the empty sheet and the surface finish menus:
 /// always, pasting whatever drawing content is on the clipboard (nothing
 /// without any).
@@ -69,8 +66,10 @@ pub fn paste_always() -> MenuEntry {
     MenuEntry::item("Paste", |t, _, cx| t.paste_views(cx))
 }
 
-pub fn paste_entry(cx: &App) -> Option<MenuEntry> {
-    view_clipboard(cx).map(|_| MenuEntry::item("Paste", |t, _, cx| t.paste_views(cx)))
+/// Live request 1736: every annotation, leader and view menu lists Paste,
+/// clipboard or not (identical before and after a Copy).
+pub fn paste_entry(_cx: &App) -> Option<MenuEntry> {
+    Some(paste_always())
 }
 
 /// A View properties dropdown choice.

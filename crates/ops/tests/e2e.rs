@@ -1638,6 +1638,14 @@ fn drawing_section_detail_views_and_annotations() {
     let sid = s["view"].as_u64().unwrap();
     let sv = views_of(&mut ctx).into_iter().find(|v| v["id"] == sid).unwrap();
     assert_eq!(sv["kind"], "section", "{sv}");
+    // Section depth Up to entity with an Offset (live request 1737): only
+    // with depth_to; a limit 2 mm past the hole's centre makes a valid view.
+    let e = try_call(&mut ctx, "drawing_section_view", json!({ "drawing": tab, "parent": top_id, "point": [cx, cy], "position": [max_x + 60.0, cy - 80.0], "depth_offset": 2 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("depth_offset"), "{e:?}");
+    let s2 = call(&mut ctx, "drawing_section_view", json!({ "drawing": tab, "parent": top_id, "point": [cx, cy], "position": [max_x + 60.0, cy - 80.0], "depth_to": [cx, cy], "depth_offset": 2 }));
+    let sv2 = views_of(&mut ctx).into_iter().find(|v| v["id"] == s2["view"]).unwrap();
+    assert!(sv2["error"].is_null(), "{sv2}");
+    call(&mut ctx, "history_undo", json!({}));
     assert_eq!(sv["parent"], top_id, "{sv}");
     assert!(last(&mut ctx).ends_with(":: Section view"));
     // Edit hatch section...: one region restyled, then back (live asb 10-23 views (4)).

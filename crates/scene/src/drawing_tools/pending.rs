@@ -71,11 +71,12 @@ impl SheetPick<'_> {
                         return Some(a);
                     }
                 };
+                let one_edge = matches!(picks.as_slice(), [Pick::Line { .. }]);
                 let (ps, qs) = (self.pick_sheet(&a)?, self.pick_sheet(&b)?);
                 // Horizontal / vertical / aligned follows the cursor (Onshape).
                 let o = auto_orientation(ps, qs, c);
                 let offset = dim_offset(ps, qs, o, c);
-                Some(ann(AnnotationKind::LinearDimension { view: a.view, a: a.p, b: b.p, offset, orientation: o, override_text: None }, vec![(0, a.r), (1, b.r)]))
+                Some(Annotation { one_edge, ..ann(AnnotationKind::LinearDimension { view: a.view, a: a.p, b: b.p, offset, orientation: o, override_text: None }, vec![(0, a.r), (1, b.r)]) })
             }
             // Diameter on a cylinder's silhouette: across both silhouettes.
             Tool::Dimension { kind: DimTool::Diameter, picks } if matches!(picks.as_slice(), [Pick::Line { .. }, Pick::Line { .. }]) => {

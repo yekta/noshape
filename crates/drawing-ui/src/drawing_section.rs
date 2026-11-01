@@ -28,6 +28,11 @@ pub struct SectionDlg {
     /// Section depth "Up to entity" (else Blind) and the picked point.
     pub up_to: bool,
     pub depth_ref: Option<noshape_model::drawing::PointRef>,
+    /// Up to entity's ☑ Offset (live request 1737): its field, value (m)
+    /// and Opposite direction.
+    pub offset: Option<(Entity<InputState>, Subscription)>,
+    pub offset_value: Option<f64>,
+    pub offset_flip: bool,
     /// "Exclude from cut" (assembly views): the parts picked.
     pub exclude: Vec<noshape_model::BodyId>,
     /// The model point under the cutting line's first click.
@@ -62,6 +67,11 @@ pub fn parse_depth(s: &str, mm: bool) -> Option<f64> {
     num.trim().parse::<f64>().ok().filter(|v| *v > 0.0).map(|v| v * k)
 }
 
+/// An offset: a depth, or 0 ("0 mm").
+fn parse_offset(s: &str, mm: bool) -> Option<f64> {
+    parse_depth(s, mm).or_else(|| s.trim().trim_end_matches(char::is_alphabetic).trim().parse::<f64>().ok().filter(|v| *v == 0.0))
+}
+
 impl DrawingEditor {
     /// Create / drop the dialog with the Section view tool (called from render).
     pub fn sync_section_dlg(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -72,7 +82,7 @@ impl DrawingEditor {
                 let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(next));
                 // Live drawing/20: the dialog opens with the label selected.
                 label.update(cx, |s, cx| s.focus(window, cx));
-                self.section_dlg = Some(SectionDlg { mode: 0, label, label_focused: true, select_label: true, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, exclude: Vec::new(), anchor: None, picking: 0, angle: 45.0, angle_input: None, opposite: false, flip: false, cut_from: true });
+                self.section_dlg = Some(SectionDlg { mode: 0, label, label_focused: true, select_label: true, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, offset: None, offset_value: None, offset_flip: false, exclude: Vec::new(), anchor: None, picking: 0, angle: 45.0, angle_input: None, opposite: false, flip: false, cut_from: true });
             }
             (Some(_), false) => self.section_dlg = None,
             _ => {}
@@ -185,6 +195,31 @@ impl DrawingEditor {
                 }
             });
             d.depth = Some((st, sub));
+        }
+        self.update_preview(cx);
+        cx.notify();
+    }
+
+    /// Up to entity › ☑ Offset: its field (0 in the drawing's unit, as live).
+    fn toggle_section_offset(&mut self, on: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let mm = self.drawing.units_mm;
+        let Some(d) = &mut self.section_dlg else { return };
+        if !on {
+            d.offset = None;
+        } else if d.offset.is_none() {
+            let text = if mm { "0 mm" } else { "0 in" };
+            d.offset_value = Some(0.0);
+            let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
+            let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
+                if matches!(ev, InputEvent::Change) {
+                    let v = parse_offset(&st.read(cx).value(), mm);
+                    if let Some(d) = &mut this.section_dlg {
+                        d.offset_value = v;
+                    }
+                    this.update_preview(cx);
+                }
+            });
+            d.offset = Some((st, sub));
         }
         self.update_preview(cx);
         cx.notify();
@@ -428,6 +463,40 @@ impl DrawingEditor {
                                         cx.notify();
                                     })),
                             )
+                            // Live request 1737: ☐ Offset → [0] and its Opposite
+                            // direction, only with Up to entity.
+                            .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-offset").label("Offset").checked(d.offset.is_some()).on_click(cx.listener(|this, v: &bool, w, cx| this.toggle_section_offset(*v, w, cx)))))
+                            .when_some(d.offset.as_ref().map(|x| x.0.clone()), |e, st| {
+                                let flip = d.offset_flip;
+                                e.child(
+                                    h_flex()
+                                        .h(px(30.))
+                                        .px(px(6.))
+                                        .gap(px(6.))
+                                        .child(div().flex_1().child(Input::new(&st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).small()))
+                                        .child(
+                                            div()
+                                                .id("ds-offset-flip")
+                                                .size(px(24.))
+                                                .flex()
+                                                .items_center()
+                                                .justify_center()
+                                                .border_1()
+                                                .border_color(gpui_kit::rgb(0xd3d7d9))
+                                                .when(flip, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
+                                                .cursor_pointer()
+                                                .tooltip(crate::ui::tooltip("Opposite direction"))
+                                                .child(crate::assets::icon(&crate::assets::icon_path("flip"), 16., cx))
+                                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                                    if let Some(d) = &mut this.section_dlg {
+                                                        d.offset_flip = !d.offset_flip;
+                                                    }
+                                                    this.update_preview(cx);
+                                                    cx.notify();
+                                                })),
+                                        ),
+                                )
+                            })
                         })
                         .when(assembly, |e| {
                             let n = d.exclude.len();

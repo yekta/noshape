@@ -464,6 +464,10 @@ pub struct DrawingView {
     /// associative; overrides `section_depth`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub section_depth_ref: Option<PointRef>,
+    /// Up to entity's ☑ Offset (live request 1737): meters past the entity,
+    /// negative with Opposite direction (back toward the cut).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub section_depth_offset: Option<f64>,
     /// Section views of assemblies: "Exclude from cut" (these parts stay whole).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub exclude_from_cut: Vec<crate::BodyId>,
@@ -818,6 +822,7 @@ impl Default for DrawingView {
             detail_label_at: None,
             label_at: None,
             section_depth_ref: None,
+            section_depth_offset: None,
             exclude_from_cut: Vec::new(),
             cut_from_section: false,
             broken_out: Vec::new(),
@@ -2022,6 +2027,11 @@ pub struct Annotation {
     /// longer draws the field; reading and setting it go through this note.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title_field: Option<String>,
+    /// A linear dimension made on one edge (not two points or a pair of
+    /// edges): the inspection table's Type "Aligned dimension" (live request
+    /// 1735).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub one_edge: bool,
 }
 
 /// See [`Annotation::sketch_dim`].
@@ -2035,22 +2045,45 @@ pub struct SketchDim {
 /// it (view metres = sheet millimetres / 1000, no rotation).
 pub const SHEET_VIEW: ViewId = ViewId(u64::MAX);
 
-/// A datum target symbol's style (live drawing/510).
+/// A datum target symbol's style (live drawing/510, request 1735): the
+/// area size inside the bubble's top half, or outside on a leader from a dot
+/// there; the moveable ones add a pointer.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TargetStyle {
     #[default]
     Inside,
+    Outside,
     MoveableHorizontal,
+    MoveableHorizontalOutside,
     MoveableRotational,
+    MoveableRotationalOutside,
 }
 
 impl TargetStyle {
-    pub const ALL: [TargetStyle; 3] = [TargetStyle::Inside, TargetStyle::MoveableHorizontal, TargetStyle::MoveableRotational];
+    /// Live's Style list order.
+    pub const ALL: [TargetStyle; 6] = [TargetStyle::Inside, TargetStyle::Outside, TargetStyle::MoveableHorizontal, TargetStyle::MoveableHorizontalOutside, TargetStyle::MoveableRotational, TargetStyle::MoveableRotationalOutside];
     pub fn name(self) -> &'static str {
         match self {
             TargetStyle::Inside => "Inside",
+            TargetStyle::Outside => "Outside",
             TargetStyle::MoveableHorizontal => "Moveable horizontal inside",
+            TargetStyle::MoveableHorizontalOutside => "Moveable horizontal outside",
             TargetStyle::MoveableRotational => "Moveable rotational inside",
+            TargetStyle::MoveableRotationalOutside => "Moveable rotational outside",
+        }
+    }
+
+    /// The area size outside the bubble.
+    pub fn outside(self) -> bool {
+        matches!(self, TargetStyle::Outside | TargetStyle::MoveableHorizontalOutside | TargetStyle::MoveableRotationalOutside)
+    }
+
+    /// Moveable: Some(horizontal) for the pointer's kind.
+    pub fn moveable(self) -> Option<bool> {
+        match self {
+            TargetStyle::MoveableHorizontal | TargetStyle::MoveableHorizontalOutside => Some(true),
+            TargetStyle::MoveableRotational | TargetStyle::MoveableRotationalOutside => Some(false),
+            _ => None,
         }
     }
 }
@@ -2404,7 +2437,7 @@ impl AnnotationKind {
 
 impl Default for Annotation {
     fn default() -> Self {
-        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, text_along: None, loose: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None, target: None, sketch_dim: None, model: None, title_field: None }
+        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, text_along: None, loose: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None, target: None, sketch_dim: None, model: None, title_field: None, one_edge: false }
     }
 }
 

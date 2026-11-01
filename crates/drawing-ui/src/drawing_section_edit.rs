@@ -79,9 +79,9 @@ impl DrawingEditor {
         if let Some(v) = s.view_mut(e.view) {
             v.cut_only = e.cut_only;
             if e.depth.is_none() {
-                (v.section_depth, v.section_depth_ref) = (None, None);
+                (v.section_depth, v.section_depth_ref, v.section_depth_offset) = (None, None, None);
             } else if e.depth_value != v.section_depth {
-                (v.section_depth, v.section_depth_ref) = (e.depth_value, None);
+                (v.section_depth, v.section_depth_ref, v.section_depth_offset) = (e.depth_value, None, None);
             }
         }
         Some(dr)

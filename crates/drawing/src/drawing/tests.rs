@@ -4517,6 +4517,34 @@ fn datum_target_area_size_precision() {
     assert_eq!(size(&drawing), "Ø25.123");
 }
 
+/// Datum target Outside styles (live request 1735): the size leaves the
+/// bubble for a leader from a dot in its top half, up-right; the moveable
+/// rotational outside one up-left.
+#[test]
+fn datum_target_outside_styles_put_the_size_on_a_leader() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let size_x = |drawing: &Drawing| {
+        let built = render_sheet(drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+        let p = pick_of(&built, PickTarget::Annotation(951));
+        let t = built.geometry.texts.iter().find(|t| t.pick == p && t.text.starts_with('Ø')).expect("the size").clone();
+        let b = font::text_box(&t);
+        (b.iter().map(|q| q[0]).fold(f64::MAX, f64::min), b.iter().map(|q| q[0]).fold(f64::MIN, f64::max), b.iter().map(|q| q[1]).fold(f64::MAX, f64::min), built.geometry.fills.len())
+    };
+    let a = Annotation { id: 951, kind: AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.03, 0.0], label: "A1".into(), area: DatumTargetArea::Circle { diameter: 0.006 } }, position: [60.0, 250.0], ..Default::default() };
+    drawing.sheets[0].annotations.push(a);
+    let (x0, x1, y0, fills) = size_x(&drawing);
+    assert!(x0 > 54.6 && x1 < 65.4 && y0 > 250.0, "inside: in the top half ({x0}..{x1}, {y0})");
+    let set = |d: &mut Drawing, style: TargetStyle| d.sheets[0].annotations.last_mut().unwrap().target = Some(Box::new(DatumTargetOpts { style, ..Default::default() }));
+    set(&mut drawing, TargetStyle::Outside);
+    let (x0, _, y0, fills_out) = size_x(&drawing);
+    assert!(x0 > 65.5 && y0 > 252.0, "outside: up-right of the bubble ({x0}, {y0})");
+    assert!(fills_out > fills, "the dot");
+    set(&mut drawing, TargetStyle::MoveableRotationalOutside);
+    let (_, x1, _, _) = size_x(&drawing);
+    assert!(x1 < 54.5, "rotational outside: up-left ({x1})");
+}
+
 /// ANSI radial / diameter values dropped inside the circle (live
 /// asbdt-3r-1 / 3d-1, drawing.md D13): a diameter's value centred on the
 /// circle's center with one arrow to the edge; a radius's value where dropped,

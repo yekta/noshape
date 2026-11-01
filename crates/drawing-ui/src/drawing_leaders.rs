@@ -60,7 +60,10 @@ impl DrawingEditor {
         if let LeaderHit::Node { node, .. } = hit {
             out.push(MenuEntry::item("Add leader", move |t, _, cx| t.start_branch(id, LeaderStart::Node(leader, node), cx)));
         }
-        out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| ae::remove_leaders(s, id))));
+        // Live request 1736: a weld symbol's leader has no Remove leaders.
+        if !self.current_sheet().annotations.iter().any(|a| a.id == id && matches!(a.kind, AnnotationKind::Weld { .. })) {
+            out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| ae::remove_leaders(s, id))));
+        }
         match hit {
             LeaderHit::Node { node, .. } => out.push(MenuEntry::item("Remove node", move |t, _, cx| t.edit_annotation("Remove node", id, cx, |a| {
                 ae::remove_node(a, leader, node);

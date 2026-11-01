@@ -47,7 +47,9 @@ impl DrawingEditor {
                     }),
                 ],
             ),
-            MenuEntry::item("Replicate annotations\tbeta", move |t, _, cx| t.replicate_annotations(id, cx)).disabled(self.replication.is_none()),
+            // Live request 1736: listed and enabled also with nothing
+            // selected for replication (then it does nothing).
+            MenuEntry::item("Replicate annotations\tbeta", move |t, _, cx| t.replicate_annotations(id, cx)),
         ]
     }
 

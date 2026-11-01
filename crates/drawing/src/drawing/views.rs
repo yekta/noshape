@@ -814,6 +814,8 @@ pub struct SectionCut {
     pub cut_only: bool,
     pub depth: Option<f64>,
     pub depth_ref: Option<PointRef>,
+    /// Up to entity's Offset (m; negative toward the cut).
+    pub depth_offset: f64,
     /// "Exclude from cut": parts left whole.
     pub exclude: Vec<BodyId>,
 }
@@ -837,7 +839,7 @@ pub fn section_cut(sheet: &Sheet, id: ViewId) -> Option<SectionCut> {
     let n = [-e[1] / l, e[0] / l];
     let s = side_of(sheet, id, parent, n) * if v.flip { -1.0 } else { 1.0 };
     let section = matches!(v.kind, ViewKind::Section { .. });
-    Some(SectionCut { points, p0, p1, toward_view: [n[0] * s, n[1] * s], partial: v.partial && section, cut_only: v.cut_only, depth: v.section_depth.filter(|d| *d > 0.0), depth_ref: v.section_depth_ref.clone(), exclude: v.exclude_from_cut.clone() })
+    Some(SectionCut { points, p0, p1, toward_view: [n[0] * s, n[1] * s], partial: v.partial && section, cut_only: v.cut_only, depth: v.section_depth.filter(|d| *d > 0.0), depth_ref: v.section_depth_ref.clone(), depth_offset: v.section_depth_offset.unwrap_or(0.0), exclude: v.exclude_from_cut.clone() })
 }
 
 /// Section lines placed through a model point follow it (live request
@@ -2027,7 +2029,7 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
     v.cut_only.hash(&mut h);
     format!("{:?}", sketch_of(sheet, id)).hash(&mut h);
     v.section_depth.map(|d| (d * 1e9).round() as i64).hash(&mut h);
-    format!("{:?}{:?}", v.section_depth_ref, v.exclude_from_cut).hash(&mut h);
+    format!("{:?}{:?}{:?}", v.section_depth_ref, v.section_depth_offset, v.exclude_from_cut).hash(&mut h);
     format!("{:?}", view_simplification(sheet, id)).hash(&mut h);
     for b in &v.broken_out {
         b.spline.hash(&mut h);
@@ -2750,11 +2752,13 @@ fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &Vi
     let big = diag * 4.0 + 1.0;
     let mut tool = removal_tool(parent, &cut.points, cut.toward_view, center, big, partial);
     // Section depth: Blind, or Up to entity (the depth to that point,
-    // measured along the line of sight from the cutting plane).
+    // measured along the line of sight from the cutting plane, plus the
+    // Offset: live request 1737, negative back toward the cut; a limit on a
+    // face leaves that face out).
     let along0 = parent.lift([cut.points[1][0] - cut.p0[0], cut.points[1][1] - cut.p0[1]]).normalize();
     let plane0 = Plane::new(parent.lift(cut.p0) + parent.dir * center.dot(parent.dir), sight, along0);
     let depth = match &cut.depth_ref {
-        Some(r) => resolve_point3(ctx, r).map(|(p, _)| plane0.signed_distance(p).abs()).filter(|d| *d > 1e-9),
+        Some(r) => resolve_point3(ctx, r).map(|(p, _)| plane0.signed_distance(p).abs() + cut.depth_offset).filter(|d| *d > 1e-9),
         None => cut.depth,
     };
     if let Some(depth) = depth {

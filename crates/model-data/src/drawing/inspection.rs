@@ -92,7 +92,7 @@ impl Drawing {
                     (n, Some(k)) => format!("{n}.{k}"),
                     (n, None) => n.to_string(),
                 };
-                let row = |k: Option<usize>, nominal: String, unit: &str| InspectionRow { id: a.id, number: num(k), sheet: si + 1, kind: a.kind.type_name().to_string(), unit: unit.to_string(), nominal, tolerance: String::new(), upper: String::new(), lower: String::new() };
+                let row = |k: Option<usize>, nominal: String, unit: &str| InspectionRow { id: a.id, number: num(k), sheet: si + 1, kind: inspection_type(a), unit: unit.to_string(), nominal, tolerance: String::new(), upper: String::new(), lower: String::new() };
                 match &a.kind {
                     AnnotationKind::HoleCallout { .. } => {
                         let lines = callout(si, a).unwrap_or_default();
@@ -135,7 +135,7 @@ impl Drawing {
                     id: a.id,
                     number: num(None),
                     sheet: si + 1,
-                    kind: a.kind.type_name().to_string(),
+                    kind: inspection_type(a),
                     unit: unit.map(|u| u.to_string()).unwrap_or_default(),
                     nominal: nominal.map(|v| fmt(v, unit)).unwrap_or_default(),
                     tolerance: tol,
@@ -226,6 +226,20 @@ fn nominal_of(d: &Drawing, a: &Annotation) -> (Option<f64>, Option<&'static str>
     }
 }
 
+/// The Type column: how a dimension was made, not its orientation (live
+/// request 1735: one edge "Aligned dimension" even when horizontal, two
+/// points or a model dimension "2 point linear dimension", two lines "Line to
+/// line angular dimension").
+fn inspection_type(a: &Annotation) -> String {
+    match &a.kind {
+        AnnotationKind::LinearDimension { .. } if a.one_edge => "Aligned dimension",
+        AnnotationKind::LinearDimension { .. } => "2 point linear dimension",
+        AnnotationKind::AngularDimension { three_point: false, .. } => "Line to line angular dimension",
+        k => k.type_name(),
+    }
+    .to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -250,7 +264,11 @@ mod tests {
         assert_eq!(d.next_inspection_number(), 3);
         let csv = d.inspection_csv();
         let first = csv.lines().nth(1).unwrap();
-        assert_eq!(first, "1,1,Linear dimension,mm,50,±0.1,50.1,49.9");
+        assert_eq!(first, "1,1,2 point linear dimension,mm,50,±0.1,50.1,49.9");
+        // One edge: Aligned, also when horizontal (live request 1735).
+        d.sheets[0].annotations[0].one_edge = true;
+        assert_eq!(d.inspection_rows()[0].kind, "Aligned dimension");
+        d.sheets[0].annotations[0].one_edge = false;
         // Parameter parsing splits a chamfer; Row keeps one item.
         let s = &mut d.sheets[0];
         s.annotations.push(Annotation { id: 5, kind: AnnotationKind::ChamferDimension { view: ViewId(1), a: [0.0, 0.0], b: [0.001, 0.001], c: [0.0, 0.0], d: [0.01, 0.0] }, inspection: Some(3), ..Default::default() });

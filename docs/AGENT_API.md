@@ -3618,6 +3618,7 @@ Examples:
 | `flip` | boolean |  | Flip the view direction. |
 | `depth` | number |  | Section depth (model mm). |
 | `depth_to` | array of number |  | Section depth up to this vertex / circle center (sheet mm). |
+| `depth_offset` | number |  | With `depth_to`: Offset (model mm) past that point along the line of sight; negative is Opposite direction, back toward the cut (live: a limit on a face leaves the face out). |
 | `exclude` | array of string |  | Parts excluded from the cut (`body:…`). |
 | `cut_from_section` | boolean |  | Sectioning a section view: cut from the section. |
 

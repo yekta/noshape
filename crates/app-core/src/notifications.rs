@@ -3,7 +3,9 @@
 //! its panel "Notifications" (Only show unread, ✕) lists the newest first,
 //! each a collapsed row (blue unread dot, ⌄, bold title, the time) that
 //! opens to its message: "Export completed" / "<file> was exported
-//! successfully.", a failure with a red ⓘ. Kept for the app's session.
+//! successfully.", a failure with a red ⓘ. The header's ⋯ (live request
+//! 1735): Mark all as read · Expand all · Delete all. Kept for the app's
+//! session.
 
 use crate::theme::p;
 use gpui_kit::component::{h_flex, v_flex};
@@ -149,6 +151,30 @@ pub fn panel(on_close: impl Fn(&mut Window, &mut App) + 'static, cx: &App) -> An
                         .child(div().w(px(26.)).h(px(14.)).rounded_full().bg(if only_unread { blue } else { gpui_kit::rgb(0xbbbbbb) }).child(div().size(px(10.)).mt(px(2.)).rounded_full().bg(gpui_kit::rgb_static(0xffffff)).when(only_unread, |d| d.ml(px(14.))).when(!only_unread, |d| d.ml(px(2.)))))
                         .child("Only show unread")
                         .on_click(|_, _, cx| update(cx, |s| s.only_unread = !s.only_unread)),
+                )
+                .child(
+                    div()
+                        .id("notifications-more")
+                        .size(px(20.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor_pointer()
+                        .rounded(px(3.))
+                        .hover(|d| d.bg(pal.row_hover))
+                        .text_size(px(14.))
+                        .text_color(pal.text_muted)
+                        .child("⋯")
+                        .on_click(|_, window, cx| {
+                            let menu = crate::os_menu::OsMenu::build(window, cx, |m, _, _| {
+                                let item = |label: &'static str, f: fn(&mut Notifications)| crate::os_menu::OsMenuItem::new(label).on_click(move |_, _, cx| update(cx, f));
+                                m.dropdown()
+                                    .item(item("Mark all as read", |s| s.items.iter_mut().for_each(|i| i.unread = false)))
+                                    .item(item("Expand all", |s| s.items.iter_mut().for_each(|i| i.open = true)))
+                                    .item(item("Delete all", |s| s.items.clear()))
+                            });
+                            crate::os_menu::open_anchored(window.mouse_position(), Anchor::TopRight, menu, window, cx);
+                        }),
                 )
                 .child(div().id("notifications-close").size(px(20.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 12., pal.text_muted)).on_click(move |_, window, cx| on_close(window, cx))),
         )

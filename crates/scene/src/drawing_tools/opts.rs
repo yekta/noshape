@@ -66,6 +66,9 @@ pub struct SectionOpts {
     pub depth_value: Option<f64>,
     pub up_to: bool,
     pub depth_ref: Option<PointRef>,
+    /// Up to entity's ☑ Offset (m) and its Opposite direction.
+    pub offset: Option<f64>,
+    pub offset_flip: bool,
     /// "Exclude from cut" (assembly views).
     pub exclude: Vec<noshape_model::BodyId>,
     /// "Cut from section" (sectioning a section view).
@@ -233,6 +236,7 @@ impl SheetPick<'_> {
             v.flip = d.flip;
             v.section_depth = d.depth_value.filter(|_| d.depth_on && !d.up_to);
             v.section_depth_ref = d.depth_ref.clone().filter(|_| d.up_to && d.depth_on);
+            v.section_depth_offset = d.offset.filter(|_| d.up_to && d.depth_on && v.section_depth_ref.is_some()).map(|o| if d.offset_flip { -o } else { o });
             v.exclude_from_cut = d.exclude.clone();
             // Live drawing/505: ☑ Cut from section by default, only when
             // sectioning a section view.
