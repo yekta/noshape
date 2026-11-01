@@ -567,6 +567,8 @@ struct Piece {
     inside: DVec3,
     /// An edge ends inside it (one that touches it, as a box's edge on another's face, without cutting it).
     dangling: bool,
+    /// Those edges (split edges), each once: in the result inside its face (OCCT's INTERNAL edges).
+    inner: Vec<usize>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -3825,7 +3827,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             && (0..ns).any(|t| meets[fs * ns + t] && boxes_meet(cx.faces[f].lo, cx.faces[f].hi, cx.solids[t].lo, cx.solids[t].hi, GREY * tol));
         if !near && !split {
             let loops = vec![cx.faces[f].edges.iter().map(|&(e, r)| (edge_pieces[e][0].0, r ^ edge_pieces[e][0].1)).collect()];
-            return Ok((split, Vec::new(), vec![Piece { face: f, loops, inside: DVec3::NAN, dangling: false }]));
+            return Ok((split, Vec::new(), vec![Piece { face: f, loops, inside: DVec3::NAN, dangling: false, inner: Vec::new() }]));
         }
         // The curves in the face's parameter plane (a seam's pieces on both sides).
         let seams: HashSet<usize> = {
@@ -3909,7 +3911,8 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             let mut loops = vec![r.outer];
             loops.extend(r.holes);
             let loops = loops.into_iter().map(|l| l.into_iter().map(|(s, rev)| (lsrc[s as usize], rev)).collect()).collect();
-            out.push(Piece { face: f, loops, inside: inside3, dangling: r.dangling });
+            let inner = r.inner.iter().map(|&s| lsrc[s as usize]).collect();
+            out.push(Piece { face: f, loops, inside: inside3, dangling: r.dangling, inner });
         }
         if out.is_empty() {
             return Err(Decline("a face lost"));
@@ -3969,7 +3972,8 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                     })
                     .collect::<Option<Vec<_>>>()?;
                 loops[1..].sort_by_key(|l| half(&l[0]));
-                Some(Piece { face: f, loops, inside: if p.inside.is_nan() { p.inside } else { g.point(p.inside) }, dangling: p.dangling })
+                let inner = p.inner.iter().map(|s0| to.get(s0).copied()).collect::<Option<Vec<usize>>>()?;
+                Some(Piece { face: f, loops, inside: if p.inside.is_nan() { p.inside } else { g.point(p.inside) }, dangling: p.dangling, inner })
             })
             .collect::<Option<Vec<Piece>>>()?;
         if pieces.iter().any(|p| p.inside.is_nan()) {
@@ -4218,7 +4222,8 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
     }
     // (A piece an edge ends in: only where it goes, as OCCT's builder leaves such an edge in the face.)
-    if pieces.iter().enumerate().any(|(p, x)| x.dangling && (keep[p].is_some() || on_pairs.iter().any(|o| o.0 == p))) {
+    // (Kept: the edges into the result's face as OCCT's INTERNAL ones; on another's piece, not yet.)
+    if pieces.iter().enumerate().any(|(p, x)| x.dangling && on_pairs.iter().any(|o| o.0 == p)) {
         return Err(Decline("an edge ends inside a face"));
     }
     crate::check_cancel()?;
@@ -4388,9 +4393,13 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 .min()
                 .unwrap_or((usize::MAX, 0))
         };
+        // (The edges ending inside it out of its loops, into the face as internal ones.)
+        let inner: HashSet<usize> = pieces[p].inner.iter().copied().collect();
         let loops: Vec<Vec<Use>> = pieces[p]
             .loops
             .iter()
+            .map(|l| l.iter().copied().filter(|x| !inner.contains(&x.0)).collect::<Vec<(usize, bool)>>())
+            .filter(|l| !l.is_empty())
             .map(|l| {
                 let start = (0..l.len()).min_by_key(|&k| rank(l[k].0)).unwrap_or(0);
                 let mut l: Vec<Use> = l[start..].iter().chain(&l[..start]).map(|&(s, r)| Use { edge: emap[s], reversed: r ^ sedge_flip[s] }).collect();
@@ -4422,6 +4431,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             (s, _) => s,
         };
         out.body.faces.push(Face { surface, reversed: src.reversed ^ flip, loops });
+        out.face_internal.push(pieces[p].inner.iter().map(|&s| Use { edge: emap[s], reversed: false }).collect());
         out.face_origin.push(if same { Origin::Same { arg: g.arg, index: g.index } } else { Origin::Piece { arg: g.arg, index: g.index } });
     }
     // Solids, one per shell, outward (a sheet's result: faces alone).

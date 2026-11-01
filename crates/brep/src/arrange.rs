@@ -13,6 +13,8 @@ pub(crate) struct Region {
     pub inside: DVec2,
     /// A curve with the region on both sides (it ends inside the region).
     pub dangling: bool,
+    /// Those curves (each once).
+    pub inner: Vec<u32>,
 }
 
 /// The regions of the curves `segs` (each from point `ends[0]` to `ends[1]`; no two overlap or cross, they
@@ -103,7 +105,7 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
     for (ci, c) in cycles.iter().enumerate() {
         if areas[ci] > 0.0 {
             region_of_cycle[ci] = regions.len();
-            regions.push(Region { outer: loop_of(c), holes: Vec::new(), inside: DVec2::ZERO, dangling: false });
+            regions.push(Region { outer: loop_of(c), holes: Vec::new(), inside: DVec2::ZERO, dangling: false, inner: Vec::new() });
         }
     }
     let cycle_curves: Vec<Vec<C2>> = crate::boolean::par_map(cycles.len(), &|i| curves_of(&cycles[i]))?;
@@ -141,9 +143,9 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
     // Each region's point inside (on all threads): from the middle of the outer loop's longest curve, halfway to
     // the nearest curve across (elsewhere on it, then on the others, when that ray passes exactly between two
     // curves).
-    let inside_of = |ri: usize| -> (bool, Option<DVec2>) {
+    let inside_of = |ri: usize| -> (Vec<u32>, Option<DVec2>) {
         let hs: Vec<usize> = members[ri].iter().flat_map(|&ci| cycles[ci].iter().copied()).collect();
-        let dangling = hs.iter().any(|&h| members[ri].contains(&cycle_of[h ^ 1]));
+        let dangling: Vec<u32> = hs.iter().filter(|&&h| h % 2 == 0 && members[ri].contains(&cycle_of[h ^ 1])).map(|&h| (h / 2) as u32).collect();
         // (Longest first, each length found once.)
         let mut by_length: Vec<(f64, usize)> = cycles[members[ri][0]].iter().map(|&h| (curve(h).length(), h)).collect();
         by_length.sort_by(|a, b| b.0.total_cmp(&a.0));
@@ -166,8 +168,9 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         (dangling, None)
     };
     let found = crate::boolean::par_map(regions.len(), &inside_of)?;
-    for (r, (dangling, inside)) in regions.iter_mut().zip(found) {
-        r.dangling = dangling;
+    for (r, (inner, inside)) in regions.iter_mut().zip(found) {
+        r.dangling = !inner.is_empty();
+        r.inner = inner;
         let Some(inside) = inside else { return Err(Decline("no point inside a face piece")) };
         r.inside = inside;
     }
