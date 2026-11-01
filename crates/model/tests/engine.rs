@@ -543,6 +543,15 @@ fn thin_loft_flipped_inside_is_the_inner_offset_as_live() {
         let body = res.context.bodies.iter().find(|b| b.kind == BodyKind::Solid).unwrap();
         let v = total_volume(&res.context) * 1e9;
         let bb = body.shape.bounding_box(true).unwrap();
+        // NOSHAPE_FACES=1: each face's kind and area (mm²), against live 1728's per-face areas.
+        if std::env::var_os("NOSHAPE_FACES").is_some() {
+            let precise = noshape_kernel::mass_properties(&body.shape).map(|m| m.mass * 1e9);
+            let bound = noshape_kernel::mass_property_bounds(&body.shape, noshape_kernel::PropsKind::Volume).map(|m| m.mass * 1e9);
+            eprintln!("three {three}: {v:.7} mm³, precise {precise:?}, bound {bound:?}");
+            for f in body.shape.faces() {
+                eprintln!("  {:.7} {}", f.area().unwrap_or(0.0) * 1e6, format!("{:?}", f.face_surface()).chars().take(40).collect::<String>());
+            }
+        }
         assert!((v - want).abs() < 0.4, "three {three}: {v} mm³");
         assert_eq!(body.shape.faces().len(), 16, "three {three}");
         assert!((bb.min.z - lo).abs() < 2e-6 && (bb.max.z - hi).abs() < 2e-6, "three {three}: {bb:?}");

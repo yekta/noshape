@@ -78,7 +78,7 @@ sketch edges, as live's): fixed, T1 features_b::helix_on_a_sketch_circle.
 |---|---|---|---|---|---|---|
 | 1 | Knurl 45/45 (whole part, 148 grooves + mirror) | | | −3.45 mm³ (−3.6e-5) | live's helix sweep: one groove tool exact = area × height 44.730217, ours 44.730284, live 44.733402 (+7.1e-5); 80/30 live −1.4e-5 | not ours: Parasolid's approximation (bool.md 11-01 20:00) |
 | 2 | G46 shell 1 mm after fillet + chamfer | 6053.883 mm³ | 6052.697 | +1.19 | live's inner corner patch isn't the exact offset (ours mirror-symmetric, live's not) | kept: ours exact (handoff "From skasm (10-31 05:40)") |
-| 3 | Thin loft (d) square → Ø16 → square, Trim ends off | 2584.187 | 2584.533 | −0.346 | the faces' continuation past the creases (Parasolid's lies between the polynomial and the tangent one) | open: three continuations tried |
+| 3 | Thin loft (d) square → Ø16 → square, Trim ends off | 2584.187 | 2584.533 | −0.346 | faces match live's; live's volume integral suspected (below) | live's .x_t asked |
 | 4 | Thin loft (c) Thickness 2 = 0.5 | 1999.930 | 2000.250 | −0.32 | (c)'s faces match live's to 1e-4; live's evVolume moves 0.73 with its accuracy | ≈ |
 | 5 | Thin loft flipped (d) | 2334.600 | 2334.863 | −0.263 | as #3 | open |
 | 6 | Mixed-radius corner (a), R4 top over R2 verticals | 8548.6645 | 8548.5639 | +0.10 | live's procedural corner (its own −0.04…+0.10 off the exact face) | ≈ |
@@ -86,3 +86,12 @@ sketch edges, as live's): fixed, T1 features_b::helix_on_a_sketch_circle.
 | 8 | Thin loft flipped (b) | 1228.098 | 1228.170 | −0.072 | as #3 | open |
 | 9 | Thin loft (a) | 1370.084 | 1370.105 | −0.021 | as #3 | open |
 | 10 | Mixed-radius drafted (c), one call | 44304.915 | 44304.934 | −0.019 | OCCT's 4-sided corner patch | ≈ |
+
+Thin loft (#3, #5, #7-#9), 11-01 21:40: face by face against live 1728's areas (engine
+`thin_loft_flipped_inside_is_the_inner_offset_as_live` with NOSHAPE_FACES=1): (b-in) outer 324.62155 / live
+324.62147, inner 289.45442 / 289.45426, caps 19.01936 / 19.02057 and 11.79670 / 11.79565 (the total area equal to
+1e-5 mm²); (d-in) outer 615.22464 / 615.22452, inner 551.91000 / 551.91313, caps 19.04223 / 19.04461. Ours
+integrates tight (mass_property_bounds 2e-5 / 1e-3 mm³). Ruled out as the cause: the offset fit (rows twice as
+dense: 10× closer, volume +3e-4), the caps' ruling (by the loft's parameter as Parasolid's: +0.001). The gaps
+(6e-5 to 1.3e-4 of the volume) are the knurl gap's size, which was Parasolid's; live asked (21:40) for the four
+bodies as .x_t, to integrate here (xt_read reads Parasolid offset surfaces).
