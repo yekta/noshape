@@ -517,6 +517,10 @@ pub struct Group {
     /// the pattern): their copies are members.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub patterns: Vec<MateId>,
+    /// Hidden like a mate (live 1694: a new group is, its row grey "Group 1
+    /// (Hidden)"; Show turns the row black; nothing is drawn either way).
+    #[serde(default)]
+    pub hidden: bool,
 }
 
 impl Group {

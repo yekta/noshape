@@ -2546,10 +2546,17 @@ impl PartStudioView {
             }
             "unconfigure" => {
                 if let Some(feature) = self.sketch.as_ref().map(|s| s.feature) {
+                    // Live (request 1703): "Sketch 1 length removed from Size".
+                    let input = self.dimension_configuration(cid, cx).map(|c| c.0);
+                    let names = self.studio(cx).map(|s| (s.feature(feature).map(|f| f.name.clone()).unwrap_or_default(), input.and_then(|id| s.configuration.inputs.iter().find(|i| i.id == id).map(|i| i.name.clone())).unwrap_or_default()));
+                    let noun = self.dimension_noun(cid, cx);
                     let tab = self.tab;
                     self.doc.update(cx, |doc, cx| {
                         doc.edit_studio(tab, noshape_ops::studio::UNCONFIGURE_DIMENSION, cx, |ps| noshape_ops::studio::unconfigure_dimension(ps, feature, cid.0));
                     });
+                    if let Some((sketch, input_name)) = names {
+                        self.flash_for(FeatureStatus::Info, format!("{sketch} {noun} removed from {input_name}"), std::time::Duration::from_millis(6700), cx);
+                    }
                 }
             }
             a if a.starts_with("configure:") => {
@@ -2569,16 +2576,25 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let Some(text) = self.sketch_data(cx).and_then(|d| noshape_ops::studio::dimension_text(&d, cid.0, &units)) else { return };
         let (input, tab) = (input.to_string(), self.tab);
-        // Live: the toast "Sketch 1 length added to Size".
+        // Live (request 1703): the toast "Sketch 1 length added to Size"
+        // ("angle" for an angle dimension).
         let names = self.studio(cx).map(|s| (s.feature(feature).map(|f| f.name.clone()).unwrap_or_default(), s.configuration.inputs.iter().find(|i| i.id == input).map(|i| i.name.clone()).unwrap_or_default()));
+        let noun = self.dimension_noun(cid, cx);
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(tab, noshape_ops::studio::CONFIGURE_DIMENSION, cx, |ps| {
                 noshape_ops::studio::configure_dimension(ps, feature, cid.0, &input, &text);
             });
         });
         if let Some((sketch, input_name)) = names {
-            self.flash_for(noshape_model::display::FeatureStatus::Info, format!("{sketch} length added to {input_name}"), std::time::Duration::from_millis(6700), cx);
+            self.flash_for(noshape_model::display::FeatureStatus::Info, format!("{sketch} {noun} added to {input_name}"), std::time::Duration::from_millis(6700), cx);
         }
+    }
+
+    /// The word live's configure toasts use for a dimension: "angle" for
+    /// angles, else "length" (diameters, radii and distances too).
+    fn dimension_noun(&self, cid: noshape_sketch::ConstraintId, cx: &App) -> &'static str {
+        let angle = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Angle { .. } | noshape_sketch::ConstraintKind::ArcAngle { .. }))).unwrap_or(false);
+        if angle { "angle" } else { "length" }
     }
 
     /// The configuration input and option a configured dimension currently
@@ -2599,20 +2615,22 @@ impl PartStudioView {
     /// driven dims" (2)): tolerances are set from the value box's ±.
     fn dimension_menu_items(&self, cid: noshape_sketch::ConstraintId, cx: &App) -> Vec<(String, String)> {
         let Some(driving) = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| c.driving)) else { return Vec::new() };
-        // Live (behaviours "(3) Right-click a sketch dimension"): with a
-        // configuration input the menu starts "Configure dimension", then
-        // Change to driven dimension.
+        // Live (behaviours "(3) Right-click a sketch dimension", request
+        // 1703): with a configuration input the menu starts "Configure
+        // dimension" (a submenu of the inputs when there are several:
+        // CONFIGURE_SUBMENU-prefixed labels), then Change to driven
+        // dimension; a configured dimension has only "Unconfigure dimension".
         let mut out = Vec::new();
         if self.dimension_configuration(cid, cx).is_some() {
             out.push(("Unconfigure dimension".into(), "unconfigure".into()));
-        } else {
-            use noshape_model::configuration::ConfigInputKind;
-            if let Some(st) = self.studio(cx) {
-                let inputs: Vec<_> = st.configuration.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })).collect();
-                for i in &inputs {
-                    let label = if inputs.len() == 1 { "Configure dimension".to_string() } else { format!("Configure dimension with {}", i.name) };
-                    out.push((label, format!("configure:{}", i.id)));
-                }
+            return out;
+        }
+        use noshape_model::configuration::ConfigInputKind;
+        if let Some(st) = self.studio(cx) {
+            let inputs: Vec<_> = st.configuration.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })).collect();
+            for i in &inputs {
+                let label = if inputs.len() == 1 { "Configure dimension".to_string() } else { format!("{CONFIGURE_SUBMENU}{}", i.name) };
+                out.push((label, format!("configure:{}", i.id)));
             }
         }
         out.push(((if driving { "Change to driven dimension" } else { "Change to driving dimension" }).to_string(), "driving".to_string()));
@@ -2635,12 +2653,10 @@ impl PartStudioView {
                 .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.dim_menu_action(cid, &action, window, cx)))
         };
         let mut menu = v_flex().absolute().left(px(x)).top(px(y)).occlude().w(px(170.)).p_1().gap_0p5().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.border_strong).shadow_lg();
-        // Onshape: dimensions toggle driving/driven; constraints only delete.
+        // Onshape: dimensions toggle driving/driven; constraints only
+        // delete. Configure dimension leads (live request 1703); a
+        // configured dimension has only Unconfigure dimension.
         if is_dim {
-            menu = menu.child(item("sk-dim-driving", if driving { "Change to driven dimension" } else { "Change to driving dimension" }, "driven-dimension", "driving", cx));
-        }
-        if is_dim {
-            // Configure dimension with a list / checkbox configuration input.
             if self.dimension_configuration(cid, cx).is_some() {
                 menu = menu.child(item("sk-dim-unconf", "Unconfigure dimension", "configuration", "unconfigure", cx));
             } else {
@@ -2649,9 +2665,12 @@ impl PartStudioView {
                     .studio(cx)
                     .map(|s| s.configuration.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })).map(|i| (i.id.clone(), i.name.clone())).collect())
                     .unwrap_or_default();
+                let single = inputs.len() == 1;
                 for (id, name) in inputs {
-                    menu = menu.child(item(&format!("sk-dim-conf-{id}"), &format!("Configure dimension with {name}"), "configuration", &format!("configure:{id}"), cx));
+                    let label = if single { "Configure dimension".to_string() } else { format!("Configure dimension with {name}") };
+                    menu = menu.child(item(&format!("sk-dim-conf-{id}"), &label, "configuration", &format!("configure:{id}"), cx));
                 }
+                menu = menu.child(item("sk-dim-driving", if driving { "Change to driven dimension" } else { "Change to driving dimension" }, "driven-dimension", "driving", cx));
             }
         }
         menu = menu.child(item("sk-dim-delete", if is_dim { "Delete dimension" } else { "Delete" }, "delete", "delete", cx));
@@ -4055,7 +4074,21 @@ impl PartStudioView {
                 m = m.on_first_escape(move |_, cx| v.update(cx, |this, cx| this.set_tool(Tool::Select, cx)));
             }
             if let Some(cid) = dim.filter(|_| !dim_items.is_empty()) {
-                for (label, action) in &dim_items {
+                let configure: Vec<(String, String)> = dim_items.iter().filter_map(|(l, a)| l.strip_prefix(CONFIGURE_SUBMENU).map(|n| (n.to_string(), a.clone()))).collect();
+                if !configure.is_empty() {
+                    let vs = v.clone();
+                    m = m.submenu("Configure dimension", window, cx, move |mut sm, _, _| {
+                        for (name, action) in &configure {
+                            let (v, action) = (vs.clone(), action.clone());
+                            sm = sm.item(crate::os_menu::OsMenuItem::new(name.clone()).on_click(move |_, w, cx| v.update(cx, |this, cx| {
+                                this.close_context_menu(cx);
+                                this.dim_menu_action(cid, &action, w, cx);
+                            })));
+                        }
+                        sm
+                    });
+                }
+                for (label, action) in dim_items.iter().filter(|(l, _)| !l.starts_with(CONFIGURE_SUBMENU)) {
                     let action = action.clone();
                     m = m.item(item(label, Box::new(move |this, w, cx| this.dim_menu_action(cid, &action, w, cx))));
                 }
@@ -4626,3 +4659,7 @@ fn sketch_screen_map(vp: &crate::viewport::Viewport, ed: &crate::sketch_mode::Sk
 #[cfg(test)]
 #[path = "sketch_ui_tests.rs"]
 mod ui_tests;
+
+/// Label prefix of a "Configure dimension ▸" submenu entry in
+/// `dimension_menu_items` (several configuration inputs).
+const CONFIGURE_SUBMENU: &str = "Configure dimension\u{25b8}";

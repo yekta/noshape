@@ -329,6 +329,9 @@ impl Assembly {
         for c in self.connectors.iter_mut().filter(|c| ids.contains(&c.id)) {
             c.hidden = hidden;
         }
+        for g in self.groups.iter_mut().filter(|g| ids.contains(&g.id)) {
+            g.hidden = hidden;
+        }
     }
 
     /// Hide every mate and mate connector except `keep`.
@@ -338,6 +341,9 @@ impl Assembly {
         }
         for c in &mut self.connectors {
             c.hidden = !keep.contains(&c.id);
+        }
+        for g in &mut self.groups {
+            g.hidden = !keep.contains(&g.id);
         }
     }
 

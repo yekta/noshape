@@ -4189,7 +4189,15 @@ impl AssemblyView {
             if !self.feature_passes(noshape_model::assembly::ops::RowKind::Group, &g.name, err, g.suppressed, false, false) {
                 continue;
             }
-            items.push((g.id, self.feature_row(FeatureRow { id: g.id, icon: icon_path("group"), name: g.name.clone(), ok: !err, inactive: g.suppressed, message: err.then(|| SAME_GROUP.to_string()), has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx)));
+            // Live 1681 / 1694: a hidden group's row is grey, "Group 1
+            // (Hidden)", as a hidden mate's; shown, black and just its name.
+            // The group being edited: its row selected, the name bold black.
+            let editing = self.ui.group.as_ref().is_some_and(|e| e.0 == Some(g.id));
+            let hidden = (g.hidden || !self.show_mates) && !editing;
+            let tail = if hidden { " (Hidden)" } else { "" };
+            let tooltip = Some(if err { format!("{} has error: {SAME_GROUP}{tail}", g.name) } else { format!("{}{tail}", g.name) });
+            let row = self.feature_row(FeatureRow { id: g.id, icon: icon_path("group"), name: g.name.clone(), ok: !err, inactive: g.suppressed, message: err.then(|| SAME_GROUP.to_string()), has_limits: false, hidden: Some(hidden), tooltip, implicit: vec![] }, cx);
+            items.push((g.id, if editing { div().bg(pal.accent_soft).font_weight(FontWeight::BOLD).child(row).into_any_element() } else { row }));
         }
         items.sort_by_key(|(id, _)| id.0);
         let (mut mate_ids, mut mate_rows): (Vec<MateId>, Vec<AnyElement>) = items.into_iter().unzip();
@@ -4215,13 +4223,28 @@ impl AssemblyView {
             mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());
             mate_ids.push(id);
         }
+        // Live 1693: a new group's row ("Group 1", grey, selected) is in the
+        // list while its dialog is open.
+        let new_group = self.ui.group.as_ref().filter(|g| g.0.is_none()).map(|_| asm.next_feature_name("Group"));
+        if let Some(name) = new_group.clone() {
+            mate_rows.push(
+                crate::ui::tree_row("group-new", true)
+                    .text_color(pal.text_faint)
+                    .font_weight(FontWeight::BOLD)
+                    .child(div().w(px(12.)))
+                    .child(crate::assets::icon(&icon_path("group"), 14., cx))
+                    .child(div().flex_1().truncate().child(crate::ui::user_text(name)))
+                    .into_any_element(),
+            );
+            mate_ids.push(MateId(u64::MAX));
+        }
         let mate_hidden = filtering && mate_ids.iter().filter(|id| id.0 != u64::MAX).count() < asm.connectors.len() + asm.mates.len() + asm.relations.len() + asm.groups.len();
         let mate_rows = if filtering { mate_rows } else { self.fold_mate_rows(&asm, mate_ids, mate_rows, cx) };
         // Onshape's instance list: the filter row, the "Instances (N)" header
         // with its new-folder button, then one tree that ends with the
         // collapsible "Mate features (N)" folder holding the mates.
         let mates_open = !self.expanded.contains(&vec![MATE_FEATURES_COLLAPSED]);
-        let mate_count = asm.listed_mate_count() + usize::from(new_relation.is_some()) + usize::from(new_mate.is_some());
+        let mate_count = asm.listed_mate_count() + usize::from(new_relation.is_some()) + usize::from(new_mate.is_some()) + usize::from(new_group.is_some());
         let mate_error = result.mates.iter().any(|m| !m.ok) || result.relations.iter().any(|r| !r.ok);
         if !filtering || (tree && !mate_rows.is_empty()) {
             rows.push(

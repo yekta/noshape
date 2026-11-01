@@ -216,6 +216,12 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   insert with explicit connectors), workflow-assembly SV2 (the base-handle press missed and box-selected: retry),
   navigation 1.18 (live request 03:00, plane size). RUST-SM-CUT-VOLUME filed for bool (qa4_s1 T2 7 mm³ over live on
   the Rust Boolean; passes with NOSHAPE_BOOL_RUST=0).
+- 11-01 ~05:00, live answers folded in: 1703 (a dimension's Configure dimension ▸ submenu with several inputs, "angle"
+  in the toast, a configured dimension has only Unconfigure dimension with "… removed from <input>"), 1694 (groups have
+  Hide / Show like mates, new ones hidden; shown = black row "Group 1"; the edited group's row selected, name bold;
+  a new group's pending row bold grey), 1695 (the sheet metal table over both parts = the a5ab5f91 fix). Navigation
+  1.18 answered (1701): the planes don't grow, the zoom bounds grow by Mate connector 1's constant-pixel glyph
+  (disc 18 px, triad +33 px x / y, +23 px z) — next.
 - **End-of-day walk 11-01 03:40, green b6ba4390:** line chain 40 / 25 typed; rectangle boxes (Tab on a typed value
   stays, as live); Revolute via tool search, both picks → HUD ✓ commits and starts Revolute 2 (= live), the pattern
   copy follows its seed; dragging the mated pin keeps it seated. No regressions.

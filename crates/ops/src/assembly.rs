@@ -334,7 +334,7 @@ pub fn commit_group(a: &mut Assembly, editing: Option<MateId>, ids: Vec<Instance
     }
     let id = MateId(a.next_id());
     let name = a.next_feature_name("Group");
-    a.groups.push(Group { id, name, instances: ids, suppressed: false, patterns });
+    a.groups.push(Group { id, name, instances: ids, suppressed: false, patterns, hidden: true });
     id
 }
 

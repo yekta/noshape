@@ -581,7 +581,7 @@ impl AssemblyView {
     }
 
     pub(super) fn show_all_mates(&mut self, cx: &mut Context<Self>) {
-        let ids: Vec<MateId> = self.assembly(cx).map(|a| a.mates.iter().map(|m| m.id).collect()).unwrap_or_default();
+        let ids: Vec<MateId> = self.assembly(cx).map(|a| a.mates.iter().map(|m| m.id).chain(a.groups.iter().map(|g| g.id)).collect()).unwrap_or_default();
         self.set_mates_hidden(ids, false, cx);
     }
 
@@ -1959,9 +1959,18 @@ impl AssemblyView {
                     t.refresh_scene(false, cx);
                 }));
                 m.push(item("Hide all mates", |t, _, cx| {
-                    let ids: Vec<MateId> = t.assembly(cx).map(|a| a.mates.iter().map(|m| m.id).collect()).unwrap_or_default();
+                    let ids: Vec<MateId> = t.assembly(cx).map(|a| a.mates.iter().map(|m| m.id).chain(a.groups.iter().map(|g| g.id)).collect()).unwrap_or_default();
                     t.set_mates_hidden(ids, true, cx);
                 }));
+            }
+        } else if let Some(g) = asm.groups.iter().find(|g| g.id == id) {
+            // A group shows / hides like a mate (live 1694).
+            m.push(MenuEntry::Sep);
+            if g.hidden || !self.show_mates {
+                m.push(icon_item("Show", "eye", move |t, _, cx| t.set_mates_hidden(vec![id], false, cx)));
+                m.push(item("Show all mates", |t, _, cx| t.show_all_mates(cx)));
+            } else {
+                m.push(icon_item("Hide", "eye-off", move |t, _, cx| t.set_mates_hidden(vec![id], true, cx)));
             }
         }
         let ids = self.mate_instances(id, cx);

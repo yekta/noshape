@@ -453,7 +453,7 @@ fn group_moves_rigidly_and_gear_relation() {
             part_instance(3, "Block <3>", f.studios[0], body.clone(), DVec3::new(0.1, 0.05, 0.0), false),
         ],
         mates: vec![mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid))],
-        groups: vec![Group { id: MateId(30), name: "Group 1".into(), instances: vec![InstanceId(2), InstanceId(3)], suppressed: false, patterns: Vec::new() }],
+        groups: vec![Group { id: MateId(30), name: "Group 1".into(), instances: vec![InstanceId(2), InstanceId(3)], suppressed: false, patterns: Vec::new(), hidden: false }],
         ..Default::default()
     };
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
@@ -1961,7 +1961,7 @@ fn rename_hide_others_and_unfix_all() {
     asm.set_mates_hidden(&[MateId(10)], true);
     assert!(asm.mate(MateId(10)).unwrap().hidden);
     // Deleting a group member keeps the group until its last member goes.
-    asm.groups.push(Group { id: MateId(20), name: "Group 1".into(), instances: vec![InstanceId(2), InstanceId(3)], suppressed: false, patterns: Vec::new() });
+    asm.groups.push(Group { id: MateId(20), name: "Group 1".into(), instances: vec![InstanceId(2), InstanceId(3)], suppressed: false, patterns: Vec::new(), hidden: false });
     asm.remove_instance(InstanceId(3));
     assert_eq!(asm.groups.len(), 1);
     assert_eq!(asm.groups[0].instances, vec![InstanceId(2)]);
@@ -1977,7 +1977,7 @@ fn rename_hide_others_and_unfix_all() {
         generated: vec![PatternInstance { seed: InstanceId(1), index: 1, instance: InstanceId(1), mate: None, target: None }],
         suppressed: false,
     });
-    asm.groups.push(Group { id: MateId(21), name: "Group 1".into(), instances: vec![], suppressed: false, patterns: vec![MateId(30)] });
+    asm.groups.push(Group { id: MateId(21), name: "Group 1".into(), instances: vec![], suppressed: false, patterns: vec![MateId(30)], hidden: false });
     assert_eq!(asm.group_members(&asm.groups[0]), vec![InstanceId(1)]);
     asm.remove_mate(MateId(30));
     assert!(asm.groups.is_empty());
@@ -4346,7 +4346,7 @@ fn relation_and_mate_errors_use_live_texts() {
     assert_eq!(m12.message.as_deref(), Some("Mate connectors are on same instance."));
     // Two members of one group (row 13).
     asm.mates.pop();
-    asm.groups.push(Group { id: MateId(50), name: "Group 1".into(), instances: vec![InstanceId(2), InstanceId(3)], suppressed: false, patterns: Vec::new() });
+    asm.groups.push(Group { id: MateId(50), name: "Group 1".into(), instances: vec![InstanceId(2), InstanceId(3)], suppressed: false, patterns: Vec::new(), hidden: false });
     asm.mates.push(mate(13, MateType::Fastened, conn(2, pf.clone(), Inference::Centroid), conn(3, pf.clone(), Inference::Centroid)));
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     let m13 = res.mates.iter().find(|m| m.id == MateId(13)).unwrap();
@@ -4461,7 +4461,7 @@ fn random_assembly_edits_never_panic() {
                 8 => {
                     let (a, b) = (asm.instances[rnd(n)].id, asm.instances[rnd(n)].id);
                     if a != b {
-                        asm.groups.push(Group { id: MateId(next), name: format!("Group {next}"), instances: vec![a, b], suppressed: rnd(4) == 0, patterns: Vec::new() });
+                        asm.groups.push(Group { id: MateId(next), name: format!("Group {next}"), instances: vec![a, b], suppressed: rnd(4) == 0, patterns: Vec::new(), hidden: false });
                         log.push(format!("group {next} {} {}", a.0, b.0));
                         next += 1;
                     }
