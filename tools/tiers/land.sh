@@ -33,7 +33,7 @@ for r in run/*/; do
 done
 for b in splits/*.batch; do [ -f "$b" ] || continue; for k in $(grep -v '^kind=' "$b"); do [ "$(f name "$k")" = "$me" ] && line "QUEUED (next: re-checked apart from a red batch)" "$k"; done; done
 pos=0; for k in $(ls queue); do pos=$((pos + 1)); [ "$(f name "$k")" = "$me" ] && line "QUEUED (#$pos)" "$k"; done
-echo "==results=="; tail -n 25 "results/$me.log" 2>/dev/null
+echo "==results=="; tail -n 25 "results/$me.log" 2>/dev/null; exit 0
 R
 if [ $mode = status ]; then
   if out=$("${SSH[@]}" "$qhost" "bash -c $(printf %q "$STATUS") _ $qdir $name" 2>/dev/null); then
