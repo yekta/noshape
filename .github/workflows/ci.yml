@@ -74,7 +74,8 @@ jobs:
         shell: bash
         run: |
           case "$RUNNER_OS" in
-            Linux) command -v ninja || { sudo apt-get update -q && sudo apt-get install -y --no-install-recommends ninja-build; } ;;
+            # OCCT's Visualization module includes X11's headers.
+            Linux) sudo apt-get update -q && sudo apt-get install -y --no-install-recommends ninja-build libx11-dev ;;
             macOS) command -v ninja || brew install ninja ;;
           esac
 
