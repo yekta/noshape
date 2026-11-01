@@ -628,6 +628,16 @@ uint8_t shape_orientation(const OcShape& s)
   return static_cast<uint8_t>(s.shape.Orientation());
 }
 
+uint8_t edge_orientation_in(const OcShape& face, const OcShape& edge)
+{
+  // (Edges are handed out FORWARD: the way a face runs along one is its use in the face's wires, the face's own
+  // orientation composed.)
+  for (TopExp_Explorer x(face.shape, TopAbs_EDGE); x.More(); x.Next())
+    if (x.Current().IsSame(edge.shape))
+      return static_cast<uint8_t>(x.Current().Orientation());
+  fail_invalid("the edge isn't one of the face's");
+}
+
 std::unique_ptr<OcShape> shape_oriented(const OcShape& s, uint8_t orientation)
 {
   if (orientation > TopAbs_EXTERNAL)

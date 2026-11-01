@@ -433,6 +433,7 @@ pub(crate) mod ffi {
         fn shape_type(s: &OcShape) -> Result<u8>;
         fn shape_is_null(s: &OcShape) -> Result<bool>;
         fn shape_orientation(s: &OcShape) -> Result<u8>;
+        fn edge_orientation_in(face: &OcShape, edge: &OcShape) -> Result<u8>;
         fn shape_oriented(s: &OcShape, orientation: u8) -> Result<UniquePtr<OcShape>>;
         fn shape_hash(s: &OcShape) -> Result<u64>;
         fn shape_is_same(a: &OcShape, b: &OcShape) -> Result<bool>;

@@ -27,6 +27,9 @@ fn profile(model: &str, ps: &PartStudio, units: &UnitPrefs, rows: &mut Vec<Row>)
     eprintln!("profile: {model}: {total:.0} ms total, features {:.0} ms, display {:.0} ms, {} features", d.regen_ms, total - d.regen_ms as f64, ps.features.len());
     for (f, s) in ps.features.iter().zip(&d.features) {
         rows.push((model.to_string(), f.name.clone(), f.type_id.clone(), s.time_ms as f64));
+        if s.status != noshape_model::display::FeatureStatus::Ok {
+            eprintln!("profile: {model}: {} {:?} {}", f.name, s.status, s.message.as_deref().unwrap_or(""));
+        }
     }
     rows.push((model.to_string(), "(display)".into(), "display".into(), total - d.regen_ms as f64));
     r

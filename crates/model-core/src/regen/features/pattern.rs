@@ -1258,8 +1258,9 @@ fn on_surface(face: &Shape, p: DVec3, tol: f64) -> bool {
 /// runs it, n the outward normals.
 fn edge_convexity(body: &Body, e: usize, fa: usize, fb: usize) -> i32 {
     let (Ok(edge), Ok(a), Ok(b)) = (body.shape.sub_shape(ShapeType::Edge, e), body.shape.sub_shape(ShapeType::Face, fa), body.shape.sub_shape(ShapeType::Face, fb)) else { return 0 };
-    // The edge as face `fa` uses it (its orientation in that face).
-    let Some(ea) = a.edges().into_iter().find(|x| x.is_same(&edge)) else { return 0 };
+    // The edge as face `fa` uses it (its orientation in that face: edges are handed out FORWARD since 4e9b054e, which
+    // made a through hole's far rim read concave, qa PATTERN-HOLE-NOREAPPLY).
+    let Ok(ea) = a.edge_orientation_in(&edge).and_then(|o| edge.oriented(o)) else { return 0 };
     let Ok(info) = ea.edge_info() else { return 0 };
     let t = (info.first_param + info.last_param) * 0.5;
     let (Ok(p), Ok(tan)) = (ea.point_at(t), ea.tangent_at(t)) else { return 0 };

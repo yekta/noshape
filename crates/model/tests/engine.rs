@@ -1022,6 +1022,27 @@ fn feature_pattern_of_hole_copies_the_holes() {
     }
 }
 
+/// qa PATTERN-HOLE-NOREAPPLY (v0.4.18): a Feature pattern (Reapply off) of two through holes copies them (qa's
+/// wf-block: 6649.8854 mm³ in v0.4.17); the copy check read the far rim as concave once edges were handed out
+/// FORWARD, and the pattern failed with "Could not create all instances as entered".
+#[test]
+fn feature_pattern_of_through_holes_without_reapply_copies_them() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let pl = t.top_plane("10 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts = [sk.add_point(DVec2::new(0.008, 0.006)), sk.add_point(DVec2::new(0.008, 0.014))];
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    let locs = q(pts.iter().map(|p| Reference::SketchEntity { sketch: s, entity: p.0 }).collect());
+    let h = t.add("hole", &[("locations", locs), ("unitsSystem", en("METRIC")), ("styleV2", en("SIMPLE")), ("endStyleV2", en("THROUGH")), ("holeDiameterV3", e("6 mm"))]);
+    let one = (0.04 * 0.02 * 0.01 - total_volume(&t.ok().context)) / 2.0;
+    let pattern = feature_pattern(&mut t, vec![h], "2", false);
+    let r = t.ok();
+    assert_eq!(r.display.features.iter().find(|f| f.id == pattern).unwrap().status, FeatureStatus::Ok);
+    let removed = 0.04 * 0.02 * 0.01 - total_volume(&r.context);
+    assert!(near(removed, 4.0 * one, 1e-4), "removed {removed}, 4 holes {}", 4.0 * one);
+}
+
 /// qa4 F12: a Feature-type linear pattern of a Hole cuts holes into the
 /// part (it doesn't turn it into a shell with cylinders), and keeps doing so
 /// after the block's depth changes.

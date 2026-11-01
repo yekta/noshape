@@ -143,6 +143,17 @@ impl Shape {
         }
     }
 
+    /// How this face uses `edge` (its orientation in the face's wires, the face's own composed; the first use of a
+    /// seam). [`Shape::edges`] hands every edge out FORWARD.
+    pub fn edge_orientation_in(&self, edge: &Shape) -> Result<Orientation> {
+        Ok(match ck(ffi::edge_orientation_in(self.raw(), edge.raw()))? {
+            1 => Orientation::Reversed,
+            2 => Orientation::Internal,
+            3 => Orientation::External,
+            _ => Orientation::Forward,
+        })
+    }
+
     /// The same shape with the given orientation.
     pub fn oriented(&self, o: Orientation) -> Result<Shape> {
         Shape::from_res(ffi::shape_oriented(self.raw(), o as u8))

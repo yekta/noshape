@@ -659,6 +659,7 @@ std::unique_ptr<OcShape> shape_clone(const OcShape& s);
 uint8_t                  shape_type(const OcShape& s);
 bool                     shape_is_null(const OcShape& s);
 uint8_t                  shape_orientation(const OcShape& s);
+uint8_t                  edge_orientation_in(const OcShape& face, const OcShape& edge);
 std::unique_ptr<OcShape> shape_oriented(const OcShape& s, uint8_t orientation);
 uint64_t                 shape_hash(const OcShape& s);
 bool                     shape_is_same(const OcShape& a, const OcShape& b);
