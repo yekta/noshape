@@ -271,6 +271,8 @@ jobs:
       - name: Windows (installer, PATH, terminal launcher, uninstall, zip, CLI-only)
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $check = ".github/release/check_binary.py"
           $setup = (Get-ChildItem dl\noshape-*-windows-x86_64-setup.exe).FullName
@@ -285,6 +287,14 @@ jobs:
           $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + $userPath
           & .github/release/check_terminal.ps1 $dir
           if ($LASTEXITCODE -ne 0) { throw "terminal check failed" }
+          # Opening a document shows no console window; the last release, for comparison (it flashed one per open).
+          & .github/release/check_no_console.ps1 "$dir\noshape.exe"
+          if ($LASTEXITCODE -ne 0) { throw "console window check failed" }
+          gh release download --repo $env:GITHUB_REPOSITORY --pattern "noshape-[0-9]*-windows-x86_64.zip" --dir "$env:RUNNER_TEMP\prev"
+          if ($LASTEXITCODE -eq 0) {
+            Expand-Archive (Get-ChildItem "$env:RUNNER_TEMP\prev\*.zip").FullName -DestinationPath "$env:RUNNER_TEMP\prev"
+            & .github/release/check_no_console.ps1 (Get-ChildItem "$env:RUNNER_TEMP\prev\noshape-*\noshape.exe").FullName -Report
+          }
           python $check noshape
           if ($LASTEXITCODE -ne 0) { throw "check failed" }
           # MCP through the launcher too (a client that resolves `noshape` as cmd does).
