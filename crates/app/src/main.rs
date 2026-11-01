@@ -364,7 +364,7 @@ fn register_history_hooks() {
 
 /// What the documents page (noshape-start-ui) needs of the app: a document's window, the build label.
 fn register_start_hooks() {
-    noshape_start_ui::start_hooks::register(noshape_start_ui::start_hooks::Hooks { open_document_window: files::open_document_window, build_label });
+    noshape_start_ui::start_hooks::register(noshape_start_ui::start_hooks::Hooks { open_document_window: files::open_document_window, open_document_at: files::open_document_at, build_label });
 }
 
 fn main() {

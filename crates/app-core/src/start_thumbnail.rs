@@ -135,7 +135,13 @@ struct Engine {
     gpu_cache: GpuCache,
 }
 
+/// A thumbnail run's result: the PNG (None: nothing to show) and the parts
+/// of the studio it drew, for the search index.
+type Rendered = (Option<Vec<u8>>, Vec<(noshape_model::BodyId, String)>);
+
 struct Job {
+    /// The Part Studio drawn.
+    tab: TabId,
     /// The open view's display (no regeneration).
     shown: Option<Arc<StudioDisplay>>,
     studio: PartStudio,
@@ -150,8 +156,8 @@ struct Job {
 
 impl Job {
     /// Regenerate, build the scene and render. `Ok(None)`: nothing to show.
-    async fn run(self) -> anyhow::Result<Option<Vec<u8>>> {
-        let (scene, camera) = {
+    async fn run(self) -> anyhow::Result<Rendered> {
+        let (scene, camera, parts) = {
             let mut engine = self.engine.lock();
             let display = match self.shown {
                 Some(d) => d,
@@ -164,20 +170,21 @@ impl Job {
                     Arc::new(r.display)
                 }
             };
+            let parts = crate::search_index::parts_of(&display);
             let has_bodies = display.bodies.iter().any(|b| !b.hidden);
             if !has_bodies && display.sketches.is_empty() {
-                return Ok(None);
+                return Ok((None, parts));
             }
             // Parts only when there are parts; sketches otherwise.
             let scene_opts = SceneOptions { show_planes: false, show_sketches: !has_bodies, show_origin: false, ..Default::default() };
             let Engine { gpu_cache, .. } = &mut *engine;
             let built = scene_builder::build(&display, &scene_opts, gpu_cache, self.gpu.uploader());
-            let Some((lo, hi)) = built.scene.bounds() else { return Ok(None) };
+            let Some((lo, hi)) = built.scene.bounds() else { return Ok((None, parts)) };
             let (w, h) = crate::gpu::THUMBNAIL_SIZE;
-            (Arc::new(built.scene), fit_camera(lo.as_dvec3(), hi.as_dvec3(), w as f64 / h as f64))
+            (Arc::new(built.scene), fit_camera(lo.as_dvec3(), hi.as_dvec3(), w as f64 / h as f64), parts)
         };
         let png = self.gpu.render_thumbnail(scene, camera, thumbnail_style()).await?;
-        Ok(Some(png))
+        Ok((Some(png), parts))
     }
 }
 
@@ -236,11 +243,15 @@ impl Thumbnailer {
             if !this.dirty && this.task.is_none() {
                 return;
             }
-            let path = this.doc.read(cx).session.path.clone();
+            let (path, branch) = {
+                let s = &this.doc.read(cx).session;
+                (s.path.clone(), s.branch)
+            };
             if let Prepared::Job(job) = this.prepare(false, cx) {
+                let (tab, tabs) = (job.tab, this.studio_tabs(cx));
                 cx.spawn(async move |cx| {
                     let result = cx.background_spawn((*job).run()).await;
-                    store_to_file(path, result);
+                    store_to_file(path, branch, tab, &tabs, result);
                 })
                 .detach();
             }
@@ -274,11 +285,12 @@ impl Thumbnailer {
                     }
                 }
             };
+            let tab = job.tab;
             let result = cx.background_spawn(job.run()).await;
             let _ = this.update(cx, |t, cx| {
                 t.task = None;
                 t.last = Some(Instant::now());
-                t.store(result, cx);
+                t.store(tab, result, cx);
                 if t.dirty {
                     t.schedule(cx);
                 }
@@ -318,30 +330,62 @@ impl Thumbnailer {
         self.dirty = false;
         let cancel = RegenCancel::default();
         let path = session.path.clone();
-        let job = Job { shown, config: studio.configuration.defaults(), studio, units: doc.settings.units, doc_vars, engine: self.engine.clone(), gpu: self.gpu.clone(), cancel: cancel.clone() };
+        let job = Job { tab, shown, config: studio.configuration.defaults(), studio, units: doc.settings.units, doc_vars, engine: self.engine.clone(), gpu: self.gpu.clone(), cancel: cancel.clone() };
         cx.default_global::<ThumbnailJobs>().0.insert(path, cancel);
         Prepared::Job(Box::new(job))
     }
 
-    fn store(&mut self, result: anyhow::Result<Option<Vec<u8>>>, cx: &mut Context<Self>) {
+    /// The document's Part Studio tabs.
+    fn studio_tabs(&self, cx: &App) -> Vec<TabId> {
+        self.doc.read(cx).session.doc.tabs.iter().filter(|t| matches!(t.content, TabContent::PartStudio(_))).map(|t| t.id).collect()
+    }
+
+    fn store(&mut self, tab: TabId, result: anyhow::Result<Rendered>, cx: &mut Context<Self>) {
         match result {
             // Stopped for the user's own work: again later.
             Err(e) if e.is::<Cancelled>() => self.dirty = true,
-            Ok(png) => self.doc.update(cx, |d, _| {
-                if let Err(e) = d.session.store.set_thumbnail(png.as_deref()) {
-                    log::warn!("could not store thumbnail: {e}");
+            Ok((png, parts)) => {
+                // The search index: this studio's parts, and those of the
+                // other Part Studios open views show at their head.
+                let path = self.doc.read(cx).session.path.clone();
+                let mut fresh = vec![(tab, parts)];
+                if let Some(shown) = cx.try_global::<StudioDisplays>() {
+                    let doc = &self.doc.read(cx).session.doc;
+                    for t in &doc.tabs {
+                        let TabContent::PartStudio(ps) = &t.content else { continue };
+                        if t.id == tab {
+                            continue;
+                        }
+                        let vars = noshape_model::variables::element_variables(doc, t.id);
+                        if let Source::Shown(d) = decide(shown.0.get(&(path.clone(), t.id)), ps, &vars) {
+                            fresh.push((t.id, crate::search_index::parts_of(&d)));
+                        }
+                    }
                 }
-            }),
+                let tabs = self.studio_tabs(cx);
+                self.doc.update(cx, |d, _| {
+                    if let Err(e) = d.session.store.set_thumbnail(png.as_deref()) {
+                        log::warn!("could not store thumbnail: {e}");
+                    }
+                    let branch = d.session.branch;
+                    if let Err(e) = crate::search_index::update(&mut d.session.store, branch, fresh, &tabs) {
+                        log::warn!("could not store the parts index: {e}");
+                    }
+                })
+            }
             Err(e) => log::warn!("thumbnail render failed: {e:#}"),
         }
     }
 }
 
-/// Write a thumbnail after the document window closed.
-fn store_to_file(path: PathBuf, result: anyhow::Result<Option<Vec<u8>>>) {
+/// Write a thumbnail (and the parts index) after the document window closed.
+fn store_to_file(path: PathBuf, branch: noshape_store::BranchId, tab: TabId, tabs: &[TabId], result: anyhow::Result<Rendered>) {
     match result {
-        Ok(png) => {
-            let r = noshape_store::Document::open(&path).and_then(|mut s| s.set_thumbnail(png.as_deref()));
+        Ok((png, parts)) => {
+            let r = noshape_store::Document::open(&path).and_then(|mut s| {
+                s.set_thumbnail(png.as_deref())?;
+                crate::search_index::update(&mut s, branch, vec![(tab, parts)], tabs)
+            });
             if let Err(e) = r {
                 log::warn!("could not store thumbnail for {}: {e}", path.display());
             }

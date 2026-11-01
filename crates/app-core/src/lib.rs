@@ -36,6 +36,7 @@ pub mod quantity_field;
 pub mod reflection;
 pub mod repair_mode;
 pub mod scene_builder;
+pub mod search_index;
 pub mod section_dialog;
 pub mod session;
 pub mod shortcut_sheet;

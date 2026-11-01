@@ -30,7 +30,7 @@ Priorities:
 |---|---|
 | Surfaces audited | 16 |
 | Gaps found | 7 |
-| Gaps fixed | 4 |
+| Gaps fixed | 5 |
 
 ## Surfaces
 
@@ -61,6 +61,6 @@ Priorities:
 | D3 | P1 | ☰ on a version (a version window): live shows Rename document, Move to…, Restore deleted workspaces… · Copy version…, Version properties… · Print… · Close document. Ours showed the workspace items (Copy workspace…, Update workspace…, Workspace units…, Workspace properties…, Switch to view only mode). | fixed: the version variant; Copy version… makes a new document from the version's state (`start_library::copy_version_named`) |
 | D6 | P2 | Documents page › Versions and history: live rows have a 140 px graph column (white workspace ring, blue version dots), "Show changes…" under Main and the versions, a selected row (light blue) and the tooltip "No description" / "Description: …". Ours lists Name / Modified only. | open |
 | D7 | P3 | Documents page while searching: live's header is "Search results in" with the place in blue / 600. With no results it shows "No results found that match this search. Try other search terms or refine the search by clicking the arrow in the search box." Ours kept the place header and said "No documents match …". | fixed |
-| D8 | P1 | Documents page search results with Type Part (Part Studio, …): live lists **each part (tab) as its own row**, with thumbnail, part icon, bold matched name, ⚲ Main, a state badge, and the Part number and Revision columns. Ours filters whole documents. | open |
+| D8 | P1 | Documents page search results with Type Part (Part Studio, …): live lists **each part (tab) as its own row**, with thumbnail, part icon, bold matched name, ⚲ Main, a state badge, and the Part number and Revision columns. Ours filtered whole documents. | fixed: a search of parts or tab types lists a row per item (`start_search::hits`), with the item's icon, the searched text in bold, the workspace, the part's state, Part number and Revision; a double click opens the document at its tab. Part names come from regeneration, so each workspace keeps an index of its Part Studios' parts (store meta `search_parts:<workspace>`, `app-core/search_index.rs`), written with the thumbnail. A document not edited since has none and lists only its named parts, as do versions. |
 | D9 | P3 | Search boxes of the standard content browser and Insert › Other documents: tooltip "Type and press enter to search", and the clear button's tooltip "Clear search". | open |
 | D10 | P2 | ☰ › Workspace properties…: live runs the same command as the version's Version properties… (the metadata modal with the tab tree). Ours opened a plain name / description modal. | fixed: opens history-ui's Properties modal for the workspace |

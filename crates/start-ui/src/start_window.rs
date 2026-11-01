@@ -2631,9 +2631,122 @@ impl StartView {
         div().child(button).child(panel).into_any_element()
     }
 
+    /// A search for parts or tabs (live documents/135): a row for each item
+    /// of the documents in the current place; None for a search of documents.
+    fn item_hits(&self) -> Option<Vec<(DocEntry, crate::start_search::Hit)>> {
+        let q = self.adv_query.as_ref().filter(|q| !q.item_types().is_empty())?;
+        let typed = self.query.trim();
+        let mut out = Vec::new();
+        for d in self.docs.iter().filter(|d| !d.trashed && self.in_source(d, &self.source)) {
+            let labels: Vec<String> = self.labels.labels.iter().filter(|l| self.labels.has(&d.path, l)).cloned().collect();
+            if !crate::start_search::matches_document(q, &d.description, &d.owner, &labels) {
+                continue;
+            }
+            let Some((_, facts)) = self.facts.get(&d.path) else { continue };
+            out.extend(crate::start_search::hits(q, typed, facts).into_iter().map(|h| (d.clone(), h)));
+        }
+        match self.sort {
+            SortKey::Name => out.sort_by_key(|(_, h)| h.name.to_lowercase()),
+            SortKey::Modified => out.sort_by_key(|(d, _)| d.modified),
+        }
+        if self.descending {
+            out.reverse();
+        }
+        Some(out)
+    }
+
+    /// The rows of a search for parts or tabs (live documents/135): the
+    /// document's thumbnail, the item's icon, its name with the searched
+    /// text in bold, ⚲ the workspace, a part's state badge; the document's
+    /// Modified / Modified by / Owned by, a part's Part number and Revision.
+    /// A double click opens the document at the item's tab.
+    fn hit_rows(&self, hits: &[(DocEntry, crate::start_search::Hit)], cols: &[Col], cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let pal = p();
+        let me = self.me.clone();
+        let who = move |name: &str| if name.is_empty() || me.iter().any(|m| m == name) { "me".to_string() } else { name.to_string() };
+        let needle = self.adv_query.as_ref().map(|q| q.name.trim().to_lowercase()).filter(|n| !n.is_empty()).unwrap_or_else(|| self.query.trim().to_lowercase());
+        hits.iter()
+            .enumerate()
+            .map(|(ix, (d, h))| {
+                let cell = |w: f32| div().w(px(w)).flex_none().pl(px(16.)).truncate();
+                let icon = match h.kind {
+                    "Part" => "part",
+                    "Part Studio" => "part-studio",
+                    "Assembly" => "assembly",
+                    "Drawing" => "drawing",
+                    "Feature Studio" => "feature-studio",
+                    "Variable Studio" => "variable-studio",
+                    _ => "material-library",
+                };
+                // The searched text in bold ("**Part** 1").
+                let name = match h.name.to_lowercase().find(&needle).filter(|_| !needle.is_empty()) {
+                    Some(at) if h.name.is_char_boundary(at) && h.name.is_char_boundary(at + needle.len()) => h_flex()
+                        .min_w_0()
+                        .child(div().flex_none().child(h.name[..at].to_string()))
+                        .child(div().flex_none().font_weight(FontWeight::BOLD).child(h.name[at..at + needle.len()].to_string()))
+                        .child(div().min_w_0().truncate().child(h.name[at + needle.len()..].to_string())),
+                    _ => h_flex().min_w_0().child(div().min_w_0().truncate().child(h.name.clone())),
+                };
+                let props = h.props.clone().unwrap_or_default();
+                let state = (h.kind == "Part").then(|| props.meta.state().to_string());
+                let (path, tab) = (d.path.clone(), h.tab);
+                h_flex()
+                    .id(SharedString::from(format!("hit-{ix}")))
+                    .h(px(42.))
+                    .flex_none()
+                    .cursor_pointer()
+                    .text_size(px(14.))
+                    .text_color(pal.text)
+                    .border_b_1()
+                    .border_color(rgb(0xececec))
+                    .hover(|r| r.bg(pal.row_hover))
+                    .child(
+                        h_flex()
+                            .w(px(350.))
+                            .flex_none()
+                            .pl(px(16.))
+                            .pr(px(15.))
+                            .gap(px(8.))
+                            .child(self.thumbnail(d, 64.0, 36.0, false))
+                            .child(div().flex_none().child(crate::assets::icon(icon, 16., cx)))
+                            .child(name)
+                            .child(h_flex().flex_none().gap(px(1.)).text_size(px(11.)).text_color(pal.text).child(os::glyph(os::GLYPH_WORKSPACE, 14., pal.text)).child(crate::ui::user_text(h.at.clone())))
+                            .children(state.map(|s| div().flex_none().px(px(4.)).rounded(px(3.)).bg(rgb(0xe2e2e2)).text_size(px(11.)).text_color(rgb(0x666666)).child(s))),
+                    )
+                    .children(cols.iter().map(|c| {
+                        cell(200.)
+                            .child(match c {
+                                Col::Modified => lib::format_onshape_time(d.modified),
+                                Col::ModifiedBy => who(&d.modified_by),
+                                Col::OwnedBy => who(&d.owner),
+                                Col::Type => h.kind.to_string(),
+                                Col::Description => props.description.clone().unwrap_or_default(),
+                            })
+                            .into_any_element()
+                    }))
+                    .child(cell(200.).child(props.part_number.clone().unwrap_or_default()))
+                    .child(cell(200.).child(props.revision.clone().unwrap_or_default()))
+                    .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
+                        if ev.click_count() >= 2 {
+                            let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
+                            match crate::start_hooks::open_document_at(path.clone(), tab, gpu, cx) {
+                                Ok(()) => this.force_rescan(cx),
+                                Err(e) => Self::notify(window, cx, AlertKind::Error, format!("Could not open document: {e:#}")),
+                            }
+                        }
+                    }))
+                    .into_any_element()
+            })
+            .collect()
+    }
+
     fn render_list(&self, docs: &[DocEntry], cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let cols: Vec<Col> = self.columns.iter().filter(|c| c.1).map(|c| c.0).collect();
+        // Live documents/131-135: a search adds Part number and Revision.
+        let searching = !self.query.trim().is_empty() || self.adv_query.is_some();
+        let search_cols: &[&'static str] = if searching { &["Part number", "Revision"] } else { &[] };
+        let hits = self.item_hits();
         let mut header = h_flex()
             .h(px(32.))
             .flex_none()
@@ -2644,10 +2757,16 @@ impl StartView {
             let key = (*c == Col::Modified).then_some(SortKey::Modified);
             header = header.child(self.list_header_cell(c.label(), c.label(), key, cx).w(px(200.)).flex_none());
         }
+        for c in search_cols {
+            header = header.child(self.list_header_cell(c, c, None, cx).w(px(200.)).flex_none());
+        }
         // Onshape writes the signed-in user as "me".
         let me = self.me.clone();
         let who = move |name: &str| if name.is_empty() || me.iter().any(|m| m == name) { "me".to_string() } else { name.to_string() };
-        let rows: Vec<AnyElement> = docs
+        let rows: Vec<AnyElement> = if let Some(hits) = &hits {
+            self.hit_rows(hits, &cols, cx)
+        } else {
+            docs
             .iter()
             .enumerate()
             .map(|(ix, d)| {
@@ -2694,6 +2813,7 @@ impl StartView {
                             })
                             .into_any_element()
                     }))
+                    .children(search_cols.iter().map(|_| cell(200.).into_any_element()))
                     // Live documents/112: the selected row shows its quick actions at the
                     // right end (share is cloud-only): Send to trash, Labels.
                     .when(selected && !d.trashed, |r| {
@@ -2723,7 +2843,9 @@ impl StartView {
                     })
                     .into_any_element()
             })
-            .collect();
+            .collect()
+        };
+        let empty = rows.is_empty();
         v_flex()
             .size_full()
             .pl(px(10.))
@@ -2737,9 +2859,9 @@ impl StartView {
                     v_flex()
                         .h_full()
                         .min_w_full()
-                        .w(px(350. + 200. * cols.len() as f32))
+                        .w(px(350. + 200. * (cols.len() + search_cols.len()) as f32))
                         .child(header)
-                        .child(if docs.is_empty() {
+                        .child(if empty {
                             self.render_empty(cx)
                         } else {
                             div().id("doc-list").flex_1().min_h_0().overflow_y_scrollbar().child(v_flex().children(rows)).into_any_element()

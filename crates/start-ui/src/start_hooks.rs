@@ -11,6 +11,8 @@ use std::sync::OnceLock;
 pub struct Hooks {
     /// Open (or create, with that document) the document at a path in its own window, or bring it to the front.
     pub open_document_window: fn(PathBuf, Option<noshape_model::Document>, Gpu, &mut App) -> anyhow::Result<()>,
+    /// Open the document (or bring its window to the front) at a tab: a search result row (a part or a tab).
+    pub open_document_at: fn(PathBuf, noshape_model::document::TabId, Gpu, &mut App) -> anyhow::Result<()>,
     /// The build as the documents page shows it ("0.4.4.c8d74e607a47").
     pub build_label: fn() -> String,
 }
@@ -28,6 +30,10 @@ fn hooks() -> &'static Hooks {
 
 pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Document>, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
     (hooks().open_document_window)(path, create_with, gpu, cx)
+}
+
+pub fn open_document_at(path: PathBuf, tab: noshape_model::document::TabId, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
+    (hooks().open_document_at)(path, tab, gpu, cx)
 }
 
 pub fn build_label() -> String {

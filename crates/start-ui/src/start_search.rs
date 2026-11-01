@@ -90,6 +90,12 @@ impl Query {
         self.types.iter().any(|t| !matches!(*t, "Document" | "Folder")) || !self.part_number.is_empty() || self.state.is_some() || !self.revision.is_empty() || self.extra.iter().any(|(c, _)| *c != "Creator" && *c != "Library label")
     }
 
+    /// The item types searched for (parts and tabs): their results are
+    /// rows of their own (live documents/135), not documents.
+    pub fn item_types(&self) -> Vec<&'static str> {
+        self.types.iter().copied().filter(|t| !matches!(*t, "Document" | "Folder")).collect()
+    }
+
     /// Folders only (Type = Folder).
     pub fn folders_only(&self) -> bool {
         !self.types.is_empty() && self.types.iter().all(|t| *t == "Folder")
@@ -102,6 +108,22 @@ pub struct StateFacts {
     /// Type names of its tabs (as [`TYPES`]), plus "Part" when it has parts.
     pub kinds: Vec<&'static str>,
     pub parts: Vec<noshape_model::partstudio::PartProperties>,
+    /// Its tabs and parts, as search result rows.
+    pub items: Vec<Hit>,
+}
+
+/// One row of a search for parts or tabs (live documents/135: each part is
+/// its own row, with ⚲ Main, its state and part number).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Hit {
+    /// As [`TYPES`]: "Part", "Part Studio", "Assembly"…
+    pub kind: &'static str,
+    pub name: String,
+    pub tab: noshape_model::document::TabId,
+    /// The workspace or version it is in.
+    pub at: String,
+    /// A part's properties (part number, revision, state).
+    pub props: Option<noshape_model::partstudio::PartProperties>,
 }
 
 /// A document's states: every workspace's current state, and its versions
@@ -117,22 +139,29 @@ pub struct DocFacts {
 /// Read a document's facts (blocking; call off the UI thread).
 pub fn facts(path: &Path) -> Option<DocFacts> {
     let store = noshape_store::Document::open_read_only(path).ok()?;
-    let read = |mv| store.read_all(mv).ok().and_then(|b| noshape_model::document::Document::from_blobs(&b).ok()).map(|d| state_facts(&d));
-    let workspaces = store.list_branches().ok()?.iter().filter(|b| !b.deleted).filter_map(|b| read(b.head)).collect();
+    let read = |mv, at: &str, index: &crate::search_index::PartsIndex| store.read_all(mv).ok().and_then(|b| noshape_model::document::Document::from_blobs(&b).ok()).map(|d| state_facts(&d, at, index));
+    // Part names come from regeneration: a workspace's are kept in its
+    // index (versions have none, so only their named parts are found).
+    let workspaces = store.list_branches().ok()?.iter().filter(|b| !b.deleted).filter_map(|b| read(b.head, &b.name, &crate::search_index::read(&store, b.id))).collect();
     let list = store.list_versions().ok()?;
     let published = list.iter().any(|v| store.get_meta(&format!("{}{}", noshape_ops::versions::PUBLISHED_FS_KEY, v.id)).ok().flatten().is_some());
-    let versions = list.iter().filter_map(|v| read(v.microversion)).collect();
+    let versions = list.iter().filter_map(|v| read(v.microversion, &v.name, &Default::default())).collect();
     Some(DocFacts { workspaces, versions, published })
 }
 
-fn state_facts(doc: &noshape_model::document::Document) -> StateFacts {
+fn state_facts(doc: &noshape_model::document::Document, at: &str, index: &crate::search_index::PartsIndex) -> StateFacts {
     let mut f = StateFacts::default();
-    for t in &doc.tabs {
+    let hit = |kind: &'static str, name: String, tab, props| Hit { kind, name, tab, at: at.to_string(), props };
+    for t in doc.ordered_tabs() {
         let k = match &t.content {
             TabContent::PartStudio(ps) => {
                 f.parts.extend(ps.part_properties.values().cloned());
                 if !ps.part_properties.is_empty() || !ps.features.is_empty() {
                     f.kinds.push("Part");
+                }
+                match index.get(&t.id.0) {
+                    Some(parts) => f.items.extend(parts.iter().map(|(id, name)| hit("Part", name.clone(), t.id, ps.part_properties.get(id).cloned()))),
+                    None => f.items.extend(ps.part_properties.values().filter_map(|pp| Some(hit("Part", pp.name.clone()?, t.id, Some(pp.clone()))))),
                 }
                 "Part Studio"
             }
@@ -144,6 +173,7 @@ fn state_facts(doc: &noshape_model::document::Document) -> StateFacts {
             TabContent::File(_) => continue,
         };
         f.kinds.push(k);
+        f.items.push(hit(k, t.name.clone(), t.id, None));
     }
     f
 }
@@ -170,18 +200,87 @@ pub fn matches(q: &Query, name: &str, description: &str, owner: &str, labels: &[
         return true;
     }
     let Some(facts) = facts else { return false };
-    // The states searched (Results from): workspaces, the latest or every
-    // version, or both; one of them must match the content criteria.
-    let versions: &[StateFacts] = if q.all_versions { &facts.versions } else { facts.versions.last().map(std::slice::from_ref).unwrap_or(&[]) };
-    let states: Vec<&StateFacts> = match q.from {
-        ResultsFrom::Workspaces => facts.workspaces.iter().collect(),
-        ResultsFrom::Versions => versions.iter().collect(),
-        ResultsFrom::All => facts.workspaces.iter().chain(versions).collect(),
-    };
     if q.extra.iter().any(|(c, _)| *c == "Published FeatureScript") && !facts.published {
         return false;
     }
-    states.into_iter().any(|f| state_matches(q, f))
+    states(q, facts).into_iter().any(|f| state_matches(q, f))
+}
+
+/// The states searched (Results from): workspaces, the latest or every
+/// version, or both.
+fn states<'a>(q: &Query, facts: &'a DocFacts) -> Vec<&'a StateFacts> {
+    let versions: &[StateFacts] = if q.all_versions { &facts.versions } else { facts.versions.last().map(std::slice::from_ref).unwrap_or(&[]) };
+    match q.from {
+        ResultsFrom::Workspaces => facts.workspaces.iter().collect(),
+        ResultsFrom::Versions => versions.iter().collect(),
+        ResultsFrom::All => facts.workspaces.iter().chain(versions).collect(),
+    }
+}
+
+/// A document's rows for a search of parts or tabs ([`Query::item_types`]):
+/// the items of the searched states of a type searched whose name holds
+/// the Name criterion and `typed` (the search box), parts meeting the part
+/// criteria. A document's own criteria (Description, Creator, labels) are
+/// checked by [`matches_document`].
+pub fn hits(q: &Query, typed: &str, facts: &DocFacts) -> Vec<Hit> {
+    let kinds = q.item_types();
+    if q.extra.iter().any(|(c, _)| *c == "Published FeatureScript") && !facts.published {
+        return Vec::new();
+    }
+    let part_criteria = has_part_criteria(q);
+    let mut out: Vec<Hit> = Vec::new();
+    for f in states(q, facts) {
+        for h in &f.items {
+            let ok = kinds.contains(&h.kind)
+                && contains(&h.name, &q.name)
+                && contains(&h.name, typed)
+                && if h.kind == "Part" { !part_criteria || h.props.as_ref().is_some_and(|pp| part_matches(q, pp)) } else { !part_criteria };
+            if ok && !out.iter().any(|o| o.tab == h.tab && o.kind == h.kind && o.name == h.name) {
+                out.push(h.clone());
+            }
+        }
+    }
+    out
+}
+
+/// A document's own criteria for a search of parts or tabs.
+pub fn matches_document(q: &Query, description: &str, owner: &str, labels: &[String]) -> bool {
+    contains(description, &q.description)
+        && q.extra.iter().all(|(c, v)| match *c {
+            "Creator" => contains(owner, v),
+            "Library label" => labels.iter().any(|l| contains(l, v)),
+            _ => true,
+        })
+}
+
+fn has_part_criteria(q: &Query) -> bool {
+    !q.part_number.is_empty() || q.state.is_some() || !q.revision.is_empty() || q.extra.iter().any(|(c, _)| !matches!(*c, "Creator" | "Library label" | "Published FeatureScript"))
+}
+
+/// Does a part meet the part criteria (Part number, State, Revision, the
+/// added criteria)?
+fn part_matches(q: &Query, pp: &noshape_model::partstudio::PartProperties) -> bool {
+    let m = &pp.meta;
+    contains(pp.part_number.as_deref().unwrap_or(""), &q.part_number)
+        && (q.part_number.is_empty() || pp.part_number.is_some())
+        && q.state.is_none_or(|s| m.state() == s)
+        && contains(pp.revision.as_deref().unwrap_or(""), &q.revision)
+        && (q.revision.is_empty() || pp.revision.is_some())
+        && q.extra.iter().filter(|(c, _)| !matches!(*c, "Creator" | "Library label" | "Published FeatureScript")).all(|(c, v)| {
+            let field = |o: &Option<String>| o.as_deref().is_some_and(|s| contains(s, v));
+            match *c {
+                "Vendor" => field(&m.vendor),
+                "Project" => field(&m.project),
+                "Product line" => field(&m.product_line),
+                "Title 1" => field(&m.title1),
+                "Title 2" => field(&m.title2),
+                "Title 3" => field(&m.title3),
+                "Not revision managed" => m.not_revision_managed,
+                "Exclude from all BOMs" => m.exclude_from_bom,
+                // Drawing and release fields: no part holds them.
+                _ => false,
+            }
+        })
 }
 
 /// Does one state of a document match the content criteria?
@@ -191,34 +290,8 @@ fn state_matches(q: &Query, f: &StateFacts) -> bool {
         return false;
     }
     // Part criteria: one part must match them all.
-    let part_crit: Vec<(&str, &str)> = q.extra.iter().filter(|(c, _)| !matches!(*c, "Creator" | "Library label" | "Published FeatureScript")).map(|(c, v)| (*c, v.as_str())).collect();
-    if !q.part_number.is_empty() || q.state.is_some() || !q.revision.is_empty() || !part_crit.is_empty() {
-        let part_ok = |pp: &noshape_model::partstudio::PartProperties| {
-            let m = &pp.meta;
-            contains(pp.part_number.as_deref().unwrap_or(""), &q.part_number)
-                && (q.part_number.is_empty() || pp.part_number.is_some())
-                && q.state.is_none_or(|s| m.state() == s)
-                && contains(pp.revision.as_deref().unwrap_or(""), &q.revision)
-                && (q.revision.is_empty() || pp.revision.is_some())
-                && part_crit.iter().all(|(c, v)| {
-                    let field = |o: &Option<String>| o.as_deref().is_some_and(|s| contains(s, v));
-                    match *c {
-                        "Vendor" => field(&m.vendor),
-                        "Project" => field(&m.project),
-                        "Product line" => field(&m.product_line),
-                        "Title 1" => field(&m.title1),
-                        "Title 2" => field(&m.title2),
-                        "Title 3" => field(&m.title3),
-                        "Not revision managed" => m.not_revision_managed,
-                        "Exclude from all BOMs" => m.exclude_from_bom,
-                        // Drawing and release fields: no part holds them.
-                        _ => false,
-                    }
-                })
-        };
-        if !f.parts.iter().any(part_ok) {
-            return false;
-        }
+    if has_part_criteria(q) && !f.parts.iter().any(|pp| part_matches(q, pp)) {
+        return false;
     }
     !q.extra.iter().any(|(c, _)| *c == "Published FeatureScript") || f.kinds.contains(&"Feature Studio")
 }
@@ -459,5 +532,34 @@ impl Render for AdvancedSearch {
                         cx.emit(SearchEvent::Search(q));
                     }))),
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{hits, state_facts, DocFacts, Query, TabContent};
+    use noshape_model::document::Document;
+    use noshape_model::partstudio::{PartProperties, PartStudio};
+
+    /// Live documents/135: a search for parts lists each part as its own
+    /// row; the index names the parts, their properties give the part number.
+    #[test]
+    fn a_part_search_lists_each_part() {
+        let mut doc = Document::new();
+        let mut ps = PartStudio::new();
+        let (bracket, plate) = (noshape_model::BodyId { feature: noshape_model::FeatureId(1), index: 0 }, noshape_model::BodyId { feature: noshape_model::FeatureId(1), index: 1 });
+        ps.part_properties.insert(plate.clone(), PartProperties { part_number: Some("PN-7".into()), ..Default::default() });
+        let tab = doc.add_tab("Brackets", TabContent::PartStudio(ps));
+        let index: crate::search_index::PartsIndex = [(tab.0, vec![(bracket, "Bracket".to_string()), (plate, "Base plate".to_string())])].into_iter().collect();
+        let facts = DocFacts { workspaces: vec![state_facts(&doc, "Main", &index)], ..Default::default() };
+        let mut q = Query { types: vec!["Part"], ..Default::default() };
+        let names = |q: &Query, typed: &str| hits(q, typed, &facts).into_iter().map(|h| (h.name, h.at)).collect::<Vec<_>>();
+        assert_eq!(names(&q, ""), [("Bracket".to_string(), "Main".to_string()), ("Base plate".to_string(), "Main".to_string())]);
+        assert_eq!(names(&q, "plate"), [("Base plate".to_string(), "Main".to_string())]);
+        q.part_number = "pn".into();
+        assert_eq!(names(&q, ""), [("Base plate".to_string(), "Main".to_string())]);
+        // Tabs are rows of their own type.
+        let q = Query { types: vec!["Part Studio"], ..Default::default() };
+        assert!(names(&q, "").contains(&("Brackets".to_string(), "Main".to_string())));
     }
 }
