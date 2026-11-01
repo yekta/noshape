@@ -182,6 +182,9 @@ impl Render for FileTabView {
 /// The insert-from-file dialog's state: Current document / Other
 /// documents, the library's documents (read once) and the opened one's
 /// files.
+/// The pickers' "Import…" icon: an arrow up onto a bar (live drawing/984).
+const GLYPH_UPLOAD: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5 3 7h3.2v4.5h3.6V7H13z"/><rect x="2.5" y="13" width="11" height="1.8"/></svg>"#;
+
 #[derive(Default)]
 struct PickState {
     other: bool,
@@ -210,13 +213,20 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
         let other = st.other;
         let tab = |id: &'static str, label: &'static str, on: bool, to_other: bool| {
             let state = state.clone();
+            // Live (drawing/984): two halves, the active one blue with a 2 px
+            // underline.
             div()
                 .id(id)
-                .px(px(12.))
-                .py(px(6.))
-                .text_size(px(13.))
+                .flex_1()
+                .h(px(32.))
+                .relative()
+                .flex()
+                .items_center()
+                .justify_center()
+                .text_size(px(12.))
                 .cursor_pointer()
-                .when(on, |d| d.border_b_2().border_color(gpui_kit::rgb(0x1d6bd6)).text_color(gpui_kit::rgb(0x1d6bd6)))
+                .when(on, |d| d.text_color(gpui_kit::rgb(0x1651b0)).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(gpui_kit::rgb(0x1651b0))))
+                .when(!on, |d| d.text_color(pal.text))
                 .child(label)
                 .on_click(move |_, _, cx| {
                     let here = state.clone();
@@ -238,8 +248,8 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
                     }
                 })
         };
-        let tabs = h_flex().gap(px(4.)).border_b_1().border_color(gpui_kit::rgb(0xd3d7d9)).child(tab("pick-tab-current", "Current document", !other, false)).child(tab("pick-tab-other", "Other documents", other, true));
-        let mut list = v_flex().id("pick-file-list").h(px(240.)).overflow_y_scroll().border_1().border_color(gpui_kit::rgb(0xd3d7d9));
+        let tabs = h_flex().flex_none().border_b_1().border_color(gpui_kit::rgb(0xeeeeee)).child(tab("pick-tab-current", "Current document", !other, false)).child(tab("pick-tab-other", "Other documents", other, true));
+        let mut list = v_flex().id("pick-file-list").flex_1().min_h_0().overflow_y_scroll();
         let row = |id: SharedString| h_flex().id(id).h(px(32.)).px(px(8.)).gap(px(8.)).text_size(px(13.)).cursor_pointer().hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)));
         let files: Vec<(TabId, String, FileTab)> = if other {
             match &st.opened {
@@ -304,25 +314,28 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
                 .collect()
         };
         if files.is_empty() && !other {
-            list = list.child(div().p(px(12.)).text_size(px(13.)).text_color(pal.text_muted).child("No files in this document. Use Import to add one."));
+            list = list.child(div().p(px(12.)).text_size(px(13.)).text_color(pal.text_muted).child("No files available."));
         }
         if files.is_empty() && other && st.opened.is_some() {
             list = list.child(div().p(px(12.)).text_size(px(13.)).text_color(pal.text_muted).child("No files of this type in this document."));
         }
         for (k, (id, name, f)) in files.into_iter().enumerate() {
             let (pick, f2) = (on_pick.clone(), f.clone());
+            // Live: 40 px rows, the file's icon, its name (no size).
             list = list.child(
                 h_flex()
                     .id(SharedString::from(format!("pick-{id}-{k}")))
-                    .h(px(32.))
-                    .px(px(8.))
-                    .gap(px(8.))
+                    .h(px(40.))
+                    .flex_none()
+                    .px(px(6.))
+                    .gap(px(10.))
                     .text_size(px(13.))
+                    .text_color(pal.text)
                     .cursor_pointer()
                     .hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)))
-                    .child(crate::assets::icon(file_icon(&f), 20., cx))
+                    .tooltip(crate::ui::tooltip(f.size_label()))
+                    .child(div().w(px(52.)).flex_none().flex().justify_center().child(crate::assets::icon(file_icon(&f), 28., cx)))
                     .child(div().flex_1().truncate().child(crate::ui::user_text(name)))
-                    .child(div().text_size(px(12.)).text_color(pal.text_muted).child(f.size_label()))
                     .on_click(move |_, window, cx| {
                         window.close_dialog(cx);
                         pick(f2.clone(), window, cx);
@@ -330,12 +343,67 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
             );
         }
         let (doc2, pick2) = (doc.clone(), on_pick.clone());
-        crate::os_ui::modal(dialog, title, 560.)
-            .child(crate::os_ui::modal_body().gap(px(8.)).child(tabs).child(Input::new(&search).h(px(30.)).text_size(px(13.))).child(list))
-            .footer(
-                crate::os_ui::modal_footer()
+        // Live (drawing/123, 984): a 300 px flyout under the toolbar at the
+        // left (beside Sheet properties), not a centred modal: title and ✕,
+        // the tabs, this document's name and branch, Search files, the list,
+        // and "⤒ Import…" at the bottom.
+        let header = h_flex()
+            .h(px(30.))
+            .flex_none()
+            .pl(px(6.))
+            .pr(px(6.))
+            .border_b_1()
+            .border_color(gpui_kit::rgb(0xd7d7d7))
+            .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title))
+            .child(div().flex_none().child(gpui_kit::component::dialog::DialogClose::new().child(div().id("pick-close").size(px(20.)).flex().items_center().justify_center().cursor_pointer().text_color(pal.text_faint).hover(|d| d.text_color(pal.text_muted)).child(gpui_kit::component::Icon::empty().data(crate::os_ui::GLYPH_MODAL_CLOSE).size(px(14.))))));
+        let (doc_name, branch) = {
+            let d = doc.read(cx);
+            (d.name(), d.session.store.branch(d.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()))
+        };
+        let document_row = h_flex().h(px(40.)).flex_none().px(px(6.)).child(
+            v_flex()
+                .flex_1()
+                .min_w_0()
+                .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).text_color(pal.text).child(crate::ui::user_text(doc_name)))
+                .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(15.6)).text_color(pal.text).child(crate::ui::glyph("branch", 10., pal.text)).child(branch)),
+        );
+        let search_row = div().flex_none().p(px(6.)).child(Input::new(&search).h(px(30.)).text_size(px(13.)));
+        dialog
+            .w(px(300.))
+            .margin_left(px(290.))
+            .margin_top(px(78.))
+            .overlay(false)
+            .close_button(false)
+            .p_0()
+            .gap_0()
+            .rounded(px(0.))
+            .border_0()
+            .bg(pal.panel)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .child(
+                v_flex()
+                    .h(px(584.))
+                    .child(header)
+                    .child(tabs)
+                    .when(!other, |d| d.child(document_row))
+                    .child(search_row)
+                    .child(list)
                     .child(
-                        Button::new("pick-import").label("Import").outline().on_click(move |_, window, cx| {
+                        h_flex()
+                            .id("pick-import")
+                            .h(px(24.))
+                            .flex_none()
+                            .px(px(6.))
+                            .gap(px(6.))
+                            .border_t_1()
+                            .border_color(gpui_kit::rgb(0xeaeaea))
+                            .text_size(px(13.))
+                            .text_color(pal.text)
+                            .cursor_pointer()
+                            .hover(|d| d.bg(pal.panel_hover))
+                            .child(gpui_kit::component::Icon::empty().data(GLYPH_UPLOAD).size(px(13.)))
+                            .child("Import…")
+                            .on_click(move |_, window, cx| {
                             window.close_dialog(cx);
                             // This window, not the active one (none while
                             // the path prompt closes, or without a window
@@ -356,8 +424,7 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
                                 });
                             });
                         }),
-                    )
-                    .child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("pick-cancel", "Cancel", cx))),
+                    ),
             )
     });
 }

@@ -432,7 +432,7 @@ impl DrawingEditor {
         let this = cx.entity().downgrade();
         let doc = self.doc.clone();
         use noshape_model::file_tab::FileKind;
-        crate::drawing_hooks::pick_file(doc, "Insert DXF or DWG", &[FileKind::Drawing2d], &["dxf", "dwg"], window, cx, move |file, _, cx| {
+        crate::drawing_hooks::pick_file(doc, "Select a DXF or DWG file", &[FileKind::Drawing2d], &["dxf", "dwg"], window, cx, move |file, _, cx| {
             let parsed = file.bytes().ok_or_else(|| "the file data is damaged".to_string()).and_then(|b| noshape_sketch::cad::parse_cad(&b).map(|_| b).map_err(|e| e.to_string()));
             this.update(cx, |this, cx| match parsed {
                 Ok(b) => {
