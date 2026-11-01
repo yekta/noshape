@@ -1,9 +1,9 @@
 # rb.sh's build server per worktree (11-01): the first line whose pattern matches the worktree's directory name
 # (a bash glob) wins; no match: vibe4. Each worktree keeps its warm target dir on its own host.
-# vibe4 (16 cores, 62 GB): the land checks plus the memory-heavy kernel work (replay corpora, probes).
-# vibe5 (16 cores, 29 GB): the UI agents' app builds and tests.
+# vibe4 (16 cores, 62 GB): the land checks plus bool (replay corpora). Heavy probes elsewhere: NOSHAPE_RB_HOST=vibe4.
+# vibe5 (16 cores, 29 GB): core's and the UI agents' builds and tests.
 bool*     vibe4
-core*     vibe4
+core*     vibe5
 dev*      vibe4
 psui*     vibe5
 skasm*    vibe5
