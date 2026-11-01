@@ -827,8 +827,13 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
             // outward about the profiles' axis; anything else is built as before.
             // (With Thickness 2 (no Trim ends), the inside moved in along the normals as well: live (c).)
             let trim = ev.bool("trimEnds");
+            // (Flipped, the wall all inside (t1 0): Trim ends can't trim it, live 1728 (a); without, the loft's
+            // faces are the outside, the inside offset in.)
+            if trim && t1 == 0.0 && t2 > 0.0 {
+                return err(THIN_TRIM_FAILED);
+            }
             // (Through more profiles, without Trim ends: live (d).)
-            if t1 > 0.0 && (t2 == 0.0 || (t2 > 0.0 && !trim)) && (shapes.len() == 2 || !trim)
+            if (t1 > 0.0 || t2 > 0.0) && (t2 == 0.0 || !trim) && (shapes.len() == 2 || !trim)
                 && let (Ok(Some(p0)), Ok(Some(p1))) = (shapes[0].find_plane(1e-6), shapes[shapes.len() - 1].find_plane(1e-6))
                 && let Ok(wall) = k::thicken_loft_out(&res.shape, t1, t2, &p0, &p1, trim)
                 && wall.shape.count(ShapeType::Solid) == 1

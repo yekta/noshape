@@ -511,6 +511,45 @@ fn thin_loft_square_to_circle_is_the_offset_surface_as_live() {
     }
 }
 
+/// Live 1728: the thin loft's wall flipped inside (Flip wall). Trim ends can't trim it ("Failed to trim result body…");
+/// without, the loft's faces are its outside and the caps run from them to the inner offset: (b) square → Ø16
+/// 1228.1703 mm³, z −0.192548 … 20, (d) square → Ø16 → square 2334.8631, z −0.282954 … 40.282954; 16 faces, the box the
+/// profiles' ±10.
+#[test]
+fn thin_loft_flipped_inside_is_the_inner_offset_as_live() {
+    let item = |s: FeatureId| {
+        let mut v = ParamValues::default();
+        v.set("wireProfileEntities", q(vec![Reference::Sketch(s)]));
+        v
+    };
+    for (three, trim, want, lo, hi) in [(false, true, None, 0.0, 0.0), (false, false, Some(1228.1703084), -0.000192548, 0.02), (true, false, Some(2334.8631279), -0.000282954, 0.040282954)] {
+        let mut t = T::new();
+        let a = t.sketch(Reference::Plane(DatumPlane::Top), rect(-0.01, -0.01, 0.01, 0.01));
+        let p20 = t.top_plane("20 mm");
+        let b2 = t.sketch(Reference::FeaturePlane(p20), circle(DVec2::ZERO, 0.008));
+        let mut profiles = vec![item(a), item(b2)];
+        if three {
+            let p40 = t.top_plane("40 mm");
+            profiles.push(item(t.sketch(Reference::FeaturePlane(p40), rect(-0.01, -0.01, 0.01, 0.01))));
+        }
+        let loft = t.add("loft", &[("bodyType", en("THIN")), ("wireProfilesArray", ParamValue::Array(profiles)), ("thickness1", e("1 mm")), ("flipWall", ParamValue::Bool(true)), ("trimEnds", ParamValue::Bool(trim))]);
+        let res = t.regen();
+        let st = res.display.features.iter().find(|f| f.id == loft).unwrap();
+        let Some(want) = want else {
+            assert_eq!(st.message.as_deref(), Some("Failed to trim result body, try deselecting \"Trim ends\" option."), "{:?}", st.status);
+            continue;
+        };
+        assert_eq!(st.status, FeatureStatus::Ok, "three {three}: {:?}", st.message);
+        let body = res.context.bodies.iter().find(|b| b.kind == BodyKind::Solid).unwrap();
+        let v = total_volume(&res.context) * 1e9;
+        let bb = body.shape.bounding_box(true).unwrap();
+        assert!((v - want).abs() < 0.4, "three {three}: {v} mm³");
+        assert_eq!(body.shape.faces().len(), 16, "three {three}");
+        assert!((bb.min.z - lo).abs() < 2e-6 && (bb.max.z - hi).abs() < 2e-6, "three {three}: {bb:?}");
+        assert!((bb.max.x - 0.01).abs() < 2e-6 && (bb.max.y - 0.01).abs() < 2e-6, "three {three}: {bb:?}");
+    }
+}
+
 /// Live (d): a thin loft square 20 → Ø16 → square 20 (z 0 / 20 / 40), 1 mm, Trim ends off: the lofted surface
 /// (cubic along the loft) offset along its normals, mitred, with ruled end caps: 2584.5331 mm³, 16 faces (the profiles'
 /// offsets lofted were 2592.06).

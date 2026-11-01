@@ -224,6 +224,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   2584.533), 16 faces, live's box (±10.988936, z 0 … 40); caps 20.9437 (live 20.9449), outer faces 676.695 (live
   676.775, the creases' continuation as (b)). T1 engine::thin_loft_through_three_profiles_is_the_offset_surface_as_
   live. Left: inward walls (Flip), Trim ends through three profiles is live's error already.
+  core 11-01 16:30: inward walls (Flip wall, live 1728): Trim ends gives live's "Failed to trim result body…"; without,
+  the loft's faces are the outside and the inside is offset in, the caps ruled between: (b) 1228.098 mm³ (live
+  1228.170), (d) 2334.600 (live 2334.863), 16 faces, live's boxes (±10, z −0.192548 … 20 / −0.282954 … 40.282954). T1
+  engine::thin_loft_flipped_inside_is_the_inner_offset_as_live.
   thinLoft thickens with the first / last profiles' planes as the side faces (opThicken sideGeometryRule SUPPLIED), so
   the wall ends lie on those planes. Ours thickens the sheet with ends normal to it: the ADV2 square → Ø16 loft, Thin 1 mm
   runs z 0 … 20.29 and falls short of z 0 on its other side (main CLI, skasm-scratch/feat/thinloft.py). Two kernel

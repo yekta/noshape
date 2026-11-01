@@ -3222,9 +3222,9 @@ bool ruled_normal(const RuledFace& f, double s, double w, gp_Vec& n)
 OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, double t_inner_in, const PlaneF& p0, const PlaneF& p1, bool trim_ends)
 {
   require_non_null(sheet_in.shape, "sheet");
-  if (!(t_in > 0))
-    fail_invalid("thicken loft: the wall must grow outward");
-  if (t_inner_in < 0 || (t_inner_in > 0 && trim_ends))
+  if (!(t_in >= 0 && t_inner_in >= 0 && t_in + t_inner_in > 0))
+    fail_invalid("thicken loft: the wall needs a thickness");
+  if (t_inner_in > 0 && trim_ends)
     fail_invalid("thicken loft: an inner offset only without Trim ends");
   const bool dbg    = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
   auto       t_last = std::chrono::steady_clock::now();
@@ -3524,39 +3524,41 @@ OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, double t_inner_i
     }
     return faces;
   };
-  const std::vector<TopoDS_Face> outer = offsets(t);
+  const std::vector<TopoDS_Face> outer = t > 0 ? offsets(t) : std::vector<TopoDS_Face>();
   const std::vector<TopoDS_Face> inner = t_inner > 0 ? offsets(-t_inner) : std::vector<TopoDS_Face>();
   lap("outer faces");
   if (!trim_ends)
   {
-    // The ends: per face and profile, ruled from the profile edge (the inner offset's row) to the outer face's
-    // row there (their starts matched); neighbouring caps meet on the line from the profile's vertex (the inner
-    // mitre point) to the outer mitre point.
+    // The ends: per face and profile, ruled from the inside's row there (the profile edge, or the inner offset's
+    // row) to the outside's (the outer offset's row, or the profile edge when the wall is all inside: flipped),
+    // their starts matched; neighbouring caps meet on the line between the two sides' mitre points.
     BRepBuilderAPI_Sewing sew(1e-5);
     for (int i = 0; i < nf; ++i)
     {
       const RuledFace& f = fs[order[i]];
       sew.Add(inner.empty() ? f.face : inner[(size_t)i]);
-      sew.Add(outer[(size_t)i]);
-      const occ::handle<Geom_Surface> os = BRep_Tool::Surface(outer[(size_t)i]);
-      double                          ou0, ou1, ov0, ov1;
-      os->Bounds(ou0, ou1, ov0, ov1);
-      for (const auto& [r, v] : {std::pair{f.r0, ov0}, std::pair{f.r1, ov1}})
-      {
-        // The profile edge: the face's iso at the profile's ruling parameter (the edges' own curves carry the
-        // working scale in their location, which OCCT applies to the curve but not to its parameters).
-        occ::handle<Geom_Curve> pc = new Geom_TrimmedCurve(f.ruling_in_v ? f.s->VIso(r) : f.s->UIso(r), f.p0, f.p1);
-        if (!inner.empty())
+      sew.Add(outer.empty() ? f.face : outer[(size_t)i]);
+      // Side `faces`' row at the first (`first`) or last profile.
+      auto end_row = [&](const std::vector<TopoDS_Face>& faces, bool first) -> occ::handle<Geom_Curve> {
+        if (faces.empty())
         {
-          const occ::handle<Geom_Surface> is = BRep_Tool::Surface(inner[(size_t)i]);
-          double                          iu0, iu1, iv0, iv1;
-          is->Bounds(iu0, iu1, iv0, iv1);
-          pc = new Geom_TrimmedCurve(is->VIso(v == ov0 ? iv0 : iv1), iu0, iu1);
+          // The profile edge: the face's iso at the profile's ruling parameter (the edges' own curves carry the
+          // working scale in their location, which OCCT applies to the curve but not to its parameters).
+          const double r = first ? f.r0 : f.r1;
+          return new Geom_TrimmedCurve(f.ruling_in_v ? f.s->VIso(r) : f.s->UIso(r), f.p0, f.p1);
         }
-        occ::handle<Geom_Curve> row = new Geom_TrimmedCurve(os->VIso(v), ou0, ou1);
-        if (pc->Value(pc->FirstParameter()).Distance(row->Value(ou0)) > pc->Value(pc->LastParameter()).Distance(row->Value(ou0)))
-          pc = pc->Reversed();
-        const TopoDS_Face cap = BRepFill::Face(BRepBuilderAPI_MakeEdge(pc).Edge(), BRepBuilderAPI_MakeEdge(row).Edge());
+        const occ::handle<Geom_Surface> os = BRep_Tool::Surface(faces[(size_t)i]);
+        double                          u0, u1, v0, v1;
+        os->Bounds(u0, u1, v0, v1);
+        return new Geom_TrimmedCurve(os->VIso(first ? v0 : v1), u0, u1);
+      };
+      for (const bool first : {true, false})
+      {
+        occ::handle<Geom_Curve> in = end_row(inner, first), out = end_row(outer, first);
+        const gp_Pnt            o0 = out->Value(out->FirstParameter());
+        if (in->Value(in->FirstParameter()).Distance(o0) > in->Value(in->LastParameter()).Distance(o0))
+          in = in->Reversed();
+        const TopoDS_Face cap = BRepFill::Face(BRepBuilderAPI_MakeEdge(in).Edge(), BRepBuilderAPI_MakeEdge(out).Edge());
         if (cap.IsNull())
           fail_op("thicken loft: an end cap failed");
         sew.Add(cap);

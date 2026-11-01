@@ -504,7 +504,8 @@ pub fn draft(shape: &Shape, faces: &[Shape], pull_direction: DVec3, neutral: &Pl
 /// offsets mitred where they crease, trimmed to the profile planes `p0` / `p1` (Onshape's Thin loft with Trim
 /// ends), or (`trim_ends` false) ending at the profiles with caps ruled from each profile edge to its offset (live:
 /// the wall's ends normal to it); `t_inner` > 0 (without Trim ends only) moves the wall's inside that far in along
-/// the normals too (live's Thickness 2), the caps ruled between the two offsets. Convex lofts only (each face
+/// the normals too (live's Thickness 2), the caps ruled between the two offsets; `t` 0 with `t_inner` > 0: the wall all
+/// inside (Flip wall), the loft's faces its outside. Convex lofts only (each face
 /// within a half-turn about the profiles' axis); an error otherwise.
 pub fn thicken_loft_out(sheet: &Shape, t: f64, t_inner: f64, p0: &Plane, p1: &Plane, trim_ends: bool) -> Result<OpResult> {
     op(ffi::op_thicken_loft_out(sheet.raw(), t, t_inner, &p0.ffi(), &p1.ffi(), trim_ends))
