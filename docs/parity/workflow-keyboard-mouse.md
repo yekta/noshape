@@ -16,7 +16,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | Space | clear selection | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Delete / Backspace | delete selection | deletes a feature row (core F15 fixed) | ✅ | 0.4.10+ / dd1b5037 10-27 (Plane 1 row + Delete: gone at once; Ctrl+Z back) |
 | Ctrl+C / Ctrl+V | copy / paste | part copy → paste opens Derived (DOC3) | ✅ (CTRL-C-PART fixed) | 77870dd4 10-28 (menu Copy Part + Ctrl+V ✅; Ctrl+C on a selected part copies nothing) · verified 3f4e10d9 10-28 (TICKETS CTRL-C-PART) → corrected by live (behaviours "skasm (2026-10-31, P3 workflow-derived rows 29 / 30)" (b)): a part's Ctrl+V in a Part Studio does nothing, in an Assembly inserts it; ours the same since skasm 10-31 ✅ |
-| Shift+C | Curve/surface analysis | opens (re-uses the last entity "Face of Fillet 1") | ✅ / ? (whether live keeps the last entity: asked, REQUESTS psui 2026-11-01 01:59 (a)) | 0.4.10+ / dd1b5037 10-27 |
+| Shift+C | Curve/surface analysis | opens with the last analysed entity when nothing is selected; a selection made first replaces it (one chip) | ✅ = live 1702 (a): sticky, a fresh selection replaces it | psui 11-01 (:102 blk: Face of Extrude 1 kept; top face selected → one chip) |
 | Shift+D | Dihedral analysis | opens | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Ctrl+Shift+F, Ctrl+U | FeatureScript search, Report a bug | not offered (cloud/FS) | – | n/a: cloud (psui 11-01) |
 | a / q / k | Flip primary axis / Reorient secondary / Hide-show mate connectors (assembly) | in the Revolute dialog a flips the mated part (the pin goes through the plate), a again flips it back; q reorients the secondary axis by 90° (no visible change on a pin, the same action as the dialog's Reorient button); k hides / shows the mate connectors (handler checked) | ✅ | psui 11-01 (:102 asm5, Revolute 1 edit) |
@@ -51,7 +51,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | Shift+R | view in high quality | toggles the "Viewing in high quality. Performance can decrease. [Disable]" banner (live spec "Shift+R") | ✅ | psui 10-31 (:102 cm3) |
 | n | view normal to; second n flips | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | z / Shift+Z | zoom out / in about the view centre | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
-| f | zoom to fit | ✅ (a press during a view animation is ignored: workflow-surfaces) | ✅ / ? (live during an animation: asked, REQUESTS psui 2026-11-01 01:59 (b)) | 0.4.10+ / dd1b5037 10-27 |
+| f | zoom to fit | ✅ (a press during a view animation is ignored: workflow-surfaces); Shift+7 itself ends fitted, so f after it changes nothing | ✅ = live 1702 (b): Shift+7 ends isometric and fitted; f during or after it pixel-identical | psui 11-01 (:102 blk zoomed out: Shift+7 then f, frames identical) |
 | w | zoom to window | drag a box, the view frames it (live spec "W (zoom window)") | ✅ | psui 11-01 (:102) |
 
 ## Sketch (all checked by the highlighted tool)
