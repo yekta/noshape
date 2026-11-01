@@ -241,3 +241,35 @@ fn the_pattern_and_copy_row_menus_are_lives(cx: &mut TestAppContext) {
     })
     .unwrap();
 }
+
+/// Live 1723: Ctrl+click puts a second mate in the selection; the two have
+/// their own menu (Rename, Edit… and Animate… drop out, Clear selection
+/// comes in), and Delete takes both in one step.
+#[gpui::test]
+fn two_selected_mates_have_lives_menu(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "two-mates");
+    let sep = "—";
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let (a, b) = (face_connector(v, "Part 1 <1>", true, cx), face_connector(v, "Part 2 <1>", false, cx));
+            let (c, d) = (face_connector(v, "Part 1 <1>", false, cx), face_connector(v, "Part 2 <1>", true, cx));
+            v.edit("Insert : mates", cx, |asm| {
+                asm.mates.push(noshape_model::assembly::Mate::new(noshape_model::assembly::MateId(901), "Fastened 1".into(), MateType::Fastened, a, b));
+                asm.mates.push(noshape_model::assembly::Mate::new(noshape_model::assembly::MateId(902), "Fastened 2".into(), MateType::Fastened, c, d));
+            });
+            let ids = vec![noshape_model::assembly::MateId(901), noshape_model::assembly::MateId(902)];
+            assert_eq!(
+                labels(&v.mates_menu(ids.clone(), cx)),
+                [
+                    "Show", "Show all mates", "Isolate…", "Make transparent…", "Suppress", sep,
+                    "Clear selection", sep,
+                    "Add selection to folder…", "Expand ▸", "Collapse ▸", sep,
+                    "Delete",
+                ]
+            );
+            v.delete_mates(ids, cx);
+            assert!(v.assembly(cx).unwrap().mates.is_empty());
+        });
+    })
+    .unwrap();
+}

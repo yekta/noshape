@@ -13,7 +13,7 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 |---|---|
 | Surfaces audited | 19 |
 | Gaps found | 28 |
-| Gaps fixed | 26 |
+| Gaps fixed | 27 |
 
 ## Surfaces
 
@@ -72,4 +72,4 @@ Live requests answered: 1715 (tool options), 1716 (Flow), 1720 (exploded views /
 | G25 | P3 | Mate folder row | Rename | Hide · Hide other mates · Hide all mates · Isolate… · Make transparent… · Suppress · Dynamic suppression ▸ | Add selection to folder… · Expand ▸ · Collapse ▸ | Delete · Unpack folder | Hide and Show, "… mate connectors and mates", no Dynamic suppression, Expand / Collapse as plain items | fixed (11-01) |
 | G26 | P2 | Nested instance row (inside an expanded subassembly) | Properties… | Hide · Hide other / all instances · Isolate… · Make transparent… · Fix · Use best available tessellation | Edit in context · Add mate connector to instance origin… · Switch to … | Copy | Move to new subassembly · Export… · Release… | Zoom to selection | Create Drawing of … | Create empty subassembly | no menu | open: our hide / isolate / fix act on top-level instances only |
 | G27 | P2 | Dynamic suppression ▸ on patterns, relations and assembly mate connectors | offered | not modelled (instances, mates and folders only) | fixed (11-01): Assembly::unsuppressed_if keeps their expressions by id; evaluation suppresses them, the menus offer Dynamic suppression ▸ / Unsuppress · Edit dynamic suppression (T1 assembly dynamic_suppression_applies_to_relations) |
-| G28 | P3 | Two mates selected | Reset | Show · Show all mates · Isolate… · Make transparent… · Edit named position driver mate… · Suppress · Dynamic suppression ▸ | Clear selection | Add selection to folder… · Expand ▸ · Collapse ▸ | Delete | the clicked mate's menu | open |
+| G28 | P3 | Two mates selected | Reset | Show · Show all mates · Isolate… · Make transparent… · Edit named position driver mate… · Suppress · Dynamic suppression ▸ | Clear selection | Add selection to folder… · Expand ▸ · Collapse ▸ | Delete | the clicked mate's menu | fixed (11-01): Ctrl / Cmd+click adds mates to the selection (highlighted), their menu as live\'s, Delete removes them in one step (UI test two_selected_mates_have_lives_menu); no Dynamic suppression or driver item for several yet |

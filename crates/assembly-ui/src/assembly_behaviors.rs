@@ -260,6 +260,9 @@ pub struct AsmUi {
     /// Pattern rows a Shift+click range ran over (selected with the
     /// instances; live: "Linear pattern 1" is in the range).
     pub range_patterns: Vec<MateId>,
+    /// Mates Ctrl+clicked into the selection beside `selected_mate` (live
+    /// 1723: two selected mates have a menu of their own).
+    pub more_mates: Vec<MateId>,
     /// The face a graphics context menu was opened on (its Section view…
     /// cuts parallel to it).
     pub menu_face: Option<AsmPickTarget>,
@@ -2112,6 +2115,103 @@ impl AssemblyView {
     /// Assembly mate connector context menu.
     pub(super) fn connector_menu(&self, id: MateId, cx: &App) -> Vec<MenuEntry> {
         self.connector_menu_at(id, false, cx)
+    }
+
+    /// Several selected mates (live 1723): Reset | Show · Show all mates (or
+    /// Hide · Hide other mates · Hide all mates) · Isolate… · Make
+    /// transparent… · Suppress | Clear selection | Add selection to folder… ·
+    /// Expand ▸ · Collapse ▸ | Delete.
+    pub(super) fn mates_menu(&self, ids: Vec<MateId>, cx: &App) -> Vec<MenuEntry> {
+        let Some(asm) = self.assembly(cx) else { return vec![] };
+        let mates: Vec<Mate> = ids.iter().filter_map(|id| asm.mate(*id).cloned()).collect();
+        let movable: Vec<MateId> = mates.iter().filter(|mt| mt.mate_type.dof() > 0 && !matches!(mt.mate_type, MateType::Tangent | MateType::Width)).map(|mt| mt.id).collect();
+        let hidden = !self.show_mates || mates.iter().all(|mt| mt.hidden);
+        let suppressed = mates.iter().all(|mt| mt.suppressed);
+        let mut m = Vec::new();
+        if !movable.is_empty() {
+            m.push(item("Reset", move |t, _, cx| {
+                for id in &movable {
+                    t.reset_mate(*id, cx);
+                }
+            }));
+            m.push(MenuEntry::Sep);
+        }
+        let i1 = ids.clone();
+        if hidden {
+            m.push(icon_item("Show", "eye", move |t, _, cx| t.set_mates_hidden(i1.clone(), false, cx)));
+            m.push(item("Show all mates", |t, _, cx| t.show_all_mates(cx)));
+        } else {
+            m.push(icon_item("Hide", "eye-off", move |t, _, cx| t.set_mates_hidden(i1.clone(), true, cx)));
+            let i2 = ids.clone();
+            m.push(item("Hide other mates", move |t, _, cx| {
+                t.edit("Hide other mates", cx, |a| a.hide_other_mates(&i2));
+                t.refresh_scene(false, cx);
+            }));
+            m.push(item("Hide all mates", |t, _, cx| {
+                let ids: Vec<MateId> = t.assembly(cx).map(|a| a.mates.iter().map(|m| m.id).chain(a.groups.iter().map(|g| g.id)).collect()).unwrap_or_default();
+                t.set_mates_hidden(ids, true, cx);
+            }));
+        }
+        let mut insts: Vec<InstanceId> = Vec::new();
+        for id in &ids {
+            for i in self.mate_instances(*id, cx) {
+                if !insts.contains(&i) {
+                    insts.push(i);
+                }
+            }
+        }
+        let i2 = insts.clone();
+        m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, insts.clone(), cx)));
+        m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, i2.clone(), cx)));
+        let i3 = ids.clone();
+        m.push(item(if suppressed { "Unsuppress" } else { "Suppress" }, move |t, _, cx| {
+            t.edit("Suppress mates", cx, |a| {
+                for mm in a.mates.iter_mut().filter(|mm| i3.contains(&mm.id)) {
+                    mm.suppressed = !suppressed;
+                }
+            });
+        }));
+        m.push(MenuEntry::Sep);
+        m.push(item("Clear selection", |t, _, cx| {
+            t.clear_selection();
+            t.refresh_scene(false, cx);
+        }));
+        m.push(MenuEntry::Sep);
+        let i4 = ids.clone();
+        m.push(item("Add selection to folder…", move |t, w, cx| t.folder_from_features(i4.clone(), w, cx)));
+        let (e1, e2) = (ids.clone(), ids.clone());
+        m.push(MenuEntry::Sub {
+            label: "Expand".into(),
+            children: vec![
+                item("Expand selected", move |t, _, cx| {
+                    t.ui.expanded_mates.extend(e1.iter().copied());
+                    cx.notify();
+                }),
+                item("Expand all", |t, _, cx| {
+                    let ids: Vec<MateId> = t.assembly(cx).map(|a| a.mates.iter().map(|m| m.id).collect()).unwrap_or_default();
+                    t.ui.expanded_mates.extend(ids);
+                    cx.notify();
+                }),
+            ],
+        });
+        m.push(MenuEntry::Sub {
+            label: "Collapse".into(),
+            children: vec![
+                item("Collapse selected", move |t, _, cx| {
+                    for id in &e2 {
+                        t.ui.expanded_mates.remove(id);
+                    }
+                    cx.notify();
+                }),
+                item("Collapse all", |t, _, cx| {
+                    t.ui.expanded_mates.clear();
+                    cx.notify();
+                }),
+            ],
+        });
+        m.push(MenuEntry::Sep);
+        m.push(icon_item("Delete", "delete", move |t, _, cx| t.delete_mates(ids.clone(), cx)));
+        m
     }
 
     /// "Create Drawing of <assembly>…" of the graphics menus.

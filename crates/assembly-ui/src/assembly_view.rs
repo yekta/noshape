@@ -1618,6 +1618,18 @@ impl AssemblyView {
         }
     }
 
+    /// Delete several mates in one step.
+    pub(super) fn delete_mates(&mut self, ids: Vec<MateId>, cx: &mut Context<Self>) {
+        let desc = format!("Delete {} items", ids.len());
+        self.edit(&desc, cx, |a| {
+            for id in &ids {
+                noshape_ops::assembly::delete_mate(a, *id);
+            }
+        });
+        self.selected_mate = None;
+        self.ui.more_mates.clear();
+    }
+
     fn toggle_mate_suppressed(&mut self, id: MateId, cx: &mut Context<Self>) {
         let values = self.ui.config_values.clone();
         self.edit("Suppress mate", cx, |a| noshape_ops::assembly::toggle_mate_suppressed(a, id, &values));
@@ -3013,6 +3025,7 @@ impl AssemblyView {
         self.selected.clear();
         self.ui.range_patterns.clear();
         self.selected_mate = None;
+        self.ui.more_mates.clear();
         self.ui.entity_sel.clear();
         self.update_entity_measure();
         self.triad = None;
@@ -3689,7 +3702,9 @@ impl AssemblyView {
     fn feature_row(&self, f: FeatureRow, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let FeatureRow { id, icon, name, ok, inactive, message, has_limits, hidden, tooltip, implicit } = f;
-        let selected = self.selected_mate == Some(id);
+        // The added mates only count beside a selected one (other clicks
+        // clear `selected_mate` alone).
+        let selected = self.selected_mate == Some(id) || (self.selected_mate.is_some() && self.ui.more_mates.contains(&id));
         let accent = pal.accent;
         let dim = hidden == Some(true);
         let color = feature_row_color(inactive, ok, dim);
@@ -3797,7 +3812,18 @@ impl AssemblyView {
                     this.open_dof_chooser(cx);
                     return;
                 }
-                this.selected_mate = if this.selected_mate == Some(id) { None } else { Some(id) };
+                // Ctrl / Cmd+click adds a mate to the selection (or takes it out).
+                let m = ev.modifiers();
+                if (m.control || m.platform) && this.selected_mate.is_some_and(|s| s != id) {
+                    if let Some(i) = this.ui.more_mates.iter().position(|x| *x == id) {
+                        this.ui.more_mates.remove(i);
+                    } else {
+                        this.ui.more_mates.push(id);
+                    }
+                } else {
+                    this.ui.more_mates.clear();
+                    this.selected_mate = if this.selected_mate == Some(id) { None } else { Some(id) };
+                }
                 this.selected.clear();
                 this.refresh_scene(false, cx);
                 cx.notify();
@@ -3805,7 +3831,9 @@ impl AssemblyView {
         let view = cx.entity();
         let main = row
             .os_context_menu(move |menu, window, cx| {
-                let entries = view.read(cx).mate_menu(id, cx);
+                let v = view.read(cx);
+                let many: Vec<MateId> = v.selected_mate.into_iter().flat_map(|s| std::iter::once(s).chain(v.ui.more_mates.iter().copied())).collect();
+                let entries = if many.len() > 1 && many.contains(&id) { v.mates_menu(many, cx) } else { v.mate_menu(id, cx) };
                 fill_menu(menu, entries, view.clone(), window, cx)
             })
             .into_any_element();
@@ -6068,7 +6096,10 @@ impl AssemblyView {
                 cx.notify();
             }))
             .on_action(cx.listener(|this, _: &DeleteSelection, _, cx| {
-                if let Some(m) = this.selected_mate {
+                if this.selected_mate.is_some() && !this.ui.more_mates.is_empty() {
+                    let ids: Vec<MateId> = this.selected_mate.into_iter().chain(this.ui.more_mates.iter().copied()).collect();
+                    this.delete_mates(ids, cx);
+                } else if let Some(m) = this.selected_mate {
                     this.delete_mate(m, cx);
                 } else {
                     let ids = this.selected.clone();
