@@ -91,8 +91,14 @@ discovery probe is a 300 ms localhost connect) and passed on the re-run and loca
 
 ## Open
 
-- Windows: a terminal prompt doesn't wait for the GUI-subsystem exe (see above). A `noshape.com` console shim next to
-  the exe would fix it at the cost of a second (tiny) binary; not done (one binary was the requirement).
-- The installer doesn't disconnect agents on uninstall (an entry may then point at a removed exe; `noshape agents
-  connect` from a new install updates it).
+- ~~Windows terminal prompt doesn't wait~~ done 11-01 (cde0386e): noshape.com (crates/launcher, std only) beside
+  noshape.exe in the installer and the zip; terminals run it for `noshape` (.com before .exe), it runs noshape.exe with
+  the terminal's handles and waits (exit code passed on); a document / --demo / no argument opens the app without
+  waiting (and without passing its handles on, else a pipe reader waits for the window). noshape.exe joins the
+  parent's console first. Dry run 41289774607 checks cmd, pwsh and Windows PowerShell (.github/release/check_terminal.ps1).
+- ~~Uninstall leaves agents connected~~ done 11-01 (43b1ccdd): `agents disconnect --command <binary>` removes only
+  that binary's entries; the Windows uninstaller ([UninstallRun]) and `install.sh --uninstall` run it.
+- ~~ops live test flaky under load~~ done 11-01 (7a8d1dd4): discovery files are renamed into place and stale only when
+  the app's process is gone or its port refuses; T1 `live::servers_starting_together_stay_discoverable_and_stale_files_go`
+  failed 3 of 6 runs on the old code.
 - macOS and Windows builds aren't notarized/signed beyond ad hoc.
