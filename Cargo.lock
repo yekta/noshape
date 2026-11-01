@@ -4667,6 +4667,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "noshape-launcher"
+version = "0.0.0-dev"
+
+[[package]]
 name = "noshape-model"
 version = "0.0.0-dev"
 dependencies = [

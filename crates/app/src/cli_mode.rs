@@ -32,9 +32,11 @@ pub fn reopen_as_bundle(args: &[OsString]) -> bool {
 }
 
 /// Windows: the release app is a GUI-subsystem program, so it has no console
-/// of its own. The standard handles a caller passes (an MCP client's pipes, a
-/// redirect to a file) are used as they are; the missing ones write to the
-/// console of the terminal it was started from.
+/// of its own. It joins the console of the program that started it (the
+/// terminal, or noshape.com, the console launcher a terminal runs for
+/// `noshape`, whose console handles it inherits). The standard handles a
+/// caller passes (an MCP client's pipes, a redirect to a file) are used as
+/// they are; the missing ones write to that console.
 #[cfg(windows)]
 mod console {
     use std::ffi::c_void;
@@ -62,10 +64,11 @@ mod console {
     }
 
     pub fn attach() {
-        let missing: Vec<u32> = STD_HANDLES.into_iter().filter(|id| !usable(unsafe { GetStdHandle(*id) })).collect();
-        if missing.is_empty() || unsafe { AttachConsole(ATTACH_PARENT_PROCESS) } == 0 {
+        // Fails harmlessly when the parent has no console (an MCP client started from the desktop).
+        if unsafe { AttachConsole(ATTACH_PARENT_PROCESS) } == 0 {
             return;
         }
+        let missing: Vec<u32> = STD_HANDLES.into_iter().filter(|id| !usable(unsafe { GetStdHandle(*id) })).collect();
         for id in missing {
             let name: Vec<u16> = if id == STD_HANDLES[0] { "CONIN$" } else { "CONOUT$" }.encode_utf16().chain([0]).collect();
             let h = unsafe { CreateFileW(name.as_ptr(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ_WRITE, std::ptr::null_mut(), OPEN_EXISTING, 0, std::ptr::null_mut()) };

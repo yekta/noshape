@@ -89,8 +89,9 @@ jobs:
           key: occt-V8_0_1
 
       - name: Build (release)
-        # The app (which is also the CLI and the MCP server: `noshape mcp`) and the headless CLI for servers.
-        run: cargo build --release --locked -p noshape -p noshape-cli
+        # The app (which is also the CLI and the MCP server: `noshape mcp`), the headless CLI for servers, and (Windows)
+        # noshape.com, the console launcher terminals run for `noshape`.
+        run: cargo build --release --locked -p noshape -p noshape-cli -p noshape-launcher
 
       - name: Bundle (macOS .app in .dmg)
         if: runner.os == 'macOS'
@@ -144,6 +145,7 @@ jobs:
           $d = "noshape-$env:VERSION-${{ matrix.asset }}"
           New-Item -ItemType Directory -Force -Path $d | Out-Null
           Copy-Item target/release/noshape.exe, README.md $d
+          Copy-Item target/release/noshape-launcher.exe "$d/noshape.com"
           Compress-Archive -Path $d -DestinationPath "out/$d.zip"
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
@@ -261,7 +263,7 @@ jobs:
           tar xzf dl/noshape-cli-*-macos-arm64.tar.gz -C "$RUNNER_TEMP"
           python3 $check "$(ls "$RUNNER_TEMP"/noshape-cli-*/noshape-cli)" noshape-cli
 
-      - name: Windows (installer, PATH, uninstall, zip, CLI-only)
+      - name: Windows (installer, PATH, terminal launcher, uninstall, zip, CLI-only)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -274,17 +276,15 @@ jobs:
           if (-not (Test-Path "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\noshape.lnk")) { throw "no Start menu entry" }
           $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
           if (($userPath -split ';') -notcontains $dir) { throw "$dir not on the user PATH: $userPath" }
-          # A new terminal's PATH: `noshape` resolves to the installed exe.
+          # A new terminal's PATH: `noshape` is the console launcher; typed commands print before the next prompt.
           $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + $userPath
-          $found = (Get-Command noshape).Source
-          if ($found -ne "$dir\noshape.exe") { throw "noshape resolves to $found" }
+          & .github/release/check_terminal.ps1 $dir
+          if ($LASTEXITCODE -ne 0) { throw "terminal check failed" }
           python $check noshape
           if ($LASTEXITCODE -ne 0) { throw "check failed" }
-          # The GUI-subsystem exe prints into a redirect from cmd and into PowerShell's pipe.
-          cmd /c "noshape --version > `"$env:RUNNER_TEMP\v.txt`""
-          if (-not ((Get-Content "$env:RUNNER_TEMP\v.txt") -match '^noshape ')) { throw "cmd redirect: $(Get-Content "$env:RUNNER_TEMP\v.txt")" }
-          $v = noshape --version | Out-String
-          if ($v -notmatch '^noshape ') { throw "pipe: $v" }
+          # MCP through the launcher too (a client that resolves `noshape` as cmd does).
+          python $check "$dir\noshape.com"
+          if ($LASTEXITCODE -ne 0) { throw "launcher MCP check failed" }
           # Uninstall: the files and the PATH entry go.
           $u = Start-Process "$dir\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
           if ($u.ExitCode -ne 0) { throw "uninstall exit $($u.ExitCode)" }

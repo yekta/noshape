@@ -1,8 +1,9 @@
 ; noshape's Windows installer (Inno Setup 6), built by .github/workflows/release.yml:
 ;   iscc /DVersion=<version> /DSource=<folder with noshape.exe> /DOutput=<folder> packaging\windows\noshape.iss
-; Installs noshape.exe (the app, the CLI and the MCP server `noshape mcp`) to Program Files, adds a Start menu entry,
-; puts the install folder on the user's PATH (removed on uninstall) and, on the finish page, offers to connect noshape
-; to the coding agents found (`noshape agents connect`: Claude Code, Codex CLI, Claude Desktop).
+; Installs noshape.exe (the app, the CLI and the MCP server `noshape mcp`) and noshape.com (its console launcher) to
+; Program Files, adds a Start menu entry, puts the install folder on the user's PATH and, on the finish page, offers to
+; connect noshape to the coding agents found (`noshape agents connect`: Claude Code, Codex CLI, Claude Desktop).
+; Uninstalling takes the folder off PATH.
 
 #ifndef Version
   #define Version "0.0.0"
@@ -38,6 +39,9 @@ WizardStyle=modern
 
 [Files]
 Source: "{#Source}\noshape.exe"; DestDir: "{app}"; Flags: ignoreversion
+; The console launcher a terminal runs for `noshape` (.com before .exe): it waits for noshape.exe, so commands print
+; before the prompt returns (crates/launcher). The Start menu and file opens use noshape.exe (no console).
+Source: "{#Source}\noshape-launcher.exe"; DestDir: "{app}"; DestName: "noshape.com"; Flags: ignoreversion
 Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]

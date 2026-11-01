@@ -1,0 +1,13 @@
+[package]
+name = "noshape-launcher"
+description = "noshape.com on Windows: runs noshape.exe in the terminal that started it and waits for it"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+# std only, and not in workspace-hack (.config/hakari.toml): a few hundred KB that builds in seconds.
+[[bin]]
+name = "noshape-launcher"
+path = "src/main.rs"
