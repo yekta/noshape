@@ -2335,7 +2335,13 @@ impl Workspace {
                 _ => None,
             })
             .collect();
-        let dialog = cx.new(|cx| CreateDrawingDialog::new(req, default_name, metric, dwts, window, cx));
+        // A Part Studio with MBD data (Model definitions) gets the dialog's note.
+        let mbd = req.source.as_ref().and_then(|s| doc.tab(s.tab)).is_some_and(|t| matches!(&t.content, noshape_model::document::TabContent::PartStudio(ps) if !ps.annotations.is_empty()));
+        let dialog = cx.new(|cx| {
+            let mut d = CreateDrawingDialog::new(req, default_name, metric, dwts, window, cx);
+            d.mbd = mbd;
+            d
+        });
         // The other documents' DWTs (live 1627: "Created by me" lists the
         // DWTs exported from every document), read in the background.
         let here = self.doc.read(cx).session.path.clone();

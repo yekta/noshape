@@ -730,6 +730,7 @@ impl StartView {
         crate::file_dialogs::request_open_path("Import files", "All files", &["*"], window, cx, move |path, cx| {
             let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
             let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+            let file = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
             let result = if ext == lib::EXT {
                 crate::start_hooks::open_document_window(path, None, gpu, cx)
             } else {
@@ -770,6 +771,13 @@ impl StartView {
                     crate::start_hooks::open_document_window(target, Some(doc), gpu, cx)
                 })()
             };
+            // Live: the import's result in the Notifications bell (EX11).
+            if ext != lib::EXT {
+                match &result {
+                    Ok(_) => crate::notifications::push(cx, format!("Import {file}"), format!("Uploaded · Translated · Post-processing done · Created {file}"), false),
+                    Err(e) => crate::notifications::push(cx, format!("Import {file} failed"), format!("{e:#}"), true),
+                }
+            }
             if let Err(e) = result {
                 let msg = format!("Import failed: {e:#}");
                 cx.defer(move |cx| {

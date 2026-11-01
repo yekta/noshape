@@ -103,7 +103,13 @@ pub fn panel(on_close: impl Fn(&mut Window, &mut App) + 'static, cx: &App) -> An
                         .child(div().flex_1().min_w_0().truncate().text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(pal.text).child(crate::ui::user_text(n.title.clone())))
                         .child(div().flex_none().text_size(px(11.)).text_color(pal.text_muted).child(time_label(n.time, now))),
                 )
-                .when(n.open, |d| d.child(div().pl(px(28.)).text_size(px(13.)).text_color(pal.text).child(crate::ui::user_text(n.body.clone()))))
+                // An import's steps (" · " apart) are rows with a green ✓ (live).
+                .when(n.open && n.body.contains(" · "), |d| {
+                    d.children(n.body.split(" · ").map(|step| {
+                        h_flex().pl(px(28.)).gap(px(6.)).text_size(px(13.)).text_color(pal.text).child(div().text_color(gpui_kit::rgb(0x2e8b3a)).font_weight(FontWeight::BOLD).child("✓")).child(crate::ui::user_text(step.to_string()))
+                    }))
+                })
+                .when(n.open && !n.body.contains(" · "), |d| d.child(div().pl(px(28.)).text_size(px(13.)).text_color(pal.text).child(crate::ui::user_text(n.body.clone()))))
                 .on_click(move |_, _, cx| {
                     update(cx, |s| {
                         if let Some(i) = s.items.iter_mut().find(|i| i.id == id) {

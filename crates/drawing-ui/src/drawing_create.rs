@@ -107,6 +107,9 @@ pub struct CreateDrawingDialog {
     custom: bool,
     ct: CustomTemplate,
     suggested: bool,
+    /// The source has MBD data: the options say Suggested views keeps only
+    /// the views it needs (live dialog text).
+    pub mbd: bool,
     pub focus: FocusHandle,
     /// Template list scrolling (the preselected template is scrolled into view).
     list_scroll: ScrollHandle,
@@ -161,6 +164,7 @@ impl CreateDrawingDialog {
             ct: CustomTemplate::new(metric),
             // Onshape preselects "No views" (the first view follows the cursor).
             suggested: false,
+            mbd: false,
             focus: cx.focus_handle(),
             list_scroll: {
                 // Item 0 is the header row.
@@ -534,6 +538,8 @@ impl Render for CreateDrawingDialog {
                 // Live dom/dialog-create-drawing: the 55x40 art at 1.15 px/unit (65x46 box).
                 .child(div().mb(px(-3.)).child(crate::assets::icon(&crate::assets::icon_path(icon), 63.25, cx)))
                 .child(label)
+                // Live dialog-create-drawing: the options' tooltips.
+                .tooltip(crate::ui::tooltip(if value { "Drawing will automatically have recommended views" } else { "Drawing will be empty, ready for views to be added manually" }))
                 .when(enabled, |d| {
                     d.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         this.suggested = value;
@@ -594,6 +600,7 @@ impl Render for CreateDrawingDialog {
                             .child(option("cd-suggested", "Suggested views", suggested, has_source, "drawing-suggested-views", cx, true))
                             .child(option("cd-noviews", "No views", !suggested, true, "drawing-no-views", cx, false)),
                     )
+                    .when(self.mbd, |d| d.child(div().px(px(15.)).pb_2().text_size(px(12.)).text_color(pal.text_muted).child("Suggested views provide only necessary views when MBD data is present.")))
                     .child(
                         h_flex()
                             .h(px(56.))
