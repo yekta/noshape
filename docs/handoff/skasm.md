@@ -487,15 +487,15 @@ sketch: `-p noshape-scene --test all sketch_perf::s300 -- --ignored --nocapture`
   stack's top pin (solve + scene retransform per pointer move), insert a pin; sketch: open for edit (solve with DOF,
   regions, regeneration), change a dimension, drag a corner, add a dimension.
 
-Numbers on vibe3 (release, 3 runs, medians), before → after (5bde395b solver, 6a4959bc connector frames):
+Numbers on vibe3 (release, 3 runs, medians), before (2f715f2d) → after (7e269c42: solver, connector frames, drag step):
 | | a200 | a1000 |
 |---|---|---|
-| open: first evaluation | 105 → 78 ms | 327 → 243 ms |
-| evaluate again | 32 → 6.5 ms | 106 → 37 ms |
-| regenerate | **621 → 220 ms** | **3693 → 1247 ms** |
-| add a mate | 42 → 16 ms | 120 → 51 ms |
-| drag frame | 2.1 ms (483 fps) | 20.7 ms (48 fps) |
-| insert a pin | 33 → 6.6 ms | 107 → 37 ms |
+| open: first evaluation | 105 → 78 ms | 327 → 237 ms |
+| evaluate again | 32 → 6.1 ms | 106 → 24 ms |
+| regenerate | **621 → 216 ms** | **3693 → 1252 ms** |
+| add a mate | 42 → 15 ms | 120 → 37 ms |
+| drag frame | 2.1 → 1.4 ms (723 fps) | **20.7 → 8.2 ms (48 → 123 fps)** |
+| insert a pin | 33 → 6.1 ms | 107 → 24 ms |
 S300 (vibe4, loaded): open for edit 4.4 ms, change a dimension 3.5 ms, drag step 3.2 ms (≈ 300 fps), add a dimension 3.4 ms.
 Live: asked (REQUESTS 18:30, scripting allowed); the old figures (request 1501): an assembly drag step ≈ 1.2 s at 200
 instances, insert 1.3–2.2 s, sketch drag ≈ 400 ms a step at 188 entities.
@@ -512,15 +512,18 @@ Fixes so far (5bde395b / 34aa527a):
 6. Mate connector frames kept by the evaluator across evaluations (by the part's regeneration `Arc`, held so its
    address stays its own; dropped when nothing else holds it, all of them when the units change): an unchanged a1000
    evaluation spent a quarter of its time integrating the same face centroids (OCCT BRepGProp).
-7. The bench folds nested positions as the app does (`ops::assembly::fold_solved`); without it every evaluation
+7. `orient_axial_mates` (run before every solve) copied every body's pose for every mate: one list kept in step
+   (a1000: 5 of 7 ms of a drag step, and part of every evaluation).
+8. The bench folds nested positions as the app does (`ops::assembly::fold_solved`); without it every evaluation
    re-solved each flexible subassembly from its unsolved start.
 Tried and dropped: one SVD instead of the eigendecomposition + SVD per `least_change` round (changes which directions
 count as free near the threshold: the live oracle failed).
 
-Next (biggest first): a1000's regenerate (1.3 s) is now `least_change` converging slowly (×0.66 a round, all 12
-rounds) on the 40 stack groups after their heights change; its drag frame (20 ms on vibe3) is the per-step whole-assembly
-work (stays for every body, all 2380 mates' residuals and status) plus the dragged group's Jacobian; the first
-evaluation (310 ms). Live's numbers decide which matters most.
+Next (biggest first): a1000's regenerate (1.25 s) is `least_change` converging only ×0.66 a round (all 12 rounds) on
+the 40 stack groups after their heights change (its comment expects ~10×; apply_delta and the pull-back agree to first
+order, so the cause is elsewhere: null-space tolerance or the skipped bodies; a fix changes results in the last
+digits); the drag step's remaining whole-assembly passes (two solve_inner over all 2380 mates' residuals and status);
+the first evaluation (237 ms). Live's numbers decide which matters most.
 
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
