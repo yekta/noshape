@@ -816,3 +816,32 @@ fn a_full_round_is_one_face_as_lives() {
         assert_eq!((res.shape.faces().len(), cylinders(&res.shape)), (faces, cyl), "R{r}");
     }
 }
+
+/// noshape's own rolling-ball corners (a top loop R over vertical corner rounds Rc < R, live G24 / G25): the same
+/// counts and volume as OCCT's fillet with its corner patches replaced by the exact face (vertex_blends_match_onshape
+/// holds those to live), valid. The corpus's twelve "an arc the blend closes up" cases are these.
+#[test]
+fn rust_rolling_ball_corners_are_occts() {
+    setup();
+    for (h, rc, r) in [(10.0, 3.0, 6.0), (10.0, 2.0, 4.0), (10.0, 1.0, 4.0), (12.0, 3.0, 8.0), (10.0, 3.0, 3.5), (10.0, 3.0, 4.0)] {
+        let b = bx([0.0; 3], [40.0, 20.0, h]);
+        let v = edges_where(&b, |i| (i.start.z - i.end.z).abs() > 1e-9);
+        set_rust_blend(Some(false));
+        let s = fillet_checked(&b, &v, &[rc * MM]).unwrap().shape;
+        let top = edges_where(&s, |i| i.start.z > (h - 0.01) * MM && i.end.z > (h - 0.01) * MM);
+        let occt = fillet_checked(&s, &top, &[r * MM]).unwrap();
+        set_rust_blend(Some(true));
+        reset_blend_decline();
+        let ours = fillet_checked(&s, &top, &[r * MM]);
+        set_rust_blend(None);
+        let why = last_blend_decline();
+        let ours = ours.unwrap_or_else(|e| panic!("H{h} Rc{rc} R{r}: {e} ({why})"));
+        assert_eq!(why, "", "H{h} Rc{rc} R{r}: declined");
+        assert!(ours.shape.is_valid(), "H{h} Rc{rc} R{r}: invalid");
+        let (vo, vu) = (vol_mm3(&occt.shape), vol_mm3(&ours.shape));
+        assert!((vo - vu).abs() < 1e-7 * vo, "H{h} Rc{rc} R{r}: {vu} vs OCCT's {vo}");
+        for k in [ShapeType::Face, ShapeType::Edge, ShapeType::Vertex] {
+            assert_eq!(ours.shape.count(k), occt.shape.count(k), "H{h} Rc{rc} R{r}: {k:?}");
+        }
+    }
+}

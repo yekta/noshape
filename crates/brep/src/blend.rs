@@ -12,6 +12,8 @@
 //! blended edge Generated its blend face, the shortened edges Modified to their pieces.
 
 use crate::{Body, Curve, Decline, Edge, Face, Kind, Origin, Output, Record, Relation, Solid, Surface, Use};
+
+mod corner;
 use glam::DVec3;
 
 /// A blend of one edge.
@@ -338,6 +340,10 @@ struct Chain {
     /// blend face is a sphere (a fillet) or a cone with its apex on P (a chamfer) about the centre, P keeps a
     /// corner there (live request 1646: a block's top loop blended at its vertical fillets' radius).
     closes: Vec<bool>,
+    /// Per link: a closing arc past its centre (a fillet R over a corner round Rc < R, square walls, lines on both
+    /// sides): P's corner where its neighbours' offsets meet, its blend face the rolling-ball corner
+    /// ([`corner::RollCorner`], live G24 / G25).
+    past: Vec<bool>,
 }
 
 impl Chain {
@@ -609,7 +615,8 @@ fn chain(
     }
     let corner = vec![false; verts.len()];
     let closes = vec![false; links.len()];
-    let mut c = Chain { face: f, links, verts, corner, closed, ends: [None, None], d1, d2, centre, sigma, closes };
+    let past = vec![false; links.len()];
+    let mut c = Chain { face: f, links, verts, corner, closed, ends: [None, None], d1, d2, centre, sigma, closes, past };
     // Corners: where two links (lines) meet at an angle. A fillet's two cylinders meet along an ellipse in the
     // corner's bisector plane only with walls square to P.
     for j in 0..c.verts.len() {
@@ -642,6 +649,24 @@ fn chain(
             let j1 = if c.closed { (i + 1) % c.k() } else { i + 1 };
             if (radius + into_p * d1).abs() <= margin && into_p < 0.0 && between && !c.corner[i] && !c.corner[j1] {
                 closes[i] = true;
+                continue;
+            }
+            // Past its centre: a convex fillet over a smaller corner round, lines on both sides.
+            let line = |l: usize| matches!(b.edges[c.links[l].edge as usize].curve, Curve::Line);
+            let (prev, next) = (if i == 0 { c.k() - 1 } else { i - 1 }, j1 % c.k());
+            if radius + into_p * d1 < -margin
+                && into_p < 0.0
+                && between
+                && !c.corner[i]
+                && !c.corner[j1]
+                && matches!(x.spec, Spec::Fillet { .. })
+                && c.sigma > 0.0
+                && (c.d1 - c.d2).abs() <= margin
+                && line(prev)
+                && line(next)
+            {
+                closes[i] = true;
+                c.past[i] = true;
                 continue;
             }
             if radius + into_p * d1 <= 100.0 * margin {
@@ -809,9 +834,43 @@ fn down_edges(b: &Body, c: &Chain, ve: &[Vec<u32>], margin: f64) -> Result<Vec<O
 /// chamfer is the chord), so within the larger of them; a closing arc's sphere or cone also round its centre; at
 /// the chain's ends a cap at an angle moves it on along the line (`ext`).
 fn extent(c: &Chain, i: usize) -> f64 {
-    let r = if c.closes.iter().any(|&x| x) { c.d1.max(c.d2).max(c.centre) } else { c.d1.max(c.d2) };
+    // (A rolling-ball corner stays within R of its arc: R below it at the walls, its point on P closer.)
+    let r = if c.closes.iter().zip(&c.past).any(|(&x, &p)| x && !p) { c.d1.max(c.d2).max(c.centre) } else { c.d1.max(c.d2) };
     let end = |side: usize| c.ends[side].filter(|e| e.corner.is_none()).map_or(0.0, |e| e.ext);
     r + if i == 0 { end(0) } else { 0.0 }.max(if i + 1 == c.k() { end(1) } else { 0.0 })
+}
+
+/// Where link `i`'s blend lies, when it is a rolling-ball corner: its face lies in the box of its arc's ends, P's
+/// corner, and those ends R down the walls (the sections bulge towards the part's corner, inside it).
+fn corner_box(b: &Body, c: &Chain, i: usize) -> Result<Option<(DVec3, DVec3)>, Decline> {
+    if !c.past[i] {
+        return Ok(None);
+    }
+    let (rc, v) = roll_corner(b, c, i)?;
+    let j = if c.closed { (i + 1) % c.k() } else { i + 1 };
+    let (pi, pj) = (b.vertices[c.verts[i] as usize], b.vertices[c.verts[j] as usize]);
+    let t = c.links[i].t * rc.r;
+    let pts = [pi, pj, v, pi + t, pj + t];
+    let lo = pts.iter().fold(DVec3::splat(f64::INFINITY), |m, p| m.min(*p));
+    let hi = pts.iter().fold(DVec3::splat(f64::NEG_INFINITY), |m, p| m.max(*p));
+    Ok(Some((lo, hi)))
+}
+
+/// Links `i` of `c` and `j` of `o` clear of each other by boxes, when either is a rolling-ball corner (its box; the
+/// other's its edge's box grown by its reach); false otherwise (left to the distance test).
+fn apart_boxes(b: &Body, boxes: &[(DVec3, DVec3)], c: &Chain, i: usize, o: &Chain, j: usize) -> Result<bool, Decline> {
+    let (bx, by) = (corner_box(b, c, i)?, corner_box(b, o, j)?);
+    if bx.is_none() && by.is_none() {
+        return Ok(false);
+    }
+    let grown = |ch: &Chain, k: usize| {
+        let (lo, hi) = boxes[ch.links[k].edge as usize];
+        let r = extent(ch, k);
+        (lo - DVec3::splat(r), hi + DVec3::splat(r))
+    };
+    let (x, y) = (bx.unwrap_or_else(|| grown(c, i)), by.unwrap_or_else(|| grown(o, j)));
+    let pad = 1e-9 * (x.1 - x.0).length().max((y.1 - y.0).length());
+    Ok((x.0 - y.1).max_element() > pad || (y.0 - x.1).max_element() > pad)
 }
 
 /// The blend's strips on P, the walls and the caps are clear of every other edge of those faces, and of any
@@ -895,7 +954,7 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
             if (j == i + 2 && c.closes[i + 1]) || (c.closed && i + k == j + 2 && c.closes[(j + 1) % k]) {
                 continue;
             }
-            if !far(c.links[i].edge, c.links[j].edge, extent(c, i) + extent(c, j))? {
+            if !apart_boxes(b, boxes, c, i, c, j)? && !far(c.links[i].edge, c.links[j].edge, extent(c, i) + extent(c, j))? {
                 return no("a chain whose blend meets itself");
             }
         }
@@ -910,7 +969,7 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
                 if corner_vs.iter().any(|v| ex.v.contains(v) && ey.v.contains(v)) {
                     continue;
                 }
-                if !far(x.edge, y.edge, extent(c, i) + extent(o, j))? {
+                if !apart_boxes(b, boxes, c, i, o, j)? && !far(x.edge, y.edge, extent(c, i) + extent(o, j))? {
                     return no("two chains' blends close");
                 }
             }
@@ -948,6 +1007,19 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorn
     for c in chains {
         let k = c.k();
         let downs = down_edges(body, c, ve, margin)?;
+        // Each arc closed past its centre: its rolling-ball corner and P's corner point there.
+        let mut rolls: Vec<Option<(corner::RollCorner, DVec3)>> = vec![None; k];
+        for i in (0..k).filter(|&i| c.past[i]) {
+            rolls[i] = Some(roll_corner(body, c, i)?);
+        }
+        // At a vertex: the corner it starts (side 1) or ends (side 2).
+        let roll_at = |j: usize| -> Option<(corner::RollCorner, DVec3, u8)> {
+            if j < k && let Some((rc, v)) = rolls[j] {
+                return Some((rc, v, 1));
+            }
+            let i = if j == 0 { if c.closed { k - 1 } else { return None } } else { j - 1 };
+            rolls[i].map(|(rc, v)| (rc, v, 2))
+        };
         // At each vertex: a vertex on P (v1), one on the walls (v2), the cross-section edge between.
         let (mut v1, mut v2, mut cross) = (Vec::new(), Vec::new(), Vec::new());
         for (j, &v) in c.verts.iter().enumerate() {
@@ -977,6 +1049,9 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorn
                 (None, Some(s)) => (p + w, p + s * (c.d2 / s.dot(x.t))),
                 (None, None) => (p + w, p + x.t * c.d2),
             };
+            // (At a rolling-ball corner: P's point is the corner's.)
+            let roll = roll_at(j);
+            let p1 = roll.map_or(p1, |(_, v, _)| v);
             // A cap at an angle to the line: its normal and the line's direction.
             let oblique = end.filter(|e| e.corner.is_none()).and_then(|end| {
                 let nc = plane_normal(&body.faces[end.cap as usize])?;
@@ -1002,6 +1077,13 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorn
             v2.push(i2);
             dead_v[v as usize] = true;
             let curve = match x.spec {
+                // The rolling-ball corner's side: an ellipse on the cylinder, from P's corner to the wall.
+                Spec::Fillet { .. } if roll.is_some() => {
+                    let (rc, _, side) = roll.unwrap();
+                    let (center, xdir, normal, major, minor) = rc.side(side);
+                    let n2 = (u32::MAX, u32::MAX);
+                    Curve::Ellipse { center, normal, xdir, major, minor, faces: [n2, n2] }
+                }
                 Spec::Fillet { radius } if c.corner[j] && turn.is_some() => {
                     // The two cylinders' axes meet in the plane the walls are mirror images in (P's normal and
                     // the corner's bisector): their section there an ellipse about that point, its minor axis R
@@ -1136,6 +1218,17 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorn
                     Use { edge: pole, reversed: false },
                 ];
                 let Curve::Circle { center, .. } = e.curve else { return no("a closing link not an arc") };
+                if let Some((rc, _)) = rolls[i] {
+                    // The rolling-ball corner: a NURBS face over (spine angle, arc), outward away from the ball.
+                    let tol = rc.r * 2.5e-8;
+                    let Some(s) = [64, 128, 256].into_iter().find_map(|n| rc.surface(n, tol)) else { return no("a rolling-ball corner not fitted") };
+                    let [p, du, dv, ..] = s.derivs(std::f64::consts::FRAC_PI_4, 0.5);
+                    let reversed = du.cross(dv).dot(p - rc.spine(std::f64::consts::FRAC_PI_4)) < 0.0;
+                    b.nurbs_surfaces.push(s);
+                    let surface = Surface::Nurbs { index: b.nurbs_surfaces.len() as u32 - 1 };
+                    new_faces.push((x.edge, Face { surface, reversed, loops: vec![lp] }));
+                    continue;
+                }
                 let surface = closing_surface(body, c, x, &e)?;
                 let probe = match x.spec {
                     Spec::Fillet { radius } => {
@@ -1305,6 +1398,44 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorn
     let solid_origin = vec![Origin::Piece { arg: 0, index: 0 }];
     let _ = Solid::default();
     Ok(Output { body: b, vertex_origin: vo, edge_origin: eo, face_origin, solid_origin, face_u0, edge_section, edge_apex: Vec::new(), face_internal: Vec::new(), history })
+}
+
+/// Arc link `i` of `c` closed past its centre: its rolling-ball corner (the two neighbouring lines' cylinders' axes
+/// meeting under P's corner) and P's corner, where the neighbours' offsets into P meet.
+fn roll_corner(b: &Body, c: &Chain, i: usize) -> Result<(corner::RollCorner, DVec3), Decline> {
+    let k = c.k();
+    let x = &c.links[i];
+    let (prev, next) = (if i == 0 { k - 1 } else { i - 1 }, (i + 1) % k);
+    let j = if c.closed { (i + 1) % k } else { i + 1 };
+    let (Curve::Circle { center, radius: rc, .. }, Spec::Fillet { radius: r }) = (b.edges[x.edge as usize].curve, x.spec) else { return no("a rolling-ball corner not a fillet over an arc") };
+    let Some(np) = plane_normal(&b.faces[c.face as usize]) else { return no("a rolling-ball corner off P") };
+    let dir = |l: &Link| {
+        let e = &b.edges[l.edge as usize];
+        let d = (b.vertices[e.v[1] as usize] - b.vertices[e.v[0] as usize]).normalize();
+        if l.rev { -d } else { d }
+    };
+    let (lp, ln) = (&c.links[prev], &c.links[next]);
+    let (pi, pj) = (b.vertices[c.verts[i] as usize], b.vertices[c.verts[j] as usize]);
+    let (u, w) = (dir(lp), dir(ln));
+    let (pa, pb) = (pi + into_p_at(b, lp, pi) * r, pj + into_p_at(b, ln, pj) * r);
+    let den = u.cross(w).dot(np);
+    if den.abs() < 1e-9 {
+        return no("a rolling-ball corner between parallel lines");
+    }
+    let v = pa + u * ((pb - pa).cross(w).dot(np) / den);
+    let q = v + x.t * r;
+    let s0 = center + x.t * r;
+    let l0 = (s0 - q).length();
+    if l0 < 1e-9 * r {
+        return no("a rolling-ball corner without its spine");
+    }
+    let rcorner = corner::RollCorner { q, b: (s0 - q) / l0, n: -x.t, d1: u, d2: w, l0, r, rc };
+    // (The arc's ends where the ball meets the walls; the corner's spine R - Rc from both axes.)
+    let off = |d: DVec3| ((s0 - q) - d * (s0 - q).dot(d)).length();
+    if (off(u) - (r - rc)).abs() > 1e-7 * r || (off(w) - (r - rc)).abs() > 1e-7 * r || rcorner.side_point(1, 0.0).distance(pi + x.t * r) > 1e-7 * r || rcorner.side_point(2, 0.0).distance(pj + x.t * r) > 1e-7 * r {
+        return no("a rolling-ball corner whose ball doesn't fit");
+    }
+    Ok((rcorner, v))
 }
 
 /// The blend surface of link `x` (edge `e`).

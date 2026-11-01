@@ -28,6 +28,10 @@
 #include <Geom2d_Curve.hxx>
 #include <Geom_Circle.hxx>
 #include <Geom_Ellipse.hxx>
+#include <GeomAPI_ProjectPointOnCurve.hxx>
+#include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <Geom_BSplineSurface.hxx>
+#include <ShapeFix_Edge.hxx>
 #include <Geom2dAPI_Interpolate.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <NCollection_HArray1.hxx>
@@ -55,6 +59,59 @@ gp_Pnt pnt(const BrepBody& b, uint32_t v) { return gp_Pnt(b.vertices[3 * v], b.v
 
 gp_Dir dir3(const double* p) { return gp_Dir(p[0], p[1], p[2]); }
 
+// A NURBS surface of the flat body's (crates/brep's layout: 1, degrees, knot counts, pole counts, rational, knots
+// (u, v, each as often as its multiplicity), poles row by row (u first), weights), or null.
+occ::handle<Geom_Surface> nurbs_surface(const BrepBody& b, size_t at)
+{
+  const auto& x = b.nurbs;
+  if (at + 8 > x.size() || x[at] != 1)
+    return nullptr;
+  const int    du = (int)x[at + 1], dv = (int)x[at + 2], nku = (int)x[at + 3], nkv = (int)x[at + 4], nu = (int)x[at + 5], nv = (int)x[at + 6];
+  const bool   rational = x[at + 7] != 0;
+  const size_t need     = at + 8 + nku + nkv + 3 * (size_t)nu * nv + (rational ? (size_t)nu * nv : 0);
+  if (need > x.size())
+    return nullptr;
+  // Distinct knots with their multiplicities.
+  auto knots = [](const double* k, int n, NCollection_Array1<double>*& kv, NCollection_Array1<int>*& mv) {
+    std::vector<double> d;
+    std::vector<int>    m;
+    for (int i = 0; i < n; ++i)
+      if (!d.empty() && std::abs(k[i] - d.back()) <= 1e-12 * std::max(1.0, std::abs(k[i])))
+        ++m.back();
+      else
+        d.push_back(k[i]), m.push_back(1);
+    kv = new NCollection_Array1<double>(1, (int)d.size());
+    mv = new NCollection_Array1<int>(1, (int)m.size());
+    for (size_t i = 0; i < d.size(); ++i)
+      (*kv)((int)i + 1) = d[i], (*mv)((int)i + 1) = m[i];
+  };
+  NCollection_Array1<double>*ku, *kv;
+  NCollection_Array1<int>*   mu, *mv;
+  knots(&x[at + 8], nku, ku, mu);
+  knots(&x[at + 8 + nku], nkv, kv, mv);
+  const std::unique_ptr<NCollection_Array1<double>> kuo(ku), kvo(kv);
+  const std::unique_ptr<NCollection_Array1<int>>    muo(mu), mvo(mv);
+  NCollection_Array2<gp_Pnt> poles(1, nu, 1, nv);
+  NCollection_Array2<double> w(1, nu, 1, nv);
+  const double*              p  = &x[at + 8 + nku + nkv];
+  const double*              ww = p + 3 * (size_t)nu * nv;
+  for (int i = 0; i < nu; ++i)
+    for (int j = 0; j < nv; ++j)
+    {
+      const size_t k     = (size_t)i * nv + j;
+      poles(i + 1, j + 1) = gp_Pnt(p[3 * k], p[3 * k + 1], p[3 * k + 2]);
+      w(i + 1, j + 1)     = rational ? ww[k] : 1.0;
+    }
+  try
+  {
+    return rational ? new Geom_BSplineSurface(poles, w, *ku, *kv, *mu, *mv, du, dv) : new Geom_BSplineSurface(poles, *ku, *kv, *mu, *mv, du, dv);
+  }
+  catch (const Standard_Failure&)
+  {
+    return nullptr;
+  }
+}
+
 // A new face's surface (a direct frame: its normal the body's surface normal).
 occ::handle<Geom_Surface> new_surface(const BrepBody& b, size_t f)
 {
@@ -62,6 +119,8 @@ occ::handle<Geom_Surface> new_surface(const BrepBody& b, size_t f)
   const gp_Pnt  o(s[1], s[2], s[3]);
   switch (static_cast<int>(s[0]))
   {
+    case 3:
+      return nurbs_surface(b, (size_t)s[1]);
     case 0:
     {
       const gp_Dir n = dir3(s + 4);
@@ -96,6 +155,102 @@ occ::handle<Geom_Surface> new_surface(const BrepBody& b, size_t f)
   }
 }
 
+
+// A NURBS blend face's (a rolling-ball corner's) edges' curves on it: projected (ShapeFix_Edge); a degenerate
+// edge's the line in (u, v) between its neighbours' ends, the way its use runs.
+const char* nurbs_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<TopoDS_Edge>& eo, const TopoDS_Face& fwd, double tol)
+{
+  BRep_Builder bb;
+  for (uint32_t l = o.face_loops[i]; l < o.face_loops[i + 1]; ++l)
+  {
+    std::vector<std::pair<uint32_t, bool>> lp; // edge, its use reversed in the face's wire
+    for (uint32_t k = o.loop_uses[l]; k < o.loop_uses[l + 1]; ++k)
+      lp.emplace_back(o.uses[k] / 2, (o.uses[k] % 2 == 1) != flip);
+    const occ::handle<Geom_Surface> S = BRep_Tool::Surface(fwd);
+    double                          su0, su1, sv0, sv1;
+    S->Bounds(su0, su1, sv0, sv1);
+    for (const auto& [e, rev] : lp)
+      if (!BRep_Tool::Degenerated(eo[e]))
+      {
+        BRepAdaptor_Curve c(eo[e]);
+        const double      t0 = c.FirstParameter(), t1 = c.LastParameter();
+        const gp_Pnt      p0 = c.Value(t0), p1 = c.Value(t1);
+        // (Exact, no projecting: the face's point is its u-max side; its wall row u-min, from cylinder 1 (v-min) to
+        // cylinder 2 (v-max).)
+        const gp_Pnt apex = S->Value(su1, sv0), a0 = S->Value(su0, sv0), c0 = S->Value(su0, sv1);
+        if (c.GetType() == GeomAbs_Ellipse)
+        {
+          // A side: on the iso v = v0, from the face's point to the wall, its u linear in the ellipse's angle (the
+          // side is the spine scaled from the cylinder's axis).
+          const bool   from_apex = p0.Distance(apex) < p1.Distance(apex);
+          const gp_Pnt wall      = from_apex ? p1 : p0;
+          const double v0        = wall.Distance(a0) < wall.Distance(c0) ? sv0 : sv1;
+          NCollection_Array1<gp_Pnt2d> poles(1, 2);
+          NCollection_Array1<double>   knots(1, 2);
+          NCollection_Array1<int>      mults(1, 2);
+          poles(1) = gp_Pnt2d(from_apex ? su1 : su0, v0);
+          poles(2) = gp_Pnt2d(from_apex ? su0 : su1, v0);
+          knots(1) = t0, knots(2) = t1, mults(1) = mults(2) = 2;
+          bb.UpdateEdge(eo[e], new Geom2d_BSplineCurve(poles, knots, mults, 1), fwd, tol);
+        }
+        else if (c.GetType() == GeomAbs_Circle)
+        {
+          // The wall's arc: the iso u-min, a rational quadratic arc over the angle phi; at angle alpha from cylinder
+          // 1's end v = (1 + tan((alpha - phi/2) / 2) / tan(phi/4)) / 2.
+          const double phi      = t1 - t0;
+          const bool   from_one = p0.Distance(a0) < p0.Distance(c0);
+          const int    n        = 16;
+          occ::handle<NCollection_HArray1<gp_Pnt2d>> pts = new NCollection_HArray1<gp_Pnt2d>(1, n + 1);
+          occ::handle<NCollection_HArray1<double>>   prm = new NCollection_HArray1<double>(1, n + 1);
+          for (int k = 0; k <= n; ++k)
+          {
+            const double t     = t0 + phi * k / n;
+            const double alpha = from_one ? t - t0 : t1 - t;
+            const double v     = 0.5 * (1 + std::tan((alpha - phi / 2) / 2) / std::tan(phi / 4));
+            pts->SetValue(k + 1, gp_Pnt2d(su0, sv0 + (sv1 - sv0) * v));
+            prm->SetValue(k + 1, t);
+          }
+          Geom2dAPI_Interpolate ip(pts, prm, false, 1e-12);
+          ip.Perform();
+          if (!ip.IsDone())
+            return "a corner face's wall arc not on it";
+          bb.UpdateEdge(eo[e], ip.Curve(), fwd, tol);
+        }
+        else
+          return "a corner face's edge not an ellipse or an arc";
+        double a, z;
+        if (BRep_Tool::CurveOnSurface(eo[e], fwd, a, z).IsNull())
+          return "a corner face's edge not on it";
+      }
+    // Where a use starts / ends in (u, v).
+    auto end_uv = [&](uint32_t e, bool rev, bool at_end) {
+      double                          a, z;
+      const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(eo[e], fwd, a, z);
+      return pc->Value((at_end != rev) ? z : a);
+    };
+    const size_t n = lp.size();
+    for (size_t k = 0; k < n; ++k)
+    {
+      const auto [e, rev] = lp[k];
+      if (!BRep_Tool::Degenerated(eo[e]))
+        continue;
+      // (On a flipped face every use runs the other way: the loop goes round backwards through the list.)
+      const auto [pe, prev] = lp[flip ? (k + 1) % n : (k + n - 1) % n];
+      const auto [ne, nrev] = lp[flip ? (k + n - 1) % n : (k + 1) % n];
+      if (BRep_Tool::Degenerated(eo[pe]) || BRep_Tool::Degenerated(eo[ne]))
+        return "a corner face's degenerate edges side by side";
+      gp_Pnt2d a0 = end_uv(pe, prev, true), a1 = end_uv(ne, nrev, false);
+      if (rev)
+        std::swap(a0, a1);
+      const double len = a0.Distance(a1);
+      if (len < 1e-12)
+        return "a corner face's degenerate edge of no length";
+      bb.UpdateEdge(eo[e], new Geom2d_Line(a0, gp_Dir2d(gp_Vec2d(a0, a1))), fwd, tol);
+      bb.Range(eo[e], 0, len);
+    }
+  }
+  return nullptr;
+}
 
 // A chamfer's plane framed as OCCT's (ChFiKPart_ComputeData_ChPlnPln; sketches on the face take their axes from
 // it): x along the edge it was generated from (its own direction), the origin half way between the two faces'
@@ -780,6 +935,50 @@ bool rust_blend(const OcShape& s, const std::vector<TopoDS_Edge>& es, const std:
         for (uint32_t k = o.loop_uses[l]; k < o.loop_uses[l + 1]; ++k)
           if (made[o.uses[k] / 2])
             BRepLib::BuildPCurveForEdgeOnPlane(eo[o.uses[k] / 2], fwd);
+    }
+    else if (!occ::down_cast<Geom_BSplineSurface>(S).IsNull())
+    {
+      if (const char* why = nurbs_pcurves(o, i, flip, eo, fwd, tol))
+      {
+        brep_decline(why);
+        return false;
+      }
+      if (std::getenv("NOSHAPE_BLEND_DEBUG"))
+      {
+        BRepCheck_Analyzer an(f);
+        std::fprintf(stderr, "blend: corner face %zu valid %d\n", i, (int)an.IsValid());
+        for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+        {
+          const occ::handle<BRepCheck_Result> r = an.Result(x.Current());
+          if (r.IsNull())
+            continue;
+          r->InitContextIterator();
+          for (; r->MoreShapeInContext(); r->NextShapeInContext())
+            for (const BRepCheck_Status st : r->StatusOnShape())
+              if (st != BRepCheck_NoError)
+              {
+                double a, z;
+                const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(TopoDS::Edge(x.Current()), fwd, a, z);
+                std::fprintf(stderr, "  edge status %d: degenerate %d, type %d, range %g .. %g, uv (%g %g) .. (%g %g)\n", (int)st, (int)BRep_Tool::Degenerated(TopoDS::Edge(x.Current())),
+                             BRep_Tool::Degenerated(TopoDS::Edge(x.Current())) ? -1 : (int)BRepAdaptor_Curve(TopoDS::Edge(x.Current())).GetType(), a, z, pc.IsNull() ? 0 : pc->Value(a).X(), pc.IsNull() ? 0 : pc->Value(a).Y(),
+                             pc.IsNull() ? 0 : pc->Value(z).X(), pc.IsNull() ? 0 : pc->Value(z).Y());
+              }
+        }
+        const occ::handle<BRepCheck_Result> rf = an.Result(f);
+        if (!rf.IsNull())
+          for (const BRepCheck_Status st : rf->Status())
+            std::fprintf(stderr, "  face status %d\n", (int)st);
+        for (TopExp_Explorer x(f, TopAbs_WIRE); x.More(); x.Next())
+        {
+          const occ::handle<BRepCheck_Result> rw = an.Result(x.Current());
+          if (rw.IsNull())
+            continue;
+          rw->InitContextIterator();
+          for (; rw->MoreShapeInContext(); rw->NextShapeInContext())
+            for (const BRepCheck_Status st : rw->StatusOnShape())
+              std::fprintf(stderr, "  wire status %d\n", (int)st);
+        }
+      }
     }
     else if (const char* why = iso_pcurves(o, i, flip, eo, made, fwd, S, loc, tol))
     {

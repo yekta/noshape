@@ -25,6 +25,12 @@ clifuzz_time.py / nscli.py with paths moved; NSCLI_ERR=<file> keeps the CLI's st
 jumps; run1052.sh / mem1002.sh / run979.sh as examples; CLIs built in ~/agents/core/target-fuzz from rb.sh's synced
 src: don't rb.sh while one builds). Next: thin loft inward walls (live request 11-01 13:45), noshape's blends for
 the R-over-Rc vertex corners (the 12 "an arc the blend closes up" corpus cases; OCCT + exact_vertex_blends today).
+Rolling-ball corners (18:00): brep blend/corner.rs (RollCorner: spine, sections, `surface` C2 interpolation with a
+midpoint check at 2.5e-8 R, `side` ellipses), blend.rs Chain.past / roll_corner / corner_box (the clearance by the
+corner's box: its R reach overstated sideways); rust_blend.cpp `nurbs_surface` (flat NURBS → Geom_BSplineSurface) and
+`nurbs_pcurves` (sides: degree-1 lines in the ellipse's angle; the wall arc: v from the angle in closed form; the
+degenerate edge between its neighbours, the loop backwards on a flipped face). A C1 Hermite surface first: its 128
+spans made the volume integral 63 s (C2 intervals); OCCT projections made the conversion 60 ms.
 G31 (skasm audit, 16:00): kernel `mass_property_bounds` (props_bounds: fine vs coarse integration, t_props_coarse /
 props_eps), model `mass_property_variance`; live's format requested (REQUESTS core 15:30); psui wires the checkbox.
 **Sheet metal moved to skasm (lead 10-29 19:40):** model-core's sheet metal (crates/model-core/src/sheetmetal,
