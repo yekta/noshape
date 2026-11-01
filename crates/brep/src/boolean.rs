@@ -973,7 +973,7 @@ impl Ctx<'_> {
             _ => (self.tol, self.tol, None),
         };
         let len = path.length(t0, t1);
-        if len <= tol {
+        if len <= vtol {
             return Ok(Vec::new());
         }
         // A circle or ellipse about a face that doesn't go round: in parts either side of the face's gap.
@@ -1072,11 +1072,11 @@ impl Ctx<'_> {
             Path::Ellipse(e) => e.length(x, y),
             _ => (y - x) * scale,
         };
-        // Cuts at one place are one, a vertex if any of them is.
+        // Cuts at one place (within the section's tolerance, OCCT's paves on it) are one, a vertex if any of them is.
         let mut merged: Vec<(f64, End)> = Vec::with_capacity(cuts.len());
         for c in cuts {
             match merged.last_mut() {
-                Some(last) if apart(last.0, c.0) <= tol => {
+                Some(last) if apart(last.0, c.0) <= vtol => {
                     if c.1.rank() > last.1.rank() {
                         *last = c;
                     }
@@ -1091,7 +1091,7 @@ impl Ctx<'_> {
         let mut out: Vec<Ival> = Vec::new();
         for k in 0..cuts.len() - 1 {
             let (a, b) = (cuts[k], cuts[k + 1]);
-            if apart(a.0, b.0) <= tol {
+            if apart(a.0, b.0) <= vtol {
                 continue;
             }
             // (OCCT's curve clear of the boundary but touching it between its crossings: OCCT may put a vertex
