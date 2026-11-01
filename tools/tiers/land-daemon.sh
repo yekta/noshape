@@ -182,6 +182,14 @@ contains() {   # contains <ref> <ref2>
   for c in $miss; do grep -qxF "$(git -C "$repo" log -1 --format='%at %s' "$c")" <<< "$have" || return 1; done
 }
 
+# The batch size that lands most per check at the recent red rate: ~1/p (at least 2), from the last 30 first checks
+# (not halves or re-checks); 99 with fewer than 8 of them.
+best_batch() {
+  tail -n 60 "$LD/history.tsv" 2>/dev/null | awk -F'\t' '$4 == "batch" && $6 != "retest" && $6 != "result" { k[++n] = $5 " " ($6 == "blamed" || $6 == "split" || $6 == "failed") }
+    END { if (n > 30) { o = n - 30 } ; for (i = o + 1; i <= n; i++) { split(k[i], a, " "); m++; s += a[1]; r += a[2] }
+          if (m < 8 || r == 0) { print 99; exit } p = 1 - (1 - r / m) ^ (m / s); b = int(1 / p + 0.5); print (b < 2 ? 2 : b) }'
+}
+
 # Whether the batch under this one (if any) has ended without landing.
 dep_failed() {
   [ -n "$1" ] || return 1
@@ -447,6 +455,9 @@ worker() {
         newest[$nm]=$k
       done
       max=$MAXB; [ "$npend" -gt 12 ] && max=$(( MAXB * 2 )); [ "$npend" -gt 24 ] && max=$(( MAXB * 3 ))
+      # …and never above ~1/p, p a stack's chance to be red in the recent first checks (11-01 afternoon ~30 %, not
+      # the 3 % per change of the model: a worktree's run is one stack; most batches of 4-5 went red).
+      local b; b=$(best_batch); [ "$b" -lt "$max" ] && max=$b
       for nm in "${order[@]:0:$max}"; do ks+=("${newest[$nm]}"); done
       if [ ${#ks[@]} -gt 0 ]; then
         bid="$(date -u +%m%d-%H%M%S)-$BASHPID"; mkdir -p "$LD/run/$bid"; echo "$BASHPID" > "$LD/run/$bid/pid"
