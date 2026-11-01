@@ -920,6 +920,31 @@ mod tests {
     }
 
     #[test]
+    fn a_b_spline_crowding_its_parameter_at_one_end() {
+        // A line from (0, 1) to (1, 0) as a degree-1 B-spline, 10 of its 11 even knot spans in its first 1e-5 (as
+        // OCCT's sections crowd theirs where they turn), and its first one turning back (a hook within the
+        // tolerance).
+        let mut poles = vec![DVec3::new(0.0, 1.0, 0.0), DVec3::new(-1e-8, 1.0, 0.0)];
+        poles.extend((1..10).map(|k| DVec3::new(1e-6 * k as f64, 1.0 - 1e-6 * k as f64, 0.0)));
+        poles.push(DVec3::new(1.0, 0.0, 0.0));
+        let n = poles.len();
+        let mut knots = vec![0.0];
+        knots.extend((0..n).map(|k| k as f64 / (n - 1) as f64));
+        knots.push(1.0);
+        let c = crate::nurbs::NurbsCurve { degree: 1, knots, weights: vec![1.0; n], poles, spans: Default::default() };
+        let line = C2::Nurbs { c: std::sync::Arc::new(c), t0: 0.0, t1: 1.0 };
+        // Its area with the two sides to the origin: the triangle's (clockwise).
+        let area = line.area_term() + C2::Seg { a: DVec2::new(1.0, 0.0), b: DVec2::ZERO }.area_term() + C2::Seg { a: DVec2::ZERO, b: DVec2::new(0.0, 1.0) }.area_term();
+        assert!((area + 0.5).abs() < 1e-12, "{area}");
+        assert!((line.length() - 2f64.sqrt()).abs() < 1e-6, "{}", line.length());
+        // Its middle by length, and the way it leaves its start past the hook.
+        let m = line.at(line.at_fraction(0.5));
+        assert!(m.distance(DVec2::splat(0.5)) < 1e-3, "{m:?}");
+        assert!(line.tangent(0.0).x < 0.0);
+        assert!(line.leaving().distance(DVec2::new(1.0, -1.0).normalize()) < 1e-2, "{:?}", line.leaving());
+    }
+
+    #[test]
     fn a_curve_once_round_a_cylinder_spans_its_angles() {
         // A circle's NURBS rising along the axis: from the cylinder's seam once round to it, 0.8 higher.
         let h = std::f64::consts::FRAC_1_SQRT_2;

@@ -3750,16 +3750,8 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     for (&(f, s), chain) in extra_segs.iter().zip(extra_chains) {
         crate::check_cancel()?;
         let chain = chain?;
-        let watch = std::env::var("NOSHAPE_X_FACE").is_ok_and(|v| v == format!("{},{}", cx.faces[f].arg, cx.faces[f].index));
-        if watch {
-            eprintln!("EXTRA face {f} seg {:?} v {:?} chain {chain:?}", s.g, s.v);
-        }
         for piece in cx.pieces_of(&s, &chain) {
-            let (si, rev) = get_sedge(&cx, &mut sedges, piece);
-            if watch {
-                eprintln!("EXTRA   piece {:?} v {:?} -> sedge {si} rev {rev} ({:?} v {:?})", piece.g, piece.v, sedges[si].seg.g, sedges[si].seg.v);
-            }
-            face_extra[f].push(si);
+            face_extra[f].push(get_sedge(&cx, &mut sedges, piece).0);
         }
     }
     // The faces each section edge was made by (OCCT: they generated it).
@@ -3872,17 +3864,6 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         let mut inner: Vec<u32> = local.keys().map(|k| k.0).filter(|w| !boundary.contains(w)).collect();
         inner.sort_unstable();
         inner.dedup();
-        if std::env::var("NOSHAPE_X_FACE").is_ok_and(|v| v == format!("{},{}", cx.faces[f].arg, cx.faces[f].index)) {
-            for (k, (e, c)) in lsegs.iter().enumerate() {
-                let (d0, d1) = (c.tangent(0.0), c.reversed().tangent(0.0));
-                eprintln!("FACE seg {k} sedge {} ends {e:?} {:?} -> {:?} out {:.6} back {:.6} len {:e} area {:e} curv {:e} v {:?}", lsrc[k], c.start(), c.end(), d0.y.atan2(d0.x), d1.y.atan2(d1.x), c.length(), c.area_term(), c.curvature(), sedges[lsrc[k]].seg.v);
-            }
-            if let Ok(rs) = regions(&pts, &lsegs) {
-                for r in rs {
-                    eprintln!("FACE region outer {:?} holes {:?} inside {:?}", r.outer, r.holes, r.inside);
-                }
-            }
-        }
         let mut out = Vec::new();
         for mut r in regions(&pts, &lsegs)? {
             let mut dist = distance2(r.inside, cx.bound(f)?);
@@ -3915,9 +3896,6 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     let turned_pieces = |f: usize| -> Option<FacePieces> {
         let sym = sym.as_ref()?;
         let (f0, j) = copy_step(f)?;
-        if std::env::var("NOSHAPE_X_FACE").is_ok_and(|v| v == format!("{},{}", cx.faces[f].arg, cx.faces[f].index)) {
-            eprintln!("TURNED face {f} from {f0} ({}, {}) step {j}", cx.faces[f0].arg, cx.faces[f0].index);
-        }
         let Some(Ok((split0, inner0, pieces0))) = &first_pieces[f0] else { return None };
         let ((segs, split), (segs0, _)) = (face_curves(f), face_curves(f0));
         if split != *split0 || segs.len() != segs0.len() {
@@ -3943,14 +3921,6 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             let s0 = *at0.get(&v)?.iter().find(|&&s0| std::mem::discriminant(&a.g) == std::mem::discriminant(&sedges[s0].seg.g) && (cx.seg_at(&sedges[s0].seg, 0.5) - mid).length() <= tol)?;
             if to.insert(s0, si).is_some() {
                 return None;
-            }
-        }
-        if std::env::var("NOSHAPE_X_FACE").is_ok_and(|v| v == format!("{},{}", cx.faces[f].arg, cx.faces[f].index)) {
-            for (s0, si) in &to {
-                eprintln!("TO {si} <- {s0}");
-            }
-            for (k, p) in pieces0.iter().enumerate() {
-                eprintln!("TO piece0 {k} loops {:?}", p.loops);
             }
         }
         let place: HashMap<usize, usize> = segs.iter().enumerate().map(|(k, &si)| (si, k)).collect();
@@ -4040,14 +4010,6 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 let q = cx.faces[g].to2(pieces[pi].inside);
                 let d = distance2(q, cx.bound(g)?);
                 if d <= GREY * tol {
-                    if std::env::var_os("NOSHAPE_X_CB").is_some() {
-                        let k = |h: usize| match cx.faces[h].s { Surf::Plane { .. } => "plane", Surf::Cyl { .. } => "cyl", _ => "other" };
-                        eprintln!("CB piece {pi} face {f} ({}, arg {}) vs {g} ({}, arg {}): d {d:e} tol {tol:e}, inside {:?}, loops {:?}", k(f), cx.faces[f].arg, k(g), cx.faces[g].arg, pieces[pi].inside, pieces[pi].loops.iter().map(|l| l.len()).collect::<Vec<_>>());
-                        for &(e, _) in pieces[pi].loops.iter().flatten() {
-                            let sg = &sedges[e].seg;
-                            eprintln!("  sedge {e} {:?} {:?} .. {:?} mid {:?}", sg.g, cx.pool.p[sg.v[0] as usize], cx.pool.p[sg.v[1] as usize], cx.seg_at(sg, 0.5));
-                        }
-                    }
                     return Err(Decline("a piece's point near a coincident face's boundary"));
                 }
                 if inside2(q, cx.bound(g)?) {
@@ -4253,38 +4215,6 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     }
     // (A cone's apex is used once; a sheet's edges any way.)
     if !sheets && uses.iter().any(|(&s, u)| !matches!(sedges[s].seg.g, Geo::Apex { .. }) && (u[0] != u[1] || u[0] == 0)) {
-        if std::env::var_os("NOSHAPE_X_NM").is_some() {
-            for (&s, u) in &uses {
-                if !matches!(sedges[s].seg.g, Geo::Apex { .. }) && (u[0] != u[1] || u[0] == 0) {
-                    let users: Vec<(usize, u32, u32, bool, Option<usize>, Vec<usize>)> = (0..pieces.len())
-                        .filter(|&p| pieces[p].loops.iter().flatten().any(|x| x.0 == s))
-                        .map(|p| (p, cx.faces[pieces[p].face].arg, cx.faces[pieces[p].face].index, keep[p].is_some(), partner[p], pieces[p].loops.iter().map(|l| l.len()).collect()))
-                        .collect();
-                    eprintln!("NM sedge {s} {:?} from {:?} to {:?} mid {:?} uses {u:?} pieces (piece, arg, face, kept, partner, loops) {users:?}", sedges[s].seg.g, cx.p(sedges[s].seg.v[0]), cx.p(sedges[s].seg.v[1]), cx.seg_at(&sedges[s].seg, 0.5));
-                    if let Geo::Nurbs { id, .. } = sedges[s].seg.g {
-                        if let Some((fs, _, _)) = &cx.ncurves[id as usize].sec {
-                            eprintln!("  section of faces {:?} (arg, index) {:?} acc {:e}", fs, fs.iter().map(|&f| (cx.faces[f].arg, cx.faces[f].index)).collect::<Vec<_>>(), cx.ncurves[id as usize].acc);
-                            let near = |k: usize| sedges[k].seg.v.iter().any(|&w| sedges[s].seg.v.iter().any(|&x| (cx.p(x) - cx.p(w)).length() < 3e-5));
-                            for &f in fs {
-                                for &p in &face_pieces[f] {
-                                    if pieces[p].loops.iter().flatten().any(|x| near(x.0)) {
-                                        eprintln!("  face {f} piece {p} kept {:?} inside {:?} loops {:?}", keep[p], pieces[p].inside, pieces[p].loops);
-                                    }
-                                }
-                                eprintln!("  face {f} split {:?}", face_split[f]);
-                            }
-                        }
-                    }
-                    for (k, o) in sedges.iter().enumerate() {
-                        let close = |w: u32| sedges[s].seg.v.iter().any(|&x| (cx.p(x) - cx.p(w)).length() < 3e-5);
-                        if k != s && (close(o.seg.v[0]) || close(o.seg.v[1])) {
-                            let us: Vec<(u32, u32, bool)> = (0..pieces.len()).filter(|&p| pieces[p].loops.iter().flatten().any(|x| x.0 == k)).map(|p| (cx.faces[pieces[p].face].arg, cx.faces[pieces[p].face].index, keep[p].is_some())).collect();
-                            eprintln!("  neighbour {k} {:?} v {:?} (ours {:?}) to {:?} mid {:?} pieces {us:?}", o.seg.g, o.seg.v, sedges[s].seg.v, cx.p(o.seg.v[1]), cx.seg_at(&o.seg, 0.5));
-                        }
-                    }
-                }
-            }
-        }
         return Err(Decline("a non-manifold result"));
     }
     // Seams: an edge one face uses both ways; any other edge two faces once each.

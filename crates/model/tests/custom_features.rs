@@ -2027,7 +2027,7 @@ fn knurl_feature_b94_tooth_and_helix_angles() {
         let errors: Vec<String> = r.display.features.iter().filter(|s| s.status == FeatureStatus::Error).map(|s| s.message.clone().unwrap_or_default()).collect();
         let b = r.context.bodies.first();
         let (v, faces, valid) = b.map_or((0.0, 0, false), |b| (b.shape.volume().unwrap_or(0.0) * 1e9, b.shape.count(noshape_kernel::ShapeType::Face), b.shape.is_valid()));
-        eprintln!("knurl tooth {tooth}° helix {helix}°: {v:.3} mm³, {faces} faces, valid {valid}, {} parts, {took:.1} s, errors {errors:?}", r.context.bodies.len());
+        eprintln!("knurl tooth {tooth}° helix {helix}°: {v:.3} mm³, {faces} faces, valid {valid}, {} parts, {took:.1} s, errors {errors:?}, noshape's Boolean declined {:?}", r.context.bodies.len(), noshape_kernel::last_rust_decline());
         if !errors.is_empty() || !valid || r.context.bodies.len() != 1 {
             bad.push(format!("tooth {tooth}° helix {helix}°: {errors:?}, valid {valid}, {} parts", r.context.bodies.len()));
         }
