@@ -444,6 +444,10 @@ and Shortcut toolbars lists now include Flow.
 Audit now 19 surfaces, 28 gaps, 26 fixed. Open, in order: G26 nested instance rows' menu (needs occurrence-level
 hide / isolate / fix in the model: Instance has only `nested` placements), G28 a menu for several selected mates
 (needs multi-select of mates: `selected_mate` is one id), G13 Insert image's Libraries tab (no image library).
+Later: G27 (dynamic suppression on patterns / relations / connectors) and G28 (several mates, Ctrl+click) fixed too;
+audit 19 surfaces, 28 gaps, 27 fixed; G26 planned in the audit doc (paths for hide / isolate). SM-MAKE-JOINT-ONE-EDGE:
+two FS probes, see the ticket (each definition entity gets two association attributes). Live request "Preferences
+shortcut lists" posted 12:05 (does Flow appear there).
 
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
