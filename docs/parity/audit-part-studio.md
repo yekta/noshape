@@ -22,7 +22,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | Render Studio / Display states (1713) | live | live: no Display states in a Part Studio; Render Studio only as an Upgrade-gated tab type (cloud plan) | 0 |
 | View cube (right-click, arrows, hover) | live 1714 | every face / edge / corner / arrow gives the empty-space menu, no tooltips: = ours | 0 |
 
-**Counts (11-01, audit 10):** surfaces audited 9 of 9. Dialogs: 199 field rows + 52 visibility states; fixed 183 rows and 39 states; accepted 14 rows and 13 states (fields std declares `isAnything`, which the oracle cannot read); open 1 row (Frame's profile picker: live's browses Onshape's profile libraries); 64 of 75 dialogs equal std (37 at first). Editing logic: 48 std functions, 36 run std's, 10 native, 1 no-op, 1 open (Unfold). Found outside the oracle (A rows): 20; fixed 18, = live 1 (A1), open 1 (A10 core).
+**Counts (11-01, audit 10):** surfaces audited 9 of 9. Dialogs: 199 field rows + 52 visibility states; fixed 183 rows and 39 states; accepted 14 rows and 13 states (fields std declares `isAnything`, which the oracle cannot read); open 1 row (Frame's profile picker: live's browses Onshape's profile libraries); 64 of 75 dialogs equal std (37 at first). Editing logic: 48 std functions, 36 run std's, 10 native, 1 no-op, 1 partly (Unfold's second unfold). Found outside the oracle (A rows): 20; fixed 18, = live 1 (A1), open 1 (A10 core).
 
 ## Found outside the oracle (in the app, std's code, live)
 
@@ -102,7 +102,7 @@ from the picks). The dialog runs std's own function where `std_feature::has_edit
 | E43 | projectCurvesEditLogic | Projected curve | ✅ std's runs (audit 8): the preselection into the fields, the Curve to face flip (same T2) |
 | E44 | routingCurveEditLogic | Routing curve | ✅ std's runs (audit 9): Point 0 to start, new points copy the active one (std's copyParameter now honoured), indices in step (T2 routing_curve_editing_logic_runs_std) |
 | E45 | ruledSurfaceEditingLogic | Ruled surface | ✅ std's runs (audit 8): Add on a surface's open edge, reference faces, vertex overrides cleaned (same T2) |
-| E46 | unfoldEditLogic | Unfold | ✗ (hold entity): std's runs on our model (11-01) but leaves Wall face to hold empty (getEntityHeldForUnfold finds no face pair on our sheet metal part); not enabled |
+| E46 | unfoldEditLogic | Unfold | ◐ std's only reuses the hold face of an earlier Unfold of the part (wall attribute holdFaceForUnfold); without one it leaves Wall face to hold empty, as ours. Left: the second Unfold of a part (our native Unfold records no hold face) |
 | E47 | variableEditLogic | Variable | ✅ native: a preselection in Measured mode fills the visible field std's would (Entities to measure between / Entities / Entity); Assigned ignores it as std |
 | E48 | wrapEditLogic | Wrap | ✅ std's runs (audit 8): Merge scope = the target's part, Add / Remove from the thickness direction, the flip; default anchors found (T2 wrap_editing_logic_runs_std) |
 
