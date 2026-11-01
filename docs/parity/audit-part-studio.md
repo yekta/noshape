@@ -12,7 +12,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 |---|---|---|---|
 | Toolbar, every group and overflow (75 tools + Add custom features) | behaviours "Toolbar" (Customize toolbar list), dom/toolbar-partstudio.txt | every live tool in live's group, in order (Move boundary = extendSurface) | 0 |
 | Toolbar right-click, Customize toolbar, narrow-window collapse | behaviours "Toolbar", "Narrow window" | checked earlier (cursors 81, part-studio 4.x, chrome-sweep) | 0 |
-| Feature dialogs, fields and options (75 toolbar features); their editing logic (48 std functions) | std preconditions via std_oracle::print_all | 63 same as std now (37 at first); the rest differ only in accepted rows or the 10 open below | rows below, A15 |
+| Feature dialogs, fields and options (75 toolbar features); their editing logic (48 std functions) | std preconditions via std_oracle::print_all | 64 same as std now (37 at first); the rest differ only in accepted rows or the 10 open below | rows below, A15 |
 | Keyboard shortcuts (live's Shift+/ list, 121 entries) | dom/keyboard-shortcuts.txt | every applicable entry in workflow-keyboard-mouse.md, all ✅ (11-01) | 0 |
 | View menu (camera / render ▾) | dom/menu-camera-render.txt | 16 items = live (part-studio 9.8) | 0 |
 | Context menus: face, edge, vertex, empty space, part, plane, origin, mate connector, sketch region / curve, feature rows (sketch, extrude, fillet, multi), parts-list part, tabs, Select ▸ submenus | dom/context-menus-partstudio.txt, -ps-*.txt | compared in core-workflow §8 and chrome-sweep CM1–CM5 (✅) | 0 |
@@ -22,13 +22,13 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | Render Studio / Display states (1713) | live | live: no Display states in a Part Studio; Render Studio only as an Upgrade-gated tab type (cloud plan) | 0 |
 | View cube (right-click, arrows, hover) | live 1714 | every face / edge / corner / arrow gives the empty-space menu, no tooltips: = ours | 0 |
 
-**Counts (11-01, audit 8):** surfaces audited 9 of 9. Dialogs: 199 field rows + 52 visibility states; fixed 178 rows and 39 states; accepted 12 rows and 13 states (fields std declares `isAnything`, which the oracle cannot read); open 9 rows (Helix End radius and Routing curve point titles asked live, REQUESTS 1722; the five reference pickers); 63 of 75 dialogs equal std (37 at first). Editing logic: 48 std functions, 35 run std's, 10 native, 1 no-op, 2 open. Found outside the oracle (A rows): 16; fixed 14, open 2 (A1 asked, REQUESTS 1722; A10 core).
+**Counts (11-01, audit 9):** surfaces audited 9 of 9. Dialogs: 199 field rows + 52 visibility states; fixed 182 rows and 39 states; accepted 12 rows and 13 states (fields std declares `isAnything`, which the oracle cannot read); open 5 rows (the reference pickers: Variable CSV, Frame profile, Derived, Routing CSV, Form); 64 of 75 dialogs equal std (37 at first). Editing logic: 48 std functions, 35 run std's, 10 native, 1 no-op, 2 open. Found outside the oracle (A rows): 17; fixed 14, = live 1 (A1), open 2 (A10 core, A17 Routing curve).
 
 ## Found outside the oracle (in the app, std's code, live)
 
 | # | Surface | Item | P | Difference | Status |
 |---|---|---|---|---|---|
-| A1 | Tag dialog | basePlane | P2 | std pre-fills Base plane with the Top plane (tag.fs defaults `qTopPlane`); ours starts empty | ✗ |
+| A1 | Tag dialog | basePlane | P2 | std pre-fills Base plane with the Top plane (tag.fs defaults `qTopPlane`); ours starts empty | – = live (1722): live's Base plane starts empty too (std's defaults map isn't a dialog prefill) |
 | A2 | Variable (Measured) | componentSelector | P1 | Along custom recorded the plain distance, and X / Y / Z only while the Axis measurements group was open; std records the chosen component always and Along custom along the picked direction ("Select custom direction." when empty) | ✅ ce91c9c7 |
 | A3 | Query variable dialog | additionalQueries | P1 | an additional query offers only Selection / Created by / Owned by / Protrusion / Pocket / Hole style types with 5 seed fields; std's item has 20 fields (entity type, fillet compare, bounded faces, edge convexity, construction / body-type filters, adjacency) and ids in std's case (addQselectionType, …) | ✅ (audit 3): std's 20 item fields with std ids (old documents renamed on load); the evaluator now does Protrusion, Pocket, Hole, Fillets (Equal), Tangent connected, Parallel, Bounded faces, Loop/chain connected and Edge convexity for the main query and each additional one, with each item\'s own entity type. Still to do: Matching, Adjacent, Fillets Less / Greater than (warnings) |
 | A4 | Mutual trim | body1 / body2 | P1 | std trims a set of surfaces against a set ("First set of surfaces", "Second set of surfaces"); ours takes one surface a side; with nothing to trim std reports "no geometry change" as info, ours errors | ✅ (audit 3): sets of surfaces each side, std's texts ("Select a surface.", "Same surface cannot be used twice."), no change = info (T1 features_b offset_curve_move_boundary_mutual_trim) |
@@ -44,6 +44,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | A14 | Appearances (live 1712) | part row right-click | P2 | live: Rename… · Edit appearance… · Configure appearance; ours has no menu on part rows | ✅ (audit 5): Rename… (the small "Rename" ✓ ✕ popup beside the row) · Edit appearance… · Configure appearance (Configured properties for the part, a row per configuration and an Appearance column; offered with configuration inputs); Remove appearance stays after them on a part with its own |
 | A15 | Feature dialogs | arrays std drives by a query | P2 | std's "Driven query" arrays are one selection field (a pick per item); Frame's Corner overrides, Frame trim's groups, Face blend's Caps and Edge limits, Constrained surface's Vertices, Ruled surface's Vertex overrides and Sheet metal loft's connections were item lists with an Add button; the oracle didn't see it (the custom-feature reader ignored "Driven query", the oracle masked the hint) | ✅ (audit 7): all 13 std driven arrays are driven queries; custom features read "Driven query"; the oracle compares the hint |
 | A16 | Configuration panel | configured parameter column headers | P2 | std names 99 parameters differently in the configuration table ("Column Name": the second direction's Depth is "Second depth", Variable's row Index "Row index (0-based)"); ours showed the dialog label, so two "Depth" columns; the oracle didn't read it | ✅ (audit 8): `features::columns` holds std's 99, the table header uses them, custom features read "Column Name", the oracle compares them; the Configure toast keeps the label until live answers (REQUESTS psui A16) |
+| A17 | Routing curve dialog (live 1722) | points list | P2 | live opens with "Point 0" at the origin; Single mode shows only the active point's row (click a point to switch); a new point copies the active one's coordinates; the title carries the length ("Routing curve (61.825 mm)"); under two points the error ("Create at least two non-coincident points.") is on the title and the Points label. Ours: no point at first, every row shown, new points at the origin, plain title, the error on Vertices. Rows are titled "Point N" as live (audit 9) | ✗ (std's routingCurveEditLogic + manipulators; E row open) |
 
 ## Editing logic (std's dialog reactions)
 
@@ -110,7 +111,7 @@ which fields show); P3: internal (option ids under the same labels, configurabil
 oracle reads std's annotations, not its feature defaults map: a default std sets there (Ruled surface's cubic interpolation)
 is checked by hand.
 
-Field rows: 199 (fixed 178, accepted 12, open 9); visibility states differing now: 13.
+Field rows: 199 (fixed 182, accepted 12, open 5); visibility states differing now: 13.
 
 | # | Feature | Field | P | Difference (std = live) | Status |
 |---|---|---|---|---|---|
@@ -155,8 +156,8 @@ Field rows: 199 (fixed 178, accepted 12, open 9); visibility states differing no
 | D39 | frameTrim | frameGroups | P2 | array item fields differ: std [frames "Frames" query max None hints 0x0 "Frame segments are trimmed against preceding groups and are used as… ours [frames "Frames" query max None hints 0x0 "" None]… | ✅ (audit 6) |
 | D40 | frameTrim | frameGroups | P2 | array row label: std Some("#frames"), ours None | ✅ (audit 2, 11-01) |
 | D41 | gusset | chamfer | P2 | hints: std adds [], ours adds ['FIRST_IN_ROW'] | – std pairs a DISPLAY_SHORT boolean with the DISPLAY_SHORT field after it; ours marks the pair's first field FIRST_IN_ROW for the same one row |
-| D42 | helix | endRadToggle | P2 | hints: std adds [], ours adds ['DISPLAY_SHORT', 'FIRST_IN_ROW'] | ✗ |
-| D43 | helix | endRadius | P2 | hints: std adds [], ours adds ['DISPLAY_SHORT'] | ✗ |
+| D42 | helix | endRadToggle | P2 | hints: std adds [], ours adds ['DISPLAY_SHORT', 'FIRST_IN_ROW'] | ✅ (audit 9) |
+| D43 | helix | endRadius | P2 | hints: std adds [], ours adds ['DISPLAY_SHORT'] | ✅ (audit 9) |
 | D44 | importDerived | mateConnectorId | P2 | extra: ours has "Base mate connector", std has no `mateConnectorId` | – std has it too, declared `isAnything` (importDerived.fs:98), which the oracle cannot read |
 | D45 | intersectionCurve | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
 | D46 | isoparametricCurve | directionType | P2 | default option: std U_DIRECTION / ours U | ✅ (audit 1, 11-01) |
@@ -175,8 +176,8 @@ Field rows: 199 (fixed 178, accepted 12, open 9); visibility states differing no
 | D59 | routingCurve | csvUnit | P2 | options: std ['Centimeter', 'Foot', 'Inch', 'Millimeter', 'Meter', 'Yard'] / ours ['Meter', 'Centimeter', 'Millimeter', 'Inch', 'Foot', 'Yard'] | ✅ (audit 1, 11-01) |
 | D60 | routingCurve | hasTargetLength | P2 | hints: std adds [], ours adds ['FIRST_IN_ROW'] | – std pairs a DISPLAY_SHORT boolean with the DISPLAY_SHORT field after it; ours marks the pair's first field FIRST_IN_ROW for the same one row |
 | D61 | routingCurve | inputsGroup | P2 | missing: std has "Inputs" (a group) | ✅ (audit 2, 11-01) |
-| D62 | routingCurve | points | P2 | array item fields differ: std [index "Point index" Integer 0..10000 =0.000000000000 / 0.000000000000 hints 0x8000 "" None, referenceType "Re… ours [referenceType "Reference" enum[("ORIGIN", "Origin"), ("VERTEX", "Vertex"), ("CURVE", "Curve"), ("RELATIVE", "… | ✗ |
-| D63 | routingCurve | points | P2 | array row label: std Some("Point #index"), ours None | ✗ |
+| D62 | routingCurve | points | P2 | array item fields differ: std [index "Point index" Integer 0..10000 =0.000000000000 / 0.000000000000 hints 0x8000 "" None, referenceType "Re… ours [referenceType "Reference" enum[("ORIGIN", "Origin"), ("VERTEX", "Vertex"), ("CURVE", "Curve"), ("RELATIVE", "… | ✅ (audit 9) |
+| D63 | routingCurve | points | P2 | array row label: std Some("Point #index"), ours None | ✅ (audit 9) |
 | D64 | routingCurve | segmentEditType | P2 | default option: std ADD / ours ADD_POINTS | ✅ (audit 1, 11-01) |
 | D65 | routingCurve | selectedIndices | P2 | array row label: std Some("Selected point #indexValue"), ours None | ✅ (audit 7) |
 | D66 | ruledSurface | vertexOverrides | P2 | array item fields differ: std [vertex "Vertex" query max Some(1) hints 0x2 "" None, overrideType "Ruled surface type" enum[("NORMAL", "Norma… ours [vertex "Vertex" query max Some(1) hints 0x2 "" None, overrideType "Ruled surface type" enum[("NORMAL", "Norma… | ✅ (audit 6) |

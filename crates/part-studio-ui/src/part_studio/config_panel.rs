@@ -1246,7 +1246,15 @@ impl PartStudioView {
             ConfigInputKind::Checkbox { .. } => vec![("false".into(), "false".into()), ("true".into(), "true".into())],
             _ => Vec::new(),
         };
-        let columns: Vec<(usize, &ConfiguredParam)> = cfg.configured.iter().enumerate().filter(|(_, c)| c.input == iid).collect();
+        let mut columns: Vec<(usize, &ConfiguredParam)> = cfg.configured.iter().enumerate().filter(|(_, c)| c.input == iid).collect();
+        // Live 1725: grouped under their feature (in feature order), each
+        // feature's in its parameter order, not the order configured.
+        let place = |c: &ConfiguredParam| {
+            let fi = studio.index_of(c.feature).unwrap_or(usize::MAX);
+            let pi = studio.feature(c.feature).and_then(|f| f.feature_type()).and_then(|t| t.params.iter().position(|p| p.id == c.param)).unwrap_or(usize::MAX);
+            (fi, pi)
+        };
+        columns.sort_by_key(|(_, c)| place(c));
         const NAME_W: f32 = 140.;
         const COL_W: f32 = 140.;
         const ROW_H: f32 = 34.;

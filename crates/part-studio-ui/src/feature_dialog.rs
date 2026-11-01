@@ -1109,6 +1109,9 @@ impl FeatureDialog {
             let name = &tail[..end];
             let value = match (name, specs.iter().find(|p| p.id == name)) {
                 ("index", None) => (index + 1).to_string(),
+                // A hidden `index` std keeps at the row's 0-based position
+                // (Routing curve's "Point 0").
+                ("index", Some(spec)) if spec.hints.has(Hints::ALWAYS_HIDDEN) => index.to_string(),
                 (_, Some(spec)) => match (&spec.kind, item.get(name)) {
                     (ParamKind::Query { .. }, _) => item.query(name).first().map(|r| (self.labeler)(r)).unwrap_or_default(),
                     (ParamKind::Enum { options, default }, _) => options.iter().find(|(id, _)| item.is(name, id)).or_else(|| options.iter().find(|(id, _)| id == default)).map(|(_, l)| l.to_string()).unwrap_or_default(),

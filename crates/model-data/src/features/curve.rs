@@ -53,12 +53,9 @@ pub fn helix() -> FeatureType {
         // Zero height is a flat spiral.
         // helix.fs NONNEGATIVE_LENGTH_BOUNDS: 1e-5 m minimum (live L32: 0 is invalid).
         ParamSpec::num("height", "Height", NumSpec { min: 1e-5, ..NumSpec::positive_length(25.0, 1.0) }).visible(move |v| height_end(v) && !axis_ty(v, "SURFACE")),
-        ParamSpec::bool("endRadToggle", "End radius", false)
-            .hints(Hints::DISPLAY_SHORT | Hints::FIRST_IN_ROW)
-            .visible(move |v| height_end(v) && axis_ty(v, "AXIS")),
-        ParamSpec::num("endRadius", "End radius", NumSpec::positive_length(25.0, 1.0))
-            .hints(Hints::DISPLAY_SHORT)
-            .visible(move |v| height_end(v) && axis_ty(v, "AXIS") && v.bool("endRadToggle")),
+        // Live 1722: the checkbox on its own row, End radius on the next.
+        ParamSpec::bool("endRadToggle", "End radius", false).visible(move |v| height_end(v) && axis_ty(v, "AXIS")),
+        ParamSpec::num("endRadius", "End radius", NumSpec::positive_length(25.0, 1.0)).visible(move |v| height_end(v) && axis_ty(v, "AXIS") && v.bool("endRadToggle")),
         ParamSpec::query1("endPoint", "End point", QueryFilter::VERTEX | QueryFilter::SKETCH_POINT).visible(end_point),
         ParamSpec::num("revolutions", "Target revolutions", NumSpec::real(4.0, 1e-5, 1000.0)).visible(move |v| path(v, "TURNS") || path(v, "TURNS_PITCH")),
         ParamSpec::num("actualRevolutions", "Computed revolutions", NumSpec::real(4.0, 1e-5, 1000.0))
@@ -398,6 +395,8 @@ pub fn routing_curve() -> FeatureType {
             "Points",
             "point",
             vec![
+                // std keeps it at the point's 0-based position ("Point 0", live 1722).
+                hidden(ParamSpec::num("index", "Point index", NumSpec::integer(0, 0, 10_000))),
                 ParamSpec::enum_("referenceType", "Reference", &[("ORIGIN", "Origin"), ("VERTEX", "Vertex"), ("CURVE", "Curve"), ("RELATIVE", "Relative")]).hints(Hints::SHOW_LABEL),
                 ParamSpec::query1("vertex", "Vertex", QueryFilter::POINT_LIKE).visible(move |v| reference(v, "VERTEX")),
                 ParamSpec::query("curve", "Edges", CURVES).visible(move |v| reference(v, "CURVE")),
@@ -407,6 +406,7 @@ pub fn routing_curve() -> FeatureType {
                 ParamSpec::num("dx", "X offset", ZERO_DEFAULT_LENGTH),
                 ParamSpec::num("dy", "Y offset", ZERO_DEFAULT_LENGTH),
                 ParamSpec::num("dz", "Z offset", ZERO_DEFAULT_LENGTH),
+                hidden(ParamSpec::text("rotationMatrix", "Rotation matrix", "")),
                 ParamSpec::bool("overrideBendRadius", "Override bend radius", false),
                 ParamSpec::num("pointBendRadius", "Bend radius", NONNEGATIVE_ZERO_DEFAULT).visible(|v| v.bool("overrideBendRadius")),
                 ParamSpec::bool("hasDerivative", "Derivative", false),
@@ -420,8 +420,10 @@ pub fn routing_curve() -> FeatureType {
                     .visible(|v| v.bool("hasDerivative") && v.is("derivativeAlignment", "DIRECTION")),
                 ParamSpec::num("magnitude", "Magnitude", CLAMP_MAGNITUDE).visible(|v| v.bool("hasDerivative")),
                 ParamSpec::flip("oppositeDirection", "Opposite direction").visible(|v| v.bool("hasDerivative")),
+                hidden(ParamSpec::bool("arrayAdded", "Added by the array", true)),
             ],
         )
+        .item_template("Point #index")
         .hints(Hints::PREVENT_ARRAY_REORDER)
         .visible(single),
         ParamSpec::bool("addPointOnAxisDrag", "Add point on axis drag", false).hints(Hints::UNCONFIGURABLE).visible(single),
