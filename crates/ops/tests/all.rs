@@ -17,4 +17,5 @@ mod mate_flip;
 mod mesh_pixels;
 mod regen_profile;
 mod smoke;
+mod spawn_guard;
 mod symmetric_mirror;
