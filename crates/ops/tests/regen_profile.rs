@@ -372,3 +372,37 @@ fn bench_profile_live30_display_mesh() {
     kernel_profile_mark("ours, three rounds");
     let _ = std::fs::remove_file(&tmp);
 }
+
+/// The profile documents (core 11-01: the perf fixtures and qa's documents, ~/agents/profdocs on the perf hosts, else
+/// NOSHAPE_PROFILE_DIR) regenerated once each, one line a document: its total and its slowest feature.
+/// `tools/tiers/perf.sh -p noshape-ops --test all -- regen_profile::bench_profdocs --ignored --nocapture --test-threads=1`
+#[test]
+#[ignore = "T2 bench: needs ~/agents/profdocs"]
+fn bench_profdocs() {
+    let dir = std::env::var_os("NOSHAPE_PROFILE_DIR").map_or_else(|| std::path::PathBuf::from(format!("{}/agents/profdocs", std::env::var("HOME").unwrap_or_default())), std::path::PathBuf::from);
+    let mut files: Vec<_> = std::fs::read_dir(&dir).expect("profile documents").filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape")).collect();
+    files.sort();
+    let tmp = std::env::temp_dir().join(format!("noshape-profdocs-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+    for path in files {
+        let copy = tmp.join(path.file_name().unwrap());
+        std::fs::copy(&path, &copy).unwrap();
+        let s = noshape_ops::session::Session::open(&copy).unwrap();
+        let units = s.doc.settings.units;
+        let (mut total, mut slow) = (0.0, (String::new(), 0.0));
+        for tab in &s.doc.tabs {
+            if let TabContent::PartStudio(ps) = &tab.content {
+                let t = Instant::now();
+                let r = Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+                total += t.elapsed().as_secs_f64() * 1e3;
+                for (f, st) in ps.features.iter().zip(&r.display.features) {
+                    if st.time_ms as f64 > slow.1 {
+                        slow = (f.name.clone(), st.time_ms as f64);
+                    }
+                }
+            }
+        }
+        println!("profdoc {}: {total:.0} ms (slowest {} {:.0} ms)", path.file_stem().unwrap().to_string_lossy(), slow.0, slow.1);
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+}
