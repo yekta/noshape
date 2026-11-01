@@ -3499,6 +3499,7 @@ impl PartStudioView {
             // off its midpoint, a point's glyph sits up-left of it (top-left
             // at -27, -26) with a leader.
             let mut leader = false;
+            let mut hang = false;
             let (x, y, dx, dy) = match g.offset {
                 Some(o) => {
                     let Some((x, y)) = project(g.anchor + o) else { continue };
@@ -3515,11 +3516,18 @@ impl PartStudioView {
                         (x, y, -27.0 - 22.0 * kf, -26.0)
                     } else if let Some((nx, ny)) = line_side(g.entity) {
                         (x + nx * 20.5, y + ny * 20.5, -10.0 - 11.0 * (n - 1.0) + 22.0 * kf, -10.0)
+                    } else if g.icon == "flow" {
+                        // Live 1716: below the curve on a short grey leader.
+                        hang = true;
+                        (x, y, -10.0 + 22.0 * kf, 14.0)
                     } else {
                         (x, y, 6.0 + 22.0 * kf, 6.0)
                     }
                 }
             };
+            if hang {
+                out.push(div().absolute().left(px(x)).top(px(y)).w(px(1.)).h(px(14.)).bg(rgb(0xa8b2bb)).into_any_element());
+            }
             if leader {
                 // Live: a 1 px #a8b2bb line from the box's corner to the point.
                 out.push(
