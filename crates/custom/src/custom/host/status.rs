@@ -21,7 +21,7 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("functionReportFeatureStatus", report_status),
     ("functionGetFeatureStatus", get_status),
     ("clearFeatureStatus", clear_status),
-    ("setFeatureComputedParameter", noop),
+    ("setFeatureComputedParameter", set_feature_computed_parameter),
     ("setFeatureHiddenParameters", noop),
     ("recordQuery", noop),
     ("setExternalDisambiguation", noop),
@@ -362,6 +362,28 @@ fn quantity_value(q: &Quantity) -> Value {
     } else {
         Value::num(q.value)
     }
+}
+
+/// `setFeatureComputedParameter(context, id, { name, value })`: a value the
+/// dialog shows (lengths as lengths, other quantities in the units, text).
+fn set_feature_computed_parameter(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let def = def_arg(i, &a, 2)?;
+    let Some(name) = def.get("name").as_str() else { return Ok(Value::Undefined) };
+    let value = def.get("value");
+    let mut st = cx.state.lock();
+    let shown = match quantity_of(value) {
+        Some(q) if q.dim == noshape_units::Dim::LENGTH => crate::display::ComputedValue::Length(q.value),
+        Some(q) => crate::display::ComputedValue::Text(noshape_units::format_quantity(q, &st.units)),
+        None => match value.as_str() {
+            Some(s) => crate::display::ComputedValue::Text(s.to_string()),
+            None if value.as_bool().is_some() => crate::display::ComputedValue::Text(value.as_bool().unwrap_or_default().to_string()),
+            None => return Ok(Value::Undefined),
+        },
+    };
+    st.computed.retain(|(k, _)| **k != *name);
+    st.computed.push((name.to_string(), shown));
+    Ok(Value::Undefined)
 }
 
 fn set_variable(i: &mut Interp, a: Vec<Value>) -> R<Value> {

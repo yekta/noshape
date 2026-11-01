@@ -131,6 +131,9 @@ pub struct CtxState {
     /// lines and arrows of sub-features it then aborts) and their colours
     /// (sRGB), shown while the feature is edited.
     pub debug_entities: Vec<(noshape_kernel::Shape, [u8; 3])>,
+    /// `setFeatureComputedParameter`: values the dialog shows (Jog's
+    /// computed bend angle), handed to the regeneration's feature state.
+    pub computed: Vec<(String, crate::display::ComputedValue)>,
     /// Sketches being built (`newSketch` .. `skSolve`), by sketch id.
     pub sketches: HashMap<FsId, sketch::SketchBuild>,
     /// String entity ids of FeatureScript sketches.
@@ -226,6 +229,7 @@ impl FsContext {
                 variables: BTreeMap::new(),
                 attributes,
                 debug_entities: Vec::new(),
+                computed: Vec::new(),
                 sketches: HashMap::new(),
                 sketch_names: HashMap::new(),
                 hidden,

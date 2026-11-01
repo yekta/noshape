@@ -272,6 +272,11 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
     let top = vec![Arc::<str>::from(ev.feature.to_string())];
     let status = st.status.get(&top).cloned();
     let debug = std::mem::take(&mut st.debug_entities);
+    // std's setFeatureComputedParameter values (Jog's bend angle).
+    for (k, v) in std::mem::take(&mut st.computed) {
+        ev.computed.retain(|(c, _)| *c != k);
+        ev.computed.push((k, v));
+    }
     drop(st);
     // Shown while the feature is edited, also when it fails (live).
     add_debug(&mut ev.debug, debug);
