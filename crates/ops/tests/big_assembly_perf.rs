@@ -229,3 +229,14 @@ fn big_assembly_1000_drag_profile() {
     let (s, frame) = drag(&mut b.ctx, &b.path, b.tops[3], DVec3::new(0.05, 0.03, 0.0), 600);
     println!("a1000 drag: solve median {:.2} ms, frame {}", ms(s.median), frame.map(|f| format!("{:.2} ms", ms(f.median))).unwrap_or_default());
 }
+
+/// A1000 evaluated again and again with nothing changed (to profile what
+/// every edit pays: `perf record` this test).
+#[test]
+#[ignore]
+fn big_assembly_1000_evaluate_profile() {
+    let mut b = build(A1000);
+    fold_solved(&mut b.ctx, &b.path);
+    let again = stats((0..300).map(|_| evaluate(&mut b.ctx, &b.path, |_| {})).collect());
+    println!("a1000 evaluate again: median {:.1} ms", ms(again.median));
+}

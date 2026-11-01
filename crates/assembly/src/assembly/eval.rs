@@ -997,6 +997,8 @@ pub struct AssemblyEvaluator {
     /// subassembly reuses them (26 instances of one sub re-solved the same
     /// mates 26 times). Empty outside `evaluate`.
     subs_done: HashMap<u64, SubassemblyDone>,
+    /// Mate connector frames of parts (see [`ConnectorMemo`]).
+    connectors: ConnectorMemo,
 }
 
 /// A subassembly's preparation and solve, as [`AssemblyEvaluator::prepare_subassembly`] makes them.
@@ -1421,24 +1423,53 @@ fn connector_frame(origin: DVec3, z: DVec3) -> Frame {
     Frame::from_axes(origin, z, x.normalize())
 }
 
-/// Connector frames resolved during one evaluation, by part context (its
-/// `Arc`, alive for the evaluation), body, reference and alignment: the
-/// instances of one part share them.
+/// Connector frames by part context (its `Arc`, held here so its address
+/// stays its own), body, reference and alignment: the instances of one part
+/// share them, and later evaluations reuse them while the part's
+/// regeneration is the same (an a1000 evaluation spent a quarter of its time
+/// integrating the same face centroids again). Kept by the evaluator; the
+/// contexts nothing else holds any more are dropped at each evaluation.
 #[derive(Default)]
-struct ConnectorMemo(std::cell::RefCell<HashMap<ConnectorKey, Option<Frame>>>);
+struct ConnectorMemo {
+    frames: std::cell::RefCell<HashMap<ConnectorKey, Option<Frame>>>,
+    contexts: std::cell::RefCell<HashMap<usize, Arc<Context>>>,
+    /// The units the frames were resolved in.
+    units: String,
+}
 
 /// (part context address, body, reference, alignment).
 type ConnectorKey = (usize, Option<BodyId>, Reference, Option<Reference>);
 
 impl ConnectorMemo {
     fn resolve(&self, ctx: &Arc<Context>, body: Option<&BodyId>, reference: &Reference, align: Option<&Reference>, units: &UnitPrefs) -> Option<Frame> {
-        let key = (Arc::as_ptr(ctx) as usize, body.cloned(), reference.clone(), align.cloned());
-        if let Some(f) = self.0.borrow().get(&key) {
+        let address = Arc::as_ptr(ctx) as usize;
+        let key = (address, body.cloned(), reference.clone(), align.cloned());
+        if let Some(f) = self.frames.borrow().get(&key) {
             return *f;
         }
         let f = resolve_connector_aligned(ctx, body, reference, align, units);
-        self.0.borrow_mut().insert(key, f);
+        self.contexts.borrow_mut().entry(address).or_insert_with(|| ctx.clone());
+        self.frames.borrow_mut().insert(key, f);
         f
+    }
+
+    /// Before an evaluation: forget the contexts only this memo still holds
+    /// (their parts were regenerated or removed), all of it when the units
+    /// changed.
+    fn prune(&mut self, units: &UnitPrefs) {
+        let u = format!("{units:?}");
+        if u != self.units {
+            self.frames.get_mut().clear();
+            self.contexts.get_mut().clear();
+            self.units = u;
+            return;
+        }
+        let gone: HashSet<usize> = self.contexts.get_mut().iter().filter(|(_, c)| Arc::strong_count(c) == 1).map(|(a, _)| *a).collect();
+        if gone.is_empty() {
+            return;
+        }
+        self.contexts.get_mut().retain(|a, _| !gone.contains(a));
+        self.frames.get_mut().retain(|k, _| !gone.contains(&k.0));
     }
 }
 
@@ -2006,6 +2037,7 @@ impl AssemblyEvaluator {
         self.evaluating = true;
         self.studios_checked.clear();
         self.subs_done.clear();
+        self.connectors.prune(&doc.settings.units);
         let (leaves, nodes, prepared) = self.prepare_inner(doc, assembly, &mut visited);
         self.evaluating = false;
         self.studios_checked.clear();
@@ -2554,7 +2586,8 @@ impl AssemblyEvaluator {
             }
             m
         };
-        let memo = ConnectorMemo::default();
+        // (Taken from the evaluator for the borrow; given back at the end.)
+        let memo = std::mem::take(&mut self.connectors);
 
         // ---------------------------------------------------- assembly mate connectors
         // Frame of a connector relative to its owner (a flexible subassembly
@@ -2994,6 +3027,7 @@ impl AssemblyEvaluator {
                 mark(n, asm);
             }
         }
+        self.connectors = memo;
         (leaves, nodes, prepared)
     }
 
