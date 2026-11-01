@@ -185,9 +185,9 @@ pub fn ruled_surface() -> FeatureType {
 
 pub fn mutual_trim() -> FeatureType {
     let p = vec![
-        ParamSpec::query1("body1", "First surface", QueryFilter::SHEET_BODY).hints(Hints::INITIAL_FOCUS),
+        ParamSpec::query("body1", "First set of surfaces", QueryFilter::SHEET_BODY).hints(Hints::INITIAL_FOCUS),
         ParamSpec::flip("keepOtherSide1", "Keep opposite side"),
-        ParamSpec::query1("body2", "Second surface", QueryFilter::SHEET_BODY),
+        ParamSpec::query("body2", "Second set of surfaces", QueryFilter::SHEET_BODY),
         ParamSpec::flip("keepOtherSide2", "Keep opposite side"),
         ParamSpec::bool("merge", "Merge", true).hints(Hints::REMEMBER_PREVIOUS_VALUE),
     ];

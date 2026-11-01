@@ -783,40 +783,65 @@ pub fn ruled_surface(ev: &mut EvalCtx) -> FResult<()> {
 // ------------------------------------------------------------------ mutual trim
 
 pub fn mutual_trim(ev: &mut EvalCtx) -> FResult<()> {
-    let b1 = ev.resolve_bodies(ev.query("body1")).first().copied().ok_or_else(|| FeatureError::new("Select the first surface"))?;
-    let b2 = ev.resolve_bodies(ev.query("body2")).first().copied().ok_or_else(|| FeatureError::new("Select the second surface"))?;
-    if b1 == b2 {
-        return err("Select two different surfaces");
+    // std mutualTrim.fs: a set of surfaces trimmed against another set (each
+    // side's surfaces split by the other side's, one side of the cut kept),
+    // then merged into one surface when Merge is on.
+    let set = |ev: &EvalCtx, id: &str| -> Vec<usize> {
+        let mut v = ev.resolve_bodies(ev.query(id));
+        v.dedup();
+        v
+    };
+    let (s1, s2) = (set(ev, "body1"), set(ev, "body2"));
+    let msg = crate::regen::custom_features::error_text;
+    if s1.is_empty() {
+        return crate::regen::eval::err_at(&["body1"], msg("MUTUAL_TRIM_SURFACE_NOT_SELECTED"));
     }
-    for bi in [b1, b2] {
-        if ev.ctx.bodies[bi].kind != BodyKind::Surface {
-            return err("Mutual trim works on surfaces only");
-        }
+    if s2.is_empty() {
+        return crate::regen::eval::err_at(&["body2"], msg("MUTUAL_TRIM_SURFACE_NOT_SELECTED"));
     }
+    if s1.iter().any(|b| s2.contains(b)) {
+        return crate::regen::eval::err_at(&["body1", "body2"], msg("MUTUAL_TRIM_SAME_SURFACE_USED"));
+    }
+    if s1.iter().chain(&s2).any(|&bi| ev.ctx.bodies[bi].kind != BodyKind::Surface) {
+        return err("Mutual trim works on surfaces only");
+    }
+    let tool_of = |ev: &EvalCtx, set: &[usize]| -> Shape {
+        let shapes: Vec<Shape> = set.iter().map(|&i| ev.ctx.bodies[i].shape.clone()).collect();
+        if shapes.len() == 1 { shapes[0].clone() } else { Shape::compound(&shapes) }
+    };
     let mut kept: Vec<(usize, Shape, Vec<Name>)> = Vec::new();
-    for (me, other, flip) in [(b1, b2, ev.bool("keepOtherSide1")), (b2, b1, ev.bool("keepOtherSide2"))] {
-        let body = ev.ctx.bodies[me].clone();
-        let tool = ev.ctx.bodies[other].shape.clone();
-        let res = k::split(std::slice::from_ref(&body.shape), std::slice::from_ref(&tool), &k::BooleanOptions::default())?;
-        let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &Default::default(), None);
-        let faces = res.shape.faces();
-        if faces.len() < 2 {
-            return err("The surfaces do not intersect");
+    let mut trimmed = false;
+    for (mine, other, flip) in [(&s1, &s2, ev.bool("keepOtherSide1")), (&s2, &s1, ev.bool("keepOtherSide2"))] {
+        let tool = tool_of(ev, other);
+        for &me in mine.iter() {
+            let body = ev.ctx.bodies[me].clone();
+            let res = k::split(std::slice::from_ref(&body.shape), std::slice::from_ref(&tool), &k::BooleanOptions::default())?;
+            let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &Default::default(), None);
+            let faces = res.shape.faces();
+            // Group faces into connected sides; keep the larger side by default.
+            let groups = if faces.len() < 2 { Vec::new() } else { side_groups(&faces, &tool) };
+            if groups.len() < 2 {
+                // Not cut by the other set: kept whole.
+                kept.push((me, body.shape.clone(), body.faces.clone()));
+                continue;
+            }
+            trimmed = true;
+            let area = |g: &Vec<usize>| g.iter().map(|&i| faces[i].area().unwrap_or(0.0)).sum::<f64>();
+            let big = (0..groups.len()).max_by(|a, b| area(&groups[*a]).total_cmp(&area(&groups[*b]))).unwrap_or(0);
+            let chosen: Vec<usize> = if flip { groups.iter().enumerate().filter(|(i, _)| *i != big).flat_map(|(_, g)| g.clone()).collect() } else { groups[big].clone() };
+            let fs: Vec<Shape> = chosen.iter().map(|&i| faces[i].clone()).collect();
+            let ns: Vec<Name> = chosen.iter().map(|&i| names[i].clone()).collect();
+            kept.push((me, if fs.len() == 1 { fs[0].clone() } else { Shape::compound(&fs) }, ns));
         }
-        // Group faces into connected sides via sewing; keep the larger side by default.
-        let groups = side_groups(&faces, &tool);
-        if groups.len() < 2 {
-            return err("The surfaces do not cut each other");
-        }
-        let area = |g: &Vec<usize>| g.iter().map(|&i| faces[i].area().unwrap_or(0.0)).sum::<f64>();
-        let big = (0..groups.len()).max_by(|a, b| area(&groups[*a]).total_cmp(&area(&groups[*b]))).unwrap_or(0);
-        let chosen: Vec<usize> = if flip { groups.iter().enumerate().filter(|(i, _)| *i != big).flat_map(|(_, g)| g.clone()).collect() } else { groups[big].clone() };
-        let fs: Vec<Shape> = chosen.iter().map(|&i| faces[i].clone()).collect();
-        let ns: Vec<Name> = chosen.iter().map(|&i| names[i].clone()).collect();
-        kept.push((me, if fs.len() == 1 { fs[0].clone() } else { Shape::compound(&fs) }, ns));
     }
+    if !trimmed {
+        // std: the split changes nothing, an info rather than an error.
+        ev.infos.push(crate::regen::eval::NO_GEOMETRY_CHANGE.into());
+        return Ok(());
+    }
+    let b1 = s1[0];
     let first = ev.ctx.bodies[b1].clone();
-    let ids = [ev.ctx.bodies[b1].id.clone(), ev.ctx.bodies[b2].id.clone()];
+    let ids: Vec<BodyId> = s1.iter().chain(&s2).map(|&i| ev.ctx.bodies[i].id.clone()).collect();
     let mut new_bodies = Vec::new();
     if ev.bool("merge") {
         let shapes: Vec<Shape> = kept.iter().map(|k| k.1.clone()).collect();
@@ -841,13 +866,12 @@ pub fn mutual_trim(ev: &mut EvalCtx) -> FResult<()> {
             new_bodies.push(Body::new(b.id.clone(), b.name.clone(), b.kind, shape, names, b.color, ev.feature));
         }
     }
-    let pos = b1.min(b2);
+    let pos = s1.iter().chain(&s2).copied().min().unwrap_or(0);
     ev.ctx.bodies.retain(|b| !ids.contains(&b.id));
     for (j, b) in new_bodies.into_iter().enumerate() {
         let at = (pos + j).min(ev.ctx.bodies.len());
         ev.ctx.bodies.insert(at, Arc::new(b));
     }
-    let _ = BodyId { feature: ev.feature, index: 0 };
     Ok(())
 }
 

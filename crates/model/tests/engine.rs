@@ -679,6 +679,41 @@ fn query_variables_feed_query_parameters() {
     assert_eq!(res.display.features[2].status, FeatureStatus::Error);
 }
 
+/// std queryVariable.fs selection types beyond Selection / Created by: Edge
+/// convexity on a block (12 convex edges), Tangent connected faces, and an
+/// additional query (std's "addQ" fields) subtracting the top face's edges.
+#[test]
+fn query_variable_selection_types_as_std() {
+    let mut t = T::new();
+    let (_, _x) = t.block(0.0, 0.0, 0.02, 0.02, "10 mm");
+    let res = t.ok();
+    let body = Reference::Body(res.context.bodies[0].id.clone());
+    let top = res.context.bodies[0].faces.iter().map(|n| Reference::Face((**n).clone())).find(|f| {
+        let fs = res.context.bodies[0].shape.faces();
+        let i = res.context.bodies[0].faces.iter().position(|n| Reference::Face((**n).clone()) == *f).unwrap();
+        fs[i].centroid().is_ok_and(|c| (c.z - 0.01).abs() < 1e-9)
+    }).unwrap();
+    t.add("queryVariable", &[("name", ParamValue::Text("convex".into())), ("selectionType", en("EDGE_CONVEXITY")), ("seedBodies", q(vec![body.clone()])), ("edgeConvexityType", en("CONVEX"))]);
+    t.add("queryVariable", &[("name", ParamValue::Text("tangent".into())), ("selectionType", en("TANGENT_CONNECTED")), ("seedType", en("FACE")), ("seedFaces", q(vec![top.clone()]))]);
+    let mut item = ParamValues::default();
+    item.set("booleanOperation", en("SUBTRACTION"));
+    item.set("addQselectionType", en("LOOP_CHAIN_CONNECTED"));
+    item.set("addQseedEdgesOrFaces", q(vec![top]));
+    t.add("queryVariable", &[
+        ("name", ParamValue::Text("sides".into())),
+        ("selectionType", en("EDGE_CONVEXITY")),
+        ("seedBodies", q(vec![body])),
+        ("edgeConvexityType", en("CONVEX")),
+        ("addAdditionalQueries", b(true)),
+        ("additionalQueries", ParamValue::Array(vec![item])),
+    ]);
+    let res = t.ok();
+    let n = |k: &str| res.context.query_variables.get(k).map(|v| v.len());
+    assert_eq!(n("convex"), Some(12));
+    assert_eq!(n("tangent"), Some(1), "a block's top face has no tangent neighbours");
+    assert_eq!(n("sides"), Some(8), "12 convex edges less the top face's loop of 4");
+}
+
 // ------------------------------------------------------------------ hole table edit logic
 
 #[test]

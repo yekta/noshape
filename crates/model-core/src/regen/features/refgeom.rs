@@ -442,7 +442,7 @@ pub fn query_variable(ev: &mut EvalCtx) -> FResult<()> {
     let mut refs = query_selection(ev, ev.params, &st, "")?;
     if ev.bool("addAdditionalQueries") {
         for item in ev.params.array("additionalQueries") {
-            let t = item.enum_("addQSelectionType").to_string();
+            let t = item.enum_("addQselectionType").to_string();
             let more = query_selection(ev, item, &t, "addQ")?;
             match item.enum_("booleanOperation") {
                 "SUBTRACTION" => refs.retain(|r| !more.contains(r)),
@@ -466,20 +466,14 @@ pub fn query_variable(ev: &mut EvalCtx) -> FResult<()> {
 }
 
 /// Parameter id with the additional-query prefix ("selectionQuery" ->
-/// "addQSelectionQuery").
+/// "addQselectionQuery", std queryVariable.fs).
 fn qid(prefix: &str, id: &str) -> String {
-    if prefix.is_empty() {
-        id.to_string()
-    } else {
-        let mut c = id.chars();
-        let first = c.next().map(|x| x.to_ascii_uppercase()).unwrap_or_default();
-        format!("{prefix}{first}{}", c.as_str())
-    }
+    format!("{prefix}{id}")
 }
 
 fn query_selection(ev: &mut EvalCtx, p: &crate::params::ParamValues, st: &str, prefix: &str) -> FResult<Vec<Reference>> {
     // Entity type: per item for additional queries, else the feature's.
-    let entity_type = if prefix.is_empty() { p.enum_("entityType").to_string() } else { ev.enum_("entityType").to_string() };
+    let entity_type = p.enum_(&qid(prefix, "entityType")).to_string();
     let collect = |ev: &EvalCtx, bodies: &[usize], keep: &dyn Fn(&crate::naming::Name) -> bool| -> Vec<Reference> {
         let mut out = Vec::new();
         for &bi in bodies {
@@ -518,6 +512,50 @@ fn query_selection(ev: &mut EvalCtx, p: &crate::params::ParamValues, st: &str, p
             collect(ev, &bodies, &|_| true)
         }
         "ALL_SOLID_BODIES" => ev.ctx.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect(),
+        // std queryVariable.fs: the Create selection queries, from their seeds.
+        "PROTRUSION" | "POCKET" | "HOLE" | "FILLETS" | "TANGENT_CONNECTED" | "PARALLEL" => {
+            use crate::select::Criterion;
+            let seed_type = p.enum_(&qid(prefix, "seedType")).to_string();
+            let (seeds, criterion) = match st {
+                "PROTRUSION" => (qid(prefix, "seedFaces"), Criterion::Protrusion),
+                "POCKET" => (qid(prefix, "seedFaces"), Criterion::Pocket),
+                "HOLE" => (qid(prefix, "seedFaces"), Criterion::Hole),
+                "FILLETS" => (qid(prefix, "seedFaces"), Criterion::Fillets),
+                "PARALLEL" => (qid(prefix, "seedEdges"), Criterion::ParallelEdges),
+                _ if seed_type == "EDGE" => (qid(prefix, "seedEdges"), Criterion::TangentEdges),
+                _ => (qid(prefix, "seedFaces"), Criterion::TangentFaces),
+            };
+            if st == "FILLETS" && !p.is(&qid(prefix, "filletCompareType"), "EQUAL") {
+                ev.warnings.push("Query variable: only Equal fillet compare is supported yet".into());
+            }
+            let mut out: Vec<Reference> = Vec::new();
+            for seed in p.query(&seeds).to_vec() {
+                for r in crate::select::select_related(&ev.ctx, &seed, criterion) {
+                    if !out.contains(&r) {
+                        out.push(r);
+                    }
+                }
+            }
+            out
+        }
+        "BOUNDED_FACES" => {
+            let bounds = p.query(&qid(prefix, "boundedFacesBounds")).to_vec();
+            let mut out: Vec<Reference> = Vec::new();
+            for seed in p.query(&qid(prefix, "seedFaces")).to_vec() {
+                for r in crate::select::select_bounded(&ev.ctx, &seed, &bounds) {
+                    if !out.contains(&r) {
+                        out.push(r);
+                    }
+                }
+            }
+            out
+        }
+        "LOOP_CHAIN_CONNECTED" => crate::select::select_loops(&ev.ctx, p.query(&qid(prefix, "seedEdgesOrFaces"))),
+        "EDGE_CONVEXITY" => {
+            let kind = p.enum_(&qid(prefix, "edgeConvexityType")).to_string();
+            let bodies = ev.resolve_bodies(p.query(&qid(prefix, "seedBodies")));
+            bodies.into_iter().flat_map(|bi| crate::select::edges_by_convexity(&ev.ctx.bodies[bi], &kind)).collect()
+        }
         other => {
             ev.warnings.push(format!("Query variable selection type {other} is not supported yet; it selects nothing"));
             Vec::new()

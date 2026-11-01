@@ -847,6 +847,50 @@ fn offset_curve_move_boundary_mutual_trim() {
     // Front keeps x in [0.02, 0.05] (0.03 x 0.03), the other keeps y in [0, 0.03].
     let front_y = r.context.bodies[0].shape.bounding_box(true).unwrap();
     assert!(near(a, 0.03 * 0.03 * 2.0, 1e-8), "trimmed area {a} {front_y:?}");
+
+    // Sets (std mutualTrim.fs "First set of surfaces"): two parallel fills
+    // against one crossing fill, not merged: both of the first set keep their
+    // larger side (x in [0.02, 0.05]), the crossing one is cut by both.
+    let mut s = Studio::new();
+    let front = |s: &mut Studio, plane: Reference| {
+        let mut a = noshape_sketch::Sketch::new();
+        let lines = rect(&mut a, 0.0, 0.0, 0.05, 0.03);
+        let sk = s.sketch(plane, a);
+        (sk, lines)
+    };
+    let fa = front(&mut s, Reference::Plane(DatumPlane::Front));
+    s.add("cPlane", |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Front)]));
+        p.set("offset", expr("10 mm"));
+    });
+    let fpl = s.ps.features.last().unwrap().id;
+    let fb = front(&mut s, Reference::FeaturePlane(fpl));
+    s.add("cPlane", |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Right)]));
+        p.set("offset", expr("20 mm"));
+    });
+    let pl = s.ps.features.last().unwrap().id;
+    let mut c = noshape_sketch::Sketch::new();
+    let lc = rect(&mut c, -0.02, 0.0, 0.04, 0.03);
+    let sc = s.sketch(Reference::FeaturePlane(pl), c);
+    let mut fills = Vec::new();
+    for (sk, lines) in [fa, fb, (sc, lc)] {
+        fills.push(s.add("fill", move |p| {
+            let mut row = ParamValues::default();
+            row.set("entities", ParamValue::Query(lines.iter().map(|&e| Reference::SketchEntity { sketch: sk, entity: e }).collect()));
+            p.set("edges", ParamValue::Array(vec![row]));
+        }));
+    }
+    s.add("mutualTrim", move |p| {
+        let body = |f| Reference::Body(BodyId { feature: f, index: 0 });
+        p.set("body1", ParamValue::Query(vec![body(fills[0]), body(fills[1])]));
+        p.set("body2", ParamValue::Query(vec![body(fills[2])]));
+        p.set("merge", ParamValue::Bool(false));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 3);
+    let areas: Vec<f64> = (0..3).map(|i| surface_area(&r, i)).collect();
+    assert_eq!(areas.iter().filter(|a| near(**a, 0.03 * 0.03, 1e-8)).count(), 2, "first set trimmed to 30 x 30 mm each: {areas:?}");
 }
 
 /// Mesh parts in booleans and splits (live G35/G35-retry): a split by a plane

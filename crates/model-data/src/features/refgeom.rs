@@ -194,18 +194,61 @@ pub fn query_variable() -> FeatureType {
             "additionalQueries",
             "Additional queries",
             "Additional query",
-            vec![
-                ParamSpec::enum_("booleanOperation", "Boolean operation", &[("UNION", "Union"), ("SUBTRACTION", "Subtract"), ("INTERSECTION", "Intersect")])
-                    .hints(Hints::HORIZONTAL_ENUM),
-                ParamSpec::enum_("addQSelectionType", "Selection type", SELECTION_TYPE),
-                ParamSpec::query("addQSelectionQuery", "Selections", ANY_ENTITY).visible(|v| v.is("addQSelectionType", "SELECTION")),
-                ParamSpec::query("addQCreatedByFeatures", "Created by features", QueryFilter::FEATURE).visible(|v| v.is("addQSelectionType", "CREATED_BY")),
-                ParamSpec::query("addQSeedBodies", "Entities", QueryFilter::BODY | QueryFilter::WIRE_BODY)
-                    .visible(|v| v.is("addQSelectionType", "OWNED_BY") || v.is("addQSelectionType", "EDGE_CONVEXITY")),
-                ParamSpec::query("addQSeedFaces", "Faces", QueryFilter::ANY_FACE),
-                ParamSpec::query("addQSeedEdges", "Edges", QueryFilter::ANY_EDGE),
-            ],
+            // std queryVariable.fs additionalQueryPredicate: the main query's
+            // fields again, "addQ"-prefixed.
+            {
+                let st = |v: &ParamValues, t: &str| v.is("addQselectionType", t);
+                let any = move |v: &ParamValues, ts: &[&str]| ts.iter().any(|t| st(v, t));
+                let seeded = move |v: &ParamValues| any(v, &["TANGENT_CONNECTED", "MATCHING"]);
+                let face_seed = move |v: &ParamValues| any(v, &["PROTRUSION", "POCKET", "HOLE", "FILLETS", "BOUNDED_FACES"]) || (seeded(v) && v.is("addQseedType", "FACE"));
+                let edge_seed = move |v: &ParamValues| st(v, "PARALLEL") || (seeded(v) && v.is("addQseedType", "EDGE"));
+                let created = move |v: &ParamValues| st(v, "CREATED_BY");
+                let adjacent = move |v: &ParamValues| st(v, "ADJACENT");
+                vec![
+                    ParamSpec::enum_("booleanOperation", "Boolean operation", &[("UNION", "Union"), ("SUBTRACTION", "Subtract"), ("INTERSECTION", "Intersect")])
+                        .hints(Hints::HORIZONTAL_ENUM),
+                    ParamSpec::enum_("addQselectionType", "Selection type", SELECTION_TYPE),
+                    ParamSpec::text("addQlowercaseSelectionType", "Selection type", "").hints(Hints::ALWAYS_HIDDEN),
+                    ParamSpec::enum_("addQseedType", "Entity type", &[("FACE", "Face"), ("EDGE", "Edge")]).visible(seeded),
+                    ParamSpec::query("addQselectionQuery", "Selections", ANY_ENTITY).visible(move |v| st(v, "SELECTION")),
+                    ParamSpec::query("addQcreatedByFeatures", "Created by features", QueryFilter::FEATURE).visible(created),
+                    ParamSpec::query("addQseedBodies", "Entities", QueryFilter::BODY | QueryFilter::WIRE_BODY).visible(move |v| any(v, &["OWNED_BY", "EDGE_CONVEXITY"])),
+                    ParamSpec::query("addQseedFaces", "Face", QueryFilter::ANY_FACE).visible(face_seed),
+                    ParamSpec::query("addQseedEdgesOrFaces", "Edge or face", QueryFilter::ANY_EDGE | QueryFilter::ANY_FACE).visible(move |v| st(v, "LOOP_CHAIN_CONNECTED")),
+                    ParamSpec::query("addQseedEdges", "Edge", QueryFilter::ANY_EDGE).visible(edge_seed),
+                    ParamSpec::enum_("addQentityType", "Entity type", &[("VERTEX", "Vertex"), ("EDGE", "Edge"), ("FACE", "Face"), ("BODY", "Body")])
+                        .visible(move |v| any(v, &["CREATED_BY", "OWNED_BY"])),
+                    ParamSpec::enum_("addQfilletCompareType", "Fillet compare type", &[("EQUAL", "Equal"), ("LESS_EQUAL", "Less or equal"), ("GREATER_EQUAL", "Greater or equal")])
+                        .visible(move |v| st(v, "FILLETS")),
+                    ParamSpec::query("addQboundedFacesBounds", "Bounds", QueryFilter::ANY_EDGE | QueryFilter::ANY_FACE).visible(move |v| st(v, "BOUNDED_FACES")),
+                    ParamSpec::enum_("addQedgeConvexityType", "Edge convexity type", &[("CONVEX", "Convex"), ("CONCAVE", "Concave"), ("SMOOTH", "Smooth"), ("VARIABLE", "Variable")])
+                        .visible(move |v| st(v, "EDGE_CONVEXITY")),
+                    ParamSpec::bool("addQfilterConstruction", "Filter construction entities", true).visible(created),
+                    ParamSpec::bool("addQfilterByBodyType", "Filter by body type", false).visible(created),
+                    ParamSpec::enum_(
+                        "addQcreatedByBodyType",
+                        "Body type",
+                        &[("SOLID", "Part"), ("SHEET", "Surface"), ("WIRE", "Curve"), ("POINT", "Point"), ("MATE_CONNECTOR", "Mate connector"), ("COMPOSITE", "Composite part")],
+                    )
+                    .visible(move |v| created(v) && v.bool("addQfilterByBodyType")),
+                    ParamSpec::query("addQseedQuery", "Entities", QueryFilter::ANY_FACE | QueryFilter::EDGE | QueryFilter::VERTEX).visible(adjacent),
+                    ParamSpec::enum_("addQadjacencyType", "Shared", &[("VERTEX", "Vertex"), ("EDGE", "Edge")]).hints(Hints::SHOW_LABEL).visible(adjacent),
+                    ParamSpec::enum_("addQedgeAdjacentEntityType", "Select", &[("ALL", "Edges and faces"), ("EDGE", "Only edges"), ("FACE", "Only faces")])
+                        .hints(Hints::SHOW_LABEL)
+                        .visible(move |v| adjacent(v) && v.is("addQadjacencyType", "EDGE")),
+                    ParamSpec::enum_(
+                        "addQvertexAdjacentEntityType",
+                        "Select",
+                        &[("ALL", "Edges, faces, and vertices"), ("EDGE", "Only edges"), ("VERTEX", "Only vertices"), ("FACE", "Only faces")],
+                    )
+                    .hints(Hints::SHOW_LABEL)
+                    .visible(move |v| adjacent(v) && v.is("addQadjacencyType", "VERTEX")),
+                ]
+            },
         )
+        // std's "#booleanOperation of #addQlowercaseSelectionType" reads a
+        // label its editing logic writes; the option label stands in for it.
+        .item_template("#booleanOperation of #addQselectionType")
         .visible(|v| v.bool("addAdditionalQueries")),
         ParamSpec::bool("evaluateOnUse", "Evaluate on use", false),
         ParamSpec::bool("showSelection", "Show selection", true),

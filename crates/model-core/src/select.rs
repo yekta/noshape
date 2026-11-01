@@ -215,6 +215,30 @@ fn on_axis(p: DVec3, o: DVec3, a: DVec3, tol: f64) -> bool {
 /// face without crossing the boundary (the other selected edges, or into
 /// the other selected faces). When the boundary doesn't close, the seed
 /// and the faces next to it.
+/// The edges of `body` by convexity (std query.fs qEdgeConvexityTypeFilter,
+/// Query variable's Edge convexity): "CONVEX" / "CONCAVE" sharp edges, "SMOOTH"
+/// tangent ones, "VARIABLE" the rest (changing along the edge).
+pub fn edges_by_convexity(body: &Body, kind: &str) -> Vec<Reference> {
+    let edge_faces = body.shape.edge_faces().unwrap_or_default();
+    edge_faces
+        .iter()
+        .enumerate()
+        .filter(|(e, fs)| {
+            let [fa, fb] = fs.as_slice() else { return false };
+            let (fa, fb) = (*fa as usize, *fb as usize);
+            let smooth = smooth_edge(body, *e, fa, fb);
+            let c = edge_convexity(body, *e, fa, fb);
+            match kind {
+                "SMOOTH" => smooth,
+                "CONVEX" => !smooth && c > 0,
+                "CONCAVE" => !smooth && c < 0,
+                _ => !smooth && c == 0,
+            }
+        })
+        .filter_map(|(e, _)| edge_ref(body, e))
+        .collect()
+}
+
 pub fn select_bounded(ctx: &Context, seed: &Reference, boundary: &[Reference]) -> Vec<Reference> {
     let Some((b, ShapeType::Face, i)) = body_of(ctx, seed) else { return Vec::new() };
     let edge_faces = b.shape.edge_faces().unwrap_or_default();

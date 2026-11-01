@@ -372,6 +372,25 @@ impl PartStudio {
                     f.params.set(param, ParamValue::Enum(new.into()));
                 }
             }
+            // Query variable's additional-query fields in std's case.
+            if f.type_id == "queryVariable"
+                && let Some(ParamValue::Array(items)) = f.params.0.get_mut("additionalQueries")
+            {
+                for item in items.iter_mut() {
+                    for (old, new) in [
+                        ("addQSelectionType", "addQselectionType"),
+                        ("addQSelectionQuery", "addQselectionQuery"),
+                        ("addQCreatedByFeatures", "addQcreatedByFeatures"),
+                        ("addQSeedBodies", "addQseedBodies"),
+                        ("addQSeedFaces", "addQseedFaces"),
+                        ("addQSeedEdges", "addQseedEdges"),
+                    ] {
+                        if let Some(v) = item.0.shift_remove(old) {
+                            item.set(new, v);
+                        }
+                    }
+                }
+            }
             for &(ty, old, new) in RENAMED_PARAMS {
                 if f.type_id == ty
                     && let Some(v) = f.params.0.shift_remove(old)

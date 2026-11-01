@@ -432,9 +432,8 @@ fn query_pick_limits_follow_std() {
             }
         }
     }
-    // And no limit std doesn't set, except where our model takes one entity only (std takes sets: the surfaces
-    // owner's mutualTrim, the Tag's flat view sketch) and the sketch's plane (sketch isn't a std feature).
-    const OURS_ONLY: &[(&str, &str)] = &[("sketch", "sketchPlane"), ("mutualTrim", "body1"), ("mutualTrim", "body2"), ("tag", "flatFormSketch")];
+    // And no limit std doesn't set, except where our model takes one entity only (std takes a set: the Tag's flat view sketch) and the sketch's plane (sketch isn't a std feature).
+    const OURS_ONLY: &[(&str, &str)] = &[("sketch", "sketchPlane"), ("tag", "flatFormSketch")];
     for t in all() {
         for p in t.params.iter() {
             if let ParamKind::Query { max_picks: Some(n), .. } = p.kind

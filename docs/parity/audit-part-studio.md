@@ -12,7 +12,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 |---|---|---|---|
 | Toolbar, every group and overflow (75 tools + Add custom features) | behaviours "Toolbar" (Customize toolbar list), dom/toolbar-partstudio.txt | every live tool in live's group, in order (Move boundary = extendSurface) | 0 |
 | Toolbar right-click, Customize toolbar, narrow-window collapse | behaviours "Toolbar", "Narrow window" | checked earlier (cursors 81, part-studio 4.x, chrome-sweep) | 0 |
-| Feature dialogs, fields and options (75 toolbar features) | std preconditions via std_oracle::print_all | 47 same as std now (37 at first); 28 differ | rows below |
+| Feature dialogs, fields and options (75 toolbar features) | std preconditions via std_oracle::print_all | 48 same as std now (37 at first); 27 differ | rows below |
 | Keyboard shortcuts (live's Shift+/ list, 121 entries) | dom/keyboard-shortcuts.txt | every applicable entry in workflow-keyboard-mouse.md, all ✅ (11-01) | 0 |
 | View menu (camera / render ▾) | dom/menu-camera-render.txt | 16 items = live (part-studio 9.8) | 0 |
 | Context menus: face, edge, vertex, empty space, part, plane, origin, mate connector, sketch region / curve, feature rows (sketch, extrude, fillet, multi), parts-list part, tabs, Select ▸ submenus | dom/context-menus-partstudio.txt, -ps-*.txt | compared in core-workflow §8 and chrome-sweep CM1–CM5 (✅) | 0 |
@@ -20,7 +20,16 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | Panels: Measure, Mass and section properties, Section view, Appearances, Variable table, Configurations, Render / Display states | live asked for whole-panel dumps (REQUESTS 11-01) | in progress | – |
 | View cube (right-click, arrows, hover) | menus/625-proj-viewcube-rightclick*.png | in progress | – |
 
-**Counts (11-01, audit 2):** surfaces audited 5 of 9 (4 waiting on live dumps); dialog gaps found 199 field rows + 52 visibility states; fixed 73 rows and 39 states, accepted 7, open 119 rows + 13 states. 47 of 75 dialogs now equal std (37 at first).
+**Counts (11-01, audit 3):** surfaces audited 5 of 9 (4 waiting on live dumps); dialog gaps found 199 field rows + 52 visibility states + 4 found outside the oracle; fixed 79 rows, 39 states and 3 of the 4 (A2–A4); accepted 7; open 113 rows + 13 states + A1. 48 of 75 dialogs now equal std (37 at first).
+
+## Found outside the oracle (in the app, std's code, live)
+
+| # | Surface | Item | P | Difference | Status |
+|---|---|---|---|---|---|
+| A1 | Tag dialog | basePlane | P2 | std pre-fills Base plane with the Top plane (tag.fs defaults `qTopPlane`); ours starts empty | ✗ |
+| A2 | Variable (Measured) | componentSelector | P1 | Along custom recorded the plain distance, and X / Y / Z only while the Axis measurements group was open; std records the chosen component always and Along custom along the picked direction ("Select custom direction." when empty) | ✅ ce91c9c7 |
+| A3 | Query variable dialog | additionalQueries | P1 | an additional query offers only Selection / Created by / Owned by / Protrusion / Pocket / Hole style types with 5 seed fields; std's item has 20 fields (entity type, fillet compare, bounded faces, edge convexity, construction / body-type filters, adjacency) and ids in std's case (addQselectionType, …) | ✅ (audit 3): std\'s 20 item fields with std ids (old documents renamed on load); the evaluator now does Protrusion, Pocket, Hole, Fillets (Equal), Tangent connected, Parallel, Bounded faces, Loop/chain connected and Edge convexity for the main query and each additional one, with each item\'s own entity type. Still to do: Matching, Adjacent, Fillets Less / Greater than (warnings) |
+| A4 | Mutual trim | body1 / body2 | P1 | std trims a set of surfaces against a set ("First set of surfaces", "Second set of surfaces"); ours takes one surface a side; with nothing to trim std reports "no geometry change" as info, ours errors | ✅ (audit 3): sets of surfaces each side, std\'s texts ("Select a surface.", "Same surface cannot be used twice."), no change = info (T1 features_b offset_curve_move_boundary_mutual_trim) |
 
 ## Feature dialogs against std
 
@@ -30,15 +39,15 @@ which fields show); P3: internal (option ids under the same labels, configurabil
 oracle reads std's annotations, not its feature defaults map: a default std sets there (Ruled surface's cubic interpolation)
 is checked by hand.
 
-Field rows: 199 (fixed 73, accepted 7, open 119); visibility states differing now: 13.
+Field rows: 199 (fixed 79, accepted 7, open 113); visibility states differing now: 13.
 
 | # | Feature | Field | P | Difference (std = live) | Status |
 |---|---|---|---|---|---|
 | D1 | editCurve | curveDegree | P1 | value: std `Integer 0..15 =0.000000000000 / 0.000000000000` / ours `Integer 0..1000 =3.000000000000 / 3.000000000000` | – read-only counts std's editing logic fills from the picked curve; ours shows the same once picked (P3) |
 | D2 | editCurve | curveNumCPs | P1 | value: std `Integer 0..99 =0.000000000000 / 0.000000000000` / ours `Integer 0..100000 =4.000000000000 / 4.000000000000` | – read-only counts std's editing logic fills from the picked curve; ours shows the same once picked (P3) |
 | D3 | editCurve | curveNumSpans | P1 | value: std `Integer 0..99 =0.000000000000 / 0.000000000000` / ours `Integer 0..100000 =1.000000000000 / 1.000000000000` | – read-only counts std's editing logic fills from the picked curve; ours shows the same once picked (P3) |
-| D4 | mutualTrim | body1 | P1 | value: std `query max None` / ours `query max Some(1)` | ✗ |
-| D5 | mutualTrim | body2 | P1 | value: std `query max None` / ours `query max Some(1)` | ✗ |
+| D4 | mutualTrim | body1 | P1 | value: std `query max None` / ours `query max Some(1)` | ✅ (audit 3, 11-01) |
+| D5 | mutualTrim | body2 | P1 | value: std `query max None` / ours `query max Some(1)` | ✅ (audit 3, 11-01) |
 | D6 | ruledSurface | useCubicInterpolation | P1 | value: std `bool=false` / ours `bool=true` | – std's defaults map sets true (ruledSurface.fs); ours true |
 | D7 | sheetMetalJog | jogLimitDistance | P1 | value: std `Length 0..500 =0.005000000000 / 0.006350000000` / ours `Length 0..500 =0.000000000000 / 0.000000000000` | ✅ (audit 1, 11-01) |
 | D8 | sheetMetalJog | thicknessFactor | P1 | value: std `Real 0..100000 =1.000000000000 / 1.000000000000` / ours `Real 0.00001..100000 =3.000000000000 / 3.000000000000` | ✅ (audit 1, 11-01) |
@@ -81,16 +90,16 @@ Field rows: 199 (fixed 73, accepted 7, open 119); visibility states differing no
 | D45 | intersectionCurve | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
 | D46 | isoparametricCurve | directionType | P2 | default option: std U_DIRECTION / ours U | ✅ (audit 1, 11-01) |
 | D47 | mateConnector | flipPrimary | P2 | hints: std adds ['FIRST_IN_ROW', 'OPPOSITE_DIRECTION'], ours adds ['PRIMARY_AXIS'] | ✗ |
-| D48 | mutualTrim | body1 | P2 | label: std "First set of surfaces", ours "First surface" | ✗ |
-| D49 | mutualTrim | body2 | P2 | label: std "Second set of surfaces", ours "Second surface" | ✗ |
+| D48 | mutualTrim | body1 | P2 | label: std "First set of surfaces", ours "First surface" | ✅ (audit 3, 11-01) |
+| D49 | mutualTrim | body2 | P2 | label: std "Second set of surfaces", ours "Second surface" | ✅ (audit 3, 11-01) |
 | D50 | offsetCurveOnFace | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
 | D51 | pcbStart | hasSecondDirection | P2 | hints: std adds [], ours adds ['GROUP_HEADER'] | ✅ (audit 2, 11-01) |
 | D52 | pcbStart | offsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✗ |
 | D53 | pcbStart | secondDirectionDepth | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✗ |
 | D54 | pcbStart | secondDirectionOffsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✗ |
 | D55 | projectCurves | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
-| D56 | queryVariable | additionalQueries | P2 | array item fields differ: std [booleanOperation "Boolean operation" enum[("UNION", "Union"), ("SUBTRACTION", "Subtract"), ("INTERSECTION", "… ours [booleanOperation "Boolean operation" enum[("UNION", "Union"), ("SUBTRACTION", "Subtract"), ("INTERSECTION", "… | ✗ |
-| D57 | queryVariable | additionalQueries | P2 | array row label: std Some("#booleanOperation of #addQlowercaseSelectionType"), ours None | ✗ |
+| D56 | queryVariable | additionalQueries | P2 | array item fields differ: std [booleanOperation "Boolean operation" enum[("UNION", "Union"), ("SUBTRACTION", "Subtract"), ("INTERSECTION", "… ours [booleanOperation "Boolean operation" enum[("UNION", "Union"), ("SUBTRACTION", "Subtract"), ("INTERSECTION", "… | ✅ (audit 3, 11-01) |
+| D57 | queryVariable | additionalQueries | P2 | array row label: std Some("#booleanOperation of #addQlowercaseSelectionType"), ours None | ✅ (audit 3, 11-01) |
 | D58 | queryVariable | edgeAdjacentEntityType | P2 | default option: std ALL / ours EDGES_AND_FACES | ✅ (audit 1, 11-01) |
 | D59 | routingCurve | csvUnit | P2 | options: std ['Centimeter', 'Foot', 'Inch', 'Millimeter', 'Meter', 'Yard'] / ours ['Meter', 'Centimeter', 'Millimeter', 'Inch', 'Foot', 'Yard'] | ✅ (audit 1, 11-01) |
 | D60 | routingCurve | hasTargetLength | P2 | hints: std adds [], ours adds ['FIRST_IN_ROW'] | ✗ |
@@ -233,6 +242,12 @@ Field rows: 199 (fixed 73, accepted 7, open 119); visibility states differing no
 | D197 | sheetMetalStart | bendsIncluded | P3 | tooltip: std "Check to include the clearance for bends", ours "" | ✗ |
 | D198 | tag | additionalColumns | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds ['UNCONFIGURABLE'] | ✅ (audit 1, 11-01) |
 | D199 | tag | cSysMateConnector | P3 | tooltip: std "If none selected, this feature will create one at Origin", ours "" | ✗ |
+
+New rows since the first run:
+
+| # | Feature | Field | P | Difference | Status |
+|---|---|---|---|---|---|
+| N1 | queryVariable | additionalQueries | P2 | array row label: std Some("#booleanOperation of #addQlowercaseSelectionType"), ours Some("#booleanOperation of #addQselectionType") | ✗ |
 
 ### Visibility states that differ (current run)
 
