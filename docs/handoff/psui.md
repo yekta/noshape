@@ -345,6 +345,12 @@ N12. (11-01) Part Studio audit (user 11-01): docs/parity/audit-part-studio.md. D
      audit 6: std's ranges / hints on Variable, Helix, Routing curve, End cap, Hem, Corner, Corner break, Jog, Flex
      PCB end, Mate connector, Ruled surface, Frame trim: 154 of 199 rows fixed, 56 of 75 dialogs equal std. Asked live
      (1722): Tag Base plane prefill, Helix Axis layout, Routing curve point row titles.
+     12:53 audit 8: oracle blind spots closed (custom reader + oracle now read "Driven query" and "Column Name":
+     A15 driven arrays, A16 std's 99 column names in the configuration table, asked live 1725 for the toast);
+     std's 48 editing logic functions audited (section "Editing logic"): 35 run std's (std_feature STD_EDITING_LOGIC +
+     LOGIC_ONLY for types std can't regenerate; T2 tests in std_oracle), 10 native, 2 open (Routing curve, Unfold).
+     A preselection goes to std's hidden initEntities / preselectedEntities / preselection where std's logic runs.
+     Lookup results of editing logic reach the dialog (External thread sizes). 63 of 75 dialogs equal std.
 
 N11. (11-01 04:54) Drawing sheets taken from dx (user 11-01): docs/parity/workflow-drawing.md and
      workflow-drawing-sheet-metal.md. dx keeps drawing.md and the import sheets; notes to dx in docs/handoff/dx.md
