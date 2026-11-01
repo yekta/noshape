@@ -88,6 +88,44 @@ pub struct ChooserState {
     /// The opened other document as a model while its Create version
     /// dialog is open (the document is reread when a version is made).
     pub other_model: Option<(Entity<crate::doc_model::DocModel>, Subscription)>,
+    /// The opened other document's "View released items": its released
+    /// revisions listed instead of its tree.
+    pub other_released: bool,
+}
+
+/// A released revision of a part or assembly in an opened other document
+/// (View released items; help: "pick a particular revision; released items
+/// show a solid triangle icon").
+#[derive(Clone)]
+pub struct Released {
+    pub tab: TabId,
+    pub part: Option<BodyId>,
+    pub name: String,
+    pub assembly: bool,
+    pub revision: String,
+    pub part_number: String,
+    /// The version it was released at.
+    pub microversion: noshape_store::MicroversionId,
+}
+
+/// A release log's released parts and assemblies, newest release first
+/// (obsoleted revisions and items linked from other documents left out);
+/// `microversion` resolves a package's version (a version id, or a
+/// microversion for versions linked from elsewhere).
+pub fn released_items(log: &noshape_model::release::ReleaseLog, microversion: &dyn Fn(&str) -> Option<noshape_store::MicroversionId>) -> Vec<Released> {
+    use noshape_model::release::{ItemKind, PackageKind};
+    let obsolete: Vec<(&str, &str)> = log.packages.iter().filter(|p| p.kind == PackageKind::Obsoletion).flat_map(|p| p.items.iter().map(|i| (i.part_number.as_str(), i.revision.as_str()))).collect();
+    let mut out = Vec::new();
+    for p in log.packages.iter().rev().filter(|p| p.kind == PackageKind::Release) {
+        let Some(mv) = p.version.as_deref().and_then(microversion) else { continue };
+        for i in &p.items {
+            if !matches!(i.kind, ItemKind::Part | ItemKind::Assembly) || i.document.is_some() || i.reverted || obsolete.contains(&(i.part_number.as_str(), i.revision.as_str())) {
+                continue;
+            }
+            out.push(Released { tab: i.tab, part: i.part.clone(), name: i.name.clone(), assembly: i.kind == ItemKind::Assembly, revision: i.revision.clone(), part_number: i.part_number.clone(), microversion: mv });
+        }
+    }
+    out
 }
 
 /// Other documents categories (live, as the assembly Insert dialog).
@@ -105,6 +143,7 @@ pub struct OtherDoc {
     pub changes: usize,
     pub version: usize,
     pub tabs: Vec<(TabId, String, bool)>,
+    pub released: Vec<Released>,
 }
 
 impl OtherDoc {
@@ -124,7 +163,9 @@ impl OtherDoc {
             at = parent.get(&mv).copied().flatten();
         }
         let name = store.meta().map(|m| m.name).unwrap_or_else(|_| path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
-        let mut d = OtherDoc { path: path.to_path_buf(), name, versions, changes, version: 0, tabs: Vec::new() };
+        let at = |s: &str| graph.versions.iter().find(|v| v.id.to_string() == s).map(|v| v.microversion).or_else(|| s.parse().ok());
+        let released = store.get_meta(noshape_ops::release::META_KEY).ok().flatten().map(|b| released_items(&noshape_model::release::ReleaseLog::from_json(&b), &at)).unwrap_or_default();
+        let mut d = OtherDoc { path: path.to_path_buf(), name, versions, changes, version: 0, tabs: Vec::new(), released };
         d.load_tabs();
         Ok(d)
     }
@@ -460,6 +501,39 @@ impl DrawingEditor {
                 .child(div().id("dr-ch-other-mkversion").underline().cursor_pointer().child(format!("Create a version in {}.", d.name)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.create_version_in_other(window, cx))))
                 .into_any_element()
         })
+    }
+
+    /// View released items: the opened document's released parts (or
+    /// assemblies), newest first, each a solid triangle, its name and
+    /// "Rev A · part number"; a click inserts it at the version it was
+    /// released at.
+    fn render_released(&mut self, d: &OtherDoc, assemblies: bool, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let query = self.chooser.search.as_ref().map(|s| s.read(cx).value().trim().to_lowercase()).unwrap_or_default();
+        let mut col = v_flex().id("dr-ch-released-list").flex_1().min_h_0().overflow_y_scroll();
+        let items: Vec<&Released> = d.released.iter().filter(|r| r.assembly == assemblies && (query.is_empty() || r.name.to_lowercase().contains(&query) || r.part_number.to_lowercase().contains(&query))).collect();
+        if items.is_empty() {
+            col = col.child(div().p(px(10.)).text_size(px(13.)).text_color(pal.text_muted).child(if assemblies { "No released assemblies." } else { "No released parts." }));
+        }
+        for (i, r) in items.into_iter().enumerate() {
+            let key = crate::derived::ExternalRef { path: d.path.clone(), microversion: r.microversion, tab: r.tab.to_string() }.key();
+            let label = format!("{} Rev {}", d.name, r.revision);
+            let (tab, part) = (r.tab, r.part.clone());
+            let second = if r.part_number.is_empty() { format!("Rev {}", r.revision) } else { format!("Rev {} · {}", r.revision, r.part_number) };
+            col = col.child(
+                h_flex()
+                    .id(SharedString::from(format!("dr-ch-rel-{i}")))
+                    .min_h(px(38.))
+                    .px(px(6.))
+                    .gap(px(8.))
+                    .cursor_pointer()
+                    .hover(|d| d.bg(pal.row_hover))
+                    .child(div().text_size(px(10.)).text_color(pal.text).child("▲"))
+                    .child(v_flex().min_w_0().child(div().truncate().text_size(px(13.33)).child(crate::ui::user_text(r.name.clone()))).child(div().text_size(px(12.)).text_color(gpui_kit::rgb(0x999999)).child(second)))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.choose_external(key.clone(), tab, part.clone(), label.clone(), cx))),
+            );
+        }
+        col.into_any_element()
     }
 
     /// The opened document's Version graph: its versions (newest first,
@@ -904,12 +978,23 @@ impl DrawingEditor {
                         panel.child(self.render_other_versions(&d, cx)).child(import_row(cx))
                     } else {
                         let changes = self.render_other_changes(&d, cx);
+                        // View released items (when it has any): its
+                        // released revisions instead of its tree.
+                        let released = self.chooser.other_released && !d.released.is_empty();
+                        let view_released = (!d.released.is_empty()).then(|| {
+                            div().h(px(28.)).flex().items_center().px(px(7.)).child(crate::drawing_chrome::DrCheckbox::new("dr-ch-released").label("View released items").checked(released).on_click(cx.listener(|this, v: &bool, _, cx| {
+                                this.chooser.other_released = *v;
+                                cx.notify();
+                            })))
+                        });
+                        let body = if released { self.render_released(&d, tab == 1, cx) } else { list.into_any_element() };
                         panel
                             .child(sub_tabs)
                             .children(self.chooser.search.as_ref().map(|s| div().px(px(6.)).pt(px(6.)).child(Input::new(s).small())))
-                            .when(tab == 0, |d| d.child(filters).child(div().h(px(1.)).bg(gpui_kit::rgb(0xeeeeee))))
+                            .children(view_released)
+                            .when(tab == 0 && !released, |d| d.child(filters).child(div().h(px(1.)).bg(gpui_kit::rgb(0xeeeeee))))
                             .children(changes)
-                            .child(list)
+                            .child(body)
                             .child(import_row(cx))
                     }
                 }
@@ -1050,4 +1135,30 @@ fn decode(png: &[u8]) -> Option<Arc<RenderImage>> {
         }
     }
     Some(Arc::new(RenderImage::new(vec![image::Frame::new(rgba)])))
+}
+
+#[cfg(test)]
+mod released_tests {
+    use noshape_model::release::{ItemKind, Package, PackageKind, ReleaseItem, ReleaseLog};
+
+    fn item(name: &str, kind: ItemKind, pn: &str, rev: &str) -> ReleaseItem {
+        ReleaseItem { tab: noshape_model::document::TabId(7), part: None, name: name.into(), kind, part_number: pn.into(), revision: rev.into(), not_revision_managed: false, reverted: false, config: Default::default(), document: None }
+    }
+
+    fn package(id: u64, kind: PackageKind, version: Option<&str>, items: Vec<ReleaseItem>) -> Package {
+        Package { id, kind, name: format!("R{id}"), notes: String::new(), created: 0, version: version.map(String::from), items, re_releasable: false }
+    }
+
+    /// View released items: parts and assemblies, newest release first;
+    /// drawings, obsoleted revisions and releases without a version left out.
+    #[test]
+    fn released_items_newest_first_without_obsolete() {
+        let mut log = ReleaseLog::default();
+        log.packages.push(package(1, PackageKind::Release, Some("00000000-0000-0000-0000-000000000001"), vec![item("Bracket", ItemKind::Part, "PN-1", "A"), item("Drawing", ItemKind::Drawing, "PN-9", "A")]));
+        log.packages.push(package(2, PackageKind::Release, Some("00000000-0000-0000-0000-000000000002"), vec![item("Bracket", ItemKind::Part, "PN-1", "B"), item("Gearbox", ItemKind::Assembly, "PN-2", "A")]));
+        log.packages.push(package(3, PackageKind::Obsoletion, None, vec![item("Bracket", ItemKind::Part, "PN-1", "A")]));
+        log.packages.push(package(4, PackageKind::Release, None, vec![item("Lost", ItemKind::Part, "PN-3", "A")]));
+        let r: Vec<(String, String, bool)> = super::released_items(&log, &|s| s.parse().ok()).into_iter().map(|r| (r.name, r.revision, r.assembly)).collect();
+        assert_eq!(r, vec![("Bracket".into(), "B".into(), false), ("Gearbox".into(), "A".into(), true)]);
+    }
 }
