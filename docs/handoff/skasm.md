@@ -232,6 +232,11 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   sheets the lead listed have no unverified row left** (feature-sweep, navigation, sheet-metal, import-edit, assembly,
   sketch, workflow-assembly, advanced, sheet-metal-joints). Open: SNAP-INSERT-FACE leftovers (live 07:15),
   SM-MAKE-JOINT-ONE-EDGE (P3), RUST-SM-CUT-VOLUME (bool).
+- 11-01 ~08:40: d318c8dc (Part Studio mate connector at a circular edge's CENTER: Z out through the bounded planar face,
+  X the sketch x, live 1708). Still open: SNAP-INSERT-FACE's face-centroid snap target (live 1704: at A the triad sat on
+  the face centroid; ours takes the nearest inference point); SM-MAKE-JOINT-ONE-EDGE (the two coincident edges have
+  different ids, so the double mapping is inside std's getSMDefinitionEntities over our attributes: probe it with a
+  Feature Studio feature printing evaluateQuery sizes); RUST-SM-CUT-VOLUME still fails on main (bool's).
 - **End-of-day walk 11-01 03:40, green b6ba4390:** line chain 40 / 25 typed; rectangle boxes (Tab on a typed value
   stays, as live); Revolute via tool search, both picks → HUD ✓ commits and starts Revolute 2 (= live), the pattern
   copy follows its seed; dragging the mated pin keeps it seated. No regressions.
