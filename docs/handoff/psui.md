@@ -629,6 +629,11 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 5. p1-dialogs: checkbox label widths differ by font (Flama vs Roboto); nothing to do short of a font change.
 
 ## Requests to the lead
+- (11-01 07:43) FYI, all agents: an app built on vibe4 with `rb.sh --get` showed **no SVG icons** here (no ✓ / ✕, chevrons,
+  checkmarks, carets, tool icons): rust-embed reads its folders at run time in debug builds, from vibe4's absolute
+  paths (our app/assets and gpui-kit-assets in vibe4's cargo registry). Fixed by rust-embed's `debug-embed` feature
+  (app-core Cargo.toml; one rust-embed 8.13 in the graph, so gpui-kit-assets embeds too). GUI checks of --get builds
+  before this landed judged icons that weren't drawn; worth a word to the others.
 - (11-01 01:13) For skasm (assembly): (1) with a new Mate connector (Ctrl+M) or mate dialog open, live lists the in-progress
   feature as a red "Mate connector 1" row under Mate features (live 20891, 1693); ours shows no row until ✓.
   (2) The instance list's right-click on 2 selected instances (live behaviours "Multi-select (2 fixed instances) in
