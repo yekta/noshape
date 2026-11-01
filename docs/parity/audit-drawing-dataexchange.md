@@ -18,14 +18,20 @@ message, P3 tooltip / prompt / look. Status: ✗ open, ✅ fixed (commit), – a
 | Drawing right-click menus per entity type (25 types) | context-menus-drawing*.txt, behaviours (menu lines) | in the app 11-01 (w3/menus.noshape, a d6 copy with every annotation type; crops in dx-scratch/audit/rmb): **= live** (Add comment is cloud-only; Paste shows while something is copied, as live): empty sheet, view (projected, detail, section label: Copy on top), extension line, linear dimension, ordinate value, note, callout, hole callout, datum, centermark, surface finish (edge-attached), table, sketch line, section cut line. **Live unknown, asked**: weld, geometric tolerance, centerline, revision table, datum target, note leader line. **Differs**: M1 | M1, M2 |
 | Notifications panel | behaviours (EX11 request 1544, import flow) | compared with live's description | N… |
 
+**Counts (11-01 16:36 UTC):** surfaces audited 4 of 4 (dialogs and panels with dumps 55, import / export dialogs 16,
+right-click menus 22 entity types in the app, Notifications). 2918 live texts and options scanned, 2544 found as is.
+Gap rows 24: fixed 12 (P1 1, P2 5, P3 6), asked of live 9 (P1 5, P2 3, P3 1), open 3 (P2: M1 format lines not
+selectable, X1 start page import modal; P3: D15), plus partial leftovers noted in fixed rows (D8 error tooltip, D10
+"Datum style", D11 «Varies», D14 Show Onshape drawing templates). P0: none found.
+
 ## Gaps
 
 | # | Surface | Item | P | Difference | Status |
 |---|---|---|---|---|---|
-| D1 | Datum › Datum target | Style list | P1 | live: Inside, Outside, Moveable horizontal inside / outside, Moveable rotational inside / outside (6); ours: the 3 inside ones | ✗ |
+| D1 | Datum › Datum target | Style list | P1 | live: Inside, Outside, Moveable horizontal inside / outside, Moveable rotational inside / outside (6); ours: the 3 inside ones | ? (how it draws / what it does: asked live 14:24) |
 | D2 | Styles panel (a dimension) | rows | P1 | live: Font, Text height, Color, Arrowhead, Text justification, Text alignment, Text gap, **Geometry gap, Extension past line, Show first extension line, Show second extension line**, Break dimension; ours lacked the four in bold | ✅ the four rows in live's order (spinboxes in the drawing's unit; the extension-line ticks on linear dimensions); `AnnStyle` geometry_gap / extension / hide_ext; test `dimension_style_extension_lines`; app check 11-01 (mbd: first extension line hidden) |
-| D3 | Hole table dialog | Collapse tags | P1 | live has ☐ Collapse tags (after Location precision); ours none | ✗ |
-| D4 | Hole table dialog | Title row | P1 | live has ☐ Title row (after the Views list); ours none | ✗ |
+| D3 | Hole table dialog | Collapse tags | P1 | live has ☐ Collapse tags (after Location precision); ours none | ? (how it draws / what it does: asked live 14:24) |
+| D4 | Hole table dialog | Title row | P1 | live has ☐ Title row (after the Views list); ours none | ? (how it draws / what it does: asked live 14:24) |
 | D5 | Hatch region dialog | Apply to | P1 | live: an "Apply to" select ("All instances in all views", other options not dumped); ours none | ? |
 | D6 | Inspection table | Type of a linear dimension | P2 | live "Aligned dimension" (an aligned one); ours "Linear dimension" for all | ? (horizontal / vertical names) |
 | D7 | Hole table dialog | Sheet row | P2 | live: a select (Sheet1 …); ours the name as text | ✅ a Sheet select: a placed table moves to the sheet chosen (as Move to sheet…); a new one stays on this sheet |

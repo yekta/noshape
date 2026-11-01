@@ -11,6 +11,19 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## Evening 11-01 (11-01 16:36 UTC)
+- User 11-01: S18 model change, CR5, CR18 (asked live), TB12 on Windows, then an audit of my surfaces like psui's /
+  skasm's. Done and queued: S18 (title fields become notes on Explode / Add leader / Move to / order:
+  `promote_title_field`, `Annotation::title_field`), CR5 + CR18 (live 1733 / 1734: one standard view per MBD item),
+  TB12 Windows CF_HTML (compiled by the OS CI only).
+- Audit: docs/parity/audit-drawing-dataexchange.md (counts at its top). Method: /root/dx-scratch/audit/strings2.py
+  lists the live dumps' texts missing from our sources; menus right-clicked in the app on w3/menus.noshape (crops in
+  dx-scratch/audit/rmb). Fixed: Styles panel extension-line rows (D2), Hole table Sheet select, tooltips and
+  prompts, Create Drawing's MBD note, import steps in Notifications, a note's leader on an edge (A1). Waiting on live
+  (REQUESTS 14:24, 14:39, 14:42): datum target Outside styles, hole table Collapse tags / Title row, hatch Apply to,
+  inspection type names, Formulas, Notifications ⋯, menus of weld / GD&T / centerline / revision table / datum target
+  / leader line, section depth Offset distance. Open: M1 format lines selectable, X1 the start page's Import modal.
+
 ## Afternoon 11-01 (13:10–14:08 UTC; queued lands: land.sh returns QUEUED, `land.sh --status`)
 - Landed: 9b100b79 A15 part custom properties; cc1a4a9b A23 / S18 property chips; a49cffca CR5 / CR18 / V5 MBD
   dimensions; 4976f492 TB14 BOM tables of other assemblies (this document's, Other documents…) and BOM data (CSV),
