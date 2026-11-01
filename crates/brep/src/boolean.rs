@@ -1051,6 +1051,20 @@ impl Ctx<'_> {
                 }
             }
         }
+        // (A point made on it at a vertex of the face on the other face too, within the tolerance OCCT gives the
+        // section: that vertex, as OCCT's pave there.)
+        if vtol > tol {
+            for cut in cuts.iter_mut() {
+                if let End::Point(q) = cut.1 {
+                    let near = self.faces[f].edges.iter().flat_map(|&(e, _)| self.edges[e].v).filter(|&w| (self.p(w) - q).length() <= vtol).min_by(|&a, &b| (self.p(a) - q).length().total_cmp(&(self.p(b) - q).length()));
+                    if let Some(w) = near
+                        && other.is_some_and(|g| free::surface_distance(&self.faces[g], self.p(w)) <= self.tol.max(self.pool.t[w as usize] + self.tol))
+                    {
+                        cut.1 = End::Vertex(w);
+                    }
+                }
+            }
+        }
         cuts.sort_by(|a, b| a.0.total_cmp(&b.0));
         let scale = len / (t1 - t0);
         // The length along it between two parameters.
