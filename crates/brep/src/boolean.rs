@@ -1411,9 +1411,12 @@ impl Ctx<'_> {
         for iv in ivs {
             let mut ends = [0u32; 2];
             for k in 0..2 {
+                // (A point made where it crosses the face's boundary, past the two tolerances from a vertex: apart,
+                // OCCT's rule (a sharp knurl tooth's cap edge crossing the cylinder's end circle under a micrometre
+                // from its own end).)
                 ends[k] = match iv[k].1 {
                     End::Vertex(v) => v,
-                    End::Point(p) => self.pool.add(p)?,
+                    End::Point(p) => self.pool.add_apart(p, &|_, _| true)?,
                     End::Open => return Err(Decline("an edge's piece without ends")),
                 };
             }
