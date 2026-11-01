@@ -23,10 +23,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - To skasm: the Insert dialog's configuration selects have tooltips "<input>: (Default: <value>)"
   (dom/qa5-p7-change-config-25.html); `ConfigInput::default_text()` now gives the value.
 - Land: M1 landed 18:24 (9bf545cb). The next piece failed 18:47 on part-studio-ui's
-  `a_shelled_face_is_highlighted_as_before` (psui, landed 18:28): it fails on main alone and at psui's own commit
-  a965fd2e (the Shell's picked top face doesn't resolve: "Select faces to remove."; not timing, 2 s of test clock
-  didn't help). My part-studio-ui edits (C1 tooltip, X4 Part Studio export file name) are held back in
-  /root/dx-scratch/psui-held.patch so the rest lands; re-apply when psui's test is green.
+  `a_shelled_face_is_highlighted_as_before` (psui, landed 18:28). It fails on main, at a965fd2e and at psui's own
+  7a3662ac in 5 of 5 runs here (the Shell's picked top face doesn't resolve: "Select faces to remove."; not timing:
+  2 s of test clock didn't help); it passed once in psui's land. Every change reaching part-studio-ui's tests
+  (model-data does) fails on it until psui fixes it. Told the user 11-01 evening.
 
 ## Audit answers implemented (11-01 17:33 UTC)
 - Landed 17:25: the whole stack (26 commits, da4a95c0) after the land-loop fixes below.

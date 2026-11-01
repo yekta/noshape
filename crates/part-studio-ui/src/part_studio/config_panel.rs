@@ -1054,13 +1054,8 @@ impl PartStudioView {
         let iid = input.id.clone();
         let folded = self.ui.cfg_folded.contains(&iid);
         let current = cfg.value_of(&self.config_values, &iid).unwrap_or_default();
-        let default_text = match &input.kind {
-            ConfigInputKind::List { options, default } => options.iter().find(|o| &o.id == default).map(|o| o.name.clone()).unwrap_or_default(),
-            // Live 433: "Hole Default: false".
-            ConfigInputKind::Checkbox { default } => default.to_string(),
-            ConfigInputKind::Variable { default, .. } => default.text.clone(),
-            ConfigInputKind::Text { default } => default.clone(),
-        };
+        // Live 433: "Hole Default: false".
+        let default_text = input.default_text();
         // Live 433: variables read "Len (#Len)".
         let variable_ref = matches!(input.kind, ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. }).then(|| format!("(#{})", input.name));
         // Header bar.
@@ -2616,6 +2611,8 @@ impl PartStudioView {
             .hover(|d| d.bg(pal.panel_hover))
             .child(crate::assets::icon("cfg-filter-list", 20., cx))
             .child(div().text_size(px(14.)).text_color(pal.text).child("Add configuration input"))
+            // Live (dom panel-configurations-full): the button's tooltip.
+            .tooltip(crate::ui::tooltip("Add configuration input to create multiple variants of this Part Studio"))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_config_input("List", cx)));
         let caret = div()
             .id("cfg-add-input-more")
