@@ -639,3 +639,25 @@ mod eval_message_tests {
         assert_eq!(msg("1+"), "Syntax error in expression.");
     }
 }
+
+/// Mass and section properties › Show calculation variance: a bound as live
+/// writes it after a value, in the value's unit ("± 9.422e-1", "± 2.100e+0":
+/// three decimals, the exponent signed, behaviours skasm G31).
+pub fn plus_minus(bound: f64) -> String {
+    let s = format!("{:.3e}", bound.abs());
+    match s.split_once('e') {
+        Some((m, e)) if e.starts_with('-') => format!("± {m}e{e}"),
+        Some((m, e)) => format!("± {m}e+{e}"),
+        None => format!("± {s}"),
+    }
+}
+
+#[cfg(test)]
+mod plus_minus_tests {
+    #[test]
+    fn as_live() {
+        assert_eq!(super::plus_minus(0.9422), "± 9.422e-1");
+        assert_eq!(super::plus_minus(2.1), "± 2.100e+0");
+        assert_eq!(super::plus_minus(1.774e-9), "± 1.774e-9");
+    }
+}

@@ -330,6 +330,12 @@ pub struct UiState {
     pub com: Option<(BodyId, glam::DVec3)>,
     pub mass_ref_active: bool,
     pub mass_reference: Option<Reference>,
+    /// Mass and section properties › Show calculation variance, and the
+    /// bounds of the parts last measured (by the model they came from: two
+    /// more integrations a part, so only while ticked and once per model).
+    pub mass_variance: bool,
+    pub mass_variance_cache: Option<(Vec<BodyId>, usize, Option<noshape_model::regen::measure::MassProperties>)>,
+    pub mass_face_variance_cache: Option<(Vec<Reference>, usize, Option<noshape_model::regen::measure::FaceVariance>)>,
     /// Mass Override changed in the open dialog (live ui-mass/10–15): the
     /// part, and its mass (kg; None = unticked, the computed mass). ✓
     /// stores it on the part; the mass box while it is typed into.
@@ -636,6 +642,9 @@ impl UiState {
             com: None,
             mass_ref_active: false,
             mass_reference: None,
+            mass_variance: false,
+            mass_variance_cache: None,
+            mass_face_variance_cache: None,
             mass_override_edit: None,
             mass_override_input: None,
             measure_type: None,

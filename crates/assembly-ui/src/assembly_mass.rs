@@ -31,6 +31,10 @@ pub struct AsmMassUi {
     pub override_on: bool,
     pub override_input: Entity<InputState>,
     _override_sub: Subscription,
+    /// Show calculation variance, and the bounds last computed (by the
+    /// instances and the assembly result: two more integrations a part).
+    pub variance: bool,
+    variance_cache: Option<(Vec<InstanceId>, usize, Option<noshape_model::regen::measure::MassProperties>)>,
 }
 
 /// The analysis tools of an assembly, in menu order (live assembly/734).
@@ -80,7 +84,7 @@ impl AssemblyView {
                     cx.notify();
                 }
             });
-            self.ui.mass = Some(AsmMassUi { faces: false, face_picks: Vec::new(), connector_active: false, reference: None, warning_closed: false, override_on: stored.is_some(), override_input, _override_sub: sub });
+            self.ui.mass = Some(AsmMassUi { faces: false, face_picks: Vec::new(), connector_active: false, reference: None, warning_closed: false, override_on: stored.is_some(), override_input, _override_sub: sub, variance: false, variance_cache: None });
         }
         cx.notify();
     }
@@ -179,6 +183,30 @@ impl AssemblyView {
         assembly_mass_properties(&self.result, &self.selected, &density)
     }
 
+    /// Show calculation variance: the bounds of the selected instances'
+    /// values, computed once per selection and assembly result.
+    fn assembly_variance(&mut self, cx: &App) -> Option<noshape_model::regen::measure::MassProperties> {
+        let key = (self.selected.clone(), Arc::as_ptr(&self.result) as usize);
+        if let Some((s, r, v)) = self.ui.mass.as_ref().and_then(|m| m.variance_cache.as_ref())
+            && *s == key.0
+            && *r == key.1
+        {
+            return v.clone();
+        }
+        let v = {
+            let doc = &self.doc.read(cx).session.doc;
+            let density = |o: &noshape_model::assembly::eval::PartOccurrence| match doc.tab(o.studio).map(|t| &t.content) {
+                Some(TabContent::PartStudio(ps)) => ps.part_properties.get(&o.body).and_then(|p| p.density),
+                _ => None,
+            };
+            noshape_model::assembly::analysis::assembly_mass_variance(&self.result, &self.selected, &density)
+        };
+        if let Some(m) = &mut self.ui.mass {
+            m.variance_cache = Some((key.0, key.1, v.clone()));
+        }
+        v
+    }
+
     /// The 440 px "Mass and section properties" dialog in the feature-dialog
     /// place, plus Onshape's warning bubble when a part has no material.
     pub(super) fn render_mass_dialog(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
@@ -215,6 +243,17 @@ impl AssemblyView {
         };
         let stored = self.assembly(cx).and_then(|a| a.properties.mass_override).is_some();
         let can_accept = top_level && (overriding || stored);
+        // Show calculation variance (live skasm G31): "41032.079 mm³ ± 2.100e+0
+        // mm³" after each value, the inertia cells without a unit.
+        let variance_on = self.ui.mass.as_ref().is_some_and(|m| m.variance);
+        let var = if variance_on && !faces && !self.selected.is_empty() { self.assembly_variance(cx) } else { None };
+        let with_pm = |text: String, bound: Option<f64>| match bound {
+            Some(b) if !text.is_empty() => match text.split_once(' ') {
+                Some((_, unit)) => format!("{text} {} {unit}", crate::quantity_field::plus_minus(b)),
+                None => format!("{text} {}", crate::quantity_field::plus_minus(b)),
+            },
+            _ => text,
+        };
         let tab = |id: &'static str, label: &'static str, on_faces: bool, cx: &mut Context<Self>| {
             let on = faces == on_faces;
             div()
@@ -282,7 +321,12 @@ impl AssemblyView {
                 }
                 cx.notify();
             })))
-            .child(div().mt(px(8.)).child(crate::ui::os_checkbox("amass-variance", "Show calculation variance", false)));
+            .child(div().mt(px(8.)).child(crate::ui::os_checkbox("amass-variance", "Show calculation variance", variance_on).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                if let Some(m) = &mut this.ui.mass {
+                    m.variance = !m.variance;
+                }
+                cx.notify();
+            }))));
         // Face tab (live 851–854): Surface area, Perimeter, the 2×2 area
         // moments and the polar moment (mm⁴), no Override boxes; blank with a
         // red title while the faces aren't coplanar.
@@ -342,14 +386,14 @@ impl AssemblyView {
                     let shown: AnyElement = if overriding {
                         gpui_kit::base::input::input_frame(div().flex_1().mr(px(5.)).h(px(24.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(&override_input).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 23.)).into_any_element()).into_any_element()
                     } else {
-                        value(with_unit(props.and_then(|p| p.mass).map(|m| number(m * mass_factor)), mass_sym.to_string())).into_any_element()
+                        value(with_pm(with_unit(props.and_then(|p| p.mass).map(|m| number(m * mass_factor)), mass_sym.to_string()), var.as_ref().and_then(|v| v.mass).map(|b| b * mass_factor))).into_any_element()
                     };
                     h_flex().h(px(29.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(check).child(shown)
                 })
-                .child(value_row("Volume", with_unit(props.map(|p| in_units(p.volume, noshape_units::Dim { length: 3, angle: 0 })), format!("{len_sym}³"))))
-                .child(value_row("Surface area", with_unit(props.map(|p| in_units(p.surface_area, noshape_units::Dim { length: 2, angle: 0 })), format!("{len_sym}²"))))
+                .child(value_row("Volume", with_pm(with_unit(props.map(|p| in_units(p.volume, noshape_units::Dim { length: 3, angle: 0 })), format!("{len_sym}³")), var.as_ref().map(|v| v.volume / units.si_factor(noshape_units::Dim { length: 3, angle: 0 })))))
+                .child(value_row("Surface area", with_pm(with_unit(props.map(|p| in_units(p.surface_area, noshape_units::Dim { length: 2, angle: 0 })), format!("{len_sym}²")), var.as_ref().map(|v| v.surface_area / units.si_factor(noshape_units::Dim { length: 2, angle: 0 })))))
                 .child(h_flex().h(px(30.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(override_check("amass-com-override", false)))
-                .children([("X", 0xcd0000u32, "↘", c.x), ("Y", 0x009400, "↗", c.y), ("Z", 0x0000d0, "↑", c.z)].into_iter().map(|(l, col, g, v)| h_flex().h(px(31.)).child(axis(l, col, g)).child(value(com(v)))))
+                .children([("X", 0xcd0000u32, "↘", c.x, 0), ("Y", 0x009400, "↗", c.y, 1), ("Z", 0x0000d0, "↑", c.z, 2)].into_iter().map(|(l, col, g, v, k)| h_flex().h(px(31.)).child(axis(l, col, g)).child(value(with_pm(com(v), var.as_ref().map(|b| b.center_of_mass[k] / units.si_factor(length)))))))
                 .child(h_flex().h(px(29.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Mass moments of inertia ({mass_sym} {len_sym}²)"))).child(override_check("amass-moi-override", false)));
             let f = units.si_factor(length).powi(2);
             // With a reference connector: about its origin, in its axes (help).
@@ -360,12 +404,16 @@ impl AssemblyView {
                 })
                 .unwrap_or(glam::DMat3::ZERO);
             let iv = |x: f64| if have { number(x * scale * mass_factor / f) } else { String::new() };
+            let ib = |r: usize, c: usize| var.as_ref().map(|b| b.inertia.col(c)[r] * scale * mass_factor / f);
             let grid = [[i.x_axis.x, i.y_axis.x, i.z_axis.x], [i.x_axis.y, i.y_axis.y, i.z_axis.y], [i.x_axis.z, i.y_axis.z, i.z_axis.z]];
             let labels = [["Lxx", "Lxy", "Lxz"], ["Lyx", "Lyy", "Lyz"], ["Lzx", "Lzy", "Lzz"]];
             for (r, row_names) in labels.iter().enumerate() {
                 let mut row = h_flex().h(px(28.)).px(px(5.)).gap(px(8.));
                 for (k, n) in row_names.iter().enumerate() {
-                    row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(*n)).child(div().flex_1().h(px(22.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(iv(grid[r][k]))));
+                    row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(*n)).child(div().flex_1().h(px(22.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(match ib(r, k).filter(|_| have) {
+                        Some(b) => format!("{} {}", iv(grid[r][k]), crate::quantity_field::plus_minus(b)),
+                        None => iv(grid[r][k]),
+                    })));
                 }
                 body = body.child(row);
             }

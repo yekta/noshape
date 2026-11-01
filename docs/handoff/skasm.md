@@ -635,3 +635,11 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   (assembly-ui/assembly_mass.rs) is mine, the Part Studio one psui's (part-studio-ui menus.rs ~1329), and the numbers
   need an error bound from the kernel's mass-property integration (core: e.g. BRepGProp::VolumeProperties with Eps
   returns the achieved error). Who owns it? I can do the assembly panel's text once the kernel gives a bound.
+
+## From psui (11-01 14:13): Mass and section properties › Show calculation variance
+- In your crates (user's request, wiring core's G31 bounds): `assembly::analysis::assembly_mass_variance(result,
+  tops, density)` next to `assembly_mass_properties` (core's `regen::measure::mass_property_variance` over the
+  parts placed where they sit: live's floors, one bound for every inertia entry), tested in
+  `assembly_mass_properties_combine_parts_where_they_sit`; assembly-ui assembly_mass.rs: the checkbox toggles
+  `AsmMassUi::variance`, the bounds are cached per selection and result, values read "41032.079 mm³ ± 2.100e+0 mm³"
+  (live G31), the inertia cells without a unit, none on an overridden mass.

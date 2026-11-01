@@ -1084,6 +1084,21 @@ impl PartStudioView {
                 faces.iter().map(|r| label(r)).collect()
             };
             let shapes: Vec<noshape_kernel::Shape> = faces.iter().flat_map(|f| measure::resolve_shapes(&ctx, f)).collect();
+            // Show calculation variance (live G31): the faces' bounds, once per faces and model.
+            let var = if self.ui.mass_variance && !shapes.is_empty() {
+                let key = (faces.clone(), std::sync::Arc::as_ptr(&ctx) as usize);
+                let hit = self.ui.mass_face_variance_cache.as_ref().filter(|(f, p, _)| *f == key.0 && *p == key.1).map(|(_, _, v)| *v);
+                match hit {
+                    Some(v) => v,
+                    None => {
+                        let v = measure::face_property_variance(&shapes);
+                        self.ui.mass_face_variance_cache = Some((key.0, key.1, v));
+                        v
+                    }
+                }
+            } else {
+                None
+            };
             let units = self.doc.read(cx).session.doc.settings.units;
             let mut fv = FaceMassView { faces: names, area: String::new(), perimeter: String::new(), inertia: None, polar: None, coplanar: true, unit: format!("{}⁴", units.length.symbol()) };
             if !shapes.is_empty() {
@@ -1096,11 +1111,23 @@ impl PartStudioView {
                     let props: Vec<noshape_kernel::MassProperties> = shapes.iter().filter_map(|s| noshape_kernel::surface_properties(s).ok()).collect();
                     let area: f64 = props.iter().map(|p| p.mass).sum();
                     let perimeter: f64 = shapes.iter().map(|s| s.edges().iter().map(|e| e.length().unwrap_or(0.0)).sum::<f64>()).sum();
-                    fv.area = self.fmt(Quantity::new(area, Dim { length: 2, angle: 0 }), cx);
-                    fv.perimeter = self.fmt(Quantity::new(perimeter, Dim::LENGTH), cx);
+                    let pm = |text: String, b: Option<f64>, unit: bool| match b {
+                        Some(b) if unit => match text.split_once(' ') {
+                            Some((_, u)) => format!("{text} {} {u}", crate::quantity_field::plus_minus(b)),
+                            None => format!("{text} {}", crate::quantity_field::plus_minus(b)),
+                        },
+                        Some(b) => format!("{text} {}", crate::quantity_field::plus_minus(b)),
+                        None => text,
+                    };
+                    fv.area = pm(self.fmt(Quantity::new(area, Dim { length: 2, angle: 0 }), cx), var.map(|v| v.area / units.si_factor(Dim { length: 2, angle: 0 })), true);
+                    fv.perimeter = pm(self.fmt(Quantity::new(perimeter, Dim::LENGTH), cx), var.map(|v| v.perimeter / units.si_factor(Dim::LENGTH)), true);
                     if let Some(p0) = first.as_ref().filter(|_| area > 0.0) {
-                        fv.inertia = Some(face_area_moments(&props, p0, units.si_factor(Dim::LENGTH)));
-                        fv.polar = fv.inertia.as_ref().map(|m| m.1.clone());
+                        // The moments' cells: "1.152e+6 ± 2.400e+3" (the unit in the header).
+                        let mb = var.map(|v| v.moment / units.si_factor(Dim::LENGTH).powi(4));
+                        let (cells, polar) = face_area_moments(&props, p0, units.si_factor(Dim::LENGTH));
+                        let cells = cells.map(|row| row.map(|c| pm(c, mb, false)));
+                        fv.polar = Some(pm(polar.clone(), mb, false));
+                        fv.inertia = Some((cells, pm(polar, mb, false)));
                     }
                 }
             }
@@ -1116,6 +1143,21 @@ impl PartStudioView {
             // all parts; behaviours "qa5 (10-26 p4)", qa5 P1-17).
             self.note_unmaterialed_parts(&bodies, cx);
             let measured = if bodies.is_empty() { None } else { noshape_ops::analysis::studio_mass_properties(&ctx, &self.display, &studio, &bodies, reference.as_ref()) };
+            // Show calculation variance: the bounds, once per parts and model.
+            let var = if self.ui.mass_variance && !bodies.is_empty() {
+                let key = (bodies.clone(), std::sync::Arc::as_ptr(&ctx) as usize);
+                let hit = self.ui.mass_variance_cache.as_ref().filter(|(b, p, _)| *b == key.0 && *p == key.1).map(|(_, _, v)| v.clone());
+                match hit {
+                    Some(v) => v,
+                    None => {
+                        let v = measure::mass_property_variance(&ctx, &bodies, &|b| studio.part_properties.get(b).and_then(|p| p.density));
+                        self.ui.mass_variance_cache = Some((key.0, key.1, v.clone()));
+                        v
+                    }
+                }
+            } else {
+                None
+            };
             if let Some(noshape_ops::analysis::StudioMass { props: mp, reference }) = measured {
                 if let Some(name) = &reference {
                     rows.push(("Reference".into(), name.clone()));
@@ -1154,16 +1196,37 @@ impl PartStudioView {
                 let (msym, mfac) = crate::properties_dialog::mass_unit(&units);
                 let scale_of = [i.x_axis.x, i.y_axis.y, i.z_axis.z].into_iter().fold(0.0f64, |a, x| a.max(x.abs())) * mfac / f;
                 let v = |x: f64| mass_number(x * mfac / f, scale_of);
+                // Show calculation variance (live skasm G31): "28919.247 mm³ ±
+                // 9.422e-1 mm³" after each value, the inertia cells without a
+                // unit; an overridden value has none.
+                let with_pm = |text: String, bound: Option<f64>| match bound {
+                    Some(b) if !text.is_empty() => match text.split_once(' ') {
+                        Some((_, unit)) => format!("{text} {} {unit}", crate::quantity_field::plus_minus(b)),
+                        None => format!("{text} {}", crate::quantity_field::plus_minus(b)),
+                    },
+                    _ => text,
+                };
+                // Live's bounds don't turn with a reference frame: the centre's
+                // per axis, one for every inertia entry.
+                let var_c = var.as_ref().map(|b| b.center_of_mass);
+                let var_i = var.as_ref().map(|b| b.inertia * scale);
+                let len_f = units.si_factor(Dim::LENGTH);
+                let overridden = edit.unwrap_or(stored).is_some();
+                let cell = |x: f64, b: Option<f64>| match b {
+                    Some(b) => format!("{} {}", v(x), crate::quantity_field::plus_minus(b * mfac / f)),
+                    None => v(x),
+                };
+                let ib = |r: usize, c: usize| var_i.map(|m| m.col(c)[r]);
                 mass_view = Some(MassView {
                     override_part: single.filter(|_| mp.mass.is_some()).map(|b| (b, edit.unwrap_or(stored).is_some(), shown.unwrap_or(0.0))),
                     changed: edit.is_some_and(|e| e != stored),
-                    volume: self.fmt(Quantity::new(mp.volume, len3), cx),
-                    area: self.fmt(Quantity::new(mp.surface_area, len2), cx),
-                    mass: mp.mass.and(shown).map(|m| format!("{} {msym}", mass_number(m * mfac, m * mfac))),
+                    volume: with_pm(self.fmt(Quantity::new(mp.volume, len3), cx), var.as_ref().map(|b| b.volume / units.si_factor(len3))),
+                    area: with_pm(self.fmt(Quantity::new(mp.surface_area, len2), cx), var.as_ref().map(|b| b.surface_area / units.si_factor(len2))),
+                    mass: mp.mass.and(shown).map(|m| with_pm(format!("{} {msym}", mass_number(m * mfac, m * mfac)), var.as_ref().and_then(|b| b.mass).filter(|_| !overridden).map(|b| b * mfac))),
                     // Without a material Onshape leaves the center of mass empty.
-                    center: if mp.mass.is_some() { [l(c.x), l(c.y), l(c.z)] } else { Default::default() },
+                    center: if mp.mass.is_some() { [with_pm(l(c.x), var_c.map(|b| b.x / len_f)), with_pm(l(c.y), var_c.map(|b| b.y / len_f)), with_pm(l(c.z), var_c.map(|b| b.z / len_f))] } else { Default::default() },
                     inertia_unit: format!("{msym} {sym}²"),
-                    inertia: mp.mass.map(|_| [[v(i.x_axis.x), v(i.y_axis.x), v(i.z_axis.x)], [v(i.x_axis.y), v(i.y_axis.y), v(i.z_axis.y)], [v(i.x_axis.z), v(i.y_axis.z), v(i.z_axis.z)]]),
+                    inertia: mp.mass.map(|_| [[cell(i.x_axis.x, ib(0, 0)), cell(i.y_axis.x, ib(0, 1)), cell(i.z_axis.x, ib(0, 2))], [cell(i.x_axis.y, ib(1, 0)), cell(i.y_axis.y, ib(1, 1)), cell(i.z_axis.y, ib(1, 2))], [cell(i.x_axis.z, ib(2, 0)), cell(i.y_axis.z, ib(2, 1)), cell(i.z_axis.z, ib(2, 2))]]),
                     parts: if bodies.is_empty() { Vec::new() } else { bodies.iter().filter_map(|b| self.display.body(b).map(|d| d.name.clone())).collect() },
                     reference,
                 });
@@ -1355,7 +1418,10 @@ impl PartStudioView {
                     body = body
                         .child(field("Faces to measure", fv.faces.clone(), true, false, false).mt(px(5.)).mb(px(0.)))
                         .child(field("Mate connector for reference frame", Vec::new(), false, false, false).mt(px(5.)).mb(px(0.)))
-                        .child(div().mt(px(9.)).h(px(27.)).child(crate::ui::os_checkbox("mass-variance", "Show calculation variance", false)))
+                        .child(div().mt(px(9.)).h(px(27.)).child(crate::ui::os_checkbox("mass-variance", "Show calculation variance", self.ui.mass_variance).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.ui.mass_variance = !this.ui.mass_variance;
+                            cx.notify();
+                        }))))
                         .child(value_row("Surface area".into(), if blank { String::new() } else { fv.area.clone() }).mt(px(2.)).h(px(26.)))
                         .child(value_row("Perimeter".into(), if blank { String::new() } else { fv.perimeter.clone() }).mt(px(2.)).h(px(26.)))
                         .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Area moment of inertia ({})", fv.unit))));
@@ -1391,7 +1457,10 @@ impl PartStudioView {
                         // Live (dom/dialog-mass-properties.txt): the rows from here are
                         // 27 / 26 / 29 px tall, 2 px apart (3 px above X): X, Y and Z
                         // sit 31 px apart, the inertia rows 28.
-                        .child(div().mt(px(9.)).h(px(27.)).child(crate::ui::os_checkbox("mass-variance", "Show calculation variance", false)))
+                        .child(div().mt(px(9.)).h(px(27.)).child(crate::ui::os_checkbox("mass-variance", "Show calculation variance", self.ui.mass_variance).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.ui.mass_variance = !this.ui.mass_variance;
+                            cx.notify();
+                        }))))
                         // Nothing measured: Mass's Override is greyed like the others (live part-studio/2382).
                         .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(match &m.override_part {
                             // Ticking keeps the shown mass and doesn't focus the box.
@@ -1941,6 +2010,8 @@ impl PartStudioView {
 
     pub(super) fn set_show_mass(&mut self, show: bool, cx: &mut Context<Self>) {
         self.show_mass = show;
+        // Show calculation variance isn't kept (live: reopened, it's unticked).
+        self.ui.mass_variance = false;
         self.ui.mass_ref_active = false;
         self.ui.mass_reference = None;
         self.ui.mass_override_edit = None;

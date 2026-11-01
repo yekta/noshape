@@ -3262,6 +3262,14 @@ fn assembly_mass_properties_combine_parts_where_they_sit() {
     let missing = super::analysis::assembly_mass_properties(&res, &[], &|o| (o.top() == InstanceId(1)).then_some(1000.0)).unwrap();
     assert!(missing.props.mass.is_none());
     assert_eq!(missing.without_material.len(), 1);
+    // Show calculation variance: every value gets a small, positive bound (live's floors: the centre's 1e-3 mm, one
+    // bound for every inertia entry).
+    let v = super::analysis::assembly_mass_variance(&res, &[], &|_| Some(1000.0)).expect("bounds");
+    let small = |b: f64, x: f64| b > 0.0 && b <= 1e-3 * x.abs();
+    assert!(small(v.volume, p.volume) && small(v.surface_area, p.surface_area) && small(v.mass.unwrap(), p.mass.unwrap()), "{v:?}");
+    assert!((0..3).all(|i| (v.center_of_mass[i] - 1e-6).abs() < 1e-12), "{v:?}");
+    let i = v.inertia.to_cols_array();
+    assert!(small(i[0], p.inertia.z_axis.z) && i.iter().all(|x| *x == i[0]), "{v:?}");
 }
 
 #[test]

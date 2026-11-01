@@ -913,6 +913,24 @@ pub fn assembly_mass_properties(result: &AssemblyResult, tops: &[InstanceId], de
     })
 }
 
+/// Mass and section properties › Show calculation variance in an assembly: a
+/// bound on each value of [`assembly_mass_properties`], core's
+/// `regen::measure::mass_property_variance` over the parts placed where they
+/// sit (live's magnitudes as floors, one bound for every inertia entry). About
+/// two more integrations a part: only while ticked.
+pub fn assembly_mass_variance(result: &AssemblyResult, tops: &[InstanceId], density: &dyn Fn(&PartOccurrence) -> Option<f64>) -> Option<crate::regen::measure::MassProperties> {
+    let mut ctx = crate::regen::context::Context::default();
+    let mut rho = Vec::new();
+    for o in result.occurrences.iter().filter(|o| (tops.is_empty() || tops.contains(&o.top())) && matches!(o.kind, BodyKind::Solid)) {
+        let Some(body) = o.context.bodies.iter().find(|b| b.id == o.body) else { continue };
+        let Ok(placed) = k::transform(&body.shape, &k::Transform::Matrix(o.transform), false) else { continue };
+        let id = BodyId { feature: FeatureId(0), index: ctx.bodies.len() as u32 };
+        ctx.bodies.push(Arc::new(crate::regen::context::Body::new(id, String::new(), BodyKind::Solid, placed.shape, Vec::new(), 0, FeatureId(0))));
+        rho.push(density(o));
+    }
+    crate::regen::measure::mass_property_variance(&ctx, &[], &|b| rho.get(b.index as usize).copied().flatten())
+}
+
 /// Mass moments of inertia moved to a reference frame (Mass and section
 /// properties' "Mate connector for reference frame"; help: the moments are
 /// taken about the connector instead of the centre of gravity): about the
