@@ -212,6 +212,9 @@ pub fn parse_html_table(html: &str) -> Option<PastedTable> {
     // Inline style stack inside a cell: (tag, style before it).
     let mut stack: Vec<(String, Style)> = Vec::new();
     let mut style = Style::default();
+    // The <table>'s own style is every cell's start (live 1727: Sheets'
+    // table font-size:10pt gives 10 mm text in every cell).
+    let mut base = Style::default();
     let mut col_defs: Vec<Option<f64>> = Vec::new();
     let mut skip = false;
 
@@ -263,6 +266,7 @@ pub fn parse_html_table(html: &str) -> Option<PastedTable> {
         let name: String = tag.trim_start_matches('/').chars().take_while(|c| c.is_ascii_alphanumeric()).collect::<String>().to_ascii_lowercase();
         match (name.as_str(), closing) {
             ("style" | "script", false) => skip = true,
+            ("table", false) => base = apply_css(Style::default(), &css(&attrs(tag))),
             ("style" | "script", true) => skip = false,
             ("col", false) => {
                 let a = attrs(tag);
@@ -329,7 +333,7 @@ pub fn parse_html_table(html: &str) -> Option<PastedTable> {
                 {
                     t.row_heights[r] = h;
                 }
-                style = apply_css(Style { bold: name == "th", ..Style::default() }, &decls);
+                style = apply_css(Style { bold: name == "th" || base.bold, ..base }, &decls);
                 stack.clear();
                 cell = Some(Cell { row: r, col, text: String::new(), runs: Vec::new() });
                 col += cols;
@@ -428,11 +432,14 @@ mod tests {
         assert_eq!(t.merges, vec![CellMerge { row: 0, col: 0, rows: 1, cols: 2 }]);
         let f = |r, c| t.formats.iter().find(|s| s.row == r && s.col == c).unwrap().format.clone();
         assert!(f(0, 0).bold && !f(0, 0).italic);
+        // The table's font-size:10pt reaches every cell (live 1727).
+        assert_eq!(f(0, 0).height, Some(10.0 * PT));
         assert!((f(0, 2).height.unwrap() - 14.0 * PT).abs() < 1e-9);
         assert!(f(1, 0).italic && f(1, 0).underline && !f(1, 0).bold);
         assert!(f(1, 1).strikethrough, "links and colours dropped, strikethrough kept");
         // Partly bold: no formatting.
         assert_eq!(f(1, 2), CellFormat::default());
+        assert_eq!(f(1, 0).height, Some(10.0 * PT));
         // Every cell centred.
         assert!(t.formats.iter().all(|s| s.format.align == noshape_model::drawing::CellAlign::Center));
         assert_eq!(t.col_widths.iter().map(|w| (w / PX).round()).collect::<Vec<_>>(), vec![100.0, 120.0, 80.0]);

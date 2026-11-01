@@ -382,6 +382,8 @@ impl DrawingEditor {
         let t = noshape_scene::drawing_tools::table_edit::pasted_table(id, cells, self.cursor);
         self.edit_sheet("Paste as table", cx, |s| s.tables.push(t));
         self.selection = vec![Sel::Table(id)];
+        // The placeholder grid goes with the click.
+        self.update_preview(cx);
         // The clipboard is used up after one paste.
         cx.write_to_clipboard(ClipboardItem::new_string(String::new()));
         self.status = None;

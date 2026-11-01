@@ -86,6 +86,20 @@ impl DrawingEditor {
             overlay.tinted.push((rect(a, b), [33, 96, 168, 255], 2.0));
         }
         let c = self.hover_snap.unwrap_or(self.cursor);
+        // Paste as table: live's placeholder grid, 4 × 3 cells of about
+        // 62 × 14 px, follows the pointer until the click places the table
+        // at its top-left corner (request 1727).
+        if self.paste_table.is_some() {
+            let (w, h, o) = (self.tol_mm(62.0), self.tol_mm(14.0), self.cursor);
+            for r in 0..=3 {
+                let y = o[1] - r as f64 * h;
+                overlay.lines.push((vec![[o[0], y], [o[0] + 4.0 * w, y]], false));
+            }
+            for k in 0..=4 {
+                let x = o[0] + k as f64 * w;
+                overlay.lines.push((vec![[x, o[1]], [x, o[1] - 3.0 * h]], false));
+            }
+        }
         match &self.tool {
             Tool::BrokenOut { parent: Some(pid), points, .. } | Tool::CropPoly { parent: Some(pid), points, .. } if !points.is_empty() => {
                 let Some(pl) = self.placement(*pid) else { return };

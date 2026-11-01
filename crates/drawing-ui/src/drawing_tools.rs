@@ -1302,8 +1302,8 @@ impl DrawingEditor {
                 self.update_hover(cx);
                 self.inspection_hover(cx);
                 // Edit section: the preview jog follows the pointer (qa
-                // DWG-EDIT-SECTION-DIALOG).
-                if self.section_edit.is_some() {
+                // DWG-EDIT-SECTION-DIALOG); so does Paste as table's grid.
+                if self.section_edit.is_some() || (self.paste_table.is_some() && matches!(self.tool, Tool::Select)) {
                     self.update_preview(cx);
                 }
                 if !matches!(self.tool, Tool::Select) {
