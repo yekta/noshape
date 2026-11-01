@@ -957,12 +957,10 @@ impl Ctx<'_> {
 
     /// The same, `on_free` the curve on a free-form face `path` lies on (projected there).
     fn intervals_on(&self, f: usize, path: &Path, (t0, t1): (f64, f64), ends: [End; 2], closed: bool, on_free: Option<&(usize, Arc<NurbsCurve>)>) -> R<Vec<Ival>> {
-        // (OCCT's section of a free-form face: within its own accuracy of where the faces meet (a sharp knurl tooth's
-        // section runs 3.5 µm inside its side edge); its ends at the face's vertices within the tolerance OCCT gives
-        // it (5e-6 at least), as OCCT's vertices take it.)
-        let (tol, vtol) = match path {
-            Path::Nurbs { id, .. } => (self.tol.max(self.ncurves[*id as usize].acc), self.tol.max(self.ncurves[*id as usize].tol)),
-            _ => (self.tol, self.tol),
+        // (OCCT's section of a free-form face: within its own tolerance of where the faces meet.)
+        let tol = match path {
+            Path::Nurbs { id, .. } => self.tol.max(self.ncurves[*id as usize].tol),
+            _ => self.tol,
         };
         let len = path.length(t0, t1);
         if len <= tol {
@@ -1011,7 +1009,7 @@ impl Ctx<'_> {
         // (OCCT's curve ending on the boundary, as it does at the face's parameter bounds: a point there.)
         if let Path::Nurbs { .. } = path {
             for (k, u) in [(0, 0.0), (1, 1.0)] {
-                if ends[k] == End::Open && distance2(c2.at(u), &bound) <= vtol {
+                if ends[k] == End::Open && distance2(c2.at(u), &bound) <= tol {
                     cuts[k].1 = End::Point(path.at(cuts[k].0));
                 }
             }
@@ -1037,7 +1035,7 @@ impl Ctx<'_> {
                 }
                 let q = self.faces[f].to2(self.p(w));
                 let (u, dist) = c2.param_of(q);
-                if dist <= vtol && u > 0.0 && u < 1.0 {
+                if dist <= tol && u > 0.0 && u < 1.0 {
                     cuts.push((t0 + (t1 - t0) * u, End::Vertex(w)));
                 }
             }
