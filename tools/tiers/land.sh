@@ -97,7 +97,7 @@ if [ $mode = queue ]; then
   # The job (arrival order = its name), then the daemon if it isn't running (origin's version).
   read -r -d '' REG <<'R'
 LD=~/$1; key=$2; target=$3
-ls "$LD/jobs/"*"-${key#*-}.job" > /dev/null 2>&1 && { cat > /dev/null; echo "(already queued: nothing new)"; exit 0; }
+ls "$LD/jobs/"*"-${key#*-}.job" > /dev/null 2>&1 && { cat > /dev/null; echo ALREADY; exit 0; }
 mkdir -p "$LD/jobs" "$LD/pending" "$LD/bin" && cat > "$LD/jobs/.$key" && mv "$LD/jobs/.$key" "$LD/jobs/$key.job" && : > "$LD/pending/$key" || exit 1
 if ! { [ -f "$LD/daemon.pid" ] && kill -0 "$(cat "$LD/daemon.pid")" 2>/dev/null; }; then
   cd ~/projects/noshape && git fetch -q origin "$target" && git show "origin/$target:tools/tiers/land-daemon.sh" > "$LD/bin/land-daemon.sh.new" 2>/dev/null \
@@ -109,6 +109,7 @@ R
   info=$(printf 'name=%s\nsha=%s\nbase=%s\nref=%s\npkgs=%s\nqueued=%s\nsubject=%s\n--\n%s\n' "$name" "$sha" "$(git rev-parse "origin/$target")" \
     "$ref" "$pkgs" "$(date +%s)" "$(git log -1 --format=%s | tr -d '\t')" "$changed" \
     | "${SSH[@]}" "$qhost" "bash -c $(printf %q "$REG") _ $qdir $key $target") || fail "could not queue on $qhost: re-run, or land with --wait"
+  [ "$info" = ALREADY ] && { echo "ALREADY QUEUED $short: nothing new since (tools/tiers/land.sh --status)"; exit 0; }
   echo "QUEUED $short ($(git rev-list --count "origin/$target..HEAD") commit(s); crates: $pkgs)"
   echo "$info" | sed 's/^/   /'
   echo "   Keep working. Results: tools/tiers/land.sh --status (or the lead tells you)."
