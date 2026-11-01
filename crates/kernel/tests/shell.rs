@@ -604,6 +604,12 @@ fn quadrics_and_slabs_agree() {
         let p = chamfer(&p, &es, ChamferSpec::Equal(2.0), &[]).unwrap().shape;
         unified(cut(&p, &bx([15.0, 5.0, 4.0], [25.0, 15.0, 11.0])).unwrap().shape)
     };
+    // A block whose top is a vault (an R50 cylinder along x, 15 mm high in the middle); a slot cut in its floor.
+    let vault = {
+        let c = make_cylinder(&Plane::from_normal(DVec3::new(-1.0, 10.0, -35.0), DVec3::X), 50.0, 42.0, std::f64::consts::TAU).unwrap();
+        let p = common(&bx([0.0; 3], [40.0, 20.0, 20.0]), &c).unwrap().shape;
+        unified(cut(&p, &bx([10.0, 8.0, -1.0], [30.0, 12.0, 4.0])).unwrap().shape)
+    };
     // (The countersunk plate: the slabs' offset cone has its seam opposite the offset hole's, splitting the circle
     // they share in two (one more shown edge, two more vertices); ours keep the faces' frames, the circle whole, its
     // corners only shown, as live's.)
@@ -614,6 +620,8 @@ fn quadrics_and_slabs_agree() {
         ("L with a filleted inner corner, top removed", l_fillet.clone(), top(&l_fillet, 10.0), 2.0, (0, 0)),
         ("countersunk plate, bottom removed", sunk.clone(), bottom(&sunk), 2.0, (1, 2)),
         ("two chamfers meeting (a vertex of four faces), bottom removed", chamfered.clone(), bottom(&chamfered), 1.0, (2, 2)),
+        ("a vaulted top removed (a curved opening)", vault.clone(), faces_where(&vault, |c| c.z > 12.0), 1.0, (0, 0)),
+        ("a hole's wall removed (a closed curved opening)", plate_hole.clone(), plate_hole.faces().into_iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { .. }))).collect(), 2.0, (0, 0)),
         ("qa plate R2, top removed, 1.5", qa_plate.clone(), top(&qa_plate, 10.0), 1.5, (0, 0)),
         ("qa plate R2, top removed, 3 (the fillets collapse)", qa_plate.clone(), top(&qa_plate, 10.0), 3.0, (0, 0)),
     ];
@@ -660,5 +668,55 @@ fn qa_plate_shell_path() {
         let t0 = std::time::Instant::now();
         let r = shell_solid(&p, &top(&p, 10.0), t, ShellSide::Inside, ShellMethod::Auto).map(|r| vol(&r.shape));
         println!("qa plate t {t}: {r:?} by {} in {:.0} ms", last_shell_path(), t0.elapsed().as_secs_f64() * 1e3);
+    }
+}
+
+/// The shell corpus's cases the direct walls take (~/agents/shellcorpus: cases/<name>.brep + .txt as NOSHAPE_DUMP_OPS
+/// writes them, `taken` lists them), each shelled with and without the direct walls, best of 3: one line each way.
+/// `tools/tiers/perf.sh -p noshape-kernel --test all -- shell::shell_corpus_time --ignored --nocapture --test-threads=1`
+#[test]
+#[ignore = "T2 bench: needs ~/agents/shellcorpus"]
+fn shell_corpus_time() {
+    let dir = std::path::PathBuf::from(format!("{}/agents/shellcorpus", std::env::var("HOME").unwrap_or_default()));
+    let names: Vec<String> = std::fs::read_to_string(dir.join("taken")).expect("taken").lines().map(str::to_string).filter(|l| !l.is_empty()).collect();
+    let run = |direct: bool| {
+        // SAFETY: the bench is single-threaded (--test-threads=1); the kernel reads these per call.
+        unsafe {
+            if direct {
+                std::env::remove_var("NOSHAPE_SHELL_NO_QUADRICS");
+                std::env::remove_var("NOSHAPE_SHELL_NO_PLANES");
+            } else {
+                std::env::set_var("NOSHAPE_SHELL_NO_QUADRICS", "1");
+                std::env::set_var("NOSHAPE_SHELL_NO_PLANES", "1");
+            }
+        }
+        let (mut total, mut vols) = (0.0, Vec::new());
+        for n in &names {
+            let body = read_brep(&dir.join(format!("cases/{n}.brep"))).unwrap();
+            let txt = std::fs::read_to_string(dir.join(format!("cases/{n}.txt"))).unwrap();
+            let faces = body.faces();
+            let picked: Vec<Shape> = txt.lines().filter_map(|l| l.strip_prefix("face ")).map(|i| faces[i.trim().parse::<usize>().unwrap()].clone()).collect();
+            let w: Vec<&str> = txt.lines().last().unwrap().split_whitespace().collect();
+            let t: f64 = w[2].parse().unwrap();
+            let side = if w[4] == "1" { ShellSide::Outside } else { ShellSide::Inside };
+            let mut best = f64::MAX;
+            let mut v = 0.0;
+            for _ in 0..3 {
+                let t0 = std::time::Instant::now();
+                v = shell_solid(&body, &picked, t, side, ShellMethod::Auto).map(|r| vol(&r.shape)).unwrap_or(f64::NAN);
+                best = best.min(t0.elapsed().as_secs_f64() * 1e3);
+            }
+            total += best;
+            vols.push(v);
+        }
+        (total, vols)
+    };
+    let (slab_ms, slab_v) = run(false);
+    let (direct_ms, direct_v) = run(true);
+    let same = slab_v.iter().zip(&direct_v).all(|(a, b)| (a - b).abs() <= 1e-9 * a.abs().max(1e-12));
+    println!("shell corpus: {} cases taken; slabs {slab_ms:.1} ms, direct {direct_ms:.1} ms (best of 3 each); volumes {}", names.len(), if same { "the same" } else { "DIFFER" });
+    unsafe {
+        std::env::remove_var("NOSHAPE_SHELL_NO_QUADRICS");
+        std::env::remove_var("NOSHAPE_SHELL_NO_PLANES");
     }
 }

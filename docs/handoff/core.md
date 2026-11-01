@@ -109,6 +109,17 @@ Share: corpus 0 (vertex reasons 8 → 5); shell-hang's Shells 2 / 3 now stop at 
 vanishes at 5 mm (next after the removed curved faces and multi-shell inputs: faces whose offset vanishes, the planar
 form of 2b). Real parts mostly shell by regions / offset already (SHELL-SLOW's R2 plate: regions, 30-74 ms); the slab
 time left is in fuzz bodies, the slowest of which fail either way.
+Step 2d (11-02): removed cylinders and cones (the rim on the removed surface, its offset edges' curves there placed
+as the originals'); a corner start on a removed face's line of tangency is a saddle: retried a wall's thickness along
+each edge both ways, solutions off the removed face's patch dropped. T1: a vaulted top removed (R50) as the slabs'.
+Declined: a kept face tangent to a removed one (a removed R5 fillet on a 40 × 20 × 10 block, 1 mm: ours 2330.596 mm³,
+13 faces; the slabs 2175.270, 16 faces; live asked, REQUESTS 02:30). Closed removed faces (a hole's wall): one band per
+circle, closed by its own seam piece whose run and orientation follow the seam curve at the u where the circle ends
+(the wire explorer gives a seam's two uses one orientation); a band whose offset circle lies past the removed face (a
+downward face's offset moving up: draft-hang Shell 3) is invalid → declined (a rim past its face, as in planes). T1:
+the plate's hole wall removed, as the slabs'. A corner may move up to 1000 t (a narrow corner moves t / sin(half
+angle); draft-hang's 0.1 mm wall moved one 1 mm). Share: corpus 1 of 134 (5f916ee4, as the slabs': volume, counts,
+history); bench `shell::shell_corpus_time` (~/agents/shellcorpus on vibe3 / vibe4, `taken` lists the cases).
 Was: next (step 2b): collapsing fillets (their offset vanishes: the neighbours' offsets meet; contract the face to an
 edge, its end arcs to points), vertices of more faces, removed curved faces.
 Release note for the lead: "Shell: a pocket's floor corners are now mitred as Onshape does (the wall used to thin to

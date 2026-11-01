@@ -2785,11 +2785,18 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       q.c = n.Dot(ax.Location().XYZ()) - (kept[(size_t)i] ? t : 0.0);
       continue;
     }
-    if (!kept[(size_t)i])
-      return no("a removed face isn't planar");
     curved = true;
     if (q.kind != GeomAbs_Cylinder && q.kind != GeomAbs_Cone)
       return no("a face neither a plane, a cylinder nor a cone");
+    if (!kept[(size_t)i])
+    {
+      // A removed cylinder or cone stays: the rim lies on it.
+      q.ax  = q.kind == GeomAbs_Cylinder ? s.Cylinder().Position() : s.Cone().Position();
+      q.ang = q.kind == GeomAbs_Cone ? s.Cone().SemiAngle() : 0.0;
+      q.r   = q.kind == GeomAbs_Cylinder ? s.Cylinder().Radius() : s.Cone().RefRadius();
+      q.off = BRep_Tool::Surface(f);
+      continue;
+    }
     // The point at (0, 0) moved along the natural normal; the offset's reference radius where its generator crosses
     // the frame's plane.
     gp_Pnt P;
@@ -2840,8 +2847,8 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       const int a     = faces.FindIndex(fl.First());
       efi[(size_t)i]  = {a, a};
       seam[(size_t)i] = 1;
-      if (BRepAdaptor_Curve(e).GetType() != GeomAbs_Line || !kept[(size_t)a])
-        return no("a seam not a kept face's generator");
+      if (BRepAdaptor_Curve(e).GetType() != GeomAbs_Line)
+        return no("a seam not a generator");
       continue;
     }
     if (fl.Extent() != 2)
@@ -2853,10 +2860,12 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     BRepAdaptor_Curve c(e);
     const gp_Pnt      m = c.Value(0.5 * (c.FirstParameter() + c.LastParameter()));
     const gp_Dir      na = normal_at(TopoDS::Face(faces(a)), m), nb = normal_at(TopoDS::Face(faces(b)), m);
+    // A kept face tangent to a removed one (a removed fillet): ours and the slabs' disagree there (2330.6 against
+    // 2175.3 mm³ on a block whose R5 fillet is removed); live asked.
+    if (na.Dot(nb) > 1 - 1e-9 && (!kept[(size_t)a] || !kept[(size_t)b]))
+      return no("a kept face tangent to a removed one");
     if (na.Dot(nb) > 1 - 1e-9)
     {
-      if (!kept[(size_t)a] || !kept[(size_t)b])
-        return no("a kept face tangent to a removed one");
       if (c.GetType() != GeomAbs_Line)
         return no("faces tangent along a curve");
       tangent[(size_t)i] = 1;
@@ -2966,9 +2975,57 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       else
       {
         const quad::Surf* s3[3] = {&sf[(size_t)fs[0]], &sf[(size_t)fs[1]], &sf[(size_t)fs[2]]};
-        x = V.XYZ() - (n_at(fs[0]) * (kept[(size_t)fs[0]] ? t : 0.0) + n_at(fs[1]) * (kept[(size_t)fs[1]] ? t : 0.0) + n_at(fs[2]) * (kept[(size_t)fs[2]] ? t : 0.0));
+        const gp_XYZ      x0 = V.XYZ() - (n_at(fs[0]) * (kept[(size_t)fs[0]] ? t : 0.0) + n_at(fs[1]) * (kept[(size_t)fs[1]] ? t : 0.0) + n_at(fs[2]) * (kept[(size_t)fs[2]] ? t : 0.0));
+        x = x0;
         if (!quad::solve3(s3, x, size))
-          return no("a corner's offsets don't meet");
+        {
+          // (A start on a removed face's line of tangency is a saddle: start again a wall's thickness along each of
+          // the vertex's edges, both ways; the solution nearest the corner.)
+          bool   found = false;
+          double best  = 0;
+          for (int e : es)
+          {
+            BRepAdaptor_Curve c(TopoDS::Edge(edges(e)));
+            const double      u = std::abs(c.Value(c.FirstParameter()).Distance(V)) < std::abs(c.Value(c.LastParameter()).Distance(V)) ? c.FirstParameter() : c.LastParameter();
+            gp_Pnt            p0;
+            gp_Vec            d0;
+            c.D1(u, p0, d0);
+            if (d0.Magnitude() < 1e-12)
+              continue;
+            for (double sg : {1.0, -1.0})
+            {
+              gp_XYZ y = x0 + d0.Normalized().XYZ() * (sg * t);
+              if (!quad::solve3(s3, y, size))
+                continue;
+              // On a removed face: within its patch (the other root of a removed cylinder lies off it).
+              bool on = true;
+              for (int f : fs)
+                if (!kept[(size_t)f] && sf[(size_t)f].kind != GeomAbs_Plane)
+                {
+                  const TopoDS_Face&         rf = TopoDS::Face(faces(f));
+                  GeomAPI_ProjectPointOnSurf pr(gp_Pnt(y), BRep_Tool::Surface(rf));
+                  double                     u0, u1, v0, v1, pu, pv;
+                  BRepTools::UVBounds(rf, u0, u1, v0, v1);
+                  if (pr.NbPoints() == 0)
+                  {
+                    on = false;
+                    continue;
+                  }
+                  pr.LowerDistanceParameters(pu, pv);
+                  const double eu = 1e-6 * (u1 - u0) + 1e-9, ev = 1e-6 * (v1 - v0) + 1e-9;
+                  on = on && pu >= u0 - eu && pu <= u1 + eu && pv >= v0 - ev && pv <= v1 + ev;
+                }
+              if (on && (!found || (y - V.XYZ()).Modulus() < best))
+              {
+                found = true;
+                best  = (y - V.XYZ()).Modulus();
+                x     = y;
+              }
+            }
+          }
+          if (!found)
+            return no("a corner's offsets don't meet");
+        }
       }
     }
     else if (fs.size() > 3 && es.size() == fs.size() && std::none_of(es.begin(), es.end(), [&](int e) { return tangent[(size_t)e] != 0 || seam[(size_t)e] != 0; }))
@@ -2993,13 +3050,17 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       gp_Pnt            p0;
       gp_Vec            d0;
       c.D1(c.FirstParameter(), p0, d0);
-      if (!quad::solve_line(sf[(size_t)b], V.XYZ() - n_at(a) * t, d0.Normalized().XYZ(), x, size))
+      if (!quad::solve_line(sf[(size_t)b], V.XYZ() - n_at(a) * (kept[(size_t)a] ? t : 0.0), d0.Normalized().XYZ(), x, size))
         return no("a seam's corner not found");
     }
     else
       return no("a vertex not of three faces (or a seam and one)");
-    if ((x - V.XYZ()).Modulus() > 10 * t + 1e3 * tol)
+    if ((x - V.XYZ()).Modulus() > 1e3 * t + 1e3 * tol) // (a narrow corner moves t / sin(half its angle))
+    {
+      if (dbg)
+        std::fprintf(stderr, "quadrics: vertex %d at %g %g %g (%zu faces, %zu edges) offset to %g %g %g\n", i, V.X(), V.Y(), V.Z(), fs.size(), es.size(), x.X(), x.Y(), x.Z());
       return no("a corner's offset far from it");
+    }
     pts[(size_t)i] = x;
   }
   // The edges' offsets.
@@ -3020,7 +3081,8 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   std::vector<int>         group_edge(nf + 1, 0); // a collapsing face's edge (the first of its tangent edges)
   for (int i = 1; i <= ne; ++i)
   {
-    if (gone[(size_t)i])
+    // (A removed face's seam has no offset: its rim bands get their own, below.)
+    if (gone[(size_t)i] || (seam[(size_t)i] && !kept[(size_t)efi[(size_t)i][0]]))
       continue;
     const TopoDS_Edge e = TopoDS::Edge(edges(i).Oriented(TopAbs_FORWARD));
     TopoDS_Vertex     a, b;
@@ -3169,12 +3231,95 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     {
       TopLoc_Location                 loc;
       const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(ff, loc);
+      bool                            closed = false;
+      for (TopExp_Explorer x(ff, TopAbs_EDGE); x.More() && !closed; x.Next())
+        closed = seam[(size_t)edges.FindIndex(x.Current())] != 0;
+      if (closed)
+      {
+        // A closed removed face (a hole's wall): its wire is circle, seam, circle, seam; one band per circle, between
+        // it and its offset, closed by its own piece of the seam (the circle's corner to its offset's, along the
+        // seam's line and the seam's way).
+        TopoDS_Wire w0;
+        int         nw = 0;
+        for (TopExp_Explorer x(ff, TopAbs_WIRE); x.More(); x.Next(), ++nw)
+          w0 = TopoDS::Wire(x.Current());
+        std::vector<TopoDS_Edge> seq;
+        for (BRepTools_WireExplorer x(w0, ff); x.More(); x.Next())
+          seq.push_back(x.Current());
+        if (nw != 1 || seq.size() != 4)
+          return no("a closed removed face not between two circles");
+        for (size_t p = 0; p < 4; ++p)
+        {
+          const int k = edges.FindIndex(seq[p]);
+          if (seam[(size_t)k])
+            continue;
+          const TopoDS_Edge& sn = seq[(p + 1) % 4]; // the seam as it follows the circle
+          const int          ks = edges.FindIndex(sn);
+          if (!seam[(size_t)ks] || ex[(size_t)k].IsNull() || !BRep_Tool::IsClosed(seq[p]))
+            return no("a closed removed face not between two circles");
+          // The circle's corner and its offset's. The seam's two curves on the face sit at two u (its two uses); the
+          // band's piece goes up from the circle on the curve at the u where the circle ends: with that use's
+          // orientation, run so that this use starts at the circle.
+          const TopoDS_Vertex  vc = TopExp::FirstVertex(seq[p]);
+          const int            iv = verts.FindIndex(vc);
+          const TopoDS_Vertex& vo = vx[(size_t)find(iv)];
+          const gp_Pnt         pc = BRep_Tool::Pnt(vc), po = BRep_Tool::Pnt(vo);
+          if (pc.Distance(po) <= 10 * tol)
+            return no("a band's seam vanishes");
+          auto uv_on = [&](const TopoDS_Edge& e, const TopoDS_Face& face, bool start) {
+            double                          c0, c1;
+            const occ::handle<Geom2d_Curve> pcv = BRep_Tool::CurveOnSurface(e, face, c0, c1);
+            const bool                      rev = e.Orientation() == TopAbs_REVERSED;
+            return pcv.IsNull() ? gp_Pnt2d(1e300, 1e300) : pcv->Value((start != rev) ? c0 : c1);
+          };
+          const gp_Pnt2d end = uv_on(seq[p], ff, false);
+          const TopoDS_Edge so = TopoDS::Edge(edges(ks).Oriented(TopAbs_FORWARD));
+          const double uF = uv_on(so, ff, true).X(), uR = uv_on(TopoDS::Edge(so.Reversed()), ff, true).X();
+          const TopAbs_Orientation way = std::abs(end.X() - uF) <= std::abs(end.X() - uR) ? TopAbs_FORWARD : TopAbs_REVERSED;
+          // FORWARD use going up: the piece runs circle → offset; REVERSED use going up: offset → circle.
+          const gp_Pnt  a = way == TopAbs_FORWARD ? pc : po, b = way == TopAbs_FORWARD ? po : pc;
+          BRepBuilderAPI_MakeEdge mk(new Geom_Line(a, gp_Dir(gp_Vec(a, b))), way == TopAbs_FORWARD ? vc : vo, way == TopAbs_FORWARD ? vo : vc, 0.0, a.Distance(b));
+          if (!mk.IsDone())
+            return no("a band's seam failed");
+          const TopoDS_Edge piece = mk.Edge();
+          TopoDS_Face       rim;
+          bld.MakeFace(rim, surf, loc, BRep_Tool::Tolerance(ff));
+          // (The piece's two curves: its FORWARD use on the seam's FORWARD curve's u, REVERSED on the other.)
+          if (!quad::add_pcurve(ex[(size_t)k], rim, TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD)), ff, false, 1e3 * tol) ||
+              !quad::add_pcurve(piece, rim, so, ff, true, 1e3 * tol))
+            return no("a band's edge curves failed");
+          TopoDS_Wire bw;
+          bld.MakeWire(bw);
+          // circle, the seam piece up, the offset circle back, the seam piece down.
+          bld.Add(bw, seq[p]);
+          bld.Add(bw, piece.Oriented(way));
+          bld.Add(bw, ex[(size_t)k].Oriented(TopAbs::Reverse(seq[p].Orientation())));
+          bld.Add(bw, piece.Oriented(TopAbs::Reverse(way)));
+          bw.Closed(true);
+          bld.Add(rim, bw);
+          BRepLib::SameParameter(piece, 1e3 * tol);
+          const TopoDS_Face band = TopoDS::Face(rim.Oriented(f.Orientation()));
+          bld.Add(shell, band);
+          h->AddModified(f, band);
+        }
+        continue;
+      }
       for (TopoDS_Iterator w(ff, false); w.More(); w.Next())
       {
         TopoDS_Face rim;
         bld.MakeFace(rim, surf, loc, BRep_Tool::Tolerance(ff));
         bld.Add(rim, w.Value());
         bld.Add(rim, offset_wire(w.Value()).Oriented(TopAbs::Reverse(w.Value().Orientation())));
+        if (sf[(size_t)i].kind != GeomAbs_Plane)
+          for (TopoDS_Iterator x(w.Value(), false); x.More(); x.Next())
+          {
+            // The offset edges on the removed face's own surface (its edges have their curves there already).
+            const int k = edges.FindIndex(x.Value());
+            if (gone[(size_t)k])
+              continue;
+            if (!quad::add_pcurve(ex[(size_t)k], rim, TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD)), ff, false, 1e3 * tol))
+              return no("an offset edge's curve on a removed face failed");
+          }
         const TopoDS_Face r = TopoDS::Face(rim.Oriented(f.Orientation()));
         bld.Add(shell, r);
         h->AddModified(f, r);
