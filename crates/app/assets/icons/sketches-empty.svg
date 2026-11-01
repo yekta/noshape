@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="170" viewBox="0 0 200 170">
+<defs>
+<mask id="m2" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="170"><rect width="200" height="170" fill="#fff"/><path transform="translate(68.25 143.75) scale(1.127)" d="M-15 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-15A6 6 0 0 1 -21 14.6V-14.6A6 6 0 0 1 -15 -20.6Z" stroke="#000" stroke-width="4.4"/></mask>
+<mask id="m3" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="170"><rect width="200" height="170" fill="#fff"/><g stroke="#000" stroke-width="4.4"><path transform="translate(68.25 143.75) scale(1.127)" d="M-15 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-15A6 6 0 0 1 -21 14.6V-14.6A6 6 0 0 1 -15 -20.6Z"/><path transform="translate(5 -3.6) translate(68.25 143.75) scale(1.127) rotate(-31)" d="M-4 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-4Z"/></g></mask>
+<mask id="ml" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="170"><rect width="200" height="170" fill="#fff"/><g stroke="#000" stroke-width="7.8"><path transform="translate(68.25 143.75) scale(1.127)" d="M-15 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-15A6 6 0 0 1 -21 14.6V-14.6A6 6 0 0 1 -15 -20.6Z"/><path transform="translate(5 -3.6) translate(68.25 143.75) scale(1.127) rotate(-31)" d="M-4 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-4Z"/><path transform="translate(1.75 -3.875) translate(68.25 143.75) scale(1.127) rotate(-58)" d="M-4 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-4Z"/></g><path transform="translate(10 92) rotate(-45)" d="M0 0L21.9 -8.3H81.8V8.3H21.9ZM21.9 -8.3V8.3" stroke="#000" stroke-width="7"/></mask>
+</defs>
+<g fill="none" stroke="#555555">
+<g mask="url(#ml)"><path d="M24 4H183M24 4V150M183 4V85M5 97H120M24 150H60" stroke-width="3"/><g fill="#555555" stroke="none"><circle cx="24" cy="4" r="4.75"/><circle cx="183" cy="4" r="4.75"/><circle cx="5" cy="97" r="4.75"/><circle cx="24" cy="150" r="4.75"/></g></g>
+<path transform="translate(10 92) rotate(-45)" d="M0 0L21.9 -8.3H81.8V8.3H21.9ZM21.9 -8.3V8.3" stroke-width="4" stroke-linejoin="round"/>
+<g stroke-width="4.4">
+<g mask="url(#m3)"><path transform="translate(1.75 -3.875) translate(68.25 143.75) scale(1.127) rotate(-58)" d="M-4 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-4ZM25.5 -20.6V20.6M72.3 -20.6V20.6"/></g>
+<g mask="url(#m2)"><path transform="translate(5 -3.6) translate(68.25 143.75) scale(1.127) rotate(-31)" d="M-4 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-4ZM25.5 -20.6V20.6M72.3 -20.6V20.6"/></g>
+<path transform="translate(68.25 143.75) scale(1.127)" d="M-15 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-15A6 6 0 0 1 -21 14.6V-14.6A6 6 0 0 1 -15 -20.6ZM25.5 -20.6V20.6M72.3 -20.6V20.6"/>
+<circle transform="translate(68.25 143.75) scale(1.127)" r="7" stroke-width="4.6"/>
+</g></g>
+</svg>

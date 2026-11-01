@@ -844,25 +844,24 @@ impl PartStudioView {
                     cx.notify();
                 }))
         };
-        // Live (dark/dk-993, a studio with only a sketch): no parts gives an
-        // empty state centred in the panel, our drawing of Onshape's
-        // illustration (200 x 170) with the text's ink 27 px under it.
-        let empty = (!sketches_tab && rows.is_empty()).then(|| {
+        // Live (request 1700, dark/dk-993): an empty tab shows a 200 x 170
+        // illustration (our drawings of Onshape's) and a line of text 20 px
+        // under it, the two centred in the pane under the tabs.
+        let empty = rows.is_empty().then(|| {
+            let (icon, text) = if sketches_tab { ("sketches-empty", "No sketches or curves in this document") } else { ("appearances-empty", "No parts or surfaces in this document") };
             v_flex()
                 .flex_1()
                 .items_center()
                 .justify_center()
-                // Live: 6 px above the panel's middle.
-                .pb(px(12.))
-                .child(svg().path(crate::assets::icon_path("appearances-empty")).w(px(200.)).h(px(170.)).flex_none().text_color(pal.illustration))
-                .child(div().mt(px(20.)).text_size(px(13.33)).line_height(px(20.8)).text_color(pal.text_muted).child("No parts or surfaces in this document"))
+                .child(svg().path(crate::assets::icon_path(icon)).w(px(200.)).h(px(170.)).flex_none().text_color(pal.illustration))
+                .child(div().mt(px(20.)).text_size(px(14.67)).line_height(px(22.)).text_color(pal.text_muted).child(text))
         });
         v_flex()
             .when(empty.is_some(), |d| d.flex_1())
             // Live (dom/panel-appearance.txt): the tab row has 4 px of top
             // padding under the title (tabs 111–137, rows from 147).
             .child(h_flex().w_full().mt(px(-1.)).mx(px(-5.)).child(tab("ap-tab-parts", "Parts and surfaces", !sketches_tab, false, cx)).child(tab("ap-tab-sketches", "Sketches and curves", sketches_tab, true, cx)))
-            .child(v_flex().pt(px(10.)).children(rows))
+            .when(empty.is_none(), |d| d.child(v_flex().pt(px(10.)).children(rows)))
             .children(empty)
             .into_any_element()
     }
