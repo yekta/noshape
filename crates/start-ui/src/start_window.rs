@@ -274,6 +274,10 @@ pub struct StartView {
     /// Right panel (Details / Versions and history) and the details read for it.
     panel: Option<DocPanel>,
     details: Option<(PathBuf, i64, lib::DocDetails)>,
+    /// Versions and history: the selected row and the rows whose "Show
+    /// changes…" is open, of the document shown.
+    history_sel: Option<(PathBuf, usize)>,
+    history_open: std::collections::HashSet<(PathBuf, usize)>,
     /// The "Folders" section of "Owned by me" is expanded.
     folders_open: bool,
     /// "Last opened by me" is expanded.
@@ -410,6 +414,8 @@ impl StartView {
             label_search,
             panel: prefs.panel,
             details: None,
+            history_sel: None,
+            history_open: Default::default(),
             folders_open: false,
             recent_open: true,
             sub_open: true,
@@ -1510,25 +1516,113 @@ impl StartView {
                         .font_weight(FontWeight::SEMIBOLD)
                         .border_b_1()
                         .border_color(rgb(0xd0dbe5))
-                        .child(div().w(px(150.)).child("Name"))
+                        .child(div().w(px(100.)).flex_none())
+                        .child(div().w(px(120.)).flex_none().child("Name"))
                         .child(div().child("Modified")),
                 )
-                .children(d.history.iter().map(|(name, ws, author, t)| {
-                    let name_el = if *ws {
-                        div().px(px(3.)).rounded(px(3.)).border_1().border_color(pal.accent).bg(rgb(0xd0dbe5)).font_weight(FontWeight::MEDIUM).child(crate::ui::user_text(name.clone()))
-                    } else {
-                        div().font_weight(FontWeight::MEDIUM).child(crate::ui::user_text(name.clone()))
+                .children({
+                    // Live documents-versions-history-panel: a 140 px graph
+                    // column (the workspace a white ring, versions blue
+                    // dots, 16 px down, a line through each workspace's
+                    // rows), then Name and Modified, 50 px rows.
+                    let path = entry.as_ref().map(|e| e.path.clone()).unwrap_or_default();
+                    let rows = &d.history;
+                    let lanes = rows.iter().map(|r| r.lane).max().unwrap_or(0) + 1;
+                    // A lane runs from its first row to its last, or on to
+                    // the row it branched from.
+                    let span = |lane: usize| {
+                        let first = rows.iter().position(|r| r.lane == lane || (lane == 0 && r.name == "Start"));
+                        let last = rows.iter().rposition(|r| r.lane == lane || (lane == 0 && r.name == "Start"));
+                        let from = rows.iter().filter(|r| r.lane == lane).filter_map(|r| r.from).max();
+                        first.zip(last.max(from))
                     };
-                    h_flex()
-                        .h(px(50.))
-                        .px(px(10.))
-                        .items_start()
-                        .pt(px(5.))
-                        .text_size(px(14.))
-                        .text_color(pal.text_muted)
-                        .child(div().w(px(150.)).text_color(pal.text).child(name_el))
-                        .child(v_flex().child(who(author)).child(lib::format_onshape_time(*t)))
-                }))
+                    let spans: Vec<Option<(usize, usize)>> = (0..lanes).map(span).collect();
+                    let blue = rgb(0x1651b0);
+                    let mut out = Vec::new();
+                    for (i, r) in rows.iter().enumerate() {
+                        let x = |lane: usize| 40. + 16. * lane as f32;
+                        let mut graph = div().relative().w(px(100.)).flex_none();
+                        // A branch's foot: from the version's dot across to its lane.
+                        for (lane, sp) in spans.iter().enumerate() {
+                            if lane > 0 && sp.is_some_and(|(_, b)| b == i) && rows.iter().any(|r| r.lane == lane && r.from == Some(i)) {
+                                graph = graph.child(div().absolute().left(px(x(0))).top(px(15.5)).h(px(1.)).w(px(x(lane) - x(0))).bg(blue));
+                            }
+                        }
+                        for (lane, sp) in spans.iter().enumerate() {
+                            let Some((a, b)) = *sp else { continue };
+                            if i > a && i <= b {
+                                graph = graph.child(div().absolute().left(px(x(lane) - 0.5)).top_0().h(px(16.)).w(px(1.)).bg(blue));
+                            }
+                            if i >= a && i < b {
+                                graph = graph.child(div().absolute().left(px(x(lane) - 0.5)).top(px(16.)).bottom_0().w(px(1.)).bg(blue));
+                            }
+                        }
+                        let dot = if r.workspace {
+                            div().absolute().left(px(x(r.lane) - 6.)).top(px(10.)).size(px(12.)).rounded_full().border_1().border_color(blue).bg(rgb(0xffffff))
+                        } else {
+                            div().absolute().left(px(x(r.lane) - 4.)).top(px(12.)).size(px(8.)).rounded_full().bg(blue)
+                        };
+                        graph = graph.child(dot);
+                        let name_el = if r.workspace {
+                            div().px(px(3.)).rounded(px(3.)).border_1().border_color(pal.accent).bg(rgb(0xd0dbe5)).font_weight(FontWeight::MEDIUM).child(crate::ui::user_text(r.name.clone()))
+                        } else {
+                            div().font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(r.name.clone()))
+                        };
+                        let open = self.history_open.contains(&(path.clone(), i));
+                        let selected = self.history_sel.as_ref() == Some(&(path.clone(), i));
+                        let tip = if r.description.trim().is_empty() { "No description".to_string() } else { format!("Description: {}", r.description) };
+                        let (p1, p2) = (path.clone(), path.clone());
+                        let show = (!r.changes.is_empty()).then(|| {
+                            h_flex()
+                                .id(SharedString::from(format!("vh-changes-{i}")))
+                                .gap(px(3.))
+                                .cursor_pointer()
+                                .child(os::glyph(if open { os::GLYPH_EXPANDED } else { os::GLYPH_COLLAPSED }, 10., pal.text_muted))
+                                .child(if open { "Hide changes…" } else { "Show changes…" })
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    cx.stop_propagation();
+                                    let key = (p1.clone(), i);
+                                    if !this.history_open.remove(&key) {
+                                        this.history_open.insert(key);
+                                    }
+                                    cx.notify();
+                                }))
+                        });
+                        let changes = open.then(|| {
+                            v_flex().pt(px(4.)).gap(px(2.)).text_size(px(12.)).children(r.changes.iter().map(|(desc, author, t)| {
+                                h_flex().gap(px(6.)).child(div().w(px(150.)).flex_none().truncate().text_color(pal.text).child(desc.clone())).child(div().truncate().child(format!("{} · {}", who(author), lib::format_onshape_time(*t))))
+                            }))
+                        });
+                        out.push(h_flex()
+                            .id(SharedString::from(format!("vh-row-{i}")))
+                            .min_h(px(50.))
+                            .items_stretch()
+                            .text_size(px(14.))
+                            .text_color(pal.text_muted)
+                            .when(selected, |d| d.bg(rgb(0xb2ddf6)))
+                            .tooltip(crate::ui::tooltip(tip))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                this.history_sel = Some((p2.clone(), i));
+                                cx.notify();
+                            }))
+                            .child(graph)
+                            .child(
+                                v_flex()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .pt(px(5.))
+                                    .pb(px(4.))
+                                    .child(
+                                        h_flex()
+                                            .items_start()
+                                            .child(v_flex().w(px(120.)).flex_none().child(h_flex().child(name_el)).children(show))
+                                            .child(v_flex().min_w_0().child(div().truncate().child(who(&r.author))).child(div().truncate().child(lib::format_onshape_time(r.time)))),
+                                    )
+                                    .children(changes),
+                            ));
+                    }
+                    out
+                })
                 .into_any_element(),
             // A folder (live documents/47): name, Owner, Created by, Last modified by.
             _ if panel == DocPanel::Details && folder.is_some() => {

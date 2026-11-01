@@ -1719,6 +1719,7 @@ impl PartStudioView {
                 .cursor_pointer()
                 .text_size(px(13.33))
                 .text_color(pal.text)
+                .tooltip(crate::ui::tooltip(format!("Configure a property of {part_name}")))
                 .child("Add property")
                 .child(crate::ui::glyph("ui-caret-down", 8., pal.text))
                 .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())

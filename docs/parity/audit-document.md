@@ -28,9 +28,9 @@ Priorities:
 
 | | |
 |---|---|
-| Surfaces audited | 16 |
-| Gaps found | 7 |
-| Gaps fixed | 5 |
+| Surfaces audited | 19 |
+| Gaps found | 8 |
+| Gaps fixed | 7 |
 
 ## Surfaces
 
@@ -52,6 +52,9 @@ Priorities:
 | S14 | Standard content browser | skb-standard-content*.json, ui2-standard-content*.json\|html | D9 |
 | S15 | Insert dialog, other documents | assembly-insert-other-*.txt | D9 |
 | S16 | Part / assembly / instance Properties dialogs | dialog-*-properties.txt | 0 |
+| S17 | Compare (bar, tab states, feature and parameter rows, moved markers) | ui2-compare*.json\|html | 0 |
+| S18 | Release management | upsell-release-management-modal.txt (the free plan shows only the upsell), help enterprise_settings_release_management | not auditable on live; ours follows the help |
+| S19 | Configured part properties panel (tables, menus, cell editors) | cp-*.json\|html | D11 |
 
 ## Gaps
 
@@ -59,8 +62,9 @@ Priorities:
 |---|---|---|---|
 | D2 | P2 | Create version: live warns "These drawings should be updated before creating a version:" with drawing links and an "Update drawings." button. Ours has no warning. It needs a drawing staleness query from the drawings side (dx). | open: asked dx in the handoff |
 | D3 | P1 | ☰ on a version (a version window): live shows Rename document, Move to…, Restore deleted workspaces… · Copy version…, Version properties… · Print… · Close document. Ours showed the workspace items (Copy workspace…, Update workspace…, Workspace units…, Workspace properties…, Switch to view only mode). | fixed: the version variant; Copy version… makes a new document from the version's state (`start_library::copy_version_named`) |
-| D6 | P2 | Documents page › Versions and history: live rows have a 140 px graph column (white workspace ring, blue version dots), "Show changes…" under Main and the versions, a selected row (light blue) and the tooltip "No description" / "Description: …". Ours lists Name / Modified only. | open |
+| D6 | P2 | Documents page › Versions and history: live rows have a 140 px graph column (white workspace ring, blue version dots), "Show changes…" under Main and the versions, a selected row (light blue) and the tooltip "No description" / "Description: …". Ours listed Name / Modified only. | fixed: graph column (a lane per workspace, a branch drawn from the version it was made from), Show / Hide changes… with the changes since the version before (description, author, time), the selected row, the description tooltip (`start_library::HistoryRow`) |
 | D7 | P3 | Documents page while searching: live's header is "Search results in" with the place in blue / 600. With no results it shows "No results found that match this search. Try other search terms or refine the search by clicking the arrow in the search box." Ours kept the place header and said "No documents match …". | fixed |
 | D8 | P1 | Documents page search results with Type Part (Part Studio, …): live lists **each part (tab) as its own row**, with thumbnail, part icon, bold matched name, ⚲ Main, a state badge, and the Part number and Revision columns. Ours filtered whole documents. | fixed: a search of parts or tab types lists a row per item (`start_search::hits`), with the item's icon, the searched text in bold, the workspace, the part's state, Part number and Revision; a double click opens the document at its tab. Part names come from regeneration, so each workspace keeps an index of its Part Studios' parts (store meta `search_parts:<workspace>`, `app-core/search_index.rs`), written with the thumbnail. A document not edited since has none and lists only its named parts, as do versions. |
-| D9 | P3 | Search boxes of the standard content browser and Insert › Other documents: tooltip "Type and press enter to search", and the clear button's tooltip "Clear search". | open |
+| D9 | P3 | Search boxes of the standard content browser and Insert › Other documents: tooltip "Type and press enter to search", and the clear button's tooltip "Clear search". | fixed (the clear button's tooltip landed with audit G7) |
 | D10 | P2 | ☰ › Workspace properties…: live runs the same command as the version's Version properties… (the metadata modal with the tab tree). Ours opened a plain name / description modal. | fixed: opens history-ui's Properties modal for the workspace |
+| D11 | P3 | Configured part properties: Add property ▾ has the tooltip "Configure a property of <part>". | fixed |

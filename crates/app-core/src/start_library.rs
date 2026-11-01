@@ -313,12 +313,34 @@ pub struct DocDetails {
     pub created: i64,
     pub modified_by: String,
     pub modified: i64,
-    /// Workspaces and versions, newest first: (name, is_workspace, author, time).
-    pub history: Vec<(String, bool, String, i64)>,
+    /// Workspaces and versions, newest first.
+    pub history: Vec<HistoryRow>,
     /// Document notes (markdown, the rail's Notes panel) and the Properties
     /// panel's Library label.
     pub notes: String,
     pub library_label: String,
+}
+
+/// A row of the documents page's Versions and history panel (live
+/// documents-versions-history-panel: graph, name, Show changes…, author,
+/// time; the tooltip is its description).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct HistoryRow {
+    pub name: String,
+    pub workspace: bool,
+    pub author: String,
+    pub time: i64,
+    pub description: String,
+    /// The graph's lane: the workspace it was made in (Main is 0).
+    pub lane: usize,
+    /// Its changes since the version before it, newest first (Show
+    /// changes…): description, author, time.
+    pub changes: Vec<(String, String, i64)>,
+    /// A workspace made from a version: that version's row (the graph
+    /// draws the branch from it).
+    pub from: Option<usize>,
+    /// The state it shows (None for Start's row before sorting).
+    pub microversion: Option<noshape_store::MicroversionId>,
 }
 
 /// Store meta key of the Properties panel's Library label.
@@ -340,18 +362,47 @@ pub fn doc_details(path: &Path) -> anyhow::Result<DocDetails> {
     let (notes, library_label) = (text("notes"), text(LIBRARY_LABEL_KEY));
     let first = graph.microversions.iter().min_by_key(|m| m.seq);
     let last = graph.microversions.iter().max_by_key(|m| m.seq);
-    let mut history: Vec<(String, bool, String, i64)> = Vec::new();
+    let lanes: Vec<noshape_store::BranchId> = graph.branches.iter().filter(|b| !b.deleted).map(|b| b.id).collect();
+    let lane_of = |b: noshape_store::BranchId| lanes.iter().position(|l| *l == b).unwrap_or(0);
+    let by_id: std::collections::HashMap<_, _> = graph.microversions.iter().map(|m| (m.id, m)).collect();
+    let marks: std::collections::HashSet<_> = graph.versions.iter().map(|v| v.microversion).collect();
+    // The changes from `mv` back along first parents to the version before
+    // it (a workspace still at a version has none).
+    let changes = |mv, version: bool| {
+        let mut out = Vec::new();
+        let mut cur = Some(mv);
+        while let Some(m) = cur.and_then(|c| by_id.get(&c)) {
+            if ((m.id != mv || !version) && marks.contains(&m.id)) || m.parents.is_empty() || out.len() >= 200 {
+                break;
+            }
+            out.push((m.description.clone(), m.author.clone(), m.created));
+            cur = m.parents.first().copied();
+        }
+        out
+    };
+    let mut history: Vec<HistoryRow> = Vec::new();
     for b in graph.branches.iter().filter(|b| !b.deleted) {
         let head = graph.microversions.iter().find(|m| m.id == b.head);
-        history.push((b.name.clone(), true, head.map(|m| m.author.clone()).unwrap_or_default(), head.map(|m| m.created).unwrap_or(b.created).max(b.created)));
+        let description = text(&format!("{}{}", noshape_ops::versions::WORKSPACE_DESCRIPTION_KEY, b.id));
+        let time = head.map(|m| m.created).unwrap_or(b.created).max(b.created);
+        history.push(HistoryRow { name: b.name.clone(), workspace: true, author: head.map(|m| m.author.clone()).unwrap_or_default(), time, description, lane: lane_of(b.id), changes: changes(b.head, false), from: None, microversion: Some(b.head) });
     }
     for v in &graph.versions {
-        history.push((v.name.clone(), false, v.author.clone(), v.created));
+        let lane = by_id.get(&v.microversion).map(|m| lane_of(m.branch)).unwrap_or(0);
+        history.push(HistoryRow { name: v.name.clone(), workspace: false, author: v.author.clone(), time: v.created, description: v.description.clone(), lane, changes: changes(v.microversion, true), from: None, microversion: Some(v.microversion) });
     }
     if let Some(f) = first {
-        history.push(("Start".into(), false, f.author.clone(), f.created));
+        history.push(HistoryRow { name: "Start".into(), author: f.author.clone(), time: f.created, microversion: Some(f.id), ..Default::default() });
     }
-    history.sort_by(|a, b| b.3.cmp(&a.3).then(b.1.cmp(&a.1)));
+    history.sort_by(|a, b| b.time.cmp(&a.time).then(b.workspace.cmp(&a.workspace)));
+    // Where each other workspace branched off (a version's or Start's row).
+    for b in graph.branches.iter().filter(|b| !b.deleted && !b.is_default) {
+        let Some(from) = b.created_from else { continue };
+        let at = history.iter().position(|r| !r.workspace && r.microversion == Some(from));
+        if let Some(r) = history.iter_mut().find(|r| r.workspace && r.name == b.name) {
+            r.from = at;
+        }
+    }
     Ok(DocDetails {
         name: if meta.name.is_empty() { path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default() } else { meta.name },
         description: meta.description,
@@ -464,6 +515,35 @@ mod tests {
         let now = to_ms(SystemTime::now());
         assert!(format_onshape_time(now).ends_with(" Today"));
         assert!(format_onshape_time(now - 400 * 86_400_000).contains(", "));
+    }
+
+    /// Documents › Versions and history: each row's changes since the
+    /// version before it, the description, and where a workspace branched.
+    #[test]
+    fn versions_panel_rows() {
+        let dir = std::env::temp_dir().join(format!("noshape-history-rows-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("doc.noshape");
+        let mut store = noshape_store::Document::create(&path, &[("a", b"0")]).unwrap();
+        let main = store.default_branch().unwrap();
+        store.commit(main, &[("a", Some(b"1"))], "one").unwrap();
+        let v1 = store.commit(main, &[("a", Some(b"2"))], "two").unwrap();
+        store.create_version(v1, "V1", "First cut").unwrap();
+        store.create_branch(v1, "experiment").unwrap();
+        store.commit(main, &[("a", Some(b"3"))], "three").unwrap();
+        drop(store);
+        let h = doc_details(&path).unwrap().history;
+        let row = |n: &str| h.iter().find(|r| r.name == n).unwrap().clone();
+        let descs = |r: HistoryRow| r.changes.into_iter().map(|c| c.0).collect::<Vec<_>>();
+        assert_eq!(descs(row("Main")), ["three"]);
+        assert_eq!(descs(row("V1")), ["two", "one"]);
+        assert!(row("experiment").changes.is_empty(), "still at V1");
+        assert_eq!(row("V1").description, "First cut");
+        let at = h.iter().position(|r| r.name == "V1");
+        assert_eq!(row("experiment").from, at);
+        assert_eq!((row("Main").lane, row("experiment").lane), (0, 1));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// ☰ › Copy version…: the copy holds the version's state, not the workspace's.
