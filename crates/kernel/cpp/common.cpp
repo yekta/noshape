@@ -138,8 +138,12 @@ void unique_ancestors(const TopoDS_Shape& s, TopAbs_ShapeEnum kind, TopAbs_Shape
   // the lists' nodes from one bump allocator: half its time was malloc.
   const occ::handle<NCollection_IncAllocator> alloc = new NCollection_IncAllocator();
   const ShapeList                             empty(alloc);
+  // (Seconds on a knurl's 50 k faces: stopped on a cancel.)
+  int n = 0;
   for (TopExp_Explorer a(s, ancestor_kind); a.More(); a.Next())
   {
+    if ((++n & 0x3FF) == 0)
+      fail_if_cancelled();
     const TopoDS_Shape& anc = a.Current();
     for (TopExp_Explorer x(anc, kind); x.More(); x.Next())
     {

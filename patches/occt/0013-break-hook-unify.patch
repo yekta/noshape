@@ -1,0 +1,92 @@
+--- a/src/ModelingAlgorithms/TKShHealing/ShapeBuild/ShapeBuild_ReShape.cxx
++++ b/src/ModelingAlgorithms/TKShHealing/ShapeBuild/ShapeBuild_ReShape.cxx
+@@ -14,6 +14,17 @@
+ //    abv 28.04.99 S4137: adding method Apply for work on all types of shapes
+ 
+ #include <BRep_Builder.hxx>
++#include <Standard_Failure.hxx>
++
++// noshape (patch 0013): whether the caller's budget or cancel says stop (noshape's kernel, boolean.cpp; weak
++// default as 0008): every 4096 shapes rebuilt (a whole knurl's, after UnifySameDomain's edges, took seconds).
++extern "C" int noshape_should_break();
++#if defined(__GNUC__)
++extern "C" __attribute__((weak)) int noshape_should_break()
++{
++  return 0;
++}
++#endif
+ #include <BRep_Tool.hxx>
+ #include <ShapeBuild_Edge.hxx>
+ #include <ShapeBuild_ReShape.hxx>
+@@ -201,6 +212,9 @@
+                                            const TopAbs_ShapeEnum                       theUntil,
+                                            NCollection_Map<occ::handle<TopoDS_TShape>>& theInFlight)
+ {
++  static thread_local unsigned aNoshapeCount = 0;
++  if ((++aNoshapeCount & 4095) == 0 && noshape_should_break() != 0)
++    throw Standard_Failure("noshape: stopped");
+   myStatus = ShapeExtend::EncodeStatus(ShapeExtend_OK);
+   if (theShape.IsNull())
+   {
+--- a/src/ModelingAlgorithms/TKShHealing/ShapeUpgrade/ShapeUpgrade_UnifySameDomain.cxx
++++ b/src/ModelingAlgorithms/TKShHealing/ShapeUpgrade/ShapeUpgrade_UnifySameDomain.cxx
+@@ -88,6 +88,24 @@
+ #include <BRepBuilderAPI_MakeEdge.hxx>
+ #include <ElSLib.hxx>
+ #include <GeomProjLib.hxx>
++#include <Standard_Failure.hxx>
++
++// noshape (patch 0013): whether the caller's budget or cancel says stop (noshape's kernel, boolean.cpp; weak
++// default as 0008): every 256 faces / edges merged and every changed face fixed (a knurl's unify ran seconds
++// after the user's cancel).
++extern "C" int noshape_should_break();
++#if defined(__GNUC__)
++extern "C" __attribute__((weak)) int noshape_should_break()
++{
++  return 0;
++}
++#endif
++
++static inline void noshapeUnifyCheck(const int theI, const int theMask = 255)
++{
++  if ((theI & theMask) == 0 && noshape_should_break() != 0)
++    throw Standard_Failure("noshape: stopped");
++}
+ 
+ IMPLEMENT_STANDARD_RTTIEXT(ShapeUpgrade_UnifySameDomain, Standard_Transient)
+ 
+@@ -2821,6 +2839,7 @@
+ 
+   for (int iE = 1; iE <= aNbE; ++iE)
+   {
++    noshapeUnifyCheck(iE);
+     TopoDS_Edge edge = TopoDS::Edge(SeqEdges(iE));
+     if (!aUsedEdges.Add(edge))
+     {
+@@ -2924,6 +2943,7 @@
+   {
+     for (int i = 1; i <= SeqOfSubsSeqOfEdges.Length(); i++)
+     {
++      noshapeUnifyCheck(i);
+       if (SeqOfSubsSeqOfEdges(i).UnionEdges.IsNull())
+       {
+         continue;
+@@ -3231,8 +3251,10 @@
+ 
+   // processing each face
+   TopExp_Explorer exp;
++  int             aNoshapeCount = 0;
+   for (exp.Init(theInpShape, TopAbs_FACE); exp.More(); exp.Next())
+   {
++    noshapeUnifyCheck(++aNoshapeCount, 63);
+     const TopoDS_Face aFace = TopoDS::Face(exp.Current());
+     if (aProcessed.Contains(aFace))
+     {
+@@ -4452,6 +4474,7 @@
+   constexpr double aPrec = Precision::Confusion();
+   for (int i = 1; i <= aChangedFaces.Extent(); i++)
+   {
++    noshapeUnifyCheck(i, 0);
+     TopoDS_Face aFace = TopoDS::Face(myContext->Apply(aChangedFaces.FindKey(i)));
+     if (aFace.IsNull())
+     {

@@ -81,6 +81,8 @@ unsigned long seh_run(F& f) noexcept
 namespace noshape {
 // The calling thread's regeneration cancel flag (set_thread_cancel), or null.
 const std::atomic<bool>* thread_cancel_flag();
+// Throws "cancelled" (fail_op) once the thread's regeneration is cancelled or the memory budget is spent.
+void fail_if_cancelled();
 // Budget of a blend (qa FILLET-HANG: OCCT's blend approximation never
 // returned): `f` runs with a CPU-time timer on this thread (Linux) that
 // ticks every 100 ms; once `cpu_seconds` are used or the regeneration is
