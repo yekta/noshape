@@ -1531,6 +1531,11 @@ impl Ctx<'_> {
             }
             return Err(Decline("an edge on another argument's free-form face"));
         }
+        // (Every point past the tolerance: apart, OCCT's rule (an edge on a face within the two's tolerances), as a
+        // sharp knurl tooth's side edge a micrometre outside the cylinder; some on, some not: ambiguous.)
+        if on == 0 {
+            return Ok(false);
+        }
         if near > 0 && on + near == 7 {
             return Err(Decline("an edge nearly on another argument's face"));
         }
