@@ -468,6 +468,8 @@ re-queues everything after it). Waiting: live request 13:45
   - D8 (P1): part / tab search results get a row each. Each workspace keeps an index of its parts, written with the thumbnail (`app-core/search_index.rs`).
   - D6: Documents › Versions and history (graph, Show changes…, tooltip).
   - D9 and D11: tooltips.
+- Landed 64023b00 (16:43): the whole stack (G26, G13, G29, G30, SM-MAKE-JOINT, the document audit D2-D15).
+- For dx: your queued drawing_behind (a drawing pinned to an older version of this document) and my D12 put the same out-of-date icon on tabs in workspace.rs's tab bar; keep one icon shown when either holds (`self.behind.contains(&id) || drawing_behind(...)`).
 - D2 fixed later with ops' `drawing::old_state`, and so was D15 (the Workspace protection notice).
 - Later: D12 tab out-of-date icon; D13 the search box takes the query as text (`type:part name:pvz`). Audit at 22 surfaces, 12 gaps, 12 fixed. Live request 15:00 asks for Tab › Properties…, Document details…, Copy workspace / version dialogs.
 
