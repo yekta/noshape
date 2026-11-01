@@ -338,6 +338,44 @@ impl PartStudio {
         for f in self.features.iter_mut().filter(|f| f.type_id == "cPlane") {
             crate::features::core::upgrade_plane_params(&mut f.params);
         }
+        // Option ids and group ids renamed to std's (audit-part-studio,
+        // 11-01): (feature type, parameter, old, new).
+        const RENAMED_OPTIONS: &[(&str, &str, &str, &str)] = &[
+            ("offsetCurveOnFace", "scope", "OFFSET_EXTEND", "OFFSET_AND_EXTEND"),
+            ("offsetCurveOnFace", "scope", "OFFSET_EXTEND_SPLIT", "OFFSET_EXTEND_AND_SPLIT"),
+            ("isoparametricCurve", "directionType", "U", "U_DIRECTION"),
+            ("isoparametricCurve", "directionType", "V", "V_DIRECTION"),
+            ("editCurve", "planeReference", "YZ", "YZPLANE"),
+            ("editCurve", "planeReference", "XZ", "XZPLANE"),
+            ("editCurve", "planeReference", "XY", "XYPLANE"),
+            ("editCurve", "editPointMode", "UVN_POLYGON", "UVN_CONTROL_POLYGON"),
+            ("routingCurve", "pointsEditType", "MULTIPLE", "MULTI"),
+            ("routingCurve", "segmentEditType", "ADD_POINTS", "ADD"),
+            ("routingCurve", "segmentEditType", "ORTHOGONAL_PATH", "ORTHOGONAL"),
+            ("queryVariable", "edgeAdjacentEntityType", "EDGES_AND_FACES", "ALL"),
+            ("queryVariable", "edgeAdjacentEntityType", "EDGES", "EDGE"),
+            ("queryVariable", "edgeAdjacentEntityType", "FACES", "FACE"),
+            ("queryVariable", "vertexAdjacentEntityType", "EDGES", "EDGE"),
+            ("queryVariable", "vertexAdjacentEntityType", "VERTICES", "VERTEX"),
+            ("queryVariable", "vertexAdjacentEntityType", "FACES", "FACE"),
+            ("ruledSurface", "cornerType", "NONE", "NO_CORNER"),
+        ];
+        const RENAMED_PARAMS: &[(&str, &str, &str)] =
+            &[("sheetMetalFlange", "partialOverallGroup", "overallParametersGroup"), ("sheetMetalFlange", "partialEndGroup", "endConditionsGroup")];
+        for f in &mut self.features {
+            for &(ty, param, old, new) in RENAMED_OPTIONS {
+                if f.type_id == ty && matches!(f.params.get(param), Some(ParamValue::Enum(o)) if o == old) {
+                    f.params.set(param, ParamValue::Enum(new.into()));
+                }
+            }
+            for &(ty, old, new) in RENAMED_PARAMS {
+                if f.type_id == ty
+                    && let Some(v) = f.params.0.shift_remove(old)
+                {
+                    f.params.set(new, v);
+                }
+            }
+        }
         // Before Onshape's "No merge scope selected." rule an empty merge
         // scope merged with the parts the tool touched; "Merge with all"
         // gives those studios the same result.

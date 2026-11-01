@@ -187,3 +187,10 @@ pub fn std_dialog(type_id: &str) -> Option<Vec<crate::params::ParamSpec>> {
     let f = loaded(module, name)?;
     Some(super::studio::param_specs(&f.params))
 }
+
+/// The dialog of std's feature `name` in `module`, whether or not std runs
+/// it here (the oracle's audit of every built-in dialog, tests/std_oracle.rs).
+pub fn std_dialog_of(module: &str, name: &'static str) -> Option<Vec<crate::params::ParamSpec>> {
+    let f = loaded(module, name)?;
+    Some(super::studio::param_specs(&f.params))
+}

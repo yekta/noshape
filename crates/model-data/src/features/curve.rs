@@ -231,7 +231,7 @@ pub fn isocline() -> FeatureType {
 }
 
 pub fn offset_curve() -> FeatureType {
-    let extend = |v: &ParamValues| v.is("scope", "OFFSET_EXTEND");
+    let extend = |v: &ParamValues| v.is("scope", "OFFSET_AND_EXTEND");
     let trim = move |v: &ParamValues| extend(v) && v.bool("trim");
     let mut p = vec![
         ParamSpec::query("edges", "Edges", QueryFilter::EDGE).hints(Hints::INITIAL_FOCUS),
@@ -242,7 +242,7 @@ pub fn offset_curve() -> FeatureType {
         ParamSpec::enum_(
             "scope",
             "Scope",
-            &[("OFFSET", "Offset"), ("OFFSET_EXTEND", "Offset and extend"), ("OFFSET_EXTEND_SPLIT", "Offset, extend, and split")],
+            &[("OFFSET", "Offset"), ("OFFSET_AND_EXTEND", "Offset and extend"), ("OFFSET_EXTEND_AND_SPLIT", "Offset, extend, and split")],
         ),
         ParamSpec::bool("trim", "Trim", false).hints(Hints::GROUP_HEADER).visible(extend),
         ParamSpec::num("startTrim", "Start trim", NONNEGATIVE_ZERO_DEFAULT).visible(trim),
@@ -250,14 +250,14 @@ pub fn offset_curve() -> FeatureType {
         ParamSpec::num("endTrim", "End trim", NONNEGATIVE_ZERO_DEFAULT).visible(move |v| trim(v) && !v.bool("equalTrim")),
         ParamSpec::query("targets", "Targets", QueryFilter::ANY_FACE),
     ];
-    p.extend(curve_approximation(|v: &ParamValues| !v.is("scope", "OFFSET_EXTEND_SPLIT")));
+    p.extend(curve_approximation(|v: &ParamValues| !v.is("scope", "OFFSET_EXTEND_AND_SPLIT")));
     FeatureType::new("offsetCurveOnFace", "Offset curve", Category::Curve, p).icon("offsetCurve").describe("Create curves on faces offset from edges")
 }
 
 pub fn isoparametric_curve() -> FeatureType {
     let p = vec![
         ParamSpec::query1("face", "Select face", QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS),
-        ParamSpec::enum_("directionType", "Direction", &[("U", "U direction"), ("V", "V direction")]).hints(Hints::SHOW_LABEL),
+        ParamSpec::enum_("directionType", "Direction", &[("U_DIRECTION", "U direction"), ("V_DIRECTION", "V direction")]).hints(Hints::SHOW_LABEL),
         ParamSpec::bool("equalSpacing", "Equal spacing", false),
         ParamSpec::num("nCurves", "Instance count", NumSpec::integer(10, 2, 50)).visible(|v| v.bool("equalSpacing")),
         ParamSpec::array(
@@ -293,14 +293,14 @@ pub fn edit_curve() -> FeatureType {
         ParamSpec::enum_(
             "planeReference",
             "Reference plane",
-            &[("BEST", "Best fit"), ("YZ", "YZ plane"), ("XZ", "XZ plane"), ("XY", "XY plane"), ("CUSTOM", "Custom")],
+            &[("BEST", "Best fit"), ("YZPLANE", "YZ plane"), ("XZPLANE", "XZ plane"), ("XYPLANE", "XY plane"), ("CUSTOM", "Custom")],
         )
         .visible(|v| v.bool("planarize")),
         ParamSpec::query1("referencePlane", "Entity or mate connector", QueryFilter::PLANE_LIKE)
             .visible(|v| v.bool("planarize") && v.is("planeReference", "CUSTOM")),
         ParamSpec::bool("lockEnds", "Lock ends", false).visible(|v| v.bool("planarize") && v.is("planeReference", "BEST")),
         ParamSpec::bool("editControlPoints", "Edit control points", false).hints(Hints::GROUP_HEADER),
-        ParamSpec::enum_("editPointMode", "Edit mode", &[("XYZ", "XYZ"), ("UVN_TANGENT", "UVN (Tangent)"), ("UVN_POLYGON", "UVN (Control polygon)")])
+        ParamSpec::enum_("editPointMode", "Edit mode", &[("XYZ", "XYZ"), ("UVN_TANGENT", "UVN (Tangent)"), ("UVN_CONTROL_POLYGON", "UVN (Control polygon)")])
             .visible(cps),
         ParamSpec::array(
             "selectedIndices",
@@ -343,6 +343,9 @@ pub fn edit_curve() -> FeatureType {
     FeatureType::new("editCurve", "Edit curve", Category::Curve, p).describe("Approximate, elevate, planarize or edit control points of a curve")
 }
 
+/// Routing curve's CSV units in std's order (routingCurve.fs `LengthUnitNames`).
+const CSV_UNIT_NAMES: &[(&str, &str)] = &[("Centimeter", "Centimeter"), ("Foot", "Foot"), ("Inch", "Inch"), ("Millimeter", "Millimeter"), ("Meter", "Meter"), ("Yard", "Yard")];
+
 pub const LENGTH_UNIT_NAMES: &[(&str, &str)] =
     &[("Meter", "Meter"), ("Centimeter", "Centimeter"), ("Millimeter", "Millimeter"), ("Inch", "Inch"), ("Foot", "Foot"), ("Yard", "Yard")];
 
@@ -352,7 +355,7 @@ pub fn routing_curve() -> FeatureType {
     let input = move |v: &ParamValues, t: &str| points(v) && v.is("inputType", t);
     let single = move |v: &ParamValues| points(v) && v.is("pointsEditType", "SINGLE");
     let segments = |v: &ParamValues| v.is("step", "SEGMENTS");
-    let ortho = move |v: &ParamValues| segments(v) && v.is("segmentEditType", "ORTHOGONAL_PATH");
+    let ortho = move |v: &ParamValues| segments(v) && v.is("segmentEditType", "ORTHOGONAL");
     let reference = |v: &ParamValues, t: &str| v.is("referenceType", t);
     let p = vec![
         hidden(ParamSpec::query("preselectedEntities", "Preselection", CURVES | QueryFilter::POINT_LIKE)),
@@ -371,11 +374,11 @@ pub fn routing_curve() -> FeatureType {
         ParamSpec::num("samples", "Number of samples", NumSpec::integer(5, 2, 50)).visible(move |v| input(v, "CURVE")),
         ParamSpec::text("inputData", "Table", "").hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CSV")),
         ParamSpec::num("startColumn", "Data start column (0,1,2,.)", NumSpec::integer(0, 0, 100_000)).visible(move |v| input(v, "CSV")),
-        ParamSpec::enum_("csvUnit", "Unit", LENGTH_UNIT_NAMES).visible(move |v| input(v, "CSV")),
+        ParamSpec::enum_("csvUnit", "Unit", CSV_UNIT_NAMES).default_enum("Meter").visible(move |v| input(v, "CSV")),
         ParamSpec::bool("overwritePoints", "Overwrite points", true).visible(move |v| input(v, "CURVE") || input(v, "CSV")),
         ParamSpec::bool("isPeriodic", "Closed", false).visible(points),
         ParamSpec::query1("curveBaseCSys", "Curve reference", QueryFilter::POINT_LIKE).visible(points),
-        ParamSpec::enum_("pointsEditType", "Point edit type", &[("SINGLE", "Single"), ("MULTIPLE", "Multiple")]).hints(Hints::HORIZONTAL_ENUM).visible(points),
+        ParamSpec::enum_("pointsEditType", "Point edit type", &[("SINGLE", "Single"), ("MULTI", "Multiple")]).hints(Hints::HORIZONTAL_ENUM).visible(points),
         ParamSpec::query1("multiEditReference", "Edit reference", QueryFilter::POINT_LIKE).visible(move |v| points(v) && !single(v)),
         ParamSpec::array("selectedIndices", "Selected points", "Point", vec![ParamSpec::num("indexValue", "Point index", NumSpec::integer(0, 0, 10_000))])
             .visible(move |v| points(v) && !single(v)),
@@ -417,9 +420,9 @@ pub fn routing_curve() -> FeatureType {
         ParamSpec::bool("keepPoints", "Keep points", false).visible(points),
         // Segments step.
         hidden(ParamSpec::num("segmentIndex", "Segment index", NumSpec::integer(-1, -1, 10_000))),
-        ParamSpec::enum_("segmentEditType", "Segment edit type", &[("ADD_POINTS", "Add points"), ("ORTHOGONAL_PATH", "Orthogonal path")]).visible(segments),
+        ParamSpec::enum_("segmentEditType", "Segment edit type", &[("ADD", "Add points"), ("ORTHOGONAL", "Orthogonal path")]).visible(segments),
         ParamSpec::num("numPointsToAdd", "Number of points to add", NumSpec::integer(1, 0, 10_000))
-            .visible(move |v| segments(v) && v.is("segmentEditType", "ADD_POINTS")),
+            .visible(move |v| segments(v) && v.is("segmentEditType", "ADD")),
         ParamSpec::enum_("orthoCsys", "Coordinate system", &[("WORLD", "World"), ("CURVE", "Curve"), ("OTHER", "Other")]).hints(Hints::SHOW_LABEL).visible(ortho),
         ParamSpec::query1("orthoCsysMate", "Orthogonal path coordinate system", QueryFilter::POINT_LIKE)
             .visible(move |v| ortho(v) && v.is("orthoCsys", "OTHER")),

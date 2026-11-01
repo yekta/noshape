@@ -175,7 +175,7 @@ pub fn ruled_surface() -> FeatureType {
         ParamSpec::enum_(
             "cornerType",
             "Corner type",
-            &[("SPUN", "Spun corner"), ("EXTENDED", "Extended corner"), ("LOFTED", "Lofted corner"), ("NONE", "No corner")],
+            &[("SPUN", "Spun corner"), ("EXTENDED", "Extended corner"), ("LOFTED", "Lofted corner"), ("NO_CORNER", "No corner")],
         ).hints(Hints::SHOW_LABEL),
     ];
     p.extend(surface_merge_scope());

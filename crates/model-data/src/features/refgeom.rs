@@ -181,12 +181,12 @@ pub fn query_variable() -> FeatureType {
         .visible(move |v| created(v) && v.bool("filterByBodyType")),
         ParamSpec::query("seedQuery", "Entities", QueryFilter::ANY_FACE | QueryFilter::EDGE | QueryFilter::VERTEX).visible(adjacent),
         ParamSpec::enum_("adjacencyType", "Shared", &[("VERTEX", "Vertex"), ("EDGE", "Edge")]).hints(Hints::SHOW_LABEL).visible(adjacent),
-        ParamSpec::enum_("edgeAdjacentEntityType", "Select", &[("EDGES_AND_FACES", "Edges and faces"), ("EDGES", "Only edges"), ("FACES", "Only faces")]).hints(Hints::SHOW_LABEL)
+        ParamSpec::enum_("edgeAdjacentEntityType", "Select", &[("ALL", "Edges and faces"), ("EDGE", "Only edges"), ("FACE", "Only faces")]).hints(Hints::SHOW_LABEL)
             .visible(move |v| adjacent(v) && v.is("adjacencyType", "EDGE")),
         ParamSpec::enum_(
             "vertexAdjacentEntityType",
             "Select",
-            &[("ALL", "Edges, faces, and vertices"), ("EDGES", "Only edges"), ("VERTICES", "Only vertices"), ("FACES", "Only faces")],
+            &[("ALL", "Edges, faces, and vertices"), ("EDGE", "Only edges"), ("VERTEX", "Only vertices"), ("FACE", "Only faces")],
         ).hints(Hints::SHOW_LABEL)
         .visible(move |v| adjacent(v) && v.is("adjacencyType", "VERTEX")),
         ParamSpec::bool("addAdditionalQueries", "Add additional queries", false).hints(Hints::GROUP_HEADER),

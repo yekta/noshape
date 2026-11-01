@@ -881,7 +881,7 @@ pub fn isoparametric_curve(ev: &mut EvalCtx) -> FResult<()> {
     let Some(&(bi, fi)) = ev.resolve_faces(ev.query("face")).first() else { return err("Select a face") };
     let face = ev.face_shape(bi, fi)?;
     let [u0, u1, v0, v1] = face.uv_bounds()?;
-    let along_u = ev.is("directionType", "U");
+    let along_u = ev.is("directionType", "U_DIRECTION");
     let mut positions = Vec::new();
     if ev.bool("equalSpacing") {
         let n = ev.integer("nCurves")?.max(1);
@@ -953,9 +953,9 @@ pub fn edit_curve(ev: &mut EvalCtx) -> FResult<()> {
     let mut changed = ev.bool("approximate");
     if ev.bool("planarize") {
         let (o, n) = match ev.enum_("planeReference") {
-            "YZ" => (DVec3::ZERO, DVec3::X),
-            "XZ" => (DVec3::ZERO, DVec3::Y),
-            "XY" => (DVec3::ZERO, DVec3::Z),
+            "YZPLANE" => (DVec3::ZERO, DVec3::X),
+            "XZPLANE" => (DVec3::ZERO, DVec3::Y),
+            "XYPLANE" => (DVec3::ZERO, DVec3::Z),
             "CUSTOM" => {
                 let Some(r) = ev.query("referencePlane").first() else { return err("Select a reference plane") };
                 let f = ev.resolve_plane(r).ok_or_else(|| FeatureError::new("Could not resolve the reference plane"))?;
@@ -1023,7 +1023,7 @@ fn edit_control_points(ev: &EvalCtx, wire: &Shape) -> FResult<Shape> {
         let off = if mode == "XYZ" {
             off
         } else {
-            let u = if mode == "UVN_POLYGON" {
+            let u = if mode == "UVN_CONTROL_POLYGON" {
                 let (a, b) = if i + 1 < n { (orig[i], orig[i + 1]) } else { (orig[i.saturating_sub(1)], orig[i]) };
                 (b - a).normalize_or_zero()
             } else {

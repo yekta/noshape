@@ -144,11 +144,16 @@ pub fn cut_list() -> FeatureType {
 pub fn tag() -> FeatureType {
     let frame = |v: &ParamValues| v.is("tagPurpose", "FRAME");
     let form = |v: &ParamValues| v.is("tagPurpose", "FORM");
-    let p = vec![
+    let pcb = |v: &ParamValues| v.is("tagPurpose", "PCB_HOLES");
+    let hole = move |v: &ParamValues| pcb(v) && v.is("pcbEntityType", "HOLE");
+    let mut p = vec![
         ParamSpec::enum_("tagPurpose", "Tag purpose", &[("FRAME", "Frame"), ("FORM", "Form"), ("PCB_HOLES", "PCB holes")])
             .hints(Hints::REMEMBER_PREVIOUS_VALUE),
         ParamSpec::query1("sketch", "Sketch profile", QueryFilter::FEATURE | QueryFilter::SKETCH).hints(Hints::INITIAL_FOCUS).visible(frame),
-        ParamSpec::query("alignmentPoints", "Sketch points", QueryFilter::SKETCH_POINT).visible(frame),
+    ];
+    // std tag.fs defineFrameTagParams: the points sit in a collapsed group.
+    p.extend(group("additionalAlignmentPointsGroup", "Additional alignment points", false, vec![ParamSpec::query("alignmentPoints", "Sketch points", QueryFilter::SKETCH_POINT).visible(frame)]).into_iter().map(|s| if s.id == "additionalAlignmentPointsGroup" { s.visible(frame) } else { s }));
+    p.extend([
         ParamSpec::text("standard", "Standard", "").visible(frame),
         ParamSpec::text("description", "Description", "").visible(frame),
         ParamSpec::array(
@@ -157,7 +162,8 @@ pub fn tag() -> FeatureType {
             "Column",
             vec![ParamSpec::text("header", "Header", ""), ParamSpec::text("value", "Value", "")],
         )
-        .hints(Hints::UNCONFIGURABLE)
+        .item_template("#header = #value")
+        .hints(Hints::PREVENT_ARRAY_REORDER)
         .visible(frame),
         ParamSpec::bool("showDefaultAlignmentPoints", "Show default points", true).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(frame),
         // Form tag (sheet metal form tools).
@@ -165,6 +171,33 @@ pub fn tag() -> FeatureType {
         ParamSpec::query1("negativePart", "Part to remove", QueryFilter::SOLID_BODY).visible(form),
         ParamSpec::query1("flatFormSketch", "Sketch for flat view", QueryFilter::FEATURE | QueryFilter::SKETCH).visible(form),
         ParamSpec::query1("cSysMateConnector", "Form origin mate connector", QueryFilter::MATE_CONNECTOR).visible(form),
-    ];
+        // PCB holes (std definePcbHolesTagParams; std runs Tag).
+        ParamSpec::enum_("pcbEntityType", "PCB entity type", &[("HOLE", "Holes"), ("CUTOUT", "Cutouts")]).hints(Hints::SHOW_LABEL).visible(pcb),
+        ParamSpec::bool("plated", "Plated", false).visible(pcb),
+        ParamSpec::query1("basePlane", "Base plane", QueryFilter::PLANE_LIKE).visible(pcb),
+        ParamSpec::array(
+            "holes",
+            "Holes",
+            "Hole",
+            vec![
+                ParamSpec::query("interiorFaces", "Interior faces", QueryFilter::FACE),
+                ParamSpec::text("holeId", "Hole ID", "").hints(Hints::ALWAYS_HIDDEN),
+                ParamSpec::text("designator", "Designator", ""),
+                ParamSpec::enum_("platedPurpose", "Purpose", &[("NONE", "None"), ("VIA", "Via"), ("THERMAL_VIA", "Thermal via"), ("PIN", "Pin"), ("CUSTOM", "Custom")])
+                    .default_enum("VIA")
+                    .visible(move |v| hole(v) && v.bool("plated")),
+                ParamSpec::enum_("nonPlatedPurpose", "Purpose", &[("NONE", "None"), ("MOUNTING", "Mounting"), ("TOOLING", "Tooling"), ("CUSTOM", "Custom")])
+                    .visible(move |v| hole(v) && !v.bool("plated")),
+                ParamSpec::text("customPurpose", "Purpose", "").visible(move |v| {
+                    v.is("pcbEntityType", "CUTOUT") || (hole(v) && if v.bool("plated") { v.is("platedPurpose", "CUSTOM") } else { v.is("nonPlatedPurpose", "CUSTOM") })
+                }),
+                ParamSpec::text("componentDesignator", "Associated component instance", "").visible(hole),
+                ParamSpec::enum_("holeOwner", "Owner", &[("UNOWNED", "Unowned"), ("ECAD", "ECAD"), ("MCAD", "MCAD")]).hints(Hints::SHOW_LABEL),
+            ],
+        )
+        .item_template("[#designator] #interiorFaces")
+        .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::INITIAL_FOCUS_ON_EDIT | Hints::DRIVEN_QUERY)
+        .visible(pcb),
+    ]);
     FeatureType::new("tag", "Tag", Category::Frame, p).icon("tagProfile").describe("Tag a profile sketch for frames or a form tool for sheet metal")
 }

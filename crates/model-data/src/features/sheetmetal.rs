@@ -285,15 +285,15 @@ pub fn flange() -> FeatureType {
     // plain checkbox; ticked, two open groups follow at its level, "Overall
     // parameters" and "End conditions" (the second bound inside the latter).
     let group = |id: &'static str, label: &'static str| ParamSpec::bool(id, label, true).hints(Hints::GROUP_HEADER | Hints::GROUP_LABEL | Hints::UNCONFIGURABLE).visible(partial);
-    let overall = move |v: &ParamValues| partial(v) && v.bool("partialOverallGroup");
-    let ends = move |v: &ParamValues| partial(v) && v.bool("partialEndGroup");
+    let overall = move |v: &ParamValues| partial(v) && v.bool("overallParametersGroup");
+    let ends = move |v: &ParamValues| partial(v) && v.bool("endConditionsGroup");
     p.extend([
         ParamSpec::bool("isPartialFlange", "Partial flange", false),
-        group("partialOverallGroup", "Overall parameters"),
+        group("overallParametersGroup", "Overall parameters"),
         ParamSpec::enum_("chainType", "Chain type", &[("PER_EDGE", "Per edge"), ("PER_CHAIN", "Per chain")]).visible(overall),
         ParamSpec::flip("flipFlangeBounds", "Flip sides").visible(overall),
         ParamSpec::bool("holdAdjacentEdges", "Hold adjacent edges", true).visible(overall),
-        group("partialEndGroup", "End conditions"),
+        group("endConditionsGroup", "End conditions"),
     ]);
     for (gate_id, ty, dist, ent, ent_off, ent_flip, labels) in [
         (
@@ -419,11 +419,11 @@ pub fn jog() -> FeatureType {
         ParamSpec::bool("jogLimitOffset", "Offset distance", false)
             .hints(Hints::DISPLAY_SHORT | Hints::FIRST_IN_ROW)
             .visible(move |v| bt(v, "UP_TO_ENTITY")),
-        ParamSpec::num("jogLimitDistance", "Offset distance", NONNEGATIVE_ZERO_DEFAULT)
+        ParamSpec::num("jogLimitDistance", "Offset distance", ZERO_INCLUSIVE_OFFSET.bounded(0.0, 500.0))
             .hints(Hints::DISPLAY_SHORT)
             .visible(move |v| bt(v, "UP_TO_ENTITY") && v.bool("jogLimitOffset")),
         ParamSpec::flip("jogLimitOppositeDirection", "Opposite direction").visible(move |v| bt(v, "UP_TO_ENTITY") && v.bool("jogLimitOffset")),
-        ParamSpec::num("thicknessFactor", "Thickness factor", NumSpec::real(3.0, 1e-5, 1e5)).visible(move |v| bt(v, "THICKNESS")),
+        ParamSpec::num("thicknessFactor", "Thickness factor", NumSpec::real(1.0, 0.0, 1e5)).visible(move |v| bt(v, "THICKNESS")),
         ParamSpec::enum_("bendOffsetAnchor", "Jog offset anchor", &[("INSIDE", "Inside"), ("NOMINAL", "Nominal"), ("OUTSIDE", "Outside")]).hints(Hints::SHOW_LABEL),
         ParamSpec::bool("preserveMaterial", "Preserve material", true),
     ]);
@@ -490,7 +490,7 @@ pub fn sheet_metal_loft() -> FeatureType {
             vec![ParamSpec::query("connectionEntities", "Vertices or edges", QueryFilter::EDGE | QueryFilter::VERTEX), ParamSpec::bool("isRip", "Rip", false)],
         )
         .visible(|v| v.bool("matchConnections")),
-        ParamSpec::num("chordalTolerance", "Chordal tolerance", NumSpec::positive_length(1.0, 0.04).bounded(1e-5, 0.1)),
+        ParamSpec::num("chordalTolerance", "Chordal tolerance", NumSpec::positive_length(1.0, 0.05).bounded(1e-5, 0.1)),
         ParamSpec::query("booleanScope", "Merge scope", QueryFilter::SOLID_BODY).visible(move |v| !new(v)),
     ];
     p.extend(model_parameters(new));

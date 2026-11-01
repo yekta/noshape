@@ -25,8 +25,26 @@ const STRICT: &[&str] = &[
 /// `INITIAL_FOCUS`: Onshape focuses the first selection field by itself.
 const BUILTIN_ONLY_HINTS: Hints = Hints(Hints::GROUP_LABEL.0 | Hints::DRIVEN_QUERY.0 | Hints::NO_MATE_CONNECTOR_BUTTON.0 | Hints::INITIAL_FOCUS.0);
 
+/// Built-in features std doesn't run here, with the std module defining each
+/// (the audit of every dialog: `print_all`).
+const STD_MODULES: &[(&str, &str)] = &[
+    ("thicken", "thicken.fs"), ("enclose", "enclose.fs"), ("faceBlend", "faceBlend.fs"), ("bodyDraft", "bodyDraft.fs"), ("rib", "rib.fs"),
+    ("externalThread", "externalThread.fs"), ("curvePattern", "curvePattern.fs"), ("wrap", "wrap.fs"), ("decal", "decal.fs"),
+    ("deleteBodies", "deleteBodies.fs"), ("modifyFillet", "modifyFillet.fs"), ("deleteFace", "deleteFace.fs"), ("moveFace", "moveFace.fs"),
+    ("replaceFace", "replaceFace.fs"), ("offsetSurface", "offsetSurface.fs"), ("boundarySurface", "bsurf.fs"), ("fill", "fillSurface.fs"),
+    ("extendSurface", "extend.fs"), ("ruledSurface", "ruledSurface.fs"), ("mutualTrim", "mutualTrim.fs"), ("constrainedSurface", "constrainedSurface.fs"),
+    ("helix", "helix.fs"), ("fitSpline", "fitSpline.fs"), ("projectCurves", "projectCurves.fs"), ("bridgingCurve", "bridgingCurve.fs"),
+    ("compositeCurve", "compositeCurve.fs"), ("intersectionCurve", "faceIntersection.fs"), ("trimCurve", "moveCurveBoundary.fs"), ("isocline", "isocline.fs"),
+    ("offsetCurveOnFace", "offsetCurveOnFace.fs"), ("isoparametricCurve", "isoparametricCurve.fs"), ("editCurve", "editCurve.fs"),
+    ("routingCurve", "routingCurve.fs"), ("mateConnector", "mateConnector.fs"), ("importDerived", "importDerived.fs"), ("assignVariable", "variable.fs"),
+    ("queryVariable", "queryVariable.fs"), ("compositePart", "compositePart.fs"), ("frame", "frame.fs"), ("frameTrim", "frameTrim.fs"),
+    ("gusset", "gusset.fs"), ("endcap", "endcap.fs"), ("cutlist", "cutlist.fs"),
+];
+
 fn std_dialog(name: &str) -> Vec<ParamSpec> {
-    custom::std_feature::std_dialog(name).unwrap_or_else(|| panic!("{name}: no std dialog"))
+    custom::std_feature::std_dialog(name)
+        .or_else(|| STD_MODULES.iter().find(|(t, _)| *t == name).and_then(|&(t, m)| custom::std_feature::std_dialog_of(m, t)))
+        .unwrap_or_else(|| panic!("{name}: no std dialog"))
 }
 
 /// A lookup table's levels (names, options, defaults) as a digest: the
@@ -221,6 +239,25 @@ fn compare(name: &str) -> String {
 fn core_dialogs_match_std_in_every_state() {
     let report: String = STRICT.iter().map(|n| compare(n)).collect();
     assert!(report.is_empty(), "built-in dialogs differ from the std:\n{report}");
+}
+
+/// Every toolbar feature's dialog against std's, printed (the Part Studio
+/// audit, docs/parity/audit-part-studio.md): `cargo test -p noshape-model
+/// --test all std_oracle::print_all -- --ignored --nocapture`.
+#[test]
+#[ignore = "T2: audit report, not a pass/fail check"]
+fn print_all() {
+    let names = STRICT.iter().copied().chain(STD_MODULES.iter().map(|m| m.0)).chain([
+        "tag", "sheetMetalStart", "sheetMetalFlange", "sheetMetalHem", "sheetMetalTab", "sheetMetalBend", "sheetMetalJog", "sheetMetalFormed",
+        "sheetMetalLoft", "sheetMetalMakeJoint", "sheetMetalCorner", "sheetMetalBendRelief", "sheetMetalCornerBreak", "sheetMetalEnd", "pcbStart", "pcbEnd",
+    ]);
+    for n in names {
+        match std::panic::catch_unwind(|| compare(n)) {
+            Ok(r) if r.is_empty() => eprintln!("== {n}: same as std"),
+            Ok(r) => eprintln!("{r}"),
+            Err(_) => eprintln!("== {n}: no comparison (no std dialog or no built-in)"),
+        }
+    }
 }
 
 /// Prints the comparison of one feature: `STD_ORACLE=fillet cargo test

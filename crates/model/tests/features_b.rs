@@ -755,7 +755,7 @@ fn boundary_routing_edit_isoparametric() {
     s.add("editCurve", move |p| {
         p.set("wire", ParamValue::Query(vec![Reference::Body(BodyId { feature: helix, index: 0 })]));
         p.set("planarize", ParamValue::Bool(true));
-        p.set("planeReference", ParamValue::Enum("XY".into()));
+        p.set("planeReference", ParamValue::Enum("XYPLANE".into()));
     });
     let r = s.ok();
     let top = top_face(&r);
