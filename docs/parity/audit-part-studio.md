@@ -22,7 +22,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | Render Studio / Display states (1713) | live | live: no Display states in a Part Studio; Render Studio only as an Upgrade-gated tab type (cloud plan) | 0 |
 | View cube (right-click, arrows, hover) | live 1714 | every face / edge / corner / arrow gives the empty-space menu, no tooltips: = ours | 0 |
 
-**Counts (11-01, audit 6):** surfaces audited 9 of 9. Dialogs: 199 field rows + 52 visibility states found; fixed 154 rows and 39 states; accepted 7; open 38 rows + 13 states; 56 of 75 dialogs equal std (37 at first). Found outside the oracle (A rows): 14; fixed 12, open 2 (A1 asked, REQUESTS 1722; A10 core).
+**Counts (11-01, audit 7):** surfaces audited 9 of 9. Dialogs: 199 field rows (+ 2 found in later runs) + 52 visibility states; fixed 164 rows and 39 states; accepted 7; open 28 + 2 rows + 13 states; 57 of 75 dialogs equal std (37 at first). Found outside the oracle (A rows): 14; fixed 12, open 2 (A1 asked, REQUESTS 1722; A10 core).
 
 ## Found outside the oracle (in the app, std's code, live)
 
@@ -51,7 +51,7 @@ which fields show); P3: internal (option ids under the same labels, configurabil
 oracle reads std's annotations, not its feature defaults map: a default std sets there (Ruled surface's cubic interpolation)
 is checked by hand.
 
-Field rows: 199 (fixed 154, accepted 7, open 38); visibility states differing now: 13.
+Field rows: 199 (fixed 164, accepted 7, open 28); visibility states differing now: 13.
 
 | # | Feature | Field | P | Difference (std = live) | Status |
 |---|---|---|---|---|---|
@@ -88,9 +88,9 @@ Field rows: 199 (fixed 154, accepted 7, open 38); visibility states differing no
 | D31 | faceBlend | caps | P2 | array row label: std Some("#entity"), ours None | ✅ (audit 2, 11-01) |
 | D32 | faceBlend | edgeLimits | P2 | array row label: std Some("#edge"), ours None | ✅ (audit 2, 11-01) |
 | D33 | fill | addGuides | P2 | hints: std adds [], ours adds ['GROUP_HEADER'] | ✅ (audit 2, 11-01) |
-| D34 | fill | edges | P2 | array item fields differ: std [entities "Edges" query max None hints 0x8000 "" None, continuity "Continuity" enum[("G0", "Position"), ("G1",… ours [entities "Edges" query max None hints 0x0 "" None, continuity "Continuity" enum[("G0", "Position"), ("G1", "T… | ✗ |
+| D34 | fill | edges | P2 | array item fields differ: std [entities "Edges" query max None hints 0x8000 "" None, continuity "Continuity" enum[("G0", "Position"), ("G1",… ours [entities "Edges" query max None hints 0x0 "" None, continuity "Continuity" enum[("G0", "Position"), ("G1", "T… | ✅ (audit 7) |
 | D35 | fitSpline | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
-| D36 | frame | cornerOverrides | P2 | array item fields differ: std [vertex "Vertex" query max Some(1) hints 0x8000 "" None, cornerType "Corner type" enum[("MITER", "Miter"), ("B… ours [vertex "Vertex" query max Some(1) hints 0x0 "" None, cornerType "Corner type" enum[("MITER", "Miter"), ("BUTT… | ✗ |
+| D36 | frame | cornerOverrides | P2 | array item fields differ: std [vertex "Vertex" query max Some(1) hints 0x8000 "" None, cornerType "Corner type" enum[("MITER", "Miter"), ("B… ours [vertex "Vertex" query max Some(1) hints 0x0 "" None, cornerType "Corner type" enum[("MITER", "Miter"), ("BUTT… | ✅ (audit 7) |
 | D37 | frame | cornerOverrides | P2 | array row label: std Some("#vertex [#cornerType]"), ours None | ✅ (audit 2, 11-01) |
 | D38 | frame | selections | P2 | hints: std adds [], ours adds ['ALLOW_QUERY_ORDER'] | ✅ (audit 5, 11-01) |
 | D39 | frameTrim | frameGroups | P2 | array item fields differ: std [frames "Frames" query max None hints 0x0 "Frame segments are trimmed against preceding groups and are used as… ours [frames "Frames" query max None hints 0x0 "" None]… | ✅ (audit 6) |
@@ -119,7 +119,7 @@ Field rows: 199 (fixed 154, accepted 7, open 38); visibility states differing no
 | D62 | routingCurve | points | P2 | array item fields differ: std [index "Point index" Integer 0..10000 =0.000000000000 / 0.000000000000 hints 0x8000 "" None, referenceType "Re… ours [referenceType "Reference" enum[("ORIGIN", "Origin"), ("VERTEX", "Vertex"), ("CURVE", "Curve"), ("RELATIVE", "… | ✗ |
 | D63 | routingCurve | points | P2 | array row label: std Some("Point #index"), ours None | ✗ |
 | D64 | routingCurve | segmentEditType | P2 | default option: std ADD / ours ADD_POINTS | ✅ (audit 1, 11-01) |
-| D65 | routingCurve | selectedIndices | P2 | array row label: std Some("Selected point #indexValue"), ours None | ✗ |
+| D65 | routingCurve | selectedIndices | P2 | array row label: std Some("Selected point #indexValue"), ours None | ✅ (audit 7) |
 | D66 | ruledSurface | vertexOverrides | P2 | array item fields differ: std [vertex "Vertex" query max Some(1) hints 0x2 "" None, overrideType "Ruled surface type" enum[("NORMAL", "Norma… ours [vertex "Vertex" query max Some(1) hints 0x2 "" None, overrideType "Ruled surface type" enum[("NORMAL", "Norma… | ✅ (audit 6) |
 | D67 | ruledSurface | vertexOverrides | P2 | array row label: std Some("#vertex"), ours None | ✅ (audit 2, 11-01) |
 | D68 | sheetMetalBend | oppositeAngleFromDirection | P2 | hints: std adds ['OPPOSITE_DIRECTION'], ours adds ['OPPOSITE_DIRECTION_CIRCULAR'] | ✅ (audit 2, 11-01) |
@@ -172,22 +172,22 @@ Field rows: 199 (fixed 154, accepted 7, open 38); visibility states differing no
 | D115 | assignVariable | zOffset | P3 | value: std `Length 0..500 =0.000000000000 / 0.000000000000` / ours `Length -500..500 =0.000000000000 / 0.000000000000` | ✅ (audit 6) |
 | D116 | boundarySurface | uProfilesArray | P3 | array item "profile" (std) vs "Profile" (ours) | ✗ |
 | D117 | boundarySurface | vProfilesArray | P3 | array item "profile" (std) vs "Profile" (ours) | ✗ |
-| D118 | constrainedSurface | vertices | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✗ |
+| D118 | constrainedSurface | vertices | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✅ (audit 7) |
 | D119 | cutlist | columnOverrides | P3 | array item "Column Override" (std) vs "Column override" (ours) | ✗ |
-| D120 | cutlist | columnOverrides | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✗ |
+| D120 | cutlist | columnOverrides | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✅ (audit 7) |
 | D121 | editCurve | controlPointEdits | P3 | array item "point override" (std) vs "Point override" (ours) | ✗ |
-| D122 | editCurve | controlPointEdits | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✗ |
+| D122 | editCurve | controlPointEdits | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✅ (audit 7) |
 | D123 | editCurve | editPointMode | P3 | option ids: std ['XYZ', 'UVN_TANGENT', 'UVN_CONTROL_POLYGON'] / ours ['XYZ', 'UVN_TANGENT', 'UVN_POLYGON'] | ✅ (audit 1, 11-01) |
 | D124 | editCurve | planeReference | P3 | option ids: std ['BEST', 'YZPLANE', 'XZPLANE', 'XYPLANE', 'CUSTOM'] / ours ['BEST', 'YZ', 'XZ', 'XY', 'CUSTOM'] | ✅ (audit 1, 11-01) |
 | D125 | editCurve | selectedIndices | P3 | array item "index" (std) vs "Index" (ours) | ✗ |
-| D126 | editCurve | selectedIndices | P3 | hints: std adds ['PREVENT_ARRAY_REORDER', 'X25'], ours adds [] | ✗ |
+| D126 | editCurve | selectedIndices | P3 | hints: std adds ['PREVENT_ARRAY_REORDER', 'X25'], ours adds [] | ✅ (audit 7) |
 | D127 | endcap | cornerDistance | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✅ (audit 6) |
 | D128 | endcap | cornerRadius | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✅ (audit 6) |
 | D129 | faceBlend | caps | P3 | array item "cap" (std) vs "Cap" (ours) | ✗ |
 | D130 | faceBlend | crossSectionShape | P3 | tooltip: std "Cross sectional control", ours "" | ✅ (audit 5, 11-01) |
 | D131 | faceBlend | edgeLimits | P3 | array item "edge limit" (std) vs "Edge limit" (ours) | ✗ |
 | D132 | fill | edges | P3 | array item "edge" (std) vs "Edge" (ours) | ✗ |
-| D133 | frame | cornerOverrides | P3 | array item "vertex" (std) vs "Corner" (ours) | ✗ |
+| D133 | frame | cornerOverrides | P3 | array item "vertex" (std) vs "Corner" (ours) | ✅ (audit 7) |
 | D134 | frame | profileSketch | P3 | kind: std `reference PartStudio` / ours `text=""` (our own picker) | ✗ |
 | D135 | frame | selections | P3 | tooltip: std "Faces, edges, and vertices that define sweep paths", ours "" | ✅ (audit 5, 11-01) |
 | D136 | frame | trimBodies | P3 | tooltip: std "Parts to use as trim tools", ours "" | ✅ (audit 5, 11-01) |
@@ -222,14 +222,14 @@ Field rows: 199 (fixed 154, accepted 7, open 38); visibility states differing no
 | D165 | routingCurve | orthoCsysMate | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
 | D166 | routingCurve | overwritePoints | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D167 | routingCurve | points | P3 | array item "point" (std) vs "Point" (ours) | ✗ |
-| D168 | routingCurve | points | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✗ |
+| D168 | routingCurve | points | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✅ (audit 7) |
 | D169 | routingCurve | pointsEditType | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
 | D170 | routingCurve | pointsEditType | P3 | option ids: std ['SINGLE', 'MULTI'] / ours ['SINGLE', 'MULTIPLE'] | ✅ (audit 1, 11-01) |
 | D171 | routingCurve | samples | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D172 | routingCurve | segmentEditType | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
 | D173 | routingCurve | segmentEditType | P3 | option ids: std ['ADD', 'ORTHOGONAL'] / ours ['ADD_POINTS', 'ORTHOGONAL_PATH'] | ✅ (audit 1, 11-01) |
 | D174 | routingCurve | selectedIndices | P3 | array item "index" (std) vs "Point" (ours) | ✗ |
-| D175 | routingCurve | selectedIndices | P3 | hints: std adds ['PREVENT_ARRAY_REORDER', 'X25'], ours adds [] | ✗ |
+| D175 | routingCurve | selectedIndices | P3 | hints: std adds ['PREVENT_ARRAY_REORDER', 'X25'], ours adds [] | ✅ (audit 7) |
 | D176 | routingCurve | showCSys | P3 | tooltip: std "Show coordinate system of the reference used by the current vertex.", ours "" | ✅ (audit 5, 11-01) |
 | D177 | routingCurve | startColumn | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D178 | routingCurve | targetLength | P3 | value: std `Length -500..500 =0.025000000000 / 0.025400000000` / ours `Length 0.00001..500 =0.025000000000 / 0.025400000000` | ✅ (audit 6) |
@@ -260,6 +260,7 @@ New rows since the first run:
 | # | Feature | Field | P | Difference | Status |
 |---|---|---|---|---|---|
 | N1 | queryVariable | additionalQueries | P2 | array row label: std Some("#booleanOperation of #addQlowercaseSelectionType"), ours Some("#booleanOperation of #addQselectionType") | ✗ |
+| N2 | frame | cornerOverrides | P3 | array item "vertex" (std) vs "Vertex" (ours) | ✗ |
 
 ### Visibility states that differ (current run)
 

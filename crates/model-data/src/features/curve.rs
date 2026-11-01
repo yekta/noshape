@@ -309,6 +309,7 @@ pub fn edit_curve() -> FeatureType {
             vec![ParamSpec::num("indexValue", "Control point index", NumSpec::integer(0, 0, 99))],
         )
         .item_template("Control point index #indexValue")
+        .hints(Hints::PREVENT_ARRAY_REORDER | Hints::ALLOW_ARRAY_FOCUS)
         .visible(move |v| cps(v) && v.is("editPointMode", "XYZ")),
         ParamSpec::num("selectedIndex", "Control point index", NumSpec::integer(0, 0, 99)).visible(move |v| cps(v) && !v.is("editPointMode", "XYZ")),
         ParamSpec::array(
@@ -325,7 +326,7 @@ pub fn edit_curve() -> FeatureType {
             ],
         )
         .item_template("#index: #x;#y;#z")
-        .hints(Hints::COLLAPSE_ARRAY_ITEMS)
+        .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::PREVENT_ARRAY_REORDER)
         .visible(cps),
         ParamSpec::bool("showDetails", "Show details", true).hints(Hints::GROUP_HEADER),
         ParamSpec::num("curveDegree", "Degree", NumSpec::integer(3, 0, 1000))
@@ -386,6 +387,8 @@ pub fn routing_curve() -> FeatureType {
         ParamSpec::enum_("pointsEditType", "Point edit type", &[("SINGLE", "Single"), ("MULTI", "Multiple")]).hints(Hints::HORIZONTAL_ENUM | Hints::UNCONFIGURABLE).visible(points),
         ParamSpec::query1("multiEditReference", "Edit reference", QueryFilter::POINT_LIKE).visible(move |v| points(v) && !single(v)),
         ParamSpec::array("selectedIndices", "Selected points", "Point", vec![ParamSpec::num("indexValue", "Point index", NumSpec::integer(0, 0, 10_000))])
+            .item_template("Selected point #indexValue")
+            .hints(Hints::PREVENT_ARRAY_REORDER | Hints::ALLOW_ARRAY_FOCUS)
             .visible(move |v| points(v) && !single(v)),
         hidden(ParamSpec::num("pointIndex", "Selected point", NumSpec::integer(0, 0, 10_000))),
         // Item visibility below only sees the item's own values; the
@@ -419,6 +422,7 @@ pub fn routing_curve() -> FeatureType {
                 ParamSpec::flip("oppositeDirection", "Opposite direction").visible(|v| v.bool("hasDerivative")),
             ],
         )
+        .hints(Hints::PREVENT_ARRAY_REORDER)
         .visible(single),
         ParamSpec::bool("addPointOnAxisDrag", "Add point on axis drag", false).hints(Hints::UNCONFIGURABLE).visible(single),
         ParamSpec::bool("showCSys", "Show reference coordinate system", true).describe("Show coordinate system of the reference used by the current vertex.").visible(points),

@@ -37,14 +37,16 @@ pub fn frame() -> FeatureType {
         ParamSpec::array(
             "cornerOverrides",
             "Corner overrides",
-            "Corner",
+            "Vertex",
             vec![
-                ParamSpec::query1("vertex", "Vertex", QueryFilter::VERTEX),
+                ParamSpec::query1("vertex", "Vertex", QueryFilter::VERTEX).hints(Hints::ALWAYS_HIDDEN),
                 ParamSpec::enum_("cornerType", "Corner type", FRAME_CORNER).hints(Hints::SHOW_LABEL),
                 ParamSpec::flip("cornerButtFlip", "Flip corner").visible(|v| butt(v, "cornerType")),
             ],
         )
-        .item_template("#vertex [#cornerType]"),
+        // frame.fs: a driven query, picked vertices add the overrides.
+        .item_template("#vertex [#cornerType]")
+        .hints(Hints::DRIVEN_QUERY),
         ParamSpec::bool("trim", "Limit frame ends", false).hints(Hints::GROUP_HEADER),
         ParamSpec::query("trimPlanes", "Faces to trim to", QueryFilter::PLANAR_FACE | QueryFilter::PLANE).describe("Planes and planar faces to use as trim tools").visible(|v| v.bool("trim")),
         ParamSpec::query("trimBodies", "Parts to trim to", QueryFilter::SOLID_BODY).describe("Parts to use as trim tools").visible(|v| v.bool("trim")),
@@ -141,7 +143,8 @@ pub fn cut_list() -> FeatureType {
                 ParamSpec::text("value", "Value", ""),
             ],
         )
-        .item_template("#column = #value"),
+        .item_template("#column = #value")
+        .hints(Hints::PREVENT_ARRAY_REORDER),
     ];
     FeatureType::new("cutlist", "Cut list", Category::Frame, p).icon("cutList").describe("Group frame segments and generate a cut list table")
 }

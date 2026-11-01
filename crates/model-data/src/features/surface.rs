@@ -43,7 +43,7 @@ pub fn fill() -> FeatureType {
             "Edges",
             "Edge",
             vec![
-                ParamSpec::query("entities", "Edges", CURVES),
+                ParamSpec::query("entities", "Edges", CURVES).hints(Hints::ALWAYS_HIDDEN),
                 ParamSpec::enum_("continuity", "Continuity", &[("G0", "Position"), ("G1", "Tangency"), ("G2", "Curvature")])
                     .hints(Hints::SHOW_LABEL | Hints::MATCH_LAST_ARRAY_ITEM),
                 ParamSpec::query("adjacentFaces", "Adjacent faces", QueryFilter::ANY_FACE).visible(|v| !v.is("continuity", "G0")),
@@ -208,7 +208,7 @@ pub fn constrained_surface() -> FeatureType {
             ],
         )
         .item_template("#vertex")
-        .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::INITIAL_FOCUS)
+        .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::INITIAL_FOCUS | Hints::PREVENT_ARRAY_REORDER)
         .visible(|v| v.is("csType", "POINTS")),
         ParamSpec::query("meshes", "Mesh bodies or faces", QueryFilter::ANY_FACE | QueryFilter::BODY).visible(|v| v.is("csType", "MESH")),
         ParamSpec::num("tolerance", "Tolerance", TOLERANCE_BOUND),
