@@ -1124,9 +1124,15 @@ impl Ctx<'_> {
                     }
                 }
             }
-            let inside = if dist <= tol {
+            // (Along the boundary or not by the curve's own accuracy, not the tolerance OCCT gives it (5e-6 at least):
+            // a sharp knurl tooth's section runs 3.5 µm inside its side edge, a sliver apart.)
+            let along = match path {
+                Path::Nurbs { id, .. } => self.tol.max(self.ncurves[*id as usize].acc),
+                _ => tol,
+            };
+            let inside = if dist <= along {
                 closed
-            } else if dist <= GREY * tol {
+            } else if dist <= GREY * along {
                 // Judged where it is farthest from the boundary (a shallow helix rising from a rod's end, an arc
                 // nearly tangent to a face's edge), if that is clearly off it; else ambiguous.
                 let far = (1..8).map(|k| c2.at(((a.0 + (b.0 - a.0) * k as f64 / 8.0) - t0) / (t1 - t0))).map(|q| (distance2(q, &bound), q)).max_by(|x, y| x.0.total_cmp(&y.0));
