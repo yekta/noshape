@@ -35,6 +35,17 @@ spans made the volume integral 63 s (C2 intervals); OCCT projections made the co
 (after patch 0014): 2.6 s over 77 corpus cases, mostly face-consuming (exact-fit / overflow) blends that OCCT and
 merge_full_rounds build as live: not ported. Numerical audit started: docs/parity/audit-feature-results.md
 (oracle_p1 91 / 91; live batches 11-13 asked); ~/agents/audit_run.sh on vibe4 runs the oracle suites.
+21:45: blend declines by today's OCCT time (blend_replay's listing prints "now" too; the recorded times predate
+patches 0014 / 0015: 7ac37ed0's 11.4 s is 30 ms today): 125 declined cases 2.3 s in all, the slowest 125 ms; "two
+chains' blends close" 687 ms / 18 and "a chain end's edge not along the blend's side" 672 ms / 21 are face-consuming
+blends (R1 + R1 on a 2 mm rim, R12 twice on a 20 mm face); "an edge in two chains" 333 ms / 8 is every edge of a
+box with a pocket (mixed convex / concave corners: OCCT's spheres and tori; ours would go verticals first). Profile
+of 3a3d5176 (24 edges): 61 % in ChFi3d::IsTangentFaces (each call projects every edge of both faces onto its plane
+for their UV bounds), so OCCT patch 0017 answers it for two planes in closed form (the same 0.1 rad / oriented
+normal test): every OCCT fillet on planar faces gains: the corpus OCCT-only 5.0-5.3 → 3.8-4.1 s on vibe4, same
+results (lib in /root/occt; lead asked to sync).
+Audit: oracle_p1::audit_feature_results builds live batches 11-13 (30 cases, ours in docs/parity/
+audit-feature-results.md); found and fixed Helix › Circle on a sketch circle.
 G31 tuned to live 1731 (19:00): measure.rs LIVE_* floors (Parasolid's magnitudes from the block, its ×10 copy and its
 top face; freeform bounds live are ~20× those: its loft volume is 11 mm³ off, ours exact, so ours stay at the floors);
 face_property_variance for the Face tab. Inch units and REST /massproperties still to compare when live's REST is back.
@@ -507,6 +518,12 @@ deadlock in malloc).
   min_distance (~140 calls, ~0.8 ms each, BRepExtrema rebuilt per call).
 
 ## OCCT patches (patches/occt)
+- 0017 (11-01) TKFillet ChFi3d::IsTangentFaces: two planes answered in closed form (the samples' test: the surfaces'
+  normals within 0.1 rad either way, then the faces' oriented normals not opposed). 61 % of a 24-edge box-with-pocket
+  fillet went there (each call projected every edge of both faces for their UV bounds). Blend corpus, OCCT only,
+  vibe4: 5.0-5.3 s → 3.8-4.1 s over 310 cases, every result as before (counts, volume, history); kernel blend::*,
+  model fillet / chamfer, oracle_p1 and kernel_robustness as before. Lib: /root/core-scratch/p17/libTKFillet.a, in
+  /root/occt since 15:54 (backup occt-lib-backup/libTKFillet.a.pre0017; vibe4's build tree has 0013-0017).
 - 0009 (10-31) the break hook where MEM-RUNAWAY-508's last 9 budget jumps were (qa's seed 685 trace): math_PSO (its
   grid and each step: Extrema_GenExtCS::GlobMinCQuadric), math_FunctionAllRoots (every 64 samples) and
   IntStart_SearchOnBoundaries (each arc and every 64 samples: Draft_Modification's IntPatch_ImpImpIntersection arc
@@ -1109,6 +1126,8 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20�
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- (11-01 15:55) OCCT patch 0017 (fillets on planar faces ~22 % faster): please let the sync carry
+  /root/occt/lib/libTKFillet.a to vibe2 / vibe3 / vibe4 (/opt/occt). Same results without it, only slower.
 - (10-31 23:45, 11-01 01:10) OCCT patches 0010 + 0011 (CANCEL-LATENCY): please sync /root/occt/lib/libTKernel.a,
   libTKGeomAlgo.a and libTKBO.a (also /root/core-scratch/occt0010, occt0011) to vibe2 / vibe3 (/opt/occt). Weak hook defaults: nothing breaks without them, the
   cancel is just slower there.

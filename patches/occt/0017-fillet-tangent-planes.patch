@@ -1,0 +1,52 @@
+--- a/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d.cxx
++++ b/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d.cxx
+@@ -30,6 +30,8 @@
+ #include <BRepTopAdaptor_TopolTool.hxx>
+ #include <LocalAnalysis_SurfaceContinuity.hxx>
+ #include <TopOpeBRepTool_TOOL.hxx>
++#include <Geom_Plane.hxx>
++#include <TopLoc_Location.hxx>
+ 
+ static void Correct2dPoint(const TopoDS_Face& theF, gp_Pnt2d& theP2d);
+ 
+@@ -167,6 +169,40 @@
+     return true;
+   }
+ 
++  // noshape (patch 0017): two planes. Their normals are constant, so the samples below come to this: G1 when the
++  // surfaces' normals are within 0.1 rad either way, and then the faces' (oriented) normals not opposed. Planar
++  // parts spent half of each fillet in those samples: every call projected each edge of both faces onto its plane
++  // for the faces' UV bounds.
++  if (theOrder == GeomAbs_G1 && !theFace1.IsSame(theFace2))
++  {
++    TopLoc_Location aL1, aL2;
++    occ::handle<Geom_Plane> aP1 = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(theFace1, aL1));
++    occ::handle<Geom_Plane> aP2 = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(theFace2, aL2));
++    if (!aP1.IsNull() && !aP2.IsNull())
++    {
++      const gp_Ax3& aA1 = aP1->Position();
++      const gp_Ax3& aA2 = aP2->Position();
++      gp_Dir        aN1 = aA1.XDirection().Crossed(aA1.YDirection());
++      gp_Dir        aN2 = aA2.XDirection().Crossed(aA2.YDirection());
++      aN1.Transform(aL1.Transformation());
++      aN2.Transform(aL2.Transformation());
++      const double anAng = aN1.Angle(aN2);
++      if (std::min(anAng, M_PI - anAng) > 0.1)
++      {
++        return false;
++      }
++      if (theFace1.Orientation() == TopAbs_REVERSED)
++      {
++        aN1.Reverse();
++      }
++      if (theFace2.Orientation() == TopAbs_REVERSED)
++      {
++        aN2.Reverse();
++      }
++      return aN1.Dot(aN2) >= 0.;
++    }
++  }
++
+   double TolC0 = std::max(0.001, 1.5 * BRep_Tool::Tolerance(theEdge));
+ 
+   double aFirst;

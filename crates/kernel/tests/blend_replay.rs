@@ -27,10 +27,10 @@ fn replay(dir: &Path) -> (usize, Vec<String>, String) {
         let post = noshape_kernel::last_rust_decline();
         let path = if why.is_empty() && post.is_empty() { "rust".to_string() } else if why.is_empty() { format!("built, then: {post}") } else { why };
         *paths.entry(path.clone()).or_insert(0) += 1;
-        if std::env::var("NOSHAPE_BLEND_LIST").is_ok_and(|l| path.contains(&l)) {
-            println!("{name} [{path}] {:?} {} edges, {} faces, recorded {:.1} ms", case.blend, case.edges.len(), case.shape.count(noshape_kernel::ShapeType::Face), case.ms);
-        }
         let ms = t.elapsed().as_secs_f64() * 1e3;
+        if std::env::var("NOSHAPE_BLEND_LIST").is_ok_and(|l| path.contains(&l)) {
+            println!("{name} [{path}] {:?} {} edges, {} faces, recorded {:.1} ms, now {ms:.1} ms", case.blend, case.edges.len(), case.shape.count(noshape_kernel::ShapeType::Face), case.ms);
+        }
         was_ms += case.ms;
         now_ms += ms;
         match r {
