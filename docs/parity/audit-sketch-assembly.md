@@ -13,7 +13,7 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 |---|---|
 | Surfaces audited | 18 |
 | Gaps found | 18 |
-| Gaps fixed | 17 |
+| Gaps fixed | 18 |
 
 ## Surfaces
 
@@ -50,7 +50,7 @@ Live requests answered: 1715 (tool options), 1716 (Flow), 1720 (exploded views /
 | G4 | P2 | Instance list top row | fix-within icon tooltip "Part(s) inside are fixed" / "More than one part inside is fixed" / "Contains both fixed part(s) and part(s) fastened to origin" (locale table; behaviours 1222, 13414) | "Assembly is grounded" (not a live text) | fixed (11-01) |
 | G5 | P3 | Sheet metal table | header tooltips "#", "Name", "Radius (mm)", "Angle (deg)", "Bend direction", "K Factor"; joints "Name", "Type", "Style" | no header tooltips | fixed (11-01) |
 | G6 | P1? | Exploded views panel | a view row that is not active: Activate Explode 1 · Rename · Reset starting position · Duplicate · Delete (asb 10-20, behaviours 3139; the active view's menu 814 matches ours) | the active view's menu in every state | fixed (11-01, live 1720 confirmed it): an inactive view: Activate <view> (into editing) · Rename · Reset starting position | Duplicate ("Explode 1 (1)") | Delete; Reset is a no-op (our views always start from the solved assembly) |
-| G7 | P3 | Insert dialog | search box clear button tooltip "Clear search" | no tooltip (the vendored gpui-component input draws the clear button) | deferred: needs a vendor change |
+| G7 | P3 | Insert dialog | search box clear button tooltip "Clear search" | no tooltip (the vendored gpui-component input draws the clear button) | fixed (11-01): every cleanable input\'s clear button has the tooltip "Clear search" (vendor gpui-component input.rs; ours are all search or URL boxes) |
 | G8 | P3 | Configuration panel | "Configure Assembly" tooltip "Add configuration input to create multiple variants of this assembly" | none | fixed (11-01) |
 | G9 | P3 | Explode step dialog | step type dropdown tooltip "Explode step type" | none | fixed (11-01) |
 | G10 | P3 | BOM | an excluded row (Show excluded/suppressed) has the tooltip "Excluded from all BOMs" | none | fixed (11-01) |

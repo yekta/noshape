@@ -841,7 +841,9 @@ impl RenderOnce for Input {
                             this.child(Self::render_toggle_mask_button(&state, cx))
                         })
                         .when(show_clear_button, |this| {
-                            this.child(clear_button(cx).on_click({
+                            // noshape: Onshape's search boxes say "Clear search"
+                            // (live dom/assembly-insert-configured).
+                            this.child(clear_button(cx).tooltip("Clear search").on_click({
                                 let state = state.clone();
                                 move |_, window, cx| {
                                     state.clean(window, cx);
