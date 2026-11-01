@@ -6,7 +6,8 @@ use super::AssemblyView;
 use crate::doc_model::DocModel;
 use crate::gpu::Gpu;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Bounds, Entity, Point, TestAppContext, WindowBounds, WindowOptions, px, size};
-use noshape_model::assembly::InstanceId;
+use noshape_model::assembly::{InstanceId, MateConnectorRef, MateType};
+use noshape_model::reference::{Inference, Reference};
 use noshape_ops::{Ctx, registry};
 use serde_json::{Value, json};
 
@@ -54,6 +55,8 @@ fn pattern_assembly(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, En
         (w, view.unwrap())
     });
     cx.update_window(window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
+    // The evaluation runs in the background after a short timer.
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
     cx.run_until_parked();
     (window, view)
 }
@@ -89,6 +92,37 @@ fn a_group_takes_a_pattern_copy_as_its_pattern(cx: &mut TestAppContext) {
             assert_eq!((g.name.as_str(), g.instances.len(), g.patterns.clone()), ("Group 1", 0, vec![pat]));
             v.open_group(Some(g.id), g.instances, g.patterns, cx);
             assert_eq!(v.ui.group_patterns, vec![pat]);
+        });
+    })
+    .unwrap();
+}
+
+/// An implicit connector at the centroid of the top (+Z) or bottom (−Z)
+/// face of an instance's part.
+fn face_connector(v: &AssemblyView, name: &str, up: bool, cx: &gpui_kit::App) -> MateConnectorRef {
+    let id = instance(v, name, cx);
+    let occ = v.result.occurrences.iter().find(|o| o.top() == id).unwrap_or_else(|| panic!("{name} not evaluated"));
+    let body = occ.context.body(&occ.body).unwrap();
+    let side = if up { 1.0 } else { -1.0 };
+    let k = body.shape.faces().iter().position(|f| f.face_plane().ok().flatten().is_some_and(|p| p.unit_normal().z * side > 0.99)).unwrap();
+    MateConnectorRef::on(id, Vec::new(), Reference::Implicit { on: Box::new(occ.face_refs[k].clone()), inference: Inference::Centroid })
+}
+
+/// A new mate's second pick fills the dialog and puts up the heads-up ✓
+/// (it stopped when the last field started keeping the focus, 10-31: the
+/// dialog then still awaits picks, so "complete" is its own test).
+#[gpui::test]
+fn a_mate_gets_its_heads_up_check_after_the_second_pick(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "mate-hud");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Fastened, w, cx);
+            let (a, b) = (face_connector(v, "Part 1 <1>", true, cx), face_connector(v, "Part 2 <1>", false, cx));
+            v.deliver_connector(a, w, cx);
+            assert!(v.mate.as_ref().is_some_and(|s| s.hud.is_none() && !s.dialog.read(cx).connectors_complete()));
+            v.deliver_connector(b, w, cx);
+            let s = v.mate.as_ref().unwrap();
+            assert!(s.dialog.read(cx).connectors_complete() && s.hud.is_some());
         });
     })
     .unwrap();
