@@ -358,12 +358,18 @@ pub enum PointRef {
     Quadrant { body: BodyId, name: TopoName, k: u8 },
     /// Where two straight edges meet in the view (a virtual sharp).
     Intersection { body: BodyId, name: TopoName, body2: BodyId, name2: TopoName },
+    /// An end of a cosmetic thread line seen from the side (live request
+    /// 1644 d-7): the `index`th hole of Hole `feature` (cutting `body`), the
+    /// line on `side` (+1 / -1, left of the hole's projected direction or
+    /// right), at the entrance (`end` 0) or the tapped depth (1). Two of one
+    /// hole dimension as its designation ("M6x1").
+    Thread { body: BodyId, feature: crate::reference::FeatureId, index: u32, side: i8, end: u8 },
 }
 
 impl PointRef {
     pub fn body(&self) -> &BodyId {
         match self {
-            PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. } => body,
+            PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. } | PointRef::Thread { body, .. } => body,
         }
     }
 }

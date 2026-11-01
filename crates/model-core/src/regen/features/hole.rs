@@ -574,8 +574,13 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
             let (pid, _) = ht::hole_table_param(ev.params);
             let path = ev.params.lookup(pid);
             let iso = !ev.params.is("unitsSystem", "INCH");
+            // The pitch option's number ("1.00 mm (Coarse)": "M6x1.00", "20
+            // tpi (UNC)": "1/4-20"; live feature titles and hole tables).
             let thread = match path {
-                [t, _, size, pitch, ..] if t == "Tapped" => Some(if iso { format!("{size}x{pitch}") } else { format!("{size}-{pitch}") }),
+                [t, _, size, pitch, ..] if t == "Tapped" => {
+                    let pitch = pitch.split_whitespace().take_while(|w| *w != "mm" && *w != "tpi").collect::<Vec<_>>().join(" ");
+                    Some(if iso { format!("{size}x{pitch}") } else { format!("{size}-{pitch}") })
+                }
                 _ => None,
             };
             let class_param = if iso { "isoThreadClassV2" } else { "ansiThreadClassV2" };

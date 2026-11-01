@@ -21,7 +21,7 @@ const REFERENCE_BLUE: [u8; 4] = [0x90, 0xce, 0xf1, 255];
 /// (vertices are shown as points instead).
 fn edge_matches(me: &ModelEdge, r: &PointRef) -> bool {
     match r {
-        PointRef::Vertex { .. } => false,
+        PointRef::Vertex { .. } | PointRef::Thread { .. } => false,
         PointRef::Center { body, name } | PointRef::Midpoint { body, name } | PointRef::Quadrant { body, name, .. } => me.body == *body && *me.name == *name,
         PointRef::Intersection { body, name, body2, name2 } => (me.body == *body && *me.name == *name) || (me.body == *body2 && *me.name == *name2),
     }

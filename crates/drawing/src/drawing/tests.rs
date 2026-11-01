@@ -927,7 +927,7 @@ fn broken_out_section_exposes_interior() {
     // Its depth point gone after an update (help V29): the profile is drawn
     // red, the stored depth still cuts.
     let mut lost = back;
-    let (PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. }) = &mut lost;
+    let (PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. } | PointRef::Thread { body, .. }) = &mut lost;
     body.index += 1000;
     drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out[0].depth_ref = Some(lost);
     let cache = ViewCache::new();
@@ -1331,7 +1331,7 @@ fn aligned_section_dimensions_are_associative() {
     // Its second end on a body that is gone: dangling, that slot lost (help
     // D40: a red grip there).
     let mut gone = sb.point.clone().unwrap();
-    let (PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. }) = &mut gone;
+    let (PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. } | PointRef::Thread { body, .. }) = &mut gone;
     body.index += 1000;
     drawing.sheets[0].annotations.iter_mut().find(|a| a.id == aid).unwrap().refs[1].point = gone;
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
@@ -1918,6 +1918,8 @@ fn ordinate_group_with_a_lost_point_is_red_as_a_whole() {
     // The last point's body is gone (its feature deleted).
     let lost = match snaps[2].point.clone().unwrap() {
         PointRef::Vertex { name, .. } | PointRef::Center { name, .. } | PointRef::Midpoint { name, .. } | PointRef::Quadrant { name, .. } | PointRef::Intersection { name, .. } => PointRef::Vertex { body: crate::BodyId { feature: crate::reference::FeatureId(u64::MAX - 7), index: 0 }, name },
+
+        PointRef::Thread { .. } => unreachable!(),
     };
     let id = drawing.sheets[0].next_annotation_id();
     drawing.sheets[0].annotations.push(Annotation {
@@ -2534,7 +2536,7 @@ fn gdt_leader_to_a_lost_point_turns_red() {
     assert!(ok.lost.is_empty() && !red(&ok), "{:?}", ok.lost);
     // A reference to a body that isn't there: lost.
     let mut gone = r;
-    let (PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. }) = &mut gone;
+    let (PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. } | PointRef::Thread { body, .. }) = &mut gone;
     body.index += 1000;
     drawing.sheets[0].annotations.last_mut().unwrap().refs = vec![AnnotationRef { slot: 100, point: gone }];
     let bad = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
@@ -2562,7 +2564,7 @@ fn section_line_follows_its_point() {
     assert!(!moved.sheets[0].view(id).unwrap().cut_lost);
     // A point that isn't there: red.
     let mut gone = r;
-    let (PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. }) = &mut gone;
+    let (PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. } | PointRef::Thread { body, .. }) = &mut gone;
     body.index += 1000;
     drawing.sheets[0].view_mut(id).unwrap().cut_anchor = Some((gone, p));
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
@@ -2681,14 +2683,14 @@ fn tapped_hole_threads_from_the_side() {
             through: false,
             tap_drill: Some(0.005),
             tapped_depth: Some(0.01),
-            thread: Some("M6x1".into()),
+            thread: Some("M6x1.00".into()),
             thread_class: None,
             cbore: None,
             csink: None,
             inch: false,
             diameter_fit: None,
             exits: false,
-            parts: Vec::new(),
+            parts: ctx.bodies.iter().map(|b| b.id.clone()).take(1).collect(),
             tip_angle: None,
         });
         src.context = std::sync::Arc::new(ctx);
@@ -2703,6 +2705,25 @@ fn tapped_hole_threads_from_the_side() {
     let lines: Vec<&Vec<[f64; 2]>> = g.side_threads.iter().map(|(p, _)| p).filter(|p| ((p[1][0] - p[0][0]).hypot(p[1][1] - p[0][1]) - 0.01).abs() < 1e-9).collect();
     assert_eq!(lines.len(), 2);
     assert!(((lines[0][0][0] - lines[1][0][0]).abs() - 0.006).abs() < 1e-9, "{lines:?}");
+    // The two lines dimension as the thread designation (live d-7, d-8),
+    // the dimension's ends on them.
+    assert_eq!(g.thread_lines.len(), 2);
+    let sheet = &mut drawing.sheets[0];
+    let id = sheet.next_annotation_id();
+    let (ra, rb) = (g.thread_lines[0][0].1.clone(), g.thread_lines[1][0].1.clone());
+    sheet.annotations.push(Annotation {
+        id,
+        kind: AnnotationKind::LinearDimension { view: ViewId(1), a: [0.0; 2], b: [0.0; 2], offset: 10.0, orientation: DimOrientation::Horizontal, override_text: None },
+        refs: vec![AnnotationRef { slot: 0, point: ra }, AnnotationRef { slot: 1, point: rb }],
+        ..Default::default()
+    });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(built.dangling.is_empty() && built.lost.is_empty(), "{:?} {:?}", built.dangling, built.lost);
+    let a = built.resolved.annotations.iter().find(|a| a.id == id).unwrap();
+    let AnnotationKind::LinearDimension { a: pa, b: pb, .. } = &a.kind else { unreachable!() };
+    assert!((pa[0] - g.thread_lines[0][0].0[0]).abs() < 1e-9 && (pb[0] - g.thread_lines[1][0].0[0]).abs() < 1e-9, "{pa:?} {pb:?}");
+    let pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(id)).unwrap() as u32;
+    assert_eq!(built.geometry.texts.iter().find(|t| t.pick == pick).map(|t| t.text.as_str()), Some("M6x1"));
 }
 
 /// A view of a named view with a section plane (live 3121-3127): the

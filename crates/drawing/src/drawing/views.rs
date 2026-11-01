@@ -1108,6 +1108,9 @@ pub struct ViewGeometry {
     /// (view coordinates), solid (a section's thread end and ticks) or not
     /// (hidden / dashed).
     pub side_threads: Vec<(Vec<[f64; 2]>, bool)>,
+    /// The side threads' lines at the major diameter, pickable for
+    /// dimensions (live d-7): ends (view coordinates) and their references.
+    pub thread_lines: Vec<[([f64; 2], PointRef); 2]>,
     pub form_marks: Vec<[f64; 2]>,
     /// Flat pattern views: form outlines (closed, view coordinates) and
     /// whether the form points up (toward the viewer).
@@ -1629,9 +1632,50 @@ fn bodies_diagonal(bodies: &[&Arc<Body>]) -> f64 {
     acc.map(|(a, b)| (b - a).length()).unwrap_or(0.1).max(1e-6)
 }
 
+/// A thread line end (`PointRef::Thread`) in a view: the hole's axis point
+/// (through `map`, an aligned section's) moved half the major diameter to
+/// its side.
+fn thread_point(ctx: &Context, frame: &ViewFrame, r: &PointRef, map: &dyn Fn(DVec3) -> DVec3) -> Option<[f64; 2]> {
+    let (p, _) = resolve_point3(ctx, r)?;
+    let PointRef::Thread { feature, index, side, .. } = r else { return None };
+    let hole = thread_hole(ctx, *feature, *index)?;
+    let big = thread_major_diameter(hole.thread.as_deref()?)? / 2.0;
+    let u = frame.project(map(hole.start + hole.dir.normalize()) - map(hole.start));
+    let ul = u[0].hypot(u[1]);
+    if ul < 1e-9 {
+        return None;
+    }
+    let n = [-u[1] / ul, u[0] / ul];
+    let q = frame.project(map(p));
+    let t = f64::from(*side) * big;
+    Some([q[0] + n[0] * t, q[1] + n[1] * t])
+}
+
+/// The `index`th hole of Hole feature `feature`.
+pub fn thread_hole(ctx: &Context, feature: crate::reference::FeatureId, index: u32) -> Option<&crate::regen::context::HoleRecord> {
+    ctx.holes.iter().filter(|h| h.feature == feature).nth(index as usize)
+}
+
+/// The thread designation two references dimension: ends of the two
+/// thread lines of one hole (live request 1644 d-8: "M6x1", the pitch
+/// without the hole's trailing zeros "M6x1.00").
+pub fn thread_pair_designation(ctx: &Context, a: &PointRef, b: &PointRef) -> Option<String> {
+    let t = match (a, b) {
+        (PointRef::Thread { feature, index, side, .. }, PointRef::Thread { feature: f2, index: i2, side: s2, .. }) if feature == f2 && index == i2 && side != s2 => thread_hole(ctx, *feature, *index)?.thread.clone()?,
+        _ => return None,
+    };
+    Some(match t.rsplit_once('x').and_then(|(size, p)| Some((size, p.parse::<f64>().ok()?))) {
+        Some((size, p)) => format!("{size}x{p}"),
+        None => t,
+    })
+}
+
 /// Resolve a point reference: projected position and, for circle centers,
 /// the radius.
 pub fn resolve_point(ctx: &Context, frame: &ViewFrame, r: &PointRef) -> Option<([f64; 2], Option<f64>)> {
+    if let PointRef::Thread { .. } = r {
+        return Some((thread_point(ctx, frame, r, &|p| p)?, None));
+    }
     if let PointRef::Intersection { .. } = r {
         return Some((intersection_in_view(ctx, frame, r)?, None));
     }
@@ -1654,7 +1698,7 @@ pub fn resolve_point(ctx: &Context, frame: &ViewFrame, r: &PointRef) -> Option<(
                 _ => None,
             }
         }
-        PointRef::Midpoint { .. } | PointRef::Quadrant { .. } | PointRef::Intersection { .. } => resolve_point3(ctx, r).map(|(p, _)| (frame.project(p), None)),
+        PointRef::Midpoint { .. } | PointRef::Quadrant { .. } | PointRef::Intersection { .. } | PointRef::Thread { .. } => resolve_point3(ctx, r).map(|(p, _)| (frame.project(p), None)),
     }
 }
 
@@ -1722,6 +1766,14 @@ pub fn resolve_point3(ctx: &Context, r: &PointRef) -> Option<(DVec3, Option<f64>
             let info = e.edge_info().ok()?;
             Some((e.point_at((info.first_param + info.last_param) * 0.5).ok()?, None))
         }
+        // A thread line's end: in 3D the point on the hole's axis (views
+        // move it to its side, see `thread_point`).
+        PointRef::Thread { feature, index, end, .. } => {
+            let hole = thread_hole(ctx, *feature, *index)?;
+            hole.thread.as_ref()?;
+            let len = if *end == 0 { 0.0 } else { hole.tapped_depth? };
+            Some((hole.start + hole.dir.normalize() * len, None))
+        }
     }
 }
 
@@ -1729,6 +1781,10 @@ pub fn resolve_point3(ctx: &Context, r: &PointRef) -> Option<(DVec3, Option<f64>
 /// following the view's point mapping (aligned sections).
 pub fn resolve_in_view(ctx: &Context, g: &ViewGeometry, r: &PointRef) -> Option<([f64; 2], Option<f64>)> {
     let frame = g.frame?;
+    if let PointRef::Thread { .. } = r {
+        let map = |p: DVec3| g.aligned.as_ref().map_or(p, |m| m.map(p));
+        return Some((thread_point(ctx, &frame, r, &map)?, None));
+    }
     let (p, radius) = resolve_point3(ctx, r)?;
     let p = match &g.aligned {
         Some(m) => m.map(p),
@@ -2040,7 +2096,12 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
             let n = [-u[1], u[0]];
             let (big, small) = (major / 2.0, hole.tap_drill.unwrap_or(hole.diameter) / 2.0);
             let at = |s: f64, t: f64| [a[0] + u[0] * s + n[0] * t, a[1] + u[1] * s + n[1] * t];
+            let k = ctx.holes.iter().take_while(|h| !std::ptr::eq(*h, hole)).filter(|h| h.feature == hole.feature).count() as u32;
             for side in [1.0, -1.0] {
+                if let Some(body) = hole.parts.first() {
+                    let r = |end: u8| PointRef::Thread { body: body.clone(), feature: hole.feature, index: k, side: side as i8, end };
+                    g.thread_lines.push([(at(0.0, side * big), r(0)), (at(len, side * big), r(1))]);
+                }
                 g.side_threads.push((vec![at(0.0, side * big), at(len, side * big)], false));
                 g.side_threads.push((vec![at(len, side * big), at(len + 0.0005, side * small)], in_section));
             }

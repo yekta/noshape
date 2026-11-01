@@ -78,6 +78,9 @@ impl<'a> SheetPick<'a> {
             _ => hover,
         };
         let hover = match (self.tool, hover) {
+            // A thread line nearer than the edge: it is highlighted instead
+            // (the tool's overlay).
+            (Tool::Dimension { .. }, Some(h)) if self.thread_line_near(Some(h)).is_some() => None,
             // 2 point linear takes points only: no edge highlight.
             (Tool::Dimension { kind: DimTool::Point2, .. }, _) => None,
             // The smart dimension also dimensions drawing sketch geometry (SK7).
@@ -338,6 +341,9 @@ impl<'a> SheetPick<'a> {
     }
 
     pub fn line_pick(&self) -> Option<Pick> {
+        if let Some(p) = self.thread_line_near(self.hover) {
+            return Some(p);
+        }
         let Some((view, me)) = self.hovered_edge() else { return self.silhouette_line_pick() };
         let EdgeGeom::Line { a, b } = me.geom else { return None };
         let pa = me.ends[0].clone().map(|(r, p)| PickedPoint { view, p, r: Some(r) }).unwrap_or(PickedPoint { view, p: a, r: None });
@@ -346,6 +352,27 @@ impl<'a> SheetPick<'a> {
             return None;
         }
         Some(Pick::Line { a: pa, b: pb })
+    }
+
+    /// A side-view cosmetic thread line under the cursor (live request 1644
+    /// d-7: pickable for dimensions), when nearer than the edge `hover`.
+    pub fn thread_line_near(&self, hover: Option<u32>) -> Option<Pick> {
+        if !matches!(self.tool, Tool::Dimension { .. }) {
+            return None;
+        }
+        let c = self.cursor;
+        let view = self.view_at(c)?;
+        let pl = self.placement(view)?;
+        let g = self.geoms.get(&view)?;
+        let dist = |a: [f64; 2], b: [f64; 2]| views::dist_to_segment(c, pl.to_sheet(a), pl.to_sheet(b));
+        let [(a, ra), (b, rb)] = g.thread_lines.iter().map(|l| (dist(l[0].0, l[1].0), l)).filter(|(d, _)| *d < self.tol_mm(6.0)).min_by(|x, y| x.0.total_cmp(&y.0)).map(|(d, l)| (d, l.clone())).filter(|(d, _)| {
+            let h = hover.and_then(|h| match self.built?.picks.get(h as usize)? {
+                PickTarget::Edge { view: v, edge } if *v == view => g.edges.get(*edge as usize),
+                _ => None,
+            });
+            h.is_none_or(|e| e.points.windows(2).map(|w| dist(w[0], w[1])).fold(f64::INFINITY, f64::min) > *d)
+        })?.1;
+        Some(Pick::Line { a: PickedPoint { view, p: a, r: Some(ra) }, b: PickedPoint { view, p: b, r: Some(rb) } })
     }
 
     /// A hovered centermark: the circle it marks (help D13: radial and

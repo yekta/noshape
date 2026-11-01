@@ -484,6 +484,12 @@ impl DrawingEditor {
                 }
             }
         }
+        // A thread line under the pointer, in the hover tan (live 1644 d-7).
+        if let Some(Pick::Line { a, b }) = self.pk().thread_line_near(self.hover)
+            && let Some(pl) = self.placement(a.view)
+        {
+            overlay.tinted.push((vec![pl.to_sheet(a.p), pl.to_sheet(b.p)], [0xcc, 0xb2, 0x92, 255], 3.0));
+        }
         if matches!(self.tool, Tool::Dimension { .. }) {
             // Orange, about 11 px tall, a red centre (live 1662 (b)).
             const ORANGE: [u8; 4] = [255, 130, 63, 255];

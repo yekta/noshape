@@ -211,6 +211,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   carry face_refs (decals find their face by name) and display.decals. With both, the CLI's sheet build got the
   decal record, but the app's shaded picture still showed none (w3/dcl.noshape: Decal 1 on the plate's top face,
   Iso view shaded, after Update). Changes reverted; worth a closer look (is the out-of-date path still used?).
+- D6 (11-01 01:30): the Dimension tool picks side-view thread lines (`PointRef::Thread`: Hole feature, its nth
+  hole, side, end; `ViewGeometry.thread_lines`; `SheetPick::thread_line_near` wins over the drill edge when nearer,
+  tan overlay) and two of one hole read the designation "M6x1" (`format.value` set in `resolve_annotations`). Also
+  fixed in model-core hole.rs: HoleRecord.thread was "M6x1.00 mm (Coarse)" (the pitch option's label), now
+  "M6x1.00" / "1/4-20" as live's feature titles and hole tables. App test doc: w3/d6.noshape.
 - Slip 10-31 ~21:40: committed during a running land (SK12); caught before the push, the commit was saved as a
   patch, the branch reset to the tested commit, and the patch re-applied after the land.
 - Left in drawing.md 🔧 (as of 10-31 evening): MBD dimensions (CR5 / CR18 / V5, need Part Studio MBD dims), V1

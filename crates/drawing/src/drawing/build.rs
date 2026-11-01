@@ -547,6 +547,14 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
             dangling.push(a.id);
             continue;
         };
+        // Two thread lines of one hole: the thread designation (live request
+        // 1644 d-8), unless a value is typed.
+        if let (AnnotationKind::LinearDimension { override_text: None, .. }, None, [x, y, ..]) = (&a.kind, &a.format.value, a.refs.as_slice())
+            && x.slot == 0
+            && y.slot == 1
+        {
+            a.format.value = views::thread_pair_designation(&ctx, &x.point, &y.point);
+        }
         let mut ok = true;
         // A max / min dimension's straight edge (slots 2, 3).
         let mut edge: [Option<[f64; 2]>; 2] = [None, None];
