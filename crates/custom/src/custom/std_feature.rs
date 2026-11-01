@@ -154,14 +154,16 @@ pub fn editing_logic(
 /// fillet; 3D fit spline: preselected edges switch it to Edges, the start /
 /// end direction toggles follow their fields; External thread: the
 /// standard size from the picked cylinder, chamfer and undercut from it;
-/// Frame: a new corner override takes the default corner type and flip).
-const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet", "loft", "revolve", "sweep", "mirror", "cPlane", "draft", "splitPart", "hole", "modifyFillet", "fitSpline", "externalThread", "frame"];
+/// Frame: a new corner override takes the default corner type and flip;
+/// Cut list: only the first override hides "Same frames as previous";
+/// Delete part: its two entity fields in step).
+const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet", "loft", "revolve", "sweep", "mirror", "cPlane", "draft", "splitPart", "hole", "modifyFillet", "fitSpline", "externalThread", "frame", "cutlist", "deleteBodies"];
 
 /// Built-in feature types std only runs the editing logic of (std's module
 /// and feature; they regenerate natively and std can't run them). Thicken's
 /// dialog keeps its native logic (`ops::studio::auto_operation`, live L18);
 /// std's is the T2 check of it.
-const LOGIC_ONLY: &[(&str, &str, &str)] = &[("thicken", "thicken.fs", "thicken"), ("modifyFillet", "modifyFillet.fs", "modifyFillet"), ("fitSpline", "fitSpline.fs", "fitSpline"), ("externalThread", "externalThread.fs", "externalThread"), ("frame", "frame.fs", "frame")];
+const LOGIC_ONLY: &[(&str, &str, &str)] = &[("thicken", "thicken.fs", "thicken"), ("modifyFillet", "modifyFillet.fs", "modifyFillet"), ("fitSpline", "fitSpline.fs", "fitSpline"), ("externalThread", "externalThread.fs", "externalThread"), ("frame", "frame.fs", "frame"), ("cutlist", "cutlist.fs", "cutlist"), ("deleteBodies", "deleteBodies.fs", "deleteBodies")];
 
 /// [`std_name`], or the std feature whose editing logic a dialog runs.
 fn logic_std_name(type_id: &str) -> Option<(&'static str, &'static str)> {

@@ -1738,6 +1738,27 @@ fn frame_editing_logic_runs_std() {
     assert!(item.contains("\"cornerType\": Enum(\"BUTT\")") && item.contains("\"cornerButtFlip\": Bool(true)"), "{item}");
 }
 
+/// std's editing logic of Cut list (only the first override has no "Same
+/// frames as previous") and Delete part (the two entity fields in step).
+#[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
+fn cutlist_and_delete_part_editing_logic_runs_std() {
+    let mut s = Studio::new();
+    s.add("cutlist", |p| p.set("columnOverrides", ParamValue::Array(vec![ParamValues::default(), ParamValues::default()])));
+    let got = edit_logic(&s, &ParamValues::default(), &["columnOverrides"]);
+    let item = got.iter().find(|x| x.starts_with("columnOverrides=")).unwrap_or_else(|| panic!("{got:?}"));
+    let first = item.find("\"isFirst\": Bool(true)").expect(item);
+    assert!(item[first..].contains("\"isFirst\": Bool(false)"), "{item}");
+
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    let cube = q(body_ref(&r, 0));
+    s.add("deleteBodies", |p| p.set("entities", cube.clone()));
+    let got = edit_logic(&s, &ParamValues::default(), &["entities"]);
+    assert!(got.contains(&format!("nonCompositeEntities={cube:?}")), "{got:?}");
+}
+
 /// std's holeEditLogic through the host natives: a new hole's Merge scope is
 /// the part it reaches, and one sketched below the part flips into it
 /// (holeScopeFlipHeuristics: an opHole probe and evCollision containment,
