@@ -3152,8 +3152,9 @@ OpOut op_draft_parting_curve(const OcShape& solid_in, const OcShapeList& faces_i
 
 
 namespace {
-// A ruled loft face (two profiles: cubic x linear): s in [0, 1] along its profiles (the way the faces go round),
-// w along its rulings (0 on the first profile, 1 on the second, any real: the face continued straight).
+// A loft face: s in [0, 1] along its profiles (the way the faces go round), w along the loft (0 on the first
+// profile, 1 on the last; past them the end spans continued). Two profiles: cubic x linear, ruled; more: cubic x
+// cubic.
 struct RuledFace
 {
   TopoDS_Face                      face;
@@ -3169,23 +3170,16 @@ void ruled_d1(const RuledFace& f, double s, double w, gp_Pnt& P, gp_Vec& Ds, gp_
 {
   const double ss  = f.flip_s ? 1 - s : s;
   const double prm = f.p0 + (f.p1 - f.p0) * ss;
+  const double r   = f.r0 + (f.r1 - f.r0) * w;
   // (Past the face's ends: the end spans' polynomials continued. Along the end tangents instead, live (a) came
   // out 0.046 mm³ over, against 0.021 under: Parasolid continues them between the two.)
-  gp_Pnt       A, B;
-  gp_Vec       Ap, Ar, Bp, Br;
+  gp_Vec Dp, Dr;
   if (f.ruling_in_v)
-  {
-    f.s->D1(prm, f.r0, A, Ap, Ar);
-    f.s->D1(prm, f.r1, B, Bp, Br);
-  }
+    f.s->D1(prm, r, P, Dp, Dr);
   else
-  {
-    f.s->D1(f.r0, prm, A, Ar, Ap);
-    f.s->D1(f.r1, prm, B, Br, Bp);
-  }
-  P  = gp_Pnt(A.XYZ() + (B.XYZ() - A.XYZ()) * w);
-  Ds = (Ap * (1 - w) + Bp * w) * ((f.p1 - f.p0) * (f.flip_s ? -1.0 : 1.0));
-  Dw = gp_Vec(A, B);
+    f.s->D1(r, prm, P, Dr, Dp);
+  Ds = Dp * ((f.p1 - f.p0) * (f.flip_s ? -1.0 : 1.0));
+  Dw = Dr * (f.r1 - f.r0);
 }
 
 gp_Pnt ruled_point(const RuledFace& f, double s, double w)
@@ -3286,18 +3280,29 @@ OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, double t_inner_i
       fail_op("thicken loft: a face not a ruled B-spline");
     double u0, u1, v0, v1;
     f.s->Bounds(u0, u1, v0, v1);
-    if (f.s->VDegree() == 1 && f.s->NbVPoles() == 2)
+    // The loft's direction: the one whose ends lie in the two planes (a ruled face's linear one).
+    auto spans = [&](bool in_v) {
+      for (const double q : {0.25, 0.5, 0.75})
+      {
+        const gp_Pnt a = in_v ? f.s->Value(u0 + (u1 - u0) * q, v0) : f.s->Value(u0, v0 + (v1 - v0) * q);
+        const gp_Pnt b = in_v ? f.s->Value(u0 + (u1 - u0) * q, v1) : f.s->Value(u1, v0 + (v1 - v0) * q);
+        if (!((pl0.Distance(a) < tol && pl1.Distance(b) < tol) || (pl1.Distance(a) < tol && pl0.Distance(b) < tol)))
+          return false;
+      }
+      return true;
+    };
+    if (spans(true))
     {
       f.ruling_in_v = true;
       f.p0 = u0, f.p1 = u1, f.r0 = v0, f.r1 = v1;
     }
-    else if (f.s->UDegree() == 1 && f.s->NbUPoles() == 2)
+    else if (spans(false))
     {
       f.ruling_in_v = false;
       f.p0 = v0, f.p1 = v1, f.r0 = u0, f.r1 = u1;
     }
     else
-      fail_op("thicken loft: a face not ruled");
+      fail_op("thicken loft: a face not from one profile plane to the other");
     // The first profile on pl0.
     const gp_Pnt a = ruled_point(f, 0.5, 0), b = ruled_point(f, 0.5, 1);
     if (pl0.Distance(a) > pl0.Distance(b))

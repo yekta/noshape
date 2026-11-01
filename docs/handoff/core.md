@@ -134,6 +134,9 @@ deadlock in malloc).
 - (c) 11-01 11:10: `t_inner` (Thickness 2, without Trim ends): `offsets(dist)` builds a side's faces (the offset
   `d` captured by offset_pt / meet); the inside at −t_inner, its caps ruled from the inner rows. 1999.930 vs live
   2000.250 (its own evVolume moves 0.73 with accuracy), faces and box as live's.
+- (d) 11-01 11:50: ruled_d1 evaluates the face at (prm, r(w)) itself (identical for ruled faces), the loft direction
+  found as the one whose ends lie in the two planes; the model passes the last profile's plane and takes more than
+  two profiles without Trim ends. 2584.187 vs live 2584.533, 16 faces, live's box.
 
 ## THIN-LOFT-TRIM-ENDS (P2), parked 11-01 02:40 (branch wip/core-thinloft2, local only)
 - Live (a) (Trim ends, outward 1 mm, square 20 → Ø16): the loft sheet offset along its normals, the offset faces
