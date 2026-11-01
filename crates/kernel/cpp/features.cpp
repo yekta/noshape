@@ -55,6 +55,8 @@
 #include <Geom2d_Line.hxx>
 #include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
+#include <Geom_ToroidalSurface.hxx>
+#include <GeomLProp_SLProps.hxx>
 #include <GeomConvert_ApproxCurve.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
@@ -3110,6 +3112,175 @@ static BlendBuild fillet_build(const Scaled& sc, const std::vector<TopoDS_Edge>&
   };
 }
 
+namespace {
+// The radius of a round blend face (a cylinder's, a torus's minor), or 0.
+double blend_radius(const TopoDS_Face& f)
+{
+  TopLoc_Location                 l;
+  const occ::handle<Geom_Surface> g = BRep_Tool::Surface(f, l);
+  if (const auto c = occ::down_cast<Geom_CylindricalSurface>(g))
+    return c->Radius();
+  if (const auto t = occ::down_cast<Geom_ToroidalSurface>(g))
+    return t->MinorRadius();
+  return 0;
+}
+
+// Whether faces `f` and `g` are tangent across their edge `e` (at its middle).
+bool tangent_across(const TopoDS_Edge& e, const TopoDS_Face& f, const TopoDS_Face& g)
+{
+  auto normal = [&](const TopoDS_Face& x, gp_Dir& n) {
+    double                           a, b;
+    const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, x, a, b);
+    if (c.IsNull())
+      return false;
+    const gp_Pnt2d    uv = c->Value(0.5 * (a + b));
+    GeomLProp_SLProps pr(BRep_Tool::Surface(x), uv.X(), uv.Y(), 1, 1e-9);
+    if (!pr.IsNormalDefined())
+      return false;
+    n = pr.Normal();
+    return true;
+  };
+  gp_Dir nf, ng;
+  return normal(f, nf) && normal(g, ng) && std::abs(nf.Dot(ng)) > 1 - 1e-6;
+}
+} // namespace
+
+// A fillet of edges that end at smaller round blends (live 1686 (b): R4 on a block's vertical edges after an R2
+// round its top; live's corner is the torus it makes with the R4 first, in either order; OCCT's fails): those
+// blends taken off (Defeaturing puts the edges they rounded back), the edges filleted, then the blends made again
+// on their edges. Each blend face taken off is Modified to the blend faces made again on its edge. Null when no
+// smaller blend meets the edges' ends or a step fails.
+static std::optional<std::pair<TopoDS_Shape, HHist>> fillet_over_smaller_blends(
+    const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es, const std::vector<double>& rs)
+{
+  const double rmin = *std::min_element(rs.begin(), rs.end());
+  ShapeAncMap  vf, ef;
+  TopExp::MapShapesAndAncestors(input, TopAbs_VERTEX, TopAbs_FACE, vf);
+  TopExp::MapShapesAndAncestors(input, TopAbs_EDGE, TopAbs_FACE, ef);
+  ShapeIMap blends; // the round blend faces at the edges' ends and the round faces of their radius they touch
+  double    r = 0;
+  for (const TopoDS_Edge& e : es)
+    for (const TopoDS_Vertex& v : {TopExp::FirstVertex(e), TopExp::LastVertex(e)})
+    {
+      if (v.IsNull() || !vf.Contains(v))
+        continue;
+      for (const TopoDS_Shape& f : vf.FindFromKey(v))
+      {
+        const double fr = blend_radius(TopoDS::Face(f));
+        bool         on = false;
+        for (const TopoDS_Shape& g : ef.FindFromKey(e))
+          on = on || g.IsSame(f);
+        if (on || !(fr > 0) || fr > rmin * (1 - 1e-6) || (r > 0 && std::abs(fr - r) > 1e-9 * r))
+          continue;
+        r = fr;
+        blends.Add(f);
+      }
+    }
+  if (blends.IsEmpty())
+    return std::nullopt;
+  // The blends they touch through edges, of the same radius (a chain round a face's loop, its corners).
+  for (int i = 1; i <= blends.Extent(); ++i)
+    for (TopExp_Explorer x(blends(i), TopAbs_EDGE); x.More(); x.Next())
+      for (const TopoDS_Shape& g : ef.FindFromKey(x.Current()))
+        if (!blends.Contains(g) && std::abs(blend_radius(TopoDS::Face(g)) - r) < 1e-9 * r)
+          blends.Add(g);
+  // Each blend's two faces it is tangent to (the faces its edge was between).
+  std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>> sides;
+  for (int i = 1; i <= blends.Extent(); ++i)
+  {
+    const TopoDS_Face   f = TopoDS::Face(blends(i));
+    std::vector<TopoDS_Shape> t;
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+      for (const TopoDS_Shape& g : ef.FindFromKey(x.Current()))
+        if (!g.IsSame(f) && !blends.Contains(g) && tangent_across(TopoDS::Edge(x.Current()), f, TopoDS::Face(g))
+            && std::none_of(t.begin(), t.end(), [&](const TopoDS_Shape& y) { return y.IsSame(g); }))
+          t.push_back(g);
+    if (t.size() != 2)
+      return std::nullopt;
+    sides.emplace_back(t[0], t[1]);
+  }
+  BRepAlgoAPI_Defeaturing df;
+  df.SetShape(input);
+  std::vector<TopoDS_Shape> off;
+  for (int i = 1; i <= blends.Extent(); ++i)
+    off.push_back(blends(i));
+  df.AddFacesToRemove(to_list(off));
+  df.SetRunParallel(false);
+  df.SetToFillHistory(true);
+  df.Build(new_cancel_indicator()->Start());
+  if (!df.IsDone() || df.HasErrors() || !valid_shape(df.Shape()))
+    return std::nullopt;
+  const TopoDS_Shape s0 = df.Shape();
+  const HHist        h0 = history_of({input}, df);
+  // One image of `x` after the steps of `h` (itself when unchanged), or null.
+  auto image = [](const HHist& h, const TopoDS_Shape& x) {
+    if (h->IsRemoved(x))
+      return TopoDS_Shape();
+    const ShapeList& m = h->Modified(x);
+    return m.IsEmpty() ? x : (m.Extent() == 1 ? m.First() : TopoDS_Shape());
+  };
+  BRepFilletAPI_MakeFillet big(s0);
+  for (size_t i = 0; i < es.size(); ++i)
+  {
+    const TopoDS_Shape e = image(h0, es[i]);
+    if (e.IsNull())
+      return std::nullopt;
+    big.Add(rs[i], TopoDS::Edge(e));
+  }
+  big.Build();
+  if (!big.IsDone() || !valid_shape(big.Shape()))
+    return std::nullopt;
+  const TopoDS_Shape s1  = big.Shape();
+  const HHist        h01 = compose(input, h0, history_of({s0}, big));
+  // The blends' edges: where their two faces' images meet.
+  ShapeAncMap ef1;
+  TopExp::MapShapesAndAncestors(s1, TopAbs_EDGE, TopAbs_FACE, ef1);
+  auto images = [&](const TopoDS_Shape& x) {
+    ShapeIMap m;
+    const ShapeList& l = h01->Modified(x);
+    if (l.IsEmpty() && !h01->IsRemoved(x))
+      m.Add(x);
+    for (const TopoDS_Shape& y : l)
+      m.Add(y);
+    return m;
+  };
+  BRepFilletAPI_MakeFillet           small(s1);
+  std::vector<std::vector<TopoDS_Shape>> edges_of(sides.size());
+  ShapeIMap                          added;
+  for (size_t i = 0; i < sides.size(); ++i)
+  {
+    const ShapeIMap a = images(sides[i].first), b = images(sides[i].second);
+    for (int k = 1; k <= ef1.Extent(); ++k)
+    {
+      const ShapeList& fs = ef1(k);
+      if (fs.Extent() != 2)
+        continue;
+      if ((a.Contains(fs.First()) && b.Contains(fs.Last())) || (b.Contains(fs.First()) && a.Contains(fs.Last())))
+      {
+        edges_of[i].push_back(ef1.FindKey(k));
+        if (!added.Contains(ef1.FindKey(k)))
+        {
+          added.Add(ef1.FindKey(k));
+          small.Add(r, TopoDS::Edge(ef1.FindKey(k)));
+        }
+      }
+    }
+    if (edges_of[i].empty())
+      return std::nullopt;
+  }
+  small.Build();
+  if (!small.IsDone() || !valid_shape(small.Shape()))
+    return std::nullopt;
+  const HHist h2 = history_of({s1}, small);
+  HHist       h  = compose(input, h01, h2);
+  for (int i = 1; i <= blends.Extent(); ++i)
+    for (const TopoDS_Shape& e : edges_of[(size_t)i - 1])
+      for (const TopoDS_Shape& g : h2->Generated(e))
+        if (g.ShapeType() == TopAbs_FACE)
+          h->AddModified(blends(i), g);
+  return std::make_pair(small.Shape(), h);
+}
+
 // A fillet along a closed edge that OCCT can't take all the way round (skb:
 // the 0.002 in mouth of the #8 flat countersunk Type VI recess, a closed
 // B-spline with its seam vertex on a lobe): the same fillet with the edge
@@ -3625,6 +3796,8 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     if (!checked)
       throw;
     auto past = fillet_split_closed(s.shape, es, rs, rmax);
+    if (!past)
+      past = fillet_over_smaller_blends(s.shape, es, rs);
     if (!past)
       past = fillet_past_end_faces(s.shape, es, rs);
     if (!past)
