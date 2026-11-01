@@ -483,7 +483,12 @@ impl<'a> QueryCx<'a> {
     /// tools, live 1616's Circle emboss flat); elsewhere std's sheet metal
     /// counts on them not being parts.
     pub fn is_modifiable(&self, e: &Ent) -> bool {
-        matches!(e, Ent::Body(_) | Ent::Face(..) | Ent::Edge(..) | Ent::Vertex(..)) || (self.st.loaded && matches!(e, Ent::SketchBody(_)))
+        // A sketch's regions, curves and points are this studio's own (live
+        // G34 c2: thickening two sketches' regions reports nothing; std's
+        // thicken counts unmodifiable ones as in-context faces). Sketch
+        // bodies only in a studio loaded for a derive (else std's sheet
+        // metal takes them for parts).
+        matches!(e, Ent::Body(_) | Ent::Face(..) | Ent::Edge(..) | Ent::Vertex(..) | Ent::SketchRegion(..) | Ent::SketchEdge(..) | Ent::SketchVertex(..)) || (self.st.loaded && matches!(e, Ent::SketchBody(_)))
     }
 
     /// A representative point (vertex position, curve / face / body centroid).

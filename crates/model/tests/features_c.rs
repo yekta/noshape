@@ -433,6 +433,32 @@ fn form_adds_and_cuts_and_shows_in_flat() {
     assert_eq!(s3.last_status().0, FeatureStatus::Error);
 }
 
+/// Live G34 c2: one Sheet metal model thickening two sketches' regions (a
+/// plate on Top, a wall on Front touching its side) gives two parts, 8400
+/// mm³, and no message (std's thicken took sketch regions the host didn't
+/// call modifiable for in-context faces: "In-context faces are not
+/// connected.").
+#[test]
+fn thickening_two_sketches_regions_reports_nothing() {
+    let mut s = Studio::new();
+    let mut a = noshape_sketch::Sketch::new();
+    polyline(&mut a, &[(0.0, 0.0), (60.0, 0.0), (60.0, 40.0), (0.0, 40.0)], true);
+    let a = s.sketch(Reference::Plane(DatumPlane::Top), a);
+    let mut b = noshape_sketch::Sketch::new();
+    polyline(&mut b, &[(0.0, 0.0), (60.0, 0.0), (60.0, 30.0), (0.0, 30.0)], true);
+    let b = s.sketch(Reference::Plane(DatumPlane::Front), b);
+    let (ra, rb) = (s.region(a), s.region(b));
+    s.add("sheetMetalStart", move |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![ra, rb]));
+        set_model(p, "2 mm", "2 mm");
+    });
+    assert_eq!(s.last_status(), (FeatureStatus::Ok, String::new()));
+    let r = s.ok();
+    let parts: Vec<f64> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.shape.volume().unwrap() * 1e9).collect();
+    assert!(parts.len() == 2 && near(parts.iter().sum::<f64>(), 8400.0, 1e-6), "{parts:?}");
+}
+
 /// Plate with flanges on two adjacent edges (x = 100 and y = 40), ripped at the corner.
 fn two_flanges() -> Studio {
     let mut s = plate();
