@@ -1123,12 +1123,38 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
     }
 
     let eps = 1e-7;
-    for (free, terms) in &groups {
-        let problem = Problem { bodies, mates, relations, drags, terms: terms.clone(), scale };
-        let dragged = terms.iter().any(|t| matches!(t, Term::Drag(_)));
-        result.iterations = result.iterations.max(levenberg_marquardt(&problem, &mut poses, free, scale, dragged));
-        if !dragged && free.iter().any(|&b| poses[b] != bodies[b].pose) {
-            least_change(&problem, &mut poses, free, scale);
+    // Groups share no free body (a term's bodies are one group's or fixed),
+    // so each is solved on its own copy of the poses, in parallel: the same
+    // arithmetic as one after the other, the results bit for bit the same.
+    {
+        use rayon::prelude::*;
+        let start = &poses;
+        let solved: Vec<(Vec<(usize, Frame)>, usize)> = groups
+            .par_iter()
+            .filter_map(|(free, terms)| {
+                let problem = Problem { bodies, mates, relations, drags, terms: terms.clone(), scale };
+                let dragged = terms.iter().any(|t| matches!(t, Term::Drag(_)));
+                // Already solved (a drag's untouched groups, held by their
+                // stays): Levenberg-Marquardt would stop at once without a
+                // move, so nothing else runs either; skip the copy of every pose.
+                let mut r = Vec::new();
+                residuals(&problem, start, &mut r);
+                if r.is_empty() || r.iter().map(|v| v * v).sum::<f64>().sqrt() < 1e-10 {
+                    return None;
+                }
+                let mut local = start.clone();
+                let iterations = levenberg_marquardt(&problem, &mut local, free, scale, dragged);
+                if !dragged && free.iter().any(|&b| local[b] != bodies[b].pose) {
+                    least_change(&problem, &mut local, free, scale);
+                }
+                Some((free.iter().map(|&b| (b, local[b])).collect(), iterations))
+            })
+            .collect();
+        for (moved, iterations) in solved {
+            for (b, p) in moved {
+                poses[b] = p;
+            }
+            result.iterations = result.iterations.max(iterations);
         }
     }
 
@@ -1147,56 +1173,67 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
     // DOF analysis on each group's constraint Jacobian (without drag rows),
     // evaluated at the final poses: null space of JᵀJ via a symmetric
     // eigendecomposition.
-    for (free, terms) in groups.iter().filter(|_| dof) {
-        let mut nodrag = Problem { bodies, mates, relations, drags, terms: terms.iter().copied().filter(|t| !matches!(t, Term::Drag(_) | Term::Stay(_))).collect(), scale };
-        // The group's own length scale, so the analysis (and its cache key)
-        // doesn't change when an instance far away is inserted or moved.
-        nodrag.scale = group_length(&nodrag, &poses);
-        let n = free.len() * 6;
-        if nodrag.terms.is_empty() {
-            result.dof += n;
-            for &bi in free {
-                result.body_dof[bi] = 6;
-            }
-            continue;
-        }
-        let (key, ids) = dof_key(&nodrag, &poses, free);
-        if let Some((d, ranks)) = DOF_CACHE.get_or_init(Default::default).lock().ok().and_then(|c| c.get(&key).cloned()) {
-            result.dof += d;
-            for &bi in free {
-                result.body_dof[bi] = ranks[ids[&bi]];
-            }
-            continue;
-        }
-        let mut base = Vec::new();
-        residuals(&nodrag, &poses, &mut base);
-        let j = jacobian(&nodrag, &poses, free, &base, nodrag.scale, eps);
-        let jtj = j.transpose() * &j;
-        let eig = jtj.symmetric_eigen();
-        let maxv = eig.eigenvalues.iter().fold(0.0f64, |a, v| a.max(v.abs()));
-        let tol = 1e-8 * maxv.max(1.0);
-        let null: Vec<usize> = (0..n).filter(|&i| eig.eigenvalues[i].abs() <= tol).collect();
-        result.dof += null.len();
-        for (k, &bi) in free.iter().enumerate() {
-            // Rank of the null space restricted to this body's 6 columns.
-            let mut m = DMatrix::<f64>::zeros(6, null.len());
-            for (c, &ni) in null.iter().enumerate() {
-                for r in 0..6 {
-                    m[(r, c)] = eig.eigenvectors[(k * 6 + r, ni)];
+    // Each group's analysis on its own (in parallel, merged in order).
+    let analysed: Vec<(usize, Vec<(usize, usize)>)> = {
+        use rayon::prelude::*;
+        let poses = &poses;
+        groups
+            .par_iter()
+            .filter(|_| dof)
+            .map(|(free, terms)| {
+                let mut nodrag = Problem { bodies, mates, relations, drags, terms: terms.iter().copied().filter(|t| !matches!(t, Term::Drag(_) | Term::Stay(_))).collect(), scale };
+                // The group's own length scale, so the analysis (and its cache key)
+                // doesn't change when an instance far away is inserted or moved.
+                nodrag.scale = group_length(&nodrag, poses);
+                let n = free.len() * 6;
+                if nodrag.terms.is_empty() {
+                    return (n, free.iter().map(|&bi| (bi, 6)).collect());
                 }
-            }
-            let rank = if null.is_empty() { 0 } else { m.svd(false, false).singular_values.iter().filter(|s| **s > 1e-6).count() };
-            result.body_dof[bi] = rank.min(6);
-        }
-        if let Ok(mut c) = DOF_CACHE.get_or_init(Default::default).lock() {
-            if c.len() > 4096 {
-                c.clear();
-            }
-            let mut ranks = vec![0; ids.len()];
-            for &bi in free {
-                ranks[ids[&bi]] = result.body_dof[bi];
-            }
-            c.insert(key, (null.len(), ranks));
+                let (key, ids) = dof_key(&nodrag, poses, free);
+                if let Some((d, ranks)) = DOF_CACHE.get_or_init(Default::default).lock().ok().and_then(|c| c.get(&key).cloned()) {
+                    return (d, free.iter().map(|&bi| (bi, ranks[ids[&bi]])).collect());
+                }
+                let mut base = Vec::new();
+                residuals(&nodrag, poses, &mut base);
+                let j = jacobian(&nodrag, poses, free, &base, nodrag.scale, eps);
+                let jtj = j.transpose() * &j;
+                let eig = jtj.symmetric_eigen();
+                let maxv = eig.eigenvalues.iter().fold(0.0f64, |a, v| a.max(v.abs()));
+                let tol = 1e-8 * maxv.max(1.0);
+                let null: Vec<usize> = (0..n).filter(|&i| eig.eigenvalues[i].abs() <= tol).collect();
+                let body_dof: Vec<(usize, usize)> = free
+                    .iter()
+                    .enumerate()
+                    .map(|(k, &bi)| {
+                        // Rank of the null space restricted to this body's 6 columns.
+                        let mut m = DMatrix::<f64>::zeros(6, null.len());
+                        for (c, &ni) in null.iter().enumerate() {
+                            for r in 0..6 {
+                                m[(r, c)] = eig.eigenvectors[(k * 6 + r, ni)];
+                            }
+                        }
+                        let rank = if null.is_empty() { 0 } else { m.svd(false, false).singular_values.iter().filter(|s| **s > 1e-6).count() };
+                        (bi, rank.min(6))
+                    })
+                    .collect();
+                if let Ok(mut c) = DOF_CACHE.get_or_init(Default::default).lock() {
+                    if c.len() > 4096 {
+                        c.clear();
+                    }
+                    let mut ranks = vec![0; ids.len()];
+                    for &(bi, r) in &body_dof {
+                        ranks[ids[&bi]] = r;
+                    }
+                    c.insert(key, (null.len(), ranks));
+                }
+                (null.len(), body_dof)
+            })
+            .collect()
+    };
+    for (d, body_dof) in analysed {
+        result.dof += d;
+        for (bi, r) in body_dof {
+            result.body_dof[bi] = r;
         }
     }
 
@@ -1410,7 +1447,10 @@ fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f
             trial[bi] = apply_delta(&trial[bi], &d);
         }
         residuals(problem, &trial, &mut r);
-        if delta.amax() < 1e-15 {
+        // The finite-difference Jacobian's noise floor: rounds after the
+        // first move ~1e-13 back and forth (200-instance bench: 4–12 rounds
+        // of those, two thirds of every evaluation's solve).
+        if delta.amax() < 1e-12 {
             break;
         }
     }

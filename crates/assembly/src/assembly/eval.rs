@@ -254,6 +254,7 @@ impl Solved {
     }
 }
 
+#[derive(Clone)]
 struct LeafInstance {
     path: InstancePath,
     inner: DMat4,
@@ -990,7 +991,16 @@ pub struct AssemblyEvaluator {
     studios_checked: HashSet<(TabId, String)>,
     /// Inside `evaluate` (the document can't change meanwhile).
     evaluating: bool,
+    /// Subassemblies prepared and solved during the current `evaluate`, by
+    /// what decides them (tab, configuration, lock, stored positions, the
+    /// path of assemblies above): every other instance of the same
+    /// subassembly reuses them (26 instances of one sub re-solved the same
+    /// mates 26 times). Empty outside `evaluate`.
+    subs_done: HashMap<u64, SubassemblyDone>,
 }
+
+/// A subassembly's preparation and solve, as [`AssemblyEvaluator::prepare_subassembly`] makes them.
+type SubassemblyDone = Arc<(Vec<LeafInstance>, Vec<InstanceNode>, Prepared, Solved)>;
 
 /// Builds the regeneration options (derived parts' sources, custom
 /// features) for a document's Part Studios.
@@ -1995,9 +2005,11 @@ impl AssemblyEvaluator {
         let mut visited = Vec::new();
         self.evaluating = true;
         self.studios_checked.clear();
+        self.subs_done.clear();
         let (leaves, nodes, prepared) = self.prepare_inner(doc, assembly, &mut visited);
         self.evaluating = false;
         self.studios_checked.clear();
+        self.subs_done.clear();
         let solved = prepared.solve(opts);
         let mut occurrences = Vec::new();
         let best: std::collections::HashSet<InstanceId> = assembly.instances.iter().filter(|i| i.best_tessellation).map(|i| i.id).collect();
@@ -2137,20 +2149,45 @@ impl AssemblyEvaluator {
             node.error = Some("Circular assembly reference".into());
             return;
         }
-        visited.push(visit);
-        let (sub_leaves, sub_nodes, sub_prep) = self.prepare_inner(doc, sub, visited);
-        visited.pop();
-        // Positions of the subassembly's instances: its named position
-        // (Lock/follow position to), else solved from the positions
-        // stored in this assembly for them.
-        let start: HashMap<InstanceId, Placement> = sub_prep.instances.iter().map(|(id, p)| (*id, inst.nested.iter().find(|(c, _)| c == id).map(|(_, q)| *q).unwrap_or(*p))).collect();
-        let solved = match &inst.lock {
-            super::SubassemblyLock::Named(n) => match sub.named_positions.iter().find(|np| &np.name == n) {
-                Some(np) => sub_prep.solve_named_position(np),
-                None => sub_prep.solve(&SolveOptions { start: Some(start), ..Default::default() }),
-            },
-            _ => sub_prep.solve(&SolveOptions { start: Some(start), ..Default::default() }),
+        // Another instance of the same subassembly (tab, configuration,
+        // lock, stored positions) in this evaluation: the same preparation
+        // and solve.
+        let key = self.evaluating.then(|| {
+            use std::hash::{Hash, Hasher};
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            visit.hash(&mut h);
+            visited.hash(&mut h);
+            if let super::InstanceSource::Assembly { config, .. } = &inst.source {
+                format!("{config:?}").hash(&mut h);
+            }
+            format!("{:?}{:?}", inst.lock, inst.nested).hash(&mut h);
+            h.finish()
+        });
+        let done = match key.and_then(|k| self.subs_done.get(&k).cloned()) {
+            Some(done) => done,
+            None => {
+                visited.push(visit);
+                let (sub_leaves, sub_nodes, sub_prep) = self.prepare_inner(doc, sub, visited);
+                visited.pop();
+                // Positions of the subassembly's instances: its named position
+                // (Lock/follow position to), else solved from the positions
+                // stored in this assembly for them.
+                let start: HashMap<InstanceId, Placement> = sub_prep.instances.iter().map(|(id, p)| (*id, inst.nested.iter().find(|(c, _)| c == id).map(|(_, q)| *q).unwrap_or(*p))).collect();
+                let solved = match &inst.lock {
+                    super::SubassemblyLock::Named(n) => match sub.named_positions.iter().find(|np| &np.name == n) {
+                        Some(np) => sub_prep.solve_named_position(np),
+                        None => sub_prep.solve(&SolveOptions { start: Some(start), ..Default::default() }),
+                    },
+                    _ => sub_prep.solve(&SolveOptions { start: Some(start), ..Default::default() }),
+                };
+                let done = Arc::new((sub_leaves, sub_nodes, sub_prep, solved));
+                if let Some(k) = key {
+                    self.subs_done.insert(k, done.clone());
+                }
+                done
+            }
         };
+        let (sub_leaves, sub_nodes, sub_prep, solved) = (done.0.clone(), done.1.clone(), &done.2, &done.3);
         // Flexible (Onshape's default): its mates join this assembly's
         // solve. Subassemblies with patterns, relations, tangent mates or
         // nested flexible subassemblies stay rigid.
