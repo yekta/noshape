@@ -163,6 +163,21 @@ pub fn delete_option(ps: &mut PartStudio, input: &str, option: &str) {
     }
 }
 
+pub const MOVE_OPTION: &str = "Move configuration";
+
+/// Move a List input's configuration `by` rows (-1 up, 1 down; live 1712's
+/// row menu "Move down").
+pub fn move_option(ps: &mut PartStudio, input: &str, option: &str, by: isize) {
+    if let Some(ConfigInput { kind: ConfigInputKind::List { options, .. }, .. }) = ps.configuration.inputs.iter_mut().find(|i| i.id == input)
+        && let Some(at) = options.iter().position(|o| o.id == option)
+    {
+        let to = at as isize + by;
+        if to >= 0 && (to as usize) < options.len() {
+            options.swap(at, to as usize);
+        }
+    }
+}
+
 pub const UNCONFIGURE_PARAMETER: &str = "Unconfigure parameter";
 
 /// A configured parameter's Unconfigure (the feature dialog's configure

@@ -72,6 +72,9 @@ impl PartStudioView {
         let editing_name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone());
         let section_dialog = self.ui.section_dialog.is_some();
         let several_parts = self.display.bodies.len() > 1;
+        // Live 1714: Hide other / all parts on a solid part's entities only
+        // (not on a surface's face or a curve).
+        let solid_body = body.as_ref().and_then(|b| self.display.body(b)).is_some_and(|d| d.kind == noshape_model::display::BodyKind::Solid);
         let planar = target_ref.as_ref().is_some_and(|r| self.frame_of_ref(r).is_some());
         let linear_edge = target_ref.as_ref().is_some_and(|r| self.linear_edge_direction(r).is_some());
         let plane_name = target_ref.as_ref().map(|r| self.labeler(cx)(r)).unwrap_or_default();
@@ -187,7 +190,7 @@ impl PartStudioView {
                             .separator();
                     }
                     if let Some(b) = body.clone() {
-                        if several_parts {
+                        if several_parts && solid_body {
                             let keep = b.clone();
                             m = m
                                 .item(item(&crate::i18n::template("Hide other __label__", &[("label", "parts")]), Box::new(move |this, _, cx| {
@@ -413,7 +416,7 @@ impl PartStudioView {
                         // / 8.10", a face of one of three parts; "3.12 / 3.13",
                         // an edge): Hide other parts and Hide all parts follow,
                         // as in the parts list.
-                        if matches!(k, PickKind::Face | PickKind::Edge) && several_parts {
+                        if matches!(k, PickKind::Face | PickKind::Edge) && several_parts && solid_body {
                             let keep = b.clone();
                             m = m
                                 .item(item(&crate::i18n::template("Hide other __label__", &[("label", "parts")]), Box::new(move |this, _, cx| {

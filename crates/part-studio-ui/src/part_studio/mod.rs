@@ -3721,6 +3721,10 @@ impl PartStudioView {
         let view = cx.entity();
         let part_name = b.name.clone();
         let several_parts = self.display.bodies.len() > 1;
+        // Live 1714: a composite part's, a surface's or a curve's row has no
+        // Copy <name> and no Hide other / all parts; a curve's no Export….
+        let solid_part = b.kind == noshape_model::display::BodyKind::Solid && b.composite.is_none();
+        let curve = b.kind == noshape_model::display::BodyKind::Wire;
         // Release…: the part's number and whether it has released revisions.
         let part_number = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).and_then(|p| p.part_number.clone()).filter(|p| !p.is_empty());
         let has_revisions = part_number.as_ref().is_some_and(|pn| !crate::part_studio_hooks::release_log(self.doc.read(cx)).revisions(pn).is_empty());
@@ -3866,20 +3870,20 @@ impl PartStudioView {
                         }
                     })))
                     // Copy Part N (live: right after Copy here…).
-                    .item(item(&format!("Copy {part_name}"), Box::new({
+                    .when(solid_part, |m| m.item(item(&format!("Copy {part_name}"), Box::new({
                         let b = b.clone();
                         move |this, _, cx| this.copy_part(b.clone(), cx)
-                    })).icon_name("menu-copy"))
+                    })).icon_name("menu-copy")))
                     .separator()
                     .item(item(&format!("Create Drawing of {part_name}…"), Box::new(move |this, w, cx| {
                         let source = Some(noshape_model::drawing::create::DrawingSource { tab: this.tab, part: Some(b10.clone()), config: Default::default(), sketch: None, flat: false });
                         let name = this.display.body(&b10).map(|d| d.name.clone());
                         crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name }, w, cx);
                     })).icon_name("menu-create-drawing"))
-                    .item(item("Export…", Box::new(move |this, w, cx| {
+                    .when(!curve, |m| m.item(item("Export…", Box::new(move |this, w, cx| {
                         let t = targets(this, &b12);
                         this.open_export_dialog(t, w, cx);
-                    })))
+                    }))))
                     // Live: Release… after Export… (the selected parts).
                     .item(item("Release…", Box::new({
                         let b = b.clone();
@@ -3901,7 +3905,7 @@ impl PartStudioView {
                     })).icon_name(if hidden { "eye" } else { "eye-off" }));
                 // Live (qa5 MENU1, part-studio/1624): with several parts,
                 // Hide other parts and Hide all parts follow.
-                if several_parts {
+                if several_parts && solid_part {
                     let keep = b.clone();
                     m = m
                         .item(item(&crate::i18n::template("Hide other __label__", &[("label", "parts")]), Box::new(move |this, _, cx| {
@@ -4116,6 +4120,8 @@ impl PartStudioView {
         let row = crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), move |_| SharedString::from(tip.clone()));
         let view = cx.entity();
         row.os_context_menu(move |menu, window, cx| {
+            // Live 1714: a folder row already selected offers Clear selection.
+            let was_selected = view.read(cx).ui.selected_folder == Some(id);
             view.update(cx, |this, cx| this.select_folder(id, cx));
             let item = |label: &str, f: ViewAction| {
                 let v = view.clone();
@@ -4141,6 +4147,15 @@ impl PartStudioView {
                     sm.item(crate::os_menu::OsMenuItem::new("Add expression…").on_click(move |_, w, cx| v.update(cx, |this, cx| this.edit_folder_dynamic_suppression(id, w, cx))))
                 })
             };
+            if was_selected {
+                m = m.separator().item(item("Clear selection", Box::new(|this, _, cx| {
+                    this.ui.selected_folder = None;
+                    this.selection.clear();
+                    this.selected_features.clear();
+                    this.refresh_scene(false, cx);
+                    cx.notify();
+                })));
+            }
             // Live ("psui (2026-10-28, P3) FOLDER-MENU-ROLL-TO-HERE"): Roll to here unless the bar is right after
             // the folder or at its top; Roll to end unless it is at the end.
             if !(is_last || at_top) || !at_end {
@@ -4335,6 +4350,8 @@ impl PartStudioView {
         // Hidden features (a sketch consumed by a feature) read gray too (live part-studio/92),
         // unless they fail: a failing hidden sketch is red (qa5 P1-7, behaviours 6432 / 6491).
         let failing = matches!(status, FeatureStatus::Error | FeatureStatus::Warning);
+        // Live 1714: a failed (red) feature's menu has no Zoom to selection.
+        let errored = status == FeatureStatus::Error;
         let color = if rolled_back {
             pal.text_rolled_back
         } else if suppressed || (f.hidden && !failing) {
@@ -4877,6 +4894,15 @@ impl PartStudioView {
                     let t: Vec<Reference> = targets(this).into_iter().map(Reference::Feature).collect();
                     this.set_visibility(&t, !hidden, cx);
                 })).icon_name(if hidden { "eye" } else { "eye-off" }));
+                // Live 1714: a hidden sketch's row offers Show all sketches
+                // while other sketches are hidden too.
+                let others_hidden = is_sketch && hidden && view.read(cx).display.sketches.iter().any(|s| s.hidden && s.feature != id);
+                if others_hidden {
+                    m = m.item(item("Show all sketches", Box::new(|this, _, cx| {
+                        let all: Vec<Reference> = this.display.sketches.iter().filter(|s| s.hidden).map(|s| Reference::Feature(s.feature)).collect();
+                        this.set_visibility(&all, false, cx);
+                    })));
+                }
             }
             if is_sketch {
                 // Live order: Create Drawing of Sketch N…, Export as DXF/DWG… (a sketch view; asb).
@@ -4884,7 +4910,12 @@ impl PartStudioView {
                 m = m.separator().item(item(&format!("Create Drawing of {sk_name}…"), Box::new(move |this, w, cx| crate::drawing_create::request_create_drawing_of_sketch(this.tab, id, &sk_name, w, cx))).icon_name("menu-create-drawing"));
                 m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.export_sketch(id, "dxf", w, cx))));
             }
-            m = m.separator().item(suppress);
+            m = m.separator();
+            if is_sketch {
+                // Live 1714: Section view… through the sketch, before Suppress.
+                m = m.item(item("Section view…", Box::new(move |this, w, cx| this.section_through_all(&[Reference::Sketch(id)], w, cx))).icon_name("menu-section-view"));
+            }
+            m = m.item(suppress);
             if let Some(input) = first_config_input.clone() {
                 // Configure suppression adds the feature to the configuration table.
                 m = m.item(item("Configure suppression", Box::new(move |this, _, cx| {
@@ -4897,12 +4928,12 @@ impl PartStudioView {
             if let Some((tab, name)) = derived_source.clone() {
                 m = m.separator().item(item(&format!("Switch to {name}"), Box::new(move |_, _, cx| cx.emit(PartStudioEvent::ActivateTab(tab)))).icon_name("part-studio"));
             }
-            m = m.separator().item(item("Zoom to selection", Box::new(move |this, _, cx| {
+            m = m.separator().when(!errored, |m| m.item(item("Zoom to selection", Box::new(move |this, _, cx| {
                 if !this.selected_features.contains(&id) {
                     this.selected_features = vec![id];
                 }
                 this.zoom_to_selection(cx);
-            })));
+            }))));
             if has_plane {
                 m = m.item(item("View normal to", Box::new(move |this, _, cx| {
                     let r = if is_sketch {

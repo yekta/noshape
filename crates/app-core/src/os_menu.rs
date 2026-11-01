@@ -308,6 +308,11 @@ impl OsMenu {
         self
     }
 
+    /// `f(self)` when `cond` (items only some targets have).
+    pub fn when(self, cond: bool, f: impl FnOnce(Self) -> Self) -> Self {
+        if cond { f(self) } else { self }
+    }
+
     pub fn item(mut self, item: impl Into<OsMenuItem>) -> Self {
         self.items.push(item.into());
         self

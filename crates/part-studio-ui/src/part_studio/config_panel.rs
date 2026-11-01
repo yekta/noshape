@@ -7,6 +7,7 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
+use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::*;
 use crate::ui::TipExt as _;
 use noshape_model::configuration::{ConfigInput, ConfigInputKind, ConfiguredParam, VariableKind};
@@ -924,7 +925,28 @@ impl PartStudioView {
                 .h(px(44.))
                 .pl(px(8.))
                 .pr(px(3.))
-                .child(crate::ui::glyph("filter", 19., pal.text))
+                .child({
+                    // Live 1712: the funnel ("Filter configuration inputs")
+                    // lists the filter commands; one puts its prefix in the box.
+                    let filter = filter.clone();
+                    div()
+                        .id("cfg-filter-commands")
+                        .cursor_pointer()
+                        .child(crate::ui::glyph("filter", 19., pal.text))
+                        .tooltip(crate::ui::tooltip("Filter configuration inputs"))
+                        .os_dropdown_menu("cfg-filter-menu", false, move |mut menu, _, _| {
+                            for (cmd, text) in CONFIG_FILTER_COMMANDS {
+                                let f = filter.clone();
+                                menu = menu.item(crate::os_menu::OsMenuItem::new(format!("{cmd} – {text}")).on_click(move |_, w, cx| {
+                                    f.update(cx, |s, cx| {
+                                        s.set_value(format!("{cmd} "), w, cx);
+                                        s.focus(w, cx);
+                                    })
+                                }));
+                            }
+                            menu
+                        })
+                })
                 .child(
                     div()
                         .flex_1()
@@ -982,7 +1004,7 @@ impl PartStudioView {
                 _ => 2,
             };
             let only = self.ui.cfg_only_kinds;
-            if (only.iter().any(|o| *o) && !only[kind_ix]) || (!query.is_empty() && !input.name.to_lowercase().contains(&query)) {
+            if (only.iter().any(|o| *o) && !only[kind_ix]) || !self.config_input_passes(&studio, input, &query) {
                 continue;
             }
             let section = self.render_config_input(&studio, input, grid, window, cx);
@@ -1326,14 +1348,30 @@ impl PartStudioView {
                             }
                         }))
                         .when(matches!(input.kind, ConfigInputKind::List { .. }), |d| {
+                            // Live 1712 (the default, first row): Move down; the
+                            // other rows Move up / down and Delete.
+                            let ri = rows.iter().position(|(k, _)| k == rk).unwrap_or(0);
+                            let n = rows.len();
+                            let is_default = matches!(&input.kind, ConfigInputKind::List { default, .. } if default == rk);
                             d.os_context_menu(move |m, _, _| {
-                                let (v, a, b) = (vr.clone(), da.clone(), db.clone());
-                                m.item(crate::os_menu::OsMenuItem::new("Delete").icon_name("menu-delete").on_click(move |_, _, cx| {
-                                    let (a, b) = (a.clone(), b.clone());
-                                    v.update(cx, |this, cx| {
-                                        this.edit_config(noshape_ops::config::DELETE_OPTION, cx, |ps| noshape_ops::config::delete_option(ps, &a, &b));
+                                let mv = |label: &str, by: isize| {
+                                    let (v, a, b) = (vr.clone(), da.clone(), db.clone());
+                                    crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, _, cx| {
+                                        let (a, b) = (a.clone(), b.clone());
+                                        v.update(cx, |this, cx| this.edit_config(noshape_ops::config::MOVE_OPTION, cx, |ps| noshape_ops::config::move_option(ps, &a, &b, by)));
                                     })
-                                }))
+                                };
+                                let (v, a, b) = (vr.clone(), da.clone(), db.clone());
+                                m.when(ri > 0, |m| m.item(mv("Move up", -1)))
+                                    .when(ri + 1 < n, |m| m.item(mv("Move down", 1)))
+                                    .when(!is_default, |m| {
+                                        m.item(crate::os_menu::OsMenuItem::new("Delete").icon_name("menu-delete").on_click(move |_, _, cx| {
+                                            let (a, b) = (a.clone(), b.clone());
+                                            v.update(cx, |this, cx| {
+                                                this.edit_config(noshape_ops::config::DELETE_OPTION, cx, |ps| noshape_ops::config::delete_option(ps, &a, &b));
+                                            })
+                                        }))
+                                    })
                             })
                         });
                     for (q, (ci, c)) in columns.iter().enumerate() {
@@ -2791,7 +2829,35 @@ fn var_row_menu(menu: crate::os_menu::OsMenu, view: Entity<PartStudioView>, fid:
     if k + 1 < count {
         menu = menu.item(edit("Move down", "Move variable", |ps, fid| noshape_model::variable_table::move_row(ps, fid, 1)));
     }
-    menu
+    // Live 1712: Configure (the variable's value joins the configuration
+    // table, as a dialog parameter's Configure does).
+    let v = view.clone();
+    menu.item(crate::os_menu::OsMenuItem::new("Configure").on_click(move |_, _, cx| v.update(cx, |this, cx| this.configure_variable(fid, cx))))
+}
+
+impl PartStudioView {
+    /// A Variable table row's Configure: its value parameter configured by
+    /// the first List / Checkbox input (an info names both, as a dialog
+    /// parameter's Configure).
+    fn configure_variable(&mut self, fid: noshape_model::FeatureId, cx: &mut Context<Self>) {
+        let Some(ps) = self.studio(cx) else { return };
+        let Some(f) = ps.feature(fid).cloned() else { return };
+        // Without an input there is nothing to configure by (what live does
+        // then is asked, REQUESTS psui 11-01 audit A13).
+        let Some((input, input_name)) = ps.configuration.inputs.iter().find(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })).map(|i| (i.id.clone(), i.name.clone())) else {
+            return;
+        };
+        let param = match f.params.enum_("variableType") {
+            "ANGLE" => "angleValue",
+            "NUMBER" => "numberValue",
+            "ANY" => "anyValue",
+            _ => "lengthValue",
+        };
+        self.add_configured(fid, param, &input, cx);
+        self.flash_for(noshape_model::display::FeatureStatus::Info, format!("{} Value added to {input_name}", f.name), std::time::Duration::from_millis(6700), cx);
+        self.right_panel = Some(RightPanel::Configurations);
+        cx.notify();
+    }
 }
 
 /// A configuration variable value outside its range (live psb/s-717:
@@ -2861,6 +2927,48 @@ impl PartStudioView {
                 cx.notify();
             }))
             .into_any_element()
+    }
+}
+
+/// The Configurations panel's filter commands (live 1712, the funnel's menu).
+const CONFIG_FILTER_COMMANDS: [(&str, &str); 6] = [
+    (":name", "Filter inputs by name"),
+    (":featurescriptid", "Filter inputs by Featurescript ID"),
+    (":featurename", "Filter inputs if they affect features/instances with a given name"),
+    (":part", "Filter inputs by the parts they affect"),
+    (":hasvisibilitycondition", "Filter inputs by whether they have a visibility condition or not"),
+    (":excludedfromproperties", "Filter inputs by whether they are excluded from properties or not"),
+];
+
+impl PartStudioView {
+    /// Whether a configuration input passes the Filter inputs box: plain text
+    /// matches its name; a command (`:name`, `:featurescriptid`,
+    /// `:featurename`, `:part`, `:hasvisibilitycondition`,
+    /// `:excludedfromproperties`) its own key, the value optionally quoted
+    /// (the two yes / no commands take true / false, empty = true).
+    fn config_input_passes(&self, studio: &noshape_model::partstudio::PartStudio, input: &ConfigInput, query: &str) -> bool {
+        let cfg = &studio.configuration;
+        let query = query.trim();
+        if query.is_empty() {
+            return true;
+        }
+        let (cmd, value) = match query.strip_prefix(':') {
+            Some(rest) => rest.split_once(char::is_whitespace).map(|(c, v)| (c, v.trim())).unwrap_or((rest, "")),
+            None => ("name", query),
+        };
+        let value = value.trim_matches('"').to_lowercase();
+        let has = |s: &str| value.is_empty() || s.to_lowercase().contains(&value);
+        let yes = !matches!(value.as_str(), "false" | "no" | "0");
+        let features = || cfg.configured.iter().filter(|c| c.input == input.id).map(|c| c.feature);
+        match cmd {
+            "name" => has(&input.name),
+            "featurescriptid" => has(&input.id),
+            "featurename" => features().any(|f| studio.feature(f).is_some_and(|ft| has(&ft.name))),
+            "part" => features().any(|f| self.display.bodies.iter().any(|b| b.id.feature == f && has(&b.name))),
+            "hasvisibilitycondition" => input.visible_when.is_some() == yes,
+            "excludedfromproperties" => input.excluded == yes,
+            _ => false,
+        }
     }
 }
 

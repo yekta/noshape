@@ -197,6 +197,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P1 COMPOSITE-LATER-FEATURE (psui 11-01 09:27, audit-part-studio A10) a composite part breaks when a later feature edits a
+  member: /root/psui-scratch/tickets/composite-fillet-stray-part.noshape (qa5's mkkinds.py: Part 1, Part 2, Composite part
+  1 of both, Surface 1, Curve 1; then a 1 mm Fillet on a Part 1 edge and a failing 100 mm Chamfer). query_parts: Part 1
+  3997.85 mm³, Part 2 4000, **Composite part 1 3997.85 (Solid, listed under Parts)**, **"Part 3" 4000 mm³ =
+  body Fillet 1 .20000**. Without the Fillet / Chamfer the studio lists Parts (2) + Composite parts (1) as live; with the
+  Fillet suppressed the composite still lists under Parts. Live (behaviours 219, 1714): members stay separate parts,
+  the composite stays in its own section, a fillet on a member changes only that member.
 - [ ] P2 THIN-LOFT-TRIM-ENDS (skasm → core, kernel thicken) a thin loft ignores Trim ends (default ☑): live's loft.fs
   core 11-01 04:20: (a) Trim ends, outward, two profiles: the lofted surface offset along its normals, mitred, cut by
   the profile planes, built directly (kernel thicken_loft_out, ~0.3 s; OCCT Booleans of the offset faces took 6 s):

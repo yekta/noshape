@@ -16,11 +16,13 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | Keyboard shortcuts (live's Shift+/ list, 121 entries) | dom/keyboard-shortcuts.txt | every applicable entry in workflow-keyboard-mouse.md, all ✅ (11-01) | 0 |
 | View menu (camera / render ▾) | dom/menu-camera-render.txt | 16 items = live (part-studio 9.8) | 0 |
 | Context menus: face, edge, vertex, empty space, part, plane, origin, mate connector, sketch region / curve, feature rows (sketch, extrude, fillet, multi), parts-list part, tabs, Select ▸ submenus | dom/context-menus-partstudio.txt, -ps-*.txt | compared in core-workflow §8 and chrome-sweep CM1–CM5 (✅) | 0 |
-| Context menus not compared yet: mesh part row, composite part row, Surfaces / Curves rows, folder, rollback bar, Configurations / Variable table rows | behaviours 219, 937; live asked for the rest | in progress | – |
-| Panels: Measure, Mass and section properties, Section view, Appearances, Variable table, Configurations, Render / Display states | live asked for whole-panel dumps (REQUESTS 11-01) | in progress | – |
-| View cube (right-click, arrows, hover) | menus/625-proj-viewcube-rightclick*.png | in progress | – |
+| Context menus: mesh / composite / surface / curve rows and graphics, folders, rollback bar, suppressed / failed / hidden-sketch rows, view cube | live 1714 (dom/psui-audit-rmb-*.txt) | compared in the app 11-01 | A5–A10 |
+| Panels: Measure, Mass and section properties, Section view (1709–1711) | live dumps | = live (measure types, units, reference frame, Add variable; Select default plane HUD, cut-face menu) | 0 |
+| Right-strip panels: Configurations, Variable table, Appearances, Custom tables, Model definitions (1712) | live dumps | compared 11-01 | A11–A14 |
+| Render Studio / Display states (1713) | live | live: no Display states in a Part Studio; Render Studio only as an Upgrade-gated tab type (cloud plan) | 0 |
+| View cube (right-click, arrows, hover) | live 1714 | every face / edge / corner / arrow gives the empty-space menu, no tooltips: = ours | 0 |
 
-**Counts (11-01, audit 3):** surfaces audited 5 of 9 (4 waiting on live dumps); dialog gaps found 199 field rows + 52 visibility states + 4 found outside the oracle; fixed 79 rows, 39 states and 3 of the 4 (A2–A4); accepted 7; open 113 rows + 13 states + A1. 48 of 75 dialogs now equal std (37 at first).
+**Counts (11-01, audit 4):** surfaces audited 9 of 9. Dialogs: 199 field rows + 52 visibility states found; fixed 79 rows and 39 states; accepted 7; open 113 rows + 13 states; 48 of 75 dialogs equal std (37 at first). Found outside the oracle (A rows): 14; fixed 9 (A2–A7, A9, A11, A13), partly 2 (A8, A12), open 3 (A1, A10 core, A14 asked).
 
 ## Found outside the oracle (in the app, std's code, live)
 
@@ -30,6 +32,16 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | A2 | Variable (Measured) | componentSelector | P1 | Along custom recorded the plain distance, and X / Y / Z only while the Axis measurements group was open; std records the chosen component always and Along custom along the picked direction ("Select custom direction." when empty) | ✅ ce91c9c7 |
 | A3 | Query variable dialog | additionalQueries | P1 | an additional query offers only Selection / Created by / Owned by / Protrusion / Pocket / Hole style types with 5 seed fields; std's item has 20 fields (entity type, fillet compare, bounded faces, edge convexity, construction / body-type filters, adjacency) and ids in std's case (addQselectionType, …) | ✅ (audit 3): std\'s 20 item fields with std ids (old documents renamed on load); the evaluator now does Protrusion, Pocket, Hole, Fillets (Equal), Tangent connected, Parallel, Bounded faces, Loop/chain connected and Edge convexity for the main query and each additional one, with each item\'s own entity type. Still to do: Matching, Adjacent, Fillets Less / Greater than (warnings) |
 | A4 | Mutual trim | body1 / body2 | P1 | std trims a set of surfaces against a set ("First set of surfaces", "Second set of surfaces"); ours takes one surface a side; with nothing to trim std reports "no geometry change" as info, ours errors | ✅ (audit 3): sets of surfaces each side, std\'s texts ("Select a surface.", "Same surface cannot be used twice."), no change = info (T1 features_b offset_curve_move_boundary_mutual_trim) |
+| A5 | Parts list rows (live 1714) | composite / surface / curve rows | P2 | ours added Copy <name>, Hide other parts, Hide all parts (and Export… on a curve); live: none on these rows | ✅ (audit 4) |
+| A6 | Graphics menu (live 1714) | surface face | P2 | ours added Hide other parts / Hide all parts after Hide Surface 1 (live: only on solid parts) | ✅ (audit 4) |
+| A7 | Feature list (live 1714) | hidden sketch row | P2 | missing Show all sketches (after Show) and Section view… (before Suppress) | ✅ (audit 4): Show all sketches while other sketches are hidden, Section view… before Suppress |
+| A8 | Feature list (live 1714) | failed feature row | P2 | missing "Edit healthy moment of <feature>…" (after Edit…); ours adds Zoom to selection | ◐ (audit 4): Zoom to selection dropped; Edit healthy moment asked (REQUESTS psui 11-01 follow-ups (c)) |
+| A9 | Feature list (live 1714) | folder row, selected | P3 | live adds Clear selection (own group after Dynamic suppression) when the folder row is selected | ✅ (audit 4) |
+| A10 | Model (core) | composite part with later features | P1 | in kinds.noshape (mkkinds + Fillet on a Part 1 edge + 100 mm Chamfer) the composite lists under Parts, and the Fillet adds a stray "Part 3" (4000 mm³, Fillet 1's body .20000); without the later features the Composite parts section is right | ✗ core (TICKETS) |
+| A11 | Configuration panel (live 1712) | filter button | P2 | live's filter button opens a menu (:name, :featurescriptid, :featurename, :part, :hasvisibilitycondition, :excludedfromproperties); ours opens nothing | ✅ (audit 4): the six commands, each puts its prefix in the box; the box filters by them |
+| A12 | Configuration panel (live 1712) | row right-click | P2 | live (first row): Duplicate row · Move down; ours: Delete only | ◐ (audit 4): Move up / Move down, Delete on the non-default rows; Duplicate row asked (follow-ups (a)) |
+| A13 | Variable table (live 1712) | row right-click | P2 | live: Filter feature list · Delete · Move down · Configure; ours lacks Configure | ✅ (audit 4): Configure adds the value to the first List / Checkbox input (as a dialog parameter); without an input, asked (b) |
+| A14 | Appearances (live 1712) | part row right-click | P2 | live: Rename… · Edit appearance… · Configure appearance; ours has no menu on part rows | ✗ asked (follow-ups (d)) |
 
 ## Feature dialogs against std
 
