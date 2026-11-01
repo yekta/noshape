@@ -11,8 +11,8 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 
 | | |
 |---|---|
-| Surfaces audited | 22 |
-| Gaps found | 29 |
+| Surfaces audited | 23 |
+| Gaps found | 30 |
 | Gaps fixed | 29 |
 
 ## Surfaces
@@ -41,6 +41,7 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 | S20 | Sheet metal toolbar dropdown (13 tools + Flex PCB, order) | dropdowns-partstudio.json | 0 |
 | S21 | Sheet metal dialogs field by field (model, flange, hem, tab, bend relief, corner, bend, jog, loft, finish; data-parameter-id order against feature_schema; script skasm-scratch/audit/dlgcmp.py) | qa5-sm-*.html | 0 (live's DOM also lists collapsed groups' parameters) |
 | S22 | Assembly tool dialogs field labels in order (linear / circular / part pattern, mirror, replicate, group, interference, mass, mate connector, mates with offset / limits) | dialog-asm-*, dialog-mate-*, dialog-interference-*, dialog-mass-* | 0 |
+| S23 | Assembly toolbar (no curve pattern in live), Create Part Studio in context, Display states | toolbar-assembly.txt, dialog-create-part-studio-in-context.txt, behaviours "Display states tool" | G30 |
 
 Live requests answered: 1715 (tool options), 1716 (Flow), 1720 (exploded views / named positions menus, subassembly fix icons).
 
@@ -77,3 +78,4 @@ Live requests answered: 1715 (tool options), 1716 (Flow), 1720 (exploded views /
 | G27 | P2 | Dynamic suppression ▸ on patterns, relations and assembly mate connectors | offered | not modelled (instances, mates and folders only) | fixed (11-01): Assembly::unsuppressed_if keeps their expressions by id; evaluation suppresses them, the menus offer Dynamic suppression ▸ / Unsuppress · Edit dynamic suppression (T1 assembly dynamic_suppression_applies_to_relations) |
 | G28 | P3 | Two mates selected | Reset | Show · Show all mates · Isolate… · Make transparent… · Edit named position driver mate… · Suppress · Dynamic suppression ▸ | Clear selection | Add selection to folder… · Expand ▸ · Collapse ▸ | Delete | the clicked mate's menu | fixed (11-01): Ctrl / Cmd+click adds mates to the selection (highlighted), their menu as live\'s, Delete removes them in one step (UI test two_selected_mates_have_lives_menu); no Dynamic suppression or driver item for several yet |
 | G29 | P3 | Preferences › Customize keyboard shortcuts and Shortcut toolbars (Sketch) | Flow listed (unassigned; after Curvature, unticked; live 1724) | missing | fixed (11-01) |
+| G30 | P3 | Display states dialog | input "New display state name" + [+]; a select "Select a display state" with ⟳ (update), ✎ (rename), ⊗ (delete, no confirmation) | a list of the states with an "Update" text button | open: live dump asked (REQUESTS 13:15) |
