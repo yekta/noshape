@@ -330,8 +330,7 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-N10. (10-31 20:36) Open after today: dark-mode dk-994 (custom table panel: needs a FeatureScript custom table; dk-9a1
-     history row menu done 10-31); residual: the Variable type ▾ 2 px narrower (the Flange dialog's Partial flange
+N10. (10-31 20:36) Dark-mode sheet: every row checked (dk-994 on ctab.noshape, 11-01); residual: the Variable type ▾ 2 px narrower (the Flange dialog's Partial flange
      groups done 11-01 as live request 1685). Every row of core-workflow 8, keyboard-mouse,
      chrome-sweep, configurations, large-models, part-studio, interaction and cursors is checked; no live request
      of mine is open.

@@ -67,7 +67,7 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-989-tab-manager-open / dk-990-tab-manager-detailed / dk-991-tab-manager-sort-open | psui-scratch c989 / c990 / c991 | header icons, search, type filters, Clear, detailed rows with thumbnails (live's default; dk-989 is its persisted list view), sort menu = live | ☑ psui 10-31 |
 | dk-992-panel-variable-table | psui-scratch vt | title, section bar, headers #555, cells #1c1c1c, add row = live (live's document has Variable Studios inserted, ours none) | ☑ psui 10-31 |
 | dk-993-panel-appearances |  | live's studio has a sketch, no parts: "No parts or surfaces in this document" (ours hides the button only with neither parts nor sketches) | ◐ |
-| dk-994-panel-custom-tables | | needs a studio with a FeatureScript custom table | ☐ |
+| dk-994-panel-custom-tables | psui-scratch c994 (ctab.noshape, ops e2e's "Part faces" table) | title, table selector + ⋯, section bar, headers #555, cells #1c1c1c = live; a column's alignment follows its definition (live's sample right-aligns Faces; ours sets none) | ☑ psui 11-01 |
 | dk-995-panel-configuration | dkcfg | the same empty state as dk-928 (checked) | ☑ psui 10-31 |
 | dk-996-left-document-notes | psui-scratch dn / rail-* | panel, header icons, empty state = live; the active rail button now as live in both themes: icon and bar #1651b0 on #eaeaea (light, document/rail-panel-document-notes), #90cef1 on the rail's #2c2c2c (dark); it was a blue-tinted cell with the icon unchanged | ☑ psui 10-31 |
 | dk-997-left-where-used / dk-998-left-performance | psui-scratch cleft | panels, sections, table and icons = live (Where used is ours: live's Free account shows nothing) | ☑ psui 10-31 |
