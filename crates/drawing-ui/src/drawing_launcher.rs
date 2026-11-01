@@ -8,6 +8,7 @@
 
 use crate::drawing_view::*;
 use gpui_kit::*;
+use noshape_model::drawing::{Annotation, AnnotationKind};
 use std::time::{Duration, Instant};
 
 /// Live: present 776 ms after the placing click (absent at 13 ms).
@@ -27,13 +28,23 @@ pub struct Launcher {
 }
 
 impl DrawingEditor {
-    /// The one selected dimension (no palette open).
-    fn launcher_dimension(&self) -> Option<u64> {
-        if self.palette.is_some() {
+    /// The selected dimensions, or hole callouts (no palette open): the
+    /// last one selected (live request 1744: one launcher serves the
+    /// selection) and whether they are callouts.
+    fn launcher_dimension(&self) -> Option<(u64, bool)> {
+        if self.palette.is_some() || self.selection.is_empty() {
             return None;
         }
-        let [Sel::Annotation(id)] = self.selection.as_slice() else { return None };
-        self.current_sheet().annotations.iter().find(|a| a.id == *id && a.kind.is_dimension()).map(|a| a.id)
+        let sheet = self.current_sheet();
+        let anns: Vec<&Annotation> = self.selection.iter().map(|s| if let Sel::Annotation(id) = s { sheet.annotations.iter().find(|a| a.id == *id) } else { None }).collect::<Option<_>>()?;
+        let hole = |a: &&Annotation| matches!(a.kind, AnnotationKind::HoleCallout { .. });
+        if anns.iter().all(|a| a.kind.is_dimension()) {
+            anns.last().map(|a| (a.id, false))
+        } else if anns.len() > 1 && anns.iter().all(hole) {
+            anns.last().map(|a| (a.id, true))
+        } else {
+            None
+        }
     }
 
     /// The launcher's top-left (editor px): its bottom-left 14 px right of
@@ -60,7 +71,7 @@ impl DrawingEditor {
     }
 
     pub fn render_dim_launcher(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let Some(id) = self.launcher_dimension() else {
+        let Some((id, hole)) = self.launcher_dimension() else {
             self.launcher.target = None;
             self.launcher.hover = None;
             return None;
@@ -85,7 +96,11 @@ impl DrawingEditor {
         }
         let at = self.launcher_at(id)?;
         let open = move |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
-            this.open_dim_palette(id, window, cx);
+            if hole {
+                this.open_hole_callout(id, window, cx);
+            } else {
+                this.open_dim_palette(id, window, cx);
+            }
             this.launcher.opened = true;
             if let Some(p) = &mut this.palette {
                 p.set_at([at[0] - 15.0, at[1] + 9.0]);

@@ -74,8 +74,25 @@ pub struct PaletteDlg {
     /// 1707: the hole Ø at first, a click in the preview selects another).
     pub hole_sel: HoleValue,
     diam: (Option<u8>, Tolerance),
+    /// The other selected dimensions / callouts (live request 1744: one
+    /// palette for the selection), as they were; `base` the palette as
+    /// opened; `varies`: the value, precision, tolerance differ among them.
+    pub others: Vec<Annotation>,
+    base: Annotation,
+    varies: Varies,
     _subs: Vec<Subscription>,
 }
+
+/// What reads «Varies» in a multi-selection palette.
+#[derive(Clone, Copy, Default)]
+struct Varies {
+    value: bool,
+    precision: bool,
+    tolerance: bool,
+}
+
+/// Live: a field the selected annotations differ in.
+const VARIES: &str = "\u{ab}Varies\u{bb}";
 
 impl PaletteDlg {
     /// The annotation as edited: on a hole callout with another value
@@ -94,6 +111,27 @@ impl PaletteDlg {
     }
 }
 
+impl PaletteDlg {
+    /// Every annotation the palette edits, as edited: one, or the selection
+    /// with the fields changed in the palette (the rest keep their own).
+    pub fn targets(&self) -> Vec<Annotation> {
+        let cur = self.annotation();
+        if self.others.is_empty() {
+            return vec![cur];
+        }
+        std::iter::once(&self.orig).chain(&self.others).map(|a| a.with_changes(&self.base, &cur)).collect()
+    }
+
+    /// The precision / tolerance lists read «Varies» while untouched.
+    fn varies_precision(&self) -> bool {
+        self.varies.precision && self.cur.format.precision == self.base.format.precision
+    }
+
+    fn varies_tolerance(&self) -> bool {
+        self.varies.tolerance && self.tol == tol_name(&self.base)
+    }
+}
+
 use noshape_ops::drawing::tolerance_name as tol_name;
 
 impl DrawingEditor {
@@ -109,6 +147,19 @@ impl DrawingEditor {
 
     fn open_palette(&mut self, id: u64, hole: bool, window: &mut Window, cx: &mut Context<Self>) {
         let Some(a) = self.current_sheet().annotations.iter().find(|x| x.id == id).cloned() else { return };
+        // The rest of a selection of the same kind (live request 1744).
+        let same = |x: &Annotation| if hole { matches!(x.kind, AnnotationKind::HoleCallout { .. }) } else { x.kind.is_dimension() };
+        let others: Vec<Annotation> = if self.selection.contains(&Sel::Annotation(id)) {
+            self.selection
+                .iter()
+                .filter_map(|s| if let Sel::Annotation(o) = s { Some(*o) } else { None })
+                .filter(|o| *o != id)
+                .filter_map(|o| self.current_sheet().annotations.iter().find(|x| x.id == o).cloned())
+                .filter(same)
+                .collect()
+        } else {
+            Vec::new()
+        };
         let u = noshape_model::drawing::format::length_units(&self.drawing, &a.format);
         let num = |m: f64| noshape_model::drawing::format::format_number(m / u.meters(), None, 4);
         let (ta, tb) = match &a.format.tolerance {
@@ -116,17 +167,30 @@ impl DrawingEditor {
             Tolerance::Deviation { upper, lower } | Tolerance::Limits { upper, lower } => (num(*upper), num(*lower)),
             _ => (String::new(), String::new()),
         };
-        let rotation = a.kind.view().and_then(|v| self.placement(v)).map(|p| p.rotation).unwrap_or(0.0);
-        let value_text = match (&a.kind, &a.format.value) {
-            (AnnotationKind::LinearDimension { override_text: Some(t), .. }, _) => t.clone(),
-            (_, Some(t)) => t.clone(),
-            (k, None) => k.measured(rotation).map(|m| noshape_model::drawing::format::format_len(&self.drawing, &noshape_model::drawing::DimFormat { show_units: false, ..a.format.clone() }, m)).unwrap_or_default(),
+        let value_of = |a: &Annotation| {
+            let rotation = a.kind.view().and_then(|v| self.placement(v)).map(|p| p.rotation).unwrap_or(0.0);
+            match (&a.kind, &a.format.value) {
+                (AnnotationKind::LinearDimension { override_text: Some(t), .. }, _) => t.clone(),
+                (_, Some(t)) => t.clone(),
+                (k, None) => k.measured(rotation).map(|m| noshape_model::drawing::format::format_len(&self.drawing, &noshape_model::drawing::DimFormat { show_units: false, ..a.format.clone() }, m)).unwrap_or_default(),
+            }
         };
-        let above = self.input(&a.format.above, window, cx);
-        let prefix = self.input(&a.format.prefix, window, cx);
+        // Live request 1744: «Varies» in the value, prefix / suffix (and
+        // the text above / below) empty, where the selection differs.
+        let differ = |f: &dyn Fn(&Annotation) -> String| others.iter().any(|o| f(o) != f(&a));
+        let varies = Varies {
+            value: differ(&value_of),
+            precision: others.iter().any(|o| o.format.precision != a.format.precision),
+            tolerance: others.iter().any(|o| o.format.tolerance != a.format.tolerance),
+        };
+        let text = |f: &dyn Fn(&Annotation) -> String| if differ(f) { String::new() } else { f(&a) };
+        let value_text = if varies.value { VARIES.to_string() } else { value_of(&a) };
+        let (ta, tb) = if varies.tolerance { (String::new(), String::new()) } else { (ta, tb) };
+        let above = self.input(&text(&|a| a.format.above.clone()), window, cx);
+        let prefix = self.input(&text(&|a| a.format.prefix.clone()), window, cx);
         let value = self.input(&value_text, window, cx);
-        let suffix = self.input(&a.format.suffix, window, cx);
-        let below = self.input(&a.format.below, window, cx);
+        let suffix = self.input(&text(&|a| a.format.suffix.clone()), window, cx);
+        let below = self.input(&text(&|a| a.format.below.clone()), window, cx);
         let tol_a = self.input(&ta, window, cx);
         let tol_b = self.input(&tb, window, cx);
         // Live: the prefix box has the focus.
@@ -151,7 +215,16 @@ impl DrawingEditor {
         }
         let tol = tol_name(&a);
         let diam = (a.format.precision, a.format.tolerance.clone());
-        self.palette = Some(PaletteDlg { id, hole, above, prefix, value, suffix, below, tol_a, tol_b, target: 1, tol, at: None, orig: a.clone(), cur: a, hole_sel: HoleValue::Diameter, diam, _subs: subs });
+        let multi = !others.is_empty();
+        self.palette = Some(PaletteDlg { id, hole, above, prefix, value, suffix, below, tol_a, tol_b, target: 1, tol, at: None, orig: a.clone(), base: a.clone(), cur: a, hole_sel: HoleValue::Diameter, diam, others, varies, _subs: subs });
+        // Several: what the palette shows as opened is the base the edits are
+        // measured from.
+        if multi {
+            self.palette_from_inputs(cx);
+            if let Some(d) = &mut self.palette {
+                d.base = d.annotation();
+            }
+        }
         self.tool = Tool::Select;
         cx.notify();
     }
@@ -177,6 +250,10 @@ impl DrawingEditor {
         noshape_ops::drawing::set_tolerance(f, d.tol, m(&d.tol_a).unwrap_or(0.0), m(&d.tol_b).unwrap_or(0.0));
         // A typed value overrides the dimension's text (D39).
         let typed = val(&d.value);
+        if typed == VARIES {
+            self.palette_preview(cx);
+            return;
+        }
         let over = (typed.trim() != measured.unwrap_or_default().trim() && !typed.trim().is_empty()).then(|| typed.clone());
         match &mut d.cur.kind {
             AnnotationKind::LinearDimension { override_text, .. } => *override_text = over,
@@ -229,8 +306,10 @@ impl DrawingEditor {
     fn palette_preview(&mut self, cx: &mut Context<Self>) {
         let Some(d) = &self.palette else { return };
         let mut dr = self.drawing.clone();
-        if let Some(a) = dr.sheets[self.sheet].annotations.iter_mut().find(|a| a.id == d.id) {
-            *a = d.annotation();
+        for t in d.targets() {
+            if let Some(a) = dr.sheets[self.sheet].annotations.iter_mut().find(|a| a.id == t.id) {
+                *a = t;
+            }
         }
         self.set_preview(Some(dr), cx);
         cx.notify();
@@ -240,12 +319,14 @@ impl DrawingEditor {
         self.launcher.opened = false;
         let Some(d) = self.palette.take() else { return };
         self.set_preview(None, cx);
-        let cur = d.annotation();
-        if accept && cur != d.orig {
-            let id = d.id;
+        let targets = d.targets();
+        let changed = targets.iter().any(|t| std::iter::once(&d.orig).chain(&d.others).any(|o| o.id == t.id && o != t));
+        if accept && changed {
             self.edit_sheet(if d.hole { "Edit hole callout" } else { "Edit dimension" }, cx, |s| {
-                if let Some(a) = s.annotations.iter_mut().find(|a| a.id == id) {
-                    *a = cur;
+                for t in targets {
+                    if let Some(a) = s.annotations.iter_mut().find(|a| a.id == t.id) {
+                        *a = t;
+                    }
                 }
             });
         }
@@ -388,8 +469,9 @@ impl DrawingEditor {
             .collect();
         let precision = fmt.precision;
         let prec_items: Vec<(String, bool, Act)> = PRECISIONS.iter().map(|&(l, v)| (l.to_string(), precision == v, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.precision = v) as Act)).collect();
-        let prec_label = PRECISIONS.iter().find(|x| x.1 == precision).map(|x| x.0).unwrap_or("(Drawing)");
-        let tol = d.tol;
+        let prec_label = if d.varies_precision() { VARIES } else { PRECISIONS.iter().find(|x| x.1 == precision).map(|x| x.0).unwrap_or("(Drawing)") };
+        // Live 1744: a tolerance the selection differs in: «Varies», no field.
+        let tol = if d.varies_tolerance() { VARIES } else { d.tol };
         // A hole callout's values other than the hole Ø take no fits (live
         // 1707: None … MAX).
         let tol_list: &'static [&'static str] = match (hole, d.hole_sel) {
@@ -762,7 +844,7 @@ impl DrawingEditor {
                 .child(middle)
                 .child(field(&d.below, None, 22.))
                 .child(toggles)
-                .when(show_tol && (hole || tol != "None"), |e| e.child(tol_row))
+                .when(show_tol && (hole || tol != "None") && tol != VARIES, |e| e.child(tol_row))
                 .when(show_tol && fit, |e| e.child(fit_row()))
                 .into_any_element(),
         )

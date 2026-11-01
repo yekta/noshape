@@ -20,11 +20,11 @@ message, P3 tooltip / prompt / look. Status: ✗ open, ✅ fixed (commit), – a
 | Drawing and export dumps outside drawing-* (50: view properties, crop / detail / hatch, section, weld, inspection, templates, Part Studio and drawing export dialogs per format, export rules, DWG toolbar) | asb*, asbv-*, crop-view-*, inspection-*, g39-export-*, preferences-export-rules-*, psb-r-weld-*, dx-17xx-*, … | 1115 texts, 636 found as is; the rest dump-format noise, user content or other audits' (sketch Insert DXF: skasm; parts list: psui) | X2–X4, A2, W1, V2 |
 | Notifications panel | behaviours (EX11 request 1544, import flow) | compared with live's description | N… |
 
-**Counts (11-01 18:15 UTC):** surfaces audited 6 (drawing dialogs and panels with dumps 55, more drawing and export
+**Counts (11-01 19:22 UTC; was 18:15 UTC):** surfaces audited 6 (drawing dialogs and panels with dumps 55, more drawing and export
 dumps 50, import / export dialogs 16, right-click menus 25 entity types in the app, Notifications, configurations /
-Variable Studio / Derived 44 dumps). 5275 live texts and options scanned, 3804 found as is. Gap rows 34: fixed 25 (P1
-3, P2 10, P3 12), same as live after asking 4 (P1 D3, D4, D5; P2 D17), already ours 1 (P3 D15), asked live 4 (P1 X2;
-P2 D19, D20, X3), open 0; leftovers of fixed rows: X1 Split's subassemblies (asked live 17:55). P0:
+Variable Studio / Derived 44 dumps). 5275 live texts and options scanned, 3804 found as is. Gap rows 34: fixed 26 (P1
+3, P2 11, P3 12), same as live after asking 4 (P1 D3, D4, D5; P2 D17), already ours 1 (P3 D15), asked live 3 (P1 X2;
+P2 D20, X3), open 0; leftovers of fixed rows: X1 Split's subassemblies (asked live 17:55). P0:
 none found.
 
 ## Gaps
@@ -63,6 +63,6 @@ none found.
 | A2 | View properties | tooltips | P3 | live: the Reference link "Switch to the tab containing Part 1", View simplification's "Threshold" field "Simplification threshold: Features below this value will be simplified" | ✅ |
 | W1 | Weld symbol dialog | tooltips | P3 | live: "Upper weld type" / "Lower weld type" on the joint pickers, "Upper flag symbol" / "Lower flag symbol" on the flags | ✅ |
 | V2 | View properties (a drawing in a version) | Workspace | P3 | live: "Main (Drawing needed update when version was created)" for a drawing that was out of date when the version was made | ✅ while viewing a version with the drawing out of date (not yet checked in the app) |
-| D19 | Dimension / hole callout panel | several selected | P2 | live: the panel edits several selected dimensions or callouts at once, a value they differ in reads «Varies» (dom drawing-hole-callout-*: Hole / Shaft class fields and the Count, Units, Precision, Tolerance lists' «Varies» items); ours edits the one clicked | ✗ |
+| D19 | Dimension / hole callout panel | several selected | P2 | live: the panel edits several selected dimensions or callouts at once, a value they differ in reads «Varies» (dom drawing-hole-callout-*: Hole / Shaft class fields and the Count, Units, Precision, Tolerance lists' «Varies» items); ours edits the one clicked | ✅ live 1744: one launcher for a selection of dimensions (or of hole callouts); the palette shows «Varies» in the value and in Precision / Tolerance the selection differs in (no tolerance fields then), prefix / suffix / text above / below empty where they differ; a field changed there reaches every selected one, the others keep their own (`Annotation::with_changes`); test `a_multi_selection_edit_changes_only_the_touched_fields`; app check 11-01 (two dimensions, one palette) |
 | D20 | Hole table dialog | several views | P2 | live: Views takes several views of one part (one table of their holes), else the header error "All views in a hole table must be of a common singular part"; ours one view (`TableKind::Hole { view }`) | ✗ |
 

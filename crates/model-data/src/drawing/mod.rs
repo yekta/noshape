@@ -2409,6 +2409,39 @@ impl AnnStyle {
 }
 
 impl Annotation {
+    /// A multi-selection edit (live request 1744: one palette for several
+    /// dimensions or callouts): this annotation with the format and hole
+    /// callout fields changed between `base` and `cur` (the palette as opened
+    /// and as edited) taken from `cur`; the fields not touched keep this
+    /// annotation's own values.
+    pub fn with_changes(&self, base: &Annotation, cur: &Annotation) -> Annotation {
+        use serde_json::{Map, Value};
+        let (Ok(Value::Object(b)), Ok(Value::Object(c)), Ok(Value::Object(mut t))) = (serde_json::to_value(base), serde_json::to_value(cur), serde_json::to_value(self)) else { return self.clone() };
+        let obj = |m: &Map<String, Value>, k: &str| m.get(k).and_then(|v| v.as_object()).cloned().unwrap_or_default();
+        let (bf, cf) = (obj(&b, "format"), obj(&c, "format"));
+        let mut tf = obj(&t, "format");
+        for k in bf.keys().chain(cf.keys()) {
+            if bf.get(k) != cf.get(k) {
+                match cf.get(k) {
+                    Some(v) => {
+                        tf.insert(k.clone(), v.clone());
+                    }
+                    None => {
+                        tf.remove(k);
+                    }
+                }
+            }
+        }
+        t.insert("format".into(), Value::Object(tf));
+        if b.get("hole") != c.get("hole") {
+            match c.get("hole") {
+                Some(v) => t.insert("hole".into(), v.clone()),
+                None => t.remove("hole"),
+            };
+        }
+        serde_json::from_value(Value::Object(t)).unwrap_or_else(|_| self.clone())
+    }
+
     /// The view it moves with (help A20: annotations attached to view
     /// geometry are grouped automatically; a note attaches to one view
     /// only): its Group view, else a note's first leader on a view's
@@ -4527,3 +4560,32 @@ pub fn rotate2(v: [f64; 2], a: f64) -> [f64; 2] {
 }
 pub mod sketch_dims;
 pub mod inspection;
+
+#[cfg(test)]
+mod multi_edit_tests {
+    use super::*;
+
+    /// One palette for two dimensions (live request 1744): Precision set
+    /// there reaches both; each keeps its own tolerance and prefix.
+    #[test]
+    fn a_multi_selection_edit_changes_only_the_touched_fields() {
+        let dim = |id: u64, tol: Tolerance, prefix: &str| Annotation {
+            id,
+            kind: AnnotationKind::LinearDimension { view: ViewId(1), a: [0.0, 0.0], b: [0.05, 0.0], offset: 5.0, orientation: DimOrientation::Horizontal, override_text: None },
+            format: DimFormat { tolerance: tol, prefix: prefix.into(), ..Default::default() },
+            ..Default::default()
+        };
+        let a = dim(1, Tolerance::Symmetric { value: 0.0001 }, "2X ");
+        let b = dim(2, Tolerance::None, "");
+        // The palette as opened shows the first one's tolerance and an empty
+        // prefix (they differ); the edit sets the precision only.
+        let base = Annotation { format: DimFormat { prefix: String::new(), ..a.format.clone() }, ..a.clone() };
+        let cur = Annotation { format: DimFormat { precision: Some(4), ..base.format.clone() }, ..base.clone() };
+        let (a2, b2) = (a.with_changes(&base, &cur), b.with_changes(&base, &cur));
+        assert_eq!((a2.format.precision, b2.format.precision), (Some(4), Some(4)));
+        assert_eq!((a2.format.tolerance.clone(), b2.format.tolerance.clone()), (Tolerance::Symmetric { value: 0.0001 }, Tolerance::None));
+        assert_eq!((a2.format.prefix.as_str(), b2.format.prefix.as_str()), ("2X ", ""));
+        // Nothing touched: nothing changes.
+        assert_eq!(b.with_changes(&base, &base), b);
+    }
+}
