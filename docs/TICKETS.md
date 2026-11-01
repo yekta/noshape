@@ -1475,6 +1475,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
+- [ ] P2 SNAP-INSERT-FACE (skasm 11-01, assembly.md I14; also v0.4.16, not new) Snap mode on, Insert › a pin with an
+  explicit mate connector on its bottom circle, hover the block's plain top face: the pin is placed with its connector on
+  the face's connector, Z aligned, so it hangs inside the opaque block (only its bottom face shows, amber); a click
+  then does not add a Fastened mate: the pin jumps away flipped (rotation 180° about Y, ui/i14b.noshape: Part 2 <3> at
+  (169.85, −30.81, 10)) and the banner asks "Snap: now click the target face or mate connector." (the click was taken as
+  snap mode's own first pick). Live 10-2x (k6–k9) was a hole's centre connector as target, which works. Live asked what
+  a plain face does (REQUESTS 11-01 04:10). Code notes: `pick_mode` returns Inference whenever snap mode is on, also
+  while an inserted instance is being placed, so the placing click can go to `snap_pick` (letting the placing click
+  win alone did not commit the instance: the placing path then didn't finish either, not traced further);
+  `eval::snap_placement` turns the source 180° about X (connector Z axes opposed), and our implicit connector on a
+  bottom circle points +Z, which is what puts the pin inside the block.
 - [x] P3 SM-THICKEN-SKETCH-INFO (skasm 11-01, live G34 c2) Sheet metal model › Thicken of two sketches' regions
   (plate on Top, wall on Front touching it) shows the Info "In-context faces are not connected. To thicken multiple
   in-context faces first copy the part then thicken faces of the copy."; live reports nothing (two parts, 8400 mm³ =
