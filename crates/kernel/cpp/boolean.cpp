@@ -1,4 +1,5 @@
 // Booleans, split, unify, enclose, transforms, sections, projections.
+#include <thread>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -411,6 +412,20 @@ template <class A> void build_with(A& algo, const std::atomic<bool>* flag)
 {
   occ::handle<CancelIndicator> pi = new CancelIndicator(flag);
   algo.Build(pi->Start());
+}
+
+// A cancelled Boolean's builder (its pave filler: most of a big Boolean's memory) freed on a thread of its own, so
+// the worker is free at once (freeing the 45 / 45 knurl's took up to a second after the user's cancel).
+template <class P> void free_elsewhere(P& p)
+{
+  try
+  {
+    std::thread([q = std::move(p)]() mutable { q.reset(); }).detach();
+  }
+  catch (...)
+  {
+    // (No thread: freed by the caller as before.)
+  }
 }
 
 void fail_if_cancelled()
@@ -4587,6 +4602,8 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     const CutByFaces scope(by_faces);
     build_cancellable(*b);
   }
+  if (cancelled(t_cancel))
+    free_elsewhere(b);
   fail_if_cancelled();
   if (!by_tree && by_faces && (b->HasErrors() || !b->IsDone()))
   {
