@@ -180,6 +180,13 @@ pub const SKETCH_CONSTRAINT_TOOLS: &[ConstraintTool] = &[
     ConstraintTool::Flow,
 ];
 
+/// The sketch tools the tool search finds: every toolbar tool but Flow
+/// (live ui-e-search-live-sketch: "Sketch flow" has no hit, though the
+/// toolbar has it).
+pub fn searchable_sketch_tools() -> impl Iterator<Item = Tool> {
+    all_sketch_tools().filter(|t| *t != Tool::Constraint(ConstraintTool::Flow))
+}
+
 /// Every sketch toolbar tool, in toolbar order (tool search).
 pub fn all_sketch_tools() -> impl Iterator<Item = Tool> {
     let groups = SKETCH_DRAW_TOOLS.iter().chain(SKETCH_USE_TOOLS).chain(SKETCH_EDIT_TOOLS).chain(SKETCH_INSERT_TOOLS);

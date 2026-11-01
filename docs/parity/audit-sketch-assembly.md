@@ -12,8 +12,8 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 | | |
 |---|---|
 | Surfaces audited | 18 |
-| Gaps found | 18 |
-| Gaps fixed | 18 |
+| Gaps found | 19 |
+| Gaps fixed | 19 |
 
 ## Surfaces
 
@@ -62,3 +62,4 @@ Live requests answered: 1715 (tool options), 1716 (Flow), 1720 (exploded views /
 | G16 | P2 | Curvature / Flow | a fit spline far from G2 with a 3 point arc solves by moving everything (live 1716 (b): the arc's radius 10 → 26.866) | Curvature and Flow reported the sketch as over-constrained from such a start | fixed (11-01): the G2 / G3 residuals are scaled to lengths (κ·L², dκ/ds·L³, L the curves' size when built); live's case (b) with a drawn spline (handles) now solves, Curvature to an arc solves at 4, 40 and 400 mm (solver_basic::curvature_to_an_arc_solves_at_sketch_size). A spline without end handles (from FeatureScript) still can't take G2 with an arc: its natural ends have no curvature (live gives it end derivatives) |
 | G17 | P2 | Text tool | no option UI before its box is drawn (live 1715: no tool shows an option box) | a floating "Text / Height (click)" box while the tool was active | fixed (11-01) |
 | G18 | P3 | Instances list | parts fixed inside a subassembly show no fix icon in the parent (live 1720) | the nested rows showed it | fixed (11-01) |
+| G19 | P3 | Tool search (sketch) | "Sketch flow" finds nothing though the toolbar has Flow (ui-e-search-live-sketch-retry) | Flow was searchable | fixed (11-01) |

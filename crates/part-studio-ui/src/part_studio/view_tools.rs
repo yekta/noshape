@@ -84,7 +84,7 @@ impl PartStudioView {
     fn palette_items(&self, cx: &App) -> Vec<PaletteItem> {
         use noshape_ops::tool_search::studio_rank;
         if self.sketch.is_some() {
-            let tools: Vec<crate::sketch_mode::Tool> = super::sketch::all_sketch_tools().collect();
+            let tools: Vec<crate::sketch_mode::Tool> = noshape_ops::tool_search::searchable_sketch_tools().collect();
             let names: Vec<&str> = tools.iter().map(|t| sketch_search_name(*t)).collect();
             return studio_rank(&names, &self.palette_query).into_iter().map(|i| PaletteItem::SketchTool(tools[i])).collect();
         }
