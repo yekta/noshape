@@ -2311,6 +2311,12 @@ pub struct AnnStyle {
     /// Chamfer dimensions: "45 degree content" / "Non 45 degree content"
     /// (Styles panel, A64); None: the drawing's.
     pub chamfer_content: Option<ChamferContent>,
+    /// Dimensions: Geometry gap and Extension past line (mm; None: the
+    /// drawing's), and the first / second extension line hidden (Styles
+    /// panel ☐ Show first / second extension line; audit D2).
+    pub geometry_gap: Option<f64>,
+    pub extension: Option<f64>,
+    pub hide_ext: [bool; 2],
 }
 
 impl AnnStyle {
@@ -2336,6 +2342,13 @@ impl AnnStyle {
             if let Some(g) = self.text_gap {
                 s.text_gap = g;
             }
+            if let Some(g) = self.geometry_gap {
+                s.geometry_gap = g;
+            }
+            if let Some(e) = self.extension {
+                s.extension = e;
+            }
+            s.hide_ext = self.hide_ext;
         } else {
             if let Some(h) = self.height {
                 s.ann_text = h;

@@ -406,6 +406,8 @@ pub struct SheetStyle {
     pub text_gap: f64,
     pub geometry_gap: f64,
     pub extension: f64,
+    /// A dimension's first / second extension line hidden (its own style).
+    pub hide_ext: [bool; 2],
     pub text_horizontal: bool,
     /// Per annotation type overrides, and the datum triangle size (mm).
     pub ann_types: Vec<(AnnType, AnnTypeStyle)>,
@@ -511,7 +513,7 @@ impl SheetStyle {
 
 impl Default for SheetStyle {
     fn default() -> Self {
-        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, sketch_dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, dim_justify: super::TextJustify::Center, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false, iso: true, virtual_sharp_extension: false, virtual_sharp_pen: 0.4, virtual_sharp_color: None, revision_callout: RevisionCalloutStyle::default() }
+        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, sketch_dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, hide_ext: [false; 2], text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, dim_justify: super::TextJustify::Center, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false, iso: true, virtual_sharp_extension: false, virtual_sharp_pen: 0.4, virtual_sharp_color: None, revision_callout: RevisionCalloutStyle::default() }
     }
 }
 
@@ -2826,7 +2828,13 @@ impl SheetGeometry {
         let (dir, dp, dq) = (f.dir, f.dp, f.dq);
         let half = self.style.dim_text * 0.4;
         let cuts = std::mem::take(&mut self.cuts);
+        let dist = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
         for e in &f.ext {
+            // Its side: the one whose point it starts from.
+            let side = usize::from(dist(e[0], q) < dist(e[0], p));
+            if self.style.hide_ext[side] {
+                continue;
+            }
             for piece in cut_polyline(e, &cuts, half) {
                 self.lines.push(Polyline2 { points: piece, style: LineStyle::Thin, closed: false, pick });
             }

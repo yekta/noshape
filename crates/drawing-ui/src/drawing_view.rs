@@ -376,7 +376,8 @@ pub struct DrawingEditor {
     /// The Datum dialog (Datum / Datum target tabs).
     pub datum_dlg: Option<crate::drawing_datum::DatumDlg>,
     /// Styles panel › Text gap spinbox: (annotation, field, its subscription).
-    pub styles_gap: Option<(u64, Entity<InputState>, Subscription)>,
+    /// Styles panel spinboxes: Text gap, Geometry gap, Extension past line.
+    pub styles_gap: [Option<(u64, Entity<InputState>, Subscription)>; 3],
     pub table_tool: Option<crate::drawing_table_tool::TableToolDlg>,
     /// Show/hide parts dialog (drawing_hide_parts.rs).
     pub hide_parts: Option<crate::drawing_hide_parts::HidePartsDlg>,
@@ -621,7 +622,7 @@ impl DrawingEditor {
             palette: None,
             launcher: Default::default(),
             datum_dlg: None,
-            styles_gap: None,
+            styles_gap: [None, None, None],
             table_tool: None,
             note_leader: None,
             leader_ref: None,

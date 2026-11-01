@@ -4675,3 +4675,27 @@ fn model_annotations_go_to_the_top_view_first() {
     assert_eq!(views, vec![ViewId(2)], "the Top view, not the Front view inserted first");
 }
 
+
+/// Styles panel (audit D2): a dimension's own Geometry gap and Extension
+/// past line, and ☐ Show first / second extension line.
+#[test]
+fn dimension_style_extension_lines() {
+    let drawing = Drawing::default();
+    let env = sheet::PlainEnv { drawing: &drawing, scale: 1000.0 };
+    let dim = |style: Option<AnnStyle>| {
+        let mut s = Sheet::default();
+        // Horizontal, 10 mm above two points at y = 0.
+        s.annotations.push(Annotation { id: 1, kind: AnnotationKind::LinearDimension { view: ViewId(1), a: [0.01, 0.0], b: [0.05, 0.0], offset: 10.0, orientation: DimOrientation::Horizontal, override_text: None }, style: style.map(Box::new), ..Default::default() });
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        g.add_annotations(&s, &env);
+        // The vertical lines: the extension lines.
+        g.lines.iter().filter(|l| l.points.len() == 2 && (l.points[0][0] - l.points[1][0]).abs() < 1e-9).map(|l| (l.points[0][0], l.points[0][1].min(l.points[1][1]))).collect::<Vec<_>>()
+    };
+    let both = dim(None);
+    assert_eq!(both.len(), 2, "{both:?}");
+    let first_hidden = dim(Some(AnnStyle { hide_ext: [true, false], ..Default::default() }));
+    assert_eq!(first_hidden.len(), 1);
+    assert!((first_hidden[0].0 - 50.0).abs() < 1e-6, "the second (at x 50) stays: {first_hidden:?}");
+    let gapped = dim(Some(AnnStyle { geometry_gap: Some(4.0), ..Default::default() }));
+    assert!(gapped.iter().all(|(_, y0)| (y0 - 4.0).abs() < 1e-6), "starts 4 mm off the geometry: {gapped:?}");
+}

@@ -28,6 +28,47 @@ impl DrawingEditor {
         self.selection.iter().filter_map(|s| if let Sel::Annotation(id) = s { sheet.annotations.iter().find(|a| a.id == *id).cloned() } else { None }).collect()
     }
 
+    /// A Styles panel spinbox for a dimension length `k` (0 Text gap, 1
+    /// Geometry gap, 2 Extension past line): type a value (Enter / leaving
+    /// sets it) or step it; `set` stores it in the selection's own style.
+    fn style_spin(&mut self, k: usize, ann: u64, value_mm: f64, set: fn(&mut AnnStyle, f64), window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let u = noshape_model::drawing::format::length_units(&self.drawing, &noshape_model::drawing::DimFormat::default());
+        let digits = if self.drawing.units_mm { 2 } else { 4 };
+        let text = noshape_model::drawing::format::format_number(value_mm / 1000.0 / u.meters(), Some(digits), 4);
+        if !self.styles_gap[k].as_ref().is_some_and(|(id, _, _)| *id == ann) {
+            let stx = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
+            let meters = u.meters();
+            let sub = cx.subscribe(&stx, move |this: &mut Self, stx, ev: &InputEvent, cx| {
+                if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                    return;
+                }
+                if let Ok(v) = stx.read(cx).value().trim().parse::<f64>() {
+                    let mm = (v * meters * 1000.0).max(0.0);
+                    this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| set(a.style.get_or_insert_with(Default::default), mm)), cx);
+                }
+            });
+            self.styles_gap[k] = Some((ann, stx, sub));
+        }
+        let input = self.styles_gap[k].as_ref().map(|g| g.1.clone());
+        let step = if self.drawing.units_mm { 0.25 } else { 0.254 };
+        let ink = gpui_kit::rgb(0x333333);
+        let stepper = |id: (&'static str, usize), glyph: &'static str, d: f64, cx: &mut Context<Self>| {
+            div().id(id).h(px(11.)).w(px(14.)).flex().items_center().justify_center().cursor_pointer().text_size(px(8.)).text_color(ink).child(glyph).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                let next = (value_mm + d).max(0.0);
+                this.styles_gap[k] = None;
+                this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| set(a.style.get_or_insert_with(Default::default), next)), cx);
+            }))
+        };
+        h_flex()
+            .w(px(200.))
+            .h(px(26.))
+            .border_b_1()
+            .border_color(gpui_kit::rgb(0xdddddd))
+            .children(input.map(|g| div().flex_1().child(Input::new(&g).appearance(false).small())))
+            .child(v_flex().child(stepper(("st-up", k), "▲", step, cx)).child(stepper(("st-down", k), "▼", -step, cx)))
+            .into_any_element()
+    }
+
     /// Apply `f` to every selected annotation (one undo step).
     fn edit_styles(&mut self, f: Edit, cx: &mut Context<Self>) {
         let ids: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(id) = s { Some(*id) } else { None }).collect();
@@ -388,47 +429,28 @@ impl DrawingEditor {
                 })
                 .collect();
             let al = if own.horizontal.unwrap_or(horiz_base) { "Horizontal" } else { "Align with dimension line" }.to_string();
-            // Text gap: a spinbox (type a value, or step it).
-            let gap = own.text_gap.unwrap_or(props.dim_text_gap);
-            let gap_text = num(gap);
-            let fresh = !self.styles_gap.as_ref().is_some_and(|(id, _, _)| *id == first.id);
-            if fresh {
-                let stx = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(gap_text.clone()));
-                let meters = u.meters();
-                let sub = cx.subscribe(&stx, move |this: &mut Self, stx, ev: &InputEvent, cx| {
-                    if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
-                        return;
-                    }
-                    if let Ok(v) = stx.read(cx).value().trim().parse::<f64>() {
-                        let mm = (v * meters * 1000.0).max(0.0);
-                        this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| a.style.get_or_insert_with(Default::default).text_gap = Some(mm)), cx);
-                    }
-                });
-                self.styles_gap = Some((first.id, stx, sub));
-            }
-            let gap_input = self.styles_gap.as_ref().map(|g| g.1.clone());
-            let step = if self.drawing.units_mm { 0.25 } else { 0.254 };
-            let stepper = |id: &'static str, glyph: &'static str, d: f64, cx: &mut Context<Self>| {
-                div().id(id).h(px(11.)).w(px(14.)).flex().items_center().justify_center().cursor_pointer().text_size(px(8.)).text_color(ink).child(glyph).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                    let next = (gap + d).max(0.0);
-                    this.styles_gap = None;
-                    this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| a.style.get_or_insert_with(Default::default).text_gap = Some(next)), cx);
-                }))
+            // Text gap, Geometry gap, Extension past line: spinboxes (type
+            // a value, or step it; live drawing-panel-styles).
+            let gap_row = self.style_spin(0, first.id, own.text_gap.unwrap_or(props.dim_text_gap), |s, v| s.text_gap = Some(v), window, cx);
+            let geo_row = self.style_spin(1, first.id, own.geometry_gap.unwrap_or(props.dim_geometry_gap), |s, v| s.geometry_gap = Some(v), window, cx);
+            let ext_row = self.style_spin(2, first.id, own.extension.unwrap_or(props.dim_extension), |s, v| s.extension = Some(v), window, cx);
+            let linear = sel.iter().all(|a| matches!(a.kind, AnnotationKind::LinearDimension { .. }));
+            let ext_check = |k: usize, label: &'static str, cx: &mut Context<Self>| {
+                div().h(px(24.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(("st-ext", k)).native().label(label).checked(!own.hide_ext[k]).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                    let show = *v;
+                    this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| a.style.get_or_insert_with(Default::default).hide_ext[k] = !show), cx);
+                })))
             };
-            let spin = h_flex()
-                .w(px(200.))
-                .h(px(26.))
-                .border_b_1()
-                .border_color(gpui_kit::rgb(0xdddddd))
-                .children(gap_input.map(|g| div().flex_1().child(Input::new(&g).appearance(false).small())))
-                .child(v_flex().child(stepper("st-gap-up", "▲", step, cx)).child(stepper("st-gap-down", "▼", -step, cx)));
             let broken = !first.unbroken;
             let radial = sel.iter().all(|a| matches!(a.kind, AnnotationKind::RadialDimension { diameter: true, .. }));
             let dim_line = matches!(first.kind, AnnotationKind::RadialDimension { dim_line: true, .. });
             body = body
                 .child(row("Text justification", select("st-just", jl, 220., justs)))
                 .child(row("Text alignment", select("st-align", al, 220., aligns)))
-                .child(row("Text gap", h_flex().gap(px(10.)).child(spin).child(div().text_size(px(13.33)).text_color(ink).child(u.symbol())).into_any_element()))
+                .child(row("Text gap", unit(gap_row)))
+                .child(row("Geometry gap", unit(geo_row)))
+                .child(row("Extension past line", unit(ext_row)))
+                .when(linear, |b| b.child(ext_check(0, "Show first extension line", cx)).child(ext_check(1, "Show second extension line", cx)))
                 .child(div().h(px(33.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("st-break").native().label("Break dimension").checked(broken).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| a.unbroken = !v), cx);
