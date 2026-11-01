@@ -1577,6 +1577,8 @@ TopoDS_Shape slab(const TopoDS_Face& f, double d, const TopoDS_Shape& src, Sourc
           r.Nullify();
       }
     }
+    if (r.IsNull() && std::getenv("NOSHAPE_SHELL_DEBUG"))
+      std::fprintf(stderr, "slabs: simple offset slab for a face of type %d\n", (int)s.GetType());
     for (double sg : {1.0, -1.0})
     {
       if (!r.IsNull())

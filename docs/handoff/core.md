@@ -56,7 +56,13 @@ shell-hang Shells 3-5 42 s (slab fuses; 4 / 5 fail after 11 / 30 s), the NIST im
 on B-spline faces, the parts one at a time on mesh_mutex: psui.md), draft-hang Draft 7 2.3 s (OCCT Defeaturing of the
 fillets, then fails), fins-400 patterns 1.5 s (OCCT fuse of 400 fins: bool.md), Fill 144 ms (OCCT plate), big-plate
 Chamfer 1 310 ms. Done: big-plate's chamfer spent 52 ms + in 79.8 k shape_is_same calls: round_overrun compared
-every two selected edges' vertices; now by the vertices' edges (Chamfer 1's kernel time 310 → 110 ms on vibe4).
+every two selected edges' vertices; now by the vertices' edges. vibe3 (712d2ce1 by hand / c19ed9ca perf.sh): the
+chamfer feature 177 → 147 ms, the depth edit 0.30 → 0.26 s; the whole test 1.64 → 1.61 s.
+Shell: 30 fuzz seeds, 188 slab Shells 1181 s (fuse 540 s, all OCCT: noshape's Boolean declines every one; ranked
+reasons in bool.md, offset faces from our MakeThickSolidBySimple slabs first). Tried and dropped: failing early on an
+invalid slab tool (1 of 8 such Shells succeeds), one OCCT common with the slabs as a tool group (results change, 2×
+slower), fusing the other slabs first (slower). The fundamental fix on our side is our own inner offset for
+non-convex parts (regions takes convex only): not started.
 G31 tuned to live 1731 (19:00): measure.rs LIVE_* floors (Parasolid's magnitudes from the block, its ×10 copy and its
 top face; freeform bounds live are ~20× those: its loft volume is 11 mm³ off, ours exact, so ours stay at the floors);
 face_property_variance for the Face tab. Inch units and REST /massproperties still to compare when live's REST is back.

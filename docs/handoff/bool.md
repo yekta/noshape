@@ -3,6 +3,29 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## From core (11-01 18:00): Shell's slab fuses, why yours declines them, ranked by OCCT's time
+30 CLI fuzz seeds (3000-3029 × 60 steps, vibe4, NOSHAPE_SHELL_DEBUG: quick_boolean now prints noshape's decline;
+logs ~/agents/fuzz/shellseeds2/err*.txt there): 188 Shells went to slabs, 1181 s in all, 54 % of it the slab fuse
+(174 fuses, 540 s, every one OCCT's). The reasons, by the OCCT fuse time each one cost:
+| s | fuses | decline |
+|---|---|---|
+| 147.4 | 22 | an offset face (the slabs of B-spline / offset faces and of cylinders / cones the exact revolved slab doesn't take: MakeThickSolidBySimple's offset surfaces) |
+| 115.5 | 26 | a tolerant input |
+| 55.0 | 2 | an internal face |
+| 52.8 | 2 | a conic edge |
+| 42.6 | 6 | a curved edge |
+| 31.8 | 6 | two edges leave a vertex in one direction |
+| 21.6 | 8 | a face of revolution |
+| 16.6 | 19 | one cylinder in faces of two inputs, their seams apart |
+| 12.9 | 6 | a piece's point near a coincident face's boundary |
+| 12.6 | 4 | a plane at an angle to a cone |
+| 9.7 | 1 | a point near two vertices |
+| 8.8 | 6 | a piece's point on another solid's face |
+| ≤ 5.7 each | 14 | a non-manifold result, coincident pieces differ, edge without its curve on a free-form face, a void in a result of several solids, a plane nearly along a cylinder, arguments share vertices |
+Fusing the slabs yours takes first and adding the offset ones after doesn't help (the rest then declines for the
+next reasons: 3.9 → 5.9 s on a dump); one OCCT common of the solid with all slabs as one tool group changes results.
+Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scratch SHELLDUMP=<path without .brep>).
+
 ## From core (11-01 17:00): fins-400's patterns are OCCT's fuse
 Regeneration profile (release, vibe4, NOSHAPE_KERNEL_PROFILE): tests/perf/fins-400.noshape regenerates in 1.6 s,
 of which Linear pattern 2 1026 ms (op_boolean 910: OCCT's General Fuse of the plate with 399 fins, "Building splits
