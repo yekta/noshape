@@ -4624,3 +4624,32 @@ fn datum_target_instance_off_the_model_is_red_alone() {
     let red_texts: Vec<&str> = g.colors.iter().filter(|c| c.rgb == sheet::OFF_MODEL_RED).flat_map(|c| g.texts[c.texts.clone()].iter().map(|t| t.text.as_str())).collect();
     assert_eq!(red_texts, ["A3"], "only the instance left of the origin is off the model");
 }
+
+/// A subassembly set to "Show Assembly only" is one row of the drawing's
+/// BOM (its name, quantity 1), its parts not listed (live behaviours "Bill
+/// of materials panel in full" (2)); the default lists its parts.
+#[test]
+fn bom_table_collapses_assembly_only_subassemblies() {
+    let (mut doc, _) = demo();
+    let asm = assembly_tab(&doc);
+    let TabContent::Assembly(inner) = &doc.tab(asm).unwrap().content else { unreachable!() };
+    let mut inst = inner.instances[0].clone();
+    inst.source = crate::assembly::InstanceSource::Assembly { assembly: asm, config: Default::default() };
+    inst.name = "Sub <1>".into();
+    let top = crate::assembly::Assembly { instances: vec![inst], ..Default::default() };
+    let top_tab = doc.add_tab("Top", TabContent::Assembly(Box::new(top)));
+    let rows = |doc: &crate::Document| {
+        let mut drawing = Drawing::default();
+        drawing.sheets[0].views.push(base_view(1, top_tab, ViewOrientation::Isometric, [150.0, 160.0]));
+        let sources = regenerate_sources(doc, &drawing);
+        sources[&SourceKey::studio(top_tab)].bom.iter().map(|r| (r.item, r.name.clone(), r.quantity, r.bodies.len())).collect::<Vec<_>>()
+    };
+    let parts = rows(&doc);
+    assert!(parts.len() >= 2 && parts.iter().all(|r| r.1 != doc.tab(asm).unwrap().name), "its parts: {parts:?}");
+    if let Some(TabContent::Assembly(a)) = doc.tab_mut(asm).map(|t| &mut t.content) {
+        a.properties.bom_behavior = crate::assembly::BomBehavior::AssemblyOnly;
+    }
+    let one = rows(&doc);
+    let total: usize = parts.iter().map(|r| r.3).sum();
+    assert_eq!(one, vec![(1, doc.tab(asm).unwrap().name.clone(), 1, total)], "one row with every body under it");
+}

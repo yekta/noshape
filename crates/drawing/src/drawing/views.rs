@@ -413,12 +413,28 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
                 return None;
             }
             let result = assemblies.evaluate(doc, asm, &opts, key.explode);
-            let mut s = assembly_source(doc, &result, hash, tab.name.clone(), hidden.as_deref());
+            let settings = crate::assembly::bom::BomSettings { bom_type: crate::assembly::bom::BomType::Flattened, ..asm.bom.clone() };
+            let mut lines: Vec<crate::assembly::bom::BomLine> = crate::assembly::bom::lines(doc, key.tab, &result, &settings).into_iter().filter(|l| !l.excluded && !l.top_level).collect();
+            // Subassemblies set to "Show Assembly only" are one row each
+            // (live behaviours "Bill of materials panel in full" (2); drawing.md TB14).
+            let collapsed: Vec<Collapsed> = lines
+                .iter()
+                .filter_map(|l| match &l.source {
+                    crate::assembly::bom::BomSource::Assembly(t) => {
+                        let number = match doc.tab(*t).map(|t| &t.content) {
+                            Some(TabContent::Assembly(a)) => a.properties.part_number.clone().unwrap_or_default(),
+                            _ => String::new(),
+                        };
+                        Some(Collapsed { name: l.name.clone(), number, paths: l.instances.clone() })
+                    }
+                    crate::assembly::bom::BomSource::ExternalAssembly { .. } => Some(Collapsed { name: l.name.clone(), number: String::new(), paths: l.instances.clone() }),
+                    _ => None,
+                })
+                .collect();
+            let mut s = assembly_source(doc, &result, hash, tab.name.clone(), hidden.as_deref(), &collapsed);
             s.bom_structured = structured_bom(doc, key.tab, &result);
             // The assembly BOM's own columns, each row matched to its line
             // by name and quantity (live request 1627: Follow assembly).
-            let settings = crate::assembly::bom::BomSettings { bom_type: crate::assembly::bom::BomType::Flattened, ..asm.bom.clone() };
-            let mut lines: Vec<crate::assembly::bom::BomLine> = crate::assembly::bom::lines(doc, key.tab, &result, &settings).into_iter().filter(|l| !l.excluded && !l.top_level).collect();
             s.bom_columns = asm.bom.columns.iter().map(|c| c.label().to_string()).collect();
             s.bom_cells = s
                 .bom
@@ -454,7 +470,15 @@ fn designator_of(doc: &Document, id: crate::assembly::InstanceId) -> Option<Stri
 /// vertex names, so annotation references resolve like in Part Studios.
 /// `hidden`: the display state's hidden instances (None: Show all, every
 /// occurrence whatever the assembly currently hides).
-pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name: String, hidden: Option<&[crate::assembly::InstanceId]>) -> SourceModel {
+/// A subassembly the flattened BOM lists as one row ("Show Assembly
+/// only"): its name, part number and instances.
+pub struct Collapsed {
+    pub name: String,
+    pub number: String,
+    pub paths: Vec<crate::assembly::eval::InstancePath>,
+}
+
+pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name: String, hidden: Option<&[crate::assembly::InstanceId]>, collapsed: &[Collapsed]) -> SourceModel {
     let mut ctx = Context::default();
     let mut parts = Vec::new();
     let mut occ_body: Vec<(usize, BodyId)> = Vec::new();
@@ -489,8 +513,15 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
     // Rows merge like the assembly's BOM: the same part in the same
     // configuration (values compared as numbers) is one row (qa5 D18).
     let canon = |studio, config: &ConfigValues| crate::assembly::bom::canonical_config(doc, studio, config);
+    // Occurrences inside a collapsed subassembly count for its row only.
+    let under = |p: &crate::assembly::eval::InstancePath| collapsed.iter().position(|c| c.paths.iter().any(|q| p.starts_with(q)));
     let mut rows: Vec<crate::assembly::analysis::BomRow> = Vec::new();
     for row in crate::assembly::analysis::bom(result) {
+        let instances: Vec<_> = row.instances.iter().filter(|p| under(p).is_none()).cloned().collect();
+        if instances.is_empty() {
+            continue;
+        }
+        let row = crate::assembly::analysis::BomRow { quantity: instances.len(), instances, ..row };
         let config = canon(row.studio, &row.config);
         if let Some(r) = rows.iter_mut().find(|r| r.studio == row.studio && r.body == row.body && r.config == config && r.mirrored == row.mirrored && r.external == row.external) {
             r.quantity += row.quantity;
@@ -500,15 +531,18 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
         }
     }
     let mut bom = Vec::new();
+    // Each row's first occurrence (collapsed rows go in at theirs).
+    let mut first: Vec<usize> = Vec::new();
     for row in &rows {
-        let bodies: Vec<BodyId> = occ_body
+        let mine: Vec<&(usize, BodyId)> = occ_body
             .iter()
             .filter(|(i, _)| {
                 let o = &result.occurrences[*i];
-                o.studio == row.studio && o.body == row.body && o.mirrored == row.mirrored && o.external == row.external && canon(o.studio, &o.config) == row.config
+                under(&o.path).is_none() && o.studio == row.studio && o.body == row.body && o.mirrored == row.mirrored && o.external == row.external && canon(o.studio, &o.config) == row.config
             })
-            .map(|(_, id)| id.clone())
             .collect();
+        first.push(mine.iter().map(|(i, _)| *i).min().unwrap_or(usize::MAX));
+        let bodies: Vec<BodyId> = mine.into_iter().map(|(_, id)| id.clone()).collect();
         let info = bodies.first().and_then(|b| parts.iter().find(|p: &&PartInfo| p.body.as_ref() == Some(b)));
         bom.push(BomEntry {
             item: row.item,
@@ -528,6 +562,16 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
         } else {
             row.name = r.name.clone();
         }
+    }
+    for (k, c) in collapsed.iter().enumerate() {
+        let mine: Vec<&(usize, BodyId)> = occ_body.iter().filter(|(i, _)| under(&result.occurrences[*i].path) == Some(k)).collect();
+        let at = mine.iter().map(|(i, _)| *i).min().unwrap_or(usize::MAX);
+        let pos = first.iter().position(|f| *f > at).unwrap_or(first.len());
+        first.insert(pos, at);
+        bom.insert(pos, BomEntry { item: 0, name: c.name.clone(), number: c.number.clone(), material: String::new(), quantity: c.paths.len(), bodies: mine.into_iter().map(|(_, id)| id.clone()).collect() });
+    }
+    for (i, e) in bom.iter_mut().enumerate() {
+        e.item = i + 1;
     }
     SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new(), bom_columns: Vec::new(), bom_cells: Vec::new(), model_annotations: Vec::new(), own: None, sketch_colors: Vec::new(), explode_trails: result.explode_trails.clone(), designators }
 }
