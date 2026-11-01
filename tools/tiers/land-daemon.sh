@@ -285,6 +285,18 @@ run_batch() {
   [ $n -gt 0 ] || { exec 6>&-; res_word=landed; return; }
   git rev-parse HEAD > "$d/stack"; echo "$dep" > "$d/dep"; git update-ref "refs/landq/$inst/stack/$bid" HEAD; exec 6>&-
   pkgs=$(echo $pkgs | tr ' ' '\n' | sort -u | tr '\n' ' '); sort -u -o "$d/changed" "$d/changed"
+  # Nothing beyond the batch under it (its changes came in with later ones of their worktrees, 11-01): no check of
+  # the same tree again; it lands or goes back with that one.
+  if [ "$(git rev-parse HEAD)" = "$base" ] && [ -n "$dep" ]; then
+    log "$bid: $kind of $n adds nothing to $dep under it: lands with it, unchecked"; echo "waiting for $dep" > "$d/state"
+    while [ ! -e "$LD/outcome/$dep" ] && [ -d "$LD/run/$dep" ]; do sleep 3; done
+    if [ "$(cat "$LD/outcome/$dep" 2>/dev/null)" = landed ]; then
+      res_word=landed; for k in "${applied[@]}"; do : > "$d/detail"; result "$k" LANDED "$base"; done
+    else
+      rm -f "$d/stack"; front retest "${applied[@]}"; res_word=retest
+    fi
+    return
+  fi
   echo "checking" > "$d/state"; log "$bid: $kind of $n on ${base:0:8}${dep:+ (on $dep)} in slot $slot: $(for k in "${applied[@]}"; do printf '%s ' "$(field name "$k"):${k##*-}"; done)"
   prune_land_target "$CARGO_TARGET_DIR" > /dev/null
   : > "$d/times"; s=$(date +%s)
