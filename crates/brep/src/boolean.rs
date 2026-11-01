@@ -1614,6 +1614,18 @@ impl Ctx<'_> {
 
     fn nurbs_pair(&mut self, fs: usize, ft: usize) -> R<()> {
         let Some(src) = self.src else { return Err(Decline("a curved face")) };
+        let watch = std::env::var("NOSHAPE_X_PAIR").is_ok_and(|v| {
+            let k = |f: usize| format!("{},{}", self.faces[f].arg, self.faces[f].index);
+            v.split(';').any(|w| w == format!("{}/{}", k(fs), k(ft)) || w == format!("{}/{}", k(ft), k(fs)))
+        });
+        if watch {
+            eprintln!("PAIR {fs} {ft}: apart {} same {} moved {:?}", self.faces_apart(fs, ft), self.same_surface(fs, ft), self.moved_pair(fs, ft).map(|m| m.0));
+            if let Ok(x) = src.sections((self.faces[fs].arg, self.faces[fs].index), (self.faces[ft].arg, self.faces[ft].index)) {
+                for c in &x {
+                    eprintln!("PAIR   occt curve t {}..{} from {:?} to {:?} tol {:e} acc {:e}", c.t0, c.t1, c.curve.at(c.t0), c.curve.at(c.t1), c.tol, c.accuracy);
+                }
+            }
+        }
         // (Clearly apart, their control points tell: no section, without asking.)
         if self.faces_apart(fs, ft) {
             return Ok(());
