@@ -551,6 +551,18 @@ impl Pool {
         }
         Ok(self.push(p))
     }
+
+    /// [`Self::add`] for a point with its own tolerance `t` (OCCT's vertex at a section's end takes the section's).
+    fn add_tol(&mut self, p: DVec3, t: f64) -> R<u32> {
+        if t <= 0.5 * self.tol {
+            return self.add(p);
+        }
+        if let Some(i) = self.find_tol(p, t)? {
+            self.grow(i, t);
+            return Ok(i);
+        }
+        Ok(self.push_tol(p, t))
+    }
 }
 
 /// A split edge: a curve between two pool vertices, no pool vertex inside it.
@@ -959,7 +971,7 @@ impl Ctx<'_> {
     fn intervals_on(&self, f: usize, path: &Path, (t0, t1): (f64, f64), ends: [End; 2], closed: bool, on_free: Option<&(usize, Arc<NurbsCurve>)>) -> R<Vec<Ival>> {
         // (OCCT's section of a free-form face: within its own tolerance of where the faces meet.)
         let tol = match path {
-            Path::Nurbs { id, .. } => self.tol.max(self.ncurves[*id as usize].tol),
+            Path::Nurbs { id, .. } => self.tol.max(self.ncurves[*id as usize].acc),
             _ => self.tol,
         };
         let len = path.length(t0, t1);
@@ -1228,6 +1240,11 @@ impl Ctx<'_> {
     /// Where both faces' intervals of a section overlap: its edges, in both faces.
     fn section_from(&mut self, fs: usize, ft: usize, path: Path, ia: Vec<Ival>, ib: Vec<Ival>) -> R<()> {
         let tol = self.tol;
+        // (A point made at its end: OCCT's vertex there, its tolerance the section's.)
+        let ptol = match &path {
+            Path::Nurbs { id, .. } => self.ncurves[*id as usize].tol,
+            _ => 0.0,
+        };
         // Whether the length along it between two parameters is within the tolerance (a B-spline's, the length
         // either way: clearly not where the chord is longer, clearly so where its control polygon there is
         // shorter).
@@ -1258,14 +1275,14 @@ impl Ctx<'_> {
             let v = match end {
                 End::Open => return Ok(None),
                 End::Vertex(v) => v,
-                End::Point(p) => cx.pool.add(p)?,
+                End::Point(p) => cx.pool.add_tol(p, ptol)?,
             };
             // Both faces end there: the same vertex.
             if near(earlier.0, later.0) {
                 for o in [x.1, y.1] {
                     let w = match o {
                         End::Vertex(w) => w,
-                        End::Point(p) => cx.pool.add(p)?,
+                        End::Point(p) => cx.pool.add_tol(p, ptol)?,
                         End::Open => continue,
                     };
                     if w != v {
