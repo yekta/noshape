@@ -285,6 +285,13 @@ the runs are aborted (`Runs::abort_all`, model-core) and the spinner ends. T1 sk
 cancel_shows_the_document_before_the_edit_at_once. Asked live (REQUESTS psui 10-31 21:24) for Onshape's toast /
 list / dialog behaviour on cancel; behaviours 4227 already says Esc doesn't cancel a committed regeneration and there
 is no cancel button.
+11-01 00:08: landed 66cf2194 (instant cancel, user P1). Live (behaviours request 1688): ✕ / Esc close the dialog at once,
+no toast, the old geometry stays drawn and input works, but Onshape's spinner runs until the model has rebuilt the old
+values (~18 s on the knurl) and a committed regeneration can't be cancelled at all (Esc does nothing, no Stop button).
+Ours now: dialog, list, geometry and spinner back in the same update (the user's request beats live's slower spinner).
+Gap: a dialog opened while a regeneration was still pending keeps no snapshot, so its cancel regenerates as before
+(the regenerator lock waits on the cancelled run until core's ~100 ms stop lands). Checked on :102 with kn.noshape
+(Diamond knurl 45 / 45): spinner and dialog gone in the first frame after Esc.
 10-30 05:05: v0.4.15 (58810bd9) carries all of it (silhouette cull on, mesher 5–5d, display off the critical path,
 MESH-EMPTY-LOOP-PANIC); qa's 04:56 list has no blocker in psui's area.
 10-30 01:50: 6ca3c756 edge-silhouette GPU cull on by default (N-Retina in 0c2 below); bca7f3d1 MESH-EMPTY-LOOP-PANIC
