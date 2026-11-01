@@ -3,8 +3,8 @@
 # waited in flock, so whoever looked at the right moment went first: one land waited 70 min while later ones went.
 # Now each waiter appends itself to ~/land/queue and only the first live entry may take slots; it leaves the queue
 # once it holds them, so the next one takes the other slot.
-# take_slots 1 | all: returns holding one slot or every slot (fds in SLOT_FDS; release_slots, or the script's exit,
-# lets them go); SLOT_WAITED = seconds waited.
+# take_slots 1 | all: returns holding one slot or every slot (numbers in SLOT_IDS, fds in SLOT_FDS; release_slots, or
+# the script's exit, lets them go); SLOT_WAITED = seconds waited.
 take_slots() {
   local want=$1 q="$HOME/land/queue" me first i fd n=${LAND_SLOTS:-2} held=()
   SLOT_FDS=()
@@ -25,7 +25,7 @@ take_slots() {
       done
       if [ ${#held[@]} -ge "$want" ]; then
         { flock 4; grep -vxF "$me" "$q" > "$q.tmp"; mv "$q.tmp" "$q"; } 4>"$q.lock"
-        trap - EXIT; return 0
+        SLOT_IDS=("${held[@]}"); trap - EXIT; return 0
       fi
     fi
     sleep 5; SLOT_WAITED=$((SLOT_WAITED + 5))
