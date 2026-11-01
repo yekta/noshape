@@ -47,7 +47,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 
 ## Editing logic (std's dialog reactions)
 
-std's 48 "Editing Logic Function"s (26 run std's, 9 native, 13 open) change a dialog's fields as the user edits (Add into the touched part, the flip, a type
+std's 48 "Editing Logic Function"s (27 run std's, 10 native, 11 open) change a dialog's fields as the user edits (Add into the touched part, the flip, a type
 from the picks). The dialog runs std's own function where `std_feature::has_editing_logic` says so (std runs the feature, or it is in
 `STD_EDITING_LOGIC`; T2 tests in std_oracle), or ours does the same natively (`behaviors::direct_edit_logic`, `boolean_edit_logic`).
 
@@ -92,14 +92,14 @@ from the picks). The dialog runs std's own function where `std_feature::has_edit
 | E37 | editCurveEditLogic | Edit curve | ✗ (control point edits kept in step) |
 | E38 | editFeatureLogicExternalThread | External thread | ✅ std's runs (audit 8): the size nearest the picked cylinder in the chosen standard (8 mm: 5/16\"-18, M8 × 1.25), chamfer and undercut from it; std's lookup results reach the dialog (T2 external_thread_editing_logic_runs_std) |
 | E39 | fitSplineEditLogic | 3D fit spline | ✅ std's runs (audit 8): a preselected edge opens on Edges with it; the preselection goes to std's hidden initEntities wherever std's logic runs (Hole, Sheet metal model, Flex PCB too) |
-| E40 | frameEditLogicFunction | Frame | ✗ ((only prewarms)) |
+| E40 | frameEditLogicFunction | Frame | ✅ std's runs (audit 8): a new corner override takes the default corner type and flip (T2 frame_editing_logic_runs_std) |
 | E41 | gussetEditLogic | Gusset | ✗ (swept faces) |
 | E42 | helixEditingLogic | Helix | ✅ native: the tab follows the preselection (live L34, checked 11-01) |
 | E43 | projectCurvesEditLogic | Projected curve | ✗ (sketch / direction from the picks) |
 | E44 | routingCurveEditLogic | Routing curve | ✗ (manipulator state, target length) |
 | E45 | ruledSurfaceEditingLogic | Ruled surface | ✗ (surface operation, vertex overrides cleaned) |
 | E46 | unfoldEditLogic | Unfold | ✗ (hold entity) |
-| E47 | variableEditLogic | Variable | ✗ (measured entities from the preselection) |
+| E47 | variableEditLogic | Variable | ✅ native: a preselection in Measured mode fills the visible field std's would (Entities to measure between / Entities / Entity); Assigned ignores it as std |
 | E48 | wrapEditLogic | Wrap | ✗ (operation / merge scope / flip, like Thicken) |
 
 ## Feature dialogs against std

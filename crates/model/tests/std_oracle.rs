@@ -1713,6 +1713,31 @@ fn external_thread_editing_logic_runs_std() {
     assert!(standard.contains("\"ISO\", \"M8\""), "{standard}");
 }
 
+/// std's frameEditLogicFunction: a new corner override starts with the
+/// dialog's default corner type and flip.
+#[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
+fn frame_editing_logic_runs_std() {
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    let vertex = vertex_at(&r, DVec3::ZERO);
+    let mut old = ParamValues::default();
+    old.set("defaultCornerType", en("BUTT"));
+    old.set("defaultButtFlip", ParamValue::Bool(true));
+    old.set("cornerOverrides", ParamValue::Array(Vec::new()));
+    s.add("frame", |p| {
+        p.set("defaultCornerType", en("BUTT"));
+        p.set("defaultButtFlip", ParamValue::Bool(true));
+        let mut item = ParamValues::default();
+        item.set("vertex", q(vertex.clone()));
+        p.set("cornerOverrides", ParamValue::Array(vec![item]));
+    });
+    let got = edit_logic(&s, &old, &["defaultCornerType", "defaultButtFlip", "cornerOverrides"]);
+    let item = got.iter().find(|x| x.starts_with("cornerOverrides=")).unwrap_or_else(|| panic!("{got:?}"));
+    assert!(item.contains("\"cornerType\": Enum(\"BUTT\")") && item.contains("\"cornerButtFlip\": Bool(true)"), "{item}");
+}
+
 /// std's holeEditLogic through the host natives: a new hole's Merge scope is
 /// the part it reaches, and one sketched below the part flips into it
 /// (holeScopeFlipHeuristics: an opHole probe and evCollision containment,
