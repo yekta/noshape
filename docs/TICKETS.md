@@ -220,7 +220,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   flag: OCCT patch 0010 (OSD_ThreadPool: each job runs under the launching thread's stop context through weak hooks
   the kernel defines; IntPolyh's triangle refinement checks the break hook). Measured with T2
   custom_features::knurl_cancel_latency_probe (release, vibe2; NOSHAPE_CANCEL_STACKS=1 prints what still runs):
-  before 14-1083 ms, now see the handoff. Libs: /root/core-scratch/occt0010/libTKernel.a.0010, libTKGeomAlgo.a.0010.
+  before 14-1083 ms early and 10-19 s late in the run; now 12-116 ms up to 20 s, 18-950 ms at 24-50 s (vibe2 at load
+  9-20). Patches 0010 (TKernel, TKGeomAlgo) and 0011 (TKBO, TKGeomAlgo); libs in /root/core-scratch/occt0010, occt0011.
 - [ ] P0 BLEND-RUST (core, lead 10-30 20:50) noshape's own fillets and chamfers for simple edges, OCCT as fallback
   (crates/brep blend.rs; kernel cpp/rust_blend.cpp in front of op_fillet / op_chamfer behind NOSHAPE_BLEND_RUST, off
   until correct; corpus NOSHAPE_RECORD_BLENDS + kernel `blend_replay`). 10-30 22:00, step 1: closed tangent chains

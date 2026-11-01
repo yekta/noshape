@@ -31,8 +31,15 @@ deadlock in malloc).
   OCCT's throw (a "noshape: stopped" through a Rust-called C++ function was std::terminate). Libs:
   /root/core-scratch/occt0010/libTKernel.a.0010, libTKGeomAlgo.a.0010 (backups occt-lib-backup/*.pre0010), in
   /root/occt here; vibe2 / vibe3 / CI need them (lead).
-- Latency on vibe2 (release), cancel at 0.7-15 s: before 14-1083 ms; after round 1 14-839; round 2: 13-207 ms with
-  one 886 ms (7 s), most under 120 ms. Left: see below.
+- Round 3: brep frees a cancelled Boolean's context on a thread of its own (its maps took 150+ ms to free) and checks
+  in the sequential loops round `pieces_of`; OCCT patch 0011 (TKBO, TKGeomAlgo): the break hook at each face / face
+  intersection's start, each PrmPrm intersection's, IntPolyh's point rows, the BOPDS iterators' pair loops (after
+  the box selection, every 4096), TreatVerticesEE's pair loop and each vertex / face job (those have no progress
+  range). Libs /root/core-scratch/occt0011/libTKBO.a.0011, libTKGeomAlgo.a.0011 (in /root/occt here).
+- Latency on vibe2 (release, load 9-20 from the watcher), cancel at 0.7-50 s: before 14-1083 ms early and 10-19 s
+  late (the OCCT fuse of the grooves: BOPDS pairs and TreatVerticesEE); round 2: 13-207 ms early; round 3: 12-116 ms
+  up to 20 s, 18-950 ms from 24-50 s. Left: BOPDS_SubIterator::Initialize's stable sort of millions of pairs (one
+  call), and what the stack probe shows next; measure at a quiet time (the watcher's load doubles these).
 
 ## 10-31 evening (core, moved account from 18:45)
 - 76cd8d31 BLEND-RUST: corners between drafted walls (details under "noshape's own blends"); the corpus's remaining
@@ -929,8 +936,8 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
-- (10-31 23:45) OCCT patch 0010 (CANCEL-LATENCY): please sync /root/occt/lib/libTKernel.a and libTKGeomAlgo.a
-  (also /root/core-scratch/occt0010/*.0010) to vibe2 / vibe3. Weak hook defaults: nothing breaks without them, the
+- (10-31 23:45, 11-01 01:10) OCCT patches 0010 + 0011 (CANCEL-LATENCY): please sync /root/occt/lib/libTKernel.a,
+  libTKGeomAlgo.a and libTKBO.a (also /root/core-scratch/occt0010, occt0011) to vibe2 / vibe3 (/opt/occt). Weak hook defaults: nothing breaks without them, the
   cancel is just slower there.
 - 10-31 15:45: OCCT patch 0009 (break hooks): please let the sync carry /root/occt/lib/libTKMath.a, libTKGeomAlgo.a and
   libTKHLR.a to vibe2 / vibe3 (also in /root/core-scratch/occt0009/*.0009). Nothing breaks without them (weak hooks,

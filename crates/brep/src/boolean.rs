@@ -717,6 +717,26 @@ struct Ctx<'a> {
     src: Option<&'a dyn SectionSource>,
 }
 
+// A cancelled Boolean's work is freed on a thread of its own: freeing a big one's maps took 150+ ms of the worker's
+// time after the user's cancel.
+impl Drop for Ctx<'_> {
+    fn drop(&mut self) {
+        if !crate::cancelled() {
+            return;
+        }
+        use std::mem::take;
+        let heavy = (
+            (take(&mut self.pool.p), take(&mut self.pool.inputs), take(&mut self.pool.grid), take(&mut self.pool.t), take(&mut self.pool.loose)),
+            (take(&mut self.faces), take(&mut self.edges), take(&mut self.solids), take(&mut self.side_cache), take(&mut self.in_face_done)),
+            (take(&mut self.face_segs), take(&mut self.seg_section), take(&mut self.coplanar), take(&mut self.sections), take(&mut self.pending)),
+            (take(&mut self.copies), take(&mut self.families), take(&mut self.canonical), take(&mut self.canon_secs), take(&mut self.apart)),
+            (take(&mut self.on_surface), take(&mut self.ncurves)),
+        );
+        // (No thread: freed here, with the closure.)
+        let _ = std::thread::Builder::new().name("brep-free".into()).spawn(move || drop(heavy));
+    }
+}
+
 fn frame(n: DVec3) -> (DVec3, DVec3) {
     let a = if n.x.abs() <= n.y.abs() && n.x.abs() <= n.z.abs() {
         DVec3::X
@@ -3647,6 +3667,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
         }
         edge_inner.push(chain[1..chain.len() - 1].to_vec());
+        crate::check_cancel()?;
         let mut pieces = Vec::with_capacity(chain.len() - 1);
         let parts = if matches!(s.g, Geo::Apex { .. }) { apex_parts(&cx, e)? } else { cx.pieces_of(&s, &chain) };
         for piece in parts {
@@ -3697,6 +3718,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     let extra_chains: Vec<R<Vec<u32>>> = (0..extra_segs.len()).map(|k| if extra_of[k] == usize::MAX { own_chains.next().expect("a curve's split points") } else { section_chains[extra_of[k]].clone() }).collect();
     let mut face_extra: Vec<Vec<usize>> = vec![Vec::new(); cx.faces.len()];
     for (&(f, s), chain) in extra_segs.iter().zip(extra_chains) {
+        crate::check_cancel()?;
         let chain = chain?;
         for piece in cx.pieces_of(&s, &chain) {
             face_extra[f].push(get_sedge(&cx, &mut sedges, piece).0);
@@ -3706,6 +3728,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     let mut section_faces: Vec<(usize, usize)> = Vec::new();
     for (k, chain) in section_chains.into_iter().enumerate() {
         let (s, fs, ft) = cx.sections[k];
+        crate::check_cancel()?;
         let chain = chain?;
         for piece in cx.pieces_of(&s, &chain) {
             let (si, _) = get_sedge(&cx, &mut sedges, piece);
