@@ -11,7 +11,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
-## Afternoon 11-01 (13:10–13:47 UTC; queued lands: land.sh returns QUEUED, `land.sh --status`)
+## Afternoon 11-01 (13:10–14:08 UTC; queued lands: land.sh returns QUEUED, `land.sh --status`)
 - Landed: 9b100b79 A15 part custom properties; cc1a4a9b A23 / S18 property chips; a49cffca CR5 / CR18 / V5 MBD
   dimensions; 4976f492 TB14 BOM tables of other assemblies (this document's, Other documents…) and BOM data (CSV),
   plus the file picker's Import (it was lost inside the prompt's click: Insert image / DXF too).
@@ -28,9 +28,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   navbar bell + panel; drawing exports and imports report there); TB14 Subassembly BOM behavior in drawing BOMs;
   import-matrix and configured-assembly-drawing sheets marked from their later runs. Landed meanwhile: 844ba722 TB12,
   842585f4 D16.
+- Then (queued 13:50–14:08): CR18 model annotations in the help's view priority (228886c0 fails clippy alone,
+  3c7c0c78 fixes it); TB12 on Wayland too, px / pt as mm 1:1 (live 1727), the table's own font size for every
+  cell, "Clipboard is empty.", the placeholder grid; S18 a title field's Copy (as a note) and Delete.
 - drawing.md 🔧 left of mine: CR5 (back / bottom / left suggested views; psui's Part Studio Dimension tool), CR18
-  (duplicate priority order, section views), TB12 (live's px / pt answer; Wayland / Windows HTML), TB14 (BOM app:
-  cloud only), S18 (title-block fields as full notes: Explode note / Add leader / Move to).
+  (section views: not tested live), TB12 (Windows CF_HTML), TB14 (BOM app: cloud only), S18 (title-block fields
+  as full notes: Explode note / Add leader / Move to / Bring to front).
 
 ## Morning 11-01 (landed through 0407a620, 08:07 UTC)
 - 4cd6262c D6 thread lines as dimension picks ("M6x1"); HoleRecord.thread is "M6x1.00" (was the pitch label).
