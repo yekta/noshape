@@ -2509,8 +2509,13 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     std::fprintf(stderr, "slabs: result valid %d volume %.6g (solid %.6g)\n", (int)valid_solid(r), r.IsNull() ? 0.0 : volume_of(r), volume_of(solid));
   if (!valid_solid(r))
     return false;
-  const double vr = volume_of(r);
-  if (!(vr > 0) || (sign < 0 && !(vr < volume_of(solid))))
+  const double vr = volume_of(r), vs = volume_of(solid);
+  if (std::getenv("NOSHAPE_SHELL_DEBUG"))
+    std::fprintf(stderr, "slabs: result volume %.17g solid %.17g\n", vr, vs);
+  // (Inward: not more than the solid. Equal within rounding (walls covering a thin part whole: the part as it was) is
+  // not more: OCCT's and noshape's Booleans round that 1e-16 either way, and a Shell failed or not by it
+  // (RUST-SHELL-2AFC).)
+  if (!(vr > 0) || (sign < 0 && !(vr <= vs * (1 + 1e-9))))
     return false;
   out.result = r;
   out.history = shell_history(solid, r, {hb, hs}, {hu, hb, hs}, sources, removed);

@@ -1079,6 +1079,20 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## RUST-SHELL-2AFC fixed (11-01 16:10 UTC)
+- qa's tickets/cli-suppress-segv.noshape, Shell 6 (two faces, 0.5 mm) shells Part 12 and Part 11. Part 12 is so thin
+  that its slabs cover it whole, so its shelled result is the part as it was; shell.cpp's slab path then required an
+  inward result strictly smaller than the solid. OCCT's Boolean happened to round the result 1e-16 under the solid,
+  noshape's 4e-21 m³ over (5.7255126800665496e-6 against 5.7255126800665454e-6), so Part 12's slabs "failed", the
+  feature errored and Part 11 stayed unshelled. Now equal within 1e-9 relative counts as not more (both Booleans give
+  OCCT's outcome). Recorded and replayed both ways first (bool-corpora shell6 / shell6on on vibe4): every Boolean of
+  the document within the replay's rules, so the fault was the shell's rounding-level test, not a wrong result.
+- Checked with a release CLI of this change on vibe4: Part 11 5553.078513 mm³ / 17 faces, as with NOSHAPE_BOOL_RUST=0.
+  Shell tests (kernel `shell`) pass.
+- Fuzz seeds against the clamp fix (same CLI): 979 (22 steps), 1036 (90), 1112 (30) run clean with no panic; 1144
+  dies at step 51 (a suppress) with "stack smashing detected" with noshape's Boolean on, deterministic, clean with it
+  off: being looked at under gdb (CRASH-1092's family).
+
 ## P0s from core (11-01 15:30 UTC): RUST-BOOL-CLAMP-ABORT, CRASH-1092
 - RUST-BOOL-CLAMP-ABORT (qa's fuzz seeds 979, 1112, 1036: "min > max, min = 8.302416520637978, max =
   6.283185307179586" in a Shell; core now catches our panics and falls back). The cause: a free-form face's parameter
