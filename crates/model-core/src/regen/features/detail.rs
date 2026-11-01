@@ -173,8 +173,21 @@ fn round_overrun(shape: &Shape, edges: &[usize], amount: &dyn Fn(usize, f64) -> 
     let (Ok(ef), faces, all) = (shape.edge_faces(), shape.faces(), shape.edges()) else { return None };
     // Edges that meet (the 4 top edges R12, live F2) fail otherwise: "Failed
     // to fillet selections.", from the kernel.
-    let ends: Vec<Vec<Shape>> = edges.iter().map(|&e| all.get(e).map(|x| x.vertices()).unwrap_or_default()).collect();
-    if ends.iter().enumerate().any(|(i, a)| ends[i + 1..].iter().any(|b| a.iter().any(|v| b.iter().any(|w| v.is_same(w))))) {
+    // (By the vertices' edges: comparing every two edges' vertices was 80 k kernel calls for big-plate's 400 edges.)
+    let Ok(ve) = shape.vertex_edges() else { return None };
+    let mut picks = vec![0usize; all.len()];
+    for &e in edges {
+        if let Some(n) = picks.get_mut(e) {
+            *n += 1;
+        }
+    }
+    let shared = |es: &Vec<u32>| {
+        let mut es = es.clone();
+        es.sort_unstable();
+        es.dedup();
+        es.iter().map(|&e| picks.get(e as usize).copied().unwrap_or(0)).sum::<usize>() >= 2
+    };
+    if ve.iter().any(shared) {
         return None;
     }
     let mut face_edges = vec![Vec::new(); faces.len()];

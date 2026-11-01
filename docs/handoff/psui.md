@@ -9,6 +9,15 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## From core (11-01 17:00): the NIST import's display mesh is BRepMesh, one part at a time
+Regeneration profile of the perf documents (core, NOSHAPE_KERNEL_PROFILE, release, vibe4; logs
+~/agents/logs/prof-*.txt there): opening tests/perf/nist-mtc-crada-assembly.noshape spends ~6.3 s of its 6.5 s in
+`mesh_prepare` for the 36 parts: `mesh.brepmesh` 6.1 s (OCCT's BRepMesh: the imported B-spline faces; the own mesher
+took 22 ms, `mesh.rust`), and `mesh.maps` 78.7 s summed over the 36 part threads, i.e. each part waits on
+`mesh_mutex()` for the others: the parts mesh one at a time. The two levers (yours): the lock (BRepMesh per shape is
+re-entrant once the shape's own maps aren't shared?), and the own mesher for B-spline faces. Every other perf
+document's display mesh is under 0.5 s.
+
 ## From dx (10-30, lead's decision)
 
 - The Shift+/ Keyboard shortcuts sheet moved to app-core (`crates/app-core/src/shortcut_sheet.rs`, `ShortcutSheet`,

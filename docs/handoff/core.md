@@ -49,6 +49,14 @@ audit-feature-results.md); found and fixed Helix › Circle on a sketch circle. 
 to ~1e-4 mm² (total area 1e-5), our integral tight; the fit density and the caps' ruling ruled out; live's volume
 suspected (the knurl gap's size): live asked for the bodies as .x_t (REQUESTS 21:40) to integrate them here.
 Waiting on live: batches 11-13 (results-11..13.jsonl → oracle_p1 AUDIT_LIVE) and those .x_t.
+Speed pass (user 11-01 evening: profile full regenerations, take the biggest OCCT sinks, results identical):
+regen_profile over tests/perf + qa's documents with NOSHAPE_KERNEL_PROFILE (vibe4 release; ~/agents/profdocs,
+~/agents/profrun.sh, logs ~/agents/logs/prof-*.txt, totals by call: ~/agents/profagg.py). Ranked by wall time:
+shell-hang Shells 3-5 42 s (slab fuses; 4 / 5 fail after 11 / 30 s), the NIST import's display mesh 6.3 s (BRepMesh
+on B-spline faces, the parts one at a time on mesh_mutex: psui.md), draft-hang Draft 7 2.3 s (OCCT Defeaturing of the
+fillets, then fails), fins-400 patterns 1.5 s (OCCT fuse of 400 fins: bool.md), Fill 144 ms (OCCT plate), big-plate
+Chamfer 1 310 ms. Done: big-plate's chamfer spent 52 ms + in 79.8 k shape_is_same calls: round_overrun compared
+every two selected edges' vertices; now by the vertices' edges (Chamfer 1's kernel time 310 → 110 ms on vibe4).
 G31 tuned to live 1731 (19:00): measure.rs LIVE_* floors (Parasolid's magnitudes from the block, its ×10 copy and its
 top face; freeform bounds live are ~20× those: its loft volume is 11 mm³ off, ours exact, so ours stay at the floors);
 face_property_variance for the Face tab. Inch units and REST /massproperties still to compare when live's REST is back.
@@ -523,8 +531,10 @@ deadlock in malloc).
 ## OCCT patches (patches/occt)
 - 0017 (11-01) TKFillet ChFi3d::IsTangentFaces: two planes answered in closed form (the samples' test: the surfaces'
   normals within 0.1 rad either way, then the faces' oriented normals not opposed). 61 % of a 24-edge box-with-pocket
-  fillet went there (each call projected every edge of both faces for their UV bounds). Blend corpus, OCCT only,
-  vibe4: 5.0-5.3 s → 3.8-4.1 s over 310 cases, every result as before (counts, volume, history); kernel blend::*,
+  fillet went there (each call projected every edge of both faces for their UV bounds). vibe3 (quiet), the same
+  commit 712d2ce1 and bench `blend_replay::occt_blend_corpus_time` (310 cases, best of 3 each): 3913 / 3923 / 3940
+  ms with the pre-0017 TKFillet (~/agents/occt-pre17, built by hand), 3341 / 3355 / 3371 ms with it (perf.sh): −14.5 %.
+  Every result as before (counts, volume, history); kernel blend::*,
   model fillet / chamfer, oracle_p1 and kernel_robustness as before. Lib: /root/core-scratch/p17/libTKFillet.a, in
   /root/occt since 15:54 (backup occt-lib-backup/libTKFillet.a.pre0017; vibe4's build tree has 0013-0017).
 - 0009 (10-31) the break hook where MEM-RUNAWAY-508's last 9 budget jumps were (qa's seed 685 trace): math_PSO (its

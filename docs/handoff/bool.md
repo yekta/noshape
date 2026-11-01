@@ -3,6 +3,13 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## From core (11-01 17:00): fins-400's patterns are OCCT's fuse
+Regeneration profile (release, vibe4, NOSHAPE_KERNEL_PROFILE): tests/perf/fins-400.noshape regenerates in 1.6 s,
+of which Linear pattern 2 1026 ms (op_boolean 910: OCCT's General Fuse of the plate with 399 fins, "Building splits
+of containers" 257, "Preparing history information" 240 over 36 k calls, "Performing intersection of shapes" 284)
+and Linear pattern 1 482 ms (op_boolean 393). Nothing else in the perf documents spends more in Booleans, apart
+from Shell's slab fuses (core's).
+
 ## From core (10-31 00:20): CutByFaces history, record order
 - op_boolean's CutByFaces build (patch 0001: a cut by 8+ tools in 2+ groups, crossing ones) now records each target
   solid Modified to the result's solids holding its faces or their pieces, as OCCT's usual build and the Rust

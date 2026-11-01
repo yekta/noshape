@@ -2339,6 +2339,8 @@ bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bo
     done = rust_boolean(op, all, srcs, own, out, hist);
     if (done)
       path = "direct_rust";
+    else if (std::getenv("NOSHAPE_SHELL_DEBUG"))
+      std::fprintf(stderr, "quick_boolean: op %d of %d shapes: noshape's declined: %s\n", (int)op, (int)all.size(), rust_last_decline().c_str());
   }
   if (!done)
   {

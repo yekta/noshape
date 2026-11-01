@@ -2403,6 +2403,22 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
   lap("tools");
   if (tools.IsEmpty())
     return false;
+  if (dbg)
+  {
+    // Each tool's validity and signed volume (a tool turned inside out spoils the fuse).
+    int k = 0;
+    for (ShapeList::Iterator it(tools); it.More(); it.Next(), ++k)
+    {
+      const bool   ok = BRepCheck_Analyzer(it.Value()).IsValid();
+      const double v  = volume_of(it.Value());
+      if (!ok || v <= 0)
+      {
+        std::fprintf(stderr, "slabs: tool %d valid %d volume %.6g\n", k, ok, v);
+        if (const char* dir = std::getenv("NOSHAPE_SHELL_DUMP"))
+          BRepTools::Write(it.Value(), (std::string(dir) + "/tool" + std::to_string(k) + "-" + std::to_string(tools.Extent()) + ".brep").c_str());
+      }
+    }
+  }
   TopoDS_Shape union_;
   HHist        hu;
   if (tools.Extent() == 1)
