@@ -825,3 +825,5 @@ mod tests {
 // s1 2
 
 // g1 2
+
+// h1 two LANDQ_SLOW
