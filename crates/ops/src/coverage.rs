@@ -489,6 +489,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Clear missing references", Op("feature_clear_missing")),
     ("partStudio:Clear selection", Op("ui_select")),
     ("partStudio:Collapse all", Op("ui_list")),
+    ("partStudio:Configure", Op("config_configure")),
     ("partStudio:Configure suppression", Op("config_configure")),
     ("partStudio:Confirm spline", Op("sketch_draw")),
     ("partStudio:Convert to checkbox", Op("feature_edit")),
