@@ -533,8 +533,52 @@ pub struct CopiedTab(pub Option<noshape_model::document::Tab>);
 
 impl Global for CopiedTab {}
 
-/// Tab › Properties…: the element's name and description.
+/// Tab › Properties…: the element's name and description; a drawing's is
+/// the metadata Properties dialog (live 2159, 3021: Part number and
+/// Revision fill its title block's DWG NO. and REV; drawing.md S15).
 pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId, window: &mut Window, cx: &mut App) {
+    let drawing = {
+        let d = &doc.read(cx).session.doc;
+        d.tab(tab).and_then(|t| match &t.content {
+            noshape_model::document::TabContent::Drawing(dr) => Some((t.name.clone(), (*dr.meta).clone())),
+            _ => None,
+        })
+    };
+    if let Some((name, m)) = drawing {
+        use noshape_app_core::properties_dialog::{MetaSpec, MetaValues};
+        let mut item = m.item.clone();
+        (item.title1, item.title2, item.title3) = (Some(m.title1.clone()), Some(m.title2.clone()), Some(m.title3.clone()));
+        let spec = MetaSpec {
+            category: "Onshape Drawing",
+            material: None,
+            computed_mass: None,
+            bom_options: None,
+            values: MetaValues { name, description: m.description.clone(), part_number: m.number.clone(), revision: m.revision.clone(), meta: item, mass_override: None, bom: 0 },
+        };
+        noshape_app_core::properties_dialog::open_properties(
+            spec,
+            move |v, _, cx| {
+                doc.update(cx, |d, cx| {
+                    d.edit_document(&format!("Properties : {}", v.name), cx, |document| {
+                        let Some(t) = document.tab_mut(tab) else { return };
+                        t.name = v.name.clone();
+                        if let noshape_model::document::TabContent::Drawing(dr) = &mut t.content {
+                            let mut item = v.meta.clone();
+                            let title = |s: Option<String>| s.unwrap_or_default();
+                            let (t1, t2, t3) = (title(item.title1.take()), title(item.title2.take()), title(item.title3.take()));
+                            let m = &mut dr.meta;
+                            (m.number, m.revision, m.description) = (v.part_number.clone(), v.revision.clone(), v.description.clone());
+                            (m.title1, m.title2, m.title3) = (t1, t2, t3);
+                            m.item = item;
+                        }
+                    })
+                });
+            },
+            window,
+            cx,
+        );
+        return;
+    }
     let (name, desc) = {
         let s = &doc.read(cx).session;
         let name = s.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
