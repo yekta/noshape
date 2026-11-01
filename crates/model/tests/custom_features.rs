@@ -2011,7 +2011,7 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
 /// 45° failed with BOOLEAN_NON_MANIFOLD_RESULT after a long run (live builds it). Each valid, one part, and where live
 /// gave them (behaviours request 1687, evVolume HIGH), its volume and faces (KNURL_ANGLES=tooth,helix: one pair).
 #[test]
-#[ignore = "T2: the B94.6 knurl at 14 angle pairs (minutes)"]
+#[ignore = "T2: the B94.6 knurl at 15 angle pairs (minutes)"]
 fn knurl_feature_b94_tooth_and_helix_angles() {
     // (Pair, volume, faces, the volume's tolerance: at 45° / 45° ours and OCCT's cut agree to 2e-12 m³ and are
     // 3.45 mm³ under live's, the groove tools' (the sweep's; asked of live, request of 11-01 01:04).)
@@ -2021,8 +2021,7 @@ fn knurl_feature_b94_tooth_and_helix_angles() {
             let x: Vec<f64> = v.split(',').map(|a| a.trim().parse().unwrap()).collect();
             vec![(x[0], x[1])]
         }
-        // (Not yet 80° / 45°: OCCT's path past the 16 GB budget there, docs/handoff/bool.md.)
-        Err(_) => [45.0, 15.0, 30.0, 60.0, 80.0].iter().flat_map(|&t| [45.0, 15.0, 30.0].map(|h| (t, h))).filter(|&p| p != (80.0, 45.0)).collect(),
+        Err(_) => [45.0, 15.0, 30.0, 60.0, 80.0].iter().flat_map(|&t| [45.0, 15.0, 30.0].map(|h| (t, h))).collect(),
     };
     let mut bad = Vec::new();
     for (tooth, helix) in pairs {

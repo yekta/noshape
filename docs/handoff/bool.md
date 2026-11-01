@@ -1101,8 +1101,11 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
 - T2 custom_features::knurl_feature_b94_tooth_and_helix_angles, 14 pairs (tooth 15–80°, helix 15–45°: the feature
   takes helix angles up to 45°), volume and faces against live's where given (45/30, 15/15, 80/15 within 9e-6; 45/45
   at 4e-5 for the tools' gap), and noshape's decline printed. On vibe2 all valid, one part. Ours (fast): 45/x, 60/x,
-  80/15, 80/30, 30/45. Still declined to OCCT (83–428 s): 15/15, 15/30, 15/45, 30/15, 30/30. 80/45 (left out of the
-  test for now): OCCT's path past the 16 GB budget after 482 s; next.
+  80/15, 80/30, 30/45, 80/45. Still declined to OCCT (83–428 s): 15/15, 15/30, 15/45, 30/15, 30/30.
+- 80/45: noshape's Boolean declined "a piece on two solids" (the wide grooves' end caps overlapping, three on one
+  plane past the cylinder's end) and OCCT's path stopped at the 16 GB budget after 482 s ("needed more than 16043 MB").
+  A tool's piece on two other tools outside every object is never kept (as any tool's piece on another tool's): taken.
+  Now valid, 1 part, 93782.726 mm³, 17762 faces, 20.5 s on vibe2 (OCCT gives none to compare; live asked).
 - Recording Booleans (NOSHAPE_RECORD_BOOLEANS) adds per-face props for the summary: 45/45 took 128 s recorded, 19.5 s not.
 
 ## The knurl back on OCCT's path, fixed (11-01 01:44 UTC; lead's P0)

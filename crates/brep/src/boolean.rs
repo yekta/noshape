@@ -4114,7 +4114,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
         // (In a cut, a piece on the object and a tool, or an object's piece on two tools sharing a face there (a
         // pattern's end caps on the object's end face): as on one, the object's or the one facing its way.)
-        let several_ok = op == Op::Cut && (arg == 0 || ons.iter().any(|&(t, _)| cx.solids[t].arg == 0));
+        // (Or a tool's piece on two other tools outside every object (wide knurl grooves' end caps on one plane past
+        // the cylinder's end): never kept, as any tool's piece on another tool.)
+        let outside_objects = arg != 0 && states.iter().all(|&(t, st)| cx.solids[t].arg != 0 || st == State::Out);
+        let several_ok = op == Op::Cut && (arg == 0 || ons.iter().any(|&(t, _)| cx.solids[t].arg == 0) || outside_objects);
         if ons.len() > 1 && op != Op::Fuse && !several_ok {
             return Err(Decline("a piece on two solids"));
         }
