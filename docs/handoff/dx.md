@@ -21,10 +21,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   by me; import matrix re-run (STEP I1 now 7582.977753, live 7582.976771). ce6d6f53 EX17 / S13 Other documents in
   the insert-from-file picker. 4941ec1b UNDO3 (a note = two undo steps; `DocModel::push_client_step`, anchored on
   the note's undo entry via `UndoStack::undo_top`). 0407a620 A58 per-value hole callout overrides.
-- drawing.md 🔧 left: CR5 / CR18 / V5 (MBD dims), V1 (released items), V27 (Cut from section), V68 (spinner), D16,
-  A15 (part custom properties), A23 (chips), A34 (Custom region hatch), S13 (flyout placement), S18 (fields as full
-  notes: Explode / Add leader / Move to), TB12 (rich paste), TB14 (other documents / BOM data), EX4 (Reference
-  manager), EX11 (notification bell).
+- Then 54709411 V27 aligned sections Cut from section (re-landed after the lead's vibe4 cleanup), 3351a4d0 A34 Custom
+  region hatch.
+- drawing.md 🔧 left: CR5 / CR18 / V5 (MBD dims), V1 (released items), V68 (spinner), D16 (live couldn't start one),
+  A15 (part custom properties), A23 (chips), A34 (per-instance red, "90°" text), S13 (flyout placement), S18 (fields
+  as full notes: Explode / Add leader / Move to), TB12 (rich paste), TB14 (other documents / BOM data), EX4
+  (Reference manager), EX11 (notification bell).
 
 ## vibe4 builds (lead, 11-01)
 
