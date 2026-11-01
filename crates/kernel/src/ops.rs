@@ -500,6 +500,13 @@ pub fn draft(shape: &Shape, faces: &[Shape], pull_direction: DVec3, neutral: &Pl
     op(ffi::op_draft(shape.raw(), &l, p3(pull_direction), &neutral.ffi(), angle))
 }
 
+/// A thin loft's wall grown `t` outward along the loft sheet's normals (two profiles, ruled faces), the faces'
+/// offsets mitred where they crease, trimmed to the profile planes `p0` / `p1` (Onshape's Thin loft with Trim
+/// ends). Convex lofts only (each face within a half-turn about the profiles' axis); an error otherwise.
+pub fn thicken_loft_out(sheet: &Shape, t: f64, p0: &Plane, p1: &Plane) -> Result<OpResult> {
+    op(ffi::op_thicken_loft_out(sheet.raw(), t, &p0.ffi(), &p1.ffi()))
+}
+
 /// [`draft`] built by booleans (`cpp/shell.cpp`), for when OCCT's draft fails or
 /// gives an invalid solid: faces parallel to the pull direction move inward by
 /// h·tan(angle) (h = height above `neutral`, along the pull), faces whose

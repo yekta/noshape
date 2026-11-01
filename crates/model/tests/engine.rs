@@ -472,6 +472,33 @@ fn thin_loft_of_squares_walls_them_as_live() {
     }
 }
 
+/// Live (behaviours "skasm (2026-10-31, P2 feature-sweep Loft 8)" (a)): a thin loft from a 20 x 20 square to a
+/// Ø16 circle 20 mm up, 1 mm outward with Trim ends: the lofted surface offset along its normals, mitred where its
+/// faces crease, cut by the profiles' planes: 1370.1046656 mm³ (evVolume HIGH), 10 faces, z 0 … 20, x and y to
+/// ±11.028116. The profiles' in-plane offsets lofted gave 1372.21. Ours continues the faces past the creases as their
+/// own profile curves continue (Parasolid's continuation differs a little): 0.021 mm³ under.
+#[test]
+fn thin_loft_square_to_circle_is_the_offset_surface_as_live() {
+    let item = |s: FeatureId| {
+        let mut v = ParamValues::default();
+        v.set("wireProfileEntities", q(vec![Reference::Sketch(s)]));
+        v
+    };
+    let mut t = T::new();
+    let a = t.sketch(Reference::Plane(DatumPlane::Top), rect(-0.01, -0.01, 0.01, 0.01));
+    let p20 = t.top_plane("20 mm");
+    let b2 = t.sketch(Reference::FeaturePlane(p20), circle(DVec2::ZERO, 0.008));
+    t.add("loft", &[("bodyType", en("THIN")), ("wireProfilesArray", ParamValue::Array(vec![item(a), item(b2)])), ("thickness1", e("1 mm"))]);
+    let res = t.ok();
+    let body = res.context.bodies.iter().find(|b| b.kind == BodyKind::Solid).unwrap();
+    let v = total_volume(&res.context) * 1e9;
+    let bb = body.shape.bounding_box(true).unwrap();
+    assert!((v - 1370.1046656).abs() < 0.03, "{v} mm³");
+    assert_eq!(body.shape.faces().len(), 10);
+    assert!(bb.min.z.abs() < 1e-7 && (bb.max.z - 0.02).abs() < 1e-7, "{bb:?}");
+    assert!((bb.max.x - 0.011028116).abs() < 2e-6 && (bb.max.y - 0.011028116).abs() < 2e-6, "{bb:?}");
+}
+
 /// A thin loft between two open L-shaped chains (10 + 10 mm legs, 20 mm
 /// apart, 1 mm) is the wall of each chain offset in its plane, lofted: 380
 /// mm³ on the L's inside (the mitred corner overlaps), 420 outside, 8 faces;

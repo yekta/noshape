@@ -1,0 +1,118 @@
+--- a/src/ModelingAlgorithms/TKBO/BOPDS/BOPDS_Iterator.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPDS/BOPDS_Iterator.cxx
+@@ -29,6 +29,8 @@
+ #include <NCollection_DynamicArray.hxx>
+ #include <algorithm>
+ #include <Standard_Failure.hxx>
++#include <vector>
++#include <algorithm>
+ 
+ // noshape (patch 0011): whether the caller's budget or cancel says stop (noshape's kernel, boolean.cpp; weak
+ // default as 0008): checked after the box selection and every 4096 pairs (a knurl's vertex / face pairs ran
+@@ -47,6 +49,38 @@
+     throw Standard_Failure("noshape: stopped");
+ }
+ 
++// noshape (patch 0011): the pairs sorted as std::stable_sort did (equal pairs are the same pair, so their order
++// doesn't show), in chunks merged level by level with the break check between steps: one stable_sort of a knurl's
++// millions of pairs (a segmented array) ran ~1 s after the user's cancel.
++static void noshapeSortPairs(NCollection_DynamicArray<BOPDS_Pair>& theList)
++{
++  const int n = theList.Length();
++  std::vector<BOPDS_Pair> aV;
++  aV.reserve((size_t)n);
++  for (int i = 0; i < n; ++i)
++  {
++    noshapePairsCheck(i);
++    aV.push_back(theList(i));
++  }
++  const size_t aN = aV.size(), aChunk = 65536;
++  for (size_t s = 0; s < aN; s += aChunk)
++  {
++    noshapePairsCheck(0);
++    std::sort(aV.begin() + s, aV.begin() + std::min(s + aChunk, aN));
++  }
++  for (size_t w = aChunk; w < aN; w *= 2)
++    for (size_t s = 0; s + w < aN; s += 2 * w)
++    {
++      noshapePairsCheck(0);
++      std::inplace_merge(aV.begin() + s, aV.begin() + s + w, aV.begin() + std::min(s + 2 * w, aN));
++    }
++  for (int i = 0; i < n; ++i)
++  {
++    noshapePairsCheck(i);
++    theList(i) = aV[(size_t)i];
++  }
++}
++
+ /////////////////////////////////////////////////////////////////////////
+ //=================================================================================================
+ 
+@@ -218,7 +252,7 @@
+     NCollection_DynamicArray<BOPDS_Pair>& aPairs =
+       (myUseExt && iX < BOPDS_Iterator::NbExtInterfs()) ? myExtLists(iX) : myLists(iX);
+     // sort interfering pairs for constant order of intersection
+-    std::stable_sort(aPairs.begin(), aPairs.end());
++    noshapeSortPairs(aPairs);
+     // initialize iterator to access the pairs
+     myIterator.Init(aPairs);
+     myLength = aPairs.Length();
+--- a/src/ModelingAlgorithms/TKBO/BOPDS/BOPDS_SubIterator.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPDS/BOPDS_SubIterator.cxx
+@@ -24,6 +24,8 @@
+ 
+ #include <algorithm>
+ #include <Standard_Failure.hxx>
++#include <vector>
++#include <algorithm>
+ 
+ // noshape (patch 0011): whether the caller's budget or cancel says stop (noshape's kernel, boolean.cpp; weak
+ // default as 0008): checked after the box selection and every 4096 pairs (a knurl's vertex / face pairs ran
+@@ -42,6 +44,38 @@
+     throw Standard_Failure("noshape: stopped");
+ }
+ 
++// noshape (patch 0011): the pairs sorted as std::stable_sort did (equal pairs are the same pair, so their order
++// doesn't show), in chunks merged level by level with the break check between steps: one stable_sort of a knurl's
++// millions of pairs (a segmented array) ran ~1 s after the user's cancel.
++static void noshapeSortPairs(NCollection_DynamicArray<BOPDS_Pair>& theList)
++{
++  const int n = theList.Length();
++  std::vector<BOPDS_Pair> aV;
++  aV.reserve((size_t)n);
++  for (int i = 0; i < n; ++i)
++  {
++    noshapePairsCheck(i);
++    aV.push_back(theList(i));
++  }
++  const size_t aN = aV.size(), aChunk = 65536;
++  for (size_t s = 0; s < aN; s += aChunk)
++  {
++    noshapePairsCheck(0);
++    std::sort(aV.begin() + s, aV.begin() + std::min(s + aChunk, aN));
++  }
++  for (size_t w = aChunk; w < aN; w *= 2)
++    for (size_t s = 0; s + w < aN; s += 2 * w)
++    {
++      noshapePairsCheck(0);
++      std::inplace_merge(aV.begin() + s, aV.begin() + s + w, aV.begin() + std::min(s + 2 * w, aN));
++    }
++  for (int i = 0; i < n; ++i)
++  {
++    noshapePairsCheck(i);
++    theList(i) = aV[(size_t)i];
++  }
++}
++
+ //=================================================================================================
+ 
+ BOPDS_SubIterator::BOPDS_SubIterator()
+@@ -69,7 +103,7 @@
+ void BOPDS_SubIterator::Initialize()
+ {
+   // sort interfering pairs for constant order of intersection
+-  std::stable_sort(myList.begin(), myList.end());
++  noshapeSortPairs(myList);
+   // initialize iterator to access the pairs
+   myIterator.Init(myList);
+ }

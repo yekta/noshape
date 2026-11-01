@@ -780,6 +780,7 @@ OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& 
                  uint8_t mode, double d1, double d2, bool checked);
 OpOut op_draft_wedges(const OcShape& solid, const OcShapeList& faces, P3 pull, const PlaneF& neutral,
                       double angle);
+OpOut op_thicken_loft_out(const OcShape& sheet, double t, const PlaneF& p0, const PlaneF& p1);
 std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcShape& profile_b, const OcShapeList& guides,
                                             bool make_solid);
 std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShape& profile_b, const OcShapeList& guides,

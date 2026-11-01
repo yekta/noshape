@@ -25,6 +25,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <BRepBuilderAPI_MakeEdge.hxx>
+#include <GeomAdaptor_Surface.hxx>
+#include <Extrema_GenLocateExtPS.hxx>
+#include <ShapeFix_Face.hxx>
+#include <NCollection_Array2.hxx>
+#include <ShapeAnalysis_FreeBounds.hxx>
+#include <GeomAPI_PointsToBSplineSurface.hxx>
+#include <Geom_BSplineSurface.hxx>
 #include <GeomLProp_SLProps.hxx>
 #include <GeomAPI_Interpolate.hxx>
 #include <BRepFill.hxx>
@@ -3143,5 +3150,453 @@ OpOut op_draft_parting_curve(const OcShape& solid_in, const OcShapeList& faces_i
 }
 
 
+
+namespace {
+// A ruled loft face (two profiles: cubic x linear): s in [0, 1] along its profiles (the way the faces go round),
+// w along its rulings (0 on the first profile, 1 on the second, any real: the face continued straight).
+struct RuledFace
+{
+  TopoDS_Face                      face;
+  occ::handle<Geom_BSplineSurface> s;
+  bool                             ruling_in_v = true;
+  double                           p0 = 0, p1 = 1; // profile-direction parameters
+  double                           r0 = 0, r1 = 1; // ruling-direction parameters (r0 on the first profile)
+  bool                             flip_s = false;
+  double                           out = 1; // makes the normal outward
+};
+
+void ruled_d1(const RuledFace& f, double s, double w, gp_Pnt& P, gp_Vec& Ds, gp_Vec& Dw)
+{
+  const double ss  = f.flip_s ? 1 - s : s;
+  const double prm = f.p0 + (f.p1 - f.p0) * ss;
+  gp_Pnt       A, B;
+  gp_Vec       Ap, Ar, Bp, Br;
+  if (f.ruling_in_v)
+  {
+    f.s->D1(prm, f.r0, A, Ap, Ar);
+    f.s->D1(prm, f.r1, B, Bp, Br);
+  }
+  else
+  {
+    f.s->D1(f.r0, prm, A, Ar, Ap);
+    f.s->D1(f.r1, prm, B, Br, Bp);
+  }
+  P  = gp_Pnt(A.XYZ() + (B.XYZ() - A.XYZ()) * w);
+  Ds = (Ap * (1 - w) + Bp * w) * ((f.p1 - f.p0) * (f.flip_s ? -1.0 : 1.0));
+  Dw = gp_Vec(A, B);
+}
+
+gp_Pnt ruled_point(const RuledFace& f, double s, double w)
+{
+  gp_Pnt P;
+  gp_Vec Ds, Dw;
+  ruled_d1(f, s, w, P, Ds, Dw);
+  return P;
+}
+
+bool ruled_normal(const RuledFace& f, double s, double w, gp_Vec& n)
+{
+  gp_Pnt P;
+  gp_Vec Ds, Dw;
+  ruled_d1(f, s, w, P, Ds, Dw);
+  n = Ds.Crossed(Dw);
+  if (n.Magnitude() < 1e-12)
+    return false;
+  n.Normalize();
+  n *= f.out;
+  return true;
+}
+} // namespace
+
+// A thin loft's wall grown `t` outward along the loft sheet's normals, the faces' offsets mitred where they crease
+// and trimmed to the two profile planes (Onshape's Thin loft with Trim ends, live "skasm (2026-10-31, P2
+// feature-sweep Loft 8)" (a): 10 faces, the outer faces meeting along their intersections; the profiles' in-plane
+// offsets lofted were 0.15 % over). Built directly (OCCT's Booleans of the offset faces took 6 s): each ruled loft
+// face's offset, continued past its rulings in its tangent plane to the mitre with its neighbour's (exact for
+// planes), as a B-spline through rows of its points past both planes (neighbours share their mitre columns), cut by
+// the planes; the planar rings and the loft's faces close it. Two-profile ruled lofts whose faces turn outward
+// about the profiles' axis only; an error otherwise.
+OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, const PlaneF& p0, const PlaneF& p1)
+{
+  require_non_null(sheet_in.shape, "sheet");
+  if (!(t_in > 0))
+    fail_invalid("thicken loft: the wall must grow outward");
+  const bool dbg    = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
+  auto       t_last = std::chrono::steady_clock::now();
+  auto       lap    = [&](const char* what) {
+    const auto now = std::chrono::steady_clock::now();
+    if (dbg)
+      std::fprintf(stderr, "thicken loft: %s %.1f ms\n", what, std::chrono::duration<double, std::milli>(now - t_last).count());
+    t_last = now;
+  };
+  // At the working scale (mm), as the other shell constructions.
+  const double k = working_scale();
+  ScaledInputs sc(k);
+  const TopoDS_Shape sheet = sc.scale(sheet_in.shape);
+  const double       t     = t_in * k;
+  gp_Pln             pl0 = to_pln(p0), pl1 = to_pln(p1);
+  pl0.SetLocation(gp_Pnt(pl0.Location().XYZ() * k));
+  pl1.SetLocation(gp_Pnt(pl1.Location().XYZ() * k));
+  const double tol = 1e-6;
+  // The sheet's free edges (its profiles) and their middles: the axis between them.
+  ShapeList free_edges;
+  {
+    ShapeAncMap ef;
+    TopExp::MapShapesAndAncestors(sheet, TopAbs_EDGE, TopAbs_FACE, ef);
+    for (int i = 1; i <= ef.Extent(); ++i)
+      if (ef(i).Extent() == 1)
+        free_edges.Append(ef.FindKey(i));
+  }
+  auto middle = [&](const gp_Pln& pl) {
+    gp_XYZ sum(0, 0, 0);
+    int    n = 0;
+    for (const TopoDS_Shape& e : free_edges)
+    {
+      BRepAdaptor_Curve c(TopoDS::Edge(e));
+      for (int i = 0; i < 16; ++i)
+      {
+        const gp_Pnt p = c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * (i + 0.5) / 16);
+        if (pl.Distance(p) < 1e-5)
+        {
+          sum += p.XYZ();
+          ++n;
+        }
+      }
+    }
+    return n > 0 ? gp_Pnt(sum / n) : pl.Location();
+  };
+  const gp_Pnt c0 = middle(pl0), c1 = middle(pl1);
+  if (c0.Distance(c1) < 1e-6)
+    fail_invalid("thicken loft: the profiles' planes coincide");
+  const gp_Lin axis(c0, gp_Dir(gp_Vec(c0, c1)));
+  // The faces, ruled, with their first profile on pl0.
+  std::vector<RuledFace> fs;
+  for (TopExp_Explorer x(sheet, TopAbs_FACE); x.More(); x.Next())
+  {
+    RuledFace f;
+    f.face = TopoDS::Face(x.Current());
+    f.s    = occ::down_cast<Geom_BSplineSurface>(BRep_Tool::Surface(f.face));
+    if (f.s.IsNull() || !BRep_Tool::Surface(f.face)->IsKind(STANDARD_TYPE(Geom_BSplineSurface)))
+      fail_op("thicken loft: a face not a ruled B-spline");
+    double u0, u1, v0, v1;
+    f.s->Bounds(u0, u1, v0, v1);
+    if (f.s->VDegree() == 1 && f.s->NbVPoles() == 2)
+    {
+      f.ruling_in_v = true;
+      f.p0 = u0, f.p1 = u1, f.r0 = v0, f.r1 = v1;
+    }
+    else if (f.s->UDegree() == 1 && f.s->NbUPoles() == 2)
+    {
+      f.ruling_in_v = false;
+      f.p0 = v0, f.p1 = v1, f.r0 = u0, f.r1 = u1;
+    }
+    else
+      fail_op("thicken loft: a face not ruled");
+    // The first profile on pl0.
+    const gp_Pnt a = ruled_point(f, 0.5, 0), b = ruled_point(f, 0.5, 1);
+    if (pl0.Distance(a) > pl0.Distance(b))
+      std::swap(f.r0, f.r1);
+    if (pl0.Distance(ruled_point(f, 0.5, 0)) > tol || pl1.Distance(ruled_point(f, 0.5, 1)) > tol)
+      fail_op("thicken loft: a face not between the profile planes");
+    // Outward: away from the axis.
+    gp_Vec n;
+    if (!ruled_normal(f, 0.5, 0.5, n))
+      fail_op("thicken loft: a degenerate face");
+    const gp_Pnt m = ruled_point(f, 0.5, 0.5);
+    gp_Vec       away(axis.Location().Translated(gp_Vec(axis.Direction()) * gp_Vec(axis.Location(), m).Dot(gp_Vec(axis.Direction()))), m);
+    if (away.Magnitude() < 1e-9)
+      fail_op("thicken loft: a face on the axis");
+    if (n.Dot(away) < 0)
+      f.out = -1;
+    fs.push_back(f);
+  }
+  const int nf = (int)fs.size();
+  if (nf == 0)
+    fail_op("thicken loft: no faces");
+  // Round order: each face's s = 1 ruling is the next one's s = 0.
+  auto ruling = [&](const RuledFace& f, double s) { return std::pair{ruled_point(f, s, 0), ruled_point(f, s, 1)}; };
+  auto same   = [&](const std::pair<gp_Pnt, gp_Pnt>& a, const std::pair<gp_Pnt, gp_Pnt>& b) { return a.first.Distance(b.first) < 1e-4 && a.second.Distance(b.second) < 1e-4; };
+  std::vector<int>  order{0};
+  std::vector<bool> used(nf, false);
+  used[0] = true;
+  while ((int)order.size() < nf)
+  {
+    const auto end  = ruling(fs[order.back()], 1);
+    int        next = -1;
+    for (int j = 0; j < nf && next < 0; ++j)
+    {
+      if (used[j])
+        continue;
+      if (same(ruling(fs[j], 0), end))
+        next = j;
+      else if (same(ruling(fs[j], 1), end))
+      {
+        fs[j].flip_s = true;
+        next         = j;
+      }
+    }
+    if (next < 0)
+      fail_op("thicken loft: the faces don't go round");
+    used[next] = true;
+    order.push_back(next);
+  }
+  if (!same(ruling(fs[order.back()], 1), ruling(fs[order[0]], 0)))
+    fail_op("thicken loft: the faces don't close round");
+  // Every face's normals within a half-turn of each other along its profile, outward.
+  for (const RuledFace& f : fs)
+    for (int i = 0; i <= 8; ++i)
+      for (const double w : {0.0, 0.5, 1.0})
+      {
+        gp_Vec n, n0;
+        if (!ruled_normal(f, i / 8.0, w, n) || !ruled_normal(f, 0.5, w, n0) || n.Dot(n0) < 0.05)
+          fail_op("thicken loft: a face not convex about the axis");
+      }
+  // The mitre between face a (its s = 1) and face b (its s = 0) at w: on both tangent planes, t off each.
+  auto mitre = [&](const RuledFace& a, const RuledFace& b, double w, gp_Pnt& m) {
+    gp_Vec na, nb;
+    if (!ruled_normal(a, 1, w, na) || !ruled_normal(b, 0, w, nb))
+      return false;
+    const double c = na.Dot(nb);
+    if (c < -0.9)
+      return false;
+    // Convex (or tangent) creases only between the profiles: b's side goes back from a's tangent plane. (Past
+    // them, cut away by the planes, a tangent end's crease continued may turn a little the other way.)
+    gp_Pnt P;
+    gp_Vec Ds, Dw;
+    ruled_d1(b, 0, w, P, Ds, Dw);
+    if (w >= 0 && w <= 1 && Ds.Dot(na) > 1e-6 * Ds.Magnitude())
+      return false;
+    m = ruled_point(a, 1, w).Translated((na + nb) * (t / (1 + c)));
+    return true;
+  };
+  lap("faces");
+  // Rows past both planes: the plane's distance along the rulings, plus a margin.
+  // Rows along the rulings, points along each row (by length: dense samples 6 times as many, evenly spaced
+  // points keep the iso-parametric interpolation from waving; the fit is checked below).
+  const int J = 24, N = 40, K = 6 * N;
+  const double margin = 2 * t / c0.Distance(c1) + 0.02;
+  const double wlo = -margin, whi = 1 + margin;
+  // Where the faces' offsets, continued past their rulings (the profile curves' end spans continued), meet: for
+  // face `f`'s row w, its s there and the other face's (s, w) (Newton from the tangent planes' mitre); faces
+  // tangent at the crease meet on its offset.
+  auto offset_pt = [&](const RuledFace& f, double s, double w) {
+    gp_Vec n;
+    ruled_normal(f, s, w, n);
+    return ruled_point(f, s, w).Translated(n * t);
+  };
+  // `f_end`: f's side at the crease (1: its s = 1 end), the other face's the opposite.
+  auto meet = [&](const RuledFace& f, double f_end, const RuledFace& o, double w, double& sf) {
+    gp_Vec nf, no;
+    if (!ruled_normal(f, f_end, w, nf) || !ruled_normal(o, 1 - f_end, w, no))
+      return false;
+    const double c = nf.Dot(no);
+    if (c > 1 - 1e-12)
+    {
+      sf = f_end;
+      return true;
+    }
+    if (c < -0.9)
+      return false;
+    // Start: the tangent planes' mitre, its distance along each face's profile direction.
+    const gp_Pnt Q  = ruled_point(f, f_end, w);
+    const gp_Pnt M0 = Q.Translated((nf + no) * (t / (1 + c)));
+    gp_Pnt       P;
+    gp_Vec       Dsf, Dwf, Dso, Dwo;
+    ruled_d1(f, f_end, w, P, Dsf, Dwf);
+    ruled_d1(o, 1 - f_end, w, P, Dso, Dwo);
+    double x[3] = {f_end + gp_Vec(Q, M0).Dot(Dsf) / Dsf.SquareMagnitude(), (1 - f_end) + gp_Vec(Q, M0).Dot(Dso) / Dso.SquareMagnitude(), w};
+    auto   G    = [&](const double* y) { return gp_Vec(offset_pt(o, y[1], y[2]), offset_pt(f, y[0], w)); };
+    for (int it = 0; it < 50; ++it)
+    {
+      const gp_Vec g = G(x);
+      if (g.Magnitude() < 1e-10)
+      {
+        sf = x[0];
+        return true;
+      }
+      gp_Mat J;
+      for (int c2 = 0; c2 < 3; ++c2)
+      {
+        double       a[3] = {x[0], x[1], x[2]}, b[3] = {x[0], x[1], x[2]};
+        const double h    = 1e-6;
+        a[c2] += h;
+        b[c2] -= h;
+        const gp_Vec d = (G(a) - G(b)) / (2 * h);
+        J.SetCol(c2 + 1, d.XYZ());
+      }
+      if (std::abs(J.Determinant()) < 1e-300)
+        return false;
+      const gp_XYZ dx = J.Inverted() * g.XYZ();
+      x[0] -= dx.X();
+      x[1] -= dx.Y();
+      x[2] -= dx.Z();
+    }
+    return false;
+  };
+  std::vector<std::vector<double>> s_lo(nf, std::vector<double>(J + 1)), s_hi(nf, std::vector<double>(J + 1));
+  for (int i = 0; i < nf; ++i)
+    for (int j = 0; j <= J; ++j)
+    {
+      const double w = wlo + (whi - wlo) * j / J;
+      gp_Pnt       m;
+      if (w >= 0 && w <= 1 && !mitre(fs[order[i]], fs[order[(i + 1) % nf]], w, m))
+        fail_op("thicken loft: a crease not convex");
+      if (!meet(fs[order[i]], 1, fs[order[(i + 1) % nf]], w, s_hi[i][j]) || !meet(fs[order[i]], 0, fs[order[(i + nf - 1) % nf]], w, s_lo[i][j]))
+        fail_op("thicken loft: the offsets' mitre not found");
+    }
+  std::vector<TopoDS_Face> outer;
+  for (int i = 0; i < nf; ++i)
+  {
+    const RuledFace&           f = fs[order[i]];
+    NCollection_Array2<gp_Pnt> grid(1, N + 1, 1, J + 1);
+    for (int j = 0; j <= J; ++j)
+    {
+      const double w = wlo + (whi - wlo) * j / J;
+      // The row: the face's offset from one mitre to the other, by length along it.
+      const double        a = s_lo[i][j], b = s_hi[i][j];
+      std::vector<gp_Pnt> dense;
+      for (int q = 0; q <= K; ++q)
+        dense.push_back(offset_pt(f, a + (b - a) * q / K, w));
+      std::vector<double> len(dense.size(), 0.0);
+      for (size_t q = 1; q < dense.size(); ++q)
+        len[q] = len[q - 1] + dense[q - 1].Distance(dense[q]);
+      for (int c = 0; c <= N; ++c)
+      {
+        const double L = len.back() * c / N;
+        size_t       q = 1;
+        while (q + 1 < len.size() && len[q] < L)
+          ++q;
+        const double u = len[q] - len[q - 1] > 0 ? (L - len[q - 1]) / (len[q] - len[q - 1]) : 0.0;
+        grid(c + 1, j + 1) = offset_pt(f, a + (b - a) * (q - 1 + u) / K, w);
+      }
+    }
+    GeomAPI_PointsToBSplineSurface fit;
+    fit.Interpolate(grid, Approx_IsoParametric);
+    if (!fit.IsDone())
+      fail_op("thicken loft: an outer face not fitted");
+    {
+      // The fit against exact offset points half-way between the data rows (every third), along each.
+      double                     worst = 0;
+      double                     fu0, fu1, fv0, fv1;
+      fit.Surface()->Bounds(fu0, fu1, fv0, fv1);
+      // (A local search from the point's place in the iso-parametric grid: a global projector's set-up cost
+      // 100 ms a face.)
+      const GeomAdaptor_Surface ad(fit.Surface());
+      Extrema_GenLocateExtPS     loc(ad);
+      for (int j = 1; j < J; j += 3)
+      {
+        const double w = wlo + (whi - wlo) * (j + 0.5) / J;
+        const double a = 0.5 * (s_lo[i][j] + s_lo[i][j + 1]), b = 0.5 * (s_hi[i][j] + s_hi[i][j + 1]);
+        for (int q = 1; q < 8; ++q)
+        {
+          loc.Perform(offset_pt(f, a + (b - a) * q / 8.0, w), fu0 + (fu1 - fu0) * q / 8.0, fv0 + (fv1 - fv0) * (j + 0.5) / J);
+          worst = std::max(worst, loc.IsDone() ? std::sqrt(loc.SquareDistance()) : 1.0);
+        }
+      }
+      if (dbg)
+        std::fprintf(stderr, "thicken loft: face %d fit within %g\n", i, worst);
+      if (worst > 1e-5)
+        fail_op("thicken loft: an outer face not fitted closely");
+    }
+    outer.push_back(BRepBuilderAPI_MakeFace(fit.Surface(), tol).Face());
+  }
+  lap("outer faces");
+  // The outer faces cut by the planes: the pieces between.
+  BRepBuilderAPI_Sewing tube_sew(1e-5);
+  for (const TopoDS_Face& f : outer)
+    tube_sew.Add(f);
+  tube_sew.Perform();
+  const TopoDS_Shape tube = tube_sew.SewedShape();
+  Bnd_Box            box;
+  BRepBndLib::Add(tube, box);
+  const double       big  = std::sqrt(box.SquareExtent()) * 2;
+  const TopoDS_Face  f0   = BRepBuilderAPI_MakeFace(pl0, -big, big, -big, big).Face();
+  const TopoDS_Face  f1   = BRepBuilderAPI_MakeFace(pl1, -big, big, -big, big).Face();
+  BRepAlgoAPI_Splitter sp;
+  ShapeList          args, tools;
+  args.Append(tube);
+  tools.Append(f0);
+  tools.Append(f1);
+  sp.SetArguments(args);
+  sp.SetTools(tools);
+  sp.Build();
+  if (sp.HasErrors())
+    fail_op("thicken loft: the outer faces not cut");
+  const gp_Vec up0(gp_Vec(c0, c1)), up1(gp_Vec(c1, c0));
+  auto         between = [&](const gp_Pnt& p) { return gp_Vec(c0, p).Dot(up0) > 0 && gp_Vec(c1, p).Dot(up1) > 0; };
+  BRepBuilderAPI_Sewing     sew(1e-5);
+  std::vector<TopoDS_Shape> kept;
+  for (TopExp_Explorer x(sp.Shape(), TopAbs_FACE); x.More(); x.Next())
+  {
+    gp_Pnt p;
+    gp_Dir n;
+    if (inner_point(TopoDS::Face(x.Current()), p, n) && between(p))
+    {
+      sew.Add(x.Current());
+      kept.push_back(x.Current());
+    }
+  }
+  if ((int)kept.size() != nf)
+    fail_op("thicken loft: the outer faces cut wrong");
+  lap("cut by the planes");
+  // The rings: each plane's section of the outer faces less the profile there.
+  for (const gp_Pln& pl : {pl0, pl1})
+  {
+    // The pieces' edges on the plane (shared with them), round the profile's.
+    occ::handle<NCollection_HSequence<TopoDS_Shape>> es = new NCollection_HSequence<TopoDS_Shape>(), ws, ps = new NCollection_HSequence<TopoDS_Shape>(), pws;
+    for (const TopoDS_Shape& piece : kept)
+      for (TopExp_Explorer x(piece, TopAbs_EDGE); x.More(); x.Next())
+      {
+        BRepAdaptor_Curve c(TopoDS::Edge(x.Current()));
+        const double      a = c.FirstParameter(), b = c.LastParameter();
+        if (pl.Distance(c.Value(a)) < 1e-5 && pl.Distance(c.Value(0.5 * (a + b))) < 1e-5 && pl.Distance(c.Value(b)) < 1e-5)
+        {
+          es->Append(x.Current());
+          if (dbg && c.GetType() == GeomAbs_BSplineCurve)
+            std::fprintf(stderr, "thicken loft: a ring edge of %d poles\n", c.NbPoles());
+        }
+      }
+    ShapeAnalysis_FreeBounds::ConnectEdgesToWires(es, 1e-5, true, ws);
+    for (const TopoDS_Shape& e : free_edges)
+    {
+      BRepAdaptor_Curve c(TopoDS::Edge(e));
+      if (pl.Distance(c.Value(0.5 * (c.FirstParameter() + c.LastParameter()))) < tol)
+        ps->Append(e);
+    }
+    ShapeAnalysis_FreeBounds::ConnectEdgesToWires(ps, 1e-5, true, pws);
+    if (ws->Length() != 1 || pws->Length() != 1)
+      fail_op("thicken loft: a plane's ring not one loop round one profile");
+    BRepBuilderAPI_MakeFace mf(pl, TopoDS::Wire(ws->Value(1)), true);
+    mf.Add(TopoDS::Wire(pws->Value(1)));
+    if (!mf.IsDone())
+      fail_op("thicken loft: a ring failed");
+    ShapeFix_Face fix(mf.Face());
+    fix.FixOrientation();
+    fix.Perform();
+    sew.Add(fix.Face());
+    lap("ring");
+  }
+  for (const RuledFace& f : fs)
+    sew.Add(f.face);
+  sew.Perform();
+  lap("sewn");
+  TopoDS_Shell shell;
+  int          shells = 0;
+  for (TopExp_Explorer x(sew.SewedShape(), TopAbs_SHELL); x.More(); x.Next(), ++shells)
+    shell = TopoDS::Shell(x.Current());
+  if (shells != 1)
+    fail_op("thicken loft: the wall not closed");
+  BRepBuilderAPI_MakeSolid ms(shell);
+  TopoDS_Solid             r = TopoDS::Solid(ms.Shape());
+  BRepLib::OrientClosedSolid(r);
+  lap("oriented");
+  const bool valid = BRepCheck_Analyzer(r).IsValid();
+  lap("checked");
+  if (!valid)
+    fail_op("thicken loft: the wall came out invalid");
+  lap("solid");
+  HHist h;
+  return make_result({sheet_in.shape}, sc.unscale(r, h), nullptr);
+}
 
 } // namespace noshape

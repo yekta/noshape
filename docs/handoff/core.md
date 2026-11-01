@@ -46,6 +46,19 @@ deadlock in malloc).
 - Round 4: op_boolean hands a cancelled build's OCCT builder (the pave filler) to a detached thread to free. vibe2 at
   load 11-17, cancel at 0.7-50 s: 15-336 ms, one 1.86 s at 24 s that didn't repeat (613 / 149 ms on reruns).
 
+## THIN-LOFT-TRIM-ENDS (P2): (a) landed 11-01 04:20
+- shell.cpp `op_thicken_loft_out` (kernel `thicken_loft_out`, model solid_a.rs thin loft, Trim ends + outward + two
+  profiles; anything it declines is built as before): each ruled loft face (cubic x linear) evaluated exactly, also
+  past its rulings (the profile curves' end spans continued); the mitre where two faces' offsets meet by Newton (3
+  unknowns, numeric Jacobian; tangent creases: the crease's offset); each outer face a B-spline through 25 rows x 41
+  points of its offset between its two mitre points (rows past both planes; evenly spaced by length, else the
+  iso-parametric interpolation waves: N 80 with 128 dense samples was 1.7e-4 off), the fit checked against exact
+  points (1e-5 or decline; 7e-8 here); a Splitter by the two planes, the rings from the pieces' edges and the
+  profiles, sewn with the loft's faces. 1370.084 mm³ vs live 1370.105 (Parasolid continues the faces differently at
+  the 90° creases); ~0.3 s (the split 0.15 s). Next: (b) Trim ends ☐: live's 8 ruled caps (neighbouring outer faces
+  must end at one mitre point per end: fix the rows at the profiles there); inward (concave mitres).
+- History: parked branches wip/core-thinloft / wip/core-thinloft2 (Boolean versions: 6 s) can go.
+
 ## THIN-LOFT-TRIM-ENDS (P2), parked 11-01 02:40 (branch wip/core-thinloft2, local only)
 - Live (a) (Trim ends, outward 1 mm, square 20 → Ø16): the loft sheet offset along its normals, the offset faces
   meeting (mitre) along their intersections, cut by the profile planes: 1370.1047 mm³, 10 faces. Ours (in-plane

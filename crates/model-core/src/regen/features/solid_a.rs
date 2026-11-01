@@ -820,6 +820,21 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         // tube creased at its corners (16 faces, 1137 mm³).
         if shapes.len() >= 2 && shapes.iter().all(super::thin::closed_planar_wire) {
             let failed = || fe("Failed to thicken lofted body, check thickness.");
+            // Trim ends outward (the default), two profiles: the lofted surface offset along its normals, its
+            // faces mitred, cut by the profiles' planes, as live (a): 1370.10 mm³, 10 faces; the profiles' offsets
+            // lofted below were 0.15 % over. The kernel takes ruled faces turning outward about the profiles' axis;
+            // anything else is built as before.
+            if ev.bool("trimEnds") && t1 > 0.0 && t2 == 0.0 && shapes.len() == 2
+                && let (Ok(Some(p0)), Ok(Some(p1))) = (shapes[0].find_plane(1e-6), shapes[1].find_plane(1e-6))
+                && let Ok(wall) = k::thicken_loft_out(&res.shape, t1, &p0, &p1)
+                && wall.shape.count(ShapeType::Solid) == 1
+            {
+                let names = super::helpers_a::name_new(ev, &wall.shape);
+                let tools = vec![NamedShape::new(wall.shape, names)];
+                let op = ev.enum_("operationType").to_string();
+                let scope = super::extrude::scope(ev);
+                return ev.apply_operation(tools, &op, scope, BodyKind::Solid);
+            }
             let (mut outer, mut inner) = (Vec::new(), Vec::new());
             for s in &shapes {
                 let (o, i) = super::thin::wall_loops(s, t1, t2).map_err(|_| failed())?;
