@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="170" viewBox="0 0 200 170" fill="#555555">
+<defs>
+<mask id="m2" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="170"><rect width="200" height="170" fill="#fff"/><path transform="translate(83 147)" d="M-15 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-15A6 6 0 0 1 -21 14.6V-14.6A6 6 0 0 1 -15 -20.6Z" fill="#000" stroke="#000" stroke-width="4.4"/></mask>
+<mask id="m3" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="170"><rect width="200" height="170" fill="#fff"/><g transform="translate(83 147)" fill="#000" stroke="#000" stroke-width="4.4"><path d="M-15 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-15A6 6 0 0 1 -21 14.6V-14.6A6 6 0 0 1 -15 -20.6Z"/><path transform="rotate(-31)" d="M-4 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-4Z"/></g></mask>
+<mask id="mb" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="170"><rect width="200" height="170" fill="#fff"/><g transform="translate(83 147)" fill="#000" stroke="#000" stroke-width="7.8"><path d="M-15 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-15A6 6 0 0 1 -21 14.6V-14.6A6 6 0 0 1 -15 -20.6Z"/><path transform="rotate(-31)" d="M-4 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-4Z"/><path transform="rotate(-58)" d="M-4 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-4Z"/></g></mask>
+</defs>
+<g mask="url(#mb)"><path d="M62 .2H90L107.8 19.7H78.7ZM56.2 2.3L76.7 22.3V76L56.2 54.3ZM25 83.5H82V25.2H111.2V112.7H25ZM3.3 58.5H55L75.3 79.3H22.8ZM.3 62.3L20.3 81.8V112.7L.3 92.3Z"/></g>
+<g fill="none" stroke="#555555" stroke-width="4.4">
+<g mask="url(#m3)"><path transform="translate(83 147) rotate(-58)" d="M-4 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-4ZM25.5 -20.6V20.6M72.3 -20.6V20.6"/></g>
+<g mask="url(#m2)"><path transform="translate(83 147) rotate(-31)" d="M-4 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-4ZM25.5 -20.6V20.6M72.3 -20.6V20.6"/></g>
+<path transform="translate(83 147)" d="M-15 -20.6H108.3A6 6 0 0 1 114.3 -14.6V14.6A6 6 0 0 1 108.3 20.6H-15A6 6 0 0 1 -21 14.6V-14.6A6 6 0 0 1 -15 -20.6ZM25.5 -20.6V20.6M72.3 -20.6V20.6"/>
+<circle cx="83" cy="147" r="7" stroke-width="4.6"/>
+</g>
+</svg>

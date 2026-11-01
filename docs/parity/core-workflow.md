@@ -270,8 +270,8 @@ and closes again with ✕/Esc/Cancel. Expected results follow live (behaviours.m
 | F14 | ✅ fixed | Shift+X does nothing while a feature dialog is open |
 | F15 | ✅ fixed | Delete key deletes the selected feature (Ctrl+Z restores) |
 | F17 | ✅ fixed | Plane ▾ dropdown scrolls; Composite part and Tag reachable |
-| F18 | ? unchanged | Mass properties without material: centre of mass / inertia still blank (live not captured yet) |
-| F19 | ✅ fixed (verify) | no lingering notice; the material notice no longer appears at all (check live) |
+| F18 | ✅ = live (behaviours 948: no material → centre of mass and inertia blank, yellow toast "One or more parts do not have a material defined."; ours the same on :102 blk, psui 11-01) | Mass properties without material: centre of mass / inertia blank |
+| F19 | ✅ fixed | no lingering notice; the material notice shows once as live's yellow toast (×, auto-hides; psui 11-01 :102 blk) |
 | F20 | ✅ fixed | Depth › right-click › Configure adds "Extrude 1 / Depth" column, field framed dashed amber |
 | F21 | ✅ fixed | banner "Select sketches or features to configure [Done]", toolbar greyed |
 | F22 | ✅ fixed | no stranded strip tooltip |

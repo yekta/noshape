@@ -844,11 +844,26 @@ impl PartStudioView {
                     cx.notify();
                 }))
         };
+        // Live (dark/dk-993, a studio with only a sketch): no parts gives an
+        // empty state centred in the panel, our drawing of Onshape's
+        // illustration (200 x 170) with the text's ink 27 px under it.
+        let empty = (!sketches_tab && rows.is_empty()).then(|| {
+            v_flex()
+                .flex_1()
+                .items_center()
+                .justify_center()
+                // Live: 6 px above the panel's middle.
+                .pb(px(12.))
+                .child(svg().path(crate::assets::icon_path("appearances-empty")).w(px(200.)).h(px(170.)).flex_none().text_color(pal.illustration))
+                .child(div().mt(px(20.)).text_size(px(13.33)).line_height(px(20.8)).text_color(pal.text_muted).child("No parts or surfaces in this document"))
+        });
         v_flex()
+            .when(empty.is_some(), |d| d.flex_1())
             // Live (dom/panel-appearance.txt): the tab row has 4 px of top
             // padding under the title (tabs 111–137, rows from 147).
             .child(h_flex().w_full().mt(px(-1.)).mx(px(-5.)).child(tab("ap-tab-parts", "Parts and surfaces", !sketches_tab, false, cx)).child(tab("ap-tab-sketches", "Sketches and curves", sketches_tab, true, cx)))
             .child(v_flex().pt(px(10.)).children(rows))
+            .children(empty)
             .into_any_element()
     }
 

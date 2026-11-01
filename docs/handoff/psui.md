@@ -339,6 +339,8 @@ N10. (11-01 01:13) Unchecked rows (user 11-01): keyboard-mouse a / q / k, Ctrl+M
      live request open (does Onshape offer a midpoint on a closed circular edge?). If not, edge_midpoint should
      return None for closed edges (behaviors.rs). part-studio 1.26 ✅ (env maps accepted as ours), 1.28 n/a.
      Dark-mode residual closed 11-01: the Variable type ▾ is live's 8 x 4 caret (os_ui::GLYPH_CARET), checked in both themes.
+     dk-993 closed 11-01: the Appearances panel's empty Parts tab (icons/appearances-empty.svg, our drawing; live
+     request open for the empty Sketches tab and the light look). core-workflow F18 / F19 = live.
 
 N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes bounded by lines; crates/brep
      `mesh`, cpp/mesh_rust.cpp after core's cache, NOSHAPE_MESH_RUST=0 off); step 2 (this commit): circles split as
