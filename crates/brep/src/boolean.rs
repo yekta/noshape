@@ -761,14 +761,12 @@ impl Ctx<'_> {
         }
         let Surf::Plane { n, d, .. } = self.faces[f].s else { return Ok(1) };
         let x = n.dot(self.p(v)) - d;
-        // (A tolerant vertex: on the plane within its own tolerance and the face's (OCCT's rule; the face's at most
-        // ~1e-5 here), apart past that.)
+        // (On the plane within its own tolerance and the face's (OCCT's rule), apart past that: no grey band, as for
+        // two vertices.)
         let tv = self.pool.t[v as usize];
-        let (reach, band) = if tv > 0.5 * self.tol { (tv + 0.5 * self.tol, tv + 0.5 * self.tol + 1e-5) } else { (self.tol, GREY * self.tol) };
+        let reach = if tv > 0.5 * self.tol { tv + 0.5 * self.tol } else { self.tol };
         let s = if x.abs() <= reach {
             0
-        } else if x.abs() <= band {
-            return Err(Decline("a vertex nearly on a plane"));
         } else if x > 0.0 {
             1
         } else {
@@ -4209,7 +4207,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         } else {
             ons.first().copied()
         };
-        // Two tools' pieces coinciding (a cut), facing each other: inside the tools.
+        // Two tools' pieces coinciding (a cut).
         let tools_on = op == Op::Cut && arg != 0 && on.is_some_and(|(t, _)| cx.solids[t].arg != 0);
         if let Some((t, _)) = on {
             // (In a common two tools' pieces coinciding: not taken. In a cut OCCT's record of the object's solid is
@@ -4230,7 +4228,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                         _ => None,
                     }
                 } else if tools_on {
-                    None
+                    // (On other tools facing its way (crossing grooves' floors on one plane): the earliest tool's
+                    // piece, as OCCT keeps one of the same-domain faces; facing each other: none.)
+                    (in_obj && !in_tool && ons.iter().all(|&(t, st)| st == State::OnSame && cx.solids[t].arg > arg)).then_some(true)
                 } else {
                     (on.is_none() && in_obj && !in_tool).then_some(true)
                 }

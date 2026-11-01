@@ -1079,6 +1079,21 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Crossing grooves with one floor; a vertex on a plane by OCCT's rule (11-01 11:30 UTC)
+- A cut's tool piece lying on other tools was never kept (right where they face each other: inside the tools). Grooves
+  crossing in pairs (a 24-tool knurl-like cut, 50004ac9 and 8c3247ab, in every set: ~25 s recorded) have their floors on
+  one plane facing one way: both pieces of the overlap were dropped, a non-manifold result. Now the earliest tool's
+  piece is kept there (inside the object, in no tool), as OCCT keeps one of same-domain faces; the others are Modified
+  to it (`partner`). Taken, 0 differ (history and unify too).
+- A vertex against a plane: OCCT's rule alone (on it within its own tolerance and the face's, apart past that), the
+  grey band ("a vertex nearly on a plane") gone, as for two vertices: 8 more taken in corpus5 and corpus6, 0 differ.
+- T1 bool_patterns::crossing_grooves_with_one_floor (tests/data/booleans/50004ac95f2ebada, 0.2 s release).
+- Replays why37 (the groove rule) and why36 (the plane rule): 0 differ everywhere; main 793, corpus2 587, corpus3 592,
+  corpus4 638, corpus5 774 + 8, corpus6 702 + 8, direct 78, Shell's 102.
+- Looked at and left: "an internal face" (b2511301, addb9a14: Shell slab fuses of 72): with the internal face left
+  out of its solid's boundary (/root/bool-scratch/internal-face.patch) they stop at "a tolerant input": faces of
+  7e-4 tolerance 1e-5 from other arguments, OCCT's own result invalid. Not worth taking.
+
 ## OCCT's ellipse round the other way; a B-spline face rising off a plane not coincident with it (11-01 10:14 UTC)
 - "An ellipse unlike OCCT's sections" (13 cases, 26 s): OCCT's ellipse of a plane and a cylinder had our centre
   and axis the other way round, and only the same axis matched. Now matched either way: a reversed one

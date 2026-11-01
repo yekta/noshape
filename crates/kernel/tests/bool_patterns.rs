@@ -383,3 +383,22 @@ fn overlapping_free_form_parts_merge_like_onshape() {
     let u = k::unify_same_domain(&r.shape).unwrap().shape;
     assert_eq!(u.count(k::ShapeType::Face), 15);
 }
+
+/// A cut by 24 grooves crossing in pairs whose floors lie on one plane facing one way (recorded): noshape's Boolean
+/// keeps one of the coinciding floor pieces, as OCCT's same-domain faces (it dropped both: a non-manifold result),
+/// valid, OCCT's volume and counts.
+#[test]
+fn crossing_grooves_with_one_floor() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "50004ac95f2ebada").expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
+    let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&r.shape), [c.summary.faces, c.summary.edges, c.summary.vertices]);
+}
