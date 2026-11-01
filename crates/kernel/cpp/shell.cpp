@@ -98,6 +98,12 @@
 
 #include <cmath>
 #include <map>
+#include <TopAbs.hxx>
+#include <Geom_Surface.hxx>
+#include <TopoDS_Iterator.hxx>
+#include <gp_Mat.hxx>
+#include <array>
+#include <set>
 
 namespace noshape {
 
@@ -2134,6 +2140,442 @@ TopoDS_Shape collapsed_corner_filler(const TopoDS_Face& f, const TopoDS_Shape& s
 }
 
 // Path 2. `sign` is -1 for an inward wall, +1 outward.
+// ------------------------------------------------------------------ planes
+
+// Path 2a (SHELL-SLOW, core 11-01): inward walls of solids bounded by planes only, the slabs' wall built directly.
+// Every kept face moves in by t, every removed face stays; at each vertex (three faces) the three planes meet in the
+// cavity's corner, each edge's offset joins two corners, parallel to the edge. The wall: the kept faces, each one's
+// offset (its wires' edges replaced by their offsets) and, on each removed face, the rim between its wires and their
+// offsets: one solid with shared edges, no Boolean. Only where that is the slabs' wall too: no offset edge vanishes
+// or turns round, and no new face crosses or touches another one away from the edges they share (thin walls,
+// pockets narrower than 2t: the slabs then). Not: curved faces, vertices of more than three faces, two removed faces
+// meeting.
+namespace planes {
+// A planar polygon of the wall (loops of points, each point a vertex id), for the crossing test.
+struct Poly
+{
+  gp_XYZ                        n;      // unit normal
+  double                        c = 0;  // n.x = c
+  std::vector<std::vector<int>> loops;  // vertex ids
+  bool                          fresh;  // an offset or rim face (old faces are tested against these only)
+  Bnd_Box                       box;
+};
+
+// The intervals of line {o + s d} (in poly's plane) inside poly: crossings of its loops, even-odd.
+std::vector<std::pair<double, double>> chords(const Poly& p, const std::vector<gp_XYZ>& pts, const gp_XYZ& o, const gp_XYZ& d)
+{
+  const gp_XYZ        m = p.n.Crossed(d); // in the plane, across the line
+  std::vector<double> s;
+  for (const auto& lp : p.loops)
+    for (size_t i = 0; i < lp.size(); ++i)
+    {
+      const gp_XYZ& a  = pts[(size_t)lp[i]];
+      const gp_XYZ& b  = pts[(size_t)lp[(i + 1) % lp.size()]];
+      const double  sa = (a - o).Dot(m), sb = (b - o).Dot(m);
+      if ((sa > 0) == (sb > 0))
+        continue;
+      const gp_XYZ x = a + (b - a) * (sa / (sa - sb));
+      s.push_back((x - o).Dot(d));
+    }
+  std::sort(s.begin(), s.end());
+  std::vector<std::pair<double, double>> out;
+  for (size_t i = 0; i + 1 < s.size(); i += 2)
+    out.push_back({s[i], s[i + 1]});
+  return out;
+}
+
+// Whether polys a and b meet anywhere but along the edges they share (`shared`: their common edges as vertex-id
+// pairs); touching within `tol` counts.
+bool cross(const Poly& a, const Poly& b, const std::vector<gp_XYZ>& pts, const std::vector<std::pair<int, int>>& shared, double tol)
+{
+  gp_XYZ d = a.n.Crossed(b.n);
+  const double sn = d.Modulus();
+  if (sn < 1e-9)
+    return std::abs(a.c - b.c * (a.n.Dot(b.n) > 0 ? 1.0 : -1.0)) <= tol; // parallel: coplanar ones are taken to meet
+  d /= sn;
+  // A point on both planes: o = alpha a.n + beta b.n.
+  const double k = a.n.Dot(b.n), det = 1 - k * k;
+  const gp_XYZ o = a.n * ((a.c - k * b.c) / det) + b.n * ((b.c - k * a.c) / det);
+  const auto   ia = chords(a, pts, o, d), ib = chords(b, pts, o, d);
+  // The shared edges' spans along the line, not counted.
+  std::vector<std::pair<double, double>> skip;
+  for (const auto& [u, v] : shared)
+  {
+    double s0 = (pts[(size_t)u] - o).Dot(d), s1 = (pts[(size_t)v] - o).Dot(d);
+    if (s0 > s1)
+      std::swap(s0, s1);
+    skip.push_back({s0 - tol, s1 + tol});
+  }
+  for (const auto& [a0, a1] : ia)
+    for (const auto& [b0, b1] : ib)
+    {
+      const double lo = std::max(a0, b0), hi = std::min(a1, b1);
+      if (hi - lo < -tol)
+        continue;
+      // [lo, hi] less the shared spans: anything left meets.
+      std::vector<std::pair<double, double>> left{{lo - tol, hi + tol}};
+      for (const auto& [s0, s1] : skip)
+      {
+        std::vector<std::pair<double, double>> next;
+        for (const auto& [x0, x1] : left)
+        {
+          if (s1 <= x0 || s0 >= x1)
+          {
+            next.push_back({x0, x1});
+            continue;
+          }
+          if (s0 > x0)
+            next.push_back({x0, s0});
+          if (s1 < x1)
+            next.push_back({s1, x1});
+        }
+        left.swap(next);
+      }
+      for (const auto& [x0, x1] : left)
+        if (x1 - x0 > 2 * tol)
+          return true;
+    }
+  return false;
+}
+} // namespace planes
+
+namespace planes {
+// Whether two segments of a loop cross (in the plane, dropping n's largest axis), adjacent ones aside.
+bool self_crossing(const Poly& p, const std::vector<gp_XYZ>& pts, double tol)
+{
+  int drop = 0;
+  for (int k = 1; k < 3; ++k)
+    if (std::abs(p.n.Coord(k + 1)) > std::abs(p.n.Coord(drop + 1)))
+      drop = k;
+  auto xy = [&](int id) {
+    const gp_XYZ& q = pts[(size_t)id];
+    return drop == 0 ? gp_XY(q.Y(), q.Z()) : drop == 1 ? gp_XY(q.X(), q.Z()) : gp_XY(q.X(), q.Y());
+  };
+  std::vector<std::pair<int, int>> segs;
+  for (const auto& lp : p.loops)
+    for (size_t i = 0; i < lp.size(); ++i)
+      segs.push_back({lp[i], lp[(i + 1) % lp.size()]});
+  auto orient = [](const gp_XY& a, const gp_XY& b, const gp_XY& c) { return (b - a).Crossed(c - a); };
+  for (size_t i = 0; i < segs.size(); ++i)
+    for (size_t j = i + 1; j < segs.size(); ++j)
+    {
+      const auto [a, b] = segs[i];
+      const auto [c, d] = segs[j];
+      if (a == c || a == d || b == c || b == d)
+        continue;
+      const gp_XY A = xy(a), B = xy(b), C = xy(c), D = xy(d);
+      const double ab = (B - A).Modulus(), cd = (D - C).Modulus();
+      const double o1 = orient(A, B, C) / ab, o2 = orient(A, B, D) / ab, o3 = orient(C, D, A) / cd, o4 = orient(C, D, B) / cd;
+      // Crossing or touching within tol.
+      if (std::min(o1, o2) <= tol && std::max(o1, o2) >= -tol && std::min(o3, o4) <= tol && std::max(o3, o4) >= -tol)
+      {
+        // (Collinear and apart along the line: no.)
+        const gp_XY u = (B - A) / ab;
+        const double s0 = (C - A).Dot(u), s1 = (D - A).Dot(u);
+        if (std::abs(o1) <= tol && std::abs(o2) <= tol && (std::max(s0, s1) < -tol || std::min(s0, s1) > ab + tol))
+          continue;
+        return true;
+      }
+    }
+  return false;
+}
+} // namespace planes
+
+bool by_planes_build(const TopoDS_Shape& so, const ShapeIMap& faces, const ShapeIMap& edges, const ShapeIMap& verts,
+                     const std::vector<std::array<int, 2>>& efi, const std::vector<char>& kept, const std::vector<gp_XYZ>& fn,
+                     const std::vector<double>& fc, const std::vector<gp_XYZ>& pts, int nv, double t, double tol,
+                     const std::vector<TopoDS_Shape>& removed, const TopoDS_Shape& solid, Built& out, bool dbg)
+{
+  auto no = [&](const char* why) {
+    if (dbg)
+      std::fprintf(stderr, "planes: %s\n", why);
+    return false;
+  };
+  const int nf = faces.Extent(), ne = edges.Extent();
+  // The wall's polygons: kept faces (old), their offsets and the rims (fresh).
+  std::vector<planes::Poly> polys;
+  auto loops_of = [&](const TopoDS_Face& f, int shift) {
+    std::vector<std::vector<int>> out_loops;
+    const TopoDS_Face             ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
+    for (TopExp_Explorer w(ff, TopAbs_WIRE); w.More(); w.Next())
+    {
+      std::vector<int> lp;
+      for (BRepTools_WireExplorer x(TopoDS::Wire(w.Current()), ff); x.More(); x.Next())
+        lp.push_back(shift + verts.FindIndex(x.CurrentVertex()));
+      out_loops.push_back(lp);
+    }
+    return out_loops;
+  };
+  auto add_poly = [&](const gp_XYZ& n, double c, std::vector<std::vector<int>> lps, bool fresh) {
+    planes::Poly p;
+    p.n     = n;
+    p.c     = c;
+    p.loops = std::move(lps);
+    p.fresh = fresh;
+    for (const auto& lp : p.loops)
+      for (int id : lp)
+        p.box.Add(gp_Pnt(pts[(size_t)id]));
+    p.box.Enlarge(10 * tol);
+    polys.push_back(std::move(p));
+  };
+  for (int i = 1; i <= nf; ++i)
+  {
+    const TopoDS_Face& f = TopoDS::Face(faces(i));
+    const auto         lps = loops_of(f, 0);
+    if (kept[(size_t)i])
+    {
+      add_poly(fn[(size_t)i], fc[(size_t)i], lps, false);
+      add_poly(fn[(size_t)i], fc[(size_t)i] - t, loops_of(f, nv), true);
+    }
+    else
+      for (const auto& lp : lps)
+      {
+        std::vector<int> off;
+        for (int id : lp)
+          off.push_back(id + nv);
+        add_poly(fn[(size_t)i], fc[(size_t)i], {lp, off}, true);
+      }
+  }
+  for (const planes::Poly& p : polys)
+    if (p.fresh && planes::self_crossing(p, pts, tol))
+      return no("an offset face crosses itself");
+  auto edge_keys = [](const planes::Poly& p) {
+    std::set<std::pair<int, int>> s;
+    for (const auto& lp : p.loops)
+      for (size_t i = 0; i < lp.size(); ++i)
+        s.insert(std::minmax(lp[i], lp[(i + 1) % lp.size()]));
+    return s;
+  };
+  std::vector<std::set<std::pair<int, int>>> keys;
+  for (const planes::Poly& p : polys)
+    keys.push_back(edge_keys(p));
+  for (size_t i = 0; i < polys.size(); ++i)
+    for (size_t j = i + 1; j < polys.size(); ++j)
+    {
+      if ((!polys[i].fresh && !polys[j].fresh) || polys[i].box.IsOut(polys[j].box))
+        continue;
+      std::vector<std::pair<int, int>> shared;
+      for (const auto& k : keys[i])
+        if (keys[j].count(k) != 0)
+          shared.push_back(k);
+      if (planes::cross(polys[i], polys[j], pts, shared, 10 * tol))
+        return no("an offset face meets another face");
+    }
+  // The wall: the solid's shell with each removed face replaced by its rims and each kept face's offset added.
+  BRep_Builder               bld;
+  std::vector<TopoDS_Vertex> vx(nv + 1);
+  for (int i = 1; i <= nv; ++i)
+    bld.MakeVertex(vx[(size_t)i], gp_Pnt(pts[(size_t)(nv + i)]), Precision::Confusion());
+  std::vector<TopoDS_Edge> ex(ne + 1);
+  for (int i = 1; i <= ne; ++i)
+  {
+    TopoDS_Vertex a, b;
+    TopExp::Vertices(TopoDS::Edge(edges(i)), a, b);
+    const TopoDS_Vertex& va = vx[(size_t)verts.FindIndex(a)];
+    const TopoDS_Vertex& vb = vx[(size_t)verts.FindIndex(b)];
+    BRepBuilderAPI_MakeEdge mk(va, vb);
+    if (!mk.IsDone())
+      return no("an offset edge failed");
+    ex[(size_t)i] = mk.Edge();
+  }
+  // A wire's offset: its edges' offsets, each the same way round in it.
+  auto offset_wire = [&](const TopoDS_Shape& w) {
+    TopoDS_Wire ow;
+    bld.MakeWire(ow);
+    for (TopoDS_Iterator it(w, false); it.More(); it.Next())
+      bld.Add(ow, ex[(size_t)edges.FindIndex(it.Value())].Oriented(it.Value().Orientation()));
+    ow.Closed(true);
+    return ow;
+  };
+  SourceMap   sources;
+  HHist       h = new BRepTools_History();
+  TopoDS_Shell shell;
+  bld.MakeShell(shell);
+  TopoDS_Shape old_shell;
+  for (TopExp_Explorer x(so, TopAbs_SHELL); x.More(); x.Next())
+    old_shell = x.Current();
+  for (TopoDS_Iterator it(old_shell, false); it.More(); it.Next())
+  {
+    const TopoDS_Face& f   = TopoDS::Face(it.Value());
+    const int          i   = faces.FindIndex(f);
+    const TopoDS_Face  ff  = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
+    TopLoc_Location    loc;
+    const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(ff, loc);
+    if (kept[(size_t)i])
+    {
+      bld.Add(shell, f);
+      // The offset: the face's twin moved in by t, facing the other way in the wall.
+      const gp_XYZ                    mv = fn[(size_t)i] * -t;
+      occ::handle<Geom_Surface>       moved = occ::down_cast<Geom_Surface>(surf->Translated(gp_Vec(mv).Transformed(loc.Transformation().Inverted())));
+      TopoDS_Face                     of;
+      bld.MakeFace(of, moved, loc, BRep_Tool::Tolerance(ff));
+      for (TopoDS_Iterator w(ff, false); w.More(); w.Next())
+        bld.Add(of, offset_wire(w.Value()).Oriented(w.Value().Orientation()));
+      const TopoDS_Face inner = TopoDS::Face(of.Oriented(TopAbs::Reverse(f.Orientation())));
+      bld.Add(shell, inner);
+      sources.Bind(inner, Source{f, (uint8_t)REL_GENERATED});
+    }
+    else
+      // Each wire's rim: the wire and its offset (the other way round), on the removed face's surface.
+      for (TopoDS_Iterator w(ff, false); w.More(); w.Next())
+      {
+        TopoDS_Face rim;
+        bld.MakeFace(rim, surf, loc, BRep_Tool::Tolerance(ff));
+        bld.Add(rim, w.Value());
+        bld.Add(rim, offset_wire(w.Value()).Oriented(TopAbs::Reverse(w.Value().Orientation())));
+        const TopoDS_Face r = TopoDS::Face(rim.Oriented(f.Orientation()));
+        bld.Add(shell, r);
+        h->AddModified(f, r);
+      }
+  }
+  shell.Closed(true);
+  TopoDS_Solid wall;
+  bld.MakeSolid(wall);
+  bld.Add(wall, shell.Oriented(old_shell.Orientation()));
+  if (!BRepCheck_Analyzer(wall).IsValid())
+    return no("the wall is invalid");
+  const double vw = volume_of(wall), vs = volume_of(so);
+  if (dbg)
+    std::fprintf(stderr, "planes: wall volume %.17g solid %.17g\n", vw, vs);
+  if (!(vw > 0) || !(vw <= vs * (1 + 1e-9)))
+    return no("the wall's volume is off");
+  out.result  = wall;
+  out.history = shell_history(solid, wall, {h}, {}, sources, removed);
+  return true;
+}
+
+// NOSHAPE_SHELL_COMPARE: a wall by planes against the slabs' (volume, counts, each input face's images by kind,
+// area and centre), printed.
+void compare_with_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t, double sign, const Built& mine);
+
+bool by_planes(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t, double sign, Built& out)
+{
+  const bool dbg = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
+  auto       no  = [&](const char* why) {
+    if (dbg)
+      std::fprintf(stderr, "planes: %s\n", why);
+    return false;
+  };
+  if (sign > 0)
+    return no("outward");
+  TopoDS_Shape so;
+  int          nso = 0, nsh = 0;
+  for (TopExp_Explorer x(solid, TopAbs_SOLID); x.More(); x.Next(), ++nso)
+    so = x.Current();
+  if (nso != 1)
+    return no("not one solid");
+  for (TopExp_Explorer x(so, TopAbs_SHELL); x.More(); x.Next())
+    ++nsh;
+  if (nsh != 1)
+    return no("not one shell");
+  ShapeIMap faces, edges, verts, rm;
+  TopExp::MapShapes(so, TopAbs_FACE, faces);
+  TopExp::MapShapes(so, TopAbs_EDGE, edges);
+  TopExp::MapShapes(so, TopAbs_VERTEX, verts);
+  for (const TopoDS_Shape& f : removed)
+    rm.Add(f);
+  Bnd_Box bb;
+  BRepBndLib::Add(so, bb, false);
+  const double size = std::sqrt(bb.SquareExtent());
+  const double tol  = 1e-9 * size + 1e-12;
+  // Each face's plane n.x = c (n outward), and the offset one n.x = c - t for a kept face.
+  const int           nf = faces.Extent();
+  std::vector<gp_XYZ> fn(nf + 1);
+  std::vector<double> fc(nf + 1), oc(nf + 1);
+  std::vector<char>   kept(nf + 1);
+  for (int i = 1; i <= nf; ++i)
+  {
+    const TopoDS_Face&  f = TopoDS::Face(faces(i));
+    BRepAdaptor_Surface s(f);
+    if (s.GetType() != GeomAbs_Plane)
+      return no("a face isn't planar");
+    const gp_Ax3 ax = s.Plane().Position();
+    gp_XYZ       n  = ax.XDirection().XYZ().Crossed(ax.YDirection().XYZ());
+    if (f.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    fn[i]   = n;
+    fc[i]   = n.Dot(ax.Location().XYZ());
+    kept[i] = !rm.Contains(f);
+    oc[i]   = kept[i] ? fc[i] - t : fc[i];
+  }
+  ShapeAncMap ef, vf;
+  TopExp::MapShapesAndUniqueAncestors(so, TopAbs_EDGE, TopAbs_FACE, ef);
+  TopExp::MapShapesAndUniqueAncestors(so, TopAbs_VERTEX, TopAbs_FACE, vf);
+  ShapeAncMap ve;
+  TopExp::MapShapesAndUniqueAncestors(so, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  // Each edge's two faces.
+  const int                        ne = edges.Extent();
+  std::vector<std::array<int, 2>>  efi(ne + 1);
+  for (int i = 1; i <= ne; ++i)
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(edges(i));
+    if (BRep_Tool::Degenerated(e))
+      return no("a degenerate edge");
+    const ShapeList& fl = ef.FindFromKey(e);
+    if (fl.Extent() != 2)
+      return no("an edge not between two faces");
+    const int a = faces.FindIndex(fl.First()), b = faces.FindIndex(fl.Last());
+    if (a == b || BRep_Tool::IsClosed(e, TopoDS::Face(fl.First())))
+      return no("a seam");
+    if (!kept[a] && !kept[b])
+      return no("two removed faces meet");
+    if (std::abs(fn[a].Dot(fn[b])) > 1 - 1e-9)
+      return no("two faces of one plane meet");
+    if (BRepAdaptor_Curve(e).GetType() != GeomAbs_Line)
+      return no("an edge not straight");
+    efi[i] = {a, b};
+  }
+  // Each vertex: three faces, three edges; the cavity's corner where their planes meet.
+  const int           nv = verts.Extent();
+  std::vector<gp_XYZ> pts(2 * nv + 1); // 1..nv: the solid's vertices, nv + 1..2 nv: their offsets
+  for (int i = 1; i <= nv; ++i)
+  {
+    const TopoDS_Vertex& v  = TopoDS::Vertex(verts(i));
+    const ShapeList&     fl = vf.FindFromKey(v);
+    if (fl.Extent() != 3 || ve.FindFromKey(v).Extent() != 3)
+      return no("a vertex not of three faces");
+    int k[3], j = 0;
+    for (ShapeList::Iterator it(fl); it.More(); it.Next())
+      k[j++] = faces.FindIndex(it.Value());
+    gp_Mat m(fn[k[0]], fn[k[1]], fn[k[2]]); // columns; rows wanted
+    m.Transpose();
+    const double det = m.Determinant();
+    if (std::abs(det) < 1e-9)
+      return no("a corner's planes nearly meet in a line");
+    // A corner where the three kept faces' edges are all concave (a pocket's floor corner): the slabs leave it out
+    // (their filler's cone there is the void's; the offset path mitres it); not ours until they agree.
+    if (kept[(size_t)k[0]] && kept[(size_t)k[1]] && kept[(size_t)k[2]])
+    {
+      const gp_Pnt V = BRep_Tool::Pnt(v);
+      bool         all_concave = true;
+      for (int p = 0; p < 3 && all_concave; ++p)
+        for (int q = 0; q < 3 && all_concave; ++q)
+          if (p != q)
+          {
+            GProp_GProps g;
+            BRepGProp::SurfaceProperties(faces(k[q]), g);
+            all_concave = gp_Vec(V, g.CentreOfMass()).XYZ().Dot(fn[(size_t)k[p]]) > 1e-9;
+          }
+      if (all_concave)
+        return no("an all-concave corner (the slabs leave it out)");
+    }
+    pts[(size_t)i]      = BRep_Tool::Pnt(v).XYZ();
+    pts[(size_t)(nv + i)] = m.Inverted() * gp_XYZ(oc[k[0]], oc[k[1]], oc[k[2]]);
+  }
+  // Every edge's offset as long as it is and the same way round (within the part's size).
+  for (int i = 1; i <= ne; ++i)
+  {
+    TopoDS_Vertex a, b;
+    TopExp::Vertices(TopoDS::Edge(edges(i)), a, b);
+    const int    ia = verts.FindIndex(a), ib = verts.FindIndex(b);
+    const gp_XYZ D  = pts[(size_t)ib] - pts[(size_t)ia], d = pts[(size_t)(nv + ib)] - pts[(size_t)(nv + ia)];
+    const double L2 = D.SquareModulus();
+    if (L2 <= tol * tol || d.Dot(D) / L2 < 1e-6)
+      return no("an offset edge vanishes or turns round");
+  }
+  return by_planes_build(so, faces, edges, verts, efi, kept, fn, fc, pts, nv, t, tol, removed, solid, out, dbg);
+}
+
 bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t,
               double sign, Built& out)
 {
@@ -2540,6 +2982,74 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
   return true;
 }
 
+void compare_with_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t, double sign, const Built& mine)
+{
+  Built slabs;
+  if (!by_slabs(solid, removed, t, sign, slabs))
+  {
+    std::fprintf(stderr, "planes-compare: slabs failed, planes built\n");
+    return;
+  }
+  auto counts = [](const TopoDS_Shape& s) {
+    int n[3] = {0, 0, 0};
+    const TopAbs_ShapeEnum k[3] = {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX};
+    for (int i = 0; i < 3; ++i)
+    {
+      ShapeIMap m;
+      TopExp::MapShapes(s, k[i], m);
+      n[i] = m.Extent();
+    }
+    return std::array<int, 3>{n[0], n[1], n[2]};
+  };
+  auto sig = [&](const Built& b) {
+    std::vector<std::string> v;
+    ShapeIMap in;
+    TopExp::MapShapes(solid, TopAbs_FACE, in);
+    for (int i = 1; i <= in.Extent(); ++i)
+    {
+      const TopoDS_Shape& f = in(i);
+      auto one = [&](const char* rel, const ShapeList& l) {
+        for (ShapeList::Iterator it(l); it.More(); it.Next())
+        {
+          GProp_GProps g;
+          BRepGProp::SurfaceProperties(it.Value(), g);
+          const gp_Pnt c = g.CentreOfMass();
+          char buf[200];
+          std::snprintf(buf, sizeof buf, "f%d %s a%.6e c(%.6e %.6e %.6e)", i, rel, g.Mass(), c.X(), c.Y(), c.Z());
+          v.push_back(buf);
+        }
+      };
+      if (b.history->IsRemoved(f))
+        v.push_back("f" + std::to_string(i) + " removed");
+      one("mod", b.history->Modified(f));
+      one("gen", b.history->Generated(f));
+      bool same = false;
+      for (TopExp_Explorer x(b.result, TopAbs_FACE); x.More() && !same; x.Next())
+        same = x.Current().IsSame(f);
+      if (same)
+      {
+        ShapeList self;
+        self.Append(f);
+        one("mod", self);
+      }
+    }
+    std::sort(v.begin(), v.end());
+    return v;
+  };
+  const double va = volume_of(mine.result), vb = volume_of(slabs.result);
+  const auto   ca = counts(mine.result), cb = counts(slabs.result);
+  auto         sa = sig(mine), sb = sig(slabs);
+  const bool vol_ok = std::abs(va - vb) <= 1e-9 * std::abs(vb);
+  std::fprintf(stderr, "planes-compare: %s volume %.17g / %.17g counts %d %d %d / %d %d %d history %s\n", vol_ok && ca == cb ? "same" : "DIFFERENT", va, vb, ca[0], ca[1], ca[2], cb[0], cb[1], cb[2], sa == sb ? "same" : "differs");
+  if (sa != sb && std::getenv("NOSHAPE_SHELL_COMPARE_HISTORY"))
+  {
+    for (const std::string& x : sa)
+      std::fprintf(stderr, "  planes %s\n", x.c_str());
+    for (const std::string& x : sb)
+      std::fprintf(stderr, "  slabs  %s\n", x.c_str());
+  }
+}
+
 OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, double thickness, bool outward,
                                 uint8_t method)
 {
@@ -2590,7 +3100,7 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
   const bool offset_ok = gap > 1e-5 && !collapses;
   Built      b;
   t_shell_path = "";
-  // method: 0 = automatic, 1 = offset only, 2 = slabs only (tests).
+  // method: 0 = automatic, 1 = offset only, 2 = slabs only, 3 = planes only (tests).
   const bool dbg = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
   auto       timed = [&](const char* what, auto&& run) {
     // (Also when it starts: a path the budget stops never reports its end.)
@@ -2606,8 +3116,14 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
     return ok;
   };
   const bool done = (method == 0 && timed("regions", [&] { return by_regions(solid.shape, removed, thickness, sign, b); })) ||
-                    (method != 2 && (offset_ok || method == 1) && timed("offset", [&] { return by_offset(solid.shape, removed, thickness, sign, b); })) ||
-                    (method != 1 && timed("slabs", [&] { return by_slabs(solid.shape, removed, thickness, sign, b); }));
+                    ((method == 0 || method == 1) && (offset_ok || method == 1) && timed("offset", [&] { return by_offset(solid.shape, removed, thickness, sign, b); })) ||
+                    ((method == 0 || method == 3) && !std::getenv("NOSHAPE_SHELL_NO_PLANES") && timed("planes", [&] {
+                       const bool ok = by_planes(solid.shape, removed, thickness, sign, b);
+                       if (ok && std::getenv("NOSHAPE_SHELL_COMPARE"))
+                         compare_with_slabs(solid.shape, removed, thickness, sign, b);
+                       return ok;
+                     })) ||
+                    ((method == 0 || method == 2) && timed("slabs", [&] { return by_slabs(solid.shape, removed, thickness, sign, b); }));
   if (!done)
     fail_op("shell failed");
   return make_result({solid.shape}, b.result, b.history.get());

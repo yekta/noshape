@@ -528,3 +528,40 @@ fn ops_leave_their_input_as_it_was() {
     }
     assert!(changed.is_empty(), "changed their input: {changed:?}");
 }
+
+/// Solids bounded by planes: the direct wall (ShellMethod::Planes) is the slabs' wall: volume, counts and each input
+/// face's images; where offsets would meet (a 3 mm wall between pockets, shelled 2 mm) it declines.
+#[test]
+fn planes_and_slabs_agree() {
+    let unified = |s: Shape| unify_same_domain(&s).unwrap().shape;
+    let l_block = unified(fuse(&bx([0.0; 3], [40.0, 20.0, 10.0]), &bx([0.0, 0.0, 0.0], [10.0, 40.0, 10.0])).unwrap().shape);
+    let pocket = unified(cut(&bx([0.0; 3], [60.0, 40.0, 20.0]), &bx([20.0, 10.0, 10.0], [40.0, 30.0, 21.0])).unwrap().shape);
+    let stepped = unified(fuse(&bx([0.0; 3], [60.0, 40.0, 10.0]), &bx([0.0, 0.0, 0.0], [30.0, 40.0, 20.0])).unwrap().shape);
+    let pockets = unified(cut(&cut(&bx([0.0; 3], [60.0, 40.0, 20.0]), &bx([5.0, 5.0, 5.0], [28.5, 35.0, 21.0])).unwrap().shape, &bx([31.5, 5.0, 5.0], [55.0, 35.0, 21.0])).unwrap().shape);
+    let bottom = |s: &Shape| faces_where(s, |c| c.z.abs() < 1e-9);
+    let cases: Vec<(&str, Shape, Vec<Shape>, f64)> = vec![
+        ("L, top removed", l_block.clone(), top(&l_block, 10.0), 2.0),
+        ("stepped, bottom removed", stepped.clone(), bottom(&stepped), 1.5),
+    ];
+    let images = |r: &OpResult, s: &Shape| -> Vec<(usize, usize)> {
+        (0..s.faces().len()).map(|i| (r.history.modified(0, ShapeType::Face, i as u32).len(), r.history.generated(0, ShapeType::Face, i as u32).len())).collect()
+    };
+    for (name, s, rm, t) in cases {
+        let p = shell_solid(&s, &rm, t, ShellSide::Inside, ShellMethod::Planes).unwrap_or_else(|e| panic!("{name}: planes declined: {e}"));
+        let q = shell_solid(&s, &rm, t, ShellSide::Inside, ShellMethod::Slabs).unwrap();
+        assert!(p.shape.is_valid(), "{name}");
+        assert!(close(vol(&p.shape), vol(&q.shape)), "{name}: {} vs slabs {}", vol(&p.shape), vol(&q.shape));
+        for k in [ShapeType::Face, ShapeType::Edge, ShapeType::Vertex] {
+            assert_eq!(p.shape.count(k), q.shape.count(k), "{name}: {k:?}");
+        }
+        assert_eq!(images(&p, &s), images(&q, &s), "{name}: each face's images (modified, generated)");
+    }
+    // A pocket's floor corners (all three edges concave): the slabs leave them out (13440 mm³; the offset path's and
+    // Parasolid's mitre is 13472): declined until the two agree.
+    assert!(shell_solid(&pocket, &bottom(&pocket), 2.0, ShellSide::Inside, ShellMethod::Planes).is_err(), "a pocket's floor corners");
+    let rm = top(&pockets, 20.0);
+    assert!(shell_solid(&pockets, &rm, 2.0, ShellSide::Inside, ShellMethod::Planes).is_err(), "offsets meeting across the 3 mm wall");
+    // Both tops of the step removed: the step's riser hangs over the cavity, its foot past the removed step face.
+    let rm = faces_where(&stepped, |c| ((c.z - 10.0).abs() < 1e-9 && c.x > 30.0) || (c.z - 20.0).abs() < 1e-9);
+    assert!(shell_solid(&stepped, &rm, 1.5, ShellSide::Inside, ShellMethod::Planes).is_err(), "a rim past its removed face");
+}

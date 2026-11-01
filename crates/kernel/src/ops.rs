@@ -355,6 +355,8 @@ pub enum ShellMethod {
     Offset,
     /// Only the boolean construction (thickened faces + fillers).
     Slabs,
+    /// Only the direct wall of a solid bounded by planes (the slabs' wall without Booleans).
+    Planes,
 }
 
 /// Which way this thread's last [`shell_solid`] was built: "regions" (cuts
@@ -378,6 +380,7 @@ pub fn shell_solid(solid: &Shape, faces: &[Shape], thickness: f64, side: ShellSi
         ShellMethod::Auto => 0,
         ShellMethod::Offset => 1,
         ShellMethod::Slabs => 2,
+        ShellMethod::Planes => 3,
     };
     op(ffi::op_shell_solid(solid.raw(), &l, thickness, side == ShellSide::Outside, m))
 }

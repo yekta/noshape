@@ -63,6 +63,24 @@ reasons in bool.md, offset faces from our MakeThickSolidBySimple slabs first). T
 invalid slab tool (1 of 8 such Shells succeeds), one OCCT common with the slabs as a tool group (results change, 2×
 slower), fusing the other slabs first (slower). The fundamental fix on our side is our own inner offset for
 non-convex parts (regions takes convex only): not started.
+SHELL-SLOW inner offset (user 11-01 evening: noshape's own inner offset for non-convex parts, landable steps, each
+measured on vibe3 and identical to the slabs). Step 1 (planes): shell.cpp `by_planes` between offset and slabs
+(ShellMethod::Planes = 3 only it; NOSHAPE_SHELL_NO_PLANES off; NOSHAPE_SHELL_COMPARE runs the slabs too and prints
+"planes-compare: same / DIFFERENT"): solids bounded by planes, every vertex of three faces, no two removed faces
+meeting; each vertex's offset where its three (offset / removed) planes meet, the wall sewn from the kept faces, the
+offsets (wire copies) and the rims, no Boolean; declines where an offset edge vanishes or turns, an offset face
+crosses itself or meets another face away from shared edges (bounding-box pruned planar polygon test), or the wall
+is invalid. T1 kernel `shell::planes_and_slabs_agree` (L, pocket, stepped: volume, counts, every face's images as the
+slabs'; three declines). Found with it: the slabs leave out the inward corners where all three edges are concave
+(a pocket's floor corners: the wall thins to a point; the vertex filler's cone is the void's, shell.cpp `if
+(m.Dot(mean) > 0)`): pocket 13440 mm³ by slabs, 13472 by the offset path (the default for it) and by planes. Fixing
+the cone (`* sg`) changes 20 of the fuzz corpus's 211 slab results (e.g. a73cee79 21432 → 21737 mm³, 87 → 51
+faces): not landed; live asked (REQUESTS 23:00) which is Parasolid's; planes declines such corners meanwhile, so it
+is identical to the slabs wherever it builds. Share: of the fuzz corpus's 211 distinct slab-bound
+Shells (vibe4 ~/agents/shellcorpus/cases, NOSHAPE_DUMP_OPS dumps of seeds 3000-3029; run.sh), none is all planes
+(113 curved faces, 21 not one shell): the share comes with step 2. Step 2 (cylinders, cones) next: offsets coaxial
+(R ∓ t, cones same half-angle), line / circle edges whose offsets stay lines / circles, corners by Newton, seams,
+pcurves; collapsing fillets (R ≤ t) declined; the crossing test needs a curved-face replacement first.
 G31 tuned to live 1731 (19:00): measure.rs LIVE_* floors (Parasolid's magnitudes from the block, its ×10 copy and its
 top face; freeform bounds live are ~20× those: its loft volume is 11 mm³ off, ours exact, so ours stay at the floors);
 face_property_variance for the Face tab. Inch units and REST /massproperties still to compare when live's REST is back.
