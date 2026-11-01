@@ -33,6 +33,8 @@ pub struct TargetRow {
     pub label: Entity<InputState>,
     pub x: Entity<InputState>,
     pub y: Entity<InputState>,
+    /// The direction came from the Y direction field (X is hidden then).
+    pub dir_y: bool,
 }
 
 /// The open Datum dialog.
@@ -54,6 +56,8 @@ pub struct DatumDlg {
     pub open: Option<usize>,
     /// The target whose Origin field takes the next click.
     pub picking_origin: Option<usize>,
+    /// The target whose X (false) / Y (true) direction takes the next click.
+    pub picking_dir: Option<(usize, bool)>,
     _subs: Vec<Subscription>,
 }
 
@@ -80,7 +84,7 @@ impl DrawingEditor {
                     d.label_text = st.read(cx).value().trim().to_string();
                 }
             });
-            self.datum_dlg = Some(DatumDlg { tab, label, label_text, area: 0, style: TargetStyle::Inside, area_size: false, size_a, size_b, size_precision: None, rows: Vec::new(), open: None, picking_origin: None, _subs: vec![sub] });
+            self.datum_dlg = Some(DatumDlg { tab, label, label_text, area: 0, style: TargetStyle::Inside, area_size: false, size_a, size_b, size_precision: None, rows: Vec::new(), open: None, picking_origin: None, picking_dir: None, _subs: vec![sub] });
         } else if !active {
             self.datum_dlg = None;
         }
@@ -147,7 +151,7 @@ impl DrawingEditor {
             }));
         }
         if let Some(d) = &mut self.datum_dlg {
-            d.rows.push(TargetRow { ann: a, label: lab, x, y });
+            d.rows.push(TargetRow { ann: a, label: lab, x, y, dir_y: false });
             d.open = Some(k);
             // Live: the new target's Origin field is active (blue) at once.
             d.picking_origin = Some(k);
@@ -170,9 +174,14 @@ impl DrawingEditor {
         if let AnnotationKind::DatumTarget { label: l, anchor, .. } = &mut row.ann.kind {
             *l = label;
             if let Some(o) = opts.origin {
+                // Along the X direction and across it, each flipped to the
+                // other side of the origin by its button (live 1699).
+                let (u, n) = opts.axes();
                 let sx = if opts.flip_x { -1.0 } else { 1.0 };
                 let sy = if opts.flip_y { -1.0 } else { 1.0 };
-                let moved = [dx.map(|v| o[0] + sx * v).unwrap_or(anchor[0]), dy.map(|v| o[1] + sy * v).unwrap_or(anchor[1])];
+                let rel = [anchor[0] - o[0], anchor[1] - o[1]];
+                let (x, y) = (dx.map(|v| sx * v).unwrap_or(rel[0] * u[0] + rel[1] * u[1]), dy.map(|v| sy * v).unwrap_or(rel[0] * n[0] + rel[1] * n[1]));
+                let moved = [o[0] + u[0] * x + n[0] * y, o[1] + u[1] * x + n[1] * y];
                 if (moved[0] - anchor[0]).abs() > 1e-12 || (moved[1] - anchor[1]).abs() > 1e-12 {
                     *anchor = moved;
                     // Placed by its distances now, not on the picked point.
@@ -187,32 +196,67 @@ impl DrawingEditor {
     pub fn datum_origin_click(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let Some(k) = self.datum_dlg.as_ref().and_then(|d| d.picking_origin) else { return false };
         let Some(pp) = self.any_point(self.cursor) else { return true };
-        let mm = self.drawing.units_mm;
-        let u = noshape_model::drawing::format::length_units(&self.drawing, &Default::default());
         let Some(d) = &mut self.datum_dlg else { return true };
         let Some(row) = d.rows.get_mut(k) else { return true };
-        let AnnotationKind::DatumTarget { anchor, view, .. } = &row.ann.kind else { return true };
+        let AnnotationKind::DatumTarget { view, .. } = &row.ann.kind else { return true };
         if *view != pp.view {
             self.status = Some("Select the origin in the target's view".into());
             return true;
         }
-        let (ax, ay) = (anchor[0], anchor[1]);
         let opts = row.ann.target.get_or_insert_with(Default::default);
         opts.origin = Some(pp.p);
         opts.origin_ref = pp.r.clone();
-        opts.flip_x = ax < pp.p[0];
-        opts.flip_y = ay < pp.p[1];
         row.ann.refs.retain(|r| r.slot != 1);
         if let Some(r) = pp.r {
             row.ann.refs.push(AnnotationRef { slot: 1, point: r });
         }
-        let fmt = |v: f64| format!("{} {}", noshape_model::drawing::format::format_number(v / u.meters(), Some(if mm { 2 } else { 3 }), 3), u.symbol());
-        let (x, y) = (fmt((ax - pp.p[0]).abs()), fmt((ay - pp.p[1]).abs()));
-        let (xs, ys) = (row.x.clone(), row.y.clone());
         d.picking_origin = None;
+        self.datum_fill_distances(k, window, cx);
+        true
+    }
+
+    /// A target's X / Y distance fields (and flips) from where it is
+    /// relative to its origin, along its X direction and across it.
+    fn datum_fill_distances(&mut self, k: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let mm = self.drawing.units_mm;
+        let u = noshape_model::drawing::format::length_units(&self.drawing, &Default::default());
+        let Some(row) = self.datum_dlg.as_mut().and_then(|d| d.rows.get_mut(k)) else { return };
+        let AnnotationKind::DatumTarget { anchor, .. } = &row.ann.kind else { return };
+        let anchor = *anchor;
+        let opts = row.ann.target.get_or_insert_with(Default::default);
+        let Some(o) = opts.origin else { return };
+        let (ux, uy) = opts.axes();
+        let rel = [anchor[0] - o[0], anchor[1] - o[1]];
+        let (a, b) = (rel[0] * ux[0] + rel[1] * ux[1], rel[0] * uy[0] + rel[1] * uy[1]);
+        opts.flip_x = a < -1e-12;
+        opts.flip_y = b < -1e-12;
+        let fmt = |v: f64| format!("{} {}", noshape_model::drawing::format::format_number(v / u.meters(), Some(if mm { 2 } else { 3 }), 3), u.symbol());
+        let (x, y) = (fmt(a.abs()), fmt(b.abs()));
+        let (xs, ys) = (row.x.clone(), row.y.clone());
         xs.update(cx, |s, cx| s.set_value(x, window, cx));
         ys.update(cx, |s, cx| s.set_value(y, window, cx));
         self.datum_preview(cx);
+    }
+
+    /// A click while a target's X / Y direction field waits for an edge: a
+    /// straight edge of its view sets the X direction (a Y edge: X a
+    /// quarter turn clockwise from it, as the hole table's; live 1699).
+    /// True when used.
+    pub fn datum_dir_click(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some((k, is_y)) = self.datum_dlg.as_ref().and_then(|d| d.picking_dir) else { return false };
+        let view = match self.datum_dlg.as_ref().and_then(|d| d.rows.get(k)).map(|r| &r.ann.kind) {
+            Some(AnnotationKind::DatumTarget { view, .. }) => *view,
+            _ => return true,
+        };
+        let Some(dir) = self.straight_edge_dir_near(view) else { return true };
+        if let Some(d) = &mut self.datum_dlg
+            && let Some(row) = d.rows.get_mut(k)
+        {
+            row.ann.target.get_or_insert_with(Default::default).x_dir = Some(if is_y { [dir[1], -dir[0]] } else { dir });
+            row.dir_y = is_y;
+            d.picking_dir = None;
+        }
+        self.datum_fill_distances(k, window, cx);
         true
     }
 
@@ -224,6 +268,11 @@ impl DrawingEditor {
         for (r, id) in d.rows.iter().zip(first..) {
             let mut a = r.ann.clone();
             a.id = id;
+            // While editing, its position dimensions show (live 1699);
+            // placed, it has none until Show dimensions (A35).
+            if let Some(t) = a.target.as_mut() {
+                t.hide_dims = false;
+            }
             dr.sheets[self.sheet].annotations.push(a);
         }
         Some(dr)
@@ -458,15 +507,34 @@ impl DrawingEditor {
                             .child(field_box(("dt-origin", k), "Origin", opts.origin.map(|_| "Point".to_string()), picking).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if let Some(d) = &mut this.datum_dlg {
                                     d.picking_origin = Some(k);
+                                    d.picking_dir = None;
                                 }
                                 cx.notify();
                             })))
                             .child(field_box(("dt-loc", k), "Target location", Some("Point".into()), false))
                             .child(h_flex().gap(px(4.)).child(crate::ui::caret(true)).child(div().text_size(px(12.)).child("X position")))
-                            .child(field_box(("dt-xdir", k), "X direction", None, false))
+                            .when(opts.x_dir.is_none() || !r.dir_y, |e| {
+                                e.child(field_box(("dt-xdir", k), "X direction", opts.x_dir.filter(|_| !r.dir_y).map(|_| "Edge".to_string()), d.picking_dir == Some((k, false))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    if let Some(d) = &mut this.datum_dlg {
+                                        d.picking_dir = Some((k, false));
+                                        d.picking_origin = None;
+                                    }
+                                    cx.notify();
+                                })))
+                            })
                             .child(h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.x).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
                             .child(h_flex().gap(px(4.)).child(crate::ui::caret(true)).child(div().text_size(px(12.)).child("Y position")))
-                            .child(field_box(("dt-ydir", k), "Y direction", None, false))
+                            // Setting one direction hides the other (live 1699, as
+                            // the hole table's).
+                            .when(opts.x_dir.is_none() || r.dir_y, |e| {
+                                e.child(field_box(("dt-ydir", k), "Y direction", opts.x_dir.filter(|_| r.dir_y).map(|_| "Edge".to_string()), d.picking_dir == Some((k, true))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    if let Some(d) = &mut this.datum_dlg {
+                                        d.picking_dir = Some((k, true));
+                                        d.picking_origin = None;
+                                    }
+                                    cx.notify();
+                                })))
+                            })
                             .child(h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.y).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
                             .child(h_flex().gap(px(8.)).pt(px(2.)).child(flip(("dt-flipx", k), "X", opts.flip_x, true, cx)).child(flip(("dt-flipy", k), "Y", opts.flip_y, false, cx))),
                     );

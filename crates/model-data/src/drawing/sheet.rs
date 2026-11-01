@@ -2244,6 +2244,9 @@ impl SheetGeometry {
                     }
                     // The target's position dimensions from its origin (X and
                     // Y; hidden with "Hide dimension").
+                    // Both from the origin to the target, on the origin's
+                    // sides (live 1699: a target up and right of its origin
+                    // gets "40" along the bottom and "30" on the left).
                     if let (Some(o), false) = (opts.origin, opts.hide_dims) {
                         let os = env.to_sheet(*view, o);
                         let (dx, dy) = ((anchor[0] - o[0]).abs(), (anchor[1] - o[1]).abs());
@@ -2251,11 +2254,13 @@ impl SheetGeometry {
                         let basic = |v: f64| DimText { boxed: true, ..env.text(a, v, false, "") };
                         if dx > 1e-9 {
                             let t = basic(dx);
-                            self.linear_dimension_text(os, [p[0], os[1]], -8.0, DimOrientation::Horizontal, &t, pick);
+                            let level = if p[1] >= os[1] { os[1] - 8.0 } else { os[1] + 8.0 };
+                            self.linear_dimension_text(os, p, level - os[1].max(p[1]), DimOrientation::Horizontal, &t, pick);
                         }
                         if dy > 1e-9 {
                             let t = basic(dy);
-                            self.linear_dimension_text([p[0], os[1]], p, 8.0, DimOrientation::Vertical, &t, pick);
+                            let level = if p[0] >= os[0] { os[0] - 8.0 } else { os[0] + 8.0 };
+                            self.linear_dimension_text(os, p, level - os[0].max(p[0]), DimOrientation::Vertical, &t, pick);
                         }
                     }
                 }

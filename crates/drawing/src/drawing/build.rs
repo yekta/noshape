@@ -676,6 +676,20 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
         out.annotations.retain(|a| !gone.contains(&a.id));
         lost.retain(|(id, _)| !gone.contains(id));
     }
+    // A datum target its distances from the origin put off the model is
+    // drawn red (live 1699: orange-red).
+    for a in &out.annotations {
+        if let AnnotationKind::DatumTarget { view, anchor, .. } = &a.kind
+            && a.target.as_ref().is_some_and(|o| o.origin.is_some())
+            && !a.refs.iter().any(|r| r.slot == 0)
+            && !dangling.contains(&a.id)
+            && let Some(frame) = views.get(view).and_then(|g| g.frame)
+            && let Some(src) = views::view_source(sheet, *view).and_then(|(key, _)| sources.get(&key))
+            && views::body_under(src, &frame, *anchor, 1e-5).is_none()
+        {
+            dangling.push(a.id);
+        }
+    }
     (out, dangling, lost)
 }
 

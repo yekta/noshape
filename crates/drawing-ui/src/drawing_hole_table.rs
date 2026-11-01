@@ -137,6 +137,24 @@ impl DrawingEditor {
     /// A click while X direction takes a pick: a straight edge of the
     /// table's view sets the table's X axis along it (live 1985). True when
     /// used.
+    /// The direction of view `v`'s straight model edge under the pointer
+    /// (pointing right, or up when vertical), by geometry (with the table
+    /// and datum tools the hover is the view, not its edge).
+    pub fn straight_edge_dir_near(&self, v: noshape_model::drawing::ViewId) -> Option<[f64; 2]> {
+        let tol = self.tol_mm(5.0);
+        let g = self.geoms.get(&v)?;
+        let pl = self.placement(v)?;
+        let c = self.cursor;
+        let near = |e: &noshape_model::drawing::views::ViewEdge| e.points.windows(2).any(|w| noshape_scene::drawing_tools::seg_dist(c, pl.to_sheet(w[0]), pl.to_sheet(w[1])) < tol);
+        let me = g.edges.iter().filter(|e| e.visible && near(e)).find_map(|e| g.model_edges.get(e.model? as usize))?;
+        let noshape_model::drawing::views::EdgeGeom::Line { a, b } = me.geom else { return None };
+        let l = (b[0] - a[0]).hypot(b[1] - a[1]);
+        (l > 1e-9).then(|| {
+            let u = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+            if u[0] < -1e-9 || (u[0].abs() <= 1e-9 && u[1] < 0.0) { [-u[0], -u[1]] } else { u }
+        })
+    }
+
     pub fn hole_x_dir_click(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(d) = self.hole_dlg.as_ref().filter(|d| d.x_picking || d.y_picking) else { return false };
         let v = match (&self.tool, d.table.and_then(|id| self.current_sheet().table(id))) {
@@ -145,23 +163,7 @@ impl DrawingEditor {
             _ => None,
         };
         let Some(v) = v else { return false };
-        // Straight edges only; by geometry near the pointer (with the table
-        // tool the hover is the view, not its edge).
-        let tol = self.tol_mm(5.0);
-        let dir = (|| {
-            let g = self.geoms.get(&v)?;
-            let pl = self.placement(v)?;
-            let c = self.cursor;
-            let near = |e: &noshape_model::drawing::views::ViewEdge| e.points.windows(2).any(|w| noshape_scene::drawing_tools::seg_dist(c, pl.to_sheet(w[0]), pl.to_sheet(w[1])) < tol);
-            let me = g.edges.iter().filter(|e| e.visible && near(e)).find_map(|e| g.model_edges.get(e.model? as usize))?;
-            let noshape_model::drawing::views::EdgeGeom::Line { a, b } = me.geom else { return None };
-            let l = (b[0] - a[0]).hypot(b[1] - a[1]);
-            (l > 1e-9).then(|| {
-                let u = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
-                // Pointing right (or up when vertical), as a picked axis reads.
-                if u[0] < -1e-9 || (u[0].abs() <= 1e-9 && u[1] < 0.0) { [-u[0], -u[1]] } else { u }
-            })
-        })();
+        let dir = self.straight_edge_dir_near(v);
         if let (Some(dir), Some(d)) = (dir, &mut self.hole_dlg) {
             // A Y edge: X a quarter turn clockwise from it (live 1682: Y
             // along the top edge → X down).

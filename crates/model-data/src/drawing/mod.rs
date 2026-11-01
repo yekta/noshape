@@ -2063,11 +2063,22 @@ pub struct DatumTargetOpts {
     /// Live (behaviours "A35 datum target"): a new target draws no
     /// dimensions until Show dimensions.
     pub hide_dims: bool,
+    /// X direction (an edge's, view coordinates; None: the view's x): the
+    /// X / Y distances measure along it and across it (live 1699).
+    pub x_dir: Option<[f64; 2]>,
 }
 
 impl Default for DatumTargetOpts {
     fn default() -> Self {
-        Self { style: TargetStyle::default(), origin: None, origin_ref: None, angular: false, flip_x: false, flip_y: false, hide_dims: true }
+        Self { style: TargetStyle::default(), origin: None, origin_ref: None, angular: false, flip_x: false, flip_y: false, hide_dims: true, x_dir: None }
+    }
+}
+
+impl DatumTargetOpts {
+    /// The X and Y axes the distances measure along (view coordinates).
+    pub fn axes(&self) -> ([f64; 2], [f64; 2]) {
+        let u = self.x_dir.unwrap_or([1.0, 0.0]);
+        (u, [-u[1], u[0]])
     }
 }
 

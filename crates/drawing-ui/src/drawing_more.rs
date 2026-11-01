@@ -225,7 +225,7 @@ impl DrawingEditor {
                 }
             }
             Tool::DatumTarget { anchor: None } => {
-                if self.datum_origin_click(window, cx) {
+                if self.datum_origin_click(window, cx) || self.datum_dir_click(window, cx) {
                     return true;
                 }
                 // On geometry, or in space (help datum: "Click in space to add

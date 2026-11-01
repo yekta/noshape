@@ -2758,6 +2758,45 @@ fn drawing_of_a_part_studio_using_document_variables() {
     assert_ne!(hash, hash2, "the source changes with the variable");
 }
 
+/// A datum target's position dimensions run from its origin on the
+/// origin's sides (live 1699: a target up and right gets "40" along the
+/// bottom and "30" on the left); one its distances put off the model is red.
+#[test]
+fn datum_target_dimensions_from_its_origin() {
+    let mut doc = crate::Document::new();
+    if let TabContent::PartStudio(ps) = &mut doc.tabs[0].content {
+        *ps = crate::demo::plate_studio();
+    }
+    let ps = doc.tabs[0].id;
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, ps, ViewOrientation::Top, [150.0, 150.0]));
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    let (o, t) = ([g.min[0] + 0.002, g.min[1] + 0.002], [g.max[0] - 0.002, g.max[1] - 0.002]);
+    let target = |anchor: [f64; 2]| Annotation {
+        id: 1,
+        kind: AnnotationKind::DatumTarget { view: ViewId(1), anchor, label: "A1".into(), area: DatumTargetArea::Point },
+        position: [250.0, 250.0],
+        target: Some(Box::new(DatumTargetOpts { origin: Some(o), hide_dims: false, ..Default::default() })),
+        ..Default::default()
+    };
+    drawing.sheets[0].annotations.push(target(t));
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(built.dangling.is_empty(), "{:?}", built.dangling);
+    let pl = built.placements.iter().find(|p| p.id == ViewId(1)).unwrap();
+    let os = pl.to_sheet(o);
+    let pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(1)).unwrap() as u32;
+    let values: Vec<_> = built.geometry.texts.iter().filter(|x| x.pick == pick && x.text != "A1").collect();
+    assert_eq!(values.len(), 2, "{values:?}");
+    // One below the origin (the horizontal one), one left of it.
+    assert!(values.iter().any(|x| x.pos[1] < os[1] - 1.0) && values.iter().any(|x| x.pos[0] < os[0] - 1.0), "{values:?} origin {os:?}");
+    // Mirrored about the origin: off the plate, red.
+    drawing.sheets[0].annotations[0] = target([2.0 * o[0] - t[0], 2.0 * o[1] - t[1]]);
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert_eq!(built.dangling, vec![1]);
+}
+
 /// A view of a named view with a section plane (live 3121-3127): the
 /// material beyond the plane cut away, the cut face hatched.
 #[test]
