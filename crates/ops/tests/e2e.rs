@@ -1752,6 +1752,9 @@ fn drawing_section_detail_views_and_annotations() {
     assert!(last(&mut ctx).ends_with(":: BOM table"));
     let e = try_call(&mut ctx, "drawing_view_table", json!({ "drawing": tab, "kind": "hole", "view": top_id, "position": [20, 200] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("origin"), "{e:?}");
+    // Further views: another view of the same part only (live request 1744).
+    let e = try_call(&mut ctx, "drawing_view_table", json!({ "drawing": tab, "kind": "hole", "view": top_id, "origin": [cx, cy], "more_views": [{ "view": top_id, "origin": [cx, cy] }], "position": [20, 200] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("more_views[0]"), "{e:?}");
 }
 
 #[test]

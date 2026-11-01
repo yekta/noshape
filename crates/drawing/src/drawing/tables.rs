@@ -331,6 +331,58 @@ pub fn hole_rows(g: &ViewGeometry, origin: [f64; 2], exclude: &[[f64; 2]], x_dir
     out
 }
 
+/// A hole table's rows from its further views (live request 1744): their
+/// holes from their own origins, flips and directions (flips relative to
+/// the table's, which the rows get when shown).
+pub fn hole_extra_rows<'a>(t: &Table, geoms: &dyn Fn(super::ViewId) -> Option<&'a ViewGeometry>, source: Option<&SourceModel>) -> Vec<HoleRow> {
+    let TableKind::Hole { more, flip_x, flip_y, .. } = &t.kind else { return Vec::new() };
+    let mut out = Vec::new();
+    for m in more {
+        let Some(g) = geoms(m.view) else { continue };
+        let o = match (&m.origin_ref, source) {
+            (Some(r), Some(src)) => super::views::resolve_in_view(&src.context, g, r).map(|(p, _)| p).unwrap_or(m.origin),
+            _ => m.origin,
+        };
+        let (fx, fy) = (if m.flip_x != *flip_x { -1.0 } else { 1.0 }, if m.flip_y != *flip_y { -1.0 } else { 1.0 });
+        out.extend(hole_rows(g, o, &m.exclude, m.x_dir).into_iter().map(|mut h| {
+            h.x *= fx;
+            h.y *= fy;
+            h
+        }));
+    }
+    out
+}
+
+/// A hole table's rows with those of its further views (live request
+/// 1744): a hole already listed (the same model circle) is left out, the
+/// others join their size's group under its letter (the next number) or
+/// start a new letter after the last.
+pub fn merge_hole_rows(mut rows: Vec<HoleRow>, extra: &[HoleRow]) -> Vec<HoleRow> {
+    for h in extra {
+        if h.point.is_some() && rows.iter().any(|r| r.point == h.point) {
+            continue;
+        }
+        let same = |r: &HoleRow| (r.diameter - h.diameter).abs() < 1e-12;
+        match rows.iter().rposition(same) {
+            Some(i) => {
+                let letter = rows[i].tag.trim_end_matches(|c: char| c.is_ascii_digit()).to_string();
+                let n = rows.iter().filter(|r| same(r)).count() + 1;
+                rows.insert(i + 1, HoleRow { tag: format!("{letter}{n}"), ..h.clone() });
+            }
+            None => {
+                let mut sizes: Vec<f64> = Vec::new();
+                for r in &rows {
+                    if !sizes.iter().any(|s| (s - r.diameter).abs() < 1e-12) {
+                        sizes.push(r.diameter);
+                    }
+                }
+                rows.push(HoleRow { tag: format!("{}1", tag_letters(sizes.len())), ..h.clone() });
+            }
+        }
+    }
+    rows
+}
+
 /// A hole table's X and Y axes (view coordinates): X along `x_dir`, Y a
 /// quarter turn counter-clockwise from it.
 pub fn hole_axes(x_dir: Option<[f64; 2]>) -> ([f64; 2], [f64; 2]) {
@@ -382,6 +434,13 @@ pub fn cut_list_rows(view_geo: Option<&ViewGeometry>, source: Option<&SourceMode
 pub const BOM_HEADER: [&str; 4] = ["Item", "Quantity", "Part number", "Description"];
 
 pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeometry>, source: Option<&SourceModel>, origin: Option<[f64; 2]>, revisions: &[RevisionRow], expand: &dyn Fn(&str) -> String) -> TableData {
+    table_data_holes(drawing, table, view_geo, source, origin, revisions, expand, &[])
+}
+
+/// [`table_data`] with a hole table's rows from its further views
+/// (`TableKind::Hole::more`, [`merge_hole_rows`]).
+#[allow(clippy::too_many_arguments)]
+pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeometry>, source: Option<&SourceModel>, origin: Option<[f64; 2]>, revisions: &[RevisionRow], expand: &dyn Fn(&str) -> String, extra: &[HoleRow]) -> TableData {
     let data = match &table.kind {
         TableKind::General { cells, title, header } => {
             let mut rows: Vec<Vec<String>> = cells.iter().map(|r| r.iter().map(|c| expand(c)).collect()).collect();
@@ -462,7 +521,7 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
             let f = DimFormat { precision: *precision, ..Default::default() };
             let u = length_units(drawing, &f);
             let num = |m: f64| format_number(m / u.meters(), f.precision, default_digits(u));
-            let holes = view_geo.map(|g| hole_rows(g, origin.unwrap_or(*stored), exclude, *x_dir)).unwrap_or_default();
+            let holes = merge_hole_rows(view_geo.map(|g| hole_rows(g, origin.unwrap_or(*stored), exclude, *x_dir)).unwrap_or_default(), extra);
             // Groups of one size: consecutive rows (hole_rows keeps a size together).
             let mut groups: Vec<(usize, usize)> = Vec::new();
             for (i, h) in holes.iter().enumerate() {
@@ -545,9 +604,15 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
 
 /// [`table_data`] with the document-level data of `info` (custom tables).
 pub fn table_data_with(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeometry>, source: Option<&SourceModel>, origin: Option<[f64; 2]>, info: &super::build::SheetInfo, expand: &dyn Fn(&str) -> String) -> TableData {
+    table_data_with_extra(drawing, table, view_geo, source, origin, info, expand, &[])
+}
+
+/// [`table_data_with`]; `extra`: a hole table's rows from its further views.
+#[allow(clippy::too_many_arguments)]
+pub fn table_data_with_extra(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeometry>, source: Option<&SourceModel>, origin: Option<[f64; 2]>, info: &super::build::SheetInfo, expand: &dyn Fn(&str) -> String, extra: &[HoleRow]) -> TableData {
     match CustomTableKey::of(&table.kind) {
         Some(key) => finish(drawing, table, custom_data(&table.kind, info.custom_tables.get(&key).map(|r| r.as_ref()))),
-        None => table_data(drawing, table, view_geo, source, origin, &info.revisions, expand),
+        None => table_data_holes(drawing, table, view_geo, source, origin, &info.revisions, expand, extra),
     }
 }
 

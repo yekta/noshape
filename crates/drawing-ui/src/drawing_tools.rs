@@ -1326,7 +1326,7 @@ impl DrawingEditor {
         match &self.tool {
             Tool::Table { kind: TableTool::Custom, .. } => self.custom_dlg_placing(),
             Tool::Table { kind: TableTool::General | TableTool::Revision, .. } => true,
-            Tool::Table { kind: TableTool::Hole, view: Some(_), origin, .. } => origin.is_some(),
+            Tool::Table { kind: TableTool::Hole, view: Some(_), .. } => self.hole_origins_done(),
             Tool::Table { view: Some(_), .. } => true,
             _ => false,
         }

@@ -10,7 +10,7 @@ use crate::drawing::{self as dr, SheetModel};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, OpenDoc, refs};
-use noshape_model::drawing::{AnnotationKind, SheetLayer, BreakStyle, CalloutBorder, CalloutStyle, Crop, Drawing, GdtLeader, TableCorner, ViewId, ViewKind};
+use noshape_model::drawing::{AnnotationKind, SheetLayer, TableKind, BreakStyle, CalloutBorder, CalloutStyle, Crop, Drawing, GdtLeader, TableCorner, ViewId, ViewKind};
 use noshape_scene::drawing_tools::{self as dt, AuxOpts, DetailOpts, Pick, PickedPoint, SectionOpts, TableTool, Tool, ToolValues, ViewOptions};
 use serde_json::{Value, json};
 
@@ -787,13 +787,14 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "view_table",
             summary: "Place a BOM, cut list or hole table of a view",
-            description: "The BOM table, Cut list table and Hole table tools: the table of `view` with its anchor corner at `position` (sheet mm): the reply's `corner`, a BOM's top right as in Onshape (A3: [410, 287] is the frame's top right). A reply `warning` says when the table runs off the sheet. A hole table measures from `origin` (a vertex or circle center of the view, sheet mm). One edit with the tool's name.",
+            description: "The BOM table, Cut list table and Hole table tools: the table of `view` with its anchor corner at `position` (sheet mm): the reply's `corner`, a BOM's top right as in Onshape (A3: [410, 287] is the frame's top right). A reply `warning` says when the table runs off the sheet. A hole table measures from `origin` (a vertex or circle center of the view, sheet mm); `more_views` adds further views of the same part, each `{view, origin}` (live request 1744: a hole seen again is listed once, the others join their size's rows; tags in the first view only). One edit with the tool's name.",
             fields: with(
                 common(),
                 vec![
                     req("kind", json!({ "type": "string", "enum": ["bom", "cut_list", "hole"] }), "Table tool."),
                     view_id("view", "The view the table lists."),
                     opt("origin", point(), "Hole table: the origin vertex (sheet mm)."),
+                    opt("more_views", json!({ "type": "array", "items": { "type": "object" } }), "Hole table: further views of the same part, each {view, origin}."),
                     req("position", point(), "Where the table goes (sheet mm)."),
                 ],
             ),
@@ -1248,8 +1249,26 @@ fn view_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         (TableTool::Hole, None) => return Err(OpError::param("origin", "a hole table needs its origin (a vertex of the view)")),
         _ => None,
     };
+    let mut more = Vec::new();
+    for (i, m) in a.opt_array("more_views")?.into_iter().flatten().enumerate() {
+        let param = format!("more_views[{i}]");
+        if kind != TableTool::Hole {
+            return Err(OpError::param(&param, "hole tables only"));
+        }
+        let v = m.get("view").and_then(|v| v.as_u64()).map(ViewId).filter(|v| t.d.sheets[t.sheet].view(*v).is_some()).ok_or_else(|| OpError::param(&param, "`view`: a view id of this sheet"))?;
+        let same = |x: ViewId| noshape_model::drawing::views::view_source(&t.d.sheets[t.sheet], x);
+        if v == view || same(v).is_none() || same(v) != same(view) {
+            return Err(OpError::param(&param, "a further view of the same part (live: other parts' views can't be picked)"));
+        }
+        let c = point_value(m.get("origin").ok_or_else(|| OpError::param(&param, "`origin`: a vertex or circle center of that view (sheet mm)"))?, &param)?;
+        let o = snap_in(&t, &Tool::Table { kind, view: Some(v), origin: None }, v, c).ok_or_else(|| OpError::param(&param, "origin: not a vertex or circle center of that view"))?;
+        more.push(noshape_model::drawing::HoleView { view: v, origin: o.p, origin_ref: o.r, flip_x: false, flip_y: false, exclude: Vec::new(), x_dir: None });
+    }
     let id = t.d.sheets[t.sheet].next_table_id();
-    let (table, name) = dt::view_table(id, kind, view, origin, pt_arg(a, "position")?);
+    let (mut table, name) = dt::view_table(id, kind, view, origin, pt_arg(a, "position")?);
+    if let TableKind::Hole { more: m, .. } = &mut table.kind {
+        *m = more;
+    }
     let sheet = t.sheet;
     t.d.sheets[sheet].tables.push(table);
     done(od, t, name, "table", id)

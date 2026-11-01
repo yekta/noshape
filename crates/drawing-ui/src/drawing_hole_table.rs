@@ -11,7 +11,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::{TableCorner, TableKind};
+use noshape_model::drawing::{TableCorner, TableKind, ViewId};
 
 const CORNERS: [TableCorner; 4] = [TableCorner::TopLeft, TableCorner::TopRight, TableCorner::BottomLeft, TableCorner::BottomRight];
 
@@ -44,11 +44,16 @@ pub struct HoleTableDlg {
     /// way round).
     pub y_picking: bool,
     pub y_set: bool,
+    /// Further views of the same part (live request 1744: the Views box
+    /// clicked again takes another view; each its own origin) and whether
+    /// the next click picks one.
+    pub more: Vec<(ViewId, Option<noshape_scene::drawing_tools::PickedPoint>)>,
+    pub adding_view: bool,
 }
 
 impl Default for HoleTableDlg {
     fn default() -> Self {
-        Self { show_location: true, precision: None, bottom_to_top: false, corner: TableCorner::TopRight, table: None, flip_x: false, flip_y: false, exclude: Vec::new(), picking: false, x_dir: None, x_picking: false, y_picking: false, y_set: false }
+        Self { show_location: true, precision: None, bottom_to_top: false, corner: TableCorner::TopRight, table: None, flip_x: false, flip_y: false, exclude: Vec::new(), picking: false, x_dir: None, x_picking: false, y_picking: false, y_set: false, more: Vec::new(), adding_view: false }
     }
 }
 
@@ -72,7 +77,7 @@ impl DrawingEditor {
     pub fn open_hole_table_props(&mut self, id: u64, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(id) else { return };
         let TableKind::Hole { show_location, precision, bottom_to_top, flip_x, flip_y, ref exclude, x_dir, .. } = t.kind else { return };
-        self.hole_dlg = Some(HoleTableDlg { show_location, precision, bottom_to_top, corner: t.corner, table: Some(id), flip_x, flip_y, exclude: exclude.clone(), picking: false, x_dir, x_picking: false, y_picking: false, y_set: false });
+        self.hole_dlg = Some(HoleTableDlg { show_location, precision, bottom_to_top, corner: t.corner, table: Some(id), flip_x, flip_y, exclude: exclude.clone(), picking: false, x_dir, x_picking: false, y_picking: false, y_set: false, more: Vec::new(), adding_view: false });
         cx.notify();
     }
 
@@ -104,13 +109,57 @@ impl DrawingEditor {
             exclude.clone_from(&d.exclude);
             *x_dir = d.x_dir;
         }
+        if let TableKind::Hole { more, .. } = &mut table.kind {
+            *more = d.more.iter().filter_map(|(v, o)| o.as_ref().map(|o| noshape_model::drawing::HoleView { view: *v, origin: o.p, origin_ref: o.r.clone(), flip_x: false, flip_y: false, exclude: Vec::new(), x_dir: None })).collect();
+        }
         table.corner = d.corner;
+    }
+
+    /// Every view of the table being inserted has its origin (live 1744: ✓
+    /// waits for all of them).
+    pub fn hole_origins_done(&self) -> bool {
+        matches!(self.tool, Tool::Table { kind: TableTool::Hole, origin: Some(_), .. }) && self.hole_dlg.as_ref().is_none_or(|d| !d.adding_view && d.more.iter().all(|m| m.1.is_some()))
+    }
+
+    /// A click for a further view (after the Views box) or its origin; true
+    /// when used. Only views of the first view's part are taken (live 1744:
+    /// others aren't pickable).
+    pub fn hole_more_click(&mut self, c: [f64; 2], cx: &mut Context<Self>) -> bool {
+        let Tool::Table { kind: TableTool::Hole, view: Some(first), .. } = self.tool else { return false };
+        let (adding, pending) = match &self.hole_dlg {
+            Some(d) => (d.adding_view, d.more.iter().position(|m| m.1.is_none())),
+            None => return false,
+        };
+        if adding {
+            let sheet = self.current_sheet();
+            let part = noshape_model::drawing::views::view_source(sheet, first);
+            let taken: Vec<ViewId> = self.hole_dlg.as_ref().map(|d| d.more.iter().map(|m| m.0).collect()).unwrap_or_default();
+            let v = self.view_at(c).filter(|v| *v != first && !taken.contains(v) && part.is_some() && noshape_model::drawing::views::view_source(sheet, *v) == part);
+            if let (Some(v), Some(d)) = (v, &mut self.hole_dlg) {
+                d.more.push((v, None));
+                d.adding_view = false;
+            }
+            cx.notify();
+            return true;
+        }
+        if let Some(i) = pending {
+            let want = self.hole_dlg.as_ref().map(|d| d.more[i].0);
+            if let (Some(p), Some(d)) = (self.snap_at(c).filter(|p| Some(p.view) == want), &mut self.hole_dlg) {
+                d.more[i].1 = Some(p);
+            }
+            cx.notify();
+            return true;
+        }
+        false
     }
 
     /// Place the hole table being inserted at the pointer's last spot (a
     /// click on the sheet, or ✓).
     pub fn place_hole_table(&mut self, cx: &mut Context<Self>) {
         let Tool::Table { kind: TableTool::Hole, view: Some(v), origin: Some(o) } = self.tool.clone() else { return };
+        if !self.hole_origins_done() {
+            return;
+        }
         let id = self.current_sheet().next_table_id();
         let (mut table, name) = noshape_scene::drawing_tools::view_table(id, TableTool::Hole, v, Some(o), self.cursor);
         self.apply_hole_table_dlg(&mut table);
@@ -125,7 +174,7 @@ impl DrawingEditor {
     /// the view's tags and the origin arrows follow it before the click).
     pub fn hole_table_preview(&self) -> Option<noshape_model::drawing::Table> {
         let Tool::Table { kind: TableTool::Hole, view: Some(v), origin: Some(o) } = &self.tool else { return None };
-        if self.hole_dlg.as_ref().is_some_and(|d| d.picking || d.x_picking || d.y_picking) {
+        if self.hole_dlg.as_ref().is_some_and(|d| d.picking || d.x_picking || d.y_picking) || !self.hole_origins_done() {
             return None;
         }
         let id = self.current_sheet().next_table_id();
@@ -210,9 +259,12 @@ impl DrawingEditor {
         let editing = d.table;
         let (view, origin) = match (&self.tool, editing.and_then(|id| self.current_sheet().table(id))) {
             (_, Some(t)) => (t.view(), true),
-            (Tool::Table { view, origin, .. }, None) => (*view, origin.is_some()),
+            (Tool::Table { view, .. }, None) => (*view, self.hole_origins_done()),
             _ => (None, false),
         };
+        let first_origin = matches!(self.tool, Tool::Table { origin: Some(_), .. }) || editing.is_some();
+        let view_label = |v: ViewId| self.current_sheet().view(v).map(|x| x.name.clone().unwrap_or_else(|| crate::drawing_props::default_view_name(&self.drawing, self.current_sheet(), x))).unwrap_or_default();
+        let more: Vec<(ViewId, String, bool)> = d.more.iter().map(|(v, o)| (*v, view_label(*v), o.is_some())).collect();
         let view_name = view.and_then(|v| self.current_sheet().view(v)).map(|v| v.name.clone().unwrap_or_else(|| crate::drawing_props::default_view_name(&self.drawing, self.current_sheet(), v)));
         type Set = std::rc::Rc<dyn Fn(&mut HoleTableDlg)>;
         let select = |id: &'static str, label: String, w: f32, items: Vec<(String, bool, Set)>| {
@@ -353,8 +405,23 @@ impl DrawingEditor {
                 )
                 .when(show, |v| v.child(row("Location precision", select("hole-table-precision", precision_label, 112., precisions).into_any_element())))
                 // Live drawing-hole-table-dialog: the Views field's tooltip.
-                .child(div().id("hole-table-views").tooltip(crate::ui::tooltip("Select views of a common singular part")).child(field(view_name.clone().unwrap_or_else(|| "Views".into()), view.is_none())))
-                .when(view.is_some(), |v| v.child(field(if origin { "Origin ✓".into() } else { "Origin: a vertex or circle center".into() }, !origin)))
+                // A click on it with a view picked takes another view of the
+                // same part (live request 1744).
+                .child(
+                    div()
+                        .id("hole-table-views")
+                        .tooltip(crate::ui::tooltip("Select views of a common singular part"))
+                        .child(field(view_name.clone().unwrap_or_else(|| "Views".into()), view.is_none() || d.adding_view))
+                        .when(view.is_some() && editing.is_none(), |e| {
+                            e.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                if let Some(d) = &mut this.hole_dlg {
+                                    d.adding_view = !d.adding_view;
+                                }
+                                cx.notify();
+                            }))
+                        }),
+                )
+                .when(view.is_some(), |v| v.child(field(if first_origin { "Origin: Point".into() } else { "Origin: a vertex or circle center".into() }, !first_origin)))
                 // Live 1985 / 1682: X direction and Y direction, each a
                 // straight edge of the view; setting one hides the other (the
                 // other axis is square to it); a click on a set one clears it.
@@ -444,6 +511,21 @@ impl DrawingEditor {
                             })),
                     )
                 })
+                // The further views: their name (× drops it) and Origin.
+                .children(more.into_iter().enumerate().map(|(i, (_, name, set))| {
+                    v_flex()
+                        .child(
+                            h_flex()
+                                .child(div().flex_1().child(field(name, false)))
+                                .child(div().id(SharedString::from(format!("hole-table-more-x-{i}"))).px(px(8.)).cursor_pointer().child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    if let Some(d) = &mut this.hole_dlg {
+                                        d.more.remove(i);
+                                    }
+                                    cx.notify();
+                                }))),
+                        )
+                        .child(field(if set { "Origin: Point".into() } else { "Origin: a vertex or circle center".into() }, !set))
+                }))
                 .child(row("Sheet", sheet_select))
                 .child(row("Order", select("hole-table-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, 112., orders).into_any_element()))
                 .child(div().px(px(8.)).pt(px(4.)).text_size(px(11.)).child("Select fixed corner"))

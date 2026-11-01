@@ -633,6 +633,30 @@ fn table_styles_from_drawing_properties() {
     assert!((data.content_height(&own) - 2.5).abs() < 1e-9 && (data.row_text_height(&own, 0) - 2.5).abs() < 1e-9);
 }
 
+/// A hole table over two views of one part (live request 1744): the same
+/// holes seen again aren't listed twice; a hole only the second view shows
+/// joins its size's group or starts the next letter.
+#[test]
+fn hole_table_over_two_views_lists_each_hole_once() {
+    let (doc, mut drawing) = demo();
+    let origin = [-0.05, -0.03];
+    let pos = drawing.sheets[0].view(ViewId(2)).unwrap().position;
+    let mut second = drawing.sheets[0].view(ViewId(2)).unwrap().clone();
+    (second.id, second.position) = (ViewId(91), [pos[0], pos[1] - 120.0]);
+    drawing.sheets[0].views.push(second);
+    let more = vec![HoleView { view: ViewId(91), origin, origin_ref: None, flip_x: false, flip_y: false, exclude: Vec::new(), x_dir: None }];
+    drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more }, [410.0, 120.0]));
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let t = texts(&built);
+    assert!(t.iter().any(|x| x == "B2") && !t.iter().any(|x| x == "B3" || x == "A2"), "each hole once: {t:?}");
+    // A hole the first view doesn't show: after its size, else a new letter.
+    let row = |tag: &str, d: f64, k: u32| tables::HoleRow { tag: tag.into(), center: [0.0; 2], x: 0.0, y: 0.0, diameter: d, point: Some(PointRef::Thread { body: crate::BodyId { feature: crate::reference::FeatureId(1), index: 0 }, feature: crate::reference::FeatureId(1), index: k, side: 1, end: 0 }) };
+    let rows = tables::merge_hole_rows(vec![row("A1", 0.024, 1), row("B1", 0.0096, 2), row("B2", 0.0096, 3)], &[row("A1", 0.0096, 4), row("A1", 0.005, 5), row("B1", 0.0096, 2)]);
+    assert_eq!(rows.iter().map(|r| r.tag.as_str()).collect::<Vec<_>>(), ["A1", "B1", "B2", "B3", "C1"]);
+}
+
 #[test]
 fn bom_hole_table_and_linked_balloons() {
     let (doc, mut drawing) = demo();
@@ -643,7 +667,7 @@ fn bom_hole_table_and_linked_balloons() {
     drawing.sheets[si].tables.push(Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: Vec::new(), default_template: false, source: None }, [410.0, 287.0]));
     // Hole table of the plate's top view on sheet 1.
     let origin = [-0.05, -0.03];
-    drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, bottom_to_top: false, exclude: Vec::new(), x_dir: None }, [410.0, 120.0]));
+    drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more: Vec::new() }, [410.0, 120.0]));
     let sources = regenerate_sources(&doc, &drawing);
     let src = &sources[&SourceKey::studio(asm)];
     assert!(src.assembly);

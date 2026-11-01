@@ -1525,6 +1525,11 @@ pub enum TableKind {
         /// coordinates, unit; Y square to it); None: the view's axes.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         x_dir: Option<[f64; 2]>,
+        /// More views of the same part (live request 1744: each with its own
+        /// origin, directions, flips and holes to exclude); a hole seen in
+        /// an earlier view is listed once; tags show in `view` only.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        more: Vec<HoleView>,
     },
     /// Cut list of the frame members of the Part Studio shown by `view`
     /// (the Cut list feature's rows); Order "Bottom to top" reverses it.
@@ -2086,6 +2091,23 @@ impl TargetStyle {
             _ => None,
         }
     }
+}
+
+/// A further view of a hole table (`TableKind::Hole::more`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HoleView {
+    pub view: ViewId,
+    pub origin: [f64; 2],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin_ref: Option<PointRef>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub flip_x: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub flip_y: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude: Vec<[f64; 2]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub x_dir: Option<[f64; 2]>,
 }
 
 /// A BOM table's own assembly: its tab, pinned version (another document's

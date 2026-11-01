@@ -591,7 +591,8 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                 },
                 _ => None,
             };
-            let data = noshape_model::drawing::tables::table_data_with(&m.drawing, t, geo, source, origin, &m.info, &expand);
+            let extra = noshape_model::drawing::tables::hole_extra_rows(t, &|v| m.geoms.get(&v).map(|g| g.as_ref()), source);
+            let data = noshape_model::drawing::tables::table_data_with_extra(&m.drawing, t, geo, source, origin, &m.info, &expand, &extra);
             let mut j = json!({ "id": t.id, "kind": variant_name(&t.kind), "position": pt(t.position), "rows": data.rows });
             if let Some(h) = data.header {
                 j["header"] = json!(h);

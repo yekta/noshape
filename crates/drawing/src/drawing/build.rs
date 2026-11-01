@@ -2624,7 +2624,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }
             _ => None,
         };
-        let data = tables::table_data_with(drawing, t, geo, source, origin, info, &expand);
+        let extra = tables::hole_extra_rows(t, &|v| views.get(&v).map(|g| g.as_ref()), source);
+        let data = tables::table_data_with_extra(drawing, t, geo, source, origin, info, &expand, &extra);
         let merged;
         let t = if data.merges.is_empty() {
             t
