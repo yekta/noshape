@@ -351,6 +351,10 @@ N12. (11-01) Part Studio audit (user 11-01): docs/parity/audit-part-studio.md. D
      LOGIC_ONLY for types std can't regenerate; T2 tests in std_oracle), 10 native, 2 open (Routing curve, Unfold).
      A preselection goes to std's hidden initEntities / preselectedEntities / preselection where std's logic runs.
      Lookup results of editing logic reach the dialog (External thread sizes). 63 of 75 dialogs equal std.
+     13:40 audit 9 (live 1722 / 1725 answered): Helix End radius rows, Routing curve (std's logic incl. copyParameter,
+     "Routing curve (30 mm)" name, Point N rows, Single mode with the triad on the active point), configured columns
+     in parameter order, out-of-range lengths / reals as live (A18). 64 of 75 dialogs equal std; editing logic 36 std /
+     10 native / 1 open (Unfold: std's leaves the hold face empty on our part). Open: A10 (core), 5 reference pickers.
 
 N11. (11-01 04:54) Drawing sheets taken from dx (user 11-01): docs/parity/workflow-drawing.md and
      workflow-drawing-sheet-metal.md. dx keeps drawing.md and the import sheets; notes to dx in docs/handoff/dx.md
