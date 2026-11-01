@@ -405,6 +405,27 @@ fn tangent_continues(body: &Shape, at: DVec3, dir: DVec3, skip: usize) -> bool {
     })
 }
 
+/// The point and the chain-forward tangent at `fraction` of the chain of
+/// `edges` (as a partial fillet's bounds measure it, along each edge's
+/// parameter), and the chain's length: where a partial fillet's bound
+/// manipulator ends.
+pub fn partial_point(shape: &Shape, edges: &[usize], fraction: f64) -> Option<(DVec3, DVec3, f64)> {
+    let chain = chain(shape, edges).ok()?;
+    let total: f64 = chain.iter().map(|c| c.length).sum();
+    let mut at = fraction.clamp(0.0, 1.0) * total;
+    for (k, c) in chain.iter().enumerate() {
+        if at <= c.length || k + 1 == chain.len() {
+            let info = c.shape.edge_info().ok()?;
+            let t = (at / c.length.max(1e-300)).clamp(0.0, 1.0);
+            let prm = info.first_param + (info.last_param - info.first_param) * if c.forward { t } else { 1.0 - t };
+            let d = c.shape.tangent_at(prm).ok()?.try_normalize()?;
+            return Some((c.shape.point_at(prm).ok()?, if c.forward { d } else { -d }, total));
+        }
+        at -= c.length;
+    }
+    None
+}
+
 /// Blend `edges` of body `bi` with `spec` (see the module docs).
 pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec) -> FResult<()> {
     use super::sheetmetal_util::{body_named, bool_named};

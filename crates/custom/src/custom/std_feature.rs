@@ -167,11 +167,12 @@ pub fn editing_logic(
 /// "Point 0" at the origin to start, points kept in step).
 const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet", "loft", "revolve", "sweep", "mirror", "cPlane", "draft", "splitPart", "hole", "modifyFillet", "fitSpline", "externalThread", "frame", "cutlist", "deleteBodies", "wrap", "boundarySurface", "ruledSurface", "bridgingCurve", "projectCurves", "editCurve", "bodyDraft", "routingCurve"];
 
-/// Built-in feature types std only runs the editing logic of (std's module
-/// and feature; they regenerate natively and std can't run them). Thicken's
+/// Built-in feature types std only runs the editing logic (or, for Helix,
+/// the manipulator change function) of (std's module and feature; they
+/// regenerate natively and std can't run them). Thicken's
 /// dialog keeps its native logic (`ops::studio::auto_operation`, live L18);
 /// std's is the T2 check of it.
-const LOGIC_ONLY: &[(&str, &str, &str)] = &[("thicken", "thicken.fs", "thicken"), ("modifyFillet", "modifyFillet.fs", "modifyFillet"), ("fitSpline", "fitSpline.fs", "fitSpline"), ("externalThread", "externalThread.fs", "externalThread"), ("frame", "frame.fs", "frame"), ("cutlist", "cutlist.fs", "cutlist"), ("deleteBodies", "deleteBodies.fs", "deleteBodies"), ("wrap", "wrap.fs", "wrap"), ("boundarySurface", "bsurf.fs", "boundarySurface"), ("ruledSurface", "ruledSurface.fs", "ruledSurface"), ("bridgingCurve", "bridgingCurve.fs", "bridgingCurve"), ("projectCurves", "projectCurves.fs", "projectCurves"), ("editCurve", "editCurve.fs", "editCurve"), ("bodyDraft", "bodyDraft.fs", "bodyDraft"), ("routingCurve", "routingCurve.fs", "routingCurve")];
+const LOGIC_ONLY: &[(&str, &str, &str)] = &[("thicken", "thicken.fs", "thicken"), ("modifyFillet", "modifyFillet.fs", "modifyFillet"), ("fitSpline", "fitSpline.fs", "fitSpline"), ("externalThread", "externalThread.fs", "externalThread"), ("frame", "frame.fs", "frame"), ("cutlist", "cutlist.fs", "cutlist"), ("deleteBodies", "deleteBodies.fs", "deleteBodies"), ("wrap", "wrap.fs", "wrap"), ("boundarySurface", "bsurf.fs", "boundarySurface"), ("ruledSurface", "ruledSurface.fs", "ruledSurface"), ("bridgingCurve", "bridgingCurve.fs", "bridgingCurve"), ("projectCurves", "projectCurves.fs", "projectCurves"), ("editCurve", "editCurve.fs", "editCurve"), ("bodyDraft", "bodyDraft.fs", "bodyDraft"), ("routingCurve", "routingCurve.fs", "routingCurve"), ("helix", "helix.fs", "helix")];
 
 /// [`std_name`], or the std feature whose editing logic a dialog runs.
 fn logic_std_name(type_id: &str) -> Option<(&'static str, &'static str)> {

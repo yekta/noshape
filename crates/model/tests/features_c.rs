@@ -1632,6 +1632,99 @@ fn parting_line_draft_sides_as_live() {
     }
 }
 
+/// A One sided parting line Draft's manipulators as std's (audit-part-studio M8): on the 40 × 20 × 10 block's
+/// top front edge with the pull up, the front face (away from the pull) is drafted: its angle arc turns about the
+/// edge's middle (axis −X) from an inch below it, its flip arrow sits a quarter along the front face's coedge (x 10)
+/// pointing down into it; std's draftManipulatorChange turns an arc dragged to −5° into Opposite direction and 5°.
+#[test]
+fn parting_line_draft_manipulators_as_std() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.ok();
+    let edge = edge_near(&r, 0, DVec3::new(mm(20.0), 0.0, mm(10.0)));
+    s.add("draft", move |p| {
+        p.set("draftFeatureType", en("PARTING_LINE"));
+        p.set("partingEdges", ParamValue::Query(vec![edge]));
+        p.set("pullDirectionEntity", q(Reference::Plane(DatumPlane::Top)));
+        p.set("partingLineSides", en("ONE_SIDED"));
+        // The dialog's draftEditLogic picks the steeper face (the front): not the more along one.
+        p.set("alongPull", ParamValue::Bool(false));
+        p.set("angle", expr("3 deg"));
+    });
+    let draft = s.ps.features.last().unwrap().clone();
+    let before = r.context.clone();
+    let m = noshape_model::interaction::draft_parting_manipulators(&before, &draft.params, &s.units);
+    let keys: Vec<&str> = m.iter().map(|(k, _)| k.as_str()).collect();
+    assert_eq!(keys, ["flipManipulator", "angleManipulator"], "{m:?}");
+    use noshape_model::display::FeatureManipulator as M;
+    let M::Flip { base, direction, .. } = &m[0].1 else { panic!("{m:?}") };
+    assert!((*base - DVec3::new(mm(10.0), 0.0, mm(10.0))).length() < 1e-9 && direction.z < -0.999, "{m:?}");
+    let M::Angular { axis_origin, axis_direction, rotation_origin, angle, .. } = &m[1].1 else { panic!("{m:?}") };
+    assert!((*axis_origin - DVec3::new(mm(20.0), 0.0, mm(10.0))).length() < 1e-9 && axis_direction.x < -0.999, "{m:?}");
+    assert!((*rotation_origin - DVec3::new(mm(20.0), 0.0, mm(10.0 - 25.4))).length() < 1e-9 && (angle - 3f64.to_radians()).abs() < 1e-12, "{m:?}");
+    let mut moved = m[1].1.clone();
+    if let M::Angular { angle, .. } = &mut moved {
+        *angle = -5f64.to_radians();
+    }
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*before).clone(), "draft", draft.id, &draft.name, &s.units, &draft.params, "angleManipulator", &moved).expect("std's change function ran");
+    assert_eq!(changed.get("pullDirection"), Some(&ParamValue::Bool(true)), "{changed:?}");
+    let a = match changed.get("angle") {
+        Some(ParamValue::Expr(e)) => noshape_units::evaluate_as(&e.text, noshape_units::Dim::ANGLE, &s.units, &noshape_units::EmptyScope).unwrap().value,
+        other => panic!("angle: {other:?}"),
+    };
+    assert!((a - 5f64.to_radians()).abs() < 1e-9, "{changed:?}");
+}
+
+/// A partial fillet's bound handle as std's (audit-part-studio M5): Position 0.25 on the 40 mm top front edge, Opposite
+/// direction on: the arrow's tip is the bound's point, its offset 10 mm (0.25 of the edge) back along the edge; std's
+/// filletManipulatorChange turns the arrow dragged to 20 mm into Start position 0.5.
+#[test]
+fn partial_fillet_manipulator_as_std() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.ok();
+    let edge = edge_near(&r, 0, DVec3::new(mm(20.0), 0.0, mm(10.0)));
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(vec![edge]));
+        p.set("radius", expr("2 mm"));
+        p.set("isPartial", ParamValue::Bool(true));
+        p.set("partialFirstEdgeTotalParameter", expr("0.25"));
+        p.set("partialOppositeParameter", ParamValue::Bool(true));
+    });
+    let fillet = s.ps.features.last().unwrap().clone();
+    let m = noshape_model::interaction::partial_fillet_manipulators(&r.context, &fillet.params, &s.units);
+    use noshape_model::display::FeatureManipulator as M;
+    let [(key, M::Linear { base, direction, offset, max, .. })] = m.as_slice() else { panic!("one bound arrow: {m:?}") };
+    assert_eq!(key, "partialPointOnEdgeManipulator.0");
+    let tip = *base + *direction * *offset;
+    assert!((tip.z - mm(10.0)).abs() < 1e-9 && tip.y.abs() < 1e-9 && ((tip.x - mm(10.0)).abs() < 1e-9 || (tip.x - mm(30.0)).abs() < 1e-9), "tip {tip}");
+    assert!((offset - mm(10.0)).abs() < 1e-9 && (max - mm(40.0)).abs() < 1e-9 && direction.x.abs() > 0.999, "{m:?}");
+    let mut moved = m[0].1.clone();
+    if let M::Linear { offset, .. } = &mut moved {
+        *offset = mm(20.0);
+    }
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*r.context).clone(), "fillet", fillet.id, &fillet.name, &s.units, &fillet.params, key, &moved).expect("std's change function ran");
+    let f = match changed.get("partialFirstEdgeTotalParameter") {
+        Some(ParamValue::Expr(e)) => noshape_units::evaluate_as(&e.text, noshape_units::Dim::UNITLESS, &s.units, &noshape_units::EmptyScope).unwrap().value,
+        other => panic!("{other:?} in {changed:?}"),
+    };
+    assert!((f - 0.5).abs() < 1e-9, "{changed:?}");
+}
+
 /// draft.fs: parting edges on two parts draft each part (two frustums);
 /// a parting line stepped to two heights (front/back at z 5, ends at z 3)
 /// hinges each face about its own edge.

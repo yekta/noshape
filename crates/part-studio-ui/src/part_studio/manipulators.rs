@@ -63,15 +63,33 @@ impl ArcHandle {
     }
 }
 
+// Built per frame and per event for the one edited feature, copied around by value: the handles' array
+// outweighing the triad and section variants costs nothing worth a box.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Copy, Debug)]
 pub(super) enum Manip {
-    /// A feature's handle, and a second end's (Extrude's second depth,
-    /// Revolve's start angle or its flip arrow).
-    Handles(Handle, Option<Handle>),
+    /// A feature's handles in hit order (Extrude's depth and second depth,
+    /// Revolve's angle and start angle or flip arrows, a partial Fillet's
+    /// radius and bounds).
+    Handles([Option<Handle>; MAX_HANDLES]),
     /// Transform ▸ Translate by XYZ (see `triad.rs`).
     Triad(super::triad::Triad),
     /// Section view: base circle, offset arrow, rotate rings (`section_manip.rs`).
     Section(super::section_manip::SectionManip),
+}
+
+/// The most handles a feature shows at once.
+pub(super) const MAX_HANDLES: usize = 4;
+
+impl Manip {
+    /// A feature's handles (the first [`MAX_HANDLES`]); None without any.
+    pub(super) fn of(list: impl IntoIterator<Item = Handle>) -> Option<Manip> {
+        let mut out = [None; MAX_HANDLES];
+        for (slot, h) in out.iter_mut().zip(list) {
+            *slot = Some(h);
+        }
+        out[0].map(|_| Manip::Handles(out))
+    }
 }
 
 /// One of a feature's handles: a length arrow (a flip arrow when it drives
@@ -108,13 +126,17 @@ impl PartStudioView {
             return None;
         }
         match e.dialog.read(cx).feature.type_id.as_str() {
-            "extrude" => self.current_arrow(cx).map(|a| Manip::Handles(Handle::Arrow(a), self.second_arrow(&a, cx).map(Handle::Arrow))),
-            "moveFace" if e.dialog.read(cx).feature.params.is("moveFaceType", "ROTATE") => self.revolve_arc(cx).map(|h| Manip::Handles(Handle::Arc(h), None)),
+            "extrude" => self.current_arrow(cx).and_then(|a| Manip::of([Handle::Arrow(a)].into_iter().chain(self.second_arrow(&a, cx).map(Handle::Arrow)))),
+            "moveFace" if e.dialog.read(cx).feature.params.is("moveFaceType", "ROTATE") => self.revolve_arc(cx).and_then(|h| Manip::of([Handle::Arc(h)])),
             // Shell and Chamfer have none (std adds no manipulator; live psb 10-24).
-            "cPlane" if e.dialog.read(cx).feature.params.is("cplaneType", "LINE_ANGLE") => self.plane_angle_arc(cx).map(|h| Manip::Handles(Handle::Arc(h), None)),
-            "cPlane" | "fillet" | "moveFace" | "offsetSurface" | "replaceFace" | "extendSurface" | "helix" | "splitPart" => self.param_arrow(cx).map(|a| Manip::Handles(Handle::Arrow(a), None)),
+            "cPlane" if e.dialog.read(cx).feature.params.is("cplaneType", "LINE_ANGLE") => self.plane_angle_arc(cx).and_then(|h| Manip::of([Handle::Arc(h)])),
+            // Fillet: its radius, then a partial fillet's bounds (std's).
+            "fillet" => Manip::of(self.param_arrow(cx).map(Handle::Arrow).into_iter().chain(self.std_handle_list(cx))),
+            "cPlane" | "moveFace" | "offsetSurface" | "replaceFace" | "extendSurface" | "splitPart" => self.param_arrow(cx).and_then(|a| Manip::of([Handle::Arrow(a)])),
             "revolve" => self.revolve_handles(cx),
-            "draft" => self.draft_arc(cx).map(|h| Manip::Handles(Handle::Arc(h), None)),
+            "draft" if e.dialog.read(cx).feature.params.is("draftFeatureType", "PARTING_LINE") => self.std_handles(cx),
+            "helix" => self.std_handles(cx),
+            "draft" => self.draft_arc(cx).and_then(|h| Manip::of([Handle::Arc(h)])),
             "transform" => self.current_triad(cx).map(Manip::Triad).or_else(|| self.transform_handle(cx)),
             "routingCurve" => self.routing_triad(cx).map(Manip::Triad),
             // Features FeatureScript runs (std's sheet metal, custom features): their own addManipulators.
@@ -188,7 +210,7 @@ impl PartStudioView {
             // axis is turned by oppositeDirection already).
             Some(flip("startOppositeDirection", p.bool("startOppositeDirection") != p.bool("oppositeDirection"), true))
         };
-        Some(Manip::Handles(first, second))
+        Manip::of([first].into_iter().chain(second))
     }
 
     /// Draft's angle (std addNeutralPlaneDraftAngularManipulator, Neutral
@@ -269,7 +291,7 @@ impl PartStudioView {
                 return None;
             }
             let axis = if opposite { -axis } else { axis };
-            return Some(Manip::Handles(Handle::Arc(ArcHandle { origin, axis, radial, angle: value("angle", Dim::ANGLE)?, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU }), None));
+            return Manip::of([Handle::Arc(ArcHandle { origin, axis, radial, angle: value("angle", Dim::ANGLE)?, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU })]);
         }
         if !p.is("transformType", "TRANSLATION_DISTANCE") {
             return None;
@@ -287,7 +309,7 @@ impl PartStudioView {
         }
         .try_normalize()?;
         let dir = if opposite { -dir } else { dir };
-        Some(Manip::Handles(Handle::Arrow(Arrow { base: c, dir, length: value("distance", Dim::LENGTH)?, param: "distance", flip: Some("oppositeDirection"), secondary: false }), None))
+        Manip::of([Handle::Arrow(Arrow { base: c, dir, length: value("distance", Dim::LENGTH)?, param: "distance", flip: Some("oppositeDirection"), secondary: false })])
     }
 
     /// World axis (point, unit direction) of a sketch line or straight/circular edge.
@@ -475,31 +497,6 @@ impl PartStudioView {
                 let dir = if p.bool("oppositeDirection") { -out } else { out };
                 Some(Arrow { base, dir, length: value("extendDistance")?, param: "extendDistance", flip: Some("oppositeDirection"), secondary: false })
             }
-            // helix.fs addHelixHeightManipulator (Axis or Circle, Height,
-            // not Turns and pitch): from the helix's start along its axis to
-            // its end; base and direction as regen's helix takes them.
-            "helix" if p.is("endType", "HEIGHT") && !p.is("pathType", "TURNS_PITCH") => {
-                let opposite = p.bool("oppositeDirection");
-                let (base, dir) = match p.enum_("axisType") {
-                    "AXIS" => {
-                        let r = p.query("axis").first()?;
-                        let line = noshape_model::regen::measure::resolve_shapes(ctx, r).into_iter().next().filter(|e| matches!(e.edge_curve(), Ok(noshape_kernel::Curve::Line { .. }))).and_then(|e| e.endpoints().ok());
-                        let (o, d) = match line {
-                            Some((a, b)) if p.bool("oppositeOrigin") => (b, (a - b).normalize()),
-                            Some((a, b)) => (a, (b - a).normalize()),
-                            None => self.axis_of(r).map(|(o, d)| if p.bool("oppositeOrigin") { (o, -d) } else { (o, d) })?,
-                        };
-                        (o, if opposite { -d } else { d })
-                    }
-                    "CIRCLE" => {
-                        let e = noshape_model::regen::measure::resolve_shapes(ctx, p.query("edge").first()?).into_iter().next()?;
-                        let noshape_kernel::Curve::Circle { center, axis, .. } = e.edge_curve().ok()? else { return None };
-                        (center, if opposite { -axis.normalize() } else { axis.normalize() })
-                    }
-                    _ => return None,
-                };
-                Some(Arrow { base, dir, length: value("height")?, param: "height", flip: Some("oppositeDirection"), secondary: false })
-            }
             // splitpart.fs addKeepSideManipulator (Part, not Keep both
             // sides): a flip arrow on the tool where it is nearest the parts
             // (here: the parts' box centre dropped onto the tool's plane),
@@ -537,7 +534,7 @@ impl PartStudioView {
         // In handle order (Viewport::manipulator_index_at: 0 the first, 1 the second end's).
         let handles: Vec<(DVec3, DVec3, f64)> = match self.current_manip(cx) {
             // The arrow glyph at the end of the length (see manipulator_overlay).
-            Some(Manip::Handles(a, b)) => [Some(a), b]
+            Some(Manip::Handles(hs)) => hs
                 .into_iter()
                 .flatten()
                 .map(|h| match h {
@@ -596,17 +593,26 @@ impl PartStudioView {
 
     /// Handle tool events for a manipulator drag. Returns true if consumed.
     pub(super) fn manipulator_event(&mut self, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        // The handle grabbed (the nearer of two), kept for the drag.
+        let manip = self.current_manip(cx);
+        // The handle grabbed (the nearest), kept for the drag.
+        let count = match manip {
+            Some(Manip::Handles(hs)) => hs.iter().flatten().count(),
+            _ => 1,
+        };
         let which = match ev {
-            ViewportEvent::ToolDown { position, .. } => self.viewport.read(cx).manipulator_index_at(*position).filter(|&i| i == 1).unwrap_or(0),
+            ViewportEvent::ToolDown { position, .. } => self.viewport.read(cx).manipulator_index_at(*position).filter(|&i| i < count).unwrap_or(0),
             _ => self.manip_drag.map_or(0, |d| d.which),
         };
-        let a = match self.current_manip(cx) {
-            Some(Manip::Handles(a, b)) => match (b.filter(|_| which == 1).unwrap_or(a), if b.is_some() { which } else { 0 }) {
-                (Handle::Arrow(a), _) => a,
-                (Handle::Arc(h), which) => return self.arc_event(h, which, ev, window, cx),
-                (Handle::StdArrow(a, i), which) => return self.std_arrow_event(a, i, which, ev, window, cx),
-                (Handle::StdArc(h, i), which) => return self.std_arc_event(h, i, which, ev, window, cx),
+        let a = match manip {
+            Some(Manip::Handles(hs)) => match (hs.get(which).copied().flatten(), which) {
+                (Some(Handle::Arrow(a)), _) => a,
+                (Some(Handle::Arc(h)), which) => return self.arc_event(h, which, ev, window, cx),
+                (Some(Handle::StdArrow(a, i)), which) => return self.std_arrow_event(a, i, which, ev, window, cx),
+                (Some(Handle::StdArc(h, i)), which) => return self.std_arc_event(h, i, which, ev, window, cx),
+                (None, _) => {
+                    self.manip_drag = None;
+                    return false;
+                }
             },
             Some(Manip::Triad(t)) => return self.triad_event(t, ev, window, cx),
             // Rings and the base circle first; the arrow as any other.
@@ -776,24 +782,111 @@ impl PartStudioView {
 impl PartStudioView {
     /// The edited feature's FeatureScript manipulators (`addManipulators`,
     /// from its last preview; the one being dragged where it is now), the
-    /// first two drawable: lengths and flips as arrows, angles as arcs.
+    /// drawable ones: lengths and flips as arrows, angles as arcs.
     fn std_handles(&self, cx: &App) -> Option<Manip> {
-        let id = self.edit.as_ref()?.dialog.read(cx).feature.id;
-        let state = self.display.feature_state(id)?;
-        let mut handles = state.manipulators.iter().enumerate().filter_map(|(i, (_, m))| {
-            let m = match &self.ui.std_manip_live {
-                Some((j, live)) if *j == i => live,
-                _ => m,
+        Manip::of(self.std_handle_list(cx))
+    }
+
+    /// [`Self::std_handles`]' handles.
+    fn std_handle_list(&self, cx: &App) -> Vec<Handle> {
+        self.feature_manipulators(cx)
+            .iter()
+            .enumerate()
+            .filter_map(|(i, (_, m))| {
+                let m = match &self.ui.std_manip_live {
+                    Some((j, live)) if *j == i => live,
+                    _ => m,
+                };
+                std_handle(m, i)
+            })
+            .collect()
+    }
+
+    /// The edited feature's FeatureScript manipulators: what its preview
+    /// added (`addManipulators`), else std's computed here for the native
+    /// features std's change function serves (Draft's parting line).
+    fn feature_manipulators(&self, cx: &App) -> Vec<(String, noshape_model::display::FeatureManipulator)> {
+        let Some(d) = self.edit.as_ref().map(|e| e.dialog.read(cx)) else { return Vec::new() };
+        if let Some(state) = self.display.feature_state(d.feature.id).filter(|s| !s.manipulators.is_empty()) {
+            return state.manipulators.clone();
+        }
+        let p = &d.feature.params;
+        match d.feature.type_id.as_str() {
+            "draft" if p.is("draftFeatureType", "PARTING_LINE") => {
+                let Some(ctx) = self.ui.before_context.as_ref().or(self.context.as_ref()) else { return Vec::new() };
+                noshape_model::interaction::draft_parting_manipulators(ctx, p, &self.doc.read(cx).session.doc.settings.units)
+            }
+            "helix" => self.helix_manipulators(cx).unwrap_or_default(),
+            "fillet" if p.bool("isPartial") => {
+                let Some(ctx) = self.ui.before_context.as_ref().or(self.context.as_ref()) else { return Vec::new() };
+                noshape_model::interaction::partial_fillet_manipulators(ctx, p, &self.doc.read(cx).session.doc.settings.units)
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    /// Helix's manipulators as std's helix.fs adds them, for its
+    /// helixManipulatorChange: Axis or Circle with Height (not Turns and
+    /// pitch), the height arrow from the helix's start along its axis as
+    /// picked, its offset the height (negative: Opposite direction); Cylinder
+    /// / Cone, the direction flip arrow on the axis halfway along the face.
+    fn helix_manipulators(&self, cx: &App) -> Option<Vec<(String, noshape_model::display::FeatureManipulator)>> {
+        use noshape_model::display::FeatureManipulator as M;
+        let d = self.edit.as_ref()?.dialog.read(cx);
+        let p = &d.feature.params;
+        let ctx = self.ui.before_context.as_ref().or(self.context.as_ref())?;
+        let opposite = p.bool("oppositeDirection");
+        if p.is("axisType", "SURFACE") {
+            let face = noshape_model::regen::measure::resolve_shapes(ctx, p.query("entities").first()?).into_iter().next()?;
+            let (origin, axis) = match face.face_surface().ok()? {
+                noshape_kernel::Surface::Cylinder { origin, axis, .. } | noshape_kernel::Surface::Cone { origin, axis, .. } => (origin, axis.try_normalize()?),
+                _ => return None,
             };
-            std_handle(m, i)
-        });
-        Some(Manip::Handles(handles.next()?, handles.next()))
+            // The face's extent along the axis, from its edges' ends and middles.
+            let ts: Vec<f64> = face
+                .edges()
+                .iter()
+                .filter_map(|e| {
+                    let i = e.edge_info().ok()?;
+                    Some([i.start, i.end, e.point_at((i.first_param + i.last_param) * 0.5).ok()?])
+                })
+                .flatten()
+                .map(|q| (q - origin).dot(axis))
+                .collect();
+            let (lo, hi) = ts.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), t| (a.min(*t), b.max(*t)));
+            if lo > hi {
+                return None;
+            }
+            return Some(vec![("directionManipulator".into(), M::Flip { base: origin + axis * (lo + hi) * 0.5, direction: axis, flipped: opposite, other_direction: None, secondary: false })]);
+        }
+        if !p.is("endType", "HEIGHT") || p.is("pathType", "TURNS_PITCH") {
+            return None;
+        }
+        let (base, dir) = match p.enum_("axisType") {
+            "AXIS" => {
+                let r = p.query("axis").first()?;
+                let line = noshape_model::regen::measure::resolve_shapes(ctx, r).into_iter().next().filter(|e| matches!(e.edge_curve(), Ok(noshape_kernel::Curve::Line { .. }))).and_then(|e| e.endpoints().ok());
+                match line {
+                    Some((a, b)) if p.bool("oppositeOrigin") => (b, (a - b).normalize()),
+                    Some((a, b)) => (a, (b - a).normalize()),
+                    None => self.axis_of(r).map(|(o, d)| if p.bool("oppositeOrigin") { (o, -d) } else { (o, d) })?,
+                }
+            }
+            "CIRCLE" => {
+                let e = noshape_model::regen::measure::resolve_shapes(ctx, p.query("edge").first()?).into_iter().next()?;
+                let noshape_kernel::Curve::Circle { center, axis, .. } = e.edge_curve().ok()? else { return None };
+                (center, axis.normalize())
+            }
+            _ => return None,
+        };
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let height = p.expr("height").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value)))?;
+        Some(vec![("heightManipulator".into(), M::Linear { base, direction: dir, offset: if opposite { -height } else { height }, min: -500.0, max: 500.0, secondary: false, primary: Some("height".into()) })])
     }
 
     /// The FeatureScript manipulator `i` as it stands (dragged or as the preview added it), with its key.
     fn std_manipulator(&self, i: usize, cx: &App) -> Option<(String, noshape_model::display::FeatureManipulator)> {
-        let id = self.edit.as_ref()?.dialog.read(cx).feature.id;
-        let (key, m) = self.display.feature_state(id)?.manipulators.get(i)?.clone();
+        let (key, m) = self.feature_manipulators(cx).get(i)?.clone();
         Some((key, self.ui.std_manip_live.as_ref().filter(|(j, _)| *j == i).map_or(m, |(_, live)| live.clone())))
     }
 
@@ -1012,10 +1105,10 @@ pub(super) struct ManipGeometry {
 
 impl ManipGeometry {
     /// A feature's handles' glyphs, the hovered or dragged one last (on top).
-    fn lit_last<T>(&self, handles: [Option<T>; 2], glyph: impl Fn(&T, bool, bool) -> Vec<Instance>) -> Vec<Instance> {
+    fn lit_last<T>(&self, handles: &[Option<T>], glyph: impl Fn(&T, bool, bool) -> Vec<Instance>) -> Vec<Instance> {
         let lit = self.arrow_dragging.or(self.arrow_hover);
-        let mut order: Vec<usize> = (0..2).filter(|&i| Some(i) != lit).collect();
-        order.extend(lit.filter(|&i| i < 2));
+        let mut order: Vec<usize> = (0..handles.len()).filter(|&i| Some(i) != lit).collect();
+        order.extend(lit.filter(|&i| i < handles.len()));
         order.into_iter().filter_map(|i| handles[i].as_ref().map(|h| glyph(h, self.arrow_hover == Some(i), self.arrow_dragging == Some(i)))).flatten().collect()
     }
 }
@@ -1024,7 +1117,7 @@ impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
     fn build(&self, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
         match self.manip {
             // The hovered or dragged handle drawn last: Revolve's start angle arc runs over the first's.
-            Manip::Handles(a, b) => self.lit_last([Some(a), b], |h, hover, drag| match h {
+            Manip::Handles(hs) => self.lit_last(&hs, |h, hover, drag| match h {
                 Handle::Arrow(a) | Handle::StdArrow(a, _) => arrow_glyph(a, hover, drag, view, up),
                 Handle::Arc(h) | Handle::StdArc(h, _) => arc_glyph(h, hover, drag, view, up),
             }),

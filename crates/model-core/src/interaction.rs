@@ -787,6 +787,153 @@ pub fn draft_switch_face(ctx: &crate::regen::context::Context, params: &ParamVal
     Some(along > against + 1e-9)
 }
 
+/// A partial fillet's bound manipulators as std's fillet.fs adds them
+/// (addPartialFilletManipulators), keyed as std keys them for its
+/// filletManipulatorChange: for each Position or Offset bound, an arrow
+/// along the chain's tangent whose tip is the bound's point, its offset the
+/// chain length times the bound's fraction (measured from the other end
+/// unless Opposite direction).
+pub fn partial_fillet_manipulators(ctx: &crate::regen::context::Context, params: &ParamValues, units: &noshape_units::UnitPrefs) -> Vec<(String, crate::display::FeatureManipulator)> {
+    let mut out = Vec::new();
+    if !params.bool("isPartial") || params.is("blendControlType", "WIDTH") {
+        return out;
+    }
+    let vars = std::collections::BTreeMap::new();
+    let ev = crate::regen::eval::EvalCtx::new(FeatureId(0), "", params, units, ctx.clone(), &vars);
+    let edges = ev.resolve_edges(params.query("entities"));
+    let Some(&(bi, _)) = edges.first() else { return out };
+    let mine: Vec<usize> = edges.iter().filter(|(b, _)| *b == bi).map(|(_, e)| *e).collect();
+    let shape = &ctx.bodies[bi].shape;
+    let Some((_, _, total)) = crate::regen::features::blend_section::partial_point(shape, &mine, 0.0) else { return out };
+    let length_of = |id: &str| params.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, noshape_units::Dim::LENGTH, units, &noshape_units::EmptyScope).ok().map(|q| q.value)));
+    let real_of = |id: &str| params.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, noshape_units::Dim::UNITLESS, units, &noshape_units::EmptyScope).ok().map(|q| q.value)));
+    let opposite = params.bool("partialOppositeParameter");
+    let bounds = [("startPartialType", "partialFirstEdgeTotalParameter", "startPartialOffset", false), ("endPartialType", "partialSecondEdgeTotalParameter", "endPartialOffset", true)];
+    for (index, (ty, frac, off, second)) in bounds.into_iter().enumerate() {
+        if second && !params.bool("secondBound") {
+            continue;
+        }
+        let (fraction, primary) = match params.enum_(ty) {
+            "OFFSET" => {
+                let Some(d) = length_of(off) else { continue };
+                (if second { (total - d) / total } else { d / total }, off)
+            }
+            "ENTITY" => continue,
+            _ => {
+                let Some(f) = real_of(frac) else { continue };
+                (f, frac)
+            }
+        };
+        let Some((point, tangent, _)) = crate::regen::features::blend_section::partial_point(shape, &mine, fraction) else { continue };
+        let param = if opposite { fraction } else { 1.0 - fraction };
+        let direction = if opposite { -tangent } else { tangent };
+        let offset = total * param;
+        out.push((
+            format!("partialPointOnEdgeManipulator.{index}"),
+            crate::display::FeatureManipulator::Linear { base: point + direction * offset, direction: -direction, offset, min: 0.0, max: total, secondary: false, primary: Some(primary.to_string()) },
+        ));
+    }
+    out
+}
+
+/// A parting line Draft's manipulators as std's draft.fs adds them/// A parting line Draft's manipulators as std's draft.fs adds them
+/// (addReferenceEntityDraftManipulators), keyed as std keys them so std's
+/// draftManipulatorChange applies their moves: on the last parting edge, its
+/// two faces ordered more-along-the-pull first; One sided: the flip arrow
+/// (quarter way along, into the drafted face) and the angle arc on the face
+/// drafted; Symmetric: the arc on the more away face (the along one's
+/// negated); Two sided: the angle and second angle arcs. An arc turns about
+/// the edge's middle across the face from an inch along (or against) the
+/// pull. Empty when the dialog has no edge or pull direction yet.
+pub fn draft_parting_manipulators(ctx: &crate::regen::context::Context, params: &ParamValues, units: &noshape_units::UnitPrefs) -> Vec<(String, crate::display::FeatureManipulator)> {
+    draft_parting_manipulators_opt(ctx, params, units).unwrap_or_default()
+}
+
+fn draft_parting_manipulators_opt(ctx: &crate::regen::context::Context, params: &ParamValues, units: &noshape_units::UnitPrefs) -> Option<Vec<(String, crate::display::FeatureManipulator)>> {
+    use crate::display::FeatureManipulator as M;
+    use noshape_kernel::{Orientation, ShapeType};
+    let vars = std::collections::BTreeMap::new();
+    let ev = crate::regen::eval::EvalCtx::new(FeatureId(0), "", params, units, ctx.clone(), &vars);
+    let pull = ev.resolve_direction(params.query("pullDirectionEntity").first()?)?.try_normalize()?;
+    let &(bi, ei) = ev.resolve_edges(params.query("partingEdges")).last()?;
+    let shape = &ctx.bodies[bi].shape;
+    let edge = shape.sub_shape(ShapeType::Edge, ei).ok()?;
+    let info = edge.edge_info().ok()?;
+    let faces: Vec<noshape_kernel::Shape> = shape.edge_faces().ok()?.get(ei)?.iter().filter_map(|&f| shape.sub_shape(ShapeType::Face, f as usize).ok()).collect();
+    // A face's point, coedge direction and normal at `frac` along its coedge.
+    let at = |face: &noshape_kernel::Shape, frac: f64| -> Option<(DVec3, DVec3, DVec3)> {
+        let rev = face.edge_orientation_in(&edge).ok()? == Orientation::Reversed;
+        let t = info.first_param + (info.last_param - info.first_param) * if rev { 1.0 - frac } else { frac };
+        let p = edge.point_at(t).ok()?;
+        let d = edge.tangent_at(t).ok()?.try_normalize()?;
+        Some((p, if rev { -d } else { d }, face.normal_at_point(p).ok()?.try_normalize()?))
+    };
+    struct Data {
+        steep: f64,
+        half: (DVec3, DVec3, DVec3),
+        quarter: (DVec3, DVec3, DVec3),
+    }
+    let mut data: Vec<(noshape_kernel::Shape, f64)> = Vec::new();
+    for f in &faces {
+        let (_, d, n) = at(f, 0.5)?;
+        data.push((f.clone(), n.dot(d.cross(pull).try_normalize()?)));
+    }
+    if data.len() == 1 {
+        data.push(data[0].clone());
+    }
+    let tol = 1e-9;
+    if data.len() != 2 || (data[0].1 - data[1].1).abs() <= tol {
+        return None;
+    }
+    // More along first; the quarter points of the two meet (0.25 and 0.75 along opposite coedges).
+    if data[1].1 > data[0].1 {
+        data.swap(0, 1);
+    }
+    let ordered: Vec<Data> = data.iter().zip([0.25, 0.75]).map(|((f, steep), q)| Some(Data { steep: *steep, half: at(f, 0.5)?, quarter: at(f, q)? })).collect::<Option<_>>()?;
+    let angle_of = |id: &str| params.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, noshape_units::Dim::ANGLE, units, &noshape_units::EmptyScope).ok().map(|q| q.value)));
+    let max = 89.9f64.to_radians();
+    let arc = |d: &Data, angle: f64, flipped: bool, secondary: bool, primary: &str| -> Option<M> {
+        if d.steep.abs() <= tol {
+            return None;
+        }
+        let (o, _, n) = d.half;
+        let along = d.steep > 0.0;
+        Some(M::Angular { axis_origin: o, axis_direction: n.cross(pull).try_normalize()?, rotation_origin: o + pull * if along { 0.0254 } else { -0.0254 }, angle: if flipped { -angle } else { angle }, min: -max, max, secondary, primary: Some(primary.to_string()) })
+    };
+    let angle = angle_of("angle")?;
+    let pull_flip = params.bool("pullDirection");
+    let mut out = Vec::new();
+    match params.enum_("partingLineSides") {
+        "TWO_SIDED" => {
+            // The more away face carries one; the other too when one is along and one away.
+            let index = if ordered[1].steep <= ordered[0].steep + tol { 1 } else { 0 };
+            let second = angle_of("secondAngle")?;
+            let first_of = |d: &Data| if d.steep > 0.0 { ("secondAngleManipulator", second, params.bool("secondPullDirection"), true, "secondAngle") } else { ("angleManipulator", angle, pull_flip, false, "angle") };
+            let (m, o) = (&ordered[index], &ordered[1 - index]);
+            let (k, a, f, sec, p) = first_of(m);
+            let added = arc(m, a, f, sec, p);
+            let other = (added.is_none() || (m.steep > 0.0) != (o.steep > 0.0)).then(|| {
+                let (k, a, f, sec, p) = first_of(o);
+                arc(o, a, f, sec, p).map(|x| (k, x))
+            });
+            out.extend(added.map(|x| (k.to_string(), x)));
+            out.extend(other.flatten().map(|(k, x)| (k.to_string(), x)));
+        }
+        sides => {
+            let index = if sides == "ONE_SIDED" { if params.bool("alongPull") { 0 } else { 1 } } else if ordered[1].steep <= ordered[0].steep + tol { 1 } else { 0 };
+            let m = &ordered[index];
+            if sides == "ONE_SIDED" && faces.len() == 2 {
+                let (o, d, n) = m.quarter;
+                out.push(("flipManipulator".to_string(), M::Flip { base: o, direction: n.cross(d).try_normalize()?, flipped: false, other_direction: None, secondary: false }));
+            }
+            let along = m.steep > 0.0;
+            let (key, a) = if sides == "SYMMETRIC" && along { ("symmetricAlongAngleManipulator", -angle) } else { ("angleManipulator", angle) };
+            out.extend(arc(m, a, pull_flip, false, "angle").map(|x| (key.to_string(), x)));
+        }
+    }
+    Some(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

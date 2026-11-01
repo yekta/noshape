@@ -984,7 +984,7 @@ fn extrude_second_end_has_its_own_arrow(cx: &mut TestAppContext) {
     draw(cx, window);
     let (at, to) = view.update(cx, |v, cx| {
         v.sync_manipulator(cx);
-        let Some(Manip::Handles(Handle::Arrow(a), Some(Handle::Arrow(b)))) = v.current_manip(cx) else { panic!("two arrows") };
+        let Some(Manip::Handles([Some(Handle::Arrow(a)), Some(Handle::Arrow(b)), ..])) = v.current_manip(cx) else { panic!("two arrows") };
         assert!(b.secondary && a.dir.dot(b.dir) < 0.0, "the second end's double chevron, the other way");
         let vp = v.viewport.read(cx);
         let tip = b.base + b.dir * b.length;
@@ -1018,7 +1018,7 @@ fn extrude_second_end_has_its_own_arrow(cx: &mut TestAppContext) {
     let before = flipped(cx);
     let at = view.update(cx, |v, cx| {
         v.sync_manipulator(cx);
-        let Some(Manip::Handles(Handle::Arrow(a), _)) = v.current_manip(cx) else { panic!("the direction arrow") };
+        let Some(Manip::Handles([Some(Handle::Arrow(a)), ..])) = v.current_manip(cx) else { panic!("the direction arrow") };
         assert!(a.param.is_empty(), "nothing to drag");
         let vp = v.viewport.read(cx);
         let (p0, p1) = (vp.project(a.base).unwrap(), vp.project(a.base + a.dir * 1e-3).unwrap());
