@@ -1,0 +1,31 @@
+--- a/src/ModelingData/TKGeomBase/Extrema/Extrema_GenExtPS.cxx
++++ b/src/ModelingData/TKGeomBase/Extrema/Extrema_GenExtPS.cxx
+@@ -44,6 +44,19 @@
+ #include <StdFail_NotDone.hxx>
+ #include <Standard_Integer.hxx>
+ #include <NCollection_Array2.hxx>
++#include <Standard_Failure.hxx>
++
++// noshape (patch 0016): whether the caller's budget or cancel says stop (noshape's kernel, boolean.cpp; weak
++// default as 0008): each grid built (a point's projection onto a face; a Boolean's edge / face projections went on
++// past a budget's deadline without a check until its timer jumped out, leaving 2 GB behind each time: qa
++// MEM-RUNAWAY-508, fuzz seed 1002).
++extern "C" int noshape_should_break();
++#if defined(__GNUC__)
++extern "C" __attribute__((weak)) int noshape_should_break()
++{
++  return 0;
++}
++#endif
+ 
+ // IMPLEMENT_HARRAY1(Extrema_HArray1OfSphere)
+ class Bnd_SphereUBTreeSelector : public NCollection_UBTree<int, Bnd_Sphere>::Selector
+@@ -527,6 +540,8 @@
+ 
+ void Extrema_GenExtPS::BuildGrid(const gp_Pnt& thePoint)
+ {
++  if (noshape_should_break() != 0)
++    throw Standard_Failure("noshape: stopped");
+   // if grid was already built skip its creation
+   if (!myInit)
+   {
