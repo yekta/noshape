@@ -1079,6 +1079,20 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## "A non-manifold result": the 30 left, surveyed (11-01 18:50 UTC)
+- Debug summary per case (which edges end up used once or twice one way): most leave one piece's whole boundary
+  open, i.e. one piece classified or split differently from its neighbours, each for its own reason; the rule "a ray
+  meeting two faces at one place is unclean" (/root/bool-scratch/ray-twice.patch) takes none of them alone.
+- Looked into: 419e648e & co (a rod cut by a swept square tube: a missed crossing with the tube's B-spline sides or
+  its caps crossing, above); e40bb5a1 (a Shell's cut of a box with two blind holes 8.245 mm apart by its cavity, whose
+  1 mm-larger hole walls (r 4.175) overlap each other by 0.1 mm: the tool solid intersects itself. OCCT doesn't
+  intersect an argument with itself and keeps both whole tubes (its result's two full cylinders); ours classifies
+  the overlap by ray parity through the self-intersecting tool and leaves a non-manifold result. A bad input from
+  Shell's cavity (core: shell.cpp could check its tool), declining is right.)
+- 419e648e's family (five): with nine Newton starts per patch in free::ray_hits (not only Bézier pieces) and the
+  unclean-ray rule, still none taken: the rays really cross both caps and no side, i.e. the swept tube's caps cross
+  each other (a square swept along a tight path: a self-intersecting tool, as e40bb5a1's). Declining is right.
+
 ## Fuzz seed 1144 diagnosed (11-01 18:20 UTC)
 - With Shell's direct Booleans kept on OCCT (a diagnostic switch, not landed) the run is clean; with b997c4c3 (the one
   of those still differing) declined it still dies. The runs part at step 2 already: the first Shell's face ids differ
