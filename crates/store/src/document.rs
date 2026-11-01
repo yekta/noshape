@@ -77,6 +77,10 @@ pub fn os_login() -> String {
         .unwrap_or_else(|| "unknown".to_string())
 }
 
+/// Windows' process creation flag for a console program started without a console window.
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
 /// The account's full name, if the OS has one.
 fn os_full_name(login: &str) -> Option<String> {
     let clean = |s: &str| Some(s.trim().to_string()).filter(|s| !s.is_empty() && s != login);
@@ -85,7 +89,12 @@ fn os_full_name(login: &str) -> Option<String> {
         return clean(&String::from_utf8_lossy(&out.stdout));
     }
     if cfg!(windows) {
-        let out = std::process::Command::new("net").args(["user", login]).output().ok()?;
+        let mut net = std::process::Command::new("net");
+        net.args(["user", login]);
+        // A console program from the (GUI) app: no console window.
+        #[cfg(windows)]
+        std::os::windows::process::CommandExt::creation_flags(&mut net, CREATE_NO_WINDOW);
+        let out = net.output().ok()?;
         let text = String::from_utf8_lossy(&out.stdout);
         let line = text.lines().find(|l| l.starts_with("Full Name"))?;
         return clean(line.trim_start_matches("Full Name"));

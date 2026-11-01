@@ -135,8 +135,8 @@ fn stale(pid: u32, port: u16) -> bool {
     matches!(TcpStream::connect_timeout(&([127, 0, 0, 1], port).into(), Duration::from_millis(500)), Err(e) if e.kind() == std::io::ErrorKind::ConnectionRefused)
 }
 
-/// Whether process `pid` is running.
-fn process_alive(pid: u32) -> bool {
+/// Whether process `pid` is running (asked of the OS directly: no helper process).
+pub(crate) fn process_alive(pid: u32) -> bool {
     #[cfg(unix)]
     {
         unsafe extern "C" {

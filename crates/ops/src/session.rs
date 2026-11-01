@@ -95,17 +95,9 @@ fn note_open(dir: &Path, path: &Path) {
     }
 }
 
+/// In this process, never by starting one (Windows' `tasklist` flashed a console window on every open).
 fn process_alive(pid: u32) -> bool {
-    if cfg!(target_os = "linux") {
-        return Path::new("/proc").join(pid.to_string()).exists();
-    }
-    #[cfg(unix)]
-    let alive = std::process::Command::new("kill").args(["-0", &pid.to_string()]).stderr(std::process::Stdio::null()).status().is_ok_and(|s| s.success());
-    #[cfg(windows)]
-    let alive = std::process::Command::new("tasklist").args(["/FI", &format!("PID eq {pid}"), "/NH"]).output().is_ok_and(|o| String::from_utf8_lossy(&o.stdout).contains(&pid.to_string()));
-    #[cfg(not(any(unix, windows)))]
-    let alive = false;
-    alive
+    crate::live::process_alive(pid)
 }
 
 pub struct Session {

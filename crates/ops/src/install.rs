@@ -425,6 +425,15 @@ fn write(file: &Path, text: &str) -> Result<(), String> {
     std::fs::write(file, text).map_err(|e| format!("could not write {}: {e}", file.display()))
 }
 
+/// Windows: a console program started from the app (a GUI program) gets no console window (it flashed);
+/// its output is read through pipes anyway.
+fn no_console_window(c: &mut Command) {
+    #[cfg(windows)]
+    std::os::windows::process::CommandExt::creation_flags(c, 0x0800_0000);
+    #[cfg(not(windows))]
+    let _ = c;
+}
+
 /// Run an agent's command (at most a minute), with its folder and the
 /// usual ones on PATH (an npm-installed `claude` needs `node`).
 fn run(env: &Env, program: &Path, args: &[&str]) -> Result<(), String> {
@@ -433,6 +442,7 @@ fn run(env: &Env, program: &Path, args: &[&str]) -> Result<(), String> {
     path.extend(env.system_dirs.iter().cloned());
     let mut c = Command::new(program);
     c.args(args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
+    no_console_window(&mut c);
     if let Ok(p) = std::env::join_paths(path) {
         c.env("PATH", p);
     }
@@ -704,7 +714,10 @@ fn mac_admin_link(command: &Path, dir: &Path) -> Result<(), String> {
 fn windows_add_to_path(command: &Path) -> Result<Value, String> {
     let dir = command.parent().ok_or("no folder")?.to_string_lossy().to_string();
     let script = "$d = $env:NOSHAPE_DIR; $p = [Environment]::GetEnvironmentVariable('Path', 'User'); $parts = @($p -split ';' | Where-Object { $_ -ne '' }); if ($parts -notcontains $d) { [Environment]::SetEnvironmentVariable('Path', (($parts + $d) -join ';'), 'User'); 'added' } else { 'present' }";
-    let out = Command::new("powershell").args(["-NoProfile", "-NonInteractive", "-Command", script]).env("NOSHAPE_DIR", &dir).stdin(Stdio::null()).output().map_err(|e| format!("powershell: {e}"))?;
+    let mut ps = Command::new("powershell");
+    ps.args(["-NoProfile", "-NonInteractive", "-Command", script]).env("NOSHAPE_DIR", &dir).stdin(Stdio::null());
+    no_console_window(&mut ps);
+    let out = ps.output().map_err(|e| format!("powershell: {e}"))?;
     if !out.status.success() {
         return Err(format!("could not change the user PATH: {}", String::from_utf8_lossy(&out.stderr).trim()));
     }
