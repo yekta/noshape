@@ -20,7 +20,7 @@ message, P3 tooltip / prompt / look. Status: ✗ open, ✅ fixed (commit), – a
 | Drawing and export dumps outside drawing-* (50: view properties, crop / detail / hatch, section, weld, inspection, templates, Part Studio and drawing export dialogs per format, export rules, DWG toolbar) | asb*, asbv-*, crop-view-*, inspection-*, g39-export-*, preferences-export-rules-*, psb-r-weld-*, dx-17xx-*, … | 1115 texts, 636 found as is; the rest dump-format noise, user content or other audits' (sketch Insert DXF: skasm; parts list: psui) | X2–X4, A2, W1, V2 |
 | Notifications panel | behaviours (EX11 request 1544, import flow) | compared with live's description | N… |
 
-**Counts (11-01 19:22 UTC; was 18:15 UTC):** surfaces audited 6 (drawing dialogs and panels with dumps 55, more drawing and export
+**Counts (11-01 19:22 UTC):** surfaces audited 6 (drawing dialogs and panels with dumps 55, more drawing and export
 dumps 50, import / export dialogs 16, right-click menus 25 entity types in the app, Notifications, configurations /
 Variable Studio / Derived 44 dumps). 5275 live texts and options scanned, 3804 found as is. Gap rows 34: fixed 26 (P1
 3, P2 11, P3 12), same as live after asking 4 (P1 D3, D4, D5; P2 D17), already ours 1 (P3 D15), asked live 3 (P1 X2;
