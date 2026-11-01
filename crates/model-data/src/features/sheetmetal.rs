@@ -281,11 +281,19 @@ pub fn flange() -> FeatureType {
         ParamSpec::num("miterAngle", "Miter angle", NumSpec::angle(45.0, 0.0, 179.0)).visible(|v| !v.bool("autoMiter")),
     ];
     p.extend(bend_radius_override(always, "bendRadius"));
+    // Live (request 1685, std's partialFlangePredicate): "Partial flange" is a
+    // plain checkbox; ticked, two open groups follow at its level, "Overall
+    // parameters" and "End conditions" (the second bound inside the latter).
+    let group = |id: &'static str, label: &'static str| ParamSpec::bool(id, label, true).hints(Hints::GROUP_HEADER | Hints::GROUP_LABEL | Hints::UNCONFIGURABLE).visible(partial);
+    let overall = move |v: &ParamValues| partial(v) && v.bool("partialOverallGroup");
+    let ends = move |v: &ParamValues| partial(v) && v.bool("partialEndGroup");
     p.extend([
-        ParamSpec::bool("isPartialFlange", "Partial flange", false).hints(Hints::GROUP_HEADER),
-        ParamSpec::enum_("chainType", "Chain type", &[("PER_EDGE", "Per edge"), ("PER_CHAIN", "Per chain")]).visible(partial),
-        ParamSpec::flip("flipFlangeBounds", "Flip sides").visible(partial),
-        ParamSpec::bool("holdAdjacentEdges", "Hold adjacent edges", true).visible(partial),
+        ParamSpec::bool("isPartialFlange", "Partial flange", false),
+        group("partialOverallGroup", "Overall parameters"),
+        ParamSpec::enum_("chainType", "Chain type", &[("PER_EDGE", "Per edge"), ("PER_CHAIN", "Per chain")]).visible(overall),
+        ParamSpec::flip("flipFlangeBounds", "Flip sides").visible(overall),
+        ParamSpec::bool("holdAdjacentEdges", "Hold adjacent edges", true).visible(overall),
+        group("partialEndGroup", "End conditions"),
     ]);
     for (gate_id, ty, dist, ent, ent_off, ent_flip, labels) in [
         (
@@ -308,9 +316,9 @@ pub fn flange() -> FeatureType {
         ),
     ] {
         if !gate_id.is_empty() {
-            p.push(ParamSpec::bool(gate_id, "Second bound", false).visible(partial));
+            p.push(ParamSpec::bool(gate_id, "Second bound", false).visible(ends));
         }
-        let on = move |v: &ParamValues| partial(v) && (gate_id.is_empty() || v.bool(gate_id));
+        let on = move |v: &ParamValues| ends(v) && (gate_id.is_empty() || v.bool(gate_id));
         p.push(ParamSpec::enum_(ty, labels[0], BOUND).visible(on));
         p.push(ParamSpec::num(dist, labels[1], NumSpec::positive_length(25.0, 1.0)).visible(move |v| on(v) && v.is(ty, "BLIND")));
         p.push(
