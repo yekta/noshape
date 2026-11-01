@@ -106,10 +106,11 @@ impl PartStudioView {
             "extrude" => self.current_arrow(cx).map(|a| Manip::Handles(Handle::Arrow(a), self.second_arrow(&a, cx).map(Handle::Arrow))),
             "moveFace" if e.dialog.read(cx).feature.params.is("moveFaceType", "ROTATE") => self.revolve_arc(cx).map(|h| Manip::Handles(Handle::Arc(h), None)),
             // Shell and Chamfer have none (std adds no manipulator; live psb 10-24).
+            "cPlane" if e.dialog.read(cx).feature.params.is("cplaneType", "LINE_ANGLE") => self.plane_angle_arc(cx).map(|h| Manip::Handles(Handle::Arc(h), None)),
             "cPlane" | "fillet" | "moveFace" | "offsetSurface" | "replaceFace" | "extendSurface" | "helix" => self.param_arrow(cx).map(|a| Manip::Handles(Handle::Arrow(a), None)),
             "revolve" => self.revolve_handles(cx),
             "draft" => self.draft_arc(cx).map(|h| Manip::Handles(Handle::Arc(h), None)),
-            "transform" => self.current_triad(cx).map(Manip::Triad),
+            "transform" => self.current_triad(cx).map(Manip::Triad).or_else(|| self.transform_handle(cx)),
             "routingCurve" => self.routing_triad(cx).map(Manip::Triad),
             _ => None,
         }
@@ -208,6 +209,79 @@ impl PartStudioView {
         let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.display.variables).ok().map(|q| q.value)))?;
         let axis = if p.bool("pullDirection") { -axis } else { axis };
         Some(ArcHandle { origin, axis, radial, angle, param: "angle", flip: Some("pullDirection"), secondary: false, max: 89.9f64.to_radians() })
+    }
+
+    /// Plane's Line angle (std cplane.fs addAngleManipulator): about the
+    /// line, from a quarter of the plane's size out along the direction
+    /// the angle is measured from (std takes that direction as a point and
+    /// drops it onto the plane through the line's origin square to it; one
+    /// line: across `perpendicular_vector`), by the angle (Opposite
+    /// direction: the other way).
+    fn plane_angle_arc(&self, cx: &App) -> Option<ArcHandle> {
+        let d = self.edit.as_ref()?.dialog.read(cx);
+        let p = &d.feature.params;
+        let ctx = self.ui.before_context.as_ref().or(self.context.as_ref())?;
+        let refs = p.query("entities");
+        let (i, (o, axis)) = refs.iter().enumerate().find_map(|(i, r)| self.axis_of(r).map(|a| (i, a)))?;
+        let in_plane = match refs.iter().enumerate().find(|(k, _)| *k != i).map(|(_, r)| r) {
+            None => noshape_model::regen::features::cplane::perpendicular_vector(axis).cross(axis),
+            Some(r) => match self.axis_of(r) {
+                Some((o2, d2)) if d2.cross(axis).length() < 1e-9 => o2 - o,
+                Some((_, d2)) => d2,
+                None => match self.frame_of_ref(r).map(|f| f.normal).or_else(|| noshape_model::select::face_anchor(ctx, r).map(|(_, n)| n)) {
+                    Some(n) => axis.cross(n),
+                    None => noshape_model::regen::measure::resolve_shapes(ctx, r).first().and_then(|s| s.vertex_point().ok())? - o,
+                },
+            },
+        };
+        let rel = in_plane - o;
+        let radial = (rel - axis * axis.dot(rel)).try_normalize()?;
+        let size = self.display.planes.iter().find(|pl| pl.reference == Reference::FeaturePlane(d.feature.id)).map(|pl| pl.half_width * 2.0)?;
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.display.variables).ok().map(|q| q.value)))?;
+        let axis = if p.bool("oppositeDirection") { -axis } else { axis };
+        Some(ArcHandle { origin: o, axis, radial: radial * size / 4.0, angle, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU })
+    }
+
+    /// Transform's Rotate angle and Translate by distance arrow (std
+    /// transformCopy.fs): from the centre of the parts' box, about the
+    /// axis / along the direction (two points, an edge's ends, a plane's
+    /// normal), Opposite direction turning them.
+    fn transform_handle(&self, cx: &App) -> Option<Manip> {
+        let d = self.edit.as_ref()?.dialog.read(cx);
+        let p = &d.feature.params;
+        let (lo, hi) = self.transform_box(cx)?;
+        let c = (lo + hi) * 0.5;
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let value = |id: &str, dim: Dim| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, dim, &units, &self.display.variables).ok().map(|q| q.value)));
+        let opposite = p.bool("oppositeDirection");
+        if p.is("transformType", "ROTATION") {
+            let (o, axis) = self.axis_of(p.query("transformAxis").first()?)?;
+            let origin = o + axis * axis.dot(c - o);
+            let radial = c - origin;
+            if radial.length() < 1e-9 {
+                return None;
+            }
+            let axis = if opposite { -axis } else { axis };
+            return Some(Manip::Handles(Handle::Arc(ArcHandle { origin, axis, radial, angle: value("angle", Dim::ANGLE)?, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU }), None));
+        }
+        if !p.is("transformType", "TRANSLATION_DISTANCE") {
+            return None;
+        }
+        let ctx = self.ui.before_context.as_ref().or(self.context.as_ref())?;
+        let refs = p.query("transformDirection");
+        let shapes: Vec<noshape_kernel::Shape> = refs.iter().flat_map(|r| noshape_model::regen::measure::resolve_shapes(ctx, r)).collect();
+        let points: Vec<DVec3> = shapes.iter().filter_map(|s| s.vertex_point().ok()).collect();
+        let dir = match points.as_slice() {
+            [a, b, ..] => *b - *a,
+            _ => match shapes.iter().find_map(|s| s.endpoints().ok()) {
+                Some((a, b)) => b - a,
+                None => refs.iter().find_map(|r| self.frame_of_ref(r).map(|f| f.normal).or_else(|| noshape_model::select::face_anchor(ctx, r).map(|(_, n)| n)))?,
+            },
+        }
+        .try_normalize()?;
+        let dir = if opposite { -dir } else { dir };
+        Some(Manip::Handles(Handle::Arrow(Arrow { base: c, dir, length: value("distance", Dim::LENGTH)?, param: "distance", flip: Some("oppositeDirection"), secondary: false }), None))
     }
 
     /// World axis (point, unit direction) of a sketch line or straight/circular edge.
