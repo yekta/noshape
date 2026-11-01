@@ -6,7 +6,8 @@
 #   ./install.sh               for you: ~/.local/bin, ~/.local/share
 #   ./install.sh --system      for everyone: /usr/local/bin, /usr/local/share (uses sudo when not root)
 #   ./install.sh --agents      also connect the coding agents found, without asking (--no-agents: don't ask)
-#   ./install.sh --uninstall   remove what --system / the default put there (with --system for the system one)
+#   ./install.sh --uninstall   remove what --system / the default put there (with --system for the system one), and
+#                              disconnect the coding agents from it (--no-agents: leave them)
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 system=0 agents=ask uninstall=0
@@ -16,7 +17,7 @@ for a in "$@"; do
     --agents) agents=yes ;;
     --no-agents) agents=no ;;
     --uninstall) uninstall=1 ;;
-    -h|--help) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "install.sh: unknown option $a (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -38,7 +39,7 @@ refresh() {
 }
 
 if [ $uninstall = 1 ]; then
-  [ -x "$bin/noshape" ] && [ "$agents" != no ] && as_user "$bin/noshape" agents disconnect >/dev/null 2>&1 || true
+  [ -x "$bin/noshape" ] && [ "$agents" != no ] && as_user "$bin/noshape" agents disconnect --command "$bin/noshape" >/dev/null 2>&1 || true
   $sudo rm -f "$bin/noshape" "$apps/noshape.desktop" "$icons/512x512/apps/noshape.png" "$icons/256x256/apps/noshape.png" "$icons/scalable/apps/noshape.svg"
   refresh
   echo "noshape removed from $bin and $share"

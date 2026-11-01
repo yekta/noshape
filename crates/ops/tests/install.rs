@@ -70,12 +70,15 @@ fn claude_desktop_entry_is_merged_kept_once_updated_and_removed() {
     assert_eq!(read_json(&file)["mcpServers"]["noshape"]["command"], other);
     assert_eq!(read_json(&file)["mcpServers"].as_object().unwrap().len(), 2);
 
-    let d = install::disconnect(&e, Agent::ClaudeDesktop).expect("disconnect");
+    // An uninstaller removes only its own binary's entry.
+    assert_eq!(install::disconnect(&e, Agent::ClaudeDesktop, Some(Path::new(APP))).unwrap().result, "connected to another noshape");
+    assert_eq!(read_json(&file)["mcpServers"]["noshape"]["command"], other);
+    let d = install::disconnect(&e, Agent::ClaudeDesktop, Some(Path::new(other))).expect("disconnect");
     assert_eq!(d.result, "disconnected");
     let v = read_json(&file);
     assert!(v["mcpServers"].get("noshape").is_none());
     assert_eq!(v["mcpServers"]["files"], before["mcpServers"]["files"]);
-    assert_eq!(install::disconnect(&e, Agent::ClaudeDesktop).unwrap().result, "not connected");
+    assert_eq!(install::disconnect(&e, Agent::ClaudeDesktop, None).unwrap().result, "not connected");
     let _ = std::fs::remove_dir_all(home);
 }
 
@@ -155,7 +158,7 @@ exit 0
         let other = home.join("noshape-2/noshape");
         assert_eq!(install::connect(&e, Agent::ClaudeCode, &other).unwrap().result, "updated");
         assert_eq!(calls(&home, "claude-calls")[1..], ["mcp remove --scope user noshape".to_string(), format!("mcp add --scope user noshape -- {} mcp", other.display())]);
-        assert_eq!(install::disconnect(&e, Agent::ClaudeCode).unwrap().result, "disconnected");
+        assert_eq!(install::disconnect(&e, Agent::ClaudeCode, None).unwrap().result, "disconnected");
         assert_eq!(install::status(&e, Agent::ClaudeCode, &other).state, State::NotConnected);
         let _ = std::fs::remove_dir_all(home);
     }
@@ -197,7 +200,7 @@ exit 0
         assert_eq!(calls(&home, "codex-calls"), ["mcp add --help".to_string(), format!("mcp add noshape -- {APP} mcp")]);
         assert_eq!(install::status(&e, Agent::Codex, Path::new(APP)).state, State::Connected);
         assert_eq!(install::connect(&e, Agent::Codex, Path::new(APP)).unwrap().result, "already connected");
-        assert_eq!(install::disconnect(&e, Agent::Codex).unwrap().via, "codex mcp remove");
+        assert_eq!(install::disconnect(&e, Agent::Codex, None).unwrap().via, "codex mcp remove");
         let _ = std::fs::remove_dir_all(home);
 
         // An older Codex: its config.toml, other tables kept.
@@ -213,7 +216,7 @@ exit 0
         assert!(c.via.starts_with("edited "), "{}", c.via);
         assert_eq!(std::fs::read_to_string(&cfg).unwrap(), format!("model = \"o4\"\n\n[mcp_servers.noshape]\ncommand = '{APP}'\nargs = [\"mcp\"]\n"));
         assert!(std::fs::read_to_string(c.backup.unwrap()).unwrap().contains("/old/noshape"));
-        install::disconnect(&e, Agent::Codex).expect("disconnect");
+        install::disconnect(&e, Agent::Codex, None).expect("disconnect");
         assert_eq!(std::fs::read_to_string(&cfg).unwrap().trim_end(), "model = \"o4\"");
         let _ = std::fs::remove_dir_all(home);
     }

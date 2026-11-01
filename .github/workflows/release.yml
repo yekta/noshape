@@ -237,8 +237,11 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           test "$(command -v noshape)" = "$HOME/.local/bin/noshape"
           python3 $check noshape
-          "$dir/install.sh" --uninstall --no-agents
+          # Uninstalling disconnects the agents from this binary (the fake leaves ~/.claude.json, so the file is edited).
+          PATH="$RUNNER_TEMP/fake:$PATH" "$dir/install.sh" --uninstall
           test ! -e "$HOME/.local/bin/noshape"
+          grep -qx "mcp remove --scope user noshape" "$HOME/claude-calls"
+          if grep -q '"noshape"' "$HOME/.claude.json"; then echo "uninstall left Claude Code connected"; exit 1; fi
 
       - name: macOS (dmg, command line tool link, CLI-only)
         if: runner.os == 'macOS'
@@ -285,6 +288,18 @@ jobs:
           # MCP through the launcher too (a client that resolves `noshape` as cmd does).
           python $check "$dir\noshape.com"
           if ($LASTEXITCODE -ne 0) { throw "launcher MCP check failed" }
+          # Claude Desktop connected by this install (another server in its file): uninstalling disconnects it.
+          $claude = "$env:APPDATA\Claude"
+          New-Item -ItemType Directory -Force -Path $claude | Out-Null
+          '{"mcpServers":{"other":{"command":"other.exe","args":[]}}}' | Set-Content -Encoding ascii "$claude\claude_desktop_config.json"
+          noshape agents connect --agents claude_desktop | Out-String | Write-Host
+          $cfg = Get-Content "$claude\claude_desktop_config.json" -Raw | ConvertFrom-Json
+          if ($cfg.mcpServers.noshape.command -ne "$dir\noshape.exe") { throw "not connected: $($cfg | ConvertTo-Json -Depth 5)" }
+          # The GUI-subsystem exe prints into a redirect from cmd and into PowerShell's pipe.
+          cmd /c "noshape --version > `"$env:RUNNER_TEMP\v.txt`""
+          if (-not ((Get-Content "$env:RUNNER_TEMP\v.txt") -match '^noshape ')) { throw "cmd redirect: $(Get-Content "$env:RUNNER_TEMP\v.txt")" }
+          $v = noshape --version | Out-String
+          if ($v -notmatch '^noshape ') { throw "pipe: $v" }
           # Uninstall: the files and the PATH entry go.
           $u = Start-Process "$dir\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
           if ($u.ExitCode -ne 0) { throw "uninstall exit $($u.ExitCode)" }
@@ -292,6 +307,9 @@ jobs:
           for ($i = 0; $i -lt 60 -and (Test-Path "$dir\noshape.exe"); $i++) { Start-Sleep -Seconds 1 }
           if (Test-Path "$dir\noshape.exe") { throw "uninstall left noshape.exe" }
           if (([Environment]::GetEnvironmentVariable('Path', 'User') -split ';') -contains $dir) { throw "uninstall left the PATH entry" }
+          $cfg = Get-Content "$claude\claude_desktop_config.json" -Raw | ConvertFrom-Json
+          if ($cfg.mcpServers.noshape) { throw "uninstall left Claude Desktop connected" }
+          if ($cfg.mcpServers.other.command -ne 'other.exe') { throw "uninstall changed another server" }
           # The portable zip and the CLI-only download.
           Expand-Archive (Get-ChildItem dl\noshape-[0-9]*-windows-x86_64.zip).FullName -DestinationPath "$env:RUNNER_TEMP\zip"
           python $check (Get-ChildItem "$env:RUNNER_TEMP\zip\noshape-*\noshape.exe").FullName

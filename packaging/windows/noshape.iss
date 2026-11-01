@@ -3,7 +3,7 @@
 ; Installs noshape.exe (the app, the CLI and the MCP server `noshape mcp`) and noshape.com (its console launcher) to
 ; Program Files, adds a Start menu entry, puts the install folder on the user's PATH and, on the finish page, offers to
 ; connect noshape to the coding agents found (`noshape agents connect`: Claude Code, Codex CLI, Claude Desktop).
-; Uninstalling takes the folder off PATH.
+; Uninstalling disconnects them and takes the folder off PATH.
 
 #ifndef Version
   #define Version "0.0.0"
@@ -54,6 +54,10 @@ Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; Value
 [Run]
 Filename: "{app}\noshape.exe"; Parameters: "agents connect"; Description: "Connect noshape to {code:FoundAgents} (its MCP server)"; Flags: postinstall runasoriginaluser runhidden waituntilterminated; Check: AgentsFound
 Filename: "{app}\noshape.exe"; Description: "Start noshape"; Flags: postinstall nowait skipifsilent runasoriginaluser unchecked
+
+[UninstallRun]
+; Before the files go: the agents this install connected forget it (another noshape's entries stay).
+Filename: "{app}\noshape.exe"; Parameters: "agents disconnect --command ""{app}\noshape.exe"""; Flags: runhidden waituntilterminated; RunOnceId: "DisconnectAgents"
 
 [Code]
 var

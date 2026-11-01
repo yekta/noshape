@@ -6446,7 +6446,7 @@ Examples:
 
 Remove noshape's MCP server from the coding agents (deletes or overwrites).
 
-Removes the `noshape` entry from each agent's MCP servers (with its own command where it has one, else from its configuration file, backed up first). Other servers are kept.
+Removes the `noshape` entry from each agent's MCP servers (with its own command where it has one, else from its configuration file, backed up first). Other servers are kept. With `command`, only entries that start that binary (the uninstallers pass their own, so another install's entry stays).
 
 Examples:
 
@@ -6457,6 +6457,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `agents` | array of one of `claude_code`, `codex`, `claude_desktop` |  | Agents to disconnect. Default: every one connected. |
+| `command` | string |  | Only entries that start this noshape binary. Default: any noshape entry. |
 
 ### cli
 

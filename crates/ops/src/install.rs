@@ -356,12 +356,17 @@ pub fn connect(env: &Env, agent: Agent, command: &Path) -> Result<Change, String
     Ok(Change { agent, result, via: via_file(&config, &tried), backup })
 }
 
-/// Remove noshape's MCP server from `agent` (whatever binary it starts).
-pub fn disconnect(env: &Env, agent: Agent) -> Result<Change, String> {
-    let st = status(env, agent, Path::new(""));
+/// Remove noshape's MCP server from `agent`.
+/// `only`: just an entry that starts this binary (an uninstaller passes its
+/// own, so another install's entry stays).
+pub fn disconnect(env: &Env, agent: Agent, only: Option<&Path>) -> Result<Change, String> {
+    let st = status(env, agent, only.unwrap_or(Path::new("")));
     let Some(found) = st.found.clone() else { return Err(format!("{} isn't installed", agent.name())) };
     if st.state == State::NotConnected {
         return Ok(Change { agent, result: "not connected", via: String::new(), backup: None });
+    }
+    if only.is_some() && st.state != State::Connected {
+        return Ok(Change { agent, result: "connected to another noshape", via: String::new(), backup: None });
     }
     let config = st.config.clone().unwrap_or_default();
     let mut tried = String::new();

@@ -44,8 +44,8 @@ pub fn ops() -> Vec<Op> {
             group: "agents",
             verb: "disconnect",
             summary: "Remove noshape's MCP server from the coding agents",
-            description: "Removes the `noshape` entry from each agent's MCP servers (with its own command where it has one, else from its configuration file, backed up first). Other servers are kept.",
-            fields: vec![agents_field("Agents to disconnect. Default: every one connected.")],
+            description: "Removes the `noshape` entry from each agent's MCP servers (with its own command where it has one, else from its configuration file, backed up first). Other servers are kept. With `command`, only entries that start that binary (the uninstallers pass their own, so another install's entry stays).",
+            fields: vec![agents_field("Agents to disconnect. Default: every one connected."), opt("command", json!({ "type": "string" }), "Only entries that start this noshape binary. Default: any noshape entry.")],
             mutates: false,
             destructive: true,
             run: agents_disconnect,
@@ -126,11 +126,12 @@ fn agents_connect(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 fn agents_disconnect(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let env = Env::current();
+    let only = a.opt_str("command")?.map(PathBuf::from);
     let list = match agents(a)? {
         Some(l) => l,
-        None => install::statuses(&env, std::path::Path::new("")).into_iter().filter(|s| matches!(s.state, install::State::Connected | install::State::Elsewhere(_))).map(|s| s.agent).collect(),
+        None => install::statuses(&env, only.as_deref().unwrap_or(std::path::Path::new(""))).into_iter().filter(|s| if only.is_some() { s.state == install::State::Connected } else { matches!(s.state, install::State::Connected | install::State::Elsewhere(_)) }).map(|s| s.agent).collect(),
     };
-    changes(list, |agent| install::disconnect(&env, agent))
+    changes(list, |agent| install::disconnect(&env, agent, only.as_deref()))
 }
 
 fn cli_status(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
