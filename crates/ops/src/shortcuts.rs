@@ -267,6 +267,7 @@ pub const ENTRIES: &[Entry] = entries! {
         ("Equal", Some("e"), Some("ConstraintEqual")),
         ("Extend", Some("x"), Some("SketchExtend")),
         ("Fix", Some("shift-j"), Some("ConstraintFix")),
+        ("Flow", N, N),
         ("Horizontal*", Some("h"), Some("ConstraintHorizontal")),
         ("Inscribed polygon", N, N),
         ("Insert DXF or DWG", N, N),

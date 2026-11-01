@@ -98,14 +98,15 @@ pub fn tool_name(t: Tool) -> &'static str {
 }
 
 /// Preferences › Shortcut toolbars › Sketch: Onshape's list, in its order
-/// and wording (live dom preferences-shortcut-toolbars.json, 56 rows).
-pub const SKETCH_PREFS_LIST: [&str; 56] = [
+/// and wording (live dom preferences-shortcut-toolbars.json, 56 rows; Flow
+/// after Curvature since live 1724).
+pub const SKETCH_PREFS_LIST: [&str; 57] = [
     "Extrude", "Revolve", "Line", "Midpoint line", "Corner rectangle", "Center point rectangle", "Aligned rectangle", "Center point circle", "3 point circle", "Ellipse",
     "3 point arc", "Tangent arc", "Center point arc", "Elliptical arc", "Conic", "Inscribed polygon", "Circumscribed polygon", "Spline", "Bezier", "Spline control point",
     "Point", "Text", "Use", "Intersection", "Construction", "Fillet", "Chamfer", "Trim", "Extend", "Split",
     "Offset", "Slot", "Mirror", "Linear pattern", "Circular pattern", "Transform", "Insert DXF or DWG", "Insert image", "Dimension", "Coincident",
     "Concentric", "Parallel", "Tangent", "Horizontal", "Vertical", "Perpendicular", "Equal", "Midpoint", "Normal", "Pierce",
-    "Symmetric", "Fix", "Curvature", "Section view", "Mass and section properties", "Measure",
+    "Symmetric", "Fix", "Curvature", "Flow", "Section view", "Mass and section properties", "Measure",
 ];
 
 /// The Sketch list's rows: (stored id: our tool's name, or the row's name

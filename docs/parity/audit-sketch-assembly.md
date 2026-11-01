@@ -12,8 +12,8 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 | | |
 |---|---|
 | Surfaces audited | 19 |
-| Gaps found | 28 |
-| Gaps fixed | 27 |
+| Gaps found | 29 |
+| Gaps fixed | 28 |
 
 ## Surfaces
 
@@ -73,3 +73,4 @@ Live requests answered: 1715 (tool options), 1716 (Flow), 1720 (exploded views /
 | G26 | P2 | Nested instance row (inside an expanded subassembly) | Properties… | Hide · Hide other / all instances · Isolate… · Make transparent… · Fix · Use best available tessellation | Edit in context · Add mate connector to instance origin… · Switch to … | Copy | Move to new subassembly · Export… · Release… | Zoom to selection | Create Drawing of … | Create empty subassembly | no menu | open. Plan: Assembly.hidden_occurrences (paths) applied to the leaves in eval; isolate / transparent sets of paths (now `HashSet<InstanceId>` of top-level ids checked against `o.top()` in assembly_panels, AsmSceneOptions and ops::assembly::instances_under; nested ids can equal top-level ones, so paths are needed); fix of a nested occurrence in the parent; then the menu (Properties… from the leaf\'s source) |
 | G27 | P2 | Dynamic suppression ▸ on patterns, relations and assembly mate connectors | offered | not modelled (instances, mates and folders only) | fixed (11-01): Assembly::unsuppressed_if keeps their expressions by id; evaluation suppresses them, the menus offer Dynamic suppression ▸ / Unsuppress · Edit dynamic suppression (T1 assembly dynamic_suppression_applies_to_relations) |
 | G28 | P3 | Two mates selected | Reset | Show · Show all mates · Isolate… · Make transparent… · Edit named position driver mate… · Suppress · Dynamic suppression ▸ | Clear selection | Add selection to folder… · Expand ▸ · Collapse ▸ | Delete | the clicked mate's menu | fixed (11-01): Ctrl / Cmd+click adds mates to the selection (highlighted), their menu as live\'s, Delete removes them in one step (UI test two_selected_mates_have_lives_menu); no Dynamic suppression or driver item for several yet |
+| G29 | P3 | Preferences › Customize keyboard shortcuts and Shortcut toolbars (Sketch) | Flow listed (unassigned; after Curvature, unticked; live 1724) | missing | fixed (11-01) |

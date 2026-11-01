@@ -123,6 +123,7 @@ pub const SHORTCUTS: &[(&str, Cover)] = &[
     ("sketch:Equal", Op("sketch_constrain")),
     ("sketch:Extend", Op("sketch_extend")),
     ("sketch:Fix", Op("sketch_constrain")),
+    ("sketch:Flow", Op("sketch_constrain")),
     ("sketch:Horizontal*", Op("sketch_constrain")),
     ("sketch:Inscribed polygon", Op("sketch_draw")),
     ("sketch:Insert DXF or DWG", Op("sketch_insert_dxf")),
