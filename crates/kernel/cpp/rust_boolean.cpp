@@ -1502,17 +1502,57 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           for (size_t y = x + 1; y < starts.size() && !pinched; ++y)
             pinched = starts[x].IsSame(starts[y]);
       }
+      std::vector<TopoDS_Edge> seq;
       for (uint32_t k = 0; k < u1 - u0; ++k)
       {
         const uint32_t u    = b.uses[mirrored || pinched ? u1 - 1 - k : u0 + k];
         const bool     back = ((u % 2 == 1) != rev) != (flipped[u / 2] != 0);
-        bb.Add(w, es[u / 2].Oriented(back ? TopAbs_REVERSED : TopAbs_FORWARD));
+        seq.push_back(TopoDS::Edge(es[u / 2].Oriented(back ? TopAbs_REVERSED : TopAbs_FORWARD)));
       }
-      if (round)
-        if (const char* why = apex_pcurves(w, s, loc, bb))
-          return why;
-      w.Closed(true);
-      bb.Add(f, w);
+      // A loop through one vertex twice, no edge twice (a hole touching the boundary at a point): a wire each side
+      // of that vertex, as OCCT's builder makes them (one wire through it twice is a bad orientation to BRepCheck,
+      // and OCCT's operations on such a result crashed: fuzz seed 1144).
+      std::vector<std::vector<TopoDS_Edge>> wires;
+      {
+        std::vector<uint32_t> ids;
+        for (uint32_t k = u0; k < u1; ++k)
+          ids.push_back(b.uses[k] / 2);
+        std::sort(ids.begin(), ids.end());
+        const bool twice = std::adjacent_find(ids.begin(), ids.end()) != ids.end();
+        std::vector<TopoDS_Edge>   st;
+        std::vector<TopoDS_Vertex> sv;
+        for (const TopoDS_Edge& e : seq)
+        {
+          const TopoDS_Vertex v = TopExp::FirstVertex(e, true);
+          if (!twice && seq.size() <= 256 && !v.IsSame(TopExp::LastVertex(e, true)))
+            for (size_t j = 0; j < sv.size(); ++j)
+              if (sv[j].IsSame(v))
+              {
+                wires.emplace_back(st.begin() + j, st.end());
+                st.resize(j);
+                sv.resize(j);
+                break;
+              }
+          st.push_back(e);
+          // (A closed edge (a pole's degenerate one, a whole circle) starts and ends at one vertex: not a pinch.)
+          sv.push_back(v.IsSame(TopExp::LastVertex(e, true)) ? TopoDS_Vertex() : v);
+        }
+        wires.push_back(st);
+      }
+      for (const std::vector<TopoDS_Edge>& es_w : wires)
+      {
+        if (es_w.empty())
+          continue;
+        TopoDS_Wire ww;
+        bb.MakeWire(ww);
+        for (const TopoDS_Edge& e : es_w)
+          bb.Add(ww, e);
+        if (round)
+          if (const char* why = apex_pcurves(ww, s, loc, bb))
+            return why;
+        ww.Closed(true);
+        bb.Add(f, ww);
+      }
     }
     // On a plane, the curves of the edges it made stored, as OCCT's pieces have them (mass properties
     // integrate along them; a big face's would cost more than they're worth).
@@ -1538,6 +1578,50 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       }
     }
     fs[i] = rev ? TopoDS::Face(f.Reversed()) : f;
+  }
+  // A new edge on a made plane whose ends lie off it by more than its tolerance (a tolerant vertex the section runs
+  // through, off a slightly tilted plane): its tolerance to cover that, as OCCT's edges there (else its curve on the
+  // plane is off its curve: BRepCheck_InvalidCurveOnSurface, and later operations on it failed: fuzz seed 1144).
+  // Its vertices' to at least that; an argument's own vertex isn't changed: declined.
+  {
+    ShapeIMap made;
+    for (size_t k = 0; k < ne; ++k)
+      if (r.edge_origin[3 * k] != 0)
+        made.Add(es[k]);
+    for (size_t i = 0; i < nf; ++i)
+    {
+      if (r.face_origin[3 * i] == 0)
+        continue;
+      TopLoc_Location                 loc;
+      const occ::handle<Geom_Plane>   pl = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(fs[i], loc));
+      if (pl.IsNull())
+        continue;
+      const gp_Pln p = pl->Pln().Transformed(loc.Transformation());
+      for (TopExp_Explorer x(fs[i], TopAbs_EDGE); x.More(); x.Next())
+      {
+        const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+        if (!made.Contains(e) || BRep_Tool::Degenerated(e))
+          continue;
+        TopoDS_Vertex a, z;
+        TopExp::Vertices(e, a, z);
+        double dev = 0;
+        for (const TopoDS_Vertex& v : {a, z})
+          if (!v.IsNull())
+            dev = std::max(dev, p.Distance(BRep_Tool::Pnt(v)));
+        if (dev <= BRep_Tool::Tolerance(e))
+          continue;
+        const double need = dev * (1 + 1e-6) + 1e-12;
+        for (const TopoDS_Vertex& v : {a, z})
+          if (!v.IsNull() && BRep_Tool::Tolerance(v) < need)
+          {
+            const int q = [&] { for (size_t w = 0; w < vs.size(); ++w) if (vs[w].IsSame(v)) return static_cast<int>(w); return -1; }();
+            if (q < 0 || r.vertex_origin[3 * q] == 0)
+              return "an edge off a plane past its tolerance";
+            bb.UpdateVertex(v, need);
+          }
+        bb.UpdateEdge(e, need);
+      }
+    }
   }
   // Made faces of cylinders and cones, all their curves set (a later face on the same surface may have set one
   // of an edge they share): one across its surface's seam angle (its angles over a multiple of 2π, though no

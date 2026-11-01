@@ -433,3 +433,39 @@ fn a_piece_of_an_arc_from_its_start() {
 fn halves_of_a_closed_edge_on_a_torus() {
     as_recorded("9f434299c9a0048f");
 }
+
+/// noshape's Boolean alone on a recorded case (recorded with it on: its summary is ours then), its result valid and
+/// against OCCT's on the same inputs now: the same counts, its volume within `rel`.
+fn valid_as_occt(name: &str, rel: f64) {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, name).expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
+    k::set_rust_boolean(None);
+    assert!(r.shape.is_valid(), "noshape's result invalid");
+    let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&r.shape), counts(&o.shape));
+    let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
+    assert!((v - w).abs() <= rel * w, "volume {v} against OCCT's {w}");
+}
+
+/// A mirror fuse whose face has a hole touching its outer boundary at one vertex (fuzz seed 1144): a wire each side of
+/// that vertex, as OCCT's builder makes them (one wire through it twice was invalid: BadOrientationOfSubshape).
+#[test]
+fn a_hole_touching_the_boundary_is_its_own_wire() {
+    valid_as_occt("e02980a2afe11ac3", 1e-9);
+}
+
+/// A Shell's common whose new edge on a slightly tilted plane runs through a tolerant vertex off it (fuzz seed 1144):
+/// the edge's tolerance covers it (its curve on the plane was off its curve: InvalidCurveOnSurface). Its volume is
+/// still 0.036 % off OCCT's (OCCT's edge on the planes' exact intersection).
+#[test]
+fn an_edge_through_a_tolerant_vertex_off_a_plane() {
+    valid_as_occt("b997c4c389ff7abe", 1e-3);
+}

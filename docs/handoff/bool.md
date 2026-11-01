@@ -1079,6 +1079,35 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Fuzz seed 1144: two invalid results of ours (11-01 16:40 UTC)
+- Seed 1144 (qa's CLI fuzz) dies at step 51 with noshape's Boolean on (stack smashing on vibe4, a segfault in OCCT's
+  BOPAlgo_PaveFiller::UpdateExistingPaveBlocks inside a Shell's slab Boolean under gdb), clean with it off. Its
+  Booleans recorded with ours on and replayed against OCCT on the same inputs (bool-corpora fz1144 on vibe4): two of
+  ours were invalid where OCCT's were valid, fed on into later operations:
+  - e02980a2 (a mirror fuse): a face with a hole touching its outer boundary at one vertex came out as one wire through
+    that vertex twice (BRepCheck_BadOrientationOfSubshape). The build now splits such a loop there into a wire each
+    side, as OCCT's builder makes them: taken, as OCCT's.
+  - b997c4c3 (a Shell's common): a new edge on a slightly tilted plane ran through a tolerant input vertex (1e-4) 1e-5
+    off the plane with a 1e-7 tolerance (BRepCheck_InvalidCurveOnSurface). A new edge on a made plane whose ends lie off
+    it past its tolerance now gets the tolerance to cover it (its vertices too; an argument's own vertex isn't
+    changed: declined). Valid now; still 0.036 % in volume off OCCT's (OCCT runs the section on the planes' exact
+    intersection, ours through the vertex).
+  The loop split skips closed edges (a sphere's pole edge starts and ends at one vertex: split off alone it left
+  sphere corners NotClosed, corpus4 43442a2f and others; why47 back to why45's counts, 0 differ). T1
+  a_hole_touching_the_boundary_is_its_own_wire, an_edge_through_a_tolerant_vertex_off_a_plane (valid, as OCCT's on
+  the same inputs).
+- After these every recorded Boolean of the run is valid, but the run still dies at step 51 (deterministic on vibe4,
+  clean with NOSHAPE_BOOL_RUST=0): NOSHAPE_GUARD_TRACE=1 puts the stack smash in op_prism (features.cpp, a sheet
+  metal extrude's prism, std_route::sm_extrude) while regenerating after a suppress, not in a Boolean; its profile
+  likely comes from a result of ours (b997c4c3, 0.036 % off OCCT's, is the one left differing). Under gdb on this
+  machine the run takes another path (budgets) and segfaults in OCCT's BOPAlgo_PaveFiller::UpdateExistingPaveBlocks
+  inside a Shell's slab fuse after ours declined it, not reproducible from the dumped Shell alone (either Boolean):
+  a race, as qa saw for CRASH-1092. Requests: core to look at op_prism with the trace (vibe4
+  ~/bool-fuzz/cli/err-1144tr.log, binary ~/bool-fuzz/noshape-cli-fix3); bool next: OCCT's exact section line
+  between planes through a tolerant vertex (b997c4c3's volume).
+- Note: cargo doesn't relink noshape-cli when only the kernel's C++ changed (its build script output); touch a CLI
+  source file before building a CLI to test a C++ change.
+
 ## RUST-SHELL-2AFC fixed (11-01 16:10 UTC)
 - qa's tickets/cli-suppress-segv.noshape, Shell 6 (two faces, 0.5 mm) shells Part 12 and Part 11. Part 12 is so thin
   that its slabs cover it whole, so its shelled result is the part as it was; shell.cpp's slab path then required an
