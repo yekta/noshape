@@ -17,7 +17,14 @@ FORWARD since 4e9b054e: ask `Shape::edge_orientation_in` for a face's use of an 
 parallel curves have no points; ChFi3d corner skips them; repro ~/agents/fuzz/run1052.sh on vibe4, log
 ~/agents/logs/fuzz1052.log), MEM-RUNAWAY patch 0016 (Extrema_GenExtPS::BuildGrid break hook; seed 1002 repro next).
 SHELL-SLOW: wf-block's top-face Shell is 76 / 112 ms now (2.5 / 1.5 mm); cli-shell-hang-pre's Shells 4 / 5 take 20 s /
-30 s (the budget) in 170+ OCCT slab Booleans: waits on bool's slab union. Next: thin loft inward walls.
+30 s (the budget) in 170+ OCCT slab Booleans: waits on bool's slab union.
+Later (14:00-15:00, queued): CRASH-1052 (patch 0015, seed 1052 5 / 5 vs 4 / 5), MEM-RUNAWAY patch 0016 (seed 1002
+finishes either way on vibe4, 2.3 GB), brep_boolean under catch_unwind (seeds 979 / 1036 run through; the panics are
+bool's), CRASH-1092 notes to bool (missing pcurves on polar faces, likely). Fuzz on vibe4: ~/agents/fuzz (qa's
+clifuzz_time.py / nscli.py with paths moved; NSCLI_ERR=<file> keeps the CLI's stderr, NOSHAPE_GUARD_TRACE=1 the
+jumps; run1052.sh / mem1002.sh / run979.sh as examples; CLIs built in ~/agents/core/target-fuzz from rb.sh's synced
+src: don't rb.sh while one builds). Next: thin loft inward walls (live request 11-01 13:45), noshape's blends for
+the R-over-Rc vertex corners (the 12 "an arc the blend closes up" corpus cases; OCCT + exact_vertex_blends today).
 **Sheet metal moved to skasm (lead 10-29 19:40):** model-core's sheet metal (crates/model-core/src/sheetmetal,
 regen/features/sheetmetal*.rs, the FS host's custom/host/sheetmetal.rs) and its Part Studio dialogs / table are
 skasm's now; see docs/handoff/skasm.md. skasm 10-30, touching core's files for sheet metal: Extrude / Revolve /
