@@ -307,6 +307,6 @@ mod landq_precheck {
     #[test]
     fn landq_precheck() {
         let x = std::hint::black_box(true);
-        assert!(x == true);
+        assert!(x);
     }
 }
