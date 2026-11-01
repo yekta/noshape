@@ -11,6 +11,20 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## Afternoon 11-01 (13:10 UTC; queued lands: land.sh returns QUEUED, `land.sh --status`)
+- Landed: 9b100b79 A15 part custom properties; cc1a4a9b A23 / S18 property chips; a49cffca CR5 / CR18 / V5 MBD
+  dimensions; 4976f492 TB14 BOM tables of other assemblies (this document's, Other documents…) and BOM data (CSV),
+  plus the file picker's Import (it was lost inside the prompt's click: Insert image / DXF too).
+- Queued (in order): TB12 rich paste (clipboard text/html: vendored gpui `ClipboardEntry::Html` on X11 and macOS,
+  `scene::drawing_tools::paste_html`); D16 / D17 foreshorten as live 1718 draws it; A65 / CR18 MBD status
+  Characteristics rows; A34 per-instance red + angle trailing zeros (follows Length trailing zeros; bend notes keep
+  "90.0°", DSM2); S13 the file pickers as live's 300 px flyout; V1 View released items. V68 marked a deliberate
+  difference (live's spinner is its server round trip).
+- Asked live 12:15: TB12's px / pt → mm mapping (ours 96 / 72 per inch).
+- To psui: the file picker (app-core `file_tab_view::pick_file`) is now a flyout at x 290 under the toolbar, as live
+  drawing/984; Sheet properties' Select a DWT sits beside the panel.
+- drawing.md 🔧 left of mine: S18 (fields as full notes), TB14 BOM app, EX4 (Reference manager, next), EX11.
+
 ## Morning 11-01 (landed through 0407a620, 08:07 UTC)
 - 4cd6262c D6 thread lines as dimension picks ("M6x1"); HoleRecord.thread is "M6x1.00" (was the pitch label).
 - a97a740e drawing sources regenerate with the Part Studio's Variable Studio values and Derived provider (views of a
