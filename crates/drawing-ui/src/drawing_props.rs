@@ -817,7 +817,7 @@ impl DrawingEditor {
         let reference = h_flex()
             .gap(px(3.))
             .child(crate::assets::icon(if is_asm { "assembly" } else { "part" }, 20., cx))
-            .child(div().id("vp-ref-link").text_color(gpui_kit::rgb(0x0088cc)).cursor_pointer().child(source_name).on_click(move |_, w, cx| {
+            .child(div().id("vp-ref-link").text_color(gpui_kit::rgb(0x0088cc)).cursor_pointer().tooltip(crate::ui::tooltip(format!("Switch to the tab containing {source_name}"))).child(source_name).on_click(move |_, w, cx| {
                 if let Some(tab) = source_tab {
                     crate::actions::request_activate_tab(tab, w, cx);
                 }
@@ -1075,7 +1075,8 @@ impl DrawingEditor {
             .collect();
         rows.push(row("View simplification", select("vp-simp", eff.name().into(), simp_items, true)));
         if !crate::drawing_insert::simplification_text(eff, true).is_empty() && props.simplification.is_some() {
-            rows.push(row("", field(&props.simp_value)));
+            // Live (dom asb-d-view-properties): "Threshold" and its tooltip.
+            rows.push(row("Threshold", div().id("vp-simp-threshold").tooltip(crate::ui::tooltip("Simplification threshold: Features below this value will be simplified")).child(field(&props.simp_value)).into_any_element()));
         }
         // Sheet: the sheet's name; with several sheets a list that moves the view.
         let sheet_name = self.drawing.sheets.get(props.sheet).map(|s| s.name.clone()).unwrap_or_default();

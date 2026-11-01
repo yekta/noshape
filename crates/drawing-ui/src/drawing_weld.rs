@@ -295,7 +295,8 @@ impl DrawingEditor {
                 .collect();
             let id = if other { "weld-joint-o" } else { "weld-joint-a" };
             let picker = if picker_on {
-                dropdown(id.into(), picker_icon(side.joint), String::new(), joints).into_any_element()
+                // Live (dom psb-r-weld-symbol-dialog): "Upper weld type" / "Lower weld type".
+                div().id(SharedString::from(format!("{id}-tip"))).tooltip(crate::ui::tooltip(if other { "Upper weld type" } else { "Lower weld type" })).child(dropdown(id.into(), picker_icon(side.joint), String::new(), joints)).into_any_element()
             } else {
                 div().w(px(BOX)).h(px(30.)).flex().items_center().justify_center().children(picker_icon(joint).map(|i| crate::ui::glyph(&i, 20., gpui_kit::rgb(0x999999)))).into_any_element()
             };
@@ -332,6 +333,7 @@ impl DrawingEditor {
                 .cursor_pointer()
                 .rounded(px(2.))
                 .when(on, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
+                .tooltip(crate::ui::tooltip(if f == WeldFlag::Up { "Upper flag symbol" } else { "Lower flag symbol" }))
                 .child(crate::ui::glyph(if f == WeldFlag::Up { "weld-flag-up" } else { "weld-flag-down" }, 16., ink))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(d) = &mut this.weld_dlg {

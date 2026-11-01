@@ -10,6 +10,7 @@
 use crate::drawing_view::*;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::drawing::cad_export::CadVersion;
 use std::cell::RefCell;
@@ -53,6 +54,8 @@ impl DrawingEditor {
                 // Live drawing/40: "View export rules" next to the label.
                 .child(gpui_kit::component::h_flex().gap(px(4.)).items_end().child(crate::os_ui::field_label("File name")).child(crate::drawing_hooks::export_rules_link("ex-rules")))
                 .child(Input::new(&file).h(px(34.)).text_size(px(14.)))
+                // Live (dom g39-export-drawing-pdf): an empty name is an error.
+                .when(file.read(cx).value().trim().is_empty(), |d| d.child(div().mt(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0xdc3545)).child("Valid file name is required.")))
                 .child(select("ex-format", "Format", DrawingFormat::ALL.iter().map(|f| f.label().to_string()).collect(), DrawingFormat::ALL.iter().position(|x| *x == f).unwrap_or(0), |s, i| {
                     s.format = DrawingFormat::ALL[i];
                     s.version = default_version(s.format);
@@ -130,6 +133,9 @@ impl DrawingEditor {
                     let mut s = st2.borrow().clone();
                     s.custom = custom2.read(cx).value().to_string();
                     let name = file2.read(cx).value().trim().to_string();
+                    if name.is_empty() {
+                        return false;
+                    }
                     let ed = ed2.clone();
                     window.defer(cx, move |window, cx| ed.update(cx, |t, cx| t.export_with(s, name, window, cx)));
                     true
