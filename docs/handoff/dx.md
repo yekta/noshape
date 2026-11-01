@@ -11,7 +11,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
-## Afternoon 11-01 (13:10 UTC; queued lands: land.sh returns QUEUED, `land.sh --status`)
+## Afternoon 11-01 (13:10–13:47 UTC; queued lands: land.sh returns QUEUED, `land.sh --status`)
 - Landed: 9b100b79 A15 part custom properties; cc1a4a9b A23 / S18 property chips; a49cffca CR5 / CR18 / V5 MBD
   dimensions; 4976f492 TB14 BOM tables of other assemblies (this document's, Other documents…) and BOM data (CSV),
   plus the file picker's Import (it was lost inside the prompt's click: Insert image / DXF too).
@@ -23,7 +23,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Asked live 12:15: TB12's px / pt → mm mapping (ours 96 / 72 per inch).
 - To psui: the file picker (app-core `file_tab_view::pick_file`) is now a flyout at x 290 under the toolbar, as live
   drawing/984; Sheet properties' Select a DWT sits beside the panel.
-- drawing.md 🔧 left of mine: S18 (fields as full notes), TB14 BOM app, EX4 (Reference manager, next), EX11.
+- Later (queued, 13:20–13:47): EX4 the Reference manager as live's (Change to version… opens it; Update to latest /
+  Selective update; the drawing tab's out-of-date icon); EX11 the Notifications bell (app-core `notifications.rs`,
+  navbar bell + panel; drawing exports and imports report there); TB14 Subassembly BOM behavior in drawing BOMs;
+  import-matrix and configured-assembly-drawing sheets marked from their later runs. Landed meanwhile: 844ba722 TB12,
+  842585f4 D16.
+- drawing.md 🔧 left of mine: CR5 (back / bottom / left suggested views; psui's Part Studio Dimension tool), CR18
+  (duplicate priority order, section views), TB12 (live's px / pt answer; Wayland / Windows HTML), TB14 (BOM app:
+  cloud only), S18 (title-block fields as full notes: Explode note / Add leader / Move to).
 
 ## Morning 11-01 (landed through 0407a620, 08:07 UTC)
 - 4cd6262c D6 thread lines as dimension picks ("M6x1"); HoleRecord.thread is "M6x1.00" (was the pitch label).
