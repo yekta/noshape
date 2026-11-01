@@ -434,6 +434,16 @@ fn editing_value(i: &mut Interp, cx: &Arc<FsContext>, d: &ParamDecl, v: &Value, 
             }
             ParamValue::Array(out)
         }
+        // A LookupTablePath back to the options along the path (std
+        // External thread's size from the picked cylinder).
+        ParamKindFs::Lookup { table } => {
+            let mut path: Vec<String> = Vec::new();
+            while let Some(level) = crate::features::hole_tables::dynamic_level(table, &path) {
+                let Some(o) = v.get(level.key.as_str()).as_str() else { break };
+                path.push(o.to_string());
+            }
+            ParamValue::Lookup(path)
+        }
         _ => return None,
     })
 }

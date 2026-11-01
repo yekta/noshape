@@ -150,15 +150,17 @@ pub fn editing_logic(
 /// Hole: Merge scope and flip from an opHole probe, standard tables, tapped
 /// depths (holeEditLogic);
 /// Draft: parting-line hint faces and flips; Split: Keep tools for a face or
-/// plane tool, live "Split"; Thicken: Add into the part whose faces it
-/// thickens, the flip for Remove; Modify fillet: Radius from the picked
+/// plane tool, live "Split"; Modify fillet: Radius from the picked
 /// fillet; 3D fit spline: preselected edges switch it to Edges, the start /
-/// end direction toggles follow their fields).
-const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet", "loft", "revolve", "sweep", "mirror", "cPlane", "draft", "splitPart", "hole", "thicken", "modifyFillet", "fitSpline"];
+/// end direction toggles follow their fields; External thread: the
+/// standard size from the picked cylinder, chamfer and undercut from it).
+const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet", "loft", "revolve", "sweep", "mirror", "cPlane", "draft", "splitPart", "hole", "modifyFillet", "fitSpline", "externalThread"];
 
 /// Built-in feature types std only runs the editing logic of (std's module
-/// and feature; they regenerate natively and std can't run them).
-const LOGIC_ONLY: &[(&str, &str, &str)] = &[("thicken", "thicken.fs", "thicken"), ("modifyFillet", "modifyFillet.fs", "modifyFillet"), ("fitSpline", "fitSpline.fs", "fitSpline")];
+/// and feature; they regenerate natively and std can't run them). Thicken's
+/// dialog keeps its native logic (`ops::studio::auto_operation`, live L18);
+/// std's is the T2 check of it.
+const LOGIC_ONLY: &[(&str, &str, &str)] = &[("thicken", "thicken.fs", "thicken"), ("modifyFillet", "modifyFillet.fs", "modifyFillet"), ("fitSpline", "fitSpline.fs", "fitSpline"), ("externalThread", "externalThread.fs", "externalThread")];
 
 /// [`std_name`], or the std feature whose editing logic a dialog runs.
 fn logic_std_name(type_id: &str) -> Option<(&'static str, &'static str)> {

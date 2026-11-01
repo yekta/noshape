@@ -30,8 +30,8 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 |---|---|---|---|---|---|
 | A1 | Tag dialog | basePlane | P2 | std pre-fills Base plane with the Top plane (tag.fs defaults `qTopPlane`); ours starts empty | ✗ |
 | A2 | Variable (Measured) | componentSelector | P1 | Along custom recorded the plain distance, and X / Y / Z only while the Axis measurements group was open; std records the chosen component always and Along custom along the picked direction ("Select custom direction." when empty) | ✅ ce91c9c7 |
-| A3 | Query variable dialog | additionalQueries | P1 | an additional query offers only Selection / Created by / Owned by / Protrusion / Pocket / Hole style types with 5 seed fields; std's item has 20 fields (entity type, fillet compare, bounded faces, edge convexity, construction / body-type filters, adjacency) and ids in std's case (addQselectionType, …) | ✅ (audit 3): std\'s 20 item fields with std ids (old documents renamed on load); the evaluator now does Protrusion, Pocket, Hole, Fillets (Equal), Tangent connected, Parallel, Bounded faces, Loop/chain connected and Edge convexity for the main query and each additional one, with each item\'s own entity type. Still to do: Matching, Adjacent, Fillets Less / Greater than (warnings) |
-| A4 | Mutual trim | body1 / body2 | P1 | std trims a set of surfaces against a set ("First set of surfaces", "Second set of surfaces"); ours takes one surface a side; with nothing to trim std reports "no geometry change" as info, ours errors | ✅ (audit 3): sets of surfaces each side, std\'s texts ("Select a surface.", "Same surface cannot be used twice."), no change = info (T1 features_b offset_curve_move_boundary_mutual_trim) |
+| A3 | Query variable dialog | additionalQueries | P1 | an additional query offers only Selection / Created by / Owned by / Protrusion / Pocket / Hole style types with 5 seed fields; std's item has 20 fields (entity type, fillet compare, bounded faces, edge convexity, construction / body-type filters, adjacency) and ids in std's case (addQselectionType, …) | ✅ (audit 3): std's 20 item fields with std ids (old documents renamed on load); the evaluator now does Protrusion, Pocket, Hole, Fillets (Equal), Tangent connected, Parallel, Bounded faces, Loop/chain connected and Edge convexity for the main query and each additional one, with each item\'s own entity type. Still to do: Matching, Adjacent, Fillets Less / Greater than (warnings) |
+| A4 | Mutual trim | body1 / body2 | P1 | std trims a set of surfaces against a set ("First set of surfaces", "Second set of surfaces"); ours takes one surface a side; with nothing to trim std reports "no geometry change" as info, ours errors | ✅ (audit 3): sets of surfaces each side, std's texts ("Select a surface.", "Same surface cannot be used twice."), no change = info (T1 features_b offset_curve_move_boundary_mutual_trim) |
 | A5 | Parts list rows (live 1714) | composite / surface / curve rows | P2 | ours added Copy <name>, Hide other parts, Hide all parts (and Export… on a curve); live: none on these rows | ✅ (audit 4) |
 | A6 | Graphics menu (live 1714) | surface face | P2 | ours added Hide other parts / Hide all parts after Hide Surface 1 (live: only on solid parts) | ✅ (audit 4) |
 | A7 | Feature list (live 1714) | hidden sketch row | P2 | missing Show all sketches (after Show) and Section view… (before Suppress) | ✅ (audit 4): Show all sketches while other sketches are hidden, Section view… before Suppress |
@@ -47,7 +47,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 
 ## Editing logic (std's dialog reactions)
 
-std's 48 "Editing Logic Function"s (26 run std's, 8 native, 14 open) change a dialog's fields as the user edits (Add into the touched part, the flip, a type
+std's 48 "Editing Logic Function"s (26 run std's, 9 native, 13 open) change a dialog's fields as the user edits (Add into the touched part, the flip, a type
 from the picks). The dialog runs std's own function where `std_feature::has_editing_logic` says so (std runs the feature, or it is in
 `STD_EDITING_LOGIC`; T2 tests in std_oracle), or ours does the same natively (`behaviors::direct_edit_logic`, `boolean_edit_logic`).
 
@@ -63,7 +63,7 @@ from the picks). The dialog runs std's own function where `std_feature::has_edit
 | E8 | draftEditLogic | Draft | ✅ std's runs |
 | E9 | splitEditLogic | Split | ✅ std's runs |
 | E10 | holeEditLogic | Hole | ✅ std's runs |
-| E11 | thickenEditLogic | Thicken | ✅ std's runs (audit 8, T2 thicken_and_modify_fillet_editing_logic_runs_std) |
+| E11 | thickenEditLogic | Thicken | ✅ native: Add / merge scope from the solids' faces, the flip (`auto_operation`, live L18); std's agrees (T2 thicken_and_modify_fillet_editing_logic_runs_std) |
 | E12 | modifyFilletLogic | Modify fillet | ✅ std's runs (audit 8, T2 thicken_and_modify_fillet_editing_logic_runs_std) |
 | E13 | sheetMetalStartEditLogic | Sheet metal model | ✅ std's runs |
 | E14 | flangeEditLogic | Flange | ✅ std's runs |
@@ -90,8 +90,8 @@ from the picks). The dialog runs std's own function where `std_feature::has_edit
 | E35 | cutlistEditLogic | Cut list | ✗ (column overrides kept in step) |
 | E36 | deletePartEditLogic | Delete part | ✗ (composite members) |
 | E37 | editCurveEditLogic | Edit curve | ✗ (control point edits kept in step) |
-| E38 | editFeatureLogicExternalThread | External thread | ✗ (standard sizes fill chamfer and undercut) |
-| E39 | fitSplineEditLogic | 3D fit spline | ✅ std\'s runs (audit 8): a preselected edge opens on Edges with it; the preselection goes to std\'s hidden initEntities wherever std\'s logic runs (Hole, Sheet metal model, Flex PCB too) |
+| E38 | editFeatureLogicExternalThread | External thread | ✅ std's runs (audit 8): the size nearest the picked cylinder in the chosen standard (8 mm: 5/16\"-18, M8 × 1.25), chamfer and undercut from it; std's lookup results reach the dialog (T2 external_thread_editing_logic_runs_std) |
+| E39 | fitSplineEditLogic | 3D fit spline | ✅ std's runs (audit 8): a preselected edge opens on Edges with it; the preselection goes to std's hidden initEntities wherever std's logic runs (Hole, Sheet metal model, Flex PCB too) |
 | E40 | frameEditLogicFunction | Frame | ✗ ((only prewarms)) |
 | E41 | gussetEditLogic | Gusset | ✗ (swept faces) |
 | E42 | helixEditingLogic | Helix | ✅ native: the tab follows the preselection (live L34, checked 11-01) |

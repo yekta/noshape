@@ -1675,6 +1675,44 @@ fn thicken_and_modify_fillet_editing_logic_runs_std() {
     assert!(got.contains(&format!("edges={:?}", ParamValue::Query(vec![edge]))), "{got:?}");
 }
 
+/// std's editFeatureLogicExternalThread: picking an 8 mm cylinder's end edge
+/// picks the nearest size of the standard (5/16"-18, M8) and sizes the
+/// chamfer and undercut from it.
+#[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
+fn external_thread_editing_logic_runs_std() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, 0.004);
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", q(Reference::Plane(DatumPlane::Top)));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.regen();
+    let region = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch").regions[0].key.clone();
+    s.add("extrude", |p| {
+        p.set("entities", q(Reference::SketchRegion { sketch, key: region }));
+        p.set("depth", expr("20 mm"));
+    });
+    let r = s.regen();
+    let edge = edge_at(&r, DVec3::new(4.0, 0.0, 20.0));
+    s.add("externalThread", |p| p.set("entities", q(edge.clone())));
+    let got = edit_logic(&s, &ParamValues::default(), &["entities"]);
+    assert!(got.contains(&"branchOfStandard=Lookup([\"ANSI\", \"5/16\", \"18 tpi\"])".to_string()), "{got:?}");
+    for k in ["chamferWidth=", "undercutDiameter=", "undercutLength="] {
+        assert!(got.iter().any(|x| x.starts_with(k)), "{k}: {got:?}");
+    }
+    // In the ISO standard: M8.
+    s.ps.features.pop();
+    s.add("externalThread", |p| {
+        p.set("entities", q(edge));
+        p.set("branchOfStandard", ParamValue::Lookup(vec!["ISO".into()]));
+    });
+    let got = edit_logic(&s, &ParamValues::default(), &["entities", "branchOfStandard"]);
+    let standard = got.iter().find(|x| x.starts_with("branchOfStandard=")).unwrap_or_else(|| panic!("{got:?}"));
+    assert!(standard.contains("\"ISO\", \"M8\""), "{standard}");
+}
+
 /// std's holeEditLogic through the host natives: a new hole's Merge scope is
 /// the part it reaches, and one sketched below the part flips into it
 /// (holeScopeFlipHeuristics: an opHole probe and evCollision containment,
