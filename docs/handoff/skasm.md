@@ -209,6 +209,16 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   Found: Thicken 4 (L17) now = live; navigation 1.18's zoom-out stop needs live's plane-size rule (REQUESTS 03:00);
   SM-THICKEN-SKETCH-INFO and SM-MAKE-JOINT-ONE-EDGE (TICKETS, live G34 c2). assembly.md: ten rows had their evidence
   one column late (moved into Verified), LA12's `||` split its row.
+- 11-01 03:00–04:00: landed b6ba4390 (SM-THICKEN-SKETCH-INFO), 42ce4965 (a dimension's menu starts Configure dimension,
+  live's toast). GUI-stamped rows: assembly.md LA8/9/16/25/26/29/30/33/34/38/40/41/46/48/50, I13, K10, K28; advanced
+  ADV3 / TAB1 rows; sketch 4.33 / 12.9. **Still unverified**: assembly.md K9 / K11 (snap-mode q / Ctrl: in snap mode
+  the moving instance doesn't preview at the target here, so q's turn can't be seen; needs a careful run), I14 (snap
+  insert with explicit connectors), workflow-assembly SV2 (the base-handle press missed and box-selected: retry),
+  navigation 1.18 (live request 03:00, plane size). RUST-SM-CUT-VOLUME filed for bool (qa4_s1 T2 7 mm³ over live on
+  the Rust Boolean; passes with NOSHAPE_BOOL_RUST=0).
+- **End-of-day walk 11-01 03:40, green b6ba4390:** line chain 40 / 25 typed; rectangle boxes (Tab on a typed value
+  stays, as live); Revolute via tool search, both picks → HUD ✓ commits and starts Revolute 2 (= live), the pattern
+  copy follows its seed; dragging the mated pin keeps it seated. No regressions.
 - **SM-TABLE-PART-ORDER (psui's report, 11-01):** e2e `sheet_metal_table_ops` ended in a different table in ~half its
   runs. Once Convert to rip leaves Bend B's wall a part of its own, the model has two parts each with its own
   SheetMetalData, and the ops table (and the app's panel, psui's crate) took the model's "first" part from
