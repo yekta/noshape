@@ -1105,6 +1105,7 @@ NOSHAPE_BREP_WHY="" replay of every set: /root/bool-scratch/why2N.sh).
 | before (why20, 17:13) | 80.5 % | 53.8 % | 89.6 % | 15–47 % |
 | three arguments' coincident edges (why21, 18:16) | 80.7 % | 54.0 % | 89.6 % | 16–48 % |
 | coincident pieces, curves along boundaries, equivalents (why22, 20:36; tolerances not in it) | 82.5 % | 70.9 % | 89.8 % | 50–70 % |
+| per-vertex and per-edge tolerances (why23, 21:17) | 82.8 % | 71.3 % | 89.8 % | 51–72 % |
 
 ## Coincident pieces OCCT's way; tolerant vertices; curves along a boundary (10-31 20:59 UTC)
 - A vertex inside coincident edges of two other arguments no longer declines where nothing is exact: Modified as
