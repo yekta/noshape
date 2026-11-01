@@ -1123,6 +1123,17 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   (moved from the first period or asked directly alike), so a side face's piece reaching into the other tool there
   isn't split and is kept as outside (non-manifold). Next: the sliver's dividing curve (the side faces' section near
   their common cap plane, or the tools' cap edges on each other's side faces), then the size × TPI sweep.
+  Narrowed (bool-a, debug only): each tool is four swept flanks (faces 0–3) and two caps (4 top, 5 on z = 0). OCCT's
+  classifier agrees with ours (cylinder pieces next to edge 14358 IN tool 61, tool 28's flank piece 11708 OUT), so
+  28:0 must leave tool 61 between them, through 61's flanks 0 / 1; IntTools_FaceFace returns no curve for 28:0 × 61:0
+  / 61:1 / 28:1 × 61:0 / 61:1, on the faces or on faces grown a tenth in u and v; 28:0 × 61:2 / 61:3 aren't near; the
+  only sections are on the cap plane (dropped as along 28:0's bottom edge, which lies on 61's cap). So the dividing
+  curve is tens of µm long at both faces' bottom edges and OCCT's walking doesn't find it. Fix to try: make it
+  ourselves for two free-form faces whose bottom edges lie on one plane inside each other's cap: its ends where each
+  tool's flank-to-flank edges pierce the other's flanks (edge / face crossings ours already finds), the curve between
+  them marched on both surfaces (a chord sags ~L²/8R ≈ 2.5e-7 over 45 µm on a 1 mm radius: march, don't chord).
+  Repro: vibe4 ~/agents/bool-corpora/k25/0488ccf3c42f9c44 (recorded with NOSHAPE_RECORD_FAILED), `why.sh k25
+  0488ccf3c42f9c44 NOSHAPE_BREP_VS_OCCT=1`.
 - NOSHAPE_BOOL_FALLBACK=0 (user's decision, default stays 1): a Boolean noshape's declines fails at once, OCCT's not run:
   op_boolean throws "noshape's Boolean declined: <reason>" (also on stderr), quick_boolean (Shell's) returns failure as
   OCCT's failing would; the reason shows in the feature's error and FeatureScript's notices (custom host passes it
