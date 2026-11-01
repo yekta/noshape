@@ -84,6 +84,8 @@ runs:
         CCACHE_MAXSIZE: 700M
         # Patched files are new on disk; their content decides, not their time.
         CCACHE_SLOPPINESS: include_file_mtime,include_file_ctime,time_macros
+        # The compiler by its content, not its file date: runner images of the same compiler differ in dates.
+        CCACHE_COMPILERCHECK: content
       run: |
         ccache -z
         scripts/build-occt.sh "${{ steps.paths.outputs.prefix }}"
@@ -99,6 +101,8 @@ runs:
         CCACHE_DIR: ${{ steps.paths.outputs.ccache }}
         CCACHE_MAXSIZE: 700M
         CCACHE_SLOPPINESS: include_file_mtime,include_file_ctime,time_macros
+        # The compiler by its content, not its file date: runner images of the same compiler differ in dates.
+        CCACHE_COMPILERCHECK: content
       run: |
         ccache -z
         scripts/build-occt.ps1 "${{ steps.paths.outputs.prefix }}"
