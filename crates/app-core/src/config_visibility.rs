@@ -871,7 +871,19 @@ impl VisibilityDialog {
             let shown = v.visible && valid;
             let id = input.id.clone();
             let value = eff.0.get(&id).cloned().unwrap_or_default();
-            let row = h_flex().min_h(px(34.)).px(px(5.)).pb(px(5.)).gap(px(6.)).text_size(px(13.)).text_color(pal.text).when(!v.visible, |d| d.bg(gpui_kit::rgb(0xeeeeee)).cursor_not_allowed());
+            // Live (dom dialog-config-visibility-conditions): each control's
+            // tooltip "Size: (Default: Small)".
+            let tip = format!("{}: (Default: {})", input.name, input.default_text());
+            let row = h_flex()
+                .id(SharedString::from(format!("vis-pv-row-{id}")))
+                .min_h(px(34.))
+                .px(px(5.))
+                .pb(px(5.))
+                .gap(px(6.))
+                .text_size(px(13.))
+                .text_color(pal.text)
+                .when(!v.visible, |d| d.bg(gpui_kit::rgb(0xeeeeee)).cursor_not_allowed())
+                .tooltip(crate::ui::tooltip(tip));
             let row = match &input.kind {
                 ConfigInputKind::Checkbox { .. } => {
                     let on = value == "true";

@@ -11,6 +11,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## Audit continued (11-01 18:11 UTC)
+- M1 format lines (stored per-line edits, live's menu, grips; API drawing_format_line), D18 End type select, D10 D11
+  D14 leftovers; new surface audited: configurations / Variable Studio / Derived (44 dumps; C1 C2 fixed).
+- Asked live: X1 Split with subassemblies (17:55), D19 multi-selection panel «Varies» and D20 hole tables of several
+  views (18:06). Implement when answered.
+- To psui: live's feature dialogs have two header buttons with tooltips "Preview before and after this feature" and
+  "Preview Part Studio up to the rollback bar" (dom/dialog-derived-*.txt); ours has neither text.
+- To skasm: the Insert dialog's configuration selects have tooltips "<input>: (Default: <value>)"
+  (dom/qa5-p7-change-config-25.html); `ConfigInput::default_text()` now gives the value.
+
 ## Audit answers implemented (11-01 17:33 UTC)
 - Landed 17:25: the whole stack (26 commits, da4a95c0) after the land-loop fixes below.
 - From live 1735 / 1736 / 1737: datum target Outside styles (D1), inspection Types by how a dimension was made

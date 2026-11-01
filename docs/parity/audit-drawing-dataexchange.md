@@ -1,4 +1,4 @@
-# Audit: every drawing and data-exchange UI surface of live against ours (dx, from 2026-11-01 14:24 UTC)
+# Audit: every drawing, data-exchange, configuration, Variable Studio and Derived UI surface of live against ours (dx, from 2026-11-01 14:24 UTC)
 
 User 11-01: audit whole surfaces, not listed rows: every drawing toolbar tool's dialog field by field, every drawing
 right-click menu per entity type, the import / export dialogs and their options per format, and the Notifications
@@ -16,13 +16,15 @@ message, P3 tooltip / prompt / look. Status: ✗ open, ✅ fixed (commit), – a
 | Drawing dialogs and panels with live dumps (55 dumps: tools, properties, Styles, Inspection, MBD status, Sheets, tables, notes) | dom/drawing-* | 2561 texts and options, 2217 found as is; the rest user content, run-time texts, or the rows below | D1–D… |
 | Import / export dialogs per format (16 dumps: Import to Onshape, STEP / SAT / x_t / PVZ / zip / STL / OBJ / 3MF / SLDPRT import; Part Studio / Assembly / Drawing / PVZ / JT / Parasolid / STEP export) | dom/dialog-import-*, dialog-export-*, 127x-* | 357 texts, 327 found; every export text and option present | X1… |
 | Drawing right-click menus per entity type (25 types) | context-menus-drawing*.txt, behaviours (menu lines) | in the app 11-01 (w3/menus.noshape, a d6 copy with every annotation type; crops in dx-scratch/audit/rmb): **= live** (Add comment is cloud-only; Paste shows while something is copied, as live): empty sheet, view (projected, detail, section label: Copy on top), extension line, linear dimension, ordinate value, note, callout, hole callout, datum, centermark, surface finish (edge-attached), table, sketch line, section cut line. From live 1736 (11-01, app check): weld (M2), GD&T frame and leader, 2 point centerline (Paste | Clear selection · Zoom to fit · Delete, fixed), datum target (ours adds Show dimensions ▸ from A35), note leader line (Remove leaders · Add node) **= live**; empty space inside a view's frame = the view menu (= live; Replicate annotations now enabled as live's); Paste listed in every menu, clipboard or not (fixed: it showed only with copied drawing content); revision table n/a on live's Free account. **Differs**: M1 | M1, M2 |
+| Configurations, Variable Studio, Derived (44 dumps: Part Studio and Assembly configuration panels, menus, input dialogs, visibility conditions, configured properties, Variable Studio, Insert Variable Studio, Derived dialogs) | dom/config-*, panel-configuration*, dialog-config-*, assembly-configuration-*, cp-*, variable-studio*, dialog-derived*, qa5-p9-derived-* | 1242 texts, 624 found as is; the rest Angular template bindings, user content (inputs, documents, parts) or owned by other audits (psui: the feature list filter, feature dialogs' preview buttons; skasm: the Insert dialog's configuration selects) | C1, C2 |
 | Notifications panel | behaviours (EX11 request 1544, import flow) | compared with live's description | N… |
 
-**Counts (11-01 18:05 UTC):** surfaces audited 4 of 4 (dialogs and panels with dumps 55, import / export dialogs 16,
-right-click menus 25 entity types in the app, Notifications). 2918 live texts and options scanned, 2544 found as is.
-Gap rows 26: fixed 19 (P1 3, P2 9, P3 7), same as live after asking 4 (P1 D3, D4, D5; P2 D17), already ours 1 (P3
-D15), open 2 (P2: D19 several selected in the panel, D20 hole tables of several views); leftovers of fixed rows: X1
-Split's subassemblies (asked live 17:55). P0: none found.
+**Counts (11-01 18:10 UTC):** surfaces audited 5 (drawing dialogs and panels with dumps 55, import / export dialogs 16,
+right-click menus 25 entity types in the app, Notifications, configurations / Variable Studio / Derived 44 dumps).
+4160 live texts and options scanned, 3168 found as is. Gap rows 28: fixed 21 (P1 3, P2 9, P3 9), same as live after
+asking 4 (P1 D3, D4, D5; P2 D17), already ours 1 (P3 D15), open 2 (P2: D19 several selected in the panel, D20 hole
+tables of several views; both asked live 18:06); leftovers of fixed rows: X1 Split's subassemblies (asked live
+17:55). P0: none found.
 
 ## Gaps
 
@@ -52,6 +54,8 @@ Split's subassemblies (asked live 17:55). P0: none found.
 | M2 | Right-click menus | weld symbol order | P3 | ours: Edit… · Add leader · Copy · Move to ▸ · Paste as table (not from live; the other symbols put Paste · Copy · Paste as table before Add leader / Move to) | ✅ live 1736: weld symbol Edit... · Copy · Paste · Paste as table · Add leader | Clear selection · Zoom to fit · Delete (no Move to, no Remove leaders; its leader line has no Remove leaders); app check 11-01 |
 | A1 | Agent API and Note tool | a note's leader on an edge | P2 | the op refused an edge point (only a vertex worked) although its error says edge points are fine; the app's Note tool took snap points only too (its hover dropped view edges); live attaches a note's leader to an edge (behaviours "Note leader") | ✅ the Note tool hovers view edges and both take a point along the edge (`SheetPick::snap_or_edge_point`); e2e `drawing_callouts_ordinates_and_datums` |
 | D18 | Section view › Section depth | End type, Offset distance | P1 | live: End type is a select (Up to entity / Blind, tooltip "End type"), a "Depth of section cut" Depth field, and an **Offset distance** field with its own Opposite direction; ours: Blind / Up to entity tabs and no offset | ✅ live 1737: Offset only under Up to entity (☐ Offset → [0] and Opposite direction); the limit is the entity's distance plus the offset, back toward the cut when flipped (`DrawingView::section_depth_offset`; agent API `depth_offset`); e2e `drawing_section_detail_views_and_annotations`; app check 11-01. the End type is live's select [Up to entity | Blind] (Up to entity first, "Depth of section cut" / "Point" field, Offset [value] and its flip on one row, defaults 1 in / 25 mm assumed for mm), and Section depth goes once the cut has a jog (live behaviours "Section view, Vertical") |
+| C1 | Part Studio configuration panel | Add configuration input | P3 | live's tooltip "Add configuration input to create multiple variants of this Part Studio" (the assembly panel had it) | ✅ |
+| C2 | Configuration visibility conditions | preview controls | P3 | live: each preview control's tooltip "Size: (Default: Small)" | ✅ (`ConfigInput::default_text`, shared with the panel's "Default: …") |
 | D19 | Dimension / hole callout panel | several selected | P2 | live: the panel edits several selected dimensions or callouts at once, a value they differ in reads «Varies» (dom drawing-hole-callout-*: Hole / Shaft class fields and the Count, Units, Precision, Tolerance lists' «Varies» items); ours edits the one clicked | ✗ |
 | D20 | Hole table dialog | several views | P2 | live: Views takes several views of one part (one table of their holes), else the header error "All views in a hole table must be of a common singular part"; ours one view (`TableKind::Hole { view }`) | ✗ |
 

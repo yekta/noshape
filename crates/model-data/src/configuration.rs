@@ -48,6 +48,19 @@ pub struct ConfigInput {
     pub excluded: bool,
 }
 
+impl ConfigInput {
+    /// Its default as the panels show it ("Default: Small", "false",
+    /// "10 mm", "abc").
+    pub fn default_text(&self) -> String {
+        match &self.kind {
+            ConfigInputKind::List { options, default } => options.iter().find(|o| &o.id == default).map(|o| o.name.clone()).unwrap_or_default(),
+            ConfigInputKind::Checkbox { default } => default.to_string(),
+            ConfigInputKind::Variable { default, .. } => default.text.clone(),
+            ConfigInputKind::Text { default } => default.clone(),
+        }
+    }
+}
+
 /// An input's visibility conditions. Only inputs above it (lists and
 /// checkboxes) can control it.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
