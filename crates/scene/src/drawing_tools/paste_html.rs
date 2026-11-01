@@ -459,6 +459,16 @@ mod tests {
         assert_eq!(t.row_heights, vec![15.0 * PT, 15.0 * PT]);
     }
 
+    /// Windows' CF_HTML (Excel): a header, then the markup with fragment
+    /// comments; the table is found past them.
+    #[test]
+    fn windows_cf_html_header() {
+        let html = "Version:0.9\r\nStartHTML:0000000105\r\nEndHTML:0000000400\r\nStartFragment:0000000140\r\nEndFragment:0000000360\r\n<html><body><!--StartFragment--><table><tr><td><b>Item</b></td><td>Qty</td></tr><tr><td>Bolt</td><td>4</td></tr></table><!--EndFragment--></body></html>";
+        let t = parse_html_table(html).unwrap();
+        assert_eq!(t.cells, vec![vec!["Item", "Qty"], vec!["Bolt", "4"]]);
+        assert!(t.formats.iter().find(|s| s.row == 0 && s.col == 0).unwrap().format.bold);
+    }
+
     #[test]
     fn not_a_table() {
         assert_eq!(parse_html_table("<p>hello</p>"), None);

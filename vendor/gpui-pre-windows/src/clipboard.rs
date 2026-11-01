@@ -36,6 +36,10 @@ static CLIPBOARD_PNG_FORMAT: LazyLock<u32> =
     LazyLock::new(|| register_clipboard_format(windows::core::w!("PNG")));
 static CLIPBOARD_JPG_FORMAT: LazyLock<u32> =
     LazyLock::new(|| register_clipboard_format(windows::core::w!("JFIF")));
+// CF_HTML: a spreadsheet's copied cells as a <table> (noshape: Paste as
+// table keeps their merges and formats).
+static CLIPBOARD_HTML_FORMAT: LazyLock<u32> =
+    LazyLock::new(|| register_clipboard_format(windows::core::w!("HTML Format")));
 
 static IMAGE_FORMATS_MAP: LazyLock<FxHashMap<u32, ImageFormat>> = LazyLock::new(|| {
     let mut map = FxHashMap::default();
@@ -96,6 +100,7 @@ pub(crate) fn read_from_clipboard() -> Option<ClipboardItem> {
     let mut have_text = false;
     let mut have_image = false;
     let mut have_files = false;
+    let mut have_html = false;
 
     let count = unsafe { CountClipboardFormats() };
     let mut format = 0;
@@ -116,6 +121,11 @@ pub(crate) fn read_from_clipboard() -> Option<ClipboardItem> {
             if let Some(entry) = read_files() {
                 entries.push(entry);
                 have_files = true;
+            }
+        } else if !have_html && format == *CLIPBOARD_HTML_FORMAT {
+            if let Some(entry) = read_html() {
+                entries.push(entry);
+                have_html = true;
             }
         }
     }
@@ -236,6 +246,17 @@ fn read_string() -> Option<ClipboardEntry> {
     let text = get_clipboard_string(CF_UNICODETEXT.0 as u32)?;
     let metadata = read_clipboard_metadata(&text);
     Some(ClipboardEntry::String(ClipboardString { text, metadata }))
+}
+
+/// CF_HTML: UTF-8 with a "Version:… StartHTML:…" header before the markup,
+/// kept whole (the reader looks for the <table> itself).
+fn read_html() -> Option<ClipboardEntry> {
+    let locked = get_clipboard_data(*CLIPBOARD_HTML_FORMAT)?;
+    let bytes = locked.as_bytes();
+    let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+    Some(ClipboardEntry::Html(
+        String::from_utf8_lossy(&bytes[..end]).into_owned(),
+    ))
 }
 
 fn read_clipboard_metadata(text: &str) -> Option<String> {
