@@ -283,6 +283,12 @@ pub struct StartView {
     history_search: Entity<InputState>,
     history_hide_merges: bool,
     history_hide_auto: bool,
+    /// Its Search history ▾ panel: open, the filter applied and the one
+    /// being edited, the two date fields.
+    history_filter_open: bool,
+    history_filter: noshape_ops::history_filter::HistoryFilter,
+    history_filter_edit: noshape_ops::history_filter::HistoryFilter,
+    history_dates: [Entity<InputState>; 2],
     /// The "Folders" section of "Owned by me" is expanded.
     folders_open: bool,
     /// "Last opened by me" is expanded.
@@ -342,6 +348,7 @@ impl StartView {
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search documents"));
         let label_search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search labels"));
         let history_search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search history"));
+        let history_dates = [cx.new(|cx| InputState::new(window, cx).placeholder("mm/dd/yyyy, --:--")), cx.new(|cx| InputState::new(window, cx).placeholder("mm/dd/yyyy, --:--"))];
         let col_search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search..."));
         let subs = vec![
             cx.subscribe(&col_search, |_, _, ev: &InputEvent, cx| {
@@ -456,6 +463,10 @@ impl StartView {
             history_search: history_search.clone(),
             history_hide_merges: true,
             history_hide_auto: true,
+            history_filter_open: false,
+            history_filter: Default::default(),
+            history_filter_edit: Default::default(),
+            history_dates,
             folders_open: false,
             recent_open: true,
             sub_open: true,
@@ -1474,6 +1485,157 @@ impl StartView {
             .into_any_element()
     }
 
+    /// Search history ▾ (live documents/117, dom/documents-history-search-filter):
+    /// 260 px, Tab (Any or a tab), Tab types (Part Studio, Assembly,
+    /// Drawing, Feature Studio, File) with Clear, Modified by (Any / Only me /
+    /// Not me), Date modified from / to; Reset | Search. It filters the
+    /// changes listed (and the rows that have one).
+    fn render_history_filter(&self, tabs: &[(noshape_model::document::TabId, String, &'static str)], cx: &mut Context<Self>) -> AnyElement {
+        use noshape_ops::history_filter::{HistoryFilter, ModifiedBy};
+        const KINDS: [(&str, &str, &str); 5] = [("partstudio", "part-studio", "Part Studio"), ("assembly", "assembly", "Assembly"), ("drawing", "drawing", "Drawing"), ("featurestudio", "feature-studio", "Feature Studio"), ("file", "file", "File")];
+        let pal = p();
+        let edit = self.history_filter_edit.clone();
+        let label = |t: &'static str| div().w(px(100.)).flex_none().pt(px(12.)).pl(px(4.)).text_size(px(11.)).text_color(rgb(0x666666)).child(t);
+        let field = |id: &'static str, text: String| {
+            h_flex()
+                .id(id)
+                .w(px(148.))
+                .h(px(34.))
+                .pl(px(8.))
+                .pr(px(6.))
+                .border_b_1()
+                .border_color(rgb(0xeaeaea))
+                .cursor_pointer()
+                .text_size(px(14.))
+                .child(div().flex_1().min_w_0().truncate().child(text))
+                .child(os::glyph(os::GLYPH_CARET, 10., rgb(0x666666)))
+        };
+        let view = cx.entity();
+        let tab_name = edit.tab.and_then(|t| tabs.iter().find(|x| x.0 == t)).map(|x| x.1.clone()).unwrap_or_else(|| "Any".into());
+        let tab_list: Vec<(noshape_model::document::TabId, String)> = tabs.iter().map(|(t, n, _)| (*t, n.clone())).collect();
+        let tab_select = field("vh-f-tab", tab_name).on_click(move |e: &ClickEvent, window, cx| {
+            let (view, tabs) = (view.clone(), tab_list.clone());
+            let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                m = m.select_list(148.);
+                let v = view.clone();
+                m = m.item(crate::os_menu::OsMenuItem::new("Any").on_click(move |_, _, cx| v.update(cx, |t, cx| {
+                    t.history_filter_edit.tab = None;
+                    cx.notify();
+                })));
+                for (id, name) in &tabs {
+                    let (v, id) = (view.clone(), *id);
+                    m = m.item(crate::os_menu::OsMenuItem::new(name.clone()).on_click(move |_, _, cx| v.update(cx, |t, cx| {
+                        t.history_filter_edit.tab = Some(id);
+                        cx.notify();
+                    })));
+                }
+                m
+            });
+            crate::os_menu::open(e.position(), menu, window, cx);
+        });
+        let view = cx.entity();
+        let by_select = field("vh-f-by", edit.by.label().into()).on_click(move |e: &ClickEvent, window, cx| {
+            let view = view.clone();
+            let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                m = m.select_list(148.);
+                for by in ModifiedBy::ALL {
+                    let v = view.clone();
+                    m = m.item(crate::os_menu::OsMenuItem::new(by.label()).on_click(move |_, _, cx| v.update(cx, |t, cx| {
+                        t.history_filter_edit.by = by;
+                        cx.notify();
+                    })));
+                }
+                m
+            });
+            crate::os_menu::open(e.position(), menu, window, cx);
+        });
+        let mut types = h_flex().w(px(148.)).flex_wrap().gap(px(6.)).pl(px(3.)).pt(px(4.));
+        for (kind, icon, tip) in KINDS {
+            let on = edit.kinds.contains(&kind);
+            types = types.child(crate::ui::icon_button(SharedString::from(format!("vh-f-kind-{kind}")), icon, 30., on, cx).tooltip(tip).on_click(cx.listener(move |t, _: &ClickEvent, _, cx| {
+                let kinds = &mut t.history_filter_edit.kinds;
+                if let Some(i) = kinds.iter().position(|k| *k == kind) {
+                    kinds.remove(i);
+                } else {
+                    kinds.push(kind);
+                }
+                cx.notify();
+            })));
+        }
+        let any_kind = !edit.kinds.is_empty();
+        let date = |st: &Entity<InputState>, tip: &'static str, cx: &App| div().id(tip).w(px(148.)).h(px(34.)).pl(px(4.)).border_b_1().border_color(rgb(0xeaeaea)).flex().items_center().tooltip(crate::ui::tooltip(tip)).child(div().flex_1().child(Input::new(st).appearance(false).text_size(px(14.)))).child(div().pr(px(6.)).child(crate::assets::icon("calendar", 16., cx)));
+        v_flex()
+            .id("vh-filter-panel")
+            .occlude()
+            .w(px(260.))
+            .bg(pal.panel)
+            .border_1()
+            .border_color(rgb(0xd7d7d7))
+            .rounded(px(4.))
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(6.)), blur_radius: px(12.), spread_radius: px(0.), inset: false }])
+            .px(px(5.))
+            .text_color(pal.text)
+            .on_mouse_down_out(cx.listener(|t, _: &MouseDownEvent, _, cx| {
+                if !crate::os_menu::is_open(cx) {
+                    t.history_filter_open = false;
+                    cx.notify();
+                }
+            }))
+            .child(h_flex().h(px(36.)).items_start().child(label("Tab")).child(tab_select))
+            .child(
+                h_flex().mt(px(14.)).items_start().child(label("Tab types")).child(
+                    v_flex().w(px(148.)).child(types).child(
+                        h_flex().justify_end().pt(px(3.)).child(
+                            div()
+                                .id("vh-f-clear")
+                                .h(px(27.))
+                                .px(px(7.))
+                                .flex()
+                                .items_center()
+                                .rounded(px(3.5))
+                                .border_1()
+                                .border_color(rgb(0xaaaaaa))
+                                .text_size(px(12.25))
+                                .text_color(rgb(0x999999))
+                                .when(!any_kind, |d| d.opacity(0.4))
+                                .when(any_kind, |d| d.cursor_pointer().text_color(pal.text))
+                                .child("Clear")
+                                .on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
+                                    t.history_filter_edit.kinds.clear();
+                                    cx.notify();
+                                })),
+                        ),
+                    ),
+                ),
+            )
+            .child(h_flex().mt(px(14.)).h(px(36.)).items_start().child(label("Modified by")).child(by_select))
+            .child(h_flex().mt(px(14.)).items_start().child(label("Date modified")).child(v_flex().gap(px(14.)).child(date(&self.history_dates[0], "Start date", cx)).child(date(&self.history_dates[1], "End date", cx))))
+            .child(
+                h_flex()
+                    .justify_end()
+                    .gap(px(4.))
+                    .pt(px(14.))
+                    .pb(px(10.))
+                    .pr(px(5.))
+                    .child(os::secondary_button("vh-f-reset", "Reset", cx).on_click(cx.listener(|t, _: &ClickEvent, window, cx| {
+                        t.history_filter_edit = HistoryFilter::default();
+                        t.history_filter = HistoryFilter::default();
+                        for st in t.history_dates.clone() {
+                            st.update(cx, |s, cx| s.set_value("", window, cx));
+                        }
+                        cx.notify();
+                    })))
+                    .child(os::primary_button("vh-f-search", "Search").on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
+                        t.history_filter_edit.from = lib::parse_filter_date(&t.history_dates[0].read(cx).value(), false);
+                        t.history_filter_edit.to = lib::parse_filter_date(&t.history_dates[1].read(cx).value(), true);
+                        t.history_filter = t.history_filter_edit.clone();
+                        t.history_filter_open = false;
+                        cx.notify();
+                    }))),
+            )
+            .into_any_element()
+    }
+
     /// The open right panel: Details (name, thumbnail, Owner, Document
     /// description, Created by, Last modified by) or Versions and history.
     fn render_doc_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -1604,7 +1766,9 @@ impl StartView {
                 .child(section("Created by", vec![who(&d.created_by), lib::format_onshape_time(d.created)]))
                 .child(section("Last modified by", vec![who(&d.modified_by), lib::format_onshape_time(d.modified)]))
                 .into_any_element(),
-            (Some(_), Some(d)) => v_flex()
+            (Some(_), Some(d)) => {
+                let d_tabs = d.tabs.clone();
+                v_flex()
                 .size_full()
                 // Live documents/116: the name, "Search history" with its 🔍,
                 // the Hide merges / Hide automatic versions toggles.
@@ -1614,8 +1778,34 @@ impl StartView {
                         .mx(px(12.))
                         .mt(px(8.))
                         .h(px(30.))
-                        .child(div().flex_1().h_full().border_1().border_color(rgb(0xaaaaaa)).rounded_l(px(4.)).child(Input::new(&self.history_search).appearance(false).cleanable(true).text_size(px(14.)).h(px(28.)).px(px(6.))))
-                        .child(div().size(px(30.)).flex().items_center().justify_center().border_1().border_l_0().border_color(rgb(0xaaaaaa)).rounded_r(px(4.)).child(crate::assets::icon("search", 20., cx))),
+                        .relative()
+                        .child(
+                            h_flex()
+                                .flex_1()
+                                .h_full()
+                                .border_1()
+                                .border_color(rgb(0xaaaaaa))
+                                .rounded_l(px(4.))
+                                .child(div().flex_1().child(Input::new(&self.history_search).appearance(false).cleanable(true).text_size(px(14.)).h(px(28.)).px(px(6.))))
+                                // ▾: the filter panel (live documents/117).
+                                .child(
+                                    div()
+                                        .id("vh-filter-caret")
+                                        .w(px(24.))
+                                        .h_full()
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .cursor_pointer()
+                                        .child(os::glyph(os::GLYPH_CARET, 10., if self.history_filter.is_active() { pal.accent } else { pal.text }))
+                                        .on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
+                                            t.history_filter_open = !t.history_filter_open;
+                                            cx.notify();
+                                        })),
+                                ),
+                        )
+                        .child(div().size(px(30.)).flex().items_center().justify_center().border_1().border_l_0().border_color(rgb(0xaaaaaa)).rounded_r(px(4.)).child(crate::assets::icon("search", 20., cx)))
+                        .when(self.history_filter_open, |d| d.child(deferred(div().absolute().top(px(31.)).right(px(0.)).child(self.render_history_filter(&d_tabs, cx))).with_priority(2))),
                 )
                 .child({
                     let toggle = |id: &'static str, icon: &'static str, on: bool, tip: &'static str, cx: &mut Context<Self>| {
@@ -1669,13 +1859,18 @@ impl StartView {
                         .history
                         .iter()
                         .filter(|r| needle.is_empty() || r.name.to_lowercase().contains(&needle) || r.description.to_lowercase().contains(&needle))
+                        // A filtered history shows the rows with a change that passes.
+                        .filter(|r| !self.history_filter.is_active() || r.changes.iter().any(|c| history_change_matches(&self.history_filter, c, &d.tabs)))
                         .map(|r| {
                             let mut r = r.clone();
                             if self.history_hide_merges {
-                                r.changes.retain(|c| !c.3);
+                                r.changes.retain(|c| !c.merge);
+                            }
+                            if self.history_filter.is_active() {
+                                r.changes.retain(|c| history_change_matches(&self.history_filter, c, &d.tabs));
                             }
                             // A filtered list has other row numbers.
-                            if !needle.is_empty() {
+                            if !needle.is_empty() || self.history_filter.is_active() {
                                 r.from = None;
                             }
                             r
@@ -1744,7 +1939,7 @@ impl StartView {
                                 }))
                         });
                         let changes = open.then(|| {
-                            v_flex().pt(px(4.)).gap(px(2.)).text_size(px(12.)).children(r.changes.iter().map(|(desc, author, t, _)| {
+                            v_flex().pt(px(4.)).gap(px(2.)).text_size(px(12.)).children(r.changes.iter().map(|lib::HistoryChange { description: desc, author, time: t, .. }| {
                                 h_flex().gap(px(6.)).child(div().w(px(150.)).flex_none().truncate().text_color(pal.text).child(desc.clone())).child(div().truncate().child(format!("{} · {}", who(author), lib::format_onshape_time(*t))))
                             }))
                         });
@@ -1790,7 +1985,8 @@ impl StartView {
                         .child(h_flex().gap(px(30.)).child(item("legend-release-candidate", "Release candidate", false, cx)).child(item("legend-release", "Release", false, cx)))
                         .child(h_flex().gap(px(30.)).child(item("legend-obsoletion", "Contains obsoletion", false, cx)))
                 })
-                .into_any_element(),
+                .into_any_element()
+            }
             // A folder (live documents/47): name, Owner, Created by, Last modified by.
             _ if panel == DocPanel::Details && folder.is_some() => {
                 let (name, created, modified) = folder.clone().unwrap_or_default();
@@ -3442,6 +3638,23 @@ fn view_toggle(id: &'static str, glyph: &'static [u8], tip: &'static str, select
 }
 
 /// A folder's display name ("noshape documents" for the default folder).
+/// Does a change pass the Search history ▾ filter (author, time, tab,
+/// tab kinds; `tabs`: the document's tabs and their kinds)?
+fn history_change_matches(f: &noshape_ops::history_filter::HistoryFilter, c: &lib::HistoryChange, tabs: &[(noshape_model::document::TabId, String, &'static str)]) -> bool {
+    use noshape_ops::history_filter::{is_me, ModifiedBy};
+    let mine = is_me(&c.author);
+    if (f.by == ModifiedBy::OnlyMe && !mine) || (f.by == ModifiedBy::NotMe && mine) {
+        return false;
+    }
+    if f.from.is_some_and(|t| c.time < t) || f.to.is_some_and(|t| c.time > t) {
+        return false;
+    }
+    if f.tab.is_none() && f.kinds.is_empty() {
+        return true;
+    }
+    c.tabs.iter().any(|t| f.tab.is_none_or(|ft| ft == *t) && (f.kinds.is_empty() || tabs.iter().any(|(id, _, k)| id == t && f.kinds.contains(k))))
+}
+
 fn folder_label(f: &Path) -> String {
     if f == crate::file_dialogs::documents_dir() {
         "noshape documents".to_string()
@@ -3766,4 +3979,27 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
             s.select_all(window, cx);
         })
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{history_change_matches, lib};
+    use noshape_model::document::TabId;
+    use noshape_ops::history_filter::HistoryFilter;
+    use std::prelude::v1::test;
+
+    /// Search history ▾ on the documents page: a change passes by the tab
+    /// or kind it changed and its time.
+    #[test]
+    fn history_filter_picks_changes() {
+        let tabs = vec![(TabId(1), "Part Studio 1".to_string(), "partstudio"), (TabId(2), "Drawing 1".to_string(), "drawing")];
+        let change = |tab: u64, time: i64| lib::HistoryChange { description: String::new(), author: "someone".into(), time, merge: false, tabs: vec![TabId(tab)] };
+        let f = HistoryFilter { kinds: vec!["drawing"], ..Default::default() };
+        assert!(history_change_matches(&f, &change(2, 10), &tabs));
+        assert!(!history_change_matches(&f, &change(1, 10), &tabs));
+        let f = HistoryFilter { tab: Some(TabId(1)), from: Some(5), to: Some(20), ..Default::default() };
+        assert!(history_change_matches(&f, &change(1, 10), &tabs));
+        assert!(!history_change_matches(&f, &change(1, 30), &tabs));
+        assert!(!history_change_matches(&f, &change(2, 10), &tabs));
+    }
 }

@@ -251,7 +251,7 @@ fn register_assembly_hooks() {
         open_release_candidate: release_dialog::open_release_candidate,
         last_viewed_config: release_dialog::last_viewed_config,
         create_version: history_panel::open_create_version_in,
-        tab_properties: doc_dialogs::tab_properties,
+        tab_properties: |doc, tab, window, cx| doc_dialogs::tab_properties(doc, tab, None, window, cx),
         instance_list_properties: || preferences_window::ListPrefs::load().instance_list_properties,
         set_instance_list_properties: preferences_window::set_instance_list_properties,
         open_export_modal: part_studio::export::open_export_modal,
@@ -362,7 +362,7 @@ fn register_history_hooks() {
     noshape_history_ui::history_hooks::register(noshape_history_ui::history_hooks::Hooks {
         feature_icon: part_studio::feature_icon,
         workspace_protection: workspace_protection::open_dialog,
-        open_new_window: |doc, at, cx| {
+        open_new_window: |doc, at, tab, cx| {
             let gpu = cx.global::<gpu::GpuGlobal>().0.clone();
             match at {
                 Some(mv) => {
@@ -371,7 +371,7 @@ fn register_history_hooks() {
                 }
                 None => {
                     let s = &doc.read(cx).session;
-                    match s.active_tab.or_else(|| s.doc.ordered_tabs().first().map(|t| t.id)) {
+                    match tab.or(s.active_tab).or_else(|| s.doc.ordered_tabs().first().map(|t| t.id)) {
                         Some(tab) => files::open_tab_window(doc, tab, gpu, cx),
                         None => Ok(()),
                     }

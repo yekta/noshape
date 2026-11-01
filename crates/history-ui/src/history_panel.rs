@@ -148,18 +148,7 @@ impl HistoryPanel {
 
     /// Read the panel's date fields ("mm/dd/yyyy, hh:mm"; the time is optional).
     fn read_dates(&mut self, cx: &App) {
-        let parse = |s: &str, end: bool| -> Option<i64> {
-            use chrono::{Local, NaiveDate, NaiveTime, TimeZone as _};
-            let s = s.trim();
-            let (d, t) = s.split_once(',').map(|(d, t)| (d.trim(), Some(t.trim()))).unwrap_or((s, None));
-            let date = NaiveDate::parse_from_str(d, "%m/%d/%Y").ok()?;
-            let time = match t.filter(|t| !t.is_empty() && !t.starts_with('-')) {
-                Some(t) => NaiveTime::parse_from_str(t, "%H:%M").or_else(|_| NaiveTime::parse_from_str(t, "%I:%M %p")).ok()?,
-                None if end => NaiveTime::from_hms_opt(23, 59, 59)?,
-                None => NaiveTime::MIN,
-            };
-            Local.from_local_datetime(&date.and_time(time)).single().map(|t| t.timestamp_millis())
-        };
+        let parse = crate::start_library::parse_filter_date;
         self.filter_edit.from = parse(&self.date_from.read(cx).value(), false);
         self.filter_edit.to = parse(&self.date_to.read(cx).value(), true);
     }
@@ -501,8 +490,8 @@ pub fn open_create_version_in(doc: Entity<DocModel>, window: &mut Window, cx: &m
 
 /// A row's Open in new browser tab (another window); a failure shows as
 /// the document's error.
-fn open_new_window(doc: &Entity<DocModel>, at: Option<noshape_store::MicroversionId>, cx: &mut App) {
-    if let Err(e) = crate::history_hooks::open_new_window(doc.clone(), at, cx) {
+fn open_new_window(doc: &Entity<DocModel>, at: Option<noshape_store::MicroversionId>, tab: Option<TabId>, cx: &mut App) {
+    if let Err(e) = crate::history_hooks::open_new_window(doc.clone(), at, tab, cx) {
         doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Error(format!("{e:#}"))));
     }
 }
@@ -835,10 +824,21 @@ pub fn stale_drawings(session: &crate::session::Session) -> Vec<(TabId, String)>
 /// updated before creating a version:" box, its drawing-update button
 /// (tooltip "Update drawings.", updating them all) and the drawings' names.
 fn stale_drawings_warning(doc: &Entity<DocModel>, stale: &Rc<std::cell::RefCell<Vec<(TabId, String)>>>, cx: &App) -> Option<AnyElement> {
-    let names: Vec<String> = stale.borrow().iter().map(|(_, n)| n.clone()).collect();
+    let names: Vec<(TabId, String)> = stale.borrow().clone();
     if names.is_empty() {
         return None;
     }
+    // Live: each drawing is a link that opens it in a new browser tab (here
+    // another window), the dialog staying open.
+    let links = h_flex().flex_wrap().gap(px(4.)).text_color(rgb(0x094174)).children(names.into_iter().enumerate().map(|(i, (tab, name))| {
+        let doc = doc.clone();
+        div()
+            .id(("stale-drawing", i))
+            .cursor_pointer()
+            .hover(|d| d.underline())
+            .child(if i == 0 { name } else { format!(", {name}") })
+            .on_click(move |_, _, cx| open_new_window(&doc, None, Some(tab), cx))
+    }));
     let (doc, stale) = (doc.clone(), stale.clone());
     let button = div()
         .id("update-drawings")
@@ -883,7 +883,7 @@ fn stale_drawings_warning(doc: &Entity<DocModel>, stale: &Rc<std::cell::RefCell<
             .text_size(px(14.))
             .child(button)
             .child(div().child("These drawings should be updated before creating a version:"))
-            .child(div().text_color(rgb(0x094174)).child(names.join(", ")))
+            .child(links)
             .into_any_element(),
     )
 }
@@ -1295,7 +1295,7 @@ impl Render for HistoryPanel {
                         // menu's); only on the current workspace, whose window shares
                         // its edits. Copy link is web-only.
                         let dn = d5.clone();
-                        let m = if b == current_branch { m.item(crate::os_menu::OsMenuItem::new("Open in new browser tab").on_click(move |_, _, cx| open_new_window(&dn, None, cx))) } else { m };
+                        let m = if b == current_branch { m.item(crate::os_menu::OsMenuItem::new("Open in new browser tab").on_click(move |_, _, cx| open_new_window(&dn, None, None, cx))) } else { m };
                         let m = if b != current_branch {
                             m.item(crate::os_menu::OsMenuItem::new("Compare").on_click(move |_, _, cx| v3.update(cx, |t, cx| t.compare_with_current(crate::compare_mode::Side::Workspace(b), name2.clone(), cx))))
                                 .item(crate::os_menu::OsMenuItem::new("Merge into current workspace…").on_click({
@@ -1318,7 +1318,7 @@ impl Render for HistoryPanel {
                         // Open in new browser tab: the version (or change) in a
                         // window of its own, read-only.
                         let dn = d.clone();
-                        let m = m.item(crate::os_menu::OsMenuItem::new("Open in new browser tab").on_click(move |_, _, cx| open_new_window(&dn, Some(mv), cx)));
+                        let m = m.item(crate::os_menu::OsMenuItem::new("Open in new browser tab").on_click(move |_, _, cx| open_new_window(&dn, Some(mv), None, cx)));
                         // Live rp-904: change rows have no "Branch to create workspace…".
                         let m = if kind == RowKind::Change { m } else { m.item(crate::os_menu::OsMenuItem::new("Branch to create workspace…").on_click(move |_, window, cx| open_branch_dialog(d1.clone(), mv, name1.clone(), window, cx))) };
                         let m = m

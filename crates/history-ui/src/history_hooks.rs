@@ -7,6 +7,10 @@ use gpui_kit::*;
 use noshape_store::BranchId;
 use std::sync::OnceLock;
 
+/// [`Hooks::open_new_window`]: the document, a version or change (None: the
+/// current workspace), the tab to show.
+pub type OpenNewWindow = fn(Entity<DocModel>, Option<noshape_store::MicroversionId>, Option<noshape_model::document::TabId>, &mut App) -> anyhow::Result<()>;
+
 /// The app's side of Versions and history.
 pub struct Hooks {
     /// A feature type's icon path, as the Part Studio's feature list shows it.
@@ -14,8 +18,9 @@ pub struct Hooks {
     /// The Workspace protection dialog of a branch.
     pub workspace_protection: fn(Entity<DocModel>, BranchId, &mut Window, &mut App),
     /// A row's Open in new browser tab: another window on the document, at a
-    /// version or change (read-only), or on the current workspace (None).
-    pub open_new_window: fn(Entity<DocModel>, Option<noshape_store::MicroversionId>, &mut App) -> anyhow::Result<()>,
+    /// version or change (read-only), or on the current workspace (None),
+    /// showing `tab` (else the active one).
+    pub open_new_window: OpenNewWindow,
 }
 
 static HOOKS: OnceLock<Hooks> = OnceLock::new();
@@ -37,6 +42,6 @@ pub fn workspace_protection(doc: Entity<DocModel>, branch: BranchId, window: &mu
     (hooks().workspace_protection)(doc, branch, window, cx)
 }
 
-pub fn open_new_window(doc: Entity<DocModel>, at: Option<noshape_store::MicroversionId>, cx: &mut App) -> anyhow::Result<()> {
-    (hooks().open_new_window)(doc, at, cx)
+pub fn open_new_window(doc: Entity<DocModel>, at: Option<noshape_store::MicroversionId>, tab: Option<noshape_model::document::TabId>, cx: &mut App) -> anyhow::Result<()> {
+    (hooks().open_new_window)(doc, at, tab, cx)
 }

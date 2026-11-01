@@ -573,7 +573,8 @@ impl Global for CopiedTab {}
 /// Tab › Properties…: the element's name and description; a drawing's is
 /// the metadata Properties dialog (live 2159, 3021: Part number and
 /// Revision fill its title block's DWG NO. and REV; drawing.md S15).
-pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId, window: &mut Window, cx: &mut App) {
+/// `thumb`: the tab's picture (the Part Studio card in the left tree).
+pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId, thumb: Option<std::sync::Arc<RenderImage>>, window: &mut Window, cx: &mut App) {
     let drawing = {
         let d = &doc.read(cx).session.doc;
         d.tab(tab).and_then(|t| match &t.content {
@@ -640,9 +641,7 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
         noshape_app_core::properties_dialog::MetaValues { name, description: text("tab_description"), part_number: text("tab_part_number"), revision: text("tab_revision"), meta, ..Default::default() }
     };
     let spec = noshape_app_core::properties_dialog::MetaSpec { category, material: None, computed_mass: None, bom_options: None, values };
-    noshape_app_core::properties_dialog::open_properties(
-        spec,
-        move |v, _, cx| {
+    let save = move |v: noshape_app_core::properties_dialog::MetaValues, _: &mut Window, cx: &mut App| {
             let r = doc.update(cx, |d, _| -> anyhow::Result<()> {
                 let store = &mut d.session.store;
                 let mut set = |k: &str, v: &str| store.set_meta(&format!("{k}:{}", tab.0), Some(v.as_bytes()).filter(|b| !b.is_empty()));
@@ -664,10 +663,14 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
                     })
                 });
             }
-        },
-        window,
-        cx,
-    );
+    };
+    // Live 1738: only a Part Studio's modal has the left tree (its card).
+    if category == "Onshape Part Studio" {
+        let card = noshape_app_core::properties_dialog::ItemCard { kind: "Part Studio", thumb };
+        noshape_app_core::properties_dialog::open_properties_with_card(spec, card, save, window, cx);
+    } else {
+        noshape_app_core::properties_dialog::open_properties(spec, save, window, cx);
+    }
 }
 
 /// Tab › Show code: the element as FeatureScript-style code (read-only).

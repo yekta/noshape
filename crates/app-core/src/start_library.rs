@@ -315,6 +315,8 @@ pub struct DocDetails {
     pub modified: i64,
     /// Workspaces and versions, newest first.
     pub history: Vec<HistoryRow>,
+    /// The tabs of the default workspace: id, name, Search history ▾ kind.
+    pub tabs: Vec<(noshape_model::document::TabId, String, &'static str)>,
     /// Document notes (markdown, the rail's Notes panel) and the Properties
     /// panel's Library label.
     pub notes: String,
@@ -334,13 +336,24 @@ pub struct HistoryRow {
     /// The graph's lane: the workspace it was made in (Main is 0).
     pub lane: usize,
     /// Its changes since the version before it, newest first (Show
-    /// changes…): description, author, time, a merge.
-    pub changes: Vec<(String, String, i64, bool)>,
+    /// changes…).
+    pub changes: Vec<HistoryChange>,
     /// A workspace made from a version: that version's row (the graph
     /// draws the branch from it).
     pub from: Option<usize>,
     /// The state it shows (None for Start's row before sorting).
     pub microversion: Option<noshape_store::MicroversionId>,
+}
+
+/// One change under a row's "Show changes…".
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct HistoryChange {
+    pub description: String,
+    pub author: String,
+    pub time: i64,
+    pub merge: bool,
+    /// The tabs it changed (Search history ▾'s Tab and Tab types).
+    pub tabs: Vec<noshape_model::document::TabId>,
 }
 
 /// Store meta key of the Properties panel's Library label.
@@ -375,7 +388,7 @@ pub fn doc_details(path: &Path) -> anyhow::Result<DocDetails> {
             if ((m.id != mv || !version) && marks.contains(&m.id)) || m.parents.is_empty() || out.len() >= 200 {
                 break;
             }
-            out.push((m.description.clone(), m.author.clone(), m.created, m.is_merge()));
+            out.push(HistoryChange { description: m.description.clone(), author: m.author.clone(), time: m.created, merge: m.is_merge(), tabs: noshape_ops::history_filter::changed_tabs(&store, m) });
             cur = m.parents.first().copied();
         }
         out
@@ -395,6 +408,14 @@ pub fn doc_details(path: &Path) -> anyhow::Result<DocDetails> {
         history.push(HistoryRow { name: "Start".into(), author: f.author.clone(), time: f.created, microversion: Some(f.id), ..Default::default() });
     }
     history.sort_by(|a, b| b.time.cmp(&a.time).then(b.workspace.cmp(&a.workspace)));
+    let tabs = store
+        .default_branch()
+        .and_then(|b| store.head(b))
+        .and_then(|h| store.read_all(h))
+        .ok()
+        .and_then(|blobs| noshape_model::document::Document::from_blobs(&blobs).ok())
+        .map(|d| d.ordered_tabs().into_iter().map(|t| (t.id, t.name.clone(), noshape_ops::history_filter::filter_kind(&t.content))).collect())
+        .unwrap_or_default();
     // Where each other workspace branched off (a version's or Start's row).
     for b in graph.branches.iter().filter(|b| !b.deleted && !b.is_default) {
         let Some(from) = b.created_from else { continue };
@@ -411,6 +432,7 @@ pub fn doc_details(path: &Path) -> anyhow::Result<DocDetails> {
         modified_by: last.map(|m| m.author.clone()).unwrap_or_default(),
         modified: last.map(|m| m.created).unwrap_or(meta.modified),
         history,
+        tabs,
         notes,
         library_label,
     })
@@ -487,6 +509,21 @@ pub fn copy_version_named(path: &Path, mv: noshape_store::MicroversionId, dir: &
     Ok(dest)
 }
 
+/// A Search history ▾ date field ("mm/dd/yyyy, hh:mm"; the time is
+/// optional: the day's start, or its end for `end`), in local time (ms).
+pub fn parse_filter_date(s: &str, end: bool) -> Option<i64> {
+    use chrono::{Local, NaiveDate, NaiveTime, TimeZone as _};
+    let s = s.trim();
+    let (d, t) = s.split_once(',').map(|(d, t)| (d.trim(), Some(t.trim()))).unwrap_or((s, None));
+    let date = NaiveDate::parse_from_str(d, "%m/%d/%Y").ok()?;
+    let time = match t.filter(|t| !t.is_empty() && !t.starts_with('-')) {
+        Some(t) => NaiveTime::parse_from_str(t, "%H:%M").or_else(|_| NaiveTime::parse_from_str(t, "%I:%M %p")).ok()?,
+        None if end => NaiveTime::from_hms_opt(23, 59, 59)?,
+        None => NaiveTime::MIN,
+    };
+    Local.from_local_datetime(&date.and_time(time)).single().map(|t| t.timestamp_millis())
+}
+
 /// Onshape's time stamps (live documents list and versions panel): "1:15 PM
 /// Today", "9:02 AM Yesterday", "Oct 12", "Oct 12, 2024", in local time.
 pub fn format_onshape_time(ms: i64) -> String {
@@ -533,7 +570,7 @@ mod tests {
         drop(store);
         let h = doc_details(&path).unwrap().history;
         let row = |n: &str| h.iter().find(|r| r.name == n).unwrap().clone();
-        let descs = |r: HistoryRow| r.changes.into_iter().map(|c| c.0).collect::<Vec<_>>();
+        let descs = |r: HistoryRow| r.changes.into_iter().map(|c| c.description).collect::<Vec<_>>();
         assert_eq!(descs(row("Main")), ["three"]);
         assert_eq!(descs(row("V1")), ["two", "one"]);
         assert!(row("experiment").changes.is_empty(), "still at V1");

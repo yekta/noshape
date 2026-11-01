@@ -1274,7 +1274,8 @@ impl Workspace {
                         if view.read(cx).doc.read(cx).session.is_protected() {
                             let menu = menu.item(I::new("Properties…").on_click(move |_, w, cx| {
                                 let doc = v6.read(cx).doc.clone();
-                                dd::tab_properties(doc, id, w, cx)
+                                let thumb = v6.read(cx).tab_thumbs.read(cx).picture(id).flatten();
+                                dd::tab_properties(doc, id, thumb, w, cx)
                             }));
                             let menu = if kind == "partstudio" {
                                 menu.item(I::new("Show code").on_click(move |_, w, cx| {
@@ -1307,7 +1308,8 @@ impl Workspace {
                             .item(I::new("Rename").on_click(move |_, w, cx| v5.update(cx, |t, cx| t.start_tab_rename(id, w, cx))))
                             .item(I::new("Properties…").on_click(move |_, w, cx| {
                                 let doc = v6.read(cx).doc.clone();
-                                dd::tab_properties(doc, id, w, cx)
+                                let thumb = v6.read(cx).tab_thumbs.read(cx).picture(id).flatten();
+                                dd::tab_properties(doc, id, thumb, w, cx)
                             }));
                         let menu = if kind == "partstudio" {
                             menu.item(I::new("Show code").on_click(move |_, w, cx| {
@@ -1588,7 +1590,7 @@ fn file_tab_menu(menu: crate::os_menu::OsMenu, view: &Entity<Workspace>, id: Tab
             }
         }))
         .item(I::new("Rename").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.start_tab_rename(id, w, cx))))
-        .item(I::new("Properties…").on_click(move |_, w, cx| dd::tab_properties(d1.clone(), id, w, cx)));
+        .item(I::new("Properties…").on_click(move |_, w, cx| dd::tab_properties(d1.clone(), id, None, w, cx)));
     if doc.read(cx).session.doc.parent_of(id).is_some() {
         let v6 = view.clone();
         menu = menu.item(I::new("Move to parent folder").on_click(move |_, _, cx| v6.update(cx, |t, cx| t.move_to_parent(id, cx))));

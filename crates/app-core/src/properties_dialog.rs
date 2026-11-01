@@ -102,8 +102,18 @@ enum CustomInput {
 /// Opens the Create Release candidate dialog for the item.
 type ReleaseFn = Rc<dyn Fn(&mut Window, &mut App)>;
 
+/// A Part Studio tab's card in the modal's left tree (live 1738: a 300 px
+/// panel with the studio's ▸, 70×40 picture, name and grey type).
+#[derive(Clone)]
+pub struct ItemCard {
+    pub kind: &'static str,
+    pub thumb: Option<std::sync::Arc<RenderImage>>,
+}
+
 /// The form inside the modal.
 pub struct MetaForm {
+    /// The left tree's card (Part Studio tabs).
+    card: Option<ItemCard>,
     /// Release management: the release-create icon at the top left
     /// (Release__typical_release_workflow, "From any Properties dialog").
     on_release: Option<ReleaseFn>,
@@ -218,6 +228,7 @@ impl MetaForm {
             reset_to: None,
             configured: Vec::new(),
             spec_category: spec.category,
+            card: None,
             material: spec.material,
             computed_mass: spec.computed_mass,
             bom_options: spec.bom_options,
@@ -698,7 +709,42 @@ impl Render for MetaForm {
                     .border_color(rgb(0xcccccc))
                     .child(div().pl(px(4.)).text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).truncate().child(self.saved.name.clone())),
             )
-            .child(div().id("meta-scroll").h(px(381. + props_size().1 - PROPS_MIN.1)).overflow_y_scroll().track_scroll(&self.scroll).p(px(15.)).child(form))
+            .child({
+                let scroll = div().id("meta-scroll").h(px(381. + props_size().1 - PROPS_MIN.1)).overflow_y_scroll().track_scroll(&self.scroll).p(px(15.)).child(form);
+                match &self.card {
+                    None => scroll.into_any_element(),
+                    Some(card) => {
+                        let picture = match &card.thumb {
+                            Some(image) => img(ImageSource::Render(image.clone())).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
+                            None => crate::assets::icon("part-studio", 30., cx),
+                        };
+                        let row = h_flex()
+                            .w_full()
+                            .h(px(55.))
+                            .pl(px(12.))
+                            .pr(px(8.))
+                            .border_b_1()
+                            .border_color(rgb(0xdddddd))
+                            .bg(rgb(0xb2ddf6))
+                            .child(div().w(px(12.)).flex_none().child(crate::os_ui::glyph(crate::os_ui::GLYPH_COLLAPSED, 12., rgb(0x333333))))
+                            .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(picture))
+                            .child(
+                                v_flex()
+                                    .pl(px(4.))
+                                    .min_w_0()
+                                    .flex_1()
+                                    .child(div().text_size(px(13.33)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).truncate().child(self.saved.name.clone()))
+                                    .child(div().text_size(px(12.)).text_color(rgb(0x666666)).truncate().child(card.kind)),
+                            );
+                        h_flex()
+                            .w_full()
+                            .items_start()
+                            .child(div().w(px(300.)).h(px(381. + props_size().1 - PROPS_MIN.1)).flex_none().bg(rgb(0xf5f5f5)).border_r_1().border_color(rgb(0xcccccc)).child(row))
+                            .child(div().flex_1().min_w_0().child(scroll))
+                            .into_any_element()
+                    }
+                }
+            })
             .child(
                 h_flex()
                     .h(px(62.))
@@ -770,6 +816,20 @@ pub fn open_properties(spec: MetaSpec, on_save: impl Fn(MetaValues, &mut Window,
     let name = form.read(cx).name.clone();
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).child(form.clone())));
     // Live: the first field (Name) has the focus when the modal opens.
+    name.update(cx, |s, cx| s.focus(window, cx));
+}
+
+/// [`open_properties`] with the item's card in a left tree (Part Studio
+/// tabs).
+pub fn open_properties_with_card(spec: MetaSpec, card: ItemCard, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+    let on_save: SaveFn = Rc::new(on_save);
+    let form = cx.new(|cx| {
+        let mut f = MetaForm::new(spec, on_save, window, cx);
+        f.card = Some(card);
+        f
+    });
+    let name = form.read(cx).name.clone();
+    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).child(form.clone())));
     name.update(cx, |s, cx| s.focus(window, cx));
 }
 
