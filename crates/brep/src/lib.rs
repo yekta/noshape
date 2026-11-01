@@ -177,6 +177,9 @@ pub struct Body {
     /// was given (the Boolean's own for all).
     pub vertex_tol: Vec<f64>,
     pub edge_tol: Vec<f64>,
+    /// Per face, whether it is an internal one (inside its solid, material both sides: OCCT's INTERNAL); empty
+    /// where none is.
+    pub face_internal: Vec<bool>,
 }
 
 /// A curve where two faces meet, as the kernel's OCCT makes it (a free-form face's sections come from there, so

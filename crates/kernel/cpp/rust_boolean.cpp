@@ -358,8 +358,9 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       const GeomAbs_SurfaceType t = GeomAdaptor_Surface(surf).GetType();
       return t == GeomAbs_Torus ? "a torus face" : t == GeomAbs_Sphere ? "a sphere face" : t == GeomAbs_OffsetSurface ? "an offset face" : t == GeomAbs_SurfaceOfRevolution ? "a face of revolution" : t == GeomAbs_SurfaceOfExtrusion ? "an extruded face" : "a curved face";
     }
-    if (f.Orientation() != TopAbs_FORWARD && f.Orientation() != TopAbs_REVERSED)
-      return "an internal face";
+    // (An internal face: noshape's Boolean leaves it out of its solid's boundary, as live has none.)
+    const bool internal = f.Orientation() != TopAbs_FORWARD && f.Orientation() != TopAbs_REVERSED;
+    b.face_internal.push_back(internal);
     max_tol   = std::max(max_tol, BRep_Tool::Tolerance(f));
     bool flip = false;
     if (!pl.IsNull())

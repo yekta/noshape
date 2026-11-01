@@ -251,6 +251,8 @@ struct GFace {
     patches: std::sync::OnceLock<free::Patches>,
     /// A Bézier face's surface in pieces, each its control points (holding it).
     hulls: std::sync::OnceLock<Option<Vec<free::Hull>>>,
+    /// An internal face (OCCT's INTERNAL): no boundary of its solid.
+    internal: bool,
 }
 
 impl GFace {
@@ -2861,18 +2863,36 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 Some(fs) => free::nurbs_surf(fs, uvbox, f.reversed),
                 None => s,
             };
-            cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default() });
+            cx.faces.push(GFace {
+                arg: a,
+                index: i as u32,
+                solid: usize::MAX,
+                s,
+                edges,
+                bound: Default::default(),
+                lo: DVec3::INFINITY,
+                hi: DVec3::NEG_INFINITY,
+                ns,
+                uvbox,
+                pcurves,
+                grid: Default::default(),
+                patches: Default::default(),
+                hulls: Default::default(),
+                internal: body.face_internal.get(i).copied().unwrap_or(false),
+            });
         }
         for (i, s) in body.solids.iter().enumerate() {
             let si = cx.solids.len();
-            // (Its voids' faces too: a ray crosses them as it does the outer shell's.)
-            let faces: Vec<usize> = s.shells.iter().flatten().map(|&f| face0 + f as usize).collect();
-            for &f in &faces {
+            // (Its voids' faces too: a ray crosses them as it does the outer shell's. An internal face is its
+            // solid's but no boundary: nothing crosses or meets it, and no piece of it is kept (live has none).)
+            let all: Vec<usize> = s.shells.iter().flatten().map(|&f| face0 + f as usize).collect();
+            for &f in &all {
                 if cx.faces[f].solid != usize::MAX {
                     return Err(Decline("a face in two solids"));
                 }
                 cx.faces[f].solid = si;
             }
+            let faces: Vec<usize> = all.into_iter().filter(|&f| !cx.faces[f].internal).collect();
             cx.solids.push(GSolid { arg: a, index: i as u32, faces, lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, sheet: false });
         }
         // A sheet (faces, no solid): one of its own, with no inside.
@@ -4142,27 +4162,32 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
             on_pairs.push((pi, t));
         }
-        keep[pi] = match op {
-            // Coincident pieces facing one way: the first argument's is kept; facing each other: none.
-            Op::Fuse => (!in_any && ons.iter().all(|&(t, st)| st == State::OnSame && cx.solids[t].arg > arg)).then_some(false),
-            Op::Cut => {
-                if arg == 0 {
-                    match on {
-                        None => (!in_tool).then_some(false),
-                        Some((_, State::OnOpposite)) => (!in_tool).then_some(false),
-                        _ => None,
+        // (An internal face's pieces: none, live has no internal faces.)
+        keep[pi] = if cx.faces[f].internal {
+            None
+        } else {
+            match op {
+                // Coincident pieces facing one way: the first argument's is kept; facing each other: none.
+                Op::Fuse => (!in_any && ons.iter().all(|&(t, st)| st == State::OnSame && cx.solids[t].arg > arg)).then_some(false),
+                Op::Cut => {
+                    if arg == 0 {
+                        match on {
+                            None => (!in_tool).then_some(false),
+                            Some((_, State::OnOpposite)) => (!in_tool).then_some(false),
+                            _ => None,
+                        }
+                    } else if tools_on {
+                        None
+                    } else {
+                        (on.is_none() && in_obj && !in_tool).then_some(true)
                     }
-                } else if tools_on {
-                    None
-                } else {
-                    (on.is_none() && in_obj && !in_tool).then_some(true)
                 }
+                Op::Common => match on {
+                    None => (in_any).then_some(false),
+                    Some((_, State::OnSame)) => (arg == 0).then_some(false),
+                    _ => None,
+                },
             }
-            Op::Common => match on {
-                None => (in_any).then_some(false),
-                Some((_, State::OnSame)) => (arg == 0).then_some(false),
-                _ => None,
-            },
         };
     }
     // Coincident pieces: each goes to the first argument's (each has one, split the same way).
