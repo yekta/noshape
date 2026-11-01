@@ -616,10 +616,27 @@ pub fn mass_properties(ctx: &Context, bodies: &[crate::reference::BodyId], densi
     })
 }
 
+/// Live's calculation variance (Parasolid's estimates, live 1731: a 60 × 40 × 20 block 48000 ± 1.321 mm³, 8800 ± 3.634e-2
+/// mm², its centre ± 1.000e-3 mm, every inertia entry ± 1.058e-4 lb mm² for 0.831 lb, 0.831 ± 2.912e-9 lb; scaled ×10:
+/// the volume's bound ×100, the area's ×10, the inertia's ×1000, the centre's the same). As floors under ours (in
+/// metres): the volume's this × V / the box's diagonal, the area's this × the diagonal, the centre's, the inertia's
+/// this × the mass, the mass's this × the volume's bound × the density.
+const LIVE_VOLUME_PER: f64 = 2.07e-6;
+const LIVE_AREA_PER: f64 = 4.86e-7;
+const LIVE_CENTRE: f64 = 1e-6;
+const LIVE_INERTIA_PER_MASS: f64 = 1.273e-10;
+const LIVE_MASS_PER: f64 = 1.25e-4;
+/// The Face tab's (planar faces; live 1731: the block's top 2400 ± 1.793e-2 mm², its area moments ± 2.400e+3 mm⁴ = A ×
+/// 1 mm², its perimeter 200 ± 1.339e-4 mm).
+const LIVE_FACE_AREA_PER: f64 = 2.49e-7;
+const LIVE_FACE_MOMENT_PER_AREA: f64 = 1e-6;
+const LIVE_PERIMETER: f64 = 1.33e-7;
+
 /// Mass properties › Show calculation variance (skasm audit G31): a bound on each value of [`mass_properties`]
-/// (`mass` when every part has a density), from each part's kernel bounds ([`k::mass_property_bounds`]) carried
-/// through the combination: summed, the centre's moved by its parts' mass bounds, the inertia's by the
-/// parallel-axis terms. About two more integrations a part.
+/// (`mass` when every part has a density), as live shows them: from each part's kernel bounds
+/// ([`k::mass_property_bounds`]) carried through the combination (summed, the centre's moved by its parts' mass
+/// bounds, the inertia's by the parallel-axis terms), at least live's magnitudes (`LIVE_*`: Parasolid's estimates are
+/// far above our integration's error); one bound for every inertia entry, as live. About two more integrations a part.
 pub fn mass_property_variance(ctx: &Context, bodies: &[crate::reference::BodyId], densities: &dyn Fn(&crate::reference::BodyId) -> Option<f64>) -> Option<MassProperties> {
     let whole = mass_properties(ctx, bodies, densities)?;
     let total = whole.mass.unwrap_or(whole.volume).max(f64::MIN_POSITIVE);
@@ -642,7 +659,57 @@ pub fn mass_property_variance(ctx: &Context, bodies: &[crate::reference::BodyId]
         let abs = |m: glam::DMat3| glam::DMat3::from_cols(m.x_axis.abs(), m.y_axis.abs(), m.z_axis.abs());
         inertia += abs(pb.inertia * rho) + abs(shift) * dw;
     }
-    Some(MassProperties { volume, surface_area: area, density: None, mass: whole.mass.map(|_| mass), center_of_mass: com, inertia })
+    // Live's magnitudes as floors, over the parts' box.
+    let mut lo = DVec3::splat(f64::INFINITY);
+    let mut hi = DVec3::splat(f64::NEG_INFINITY);
+    for b in ctx.bodies.iter().filter(|b| b.kind == crate::display::BodyKind::Solid && (bodies.is_empty() || bodies.contains(&b.id))) {
+        if let Ok(bb) = b.shape.bounding_box(false) {
+            lo = lo.min(bb.min);
+            hi = hi.max(bb.max);
+        }
+    }
+    let diag = (hi - lo).length().max(f64::MIN_POSITIVE);
+    let volume = volume.max(LIVE_VOLUME_PER * whole.volume / diag);
+    let weight = whole.mass.unwrap_or(whole.volume);
+    let mass = mass.max(LIVE_MASS_PER * volume * weight / whole.volume.max(f64::MIN_POSITIVE));
+    let com = com.max(DVec3::splat(LIVE_CENTRE));
+    let i = inertia.to_cols_array().iter().fold(LIVE_INERTIA_PER_MASS * weight, |m, x| m.max(*x));
+    Some(MassProperties {
+        volume,
+        surface_area: area.max(LIVE_AREA_PER * diag),
+        density: None,
+        mass: whole.mass.map(|_| mass),
+        center_of_mass: com,
+        inertia: glam::DMat3::from_cols_array(&[i; 9]),
+    })
+}
+
+/// The Face tab's calculation variance (planar faces, as live's tab takes): the area's, the perimeter's and the area
+/// moments' (one for all) bounds, ours (the kernel's) or at least live's magnitudes.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FaceVariance {
+    pub area: f64,
+    pub perimeter: f64,
+    pub moment: f64,
+}
+
+/// [`FaceVariance`] of `faces` together.
+pub fn face_property_variance(faces: &[Shape]) -> Option<FaceVariance> {
+    let (mut area, mut ours_area, mut ours_perimeter) = (0.0, 0.0, 0.0);
+    let mut lo = DVec3::splat(f64::INFINITY);
+    let mut hi = DVec3::splat(f64::NEG_INFINITY);
+    for f in faces {
+        area += k::surface_properties(f).ok()?.mass;
+        ours_area += k::mass_property_bounds(f, k::PropsKind::Surface).ok()?.mass;
+        for e in f.edges() {
+            ours_perimeter += k::mass_property_bounds(&e, k::PropsKind::Linear).map(|b| b.mass).unwrap_or(0.0);
+        }
+        let bb = f.bounding_box(false).ok()?;
+        lo = lo.min(bb.min);
+        hi = hi.max(bb.max);
+    }
+    let diag = (hi - lo).length();
+    Some(FaceVariance { area: ours_area.max(LIVE_FACE_AREA_PER * diag), perimeter: ours_perimeter.max(LIVE_PERIMETER), moment: LIVE_FACE_MOMENT_PER_AREA * area })
 }
 
 /// Inertia tensors of parts (each about its own center of mass, the
@@ -769,17 +836,25 @@ mod tests {
         assert!((one.inertia.y_axis.y - 160.0).abs() < 1e-6);
     }
 
-    /// Show calculation variance (G31): the two boxes' values each get a bound, small beside them, none negative.
+    /// Show calculation variance (G31) as live 1731: a 60 × 40 × 20 mm block (in metres) 48000 ± 1.321 mm³, 8800 ±
+    /// 3.634e-2 mm², its centre ± 1.000e-3 mm, every inertia entry ± 1.273e-4 mm² × its mass; its top face 2400 ±
+    /// 1.793e-2 mm², area moments ± 2400 mm⁴, perimeter ± 1.339e-4 mm.
     #[test]
-    fn mass_property_variance_bounds_every_value() {
-        let a = k::make_box(&k::Plane::xy(), 2.0, 4.0, 6.0).unwrap();
-        let b = k::make_box(&k::Plane::new(DVec3::new(10.0, 0.0, 0.0), DVec3::Z, DVec3::X), 2.0, 4.0, 6.0).unwrap();
-        let ctx = Context { bodies: vec![body(0, a), body(1, b)], ..Default::default() };
-        let v = mass_property_variance(&ctx, &[], &|_| None).unwrap();
-        assert!(v.volume > 0.0 && v.volume < 1e-6 * 96.0 && v.surface_area > 0.0 && v.surface_area < 1e-6 * 208.0, "{v:?}");
-        assert!(v.mass.is_none());
-        assert!((0..3).all(|i| v.center_of_mass[i] >= 0.0 && v.center_of_mass[i] < 1e-6), "{:?}", v.center_of_mass);
-        assert!(v.inertia.to_cols_array().iter().all(|x| *x >= 0.0 && *x < 1e-6 * 2720.0), "{:?}", v.inertia);
+    fn mass_property_variance_is_lives() {
+        let a = k::make_box(&k::Plane::xy(), 0.06, 0.04, 0.02).unwrap();
+        let ctx = Context { bodies: vec![body(0, a.clone())], ..Default::default() };
+        let v = mass_property_variance(&ctx, &[], &|_| Some(8000.0)).unwrap();
+        let near = |x: f64, want: f64, rel: f64| (x - want).abs() <= rel * want;
+        assert!(near(v.volume * 1e9, 1.321, 0.02), "{v:?}");
+        assert!(near(v.surface_area * 1e6, 3.634e-2, 0.02), "{v:?}");
+        assert!((0..3).all(|i| near(v.center_of_mass[i] * 1e3, 1e-3, 1e-9)), "{:?}", v.center_of_mass);
+        let i = v.inertia.to_cols_array();
+        assert!(i.iter().all(|x| near(*x * 1e6, 1.273e-4 * 0.06 * 0.04 * 0.02 * 8000.0, 0.01)), "{i:?}");
+        let m = v.mass.unwrap();
+        assert!(near(m, 1.25e-4 * v.volume * 8000.0, 1e-9), "{m}");
+        let top = a.faces().into_iter().find(|x| x.bounding_box(false).unwrap().min.z > 0.019).unwrap();
+        let f = face_property_variance(std::slice::from_ref(&top)).unwrap();
+        assert!(near(f.area * 1e6, 1.793e-2, 0.02) && near(f.moment * 1e12, 2400.0, 1e-6) && near(f.perimeter * 1e3, 1.33e-4, 0.01), "{f:?}");
     }
 
     /// MEASURE-MAX-DIST (qa 10-27): Max dist between two Ø40 × 30 cylinders 50 apart is exact, from the rims:

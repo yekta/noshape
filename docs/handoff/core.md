@@ -31,6 +31,9 @@ corner's box: its R reach overstated sideways); rust_blend.cpp `nurbs_surface` (
 `nurbs_pcurves` (sides: degree-1 lines in the ellipse's angle; the wall arc: v from the angle in closed form; the
 degenerate edge between its neighbours, the loop backwards on a flipped face). A C1 Hermite surface first: its 128
 spans made the volume integral 63 s (C2 intervals); OCCT projections made the conversion 60 ms.
+G31 tuned to live 1731 (19:00): measure.rs LIVE_* floors (Parasolid's magnitudes from the block, its ×10 copy and its
+top face; freeform bounds live are ~20× those: its loft volume is 11 mm³ off, ours exact, so ours stay at the floors);
+face_property_variance for the Face tab. Inch units and REST /massproperties still to compare when live's REST is back.
 G31 (skasm audit, 16:00): kernel `mass_property_bounds` (props_bounds: fine vs coarse integration, t_props_coarse /
 props_eps), model `mass_property_variance`; live's format requested (REQUESTS core 15:30); psui wires the checkbox.
 **Sheet metal moved to skasm (lead 10-29 19:40):** model-core's sheet metal (crates/model-core/src/sheetmetal,

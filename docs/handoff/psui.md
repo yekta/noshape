@@ -713,3 +713,10 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
   sit at that floor. Live's format and magnitude are asked in REQUESTS (core 2026-11-01 15:30, G31); I'll tune the
   scale to live's numbers when they come. The checkbox in part-studio-ui menus.rs / assembly_mass.rs is yours to
   wire: append " ± <bound>" in the dialog's units as live shows it.
+- (11-01 19:00) Live's answer (behaviours "core (2026-11-01, P2 audit G31)"): with the box ticked each field reads
+  "<value> <unit> ± <bound> <unit>" in the same field, the bound always d.ddde±x ("1.321e+0", "2.912e-9"), the value as
+  usual. Parts: Mass, Volume, Surface area, Center of mass X / Y / Z, the inertia grid (one bound for every cell; the
+  text cut with "…" in the narrow cells). Face tab (planar faces only): Surface area, Perimeter, Area moments, Polar
+  moment. `mass_property_variance` now gives live's magnitudes (Parasolid's: 48000 ± 1.321 mm³ for a 60 × 40 × 20
+  block, the centre ± 1.000e-3 mm), and `regen::measure::face_property_variance(faces)` the Face tab's (area,
+  perimeter, area moments).
