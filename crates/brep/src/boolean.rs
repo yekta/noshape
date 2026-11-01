@@ -1621,7 +1621,9 @@ impl Ctx<'_> {
         for (f, g) in [(fs, ft), (ft, fs)] {
             let (lo, hi) = (self.faces[g].lo, self.faces[g].hi);
             for p in self.face_samples(f) {
-                if !boxes_meet(p, p, lo, hi, tol) {
+                // (Past the other's box: off a free-form patch, so not a sample of where they coincide; a plane's,
+                // cylinder's or cone's surface goes on there (a B-spline face rising off a plane it starts on).)
+                if matches!(self.faces[g].s, Surf::Nurbs { .. }) && !boxes_meet(p, p, lo, hi, tol) {
                     continue;
                 }
                 if free::surface_distance(&self.faces[g], p) > tol {

@@ -264,6 +264,24 @@ fn an_input_edge_inside_a_face_stays_in_it() {
     assert!(c.objects.iter().chain(&c.tools).any(internal), "no INTERNAL edge in the arguments");
 }
 
+/// A fuse whose plane-cylinder sections OCCT gives round the other way (its ellipses' axes against ours, recorded):
+/// noshape's Boolean takes it on OCCT's curves, valid, OCCT's volume and counts.
+#[test]
+fn an_ellipse_round_the_other_way() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "1310d7e980382436").expect("the recorded fuse");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
+    let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&r.shape), [c.summary.faces, c.summary.edges, c.summary.vertices]);
+}
+
 /// The B94.6 knurl's cut through noshape's Boolean (its grooves' end caps share the cylinder's end planes and each
 /// other's: a piece on the object and a tool, or on two tools, taken), as OCCT's: faces, edges, vertices, validity,
 /// every history record (each output where OCCT's is, within 2 µm; an edge's ends within 20 µm, below), the volume

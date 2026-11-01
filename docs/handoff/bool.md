@@ -1079,6 +1079,23 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## OCCT's ellipse round the other way; a B-spline face rising off a plane not coincident with it (11-01 10:14 UTC)
+- "An ellipse unlike OCCT's sections" (13 cases, 26 s): OCCT's ellipse of a plane and a cylinder had our centre
+  and axis the other way round, and only the same axis matched. Now matched either way: a reversed one
+  (`EllEdge::reversed`) gives the part from our end to our start. Its edge is made from our end vertex to our start
+  on OCCT's curve and pcurves, and each of its uses in a face flips again (`flipped`).
+- `same_surface` (coincident faces of different kinds) skipped samples outside the other face's box. A B-spline
+  face rising off a plane it starts on had only its samples along the plane tested, and so came out coincident
+  with the plane ("coincident pieces differ"). The box skip now applies against a free-form patch only. A plane's,
+  cylinder's or cone's surface goes on past its face.
+- T1 bool_patterns::an_ellipse_round_the_other_way (tests/data/booleans/1310d7e980382436, a fuse of 25). Replays why35:
+  one more taken in every set but the main corpus, 0 differ. Left: the same cases then reach "a new edge on a free-form face". Projecting its
+  curve, as OCCT's builder would, takes them (763e60bc, d33e88ff equivalent). But b7eb72a8 (a fuse of 17) then
+  differs after the unify: ours 14 faces / 30 edges, OCCT's 18 / 39 (the same before it). Not landed; to look at.
+- The apex WIP (rulings of any curve kind at a cone's apex: /root/bool-scratch/apex-any-kind.patch) moves those 3
+  cases to "an edge's piece without ends". "Two edges leave a vertex in one direction" (6): seam cases, the same
+  curve twice with its ends' places swapped, or two vertices at one place on a cylinder's parameter plane.
+
 ## Inputs with INTERNAL edges, two vertices of one argument (11-01 09:21 UTC)
 - An input face's INTERNAL edges ("an internal edge", 39 cases) are no longer declined.
   - to_body passes them as (face, edge) pairs (`Body::face_inner_edges`). Each face keeps them (`GFace::inner`),

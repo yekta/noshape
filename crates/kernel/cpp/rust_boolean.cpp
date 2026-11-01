@@ -616,6 +616,8 @@ struct EllEdge
   TopoDS_Face               face[2];
   occ::handle<Geom2d_Curve> pcurve[2];
   double                    t0 = 0, t1 = 0, tol = 0;
+  // OCCT's ellipse round the other way (its axis against ours): the edge runs from its end to its start.
+  bool reversed = false;
 };
 
 // OCCT's sections of pairs of the arguments' faces (arg, face, arg, face; the earlier argument's first).
@@ -815,17 +817,21 @@ const char* ellipse_edge(const BrepResult& r, const std::vector<const OcShape*>&
     if (el.IsNull())
       continue;
     const gp_Elips g = el->Elips();
-    if (!same(g.Location(), g.Axis().Direction(), g.MajorRadius()))
+    // (OCCT's round the other way (its axis against ours): the same curve, its part from our end to our start.)
+    const bool back = g.Axis().Direction().Dot(n) < 0;
+    if (!same(g.Location(), back ? g.Axis().Direction().Reversed() : g.Axis().Direction(), g.MajorRadius()))
       continue;
+    const gp_Pnt& e0 = back ? p1 : p0;
+    const gp_Pnt& e1 = back ? p0 : p1;
     const double first = c->FirstParameter(), last = c->LastParameter();
     // Parameters within the tolerance along it (its speed is at least its minor radius): a start just short of a
     // turn past OCCT's first is at its first (a closed one starting where OCCT's does), ends just outside OCCT's
     // range at its ends.
     const double eps = std::max(1e-9, tol / g.MinorRadius());
-    double       t0  = first + turns(ElCLib::Parameter(g, p0) - first);
+    double       t0  = first + turns(ElCLib::Parameter(g, e0) - first);
     if (t0 > 2 * M_PI + first - eps || (t0 > last + eps && t0 - 2 * M_PI >= first - eps))
       t0 -= 2 * M_PI;
-    double d = turns(ElCLib::Parameter(g, p1) - t0);
+    double d = turns(ElCLib::Parameter(g, e1) - t0);
     if (closed || d < 1e-12)
       d = 2 * M_PI;
     if (t0 < first - eps || t0 + d > last + eps)
@@ -849,6 +855,7 @@ const char* ellipse_edge(const BrepResult& r, const std::vector<const OcShape*>&
     out.pcurve[1] = ic.SecondCurve2d();
     out.t0        = t0;
     out.t1        = t0 + d;
+    out.reversed  = back;
     // The pave filler's section tolerance: the curve's and the faces' (PerformFF; MakeBlocks adds the tangential
     // one, which CorrectToleranceOfSE takes off again).
     out.tol = std::max({ic.Tolerance(), BRep_Tool::Tolerance(fa), BRep_Tool::Tolerance(fb)});
@@ -990,6 +997,8 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
   }
   // Edges: the input's own, a piece on its curve, or new on a line, circle or ellipse.
   std::vector<TopoDS_Edge> es(ne);
+  // (Edges made on OCCT's curve round the other way: from our end to our start, every use the other way.)
+  std::vector<char> flipped(ne, 0);
   std::vector<EllEdge>     ells(ne);
   Sections                 sections;
   // (Each loop checks the cancel every 256: the 45 / 45 knurl's result took over a second to build after it.)
@@ -1196,8 +1205,9 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       return "an edge against its curve";
     TopoDS_Edge e;
     bb.MakeEdge(e, c, loc, tol_e);
-    bb.Add(e, vs[v0].Oriented(TopAbs_FORWARD));
-    bb.Add(e, vs[v1].Oriented(TopAbs_REVERSED));
+    flipped[i] = !ells[i].curve.IsNull() && ells[i].reversed && c == ells[i].curve;
+    bb.Add(e, vs[flipped[i] ? v1 : v0].Oriented(TopAbs_FORWARD));
+    bb.Add(e, vs[flipped[i] ? v0 : v1].Oriented(TopAbs_REVERSED));
     bb.Range(e, t0, t1);
     es[i] = e;
   }
@@ -1476,7 +1486,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         for (uint32_t k = u0; k < u1; ++k)
         {
           const TopoDS_Edge& e = es[b.uses[k] / 2];
-          starts.push_back(TopExp::FirstVertex(TopoDS::Edge(e.Oriented(b.uses[k] % 2 == 1 ? TopAbs_REVERSED : TopAbs_FORWARD)), true));
+          starts.push_back(TopExp::FirstVertex(TopoDS::Edge(e.Oriented((b.uses[k] % 2 == 1) != (flipped[b.uses[k] / 2] != 0) ? TopAbs_REVERSED : TopAbs_FORWARD)), true));
           seen.push_back(b.uses[k] / 2);
         }
         std::sort(seen.begin(), seen.end());
@@ -1488,7 +1498,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       for (uint32_t k = 0; k < u1 - u0; ++k)
       {
         const uint32_t u    = b.uses[mirrored || pinched ? u1 - 1 - k : u0 + k];
-        const bool     back = (u % 2 == 1) != rev;
+        const bool     back = ((u % 2 == 1) != rev) != (flipped[u / 2] != 0);
         bb.Add(w, es[u / 2].Oriented(back ? TopAbs_REVERSED : TopAbs_FORWARD));
       }
       if (round)
