@@ -21,6 +21,12 @@ use std::time::{Duration, Instant};
 
 /// Regeneration time limit for one feature.
 const TIME_LIMIT: Duration = Duration::from_secs(60);
+/// The longest a dialog's FeatureScript function (editing logic, a
+/// manipulator change function) may run: then the kernel work it is in is
+/// cancelled and the function fails, the fields staying as they are
+/// (RUST-EXTRUDE-SCOPE-SLOW: std's Extrude logic spent 7 minutes in one
+/// collision check, the CLI's feature add blocked on it).
+const DIALOG_LIMIT: Duration = Duration::from_secs(15);
 /// Stack for the evaluator (deeply recursive FeatureScript).
 const STACK_SIZE: usize = 256 << 20;
 
@@ -409,19 +415,30 @@ pub(crate) fn run_manipulator_change(
 fn call_and_diff(f: &Arc<noshape_featurescript::ir::OverloadSet>, args: Vec<Value>, name: &str, units: &noshape_units::UnitPrefs, decls: &[ParamDecl], new_def: &Value, news: &ParamValues, cx: &Arc<FsContext>) -> Option<ParamValues> {
     let func = Value::Function(noshape_featurescript::value::Shared::new(noshape_featurescript::value::Func::Overloads(f.clone())));
     let units = *units;
+    // The kernel's cancel flag for the call, raised at the limit (a timer woken when the call ends).
+    let stop = std::sync::atomic::AtomicBool::new(false);
+    let (done, timer) = std::sync::mpsc::channel::<()>();
     std::thread::scope(|s| {
+        let stop_at_limit = &stop;
+        s.spawn(move || {
+            if matches!(timer.recv_timeout(DIALOG_LIMIT), Err(std::sync::mpsc::RecvTimeoutError::Timeout)) {
+                stop_at_limit.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        });
+        let stop = &stop;
         std::thread::Builder::new()
             .stack_size(STACK_SIZE)
-            .spawn_scoped(s, || {
+            .spawn_scoped(s, move || {
+                let _done = done;
                 let mut i = Interp::new();
-                i.set_deadline(Some(Instant::now() + TIME_LIMIT));
+                i.set_deadline(Some(Instant::now() + DIALOG_LIMIT));
                 // NOSHAPE_FS_PROFILE=1: the call's time and its slowest std lines.
                 let profile = std::env::var_os("NOSHAPE_FS_PROFILE").is_some();
                 if profile {
                     i.profile = Some(Default::default());
                 }
                 let t = Instant::now();
-                let out = i.call_value(&func, args);
+                let out = noshape_kernel::with_cancel(stop, || i.call_value(&func, args));
                 if profile {
                     let mut lines: Vec<_> = i.profile.take().map(|p| p.times.into_iter().collect()).unwrap_or_default();
                     lines.sort_by_key(|l| std::cmp::Reverse(l.1));
