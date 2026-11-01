@@ -2171,6 +2171,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     }
                     color_lines_since(&mut g, cad_mark, vtab.section_line.color);
                     label_since(&mut g, t0, &vtab.section_label);
+                    // The model point it follows: a light-blue round grip (live
+                    // 25787; dragging the line from it onto another point
+                    // re-attaches it).
+                    if let Some((_, at)) = &v.cut_anchor {
+                        g.grips.push(super::sheet::Grip { pick, pos: ppl.to_sheet(*at), kind: super::sheet::GripKind::Origin });
+                    }
                     // Its point lost (live 1625): the line, arrows and letters
                     // red, a red dot where the point was.
                     if v.cut_lost {

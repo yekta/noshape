@@ -2567,6 +2567,10 @@ fn section_line_follows_its_point() {
     drawing.sheets[0].view_mut(id).unwrap().cut_anchor = Some((gone, p));
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     assert!(built.geometry.colors.iter().any(|c| c.rgb == [0xdd, 0x52, 0x28]));
+    // The anchor shows as a light-blue round grip on the parent (live 25787).
+    let ppl = built.placements.iter().find(|pl| pl.id == ViewId(1)).unwrap();
+    let at = ppl.to_sheet(p);
+    assert!(built.geometry.grips.iter().any(|gr| gr.kind == sheet::GripKind::Origin && (gr.pos[0] - at[0]).abs() < 1e-9 && (gr.pos[1] - at[1]).abs() < 1e-9));
 }
 
 /// Synchronize breaks from parent (live request 1630): a projected view
