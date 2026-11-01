@@ -6,7 +6,7 @@
 use super::bshared::{add_wire_bodies, canonical_x, chain_wires, curve_edges, extent_along, face_shapes, order_chain, replace_wire_body, sample_chain, sketch_edge};
 use crate::display::BodyKind;
 use crate::reference::Reference;
-use crate::regen::eval::{EvalCtx, FResult, FeatureError, err};
+use crate::regen::eval::{EvalCtx, FResult, FeatureError, err, err_at};
 use glam::{DQuat, DVec3};
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
@@ -1192,11 +1192,14 @@ pub fn routing_curve(ev: &mut EvalCtx) -> FResult<()> {
         pts.pop();
         tangents.pop();
     }
-    if closed && pts.len() < 3 {
-        return err("A closed routing curve needs at least three distinct points");
+    // std's texts on the Points list (live 1722); the title reads
+    // "Routing curve (0 mm)" then.
+    ev.computed.push(("curveLength".into(), crate::display::ComputedValue::Length(0.0)));
+    if !closed && pts.len() < 2 {
+        return err_at(&["points"], "Create at least two non-coincident points.");
     }
-    if pts.len() < 2 {
-        return err("A routing curve needs at least two distinct points");
+    if closed && pts.len() < 3 {
+        return err_at(&["points"], "Create at least three non-coincident points.");
     }
     let wire = if ev.is("curveType", "POLYLINE") {
         let global = ev.length("bendRadius")?;
@@ -1206,6 +1209,10 @@ pub fn routing_curve(ev: &mut EvalCtx) -> FResult<()> {
         let t = if tangents.iter().any(|t| t.length_squared() > 0.0) { tangents } else { Vec::new() };
         k::make_wire(&[k::make_interpolated_spline(&pts, &t, closed)?])?
     };
+    // The feature's name: "Routing curve (61.825 mm)" (std's name template).
+    let length = wire.length().unwrap_or(0.0);
+    ev.computed.retain(|(k, _)| k != "curveLength");
+    ev.computed.push(("curveLength".into(), crate::display::ComputedValue::Length(length)));
     add_wire_bodies(ev, vec![wire])
 }
 

@@ -493,6 +493,11 @@ pub fn display_name_computed(f: &Feature, shown: &dyn Fn(&str) -> Option<String>
     {
         return n;
     }
+    // std's name template "Routing curve (#curveLength)" (live 1722:
+    // "Routing curve (61.825 mm)", "(0 mm)" until it builds).
+    if f.type_id == "routingCurve" && !f.custom_name {
+        return format!("Routing curve ({})", shown("curveLength").unwrap_or_else(|| "0 mm".into()));
+    }
     if f.type_id != "assignVariable" || f.custom_name {
         return f.name.clone();
     }

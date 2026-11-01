@@ -342,14 +342,16 @@ pub(crate) fn run_editing_logic(
     }
     // After (context, id, oldDefinition, definition) each function takes what
     // its parameters' types ask for: `isCreating` (boolean),
-    // `specifiedParameters` (map), `hiddenBodies` (Query); std's cPlaneLogic
-    // takes none of them, filletEditLogic all three.
+    // `specifiedParameters` (map), `hiddenBodies` (Query), `clickedButton`
+    // (string); std's cPlaneLogic takes none of them, filletEditLogic three.
     let mut args = vec![cx.value(), host::id_value(&[Arc::<str>::from(feature.to_string())]), old_def, new_def.clone()];
     let decl = f.fns.iter().max_by_key(|d| d.arity())?;
     for t in decl.param_types.iter().skip(4) {
         args.push(match t {
             Some(noshape_featurescript::ir::TypeRef::Std(noshape_featurescript::value::StdType::Boolean)) => Value::bool(creating),
             Some(noshape_featurescript::ir::TypeRef::Std(noshape_featurescript::value::StdType::Map)) => Value::map(flags.clone()),
+            // `clickedButton` (std Routing curve): no dialog button clicked.
+            Some(noshape_featurescript::ir::TypeRef::Std(noshape_featurescript::value::StdType::String)) => Value::str(""),
             _ => query_of_refs(&cx, &hidden),
         });
     }
@@ -386,7 +388,7 @@ pub(crate) fn run_editing_logic(
                     if v.is_undefined() || v == was {
                         continue;
                     }
-                    if let Some(pv) = editing_value(&mut i, &cx, d, v, &units) {
+                    if let Some(pv) = editing_value(&mut i, &cx, d, v, &units, &news) {
                         changed.set(&d.id, pv);
                     }
                 }
@@ -400,7 +402,20 @@ pub(crate) fn run_editing_logic(
 
 /// A definition value an editing logic function returned, as the
 /// parameter value of `d` (arrays item by item); `None`: not representable.
-fn editing_value(i: &mut Interp, cx: &Arc<FsContext>, d: &ParamDecl, v: &Value, units: &noshape_units::UnitPrefs) -> Option<ParamValue> {
+/// `copyParameter("points[0].dx")` copies that value of `src` (the
+/// dialog's values), expression and all (std Routing curve, Variable).
+fn editing_value(i: &mut Interp, cx: &Arc<FsContext>, d: &ParamDecl, v: &Value, units: &noshape_units::UnitPrefs, src: &ParamValues) -> Option<ParamValue> {
+    if let Value::Str(path, t) = v
+        && noshape_featurescript::value::tag_name(*t).as_ref() == "CopyParameter"
+    {
+        return match path.split_once('[') {
+            Some((arr, rest)) => {
+                let (k, field) = rest.split_once("].")?;
+                src.array(arr).get(k.parse::<usize>().ok()?)?.get(field).cloned()
+            }
+            None => src.get(path).cloned(),
+        };
+    }
     Some(match &d.kind {
         ParamKindFs::Query { .. } => ParamValue::Query(host::query::evaluate_refs(i, cx, v).ok()?),
         ParamKindFs::FeatureList { .. } => ParamValue::Query(host::feature_list_refs(v)),
@@ -425,7 +440,7 @@ fn editing_value(i: &mut Interp, cx: &Arc<FsContext>, d: &ParamDecl, v: &Value, 
                 for d in items {
                     let x = it.get(d.id.as_str());
                     if !x.is_undefined()
-                        && let Some(pv) = editing_value(i, cx, d, x, units)
+                        && let Some(pv) = editing_value(i, cx, d, x, units, src)
                     {
                         p.set(&d.id, pv);
                     }

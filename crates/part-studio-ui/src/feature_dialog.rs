@@ -584,6 +584,18 @@ impl FeatureDialog {
         if matches!(v, ParamValue::Expr(_)) {
             self.inputs.remove(path);
         }
+        // An array the logic rewrote: its items' number fields it changed show
+        // the new values (Routing curve's new point copies the active one).
+        if let ParamValue::Array(items) = &v {
+            let old = self.feature.params.array(path).to_vec();
+            for (k, it) in items.iter().enumerate() {
+                for (field, val) in it.0.iter() {
+                    if matches!(val, ParamValue::Expr(_)) && old.get(k).and_then(|o| o.get(field)) != Some(val) {
+                        self.inputs.remove(&format!("{path}.{k}.{field}"));
+                    }
+                }
+            }
+        }
         self.set_value_auto(path, v, cx);
     }
 

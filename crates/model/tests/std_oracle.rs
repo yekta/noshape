@@ -1905,6 +1905,34 @@ fn body_draft_editing_logic_runs_std() {
     assert!(got.contains(&format!("pullDirection={:?}", q(Reference::Plane(DatumPlane::Top)))), "{got:?}");
 }
 
+/// std's routingCurveEditLogic: a new routing curve starts with "Point 0"
+/// at the origin (live 1722).
+#[test]
+#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
+fn routing_curve_editing_logic_runs_std() {
+    let mut s = Studio::new();
+    s.add("routingCurve", |_| {});
+    let got = edit_logic(&s, &ParamValues::default(), &[]);
+    let points = got.iter().find(|x| x.starts_with("points=")).unwrap_or_else(|| panic!("{got:?}"));
+    assert!(points.contains("\"referenceType\": Enum(\"ORIGIN\")"), "{points}");
+    assert_eq!(points.matches("\"referenceType\"").count(), 1, "{points}");
+
+    // Add point: the new point copies the active one (live 1722).
+    let point = |dx: &str| {
+        let mut p = ParamValues::default();
+        p.set("referenceType", en("ORIGIN"));
+        p.set("dx", expr(dx));
+        p
+    };
+    let mut old = ParamValues::default();
+    old.set("points", ParamValue::Array(vec![point("30 mm")]));
+    s.ps.features.pop();
+    s.add("routingCurve", |p| p.set("points", ParamValue::Array(vec![point("30 mm"), ParamValues::default()])));
+    let got = edit_logic(&s, &old, &["points"]);
+    let points = got.iter().find(|x| x.starts_with("points=")).unwrap_or_else(|| panic!("{got:?}"));
+    assert_eq!(points.matches("\"dx\": Expr(ExprValue { text: \"30 mm\"").count(), 2, "{points}");
+}
+
 /// std's holeEditLogic through the host natives: a new hole's Merge scope is
 /// the part it reaches, and one sketched below the part flips into it
 /// (holeScopeFlipHeuristics: an opHole probe and evCollision containment,
