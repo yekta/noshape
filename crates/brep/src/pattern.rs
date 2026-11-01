@@ -298,3 +298,6 @@ mod tests {
 // h1 one
 
 // h1 one
+
+// r1 A
+// r1 A amended
