@@ -464,31 +464,21 @@ impl Pool {
     }
 
     /// The vertex `p` (its own tolerance `tp`) is: one within the Boolean's tolerance, or within the sum of the
-    /// two's own where that's more (OCCT's rule for tolerant vertices); none in the grey band past that.
+    /// two's own where that's more (OCCT's rule for tolerant vertices); none past that.
     fn find_tol(&self, p: DVec3, tp: f64) -> R<Option<u32>> {
         let half = 0.5 * self.tol;
         let mut found: Option<u32> = None;
         let mut take = |i: u32| -> R<()> {
             let ti = self.t[i as usize];
             let reach = self.tol.max(tp + ti);
-            // (Two inputs' vertices: OCCT's rule is the sum of their tolerances, nothing in between but rounding. A
-            // new vertex's tolerance is OCCT's own choice, at most ~1e-5: past that beside a tolerant one; else the
-            // grey band.)
-            let band = if tp > 0.0 && ti > 0.0 {
-                reach * (1.0 + 1e-9)
-            } else if tp + ti > self.tol {
-                reach + 1e-5
-            } else {
-                GREY * reach
-            };
+            // (OCCT's rule: together within the sum of the two's tolerances, apart past it, nothing in between; a
+            // sharp knurl tooth's sub-micrometre slivers kept as live keeps them.)
             let d = (self.p[i as usize] - p).length();
             if d <= reach {
                 if found.is_some_and(|f| f != i) {
                     return Err(Decline("a point near two vertices"));
                 }
                 found = Some(i);
-            } else if d <= band {
-                return Err(Decline("two vertices nearly coincide"));
             }
             Ok(())
         };
@@ -2435,8 +2425,6 @@ impl Ctx<'_> {
             }
             if off <= r {
                 on.push((t, w));
-            } else if off <= GREY * r {
-                return Err(Decline("a vertex nearly on an edge"));
             }
         }
         on.sort_by(|x, y| x.0.total_cmp(&y.0));
@@ -3899,7 +3887,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 r.inside = deeper(&lsegs, &r);
                 dist = distance2(r.inside, cx.bound(f)?);
             }
-            if dist <= GREY * tol {
+            if dist <= tol {
                 return Err(Decline("a piece's point near its face's boundary"));
             }
             if !inside2(r.inside, cx.bound(f)?) {
@@ -4123,7 +4111,44 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             Some(turned(pi).map_or_else(|| state_of(pi), Ok))
         }
     })?;
-    let all_states: Vec<R<Vec<(usize, State)>>> = first.into_iter().zip(rest).map(|(a, b)| a.or(b).expect("a piece's states")).collect();
+    let mut all_states: Vec<R<Vec<(usize, State)>>> = first.into_iter().zip(rest).map(|(a, b)| a.or(b).expect("a piece's states")).collect();
+    // (A thin piece whose point lies on another solid's face (a sharp knurl tooth's sub-micrometre sliver beside the
+    // cylinder): as its neighbour across a section with that solid's face, in and out the other way.)
+    for pi in 0..pieces.len() {
+        if !matches!(&all_states[pi], Err(Decline(w)) if *w == "a piece's point on another solid's face") {
+            continue;
+        }
+        let f = pieces[pi].face;
+        let mut got = None;
+        'find: for &(s, _) in pieces[pi].loops.iter().flatten() {
+            let lo = section_faces.partition_point(|x| x.0 < s);
+            for &(_, g) in section_faces[lo..].iter().take_while(|x| x.0 == s) {
+                let t = cx.faces[g].solid;
+                if g == f || t == cx.faces[f].solid {
+                    continue;
+                }
+                for &pn in &face_pieces[f] {
+                    if pn == pi || !pieces[pn].loops.iter().flatten().any(|x| x.0 == s) {
+                        continue;
+                    }
+                    if let Ok(st) = &all_states[pn]
+                        && st.iter().any(|&(u, x)| u == t && matches!(x, State::In | State::Out))
+                    {
+                        let flip = |x: State| match x {
+                            State::In => State::Out,
+                            State::Out => State::In,
+                            o => o,
+                        };
+                        got = Some(st.iter().map(|&(u, x)| (u, if u == t { flip(x) } else { x })).collect::<Vec<_>>());
+                        break 'find;
+                    }
+                }
+            }
+        }
+        if let Some(st) = got {
+            all_states[pi] = Ok(st);
+        }
+    }
     for (pi, states) in all_states.into_iter().enumerate() {
         let states = states?;
         let f = pieces[pi].face;

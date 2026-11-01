@@ -1115,13 +1115,21 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   tolerance only where it also lies on the other face. And an edge whose seven sample points are all past the
   tolerance is off the face (OCCT's rule), not "nearly on". Taken: 30/15 in 3.8 s (OCCT 42–81 s), 30/30 in 8.7 s (OCCT
   127–178 s), both equivalent to OCCT. Replays why28: the same cases taken in every set, 0 differ.
-- Still declined: 15/15 and 15/30 "two vertices nearly coincide", 15/45 "a piece's point near its face's boundary".
-  At a 15° tooth the side edge is under a micron outside the cylinder: the same slivers, inside our grey band.
 - Live's numbers for the rest (request 1696): every face count as ours (15/30 is 10436 there too). Volumes within 1e-5
   at helix 15° and 30°. At helix 45° ours is 2.2–5.9 mm³ low, more as the tooth angle rises (30/45 −2.19, 45/45 −3.45,
   60/45 −4.6, 80/45 −5.85); our Boolean equals OCCT's there, so the gap is the tools'. One live groove tool (cut1,
   HIGH): 44.73340 mm³ at 45/45, 77.02478 at 80/30; ours to compare (the knurl with its Boolean commented out),
   then a request to core if the sweep differs.
+- Tooth 15° (11-01 06:43 UTC, lead: decide the slivers by the rule that matches live, take them). At a 15° tooth the
+  side edge is under a micrometre outside the cylinder, and the kept slivers (live's face counts keep them) are that
+  thin. OCCT's rule is now the only one for two vertices and a vertex on an edge: together within the sum of their
+  tolerances, apart past it. The grey band past that declined "two vertices nearly coincide" and "a vertex nearly
+  on an edge", and a piece's point had to be 4 tol from its face's boundary (now tol). A piece whose point lies on
+  another solid's face takes its neighbour's state across a section with that face, in and out the other way. All
+  three taken, equivalent to OCCT: 15/15 12.7 s (OCCT 79 s), 15/30 37.6 s (187 s), 15/45 28.3 s (355 s) on a loaded
+  vibe2. Replays why29: 3 more taken in the main corpus, 1 more each in corpus2 and corpus3, 0 differ.
+- The T2 angle sweep now checks every pair against live's volume and faces (all 15 from requests 1615/1687/1696):
+  7e-5 at a 45° helix (the sweep's gap), 2e-5 else.
 - Recording Booleans (NOSHAPE_RECORD_BOOLEANS) adds per-face props for the summary: 45/45 took 128 s recorded, 19.5 s not.
 
 ## The knurl back on OCCT's path, fixed (11-01 01:44 UTC; lead's P0)
