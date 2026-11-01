@@ -2198,11 +2198,43 @@ impl Workspace {
             .tabs
             .iter()
             .filter_map(|t| match &t.content {
-                noshape_model::document::TabContent::File(f) if f.kind() == noshape_model::file_tab::FileKind::Template => Some(crate::drawing_create::DwtTab { name: t.name.clone(), document: document.clone(), data_base64: f.data_base64.clone() }),
+                noshape_model::document::TabContent::File(f) if f.kind() == noshape_model::file_tab::FileKind::Template => Some(crate::drawing_create::DwtTab { name: t.name.clone(), document: document.clone(), owner: String::new(), data_base64: f.data_base64.clone() }),
                 _ => None,
             })
             .collect();
         let dialog = cx.new(|cx| CreateDrawingDialog::new(req, default_name, metric, dwts, window, cx));
+        // The other documents' DWTs (live 1627: "Created by me" lists the
+        // DWTs exported from every document), read in the background.
+        let here = self.doc.read(cx).session.path.clone();
+        let dlg = dialog.downgrade();
+        cx.spawn(async move |_, cx| {
+            let (more, own) = cx
+                .background_spawn(async move {
+                    let docs = crate::start_library::Library::default().scan(&crate::start_library::ScanInput::current()).docs;
+                    let own = docs.iter().find(|d| d.path == here).map(|d| d.owner.clone());
+                    let mut more = Vec::new();
+                    for d in docs.iter().filter(|d| !d.broken && !d.trashed && d.path != here) {
+                        let Some(snap) = (|| {
+                            let store = noshape_store::Document::open_read_only(&d.path).ok()?;
+                            let head = store.head(store.default_branch().ok()?).ok()?;
+                            crate::derived::external_snapshot(&d.path, head).ok()
+                        })() else {
+                            continue;
+                        };
+                        for t in snap.ordered_tabs() {
+                            if let noshape_model::document::TabContent::File(f) = &t.content
+                                && f.kind() == noshape_model::file_tab::FileKind::Template
+                            {
+                                more.push(crate::drawing_create::DwtTab { name: t.name.clone(), document: d.name.clone(), owner: d.owner.clone(), data_base64: f.data_base64.clone() });
+                            }
+                        }
+                    }
+                    (more, own)
+                })
+                .await;
+            let _ = dlg.update(cx, |d, cx| d.add_dwts(more, own, cx));
+        })
+        .detach();
         let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &CreateDrawingEvent, window, cx| {
             if let CreateDrawingEvent::Create { name, template, source, suggested, dwt } = ev {
                 this.create_drawing_tab(name.clone(), (*template, dwt.as_deref().cloned()), source.clone(), *suggested, window, cx);

@@ -56,12 +56,15 @@ pub enum CreateDrawingEvent {
     Cancel,
 }
 
-/// A DWT tab of the document, listed under "Created by me" (live request
-/// 1627: text rows Template | Document | Owner).
+/// A DWT tab of the document or of another one, listed under "Created by
+/// me" (live request 1627: text rows Template | Document | Owner, the DWTs
+/// of every document).
 #[derive(Clone, Debug)]
 pub struct DwtTab {
     pub name: String,
     pub document: String,
+    /// The document's owner ("" while unknown).
+    pub owner: String,
     pub data_base64: std::sync::Arc<str>,
 }
 
@@ -101,6 +104,18 @@ impl CreateDrawingDialog {
     /// `metric`: the document works in millimeters (the Custom template's
     /// units; the list preselects ANSI_A_INCH, Onshape's first row). `default_name`: the name
     /// Onshape suggests ("Part 1 Drawing 1", or "Drawing 1" without a source).
+    /// The other documents' DWTs (found in the background), after this
+    /// document's; the owner of this document's rows too.
+    pub fn add_dwts(&mut self, more: Vec<DwtTab>, own_owner: Option<String>, cx: &mut Context<Self>) {
+        if let Some(o) = own_owner {
+            for t in self.dwts.iter_mut().filter(|t| t.owner.is_empty()) {
+                t.owner = o.clone();
+            }
+        }
+        self.dwts.extend(more);
+        cx.notify();
+    }
+
     pub fn new(req: CreateRequest, default_name: String, metric: bool, dwts: Vec<DwtTab>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let name = cx.new(|cx| InputState::new(window, cx).default_value(default_name));
         let rows = template_rows();
@@ -194,7 +209,8 @@ impl CreateDrawingDialog {
                 .child(div().w(px(200.)).child("Document"))
                 .child(div().flex_1().child("…")),
         );
-        // Created by me: the document's DWT tabs (text rows, live 1627).
+        // Created by me: the DWT tabs of this document, then of the others
+        // (text rows, live 1627).
         if self.source_filter == CREATED_BY_ME {
             if self.dwts.is_empty() {
                 list = list.child(div().px(px(10.)).py_2().text_size(px(13.)).text_color(pal.text_muted).child("No templates. Export a drawing as DWT (Store file in a new tab) to make one."));
@@ -213,7 +229,7 @@ impl CreateDrawingDialog {
                         .when(!sel, |d| d.hover(|d| d.bg(pal.row_hover)))
                         .child(div().w(px(209.)).truncate().child(t.name.clone()))
                         .child(div().w(px(200.)).truncate().child(t.document.clone()))
-                        .child(div().flex_1().child("…"))
+                        .child(div().flex_1().truncate().child(if t.owner.is_empty() { "…".to_string() } else { t.owner.clone() }))
                         .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
                             this.selected_dwt = Some(i);
                             if ev.click_count() >= 2 {
