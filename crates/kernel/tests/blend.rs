@@ -776,3 +776,24 @@ fn a_drafted_blocks_mixed_radius_corners_are_lives() {
     assert!((vol_mm3(&r) - 44304.933893372094).abs() < 0.05, "{}", vol_mm3(&r));
     assert_eq!(r.faces().len(), 18);
 }
+
+/// Blends that come close but stay apart are noshape's, as OCCT's: R4.99 round all twelve edges of a 40 x 20 x 10
+/// block (the top and bottom loops' blends 0.02 apart on the sides). Declined before: the two lines' distance was
+/// sampled (9.79 for 10) and each chain counted its ball's centre (r√2) as its reach.
+#[test]
+fn rust_blends_close_but_apart_are_occts() {
+    let block = make_box_corners(DVec3::ZERO, DVec3::new(40.0, 20.0, 10.0)).unwrap();
+    let edges = block.edges();
+    set_rust_blend(Some(false));
+    let occt = fillet(&block, &edges, 4.99).unwrap();
+    set_rust_blend(Some(true));
+    reset_blend_decline();
+    let ours = fillet(&block, &edges, 4.99);
+    set_rust_blend(None);
+    let why = last_blend_decline();
+    let ours = ours.unwrap();
+    assert_eq!(why, "", "declined");
+    assert!(ours.shape.is_valid());
+    let d = bool_corpus::Summary::of(&ours).differences(&bool_corpus::Summary::of(&occt));
+    assert!(d.is_empty(), "{}", d.join(", "));
+}

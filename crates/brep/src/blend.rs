@@ -132,6 +132,12 @@ fn point_edge_distance(b: &Body, e: &Edge, p: DVec3) -> Option<f64> {
 /// A lower bound of the distance between edges `a` (a line or an arc) and `o` (any edge whose points can be
 /// had): `o` sampled, less how far its chords may stray from it.
 fn edge_distance(b: &Body, a: &Edge, o: &Edge) -> Option<f64> {
+    // Two lines: exactly (sampled, two edges 10 mm apart came out 9.79: R4.99 round a 10 mm block declined).
+    if a.curve == Curve::Line && o.curve == Curve::Line {
+        let at = |e: &Edge| (b.vertices[e.v[0] as usize], b.vertices[e.v[1] as usize]);
+        let ((p0, p1), (q0, q1)) = (at(a), at(o));
+        return Some(segment_distance(p0, p1, q0, q1));
+    }
     const N: usize = 96;
     let mut best = f64::INFINITY;
     let mut prev: Option<DVec3> = None;
@@ -146,6 +152,36 @@ fn edge_distance(b: &Body, a: &Edge, o: &Edge) -> Option<f64> {
     }
     // (A sample's neighbours are a chord away: the curve between is within half a chord of one of them.)
     Some(best - 0.5 * chord)
+}
+
+/// The distance between segments p0 p1 and q0 q1.
+fn segment_distance(p0: DVec3, p1: DVec3, q0: DVec3, q1: DVec3) -> f64 {
+    let (d1, d2, r) = (p1 - p0, q1 - q0, p0 - q0);
+    let (a, e, f) = (d1.length_squared(), d2.length_squared(), d2.dot(r));
+    let (s, t) = if a <= f64::EPSILON && e <= f64::EPSILON {
+        (0.0, 0.0)
+    } else if a <= f64::EPSILON {
+        (0.0, (f / e).clamp(0.0, 1.0))
+    } else {
+        let c = d1.dot(r);
+        if e <= f64::EPSILON {
+            ((-c / a).clamp(0.0, 1.0), 0.0)
+        } else {
+            let bb = d1.dot(d2);
+            let den = a * e - bb * bb;
+            let mut s = if den > 1e-12 * a * e { ((bb * f - c * e) / den).clamp(0.0, 1.0) } else { 0.0 };
+            let mut t = (bb * s + f) / e;
+            if t < 0.0 {
+                t = 0.0;
+                s = (-c / a).clamp(0.0, 1.0);
+            } else if t > 1.0 {
+                t = 1.0;
+                s = ((bb - c) / a).clamp(0.0, 1.0);
+            }
+            (s, t)
+        }
+    };
+    ((p0 + d1 * s) - (q0 + d2 * t)).length()
 }
 
 /// A box round edge `e` (an arc's whole circle; a NURBS edge's poles).
@@ -768,6 +804,16 @@ fn down_edges(b: &Body, c: &Chain, ve: &[Vec<u32>], margin: f64) -> Result<Vec<O
     Ok(out)
 }
 
+/// How far chain `c`'s blend reaches from its link `i`'s edge. Each cross-section lies in the triangle of the edge's
+/// point and its two tangent points (`d1` into P, `d2` along the wall; a fillet's arc is inscribed in that angle, a
+/// chamfer is the chord), so within the larger of them; a closing arc's sphere or cone also round its centre; at
+/// the chain's ends a cap at an angle moves it on along the line (`ext`).
+fn extent(c: &Chain, i: usize) -> f64 {
+    let r = if c.closes.iter().any(|&x| x) { c.d1.max(c.d2).max(c.centre) } else { c.d1.max(c.d2) };
+    let end = |side: usize| c.ends[side].filter(|e| e.corner.is_none()).map_or(0.0, |e| e.ext);
+    r + if i == 0 { end(0) } else { 0.0 }.max(if i + 1 == c.k() { end(1) } else { 0.0 })
+}
+
 /// The blend's strips on P, the walls and the caps are clear of every other edge of those faces, and of any
 /// other chain's.
 fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chain, all: &[Chain], corners: &[Option<VCorner>], margin: f64) -> Result<(), Decline> {
@@ -849,7 +895,7 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
             if (j == i + 2 && c.closes[i + 1]) || (c.closed && i + k == j + 2 && c.closes[(j + 1) % k]) {
                 continue;
             }
-            if !far(c.links[i].edge, c.links[j].edge, 2.0 * reach)? {
+            if !far(c.links[i].edge, c.links[j].edge, extent(c, i) + extent(c, j))? {
                 return no("a chain whose blend meets itself");
             }
         }
@@ -858,13 +904,13 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
         if std::ptr::eq(o, c) {
             continue;
         }
-        for y in &o.links {
-            for x in &c.links {
+        for (j, y) in o.links.iter().enumerate() {
+            for (i, x) in c.links.iter().enumerate() {
                 let (ex, ey) = (&b.edges[x.edge as usize], &b.edges[y.edge as usize]);
                 if corner_vs.iter().any(|v| ex.v.contains(v) && ey.v.contains(v)) {
                     continue;
                 }
-                if !far(x.edge, y.edge, 2.0 * reach)? {
+                if !far(x.edge, y.edge, extent(c, i) + extent(o, j))? {
                     return no("two chains' blends close");
                 }
             }

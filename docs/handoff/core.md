@@ -81,6 +81,12 @@ deadlock in malloc).
   gdb on vibe4): the untracked crates/kernel/examples/core_scratch.rs `sampler::sample(|| ...)` writes raw stacks
   every 5 ms to stderr; ~/agents/profile.py <log> (vibe4; /root/core-scratch/profile.py) prints inclusive / self
   shares. Lib /root/core-scratch/occt0013/libTKFillet.a (backup occt-lib-backup/libTKFillet.a.pre0014), in /root/occt.
+- (09:40) blend.rs clearance: `segment_distance` (exact for two lines; edge_distance sampled them) and `extent(c, i)`
+  per link (max(d1, d2), a closing arc's centre, a cap's ext at the chain's ends; vertex-corner ends' ext is the
+  corner's reach, not counted). Tried first: ext on every link (20 declines) and none (2 cases taken that OCCT
+  can't build: R3 top edges ending on a 45° corner face, 282602b0 / dc63f515). Corpus tools: core_scratch.rs
+  `CASE=<name> [SHOW=1]` runs / prints one case (sampled); `NOSHAPE_BLEND_LIST=<reason>` in the replay lists them;
+  vibe4 ~/agents/blend-corpus.
 
 ## Mixed-radius corners (live 1686, 11-01 04:50): the next blend step
 - Live's Fillet holds one radius, so its mixed corners come from two Fillet features; the order doesn't matter. Each
