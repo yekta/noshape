@@ -200,8 +200,11 @@ pub(crate) enum EqKind {
     EllipseTangent,
     /// Inputs c, mx, my, minor, t, l0, l1: E(t) on the line.
     EllipseOnLine,
-    /// Sum of oriented curvatures at a joint (G2).
-    Curvature { a: CurvSpec, b: CurvSpec },
+    /// Sum of oriented curvatures at a joint (G2), times `scale` (the square
+    /// of a length of the geometry when it was built, so the residual is a
+    /// length as the positions' are: in 1/length it was too small next to
+    /// them for the solver to move a sketch-sized spline onto an arc, G16).
+    Curvature { a: CurvSpec, b: CurvSpec, scale: f64 },
     /// Inputs p, t, control points: component of S(t) - p (analytic custom gradient).
     SplinePoint { comp: u8, curve: Arc<Nurbs> },
     /// Inputs p, t, fit points: component of S(t) - p (numeric gradient).
@@ -214,11 +217,13 @@ pub(crate) enum EqKind {
     FitFitDir { na: usize, end_a: bool, end_b: bool, perp: bool },
     /// Sum of oriented end curvatures (G2) with a fit spline on either side:
     /// evaluated numerically.
-    CurvatureNum { a: CurvSide, b: CurvSide },
+    CurvatureNum { a: CurvSide, b: CurvSide, scale: f64 },
     /// A Flow joint: with `g3` the difference of the two sides' rates of
     /// change of curvature (equal across a G3 joint when each is taken away
     /// from it), else the sum of their curvatures (G2).
-    FlowNum { a: FlowSide, b: FlowSide, g3: bool },
+    /// Times `scale²` (G2) or `scale³` (G3) for a residual in lengths, as
+    /// [`EqKind::Curvature`] (`scale` a length of the geometry).
+    FlowNum { a: FlowSide, b: FlowSide, g3: bool, scale: f64 },
 }
 
 #[derive(Clone, Debug)]
@@ -351,9 +356,9 @@ fn kernel<T: Num>(kind: &EqKind, x: &[T]) -> T {
                 d.cross(de) / (d.norm() * de.norm())
             }
         }
-        EqKind::Curvature { a, b } => {
+        EqKind::Curvature { a, b, scale } => {
             let na = a.arity();
-            curv(a, &x[..na]) + curv(b, &x[na..])
+            (curv(a, &x[..na]) + curv(b, &x[na..])) * T::cst(*scale)
         }
         EqKind::SplinePoint { .. } | EqKind::FitPoint { .. } | EqKind::FitEndDir { .. } | EqKind::FitFitDir { .. } | EqKind::CurvatureNum { .. } | EqKind::FlowNum { .. } => {
             // only evaluated through `eval_f64`
@@ -683,11 +688,11 @@ impl Eq {
                 }
                 if *perp { t.dot(o) / den } else { t.perp_dot(o) / den }
             }
-            EqKind::CurvatureNum { a, b } => {
+            EqKind::CurvatureNum { a, b, scale } => {
                 let na = a.arity();
-                a.curvature(&x[..na]) + b.curvature(&x[na..])
+                (a.curvature(&x[..na]) + b.curvature(&x[na..])) * scale
             }
-            EqKind::FlowNum { a, b, g3 } => flow_residual(a, b, *g3, x),
+            EqKind::FlowNum { a, b, g3, scale } => flow_residual(a, b, *g3, x) * scale.powi(if *g3 { 3 } else { 2 }),
             EqKind::FitEndDir { at_end, perp, n } => {
                 let Some(c) = fit_curve(x, *n) else { return 0.0 };
                 let (a, b) = c.domain();
@@ -765,15 +770,17 @@ impl Eq {
                 fit_end_grad(&x[2 * na..], nb, false, *end_b, false, |q| dir_rel(ta, glam::DVec2::new(q[0], q[1]), perp), gb);
                 return dir_rel(ta, tb, perp);
             }
-            EqKind::FlowNum { a, b, g3 } => {
-                let (a, b, g3) = (a.clone(), b.clone(), *g3);
-                return small_grad(|q| flow_residual(&a, &b, g3, q), x, g);
+            EqKind::FlowNum { a, b, g3, scale } => {
+                let (a, b, g3, k) = (a.clone(), b.clone(), *g3, scale.powi(if *g3 { 3 } else { 2 }));
+                return small_grad(|q| flow_residual(&a, &b, g3, q) * k, x, g);
             }
-            EqKind::CurvatureNum { a, b } => {
+            EqKind::CurvatureNum { a, b, scale } => {
                 g.iter_mut().for_each(|v| *v = 0.0);
                 let na = a.arity();
                 let (ga, gb) = g.split_at_mut(na);
-                return a.curvature_grad(&x[..na], ga) + b.curvature_grad(&x[na..], gb);
+                let v = a.curvature_grad(&x[..na], ga) + b.curvature_grad(&x[na..], gb);
+                g.iter_mut().for_each(|v| *v *= scale);
+                return v * scale;
             }
             _ => {}
         }
@@ -1314,6 +1321,17 @@ impl<'a, L: Lookup> Builder<'a, L> {
         Ok((CurvSide::Spec(s), inp))
     }
 
+    /// A length of a curvature joint's two curves as they are now (the
+    /// larger of their sizes; lines don't count, they may be long).
+    fn joint_scale(&self, a: EntityId, b: EntityId) -> f64 {
+        let size = |e: EntityId| match self.geom(e) {
+            Ok(Geometry::Line { .. }) | Err(_) => 0.0,
+            _ => self.sk.curve(e).map_or(0.0, |c| c.size()),
+        };
+        let l = size(a).max(size(b));
+        if l.is_finite() && l > 1e-9 { l } else { 1.0 }
+    }
+
     fn flow_side(&self, id: EntityId, at_end: bool) -> Result<(FlowSide, SmallVec<[u32; 8]>), String> {
         match self.geom(id)? {
             Geometry::Line { .. } => Ok((FlowSide::Const { arc: None }, SmallVec::new())),
@@ -1643,9 +1661,10 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 let (a, b) = if tangent_rank(ka) <= tangent_rank(kb) { (*a, *b) } else { (*b, *a) };
                 let (sa, ia) = self.curv_side(a, c.hints.end_a)?;
                 let (sb, ib) = self.curv_side(b, c.hints.end_b)?;
+                let scale = self.joint_scale(a, b).powi(2);
                 match (sa, sb) {
-                    (CurvSide::Spec(sa), CurvSide::Spec(sb)) => self.push(EqKind::Curvature { a: sa, b: sb }, cat(&[&ia, &ib])),
-                    (sa, sb) => self.push(EqKind::CurvatureNum { a: sa, b: sb }, cat(&[&ia, &ib])),
+                    (CurvSide::Spec(sa), CurvSide::Spec(sb)) => self.push(EqKind::Curvature { a: sa, b: sb, scale }, cat(&[&ia, &ib])),
+                    (sa, sb) => self.push(EqKind::CurvatureNum { a: sa, b: sb, scale }, cat(&[&ia, &ib])),
                 }
                 Ok(())
             }
@@ -1658,8 +1677,9 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 let (sa, ia) = self.flow_side(a, c.hints.end_a)?;
                 let (sb, ib) = self.flow_side(b, c.hints.end_b)?;
                 let inputs = cat(&[&ia, &ib]);
-                self.push(EqKind::FlowNum { a: sa.clone(), b: sb.clone(), g3: false }, inputs.clone());
-                self.push(EqKind::FlowNum { a: sa, b: sb, g3: true }, inputs);
+                let scale = self.joint_scale(a, b);
+                self.push(EqKind::FlowNum { a: sa.clone(), b: sb.clone(), g3: false, scale }, inputs.clone());
+                self.push(EqKind::FlowNum { a: sa, b: sb, g3: true, scale }, inputs);
                 Ok(())
             }
             K::Distance { a, b, value, mode } => self.distance(*a, *b, *value, *mode, c),
@@ -1865,7 +1885,7 @@ mod tests {
             (EqKind::Linear { terms: smallvec![(1.0, Term::Dist), (-2.0, Term::Param)], c: 0.3 }, 5),
             (EqKind::Linear { terms: smallvec![(1.0, Term::PLDist), (1.0, Term::Param)], c: 0.0 }, 7),
             (EqKind::Linear { terms: smallvec![(1.0, Term::PLDistMid)], c: 0.0 }, 8),
-            (EqKind::Curvature { a: CurvSpec::Spline { alpha: 3.0, b1: 6.0, b0: 2.0 }, b: CurvSpec::Arc { sign: 1.0 } }, 10),
+            (EqKind::Curvature { a: CurvSpec::Spline { alpha: 3.0, b1: 6.0, b0: 2.0 }, b: CurvSpec::Arc { sign: 1.0 }, scale: 1.0 }, 10),
         ];
         let x10 = [0.1, 0.2, 1.3, 0.4, -0.5, 0.9, 0.7, -1.1, 2.0, 0.3];
         for (k, n) in kinds {
@@ -1913,7 +1933,7 @@ mod tests {
                     let mut x = fit.clone();
                     x.extend([0.0, 0.0, 0.01, 0.002]);
                     let a = CurvSpec::Arc { sign: 1.0 };
-                    check_grad(&Eq { kind: EqKind::CurvatureNum { a: side, b: CurvSide::Spec(a) }, inputs: (0..x.len() as u32).collect() }, &x);
+                    check_grad(&Eq { kind: EqKind::CurvatureNum { a: side, b: CurvSide::Spec(a), scale: 1.0 }, inputs: (0..x.len() as u32).collect() }, &x);
                     if !handles {
                         for perp in [false, true] {
                             check_grad(&Eq { kind: EqKind::FitEndDir { at_end, perp, n }, inputs: (0..x.len() as u32).collect() }, &x);

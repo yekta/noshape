@@ -428,6 +428,23 @@ fn flow_makes_a_g3_joint() {
     assert!((k + ka).abs() < 1e-6, "G2: spline {k}, arc {ka}");
     assert!(dk.abs() < 1e-4, "G3: dk/ds {dk}");
 
+    // (b2) live 1716 (b) at its scale: a drawn spline (with handles) from a
+    // line's end to the end of a 3 point arc of radius 10 above it; a
+    // curvature residual in 1/mm didn't move it (G16).
+    let mut sk = Sketch::new();
+    let l = sk.add_line(v(-30.0, 0.0), v(0.0, 0.0));
+    let s = sk.add_fit_spline_with_handles(&[v(0.0, 0.0), v(20.0, 10.0), v(40.0, 0.0)]).unwrap();
+    let arc = sk.add_arc(v(50.0, 0.0), v(60.0, 0.0), v(40.0, 0.0));
+    let ((_, le), (s0, se), (_, ae)) = (sk.endpoints(l).unwrap(), sk.endpoints(s).unwrap(), sk.endpoints(arc).unwrap());
+    sk.add_constraint(ConstraintKind::Coincident { a: le, b: s0 }).unwrap();
+    sk.add_constraint(ConstraintKind::Coincident { a: se, b: ae }).unwrap();
+    sk.add_constraint(ConstraintKind::Flow { a: s, b: arc }).unwrap();
+    let r = sk.solve();
+    assert!(r.is_solved(), "{r:?}");
+    let (k, dk) = end_flow(&sk.curve(s).unwrap(), true);
+    let (ka, _) = end_flow(&sk.curve(arc).unwrap(), true);
+    assert!((k + ka).abs() < 1e-6 && dk.abs() < 1e-5, "G2: spline {k}, arc {ka}; G3 {dk}");
+
     // (c) two fit splines.
     let mut sk = Sketch::new();
     let s = sk.add_fit_spline(&[v(0.0, 0.0), v(20.0, 10.0), v(40.0, 0.0)]).unwrap();
@@ -453,3 +470,20 @@ fn flow_makes_a_g3_joint() {
     assert!(k.abs() < 1e-5 && dk.abs() < 1e-4, "conic start: k {k}, dk/ds {dk}");
 }
 
+
+/// G16: Curvature between a sketch-sized B-spline and an arc solves at
+/// 40 mm as at 4 mm (a residual in 1/mm stalled the solver).
+#[test]
+fn curvature_to_an_arc_solves_at_sketch_size() {
+    for scale in [0.1, 1.0, 10.0] {
+        let q = |x: f64, y: f64| v(x * scale, y * scale);
+        let mut sk = Sketch::new();
+        let s = sk.add_bspline(&[q(0.0, 0.0), q(10.0, 8.0), q(20.0, -4.0), q(30.0, 6.0), q(40.0, 0.0)], 3).unwrap();
+        let arc = sk.add_arc(q(50.0, 0.0), q(40.0, 0.0), q(60.0, 0.0));
+        let ((_, se), (a0, _)) = (sk.endpoints(s).unwrap(), sk.endpoints(arc).unwrap());
+        sk.add_constraint(ConstraintKind::Coincident { a: se, b: a0 }).unwrap();
+        sk.add_constraint(ConstraintKind::Curvature { a: s, b: arc }).unwrap();
+        let r = sk.solve();
+        assert!(r.is_solved(), "scale {scale}: {r:?}");
+    }
+}
