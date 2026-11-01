@@ -304,6 +304,23 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// Title block field › Copy: a note with the field's text (its property
+    /// codes) and height at the cell, on the clipboard like a copied note.
+    pub fn copy_title_field(&mut self, key: &str, cx: &mut Context<Self>) {
+        let Some(b) = self.built.as_ref() else { return };
+        let target = noshape_model::drawing::build::PickTarget::TitleField(key.to_string());
+        let Some(&(pick, r)) = b.title_cells.iter().find(|(p, _)| b.picks.get(*p as usize) == Some(&target)) else { return };
+        let h = b.geometry.texts.iter().find(|t| t.pick == pick).map(|t| t.height).unwrap_or(self.drawing.props.ann_text_height);
+        let text = self.drawing.sheets[self.sheet].title_field(key).unwrap_or("").to_string();
+        let mut d = self.drawing.clone();
+        let s = &mut d.sheets[self.sheet];
+        let id = s.next_annotation_id();
+        s.annotations.push(Annotation { id, kind: AnnotationKind::Note { text, height_mm: h, style: Default::default() }, position: [r[0] + 1.0, r[3] - 1.0], ..Default::default() });
+        if let Ok(c) = d.copy_selection(self.sheet, &[id], &[], &[], &[]) {
+            cx.write_to_clipboard(ClipboardItem::new_string(c.to_json()));
+        }
+    }
+
     pub fn open_title_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let fields = self.drawing.sheets[self.sheet].title_block.fields.clone();
         let inputs: Vec<(String, Entity<InputState>)> = fields.iter().map(|(k, v)| (k.clone(), self.input(v, window, cx))).collect();

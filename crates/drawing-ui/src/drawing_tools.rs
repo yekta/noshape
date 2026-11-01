@@ -1888,19 +1888,26 @@ impl DrawingEditor {
             (Some(hit), ..) => self.leader_entries(hit, cx),
             (None, Some(v), ..) => self.detail_circle_entries(v, cx),
             (None, None, Some(v), _) => self.section_line_entries(v, cx),
-            (None, None, None, Some(key)) => vec![
-                MenuEntry::item("Edit note...", move |t, w, cx| t.open_title_field(key.clone(), w, cx)),
-                crate::drawing_props::paste_always(),
-                MenuEntry::item("Paste as table", |t, _, cx| {
-                    t.start_paste_table(cx);
-                }),
-                MenuEntry::Separator,
-                MenuEntry::item("Clear selection", |t, _, cx| {
-                    t.selection.clear();
-                    t.redraw(cx);
-                }),
-                MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
-            ],
+            (None, None, None, Some(key)) => {
+                let (k2, k3) = (key.clone(), key.clone());
+                vec![
+                    MenuEntry::item("Edit note...", move |t, w, cx| t.open_title_field(key.clone(), w, cx)),
+                    crate::drawing_props::paste_always(),
+                    // Live 1992: Copy (a note with the field's text, to paste
+                    // anywhere) and Delete (the cell left empty).
+                    MenuEntry::item("Copy", move |t, _, cx| t.copy_title_field(&k2, cx)),
+                    MenuEntry::item("Paste as table", |t, _, cx| {
+                        t.start_paste_table(cx);
+                    }),
+                    MenuEntry::Separator,
+                    MenuEntry::item("Clear selection", |t, _, cx| {
+                        t.selection.clear();
+                        t.redraw(cx);
+                    }),
+                    MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
+                    MenuEntry::item("Delete", move |t, _, cx| t.edit_sheet("Edit title block", cx, |s| noshape_scene::drawing_tools::set_title_field(s, &k3, ""))),
+                ]
+            }
             (None, None, None, None) => self.context_entries(sel, cx),
         };
         let ed = cx.entity();
