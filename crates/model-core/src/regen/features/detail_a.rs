@@ -71,6 +71,13 @@ pub fn draft(ev: &mut EvalCtx) -> FResult<()> {
         } else {
             faces
         };
+        // A plane square to the pull (parallel to the neutral plane) has no hinge: OCCT's draft fails on it and so
+        // does the wedge fallback. Known before the fillets around it are taken off (draft-hang's Draft 7: 2 s of
+        // Defeaturing, then the same error).
+        let shapes_all = body.shape.faces();
+        if faces.iter().any(|&f| shapes_all.get(f).and_then(|s| s.face_plane().ok().flatten()).is_some_and(|p| p.normal.normalize().dot(pull.normalize()).abs() >= 1.0 - 1e-12)) {
+            return Err(fe(DRAFT_FAILED));
+        }
         // Fillets touching the drafted faces are rolled again afterwards, like
         // Parasolid: with Reapply fillet, also the drafted fillets themselves
         // (removed, their neighbours drafted, then re-filleted); without, the

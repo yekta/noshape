@@ -4854,6 +4854,7 @@ static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
   if (faces.items.empty())
     fail_invalid("delete face needs at least one face");
   check_faces_in(s.shape, faces.items);
+  dump_op("defeature", s.shape, faces.items, "defeature");
   BRepAlgoAPI_Defeaturing mk;
   mk.SetShape(s.shape);
   mk.AddFacesToRemove(to_list(faces.items));

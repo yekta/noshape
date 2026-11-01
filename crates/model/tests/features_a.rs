@@ -572,6 +572,32 @@ fn draft_of_a_face_parallel_to_the_pull_as_live() {
     }
 }
 
+/// A face parallel to the neutral plane (its normal along the pull) can't be drafted: the draft fails, with or
+/// without fillets round it to roll again (draft-hang's Draft 7 removed its fillet first, 2 s, then failed).
+#[test]
+fn draft_of_a_face_square_to_the_pull_fails_with_or_without_fillets() {
+    for fillets in [false, true] {
+        let mut t = T::new();
+        t.block(0.0, 0.0, 0.06, 0.04, "20 mm");
+        let res = t.ok();
+        if fillets {
+            let body = &res.context.bodies[0];
+            let top_edges: Vec<Reference> = [DVec3::new(0.03, 0.0, 0.02), DVec3::new(0.03, 0.04, 0.02), DVec3::new(0.0, 0.02, 0.02), DVec3::new(0.06, 0.02, 0.02)].iter().map(|p| edge_near(body, *p)).collect();
+            t.add("fillet", &[("entities", q(top_edges)), ("radius", e("3 mm"))]);
+        }
+        let res = t.ok();
+        let body = &res.context.bodies[0];
+        let top = face_with_normal(body, DVec3::Z);
+        let bottom = face_with_normal(body, DVec3::NEG_Z);
+        let d = t.add("draft", &[("neutralPlane", q(vec![bottom])), ("draftFaces", q(vec![top])), ("angle", e("5 deg")), ("reFillet", b(true))]);
+        let t0 = std::time::Instant::now();
+        let res = t.regen();
+        let st = res.display.features.iter().find(|f| f.id == d).unwrap();
+        eprintln!("fillets {fillets}: {:?} {:?} in {:.0} ms", st.status, st.message, t0.elapsed().as_secs_f64() * 1e3);
+        assert_eq!(st.message.as_deref(), Some("Selected faces could not be drafted."), "fillets {fillets}: {:?}", st.status);
+    }
+}
+
 #[test]
 fn face_blend_adjacent_faces() {
     let mut t = T::new();
