@@ -1,3 +1,4 @@
+// landq scratch c1 a
 //! noshape's documents page (docs/CRATES.md): the start window with the documents list, folders, labels, search,
 //! the Trash, Import and Create, on `noshape-app-core` (the documents library and the Trash are app-core's
 //! `start_library` and `start_trash`). Its user menu opens Preferences (`noshape-preferences-ui`) and Company settings
