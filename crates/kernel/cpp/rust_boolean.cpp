@@ -1820,7 +1820,7 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
     const double id = static_cast<double>(t_free->curves.size());
     t_free->curves.push_back({{fa, fb}, ic});
     t_free->moved.emplace_back();
-    for (const double v : {id, first, last, at3, at0, at1, section_tol(ic, fa, fb)})
+    for (const double v : {id, first, last, at3, at0, at1, section_tol(ic, fa, fb), ic.Tolerance()})
       out.curves.push_back(v);
   }
   return rust::String("");

@@ -224,15 +224,82 @@ impl C2 {
         }
     }
 
-    /// ∫ f over 0..1, in 8 parts.
+    /// ∫ f over 0..1, in 8 parts, a B-spline's split at its knots too (OCCT's sections crowd their knots where
+    /// they turn: the parts even in its parameter missed a sharp knurl tooth's corner, turning a piece's area
+    /// negative).
     fn gauss(&self, f: impl Fn(f64) -> f64) -> f64 {
+        let mut at = vec![0.0];
+        if let C2::Nurbs { c, t0, t1 } | C2::Mapped { c, t0, t1, .. } = self
+            && t1 != t0
+        {
+            at.extend(c.knots.iter().map(|k| (k - t0) / (t1 - t0)).filter(|&t| t > 1e-12 && t < 1.0 - 1e-12));
+            at.sort_by(f64::total_cmp);
+            at.dedup();
+        }
+        at.push(1.0);
         let mut sum = 0.0;
-        for k in 0..8 {
-            for &(x, wt) in &GAUSS {
-                sum += wt * f((k as f64 + x) / 8.0);
+        for w in at.windows(2) {
+            let (a, b) = (w[0], w[1]);
+            let m = (8.0 * (b - a)).ceil().max(1.0) as usize;
+            let h = (b - a) / m as f64;
+            for k in 0..m {
+                for &(x, wt) in &GAUSS {
+                    sum += wt * h * f(a + h * (k as f64 + x));
+                }
             }
         }
-        sum / 8.0
+        sum
+    }
+
+    /// The parameter `f` of the way along it by length (a B-spline's own parameter can crowd at one end: OCCT's
+    /// sections do where they turn sharply).
+    pub fn at_fraction(&self, f: f64) -> f64 {
+        if !matches!(self, C2::Nurbs { .. } | C2::Mapped { .. }) {
+            return f;
+        }
+        let n = self.samples();
+        let pts: Vec<DVec2> = (0..=n).map(|k| self.at(k as f64 / n as f64)).collect();
+        let lens: Vec<f64> = pts.windows(2).map(|w| (w[1] - w[0]).length()).collect();
+        let total: f64 = lens.iter().sum();
+        if total <= 0.0 {
+            return f;
+        }
+        let mut run = 0.0;
+        for (k, &l) in lens.iter().enumerate() {
+            if run + l >= f * total && l > 0.0 {
+                return (k as f64 + (f * total - run) / l) / n as f64;
+            }
+            run += l;
+        }
+        1.0
+    }
+
+    /// The direction it leaves its start in: its tangent there, or where a B-spline's first micrometre turns
+    /// back on itself (OCCT's curve on a face hooking within its tolerance at a sharp knurl tooth's corner), the
+    /// way to its point a micrometre on.
+    pub fn leaving(&self) -> DVec2 {
+        let d = self.tangent(0.0);
+        if !matches!(self, C2::Nurbs { .. } | C2::Mapped { .. }) {
+            return d;
+        }
+        let start = self.start();
+        let reach = 1e-6_f64.min(0.01 * (self.end() - start).length());
+        if reach <= 0.0 {
+            return d;
+        }
+        let n = self.samples();
+        let Some(k) = (1..=n).find(|&k| (self.at(k as f64 / n as f64) - start).length() >= reach) else { return d };
+        let (mut lo, mut hi) = ((k - 1) as f64 / n as f64, k as f64 / n as f64);
+        for _ in 0..40 {
+            let m = 0.5 * (lo + hi);
+            if (self.at(m) - start).length() >= reach {
+                hi = m;
+            } else {
+                lo = m;
+            }
+        }
+        let secant = (self.at(hi) - start).normalize();
+        if secant.dot(d) < 0.995 { secant } else { d }
     }
 
     /// The unit direction at `t`.
@@ -850,6 +917,31 @@ mod tests {
         let mut hits = Vec::new();
         disk.ray_hits(DVec2::ZERO, DVec2::X, &mut hits);
         assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn a_b_spline_crowding_its_parameter_at_one_end() {
+        // A line from (0, 1) to (1, 0) as a degree-1 B-spline, 10 of its 11 even knot spans in its first 1e-5 (as
+        // OCCT's sections crowd theirs where they turn), and its first one turning back (a hook within the
+        // tolerance).
+        let mut poles = vec![DVec3::new(0.0, 1.0, 0.0), DVec3::new(-1e-8, 1.0, 0.0)];
+        poles.extend((1..10).map(|k| DVec3::new(1e-6 * k as f64, 1.0 - 1e-6 * k as f64, 0.0)));
+        poles.push(DVec3::new(1.0, 0.0, 0.0));
+        let n = poles.len();
+        let mut knots = vec![0.0];
+        knots.extend((0..n).map(|k| k as f64 / (n - 1) as f64));
+        knots.push(1.0);
+        let c = crate::nurbs::NurbsCurve { degree: 1, knots, weights: vec![1.0; n], poles, spans: Default::default() };
+        let line = C2::Nurbs { c: std::sync::Arc::new(c), t0: 0.0, t1: 1.0 };
+        // Its area with the two sides to the origin: the triangle's (clockwise).
+        let area = line.area_term() + C2::Seg { a: DVec2::new(1.0, 0.0), b: DVec2::ZERO }.area_term() + C2::Seg { a: DVec2::ZERO, b: DVec2::new(0.0, 1.0) }.area_term();
+        assert!((area + 0.5).abs() < 1e-12, "{area}");
+        assert!((line.length() - 2f64.sqrt()).abs() < 1e-6, "{}", line.length());
+        // Its middle by length, and the way it leaves its start past the hook.
+        let m = line.at(line.at_fraction(0.5));
+        assert!(m.distance(DVec2::splat(0.5)) < 1e-3, "{m:?}");
+        assert!(line.tangent(0.0).x < 0.0);
+        assert!(line.leaving().distance(DVec2::new(1.0, -1.0).normalize()) < 1e-2, "{:?}", line.leaving());
     }
 
     #[test]
