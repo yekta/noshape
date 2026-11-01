@@ -476,3 +476,10 @@ fn an_edge_through_a_tolerant_vertex_off_a_plane_declines() {
     k::set_rust_boolean_only(false);
     assert!(r.is_err() && why == "an edge off a plane past its tolerance", "taken, or declined otherwise: {why}");
 }
+
+/// Two coplanar faces overlapping, their common (model-core's face-overlap test; recorded): the object's pieces on the
+/// tool's face, as OCCT's (it declined "sheets that meet").
+#[test]
+fn a_common_of_two_overlapping_coplanar_faces() {
+    as_recorded("0b6e553b104c603b");
+}

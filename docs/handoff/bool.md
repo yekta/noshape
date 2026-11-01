@@ -1079,6 +1079,18 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Coplanar sheets in a common (11-01 19:40 UTC)
+- A common of two sheets (faces, no solids) whose faces pairwise cross or lie on one plane within the tolerance (or
+  apart past the grey band) goes through the Boolean instead of declining: each face split by the other's edges on
+  their plane, the object's pieces on the tool's faces kept (either facing), the tool's there Modified to them, the
+  rest deleted (`sheet_common`; the "coplanar sheets" vertex rule and "sheets with solids" skip it). Model-core's
+  face-overlap tests.
+- Replays why50: main 819 (+22), corpus2 597, corpus3 602, corpus4 649, corpus5 793, corpus6 726 (+8 each), direct 78,
+  Shell's 105; 0 differ. Share of all sets 86.2 % of cases, 81.3 % of OCCT time. "Sheets that meet" 77 → 15.
+- T1 bool_patterns::a_common_of_two_overlapping_coplanar_faces (0b6e553b).
+- Next: the 15 left (faces not planar, or in the grey band), then fuses / cuts of coplanar sheets (the 10-30 notes:
+  0c538d2c and 7895f375 to understand first).
+
 ## Where the declines stand, and the next step (11-01 19:10 UTC)
 - By OCCT time the rest is mostly bad inputs (self-intersecting Shell tools: e40bb5a1, 419e648e's family; Shell slabs
   of 0.7 mm tolerance: b2511301 / addb9a14; radius-1e-10 arcs: "a tiny arc"; zero-width cylinder strips: "a cylinder

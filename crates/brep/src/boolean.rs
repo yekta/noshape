@@ -2778,6 +2778,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // be one of theirs).
     // Two sheets (faces, no solids) apart, or on planes that cross: an empty common (faces in common only where
     // they overlap), everything deleted, as OCCT's (model-core asks whether faces overlap so).
+    // Two sheets on one plane overlapping (model-core's face-overlap tests): through the rest, their common the
+    // object's pieces on the tool's faces (`sheet_common`).
+    let mut sheet_common = false;
     if op == Op::Common && args.len() == 2 && args.iter().all(|b| b.solids.is_empty() && !b.faces.is_empty()) {
         let plane = |f: &Face| match f.surface {
             Surface::Plane { origin, normal } => Some((origin, normal)),
@@ -2805,9 +2808,19 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             (lo, hi)
         };
         let ((l0, h0), (l1, h1)) = (bx(args[0]), bx(args[1]));
-        if !crossing && boxes_meet(l0, h0, l1, h1, GREY * tol) {
+        // (Every pair of faces on planes that cross, or on one plane within the tolerance, or apart past the grey band.)
+        let planar = args[0].faces.iter().all(|f| {
+            args[1].faces.iter().all(|g| match (plane(f), plane(g)) {
+                (Some((o1, n1)), Some((o2, n2))) => n1.cross(n2).length() > 1e-9 || (o2 - o1).dot(n1).abs() <= tol || (o2 - o1).dot(n1).abs() > GREY * tol,
+                _ => false,
+            })
+        });
+        if !crossing && boxes_meet(l0, h0, l1, h1, GREY * tol) && !planar {
             return Err(Decline("sheets that meet"));
         }
+        sheet_common = !crossing && boxes_meet(l0, h0, l1, h1, GREY * tol);
+    }
+    if op == Op::Common && args.len() == 2 && args.iter().all(|b| b.solids.is_empty() && !b.faces.is_empty()) && !sheet_common {
         let mut out = Output::default();
         for (a, b) in args.iter().enumerate() {
             let del = |kind: Kind, n: usize| (0..n as u32).map(move |i| Record { kind, arg: a as u32, index: i, relation: Relation::Deleted, out_kind: kind, out: u32::MAX });
@@ -2959,7 +2972,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // Sheets: a fuse of sheets alone, or a sheet cut by solids or in common with them (else not yet).
     let sheet_arg: Vec<bool> = (0..args.len()).map(|a| cx.solids.iter().any(|s| s.sheet && s.arg == a as u32)).collect();
     let sheets = sheet_arg.iter().any(|&x| x);
-    if sheets && !((op == Op::Fuse && sheet_arg.iter().all(|&x| x)) || (op != Op::Fuse && sheet_arg[0] && !sheet_arg[1..].iter().any(|&x| x))) {
+    if sheets && !sheet_common && !((op == Op::Fuse && sheet_arg.iter().all(|&x| x)) || (op != Op::Fuse && sheet_arg[0] && !sheet_arg[1..].iter().any(|&x| x))) {
         return Err(Decline("sheets with solids"));
     }
     // Each face: its parameter range (a partial cylinder's starts in the gap), boundary, box.
@@ -3349,7 +3362,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // left two strips overlapping by 5 µm, one's corner on the other's edge, as they were: 0c538d2c).
     for k in 0..cx.coplanar.len() {
         let (f, g) = cx.coplanar[k];
-        if !cx.solids[cx.faces[f].solid].sheet && !cx.solids[cx.faces[g].solid].sheet {
+        if (!cx.solids[cx.faces[f].solid].sheet && !cx.solids[cx.faces[g].solid].sheet) || sheet_common {
             continue;
         }
         for (a, b) in [(f, g), (g, f)] {
@@ -4255,8 +4268,17 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
         }
         let ons: Vec<(usize, State)> = states.iter().copied().filter(|x| matches!(x.1, State::OnSame | State::OnOpposite)).collect();
-        if !ons.is_empty() && (cx.solids[s].sheet || ons.iter().any(|&(t, _)| cx.solids[t].sheet)) {
+        if !ons.is_empty() && (cx.solids[s].sheet || ons.iter().any(|&(t, _)| cx.solids[t].sheet)) && !sheet_common {
             return Err(Decline("sheets coincident"));
+        }
+        // (Two sheets' common: the object's pieces on the tool's faces, either way round; the tool's there go to them.)
+        if sheet_common {
+            let on = ons.first().copied();
+            if let Some((t, _)) = on {
+                on_pairs.push((pi, t));
+            }
+            keep[pi] = (arg == 0 && on.is_some()).then_some(false);
+            continue;
         }
         // (In a cut, a piece on the object and a tool, or an object's piece on two tools sharing a face there (a
         // pattern's end caps on the object's end face): as on one, the object's or the one facing its way.)

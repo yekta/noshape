@@ -419,8 +419,10 @@ fn faces_on_crossing_planes_have_nothing_in_common() {
     let r = boolean(Op::Common, &[&sq(true), &sq(false)], TOL).unwrap();
     assert!(r.body.faces.is_empty() && r.body.edges.is_empty());
     assert_eq!(r.history.iter().filter(|h| h.relation == Relation::Deleted).count(), 18);
-    // The same square twice: declined (their overlap isn't worked out).
-    assert!(boolean(Op::Common, &[&sq(true), &sq(true)], TOL).is_err());
+    // The same square twice: their common the object's face (the tool's Modified to it), as OCCT's.
+    let r = boolean(Op::Common, &[&sq(true), &sq(true)], TOL).unwrap();
+    assert_eq!(r.body.faces.len(), 1);
+    assert!(r.history.iter().any(|h| h.kind == Kind::Face && h.arg == 1 && h.relation == Relation::Modified && h.out == 0));
 }
 
 /// `b` turned by `angle` about the x axis.
