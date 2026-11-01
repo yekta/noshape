@@ -688,9 +688,7 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   together (or tell core it should stay as it is).
 
 ## Requests to the lead
-- (11-01 20:30) main is red since ~18:30: psui's `part_studio::sketch::ui_tests::a_shelled_face_is_highlighted_as_before`
-  fails on plain origin/main e568cb9f ("Select faces to remove." in the Shell preview); likely core's SHELL-SLOW
-  (df543bc8 / e568cb9f) or bool's 0f287978. dx's lands and my ca848ee0 failed on it; my speed stack waits for green.
+- (11-01 20:30–23:33) main was red on psui's `a_shelled_face_is_highlighted_as_before` (green again at 45424566); the speed stack waited for it.
 - (11-01) Document audit D2: done without dx after all. ops' `drawing::old_state` (the drawing update icon's check) gives the out-of-date drawings; dx FYI: history-ui's Create version and the Workspace protection dialog now call it.
 - (11-01) Audit G31: the assembly (and Part Studio) Mass and section properties "Show calculation variance" needs an
   integration error estimate per value (live shows "± 1.774e-9 lb", "± 2.100e+0 mm³"). The kernel's mass properties
