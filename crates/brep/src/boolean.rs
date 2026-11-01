@@ -492,7 +492,7 @@ impl Pool {
                     return Err(Decline("a point near two vertices"));
                 }
                 found = Some(i);
-            } else if d <= band && !apart(self.p[i as usize], ti) {
+            } else if d <= band && !apart(self.p[i as usize], ti) && std::env::var_os("NOSHAPE_X_NOBAND").is_none() {
                 if std::env::var_os("NOSHAPE_X_NEAR").is_some() {
                     eprintln!("NEAR {:?} vs {i} {:?}: d {d:e} reach {reach:e} band {band:e} tp {tp:e} ti {ti:e}\n{}", p, self.p[i as usize], std::backtrace::Backtrace::force_capture());
                 }
