@@ -90,9 +90,11 @@ if [ $mode = queue ]; then
   # The relay here does the daemon's pushes (vibe4 has no GitHub credentials) and syncs the results back.
   mkdir -p /tmp/lead
   if flock -n "/tmp/lead/land-relay-$qdir.lock" true 2>/dev/null; then
-    git show "origin/$target:tools/tiers/land-relay.sh" > /tmp/lead/land-relay.sh.new 2>/dev/null && mv /tmp/lead/land-relay.sh.new /tmp/lead/land-relay.sh
-    log=/tmp/lead/land-relay.log; [ "$qdir" = land ] || log=/tmp/lead/land-relay-$qdir.log
-    [ -s /tmp/lead/land-relay.sh ] && setsid -f bash /tmp/lead/land-relay.sh "$qdir" >> "$log" 2>&1 < /dev/null
+    # (In /root/lead-scratch, not /tmp/lead: it survives a reboot, and the lead's monitor restarts it from there.)
+    rl=/root/lead-scratch/land-relay.sh; mkdir -p /root/lead-scratch
+    git show "origin/$target:tools/tiers/land-relay.sh" > "$rl.new" 2>/dev/null && mv "$rl.new" "$rl"
+    log=/root/lead-scratch/land-relay.log; [ "$qdir" = land ] || log=/root/lead-scratch/land-relay-$qdir.log
+    [ -s "$rl" ] && setsid -f bash "$rl" "$qdir" >> "$log" 2>&1 < /dev/null
   fi
   # The job (arrival order = its name), then the daemon if it isn't running (origin's version).
   read -r -d '' REG <<'R'

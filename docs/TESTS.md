@@ -30,8 +30,8 @@ rebase conflict. Deeper dependents' tests run in the watcher after the push. Doc
 - `tools/tiers/land.sh --wait`: the old blocking land (this change's checks alone, then the push), for the lead and
   scripts; land.sh falls back to it when vibe4 is unreachable.
 - Pushes go through `tools/tiers/land-relay.sh` on this machine (vibe4 has no GitHub credentials), which also syncs
-  the results to `/tmp/lead/land-results/<worktree>.log`; land.sh starts the relay and the daemon when they aren't
-  running. On vibe4: `~/land/results.tsv` (every change), `~/land/history.tsv` (every check: queue wait, slot wait,
+  the results to `/tmp/lead/land-results/<worktree>.log`; land.sh starts the relay (from `/root/lead-scratch`, log
+  `land-relay.log` there) and the daemon when they aren't running. On vibe4: `~/land/results.tsv` (every change), `~/land/history.tsv` (every check: queue wait, slot wait,
   phase times, batch size), `~/land/daemon.log`.
 - Measured 11-01 on vibe4 (busy with agents' lands): workspace clippy after a model-core edit 98 s / 53 s, against
   `cargo check --workspace` + clippy on model-core 53 s / 28 s. A queued brep change's check: cargo check 30–190 s,
