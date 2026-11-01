@@ -290,3 +290,5 @@ mod tests {
         assert!(copy_of(&a, &off, 1e-9).is_none());
     }
 }
+
+// LANDQ_FAIL s1
