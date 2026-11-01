@@ -29,8 +29,8 @@ Priorities:
 | | |
 |---|---|
 | Surfaces audited | 19 |
-| Gaps found | 9 |
-| Gaps fixed | 8 |
+| Gaps found | 10 |
+| Gaps fixed | 9 |
 
 ## Surfaces
 
@@ -47,7 +47,7 @@ Priorities:
 | S9 | Tab bar, tab manager panel, list view, sort menu, footer | tabbar-1280.html, tabbar-scroll.json, panel-tab-manager*.txt, tab-manager-footer.json | D12 |
 | S10 | Delete tabs dialog | ticket-delete-tab-dialog.txt | 0 |
 | S11 | Documents page advanced search panel | documents-advanced-search.txt, documents-history-search-filter.txt | 0 |
-| S12 | Documents page search results | documents-adv-search*.json\|txt, behaviours "Advanced search: empty state and results" | D7, D8 |
+| S12 | Documents page search results | documents-adv-search*.json\|txt, behaviours "Advanced search: empty state and results" | D7, D8, D13 |
 | S13 | Documents page create menu, row menu, folder sort, add column, empty trash, right panel (details, properties, notes) | documents-create-menu.txt, documents-row-context-menu.txt, documents-folder-sort-menu.txt, documents-add-column-menu.txt, documents-empty-trash-modal.txt, documents-right-panel-*.txt, documents-details-panel.txt | 0 |
 | S14 | Standard content browser | skb-standard-content*.json, ui2-standard-content*.json\|html | D9 |
 | S15 | Insert dialog, other documents | assembly-insert-other-*.txt | D9 |
@@ -69,3 +69,4 @@ Priorities:
 | D10 | P2 | ☰ › Workspace properties…: live runs the same command as the version's Version properties… (the metadata modal with the tab tree). Ours opened a plain name / description modal. | fixed: opens history-ui's Properties modal for the workspace |
 | D11 | P3 | Configured part properties: Add property ▾ has the tooltip "Configure a property of <part>". | fixed |
 | D12 | P2 | Tab bar: a tab that references an older version of another document has a blue out-of-date icon, tooltip "Newer versions of linked documents available". The references can be Derived, an inserted Variable Studio, Assembly instances or Drawing views. Ours had none. | fixed: `workspace_update::version_refs` / `behind_tabs`, checked off the UI thread when the references change and when the window comes back |
+| D13 | P2 | Documents search box: running an advanced search writes the query into the box as text (`type:part name:pvz`, `type:part,document`). Enter on such a text runs it, and clearing the box ends the search. Ours kept the box and the panel apart. | fixed: `Query::to_text` / `Query::parse_text` (type, name, description, partNumber, revision, state) |

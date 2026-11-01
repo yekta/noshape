@@ -349,13 +349,31 @@ impl StartView {
                 }
             }),
             cx.subscribe_in(&search, window, |this: &mut Self, state, ev: &InputEvent, _, cx| {
-                if let InputEvent::Change = ev {
-                    // No `cx.notify()`: the field's own notification
-                    // re-renders the title bar; only the body shows the query.
-                    this.query = state.read(cx).value().to_string();
-                    if let Some(b) = &this.body {
-                        b.update(cx, |_, cx| cx.notify());
+                let text = state.read(cx).value().to_string();
+                match ev {
+                    InputEvent::Change => {
+                        // No `cx.notify()`: the field's own notification
+                        // re-renders the title bar; only the body shows the query.
+                        // A written query (`type:part name:pvz`, live
+                        // documents/130-135) runs on Enter; clearing the box
+                        // ends the search.
+                        let written = crate::start_search::Query::parse_text(&text, &Default::default()).is_some();
+                        this.query = if written { String::new() } else { text.clone() };
+                        if text.trim().is_empty() {
+                            this.adv_query = None;
+                        }
+                        if let Some(b) = &this.body {
+                            b.update(cx, |_, cx| cx.notify());
+                        }
                     }
+                    InputEvent::PressEnter { .. } => {
+                        if let Some(q) = crate::start_search::Query::parse_text(&text, this.adv_query.as_ref().unwrap_or(&Default::default())) {
+                            this.adv_query = Some(q).filter(|q| *q != crate::start_search::Query::default());
+                            this.load_facts(cx);
+                            cx.notify();
+                        }
+                    }
+                    _ => {}
                 }
             }),
             cx.observe_window_activation(window, |this: &mut Self, window, cx| {
@@ -374,12 +392,20 @@ impl StartView {
             }
         });
         let adv = cx.new(|cx| crate::start_search::AdvancedSearch::new(window, cx));
-        let adv_sub = cx.subscribe(&adv, |this: &mut Self, _, ev: &crate::start_search::SearchEvent, cx| {
+        let adv_sub = cx.subscribe_in(&adv, window, |this: &mut Self, _, ev: &crate::start_search::SearchEvent, window, cx| {
             match ev {
                 crate::start_search::SearchEvent::Search(q) => {
                     this.adv_query = Some(q.clone()).filter(|q| *q != crate::start_search::Query::default());
                     this.adv_open = false;
                     this.load_facts(cx);
+                    // Live: the query is written into the search box.
+                    // (Criteria the text can't hold — added criteria,
+                    // Results from — leave the box as it is.)
+                    let text = this.adv_query.as_ref().map(|q| q.to_text()).unwrap_or_default();
+                    if !text.is_empty() {
+                        this.search.update(cx, |s, cx| s.set_value(text, window, cx));
+                        this.query = String::new();
+                    }
                 }
                 crate::start_search::SearchEvent::Reset => this.adv_query = None,
             }

@@ -469,7 +469,7 @@ re-queues everything after it). Waiting: live request 13:45
   - D6: Documents › Versions and history (graph, Show changes…, tooltip).
   - D9 and D11: tooltips.
 - Open: D2, the Create version dialog's drawings warning ("These drawings should be updated before creating a version:" + "Update drawings."). It needs a drawing staleness query from dx (request below).
-- Next: the Documents page's typed search (live writes advanced queries into the box as text, `type:part name:…`). Ours keeps the box and the panel apart.
+- Later: D12 tab out-of-date icon; D13 the search box takes the query as text (`type:part name:pvz`). Audit at 19 surfaces, 10 gaps, 9 fixed.
 
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows

@@ -96,10 +96,76 @@ impl Query {
         self.types.iter().copied().filter(|t| !matches!(*t, "Document" | "Folder")).collect()
     }
 
+    /// The query as live writes it into the search box after a search
+    /// (documents/130-135: `name:zzqx nothing here`, `type:part name:pvz`,
+    /// `type:part,document`).
+    pub fn to_text(&self) -> String {
+        let mut parts = Vec::new();
+        if !self.types.is_empty() {
+            parts.push(format!("type:{}", self.types.iter().map(|t| type_key(t)).collect::<Vec<_>>().join(",")));
+        }
+        for (key, v) in [("description", &self.description), ("partNumber", &self.part_number), ("revision", &self.revision)] {
+            if !v.is_empty() {
+                parts.push(format!("{key}:{v}"));
+            }
+        }
+        if let Some(st) = self.state {
+            parts.push(format!("state:{st}"));
+        }
+        // Name last: its value runs to the end (it may hold spaces).
+        if !self.name.is_empty() {
+            parts.push(format!("name:{}", self.name));
+        }
+        parts.join(" ")
+    }
+
+    /// A query written in the search box (`type:part name:pvz`), with the
+    /// rest of the criteria from `base`; None when the text has no
+    /// `key:` term (a plain search of names).
+    pub fn parse_text(text: &str, base: &Query) -> Option<Query> {
+        const KEYS: [&str; 6] = ["type", "name", "description", "partNumber", "revision", "state"];
+        // The terms: each key's value runs to the next key.
+        let mut found: Vec<(usize, &str)> = Vec::new();
+        for key in KEYS {
+            let pat = format!("{key}:");
+            let mut from = 0;
+            while let Some(i) = text[from..].find(&pat) {
+                let at = from + i;
+                if at == 0 || text[..at].ends_with(' ') {
+                    found.push((at, key));
+                }
+                from = at + pat.len();
+            }
+        }
+        if found.is_empty() {
+            return None;
+        }
+        found.sort();
+        let mut q = Query { types: Vec::new(), name: String::new(), description: String::new(), part_number: String::new(), state: None, revision: String::new(), ..base.clone() };
+        for (k, &(at, key)) in found.iter().enumerate() {
+            let end = found.get(k + 1).map(|f| f.0).unwrap_or(text.len());
+            let value = text[at + key.len() + 1..end].trim().to_string();
+            match key {
+                "type" => q.types = value.split(',').filter_map(|v| TYPES.iter().copied().find(|t| type_key(t) == v.trim().to_lowercase())).collect(),
+                "name" => q.name = value,
+                "description" => q.description = value,
+                "partNumber" => q.part_number = value,
+                "revision" => q.revision = value,
+                _ => q.state = STATES.iter().copied().find(|s| s.eq_ignore_ascii_case(&value)),
+            }
+        }
+        Some(q)
+    }
+
     /// Folders only (Type = Folder).
     pub fn folders_only(&self) -> bool {
         !self.types.is_empty() && self.types.iter().all(|t| *t == "Folder")
     }
+}
+
+/// A type as a search term: "Part Studio" → `partstudio`.
+fn type_key(t: &str) -> String {
+    t.to_lowercase().replace(' ', "")
 }
 
 /// What a document holds in one state (a workspace or a version).
@@ -541,6 +607,26 @@ mod tests {
     use noshape_model::document::Document;
     use noshape_model::partstudio::{PartProperties, PartStudio};
 
+    /// A document with two workspaces and a version: its tabs are found.
+    #[test]
+    fn a_tab_search_reads_every_workspace() {
+        let dir = std::env::temp_dir().join(format!("noshape-tab-search-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("Brackets.noshape");
+        let mut s = noshape_ops::session::Session::create(&path, Document::new()).unwrap();
+        s.create_version("V1", "").unwrap();
+        let head = s.head().unwrap();
+        s.branch_from(head, "experiment").unwrap();
+        drop(s);
+        let facts = super::facts(&path).expect("facts");
+        assert_eq!(facts.workspaces.len(), 2);
+        let q = Query { types: vec!["Part Studio", "Assembly"], ..Default::default() };
+        let names: Vec<String> = hits(&q, "", &facts).into_iter().map(|h| h.name).collect();
+        assert_eq!(names, ["Part Studio 1", "Assembly 1"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// Live documents/135: a search for parts lists each part as its own
     /// row; the index names the parts, their properties give the part number.
     #[test]
@@ -558,6 +644,11 @@ mod tests {
         assert_eq!(names(&q, "plate"), [("Base plate".to_string(), "Main".to_string())]);
         q.part_number = "pn".into();
         assert_eq!(names(&q, ""), [("Base plate".to_string(), "Main".to_string())]);
+        // The query as text in the search box, and back.
+        let typed = Query { types: vec!["Part", "Document"], name: "pvz block".into(), ..Default::default() };
+        assert_eq!(typed.to_text(), "type:part,document name:pvz block");
+        assert_eq!(Query::parse_text("type:part,document name:pvz block", &Query::default()), Some(typed));
+        assert_eq!(Query::parse_text("pvz block", &Query::default()), None);
         // Tabs are rows of their own type.
         let q = Query { types: vec!["Part Studio"], ..Default::default() };
         assert!(names(&q, "").contains(&("Brackets".to_string(), "Main".to_string())));
