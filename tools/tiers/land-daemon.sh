@@ -23,7 +23,7 @@ inst=$(basename "$LD")   # refs/landq/<inst>/… in the shared repo
 export LAND_SLOTS=$(( $(nproc) / 5 > 2 ? $(nproc) / 5 : 2 ))
 export CARGO_BUILD_JOBS=$(( $(nproc) / LAND_SLOTS + 1 ))
 export GIT_COMMITTER_NAME=yekta GIT_COMMITTER_EMAIL=ngyekta@gmail.com
-mkdir -p "$LD"/{jobs,pending,splits,run,results,outbox,done,bin,outcome} || { echo "land-daemon: can't make its dirs in $LD"; exit 1; }
+mkdir -p "$LD"/{jobs,pending,splits,run,results,outbox,done,bin,outcome,failed} || { echo "land-daemon: can't make its dirs in $LD"; exit 1; }
 log() { echo "$(date -u '+%F %T') $*"; }
 alive() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null; }
 field() { local f="$LD/jobs/$2.job"; [ -f "$f" ] || f="$LD/done/$2.job"; sed -n "s/^$1=//p" "$f" 2>/dev/null | head -1; }
@@ -59,8 +59,41 @@ result() {   # result <key> LANDED <main sha> | FAILED <reason>  (detail lines i
   { echo "$(date -u '+%F %T') $line"; [ "$st" = FAILED ] && [ -s "$d/detail" ] && sed 's/^/    | /' "$d/detail"; } >> "$LD/results/$name.log"
   [ "$st" = FAILED ] && [ -s "$d/detail" ] && cp "$d/detail" "$LD/results/$key.out"
   log "$bid: $name $line"
+  # The worktree's earlier queued changes this one carries (land.sh: queued again before they were claimed) get its result.
+  local c; for c in $(cat "$LD/jobs/$key.carry" 2>/dev/null); do result "$c" "$st" "$what"; done; rm -f "$LD/jobs/$key.carry"
+  if [ "$st" = FAILED ] && [ "${what#superseded}" = "$what" ]; then
+    echo "$key $sha $now" >> "$LD/failed/$name"; supersede "$key"
+  fi
   relay delete "$(field ref "$key")"; git -C "$repo" update-ref -d "refs/landq/$inst/job/$key" 2>/dev/null
-  mv "$LD/jobs/$key.job" "$LD/done/" 2>/dev/null
+  mv "$LD/jobs/$key.job" "$LD/done/" 2>/dev/null; rm -f "$LD/jobs/$key.solo"
+}
+
+# A failed change's worktree: its queued changes that contain it (queued before it failed, so not a fix on top) would
+# fail the same way: they fail with it, unchecked (11-01: skasm queued 13 commits in a row; each one after a failure
+# failed the same test again). Waiting ones and front batches' ones; not those being checked.
+supersede() {   # supersede <failed key>
+  local f=$1 name sha q b ok=() fref="refs/landq/$inst/job/$1"
+  git -C "$repo" rev-parse -q --verify "$fref" > /dev/null || return 0
+  name=$(field name "$f"); sha=$(field sha "$f")
+  for q in $(ls "$LD/pending"; cat "$LD"/splits/*.batch 2>/dev/null | grep -v '^kind='); do
+    [ "$q" != "$f" ] && [ "$(field name "$q")" = "$name" ] || continue
+    git -C "$repo" fetch -q origin "+refs/heads/$(field ref "$q"):refs/landq/$inst/job/$q" 2>/dev/null || continue
+    [ -z "$(git -C "$repo" rev-list --cherry-pick --right-only "refs/landq/$inst/job/$q...$fref")" ] && ok+=("$q")
+  done
+  [ ${#ok[@]} -gt 0 ] || return 0
+  {
+    flock 5
+    for q in "${ok[@]}"; do
+      rm -f "$LD/pending/$q"
+      for b in "$LD"/splits/*.batch; do
+        [ -f "$b" ] && grep -qx "$q" "$b" || continue
+        grep -vx "$q" "$b" > "$b.tmp"; if grep -qv '^kind=' "$b.tmp"; then mv "$b.tmp" "$b"; else rm -f "$b" "$b.tmp"; fi
+      done
+    done
+  } 5>"$LD/claim.lock"
+  cp "$d/detail" "$d/detail.keep" 2>/dev/null; : > "$d/detail"
+  for q in "${ok[@]}"; do result "$q" FAILED "superseded: contains failed ${sha:0:8} (fix it on top, then land.sh)"; done
+  mv "$d/detail.keep" "$d/detail" 2>/dev/null
 }
 
 # Which of the given files are in crates the batch edits ("manifest" for Cargo.toml / Cargo.lock).
@@ -139,13 +172,20 @@ if cands and UNDER not in cands and len({name(k) for k in cands}) == 1:
 P
 }
 
+# Whether the batch under this one (if any) has ended without landing.
+dep_failed() {
+  [ -n "$1" ] || return 1
+  if [ -e "$LD/outcome/$1" ]; then [ "$(cat "$LD/outcome/$1")" != landed ]; else [ ! -d "$LD/run/$1" ]; fi
+}
+
 # Whether a batch can be stacked on (by its run dir name): it and every batch under it are checking or green, or
-# landed. Not a half of a red batch: one of two halves is likely red, and halves are checked side by side.
+# landed. Halves of red batches too: everything goes in one train (11-01: halves checked beside it landed first and
+# sent the train's batches back to be checked again); one that turns red stops what is on it within seconds.
 can_land() {
   local b=$1
   while [ -n "$b" ]; do
     [ -e "$LD/outcome/$b" ] && { [ "$(cat "$LD/outcome/$b")" = landed ]; return; }
-    [ -s "$LD/run/$b/stack" ] && ! grep -qx 'kind=split' "$LD/run/$b/jobs" 2>/dev/null || return 1
+    [ -s "$LD/run/$b/stack" ] || return 1
     b=$(cat "$LD/run/$b/dep" 2>/dev/null)
   done
 }
@@ -165,7 +205,33 @@ run_batch() {
     for key in "${keys[@]}"; do git -C "$repo" fetch -q origin "+refs/heads/$(field ref "$key"):refs/landq/$inst/job/$key" 2>/dev/null \
       || { : > "$d/detail"; result "$key" FAILED "queue branch $(field ref "$key") is gone: re-run land.sh"; }; done
   }
-  [ -d "$wt" ] || git -C "$repo" worktree add -q --detach "$wt" "refs/landq/$inst/target"
+  # A change queued before an earlier one of its worktree failed, and containing it, fails with it unchecked (it was
+  # being checked, or on a batch being checked, when that one failed; supersede() above takes the waiting ones).
+  local fk fs ft
+  for key in "${keys[@]}"; do
+    [ -f "$LD/jobs/$key.job" ] && [ -s "$LD/failed/$(field name "$key")" ] || continue
+    while read -r fk fs ft; do
+      [ "$fk" != "$key" ] && [ "$ft" -gt "$(field queued "$key")" ] || continue
+      git -C "$repo" cat-file -e "$fs^{commit}" 2>/dev/null || continue
+      if [ -z "$(git -C "$repo" rev-list --cherry-pick --right-only "refs/landq/$inst/job/$key...$fs")" ]; then
+        : > "$d/detail"; result "$key" FAILED "superseded: contains failed ${fs:0:8} (fix it on top, then land.sh)"; break
+      fi
+    done < "$LD/failed/$(field name "$key")"
+  done
+  # A carried change must be in the one carrying it (its commits, by content), else it is queued on its own again.
+  local o keep
+  for key in "${keys[@]}"; do
+    [ -s "$LD/jobs/$key.carry" ] || continue
+    keep=()
+    for o in $(cat "$LD/jobs/$key.carry"); do
+      if git -C "$repo" fetch -q origin "+refs/heads/$(field ref "$o"):refs/landq/$inst/job/$o" 2>/dev/null \
+          && [ -z "$(git -C "$repo" rev-list --cherry-pick --right-only "refs/landq/$inst/job/$key...refs/landq/$inst/job/$o")" ]; then keep+=("$o")
+      else : > "$LD/jobs/$o.solo"; : > "$LD/pending/$o"; log "$bid: $(field name "$o") ${o##*-} isn't in ${key##*-}: queued on its own again"; fi
+    done
+    if [ ${#keep[@]} -gt 0 ]; then printf '%s\n' "${keep[@]}" > "$LD/jobs/$key.carry"; else rm -f "$LD/jobs/$key.carry"; fi
+  done
+  # (A slot checkout deleted by hand stays registered: prune it, then add it again.)
+  [ -d "$wt" ] || { git -C "$repo" worktree prune; git -C "$repo" worktree add -q --detach "$wt" "refs/landq/$inst/target"; }
   # (A slot's checkout may be left mid cherry-pick or rebase by a killed batch.)
   cd "$wt" || { log "$bid: no checkout $wt"; sleep 30; front resume "${keys[@]}"; return; }
   { git cherry-pick --quit; git rebase --quit; } 2>/dev/null
@@ -222,9 +288,21 @@ run_batch() {
   echo "checking" > "$d/state"; log "$bid: $kind of $n on ${base:0:8}${dep:+ (on $dep)} in slot $slot: $(for k in "${applied[@]}"; do printf '%s ' "$(field name "$k"):${k##*-}"; done)"
   prune_land_target "$CARGO_TARGET_DIR" > /dev/null
   : > "$d/times"; s=$(date +%s)
-  LAND_TIMES="$d/times" timeout 90m ${LAND_CHECKS:-tools/tiers/land-checks.sh} "$pkgs" "$d/changed" > "$d/check.log" 2>&1; rc=$?
+  # (In its own process group, stopped as soon as the batch under it ends without landing: its result can't be used.)
+  LAND_TIMES="$d/times" setsid timeout 90m ${LAND_CHECKS:-tools/tiers/land-checks.sh} "$pkgs" "$d/changed" > "$d/check.log" 2>&1 &
+  local cpid=$!
+  while kill -0 "$cpid" 2>/dev/null; do
+    if dep_failed "$dep"; then kill -TERM -- "-$cpid" 2>/dev/null; log "$bid: check stopped: $dep under it didn't land"; break; fi
+    sleep 5
+  done
+  wait "$cpid"; rc=$?
   local t_check=$(( $(date +%s) - s )) t_push=0 depres=landed
   [ $rc -eq 0 ] || rm -f "$d/stack"   # (red: nothing stacks on it any more)
+  # Red, and the error is certainly its own (not the batch under it): no waiting for that one (11-01: a409fa87 waited
+  # 24 min behind a batch of 4 that then failed, and was checked again).
+  if [ $rc -ne 0 ] && [ -n "$dep" ] && [ -n "$(blame "$(sed -n 's/^LAND FAILED: //p' "$d/check.log" | tail -1)" "$d/check.log" "$d/dep.changed" "${applied[@]}" 2>>"$LD/daemon.log")" ]; then
+    log "$bid: red, from the error its own: not waiting for $dep"; dep=""
+  fi
   if [ -n "$dep" ]; then
     # Green, it can land only once the batch under it has (its commits are in this stack); red, it is only to blame
     # if that one landed (else its bad change may be what failed here).
@@ -292,7 +370,7 @@ run_batch() {
       log "$bid: red ($reason): blamed ${who% } ($why); the other ${#rest[@]} again without it"
       [ ${#rest[@]} -eq 0 ] || front rest "${rest[@]}"; reason="$reason; blamed ${who% }: $why"
     else
-      # Red: halves go first (stacked like any batch); the one at fault is the half that stays red, down to one.
+      # Red: halves go first (stacked like any batch, so in the train); the one at fault is the half that stays red, down to one.
       res_word=split; local h=$(( (n + 1) / 2 ))
       log "$bid: red ($reason): no single change from the error: splitting $n into $h + $(( n - h ))"
       front split "${applied[@]:0:$h}"; front split "${applied[@]:$h}"
@@ -319,7 +397,21 @@ worker() {
     if [ -n "$b" ]; then
       bid="$(date -u +%m%d-%H%M%S)-$BASHPID"; mkdir -p "$LD/run/$bid"; echo "$BASHPID" > "$LD/run/$bid/pid"; mv "$b" "$LD/run/$bid/jobs"
     else
-      mapfile -t ks < <(ls "$LD/pending" | head -"$MAXB")
+      # One place per worktree: its newest queued change carries its older ones (they are in it; checked at stacking),
+      # so a run of lands is checked once (11-01: 39 queued were 5 worktrees' runs). Batch size grows with the
+      # backlog: 4 worktrees, 8 above 12 queued changes, 12 above 24 (~3 % of changes fail, and blame makes red batches cheap).
+      local -A newest=(); local order=() k nm max ks=() npend
+      npend=$(ls "$LD/pending" | wc -l)
+      for k in $(ls "$LD/pending"); do
+        nm=$(field name "$k"); [ -e "$LD/jobs/$k.solo" ] && nm="#$k"
+        if [ -n "${newest[$nm]:-}" ]; then
+          { echo "${newest[$nm]}"; cat "$LD/jobs/${newest[$nm]}.carry" 2>/dev/null; } >> "$LD/jobs/$k.carry"
+          rm -f "$LD/jobs/${newest[$nm]}.carry" "$LD/pending/${newest[$nm]}"
+        else order+=("$nm"); fi
+        newest[$nm]=$k
+      done
+      max=$MAXB; [ "$npend" -gt 12 ] && max=$(( MAXB * 2 )); [ "$npend" -gt 24 ] && max=$(( MAXB * 3 ))
+      for nm in "${order[@]:0:$max}"; do ks+=("${newest[$nm]}"); done
       if [ ${#ks[@]} -gt 0 ]; then
         bid="$(date -u +%m%d-%H%M%S)-$BASHPID"; mkdir -p "$LD/run/$bid"; echo "$BASHPID" > "$LD/run/$bid/pid"
         { echo kind=batch; printf '%s\n' "${ks[@]}"; } > "$LD/run/$bid/jobs"
@@ -355,7 +447,7 @@ log "land daemon $$ for $LD → $TARGET, batches up to $MAXB, $LAND_SLOTS slots 
 rm -f "$LD"/waiting.*
 last_update=0
 while [ ! -e "$LD/stop" ]; do
-  recover; waiting=0; find "$LD/outcome" -type f -mmin +1440 -delete 2>/dev/null
+  recover; waiting=0; find "$LD/outcome" "$LD/failed" -type f -mmin +1440 -delete 2>/dev/null
   for w in "$LD"/waiting.*; do
     [ -e "$w" ] || continue
     p=$(cat "$w" 2>/dev/null); if [ -z "$p" ] || alive "$p"; then waiting=$((waiting + 1)); else rm -f "$w"; fi
@@ -372,7 +464,9 @@ while [ ! -e "$LD/stop" ]; do
       fi
     fi
   fi
-  if [ $waiting = 0 ] && [ $busy -lt "$LAND_SLOTS" ] && { ls "$LD"/splits/*.batch > /dev/null 2>&1 || [ -n "$(ls "$LD/pending")" ]; }; then
+  # A waiter (in the slots' queue) per thing to claim: each front batch, and what is queued; up to the free slots.
+  units=$(( $(ls "$LD"/splits/*.batch 2>/dev/null | wc -l) + $( [ -n "$(ls "$LD/pending")" ] && echo 1 || echo 0) ))
+  if [ $waiting -lt $units ] && [ $(( busy + waiting )) -lt "$LAND_SLOTS" ]; then
     tok="$LD/waiting.$(date +%s%N)"; : > "$tok"
     ( exec 9>&-; worker "$tok" ) >> "$LD/daemon.log" 2>&1 &
     echo $! > "$tok"

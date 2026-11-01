@@ -14,16 +14,19 @@ All scripts take extra cargo args (`--locked`, `-p <crate>`, `--release`). Set `
 
 The only way to put work on main. `land.sh` rebases on origin/main, queues HEAD on the land server vibe4 and returns
 at once with `QUEUED <sha>`: **keep working, don't wait for it.** The land daemon there (`tools/tiers/land-daemon.sh`)
-takes whatever is queued whenever one of its three slots frees, up to 4 changes in arrival order (no batch waits to
-fill), stacks them on main, or on the batch being checked before it (it lands right after that one, as checked;
-if that one doesn't land, it goes back to be checked again), and checks the stack once: `cargo check` over the workspace (type errors and warnings
+takes whatever is queued whenever one of its three slots frees, in arrival order (no batch waits to fill): one place
+per worktree (its newest queued change carries its older ones: one check, one result for all), 4 worktrees, 8 above
+12 queued changes, 12 above 24. It stacks them on the batches still being checked (a merge train: it lands right
+after them, as checked; if one of them doesn't land, its check is stopped and it is rebuilt on the new base) and
+checks the stack once: `cargo check` over the workspace (type errors and warnings
 anywhere fail), clippy on the crates the changes edit, the full tests of those crates and of the crates that use them
 directly, T0 when the app, ops or cli is affected, ops' menu coverage when a UI crate changed. Green: the stack goes to
 main. Red: when the error names the change at fault for certain (a compile, clippy or warning location in a file
 only one change edited, or in a crate only one change edited or uses; a failing test's crate, the same way), that
 change is reported at once and the others are checked again without it; otherwise (two candidates, T0, menu coverage,
 a panic without a crate) the batch is split in halves that are checked next (in parallel slots), down to the change
-at fault, which is reported; the others land. A change that doesn't apply on main or on the changes queued before it is reported as a
+at fault, which is reported; the others land. When a change fails, the queued changes of its worktree that contain
+it (queued before it failed) fail with it unchecked ("superseded"); what you queue after the failure is the fix. A change that doesn't apply on main or on the changes queued before it is reported as a
 rebase conflict. Deeper dependents' tests run in the watcher after the push. Docs-only changes push at once, no build.
 - `tools/tiers/land.sh --status`: your queued, checking, landed and failed changes, with the failing output. The lead
   also tells you when one fails (`LAND FAILED <worktree> <sha> <reason>`). Each land.sh run also prints the results
