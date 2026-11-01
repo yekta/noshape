@@ -43,7 +43,8 @@ pub fn frame() -> FeatureType {
                 ParamSpec::enum_("cornerType", "Corner type", FRAME_CORNER).hints(Hints::SHOW_LABEL),
                 ParamSpec::flip("cornerButtFlip", "Flip corner").visible(|v| butt(v, "cornerType")),
             ],
-        ),
+        )
+        .item_template("#vertex [#cornerType]"),
         ParamSpec::bool("trim", "Limit frame ends", false).hints(Hints::GROUP_HEADER),
         ParamSpec::query("trimPlanes", "Faces to trim to", QueryFilter::PLANAR_FACE | QueryFilter::PLANE).visible(|v| v.bool("trim")),
         ParamSpec::query("trimBodies", "Parts to trim to", QueryFilter::SOLID_BODY).visible(|v| v.bool("trim")),
@@ -58,6 +59,7 @@ pub fn frame_trim() -> FeatureType {
         ParamSpec::enum_("trimType", "Trim Type", &[("GROUP", "Ordered groups"), ("FACE", "Face")])
             .hints(Hints::HORIZONTAL_ENUM | Hints::REMEMBER_PREVIOUS_VALUE),
         ParamSpec::array("frameGroups", "Frame groups", "Group", vec![ParamSpec::query("frames", "Frames", QueryFilter::SOLID_BODY)])
+        .item_template("#frames")
             .hints(Hints::COLLAPSE_ARRAY_ITEMS)
             .visible(move |v| !face(v)),
         ParamSpec::query("targets", "Parts to trim", QueryFilter::SOLID_BODY).visible(face),
@@ -136,7 +138,8 @@ pub fn cut_list() -> FeatureType {
                 ParamSpec::text("column", "Column", ""),
                 ParamSpec::text("value", "Value", ""),
             ],
-        ),
+        )
+        .item_template("#column = #value"),
     ];
     FeatureType::new("cutlist", "Cut list", Category::Frame, p).icon("cutList").describe("Group frame segments and generate a cut list table")
 }

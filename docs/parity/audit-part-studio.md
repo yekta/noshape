@@ -12,7 +12,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 |---|---|---|---|
 | Toolbar, every group and overflow (75 tools + Add custom features) | behaviours "Toolbar" (Customize toolbar list), dom/toolbar-partstudio.txt | every live tool in live's group, in order (Move boundary = extendSurface) | 0 |
 | Toolbar right-click, Customize toolbar, narrow-window collapse | behaviours "Toolbar", "Narrow window" | checked earlier (cursors 81, part-studio 4.x, chrome-sweep) | 0 |
-| Feature dialogs, fields and options (75 toolbar features) | std preconditions via std_oracle::print_all | 38 same as std now (37 at first); 37 differ | rows below |
+| Feature dialogs, fields and options (75 toolbar features) | std preconditions via std_oracle::print_all | 47 same as std now (37 at first); 28 differ | rows below |
 | Keyboard shortcuts (live's Shift+/ list, 121 entries) | dom/keyboard-shortcuts.txt | every applicable entry in workflow-keyboard-mouse.md, all ✅ (11-01) | 0 |
 | View menu (camera / render ▾) | dom/menu-camera-render.txt | 16 items = live (part-studio 9.8) | 0 |
 | Context menus: face, edge, vertex, empty space, part, plane, origin, mate connector, sketch region / curve, feature rows (sketch, extrude, fillet, multi), parts-list part, tabs, Select ▸ submenus | dom/context-menus-partstudio.txt, -ps-*.txt | compared in core-workflow §8 and chrome-sweep CM1–CM5 (✅) | 0 |
@@ -20,7 +20,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | Panels: Measure, Mass and section properties, Section view, Appearances, Variable table, Configurations, Render / Display states | live asked for whole-panel dumps (REQUESTS 11-01) | in progress | – |
 | View cube (right-click, arrows, hover) | menus/625-proj-viewcube-rightclick*.png | in progress | – |
 
-**Counts (11-01, audit 1):** surfaces audited 5 of 9 (4 waiting on live dumps); dialog gaps found 199 field rows + 52 visibility states; fixed 28 rows (and 27 visibility states), accepted 5, open 166 rows + 25 states.
+**Counts (11-01, audit 2):** surfaces audited 5 of 9 (4 waiting on live dumps); dialog gaps found 199 field rows + 52 visibility states; fixed 73 rows and 39 states, accepted 7, open 119 rows + 13 states. 47 of 75 dialogs now equal std (37 at first).
 
 ## Feature dialogs against std
 
@@ -30,7 +30,7 @@ which fields show); P3: internal (option ids under the same labels, configurabil
 oracle reads std's annotations, not its feature defaults map: a default std sets there (Ruled surface's cubic interpolation)
 is checked by hand.
 
-Field rows: 199 (fixed 28, accepted 5, open 166); visibility states differing now: 25.
+Field rows: 199 (fixed 73, accepted 7, open 119); visibility states differing now: 13.
 
 | # | Feature | Field | P | Difference (std = live) | Status |
 |---|---|---|---|---|---|
@@ -48,79 +48,79 @@ Field rows: 199 (fixed 28, accepted 5, open 166); visibility states differing no
 | D12 | tag | holes | P1 | missing: std has "Holes" | ✅ (audit 1, 11-01) |
 | D13 | tag | pcbEntityType | P1 | missing: std has "PCB entity type" | ✅ (audit 1, 11-01) |
 | D14 | tag | plated | P1 | missing: std has "Plated" | ✅ (audit 1, 11-01) |
-| D15 | assignVariable | anyValue | P2 | extra: ours has "Value", std has no `anyValue` | ✗ |
-| D16 | assignVariable | axisMeasurementsGroup | P2 | missing: std has "Axis measurements" (a group) | ✗ |
-| D17 | assignVariable | columnGroup | P2 | missing: std has "Column" (a group) | ✗ |
-| D18 | assignVariable | conversionFactor | P2 | extra: ours has "Conversion factor", std has no `conversionFactor` | ✗ |
+| D15 | assignVariable | anyValue | P2 | extra: ours has "Value", std has no `anyValue` | – std has it (`isAnything`, variable.fs); the oracle's extraction skips isAnything fields |
+| D16 | assignVariable | axisMeasurementsGroup | P2 | missing: std has "Axis measurements" (a group) | ✅ (audit 2, 11-01) |
+| D17 | assignVariable | columnGroup | P2 | missing: std has "Column" (a group) | ✅ (audit 2, 11-01) |
+| D18 | assignVariable | conversionFactor | P2 | extra: ours has "Conversion factor", std has no `conversionFactor` | – std has it (`isAnything`, variable.fs); the oracle's extraction skips isAnything fields |
 | D19 | assignVariable | minmax | P2 | hints: std adds [], ours adds ['HORIZONTAL_ENUM'] | ✗ |
-| D20 | assignVariable | rowGroup | P2 | missing: std has "Row" (a group) | ✗ |
-| D21 | bridgingCurve | match1 | P2 | options: std ['Match position', 'Match tangent', 'Match curvature', 'Match flow (G3)'] / ours ['Match position', 'Match tangent', 'Match curvature', 'Match flow'] | ✗ |
-| D22 | bridgingCurve | match2 | P2 | options: std ['Match position', 'Match tangent', 'Match curvature', 'Match flow (G3)'] / ours ['Match position', 'Match tangent', 'Match curvature', 'Match flow'] | ✗ |
-| D23 | compositeCurve | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✗ |
-| D24 | constrainedSurface | showDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✗ |
-| D25 | constrainedSurface | vertices | P2 | array row label: std Some("#vertex"), ours None | ✗ |
-| D26 | cutlist | columnOverrides | P2 | array row label: std Some("#column = #value"), ours None | ✗ |
-| D27 | editCurve | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✗ |
-| D28 | editCurve | controlPointEdits | P2 | array row label: std Some("#index: #x;#y;#z"), ours None | ✗ |
-| D29 | editCurve | selectedIndices | P2 | array row label: std Some("Control point index #indexValue"), ours None | ✗ |
+| D20 | assignVariable | rowGroup | P2 | missing: std has "Row" (a group) | ✅ (audit 2, 11-01) |
+| D21 | bridgingCurve | match1 | P2 | options: std ['Match position', 'Match tangent', 'Match curvature', 'Match flow (G3)'] / ours ['Match position', 'Match tangent', 'Match curvature', 'Match flow'] | ✅ (audit 2, 11-01) |
+| D22 | bridgingCurve | match2 | P2 | options: std ['Match position', 'Match tangent', 'Match curvature', 'Match flow (G3)'] / ours ['Match position', 'Match tangent', 'Match curvature', 'Match flow'] | ✅ (audit 2, 11-01) |
+| D23 | compositeCurve | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
+| D24 | constrainedSurface | showDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
+| D25 | constrainedSurface | vertices | P2 | array row label: std Some("#vertex"), ours None | ✅ (audit 2, 11-01) |
+| D26 | cutlist | columnOverrides | P2 | array row label: std Some("#column = #value"), ours None | ✅ (audit 2, 11-01) |
+| D27 | editCurve | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
+| D28 | editCurve | controlPointEdits | P2 | array row label: std Some("#index: #x;#y;#z"), ours None | ✅ (audit 2, 11-01) |
+| D29 | editCurve | selectedIndices | P2 | array row label: std Some("Control point index #indexValue"), ours None | ✅ (audit 2, 11-01) |
 | D30 | editCurve | showDetails | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✗ |
-| D31 | faceBlend | caps | P2 | array row label: std Some("#entity"), ours None | ✗ |
-| D32 | faceBlend | edgeLimits | P2 | array row label: std Some("#edge"), ours None | ✗ |
-| D33 | fill | addGuides | P2 | hints: std adds [], ours adds ['GROUP_HEADER'] | ✗ |
+| D31 | faceBlend | caps | P2 | array row label: std Some("#entity"), ours None | ✅ (audit 2, 11-01) |
+| D32 | faceBlend | edgeLimits | P2 | array row label: std Some("#edge"), ours None | ✅ (audit 2, 11-01) |
+| D33 | fill | addGuides | P2 | hints: std adds [], ours adds ['GROUP_HEADER'] | ✅ (audit 2, 11-01) |
 | D34 | fill | edges | P2 | array item fields differ: std [entities "Edges" query max None hints 0x8000 "" None, continuity "Continuity" enum[("G0", "Position"), ("G1",… ours [entities "Edges" query max None hints 0x0 "" None, continuity "Continuity" enum[("G0", "Position"), ("G1", "T… | ✗ |
-| D35 | fitSpline | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✗ |
+| D35 | fitSpline | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
 | D36 | frame | cornerOverrides | P2 | array item fields differ: std [vertex "Vertex" query max Some(1) hints 0x8000 "" None, cornerType "Corner type" enum[("MITER", "Miter"), ("B… ours [vertex "Vertex" query max Some(1) hints 0x0 "" None, cornerType "Corner type" enum[("MITER", "Miter"), ("BUTT… | ✗ |
-| D37 | frame | cornerOverrides | P2 | array row label: std Some("#vertex [#cornerType]"), ours None | ✗ |
+| D37 | frame | cornerOverrides | P2 | array row label: std Some("#vertex [#cornerType]"), ours None | ✅ (audit 2, 11-01) |
 | D38 | frame | selections | P2 | hints: std adds [], ours adds ['ALLOW_QUERY_ORDER'] | ✗ |
 | D39 | frameTrim | frameGroups | P2 | array item fields differ: std [frames "Frames" query max None hints 0x0 "Frame segments are trimmed against preceding groups and are used as… ours [frames "Frames" query max None hints 0x0 "" None]… | ✗ |
-| D40 | frameTrim | frameGroups | P2 | array row label: std Some("#frames"), ours None | ✗ |
+| D40 | frameTrim | frameGroups | P2 | array row label: std Some("#frames"), ours None | ✅ (audit 2, 11-01) |
 | D41 | gusset | chamfer | P2 | hints: std adds [], ours adds ['FIRST_IN_ROW'] | ✗ |
 | D42 | helix | endRadToggle | P2 | hints: std adds [], ours adds ['DISPLAY_SHORT', 'FIRST_IN_ROW'] | ✗ |
 | D43 | helix | endRadius | P2 | hints: std adds [], ours adds ['DISPLAY_SHORT'] | ✗ |
 | D44 | importDerived | mateConnectorId | P2 | extra: ours has "Base mate connector", std has no `mateConnectorId` | ✗ |
-| D45 | intersectionCurve | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✗ |
+| D45 | intersectionCurve | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
 | D46 | isoparametricCurve | directionType | P2 | default option: std U_DIRECTION / ours U | ✅ (audit 1, 11-01) |
 | D47 | mateConnector | flipPrimary | P2 | hints: std adds ['FIRST_IN_ROW', 'OPPOSITE_DIRECTION'], ours adds ['PRIMARY_AXIS'] | ✗ |
 | D48 | mutualTrim | body1 | P2 | label: std "First set of surfaces", ours "First surface" | ✗ |
 | D49 | mutualTrim | body2 | P2 | label: std "Second set of surfaces", ours "Second surface" | ✗ |
-| D50 | offsetCurveOnFace | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✗ |
-| D51 | pcbStart | hasSecondDirection | P2 | hints: std adds [], ours adds ['GROUP_HEADER'] | ✗ |
+| D50 | offsetCurveOnFace | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
+| D51 | pcbStart | hasSecondDirection | P2 | hints: std adds [], ours adds ['GROUP_HEADER'] | ✅ (audit 2, 11-01) |
 | D52 | pcbStart | offsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✗ |
 | D53 | pcbStart | secondDirectionDepth | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✗ |
 | D54 | pcbStart | secondDirectionOffsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✗ |
-| D55 | projectCurves | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✗ |
+| D55 | projectCurves | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
 | D56 | queryVariable | additionalQueries | P2 | array item fields differ: std [booleanOperation "Boolean operation" enum[("UNION", "Union"), ("SUBTRACTION", "Subtract"), ("INTERSECTION", "… ours [booleanOperation "Boolean operation" enum[("UNION", "Union"), ("SUBTRACTION", "Subtract"), ("INTERSECTION", "… | ✗ |
 | D57 | queryVariable | additionalQueries | P2 | array row label: std Some("#booleanOperation of #addQlowercaseSelectionType"), ours None | ✗ |
 | D58 | queryVariable | edgeAdjacentEntityType | P2 | default option: std ALL / ours EDGES_AND_FACES | ✅ (audit 1, 11-01) |
 | D59 | routingCurve | csvUnit | P2 | options: std ['Centimeter', 'Foot', 'Inch', 'Millimeter', 'Meter', 'Yard'] / ours ['Meter', 'Centimeter', 'Millimeter', 'Inch', 'Foot', 'Yard'] | ✅ (audit 1, 11-01) |
 | D60 | routingCurve | hasTargetLength | P2 | hints: std adds [], ours adds ['FIRST_IN_ROW'] | ✗ |
-| D61 | routingCurve | inputsGroup | P2 | missing: std has "Inputs" (a group) | ✗ |
+| D61 | routingCurve | inputsGroup | P2 | missing: std has "Inputs" (a group) | ✅ (audit 2, 11-01) |
 | D62 | routingCurve | points | P2 | array item fields differ: std [index "Point index" Integer 0..10000 =0.000000000000 / 0.000000000000 hints 0x8000 "" None, referenceType "Re… ours [referenceType "Reference" enum[("ORIGIN", "Origin"), ("VERTEX", "Vertex"), ("CURVE", "Curve"), ("RELATIVE", "… | ✗ |
 | D63 | routingCurve | points | P2 | array row label: std Some("Point #index"), ours None | ✗ |
 | D64 | routingCurve | segmentEditType | P2 | default option: std ADD / ours ADD_POINTS | ✅ (audit 1, 11-01) |
 | D65 | routingCurve | selectedIndices | P2 | array row label: std Some("Selected point #indexValue"), ours None | ✗ |
 | D66 | ruledSurface | vertexOverrides | P2 | array item fields differ: std [vertex "Vertex" query max Some(1) hints 0x2 "" None, overrideType "Ruled surface type" enum[("NORMAL", "Norma… ours [vertex "Vertex" query max Some(1) hints 0x2 "" None, overrideType "Ruled surface type" enum[("NORMAL", "Norma… | ✗ |
-| D67 | ruledSurface | vertexOverrides | P2 | array row label: std Some("#vertex"), ours None | ✗ |
-| D68 | sheetMetalBend | oppositeAngleFromDirection | P2 | hints: std adds ['OPPOSITE_DIRECTION'], ours adds ['OPPOSITE_DIRECTION_CIRCULAR'] | ✗ |
-| D69 | sheetMetalBend | oppositeAngleFromDirection | P2 | label: std "Opposite direction angle", ours "Opposite angle" | ✗ |
-| D70 | sheetMetalBendRelief | bendReliefStyle | P2 | hints: std adds ['SHOW_LABEL'], ours adds [] | ✗ |
-| D71 | sheetMetalCorner | cornerStyle | P2 | hints: std adds ['SHOW_LABEL'], ours adds [] | ✗ |
-| D72 | sheetMetalCornerBreak | allowEdgeOverflow | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✗ |
+| D67 | ruledSurface | vertexOverrides | P2 | array row label: std Some("#vertex"), ours None | ✅ (audit 2, 11-01) |
+| D68 | sheetMetalBend | oppositeAngleFromDirection | P2 | hints: std adds ['OPPOSITE_DIRECTION'], ours adds ['OPPOSITE_DIRECTION_CIRCULAR'] | ✅ (audit 2, 11-01) |
+| D69 | sheetMetalBend | oppositeAngleFromDirection | P2 | label: std "Opposite direction angle", ours "Opposite angle" | ✅ (audit 2, 11-01) |
+| D70 | sheetMetalBendRelief | bendReliefStyle | P2 | hints: std adds ['SHOW_LABEL'], ours adds [] | ✅ (audit 2, 11-01) |
+| D71 | sheetMetalCorner | cornerStyle | P2 | hints: std adds ['SHOW_LABEL'], ours adds [] | ✅ (audit 2, 11-01) |
+| D72 | sheetMetalCornerBreak | allowEdgeOverflow | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
 | D73 | sheetMetalCornerBreak | angle | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✗ |
 | D74 | sheetMetalCornerBreak | width | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✗ |
 | D75 | sheetMetalCornerBreak | width1 | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✗ |
 | D76 | sheetMetalCornerBreak | width2 | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✗ |
-| D77 | sheetMetalFlange | angleFromDirectionOppositeAngle | P2 | hints: std adds ['OPPOSITE_DIRECTION'], ours adds ['OPPOSITE_DIRECTION_CIRCULAR'] | ✗ |
+| D77 | sheetMetalFlange | angleFromDirectionOppositeAngle | P2 | hints: std adds ['OPPOSITE_DIRECTION'], ours adds ['OPPOSITE_DIRECTION_CIRCULAR'] | ✅ (audit 2, 11-01) |
 | D78 | sheetMetalFlange | endConditionsGroup | P2 | missing: std has "End conditions" (a group) | ✅ (audit 1, 11-01) |
 | D79 | sheetMetalFlange | overallParametersGroup | P2 | missing: std has "Overall parameters" (a group) | ✅ (audit 1, 11-01) |
-| D80 | sheetMetalFlange | secondBoundingEntityOffset | P2 | label: std "Second distance", ours "Distance" | ✗ |
-| D81 | sheetMetalHem | hemAlignment | P2 | hints: std adds ['REMEMBER_PREVIOUS_VALUE', 'SHOW_LABEL'], ours adds [] | ✗ |
-| D82 | sheetMetalHem | hemCornerType | P2 | hints: std adds ['REMEMBER_PREVIOUS_VALUE', 'SHOW_LABEL'], ours adds [] | ✗ |
-| D83 | sheetMetalJog | oppositeAngleFromDirection | P2 | hints: std adds ['OPPOSITE_DIRECTION'], ours adds ['OPPOSITE_DIRECTION_CIRCULAR'] | ✗ |
-| D84 | sheetMetalJog | oppositeAngleFromDirection | P2 | label: std "Opposite direction angle", ours "Opposite angle" | ✗ |
+| D80 | sheetMetalFlange | secondBoundingEntityOffset | P2 | label: std "Second distance", ours "Distance" | ✅ (audit 2, 11-01) |
+| D81 | sheetMetalHem | hemAlignment | P2 | hints: std adds ['REMEMBER_PREVIOUS_VALUE', 'SHOW_LABEL'], ours adds [] | ✅ (audit 2, 11-01) |
+| D82 | sheetMetalHem | hemCornerType | P2 | hints: std adds ['REMEMBER_PREVIOUS_VALUE', 'SHOW_LABEL'], ours adds [] | ✅ (audit 2, 11-01) |
+| D83 | sheetMetalJog | oppositeAngleFromDirection | P2 | hints: std adds ['OPPOSITE_DIRECTION'], ours adds ['OPPOSITE_DIRECTION_CIRCULAR'] | ✅ (audit 2, 11-01) |
+| D84 | sheetMetalJog | oppositeAngleFromDirection | P2 | label: std "Opposite direction angle", ours "Opposite angle" | ✅ (audit 2, 11-01) |
 | D85 | sheetMetalLoft | connections | P2 | array item fields differ: std [connectionEntities "Vertices or edges" query max None hints 0x0 "" None, isRip "Rip" bool=false hints 0x0 "" … ours [connectionEntities "Vertices or edges" query max None hints 0x0 "" None, isRip "Rip" bool=false hints 0x0 "" … | ✗ |
-| D86 | sheetMetalLoft | connections | P2 | array row label: std Some("#connectionEntities"), ours None | ✗ |
-| D87 | sheetMetalStart | hasSecondDirection | P2 | hints: std adds [], ours adds ['GROUP_HEADER'] | ✗ |
+| D86 | sheetMetalLoft | connections | P2 | array row label: std Some("#connectionEntities"), ours None | ✅ (audit 2, 11-01) |
+| D87 | sheetMetalStart | hasSecondDirection | P2 | hints: std adds [], ours adds ['GROUP_HEADER'] | ✅ (audit 2, 11-01) |
 | D88 | sheetMetalStart | offsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✗ |
 | D89 | sheetMetalStart | secondDirectionDepth | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✗ |
 | D90 | sheetMetalStart | secondDirectionOffsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✗ |
@@ -128,7 +128,7 @@ Field rows: 199 (fixed 28, accepted 5, open 166); visibility states differing no
 | D92 | tag | additionalColumns | P2 | array row label: std Some("#header = #value"), ours None | ✅ (audit 1, 11-01) |
 | D93 | assignVariable | angleValue | P3 | hints: std adds ['INITIAL_FOCUS_ON_EDIT'], ours adds [] | ✗ |
 | D94 | assignVariable | angleValue | P3 | value: std `Angle -1745.3292519943295..1745.3292519943295 =0.000000000000 / 0.000000000000` / ours `Angle -6.283185307179586..6.283185307179586 =0.000000000000 / 0.000000000000` | ✗ |
-| D95 | assignVariable | axisMeasurements | P3 | extra: ours has "Axis measurements", std has no `axisMeasurements` | ✗ |
+| D95 | assignVariable | axisMeasurements | P3 | extra: ours has "Axis measurements", std has no `axisMeasurements` | ✅ (audit 2, 11-01) |
 | D96 | assignVariable | columnIndex | P3 | value: std `Integer 0..100000 =0.000000000000 / 0.000000000000` / ours `Integer 0..1000000 =0.000000000000 / 0.000000000000` | ✗ |
 | D97 | assignVariable | columnLabelIndex | P3 | value: std `Integer 0..100000 =0.000000000000 / 0.000000000000` / ours `Integer 0..1000000 =0.000000000000 / 0.000000000000` | ✗ |
 | D98 | assignVariable | columnMaxIndex | P3 | value: std `Integer 0..100000 =0.000000000000 / 0.000000000000` / ours `Integer 0..1000000 =0.000000000000 / 0.000000000000` | ✗ |
@@ -188,29 +188,29 @@ Field rows: 199 (fixed 28, accepted 5, open 166); visibility states differing no
 | D152 | queryVariable | edgeAdjacentEntityType | P3 | option ids: std ['ALL', 'EDGE', 'FACE'] / ours ['EDGES_AND_FACES', 'EDGES', 'FACES'] | ✅ (audit 1, 11-01) |
 | D153 | queryVariable | vertexAdjacentEntityType | P3 | option ids: std ['ALL', 'EDGE', 'VERTEX', 'FACE'] / ours ['ALL', 'EDGES', 'VERTICES', 'FACES'] | ✅ (audit 1, 11-01) |
 | D154 | routingCurve | addPointOnAxisDrag | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
-| D155 | routingCurve | csvUnit | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
+| D155 | routingCurve | csvUnit | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D156 | routingCurve | csvUnit | P3 | option ids: std ['Centimeter', 'Foot', 'Inch', 'Millimeter', 'Meter', 'Yard'] / ours ['Meter', 'Centimeter', 'Millimeter', 'Inch', 'Foot', 'Yard'] | ✅ (audit 1, 11-01) |
 | D157 | routingCurve | curveBaseCSys | P3 | tooltip: std "Point or mate connector used as reference for the curve. Defaults to origin.", ours "" | ✗ |
-| D158 | routingCurve | inputCurve | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
+| D158 | routingCurve | inputCurve | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D159 | routingCurve | inputData | P3 | kind: std `reference Csv` / ours `text=""` (our own picker) | ✗ |
-| D160 | routingCurve | inputType | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
-| D161 | routingCurve | inputVertices | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
+| D160 | routingCurve | inputType | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
+| D161 | routingCurve | inputVertices | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D162 | routingCurve | keepPoints | P3 | tooltip: std "Create points in addition to the curve.", ours "" | ✗ |
 | D163 | routingCurve | numPointsToAdd | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
 | D164 | routingCurve | orthoCsys | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
 | D165 | routingCurve | orthoCsysMate | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
-| D166 | routingCurve | overwritePoints | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
+| D166 | routingCurve | overwritePoints | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D167 | routingCurve | points | P3 | array item "point" (std) vs "Point" (ours) | ✗ |
 | D168 | routingCurve | points | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds [] | ✗ |
 | D169 | routingCurve | pointsEditType | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
 | D170 | routingCurve | pointsEditType | P3 | option ids: std ['SINGLE', 'MULTI'] / ours ['SINGLE', 'MULTIPLE'] | ✅ (audit 1, 11-01) |
-| D171 | routingCurve | samples | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
+| D171 | routingCurve | samples | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D172 | routingCurve | segmentEditType | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
 | D173 | routingCurve | segmentEditType | P3 | option ids: std ['ADD', 'ORTHOGONAL'] / ours ['ADD_POINTS', 'ORTHOGONAL_PATH'] | ✅ (audit 1, 11-01) |
 | D174 | routingCurve | selectedIndices | P3 | array item "index" (std) vs "Point" (ours) | ✗ |
 | D175 | routingCurve | selectedIndices | P3 | hints: std adds ['PREVENT_ARRAY_REORDER', 'X25'], ours adds [] | ✗ |
 | D176 | routingCurve | showCSys | P3 | tooltip: std "Show coordinate system of the reference used by the current vertex.", ours "" | ✗ |
-| D177 | routingCurve | startColumn | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
+| D177 | routingCurve | startColumn | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D178 | routingCurve | targetLength | P3 | value: std `Length -500..500 =0.025000000000 / 0.025400000000` / ours `Length 0.00001..500 =0.025000000000 / 0.025400000000` | ✗ |
 | D179 | ruledSurface | cornerType | P3 | option ids: std ['SPUN', 'EXTENDED', 'LOFTED', 'NO_CORNER'] / ours ['SPUN', 'EXTENDED', 'LOFTED', 'NONE'] | ✅ (audit 1, 11-01) |
 | D180 | ruledSurface | vertexOverrides | P3 | array item "arrayItem" (std) vs "Vertex" (ours) | ✗ |
@@ -234,38 +234,20 @@ Field rows: 199 (fixed 28, accepted 5, open 166); visibility states differing no
 | D198 | tag | additionalColumns | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds ['UNCONFIGURABLE'] | ✅ (audit 1, 11-01) |
 | D199 | tag | cSysMateConnector | P3 | tooltip: std "If none selected, this feature will create one at Origin", ours "" | ✗ |
 
-Found in the app (11-01):
-
-| # | Feature | Field | P | Difference | Status |
-|---|---|---|---|---|---|
-| A1 | tag | basePlane | P2 | std pre-fills Base plane with the Top plane (tag.fs defaults `qTopPlane`); ours starts empty | ✗ |
-
 ### Visibility states that differ (current run)
 
 | # | Feature | P | States | Status |
 |---|---|---|---|---|
-| V1 | routingCurve | P2 | shown fields differ in ["curveType=INTERPOLATED_SPLINE", "step=POINTS", "inputsGroup", "inputType=VERTEX", "csvUnit=Meter", "overwritePoints", "pointsEditType=SINGLE", "showCSys", "segmentEditType=ADD", "orthoCsys=WORLD"]: shown only by std | ✗ |
-| V2 | routingCurve | P2 | shown fields differ in ["curveType=INTERPOLATED_SPLINE", "hasTargetLength", "step=POINTS", "inputsGroup", "inputType=VERTEX", "csvUnit=Meter", "overwritePoints", "pointsEditType=SINGLE", "showCSys", "segmentEditType=ADD", "orthoCsys=WORLD"] | ✗ |
-| V3 | routingCurve | P2 | shown fields differ in ["curveType=INTERPOLATED_SPLINE", "step=POINTS", "inputType=VERTEX", "csvUnit=Meter", "overwritePoints", "pointsEditType=SINGLE", "showCSys", "segmentEditType=ADD", "orthoCsys=WORLD"]: shown only by std ["inputsGroup" | ✗ |
-| V4 | routingCurve | P2 | shown fields differ in ["curveType=INTERPOLATED_SPLINE", "step=POINTS", "inputsGroup", "inputType=CURVE", "csvUnit=Meter", "overwritePoints", "pointsEditType=SINGLE", "showCSys", "segmentEditType=ADD", "orthoCsys=WORLD"]: shown only by std  | ✗ |
-| V5 | routingCurve | P2 | shown fields differ in ["curveType=INTERPOLATED_SPLINE", "step=POINTS", "inputsGroup", "inputType=CSV", "csvUnit=Meter", "overwritePoints", "pointsEditType=SINGLE", "showCSys", "segmentEditType=ADD", "orthoCsys=WORLD"]: shown only by std [" | ✗ |
-| V6 | routingCurve | P2 | shown fields differ in ["curveType=INTERPOLATED_SPLINE", "step=POINTS", "inputsGroup", "inputType=VERTEX", "csvUnit=Meter", "overwritePoints", "pointsEditType=MULTI", "showCSys", "segmentEditType=ADD", "orthoCsys=WORLD"]: shown only by std  | ✗ |
-| V7 | routingCurve | P2 | shown fields differ in ["curveType=POLYLINE", "step=POINTS", "inputsGroup", "inputType=VERTEX", "csvUnit=Meter", "overwritePoints", "pointsEditType=SINGLE", "showCSys", "segmentEditType=ADD", "orthoCsys=WORLD"]: shown only by std ["inputsGr | ✗ |
-| V8 | routingCurve | P2 | shown fields differ in ["curveType=POLYLINE", "step=POINTS", "inputType=VERTEX", "csvUnit=Meter", "overwritePoints", "pointsEditType=SINGLE", "showCSys", "segmentEditType=ADD", "orthoCsys=WORLD"]: shown only by std ["inputsGroup"], only by  | ✗ |
-| V9 | routingCurve | P2 | shown fields differ in ["curveType=POLYLINE", "step=POINTS", "inputsGroup", "inputType=CURVE", "csvUnit=Meter", "overwritePoints", "pointsEditType=SINGLE", "showCSys", "segmentEditType=ADD", "orthoCsys=WORLD"]: shown only by std ["inputsGro | ✗ |
-| V10 | routingCurve | P2 | shown fields differ in ["curveType=POLYLINE", "step=POINTS", "inputsGroup", "inputType=CSV", "csvUnit=Meter", "overwritePoints", "pointsEditType=SINGLE", "showCSys", "segmentEditType=ADD", "orthoCsys=WORLD"]: shown only by std ["inputsGroup | ✗ |
-| V11 | routingCurve | P2 | shown fields differ in ["curveType=POLYLINE", "step=POINTS", "inputsGroup", "inputType=VERTEX", "csvUnit=Meter", "overwritePoints", "pointsEditType=MULTI", "showCSys", "segmentEditType=ADD", "orthoCsys=WORLD"]: shown only by std ["inputsGro | ✗ |
-| V12 | routingCurve | P2 | shown fields differ in ["curveType=INTERPOLATED_SPLINE", "hasTargetLength", "step=POINTS", "inputType=VERTEX", "csvUnit=Meter", "overwritePoints", "pointsEditType=SINGLE", "showCSys", "segmentEditType=ADD", "orthoCsys=WORLD"]: shown only by | ✗ |
-| V13 | importDerived | P2 | shown fields differ in ["newUI", "placement=AT_MATE_CONNECTOR", "includeMateConnectors", "includeProperties"]: shown only by std [], only by builtin ["mateConnectorId"] | ✗ |
-| V14 | assignVariable | P2 | shown fields differ in ["mode=ASSIGNED", "variableType=ANY", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=INDEX", "rowResult=SINGLE", "columnGroup", "columnAccessType=INDEX", "columnResult=SINGLE", "minmax=MINIMUM", "componentSele | ✗ |
-| V15 | assignVariable | P2 | shown fields differ in ["mode=MEASURED", "variableType=LENGTH", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=INDEX", "rowResult=SINGLE", "columnGroup", "columnAccessType=INDEX", "columnResult=SINGLE", "minmax=MINIMUM", "componentS | ✗ |
-| V16 | assignVariable | P2 | shown fields differ in ["mode=MEASURED", "variableType=LENGTH", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=INDEX", "rowResult=SINGLE", "columnGroup", "columnAccessType=INDEX", "columnResult=SINGLE", "minmax=MAXIMUM", "componentS | ✗ |
-| V17 | assignVariable | P2 | shown fields differ in ["mode=MEASURED", "variableType=LENGTH", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=INDEX", "rowResult=SINGLE", "columnGroup", "columnAccessType=INDEX", "columnResult=SINGLE", "minmax=MINIMUM", "axisMeasur | ✗ |
-| V18 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=LENGTH", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=INDEX", "rowResult=SINGLE", "columnGroup", "columnAccessType=INDEX", "columnResult=SINGLE", "minmax=MINIMUM", "componentSele | ✗ |
-| V19 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=LENGTH", "measurementMode=DISTANCE", "rowAccessType=INDEX", "rowResult=SINGLE", "columnGroup", "columnAccessType=INDEX", "columnResult=SINGLE", "minmax=MINIMUM", "componentSelector=DISTANC | ✗ |
-| V20 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=LENGTH", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=INDEX_RANGE", "rowResult=SINGLE", "columnGroup", "columnAccessType=INDEX", "columnResult=SINGLE", "minmax=MINIMUM", "compone | ✗ |
-| V21 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=LENGTH", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=LABEL", "rowResult=SINGLE", "columnGroup", "columnAccessType=INDEX", "columnResult=SINGLE", "minmax=MINIMUM", "componentSele | ✗ |
-| V22 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=LENGTH", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=ALL", "rowResult=SINGLE", "columnGroup", "columnAccessType=INDEX", "columnResult=SINGLE", "minmax=MINIMUM", "componentSelect | ✗ |
-| V23 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=LENGTH", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=INDEX", "rowResult=MAP", "columnGroup", "columnAccessType=INDEX", "columnResult=SINGLE", "minmax=MINIMUM", "componentSelecto | ✗ |
-| V24 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=LENGTH", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=INDEX", "rowResult=SINGLE", "columnAccessType=INDEX", "columnResult=SINGLE", "minmax=MINIMUM", "componentSelector=DISTANCE"] | ✗ |
-| V25 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=LENGTH", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=INDEX", "rowResult=SINGLE", "columnGroup", "columnAccessType=INDEX_RANGE", "columnResult=SINGLE", "minmax=MINIMUM", "compone | ✗ |
+| V1 | importDerived | P2 | shown fields differ in ["newUI", "placement=AT_MATE_CONNECTOR", "includeMateConnectors", "includeProperties"]: shown only by std [], only by builtin ["mateConnectorId"] | ✗ |
+| V2 | assignVariable | P2 | shown fields differ in ["mode=ASSIGNED", "variableType=ANY", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=INDEX", "rowResult=SINGLE", "columnGroup", "columnAccessType=INDEX", "columnResult=SINGLE", "minmax=MINIMUM", "componentSele | ✗ |
+| V3 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=LENGTH", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=INDEX", "rowResult=SINGLE", "columnGroup", "columnAccessType=INDEX", "columnResult=SINGLE", "useConversionFactor", "minmax=M | ✗ |
+| V4 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=LENGTH", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=LABEL", "rowResult=ARRAY", "columnGroup", "columnAccessType=ALL", "columnResult=SINGLE", "useConversionFactor", "minmax=MAXI | ✗ |
+| V5 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=LENGTH", "measurementMode=LENGTH", "rowGroup", "rowAccessType=INDEX_RANGE", "rowResult=ARRAY", "columnGroup", "columnAccessType=INDEX_RANGE", "columnResult=ARRAY", "useConversionFactor", " | ✗ |
+| V6 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=NUMBER", "measurementMode=LENGTH", "rowGroup", "rowAccessType=INDEX", "rowRegexp", "rowResult=MAP", "columnAccessType=INDEX_RANGE", "columnResult=SINGLE", "useConversionFactor", "minmax=MA | ✗ |
+| V7 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=LENGTH", "measurementMode=LENGTH", "rowAccessType=INDEX", "rowRegexp", "rowResult=MAP", "columnGroup", "columnAccessType=ALL", "columnRegexp", "columnResult=ARRAY", "useConversionFactor",  | ✗ |
+| V8 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=NUMBER", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=INDEX", "rowRegexp", "rowResult=SINGLE", "columnAccessType=INDEX_RANGE", "columnRegexp", "columnResult=SINGLE", "useConversi | ✗ |
+| V9 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=ANY", "measurementMode=DIAMETER", "rowGroup", "rowAccessType=INDEX_RANGE", "rowRegexp", "rowResult=SINGLE", "columnGroup", "columnAccessType=INDEX", "columnRegexp", "columnResult=SINGLE",  | ✗ |
+| V10 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=ANY", "measurementMode=LENGTH", "rowAccessType=INDEX_RANGE", "rowRegexp", "rowResult=ARRAY", "columnAccessType=INDEX", "columnResult=MAP", "useConversionFactor", "minmax=MAXIMUM", "axisMea | ✗ |
+| V11 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=NUMBER", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=INDEX", "rowResult=SINGLE", "columnGroup", "columnAccessType=INDEX", "columnRegexp", "columnResult=MAP", "useConversionFacto | ✗ |
+| V12 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=ANGLE", "measurementMode=DISTANCE", "rowGroup", "rowAccessType=INDEX_RANGE", "rowResult=SINGLE", "columnAccessType=INDEX_RANGE", "columnRegexp", "columnResult=ARRAY", "useConversionFactor" | ✗ |
+| V13 | assignVariable | P2 | shown fields differ in ["mode=TABLE", "variableType=ANGLE", "measurementMode=LENGTH", "rowAccessType=LABEL", "rowResult=MAP", "columnGroup", "columnAccessType=LABEL", "columnRegexp", "columnResult=SINGLE", "useConversionFactor", "minmax=MAX | ✗ |

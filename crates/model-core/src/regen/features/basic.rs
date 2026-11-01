@@ -137,10 +137,18 @@ pub fn variable(ev: &mut EvalCtx) -> FResult<()> {
                 let refs = ev.query("entityCouple").to_vec();
                 let [a, b] = refs.as_slice() else { return err("Select two entities to measure between") };
                 let d = measure::entity_distance(&ev.ctx, a, b, ev.is("minmax", "MAXIMUM")).ok_or_else(|| crate::regen::eval::FeatureError::new("Could not measure between the selections".to_string()))?;
+                // std variable.fs selectDistanceComponent: the value along the
+                // chosen axis, whether or not the Axis measurements group is
+                // open (a group's fold is the dialog's only).
                 match ev.enum_("componentSelector") {
-                    "X" if ev.bool("axisMeasurements") => d.delta.x.abs(),
-                    "Y" if ev.bool("axisMeasurements") => d.delta.y.abs(),
-                    "Z" if ev.bool("axisMeasurements") => d.delta.z.abs(),
+                    "X" => d.delta.x.abs(),
+                    "Y" => d.delta.y.abs(),
+                    "Z" => d.delta.z.abs(),
+                    "CUSTOM" => {
+                        let Some(r) = ev.query("customDirection").first().cloned() else { return err(crate::regen::custom_features::error_text("VARIABLE_SELECT_CUSTOM_DIRECTION")) };
+                        let dir = ev.resolve_direction(&r).ok_or_else(|| crate::regen::eval::FeatureError::new("Could not resolve the custom direction".to_string()))?;
+                        d.delta.dot(dir.normalize_or_zero()).abs()
+                    }
                     _ => d.distance,
                 }
             }

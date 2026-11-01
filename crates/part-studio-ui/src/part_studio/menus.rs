@@ -813,7 +813,7 @@ impl PartStudioView {
                 p.set("minmax", ParamValue::Enum(if max { "MAXIMUM" } else { "MINIMUM" }.into()));
                 p.set("entityCouple", ParamValue::Query(picks));
                 if let Some(i) = axis {
-                    p.set("axisMeasurements", ParamValue::Bool(true));
+                    p.set("axisMeasurementsGroup", ParamValue::Bool(true));
                     p.set("componentSelector", ParamValue::Enum(["X", "Y", "Z"][i].into()));
                 }
             }

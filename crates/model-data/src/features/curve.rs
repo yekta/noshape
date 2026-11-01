@@ -133,7 +133,7 @@ pub fn projected_curve() -> FeatureType {
 }
 
 pub const BRIDGING_MATCH: &[(&str, &str)] =
-    &[("POSITION", "Match position"), ("TANGENCY", "Match tangent"), ("CURVATURE", "Match curvature"), ("G3", "Match flow")];
+    &[("POSITION", "Match position"), ("TANGENCY", "Match tangent"), ("CURVATURE", "Match curvature"), ("G3", "Match flow (G3)")];
 
 pub fn bridging_curve() -> FeatureType {
     let rem = Hints::REMEMBER_PREVIOUS_VALUE;
@@ -308,6 +308,7 @@ pub fn edit_curve() -> FeatureType {
             "Index",
             vec![ParamSpec::num("indexValue", "Control point index", NumSpec::integer(0, 0, 99))],
         )
+        .item_template("Control point index #indexValue")
         .visible(move |v| cps(v) && v.is("editPointMode", "XYZ")),
         ParamSpec::num("selectedIndex", "Control point index", NumSpec::integer(0, 0, 99)).visible(move |v| cps(v) && !v.is("editPointMode", "XYZ")),
         ParamSpec::array(
@@ -323,6 +324,7 @@ pub fn edit_curve() -> FeatureType {
                 ParamSpec::num("weight", "Weight", NumSpec::real(1.0, 1e-5, 1e5)),
             ],
         )
+        .item_template("#index: #x;#y;#z")
         .hints(Hints::COLLAPSE_ARRAY_ITEMS)
         .visible(cps),
         ParamSpec::bool("showDetails", "Show details", true),
@@ -335,7 +337,7 @@ pub fn edit_curve() -> FeatureType {
         ParamSpec::num("curveNumSpans", "Spans", NumSpec::integer(1, 0, 100_000))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("showDetails")),
-        ParamSpec::bool("approximationShowDeviation", "Show deviation", false),
+        ParamSpec::bool("approximationShowDeviation", "Show deviation", false).hints(Hints::GROUP_HEADER),
         ParamSpec::num("maxDeviation", "Maximum deviation", NumSpec::positive_length(0.0, 0.0))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("approximationShowDeviation")),
@@ -352,7 +354,9 @@ pub const LENGTH_UNIT_NAMES: &[(&str, &str)] =
 pub fn routing_curve() -> FeatureType {
     let spline = |v: &ParamValues| v.is("curveType", "INTERPOLATED_SPLINE");
     let points = |v: &ParamValues| v.is("step", "POINTS");
-    let input = move |v: &ParamValues, t: &str| points(v) && v.is("inputType", t);
+    // std routingCurve.fs: the inputs sit in the open group "Inputs".
+    let inputs = move |v: &ParamValues| points(v) && v.bool("inputsGroup");
+    let input = move |v: &ParamValues, t: &str| inputs(v) && v.is("inputType", t);
     let single = move |v: &ParamValues| points(v) && v.is("pointsEditType", "SINGLE");
     let segments = |v: &ParamValues| v.is("step", "SEGMENTS");
     let ortho = move |v: &ParamValues| segments(v) && v.is("segmentEditType", "ORTHOGONAL");
@@ -368,14 +372,15 @@ pub fn routing_curve() -> FeatureType {
             .visible(move |v| spline(v) && v.bool("hasTargetLength")),
         ParamSpec::enum_("step", "Step", &[("POINTS", "Points"), ("SEGMENTS", "Segments")]).hints(Hints::HORIZONTAL_ENUM | Hints::UNCONFIGURABLE),
         // Points step: inputs.
-        ParamSpec::enum_("inputType", "Input type", &[("VERTEX", "Vertex"), ("CURVE", "Curve"), ("CSV", "CSV file")]).visible(points),
-        ParamSpec::query("inputVertices", "Vertices", QueryFilter::POINT_LIKE).visible(move |v| input(v, "VERTEX")),
-        ParamSpec::query("inputCurve", "Edges", CURVES).visible(move |v| input(v, "CURVE")),
-        ParamSpec::num("samples", "Number of samples", NumSpec::integer(5, 2, 50)).visible(move |v| input(v, "CURVE")),
+        ParamSpec::bool("inputsGroup", "Inputs", true).hints(Hints::GROUP_HEADER | Hints::GROUP_LABEL | Hints::UNCONFIGURABLE).visible(points),
+        ParamSpec::enum_("inputType", "Input type", &[("VERTEX", "Vertex"), ("CURVE", "Curve"), ("CSV", "CSV file")]).hints(Hints::UNCONFIGURABLE).visible(inputs),
+        ParamSpec::query("inputVertices", "Vertices", QueryFilter::POINT_LIKE).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "VERTEX")),
+        ParamSpec::query("inputCurve", "Edges", CURVES).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CURVE")),
+        ParamSpec::num("samples", "Number of samples", NumSpec::integer(5, 2, 50)).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CURVE")),
         ParamSpec::text("inputData", "Table", "").hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CSV")),
-        ParamSpec::num("startColumn", "Data start column (0,1,2,.)", NumSpec::integer(0, 0, 100_000)).visible(move |v| input(v, "CSV")),
-        ParamSpec::enum_("csvUnit", "Unit", CSV_UNIT_NAMES).default_enum("Meter").visible(move |v| input(v, "CSV")),
-        ParamSpec::bool("overwritePoints", "Overwrite points", true).visible(move |v| input(v, "CURVE") || input(v, "CSV")),
+        ParamSpec::num("startColumn", "Data start column (0,1,2,.)", NumSpec::integer(0, 0, 100_000)).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CSV")),
+        ParamSpec::enum_("csvUnit", "Unit", CSV_UNIT_NAMES).default_enum("Meter").hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CSV")),
+        ParamSpec::bool("overwritePoints", "Overwrite points", true).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CURVE") || input(v, "CSV")),
         ParamSpec::bool("isPeriodic", "Closed", false).visible(points),
         ParamSpec::query1("curveBaseCSys", "Curve reference", QueryFilter::POINT_LIKE).visible(points),
         ParamSpec::enum_("pointsEditType", "Point edit type", &[("SINGLE", "Single"), ("MULTI", "Multiple")]).hints(Hints::HORIZONTAL_ENUM).visible(points),

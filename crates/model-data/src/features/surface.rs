@@ -52,7 +52,7 @@ pub fn fill() -> FeatureType {
         // fillSurface.fs: a driven query with the Create selection button.
         .hints(Hints::INITIAL_FOCUS | Hints::DRIVEN_QUERY | Hints::SHOW_CREATE_SELECTION)
         .item_template("[#continuity] #entities"),
-        ParamSpec::bool("addGuides", "Guides", false).hints(Hints::GROUP_HEADER),
+        ParamSpec::bool("addGuides", "Guides", false),
         ParamSpec::query("guideEntities", "Vertices or curves", QueryFilter::VERTEX | CURVES).visible(|v| v.bool("addGuides")),
         ParamSpec::enum_("constraintMode", "Mode", &[("PRECISE", "Precise"), ("SAMPLED", "Sampled")]).visible(|v| v.bool("addGuides")),
         ParamSpec::num("sampleSize", "Sample size", NumSpec::integer(5, 1, 50)).visible(|v| v.bool("addGuides") && v.is("constraintMode", "SAMPLED")),
@@ -168,7 +168,8 @@ pub fn ruled_surface() -> FeatureType {
                 ParamSpec::length("distanceOverride", "Distance", 25.0, 1.0).visible(move |v| !ovr(v, "UP_TO_VERTEX")),
                 ParamSpec::flip("oppositeDirectionOverride", "Opposite direction").visible(move |v| !ovr(v, "UP_TO_VERTEX")),
             ],
-        ),
+        )
+        .item_template("#vertex"),
         ParamSpec::bool("useCubicInterpolation", "Use cubic interpolation", true),
         ParamSpec::bool("showRuledLines", "Show ruled lines", false),
         ParamSpec::num("ruledLineCount", "Count", NumSpec::integer(40, 1, 100)).visible(|v| v.bool("showRuledLines")),
@@ -206,6 +207,7 @@ pub fn constrained_surface() -> FeatureType {
                 ParamSpec::flip("flipNormal", "Flip normal"),
             ],
         )
+        .item_template("#vertex")
         .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::INITIAL_FOCUS)
         .visible(|v| v.is("csType", "POINTS")),
         ParamSpec::query("meshes", "Mesh bodies or faces", QueryFilter::ANY_FACE | QueryFilter::BODY).visible(|v| v.is("csType", "MESH")),
@@ -215,7 +217,7 @@ pub fn constrained_surface() -> FeatureType {
         ParamSpec::num("maxDeviation", "Maximum deviation", NumSpec::positive_length(0.0, 0.0))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("computeDeviation")),
-        ParamSpec::bool("showDeviation", "Show deviation", false).visible(|v| v.bool("computeDeviation")),
+        ParamSpec::bool("showDeviation", "Show deviation", false).hints(Hints::GROUP_HEADER).visible(|v| v.bool("computeDeviation")),
         ParamSpec::enum_("deviationType", "Deviation type", &[("MAX", "Max deviation"), ("ALL", "All deviations")])
             .visible(|v| v.bool("computeDeviation") && v.bool("showDeviation")),
         ParamSpec::num("limit", "Limit", NONNEGATIVE_ZERO_DEFAULT).visible(|v| v.bool("computeDeviation") && v.bool("showDeviation")),

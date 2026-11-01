@@ -250,7 +250,7 @@ pub fn curve_approximation(gate: impl Fn(&ParamValues) -> bool + Clone + Send + 
         ParamSpec::num("approximationTolerance", "Tolerance", TOLERANCE_BOUND).visible(on.clone()),
         ParamSpec::bool("keepStartDerivative", "Keep start derivative", false).visible(on.clone()),
         ParamSpec::bool("keepEndDerivative", "Keep end derivative", false).visible(on.clone()),
-        ParamSpec::bool("approximationShowDeviation", "Show deviation", false).visible(on),
+        ParamSpec::bool("approximationShowDeviation", "Show deviation", false).hints(Hints::GROUP_HEADER).visible(on),
         ParamSpec::num("maxDeviation", "Maximum deviation", NumSpec::positive_length(0.0, 0.0))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(move |v| on2(v) && v.bool("approximationShowDeviation")),

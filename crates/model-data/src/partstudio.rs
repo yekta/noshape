@@ -361,7 +361,11 @@ impl PartStudio {
             ("ruledSurface", "cornerType", "NONE", "NO_CORNER"),
         ];
         const RENAMED_PARAMS: &[(&str, &str, &str)] =
-            &[("sheetMetalFlange", "partialOverallGroup", "overallParametersGroup"), ("sheetMetalFlange", "partialEndGroup", "endConditionsGroup")];
+            &[
+            ("sheetMetalFlange", "partialOverallGroup", "overallParametersGroup"),
+            ("sheetMetalFlange", "partialEndGroup", "endConditionsGroup"),
+            ("assignVariable", "axisMeasurements", "axisMeasurementsGroup"),
+        ];
         for f in &mut self.features {
             for &(ty, param, old, new) in RENAMED_OPTIONS {
                 if f.type_id == ty && matches!(f.params.get(param), Some(ParamValue::Enum(o)) if o == old) {

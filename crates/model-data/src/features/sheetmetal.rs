@@ -219,7 +219,6 @@ fn start_selections() -> Vec<ParamSpec> {
     sel.push(ParamSpec::bool("symmetric", "Symmetric", false).visible(move |v| extrude(v) && v.is("endBound", "BLIND")));
     sel.push(
         ParamSpec::bool("hasSecondDirection", "Second end position", false)
-            .hints(Hints::GROUP_HEADER)
             .visible(move |v| extrude(v) && !(v.bool("symmetric") && v.is("endBound", "BLIND"))),
     );
     sel.extend(sm_extrude_direction(true));
@@ -275,7 +274,7 @@ pub fn flange() -> FeatureType {
         ParamSpec::query1("directionEntity", "Direction", QueryFilter::DIRECTION).visible(move |v| ac(v, "ANGLE_FROM_DIRECTION")),
         ParamSpec::num("angleFromDirection", "Angle", NumSpec::angle(90.0, 0.0, 180.0)).visible(move |v| ac(v, "ANGLE_FROM_DIRECTION")),
         ParamSpec::bool("angleFromDirectionOppositeAngle", "Opposite angle", false)
-            .hints(Hints::OPPOSITE_DIRECTION_CIRCULAR)
+            .hints(Hints::OPPOSITE_DIRECTION)
             .visible(move |v| ac(v, "ANGLE_FROM_DIRECTION")),
         ParamSpec::bool("autoMiter", "Automatic miter", true),
         ParamSpec::num("miterAngle", "Miter angle", NumSpec::angle(45.0, 0.0, 179.0)).visible(|v| !v.bool("autoMiter")),
@@ -325,7 +324,7 @@ pub fn flange() -> FeatureType {
             ParamSpec::query1(ent, "Up to entity", QueryFilter::PLANE | QueryFilter::PLANAR_FACE | QueryFilter::POINT_LIKE)
                 .visible(move |v| on(v) && !v.is(ty, "BLIND")),
         );
-        p.push(ParamSpec::num(ent_off, "Distance", NumSpec::positive_length(25.0, 1.0)).visible(move |v| on(v) && v.is(ty, "UP_TO_ENTITY_OFFSET")));
+        p.push(ParamSpec::num(ent_off, labels[1], NumSpec::positive_length(25.0, 1.0)).visible(move |v| on(v) && v.is(ty, "UP_TO_ENTITY_OFFSET")));
         p.push(ParamSpec::flip(ent_flip, "Opposite offset direction").visible(move |v| on(v) && v.is(ty, "UP_TO_ENTITY_OFFSET")));
     }
     FeatureType::new("sheetMetalFlange", "Flange", Category::SheetMetal, p).icon("flange").describe("Add a wall joined by a bend to each selected edge")
@@ -344,8 +343,8 @@ pub fn hem() -> FeatureType {
         ParamSpec::num("tipGap", "Gap", SM_MINIMAL_CLEARANCE).visible(move |v| ty(v, "TEAR_DROP") && !v.bool("useMinimalGapForTipGap")),
         ParamSpec::num("angle", "Angle", NumSpec::angle(270.0, 180.0, 359.9)).visible(move |v| ty(v, "ROLLED")),
         ParamSpec::num("length", "Total length", NumSpec::positive_length(12.5, 0.5).bounded(1e-5, 500.0)).visible(move |v| !ty(v, "ROLLED")),
-        ParamSpec::enum_("hemAlignment", "Hem alignment", &[("OUTER", "Outer"), ("IN_PLACE", "In place")]),
-        ParamSpec::enum_("hemCornerType", "Corner type", &[("SIMPLE", "Simple"), ("CLOSED", "Closed")]),
+        ParamSpec::enum_("hemAlignment", "Hem alignment", &[("OUTER", "Outer"), ("IN_PLACE", "In place")]).hints(Hints::SHOW_LABEL | Hints::REMEMBER_PREVIOUS_VALUE),
+        ParamSpec::enum_("hemCornerType", "Corner type", &[("SIMPLE", "Simple"), ("CLOSED", "Closed")]).hints(Hints::SHOW_LABEL | Hints::REMEMBER_PREVIOUS_VALUE),
     ];
     FeatureType::new("sheetMetalHem", "Hem", Category::SheetMetal, p).icon("hem").describe("Fold an edge back on itself")
 }
@@ -390,8 +389,8 @@ fn bend_top(max_angle: f64) -> Vec<ParamSpec> {
         ParamSpec::query1("parallelEntity", "Parallel to", QueryFilter::DIRECTION).visible(move |v| ac(v, "ALIGN_GEOMETRY")),
         ParamSpec::query1("directionEntity", "Direction", QueryFilter::DIRECTION).visible(move |v| ac(v, "ANGLE_FROM_DIRECTION")),
         ParamSpec::num("angleFromDirection", "Angle", NumSpec::angle(90.0, 0.0, 180.0)).visible(move |v| ac(v, "ANGLE_FROM_DIRECTION")),
-        ParamSpec::bool("oppositeAngleFromDirection", "Opposite angle", false)
-            .hints(Hints::OPPOSITE_DIRECTION_CIRCULAR)
+        ParamSpec::bool("oppositeAngleFromDirection", "Opposite direction angle", false)
+            .hints(Hints::OPPOSITE_DIRECTION)
             .visible(move |v| ac(v, "ANGLE_FROM_DIRECTION")),
     ]
 }
@@ -489,6 +488,7 @@ pub fn sheet_metal_loft() -> FeatureType {
             "Connection",
             vec![ParamSpec::query("connectionEntities", "Vertices or edges", QueryFilter::EDGE | QueryFilter::VERTEX), ParamSpec::bool("isRip", "Rip", false)],
         )
+        .item_template("#connectionEntities")
         .visible(|v| v.bool("matchConnections")),
         ParamSpec::num("chordalTolerance", "Chordal tolerance", NumSpec::positive_length(1.0, 0.05).bounded(1e-5, 0.1)),
         ParamSpec::query("booleanScope", "Merge scope", QueryFilter::SOLID_BODY).visible(move |v| !new(v)),
@@ -537,7 +537,7 @@ pub fn corner() -> FeatureType {
     let rem = Hints::REMEMBER_PREVIOUS_VALUE;
     let p = vec![
         ParamSpec::query1("corner", "Corner", SM_CORNER).hints(Hints::INITIAL_FOCUS),
-        ParamSpec::enum_("cornerStyle", "Corner relief type", CORNER_RELIEF),
+        ParamSpec::enum_("cornerStyle", "Corner relief type", CORNER_RELIEF).hints(Hints::SHOW_LABEL),
         ParamSpec::num("cornerReliefScale", "Corner relief scale", NumSpec::real(1.5, 1.0, 2.0))
             .hints(rem)
             .visible(move |v| st(v, "RECTANGLE") || st(v, "ROUND")),
@@ -563,6 +563,7 @@ pub fn bend_relief() -> FeatureType {
                 ("TEAR", "Tear"),
             ],
         )
+        .hints(Hints::SHOW_LABEL)
         .default_enum("SIZED_OBROUND"),
         ParamSpec::num("bendReliefDepthScale", "Bend relief depth scale", NumSpec::real(2.0, 1.0, 5.0)).visible(scaled),
         ParamSpec::num("bendReliefWidthScale", "Bend relief width scale", NumSpec::real(1.0625, 0.0625, 2.0)).visible(scaled),
@@ -598,7 +599,7 @@ pub fn corner_break() -> FeatureType {
         ParamSpec::bool("isAsymmetric", "Asymmetric", false).visible(radius),
         ParamSpec::num("otherRadius", "Second radius", BLEND_BOUNDS).visible(move |v| radius(v) && v.bool("isAsymmetric")),
         ParamSpec::flip("flipAsymmetric", "Flip asymmetric").visible(move |v| radius(v) && v.bool("isAsymmetric")),
-        ParamSpec::bool("allowEdgeOverflow", "Allow edge overflow", false).visible(move |v| fillet(v) && !cs(v, "CURVATURE")),
+        ParamSpec::bool("allowEdgeOverflow", "Allow edge overflow", false).hints(Hints::GROUP_HEADER).visible(move |v| fillet(v) && !cs(v, "CURVATURE")),
         ParamSpec::query("keepEdges", "Edges to keep", QueryFilter::EDGE).visible(move |v| fillet(v) && !cs(v, "CURVATURE") && v.bool("allowEdgeOverflow")),
     ]);
     FeatureType::new("sheetMetalCornerBreak", "Corner break", Category::SheetMetal, p)
