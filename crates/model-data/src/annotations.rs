@@ -10,6 +10,38 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum AnnotationKind {
     Datum { letter: String },
+    /// Model definitions › Dimension (live psb 10-21: Distance, Angle,
+    /// Fillet radius, Minimum / Maximum distance between `refs`), measured
+    /// from the model every time. `face` is its first reference, `at` its
+    /// text position and `normal` its plane's normal: drawings show it in
+    /// the views facing that plane (drawing.md CR18).
+    Dimension {
+        measure: Measure,
+        refs: Vec<Reference>,
+        #[serde(default)]
+        tolerance: crate::fits::Tolerance,
+    },
+}
+
+/// What an MBD dimension measures.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Measure {
+    Distance,
+    Angle,
+    Radius,
+    Minimum,
+    Maximum,
+}
+
+impl Measure {
+    /// Its Characteristics type (live: Minimum / Maximum read "Distance").
+    pub fn label(self) -> &'static str {
+        match self {
+            Measure::Angle => "Angle",
+            Measure::Radius => "Fillet radius",
+            _ => "Distance",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -34,8 +66,9 @@ pub struct Annotation {
 pub fn next_datum_letter(existing: &[Annotation]) -> String {
     let used: Vec<&str> = existing
         .iter()
-        .map(|a| match &a.kind {
-            AnnotationKind::Datum { letter } => letter.as_str(),
+        .filter_map(|a| match &a.kind {
+            AnnotationKind::Datum { letter } => Some(letter.as_str()),
+            _ => None,
         })
         .collect();
     let name = |mut n: usize| {
@@ -55,8 +88,9 @@ pub fn next_datum_letter(existing: &[Annotation]) -> String {
 /// The datum letters, in order of creation.
 pub fn datum_letters(all: &[Annotation]) -> Vec<String> {
     all.iter()
-        .map(|a| match &a.kind {
-            AnnotationKind::Datum { letter } => letter.clone(),
+        .filter_map(|a| match &a.kind {
+            AnnotationKind::Datum { letter } => Some(letter.clone()),
+            _ => None,
         })
         .collect()
 }

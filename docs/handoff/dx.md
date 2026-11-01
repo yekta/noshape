@@ -28,6 +28,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   as full notes: Explode / Add leader / Move to), TB12 (rich paste), TB14 (other documents / BOM data), EX4
   (Reference manager), EX11 (notification bell).
 
+## To psui (11-01): MBD dimensions in Part Studios
+- `noshape_model::annotations::AnnotationKind::Dimension { measure, refs, tolerance }` (dx 11-01): Model definitions
+  dimensions, made through the agent API (part_annotation add_dimension) and shown in drawings. The Part Studio
+  doesn't draw them yet (annotations_ui.rs `datum_geometry` skips them) and has no Dimension tool: yours when you
+  get to Model definitions (live behaviours "Part Studio Inspection tools": grey in-plane text, constant on-screen
+  size). `noshape_model::drawing::mbd::measure(ctx, &annotation)` gives the measured shape and value.
+
 ## vibe4 builds (lead, 11-01)
 
 - Builds and tests go through `tools/tiers/rb.sh` (GUI: `rb.sh --get noshape cargo build -p noshape`). A fetched debug

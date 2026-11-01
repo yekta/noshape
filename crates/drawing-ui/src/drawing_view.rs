@@ -774,6 +774,13 @@ impl DrawingEditor {
         }
         // Views linked across sheets: their mirrors follow the real views.
         new.sync_links();
+        // A view added: the model's annotations it shows that no view shows
+        // yet go in it (live CR18: "dimensions on hidden lines and section
+        // views appear automatically when those views are added").
+        let views = |d: &Drawing| d.sheets.iter().map(|s| s.views.len()).sum::<usize>();
+        if views(&new) > views(&self.drawing) {
+            noshape_model::drawing::mbd::place_model_datums(&mut new, &self.doc.read(cx).session.doc);
+        }
         // Up-to-date views were made from the current document state.
         if !self.out_of_date && self.old_state.is_none() {
             new.sources_at = self.doc.read(cx).session.head().ok().map(|m| m.to_string());

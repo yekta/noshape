@@ -23,6 +23,263 @@ fn edge_on(frame: &ViewFrame, normal: DVec3) -> bool {
     normal.normalize_or_zero().dot(frame.dir.normalize()).abs() < 1e-6
 }
 
+/// Does a view along `frame` show model annotation `m`: a datum's face
+/// edge-on, a dimension's plane face-on (drawing.md CR18).
+pub fn shows(m: &ModelAnnotation, frame: &ViewFrame) -> bool {
+    let n = DVec3::from_array(m.normal);
+    match m.kind {
+        ModelKind::Datum { .. } => edge_on(frame, n),
+        ModelKind::Dimension { .. } => n.normalize_or_zero().dot(frame.dir.normalize()).abs() > 1.0 - 1e-6,
+    }
+}
+
+/// What a measured entity is, geometrically.
+#[derive(Clone, Copy, Debug)]
+enum Prim {
+    Point(DVec3),
+    /// A line through a point along a direction; a cylinder's axis keeps
+    /// its radius.
+    Line(DVec3, DVec3, f64),
+    /// A plane through a point with its normal.
+    Plane(DVec3, DVec3),
+}
+
+fn prim(ctx: &crate::regen::context::Context, r: &crate::reference::Reference) -> Option<Prim> {
+    use crate::reference::Reference as R;
+    use noshape_kernel::{Curve, ShapeType, Surface};
+    for b in &ctx.bodies {
+        match r {
+            R::Face(n) => {
+                let Some(&i) = b.find_faces(n).first() else { continue };
+                let f = b.shape.sub_shape(ShapeType::Face, i).ok()?;
+                return match f.face_surface().ok()? {
+                    Surface::Plane(p) => Some(Prim::Plane(f.centroid().ok().unwrap_or(p.origin), p.normal.normalize())),
+                    Surface::Cylinder { origin, axis, radius, .. } => Some(Prim::Line(origin, axis.normalize(), radius)),
+                    Surface::Cone { origin, axis, .. } => Some(Prim::Line(origin, axis.normalize(), 0.0)),
+                    Surface::Sphere { center, .. } => Some(Prim::Point(center)),
+                    Surface::Torus { center, axis, major_radius, .. } => Some(Prim::Line(center, axis.normalize(), major_radius)),
+                    _ => None,
+                };
+            }
+            R::Edge(n) => {
+                let Some(&i) = b.find_edges(n).first() else { continue };
+                let e = b.shape.sub_shape(ShapeType::Edge, i).ok()?;
+                return match e.edge_curve().ok()? {
+                    Curve::Line { origin, direction } => Some(Prim::Line(origin, direction.normalize(), 0.0)),
+                    Curve::Circle { center, axis, radius, .. } => Some(Prim::Line(center, axis.normalize(), radius)),
+                    _ => None,
+                };
+            }
+            R::Vertex(n) => {
+                let Some(&i) = b.find_vertices(n).first() else { continue };
+                return Some(Prim::Point(b.shape.sub_shape(ShapeType::Vertex, i).ok()?.vertex_point().ok()?));
+            }
+            _ => return None,
+        }
+    }
+    None
+}
+
+/// An MBD dimension's geometry: the measured points of a linear one (their
+/// distance its value), an angle's vertex and a point on each leg, a
+/// radius's center with its axis and radius.
+#[derive(Clone, Copy, Debug)]
+pub enum MbdShape {
+    Linear { a: DVec3, b: DVec3 },
+    Angle { vertex: DVec3, a: DVec3, b: DVec3 },
+    Radius { center: DVec3, axis: DVec3, radius: f64 },
+}
+
+/// Closest points of two entities (the first near `near`), with the radii
+/// the lines carry.
+fn closest(p: Prim, q: Prim, near: DVec3) -> Option<(DVec3, DVec3, f64, f64)> {
+    let foot = |o: DVec3, d: DVec3, x: DVec3| o + d * (x - o).dot(d);
+    let on_plane = |o: DVec3, n: DVec3, x: DVec3| x - n * (x - o).dot(n);
+    Some(match (p, q) {
+        (Prim::Point(a), Prim::Point(b)) => (a, b, 0.0, 0.0),
+        (Prim::Point(a), Prim::Line(o, d, r)) => (a, foot(o, d, a), 0.0, r),
+        (Prim::Line(o, d, r), Prim::Point(b)) => {
+            let a = foot(o, d, b);
+            (a, b, r, 0.0)
+        }
+        (Prim::Point(a), Prim::Plane(o, n)) => (a, on_plane(o, n, a), 0.0, 0.0),
+        (Prim::Plane(o, n), Prim::Point(b)) => (on_plane(o, n, b), b, 0.0, 0.0),
+        (Prim::Line(o1, d1, r1), Prim::Line(o2, d2, r2)) => {
+            if d1.cross(d2).length() < 1e-9 {
+                let a = foot(o1, d1, near);
+                (a, foot(o2, d2, a), r1, r2)
+            } else {
+                let w = o1 - o2;
+                let (b, d, e) = (d1.dot(d2), d1.dot(w), d2.dot(w));
+                let den = 1.0 - b * b;
+                let (s, t) = ((b * e - d) / den, (e - b * d) / den);
+                (o1 + d1 * s, o2 + d2 * t, r1, r2)
+            }
+        }
+        (Prim::Line(o, d, r), Prim::Plane(po, n)) => {
+            let a = foot(o, d, near);
+            (a, on_plane(po, n, a), r, 0.0)
+        }
+        (Prim::Plane(po, n), Prim::Line(o, d, r)) => {
+            let b = foot(o, d, near);
+            (on_plane(po, n, b), b, 0.0, r)
+        }
+        (Prim::Plane(o1, n1), Prim::Plane(o2, n2)) => {
+            if n1.cross(n2).length() > 1e-6 {
+                return None;
+            }
+            let a = on_plane(o1, n1, near);
+            (a, on_plane(o2, n2, a), 0.0, 0.0)
+        }
+    })
+}
+
+/// Measure MBD dimension `m` on the model: its shape and value (meters,
+/// or radians for an angle); None when its entities are gone or don't
+/// make that measure.
+pub fn measure(ctx: &crate::regen::context::Context, m: &ModelAnnotation) -> Option<(MbdShape, f64)> {
+    use crate::annotations::Measure;
+    let ModelKind::Dimension { measure, refs, .. } = &m.kind else { return None };
+    let near = DVec3::from_array(m.at);
+    match measure {
+        Measure::Radius => match prim(ctx, refs.first()?)? {
+            Prim::Line(o, d, r) if r > 0.0 => {
+                let c = o + d * (near - o).dot(d);
+                Some((MbdShape::Radius { center: c, axis: d, radius: r }, r))
+            }
+            _ => None,
+        },
+        Measure::Angle => {
+            let (Prim::Plane(o1, n1), Prim::Plane(o2, n2)) = (prim(ctx, refs.first()?)?, prim(ctx, refs.get(1)?)?) else { return None };
+            let line = n1.cross(n2);
+            if line.length() < 1e-9 {
+                return None;
+            }
+            let line = line.normalize();
+            // A point on both planes nearest the text.
+            let (d1, d2) = (n1.dot(o1), n2.dot(o2));
+            let base = (n1 * (d1 - d2 * n1.dot(n2)) + n2 * (d2 - d1 * n1.dot(n2))) / (1.0 - n1.dot(n2).powi(2));
+            let vertex = base + line * (near - base).dot(line);
+            // Each leg runs in its face, away from the line, toward the face.
+            let leg = |n: DVec3, o: DVec3| {
+                let d = line.cross(n).normalize();
+                if (o - vertex).dot(d) < 0.0 { -d } else { d }
+            };
+            let (l1, l2) = (leg(n1, o1), leg(n2, o2));
+            let value = l1.dot(l2).clamp(-1.0, 1.0).acos();
+            Some((MbdShape::Angle { vertex, a: vertex + l1 * 0.01, b: vertex + l2 * 0.01 }, value))
+        }
+        _ => {
+            let (a, b, r1, r2) = closest(prim(ctx, refs.first()?)?, prim(ctx, refs.get(1)?)?, near)?;
+            let d = b - a;
+            let len = d.length();
+            if len < 1e-12 {
+                return None;
+            }
+            let u = d / len;
+            // Minimum / maximum: the cylinders' near or far sides.
+            let (a, b) = match measure {
+                Measure::Minimum => (a + u * r1, b - u * r2),
+                Measure::Maximum => (a - u * r1, b + u * r2),
+                _ => (a, b),
+            };
+            Some((MbdShape::Linear { a, b }, (b - a).length()))
+        }
+    }
+}
+
+/// A new MBD dimension's plane (`plane`: top, front or right; else the
+/// first of front, top, right that contains the measurement) and text
+/// position (`position`, else 10 mm off its middle in that plane).
+pub fn place_dimension(ctx: &crate::regen::context::Context, m: &mut ModelAnnotation, plane: Option<&str>, position: Option<DVec3>) -> Result<(), String> {
+    let normals = [("front", DVec3::Y), ("top", DVec3::Z), ("right", DVec3::X)];
+    m.at = position.unwrap_or(DVec3::ZERO).to_array();
+    let (shape, _) = measure(ctx, m).ok_or("those entities don't make that dimension")?;
+    let (mid, along) = match shape {
+        MbdShape::Linear { a, b } => ((a + b) * 0.5, (b - a).normalize()),
+        MbdShape::Angle { vertex, a, b } => (vertex, (a - b).normalize_or_zero()),
+        MbdShape::Radius { center, axis, .. } => (center, axis),
+    };
+    let fits = |n: DVec3| match shape {
+        MbdShape::Radius { axis, .. } => n.cross(axis).length() < 1e-6,
+        MbdShape::Angle { vertex, a, b } => (a - vertex).cross(b - vertex).normalize_or_zero().cross(n).length() < 1e-6,
+        MbdShape::Linear { .. } => along.dot(n).abs() < 1e-6,
+    };
+    let n = match plane {
+        Some(p) => normals.iter().find(|(k, _)| *k == p).map(|x| x.1).ok_or("plane: top, front or right")?,
+        None => normals.iter().map(|x| x.1).find(|n| fits(*n)).unwrap_or(DVec3::Y),
+    };
+    if !fits(n) && plane.is_some() {
+        return Err("the dimension doesn't lie in that plane".into());
+    }
+    m.normal = n.to_array();
+    let side = n.cross(along).normalize_or_zero();
+    m.up = side.to_array();
+    if position.is_none() {
+        m.at = (mid + side * 0.01).to_array();
+    }
+    // Measured again from its text position (the closest points near it).
+    measure(ctx, m).ok_or("those entities don't make that dimension")?;
+    Ok(())
+}
+
+/// The drawing annotation an MBD dimension shows as in view `view` (its
+/// frame and placement `to_sheet`), its value from the model.
+fn dimension_kind(ctx: &crate::regen::context::Context, m: &ModelAnnotation, view: ViewId, frame: &ViewFrame, to_sheet: &dyn Fn([f64; 2]) -> [f64; 2]) -> Option<(AnnotationKind, [f64; 2])> {
+    let (shape, _) = measure(ctx, m)?;
+    let at = frame.project(DVec3::from_array(m.at));
+    let st = to_sheet(at);
+    Some(match shape {
+        MbdShape::Linear { a, b } => {
+            let (pa, pb) = (frame.project(a), frame.project(b));
+            let (sa, sb) = (to_sheet(pa), to_sheet(pb));
+            let d = [sb[0] - sa[0], sb[1] - sa[1]];
+            let l = d[0].hypot(d[1]).max(1e-12);
+            let n = [-d[1] / l, d[0] / l];
+            let base = |p: [f64; 2]| p[0] * n[0] + p[1] * n[1];
+            let offset = base(st) - base(sa).max(base(sb));
+            (AnnotationKind::LinearDimension { view, a: pa, b: pb, offset, orientation: super::DimOrientation::Aligned, override_text: None }, st)
+        }
+        MbdShape::Angle { vertex, a, b } => {
+            let (v, pa, pb) = (frame.project(vertex), frame.project(a), frame.project(b));
+            let (sv, sl) = (to_sheet(v), to_sheet(at));
+            let radius = (sl[0] - sv[0]).hypot(sl[1] - sv[1]).max(8.0);
+            // Counterclockwise from a to b (the smaller turn).
+            let ang = |p: [f64; 2]| (p[1] - v[1]).atan2(p[0] - v[0]);
+            let turn = (ang(pb) - ang(pa)).rem_euclid(std::f64::consts::TAU);
+            let (a2, b2) = if turn <= std::f64::consts::PI { (pa, pb) } else { (pb, pa) };
+            (AnnotationKind::AngularDimension { view, vertex: v, a: a2, b: b2, radius, three_point: false, flip_a: false, flip_b: false, text_angle: None }, st)
+        }
+        MbdShape::Radius { center, radius, .. } => {
+            let c = frame.project(center);
+            let sc = to_sheet(c);
+            (AnnotationKind::RadialDimension { view, center: c, radius, diameter: false, angle: (st[1] - sc[1]).atan2(st[0] - sc[0]), dim_line: false, knee: None }, st)
+        }
+    })
+}
+
+/// An MBD dimension's tolerance and precision as a drawing format.
+fn dimension_format(m: &ModelAnnotation, base: &super::DimFormat) -> super::DimFormat {
+    let ModelKind::Dimension { tolerance: t, measure, .. } = &m.kind else { return base.clone() };
+    let angle = *measure == crate::annotations::Measure::Angle;
+    // Deviations are typed in the document unit (mm here) or degrees.
+    let v = |s: &str| {
+        let x = s.trim().trim_end_matches("mm").trim_end_matches("deg").trim_end_matches('°').trim().parse::<f64>().unwrap_or(0.0);
+        if angle { x.to_radians() } else { x * 0.001 }
+    };
+    let (u, l) = (v(&t.upper), v(&t.lower));
+    let tolerance = match t.kind.as_str() {
+        "Symmetrical" => super::Tolerance::Symmetric { value: u },
+        "Deviation" => super::Tolerance::Deviation { upper: u, lower: -l },
+        "Limits" => super::Tolerance::Limits { upper: u, lower: -l },
+        "Min" => super::Tolerance::Min,
+        "Max" => super::Tolerance::Max,
+        "Basic" => super::Tolerance::Basic,
+        _ => super::Tolerance::None,
+    };
+    super::DimFormat { tolerance, precision: t.precision.or(base.precision), ..base.clone() }
+}
+
 /// Suggested views of a part with MBD data (live behaviours "MBD datums
 /// in drawings": "Suggested views provide only necessary views when MBD
 /// data is present"; datums on the top and front faces gave Top and Front
@@ -42,8 +299,7 @@ pub fn trim_suggested_views(drawing: &mut Drawing, doc: &Document) {
     let frames: Vec<Option<ViewFrame>> = (1..=3).map(|i| views::view_frame(drawing, sheet, ViewId(i))).collect();
     let mut keep = vec![1u64];
     for m in &ps.annotations {
-        let n = DVec3::from_array(m.normal);
-        let shown = |id: u64| frames[id as usize - 1].as_ref().is_some_and(|f| edge_on(f, n));
+        let shown = |id: u64| frames[id as usize - 1].as_ref().is_some_and(|f| shows(m, f));
         if keep.iter().any(|&id| shown(id)) {
             continue;
         }
@@ -71,17 +327,16 @@ pub fn place_model_datums(drawing: &mut Drawing, doc: &Document) {
                 let Some(TabContent::PartStudio(ps)) = doc.tab(key.tab).map(|t| &t.content) else { continue };
                 let Some(frame) = views::view_frame(drawing, sheet, v.id) else { continue };
                 for m in &ps.annotations {
-                    if placed.contains(&(key.tab, m.id)) || !edge_on(&frame, DVec3::from_array(m.normal)) {
+                    if placed.contains(&(key.tab, m.id)) || !shows(m, &frame) {
                         continue;
                     }
-                    let ModelKind::Datum { letter } = &m.kind;
                     placed.push((key.tab, m.id));
-                    add.push(Annotation {
-                        kind: AnnotationKind::Datum { anchor: v.position, label: letter.clone(), on: None, at: None },
-                        position: v.position,
-                        model: Some(ModelRef { tab: key.tab, id: m.id, view: v.id, offset: DEFAULT_OFFSET, hidden: false }),
-                        ..Default::default()
-                    });
+                    // Laid out on the sheet when it is built (`resolve_model_annotations`).
+                    let kind = match &m.kind {
+                        ModelKind::Datum { letter } => AnnotationKind::Datum { anchor: v.position, label: letter.clone(), on: None, at: None },
+                        ModelKind::Dimension { .. } => AnnotationKind::LinearDimension { view: v.id, a: [0.0; 2], b: [0.0; 2], offset: 0.0, orientation: super::DimOrientation::Aligned, override_text: None },
+                    };
+                    add.push(Annotation { kind, position: v.position, model: Some(ModelRef { tab: key.tab, id: m.id, view: v.id, offset: DEFAULT_OFFSET, hidden: false }), ..Default::default() });
                 }
             }
         }
@@ -134,8 +389,17 @@ pub fn resolve_model_annotations(sheet: &mut Sheet, geoms: &HashMap<ViewId, Arc<
         let Some(src) = keys.get(&m.view).and_then(|k| sources.get(k)) else { return false };
         let Some(ma) = src.model_annotations.iter().find(|x| x.id == m.id) else { return false };
         let view = m.view;
+        if let ModelKind::Dimension { .. } = &ma.kind {
+            // Its value, ends and text from the model (a dimension whose
+            // entities are gone isn't drawn).
+            let Some((kind, pos)) = dimension_kind(&src.context, ma, view, &frame, &|p| to_sheet(view, p)) else { return false };
+            a.kind = kind;
+            a.position = pos;
+            a.format = dimension_format(ma, &a.format);
+            return true;
+        }
         let Some((anchor, pos)) = model_datum_points(ma, &frame, &|p| to_sheet(view, p), m.offset) else { return false };
-        let ModelKind::Datum { letter } = &ma.kind;
+        let ModelKind::Datum { letter } = &ma.kind else { return false };
         a.kind = AnnotationKind::Datum { anchor, label: letter.clone(), on: None, at: None };
         a.position = pos;
         true
@@ -172,11 +436,14 @@ pub fn mbd_rows(drawing: &Drawing, doc: &Document, sheet: Option<usize>) -> Vec<
     for tab in tabs {
         let Some(TabContent::PartStudio(ps)) = doc.tab(tab).map(|t| &t.content) else { continue };
         for m in &ps.annotations {
-            let ModelKind::Datum { letter } = &m.kind;
+            let name = match &m.kind {
+                ModelKind::Datum { letter } => letter.clone(),
+                ModelKind::Dimension { measure, .. } => measure.label().to_string(),
+            };
             let visible = drawing.sheets.iter().any(|s| {
                 s.annotations.iter().any(|a| a.model.as_ref().is_some_and(|r| r.tab == tab && r.id == m.id && !r.hidden && s.view(r.view).is_some_and(|v| v.model_annotations)))
             });
-            out.push(MbdRow { tab, id: m.id, name: letter.clone(), visible });
+            out.push(MbdRow { tab, id: m.id, name, visible });
         }
     }
     out

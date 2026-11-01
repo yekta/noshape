@@ -66,12 +66,17 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "part",
             verb: "annotation",
-            summary: "Part Studio annotations: add a datum, list, delete",
-            description: "Inspection panel › Datum and the annotations' right-click › Delete annotation (Model definitions; annotations aren't features). `add_datum` puts datum `letter` (default the next free letter) on planar face `face`, lying in the face's plane at its center (\"Datum\"); `delete` removes annotation `annotation` (\"Delete annotation\"); `move` is dragging its letter box: `offset` [right, up] from the triangle in screen pixels along the symbol's plane axes, drawn with a dashed leader ([0, 0] puts it back; \"Move annotation\"). Without `action`, lists them (with each moved box's `offset`).",
+            summary: "Part Studio annotations: add a datum or an MBD dimension, list, delete",
+            description: "Inspection panel › Datum / Dimension and the annotations' right-click › Delete annotation (Model definitions; annotations aren't features). `add_datum` puts datum `letter` (default the next free letter) on planar face `face`, lying in the face's plane at its center (\"Datum\"); `add_dimension` measures `entities` (distance between two of them, angle between two planar faces, radius of a cylindrical face, minimum / maximum distance), lying in `plane`, its text at `position`, with an optional `tolerance` (\"Dimension\"; drawings of the part show it in the views facing its plane); `delete` removes annotation `annotation` (\"Delete annotation\"); `move` is dragging its letter box: `offset` [right, up] from the triangle in screen pixels along the symbol's plane axes, drawn with a dashed leader ([0, 0] puts it back; \"Move annotation\"). Without `action`, lists them (with each moved box's `offset`).",
             fields: vec![
                 doc_field(),
                 tab_field(),
-                opt("action", json!({ "type": "string", "enum": ["add_datum", "delete", "move"] }), "What to do (default: list)."),
+                opt("action", json!({ "type": "string", "enum": ["add_datum", "add_dimension", "delete", "move"] }), "What to do (default: list)."),
+                opt("entities", json!({ "type": "array", "items": { "type": "string" } }), "add_dimension: the measured entities (faces, edges, vertices; one cylindrical face for a radius)."),
+                opt("measure", json!({ "type": "string", "enum": ["distance", "angle", "radius", "minimum", "maximum"] }), "add_dimension: what it measures (default distance; radius with one entity)."),
+                opt("plane", json!({ "type": "string", "enum": ["top", "front", "right"] }), "add_dimension: the plane it lies in (default: the first of front, top, right containing the measurement)."),
+                opt("position", json!({ "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }), "add_dimension: its text position [x, y, z] mm (default 10 mm off the measurement)."),
+                opt("tolerance", json!({ "type": "object" }), "add_dimension: {type: Default | Symmetrical | Deviation | Limits | Min | Max | Basic, upper, lower, precision}."),
                 opt("face", s(), "add_datum: a planar face id."),
                 opt("letter", s(), "add_datum: the datum letter."),
                 opt("annotation", json!({ "type": "integer" }), "delete / move: the annotation id."),
@@ -298,8 +303,63 @@ fn annotation(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 Ok(())
             })?;
         }
-        Some(_) => return Err(OpError::param("action", "add_datum, delete or move")),
+        Some("add_dimension") => {
+            let ents = a.opt_array("entities")?.ok_or_else(|| OpError::param("entities", "one or two entity ids"))?;
+            let rs: Vec<Reference> = ents.iter().map(refs::parse).collect::<Result<_, _>>().map_err(|e| e.with_param("entities"))?;
+            let measure = match a.opt_str("measure")? {
+                None if rs.len() == 1 => ann::Measure::Radius,
+                None | Some("distance") => ann::Measure::Distance,
+                Some("angle") => ann::Measure::Angle,
+                Some("radius") => ann::Measure::Radius,
+                Some("minimum") => ann::Measure::Minimum,
+                Some("maximum") => ann::Measure::Maximum,
+                Some(_) => return Err(OpError::param("measure", "distance, angle, radius, minimum or maximum")),
+            };
+            let want = if measure == ann::Measure::Radius { 1 } else { 2 };
+            if rs.len() != want {
+                return Err(OpError::param("entities", if want == 1 { "one cylindrical (fillet) face" } else { "two entities" }));
+            }
+            let r = od.regenerate(tab, None)?;
+            let mut x = Annotation { id: 0, kind: AnnotationKind::Dimension { measure, refs: rs.clone(), tolerance: Default::default() }, face: rs[0].clone(), at: [0.0; 3], normal: [0.0, 0.0, 1.0], up: [0.0, 1.0, 0.0], offset: None };
+            let plane = a.opt_str("plane")?;
+            let position = match a.opt_array("position")? {
+                Some(p) => {
+                    let v: Vec<f64> = p.iter().filter_map(serde_json::Value::as_f64).collect();
+                    let [px, py, pz] = v[..] else { return Err(OpError::param("position", "[x, y, z] in mm")) };
+                    Some(glam::DVec3::new(px, py, pz) * 0.001)
+                }
+                None => None,
+            };
+            noshape_model::drawing::mbd::place_dimension(&r.context, &mut x, plane, position).map_err(|e| OpError::param("entities", &e))?;
+            if let Some(t) = a.get("tolerance") {
+                let t = t.as_object().ok_or_else(|| OpError::param("tolerance", "an object: type, upper, lower, precision"))?;
+                if let AnnotationKind::Dimension { tolerance, .. } = &mut x.kind {
+                    if let Some(k) = t.get("type").and_then(|v| v.as_str()) {
+                        tolerance.kind = ["Default", "Symmetrical", "Deviation", "Limits", "Min", "Max", "Basic"].into_iter().find(|n| n.eq_ignore_ascii_case(k)).ok_or_else(|| OpError::param("tolerance.type", "Default, Symmetrical, Deviation, Limits, Min, Max or Basic"))?.to_string();
+                    }
+                    for (key, f) in [("upper", &mut tolerance.upper), ("lower", &mut tolerance.lower)] {
+                        if let Some(v) = t.get(key) {
+                            *f = match v {
+                                serde_json::Value::Number(n) => n.to_string(),
+                                serde_json::Value::String(s) => s.clone(),
+                                _ => return Err(OpError::param(&format!("tolerance.{key}"), "a number or text")),
+                            };
+                        }
+                    }
+                    if let Some(p) = t.get("precision") {
+                        tolerance.precision = p.as_u64().filter(|p| *p <= 6).map(|p| p as u8);
+                    }
+                }
+            }
+            edit_studio(od, tab, "Dimension", |ps| {
+                x.id = ps.annotations.iter().map(|y| y.id).max().unwrap_or(0) + 1;
+                ps.annotations.push(x);
+                Ok(())
+            })?;
+        }
+        Some(_) => return Err(OpError::param("action", "add_datum, add_dimension, delete or move")),
     }
+    let r = od.regenerate(tab, None)?;
     let ps = crate::doc::studio(od.doc(), tab)?;
     let list: Vec<serde_json::Value> = ps
         .annotations
@@ -307,6 +367,10 @@ fn annotation(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         .map(|x| {
             let kind = match &x.kind {
                 AnnotationKind::Datum { letter } => json!({ "datum": letter }),
+                AnnotationKind::Dimension { measure, refs: rs, tolerance } => {
+                    let value = noshape_model::drawing::mbd::measure(&r.context, x).map(|(_, v)| if *measure == ann::Measure::Angle { v.to_degrees() } else { v * 1000.0 });
+                    json!({ "dimension": { "measure": format!("{measure:?}").to_lowercase(), "value": value, "entities": rs.iter().map(refs::to_id).collect::<Vec<_>>(), "tolerance": tolerance.kind, "upper": tolerance.upper, "lower": tolerance.lower, "precision": tolerance.precision } })
+                }
             };
             let mut v = json!({ "id": x.id, "kind": kind, "face": refs::to_id(&x.face) });
             if let Some(o) = x.offset {

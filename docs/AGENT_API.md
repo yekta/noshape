@@ -5496,9 +5496,9 @@ Examples:
 
 #### part_annotation
 
-Part Studio annotations: add a datum, list, delete (edits the document (one undoable history entry)).
+Part Studio annotations: add a datum or an MBD dimension, list, delete (edits the document (one undoable history entry)).
 
-Inspection panel › Datum and the annotations' right-click › Delete annotation (Model definitions; annotations aren't features). `add_datum` puts datum `letter` (default the next free letter) on planar face `face`, lying in the face's plane at its center ("Datum"); `delete` removes annotation `annotation` ("Delete annotation"); `move` is dragging its letter box: `offset` [right, up] from the triangle in screen pixels along the symbol's plane axes, drawn with a dashed leader ([0, 0] puts it back; "Move annotation"). Without `action`, lists them (with each moved box's `offset`).
+Inspection panel › Datum / Dimension and the annotations' right-click › Delete annotation (Model definitions; annotations aren't features). `add_datum` puts datum `letter` (default the next free letter) on planar face `face`, lying in the face's plane at its center ("Datum"); `add_dimension` measures `entities` (distance between two of them, angle between two planar faces, radius of a cylindrical face, minimum / maximum distance), lying in `plane`, its text at `position`, with an optional `tolerance` ("Dimension"; drawings of the part show it in the views facing its plane); `delete` removes annotation `annotation` ("Delete annotation"); `move` is dragging its letter box: `offset` [right, up] from the triangle in screen pixels along the symbol's plane axes, drawn with a dashed leader ([0, 0] puts it back; "Move annotation"). Without `action`, lists them (with each moved box's `offset`).
 
 Examples:
 
@@ -5512,7 +5512,12 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
-| `action` | one of `add_datum`, `delete`, `move` |  | What to do (default: list). |
+| `action` | one of `add_datum`, `add_dimension`, `delete`, `move` |  | What to do (default: list). |
+| `entities` | array of string |  | add_dimension: the measured entities (faces, edges, vertices; one cylindrical face for a radius). |
+| `measure` | one of `distance`, `angle`, `radius`, `minimum`, `maximum` |  | add_dimension: what it measures (default distance; radius with one entity). |
+| `plane` | one of `top`, `front`, `right` |  | add_dimension: the plane it lies in (default: the first of front, top, right containing the measurement). |
+| `position` | array of number |  | add_dimension: its text position [x, y, z] mm (default 10 mm off the measurement). |
+| `tolerance` | object |  | add_dimension: {type: Default \| Symmetrical \| Deviation \| Limits \| Min \| Max \| Basic, upper, lower, precision}. |
 | `face` | string |  | add_datum: a planar face id. |
 | `letter` | string |  | add_datum: the datum letter. |
 | `annotation` | integer |  | delete / move: the annotation id. |

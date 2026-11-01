@@ -148,6 +148,10 @@ impl PartStudioView {
 
     /// The symbol in world space.
     fn datum_geometry(&self, a: &Annotation, cx: &App) -> Option<DatumShape> {
+        // Datums only (MBD dimensions are drawn by drawings for now).
+        if !matches!(a.kind, AnnotationKind::Datum { .. }) {
+            return None;
+        }
         let at = v3(a.at);
         let (flat, _, _) = self.pixel_frame(at, cx)?;
         let n = v3(a.normal).normalize_or_zero();
@@ -279,7 +283,7 @@ impl PartStudioView {
                     t += 7.0 * s;
                 }
             }
-            let AnnotationKind::Datum { letter } = &a.kind;
+            let AnnotationKind::Datum { letter } = &a.kind else { continue };
             let (cap, baseline) = ann::DATUM_LETTER;
             let asc = cap * s;
             let width = 0.62 * asc * letter.chars().count() as f64;

@@ -5330,3 +5330,40 @@ fn agents_and_command_line_tool_ops() {
         assert_eq!(r["on_path"], false);
     }
 }
+
+/// MBD dimensions (drawing.md CR18): a Model definitions dimension between
+/// two holes' cylinders measures their axes' distance, and a drawing of the
+/// part shows it, with its tolerance, in the view facing its plane.
+#[test]
+fn mbd_dimension_shows_in_the_drawing() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "mbd-dim.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[-30, -20], [30, 20]] }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[-15, 0], [-11, 0]] }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[15, 0], [19, 0]] }));
+    let regions = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"].clone();
+    let outer = regions.as_array().unwrap().iter().max_by(|a, b| num(&a["area"]).total_cmp(&num(&b["area"]))).unwrap()["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [outer], "depth": "20 mm" } }));
+    let cyl = call(&mut ctx, "query_entities", json!({ "kind": "faces", "surface": "cylinder" }))["faces"].clone();
+    let ids: Vec<Value> = cyl.as_array().unwrap().iter().map(|f| f["id"].clone()).collect();
+    assert_eq!(ids.len(), 2, "{cyl}");
+    let r = call(&mut ctx, "part_annotation", json!({ "action": "add_dimension", "entities": ids, "plane": "top", "position": [0, 10, 20], "tolerance": { "type": "Symmetrical", "upper": 0.1 } }));
+    let d = &r["annotations"][0]["kind"]["dimension"];
+    assert!((num(&d["value"]) - 30.0).abs() < 1e-6, "{r}");
+    // Its plane (top) faces the Top view only.
+    let dr = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let name = dr["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": name }));
+    let dims: Vec<&Value> = g["annotations"].as_array().unwrap().iter().filter(|a| a["kind"] == "LinearDimension").collect();
+    assert_eq!(dims.len(), 1, "{}", g["annotations"]);
+    assert!(dims[0]["text"].as_str().unwrap().starts_with("30±0"), "{}", dims[0]);
+    let top = g["views"].as_array().unwrap().iter().find(|v| v["orientation"] == "top").expect("a Top view");
+    assert_eq!(dims[0]["view"], top["id"], "{g}");
+    // A second drawing without views: a Top view inserted later gets it.
+    let dr = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let name = dr["drawing"].as_str().unwrap().to_string();
+    call(&mut ctx, "drawing_insert_view", json!({ "drawing": name, "source": "Part Studio 1", "orientation": "top", "position": [200, 150] }));
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": name }));
+    assert_eq!(g["annotations"].as_array().unwrap().iter().filter(|a| a["kind"] == "LinearDimension").count(), 1, "{}", g["annotations"]);
+}
+

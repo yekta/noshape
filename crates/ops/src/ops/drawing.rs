@@ -241,6 +241,15 @@ pub(super) fn part_arg(od: &mut OpenDoc, source: TabId, a: &Args) -> Result<Opti
 /// Commit an edited drawing as the editor does ("<tab> :: <description>").
 pub(super) fn commit(od: &mut OpenDoc, tab: TabId, sheet: usize, mut d: Drawing, description: &str) -> Result<(), OpError> {
     dr::finish_edit(&mut d, sheet);
+    // A view added: the model annotations no view shows yet go in it (CR18).
+    let views = |d: &Drawing| d.sheets.iter().map(|s| s.views.len()).sum::<usize>();
+    let before = match od.doc().tab(tab).map(|t| &t.content) {
+        Some(TabContent::Drawing(x)) => views(x),
+        _ => 0,
+    };
+    if views(&d) > before {
+        noshape_model::drawing::mbd::place_model_datums(&mut d, od.doc());
+    }
     dr::stamp_sources(&od.session, &mut d);
     od.session.edit_tab(tab, description, |c| {
         if let TabContent::Drawing(x) = c {
